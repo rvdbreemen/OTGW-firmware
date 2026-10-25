@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.501
+**  Version  : v2.0.0-alpha.502
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -996,7 +996,7 @@ void updateSetting(const char *field, const char *newValue)
   }
   else if (strcasecmp_P(field, PSTR("SATsystem")) == 0)          settings.sat.iHeatingSystem = constrain(atoi(newValue), 0, 2);  // 0=auto,1=radiators,2=underfloor
   else if (strcasecmp_P(field, PSTR("SATsource")) == 0)          settings.sat.iHeatingSource = constrain(atoi(newValue), 0, 3);  // 0=auto,1=gas_boiler,2=heat_pump,3=hybrid (TASK-891.8)
-  else if (strcasecmp_P(field, PSTR("SAThpcycle")) == 0)         settings.sat.iHpCycleSeconds = constrain(atoi(newValue), 1800, 2400);  // heat-pump cycle: 1800=2/hr, 2400=1.5/hr
+  else if (strcasecmp_P(field, PSTR("SAThpcycle")) == 0)         settings.sat.iHpCycleSeconds = (atoi(newValue) >= 2100) ? 2400 : 1800;  // heat-pump PWM cycle length, two options only: 1800=2/hr, 2400=1.5/hr (entries 40/50); other values snap to the nearer one
   else if (strcasecmp_P(field, PSTR("SATtargettemp")) == 0)      settings.sat.fTargetTemp = clampSettingFloat(newValue, settings.sat.fTargetTemp, 5.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("SATcoefficient")) == 0)     settings.sat.fHeatingCurveCoeff = clampSettingFloat(newValue, settings.sat.fHeatingCurveCoeff, 0.1f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATdeadband")) == 0)        settings.sat.fDeadband = clampSettingFloat(newValue, settings.sat.fDeadband, 0.05f, 2.0f);

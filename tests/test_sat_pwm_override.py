@@ -79,6 +79,7 @@ static float satGetMaxSetpoint() { return 62.0f; }
 static float satEffectiveMaxSetpoint() { return 62.0f; }
 static uint32_t satGetMinOnTimeSec() { return 180; }
 static uint8_t satGetMaxCyclesPerHour() { return 4; }
+static uint32_t satGetPwmPeriodSec() { return 3600 / satGetMaxCyclesPerHour(); }   // TASK-1366: the PWM period getter (unused on HEAD)
 static uint32_t satCycleGetFlameOnStartMs() { return g_flameOnStart; }
 static uint32_t satCycleGetFlameOffStartMs() { return g_flameOffStart; }
 static bool satCycleIsHourLimitReached() { return g_hourLimit; }

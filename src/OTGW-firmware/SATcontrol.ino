@@ -344,8 +344,8 @@ static float satGetColdSetpoint()
 // Returns max PWM cycles per hour for the current heating system
 static uint8_t satGetMaxCyclesPerHour()
 {
-  // Heat-pump source caps at 2 cycles/hr; the effective rate is governed by the heat-pump
-  // min-on setting (iHpCycleSeconds, see satGetMinOnTimeSec).
+  // Heat-pump source: 2 starts per rolling hour (the hourly start cap). Its PWM period comes
+  // from iHpCycleSeconds instead (satGetPwmPeriodSec).
   if (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP) return 2;
   // Otherwise use the user-configured value if set (Task #82); else system defaults.
   if (settings.sat.iCyclesPerHour >= 2 && settings.sat.iCyclesPerHour <= 6) {
@@ -354,13 +354,22 @@ static uint8_t satGetMaxCyclesPerHour()
   return (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? 3 : 4;
 }
 
-// Returns minimum ON time in seconds for the current heating system
+// Returns the PWM minimum ON time in seconds: 180 s for every heating source
+// (thermo-nova pwm.py:53; heat pumps too, Sergeant D entries 40 and 50).
 static uint32_t satGetMinOnTimeSec()
 {
-  // Heat-pump source: user-selectable cycle rate (iHpCycleSeconds; 1800s=2/hr default,
-  // 2400s=1.5/hr). Gas boiler / hybrid: 3-minute minimum on-time.
-  if (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP) return settings.sat.iHpCycleSeconds;
   return 180;
+}
+
+// Returns the PWM cycle length (period) in seconds, thermo-nova's _on_time_upper_threshold
+// (pwm.py:54). Heat-pump source: iHpCycleSeconds, 1800 s (2 per hour, default) or 2400 s
+// (1.5 per hour), Sergeant D entries 40 and 50. Otherwise 3600 / cycles per hour.
+static uint32_t satGetPwmPeriodSec()
+{
+  if (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP) {
+    return (settings.sat.iHpCycleSeconds == 2400) ? 2400UL : 1800UL;
+  }
+  return 3600UL / satGetMaxCyclesPerHour();
 }
 
 // Returns whether MM=100 should always be used (heat pumps)
@@ -863,10 +872,9 @@ static void satPwmSchedule(float pidOutput)
   state.sat.fPwmDutyCycle = duty;
 
   // --- Time thresholds from heating system ---
-  uint32_t minOnMs   = satGetMinOnTimeSec() * 1000UL;  // 180s gas, 1800s heat pump
-  uint8_t  cyclesHr  = satGetMaxCyclesPerHour();
-  uint32_t upperMs   = (3600000UL / cyclesHr);          // e.g. 900s at 4 cycles/hr
-  uint32_t maxMs     = upperMs * 2;                      // Max cycle time
+  uint32_t minOnMs   = satGetMinOnTimeSec() * 1000UL;  // 180 s for every source (pwm.py:53)
+  uint32_t upperMs   = satGetPwmPeriodSec() * 1000UL;  // period (pwm.py:54): e.g. 900 s at 4 cycles/hr, 1800/2400 s heat pump
+  uint32_t maxMs     = upperMs * 2;                      // Max cycle time (pwm.py:55)
 
   // --- Effective temperature: EMA 0.3/0.7 for HEATER_STARTUP_TIMEFRAME (180 s) after flame-on
   // (pwm.py:148-149; Sergeant D confirmed 180 s on 2026-10-22). After the window the value is held.

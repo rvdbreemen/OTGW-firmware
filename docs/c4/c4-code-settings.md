@@ -407,7 +407,7 @@ struct PICBootSection {
 
 #### SATSection (sat): Smart Auto Thermostat (~100 fields, `SATtypes.h`)
 Controls autonomous heating/cooling via OpenTherm. Includes:
-- **Core**: enabled, heating system (`iHeatingSystem`: auto/radiators/underfloor), heating source (`iHeatingSource`: auto/gas boiler/heat pump/hybrid, with `iHpCycleSeconds`), target temp, heating curve coefficient, deadband, control interval
+- **Core**: enabled, heating system (`iHeatingSystem`: auto/radiators/underfloor), heating source (`iHeatingSource`: auto/gas boiler/heat pump/hybrid, with `iHpCycleSeconds`, the heat-pump PWM cycle length 1800 or 2400 s), target temp, heating curve coefficient, deadband, control interval
 - **Presets**: comfort (21°C), eco (18°C), away (15°C), sleep (16°C), activity (10°C), home (18°C)
 - **Modulation**: PWM auto-switch, max relative modulation, overshoot protection, modulation suppression
 - **PID**: manual/auto gains (Kp, Ki, Kd), auto-tune rate

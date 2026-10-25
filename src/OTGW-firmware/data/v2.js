@@ -2013,7 +2013,7 @@
     satheatingmode:  { cat: 'sat', label: 'Heating mode' },
     satmanufacturer: { cat: 'sat', label: 'Manufacturer' },
     satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' },
-    sathpcycle:      { cat: 'sat', label: 'Heat-pump min cycle', hint: 'Seconds (1800 = 2/hr, 2400 = 1.5/hr)' },
+    sathpcycle:      { cat: 'sat', label: 'Heat-pump PWM cycle', hint: 'Cycle length; the minimum on time is 180 s' },
     otdmode:         { cat: 'otd', label: 'OT-Direct mode' },
     // OT-Direct heating-curve / PI room-comp + ventilation (TASK-933 Phase 2)
     otdchmode:           { cat: 'otd', label: 'CH mode' },
@@ -3029,6 +3029,7 @@
   var ENUM_OPTS = {
     satsource: [[0, 'Auto'], [1, 'Gas Boiler'], [2, 'Heat Pump'], [3, 'Hybrid']],
     satsystem: [[0, 'Auto'], [1, 'Radiators'], [2, 'Underfloor']],
+    sathpcycle: [[1800, '1800 s (2 per hour, default)'], [2400, '2400 s (1.5 per hour)']],
     // boardmode is the real 3-value hardware override (ADR-127); the mockup's
     // 4-option ESP8266/OTGW32/LOLIN list was semantically wrong.
     boardmode: [[0, 'Auto-detect'], [1, 'PIC (Classic)'], [2, 'OT-Direct (OTGW32)']],

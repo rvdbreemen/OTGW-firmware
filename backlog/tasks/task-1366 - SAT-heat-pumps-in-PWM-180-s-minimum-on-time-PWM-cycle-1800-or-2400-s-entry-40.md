@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:42:00Z'
-updated_date: '2026-10-25T07:08:00Z'
+updated_date: '2026-10-25T09:53:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,7 +24,7 @@ Sergeant D 2026-10-24 (Q8, entry 40): heat pump minimum ON time 180 s; PWM cycle
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Heat pump PWM uses min ON 180 s and a 1800/2400 s cycle; duty mapper no longer collapses (host test red/green)
+- [x] #1 Heat pump PWM uses min ON 180 s and a 1800/2400 s cycle; duty mapper no longer collapses (host test red/green)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -267,4 +267,6 @@ Flow 50, base 27.2, duty = (pid − 27.2)/22.8:
 2026-10-25: plan (second-read) stored; waiting for Sergeant D's OK on the open question (open-questions Q29/Q30/Q31) before implementation, per CLAUDE.md SAT rules.
 
 2026-10-25 06:36 UTC Sergeant D answered Q31 (entry 50): option A - min ON 180 s, cycle 1800 s default / 2400 s. Plan confirmed; ready to implement.
+
+2026-10-25 implemented (wf_e683b675: implement, two refuting reviews non-blocking, fix). Heat pump: min ON 180 s (pwm.py:53), PWM period iHpCycleSeconds 1800/2400 s (entries 40/50/52) via satGetPwmPeriodSec(); gas and hybrid unchanged. Deviation from plan: setter snaps to the nearer option (atoi >= 2100 ? 2400 : 1800) instead of '== 2400 ? 2400 : 1800', so an old/out-of-range value lands on the closer option; also applied at settings load (settingStuff.ino:556). R3 correction: R3 is NOT unchanged by this task: on HEAD heat-pump duty >= 0.5 (1800 s) / >= 0.333 (2400 s) went to range 5 before the state machine; after the fix duty 0.05-0.95 goes through it, where an ON phase whose unit has not lit within one tick ends on the next tick (r3 host scenario old-vs-fix). Heat pumps reach PWM only through manual control_mode pwm. Queued for Sergeant D: Q35 (PWM ON timing), Q36 (heat-pump hourly cap), Q37 (hybrid timing), Q38 (180 s start gate). Evidence this session: tests/test_sat_hp_pwm.py fix 'OK (expected failures=1)', HEAD 'FAILED (failures=14)'; all tests/test_sat_*.py + test_otd_ch_override OK; evaluate --quick exit 0; node --check v2.js ok. Not bench-verified: no heat pump on the bench.
 <!-- SECTION:NOTES:END -->

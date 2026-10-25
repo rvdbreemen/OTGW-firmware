@@ -136,7 +136,7 @@ back to the area audit.
 | 6 | high | pwm | The PWM ON phase is timed from the last real flame-on, not from the start of the ON phase. | While the boiler waits to ignite, CH and CS toggle every 30 s. After a switch to PWM during a long burn, the first ON phase ends within one tick. Breaks entry 17 (CH=1 during ON). | plan OK | PWM-01; SATcontrol.ino:935-944; pwm.py:154-205 |
 | 7 | high | defaults | The setup wizard writes heating curve coefficient 1.4 (radiators), 0.6 (underfloor) or 0.8 (heat pump), also over a stored value on "migrate". | Underfloor at 0.6: 23.0 °C flow at 0 °C outside against 30.0 °C at 2.0, and about 4x weaker P. Slow recovery, room below target. | no | DEF-1; data/v2.js:5368, 5426-5434; const.py:182; entry 24 |
 | 8 | high | cycles | **[TASK-1331, uncommitted]** The classifier compares the tail flow with the setpoint frozen at flame-on (0.0 at boot or enable), so cycles are wrongly classified OVERSHOOT and switch to PWM. | After every reboot, OTA, enable or fallback during a burn, and after a rising request, a wrong switch to PWM follows: extra burner starts and reduced heat until an underheat exit. This is the review blocker. | plan OK | STARTUP-1, CYC-01, CYC-02; SATcycles.ino:744, 701, 874-877; cycles/tracker.py:267-271 |
-| 9 | high | pwm | Heat pump: min-on 1800/2400 s with 2 cycles per hour collapses the duty mapper. With TASK-1331, a heat pump can also enter PWM but cannot use the runtime exits. | At 1800 s, PWM becomes 30 min on / 30 min off or continuous. At 2400 s, lower demand gives more run time. **[TASK-1331, uncommitted]** A heat pump in PWM can stay there with no runtime exit. | yes | PWM-02, CYC-03, DEF-6; SATcontrol.ino:346-365, 889-913, 5124; pwm.py:53; entries 30, C3, C4 |
+| 9 | high | pwm | Heat pump: min-on 1800/2400 s with 2 cycles per hour collapses the duty mapper (**mapper fixed by TASK-1366**, entries 40/50). With TASK-1331, a heat pump can also enter PWM but cannot use the runtime exits. | At 1800 s, PWM becomes 30 min on / 30 min off or continuous. At 2400 s, lower demand gives more run time. **[TASK-1331, uncommitted]** A heat pump in PWM can stay there with no runtime exit. | answered for the mapper (entries 40, 50); still yes for the runtime exits (C3), hybrids and the hourly cap | PWM-02, CYC-03, DEF-6; SATcontrol.ino:345-374, 875-944, 5298 (TASK-1366 working tree); pwm.py:53-61; entries 30, 40, 50, C3, C4 |
 | 10 | medium | dhw | During hot water, the firmware sends no MM, so MM=0 from PWM stays on the boiler. thermo-nova sends the maximum. | Every tap draw during PWM. If the boiler applies MsgID 14 to DHW (unknown), showers get minimum burner power. | no | DHW-1, MODS-03; SATcontrol.ino:4801-4818; heating_control.py:136-137, 517-520; entry 21 |
 | 11 | medium | dhw | The 300 s guard after hot water never arms, and DHW does not reset the sustain timers. | After a shower, the flow can trigger a switch to PWM within 30-60 s, where thermo-nova waits 300 s. This happens on most draws. | no | PWM-07, DHW-2, S6; SATcycles.ino:1008-1017; SATcontrol.ino:4801-4818, 5124 |
 | 12 | medium | pwm | The sustain timers count the first tick as 30 s. The 60 s switch fires after about 30 s, and a tick above 60 s disables all three switches. | Entry into PWM after 30 s of overshoot. Underheat exit at about 150 s, saturation at about 270 s. | C1 only | PWM-08, S7; SATcycles.ino:993-1028; helpers.py:51-56; conflict C1 |
@@ -432,6 +432,15 @@ Each paragraph gives:
     check, or the cold cutoff.
 - **Action:** ask Sergeant D whether 1800 / 2400 s are periods or minimum on-times, and which heat-
   pump rules besides MM he wants. Until he answers, gate the end-of-cycle switch for heat pumps.
+- **[TASK-1366] Duty mapper fixed:** he answered (entries 40 and 50): minimum ON 180 s, and 1800 /
+  2400 s is the PWM period. `satGetMinOnTimeSec()` returns 180 for every source and the new
+  `satGetPwmPeriodSec()` gives the period (`SATcontrol.ino:357-374`, `:875-877`); host test
+  `tests/test_sat_hp_pwm.py`. Still open: the runtime exits skipped for heat pumps (C3), hybrids
+  (entries 50/52) and the hourly cap (Q12). Side effect: heat-pump duty 0.05-0.95 (1800 s) now runs
+  through the ON/OFF state machine, where the pre-existing ON-end timing from the previous flame-on
+  edge (`SATcontrol.ino:949-958`) ends an ON phase one tick after its start when the unit has not lit
+  yet (thermo-nova waits up to 180 s, `pwm.py:181-199`). Reachable for a heat pump only through the
+  manual `control_mode` "pwm" command; open, to be asked.
 
 ### Medium
 

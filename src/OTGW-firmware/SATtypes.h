@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.501
+**  Version  : v2.0.0-alpha.502
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -462,7 +462,7 @@ struct SATSection {
   bool     bEnabled           = false;
   uint8_t  iHeatingSystem     = SAT_HSYS_AUTO; // SATHeatingSystem: auto/radiators/underfloor (heat_pump=legacy, migrated to iHeatingSource)
   uint8_t  iHeatingSource     = SAT_SRC_AUTO;  // SATHeatingSource: auto/gas_boiler/heat_pump/hybrid (TASK-891.8)
-  uint16_t iHpCycleSeconds    = 1800;          // Heat-pump min-on / cycle rate: 1800s=2/hr (default) or 2400s=1.5/hr (TASK-891.8)
+  uint16_t iHpCycleSeconds    = 1800;          // Heat-pump PWM cycle length (period): 1800s=2/hr (default) or 2400s=1.5/hr (entries 40/50, TASK-1366)
   float    fTargetTemp        = 20.0f;  // Default room target °C
   float    fHeatingCurveCoeff = 2.0f;   // Heating curve coefficient; 2.0 as thermo-nova const.py:182 (Sergeant D entry 24, TASK-1347). A stored value is kept
   float    fDeadband          = 0.1f;   // PID deadband °C (matches Python DEADBAND=0.1)
