@@ -1,9 +1,11 @@
 ---
 id: TASK-1378
 title: 'Epic (1.x): Home Assistant UI integration via standard contracts and ingress'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T09:10:00Z'
+updated_date: '2026-10-25T09:29:00Z'
 labels:
   - epic
   - home-assistant
