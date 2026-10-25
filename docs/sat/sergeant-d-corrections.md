@@ -2923,3 +2923,29 @@ field data in Q12).
 **Task:** after his confirmation of Q12 (a task for "count only PWM ON phases").
 
 **Open:** his confirmation that Q12 = A.
+
+## 59. Hourly start limit counts only PWM's own ON phases (2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 19:52 UTC, answer to Q12 (confirmation asked 19:50 UTC, message
+1564003236094935102: "Q12 = A (count only PWM's own ON phases against cycles per hour)?"):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564003846978670623
+
+**Quoted:**
+
+> Q12: yes count only PWM’s own ON phases against cycles per hour
+
+**Settled by this statement:**
+
+- The hourly start limit in PWM counts only PWM's own ON-phase starts, against the cycles-per-hour
+  setting. Hot-water and relight flame starts do not count. Confirms the intent of entry 58.
+
+**Compared with thermo-nova and the firmware:** thermo-nova counts ON-phase starts only
+(`pwm.py:159-160`) in a rolling hour (`:138-141`), but its check compares with `duty_cycle_seconds`
+(`:156`) and so never blocks; entry 59 asks for the cycles-per-hour limit. Firmware counts every
+flame-on edge (SATcycles.ino:279-299), hot water included (gruijter's field data in Q12).
+
+**Changes an earlier entry:** settles entry 58 (Open: confirmation).
+
+**Task:** TASK-1401.
+
+**Open:** none.
