@@ -38,7 +38,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q13 | answered (entry 44: every update) -> TASK-1370 | CS/MM/CH refresh: every 5 s as thermo-nova, or on change + 300 s? (audit #24) | ADR-199 |
 | Q14 | answered (entry 45: flow-based start, CS/PM=25 flood, MI=500) -> TASK-1371 | PWM ignition hold without a return temperature sensor (audit #27) | - |
 | Q15 | answered (entry 48: a MaxTSet slider bounded by MsgID 57, sent to the boiler) -> TASK-1373 | Maximum flow setpoint: a user setting, and which defaults? (audit #29) | - |
-| Q16 | queued | Cycles per hour default and range (audit #30) | - |
+| Q16 | asked 2026-10-25 07:08 UTC, default only (choices 3/4 settled by entry 30) ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563811397534613505)) | Cycles per hour default and range (audit #30) | - |
 | Q17 | queued | DHW setpoint: SW= on change, slider bounded by MsgID 48 (audit #31, entry 33) | - |
 | Q18 | queued | Zones: follow area.py (max, no headroom, cap overshoot)? (audit #32, entry 35) | - |
 | Q19 | queued | Units whose coefficient was set by the old wizard (1.4 / 0.6 / 0.8, not chosen by the user): leave them (entry 24) or reset them once to 2.0? (TASK-1347) | - |
@@ -53,7 +53,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q28 | queued | Integral with Ki near 0 skips the clamp (SATpid.ino:166) and no rounding of gains/terms/output (pid.py:71-132): match thermo-nova? (ADR-197, audit #38) | ADR-197 |
 | Q29 | answered (entry 46: reset P, I and D to 0) -> TASK-1364 | TASK-1364 (entry 38): while the room temperature is missing, reset I and D to 0 (thermo-nova on a stale sensor) or freeze them? | TASK-1364 |
 | Q30 | answered (entry 47: option B) -> TASK-1365 | TASK-1365 (entry 39): final message on lost OpenTherm: A) CH=0, CS=0 (literal), B) CS=0, CH=1, MM=T (same hand-back as switching SAT off), C) CH=0, CS=0, MM=T? | TASK-1365 |
-| Q31 | asked 2026-10-25 05:31 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563787079249297559)) | TASK-1366 (entry 40): heat pump PWM: min ON 180 s with cycle length 1800/2400 s (his answer) or 2/3 cycles per hour as thermo-nova config_flow.py:686-693? | TASK-1366 |
+| Q31 | answered (entry 50: option A) -> TASK-1366 | TASK-1366 (entry 40): heat pump PWM: min ON 180 s with cycle length 1800/2400 s (his answer) or 2/3 cycles per hour as thermo-nova config_flow.py:686-693? | TASK-1366 |
 
 Questions Q5 onwards come from the SAT port audit of 2026-10-24
 ([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)); the numbers in brackets are its

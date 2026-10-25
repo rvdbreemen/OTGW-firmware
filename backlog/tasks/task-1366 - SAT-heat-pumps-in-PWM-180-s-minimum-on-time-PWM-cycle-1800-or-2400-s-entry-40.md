@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:42:00Z'
-updated_date: '2026-10-24T22:01:00Z'
+updated_date: '2026-10-25T07:08:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -265,4 +265,6 @@ Flow 50, base 27.2, duty = (pid − 27.2)/22.8:
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-25: plan (second-read) stored; waiting for Sergeant D's OK on the open question (open-questions Q29/Q30/Q31) before implementation, per CLAUDE.md SAT rules.
+
+2026-10-25 06:36 UTC Sergeant D answered Q31 (entry 50): option A - min ON 180 s, cycle 1800 s default / 2400 s. Plan confirmed; ready to implement.
 <!-- SECTION:NOTES:END -->

@@ -2655,3 +2655,31 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156379900715
 
 **Open:** whether the room temperature is still shown and recorded while the switch is on (we will
 keep showing it), and whether the switch should end by itself (for example at the next morning).
+
+## 50. Heat pumps in PWM: minimum ON 180 s, cycle length 1800 s (default) or 2400 s (2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 06:36 UTC, answer to Q31 (05:31 UTC, message
+1563787079249297559: A) minimum ON 180 s, cycle length 1800 s (2 per hour, default) or 2400 s (1.5
+per hour); B) 2 or 3 cycles per hour as thermo-nova; C) something else; our advice A):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563803408262234155
+
+**Quoted:**
+
+> Question 31: Yes the correct option is A
+
+**Settled by this statement:**
+
+- Heat pumps in PWM use the same minimum ON time as gas boilers, 180 s (thermo-nova `pwm.py:53`).
+- The heat pump PWM cycle length is 1800 s (2 per hour, default) or 2400 s (1.5 per hour), a user
+  choice; the duty logic is thermo-nova's (`pwm.py:54`, cycle = 3600 / cycles per hour).
+- It confirms our reading of entry 40 and settles conflict C4 for heat pumps: his 2 / 1.5 per hour,
+  not thermo-nova's 2 / 3 (`config_flow.py:686-693`).
+
+**Compared with the firmware:** today 1800 / 2400 s are used as the heat pump minimum ON time
+(audit #9), which collapses the duty mapping; see the TASK-1366 plan.
+
+**Changes an earlier entry:** confirms entry 40 (no longer an interpretation).
+
+**Task:** TASK-1366.
+
+**Open:** whether hybrids get the heat pump cycle lengths (the TASK-1366 plan lists it).
