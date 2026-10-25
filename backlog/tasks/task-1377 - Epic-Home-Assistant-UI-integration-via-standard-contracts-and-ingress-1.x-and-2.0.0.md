@@ -3,11 +3,11 @@ id: TASK-1377
 title: >-
   Epic: Home Assistant UI integration via standard contracts and ingress (1.x
   and 2.0.0)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T09:01:00Z'
-updated_date: '2026-10-25T17:50:00Z'
+updated_date: '2026-10-25T18:16:00Z'
 labels:
   - epic
   - home-assistant
@@ -46,7 +46,7 @@ Ordering: A is independent. C depends on B per line. D depends on C per line.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All eight child tasks are Done, or explicitly dropped with a reason
+- [x] #1 All eight child tasks are Done, or explicitly dropped with a reason
 - [x] #2 On both lines, a HA instance shows a working 'Visit device' link for the OTGW device, shown by a screenshot
 - [x] #3 On both lines, the OTGW UI opens from the HA sidebar through the chosen ingress component with HA over HTTPS, read and admin actions work, shown by a bench transcript or screenshots
 - [x] #4 MQTT discovery and REST contracts are unchanged apart from the added cu field, shown by a discovery payload diff
@@ -71,3 +71,15 @@ Port plan for dev: see the notes on 1377.1/.3/.5/.7.
 
 2026-10-25: 2.0.0 port done in alpha.506/alpha.507 (6da168984, f3ebc29b4, rig aa040560b, docs ab2a36fe5). 1377.1, .3, .7 Done; 1377.5 waits only on AC#4 (ADR), the same open maintainer question as 1.x task 1378.3 AC#4.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+HA UI integration via standard contracts and ingress, on both lines.
+
+- 1.x (otgw-1.x.x, task 1378): shipped in 1.7.8-beta.6.
+- 2.0.0 (dev): 1377.1 cu / Visit link; 1377.3 spike and rig; 1377.5 base-path agnostic v2 UI, FSexplorer and updater, live log through the proxy, ADR-165 gate path-aware, fonts relative (alpha.506, alpha.507); 1377.7 guide and EN/NL manual sections.
+- CSRF unchanged on both lines (hass_ingress keeps Host); the ADR ACs were dropped by the maintainer.
+- Known risk: firmware OTA through hass_ingress failed once in 3 on 2.0.0 (502, recovered by IP); documented.
+Evidence: docs/research/2026-10-25-ha-ingress-bench-2.0.0 (dev) and docs/research/2026-10-25-ha-ingress-bench-1x (otgw-1.x.x).
+<!-- SECTION:FINAL_SUMMARY:END -->
