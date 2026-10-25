@@ -1,0 +1,10 @@
+# TLS front for Home Assistant, the usual "HA over HTTPS" setup.
+# Caddy keeps the browser's Host header and adds X-Forwarded-*.
+{
+	auto_https off
+}
+
+https://localhost:18443 {
+	tls /certs/rig.crt /certs/rig.key
+	reverse_proxy homeassistant:8123
+}
