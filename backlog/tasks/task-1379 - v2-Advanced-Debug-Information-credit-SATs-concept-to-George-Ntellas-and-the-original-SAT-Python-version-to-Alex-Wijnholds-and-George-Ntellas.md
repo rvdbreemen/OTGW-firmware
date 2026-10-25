@@ -3,11 +3,11 @@ id: TASK-1379
 title: >-
   v2 Advanced > Debug Information: credit SAT's concept to George Ntellas and
   the original SAT Python version to Alex Wijnholds and George Ntellas
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T09:31:00Z'
-updated_date: '2026-10-25T10:06:00Z'
+updated_date: '2026-10-25T10:25:00Z'
 labels:
   - webui
   - sat
@@ -24,9 +24,9 @@ Robert 2026-10-25: add two fields to Advanced tab -> Debug Information: 'SAT con
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Debug Information shows 'SAT concept by' = George Ntellas and 'Original SAT Python version' = Authors Alex Wijnholds - George Ntellas (screenshot)
-- [ ] #2 Fields are static text, present on every board, no new REST field needed unless the page renders only REST data
-- [ ] #3 Third field 'C/C++ version' = Robert + Claude (Robert 2026-10-25)
+- [x] #1 Debug Information shows 'SAT concept by' = George Ntellas and 'Original SAT Python version' = Authors Alex Wijnholds - George Ntellas (screenshot)
+- [x] #2 Fields are static text, present on every board, no new REST field needed unless the page renders only REST data
+- [x] #3 Third field 'C/C++ version' = Robert + Claude (Robert 2026-10-25)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -40,3 +40,9 @@ Static UI only (KISS): in v2.js renderDebugGroups() (~3634) add a group 'Credits
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-25 Robert's follow-ups: drop 'Authors' from the Python field; C/C++ version = Robert van den Breemen + Claude + George Ntellas. Final: SAT concept by = George Ntellas; Original SAT Python version = Alex Wijnholds - George Ntellas; C/C++ version = Robert van den Breemen + Claude + George Ntellas.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Static 'Credits' group in v2 Advanced > Debug Information, right after Firmware: SAT concept by = George Ntellas; Original SAT Python version = Alex Wijnholds - George Ntellas; C/C++ version = Robert van den Breemen + Claude + George Ntellas (Robert's follow-ups applied: 'Authors' dropped, George and full name added). No firmware/REST change. Evidence: alpha.504+51c1290 OTA'd to the bench OTGW32 (app then fs, 177 settings kept); Playwright on http://192.168.88.61 Advanced > Debug Information read the three rows verbatim and a screenshot was taken (.playwright-mcp/task1379-credits.png, not shared: shows the SSID); node --check v2.js ok; build green; zip alpha.504+5e57434 posted.
+<!-- SECTION:FINAL_SUMMARY:END -->
