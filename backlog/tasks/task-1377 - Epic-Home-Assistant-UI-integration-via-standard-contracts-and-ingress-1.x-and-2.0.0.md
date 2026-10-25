@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T09:01:00Z'
-updated_date: '2026-10-25T09:06:00Z'
+updated_date: '2026-10-25T09:09:00Z'
 labels:
   - epic
   - home-assistant
@@ -55,4 +55,6 @@ Ordering: A is independent. C depends on B per line. D depends on C per line.
 
 <!-- SECTION:NOTES:BEGIN -->
 Research 2026-10-25 recorded in docs/research/2026-10-25-home-assistant-ui-integration.md (identical copy on dev and otgw-1.x.x). Key facts: the HA 2026.11 Marketplace is HACS in core (same hacs/default catalog and hacs.json, months of review, nothing audited by HA); options B (card) and D (custom integration) rejected for maintenance and contract duplication; hass_ingress (Apache-2.0) proxies at /api/ingress/{name}/, sends X-Ingress-Path, supports body/header rewrite rules, extra headers (incl. host and authorization) and require_admin. New since the epic was written: rewrite rules may fix absolute UI paths without firmware changes, so the spikes test rewrite-only first and items C shrink to what rewrite cannot fix.
+
+Maintainer decision 2026-10-25 (confirmed): go for the minimal integration and make HA ingress work properly now. No new integration in the HA Marketplace for now (no custom integration, no card). Scope stays items A-D on both lines.
 <!-- SECTION:NOTES:END -->
