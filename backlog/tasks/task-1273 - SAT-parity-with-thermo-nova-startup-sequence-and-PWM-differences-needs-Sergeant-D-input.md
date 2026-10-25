@@ -3,11 +3,11 @@ id: TASK-1273
 title: >-
   SAT parity with thermo-nova: startup sequence and PWM differences (needs
   Sergeant D input)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: 2026-10-20 18:17
-updated_date: '2026-10-23T10:32:00Z'
+updated_date: '2026-10-25T10:40:00Z'
 labels:
   - sat
   - parity
@@ -26,7 +26,7 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Sergeant D answered the open design questions (recorded in notes)
-- [ ] #2 Each agreed difference has its own task or is fixed here with a simulator or host test
+- [x] #2 Each agreed difference has its own task or is fixed here with a simulator or host test
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -65,4 +65,12 @@ From the TASK-1268 round-2 review (opus, by reading, pre-existing): (a) PWM ON-p
 2026-10-22 PWM item 1 (duty-cycle BT) shipped: see the commit 'SAT PWM: take the duty-cycle boiler temperature from the real flow' (alpha.460). Remaining items of this task, each needing Sergeant D's OK before implementation: continuous previous-CS term; PWM ON expiry timed from the ignition sync; on_time >= 180 s start gate; cycle-end OVERSHOOT/UNDERHEAT switch; CH threshold 22; PM=25 after CS; PM/MI on runtime enable; 28.2 cold cutoff and curve coefficient; ignition timeout abort vs thermo-nova continuing the phase (pwm.py:197-199); range 5 without reseed; 30 s tick vs 5 s cadence.
 
 2026-10-23 Sergeant D (#alpha-testing msg 1563135315991072789, 10:21 UTC): 'the CS is following the BT correctly now! Great job' (the duty-cycle BT change, alpha.460). Same message raised CH=0 on PWM OFF: filed separately.
+
+2026-10-25 mapping of every remaining difference (checked at HEAD by triage wf_8965d91a): fixed here: duty-cycle BT (10d9ffb0e, alpha.460). Done elsewhere: coefficient 2.0 (TASK-1347), overshoot-protection gating + flame-off offset (TASK-1268), MM/CH in PWM OFF (TASK-1316), CH rule/prevCS in PWM (TASK-1323), cold cutoff (TASK-1327). Own task: cycle-end OVERSHOOT/UNDERHEAT switch TASK-1331 (Q4); 30 s tick vs 5 s cadence TASK-1368 + TASK-1370; PM=25 after CS TASK-1371; continuous previous-CS term TASK-1381; PWM ON timing from phase start + ignition-timeout abort TASK-1382 (Q35); 180 s start gate TASK-1383 (Q38); PM/MI on runtime enable TASK-1384 (audit #44); range 5 reseed TASK-1385; PWM OFF anchor TASK-1380.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Parity review of the SAT startup sequence and PWM against thermo-nova (gruijter field run 2026-10-20). Fixed here: PWM duty-cycle boiler temperature from the real flow (10d9ffb0e, alpha.460, host test + bench red/green). Every other agreed difference has its own task (mapping note 2026-10-25): TASK-1268, 1316, 1323, 1327, 1347 Done; TASK-1331, 1368, 1370, 1371, 1380-1385 open, those changing boiler control blocked on Sergeant D's OK (Q4, Q35, Q38).
+<!-- SECTION:FINAL_SUMMARY:END -->

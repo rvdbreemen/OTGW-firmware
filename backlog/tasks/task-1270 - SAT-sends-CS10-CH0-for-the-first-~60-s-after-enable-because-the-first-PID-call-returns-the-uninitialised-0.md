@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-20 18:16
-updated_date: '2026-10-22T21:31:00Z'
+updated_date: '2026-10-25T10:41:00Z'
 labels:
   - bug
   - sat
@@ -46,4 +46,6 @@ Verification: host test compiling the real satPidUpdate() path (first call retur
 2026-10-22: TASK-1292 ground-truth spec is on dev: docs/sat/thermo-nova-spec.md (cited, Alexwijn/SAT releases/thermo-nova @ 7beaaf5), docs/sat/firmware-sat-spec.md and docs/sat/sat-comparison.md (443 rows, 434 verified). This task waits for Sergeant D's validation of the thermo-nova spec; the plan must quote the thermo-nova code for its area with file:line citations (CLAUDE.md 'SAT ground truth' block) before it is resumed.
 
 2026-10-22 23:15 cycle: skipped, still waiting for Sergeant D's OK on the plan (SAT control behaviour).
+
+2026-10-25: changes boiler control, so queued for Sergeant D as Q39 in docs/sat/open-questions.md (A curve+P+restored I with D=0 as thermo-nova pid.py:126-131; B curve only; C keep CS=10/CH=0). Blocked on Q39.
 <!-- SECTION:NOTES:END -->

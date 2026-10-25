@@ -3,11 +3,11 @@ id: TASK-1217
 title: >-
   Decide: boot-time console output reaches the PIC RX line, and the UART0 mute
   also silences the USB console
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: 2026-10-11 22:25
-updated_date: '2026-10-22T21:30:00Z'
+updated_date: '2026-10-25T10:37:00Z'
 labels:
   - esp32
   - pic
@@ -30,8 +30,8 @@ Options for the maintainer: (a) mute as the first statement of setup() on PIC-ca
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Maintainer decision recorded (a, b or c)
-- [ ] #2 If a or b: bench evidence on the Classic + S3 Mini that no console text reaches the PIC after the change (e.g. no SE/syntax-error replies from the PIC at boot in the telnet/OT log), and for b that the [combo] detect line appears on the USB console
-- [ ] #3 Comments at OTGW-firmware.ino:379 and :454-455 match the real behaviour
+- [x] #2 If a or b: bench evidence on the Classic + S3 Mini that no console text reaches the PIC after the change (e.g. no SE/syntax-error replies from the PIC at boot in the telnet/OT log), and for b that the [combo] detect line appears on the USB console
+- [x] #3 Comments at OTGW-firmware.ino:379 and :454-455 match the real behaviour
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -64,4 +64,12 @@ ADR-168 (Accepted) stays valid: the decision is unchanged, only the mechanism an
 2026-10-22 cycle: skipped, AC2 needs the Classic + S3 Mini bench board, which is not connected (no COM8, .88.63 silent).
 
 2026-10-22 23:15 cycle: skipped, needs the Classic + S3 Mini bench board (not connected; only OTGW32 COM4 and the 1.x ESP8266 COM3).
+
+2026-10-25 evidence recovered from the 2026-10-18 bench session (Classic + LOLIN S3 Mini, captures in the local untracked folder .tmp/bench-1217/): OLD build probe-old-r1/r2-usb.txt '[probe1217] rx=73 SE=1' and 'rx=84 SE=1' (the PIC answered SE to console text); FIX build probe-fix-r1/r2-usb.txt 'rx=21 SE=0' in both runs, and '[combo] detect: eMode=1 picEnabled=1 boardMode=1 pro=0 ...' on the USB console in both runs. Caveat: probe build = the fix (87cb037c2, fixsave matches apart from the version banner) plus one marker log line, not the shipped alpha.436 binary; boot without a USB host was not captured (not an AC). AC3: comments rewritten in 87cb037c2; HEAD OTGW-firmware.ino:267, :457-459, :468 say UART0 is muted at the top of setup() and the console stays on USB-Serial-JTAG, matching platformMuteUart0Console().
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Decision b: platformMuteUart0Console() mutes only the UART0 console channel at the top of setup(), so boot text no longer reaches the PIC RX and the IDF console keeps logging on USB-Serial-JTAG (87cb037c2, alpha.436). Evidence: AC2 bench old-vs-fix on the Classic + S3 Mini 2026-10-18 (.tmp/bench-1217: old SE=1 in 2 runs, fix SE=0 in 2 runs plus the [combo] detect line on USB; probe build = fix + marker line). AC3: comment rewrite in 87cb037c2, checked at HEAD OTGW-firmware.ino:267/457-459/468.
+<!-- SECTION:FINAL_SUMMARY:END -->
