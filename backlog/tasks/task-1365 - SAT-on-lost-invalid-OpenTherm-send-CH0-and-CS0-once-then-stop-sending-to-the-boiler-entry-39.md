@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:41:00Z'
-updated_date: '2026-10-25T20:02:00Z'
+updated_date: '2026-10-25T20:11:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -198,4 +198,6 @@ Sergeant D entries:
 2026-10-25 bench alpha.501+6948ad5 on OTGW32 (OT-Direct, no boiler, SAT on, simulation off), app then fs over OTA, 177 settings kept. (1) Boot without boiler: ot_link_lost true ~30 s after SAT's first pass (09:55:11), 'OpenTherm lost: boiler handed back', OT-Direct write overrides empty afterwards (CS and MM released), 0 OTD commands for the next 2 min. (2) OT replay start (POST /api/v2/simulate/start): 09:59:01 'OpenTherm back: SAT resumes', CS=23.0/MM=100/CH=1 re-sent. (3) Replay stop ~09:59:48: 10:00:18 (30 s later) CS=0, CH=1, MM=T once, then 0 OTD commands until capture end 10:01:48. Logs in the session scratchpad (telnet501.txt, telnet501b.txt). AC#2 open: Q33 asked, Q34 queued.
 
 2026-10-25 correction: the bench unit at 192.168.88.61 (MAC 10:20:BA:21:B4:F8) used for this task's evidence was NOT the OTGW32 (Robert: OTGW32 not connected in the 48 h before 2026-10-25 evening). It was an ESP32-S3 without PIC and without boiler running the combo image in OT-Direct mode (ADR-160 bench default). The evidence stands as 'combo image, OT-Direct mode, no boiler'; any 'OTGW32' wording in earlier notes is wrong.
+
+2026-10-25 correction 2: Robert confirmed the .88.61 unit (MAC 10:20:BA:21:B4:F8) is an S3 WITH a PIC; it ran in OT-Direct mode because the PIC was not detected at boot (TASK-1399). So the evidence is 'combo image in OT-Direct mode on a board whose PIC was not detected', not PIC-gateway behaviour.
 <!-- SECTION:NOTES:END -->

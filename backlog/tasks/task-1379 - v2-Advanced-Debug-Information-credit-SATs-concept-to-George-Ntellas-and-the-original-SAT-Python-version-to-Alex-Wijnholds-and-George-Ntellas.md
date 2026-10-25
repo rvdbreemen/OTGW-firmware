@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T09:31:00Z'
-updated_date: '2026-10-25T20:02:00Z'
+updated_date: '2026-10-25T20:11:00Z'
 labels:
   - webui
   - sat
@@ -41,6 +41,8 @@ Static UI only (KISS): in v2.js renderDebugGroups() (~3634) add a group 'Credits
 2026-10-25 Robert's follow-ups: drop 'Authors' from the Python field; C/C++ version = Robert van den Breemen + Claude + George Ntellas. Final: SAT concept by = George Ntellas; Original SAT Python version = Alex Wijnholds - George Ntellas; C/C++ version = Robert van den Breemen + Claude + George Ntellas.
 
 2026-10-25 correction: the bench unit at 192.168.88.61 (MAC 10:20:BA:21:B4:F8) used for this task's evidence was NOT the OTGW32 (Robert: OTGW32 not connected in the 48 h before 2026-10-25 evening). It was an ESP32-S3 without PIC and without boiler running the combo image in OT-Direct mode (ADR-160 bench default). The evidence stands as 'combo image, OT-Direct mode, no boiler'; any 'OTGW32' wording in earlier notes is wrong.
+
+2026-10-25 correction 2: Robert confirmed the .88.61 unit (MAC 10:20:BA:21:B4:F8) is an S3 WITH a PIC; it ran in OT-Direct mode because the PIC was not detected at boot (TASK-1399). So the evidence is 'combo image in OT-Direct mode on a board whose PIC was not detected', not PIC-gateway behaviour.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

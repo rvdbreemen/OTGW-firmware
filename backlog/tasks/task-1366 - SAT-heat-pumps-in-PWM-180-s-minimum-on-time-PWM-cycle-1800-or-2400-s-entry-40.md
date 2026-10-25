@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:42:00Z'
-updated_date: '2026-10-25T20:02:00Z'
+updated_date: '2026-10-25T20:11:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -271,6 +271,8 @@ Flow 50, base 27.2, duty = (pid − 27.2)/22.8:
 2026-10-25 implemented (wf_e683b675: implement, two refuting reviews non-blocking, fix). Heat pump: min ON 180 s (pwm.py:53), PWM period iHpCycleSeconds 1800/2400 s (entries 40/50/52) via satGetPwmPeriodSec(); gas and hybrid unchanged. Deviation from plan: setter snaps to the nearer option (atoi >= 2100 ? 2400 : 1800) instead of '== 2400 ? 2400 : 1800', so an old/out-of-range value lands on the closer option; also applied at settings load (settingStuff.ino:556). R3 correction: R3 is NOT unchanged by this task: on HEAD heat-pump duty >= 0.5 (1800 s) / >= 0.333 (2400 s) went to range 5 before the state machine; after the fix duty 0.05-0.95 goes through it, where an ON phase whose unit has not lit within one tick ends on the next tick (r3 host scenario old-vs-fix). Heat pumps reach PWM only through manual control_mode pwm. Queued for Sergeant D: Q35 (PWM ON timing), Q36 (heat-pump hourly cap), Q37 (hybrid timing), Q38 (180 s start gate). Evidence this session: tests/test_sat_hp_pwm.py fix 'OK (expected failures=1)', HEAD 'FAILED (failures=14)'; all tests/test_sat_*.py + test_otd_ch_override OK; evaluate --quick exit 0; node --check v2.js ok. Not bench-verified: no heat pump on the bench.
 
 2026-10-25 correction: the bench unit at 192.168.88.61 (MAC 10:20:BA:21:B4:F8) used for this task's evidence was NOT the OTGW32 (Robert: OTGW32 not connected in the 48 h before 2026-10-25 evening). It was an ESP32-S3 without PIC and without boiler running the combo image in OT-Direct mode (ADR-160 bench default). The evidence stands as 'combo image, OT-Direct mode, no boiler'; any 'OTGW32' wording in earlier notes is wrong.
+
+2026-10-25 correction 2: Robert confirmed the .88.61 unit (MAC 10:20:BA:21:B4:F8) is an S3 WITH a PIC; it ran in OT-Direct mode because the PIC was not detected at boot (TASK-1399). So the evidence is 'combo image in OT-Direct mode on a board whose PIC was not detected', not PIC-gateway behaviour.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
