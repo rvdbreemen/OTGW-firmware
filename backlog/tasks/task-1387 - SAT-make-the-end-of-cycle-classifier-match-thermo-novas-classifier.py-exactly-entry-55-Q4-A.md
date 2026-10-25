@@ -3,9 +3,11 @@ id: TASK-1387
 title: >-
   SAT: make the end-of-cycle classifier match thermo-nova's classifier.py
   exactly (entry 55, Q4 A)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T11:34:00Z'
+updated_date: '2026-10-25T21:45:00Z'
 labels:
   - sat
 milestone: 2.0.0
