@@ -3,10 +3,11 @@ id: TASK-1377
 title: >-
   Epic: Home Assistant UI integration via standard contracts and ingress (1.x
   and 2.0.0)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T09:01:00Z'
-updated_date: '2026-10-25T09:12:00Z'
+updated_date: '2026-10-25T15:44:00Z'
 labels:
   - epic
   - home-assistant
@@ -59,4 +60,12 @@ Research 2026-10-25 recorded in docs/research/2026-10-25-home-assistant-ui-integ
 Maintainer decision 2026-10-25 (confirmed): go for the minimal integration and make HA ingress work properly now. No new integration in the HA Marketplace for now (no custom integration, no card). Scope stays items A-D on both lines.
 
 2026-10-25: on maintainer request the 1.x children moved to the otgw-1.x.x backlog as epic TASK-1378 with children TASK-1378.1 (A), .2 (B), .3 (C), .4 (D). The dev copies TASK-1377.2/.4/.6/.8 are archived. This epic now tracks the 2.0.0 line (TASK-1377.1/.3/.5/.7); AC #1 reads as 'all 2.0.0 children Done', and ACs #2 and #3 'on both lines' are met together with TASK-1378. Cross-branch link: TASK-1378.2 reuses the component choice of TASK-1377.3; the 1.x CSRF ADR mirrors the 2.0.0 ADR from TASK-1377.5.
+
+2026-10-25: 1.x side done and published in 1.7.8-beta.6 (otgw-1.x.x TASK-1378: 18068a353, 1f7553247; guide docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md and bench evidence docs/research/2026-10-25-ha-ingress-bench-1x on otgw-1.x.x). Findings that carry over to 2.0.0:
+- hass_ingress 1.4.0 copies the browser's Host to the device (ingress.py _init_header), adds X-Forwarded-Host/Proto and X-Ingress-Path, strips its own token cookie. Origin and Host therefore match and the existing same-origin CSRF check passes with no code change; measured with a password set. A headers: host: <ip> override, or nginx with its default Host, gives 403: documented, not coded around.
+- Rewrite rules are not needed once the UI is base-path aware, and they then break it (prefix applied twice).
+- nginx needs client_max_body_size 4m for the LittleFS image (~2 MB).
+- HA 2026.10 keeps the http: config in storage; trusted_proxies changes revert after 5 min unless promoted.
+- Bench rig: scripts/ha-ingress-rig on otgw-1.x.x (Docker HA 2026.10.4 + hass_ingress, Caddy TLS front, nginx sub-path, header echo, Playwright validator, OTA and PIC flash scripts).
+Port plan for dev: see the notes on 1377.1/.3/.5/.7.
 <!-- SECTION:NOTES:END -->
