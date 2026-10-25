@@ -76,6 +76,7 @@ static void satGetWindow24hStats() {}
 static void satPwmSuppressionRefresh() {}
 static void satSetControlMode(int m) { state.sat.eControlMode = m; }
 static void satPwmReset() {}
+static void satCycleSkipAutoSwitch() {}   // TASK-1367: called by satDisable(); the overshoot timer is not under test here
 static float _sat_lastControlCS = 0, _sat_requestedSetpoint = 0;
 static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false;
 static void satPidReset() {} static void satSavePidState() {} static void satSaveEnergyState() {}

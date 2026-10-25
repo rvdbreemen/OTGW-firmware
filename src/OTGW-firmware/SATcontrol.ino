@@ -1086,10 +1086,16 @@ void satPwmReset()
   _pwm_effectiveBoilerTemp    = 0.0f;   // thermo-nova pwm.reset(): _effective_on_temperature = None (pwm.py:100)
 }
 
-// Change the control mode; entering or leaving PWM resets the PWM state.
+// Change the control mode; entering or leaving PWM resets the PWM state. Every mode change also clears the
+// sustained-overshoot start, so no path (the control_mode command included) can carry a start from one
+// continuous stint into the next. Firmware choice: thermo-nova has no mode command; it clears the start on
+// the next update while PWM is enabled (heating_control.py:264-266).
 static void satSetControlMode(SATControlMode m)
 {
-  if (m != state.sat.eControlMode) satPwmReset();
+  if (m != state.sat.eControlMode) {
+    satPwmReset();
+    satCycleSkipAutoSwitch();
+  }
   state.sat.eControlMode = m;
 }
 
@@ -2396,6 +2402,7 @@ void satDisable()
   const bool handedBack = state.sat.bOtLinkLost;
   state.sat.bOtLinkLost = false;       // a switch-off ends the OpenTherm-loss state; the loss path sets it again after this call (TASK-1365)
   satSetControlMode(SAT_MODE_OFF);
+  satCycleSkipAutoSwitch();            // no overshoot start survives a switch-off, trip or OT loss (TASK-1367; firmware choice: thermo-nova keeps it, climate.py:544-545 returns before update())
   satPwmReset();                       // also when the mode was not PWM: a safety trip must leave no stale PWM state
   _sat_lastControlCS = 0.0f;
   _sat_requestedSetpoint = 0.0f;
@@ -4963,6 +4970,7 @@ static void satControlLoopRun()
   state.sat.bActive = true;
   if (state.sat.eControlMode == SAT_MODE_OFF) {
     state.sat.eControlMode = SAT_MODE_CONTINUOUS;
+    satCycleSkipAutoSwitch();   // back from satDisable() (switch-off, trip, fallback lift, OT loss): no stale overshoot start (firmware choice, TASK-1367)
   }
 
   // --- DHW detection (Task #3): skip CH control when DHW is active ---
@@ -4994,6 +5002,7 @@ static void satControlLoopRun()
       SATDebugTf(PSTR("SAT: DHW active, sent %s\r\n"), swCmd);
     }
     _sat_prevDhwActive = true;
+    satCycleSkipAutoSwitch();   // hot water: thermo-nova clears the overshoot start (heating_control.py:268-270)
     satPublishMQTT();   // sat/power carries the DHW-capacity value while DHW runs (TASK-1258)
     return;
   }
@@ -5052,6 +5061,7 @@ static void satControlLoopRun()
   // Task #38: OT error flag monitoring -- check for critical boiler faults
   if (OTcurrentSystemState.SlaveStatus & 0x01) { // Bit 0 = fault indication
     SATDebugTln(F("SAT: boiler fault flag detected, skipping control cycle"));
+    satCycleSkipAutoSwitch();   // a skipped tick is not a qualifying overshoot sample (firmware choice: no thermo-nova fault skip, TASK-1367)
     return; // Skip this control cycle, let boiler handle the fault
   }
 
@@ -5079,6 +5089,7 @@ static void satControlLoopRun()
         satEnqueueIfChangedMM(settings.sat.iMaxRelModulation);
         satEnqueueIfChangedCH(1);
       }
+      satCycleSkipAutoSwitch();   // thermal-safe fallback: no overshoot sample this tick (firmware-only path, TASK-1367)
       satPublishMQTT();
       return;
     }
@@ -5109,6 +5120,7 @@ static void satControlLoopRun()
       satEnqueueIfChangedMM(settings.sat.iMaxRelModulation);
       satEnqueueIfChangedCH(0);
     }
+    satCycleSkipAutoSwitch();   // summer simmer: no overshoot sample this tick (firmware-only path, TASK-1367)
     satPublishMQTT();   // power/energy keep moving here (DHW in summer), so publish them (TASK-1258)
     return; // Skip rest of control loop
   }
@@ -5293,10 +5305,15 @@ static void satControlLoopRun()
   state.sat.fFinalSetpoint = finalSetpoint;
 
   // --- Auto-switch between continuous and PWM modes (Tasks #42/#43) ---
-  // Delegated to satCycleCheckAutoSwitch() in SATcycles.ino which uses correct
-  // thresholds (3.0C overshoot margin, 60s sustain, 300s DHW post-overshoot guard).
+  // Delegated to satCycleCheckAutoSwitch() in SATcycles.ino: overshoot margin settings.sat.fOvershootMargin
+  // (default 2.0C), 60 s sustain counted from the first overshoot sample (entry 41), 300 s DHW guard.
+  // The heat-pump exclusion (satAlwaysMaxModulation()) is a firmware divergence: thermo-nova's
+  // _maybe_enable_pwm_on_sustained_overshoot (heating_control.py:262-305) has no heat-pump case, and entries
+  // 40 and 50 run heat pumps in PWM (open question Q45).
   if (!satAlwaysMaxModulation() && pidOutput > satGetColdSetpoint()) {
     satCycleCheckAutoSwitch(pidOutput);
+  } else {
+    satCycleSkipAutoSwitch();   // requested <= cold setpoint clears the start (heating_control.py:280-282); heat pump: see above
   }
 
   // Modulation suppression is handled via CS sequence in satApplyPWM() (PWM ON only)

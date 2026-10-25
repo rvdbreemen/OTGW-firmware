@@ -139,7 +139,7 @@ back to the area audit.
 | 9 | high | pwm | Heat pump: min-on 1800/2400 s with 2 cycles per hour collapses the duty mapper (**mapper fixed by TASK-1366**, entries 40/50). With TASK-1331, a heat pump can also enter PWM but cannot use the runtime exits. | At 1800 s, PWM becomes 30 min on / 30 min off or continuous. At 2400 s, lower demand gives more run time. **[TASK-1331, uncommitted]** A heat pump in PWM can stay there with no runtime exit. | answered for the mapper (entries 40, 50); still yes for the runtime exits (C3), hybrids and the hourly cap | PWM-02, CYC-03, DEF-6; SATcontrol.ino:345-374, 875-944, 5298 (TASK-1366 working tree); pwm.py:53-61; entries 30, 40, 50, C3, C4 |
 | 10 | medium | dhw | During hot water, the firmware sends no MM, so MM=0 from PWM stays on the boiler. thermo-nova sends the maximum. | Every tap draw during PWM. If the boiler applies MsgID 14 to DHW (unknown), showers get minimum burner power. | no | DHW-1, MODS-03; SATcontrol.ino:4801-4818; heating_control.py:136-137, 517-520; entry 21 |
 | 11 | medium | dhw | The 300 s guard after hot water never arms, and DHW does not reset the sustain timers. | After a shower, the flow can trigger a switch to PWM within 30-60 s, where thermo-nova waits 300 s. This happens on most draws. | no | PWM-07, DHW-2, S6; SATcycles.ino:1008-1017; SATcontrol.ino:4801-4818, 5124 |
-| 12 | medium | pwm | The sustain timers count the first tick as 30 s. The 60 s switch fires after about 30 s, and a tick above 60 s disables all three switches. | Entry into PWM after 30 s of overshoot. Underheat exit at about 150 s, saturation at about 270 s. | C1 only | PWM-08, S7; SATcycles.ino:993-1028; helpers.py:51-56; conflict C1 |
+| 12 | medium | pwm | The sustain timers count the first tick as 30 s. The 60 s switch fires after about 30 s, and a tick above 60 s disables all three switches. (**Overshoot switch fixed by TASK-1367**, entry 41; underheat and saturation counting still open.) | Entry into PWM after 30 s of overshoot. Underheat exit at about 150 s, saturation at about 270 s. | C1 only | PWM-08, S7; SATcycles.ino:993-1028; helpers.py:51-56; conflict C1 |
 | 13 | medium | pid | The first PID call after a boot, a disable or a flush returns 0, so the first one or two ticks send CS=10, CH=0. At boot the CS=0 also hands TSet to the thermostat for 30 s. | About 60-90 s of boiler-off after each reboot, OTA or enable. With a thermostat calling for heat, one extra short burn per restart. | plan OK | STARTUP-3, F1; SATpid.ino:266-288; SATcontrol.ino:3873-3877, 5145-5159; pid.py:126-132 |
 | 14 | medium | pid | The PID runs on the control tick (30 s, settable 10-300 s), not on a fixed 60 s. The integral adds ki × error × 60 per update. | Inside the deadband the integral grows 2x faster at 30 s and up to 6x faster at 10 s (estimate). More risk of oscillation around the target. | yes | F4, DEF-8; SATpid.ino:169, 279-288; climate.py:712-716; pid.py:191 |
 | 15 | medium | pid | A target change, an HVAC mode change, a window event or reset_integral does not reset the PID as thermo-nova does. A preset change clears only the published copy of I. | After a schedule or thermostat change, a frozen D term (about -2 °C at Kp 17.35, estimate) is carried into the new target. | no | F2, F3, F10(curve); SATcontrol.ino:1161-1171, 2071-2102; climate.py:641-660 |
@@ -471,6 +471,9 @@ Each paragraph gives:
 - **Applies:** entry 22 cites this guard as matching thermo-nova. That claim is wrong in effect.
 - **Impact:** needless switches into PWM after showers on combi boilers.
 - **Action:** port the guard as in thermo-nova.
+- **[TASK-1367] Partly addressed (working tree):** a hot-water tick now clears the overshoot start
+  (`satCycleSkipAutoSwitch()` on the DHW return), so overshoot time from before a draw no longer
+  survives it, and the stale comment is corrected. The 300 s guard after the draw still never arms.
 
 **#12. Sustain counting.**
 
@@ -485,6 +488,17 @@ Each paragraph gives:
 - **Action:**
   - Count from the first qualifying tick, as in thermo-nova.
   - Ask C1 once.
+- **[TASK-1367] Overshoot switch fixed (working tree, not yet built or committed):** C1 is closed by
+  entry 41 (60 s). The overshoot timer is now a start timestamp: the first qualifying sample starts
+  it, the switch comes once `millis()` is 60 000 ms past that start, and a sample that does not
+  qualify, a call outside CONTINUOUS, or a control tick that bypasses the switch (hot water, boiler
+  fault, thermal-safe fallback, summer simmer, heat pump or requested <= cold setpoint, re-enable)
+  clears it (`SATcycles.ino` `satCycleCheckAutoSwitch`, `satCycleSkipAutoSwitch`). The 60 s gap
+  bail-out no longer applies to it, and the switch resets the underheat and saturation timers
+  (`heating_control.py:304-305`). Host test `tests/test_sat_overshoot_sustain.py`. Still open:
+  the underheat and saturation timers keep the old counting and the 60 s bail-out (queued as Q44
+  in `open-questions.md`), the strict `>` (Q43), the heat-pump exclusion (Q45), tick jitter (Q46),
+  the switch one tick after the CS (Q47), and the 300 s post-hot-water guard still never fires (#11).
 
 **#13. First PID call returns 0.**
 

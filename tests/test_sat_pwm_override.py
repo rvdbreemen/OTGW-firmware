@@ -87,6 +87,7 @@ static bool g_hasOT = true;
 static bool hasOTCommandInterface() { return g_hasOT; }
 static bool satEnqueueIfChangedCS(float cs) { g_csSent++; g_csLast = cs; return true; }
 void satCycleResetSustainGuards();                                    // defined in the cut SATcycles block
+void satCycleSkipAutoSwitch();                                        // idem (TASK-1367; a no-op stub on HEAD)
 #define DUE(t) (g_due)
 #define timerSATSuppress 0
 #include "@CHENABLE@"
@@ -214,7 +215,12 @@ int main(int argc, char** argv) {
       return cs;
     };
     const float held = tick(40.0f, true);  // above cold: PWM without override keeps prevCS 45
-    _sustain_overshootSec = 45.0f; _sustain_underheatSec = 12.0f; _sustain_saturationSec = 7.0f;
+#ifdef HAS_OS_START
+    _sustain_overshootRunning = true; _sustain_overshootStartMs = g_ms - 45000UL;   // TASK-1367: a started overshoot timer
+#else
+    _sustain_overshootSec = 45.0f;
+#endif
+    _sustain_underheatSec = 12.0f; _sustain_saturationSec = 7.0f;
     state.sat.iCurrentModulation = 55;
     float cutoff = 0;
     if (valves) {                          // valves-closed early return of satControlLoopRun()
@@ -226,7 +232,11 @@ int main(int argc, char** argv) {
     const int reqAfter = (int)state.sat.bPwmFlameRequested; const float holdAfter = _pwm_flameOffHoldSetpoint;
     const int modeAfter = state.sat.eControlMode; const float lastAfter = _sat_lastControlCS;
     const int mmAfter = state.sat.iCurrentModulation;
+#ifdef HAS_OS_START
+    const float sus = (_sustain_overshootRunning ? 45.0f : 0.0f) + _sustain_underheatSec + _sustain_saturationSec;
+#else
     const float sus = _sustain_overshootSec + _sustain_underheatSec + _sustain_saturationSec;
+#endif
     state.sat.bValvesOpen = true;
     const float rec = tick(30.0f, false);  // solar clears / valves reopen: a clean phase, so the result shows the reset
     printf("held=%.1f cutoff=%.1f req=%d hold=%.1f mode=%d last=%.1f mm=%d sustain=%.1f recovery=%.1f\n", held, cutoff, reqAfter,
@@ -335,7 +345,9 @@ def extract_cycles() -> str:
         "(state.sat.fFinalSetpoint = (sp), satCycleCheckAutoSwitch())"
     g = re.search(r"^void satCycleResetSustainGuards\(\)\s*\{.*?^\}\s*$", src, re.S | re.M)
     guards = g.group(0) if g else "void satCycleResetSustainGuards() { }"   # HEAD: no guard reset
-    return "\n".join(consts) + "\n" + guards + "\n" + fn + f"\n#define CALL_AUTOSWITCH(sp) {call}\n"
+    k = re.search(r"^void satCycleSkipAutoSwitch\(\)\s*\{.*?^\}\s*$", src, re.S | re.M)
+    skip = k.group(0) if k else "void satCycleSkipAutoSwitch() { }"          # HEAD: no overshoot-start clear (TASK-1367)
+    return "\n".join(consts) + "\n" + guards + "\n" + skip + "\n" + fn + f"\n#define CALL_AUTOSWITCH(sp) {call}\n"
 
 
 def compile_cpp(cpp: Path, exe: Path):
@@ -378,6 +390,9 @@ def build(workdir: Path):
     has_auto = "bPwmAutoSwitch" in cycles
     if has_auto:
         flag += "#define HAS_AUTOSWITCH 1\n"
+    # TASK-1367: the overshoot timer is a start timestamp, not a seconds counter
+    if "_sustain_overshootRunning" in cycles:
+        flag += "#define HAS_OS_START 1\n"
     chenable = (REPO / "src" / "OTGW-firmware" / "SATchEnable.h").as_posix()
     cpp.write_text(flag + STUBS.replace("@FORCEFIELD@", "bool bForcePWM=false;" if has_force else "").replace("@AUTOFIELD@", "bool bPwmAutoSwitch=true;" if has_auto else "").replace("@CHENABLE@", chenable) + pre + body + cycles + MAIN, encoding="utf-8")
     return compile_cpp(cpp, workdir / "t.exe")
