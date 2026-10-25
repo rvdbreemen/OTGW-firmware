@@ -54,6 +54,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q29 | answered (entry 46: reset P, I and D to 0) -> TASK-1364 | TASK-1364 (entry 38): while the room temperature is missing, reset I and D to 0 (thermo-nova on a stale sensor) or freeze them? | TASK-1364 |
 | Q30 | answered (entry 47: option B) -> TASK-1365 | TASK-1365 (entry 39): final message on lost OpenTherm: A) CH=0, CS=0 (literal), B) CS=0, CH=1, MM=T (same hand-back as switching SAT off), C) CH=0, CS=0, MM=T? | TASK-1365 |
 | Q31 | answered (entry 50: option A) -> TASK-1366 | TASK-1366 (entry 40): heat pump PWM: min ON 180 s with cycle length 1800/2400 s (his answer) or 2/3 cycles per hour as thermo-nova config_flow.py:686-693? | TASK-1366 |
+| Q32 | queued | TASK-1282 (entry 32): comfort humidity adjust checks the summer-off switch (bSummerSimmer, SATcontrol.ino:3460) instead of Thermal comfort. Entry 32: humidity counts only when the Summer Simmer index is on. Gate on Thermal comfort (bThermalComfort), or no gate? (gruijter 2026-10-25) | TASK-1282 |
 
 Questions Q5 onwards come from the SAT port audit of 2026-10-24
 ([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)); the numbers in brackets are its

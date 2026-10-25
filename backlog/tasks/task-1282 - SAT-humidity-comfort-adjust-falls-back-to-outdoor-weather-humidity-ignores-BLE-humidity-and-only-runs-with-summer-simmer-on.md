@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-21 09:32
-updated_date: '2026-10-22T06:54:00Z'
+updated_date: '2026-10-25T07:28:00Z'
 labels:
   - sat
   - humidity
@@ -44,4 +44,6 @@ Plan: 1) indoor sources only: MQTT/REST push (existing), and BLE humidity from t
 2026-10-21 plan posted to Sergeant D (#alpha-testing msg 1562558755898523739); open points: comfort adjust outside summer, pushed value vs BLE priority. Waiting for his OK; cycle continues.
 
 2026-10-22: TASK-1292 ground-truth spec is on dev: docs/sat/thermo-nova-spec.md (cited, Alexwijn/SAT releases/thermo-nova @ 7beaaf5), docs/sat/firmware-sat-spec.md and docs/sat/sat-comparison.md (443 rows, 434 verified). This task waits for Sergeant D's validation of the thermo-nova spec; the plan must quote the thermo-nova code for its area with file:line citations (CLAUDE.md 'SAT ground truth' block) before it is resumed.
+
+2026-10-25 gruijter re-reported all four points (#alpha-testing 1563792462328111185); verified at HEAD by a workflow with a refuting second reader (wf_16ada525): weather fallback SATcontrol.ino:5052-5059, gate on bSummerSimmer :3460, hardcoded 1800000UL :3465-3467 (also clears bHumidityValid, which turns Thermal comfort off; iHumidityTimeoutS used at :1469), BLE humidity never copied into fHumidity. Gate fix conflicts with Sergeant D entry 32 (humidity only when Summer Simmer index / Thermal comfort is on): queued as Q32. Answered gruijter 1563816427851354243.
 <!-- SECTION:NOTES:END -->

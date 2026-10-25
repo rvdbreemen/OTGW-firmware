@@ -4,6 +4,7 @@ title: 'SAT: user MaxTSet slider bounded by MsgID 57, sent to the boiler (entry 
 status: To Do
 assignee: []
 created_date: '2026-10-25T06:31:00Z'
+updated_date: '2026-10-25T07:28:00Z'
 labels:
   - sat
   - webui
@@ -24,3 +25,9 @@ Sergeant D 2026-10-25 05:56/06:10 UTC (#alpha-testing 1563793351961223221, 15637
 <!-- AC:BEGIN -->
 - [ ] #1 A MaxTSet slider in the v2 SAT page bounded by MsgID 57 (fallback 20..80) sets the value, the gateway sends it to the boiler (SH= on PIC, MsgID 57 write on OT-Direct) and SAT uses it as its ceiling (host test + bench capture); HA number entity + MQTT documented
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-25 second reader (wf_16ada525): MsgID 57 carries no bounds; the MaxTSet upper/lower bounds are MsgID 49 MaxTSetUBMaxTSetLB (OTGW-Core.h:423 vs :431). Entry 48 quotes 'MsgID 57 values (Lower/Higher)'; our reading: bounds from MsgID 49, value written as MsgID 57 (SH= on PIC). Confirm with Sergeant D when the plan is shared. Also: the ignition hold is clamped with satGetMaxSetpoint (SATcontrol.ino:1030-1032), not satEffectiveMaxSetpoint; thermo-nova clamps the hold with the user maximum_setpoint (heating_control.py:398). Entry 51: SAT caps every CS at the user value. gruijter answered 1563816425838219335 (asked for MsgID 57 OT log).
+<!-- SECTION:NOTES:END -->
