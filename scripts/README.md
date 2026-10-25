@@ -119,6 +119,8 @@ python scripts/ha-ingress-rig/validate_ingress.py --label check [--password <gat
 python scripts/ha-ingress-rig/ota_via_ingress.py --firmware build/<name>.ino.bin
 python scripts/ha-ingress-rig/ota_via_ingress.py --filesystem build/<name>.littlefs.bin
 python scripts/ha-ingress-rig/pic_flash_dryrun.py --label check   # never writes the PIC
+python scripts/ha-ingress-rig/pic_flash_ui_sim.py --label check   # replays a flash against the page, no PIC write
+python scripts/ha-ingress-rig/pic_flash_via_proxy.py --file gateway.hex --label x   # REAL PIC write, maintainer's order only
 python scripts/ha-ingress-rig/ha_device_page.py --label check
 python scripts/ha-ingress-rig/setup_rig.py --down
 ```

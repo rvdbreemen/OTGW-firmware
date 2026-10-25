@@ -955,6 +955,9 @@ let currentMaxFreeBlock = null; // Max free block bytes from /v2/device/time
 let sensorSimulationActive = false; // Mirror of otmonitor.sensorsimulation for footer notice
 let otgwSimulationActive = false; // Mirror of device.otgwsimulation for status badge
 let flashPollTimer = null; // Timer for polling flash status as failsafe (both ESP and PIC)
+let flashSeenActive = false; // the poll has seen this PIC flash running
+let flashStartedAt = 0;      // when performFlash() started, for the start timeout
+const FLASH_START_TIMEOUT_MS = 60000;
 let otLogResponsiveInitialized = false;
 let otLogResizeTimer = null;
 
@@ -5914,9 +5917,23 @@ function pollFlashStatus() {
             const status = json.flashstatus;
             console.log("Flash status poll:", status);
             
-            // If not flashing at all, stop polling
+            if (status.pic_flashing) flashSeenActive = true;
+
+            // Not flashing. The PIC flash is queued and starts in the gateway's
+            // loop, so the first polls can come before it runs: keep polling
+            // until it has been seen running, then read its result. Without
+            // the WebSocket (reverse proxy, HTTPS, Safari) this poll is the only
+            // way the page learns that the flash ended.
             if (!status.flashing) {
-                stopFlashPolling();
+                if (flashSeenActive) {
+                    if (status.pic_progress === 100) {
+                        handleFlashCompletion(status.pic_filename, status.pic_error);
+                    } else {
+                        handleFlashError(status.pic_filename, status.pic_error);
+                    }
+                } else if (Date.now() - flashStartedAt > FLASH_START_TIMEOUT_MS) {
+                    handleFlashError(currentFlashFilename, "flash did not start");
+                }
                 return;
             }
             
@@ -6037,6 +6054,8 @@ function handleFlashError(filename, error) {
 
 function performFlash(filename) {
     currentFlashFilename = filename;
+    flashSeenActive = false;
+    flashStartedAt = Date.now();
     isFlashing = true;
     toggleInteraction(false);
     // Stop polling during upgrade to prevent interference and reduce load

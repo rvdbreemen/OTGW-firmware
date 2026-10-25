@@ -114,8 +114,38 @@ Both proxies: file list `diagnose.hex`, `gateway.hex`, `interface.hex` via
 Afterwards the device still reported PIC gateway 6.8 and `flashing: false`.
 Progress during a flash rides on that HTTP poll (ADR-025); the live-log WebSocket
 the page also tries is caught (`try` around `new WebSocket`) and is not needed.
-A real PIC flash through a proxy was not run (needs the maintainer's explicit go
-per flash).
+
+### Real PIC flash through HA ingress (maintainer's go, `gateway.hex` 6.8)
+
+`pic_flash_via_ingress.json`: run with `pic_flash_via_proxy.py --file gateway.hex`,
+which lets only that file's upgrade request leave the browser. Flash request on the
+proxy path, result after 33.9 s: progress 100, "PIC upgrade was successful"; PIC
+before and after gateway 6.8 on pic16f1847.
+
+The flash worked, the page did not: it stayed on "Flashing gateway.hex started..."
+with the page greyed out (`pic_real_flash_ha_https_ui_stuck_old.png`), and the UI
+polled `/api/v2/flash/status` once. Cause (`index.js` `performFlash` /
+`pollFlashStatus`): the poll starts before the flash request (that waits up to 5 s
+for the WebSocket), the gateway runs the queued flash later from its loop, so the
+first poll sees `flashing: false` and stopped polling without ever calling the
+completion handler. Direct access hides this because the WebSocket reports the
+progress; behind a proxy (and in Safari, ADR-025) the poll is the only source.
+Fix: keep polling until this flash has been seen running, then report its result;
+give up with "flash did not start" after 60 s.
+
+Old vs fix on the same setup, real UI code with the gateway's flash answers
+scripted in the browser (`pic_flash_ui_sim.py`; first poll: an earlier flash's
+"successful" result before the new one starts, then 40 %, then done; no PIC write):
+- old index.js: texts "Connecting to event stream...", "Flashing gateway.hex
+  started...", 0 polls answered after the start, page still greyed out
+  (`pic_flash_ui_sim_old.json`/`.png`), the same as the real flash above;
+- fix: "... started...", "Flashing gateway.hex : 40%", "Successfully flashed to
+  Gateway 6.8", "Ready to flash", 3 polls, page usable (`pic_flash_ui_sim_fix.json`/`.png`);
+  the stale "successful" first answer did not end it early;
+- fix flashed to the gateway (d54a3c4 firmware + LittleFS) and run against the
+  served page: same result (`pic_flash_ui_sim_device.json`). Regression matrix
+  `validate_ingress.py` on that build: 5/5 PASS.
+A second real PIC flash with the fixed page was not run.
 
 ## Free heap during the proxied session
 

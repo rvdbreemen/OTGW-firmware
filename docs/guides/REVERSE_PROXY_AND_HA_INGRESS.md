@@ -149,13 +149,14 @@ location /otgw/ {
   48 s) and through nginx (about 38 s). Your settings are kept, as with direct
   access. The image is about 2 MB, so the proxy must accept a body of that size
   (nginx: `client_max_body_size 4m`).
-- **PIC firmware flashing**: the PIC page, the file list and the flash progress
-  work through the proxy, and the flash request goes to the gateway on the proxy
-  path. The flash itself runs on the gateway (ESP to PIC over serial), not
-  through the proxy. A real PIC flash through a proxy has not been done on the
-  bench, only a dry run in which the browser held back the final flash request.
-  Until it has, flash the PIC over direct access: an interrupted PIC flash can
-  brick the PIC.
+- **PIC firmware flashing** works through the HA ingress panel: a real flash of
+  `gateway.hex` 6.8 took 34 s and reported "PIC upgrade was successful". The
+  flash itself runs on the gateway (ESP to PIC over serial); the proxy only
+  carries the start request and the progress polls. Firmware 1.7.8-beta.6 or
+  later is needed for the page to show the progress and the result through a
+  proxy; older pages stay on "Flashing ... started..." and greyed out although
+  the flash completes. Reload the page then. As always: do not close the page
+  or cut the power while the PIC is being flashed.
 - If an update through a proxy stops halfway, open the gateway directly and run it
   again from `http://<gateway-ip>/update`.
 
