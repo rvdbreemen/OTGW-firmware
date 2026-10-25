@@ -9,9 +9,10 @@ and then becomes a backlog task.
 George: if a question below is unclear or wrongly put, just say so. A correction of
 the question is as useful as an answer.
 
-We check for an answer every hour and stay quiet while there is none. When a question
-has waited 12 hours and 3 or more other messages have pushed it out of view, we repeat
-it once, with a link to the original.
+While George is answering, the next question follows at once. We check the chat every
+hour. If a question gets no reaction within the first hour, we wait quietly until he is
+back; on his next message in the channel we ask the first open question again, with a
+link to the original (Robert, 2026-10-25).
 
 On 2026-10-24 at 20:58 UTC Sergeant D got the full list Q2-Q28 as an overview
 ([part 1](https://discord.com/channels/812969634638725140/1514720723980259460/1563656700118958262),
