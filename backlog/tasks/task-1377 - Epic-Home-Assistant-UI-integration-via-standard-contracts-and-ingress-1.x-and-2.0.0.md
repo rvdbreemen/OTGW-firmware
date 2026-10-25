@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-25T09:01:00Z'
-updated_date: '2026-10-25T15:44:00Z'
+updated_date: '2026-10-25T17:50:00Z'
 labels:
   - epic
   - home-assistant
@@ -47,9 +47,9 @@ Ordering: A is independent. C depends on B per line. D depends on C per line.
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 All eight child tasks are Done, or explicitly dropped with a reason
-- [ ] #2 On both lines, a HA instance shows a working 'Visit device' link for the OTGW device, shown by a screenshot
-- [ ] #3 On both lines, the OTGW UI opens from the HA sidebar through the chosen ingress component with HA over HTTPS, read and admin actions work, shown by a bench transcript or screenshots
-- [ ] #4 MQTT discovery and REST contracts are unchanged apart from the added cu field, shown by a discovery payload diff
+- [x] #2 On both lines, a HA instance shows a working 'Visit device' link for the OTGW device, shown by a screenshot
+- [x] #3 On both lines, the OTGW UI opens from the HA sidebar through the chosen ingress component with HA over HTTPS, read and admin actions work, shown by a bench transcript or screenshots
+- [x] #4 MQTT discovery and REST contracts are unchanged apart from the added cu field, shown by a discovery payload diff
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -68,4 +68,6 @@ Maintainer decision 2026-10-25 (confirmed): go for the minimal integration and m
 - HA 2026.10 keeps the http: config in storage; trusted_proxies changes revert after 5 min unless promoted.
 - Bench rig: scripts/ha-ingress-rig on otgw-1.x.x (Docker HA 2026.10.4 + hass_ingress, Caddy TLS front, nginx sub-path, header echo, Playwright validator, OTA and PIC flash scripts).
 Port plan for dev: see the notes on 1377.1/.3/.5/.7.
+
+2026-10-25: 2.0.0 port done in alpha.506/alpha.507 (6da168984, f3ebc29b4, rig aa040560b, docs ab2a36fe5). 1377.1, .3, .7 Done; 1377.5 waits only on AC#4 (ADR), the same open maintainer question as 1.x task 1378.3 AC#4.
 <!-- SECTION:NOTES:END -->
