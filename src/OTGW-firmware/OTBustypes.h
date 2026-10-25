@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTBustypes.h
-**  Version  : v2.0.0-alpha.500
+**  Version  : v2.0.0-alpha.501
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -38,6 +38,10 @@ struct OTBusState {          // state.otBus — OpenTherm protocol & bus state (
   // availability gate reads it (otRealBoilerSeenRecently(), ADR-117 section 2),
   // so a simulated boiler never switches SAT simulation off (TASK-1185).
   time_t tRealBoilerLastSeen = 0;
+  // millis() of the last B frame, any kind (Data-Invalid, loopback and replay
+  // included, like tBoilerLastSeen); 0 = never. SAT's OpenTherm-loss check reads
+  // it (TASK-1365): millis() does not jump at NTP sync, time() does.
+  uint32_t iBoilerLastSeenMs = 0;
   // millis() of the last room temperature (MsgID 24) the THERMOSTAT wrote, from a
   // live T frame or the PS=1 summary; 0 = never. Gateway-originated MsgID 24 frames
   // (the master scheduler re-sending its write cache, TR= overrides) do not stamp

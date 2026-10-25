@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.500
+**  Version  : v2.0.0-alpha.501
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5241,6 +5241,8 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
       // its own synthetic traffic raised the flag. The two sites differ on
       // purpose; do not "fix" one to match the other.
       state.otBus.tBoilerLastSeen = now;
+      const uint32_t boilerSeenMs = millis();   // TASK-1365: SAT's OpenTherm-loss check; 0 means "never"
+      state.otBus.iBoilerLastSeenMs = (boilerSeenMs != 0) ? boilerSeenMs : 1;
       OTdata.rsptype = OTGW_BOILER;
       // TASK-795 §4.2: a boiler frame arrived. If SAT simulation is active,
       // trip the edge hook (deferred auto-disable), and stamp the real-boiler

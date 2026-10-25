@@ -1,13 +1,13 @@
 ---
 id: TASK-1365
 title: >-
-  SAT: on lost/invalid OpenTherm send CH=0 and CS=0 once, then stop sending to
-  the boiler (entry 39)
+  SAT: on lost OpenTherm hand the boiler back once (CS=0, CH=1, MM=T), then send
+  nothing (entries 39, 47)
 status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:41:00Z'
-updated_date: '2026-10-25T05:31:00Z'
+updated_date: '2026-10-25T08:23:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,7 +24,9 @@ Sergeant D 2026-10-24 (entry 39): if the software has no valid OT, SAT stops: CH
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 On OT loss SAT sends CH=0 and CS=0 exactly once and nothing after (host test red/green)
+- [ ] #1 On OT loss SAT sends CS=0, CH=1, MM=T exactly once (entry 47), then nothing to the boiler while the loss lasts (host test red on old, green on fix)
+- [ ] #2 What counts as lost (30 s, Data-Invalid) and whether SAT resumes by itself are answered by Sergeant D (Q33, Q34) and recorded before commit
+- [ ] #3 No false hand-back on PIC PS=1 enter/leave, a late first loop pass, or millis wrap (host tests)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -188,4 +190,8 @@ Sergeant D entries:
 2026-10-25: plan (second-read) stored; waiting for Sergeant D's OK on the open question (open-questions Q29/Q30/Q31) before implementation, per CLAUDE.md SAT rules.
 
 2026-10-25 04:33 UTC Sergeant D answered Q30 (entry 47): option B, final message CS=0, CH=1, MM=T (same as satDisable), then nothing. Remaining plan points (no-valid-OT = no boiler reply for 30 s; automatic resume) are our design, stated in the plan; ready to implement.
+
+2026-10-25: two workflows ran on this task (orphaned wf_73ecbf70 from before /clear wrote the code; wf_4c6959ba reviewed it). Review findings A (PS=1 exemption PIC-only, hold not resume), D (boot baseline seed), F (wrap-proof stamp resume) are in the tree; E documented; G (MsgID 1 ownership while lost) and H (satDisable wipes PID/HCR) go into Q34. Blocking: Q33/Q34 to Sergeant D; test_sat_ot_loss.py needs the psleave/pslost/otdps/late/wrap cases.
+
+2026-10-25 Robert decided (interactive): commit provisionally now, mark the behaviour provisional in docs/task, keep the task In Progress until Q33/Q34 are answered; a different answer from Sergeant D becomes a follow-up change. Verification this session: test_sat_ot_loss 21/21 OK on fix, HEAD FAILED (failures=10, errors=2); all tests/test_sat_*.py + test_otd_ch_override OK; evaluate --quick exit 0, 0 failed.
 <!-- SECTION:NOTES:END -->

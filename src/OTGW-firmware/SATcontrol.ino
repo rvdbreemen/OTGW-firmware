@@ -2382,6 +2382,11 @@ void satDisable()
   state.sat.bPushRefused = false;
   state.sat.bRoomTempLost = false;     // narration and status start clean after a re-enable (TASK-1364)
   _sat_roomLostActive = false;
+  // TASK-1365: during an OpenTherm loss the hand-back below already went out once (the loss path's own
+  // satDisable() call, made with the flag still false). A user switch-off or the MQTT-takeover lift during
+  // the loss only ends the loss state; the commands are not sent a second time.
+  const bool handedBack = state.sat.bOtLinkLost;
+  state.sat.bOtLinkLost = false;       // a switch-off ends the OpenTherm-loss state; the loss path sets it again after this call (TASK-1365)
   satSetControlMode(SAT_MODE_OFF);
   satPwmReset();                       // also when the mode was not PWM: a safety trip must leave no stale PWM state
   _sat_lastControlCS = 0.0f;
@@ -2398,6 +2403,11 @@ void satDisable()
   // physical thermostat resumes authority -- OTGW is a gateway between thermostat and boiler.
   // (This is the disabled-handover only; while SAT is ENABLED it implements a per-heating-system
   // COLD_SETPOINT cold-cutoff that commands the boiler off on low demand -- see ADR-150 / TASK-891.2.)
+  if (handedBack) {
+    satResetCmdCache();
+    SATDebugTln(F("SAT: disabled during an OpenTherm loss, hand-back already sent"));
+    return;
+  }
   satEnqueueOwnCS("CS=0");
   // TASK-1346: also hand back the CH override. CH= only counts while a CS override is
   // active (gateway.asm:53, pyotgw.py:602-603), but the flag itself stays: when the
@@ -2417,6 +2427,80 @@ void satDisable()
   // async_tcp task (REST, settings POST) and the loop task owns the MQTT publish state
   // (TASK-1176). satControlLoop() publishes the new state on its next pass (TASK-1284).
 }
+
+// --- satOtLink begin
+// TASK-1365, Sergeant D entries 39 and 47: when SAT sees no valid OpenTherm it hands the boiler back
+// once, with the same commands as a user switch-off (satDisable(): CS=0, CH=1, MM=T), and then sends
+// nothing to the boiler until a boiler reply arrives again. SAT stays enabled; settings are untouched.
+// PROVISIONAL, not confirmed by Sergeant D (entry 47, Open; queued as Q33 and Q34 in
+// docs/sat/open-questions.md): what counts as "no valid OpenTherm" and the automatic resume.
+// Current reading: no boiler reply (B frame) for 30 s. Any B frame counts, a Data-Invalid reply
+// included (OTDirect.ino bridges it as 'B'; the PIC prints it as a B line). Measured with millis()
+// (state.otBus.iBoilerLastSeenMs), because time() jumps at NTP sync. Silence is measured from the
+// later of the last B frame and _sat_otLinkBaseMs: SAT's first pass after boot, the last pass on
+// which SAT was disabled or a flash ran, or the last exempt pass. A slow boot, a flash, a switch-off
+// or an exempt period therefore does not count as silence.
+// Resume: the first B frame stamped after the hand-back (a changed stamp, so a millis() wrap during
+// a long loss cannot fake one). The hand-back is satDisable(), which also resets PID, PWM and the
+// curve recommendation and persists the zeroed PID; SAT stays enabled and keeps owning MsgID 1.
+// Exempt: SAT simulation (satSimulationBlocksBusTx() keeps every SAT command off the bus, so a
+// simulation started during a loss leaves the loss state) and PIC PS=1 summary mode (the PIC
+// prints no B lines; the loss state is held, so only a boiler reply resumes). OT-Direct in PS=1
+// still bridges every B frame and is checked normally. With no command interface at all (no PIC,
+// not OT-Direct) the check is skipped, so the existing 5-tick interface trip still latches.
+// A user switch-off or the MQTT-takeover lift during a loss does not send the hand-back again
+// (satDisable() checks the flag). A safety trip rebases the window like a switch-off.
+// Runs from satControlLoopRun() on the loop task, never from processOT().
+static const uint32_t SAT_OT_LINK_LOST_MS = 30000UL;
+static const uint8_t  SAT_OTLINK_NONE   = 0;
+static const uint8_t  SAT_OTLINK_LOST   = 1;
+static const uint8_t  SAT_OTLINK_RESUME = 2;
+static uint32_t _sat_otLinkBaseMs = 0;     // seeded on SAT's first pass (satOtLinkStep)
+static uint32_t _sat_otLinkLostStamp = 0;  // iBoilerLastSeenMs at the hand-back
+
+static uint8_t satOtLinkDecide(uint32_t nowMs, uint32_t lastBoilerMs, uint32_t baseMs, bool lost, uint32_t lostStamp)
+{
+  if (lost) return (lastBoilerMs != lostStamp) ? SAT_OTLINK_RESUME : SAT_OTLINK_NONE;   // only a new boiler reply resumes
+  const bool alive = (lastBoilerMs != 0) && ((uint32_t)(nowMs - lastBoilerMs) < SAT_OT_LINK_LOST_MS);
+  const bool quiet = !alive && ((uint32_t)(nowMs - baseMs) >= SAT_OT_LINK_LOST_MS);
+  return quiet ? SAT_OTLINK_LOST : SAT_OTLINK_NONE;
+}
+
+// Returns true while the link is lost: the caller ends the pass before any sender runs.
+static bool satOtLinkStep()
+{
+  static bool seeded = false;              // silence counts from SAT's first pass, not from the ESP boot
+  const uint32_t nowMs = millis();
+  if (!seeded) { seeded = true; _sat_otLinkBaseMs = nowMs; }
+  if (!hasOTCommandInterface()) {          // no PIC, no OT-Direct: the 5-tick interface trip (SAT_MAX_PIC_FAILS) handles it
+    _sat_otLinkBaseMs = nowMs;
+    return state.sat.bOtLinkLost;          // a loss entered earlier is held
+  }
+  const bool picSummary = state.otBus.bPSmode && isPICEnabled();
+  if (settings.sat.bSimulation || picSummary) {
+    _sat_otLinkBaseMs = nowMs;             // leaving the exemption starts a fresh 30 s window
+    if (!settings.sat.bSimulation || !state.sat.bOtLinkLost) return state.sat.bOtLinkLost;   // PIC PS=1 holds
+  }
+  uint8_t action = SAT_OTLINK_RESUME;      // simulation during a loss: no bus traffic, leave the loss state
+  if (!settings.sat.bSimulation) {
+    action = satOtLinkDecide(nowMs, state.otBus.iBoilerLastSeenMs, _sat_otLinkBaseMs,
+                             state.sat.bOtLinkLost, _sat_otLinkLostStamp);
+  }
+  if (action == SAT_OTLINK_LOST) {
+    DebugTln(F("SAT: no boiler reply for 30 s, boiler handed back (CS=0, CH=1, MM=T)"));
+    satDisable();                          // the one hand-back: CS=0, CH=1, MM=T, cache reset
+    state.sat.bOtLinkLost = true;          // after satDisable(), which clears it
+    _sat_otLinkLostStamp = state.otBus.iBoilerLastSeenMs;
+    satNarrate_P(PSTR("OpenTherm lost: boiler handed back"));
+  } else if (action == SAT_OTLINK_RESUME) {
+    state.sat.bOtLinkLost = false;
+    satResetCmdCache();                    // the next control tick re-sends CS, MM and CH
+    DebugTln(F("SAT: boiler reply seen again, SAT resumes"));
+    satNarrate_P(PSTR("OpenTherm back: SAT resumes"));
+  }
+  return state.sat.bOtLinkLost;
+}
+// --- satOtLink end
 
 //=== Flush short-lived SAT data (Task #237) ===
 // Clears PID integral and cycle window from both memory and LittleFS.
@@ -2637,6 +2721,7 @@ void satSendStatusJSON()
     je.field(F("fallback_active"),      snap->st.sat.bFallbackActive);
     je.field(F("push_refused"),         snap->st.sat.bPushRefused);
     je.field(F("room_temp_lost"),       snap->st.sat.bRoomTempLost);
+    je.field(F("ot_link_lost"),         snap->st.sat.bOtLinkLost);
     je.field(F("fallback_reason"),      (int32_t)snap->st.sat.eFallbackReason);
     je.field(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
     je.field(F("current_modulation"),   (int32_t)snap->st.sat.iCurrentModulation);
@@ -2837,7 +2922,7 @@ static const char* satSimmerPerception(float indexC) {
 // the ADR-111 heartbeat keeps the retained values fresh. A REST or settings disable therefore
 // reaches the broker on the next loop pass. Shadows are file-scope so satRepublishCoreState()
 // can reset them.
-static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_room_temp_lost, s_core_external_temp_enable;
+static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_room_temp_lost, s_core_ot_link_lost, s_core_external_temp_enable;
 static SATShadowS s_core_mode, s_core_preset, s_core_control_mode;
 
 static void satPublishCoreState()
@@ -2850,6 +2935,7 @@ static void satPublishCoreState()
   publishIfChangedB(F("sat/fallback_active"),  state.sat.bFallbackActive,   s_core_fallback_active,  true);
   publishIfChangedB(F("sat/push_refused"),     state.sat.bPushRefused,      s_core_push_refused,     true);
   publishIfChangedB(F("sat/room_temp_lost"),   state.sat.bRoomTempLost,     s_core_room_temp_lost,   true);
+  publishIfChangedB(F("sat/ot_link_lost"),     state.sat.bOtLinkLost,       s_core_ot_link_lost,     true);
   publishIfChangedB(F("sat/external_temp_enable"), settings.sat.bUseExternalTemp, s_core_external_temp_enable, true);
 
   // sat/mode is the ACTUAL control mode; sat/control_mode is the one the control_mode command
@@ -2875,6 +2961,7 @@ void satRepublishCoreState()
   memset(&s_core_fallback_active, 0, sizeof(s_core_fallback_active));
   memset(&s_core_push_refused, 0, sizeof(s_core_push_refused));
   memset(&s_core_room_temp_lost, 0, sizeof(s_core_room_temp_lost));
+  memset(&s_core_ot_link_lost, 0, sizeof(s_core_ot_link_lost));
   memset(&s_core_external_temp_enable, 0, sizeof(s_core_external_temp_enable));
   memset(&s_core_mode, 0, sizeof(s_core_mode));
   memset(&s_core_control_mode, 0, sizeof(s_core_control_mode));
@@ -4814,6 +4901,8 @@ static void satControlLoopRun()
     if (state.sat.bActive) {
       satDisable();
     }
+    _sat_otLinkBaseMs = millis();          // TASK-1365: a flash or a switch-off is not OpenTherm silence
+    if (!satIsEnabled()) state.sat.bOtLinkLost = false;
     return;
   }
 
@@ -4823,7 +4912,12 @@ static void satControlLoopRun()
   satUpdateThermalLearning();
 
   // If safety tripped, stay disabled until explicitly re-enabled
+  if (state.sat.bSafetyTripped) _sat_otLinkBaseMs = millis();   // TASK-1365: a trip is a stop, not OpenTherm silence
   if (state.sat.bSafetyTripped) return;
+
+  // TASK-1365: no boiler reply for 30 s -> one hand-back, then nothing to the boiler until a reply
+  // returns. Placed before every SAT sender below (boot CS=0, PIC keepalive, PWM refresh, control tick).
+  if (satOtLinkStep()) return;
 
   // Boot safety deferred: if CS=0 wasn't sent during initSAT(), send it on the
   // first call where an OT command interface is available.
