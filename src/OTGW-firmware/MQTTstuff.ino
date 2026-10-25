@@ -1849,6 +1849,12 @@ void loopMQTTDiscovery()
 // Build a discovery context from the current MQTT state.
 // Caller sets ctx.isFirstEntity as appropriate.
 static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
+  // configuration_url ("cu"): the IP, not the hostname, because <host>.local does not
+  // resolve on every client (TASK-1378). Rebuilt per context, so a republish after an
+  // IP change carries the new address.
+  static char configUrl[24];  // "http://255.255.255.255/" = 23 + nul
+  const IPAddress ip = WiFi.localIP();
+  snprintf_P(configUrl, sizeof(configUrl), PSTR("http://%u.%u.%u.%u/"), ip[0], ip[1], ip[2], ip[3]);
   HaDiscoveryContext ctx;
   ctx.nodeId = NodeId;
   ctx.hostname = CSTR(settings.sHostname);
@@ -1856,6 +1862,7 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
   ctx.mqttPubTopic = MQTTPubNamespace;
   ctx.mqttSubTopic = MQTTSubNamespace;
   ctx.haPrefix = CSTR(settings.mqtt.sHaprefix);
+  ctx.configUrl = configUrl;
   ctx.isFirstEntity = isFirst;
   ctx.sourceSuffix = "";
   ctx.sourceName = "";

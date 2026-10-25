@@ -1,0 +1,25 @@
+{
+  "result": "ok",
+  "seconds": 43.8,
+  "before": "1.7.8-beta.6+54cbe02",
+  "after": "1.7.8-beta.6+54cbe02",
+  "uptime_min_before": 4,
+  "uptime_min_after": 0,
+  "console_tail": [
+    "[OTA] State: Device is healthy",
+    "[OTA] State: Device is healthy",
+    "[OTA] State: Device is healthy",
+    "[OTA] State: Device is healthy",
+    "[OTA] State: Device is healthy",
+    "[OTA] State: Device is healthy",
+    "[OTA] State: Device is healthy",
+    "[OTA] State: Device is healthy",
+    "Hash=",
+    "%c\ud83d\udd27 OTGW Debug Helper Loaded color: #00ff00; font-weight: bold; font-size: 14px;",
+    "%cType otgwDebug.help() for available commands color: #ffaa00;",
+    "Storage quota: 5120.19 MB",
+    "Storage used: 0.19 MB",
+    "Storage available: 5120.00 MB",
+    "Normal mode: max 10,000 lines (mem: 7,473,800, storage: 8,590,248)"
+  ]
+}

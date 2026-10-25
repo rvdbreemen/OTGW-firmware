@@ -44,7 +44,7 @@
              let fileSize = document.querySelector('fileSize');
              let fileInput = document.querySelector('input[name="upload"]');
              let uploadBtn = document.querySelector('input[value="Upload"]');
-             let uploadForm = document.querySelector('form[action="/upload"]');
+             let uploadForm = document.querySelector('form[action="upload"]');
              let freeBytes = 0;
 
              // Create progress bar
@@ -83,7 +83,7 @@
              }
 
              function loadFileList(highlightFile = null) {
-                 uploadForm.action = '/upload?path=' + encodeURIComponent(currentPath);
+                 uploadForm.action = 'upload?path=' + encodeURIComponent(currentPath);
                  
                  fetch('api/listfiles?path=' + encodeURIComponent(currentPath))
                    .then(function (response) {
@@ -160,7 +160,9 @@
                        // Encode per segment so '/' stays a separator: assigning the raw path to
                        // href lets the URL parser eat a '#' as a fragment and a '?' as a query,
                        // so those files could be deleted (that link encodes) but never opened.
-                       const hrefPath = fullPath.split('/').map(encodeURIComponent).join('/');
+                       // No leading '/': page-relative, so the link also works behind a
+                       // reverse proxy that serves the device on a path prefix.
+                       const hrefPath = fullPath.split('/').map(encodeURIComponent).join('/').replace(/^\//, '');
 
                        if (files[i].type === 'dir') {
                          const nameCell = row.insertCell();
@@ -419,7 +421,7 @@
       
       <fieldset class="upload-box">
         <legend>Upload File</legend>
-        <form action="/upload" method="POST" enctype="multipart/form-data">
+        <form action="upload" method="POST" enctype="multipart/form-data">
              <input type="file" name="upload">
              <input type="submit" value="Upload" disabled>
         </form>
@@ -432,17 +434,17 @@
       <div class="system-actions">
            <h3>System Actions</h3>
            <div class="button-row">
-                <form action='/update' method='GET' class='desktop-only'>
+                <form action='update' method='GET' class='desktop-only'>
                   <input type='submit' class='button' name='SUBMIT' value='Update Firmware' ENABLED/>
                 </form>
-                <form action='/ReBoot'>
+                <form action='ReBoot'>
                   <input type='submit' class='button' name='SUBMIT' value='ReBoot'>
                 </form>
-                <form action='/ResetWireless'>
+                <form action='ResetWireless'>
                   <input type='submit' class='button' name='SUBMIT' value='Reset Wireless'>
                 </form>
-                <form action='/'>
-                  <input type='button' class='button' value='Exit FSexplorer' onclick="window.location.href='/'">
+                <form action='./'>
+                  <input type='button' class='button' value='Exit FSexplorer' onclick="window.location.href='./'">
                 </form>
            </div>
       </div>

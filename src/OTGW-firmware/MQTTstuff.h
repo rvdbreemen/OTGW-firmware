@@ -276,6 +276,7 @@ struct HaDiscoveryContext {
     const char *mqttPubTopic;
     const char *mqttSubTopic;
     const char *haPrefix;
+    const char *configUrl;  // device web UI, "http://<ip>/", shown in HA as "Visit device"
     // manufacturer/model are fixed PROGMEM constants (kMfrVal/kModelVal in
     // mqtt_configuratie.cpp), no longer ctx fields (TASK-903).
     bool        isFirstEntity;

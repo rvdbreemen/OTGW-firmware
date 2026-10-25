@@ -1950,6 +1950,7 @@ static const char kIds[]      PROGMEM = "identifiers";
 static const char kMfr[]      PROGMEM = "manufacturer";
 static const char kModel[]    PROGMEM = "model";
 static const char kSwVer[]    PROGMEM = "sw_version";
+static const char kCfgUrl[]   PROGMEM = "cu";  // configuration_url: HA "Visit device" link
 static const char kDevName[]  PROGMEM = "name";
 static const char kUniqId[]   PROGMEM = "uniq_id";
 static const char kName[]     PROGMEM = "name";
@@ -1995,6 +1996,10 @@ static bool writeDeviceBlock(MqttJsonWriter &w, const HaDiscoveryContext &ctx) {
     if (!w.writeProgmem(PSTR(")\""))) return false;
     if (!writeJsonComma(w)) return false;
     if (!writeJsonKV(w, kSwVer, ctx.version)) return false;
+    if (ctx.configUrl && ctx.configUrl[0]) {
+      if (!writeJsonComma(w)) return false;
+      if (!writeJsonKV(w, kCfgUrl, ctx.configUrl)) return false;
+    }
   }
 
   return w.writeChar('}');

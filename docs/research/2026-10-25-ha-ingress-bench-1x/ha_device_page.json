@@ -1,0 +1,20 @@
+[
+  {
+    "id": "45f14bfc1ddb43b2828bca2c7c0e83c5",
+    "name": "OpenTherm Gateway (OTGW2)",
+    "sw_version": "2.0.0-alpha.504+51c1290 (25-10-2026)",
+    "configuration_url": null,
+    "visit_link": null
+  },
+  {
+    "id": "9844c728762e0e69daa06f2b4706ec12",
+    "name": "OpenTherm Gateway (OTGW)",
+    "sw_version": "1.7.8-beta.6+54cbe02 (25-10-2026)",
+    "configuration_url": "http://192.168.88.68/",
+    "visit_link": "http://192.168.88.68/",
+    "visit_opened": {
+      "url": "http://192.168.88.68/",
+      "devVersion": "1.7.8-beta.6+54cbe02"
+    }
+  }
+]
