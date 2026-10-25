@@ -2586,3 +2586,72 @@ stays).
 **Open:** what counts as "no valid OpenTherm" (the plan proposes no boiler reply for 30 s) and
 whether SAT resumes by itself when OpenTherm returns (the plan recommends automatic resume); both
 are in the TASK-1365 plan and not yet confirmed by him.
+
+## 48. A user MaxTSet slider, bounded by MsgID 57, sent to the boiler (2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 05:56 and 06:10 UTC, a new development he asked for (it also
+answers Q15, "Maximum flow setpoint: a user setting? Which defaults?"):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563793351961223221
+https://discord.com/channels/812969634638725140/1514720723980259460/1563796961771913227
+
+**Quoted:**
+
+> @BlueFlame Bot NEW DEVELOPMENT:
+> Create a MaxTset slider. The limit values should be  the MsgID 57 values ( Lower/Higher ). Then pass this value to the boiler. If the boiler doesn’t report the MsgID 57, then use as default lower/upper limit values the 20/80
+
+> This development should be identical to the DHW Setpoint slider.
+
+**Interpretation (ours):** a user setting "maximum CH setpoint" with a slider whose range is the
+boiler's MsgID 57 bounds (MaxTSet lower/upper), or 20..80 °C when the boiler does not report them;
+the chosen value is written to the boiler (MsgID 57; `SH=` on a PIC gateway) and SAT uses it as its
+ceiling. "Identical to the DHW Setpoint slider" means the same pattern as the DHW setpoint (bounds
+from MsgID 48, value sent to the boiler; entry 33).
+
+**Settled by this statement:**
+
+- Q15: the maximum flow setpoint becomes a user setting (a slider), bounded by MsgID 57 or 20..80.
+- The value is passed to the boiler, not only used inside SAT.
+
+**Compared with thermo-nova and the firmware:** thermo-nova has a user `maximum_setpoint` (range
+10..100, `config_flow.py:612-613`) used as SAT's ceiling. Firmware today: a fixed cap per system
+(62 / 45 / 40, `SATcontrol.ino` around 293-327, audit #29) combined with the boiler's MaxTSet
+(`SATcontrol.ino:316`); no user setting and nothing written to the boiler.
+
+**Changes an earlier entry:** none.
+
+**Task:** TASK-1373.
+
+**Open:** the default value when nothing is chosen (keep 62/45/40 per system, or the boiler's own
+MaxTSet); whether writing MsgID 57 is safe on boilers that reject the write.
+
+## 49. Fireplace mode: a switch that makes SAT heat on the heating curve only (2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 06:18 UTC, a new development he asked for:
+https://discord.com/channels/812969634638725140/1514720723980259460/1563799007157817405
+
+**Quoted:**
+
+> @BlueFlame Bot New development II:
+> Create a switch called “Fireplace mode”
+>
+> When this switch is enabled SAT will send only the heating curve value to the control loop and not the PID. The behavior of SAT will be identical to the missing indoor temperature senso we discussed earlier.
+>
+> Some homes have a stove or an AC heating their primary room which most often the indoor temperature sensor is placed. When they are heating this specific room, SAT stops the heating completely because the setpoint is reached while the other rooms are still cold. This new development will let SAT continue heating the home regardless of the main room reached the setpoint or not.
+
+**Settled by this statement:**
+
+- A user switch "Fireplace mode" (default off). While on, SAT behaves exactly as with a missing room
+  temperature (entries 38 and 46): the setpoint is the heating curve only, with P, I and D at 0.
+- Purpose: a stove or air conditioner heats the room with the sensor; the rest of the house must
+  keep getting heat.
+
+**Compared with thermo-nova and the firmware:** not found in thermo-nova (grep for fireplace/stove in
+`custom_components/sat`: nothing). Firmware: the curve-only path exists since TASK-1364
+(`satPidCurveOnly`, alpha.500); the switch reuses it.
+
+**Changes an earlier entry:** none (it reuses entries 38 and 46).
+
+**Task:** TASK-1374.
+
+**Open:** whether the room temperature is still shown and recorded while the switch is on (we will
+keep showing it), and whether the switch should end by itself (for example at the next morning).

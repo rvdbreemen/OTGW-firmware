@@ -37,7 +37,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q12 | asked again with more detail 2026-10-24 21:31 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563666349450985620)) | Hourly start cap: count hot-water ignitions or not? (audit #18) | - |
 | Q13 | answered (entry 44: every update) -> TASK-1370 | CS/MM/CH refresh: every 5 s as thermo-nova, or on change + 300 s? (audit #24) | ADR-199 |
 | Q14 | answered (entry 45: flow-based start, CS/PM=25 flood, MI=500) -> TASK-1371 | PWM ignition hold without a return temperature sensor (audit #27) | - |
-| Q15 | queued | Maximum flow setpoint: a user setting, and which defaults? (audit #29) | - |
+| Q15 | answered (entry 48: a MaxTSet slider bounded by MsgID 57, sent to the boiler) -> TASK-1373 | Maximum flow setpoint: a user setting, and which defaults? (audit #29) | - |
 | Q16 | queued | Cycles per hour default and range (audit #30) | - |
 | Q17 | queued | DHW setpoint: SW= on change, slider bounded by MsgID 48 (audit #31, entry 33) | - |
 | Q18 | queued | Zones: follow area.py (max, no headroom, cap overshoot)? (audit #32, entry 35) | - |
