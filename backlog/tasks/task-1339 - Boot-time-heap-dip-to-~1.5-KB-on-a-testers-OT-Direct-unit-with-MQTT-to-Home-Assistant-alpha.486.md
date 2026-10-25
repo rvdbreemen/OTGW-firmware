@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T07:29:00Z'
-updated_date: '2026-10-25T17:23:00Z'
+updated_date: '2026-10-25T18:41:00Z'
 labels:
   - heap
   - mqtt
@@ -50,4 +50,6 @@ Sergeant D capture 2026-10-24 06:41 UTC (alpha.486, transcript-20261024-093559-.
 2026-10-25 first [HEAP] trace on alpha.505 (bench OTGW32, broker .32, 2 boots, telnet from boot): boot 1 hd_min_free_heap 2032 B (block 13812), burst window minimum 5700 B within the first second after onMqttConnect while the outbox was already empty at the 1 s sample (outbox drains fast; the dip is the queueing moment), burst end 'drained' at ~5 s; boot 2 hd_min 9032, burst window minimum 24504. Drip ticks: OT ID 0 queues 35 topics (free 50252/48672), OT ID 252 35 topics (free ~54.8 KB), and at the ID 254 tick the outbox held 126 packets (free 46364 boot 1) while the tick itself queued 5: other publishers (status first-seen) fill the outbox at that moment. Boot 1's 2032 B is lower than any window minimum, so it happened outside the windows (before connect, between ticks, or the region-sum effect). Logs: scratchpad boot505-1.txt / boot505-2.txt. Next: same trace from Sergeant D's unit (asked, msg 1563898246894714940).
 
 2026-10-25 Sergeant D transcript alpha.505 (msg 1563963515209908374): capture started at uptime ~1 min, banner minFree 1640, stats min_free_heap 1300; no [HEAP] burst/drip lines (they ran before telnet attached). RSSI -56. Reboot log shows paired software resets ~1 min apart on each update (OTA app + fs). Asked him to start the capture first and reboot from the UI (the script reconnects telnet within 500 ms, capture-mqtt-debug.bat:72/:1347).
+
+2026-10-25 Sergeant D capture with reboot (msg 1563968524693545032, analysed + verified wf_a5432f10): no [HEAP] lines; telnet went silent ~14 s after restart while setup() ran (unit kept working, MQTT online). Previous boot (20 min uptime): banner minFree 1640, maxblock histogram <2k 1, <8k 1, >=16k 1218 (a short dip, same shape as the bench), drip_slow_mode 1. His unit finds a W5500 (bench does not). Follow-ups: TASK-1395 (telnet stall / q during setup), TASK-1396 (capture script). Asked him for a device/info read 20 min after a reboot without telnet (msg 1563985382469533958).
 <!-- SECTION:NOTES:END -->
