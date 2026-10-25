@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.509
+**  Version  : v2.0.0-alpha.510
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -395,6 +395,7 @@ bool satSimInjectEvent(const char* event, float value, int32_t durationS);  // T
 void satSendStatusJSON();
 uint32_t satCycleGetFlameOnStartMs();
 uint32_t satCycleGetFlameOffStartMs();
+bool    satPwmIsIdle();             // TASK-1387: PWM status IDLE, read by the cycle classifier (SATcontrol.ino)
 bool    satCycleIsHourLimitReached();
 uint8_t satCycleGetCyclesThisHour();
 void satHCRSaveState();

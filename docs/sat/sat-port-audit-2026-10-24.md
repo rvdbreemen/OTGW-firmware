@@ -1007,6 +1007,8 @@ Each paragraph gives:
 loop rate was not measured.
 
 - **Action:** use 32-bit counters, or count on the 1 Hz sample.
+- **Closed 2026-10-25 by TASK-1387:** the kind counters are `uint32_t` and count on the 1 Hz sample
+  (SATcycles.ino:112-117, :907-929).
 
 **#62. Boiler fault freeze.**
 

@@ -4712,7 +4712,7 @@ components:
           description: "Total boiler cycles counted"
         cycle_fraction_ch:
           type: number
-          description: "Fraction of the last cycle spent on CH (0.0-1.0)"
+          description: "Fraction of the last cycle's 1 Hz samples with CH enabled and no DHW (0.0-1.0); with cycle_fraction_dhw it need not add up to 1"
         cycle_fraction_dhw:
           type: number
           description: "Fraction of the last cycle spent on DHW (0.0-1.0)"

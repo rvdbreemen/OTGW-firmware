@@ -136,6 +136,31 @@ int main(int argc, char** argv) {
     printf("mode=%d calls=%d\n", state.sat.eControlMode, calls);
     return 0;
   }
+  if (!strcmp(sc, "idle")) {               // TASK-1387: PWM IDLE flag (pwm.py PWMStatus.IDLE), read by the cycle classifier
+#ifdef HAS_IDLE
+    g_flameOffStart = g_ms - 600000UL;     // long OFF: the schedule step would start an ON phase
+    state.sat.eControlMode = SAT_MODE_PWM;
+    _pwm_idle = false; satPwmReset();                         const int a = (int)_pwm_idle;   // reset -> IDLE (pwm.py:92)
+    satApplyPWM(pid);                                         const int b = (int)_pwm_idle;   // first step with a flow -> not IDLE (pwm.py:154-180)
+    // duty 0.39 (range 3, BT 47.2 as the legacy scenarios): range 5 would return before the hour-limit check
+    satPwmReset(); _pwm_effectiveBoilerTemp = 47.2f; g_hourLimit = true; satApplyPWM(pid); const int c = (int)_pwm_idle; // hour-limit return keeps IDLE
+    _pwm_idle = false; satApplyPWM(pid);                      const int c2 = (int)_pwm_idle;  // ... and keeps not-IDLE
+    g_hourLimit = false;
+    g_flow = 0.0f; satApplyPWM(pid);                          const int d = (int)_pwm_idle;   // no flow temperature -> IDLE (pwm.py:122-128)
+    // overshoot switch CONTINUOUS -> PWM through the real satCycleCheckAutoSwitch(): not IDLE on the switch tick
+    state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false; _pwm_idle = true;
+    g_flow = 45.0f; _sustain_lastCheckMs = g_ms;
+    for (int i = 0; i < 400 && state.sat.eControlMode == SAT_MODE_CONTINUOUS; i++) { g_ms += 1000; CALL_AUTOSWITCH(pid); }
+    const int e = (int)_pwm_idle; const int emode = state.sat.eControlMode;
+    // a switch to PWM without a flow temperature stays IDLE (the first step would idle it too)
+    state.sat.eControlMode = SAT_MODE_CONTINUOUS; g_flow = 0.0f; satSetControlMode(SAT_MODE_PWM);
+    const int f = (int)_pwm_idle;
+    printf("reset=%d step=%d limit=%d limit_busy=%d noflow=%d switch=%d switchmode=%d switch_noflow=%d\n", a, b, c, c2, d, e, emode, f);
+#else
+    printf("reset=-1\n");
+#endif
+    return 0;
+  }
   if (!strcmp(sc, "uh")) {                 // uh protection pwmFlameRequested: 200 s of low flow, 1 s calls
     state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = atoi(argv[3]) != 0;
     state.sat.fFinalSetpoint = pid; g_flow = 20.0f; _sustain_lastCheckMs = g_ms;
@@ -393,6 +418,9 @@ def build(workdir: Path):
     # TASK-1367: the overshoot timer is a start timestamp, not a seconds counter
     if "_sustain_overshootRunning" in cycles:
         flag += "#define HAS_OS_START 1\n"
+    # TASK-1387: the PWM IDLE flag read by the cycle classifier
+    if "_pwm_idle" in body:
+        flag += "#define HAS_IDLE 1\n"
     chenable = (REPO / "src" / "OTGW-firmware" / "SATchEnable.h").as_posix()
     cpp.write_text(flag + STUBS.replace("@FORCEFIELD@", "bool bForcePWM=false;" if has_force else "").replace("@AUTOFIELD@", "bool bPwmAutoSwitch=true;" if has_auto else "").replace("@CHENABLE@", chenable) + pre + body + cycles + MAIN, encoding="utf-8")
     return compile_cpp(cpp, workdir / "t.exe")
@@ -617,6 +645,25 @@ class SatPwmOverride(unittest.TestCase):
 
     def test_pwm_reset_clears_stale_state(self):
         self.assertEqual(self.run_sc("reset", 1), {"req": "0", "wait": "0", "hold": "0.0", "onms": "0", "mode": "2", "bt": "0.0"})
+
+    # --- TASK-1387: PWM IDLE (thermo-nova PWMStatus.IDLE), read by the cycle classifier (classifier.py:28-29) ---
+    def test_pwm_idle_flag_follows_pwm_py(self):
+        r = self.run_sc("idle", 1)
+        self.assertNotEqual(r["reset"], "-1", "no _pwm_idle flag in this SATcontrol.ino")
+        self.assertEqual(r["reset"], "1")         # reset(): IDLE (pwm.py:92)
+        self.assertEqual(r["step"], "0")          # a step with a flow temperature leaves IDLE (pwm.py:154-180)
+        self.assertEqual(r["limit"], "1")         # the hour-limit return keeps the status (pwm.py:156-158)
+        self.assertEqual(r["limit_busy"], "0")
+        self.assertEqual(r["noflow"], "1")        # flow missing: IDLE (pwm.py:122-128)
+
+    def test_overshoot_switch_tick_is_not_idle(self):
+        # thermo-nova runs pwm.update() in the same pass that enables PWM (heating_control.py:206-215): a cycle
+        # that ends before the firmware's next control tick must not be classified as an IDLE PWM cycle.
+        r = self.run_sc("idle", 1)
+        self.assertNotEqual(r["reset"], "-1", "no _pwm_idle flag in this SATcontrol.ino")
+        self.assertEqual(r["switchmode"], "2")
+        self.assertEqual(r["switch"], "0")
+        self.assertEqual(r["switch_noflow"], "1")
 
     def test_mode_switch_resets_pwm_state(self):
         r = self.run_sc("reset", 1, "mode")

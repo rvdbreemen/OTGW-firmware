@@ -24,7 +24,6 @@
 
 // --- Cycle Constants ---
 static const uint8_t  SAT_CYCLE_HISTORY_SIZE       = 16;
-static const float    SAT_CYCLE_SHORT_DURATION_SEC  = 60.0f;   // Cycles shorter than this = SHORT_CYCLING
 // Overshoot margin now read from settings.sat.fOvershootMargin (default 2.0C; Python OVERSHOOT_MARGIN_CELSIUS is 3.0)
 static const float    SAT_OVERSHOOT_SUSTAIN_SEC     = 60.0f;   // Sustained overshoot before PWM switch
 static const float    SAT_UNDERSHOOT_MARGIN_C       = 3.0f;    // Below-setpoint margin for underheat (Python UNDERSHOOT_MARGIN_CELSIUS=-3.0)
@@ -80,7 +79,6 @@ static float satGetColdSetpoint();
 
 // TASK-891.4 classifier / shape-metric constants
 static const float SAT_IN_BAND_MARGIN_C     = 1.0f;   // |flow - control_sp| <= this => in-band (Python IN_BAND_MARGIN_CELSIUS)
-static const float SAT_CYCLE_SHORT_FLOOR_SEC = 30.0f; // sane floor for PWM short-cycle threshold when configured on-time is unset/0
 static const float SAT_SHAPE_WARMUP_SEC     = 60.0f;  // shape metrics ignore the first N s of a cycle (Python effective_warmup cap = min(60, 0.25*duration); streaming approx uses the 60s cap)
 
 // Accumulator for flow-return delta during active cycle
@@ -111,8 +109,12 @@ static float    _cycle_minFlowTemp      = 999.0f;
 static float    _cycle_setpointAtStart  = 0.0f;
 static float    _cycle_overshootSec     = 0.0f;
 static uint32_t _cycle_lastSampleMs     = 0;
-static uint16_t _cycle_dhwSamples       = 0;   // samples where DHW was active
-static uint16_t _cycle_totalSamples     = 0;   // total samples this cycle
+// Cycle kind and hot-water-in-tail inputs, counted at 1 Hz in satCycleSample() (TASK-1387).
+// uint32_t: a cycle of more than 65535 s (18 h of continuous burn) must not wrap the counters.
+static uint32_t _cycle_dhwSamples       = 0;   // samples with DHW active (Statusflags bit 2), tracker.py:103
+static uint32_t _cycle_chSamples        = 0;   // samples with CH enabled and no DHW, tracker.py:104
+static uint32_t _cycle_totalSamples     = 0;   // total 1 Hz samples this cycle (tracker.py sample_count)
+static uint32_t _cycle_lastDhwMs        = 0;   // time of the last DHW sample, ms after flame-on (DHW-in-tail test; valid while _cycle_dhwSamples > 0)
 static SATCyclePhase _cycle_phase       = SAT_CP_IDLE;
 static uint32_t _cycle_phaseStartMs     = 0;
 
@@ -559,14 +561,23 @@ static float _tailPercentile(uint8_t pct)
   return sorted[idx];
 }
 
-//=== Determine cycle kind from DHW sample fraction ===
+//=== Cycle kind (TASK-1387): thermo-nova cycles/tracker.py:101-108 and _determine_cycle_kind :314-324 ===
+// Inputs are counted at 1 Hz in satCycleSample():
+//   DHW = slave DHW-mode bit, Statusflags bit 2 (device_state.hot_water_active,
+//         coordinator/serial/__init__.py:57-59), tracker.py:103;
+//   CH  = master CH-enable bit, Statusflags bit 8 (device_state.central_heating = coordinator.active,
+//         coordinator/__init__.py:136, serial/__init__.py:53-55), counted only without DHW, tracker.py:104.
+// The integer cross-multiplication is the same strict comparison as tracker.py's float fractions.
 static SATCycleKind _cycleDetectKind()
 {
-  if (_cycle_totalSamples < 3) return SAT_CK_UNKNOWN;
-  float dhwFrac = (float)_cycle_dhwSamples / (float)_cycle_totalSamples;
-  if (dhwFrac > 0.8f) return SAT_CK_DHW;
-  if (dhwFrac < 0.2f) return SAT_CK_CH;
-  return SAT_CK_MIXED;
+  const uint64_t n = _cycle_totalSamples;
+  if (n == 0) return SAT_CK_UNKNOWN;
+  const uint64_t dhw = _cycle_dhwSamples;
+  const uint64_t ch  = _cycle_chSamples;
+  if (dhw * 5 > n * 4 && ch * 5 < n) return SAT_CK_DHW;    // tracker.py:315-316 dhw > 0.8 and ch < 0.2
+  if (ch * 5 > n * 4 && dhw * 5 < n) return SAT_CK_CH;     // tracker.py:318-319 ch > 0.8 and dhw < 0.2
+  if (dhw * 10 > n && ch * 10 > n)   return SAT_CK_MIXED;  // tracker.py:321-322 dhw > 0.1 and ch > 0.1
+  return SAT_CK_UNKNOWN;                                   // tracker.py:324
 }
 
 //=== Record a completed cycle into history ===
@@ -591,11 +602,11 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
   state.sat.fCycleOvershootSec = overshootSec;
   state.sat.fLastCycleDuration = durationSec;
   state.sat.eLastCycleKind = kind;
-  // Compute CH/DHW fractions from sample counts
+  // CH/DHW fractions as tracker.py:106-107 (fraction_space_heating counts CH without DHW, so the two
+  // need not add up to 1)
   if (_cycle_totalSamples > 0) {
-    float dhwFrac = (float)_cycle_dhwSamples / (float)_cycle_totalSamples;
-    state.sat.fLastCycleFractionDHW = dhwFrac;
-    state.sat.fLastCycleFractionCH  = 1.0f - dhwFrac;
+    state.sat.fLastCycleFractionDHW = (float)_cycle_dhwSamples / (float)_cycle_totalSamples;
+    state.sat.fLastCycleFractionCH  = (float)_cycle_chSamples  / (float)_cycle_totalSamples;
   } else {
     state.sat.fLastCycleFractionDHW = 0.0f;
     state.sat.fLastCycleFractionCH  = 0.0f;
@@ -624,96 +635,79 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
   state.sat.fUnderheatFraction = _ema_underheatFrac;
 }
 
-//=== Classify a completed cycle (Task #225: uses p90/p10 flow temp, not max) ===
-// p90FlowTemp: 90th percentile of the flow samples (last SAT_FLOW_SAMPLE_SIZE s of the cycle)
-// p10FlowTemp: 10th percentile of the same samples
-// maxFlowTemp is still recorded for diagnostics but not used for classification.
-//
-// Verified scenarios (Python CycleClassifier.classify() parity — Task #225 AC#5):
-//   Scenario A — GOOD cycle: setpoint=55C, overshootMargin=2C
-//     Samples: all between 54C and 56.5C (90+ samples), duration=300s, overshootSec=5s
-//     p90=56.2C (<55+2=57 → no overshoot), p10=54.1C (>55-2=53 → no underheat)
-//     Classification: GOOD  [would have been OVERSHOOT with max_flow=56.5 if margin=1.5C]
-//
-//   Scenario B — OVERSHOOT cycle: setpoint=55C, overshootMargin=2C
-//     Samples: 90% between 57C and 58C, 10% spike to 62C at ignition, duration=400s, overshootSec=120s
-//     p90=57.8C (>57 → overshoot) AND overshootSec=120>10: OVERSHOOT
-//     With old max_flow classifier: also OVERSHOOT. No regression.
-//
-//   Scenario C — UNDERHEAT cycle: setpoint=55C, overshootMargin=2C
-//     Samples: all between 48C and 52C, duration=250s, overshootSec=0s
-//     p90=51.8C (<57 → no overshoot), p10=48.2C (<53 → underheat): UNDERHEAT
-//     With old classifier: also UNDERHEAT (min_flow=48.2<53). No regression.
-//     [p10 advantage: brief cold pocket at ignition start doesn't skew result]
-// TASK-891.4: mode-aware classifier (Python cycles/classifier.py parity).
-//   controlSp   = sent CH setpoint at cycle start (state.sat.fFinalSetpoint) — Python control_setpoint.
-//   requestedSp = PID requested setpoint snapshot at flame-off (state.sat.fPidOutput) — Python requested_setpoint.
-// Constant-per-cycle approximation: because percentile(flow - c) == percentile(flow) - c for a
-// per-cycle constant c, both error metrics are derived from the existing flow tail ring by
-// shifting the tail percentiles — no second per-sample ring is needed (heap win, AC#1/#6).
-//   flow_control_setpoint_error.p{50,90} = tailP{50,90} - controlSp
-//   flow_requested_setpoint_error.p90    = tailP90       - requestedSp
-// Ordering honours the no-regression clause: INSUFFICIENT -> SHORT -> OVERSHOOT (both modes) ->
-// mode-specific underheat -> GOOD/UNCERTAIN. Keeping SHORT ahead of OVERSHOOT prevents a short
-// overshooting cycle from flipping SHORT->OVERSHOOT.
-static SATCycleClass _cycleClassify(float durationSec, float tailP90, float tailP50,
-                                    float controlSp, float requestedSp, float overshootSec,
-                                    uint16_t sampleCount, bool isPwm, float onTimeSec)
+//=== Classify a completed cycle (TASK-1387, Sergeant D entry 55: match classifier.py exactly) ===
+// Port of thermo-nova cycles/classifier.py (pin 7beaaf5), rules in the same order; "cls:N" below is
+// that file's line. Firmware deviations, each decided or planned:
+//   - cold setpoint satGetColdSetpoint() (28.2 radiators / 21 underfloor, entries 7 and 11), not
+//     COLD_SETPOINT 22;
+//   - overshoot margin settings.sat.fOvershootMargin (2.0, `>=`, entries 15 and 37), not
+//     OVERSHOOT_MARGIN_CELSIUS 3.0 (cycles/const.py:10);
+//   - PWM underheat is labelled SAT_CYCLE_UNDERHEAT_PWM, continuous underheat SAT_CYCLE_UNDERHEAT;
+//   - a missing percentile (thermo-nova: p50/p90 None) has these stand-ins: controlSp <= 0 for the
+//     control-setpoint error (cls:71-72), requestedSp <= 0 for the requested-setpoint error (cls:42-43);
+//   - both setpoints are one value per cycle (controlSp = state.sat.fFinalSetpoint at flame-on,
+//     requestedSp = _sat_requestedSetpoint at flame-off), so percentile(flow - sp) = tailPxx - sp.
+//     thermo-nova uses the per-sample setpoints (tracker.py:267-271); that port is TASK-1405;
+//   - fewer than 3 samples is recorded as INSUFFICIENT; tracker.py:98-100 drops such a cycle;
+//   - pwmIdle comes from satPwmIsIdle(), an approximation of pwm.py's IDLE status;
+//   - the tail percentiles come from the last 180 s ring without tracker.py's warm-up exclusion
+//     (tail_start = max(start + min(60, 0.25 * duration), end - 180), tracker.py:113-116), so a cycle
+//     shorter than 240 s still has its first seconds in tailP50/tailP90.
+// The kind is _cycleDetectKind(); dhwInTail is "a DHW sample in the tail" (tail_metrics.
+// hot_water_active_fraction > 0, tracker.py:294-296), with the warm-up exclusion applied.
+static SATCycleClass _cycleClassify(float durationSec, uint32_t sampleCount, SATCycleKind kind,
+                                    bool dhwInTail, bool pwmEnabled, bool pwmIdle, bool pwmOn,
+                                    float onTimeSec, float tailP90, float tailP50,
+                                    float controlSp, float requestedSp)
 {
-  // INSUFFICIENT_DATA: no duration or too few samples (Python classify() duration<=0 + tracker <3 samples)
-  if (durationSec <= 0.0f || sampleCount < 3) {
-    return SAT_CYCLE_INSUFFICIENT;
+  // cls:19-20 (and the firmware's < 3 samples, see above)
+  if (durationSec <= 0.0f || sampleCount < 3) return SAT_CYCLE_INSUFFICIENT;
+
+  // cls:22-23
+  if (kind == SAT_CK_UNKNOWN) return SAT_CYCLE_UNCERTAIN;
+
+  // cls:25-26
+  if (dhwInTail) return SAT_CYCLE_UNCERTAIN;
+
+  // cls:28-29
+  if (pwmEnabled && pwmIdle) return SAT_CYCLE_UNCERTAIN;
+
+  const float coldSp = satGetColdSetpoint();
+
+  // cls:31-32 -> _classify_pwm, cls:40-66
+  if (pwmEnabled) {
+    // cls:42-43: flow_requested_setpoint_error p50/p90 missing
+    if (requestedSp <= 0.0f) return SAT_CYCLE_UNCERTAIN;
+    // cls:45: p90 of the requested-setpoint error <= UNDERSHOOT_MARGIN_CELSIUS (-3.0)
+    const float reqErrP90 = tailP90 - requestedSp;
+    if (reqErrP90 <= -SAT_UNDERSHOOT_MARGIN_C) {
+      // cls:48-49: the effective setpoint is the requested setpoint (never missing past cls:42-43 here)
+      if (requestedSp < coldSp) return SAT_CYCLE_UNCERTAIN;  // cls:51-52
+      return SAT_CYCLE_UNDERHEAT_PWM;                        // cls:54
+    }
+    // cls:56-64: the short-cycle test only while the PWM ON phase runs at cycle end
+    if (pwmOn) {
+      if (onTimeSec <= 0.0f) return SAT_CYCLE_SHORT;               // cls:57-61
+      if (durationSec < onTimeSec * 0.8f) return SAT_CYCLE_SHORT;  // cls:63-64
+    }
+    return SAT_CYCLE_GOOD;                                         // cls:66 (no OVERSHOOT for PWM)
   }
 
-  const float coldSp     = satGetColdSetpoint();
+  // cls:34-35 -> _classify_continuous, cls:69-90
+  // cls:71-72: flow_control_setpoint_error p50/p90 missing
+  if (controlSp <= 0.0f) return SAT_CYCLE_UNCERTAIN;
   const float ctrlErrP90 = tailP90 - controlSp;
   const float ctrlErrP50 = tailP50 - controlSp;
-  const float reqErrP90  = tailP90 - requestedSp;
-
-  // PWM underheat takes PRIORITY over SHORT (Python _classify_pwm checks underheat first;
-  // SHORT is only the non-underheat branch). Review fix: a short underheating PWM burst is
-  // UNDERHEAT_PWM, not SHORT_CYCLING, else it distorts the underheat fraction / health verdict.
-  if (isPwm && reqErrP90 <= -SAT_UNDERSHOOT_MARGIN_C) {
-    if (requestedSp < coldSp) return SAT_CYCLE_UNCERTAIN;
-    return SAT_CYCLE_UNDERHEAT_PWM;
-  }
-
-  // SHORT cycling: PWM keys off < 80% of the configured on-time (AC#3, Python _classify_pwm);
-  // continuous keeps the fixed floor. Sane floor when the configured on-time is unset/0.
-  float shortThreshSec;
-  if (isPwm) {
-    shortThreshSec = (onTimeSec > 0.0f) ? fmaxf(SAT_CYCLE_SHORT_FLOOR_SEC, onTimeSec * 0.8f)
-                                        : SAT_CYCLE_SHORT_DURATION_SEC;
-  } else {
-    shortThreshSec = SAT_CYCLE_SHORT_DURATION_SEC;
-  }
-  if (durationSec < shortThreshSec) {
-    return SAT_CYCLE_SHORT;
-  }
-
-  // Significant overshoot — kept in BOTH modes (no-regression): p90 control-error over margin
-  // AND overshoot timer confirms (guards against brief ignition spikes).
-  if (ctrlErrP90 >= settings.sat.fOvershootMargin && overshootSec > 10.0f) {
-    return SAT_CYCLE_OVERSHOOT;
-  }
-
-  if (isPwm) {
-    // PWM underheat already handled above (before SHORT); a non-short non-overshoot PWM cycle is GOOD.
-    return SAT_CYCLE_GOOD;
-  }
-
-  // Continuous underheat: tail P50 of control-error <= -3 AND requested > COLD_SETPOINT (Python _classify_continuous)
+  // cls:74, 77-78: overshoot is tested first
+  if (ctrlErrP90 >= settings.sat.fOvershootMargin) return SAT_CYCLE_OVERSHOOT;
+  // cls:75, 80-88
   if (ctrlErrP50 <= -SAT_UNDERSHOOT_MARGIN_C) {
-    if (requestedSp < coldSp) return SAT_CYCLE_UNCERTAIN;
-    return SAT_CYCLE_UNDERHEAT;
+    // cls:81-83: requested setpoint, else the device setpoint (the control setpoint)
+    const float effSp = (requestedSp > 0.0f) ? requestedSp : controlSp;
+    if (effSp < coldSp) return SAT_CYCLE_UNCERTAIN;   // cls:85-86
+    return SAT_CYCLE_UNDERHEAT;                       // cls:88
   }
-
-  // Not enough data for a confident classification
-  if (durationSec < SAT_CYCLE_SHORT_DURATION_SEC * 2.0f) {
-    return SAT_CYCLE_UNCERTAIN;
-  }
-
-  return SAT_CYCLE_GOOD;
+  return SAT_CYCLE_GOOD;                              // cls:90 returns None -> cls:37 GOOD
 }
 
 //=== Called on each flame status change ===
@@ -740,8 +734,6 @@ void satCycleOnFlameChange(bool flameOn)
     _cycle_setpointAtStart = state.sat.fFinalSetpoint;
     _cycle_overshootSec = 0.0f;
     _cycle_lastSampleMs = now;
-    _cycle_dhwSamples = 0;
-    _cycle_totalSamples = 0;
     // Record flame-on event in the rolling per-hour counter (Task #203)
     _hourCountRecord(now);
     state.sat.iCyclesThisHour = _hourCountGet(now);
@@ -767,6 +759,11 @@ void satCycleOnFlameChange(bool flameOn)
     _tail_sampleHead  = 0;
     _tail_sampleCount = 0;
     _tail_lastSampleMs = now;
+    // Reset the cycle kind / DHW-in-tail counters (TASK-1387)
+    _cycle_dhwSamples    = 0;
+    _cycle_chSamples     = 0;
+    _cycle_totalSamples  = 0;
+    _cycle_lastDhwMs     = 0;
     // Reset flow-return delta accumulator (Task #227)
     _cycle_sumFlowRetDelta = 0.0f;
     _cycle_deltasamples    = 0;
@@ -806,16 +803,24 @@ void satCycleOnFlameChange(bool flameOn)
     float tailP50 = (_tail_sampleCount >= 10) ? _tailPercentile(50) : (p90 + p10) * 0.5f;
     SATDebugTf(PSTR("SAT cycle classify: fullP90=%.1f tailP90=%.1f tailP50=%.1f tailP10=%.1f tailN=%u\r\n"),
                p90, tailP90, tailP50, tailP10, (unsigned)_tail_sampleCount);
-    // TASK-891.4: mode-aware classification. Snapshot the PID requested setpoint at flame-off
-    // (it drifts across a multi-minute cycle) and pick the SHORT threshold from the configured
-    // PWM on-time. isPwm follows the active control mode (Python pwm_state.enabled).
+    // Classifier inputs (TASK-1387, cycles/classifier.py). Snapshot the PID requested setpoint at
+    // flame-off (it drifts across a multi-minute cycle). pwm_state at cycle end: enabled = PWM mode,
+    // status IDLE = satPwmIsIdle(), ON = the PWM ON phase (bPwmFlameRequested), on_time_seconds =
+    // the last PWM on-time.
     float requestedSp = _sat_requestedSetpoint;   // includes the solar offset, as thermo-nova requested_setpoint (TASK-1323)
-    bool  isPwm       = (state.sat.eControlMode == SAT_MODE_PWM);
+    bool  pwmEnabled  = (state.sat.eControlMode == SAT_MODE_PWM);
     float onTimeSec   = (float)satPwmLastOnTimeMs() / 1000.0f;
-    SATCycleClass cls = _cycleClassify(durationSec, tailP90, tailP50,
-                                        _cycle_setpointAtStart, requestedSp,
-                                        _cycle_overshootSec, _cycle_totalSamples,
-                                        isPwm, onTimeSec);
+    // hot_water_active_fraction > 0 over the tail (tracker.py:294-296). The tail is every sample at or
+    // after tail_start = max(start + min(60, 0.25 * duration), end - 180) (tracker.py:113-116, :237-241),
+    // so a DHW sample in the warm-up of a short cycle does not count. The tail is a suffix of the
+    // cycle, so the last DHW sample decides. In seconds after flame-on: offset >= max(warm-up, dur - 180).
+    const float tailStartSec = fmaxf(fminf(60.0f, 0.25f * durationSec), durationSec - 180.0f);
+    bool  dhwInTail   = (_cycle_dhwSamples > 0) &&
+                        ((float)_cycle_lastDhwMs / 1000.0f >= tailStartSec);
+    SATCycleClass cls = _cycleClassify(durationSec, _cycle_totalSamples, _cycleDetectKind(),
+                                       dhwInTail, pwmEnabled, satPwmIsIdle(),
+                                       state.sat.bPwmFlameRequested, onTimeSec,
+                                       tailP90, tailP50, _cycle_setpointAtStart, requestedSp);
     _cycleRecord(cls, durationSec, _cycle_maxFlowTemp, _cycle_overshootSec);
 
     // Expose the 2nd error metric (AC#1) + shape metrics (AC#4) for state/JSON.
@@ -899,6 +904,30 @@ void satCycleSample()
     if (_tail_sampleCount < SAT_TAIL_SAMPLE_SIZE) _tail_sampleCount++;
     _tail_lastSampleMs = nowMs;
 
+    // Cycle kind and DHW-in-tail inputs, counted in the same 1 Hz gate as the tail ring
+    // (TASK-1387; tracker.py:103-104 counts per sample):
+    // DHW = Statusflags bit 2 (slave DHW mode), CH = Statusflags bit 8 (master CH enable) without DHW.
+    // SAT simulation has no OT status: the simulated DHW draw (bDhwActive, forced by the simulation)
+    // stands in for bit 2, and the CH enable SAT commands stands in for bit 8 (CS above the minimum
+    // setpoint: the CH rule sends CH=0 exactly with CS=10, satChEnableDecide; the simulated boiler
+    // also only fires CH above it).
+    bool dhwSample, chSample;
+    if (settings.sat.bSimulation) {
+      dhwSample = state.sat.bDhwActive;
+      chSample  = state.sat.fFinalSetpoint > SAT_MIN_SETPOINT;
+    } else {
+      const uint16_t sf = OTcurrentSystemState.Statusflags;
+      dhwSample = (sf & 0x0004) != 0;
+      chSample  = (sf & 0x0100) != 0;
+    }
+    _cycle_totalSamples++;
+    if (dhwSample) {
+      _cycle_dhwSamples++;
+      _cycle_lastDhwMs = nowMs - _cycle_flameOnStartMs;
+    } else if (chSample) {
+      _cycle_chSamples++;
+    }
+
     if (++_flow_logTick >= 30) {   // one debug line per 30 samples (30 s)
       _flow_logTick = 0;
       SATDebugTf(PSTR("SAT sample: flow=%.1f n=%u sp=%.1f os=%.0fs\r\n"),
@@ -934,12 +963,6 @@ void satCycleSample()
     } else {
       _cycle_overshootStreakSec = 0.0f;              // streak broken
     }
-  }
-
-  // Track DHW vs CH samples for cycle kind detection
-  _cycle_totalSamples++;
-  if ((OTcurrentSystemState.Statusflags & 0x04) != 0) {  // Bit 2 = DHW active
-    _cycle_dhwSamples++;
   }
 
   // Phase detection (Task #35)

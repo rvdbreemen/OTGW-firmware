@@ -1584,14 +1584,16 @@ How a "sustained" timer works in the firmware. `satCycleCheckAutoSwitch()` is ca
 
 DHW guard: the guard refreshes `_sustain_dhwEndMs` only when it is called with `bDhwActive` true (SATcycles.ino:977-979). `bDhwActive` is written only at SATcontrol.ino:4981 and SATcontrol.ino:4983 (search), and when it is true the tick returns at SATcontrol.ino:5007, before the call at SATcontrol.ino:5314 [lines refreshed 2026-10-25, TASK-1367 review]. So in the code as written the guard timestamp keeps its boot sentinel (SATcycles.ino:139) and the 300 s post-DHW guard does not block the overshoot switch. The only exception is arithmetic: the sentinel is `0 - 300 000` in unsigned 32-bit, so in the last 300 s before `millis()` wraps (about every 49.7 days) the subtraction at SATcycles.ino:992 is below 300 000 and the guard is active.
 
-How cycles are classified. A cycle runs from a flame-on edge to the next flame-off edge (SATcycles.ino:697-764). At flame-off the classifier `_cycleClassify()` gets: duration, the 90th and 50th percentiles of the tail ring (flow sampled at 1 Hz, last `SAT_TAIL_SAMPLE_SIZE` seconds; with fewer than 10 samples it falls back to the per-cycle ring or max/min) (SATcycles.ino:776-783, SATcycles.ino:865-877); `controlSp` = `fFinalSetpoint` at flame-on (SATcycles.ino:717); `requestedSp` = `fPidOutput` at flame-off (SATcycles.ino:789); `isPwm` = mode is PWM at flame-off (SATcycles.ino:790); the last computed on-time (SATcycles.ino:791). Classification order (SATcycles.ino:636-693):
+How cycles are classified (TASK-1387, Sergeant D entry 55: `cycles/classifier.py` exactly). A cycle runs from a flame-on edge to the next flame-off edge (SATcycles.ino:711-860). At flame-off `_cycleClassify()` (SATcycles.ino:655-708) gets: duration; the 1 Hz sample count; the cycle kind (SATcycles.ino:571-581); whether a hot-water sample lies in the tail (SATcycles.ino:812-813); PWM enabled (mode is PWM), PWM IDLE (`satPwmIsIdle()`, SATcontrol.ino:1143) and PWM ON (`bPwmFlameRequested`) at flame-off; the last PWM on-time; the 90th and 50th percentiles of the tail ring (with fewer than 10 samples it falls back to the per-cycle ring or max/min, SATcycles.ino:794-800); `controlSp` = `fFinalSetpoint` at flame-on (SATcycles.ino:731); `requestedSp` = `_sat_requestedSetpoint` at flame-off (SATcycles.ino:807). Classification order, as `cycles/classifier.py` (`cls`):
 
-1. Duration <= 0 or fewer than 3 samples: INSUFFICIENT (SATcycles.ino:641-643).
-2. PWM and `tailP90 - requestedSp <= -3.0`: UNCERTAIN if `requestedSp` < cold setpoint, else UNDERHEAT_PWM (SATcycles.ino:653-656).
-3. Shorter than the short threshold: SHORT. PWM: `max(30, 0.8 x on-time)` if the on-time > 0, else 60 s; continuous: 60 s (SATcycles.ino:660-669, SATcycles.ino:27, SATcycles.ino:83).
-4. `tailP90 - controlSp >= fOvershootMargin` and in-cycle overshoot time > 10 s: OVERSHOOT (SATcycles.ino:673-675).
-5. PWM: GOOD (SATcycles.ino:677-680).
-6. Continuous: `tailP50 - controlSp <= -3.0` gives UNDERHEAT (or UNCERTAIN below the cold setpoint); duration < 120 s gives UNCERTAIN; otherwise GOOD (SATcycles.ino:682-693).
+1. Duration <= 0 (cls:19-20), or fewer than 3 samples (firmware: tracker.py:98-100 drops such a cycle): INSUFFICIENT (SATcycles.ino:661).
+2. Kind UNKNOWN: UNCERTAIN (cls:22-23, SATcycles.ino:664).
+3. A hot-water sample in the tail: UNCERTAIN (cls:25-26, SATcycles.ino:667).
+4. PWM enabled and IDLE: UNCERTAIN (cls:28-29, SATcycles.ino:670).
+5. PWM (cls:40-66): `requestedSp <= 0` (stand-in for a missing requested-setpoint error) UNCERTAIN; `tailP90 - requestedSp <= -3.0` UNCERTAIN below the cold setpoint, else UNDERHEAT_PWM; only while the PWM ON phase runs: on-time <= 0 or duration < 0.8 x on-time SHORT; otherwise GOOD. PWM has no OVERSHOOT (SATcycles.ino:675-691).
+6. Continuous (cls:69-90): `controlSp <= 0` (stand-in for a missing control-setpoint error) UNCERTAIN; `tailP90 - controlSp >= fOvershootMargin` OVERSHOOT, tested first and without an overshoot-time condition; `tailP50 - controlSp <= -3.0` UNCERTAIN below the cold setpoint (requested setpoint, else the control setpoint), else UNDERHEAT; otherwise GOOD (SATcycles.ino:695-707).
+
+There is no SHORT for a continuous cycle and no rule that a short cycle is UNCERTAIN (both removed in TASK-1387).
 
 **No cycle class changes the control mode.** The result goes to the history, the EMA fractions and the 4 h / 24 h windows only (SATcycles.ino:792-835, SATcycles.ino:551-602); the full list of `satSetControlMode` callers above contains no call from the flame-off path.
 
@@ -1735,7 +1737,7 @@ dutyMax   = 1 - dutyMin
 
 Heat pump (TASK-1366, Sergeant D entries 40 and 50): at 1800 s the thresholds are lower 0.10, upper 0.90, min 0.05, max 0.95 and `maxMs` 3600 s; at 2400 s they are 0.075, 0.925, 0.0375, 0.9625 and 4800 s, so all five ranges are reachable (duty 0.30 at 1800 s gives 540 s on, 1260 s off). The 2400 s option (1.5 per hour) is Sergeant D's (entry 50) and is not in thermo-nova, whose heat-pump options are 2 or 3 per hour (config_flow.py:686-693); the period is therefore stored in seconds, not as cycles per hour. Two points stay as they were and are open: a hybrid source keeps the gas timing (180 s, 3600 / `iCyclesPerHour`), because entries 50 and 52 leave the hybrid choice open; and the hourly start cap (`satCycleIsHourLimitReached()`, SATcycles.ino:293-299) still allows 2 starts per rolling hour for a heat pump (`satGetMaxCyclesPerHour()`, SATcontrol.ino:349); no Sergeant D entry sets that value. Derived from reading the code, not tested: every mapped heat-pump cycle (on + off) lasts at least the period (range 2: 180 / d, range 3: P, range 4: 180 / (1 - d)), and the counter holds flame-on edges with `now - ts < 3600 s` and blocks at 2 (SATcycles.ino:279-299). So at each PWM start request the window holds one earlier PWM flame-on edge, with either period (at 1800 s the edge before it leaves the window only through ignition and tick latency, a borderline case). With either period, one extra flame-on in the rolling hour, a hot-water ignition or a relight inside an ON phase (every edge is recorded, SATcycles.ino:722-730), holds the next PWM start until the oldest edge leaves the window. What the cap counts is open question Q12.
 
-Cycle classifier (TASK-1366 side effect): the PWM SHORT threshold is max(floor, 0.8 x the mapped on-time) (SATcycles.ino:666-676, fed by `satPwmLastOnTimeMs()` at SATcycles.ino:799). For a heat pump it now follows the real on-time, for example 432 s at 540 s on, where it used to be 1440 s or 2880 s, so heat-pump PWM burns are no longer classified SHORT almost every time. That brings the firmware closer to thermo-nova; no Sergeant D entry covers it.
+Cycle classifier (TASK-1366 side effect, TASK-1387): a PWM cycle that ends during the ON phase is SHORT when it lasted less than 0.8 x the mapped on-time (SATcycles.ino:685-689, fed by `satPwmLastOnTimeMs()` at SATcycles.ino:809), as `cycles/classifier.py:56-64`. For a heat pump the threshold follows the real on-time, for example 432 s at 540 s on.
 
 On and off times, first matching row wins, values cast to whole milliseconds (SATcontrol.ino:909-944):
 
@@ -1841,8 +1843,7 @@ CH command (SATcontrol.ino:5223): `CH = satChEnableDecide(pidOutput, coldSetpoin
 | Suppression refresh interval | 3 | s | SATcontrol.ino:480 |
 | Write-on-change refresh (CS, MM, CH) | 300 | s | SATcontrol.ino:351 |
 | PIC CS keepalive | 30 (only CS >= 8 °C) | s | SATcontrol.ino:403-409 |
-| Classifier: short threshold continuous / PWM floor / PWM factor | 60 / 30 / 0.8 of on-time | s, s, - | SATcycles.ino:27, SATcycles.ino:83, SATcycles.ino:662 |
-| Classifier: overshoot time needed | > 10 | s | SATcycles.ino:673 |
+| Classifier: PWM short factor (only PWM ON at cycle end; no continuous SHORT, no floor) | 0.8 of on-time | - | SATcycles.ino:688 |
 | `SAT_PWM_MIN_ON_SEC` | 180 (defined, not used) | s | SATcontrol.ino:59 |
 | `SAT_FLOW_OFFSET_CONTINUOUS` | 5.0 (defined, not used) | °C | SATcontrol.ino:58 |
 
@@ -1953,8 +1954,8 @@ There is no event like `sat_cycle_started` / `sat_cycle_ended`: searches for `on
 | thermo-nova `DeviceState` field | Firmware source | Where it is read in this area |
 |---|---|---|
 | `flame_active` | `satIsFlameOn()`: `OTcurrentSystemState.Statusflags & 0x08`, or `state.sat.bSimFlameOn` in simulation (SATcontrol.ino:1337-1341) | edge detection (SATcontrol.ino:4592), boiler status (SATcontrol.ino:518), modulation reliability (SATcontrol.ino:3565), flame status (SATcontrol.ino:3635) |
-| `hot_water_active` | two different sources: `state.sat.bDhwActive` = `SlaveStatus & 0x04`, refreshed only on the control tick (SATcontrol.ino:4625-4629); and `Statusflags & 0x04` read directly per sample (SATcycles.ino:918) | `bDhwActive`: boiler status (SATcontrol.ino:548), off-with-demand (SATcycles.ino:708), auto-switch guard (SATcycles.ino:964-972). `Statusflags`: cycle kind counting (SATcycles.ino:917-920) |
-| `central_heating` | `Statusflags & 0x02` (SATcycles.ino:709) | only the off-with-demand test. The boiler status evaluator has no central-heating input (SATcontrol.ino:516-647) |
+| `hot_water_active` | two different sources: `state.sat.bDhwActive` = `SlaveStatus & 0x04`, or forced true by a simulated draw, refreshed only on the control tick (SATcontrol.ino:4998-5002); and, for the cycle kind and the DHW-in-tail test, `Statusflags & 0x04` read per 1 Hz sample on the real bus, `bDhwActive` under SAT simulation (SATcycles.ino:907-929) [lines refreshed 2026-10-25, TASK-1387 review] | `bDhwActive`: boiler status, off-with-demand (SATcycles.ino:725), auto-switch guard. Per-sample bit: cycle kind and DHW-in-tail (SATcycles.ino:923-929) |
+| `central_heating` | two different sources: the cycle kind counts the master CH-enable bit, `Statusflags & 0x0100` (thermo-nova `central_heating` = `coordinator.active` = master CH enabled, coordinator/__init__.py:136, coordinator/serial/__init__.py:53-55), or under SAT simulation a commanded CS above `SAT_MIN_SETPOINT` (SATcycles.ino:907-929); the off-with-demand test reads the slave CH-mode bit `Statusflags & 0x02` (SATcycles.ino:726) [lines refreshed 2026-10-25, TASK-1387 review] | cycle kind and off-with-demand. The boiler status evaluator has no central-heating input |
 | `setpoint` | `state.sat.fFinalSetpoint`, SAT's own last commanded control setpoint (SATcontrol.ino:4946), not a value reported back by the boiler | boiler status (SATcontrol.ino:521), cycle start setpoint (SATcycles.ino:717), off-with-demand (SATcycles.ino:710), flame status (SATcontrol.ino:3655, SATcontrol.ino:3661) |
 | `flow_temperature` | `satGetFlowTemp()`: `OTcurrentSystemState.Tboiler` (MsgID 25), or the simulated flow plus optional noise (SATcontrol.ino:1325-1329) | everywhere in this area |
 | `return_temperature` | `satGetReturnTemp()`: `OTcurrentSystemState.Tret` (MsgID 28), or simulated (SATcontrol.ino:1331-1335) | flow-return delta (SATcycles.ino:859-863) |
@@ -1967,7 +1968,7 @@ There is no event like `sat_cycle_started` / `sat_cycle_ended`: searches for `on
 
 | Value | Source |
 |---|---|
-| requested setpoint for the classifier | `state.sat.fPidOutput` at the flame-off moment (SATcycles.ino:789). It is the raw single-zone PID output `heatingCurveValue + P + I + D` (SATpid.ino:308-310) |
+| requested setpoint for the classifier | `_sat_requestedSetpoint` at the flame-off moment (SATcycles.ino:807): the requested setpoint of the last control tick, after the multi-zone block and the solar offset, clamped (SATcontrol.ino:808) |
 | requested setpoint for the auto-switch | the local `pidOutput` of the control tick, after the multi-zone override and the min/max clamp (SATcontrol.ino:4839-4912, SATcontrol.ino:4952) |
 | PWM mode | `state.sat.eControlMode == SAT_MODE_PWM` (SATcycles.ino:790) |
 | PWM on-time | `satPwmLastOnTimeMs()` (SATcycles.ino:791, SATcontrol.ino:946), set by the PWM schedule (SATcontrol.ino:780, SATcontrol.ino:810) |
@@ -2084,7 +2085,7 @@ Notes on the status rules:
 | 1 | fewer than 6 earlier calls | `INSUFFICIENT_DATA` | SATcontrol.ino:3629-3633 |
 | 2 | SAT not active (unreachable through its only caller: `bActive` is set true at SATcontrol.ino:4616, before the call at SATcontrol.ino:4811; derived from the order of the code) | `IDLE_OK` | SATcontrol.ino:3637-3640 |
 | 3 | safety tripped | `STUCK_OFF` | SATcontrol.ino:3643-3646 |
-| 4 | last cycle class is `SHORT` | `SHORT_CYCLING` | SATcontrol.ino:3649-3652 |
+| 4 | last cycle class is `SHORT`. Since TASK-1387 (entry 55) only a PWM cycle that ends in the ON phase can be `SHORT` (cls:56-64); a short continuous burn is `GOOD` or `OVERSHOOT`, so `SHORT_CYCLING`, `sat/cycle_health` and the `flame_health` problem flag no longer fire for it | `SHORT_CYCLING` | SATcontrol.ino:4004-4007, `cycle_health` SATcontrol.ino:3360-3366 [lines refreshed 2026-10-25, TASK-1387 review] |
 | 5 | flame on and `fFinalSetpoint` < 5 °C | `STUCK_ON` | SATcontrol.ino:3655-3658 |
 | 6 | flame off, `fFinalSetpoint` > 30 °C, more than 300 s since the cycle tracker's flame-off | `STUCK_OFF` | SATcontrol.ino:3661-3667 |
 | 7 | PWM mode, PWM duty < 0.05, flame on | `PWM_SHORT` | SATcontrol.ino:3670-3673 |
@@ -2094,68 +2095,70 @@ Notes on the status rules:
 
 On each `loop()` pass, edge detection calls `satCycleOnFlameChange(currentFlame)` when the flame differs from `_sat_prevFlameState` (SATcontrol.ino:4592-4596), then `satCycleSample()` runs (SATcontrol.ino:4599).
 
-1. **Flame OFF->ON** (`flameOn` and `_cycle_flameOn` false, SATcycles.ino:701):
-   - Off-with-demand duration (see Formulas) into `state.sat.fOffWithDemandSec` (SATcycles.ino:706-712).
-   - Mark the cycle open, start time = now, max and min flow = current flow, `_cycle_setpointAtStart` = `fFinalSetpoint`, overshoot seconds 0, last sample time = now, sample counters 0 (SATcycles.ino:713-721).
-   - Record the flame-on time in the per-hour counter and refresh `iCyclesThisHour` (SATcycles.ino:723-724).
-   - Debug line, narration line and a WebSocket status message (SATcycles.ino:725-734).
-   - Empty the flow ring and seed it with the current flow as its first sample (SATcycles.ino:736-741). Empty the tail ring without a seed and set its last sample time = now (SATcycles.ino:743-746).
-   - Reset the flow-return delta and shape accumulators (SATcycles.ino:748-755).
-2. **Flame on (`satCycleSample`, every `loop()` pass, SATcycles.ino:847-940)**: returns at once while the cycle is not open (SATcycles.ino:849). Otherwise:
-   - Update max and min flow (SATcycles.ino:854-855).
-   - If the return temperature is between 10 and 100 °C, add (flow - return) to the delta sum (SATcycles.ino:859-863).
-   - If at least 1000 ms passed since the last ring sample, append the flow to the flow ring and the tail ring (SATcycles.ino:868-878).
-   - Add the time since the previous `satCycleSample` call to the overshoot seconds when flow > `_cycle_setpointAtStart` + margin (SATcycles.ino:887-890).
-   - From 60 s after flame-on: shape metrics (see Formulas) (SATcycles.ino:895-914).
-   - Count the call as a sample, and as a hot water sample when `Statusflags` bit 2 is set (SATcycles.ino:917-920). These two counters are per `loop()` pass, not per second (derived from the order of the code: they sit outside the 1 s gate at SATcycles.ino:869).
+1. **Flame OFF->ON** (`flameOn` and `_cycle_flameOn` false, SATcycles.ino:718) [lines refreshed 2026-10-25, TASK-1387 review]:
+   - Off-with-demand duration (see Formulas) into `state.sat.fOffWithDemandSec` (SATcycles.ino:723-729).
+   - Mark the cycle open, start time = now, max and min flow = current flow, `_cycle_setpointAtStart` = `fFinalSetpoint`, overshoot seconds 0, last sample time = now (SATcycles.ino:730-736).
+   - Record the flame-on time in the per-hour counter and refresh `iCyclesThisHour` (SATcycles.ino:738-739).
+   - Debug line, narration line and a WebSocket status message (SATcycles.ino:740-749).
+   - Empty the flow ring and seed it with the current flow as its first sample (SATcycles.ino:751-756). Empty the tail ring without a seed and set its last sample time = now (SATcycles.ino:758-761). Zero the kind and DHW-in-tail counters (SATcycles.ino:763-766).
+   - Reset the flow-return delta and shape accumulators (SATcycles.ino:768-775).
+2. **Flame on (`satCycleSample`, every `loop()` pass, SATcycles.ino:875-986)**: returns at once while the cycle is not open (SATcycles.ino:877). Otherwise:
+   - Update max and min flow (SATcycles.ino:882-883).
+   - If the return temperature is between 10 and 100 °C, add (flow - return) to the delta sum (SATcycles.ino:887-891).
+   - If at least 1000 ms passed since the last ring sample (SATcycles.ino:897): append the flow to the flow ring and the tail ring (SATcycles.ino:898-905), and count the sample for the cycle kind (see Formulas): `_cycle_totalSamples`++, `_cycle_dhwSamples`++ with the time of this DHW sample after flame-on, or `_cycle_chSamples`++ (SATcycles.ino:907-929). These counters are `uint32_t` and count at 1 Hz, inside the gate (TASK-1387).
+   - Add the time since the previous `satCycleSample` call to the overshoot seconds when flow > `_cycle_setpointAtStart` + margin (SATcycles.ino:938-942). Diagnostic only since TASK-1387.
+   - From 60 s after flame-on: shape metrics (see Formulas) (SATcycles.ino:944-966).
+   - The kind counters are no longer counted per `loop()` pass (moved into the 1 Hz gate above, TASK-1387).
    - Update the cycle phase (see the "Firmware only" paragraph at the end of this section).
-   - Remember this call's time (SATcycles.ino:939).
-3. **Flame ON->OFF** (`!flameOn` and `_cycle_flameOn`, SATcycles.ino:757-843):
-   - Mark the cycle closed, `_cycle_flameOffStartMs` = now, phase = COOLDOWN (SATcycles.ino:759-762).
-   - `durationSec` = (now - flame-on time) / 1000 (SATcycles.ino:764).
-   - Debug line and WebSocket message with the room temperature (SATcycles.ino:765-775).
-   - Percentiles (SATcycles.ino:777-783), classification (SATcycles.ino:789-795), record (SATcycles.ino:796), extra metrics to `state.sat` (SATcycles.ino:799-803), narration (SATcycles.ino:804-813).
-   - Append to the 4 h window and the 24 h window (SATcycles.ino:816-835).
-   - `_cycle_lastFlameOffMs` = now (SATcycles.ino:838).
-4. A cycle is always recorded at flame-off, whatever its length or sample count. A cycle with fewer than 3 samples is recorded with class `INSUFFICIENT` (SATcycles.ino:641-643, SATcycles.ino:796).
+   - Remember this call's time (SATcycles.ino:985).
+3. **Flame ON->OFF** (`!flameOn` and `_cycle_flameOn`, SATcycles.ino:777-871):
+   - Mark the cycle closed, `_cycle_flameOffStartMs` = now, phase = COOLDOWN (SATcycles.ino:779-782).
+   - `durationSec` = (now - flame-on time) / 1000 (SATcycles.ino:784).
+   - Debug line and WebSocket message with the room temperature (SATcycles.ino:785-795).
+   - Percentiles (SATcycles.ino:797-803), classification inputs and classification (SATcycles.ino:806-823), record (SATcycles.ino:824), extra metrics to `state.sat` (SATcycles.ino:827-831), narration (SATcycles.ino:832-841).
+   - Append to the 4 h window and the 24 h window (SATcycles.ino:844-863).
+   - `_cycle_lastFlameOffMs` = now (SATcycles.ino:866).
+4. A cycle is always recorded at flame-off, whatever its length or sample count. A cycle with fewer than 3 samples is recorded with class `INSUFFICIENT` (SATcycles.ino:664, SATcycles.ino:824).
 
-**Firmware only: cycle phase.** Per `satCycleSample` call with the flame on (SATcycles.ino:922-937): `STARTUP` when flow < `_cycle_setpointAtStart` - 1.5; `STEADY` when abs(flow - `_cycle_setpointAtStart`) <= 1.5; otherwise the phase is unchanged. Flame-off sets `COOLDOWN` (SATcycles.ino:761). The phase starts as `IDLE` (SATcycles.ino:116); no code sets it back to `IDLE` (search for `_cycle_phase\s*=` found only SATcycles.ino:116, SATcycles.ino:761, SATcycles.ino:935).
+**Firmware only: cycle phase.** Per `satCycleSample` call with the flame on (SATcycles.ino:968-983): `STARTUP` when flow < `_cycle_setpointAtStart` - 1.5; `STEADY` when abs(flow - `_cycle_setpointAtStart`) <= 1.5; otherwise the phase is unchanged. Flame-off sets `COOLDOWN` (SATcycles.ino:781). The phase starts as `IDLE` (SATcycles.ino:118); no code sets it back to `IDLE` (search for `_cycle_phase\s*=` found only SATcycles.ino:118, SATcycles.ino:781, SATcycles.ino:981).
 
-#### 6. Building a finished cycle (firmware: flame-off branch, SATcycles.ino:757-843)
+#### 6. Building a finished cycle (firmware: flame-off branch, SATcycles.ino:777-871)
 
-1. No start-time check: the branch only runs when a cycle is open (SATcycles.ino:757).
-2. `durationSec` = (now - `_cycle_flameOnStartMs`) / 1000 (SATcycles.ino:764). The sample count used by the classifier is `_cycle_totalSamples` (SATcycles.ino:794).
-3. No discard: a cycle with fewer than 3 samples is classified `INSUFFICIENT` and still recorded (SATcycles.ino:641-643, SATcycles.ino:796).
-4. Cycle kind from the hot water sample fraction (see Formulas, SATcycles.ino:541-548).
-5. Maximum and minimum flow over every `loop()` pass of the cycle (SATcycles.ino:715-716, SATcycles.ino:854-855).
-6. Windows: the tail is whatever the 180-slot tail ring holds, at about 1 sample per second, so the last 180 s, or the whole cycle when it is shorter (SATcycles.ino:868-878, src/libraries/Platform/src/boards.h:122). The flow ring holds the last 256 s (src/libraries/Platform/src/boards.h:121). The shape metrics skip a fixed first 60 s (SATcycles.ino:84, SATcycles.ino:895-896).
+1. No start-time check: the branch only runs when a cycle is open (SATcycles.ino:777).
+2. `durationSec` = (now - `_cycle_flameOnStartMs`) / 1000 (SATcycles.ino:784). The sample count used by the classifier is `_cycle_totalSamples`, counted in the 1 Hz gate of `satCycleSample()` (SATcycles.ino:923).
+3. No discard: a cycle with fewer than 3 samples is classified `INSUFFICIENT` and still recorded (SATcycles.ino:664, SATcycles.ino:824).
+4. Cycle kind from the hot water and central heating sample fractions, as tracker.py:101-108 and :314-324 (see Formulas, SATcycles.ino:571-581).
+5. Maximum and minimum flow over every `loop()` pass of the cycle (SATcycles.ino:732-733, SATcycles.ino:882-883).
+6. Windows: the tail percentiles use whatever the 180-slot tail ring holds, at about 1 sample per second, so the last 180 s, or the whole cycle when it is shorter (SATcycles.ino:897-905, src/libraries/Platform/src/boards.h:122); there is no warm-up exclusion for them (tracker.py:113-116 starts the tail at max(start + min(60, 0.25 x duration), end - 180)). The DHW-in-tail test does apply that tail start (SATcycles.ino:813-819). The flow ring holds the last 256 s (src/libraries/Platform/src/boards.h:121). The shape metrics skip a fixed first 60 s (SATcycles.ino:84, SATcycles.ino:947-948).
 7. Metric sets:
-   - full-cycle `p90` and `p10` from the flow ring when it has >= 10 samples, else the cycle maximum and minimum (SATcycles.ino:777-778);
-   - `tailP90`, `tailP10`, `tailP50` from the tail ring when it has >= 10 samples, else `p90`, `p10` and (p90 + p10) / 2 (SATcycles.ino:781-783);
-   - shape metrics accumulated while running (SATcycles.ino:892-914).
+   - full-cycle `p90` and `p10` from the flow ring when it has >= 10 samples, else the cycle maximum and minimum (SATcycles.ino:797-798);
+   - `tailP90`, `tailP10`, `tailP50` from the tail ring when it has >= 10 samples, else `p90`, `p10` and (p90 + p10) / 2 (SATcycles.ino:801-803);
+   - shape metrics accumulated while running (SATcycles.ino:944-966).
 8. Classify (section 7).
-9. Control mode: `isPwm` = `eControlMode == SAT_MODE_PWM` at the flame-off moment (SATcycles.ino:790). It is not stored in the cycle record (SATcycles.ino:146-153).
+9. PWM state: `pwmEnabled` = `eControlMode == SAT_MODE_PWM`, IDLE = `satPwmIsIdle()`, ON = `bPwmFlameRequested`, all at the flame-off moment (SATcycles.ino:811, SATcycles.ino:820-822). None is stored in the cycle record.
 
-#### 7. Cycle classification (`_cycleClassify`, SATcycles.ino:636-694)
+#### 7. Cycle classification (`_cycleClassify`, SATcycles.ino:658-711) [lines refreshed 2026-10-25, TASK-1387 review]
 
-Inputs: `tailP90`, `tailP50`, `controlSp` = `_cycle_setpointAtStart` (the `fFinalSetpoint` at flame-on, constant for the cycle), `requestedSp` = `fPidOutput` at flame-off, the overshoot seconds, the sample count, `isPwm` and the PWM on-time (SATcycles.ino:789-795). The first matching rule wins:
+TASK-1387 (Sergeant D entry 55): the rules and their order are those of `cycles/classifier.py` (`cls`). Inputs: duration, the 1 Hz sample count, the kind (SATcycles.ino:571-581), DHW in the tail (SATcycles.ino:813-819, with tracker.py's warm-up exclusion), PWM enabled / IDLE / ON at flame-off, the PWM on-time, `tailP90`, `tailP50`, `controlSp` = `_cycle_setpointAtStart` (the `fFinalSetpoint` at flame-on, constant for the cycle) and `requestedSp` = `_sat_requestedSetpoint` at flame-off (SATcycles.ino:810-823). The first matching rule wins:
 
-| # | Condition | Result | Citation |
-|---|---|---|---|
-| 1 | duration <= 0 or fewer than 3 samples | `INSUFFICIENT` | SATcycles.ino:641-643 |
-| 2 | PWM and `tailP90 - requestedSp` <= -3 | `UNCERTAIN` if `requestedSp` < cold setpoint, else `UNDERHEAT_PWM` | SATcycles.ino:653-656 |
-| 3 | duration < short threshold | `SHORT` | SATcycles.ino:660-669 |
-| 4 | `tailP90 - controlSp` >= `fOvershootMargin` and overshoot seconds > 10 | `OVERSHOOT` (both modes) | SATcycles.ino:673-675 |
-| 5 | PWM, otherwise | `GOOD` | SATcycles.ino:677-680 |
-| 6 | continuous, `tailP50 - controlSp` <= -3 | `UNCERTAIN` if `requestedSp` < cold setpoint, else `UNDERHEAT` | SATcycles.ino:683-686 |
-| 7 | continuous, duration < 120 s | `UNCERTAIN` | SATcycles.ino:689-691 |
-| 8 | otherwise | `GOOD` | SATcycles.ino:693 |
+| # | Condition | Result | thermo-nova | Citation |
+|---|---|---|---|---|
+| 1 | duration <= 0, or fewer than 3 samples | `INSUFFICIENT` | cls:19-20 (the < 3 sample case: tracker.py:98-100 drops the cycle) | SATcycles.ino:664 |
+| 2 | kind `UNKNOWN` | `UNCERTAIN` | cls:22-23 | SATcycles.ino:667 |
+| 3 | a DHW sample in the tail | `UNCERTAIN` | cls:25-26 | SATcycles.ino:670 |
+| 4 | PWM enabled and IDLE | `UNCERTAIN` | cls:28-29 | SATcycles.ino:673 |
+| 5 | PWM, `requestedSp` <= 0 | `UNCERTAIN` | cls:42-43 (error percentiles missing) | SATcycles.ino:680 |
+| 6 | PWM, `tailP90 - requestedSp` <= -3 | `UNCERTAIN` if `requestedSp` < cold setpoint, else `UNDERHEAT_PWM` | cls:45-54 | SATcycles.ino:682-686 |
+| 7 | PWM ON at flame-off, on-time <= 0 or duration < 0.8 x on-time | `SHORT` | cls:56-64 | SATcycles.ino:689-692 |
+| 8 | PWM, otherwise | `GOOD` | cls:66 | SATcycles.ino:693 |
+| 9 | continuous, `controlSp` <= 0 | `UNCERTAIN` | cls:71-72 (error percentiles missing) | SATcycles.ino:698 |
+| 10 | continuous, `tailP90 - controlSp` >= `fOvershootMargin` | `OVERSHOOT` | cls:74, 77-78 | SATcycles.ino:702 |
+| 11 | continuous, `tailP50 - controlSp` <= -3 | `UNCERTAIN` if the requested setpoint (else the control setpoint) < cold setpoint, else `UNDERHEAT` | cls:75, 80-88 | SATcycles.ino:704-709 |
+| 12 | otherwise | `GOOD` | cls:37, 90 | SATcycles.ino:710 |
 
-Short threshold (SATcycles.ino:660-666): in PWM with a known on-time, max(30 s, 0.8 x on-time); in PWM with on-time 0, 60 s; in continuous mode, 60 s.
+Firmware deviations: cold setpoint 28.2 °C radiators / 21.0 °C underfloor (`satGetColdSetpoint()`, entries 7 and 11) instead of `COLD_SETPOINT` 22; margin `fOvershootMargin` 2.0 with `>=` (entries 15 and 37) instead of 3.0; PWM underheat labelled `UNDERHEAT_PWM`; the setpoint `<= 0` stand-ins for missing percentiles; one control and one requested setpoint per cycle instead of per sample (TASK-1405); floor-index percentiles instead of `percentile_interpolated`, and no warm-up exclusion for the tail percentiles (the DHW-in-tail test has it); PWM IDLE is a flag approximation of pwm.py's status, set by `satPwmReset()`, cleared by the first schedule step past the flow check and by a switch into PWM with a flow temperature, kept by the hour-limit return (SATcontrol.ino:807, :868-869, :991, :1093, :1103-1112). Remaining IDLE differences: on the switch tick thermo-nova runs `pwm.update()` in the same pass (heating_control.py:206-215) and with an on-time of at least 180 s starts ON (pwm.py:154-170; entry 43, the first PWM phase is ON), while the firmware reads OFF until its next control tick, so a cycle that ends inside that tick skips the SHORT test (the tick order is Q47, the first ON phase is entry 43's task); the hour-limit return keeps the status, as the code at pwm.py:156-158 does. thermo-nova's check there never blocks (it compares a cycle count with `duty_cycle_seconds`, 780 s by default, pwm.py:156, entry_data.py:220, const.py:167), but entry 59 asks for a real cycles-per-hour limit (TASK-1401), so keeping the status is the faithful reading; thermo-nova only reaches that return with `on_time >= 180` (pwm.py:155), which the firmware has no gate for (Q38, entry 43 Open). SAT simulation has no OT status flags: the kind counter takes DHW from `bDhwActive` and CH from a commanded CS above `SAT_MIN_SETPOINT` (SATcycles.ino:907-920).
 
-Cold setpoint is per heating system: 28.2 °C for radiators, 21.0 °C for underfloor (SATcontrol.ino:55-56, SATcontrol.ino:264-268).
-
-No counterpart was found for these thermo-nova rules: kind `UNKNOWN` gives `UNCERTAIN`; any hot water in the tail gives `UNCERTAIN`; PWM enabled but `IDLE` gives `UNCERTAIN`; missing p50/p90 gives `UNCERTAIN` (SATcycles.ino:636-694 has no such tests).
+Host test: `tests/test_sat_cycle_classifier.py` runs the real `satCycleOnFlameChange()`, `satCycleSample()` and `_cycleClassify()` per rule (also the DHW warm-up, the master CH-enable kind and the simulation inputs) and checks the expected classes against the real `classifier.py`, with tracker.py's tail start in the oracle. `tests/test_sat_pwm_override.py` checks the real IDLE flag (reset, first step, hour limit, flow loss, overshoot switch).
 
 #### 8. Recording into history (`_cycleRecord`, SATcycles.ino:551-602, plus the window block SATcycles.ino:815-835)
 
@@ -2176,7 +2179,7 @@ This was not checked on a running device.
 
 #### 9. How cycle data feeds control decisions
 
-- **No PWM switch from the cycle verdict.** No code path reads `eLastCycleClass` to change the control mode. The callers of `satSetControlMode` are SATcycles.ino:1001, SATcycles.ino:1039, SATcycles.ino:1055, SATcontrol.ino:1117, SATcontrol.ino:2404, SATcontrol.ino:2572-2578 and SATcontrol.ino:5280 [refreshed 2026-10-25, TASK-1367 review]. The readers of `eLastCycleClass` are the auto-tune counters (SATcontrol.ino:4398-4413), the flame status rule `SHORT_CYCLING` (SATcontrol.ino:3649), and the MQTT, REST and debug outputs (SATcontrol.ino:2766-2768, SATcontrol.ino:3004-3008, restAPI.ino:1028-1039, networkStuff.ino:571, handleDebug.ino:233).
+- **No PWM switch from the cycle verdict.** No code path reads `eLastCycleClass` to change the control mode. The callers of `satSetControlMode` are SATcycles.ino:1001, SATcycles.ino:1039, SATcycles.ino:1055, SATcontrol.ino:1117, SATcontrol.ino:2404, SATcontrol.ino:2572-2578 and SATcontrol.ino:5280 [refreshed 2026-10-25, TASK-1367 review]. The readers of `eLastCycleClass` are the auto-tune counters (SATcontrol.ino:4398-4413), the flame status rule `SHORT_CYCLING` (SATcontrol.ino:4005), and the MQTT, REST and debug outputs (SATcontrol.ino:2766-2768, SATcontrol.ino:3004-3008, restAPI.ino:1028-1039, networkStuff.ino:571, handleDebug.ino:233).
 - **Sustained-condition mode switch (`satCycleCheckAutoSwitch`, SATcycles.ino:967-1062).** Called on the control tick only when `satAlwaysMaxModulation()` is false and `pidOutput` > cold setpoint (SATcontrol.ino:5313-5317; the heat-pump exclusion is a firmware divergence, open question Q45); otherwise `satCycleSkipAutoSwitch()` clears the overshoot start. It always runs (no setting, removed in TASK-1341, Sergeant D entry 19). It compares flow with `requestedSetpoint`:
   - continuous: flow > requested + `fOvershootMargin`, outside the hot water guard, for 60 000 ms counted from the first qualifying sample -> PWM (SATcycles.ino:989-1011; TASK-1367, entry 41; strict `>`, open question Q43). The underheat and saturation checks below return when the time since the previous call is <= 0 or > 60 s (SATcycles.ino:1022);
   - PWM OFF phase: underheat and saturation timers reset (SATcycles.ino:1027-1030);
@@ -2185,7 +2188,7 @@ This was not checked on a running device.
 - **Hot water guard, as built.** The guard refreshes `_sustain_dhwEndMs` only while `bDhwActive` (SATcycles.ino:977-979). This function runs after the DHW early return (SATcontrol.ino:4976-5008, SATcontrol.ino:5314 [lines refreshed 2026-10-25, TASK-1367 review]), so `bDhwActive` is false whenever it runs, and `_sustain_dhwEndMs` keeps its boot value `0 - 300000` (SATcycles.ino:139). The 300 s guard (SATcycles.ino:991-992) is then never active (derived from the order of the code).
 - **Flame-on time for the PWM schedule.** The PWM hold ends `fModSupDelay` (default 20 s, SATtypes.h:455) after the cycle tracker's flame-on time (SATcontrol.ino:720-723, SATcontrol.ino:884-888). The PWM ON phase ends when the time since that flame-on is >= on-time and >= minimum on-time (SATcontrol.ino:813-820). That test does not check whether the flame is on, and it runs before the 180 s ignition timeout (SATcontrol.ino:824-832). While a new ON phase waits for ignition, the cycle tracker's flame-on time still belongs to the previous cycle, so the ON phase can end on the next control tick before the flame lights (derived from the order of the code; see Edge cases). The PWM controller also keeps its own `_pwm_flameOnMs` for the effective temperature EMA (SATcontrol.ino:764-782).
 - **Flame-off time and per-hour count for the PWM schedule.** The OFF phase ends when the time since the cycle tracker's flame-off is >= off-time, unless the rolling-hour count of flame-on events has reached `satGetMaxCyclesPerHour()` (SATcontrol.ino:836-854, SATcycles.ino:286-292). The maximum is 2 for a heat pump, the configured value when it is 2 to 6, else 3 (underfloor) or 4 (SATcontrol.ino:271-281).
-- **PWM on-time into the classifier**: the short threshold (SATcycles.ino:660-666, SATcycles.ino:791).
+- **PWM on-time into the classifier**: the PWM SHORT test (SATcycles.ino:689-692, SATcycles.ino:812).
 - **Last cycle duration into the boiler status**: stall threshold (SATcontrol.ino:571-575).
 - **Modulation reliability** is used only for the modulation direction in the boiler status (SATcontrol.ino:616-622) and is published (SATcontrol.ino:2893, restAPI.ino:1021). A search for `bModulationReliable` found no other reader.
 - **Not consumed by control:** the 4 h and 24 h windows, the EMAs, the off-with-demand duration, the shape metrics, the cycle phase, the boiler status and the flame status are only published (SATcontrol.ino:2368-2389, SATcontrol.ino:2758-2810, SATcontrol.ino:2826-2847, SATcontrol.ino:3000-3009).
@@ -2239,19 +2242,20 @@ required    = max(2, int(8 * 0.4)) = 3
 bModulationReliable = aboveThresh >= required
 ```
 
-**Cycle kind** (SATcycles.ino:541-548):
+**Cycle kind** (SATcycles.ino:571-581, tracker.py:101-108 and :314-324; counted per 1 Hz sample, SATcycles.ino:907-929):
 ```
-if _cycle_totalSamples < 3: UNKNOWN
-dhwFrac = _cycle_dhwSamples / _cycle_totalSamples
-DHW if dhwFrac > 0.8;  CH if dhwFrac < 0.2;  else MIXED
+dhw = samples with Statusflags bit 2 (slave DHW mode); SAT simulation: bDhwActive
+ch  = samples without DHW and with Statusflags bit 8 (master CH enable); SAT simulation: fFinalSetpoint > SAT_MIN_SETPOINT
+DHW if dhw/n > 0.8 and ch/n < 0.2;  CH if ch/n > 0.8 and dhw/n < 0.2
+MIXED if dhw/n > 0.1 and ch/n > 0.1;  else UNKNOWN
 ```
-The CH fraction shown is `1 - dhwFrac` (SATcycles.ino:572-575); the central-heating bit is not used.
+The fractions shown are `dhw/n` and `ch/n` (SATcycles.ino:607-609); they need not add up to 1. A cycle in which the master CH-enable bit is clear for more than 20 % of the samples and DHW for at most 10 % (for example a PWM flame tail after SAT sent CH=0, entry 5) is `UNKNOWN`, so `UNCERTAIN`, as in thermo-nova. On PIC and OT-Direct units that bit 8 follows SAT's CH= command was not verified on a bench.
 
-**Per-cycle signals at flame-off** (SATcycles.ino:646-648, SATcycles.ino:799):
+**Per-cycle signals at flame-off** (SATcycles.ino:699-700, SATcycles.ino:683, SATcycles.ino:827):
 ```
 ctrlErrP90 = tailP90 - controlSp          # controlSp = fFinalSetpoint at flame-on
 ctrlErrP50 = tailP50 - controlSp
-reqErrP90  = tailP90 - requestedSp        # requestedSp = fPidOutput at flame-off
+reqErrP90  = tailP90 - requestedSp        # requestedSp = _sat_requestedSetpoint at flame-off
 fCycleReqSetpointError = tailP90 - requestedSp
 ```
 The error percentiles are flow percentiles shifted by a setpoint that is constant for the cycle.
@@ -2264,9 +2268,9 @@ p   = sorted[idx]
 ```
 See "Tail percentile sort" under Edge cases for a defect in the tail version.
 
-**Overshoot seconds** (SATcycles.ino:887-890), whole cycle, no warm-up: `elapsed` since the previous call is added while `flow > _cycle_setpointAtStart + fOvershootMargin`.
+**Overshoot seconds** (SATcycles.ino:938-942), whole cycle, no warm-up: `elapsed` since the previous call is added while `flow > _cycle_setpointAtStart + fOvershootMargin`. Diagnostic only since TASK-1387: it no longer gates `OVERSHOOT`.
 
-**Shape metrics** (SATcycles.ino:895-914), for every `satCycleSample` call from 60 s after flame-on, with `elapsed` = time since the previous call and `ctrlErr = flow - _cycle_setpointAtStart`:
+**Shape metrics** (SATcycles.ino:944-966), for every `satCycleSample` call from 60 s after flame-on, with `elapsed` = time since the previous call and `ctrlErr = flow - _cycle_setpointAtStart`:
 ```
 abs(ctrlErr) <= 1.0          : _cycle_timeInBandSec += elapsed
 ctrlErr >= fOvershootMargin  : _cycle_totalOvershootSec += elapsed
@@ -2324,10 +2328,7 @@ f24hLongCycleFraction = sum(nLong) / sum(nCycles)     # nLong: durationSec >= 60
 | Name | Value | Unit | Citation |
 |---|---|---|---|
 | `SAT_CYCLE_HISTORY_SIZE` | 16 | cycles | SATcycles.ino:26 |
-| `SAT_CYCLE_SHORT_DURATION_SEC` | 60 | s | SATcycles.ino:27 |
-| `SAT_CYCLE_SHORT_FLOOR_SEC` | 30 | s | SATcycles.ino:83 |
-| PWM short ratio | 0.8 | x PWM on-time | SATcycles.ino:662 |
-| Continuous "not enough data" limit | 120 (2 x 60) | s | SATcycles.ino:689 |
+| PWM short ratio | 0.8 | x PWM on-time | SATcycles.ino:688 |
 | Minimum samples for a class | 3 | `loop()` passes | SATcycles.ino:641 |
 | Overshoot timer confirmation | > 10 | s | SATcycles.ino:673 |
 | `fOvershootMargin` (setting) | 2.0 | °C | SATtypes.h:454 |
@@ -2382,7 +2383,7 @@ The buffer sizes are the same for the OTGW32, Classic-S3 and combo builds: the c
 ### State kept between passes
 
 **Cycle tracker (SATcycles.ino, file statics):**
-- Open cycle: `_cycle_flameOn`, `_cycle_flameOnStartMs`, `_cycle_flameOffStartMs`, `_cycle_maxFlowTemp`, `_cycle_minFlowTemp`, `_cycle_setpointAtStart`, `_cycle_overshootSec`, `_cycle_lastSampleMs`, `_cycle_dhwSamples`, `_cycle_totalSamples`, `_cycle_phase`, `_cycle_phaseStartMs` (SATcycles.ino:106-117).
+- Open cycle: `_cycle_flameOn`, `_cycle_flameOnStartMs`, `_cycle_flameOffStartMs`, `_cycle_maxFlowTemp`, `_cycle_minFlowTemp`, `_cycle_setpointAtStart`, `_cycle_overshootSec`, `_cycle_lastSampleMs`, `_cycle_dhwSamples`, `_cycle_chSamples`, `_cycle_totalSamples`, `_cycle_lastDhwSample`, `_cycle_phase`, `_cycle_phaseStartMs` (SATcycles.ino:105-121).
 - Shape metrics and last flame-off: SATcycles.ino:121-126. Flow-return delta sum: SATcycles.ino:87-88.
 - Flow ring (256) and tail ring (180) with heads and counts (SATcycles.ino:92-103).
 - Sustained-condition timers and the hot water end time (SATcycles.ino:129-136).
@@ -2428,15 +2429,15 @@ The buffer sizes are the same for the OTGW32, Classic-S3 and combo builds: the c
 
 - **Flame already on at boot or at enable.** The first enabled pass sees OFF->ON and starts a cycle at that moment, not at the real ignition (SATcontrol.ino:473, SATcontrol.ino:4592-4596). Its off-with-demand time is measured from boot (SATcycles.ino:247, SATcycles.ino:707).
 - **SAT disabled mid-cycle (derived from the order of the code).** While disabled, edge detection does not run (SATcontrol.ino:4568-4573), and `satDisable()` does not close the open cycle (SATcontrol.ino:2160-2187). After re-enable, the cycle closes at the next observed flame-off, so its duration includes the disabled time (SATcycles.ino:764).
-- **Two different "samples".** The INSUFFICIENT test and the hot water fraction count `loop()` passes (SATcycles.ino:917-920), whose rate is not fixed in this code. The percentiles use the 1 Hz rings (SATcycles.ino:868-878).
+- **Samples.** Since TASK-1387 the INSUFFICIENT test, the cycle kind and the DHW-in-tail test count 1 Hz samples in the same gate as the rings (SATcycles.ino:897-929). Max/min flow, the flow-return delta, the overshoot seconds and the shape metrics still run per `loop()` pass.
 - **Short cycles.** Below 10 tail samples (about 10 s) the tail values fall back to the flow ring, and below 10 flow samples to the cycle maximum and minimum (SATcycles.ino:777-783). The flow ring is seeded with the flame-on flow, the tail ring is not (SATcycles.ino:739-746).
 - **Tail percentile sort (derived from reading the code, not run).** `_tailPercentile` uses `uint8_t n` and `int8_t j = (int8_t)i - 1` in the insertion sort (SATcycles.ino:519, SATcycles.ino:525-533). For a ring index `i` of 129 or more, `(int8_t)i` is negative, so `j` is negative, the shift loop does not run, and `sorted[j + 1] = key` writes to a negative index outside `sorted`. The tail ring holds up to 180 samples (src/libraries/Platform/src/boards.h:122), so this applies to any cycle whose tail ring holds more than 129 samples, that is a cycle of more than about 130 s. Then only the first 129 (oldest) samples of the copy are sorted; with a full ring the p90 index is 161 (SATcycles.ino:535), which picks an unsorted sample from about 18 s before flame-off rather than the 90th percentile. `tailP50` (index 89) comes from the sorted oldest 129 samples. The flow ring version uses `int16_t j` and is not affected (SATcycles.ino:494-502). This was not verified with a compiler run or on a device.
 - **PWM ON phase and a stale flame-on time (derived from the order of the code, not run).** The OFF phase starts a new ON phase by setting `bPwmFlameRequested` (SATcontrol.ino:851-853). On the next control tick, `sinceFlameStart` is measured from `satCycleGetFlameOnStartMs()` (SATcontrol.ino:813), which is only updated at a flame OFF->ON edge (SATcycles.ino:714, SATcycles.ino:1039). If the flame has not lit by then, that time is the previous cycle's ignition, at least one on-time plus one off-time ago, so the expiry test at SATcontrol.ino:816 is true and the ON phase is cancelled (SATcontrol.ino:818-820) before the ignition timeout check (SATcontrol.ino:824). The PWM mechanism itself is described in the PWM section.
 - **Off-time zero.** See section 8: window off-times are always 0 and the duty ratios are 1.0 (derived from the order of the code).
-- **Hot water.** No hot water rule in the classifier; a hot water cycle can be OVERSHOOT, UNDERHEAT or GOOD (SATcycles.ino:636-694). The kind is only reported (SATcycles.ino:553, SATcycles.ino:570).
-- **Hot water source mismatch.** `bDhwActive` is set from `SlaveStatus` on the control tick, or forced true by a simulated draw (SATcontrol.ino:4625-4629). The cycle kind counts `Statusflags` bit 2 directly (SATcycles.ino:918), so under simulation a synthetic draw is not seen by the kind counter, and the off-with-demand test uses the real bus CH bit (SATcycles.ino:709).
+- **Hot water.** Since TASK-1387 a cycle with a hot water sample in its tail (after the warm-up, tracker.py:113-116), or of kind UNKNOWN, is UNCERTAIN (SATcycles.ino:667-670, cls:22-26). A DHW or MIXED cycle without hot water in the tail is classified by the PWM or continuous rules, as in thermo-nova.
+- **Hot water and CH sources.** On the real bus the cycle kind and the DHW-in-tail test read `Statusflags` bit 2 and bit 8 per sample; under SAT simulation they read `bDhwActive` (forced true by a simulated draw, SATcontrol.ino:4998-5002) and a commanded CS above `SAT_MIN_SETPOINT` (SATcycles.ino:907-920) [lines refreshed 2026-10-25, TASK-1387 review]. The off-with-demand test still reads the real bus slave CH-mode bit (SATcycles.ino:726), also under simulation.
 - **Setpoint used for the cycle.** The control error uses `fFinalSetpoint` captured at flame-on (SATcycles.ino:717). In PWM, `fFinalSetpoint` at the ignition tick is the flame-off hold value (return + offset, SATcontrol.ino:701-707, SATcontrol.ino:880-882) and changes later in the cycle (SATcontrol.ino:884-888), so the captured value is the setpoint of one moment (derived from the order of the code).
-- **Requested setpoint mismatch.** The classifier uses the raw `fPidOutput` (SATcycles.ino:789, SATpid.ino:309-310); the auto-switch uses the clamped, multi-zone `pidOutput` (SATcontrol.ino:4846-4912, SATcontrol.ino:4952). With more than one zone these can differ.
+- **Requested setpoint.** The classifier uses `_sat_requestedSetpoint` of the last control tick (SATcycles.ino:807; set from the clamped multi-zone `pidOutput` plus the solar offset, TASK-1323), so it no longer differs from the auto-switch input.
 - **Low setpoint.** Underheat with `requestedSp` below the cold setpoint (28.2 °C radiators, 21 °C underfloor) gives `UNCERTAIN` (SATcycles.ino:654, SATcycles.ino:684, SATcontrol.ino:55-56).
 - **`HEATING_HOT_WATER` and `OFF`** are never produced by the evaluator after the first tick (section 4 notes).
 - **Window time base.** Both windows count back from `millis()` at statistics time (SATcycles.ino:310, SATcycles.ino:328, SATcycles.ino:440-447), so old cycles leave the window even without new cycles. The 24 h buckets are uptime hours, not clock hours (SATcycles.ino:405).
@@ -2455,10 +2456,10 @@ The buffer sizes are the same for the OTGW32, Classic-S3 and combo builds: the c
 4. **Comment vs code, temperature rate.** SATcontrol.ino:536 says degrees per second; the code computes a difference per call (SATcontrol.ino:542).
 5. **Comment vs code, `sample_count`.** The `cycle_attributes` field named `sample_count` carries `iCycleCount` (SATcontrol.ino:2785-2787).
 6. **Comment vs code, flame status cadence.** SATcontrol.ino:3625 says "every 10 seconds"; the only caller is the control tick (SATcontrol.ino:4811), default 30 s (SATtypes.h:444).
-7. **Rate of `loop()` passes.** The INSUFFICIENT test and the hot water fraction depend on how often `loop()` runs (SATcycles.ino:917-920). The loop rate is not set in the code read here.
+7. **Rate of `loop()` passes.** Closed by TASK-1387: the INSUFFICIENT test and the kind fractions now count 1 Hz samples (SATcycles.ino:897-929).
 8. **OTDirect boards.** Whether the OTDirect path fills `OTcurrentSystemState.Statusflags` through the same `print_status` route (OTGW-Core.ino:4548) was not traced; OTDirect.ino:1622 only reads it.
-9. **No counterparts found** for: the cycle start/end events; the 3-sample discard (the firmware records the cycle as `INSUFFICIENT`); the classifier rules for kind UNKNOWN, hot water in the tail, PWM `IDLE` and missing percentiles; the cycle verdict switching PWM on or off; `max_modulation_level` and its >= 3 gate in the reliability tracker; the 50-value modulation history; persistence of the reliability verdict; the 6 h expiry of the last cycle; the separate requested-setpoint and control-setpoint per sample (the firmware uses one constant per cycle for each); interpolated percentiles; warm-up as 25 % of the duration. Searches over `src/OTGW-firmware` (`*.ino`, `*.h`, `*.cpp`): `on_cycle_end|OnCycleEnd` and `cycle_start|cycle_end|CycleStart|CycleEnd|cycle_started|cycle_ended` found nothing; `max_modulation|MaxRelMod` found `MaxRelModLevelSetting` read only outside this area (for example SATcontrol.ino:3098-3099), not in SATcycles.ino or in `satUpdateModulationReliability` (SATcontrol.ino:3562-3585).
-10. **Firmware-only parts** with no thermo-nova counterpart in this area: the flame status tracker (SATcontrol.ino:3622-3676), the cycle phase (SATcycles.ino:922-937), the per-hour counter (SATcycles.ino:260-301), the EMAs (SATcycles.ino:139-143), the 16-entry history (SATcycles.ino:146-157), the overshoot-seconds timer used as a second overshoot condition (SATcycles.ino:673, SATcycles.ino:887-890), the continuous `SHORT` and "under 120 s" `UNCERTAIN` rules (SATcycles.ino:665-669, SATcycles.ino:689-691), and the `UNDERHEAT_PWM` class (SATtypes.h:72).
+9. **No counterparts found** for: the cycle start/end events; the 3-sample discard (the firmware records the cycle as `INSUFFICIENT`); the cycle verdict switching PWM on or off; `max_modulation_level` and its >= 3 gate in the reliability tracker; the 50-value modulation history; persistence of the reliability verdict; the 6 h expiry of the last cycle; the separate requested-setpoint and control-setpoint per sample (the firmware uses one constant per cycle for each); interpolated percentiles; warm-up as 25 % of the duration. Searches over `src/OTGW-firmware` (`*.ino`, `*.h`, `*.cpp`): `on_cycle_end|OnCycleEnd` and `cycle_start|cycle_end|CycleStart|CycleEnd|cycle_started|cycle_ended` found nothing; `max_modulation|MaxRelMod` found `MaxRelModLevelSetting` read only outside this area (for example SATcontrol.ino:3098-3099), not in SATcycles.ino or in `satUpdateModulationReliability` (SATcontrol.ino:3562-3585).
+10. **Firmware-only parts** with no thermo-nova counterpart in this area: the flame status tracker (SATcontrol.ino:3622-3676), the cycle phase (SATcycles.ino:922-937), the per-hour counter (SATcycles.ino:260-301), the EMAs (SATcycles.ino:139-143), the 16-entry history (SATcycles.ino:146-157), the overshoot-seconds timer (diagnostic only since TASK-1387; it no longer gates OVERSHOOT), and the `UNDERHEAT_PWM` class (SATtypes.h:72). The continuous `SHORT` and "under 120 s" `UNCERTAIN` rules were removed in TASK-1387.
 11. **History readers.** `satCycleCountClass()` (SATcycles.ino:1027-1036) reads the 16-entry history; a search for `satCycleCountClass` outside SATcycles.ino found no caller, so the history is written but not read by other code.
 
 ---

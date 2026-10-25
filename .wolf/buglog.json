@@ -3621,5 +3621,42 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-10-23T17:42:16"
+  },
+  {
+    "id": "bug-909",
+    "timestamp": "2026-10-25T22:55:00Z",
+    "error_message": "OTGW-firmware.ino:180:33: error: 'BootHeapRec' does not name a type",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "Arduino .ino prototype generation hoists a prototype for static bootHeapPrint(const BootHeapRec&) to the top of the single translation unit, before the struct defined in MQTTstuff.ino",
+    "fix": "Move the struct definition to OTGW-firmware.h (included before the generated prototypes)",
+    "tags": [
+      "arduino",
+      "ino",
+      "prototype",
+      "struct",
+      "build"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-25T22:55:00Z"
+  },
+  {
+    "id": "bug-910",
+    "timestamp": "2026-10-26T00:10:00Z",
+    "error_message": "TASK-1387 review: cycle ending right after the overshoot switch to PWM labelled UNCERTAIN (PWM IDLE); SAT simulation cycles all UNCERTAIN (no master CH bit); DHW in a short cycle's warm-up made it UNCERTAIN",
+    "file": "src/OTGW-firmware/SATcycles.ino, src/OTGW-firmware/SATcontrol.ino",
+    "root_cause": "_pwm_idle only cleared by the next schedule step one control tick after satSetControlMode(PWM); simulation never writes Statusflags bit 8/2; DHW-in-tail test used the 180-sample ring without tracker.py's warm-up tail start",
+    "fix": "satSetControlMode clears _pwm_idle on entering PWM with a flow temperature (classifier-only flag); simulation kind inputs from bDhwActive and fFinalSetpoint > SAT_MIN_SETPOINT; DHW-in-tail compares the last DHW sample's ms offset with max(min(60,0.25*dur), dur-180)",
+    "tags": [
+      "sat",
+      "classifier",
+      "task-1387",
+      "pwm-idle",
+      "simulation",
+      "tail"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-26T00:10:00Z"
   }
 ]

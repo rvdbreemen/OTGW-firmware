@@ -804,6 +804,7 @@ static bool     _pwm_waitingForFlame       = false;
 static uint32_t _pwm_waitForFlameStartMs   = 0;    // Timestamp when flame wait began (for 180s timeout)
 static float    _pwm_flameOffHoldSetpoint  = 0.0f;
 static uint32_t _pwm_lastOffTimeMs         = 1;    // Last PWM off-phase duration (ms); 0 = saturation (duty wants continuous ON). Read by the off_time==0 saturation guard.
+static bool     _pwm_idle                  = true; // thermo-nova PWMStatus.IDLE: no ON/OFF phase since the last reset (pwm.py:92, :122-128, :179-180). Read by the cycle classifier (classifier.py:28-29, TASK-1387).
 static uint32_t _pwm_lastOnTimeMs          = 0;    // Last PWM on-phase duration (ms) = Python pwm_state.on_time_seconds. Read by the cycle classifier's SHORT_CYCLING threshold (TASK-891.4 AC#3).
 static float    _sat_requestedSetpoint      = 0.0f;  // Requested setpoint of the last control tick: PID output after the multi-zone block and the solar offset, clamped (thermo-nova requested_setpoint, climate.py:370-394). state.sat.fPidOutput stays the raw PID output.
 static float    _sat_lastControlCS          = 0.0f;  // Control setpoint of the last control tick or refresh (the "previous CS" PWM keeps without an override)
@@ -862,6 +863,10 @@ static void satPwmSchedule(float pidOutput)
     state.sat.fPwmDutyCycle = 0.0f;
     return;
   }
+  // Past the flow check the step leaves IDLE: it starts an ON phase or turns IDLE into OFF
+  // (pwm.py:154-180). The one exception, the hour-limit return below, restores the old value.
+  const bool wasIdle = _pwm_idle;
+  _pwm_idle = false;
   if (_pwm_effectiveBoilerTemp <= 0.0f && flame) _pwm_effectiveBoilerTemp = boilerTemp;
   float effectiveTemp = (_pwm_effectiveBoilerTemp > 0.0f) ? _pwm_effectiveBoilerTemp : boilerTemp;
   if (effectiveTemp < baseOffset + 1.0f) effectiveTemp = baseOffset + 1.0f;
@@ -983,6 +988,7 @@ static void satPwmSchedule(float pidOutput)
                   (unsigned)satGetMaxCyclesPerHour());
           _hourLimitLogged = true;
         }
+        _pwm_idle = wasIdle;   // pwm.py:156-158: the max-cycles return leaves the status unchanged
         return;
       }
       _hourLimitLogged = false;  // reset latch when limit clears
@@ -1084,6 +1090,7 @@ void satPwmReset()
   _pwm_flameOffHoldSetpoint   = 0.0f;
   _pwm_lastOffTimeMs          = 1;
   _pwm_effectiveBoilerTemp    = 0.0f;   // thermo-nova pwm.reset(): _effective_on_temperature = None (pwm.py:100)
+  _pwm_idle                   = true;   // pwm.reset(): _status = PWMStatus.IDLE (pwm.py:92)
 }
 
 // Change the control mode; entering or leaving PWM resets the PWM state. Every mode change also clears the
@@ -1095,6 +1102,12 @@ static void satSetControlMode(SATControlMode m)
   if (m != state.sat.eControlMode) {
     satPwmReset();
     satCycleSkipAutoSwitch();
+    // thermo-nova runs pwm.update() in the same update() pass that enables PWM (heating_control.py:206-215),
+    // so with a flow temperature the status leaves IDLE at once (pwm.py:154-180). The firmware switches after
+    // the mode step of the control tick and runs its first schedule step one tick later; until then the
+    // cycle classifier must not see IDLE (classifier.py:28-29, TASK-1387). Only the classifier reads the
+    // flag, so this does not change what the boiler is sent.
+    if (m == SAT_MODE_PWM && satGetFlowTemp() > 0.0f) _pwm_idle = false;
   }
   state.sat.eControlMode = m;
 }
@@ -1129,6 +1142,11 @@ uint32_t satPwmLastOffTimeMs() { return _pwm_lastOffTimeMs; }
 // Last PWM on-phase duration in ms (Python pwm_state.on_time_seconds).
 // Read by the cycle classifier's PWM SHORT_CYCLING threshold (TASK-891.4 AC#3).
 uint32_t satPwmLastOnTimeMs() { return _pwm_lastOnTimeMs; }
+
+// PWM status IDLE (thermo-nova PWMStatus.IDLE): no ON/OFF phase since the last reset or since the flow
+// temperature went missing. The end-of-cycle classifier returns UNCERTAIN for an idle PWM cycle
+// (cycles/classifier.py:28-29, TASK-1387).
+bool satPwmIsIdle() { return _pwm_idle; }
 
 //=====================================================================
 //=== Preset Handling ===
