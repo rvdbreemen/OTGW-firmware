@@ -3,9 +3,10 @@ id: TASK-1404
 title: >-
   Combo AUTO detection persists a false-positive PIC verdict on the OTGW32 (ETX
   seen, no PIC banner): unit stuck in PIC mode
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-25T21:21:00Z'
+updated_date: '2026-10-25T21:22:00Z'
 labels:
   - combo
   - pic
@@ -28,3 +29,15 @@ Bench 2026-10-25, OTGW32 (USB 303A:1001 MAC AC:27:6E:CE:45:D8, COM8, .63), confi
 - [ ] #2 Detection requires more than a single 0x03 byte (for example ETX followed by a parsed banner or a PR=A reply) before it persists Classic; host test red on HEAD, green on fix
 - [ ] #3 OTGW32 in auto boots OT-Direct (otdirectavailable true) and boardmode stays 0 across 3 boots; a Classic with a live PIC still persists 1/3
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-25 RETRACTED: Robert corrected that the unit is a Classic with an S3 (live PIC), not the OTGW32. Detection was right: /bootdetect.log pic=1 mode=1, and 1 min after boot device/info reads picfwversion 6.8, pic16f1847, gateway. The 'no pic found' right after boot was the banner not yet received. Not a bug.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Not a bug: retracted. The unit on the bench was a Classic with an S3 and a live PIC; combo detection correctly persisted iBoardMode=1 (ADR-201).
+<!-- SECTION:FINAL_SUMMARY:END -->
