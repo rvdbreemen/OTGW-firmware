@@ -39,7 +39,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q14 | answered (entry 45: flow-based start, CS/PM=25 flood, MI=500) -> TASK-1371 | PWM ignition hold without a return temperature sensor (audit #27) | - |
 | Q15 | answered (entry 48: a MaxTSet slider bounded by MsgID 57, sent to the boiler) -> TASK-1373 | Maximum flow setpoint: a user setting, and which defaults? (audit #29) | - |
 | Q16 | answered (entry 52: default 3 gas, 2 heat pump) -> TASK-1366 + new task | Cycles per hour default and range (audit #30) | - |
-| Q17 | asked 2026-10-25 07:24 UTC, when to send SW= (bounds and SW= on change settled by entry 33) ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563815326800552037)) | DHW setpoint: SW= on change, slider bounded by MsgID 48 (audit #31, entry 33) | - |
+| Q17 | answered (entry 53: option A) -> TASK-1376 | DHW setpoint: SW= on change, slider bounded by MsgID 48 (audit #31, entry 33) | - |
 | Q18 | queued | Zones: follow area.py (max, no headroom, cap overshoot)? (audit #32, entry 35) | - |
 | Q19 | queued | Units whose coefficient was set by the old wizard (1.4 / 0.6 / 0.8, not chosen by the user): leave them (entry 24) or reset them once to 2.0? (TASK-1347) | - |
 | Q20 | queued | Cold cutoff boundary: is a requested setpoint exactly equal to the cold setpoint (28.2 / 21) cold (`<=`, as thermo-nova heating_control.py:72 and :385) or not (`<`)? Entries 7 and 11 left it open (TASK-1355) | ADR-199 |

@@ -2745,3 +2745,55 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156381190770
 says gas boilers use 3 or 4, so we read the range as 3 or 4 for gas boilers.
 
 **Open:** what hybrids default to.
+
+## 53. Hot water setpoint: send SW= at once on every change (2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 07:28 UTC, answer to Q17 (07:23 UTC, message
+1563815326800552037: A) send SW= at once on every change and once after a restart, while DHW control
+is on; B) keep sending it only when a hot water draw starts; C) something else; our advice A):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563816490799472681
+
+**Quoted:**
+
+> @BlueFlame Bot Exactly, option A is the correct. Normally users do not change the DHW setpoint or the MaxTset. They set it probably once and then forget it.
+
+**Settled by this statement:**
+
+- A DHW setpoint change sends `SW={value}` at once, and once after a restart, while DHW control is on.
+  This confirms entry 33 ("When a DHW setpoint temperature change occurs you need to send the SW={value}
+  command").
+- Context from him: users set the DHW setpoint and the MaxTSet once and then leave them.
+
+**Compared with thermo-nova and the firmware:** thermo-nova sends the setpoint at once on change
+(`number.py:72-74`). Firmware at HEAD `31933adaf`: `SW=` only on the off-to-on edge of a hot water draw
+and only with `bDhwEnabled` (`SATcontrol.ino:4885-4891` before TASK-1365 moved the lines).
+
+**Changes an earlier entry:** none; it confirms entry 33.
+
+**Task:** TASK-1376.
+
+**Open:** whether the draw-edge `SW=` stays as well (not asked; the plan decides and names it).
+
+## 54. SAT knows the user's MaxTSet and never sends a higher CS (2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 07:31 UTC, his reply after our answer to gruijter (message
+1563816425838219335, which said SAT has no user MaxTSet setting yet and asked for an OT log):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563817156884430930
+
+**Quoted:**
+
+> @BlueFlame Bot SAT should know this actually. So when the MaxTset slider is set to 48, then SAT knows that the highest value can send to the boiler is 48. It is also in the thermo-nova
+
+**Settled by this statement:** the same rule as entry 51, restated: with the MaxTSet slider at 48, SAT
+never sends a CS above 48. It applies to every CS, the ignition hold included.
+
+**Compared with thermo-nova and the firmware:** thermo-nova clamps the PID output and the flame-off
+hold at the user `maximum_setpoint` (`climate.py:379`, `:394`; `heating_control.py:397`). Firmware at
+HEAD: no user setting (entry 51); the ignition hold is clamped with the system cap only
+(`satGetMaxSetpoint()`, noted on TASK-1373).
+
+**Changes an earlier entry:** none; it confirms entry 51.
+
+**Task:** TASK-1373 (the clamp must also cover the ignition hold).
+
+**Open:** none.
