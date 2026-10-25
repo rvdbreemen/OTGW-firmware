@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-24T22:32:00Z'
+updated_date: '2026-10-25T16:37:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,3 +25,9 @@ Sergeant D 2026-10-24 21:34 UTC (Q14, entry 45, a deliberate deviation from ther
 <!-- AC:BEGIN -->
 - [ ] #1 Without a return temperature the PWM ON phase suppresses to flow - offset from ignition and sends CS/PM=25 alternately each second for 20 s (host test of the command sequence red on HEAD, green); MI=500 sent for such boilers on PIC boards; plan OK'd by Sergeant D first
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-25 implement-next-task: skipped, waits for Q40 (how 'no return temperature' is detected) and Sergeant D's OK on the plan.
+<!-- SECTION:NOTES:END -->
