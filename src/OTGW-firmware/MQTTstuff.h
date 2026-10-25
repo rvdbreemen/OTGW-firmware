@@ -416,6 +416,7 @@ struct HaDiscoveryContext {
     const char *mqttPubTopic;
     const char *mqttSubTopic;
     const char *haPrefix;
+    const char *configUrl;         // device web UI "http://<ip>/", HA shows it as "Visit" (TASK-1377.1)
     const char *manufacturer;      // Hardware manufacturer (from settings.device) — legacy only
     const char *model;             // Hardware model (from settings.device) — legacy only
     bool        isFirstEntity;

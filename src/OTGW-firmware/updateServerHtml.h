@@ -122,7 +122,7 @@ static const char UpdateServerIndex[] PROGMEM =
       <div id='oneRec'></div>
       <input id='oneRetry' type='button' value='Try again' style='display:none;'>
       <input id='oneBack' type='button' value='Back' style='display:none;'>
-      <a id='oneOpen' href='/' style='display:none;'>Open web UI</a>
+      <a id='oneOpen' href='./' style='display:none;'>Open web UI</a>
     </div>
     <p><a id='bkLink' href='/settings.ini' download>Download a settings backup (optional)</a></p>
   </div>
@@ -543,8 +543,18 @@ var OTGWUpd = (function () {
   function show(id, on) { var e = $(id); if (e) e.style.display = on ? '' : 'none'; }
 
   // Plain XHR: fetch has no upload progress. One request at a time is the caller's job.
+  // The phase engine names device paths from the root ('/safeboot', '/info', ...).
+  // Resolve them against the page's directory, so the update also runs behind a
+  // reverse proxy that serves the gateway on a path prefix (TASK-1377.5).
+  var PAGE_BASE = location.pathname.replace(/[^/]*$/, '');
+  // Served through a reverse proxy: on a path prefix (HA ingress, nginx sub-path) or over HTTPS.
+  var PROXIED = PAGE_BASE !== '/' || location.protocol === 'https:';
+  // The updater (safeboot) has no mDNS name, so the browser must reach the unit by IP, or a
+  // proxy must, which the page cannot check: it warns instead (see the snapshot notes).
+  function hostReachable() { return U.isIPv4(location.hostname) || PROXIED; }
   function req(method, url, o) {
     o = o || {};
+    if (url.charAt(0) === '/') url = PAGE_BASE + url.slice(1);
     return new Promise(function (resolve, reject) {
       var x = new XMLHttpRequest(), sent = false, fd = null;
       x.open(method, url, true);
@@ -578,7 +588,7 @@ var OTGWUpd = (function () {
         localStorage.removeItem('otgw_dallas_restore');
         return Promise.resolve();
       }
-      return fetch('/api/v2/sensors/labels', {
+      return fetch('api/v2/sensors/labels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(entry.data)
@@ -591,7 +601,7 @@ var OTGWUpd = (function () {
   // The firmware keeps up to 2 KB of Dallas labels across a filesystem update;
   // this copy in the browser covers larger label files.
   function saveDallasLabelsToStorage() {
-    return fetch('/api/v2/sensors/labels', { cache: 'no-store' })
+    return fetch('api/v2/sensors/labels', { cache: 'no-store' })
       .then(function(res) { return res.ok ? res.json() : null; })
       .then(function(labels) {
         if (!labels || typeof labels !== 'object' || Object.keys(labels).length === 0) return;
@@ -601,7 +611,7 @@ var OTGWUpd = (function () {
   }
 
   function redirectToHome(delayMs) {
-    setTimeout(function() { window.location.href = '/?_ota=' + Date.now(); }, delayMs || 1000);
+    setTimeout(function() { window.location.href = PAGE_BASE + '?_ota=' + Date.now(); }, delayMs || 1000);
   }
 
   function formatBytes(bytes) {
@@ -652,6 +662,9 @@ var OTGWUpd = (function () {
       setText('unitInfo', 'Unit ' + (s.host || '?') + ' (' + (s.ip || '?') + ') runs ' + s.ver + '. Its web files ' + fsTxt + '.');
       if (s.appOta) { blockOne('This unit takes a firmware image directly (two firmware slots). Use the manual forms below.'); }
       else if (!s.sb) { blockOne('This unit cannot update its firmware over WiFi. Use USB (flash_otgw) or, for the web files only, the manual form below.'); }
+      else if (PROXIED && !U.isIPv4(location.hostname)) {
+        note('This page was opened through a reverse proxy. The update works only if the proxy reaches the unit by IP address (' + (s.ip || '?') + '): the updater has no network name.', 'warn');
+      }
       else if (!U.isIPv4(location.hostname)) {
         blockOne('This page was opened as "' + location.hostname + '". The updater can only be reached by IP address, so open this page by IP:', s.ip ? 'http://' + s.ip + '/update' : '');
       }
@@ -663,7 +676,7 @@ var OTGWUpd = (function () {
   }
 
   function refreshStart() {
-    $('oneStart').disabled = !plan || !snap || !snap.ok || !snap.sb || snap.appOta || !U.isIPv4(location.hostname);
+    $('oneStart').disabled = !plan || !snap || !snap.ok || !snap.sb || snap.appOta || !hostReachable();
   }
 
   function setFiles(files) {
@@ -673,7 +686,9 @@ var OTGWUpd = (function () {
     if (!files || !files.length) return;
     setText('oneFilesInfo', 'Reading the files...');
     U.intake(files, readFile).then(function (r) {
-      var p = U.planFor(snap, r, location.hostname);
+      // Behind a proxy the browser never talks to the unit's address itself; the proxy does,
+      // so the unit's IP stands in for the host check.
+      var p = U.planFor(snap, r, PROXIED && snap && snap.ip ? snap.ip : location.hostname);
       plan = { r: r, from: p.from };
       setText('oneFilesInfo', p.info + (p.warns.length ? ' Warning: ' + p.warns.join(' ') : ''));
       refreshStart();
@@ -715,7 +730,7 @@ var OTGWUpd = (function () {
       if (res.ok) {
         setSteps('done'); ui.say('Done. The unit runs ' + r.E + ' with matching web files.');
         $('oneBar').style.width = '100%'; setText('oneBarText', 'Done');
-        $('oneOpen').href = '/?_ota=' + Date.now(); show('oneOpen', true);
+        $('oneOpen').href = PAGE_BASE + '?_ota=' + Date.now(); show('oneOpen', true);
         return;
       }
       setText('oneErr', res.msg); setText('oneRec', res.rec);
@@ -750,7 +765,7 @@ var OTGWUpd = (function () {
       remaining--;
       if (remaining <= 0) { clearInterval(timer); if (options.onTimeout) options.onTimeout(); return; }
       if (options.onTick) options.onTick(remaining);
-      fetch('/api/v2/health?t=' + Date.now(), { method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' } })
+      fetch('api/v2/health?t=' + Date.now(), { method: 'GET', cache: 'no-store', headers: { 'Accept': 'application/json' } })
         .then(function(res) { if (res.ok) return res.json(); throw new Error('HTTP ' + res.status); })
         .then(function(data) {
           if (data && data.health && data.health.status === 'UP') { clearInterval(timer); options.onHealthy(); }
@@ -790,7 +805,7 @@ var OTGWUpd = (function () {
       },
       onTimeout: function() {
         progressText.textContent = 'Redirecting...';
-        window.location.href = '/?_ota=' + Date.now();
+        window.location.href = PAGE_BASE + '?_ota=' + Date.now();
       }
     });
   }
@@ -918,7 +933,7 @@ var OTGWUpd = (function () {
       btn.addEventListener('click', function() {
         if (!confirm('Restart into the firmware updater now? The gateway stops until you upload a firmware or restart.')) return;
         btn.disabled = true;
-        fetch('/safeboot', { method: 'POST' })
+        fetch('safeboot', { method: 'POST' })
           .then(function(r) { return r.text().then(function(t) { return { ok: r.ok, t: t }; }); })
           .then(function(res) {
             msg.textContent = res.t;
@@ -927,7 +942,7 @@ var OTGWUpd = (function () {
             var tick = setInterval(function() {
               left--;
               msg.textContent = 'Restarting into the updater... ' + left + 's';
-              if (left <= 0) { clearInterval(tick); location.href = '/'; }
+              if (left <= 0) { clearInterval(tick); location.href = './'; }
             }, 1000);
           })
           .catch(function() { msg.textContent = 'Request failed.'; btn.disabled = false; });
@@ -967,7 +982,7 @@ static const char UpdateServerSuccess[] PROGMEM =
       <h2>Flashing successful!</h2>
       <p>Wait for the OTGW firmware to reboot and start the HTTP server.</p>
       <p><span id="s" style="font-weight:bold; color:#666;">Waiting for device... (60s)</span></p>
-      <p>If nothing happens: <b><a href="/">click here</a></b>.</p>
+      <p>If nothing happens: <b><a href="./">click here</a></b>.</p>
       </body>
       <script>
         // Fallback path only — restore Dallas labels from localStorage then redirect.
@@ -984,7 +999,7 @@ static const char UpdateServerSuccess[] PROGMEM =
               if (typeof e.data !== 'object' || Object.keys(e.data).length === 0) {
                 localStorage.removeItem('otgw_dallas_restore'); return;
               }
-              fetch('/api/v2/sensors/labels', {
+              fetch('api/v2/sensors/labels', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(e.data)
@@ -998,16 +1013,16 @@ static const char UpdateServerSuccess[] PROGMEM =
           var s = document.getElementById('s'), n = 60;
           var t = setInterval(function() {
             n--;
-            if (n <= 0) { clearInterval(t); window.location.href = '/'; return; }
+            if (n <= 0) { clearInterval(t); window.location.href = './'; return; }
             s.textContent = 'Waiting for device... (' + n + 's)';
-            fetch('/api/v2/health?t=' + Date.now(), { cache: 'no-store' })
+            fetch('api/v2/health?t=' + Date.now(), { cache: 'no-store' })
               .then(function(r) { return r.ok ? r.json() : null; })
               .then(function(d) {
                 if (d && d.health && d.health.status === 'UP') {
                   clearInterval(t);
                   s.textContent = 'Device is back online!';
                   tryRestoreLabels();
-                  setTimeout(function() { window.location.href = '/'; }, 1000);
+                  setTimeout(function() { window.location.href = './'; }, 1000);
                 }
               }).catch(function() {});
           }, 1000);

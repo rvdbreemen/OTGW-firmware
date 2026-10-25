@@ -2291,6 +2291,7 @@ static const char kIds[]      PROGMEM = "identifiers";
 static const char kMfr[]      PROGMEM = "manufacturer";
 static const char kModel[]    PROGMEM = "model";
 static const char kSwVer[]    PROGMEM = "sw_version";
+static const char kCfgUrl[]   PROGMEM = "cu";  // configuration_url: HA "Visit" link (TASK-1377.1)
 static const char kDevName[]  PROGMEM = "name";
 static const char kUniqId[]   PROGMEM = "uniq_id";
 static const char kName[]     PROGMEM = "name";
@@ -2353,6 +2354,10 @@ static bool writeDeviceBlock(MqttJsonWriter &w, HaDiscoveryContext &ctx) {
     if (!w.writeRamEscaped(ctx.hostname) || !w.writeProgmem(PSTR(")\""))) return false;
     if (!writeJsonComma(w)) return false;
     if (!w.writeChar('"'  ) || !w.writeProgmem(kSwVer) || !w.writeProgmem(PSTR("\":\"")) || !w.writeRamEscaped(ctx.version) || !w.writeChar('"'  )) return false;
+    if (ctx.configUrl && ctx.configUrl[0]) {
+      if (!writeJsonComma(w)) return false;
+      if (!w.writeChar('"'  ) || !w.writeProgmem(kCfgUrl) || !w.writeProgmem(PSTR("\":\"")) || !w.writeRamEscaped(ctx.configUrl) || !w.writeChar('"'  )) return false;
+    }
   }
   return w.writeChar('}');
 }

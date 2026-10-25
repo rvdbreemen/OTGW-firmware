@@ -1,7 +1,7 @@
 <!--
 ***************************************************************************  
 **  Program  : FSexplorer.html
-**  Version  : v2.0.0-alpha.505
+**  Version  : v2.0.0-alpha.506
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -45,7 +45,7 @@
              let fileSize = document.querySelector('fileSize');
              let fileInput = document.querySelector('input[name="upload"]');
              let uploadBtn = document.querySelector('input[value="Upload"]');
-             let uploadForm = document.querySelector('form[action="/upload"]');
+             let uploadForm = document.querySelector('form[action="upload"]');
              let freeBytes = 0;
 
              // Create progress bar
@@ -84,7 +84,7 @@
              }
 
              function loadFileList(highlightFile = null) {
-                 uploadForm.action = '/upload?path=' + encodeURIComponent(currentPath);
+                 uploadForm.action = 'upload?path=' + encodeURIComponent(currentPath);
                  
                  fetch('api/listfiles?path=' + encodeURIComponent(currentPath))
                    .then(function (response) {
@@ -163,7 +163,9 @@
                        // becomes path '/notes' + fragment '1.txt' and 404s, while the Delete link on
                        // the same row works because it already runs encodeURIComponent. The server
                        // decodes once, so this round-trips '#', '?', '+' and a literal '%'.
-                       const hrefPath = fullPath.split('/').map(encodeURIComponent).join('/');
+                       // No leading '/': page-relative, so the link also works behind a
+                       // reverse proxy that serves the device on a path prefix (TASK-1377.5).
+                       const hrefPath = fullPath.split('/').map(encodeURIComponent).join('/').replace(/^\//, '');
 
                        if (files[i].type === 'dir') {
                          const nameCell = row.insertCell();
@@ -422,7 +424,7 @@
       
       <fieldset class="upload-box">
         <legend>Upload File</legend>
-        <form action="/upload" method="POST" enctype="multipart/form-data">
+        <form action="upload" method="POST" enctype="multipart/form-data">
              <input type="file" name="upload">
              <input type="submit" value="Upload" disabled>
         </form>
@@ -435,17 +437,17 @@
       <section class="fs-action-card">
            <h3>System Actions</h3>
            <div class="button-row">
-                <form action='/update' method='GET'>
+                <form action='update' method='GET'>
                   <input type='submit' class='button fs-btn' name='SUBMIT' value='Update Firmware' ENABLED/>
                 </form>
-                <form action='/ReBoot'>
+                <form action='ReBoot'>
                   <input type='submit' class='button fs-btn secondary' name='SUBMIT' value='ReBoot'>
                 </form>
-                <form action='/ResetWireless'>
+                <form action='ResetWireless'>
                   <input type='submit' class='button fs-btn wifi' name='SUBMIT' value='Reset Wireless'>
                 </form>
-                <form action='/'>
-                  <input type='button' class='button fs-btn secondary' value='Exit FSexplorer' onclick="window.location.href='/'">
+                <form action='./'>
+                  <input type='button' class='button fs-btn secondary' value='Exit FSexplorer' onclick="window.location.href='./'">
                 </form>
            </div>
       </section>

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.505
+**  Version  : v2.0.0-alpha.506
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2394,6 +2394,15 @@ void loopMQTTDiscovery()
 // Build a discovery context from the current MQTT state.
 // Caller sets ctx.isFirstEntity as appropriate.
 static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
+  // configuration_url ("cu"): the active transport's IP, not <host>.local, which does not
+  // resolve on every client (TASK-1377.1). Rebuilt per context, so a republish after an IP
+  // change carries the new address. IPAddress + snprintf_P: no String on this path (ADR-180).
+  static char configUrl[24];  // "http://255.255.255.255/" = 23 + nul
+  IPAddress ip = WiFi.localIP();
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  if (state.net.eMode == NET_ETHERNET) ip = Ethernet.localIP();
+#endif
+  snprintf_P(configUrl, sizeof(configUrl), PSTR("http://%u.%u.%u.%u/"), ip[0], ip[1], ip[2], ip[3]);
   HaDiscoveryContext ctx;
   ctx.nodeId = NodeId;
   ctx.hostname = CSTR(settings.sHostname);
@@ -2401,6 +2410,7 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
   ctx.mqttPubTopic = MQTTPubNamespace;
   ctx.mqttSubTopic = MQTTSubNamespace;
   ctx.haPrefix = CSTR(settings.mqtt.sHaprefix);
+  ctx.configUrl = configUrl;
   ctx.manufacturer = settings.device.sManufacturer;
   ctx.model = settings.device.sModel;
   ctx.isFirstEntity = isFirst;

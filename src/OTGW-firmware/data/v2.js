@@ -33,7 +33,11 @@
     var url = (typeof input === 'string') ? input : (input && input.url) || '';
     try {
       var u = new URL(url, window.location.href);
-      return u.origin === window.location.origin && u.pathname.indexOf('/api/') === 0;
+      // The API sits under the page's own directory: '/api/' directly, '<prefix>/api/'
+      // behind a reverse proxy (TASK-1377.5). A bare '/api/' test would miss the API
+      // behind a proxy path and queue every static file behind HA ingress (/api/ingress/...).
+      var base = window.location.pathname.replace(/[^/]*$/, '');
+      return u.origin === window.location.origin && u.pathname.indexOf(base + 'api/') === 0;
     } catch (e) {
       return false;
     }
@@ -81,7 +85,11 @@
 (function () {
   'use strict';
 
-  var APIGW = location.protocol + '//' + location.host + '/api/';
+  // Directory the page was served from: '/' on direct access, the proxy prefix behind a
+  // reverse proxy (e.g. '/api/ingress/otgw/' behind Home Assistant ingress). Every device
+  // URL below is built on it, so the UI works on any base path (TASK-1377.5).
+  var BASE = location.pathname.replace(/[^/]*$/, '');
+  var APIGW = location.protocol + '//' + location.host + BASE + 'api/';
 
   // ---------- fetch with 503-retry (TASK-1033) ----------
   // The REST backpressure gate (ADR-165) 503s transiently during load bursts.
@@ -258,7 +266,7 @@
         var fc = j && j.filesystem_check, b = document.getElementById('fsMismatch');
         if (!fc || !b || fc.match !== false) return;
         b.textContent = '⚠ Firmware/filesystem mismatch (firmware ' + fc.fw_hash + ', filesystem ' + (fc.fs_hash || 'unknown') + '). ';
-        var a = document.createElement('a'); a.href = '/update'; a.textContent = 'Flash the matching LittleFS image';
+        var a = document.createElement('a'); a.href = BASE + 'update'; a.textContent = 'Flash the matching LittleFS image';
         b.appendChild(a); b.hidden = false;
       }).catch(function () { });
   }
@@ -441,7 +449,7 @@
   // matching thermostat READ request carries zero data, so we filter by
   // message type per msgid to avoid clobbering a reading with a request.
 
-  var WS_PATH = '/ws';            // overwritten by discovery below if needed
+  var WS_PATH = 'ws';             // relative to BASE, so it also passes a reverse proxy
   var ws = null, wsTimer = null;
   var model = {
     flow: null, ret: null, dhw: null, outside: null, room: null,
@@ -980,7 +988,7 @@
   }
 
   function connectWs() {
-    var url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + WS_PATH;
+    var url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + BASE + WS_PATH;
     try {
       ws = new WebSocket(url);
       ws.onmessage = onWsMessage;
@@ -3705,7 +3713,7 @@
   }
 
   // ---------- Advanced > PIC firmware flash (TASK-972/982) ----------
-  var PICBASE = location.protocol + '//' + location.host + '/';   // /pic is a top-level route, not under /api/v2
+  var PICBASE = location.protocol + '//' + location.host + BASE;   // /pic is a top-level route, not under /api/v2
   var picPollTimer = null, picBusy = false, picDevVer = '';
   var PIC_NONE_MSG = 'No PIC detected — PIC firmware flashing is unavailable on this board (OT-Direct / OTGW32).';
   var picGateRetries = 0;
@@ -4186,7 +4194,7 @@
     if (btn) btn.disabled = true;
     // /upload replies 303 -> FSexplorer.html; redirect:'manual' keeps us here and we
     // refresh the listing ourselves instead of following the redirect.
-    fetch('/upload?path=' + encodeURIComponent(fsCurrentPath), {
+    fetch(BASE + 'upload?path=' + encodeURIComponent(fsCurrentPath), {
       method: 'POST', body: fd, credentials: 'same-origin', redirect: 'manual'
     }).then(function (r) {
       // An opaqueredirect (type 'opaqueredirect', status 0) is the success path here.
@@ -4212,11 +4220,11 @@
     if (act === 'home') { showPage('home'); return; }
     if (act === 'onboarding') { startOnboarding(); return; }   // TASK-997: re-run the first-time setup wizard on demand
     if (act === 'sat-onboarding') { _satOnbShown = false; startSatOnboarding('rerun'); return; }   // TASK-1012: re-run the SAT setup wizard on demand
-    if (act === 'update') { window.location.href = '/update'; return; }   // OTA sketch / filesystem upload page
+    if (act === 'update') { window.location.href = BASE + 'update'; return; }   // OTA sketch / filesystem upload page
     if (act === 'reboot') {
       if (!window.confirm('Reboot the OTGW device now? The Web UI will be unavailable for a few seconds.')) return;
       bleToast('Device is rebooting…');
-      fetch('/ReBoot', { credentials: 'same-origin' })
+      fetch(BASE + 'ReBoot', { credentials: 'same-origin' })
         .then(function (r) { if (!r.ok) bleToast('Reboot failed: ' + r.status, true); })
         .catch(function () { });   // socket drops as the device restarts — expected
       return;
@@ -4224,7 +4232,7 @@
     if (act === 'resetwifi') {
       if (!window.confirm('Reset Wireless settings?\n\nThis CLEARS the stored Wi-Fi network and reboots the device into AP-mode setup. You will have to reconnect it to your network afterwards.')) return;
       bleToast('Wi-Fi cleared — rebooting into AP-mode setup…');
-      fetch('/ResetWireless', { credentials: 'same-origin' })
+      fetch(BASE + 'ResetWireless', { credentials: 'same-origin' })
         .then(function (r) { if (!r.ok) bleToast('Reset failed: ' + r.status, true); })
         .catch(function () { });   // socket drops as the device restarts — expected
     }
