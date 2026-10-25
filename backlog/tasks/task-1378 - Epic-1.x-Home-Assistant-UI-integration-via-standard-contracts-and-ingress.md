@@ -1,11 +1,11 @@
 ---
 id: TASK-1378
 title: 'Epic (1.x): Home Assistant UI integration via standard contracts and ingress'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T09:10:00Z'
-updated_date: '2026-10-25T11:21:00Z'
+updated_date: '2026-10-25T18:04:00Z'
 labels:
   - epic
   - home-assistant
@@ -34,7 +34,7 @@ Cross-branch coordination: the 2.0.0 siblings are TASK-1377.1 (A), .3 (B), .5 (C
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All child tasks are Done, or explicitly dropped with a reason
+- [x] #1 All child tasks are Done, or explicitly dropped with a reason
 - [x] #2 HA shows a working 'Visit device' link for a 1.x OTGW, shown by a screenshot
 - [x] #3 The classic UI opens from the HA sidebar through the chosen ingress component with HA over HTTPS; reads and admin actions work, live log shows its degraded state, shown by screenshots or a bench transcript
 - [x] #4 MQTT discovery and REST contracts unchanged apart from the added cu field, shown by a discovery payload diff
@@ -47,3 +47,15 @@ Cross-branch coordination: the 2.0.0 siblings are TASK-1377.1 (A), .3 (B), .5 (C
 - Work in worktree wt-1378 from origin/otgw-1.x.x, not in wt-otgw-1.x.x: that tree holds 35 unpushed local commits and an uncommitted TEMP DIAG build (TASK-1262/1302); left untouched.
 - Bench .88.68 now runs 1.7.8-beta.6+54cbe02 (fw + LittleFS); it ran the TASK-1302 no-GARP diag build before. MQTT broker setting restored to homeassistant.local, no HTTP password.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+1.x: HA UI integration via standard contracts and ingress, shipped in 1.7.8-beta.6.
+
+- 1378.1 configuration_url (cu): HA Visit link, discovery diff clean.
+- 1378.2 spike: hass_ingress chosen; headers, matrix, heap recorded.
+- 1378.3 base-path agnostic classic UI, complete upload 303 for proxies, PIC flash page polling fix (real PIC flash through HA ingress verified twice), visible live-log notice; CSRF unchanged (ADR AC dropped by the maintainer, no decision changed).
+- 1378.4 guide docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md.
+Evidence: docs/research/2026-10-25-ha-ingress-bench-1x. 2.0.0 counterpart: dev TASK-1377.
+<!-- SECTION:FINAL_SUMMARY:END -->
