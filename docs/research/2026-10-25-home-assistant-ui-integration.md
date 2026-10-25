@@ -1,6 +1,7 @@
 # Home Assistant UI integration: Marketplace, custom integration or ingress
 
-Date: 2026-10-25. Epic: TASK-1377 (children TASK-1377.1 to .8, backlog on `dev`).
+Date: 2026-10-25. Epics: TASK-1377 on `dev` (2.0.0: TASK-1377.1, .3, .5, .7) and
+TASK-1378 on `otgw-1.x.x` (1.x: TASK-1378.1, .2, .3, .4), each in its own branch's backlog.
 This note is identical on `dev` (2.0.0) and `otgw-1.x.x` (1.x).
 
 ## Question
@@ -101,8 +102,8 @@ dashboard (no proxy, level 2 only), and any other maintained HA proxy component 
 the time of the spike.
 
 Consequence for the firmware work: `rewrite` rules and `X-Ingress-Path` may make some or
-all firmware path changes unnecessary. The spike (TASK-1377.3 / .4) first tests the
-current firmware with rewrite rules only. Firmware changes (TASK-1377.5 / .6) cover only
+all firmware path changes unnecessary. The spikes (TASK-1377.3 on 2.0.0, TASK-1378.2 on 1.x) first test the
+current firmware with rewrite rules only. Firmware changes (TASK-1377.5, TASK-1378.3) cover only
 what rewrite rules cannot fix cleanly.
 
 ## 5. Code findings per line (read 2026-10-25)
@@ -144,12 +145,12 @@ what rewrite rules cannot fix cleanly.
 
 ## 6. What each task takes from this note
 
-| Task | Line | Uses sections |
-|---|---|---|
-| TASK-1377.1 / .2 configuration_url | 2.0.0 / 1.x | 3 (level 1), 5 (device block) |
-| TASK-1377.3 / .4 bench spike | 2.0.0 / 1.x | 3, 4 (modes, rewrite, headers, require_admin), 5 (URLs, WS, CSRF) |
-| TASK-1377.5 / .6 base path and CSRF | 2.0.0 / 1.x | 4 (X-Ingress-Path, rewrite), 5 |
-| TASK-1377.7 / .8 manual | 2.0.0 / 1.x | 1 (trust), 3, 4 (require_admin, static_token warning) |
+| Item | 2.0.0 (`dev`) | 1.x (`otgw-1.x.x`) | Uses sections |
+|---|---|---|---|
+| A configuration_url | TASK-1377.1 | TASK-1378.1 | 3 (level 1), 5 (device block) |
+| B bench spike | TASK-1377.3 | TASK-1378.2 | 3, 4 (modes, rewrite, headers, require_admin), 5 (URLs, WS, CSRF) |
+| C base path and CSRF | TASK-1377.5 | TASK-1378.3 | 4 (X-Ingress-Path, rewrite), 5 |
+| D manual | TASK-1377.7 | TASK-1378.4 | 1 (trust), 3, 4 (require_admin, static_token warning) |
 
 ## 7. Open points
 

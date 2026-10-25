@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T09:01:00Z'
-updated_date: '2026-10-25T09:09:00Z'
+updated_date: '2026-10-25T09:12:00Z'
 labels:
   - epic
   - home-assistant
@@ -57,4 +57,6 @@ Ordering: A is independent. C depends on B per line. D depends on C per line.
 Research 2026-10-25 recorded in docs/research/2026-10-25-home-assistant-ui-integration.md (identical copy on dev and otgw-1.x.x). Key facts: the HA 2026.11 Marketplace is HACS in core (same hacs/default catalog and hacs.json, months of review, nothing audited by HA); options B (card) and D (custom integration) rejected for maintenance and contract duplication; hass_ingress (Apache-2.0) proxies at /api/ingress/{name}/, sends X-Ingress-Path, supports body/header rewrite rules, extra headers (incl. host and authorization) and require_admin. New since the epic was written: rewrite rules may fix absolute UI paths without firmware changes, so the spikes test rewrite-only first and items C shrink to what rewrite cannot fix.
 
 Maintainer decision 2026-10-25 (confirmed): go for the minimal integration and make HA ingress work properly now. No new integration in the HA Marketplace for now (no custom integration, no card). Scope stays items A-D on both lines.
+
+2026-10-25: on maintainer request the 1.x children moved to the otgw-1.x.x backlog as epic TASK-1378 with children TASK-1378.1 (A), .2 (B), .3 (C), .4 (D). The dev copies TASK-1377.2/.4/.6/.8 are archived. This epic now tracks the 2.0.0 line (TASK-1377.1/.3/.5/.7); AC #1 reads as 'all 2.0.0 children Done', and ACs #2 and #3 'on both lines' are met together with TASK-1378. Cross-branch link: TASK-1378.2 reuses the component choice of TASK-1377.3; the 1.x CSRF ADR mirrors the 2.0.0 ADR from TASK-1377.5.
 <!-- SECTION:NOTES:END -->
