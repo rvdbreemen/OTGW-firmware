@@ -3083,4 +3083,4 @@ firmware follows 7beaaf5 (no flow + 10 boost).
 
 **Doubt put to Robert (2026-10-26):** same pattern as entry 64 (Alex describes develop, the pin differs).
 
-**Open:** Robert's decision.
+**Maintainer decision (Robert, 2026-10-26, in session):** keep 7beaaf5 (no flow + 10 boost). Open point only.
