@@ -3,11 +3,11 @@ id: TASK-1339
 title: >-
   Boot-time heap dip to ~1.5 KB on a tester's OT-Direct unit with MQTT to Home
   Assistant (alpha.486)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-24T07:29:00Z'
-updated_date: '2026-10-25T22:14:00Z'
+updated_date: '2026-10-26T00:24:00Z'
 labels:
   - heap
   - mqtt
@@ -27,7 +27,7 @@ Sergeant D capture 2026-10-24 06:41 UTC (alpha.486, transcript-20261024-093559-.
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 The allocation that drives the boot-time dip is named with a bench reproduction (e.g. throttled or remote broker via the MikroTik router, mDNS broker name) or recorded as not reproducible with what was tried
-- [ ] #2 If a fix follows: min_free_heap after boot before/after on the same reproduction
+- [x] #2 If a fix follows: min_free_heap after boot before/after on the same reproduction
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -60,4 +60,12 @@ Sergeant D capture 2026-10-24 06:41 UTC (alpha.486, transcript-20261024-093559-.
 2026-10-25 Robert approved widening the diagnostics. Boot-path heap windows added (diagnostic only): consecutive IDF windows setup-early / setup-net / setup-services / setup-late / wait-mqtt / connect / drip from setup() until the boot discovery drip drains (or mqtt-off, or 10-min timeout); one line per phase '[HEAP] boot win=.. minWin=.. free=.. maxblk=.. outbox=.. sburst connburst drip' and a summary '[HEAP] boot done ... allWinMin=.. nativeMin=.. outside=0|1' (outside=1 = a dip fell outside every window). setup() phase lines are stored and printed at end of setup() and again at boot done.
 
 2026-10-25 23:09-23:12 bench, OTGW32 .61 alpha.509+eba2781, MQTT to 192.168.88.32, 3 reboots with telnet from 13 s (scratchpad task1339-509/boot1..3.log). Every boot the deepest window is the drip window that follows the first SAT control tick: minWin 9760 / 8752 / 14060 B (boot done: allWinMin 9760/8752/14060, nativeMin 9760/8596/13456; outside=1 on boots 2-3 by only 156/604 B = window-restart granularity, the dip itself is inside the windows). Setup phases stay >= 69 KB, connect burst >= 24 KB. Cause, named: the first satPublishMQTT() after boot (SATcontrol.ino:2991, 'publishing MQTT state (ADR-111 on-change + heartbeat)') publishes every sat/* topic at once because all values are 'changed' on the first pass: 102-132 sendMQTTData lines in one loop pass (telnet may drop some), outbox depth 126 right after (heapDripTick id=254 line, free 58.7 KB), each queued packet is its own malloc in espMqttClient (Packet.cpp, EMC_USE_MEMPOOL 0), and the heap minimum (8.7-14 KB) follows while the outbox drains and the next drip tick publishes. A unit with less free heap at that moment (Sergeant D's) lands at ~1.5 KB. Fix direction (AC#2): pace the first full SAT publish so the outbox stays bounded (e.g. cap topics per pass / wait while MQTTclient.queueSize() is high), then repeat the same 3-boot capture.
+
+2026-10-26 fix: alpha.511 (c21ed8d5a) bounded the SAT MQTT publish by outbox depth (SAT_MQTT_OUTBOX_LIMIT 24, skip leaves the ADR-111 shadow due, 500 ms retry); bench showed a regression: retry sat after satOtLinkStep(), and with no boiler SAT went OT-link-lost after its first tick, so only ~33 of 143 sat/ topics were ever published. alpha.512 (b3fcc01f5) moved the retry before the trip/OT-loss returns; source check inverted (red on 511 placement, green on 512). Evidence on OTGW32 .61, MQTT to .32, same 3-boot capture: BEFORE (509: nativeMin 9760/8596/13456; 510: 6916/1336) outbox 126 at the first SAT publish; AFTER (512: nativeMin 21160/18040/22488) outbox 5-14. Completeness checked at the broker (mosquitto .32, non-retained, fresh reboot): 143 distinct sat/ topics within 110 s, all between 45.6 and 48.1 s after reboot. Host tests: test_sat_mqtt_state 26 OK on fix, FAILED (18 failures, 3 errors) on HEAD before the fix; all test_sat_*.py OK; evaluate --quick 0 failed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Boot-time heap dip found and fixed. Cause (AC#1, bench reproduction on the OTGW32 with the windowed boot-heap diagnostics, alpha.509 eba2781f9): the first SAT MQTT publish after boot queues every sat/* topic in one loop pass (ADR-111 shadows are all first-seen), the espMqttClient outbox reaches 126 packets, each its own malloc, and free heap falls to 1.3-14 KB (1336 B reproduced = the tester's ~1.5 KB). Fix (alpha.511 c21ed8d5a + alpha.512 b3fcc01f5): the shadow helpers skip a due publish while the outbox holds more than 24 packets and keep the topic due; satPublishMQTT() retries every 500 ms, placed before the trip and OT-loss returns so a unit without a boiler still finishes. AC#2 evidence, same 3-boot reproduction: native heap minimum before 1336-13456 B, after 18040-22488 B; outbox 126 -> 5-14; all 143 sat/ topics still reach the broker, within ~3 s. Tests: test_sat_mqtt_state red on old / green on fix, all SAT tests OK, evaluate 0 failed, build.bat SUCCESS. Not verified: on Sergeant D's unit (asked for device/info after the next build); topic arrival with a slow broker. The [HEAP] boot diagnostics stay in the firmware (diagnostic only).
+<!-- SECTION:FINAL_SUMMARY:END -->
