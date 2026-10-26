@@ -384,13 +384,16 @@ class OutboxGate(unittest.TestCase):
         run = body(read("SATcontrol.ino"), "static void satControlLoopRun()")
         self.assertNotIn("satPublishDeferred()", run)
 
-    def test_retry_runs_between_ticks_after_the_safety_returns(self):
+    def test_retry_runs_before_the_trip_and_ot_loss_returns(self):
+        # Bench 2026-10-26 (alpha.511): with the retry after satOtLinkStep(), a unit without a
+        # boiler published ~33 of ~115 sat/* topics after boot and never the rest. Publishing
+        # sends nothing to the boiler, so the retry runs after the disabled/flash bail only.
         run = body(read("SATcontrol.ino"), "static void satControlLoopRun()")
         retry = run.index("if (_sat_publishRetryPending && DUE(timerSATPublishRetry)) satPublishMQTT();")
-        for guard in ("if (satMqttFallbackStep()) return;", "if (state.sat.bSafetyTripped) return;",
-                      "if (satOtLinkStep()) return;"):
-            self.assertLess(run.index(guard), retry)
-        self.assertLess(retry, run.index("if (!DUE(timerSATControl)) return;"))
+        self.assertLess(run.index("if (!satIsEnabled() || isFlashing()) {"), retry)
+        for later in ("if (state.sat.bSafetyTripped) return;", "if (satOtLinkStep()) return;",
+                      "if (!DUE(timerSATControl)) return;"):
+            self.assertLess(retry, run.index(later))
         self.assertIn("DECLARE_TIMER_MS(timerSATPublishRetry, 500, SKIP_MISSED_TICKS);", read("SATcontrol.ino"))
 
 

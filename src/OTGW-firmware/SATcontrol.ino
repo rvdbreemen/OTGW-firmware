@@ -4951,6 +4951,11 @@ static void satControlLoopRun()
     return;
   }
 
+  // TASK-1339: topics the outbox gate skipped go out between control ticks. Publish only
+  // (satPublishMQTT() sends nothing to the boiler), so it sits before the trip and OT-loss
+  // returns: a unit that lost its boiler still finishes the first full publish after boot.
+  if (_sat_publishRetryPending && DUE(timerSATPublishRetry)) satPublishMQTT();
+
   // --- Simulation update (Task #37): model thermal behavior before PID ---
   satUpdateSimulation();
   // --- Thermal drop learning (Task #21): learn building thermal decay rate ---
@@ -4993,10 +4998,6 @@ static void satControlLoopRun()
 
   // Refresh the PWM suppression CS between control ticks (TASK-1268)
   satPwmSuppressionRefresh();
-
-  // TASK-1339: topics the outbox gate skipped go out between control ticks, publish only
-  // (satPublishMQTT() computes nothing for control). Bounds the first full publish after boot.
-  if (_sat_publishRetryPending && DUE(timerSATPublishRetry)) satPublishMQTT();
 
   // Main control loop on timer
   if (!DUE(timerSATControl)) return;
