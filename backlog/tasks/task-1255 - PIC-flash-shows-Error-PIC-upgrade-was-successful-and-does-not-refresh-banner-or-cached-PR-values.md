@@ -3,11 +3,11 @@ id: TASK-1255
 title: >-
   PIC flash shows 'Error: PIC upgrade was successful' and does not refresh
   banner or cached PR= values
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: 2026-10-19 17:32
-updated_date: '2026-10-26T06:05:00Z'
+updated_date: '2026-10-26T06:24:00Z'
 labels:
   - bug
   - webui
@@ -27,7 +27,7 @@ Reported by gruijter in #alpha-testing 2026-10-19 with screenshot: after a succe
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Successful flash shows a green/neutral success state, a failed flash still shows the error (old-vs-fix evidence)
-- [ ] #2 After success the update banner and the cached PR= gateway settings refresh to the new version without a page reload
+- [x] #2 After success the update banner and the cached PR= gateway settings refresh to the new version without a page reload
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -64,12 +64,12 @@ Finalize (2026-10-19): build.bat (esp32-combo) SUCCESS, firmware 2,020,944 B (88
 2026-10-22 23:15 cycle: skipped, AC2 needs a real PIC flash (explicit maintainer order required).
 
 2026-10-26 07:00 bench, Classic + S3 Mini .63 (MAC AC:27:6E:CE:45:D8, PIC 6.8 pic16f1847, alpha.508), one same-version re-flash of gateway.hex 6.8 from the v2 UI (Robert's permission 2026-10-25). Success state PASS: 'Flash complete: gateway.hex' in ~44 s, accent bar, no error. PR= table PASS: re-rendered without a reload ~16 s after completion. Banner FAIL: stayed on 'Checking for updates…' > 75 s; the recheck=1 GET answered 'checking', the follow-up GET /api/v2/pic/update-check failed net::ERR_CONNECTION_TIMED_OUT, and picUpdatePoll's catch only called done() (v2.js:3807-3815), no retry, no banner text. Device itself answered ready/6.8 by curl. Fix: retry up to 3 times 2.5 s apart, then 'Update check failed' (as checkPicUpdate does). tests/webui/pic-flash-status.test.mjs: 2 new cases with the real picUpdatePoll, 14/14 pass on the fix, 2 fail on HEAD (banner stuck). Separate finding filed as TASK-1406 (reset_cause raw 0xFF after the flash). Screenshots: scratchpad task1255/task1255-01..04.
+
+2026-10-26 06:20 UTC bench re-test on alpha.513+9da1570 (Classic + S3 Mini .63, PIC 6.8 pic16f1847), second and last same-version re-flash of gateway.hex 6.8 from the v2 UI (Robert's permission 2026-10-26). Served v2.js confirmed to contain the retry. Timeline: confirm 06:20:36.220; 'Flash complete: gateway.hex' 06:21:18.436 (no error); banner 'Checking for updates…' 06:21:21.732 -> '✓ PIC firmware up to date (6.8)' 06:21:24.271 and unchanged through 06:23:05; PR= table re-rendered at 06:21:24.290 and re-read every ~5 s for ~40 s, no page reload. All 146 requests 200, console 0 errors. Limits: no update-check GET failed in this run, so the retry branch ran only in the harness (tests/webui/pic-flash-status.test.mjs, red on HEAD / green on fix); same version flashed, so PR= values could not visibly change. Minor (code reading, not observed): a non-OK HTTP reply (e.g. 503) to update-check renders an empty banner (hidden) rather than 'Update check failed'; it does not stick. Evidence: scratchpad task1255-513/.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Successful PIC flash no longer shows 'Error: PIC upgrade was successful'. Cause: fwupgradedone() wrote the success text into state.flash.sError, and pollPicFlash() treated any non-empty error as failure; after a flash only fetchPic ran. Fix: firmware clears sError on success and restarts the PR= readout; upgrade start resets progress/error; v2.js picFlashOutcome() decides running/success/error/pending (legacy success text accepted only after this flash was seen running), non-OK replies get their own neutral cap, and success runs picAfterFlash(): fresh device/info -> update-check ?recheck=1 -> full PR= re-read, one request at a time. Docs: README + openapi flash-status semantics.
-Evidence AC#1: tests/webui/pic-flash-status.test.mjs runs the real v2.js functions; OLD (HEAD) 1 pass/8 fail incl. 'Error: PIC upgrade was successful', NEW 12/12 pass incl. real failure still red. Build SUCCESS, evaluate 72/0/0.
-AC#2 (open): harness shows the refresh order fetchPic(devInfoTs=0) -> picUpdatePoll(recheck) -> fetchPicSettings(full) with max 1 in flight; on-device confirmation of the banner and PR= values after a real flash on the Classic-S3 bench is still needed.
+PIC flash from the v2 UI now ends in a clear state. AC#1 (commit 1b818747d): a successful flash shows a neutral/accent success state, a real failure still shows the red error; tests/webui/pic-flash-status.test.mjs decision table. AC#2: after success the banner and the cached PR= settings refresh without a page reload. The first bench run (alpha.508, 2026-10-26 07:00) found the banner stuck on 'Checking for updates…' after one timed-out update-check GET; fixed in alpha.513 (9da1570b1): picUpdatePoll retries up to 3 times, then shows 'Update check failed'. Evidence: harness 14/14 on the fix, 2 failures on the old v2.js; bench re-test on alpha.513: 'Flash complete' -> banner 'up to date (6.8)' 2.5 s after 'Checking…', PR= table re-rendered at +6 s, no reload, 0 console errors (scratchpad task1255-513). Not verified on the device: the retry branch itself (no GET failed in the re-test). Separate finding: TASK-1406 (reset_cause raw 0xFF after a flash).
 <!-- SECTION:FINAL_SUMMARY:END -->
