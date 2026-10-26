@@ -231,6 +231,45 @@ test('picAfterFlash() runs the real refresh functions one request at a time', as
   assert.equal(maxInflight, 1, 'refresh requests must not overlap');
 });
 
+// Bench 2026-10-26 (Classic .63, alpha.508): after a real flash the recheck answered
+// "checking" and the next GET timed out; picUpdatePoll's catch only finished, so the
+// banner stayed on "Checking for updates…". Runs the REAL picUpdatePoll with fast timers.
+function runPoll(failures) {
+  const src = fs.readFileSync(V2JS, 'utf8');
+  const poll = extractFunction(src, 'picUpdatePoll');
+  assert.ok(poll, 'picUpdatePoll missing in ' + V2JS);
+  const log = [];
+  let failsLeft = failures;
+  const banner = { className: '', textContent: 'Checking for updates…' };
+  const fetchStub = (url) => {
+    log.push('GET ' + url);
+    if (url.endsWith('?recheck=1')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ pic_update: { status: 'checking' } }) });
+    if (failsLeft-- > 0) return Promise.reject(new TypeError('net::ERR_CONNECTION_TIMED_OUT'));
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({ pic_update: { status: 'ready', current: '6.8', latest: '6.8', update_available: false } }) });
+  };
+  const body = 'var APIGW = "/api/";\n' +
+    'function renderPicBanner(u) { log.push("render " + (u.status || "")); if (u.status === "ready") banner.textContent = "up to date " + u.current; }\n' +
+    poll + '\nreturn picUpdatePoll;';
+  const fn = new Function('document', 'fetch', 'setTimeout', 'log', 'banner', body)(
+    { getElementById: (id) => (id === 'picBanner' ? banner : null) }, fetchStub, (f) => setTimeout(f, 1), log, banner);
+  let done = 0;
+  fn(() => { done++; }, true);
+  return new Promise((r) => setTimeout(r, 80)).then(() => ({ log, banner, done }));
+}
+
+test('picUpdatePoll: one timed-out GET after "checking" is retried and the banner shows the result', async () => {
+  const h = await runPoll(1);
+  assert.equal(h.banner.textContent, 'up to date 6.8', 'banner stuck: ' + h.log.join(' | '));
+  assert.equal(h.done, 1, 'done callback runs once');
+});
+
+test('picUpdatePoll: a persistent network error ends on "Update check failed", not "Checking…"', async () => {
+  const h = await runPoll(99);
+  assert.equal(h.banner.textContent, 'Update check failed', 'banner stuck: ' + h.log.join(' | '));
+  assert.equal(h.done, 1, 'done callback runs once');
+  assert.ok(h.log.filter((l) => l === 'GET /api/v2/pic/update-check').length <= 4, 'bounded retries: ' + h.log.join(' | '));
+});
+
 // Post-flash PR= window: with a complete (but old-firmware) cache, a normal tab-open
 // read stops after one GET; the post-flash read keeps going so the restarted PR=
 // cycle's new values reach the table.

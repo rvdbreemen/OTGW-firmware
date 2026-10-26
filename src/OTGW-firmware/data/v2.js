@@ -3804,14 +3804,21 @@
     else { b.style.display = 'none'; b.textContent = ''; }
   }
   // recheck: drop the cached latest version first (after a flash the PIC type can differ).
-  function picUpdatePoll(done, recheck) {
+  // TASK-1255: a network error during the poll is retried (up to 3 times, 2.5 s apart) and then
+  // shown as "Update check failed"; before, one timed-out GET left the banner on "Checking…".
+  function picUpdatePoll(done, recheck, tries) {
     var fin = function () { if (typeof done === 'function') done(); };
+    tries = tries || 0;
     fetch(APIGW + 'v2/pic/update-check' + (recheck ? '?recheck=1' : '')).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       var u = (j && j.pic_update) || {};
       if (u.status === 'checking') { setTimeout(function () { picUpdatePoll(done); }, 2500); renderPicBanner(u); return; }
       renderPicBanner(u);
       fin();
-    }).catch(function () { fin(); });
+    }).catch(function () {
+      if (tries < 3) { setTimeout(function () { picUpdatePoll(done, recheck, tries + 1); }, 2500); return; }
+      var b = document.getElementById('picBanner'); if (b) { b.className = 'pic-banner'; b.textContent = 'Update check failed'; }
+      fin();
+    });
   }
   function checkPicUpdate() {
     var b = document.getElementById('picBanner'); if (b) { b.className = 'pic-banner'; b.style.display = ''; b.textContent = 'Checking for updates…'; }

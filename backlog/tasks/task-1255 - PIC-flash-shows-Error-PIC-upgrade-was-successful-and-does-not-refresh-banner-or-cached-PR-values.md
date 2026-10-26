@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-19 17:32
-updated_date: '2026-10-22T21:31:00Z'
+updated_date: '2026-10-26T06:05:00Z'
 labels:
   - bug
   - webui
@@ -62,6 +62,8 @@ Finalize (2026-10-19): build.bat (esp32-combo) SUCCESS, firmware 2,020,944 B (88
 2026-10-22 cycle check: Classic-S3 still not connected (no COM8, 192.168.88.63 no HTTP answer); stays blocked.
 
 2026-10-22 23:15 cycle: skipped, AC2 needs a real PIC flash (explicit maintainer order required).
+
+2026-10-26 07:00 bench, Classic + S3 Mini .63 (MAC AC:27:6E:CE:45:D8, PIC 6.8 pic16f1847, alpha.508), one same-version re-flash of gateway.hex 6.8 from the v2 UI (Robert's permission 2026-10-25). Success state PASS: 'Flash complete: gateway.hex' in ~44 s, accent bar, no error. PR= table PASS: re-rendered without a reload ~16 s after completion. Banner FAIL: stayed on 'Checking for updates…' > 75 s; the recheck=1 GET answered 'checking', the follow-up GET /api/v2/pic/update-check failed net::ERR_CONNECTION_TIMED_OUT, and picUpdatePoll's catch only called done() (v2.js:3807-3815), no retry, no banner text. Device itself answered ready/6.8 by curl. Fix: retry up to 3 times 2.5 s apart, then 'Update check failed' (as checkPicUpdate does). tests/webui/pic-flash-status.test.mjs: 2 new cases with the real picUpdatePoll, 14/14 pass on the fix, 2 fail on HEAD (banner stuck). Separate finding filed as TASK-1406 (reset_cause raw 0xFF after the flash). Screenshots: scratchpad task1255/task1255-01..04.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
