@@ -2949,3 +2949,65 @@ flame-on edge (SATcycles.ino:279-299), hot water included (gruijter's field data
 **Task:** TASK-1401.
 
 **Open:** none.
+
+## 60. "CH=1 stays during the PWM OFF phase" (report, 2026-10-26)
+
+**Source:** #alpha-testing, 2026-10-26 13:29 UTC, reacting to gruijter's alpha.513 graphs:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564269695257935976
+
+**Quoted:**
+
+> @BlueFlame Bot I noticed that the CH=1 stays during the PWM OFF phase. check again your documentation and please resolve this bug.
+
+**Checked against the code and the capture (not yet settled):** thermo-nova sends CS=10 in the PWM OFF phase
+(`heating_control.py:385`, `:388-389`, `const.py:35`) and then the heater state, ON only when the control setpoint is
+above 22 (`heating_control.py:236-238`, `const.py:34`), so CH=0. The firmware does the same: `satApplyPWM` returns
+SAT_MIN_SETPOINT in OFF (SATcontrol.ino:1042-1047) and `satChEnableDecide` returns 0 in the OFF phase
+(SATchEnable.h:46-51), both queued in one tick (SATcontrol.ino:5381-5385). Entries 5, 9 and 17 say the same (entry 17:
+"When we are in PWM OFF m, CS=10 CH=0"). gruijter's capture (telnet.log, local time) shows CS=10.0 and CH=0 queued and
+sent at 12:06:55 and every later MsgID 0 request to the boiler with CH enable = 0 (R80000200), the thermostat's own CH=1
+rewritten to CH=0 at 12:10:58. What stays 1 is the boiler's own slave status bit 1 "CH mode" (OT spec v4.2 line 1444,
+master CH enable is line 1432): BC0000202 from 12:07:03 to 12:16:59 with the flame off, likely pump overrun (not proven).
+The OTGW graph's "CH mode" lane is that boiler bit (v2.js:480).
+
+**Interpretation (ours):** he read the boiler's CH-mode bit in the graph as SAT's CH enable. Not acted on: put back to
+him with the frames (2026-10-26) before any change.
+
+**Task:** none until he answers.
+
+**Open:** whether he means SAT's CH enable (then which frame) or wants the boiler's CH-mode bit handled.
+
+## 61. Add PWM ON and OFF times in seconds to the SAT log (request, 2026-10-26)
+
+**Source:** #alpha-testing, 2026-10-26 13:35 UTC:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564271354390257867
+
+**Quoted:**
+
+> @BlueFlame Bot Also in the SAT log add PWM ON and PWM OFF times in seconds
+
+**Settled:** logging only, no control change. **Task:** TASK-1407. **Open:** none.
+
+## 62. Coefficient 2.2 for gruijter, why, and the morning rise time (statements, 2026-10-26)
+
+**Source:** #alpha-testing, 2026-10-26 12:54-13:31 UTC:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564260826364248125 (disable solar gain), https://discord.com/channels/812969634638725140/1514720723980259460/1564261109333098577 (coefficient 2.2),
+https://discord.com/channels/812969634638725140/1514720723980259460/1564269127013503097 (why 2.2), https://discord.com/channels/812969634638725140/1514720723980259460/1564270140957130834 (solar gain hypothesis)
+
+**Quoted:**
+
+> Can you disable solar gain?
+
+> @gruijter also can you raise your heating curve coefficient to 2.2?
+
+> Actually it is not that big. SAT’s each increment equals to 1/4 of a normal heating curve. In reality it is like raising the heating curve by 0.15 of a conventional heating curve. We made smaller increments for finer tuning. Another reason for setting it to 2.2 is that a lot of sat systems are tuned to that exact value. Moreover the morning heating schedule needs about 2 hours and 20 minutes to raise the room temperature to the new setpoint to most SAT users
+
+> In the morning when sat started heating your home maybe the raw derivative was higher than 0.6 °C/h. it might triggered the solar gain.
+
+**Settled:** tuning advice to one tester and field experience, not a change to defaults: the firmware default
+coefficient stays 2.0 (entry 24, ADR-198). The 2 h 20 min figure is his experience, not in the code. His solar-gain
+hypothesis is confirmed for the morning only: active 10:11:55-10:45:25 in gruijter's capture, without a sun position
+(the firmware then judges on the rise rate alone, SATcontrol.ino:4616-4643; thermo-nova stays inactive without a sun
+elevation, solar_gain.py:56-58) -> TASK-1408 (needs his OK before any change).
+
+**Open:** whether the default coefficient should become 2.2 (not asked; queue if needed).

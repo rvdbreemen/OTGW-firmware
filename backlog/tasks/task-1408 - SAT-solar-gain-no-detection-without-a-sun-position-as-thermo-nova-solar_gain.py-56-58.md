@@ -1,0 +1,26 @@
+---
+id: TASK-1408
+title: >-
+  SAT solar gain: no detection without a sun position, as thermo-nova
+  (solar_gain.py:56-58)
+status: To Do
+assignee: []
+created_date: '2026-10-26T18:41:00Z'
+labels:
+  - sat
+milestone: 2.0.0
+dependencies: []
+ordinal: 546000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Found in gruijter's alpha.513 capture 2026-10-26 (second reader checked the citations): with no sun elevation available the firmware detects solar gain from the room rise rate alone (SATcontrol.ino:4616-4629, :4635-4643) and was active 10:11:55-10:45:25 while the rise came from the boiler heating the room; while active it lowers the requested setpoint by 2 C (SATcontrol.ino:5298-5300) and freezes the PID integral (SATpid.ino:178). thermo-nova returns inactive when the sun elevation is unknown (solar_gain.py:56-58), uses the raw rate between two samples (:66-78), a 600 s hold (:60-63) and is off by default (const.py:132). SAT behaviour change: needs Sergeant D's OK before implementing (CLAUDE.md SAT rules).
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 Plan quotes thermo-nova solar_gain.py and gets Sergeant D's OK (recorded entry)
+- [ ] #2 Without a sun position solar gain stays inactive (host test red on HEAD)
+<!-- AC:END -->
