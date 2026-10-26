@@ -3,9 +3,11 @@ id: TASK-1401
 title: >-
   SAT PWM: count only PWM's own ON phases against cycles per hour (entry 59, Q12
   A)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T20:29:00Z'
+updated_date: '2026-10-26T19:16:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -25,3 +27,9 @@ Sergeant D 2026-10-25 19:52 (Q12: A, entry 59; context entry 58). thermo-nova co
 - [ ] #1 Hot-water and relight flame starts do not count; only PWM ON-phase starts count against cycles per hour (host test red on HEAD with the shower scenario)
 - [ ] #2 A 4th PWM ON start in the rolling hour at 3 cycles/h is still blocked
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-26 Robert: implement now with priority, together with TASK-1369 (PWM-entry ON counts, never blocked by the limit; see TASK-1369 notes).
+<!-- SECTION:NOTES:END -->

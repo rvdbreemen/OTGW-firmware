@@ -1,9 +1,11 @@
 ---
 id: TASK-1369
 title: 'SAT PWM: the first phase after PWM starts is ON (entry 43)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-24T21:43:00Z'
+updated_date: '2026-10-26T19:16:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -22,3 +24,9 @@ Sergeant D 2026-10-24 (Q11, entry 43): first PWM phase is ON, as thermo-nova pwm
 <!-- AC:BEGIN -->
 - [ ] #1 When PWM starts the first phase is ON at once (host test red/green)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-26 Robert (maintainer decision, provisional until Sergeant D answers Q48): the ON phase that starts when PWM is entered with the burner already running (entries 22, 43) COUNTS as a PWM ON start for the hourly limit (entry 59, TASK-1401) but the limit never blocks or cuts that entry start. Rationale: entry 43 literally; thermo-nova counts it (pwm.py:160) and its cap check (pwm.py:156) compares with duty_cycle_seconds, so in practice it never blocks. Removes gruijter's 12:31 cut (2026-10-26 capture).
+<!-- SECTION:NOTES:END -->

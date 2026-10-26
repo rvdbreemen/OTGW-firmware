@@ -3,9 +3,11 @@ id: TASK-1408
 title: >-
   SAT solar gain: no detection without a sun position, as thermo-nova
   (solar_gain.py:56-58)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-26T18:41:00Z'
+updated_date: '2026-10-26T19:16:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,3 +26,9 @@ Found in gruijter's alpha.513 capture 2026-10-26 (second reader checked the cita
 - [ ] #1 Plan quotes thermo-nova solar_gain.py and gets Sergeant D's OK (recorded entry)
 - [ ] #2 Without a sun position solar gain stays inactive (host test red on HEAD)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-26 MAINTAINER OVERRIDE (Robert, in session): implement without waiting for Sergeant D's OK, because the change aligns with thermo-nova (ground truth #2, solar_gain.py:56-58) and no recorded entry conflicts. Sergeant D is informed with the citations; if he objects, revert. AC#1 is satisfied by this recorded override instead of his OK.
+<!-- SECTION:NOTES:END -->

@@ -20,7 +20,7 @@ Order: what users feel now or what blocks shipped work first, then ADR-only and 
 7. Q20 (cold cutoff boundary, ADR-199 / TASK-1355)
 8-13. Q23, Q24, Q25, Q26, Q27, Q28 (PID, ADR-197)
 14-15. Q21, Q22 (heating curve, ADR-198)
-Then Q35, Q36, Q37, Q40, Q41, Q42, Q43, Q45, Q46, Q47, Q18, Q19.
+Then Q48 (PWM entry vs hourly limit, provisional decision in force), Q35, Q36, Q37, Q40, Q41, Q42, Q43, Q45, Q46, Q47, Q18, Q19.
 A new correction from Sergeant D (e.g. 2026-10-26 'CH=1 stays during PWM OFF') is handled before the queue.
 
 George: if a question below is unclear or wrongly put, just say so. A correction of
@@ -88,6 +88,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q45 | queued (TASK-1367 review 2026-10-25) | Heat pumps and the 60 s overshoot switch. The firmware never runs the switch for a heat pump (gate `!satAlwaysMaxModulation()`, SATcontrol.ino:5313; heat pump test SATcontrol.ino:376-380), so a heat pump never enters PWM by itself. thermo-nova's switch has no heat-pump case (heating_control.py:262-305), and entries 40 and 50 run heat pumps in PWM. A) remove the exclusion, as thermo-nova (heat-pump PWM timing from entries 40/50 applies; Q35 and Q36 are still open for heat-pump PWM); B) keep it (heat pumps stay continuous unless the user picks PWM); C) another rule. Our advice: A, after Q35 | TASK-1367 follow-up |
 | Q46 | queued (TASK-1367 review 2026-10-25; may be a maintainer call) | 60 s switch and the control tick. Ticks run on a fixed grid (CATCH_UP_MISSED_TICKS, SATcontrol.ino:590; safeTimers.h:192-193), but the time is read a few ms late in each tick, so about half the time the tick 60 s after the start measures 59 99x ms and the switch comes one tick later: 90 s at the 30 s default, 120 s at a 60 s tick (derived from the code, not measured). thermo-nova has the same strict test but a 5 s loop (climate.py:706-709), so it lands at 60-65 s. A) keep the strict millis() test (60 s or one tick later); B) time on the tick's scheduled time, so the switch comes on the first tick at least 60 s after the start; C) allow a small tolerance (for example 1 s). Our advice: B | TASK-1367 follow-up |
 | Q47 | queued (TASK-1367 review 2026-10-25) | 60 s switch: same tick or next tick? The firmware computes that tick's continuous CS (SATcontrol.ino:5297) and only then runs the switch (SATcontrol.ino:5314), so the first PWM CS goes out one control tick later (30 s at the default). thermo-nova enables PWM before it computes the setpoint in the same update (heating_control.py:206-228). A) run the switch before the CS, as thermo-nova; B) keep today. Not new in TASK-1367. Our advice: A | TASK-1367 follow-up |
+| Q48 | queued (TASK-1369/1401, 2026-10-26; provisional maintainer decision in force) | Entries 22/43 keep the burner on when PWM is entered, entry 59 makes cycles per hour a real limit. When the PWM-entry ON is the 4th start of the hour: A) it counts but the limit never cuts it (provisional, Robert 2026-10-26; thermo-nova counts it, pwm.py:160, and its cap at pwm.py:156 never blocks at defaults), B) it counts and the limit cuts the burner, C) it does not count. | - |
 
 Questions Q5 onwards come from the SAT port audit of 2026-10-24
 ([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)); the numbers in brackets are its
