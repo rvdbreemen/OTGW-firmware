@@ -3063,3 +3063,24 @@ learned ON temperature) is correct for 7beaaf5 and will be corrected if Alex say
 **Maintainer decision (Robert, 2026-10-26, in session, after the doubt was put to him):** keep 7beaaf5. The firmware
 follows the published thermo-nova code (learned ON temperature held after 180 s). Alex's statement stays an open point;
 it is revisited if he names a newer thermo-nova commit.
+
+## 65. Alexw: "when the flame is extinguished, we attempt to reignite it by increasing the flow by a factor of 10" (technical statement, 2026-10-26)
+
+**Source:** #alpha-testing, 2026-10-26 19:30 UTC (Alexw, SAT Python developer; Robert's rule 2026-10-26: listen to him,
+doubt goes to Robert):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564360503793287252
+
+**Quoted:**
+
+> Please note that when the flame is extinguished, we attempt to reignite it by increasing the flow by a factor of 10
+
+**Checked (second reader):** this is in the develop branch: pwm.py:139-142 forces the setpoint to flow temperature + 10
+when the flame is off and the average flame-on time is unknown or under 60 s ("Forcing setpoint up due to short flame
+cycles"); read "factor of 10" as +10 C on the flow. At the pin 7beaaf5 (= upstream releases/thermo-nova HEAD) that code
+is not there: with the flame off in the PWM ON phase heating_control.py:392-408 holds the setpoint at return
+temperature + flame_off_setpoint_offset (default 18 C), then after ignition flow minus the suppression offset. The
+firmware follows 7beaaf5 (no flow + 10 boost).
+
+**Doubt put to Robert (2026-10-26):** same pattern as entry 64 (Alex describes develop, the pin differs).
+
+**Open:** Robert's decision.
