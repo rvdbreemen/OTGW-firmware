@@ -3033,3 +3033,29 @@ upstream. Moving the pin is a deliberate maintainer decision (CLAUDE.md SAT grou
 
 **Open:** Robert's decision on (a) whether Alexw's technical statements may guide the bot, (b) whether to compare
 upstream thermo-nova with the pin.
+
+## 64. Alexw: "SAT uses the flow temperature while the flame is off" (technical statement, 2026-10-26)
+
+**Status of the source:** Robert, 2026-10-26 (in session): "Geloof AlexW, hij is de ontwerper van de python variant."
+Alexw (alexw47) wrote the thermo-nova Python code; his statements about thermo-nova behaviour outrank our reading of the
+pinned copy (supersedes the read-only rule of 2026-10-25 for technical statements; entry 63).
+
+**Source:** #alpha-testing, 2026-10-26 19:17 UTC:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564357301341655121
+
+**Quoted:**
+
+> That is incorrect. SAT does utilize the flow temperature while the flame is off. We apply a filter during startup, but we use the raw value thereafter. We use this to calculate the duty cycle. It is possible that you have an outdated codebase.
+
+**Checked (2026-10-26, upstream GitHub API):** releases/thermo-nova HEAD is 7beaaf5 (2026-03-18), identical to the
+local copy (pwm.py, heating_control.py, solar_gain.py byte-identical). develop is an ancestor of it (294 commits
+behind, 0 ahead). At 7beaaf5 the duty uses _effective_on_temperature (pwm.py:232), updated only in the first 180 s after
+ignition (pwm.py:144-149) and held after that. Alex's description matches develop: _last_boiler_temperature takes the
+EMA during start-up and the raw flow after it while PWM is ON (develop pwm.py:123-131), used by _calculate_duty_cycle.
+
+**Not acted on yet:** asked Alex (2026-10-26 19:23 UTC,
+https://discord.com/channels/812969634638725140/1514720723980259460/1564358771931742271) which behaviour the port
+should follow, develop's or a newer thermo-nova commit than 7beaaf5. Our 18:43 answer to Sergeant D (duty uses the held
+learned ON temperature) is correct for 7beaaf5 and will be corrected if Alex says otherwise.
+
+**Open:** Alex's answer; possibly moving the pin (CLAUDE.md SAT ground truth block).
