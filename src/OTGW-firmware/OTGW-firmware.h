@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.513
+**  Version  : v2.0.0-alpha.514
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -397,6 +397,7 @@ uint32_t satCycleGetFlameOnStartMs();
 uint32_t satCycleGetFlameOffStartMs();
 bool    satPwmIsIdle();             // TASK-1387: PWM status IDLE, read by the cycle classifier (SATcontrol.ino)
 bool    satCycleIsHourLimitReached();
+void    satCycleRecordPwmStart();   // TASK-1401: the per-hour counter holds PWM ON-phase starts only (SATcycles.ino)
 uint8_t satCycleGetCyclesThisHour();
 void satHCRSaveState();
 void satHCRLoadState();

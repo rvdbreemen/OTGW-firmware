@@ -4201,7 +4201,7 @@ components:
           description: "Total boiler cycles counted"
         cycles_this_hour:
           type: integer
-          description: "Boiler cycles in the trailing hour"
+          description: "PWM ON phases started in the trailing hour, the count the cycles-per-hour limit is checked against (hot-water ignitions and relights are not counted)"
         last_cycle_class:
           type: integer
           description: "Last cycle classification code (0=none,1=good,2=overshoot,3=underheat,4=short,5=uncertain)"

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-25T20:29:00Z'
-updated_date: '2026-10-26T19:16:00Z'
+updated_date: '2026-10-26T20:39:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -32,4 +32,6 @@ Sergeant D 2026-10-25 19:52 (Q12: A, entry 59; context entry 58). thermo-nova co
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-26 Robert: implement now with priority, together with TASK-1369 (PWM-entry ON counts, never blocked by the limit; see TASK-1369 notes).
+
+2026-10-26 implemented (workflow wf_ab1ccec1: implement, two refuting reviews, fix; main-session re-run): tests/test_sat_pwm_start_limit.py 17 OK on the fix, FAILED (failures=15) against HEAD sources; all tests/test_sat_*.py and test_otd_ch_override OK; evaluate --quick 0 failed. The hourly counter has one writer (satCycleRecordPwmStart); hot-water and relight flame edges no longer count; cycles_this_hour now shows PWM ON phases. Deviations from thermo-nova (provisional, queued as Q49-Q51): count at the first flame of the phase (not at the ON start), ON timing from the phase start when the flame already burns, off wait from the ON-to-OFF edge while the flame is lit. Not built/benched yet.
 <!-- SECTION:NOTES:END -->

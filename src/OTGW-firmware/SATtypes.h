@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.513
+**  Version  : v2.0.0-alpha.514
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -166,7 +166,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   SATCycleClass eLastCycleClass  = SAT_CYCLE_NONE;
   uint32_t iLastCycleEndMs       = 0;      // millis() when eLastCycleClass was recorded (TASK-1352)
   uint32_t iCycleCount           = 0;
-  uint8_t  iCyclesThisHour       = 0;      // Flame-on events in the rolling 60-min window
+  uint8_t  iCyclesThisHour       = 0;      // PWM ON-phase starts in the rolling 60-min window (TASK-1401; not flame-on edges)
   float    fCycleMaxFlow         = 0.0f;
   float    fCycleOvershootSec    = 0.0f;
   float    fLastCycleDuration     = 0.0f;   // Duration of last completed cycle (sec)

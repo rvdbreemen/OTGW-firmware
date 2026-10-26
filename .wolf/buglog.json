@@ -3658,5 +3658,25 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-10-26T00:10:00Z"
+  },
+  {
+    "id": "bug-911",
+    "timestamp": "2026-10-26T22:00:00Z",
+    "error_message": "Review of TASK-1401+1369 diff: (1) flame lit one tick after PWM ON->OFF restarted ON at once and used up an hourly start; (2) PWM entered in duty range 5 then dropping to range 3 cut the burner at once (ON timed from old flame-on); (3) entry off-wait skip lost when flow was missing or the hour limit blocked; (4) millis() wrap revived stale per-hour starts",
+    "file": "src/OTGW-firmware/SATcontrol.ino, src/OTGW-firmware/SATcycles.ino",
+    "root_cause": "(1) OFF wait timed only from the last real flame-off, which predates the ON phase when the flame lags; (2) the range-5 OFF->ON shortcut set bPwmFlameRequested without the ON-start anchors; (3) _pwm_entryPending consumed by steps that keep thermo-nova IDLE (pwm.py:123, :156-158); (4) _hourCountGet never lowered _hourCycleCount",
+    "fix": "satPwmBeginOn()/satPwmEndOn(flame) helpers shared by the OFF branch and range 5; _pwm_offStartMs set at ON->OFF with flame, OFF wait = min elapsed of flame-off and ON->OFF edge when the flame is lit; entry flag kept across the flow-missing reset and restored at the hour-limit return; _hourCountGet evicts at the first stale entry. Host tests in tests/test_sat_pwm_start_limit.py (entry5, lag, entryflow, entrylimit, wrap) red on the pre-fix tree, green on the fix",
+    "tags": [
+      "sat",
+      "pwm",
+      "hour-limit",
+      "millis-wrap",
+      "review",
+      "TASK-1401",
+      "TASK-1369"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-26T22:00:00Z"
   }
 ]

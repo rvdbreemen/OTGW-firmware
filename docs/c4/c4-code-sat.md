@@ -123,7 +123,7 @@ Cycle tracking, on/off transition detection, cycle classification, rolling stati
 #### Data Structures
 
 - `_hourCycleTs[SAT_MAX_CYCLES_PER_HOUR]` (SAT_MAX_CYCLES_PER_HOUR = 6)
-  - Ring buffer of millis() timestamps for flame-on events (rolling 60-min window)
+  - Ring buffer of millis() timestamps of PWM ON-phase starts (rolling 60-min window; hot-water ignitions and relights are not recorded, TASK-1401)
 - `_win4h[SAT_WIN4H_SIZE]` (360 slots, `SATWindowRecord`, size defined in boards.h)
   - Rolling cycle statistics window (Task #227)
 - `_flow_samples[SAT_FLOW_SAMPLE_SIZE]` (board-defined in boards.h)

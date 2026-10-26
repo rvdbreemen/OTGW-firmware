@@ -83,6 +83,7 @@ static uint32_t satGetPwmPeriodSec() { return 3600 / satGetMaxCyclesPerHour(); }
 static uint32_t satCycleGetFlameOnStartMs() { return g_flameOnStart; }
 static uint32_t satCycleGetFlameOffStartMs() { return g_flameOffStart; }
 static bool satCycleIsHourLimitReached() { return g_hourLimit; }
+static void satCycleRecordPwmStart() { }                           // TASK-1401 (the ring itself: tests/test_sat_pwm_start_limit.py)
 static bool g_hasOT = true;
 static bool hasOTCommandInterface() { return g_hasOT; }
 static bool satEnqueueIfChangedCS(float cs) { g_csSent++; g_csLast = cs; return true; }

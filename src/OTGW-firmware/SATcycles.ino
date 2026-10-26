@@ -31,10 +31,11 @@ static const float    SAT_UNDERHEAT_SUSTAIN_SEC     = 180.0f;  // Sustained unde
 static const float    SAT_SATURATION_SUSTAIN_SEC    = 300.0f;  // Sustained saturation before continuous switch
 static const uint32_t SAT_DHW_OVERSHOOT_GUARD_MS    = 300000UL; // 300s guard: skip overshoot->PWM switch during/after DHW
 
-// --- Per-hour cycle counter (rolling 60-minute window, Task #203) ---
-// Max cycles/hour is capped at 6 by settings; ring buffer holds 6 timestamps.
+// --- Per-hour PWM start counter (rolling 60-minute window, Task #203, TASK-1401) ---
+// Holds PWM's own ON-phase starts only (thermo-nova pwm.py:159-160; Sergeant D entry 59): hot-water
+// ignitions and relights are not recorded. Max cycles/hour is capped at 6 by settings; the ring holds 6.
 static const uint8_t SAT_MAX_CYCLES_PER_HOUR = 6;
-static uint32_t _hourCycleTs[SAT_MAX_CYCLES_PER_HOUR]; // millis() of each flame-on event
+static uint32_t _hourCycleTs[SAT_MAX_CYCLES_PER_HOUR]; // millis() of each PWM ON-phase start
 static uint8_t  _hourCycleHead  = 0;  // next write position
 static uint8_t  _hourCycleCount = 0;  // valid entries (0..SAT_MAX_CYCLES_PER_HOUR)
 
@@ -281,8 +282,8 @@ void satCycleInit()
   strlcpy(state.sat.sHeatCurveRec, "insufficient", sizeof(state.sat.sHeatCurveRec));
 }
 
-//=== Per-hour cycle counter helpers (Task #203) ===
-// Record a flame-on event timestamp in the rolling 60-minute window.
+//=== Per-hour PWM start counter helpers (Task #203, TASK-1401) ===
+// Record a PWM ON-phase start timestamp in the rolling 60-minute window.
 static void _hourCountRecord(uint32_t nowMs)
 {
   _hourCycleTs[_hourCycleHead] = nowMs;
@@ -291,19 +292,28 @@ static void _hourCountRecord(uint32_t nowMs)
 }
 
 // Count how many recorded timestamps are still within the last 3600s.
-// Also evicts stale entries by reducing _hourCycleCount (no explicit removal —
-// the ring overwrites them naturally; we just don't count them).
+// Walks newest to oldest (the entries are in time order) and evicts the first stale entry and all older
+// ones by lowering _hourCycleCount, so after a millis() wrap an old timestamp cannot look recent again.
 static uint8_t _hourCountGet(uint32_t nowMs)
 {
-  uint8_t count = 0;
   for (uint8_t i = 0; i < _hourCycleCount; i++) {
-    // Walk backwards from (head-1) to find valid entries
     uint8_t idx = (_hourCycleHead + SAT_MAX_CYCLES_PER_HOUR - 1 - i) % SAT_MAX_CYCLES_PER_HOUR;
-    if ((nowMs - _hourCycleTs[idx]) < 3600000UL) {
-      count++;
+    if ((nowMs - _hourCycleTs[idx]) >= 3600000UL) {
+      _hourCycleCount = i;
+      break;
     }
   }
-  return count;
+  return _hourCycleCount;
+}
+
+// Public: record a PWM ON-phase start, once per ON phase (OFF->ON, duty range 5, the ON phase at PWM
+// entry), when that phase has a burning flame (satPwmCountStart() in SATcontrol.ino). The only writer of
+// the ring (TASK-1401, Sergeant D entry 59, pwm.py:159-160).
+void satCycleRecordPwmStart()
+{
+  uint32_t nowMs = millis();
+  _hourCountRecord(nowMs);
+  state.sat.iCyclesThisHour = _hourCountGet(nowMs);
 }
 
 // Public: return true if starting a new PWM ON cycle would exceed the limit.
@@ -315,7 +325,7 @@ bool satCycleIsHourLimitReached()
   return (count >= satGetMaxCyclesPerHour());
 }
 
-// Public: current rolling-hour cycle count (for status JSON / MQTT).
+// Public: PWM ON-phase starts in the rolling hour (status JSON / MQTT cycles_this_hour).
 uint8_t satCycleGetCyclesThisHour()
 {
   uint32_t nowMs = millis();
@@ -734,10 +744,9 @@ void satCycleOnFlameChange(bool flameOn)
     _cycle_setpointAtStart = state.sat.fFinalSetpoint;
     _cycle_overshootSec = 0.0f;
     _cycle_lastSampleMs = now;
-    // Record flame-on event in the rolling per-hour counter (Task #203)
-    _hourCountRecord(now);
+    // A flame-on edge is not a PWM start: the per-hour counter holds PWM ON-phase starts only (TASK-1401)
     state.sat.iCyclesThisHour = _hourCountGet(now);
-    SATDebugTf(PSTR("SAT cycle: flame ON flow=%.1f sp=%.1f cycles/hr=%u\r\n"),
+    SATDebugTf(PSTR("SAT cycle: flame ON flow=%.1f sp=%.1f pwm starts/hr=%u\r\n"),
                satGetFlowTemp(), _cycle_setpointAtStart,
                (unsigned)state.sat.iCyclesThisHour);
     satNarratef_P(PSTR("Flame lit: flow %.0f\xc2\xb0""C, setpoint %.0f\xc2\xb0""C"),
