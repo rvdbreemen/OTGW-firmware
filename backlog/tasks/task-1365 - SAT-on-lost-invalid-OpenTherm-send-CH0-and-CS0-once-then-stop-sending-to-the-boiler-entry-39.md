@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:41:00Z'
-updated_date: '2026-10-25T20:11:00Z'
+updated_date: '2026-10-26T19:19:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -200,4 +200,6 @@ Sergeant D entries:
 2026-10-25 correction: the bench unit at 192.168.88.61 (MAC 10:20:BA:21:B4:F8) used for this task's evidence was NOT the OTGW32 (Robert: OTGW32 not connected in the 48 h before 2026-10-25 evening). It was an ESP32-S3 without PIC and without boiler running the combo image in OT-Direct mode (ADR-160 bench default). The evidence stands as 'combo image, OT-Direct mode, no boiler'; any 'OTGW32' wording in earlier notes is wrong.
 
 2026-10-25 correction 2: Robert confirmed the .88.61 unit (MAC 10:20:BA:21:B4:F8) is an S3 WITH a PIC; it ran in OT-Direct mode because the PIC was not detected at boot (TASK-1399). So the evidence is 'combo image in OT-Direct mode on a board whose PIC was not detected', not PIC-gateway behaviour.
+
+2026-10-26 19:13 UTC Q33 answered by the maintainer (Robert, #alpha-testing msg 1564356412585287824): A = lost means no boiler reply for 30 s; a Data-Invalid reply still counts as a reply. This is the provisional design already in commit 31933adaf, so no code change. Q34 (resume by itself) asked of Sergeant D next.
 <!-- SECTION:NOTES:END -->
