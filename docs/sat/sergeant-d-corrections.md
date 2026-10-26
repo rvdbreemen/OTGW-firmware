@@ -3084,3 +3084,29 @@ firmware follows 7beaaf5 (no flow + 10 boost).
 **Doubt put to Robert (2026-10-26):** same pattern as entry 64 (Alex describes develop, the pin differs).
 
 **Maintainer decision (Robert, 2026-10-26, in session):** keep 7beaaf5 (no flow + 10 boost). Open point only.
+
+## 66. Alexw: "updated in the newer version of SAT, in the branch you mentioned" (technical statement, 2026-10-26)
+
+**Source:** #alpha-testing, 2026-10-26 19:26 UTC (Alexw, SAT Python developer), answering our question of 19:23 (which
+behaviour the port should follow, develop's raw flow or a newer commit):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564359654958563339
+
+**Quoted:**
+
+> Correct, this has been updated in the newer version of SAT. In the branch you mentioned. I was not aware that you were using a beta version.
+
+**Settles:** confirms that the PWM duty behaviour he described (raw flow after the start-up filter, entry 64) and the
+reignition boost (entry 65) are in the **develop** branch, a newer version than the published thermo-nova release
+(releases/thermo-nova HEAD 7beaaf5, 2026-03-18). The two entries describe a newer upstream, not a defect in our copy of
+the pinned release.
+
+**Interpretation (ours):** "the newer version" = Alexwijn/SAT develop (HEAD 7d4356034, 294 commits ahead of the pin;
+the branch history shows the pin is an ancestor of develop was reported by the GitHub compare API as ahead 0 / behind
+294 for the pin against develop).
+
+**Relation to earlier entries:** entries 64 and 65 recorded Robert's decision "keep 7beaaf5". That was taken before this
+confirmation; the facts it rested on are unchanged (the pin is the latest published release), but whether the port should
+follow develop is a new, larger question for the maintainer.
+
+**Open:** Robert's decision on (a) following develop for the PWM duty temperature and reignition, (b) moving the pinned
+commit (CLAUDE.md SAT ground truth block: one commit, spec re-diff).
