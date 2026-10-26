@@ -3059,3 +3059,7 @@ should follow, develop's or a newer thermo-nova commit than 7beaaf5. Our 18:43 a
 learned ON temperature) is correct for 7beaaf5 and will be corrected if Alex says otherwise.
 
 **Open:** Alex's answer; possibly moving the pin (CLAUDE.md SAT ground truth block).
+
+**Maintainer decision (Robert, 2026-10-26, in session, after the doubt was put to him):** keep 7beaaf5. The firmware
+follows the published thermo-nova code (learned ON temperature held after 180 s). Alex's statement stays an open point;
+it is revisited if he names a newer thermo-nova commit.
