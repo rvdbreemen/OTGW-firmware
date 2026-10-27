@@ -146,4 +146,3 @@ Archive candidate commit/build/filesystem IDs, source/test/configuration hashes,
 The [sequencing audit](evidence/2026-10-28-low-load-backlog-order.json) checked actual task metadata: 47 graph nodes, no dependency cycles, all 42 issues with a non-final execution owner, queue-tail ordinals, matching dependencies and mandatory bench ancestry for equipment and field stages. Its topological waves show possible parallel work; human approval blockers still apply. This is scheduling evidence only.
 
 The governing decisions and their agreement/conflict treatment are listed in remediation-plan section 2. Every implementation task must reopen its own cited source and relevant recorded entries before acting. No accepted ADR, designer quotation or upstream pin changes in this scheduling update.
-
