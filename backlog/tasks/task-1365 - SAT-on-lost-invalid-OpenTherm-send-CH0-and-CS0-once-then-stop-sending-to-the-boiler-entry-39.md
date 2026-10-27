@@ -7,11 +7,14 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:41:00Z'
-updated_date: '2026-10-26T19:19:00Z'
+updated_date: '2026-10-27T23:45:00Z'
 labels:
   - sat
 milestone: 2.0.0
-dependencies: []
+dependencies:
+  - TASK-1412.3
+references:
+  - TASK-1412
 priority: high
 ordinal: 500000
 ---
@@ -202,4 +205,6 @@ Sergeant D entries:
 2026-10-25 correction 2: Robert confirmed the .88.61 unit (MAC 10:20:BA:21:B4:F8) is an S3 WITH a PIC; it ran in OT-Direct mode because the PIC was not detected at boot (TASK-1399). So the evidence is 'combo image in OT-Direct mode on a board whose PIC was not detected', not PIC-gateway behaviour.
 
 2026-10-26 19:13 UTC Q33 answered by the maintainer (Robert, #alpha-testing msg 1564356412585287824): A = lost means no boiler reply for 30 s; a Data-Invalid reply still counts as a reply. This is the provisional design already in commit 31933adaf, so no code change. Q34 (resume by itself) asked of Sergeant D next.
+
+2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
 <!-- SECTION:NOTES:END -->

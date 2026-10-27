@@ -6,10 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T21:44:00Z'
+updated_date: '2026-10-27T23:46:00Z'
 labels:
   - sat
 milestone: 2.0.0
-dependencies: []
+dependencies:
+  - TASK-1412.3
+references:
+  - TASK-1412
 ordinal: 543000
 ---
 
@@ -24,3 +28,9 @@ Sergeant D entry 36 (Q2 A): the end-of-cycle mode switch waits until the classif
 - [ ] #1 Tail control-setpoint error p50/p90 computed from per-sample setpoints (host test red on HEAD: a setpoint change mid-cycle changes the classification)
 - [ ] #2 RAM cost of the per-sample buffer measured and within budget
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
+<!-- SECTION:NOTES:END -->

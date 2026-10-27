@@ -6,11 +6,16 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-24T22:32:00Z'
-updated_date: '2026-10-25T16:37:00Z'
+updated_date: '2026-10-27T23:45:00Z'
 labels:
   - sat
 milestone: 2.0.0
-dependencies: []
+dependencies:
+  - TASK-1412.5
+  - TASK-1412.11
+  - TASK-1382
+references:
+  - TASK-1412
 priority: high
 ordinal: 506000
 ---
@@ -30,4 +35,6 @@ Sergeant D 2026-10-24 21:34 UTC (Q14, entry 45, a deliberate deviation from ther
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-25 implement-next-task: skipped, waits for Q40 (how 'no return temperature' is detected) and Sergeant D's OK on the plan.
+
+2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
 <!-- SECTION:NOTES:END -->

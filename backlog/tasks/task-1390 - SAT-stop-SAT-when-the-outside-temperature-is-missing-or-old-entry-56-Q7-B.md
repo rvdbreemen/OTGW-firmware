@@ -4,11 +4,14 @@ title: 'SAT: stop SAT when the outside temperature is missing or old (entry 56, 
 status: To Do
 assignee: []
 created_date: '2026-10-25T13:17:00Z'
-updated_date: '2026-10-25T13:46:00Z'
+updated_date: '2026-10-27T23:46:00Z'
 labels:
   - sat
 milestone: 2.0.0
-dependencies: []
+dependencies:
+  - TASK-1412.5
+references:
+  - TASK-1412
 ordinal: 529000
 ---
 
@@ -32,4 +35,6 @@ Sergeant D 2026-10-25 (Q7: B, entry 56): when the outside temperature is missing
 2026-10-25 Q7b answered (entry 57): old = no fresh value from any source for 1 hour; on expiry the entry-47 hand-back once, resume when a fresh value arrives.
 
 2026-10-25 maintainer decision (Robert): weather data must be fetched at least once per hour; for ageing, weather data may not be older than 1 hour. Consistent with entry 57. Current code: the poll interval setter clamps 900-3600 s (settingStuff.ino:1053), so 'at least once per hour' already holds for the schedule. Edge case to handle in the implementation: with the interval at 3600 s, one slow or failed fetch makes the value older than 1 h, so SAT would hand back until the next successful fetch (the TASK-1319 retry backs off 60 s doubling up to the interval, SATweather.ino:447-449). Side note: REST descriptor says min 300 s (restAPI.ino:3927) while the setter's minimum is 900 s (settingStuff.ino:1053).
+
+2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
 <!-- SECTION:NOTES:END -->

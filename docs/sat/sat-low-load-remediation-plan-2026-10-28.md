@@ -2,6 +2,8 @@
 
 Date: 2026-10-28 (Europe/Amsterdam). Planning deliverable: **TASK-1411**.
 
+Execution breakdown: **TASK-1412**, with 26 child tasks and reused existing fixes. See the [ordered backlog and mandatory bench-to-field gates](sat-low-load-execution-backlog-2026-10-28.md). The task IDs there replace the provisional `NEW-*` work-order labels below; the issue register remains the scope reference.
+
 Status: proposed work programme, with existing decisions identified separately from new recommendations. This document does not approve a boiler-control change, move the thermo-nova pin, amend an Accepted ADR, or claim that the controller has passed physical validation.
 
 ## 1. Outcome and scope

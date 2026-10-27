@@ -7,11 +7,18 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T19:43:00Z'
-updated_date: '2026-10-25T11:35:00Z'
+updated_date: '2026-10-27T23:45:00Z'
 labels:
   - sat
 milestone: 2.0.0
-dependencies: []
+dependencies:
+  - TASK-1405
+  - TASK-1387
+  - TASK-1412.14
+  - TASK-1412.4
+  - TASK-1412.7
+references:
+  - TASK-1412
 priority: low
 ordinal: 454000
 ---
@@ -48,4 +55,6 @@ From the TASK-1327 review: thermo-nova re-enables PWM in two ways after a disabl
 2026-10-24 Sergeant D answered Q2 (entry 36: per-sample control setpoint first, option A) and Q3 (entry 37: margin 2.0, a cycle at exactly 2.0 counts as overshoot; the firmware's strict '>' in the overshoot timer SATcycles.ino:896 must become '>='). Q4 (classifier steps) asked again with detail. Resume after Q4.
 
 2026-10-25 Q4 answered (entry 55: classifier matches classifier.py exactly) -> prerequisite task TASK-1387.
+
+2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
 <!-- SECTION:NOTES:END -->

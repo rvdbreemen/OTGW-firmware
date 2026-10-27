@@ -4,13 +4,17 @@ title: 'SAT: user MaxTSet slider bounded by MsgID 57, sent to the boiler (entry 
 status: To Do
 assignee: []
 created_date: '2026-10-25T06:31:00Z'
-updated_date: '2026-10-25T08:30:00Z'
+updated_date: '2026-10-27T23:45:00Z'
 labels:
   - sat
   - webui
   - mqtt
 milestone: 2.0.0
-dependencies: []
+dependencies:
+  - TASK-1412.1
+  - TASK-1412.3
+references:
+  - TASK-1412
 priority: medium
 ordinal: 508000
 ---
@@ -32,4 +36,6 @@ Sergeant D 2026-10-25 05:56/06:10 UTC (#alpha-testing 1563793351961223221, 15637
 2026-10-25 second reader (wf_16ada525): MsgID 57 carries no bounds; the MaxTSet upper/lower bounds are MsgID 49 MaxTSetUBMaxTSetLB (OTGW-Core.h:423 vs :431). Entry 48 quotes 'MsgID 57 values (Lower/Higher)'; our reading: bounds from MsgID 49, value written as MsgID 57 (SH= on PIC). Confirm with Sergeant D when the plan is shared. Also: the ignition hold is clamped with satGetMaxSetpoint (SATcontrol.ino:1030-1032), not satEffectiveMaxSetpoint; thermo-nova clamps the hold with the user maximum_setpoint (heating_control.py:398). Entry 51: SAT caps every CS at the user value. gruijter answered 1563816425838219335 (asked for MsgID 57 OT log).
 
 Entry 54 (2026-10-25 07:31): with the slider at 48 SAT never sends a CS above 48, ignition hold included (thermo-nova heating_control.py:397 clamps the flame-off hold at maximum_setpoint).
+
+2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
 <!-- SECTION:NOTES:END -->

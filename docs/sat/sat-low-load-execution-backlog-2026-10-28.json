@@ -1,0 +1,732 @@
+{
+  "epic": "TASK-1412",
+  "date": "2026-10-28",
+  "previousMaximumOrdinal": 549000,
+  "epicOrdinal": 550000,
+  "epicDependencies": [
+    "TASK-1412.26"
+  ],
+  "tasks": [
+    {
+      "key": "records",
+      "title": "Reconcile SAT low-load question, decision and task evidence records",
+      "issues": [
+        11,
+        20,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40
+      ],
+      "deps": [],
+      "ac": [
+        "LL-023 distinguishes desired, implemented, host-tested and physically verified states; dated history and verbatim designer quotations remain intact.",
+        "Q35/Q38/Q40/Q44/Q46/Q47 and provisional Q48-Q51 have non-overlapping choices, source citations and explicit approval/revisit triggers; no unsupported probability or ancestry claim survives in current guidance.",
+        "TASK-1373 uses ID49 bounds, ID57 value and ID6 support/writability; TASK-1385 is revalidated against TASK-1401 before any duplicate fix; historical TASK-14/16/43/1268/1277 closure claims have attributed current-status annotations.",
+        "Existing asking order and one-question-at-a-time policy are preserved unless Robert changes them; unresolved decisions remain unresolved and linked to their implementation tasks."
+      ],
+      "id": "TASK-1412.1",
+      "ordinal": 551000
+    },
+    {
+      "key": "contracts",
+      "title": "Establish reviewed OT low-load requirements and scoped decision contracts",
+      "issues": [
+        1,
+        6,
+        7,
+        8,
+        9,
+        14,
+        15,
+        17,
+        25,
+        41
+      ],
+      "deps": [
+        "TASK-1412.1"
+      ],
+      "ac": [
+        "A clause-to-behaviour-to-test crosswalk distinguishes mandatory OT requirements, suggested low-load recipes, recorded SAT decisions and new proposals; each selected implementation path has an unambiguous contract.",
+        "Decision entries listed in remediation section 2 are checked individually for agreement; any conflict is cited and queued for Sergeant D, with no fabricated resolution or accepted-ADR edits.",
+        "Unknown support, invalid reply, missing sample, source identity and sample age are separate states; manual source selection and ownership/cutoff rules remain explicit.",
+        "Each control-change task identifies its own required approval; unresolved policy blocks only affected implementation and the corresponding validation claim."
+      ],
+      "id": "TASK-1412.2",
+      "ordinal": 552000
+    },
+    {
+      "key": "red",
+      "title": "Add executable low-load contract regressions before implementation fixes",
+      "issues": [
+        2,
+        3,
+        4,
+        5,
+        18,
+        19,
+        24,
+        41
+      ],
+      "deps": [
+        "TASK-1412.2"
+      ],
+      "ac": [
+        "LL-001..004 and contract fixtures for LL-010..023 execute real production functions or integrated production code; approved expectations and undecided alternatives are clearly separated.",
+        "Baseline defects are reproduced with timestamped input/output and source hashes; missing tools/tests exit distinctly from a passing test.",
+        "Fix tasks can run focused red/green scenarios without disabling unrelated assertions; release mode rejects expectedFailure, skipped mandatory scenarios and missing evidence."
+      ],
+      "id": "TASK-1412.3",
+      "ordinal": 553000
+    },
+    {
+      "key": "cap",
+      "title": "Honor slave low-load permission across SAT entry and active PWM",
+      "issues": [
+        1,
+        17
+      ],
+      "deps": [
+        "TASK-1412.3"
+      ],
+      "control": true,
+      "ac": [
+        "LL-010 covers ID3 HB4 permission, unknown/changed permission, every automatic/manual entry and active-PWM response under the approved contract.",
+        "A slave veto cannot be bypassed by another entry path; manual gas/HP/hybrid selection remains authoritative under ADR-157.",
+        "Host traces prove requested and transmitted master bits separately; the design defines safe fallback and re-entry before implementation."
+      ],
+      "id": "TASK-1412.4",
+      "ordinal": 554000
+    },
+    {
+      "key": "data",
+      "title": "Make SAT flow and return measurement validity and age explicit",
+      "issues": [
+        8,
+        9,
+        35
+      ],
+      "deps": [
+        "TASK-1412.3"
+      ],
+      "control": true,
+      "ac": [
+        "LL-011 distinguishes unsupported, never received, Data-Invalid, stale, fresh zero and valid values for ID25/ID28 on PIC and OT-Direct.",
+        "A live link with stale flow cannot masquerade as fresh feedback; approved stale-data fallback and recovery are deterministic.",
+        "Timestamp traces measure source sample age plus scheduler/queue/wire delay against reviewed transport budgets; infeasible fallback is rejected for that profile."
+      ],
+      "id": "TASK-1412.5",
+      "ordinal": 555000
+    },
+    {
+      "key": "mode",
+      "title": "Separate PWM phase actuation from overshoot protection enablement",
+      "issues": [
+        7
+      ],
+      "deps": [
+        "TASK-1412.3"
+      ],
+      "control": true,
+      "ac": [
+        "LL-017 exercises protection toggles during continuous, PWM ON, PWM OFF, startup and recovery.",
+        "An approved mode contract preserves OFF-phase actuation or explicitly rejects the unsupported combination; disabling a setting cannot silently bypass phase ownership.",
+        "No change to CH/cold-cutoff/ownership semantics is inferred without the required recorded decision."
+      ],
+      "id": "TASK-1412.6",
+      "ordinal": 556000
+    },
+    {
+      "key": "entry",
+      "title": "Correct low-load entry qualification and post-DHW recovery",
+      "issues": [
+        6,
+        19,
+        25,
+        31
+      ],
+      "deps": [
+        "TASK-1412.4",
+        "TASK-1412.5",
+        "TASK-1412.3",
+        "TASK-1380",
+        "TASK-1382",
+        "TASK-1383"
+      ],
+      "external": [
+        "TASK-1380",
+        "TASK-1382",
+        "TASK-1383"
+      ],
+      "control": true,
+      "ac": [
+        "LL-012 covers startup, setpoint fall, maximum-temperature limiting, pump/valve changes, DHW tails and real minimum-capacity saturation.",
+        "The approved entry evidence distinguishes a temperature proxy from confirmed low-load operation; application 2.2.3 recovery and current inhibit timing are compared explicitly.",
+        "DHW/flame edges do not move phase-owned timers; master CH-enable and slave CH-mode are tested as different signals."
+      ],
+      "id": "TASK-1412.7",
+      "ordinal": 557000
+    },
+    {
+      "key": "exit",
+      "title": "Make SAT low-load exits correct across long and jittered scheduler intervals",
+      "issues": [
+        5,
+        36
+      ],
+      "deps": [
+        "TASK-1412.3"
+      ],
+      "control": true,
+      "ac": [
+        "Q44/Q46/Q47 decisions are recorded before changing exit duration, saturation/underheat accumulation or action order.",
+        "LL-004 tests every supported tick including >60 s, delayed calls, jitter, same-update transitions and timer rollover against the chosen elapsed-time contract.",
+        "A transition takes effect on the approved update; unsupported probability claims are replaced by reproducible traces."
+      ],
+      "id": "TASK-1412.8",
+      "ordinal": 558000
+    },
+    {
+      "key": "count",
+      "title": "Revalidate PWM start counting and phase duration policy after anchor fixes",
+      "issues": [
+        11,
+        20,
+        22,
+        30,
+        31,
+        37
+      ],
+      "deps": [
+        "TASK-1412.3",
+        "TASK-1380",
+        "TASK-1382",
+        "TASK-1383",
+        "TASK-1385",
+        "TASK-1375"
+      ],
+      "external": [
+        "TASK-1380",
+        "TASK-1382",
+        "TASK-1383",
+        "TASK-1385",
+        "TASK-1375"
+      ],
+      "control": true,
+      "ac": [
+        "LL-019 covers P versus 2P, zero ON, first entry, range 5, DHW, delayed/failed ignition, relight, limit windows and timestamp rollover.",
+        "Q48-Q51 provisional decisions are explicitly revisited after Q35 changes, with maintainer/designer provenance preserved.",
+        "Commanded phase durations, counted starts and observed burner/compressor runtimes are separate outputs; no unconditional 180 s flame guarantee is asserted."
+      ],
+      "id": "TASK-1412.9",
+      "ordinal": 559000
+    },
+    {
+      "key": "pid",
+      "title": "Verify SAT PID startup, held derivative and saturation semantics",
+      "issues": [
+        4,
+        13,
+        18,
+        24,
+        32
+      ],
+      "deps": [
+        "TASK-1412.3",
+        "TASK-1270",
+        "TASK-1368",
+        "TASK-1381"
+      ],
+      "external": [
+        "TASK-1270",
+        "TASK-1368",
+        "TASK-1381"
+      ],
+      "ac": [
+        "LL-003/020 cover main and area PID, approved startup/restore output, 10/30/60/long actuator calls, scheduler outages and no catch-up integral burst.",
+        "Deadband/reset boundaries, Ki=0, persistence, rounding, dynamic gain times held raw derivative and actuator saturation are characterized from the real implementation.",
+        "Only approved Q23-Q28 policy changes are implemented; a proposed alternative anti-windup/controller is a separate decision, not an incidental fix."
+      ],
+      "id": "TASK-1412.10",
+      "ordinal": 560000
+    },
+    {
+      "key": "tx",
+      "title": "Make SAT command delivery and latest-state recovery verifiable",
+      "issues": [
+        10,
+        21
+      ],
+      "deps": [
+        "TASK-1412.5",
+        "TASK-1412.3",
+        "TASK-1370",
+        "TASK-1384"
+      ],
+      "external": [
+        "TASK-1370",
+        "TASK-1384"
+      ],
+      "control": true,
+      "ac": [
+        "LL-013 records logical intent, enqueue result, actual frame transmission and available acknowledgement as separate events on PIC and OT-Direct.",
+        "Queue-full, interrupted exchange, reset, superseded commands and recovery retain/retry the latest approved state; rejected enqueue is never reported delivered.",
+        "CS/MM/CH update deadlines, suppression service and ordinary OT traffic coexist within measured budgets; PIC echoes are not treated as boiler acceptance."
+      ],
+      "id": "TASK-1412.11",
+      "ordinal": 561000
+    },
+    {
+      "key": "ignition",
+      "title": "Validate missing-return ignition and runtime startup on both transports",
+      "issues": [
+        8,
+        21,
+        28,
+        39
+      ],
+      "deps": [
+        "TASK-1412.5",
+        "TASK-1412.11",
+        "TASK-1371",
+        "TASK-1384"
+      ],
+      "external": [
+        "TASK-1371",
+        "TASK-1384"
+      ],
+      "ac": [
+        "LL-018 executes the approved no-return startup contract with unsupported/invalid/stale return, runtime enable and hot-boiler anti-cycle lockout.",
+        "Entry45 and Q40 interpretation is recorded before implementation; actual sample age and ignition sequence are compared with the application specification.",
+        "PIC MI/PM behaviour and OT-Direct equivalents are proven separately; a replay or command echo cannot close physical ignition acceptance."
+      ],
+      "id": "TASK-1412.12",
+      "ordinal": 562000
+    },
+    {
+      "key": "ceiling",
+      "title": "Verify MaxTSet negotiation and every transmitted SAT ceiling",
+      "issues": [
+        15,
+        29
+      ],
+      "deps": [
+        "TASK-1412.3",
+        "TASK-1373"
+      ],
+      "external": [
+        "TASK-1373"
+      ],
+      "ac": [
+        "LL-014 verifies ID49 bounds, ID57 value, ID6 support/writability and unsupported/rejected/write-readback cases.",
+        "Ignition, refresh, continuous, PWM and recovery paths never exceed the effective approved user/equipment ceiling.",
+        "Stored user limits persist; device measurements and transient support state are not persisted as settings."
+      ],
+      "id": "TASK-1412.13",
+      "ordinal": 563000
+    },
+    {
+      "key": "classifier",
+      "title": "Prove classifier input parity before cycle-end mode switching",
+      "issues": [
+        16,
+        40
+      ],
+      "deps": [
+        "TASK-1412.3",
+        "TASK-1405",
+        "TASK-1387"
+      ],
+      "external": [
+        "TASK-1405",
+        "TASK-1387"
+      ],
+      "ac": [
+        "LL-021 runs the real pinned upstream and port classifiers on identical timestamped samples including changing CS and mode mid-burn.",
+        "Per-sample requested/control CS, warm-up exclusion, percentile interpolation, missing-data treatment, boundary margin and label deviations are explicitly verified.",
+        "RAM cost is measured; TASK-1331 cannot resume until input parity and approved deviations pass."
+      ],
+      "id": "TASK-1412.14",
+      "ordinal": 564000
+    },
+    {
+      "key": "telemetry",
+      "title": "Validate SAT telemetry against independent event and wire evidence",
+      "issues": [
+        23
+      ],
+      "deps": [
+        "TASK-1412.3",
+        "TASK-1389",
+        "TASK-1409",
+        "TASK-1407"
+      ],
+      "external": [
+        "TASK-1389",
+        "TASK-1409",
+        "TASK-1407"
+      ],
+      "ac": [
+        "LL-022 compares MM value/units, ON/OFF seconds, cycle off-gaps and rolling duty metrics with independent timestamped frames/events.",
+        "Zero-gap, boot-existing-flame, DHW overlap, missing samples and window expiry cannot create fabricated duty or modulation values.",
+        "Telemetry used for bench/field scoring passes this gate before those runs; it is not its own evidence oracle."
+      ],
+      "id": "TASK-1412.15",
+      "ordinal": 565000
+    },
+    {
+      "key": "model",
+      "title": "Quantify repaired SAT duty and PID behaviour against controlled plant models",
+      "issues": [
+        12,
+        13,
+        42
+      ],
+      "deps": [
+        "TASK-1412.10",
+        "TASK-1412.9",
+        "TASK-1412.7",
+        "TASK-1412.8"
+      ],
+      "ac": [
+        "LL-016 compares the temperature-ratio estimate with integrated heat delivery, room error and actual start events across fixed/variable flow and radiator/low-temperature plant models.",
+        "The repaired SAT baseline is compared under identical scenarios with suitable bounded PI/TPI and native weather/room-influence baselines; model limits and parameter sensitivity are published.",
+        "No energy/COP/comfort improvement or new algorithm approval is inferred from simulation alone; a controller replacement requires a separate approved ADR/task."
+      ],
+      "id": "TASK-1412.16",
+      "ordinal": 566000
+    },
+    {
+      "key": "profile",
+      "title": "Define equipment-specific gas, heat-pump and hybrid commissioning profiles",
+      "issues": [
+        14,
+        17,
+        42
+      ],
+      "deps": [
+        "TASK-1412.2"
+      ],
+      "ac": [
+        "PH-PROFILE/LL-015 require source/emitter/native-control mode, interface capabilities, minimum output, ON/OFF/start limits, hydraulic limits, temperature ceiling and measurement availability.",
+        "Q37/Q45 and entry21/52 exceptions are resolved for each included profile; unknown compressor protections block that heat-pump claim.",
+        "Native defrost/DHW/backup protections and explicit hand-back/rollback are documented; gas MM0 evidence is not generalized to heat pumps."
+      ],
+      "id": "TASK-1412.17",
+      "ordinal": 567000
+    },
+    {
+      "key": "integration",
+      "title": "Pass the complete SAT low-load host and production integration gate",
+      "issues": [
+        41
+      ],
+      "deps": [
+        "TASK-1412.4",
+        "TASK-1412.5",
+        "TASK-1412.6",
+        "TASK-1412.7",
+        "TASK-1412.8",
+        "TASK-1412.9",
+        "TASK-1412.10",
+        "TASK-1412.11",
+        "TASK-1412.12",
+        "TASK-1412.13",
+        "TASK-1412.14",
+        "TASK-1412.15",
+        "TASK-1331",
+        "TASK-1390",
+        "TASK-1365"
+      ],
+      "external": [
+        "TASK-1331",
+        "TASK-1390",
+        "TASK-1365"
+      ],
+      "ac": [
+        "LL-001..004 and LL-010..023 software portions pass together against the candidate commit with no mandatory skip/expectedFailure; unresolved affected policy is a blocker.",
+        "Real scheduling, production control, transport queues, ownership and sensor-loss/recovery are exercised together, beyond isolated extracted-function tests.",
+        "Project checklist/build/evaluate/relevant regression results and commit/config/source/test hashes are archived; physical gates remain explicitly pending."
+      ],
+      "id": "TASK-1412.18",
+      "ordinal": 568000
+    },
+    {
+      "key": "simulation",
+      "title": "Pass reproducible closed-loop low-load simulation before hardware bench",
+      "issues": [
+        41
+      ],
+      "deps": [
+        "TASK-1412.18",
+        "TASK-1412.16",
+        "TASK-1412.17"
+      ],
+      "ac": [
+        "The candidate production controller runs against documented plant models for very low load, thermal lag, minimum power, pump/TRV changes, DHW, delayed ignition and sensor/transport faults.",
+        "Pre-registered comfort, cycling, temperature and protection thresholds pass across parameter ranges and seeded fault runs; exact inputs/seeds/raw traces are reproducible.",
+        "Simulation limitations and failed scenarios are recorded; no simulator result is labeled physical boiler or compressor proof."
+      ],
+      "id": "TASK-1412.19",
+      "ordinal": 569000
+    },
+    {
+      "key": "benchrig",
+      "title": "Prepare and calibrate an isolated SAT real-board bench simulator",
+      "issues": [
+        41
+      ],
+      "deps": [
+        "TASK-1412.2",
+        "TASK-1412.17"
+      ],
+      "ac": [
+        "A real ESP32-S3 board drives a safe emulated OT slave/plant on PIC and OT-Direct paths, with actual transport identity verified and no live heating equipment required.",
+        "Injected support/veto/invalid/stale data, ignition/lockout delays, DHW and queue faults are timestamped by an independent capture; simulator timing and instrumentation are calibrated.",
+        "A versioned operator procedure, fixtures, expected outputs and rollback/reset check allow another operator to repeat the bench scenarios."
+      ],
+      "id": "TASK-1412.20",
+      "ordinal": 570000
+    },
+    {
+      "key": "benchrun",
+      "title": "Execute SAT low-load real-board bench simulation on PIC and OT-Direct",
+      "issues": [
+        41
+      ],
+      "deps": [
+        "TASK-1412.19",
+        "TASK-1412.20",
+        "TASK-1412.15"
+      ],
+      "ac": [
+        "Both PIC gateway and OT-Direct candidate firmware pass the versioned bench scenario matrix using emulated loads before any tester field run.",
+        "Independent captures verify commanded CH/CS/MM, deadlines, phase/ignition anchors, veto, limits, faults and recovery; firmware/FS/settings/simulator/instrument identities are archived.",
+        "A failed scenario blocks bench acceptance; fixes rerun the failed scenarios and relevant integrated regressions on the new candidate."
+      ],
+      "id": "TASK-1412.21",
+      "ordinal": 571000
+    },
+    {
+      "key": "benchgate",
+      "title": "Approve bench evidence and authorize controlled equipment validation readiness",
+      "issues": [
+        41
+      ],
+      "deps": [
+        "TASK-1412.21"
+      ],
+      "ac": [
+        "An independent reviewer checks both bench transport reports against all applicable LL scenarios and pre-registered thresholds; missing evidence or unexplained failures block acceptance.",
+        "The exact accepted firmware/FS/configuration and scope are recorded; a later control change invalidates affected acceptance and requires rerun.",
+        "Bench evidence proves board/protocol behaviour only; the signed readiness record is a mandatory prerequisite to equipment commissioning and tester field-validation tasks."
+      ],
+      "id": "TASK-1412.22",
+      "ordinal": 572000
+    },
+    {
+      "key": "equipment",
+      "title": "Commission accepted SAT candidate on controlled real heating equipment",
+      "issues": [
+        11,
+        14,
+        39,
+        41
+      ],
+      "deps": [
+        "TASK-1412.22",
+        "TASK-1412.17"
+      ],
+      "ac": [
+        "PH-PIC/PH-OTD pass for claimed transport/equipment combinations with independent actual flame/compressor state, temperature/flow and command timestamps.",
+        "Actual ignition/relight, minimum runtime/lockout, low-load veto, ceiling, sensor faults, DHW/defrost/native protections and hand-back are verified within manufacturer limits.",
+        "Unsupported/unavailable combinations remain excluded; stop/rollback criteria are demonstrated, and physical results cannot be substituted by simulated traces."
+      ],
+      "id": "TASK-1412.23",
+      "ordinal": 573000
+    },
+    {
+      "key": "fieldpack",
+      "title": "Prepare tester field protocol and readiness after bench and equipment acceptance",
+      "issues": [
+        41,
+        42
+      ],
+      "deps": [
+        "TASK-1412.23",
+        "TASK-1412.22"
+      ],
+      "ac": [
+        "A named-equipment tester pack contains accepted artifacts, setup/calibration, measurement schema, limits, stop/rollback instructions and reporting templates.",
+        "Matched A/B or B/A periods and weather/comfort/energy uncertainty controls are pre-registered, including DHW/defrost/backup and hydraulic configuration.",
+        "Readiness explicitly records bench and controlled-equipment acceptance; recruiting/contacting testers requires Robert's authorization and is not performed by this planning task."
+      ],
+      "id": "TASK-1412.24",
+      "ordinal": 574000
+    },
+    {
+      "key": "field",
+      "title": "Run authorized matched SAT tester field validation and publish measurements",
+      "issues": [
+        12,
+        14,
+        41,
+        42
+      ],
+      "deps": [
+        "TASK-1412.24",
+        "TASK-1412.22"
+      ],
+      "ac": [
+        "Only authorized testers with accepted equipment/profile and bench-approved candidate run the pre-registered PH-FIELD protocol.",
+        "Raw measurements, weather/room comfort, heat/fuel/electricity, start/runtime, DHW/defrost/backup, settings and uncertainty are retained; matched comparisons include native control where applicable.",
+        "Failures trigger stop/rollback and affected bench reruns before redeployment; no cost-only result is described as COP/energy improvement."
+      ],
+      "id": "TASK-1412.25",
+      "ordinal": 575000
+    },
+    {
+      "key": "final",
+      "title": "Independently verify SAT low-load implementation and release evidence",
+      "issues": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42
+      ],
+      "deps": [
+        "TASK-1412.25",
+        "TASK-1412.1"
+      ],
+      "ac": [
+        "A second reviewer opens cited upstream/current locations and challenges claimed differences; all R01-R42 have evidence-backed closure or explicit release exclusion.",
+        "Release acceptance validates LL-001..004, LL-010..023 and PH-PIC/OTD/PROFILE/FIELD evidence for the exact candidate; absent physical evidence, expected failures and unapproved decisions fail closed.",
+        "Supported combinations, residual limitations, benchmark results and rollback proof are published; documentation agrees with measured implementation and the project checklist is complete.",
+        "Only after this gate passes may TASK-1412 be marked Done; required task commits are narrow and pushed to the configured upstream."
+      ],
+      "id": "TASK-1412.26",
+      "ordinal": 576000
+    }
+  ],
+  "existingDependencies": {
+    "TASK-1270": [
+      "TASK-1412.3",
+      "TASK-1368"
+    ],
+    "TASK-1331": [
+      "TASK-1405",
+      "TASK-1387",
+      "TASK-1412.14",
+      "TASK-1412.4",
+      "TASK-1412.7"
+    ],
+    "TASK-1365": [
+      "TASK-1412.3"
+    ],
+    "TASK-1368": [
+      "TASK-1412.3"
+    ],
+    "TASK-1370": [
+      "TASK-1412.3",
+      "TASK-1412.5"
+    ],
+    "TASK-1371": [
+      "TASK-1412.5",
+      "TASK-1412.11",
+      "TASK-1382"
+    ],
+    "TASK-1373": [
+      "TASK-1412.1",
+      "TASK-1412.3"
+    ],
+    "TASK-1375": [
+      "TASK-1412.3"
+    ],
+    "TASK-1380": [
+      "TASK-1412.3",
+      "TASK-1382"
+    ],
+    "TASK-1381": [
+      "TASK-1412.3",
+      "TASK-1270"
+    ],
+    "TASK-1382": [
+      "TASK-1412.3"
+    ],
+    "TASK-1383": [
+      "TASK-1412.3"
+    ],
+    "TASK-1384": [
+      "TASK-1412.3",
+      "TASK-1412.5"
+    ],
+    "TASK-1385": [
+      "TASK-1412.1",
+      "TASK-1412.3"
+    ],
+    "TASK-1389": [
+      "TASK-1412.3"
+    ],
+    "TASK-1390": [
+      "TASK-1412.5"
+    ],
+    "TASK-1405": [
+      "TASK-1412.3"
+    ],
+    "TASK-1407": [
+      "TASK-1412.3"
+    ],
+    "TASK-1409": [
+      "TASK-1412.3"
+    ]
+  }
+}
