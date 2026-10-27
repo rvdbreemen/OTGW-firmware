@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "referencePin": "7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb",
+  "generatedUtc": "2026-10-27T23:25:22.441438+00:00",
+  "source": {
+    "path": "D:\\Users\\Robert\\Documents\\GitHub\\RvdB\\OTGW-firmware\\other-projects\\SAT-releases-thermo-nova\\custom_components\\sat\\pwm.py",
+    "sha256": "d0dc7f30b029f519fc4f3d93e7409dfaeae513e6a3f2084066a0e8a2129050a0"
+  },
+  "constants": {
+    "path": "D:\\Users\\Robert\\Documents\\GitHub\\RvdB\\OTGW-firmware\\other-projects\\SAT-releases-thermo-nova\\custom_components\\sat\\const.py",
+    "sha256": "e7104c9b51b2394a8b251331f9d0d6ca24bbc501daf675c75628eb859833ea9e"
+  },
+  "adapter": "Original PWM methods; import AST nodes removed; HA/type/config/clock names stubbed",
+  "limitations": "No full HA scheduling, transport, physical boiler or efficiency validation; only the named PWM scenarios are asserted",
+  "dutyMapping": [
+    {
+      "inputDuty": 0.06,
+      "requestedC": 28.268,
+      "onSeconds": 0,
+      "offSeconds": 2400
+    },
+    {
+      "inputDuty": 0.075,
+      "requestedC": 28.535,
+      "onSeconds": 180,
+      "offSeconds": 2219
+    },
+    {
+      "inputDuty": 0.1,
+      "requestedC": 28.98,
+      "onSeconds": 180,
+      "offSeconds": 1619
+    },
+    {
+      "inputDuty": 0.15,
+      "requestedC": 29.869999999999997,
+      "onSeconds": 180,
+      "offSeconds": 1020
+    },
+    {
+      "inputDuty": 0.5,
+      "requestedC": 36.1,
+      "onSeconds": 600,
+      "offSeconds": 599
+    },
+    {
+      "inputDuty": 0.925,
+      "requestedC": 43.665,
+      "onSeconds": 2219,
+      "offSeconds": 180
+    },
+    {
+      "inputDuty": 0.93,
+      "requestedC": 43.754000000000005,
+      "onSeconds": 2400,
+      "offSeconds": 0
+    }
+  ],
+  "ultraLowTrace": [
+    {
+      "timeSeconds": 0,
+      "phase": "off",
+      "phaseStarts": 0,
+      "onOffSeconds": [
+        0,
+        2400
+      ]
+    },
+    {
+      "timeSeconds": 2400,
+      "phase": "off",
+      "phaseStarts": 0,
+      "onOffSeconds": [
+        0,
+        2400
+      ]
+    },
+    {
+      "timeSeconds": 4800,
+      "phase": "off",
+      "phaseStarts": 0,
+      "onOffSeconds": [
+        0,
+        2400
+      ]
+    },
+    {
+      "timeSeconds": 7200,
+      "phase": "off",
+      "phaseStarts": 0,
+      "onOffSeconds": [
+        0,
+        2400
+      ]
+    }
+  ],
+  "relightTrace": [
+    {
+      "timeSeconds": 0,
+      "flameInput": true,
+      "phase": "on",
+      "storedFlameOnSeconds": 0
+    },
+    {
+      "timeSeconds": 60,
+      "flameInput": false,
+      "phase": "on",
+      "storedFlameOnSeconds": 0
+    },
+    {
+      "timeSeconds": 120,
+      "flameInput": true,
+      "phase": "on",
+      "storedFlameOnSeconds": 0
+    },
+    {
+      "timeSeconds": 180,
+      "flameInput": true,
+      "phase": "off",
+      "storedFlameOnSeconds": null
+    }
+  ],
+  "checks": {
+    "ultraLowRemainsOff": true,
+    "relightDoesNotRestartMinimumAnchor": true,
+    "mappedUltraLowZeroOn": true
+  },
+  "referenceTraceReproduced": true
+}

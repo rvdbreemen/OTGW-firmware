@@ -1,0 +1,498 @@
+{
+  "schemaVersion": 1,
+  "metadata": {
+    "startedUtc": "2026-10-27T23:23:45.054893+00:00",
+    "python": "3.12.9 (tags/v3.12.9:fdb8142, Feb  4 2025, 15:27:58) [MSC v.1942 64 bit (AMD64)]",
+    "repo": "D:\\Users\\Robert\\Documents\\GitHub\\RvdB\\OTGW-firmware",
+    "mode": "baseline",
+    "selection": "all",
+    "commit": "4c7498a28945b510166999cb7c27e0d1b889d4bc",
+    "branch": "dev",
+    "dirty": [
+      "M .wolf/anatomy.md",
+      " M src/OTGW-firmware/data/version.hash",
+      " M src/OTGW-firmware/version.h",
+      "?? \"backlog/tasks/task-1411 - SAT-publish-low-load-remediation-executable-verification-plan-and-control-algorithm-comparison.md\"",
+      "?? compile_commands.json",
+      "?? docs/sat/sat-control-algorithm-research-2026-10-28.md",
+      "?? docs/sat/sat-low-load-remediation-plan-2026-10-28.md",
+      "?? docs/sat/sat-low-load-verification-plan-2026-10-28.md",
+      "?? docs/sat/sat-low-temperature-control-comparison-2026-10-28.md",
+      "?? scripts/inspect_sat_reference.py",
+      "?? scripts/verify_sat_low_load.py"
+    ],
+    "sha256": {
+      "src/OTGW-firmware/SATcontrol.ino": "69e682f00f97a05aaced1eedbbb261b00855d10f6bca5ee49777d45cc26b712d",
+      "src/OTGW-firmware/SATpid.ino": "f1596b1bca3c6d29a58f1d20b5cc995c7439c1d00a62c1a8403e8e7304753764",
+      "src/OTGW-firmware/SATcycles.ino": "df5b62058ead0fb15ab35b381d64283d18bffd6c7da46a355fa37cf5ba74db42",
+      "src/OTGW-firmware/SATchEnable.h": "076e3c150a5d35b227f06e0d64914f9590be449bf01e915afc8608e53bdf6b11",
+      "src/OTGW-firmware/SATtypes.h": "b2f10039a4eb96c7e95acda0af8328815f7202086522b1c3e8878f5707dcfced",
+      "src/OTGW-firmware/settingStuff.ino": "7894006fbcb8363350bb37e5f7961c953753f8e40b594a1d72be24b09d46dfb3",
+      "tests/test_sat_pwm_override.py": "2252d48f9d9d9621aafefbe3a1d43269716a4975be4e99d3a793d7dea32fcc95",
+      "tests/test_sat_pwm_start_limit.py": "4dab68dedd268ba9a903f406878803ed2a5949063c8a90cd6f2b09a25573d341",
+      "tests/test_sat_hp_pwm.py": "329b3362c43b235d47ed70ec7cb3a1a0ac5fde1141d5c1396ec36e4c3bb7d97e",
+      "tests/test_sat_overshoot_sustain.py": "a4a49e56199c981c858279c3e66b4fabe215c2f77ae0c83b14a6d9d5fdc8839d",
+      "tests/test_sat_pwm_replay_fixture.py": "7911d36a6817a6dbfd925a0d9a0068c43083b4e754d91137b4a396b427d1fe37",
+      "tests/test_sat_cycle_classifier.py": "34e0f6abbf0f7614df2ea5fcf43bed88685446598ebfb9da1b27c2f1d0b61ac2",
+      "scripts/gen_sat_pwm_replay.py": "05684dea6ddcc4f6a55626f78f816a434f1e41d7e08e681ed52d29f2167814b0",
+      "tests/webui/fixtures/sat-pwm-suppression-replay.txt": "704c7a884ab19ecc2e8c7bd0c5d09b06e25f79809459801f8d822bd1fa75d355"
+    },
+    "runner": {
+      "path": "D:\\Users\\Robert\\Documents\\GitHub\\RvdB\\OTGW-firmware\\scripts\\verify_sat_low_load.py",
+      "sha256": "c128478723b0ab3f342d3b5d85b6345769110d9f99faaa5431dc82b0fb8486b9"
+    },
+    "hashScope": "Selected target firmware, test adapters and replay inputs; runner is the separately identified executing file",
+    "clearedSourceOverrideNames": []
+  },
+  "suites": [
+    {
+      "module": "test_sat_pwm_override",
+      "testsRun": 72,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "expectedFailures": 0,
+      "unexpectedSuccesses": 0,
+      "details": "........................................................................\n----------------------------------------------------------------------\nRan 72 tests in 21.254s\n\nOK\n",
+      "skips": [],
+      "expectedFailureTests": []
+    },
+    {
+      "module": "test_sat_pwm_start_limit",
+      "testsRun": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "expectedFailures": 0,
+      "unexpectedSuccesses": 0,
+      "details": ".................\n----------------------------------------------------------------------\nRan 17 tests in 9.475s\n\nOK\n",
+      "skips": [],
+      "expectedFailureTests": []
+    },
+    {
+      "module": "test_sat_hp_pwm",
+      "testsRun": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "expectedFailures": 1,
+      "unexpectedSuccesses": 0,
+      "details": "...................x..\n----------------------------------------------------------------------\nRan 22 tests in 10.078s\n\nOK (expected failures=1)\n",
+      "skips": [],
+      "expectedFailureTests": [
+        "test_r3_on_phase_waits_for_flame (test_sat_hp_pwm.SatHeatPumpPwm.test_r3_on_phase_waits_for_flame)"
+      ]
+    },
+    {
+      "module": "test_sat_overshoot_sustain",
+      "testsRun": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "expectedFailures": 0,
+      "unexpectedSuccesses": 0,
+      "details": ".................\n----------------------------------------------------------------------\nRan 17 tests in 9.865s\n\nOK\n",
+      "skips": [],
+      "expectedFailureTests": []
+    },
+    {
+      "module": "test_sat_pwm_replay_fixture",
+      "testsRun": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "expectedFailures": 0,
+      "unexpectedSuccesses": 0,
+      "details": ".....\n----------------------------------------------------------------------\nRan 5 tests in 0.010s\n\nOK\n",
+      "skips": [],
+      "expectedFailureTests": []
+    }
+  ],
+  "suiteTotals": {
+    "testsRun": 133,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "expectedFailures": 1,
+    "unexpectedSuccesses": 0
+  },
+  "contracts": [
+    {
+      "id": "LL-001",
+      "status": "fail",
+      "observed": [
+        {
+          "elapsed_s": 0.0,
+          "request": 28.568,
+          "duty": 0.06,
+          "on_s": 0.0,
+          "off_s": 2400.0,
+          "phase_on": 1.0,
+          "cs": 48.0,
+          "ch": 1.0
+        },
+        {
+          "elapsed_s": 30.0,
+          "request": 28.568,
+          "duty": 0.06,
+          "on_s": 0.0,
+          "off_s": 2400.0,
+          "phase_on": 0.0,
+          "cs": 10.0,
+          "ch": 0.0
+        },
+        {
+          "elapsed_s": 60.0,
+          "request": 28.568,
+          "duty": 0.06,
+          "on_s": 0.0,
+          "off_s": 2400.0,
+          "phase_on": 1.0,
+          "cs": 48.0,
+          "ch": 1.0
+        }
+      ],
+      "expected": "Mapped on_time=0: phase OFF, CH=0 and CS=10 (protection enabled)",
+      "scope": "Real PWM block + CH helper, stubbed clock/sensors/queue; no physical boiler",
+      "authority": "TASK-1383/Q38 candidate"
+    },
+    {
+      "id": "LL-002",
+      "status": "fail",
+      "observed": [
+        {
+          "elapsed_s": 0.0,
+          "request": 38.6,
+          "duty": 0.5,
+          "on_s": 599.999,
+          "off_s": 600.001,
+          "phase_on": 1.0,
+          "cs": 48.0,
+          "ch": 1.0
+        },
+        {
+          "elapsed_s": 30.0,
+          "request": 38.6,
+          "duty": 0.5,
+          "on_s": 599.999,
+          "off_s": 600.001,
+          "phase_on": 0.0,
+          "cs": 10.0,
+          "ch": 0.0
+        },
+        {
+          "elapsed_s": 60.0,
+          "request": 38.6,
+          "duty": 0.5,
+          "on_s": 599.999,
+          "off_s": 600.001,
+          "phase_on": 1.0,
+          "cs": 48.0,
+          "ch": 1.0
+        }
+      ],
+      "expected": "Keep phase ON and CH=1 while awaiting ignition during the first 60 s",
+      "scope": "Real PWM block + CH helper, stubbed clock/sensors/queue; no physical boiler",
+      "authority": "TASK-1382/Q35 A candidate"
+    },
+    {
+      "id": "LL-003",
+      "status": "fail",
+      "observed": [
+        {
+          "interval_s": 60.0,
+          "changing": 0.0,
+          "integral": 0.3
+        },
+        {
+          "interval_s": 10.0,
+          "changing": 0.0,
+          "integral": 0.3
+        },
+        {
+          "interval_s": 30.0,
+          "changing": 0.0,
+          "integral": 0.3
+        },
+        {
+          "interval_s": 120.0,
+          "changing": 0.0,
+          "integral": 0.15
+        },
+        {
+          "interval_s": 10.0,
+          "changing": 1.0,
+          "integral": 0.66
+        },
+        {
+          "interval_s": 30.0,
+          "changing": 1.0,
+          "integral": 0.66
+        },
+        {
+          "interval_s": 60.0,
+          "changing": 1.0,
+          "integral": 0.3
+        },
+        {
+          "interval_s": 120.0,
+          "changing": 1.0,
+          "integral": 0.15
+        }
+      ],
+      "expected": "Same 600 s physical error trace: integral independent of control tick (60 s reference)",
+      "scope": "Whole SATpid.ino under the current shared-tick call contract; scheduler integration remains LL-020",
+      "authority": "Sergeant D entry 42 / TASK-1368; adapter must be reviewed when PID scheduling is separated"
+    },
+    {
+      "id": "LL-004",
+      "status": "fail",
+      "observed": [
+        {
+          "interval_s": 30,
+          "condition": "underheat",
+          "threshold_s": 180,
+          "qualifying_elapsed_s": 150.0,
+          "observed": {
+            "t": 180000.0,
+            "mode": 1.0,
+            "sat": 0.0
+          },
+          "pass": false
+        },
+        {
+          "interval_s": 30,
+          "condition": "saturation",
+          "threshold_s": 300,
+          "qualifying_elapsed_s": 270.0,
+          "observed": {
+            "t": 300000.0,
+            "mode": 1.0,
+            "sat": 0.0
+          },
+          "pass": false
+        },
+        {
+          "interval_s": 60,
+          "condition": "underheat",
+          "threshold_s": 180,
+          "qualifying_elapsed_s": 120.0,
+          "observed": {
+            "t": 180000.0,
+            "mode": 1.0,
+            "sat": 0.0
+          },
+          "pass": false
+        },
+        {
+          "interval_s": 60,
+          "condition": "saturation",
+          "threshold_s": 300,
+          "qualifying_elapsed_s": 240.0,
+          "observed": {
+            "t": 300000.0,
+            "mode": 1.0,
+            "sat": 0.0
+          },
+          "pass": false
+        },
+        {
+          "interval_s": 90,
+          "condition": "underheat",
+          "threshold_s": 180,
+          "qualifying_elapsed_s": null,
+          "observed": {
+            "t": -1.0,
+            "mode": 2.0,
+            "sat": 0.0
+          },
+          "pass": false
+        },
+        {
+          "interval_s": 90,
+          "condition": "saturation",
+          "threshold_s": 300,
+          "qualifying_elapsed_s": null,
+          "observed": {
+            "t": -1.0,
+            "mode": 2.0,
+            "sat": 0.0
+          },
+          "pass": false
+        },
+        {
+          "interval_s": 120,
+          "condition": "underheat",
+          "threshold_s": 180,
+          "qualifying_elapsed_s": null,
+          "observed": {
+            "t": -1.0,
+            "mode": 2.0,
+            "sat": 0.0
+          },
+          "pass": false
+        },
+        {
+          "interval_s": 120,
+          "condition": "saturation",
+          "threshold_s": 300,
+          "qualifying_elapsed_s": null,
+          "observed": {
+            "t": -1.0,
+            "mode": 2.0,
+            "sat": 0.0
+          },
+          "pass": false
+        },
+        {
+          "interval_s": 300,
+          "condition": "underheat",
+          "threshold_s": 180,
+          "qualifying_elapsed_s": null,
+          "observed": {
+            "t": -1.0,
+            "mode": 2.0,
+            "sat": 0.0
+          },
+          "pass": false
+        },
+        {
+          "interval_s": 300,
+          "condition": "saturation",
+          "threshold_s": 300,
+          "qualifying_elapsed_s": null,
+          "observed": {
+            "t": -1.0,
+            "mode": 2.0,
+            "sat": 0.0
+          },
+          "pass": false
+        }
+      ],
+      "expected": "Exit after 180/300 s from first qualifying sample at every supported tick",
+      "scope": "Real satCycleCheckAutoSwitch, stubbed sensors/clock; full loop entry/recovery remains LL-020",
+      "authority": "Q44 A candidate; TASK-1367 only repaired the opposite direction"
+    }
+  ],
+  "missingChecks": [
+    {
+      "id": "LL-010",
+      "status": "unavailable",
+      "description": "Capability veto: MsgID 3 HB4, permitted/forbidden/unknown"
+    },
+    {
+      "id": "LL-011",
+      "status": "unavailable",
+      "description": "Per-ID freshness/invalidity while status replies continue"
+    },
+    {
+      "id": "LL-012",
+      "status": "unavailable",
+      "description": "DHW transitions and post-DHW recovery in the complete loop"
+    },
+    {
+      "id": "LL-013",
+      "status": "unavailable",
+      "description": "Queue full/retry/acknowledgement and actual wire ordering"
+    },
+    {
+      "id": "LL-014",
+      "status": "unavailable",
+      "description": "MaxTset limits throughout hold, refresh and recovery"
+    },
+    {
+      "id": "LL-015",
+      "status": "unavailable",
+      "description": "Heat-pump automatic entry and source-specific recovery"
+    },
+    {
+      "id": "LL-016",
+      "status": "unavailable",
+      "description": "Room control and measured heat/energy performance"
+    },
+    {
+      "id": "LL-017",
+      "status": "unavailable",
+      "description": "Overshoot-protection toggle and mode consistency"
+    },
+    {
+      "id": "LL-018",
+      "status": "unavailable",
+      "description": "No-return-temperature ignition and polling"
+    },
+    {
+      "id": "LL-019",
+      "status": "unavailable",
+      "description": "Phase anchors, start counts and duty ranges"
+    },
+    {
+      "id": "LL-020",
+      "status": "unavailable",
+      "description": "PID details, continuous clamp and independent scheduler integration"
+    },
+    {
+      "id": "LL-021",
+      "status": "unavailable",
+      "description": "Classifier inputs, rule order and mode-switch prerequisites"
+    },
+    {
+      "id": "LL-022",
+      "status": "unavailable",
+      "description": "Telemetry distinguishes intended, queued, acknowledged and measured"
+    },
+    {
+      "id": "LL-023",
+      "status": "unavailable",
+      "description": "Documentation/decision/task consistency and independent review"
+    },
+    {
+      "id": "PH-PIC",
+      "status": "unavailable",
+      "description": "PIC real-boiler timestamped wire and physical flame validation"
+    },
+    {
+      "id": "PH-OTD",
+      "status": "unavailable",
+      "description": "OT-Direct real-boiler timestamped wire and flame validation"
+    },
+    {
+      "id": "PH-FIELD",
+      "status": "unavailable",
+      "description": "Matched field comparison with measured heat/energy and uncertainty"
+    },
+    {
+      "id": "PH-PROFILE",
+      "status": "unavailable",
+      "description": "Approved equipment-specific ON/OFF/minimum-flow limits and targets"
+    }
+  ],
+  "verdict": "blocked",
+  "blockers": [
+    "LL-010: unavailable - Capability veto: MsgID 3 HB4, permitted/forbidden/unknown",
+    "LL-011: unavailable - Per-ID freshness/invalidity while status replies continue",
+    "LL-012: unavailable - DHW transitions and post-DHW recovery in the complete loop",
+    "LL-013: unavailable - Queue full/retry/acknowledgement and actual wire ordering",
+    "LL-014: unavailable - MaxTset limits throughout hold, refresh and recovery",
+    "LL-015: unavailable - Heat-pump automatic entry and source-specific recovery",
+    "LL-016: unavailable - Room control and measured heat/energy performance",
+    "LL-017: unavailable - Overshoot-protection toggle and mode consistency",
+    "LL-018: unavailable - No-return-temperature ignition and polling",
+    "LL-019: unavailable - Phase anchors, start counts and duty ranges",
+    "LL-020: unavailable - PID details, continuous clamp and independent scheduler integration",
+    "LL-021: unavailable - Classifier inputs, rule order and mode-switch prerequisites",
+    "LL-022: unavailable - Telemetry distinguishes intended, queued, acknowledged and measured",
+    "LL-023: unavailable - Documentation/decision/task consistency and independent review",
+    "PH-PIC: unavailable - PIC real-boiler timestamped wire and physical flame validation",
+    "PH-OTD: unavailable - OT-Direct real-boiler timestamped wire and flame validation",
+    "PH-FIELD: unavailable - Matched field comparison with measured heat/energy and uncertainty",
+    "PH-PROFILE: unavailable - Approved equipment-specific ON/OFF/minimum-flow limits and targets",
+    "test_sat_hp_pwm: expectedFailures=1",
+    "LL-001: fail",
+    "LL-002: fail",
+    "LL-003: fail",
+    "LL-004: fail"
+  ],
+  "baselineExecution": "complete",
+  "evidenceLevel": "Host control-path tests only; no physical boiler/efficiency acceptance",
+  "elapsedSeconds": 48.203
+}
