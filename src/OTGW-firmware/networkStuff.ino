@@ -223,6 +223,43 @@ static void printWifiDropBanner()
     wifiDropSelf ? PSTR(", self: dead-link check") : PSTR(""));
 }
 
+// The same link record as printWifiDropBanner(), for /api/v2/device/info
+// (TASK-1434, GH #682): a capture can read it at the end without waiting for a
+// telnet reconnect. Every key is always present; the drop fields stay 0 or
+// empty until the first outage.
+void sendWifiLinkInfoJson()
+{
+  char bssid[18];
+  char reasonName[sizeof(wifiReasonNames[0].name)];
+  const bool dropped = (wifiOutages > 0);
+
+  formatBssid(bssid, sizeof(bssid), wifiJoinedBssid);
+  sendJsonMapEntry(F("wifi_ap_bssid"),              bssid);
+  sendJsonMapEntry(F("wifi_ap_channel"),            (uint32_t)wifiJoinedChannel);
+  sendJsonMapEntry(F("wifi_outages"),               wifiOutages);
+  sendJsonMapEntry(F("wifi_disconnect_events"),     wifiDisconnectEvents);
+
+  if (dropped) formatBssid(bssid, sizeof(bssid), wifiDropBssid);
+  else bssid[0] = '\0';
+  sendJsonMapEntry(F("wifi_drop_bssid"),            bssid);
+  sendJsonMapEntry(F("wifi_drop_channel"),          (uint32_t)(dropped ? wifiDropChannel : 0));
+  sendJsonMapEntry(F("wifi_drop_reason"),           (uint32_t)(dropped ? wifiDropFirstReason : 0));
+  // wifiReasonName() points into flash: copy to RAM before the RAM-string overload.
+  if (dropped) strncpy_P(reasonName, wifiReasonName(wifiDropFirstReason), sizeof(reasonName) - 1);
+  else reasonName[0] = '\0';
+  reasonName[sizeof(reasonName) - 1] = '\0';
+  sendJsonMapEntry(F("wifi_drop_reason_name"),      reasonName);
+  sendJsonMapEntry(F("wifi_drop_last_reason"),      (uint32_t)(dropped ? wifiDropLastReason : 0));
+  if (dropped) strncpy_P(reasonName, wifiReasonName(wifiDropLastReason), sizeof(reasonName) - 1);
+  else reasonName[0] = '\0';
+  reasonName[sizeof(reasonName) - 1] = '\0';
+  sendJsonMapEntry(F("wifi_drop_last_reason_name"), reasonName);
+  sendJsonMapEntry(F("wifi_drop_events"),           (uint32_t)(dropped ? wifiDropEvents : 0));
+  sendJsonMapEntry(F("wifi_drop_down_sec"),         (uint32_t)(dropped ? wifiDropDurationMs / 1000 : 0));
+  sendJsonMapEntry(F("wifi_drop_ago_sec"),          (uint32_t)(dropped ? (millis() - wifiDropStartMs) / 1000 : 0));
+  sendJsonMapEntry(F("wifi_drop_self"),             dropped && wifiDropSelf);
+}
+
 // ADR-099: a WiFi supervisor restart marks the next boot, which then skips the
 // config portal when the saved network is not back yet. While the portal runs,
 // WiFiManager switches the station off, so the gateway could not rejoin an

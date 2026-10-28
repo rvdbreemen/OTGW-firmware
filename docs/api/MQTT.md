@@ -56,6 +56,8 @@ Published at startup, on MQTT (re)connect, and every 5 minutes.
 | `otgw-firmware/reboot_reason` | `"Software/System restart"` | Last reboot reason |
 | `otgw-firmware/uptime` | `"12345"` | Uptime in seconds (not retained) |
 | `otgw-firmware/error` | `"LittleFS mount failed..."` | Error messages (not retained, only when applicable) |
+| `otgw-firmware/command_dropped` | `"TT=22.0"` | A command the PIC did not confirm after 5 tries, published once per drop (not retained). Includes the gateway's own `PR=` readouts. Home Assistant sensor "Last Dropped Command". |
+| `otgw-firmware/command_retry_exceeded` | `"ON"` / `"OFF"` | `ON` after a dropped command, `OFF` again after the next confirmed command that is not a `PR=` readout (retained; republished as `OFF` after a reboot). Home Assistant binary sensor "Command Dropped". The total count is `cmd_dropped` in `/api/v2/device/info`. A drop while MQTT is disconnected is not published afterwards. |
 
 ### PIC Gateway Information
 
@@ -435,6 +437,8 @@ Auto-discovered users on beta.22+ get fresh sibling-suffix configs on the next b
 ### Command Topics
 
 The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` and processes commands published to sub-topics.
+
+Commands go through a queue. A new command replaces one with the same two-letter code that is still waiting (so `TT=20` followed by `TT=21` sends only `TT=21`), except `TP=` commands: each `TP=` is queued behind the others. A command the PIC does not confirm after 5 tries is dropped and reported on `otgw-firmware/command_dropped`.
 
 #### Direct Commands
 

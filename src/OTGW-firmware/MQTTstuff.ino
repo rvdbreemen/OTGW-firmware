@@ -1037,6 +1037,7 @@ void handleMQTT()
         DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
         sendMQTTversioninfo();
         publishAllPICsettings();
+        publishCommandDroppedState();  // TASK-1431: replaces a retained ON left from before a reboot
         publishBoilerUnsupportedMsgids();  // TASK-686: republish the retained CSV so HA/dashboards see it after every reconnect.
         clearBoilerUnsupportedDirty();
         DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
@@ -1665,6 +1666,7 @@ void publishNonOTDiscoveryConfigs()
   setMQTTConfigPending(OTGWpicsettingsid);  // PIC settings
   setMQTTConfigPending(OTGWpiccontrolsid);  // PIC controls: resetgateway button, GPIO/LED selects
   setMQTTConfigPending(OTGWconnstatusid);   // gateway_mode + otgw_connected binary-sensors (faux id 244)
+  setMQTTConfigPending(OTGWcmddropid);      // command_dropped sensor + command_retry_exceeded binary-sensor (faux id 241)
   dripDeviceInfoPending = true;
   MQTTDebugTln(F("MQTT discovery: non-OT configs queued; OT IDs will publish JIT"));
 }

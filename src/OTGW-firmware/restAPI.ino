@@ -1443,6 +1443,10 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("otgwstream_clients"),        (uint32_t)OTGWstream.connectedCount());
   sendJsonMapEntry(F("otgwstream_client_ip"),      streamClientIp);
   sendJsonMapEntry(F("otgwstream_last_refused_ip"), OTGWstream.getLastAttemptIP());
+  // TASK-1431: PIC commands dropped after OTGW_CMD_RETRY tries.
+  sendJsonMapEntry(F("cmd_dropped"),               state.otgw.iCmdDropped);
+  // TASK-1434: WiFi outage count and the last drop, as in the telnet banner.
+  sendWifiLinkInfoJson();
 
   sendEndJsonMap(F("device"));
 

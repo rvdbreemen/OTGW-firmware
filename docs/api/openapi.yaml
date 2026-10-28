@@ -404,6 +404,48 @@ paths:
                         type: boolean
                       otgwsimulation:
                         type: boolean
+                      cmd_dropped:
+                        type: integer
+                        description: PIC commands dropped after 5 unconfirmed tries since boot (see otgw-firmware/command_dropped on MQTT).
+                      wifi_ap_bssid:
+                        type: string
+                        description: Access point the gateway is joined to now.
+                      wifi_ap_channel:
+                        type: integer
+                      wifi_outages:
+                        type: integer
+                        description: WiFi outages since boot. One outage runs from the first disconnect event after a connect to the next connect.
+                      wifi_disconnect_events:
+                        type: integer
+                        description: Every disconnect event since boot (the SDK repeats the event while it retries).
+                      wifi_drop_bssid:
+                        type: string
+                        description: Access point that was left in the last outage; empty before the first outage.
+                      wifi_drop_channel:
+                        type: integer
+                      wifi_drop_reason:
+                        type: integer
+                        description: 802.11 reason code of the first disconnect event of the last outage; 0 before the first outage.
+                      wifi_drop_reason_name:
+                        type: string
+                        description: Name of wifi_drop_reason, e.g. BEACON_TIMEOUT.
+                      wifi_drop_last_reason:
+                        type: integer
+                        description: Reason code of the last disconnect event of the last outage.
+                      wifi_drop_last_reason_name:
+                        type: string
+                      wifi_drop_events:
+                        type: integer
+                        description: Disconnect events in the last outage.
+                      wifi_drop_down_sec:
+                        type: integer
+                        description: How long the last outage lasted, in seconds.
+                      wifi_drop_ago_sec:
+                        type: integer
+                        description: Seconds since the last outage started.
+                      wifi_drop_self:
+                        type: boolean
+                        description: True when the gateway's own dead-link check caused the last outage.
               examples:
                 example:
                   value:

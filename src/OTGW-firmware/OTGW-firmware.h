@@ -280,6 +280,8 @@ struct OTGWProtocol {          // state.otgw — OpenTherm protocol & bus state
   bool bGatewayModeKnown = false;  // was bOTGWgatewaystateKnown
   bool bBoilerState      = false;  // was bOTGWboilerstate — CH/boiler active
   bool bThermostatState  = false;  // was bOTGWthermostatstate
+  uint32_t iCmdDropped    = 0;      // commands dropped after OTGW_CMD_RETRY tries (TASK-1431)
+  bool bCmdRetryExceeded  = false;  // latched by a drop, cleared by the next confirmed non-PR command
 };
 
 struct MQTTRuntimeSection {    // state.mqtt — MQTT broker connection state
@@ -622,6 +624,10 @@ byte      OTGWdhwmeterid     = 243;
 // otgw-pic/temperature_reading sensor. Announced on the first valid PR=E reading,
 // never at boot, so a gateway without a sensor never shows the entity.
 byte      OTGWpictempid      = 242;
+// Dropped-command discovery pseudo-ID (TASK-1431): anchors the
+// otgw-firmware/command_dropped sensor and the otgw-firmware/command_retry_exceeded
+// binary sensor. Must be queued in publishNonOTDiscoveryConfigs() like the others.
+byte      OTGWcmddropid      = 241;
 
 // Cumulative DHW water meter (TASK-1091) — see dhwWaterMeter.ino.
 extern float dhwWaterTotalL;

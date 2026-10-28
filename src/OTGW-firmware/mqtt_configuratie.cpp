@@ -259,6 +259,8 @@ const char ha_lbl_fw_version[]       PROGMEM = "otgw-firmware/version";
 const char ha_lbl_fw_hostname[]      PROGMEM = "otgw-firmware/hostname";
 const char ha_lbl_fw_uptime[]           PROGMEM = "otgw-firmware/uptime";
 const char ha_lbl_fw_unsupported_msgids[] PROGMEM = "otgw-firmware/boiler/unsupported_msgids";
+const char ha_lbl_cmd_dropped[]         PROGMEM = "otgw-firmware/command_dropped";          // TASK-1431
+const char ha_lbl_cmd_retry_exceeded[]  PROGMEM = "otgw-firmware/command_retry_exceeded";   // TASK-1431
 // PIC info labels (TASK-540, faux dataid 249). MQTT_HA_FLAG_IS_PIC_ENTRY auto-prepends "otgw-pic/".
 const char ha_lbl_pic_version[]       PROGMEM = "version";
 const char ha_lbl_pic_deviceid[]      PROGMEM = "deviceid";
@@ -651,9 +653,11 @@ const char ha_name_solar_storage_system_type[] PROGMEM = "solar_storage_system_t
 const char ha_name_gateway_mode[] PROGMEM = "Gateway_Mode";
 const char ha_name_otgw_connected[] PROGMEM = "OTGW_Connected";
 const char ha_name_dhw_water_total[] PROGMEM = "DHW_Water_Total";
+const char ha_name_cmd_dropped[]        PROGMEM = "Last_Dropped_Command";     // TASK-1431
+const char ha_name_cmd_retry_exceeded[] PROGMEM = "Command_Dropped";          // TASK-1431
 const char ha_name_pic_temperature_reading[] PROGMEM = "PIC_Temperature_Reading";  // not "PIC_Temp_Sensor", which is the PR=D setting
 // ========== Sensor array (335 entries) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 337;  // +5 (uptime, unsupported_msgids, ws/mqtt/http_fragskips), +1 (dhw_water_total), +1 (pic temperature_reading)
+const uint16_t MQTT_HA_SENSOR_COUNT = 338;  // +1 (command_dropped, TASK-1431), +5 (uptime, unsupported_msgids, ws/mqtt/http_fragskips), +1 (dhw_water_total), +1 (pic temperature_reading)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1133,10 +1137,13 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     // (handlePRresponse) and gated in markAllMQTTConfigPending(), so a gateway
     // without a sensor, or with the setting off, never shows the entity.
     {242, 0x08, ha_lbl_pic_temperature_reading, ha_name_pic_temperature_reading, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, true},
+    // --- Pseudo-ID 241: last PIC command dropped after 5 tries (TASK-1431) ---
+    // otgw-firmware/command_dropped, published (not retained) on every drop.
+    {241, 0x00, ha_lbl_cmd_dropped, ha_name_cmd_dropped, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::alert_circle, HaEntityCat::diagnostic, true},
 };
 
 // ========== Binary sensor array (53 entries, sorted by id) ==========
-const uint16_t MQTT_HA_BINSENSOR_COUNT = 55;  // +2 (gateway_mode, otgw_connected; faux id 244)
+const uint16_t MQTT_HA_BINSENSOR_COUNT = 56;  // +1 (command_retry_exceeded, faux id 241, TASK-1431), +2 (gateway_mode, otgw_connected; faux id 244)
 
 const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
 //  {id, flags, label, friendlyName, icon, entityCat, enabledByDefault}
@@ -1209,6 +1216,10 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     // so HA's default ON/OFF payloads apply and match.
     {244, 0x08, ha_lbl_gateway_mode,   ha_name_gateway_mode,   HaIcon::lan_connect, HaEntityCat::diagnostic, true},
     {244, 0x08, ha_lbl_otgw_connected, ha_name_otgw_connected, HaIcon::lan_connect, HaEntityCat::diagnostic, true},
+    // --- Pseudo-ID 241: a PIC command was dropped after 5 tries (TASK-1431) ---
+    // otgw-firmware/command_retry_exceeded, retained ON/OFF; ON on a drop, OFF on
+    // the next confirmed command that is not a PR= readout.
+    {241, 0x00, ha_lbl_cmd_retry_exceeded, ha_name_cmd_retry_exceeded, HaIcon::alert_circle, HaEntityCat::diagnostic, true},
 };
 
 // ========== Index arrays (OT ID -> first entry) ==========
@@ -1454,7 +1465,7 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 238
     0xFFFF, // id 239
     0xFFFF, // id 240
-    0xFFFF, // id 241
+    337, // id 241, 1 entry (command_dropped, TASK-1431)
     336, // id 242, 1 entry (pic temperature_reading, TASK-1147)
     335, // id 243, 1 entry (dhw_water_total, TASK-1091)
     0xFFFF, // id 244
@@ -1713,7 +1724,7 @@ const uint16_t PROGMEM mqttHaBinSensorIndex[256] = {
     0xFFFF, // id 238
     0xFFFF, // id 239
     0xFFFF, // id 240
-    0xFFFF, // id 241
+    55,     // id 241, 1 entry (command_retry_exceeded, TASK-1431)
     0xFFFF, // id 242
     0xFFFF, // id 243
     53,     // id 244, 2 entries (gateway_mode, otgw_connected)
@@ -2152,8 +2163,13 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
                                     const HaDiscoveryContext &ctx)
 {
   char label[48];
+  char idLabel[48];
   char friendlyName[80];
   strlcpy_P(label, cfg.label, sizeof(label));
+  // As in composeSensorPayload: a label with a path ('/', TASK-1431) keeps it in
+  // stat_t but not in uniq_id. Every older binary label is already [A-Za-z0-9_-].
+  strlcpy(idLabel, label, sizeof(idLabel));
+  sanitizeHaObjectId(idLabel);
   strlcpy_P(friendlyName, cfg.friendlyName, sizeof(friendlyName));
 
   if (!writeJsonOpen(w)) return false;
@@ -2170,7 +2186,7 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.nodeId)) return false;
   if (!w.writeChar('-')) return false;
-  if (!w.writeRam(label)) return false;
+  if (!w.writeRam(idLabel)) return false;
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 
@@ -2251,6 +2267,7 @@ static bool buildBinSensorDiscoveryTopic(char *dest, size_t destSize,
 {
   char labelBuf[48];
   strlcpy_P(labelBuf, label, sizeof(labelBuf));
+  sanitizeHaObjectId(labelBuf);  // a '/' in the label would add a topic level (TASK-1431)
   int n = snprintf_P(dest, destSize, PSTR("%s/binary_sensor/%s/%s/config"),
                      haPrefix, nodeId, labelBuf);
   return (n > 0 && static_cast<size_t>(n) < destSize);

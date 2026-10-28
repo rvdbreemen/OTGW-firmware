@@ -2981,6 +2981,29 @@ static uint32_t lastSer2netCmdMs = 0 - SER2NET_QUIET_MS;  // expired at boot
 #define OTGW_DELAY_SEND_MS 1000
 #define MAX_QUEUE_MSGSIZE 127
 
+// Dropped-command feedback (TASK-1431). A drop publishes the command once
+// (not retained, nothing to clear) and latches command_retry_exceeded ON
+// (retained) until the next confirmed command. A drop while MQTT is down is
+// not replayed; the counter in /api/v2/device/info still has it.
+void publishCommandDroppedState() {
+  sendMQTTData(F("otgw-firmware/command_retry_exceeded"), CCONOFF(state.otgw.bCmdRetryExceeded), true);
+}
+
+static void reportCommandDropped(const char* cmd) {
+  state.otgw.iCmdDropped++;
+  sendMQTTData(F("otgw-firmware/command_dropped"), cmd, false);
+  if (!state.otgw.bCmdRetryExceeded) {
+    state.otgw.bCmdRetryExceeded = true;
+    publishCommandDroppedState();
+  }
+}
+
+static void clearCommandDropped() {
+  if (!state.otgw.bCmdRetryExceeded) return;
+  state.otgw.bCmdRetryExceeded = false;
+  publishCommandDroppedState();
+}
+
 // Remove entry at index from the command queue, shifting remaining entries down.
 static void removeFromCmdQueue(int index) {
   for (int j = index; j < (cmdQueueSize - 1); j++) {
@@ -3033,7 +3056,9 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
   //check to see if the cmd is in queue
   bool foundcmd = false;
   int8_t insertptr = cmdQueueSize; //set insertptr to next empty slot
-  if (!forceQueue){
+  // TP= commands are never replaced: each one goes behind the others (TASK-1431).
+  const bool appendOnly = forceQueue || (buf[0] == 'T' && buf[1] == 'P');
+  if (!appendOnly){
     char cmd[3];
     memset(cmd, 0, sizeof(cmd));
     memcpy(cmd, buf, 2);
@@ -3133,6 +3158,7 @@ void handleOTGWqueue(){
         OTGWDebugTf(PSTR("CmdQueue: Delete [%d] from queue\r\n"), i);
         snprintf_P(cMsg, sizeof(cMsg), PSTR("%s [dropped]"), cmdqueue[i].cmd);
         sendEventToWebSocket('!', cMsg);
+        reportCommandDropped(cmdqueue[i].cmd);
         removeFromCmdQueue(i);
         i--; // re-check current index after shift
       }
@@ -3185,6 +3211,9 @@ void checkOTGWcmdqueue(const char *buf, unsigned int len){
       OTGWDebugTf(PSTR("CmdQueue: Found cmd [%2s]==>[%d]:[%s]\r\n"), cmd, i, cmdqueue[i].cmd);
         OTGWDebugTf(PSTR("CmdQueue: Found value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd);
         OTGWDebugTf(PSTR("CmdQueue: Remove from queue [%d]:[%s] from queue\r\n"), i, cmdqueue[i].cmd);
+        // PR= readouts run every few seconds on their own, so only a confirmed
+        // command that was sent on purpose clears the dropped flag (TASK-1431).
+        if (!(cmd[0] == 'P' && cmd[1] == 'R')) clearCommandDropped();
         removeFromCmdQueue(i);
         break;
       // } else OTGWDebugTf(PSTR("Error: Did not find value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd); 
