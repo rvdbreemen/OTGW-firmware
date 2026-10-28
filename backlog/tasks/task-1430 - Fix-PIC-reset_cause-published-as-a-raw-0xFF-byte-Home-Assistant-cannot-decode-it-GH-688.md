@@ -3,9 +3,11 @@ id: TASK-1430
 title: >-
   Fix: PIC reset_cause published as a raw 0xFF byte, Home Assistant cannot
   decode it (GH #688)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-28T20:25:00Z'
+updated_date: '2026-10-28T21:05:00Z'
 labels:
   - bug
 dependencies: []
