@@ -133,6 +133,7 @@ SETTINGS_STUB = ("struct SatSettingsStub { float fOvershootMargin = 2.0f; bool b
                  "struct Settings { SatSettingsStub sat; };\nstatic Settings settings;\n")
 
 MAIN = r"""
+static const unsigned CHFLAGS = 0x0100 | 0x02 | 0x08;   // master CH enable + slave CH mode + flame
 static void apply(float flow, unsigned flags, int mode, int pwmOn) {
   g_flow = flow;
   OTcurrentSystemState.Statusflags = (uint16_t)flags;
@@ -142,8 +143,33 @@ static void apply(float flow, unsigned flags, int mode, int pwmOn) {
   state.sat.eControlMode = (SATControlMode)mode;
   state.sat.bPwmFlameRequested = pwmOn != 0;
 }
+// TASK-1409: two CH cycles with a 600 s off gap, run through the real satCycleOnFlameChange()/satCycleSample()
+// and the real satGetWindow4hStats(). Prints what the real code stored after each flame-off.
+static void report(int n) {
+  const SATWindowRecord& w = _win4h[(_win4hHead + SAT_WIN4H_SIZE - 1) % SAT_WIN4H_SIZE];
+  printf("c%d_off_ms=%lu c%d_on_ms=%lu c%d_duty=%.9g count=%d\n", n, (unsigned long)w.offDurationMs, n,
+         (unsigned long)w.onDurationMs, n, (double)state.sat.fDutyRatio, (int)_win4hCount);
+  satGetWindow4hStats();
+  printf("c%d_4h_avg_off_s=%.9g c%d_4h_avg_on_s=%.9g c%d_4h_duty=%.9g c%d_4h_n=%d\n", n,
+         (double)state.sat.f4hAvgOffSec, n, (double)state.sat.f4hAvgOnSec, n, (double)state.sat.f4hDutyRatio,
+         n, (int)state.sat.i4hCycles);
+}
+static int twoCycle() {
+  settings.sat.fOvershootMargin = 2.0f;
+  state.sat.fFinalSetpoint = 50.0f; _sat_requestedSetpoint = 50.0f; state.sat.fPidOutput = 50.0f;
+  printf("init_ema_alpha=%.9g init_duty=%.9g\n", (double)EMA_ALPHA, (double)state.sat.fDutyRatio);
+  for (int n = 1; n <= 2; n++) {
+    if (n == 2) g_ms += 600000;                    // the 600 s off gap (flame off since cycle 1 ended)
+    apply(50.0f, CHFLAGS, 1, 0); satCycleOnFlameChange(true);
+    for (int k = 0; k < 300; k++) { g_ms += 1000; apply(50.0f, CHFLAGS, 1, 0); satCycleSample(); }
+    satCycleOnFlameChange(false);                  // flame off at the last sample's time
+    report(n);
+  }
+  return 0;
+}
 // argv: ctrlSp reqSp onTimeSec idle sim seg...   seg = count:flow:flags:mode:pwmOn
 int main(int argc, char** argv) {
+  if (argc > 1 && strcmp(argv[1], "twocycle") == 0) return twoCycle();
   if (argc < 6) return 2;
   settings.sat.fOvershootMargin = 2.0f;
   const float ctrlSp = (float)atof(argv[1]), reqSp = (float)atof(argv[2]);
@@ -196,9 +222,10 @@ def extract_cycles(src: str) -> str:
                        src, re.M)
     rec = _grab(r"^struct SATCycleRecord\s*\{.*?^\};", src, "struct SATCycleRecord").group(0)
     guards = _grab(r"^void satCycleResetSustainGuards\(\)\s*\{.*?^\}", src, "satCycleResetSustainGuards").group(0)
+    win = _grab(r"^void satGetWindow4hStats\(\)\s*\{.*?^\}", src, "satGetWindow4hStats").group(0)   # TASK-1409
     a = _grab(r"^static float _flowPercentile\(", src, "_flowPercentile").start()
     b = _grab(r"^void satCycleSample\(\)\s*\{.*?^\}", src, "satCycleSample").end()
-    return "\n".join(consts) + "\n" + rec + "\n" + "\n".join(globs) + "\n" + guards + "\n" + src[a:b] + "\n"
+    return "\n".join(consts) + "\n" + rec + "\n" + "\n".join(globs) + "\n" + guards + "\n" + src[a:b] + "\n" + win + "\n"
 
 
 def idle_return_type(sat_src: str) -> str:
@@ -413,6 +440,36 @@ class CycleClassifier(unittest.TestCase):
             self.check("C4b_40s")
         with self.subTest("90 s (HEAD: blanket < 120 s UNCERTAIN)"):
             self.check("C4b_90s")
+
+    def test_task1409_off_gap_and_duty_come_from_the_previous_flame_off_edge(self):
+        """Cycle 1: 300 s on, then 600 s off, cycle 2: 300 s on. The stored off gap of cycle 2 is 600 s and its
+        duty is 300 / 900. HEAD zeroed the gap (flameOffStart was overwritten before use) and gave duty 1.0."""
+        if self.exe is None:
+            self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
+        r = subprocess.run([str(self.exe), "twocycle"], capture_output=True, text=True, timeout=20)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr[-300:])
+        v = dict(tok.split("=") for tok in r.stdout.split())
+        alpha, duty0 = float(v["init_ema_alpha"]), float(v["init_duty"])
+        # Cycle 1 is the first one after init: no previous flame-off edge exists, so the stored gap is 0
+        # (not "time since init") and the duty is on/on = 1.0.
+        self.assertEqual(int(v["c1_off_ms"]), 0, "cycle 1 (first after init) off gap")
+        self.assertAlmostEqual(float(v["c1_duty"]), alpha * 1.0 + (1.0 - alpha) * duty0, places=5,
+                               msg="cycle 1 EMA duty (no previous edge: duty 1.0)")
+        # Cycle 2
+        self.assertEqual(int(v["c2_on_ms"]), 300000, "cycle 2 on time")
+        with self.subTest("stored off gap"):
+            self.assertEqual(int(v["c2_off_ms"]), 600000, "cycle 2 stored off gap (ms)")
+        with self.subTest("per-cycle duty (EMA)"):
+            want = alpha * (300.0 / 900.0) + (1.0 - alpha) * float(v["c1_duty"])
+            self.assertAlmostEqual(float(v["c2_duty"]), want, places=5,
+                                   msg="cycle 2 EMA duty must use 300 s on / 900 s since the previous flame-off")
+        # Rolling 4 h window over both cycles: off 0 + 600 s, on 300 + 300 s.
+        self.assertEqual(int(v["c2_4h_n"]), 2)
+        self.assertAlmostEqual(float(v["c2_4h_avg_on_s"]), 300.0, places=3)
+        with self.subTest("4h average off time"):
+            self.assertAlmostEqual(float(v["c2_4h_avg_off_s"]), (0 + 600) / 2.0, places=3, msg="4h avg off time")
+        with self.subTest("4h duty ratio"):
+            self.assertAlmostEqual(float(v["c2_4h_duty"]), 600.0 / (600.0 + 600.0), places=5, msg="4h duty ratio")
 
     def test_kind_mixed(self):
         _, kind = self.run_case("kind_mixed")

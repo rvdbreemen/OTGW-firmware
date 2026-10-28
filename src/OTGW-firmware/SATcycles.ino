@@ -666,10 +666,12 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
   _ema_longCycleFrac = EMA_ALPHA * (durationSec > 600.0f ? 1.0f : 0.0f)
                      + (1.0f - EMA_ALPHA) * _ema_longCycleFrac;
 
-  // Duty ratio: flame-on time / total time since last cycle
+  // Duty ratio: flame-on time / total time since the previous flame-off edge. _cycle_flameOffStartMs is
+  // already this cycle's own flame-off here, so the previous edge comes from _cycle_lastFlameOffMs
+  // (updated only after the cycle is recorded, TASK-1409).
   float totalTime = durationSec;
-  if (_cycle_flameOffStartMs > 0 && _cycle_flameOnStartMs > _cycle_flameOffStartMs) {
-    totalTime = (float)(millis() - _cycle_flameOffStartMs) / 1000.0f;
+  if (_cycle_lastFlameOffMs > 0 && (int32_t)(_cycle_flameOnStartMs - _cycle_lastFlameOffMs) >= 0) {
+    totalTime = (float)(millis() - _cycle_lastFlameOffMs) / 1000.0f;
   }
   float dutyThis = (totalTime > 0.0f) ? (durationSec / totalTime) : 0.0f;
   if (dutyThis > 1.0f) dutyThis = 1.0f;
@@ -888,8 +890,9 @@ void satCycleOnFlameChange(bool flameOn)
     // Record completed cycle into the rolling 4-hour window (Task #227)
     {
       uint32_t onMs  = now - _cycle_flameOnStartMs;
-      uint32_t offMs = (_cycle_flameOffStartMs > 0 && _cycle_flameOnStartMs > _cycle_flameOffStartMs)
-                       ? (_cycle_flameOnStartMs - _cycle_flameOffStartMs)
+      // The off gap before this cycle: previous flame-off edge to this flame-on (TASK-1409).
+      uint32_t offMs = (_cycle_lastFlameOffMs > 0 && (int32_t)(_cycle_flameOnStartMs - _cycle_lastFlameOffMs) >= 0)
+                       ? (_cycle_flameOnStartMs - _cycle_lastFlameOffMs)
                        : 0;
       float avgDelta = (_cycle_deltasamples > 0)
                        ? (_cycle_sumFlowRetDelta / (float)_cycle_deltasamples)
