@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-22T04:25:00Z'
-updated_date: '2026-10-22T06:16:00Z'
+updated_date: '2026-10-28T20:32:00Z'
 labels:
   - bug
   - wifi
@@ -39,4 +39,6 @@ mrfox7688 (GH #682, 2026-10-21 20:24Z, 1.7.8-beta.2, ASUS RT-AX88U Broadcom, ch 
 - lwIP: ARP_MAXAGE 300 s (the ESP re-ARPs its router every 5 min), DHCP coarse timer 60 s with renewal at T1 = lease/2 (router-dependent: an 18 min lease would give exactly 9 min), SNTP 3600 s, DNS 1 s, IGMP reports only in answer to router queries (router interval, often 125 s).
 - SDK/AP side, not in firmware: beacon/DTIM, WPA group-key rotation (AP setting), AP band-steering/roaming assistant.
 - Not a firmware period. Ruled in/out per item needs the reporter's DHCP lease time and group-key interval; the strict daytime window (09:25-17:38, none at night) argues for something external that runs by day. AC#1 waits for the beta.5 Link/Drop data.
+
+2026-10-28 triage: GH #682 comment 2026-10-22 20:54Z (mrfox7688, first full day on beta.5): banner shows only 2 real WiFi outages in ~16.5 h (reason 7 NOT_ASSOCED roam attic->office node, down 0 s; reason 200 BEACON_TIMEOUT, down 6 s) while ping loss stays ~20%/h on both APs -> associated-but-silent. Dead-link check never past 2/8. 45 of 52 '(1/8)' gaps exactly 9.0 min. 16 Mosquitto disconnects 11:13-17:17. Reporter asks: (1) outage count + last drop record via REST/MQTT (device/info), (2) any 9-min timer in firmware/WiFi stack. New lead: solar inverter + Pocket LAN dongle 40 cm from gateway, active hours roughly match loss window (correlation only). Unanswered on GH.
 <!-- SECTION:NOTES:END -->
