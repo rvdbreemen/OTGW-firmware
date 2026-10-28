@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:43:00Z'
-updated_date: '2026-10-28T19:18:00Z'
+updated_date: '2026-10-28T19:49:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -55,4 +55,6 @@ Verification: LL-003 adapter (scripts/verify_sat_low_load.py:127-171) red on HEA
 2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): TASK-1412.3 dependency removed: decision recorded (entry 42) and LL-003 (scripts/verify_sat_low_load.py:127-171) is its red test in substance; this task must carry its own red/green host test and update the LL-003 adapter. LL-020 (PID/clamp/scheduler, PENDING in 1412.3) absorbs the test later.
 
 2026-10-28 advisor review: open points are SAT control behaviour -> implementation waits for Sergeant D (skill step 4; CLAUDE.md 'an open question blocks the implementation'). Q55 queued in open-questions.md ahead of Q53. The 2026-10-28 'do not resume before approved contract and red tests' note still applies; the graph edge to 1412.3 was removed only because the task carries its own red test (LL-003).
+
+2026-10-28 Q55 answered (entry 111): full thermo-nova; zones get the 60 s timer; the PID steps through hot water, fault, thermal-safe, simmer and valves closed; stops only when SAT is off (OT loss turns SAT off); no room temperature = curve only (entries 38/46), no integration. Unblocked.
 <!-- SECTION:NOTES:END -->

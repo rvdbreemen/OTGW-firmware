@@ -4496,3 +4496,23 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156507933117
 **Compared with the firmware:** the system cap for underfloor is 45 (`SATcontrol.ino:305`), below both the new default and the ceiling; how the user setting replaces that cap is TASK-1373's work (entries 51, 54, 100).
 
 **Task:** TASK-1373. **Open:** the heat-pump default (entry 67 Open, not asked yet); whether SAT writes an unchosen default to the boiler (entry 67 Open, read with entry 100).
+
+## 111. Q55: full thermo-nova for the 60 s PID timer: zones too, the PID keeps stepping when control is skipped; no room temperature keeps the heating curve (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 19:38 UTC, answer to Q55 (msg 1565082574374576272):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565087366996037693
+
+**Quoted:**
+
+> @BlueFlame Bot Q55: Full thermo-nova: zones get the 60 s timer too, and the PID keeps stepping in all of these cases. Only SAT off when OT loss. If no room temperature then continue heating with heating curve only as we previously agreed, so the home will stay warm.
+
+**Settled (option A, with one change):**
+- Zone (area) PIDs get their own 60 s timer, as thermo-nova `area.py:183-190`.
+- The main PID steps on its own 60 s timer (entry 42) also while the control tick skips: hot water, boiler fault, thermal-safe fallback, summer simmer, valves closed.
+- Without a room temperature the heating curve keeps heating, curve only (entries 38 and 46: no P term, P/I/D reset). This replaces "no room temperature stops it" in our option A.
+
+**Interpretation (ours, acted on):** "Only SAT off when OT loss" reads as: the PID stops stepping only when SAT is off, and an OT loss turns SAT off (entry 79: SAT resumes by itself on the first boiler reply). Without a room temperature the PID step does not integrate (there is no error to integrate); the output is curve only as entries 38/46, so the home stays warm.
+
+**Compared with thermo-nova:** zones and the independent timer as thermo-nova (`climate.py:712-716`, `area.py:183-190`); thermo-nova has no fault/fallback/simmer/valves paths, so stepping through them follows its timer model. Room temperature missing: thermo-nova resets the PID on a stale sensor (`climate.py:466-482`); his curve-only rule is entries 38/46.
+
+**Task:** TASK-1368 (unblocked). **Open:** none.
