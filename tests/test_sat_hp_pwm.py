@@ -43,7 +43,7 @@ static void reset() {
   settings = Settings(); state = State(); OTcurrentSystemState = OTSys();
   g_flame = false; g_flow = 50; g_ret = 30; g_due = true; g_hourLimit = false; g_csSent = 0; g_csLast = 0; g_hasOT = true; g_cold = 28.2f;
   _pwm_waitingForFlame = false; _pwm_flameOffHoldSetpoint = 0; _pwm_flameOnMs = 0; _pwm_lastOffTimeMs = 1; _pwm_lastOnTimeMs = 1;
-  _pwm_effectiveBoilerTemp = 0; _pwm_waitForFlameStartMs = 0; _sat_lastControlCS = 0; _sat_thermalSafeActive = false;
+  _pwm_effectiveBoilerTemp = 0; _sat_lastControlCS = 0; _sat_thermalSafeActive = false;
 }
 int main(int argc, char** argv) {
   if (argc < 2) return 2;
@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
     g_source = atoi(argv[2]); settings.sat.iHpCycleSeconds = (uint16_t)atoi(argv[3]); settings.sat.iCyclesPerHour = atoi(argv[4]);
     const float pid = 27.2f + (float)atof(argv[5]) * (50.0f - 27.2f);
     g_flame = false; state.sat.bPwmFlameRequested = false;   // OFF phase
-    g_flameOnStart = g_ms - 4000000UL; g_flameOffStart = g_ms - 3000000UL;  // previous burn: lit 4000 s ago, out 3000 s ago
+    g_flameOnStart = g_ms - 4000000UL; g_flameOffStart = g_ms - 3000000UL; _pwm_lastUpdateMs = g_ms - 3000000UL;  // previous burn: lit 4000 s ago, out 3000 s ago
     satApplyPWM(pid);                                         // tick N: OFF -> ON
     const int startReq = (int)state.sat.bPwmFlameRequested;
     g_ms += 30000UL; satApplyPWM(pid);                        // tick N+1: still no flame (slow ignition / compressor delay)
@@ -72,9 +72,9 @@ int main(int argc, char** argv) {
   state.sat.bPwmFlameRequested = true;
   if (argc > 7) {                                           // an ON phase whose flame lit onAgoSec ago
     const uint32_t ago = (uint32_t)atoi(argv[7]) * 1000UL;
-    g_flameOnStart = g_ms - ago; _pwm_flameOnMs = g_ms - ago;
+    g_flameOnStart = g_ms - ago; _pwm_flameOnMs = g_ms - ago; _pwm_lastUpdateMs = g_ms - ago;   // the phase anchor (pwm.py:188, :205)
   } else {
-    g_flameOnStart = g_ms;                                  // flame edge now: the ON phase does not end in this call
+    g_flameOnStart = g_ms; _pwm_lastUpdateMs = g_ms;        // flame edge now: the ON phase does not end in this call
   }
   satApplyPWM(pid);
   printf("on=%.3f off=%.3f req=%d duty=%.4f\n", _pwm_lastOnTimeMs / 1000.0, _pwm_lastOffTimeMs / 1000.0,
@@ -245,7 +245,6 @@ class SatHeatPumpPwm(unittest.TestCase):
         r = self.run_sc("r3", SRC_GAS, 1800, 4, 0.50)
         self.assertEqual(r["start"], "1", "OFF phase with off time passed did not start ON")
 
-    @unittest.expectedFailure
     def test_r3_on_phase_waits_for_flame(self):
         r = self.run_sc("r3", SRC_GAS, 1800, 4, 0.50)
         self.assertEqual(r["req"], "1", "ON phase ended 30 s after its start, before the flame lit (R3)")

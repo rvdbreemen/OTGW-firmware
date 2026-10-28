@@ -3,10 +3,11 @@ id: TASK-1383
 title: >-
   SAT PWM: start an ON phase only when the mapped ON time is at least 180 s
   (Q38)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T10:39:00Z'
-updated_date: '2026-10-28T06:48:00Z'
+updated_date: '2026-10-28T07:13:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -35,4 +36,6 @@ From TASK-1273. thermo-nova starts ON only when on_time_seconds >= HEATER_STARTU
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
 
 2026-10-28: Q38 A decided (entry 80): start an ON phase only when the mapped ON time is >= 180 s. After or with TASK-1382.
+
+2026-10-28: bundled into the TASK-1382/1380 candidate (advisor review: without the Q38 gate the new ignition wait would fire the burner in range 1 with no flame every 2P). Q38 A recorded as entry 80.
 <!-- SECTION:NOTES:END -->

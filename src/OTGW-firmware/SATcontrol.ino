@@ -806,19 +806,18 @@ void satGetBoilerStatusName(char* buf, size_t bufLen)
 static float    _pwm_effectiveBoilerTemp    = 0.0f;
 static uint32_t _pwm_flameOnMs             = 0;
 static bool     _pwm_waitingForFlame       = false;
-static uint32_t _pwm_waitForFlameStartMs   = 0;    // Timestamp when flame wait began (for 180s timeout)
 static float    _pwm_flameOffHoldSetpoint  = 0.0f;
 static uint32_t _pwm_lastOffTimeMs         = 1;    // Last PWM off-phase duration (ms); 0 = saturation (duty wants continuous ON). Read by the off_time==0 saturation guard.
 static bool     _pwm_idle                  = true; // thermo-nova PWMStatus.IDLE: no ON/OFF phase since the last reset (pwm.py:92, :122-128, :179-180). Read by the cycle classifier (classifier.py:28-29, TASK-1387).
 static uint32_t _pwm_lastOnTimeMs          = 0;    // Last PWM on-phase duration (ms) = Python pwm_state.on_time_seconds. Read by the cycle classifier's SHORT_CYCLING threshold (TASK-891.4 AC#3).
 static bool     _pwm_entryPending          = false; // PWM was just entered (satSetControlMode): the first schedule step starts ON without the off wait, as thermo-nova from IDLE (pwm.py:154-155; entry 43, TASK-1369)
-static uint32_t _pwm_onStartMs             = 0;    // ON phase that started with the flame already burning: its start, from which its ON time counts (pwm.py:162-165, :205-209). 0 = the ON time counts from the ignition
 static bool     _pwm_startCounted          = false; // this ON phase is recorded in the per-hour PWM start counter (TASK-1401); cleared at every OFF->ON edge
-static uint32_t _pwm_offStartMs            = 0;    // millis() of the last ON->OFF edge with the flame burning (thermo-nova _last_update, pwm.py:208); 0 = none
+static uint32_t _pwm_lastUpdateMs          = 0;    // thermo-nova _last_update: the one anchor of both phases. Set at reset (pwm.py:91), at OFF/IDLE->ON (:162), at the first ignition while waiting (:188) and at ON->OFF (:208); the ON time and the off wait count from it (:155, :205; entries 43, 80, 91, 92)
 static float    _sat_requestedSetpoint      = 0.0f;  // Requested setpoint of the last control tick: PID output after the multi-zone block and the solar offset, clamped (thermo-nova requested_setpoint, climate.py:370-394). state.sat.fPidOutput stays the raw PID output.
 static float    _sat_lastControlCS          = 0.0f;  // Control setpoint of the last control tick or refresh (the "previous CS" PWM keeps without an override)
 static bool     _sat_thermalSafeActive      = false; // The thermal safe fallback owns CS: the 3 s PWM refresh stays out
-// Python HEATER_STARTUP_TIMEFRAME: max wait for ignition before giving up
+// Python HEATER_STARTUP_TIMEFRAME 180 s (pwm.py const): the ignition wait at the start of an ON phase before the
+// ON timer runs anyway, the minimum flame-on hold, and the start-up EMA window. Nothing aborts the phase.
 static const uint32_t PWM_IGNITION_TIMEOUT_MS = 180000UL; // 180s ignition timeout
 
 // Flame-off hold setpoint of the PWM ON phase (thermo-nova flame_off_hold_setpoint): return
@@ -850,9 +849,9 @@ static bool satPwmHoldElapsed()
 
 // Record the current ON phase once in the per-hour PWM start counter (TASK-1401, entry 59, pwm.py:159-160).
 // Called when the phase has a burning flame: at its start when the flame already burns, else at its first
-// flame in the phase (normally its ignition; a flame lit by hot water during a requested ON phase counts the
-// same way, as in thermo-nova, pwm.py:186-193). An ON phase that ends without a flame (the expiry timed from
-// an older flame-on, or the 180 s ignition abort) is not counted, so those restarts cannot use up the limit.
+// flame in the phase (normally its ignition). Today the first flame counts whatever lit it, a hot-water flame
+// included; entry 89 (Q48) decides a hot-water flame must not count, and TASK-1421 makes that change.
+// An ON phase that never sees a flame is not counted.
 static void satPwmCountStart()
 {
   if (_pwm_startCounted) return;
@@ -861,39 +860,34 @@ static void satPwmCountStart()
 }
 
 // OFF->ON: start a new ON phase (thermo-nova pwm.py:160-167). Used by the OFF branch of the state machine and
-// by duty range 5, so both anchor the phase the same way. With the flame already burning the phase is counted
-// now, its ON time and start-up window count from now and BT is reseeded from the live flow (TASK-1273); with
-// the flame off it waits for ignition (180 s, Task #208) and is counted at its first flame.
+// by duty range 5, so both anchor the phase the same way. The phase is timed from now (_last_update, pwm.py:162;
+// entries 80, 91, 92). With the flame already burning the phase is counted now, its start-up window counts from
+// now and BT is reseeded from the live flow (TASK-1273); with the flame off it waits for ignition (up to 180 s,
+// pwm.py:186-199) and is counted at its first flame.
 static void satPwmBeginOn(bool flame, float boilerTemp)
 {
   state.sat.bPwmFlameRequested = true;
-  _pwm_offStartMs   = 0;
+  _pwm_lastUpdateMs = millis();
   _pwm_startCounted = false;
   if (flame) {
     satPwmCountStart();
     _pwm_waitingForFlame = false;
-    _pwm_waitForFlameStartMs = 0;
-    _pwm_flameOnMs = millis();
-    _pwm_onStartMs = _pwm_flameOnMs;
+    _pwm_flameOnMs = _pwm_lastUpdateMs;
     _pwm_effectiveBoilerTemp = boilerTemp;
   } else {
     _pwm_waitingForFlame = true;
-    _pwm_waitForFlameStartMs = millis();
     _pwm_flameOnMs = 0;                   // no ignition yet in this ON phase (pwm.py:164)
-    _pwm_onStartMs = 0;
   }
 }
 
-// ON->OFF (pwm.py:205-209): the ignition anchor goes with the phase. With the flame still burning at this edge
-// the OFF phase is also timed from now (thermo-nova _last_update, pwm.py:208), for the lag check in the OFF
-// branch. A phase that ends without a flame keeps the off wait timed from the flame-off only (the Q35 path).
-static void satPwmEndOn(bool flame)
+// ON->OFF (pwm.py:205-209): the ignition anchor goes with the phase and the off wait is timed from this edge
+// (_last_update, pwm.py:208), whatever the boiler flame did before or since (entries 91, 92).
+static void satPwmEndOn()
 {
   state.sat.bPwmFlameRequested = false;
   _pwm_flameOffHoldSetpoint = 0.0f;
   _pwm_flameOnMs = 0;
-  _pwm_onStartMs = 0;
-  _pwm_offStartMs = flame ? millis() : 0;
+  _pwm_lastUpdateMs = millis();
 }
 
 // PWM schedule: duty cycle and the ON/OFF phase state machine. It only moves state
@@ -945,6 +939,12 @@ static void satPwmSchedule(float pidOutput)
   uint32_t upperMs   = satGetPwmPeriodSec() * 1000UL;  // period (pwm.py:54): e.g. 900 s at 4 cycles/hr, 1800/2400 s heat pump
   uint32_t maxMs     = upperMs * 2;                      // Max cycle time (pwm.py:55)
 
+  // A first flame that appears after the ignition wait timed out still anchors the start-up window
+  // (pwm.py:144-146 `_flame_on_at is None`); it does not move _last_update.
+  if (flame && state.sat.bPwmFlameRequested && !_pwm_waitingForFlame && _pwm_flameOnMs == 0) {
+    _pwm_flameOnMs = millis();
+  }
+
   // --- Effective temperature: EMA 0.3/0.7 for HEATER_STARTUP_TIMEFRAME (180 s) after flame-on
   // (pwm.py:148-149; Sergeant D confirmed 180 s on 2026-10-22). After the window the value is held.
   if (flame && !_pwm_waitingForFlame && _pwm_flameOnMs != 0) {
@@ -954,19 +954,16 @@ static void satPwmSchedule(float pidOutput)
     }
   }
 
-  // --- Flame sync (pwm.py:186-193): the first ignition of this ON phase anchors the start-up
-  // window and reseeds BT from the live flow; a relight after a mid-phase flame-out does neither ---
+  // --- Flame sync (pwm.py:186-193): the first ignition of this ON phase moves _last_update and the
+  // start-up window to now and reseeds BT from the live flow. A relight after a mid-phase flame-out
+  // keeps all of it (pwm.py:144-146): there is no second wait ---
+  bool syncedNow = false;
   if (flame && _pwm_waitingForFlame) {
     _pwm_waitingForFlame = false;
-    _pwm_waitForFlameStartMs = 0;  // Clear ignition timeout on successful ignition
-    if (_pwm_flameOnMs == 0) {
-      _pwm_flameOnMs = millis();
-      _pwm_effectiveBoilerTemp = boilerTemp;
-    }
-  }
-  if (!flame && !_pwm_waitingForFlame && state.sat.bPwmFlameRequested) {
-    _pwm_waitingForFlame = true;
-    _pwm_waitForFlameStartMs = millis();  // Start ignition timeout timer
+    _pwm_lastUpdateMs = millis();
+    _pwm_flameOnMs = _pwm_lastUpdateMs;
+    _pwm_effectiveBoilerTemp = boilerTemp;
+    syncedNow = true;
   }
   if (flame && state.sat.bPwmFlameRequested) satPwmCountStart();   // first flame of this ON phase (TASK-1401)
 
@@ -1018,44 +1015,36 @@ static void satPwmSchedule(float pidOutput)
   _pwm_lastOffTimeMs = offTimeMs;   // record for the off_time==0 saturation guard (Python pwm off_time)
   _pwm_lastOnTimeMs  = onTimeMs;    // record for the cycle-classifier SHORT threshold (Python pwm on_time, TASK-891.4)
 
-  // --- PWM state machine (ON/OFF phase, ignition timeout, cycle limit) ---
-  // The ON time counts from the ignition (cycle tracker flame-on), or from the ON start when the flame was
-  // already burning then (pwm.py:162-165, :205-209), so a burner kept on at the start is not cut at once.
-  const uint32_t onAnchorMs = (_pwm_onStartMs != 0) ? _pwm_onStartMs : satCycleGetFlameOnStartMs();
-  uint32_t sinceFlameStart = millis() - onAnchorMs;
+  // --- PWM state machine (ON/OFF phase) ---
+  // Both phases count from the one anchor _pwm_lastUpdateMs (thermo-nova _last_update).
+  const uint32_t elapsedMs = millis() - _pwm_lastUpdateMs;
   if (state.sat.bPwmFlameRequested) {
-    // ON phase
-    if (sinceFlameStart >= onTimeMs && sinceFlameStart >= minOnMs) {
-      // ON time expired: switch to OFF; the ignition anchor is cleared (pwm.py:205-209)
-      satPwmEndOn(flame);
+    // ON phase (pwm.py:182-209)
+    if (syncedNow) return;                 // synced to the ignition this step (pwm.py:187-193)
+    if (_pwm_waitingForFlame) {
+      // Waiting for ignition: the phase stays up to HEATER_STARTUP_TIMEFRAME 180 s from its start, then the
+      // timer runs anyway; no abort (pwm.py:194-199; entry 80, Q35 A).
+      if (elapsedMs < PWM_IGNITION_TIMEOUT_MS) return;
+      _pwm_waitingForFlame = false;
+      SATDebugTln(F("SAT PWM: no flame within 180s, starting the ON timer anyway"));
+    }
+    // Minimum flame-on hold, 180 s from the first flame of the phase (pwm.py:201-203)
+    if (_pwm_flameOnMs != 0 && (millis() - _pwm_flameOnMs) < PWM_IGNITION_TIMEOUT_MS) return;
+    if (elapsedMs >= onTimeMs) {
+      // ON time expired: switch to OFF (pwm.py:205-209)
+      satPwmEndOn();
       return;
     }
-    // Waiting for flame: 180s ignition timeout (Python HEATER_STARTUP_TIMEFRAME): if boiler fails to
-    // ignite, give up and switch to OFF phase, matching Python pwm.py:194-202 behavior.
-    if (_pwm_waitingForFlame &&
-        _pwm_waitForFlameStartMs > 0 &&
-        (millis() - _pwm_waitForFlameStartMs) >= PWM_IGNITION_TIMEOUT_MS) {
-      SATDebugTln(F("SAT PWM: ignition timeout (180s), aborting ON phase"));
-      _pwm_waitingForFlame = false;
-      _pwm_waitForFlameStartMs = 0;
-      satPwmEndOn(flame);                   // ON->OFF: the ignition anchor goes with the phase (pwm.py:206)
-    }
   } else {
-    // OFF phase: clear hold setpoint, wait for off duration then restart
+    // OFF phase: clear hold setpoint, wait for the off duration from the ON->OFF switch, then restart
+    // (pwm.py:154-155). The boiler's own flame-off (hot water included) does not move the anchor (entries 91, 92).
     _pwm_flameOffHoldSetpoint = 0.0f;
-    uint32_t sinceFlameOff = millis() - satCycleGetFlameOffStartMs();
-    // Flame burning at the ON->OFF edge and still lit now (slow burner stop, CS queue or PIC latency): the last
-    // flame-off is from before that ON phase, so the off wait counts from the ON->OFF edge instead, as
-    // thermo-nova times OFF from _last_update (pwm.py:155, :208). Otherwise the wait stays timed from the flame-off.
-    if (flame && _pwm_offStartMs != 0) {
-      const uint32_t sinceOffStart = millis() - _pwm_offStartMs;
-      if (sinceOffStart < sinceFlameOff) sinceFlameOff = sinceOffStart;
-    }
     // Entry 43 (TASK-1369): the first phase after PWM is entered is ON at once, as thermo-nova starts ON from
     // IDLE without the off wait, when the ON time is at least HEATER_STARTUP_TIMEFRAME 180 s (pwm.py:154-155,
     // const.py:18). Otherwise this step falls back to the OFF wait (pwm.py:179-180).
     const bool entryOn = entry && onTimeMs >= minOnMs;
-    if (entryOn || sinceFlameOff >= offTimeMs) {
+    // The ON time must also reach HEATER_STARTUP_TIMEFRAME 180 s (pwm.py:155; Q38, TASK-1383).
+    if (onTimeMs >= minOnMs && (entryOn || elapsedMs >= offTimeMs)) {
       // Per-hour start limit (Task #203, entry 59): suppress a new ON phase once the rolling hour holds
       // cycles-per-hour PWM starts. Maintainer decision 2026-10-26 (provisional, Q48): the ON phase at PWM
       // entry with the burner already burning counts but is never blocked, so the burner is not cut.
@@ -1155,11 +1144,9 @@ void satPwmReset()
 {
   state.sat.bPwmFlameRequested = false;
   _pwm_entryPending           = false;
-  _pwm_onStartMs              = 0;
   _pwm_startCounted           = false;
-  _pwm_offStartMs             = 0;
+  _pwm_lastUpdateMs           = millis();   // pwm.reset(): _last_update = timestamp() (pwm.py:91)
   _pwm_waitingForFlame        = false;
-  _pwm_waitForFlameStartMs    = 0;
   _pwm_flameOnMs              = 0;
   _pwm_flameOffHoldSetpoint   = 0.0f;
   _pwm_lastOffTimeMs          = 1;
@@ -5113,6 +5100,8 @@ static void satControlLoopRun()
     return;
   }
   _sat_prevDhwActive = false;
+  // The branch above returns before satPwmSchedule(), so the PWM phase clock does not run during hot water.
+  // thermo-nova keeps updating it (heating_control.py:202-215); TASK-1422 tracks the difference.
 
   // --- Read inputs (staleness is checked inside these functions) ---
   float roomTemp = satGetRoomTemp();

@@ -3,10 +3,11 @@ id: TASK-1380
 title: >-
   SAT PWM: time the OFF phase from PWM's own ON->OFF switch, not from the last
   boiler flame-off (audit #59)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T10:14:00Z'
-updated_date: '2026-10-28T06:48:00Z'
+updated_date: '2026-10-28T07:10:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -27,7 +28,7 @@ thermo-nova times the OFF phase from its own ON->OFF transition (pwm.py:208); ho
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 OFF phase timed from PWM's own ON->OFF switch; a DHW flame edge during OFF does not move it (host test red on HEAD, green on fix)
-- [ ] #2 Sergeant D's OK recorded (Q35 or a follow-up) before implementation
+- [x] #2 Sergeant D's OK recorded (Q35 or a follow-up) before implementation
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -36,4 +37,6 @@ thermo-nova times the OFF phase from its own ON->OFF transition (pwm.py:208); ho
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
 
 2026-10-28: Field reproduction (entry 92, gruijter alpha.514 capture 20261027-093222.zip): OFF wait counted from the last flame-off incl. hot water (SATcontrol.ino:1046, SATcycles.ino:786-789); five draws 12:26-12:48 CET delayed CH ~23.5 min (ON 12:57:54 vs ~12:34:24). thermo-nova times OFF from _last_update (pwm.py:134,:155,:208). Q51 A (entry 91) + scope question Q51b. Proof: replay these draws old vs fix.
+
+AC#2: Sergeant D's OK recorded: entry 43 (OFF wait from flame-off is not the design) + entry 80 (Q35 A) + entry 91 (Q51 A); field reproduction entry 92.
 <!-- SECTION:NOTES:END -->

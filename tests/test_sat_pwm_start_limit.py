@@ -162,8 +162,8 @@ int main(int argc, char** argv) {
     edge(true); g_ms += 300000UL; edge(false); g_ms += 1000000UL;   // an older burn: on 410 s / off 790 s both passed
     g_pid = 35.0f;                           // duty 0.342: range 3, on 410 s, off 790 s
     int restarts = 0;
-    for (int i = 0; i < 6; i++) { const int was = req(); step(); if (!was && req()) restarts++; g_ms += 30000UL; }
-    edge(true); step();                      // ignition after 180 s
+    for (int i = 0; i < 50; i++) { const int was = req(); step(); if (!was && req()) restarts++; g_ms += 30000UL; }   // TASK-1382: no abort at 180 s (pwm.py:194-199), the flameless ON phase ends at its ON time (410 s), OFF 790 s from that switch (pwm.py:155, :208), then the next ON start: 2 flameless starts in 1500 s
+    edge(true); step();                      // ignition of the second phase
     const unsigned c1 = cnt();
     for (int i = 0; i < 400 && req(); i++) { g_ms += 30000UL; step(); }
     g_ms += 5000UL; edge(false); g_pid = PID_OFF;
@@ -410,8 +410,7 @@ class SatPwmStartLimit(unittest.TestCase):
         self.assertEqual(r["lit"], "1", "range-5 ON phase not counted at its ignition: %r" % r)
         self.assertEqual(r["later"], "1", "a relight inside the range-5 ON phase was counted: %r" % r)
 
-    # Regression guard for the counting point: ON starts that end before ignition (the expiry timed from an older
-    # flame-on, R3 / Q35, or the 180 s ignition abort) must not use up the hourly limit. Red on HEAD (it counts the
+    # Regression guard for the counting point: ON starts that end before ignition (R3 / Q35: flameless ON phases that end at their ON time) must not use up the hourly limit. Red on HEAD (it counts the
     # setup burn's flame edge: count=2 more=1), red on a variant that counts at the ON start (count=3 more=0), green on the fix.
     def test_slow_ignition_restarts_do_not_use_up_the_limit(self):
         r = self.run_sc("slow")
