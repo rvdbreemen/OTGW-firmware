@@ -68,7 +68,7 @@ struct OTSys { int SlaveStatus = 0; };
 static Settings settings; static State state; static OTSys OTcurrentSystemState;
 static bool satIsEnabled() { return settings.sat.bEnabled; }   // TASK-1345
 static uint32_t g_ms = 1000000; static bool g_flame = false; static float g_flow = 33, g_ret = 30;
-static uint32_t g_flameOnStart = 0, g_flameOffStart = 0; static bool g_due = true; static bool g_hourLimit = false;
+static uint32_t g_flameOnStart = 0, g_flameOffStart = 0; static bool g_due = true; static bool g_hourLimit = false; static int g_pwmStarts = 0;
 static int g_csSent = 0; static float g_csLast = 0;
 static uint32_t millis() { return g_ms; }
 static bool satIsFlameOn() { return g_flame; }
@@ -87,7 +87,7 @@ static uint32_t satGetPwmPeriodSec() { return 3600 / satGetMaxCyclesPerHour(); }
 static uint32_t satCycleGetFlameOnStartMs() { return g_flameOnStart; }
 static uint32_t satCycleGetFlameOffStartMs() { return g_flameOffStart; }
 static bool satCycleIsHourLimitReached() { return g_hourLimit; }
-static void satCycleRecordPwmStart() { }                           // TASK-1401 (the ring itself: tests/test_sat_pwm_start_limit.py)
+static void satCycleRecordPwmStart() { g_pwmStarts++; }             // counts the calls (TASK-1421; the ring itself: tests/test_sat_pwm_start_limit.py)
 static bool g_hasOT = true;
 static bool hasOTCommandInterface() { return g_hasOT; }
 static bool satEnqueueIfChangedCS(float cs) { g_csSent++; g_csLast = cs; return true; }

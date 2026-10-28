@@ -307,8 +307,8 @@ static uint8_t _hourCountGet(uint32_t nowMs)
 }
 
 // Public: record a PWM ON-phase start, once per ON phase (OFF->ON, duty range 5, the ON phase at PWM
-// entry), when that phase has a burning flame (satPwmCountStart() in SATcontrol.ino). The only writer of
-// the ring (TASK-1401, Sergeant D entry 59, pwm.py:159-160).
+// entry), at the start, lit or not (satPwmBeginOn() in SATcontrol.ino); a flame edge never adds a count. The only writer
+// of the ring (Sergeant D entries 59, 90, 95, pwm.py:159-160).
 void satCycleRecordPwmStart()
 {
   uint32_t nowMs = millis();

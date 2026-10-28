@@ -404,19 +404,21 @@ class SatPwmStartLimit(unittest.TestCase):
         self.assertEqual(r["start"], "1", "range-5 ON start not counted as a PWM ON start: %r" % r)
         self.assertEqual(r["later"], "1", "range-5 ON phase counted more than once: %r" % r)
 
-    def test_c_range5_on_start_counts_at_ignition_and_not_at_a_relight(self):
+    def test_c_range5_on_start_counts_at_the_start_not_at_ignition_or_relight(self):
         r = self.run_sc("range5")
-        self.assertEqual((r["req"], r["start"]), ("1", "0"), r)   # no flame yet: not counted at the start tick
-        self.assertEqual(r["lit"], "1", "range-5 ON phase not counted at its ignition: %r" % r)
+        # TASK-1421, entry 90 (pwm.py:160): the start counts at the ON start, lit or not; the ignition adds nothing.
+        # Before: start=0 (counted only at the ignition, lit=1). Now: start=1, lit=1.
+        self.assertEqual((r["req"], r["start"]), ("1", "1"), r)   # counted at the start tick although no flame burns yet
+        self.assertEqual(r["lit"], "1", "range-5 ON phase: the ignition added a count: %r" % r)
         self.assertEqual(r["later"], "1", "a relight inside the range-5 ON phase was counted: %r" % r)
 
-    # Regression guard for the counting point: ON starts that end before ignition (R3 / Q35: flameless ON phases that end at their ON time) must not use up the hourly limit. Red on HEAD (it counts the
-    # setup burn's flame edge: count=2 more=1), red on a variant that counts at the ON start (count=3 more=0), green on the fix.
-    def test_slow_ignition_restarts_do_not_use_up_the_limit(self):
+    # TASK-1421, entry 90 (Q49 B, pwm.py:159-160): every ON start counts, lit or not, so flameless ON restarts (R3 / Q35: phases that
+    # end at their ON time) do use up the hourly limit. Before (first-flame counting): count=1 more=2. Now: count=2 more=1 (cph 3).
+    def test_flameless_on_restarts_count_against_the_limit(self):
         r = self.run_sc("slow")
         self.assertGreaterEqual(int(r["restarts"]), 2, "scenario did not reproduce the restarts before ignition: %r" % r)
-        self.assertEqual(r["count"], "1", "ON restarts before ignition were counted: %r" % r)
-        self.assertEqual(r["more"], "2", "later PWM starts blocked after a slow ignition: %r" % r)
+        self.assertEqual(r["count"], "2", "flameless ON starts were not counted: %r" % r)
+        self.assertEqual(r["more"], "1", "the 2 flameless starts did not use up the hourly limit: %r" % r)
         self.assertEqual(r["after"], "3", r)
 
     # (d) TASK-1369: continuous -> PWM with the burner on: first phase ON, no CS=10 cut, counted, lasts its ON time
@@ -461,7 +463,8 @@ class SatPwmStartLimit(unittest.TestCase):
     def test_entry_with_flame_off_starts_on_without_the_off_wait(self):
         r = self.run_sc("entryfresh")
         self.assertEqual(r["req"], "1", "entry with the flame off waited for the off time: %r" % r)
-        self.assertEqual((r["count"], r["lit"]), ("0", "1"), "entry ON phase not counted once at its ignition: %r" % r)
+        # TASK-1421, entry 90: counted at the entry ON start (count=1), the ignition adds nothing. Before: count=0, lit=1.
+        self.assertEqual((r["count"], r["lit"]), ("1", "1"), "entry ON phase not counted once at its start: %r" % r)
 
     def test_entry_with_on_time_below_180s_does_not_start(self):
         r = self.run_sc("entrylow")             # pwm.py:155: on_time_seconds >= HEATER_STARTUP_TIMEFRAME

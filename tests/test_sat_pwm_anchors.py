@@ -88,6 +88,7 @@ int main() {
     _sat_lastControlCS = cs;
     printf("T %d %d %.1f %d\n", sec, (int)state.sat.bPwmFlameRequested, cs, (int)g_flame);
   }
+  fprintf(stderr, "C %d\n", g_pwmStarts);          // satCycleRecordPwmStart() calls = PWM starts counted (TASK-1421)
   return 0;
 }
 """
@@ -128,6 +129,14 @@ class SatPwmAnchors(unittest.TestCase):
     def setUp(self):
         if not self.exe:
             self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
+
+    def starts(self, cph, ratio, init, events, dur):
+        """Number of satCycleRecordPwmStart() calls (PWM starts counted) and the timeline of the same run."""
+        lines = [f"cfg {cph} {ratio}", f"init {init}", f"run {dur}"]
+        lines += [f"ev {s} {k} {v}" for s, k, v in sorted(events)]
+        r = subprocess.run([str(self.exe)], input="\n".join(lines) + "\n", capture_output=True, text=True, check=True)
+        n = [int(ln.split()[1]) for ln in r.stderr.splitlines() if ln.startswith("C ")][0]
+        return n, self.sim(cph, ratio, init, events, dur)
 
     def sim(self, cph, ratio, init, events, dur):
         lines = [f"cfg {cph} {ratio}", f"init {init}", f"run {dur}"]
@@ -256,6 +265,39 @@ class SatPwmAnchors(unittest.TestCase):
 
     def test_d8_late_ignition_keeps_on_until_180_s_after_flame_on(self):
         self._late_ignition(240, "D8 first flame at +240")
+
+    # TASK-1421 (entries 59, 89, 90, 95; pwm.py:159-160): a start counts at the ON start, no flame counts ------
+    def test_e1_unlit_on_start_counts_once(self):
+        # Red on HEAD (the count waited for a first flame). duty 0.5 -> on 600 s; the flame never lights; the ON phase
+        # runs to 600 s and ends. Exactly the one ON start is counted (run ends before the next ON at 1200 s).
+        n, tl = self.starts(3, 0.5, "cold", [], 900)
+        ons, _ = tl.edges()
+        self.assertEqual(ons, [0], tl.dump(60))
+        self.assertEqual(n, 1, f"an ON start whose flame never lights must count once, got {n}")
+
+    def test_e2_ch_ignition_and_relight_inside_on_add_no_count(self):
+        # Characterization (green on HEAD: one count per phase there as well, taken at the first flame). Unlit start,
+        # CH ignition at +60, flame-out at +200, relight at +300, inside one 600 s ON phase: exactly 1 count.
+        n, tl = self.starts(3, 0.5, "cold", [(60, "flame", 1), (200, "flame", 0), (300, "flame", 1)], 900)
+        self.assertEqual(tl.edges()[0], [0], tl.dump(60))
+        self.assertEqual(n, 1, f"CH ignition and relight must not add a count, got {n}")
+
+    def test_e3_hot_water_flame_inside_on_adds_no_count(self):
+        # Characterization (green on HEAD: the start was already counted at its lit start). Burning start at 0, then a
+        # hot-water draw (DHW bit + flame off/on) at +100..+160 skips the PWM tick as the control loop does: still 1.
+        ev = [(100, "flame", 0), (105, "dhw", 1), (110, "flame", 1), (160, "flame", 0), (160, "dhw", 0)]
+        n, tl = self.starts(3, 0.5, "burning", ev, 900)
+        self.assertEqual(tl.edges()[0], [0], tl.dump(60))
+        self.assertEqual(n, 1, f"a hot-water flame must not add a count, got {n}")
+
+    def test_e4_on_start_at_the_end_of_a_draw_with_flame_lit_counts_one(self):
+        # Characterization of the entry 101 interpretation (Q52 D, put to Sergeant D): an ON start on the tick where the
+        # DHW bit just dropped, flame still lit, counts as a normal start. Burning start at 0 (count 1), ON to 600, OFF
+        # to 1200; draw 1190..1215 with the flame lit; the first tick after it (1230) starts the next ON and adds exactly 1 (total 2, as without the draw).
+        base, _ = self.starts(3, 0.5, "burning", [], 1500)
+        n, tl = self.starts(3, 0.5, "burning", [(1190, "dhw", 1), (1215, "dhw", 0)], 1500)
+        self.assertEqual(tl.edges()[0], [0, 1230], tl.dump(1300))
+        self.assertEqual((base, n), (2, 2), f"the ON start after a draw must count exactly 1, got base={base} n={n}")
 
 
 if __name__ == "__main__":

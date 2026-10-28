@@ -4327,3 +4327,17 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156491864733
 **Changes an earlier entry:** clarifies entry 48's "MsgID 57 values (Lower/Higher)": the bounds come from MsgID 49, the value is MsgID 57.
 
 **Task:** TASK-1373. **Open:** Q15b (underfloor default 55 against the 50 C ceiling, heat-pump default), queued.
+
+## 101. Interpretation: an ON start right after a hot-water draw counts as a normal start (2026-10-28, our reading, asked as Q52 D)
+
+**Source:** no new statement. This records the reading TASK-1421 acts on, after review found that entry 89 (our interpretation text, "Interaction with Q49 = B") called an ON start right after a draw, with the hot-water flame still lit, "exactly the case to exclude", while entry 95 settled the rule differently.
+
+**His words (entries 90, 95):** Q49 B "count at the ON start, every start" (`pwm.py:160`), and Q48b "Do not count the flame when the Boiler DHW is active."
+
+**Reading acted on (ours):** the hourly limit counts ON starts, not flames. No ON start can happen while the boiler DHW-active bit is set, because the PWM schedule does not run during a draw (`SATcontrol.ino` DHW early return). So no flame is ever counted, and "do not count the flame when DHW is active" holds. An ON start that happens at the first tick after a draw, with the flame still burning from hot water, is a normal ON start and counts once. He wrote that the flame will probably be off by then (entry 95).
+
+**Replaces:** the exclusion sentence in entry 89's "Interaction with Q49 = B" paragraph, which was our interpretation, not his words. Entry 89 itself is not rewritten.
+
+**Compared with thermo-nova:** the same: `pwm.py:160` counts every ON start, whatever the flame.
+
+**Task:** TASK-1421 (implemented this way). **Open:** asked as Q52 D together with the TASK-1422 details.
