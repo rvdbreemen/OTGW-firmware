@@ -8,7 +8,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-28T06:47:00Z'
-updated_date: '2026-10-28T19:14:00Z'
+updated_date: '2026-10-28T22:18:00Z'
 labels:
   - sat
   - sergeant-d
@@ -63,6 +63,8 @@ Verification: host tests calling the real extracted functions (tests/test_sat_ov
 2026-10-28 review round 1. Opus correctness: HIGH - timerSATControl runs SKIP_MISSED_TICKS (initSAT CHANGE_INTERVAL_SEC without type, SATcontrol.ino:4277, settingStuff.ino:1005, safeTimers.h:96), so due-interval == millis(); there is no catch-up grid. Verified by me (grep + safeTimers.h). Decision (A, no behaviour change): keep SKIP, tick time = millis() once per tick; under SKIP ticks are never closer than one interval, so the timers already fire on the first tick >= their length after the first sample (Q46 B outcome). Recorded as entry 109; Q46c withdrawn; Q46 premise corrected. B (switch to catch-up) rejected: it would add CS/MM/CH bursts after a stall for no gain. Also fixed in this round: DHW sentinel false guard before millis wrap (bool flag), stale docs (rules review), loop-level switch-tick test. Filed TASK-1428 (flow validity, thermo-nova :284-286, :333-335) and TASK-1429 (DHW guard sub-tick draws / real end time).
 
 2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): TASK-1412.3 dependency removed: the task is Done with its own red/green host tests (same waiver as TASK-1419); TASK-1412.3 absorbs them into LL-004/LL-020.
+
+2026-10-28 bench old vs new on the Classic+S3 (.63), replayed boiler, old = alpha.519+49135fe (same SAT code as alpha.520 for gas), new = alpha.521+2425108, overshoot margin 3.0 (bench value, not the decided default 2.0). Logs: %TEMP%\otgw-bench-1420\{A_519,C_521}. Raw lines checked by the main session. S13 overshoot: old 'sustained overshoot (flow=41.6 > sp=34.6 + 3.0)' 20:55:47, CS still continuous, 'PWM ON' one tick later 20:56:17; new '(flow=41.6 >= sp=35.6 + 3.0)' 22:22:51.194 with 'PWM ON' and cmd[CS=40.6] on the same tick. Underheat: old 150.05 s after the first qualifying tick (20:56:47 -> 20:59:17), new 180.02 s (22:23:51 -> 22:26:51). S4 saturation: old 270.13 s, new 300.03 s after the PWM ON with pwm_off=0. S2 hot-water guard: old switch 90 s after the last DHW tick (guard never arms), new 360.1 s (300 s guard + 60 s). Not shown on the bench: equality boundaries, jitter, skip paths, the exits guard (entry 108); host tests only.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

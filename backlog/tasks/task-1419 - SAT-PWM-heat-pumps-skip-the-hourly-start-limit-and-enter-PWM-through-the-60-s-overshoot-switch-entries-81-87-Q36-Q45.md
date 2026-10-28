@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-28T06:46:00Z'
-updated_date: '2026-10-28T15:02:00Z'
+updated_date: '2026-10-28T22:18:00Z'
 labels:
   - sat
   - sergeant-d
@@ -56,6 +56,8 @@ Red/green (rerun by main session): HEAD copies (C:\Users\rvdbr\AppData\Local\Tem
 Gates on the uncommitted fix: evaluate --quick Failed 0 exit 0; build.bat esp32-combo SUCCESS (fw 00:05:27, fs 00:00:18, zip 15:58), 0 'unused' warnings.
 Review (opus correctness; sonnet tests/rules/SAT entries): no code defect, no conflict with entries 30/40/41/50/52/59/81/82/87/88/90/105/106/107; tests call the real code, red on HEAD for the right reason, regex extraction fail-loud, hybrid covered.
 Dispositions: A (cycles_this_hour ring saturates at 6, now reachable for HP) -> TASK-1425. B (HP MM in PWM = user max vs 100 outside PWM; entry 21 Open) -> TASK-1426 (question for Sergeant D). C/B7 (entry 87 names TASK-1412.3 as a dependency): waived; 1412.3 is the epic-wide contract-regression suite, and this task carries its own executable regressions (start_limit hplimit, overshoot GateHeatPumpSwitch) that 1412.3 will absorb; no code in 1412.3 is a prerequisite. D/A1 (start_limit stubs period/cph for every source): accepted, the test proves the exemption branch; HP timing is covered by test_sat_hp_pwm.py. A2 (underfloor cold setpoint not in gate test) and A3 (HP exits untested): accepted low; exits have no source check, so the existing gas exit tests exercise the same code. E/B1-B6 stale docs and history comments: fixed in this task (docs agent).
+
+2026-10-28 bench old vs new on the Classic+S3 (.63), replayed boiler, old = alpha.519+49135fe (same SAT code as alpha.520 for gas), new = alpha.521+2425108, overshoot margin 3.0 (bench value, not the decided default 2.0). Logs: %TEMP%\otgw-bench-1420\{A_519,C_521}. Raw lines checked by the main session. S5 heat pump overshoot: old (alpha.519) stays continuous for 240 s of flow 41-42, no switch line; new switches at 60 s '(flow=41.4 >= sp=33.6 + 3.0)' 22:49:44 with PWM ON and CS on the same tick; underheat exit fires for the heat pump at 180 s. S6 hourly limit (cph 2, manual mode toggles): gas both builds blocked at the 3rd start ('cycle limit 2/hr reached'); after satsource=2 old stays at cycles_this_hour 2 / pwm_flame_req false, new goes 3 then 4 with pwm_flame_req true. Not shown: a real heat pump.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
