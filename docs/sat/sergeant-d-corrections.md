@@ -4278,3 +4278,35 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156490498603
 > Q51b: Follow thermo-nova
 
 **Settled:** the PWM OFF wait always counts from the ON->OFF switch, also when the flame is already off (`pwm.py:134`, `:155`, `:208`); hot-water and other flame-offs never move it. Confirms entries 43, 91 and 92. **Task:** TASK-1380 (implemented in alpha.515, commit de23e3ea1). **Open:** none.
+
+## 98. Cold cutoff boundary: at or below the cold setpoint (2026-10-28, corrects entry 96)
+
+**Source:** #alpha-testing, 2026-10-28 07:53 UTC, reply to our reading of Q20 (msg 1564909748946731029: "SAT idles when the requested setpoint is below 28.2 / 21, so exactly 28.2 still heats ... Tell me if you meant 'at or below'"):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564909937161805966
+
+**Quoted:**
+
+> @BlueFlame Bot at or below
+
+**Settled:** SAT idles when the requested setpoint is at or below the cold setpoint (28.2 radiators / 21 underfloor): equality is idle (`<=`). This corrects our interpretation in entry 96 and agrees with thermo-nova (`heating_control.py:72` heater ON only when `requested_setpoint > COLD_SETPOINT`; `:385` returns on `<=`), with entry 12's "at the cold setpoint or below", and with the firmware today (`satColdCutoff()` returns `requestedSetpoint <= coldSetpoint`, `SATchEnable.h:26-29`).
+
+**Changes an earlier entry:** entry 96's interpretation (strict `<`) is withdrawn; entry 12 stands. No code change for the boundary.
+
+**Task:** TASK-1355 / ADR-199 (record the boundary as `<=`). **Open:** none.
+
+## 99. Gas boiler cycles per hour: 3 or 4 only, default 3 (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 07:54 UTC, answer to the expanded Q16 (msg 1564909750683045899):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564910294709571667
+
+**Quoted:**
+
+> @BlueFlame Bot Q16: A
+
+**Settled (option A as asked):** for gas boilers the user may choose only 3 or 4 PWM cycles per hour, default 3, for radiators and underfloor alike. A stored 2 becomes 3; a stored 5 or 6 becomes 4. Hybrids follow (entry 82, gas timing). Heat pumps are not covered (entries 50, 52, 81).
+
+**Compared with thermo-nova and the firmware:** thermo-nova offers 3 or 4 only for radiators (`config_flow.py:695-702`), default 4 (`const.py:119`). The firmware accepts 2 to 6 (`settingStuff.ino:1107`), default 3 (`SATtypes.h:549`), and its out-of-range fallback returns 4 for radiators (`SATcontrol.ino:354`, entry 82). Default 3 and underfloor's 3/4 choice are his deviations from thermo-nova, consistent with entries 30 and 52.
+
+**Changes an earlier entry:** confirms our provisional reading of entry 52 (range 3 or 4).
+
+**Task:** TASK-1375. **Open:** none.
