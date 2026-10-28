@@ -344,10 +344,9 @@ static float satGetColdSetpoint()
 // Returns max PWM cycles per hour for the current heating system
 static uint8_t satGetMaxCyclesPerHour()
 {
-  // Heat-pump source: 2 starts per rolling hour (the hourly start cap). Its PWM period comes
-  // from iHpCycleSeconds instead (satGetPwmPeriodSec).
-  if (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP) return 2;
-  // Otherwise use the user-configured value if set (Task #82); else system defaults.
+  // A heat pump has no hourly start limit (Sergeant D entry 81, satCycleIsHourLimitReached()); its PWM
+  // period comes from iHpCycleSeconds (satGetPwmPeriodSec). Gas boilers and hybrids: the user-configured
+  // value if set (Task #82); else system defaults.
   if (settings.sat.iCyclesPerHour >= 2 && settings.sat.iCyclesPerHour <= 6) {
     return settings.sat.iCyclesPerHour;
   }
@@ -370,13 +369,6 @@ static uint32_t satGetPwmPeriodSec()
     return (settings.sat.iHpCycleSeconds == 2400) ? 2400UL : 1800UL;
   }
   return 3600UL / satGetMaxCyclesPerHour();
-}
-
-// Returns whether MM=100 should always be used (heat pumps)
-static bool satAlwaysMaxModulation()
-{
-  // Heat pumps must always run at MM=100% (never 0%), even under PWM suppression. TASK-891.8
-  return (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP);
 }
 
 // MM= value for the current mode (TASK-1268). Pure function of its arguments.
@@ -5544,13 +5536,13 @@ static void satControlLoopRun()
   // --- Auto-switch between continuous and PWM modes (Tasks #42/#43) ---
   // Delegated to satCycleCheckAutoSwitch() in SATcycles.ino: overshoot margin settings.sat.fOvershootMargin
   // (default 2.0C), 60 s sustain counted from the first overshoot sample (entry 41), 300 s DHW guard.
-  // The heat-pump exclusion (satAlwaysMaxModulation()) is a firmware divergence: thermo-nova's
-  // _maybe_enable_pwm_on_sustained_overshoot (heating_control.py:262-305) has no heat-pump case, and entries
-  // 40 and 50 run heat pumps in PWM (open question Q45).
-  if (!satAlwaysMaxModulation() && pidOutput > satGetColdSetpoint()) {
+  // Heat pumps enter PWM through this switch like every other source: thermo-nova's
+  // _maybe_enable_pwm_on_sustained_overshoot (heating_control.py:262-305) has no heat-pump case
+  // (Sergeant D entry 87, Q45 A).
+  if (pidOutput > satGetColdSetpoint()) {
     satCycleCheckAutoSwitch(pidOutput);
   } else {
-    satCycleSkipAutoSwitch();   // requested <= cold setpoint clears the start (heating_control.py:280-282); heat pump: see above
+    satCycleSkipAutoSwitch();   // requested <= cold setpoint clears the start (heating_control.py:280-282)
   }
 
   // Modulation suppression is handled via CS sequence in satApplyPWM() (PWM ON only)

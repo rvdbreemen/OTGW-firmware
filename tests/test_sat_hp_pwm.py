@@ -8,7 +8,7 @@ mapping is thermo-nova's _calculate_duty_cycle (pwm.py:229-301) with that period
 dutyLower >= 1 and collapsed the mapper to continuous or ultra-low (audit #9).
 
 The code under test is NOT re-implemented here. The test cuts the real getter block
-(satGetMaxCyclesPerHour .. satAlwaysMaxModulation) and the real PWM block (the same cut as
+(satGetMaxCyclesPerHour .. satGetPwmPeriodSec) and the real PWM block (the same cut as
 tests/test_sat_pwm_override.py, which this file reuses) out of src/OTGW-firmware/SATcontrol.ino,
 and the real right-hand side of the SAThpcycle setter out of settingStuff.ino, and compiles them
 with a host C++ compiler. Without a compiler the tests are skipped, they do not pass silently.
@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
 
 def extract_getters(src: str) -> str:
     a = src.index("// Returns max PWM cycles per hour")
-    b = src.index("// Returns whether MM=100")
+    b = src.index("// MM= value for the current mode")   # the block after the getters (older sources put satAlwaysMaxModulation() before it)
     return src[a:b]
 
 

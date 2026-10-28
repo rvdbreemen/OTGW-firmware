@@ -74,6 +74,8 @@ static float satApplyContinuous(float p) { return 1000.0f + p; }
 static uint32_t satGetMinOnTimeSec() { return 180; }
 static uint8_t satGetMaxCyclesPerHour() { return g_cph; }
 static uint32_t satGetPwmPeriodSec() { return 3600UL / g_cph; }
+static int g_source = SAT_SRC_GAS_BOILER;            // TASK-1419: the heating source; the hour-limit check itself is the real code
+static uint8_t satGetEffectiveHeatingSource() { return (uint8_t)g_source; }
 static bool hasOTCommandInterface() { return true; }
 static bool satEnqueueIfChangedCS(float cs) { g_csSent++; g_csLast = cs; return true; }
 static void sendWebSocketJSON(const char*) {}
@@ -176,6 +178,16 @@ int main(int argc, char** argv) {
     const unsigned before = cnt();
     const int ok = waitStart(900);
     printf("pwm=%d before=%u start=%d after=%u\n", s, before, ok, cnt());
+    return 0;
+  }
+  if (!strcmp(sc, "hplimit")) {              // TASK-1419 (entry 81): 3 PWM starts at 3/h, the real limit check, then a 4th OFF->ON. argv[2] = heating source
+    g_source = atoi(argv[2]);
+    const int s = pwmCycles(3);
+    const unsigned before = cnt();
+    const int limit = (int)satCycleIsHourLimitReached();
+    const int ok = waitStart(900);
+    if (ok) burn();
+    printf("pwm=%d before=%u limit=%d start=%d after=%u\n", s, before, limit, ok, cnt());
     return 0;
   }
   if (!strcmp(sc, "range5burn")) {           // (c) duty range 5 ON start from the OFF phase with the flame burning (lit > 1 h ago)
@@ -389,6 +401,23 @@ class SatPwmStartLimit(unittest.TestCase):
         self.assertEqual(r["before"], "2", "hot-water flame starts were counted against cycles per hour: %r" % r)
         self.assertEqual(r["start"], "1", "PWM ON start blocked after 2 PWM starts + 3 hot-water starts: %r" % r)
         self.assertEqual(r["after"], "3")
+
+    # TASK-1419 AC#1 (Sergeant D entry 81): a heat pump has no hourly start limit, gas and hybrid keep it.
+    # satCycleIsHourLimitReached() is the real function from SATcycles.ino; only the source getter is stubbed.
+    def test_hp_has_no_hourly_start_limit(self):
+        r = self.run_sc("hplimit", 2)             # SAT_SRC_HEAT_PUMP
+        self.assertEqual((r["pwm"], r["before"]), ("3", "3"), r)
+        self.assertEqual(r["limit"], "0", "heat pump reports the hour limit reached: %r" % r)
+        self.assertEqual(r["start"], "1", "heat pump 4th start in the hour was held by the hour limit: %r" % r)
+        self.assertEqual(r["after"], "4", "the 4th heat-pump start is still recorded for cycles_this_hour: %r" % r)
+
+    def test_gas_and_hybrid_keep_the_hourly_start_limit(self):
+        for src in (1, 3):                        # SAT_SRC_GAS_BOILER, SAT_SRC_HYBRID
+            with self.subTest(source=src):
+                r = self.run_sc("hplimit", src)
+                self.assertEqual(r["limit"], "1", r)
+                self.assertEqual(r["start"], "0", r)
+                self.assertEqual(r["after"], "3", r)
 
     # (b) TASK-1401 AC#2: the 4th PWM ON start in the rolling hour at 3/h is still blocked
     def test_b_fourth_pwm_start_in_the_hour_is_blocked(self):

@@ -195,6 +195,95 @@ class OvershootSustain(unittest.TestCase):
         self.assertEqual((int(r["t"]), r["mode"], r["sat"]), (210000, "2", "0"))
 
 
+# TASK-1419 (Sergeant D entry 87, Q45 A): heat pumps enter PWM through the sustained-overshoot switch.
+# The gate that calls satCycleCheckAutoSwitch() lives in satControlLoopRun() (SATcontrol.ino). Its real
+# if/else block is cut out by regex and wrapped in a host function; the real satGetColdSetpoint() (and
+# satAlwaysMaxModulation() when the source defines it, for old-code comparison runs) come from the same file, the real
+# satCycleCheckAutoSwitch() from SATcycles.ino. Only the heating source and system getters are stubbed.
+GATE_STUBS = r"""
+enum { SAT_HSYS_AUTO = 0, SAT_HSYS_RADIATORS = 1, SAT_HSYS_UNDERFLOOR = 2 };
+enum { SAT_SRC_AUTO = 0, SAT_SRC_GAS_BOILER = 1, SAT_SRC_HEAT_PUMP = 2, SAT_SRC_HYBRID = 3 };
+static int g_source = SAT_SRC_GAS_BOILER;
+static uint8_t satGetEffectiveHeatingSource() { return (uint8_t)g_source; }
+static uint8_t satGetEffectiveHeatingSystem() { return SAT_HSYS_RADIATORS; }
+"""
+
+GATE_MAIN = r"""
+int main(int argc, char** argv) {      // argv[1] = heating source, argv[2] = requested setpoint (pidOutput)
+  if (argc < 3) return 2;
+  g_source = atoi(argv[1]);
+  const float pid = (float)atof(argv[2]);
+  state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false;
+  g_flow = 55.0f;                       // 5 K above 50 + 2 K margin when pid = 50: a sustained overshoot
+  _sustain_lastCheckMs = g_ms;
+  const uint32_t t0 = g_ms;
+  for (int i = 0; i < 150; i++) {       // 1 s control ticks through the real gate
+    g_ms += 1000;
+    gate(pid);
+    if (state.sat.eControlMode == SAT_MODE_PWM) { printf("t=%lu mode=%d\n", (unsigned long)(g_ms - t0), (int)state.sat.eControlMode); return 0; }
+  }
+  printf("t=-1 mode=%d\n", (int)state.sat.eControlMode);
+  return 0;
+}
+"""
+
+
+def extract_gate(sat_src: str) -> str:
+    """The real gate block, the real cold-setpoint getter and constants (and satAlwaysMaxModulation() when the source defines it)."""
+    sat_src = sat_src.replace("\r\n", "\n")
+    m = re.search(r"^[ \t]*if \([^\n]*\) \{\n[ \t]*satCycleCheckAutoSwitch\(pidOutput\);\n[ \t]*\} else \{\n"
+                  r"[ \t]*satCycleSkipAutoSwitch\(\);[^\n]*\n[ \t]*\}", sat_src, re.M)
+    if not m:
+        raise AssertionError("the satCycleCheckAutoSwitch(pidOutput) if/else gate was not found in %s" % SAT_INO)
+    consts = re.findall(r"^static const float SAT_COLD_SETPOINT_(?:RAD|FLOOR)\s*=[^;]*;", sat_src, re.M)
+    cold = _fn(sat_src, "static float satGetColdSetpoint()")
+    if len(consts) != 2 or not cold:
+        raise AssertionError("satGetColdSetpoint() or its constants not found in %s" % SAT_INO)
+    always = _fn(sat_src, "static bool satAlwaysMaxModulation()")   # empty when the source does not define it
+    return "\n".join(consts) + "\n" + cold + "\n" + always + "\nstatic void gate(float pidOutput) {\n" + m.group(0) + "\n}\n"
+
+
+class GateHeatPumpSwitch(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cyc = CYCLES_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+        cls.dir = tempfile.TemporaryDirectory()
+        d = Path(cls.dir.name)
+        flag, body = extract(cyc)
+        gate = extract_gate(SAT_INO.read_text(encoding="utf-8"))
+        cpp = d / "g.cpp"
+        cpp.write_text(flag + STUBS + GATE_STUBS + body + gate + GATE_MAIN, encoding="utf-8")
+        cls.exe = compile_cpp(cpp, d / "g.exe")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.dir.cleanup()
+
+    def run_gate(self, source, pid):
+        if self.exe is None:
+            self.skipTest("no host C++ compiler")
+        out = subprocess.run([str(self.exe), str(source), str(pid)], capture_output=True, text=True, check=True).stdout
+        return dict(kv.split("=") for kv in out.split())
+
+    def test_heat_pump_overshoot_switches_to_pwm(self):
+        r = self.run_gate(2, 50)                      # SAT_SRC_HEAT_PUMP
+        self.assertEqual((r["t"], r["mode"]), ("61000", "2"), "heat pump never entered PWM on a sustained overshoot: %r" % r)
+
+    def test_gas_boiler_overshoot_switches_to_pwm(self):
+        r = self.run_gate(1, 50)                      # SAT_SRC_GAS_BOILER
+        self.assertEqual((r["t"], r["mode"]), ("61000", "2"), r)
+
+    def test_hybrid_overshoot_switches_to_pwm(self):
+        r = self.run_gate(3, 50)                      # SAT_SRC_HYBRID
+        self.assertEqual((r["t"], r["mode"]), ("61000", "2"), r)
+
+    def test_requested_at_or_below_cold_setpoint_never_switches(self):
+        for src in (1, 2):
+            with self.subTest(source=src):
+                r = self.run_gate(src, 20)            # below the radiator cold setpoint 28.2
+                self.assertEqual((r["t"], r["mode"]), ("-1", "1"), r)
+
+
 class BypassSource(unittest.TestCase):
     """The bypass returns of satControlLoopRun() call satCycleSkipAutoSwitch() (anchored on text, not lines)."""
 

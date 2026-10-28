@@ -161,9 +161,8 @@ void satCycleResetSustainGuards()
 // clears the overshoot start so the next overshoot counts its 60 s from scratch. thermo-nova does the same
 // for hot water (heating_control.py:268-270), the DHW guard (:272-274), heater off or a requested setpoint
 // at or below the cold setpoint (:276-282) and PWM enabled (:264-266). The other callers are firmware
-// choices without a thermo-nova counterpart: boiler fault, thermal-safe fallback, summer simmer, the heat-pump
-// exclusion (open question Q45), and SAT off / OT loss / re-enable (thermo-nova keeps the start there:
-// climate.py:544-545 returns before update()).
+// choices without a thermo-nova counterpart: boiler fault, thermal-safe fallback, summer simmer, and
+// SAT off / OT loss / re-enable (thermo-nova keeps the start there: climate.py:544-545 returns before update()).
 void satCycleSkipAutoSwitch()
 {
   _sustain_overshootRunning = false;
@@ -316,12 +315,14 @@ void satCycleRecordPwmStart()
   state.sat.iCyclesThisHour = _hourCountGet(nowMs);
 }
 
-// Public: return true if starting a new PWM ON cycle would exceed the limit.
+// Public: return true if starting a new PWM ON cycle would exceed the limit. A heat pump has no hourly
+// start limit (Sergeant D entry 81): its starts are still recorded and reported, never refused.
 bool satCycleIsHourLimitReached()
 {
   uint32_t nowMs = millis();
   uint8_t count = _hourCountGet(nowMs);
   state.sat.iCyclesThisHour = count;
+  if (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP) return false;
   return (count >= satGetMaxCyclesPerHour());
 }
 
