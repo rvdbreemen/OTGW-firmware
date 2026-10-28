@@ -5,13 +5,15 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:43:00Z'
-updated_date: '2026-10-28T19:49:00Z'
+updated_date: '2026-10-28T21:30:00Z'
 labels:
   - sat
 milestone: 2.0.0
 dependencies: []
 references:
   - TASK-1412
+documentation:
+  - docs/sat/sat-low-load-agent-handoff-2026-10-28.md
 priority: medium
 ordinal: 503000
 ---
@@ -57,4 +59,19 @@ Verification: LL-003 adapter (scripts/verify_sat_low_load.py:127-171) red on HEA
 2026-10-28 advisor review: open points are SAT control behaviour -> implementation waits for Sergeant D (skill step 4; CLAUDE.md 'an open question blocks the implementation'). Q55 queued in open-questions.md ahead of Q53. The 2026-10-28 'do not resume before approved contract and red tests' note still applies; the graph edge to 1412.3 was removed only because the task carries its own red test (LL-003).
 
 2026-10-28 Q55 answered (entry 111): full thermo-nova; zones get the 60 s timer; the PID steps through hot water, fault, thermal-safe, simmer and valves closed; stops only when SAT is off (OT loss turns SAT off); no room temperature = curve only (entries 38/46), no integration. Unblocked.
+
+2026-10-28 review round 1 (opus correctness, sonnet SAT/rules, sonnet tests with 12 mutants). Fixing in round 2: first-output D=0 (entry 95 Q39b) here instead of waiting for TASK-1270; deadband widening capped at 2 h as the tick and applied to zones; reset/start-up and room-recovery tests; real widening path test; comment/spec truth; LL-003 comment (it cannot tell old from new: green on HEAD); env-override path; broken TASK-1195 derivative harness adapted. Not fixed, put to Sergeant D: boot with a saved state but no room reading yet (entries 46 vs 83) -> Q56 queued. Noted, not fixed: derivative interval depends on ms jitter at exactly 60 s (deltaTime <= 60 boundary, as thermo-nova pid.py; bench item with entry 77/TASK-1418); published P/D/output stay at the last tick value while the tick skips (I and error move).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @codex
+created: 2026-10-28T20:07:00Z
+
+---
+
+Robert requested this builder handoff from Codex. Read docs/sat/sat-low-load-execution-backlog-2026-10-28.md (current schedule) and docs/sat/sat-low-load-agent-handoff-2026-10-28.md before the next task. Keep current 1368 and 1409 work; this update changes only metadata/docs. Main PID chain: 1368 -> 1270 -> 1416 -> 1417 -> 1418 -> 1414 -> 1423 -> 1415. 1381 branches after 1270 and still waits on Q53; 1415 waits on Robert for write cadence. Q55 is answered by entry 111. 1409 is independent, followed by telemetry verification with 1425. Include 1422/1424 and 1413 in their integration gates. Do not resolve the ID6/MaxTSet contract or any open question by assumption. Per-fix bench old-vs-new proof is required before tester alphas; formal 1412.18 -> .26 validation remains required. Do not stage or overwrite another worker's source/task changes; coordinate shared SATpid.ino edits one at a time.
+
+---
+<!-- COMMENTS:END -->
