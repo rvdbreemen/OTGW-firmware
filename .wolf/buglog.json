@@ -3685,7 +3685,7 @@
     "error_message": "SAT PWM: after hot-water use CH comes back a full off time late (gruijter alpha.514, 2026-10-27: ~23.5 min delay after 5 DHW draws); ON phase that starts flame-off ends after one tick (CS 48->10->48)",
     "file": "src/OTGW-firmware/SATcontrol.ino",
     "root_cause": "PWM OFF wait timed from the last flame-off of any kind (SATcontrol.ino:1046 via satCycleGetFlameOffStartMs, moved by every DHW flame-off at SATcycles.ino:786-789); ON phase without start anchor falls back to the last flame-on (SATcontrol.ino:883/:1024), i.e. a DHW ignition. thermo-nova times both from its own phase edges (pwm.py:134,:155,:162,:188,:208).",
-    "fix": "Open: TASK-1382 (ON from phase start, Q35 A) then TASK-1380 (OFF from ON->OFF switch); proof = replay of the 2026-10-27 DHW draws old vs fix. Recorded as corrections entry 92.",
+    "fix": "TASK-1382/1380/1383 (commit de23e3ea1, alpha.515): single PWM anchor _pwm_lastUpdateMs set at reset/OFF->ON/first ignition/ON->OFF (pwm.py:91,:162,:188,:208); 180 s start gate; no ignition abort. Host red/green (test_sat_pwm_anchors.py) and bench old 870 s vs new 450 s next-ON after the switch. Remaining: ON phase during DHW -> TASK-1422.",
     "tags": [
       "sat",
       "pwm",

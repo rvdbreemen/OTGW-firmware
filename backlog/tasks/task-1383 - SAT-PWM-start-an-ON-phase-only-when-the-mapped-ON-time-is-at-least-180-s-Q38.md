@@ -3,11 +3,11 @@ id: TASK-1383
 title: >-
   SAT PWM: start an ON phase only when the mapped ON time is at least 180 s
   (Q38)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T10:39:00Z'
-updated_date: '2026-10-28T07:13:00Z'
+updated_date: '2026-10-28T09:25:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -26,8 +26,8 @@ From TASK-1273. thermo-nova starts ON only when on_time_seconds >= HEATER_STARTU
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No ON start when the mapped ON time is below 180 s (host test red on HEAD, green on fix)
-- [ ] #2 Sergeant D's OK recorded in docs/sat/sergeant-d-corrections.md before implementation (CLAUDE.md SAT rules)
+- [x] #1 No ON start when the mapped ON time is below 180 s (host test red on HEAD, green on fix)
+- [x] #2 Sergeant D's OK recorded in docs/sat/sergeant-d-corrections.md before implementation (CLAUDE.md SAT rules)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -38,4 +38,12 @@ From TASK-1273. thermo-nova starts ON only when on_time_seconds >= HEATER_STARTU
 2026-10-28: Q38 A decided (entry 80): start an ON phase only when the mapped ON time is >= 180 s. After or with TASK-1382.
 
 2026-10-28: bundled into the TASK-1382/1380 candidate (advisor review: without the Q38 gate the new ignition wait would fire the burner in range 1 with no flame every 2P). Q38 A recorded as entry 80.
+
+AC#2: Q38 A recorded as entry 80 before implementation.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+OFF->ON only when the mapped ON time >= 180 s (pwm.py:155, Q38 A entry 80), so duty range 1 without flame never starts ON. Commit de23e3ea1. AC#1: D5 in tests/test_sat_pwm_anchors.py red on the pre-fix source (ON starts every 60 s from t=1020), green on the fix. AC#2: entry 80. Note (review): in ranges 2-4 ON is clamped to >= 180 s, so the gate bites only in range 1.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -3,11 +3,11 @@ id: TASK-1382
 title: >-
   SAT PWM: time the ON phase from its start and keep waiting for ignition as
   thermo-nova (Q35)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T10:38:00Z'
-updated_date: '2026-10-28T07:13:00Z'
+updated_date: '2026-10-28T09:25:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -26,7 +26,7 @@ From TASK-1273 / TASK-1366 R3. Firmware times ON expiry from the last flame-on e
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ON phase timed from the phase start/first-ignition sync, no flip on a slow ignition (r3 host scenario green; expected-failure marker in tests/test_sat_hp_pwm.py removed)
+- [x] #1 ON phase timed from the phase start/first-ignition sync, no flip on a slow ignition (r3 host scenario green; expected-failure marker in tests/test_sat_hp_pwm.py removed)
 - [x] #2 Sergeant D's OK recorded in docs/sat/sergeant-d-corrections.md before implementation (CLAUDE.md SAT rules)
 <!-- AC:END -->
 
@@ -49,3 +49,9 @@ Self-review (advisor) changes: (a) TASK-1383 Q38 gate bundled: OFF branch starts
 
 AC#2: Sergeant D's OK recorded as entry 80 (Q35 A, msg 1564866308317773845, commit 874588e4a).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ON phase timed from its own start; waits up to 180 s for ignition, syncs at the first ignition, then times on without the old 180 s abort; 180 s flame-on hold; relight keeps timing (pwm.py:144-146, :162, :186-203; entry 80 Q35 A). Commit de23e3ea1 (alpha.515). AC#1: Host: tests/test_sat_pwm_anchors.py 10 OK on the fix; 7 failures on the pre-fix source (D1-D5, D7, D8); r3 expectedFailure removed in test_sat_hp_pwm.py (22 OK); all tests/test_sat_*.py OK; evaluate --quick 0 failed; build.bat esp32-combo SUCCESS (alpha.515+de23e3e, alpha.516+ece10d3). D2/D3/D4/D7/D8 cover ON timing; r3 scenario green, expectedFailure removed. Bench (Classic+S3 .63, live PIC, same /simulate replay, logs C:/Users/rvdbr/AppData/Local/Temp/otgw-bench-1382/{old,new}): OLD alpha.514 next ON 870 s after the ON->OFF switch / 544 s after the last DHW flame-off; NEW alpha.516+ece10d3 (OTA, settings unchanged) 450 s after the switch / 94.5 s after the last DHW flame-off, at the first tick with elapsed >= 720*(1-live duty). AC#2: entry 80. Not verified: slow ignition on a real boiler.
+<!-- SECTION:FINAL_SUMMARY:END -->

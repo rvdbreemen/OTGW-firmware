@@ -3,11 +3,11 @@ id: TASK-1407
 title: >-
   SAT log: add PWM ON and PWM OFF times in seconds (Sergeant D request
   2026-10-26)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-26T18:24:00Z'
-updated_date: '2026-10-28T08:44:00Z'
+updated_date: '2026-10-28T09:25:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -44,4 +44,12 @@ Logging only (entries 61, 93). At each PWM phase transition log the mapped ON an
 2026-10-28: request repeated with field names pwm_on (seconds) and pwm_off (seconds) (entry 93, msg 1564861520494461061).
 
 2026-10-28: satPwmNarrateEdge logs 'PWM ON: pwm_on=264 s pwm_off=936 s duty=0.22' / 'PWM OFF: ...' at every edge (SAT event log = telnet + WS ring, not MQTT/REST) and a per-tick telnet line 'SAT PWM: pwm_on=.. s pwm_off=.. s duty=.. ON|OFF'. Host test test_edges_are_narrated_with_pwm_on_and_pwm_off_seconds: FAILED (failures=1) on the alpha.515 source, OK on the fix; all tests/test_sat_*.py OK; evaluate --quick 0 failed. Control path unchanged (onTime/offTime passed into satPwmBeginOn/EndOn only for the log).
+
+2026-10-28 bench NEW alpha.516+ece10d3 telnet: 'SAT: PWM ON: pwm_on=180 s pwm_off=578 s duty=0.24' (10:08:37), 'SAT: PWM OFF: pwm_on=186 s pwm_off=534 s duty=0.26' (10:12:07), 'SAT: PWM ON: pwm_on=278 s pwm_off=442 s duty=0.39' (10:19:37); per-tick 'SAT PWM: pwm_on=.. s pwm_off=.. s duty=.. ON|OFF' every 30 s.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PWM ON/OFF seconds and duty in the SAT event log at every PWM edge and in the per-tick telnet line (entries 61, 93). Commit ece10d34c (alpha.516). AC#1: host test red on alpha.515 source, green on fix; bench lines quoted in notes. AC#2: bench + host; control path unchanged (values only passed for the log). Not shown: v2 SAT log view screenshot (WS ring carries the line).
+<!-- SECTION:FINAL_SUMMARY:END -->
