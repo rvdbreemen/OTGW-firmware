@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-28T06:47:00Z'
+updated_date: '2026-10-28T07:52:00Z'
 labels:
   - sat
   - sergeant-d
@@ -30,3 +31,9 @@ Sergeant D 2026-10-28: Q43 A (>=), Q44 A (underheat/saturation timed from the fi
 - [ ] #1 Host tests per rule, red on HEAD and green on the fix: equality counts; underheat fires at 180 s and saturation at 300 s at a 30 s and a 60 s tick; switch at the first tick >= 60 s scheduled; first PWM CS on the switch tick
 - [ ] #2 build + evaluate green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28 Q46b (entry 95): scheduled tick time applies to the underheat and saturation timers too.
+<!-- SECTION:NOTES:END -->

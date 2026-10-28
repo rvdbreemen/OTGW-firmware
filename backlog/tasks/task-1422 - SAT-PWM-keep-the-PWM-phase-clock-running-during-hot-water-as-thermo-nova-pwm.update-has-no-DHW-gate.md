@@ -1,11 +1,12 @@
 ---
 id: TASK-1422
 title: >-
-  SAT PWM: keep the PWM phase clock running during hot water, as thermo-nova
-  (pwm.update has no DHW gate)
+  SAT PWM: pause the ON timer while the boiler DHW-active bit is set, then
+  restart the start-up sequence (entry 95, Q48b)
 status: To Do
 assignee: []
 created_date: '2026-10-28T07:36:00Z'
+updated_date: '2026-10-28T07:52:00Z'
 labels:
   - sat
   - sergeant-d
@@ -31,3 +32,9 @@ Review finding on the TASK-1382/1380/1383 candidate (correctness + SAT-decision 
 - [ ] #3 No PWM setpoint override during DHW (heating_control.py:385, unchanged)
 - [ ] #4 build + evaluate green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28 scope rewritten by Sergeant D (entry 95, msg 1564902129896792156): not thermo-nova parity. During a PWM ON phase with boiler DHW active: pause the ON-seconds counter, keep sending the PWM ON values (no CS=10/CH=0); when DHW active drops, run the start-up sequence (ignition wait, entry 45 flood without return temp) and resume the remaining ON time once the CH flame is on. OFF phase during DHW: unchanged, timed from the ON->OFF switch (entry 97). AC#1 now: ON phase paused by a draw resumes with its remaining ON time after the CH ignition.
+<!-- SECTION:NOTES:END -->

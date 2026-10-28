@@ -4211,3 +4211,70 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156486813428
 question, empty for open ones. Done in the same commit as this entry. **Open:** none.
 
 **Tasks filed 2026-10-28 for entries 67-94:** TASK-1413 (entry 72, auto-tune removal), TASK-1414 (entry 73), TASK-1415 (entry 74), TASK-1416 (entry 75), TASK-1417 (entry 76), TASK-1418 (entry 77), TASK-1419 (entries 81, 87), TASK-1420 (entries 86, 88), TASK-1421 (entries 89, 90). Existing tasks got notes: TASK-1270, 1355, 1365, 1371, 1373, 1375, 1380, 1382, 1383, 1407, 1412.7-1412.10.
+
+## 95. PID rounding, Ki clamp, first-tick D, tick timing scope, and hot water during a PWM ON phase (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 07:22 UTC, answers to the follow-ups Q28a, Q28b, Q39b, Q46b and Q48b (entries 78, 83, 86, 89):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564902129896792156
+
+**Quoted:**
+
+> Q28a: Round all the values to 3 decimals not only the Output.
+>
+> Q28b: Yes, match thermo-nova
+>
+> Q39b: D = 0
+>
+> Q46b: Yes
+>
+> Q48b: Boiler DHW active.
+>
+> Do not count the flame when the Boiler DHW is active.
+>
+> So when we are in PWM ON phase and the Boiler DHW active is triggered, pause the PWM ON seconds counter and resume when the DHW active trigger goes to OFF. During this time you don't need to send the CS=10, CH=0 commands to the boiler. Keep sending the PWM ON values to the boiler. We need to just pause the PWN ON timing. So when CH heating is resumed and CH flame is on resume the PWM ON timing.
+> Note: When the DHW active goes to off and we are resume the PWM ON cycle probably the flame will be off. So you need to perform the start-up sequence to lit the fire
+
+**Settled:**
+
+- **Q28a:** every PID value is rounded to 3 decimals, the output included. thermo-nova rounds the gains to 6 decimals (`pid.py:71`, `:82`, `:93`), P, I, D and the raw derivative to 3 (`pid.py:101`, `:106`, `:114`, `:119`) and the output to 1 (`pid.py:132`). His rule is a deliberate deviation for the gains (3 instead of 6) and the output (3 instead of 1).
+- **Q28b:** the Ki-near-0 integral clamp matches thermo-nova (entry 78).
+- **Q39b:** on the first tick after boot or SAT enable, D = 0 (entry 83).
+- **Q46b:** timing on the scheduled tick time applies to the other sustained timers too (underheat, saturation; entry 86).
+- **Q48b, the bit:** "DHW" in entry 89 is the boiler's DHW-active bit (MsgID 0 slave status bit 2), as we read it. A flame while that bit is set is never counted as a PWM start.
+- **Q48b, the ON phase:** while the boiler's DHW-active bit is set during a PWM ON phase, the ON-time counter pauses. SAT keeps sending the PWM ON values (no CS=10, CH=0). When DHW active drops, the ON phase resumes; the flame is then probably off, so the start-up sequence runs again to light it (the ignition wait and, without a return temperature, the entry 45 flood), and the ON timing resumes once the CH flame is on.
+
+**Compared with thermo-nova:** thermo-nova has no hot-water pause: `pwm.update()` runs whenever the heater state is ON (`heating_control.py:202-215`), and the heater state has no hot-water term (`heating_control.py:64-72`), so its ON timer runs on during a draw. Pausing the ON timer is his deviation, recorded here.
+
+**Compared with the firmware (alpha.515, TASK-1382):** the control loop returns early while the DHW bit is set (`SATcontrol.ino` ~5096-5113): no CS=10 is sent, but the ON timer's anchor keeps aging, so an ON phase can end at the first tick after a draw. That is the TASK-1422 case; its scope changes from "keep the clock running as thermo-nova" to "pause the ON timer during the draw, then restart the start-up sequence".
+
+**Interpretation (ours):** "resume the PWM ON timing when the CH flame is on" means the paused ON phase becomes a waiting ON phase again after the draw (the 180 s ignition wait of entry 80 applies), and the remaining ON time continues from the ignition. He said nothing about an OFF phase during a draw; Q51b (entry 97) keeps the OFF wait timed from the ON->OFF switch.
+
+**Tasks:** Q28a/Q28b -> TASK-1423 (new); Q39b -> TASK-1270; Q46b -> TASK-1420; Q48b count -> TASK-1421; Q48b ON pause -> TASK-1422 (scope rewritten). **Open:** none.
+
+## 96. Cold cutoff boundary: SAT idles when the requested setpoint is below the cold setpoint (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 07:29 UTC, answer to Q20b (entry 71):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564904039643357215
+
+**Quoted:**
+
+> Q20: Cold cut-off boundary is the value that keeps SAT at idle without taking any action when the requested setpoint is below that value.
+
+**Interpretation (ours, acted on):** idle when the requested setpoint is strictly below the cold setpoint (28.2 radiators / 21 underfloor); a request exactly equal to it still heats (`<`).
+
+**Compared with thermo-nova and the firmware:** thermo-nova treats equality as cold: the heater is ON only when `requested_setpoint > COLD_SETPOINT` (`heating_control.py:72`), and the PWM override returns on `<=` (`:385`). The firmware does the same today: `satColdCutoff()` returns `requestedSetpoint <= coldSetpoint` (`SATchEnable.h:26-29`, used at `SATchEnable.h:49` and `SATcontrol.ino:5431`). His rule is a deviation at exactly the boundary.
+
+**Changes an earlier entry:** entry 12's "at the cold setpoint or below" bullet; this entry replaces it with "below".
+
+**Task:** TASK-1355 / ADR-199 (boundary), and a code change of `satColdCutoff` and the matching compares (entry 71 lists them). **Open:** confirmation of our reading is offered in the reply; acted on meanwhile.
+
+## 97. Q51b: follow thermo-nova, the OFF wait always counts from the ON->OFF switch (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 07:33 UTC:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564904986037715015
+
+**Quoted:**
+
+> Q51b: Follow thermo-nova
+
+**Settled:** the PWM OFF wait always counts from the ON->OFF switch, also when the flame is already off (`pwm.py:134`, `:155`, `:208`); hot-water and other flame-offs never move it. Confirms entries 43, 91 and 92. **Task:** TASK-1380 (implemented in alpha.515, commit de23e3ea1). **Open:** none.

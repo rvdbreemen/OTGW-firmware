@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-28T06:47:00Z'
+updated_date: '2026-10-28T07:52:00Z'
 labels:
   - sat
   - sergeant-d
@@ -30,3 +31,9 @@ Sergeant D 2026-10-28: Q49 B (count at the OFF->ON start, every start, as pwm.py
 - [ ] #2 Host test: a hot-water flame carrying into a PWM ON phase is not counted (red on HEAD, green on fix)
 - [ ] #3 build + evaluate green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28 Q48b (entry 95): the bit is the boiler DHW-active bit (MsgID 0 slave bit 2): a flame while it is set is never counted.
+<!-- SECTION:NOTES:END -->

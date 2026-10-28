@@ -21,7 +21,7 @@ Order: what users feel now or what blocks shipped work first, then ADR-only and 
 8-13. Q23, Q24, Q25, Q26, Q27, Q28 (PID, ADR-197)
 14-15. Q21, Q22 (heating curve, ADR-198)
 Then Q48-Q51 (PWM entry and start counting vs the hourly limit, provisional decisions in force), Q35, Q36, Q37, Q40, Q41, Q42, Q43, Q45, Q46, Q47, Q18, Q19.
-**Update 2026-10-28:** Sergeant D answered Q15-Q51 in batches on 2026-10-27/28 (entries 67-94). Open now, in this order: Q16, Q41, Q42 (he asked us to expand), Q15b, Q20b, Q48b, Q39b, Q28a, Q28b, Q46b, then Q32 and Q18. Q36b was a heads-up sent with the acknowledgement; Q51b is a confirmation only (entry 43 settles it) and goes last. The "Answered" column marks each answered question with its entry number (his request, entry 94).
+**Update 2026-10-28:** Sergeant D answered Q15-Q51 in batches on 2026-10-27/28 (entries 67-94). Open now, in this order: Q16, Q41, Q42 (he asked us to expand), Q15b, then Q32 and Q18 (Q20b, Q28a/b, Q39b, Q46b, Q48b and Q51b were answered on 2026-10-28, entries 95-97). Q36b was a heads-up sent with the acknowledgement; Q51b is a confirmation only (entry 43 settles it) and goes last. The "Answered" column marks each answered question with its entry number (his request, entry 94).
 
 A new correction from Sergeant D (e.g. 2026-10-26 'CH=1 stays during PWM OFF') is handled before the queue.
 
@@ -58,7 +58,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q13 | ✓ 44 | answered (entry 44: every update) -> TASK-1370 | CS/MM/CH refresh: every 5 s as thermo-nova, or on change + 300 s? (audit #24) | ADR-199 |
 | Q14 | ✓ 45 | answered (entry 45: flow-based start, CS/PM=25 flood, MI=500) -> TASK-1371 | PWM ignition hold without a return temperature sensor (audit #27) | - |
 | Q15 | ✓ 67 | answered (entries 48, 67: defaults 62 radiators / 55 underfloor) -> TASK-1373; follow-up Q15b | Maximum flow setpoint: a user setting, and which defaults? (audit #29) | - |
-| Q16 |  | expand requested 2026-10-27 (entry 68): default settled in entry 52; the gas-boiler range is re-asked -> TASK-1375 | Cycles per hour default and range (audit #30) | - |
+| Q16 |  | asked 2026-10-28 07:53 UTC (msg 1564909750683045899); expand requested 2026-10-27 (entry 68): default settled in entry 52; the gas-boiler range is re-asked -> TASK-1375 | Cycles per hour default and range (audit #30) | - |
 | Q17 | ✓ 69 | answered (entries 53, 69: yes, re-confirmed) -> TASK-1376 | DHW setpoint: SW= on change, slider bounded by MsgID 48 (audit #31, entry 33) | - |
 | Q18 |  | queued | Zones: follow area.py (max, no headroom, cap overshoot)? (audit #32, entry 35) | - |
 | Q19 | ✓ 70 | answered (entry 70: leave them as is) -> no change (TASK-1347) | Units whose coefficient was set by the old wizard (1.4 / 0.6 / 0.8, not chosen by the user): leave them (entry 24) or reset them once to 2.0? (TASK-1347) | - |
@@ -95,14 +95,14 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q50 | ✓ 91 | answered (entry 91: A) -> TASK-1412.9 (confirms TASK-1401) | When an ON phase starts with the flame already burning (also in duty range 5, and when PWM is entered), what does its ON time count from? A) from that start, as thermo-nova (pwm.py:162-167, :205-209). B) from the last real ignition: a burner that is kept burning is then cut on the next tick. Our advice: A | TASK-1401, TASK-1369 |
 | Q51 | ✓ 91 | answered (entry 91: A) -> TASK-1380; scope Q51b | If the flame is still lit at the first tick after ON to OFF, does the off wait count from the ON-to-OFF edge? A) yes, as thermo-nova (pwm.py:208). B) no, from the last real flame-off: the burner restarts at once and uses up an hourly start (about 30% fewer real heat starts under a one-tick lag in the review probe). Our advice: A | TASK-1401 |
 | Q15b | | asked next (entry 67) | MaxTSet default for underfloor: 55 against the firmware's 50 hard ceiling and 45 system cap; and the heat-pump default | TASK-1373 |
-| Q20b | | queued (entry 71) | Cold cutoff: is a requested setpoint exactly equal to 28.2 / 21 cold (<=, thermo-nova) or not (<)? | TASK-1355, ADR-199 |
-| Q28a | | queued (entry 78) | "Round PID values to 3 decimals": which values (gains, P/I/D terms, output)? | ADR-197 |
-| Q28b | | queued (entry 78) | Ki near 0 skips the integral clamp: match thermo-nova? | ADR-197 |
+| Q20b | ✓ 96 | answered (entry 96: idle below the cold setpoint, our reading `<`) -> TASK-1355 | Cold cutoff: is a requested setpoint exactly equal to 28.2 / 21 cold (<=, thermo-nova) or not (<)? | TASK-1355, ADR-199 |
+| Q28a | ✓ 95 | answered (entry 95: all PID values 3 decimals) -> TASK-1423 | "Round PID values to 3 decimals": which values (gains, P/I/D terms, output)? | ADR-197 |
+| Q28b | ✓ 95 | answered (entry 95: match thermo-nova) -> TASK-1423 | Ki near 0 skips the integral clamp: match thermo-nova? | ADR-197 |
 | Q36b | | heads-up, not blocking (entry 81) | The hourly counter now counts only PWM ON starts (TASK-1401), so the Q36 premise changed | - |
-| Q39b | | queued (entry 83) | First tick after enable: D = 0, or the restored raw derivative? | TASK-1270 |
-| Q46b | | queued (entry 86) | Does timing on the scheduled tick time also apply to the other sustained timers? | TASK-1412.8 |
-| Q48b | | queued (entry 89) | Which DHW bit (boiler DHW active or thermostat DHW enable), and does a hot-water flame that continues into a PWM ON phase count? | TASK-1412.9 |
-| Q51b | | confirmation only, not blocking (entry 43 already settles "the OFF wait timed from the last flame-off is not the design"; our reading) | Always time the PWM OFF wait from the ON-to-OFF switch, also when the flame is already off (entry 92 report)? | - |
+| Q39b | ✓ 95 | answered (entry 95: D = 0) -> TASK-1270 | First tick after enable: D = 0, or the restored raw derivative? | TASK-1270 |
+| Q46b | ✓ 95 | answered (entry 95: yes) -> TASK-1420 | Does timing on the scheduled tick time also apply to the other sustained timers? | TASK-1412.8 |
+| Q48b | ✓ 95 | answered (entry 95: boiler DHW active; pause the ON timer during a draw) -> TASK-1421, TASK-1422 | Which DHW bit (boiler DHW active or thermostat DHW enable), and does a hot-water flame that continues into a PWM ON phase count? | TASK-1412.9 |
+| Q51b | ✓ 97 | answered (entry 97: follow thermo-nova) -> TASK-1380 | Always time the PWM OFF wait from the ON-to-OFF switch, also when the flame is already off (entry 92 report)? | - |
 
 Questions Q5 onwards come from the SAT port audit of 2026-10-24
 ([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)); the numbers in brackets are its
