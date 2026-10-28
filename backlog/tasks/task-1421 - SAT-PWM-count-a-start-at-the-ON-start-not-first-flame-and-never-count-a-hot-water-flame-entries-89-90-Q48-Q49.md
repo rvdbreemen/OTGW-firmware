@@ -3,11 +3,11 @@ id: TASK-1421
 title: >-
   SAT PWM: count a start at the ON start (not first flame) and never count a
   hot-water flame (entries 89, 90; Q48, Q49)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-28T06:47:00Z'
-updated_date: '2026-10-28T09:52:00Z'
+updated_date: '2026-10-28T10:56:00Z'
 labels:
   - sat
   - sergeant-d
@@ -29,9 +29,9 @@ Sergeant D 2026-10-28: Q49 B (count at the OFF->ON start, every start, as pwm.py
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Host test: an unlit ON start counts (red on HEAD, green on fix)
-- [ ] #2 build + evaluate green
+- [x] #2 build + evaluate green
 - [x] #3 Characterization: no flame (CH or hot water) adds a count; only ON starts count (a CH or hot-water flame inside an ON phase leaves cycles_this_hour unchanged)
-- [ ] #4 Bench old vs fix (Classic .63): an ON phase whose flame never lights does not move cycles_this_hour on alpha.516, adds 1 on the fix
+- [x] #4 Bench old vs fix (Classic .63): an ON phase whose flame never lights does not move cycles_this_hour on alpha.516, adds 1 on the fix
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,4 +50,12 @@ Self-review (advisor): plain reading of entry 95. Under Q49 B the counter counts
 2026-10-28 Q48b (entry 95): the bit is the boiler DHW-active bit (MsgID 0 slave bit 2): a flame while it is set is never counted.
 
 2026-10-28: implemented (count in satPwmBeginOn at every start; first-flame count, satPwmCountStart, _pwm_startCounted removed). Host: tests/test_sat_pwm_anchors.py 14 OK; e1 (unlit ON start counts) FAILED on the alpha.516 source, OK on fix; e2/e3/e4 characterization (e4 = entry 101 reading). test_sat_pwm_start_limit 17 OK with 3 expectations flipped per entry 90 (range-5 start counted at start; slow scenario count 1->2, more 2->1; entry ON flame-off counted). Review (opus correctness + sonnet tests/decisions): no code defect; docs + comments + entry 101 added. Compile esp32-combo SUCCESS; evaluate --quick 0 failed.
+
+2026-10-28 bench (Classic .63, live PIC, replay 2580 lines, cph 5; logs C:/Users/rvdbr/AppData/Local/Temp/otgw-bench-1421/): OLD alpha.516+ece10d3: ON #2 unlit at 11:27:34, cycles_this_hour stayed 1. NEW alpha.517+932cda2 (OTA, settings unchanged): ON #2 unlit at 11:51:48, cycles_this_hour 1 -> 2 at the start (poll 11:51:52). Restore diff empty (new run).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Hourly PWM start count at every OFF/IDLE->ON start, lit or not (pwm.py:160; entries 90, 95, 101). Commit 932cda228 (alpha.517). AC#1: test_e1 red on alpha.516 source, green on fix. AC#2: e2/e3/e4 characterization (no flame adds a count). AC#3: build.bat esp32-combo SUCCESS, evaluate --quick 0 failed, all tests/test_sat_*.py OK. AC#4: bench old 1->1 vs new 1->2 at an unlit ON start. Open: Q52 D (start right after a draw with the hot-water flame lit) asked; current behaviour counts it (entry 101); a change follows his answer.
+<!-- SECTION:FINAL_SUMMARY:END -->
