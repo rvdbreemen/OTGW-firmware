@@ -4,7 +4,7 @@ title: 'SAT: user MaxTSet slider bounded by MsgID 57, sent to the boiler (entry 
 status: To Do
 assignee: []
 created_date: '2026-10-25T06:31:00Z'
-updated_date: '2026-10-28T06:48:00Z'
+updated_date: '2026-10-28T08:49:00Z'
 labels:
   - sat
   - webui
@@ -40,4 +40,6 @@ Entry 54 (2026-10-25 07:31): with the slider at 48 SAT never sends a CS above 48
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
 
 2026-10-28: Sergeant D Q15 (entry 67): defaults 62 radiators / 55 underfloor when the user did not set the slider. Conflict: firmware 45 underfloor system cap and 50 hard ceiling; Q15b asked. Q41 expansion asked (entry 85: MsgID 49 vs 57 bounds).
+
+2026-10-28 Q41 A (entry 100, msg 1564918647338700851): bounds from MsgID 49 (20/80 fallback), always send SH= (MsgID 57), no MsgID 6 gate, SAT caps CS itself. Defaults 62/55 (entry 67) wait on Q15b (underfloor 50 C ceiling, heat-pump default).
 <!-- SECTION:NOTES:END -->

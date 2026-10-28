@@ -4310,3 +4310,20 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156491029470
 **Changes an earlier entry:** confirms our provisional reading of entry 52 (range 3 or 4).
 
 **Task:** TASK-1375. **Open:** none.
+
+## 100. MaxTSet slider: bounds from MsgID 49, always send the value, SAT caps CS itself (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 08:28 UTC, answer to the expanded Q41 (msg 1564916590674452491):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564918647338700851
+
+**Quoted:**
+
+> Q41: A
+
+**Settled (option A as asked):** the MaxTSet slider takes its bounds from MsgID 49 (max CH setpoint upper/lower bound), with 20/80 when the boiler does not report it; the value is always sent to the boiler (SH=, MsgID 57) without checking MsgID 6; SAT also caps the CS it sends itself (entries 51, 54). Same pattern as the hot-water slider with MsgID 48 (entry 53).
+
+**Compared with thermo-nova and the firmware:** thermo-nova uses a fixed 30-80 range for the maximum setpoint entity (`number.py:116-123`) and reads only MsgID 57 (`coordinator/mqtt/opentherm.py:18`); MsgID 49 bounds are a deviation he chose. The firmware has no user MaxTSet yet (entry 67). OT-Direct already writes MsgID 57 for SH= (`OTDirect.ino:143`).
+
+**Changes an earlier entry:** clarifies entry 48's "MsgID 57 values (Lower/Higher)": the bounds come from MsgID 49, the value is MsgID 57.
+
+**Task:** TASK-1373. **Open:** Q15b (underfloor default 55 against the 50 C ceiling, heat-pump default), queued.
