@@ -1,9 +1,11 @@
 ---
 id: TASK-1434
 title: 'Expose WiFi outage count and last-drop record in /api/v2/device/info (GH #682)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-28T21:06:00Z'
+updated_date: '2026-10-28T22:14:00Z'
 labels:
   - enhancement
 dependencies: []
