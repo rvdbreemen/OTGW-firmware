@@ -4553,3 +4553,18 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156509869907
 **Changes an earlier entry:** settles entry 21 Open ("100 % or the max modulation the user selects": the user's value).
 
 **Task:** TASK-1426. **Open:** none.
+
+## 114. Q32 C: remove the firmware-only comfort adjust; humidity is used only through Thermal comfort, as thermo-nova (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 20:42 UTC, answer to Q32 (msg 1565102519879733351; raised by gruijter 2026-10-25):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565103411240902818
+
+**Quoted:**
+
+> Q32: C, follow thermo-nova
+
+**Settled:** the firmware-only "comfort adjust" (a humidity offset on the target, `satUpdateComfort`, `SATcontrol.ino:3790-3800`, setting `bComfortAdjust`) is removed. Humidity is used only by Thermal comfort, where the PID uses the Summer Simmer Index instead of the room temperature, as thermo-nova `climate.py:276-277` (`SATcontrol.ino:1688-1700`). Our advice was A.
+
+**Changes an earlier entry:** entry 32's "Humidity comes to play ONLY when summer simmer index is enabled" is now read as the Thermal comfort option.
+
+**Task:** TASK-1282 (scope changes from "fix the gate" to "remove comfort adjust": the setting, its REST/MQTT/UI exposure and docs). **Open:** none; what happens to a stored `bComfortAdjust` value is an implementation detail (ignore it).
