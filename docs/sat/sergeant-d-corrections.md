@@ -4536,3 +4536,20 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156509395301
 **Not settled:** "Q54: Yes" in the second message. Q54 had not been posted to him; it was only queued (open-questions.md). It asks which modulation value a heat pump gets, so "yes" does not answer it. Q54 is posted in full; this "yes" is not acted on.
 
 **Task:** TASK-1381 (AC#2 now has his OK). **Open:** none for Q53.
+
+## 113. Q54 B: a heat pump always gets the configured max modulation, in and outside PWM (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 20:23 UTC, answer to Q54 (msg 1565098261210079263):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565098699074576566
+
+**Quoted:**
+
+> @BlueFlame Bot Q54: B
+
+**Settled:** for a heat pump the max relative modulation (MM) is always the configured "max modulation" setting, 100 when that is 0, both in and outside PWM. Never 0 (entry 21).
+
+**Compared with thermo-nova and the firmware:** thermo-nova sends 0 in PWM for every boiler (`heating_control.py:139-140`, `:517-518`) and has no heat-pump case; his rule is a deviation, consistent with entry 21. Firmware today: 100 outside PWM, configured max inside PWM (`satComputeMM`, `SATcontrol.ino:379-388`); the outside-PWM branch changes. Hybrids are not part of this answer (they keep today's rule).
+
+**Changes an earlier entry:** settles entry 21 Open ("100 % or the max modulation the user selects": the user's value).
+
+**Task:** TASK-1426. **Open:** none.
