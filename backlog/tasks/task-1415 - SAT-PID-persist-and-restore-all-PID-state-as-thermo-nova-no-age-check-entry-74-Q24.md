@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-28T06:45:00Z'
-updated_date: '2026-10-28T21:26:00Z'
+updated_date: '2026-10-28T21:41:00Z'
 labels:
   - sat
   - sergeant-d
@@ -49,4 +49,6 @@ Execution-graph update requested by Robert: serialize pending SATpid.ino writers
 2026-10-28 handoff specification written and independently reviewed: docs/design/pid-checkpoint-ten-year-spec.md. Proposed design: one dedicated-directory atomic binary snapshot, 52 B main-only or 180 B main plus four zones; five-minute ordinary attempt interval; full TASK-1415 field/time/NaN semantics; ten-year qualification ceilings of 40000 added erases per sector for the declared PID workload and 50000 for the bounded combined LittleFS workload. The spec contains concrete migration/reset decision points, operating assumptions, failure/OTA limits and acceptance tests. The earlier 62-byte simulation does not qualify this new format. Documentation-only work; no firmware implementation, build or new hardware validation was performed in this handoff turn. Task remains To Do pending its existing predecessor chain and required maintainer decisions.
 
 2026-10-28 maintainer decision (Robert, in session): write cadence: write the PID checkpoint only when a stored value has changed (no fixed interval). Read with docs/design/pid-checkpoint-ten-year-spec.md, which proposed a 5-minute maximum. Risk reported to Robert in the session: with the 60 s PID (TASK-1368) integral, error and temperature change on almost every step while heating, so 'only on change' is close to one write per minute during the heating season; the spec's 62-byte simulation (1538 max erases per 100k updates, dedicated dir + tmp/rename) puts that near or above the 50,000-erase ten-year budget. The endurance gate of the spec (section 10) must be measured on the final record before Done.
+
+2026-10-28 maintainer decision (Robert, in session), replaces the earlier 'only on change' note: write the PID checkpoint at most once every 15 minutes, and only when a stored value changed (the spec proposed 5 minutes). Planned restarts and SAT disable still flush immediately (spec section 10 exceptional events). Wear estimate from docs/design/pid-checkpoint-ten-year-spec.md (LittleFS simulation, 62-byte record, dedicated dir + tmp/rename: max 1538 erases on one sector per 100k updates; not a hardware test, the final 180-byte record must be re-measured): worst case every interval writes = 35,040 writes/yr -> ~539 erases/yr on the hottest sector -> ~5,400 in 10 years (+~560 for 36,525 flushes) = ~12% of the spec's 50,000 ten-year budget, ~6% of the 100,000 rated cycles. 5 min would be ~16,200 (+560) in 10 years; 60 s ~80,800 (over budget). Cost: up to 15 min of learned PID state lost on an unplanned reset (power cut, crash).
 <!-- SECTION:NOTES:END -->
