@@ -812,6 +812,17 @@ static bool     _pwm_idle                  = true; // thermo-nova PWMStatus.IDLE
 static uint32_t _pwm_lastOnTimeMs          = 0;    // Last PWM on-phase duration (ms) = Python pwm_state.on_time_seconds. Read by the cycle classifier's SHORT_CYCLING threshold (TASK-891.4 AC#3).
 static bool     _pwm_entryPending          = false; // PWM was just entered (satSetControlMode): the first schedule step starts ON without the off wait, as thermo-nova from IDLE (pwm.py:154-155; entry 43, TASK-1369)
 static uint32_t _pwm_lastUpdateMs          = 0;    // thermo-nova _last_update: the one anchor of both phases. Set at reset (pwm.py:91), at OFF/IDLE->ON (:162), at the first ignition while waiting (:188) and at ON->OFF (:208); the ON time and the off wait count from it (:155, :205; entries 43, 80, 91, 92)
+// Hot water inside a PWM ON phase (Sergeant D, entries 95 and 103; not in thermo-nova, pwm.py runs on during a draw, heating_control.py:202-215):
+// the ON clock freezes while the boiler DHW-active bit is set (Draw), then stays frozen in a post-draw wait (Wait)
+// until the CH flame is back or 180 s after the draw end have passed. _pwm_dhwUsedMs is the ON time already used.
+enum class PwmDhwPhase : uint8_t { None, Draw, Wait };
+static PwmDhwPhase _pwm_dhwPhase   = PwmDhwPhase::None;
+static uint32_t    _pwm_dhwUsedMs  = 0;   // ON time used when the draw began
+static uint32_t    _pwm_dhwEndMs   = 0;   // millis() of the first control tick after the draw (start of the 180 s wait)
+// True from the resume after a draw until this ON phase ends: the phase continues as it was (entry 103 B: no new 180 s minimum
+// burn, no new boiler-temperature measurement). It closes the start-up window (no EMA, no minimum-burn hold), blocks a new
+// _pwm_flameOnMs anchor (pwm.py:144-146 path) and the first-ignition sync, also when the draw came during the ignition wait.
+static bool        _pwm_dhwResumed = false;
 static float    _sat_requestedSetpoint      = 0.0f;  // Requested setpoint of the last control tick: PID output after the multi-zone block and the solar offset, clamped (thermo-nova requested_setpoint, climate.py:370-394). state.sat.fPidOutput stays the raw PID output.
 static float    _sat_lastControlCS          = 0.0f;  // Control setpoint of the last control tick or refresh (the "previous CS" PWM keeps without an override)
 static bool     _sat_thermalSafeActive      = false; // The thermal safe fallback owns CS: the 3 s PWM refresh stays out
@@ -868,6 +879,7 @@ static void satPwmBeginOn(bool flame, float boilerTemp, uint32_t onTimeMs, uint3
   satPwmNarrateEdge(true, onTimeMs, offTimeMs);
   state.sat.bPwmFlameRequested = true;
   _pwm_lastUpdateMs = millis();
+  _pwm_dhwResumed = false;
   satCycleRecordPwmStart();
   if (flame) {
     _pwm_waitingForFlame = false;
@@ -887,7 +899,69 @@ static void satPwmEndOn(uint32_t onTimeMs, uint32_t offTimeMs)
   state.sat.bPwmFlameRequested = false;
   _pwm_flameOffHoldSetpoint = 0.0f;
   _pwm_flameOnMs = 0;
+  _pwm_dhwResumed = false;
   _pwm_lastUpdateMs = millis();
+}
+
+// Hot water begins during a PWM ON phase (first control tick with the DHW bit set; entry 95, Q48b): freeze the ON clock.
+// Nothing is sent: the control loop's DHW early return sends no CS=10 or CH=0. In an OFF phase nothing happens: the
+// off wait stays timed from the ON->OFF switch (entry 97).
+static void satPwmOnDhwStart()
+{
+  if (state.sat.eControlMode != SAT_MODE_PWM || !state.sat.bPwmFlameRequested) return;
+  if (_pwm_dhwPhase == PwmDhwPhase::Wait) {   // a second draw inside the post-draw wait: the clock is frozen already
+    _pwm_dhwPhase = PwmDhwPhase::Draw;
+    return;
+  }
+  if (_pwm_dhwPhase != PwmDhwPhase::None) return;
+  _pwm_dhwUsedMs = millis() - _pwm_lastUpdateMs;
+  _pwm_dhwPhase = PwmDhwPhase::Draw;
+  satNarratef_P(PSTR("PWM ON paused for hot water (used %lu s of %lu s)"),
+                (unsigned long)((_pwm_dhwUsedMs + 500UL) / 1000UL), (unsigned long)((_pwm_lastOnTimeMs + 500UL) / 1000UL));
+}
+
+// The "N s left" figure uses _pwm_lastOnTimeMs, the ON time of the previous schedule tick (this tick's is computed after the resume).
+static void satPwmDhwResume()
+{
+  _pwm_dhwPhase = PwmDhwPhase::None;
+  _pwm_dhwResumed = true;
+  _pwm_waitingForFlame = false;   // a draw during the first-ignition wait ends that wait: the phase continues from the used ON time (entry 104)
+  const uint32_t left = (_pwm_lastOnTimeMs > _pwm_dhwUsedMs) ? (_pwm_lastOnTimeMs - _pwm_dhwUsedMs) : 0;
+  satNarratef_P(PSTR("PWM ON resumed after hot water (%lu s left)"), (unsigned long)((left + 500UL) / 1000UL));
+}
+
+// Hot water ends (first control tick without the DHW bit, before the schedule runs): the draw time does not count, so the
+// anchor moves to now - used. Flame burning: resume at once (entry 103 C). Otherwise the clock stays held (satPwmDhwHold).
+// _pwm_effectiveBoilerTemp and _pwm_flameOnMs stay as they are, and the resume sets _pwm_dhwResumed: no BT reseed, no first-ignition
+// sync, no new EMA window or 180 s hold (entries 103 B, 104).
+static void satPwmOnDhwEnd(bool flame)
+{
+  if (_pwm_dhwPhase != PwmDhwPhase::Draw) return;
+  if (state.sat.eControlMode != SAT_MODE_PWM || !state.sat.bPwmFlameRequested) {
+    _pwm_dhwPhase = PwmDhwPhase::None;
+    return;
+  }
+  _pwm_lastUpdateMs = millis() - _pwm_dhwUsedMs;
+  _pwm_dhwEndMs = millis();
+  _pwm_dhwPhase = PwmDhwPhase::Wait;
+  if (flame) satPwmDhwResume();
+}
+
+// Post-draw wait (entry 103 A): the ON clock stays frozen until the CH flame burns or 180 s after the draw end have passed,
+// then runs on with the remaining ON time. True while held (flame off); the schedule then skips the ON state machine. What runs
+// meanwhile is satApplyPWM()'s flame-off path (ON requested, flame off: the flame-off hold setpoint). The start-up flood of
+// entry 45 (CS/PM=25 for 20 s, MI=500) is not implemented yet (TASK-1371).
+static bool satPwmDhwHold(bool flame)
+{
+  if (_pwm_dhwPhase != PwmDhwPhase::Wait) return false;
+  if (!state.sat.bPwmFlameRequested) {
+    _pwm_dhwPhase = PwmDhwPhase::None;
+    return false;
+  }
+  _pwm_lastUpdateMs = millis() - _pwm_dhwUsedMs;
+  if (!flame && (millis() - _pwm_dhwEndMs) < PWM_IGNITION_TIMEOUT_MS) return true;
+  satPwmDhwResume();
+  return false;
 }
 
 // PWM schedule: duty cycle and the ON/OFF phase state machine. It only moves state
@@ -939,15 +1013,19 @@ static void satPwmSchedule(float pidOutput)
   uint32_t upperMs   = satGetPwmPeriodSec() * 1000UL;  // period (pwm.py:54): e.g. 900 s at 4 cycles/hr, 1800/2400 s heat pump
   uint32_t maxMs     = upperMs * 2;                      // Max cycle time (pwm.py:55)
 
+  // After a hot-water draw inside an ON phase the clock is held while the flame is off (entries 95, 103); a lit flame resumes the
+  // phase at once, so the flame-dependent steps below only run once the phase is resumed (_pwm_dhwResumed) or never paused.
+  const bool dhwHold = satPwmDhwHold(flame);
+
   // A first flame that appears after the ignition wait timed out still anchors the start-up window
   // (pwm.py:144-146 `_flame_on_at is None`); it does not move _last_update.
-  if (flame && state.sat.bPwmFlameRequested && !_pwm_waitingForFlame && _pwm_flameOnMs == 0) {
+  if (flame && state.sat.bPwmFlameRequested && !_pwm_waitingForFlame && !_pwm_dhwResumed && _pwm_flameOnMs == 0) {
     _pwm_flameOnMs = millis();
   }
 
   // --- Effective temperature: EMA 0.3/0.7 for HEATER_STARTUP_TIMEFRAME (180 s) after flame-on
   // (pwm.py:148-149; Sergeant D confirmed 180 s on 2026-10-22). After the window the value is held.
-  if (flame && !_pwm_waitingForFlame && _pwm_flameOnMs != 0) {
+  if (flame && !_pwm_waitingForFlame && !_pwm_dhwResumed && _pwm_flameOnMs != 0) {
     uint32_t sinceFlamOn = millis() - _pwm_flameOnMs;
     if (sinceFlamOn < PWM_IGNITION_TIMEOUT_MS) {
       _pwm_effectiveBoilerTemp = 0.3f * boilerTemp + 0.7f * _pwm_effectiveBoilerTemp;
@@ -1023,6 +1101,7 @@ static void satPwmSchedule(float pidOutput)
   if (state.sat.bPwmFlameRequested) {
     // ON phase (pwm.py:182-209)
     if (syncedNow) return;                 // synced to the ignition this step (pwm.py:187-193)
+    if (dhwHold) return;                   // clock held after hot water (entries 95, 103)
     if (_pwm_waitingForFlame) {
       // Waiting for ignition: the phase stays up to HEATER_STARTUP_TIMEFRAME 180 s from its start, then the
       // timer runs anyway; no abort (pwm.py:194-199; entry 80, Q35 A).
@@ -1031,7 +1110,7 @@ static void satPwmSchedule(float pidOutput)
       SATDebugTln(F("SAT PWM: no flame within 180s, starting the ON timer anyway"));
     }
     // Minimum flame-on hold, 180 s from the first flame of the phase (pwm.py:201-203)
-    if (_pwm_flameOnMs != 0 && (millis() - _pwm_flameOnMs) < PWM_IGNITION_TIMEOUT_MS) return;
+    if (!_pwm_dhwResumed && _pwm_flameOnMs != 0 && (millis() - _pwm_flameOnMs) < PWM_IGNITION_TIMEOUT_MS) return;
     if (elapsedMs >= onTimeMs) {
       // ON time expired: switch to OFF (pwm.py:205-209)
       satPwmEndOn(onTimeMs, offTimeMs);
@@ -1153,6 +1232,10 @@ void satPwmReset()
   _pwm_lastOffTimeMs          = 1;
   _pwm_effectiveBoilerTemp    = 0.0f;   // thermo-nova pwm.reset(): _effective_on_temperature = None (pwm.py:100)
   _pwm_idle                   = true;   // pwm.reset(): _status = PWMStatus.IDLE (pwm.py:92)
+  _pwm_dhwPhase               = PwmDhwPhase::None;   // a hot-water pause belongs to the ON phase it interrupted (entries 95, 103)
+  _pwm_dhwUsedMs              = 0;
+  _pwm_dhwEndMs               = 0;
+  _pwm_dhwResumed             = false;
 }
 
 // Change the control mode; entering or leaving PWM resets the PWM state. Every mode change also clears the
@@ -5095,14 +5178,17 @@ static void satControlLoopRun()
       addCommandToQueue(swCmd, strlen(swCmd), false, 0);
       SATDebugTf(PSTR("SAT: DHW active, sent %s\r\n"), swCmd);
     }
+    if (!_sat_prevDhwActive) satPwmOnDhwStart();   // freeze the ON clock (entry 95)
     _sat_prevDhwActive = true;
     satCycleSkipAutoSwitch();   // hot water: thermo-nova clears the overshoot start (heating_control.py:268-270)
     satPublishMQTT();   // sat/power carries the DHW-capacity value while DHW runs (TASK-1258)
     return;
   }
+  // The branch above returns before satPwmSchedule(), so the PWM ON clock does not run during hot water. thermo-nova
+  // keeps updating it (heating_control.py:202-215); Sergeant D pauses it instead (entries 95, 103): the end of the draw
+  // shifts the anchor by the draw length before the schedule runs.
+  if (_sat_prevDhwActive) satPwmOnDhwEnd(satIsFlameOn());
   _sat_prevDhwActive = false;
-  // The branch above returns before satPwmSchedule(), so the PWM phase clock does not run during hot water.
-  // thermo-nova keeps updating it (heating_control.py:202-215); TASK-1422 tracks the difference.
 
   // --- Read inputs (staleness is checked inside these functions) ---
   float roomTemp = satGetRoomTemp();

@@ -72,21 +72,28 @@ int main() {
   } else {                                          // "cold": flame off; the last flame-on is an old hot-water ignition (1500 s ago)
     g_flame = false; g_flameOnStart = base - 1500000UL; g_flameOffStart = base - 1400000UL;
   }
-  state.sat.bPwmFlameRequested = false;
+  state.sat.bPwmFlameRequested = false; bool prevDhw = false;
   for (int sec = 0; sec <= (int)dur; sec++) {
     g_ms = base + (uint32_t)sec * 1000UL;
     for (auto& e : evs) {
       if (e.sec != sec) continue;
       if (e.kind == "dhw") state.sat.bDhwActive = e.val != 0;
+      else if (e.kind == "flow") g_flow = (float)e.val;
       else if (e.kind == "flame" && (e.val != 0) != g_flame) {   // flame edge: what satCycleOnFlameChange() records
         g_flame = e.val != 0;
         if (g_flame) g_flameOnStart = g_ms; else g_flameOffStart = g_ms;
       }
     }
-    if (sec % 30 != 0 || state.sat.bDhwActive) continue;         // control tick; skipped during a hot-water draw
+    if (sec % 30 != 0) continue;                                 // control tick
+    if (state.sat.bDhwActive) {                                  // hot water: the loop returns early, the schedule is skipped
+      if (!prevDhw) { @DHWSTART@ }                               // satControlLoopRun(): rising edge, before the early return
+      prevDhw = true; continue;
+    }
+    if (prevDhw) { @DHWEND@ }                                    // falling edge: before satApplyPWM(), as in satControlLoopRun()
+    prevDhw = false;
     const float cs = satApplyPWM(pid);
     _sat_lastControlCS = cs;
-    printf("T %d %d %.1f %d\n", sec, (int)state.sat.bPwmFlameRequested, cs, (int)g_flame);
+    printf("T %d %d %.1f %d %.1f\n", sec, (int)state.sat.bPwmFlameRequested, cs, (int)g_flame, _pwm_effectiveBoilerTemp);
   }
   fprintf(stderr, "C %d\n", g_pwmStarts);          // satCycleRecordPwmStart() calls = PWM starts counted (TASK-1421)
   return 0;
@@ -96,14 +103,14 @@ int main() {
 
 class Timeline:
     def __init__(self, rows):
-        self.rows = rows  # (sec, req, cs, flame)
+        self.rows = rows  # (sec, req, cs, flame, effective BT)
 
     def req_at(self, sec):
         return [r[1] for r in self.rows if r[0] == sec][0]
 
     def edges(self):
         prev, ons, offs = 0, [], []
-        for sec, req, _cs, _fl in self.rows:
+        for sec, req, _cs, _fl, _bt in self.rows:
             if req and not prev:
                 ons.append(sec)
             if prev and not req:
@@ -112,13 +119,15 @@ class Timeline:
         return ons, offs
 
     def dump(self, upto=None):
-        return " ".join(f"{s}:{'ON' if q else 'off'}/{cs:.0f}" for s, q, cs, _ in self.rows if upto is None or s <= upto)
+        return " ".join(f"{s}:{'ON' if q else 'off'}/{cs:.0f}" for s, q, cs, _, _bt in self.rows if upto is None or s <= upto)
 
 
 class SatPwmAnchors(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        hp.MAIN = MAIN
+        hooks = "satPwmOnDhwStart" in hp.SAT_INO.read_text(encoding="utf-8")
+        hp.MAIN = (MAIN.replace("@DHWSTART@", "satPwmOnDhwStart();" if hooks else "")
+                       .replace("@DHWEND@", "satPwmOnDhwEnd(g_flame);" if hooks else ""))
         cls.tmp = tempfile.TemporaryDirectory()
         cls.exe = hp.build(Path(cls.tmp.name))
 
@@ -145,7 +154,7 @@ class SatPwmAnchors(unittest.TestCase):
         rows = []
         for ln in out.splitlines():
             p = ln.split()
-            rows.append((int(p[1]), int(p[2]), float(p[3]), int(p[4])))
+            rows.append((int(p[1]), int(p[2]), float(p[3]), int(p[4]), float(p[5])))
         return Timeline(rows)
 
     # TASK-1407: PWM edges in the SAT log, with pwm_on / pwm_off in seconds (Sergeant D, entry 93) ------
@@ -184,7 +193,7 @@ class SatPwmAnchors(unittest.TestCase):
         t0 = 270
         ev = [(t0 + 8, "flame", 0), (t0 + 491, "dhw", 1), (t0 + 496, "flame", 1), (t0 + 510, "flame", 0), (t0 + 510, "dhw", 0)]
         tl = self.sim(3, 0.22, "burning", ev, 1500)
-        bad = [(s, cs) for s, q, cs, _ in tl.rows if t0 <= s < t0 + 936 and q == 0 and cs != 10.0 and s != t0 + 0]
+        bad = [(s, cs) for s, q, cs, _, _bt in tl.rows if t0 <= s < t0 + 936 and q == 0 and cs != 10.0 and s != t0 + 0]
         # the tick that ends ON (s == t0) already returns the OFF setpoint
         self.assertEqual(bad, [], f"OFF phase ticks with CS != 10: {bad}")
 
@@ -198,7 +207,7 @@ class SatPwmAnchors(unittest.TestCase):
         seen = ((ignite_at + TICK - 1) // TICK) * TICK
         exp_end = seen + 264
         self.assertTrue(offs, f"{label}: ON phase never ended")
-        for s, q, cs, _ in tl.rows:
+        for s, q, cs, _, _bt in tl.rows:
             if s < ignite_at + 180:
                 self.assertEqual(q, 1, f"{label}: ON phase ended early at t={s}s (ignition at {ignite_at}s); {tl.dump(240)}")
                 self.assertNotEqual(cs, 10.0, f"{label}: CS=10 inside the ON phase at t={s}s")
@@ -253,7 +262,7 @@ class SatPwmAnchors(unittest.TestCase):
         hold_end = seen + 180
         self.assertGreater(hold_end, 264 + TICK, "precondition: the hold, not the ON time, must end the phase")
         self.assertLess(hold_end, seen + 264 - TICK, "precondition: ending at the hold means no resync")
-        for s, q, cs, _ in tl.rows:
+        for s, q, cs, _, _bt in tl.rows:
             if s < hold_end:
                 self.assertEqual(q, 1, f"{label}: ON ended early at t={s}s (hold until {hold_end}s); {tl.dump(600)}")
                 self.assertNotEqual(cs, 10.0, f"{label}: CS=10 inside the ON phase at t={s}s")
@@ -298,6 +307,100 @@ class SatPwmAnchors(unittest.TestCase):
         n, tl = self.starts(3, 0.5, "burning", [(1190, "dhw", 1), (1215, "dhw", 0)], 1500)
         self.assertEqual(tl.edges()[0], [0, 1230], tl.dump(1300))
         self.assertEqual((base, n), (2, 2), f"the ON start after a draw must count exactly 1, got base={base} n={n}")
+
+    # TASK-1422 (entries 95, 103): hot water inside an ON phase freezes the ON clock ------------------------
+    # cycles/hour 3, duty 0.22: ON 264 s, burning start at 0. Draw bit 100..400 (the first loop tick with it is 120, the first
+    # tick after it 420: used ON time 120 s, 144 s left). The DHW flame stays lit through the draw unless noted.
+    def _draw(self, extra, dur=1000):
+        return self.sim(3, 0.22, "burning", [(100, "dhw", 1), (400, "dhw", 0)] + extra, dur)
+
+    def test_f1_draw_in_on_phase_resumes_with_the_remaining_on_time_after_the_ch_relight(self):
+        # Red on HEAD: ON ends at the first tick after the draw (420). Fix: DHW flame out at 400, CH relight at 430 (seen at
+        # the tick at 450): anchor = 450 - 120, ON ends at 330 + 264 = 594 (tick 600).
+        tl = self._draw([(400, "flame", 0), (430, "flame", 1)])
+        ons, offs = tl.edges()
+        self.assertEqual(ons[:1], [0], tl.dump(60))
+        self.assertTrue(offs, f"ON never ended: {tl.dump()}")
+        self.assertLessEqual(abs(offs[0] - 594), TICK, f"ON ended at {offs[0]} s, expected 594 s (430 + 164); {tl.dump(700)}")
+        self.assertTrue(all(q == 1 for s, q, _c, _f, _b in tl.rows if s < 590), tl.dump(700))
+
+    def test_f2_no_ch_flame_after_the_draw_resumes_180_s_after_the_draw_end(self):
+        # The draw ends at the tick 420; no CH flame: the clock resumes at 600, 144 s left: ON ends at 744.
+        tl = self._draw([(400, "flame", 0)])
+        _ons, offs = tl.edges()
+        self.assertTrue(offs, f"ON never ended: {tl.dump()}")
+        self.assertLessEqual(abs(offs[0] - 744), TICK, f"ON ended at {offs[0]} s, expected 744 s (600 + 144); {tl.dump(800)}")
+        self.assertTrue(all(q == 1 for s, q, _c, _f, _b in tl.rows if s < 740), tl.dump(800))
+
+    def test_f3_flame_still_lit_after_the_draw_resumes_at_once(self):
+        # The flame burns through the draw and after it: anchor = 420 - 120, ON ends at 300 + 264 = 564.
+        tl = self._draw([])
+        _ons, offs = tl.edges()
+        self.assertTrue(offs, f"ON never ended: {tl.dump()}")
+        self.assertLessEqual(abs(offs[0] - 564), TICK, f"ON ended at {offs[0]} s, expected 564 s (420 + 144); {tl.dump(700)}")
+        self.assertGreater(offs[0], 420 + TICK, "ON must not end right after the draw")
+
+    def test_f4_draw_in_off_phase_keeps_the_off_wait_from_the_switch(self):
+        # Characterization (green on HEAD): ON 0..270, off wait 936 s, next ON at 270 + 960. A draw in the OFF phase changes nothing.
+        ev = [(278, "flame", 0), (500, "dhw", 1), (505, "flame", 1), (800, "flame", 0), (800, "dhw", 0)]
+        tl = self.sim(3, 0.22, "burning", ev, 1700)
+        ons, offs = tl.edges()
+        self.assertEqual(offs[0], 270, tl.dump(300))
+        self.assertLessEqual(abs(ons[1] - (270 + 960)), TICK, f"second ON at {ons[1]}; {tl.dump(1400)}")
+
+    def test_f5_no_bt_reseed_across_the_draw(self):
+        # BT learned at 50 C stays 50 C at every tick after the draw although the flow is 62 C: no flame sync, no new EMA window.
+        tl = self._draw([(400, "flame", 0), (400, "flow", 62), (430, "flame", 1)], 700)
+        bts = {bt for s, _q, _c, _f, bt in tl.rows if s >= 420}
+        self.assertEqual(bts, {50.0}, f"BT changed across the draw: {tl.rows}")
+
+    # Entry 104: the pause/resume of entry 103 B applies to every ON phase a draw interrupts, also one still waiting for its first
+    # ignition and one inside its 180 s start-up window. Cold start: the ON phase begins at 0 with the flame off (waiting).
+    def _cold(self, extra, dur=900):
+        return self.sim(3, 0.22, "cold", extra, dur)
+
+    def test_g1_draw_during_the_first_ignition_wait_resumes_without_a_flame_sync(self):
+        # Draw bit 40..200 (first loop tick with it 60: 60 s used), the DHW flame lights at 45 and burns on after the draw. Resume at the
+        # tick 210: anchor = 210 - 60, ON ends at 150 + 264 = 414 (tick 420), BT stays 50. A flame sync at 210 would end it at 474.
+        tl = self._cold([(40, "dhw", 1), (45, "flame", 1), (200, "dhw", 0)])
+        _ons, offs = tl.edges()
+        self.assertTrue(offs, f"ON never ended: {tl.dump()}")
+        self.assertLessEqual(abs(offs[0] - 414), TICK, f"ON ended at {offs[0]} s, expected 414 s (210 - 60 + 264); {tl.dump(600)}")
+        self.assertEqual({bt for s, _q, _c, _f, bt in tl.rows if s >= 210}, {50.0}, tl.rows)
+
+    def test_g2_no_flame_after_a_draw_in_the_ignition_wait_resumes_180_s_after_the_draw_end(self):
+        # Draw 40..200 (60 s used), no flame at all. Draw end tick 210, ON timer resumes at 390: anchor 330, ON ends at 594 (tick 600).
+        tl = self._cold([(40, "dhw", 1), (200, "dhw", 0)])
+        _ons, offs = tl.edges()
+        self.assertTrue(offs, f"ON never ended: {tl.dump()}")
+        self.assertLessEqual(abs(offs[0] - 594), TICK, f"ON ended at {offs[0]} s, expected 594 s (390 - 60 + 264); {tl.dump(700)}")
+        self.assertTrue(all(q == 1 for s, q, _c, _f, _b in tl.rows if s < 590), tl.dump(700))
+
+    def test_g3_short_draw_inside_the_start_up_window_leaves_bt_alone(self):
+        # Burning start at 0 (window 0..180, BT 50). Draw 50..85 with the flow at 62 C afterwards (first tick with the bit 60, resume at
+        # 90, 60 s used): the EMA must not follow the hot flow, BT stays 50; ON ends at 90 - 60 + 264 = 294 (tick 300).
+        tl = self.sim(3, 0.22, "burning", [(50, "dhw", 1), (50, "flow", 62), (85, "dhw", 0)], 700)
+        self.assertEqual({bt for s, _q, _c, _f, bt in tl.rows if s >= 90}, {50.0}, tl.rows)
+        _ons, offs = tl.edges()
+        self.assertTrue(offs, f"ON never ended: {tl.dump()}")
+        self.assertLessEqual(abs(offs[0] - 294), TICK, f"ON ended at {offs[0]} s, expected 294 s; {tl.dump(500)}")
+
+    def test_g4_second_draw_in_the_post_draw_wait_counts_the_180_s_from_the_last_draw_end(self):
+        # Draw 1 40..200 (tick 210 = end, Wait), draw 2 bit 250..320 (ticks 270..300 skipped, end tick 330). No flame. The wait runs
+        # 330..510, anchor 510 - 60 = 450, ON ends at 714 (tick 720). Counting from the first draw end it would end at 594.
+        tl = self._cold([(40, "dhw", 1), (200, "dhw", 0), (250, "dhw", 1), (320, "dhw", 0)], 1000)
+        _ons, offs = tl.edges()
+        self.assertTrue(offs, f"ON never ended: {tl.dump()}")
+        self.assertLessEqual(abs(offs[0] - 714), TICK, f"ON ended at {offs[0]} s, expected 714 s; {tl.dump(800)}")
+        self.assertTrue(all(q == 1 for s, q, _c, _f, _b in tl.rows if s < 700), tl.dump(800))
+
+    def test_f6_pause_and_resume_are_narrated_once_each(self):
+        lines = ["cfg 3 0.22", "init burning", "run 700", "ev 100 dhw 1", "ev 400 dhw 0"]
+        r = subprocess.run([str(self.exe)], input="\n".join(lines) + "\n", capture_output=True, text=True, check=True)
+        narr = [ln[2:] for ln in r.stderr.splitlines() if ln.startswith("N ") and "hot water" in ln]
+        self.assertEqual(narr, ["PWM ON paused for hot water (used 120 s of 264 s)",
+                                "PWM ON resumed after hot water (144 s left)"], narr)
+        self.assertLess(max(len(x) for x in narr), 96)
 
 
 if __name__ == "__main__":

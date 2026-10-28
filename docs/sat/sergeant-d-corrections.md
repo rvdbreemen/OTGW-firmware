@@ -4377,3 +4377,20 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156495318996
 **Not settled:** D (an ON start right after a draw with the hot-water flame still lit counts as a normal start, our entry 101 reading); he asked us to expand. TASK-1421 counts it meanwhile (entry 101).
 
 **Task:** TASK-1422 (A, B, C: implementation unblocked); D -> TASK-1421 follow-up depending on the answer. **Open:** D.
+
+## 104. Interpretation: the hot-water resume rules apply to every interrupted ON phase, also one still waiting for its first ignition (2026-10-28, our reading)
+
+**Source:** no new statement. Review of the TASK-1422 implementation (2026-10-28) found two cases entries 95 and 103 do not name: a draw during an ON phase that is still waiting for its first CH ignition, and a short draw inside the 180 s start-up window after an ignition.
+
+**His words (entry 103 B):** "When the CH flame is back, the ON phase continues with the ON time that was still left. No new 180 s minimum burn and no new boiler-temperature measurement (the flow is still hot from the hot water)".
+
+**Reading acted on (ours):** the reason he gave (the flow is hot after a draw) holds for every ON phase a draw interrupts. So after any draw:
+- the phase resumes with the ON time it had used before the draw (A: up to 180 s from the draw end for the CH flame, then the timer runs; C: flame still lit, resume at once);
+- the first CH flame after the draw is not treated as the phase's ignition: no new ON-time anchor, no new boiler-temperature seed, no new 180 s minimum burn;
+- a start-up window (EMA of the boiler temperature, `pwm.py:148-149`) that the draw interrupted is closed; the value from before the draw is kept.
+
+Without this the DHW flame or the first CH flame after the draw would anchor a full ON time and seed the boiler temperature from the hot flow (`pwm.py:186-193` first-ignition sync).
+
+**Compared with thermo-nova:** thermo-nova has no hot-water pause at all (entry 95); its first-ignition sync (`pwm.py:186-193`) would fire on whatever flame comes first. This reading extends his deviation consistently.
+
+**Task:** TASK-1422. **Open:** offered to him in the progress note; acted on meanwhile.

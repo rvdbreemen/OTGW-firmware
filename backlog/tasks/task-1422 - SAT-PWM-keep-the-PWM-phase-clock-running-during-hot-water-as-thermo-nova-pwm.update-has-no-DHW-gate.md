@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-28T07:36:00Z'
-updated_date: '2026-10-28T10:49:00Z'
+updated_date: '2026-10-28T11:11:00Z'
 labels:
   - sat
   - sergeant-d
@@ -28,8 +28,8 @@ Review finding on the TASK-1382/1380/1383 candidate (correctness + SAT-decision 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test: an ON phase interrupted by a hot-water draw keeps its used ON time and continues with the remaining ON time after the CH flame relights (freeze-clock: lastUpdate shifted by the draw length, no BT reseed, no new EMA window or hold); red on alpha.516, green on the fix
-- [ ] #2 No CS=10/CH=0 sent during the draw; OFF phase during a draw unchanged (timed from the ON->OFF switch)
+- [x] #1 Host test: an ON phase interrupted by a hot-water draw keeps its used ON time and continues with the remaining ON time after the CH flame relights (freeze-clock: lastUpdate shifted by the draw length, no BT reseed, no new EMA window or hold); red on alpha.516, green on the fix
+- [x] #2 No CS=10/CH=0 sent during the draw; OFF phase during a draw unchanged (timed from the ON->OFF switch)
 - [x] #3 Sergeant D's OK on the open points (post-draw 180 s wait then resume anyway; no new hold/BT reseed; flame already burning after the draw resumes at once) recorded in docs/sat/sergeant-d-corrections.md before implementation
 - [ ] #4 build + evaluate green
 <!-- AC:END -->
@@ -49,4 +49,6 @@ Proof: host test: ON 264 s (duty 0.22, 1200 s), draw from +100 s to +400 s, CH i
 2026-10-28 advisor review: design defects in the first plan (flame-sync would give a full ON time and reseed BT with hot DHW flow; wait timed from lastUpdate would end the phase at once; end-time contradiction 594 vs 610). Freeze-clock model chosen: on DHW rising edge capture used ON ms; on falling edge (before _sat_prevDhwActive clears, before satPwmSchedule) shift _pwm_lastUpdateMs by the draw length and enter a post-draw wait timed from the DHW falling edge, bypassing flame-sync; clear in satPwmReset. Waiting for Sergeant D's OK on the three open points (asked after Q42).
 
 2026-10-28 Sergeant D Q52 A, B, C yes (entry 103, msg 1564953189969829993): 180 s post-draw wait from the draw end then resume anyway; resume with the remaining ON time, no new hold, no BT reseed; flame still lit after the draw resumes at once. Implementation unblocked. D (start-count after a draw) asked separately (TASK-1421).
+
+2026-10-28 implemented: PwmDhwPhase + satPwmOnDhwStart/satPwmOnDhwEnd/satPwmDhwHold/satPwmDhwResume, _pwm_dhwResumed (entries 95, 103, 104). Host: tests/test_sat_pwm_anchors.py 24 OK; on the alpha.517 source 8 failures (f1, f2, f3, f6, g1-g4); f4 (draw in OFF) and f5 (no BT reseed) characterization. Review (opus correctness, sonnet rules, sonnet tests): draw during first-ignition wait reseeded BT and gave a full ON time -> fixed (resume clears the wait, blocks sync/EMA/hold; entry 104); dead guards removed; entry 45 comment corrected (flood is TASK-1371); docs updated. All tests/test_sat_*.py OK; evaluate --quick 0 failed; compile esp32-combo SUCCESS (pre-fix version). AC#2: no CS=10/CH=0 during the draw (early return unchanged), OFF draw unchanged (f4).
 <!-- SECTION:NOTES:END -->
