@@ -4356,3 +4356,24 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156494948247
 **Compared with thermo-nova and the firmware:** thermo-nova only exposes the bit as a sensor (`coordinator/serial/binary_sensor.py:51`). The firmware does not act on it for SAT control today. No change.
 
 **Task:** none (no capability-forced PWM task is created). **Open:** none.
+
+## 103. Hot water during a PWM ON phase: resume details A, B and C confirmed; D to expand (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 10:45 UTC, answer to Q52 (msg 1564951907665977416):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564953189969829993
+
+**Quoted:**
+
+> @BlueFlame Bot Q52: A B and C yes. Expand on D
+
+**Settled (as asked, refining entry 95):**
+
+- **A:** after a hot-water draw that interrupted a PWM ON phase, SAT waits up to 180 s, counted from the end of the draw, for the CH flame; if none comes, the ON timer resumes anyway (the entry 80 rule).
+- **B:** when the CH flame is back, the ON phase continues with the ON time that was still left: no new 180 s minimum burn and no new boiler-temperature measurement (the flow is still hot from the draw), the same as a relight in thermo-nova (`pwm.py:144-146`).
+- **C:** if the flame is still burning at the first moment after the draw, the ON timer resumes at once.
+
+**Compared with thermo-nova:** the pause itself is his deviation (entry 95; thermo-nova runs `pwm.update()` during hot water, `heating_control.py:202-215`); B follows thermo-nova's relight handling.
+
+**Not settled:** D (an ON start right after a draw with the hot-water flame still lit counts as a normal start, our entry 101 reading); he asked us to expand. TASK-1421 counts it meanwhile (entry 101).
+
+**Task:** TASK-1422 (A, B, C: implementation unblocked); D -> TASK-1421 follow-up depending on the answer. **Open:** D.
