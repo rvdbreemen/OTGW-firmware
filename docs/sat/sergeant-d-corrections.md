@@ -4477,3 +4477,22 @@ Also (review, same task): a hot-water flame is marked at its ignition when the b
 **Changes an earlier entry:** entry 86, the Q46 comparison bullets (catch-up grid, "about half the time one tick late"): wrong premise, corrected here.
 
 **Task:** TASK-1420. **Open:** none; offered to him in the progress note.
+
+## 110. Q15b B: keep the 50 °C underfloor ceiling; the underfloor default for max flow becomes 50 °C, as thermo-nova (2026-10-28, changes entry 67)
+
+**Source:** #alpha-testing, 2026-10-28 19:06 UTC, answer to Q15b (msg 1565072816162873576):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565079331175268423
+
+**Quoted:**
+
+> Q15b: B
+
+**The question (as posted):** the underfloor default of 55 °C (entry 67) against the firmware's fixed underfloor ceiling of 50 °C (`SATcontrol.ino:137`, applied at `:319`). A) drop the 50 ceiling, the user setting (default 55) is the limit, global 65 stays; B) keep the 50 ceiling, the underfloor default becomes 50, as in thermo-nova; C) default 55 and ceiling 50. Our advice was A.
+
+**Settled:** the 50 °C underfloor ceiling (`SAT_HARD_MAX_FLOOR`) stays. The default maximum flow setpoint for underfloor is 50 °C, the value thermo-nova uses (`helpers.py:97-99`, `calculate_default_maximum_setpoint`: 50 underfloor, 55 otherwise). Radiators keep 62 °C (entry 67).
+
+**Changes an earlier entry:** entry 67, the underfloor default (55 -> 50). The radiator default 62 is unchanged.
+
+**Compared with the firmware:** the system cap for underfloor is 45 (`SATcontrol.ino:305`), below both the new default and the ceiling; how the user setting replaces that cap is TASK-1373's work (entries 51, 54, 100).
+
+**Task:** TASK-1373. **Open:** the heat-pump default (entry 67 Open, not asked yet); whether SAT writes an unchosen default to the boiler (entry 67 Open, read with entry 100).
