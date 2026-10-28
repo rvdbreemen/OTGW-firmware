@@ -4,7 +4,7 @@ title: 'SAT: gas boiler PWM cycles per hour 3 or 4 only, default 3 (entries 30, 
 status: To Do
 assignee: []
 created_date: '2026-10-25T07:21:00Z'
-updated_date: '2026-10-27T23:45:00Z'
+updated_date: '2026-10-28T06:48:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -32,4 +32,6 @@ Sergeant D entry 52 (2026-10-25, answer to Q16): default 3 cycles per hour for g
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
+
+2026-10-28: Q16 'please expand' (entry 68): default settled (entry 52), gas range re-asked. Q37 A (entry 82): hybrids keep gas timing, so the range covers hybrids; align the out-of-range fallback (SATcontrol.ino:354 returns 4 for radiators) with default 3.
 <!-- SECTION:NOTES:END -->

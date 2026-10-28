@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T10:38:00Z'
-updated_date: '2026-10-27T23:46:00Z'
+updated_date: '2026-10-28T06:48:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -33,4 +33,6 @@ From TASK-1273 / TASK-1366 R3. Firmware times ON expiry from the last flame-on e
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
+
+2026-10-28: Q35 A decided (entry 80). Field reproduction (entry 92): gruijter alpha.514 capture 2026-10-27, an ON phase that starts with the flame off anchors on the last hot-water ignition (SATcontrol.ino:883/:1024) and ends on its first tick: CS=48 10:14:24, CS=10 10:14:54, CS=48 10:15:24 CET, flame 10:15:35. Blocks TASK-1419 (Q45) and TASK-1421 (Q49 B).
 <!-- SECTION:NOTES:END -->

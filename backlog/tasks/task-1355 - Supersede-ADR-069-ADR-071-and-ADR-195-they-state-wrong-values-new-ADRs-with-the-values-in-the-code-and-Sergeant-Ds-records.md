@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T16:44:00Z'
-updated_date: '2026-10-25T10:40:00Z'
+updated_date: '2026-10-28T06:48:00Z'
 labels:
   - adr
   - sat
@@ -39,4 +39,6 @@ Maintainer 2026-10-24: ADRs with wrong values are retired (superseded) and repla
 2026-10-24: Robert chose to wait for Sergeant D before accepting ADR-197/198/199. All their open questions are queued (Q10, Q13, Q20-Q28). ADR-200 accepted, ADR-022 superseded.
 
 2026-10-25 AC1 evidence: commit 057535397 'ADRs 197-199 (Proposed): successors to ADR-069, ADR-071 and ADR-195' plus the second-reader notes of 2026-10-24. AC2 waits on Sergeant D (Q20-Q28) and Robert's explicit OK.
+
+2026-10-28: Q20 (entry 71): values 28.2/21 restated, boundary <= vs < re-asked as Q20b; entry 12's 'at or below' bullet named. Q21 (entry 72): 5.0 stays, confirms ADR-198. Q22 remove auto-tune -> TASK-1413. Q23-Q27 decided (entries 73-77) -> TASK-1414..1418. Q28 rounding scope open (Q28a/b).
 <!-- SECTION:NOTES:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-26T18:24:00Z'
-updated_date: '2026-10-27T23:46:00Z'
+updated_date: '2026-10-28T06:48:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -33,4 +33,6 @@ Sergeant D 2026-10-26 13:35 (#alpha-testing msg 1564271354390257867): 'Also in t
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
+
+2026-10-28: request repeated with field names pwm_on (seconds) and pwm_off (seconds) (entry 93, msg 1564861520494461061).
 <!-- SECTION:NOTES:END -->

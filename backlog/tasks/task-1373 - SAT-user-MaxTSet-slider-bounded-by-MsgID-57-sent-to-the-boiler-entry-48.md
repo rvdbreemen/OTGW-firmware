@@ -4,7 +4,7 @@ title: 'SAT: user MaxTSet slider bounded by MsgID 57, sent to the boiler (entry 
 status: To Do
 assignee: []
 created_date: '2026-10-25T06:31:00Z'
-updated_date: '2026-10-27T23:45:00Z'
+updated_date: '2026-10-28T06:48:00Z'
 labels:
   - sat
   - webui
@@ -38,4 +38,6 @@ Sergeant D 2026-10-25 05:56/06:10 UTC (#alpha-testing 1563793351961223221, 15637
 Entry 54 (2026-10-25 07:31): with the slider at 48 SAT never sends a CS above 48, ignition hold included (thermo-nova heating_control.py:397 clamps the flame-off hold at maximum_setpoint).
 
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
+
+2026-10-28: Sergeant D Q15 (entry 67): defaults 62 radiators / 55 underfloor when the user did not set the slider. Conflict: firmware 45 underfloor system cap and 50 hard ceiling; Q15b asked. Q41 expansion asked (entry 85: MsgID 49 vs 57 bounds).
 <!-- SECTION:NOTES:END -->

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-20 18:16
-updated_date: '2026-10-27T23:44:00Z'
+updated_date: '2026-10-28T06:48:00Z'
 labels:
   - bug
   - sat
@@ -54,4 +54,6 @@ Verification: host test compiling the real satPidUpdate() path (first call retur
 2026-10-25: changes boiler control, so queued for Sergeant D as Q39 in docs/sat/open-questions.md (A curve+P+restored I with D=0 as thermo-nova pid.py:126-131; B curve only; C keep CS=10/CH=0). Blocked on Q39.
 
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
+
+2026-10-28: Q39 A decided (entry 83): first tick sends curve + P + restored I; D term on the first tick asked as Q39b (D=0 provisional per the option text).
 <!-- SECTION:NOTES:END -->

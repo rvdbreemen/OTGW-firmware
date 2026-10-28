@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-24T22:32:00Z'
-updated_date: '2026-10-27T23:45:00Z'
+updated_date: '2026-10-28T06:48:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -37,4 +37,6 @@ Sergeant D 2026-10-24 21:34 UTC (Q14, entry 45, a deliberate deviation from ther
 2026-10-25 implement-next-task: skipped, waits for Q40 (how 'no return temperature' is detected) and Sergeant D's OK on the plan.
 
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
+
+2026-10-28: Q40 B 'for now, we may need to reconsider later' (entry 84): no return temperature = Unknown-DataID on MsgID 28, provisional.
 <!-- SECTION:NOTES:END -->

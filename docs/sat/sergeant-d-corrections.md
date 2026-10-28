@@ -3110,3 +3110,1104 @@ follow develop is a new, larger question for the maintainer.
 
 **Open:** Robert's decision on (a) following develop for the PWM duty temperature and reignition, (b) moving the pinned
 commit (CLAUDE.md SAT ground truth block: one commit, spec re-diff).
+
+## 67. MaxTSet slider defaults: 62 °C radiators, 55 °C underfloor (2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27 08:59 UTC. This answers Q15 ("Maximum flow setpoint: a user setting, and which defaults?") from the overview of 2026-10-24 (messages 1563656700118958262 and 1563656702086221987):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564564109092192347
+
+**Quoted:**
+
+> Q15: yes a user setting. 55 underfloor, 62 radiators / Q16: please expand / Q17: yes / Q19: leave them as is
+
+**Settled by this statement:**
+
+- He confirms again that the maximum flow setpoint is a user setting (entries 48 and 51).
+- The default when the user has not chosen a value is 62 °C for radiators and 55 °C for underfloor. This settles the first Open point of entry 48 ("the default value when nothing is chosen").
+
+**Compared with thermo-nova and the firmware (opened this session):**
+
+- thermo-nova's default is 50 for underfloor and 55 for every other system, heat pumps included (`helpers.py:97-99`, `calculate_default_maximum_setpoint`). The user can choose 10..100 (`config_flow.py:612-613`). Both of his values are higher than thermo-nova's: radiators +7, underfloor +5.
+- thermo-nova has a 62 / 45 / 40 table (radiators / underfloor / heat pump), but it is `OVERSHOOT_PROTECTION_SETPOINT` (`const.py:189-193`), not a maximum setpoint. The firmware's fixed caps have the same values. The firmware comment that 40 °C "matches Python's heat pump cap" (`SATcontrol.ino:301`) is not borne out: no heat-pump maximum setpoint was found in thermo-nova.
+- The firmware has a heating-system setting: `iHeatingSystem` auto / radiators / underfloor (`SATtypes.h:40-44`, `:463`, settings key `SATsystem` at `settingStuff.ino:997`). AUTO resolves to radiators (`SATcontrol.ino:272-273`), so a per-system default can be applied today.
+- The firmware has no user MaxTSet today. The fixed system cap is 62 radiators / 45 underfloor (`SATcontrol.ino:305`), and 40 for a heat-pump source (`:307`). `settings.sat.fMaxSetpoint` (65, `SATtypes.h:538`) has no settings key: a grep of `settingStuff.ino` for maxtset/maxsetpoint finds nothing.
+- **Conflict with the firmware ceilings:** `satEffectiveMaxSetpoint()` takes the boiler's MaxTSet, then the system cap (`:318`, `:320`), then `SAT_HARD_MAX_FLOOR = 50` for underfloor (`SATcontrol.ino:137`, applied at `:319`, `:321`).
+  - As the code stands, an underfloor CS is capped at 45 by the system cap.
+  - If TASK-1373 replaces the system cap with the user value, the 50 hard ceiling still turns a 55 default into 50.
+  - The hard ceiling is a firmware addition. thermo-nova has no separate underfloor ceiling, only the global `MAXIMUM_SETPOINT = 65.0` (`const.py:36`).
+  - We put this to him (clarification Q15b) and do not resolve it ourselves.
+
+**Changes an earlier entry:** it completes entry 48 (Open: default value). It agrees with entries 51 and 54 (the user value caps every CS).
+
+**Interpretation (ours):**
+
+- He gave no value for heat pumps. Until he says otherwise we keep the firmware's 40 °C heat-pump cap (`SATcontrol.ino:307`). This differs from thermo-nova, whose default is 55 for a heat pump (`helpers.py:99`). The 40 °C in entry 30 appears only in our own interpretation text, not in his words. The heat-pump default has to be asked separately.
+- "Default" means the value used until the user moves the slider. It is clamped to the boiler's bounds when the boiler reports them. Q41, on which he asked us to "please expand", is still open on whether those bounds come from MsgID 49 or MsgID 57.
+
+**Task:** TASK-1373. Add the per-system defaults to its AC once the underfloor ceiling is settled.
+
+**Open:**
+
+- Underfloor 55 against the 50 hard ceiling (Q15b asked).
+- The heat-pump default (not asked yet).
+- Whether SAT writes the default to the boiler (`SH=` / MsgID 57) when the user never moved the slider. That write would overwrite a MaxTSet the installer set in the boiler. Entry 48 says the chosen value is passed to the boiler, but not whether that also applies to an unchosen default. Not asked yet; it belongs with Q41.
+
+## 68. Cycles per hour: "please expand" (request, 2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27 08:59 UTC. This replies to Q16 ("Cycles per hour default and range") in the overview of 2026-10-24 (messages 1563656700118958262 and 1563656702086221987):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564564109092192347
+
+**Quoted:**
+
+> Q16: please expand
+
+**Settled by this statement:** nothing. He is replying to the one-line overview item. The default was already answered on 2026-10-25 (entry 52: 3 per hour for gas boilers, 2 per hour for heat pumps, message 1563811907708649533).
+
+**What is still open:** the range of values a gas-boiler user may pick.
+
+- Our 2026-10-25 question (message 1563811397534613505) offered A) default 4, choices 3 or 4; B) default 3, choices 3 or 4; C) default 3, keep 2..6. His reply (entry 52) set only the defaults and did not pick one of these for the range.
+- Entry 52 recorded our reading "3 or 4 only". It rests on entry 30, where he said "We have the options 3 cycles/hour and 4 cycles/hour". TASK-1375 ("gas boiler PWM cycles per hour 3 or 4 only, default 3") is the "new task" that entry 52 names, and it is built on that reading.
+- Firmware: default 3 (`SATtypes.h:549`). The setting accepts 2..6 (`settingStuff.ino:1107`). `satGetMaxCyclesPerHour()` returns 2 for a heat-pump source (`SATcontrol.ino:349`), otherwise the stored value if it is 2..6 (`:351-352`), and otherwise 3 for underfloor / 4 for radiators (`:354`).
+- thermo-nova offers 3 or 4 for radiators only (`config_flow.py:695-702`) and 2 or 3 for heat pumps (`:686-693`). The options form has no cycles choice for underfloor (`:684-706`). The default is 4 (`const.py:119`).
+
+**Not re-asked:**
+
+- Hybrids: Q37 was answered "A" (gas timing) on 2026-10-28, message 1564866308317773845.
+- The heat-pump hourly cap: Q36 was answered "A" in the same message.
+- Heat-pump cycle length: entries 40 and 50.
+
+**Changes an earlier entry:** none. Entry 52's interpretation (range 3 or 4) stays provisional until he answers.
+
+**Task:** TASK-1375 waits for the answer.
+
+**Open:** the gas-boiler range (expanded question below), and what happens to stored values outside that range.
+
+## 69. Hot water setpoint: SW= on change, slider bounded by MsgID 48, re-confirmed (2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27 08:59 UTC. This answers Q17 ("DHW setpoint: SW= on change, slider bounded by MsgID 48") in the overview of 2026-10-24:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564564109092192347
+
+**Quoted:**
+
+> Q17: yes
+
+**Settled by this statement:** the same as entry 53 option A and entry 33:
+
+- Send `SW={value}` at once on every change, and once after a restart, while DHW control is on (entry 53).
+- The slider is bounded by the boiler's MsgID 48 values (entry 33).
+
+There is no new decision. It agrees with entries 33 and 53 and changes nothing.
+
+**Compared with thermo-nova and the firmware:** see entry 53. thermo-nova sends the setpoint as soon as the value is set: `async_set_native_value` calls `async_set_control_hot_water_setpoint(value)` (`number.py:72-74`, opened this session).
+
+**Changes an earlier entry:** none; it confirms entries 33 and 53.
+
+**Task:** TASK-1376 (no change to its scope).
+
+**Open:** entry 53's Open point remains: whether the `SW=` sent when a hot-water draw starts also stays. "Yes" does not answer it.
+
+## 70. Coefficients set by the old wizard (1.4 / 0.6 / 0.8) stay as they are (2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27 08:59 UTC. This answers Q19 ("Units whose coefficient was set by the old wizard (1.4 / 0.6 / 0.8, not chosen by the user): leave them (entry 24) or reset them once to 2.0?"):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564564109092192347
+
+**Quoted:**
+
+> Q19: leave them as is
+
+**Settled by this statement:**
+
+- A stored heating-curve coefficient stays, including one the old setup wizard wrote (1.4 radiators, 0.6 underfloor, 0.8 heat pump).
+- There is no one-time reset to 2.0 and no migration.
+- This agrees with entry 24 ("Units that already store a coefficient keep it; no migration").
+
+**Compared with the firmware (opened this session):**
+
+- TASK-1347 (Done) already does this. The default is 2.0 (`SATtypes.h:467`), and in Automatic mode the wizard no longer writes `satcoefficient` (`data/v2.js:5474`).
+- TASK-1347's bench note: a stored 0.60, written by the old wizard's underfloor preset, stayed 0.60 across the upgrade.
+- The only firmware code that writes the coefficient on its own is the hourly auto-tune (`SATcontrol.ino:4917`; a grep for assignments to `fHeatingCurveCoeff` finds only this line and the settings clamp at `settingStuff.ino:1001`). Q22 removes the auto-tune (entry NN).
+
+**Changes an earlier entry:** none; it confirms entry 24.
+
+**Task:** none. TASK-1347 already implements it.
+
+**Open:** none.
+
+## 71. Cold cutoff: 28.2 / 21 restated, the boundary still open (2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27 07:32 UTC. This answers Q20 ("is a requested setpoint exactly equal to the cold setpoint (28.2 / 21) cold (`<=`, as thermo-nova heating_control.py:72 and :385) or not (`<`)?"):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564542304834945126
+
+**Quoted:**
+
+> Q20: cold cutoff should be 28.2/21 / Q21: 5.0 is fine / Q22: Remove / Q23: follow thermo-nova
+
+**Settled by this statement:** the cold setpoint stays 28.2 °C for radiators and 21 °C for underfloor. This repeats entries 7, 11 and 24, and agrees with them.
+
+**Not settled:** whether a requested setpoint exactly equal to 28.2 (or 21) counts as cold. He gave the values but did not choose between `<=` and `<`. We do not infer the boundary from his words; we ask again (clarification Q20b).
+
+**Compared with thermo-nova and the firmware (opened this session):**
+
+- thermo-nova's control path treats "equal" as cold:
+  - The heater is ON only when `requested_setpoint > COLD_SETPOINT` (`heating_control.py:72`).
+  - CH follows `_control_setpoint > COLD_SETPOINT` (`:238`).
+  - The PWM override returns when `requested_setpoint <= COLD_SETPOINT` (`:385`).
+  - Its COLD_SETPOINT is 22 (`const.py:34`). The per-system 28.2 / 21 is Sergeant D's choice (entries 7 and 11).
+- thermo-nova's cycle classifier and its overshoot-at-flame-off check use strictly below (`cycles/classifier.py:51`, `device/status.py:121`).
+- The firmware's control path also uses "at or below", as thermo-nova:
+  - `satColdCutoff()` returns `requestedSetpoint <= coldSetpoint` (`SATchEnable.h:26-29`).
+  - It drives the cutoff at `SATcontrol.ino:5442`.
+  - For CH, `satChEnableDecide()` (`SATchEnable.h:46`, `:49`) calls it, and `SATcontrol.ino:5456` sends the result.
+  - The `>` compares at `SATcontrol.ino:1096` and `:5419` are consistent with it.
+- The firmware classifier uses strict `<`, as thermo-nova's classifier does (`SATcycles.ino:695`, `:717`).
+
+**Conflict with an earlier entry:** the "Settled" bullet of entry 12 reads "When the requested setpoint drops to the cold setpoint or below". That records `<=` as settled, but it is our summary, not his words ("yes keep the thermo-nova solution"). Entries 7 ("below 28.2") and 11 ("lower than the thresholds") keep the boundary open. ADR-199 (`docs/adr/ADR-199-...md:69`, `:180`) requires the entry that records the Q20 answer to name entry 12 and correct that bullet. This entry does so: until Q20b is answered, the boundary is open, and entry 12's bullet must not be read as his decision. ADR-195 marked the boundary as settled by entry 12 (`ADR-195-...md:50`); ADR-199 replaces that.
+
+**Task:** TASK-1355 / ADR-199 wait for Q20b.
+
+- If he answers `<=`, no code changes.
+- If he answers `<`, a new task changes `satColdCutoff` and the `>` compares at `SATcontrol.ino:1096` and `:5419`.
+
+**Open:** the `<=` / `<` boundary (Q20b).
+
+## 72. Heating curve: the coefficient upper bound stays 5.0; the hourly auto-tune is removed (2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27 07:32 UTC. Both are ADR-198 open questions:
+
+- Q21: "is 5.0 enough, or should it go to 12 as thermo-nova config_flow.py:616-618?"
+- Q22: "the firmware auto-tunes the coefficient hourly, thermo-nova does not: keep or remove?"
+
+https://discord.com/channels/812969634638725140/1514720723980259460/1564542304834945126
+
+**Quoted:**
+
+> Q20: cold cutoff should be 28.2/21 / Q21: 5.0 is fine / Q22: Remove / Q23: follow thermo-nova
+
+**Settled by this statement:**
+
+- Q21: the heating-curve coefficient range stays 0.1..5.0.
+  - This is a deliberate deviation from thermo-nova, which allows 0.1..12 in 0.1 steps (`config_flow.py:616-618`).
+  - The default stays 2.0 (`const.py:182`, entry 24).
+  - It confirms Robert's ADR-198 decision of 2026-10-24 (keep 0.1-5.0), so no follow-up ADR is needed.
+- Q22: the firmware-only hourly auto-tune of the coefficient is removed.
+  - thermo-nova only reads the coefficient from the options (`entry_data.py:213`, `pid.py:71`, `heating_curve.py:25`).
+  - A grep for `heating_curve_coefficient` in `custom_components/sat` finds no code that writes it back.
+
+**Compared with the firmware (opened this session):**
+
+- Range: `SATcoefficient` is clamped to 0.1..5.0 (`settingStuff.ino:1001`). TASK-1359 aligns the REST metadata and the wizard slider to that clamp.
+- Auto-tune: the block starts at `SATcontrol.ino:4798-4800`. Gain constants are at `:4806-4811`, statics at `:4814-4823`, and `satAutoTuneUpdate()` at `:4825-4934`.
+  - It is off by default (`bAutoTune = false`, `SATtypes.h:535`).
+  - It counts completed cycles (`state.sat.iCycleCount`, `:4836-4838`).
+  - It runs once an hour, and only after at least 6 cycles (`:4822-4823`, `:4866-4867`).
+  - It changes only the coefficient (`:4881-4882`), even though the setting is described as "automatic PID gains tuning" (`SATtypes.h:535`). The gains follow through the coefficient (ADR-198 point 6).
+  - It scales the coefficient by the overshoot / undershoot / oscillation counts and clamps it to 0.3..5.0 (`:4913-4914`).
+  - It writes the result to `settings.sat.fHeatingCurveCoeff` (`:4917`) and persists it with `writeSettings` (`:4923`).
+  - It is called on each control tick while the room temperature is valid (`:5251-5252`).
+  - The line numbers in the Q22 row of open-questions.md and in ADR-198 (4664-4705), and in audit #39 (4552-4660), are stale.
+- What the removal touches:
+  - Settings: `bAutoTune` and `fAutoTuneRate` (`SATtypes.h:535-536`), keys `SATautotune` / `SATautotunerate` (`settingStuff.ino:382-383`, `:1100-1101`).
+  - State: `SATtypes.h:389-391`.
+  - REST: `SATcontrol.ino:2944-2948`, `restAPI.ino:1060-1061`, `:1689-1692`.
+  - MQTT: `SATcontrol.ino:3403-3407`, `:3599`; command table `MQTTstuff.ino:708-709`.
+  - HA discovery: the switch at `MQTTHaDiscovery.cpp:3394-3397`.
+  - Web UI: `data/v2.js:2136-2137`, `:2172`.
+  - Debug: `handleDebug.ino:111`, `:265-267`.
+  - Removing the HA entity and the MQTT topics is an API change: the retained discovery config must be cleared and `docs/api/MQTT.md` updated.
+
+**Out of scope (not part of Q22):**
+
+- `satautogains` (`settingStuff.ino:1105`), the automatic PID gains value (thermo-nova `CONF_AUTOMATIC_GAINS`, `const.py:120`).
+- The heating-curve recommendation `satUpdateCurveRecommendation()` (`SATcontrol.ino:3934`, called at `:5253`). It does not write the coefficient (grep).
+
+**Interpretation (ours):** a coefficient the auto-tune has already changed and stored stays as stored after the removal. This is the same rule as entry 24 and the Q19 answer (entry NN). He did not say this separately.
+
+**Changes an earlier entry:** none. It closes ADR-198's open questions on the upper bound (Q21) and the auto-tune (Q22). The latter was ADR-198's last unchecked open question.
+
+**Task:**
+
+- TASK-1359 (range 0.1..5.0 everywhere) no longer waits on Q21.
+- A new task removes the auto-tune.
+- TASK-1355 AC2 still covers all three ADRs. ADR-198 now waits only on Robert's explicit OK. ADR-199 still waits on Q20b, and ADR-197 on its own questions (Q23-Q28 cluster).
+
+**Open:** none for this entry.
+
+## 73. PID resets: follow thermo-nova (2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27 07:32 UTC, answer to Q23 (overview of 2026-10-24, messages 1563656700118958262 and 1563656702086221987; Q23: "PID resets: reset integral and derivative on every target, HVAC-mode and window change as thermo-nova, or keep the firmware's narrower resets?", ADR-197, audit #15):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564542304834945126
+
+**Quoted:**
+
+> Q20: cold cutoff should be 28.2/21 / Q21: 5.0 is fine / Q22: Remove / Q23: follow thermo-nova
+
+(Q20-Q22 are recorded in their own entries.)
+
+**Settled by this statement:**
+
+- The PID resets where thermo-nova resets it, with what thermo-nova resets. All citations opened this session, thermo-nova at 7beaaf5, `custom_components/sat`:
+  - What a reset clears: `PID.reset()` sets `_integral = 0.0` and `_raw_derivative = 0.0` (`pid.py:134-137`). It does NOT clear `_last_error`, `_last_temperature` or `_last_derivative_updated`.
+  - `reset_control_state()` resets the main PID and all area PIDs (`climate.py:461-464`; area reset `area.py:335-338`).
+  - Target change: `async_set_target_temperature` returns early when the target is unchanged (`climate.py:643-644`), else resets (`:660`).
+  - Preset change and preset clear reach that reset through `async_set_target_temperature` (`climate.py:616`, `:624`); setting the same preset again returns early (`:610-611`); a manual target equal to a preset goes through the preset (`:563-565`).
+  - Window: open for the minimum time switches to the ACTIVITY preset (`climate.py:819`), close restores the pre-activity target (`:832`); both reach the target-change reset when the target really changes.
+  - HVAC mode HEAT or OFF: reset on every call (`climate.py:570-583`).
+  - reset_integral service: `pid.reset()` + `areas.pids.reset()` (`climate.py:217-220`, `services.py:31-39`).
+  - Stale room sensor: `pid.reset()` (`climate.py:470-478`); that path belongs to the room-temperature entries 38 and 46, not here.
+
+**Interpretation (ours):** "follow thermo-nova" means: (1) the same trigger set, including the zone PIDs; (2) a reset zeros the integral AND the raw derivative, and nothing else. No existing firmware function does exactly that: `satResetIntegral()` is too narrow (integral only, `SATpid.ino:86-91`), `satPidReset()` is too broad (it also clears last error, timers and `_pid_initialized`, `SATpid.ino:94-114`, which is the TASK-1270 start-up failure). The fix needs a new integral + raw-derivative reset.
+
+**Compared with the firmware (opened this session):**
+
+- Target set directly (`satHandleTargetTemp`, `SATcontrol.ino:2216-2246`, and the `SATtargettemp` setter, `settingStuff.ino:1000`): no PID reset. The only writes of `settings.sat.fTargetTemp` are `SATcontrol.ino:1275`, `:1284`, `:1420`, `:1443` and `settingStuff.ino:1000` (grep), so an adopted thermostat change (entry 25) also lands on a no-reset path; which caller entry 25 uses was not opened.
+- Preset change and preset clear set only the published copy `state.sat.fPidI = 0.0f` (`SATcontrol.ino:1277`, `:1285`); `_pid_integral` is untouched, so the next update republishes the old integral. The raw derivative stays.
+- Window open (activity switch) and close: `satResetIntegral()` (`SATcontrol.ino:1444`, `:1424`), integral only.
+- SAT disable (HVAC OFF): `satPidReset()` + save (`SATcontrol.ino:2506-2507`). SAT enable (OFF to HEAT): `settingStuff.ino:982-996` calls only `satClearSafetyTrip()`; the callers of `satPidReset()` are `SATcontrol.ino:2506`, `:2621`, `:4122` only (grep), so no reset on enable.
+- reset_integral over MQTT/REST: `satResetIntegral()` (`MQTTstuff.ino:620`, `restAPI.ino:1349`, `:1600`), integral only, zones untouched.
+- Zone PIDs: the integral is zeroed only when a zone is excluded or outside its deadband (`SATcontrol.ino:2105`, `:2165`); no zone reset on a main target, preset, window or mode change was found in the code.
+
+**Changes an earlier entry:** none. Related: entry 46 (lost room temperature resets P, I, D; `satPidCurveOnly`, `SATpid.ino:123-135`) is a separate path and stays as is. Entry 25 (thermostat as user interface): an adopted thermostat change is a target change, so under this answer it resets the PID, as thermo-nova would; no conflict, but the implementation must cover that path.
+
+**Task:** to be filed ("PID resets as thermo-nova reset_control_state"); touches TASK-1270 (first-tick output) and TASK-1412.10. ADR-197 Decision 8 and its "PID resets" Open Question to be updated.
+
+**Open:** none for Sergeant D. Implementation check: the reset must not reintroduce the TASK-1270 first-tick 0 output.
+
+## 74. PID persistence: follow thermo-nova (2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27 08:56 UTC, answer to Q24 (overview of 2026-10-24, messages 1563656700118958262 and 1563656702086221987; Q24: "PID persistence: save and restore integral, last error, raw derivative, last temperature and the derivative time as thermo-nova, or only integral and derivative after a 30 min age check?", ADR-197, audit #42):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564563332449435649
+
+**Quoted:**
+
+> Q24: follow thermo-nova / Q25: follow thermo-nova / Q26: fixed 0.1 / Q27: match thermo-nova / Q28: Round PID values to 3 decimals
+
+(Q25-Q28 are recorded in their own entries.)
+
+**Settled by this statement:**
+
+- thermo-nova persists five values per PID (`pid.py:243-249`, keys `pid.py:23-27`): integral, last error, raw derivative, last temperature, and the derivative timestamp (`last_derivative_updated`).
+- It restores all five when the entity is added (`pid.py:141-157`; last error, last temperature, timestamp at `:150-152`; integral and raw derivative at `:154-155`). There is no age check: only "no stored data" skips the restore (`pid.py:147-148`).
+- It saves after every PID update (`pid.py:179-181`), so every 60 s (`pid.py:20`; entry 42).
+- A reset (`pid.py:134-137`) does not save by itself; the zeros reach storage with the next update.
+
+**Interpretation (ours):** "follow thermo-nova" means: save and restore all five values, drop the 30-minute age check and the NTP gate on the restore. Two points are implementation questions for Robert, not for Sergeant D: (1) the firmware's derivative timestamp is `millis()` (`SATpid.ino:39`, `:47`), which does not survive a reboot, so restoring it needs a wall-clock (epoch) timestamp, and then NTP must be synced before the restored timestamp can be used; (2) writing LittleFS every 60 s (thermo-nova cadence) versus flash wear. A long-stale restored timestamp gives a large `delta_time`, so alpha in `pid.py:228` goes close to 1 on the first derivative step; that is thermo-nova behaviour, not a firmware choice.
+
+**Compared with the firmware (opened this session):**
+
+- Save (`SATcontrol.ino:2309-2320`): i, d, rd, err, ts (from the published copies `state.sat.*`, `:2315-2316`); no last temperature, no derivative timestamp. Written every 5 min (`SATcontrol.ino:5484-5486`), on disable (`:2507`, zeros), on flush (`:2622`, zeros) and in `satPersistAllToFs()` (`:2445`).
+- Load (`SATcontrol.ino:2322-2359`): skipped while NTP is not synced (`:2341-2345`), discarded when older than `SAT_PID_STALE_SEC = 1800` s (`:2307`, `:2347`); retried once after NTP sync (`:4989-4993`). Only the integral and raw derivative go back into the controller (`satPidRestoreState`, `SATpid.ino:75-83`); `d` and `err` go only into the published copies (`SATcontrol.ino:2352-2353`).
+- During a lost room temperature the firmware sets `_pid_lastError = NAN` (`SATpid.ino:127`, entry 46); a persisted last error must handle that value.
+
+**Changes an earlier entry:** none.
+
+**Task:** to be filed ("PID persistence as thermo-nova"), after TASK-1368 (60 s cadence). ADR-197 Decision 7 and Open Question "PID persistence" to be updated.
+
+**Open:** none for Sergeant D. Robert: write cadence (60 s vs wear) and the zero-save on disable/flush (thermo-nova has no explicit zero-save).
+
+## 75. Remove the firmware-only integral cap of plus/minus 20 and the 10 s minimum between PID updates (2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27 08:56 UTC, answer to Q25 ("Firmware-only integral cap of plus/minus 20 and 10 s minimum between PID updates: keep or remove?"):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564563332449435649
+
+**Quoted:**
+
+> Q24: follow thermo-nova / Q25: follow thermo-nova / Q26: fixed 0.1 / Q27: match thermo-nova / Q28: Round PID values to 3 decimals
+
+(The Q25 part is "Q25: follow thermo-nova"; the others are recorded in their own entries.)
+
+**Settled by this statement:**
+
+- thermo-nova has neither: the integral is clamped only to plus/minus the heating curve value (`pid.py:191-192`, `clamp_to_range` in `helpers.py:148-150`), and `update()` has no minimum interval (`pid.py:159-171`); it runs on the 60 s timer (entry 42).
+- So both firmware extras go:
+  - the absolute cap `SAT_PID_INTEGRAL_ABS_MAX = 20` (`SATpid.ino:199-202`);
+  - the 10 s minimum `SAT_PID_SAMPLE_TIME_LIMIT` (`SATpid.ino:21`) and its early return (`SATpid.ino:299-304`).
+
+**Interpretation (ours):** it also covers the zone PID's own plus/minus 20 cap (`SATcontrol.ino:2162-2163`), because thermo-nova areas run the same PID update (`area.py:208`). He did not name zones; entry 42 made the same zone reading and left it open. The "error unchanged and less than 60 s" skip (`SATpid.ino:306-309`) is not named in Q25; it goes with the fixed 60 s cadence of entry 42 (TASK-1368), where thermo-nova has no such skip (`pid.py:159-171`).
+
+**Changes an earlier entry:** closes the Open line of entry 28 (the two firmware-only extras never answered since 2026-06-21) and the Q25 Open line of entry 42. (Entry 42 cites the gates at the older lines `SATpid.ino:279-283` and `:286-288`; they are now `:299-304` and `:306-309`.)
+
+**Task:** TASK-1368 (60 s cadence) or a sibling task. ADR-197 Open Question "Absolute integral cap ±20 and 10 s minimum between updates" closed; Context item 2 and Decision 3 to be updated.
+
+**Open:** none for this question; whether zones follow remains our reading (as in entry 42).
+
+## 76. PID deadband: a fixed 0.1, no user setting, no widening (2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27 08:56 UTC, answer to Q26 ("Deadband as a user setting (0.05-2.0) and its widening during room-temperature estimation: keep, or a constant 0.1 as thermo-nova const.py:16?"):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564563332449435649
+
+**Quoted:**
+
+> Q24: follow thermo-nova / Q25: follow thermo-nova / Q26: fixed 0.1 / Q27: match thermo-nova / Q28: Round PID values to 3 decimals
+
+(The Q26 part is "Q26: fixed 0.1".)
+
+**Settled by this statement:**
+
+- The deadband is a constant 0.1 °C, as `DEADBAND = 0.1` (`const.py:16`), used by the integral (`pid.py:187`) and the derivative (`pid.py:205`).
+- The user setting goes: `fDeadband` (`SATtypes.h:468`), parsed at `settingStuff.ino:1002` (range 0.05-2.0), saved at `settingStuff.ino:324`. The PID reads it at `SATpid.ino:172` and `:213`; the unused constant `SAT_PID_DEADBAND_DEFAULT = 0.1f` (`SATpid.ino:20`) can become the one source.
+- The widening goes: during room-temperature estimation the firmware adds 0.5 °C per hour to `settings.sat.fDeadband` (`SATcontrol.ino:5202-5206`, saved at `:5180`) and restores it later (`:5360-5363`).
+
+**Side effects (from the code):**
+
+- The curve recommendation threshold `2 * deadband` (`SATcontrol.ino:3348`, `:3976`) becomes a fixed 0.2, which matches thermo-nova `_ERROR_THRESHOLD = DEADBAND * 2` (`sensor.py:301`). (thermo-nova's in-band count, `temperature/history.py:107`, uses `DEADBAND` itself, 0.1.)
+- The zone PID reads the same setting (`SATcontrol.ino:2153`); it becomes 0.1 too.
+- Removing the setting changes the API: the settings setters (MQTT `deadband` command, `MQTTstuff.ino:711`; REST, `restAPI.ino:1697-1698`), the REST read-outs (`restAPI.ino:2275`, `:3889-3890`, settings list `:4195`), MQTT `sat/deadband` (`SATcontrol.ino:3566`), the SAT JSON field (`SATcontrol.ino:2791`), the settings help (`settingsHelp.h:74`), the web UI (`v2.js:2020`, `:2170`, `:4647`) and the debug dump (`handleDebug.ino:94`).
+- Not part of this: the 2-hour thermal-safe setpoint of the same estimation block (`SATcontrol.ino:5184-5201`).
+
+**Changes an earlier entry:** none (entry 28 already uses thermo-nova's 0.1).
+
+**Task:** to be filed. ADR-197 Open Question "Deadband as a setting and its widening" closed; Context item 1 and Decision 3 (which describe the setting) to be updated.
+
+**Open:** none.
+
+## 77. PID derivative details: match thermo-nova (2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27 08:56 UTC, answer to Q27 ("Derivative details: 'no change' threshold 0.001 vs exactly 0, and the reference temperature that moves only with the derivative time (thermo-nova pid.py:171, :211): match thermo-nova?"):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564563332449435649
+
+**Quoted:**
+
+> Q24: follow thermo-nova / Q25: follow thermo-nova / Q26: fixed 0.1 / Q27: match thermo-nova / Q28: Round PID values to 3 decimals
+
+(The Q27 part is "Q27: match thermo-nova".)
+
+**Settled by this statement:**
+
+- "No change" is `temperature_delta == 0.0` (`pid.py:209-213`), not the firmware's `fabsf(tempDelta) < 0.001f` (`SATpid.ino:232-237`).
+- The previous temperature is overwritten on every PID update (`pid.py:171`), also when the derivative step was skipped because 60 s or less passed (`pid.py:215-218`). The firmware's separate reference `_pid_derivRefTemp`, which moves only together with the derivative timestamp (`SATpid.ino:49-56`, set at `:226`, `:235`, `:255`, `:270`; TASK-1195), goes.
+
+**Consequence to verify on the bench (not a question):** the firmware filters the room temperature before the PID (TASK-894, kept by entry 28). The TASK-1195 comment (`SATpid.ino:49-55`) says the EMA spreads one sensor step over about 8 control ticks; with the per-update overwrite, a change that arrives within 60 s of the last derivative step is dropped from the delta while the time keeps running. With the 60 s cadence (entry 42) this may matter less. The exact-zero test on a float EMA output also rarely sees exactly 0. The derivative may therefore fire with smaller values than today. Measure old vs new before release; if D becomes nearly inactive, report it to Sergeant D with the data.
+
+**Changes an earlier entry:** none. Entry 28 names TASK-1195 (derivative timer) as its task, but no entry quotes him on the separate reference temperature; this answer undoes that part of TASK-1195. Entry 28's "the PID must be identical to pid.py" agrees with this answer, and its 2026-10-03 point (the filter chain stays) is not changed: the room EMA and the derivative's own low-pass stay.
+
+**Task:** to be filed, after TASK-1368. ADR-197 Decision 5 to be updated; Open Questions "Derivative 'no change' test" and "Derivative reference" closed.
+
+**Open:** none for now; bench result may lead to a follow-up.
+
+## 78. PID rounding: "Round PID values to 3 decimals" (2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27 08:56 UTC, answer to Q28 ("Integral with Ki near 0 skips the clamp (SATpid.ino:166) and no rounding of gains/terms/output (pid.py:71-132): match thermo-nova?"):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564563332449435649
+
+**Quoted:**
+
+> Q24: follow thermo-nova / Q25: follow thermo-nova / Q26: fixed 0.1 / Q27: match thermo-nova / Q28: Round PID values to 3 decimals
+
+(The Q28 part is "Q28: Round PID values to 3 decimals".)
+
+**What thermo-nova does (pid.py, opened this session):**
+
+- Automatic gains are rounded to 6 decimals: Kp (`pid.py:71`), Ki (`:82`), Kd (`:93`). Manual gains are not rounded (`:65`, `:77`, `:88`).
+- P (`:101`), I (`:106`), D (`:114`) and the raw-derivative property (`:119`) are rounded to 3 decimals.
+- The output is rounded to 1 decimal (`:132`): curve + rounded P + rounded I + rounded D.
+- Rounding is on read only: the stored `_integral` and `_raw_derivative` are not rounded (`:191-192`, `:229-230`). The integral step uses the rounded `self.ki` (`:191`).
+- The error is already rounded to 3 decimals in the firmware (`satPidError`, `SATpid.ino:63-66`). The firmware rounds nothing else in `satPidUpdate` (`SATpid.ino:321-334`) or `_pidCalculateGains` (`:156-162`).
+
+**Interpretation (ours, to be confirmed):** for the P, I and D terms his rule equals thermo-nova. For the gains (thermo-nova 6 decimals) and the output (thermo-nova 1 decimal), a literal "everything to 3 decimals" is his deviation from thermo-nova. It has a real effect on Ki: Ki = Kp / 8400 (`pid.py:82`), Kp = coefficient * curve value / 3 or 4 (`pid.py:70-71`), and the curve value is 27.2 (radiators) or 20 (underfloor) plus coefficient/4 times the curve term (`heating_curve.py:39`, `types.py:117-118`). At coefficient 2 and a curve value near 40, Kp is about 27 and Ki about 0.0032, which 3 decimals turn into 0.003 (about -6 %). The rounding step is up to 0.0005, so the relative change of Ki is up to 0.0005/Ki: up to 12.5 % at Ki 0.004, 25 % at 0.002, 50 % at 0.001. For Kp below 4.2, Ki rounds to 0 and the integral stops (this needs a low coefficient, below about 0.6). Not acted on until he confirms the scope.
+
+**Not answered:** the Ki-near-0 half of Q28. The firmware returns before both the integral step and the clamp when Ki < 1e-9 (`SATpid.ino:187`); thermo-nova always adds and clamps (`pid.py:191-192`). A Ki rounded to 0 (above) would make that branch reachable in automatic mode, so the two halves are linked.
+
+**Changes an earlier entry:** none. The ADR-197 Open Question and Q28 cite `SATpid.ino:166`; the line is now `:187`.
+
+**Task:** none until the follow-ups are answered.
+
+**Open:** (1) rounding scope (follow-up question Q28a); (2) the Ki-near-0 clamp (follow-up question Q28b, ask after Q28a).
+
+## 79. OpenTherm back after a loss: SAT resumes by itself on the first boiler reply (2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27 10:06 UTC. Answer to Q34, asked 2026-10-26 19:19 UTC (message 1564357717089587211). The options were: A) SAT resumes by itself on the first boiler reply; B) SAT stays stopped until the user switches it off and on; C) SAT resumes by itself only after the link has been back for a set time. Our advice was A.
+https://discord.com/channels/812969634638725140/1514720723980259460/1564581168630861865
+
+**Quoted:**
+
+> Q34: A
+
+**Settled by this statement:**
+
+- When OpenTherm comes back after a loss, SAT resumes by itself on the first new boiler reply. The user does nothing. A loss here is entries 39 and 47; 'lost' means no boiler reply for 30 s, Q33 A, answered by the maintainer on 2026-10-26.
+- SAT takes MsgID 1 back from the thermostat.
+- The PID restarts from 0. Option A said so in so many words: "PID integral restarts from 0".
+- This confirms the provisional TASK-1365 behaviour. No code change.
+
+**Compared with thermo-nova and the firmware:**
+
+- thermo-nova has no stop on a lost link, so it has nothing to resume. Its control loop skips a pass only when the outside temperature is None or HVAC is OFF (`climate.py:544-545`). We opened nothing else for a loss or resume path; none was found in the code we opened.
+- Firmware, how it resumes: `satOtLinkDecide()` returns RESUME once the boiler-reply stamp has changed since the hand-back (`SATcontrol.ino:2570-2576`, the test is at `:2572`). `satOtLinkStep()` then clears `bOtLinkLost` and resets the command cache, so the next tick sends CS, MM and CH again (`:2604-2609`).
+- Firmware, what the loss does: the hand-back is `satDisable()` (`:2598-2603`, defined at `:2485`). It:
+  - resets PWM (`:2500`);
+  - resets the PID and writes the zeros to flash (`:2506-2507`);
+  - also saves the energy totals (`:2508-2509`);
+  - resets the curve recommendation in RAM only (`:2510`; `satHCRReset()` at `SATcycles.ino:1259-1267` writes no file);
+  - sends `CS=0`, `CH=1` and `MM=T` (`:2520`, `:2525`, `:2530`).
+- After a resume the PID has been reset. With a valid room temperature, the first control tick therefore sends CS=10/CH=0 until the next full PID update (`SATpid.ino:109`, `:287-309`; floor and cold cutoff at `SATcontrol.ino:5378`, `:5442-5447`). That is the Q39 path; see the Q39 entry. Q39 A fixes the first tick after a resume as well. This is derived from the code: the TASK-1365 bench note of 2026-10-25 logged CS=23.0/MM=100/CH=1 re-sent on resume, with the room-temperature state not recorded (without a room temperature the curve-only path applies, `SATcontrol.ino:5297-5298`).
+
+**Changes an earlier entry:**
+
+- Entry 39, Open: settles "Whether SAT starts again by itself when the link returns".
+- Entry 47, Open: settles the resume half.
+- Entry 39's literal "stop" now applies only while the loss lasts.
+- No conflict with entry 26: the thermostat is the backup during the loss.
+
+**Task:** TASK-1365. AC#2 says "answered by Sergeant D (Q33, Q34)", but Q33 was answered by Robert, not Sergeant D. Amend AC#2 or accept the maintainer's answer explicitly.
+
+**Open:**
+
+- Option A does not settle the firmware side effects that the Q34 text named:
+  - each loss writes three files: the zeroed PID (`:2507`) and the two energy totals (`:2508-2509`);
+  - a flapping link repeats those flash writes;
+  - a loss at boot, before the NTP-gated `satLoadPidState()`, overwrites the saved PID with zeros (stated in the Q34 text; not re-traced in this run).
+- These are firmware/maintainer points connected to entry 28 (Open). They are not SAT design.
+
+## 80. PWM ON phase: time it from the phase start and wait for ignition as thermo-nova; start ON only when the ON time is at least 180 s (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 05:00 UTC. Answers to Q35 and Q38, two items of the queued questions in `docs/sat/open-questions.md`:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845
+
+**Quoted** (excerpt; the same message also answers Q36, Q37 and Q40-Q46):
+
+> Q35: A
+> Q38: A
+
+**Settled by this statement:**
+
+- **Q35 A:** a PWM ON phase is timed as thermo-nova does it, in this order (code opened this session):
+  1. **ON start** (`pwm.py:160-167`). `_last_update` is set to the start (`:162`). `_waiting_for_flame_on` is set when there is no flame (`:163`). `_flame_on_at` is set to the start only when the flame is already burning (`:164`).
+  2. **Waiting, flame appears.** The phase re-anchors at the ignition: `_last_update` and `_flame_on_at` become the ignition time, and the boiler temperature is reseeded (`:186-193`).
+  3. **Waiting, no flame yet.** While `elapsed` (counted from the ON start) is below 180 s, the phase stays ON (`:194-196`).
+  4. **Still no flame after 180 s.** Only the wait flag is cleared (`:197-199`). `_last_update` is **not** reset. "starting timer anyway" is the log text at `:199`, not a new anchor.
+  5. **Minimum flame-on hold.** For 180 s after `_flame_on_at` the phase stays ON (`:201-203`). A flame that first appears after the wait has timed out sets `_flame_on_at` at `:144-146`, so the hold applies from then.
+  6. **Expiry.** When `elapsed >= on_time`, the phase goes to OFF, with `_last_update` set to now (`:205-209`).
+  - Result: a phase that ignites at t_i (while waiting) ends at t_i + max(on_time, 180 s).
+  - A phase that never ignites ends at on_time after its start. If on_time is about 180 s or less, that can be the same tick on which the wait times out.
+  - thermo-nova has no ignition abort that ends the ON phase.
+- **Q35, our wording.** The Q35 text said "then start the on timer anyway". That came from the log string. Since he answered "as thermo-nova", we implement what the code does (steps 4 and 6), not that wording.
+- **Q38 A:** an OFF or IDLE phase moves to ON only when the mapped on_time is at least `HEATER_STARTUP_TIMEFRAME` = 180 (`pwm.py:155`, `const.py:18`). This applies to every ON start, not only the first.
+  - In thermo-nova the gate only bites in the ultra-low range without a flame. That range gives on_time 0 (`pwm.py:259-260`); with a flame it gives the 180 s lower threshold (`:247-257`, `:53`), and the other ranges give 180 s or more (`pwm.py:263-301`).
+
+**Compared with thermo-nova and the firmware:**
+
+- Firmware, ON start with the flame already burning: anchored at the phase start (`_pwm_onStartMs`, `SATcontrol.ino:872-877`, used at `:1024`). Q50 A confirms this.
+- Firmware, ON start without a flame: `_pwm_onStartMs = 0` (`:883`). The anchor then falls back to the cycle tracker's last flame-on (`:1024`, set at `SATcycles.ino:741`), which is an older flame-on. So the expiry test (`SATcontrol.ino:1028`) is true on the next tick, and `satPwmEndOn()` ends the phase (`:1030`).
+- The firmware also has a 180 s ignition abort (`:1035-1042`). thermo-nova has none.
+- In OFF, the wait is timed from the last flame-off (`:1046`). That flame-off is usually long past, so ON restarts at once (`:1058`, `:1076`). CS and CH toggle every tick.
+- Host evidence: `tests/test_sat_hp_pwm.py:248-249`, `test_r3_on_phase_waits_for_flame`, still marked `@unittest.expectedFailure`.
+- Firmware, Q38: the 180 s gate exists only on the PWM-entry path (`entryOn = entry && onTimeMs >= minOnMs`, `:1057`). The normal start (`sinceFlameOff >= offTimeMs`, `:1058`) has no gate. Range 1 without a flame sets on 0 and off maxMs = 2P (`:998-1000`, `:946`), so ON is requested 2P after the flame-off.
+- Line check (question cite to current HEAD):
+  - ON timing: `SATcontrol.ino:949-958` is now `:1021-1032`.
+  - Abort: `:959-970` is now `:1035-1042`.
+  - Cycle-tracker flame-on: `SATcycles.ino:722` is now `:741`.
+  - OFF branch: `SATcontrol.ino:971-1002` is now `:1043-1078`.
+
+**Changes an earlier entry:**
+
+- Settles entry 43, Open bullet 1: whether the 180 s minimum on time gates every ON start. It does (audit #19).
+- Consistent with entry 31 (180 s minimum flame time) and with entry 43 (the first phase is ON).
+- Entry 45 / TASK-1371 (the 20 s ignition flood) assumes the ON phase lasts through ignition. Q35 A makes that true.
+
+**Task:** TASK-1382 (Q35), scoped together with TASK-1380 per its description. TASK-1383 (Q38). Both currently depend on TASK-1412.3.
+
+**Open:**
+
+- Duty range 5 starts ON directly (`SATcontrol.ino:982-990`, `satPwmBeginOn` at `:987`). That skips the Q38 gate and the hourly limit (comment at `:985-986`).
+  - In thermo-nova, range 5 goes through `:155-160` with on_time = 2P (`pwm.py:297`, `:55`), so it passes the gate but meets the hourly check at `:156`. That check never blocks at the defaults.
+  - Not asked.
+- After Q35 lands, the provisional Q48-Q51 decisions must be revisited (TASK-1412.9 AC#2). Q49 B depends on Q35 directly; see the Q49 entry.
+- Interaction with Q40 B (same message, another entry), the detection of a missing return temperature, for the TASK-1371 flood: not checked here.
+
+## 81. Heat pumps: no hourly start limit in PWM, as thermo-nova (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 05:00 UTC. This answers Q36, queued after the TASK-1366 review of 2026-10-25. It is part of a multi-answer message:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845
+
+**Quoted:**
+
+> Q35: A / Q36: A / Q37: A / Q38: A / Q40: B for now, we may need to reconsider later / Q41: Please expand / Q42: Please expand / Q43: A / Q44: A / Q45: A / Q46: B
+
+**Settled by this statement (his literal choice):**
+
+- Q36 option A: heat pumps get no hourly cap on PWM ON starts, as in thermo-nova.
+- In thermo-nova (opened this session; the local snapshot is commit c5211af, recorded as a mirror of 7beaaf5, with no local changes):
+  - the check is `if self._current_cycle >= self._config.duty_cycle_seconds` (`pwm.py:156`);
+  - `duty_cycle_seconds` comes from CONF_DUTY_CYCLE (`entry_data.py:220`), and its default is "00:13:00", which is 780 (`const.py:167`);
+  - so the cap never takes effect at defaults, for any boiler type. There is no heat-pump case.
+- The Q36 row said "Related to Q12", so the link to entry 59 was in front of him. Q36 says nothing about gas boilers, so for them entry 59 stands.
+
+**Firmware at HEAD:**
+
+- A heat pump is capped at 2 PWM starts per rolling hour (`SATcontrol.ino:345-349`).
+- The cap is checked before every new ON phase (`SATcontrol.ino:1058-1074`), with two exceptions:
+  - the ON phase at PWM entry while the flame burns (`:1063`);
+  - duty range 5 (`:982-987`).
+- The heat-pump period is 1800 s or 2400 s (`SATcontrol.ino:367-373`).
+
+**The premise of Q36 has moved (we must tell him):**
+
+- Q36 was written on 2026-10-25. Back then the firmware counted every flame-on edge, hot water and relights included, and the question cited `SATcycles.ino:279-299` for that counter.
+- Since TASK-1401 the rolling-hour ring holds only PWM ON-phase starts:
+  - the only writer is `satCycleRecordPwmStart()` (`SATcycles.ino:309-317`);
+  - it is called through `satPwmCountStart()` (`SATcontrol.ino:851-861`).
+- So the reason given in Q36 no longer holds ("one extra flame-on in the hour (hot water, relight) holds the next PWM start").
+
+**How often a cap of 2 per hour would bind** (derived from the code, not measured):
+
+- A heat-pump cycle in duty ranges 1-4 normally lasts at least one period (`SATcontrol.ino:991-1017`, upperMs = 1800/2400 s).
+- It can be shorter in one case. The OFF wait counts from the last flame-off (`:1046`), and `:1050-1053` corrects that only while the flame burns. So a flame-out early in the ON phase shortens the cycle.
+- Range 5 starts (`:982-987`) and PWM re-entry starts are extra starts.
+- With Q49 = B (same message), every ON start counts, failed ignitions included.
+- So the cap can bind, but rarely. Choosing A removes that.
+
+**Relation to earlier entries:**
+
+- **Entry 59:** "count only PWM's own ON phases against cycles per hour". It has no exemption by heating source and keeps the cycles-per-hour limit real, unlike thermo-nova (`pwm.py:156`). Q36 A narrows it, which is a later and more specific answer rather than a contradiction:
+  - gas boilers and hybrids keep the limit (entry 59; for hybrids see the Q37 entry);
+  - heat pumps have none.
+- **Entry 52:** "Keep 3x hour for gas boilers and 2x hour for heat pumps as default values." Not a conflict. For heat pumps, "2x hour" is the cycle length (1800 s, entry 50). Q36 A means that number is no longer also a start cap.
+- **Entry 50:** no conflict. It sets only the minimum ON time (180 s) and the cycle length (1800/2400 s).
+- **Entry 30:** our interpretation there gave heat pumps "at most 2 cycles per hour". His words were only the options 2 and 1.5 per hour. Q36 A replaces our interpretation, not a statement of his.
+
+**Changes an earlier entry:** narrows entry 59 (heat pumps exempt). Replaces our interpretation in entry 30.
+
+**Task:** a TASK-1366 follow-up: skip the limit for heat pumps (`SATcontrol.ino:1063` / `:349`) and keep counting for `iCyclesThisHour`.
+
+**Open:** none blocking. A heads-up (Q36b) tells him the counter changed since he read the question.
+
+## 82. Hybrid in PWM: gas boiler timing (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 05:00 UTC, answer to Q37 (queued after the TASK-1366 review of 2026-10-25):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845
+
+**Quoted:**
+
+> Q37: A
+
+**Settled by this statement:**
+
+- A hybrid source in PWM uses the gas boiler timing:
+  - a minimum ON time of 180 s;
+  - a cycle length of 3600 / cycles per hour;
+  - the gas choices and default: 3 or 4 per hour, default 3 (entry 52, with our range interpretation there).
+- It does not get the heat-pump cycle length of 1800/2400 s (entries 40 and 50).
+
+**Compared with thermo-nova and the firmware:**
+
+- thermo-nova's PWM timing has no case per source: a 180 s minimum and a period of 3600 / cycles_per_hour (`pwm.py:53-55`). A grep of its `.py` files for "hybrid" finds nothing.
+- The firmware at HEAD already does this. Only `SAT_SRC_HEAT_PUMP` is a special case, for:
+  - the hourly cap (`SATcontrol.ino:349`);
+  - the period (`:369-370`).
+- A hybrid (`SAT_SRC_HYBRID`, `SATtypes.h:51`) therefore gets:
+  - the user's cycles per hour (`SATcontrol.ino:351-353`), and outside the range 2..6 the fallback 3 for underfloor or 4 otherwise (`:354`);
+  - a period of 3600 / cycles per hour (`:372`);
+  - a minimum ON time of 180 s (`:359-362`).
+- Under entry 59, the hybrid also keeps the real hourly limit, as a gas boiler does. That is our reading of "gas timing"; he did not mention the limit. Q36 (heat pumps exempt) does not cover hybrids.
+- Out of scope here and unchanged: MM for hybrids is never 0 (entry 21; `SATcontrol.ino:384-385`, `:5434`).
+
+**Changes an earlier entry:** it closes two open items:
+
+- entry 50 Open ("whether hybrids get the heat pump cycle lengths"): no;
+- entry 52 Open ("what hybrids default to"): the gas default, 3 per hour.
+
+**Task:** no timing change. The gas-boiler range task from entry 52 (3 or 4 per hour) applies to hybrids as well.
+
+**Open:** none.
+
+## 83. First control tick after boot or SAT enable: send curve + P + restored I, not CS=10/CH=0 (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 05:14 UTC. Answer to Q39 (TASK-1270). Our options were: A) send curve + P + restored I with D=0 on the first tick (as thermo-nova); B) send the curve only on the first tick; C) keep today's CS=10/CH=0. Our advice was A.
+https://discord.com/channels/812969634638725140/1514720723980259460/1564869959920783400
+
+**Quoted:**
+
+> @BlueFlame Bot Q39: A
+
+**Settled by this statement:**
+
+- On the first control tick after boot or SAT enable, SAT sends a real setpoint: heating curve + P + restored I. It no longer sends CS=10 with CH=0 until the first full PID update.
+- The same holds after an OT-loss resume (Q34). The PID was reset there, so I = 0.
+
+**Compared with thermo-nova and the firmware:**
+
+- Firmware, the first `satPidUpdate()` call (with a valid room temperature):
+  1. it initialises and sets the update time to now (`SATpid.ino:287-297`);
+  2. with `elapsed` = 0, below the 10 s limit, it returns the stored `state.sat.fPidOutput` (`:299-304`, limit at `:21`);
+  3. that stored value is 0 at boot and after `satPidReset()` (`:109`);
+  4. later calls with an unchanged error keep returning it until 60 s have passed (`:306-309`, `:22`).
+- The PID output 0 is floored to `SAT_MIN_SETPOINT` (`SATcontrol.ino:5378`). The cold cutoff then sends CS=10 (`:5442-5447`), and the CH rule sends CH=0 (`:5454-5456`).
+- `satPidRestoreState()` pre-loads the integral and the raw derivative from flash (`SATpid.ino:75-80`).
+- Line check: question cite `SATpid.ino ~264-285` is now `:287-309`.
+- thermo-nova: `output` = round(curve + P + I + D, 1) (`pid.py:126-132`), and 0.0 only when the curve is None (`:129-130`).
+  - P = kp × `_last_error` (`:96-101`); I = `_integral` (`:104-106`); D = kd × `_raw_derivative` (`:108-114`).
+  - `_integral` and `_raw_derivative` are restored from storage (`:154-155`).
+- **Conflict in our own option text.** Option A said "D=0 ... (as thermo-nova)", but thermo-nova's first output includes D from the restored derivative. Both cannot hold. Re-ask (see clarifications).
+
+**Changes an earlier entry:** none.
+
+- Entry 42 (60 s PID cadence, TASK-1368, which TASK-1270 depends on) is unchanged.
+- Entries 38 and 46 (no room temperature: curve only, `satPidCurveOnly`, `SATcontrol.ino:5297-5298`) are not affected.
+- Q28 (round the PID values to 3 decimals, another entry) matches thermo-nova's rounding of P, I and D (`pid.py:101`, `:106`, `:114`). thermo-nova rounds the output to 1 decimal (`:132`).
+
+**Task:** TASK-1270.
+
+**Open:** the D term on the first tick: D=0, or kd × the restored derivative as thermo-nova.
+
+## 84. "No return temperature" means Unknown-DataID on MsgID 28, for now (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 05:00 UTC, answer to Q40 (boiler-capability research, 2026-10-25):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845
+
+**Quoted:**
+
+> Q40: B for now, we may need to reconsider later
+
+**Settled by this statement (provisional, in his own words "for now"):**
+
+- Entry 45's "boiler reports no return temperature" is detected this way: the boiler answered Unknown-DataID to a read of MsgID 28 (Tret).
+- Not chosen:
+  - A, never reported (None, as in thermo-nova);
+  - C, Data-Invalid or stale;
+  - D, present only through the board sensor.
+- He expects to revisit it.
+
+**Compared with thermo-nova:**
+
+- thermo-nova has no Unknown-DataID test. The return temperature is `None` when the coordinator has no value:
+  - MQTT: `coordinator/mqtt/opentherm.py:114-118`;
+  - serial: `coordinator/serial/__init__.py:99-103`;
+  - the base class returns None: `coordinator/__init__.py:189-191`.
+- With None, the flame-off override returns without a hold setpoint (`heating_control.py:392-395`).
+- B is therefore a further deviation. It comes on top of entry 45, which already deviates on purpose from `heating_control.py:392-395`.
+
+**Compared with the firmware at HEAD (how Unknown-DataID on MsgID 28 is tracked):**
+
+- The gateway already keeps a per-MsgID bitmap of what the boiler does not implement:
+  - `boilerUnsupportedRead[32]` (`OTGW-Core.ino:5064`);
+  - its accessor `isBoilerMsgIdUnsupportedRead(id)` (`:5074-5076`).
+- Setting a bit (`OTGW-Core.ino:5438-5450`):
+  - it is set when the boiler answers Unknown-DataID in a read context, with boiler evidence;
+  - answers the gateway made itself are skipped (OT-Direct master mode, its UI= table, loopback; `:5439-5443`).
+- Clearing a bit (`OTGW-Core.ino:5407-5426`): only a genuine boiler B frame with a real answer clears it.
+- Persistence:
+  - the bitmap is written to `/ot-boiler.json` and reloaded at boot (`:5059-5062`, `:5407-5409`);
+  - so one verdict survives a restart until the boiler answers 28 for real.
+- SAT does not use the bitmap today:
+  - the only callers are MQTT (`MQTTstuff.ino:1935`) and REST (`restAPI.ino:827`, `:876`);
+  - `satGetReturnTemp()` returns the raw `OTcurrentSystemState.Tret` without a validity check (`SATcontrol.ino:1643-1647`);
+  - without a value, the flame-off hold floors at the cold setpoint (`SATcontrol.ino:827-833`).
+- So the TASK-1371 detection reads `isBoilerMsgIdUnsupportedRead(28)`.
+
+**Changes an earlier entry:** provisionally settles the open item of entry 45 (how "no return temperature" is detected).
+
+**Task:** TASK-1371, with TASK-1412.5 (measurement validity).
+
+**Open:**
+
+1. A verdict exists only after something reads MsgID 28 and the boiler answers.
+   - OT-Direct polls MsgID 28 itself every 10 s (`OTDirect.ino:147`, `R_ENTRY(28, OT_TEMP_INTERVAL_MS)`).
+   - **Not traced in this session:** whether those boiler answers pass the `boilerEvidence` test, so that they set the bit.
+   - PIC boards: whether the PIC reads MsgID 28 when the thermostat does not was **not checked**. A firmware comment says the thermostat polls MsgID 28 only every few minutes (`OTGW-Core.ino:1107-1108`).
+2. Overlap with option D (entry 6, gruijter's Intergas):
+   - a board sensor set to 'R' feeds Tret without any OpenTherm frame (`OTGW-Core.ino:1107-1112`, `:1312-1323`);
+   - the boiler may still answer Unknown-DataID on 28;
+   - which wins: the sensor value (a return temperature exists) or the Unknown-DataID verdict? Re-ask him.
+3. Data-Invalid or a stale Tret (option C) stays unhandled. That is his "reconsider later".
+
+## 85. Q41 and Q42: he asked us to expand (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 05:00 UTC:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845
+
+**Quoted:**
+
+> Q41: Please expand / Q42: Please expand
+
+**Settled by this statement:** nothing. Both questions were too short to answer. Expanded versions are drafted, to be posted one at a time.
+
+**Material for Q41** (bounds of the MaxTSet slider, TASK-1373; entry 48 said "the MsgID 57 values ( Lower/Higher )"):
+
+- Spec v4.2:
+  - Each remote boiler parameter has an upper and a lower bound. The master should read them; without them the master may apply its own defaults (lines 2016-2019).
+  - MsgID 6 carries the transfer-enable and read/write flags. Bit 1 is "max CHsetpoint" (lines 2029-2040).
+  - MsgID 49 carries the upper and lower bound of maxCHsetp (lines 2059-2060, 2382).
+  - MsgID 57 is the value itself, read/write (line 2062).
+  - So "Lower/Higher" belongs to MsgID 49, not to MsgID 57.
+  - "Identical to the DHW Setpoint slider" (entry 48) matches the DHW pair: bounds in MsgID 48, value in MsgID 56 (lines 2057-2058, 2381).
+- thermo-nova:
+  - The device number "Maximum Setpoint {name} (Device)" (`number.py:84`) has a fixed range of 30..80 (`number.py:116-123`).
+  - It is written with `SH=` (`number.py:125-127`, `coordinator/mqtt/opentherm.py:224-225`).
+  - It reads only MaxTSet (`coordinator/mqtt/opentherm.py:18`, `:79-83`).
+  - Neither MsgID 49 nor MsgID 6 was found in that path.
+  - Entry 48's fallback of 20/80 differs from thermo-nova's 30/80.
+- Firmware:
+  - SAT reads only `OTcurrentSystemState.MaxTSet` (`SATcontrol.ino:316`).
+  - MsgID 49 is stored in `MaxTSetUBMaxTSetLB` on the PS=1 summary route (`OTGW-Core.ino:4627`). The frame path was not traced.
+  - OT-Direct already has a periodic write of MsgID 57 for `SH=` (`OTDirect.ino:143`).
+  - No SAT code reads MsgID 49 or MsgID 6.
+- Related, same day: his Q15 answer of 2026-10-27 08:59 UTC (msg 1564564109092192347), "yes a user setting. 55 underfloor, 62 radiators". It gives slider defaults per heating system. It is recorded in the cluster that handles Q15; it does not change Q41.
+
+**Material for Q42 (on/off boiler):**
+
+- Spec v4.2: MsgID 3 HB bit 1 = "Control type [ modulating, on/off ]" (line 1605).
+- thermo-nova only shows the bit as a binary sensor, "Device Control Type" (`coordinator/serial/binary_sensor.py:51`). A grep finds no other use.
+- Firmware: SAT does not read the bit. It appears only in:
+  - an OT-Direct debug print of the MsgID 3 handshake (`OTDirect.ino:943-959`);
+  - a comment (`OTGW-Core.ino:3113`).
+- Entry 13 removed the user Force PWM switch. The question is whether that also rules out a PWM forced by capability.
+- Precedent: in entry 30 he himself proposed deriving the device type from a MsgID 3 bit (cooling supported). Capability-driven behaviour from MsgID 3 is therefore not foreign to his design.
+
+**Changes an earlier entry:** none.
+
+**Task:** TASK-1373 waits on Q41. Q42 has no task.
+
+**Open:** both questions, to be re-asked in expanded form.
+
+## 86. Sustained switches: overshoot counts at equality, underheat and saturation timed as thermo-nova, the 60 s switch timed on the tick's scheduled time (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 05:00 UTC. Answers to Q43, Q44 and Q46:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845
+
+**Quoted** (excerpt; Q43 and Q44 appear twice in the message, with the same answer):
+
+> Q43: A
+> Q44: A
+> Q43: A
+> Q44: A
+> Q46: B
+
+**Settled by this statement:**
+
+- **Q43 A:** the 60 s overshoot switch counts a flow exactly on requested + margin as overshoot (`>=`). It resets only when the flow is below that threshold, as thermo-nova does (`heating_control.py:288-291`).
+  - The margin stays 2.0 (entries 15 and 37).
+  - thermo-nova's own margin is `OVERSHOOT_MARGIN_CELSIUS` = 3.0 (`cycles/const.py:10`, imported at `heating_control.py:21`). "As thermo-nova" therefore covers the comparison only.
+- **Q44 A:** the underheat and saturation exits (PWM to continuous) are timed as thermo-nova times them:
+  - the first qualifying sample starts the timer at 0 s (`sustained_runtime`, `helpers.py:51-56`);
+  - there is no bail-out on a long gap;
+  - underheat counts while flow <= requested + `UNDERSHOOT_MARGIN_CELSIUS` (-3.0, `cycles/const.py:11`) and resets on `>` (`heating_control.py:337-340`); its timer is at `:342-345`, 180 s (`const.py:22`);
+  - saturation runs while off_time == 0 (`:359-362`); its timer is at `:364-367`, 300 s (`const.py:23`).
+- **Q46 B:** the 60 s switch fires on the first control tick whose scheduled time is at least 60 s after the overshoot started. The few milliseconds by which the tick runs late no longer matter.
+
+**Compared with thermo-nova and the firmware:**
+
+- Firmware Q43: strict `flowTemp > setpoint + fOvershootMargin` (`SATcycles.ino:1025`, comment at `:1018-1019`).
+- Firmware Q44:
+  - `dt` is the time since the previous call (`:1046-1047`);
+  - a gap of 0 or more than 60 s returns early (`:1054`);
+  - underheat adds `dt` (`:1065`) and uses a strict `<` (`:1064`);
+  - saturation adds `dt` (`:1081`);
+  - the constants are at `:30` and `:31`; entry 41 cites `:31`/`:32`, which have drifted.
+  - Both exits run only in the PWM ON phase (`:1059-1063`), as thermo-nova (`heating_control.py:321-323`).
+- Firmware Q46:
+  - the overshoot start and the 60 s test read `millis()` inside the tick (`:1001`, `:1028-1029`);
+  - control ticks run on a catch-up grid (`SATcontrol.ino:590`; `safeTimers.h:192-193`, `timer_due += timer_interval`);
+  - `safeTimers.h` has no accessor for a timer's scheduled time. `DUE()` expands to `__Due__(timerName##_due, ...)` (`:161`). So after DUE fires, the scheduled time is `timerSATControl_due` minus the interval, and B needs a small helper;
+  - after more than 10 missed intervals the grid restarts from now (`safeTimers.h:186-187`).
+- thermo-nova runs its loop every 5 s (`climate.py:706-709`) and times the switch from `demand.timestamp` (`heating_control.py:293`).
+- Not measured: the Q46 claim that the switch comes one tick late about half the time is derived from the code.
+- Line check (question cite to current HEAD): `SATcycles.ino:993` is now `:1025`; `:1014-1022` is now `:1045-1054`; `:1032` is now `:1064`.
+
+**Changes an earlier entry:**
+
+- Entry 41, Open: settles bullet 2 (how underheat and saturation are counted) and bullet 3 (the strict `>`).
+- Entry 22: settles the strict `>` point recorded there ("Firmware uses `>` where thermo-nova uses `>=`"). Consistent with his own wording quoted in entry 22, "BT - CS >= 2".
+- Entry 37: settles the point it left open, that its `>=` answer did not decide the 60 s path. The classifier decision itself (`>=`, 2.0) is unchanged.
+
+**Task:** a new follow-up task to TASK-1367 (Done), with Q47 (see that entry). Records the decisions TASK-1412.8 AC#1 asks for, except the Q46 scope below.
+
+**Interpretation (ours):** Q46 asked about the 60 s switch only. Q44 A turns underheat and saturation into the same kind of timer, but whether B also applies to them is not his answer. Re-ask (see clarifications).
+
+**Open:**
+
+- The scope of Q46 B for the underheat and saturation timers.
+- thermo-nova resets the exit timers during hot water and for 300 s after it (`heating_control.py:313-315`). The firmware's exits have no hot-water condition: in `satCycleCheckAutoSwitch()` `bDhwActive` is read only for the overshoot guard (`SATcycles.ino:1009`, `:1023`), not in the exits (`:1056-1090`). Not asked; Q44 covered the timing only.
+
+## 87. Heat pumps enter PWM through the 60 s overshoot switch, as thermo-nova (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 05:00 UTC. Answer to Q45:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845
+
+**Quoted** (excerpt):
+
+> Q45: A
+
+**Settled by this statement:**
+
+- The heat-pump exclusion from the continuous-to-PWM overshoot switch is removed. A heat pump in sustained overshoot enters PWM by itself, as thermo-nova does. thermo-nova's `_maybe_enable_pwm_on_sustained_overshoot` has no heat-pump case (`heating_control.py:262-305`).
+- The PWM-to-continuous exits then apply to heat pumps too. `_maybe_disable_pwm_runtime` has no source case either (`heating_control.py:307-329`).
+- Heat-pump PWM timing follows entries 40 and 50.
+
+**Compared with thermo-nova and the firmware:**
+
+- Firmware gate: `if (!satAlwaysMaxModulation() && pidOutput > satGetColdSetpoint())` (`SATcontrol.ino:5419`). The comment at `:5416-5418` names Q45.
+- `satAlwaysMaxModulation()` is true only for `SAT_SRC_HEAT_PUMP` (`:376-380`). Hybrids already pass the gate.
+- Heat pumps otherwise fall into `satCycleSkipAutoSwitch()` (`:5422`), whose comment lists the exclusion as open question Q45 (`SATcycles.ino:164-166`).
+- Heat-pump PWM timing is already in place: 180 s minimum ON (`SATcontrol.ino:359-362`), period 1800 or 2400 s (`:367-373`).
+- MM is never 0 for a heat pump or hybrid in PWM (comment at `:383-385`).
+- Line check: question cite `:5313` is now `:5419`. `:376-380` is unchanged.
+
+**Ordering (ours):** our advice was "A, after Q35", and he answered A.
+
+- A heat pump that has not started within one control tick hits today's ON-phase flap (the Q35 entry).
+- So this lands with or after the Q35 fix (TASK-1382).
+
+**Changes an earlier entry:**
+
+- Consistent with entries 40 and 50, which run heat pumps in PWM.
+- Entry 13 (Force PWM removed) is not affected: this is the automatic switch.
+- Same message: Q36 A (no hourly start cap for heat pumps; today 2 per hour at `SATcontrol.ino:349`) is recorded in its own entry and belongs in the same change.
+
+**Task:** a new task. It depends on TASK-1382 and TASK-1412.3, and goes together with the Q36 change.
+
+**Open:** none from him.
+
+## 88. The 60 s overshoot switch runs before the CS of the same tick, as thermo-nova (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 05:07 UTC. Answer to Q47:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564868134287048788
+
+**Quoted** (excerpt; the same message answers Q48-Q51 and asks for a new table column):
+
+> @BlueFlame Bot Q47: A
+
+**Settled by this statement:**
+
+- The continuous-to-PWM overshoot switch runs before the control setpoint of the same tick is computed. The first PWM CS therefore goes out on the switch tick, not one tick (30 s) later.
+
+**Compared with thermo-nova and the firmware:**
+
+- thermo-nova's order in `update()`:
+  1. disable PWM at the maximum setpoint (`heating_control.py:203-204`);
+  2. the overshoot enable (`:206-209`);
+  3. `pwm.update` (`:211-215`);
+  4. the underheat and saturation exits (`:217-220`);
+  5. modulation (`:222`);
+  6. the PWM or continuous setpoint (`:224-228`);
+  7. send (`:236-238`).
+- Firmware order:
+  1. the maximum-setpoint check (`SATcontrol.ino:5385-5388`);
+  2. `satApplyPWM()` / `satApplyContinuous()` (`:5396`, `:5403`). `satApplyPWM` runs the schedule and the setpoint together (`:1102`);
+  3. then `satCycleCheckAutoSwitch()` (`:5419-5420`), which holds both the overshoot enable and the PWM exits.
+- Line check: question cites `:5297` / `:5314` are now `:5396`-`:5403` / `:5420`.
+
+**Interpretation (ours):** the question named only the 60 s switch. Moving the whole `satCycleCheckAutoSwitch()` ahead would be wrong: the saturation exit reads the off time recorded by this tick's `satApplyPWM()` (`SATcycles.ino:1079-1080`), so it would read the previous tick's value.
+
+- We read A as: only the continuous-to-PWM part moves before the CS.
+- thermo-nova also runs the exits before the setpoint (`heating_control.py:217-228`). Matching that as well needs the schedule step split from the setpoint step. That is beyond the question, so it is open.
+- These code facts change when the switch moves into the same tick: the CH-rule capture of the PWM phase (`SATcontrol.ino:5398-5401`) and the note that PWM's first schedule step comes one tick later (`:1179-1184`).
+
+**Changes an earlier entry:** none. Consistent with entry 44 (CS, MM and CH on every update) and entry 41 (60 s).
+
+**Task:** the same follow-up task as Q43/Q44/Q46. TASK-1412.8 AC#1.
+
+**Open:** whether the PWM-to-continuous exits must also come before the CS, as in thermo-nova (`heating_control.py:217-228`). Not asked. The plan states the choice.
+
+## 89. PWM-entry ON counts but is never cut; a hot-water flame is not counted (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 05:07 UTC, answer to Q48 (TASK-1369/1401, 2026-10-26). A provisional maintainer decision was in force:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564868134287048788
+
+**Quoted:**
+
+> Q47: A / Q48: A but do not count flame when DHW enable is triggered / Q49: B / Q50: A / Q51: A / Create a new column in the open questions table with a mark for the answered questions for better traceability
+
+He also wrote about hot water on 2026-10-27 at 18:37 UTC (msg 1564709639944151071); that report is recorded as its own entry below (after hot water the next PWM ON comes a full off time late).
+
+**Settled by this statement:**
+
+- Q48 A: when the PWM-entry ON phase is the 4th start of the hour, it counts, but the limit never cuts the burner.
+  - This confirms the provisional maintainer decision of 2026-10-26.
+  - It is implemented at `SATcontrol.ino:1059-1063`, where `!(entryOn && flame)` skips the limit.
+  - thermo-nova counts that start at `pwm.py:160`.
+- Addition: "do not count flame when DHW enable is triggered". A flame that belongs to a hot-water draw never counts as a PWM start.
+
+**Interpretation (ours; to confirm, see Q48b):** "DHW enable" means the boiler's DHW-active bit (MsgID 0 slave LB bit 2, spec v4.2 line 1445). It does not mean the thermostat's DHW-enable bit (master HB bit 1, line 1433). Reasons:
+
+- thermo-nova's own name for hot water is "DHW enable". In its MQTT coordinator, `DATA_DHW_ENABLE = "domestichotwater"` (`coordinator/mqtt/opentherm.py:22`) drives `hot_water_active` (`:68-69`). This firmware publishes `domestichotwater` from slave LB bit 2 (`OTGW-Core.ino:2514`). The serial coordinator uses `DATA_SLAVE_DHW_ACTIVE` (`coordinator/serial/__init__.py:58-59`).
+- The master bit is published separately, as `dhw_enable` (`OTGW-Core.ino:2469`).
+- In entry 58 he used the same words, "when the DHW is enabled ... When DHW enable is off", for hot water running.
+- The firmware's `bDhwActive` is the slave bit (`SATcontrol.ino:5089`).
+
+**Where the firmware can count a hot-water flame today:**
+
+- During the draw nothing is counted. While the slave DHW bit is set, the control loop returns early (`SATcontrol.ino:5096-5113`), before `satApplyPWM()` (`:5396`) and so before `satPwmSchedule()` (`:1102`).
+- After the draw ends with the flame still lit, there are two ways it gets counted:
+  - (a) an ON phase that was already requested is counted at its first flame (`SATcontrol.ino:971`);
+  - (b) an OFF wait that ends while the flame burns starts an ON phase and counts it at once (`:1076`, then `:872-873`).
+- The comment at `SATcontrol.ino:852-855` says outright that "a flame lit by hot water during a requested ON phase counts the same way, as in thermo-nova, pwm.py:186-193". Q48 reverses that.
+- In thermo-nova an ON start counts at `pwm.py:160`, whatever lit the flame. The exclusion is therefore a deliberate deviation from thermo-nova.
+
+**Interaction with Q49 = B (same message):**
+
+- Counting moves from the first flame to the ON start, as in thermo-nova (`pwm.py:160`).
+- The DHW exclusion must attach to that new counting point (`satPwmBeginOn`, `SATcontrol.ino:867-885`), not to `:971`.
+- Under B, an ON start right after a draw, with the hot-water flame still lit, is exactly the case to exclude.
+
+**Code path behind the OFF wait after hot water** (confirmed independently by the capture analysis of gruijter's alpha.514 run, see the hot-water report entry below):
+
+- The flame-edge handler runs on every loop, before the DHW return (`SATcontrol.ino:5051-5056` vs `:5096-5113`).
+- So a hot-water flame-on sets `_cycle_flameOnStartMs` (`SATcycles.ino:741`), and its flame-off sets `_cycle_flameOffStartMs` (`SATcycles.ino:786-789`).
+- The PWM OFF wait counts from that flame-off (`SATcontrol.ino:1046`). After a draw, the next ON phase therefore waits a full off time from the end of the draw. At low duty that is up to 2 x period - 180 s (`:946`, `:996`, `:1006`).
+- thermo-nova times the OFF wait from `_last_update` (`pwm.py:134`, `:155`, `:208`). A hot-water flame does not move that value.
+- Entry 58 says `pwm.update()` keeps running while hot water is active (`heating_control.py:211`). Whether `demand.heater_state == HeaterState.ON` at `:202` holds during hot water was not traced.
+
+**Changes an earlier entry:**
+
+- Entry 59 settled that hot-water flame starts do not count. This entry extends that to a hot-water flame that carries into a PWM ON phase.
+- It reverses the thermo-nova-parity reading in the TASK-1401 code comment (`SATcontrol.ino:852-855`). That is a firmware comment, not an entry.
+- The PWM-entry rule (entries 22/43 with entry 59) is no longer provisional.
+
+**Task:** a TASK-1401 follow-up for the DHW exclusion, planned together with the Q49 = B change. The Q48 code stays.
+
+**Open:**
+
+- Q48b: which bit he means, and whether a flame lit for hot water that continues into a PWM ON phase counts. Our reading above is acted on meanwhile.
+- The OFF-wait restart after hot water: confirmed, see the hot-water report entry below (TASK-1380, TASK-1382).
+- His table request (a column marking answered questions in `docs/sat/open-questions.md`) belongs to the cluster that edits that file.
+
+## 90. A PWM ON phase counts against cycles per hour at its ON start, as thermo-nova (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 05:07 UTC. Answer to Q49 (queued after the TASK-1401 review; provisional A was in force). Our advice was "A until Q35 is fixed, then B".
+https://discord.com/channels/812969634638725140/1514720723980259460/1564868134287048788
+
+**Quoted** (excerpt):
+
+> Q49: B
+
+**Settled by this statement:**
+
+- Every PWM ON start counts against cycles per hour at the moment it starts, also an ON phase that never lights. This is thermo-nova's behaviour: `self._current_cycle += 1` at the OFF/IDLE-to-ON start (`pwm.py:159-162`, the increment at `:160`).
+- It replaces the provisional A of TASK-1401, under which a phase counted only at its first flame.
+
+**Compared with thermo-nova and the firmware:**
+
+- Firmware today:
+  - `satPwmCountStart()` counts once per phase at its first flame (`SATcontrol.ino:856-861`, comment at `:851-855`, called at `:971`);
+  - a phase that starts with the flame already burning is counted at once (`:872-873`);
+  - an unlit phase is not counted (the comment at `:854-855`);
+  - the ring and the limit are at `SATcycles.ino:285-326`;
+  - the limit is applied at `SATcontrol.ino:1063`.
+- thermo-nova's own cap compares the count with `duty_cycle_seconds` (`pwm.py:156`). That value is `"00:13:00"` = 780 by default (`entry_data.py:220`, `const.py:167`), so the cap never blocks. Entry 59 keeps the real cycles-per-hour limit.
+
+**Ordering dependency (ours, stated in our own question):** B is safe only after Q35 is fixed.
+
+- With today's anchor, an ON phase that has not lit within one tick ends on the next tick (`SATcontrol.ino:883`, `:1024`, `:1028`, `:1030`) and the following tick starts ON again (`:1058`, `:1076`). So an unlit start comes every second tick.
+- Under B, each of those starts counts. At a 30 s tick and the default of 3 per hour (entry 52; `SATtypes.h:549`), the starts at about 0, 60 and 120 s reach the limit (`:1063`). PWM starts are then blocked for up to an hour, until the oldest start leaves the rolling window (`SATcycles.ino:297-306`). Derived from the code, not measured; our question said "about 90 s", the code walk gives about 2 minutes.
+- So B ships in the same build as the Q35 fix (TASK-1382), or after it. Provisional A stays until then.
+- This orders the work. It does not change his answer: the end state is B.
+
+**Changes an earlier entry:** consistent with entries 58 and 59: only PWM's own ON phases count. B decides when they count. It also changes the TASK-1401 behaviour that was provisional.
+
+**Task:** a new follow-up task to TASK-1401. It depends on TASK-1382. See TASK-1412.9 AC#2.
+
+**Open:** the interaction with Q48, answered in the same message: "A but do not count flame when DHW enable is triggered" (recorded in its own entry).
+
+- The firmware comment at `SATcontrol.ino:852-854` counts a flame lit by hot water during a requested ON phase.
+- Under B the count moves to the ON start, so a hot-water flame no longer decides it.
+- How his qualifier maps onto counting at the ON start belongs to the Q48 entry. Not resolved here.
+
+## 91. PWM phase anchors when the flame is already burning: ON counts from its start, OFF from the ON-to-OFF switch (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 05:07 UTC. Answers to Q50 and Q51 (queued after the TASK-1401 review; provisional A was in force for both):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564868134287048788
+
+**Quoted** (excerpt):
+
+> Q50: A
+> Q51: A
+
+**Settled by this statement:**
+
+- **Q50 A:** an ON phase that starts with the flame already burning counts its ON time from that start. This covers duty range 5 and PWM entry. Source: `pwm.py:162-167`; expiry at `:205-209`.
+- **Q51 A:** if the flame is still lit on the first tick after ON to OFF, the OFF wait counts from the ON-to-OFF switch. In thermo-nova, `_last_update` is set at `pwm.py:208`, and OFF uses `elapsed` from it (`:134`, `:155`).
+
+**Compared with the firmware:** both answers confirm what TASK-1401 already implements.
+
+- Q50: `_pwm_onStartMs` (`SATcontrol.ino:815`), set at `:872-877`, used at `:1024`.
+- Q51: `_pwm_offStartMs` (`:817`), set at `:896`, used at `:1050-1053`.
+- After the Q35 fix (TASK-1382), Q50's rule becomes part of the general ON anchor: time from the phase start, re-anchor at ignition.
+
+**Changes an earlier entry:** none. Consistent with entries 43 and 59.
+
+**Task:** TASK-1401 (confirmation, no change). The "provisional" marks go.
+
+**Open:**
+
+- Q51 covers only the case where the flame is still lit at the switch. thermo-nova always times OFF from the switch (`pwm.py:208`). The firmware otherwise times it from the last flame-off (`SATcontrol.ino:1046`; the switch time is used only while the flame is lit, `:1050-1053`), so a later flame-off from hot water restarts the wait.
+- That general case is TASK-1380 (audit #59), and it was not asked.
+- Related reports, recorded nowhere yet:
+  - gruijter, 2026-10-27 12:18 UTC, on alpha.514: "after 12:30, when DHW is used multple times in short bursts, it does take longer for CH to come back again" (https://discord.com/channels/812969634638725140/1514720723980259460/1564614286351794217).
+  - Sergeant D, 2026-10-27 18:37 UTC: "It looks like when DHW enable is triggered the next PWM cycle resets. It has a pattern of 20 minutes idle after DHW enable goes to 0. PWM cycle = 20 minutes" (https://discord.com/channels/812969634638725140/1514720723980259460/1564709639944151071). gruijter replied at 18:44 asking us to verify and fix (message 1564711480912388097).
+  - This fits an OFF wait timed from the hot-water flame-off. That is our reading; we have not checked it against gruijter's capture.
+  - See the clarification question.
+
+## 92. After hot water the next PWM ON comes a full off time late (report, 2026-10-27)
+
+**Source:** #alpha-testing, 2026-10-27. Sergeant D, 18:37 UTC:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564709639944151071
+(with a graph at 18:30 UTC, msg 1564707985186488490). gruijter (tester, Intergas, PIC board, alpha.514), 12:18 UTC with
+capture `20261027-093222.zip` and `otgw-graph-20261027-131309.csv`:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564614286351794217
+and 18:44 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1564711480912388097
+
+**Quoted:**
+
+> It looks like when DHW enable is triggered the next PWM cycle resets. It has a pattern of 20 minutes idle after DHW enable goes to 0. PWM cycle = 20 minutes
+
+gruijter:
+
+> DHW usage does not seem to interfere anymore with CH cycles. Although after 12:30, when DHW is used multple times in short bursts, it does take longer for CH to come back again, even when the room temperature drops a bit.
+
+> That would indeed explain what happened when DHW was used multiple times after 12:30 CET @BlueFlame Bot can you verify and fix if needed?
+
+**Checked (capture analysis, 2026-10-28; times CET = UTC+1):**
+
+- Settings: cycles per hour 3, so the period is 1200 s (his "20 minutes"). Duty 0.21-0.24 at the time.
+- PWM went OFF at 12:18:24, CH flame off 12:18:32. Five hot-water draws followed: 12:26:35-12:26:54, 12:29:05-12:29:32,
+  12:30:02-12:30:47, 12:38:49-12:39:39, 12:48:19-12:48:28. PWM ON came at 12:57:54 (CH flame 12:58:34), room 19.75 for
+  setpoint 20.
+- Without the draws the OFF wait (912-948 s at that duty) would have ended about 12:34:24: CH came back about 23.5 min late.
+  Morning case: draws 09:56:55-09:58:41, ON 10:14:24 instead of about 10:11:54.
+- The wait after the last draw was 9 min 26 s, not 20 min: it is the off time, restarted at each hot-water flame-off. His
+  "20 minutes" is the period; the mechanism he describes is confirmed.
+- The hourly start limit was not involved: no "cycle limit" lines, and the count dropped 3 -> 2 -> 1 in that window.
+
+**Cause in the firmware (two readers: the capture analysis and the Q48 verification, independently):**
+
+- The OFF wait counts from the last flame-off of any kind (`SATcontrol.ino:1046`, `satCycleGetFlameOffStartMs()`); the
+  flame-off time moves on every flame-off, hot water included (`SATcycles.ino:786-789`). `_pwm_offStartMs`
+  (`SATcontrol.ino:1050-1053`) is used only when the flame still burns at the ON->OFF switch.
+- A second path: an ON phase that starts with the flame off has no start anchor (`:883`) and falls back to the last flame-on
+  (`:1024`), here the hot-water ignition, so it ended on its first tick (CS=48 at 10:14:24, CS=10 at 10:14:54, CS=48 at
+  10:15:24, flame 10:15:35). This is the Q35 path.
+- thermo-nova times the OFF wait from `_last_update` (`pwm.py:134`, `:155`), set only at an ON start (`:162`), at ignition
+  (`:188`) and at ON->OFF (`:208`); no flame-off moves it.
+
+**Settles:** his observation is a firmware defect against thermo-nova and against entry 43 (the OFF wait timed from flame-off
+is not the design) and decided by Q35 A; Q51 A (above) covers the flame-still-lit case, and whether the OFF wait always
+counts from the ON->OFF switch is the Q51 scope question. **Tasks:** TASK-1380 (OFF from PWM's own ON->OFF
+switch) and TASK-1382 (ON from its own start, Q35), with this capture as the reproduction; TASK-1412.7 (post-DHW recovery).
+
+**Open:** none for him; the fix is decided. The proof is an old-vs-fix replay of these draws (host test, then bench).
+
+## 93. PWM ON and OFF seconds in the SAT log (request repeated, 2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 04:41 UTC:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564861520494461061
+
+**Quoted:**
+
+> @BlueFlame Bot In the next build, add pwm_on (seconds) and pwm_off (seconds) to the SAT log.
+
+**Settles:** the same request as entry 61, now with the field names pwm_on and pwm_off. Logging only, no control change.
+**Task:** TASK-1407 (field names added). **Open:** none.
+
+## 94. Mark answered questions in the open-questions table (process request, 2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 05:07 UTC:
+https://discord.com/channels/812969634638725140/1514720723980259460/1564868134287048788
+
+**Quoted:**
+
+> Create a new column in the open questions table with a mark for the answered questions for better traceability
+
+**Settles:** `docs/sat/open-questions.md` gets an "Answered" column: a mark plus the entry number for every answered
+question, empty for open ones. Done in the same commit as this entry. **Open:** none.
+
+**Tasks filed 2026-10-28 for entries 67-94:** TASK-1413 (entry 72, auto-tune removal), TASK-1414 (entry 73), TASK-1415 (entry 74), TASK-1416 (entry 75), TASK-1417 (entry 76), TASK-1418 (entry 77), TASK-1419 (entries 81, 87), TASK-1420 (entries 86, 88), TASK-1421 (entries 89, 90). Existing tasks got notes: TASK-1270, 1355, 1365, 1371, 1373, 1375, 1380, 1382, 1383, 1407, 1412.7-1412.10.

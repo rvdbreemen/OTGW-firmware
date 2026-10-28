@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:41:00Z'
-updated_date: '2026-10-27T23:45:00Z'
+updated_date: '2026-10-28T06:48:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -207,4 +207,6 @@ Sergeant D entries:
 2026-10-26 19:13 UTC Q33 answered by the maintainer (Robert, #alpha-testing msg 1564356412585287824): A = lost means no boiler reply for 30 s; a Data-Invalid reply still counts as a reply. This is the provisional design already in commit 31933adaf, so no code change. Q34 (resume by itself) asked of Sergeant D next.
 
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
+
+2026-10-28: Sergeant D Q34 A (entry 79, msg 1564581168630861865): resume on the first boiler reply is confirmed; drop PROVISIONAL from SATcontrol.ino ~2544 comment and docs. Q33 was answered by Robert (msg 1564356412585287824).
 <!-- SECTION:NOTES:END -->
