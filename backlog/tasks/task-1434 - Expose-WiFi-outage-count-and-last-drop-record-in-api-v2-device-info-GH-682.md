@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-28T21:06:00Z'
-updated_date: '2026-10-28T22:14:00Z'
+updated_date: '2026-10-28T22:35:00Z'
 labels:
   - enhancement
 dependencies: []
@@ -23,6 +23,6 @@ mrfox7688 asked on GH #682 (2026-10-22) to read the WiFi outage counters without
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 C:/Program Files/Git/api/v2/device/info returns outage count, disconnect events and last drop (reason code, name, channel, duration), matching the telnet banner on the bench after a forced AP drop
-- [ ] #2 esp8266 build and evaluate.py --quick green
+- [x] #1 esp8266 build and evaluate.py --quick green
+- [ ] #2 /api/v2/device/info returns outage count, disconnect events and last drop (reason code, name, channel, duration), matching the telnet banner on the bench after a forced AP drop
 <!-- AC:END -->
