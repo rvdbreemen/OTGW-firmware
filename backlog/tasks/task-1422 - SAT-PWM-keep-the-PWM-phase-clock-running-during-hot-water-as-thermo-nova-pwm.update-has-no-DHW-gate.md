@@ -3,11 +3,11 @@ id: TASK-1422
 title: >-
   SAT PWM: pause the ON timer while the boiler DHW-active bit is set, then
   restart the start-up sequence (entry 95, Q48b)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-28T07:36:00Z'
-updated_date: '2026-10-28T11:11:00Z'
+updated_date: '2026-10-28T13:39:00Z'
 labels:
   - sat
   - sergeant-d
@@ -31,7 +31,7 @@ Review finding on the TASK-1382/1380/1383 candidate (correctness + SAT-decision 
 - [x] #1 Host test: an ON phase interrupted by a hot-water draw keeps its used ON time and continues with the remaining ON time after the CH flame relights (freeze-clock: lastUpdate shifted by the draw length, no BT reseed, no new EMA window or hold); red on alpha.516, green on the fix
 - [x] #2 No CS=10/CH=0 sent during the draw; OFF phase during a draw unchanged (timed from the ON->OFF switch)
 - [x] #3 Sergeant D's OK on the open points (post-draw 180 s wait then resume anyway; no new hold/BT reseed; flame already burning after the draw resumes at once) recorded in docs/sat/sergeant-d-corrections.md before implementation
-- [ ] #4 build + evaluate green
+- [x] #4 build + evaluate green
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -51,4 +51,21 @@ Proof: host test: ON 264 s (duty 0.22, 1200 s), draw from +100 s to +400 s, CH i
 2026-10-28 Sergeant D Q52 A, B, C yes (entry 103, msg 1564953189969829993): 180 s post-draw wait from the draw end then resume anyway; resume with the remaining ON time, no new hold, no BT reseed; flame still lit after the draw resumes at once. Implementation unblocked. D (start-count after a draw) asked separately (TASK-1421).
 
 2026-10-28 implemented: PwmDhwPhase + satPwmOnDhwStart/satPwmOnDhwEnd/satPwmDhwHold/satPwmDhwResume, _pwm_dhwResumed (entries 95, 103, 104). Host: tests/test_sat_pwm_anchors.py 24 OK; on the alpha.517 source 8 failures (f1, f2, f3, f6, g1-g4); f4 (draw in OFF) and f5 (no BT reseed) characterization. Review (opus correctness, sonnet rules, sonnet tests): draw during first-ignition wait reseeded BT and gave a full ON time -> fixed (resume clears the wait, blocks sync/EMA/hold; entry 104); dead guards removed; entry 45 comment corrected (flood is TASK-1371); docs updated. All tests/test_sat_*.py OK; evaluate --quick 0 failed; compile esp32-combo SUCCESS (pre-fix version). AC#2: no CS=10/CH=0 during the draw (early return unchanged), OFF draw unchanged (f4).
+
+Bench old vs new, Classic+S3 Mini .63, same gen_1422 /simulate replay (logs C:/Users/rvdbr/AppData/Local/Temp/otgw-bench-1422/old/ and C:/Users/rvdbr/AppData/Local/Temp/otgw-bench-1422/new/).
+OLD alpha.517: PWM ON 12:42:08 (pwm_on 268 s), DHW 12:43:19-12:51:13, PWM OFF 12:51:38 = first tick after the draw (ON time used up by the draw).
+NEW alpha.519+49135fe: PWM ON 13:50:00 (pwm_on 285 s); DHW bit 13:51:34.8-13:59:29.1; 'SAT: PWM ON paused for hot water (used 120 s of 298 s)' 13:52:00; 'SAT: PWM ON resumed after hot water (178 s left)' 13:59:30; PWM OFF 14:03:00 (pwm_on recomputed to 310 s -> resume+190 s = 14:02:40, next 30 s tick 14:03:00). Used 120 s = pause recorded at the next control tick, not at the bit edge (tick granularity).
+AC2: during the draw only CS=47.0 keepalives every 30 s, no CS=10; CS=10.0 only at the PWM OFF.
+Settings before/after diff empty (177 keys). Host suites rerun 2026-10-28: anchors 32 OK, hp_pwm 22 OK, override 72 OK, start_limit 17 OK, ot_loss 21 OK. evaluate --quick: Failed 0, exit 0.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Pause the PWM ON timer while the boiler DHW-active bit is set and resume with the remaining ON time (entries 95, 103, 104). Commit 8372293f2 (alpha.518), shipped in 2.0.0-alpha.519+49135fe.
+AC1: host tests D/e/f/g in tests/test_sat_pwm_anchors.py red against the alpha.516 copy, green on the fix; rerun 2026-10-28 anchors 32 OK, hp_pwm 22, override 72, start_limit 17, ot_loss 21 all OK. Bench old vs new (same replay, C:/Users/rvdbr/AppData/Local/Temp/otgw-bench-1422/old and C:/Users/rvdbr/AppData/Local/Temp/otgw-bench-1422/new): alpha.517 ended ON at the first tick after the draw (12:51:38); alpha.519 logged 'paused (used 120 s of 298 s)', 'resumed (178 s left)', PWM OFF 14:03:00 = resume + remaining (recomputed) ON time, next tick.
+AC2: bench: during the draw only CS=47.0 keepalives, no CS=10; CS=10.0 only at PWM OFF.
+AC3: entries 95/103/104 recorded before implementation.
+AC4: build.bat esp32-combo SUCCESS (fw 304 s, fs 18 s, artefacts 14:38, +49135fe); evaluate --quick Failed 0, exit 0.
+Not verified: a real boiler (field run pending); pause is recorded at the next 30 s control tick, so up to one tick of ON time is counted as used.
+<!-- SECTION:FINAL_SUMMARY:END -->

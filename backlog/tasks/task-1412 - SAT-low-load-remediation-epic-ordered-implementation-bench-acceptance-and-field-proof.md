@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-27T23:40:00Z'
-updated_date: '2026-10-28T06:54:00Z'
+updated_date: '2026-10-28T07:09:00Z'
 labels:
   - epic
   - sat
@@ -69,4 +69,6 @@ stays; the order inside it changes so that this defect is fixed first, with old-
   TASK-1365 close-out.
 - Blocked on Sergeant D: TASK-1373 (Q15b, Q41), TASK-1375 (Q16), TASK-1355/ADR-199 (Q20b), Q28 rounding.
 - Validation sequence TASK-1412.18 -> .26 is unchanged.
+
+2026-10-28 maintainer decision (Robert, in session): alphas keep reaching testers after a bench old-vs-fix proof per fix; TASK-1412.22 gates only the formal field-validated claim and the release, not alpha builds.
 <!-- SECTION:NOTES:END -->
