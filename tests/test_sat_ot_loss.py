@@ -53,7 +53,8 @@ struct Settings { SatSettings sat; };
 struct SatState { bool bLastSentValid=false, bTCAccountedValid=false, bActive=false, bSafetyTripped=false, bFallbackActive=false,
                   bPushRefused=false, bRoomTempLost=false, bOtLinkLost=false;
                   uint32_t iLastSentCSMs=0, iLastSentMMMs=0, iLastSentCHMs=0, iTCPushMs=0;
-                  float fLastSentCS=0, fFinalSetpoint=0; uint8_t iLastSentMM=0, iLastSentCH=0; int eControlMode=0; };
+                  float fLastSentCS=0, fFinalSetpoint=0; uint8_t iLastSentMM=0, iLastSentCH=0; int eControlMode=0; uint32_t iSimDhwExpiryMs=0; };
+struct OTSys { uint8_t SlaveStatus = 0; }; static OTSys OTcurrentSystemState;
 struct OtBusState { uint32_t iBoilerLastSeenMs = 0; bool bPSmode = false; };
 struct State { SatState sat; OtBusState otBus; };
 static Settings settings; static State state;
@@ -70,6 +71,7 @@ static bool _sat_bootCS0sent = true;
 static bool _sat_prevFlameState = false;
 static bool satIsFlameOn() { return false; }
 static void satCycleOnFlameChange(bool) {}
+static void satPwmNoteDhwFlameEdge(bool, bool) {}
 static void satCycleSample() {}
 static void satGetWindow4hStats() {}
 static void satGetWindow24hStats() {}

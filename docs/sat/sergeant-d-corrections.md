@@ -4433,3 +4433,17 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156496290250
 **Interpretation (ours, acted on):** "the hot-water flame" is a flame that was lit while the boiler DHW-active bit was set; a CH flame (e.g. the PWM-entry ON, entry 43) is not held. The hold ends when the flame goes out, or when the DHW bit returns (then the normal draw rules apply). Duty range 5 (continuous ON) follows the same hold.
 
 **Task:** TASK-1424. **Open:** none.
+
+## 107. Interpretation: the hot-water-flame hold applies only while PWM drives the setpoint (2026-10-28, our reading)
+
+**Source:** no new statement. Review of the TASK-1424 implementation of entry 106 (2026-10-28).
+
+**His words (entry 106, Q52E C):** "No PWM ON start while the hot-water flame still burns: PWM waits until the flame has gone out, then starts normally and that start counts."
+
+**Reading acted on (ours):** the hold applies while PWM actually switches the burner, i.e. while the PWM setpoint override is active (overshoot protection on, no hot water, requested setpoint above the cold setpoint; `satPwmDrivesSetpoint`, as thermo-nova `heating_control.py:385`). Then SAT sends CS=10/CH=0 in the OFF phase, so the hot-water flame goes out and the held start follows. Without the override SAT keeps sending the previous setpoint with CH on, a combi boiler can carry the hot-water flame straight on as heating, and a hold would never end: PWM would stop counting starts while the burner runs. So without the override there is no hold.
+
+Also (review, same task): a hot-water flame is marked at its ignition when the boiler DHW-active bit is set, not only on a control tick, so draws shorter than one tick are caught; a flame that entry 103 C resumes as the ON phase's CH flame is no longer marked.
+
+**Compared with thermo-nova:** thermo-nova has no such hold (entry 106).
+
+**Task:** TASK-1424. **Open:** offered to him in the progress note.

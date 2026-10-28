@@ -43,6 +43,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_sat_hp_pwm as hp  # noqa: E402  (builds the real PWM cut; its MAIN is replaced below)
 
+NL = chr(10)
 TICK = 30  # control loop period in seconds
 
 MAIN = r"""
@@ -58,14 +59,18 @@ int main() {
   _sat_lastControlCS = 0; _sat_thermalSafeActive = false;
   state.sat.eControlMode = SAT_MODE_PWM; state.sat.bDhwActive = false;
   std::string cmd; int cph = 3; double ratio = 0.22, dur = 0; std::string init = "burning"; std::vector<Ev> evs;
+  int ovs = 1, entryArm = 0;
   while (std::cin >> cmd) {
     if (cmd == "cfg") std::cin >> cph >> ratio;
     else if (cmd == "init") std::cin >> init;
     else if (cmd == "ev") { Ev e; std::cin >> e.sec >> e.kind >> e.val; evs.push_back(e); }
     else if (cmd == "run") std::cin >> dur;
+    else if (cmd == "ovs") std::cin >> ovs;                 // overshoot protection on/off
+    else if (cmd == "entry") std::cin >> entryArm;          // PWM just entered: the first step skips the off wait (entry 43)
   }
+  settings.sat.bOvershootProtection = ovs != 0;
   settings.sat.iCyclesPerHour = (uint8_t)cph;
-  const float pid = 27.2f + (float)ratio * (50.0f - 27.2f);
+  float pid = 27.2f + (float)ratio * (50.0f - 27.2f);
   g_ms = 100000000UL; const uint32_t base = g_ms;
   if (init == "burning") {                          // flame lit, last burn long ago, OFF phase: the first tick starts ON with the flame
     g_flame = true;  g_flameOnStart = base - 4000000UL; g_flameOffStart = base - 5000000UL;
@@ -73,20 +78,24 @@ int main() {
     g_flame = false; g_flameOnStart = base - 1500000UL; g_flameOffStart = base - 1400000UL;
   }
   state.sat.bPwmFlameRequested = false; bool prevDhw = false;
+  if (entryArm) { _pwm_entryPending = true; _pwm_lastUpdateMs = base; }   // satSetControlMode() arms this; the off wait runs from the entry
   for (int sec = 0; sec <= (int)dur; sec++) {
     g_ms = base + (uint32_t)sec * 1000UL;
     for (auto& e : evs) {
       if (e.sec != sec) continue;
       if (e.kind == "dhw") state.sat.bDhwActive = e.val != 0;
       else if (e.kind == "flow") g_flow = (float)e.val;
+      else if (e.kind == "ratio") pid = 27.2f + (float)e.val / 100.0f * (50.0f - 27.2f);
       else if (e.kind == "flame" && (e.val != 0) != g_flame) {   // flame edge: what satCycleOnFlameChange() records
         g_flame = e.val != 0;
         if (g_flame) g_flameOnStart = g_ms; else g_flameOffStart = g_ms;
+        @FLAMEEDGE@                                              // satControlLoopRun(): the every-loop flame-edge path, with the live DHW bit
       }
     }
     if (sec % 30 != 0) continue;                                 // control tick
     if (state.sat.bDhwActive) {                                  // hot water: the loop returns early, the schedule is skipped
       if (!prevDhw) { @DHWSTART@ }                               // satControlLoopRun(): rising edge, before the early return
+      @DHWFLAME@                                                 // satControlLoopRun(): a flame burning with the DHW bit set is a hot-water flame
       prevDhw = true; continue;
     }
     if (prevDhw) { @DHWEND@ }                                    // falling edge: before satApplyPWM(), as in satControlLoopRun()
@@ -127,7 +136,9 @@ class SatPwmAnchors(unittest.TestCase):
     def setUpClass(cls):
         hooks = "satPwmOnDhwStart" in hp.SAT_INO.read_text(encoding="utf-8")
         hp.MAIN = (MAIN.replace("@DHWSTART@", "satPwmOnDhwStart();" if hooks else "")
-                       .replace("@DHWEND@", "satPwmOnDhwEnd(g_flame);" if hooks else ""))
+                       .replace("@DHWEND@", "satPwmOnDhwEnd(g_flame);" if hooks else "")
+                       .replace("@FLAMEEDGE@", "satPwmNoteDhwFlameEdge(g_flame, state.sat.bDhwActive);" if "satPwmNoteDhwFlameEdge" in hp.SAT_INO.read_text(encoding="utf-8") else "")
+                       .replace("@DHWFLAME@", "satPwmNoteDhwFlame(g_flame);" if "satPwmNoteDhwFlame" in hp.SAT_INO.read_text(encoding="utf-8") else ""))
         cls.tmp = tempfile.TemporaryDirectory()
         cls.exe = hp.build(Path(cls.tmp.name))
 
@@ -139,16 +150,16 @@ class SatPwmAnchors(unittest.TestCase):
         if not self.exe:
             self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
 
-    def starts(self, cph, ratio, init, events, dur):
+    def starts(self, cph, ratio, init, events, dur, extra=()):
         """Number of satCycleRecordPwmStart() calls (PWM starts counted) and the timeline of the same run."""
-        lines = [f"cfg {cph} {ratio}", f"init {init}", f"run {dur}"]
+        lines = [f"cfg {cph} {ratio}", f"init {init}", f"run {dur}", *extra]
         lines += [f"ev {s} {k} {v}" for s, k, v in sorted(events)]
         r = subprocess.run([str(self.exe)], input="\n".join(lines) + "\n", capture_output=True, text=True, check=True)
         n = [int(ln.split()[1]) for ln in r.stderr.splitlines() if ln.startswith("C ")][0]
-        return n, self.sim(cph, ratio, init, events, dur)
+        return n, self.sim(cph, ratio, init, events, dur, extra)
 
-    def sim(self, cph, ratio, init, events, dur):
-        lines = [f"cfg {cph} {ratio}", f"init {init}", f"run {dur}"]
+    def sim(self, cph, ratio, init, events, dur, extra=()):
+        lines = [f"cfg {cph} {ratio}", f"init {init}", f"run {dur}", *extra]
         lines += [f"ev {s} {k} {v}" for s, k, v in sorted(events)]
         out = subprocess.run([str(self.exe)], input="\n".join(lines) + "\n", capture_output=True, text=True, check=True).stdout
         rows = []
@@ -299,14 +310,78 @@ class SatPwmAnchors(unittest.TestCase):
         self.assertEqual(tl.edges()[0], [0], tl.dump(60))
         self.assertEqual(n, 1, f"a hot-water flame must not add a count, got {n}")
 
-    def test_e4_on_start_at_the_end_of_a_draw_with_flame_lit_counts_one(self):
-        # Characterization of the entry 101 interpretation (Q52 D, put to Sergeant D): an ON start on the tick where the
-        # DHW bit just dropped, flame still lit, counts as a normal start. Burning start at 0 (count 1), ON to 600, OFF
-        # to 1200; draw 1190..1215 with the flame lit; the first tick after it (1230) starts the next ON and adds exactly 1 (total 2, as without the draw).
+    def test_e4_on_start_at_the_end_of_a_draw_with_flame_lit_is_held_until_the_flame_is_out(self):
+        # TASK-1424, entries 105 and 106 (replaces the entry 101 reading of TASK-1421, which counted this start at once):
+        # an ON start on the first tick after a draw, with the hot-water flame still lit, is held. Burning start at 0
+        # (count 1), ON to 600, OFF to 1200; draw 1190..1215 with the flame lit; tick 1230 holds; flame out at 1250;
+        # tick 1260 starts the ON and counts it (total 2, as without the draw).
         base, _ = self.starts(3, 0.5, "burning", [], 1500)
-        n, tl = self.starts(3, 0.5, "burning", [(1190, "dhw", 1), (1215, "dhw", 0)], 1500)
+        n, tl = self.starts(3, 0.5, "burning", [(1190, "dhw", 1), (1215, "dhw", 0), (1250, "flame", 0)], 1500)
+        self.assertEqual(tl.edges()[0], [0, 1260], tl.dump(1300))
+        self.assertEqual((base, n), (2, 2), f"the delayed ON start must count exactly 1, got base={base} n={n}")
+
+    # TASK-1424 (entries 105, 106) ----------------------------------------------------------------------------
+    def test_h1_no_on_start_while_the_hot_water_flame_burns(self):
+        # Red on alpha.518 (starts at 1230 and counts there). The flame stays lit past the draw: ticks 1230..1320 hold.
+        n, tl = self.starts(3, 0.5, "burning", [(1190, "dhw", 1), (1215, "dhw", 0), (1350, "flame", 0)], 1500)
+        ons = tl.edges()[0]
+        self.assertEqual(ons, [0, 1350], tl.dump(1400))   # flame out at 1350: the first tick after it starts
+        self.assertEqual(n, 2, f"one count for the delayed start, got {n}")
+
+    def test_h2_ch_flame_at_the_end_of_the_off_wait_starts_at_once(self):
+        # Characterization: a CH-lit flame (no draw) is never held; the OFF wait ends at 1200.
+        n, tl = self.starts(3, 0.5, "burning", [], 1500)
         self.assertEqual(tl.edges()[0], [0, 1230], tl.dump(1300))
-        self.assertEqual((base, n), (2, 2), f"the ON start after a draw must count exactly 1, got base={base} n={n}")
+        self.assertEqual(n, 2)
+
+    def test_h3_range_5_is_held_the_same_way(self):
+        # Red on alpha.518 (starts at 30). Duty at the maximum (continuous ON). Draw 0..20 with the flame lit; tick 30
+        # holds; flame out at 50; tick 60 starts and counts once.
+        n, tl = self.starts(3, 0.95, "burning", [(0, "dhw", 1), (20, "dhw", 0), (50, "flame", 0)], 200)
+        self.assertEqual(tl.edges()[0], [60], tl.dump(100))
+        self.assertEqual(n, 1)
+
+    def test_h4_the_hold_is_narrated_once(self):
+        r = subprocess.run([str(self.exe)], capture_output=True, text=True, check=True,
+                           input=NL.join(["cfg 3 0.5", "init burning", "run 1500", "ev 1190 dhw 1", "ev 1215 dhw 0", "ev 1350 flame 0"]) + NL)
+        if "PWM ON held" not in hp.SAT_INO.read_text(encoding="utf-8"):
+            self.skipTest("old source")
+        self.assertEqual(r.stderr.count("N PWM ON held: hot-water flame still burning"), 1, r.stderr)
+
+    # Review fixes of TASK-1424 --------------------------------------------------------------------------------
+    def test_k1_a_draw_shorter_than_one_tick_still_marks_its_flame(self):
+        # Red on 8372293 (starts at 1230). Flame out at 700 (OFF phase); the draw begins and ends between two control ticks (DHW bit
+        # 1205..1215, flame lit at 1206 and still burning at the tick 1230 with the bit off): the flame-edge path marks it, the start waits
+        # for the flame-out at 1350. The harness calls the real satPwmNoteDhwFlameEdge() at its flame edge, as satControlLoopRun() does.
+        ev = [(700, "flame", 0), (1205, "dhw", 1), (1206, "flame", 1), (1215, "dhw", 0), (1350, "flame", 0)]
+        n, tl = self.starts(3, 0.5, "burning", ev, 1500)
+        self.assertEqual(tl.edges()[0], [0, 1350], tl.dump(1400))
+        self.assertEqual(n, 2)
+
+    def test_k2_range_5_hold_keeps_the_entry_skip_of_the_off_wait(self):
+        # PWM just entered (entry 43), duty in range 5, draw 0..20 with the flame lit: tick 30 holds. The duty then drops to range 3 and
+        # the flame goes out at 50: tick 60 starts ON at once; the 936 s off wait (from the entry) must not apply.
+        ev = [(0, "dhw", 1), (20, "dhw", 0), (40, "ratio", 22), (50, "flame", 0)]
+        n, tl = self.starts(3, 0.95, "burning", ev, 200, ("entry 1",))
+        self.assertEqual(tl.edges()[0], [60], tl.dump(120))
+        self.assertEqual(n, 1)
+
+    def test_k3_without_overshoot_protection_there_is_no_hold(self):
+        # Entry 107 (our reading): SAT does not switch the burner then, so the start is not held; the hot-water flame is lit at 1230 as in e4.
+        n, tl = self.starts(3, 0.5, "burning", [(1190, "dhw", 1), (1215, "dhw", 0), (1350, "flame", 0)], 1500, ("ovs 0",))
+        self.assertEqual(tl.edges()[0], [0, 1230], tl.dump(1300))
+        self.assertEqual(n, 2)
+
+    def test_k4_resume_with_the_flame_lit_clears_the_hot_water_mark(self):
+        # Entry 103 C: the flame that burns after the draw is the CH flame of the ON phase. Duty 0.9 (range 4: on 1620 s, off 180 s),
+        # draw bit 100..400 with the flame lit throughout, resume at the tick 420, ON ends at 1920 with the flame still burning; the
+        # next start comes after the 180 s off wait (2100), not after a flame-out.
+        n, tl = self.starts(3, 0.9, "burning", [(100, "dhw", 1), (400, "dhw", 0)], 2200)
+        ons, offs = tl.edges()
+        self.assertEqual(ons[:1], [0], tl.dump(60))
+        self.assertTrue(offs, tl.dump(2200))
+        self.assertEqual(len(ons), 2, tl.dump(2200))
+        self.assertLessEqual(abs(ons[1] - (offs[0] + 180)), TICK, f"ON ends {offs[0]}, next start {ons[1]}; {tl.dump(2200)}")
 
     # TASK-1422 (entries 95, 103): hot water inside an ON phase freezes the ON clock ------------------------
     # cycles/hour 3, duty 0.22: ON 264 s, burning start at 0. Draw bit 100..400 (the first loop tick with it is 120, the first
