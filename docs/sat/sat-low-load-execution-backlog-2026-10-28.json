@@ -186,7 +186,8 @@
         36
       ],
       "deps": [
-        "TASK-1412.3"
+        "TASK-1412.3",
+        "TASK-1420"
       ],
       "control": true,
       "ac": [
@@ -214,14 +215,18 @@
         "TASK-1382",
         "TASK-1383",
         "TASK-1385",
-        "TASK-1375"
+        "TASK-1375",
+        "TASK-1419",
+        "TASK-1421"
       ],
       "external": [
         "TASK-1380",
         "TASK-1382",
         "TASK-1383",
         "TASK-1385",
-        "TASK-1375"
+        "TASK-1375",
+        "TASK-1419",
+        "TASK-1421"
       ],
       "control": true,
       "ac": [
@@ -246,12 +251,22 @@
         "TASK-1412.3",
         "TASK-1270",
         "TASK-1368",
-        "TASK-1381"
+        "TASK-1381",
+        "TASK-1414",
+        "TASK-1415",
+        "TASK-1416",
+        "TASK-1417",
+        "TASK-1418"
       ],
       "external": [
         "TASK-1270",
         "TASK-1368",
-        "TASK-1381"
+        "TASK-1381",
+        "TASK-1414",
+        "TASK-1415",
+        "TASK-1416",
+        "TASK-1417",
+        "TASK-1418"
       ],
       "ac": [
         "LL-003/020 cover main and area PID, approved startup/restore output, 10/30/60/long actuator calls, scheduler outages and no catch-up integral burst.",
@@ -728,5 +743,10 @@
     "TASK-1409": [
       "TASK-1412.3"
     ]
+  },
+  "resequenced": {
+    "date": "2026-10-28",
+    "reason": "Sergeant D answers Q15-Q51 (entries 67-94); TASK-1413..1421 added; hot-water OFF-wait defect (entry 92) first",
+    "note": "see the Re-sequencing section of the .md; evidence/2026-10-28-low-load-backlog-order.json is the original snapshot and is not changed"
   }
 }

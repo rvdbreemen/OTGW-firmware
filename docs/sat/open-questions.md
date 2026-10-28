@@ -21,7 +21,7 @@ Order: what users feel now or what blocks shipped work first, then ADR-only and 
 8-13. Q23, Q24, Q25, Q26, Q27, Q28 (PID, ADR-197)
 14-15. Q21, Q22 (heating curve, ADR-198)
 Then Q48-Q51 (PWM entry and start counting vs the hourly limit, provisional decisions in force), Q35, Q36, Q37, Q40, Q41, Q42, Q43, Q45, Q46, Q47, Q18, Q19.
-**Update 2026-10-28:** Sergeant D answered Q15-Q51 in batches on 2026-10-27/28 (entries 67-94). Open now, in this order: Q16, Q41, Q42 (he asked us to expand), Q51b (OFF-wait anchor, the hot-water delay of entry 92), Q15b, Q20b, Q48b, Q39b, Q28a, Q28b, Q46b, then Q32 and Q18. Q36b is a heads-up sent with the acknowledgement. The "Answered" column marks each answered question with its entry number (his request, entry 94).
+**Update 2026-10-28:** Sergeant D answered Q15-Q51 in batches on 2026-10-27/28 (entries 67-94). Open now, in this order: Q16, Q41, Q42 (he asked us to expand), Q15b, Q20b, Q48b, Q39b, Q28a, Q28b, Q46b, then Q32 and Q18. Q36b was a heads-up sent with the acknowledgement; Q51b is a confirmation only (entry 43 settles it) and goes last. The "Answered" column marks each answered question with its entry number (his request, entry 94).
 
 A new correction from Sergeant D (e.g. 2026-10-26 'CH=1 stays during PWM OFF') is handled before the queue.
 
@@ -102,7 +102,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q39b | | queued (entry 83) | First tick after enable: D = 0, or the restored raw derivative? | TASK-1270 |
 | Q46b | | queued (entry 86) | Does timing on the scheduled tick time also apply to the other sustained timers? | TASK-1412.8 |
 | Q48b | | queued (entry 89) | Which DHW bit (boiler DHW active or thermostat DHW enable), and does a hot-water flame that continues into a PWM ON phase count? | TASK-1412.9 |
-| Q51b | | queued (entry 91) | Always time the PWM OFF wait from the ON-to-OFF switch, also when the flame is already off (entry 92 report)? | TASK-1380 |
+| Q51b | | confirmation only, not blocking (entry 43 already settles "the OFF wait timed from the last flame-off is not the design"; our reading) | Always time the PWM OFF wait from the ON-to-OFF switch, also when the flame is already off (entry 92 report)? | - |
 
 Questions Q5 onwards come from the SAT port audit of 2026-10-24
 ([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)); the numbers in brackets are its

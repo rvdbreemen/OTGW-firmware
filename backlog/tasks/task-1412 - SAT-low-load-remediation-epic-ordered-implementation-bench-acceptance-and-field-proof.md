@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-27T23:40:00Z'
-updated_date: '2026-10-27T23:48:00Z'
+updated_date: '2026-10-28T06:54:00Z'
 labels:
   - epic
   - sat
@@ -46,4 +46,27 @@ Execute the TASK-1411 review programme for R01-R42 using the existing implementa
 Created 26 child tasks after the pre-existing maximum ordinal 549000; epic 550000 and children 551000..576000. Existing SAT fix tasks retain their original position/status and gain explicit prerequisites. The parent depends on final independent evidence acceptance; no child depends on the parent. Bench acceptance TASK-1412.22 blocks controlled equipment TASK-1412.23, tester readiness TASK-1412.24 and tester field runs TASK-1412.25. No firmware implementation, bench execution or tester contact has occurred in this planning update.
 
 Sequencing audit passed: 47 graph nodes, zero dependency cycles, all 42 review issues assigned to non-final execution owners, all 26 new children after the previous queue maximum, and every equipment/tester/final path includes TASK-1412.22 bench acceptance. Actual task metadata matches the execution manifest. This audits scheduling only; all children remain To Do and no implementation/physical pass is claimed. evaluate.py --quick: 78 passed, 0 failed, 0 warnings, 7 info.
+
+## Re-sequencing 2026-10-28 (after Sergeant D answered Q15-Q51)
+
+Sergeant D's answers (entries 67-94) removed most of the approval blockers, and gruijter's alpha.514 capture
+(entry 92) shows the defect testers feel today: after hot water the PWM OFF wait restarts on every hot-water
+flame-off (~23.5 min CH delay), and an ON phase that starts flame-off ends after one tick. The dependency graph
+stays; the order inside it changes so that this defect is fixed first, with old-vs-fix proof.
+
+- TASK-1412.2 is split. A thin PWM-anchor contract (entries 43, 80, 89-91, 92) is written first and unblocks a
+  PWM slice of TASK-1412.3. The full OT low-load crosswalk (low-load permission, measurement validity) runs in
+  parallel and does not gate the PWM slice.
+- Wave 1 (critical path): TASK-1412.1 (records, mostly done 2026-10-28) -> PWM contract slice -> TASK-1412.3
+  PWM slice (real-code harness as tests/test_sat_hp_pwm.py; replay of the 2026-10-27 hot-water draws and the
+  slow-ignition case, red on HEAD) -> TASK-1382 + TASK-1380 (one candidate) -> TASK-1383 -> TASK-1407
+  (pwm_on/pwm_off in the SAT log, so the fix is visible) -> bench old vs fix on the Classic.
+- Wave 2: TASK-1421 (count at the ON start, never a hot-water flame; hard dependency on TASK-1382) ->
+  TASK-1419 (heat pumps) -> TASK-1420 (sustained switches).
+- Wave 3: TASK-1368 -> TASK-1270 -> TASK-1381, then the PID parity tasks one at a time (they share SATpid.ino):
+  TASK-1416, TASK-1417, TASK-1418, TASK-1414, TASK-1415 (write cadence is Robert's call).
+- Wave 4: TASK-1413 (auto-tune removal; API removal recorded in ADR-198, Proposed), TASK-1409, TASK-1412.4/.5/.6,
+  TASK-1365 close-out.
+- Blocked on Sergeant D: TASK-1373 (Q15b, Q41), TASK-1375 (Q16), TASK-1355/ADR-199 (Q20b), Q28 rounding.
+- Validation sequence TASK-1412.18 -> .26 is unchanged.
 <!-- SECTION:NOTES:END -->
