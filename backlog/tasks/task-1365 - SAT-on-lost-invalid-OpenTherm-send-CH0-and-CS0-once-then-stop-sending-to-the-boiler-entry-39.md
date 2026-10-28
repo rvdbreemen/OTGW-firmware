@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:41:00Z'
-updated_date: '2026-10-28T06:48:00Z'
+updated_date: '2026-10-28T21:26:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -28,8 +28,9 @@ Sergeant D 2026-10-24 (entry 39): if the software has no valid OT, SAT stops: CH
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 On OT loss SAT sends CS=0, CH=1, MM=T exactly once (entry 47), then nothing to the boiler while the loss lasts (host test red on old, green on fix)
-- [ ] #2 What counts as lost (30 s, Data-Invalid) and whether SAT resumes by itself are answered by Sergeant D (Q33, Q34) and recorded before commit
-- [x] #3 No false hand-back on PIC PS=1 enter/leave, a late first loop pass, or millis wrap (host tests)
+- [x] #2 No false hand-back on PIC PS=1 enter/leave, a late first loop pass, or millis wrap (host tests)
+- [ ] #3 What counts as lost (Robert, Q33) and whether SAT resumes by itself (Sergeant D, Q34, entry 79) are recorded before commit
+- [ ] #4 An OT loss in the first minute after boot does not overwrite the saved PID state (host test red on old, green on fix)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -209,4 +210,6 @@ Sergeant D entries:
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
 
 2026-10-28: Sergeant D Q34 A (entry 79, msg 1564581168630861865): resume on the first boiler reply is confirmed; drop PROVISIONAL from SATcontrol.ino ~2544 comment and docs. Q33 was answered by Robert (msg 1564356412585287824).
+
+2026-10-28 maintainer decision (Robert, in session): follow the advice: AC#2 reworded (Q33 was answered by Robert, Q34 by Sergeant D, entry 79); new AC: an OT loss shortly after boot must not overwrite the saved PID state (entry 79 Open: three flash writes per loss; a loss at boot overwrites the saved PID).
 <!-- SECTION:NOTES:END -->

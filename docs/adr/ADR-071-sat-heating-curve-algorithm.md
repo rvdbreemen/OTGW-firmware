@@ -1,15 +1,20 @@
 ---
 id: "ADR-071"
 title: "SAT Heating Curve Algorithm"
-status: "Accepted"
-date: null
+status: "Superseded"
+date: "2026-10-28"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-198"
 ---
+
+## Status
+
+Superseded by ADR-198, 2026-10-28.
+
 # ADR-071: SAT Heating Curve Algorithm
 
 **Status:** Accepted
@@ -193,3 +198,19 @@ the coarse setpoint and the PID trims it within the clamped range.
 - `OTGW-firmware.h`: `state.sat.fHeatingCurveValue`, `settings.sat.fHeatingCurveCoeff`
 - SAT upstream: https://github.com/Alexwijn/SAT (thermo-nova branch)
 - OT-Thing reference: https://github.com/OTGW32/OT-Thing
+
+## Status History
+
+```yaml
+status_history:
+  - date: 2026-04-09
+    status: Accepted
+    changed_by: unknown
+    reason: "Recovered from the record as it stood before this transition; this ADR predates the status_history convention. The actor was never recorded and is not guessed here. The Status line read: "
+    changed_via: unrecorded
+  - date: 2026-10-28
+    status: Superseded
+    changed_by: Robert van den Breemen
+    reason: Superseded by ADR-198, accepted by the maintainer 2026-10-28
+    changed_via: adr-kit lifecycle
+```

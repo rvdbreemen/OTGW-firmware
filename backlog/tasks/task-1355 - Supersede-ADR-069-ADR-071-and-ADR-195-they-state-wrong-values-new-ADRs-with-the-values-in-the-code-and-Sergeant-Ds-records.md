@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T16:44:00Z'
-updated_date: '2026-10-28T08:19:00Z'
+updated_date: '2026-10-28T21:26:00Z'
 labels:
   - adr
   - sat
@@ -45,4 +45,6 @@ Maintainer 2026-10-24: ADRs with wrong values are retired (superseded) and repla
 2026-10-28 Q20b (entry 96): idle when the requested setpoint is BELOW the cold setpoint (our reading: strict <, equality heats; deviation from thermo-nova heating_control.py:72/:385 and entry 12). Change satColdCutoff (SATchEnable.h:26-29) and compares listed in entry 71.
 
 2026-10-28 entry 98 (msg 1564909937161805966): 'at or below' — corrects entry 96; boundary is <= as thermo-nova and entry 12; no code change.
+
+2026-10-28 maintainer decision (Robert, in session): ADR-198 accepted (adr accept --confirm, changed_by Robert van den Breemen); ADR-071 superseded by ADR-198 (adr supersede; ADR-071 frontmatter date set to its first commit 2026-04-09 so the supersede command could record the earlier transition).
 <!-- SECTION:NOTES:END -->

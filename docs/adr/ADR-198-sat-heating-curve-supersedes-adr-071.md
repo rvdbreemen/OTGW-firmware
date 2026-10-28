@@ -1,13 +1,14 @@
 ---
 id: "ADR-198"
 title: "SAT heating curve (proposed successor to ADR-071)"
-status: "Proposed"
-date: "2026-10-24"
+status: "Accepted"
+date: "2026-10-28"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-071"
 superseded_by: null
 topics:
   - "sat"
@@ -39,7 +40,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-10-24.
+Accepted, 2026-10-28.
 
 This ADR is the proposed successor to ADR-071 (TASK-1355). ADR-071 stays Accepted and its file is untouched while this ADR is Proposed, so the `supersedes` list in the front matter is empty for now: adr-kit's supersede command writes both sides of a supersession at once (adr-kit 0.59.1 `adr_catalog.py:300`), and a link on this side only would contradict ADR-071's unchanged `superseded_by`. Whether `adr-lint --strict` rejects a one-sided link was not verified: `bin/adr-lint` contains no supersession check, and `bin/adr-lint --strict docs/adr` crashed on 2026-10-24 (`AttributeError` in `severity_of`). The supersession is recorded on both sides (`adr supersede ADR-071 --by ADR-198`) only after the maintainer's explicit OK. Guideline-level per ADR-080: no CI (continuous integration) gate checks this decision.
 
@@ -52,11 +53,21 @@ status_history:
     changed_by: "Agent: Claude"
     reason: Initial proposal, supersedes ADR-071 (SAT port audit finding 69, TASK-1355)
     changed_via: adr-kit
+  - date: 2026-10-28
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer acceptance in the session of 2026-10-28
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-28
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Superseded by ADR-198, accepted by the maintainer 2026-10-28
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-SAT (Smart Autotune Thermostat) computes a boiler flow temperature from the room target and the outdoor temperature (weather compensation), and the PID (proportional-integral-derivative) controller adds its correction on top. Ground truth for SAT behaviour is, in order (ADR-196): Sergeant D's recorded decisions in `docs/sat/sergeant-d-corrections.md`, then thermo-nova at commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`. thermo-nova paths below are relative to `other-projects/SAT-releases-thermo-nova/custom_components/sat`; that local copy was verified identical to the pinned commit on 2026-10-22 (CLAUDE.md, "SAT ground truth") and was not re-diffed for this ADR. Firmware paths are relative to `src/OTGW-firmware` at HEAD `2d01d3297`.
+SAT (Smart Autotune Thermostat) computes a boiler flow temperature from the room target and the outdoor temperature (weather compensation), and the PID (proportional-integral-derivative) controller adds its correction on top. Ground truth for SAT behaviour is, in order (ADR-196): Sergeant D's recorded decisions in `docs/sat/sergeant-d-corrections.md`, then thermo-nova at commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`. thermo-nova paths below are relative to `other-projects/SAT-releases-thermo-nova/custom_components/sat`; that local copy was verified identical to the pinned commit on 2026-10-22 (CLAUDE.md, "SAT ground truth") and was not re-diffed for this ADR. Firmware paths are relative to `src/OTGW-firmware` at commit `2d01d3297`.
 
 ADR-071 (Accepted 2026-04-09) recorded the curve. The SAT port audit of 2026-10-24 (`docs/sat/sat-port-audit-2026-10-24.md`, finding 69) found three wrong statements in it. The maintainer directive of 2026-10-24 is that an ADR with wrong values is superseded, not edited.
 
@@ -86,7 +97,7 @@ setpoint = base_offset + (coefficient / 4) * value
 
 as thermo-nova `HeatingCurve.calculate()` (`heating_curve.py:28-30`) and `update()` (`heating_curve.py:36-39`). The reference temperature 20 is `SAT_HC_REF_TEMP` (`SATcontrol.ino:126`). The constants 4, 0.03 and 0.4 are fixed and not user settings, as in thermo-nova. The convex shape is deliberate (entry 24). The firmware stores the result in `state.sat.fHeatingCurveValue` (`SATcontrol.ino:604`).
 
-**2. Base offset.** 27.2 °C for radiators and 20.0 °C for underfloor (`SAT_HC_BASE_OFFSET_RAD` and `SAT_HC_BASE_OFFSET_FLOOR`, `SATcontrol.ino:124-125`), chosen in `satGetBaseOffset()` (`SATcontrol.ino:330-335`) from the heating system only. AUTO resolves to radiators (`satGetEffectiveHeatingSystem()`, `SATcontrol.ino:269-276`). The values match thermo-nova `types.py:116-118`.
+**2. Base offset.** 27.2 °C for radiators and 20.0 °C for underfloor (`SAT_HC_BASE_OFFSET_RAD` and `SAT_HC_BASE_OFFSET_FLOOR`, `SATcontrol.ino:124-125`), chosen in `satGetBaseOffset()` (`SATcontrol.ino:330-335`) from the heating system only. `AUTO` resolves to radiators (`satGetEffectiveHeatingSystem()`, `SATcontrol.ino:269-276`). The values match thermo-nova `types.py:116-118`.
 
 This is a deliberate difference from thermo-nova. thermo-nova has one axis, where `HEAT_PUMP` is a heating system and gets 27.2 (`types.py:110-118`). The firmware has a separate device type (`iHeatingSource`, `SATtypes.h:462`). A heat pump with underfloor therefore gets 20.0 in the firmware, where thermo-nova would give 27.2. That follows entry 30. ADR-071's table row "Heat pump: 27.2" no longer describes the firmware.
 
@@ -126,7 +137,7 @@ ADR-071 left out the global cap and MaxTSet. The code comment at `SATcontrol.ino
 ### Must
 
 - Compute the curve with thermo-nova's formula and its fixed constants 4, 0.03, 0.4 and reference 20 (`heating_curve.py:28-39`).
-- Take the base offset from the heating system alone: 27.2 radiators (and AUTO), 20.0 underfloor (entries 3 and 30).
+- Take the base offset from the heating system alone: 27.2 radiators (and `AUTO`), 20.0 underfloor (entries 3 and 30).
 - Default the coefficient to 2.0 and keep a stored coefficient across upgrades (entry 24).
 - Cite thermo-nova `heating_curve.py`, not OT-Thing, as the origin of the formula.
 
@@ -146,7 +157,7 @@ ADR-071 left out the global cap and MaxTSet. The code comment at `SATcontrol.ino
 ## Alternatives Considered
 
 - **Amend ADR-071 in place.** Rejected: ADR-071 is Accepted and immutable, and the maintainer directive of 2026-10-24 is to supersede an ADR with wrong values.
-- **Retire ADR-071 without a successor.** Rejected: the curve is a durable decision that the PID, the PWM duty formula (base offset) and the UI all depend on. Without a record, the next maintainer has only the code and an audit finding.
+- **Retire ADR-071 without a successor.** Rejected: the curve is a durable decision that the PID, the PWM (pulse-width modulation) duty formula (base offset) and the UI all depend on. Without a record, the next maintainer has only the code and an audit finding.
 - **Declare the firmware an exact port and fix the differences in the same change.** Rejected for this ADR: rounding, the target input and auto-tune each need a decision of their own, and the auto-tune option needs Sergeant D's view. This ADR records the current state and lists the decisions still to be taken. Code changes are out of scope for TASK-1355.
 - **Adopt thermo-nova's 0.1-12 range now.** Not chosen: no installation or statement shows a need for a coefficient above 5, and the four firmware ranges should be reconciled in one step. Left as an open question.
 - **Keep thermo-nova's single axis (heat pump base offset 27.2).** Rejected on entry 30: the heating system alone sets the base offset.
@@ -155,7 +166,7 @@ ADR-071 left out the global cap and MaxTSet. The code comment at `SATcontrol.ino
 
 **Positive:**
 
-- Every value in the record matches the code at HEAD `2d01d3297` and has a citation (firmware `file:line`, entry number, thermo-nova `file:line`).
+- Every value in the record matches the code at commit `2d01d3297` and has a citation (firmware `file:line`, entry number, thermo-nova `file:line`).
 - The real origin of the formula is recorded with Sergeant D's own statement.
 - The departures from thermo-nova are visible, so a later "exact port" claim can be checked against this list.
 
@@ -170,7 +181,7 @@ ADR-071 left out the global cap and MaxTSet. The code comment at `SATcontrol.ino
 
 - [x] Coefficient range: keep 0.1-5.0, or follow thermo-nova's 0.1-12 (`config_flow.py:616-618`)? And should the REST metadata (`restAPI.ino:3888`, 0-5 as integers) and the wizard slider (`data/v2.js:5547`, 0.2-2.4) follow the setting clamp (`settingStuff.ino:1001`)? Needs a maintainer decision. Ask Sergeant D only for the upper bound, through `docs/sat/open-questions.md`. — **Answered 2026-10-24 by Robert van den Breemen:** Robert 2026-10-24: keep 0.1-5.0 and make the REST metadata and the wizard slider follow it (TASK-1359). Whether 5 is a high enough upper bound is asked of Sergeant D (docs/sat/open-questions.md Q21); a different answer from him leads to a follow-up ADR.
 - [x] Round the curve value to 0.1 °C as thermo-nova `heating_curve.py:39`? Firmware `SATcontrol.ino:602-605` does not round. — **Answered 2026-10-24 by Robert van den Breemen:** Robert 2026-10-24: yes, round to 0.1 C as thermo-nova heating_curve.py:39 (TASK-1360; plan shown to Sergeant D first because it touches control).
-- [ ] Firmware auto-tune of the coefficient (`SATcontrol.ino:4664-4705`) is not in thermo-nova. Keep it, or remove it? This one is for Sergeant D (ADR-196: firmware additions need his view), asked one question per message through `docs/sat/open-questions.md`.
+- [x] Firmware auto-tune of the coefficient (`SATcontrol.ino:4664-4705`) is not in thermo-nova. Keep it, or remove it? This one is for Sergeant D (ADR-196: firmware additions need his view), asked one question per message through `docs/sat/open-questions.md`. — **Answered 2026-10-28 by Agent: Claude:** Sergeant D 2026-10-27 (docs/sat/sergeant-d-corrections.md entry 72, Q22): remove. The removal is TASK-1413.
 - [x] Target input: does thermo-nova's `target_temperature` (`climate.py:690`) include anything equivalent to the firmware's comfort offset (`SATcontrol.ino:5062`)? Not checked for this ADR. — **Answered 2026-10-24 by Agent: Claude:** Checked 2026-10-24: no. thermo-nova's target_temperature is the plain target (climate.py:266-268) and the heating curve uses it unchanged (climate.py:690, :697); thermal comfort adjusts the measured room temperature instead (climate.py:276-277, SummerSimmer.index). The firmware adds a comfort offset and the PV boost to the target before the curve (SATcontrol.ino:5063-5065): a firmware-only difference, already audit findings #33 and #48, to be put to Sergeant D through docs/sat/open-questions.md. The curve formula itself is unaffected.
 - [x] With more than one zone (`settings.sat.iZoneCount > 1`), `satZonePidStep()` (`SATcontrol.ino:2003`) calls `satCalcHeatingCurve()` again for each zone that passes its validity checks (`:2025`, called from `:5085`) after the primary call (`:5067`). Each call overwrites `state.sat.fHeatingCurveValue` (`:604`), so the published `heating_curve` is the curve of the last zone that reached that call, not the primary's. This was found by reading the code and not reproduced. Is that intended? — **Answered 2026-10-24 by Agent: Claude:** Not intended; fixed by TASK-1353 (alpha.498, 2026-10-24): satCalcHeatingCurve() is now pure and only the primary call site stores state.sat.fHeatingCurveValue, so the published curve is the primary curve with zones on (tests/test_sat_published_curve.py, red on the old code).
 
@@ -189,7 +200,7 @@ ADR-071 left out the global cap and MaxTSet. The code comment at `SATcontrol.ino
 - `docs/sat/sat-port-audit-2026-10-24.md`, finding 69 (ADR drift).
 - `docs/sat/sergeant-d-corrections.md` entries 3, 24, 28 and 30, with the Discord links recorded there. Entry 24 links: https://discord.com/channels/812969634638725140/1514720723980259460/1562170196897038447, https://discord.com/channels/812969634638725140/1514720723980259460/1562177212155826199, https://discord.com/channels/812969634638725140/1105556725714649128/1502183820454006835.
 - thermo-nova at `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`, `custom_components/sat`: `heating_curve.py:13-39`; `const.py:97`, `:182`; `config_flow.py:616-618`; `types.py:110-118`; `entry_data.py:50`, `:213`; `pid.py:71`, `:191-192`; `climate.py:688-697`.
-- Firmware at HEAD `2d01d3297`, `src/OTGW-firmware`: `SATcontrol.ino:124-126`, `:129`, `:132`, `:137-139`, `:269-276`, `:293-310`, `:315-327`, `:330-335`, `:591-606`, `:2025-2034`, `:4664-4705`, `:5062-5067`, `:5085`, `:5145-5152`; `SATpid.ino:120-142`; `SATtypes.h:462`, `:465`, `:533`; `settingStuff.ino:556`, `:708-716`, `:1001`; `MQTTstuff.ino:710`; `SATcontrol.ino:2003`; `restAPI.ino:3802`, `:3887-3888`; `data/v2.js:4818-4822`, `:5400`, `:5447`, `:5547`.
+- Firmware at commit `2d01d3297`, `src/OTGW-firmware`: `SATcontrol.ino:124-126`, `:129`, `:132`, `:137-139`, `:269-276`, `:293-310`, `:315-327`, `:330-335`, `:591-606`, `:2025-2034`, `:4664-4705`, `:5062-5067`, `:5085`, `:5145-5152`; `SATpid.ino:120-142`; `SATtypes.h:462`, `:465`, `:533`; `settingStuff.ino:556`, `:708-716`, `:1001`; `MQTTstuff.ino:710`; `SATcontrol.ino:2003`; `restAPI.ino:3802`, `:3887-3888`; `data/v2.js:4818-4822`, `:5400`, `:5447`, `:5547`.
 - Tasks: TASK-1355 (this supersession), TASK-1347 (coefficient default 2.0, commit `8bfea9d7d`), TASK-1273.
 - Tests: `tests/test_sat_wizard_coefficient.py`.
 

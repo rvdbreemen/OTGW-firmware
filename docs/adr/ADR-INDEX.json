@@ -2188,9 +2188,9 @@
       "id": "ADR-071",
       "title": "SAT Heating Curve Algorithm",
       "path": "ADR-071-sat-heating-curve-algorithm.md",
-      "format": "unknown",
-      "status": "Accepted",
-      "date": null,
+      "format": "nygard",
+      "status": "Superseded",
+      "date": "2026-10-28",
       "decision_summary": "Implement the SAT polynomial heating curve exactly as used in the SAT Python thermo-nova branch, ported to C in SATco...",
       "topics": [],
       "aliases": [],
@@ -2212,7 +2212,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-198"
       }
     },
     {
@@ -6999,7 +6999,7 @@
           "The firmware-only differences listed under Open Questions stay in the code until Sergeant D decides them. They are recorded, not decided, by this ADR."
         ],
         "verification": [
-          "python tests/testsatpwmoverride.py compiles the real pidUpdateIntegral() from SATpid.ino and checks the solar freeze path (TASK-1323). No host test exercises the rest of satPidUpdate() (gains, clamp, derivative, cadence).",
+          "python tests/testsatpwmoverride.py compiles the real pidUpdateIntegral() from SATpid.ino and checks the solar freeze path (TASK-1323). python tests/testsatpidcadence.py (TASK-1368) compiles the whole SATpid.ino with the real safeTimers.h...",
           "The test is not run in CI. This ADR claims no gate.",
           "Every value in this ADR was read from the code at 2d01d3297 and from thermo-nova pid.py, const.py, climate.py, helpers.py and temperature/state.py in this session. A second reader checked them on 2026-10-24 and refuted no core value; the..."
         ]
@@ -7021,8 +7021,8 @@
       "title": "SAT heating curve (proposed successor to ADR-071)",
       "path": "ADR-198-sat-heating-curve-supersedes-adr-071.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-10-24",
+      "status": "Accepted",
+      "date": "2026-10-28",
       "decision_summary": "SAT keeps thermo-nova's convex heating curve with one user coefficient, default 2.0, and a base offset chosen by the...",
       "topics": [
         "heating-curve",
@@ -7077,7 +7077,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-071"
+        ],
         "superseded_by": null
       }
     },
@@ -8855,6 +8857,12 @@
       "source": "ADR-067",
       "target": "ADR-063",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-071",
+      "target": "ADR-198",
+      "type": "superseded-by",
       "resolved": true
     },
     {
@@ -12797,6 +12805,12 @@
       "source": "ADR-198",
       "target": "ADR-071",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-198",
+      "target": "ADR-071",
+      "type": "supersedes",
       "resolved": true
     },
     {

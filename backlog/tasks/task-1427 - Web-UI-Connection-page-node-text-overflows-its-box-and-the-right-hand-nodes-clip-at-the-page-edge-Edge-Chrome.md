@@ -6,9 +6,9 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-28T15:19:00Z'
+updated_date: '2026-10-28T21:26:00Z'
 labels:
   - web-ui
-  - needs-maintainer-ok
   - tester-feedback
 milestone: 2.0.0
 dependencies: []
@@ -28,3 +28,9 @@ Tester report, maarten_41762 (<@1544684325847703602>), #alpha-testing 2026-10-28
 - [ ] #2 Phone width (375 px) still works, no horizontal page scroll
 - [ ] #3 build (filesystem) green; no new FAIL in evaluate
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28 maintainer decision (Robert, in session): released ('vrijgeven'); label needs-maintainer-ok removed.
+<!-- SECTION:NOTES:END -->
