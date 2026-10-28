@@ -580,6 +580,9 @@ static bool     _sat_prevFlameState = false;
 
 // --- Timer for control loop (initial value, updated from settings in initSAT) ---
 DECLARE_TIMER_SEC(timerSATControl, settings.sat.iControlInterval, CATCH_UP_MISSED_TICKS);
+// Scheduled time of the control tick that is running (see satControlLoopRun()); the time base of the sustained
+// switches in SATcycles.ino (Sergeant D entries 86 Q46 B, 95 Q46b).
+static uint32_t _sat_tickMs = 0;
 // --- Timer for 4-hour window stats (Task #227): update once per minute ---
 DECLARE_TIMER_SEC(timerSAT4hStats, 60, SKIP_MISSED_TICKS);
 // --- Timer for the PWM suppression CS refresh (TASK-1268): every 3 s, between control ticks ---
@@ -1292,10 +1295,11 @@ static void satSetControlMode(SATControlMode m)
     satPwmReset();
     satCycleSkipAutoSwitch();
     // thermo-nova runs pwm.update() in the same update() pass that enables PWM (heating_control.py:206-215),
-    // so with a flow temperature the status leaves IDLE at once (pwm.py:154-180). The firmware switches after
-    // the mode step of the control tick and runs its first schedule step one tick later; until then the
-    // cycle classifier must not see IDLE (classifier.py:28-29, TASK-1387). Only the classifier reads the
-    // flag, so this does not change what the boiler is sent.
+    // so with a flow temperature the status leaves IDLE at once (pwm.py:154-180). The overshoot switch runs
+    // before the mode step of its tick (entry 88), so satApplyPWM() takes its first schedule step on the switch
+    // tick; the flag is set here for the other mode changes (control_mode command), whose first step comes with
+    // the next tick, and so that the cycle classifier never sees IDLE in between (classifier.py:28-29,
+    // TASK-1387). Only the classifier reads the flag, so this does not change what the boiler is sent.
     if (m == SAT_MODE_PWM && satGetFlowTemp() > 0.0f) _pwm_idle = false;
     // Entry 43 (TASK-1369): the first schedule step in PWM starts ON without the off wait (pwm.py:154-155).
     _pwm_entryPending = (m == SAT_MODE_PWM);
@@ -1311,7 +1315,7 @@ static void satSetControlMode(SATControlMode m)
 // thermo-nova's control_mode is CONTINUOUS while PWM is not enabled (heating_control.py:148-152). The firmware
 // mirrors that by always leaving PWM mode here (the Force PWM option was removed, Sergeant D 2026-10-23,
 // entry 13). PWM comes back through the overshoot auto-switch: the sustained-overshoot re-enable
-// (heating_control.py:280-304) is mirrored by satCycleCheckAutoSwitch(); the second re-enable, on_cycle_end() after
+// (heating_control.py:280-304) is mirrored by satCycleCheckOvershootSwitch(); the second re-enable, on_cycle_end() after
 // a continuous cycle classified OVERSHOOT (pwm.py:219-223), is not ported. The summer simmer path is a firmware
 // feature without a thermo-nova counterpart and does not call this.
 // Sergeant D 2026-10-23, docs/sat/sergeant-d-corrections.md entry 12.
@@ -1327,7 +1331,7 @@ static void satPwmDisableOnHeaterOff()
 }
 
 // Last PWM off-phase duration in ms (0 = saturation: duty calc wants continuous ON).
-// Read by satCycleCheckAutoSwitch() for the off_time==0 saturation guard (Python pwm off_time).
+// Read by satCycleCheckPwmExits() for the off_time==0 saturation guard (Python pwm off_time).
 uint32_t satPwmLastOffTimeMs() { return _pwm_lastOffTimeMs; }
 
 // Last PWM on-phase duration in ms (Python pwm_state.on_time_seconds).
@@ -5189,6 +5193,11 @@ static void satControlLoopRun()
 
   // Main control loop on timer
   if (!DUE(timerSATControl)) return;
+  // One time for the whole tick, read once here: the sustained switches and the DHW guard all use it. The timer
+  // skips missed ticks (initSAT() and settingStuff.ino call CHANGE_INTERVAL_SEC without a type, so the type is
+  // SKIP_MISSED_TICKS), so two ticks are never closer than one interval, and a sustained timer fires on the first
+  // tick at least its length after the first qualifying tick (Sergeant D entries 86 Q46 B, 95 Q46b, 109).
+  _sat_tickMs = millis();
 
   state.sat.bActive = true;
   if (state.sat.eControlMode == SAT_MODE_OFF) {
@@ -5227,7 +5236,9 @@ static void satControlLoopRun()
     if (!_sat_prevDhwActive) satPwmOnDhwStart();   // freeze the ON clock (entry 95)
     satPwmNoteDhwFlame(satIsFlameOn());            // a flame burning with the DHW bit set is a hot-water flame (entries 105, 106)
     _sat_prevDhwActive = true;
-    satCycleSkipAutoSwitch();   // hot water: thermo-nova clears the overshoot start (heating_control.py:268-270)
+    // Hot water: refreshes the end of the draw (the 300 s guards, heating_control.py:272-274, :313-315) and
+    // clears the overshoot, underheat and saturation starts (:268-270, :313-315; entry 108).
+    satCycleNoteDhwTick(_sat_tickMs);
     satPublishMQTT();   // sat/power carries the DHW-capacity value while DHW runs (TASK-1258)
     return;
   }
@@ -5510,6 +5521,19 @@ static void satControlLoopRun()
     SATDebugTln(F("SAT: PID at system max, switching to continuous mode"));
   }
 
+  // --- Sustained overshoot: continuous -> PWM (Tasks #42/#43) ---
+  // Before the mode is applied, as thermo-nova (heating_control.py:206-215, Sergeant D entry 88, Q47 A): on the
+  // switch tick satApplyPWM() below sends the first PWM CS. Delegated to satCycleCheckOvershootSwitch() in
+  // SATcycles.ino: flow >= requested + settings.sat.fOvershootMargin (default 2.0C), 60 s from the first
+  // qualifying tick on the tick time (entries 41, 86, 109), 300 s DHW guard. Heat pumps enter PWM through
+  // this switch like every other source: thermo-nova's _maybe_enable_pwm_on_sustained_overshoot
+  // (heating_control.py:262-305) has no heat-pump case (entry 87, Q45 A).
+  if (pidOutput > satGetColdSetpoint()) {
+    satCycleCheckOvershootSwitch(pidOutput, _sat_tickMs);
+  } else {
+    satCycleSkipAutoSwitch();   // requested <= cold setpoint clears the start (heating_control.py:280-282)
+  }
+
   // --- Apply control mode ---
   float finalSetpoint;
   const bool pwmMode = (state.sat.eControlMode == SAT_MODE_PWM);
@@ -5518,7 +5542,7 @@ static void satControlLoopRun()
   if (pwmMode) {
     finalSetpoint = satApplyPWM(pidOutput);
     pwmDrivesSetpoint = satPwmDrivesSetpoint(pidOutput);
-    // The phase that produced this tick's CS. Read here: satCycleCheckAutoSwitch() below
+    // The phase that produced this tick's CS. Read here: satCycleCheckPwmExits() below
     // can switch to continuous and satPwmReset() clears bPwmFlameRequested, which would
     // send CH=0 with the ON-phase CS on the switch tick.
     pwmOn = state.sat.bPwmFlameRequested;
@@ -5533,16 +5557,14 @@ static void satControlLoopRun()
   _sat_lastControlCS = finalSetpoint;   // the "previous CS" a PWM tick without override keeps
   state.sat.fFinalSetpoint = finalSetpoint;
 
-  // --- Auto-switch between continuous and PWM modes (Tasks #42/#43) ---
-  // Delegated to satCycleCheckAutoSwitch() in SATcycles.ino: overshoot margin settings.sat.fOvershootMargin
-  // (default 2.0C), 60 s sustain counted from the first overshoot sample (entry 41), 300 s DHW guard.
-  // Heat pumps enter PWM through this switch like every other source: thermo-nova's
-  // _maybe_enable_pwm_on_sustained_overshoot (heating_control.py:262-305) has no heat-pump case
-  // (Sergeant D entry 87, Q45 A).
+  // --- Sustained underheat and saturation: PWM -> continuous (Tasks #42/#43) ---
+  // After satApplyPWM(): saturation reads this tick's off time. Delegated to satCycleCheckPwmExits() in
+  // SATcycles.ino (180 s underheat, 300 s saturation from the first qualifying tick, entries 86, 95). At or below
+  // the cold setpoint the timers reset (heating_control.py:317-319).
   if (pidOutput > satGetColdSetpoint()) {
-    satCycleCheckAutoSwitch(pidOutput);
+    satCycleCheckPwmExits(pidOutput, _sat_tickMs);
   } else {
-    satCycleSkipAutoSwitch();   // requested <= cold setpoint clears the start (heating_control.py:280-282)
+    satCycleResetSustainGuards();
   }
 
   // Modulation suppression is handled via CS sequence in satApplyPWM() (PWM ON only)

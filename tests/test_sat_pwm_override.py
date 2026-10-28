@@ -4,7 +4,7 @@
 The code under test is NOT re-implemented here. The test cuts the real PWM block
 (from `_pwm_effectiveBoilerTemp` up to the satPwmLastOffTimeMs() accessor: schedule,
 satApplyPWM(), the 3 s satPwmSuppressionRefresh(), satPwmReset(), satSetControlMode()) and
-satComputeMM() out of src/OTGW-firmware/SATcontrol.ino, plus satCycleCheckAutoSwitch() and
+satComputeMM() out of src/OTGW-firmware/SATcontrol.ino, plus the sustained switches (satCycleCheckOvershootSwitch(), satCycleCheckPwmExits()) and
 its constants out of SATcycles.ino, wraps them in a stub header and compiles them with a
 host C++ compiler (g++, clang++ or MSVC cl via vswhere). Without a compiler the tests
 are skipped, they do not pass silently.
@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
     const bool os = !strcmp(argv[4], "os");
     const bool sat = !strcmp(argv[4], "sat");
     state.sat.eControlMode = os ? SAT_MODE_CONTINUOUS : SAT_MODE_PWM;
-    state.sat.bPwmFlameRequested = !os; state.sat.fFinalSetpoint = pid; _sustain_lastCheckMs = g_ms;
+    state.sat.bPwmFlameRequested = !os; state.sat.fFinalSetpoint = pid; SYNC_SUSTAIN_CLOCK();
     g_flow = os ? 45.0f : (sat ? 35.0f : 20.0f);     // overshoot: flow above request + margin; underheat: far below; saturation: on target
     _pwm_lastOffTimeMs = sat ? 0 : 1;                // saturation: the PWM off time stays 0
     int calls = 0;
@@ -152,9 +152,9 @@ int main(int argc, char** argv) {
     _pwm_idle = false; satApplyPWM(pid);                      const int c2 = (int)_pwm_idle;  // ... and keeps not-IDLE
     g_hourLimit = false;
     g_flow = 0.0f; satApplyPWM(pid);                          const int d = (int)_pwm_idle;   // no flow temperature -> IDLE (pwm.py:122-128)
-    // overshoot switch CONTINUOUS -> PWM through the real satCycleCheckAutoSwitch(): not IDLE on the switch tick
+    // overshoot switch CONTINUOUS -> PWM through the real satCycleCheckOvershootSwitch(): not IDLE on the switch tick
     state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false; _pwm_idle = true;
-    g_flow = 45.0f; _sustain_lastCheckMs = g_ms;
+    g_flow = 45.0f; SYNC_SUSTAIN_CLOCK();
     for (int i = 0; i < 400 && state.sat.eControlMode == SAT_MODE_CONTINUOUS; i++) { g_ms += 1000; CALL_AUTOSWITCH(pid); }
     const int e = (int)_pwm_idle; const int emode = state.sat.eControlMode;
     // a switch to PWM without a flow temperature stays IDLE (the first step would idle it too)
@@ -166,9 +166,30 @@ int main(int argc, char** argv) {
 #endif
     return 0;
   }
+  if (!strcmp(sc, "swtick")) {             // TASK-1420 loop level: the real overshoot gate + the real apply step in ONE tick
+#ifdef HAS_SWITCH_TICK
+    state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false;
+    satPwmReset(); _pwm_effectiveBoilerTemp = 47.2f; g_flameOffStart = g_ms - 600000UL; _pwm_lastUpdateMs = g_ms - 600000UL;
+    g_flow = 45.0f; setPrev(40.0f);        // 45 >= 35 + 2: a sustained overshoot
+    float cs = 0; int ticks = 0; int contBefore = 0;
+    for (; ticks < 400; ticks++) {
+      g_ms += 1000; _sat_tickMs = g_ms;
+      const int before = state.sat.eControlMode;
+      cs = tickRunSw(pid);
+      if (before == SAT_MODE_CONTINUOUS && state.sat.eControlMode == SAT_MODE_CONTINUOUS && cs >= 61.9f) contBefore++;
+      if (state.sat.eControlMode == SAT_MODE_PWM) break;
+    }
+    const int ch = (int)satChEnableDecide(pid, satGetColdSetpoint(), g_swDrives, g_swPwmOn);
+    printf("mode=%d ticks=%d cs=%.1f final=%.1f cont_marker=%d continuous_ticks=%d req=%d drives=%d ch=%d\n", state.sat.eControlMode, ticks + 1, cs,
+           state.sat.fFinalSetpoint, (int)(cs >= 61.9f), contBefore, (int)g_swPwmOn, (int)g_swDrives, ch);
+#else
+    printf("mode=-1\n");
+#endif
+    return 0;
+  }
   if (!strcmp(sc, "uh")) {                 // uh protection pwmFlameRequested: 200 s of low flow, 1 s calls
     state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = atoi(argv[3]) != 0;
-    state.sat.fFinalSetpoint = pid; g_flow = 20.0f; _sustain_lastCheckMs = g_ms;
+    state.sat.fFinalSetpoint = pid; g_flow = 20.0f; SYNC_SUSTAIN_CLOCK();
     for (int i = 0; i < 200; i++) { g_ms += 1000; CALL_AUTOSWITCH(pid); }
     printf("mode=%d req=%d\n", state.sat.eControlMode, (int)state.sat.bPwmFlameRequested);
     return 0;
@@ -250,7 +271,12 @@ int main(int argc, char** argv) {
 #else
     _sustain_overshootSec = 45.0f;
 #endif
+#ifdef HAS_EXIT_START
+    _sustain_underheatRunning = true; _sustain_underheatStartMs = g_ms - 12000UL;   // TASK-1420: started exit timers
+    _sustain_saturationRunning = true; _sustain_saturationStartMs = g_ms - 7000UL;
+#else
     _sustain_underheatSec = 12.0f; _sustain_saturationSec = 7.0f;
+#endif
     state.sat.iCurrentModulation = 55;
     float cutoff = 0;
     if (valves) {                          // valves-closed early return of satControlLoopRun()
@@ -262,7 +288,9 @@ int main(int argc, char** argv) {
     const int reqAfter = (int)state.sat.bPwmFlameRequested; const float holdAfter = _pwm_flameOffHoldSetpoint;
     const int modeAfter = state.sat.eControlMode; const float lastAfter = _sat_lastControlCS;
     const int mmAfter = state.sat.iCurrentModulation;
-#ifdef HAS_OS_START
+#if defined(HAS_OS_START) && defined(HAS_EXIT_START)
+    const float sus = (_sustain_overshootRunning ? 45.0f : 0.0f) + (_sustain_underheatRunning ? 12.0f : 0.0f) + (_sustain_saturationRunning ? 7.0f : 0.0f);
+#elif defined(HAS_OS_START)
     const float sus = (_sustain_overshootRunning ? 45.0f : 0.0f) + _sustain_underheatSec + _sustain_saturationSec;
 #else
     const float sus = _sustain_overshootSec + _sustain_underheatSec + _sustain_saturationSec;
@@ -336,9 +364,32 @@ def extract_tick(src: str) -> str:
     loop = src[src.index("void satControlLoopRun"):] if "void satControlLoopRun" in src else src[src.index("void satControlLoop"):]
     solar = loop.find("  // --- Solar gain compensation on the requested setpoint")
     a = solar if solar >= 0 else loop.index("  // --- Clamp to valid range ---")
-    b = loop.index("  // --- Auto-switch between continuous and PWM modes")
-    return ("\nstatic float tickRun(float pidOutput) {\n" + loop[a:b] +
+    ov = loop.find("  // --- Sustained overshoot: continuous -> PWM")
+    if ov >= 0:
+        # TASK-1420: the overshoot switch sits between the max-setpoint check and the mode step, the exits after the
+        # final clamp. The switches are not under test here (tests/test_sat_overshoot_sustain.py), so both are cut out.
+        ap = loop.index("  // --- Apply control mode ---", ov)
+        ex = loop.index("  // --- Sustained underheat and saturation", ap)
+        seg = loop[a:ov] + loop[ap:ex]
+    else:
+        seg = loop[a:loop.index("  // --- Auto-switch between continuous and PWM modes")]
+    return ("\nstatic float tickRun(float pidOutput) {\n" + seg +
             "\n  return state.sat.fFinalSetpoint;\n}\n")
+
+
+def extract_switch_tick(src: str) -> str:
+    """TASK-1420: the whole real tick segment INCLUDING the real overshoot-switch gate (tickRunSw), or "" when the source has none."""
+    loop = src[src.index("void satControlLoopRun"):] if "void satControlLoopRun" in src else ""
+    ov = loop.find("  // --- Sustained overshoot: continuous -> PWM")
+    if ov < 0:
+        return ""
+    solar = loop.find("  // --- Solar gain compensation on the requested setpoint")
+    a = solar if solar >= 0 else loop.index("  // --- Clamp to valid range ---")
+    ex = loop.index("  // --- Sustained underheat and saturation", ov)
+    return ("\n#define HAS_SWITCH_TICK 1\nstatic uint32_t _sat_tickMs = 0; static bool g_swPwmOn = false, g_swDrives = false;\n"
+            "bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs);\n"
+            "static float tickRunSw(float pidOutput) {\n" + loop[a:ex] +
+            "\n  g_swPwmOn = pwmOn; g_swDrives = pwmDrivesSetpoint;\n  return state.sat.fFinalSetpoint;\n}\n")
 
 
 def extract(src: str) -> str:
@@ -364,12 +415,29 @@ def _vcvars():
 
 
 def extract_cycles() -> str:
-    src = CYCLES_INO.read_text(encoding="utf-8")
+    src = CYCLES_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
     consts = re.findall(r"^static (?:const )?\w+\s+(?:SAT_(?:OVERSHOOT|UNDERSHOOT|UNDERHEAT|SATURATION|DHW)\w*|_sustain_\w+)\s*=[^;]*;",
                         src, re.M)
+    if "bool satCycleCheckOvershootSwitch(" in src:
+        # TASK-1420: the sustained timers on the tick clock. Cut the whole state/helper block plus both switch functions.
+        a = src.index("// --- Sustained State Detection ---")
+        b = src.index("// --- Cycle History ---", a)
+        blocks = []
+        for head in ("bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)",
+                     "bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)"):
+            m = re.search(r"^" + re.escape(head) + r"\s*\{.*?^\}[ \t]*$", src, re.S | re.M)
+            if not m:
+                raise AssertionError(head + " not found in SATcycles.ino")
+            blocks.append(m.group(0))
+        both = ("static bool satCycleCheckBoth(float sp) {   // the control loop order: overshoot switch, (apply), exits\n"
+                "  const bool a = satCycleCheckOvershootSwitch(sp, g_ms);\n"
+                "  const bool b = satCycleCheckPwmExits(sp, g_ms);\n  return a || b; }\n")
+        sat_consts = "\n".join(c for c in consts if c.startswith("static const"))
+        return (sat_consts + "\n" + src[a:b] + "\n" + "\n".join(blocks) + "\n" + both +
+                "\n#define CALL_AUTOSWITCH(sp) satCycleCheckBoth(sp)\n#define SYNC_SUSTAIN_CLOCK() ((void)0)\n")
     m = re.search(r"^bool satCycleCheckAutoSwitch\([^)]*\)\s*\{.*?^\}\s*$", src, re.S | re.M)
     if not m:
-        raise AssertionError("satCycleCheckAutoSwitch() not found in SATcycles.ino")
+        raise AssertionError("neither satCycleCheckOvershootSwitch() nor satCycleCheckAutoSwitch() found in SATcycles.ino")
     fn = m.group(0)
     call = "satCycleCheckAutoSwitch(sp)" if re.search(r"satCycleCheckAutoSwitch\(float", fn) else \
         "(state.sat.fFinalSetpoint = (sp), satCycleCheckAutoSwitch())"
@@ -377,7 +445,8 @@ def extract_cycles() -> str:
     guards = g.group(0) if g else "void satCycleResetSustainGuards() { }"   # HEAD: no guard reset
     k = re.search(r"^void satCycleSkipAutoSwitch\(\)\s*\{.*?^\}\s*$", src, re.S | re.M)
     skip = k.group(0) if k else "void satCycleSkipAutoSwitch() { }"          # HEAD: no overshoot-start clear (TASK-1367)
-    return "\n".join(consts) + "\n" + guards + "\n" + skip + "\n" + fn + f"\n#define CALL_AUTOSWITCH(sp) {call}\n"
+    return ("\n".join(consts) + "\n" + guards + "\n" + skip + "\n" + fn + f"\n#define CALL_AUTOSWITCH(sp) {call}\n"
+            "#define SYNC_SUSTAIN_CLOCK() (_sustain_lastCheckMs = g_ms)\n")
 
 
 def compile_cpp(cpp: Path, exe: Path):
@@ -423,11 +492,14 @@ def build(workdir: Path):
     # TASK-1367: the overshoot timer is a start timestamp, not a seconds counter
     if "_sustain_overshootRunning" in cycles:
         flag += "#define HAS_OS_START 1\n"
+    # TASK-1420: the exit timers are start timestamps too
+    if "_sustain_underheatRunning" in cycles:
+        flag += "#define HAS_EXIT_START 1\n"
     # TASK-1387: the PWM IDLE flag read by the cycle classifier
     if "_pwm_idle" in body:
         flag += "#define HAS_IDLE 1\n"
     chenable = (REPO / "src" / "OTGW-firmware" / "SATchEnable.h").as_posix()
-    cpp.write_text(flag + STUBS.replace("@FORCEFIELD@", "bool bForcePWM=false;" if has_force else "").replace("@AUTOFIELD@", "bool bPwmAutoSwitch=true;" if has_auto else "").replace("@CHENABLE@", chenable) + pre + body + cycles + MAIN, encoding="utf-8")
+    cpp.write_text(flag + STUBS.replace("@FORCEFIELD@", "bool bForcePWM=false;" if has_force else "").replace("@AUTOFIELD@", "bool bPwmAutoSwitch=true;" if has_auto else "").replace("@CHENABLE@", chenable) + pre + body + cycles + extract_switch_tick(SAT_INO.read_text(encoding="utf-8")) + MAIN, encoding="utf-8")
     return compile_cpp(cpp, workdir / "t.exe")
 
 
@@ -673,6 +745,23 @@ class SatPwmOverride(unittest.TestCase):
         self.assertEqual(r["switch"], "0")
         self.assertEqual(r["switch_noflow"], "1")
 
+    # TASK-1420, Q47 A (entry 88), LOOP LEVEL: the real overshoot gate of satControlLoopRun() followed by the real
+    # apply step in the same tick (tickRunSw cuts them out of SATcontrol.ino; the switch itself is the real
+    # satCycleCheckOvershootSwitch()). On the switch tick the mode is PWM and the setpoint is the PWM value, not the
+    # continuous one (the continuous stub returns 1000+p, which the final clamp cuts to the 62 max), and CH stays 1 (satChEnableDecide, real).
+    # Not covered: the CS enqueue after the segment (satEnqueueIfChangedCS is not part of the cut).
+    def test_overshoot_switch_tick_sends_the_pwm_setpoint_not_the_continuous_one(self):
+        r = self.run_sc("swtick", 1)
+        self.assertNotEqual(r["mode"], "-1", "no overshoot switch gate in this SATcontrol.ino")
+        self.assertEqual(r["mode"], "2", r)
+        self.assertEqual(r["ticks"], "61", r)                       # first qualifying tick starts the timer, 60 s later it fires
+        self.assertEqual(r["continuous_ticks"], "60", r)            # every tick before it still sent the continuous setpoint
+        self.assertEqual(r["cont_marker"], "0", "the switch tick sent the continuous setpoint: %r" % r)
+        self.assertEqual(r["final"], r["cs"], r)
+        self.assertEqual(r["cs"], "48.0", r)                         # PWM ON start: return 30 + flame-off offset 18, not the clamped continuous 62
+        self.assertEqual(r["drives"], "1", r)
+        self.assertEqual(r["ch"], "1", r)
+
     def test_mode_switch_resets_pwm_state(self):
         r = self.run_sc("reset", 1, "mode")
         self.assertEqual((r["req"], r["wait"], r["mode"]), ("0", "0", "1"))
@@ -887,10 +976,10 @@ class ChEnableSource(unittest.TestCase):
         src = SAT_INO.read_text(encoding="utf-8")
         loop = src[src.index("void satControlLoop"):]
         self.assertIn("satEnqueueIfChangedCH(satChEnableDecide(pidOutput, satGetColdSetpoint(), pwmDrivesSetpoint, pwmOn))", loop)
-        # The PWM phase must be read before satCycleCheckAutoSwitch(): a switch to continuous
+        # The PWM phase must be read before satCycleCheckPwmExits(): a switch to continuous
         # runs satPwmReset(), which clears bPwmFlameRequested and would send CH=0 mid-burn.
         self.assertLess(loop.index("pwmOn = state.sat.bPwmFlameRequested;"),
-                        loop.index("satCycleCheckAutoSwitch(pidOutput);"))
+                        loop.index("satCycleCheckPwmExits(pidOutput, _sat_tickMs);"))
         self.assertNotIn("finalSetpoint > SAT_MIN_SETPOINT", loop)
 
 

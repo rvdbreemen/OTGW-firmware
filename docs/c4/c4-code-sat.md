@@ -114,7 +114,9 @@ Cycle tracking, on/off transition detection, cycle classification, rolling stati
   - Rolling 4-hour (Task #227) and 24-hour (TASK-891.4) cycle statistics, refreshed once per minute
 - `satCycleIsHourLimitReached(): bool`, `satCycleGetCyclesThisHour(): uint8_t`
   - Rolling 60-min window for max cycles per hour (Task #203)
-- `satCycleCheckAutoSwitch(): bool`
+- `satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs): bool` (continuous -> PWM, 60 s, before the mode is applied)
+- `satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs): bool` (PWM -> continuous: underheat 180 s, saturation 300 s, after `satApplyPWM`)
+- `satCycleNoteDhwTick(uint32_t tickMs): void` (DHW tick: refreshes the 300 s guard end, clears the sustained starts)
   - Continuous/PWM auto-switch (Tasks #42/#43)
 - `satHCRAddSample()`, `satHCRSaveState()`, `satHCRLoadState()`, `satHCRReset()`, `satHeatingCurveRecommendation()`
   - Heating curve recommendation (Task #228), persisted to `/sat/sat_hcr.json`

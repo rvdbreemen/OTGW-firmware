@@ -188,7 +188,7 @@ int main(int argc,char** argv) {
                     "pass": elapsed is not None and threshold <= elapsed <= threshold + interval and observed["mode"] == 1})
         results.append({"id": "LL-004", "status": "pass" if all(row["pass"] for row in cases) else "fail",
             "observed": cases, "expected": "Exit after 180/300 s from first qualifying sample at every supported tick",
-            "scope": "Real satCycleCheckAutoSwitch, stubbed sensors/clock; full loop entry/recovery remains LL-020",
+            "scope": "Real satCycleCheckOvershootSwitch / satCycleCheckPwmExits, stubbed sensors/clock; full loop entry/recovery remains LL-020",
             "authority": "Q44 A candidate; TASK-1367 only repaired the opposite direction"})
     return results
 

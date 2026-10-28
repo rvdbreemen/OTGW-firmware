@@ -4447,3 +4447,33 @@ Also (review, same task): a hot-water flame is marked at its ignition when the b
 **Compared with thermo-nova:** thermo-nova has no such hold (entry 106).
 
 **Task:** TASK-1424. **Open:** offered to him in the progress note.
+
+## 108. Interpretation: the hot-water guard covers the PWM exits too, during the draw and for 300 s after it, as thermo-nova (2026-10-28, our reading)
+
+**Source:** no new statement. Plan review of TASK-1420 (entries 86, 88, 95), 2026-10-28.
+
+**What his answers leave open:** Q44 A (entry 86) times the underheat and saturation exits as thermo-nova, from the first qualifying sample and without a bail-out on a long gap. Entry 86 Open names the thermo-nova hot-water reset of those exits (`heating_control.py:313-315`) as not asked.
+
+**Why it cannot stay as it is:** the old firmware added the time since the previous call and skipped gaps above 60 s (`SATcycles.ino:1054`), so a draw, during which the control loop returns before the exits (`SATcontrol.ino` DHW branch), was never counted. With a start timestamp and no bail-out, an exit timer started before a draw would count the whole draw and could fire on the first tick after it.
+
+**Reading acted on (ours):** port thermo-nova's guard as written:
+- the exits reset their timers while the boiler DHW-active bit is set and for 300 s after it (`heating_control.py:313-315`, `DHW_OVERSHOOT_GUARD_SECONDS` = 300, `const.py:19`);
+- the 300 s overshoot guard after a draw (`heating_control.py:272-274`) is made to work. The firmware refreshed its end time only inside a function that is never reached during a draw (`SATcycles.ino:1011`; audit 2026-10-24 #11), so it never armed.
+
+**Consistent with:** entry 22, which already cites this guard as matching thermo-nova. The guard matched only on paper (audit #11).
+
+**Task:** TASK-1420. **Open:** offered to him in the progress note.
+
+## 109. Correction of our own premise in Q46 and entry 86: the control timer skips missed ticks, it does not catch up (2026-10-28, our finding)
+
+**Source:** no new statement. Correctness review of TASK-1420, 2026-10-28.
+
+**What we claimed:** Q46 and entry 86 (Q46 comparison bullets) said control ticks run on a catch-up grid (`SATcontrol.ino:590`; `safeTimers.h:192-193`), so the tick 60 s after the start often measures 59 99x ms and the switch comes one tick late. Q46c (queued, not posted) built on the same premise.
+
+**What the code does:** `timerSATControl` is declared `CATCH_UP_MISSED_TICKS` (`SATcontrol.ino:582`), but `initSAT()` (called from `setup()`) and the SATinterval setting both re-set it with `CHANGE_INTERVAL_SEC(timerSATControl, settings.sat.iControlInterval)` without a type (`SATcontrol.ino:4277`, `settingStuff.ino:1005`), which makes it type 0, `SKIP_MISSED_TICKS` (`safeTimers.h:96`, `:131-135`). On each tick the next due time is now + interval (`safeTimers.h` SKIP branch). So two ticks are never closer than one interval: the tick two intervals after the first overshoot sample is always at least 60 s later, and the switch already comes on the first tick at least 60 s after the start. The "one tick late" case of Q46 did not occur in the firmware, and the catch-up burst of Q46c cannot occur. Measured on the host with the real `safeTimers.h` (review): after `initSAT` type=0; a tick 7 ms late gives due - interval = millis().
+
+**Effect on his answers:** none. Q46 B (switch on the first tick at least 60 s after the start) and Q46b (the same for underheat and saturation) describe what the timer gives. TASK-1420 times all three timers on one tick time, taken once per control tick, as start timestamps (Q44 A). Q46c is withdrawn.
+
+**Changes an earlier entry:** entry 86, the Q46 comparison bullets (catch-up grid, "about half the time one tick late"): wrong premise, corrected here.
+
+**Task:** TASK-1420. **Open:** none; offered to him in the progress note.

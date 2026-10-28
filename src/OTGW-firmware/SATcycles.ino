@@ -25,11 +25,12 @@
 // --- Cycle Constants ---
 static const uint8_t  SAT_CYCLE_HISTORY_SIZE       = 16;
 // Overshoot margin now read from settings.sat.fOvershootMargin (default 2.0C; Python OVERSHOOT_MARGIN_CELSIUS is 3.0)
-static const float    SAT_OVERSHOOT_SUSTAIN_SEC     = 60.0f;   // Sustained overshoot before PWM switch
+static const float    SAT_OVERSHOOT_SUSTAIN_SEC     = 60.0f;   // Sustained overshoot (cycle classifier streak)
+static const uint32_t SAT_OVERSHOOT_SUSTAIN_MS      = 60000UL;  // Sustained overshoot before PWM switch (satCycleCheckOvershootSwitch)
 static const float    SAT_UNDERSHOOT_MARGIN_C       = 3.0f;    // Below-setpoint margin for underheat (Python UNDERSHOOT_MARGIN_CELSIUS=-3.0)
-static const float    SAT_UNDERHEAT_SUSTAIN_SEC     = 180.0f;  // Sustained underheat before continuous switch
-static const float    SAT_SATURATION_SUSTAIN_SEC    = 300.0f;  // Sustained saturation before continuous switch
-static const uint32_t SAT_DHW_OVERSHOOT_GUARD_MS    = 300000UL; // 300s guard: skip overshoot->PWM switch during/after DHW
+static const uint32_t SAT_UNDERHEAT_SUSTAIN_MS      = 180000UL; // Sustained underheat before continuous switch
+static const uint32_t SAT_SATURATION_SUSTAIN_MS     = 300000UL; // Sustained saturation before continuous switch
+static const uint32_t SAT_DHW_OVERSHOOT_GUARD_MS    = 300000UL; // 300s guard: no overshoot count and no PWM exit count during/after DHW (heating_control.py:272-274, :313-315)
 
 // --- Per-hour PWM start counter (rolling 60-minute window, Task #203, TASK-1401) ---
 // Holds PWM's own ON-phase starts only (thermo-nova pwm.py:159-160; Sergeant D entry 59): hot-water
@@ -129,17 +130,42 @@ static float    _cycle_timeToSustainedOvershootSec = -1.0f; // -1 = none yet
 static uint32_t _cycle_lastFlameOffMs   = 0;      // millis() of the previous flame-off edge (for off-with-demand gating)
 
 // --- Sustained State Detection ---
-// Sustained overshoot (continuous -> PWM): the millis() of the first qualifying sample, counted as thermo-nova
-// sustained_runtime() does (helpers.py:51-56; Sergeant D entry 41). Valid only while _sustain_overshootRunning.
+// The three sustained timers (overshoot -> PWM, underheat and saturation -> continuous) each hold a running flag
+// and the start of the first qualifying sample, in the time base of the control tick (tickMs, one millis() read per
+// tick; Sergeant D entries 86 Q46 B, 95 Q46b, 109): millis() is never read here. They are counted as thermo-nova
+// sustained_runtime() does (helpers.py:51-56; entry 41): the first sample only starts the timer.
 static bool     _sustain_overshootRunning = false;
 static uint32_t _sustain_overshootStartMs = 0;
-static float    _sustain_underheatSec   = 0.0f;
-static float    _sustain_saturationSec  = 0.0f;
-static uint32_t _sustain_lastCheckMs    = 0;
-// Initialised to a sentinel far enough in the past that the guard is inactive at boot.
-// SAT_DHW_OVERSHOOT_GUARD_MS (300000) is the guard window; subtracting it from 0 wraps to UINT32_MAX-300000,
-// which means (millis() - _sustain_dhwEndMs) will always exceed the threshold unless DHW actually ran.
-static uint32_t _sustain_dhwEndMs       = (uint32_t)(0UL - SAT_DHW_OVERSHOOT_GUARD_MS); // inactive at boot
+static bool     _sustain_underheatRunning = false;
+static uint32_t _sustain_underheatStartMs = 0;
+static bool     _sustain_saturationRunning = false;
+static uint32_t _sustain_saturationStartMs = 0;
+// Tick time of the last control tick with the boiler DHW-active bit set; only meaningful once a draw has been
+// seen (_sustain_dhwSeen), so the guard is inactive from boot until the first draw.
+static uint32_t _sustain_dhwEndMs       = 0;
+static bool     _sustain_dhwSeen        = false;
+
+// thermo-nova sustained_runtime() (helpers.py:51-56): a timer that is not running, or whose start lies after the
+// tick (clock went back), starts at tickMs with elapsed 0 and never fires on that sample. Otherwise the elapsed
+// time is tickMs - start, and the condition has been sustained once it reaches limitMs. No dt and no gap
+// bail-out: a long gap between two ticks counts in full.
+static bool satSustainedFor(bool &running, uint32_t &startMs, uint32_t tickMs, uint32_t limitMs)
+{
+  if (!running || (int32_t)(tickMs - startMs) < 0) {
+    running = true;
+    startMs = tickMs;
+    return false;
+  }
+  return (uint32_t)(tickMs - startMs) >= limitMs;
+}
+
+// Hot water now, or within 300 s of its end (heating_control.py:272-274 for the overshoot switch, :313-315 for
+// the PWM exits; entry 108). Measured on the tick clock, like the timers.
+static bool satDhwGuardActive(uint32_t tickMs)
+{
+  return state.sat.bDhwActive ||
+         (_sustain_dhwSeen && (uint32_t)(tickMs - _sustain_dhwEndMs) < SAT_DHW_OVERSHOOT_GUARD_MS);
+}
 
 // --- EMA Fractions (lightweight sliding window) ---
 static float _ema_dutyRatio       = 0.0f;  // fraction of time flame is on
@@ -153,19 +179,29 @@ static const float EMA_ALPHA      = 0.15f; // decay factor per cycle
 void satCycleResetSustainGuards()
 {
   _sustain_overshootRunning = false;
-  _sustain_underheatSec = 0.0f;
-  _sustain_saturationSec = 0.0f;
+  _sustain_underheatRunning = false;
+  _sustain_saturationRunning = false;
 }
 
-// A control tick that does not reach satCycleCheckAutoSwitch() is a tick without a qualifying sample, and
-// clears the overshoot start so the next overshoot counts its 60 s from scratch. thermo-nova does the same
-// for hot water (heating_control.py:268-270), the DHW guard (:272-274), heater off or a requested setpoint
-// at or below the cold setpoint (:276-282) and PWM enabled (:264-266). The other callers are firmware
-// choices without a thermo-nova counterpart: boiler fault, thermal-safe fallback, summer simmer, and
-// SAT off / OT loss / re-enable (thermo-nova keeps the start there: climate.py:544-545 returns before update()).
+// A control tick without a qualifying sample, and every mode change, clears all three starts: the next
+// qualifying sample counts its time from scratch. thermo-nova does the same for hot water (heating_control.py:
+// :268-270, :313-315), the DHW guard (:272-274), heater off or a requested setpoint at or below the cold
+// setpoint (:276-282, :317-319) and PWM enabled or not (:264-266, :308-311). The other callers are firmware
+// choices without a thermo-nova counterpart: boiler fault, thermal-safe fallback, summer simmer, and SAT off /
+// OT loss / re-enable (thermo-nova keeps the start there: climate.py:544-545 returns before update()). The exit
+// starts are cleared here too: a start kept across a skipped tick would count the skipped time (TASK-1420).
 void satCycleSkipAutoSwitch()
 {
-  _sustain_overshootRunning = false;
+  satCycleResetSustainGuards();
+}
+
+// A hot-water tick (the DHW early return of the control loop): refreshes the end of the draw, which arms the
+// 300 s guards of satDhwGuardActive(), and clears all three starts. Called with the tick time.
+void satCycleNoteDhwTick(uint32_t tickMs)
+{
+  _sustain_dhwEndMs = tickMs;
+  _sustain_dhwSeen = true;
+  satCycleResetSustainGuards();
 }
 
 // --- Cycle History ---
@@ -220,7 +256,6 @@ void satCycleInit()
   _cycle_minFlowTemp = 999.0f;
   _cycle_overshootSec = 0.0f;
   satCycleResetSustainGuards();
-  _sustain_lastCheckMs = millis();
   _cycleHistoryIdx = 0;
   _cycleHistoryCount = 0;
   memset(_cycleHistory, 0, sizeof(_cycleHistory));
@@ -995,102 +1030,76 @@ void satCycleSample()
   _cycle_lastSampleMs = now;
 }
 
-//=== Check if auto-switch between PWM and continuous is needed ===
-// Called from the control loop. Returns true if mode was switched.
-bool satCycleCheckAutoSwitch(float requestedSetpoint)
+//=== Sustained overshoot: continuous -> PWM (thermo-nova _maybe_enable_pwm_on_sustained_overshoot, heating_control.py:262-305) ===
+// Called from the control loop once per tick, before the control mode is applied (Q47 A, entry 88), with the
+// tick time. Returns true if the mode was switched. Heat pumps use it too (entry 87).
+// The test uses the requested (PID) setpoint, not the final one: the continuous clamp keeps the final setpoint
+// within a few degrees of the flow, so comparing against it would almost never see an overshoot.
+// flow >= requested + margin counts, equality included (Q43 A; thermo-nova resets only on flow < threshold,
+// :288-291). The margin is settings.sat.fOvershootMargin (default 2.0; thermo-nova's own is 3.0).
+// The 60 s are tickMs - start (Q46 B), so the switch comes on the first tick at least 60 s after
+// the first qualifying tick (ticks are never closer than one interval; entry 109). A tick outside CONTINUOUS (:264-266), or within the hot-water guard (:268-274),
+// clears the start.
+bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
 {
-  uint32_t now = millis();
-  float flowTemp = satGetFlowTemp();
-  // The requested (PID) setpoint, not the final one: the continuous clamp keeps the final setpoint within
-  // a few degrees of the flow, so comparing against it would almost never see an overshoot (thermo-nova
-  // compares flow with the requested setpoint, heating_control.py _maybe_enable_pwm_on_sustained_overshoot).
-  float setpoint = requestedSetpoint;
-
-  // --- DHW post-overshoot guard: track end of DHW heating ---
-  if (state.sat.bDhwActive) {
-    _sustain_dhwEndMs = now; // Keep refreshing while DHW is active
-  }
-
-  // --- Overshoot detection (continuous → PWM), Sergeant D entry 41 ---
-  // Timed from the first qualifying sample, as thermo-nova (heating_control.py:293-304, helpers.py:51-56):
-  // that sample only starts the timer, and the switch comes once the overshoot has lasted 60 s of wall
-  // clock. A sample that does not qualify, or any call outside CONTINUOUS (thermo-nova: PWM enabled,
-  // :264-266), clears the start. Counted in millis(), so it does not depend on the control interval.
-  // Exception: the test is strict (flow > setpoint + margin); thermo-nova also counts equality (it resets
-  // only on flow < threshold, :289). Entry 37 decided >= for the cycle classifier only (open question Q43).
-  // The switch also resets the underheat and saturation timers, as thermo-nova (:305).
-  if (state.sat.eControlMode == SAT_MODE_CONTINUOUS) {
-    // Skip overshoot→PWM switch while DHW is active or within 300s of DHW end
-    bool dhwGuardActive = state.sat.bDhwActive ||
-                          (now - _sustain_dhwEndMs < SAT_DHW_OVERSHOOT_GUARD_MS);
-    if (!dhwGuardActive && flowTemp > setpoint + settings.sat.fOvershootMargin) {
-      if (!_sustain_overshootRunning) {
-        _sustain_overshootRunning = true;
-        _sustain_overshootStartMs = now;
-      } else if ((uint32_t)(now - _sustain_overshootStartMs) >= (uint32_t)(SAT_OVERSHOOT_SUSTAIN_SEC * 1000.0f)) {
-        SATDebugTf(PSTR("SAT: sustained overshoot for %lus (flow=%.1f > sp=%.1f + %.1f), switching to PWM mode\r\n"),
-                   (unsigned long)((now - _sustain_overshootStartMs) / 1000UL), flowTemp, setpoint,
-                   settings.sat.fOvershootMargin);
-        satSetControlMode(SAT_MODE_PWM);
-        satCycleResetSustainGuards();   // _reset_pwm_disable_guards() after pwm.enable() (heating_control.py:304-305)
-        _sustain_lastCheckMs = now;
-        return true;
-      }
-    } else {
-      _sustain_overshootRunning = false;
-    }
-  } else {
+  if (state.sat.eControlMode != SAT_MODE_CONTINUOUS || satDhwGuardActive(tickMs)) {
     _sustain_overshootRunning = false;
+    return false;
   }
-
-  // The underheat and saturation timers below still add the time since the previous call.
-  float dt = (float)(now - _sustain_lastCheckMs) / 1000.0f;
-  _sustain_lastCheckMs = now;
-
-  SATDebugTf(PSTR("SAT autoswitch: mode=%d flow=%.1f sp=%.1f os=%lus uh=%.0fs\r\n"),
-             (int)state.sat.eControlMode, flowTemp, setpoint,
-             _sustain_overshootRunning ? (unsigned long)((now - _sustain_overshootStartMs) / 1000UL) : 0UL,
-             _sustain_underheatSec);
-
-  if (dt <= 0.0f || dt > 60.0f) return false; // Skip on first call or large gaps
-
-  // --- Underheat detection (PWM → continuous) ---
-  // Both checks only run in the PWM ON phase (thermo-nova _maybe_disable_pwm_runtime returns and resets
-  // the guards while the PWM status is not ON): in the OFF phase the flow is low by design.
-  if (state.sat.eControlMode == SAT_MODE_PWM && !state.sat.bPwmFlameRequested) {
-    _sustain_underheatSec  = 0.0f;
-    _sustain_saturationSec = 0.0f;
+  const float flowTemp = satGetFlowTemp();
+  if (!(flowTemp >= requestedSetpoint + settings.sat.fOvershootMargin)) {
+    _sustain_overshootRunning = false;
+    return false;
   }
-  if (state.sat.eControlMode == SAT_MODE_PWM && state.sat.bPwmFlameRequested) {
-    if (flowTemp < setpoint - SAT_UNDERSHOOT_MARGIN_C) {
-      _sustain_underheatSec += dt;
-    } else {
-      _sustain_underheatSec = 0.0f;
-    }
-    if (_sustain_underheatSec >= SAT_UNDERHEAT_SUSTAIN_SEC) {
+  if (!satSustainedFor(_sustain_overshootRunning, _sustain_overshootStartMs, tickMs, SAT_OVERSHOOT_SUSTAIN_MS)) return false;
+
+  SATDebugTf(PSTR("SAT: sustained overshoot for %lus (flow=%.1f >= sp=%.1f + %.1f), switching to PWM mode\r\n"),
+             (unsigned long)((uint32_t)(tickMs - _sustain_overshootStartMs) / 1000UL), flowTemp, requestedSetpoint,
+             settings.sat.fOvershootMargin);
+  satSetControlMode(SAT_MODE_PWM);
+  satCycleResetSustainGuards();   // _reset_pwm_disable_guards() after pwm.enable() (heating_control.py:304-305)
+  return true;
+}
+
+//=== Sustained underheat and saturation: PWM -> continuous (thermo-nova _maybe_disable_pwm_runtime, heating_control.py:307-372) ===
+// Called after satApplyPWM() in the same tick (saturation reads this tick's off time), with the tick time
+// (entry 95, Q46b). Returns true if the mode was switched.
+// Both timers reset while PWM is not the mode (:308-311), during hot water and within 300 s after it (:313-315,
+// entry 108), and outside the PWM ON phase (:321-323): in the OFF phase the flow is low by design.
+// Underheat counts while flow <= requested - 3 and resets on a higher flow (:337-340); 180 s from the first
+// qualifying tick (Q44 A). Saturation counts while the last PWM off time is 0, 300 s from the first such tick
+// (:359-362), and is only looked at when underheat did not fire (:217-220, :325-329).
+bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
+{
+  if (state.sat.eControlMode != SAT_MODE_PWM || satDhwGuardActive(tickMs) || !state.sat.bPwmFlameRequested) {
+    _sustain_underheatRunning = false;
+    _sustain_saturationRunning = false;
+    return false;
+  }
+  const float flowTemp = satGetFlowTemp();
+
+  if (flowTemp <= requestedSetpoint - SAT_UNDERSHOOT_MARGIN_C) {
+    if (satSustainedFor(_sustain_underheatRunning, _sustain_underheatStartMs, tickMs, SAT_UNDERHEAT_SUSTAIN_MS)) {
       SATDebugTln(F("SAT: sustained underheat detected, switching to continuous mode"));
       satSetControlMode(SAT_MODE_CONTINUOUS);
-      _sustain_underheatSec = 0.0f;
+      satCycleResetSustainGuards();
       return true;
     }
-
-    // --- Saturation detection (PWM → continuous): PWM off_time stays 0 too long ---
-    // Matches Python pwm.state.off_time_seconds == 0 sustained for SATURATION_SUSTAIN_SECONDS:
-    // the duty calc wants the boiler running continuously, so PWM mode gives no benefit.
-    // satPwmLastOffTimeMs() is recorded by satApplyPWM() earlier in the same control cycle.
-    if (satPwmLastOffTimeMs() == 0) {
-      _sustain_saturationSec += dt;
-    } else {
-      _sustain_saturationSec = 0.0f;
-    }
-    if (_sustain_saturationSec >= SAT_SATURATION_SUSTAIN_SEC) {
-      SATDebugTln(F("SAT: PWM saturation (off_time=0 sustained), switching to continuous mode"));
-      satSetControlMode(SAT_MODE_CONTINUOUS);
-      _sustain_saturationSec = 0.0f;
-      return true;
-    }
+  } else {
+    _sustain_underheatRunning = false;
   }
 
+  // satPwmLastOffTimeMs() is recorded by satApplyPWM() earlier in the same control tick.
+  if (satPwmLastOffTimeMs() == 0) {
+    if (satSustainedFor(_sustain_saturationRunning, _sustain_saturationStartMs, tickMs, SAT_SATURATION_SUSTAIN_MS)) {
+      SATDebugTln(F("SAT: PWM saturation (off_time=0 sustained), switching to continuous mode"));
+      satSetControlMode(SAT_MODE_CONTINUOUS);
+      satCycleResetSustainGuards();
+      return true;
+    }
+  } else {
+    _sustain_saturationRunning = false;
+  }
   return false;
 }
 
