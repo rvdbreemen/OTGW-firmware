@@ -3564,7 +3564,7 @@ All inbound services are unencrypted (HTTP, not HTTPS; WS, not WSS). The device 
 
 #### Home Assistant Integration
 
-- Home Assistant OTGW integration (HACS): [https://github.com/mvdwetering/hass-otgw](https://github.com/mvdwetering/hass-otgw)
+- Home Assistant OpenTherm Gateway integration (built in, connects to port 25238): [https://www.home-assistant.io/integrations/opentherm_gw/](https://www.home-assistant.io/integrations/opentherm_gw/)
 - Home Assistant MQTT integration documentation: [https://www.home-assistant.io/integrations/mqtt/](https://www.home-assistant.io/integrations/mqtt/)
 - Home Assistant MQTT discovery: [https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)
 
@@ -3588,7 +3588,7 @@ All inbound services are unencrypted (HTTP, not HTTPS; WS, not WSS). The device 
 - TelnetStream: [https://github.com/jandrassy/TelnetStream](https://github.com/jandrassy/TelnetStream)
 - WebSockets (Links2004): [https://github.com/Links2004/arduinoWebSockets](https://github.com/Links2004/arduinoWebSockets)
 - DallasTemperature: [https://github.com/milesburton/Arduino-Temperature-Control-Library](https://github.com/milesburton/Arduino-Temperature-Control-Library)
-- EthernetESP32: [https://github.com/JAndrassy/EthernetESP32](https://github.com/JAndrassy/EthernetESP32)
+- EthernetESP32: [https://github.com/Networking-for-Arduino/EthernetESP32](https://github.com/Networking-for-Arduino/EthernetESP32)
 - OTGWSerial (Schelte Bron): included in `libraries/OTGWSerial/`
 
 ---

@@ -208,7 +208,7 @@ All inbound services are unencrypted (HTTP, not HTTPS; WS, not WSS). The device 
 
 #### Home Assistant Integration
 
-- Home Assistant OTGW integration (HACS): [https://github.com/mvdwetering/hass-otgw](https://github.com/mvdwetering/hass-otgw)
+- Home Assistant OpenTherm Gateway integration (built in, connects to port 25238): [https://www.home-assistant.io/integrations/opentherm_gw/](https://www.home-assistant.io/integrations/opentherm_gw/)
 - Home Assistant MQTT integration documentation: [https://www.home-assistant.io/integrations/mqtt/](https://www.home-assistant.io/integrations/mqtt/)
 - Home Assistant MQTT discovery: [https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery)
 
@@ -240,7 +240,7 @@ Pinned versions are defined in `platformio.ini`. Bundled libraries live in `src/
 | NetApiHelpers | 1.0.2 | Patched at build time for Arduino Core 3.x compatibility | registry |
 | OneWire | 2.3.8 | 1-Wire bus transport for DS18B20 | registry |
 | DallasTemperature | 4.0.6 | DS18B20 temperature sensor driver | [milesburton/Arduino-Temperature-Control-Library](https://github.com/milesburton/Arduino-Temperature-Control-Library) |
-| EthernetESP32 | 1.0.2 (ESP32 only) | W5500 SPI Ethernet driver for OTGW32 | [JAndrassy/EthernetESP32](https://github.com/JAndrassy/EthernetESP32) |
+| EthernetESP32 | 1.0.2 (ESP32 only) | W5500 SPI Ethernet driver for OTGW32 | [Networking-for-Arduino/EthernetESP32](https://github.com/Networking-for-Arduino/EthernetESP32) |
 | OpenTherm Library | 1.1.5 (bundled, ESP32 only) | OTDirect GPIO OpenTherm transport | [ihormelnyk/opentherm_library](https://github.com/ihormelnyk/opentherm_library) |
 | OTGWSerial (Schelte Bron) | bundled (ESP8266 only) | PIC co-processor UART protocol | included in `src/libraries/OTGWSerial/` |
 | SSD1306Ascii | as installed (ESP32 only) | OLED display driver (ADR-067) | registry |
