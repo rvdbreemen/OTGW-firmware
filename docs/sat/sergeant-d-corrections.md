@@ -4516,3 +4516,23 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156508736699
 **Compared with thermo-nova:** zones and the independent timer as thermo-nova (`climate.py:712-716`, `area.py:183-190`); thermo-nova has no fault/fallback/simmer/valves paths, so stepping through them follows its timer model. Room temperature missing: thermo-nova resets the PID on a stale sensor (`climate.py:466-482`); his curve-only rule is entries 38/46.
 
 **Task:** TASK-1368 (unblocked). **Open:** none.
+
+## 112. Q53 A: continuous mode follows thermo-nova's previous-CS clamp (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 19:54 UTC and 20:04 UTC (repeated), answer to Q53 (msg 1565090124415639564):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565091338842669137
+https://discord.com/channels/812969634638725140/1514720723980259460/1565093953013944431
+
+**Quoted:**
+
+> Q53: A
+
+> Q53: A / Q54: Yes
+
+**Settled:** in continuous mode, with the flame on and a valid flow, the CS follows thermo-nova `heating_control.py:485-489`: if the request rises above the previous CS, CS = max(request, flow - offset); otherwise CS = max(request, min(flow - offset, previous CS)). The previous CS is the last CS SAT sent: 10 after heater-off or the cold cutoff, 0 after SAT enable or boot (no restore after a reboot; option C not chosen). Firmware today: only max(request, flow - offset) (`SATcontrol.ino:1603-1610`).
+
+**Interpretation (ours, acted on):** the firmware-only paths thermal-safe fallback and summer simmer write the CS they send as the previous CS, so the clamp never starts from a stale value (sub-point of Q53, our choice).
+
+**Not settled:** "Q54: Yes" in the second message. Q54 had not been posted to him; it was only queued (open-questions.md). It asks which modulation value a heat pump gets, so "yes" does not answer it. Q54 is posted in full; this "yes" is not acted on.
+
+**Task:** TASK-1381 (AC#2 now has his OK). **Open:** none for Q53.
