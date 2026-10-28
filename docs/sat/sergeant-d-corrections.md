@@ -4568,3 +4568,18 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156510341124
 **Changes an earlier entry:** entry 32's "Humidity comes to play ONLY when summer simmer index is enabled" is now read as the Thermal comfort option.
 
 **Task:** TASK-1282 (scope changes from "fix the gate" to "remove comfort adjust": the setting, its REST/MQTT/UI exposure and docs). **Open:** none; what happens to a stored `bComfortAdjust` value is an implementation detail (ignore it).
+
+## 115. Q56 A: after a boot without a room reading yet, keep the restored PID state; a reading lost later still resets (2026-10-28, refines entry 46)
+
+**Source:** #alpha-testing, 2026-10-28 21:39 UTC, answer to Q56 (msg 1565115722487832687):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565117854611939329
+
+**Quoted:**
+
+> Q56: A
+
+**Settled:** as thermo-nova (`climate.py:480-482`: the PID update is skipped without a reset while no temperature is available yet). After a boot or SAT enable with a restored PID state, and no room temperature received yet since that boot, the PID waits: the restored integral and raw derivative are kept, nothing is saved over them, and the output is curve only until the first reading. A room temperature that was present and then goes missing still resets P, I and D (entry 46); a stale sensor resets as thermo-nova `climate.py:470-478`.
+
+**Changes an earlier entry:** entry 46 (reset when the room temperature is lost or missing): "missing" no longer covers the time before the first reading after boot. Consistent with entry 83 (the restored I is used once a reading arrives).
+
+**Task:** TASK-1368. **Open:** none.

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:43:00Z'
-updated_date: '2026-10-28T21:30:00Z'
+updated_date: '2026-10-28T21:49:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -61,6 +61,8 @@ Verification: LL-003 adapter (scripts/verify_sat_low_load.py:127-171) red on HEA
 2026-10-28 Q55 answered (entry 111): full thermo-nova; zones get the 60 s timer; the PID steps through hot water, fault, thermal-safe, simmer and valves closed; stops only when SAT is off (OT loss turns SAT off); no room temperature = curve only (entries 38/46), no integration. Unblocked.
 
 2026-10-28 review round 1 (opus correctness, sonnet SAT/rules, sonnet tests with 12 mutants). Fixing in round 2: first-output D=0 (entry 95 Q39b) here instead of waiting for TASK-1270; deadband widening capped at 2 h as the tick and applied to zones; reset/start-up and room-recovery tests; real widening path test; comment/spec truth; LL-003 comment (it cannot tell old from new: green on HEAD); env-override path; broken TASK-1195 derivative harness adapted. Not fixed, put to Sergeant D: boot with a saved state but no room reading yet (entries 46 vs 83) -> Q56 queued. Noted, not fixed: derivative interval depends on ms jitter at exactly 60 s (deltaTime <= 60 boundary, as thermo-nova pid.py; bench item with entry 77/TASK-1418); published P/D/output stay at the last tick value while the tick skips (I and error move).
+
+2026-10-28 Q56 answered A (entry 115): no room reading yet since boot/enable -> keep the restored PID state, curve-only output, no reset and no save over it; a reading lost later resets (entry 46). To implement in this task (round 2/3).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
