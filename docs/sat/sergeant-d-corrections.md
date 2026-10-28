@@ -4394,3 +4394,25 @@ Without this the DHW flame or the first CH flame after the draw would anchor a f
 **Compared with thermo-nova:** thermo-nova has no hot-water pause at all (entry 95); its first-ignition sync (`pwm.py:186-193`) would fire on whatever flame comes first. This reading extends his deviation consistently.
 
 **Task:** TASK-1422. **Open:** offered to him in the progress note; acted on meanwhile.
+
+## 105. Q52 D: an ON start right after a draw with the hot-water flame still lit does not count (2026-10-28, corrects entry 101)
+
+**Source:** #alpha-testing, 2026-10-28 10:51 and 10:58 UTC, answers to the expanded Q52 D (msg 1564954297135796305: A counts as thermo-nova, B not counted because the flame was lit for hot water, C no start while that flame burns, start later and count):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564954645489782858
+https://discord.com/channels/812969634638725140/1514720723980259460/1564956502849093675
+
+**Quoted:**
+
+> @BlueFlame Bot Q52D: No
+
+> @BlueFlame Bot Q52: D No
+
+**Settled:** our reading in entry 101 (such a start counts, option A) is rejected: an ON start at the first tick after a draw, with the flame still burning from hot water, must not count against cycles per hour. This is his deviation from thermo-nova (`pwm.py:160` counts every ON start).
+
+**Interpretation needed:** "No" rejects A but does not choose between B (the start happens but is not counted; SAT remembers that the burning flame was lit during DHW) and C (no ON start while that hot-water flame burns; the start comes after it goes out and is counted). Asked as Q52E.
+
+**Changes an earlier entry:** entry 101 (our interpretation) is withdrawn.
+
+**Conflict with shipped code:** TASK-1421 (alpha.517, alpha.518) counts this start. A follow-up task changes it once Q52E is answered.
+
+**Task:** TASK-1424 (new, after Q52E). **Open:** Q52E (B or C).
