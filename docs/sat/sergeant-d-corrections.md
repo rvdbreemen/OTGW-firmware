@@ -4416,3 +4416,20 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156495650284
 **Conflict with shipped code:** TASK-1421 (alpha.517, alpha.518) counts this start. A follow-up task changes it once Q52E is answered.
 
 **Task:** TASK-1424 (new, after Q52E). **Open:** Q52E (B or C).
+
+## 106. Q52E: no PWM ON start while the hot-water flame still burns; start after it goes out, counted (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 11:23 UTC, answer to Q52E (msg 1564961956140421181):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564962902509752442
+
+**Quoted:**
+
+> @BlueFlame Bot Q52E:  C
+
+**Settled (option C as asked):** when the PWM OFF wait ends while the flame is still burning from a hot-water draw (the boiler DHW-active bit already off), PWM does not start the ON phase yet; it waits until that flame has gone out, then starts normally, and that start counts against cycles per hour (entries 90, 105). Our advice was B.
+
+**Compared with thermo-nova:** thermo-nova starts the ON phase at once and counts it (`pwm.py:155-167`); this hold is his deviation.
+
+**Interpretation (ours, acted on):** "the hot-water flame" is a flame that was lit while the boiler DHW-active bit was set; a CH flame (e.g. the PWM-entry ON, entry 43) is not held. The hold ends when the flame goes out, or when the DHW bit returns (then the normal draw rules apply). Duty range 5 (continuous ON) follows the same hold.
+
+**Task:** TASK-1424. **Open:** none.
