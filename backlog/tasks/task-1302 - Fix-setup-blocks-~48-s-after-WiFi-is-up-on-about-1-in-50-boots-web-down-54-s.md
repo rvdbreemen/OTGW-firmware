@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-22T14:49:00Z'
-updated_date: '2026-10-28T21:06:00Z'
+updated_date: '2026-10-28T22:14:00Z'
 labels:
   - bug
 dependencies: []
@@ -54,4 +54,6 @@ Diag patch with corrected markers (ev36, ev37, ev42-ev46 incl. around hostByName
 2026-10-28: uncommitted TEMP DIAG (stage markers + no-GARP A/B) removed from the 1.x worktree to merge origin; parked as %LOCALAPPDATA%\OTGW-capture\parked\task1302-temp-boot-diag-20261028.patch (git apply --check after the merge: see session). Bench .68 still runs the no-GARP diag build 1.7.8-beta.6+12975b4.
 
 Post-merge check: code hunks still apply (git apply --check --exclude='*version.h' --exclude='*version.hash'); only the generated version files conflict, regenerate them instead.
+
+2026-10-28: bench .68 will be reflashed with the beta.8 candidate (TASK-1434/1431 verification), replacing the no-GARP diag build.
 <!-- SECTION:NOTES:END -->
