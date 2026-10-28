@@ -44,10 +44,14 @@ STUBS = r"""
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+#include <cstdarg>
 #define F(x) x
 #define PSTR(x) x
 #define SATDebugTln(x) ((void)0)
 #define SATDebugTf(...) ((void)0)
+static void satNarratef_P(const char *fmt, ...) {   // SAT log sink: one "N <text>" line on stderr (stdout carries the timeline)
+  char b[96]; va_list ap; va_start(ap, fmt); vsnprintf(b, sizeof(b), fmt, ap); va_end(ap); fprintf(stderr, "N %s\n", b);
+}
 #define SAT_MIN_SETPOINT 10.0f
 #define SAT_QUIRK_MIN_MOD_10 0x01
 #define SAT_QUIRK_IMMERGAS_TP 0x02

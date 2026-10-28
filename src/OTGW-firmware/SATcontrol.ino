@@ -864,8 +864,19 @@ static void satPwmCountStart()
 // entries 80, 91, 92). With the flame already burning the phase is counted now, its start-up window counts from
 // now and BT is reseeded from the live flow (TASK-1273); with the flame off it waits for ignition (up to 180 s,
 // pwm.py:186-199) and is counted at its first flame.
-static void satPwmBeginOn(bool flame, float boilerTemp)
+// Sergeant D, entry 93: each PWM edge goes to the SAT log with the ON and OFF times of the current step in seconds.
+static void satPwmNarrateEdge(bool on, uint32_t onTimeMs, uint32_t offTimeMs)
 {
+  const unsigned long onSec = (unsigned long)((onTimeMs + 500UL) / 1000UL);
+  const unsigned long offSec = (unsigned long)((offTimeMs + 500UL) / 1000UL);
+  const double duty = (double)state.sat.fPwmDutyCycle;
+  if (on) satNarratef_P(PSTR("PWM ON: pwm_on=%lu s pwm_off=%lu s duty=%.2f"), onSec, offSec, duty);
+  else    satNarratef_P(PSTR("PWM OFF: pwm_on=%lu s pwm_off=%lu s duty=%.2f"), onSec, offSec, duty);
+}
+
+static void satPwmBeginOn(bool flame, float boilerTemp, uint32_t onTimeMs, uint32_t offTimeMs)
+{
+  satPwmNarrateEdge(true, onTimeMs, offTimeMs);
   state.sat.bPwmFlameRequested = true;
   _pwm_lastUpdateMs = millis();
   _pwm_startCounted = false;
@@ -882,8 +893,9 @@ static void satPwmBeginOn(bool flame, float boilerTemp)
 
 // ON->OFF (pwm.py:205-209): the ignition anchor goes with the phase and the off wait is timed from this edge
 // (_last_update, pwm.py:208), whatever the boiler flame did before or since (entries 91, 92).
-static void satPwmEndOn()
+static void satPwmEndOn(uint32_t onTimeMs, uint32_t offTimeMs)
 {
+  satPwmNarrateEdge(false, onTimeMs, offTimeMs);
   state.sat.bPwmFlameRequested = false;
   _pwm_flameOffHoldSetpoint = 0.0f;
   _pwm_flameOnMs = 0;
@@ -981,7 +993,7 @@ static void satPwmSchedule(float pidOutput)
     // start (pwm.py:160-167 with off_time 0, pwm.py:296-301): counted (entry 59) and anchored, so a later
     // drop into ranges 1-4 times the ON phase from this start, not from an older flame-on. It is not held
     // back by the hourly limit.
-    if (!state.sat.bPwmFlameRequested) satPwmBeginOn(flame, boilerTemp);
+    if (!state.sat.bPwmFlameRequested) satPwmBeginOn(flame, boilerTemp, maxMs, 0);
     _pwm_lastOffTimeMs = 0;   // off_time==0: duty wants continuous ON (saturation signal)
     _pwm_lastOnTimeMs  = maxMs; // continuous ON: report the full period as on-time (TASK-891.4)
     return;
@@ -1015,6 +1027,9 @@ static void satPwmSchedule(float pidOutput)
   _pwm_lastOffTimeMs = offTimeMs;   // record for the off_time==0 saturation guard (Python pwm off_time)
   _pwm_lastOnTimeMs  = onTimeMs;    // record for the cycle-classifier SHORT threshold (Python pwm on_time, TASK-891.4)
 
+  SATDebugTf(PSTR("SAT PWM: pwm_on=%lu s pwm_off=%lu s duty=%.2f %s\r\n"), (unsigned long)((onTimeMs + 500UL) / 1000UL),
+             (unsigned long)((offTimeMs + 500UL) / 1000UL), (double)duty, state.sat.bPwmFlameRequested ? "ON" : "OFF");
+
   // --- PWM state machine (ON/OFF phase) ---
   // Both phases count from the one anchor _pwm_lastUpdateMs (thermo-nova _last_update).
   const uint32_t elapsedMs = millis() - _pwm_lastUpdateMs;
@@ -1032,7 +1047,7 @@ static void satPwmSchedule(float pidOutput)
     if (_pwm_flameOnMs != 0 && (millis() - _pwm_flameOnMs) < PWM_IGNITION_TIMEOUT_MS) return;
     if (elapsedMs >= onTimeMs) {
       // ON time expired: switch to OFF (pwm.py:205-209)
-      satPwmEndOn();
+      satPwmEndOn(onTimeMs, offTimeMs);
       return;
     }
   } else {
@@ -1062,7 +1077,7 @@ static void satPwmSchedule(float pidOutput)
         return;
       }
       _hourLimitLogged = false;  // reset latch when limit clears
-      satPwmBeginOn(flame, boilerTemp);   // counted now with a burning flame, else at its first flame (TASK-1401)
+      satPwmBeginOn(flame, boilerTemp, onTimeMs, offTimeMs);   // counted now with a burning flame, else at its first flame (TASK-1401)
     }
   }
 }

@@ -139,6 +139,18 @@ class SatPwmAnchors(unittest.TestCase):
             rows.append((int(p[1]), int(p[2]), float(p[3]), int(p[4])))
         return Timeline(rows)
 
+    # TASK-1407: PWM edges in the SAT log, with pwm_on / pwm_off in seconds (Sergeant D, entry 93) ------
+    def test_edges_are_narrated_with_pwm_on_and_pwm_off_seconds(self):
+        # cycles/hour 3 -> period 1200 s, duty 0.22 -> on 264 s, off 936 s: OFF->ON at 0, ON->OFF at 270, OFF->ON again at 1230
+        lines = ["cfg 3 0.22", "init burning", "run 1300"]
+        r = subprocess.run([str(self.exe)], input="\n".join(lines) + "\n", capture_output=True, text=True, check=True)
+        narr = [ln[2:] for ln in r.stderr.splitlines() if ln.startswith("N ")]
+        self.assertEqual(narr[:3], ["PWM ON: pwm_on=264 s pwm_off=936 s duty=0.22",
+                                    "PWM OFF: pwm_on=264 s pwm_off=936 s duty=0.22",
+                                    "PWM ON: pwm_on=264 s pwm_off=936 s duty=0.22"], narr)
+        self.assertEqual(len(narr), 3, narr)
+        self.assertLess(max(len(x) for x in narr), 96)   # SAT_NARRATE_BUF
+
     # D1 ------------------------------------------------------------------------------------------------
     def test_d1_off_wait_ignores_hot_water_flame_offs(self):
         # cycles/hour 3 -> period 1200 s, duty 0.22 -> on 264 s, off 936 s. ON phase starts burning at 0, ends on
