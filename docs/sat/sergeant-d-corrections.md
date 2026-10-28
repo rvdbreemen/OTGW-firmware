@@ -4341,3 +4341,18 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156491864733
 **Compared with thermo-nova:** the same: `pwm.py:160` counts every ON start, whatever the flame.
 
 **Task:** TASK-1421 (implemented this way). **Open:** asked as Q52 D together with the TASK-1422 details.
+
+## 102. The boiler's on/off-control bit (MsgID 3) does not force PWM (2026-10-28)
+
+**Source:** #alpha-testing, 2026-10-28 10:30 UTC, answer to the expanded Q42 (msg 1564924112340652083):
+https://discord.com/channels/812969634638725140/1514720723980259460/1564949482477457409
+
+**Quoted:**
+
+> Q42: A
+
+**Settled (option A as asked):** SAT ignores the MsgID 3 high-byte bit 1 (modulating vs on/off boiler) for control and keeps choosing PWM or continuous itself; an on/off boiler that overshoots reaches PWM through the 60 s overshoot switch (entries 41, 86). Consistent with entry 13 (Force PWM removed).
+
+**Compared with thermo-nova and the firmware:** thermo-nova only exposes the bit as a sensor (`coordinator/serial/binary_sensor.py:51`). The firmware does not act on it for SAT control today. No change.
+
+**Task:** none (no capability-forced PWM task is created). **Open:** none.
