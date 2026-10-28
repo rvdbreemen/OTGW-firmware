@@ -1,0 +1,51 @@
+# Bench rig: OTGW classic web UI behind Home Assistant ingress and a generic
+# reverse proxy (TASK-1378). Started and filled by setup_rig.py; all state lives
+# in ./.runtime (gitignored). The OTGW itself is a real device on the LAN.
+#
+#   http://localhost:18123        Home Assistant over plain HTTP
+#   https://localhost:18443       Home Assistant over HTTPS (Caddy TLS front)
+#   https://localhost:19443/otgw/ OTGW behind nginx on a sub-path (generic proxy)
+#   http://localhost:19080/otgw/  same, plain HTTP
+#   MQTT: HA uses the broker given to setup_rig.py --broker (default: one on this
+#   host at port 1883, reached as host.docker.internal). The OTGW must reach the
+#   same broker over the LAN, so the host firewall must allow inbound 1883.
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:2026.10.4
+    container_name: otgw-rig-ha
+    ports:
+      - "18123:8123"
+    volumes:
+      - ./.runtime/ha:/config
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - echo
+
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: otgw-rig-caddy
+    ports:
+      - "18443:18443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./.runtime/certs:/certs:ro
+    depends_on:
+      - homeassistant
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: otgw-rig-nginx
+    ports:
+      - "19080:19080"
+      - "19443:19443"
+    volumes:
+      - ./.runtime/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./.runtime/certs:/certs:ro
+
+  echo:
+    image: python:3.12-alpine
+    container_name: otgw-rig-echo
+    command: ["python", "-u", "/echo.py"]
+    volumes:
+      - ./echo.py:/echo.py:ro

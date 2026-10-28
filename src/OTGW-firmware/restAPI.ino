@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.7.8-beta.6
+**  Version  : v1.7.8-beta.7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1675,7 +1675,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("s0counterinterval"), settings.s0.iInterval, "i", 5, 65535);
   sendJsonSettingObj(F("gpiooutputsenabled"), settings.outputs.bEnabled, "b");
   sendJsonSettingObj(F("gpiooutputspin"), settings.outputs.iPin, "i", 0, 16);
-  sendJsonSettingObj(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 16);
+  sendJsonSettingObj(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 15);   // settingStuff clamps to 0..15 (TASK-1305)
   sendJsonSettingObj(F("otgwcommandenable"), settings.otgw.bEnable, "b");
   sendJsonSettingObj(F("otgwcommands"), CSTR(settings.otgw.sCommands), "s", 128);
   sendJsonSettingObj(F("pictempsensor"), settings.otgw.bPicTempSensor, "b");

@@ -1,0 +1,28 @@
+{
+  "file": "gateway.hex",
+  "pic_before": {
+    "picfwtype": "gateway",
+    "picfwversion": "6.8",
+    "picdeviceid": "pic16f1847"
+  },
+  "seconds": 33.9,
+  "progress_text": "Flashing gateway.hex started...",
+  "upgrade_sent": [
+    "https://localhost:18443/api/ingress/otgw/pic?action=upgrade&name=gateway.hex"
+  ],
+  "upgrade_refused": [],
+  "final_status": {
+    "pic_progress": 100,
+    "pic_error": "PIC upgrade was successful",
+    "pic_filename": "gateway.hex"
+  },
+  "ui_flash_status_polls": 1,
+  "ui_flash_status_codes": [
+    200
+  ],
+  "pic_after": {
+    "picfwtype": "gateway",
+    "picfwversion": "6.8",
+    "picdeviceid": "pic16f1847"
+  }
+}

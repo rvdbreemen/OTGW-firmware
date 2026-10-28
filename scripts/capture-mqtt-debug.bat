@@ -97,6 +97,11 @@ $telnetPort = 23
 $telnetConnectTimeoutSeconds = $TelnetConnectTimeoutSeconds
 $telnetPostDisconnectDelayMilliseconds = $TelnetPostDisconnectDelayMilliseconds
 $telnetReconnectDelayMilliseconds = $TelnetReconnectDelayMilliseconds
+$script:TelnetGap = $null
+$script:TelnetGapCount = 0
+$script:TelnetGapTotalSeconds = 0
+$script:TelnetKeepAliveStatus = $null
+$script:TelnetKeepAliveReported = $false
 
 # Telnet debug toggles are parsed dynamically from the banner "Debug toggles"
 # block, so the same code works across firmware families. 1.x and 2.0.0/OTGW32
@@ -212,6 +217,11 @@ function Show-Help {
     Write-Host "                                0 = off). The firmware prints heap stats every minute, so a longer"
     Write-Host "                                silence is not normal. While the device does not answer either, the"
     Write-Host "                                script waits and reconnects once it does."
+    Write-Host "  A TCP keepalive (idle 10s, interval 5s; Windows fixes the probe count at 10) is also set on the"
+    Write-Host "  telnet socket, so a device that rebooted without closing the connection is noticed by the OS"
+    Write-Host "  and reconnected before the idle watchdog fires."
+    Write-Host "  summary.txt lists every telnet gap (start, end, length, failed connect attempts, reason) and"
+    Write-Host "  telnet.log gets a '### capture: telnet reconnected' marker line at each reconnect."
     Write-Host ""
     Write-Host "Stopping capture:"
     Write-Host "  Press Q in the console to stop cleanly. The script closes the logs and leaves"
@@ -1095,6 +1105,36 @@ function Remove-IntermediateCaptureFiles {
     return $removed
 }
 
+function Set-TelnetKeepAlive {
+    param([Parameter(Mandatory = $true)][System.Net.Sockets.TcpClient]$Client)
+
+    # Probe an idle connection (idle 10 s, interval 5 s) so a device that rebooted
+    # without sending a FIN is noticed: the OS faults the socket and
+    # Test-TelnetDisconnected sees it. Windows fixes the probe count itself.
+    $applied = New-Object System.Collections.Generic.List[string]
+    try {
+        $Client.Client.SetSocketOption([System.Net.Sockets.SocketOptionLevel]::Socket, [System.Net.Sockets.SocketOptionName]::KeepAlive, $true)
+        $applied.Add("SO_KEEPALIVE") | Out-Null
+    }
+    catch {
+        return "not applied: $($_.Exception.Message)"
+    }
+
+    try {
+        $values = New-Object byte[] 12
+        [BitConverter]::GetBytes([uint32]1).CopyTo($values, 0)
+        [BitConverter]::GetBytes([uint32]10000).CopyTo($values, 4)
+        [BitConverter]::GetBytes([uint32]5000).CopyTo($values, 8)
+        [void]$Client.Client.IOControl([System.Net.Sockets.IOControlCode]::KeepAliveValues, $values, $null)
+        $applied.Add("SIO_KEEPALIVE_VALS idle 10000ms interval 5000ms") | Out-Null
+    }
+    catch {
+        $applied.Add("SIO_KEEPALIVE_VALS failed: $($_.Exception.Message)") | Out-Null
+    }
+
+    return ($applied -join ", ")
+}
+
 function New-TelnetClient {
     param(
         [Parameter(Mandatory = $true)][string]$HostName,
@@ -1112,6 +1152,7 @@ function New-TelnetClient {
         }
 
         $client.EndConnect($asyncResult)
+        $script:TelnetKeepAliveStatus = Set-TelnetKeepAlive -Client $client
         return $client
     }
     catch {
@@ -1151,6 +1192,12 @@ function Test-TelnetDisconnected {
 
         $socket = $Client.Client
         if (-not $socket) {
+            return $true
+        }
+
+        # A pending socket error shows up here; a reset or keepalive timeout on a
+        # connected socket also makes the socket readable with Available 0 (below).
+        if ($socket.Poll(0, [System.Net.Sockets.SelectMode]::SelectError)) {
             return $true
         }
 
@@ -1379,6 +1426,45 @@ function Restore-TelnetDebugToggles {
     return "Debug toggles restored to their state at capture start: $($restored -join ', ')"
 }
 
+function Open-TelnetGap {
+    param(
+        [Parameter(Mandatory = $true)][string]$Reason,
+        [Parameter(Mandatory = $true)][DateTime]$StartUtc
+    )
+
+    # A gap starts at the last telnet byte and ends when the next connect succeeds.
+    if (-not $script:TelnetGap) {
+        $script:TelnetGap = [PSCustomObject]@{
+            StartUtc = $StartUtc
+            EndUtc   = [DateTime]::MinValue
+            Seconds  = 0
+            Reason   = $Reason
+            Failed   = 0
+        }
+    }
+}
+
+function Close-TelnetGap {
+    if ($script:TelnetGap) {
+        $gap = $script:TelnetGap
+        Add-SummaryLine "Telnet gap: $($gap.StartUtc.ToLocalTime().ToString('yyyy-MM-ddTHH:mm:sszzz')) -> $($gap.EndUtc.ToLocalTime().ToString('yyyy-MM-ddTHH:mm:sszzz')) ($($gap.Seconds) s, $($gap.Failed) failed connect attempts, $($gap.Reason))"
+        $script:TelnetGapCount++
+        $script:TelnetGapTotalSeconds += $gap.Seconds
+        $script:TelnetGap = $null
+    }
+}
+
+function Add-TelnetGapTotals {
+    if ($script:TelnetGap) {
+        $script:TelnetGapCount++
+        $script:TelnetGapTotalSeconds += [int][Math]::Round(([DateTime]::UtcNow - $script:TelnetGap.StartUtc).TotalSeconds)
+    }
+    Add-SummaryLine "Telnet gaps: $($script:TelnetGapCount), total $($script:TelnetGapTotalSeconds) s"
+    if ($script:TelnetGap) {
+        Add-SummaryLine "Telnet gap still open at stop: since $($script:TelnetGap.StartUtc.ToLocalTime().ToString('yyyy-MM-ddTHH:mm:sszzz')) ($($script:TelnetGap.Reason))"
+    }
+}
+
 function Get-DeviceHttpStatus {
     param([string]$Url, [int]$TimeoutMilliseconds = 5000)
 
@@ -1469,6 +1555,17 @@ function Connect-TelnetCapture {
     try {
         $stream = $client.GetStream()
         Add-SummaryLine "Telnet connected: $((Get-Date).ToString('o'))"
+        if (-not $script:TelnetKeepAliveReported) {
+            $script:TelnetKeepAliveReported = $true
+            Add-SummaryLine "Telnet keepalive: idle 10s interval 5s count fixed by Windows (10) (applied: $($script:TelnetKeepAliveStatus))"
+        }
+        if ($script:TelnetGap) {
+            $script:TelnetGap.EndUtc = [DateTime]::UtcNow
+            $gapSeconds = [int][Math]::Round(($script:TelnetGap.EndUtc - $script:TelnetGap.StartUtc).TotalSeconds)
+            $script:TelnetGap.Seconds = $gapSeconds
+            $Writer.Write("`n### capture: telnet reconnected after $gapSeconds s gap ($($script:TelnetGap.Reason))`n")
+            $Writer.Flush()
+        }
 
         $banner = Read-InitialTelnetBanner -Stream $stream -Writer $Writer
         # The first banner that lists toggles holds the states to restore at the end.
@@ -2387,6 +2484,7 @@ try {
         if (Test-TelnetDisconnected -Client $telnetClient) {
             if ($telnetClient) {
                 $telnetReconnectReason = "connection closed"
+                Open-TelnetGap -Reason $telnetReconnectReason -StartUtc $telnetLastByteUtc
                 $telnetReconnectAttempts = 0
                 $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetPostDisconnectDelayMilliseconds)
                 Write-CaptureStatus "Telnet disconnected; waiting $($telnetPostDisconnectDelayMilliseconds / 1000)s before reconnect attempts."
@@ -2428,6 +2526,7 @@ try {
                     Write-CaptureStatus "Telnet connected: $((Get-Date).ToString('o'))"
                 }
 
+                Close-TelnetGap
                 $telnetHasConnected = $true
                 $telnetReconnectAttempts = 0
                 $telnetReconnectReason = $null
@@ -2438,6 +2537,7 @@ try {
             }
             catch {
                 $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetReconnectDelayMilliseconds)
+                if ($script:TelnetGap) { $script:TelnetGap.Failed++ }
                 Write-CaptureStatus "Telnet connect attempt #$telnetReconnectAttempts failed (timeout ${effectiveConnectTimeoutSeconds}s): $($_.Exception.Message) Retrying in $($telnetReconnectDelayMilliseconds / 1000)s."
                 continue
             }
@@ -2454,6 +2554,7 @@ try {
 
                 if (Test-TelnetRebootMarker -Text $telnetRebootScanBuffer) {
                     $telnetReconnectReason = "ESP.restart() marker captured"
+                    Open-TelnetGap -Reason $telnetReconnectReason -StartUtc $telnetLastByteUtc
                     $telnetReconnectAttempts = 0
                     $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetPostDisconnectDelayMilliseconds)
                     Write-CaptureStatus "Telnet captured ESP.restart(); waiting $($telnetPostDisconnectDelayMilliseconds / 1000)s before reconnect attempts."
@@ -2467,6 +2568,7 @@ try {
         }
         catch {
             $telnetReconnectReason = "read failed"
+            Open-TelnetGap -Reason $telnetReconnectReason -StartUtc $telnetLastByteUtc
             $telnetReconnectAttempts = 0
             $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetPostDisconnectDelayMilliseconds)
             Write-CaptureStatus "Telnet read failed: $($_.Exception.Message); waiting $($telnetPostDisconnectDelayMilliseconds / 1000)s before reconnect attempts."
@@ -2493,6 +2595,7 @@ try {
                 $telnetClient = $null
                 $stream = $null
                 $telnetReconnectReason = "telnet silent for ${idleSeconds}s while the device answers HTTP"
+                Open-TelnetGap -Reason $telnetReconnectReason -StartUtc $telnetLastByteUtc
                 $telnetReconnectAttempts = 0
                 $telnetUnreachableSince = $null
                 $nextTelnetConnectUtc = [DateTime]::MinValue
@@ -2534,6 +2637,7 @@ finally {
     if ($TelnetIdleSeconds -gt 0) {
         Add-SummaryLine "Telnet idle reconnects: $telnetIdleReconnects (watchdog ${TelnetIdleSeconds}s)"
     }
+    Add-TelnetGapTotals
 
     # Restore toggles BEFORE the writer and client go away. Best-effort: a crashed
     # or rebooted device leaves a dead stream, and that must not derail shutdown.

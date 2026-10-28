@@ -106,3 +106,25 @@ scripts\capture-mqtt-debug.bat -DeviceHost 192.168.1.50 -BrokerHost 192.168.1.10
 - `-SkipToolInstall` - Do not install Mosquitto if `mosquitto_sub` is missing
 
 Each run leaves one upload artifact: `transcript.txt`. The script uses temporary `summary.txt`, `telnet.log`, `mqtt.log`, and `mqtt.stderr.log` files while capturing, merges them into `transcript.txt`, then removes the separate files after a successful merge. Press `Q` in the capture console to stop cleanly without the Windows batch `Ctrl+C` prompt; `Ctrl+C` and `Ctrl+Break` remain fallback interrupts. The script enables OTGW MQTT debug with telnet key `3` only when the banner reports `3 MQTT [0]`.
+
+## ha-ingress-rig/
+
+Bench rig that runs the classic web UI of a real gateway behind Home Assistant
+ingress (hass_ingress) and behind nginx, over HTTP and HTTPS, and checks it in
+headless Chromium (TASK-1378). Needs Docker and Playwright for Python.
+
+```bash
+python scripts/ha-ingress-rig/setup_rig.py --device <gateway-ip> --broker <broker-ip>:1883
+python scripts/ha-ingress-rig/validate_ingress.py --label check [--password <gateway admin pw>]
+python scripts/ha-ingress-rig/ota_via_ingress.py --firmware build/<name>.ino.bin
+python scripts/ha-ingress-rig/ota_via_ingress.py --filesystem build/<name>.littlefs.bin
+python scripts/ha-ingress-rig/pic_flash_dryrun.py --label check   # never writes the PIC
+python scripts/ha-ingress-rig/pic_flash_ui_sim.py --label check   # replays a flash against the page, no PIC write
+python scripts/ha-ingress-rig/pic_flash_via_proxy.py --file gateway.hex --label x   # REAL PIC write, maintainer's order only
+python scripts/ha-ingress-rig/ha_device_page.py --label check
+python scripts/ha-ingress-rig/setup_rig.py --down
+```
+
+Runtime state (HA config, certificates, rig account) stays in
+`scripts/ha-ingress-rig/.runtime/`, results in `out/`; both are gitignored. See
+[docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md](../docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md).

@@ -1,0 +1,17 @@
+{
+  "label": "sim-device",
+  "index_js": "from gateway",
+  "upgrade_requests": [
+    "https://localhost:18443/api/ingress/otgw/pic?action=upgrade&name=gateway.hex"
+  ],
+  "polls_answered_after_start": 3,
+  "progress_texts_seen": [
+    "Connecting to event stream...",
+    "Flashing gateway.hex started...",
+    "Flashing gateway.hex : 40%",
+    "Successfully flashed to Gateway 6.8",
+    "Ready to flash"
+  ],
+  "progress_text": "Ready to flash",
+  "page_disabled": false
+}

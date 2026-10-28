@@ -539,7 +539,7 @@ The firmware also exposes a Wi-Fi configuration portal (AP mode) when it cannot 
 
 ## Security note
 
-The Web UI and APIs are designed for use on a trusted local network. Do not expose the device directly to the internet; use a VPN for remote access. A reverse proxy can help with HTTP UI/API access, but WebSocket features assume plain HTTP/WS and may not work through an HTTPS proxy.
+The Web UI and APIs are designed for use on a trusted local network. Do not expose the device directly to the internet; use a VPN for remote access. To open the Web UI from Home Assistant ("Visit device" link or a sidebar panel) or through your own reverse proxy, see [docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md](docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md). Through a proxy everything works except the live OpenTherm log, which needs direct access.
 
 ### Protected endpoints (optional)
 

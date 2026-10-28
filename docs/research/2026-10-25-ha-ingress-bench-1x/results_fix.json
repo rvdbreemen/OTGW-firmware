@@ -1,0 +1,333 @@
+[
+  {
+    "scenario": "direct",
+    "url": "http://192.168.88.68/",
+    "loaded": true,
+    "version": "1.7.8-beta.6+54cbe02",
+    "livelog": {
+      "status": "Connected",
+      "notice": "",
+      "notice_visible": false
+    },
+    "write": {
+      "status": 200,
+      "api": "http://192.168.88.68/api/"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "http://192.168.88.68/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": [],
+    "device_heap_after": {
+      "freeheap": 15680,
+      "maxfreeblock": 15776
+    }
+  },
+  {
+    "scenario": "ha_http_otgw",
+    "url": "http://localhost:18123/otgw",
+    "loaded": true,
+    "version": "1.7.8-beta.6+54cbe02",
+    "livelog": {
+      "status": "Disconnected",
+      "notice": "Opened through a reverse proxy or HTTPS: the live OpenTherm log needs direct access to the gateway (http://<gateway address>/). Commands still work.",
+      "notice_visible": true
+    },
+    "write": {
+      "status": 200,
+      "api": "http://localhost:18123/api/ingress/otgw/api/"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "http://localhost:18123/api/ingress/otgw/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": [],
+    "device_heap_after": {
+      "freeheap": 16040,
+      "maxfreeblock": 15000
+    }
+  },
+  {
+    "scenario": "ha_https_otgw",
+    "url": "https://localhost:18443/otgw",
+    "loaded": true,
+    "version": "1.7.8-beta.6+54cbe02",
+    "livelog": {
+      "status": "Disconnected",
+      "notice": "Opened through a reverse proxy or HTTPS: the live OpenTherm log needs direct access to the gateway (http://<gateway address>/). Commands still work.",
+      "notice_visible": true
+    },
+    "write": {
+      "status": 200,
+      "api": "https://localhost:18443/api/ingress/otgw/api/"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:18443/api/ingress/otgw/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ],
+    "device_heap_after": {
+      "freeheap": 16720,
+      "maxfreeblock": 16048
+    }
+  },
+  {
+    "scenario": "ha_https_otgw_hostdev",
+    "url": "https://localhost:18443/otgw_hostdev",
+    "loaded": true,
+    "version": "1.7.8-beta.6+54cbe02",
+    "livelog": {
+      "status": "Disconnected",
+      "notice": "Opened through a reverse proxy or HTTPS: the live OpenTherm log needs direct access to the gateway (http://<gateway address>/). Commands still work.",
+      "notice_visible": true
+    },
+    "write": {
+      "status": 200,
+      "api": "https://localhost:18443/api/ingress/otgw_hostdev/api/"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:18443/api/ingress/otgw_hostdev/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ],
+    "device_heap_after": {
+      "freeheap": 16232,
+      "maxfreeblock": 15400
+    }
+  },
+  {
+    "scenario": "ha_https_otgw_rw",
+    "url": "https://localhost:18443/otgw_rw",
+    "loaded": false,
+    "load_error": "Frame.wait_for_function: Timeout 30000ms exceeded.",
+    "livelog": {
+      "status": "Disconnected",
+      "notice": "Opened through a reverse proxy or HTTPS: the live OpenTherm log needs direct access to the gateway (http://<gateway address>/). Commands still work.",
+      "notice_visible": true
+    },
+    "write": {
+      "status": 404,
+      "step": "read",
+      "api": "https://localhost:18443/api/ingress/otgw_rw/api/ingress/otgw_rw/api/"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:18443/api/ingress/otgw_rw/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [
+      "404 https://localhost:18443/api/ingress/otgw_rw/api/ingress/otgw_rw/api/v2/device/info",
+      "404 https://localhost:18443/api/ingress/otgw_rw/api/ingress/otgw_rw/api/v2/device/time",
+      "404 https://localhost:18443/api/ingress/otgw_rw/api/ingress/otgw_rw/api/v2/filesystem/hash-check",
+      "404 https://localhost:18443/api/ingress/otgw_rw/api/ingress/otgw_rw/api/v2/otgw/otmonitor",
+      "404 https://localhost:18443/api/ingress/otgw_rw/api/ingress/otgw_rw/api/v2/sensors/labels",
+      "404 https://localhost:18443/api/ingress/otgw_rw/api/ingress/otgw_rw/api/v2/settings"
+    ],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script.",
+      "Error loading persistent settings: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_rw/index.js?v=54cbe02:7021:15",
+      "Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_rw/index.js?v=54cbe02:5818:15",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_rw/index.js?v=54cbe02:4321:19",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_rw/index.js?v=54cbe02:4321:19",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_rw/index.js?v=54cbe02:4321:19",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_rw/index.js?v=54cbe02:4321:19",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_rw/index.js?v=54cbe02:4321:19"
+    ],
+    "device_heap_after": {
+      "freeheap": 16632,
+      "maxfreeblock": 15400
+    }
+  },
+  {
+    "scenario": "nginx_https_keephost",
+    "url": "https://localhost:19443/otgw-keephost/",
+    "loaded": true,
+    "version": "1.7.8-beta.6+54cbe02",
+    "livelog": {
+      "status": "Disconnected",
+      "notice": "Opened through a reverse proxy or HTTPS: the live OpenTherm log needs direct access to the gateway (http://<gateway address>/). Commands still work.",
+      "notice_visible": true
+    },
+    "write": {
+      "status": 200,
+      "api": "https://localhost:19443/otgw-keephost/api/"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:19443/otgw-keephost/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": [],
+    "device_heap_after": {
+      "freeheap": 16016,
+      "maxfreeblock": 13712
+    }
+  },
+  {
+    "scenario": "nginx_https_default",
+    "url": "https://localhost:19443/otgw/",
+    "loaded": true,
+    "version": "1.7.8-beta.6+54cbe02",
+    "livelog": {
+      "status": "Disconnected",
+      "notice": "Opened through a reverse proxy or HTTPS: the live OpenTherm log needs direct access to the gateway (http://<gateway address>/). Commands still work.",
+      "notice_visible": true
+    },
+    "write": {
+      "status": 200,
+      "api": "https://localhost:19443/otgw/api/"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:19443/otgw/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": [],
+    "device_heap_after": {
+      "freeheap": 16088,
+      "maxfreeblock": 14184
+    }
+  },
+  {
+    "scenario": "nginx_http_keephost",
+    "url": "http://localhost:19080/otgw-keephost/",
+    "loaded": true,
+    "version": "1.7.8-beta.6+54cbe02",
+    "livelog": {
+      "status": "Disconnected",
+      "notice": "Opened through a reverse proxy or HTTPS: the live OpenTherm log needs direct access to the gateway (http://<gateway address>/). Commands still work.",
+      "notice_visible": true
+    },
+    "write": {
+      "status": 200,
+      "api": "http://localhost:19080/otgw-keephost/api/"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "http://localhost:19080/otgw-keephost/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": [],
+    "device_heap_after": {
+      "freeheap": 15976,
+      "maxfreeblock": 15728
+    }
+  },
+  {
+    "scenario": "ha_https_echo",
+    "url": "https://localhost:18443/echo",
+    "seen_by_backend": {
+      "method": "POST",
+      "path": "/probe",
+      "headers": {
+        "Host": "localhost:18443",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Content-Type": "application/json",
+        "Origin": "https://localhost:18443",
+        "Priority": "u=1, i",
+        "Referer": "https://localhost:18443/api/ingress/echo/",
+        "Sec-CH-UA": "\"Not=A?Brand\";v=\"99\", \"HeadlessChrome\";v=\"151\", \"Chromium\";v=\"151\"",
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": "\"Windows\"",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "X-Forwarded-For": "172.19.0.1, 172.19.0.6",
+        "X-Forwarded-Host": "localhost:18443",
+        "X-Forwarded-Proto": "https",
+        "X-Ingress-Path": "/api/ingress/echo",
+        "X-Ingress-Subpath": "",
+        "Content-Length": "2"
+      }
+    },
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ],
+    "device_heap_after": {
+      "freeheap": 15976,
+      "maxfreeblock": 15728
+    }
+  },
+  {
+    "scenario": "ha_https_echo_hostdev",
+    "url": "https://localhost:18443/echo_hostdev",
+    "seen_by_backend": {
+      "method": "POST",
+      "path": "/probe",
+      "headers": {
+        "Host": "192.168.88.68",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Content-Type": "application/json",
+        "Origin": "https://localhost:18443",
+        "Priority": "u=1, i",
+        "Referer": "https://localhost:18443/api/ingress/echo_hostdev/",
+        "Sec-CH-UA": "\"Not=A?Brand\";v=\"99\", \"HeadlessChrome\";v=\"151\", \"Chromium\";v=\"151\"",
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": "\"Windows\"",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "X-Forwarded-For": "172.19.0.1, 172.19.0.6",
+        "X-Forwarded-Host": "localhost:18443",
+        "X-Forwarded-Proto": "https",
+        "X-Ingress-Path": "/api/ingress/echo_hostdev",
+        "X-Ingress-Subpath": "",
+        "Content-Length": "2"
+      }
+    },
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ],
+    "device_heap_after": {
+      "freeheap": 15512,
+      "maxfreeblock": 14776
+    }
+  }
+]

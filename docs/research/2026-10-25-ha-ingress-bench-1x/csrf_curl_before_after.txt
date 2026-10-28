@@ -1,0 +1,47 @@
+== BEFORE: 1.7.8-beta.5+0de3b19 (release asset, SHA256 OK), admin password set
+set pw 200
+settings POST Origin=[none] with auth: 200
+settings POST Origin=[http://192.168.88.68] with auth: 200
+settings POST Origin=[http://evil.example] with auth: 403
+settings POST no auth: 401
+upload Origin=evil with auth: 403
+upload same Origin with auth: 303
+files: "okprobe.txt" 
+clear pw 200
+-- BEFORE, no password: upload response (3 tries)
+upload no pw: 303
+upload no pw: 303
+upload no pw: 303
+  hdr: HTTP/1.1 303 OK
+  hdr: Location:FSexplorer.html
+  hdr: Cache-Control: no-cache
+-- BEFORE, no password: upload through nginx sub-path (3 tries)
+upload via nginx: 502
+upload via nginx: 502
+upload via nginx: 502
+  nginx: 2026/10/25 11:18:40 [error] 23#23: *1307 upstream prematurely closed connection while reading response header from upstream, client: 172.19.0.1, server: , reque
+
+== AFTER: 1.7.8-beta.6+54cbe02 (this change), admin password set
+set pw 200
+settings POST Origin=[none] with auth: 200
+settings POST Origin=[http://192.168.88.68] with auth: 200
+settings POST Origin=[http://evil.example] with auth: 403
+settings POST no auth: 401
+upload Origin=evil with auth: 403
+upload same Origin with auth: 303
+files: "okprobe.txt" 
+clear pw 200
+-- AFTER, no password: upload response (3 tries)
+upload no pw: 303
+upload no pw: 303
+upload no pw: 303
+  hdr: HTTP/1.1 303 See Other
+  hdr: Location: FSexplorer.html
+  hdr: Cache-Control: no-cache
+  hdr: Content-Length: 0
+  hdr: Connection: close
+  hdr: 
+-- AFTER, no password: upload through nginx sub-path (3 tries)
+upload via nginx: 303
+upload via nginx: 303
+upload via nginx: 303

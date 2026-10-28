@@ -1,0 +1,5 @@
+old (retained, firmware 12975b4) topics 265; fix (after POST /api/v2/otgw/discovery, 54cbe02) topics 311; common 265
+only in fix: 46 (table rows republished by the full discovery run, not in the old retained snapshot)
+common topics differing beyond dev.sw_version / dev.cu / origin.sw: 0
+fix payloads that are not valid JSON: 0; longest fix payload 1019 bytes
+fix configs carrying dev.cu: 23; all equal to http://192.168.88.68/: True

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v1.7.8-beta.6
+**  Version  : v1.7.8-beta.7
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -48,15 +48,17 @@ const char Helper[] PROGMEM =
   "  <li>FSexplorer.html</li>\n"
   "  <li>FSexplorer.css</li>\n"
   "</ul>\n"
-  "<form method=\"POST\" action=\"/upload\" enctype=\"multipart/form-data\">\n"
+  "<form method=\"POST\" action=\"upload\" enctype=\"multipart/form-data\">\n"
   "  <input type=\"file\" name=\"upload\">\n"
   "  <input type=\"submit\" value=\"Upload\">\n"
   "</form>\n"
   "<br/><b>or</b> you can use the <i>Flash Utility</i> to flash firmware or LittleFS!\n"
-  "<form action='/update' method='GET'>\n"
+  "<form action='update' method='GET'>\n"
   "  <input type='submit' name='SUBMIT' value='Flash Utility'/>\n"
   "</form>\n";
-const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
+// Complete header block (blank line, Content-Length, Connection: close): browsers accept a
+// response that ends without them, but a reverse proxy rejects it with 502 (TASK-1378).
+const char Header[] PROGMEM = "HTTP/1.1 303 See Other\r\nLocation: FSexplorer.html\r\nCache-Control: no-cache\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
 // Sent instead of the 303 when the upload never opened or a write came up short, so the
 // client's existing non-200 branch ("Upload failed!") fires instead of reporting success.
 // Raw status line like Header above, not httpServer.send(): the response is written from
@@ -701,7 +703,7 @@ void reBootESP()
 {
   if (!checkHttpAuth()) return;
   DebugTln(F("Redirect and ReBoot .."));
-  doRedirect("Reboot OTGW firmware ..", 120, "/", "Web UI: reboot request");
+  doRedirect("Reboot OTGW firmware ..", 120, "./", "Web UI: reboot request");
 } // reBootESP()
 
 void resetWirelessButton()
@@ -709,7 +711,7 @@ void resetWirelessButton()
   if (!checkHttpAuth()) return;
   DebugTln(F("Reset Wireless settings.."));
   resetWiFiSettings();
-  doRedirect("Reboot OTGW firmware with reset wireless settings..", 120, "/", "Web UI: WiFi settings reset");
+  doRedirect("Reboot OTGW firmware with reset wireless settings..", 120, "./", "Web UI: WiFi settings reset");
 }
 //=====================================================================================
 // rebootReason: restart afterwards with this reason (shown in reboot_log.txt), or nullptr.

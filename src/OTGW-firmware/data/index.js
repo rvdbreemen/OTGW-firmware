@@ -1,17 +1,22 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.7.8-beta.6
+**  Version  : v1.7.8-beta.7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
 **  TERMS OF USE: MIT License. See bottom of file.                                                            
 ***************************************************************************      
 */
-const localURL = window.location.protocol + '//' + window.location.host;
-const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
+// Directory the UI was served from: '/' on direct access, the proxy prefix
+// (e.g. '/api/ingress/otgw/' behind Home Assistant ingress) behind a reverse
+// proxy. Every device URL is built on it, so the UI works on any base path.
+const basePath = window.location.pathname.replace(/[^/]*$/, '');
+const localURL = window.location.protocol + '//' + window.location.host + basePath.replace(/\/$/, '');
+const APIGW = localURL + '/api/';
 const MOBILE_BREAKPOINT_PX = 768;
 const PS_MODE_NOTICE_TEXT = 'PS=1 mode active: showing decoded field summaries. Raw OT frames not available.';
+const PROXY_NOTICE_TEXT = 'Opened through a reverse proxy or HTTPS: the live OpenTherm log needs direct access to the gateway (http://<gateway address>/). Commands still work.';
 const WEBKIT_SCROLLBAR_STYLE_ID = 'otgw-webkit-scrollbar-style';
 
 "use strict";
@@ -157,7 +162,8 @@ function isMainPageActive() {
 }
 
 function getPICSettingsStorageKey() {
-  return 'otgwPicSettings:' + window.location.hostname;
+  // Proxied UIs share one browser origin; the base path keeps two gateways apart.
+  return 'otgwPicSettings:' + window.location.hostname + (basePath === '/' ? '' : basePath);
 }
 
 function getPICSettingsCache() {
@@ -949,6 +955,9 @@ let currentMaxFreeBlock = null; // Max free block bytes from /v2/device/time
 let sensorSimulationActive = false; // Mirror of otmonitor.sensorsimulation for footer notice
 let otgwSimulationActive = false; // Mirror of device.otgwsimulation for status badge
 let flashPollTimer = null; // Timer for polling flash status as failsafe (both ESP and PIC)
+let flashSeenActive = false; // the poll has seen this PIC flash running
+let flashStartedAt = 0;      // when performFlash() started, for the start timeout
+const FLASH_START_TIMEOUT_MS = 60000;
 let otLogResponsiveInitialized = false;
 let otLogResizeTimer = null;
 
@@ -1478,9 +1487,10 @@ function resetWSWatchdog() {
 
 //============================================================================
 function getOTLogDisplayState() {
-  // Detect if accessed via HTTPS reverse proxy
-  // WebSocket (ws://) won't work when page is served over HTTPS due to mixed content blocking
-  const isProxied = window.location.protocol === 'https:';
+  // Detect access through a reverse proxy (e.g. Home Assistant ingress): the
+  // page is served over HTTPS (an https page blocks ws://) or from a path
+  // prefix. Either way the live log WebSocket on port 81 is out of reach.
+  const isProxied = window.location.protocol === 'https:' || basePath !== '/';
 
   // Detect smartphone (iPhone or Android Phone)
   const isPhone = /iPhone|iPod/.test(navigator.userAgent) ||
@@ -1510,6 +1520,12 @@ function updateOTLogModeNotice(displayState) {
 
   if (displayState && displayState.isPSmode) {
     noticeEl.textContent = PS_MODE_NOTICE_TEXT;
+    noticeEl.classList.remove('hidden');
+    return;
+  }
+
+  if (displayState && displayState.isProxied) {
+    noticeEl.textContent = PROXY_NOTICE_TEXT;
     noticeEl.classList.remove('hidden');
     return;
   }
@@ -3002,7 +3018,7 @@ function initMainPage() {
     function (el, idx, arr) {
       el.addEventListener('click', function () {
         console.log("newTab: goFSexplorer");
-        location.href = "/FSexplorer";
+        location.href = localURL + "/FSexplorer";
       })
     }
   );
@@ -3167,7 +3183,7 @@ function checkFSMismatch() {
         );
         banner.appendChild(msg);
         var link = document.createElement('a');
-        link.href = '/update';
+        link.href = localURL + '/update';
         link.textContent = 'Flash the matching LittleFS to fix this.';
         banner.appendChild(link);
         banner.classList.remove('hidden');
@@ -5901,9 +5917,23 @@ function pollFlashStatus() {
             const status = json.flashstatus;
             console.log("Flash status poll:", status);
             
-            // If not flashing at all, stop polling
+            if (status.pic_flashing) flashSeenActive = true;
+
+            // Not flashing. The PIC flash is queued and starts in the gateway's
+            // loop, so the first polls can come before it runs: keep polling
+            // until it has been seen running, then read its result. Without
+            // the WebSocket (reverse proxy, HTTPS, Safari) this poll is the only
+            // way the page learns that the flash ended.
             if (!status.flashing) {
-                stopFlashPolling();
+                if (flashSeenActive) {
+                    if (status.pic_progress === 100) {
+                        handleFlashCompletion(status.pic_filename, status.pic_error);
+                    } else {
+                        handleFlashError(status.pic_filename, status.pic_error);
+                    }
+                } else if (Date.now() - flashStartedAt > FLASH_START_TIMEOUT_MS) {
+                    handleFlashError(currentFlashFilename, "flash did not start");
+                }
                 return;
             }
             
@@ -6024,6 +6054,8 @@ function handleFlashError(filename, error) {
 
 function performFlash(filename) {
     currentFlashFilename = filename;
+    flashSeenActive = false;
+    flashStartedAt = Date.now();
     isFlashing = true;
     toggleInteraction(false);
     // Stop polling during upgrade to prevent interference and reduce load
@@ -7000,7 +7032,7 @@ function setupPersistentUIListeners() {
 
 function loadPersistentUI() {
   console.log("Loading persistent UI settings...");
-  const apiPath = (typeof APIGW !== 'undefined') ? APIGW : (window.location.protocol + '//' + window.location.host + '/api/');
+  const apiPath = APIGW;
   
   fetch(apiPath + "v2/settings")
     .then(response => {

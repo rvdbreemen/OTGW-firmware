@@ -1,0 +1,441 @@
+[
+  {
+    "scenario": "direct",
+    "url": "http://192.168.88.68/",
+    "loaded": true,
+    "version": "1.7.8-beta.6+12975b4",
+    "livelog": {
+      "status": "Connected",
+      "notice": "",
+      "notice_visible": false
+    },
+    "write": {
+      "status": 200,
+      "api": "http://192.168.88.68/api/"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "http://192.168.88.68/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": []
+  },
+  {
+    "scenario": "ha_http_otgw",
+    "url": "http://localhost:18123/otgw",
+    "error": "Frame.wait_for_timeout: Frame was detached",
+    "escaped": [
+      "http://localhost:18123/api/v2/device/info",
+      "http://localhost:18123/api/v2/device/time",
+      "http://localhost:18123/api/v2/filesystem/hash-check",
+      "http://localhost:18123/api/v2/otgw/otmonitor",
+      "http://localhost:18123/api/v2/sensors/labels",
+      "http://localhost:18123/api/v2/settings",
+      "http://localhost:18123/files/ingress/entrypoint.js?v=1.4.0"
+    ],
+    "api_bad": [
+      "404 http://localhost:18123/api/v2/device/info",
+      "404 http://localhost:18123/api/v2/device/time",
+      "404 http://localhost:18123/api/v2/filesystem/hash-check",
+      "404 http://localhost:18123/api/v2/otgw/otmonitor",
+      "404 http://localhost:18123/api/v2/sensors/labels",
+      "404 http://localhost:18123/api/v2/settings"
+    ],
+    "console_errors": [
+      "Error loading persistent settings: Error: HTTP 404: Not Found\n    at http://localhost:18123/api/ingress/otgw/index.js?v=b80f098:7008:15",
+      "Error: HTTP 404: Not Found\n    at http://localhost:18123/api/ingress/otgw/index.js?v=b80f098:5805:15",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at http://localhost:18123/api/ingress/otgw/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at http://localhost:18123/api/ingress/otgw/index.js?v=b80f098:4308:19",
+      "WebSocket connection to 'ws://localhost:81/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at http://localhost:18123/api/ingress/otgw/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at http://localhost:18123/api/ingress/otgw/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at http://localhost:18123/api/ingress/otgw/index.js?v=b80f098:4308:19"
+    ]
+  },
+  {
+    "scenario": "ha_https_otgw",
+    "url": "https://localhost:18443/otgw",
+    "loaded": false,
+    "load_error": "Frame.wait_for_function: Timeout 30000ms exceeded.",
+    "livelog": {
+      "status": "Disconnected",
+      "notice": "",
+      "notice_visible": false
+    },
+    "write": {
+      "status": 404,
+      "step": "read",
+      "api": "https://localhost:18443/api/"
+    },
+    "upload": {
+      "status": 502,
+      "type": "basic",
+      "delete_status": 200,
+      "url": "https://localhost:18443/api/ingress/otgw/upload"
+    },
+    "fsx_forms_escaped": [
+      "https://localhost:18443/upload?path=%2F",
+      "https://localhost:18443/update",
+      "https://localhost:18443/ReBoot",
+      "https://localhost:18443/ResetWireless",
+      "https://localhost:18443/"
+    ],
+    "escaped": [
+      "https://localhost:18443/api/v2/device/info",
+      "https://localhost:18443/api/v2/device/time",
+      "https://localhost:18443/api/v2/filesystem/hash-check",
+      "https://localhost:18443/api/v2/otgw/otmonitor",
+      "https://localhost:18443/api/v2/sensors/labels",
+      "https://localhost:18443/api/v2/settings",
+      "https://localhost:18443/files/ingress/entrypoint.js?v=1.4.0"
+    ],
+    "api_bad": [
+      "404 https://localhost:18443/api/v2/device/info",
+      "404 https://localhost:18443/api/v2/device/time",
+      "404 https://localhost:18443/api/v2/filesystem/hash-check",
+      "404 https://localhost:18443/api/v2/otgw/otmonitor",
+      "404 https://localhost:18443/api/v2/sensors/labels",
+      "404 https://localhost:18443/api/v2/settings"
+    ],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script.",
+      "Error loading persistent settings: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw/index.js?v=b80f098:7008:15",
+      "Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw/index.js?v=b80f098:5805:15",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw/index.js?v=b80f098:4308:19"
+    ]
+  },
+  {
+    "scenario": "ha_https_otgw_hostdev",
+    "url": "https://localhost:18443/otgw_hostdev",
+    "loaded": false,
+    "load_error": "Frame.wait_for_function: Timeout 30000ms exceeded.",
+    "livelog": {
+      "status": "Disconnected",
+      "notice": "",
+      "notice_visible": false
+    },
+    "write": {
+      "status": 404,
+      "step": "read",
+      "api": "https://localhost:18443/api/"
+    },
+    "upload": {
+      "status": 502,
+      "type": "basic",
+      "delete_status": 200,
+      "url": "https://localhost:18443/api/ingress/otgw_hostdev/upload"
+    },
+    "fsx_forms_escaped": [
+      "https://localhost:18443/upload?path=%2F",
+      "https://localhost:18443/update",
+      "https://localhost:18443/ReBoot",
+      "https://localhost:18443/ResetWireless",
+      "https://localhost:18443/"
+    ],
+    "escaped": [
+      "https://localhost:18443/api/v2/device/info",
+      "https://localhost:18443/api/v2/device/time",
+      "https://localhost:18443/api/v2/filesystem/hash-check",
+      "https://localhost:18443/api/v2/otgw/otmonitor",
+      "https://localhost:18443/api/v2/sensors/labels",
+      "https://localhost:18443/api/v2/settings",
+      "https://localhost:18443/files/ingress/entrypoint.js?v=1.4.0"
+    ],
+    "api_bad": [
+      "404 https://localhost:18443/api/v2/device/info",
+      "404 https://localhost:18443/api/v2/device/time",
+      "404 https://localhost:18443/api/v2/filesystem/hash-check",
+      "404 https://localhost:18443/api/v2/otgw/otmonitor",
+      "404 https://localhost:18443/api/v2/sensors/labels",
+      "404 https://localhost:18443/api/v2/settings"
+    ],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script.",
+      "Error loading persistent settings: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_hostdev/index.js?v=b80f098:7008:15",
+      "Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_hostdev/index.js?v=b80f098:5805:15",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_hostdev/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_hostdev/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_hostdev/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_hostdev/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: \n    at https://localhost:18443/api/ingress/otgw_hostdev/index.js?v=b80f098:4308:19"
+    ]
+  },
+  {
+    "scenario": "ha_https_otgw_rw",
+    "url": "https://localhost:18443/otgw_rw",
+    "loaded": true,
+    "version": "1.7.8-beta.6+12975b4",
+    "livelog": {
+      "status": "Disconnected",
+      "notice": "",
+      "notice_visible": false
+    },
+    "write": {
+      "status": 200,
+      "api": "https://localhost:18443/api/ingress/otgw_rw/api/"
+    },
+    "upload": {
+      "status": 502,
+      "type": "basic",
+      "delete_status": 200,
+      "url": "https://localhost:18443/api/ingress/otgw_rw/upload"
+    },
+    "fsx_forms_escaped": [
+      "https://localhost:18443/upload?path=%2F",
+      "https://localhost:18443/update",
+      "https://localhost:18443/ReBoot",
+      "https://localhost:18443/ResetWireless",
+      "https://localhost:18443/"
+    ],
+    "escaped": [
+      "https://localhost:18443/files/ingress/entrypoint.js?v=1.4.0"
+    ],
+    "api_bad": [],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ]
+  },
+  {
+    "scenario": "nginx_https_keephost",
+    "url": "https://localhost:19443/otgw-keephost/",
+    "loaded": false,
+    "load_error": "Frame.wait_for_function: Timeout 30000ms exceeded.",
+    "livelog": {
+      "status": "Disconnected",
+      "notice": "",
+      "notice_visible": false
+    },
+    "write": {
+      "status": 404,
+      "step": "read",
+      "api": "https://localhost:19443/api/"
+    },
+    "upload": {
+      "status": 502,
+      "type": "basic",
+      "delete_status": 200,
+      "url": "https://localhost:19443/otgw-keephost/upload"
+    },
+    "fsx_forms_escaped": [
+      "https://localhost:19443/upload?path=%2F",
+      "https://localhost:19443/update",
+      "https://localhost:19443/ReBoot",
+      "https://localhost:19443/ResetWireless",
+      "https://localhost:19443/"
+    ],
+    "escaped": [
+      "https://localhost:19443/api/v2/device/info",
+      "https://localhost:19443/api/v2/device/time",
+      "https://localhost:19443/api/v2/filesystem/hash-check",
+      "https://localhost:19443/api/v2/otgw/otmonitor",
+      "https://localhost:19443/api/v2/sensors/labels",
+      "https://localhost:19443/api/v2/settings"
+    ],
+    "api_bad": [
+      "404 https://localhost:19443/api/v2/device/info",
+      "404 https://localhost:19443/api/v2/device/time",
+      "404 https://localhost:19443/api/v2/filesystem/hash-check",
+      "404 https://localhost:19443/api/v2/otgw/otmonitor",
+      "404 https://localhost:19443/api/v2/sensors/labels",
+      "404 https://localhost:19443/api/v2/settings"
+    ],
+    "console_errors": [
+      "Error loading persistent settings: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw-keephost/index.js?v=b80f098:7008:15",
+      "Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw-keephost/index.js?v=b80f098:5805:15",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw-keephost/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw-keephost/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw-keephost/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw-keephost/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw-keephost/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw-keephost/index.js?v=b80f098:4308:19"
+    ]
+  },
+  {
+    "scenario": "nginx_https_default",
+    "url": "https://localhost:19443/otgw/",
+    "loaded": false,
+    "load_error": "Frame.wait_for_function: Timeout 30000ms exceeded.",
+    "livelog": {
+      "status": "Disconnected",
+      "notice": "",
+      "notice_visible": false
+    },
+    "write": {
+      "status": 404,
+      "step": "read",
+      "api": "https://localhost:19443/api/"
+    },
+    "upload": {
+      "status": 502,
+      "type": "basic",
+      "delete_status": 200,
+      "url": "https://localhost:19443/otgw/upload"
+    },
+    "fsx_forms_escaped": [
+      "https://localhost:19443/upload?path=%2F",
+      "https://localhost:19443/update",
+      "https://localhost:19443/ReBoot",
+      "https://localhost:19443/ResetWireless",
+      "https://localhost:19443/"
+    ],
+    "escaped": [
+      "https://localhost:19443/api/v2/device/info",
+      "https://localhost:19443/api/v2/device/time",
+      "https://localhost:19443/api/v2/filesystem/hash-check",
+      "https://localhost:19443/api/v2/otgw/otmonitor",
+      "https://localhost:19443/api/v2/sensors/labels",
+      "https://localhost:19443/api/v2/settings"
+    ],
+    "api_bad": [
+      "404 https://localhost:19443/api/v2/device/info",
+      "404 https://localhost:19443/api/v2/device/time",
+      "404 https://localhost:19443/api/v2/filesystem/hash-check",
+      "404 https://localhost:19443/api/v2/otgw/otmonitor",
+      "404 https://localhost:19443/api/v2/sensors/labels",
+      "404 https://localhost:19443/api/v2/settings"
+    ],
+    "console_errors": [
+      "Error loading persistent settings: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw/index.js?v=b80f098:7008:15",
+      "Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw/index.js?v=b80f098:5805:15",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at https://localhost:19443/otgw/index.js?v=b80f098:4308:19"
+    ]
+  },
+  {
+    "scenario": "nginx_http_keephost",
+    "url": "http://localhost:19080/otgw-keephost/",
+    "loaded": false,
+    "load_error": "Frame.wait_for_function: Timeout 30000ms exceeded.",
+    "livelog": {
+      "status": "Disconnected",
+      "notice": "",
+      "notice_visible": false
+    },
+    "write": {
+      "status": 404,
+      "step": "read",
+      "api": "http://localhost:19080/api/"
+    },
+    "upload": {
+      "status": 502,
+      "type": "basic",
+      "delete_status": 200,
+      "url": "http://localhost:19080/otgw-keephost/upload"
+    },
+    "fsx_forms_escaped": [
+      "http://localhost:19080/upload?path=%2F",
+      "http://localhost:19080/update",
+      "http://localhost:19080/ReBoot",
+      "http://localhost:19080/ResetWireless",
+      "http://localhost:19080/"
+    ],
+    "escaped": [
+      "http://localhost:19080/api/v2/device/info",
+      "http://localhost:19080/api/v2/device/time",
+      "http://localhost:19080/api/v2/filesystem/hash-check",
+      "http://localhost:19080/api/v2/otgw/otmonitor",
+      "http://localhost:19080/api/v2/sensors/labels",
+      "http://localhost:19080/api/v2/settings"
+    ],
+    "api_bad": [
+      "404 http://localhost:19080/api/v2/device/info",
+      "404 http://localhost:19080/api/v2/device/time",
+      "404 http://localhost:19080/api/v2/filesystem/hash-check",
+      "404 http://localhost:19080/api/v2/otgw/otmonitor",
+      "404 http://localhost:19080/api/v2/sensors/labels",
+      "404 http://localhost:19080/api/v2/settings"
+    ],
+    "console_errors": [
+      "Error loading persistent settings: Error: HTTP 404: Not Found\n    at http://localhost:19080/otgw-keephost/index.js?v=b80f098:7008:15",
+      "Error: HTTP 404: Not Found\n    at http://localhost:19080/otgw-keephost/index.js?v=b80f098:5805:15",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at http://localhost:19080/otgw-keephost/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at http://localhost:19080/otgw-keephost/index.js?v=b80f098:4308:19",
+      "WebSocket connection to 'ws://localhost:81/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at http://localhost:19080/otgw-keephost/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at http://localhost:19080/otgw-keephost/index.js?v=b80f098:4308:19",
+      "refreshOTmonitor error: Error: HTTP 404: Not Found\n    at http://localhost:19080/otgw-keephost/index.js?v=b80f098:4308:19"
+    ]
+  },
+  {
+    "scenario": "ha_https_echo",
+    "url": "https://localhost:18443/echo",
+    "seen_by_backend": {
+      "method": "POST",
+      "path": "/probe",
+      "headers": {
+        "Host": "localhost:18443",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Content-Type": "application/json",
+        "Origin": "https://localhost:18443",
+        "Priority": "u=1, i",
+        "Referer": "https://localhost:18443/api/ingress/echo/",
+        "Sec-CH-UA": "\"Not=A?Brand\";v=\"99\", \"HeadlessChrome\";v=\"151\", \"Chromium\";v=\"151\"",
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": "\"Windows\"",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "X-Forwarded-For": "172.19.0.1, 172.19.0.6",
+        "X-Forwarded-Host": "localhost:18443",
+        "X-Forwarded-Proto": "https",
+        "X-Ingress-Path": "/api/ingress/echo",
+        "X-Ingress-Subpath": "",
+        "Content-Length": "2"
+      }
+    },
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ]
+  },
+  {
+    "scenario": "ha_https_echo_hostdev",
+    "url": "https://localhost:18443/echo_hostdev",
+    "seen_by_backend": {
+      "method": "POST",
+      "path": "/probe",
+      "headers": {
+        "Host": "192.168.88.68",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Content-Type": "application/json",
+        "Origin": "https://localhost:18443",
+        "Priority": "u=1, i",
+        "Referer": "https://localhost:18443/api/ingress/echo_hostdev/",
+        "Sec-CH-UA": "\"Not=A?Brand\";v=\"99\", \"HeadlessChrome\";v=\"151\", \"Chromium\";v=\"151\"",
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": "\"Windows\"",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "X-Forwarded-For": "172.19.0.1, 172.19.0.6",
+        "X-Forwarded-Host": "localhost:18443",
+        "X-Forwarded-Proto": "https",
+        "X-Ingress-Path": "/api/ingress/echo_hostdev",
+        "X-Ingress-Subpath": "",
+        "Content-Length": "2"
+      }
+    },
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ]
+  }
+]

@@ -518,6 +518,21 @@ Where:
 - `{node_id}` = `settings.mqtt.sUniqueid` (default: `otgw-{MAC}`)
 - `{object_id}` = unique identifier for the entity
 
+### Device Block
+
+Every config carries `"dev":{"identifiers":"<node_id>"}`. The first config of a
+discovery run carries the full block, which HA merges into the device:
+
+```json
+"dev":{"identifiers":"otgw-84F3EB22B8E1","manufacturer":"NodoShop","model":"OTGW",
+       "name":"OpenTherm Gateway (OTGW)","sw_version":"1.7.8-beta.6 ...","cu":"http://192.168.1.50/"}
+```
+
+`cu` (`configuration_url`, 1.7.8-beta.6 and later) is `http://<device IP>/`; HA shows
+it as **Visit** on the device page. It uses the IP because `<hostname>.local` does not
+resolve on every client, and it changes only when discovery is published again. See
+[`docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md`](../guides/REVERSE_PROXY_AND_HA_INGRESS.md).
+
 ### Discovered Entity Types
 
 The firmware publishes discovery configs for the following HA entity types. The

@@ -8,12 +8,12 @@ static const char UpdateServerIndex[] PROGMEM =
      <head>
      <script>
       (function() {
-        var css = "/index.css";
+        var css = "index.css";
         var isDark = false;
         try {
           var storedTheme = localStorage.getItem('theme');
           if (storedTheme === 'dark') {
-            css = "/index_dark.css";
+            css = "index_dark.css";
             isDark = true;
             document.documentElement.className = 'dark';
           }
@@ -140,7 +140,7 @@ static const char UpdateServerIndex[] PROGMEM =
                return labelsRestored;
              }
              if (onStatus) onStatus('Restoring Dallas sensor labels...');
-             labelsRestored = fetch('/api/v2/sensors/labels', {
+             labelsRestored = fetch('api/v2/sensors/labels', {
                method: 'POST',
                headers: { 'Content-Type': 'application/json' },
                body: JSON.stringify(labels)
@@ -163,7 +163,7 @@ static const char UpdateServerIndex[] PROGMEM =
          }
 
          function saveDallasLabelsToStorage() {
-           return fetch('/api/v2/sensors/labels', { cache: 'no-store' })
+           return fetch('api/v2/sensors/labels', { cache: 'no-store' })
              .then(function(res) {
                if (!res.ok) return;
                return res.json();
@@ -180,7 +180,7 @@ static const char UpdateServerIndex[] PROGMEM =
 
          function redirectToHome(delayMs) {
            setTimeout(function() {
-             window.location.href = '/';
+             window.location.href = './';
            }, delayMs || 1000);
          }
 
@@ -202,7 +202,7 @@ static const char UpdateServerIndex[] PROGMEM =
              if (options.onTick) options.onTick(remaining);
 
              console.log('[OTA] Health check: GET /api/v2/health?t=' + Date.now());
-             fetch('/api/v2/health?t=' + Date.now(), {
+             fetch('api/v2/health?t=' + Date.now(), {
                method: 'GET',
                cache: 'no-store',
                headers: { 'Accept': 'application/json' }
@@ -272,13 +272,13 @@ static const char UpdateServerIndex[] PROGMEM =
 
          // Back up settings.ini and dallas_labels.ini to the browser
          function doBackups() {
-           var settingsBackup = downloadBackup('/settings.ini', 'settings')
+           var settingsBackup = downloadBackup('settings.ini', 'settings')
              .catch(function(e) {
                if (!confirm('Could not backup settings.ini. Continue anyway?')) {
                  throw e;
                }
              });
-           var labelsBackup = downloadBackup('/dallas_labels.ini', 'dallas_labels')
+           var labelsBackup = downloadBackup('dallas_labels.ini', 'dallas_labels')
              .catch(function(e) {
                console.log('[OTA] Dallas labels backup skipped (non-fatal)', e);
              });
@@ -319,7 +319,7 @@ static const char UpdateServerIndex[] PROGMEM =
              onTimeout: function() {
                console.log('[OTA] State: Timeout reached, redirecting anyway');
                progressText.textContent = 'Redirecting...';
-               window.location.href = '/';
+               window.location.href = './';
              }
            });
          }
@@ -464,10 +464,10 @@ static const char UpdateServerSuccess[] PROGMEM =
       <head>
       <script>
         (function() {
-          var css = "/index.css";
+          var css = "index.css";
           try {
             var storedTheme = localStorage.getItem('theme');
-            if (storedTheme === 'dark') { css = "/index_dark.css"; document.documentElement.className = 'dark'; }
+            if (storedTheme === 'dark') { css = "index_dark.css"; document.documentElement.className = 'dark'; }
           } catch (e) {}
           document.write('<link rel="stylesheet" type="text/css" href="' + css + '" id="theme-style">');
         })();
@@ -479,7 +479,7 @@ static const char UpdateServerSuccess[] PROGMEM =
       <h2>Flashing successful!</h2>
       <p>Wait for the OTGW firmware to reboot and start the HTTP server.</p>
       <p><span id="s" style="font-weight:bold; color:#666;">Waiting for device... (60s)</span></p>
-      <p>If nothing happens: <b><a href="/">click here</a></b>.</p>
+      <p>If nothing happens: <b><a href="./">click here</a></b>.</p>
       </body>
       <script>
         // Fallback path only — restore Dallas labels from localStorage then redirect.
@@ -496,7 +496,7 @@ static const char UpdateServerSuccess[] PROGMEM =
               if (typeof e.data !== 'object' || Object.keys(e.data).length === 0) {
                 localStorage.removeItem('otgw_dallas_restore'); return;
               }
-              fetch('/api/v2/sensors/labels', {
+              fetch('api/v2/sensors/labels', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(e.data)
@@ -510,16 +510,16 @@ static const char UpdateServerSuccess[] PROGMEM =
           var s = document.getElementById('s'), n = 60;
           var t = setInterval(function() {
             n--;
-            if (n <= 0) { clearInterval(t); window.location.href = '/'; return; }
+            if (n <= 0) { clearInterval(t); window.location.href = './'; return; }
             s.textContent = 'Waiting for device... (' + n + 's)';
-            fetch('/api/v2/health?t=' + Date.now(), { cache: 'no-store' })
+            fetch('api/v2/health?t=' + Date.now(), { cache: 'no-store' })
               .then(function(r) { return r.ok ? r.json() : null; })
               .then(function(d) {
                 if (d && d.health && d.health.status === 'UP') {
                   clearInterval(t);
                   s.textContent = 'Device is back online!';
                   tryRestoreLabels();
-                  setTimeout(function() { window.location.href = '/'; }, 1000);
+                  setTimeout(function() { window.location.href = './'; }, 1000);
                 }
               }).catch(function() {});
           }, 1000);
