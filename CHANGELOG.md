@@ -22,6 +22,8 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ### Fixed
 
+- **The PIC reset cause no longer reaches Home Assistant as an unreadable byte.** After a PIC firmware update the PIC can answer its reset-cause query with the single byte `0xFF`. The gateway passed that byte on as is, so `otgw-pic/settings/reset_cause` was not valid text: Home Assistant logged "Can't decode payload b'\xff'" on every publish and the sensor stayed unknown, and `/api/v2/pic/settings` put the same byte into its JSON. An answer that is not plain text is now stored as hex, here `0xFF`; normal answers such as `P` or `W` are unchanged. Checked with a host test on the conversion (the old byte-for-byte copy fails it, the new code passes); not reproduced on a gateway, because that needs a PIC in this state. Reported by mrfox7688 on GH #688. (TASK-1430)
+
 - **The GPIO output trigger bit in the settings list now offers 0 to 15.** The list advertised 16 as the highest value while the gateway stores at most 15, so a 16 was quietly changed to 15. Ported from the 2.0.0 line.
 
 - **File upload and delete in FSexplorer now work through a reverse proxy.** The response after an upload or delete ended without the blank line that closes the HTTP header and without a length. Browsers and curl accept that when the connection closes; nginx and Home Assistant ingress answered 502 Bad Gateway. The response is now a complete `303 See Other` back to FSexplorer. Checked on a bench gateway: upload through nginx with 1.7.8-beta.5 3 of 3 times `502`, with this version 3 of 3 times `303`; through HA ingress `502` before, `303` after. (TASK-1378)

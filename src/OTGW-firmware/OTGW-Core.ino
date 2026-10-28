@@ -870,9 +870,16 @@ static void handlePRresponse(const char* buf, size_t len) {
       return;
   }
 
-  bool changed = (strcmp(stateField, value) != 0);
+  // A non-printable answer (PR=Q gave 0xFF on GH #688) becomes "0x.." text, so
+  // MQTT and the REST JSON stay valid UTF-8. Compare the cleaned value, or the
+  // raw byte would never match the stored text and republish every readout.
+  char cleaned[sizeof(state.picSettings.sBuilddate)];  // largest PR= field
+  if (fieldSize > sizeof(cleaned)) fieldSize = sizeof(cleaned);
+  copyPicSettingValue(cleaned, fieldSize, value);
+
+  bool changed = (strcmp(stateField, cleaned) != 0);
   if (changed) {
-    strlcpy(stateField, value, fieldSize);
+    strlcpy(stateField, cleaned, fieldSize);
     OTGWDebugTf(PSTR("handlePRresponse: PR=%c updated to [%s]\r\n"), reg, stateField);
     sendMQTTData(mqttTopic, stateField);
   }

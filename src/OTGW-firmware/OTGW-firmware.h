@@ -44,6 +44,7 @@ extern SimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 #include <OTGWSerial.h>         // Schelte Bron's Serial class - it upgrades and more
 #include "OTGW-Core.h"          // Core code for this firmware
 #include "otBusLiveness.h"      // OT-bus presence decision, host-testable (TASK-1135)
+#include "picSettingValue.h"    // PR= answer as readable text, host-testable (TASK-1430)
 #include <OneWire.h>            // required for Dallas sensor library
 #include <DallasTemperature.h>  // Miles Burton's - Arduino Dallas library
 
@@ -395,7 +396,7 @@ struct PicSettingsSection {    // state.picSettings — settings polled from PIC
   // --- Diagnostics ---
   char sBuilddate[24]         = "";  // PR=B: firmware build date/time (e.g. "17:52 12-03-2023")
   char sClockMHz[8]           = "";  // PR=C: PIC clock speed in MHz (e.g. "4", "4 MHz")
-  char sResetCause[4]         = "";  // PR=Q: last reset cause ("W"=watchdog, "B"=brownout, "P"=power-on)
+  char sResetCause[8]         = "";  // PR=Q: last reset cause ("W"=watchdog, "B"=brownout, "P"=power-on); "0xFF" for a non-printable answer (TASK-1430)
   char sStandaloneInterval[8] = "";  // PR=N: message interval in standalone mode (seconds)
   char sVoltageRef[4]         = "";  // PR=V: voltage reference setting (numeric)
 
