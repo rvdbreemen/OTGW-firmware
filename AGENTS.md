@@ -6,6 +6,8 @@ These instructions adapt the repository's Claude guidance for Codex agents. They
 
 ## Task Management
 
+For SAT work under TASK-1412, read `docs/sat/sat-low-load-agent-handoff-2026-10-28.md` before selecting the next task. It links the current execution graph, PID writer order, open decision gates and bench-to-field validation sequence. Live Backlog dependencies take precedence over an older graph snapshot.
+
 Every meaningful code or documentation change should be backed by a Backlog task before implementation work starts. Use Backlog MCP tools as the primary interface for reading, creating, updating, and completing tasks.
 
 Codex agents must not edit files in `backlog/tasks/` directly. Use Backlog MCP tools such as task view/search/create/edit when available. Use the Backlog CLI commands in the reference below only when the MCP tools are unavailable, missing required capability, or fail for the current operation.

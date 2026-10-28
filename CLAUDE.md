@@ -11,6 +11,8 @@ This project uses OpenWolf for context management. Read and follow .wolf/OPENWOL
 
 ## Task Management (MANDATORY)
 
+For SAT work under TASK-1412, read `docs/sat/sat-low-load-agent-handoff-2026-10-28.md` before selecting the next task. It links the current execution graph, PID writer order, open decision gates and bench-to-field validation sequence. Live Backlog dependencies take precedence over an older graph snapshot.
+
 **Every piece of work must have a backlog task before any code is written. No exceptions.**
 
 **Always use the `backlog` CLI for task operations on this project. Do NOT use the `mcp__backlog__*` MCP server.** The MCP server indexes only one worktree at a time and serves stale cached state across worktrees (verified 2026-05-05: MCP returned a pre-edit "In Progress" snapshot of TASK-514 long after the CLI marked it Done on disk in another tree). The "Backlog.md: always use the CLI" section near the bottom of this file is the canonical statement; this paragraph is a reminder so the rule is the first thing seen.

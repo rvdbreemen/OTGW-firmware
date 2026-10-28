@@ -1,96 +1,125 @@
 # SAT low-load execution backlog
 
-Date: 2026-10-28. Execution epic: **TASK-1412**. Planning source: **TASK-1411**.
+Updated 2026-10-28, after decision entry 111. Execution epic: **TASK-1412**.
+This current index supersedes the earlier wave notes. Backlog metadata remains the live dependency authority; status values below are a snapshot, not a release verdict.
 
-This index records the execution breakdown of the [remediation plan](sat-low-load-remediation-plan-2026-10-28.md) and [verification plan](sat-low-load-verification-plan-2026-10-28.md). It does not record completed firmware work or physical validation. All 26 new child tasks start To Do. The 19 reused tasks keep their existing status, priority and ordinal; only their execution prerequisites and epic references change.
+Read the [builder handoff](sat-low-load-agent-handoff-2026-10-28.md), [remediation scope](sat-low-load-remediation-plan-2026-10-28.md) and [verification protocol](sat-low-load-verification-plan-2026-10-28.md). Machine-readable [manifest](sat-low-load-execution-backlog-2026-10-28.json) and [audit](evidence/2026-10-28-low-load-backlog-order.json) were refreshed from actual tasks.
 
-## Scheduling contract
+## Work that can proceed
 
-The previous largest task ordinal was 549000. The epic is 550000 and its children occupy 551000 through 576000. Existing tasks are not renumbered. These values append the new programme to the existing queue; dependencies determine which task may execute. This does not create a dependency on every unrelated open task.
+Continue the existing TASK-1368 and TASK-1409 ownership. Decision entry 111 unblocks TASK-1368. Pending SATpid.ino writers execute serially:
 
-Start with TASK-1412.1, then TASK-1412.2. After the reviewed contracts are available, regression preparation (TASK-1412.3) and equipment-profile preparation (TASK-1412.17) can proceed independently. Bench-rig preparation (TASK-1412.20) can proceed after the profile while software fixes continue. Among ready tasks, retain existing queue ordering. A task with unresolved control approval remains blocked even if its technical dependencies are Done: read its question/decision references before implementation. The contract task records these scoped blockers; it does not invent their answers or wait for every unrelated question in TASK-1340.
+**1368 -> 1270 -> 1416 -> 1417 -> 1418 -> 1414 -> 1423 -> 1415**
 
-Use the graph as a partial order: independent sensor, capability, mode, PID and telemetry work can proceed when their prerequisites permit it. Avoid a single global serial chain. Existing phase fixes are reused: TASK-1382 precedes TASK-1380; TASK-1368 precedes TASK-1270 and TASK-1381; TASK-1405 and classifier verification precede TASK-1331. Open designer approvals remain in force. The record task preserves the current one-question-at-a-time asking policy; this execution order is not permission to reorder or send Discord questions.
+TASK-1381 is a separate branch after TASK-1270 and its Q53 approval. It does not block independent PID changes. TASK-1415 remains gated by Robert's persistence write-cadence choice. Revalidate each task against the preceding commit: an already implemented fix needs evidence and task reconciliation, not a duplicate patch.
 
-## New child tasks and direct prerequisites
+TASK-1409 reporting and TASK-1425 telemetry can proceed separately from PID writers. TASK-1413 auto-tune removal feeds model-baseline verification. Capability, measurement and mode work retains its scoped contract prerequisites. This order preserves the reconciliation committed in 6dda1e15a; TASK-1412.3 is not reinstated as a global blocker for fixes with their own approved contract and executable regressions.
 
-| Task | Deliverable | Depends on |
-|---|---|---|
-| TASK-1412.1 | Reconcile SAT low-load question, decision and task evidence records | None |
-| TASK-1412.2 | Establish reviewed OT low-load requirements and scoped decision contracts | TASK-1412.1 |
-| TASK-1412.3 | Add executable low-load contract regressions before implementation fixes | TASK-1412.2 |
-| TASK-1412.4 | Honor slave low-load permission across SAT entry and active PWM | TASK-1412.3 |
-| TASK-1412.5 | Make SAT flow and return measurement validity and age explicit | TASK-1412.3 |
-| TASK-1412.6 | Separate PWM phase actuation from overshoot protection enablement | TASK-1412.3 |
-| TASK-1412.7 | Correct low-load entry qualification and post-DHW recovery | TASK-1412.4, TASK-1412.5, TASK-1412.3, TASK-1380, TASK-1382, TASK-1383 |
-| TASK-1412.8 | Make SAT low-load exits correct across long and jittered scheduler intervals | TASK-1412.3 |
-| TASK-1412.9 | Revalidate PWM start counting and phase duration policy after anchor fixes | TASK-1412.3, TASK-1380, TASK-1382, TASK-1383, TASK-1385, TASK-1375 |
-| TASK-1412.10 | Verify SAT PID startup, held derivative and saturation semantics | TASK-1412.3, TASK-1270, TASK-1368, TASK-1381 |
-| TASK-1412.11 | Make SAT command delivery and latest-state recovery verifiable | TASK-1412.5, TASK-1412.3, TASK-1370, TASK-1384 |
-| TASK-1412.12 | Validate missing-return ignition and runtime startup on both transports | TASK-1412.5, TASK-1412.11, TASK-1371, TASK-1384 |
-| TASK-1412.13 | Verify MaxTSet negotiation and every transmitted SAT ceiling | TASK-1412.3, TASK-1373 |
-| TASK-1412.14 | Prove classifier input parity before cycle-end mode switching | TASK-1412.3, TASK-1405, TASK-1387 |
-| TASK-1412.15 | Validate SAT telemetry against independent event and wire evidence | TASK-1412.3, TASK-1389, TASK-1409, TASK-1407 |
-| TASK-1412.16 | Quantify repaired SAT duty and PID behaviour against controlled plant models | TASK-1412.10, TASK-1412.9, TASK-1412.7, TASK-1412.8 |
-| TASK-1412.17 | Define equipment-specific gas, heat-pump and hybrid commissioning profiles | TASK-1412.2 |
-| TASK-1412.18 | Pass the complete SAT low-load host and production integration gate | TASK-1412.4, TASK-1412.5, TASK-1412.6, TASK-1412.7, TASK-1412.8, TASK-1412.9, TASK-1412.10, TASK-1412.11, TASK-1412.12, TASK-1412.13, TASK-1412.14, TASK-1412.15, TASK-1331, TASK-1390, TASK-1365 |
-| TASK-1412.19 | Pass reproducible closed-loop low-load simulation before hardware bench | TASK-1412.18, TASK-1412.16, TASK-1412.17 |
-| TASK-1412.20 | Prepare and calibrate an isolated SAT real-board bench simulator | TASK-1412.2, TASK-1412.17 |
-| TASK-1412.21 | Execute SAT low-load real-board bench simulation on PIC and OT-Direct | TASK-1412.19, TASK-1412.20, TASK-1412.15 |
-| TASK-1412.22 | Approve bench evidence and authorize controlled equipment validation readiness | TASK-1412.21 |
-| TASK-1412.23 | Commission accepted SAT candidate on controlled real heating equipment | TASK-1412.22, TASK-1412.17 |
-| TASK-1412.24 | Prepare tester field protocol and readiness after bench and equipment acceptance | TASK-1412.23, TASK-1412.22 |
-| TASK-1412.25 | Run authorized matched SAT tester field validation and publish measurements | TASK-1412.24, TASK-1412.22 |
-| TASK-1412.26 | Independently verify SAT low-load implementation and release evidence | TASK-1412.25, TASK-1412.1 |
+No task status, assignee or queue ordinal is changed by this update. The initial epic and 26 children were appended at ordinals 550000..576000 after the previous 549000 maximum; later follow-ups keep their existing positions. Dependencies determine readiness. Completed tasks can retain historical prerequisites without being reopened; candidate integration still has to pass the combined gates.
 
-The epic depends on TASK-1412.26. No child depends on its parent; parentage groups the work and does not substitute for execution dependencies.
+## Required verification ownership
 
-## Existing implementation tasks reused
+- TASK-1412.7 now includes TASK-1422 and TASK-1424, so combined post-DHW regressions are required.
+- TASK-1412.8 includes TASK-1420 plus TASK-1428/1429; TASK-1428 keeps the TASK-1412.5 measurement-validity contract prerequisite.
+- TASK-1412.10 includes PID tasks 1414..1418 and TASK-1423.
+- TASK-1412.15 includes TASK-1409 and TASK-1425, so misleading telemetry cannot become the scoring oracle.
+- TASK-1412.16 includes TASK-1413; the repaired model baseline cannot bypass auto-tune removal.
+- TASK-1412.18 includes TASK-1426; an unanswered heat-pump modulation contract cannot disappear from final acceptance.
+- TASK-1412.3 integrates the focused suites, including tests/test_sat_pwm_anchors.py, into the LL runner. Its status does not imply those integrated checks already exist.
 
-These dependencies are recorded in Backlog metadata, rather than only in this document. They were empty before this sequencing update; existing approval notes remain intact. Integration verifies their outcomes again on the combined candidate.
+## Human decision gates
 
-| Existing task | Required prerequisites |
-|---|---|
-| TASK-1270 | TASK-1412.3, TASK-1368 |
-| TASK-1331 | TASK-1405, TASK-1387, TASK-1412.14, TASK-1412.4, TASK-1412.7 |
-| TASK-1365 | TASK-1412.3 |
-| TASK-1368 | TASK-1412.3 |
-| TASK-1370 | TASK-1412.3, TASK-1412.5 |
-| TASK-1371 | TASK-1412.5, TASK-1412.11, TASK-1382 |
-| TASK-1373 | TASK-1412.1, TASK-1412.3 |
-| TASK-1375 | TASK-1412.3 |
-| TASK-1380 | TASK-1412.3, TASK-1382 |
-| TASK-1381 | TASK-1412.3, TASK-1270 |
-| TASK-1382 | TASK-1412.3 |
-| TASK-1383 | TASK-1412.3 |
-| TASK-1384 | TASK-1412.3, TASK-1412.5 |
-| TASK-1385 | TASK-1412.1, TASK-1412.3 |
-| TASK-1389 | TASK-1412.3 |
-| TASK-1390 | TASK-1412.5 |
-| TASK-1405 | TASK-1412.3 |
-| TASK-1407 | TASK-1412.3 |
-| TASK-1409 | TASK-1412.3 |
+Read the correction log and each task's latest plan. Entry 111 answers Q55; entry 110 replaces the older underfloor default decision. Q53, Q54/TASK-1426, the remaining MaxTSet default/write details and Robert's persistence write cadence remain separate recorded gates. The entry-100/ID6 interoperability conflict is not resolved by this graph. Interpretations in entries 104/107/108 are not silently upgraded to designer confirmation. The question queue remains one question at a time; this index authorizes no Discord or tester messages.
 
-TASK-1387 is an already completed classifier rule prerequisite, retained explicitly. TASK-1365 remains In Progress with its recorded recovery question; this planning update does not close it. TASK-1385 must first be revalidated against landed work before a duplicate fix is attempted. TASK-1373's inaccurate work-order wording is repaired under TASK-1412.1 before implementation.
+## Bench and release sequence
 
-## Mandatory validation sequence
+Each control fix needs archived old-versus-new board bench proof for its exact candidate before a tester alpha. That preserves Robert's recorded alpha policy. Host tests/builds alone do not satisfy it. Formal validation remains:
 
-1. **TASK-1412.18:** combined production host/integration gate, including the relevant project checklist and software LL checks.
-2. **TASK-1412.19:** reproducible closed-loop simulation against plant/load/fault models.
-3. **TASK-1412.21:** real-board bench simulation, using the separately prepared TASK-1412.20 rig, with an emulated plant on both verified PIC and OT-Direct transports.
-4. **TASK-1412.22:** independent bench acceptance for the exact candidate and settings. Missing or failed scenarios block acceptance.
-5. **TASK-1412.23:** controlled real-equipment commissioning under manufacturer limits; verify actual burner/compressor state and hand-back.
-6. **TASK-1412.24:** tester protocol and readiness, including accepted artifacts, measurement requirements and rollback.
-7. **TASK-1412.25:** authorized matched field validation. It depends directly on bench acceptance as well as tester readiness.
-8. **TASK-1412.26:** independent final proof, supported-equipment scope and release evidence review; only then may the epic close.
+1. TASK-1412.18: complete production host/integration gate.
+2. TASK-1412.19: reproducible closed-loop simulation.
+3. TASK-1412.21: real-board bench simulation on both named transports, using the TASK-1412.20 rig.
+4. TASK-1412.22: independent bench acceptance.
+5. TASK-1412.23: controlled real-equipment commissioning.
+6. TASK-1412.24: tester readiness/protocol.
+7. TASK-1412.25: authorized formal field validation.
+8. TASK-1412.26: independent final implementation/evidence review.
+9. TASK-1412: close only after the final gate.
 
-No tester field run can start before TASK-1412.22 passes. Reaching a task is not authorization to contact a tester: obtain Robert's authorization when contact is needed. A changed candidate must rerun affected integrated and bench gates before redeployment. The review must check evidence revision/configuration identity as well as task status; a historic Done state for another binary is insufficient.
+Bench-rig preparation can proceed independently when its prerequisites permit it. A changed binary/settings combination invalidates affected acceptance and requires reruns. OTGW replay blocks transmission: its result is board-executed controller replay, not PIC wire-delivery or physical boiler/compressor proof. PH-PIC, PH-OTD, PH-PROFILE and PH-FIELD remain distinct and mandatory for claimed combinations.
 
-The bench initially uses an emulated slave/plant, with no live boiler required. It establishes actual board/protocol behaviour. Real ignition, heat delivery, compressor protection and efficiency require the later equipment/field stages. PH-PIC, PH-OTD, PH-PROFILE and PH-FIELD remain distinct from simulated LL checks. Missing hardware or measurement means blocked or explicitly excluded support, not a waived pass.
+## Live dependency snapshot
 
-## Review issue ownership
+The following includes the full epic prerequisite closure, including completed implementation tasks and all relevant SAT follow-ups. TASK-1427 is unrelated UI work and is excluded.
 
-The following are execution owners before the final independent review. Existing fix ownership and exact LL/PH closure criteria remain in the linked remediation register and task acceptance criteria. TASK-1412.26 audits every row; it is not used as a substitute implementation owner.
+| Task | Status at snapshot | Direct prerequisites | Deliverable |
+|---|---|---|---|
+| TASK-1270 | To Do | TASK-1368 | SAT sends CS=10/CH=0 for the first ~60 s after enable because the first PID call returns the uninitialised 0 |
+| TASK-1331 | In Progress | TASK-1405, TASK-1387, TASK-1412.14, TASK-1412.4, TASK-1412.7 | SAT: port thermo-nova's on_cycle_end PWM re-enable (continuous cycle classified OVERSHOOT) |
+| TASK-1365 | In Progress | TASK-1412.3 | SAT: on lost OpenTherm hand the boiler back once (CS=0, CH=1, MM=T), then send nothing (entries 39, 47) |
+| TASK-1368 | In Progress | None | SAT PID: fixed 60 s update cadence as thermo-nova (entry 42) |
+| TASK-1370 | To Do | TASK-1412.3, TASK-1412.5 | SAT: send CS, MM and CH on every control update as thermo-nova (entry 44) |
+| TASK-1371 | To Do | TASK-1412.5, TASK-1412.11, TASK-1382 | SAT PWM ignition without a return temperature: flow-based suppression from the start, CS/PM=25 flood for 20 s, MI=500 (entry 45) |
+| TASK-1373 | To Do | TASK-1412.1, TASK-1412.3 | SAT: user MaxTSet slider bounded by MsgID 57, sent to the boiler (entry 48) |
+| TASK-1375 | To Do | TASK-1412.3 | SAT: gas boiler PWM cycles per hour 3 or 4 only, default 3 (entries 30, 52) |
+| TASK-1380 | Done | TASK-1412.3, TASK-1382 | SAT PWM: time the OFF phase from PWM's own ON->OFF switch, not from the last boiler flame-off (audit #59) |
+| TASK-1381 | To Do | TASK-1270 | SAT continuous mode: add thermo-nova's previous-CS term to the flow clamp |
+| TASK-1382 | Done | TASK-1412.3 | SAT PWM: time the ON phase from its start and keep waiting for ignition as thermo-nova (Q35) |
+| TASK-1383 | Done | TASK-1412.3 | SAT PWM: start an ON phase only when the mapped ON time is at least 180 s (Q38) |
+| TASK-1384 | To Do | TASK-1412.3, TASK-1412.5 | SAT: send the boot PM/MI commands also when SAT is enabled at runtime (audit #44) |
+| TASK-1385 | To Do | TASK-1412.1, TASK-1412.3 | SAT PWM: reseed the effective boiler temperature in duty range 5 as thermo-nova |
+| TASK-1387 | Done | None | SAT: make the end-of-cycle classifier match thermo-nova's classifier.py exactly (entry 55, Q4 A) |
+| TASK-1389 | To Do | TASK-1412.3 | MQTT MaxRelModLevelSetting/override always 0.00 and declared as temperature (degrees C) in HA discovery |
+| TASK-1390 | To Do | TASK-1412.5 | SAT: stop SAT when the outside temperature is missing or old (entry 56, Q7 B) |
+| TASK-1405 | To Do | TASK-1412.3 | SAT classifier: store the control setpoint per tail sample, as thermo-nova (entry 36, Q2 A) |
+| TASK-1407 | Done | TASK-1412.3 | SAT log: add PWM ON and PWM OFF times in seconds (Sergeant D request 2026-10-26) |
+| TASK-1409 | In Progress | None | SAT cycles: stored off-gap is always 0, so the 4h average off-time reads 0 and the duty ratios (per cycle, 4h, 24h) read 1.0 |
+| TASK-1412 | To Do | TASK-1412.26 | SAT low-load remediation epic: ordered implementation, bench acceptance and field proof |
+| TASK-1412.1 | To Do | None | SAT low-load: Reconcile SAT low-load question, decision and task evidence records |
+| TASK-1412.2 | To Do | TASK-1412.1 | SAT low-load: Establish reviewed OT low-load requirements and scoped decision contracts |
+| TASK-1412.3 | To Do | TASK-1412.2 | SAT low-load: Add executable low-load contract regressions before implementation fixes |
+| TASK-1412.4 | To Do | TASK-1412.3 | SAT low-load: Honor slave low-load permission across SAT entry and active PWM |
+| TASK-1412.5 | To Do | TASK-1412.3 | SAT low-load: Make SAT flow and return measurement validity and age explicit |
+| TASK-1412.6 | To Do | TASK-1412.3 | SAT low-load: Separate PWM phase actuation from overshoot protection enablement |
+| TASK-1412.7 | To Do | TASK-1412.4, TASK-1412.5, TASK-1412.3, TASK-1380, TASK-1382, TASK-1383, TASK-1422, TASK-1424 | SAT low-load: Correct low-load entry qualification and post-DHW recovery |
+| TASK-1412.8 | To Do | TASK-1412.3, TASK-1420, TASK-1428, TASK-1429 | SAT low-load: Make SAT low-load exits correct across long and jittered scheduler intervals |
+| TASK-1412.9 | To Do | TASK-1412.3, TASK-1380, TASK-1382, TASK-1383, TASK-1385, TASK-1375, TASK-1419, TASK-1421 | SAT low-load: Revalidate PWM start counting and phase duration policy after anchor fixes |
+| TASK-1412.10 | To Do | TASK-1412.3, TASK-1270, TASK-1368, TASK-1381, TASK-1414, TASK-1415, TASK-1416, TASK-1417, TASK-1418, TASK-1423 | SAT low-load: Verify SAT PID startup, held derivative and saturation semantics |
+| TASK-1412.11 | To Do | TASK-1412.5, TASK-1412.3, TASK-1370, TASK-1384 | SAT low-load: Make SAT command delivery and latest-state recovery verifiable |
+| TASK-1412.12 | To Do | TASK-1412.5, TASK-1412.11, TASK-1371, TASK-1384 | SAT low-load: Validate missing-return ignition and runtime startup on both transports |
+| TASK-1412.13 | To Do | TASK-1412.3, TASK-1373 | SAT low-load: Verify MaxTSet negotiation and every transmitted SAT ceiling |
+| TASK-1412.14 | To Do | TASK-1412.3, TASK-1405, TASK-1387 | SAT low-load: Prove classifier input parity before cycle-end mode switching |
+| TASK-1412.15 | To Do | TASK-1412.3, TASK-1389, TASK-1409, TASK-1407, TASK-1425 | SAT low-load: Validate SAT telemetry against independent event and wire evidence |
+| TASK-1412.16 | To Do | TASK-1412.10, TASK-1412.9, TASK-1412.7, TASK-1412.8, TASK-1413 | SAT low-load: Quantify repaired SAT duty and PID behaviour against controlled plant models |
+| TASK-1412.17 | To Do | TASK-1412.2 | SAT low-load: Define equipment-specific gas, heat-pump and hybrid commissioning profiles |
+| TASK-1412.18 | To Do | TASK-1412.4, TASK-1412.5, TASK-1412.6, TASK-1412.7, TASK-1412.8, TASK-1412.9, TASK-1412.10, TASK-1412.11, TASK-1412.12, TASK-1412.13, TASK-1412.14, TASK-1412.15, TASK-1331, TASK-1390, TASK-1365, TASK-1426 | SAT low-load: Pass the complete SAT low-load host and production integration gate |
+| TASK-1412.19 | To Do | TASK-1412.18, TASK-1412.16, TASK-1412.17 | SAT low-load: Pass reproducible closed-loop low-load simulation before hardware bench |
+| TASK-1412.20 | To Do | TASK-1412.2, TASK-1412.17 | SAT low-load: Prepare and calibrate an isolated SAT real-board bench simulator |
+| TASK-1412.21 | To Do | TASK-1412.19, TASK-1412.20, TASK-1412.15 | SAT low-load: Execute SAT low-load real-board bench simulation on PIC and OT-Direct |
+| TASK-1412.22 | To Do | TASK-1412.21 | SAT low-load: Approve bench evidence and authorize controlled equipment validation readiness |
+| TASK-1412.23 | To Do | TASK-1412.22, TASK-1412.17 | SAT low-load: Commission accepted SAT candidate on controlled real heating equipment |
+| TASK-1412.24 | To Do | TASK-1412.23, TASK-1412.22 | SAT low-load: Prepare tester field protocol and readiness after bench and equipment acceptance |
+| TASK-1412.25 | To Do | TASK-1412.24, TASK-1412.22 | SAT low-load: Run authorized matched SAT tester field validation and publish measurements |
+| TASK-1412.26 | To Do | TASK-1412.25, TASK-1412.1 | SAT low-load: Independently verify SAT low-load implementation and release evidence |
+| TASK-1413 | To Do | None | SAT: remove the firmware-only hourly heating-curve coefficient auto-tune (entry 72, Q22) |
+| TASK-1414 | To Do | TASK-1270, TASK-1418 | SAT PID: reset integral and raw derivative on every target, preset, window and HVAC change as thermo-nova (entry 73, Q23) |
+| TASK-1415 | To Do | TASK-1368, TASK-1423 | SAT PID: persist and restore all PID state as thermo-nova, no age check (entry 74, Q24) |
+| TASK-1416 | To Do | TASK-1368, TASK-1270 | SAT PID: remove the firmware-only integral cap of +-20 and the 10 s minimum between updates (entry 75, Q25) |
+| TASK-1417 | To Do | TASK-1368, TASK-1416 | SAT PID: fixed deadband 0.1, remove the deadband setting and its widening (entry 76, Q26) |
+| TASK-1418 | To Do | TASK-1368, TASK-1417 | SAT PID derivative: no-change test == 0 and last temperature updated every update, as pid.py (entry 77, Q27) |
+| TASK-1419 | Done | TASK-1382 | SAT PWM: heat pumps skip the hourly start limit and enter PWM through the 60 s overshoot switch (entries 81, 87; Q36, Q45) |
+| TASK-1420 | Done | None | SAT: sustained switches as thermo-nova: overshoot >=, underheat/saturation timers, scheduled tick time, switch before CS (entries 86, 88; Q43, Q44, Q46, Q47) |
+| TASK-1421 | Done | TASK-1382 | SAT PWM: count a start at the ON start (not first flame) and never count a hot-water flame (entries 89, 90; Q48, Q49) |
+| TASK-1422 | Done | TASK-1421 | SAT PWM: pause the ON timer while the boiler DHW-active bit is set, then restart the start-up sequence (entry 95, Q48b) |
+| TASK-1423 | To Do | TASK-1368, TASK-1414 | SAT PID: round every PID value to 3 decimals and match thermo-nova's Ki-near-0 clamp (entry 95, Q28a/Q28b) |
+| TASK-1424 | Done | None | SAT PWM: an ON start right after a hot-water draw with the DHW flame still lit does not count against cycles per hour (entry 105, Q52D/Q52E) |
+| TASK-1425 | To Do | None | SAT: cycles_this_hour saturates at 6 (rolling-hour ring SAT_MAX_CYCLES_PER_HOUR); heat pumps now have no start bound |
+| TASK-1426 | To Do | None | SAT: heat pump MM in PWM is the user maximum, outside PWM always 100 (entry 21 open: 100 or user maximum?) |
+| TASK-1428 | To Do | TASK-1412.5 | SAT sustained switches: no flow-validity check (thermo-nova resets on flow None) |
+| TASK-1429 | To Do | None | SAT DHW 300 s guard: arm on sub-tick draws and count from the real end of the draw |
+
+## Issue coverage
+
+Every R01..R42 has a non-final execution owner. Exact findings and LL/PH criteria remain in the remediation register and task acceptance criteria.
 
 | Issue | Execution owner(s) |
 |---|---|
@@ -137,35 +166,8 @@ The following are execution owners before the final independent review. Existing
 | R41 | TASK-1412.2, TASK-1412.3, TASK-1412.18, TASK-1412.19, TASK-1412.20, TASK-1412.21, TASK-1412.22, TASK-1412.23, TASK-1412.24, TASK-1412.25 |
 | R42 | TASK-1412.16, TASK-1412.17, TASK-1412.24, TASK-1412.25 |
 
-## Verification and evidence rules
+## Audit and communication
 
-Run the commands and scenario procedures in the [verification plan](sat-low-load-verification-plan-2026-10-28.md). TASK-1412.3 creates the missing integrated contracts; this index does not claim they already exist. Baseline runner success is not release acceptance. Mandatory skips, expected failures, missing evidence and unapproved behaviour cannot produce a release pass.
+The refreshed graph has **63 nodes**, zero cycles, all 42 issue owners, the required PID writer order, no Q53 dependency in front of independent PID work, and bench-acceptance ancestry for every formal equipment/field/final stage. The audit checks scheduling only. Its topological waves show possible work order; human approvals still apply.
 
-Archive candidate commit/build/filesystem IDs, source/test/configuration hashes, simulator fixtures/seeds, raw timestamped protocol and independent physical measurements, calibration, expected/actual outputs, failures, reviewer and rollback result. The task graph and issue ownership are also available in [the execution manifest](sat-low-load-execution-backlog-2026-10-28.json). Dependencies live in Backlog metadata; the manifest is an auditable snapshot and must be refreshed if scheduling changes.
-
-The [sequencing audit](evidence/2026-10-28-low-load-backlog-order.json) checked actual task metadata: 47 graph nodes, no dependency cycles, all 42 issues with a non-final execution owner, queue-tail ordinals, matching dependencies and mandatory bench ancestry for equipment and field stages. Its topological waves show possible parallel work; human approval blockers still apply. This is scheduling evidence only.
-
-The governing decisions and their agreement/conflict treatment are listed in remediation-plan section 2. Every implementation task must reopen its own cited source and relevant recorded entries before acting. No accepted ADR, designer quotation or upstream pin changes in this scheduling update.
-
-## Re-sequencing 2026-10-28 (after Sergeant D answered Q15-Q51)
-
-Sergeant D's answers (entries 67-94) removed most of the approval blockers, and gruijter's alpha.514 capture
-(entry 92) shows the defect testers feel today: after hot water the PWM OFF wait restarts on every hot-water
-flame-off (~23.5 min CH delay), and an ON phase that starts flame-off ends after one tick. The dependency graph
-stays; the order inside it changes so that this defect is fixed first, with old-vs-fix proof.
-
-- TASK-1412.2 is split. A thin PWM-anchor contract (entries 43, 80, 89-91, 92) is written first and unblocks a
-  PWM slice of TASK-1412.3. The full OT low-load crosswalk (low-load permission, measurement validity) runs in
-  parallel and does not gate the PWM slice.
-- Wave 1 (critical path): TASK-1412.1 (records, mostly done 2026-10-28) -> PWM contract slice -> TASK-1412.3
-  PWM slice (real-code harness as tests/test_sat_hp_pwm.py; replay of the 2026-10-27 hot-water draws and the
-  slow-ignition case, red on HEAD) -> TASK-1382 + TASK-1380 (one candidate) -> TASK-1383 -> TASK-1407
-  (pwm_on/pwm_off in the SAT log, so the fix is visible) -> bench old vs fix on the Classic.
-- Wave 2: TASK-1421 (count at the ON start, never a hot-water flame; hard dependency on TASK-1382) ->
-  TASK-1419 (heat pumps) -> TASK-1420 (sustained switches).
-- Wave 3: TASK-1368 -> TASK-1270 -> TASK-1381, then the PID parity tasks one at a time (they share SATpid.ino):
-  TASK-1416, TASK-1417, TASK-1418, TASK-1414, TASK-1415 (write cadence is Robert's call).
-- Wave 4: TASK-1413 (auto-tune removal; API removal recorded in ADR-198, Proposed), TASK-1409, TASK-1412.4/.5/.6,
-  TASK-1365 close-out.
-- Blocked on Sergeant D: TASK-1373 (Q15b, Q41), TASK-1375 (Q16), TASK-1355/ADR-199 (Q20b), Q28 rounding.
-- Validation sequence TASK-1412.18 -> .26 is unchanged.
+The handoff is published on TASK-1412 and active-task comments for TASK-1368/TASK-1409, plus TASK-1270. AGENTS.md and CLAUDE.md point builders at it. No active builder was visible through the Codex agent messaging tools, so these shared task records and repository entry points are the delivery mechanism; no live acknowledgement is claimed.

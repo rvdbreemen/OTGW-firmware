@@ -1,6 +1,10 @@
 {
+  "schemaVersion": 2,
   "epic": "TASK-1412",
   "date": "2026-10-28",
+  "generatedUtc": "2026-10-28T20:08:50.838092+00:00",
+  "sourceCommit": "b153f0dcf6a90790c37f8c4c97ad4b569befc501",
+  "scope": "Current Backlog dependency snapshot; not implementation or physical acceptance",
   "previousMaximumOrdinal": 549000,
   "epicOrdinal": 550000,
   "epicDependencies": [
@@ -37,7 +41,8 @@
         "Existing asking order and one-question-at-a-time policy are preserved unless Robert changes them; unresolved decisions remain unresolved and linked to their implementation tasks."
       ],
       "id": "TASK-1412.1",
-      "ordinal": 551000
+      "ordinal": 551000,
+      "status": "To Do"
     },
     {
       "key": "contracts",
@@ -64,7 +69,8 @@
         "Each control-change task identifies its own required approval; unresolved policy blocks only affected implementation and the corresponding validation claim."
       ],
       "id": "TASK-1412.2",
-      "ordinal": 552000
+      "ordinal": 552000,
+      "status": "To Do"
     },
     {
       "key": "red",
@@ -88,7 +94,8 @@
         "Fix tasks can run focused red/green scenarios without disabling unrelated assertions; release mode rejects expectedFailure, skipped mandatory scenarios and missing evidence."
       ],
       "id": "TASK-1412.3",
-      "ordinal": 553000
+      "ordinal": 553000,
+      "status": "To Do"
     },
     {
       "key": "cap",
@@ -107,7 +114,8 @@
         "Host traces prove requested and transmitted master bits separately; the design defines safe fallback and re-entry before implementation."
       ],
       "id": "TASK-1412.4",
-      "ordinal": 554000
+      "ordinal": 554000,
+      "status": "To Do"
     },
     {
       "key": "data",
@@ -127,7 +135,8 @@
         "Timestamp traces measure source sample age plus scheduler/queue/wire delay against reviewed transport budgets; infeasible fallback is rejected for that profile."
       ],
       "id": "TASK-1412.5",
-      "ordinal": 555000
+      "ordinal": 555000,
+      "status": "To Do"
     },
     {
       "key": "mode",
@@ -145,7 +154,8 @@
         "No change to CH/cold-cutoff/ownership semantics is inferred without the required recorded decision."
       ],
       "id": "TASK-1412.6",
-      "ordinal": 556000
+      "ordinal": 556000,
+      "status": "To Do"
     },
     {
       "key": "entry",
@@ -162,7 +172,9 @@
         "TASK-1412.3",
         "TASK-1380",
         "TASK-1382",
-        "TASK-1383"
+        "TASK-1383",
+        "TASK-1422",
+        "TASK-1424"
       ],
       "external": [
         "TASK-1380",
@@ -176,7 +188,8 @@
         "DHW/flame edges do not move phase-owned timers; master CH-enable and slave CH-mode are tested as different signals."
       ],
       "id": "TASK-1412.7",
-      "ordinal": 557000
+      "ordinal": 557000,
+      "status": "To Do"
     },
     {
       "key": "exit",
@@ -187,7 +200,9 @@
       ],
       "deps": [
         "TASK-1412.3",
-        "TASK-1420"
+        "TASK-1420",
+        "TASK-1428",
+        "TASK-1429"
       ],
       "control": true,
       "ac": [
@@ -196,7 +211,8 @@
         "A transition takes effect on the approved update; unsupported probability claims are replaced by reproducible traces."
       ],
       "id": "TASK-1412.8",
-      "ordinal": 558000
+      "ordinal": 558000,
+      "status": "To Do"
     },
     {
       "key": "count",
@@ -235,7 +251,8 @@
         "Commanded phase durations, counted starts and observed burner/compressor runtimes are separate outputs; no unconditional 180 s flame guarantee is asserted."
       ],
       "id": "TASK-1412.9",
-      "ordinal": 559000
+      "ordinal": 559000,
+      "status": "To Do"
     },
     {
       "key": "pid",
@@ -256,7 +273,8 @@
         "TASK-1415",
         "TASK-1416",
         "TASK-1417",
-        "TASK-1418"
+        "TASK-1418",
+        "TASK-1423"
       ],
       "external": [
         "TASK-1270",
@@ -274,7 +292,8 @@
         "Only approved Q23-Q28 policy changes are implemented; a proposed alternative anti-windup/controller is a separate decision, not an incidental fix."
       ],
       "id": "TASK-1412.10",
-      "ordinal": 560000
+      "ordinal": 560000,
+      "status": "To Do"
     },
     {
       "key": "tx",
@@ -300,7 +319,8 @@
         "CS/MM/CH update deadlines, suppression service and ordinary OT traffic coexist within measured budgets; PIC echoes are not treated as boiler acceptance."
       ],
       "id": "TASK-1412.11",
-      "ordinal": 561000
+      "ordinal": 561000,
+      "status": "To Do"
     },
     {
       "key": "ignition",
@@ -327,7 +347,8 @@
         "PIC MI/PM behaviour and OT-Direct equivalents are proven separately; a replay or command echo cannot close physical ignition acceptance."
       ],
       "id": "TASK-1412.12",
-      "ordinal": 562000
+      "ordinal": 562000,
+      "status": "To Do"
     },
     {
       "key": "ceiling",
@@ -349,7 +370,8 @@
         "Stored user limits persist; device measurements and transient support state are not persisted as settings."
       ],
       "id": "TASK-1412.13",
-      "ordinal": 563000
+      "ordinal": 563000,
+      "status": "To Do"
     },
     {
       "key": "classifier",
@@ -373,7 +395,8 @@
         "RAM cost is measured; TASK-1331 cannot resume until input parity and approved deviations pass."
       ],
       "id": "TASK-1412.14",
-      "ordinal": 564000
+      "ordinal": 564000,
+      "status": "To Do"
     },
     {
       "key": "telemetry",
@@ -385,7 +408,8 @@
         "TASK-1412.3",
         "TASK-1389",
         "TASK-1409",
-        "TASK-1407"
+        "TASK-1407",
+        "TASK-1425"
       ],
       "external": [
         "TASK-1389",
@@ -398,7 +422,8 @@
         "Telemetry used for bench/field scoring passes this gate before those runs; it is not its own evidence oracle."
       ],
       "id": "TASK-1412.15",
-      "ordinal": 565000
+      "ordinal": 565000,
+      "status": "To Do"
     },
     {
       "key": "model",
@@ -412,7 +437,8 @@
         "TASK-1412.10",
         "TASK-1412.9",
         "TASK-1412.7",
-        "TASK-1412.8"
+        "TASK-1412.8",
+        "TASK-1413"
       ],
       "ac": [
         "LL-016 compares the temperature-ratio estimate with integrated heat delivery, room error and actual start events across fixed/variable flow and radiator/low-temperature plant models.",
@@ -420,7 +446,8 @@
         "No energy/COP/comfort improvement or new algorithm approval is inferred from simulation alone; a controller replacement requires a separate approved ADR/task."
       ],
       "id": "TASK-1412.16",
-      "ordinal": 566000
+      "ordinal": 566000,
+      "status": "To Do"
     },
     {
       "key": "profile",
@@ -439,7 +466,8 @@
         "Native defrost/DHW/backup protections and explicit hand-back/rollback are documented; gas MM0 evidence is not generalized to heat pumps."
       ],
       "id": "TASK-1412.17",
-      "ordinal": 567000
+      "ordinal": 567000,
+      "status": "To Do"
     },
     {
       "key": "integration",
@@ -462,7 +490,8 @@
         "TASK-1412.15",
         "TASK-1331",
         "TASK-1390",
-        "TASK-1365"
+        "TASK-1365",
+        "TASK-1426"
       ],
       "external": [
         "TASK-1331",
@@ -475,7 +504,8 @@
         "Project checklist/build/evaluate/relevant regression results and commit/config/source/test hashes are archived; physical gates remain explicitly pending."
       ],
       "id": "TASK-1412.18",
-      "ordinal": 568000
+      "ordinal": 568000,
+      "status": "To Do"
     },
     {
       "key": "simulation",
@@ -494,7 +524,8 @@
         "Simulation limitations and failed scenarios are recorded; no simulator result is labeled physical boiler or compressor proof."
       ],
       "id": "TASK-1412.19",
-      "ordinal": 569000
+      "ordinal": 569000,
+      "status": "To Do"
     },
     {
       "key": "benchrig",
@@ -512,7 +543,8 @@
         "A versioned operator procedure, fixtures, expected outputs and rollback/reset check allow another operator to repeat the bench scenarios."
       ],
       "id": "TASK-1412.20",
-      "ordinal": 570000
+      "ordinal": 570000,
+      "status": "To Do"
     },
     {
       "key": "benchrun",
@@ -531,7 +563,8 @@
         "A failed scenario blocks bench acceptance; fixes rerun the failed scenarios and relevant integrated regressions on the new candidate."
       ],
       "id": "TASK-1412.21",
-      "ordinal": 571000
+      "ordinal": 571000,
+      "status": "To Do"
     },
     {
       "key": "benchgate",
@@ -548,7 +581,8 @@
         "Bench evidence proves board/protocol behaviour only; the signed readiness record is a mandatory prerequisite to equipment commissioning and tester field-validation tasks."
       ],
       "id": "TASK-1412.22",
-      "ordinal": 572000
+      "ordinal": 572000,
+      "status": "To Do"
     },
     {
       "key": "equipment",
@@ -569,7 +603,8 @@
         "Unsupported/unavailable combinations remain excluded; stop/rollback criteria are demonstrated, and physical results cannot be substituted by simulated traces."
       ],
       "id": "TASK-1412.23",
-      "ordinal": 573000
+      "ordinal": 573000,
+      "status": "To Do"
     },
     {
       "key": "fieldpack",
@@ -588,7 +623,8 @@
         "Readiness explicitly records bench and controlled-equipment acceptance; recruiting/contacting testers requires Robert's authorization and is not performed by this planning task."
       ],
       "id": "TASK-1412.24",
-      "ordinal": 574000
+      "ordinal": 574000,
+      "status": "To Do"
     },
     {
       "key": "field",
@@ -609,7 +645,8 @@
         "Failures trigger stop/rollback and affected bench reruns before redeployment; no cost-only result is described as COP/energy improvement."
       ],
       "id": "TASK-1412.25",
-      "ordinal": 575000
+      "ordinal": 575000,
+      "status": "To Do"
     },
     {
       "key": "final",
@@ -669,28 +706,79 @@
         "Only after this gate passes may TASK-1412 be marked Done; required task commits are narrow and pushed to the configured upstream."
       ],
       "id": "TASK-1412.26",
-      "ordinal": 576000
+      "ordinal": 576000,
+      "status": "To Do"
     }
   ],
   "existingDependencies": {
-    "TASK-1270": [
+    "TASK-1382": [
+      "TASK-1412.3"
+    ],
+    "TASK-1380": [
       "TASK-1412.3",
+      "TASK-1382"
+    ],
+    "TASK-1383": [
+      "TASK-1412.3"
+    ],
+    "TASK-1421": [
+      "TASK-1382"
+    ],
+    "TASK-1422": [
+      "TASK-1421"
+    ],
+    "TASK-1424": [],
+    "TASK-1420": [],
+    "TASK-1428": [
+      "TASK-1412.5"
+    ],
+    "TASK-1429": [],
+    "TASK-1385": [
+      "TASK-1412.1",
+      "TASK-1412.3"
+    ],
+    "TASK-1375": [
+      "TASK-1412.3"
+    ],
+    "TASK-1419": [
+      "TASK-1382"
+    ],
+    "TASK-1368": [],
+    "TASK-1270": [
       "TASK-1368"
     ],
-    "TASK-1331": [
-      "TASK-1405",
-      "TASK-1387",
-      "TASK-1412.14",
-      "TASK-1412.4",
-      "TASK-1412.7"
+    "TASK-1381": [
+      "TASK-1270"
     ],
-    "TASK-1365": [
-      "TASK-1412.3"
+    "TASK-1416": [
+      "TASK-1368",
+      "TASK-1270"
     ],
-    "TASK-1368": [
-      "TASK-1412.3"
+    "TASK-1417": [
+      "TASK-1368",
+      "TASK-1416"
+    ],
+    "TASK-1418": [
+      "TASK-1368",
+      "TASK-1417"
+    ],
+    "TASK-1414": [
+      "TASK-1270",
+      "TASK-1418"
+    ],
+    "TASK-1423": [
+      "TASK-1368",
+      "TASK-1414"
+    ],
+    "TASK-1415": [
+      "TASK-1368",
+      "TASK-1423"
     ],
     "TASK-1370": [
+      "TASK-1412.3",
+      "TASK-1412.5"
+    ],
+    "TASK-1384": [
       "TASK-1412.3",
       "TASK-1412.5"
     ],
@@ -703,50 +791,1186 @@
       "TASK-1412.1",
       "TASK-1412.3"
     ],
-    "TASK-1375": [
+    "TASK-1405": [
+      "TASK-1412.3"
+    ],
+    "TASK-1387": [],
+    "TASK-1389": [
+      "TASK-1412.3"
+    ],
+    "TASK-1409": [],
+    "TASK-1407": [
+      "TASK-1412.3"
+    ],
+    "TASK-1425": [],
+    "TASK-1331": [
+      "TASK-1405",
+      "TASK-1387",
+      "TASK-1412.14",
+      "TASK-1412.4",
+      "TASK-1412.7"
+    ],
+    "TASK-1390": [
+      "TASK-1412.5"
+    ],
+    "TASK-1365": [
+      "TASK-1412.3"
+    ],
+    "TASK-1426": [],
+    "TASK-1413": []
+  },
+  "dependencyGraph": {
+    "TASK-1412.1": [],
+    "TASK-1412.2": [
+      "TASK-1412.1"
+    ],
+    "TASK-1412.3": [
+      "TASK-1412.2"
+    ],
+    "TASK-1412.4": [
+      "TASK-1412.3"
+    ],
+    "TASK-1412.5": [
+      "TASK-1412.3"
+    ],
+    "TASK-1412.6": [
+      "TASK-1412.3"
+    ],
+    "TASK-1382": [
       "TASK-1412.3"
     ],
     "TASK-1380": [
       "TASK-1412.3",
       "TASK-1382"
     ],
-    "TASK-1381": [
-      "TASK-1412.3",
-      "TASK-1270"
-    ],
-    "TASK-1382": [
-      "TASK-1412.3"
-    ],
     "TASK-1383": [
       "TASK-1412.3"
     ],
-    "TASK-1384": [
+    "TASK-1421": [
+      "TASK-1382"
+    ],
+    "TASK-1422": [
+      "TASK-1421"
+    ],
+    "TASK-1424": [],
+    "TASK-1412.7": [
+      "TASK-1412.4",
+      "TASK-1412.5",
       "TASK-1412.3",
+      "TASK-1380",
+      "TASK-1382",
+      "TASK-1383",
+      "TASK-1422",
+      "TASK-1424"
+    ],
+    "TASK-1420": [],
+    "TASK-1428": [
       "TASK-1412.5"
+    ],
+    "TASK-1429": [],
+    "TASK-1412.8": [
+      "TASK-1412.3",
+      "TASK-1420",
+      "TASK-1428",
+      "TASK-1429"
     ],
     "TASK-1385": [
       "TASK-1412.1",
       "TASK-1412.3"
     ],
-    "TASK-1389": [
+    "TASK-1375": [
       "TASK-1412.3"
     ],
-    "TASK-1390": [
+    "TASK-1419": [
+      "TASK-1382"
+    ],
+    "TASK-1412.9": [
+      "TASK-1412.3",
+      "TASK-1380",
+      "TASK-1382",
+      "TASK-1383",
+      "TASK-1385",
+      "TASK-1375",
+      "TASK-1419",
+      "TASK-1421"
+    ],
+    "TASK-1368": [],
+    "TASK-1270": [
+      "TASK-1368"
+    ],
+    "TASK-1381": [
+      "TASK-1270"
+    ],
+    "TASK-1416": [
+      "TASK-1368",
+      "TASK-1270"
+    ],
+    "TASK-1417": [
+      "TASK-1368",
+      "TASK-1416"
+    ],
+    "TASK-1418": [
+      "TASK-1368",
+      "TASK-1417"
+    ],
+    "TASK-1414": [
+      "TASK-1270",
+      "TASK-1418"
+    ],
+    "TASK-1423": [
+      "TASK-1368",
+      "TASK-1414"
+    ],
+    "TASK-1415": [
+      "TASK-1368",
+      "TASK-1423"
+    ],
+    "TASK-1412.10": [
+      "TASK-1412.3",
+      "TASK-1270",
+      "TASK-1368",
+      "TASK-1381",
+      "TASK-1414",
+      "TASK-1415",
+      "TASK-1416",
+      "TASK-1417",
+      "TASK-1418",
+      "TASK-1423"
+    ],
+    "TASK-1370": [
+      "TASK-1412.3",
       "TASK-1412.5"
+    ],
+    "TASK-1384": [
+      "TASK-1412.3",
+      "TASK-1412.5"
+    ],
+    "TASK-1412.11": [
+      "TASK-1412.5",
+      "TASK-1412.3",
+      "TASK-1370",
+      "TASK-1384"
+    ],
+    "TASK-1371": [
+      "TASK-1412.5",
+      "TASK-1412.11",
+      "TASK-1382"
+    ],
+    "TASK-1412.12": [
+      "TASK-1412.5",
+      "TASK-1412.11",
+      "TASK-1371",
+      "TASK-1384"
+    ],
+    "TASK-1373": [
+      "TASK-1412.1",
+      "TASK-1412.3"
+    ],
+    "TASK-1412.13": [
+      "TASK-1412.3",
+      "TASK-1373"
     ],
     "TASK-1405": [
       "TASK-1412.3"
     ],
+    "TASK-1387": [],
+    "TASK-1412.14": [
+      "TASK-1412.3",
+      "TASK-1405",
+      "TASK-1387"
+    ],
+    "TASK-1389": [
+      "TASK-1412.3"
+    ],
+    "TASK-1409": [],
     "TASK-1407": [
       "TASK-1412.3"
     ],
-    "TASK-1409": [
+    "TASK-1425": [],
+    "TASK-1412.15": [
+      "TASK-1412.3",
+      "TASK-1389",
+      "TASK-1409",
+      "TASK-1407",
+      "TASK-1425"
+    ],
+    "TASK-1331": [
+      "TASK-1405",
+      "TASK-1387",
+      "TASK-1412.14",
+      "TASK-1412.4",
+      "TASK-1412.7"
+    ],
+    "TASK-1390": [
+      "TASK-1412.5"
+    ],
+    "TASK-1365": [
       "TASK-1412.3"
+    ],
+    "TASK-1426": [],
+    "TASK-1412.18": [
+      "TASK-1412.4",
+      "TASK-1412.5",
+      "TASK-1412.6",
+      "TASK-1412.7",
+      "TASK-1412.8",
+      "TASK-1412.9",
+      "TASK-1412.10",
+      "TASK-1412.11",
+      "TASK-1412.12",
+      "TASK-1412.13",
+      "TASK-1412.14",
+      "TASK-1412.15",
+      "TASK-1331",
+      "TASK-1390",
+      "TASK-1365",
+      "TASK-1426"
+    ],
+    "TASK-1413": [],
+    "TASK-1412.16": [
+      "TASK-1412.10",
+      "TASK-1412.9",
+      "TASK-1412.7",
+      "TASK-1412.8",
+      "TASK-1413"
+    ],
+    "TASK-1412.17": [
+      "TASK-1412.2"
+    ],
+    "TASK-1412.19": [
+      "TASK-1412.18",
+      "TASK-1412.16",
+      "TASK-1412.17"
+    ],
+    "TASK-1412.20": [
+      "TASK-1412.2",
+      "TASK-1412.17"
+    ],
+    "TASK-1412.21": [
+      "TASK-1412.19",
+      "TASK-1412.20",
+      "TASK-1412.15"
+    ],
+    "TASK-1412.22": [
+      "TASK-1412.21"
+    ],
+    "TASK-1412.23": [
+      "TASK-1412.22",
+      "TASK-1412.17"
+    ],
+    "TASK-1412.24": [
+      "TASK-1412.23",
+      "TASK-1412.22"
+    ],
+    "TASK-1412.25": [
+      "TASK-1412.24",
+      "TASK-1412.22"
+    ],
+    "TASK-1412.26": [
+      "TASK-1412.25",
+      "TASK-1412.1"
+    ],
+    "TASK-1412": [
+      "TASK-1412.26"
     ]
   },
-  "resequenced": {
-    "date": "2026-10-28",
-    "reason": "Sergeant D answers Q15-Q51 (entries 67-94); TASK-1413..1421 added; hot-water OFF-wait defect (entry 92) first",
-    "note": "see the Re-sequencing section of the .md; evidence/2026-10-28-low-load-backlog-order.json is the original snapshot and is not changed"
-  }
+  "taskSnapshots": {
+    "TASK-1270": {
+      "title": "SAT sends CS=10/CH=0 for the first ~60 s after enable because the first PID call returns the uninitialised 0",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1368"
+      ],
+      "ordinal": 400000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1270 - SAT-sends-CS10-CH0-for-the-first-~60-s-after-enable-because-the-first-PID-call-returns-the-uninitialised-0.md"
+    },
+    "TASK-1331": {
+      "title": "SAT: port thermo-nova's on_cycle_end PWM re-enable (continuous cycle classified OVERSHOOT)",
+      "status": "In Progress",
+      "dependencies": [
+        "TASK-1405",
+        "TASK-1387",
+        "TASK-1412.14",
+        "TASK-1412.4",
+        "TASK-1412.7"
+      ],
+      "ordinal": 454000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1331 - SAT-port-thermo-novas-on_cycle_end-PWM-re-enable-continuous-cycle-classified-OVERSHOOT.md"
+    },
+    "TASK-1365": {
+      "title": "SAT: on lost OpenTherm hand the boiler back once (CS=0, CH=1, MM=T), then send nothing (entries 39, 47)",
+      "status": "In Progress",
+      "dependencies": [
+        "TASK-1412.3"
+      ],
+      "ordinal": 500000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1365 - SAT-on-lost-invalid-OpenTherm-send-CH0-and-CS0-once-then-stop-sending-to-the-boiler-entry-39.md"
+    },
+    "TASK-1368": {
+      "title": "SAT PID: fixed 60 s update cadence as thermo-nova (entry 42)",
+      "status": "In Progress",
+      "dependencies": [],
+      "ordinal": 503000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1368 - SAT-PID-fixed-60-s-update-cadence-as-thermo-nova-entry-42.md"
+    },
+    "TASK-1370": {
+      "title": "SAT: send CS, MM and CH on every control update as thermo-nova (entry 44)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3",
+        "TASK-1412.5"
+      ],
+      "ordinal": 505000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1370 - SAT-send-CS-MM-and-CH-on-every-control-update-as-thermo-nova-entry-44.md"
+    },
+    "TASK-1371": {
+      "title": "SAT PWM ignition without a return temperature: flow-based suppression from the start, CS/PM=25 flood for 20 s, MI=500 (entry 45)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.5",
+        "TASK-1412.11",
+        "TASK-1382"
+      ],
+      "ordinal": 506000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1371 - SAT-PWM-ignition-without-a-return-temperature-flow-based-suppression-from-the-start-CS-PM25-flood-for-20-s-MI500-entry-45.md"
+    },
+    "TASK-1373": {
+      "title": "SAT: user MaxTSet slider bounded by MsgID 57, sent to the boiler (entry 48)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.1",
+        "TASK-1412.3"
+      ],
+      "ordinal": 508000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1373 - SAT-user-MaxTSet-slider-bounded-by-MsgID-57-sent-to-the-boiler-entry-48.md"
+    },
+    "TASK-1375": {
+      "title": "SAT: gas boiler PWM cycles per hour 3 or 4 only, default 3 (entries 30, 52)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3"
+      ],
+      "ordinal": 510000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1375 - SAT-gas-boiler-PWM-cycles-per-hour-3-or-4-only-default-3-entries-30-52.md"
+    },
+    "TASK-1380": {
+      "title": "SAT PWM: time the OFF phase from PWM's own ON->OFF switch, not from the last boiler flame-off (audit #59)",
+      "status": "Done",
+      "dependencies": [
+        "TASK-1412.3",
+        "TASK-1382"
+      ],
+      "ordinal": 519000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1380 - SAT-PWM-time-the-OFF-phase-from-PWMs-own-ON-OFF-switch-not-from-the-last-boiler-flame-off-audit-59.md"
+    },
+    "TASK-1381": {
+      "title": "SAT continuous mode: add thermo-nova's previous-CS term to the flow clamp",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1270"
+      ],
+      "ordinal": 520000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1381 - SAT-continuous-mode-add-thermo-novas-previous-CS-term-to-the-flow-clamp.md"
+    },
+    "TASK-1382": {
+      "title": "SAT PWM: time the ON phase from its start and keep waiting for ignition as thermo-nova (Q35)",
+      "status": "Done",
+      "dependencies": [
+        "TASK-1412.3"
+      ],
+      "ordinal": 521000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1382 - SAT-PWM-time-the-ON-phase-from-its-start-and-keep-waiting-for-ignition-as-thermo-nova-Q35.md"
+    },
+    "TASK-1383": {
+      "title": "SAT PWM: start an ON phase only when the mapped ON time is at least 180 s (Q38)",
+      "status": "Done",
+      "dependencies": [
+        "TASK-1412.3"
+      ],
+      "ordinal": 522000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1383 - SAT-PWM-start-an-ON-phase-only-when-the-mapped-ON-time-is-at-least-180-s-Q38.md"
+    },
+    "TASK-1384": {
+      "title": "SAT: send the boot PM/MI commands also when SAT is enabled at runtime (audit #44)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3",
+        "TASK-1412.5"
+      ],
+      "ordinal": 523000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1384 - SAT-send-the-boot-PM-MI-commands-also-when-SAT-is-enabled-at-runtime-audit-44.md"
+    },
+    "TASK-1385": {
+      "title": "SAT PWM: reseed the effective boiler temperature in duty range 5 as thermo-nova",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.1",
+        "TASK-1412.3"
+      ],
+      "ordinal": 524000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1385 - SAT-PWM-reseed-the-effective-boiler-temperature-in-duty-range-5-as-thermo-nova.md"
+    },
+    "TASK-1387": {
+      "title": "SAT: make the end-of-cycle classifier match thermo-nova's classifier.py exactly (entry 55, Q4 A)",
+      "status": "Done",
+      "dependencies": [],
+      "ordinal": 526000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1387 - SAT-make-the-end-of-cycle-classifier-match-thermo-novas-classifier.py-exactly-entry-55-Q4-A.md"
+    },
+    "TASK-1389": {
+      "title": "MQTT MaxRelModLevelSetting/override always 0.00 and declared as temperature (degrees C) in HA discovery",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3"
+      ],
+      "ordinal": 528000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1389 - MQTT-MaxRelModLevelSetting-override-always-0.00-and-declared-as-temperature-degrees-C-in-HA-discovery.md"
+    },
+    "TASK-1390": {
+      "title": "SAT: stop SAT when the outside temperature is missing or old (entry 56, Q7 B)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.5"
+      ],
+      "ordinal": 529000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1390 - SAT-stop-SAT-when-the-outside-temperature-is-missing-or-old-entry-56-Q7-B.md"
+    },
+    "TASK-1405": {
+      "title": "SAT classifier: store the control setpoint per tail sample, as thermo-nova (entry 36, Q2 A)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3"
+      ],
+      "ordinal": 543000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1405 - SAT-classifier-store-the-control-setpoint-per-tail-sample-as-thermo-nova-entry-36-Q2-A.md"
+    },
+    "TASK-1407": {
+      "title": "SAT log: add PWM ON and PWM OFF times in seconds (Sergeant D request 2026-10-26)",
+      "status": "Done",
+      "dependencies": [
+        "TASK-1412.3"
+      ],
+      "ordinal": 545000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1407 - SAT-log-add-PWM-ON-and-PWM-OFF-times-in-seconds-Sergeant-D-request-2026-10-26.md"
+    },
+    "TASK-1409": {
+      "title": "SAT cycles: stored off-gap is always 0, so the 4h average off-time reads 0 and the duty ratios (per cycle, 4h, 24h) read 1.0",
+      "status": "In Progress",
+      "dependencies": [],
+      "ordinal": 547000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1409 - SAT-cycles-stored-off-gap-is-always-0-so-the-4h-average-off-time-reads-0-and-the-duty-ratios-per-cycle-4h-24h-read-1.0.md"
+    },
+    "TASK-1412": {
+      "title": "SAT low-load remediation epic: ordered implementation, bench acceptance and field proof",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.26"
+      ],
+      "ordinal": 550000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1412 - SAT-low-load-remediation-epic-ordered-implementation-bench-acceptance-and-field-proof.md"
+    },
+    "TASK-1412.1": {
+      "title": "SAT low-load: Reconcile SAT low-load question, decision and task evidence records",
+      "status": "To Do",
+      "dependencies": [],
+      "ordinal": 551000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.1 - SAT-low-load-Reconcile-SAT-low-load-question-decision-and-task-evidence-records.md"
+    },
+    "TASK-1412.10": {
+      "title": "SAT low-load: Verify SAT PID startup, held derivative and saturation semantics",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3",
+        "TASK-1270",
+        "TASK-1368",
+        "TASK-1381",
+        "TASK-1414",
+        "TASK-1415",
+        "TASK-1416",
+        "TASK-1417",
+        "TASK-1418",
+        "TASK-1423"
+      ],
+      "ordinal": 560000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.10 - SAT-low-load-Verify-SAT-PID-startup-held-derivative-and-saturation-semantics.md"
+    },
+    "TASK-1412.11": {
+      "title": "SAT low-load: Make SAT command delivery and latest-state recovery verifiable",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.5",
+        "TASK-1412.3",
+        "TASK-1370",
+        "TASK-1384"
+      ],
+      "ordinal": 561000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.11 - SAT-low-load-Make-SAT-command-delivery-and-latest-state-recovery-verifiable.md"
+    },
+    "TASK-1412.12": {
+      "title": "SAT low-load: Validate missing-return ignition and runtime startup on both transports",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.5",
+        "TASK-1412.11",
+        "TASK-1371",
+        "TASK-1384"
+      ],
+      "ordinal": 562000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.12 - SAT-low-load-Validate-missing-return-ignition-and-runtime-startup-on-both-transports.md"
+    },
+    "TASK-1412.13": {
+      "title": "SAT low-load: Verify MaxTSet negotiation and every transmitted SAT ceiling",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3",
+        "TASK-1373"
+      ],
+      "ordinal": 563000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.13 - SAT-low-load-Verify-MaxTSet-negotiation-and-every-transmitted-SAT-ceiling.md"
+    },
+    "TASK-1412.14": {
+      "title": "SAT low-load: Prove classifier input parity before cycle-end mode switching",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3",
+        "TASK-1405",
+        "TASK-1387"
+      ],
+      "ordinal": 564000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.14 - SAT-low-load-Prove-classifier-input-parity-before-cycle-end-mode-switching.md"
+    },
+    "TASK-1412.15": {
+      "title": "SAT low-load: Validate SAT telemetry against independent event and wire evidence",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3",
+        "TASK-1389",
+        "TASK-1409",
+        "TASK-1407",
+        "TASK-1425"
+      ],
+      "ordinal": 565000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.15 - SAT-low-load-Validate-SAT-telemetry-against-independent-event-and-wire-evidence.md"
+    },
+    "TASK-1412.16": {
+      "title": "SAT low-load: Quantify repaired SAT duty and PID behaviour against controlled plant models",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.10",
+        "TASK-1412.9",
+        "TASK-1412.7",
+        "TASK-1412.8",
+        "TASK-1413"
+      ],
+      "ordinal": 566000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.16 - SAT-low-load-Quantify-repaired-SAT-duty-and-PID-behaviour-against-controlled-plant-models.md"
+    },
+    "TASK-1412.17": {
+      "title": "SAT low-load: Define equipment-specific gas, heat-pump and hybrid commissioning profiles",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.2"
+      ],
+      "ordinal": 567000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.17 - SAT-low-load-Define-equipment-specific-gas-heat-pump-and-hybrid-commissioning-profiles.md"
+    },
+    "TASK-1412.18": {
+      "title": "SAT low-load: Pass the complete SAT low-load host and production integration gate",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.4",
+        "TASK-1412.5",
+        "TASK-1412.6",
+        "TASK-1412.7",
+        "TASK-1412.8",
+        "TASK-1412.9",
+        "TASK-1412.10",
+        "TASK-1412.11",
+        "TASK-1412.12",
+        "TASK-1412.13",
+        "TASK-1412.14",
+        "TASK-1412.15",
+        "TASK-1331",
+        "TASK-1390",
+        "TASK-1365",
+        "TASK-1426"
+      ],
+      "ordinal": 568000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.18 - SAT-low-load-Pass-the-complete-SAT-low-load-host-and-production-integration-gate.md"
+    },
+    "TASK-1412.19": {
+      "title": "SAT low-load: Pass reproducible closed-loop low-load simulation before hardware bench",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.18",
+        "TASK-1412.16",
+        "TASK-1412.17"
+      ],
+      "ordinal": 569000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.19 - SAT-low-load-Pass-reproducible-closed-loop-low-load-simulation-before-hardware-bench.md"
+    },
+    "TASK-1412.2": {
+      "title": "SAT low-load: Establish reviewed OT low-load requirements and scoped decision contracts",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.1"
+      ],
+      "ordinal": 552000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.2 - SAT-low-load-Establish-reviewed-OT-low-load-requirements-and-scoped-decision-contracts.md"
+    },
+    "TASK-1412.20": {
+      "title": "SAT low-load: Prepare and calibrate an isolated SAT real-board bench simulator",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.2",
+        "TASK-1412.17"
+      ],
+      "ordinal": 570000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.20 - SAT-low-load-Prepare-and-calibrate-an-isolated-SAT-real-board-bench-simulator.md"
+    },
+    "TASK-1412.21": {
+      "title": "SAT low-load: Execute SAT low-load real-board bench simulation on PIC and OT-Direct",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.19",
+        "TASK-1412.20",
+        "TASK-1412.15"
+      ],
+      "ordinal": 571000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.21 - SAT-low-load-Execute-SAT-low-load-real-board-bench-simulation-on-PIC-and-OT-Direct.md"
+    },
+    "TASK-1412.22": {
+      "title": "SAT low-load: Approve bench evidence and authorize controlled equipment validation readiness",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.21"
+      ],
+      "ordinal": 572000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.22 - SAT-low-load-Approve-bench-evidence-and-authorize-controlled-equipment-validation-readiness.md"
+    },
+    "TASK-1412.23": {
+      "title": "SAT low-load: Commission accepted SAT candidate on controlled real heating equipment",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.22",
+        "TASK-1412.17"
+      ],
+      "ordinal": 573000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.23 - SAT-low-load-Commission-accepted-SAT-candidate-on-controlled-real-heating-equipment.md"
+    },
+    "TASK-1412.24": {
+      "title": "SAT low-load: Prepare tester field protocol and readiness after bench and equipment acceptance",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.23",
+        "TASK-1412.22"
+      ],
+      "ordinal": 574000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.24 - SAT-low-load-Prepare-tester-field-protocol-and-readiness-after-bench-and-equipment-acceptance.md"
+    },
+    "TASK-1412.25": {
+      "title": "SAT low-load: Run authorized matched SAT tester field validation and publish measurements",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.24",
+        "TASK-1412.22"
+      ],
+      "ordinal": 575000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.25 - SAT-low-load-Run-authorized-matched-SAT-tester-field-validation-and-publish-measurements.md"
+    },
+    "TASK-1412.26": {
+      "title": "SAT low-load: Independently verify SAT low-load implementation and release evidence",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.25",
+        "TASK-1412.1"
+      ],
+      "ordinal": 576000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.26 - SAT-low-load-Independently-verify-SAT-low-load-implementation-and-release-evidence.md"
+    },
+    "TASK-1412.3": {
+      "title": "SAT low-load: Add executable low-load contract regressions before implementation fixes",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.2"
+      ],
+      "ordinal": 553000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.3 - SAT-low-load-Add-executable-low-load-contract-regressions-before-implementation-fixes.md"
+    },
+    "TASK-1412.4": {
+      "title": "SAT low-load: Honor slave low-load permission across SAT entry and active PWM",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3"
+      ],
+      "ordinal": 554000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.4 - SAT-low-load-Honor-slave-low-load-permission-across-SAT-entry-and-active-PWM.md"
+    },
+    "TASK-1412.5": {
+      "title": "SAT low-load: Make SAT flow and return measurement validity and age explicit",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3"
+      ],
+      "ordinal": 555000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.5 - SAT-low-load-Make-SAT-flow-and-return-measurement-validity-and-age-explicit.md"
+    },
+    "TASK-1412.6": {
+      "title": "SAT low-load: Separate PWM phase actuation from overshoot protection enablement",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3"
+      ],
+      "ordinal": 556000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.6 - SAT-low-load-Separate-PWM-phase-actuation-from-overshoot-protection-enablement.md"
+    },
+    "TASK-1412.7": {
+      "title": "SAT low-load: Correct low-load entry qualification and post-DHW recovery",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.4",
+        "TASK-1412.5",
+        "TASK-1412.3",
+        "TASK-1380",
+        "TASK-1382",
+        "TASK-1383",
+        "TASK-1422",
+        "TASK-1424"
+      ],
+      "ordinal": 557000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.7 - SAT-low-load-Correct-low-load-entry-qualification-and-post-DHW-recovery.md"
+    },
+    "TASK-1412.8": {
+      "title": "SAT low-load: Make SAT low-load exits correct across long and jittered scheduler intervals",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3",
+        "TASK-1420",
+        "TASK-1428",
+        "TASK-1429"
+      ],
+      "ordinal": 558000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.8 - SAT-low-load-Make-SAT-low-load-exits-correct-across-long-and-jittered-scheduler-intervals.md"
+    },
+    "TASK-1412.9": {
+      "title": "SAT low-load: Revalidate PWM start counting and phase duration policy after anchor fixes",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.3",
+        "TASK-1380",
+        "TASK-1382",
+        "TASK-1383",
+        "TASK-1385",
+        "TASK-1375",
+        "TASK-1419",
+        "TASK-1421"
+      ],
+      "ordinal": 559000,
+      "parentTaskId": "TASK-1412",
+      "path": "backlog/tasks/task-1412.9 - SAT-low-load-Revalidate-PWM-start-counting-and-phase-duration-policy-after-anchor-fixes.md"
+    },
+    "TASK-1413": {
+      "title": "SAT: remove the firmware-only hourly heating-curve coefficient auto-tune (entry 72, Q22)",
+      "status": "To Do",
+      "dependencies": [],
+      "ordinal": 577000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1413 - SAT-remove-the-firmware-only-hourly-heating-curve-coefficient-auto-tune-entry-72-Q22.md"
+    },
+    "TASK-1414": {
+      "title": "SAT PID: reset integral and raw derivative on every target, preset, window and HVAC change as thermo-nova (entry 73, Q23)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1270",
+        "TASK-1418"
+      ],
+      "ordinal": 578000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1414 - SAT-PID-reset-integral-and-raw-derivative-on-every-target-preset-window-and-HVAC-change-as-thermo-nova-entry-73-Q23.md"
+    },
+    "TASK-1415": {
+      "title": "SAT PID: persist and restore all PID state as thermo-nova, no age check (entry 74, Q24)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1368",
+        "TASK-1423"
+      ],
+      "ordinal": 579000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1415 - SAT-PID-persist-and-restore-all-PID-state-as-thermo-nova-no-age-check-entry-74-Q24.md"
+    },
+    "TASK-1416": {
+      "title": "SAT PID: remove the firmware-only integral cap of +-20 and the 10 s minimum between updates (entry 75, Q25)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1368",
+        "TASK-1270"
+      ],
+      "ordinal": 580000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1416 - SAT-PID-remove-the-firmware-only-integral-cap-of-20-and-the-10-s-minimum-between-updates-entry-75-Q25.md"
+    },
+    "TASK-1417": {
+      "title": "SAT PID: fixed deadband 0.1, remove the deadband setting and its widening (entry 76, Q26)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1368",
+        "TASK-1416"
+      ],
+      "ordinal": 581000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1417 - SAT-PID-fixed-deadband-0.1-remove-the-deadband-setting-and-its-widening-entry-76-Q26.md"
+    },
+    "TASK-1418": {
+      "title": "SAT PID derivative: no-change test == 0 and last temperature updated every update, as pid.py (entry 77, Q27)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1368",
+        "TASK-1417"
+      ],
+      "ordinal": 582000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1418 - SAT-PID-derivative-no-change-test-0-and-last-temperature-updated-every-update-as-pid.py-entry-77-Q27.md"
+    },
+    "TASK-1419": {
+      "title": "SAT PWM: heat pumps skip the hourly start limit and enter PWM through the 60 s overshoot switch (entries 81, 87; Q36, Q45)",
+      "status": "Done",
+      "dependencies": [
+        "TASK-1382"
+      ],
+      "ordinal": 583000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1419 - SAT-PWM-heat-pumps-skip-the-hourly-start-limit-and-enter-PWM-through-the-60-s-overshoot-switch-entries-81-87-Q36-Q45.md"
+    },
+    "TASK-1420": {
+      "title": "SAT: sustained switches as thermo-nova: overshoot >=, underheat/saturation timers, scheduled tick time, switch before CS (entries 86, 88; Q43, Q44, Q46, Q47)",
+      "status": "Done",
+      "dependencies": [],
+      "ordinal": 584000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1420 - SAT-sustained-switches-as-thermo-nova-overshoot-underheat-saturation-timers-scheduled-tick-time-switch-before-CS-entries-86-88-Q43-Q44-Q46-Q47.md"
+    },
+    "TASK-1421": {
+      "title": "SAT PWM: count a start at the ON start (not first flame) and never count a hot-water flame (entries 89, 90; Q48, Q49)",
+      "status": "Done",
+      "dependencies": [
+        "TASK-1382"
+      ],
+      "ordinal": 585000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1421 - SAT-PWM-count-a-start-at-the-ON-start-not-first-flame-and-never-count-a-hot-water-flame-entries-89-90-Q48-Q49.md"
+    },
+    "TASK-1422": {
+      "title": "SAT PWM: pause the ON timer while the boiler DHW-active bit is set, then restart the start-up sequence (entry 95, Q48b)",
+      "status": "Done",
+      "dependencies": [
+        "TASK-1421"
+      ],
+      "ordinal": 586000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1422 - SAT-PWM-keep-the-PWM-phase-clock-running-during-hot-water-as-thermo-nova-pwm.update-has-no-DHW-gate.md"
+    },
+    "TASK-1423": {
+      "title": "SAT PID: round every PID value to 3 decimals and match thermo-nova's Ki-near-0 clamp (entry 95, Q28a/Q28b)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1368",
+        "TASK-1414"
+      ],
+      "ordinal": 587000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1423 - SAT-PID-round-every-PID-value-to-3-decimals-and-match-thermo-novas-Ki-near-0-clamp-entry-95-Q28a-Q28b.md"
+    },
+    "TASK-1424": {
+      "title": "SAT PWM: an ON start right after a hot-water draw with the DHW flame still lit does not count against cycles per hour (entry 105, Q52D/Q52E)",
+      "status": "Done",
+      "dependencies": [],
+      "ordinal": 588000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1424 - SAT-PWM-an-ON-start-right-after-a-hot-water-draw-with-the-DHW-flame-still-lit-does-not-count-against-cycles-per-hour-entry-105-Q52D-Q52E.md"
+    },
+    "TASK-1425": {
+      "title": "SAT: cycles_this_hour saturates at 6 (rolling-hour ring SAT_MAX_CYCLES_PER_HOUR); heat pumps now have no start bound",
+      "status": "To Do",
+      "dependencies": [],
+      "ordinal": 589000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1425 - SAT-cycles_this_hour-saturates-at-6-rolling-hour-ring-SAT_MAX_CYCLES_PER_HOUR-heat-pumps-now-have-no-start-bound.md"
+    },
+    "TASK-1426": {
+      "title": "SAT: heat pump MM in PWM is the user maximum, outside PWM always 100 (entry 21 open: 100 or user maximum?)",
+      "status": "To Do",
+      "dependencies": [],
+      "ordinal": 590000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1426 - SAT-heat-pump-MM-in-PWM-is-the-user-maximum-outside-PWM-always-100-entry-21-open-100-or-user-maximum.md"
+    },
+    "TASK-1428": {
+      "title": "SAT sustained switches: no flow-validity check (thermo-nova resets on flow None)",
+      "status": "To Do",
+      "dependencies": [
+        "TASK-1412.5"
+      ],
+      "ordinal": 592000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1428 - SAT-sustained-switches-no-flow-validity-check-thermo-nova-resets-on-flow-None.md"
+    },
+    "TASK-1429": {
+      "title": "SAT DHW 300 s guard: arm on sub-tick draws and count from the real end of the draw",
+      "status": "To Do",
+      "dependencies": [],
+      "ordinal": 593000,
+      "parentTaskId": null,
+      "path": "backlog/tasks/task-1429 - SAT-DHW-300-s-guard-arm-on-sub-tick-draws-and-count-from-the-real-end-of-the-draw.md"
+    }
+  },
+  "issueOwners": {
+    "R01": [
+      "TASK-1412.2",
+      "TASK-1412.4"
+    ],
+    "R02": [
+      "TASK-1412.3"
+    ],
+    "R03": [
+      "TASK-1412.3"
+    ],
+    "R04": [
+      "TASK-1412.3",
+      "TASK-1412.10"
+    ],
+    "R05": [
+      "TASK-1412.3",
+      "TASK-1412.8"
+    ],
+    "R06": [
+      "TASK-1412.2",
+      "TASK-1412.7"
+    ],
+    "R07": [
+      "TASK-1412.2",
+      "TASK-1412.6"
+    ],
+    "R08": [
+      "TASK-1412.2",
+      "TASK-1412.5",
+      "TASK-1412.12"
+    ],
+    "R09": [
+      "TASK-1412.2",
+      "TASK-1412.5"
+    ],
+    "R10": [
+      "TASK-1412.11"
+    ],
+    "R11": [
+      "TASK-1412.1",
+      "TASK-1412.9",
+      "TASK-1412.23"
+    ],
+    "R12": [
+      "TASK-1412.16",
+      "TASK-1412.25"
+    ],
+    "R13": [
+      "TASK-1412.10",
+      "TASK-1412.16"
+    ],
+    "R14": [
+      "TASK-1412.2",
+      "TASK-1412.17",
+      "TASK-1412.23",
+      "TASK-1412.25"
+    ],
+    "R15": [
+      "TASK-1412.2",
+      "TASK-1412.13"
+    ],
+    "R16": [
+      "TASK-1412.14"
+    ],
+    "R17": [
+      "TASK-1412.2",
+      "TASK-1412.4",
+      "TASK-1412.17"
+    ],
+    "R18": [
+      "TASK-1412.3",
+      "TASK-1412.10"
+    ],
+    "R19": [
+      "TASK-1412.3",
+      "TASK-1412.7"
+    ],
+    "R20": [
+      "TASK-1412.1",
+      "TASK-1412.9"
+    ],
+    "R21": [
+      "TASK-1412.11",
+      "TASK-1412.12"
+    ],
+    "R22": [
+      "TASK-1412.9"
+    ],
+    "R23": [
+      "TASK-1412.15"
+    ],
+    "R24": [
+      "TASK-1412.3",
+      "TASK-1412.10"
+    ],
+    "R25": [
+      "TASK-1412.2",
+      "TASK-1412.7"
+    ],
+    "R26": [
+      "TASK-1412.1"
+    ],
+    "R27": [
+      "TASK-1412.1"
+    ],
+    "R28": [
+      "TASK-1412.1",
+      "TASK-1412.12"
+    ],
+    "R29": [
+      "TASK-1412.1",
+      "TASK-1412.13"
+    ],
+    "R30": [
+      "TASK-1412.1",
+      "TASK-1412.9"
+    ],
+    "R31": [
+      "TASK-1412.1",
+      "TASK-1412.7",
+      "TASK-1412.9"
+    ],
+    "R32": [
+      "TASK-1412.1",
+      "TASK-1412.10"
+    ],
+    "R33": [
+      "TASK-1412.1"
+    ],
+    "R34": [
+      "TASK-1412.1"
+    ],
+    "R35": [
+      "TASK-1412.1",
+      "TASK-1412.5"
+    ],
+    "R36": [
+      "TASK-1412.1",
+      "TASK-1412.8"
+    ],
+    "R37": [
+      "TASK-1412.1",
+      "TASK-1412.9"
+    ],
+    "R38": [
+      "TASK-1412.1"
+    ],
+    "R39": [
+      "TASK-1412.1",
+      "TASK-1412.12",
+      "TASK-1412.23"
+    ],
+    "R40": [
+      "TASK-1412.1",
+      "TASK-1412.14"
+    ],
+    "R41": [
+      "TASK-1412.2",
+      "TASK-1412.3",
+      "TASK-1412.18",
+      "TASK-1412.19",
+      "TASK-1412.20",
+      "TASK-1412.21",
+      "TASK-1412.22",
+      "TASK-1412.23",
+      "TASK-1412.24",
+      "TASK-1412.25"
+    ],
+    "R42": [
+      "TASK-1412.16",
+      "TASK-1412.17",
+      "TASK-1412.24",
+      "TASK-1412.25"
+    ]
+  },
+  "pidWriterChain": [
+    "TASK-1368",
+    "TASK-1270",
+    "TASK-1416",
+    "TASK-1417",
+    "TASK-1418",
+    "TASK-1414",
+    "TASK-1423",
+    "TASK-1415"
+  ],
+  "formalValidationChain": [
+    "TASK-1412.18",
+    "TASK-1412.19",
+    "TASK-1412.21",
+    "TASK-1412.22",
+    "TASK-1412.23",
+    "TASK-1412.24",
+    "TASK-1412.25",
+    "TASK-1412.26"
+  ],
+  "humanGates": {
+    "TASK-1381": "Q53 / recorded designer approval",
+    "TASK-1415": "Robert decides persistence write cadence",
+    "TASK-1426": "Q54 / heat-pump MM",
+    "TASK-1373": "remaining MaxTSet defaults/write behaviour and explicit ID6 interoperability resolution"
+  },
+  "history": "Supersedes the initial 47-node snapshot and incorporates reconciliation 6dda1e15a plus the user-requested update. Historical Done-task prerequisites are retained."
 }

@@ -1,29 +1,58 @@
 {
-  "scope": "Backlog sequencing audit only; no implementation or physical validation",
+  "scope": "Execution-graph scheduling audit only; no implementation or physical verdict",
+  "generatedUtc": "2026-10-28T20:08:50.838092+00:00",
+  "sourceCommit": "b153f0dcf6a90790c37f8c4c97ad4b569befc501",
   "epic": "TASK-1412",
-  "new_children": 26,
-  "reused_tasks": 19,
-  "graph_nodes": 47,
-  "dependency_cycles": 0,
-  "issues_with_nonfinal_owner": 42,
-  "old_max_ordinal": 549000,
-  "new_ordinals_after_old_queue": true,
-  "field_requires_bench_acceptance": true,
-  "topological_waves": [
+  "graphNodes": 63,
+  "dependencyCycles": 0,
+  "issuesWithExecutionOwners": 42,
+  "allRelevantFollowUpsIncluded": [
+    "TASK-1413",
+    "TASK-1414",
+    "TASK-1415",
+    "TASK-1416",
+    "TASK-1417",
+    "TASK-1418",
+    "TASK-1419",
+    "TASK-1420",
+    "TASK-1421",
+    "TASK-1422",
+    "TASK-1423",
+    "TASK-1424",
+    "TASK-1425",
+    "TASK-1426",
+    "TASK-1428",
+    "TASK-1429"
+  ],
+  "pidWriterChainVerified": true,
+  "independentPidWorkNotBlockedByQ53": true,
+  "fieldRequiresBenchAcceptance": true,
+  "manifestSha256": "6c796865109559969f9df745906f56f47c42b7595d1609835090577864b26942",
+  "topologicalWaves": [
     [
+      "TASK-1368",
       "TASK-1387",
-      "TASK-1412.1"
+      "TASK-1409",
+      "TASK-1412.1",
+      "TASK-1413",
+      "TASK-1420",
+      "TASK-1424",
+      "TASK-1425",
+      "TASK-1426",
+      "TASK-1429"
     ],
     [
+      "TASK-1270",
       "TASK-1412.2"
     ],
     [
+      "TASK-1381",
       "TASK-1412.3",
-      "TASK-1412.17"
+      "TASK-1412.17",
+      "TASK-1416"
     ],
     [
       "TASK-1365",
-      "TASK-1368",
       "TASK-1373",
       "TASK-1375",
       "TASK-1382",
@@ -32,39 +61,47 @@
       "TASK-1389",
       "TASK-1405",
       "TASK-1407",
-      "TASK-1409",
       "TASK-1412.4",
       "TASK-1412.5",
       "TASK-1412.6",
-      "TASK-1412.8",
-      "TASK-1412.20"
+      "TASK-1412.20",
+      "TASK-1417"
     ],
     [
-      "TASK-1270",
       "TASK-1370",
       "TASK-1380",
       "TASK-1384",
       "TASK-1390",
       "TASK-1412.13",
       "TASK-1412.14",
-      "TASK-1412.15"
+      "TASK-1412.15",
+      "TASK-1418",
+      "TASK-1419",
+      "TASK-1421",
+      "TASK-1428"
     ],
     [
-      "TASK-1381",
-      "TASK-1412.7",
+      "TASK-1412.8",
       "TASK-1412.9",
-      "TASK-1412.11"
+      "TASK-1412.11",
+      "TASK-1414",
+      "TASK-1422"
+    ],
+    [
+      "TASK-1371",
+      "TASK-1412.7",
+      "TASK-1423"
     ],
     [
       "TASK-1331",
-      "TASK-1371",
+      "TASK-1412.12",
+      "TASK-1415"
+    ],
+    [
       "TASK-1412.10"
     ],
     [
-      "TASK-1412.12",
-      "TASK-1412.16"
-    ],
-    [
+      "TASK-1412.16",
       "TASK-1412.18"
     ],
     [
@@ -92,5 +129,25 @@
       "TASK-1412"
     ]
   ],
-  "manifest_sha256": "a5ccf09c6fb58c4ca64b3b9f014844d12a0d1ae8c4b10b1951affe02dfe124fd"
+  "metadataReadyIgnoringHumanGates": [
+    "TASK-1368",
+    "TASK-1409",
+    "TASK-1412.1",
+    "TASK-1413",
+    "TASK-1425",
+    "TASK-1426",
+    "TASK-1429"
+  ],
+  "negativeControls": {
+    "dependencyCycle": "rejected",
+    "formalFieldBenchBypass": "rejected"
+  },
+  "liveDependencySnapshotMatches": true,
+  "localDocumentationLinksResolve": true,
+  "instructionChecks": {
+    "command": "python -m pytest -q tests/test_sat_ground_truth_block.py tests/test_adr_governance.py",
+    "passed": 20,
+    "failed": 1,
+    "limitation": "Existing ADR index misses ADR-197..201; docs/adr and governance code/tests are unchanged by this update."
+  }
 }

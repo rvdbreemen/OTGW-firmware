@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: 2026-10-20 18:16
-updated_date: '2026-10-28T19:18:00Z'
+updated_date: '2026-10-28T20:08:00Z'
 labels:
   - bug
   - sat
@@ -16,6 +16,8 @@ dependencies:
   - TASK-1368
 references:
   - TASK-1412
+documentation:
+  - docs/sat/sat-low-load-agent-handoff-2026-10-28.md
 priority: medium
 ordinal: 400000
 ---
@@ -62,3 +64,16 @@ Verification: host test compiling the real satPidUpdate() path (first call retur
 
 2026-10-28: the current plan keeps the sample-time and unchanged-error gates that TASK-1368 removes (entry 75 :3425; TASK-1368 plan). Plan superseded until TASK-1368's update/output split lands; then rewrite it (start-up state + D = 0, Q39b).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @codex
+created: 2026-10-28T20:08:00Z
+
+---
+
+Robert requested this builder handoff from Codex. Read docs/sat/sat-low-load-execution-backlog-2026-10-28.md (current schedule) and docs/sat/sat-low-load-agent-handoff-2026-10-28.md before the next task. Keep current 1368 and 1409 work; this update changes only metadata/docs. Main PID chain: 1368 -> 1270 -> 1416 -> 1417 -> 1418 -> 1414 -> 1423 -> 1415. 1381 branches after 1270 and still waits on Q53; 1415 waits on Robert for write cadence. Q55 is answered by entry 111. 1409 is independent, followed by telemetry verification with 1425. Include 1422/1424 and 1413 in their integration gates. Do not resolve the ID6/MaxTSet contract or any open question by assumption. Per-fix bench old-vs-new proof is required before tester alphas; formal 1412.18 -> .26 validation remains required. Do not stage or overwrite another worker's source/task changes; coordinate shared SATpid.ino edits one at a time.
+
+---
+<!-- COMMENTS:END -->

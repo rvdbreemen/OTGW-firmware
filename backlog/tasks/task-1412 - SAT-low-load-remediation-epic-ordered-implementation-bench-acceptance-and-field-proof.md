@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-27T23:40:00Z'
-updated_date: '2026-10-28T19:15:00Z'
+updated_date: '2026-10-28T20:11:00Z'
 labels:
   - epic
   - sat
@@ -20,6 +20,7 @@ documentation:
   - docs/sat/sat-low-load-execution-backlog-2026-10-28.md
   - docs/sat/sat-low-load-execution-backlog-2026-10-28.json
   - docs/sat/evidence/2026-10-28-low-load-backlog-order.json
+  - docs/sat/sat-low-load-agent-handoff-2026-10-28.md
 priority: medium
 type: feature
 ordinal: 550000
@@ -39,6 +40,12 @@ Execute the TASK-1411 review programme for R01-R42 using the existing implementa
 - [ ] #4 PH-PIC, PH-OTD, PH-PROFILE and PH-FIELD are passed for each claimed supported combination or that combination is explicitly excluded from the release.
 - [ ] #5 An independent final evidence review verifies the implementation, physical results, rollback and limitations; no unmeasured energy or heat-pump suitability claim remains.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+2026-10-28 Robert requested graph update and builder communication: preserve the already committed reconciliation; link TASK-1422/1424 into post-DHW verification and TASK-1413 into model-baseline verification; serialize pending SATpid.ino writers after 1368/1270 without putting Q53 or persistence-cadence decisions in front of independent fixes; refresh execution markdown/JSON and graph audit from actual task metadata; publish handoff on active tasks 1368/1409 and the epic; verify acyclicity and mandatory bench-to-field gates; commit only these task/document changes. No firmware implementation or status completion in this update.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
@@ -73,4 +80,19 @@ stays; the order inside it changes so that this defect is fixed first, with old-
 2026-10-28 maintainer decision (Robert, in session): alphas keep reaching testers after a bench old-vs-fix proof per fix; TASK-1412.22 gates only the formal field-validated claim and the release, not alpha builds.
 
 2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): removed TASK-1412.3 from TASK-1420 (Done), 1368, 1270, 1381, 1413, 1409; replaced it by TASK-1368/1270 on 1417/1414. Reason (precedent TASK-1419): these tasks carry their own red/green host tests and recorded decisions; TASK-1412.3 absorbs them into LL-003/LL-004/LL-020 later. Kept on 1412.4-.6 (LL-010/011/017 PENDING and contracts missing). Added 1428/1429 to 1412.8, 1423 to 1412.10, 1425 to 1412.15, 1426 to 1412.18, 1412.5 to 1428. Not changed: Done tasks 1380/1382/1383/1407 still list 1412.3 (history). docs/sat/sat-low-load-execution-backlog-2026-10-28.md and the backlog-order JSON are now stale on these edges. Real blockers outside the graph: TASK-1381 AC#2 (Sergeant D OK, Q53 queued), TASK-1426 (entry 21, Q54 queued), TASK-1415 AC#3 (Robert: write cadence, entry 74).
+
+2026-10-28 Codex execution-graph update completed at Robert's request: preserved reconciliation 6dda1e15a, linked 1422/1424 into 1412.7 and 1413 into 1412.16, encoded the serial PID writer chain without Q53 blocking independent fixes, refreshed markdown/JSON and audit. Audit: 63 nodes, zero cycles, 42 issue owners, all relevant SAT follow-ups in the epic closure, bench required for formal field stages; injected cycle and bench-bypass controls rejected. Builder handoff published in comments on 1368/1409/1270 and this epic, linked from AGENTS.md and CLAUDE.md. No direct active builder endpoint was available and no acknowledgement is claimed. Active builders retain ownership of 1368/1409 and all firmware edits. No control change or task completion claimed.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @codex
+created: 2026-10-28T20:08:00Z
+
+---
+
+Robert requested this builder handoff from Codex. Read docs/sat/sat-low-load-execution-backlog-2026-10-28.md (current schedule) and docs/sat/sat-low-load-agent-handoff-2026-10-28.md before the next task. Keep current 1368 and 1409 work; this update changes only metadata/docs. Main PID chain: 1368 -> 1270 -> 1416 -> 1417 -> 1418 -> 1414 -> 1423 -> 1415. 1381 branches after 1270 and still waits on Q53; 1415 waits on Robert for write cadence. Q55 is answered by entry 111. 1409 is independent, followed by telemetry verification with 1425. Include 1422/1424 and 1413 in their integration gates. Do not resolve the ID6/MaxTSet contract or any open question by assumption. Per-fix bench old-vs-new proof is required before tester alphas; formal 1412.18 -> .26 validation remains required. Do not stage or overwrite another worker's source/task changes; coordinate shared SATpid.ino edits one at a time.
+
+---
+<!-- COMMENTS:END -->
