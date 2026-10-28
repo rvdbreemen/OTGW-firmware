@@ -6,10 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-28T18:15:00Z'
+updated_date: '2026-10-28T19:15:00Z'
 labels:
   - sat
 milestone: 2.0.0
-dependencies: []
+dependencies:
+  - TASK-1412.5
 priority: low
 ordinal: 592000
 ---
@@ -25,3 +27,9 @@ Found in TASK-1420 review. satGetFlowTemp() returns raw Tboiler (SATcontrol.ino 
 - [ ] #1 Host test: no valid flow resets the overshoot and underheat starts, red on HEAD, green on fix
 - [ ] #2 build + evaluate green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): depends on TASK-1412.5: 'what counts as no flow' is the LL-011 measurement-validity contract.
+<!-- SECTION:NOTES:END -->

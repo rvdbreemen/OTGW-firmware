@@ -6,12 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-28T06:45:00Z'
+updated_date: '2026-10-28T19:14:00Z'
 labels:
   - sat
   - sergeant-d
 milestone: 2.0.0
 dependencies:
-  - TASK-1412.3
+  - TASK-1368
 references:
   - docs/sat/sergeant-d-corrections.md
 priority: medium
@@ -30,3 +31,9 @@ Sergeant D 2026-10-27 (entry 76, Q26: fixed 0.1). Deadband constant 0.1 as therm
 - [ ] #2 Setting, REST field, MQTT set command and UI control removed; docs/api updated
 - [ ] #3 build + evaluate green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): TASK-1412.3 dependency replaced by TASK-1368 (own host-test AC#1; PID tasks run one at a time after 1368).
+<!-- SECTION:NOTES:END -->

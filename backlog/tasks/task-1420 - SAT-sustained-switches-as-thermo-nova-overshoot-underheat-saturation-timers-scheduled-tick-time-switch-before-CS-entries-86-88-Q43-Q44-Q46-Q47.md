@@ -8,13 +8,12 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-28T06:47:00Z'
-updated_date: '2026-10-28T18:37:00Z'
+updated_date: '2026-10-28T19:14:00Z'
 labels:
   - sat
   - sergeant-d
 milestone: 2.0.0
-dependencies:
-  - TASK-1412.3
+dependencies: []
 references:
   - docs/sat/sergeant-d-corrections.md
 priority: medium
@@ -62,6 +61,8 @@ Verification: host tests calling the real extracted functions (tests/test_sat_ov
 2026-10-28 picked up ahead of dependency TASK-1412.3 (To Do): the maintainer-approved TASK-1412 wave plan puts TASK-1420 in wave 2. Advisor review of the plan: (1) skip paths must clear the exit starts too; (2) both halves of the thermo-nova hot-water guard (:313-315) -> entry 108 recorded first; (3) one sustained_runtime helper (helpers.py:51-56); (4) catch-up grid caveat queued as Q46c; (5) red run behavioural via a HEAD adapter. All adopted.
 
 2026-10-28 review round 1. Opus correctness: HIGH - timerSATControl runs SKIP_MISSED_TICKS (initSAT CHANGE_INTERVAL_SEC without type, SATcontrol.ino:4277, settingStuff.ino:1005, safeTimers.h:96), so due-interval == millis(); there is no catch-up grid. Verified by me (grep + safeTimers.h). Decision (A, no behaviour change): keep SKIP, tick time = millis() once per tick; under SKIP ticks are never closer than one interval, so the timers already fire on the first tick >= their length after the first sample (Q46 B outcome). Recorded as entry 109; Q46c withdrawn; Q46 premise corrected. B (switch to catch-up) rejected: it would add CS/MM/CH bursts after a stall for no gain. Also fixed in this round: DHW sentinel false guard before millis wrap (bool flag), stale docs (rules review), loop-level switch-tick test. Filed TASK-1428 (flow validity, thermo-nova :284-286, :333-335) and TASK-1429 (DHW guard sub-tick draws / real end time).
+
+2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): TASK-1412.3 dependency removed: the task is Done with its own red/green host tests (same waiver as TASK-1419); TASK-1412.3 absorbs them into LL-004/LL-020.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

@@ -7,13 +7,12 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-20 18:16
-updated_date: '2026-10-28T07:52:00Z'
+updated_date: '2026-10-28T19:14:00Z'
 labels:
   - bug
   - sat
 milestone: 2.0.0
 dependencies:
-  - TASK-1412.3
   - TASK-1368
 references:
   - TASK-1412
@@ -58,4 +57,6 @@ Verification: host test compiling the real satPidUpdate() path (first call retur
 2026-10-28: Q39 A decided (entry 83): first tick sends curve + P + restored I; D term on the first tick asked as Q39b (D=0 provisional per the option text).
 
 2026-10-28 Q39b (entry 95): D = 0 on the first tick.
+
+2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): TASK-1412.3 dependency removed (own host-test AC#1; decisions entries 83, 95). TASK-1368 kept: both change the SATpid.ino update gates.
 <!-- SECTION:NOTES:END -->

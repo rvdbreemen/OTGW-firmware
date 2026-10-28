@@ -6,13 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-26T20:12:00Z'
-updated_date: '2026-10-27T23:46:00Z'
+updated_date: '2026-10-28T19:14:00Z'
 labels:
   - sat
   - bug
 milestone: 2.0.0
-dependencies:
-  - TASK-1412.3
+dependencies: []
 references:
   - TASK-1412
 ordinal: 547000
@@ -34,4 +33,6 @@ Found 2026-10-26 while answering Alexw (flame tracking), second reader confirmed
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
+
+2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): TASK-1412.3 dependency removed: reporting only, own host-test AC#1.
 <!-- SECTION:NOTES:END -->

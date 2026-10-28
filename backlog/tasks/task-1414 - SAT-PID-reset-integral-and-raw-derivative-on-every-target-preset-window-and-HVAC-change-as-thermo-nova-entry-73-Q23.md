@@ -6,12 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-28T06:44:00Z'
+updated_date: '2026-10-28T19:14:00Z'
 labels:
   - sat
   - sergeant-d
 milestone: 2.0.0
 dependencies:
-  - TASK-1412.3
+  - TASK-1270
 references:
   - docs/sat/sergeant-d-corrections.md
 priority: medium
@@ -31,3 +32,9 @@ Sergeant D 2026-10-27 (entry 73, Q23: follow thermo-nova). Reset integral + raw 
 - [ ] #3 ADR-197 Decision 8 / open question updated
 - [ ] #4 build + evaluate green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): TASK-1412.3 dependency replaced by TASK-1270: entry 73 Open says the reset must not reintroduce the TASK-1270 first-tick behaviour; own host-test AC#1.
+<!-- SECTION:NOTES:END -->

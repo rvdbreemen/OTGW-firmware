@@ -6,12 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-28T06:44:00Z'
+updated_date: '2026-10-28T19:14:00Z'
 labels:
   - sat
   - sergeant-d
 milestone: 2.0.0
-dependencies:
-  - TASK-1412.3
+dependencies: []
 references:
   - docs/sat/sergeant-d-corrections.md
 priority: medium
@@ -32,3 +32,9 @@ Sergeant D 2026-10-27 (entry 72, Q22: Remove). Remove the hourly coefficient aut
 - [ ] #4 ADR-198 open question on auto-tune closed with entry 72
 - [ ] #5 build.bat esp32-combo SUCCESS and evaluate.py --quick green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): TASK-1412.3 dependency removed: own red/green AC#1, decision entry 72 (ADR-198 still Proposed, waits on Robert).
+<!-- SECTION:NOTES:END -->
