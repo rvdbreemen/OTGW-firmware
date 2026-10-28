@@ -52,4 +52,6 @@ Diag patch with corrected markers (ev36, ev37, ev42-ev46 incl. around hostByName
 - 2026-10-22 20:17: no-GARP A/B stopped by Claude Code after 40 resets (system low on memory, commit charge 89%), not by the test. 40/40 normal (web 4-8 s), 0 slow. Bench .68 left on the no-GARP diag build 1.7.8-beta.6+12975b4. Resume only on maintainer request.
 
 2026-10-28: uncommitted TEMP DIAG (stage markers + no-GARP A/B) removed from the 1.x worktree to merge origin; parked as %LOCALAPPDATA%\OTGW-capture\parked\task1302-temp-boot-diag-20261028.patch (git apply --check after the merge: see session). Bench .68 still runs the no-GARP diag build 1.7.8-beta.6+12975b4.
+
+Post-merge check: code hunks still apply (git apply --check --exclude='*version.h' --exclude='*version.hash'); only the generated version files conflict, regenerate them instead.
 <!-- SECTION:NOTES:END -->
