@@ -3,11 +3,11 @@ id: TASK-1270
 title: >-
   SAT sends CS=10/CH=0 for the first ~60 s after enable because the first PID
   call returns the uninitialised 0
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: 2026-10-20 18:16
-updated_date: '2026-10-28T19:14:00Z'
+updated_date: '2026-10-28T19:18:00Z'
 labels:
   - bug
   - sat
@@ -59,4 +59,6 @@ Verification: host test compiling the real satPidUpdate() path (first call retur
 2026-10-28 Q39b (entry 95): D = 0 on the first tick.
 
 2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): TASK-1412.3 dependency removed (own host-test AC#1; decisions entries 83, 95). TASK-1368 kept: both change the SATpid.ino update gates.
+
+2026-10-28: the current plan keeps the sample-time and unchanged-error gates that TASK-1368 removes (entry 75 :3425; TASK-1368 plan). Plan superseded until TASK-1368's update/output split lands; then rewrite it (start-up state + D = 0, Q39b).
 <!-- SECTION:NOTES:END -->
