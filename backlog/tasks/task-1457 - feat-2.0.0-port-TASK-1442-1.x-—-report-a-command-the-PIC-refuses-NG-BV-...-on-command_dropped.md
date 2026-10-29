@@ -3,9 +3,11 @@ id: TASK-1457
 title: >-
   feat-2.0.0: port TASK-1442 (1.x) — report a command the PIC refuses
   (NG/BV/...) on command_dropped
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T07:03:00Z'
+updated_date: '2026-10-29T19:46:00Z'
 labels:
   - port-from-1.x
   - mqtt

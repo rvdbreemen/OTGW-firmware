@@ -9,8 +9,8 @@ The queue is sliced from src/OTGW-firmware/OTGW-Core.ino (from the
 "#define OTGW_CMD_RETRY" line through checkCommandResponse()) and PICSection
 from src/OTGW-firmware/PICtypes.h, by anchor, never copied. With --old-rev both
 revisions are compiled against the same harness: the run passes only when FIX
-passes every case and OLD fails exactly the defect cases (D1-D4) while passing
-the controls (C1, C2). Compiler: MSVC (vswhere). Exit: 0 PASS, 1 FAIL, 2 error.
+passes every case and OLD fails exactly the defect cases (R1-R4, refused
+commands, TASK-1457) while passing the controls (D1-D4, C1, C2). Compiler: MSVC (vswhere). Exit: 0 PASS, 1 FAIL, 2 error.
 """
 import argparse
 import re
@@ -22,8 +22,10 @@ from test_pic_banner_dispatch import read
 
 CORE = "src/OTGW-firmware/OTGW-Core.ino"
 PICTYPES = "src/OTGW-firmware/PICtypes.h"
-DEFECT = ["D1", "D2", "D3", "D4"]
-CONTROL = ["C1", "C2"]
+# Against a revision before TASK-1439, D1-D4 are the defect cases too; the
+# lists below are for the TASK-1457 comparison against a revision with TASK-1439.
+DEFECT = ["R1", "R2", "R3", "R4"]
+CONTROL = ["D1", "D2", "D3", "D4", "C1", "C2"]
 
 
 def slice_queue(lines):

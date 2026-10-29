@@ -22,6 +22,10 @@
 //   D4  two TP= queued back to back (no forceQueue) occupy two slots
 //   C1  two TT= queued back to back (no forceQueue) share one slot, last wins
 //   C2  a command answered before its 5th try is not reported
+//   R1  ZZ=1 answered "ZZ: NG" -> command_dropped "ZZ=1 (NG)", flag ON, one send (TASK-1457)
+//   R2  with the flag ON, SB=99 answered "SB: OR" -> reported, flag not OFF
+//   R3  PR=Q answered "PR: BV" -> "PR=Q (BV)" after one send
+//   R4  PM=3 answered "PM: NG" -> "PM=3 (NG)" after one send
 //=======================================================================
 
 #include <cstdio>
@@ -171,6 +175,44 @@ int main() {
   resetQueue();
   add("SB=15", true); tick(); tick(); answer("SB: 15.00");
   report("C2", cmdQueueSize == 0 && last(kDropped) == nullptr, "an answered command is not reported", pubs());
+
+  // R1: an unknown command is refused with NG (TASK-1457).
+  resetQueue();
+  add("ZZ=1", true); tick(); answer("ZZ: NG");
+  {
+    const Pub* d = last(kDropped); const Pub* f = last(kFlag);
+    report("R1", cmdQueueSize == 0 && g_serial.size() == 1 && d && d->payload == "ZZ=1 (NG)" && !d->retain
+                   && f && f->payload == "ON" && f->retain,
+           "ZZ: NG reports ZZ=1 (NG) after one send, flag ON retained", pubs());
+  }
+
+  // R2: another refusal while the flag is ON keeps it ON.
+  g_pubs.clear();
+  add("SB=99", true); tick(); answer("SB: OR");
+  {
+    const Pub* d = last(kDropped);
+    report("R2", cmdQueueSize == 0 && d && d->payload == "SB=99 (OR)" && last(kFlag) == nullptr
+                   && state.pic.bCmdRetryExceeded,
+           "SB: OR is reported and does not set the flag OFF", pubs());
+  }
+
+  // R3: an unsupported PR= register is refused at once, not retried 5 times.
+  resetQueue();
+  add("PR=Q", true); tick(); answer("PR: BV");
+  {
+    const Pub* d = last(kDropped);
+    report("R3", cmdQueueSize == 0 && g_serial.size() == 1 && d && d->payload == "PR=Q (BV)",
+           "PR: BV reports PR=Q (BV) after one send", pubs());
+  }
+
+  // R4: a refused PM= is caught before the PM message-id match.
+  resetQueue();
+  add("PM=3", true); tick(); answer("PM: NG");
+  {
+    const Pub* d = last(kDropped);
+    report("R4", cmdQueueSize == 0 && g_serial.size() == 1 && d && d->payload == "PM=3 (NG)",
+           "PM: NG reports PM=3 (NG) after one send", pubs());
+  }
 
   std::printf("%s (%d failed)\n", g_fail ? "FAIL" : "PASS", g_fail);
   return g_fail ? 1 : 0;

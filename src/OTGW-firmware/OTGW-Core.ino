@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.534
+**  Version  : v2.0.0-alpha.535
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3697,6 +3697,28 @@ static void clearCommandDropped() {
   publishCommandDroppedState();
 }
 
+// The PIC refuses a command with one of these codes instead of echoing it:
+// NG unknown command, SE syntax error, BV bad value, OR out of range, NS no
+// space, NF not found, OE overrun (otgw.tclcode.com/firmware.html).
+static bool isPicErrorReply(const char* code) {
+  static const char kCodes[] = "NG SE BV OR NS NF OE";
+  if (!isupper((unsigned char)code[0]) || !isupper((unsigned char)code[1])) return false;
+  if (code[2] != '\0' && code[2] != ' ' && code[2] != '\r' && code[2] != '\n') return false;
+  for (const char* p = kCodes; *p != '\0'; p += 3) {
+    if (p[0] == code[0] && p[1] == code[1]) return true;
+  }
+  return false;
+}
+
+// A refused command is reported like a dropped one, with the code appended,
+// e.g. "ZZ=1 (NG)", and is not retried: the PIC would refuse it again
+// (TASK-1457, port of 1.x TASK-1442).
+static void reportCommandRejected(const char* cmd, const char* code) {
+  char msg[sizeof(cmdqueue[0].cmd) + 6];
+  snprintf_P(msg, sizeof(msg), PSTR("%s (%c%c)"), cmd, code[0], code[1]);
+  reportCommandDropped(msg);
+}
+
 // Remove entry at index from the command queue, shifting remaining entries down.
 static void removeFromCmdQueue(int index) {
   for (int j = index; j < (cmdQueueSize - 1); j++) {
@@ -3899,9 +3921,20 @@ void checkCommandResponse(const char *buf, unsigned int len){
   char value[11]; memset( value, 0, sizeof(value));
   memcpy(cmd, buf, 2);
   memcpy(value, buf+3, ((len-3)<(sizeof(value)-1))?(len-3):(sizeof(value)-1));
+  const char* code = value;
+  while (*code == ' ') code++;
+  const bool rejected = isPicErrorReply(code);
   for (int i=0; i<cmdQueueSize; i++){
       OTDebugTf(PSTR("CmdQueue: Checking [%2s]==>[%d]:[%s] from queue\r\n"), cmd, i, cmdqueue[i].cmd);
     if (cmdqueue[i].cmd[0] == cmd[0] && cmdqueue[i].cmd[1] == cmd[1]){
+      // An error reply carries no register letter or message id to match on,
+      // so it goes to the first queued command with these two letters (TASK-1457).
+      if (rejected) {
+        OTDebugTf(PSTR("CmdQueue: PIC refused [%d]:[%s] with [%s]\r\n"), i, cmdqueue[i].cmd, code);
+        reportCommandRejected(cmdqueue[i].cmd, code);
+        removeFromCmdQueue(i);
+        break;
+      }
       // For PR commands, also match the register letter
       // (e.g., response "PR: S=16.00" must match "PR=S" in queue, not "PR=O")
       // value starts at buf+3, which may have a leading space (e.g., " S=16.00")
