@@ -3,11 +3,11 @@ id: TASK-1440
 title: >-
   SAT zones: port thermo-nova area.py zone aggregation as it is (Q18 A, entry
   116)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T05:02:00Z'
-updated_date: '2026-10-29T07:04:00Z'
+updated_date: '2026-10-29T07:32:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -41,3 +41,9 @@ Sources (opened 2026-10-29 at 7beaaf5, UPSTREAM_COMMIT verified): climate.py:369
 
 Docs (AC2): firmware-sat-spec.md, sat-comparison.md, c4-code-sat.md, c4-component-smart-thermostat.md, manuals en/nl, CHANGELOG updated by a docs agent and checked: content matches the helper; 39 shifted SATcontrol.ino cites in the new text corrected after the rebase on 2698f3e06; stale texts fixed (settingsHelp satzonecount, two P75 code comments, manuals 'Zone 1 always maps to the primary target', which the code does not do: zone setpoints only come from a push, SATcontrol.ino:2211). fZoneAggregationHeadroom kept as the cap headroom, documented as not binding with <= 4 zones. ECO solar (entry 118, Q58 A): tests/test_sat_zone_aggregation.py test_eco_applies_no_solar_offset red on the old code (37.0 with a 3.0 offset, want 40.0), green on the fix; COMFORT still applies it (37.0). All tests/test_sat_*.py OK after the rebase; test_sat_pwm_override stub extended (iHeatingMode). Not touched: ECO 0.1 rounding (entry 95, TASK-1423).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT zones now follow thermo-nova area.py as it is (Sergeant D entry 116, Q18 A) combined with ADR-199 (Robert 2026-10-24: area.py's COLD_SETPOINT sites use the per-system cold setpoint 28.2 / 21.0), and ECO takes no solar offset (entry 118, Q58 A). Shipped in 2.0.0-alpha.528+20610d9 (commit 20610d9eb, posted to #alpha-testing, message 1565267051780644964). Code: new satAggregateZoneSetpoint() (climate.py:369-394, area.py:166-175, 264-333 at 7beaaf5): setpoint = max(main, zones output), zones output = min(highest, P75 + headroom) round 1, a zone counts when usable and output > cold, overshoot cap cold + 10 - 4 x over beyond 0.3 floored at cold applied as min(), ECO main only; runs for every zone count 1-4. satZonePidAdvanceAll() now steps zone 1 at count 1 (found in self-review). Deliberate: zone diagnostics stay gated at > 1 zone (C5). AC1 evidence: tests/test_sat_zone_aggregation.py red on a632e8e68 (12 of 14 fail: ECO 52 for main 35, four zones 49 for 46, main 50 lowered to 37, one zone at count 1 ignored, no cap/floor/margin, underfloor) and red on the old solar line (ECO 37.0, want 40.0); green on the fix 16/16. test_sat_pid_cadence test_g2: zone 1 I after 600 s at count 1 0.000000 old vs 0.071029 fix; no zone data -> I 0, output 10, so default single-room users see no change. AC2: fZoneAggregationHeadroom kept as the cap headroom (default 5.0 = area.py:267), meaning changed and documented; with <= 4 zones it does not bind. firmware-sat-spec, sat-comparison, c4 docs, manuals en/nl, CHANGELOG, settingsHelp updated. Gates: all tests/test_sat_*.py OK, test/host/test_sat_pid_derivative OK, settings-help.test.mjs 28/28, evaluate --quick 86 checks 0 fail 0 warn, combo build exit 0 with fresh +20610d9 artifacts (and earlier +6b8c006, same code before the docs-only rebase). Not verified: a real multi-zone house or bench run with pushed zone data (host tests only); roundf vs Python round-half-even differs only on exact ties; ECO 0.1 rounding of the main output not done (entry 95, TASK-1423); zone PID itself unchanged (TASK-1414..1418/1423).
+<!-- SECTION:FINAL_SUMMARY:END -->
