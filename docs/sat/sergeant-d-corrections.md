@@ -4745,3 +4745,47 @@ Not yet second-read: no independent reader has tried to refute the anchored-vers
 **Status updates:** entry 64's "Open: Alex's answer" is answered by entry 66. Entry 66 Open (a)/(b) stays open with Robert and is revisited only if Alex names a concrete commit newer than 7beaaf5 (following the 2026-10-26 decision in entry 64).
 
 **Changes an earlier entry:** entries 63, 64, 65, 66, wording only, as listed. **Task:** TASK-1412.1 (R33). **Open:** entry 66 Open (a)/(b), Robert.
+
+## 126. A valid outside temperature is younger than 1 hour and survives a restart, so SAT resumes in one tick (2026-10-29, refines entry 121 and the TASK-1482 plan)
+
+**Source:** #alpha-testing, 2026-10-29, reply to our TASK-1482/TASK-1390 plan (msg 1565441560621875261):
+- 20:15 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1565459158591869019
+- 20:26 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1565461805260869694
+- 20:28 UTC ("Yes please", to the maintainer's request below): https://discord.com/channels/812969634638725140/1514720723980259460/1565462241413697647
+- Maintainer (Robert, number3nl), 20:27-20:28 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1565462292915687596
+
+**Quoted:**
+
+> I prefer a different approach regarding OT. We should count a valid OT value when is younger than 1 hour, moreover it needs to survive a restart, so it can resume heating immediately after the restart without the user feel any disturbance.
+> Is it possible?
+
+> @Robert van den Breemen if also the OT value is able to survive a restart, the resume of heating will be matter of 1 tick.
+
+> Yes please
+
+Maintainer (number3nl): "add the outside temperature to the dataset stored as PID value. That way you can easily recover."
+
+**Settled (our reading; "OT value" read as the outside temperature, the value our plan point 1 and choice (b) were about):**
+
+- An outside temperature counts as valid while it is younger than 1 hour, whatever its source (consistent with entry 57).
+- The last valid outside temperature and its age are saved with the PID state (the maintainer's request) and restored at boot. After a restart that is still younger than 1 hour, SAT does not wait for a new weather fetch: it resumes heating on its first control tick, so the user notices no disturbance.
+- This replaces the "wait for a fresh outside temperature" part of entry 121 at a restart; entry 121's quiet state still applies when no valid (restored or fresh) outside temperature exists.
+
+**Compared with thermo-nova and the firmware:** thermo-nova restores its state after a Home Assistant restart (`climate.py:169-190`, `heating_control.py:181-191`) and reads the outside temperature from the HA sensor, which HA itself restores; it skips a pass only while that value is None (`climate.py:544-545`). Firmware at b70338aad: the PID state is persisted (`satSavePidState()`/`satLoadPidState()`, SATcontrol.ino ~2488-2560), the outside temperature is not; boot sends CS=0 (`:4317-4325`).
+
+**Changes an earlier entry:** refines entry 121 (restart wait) and answers plan choice (b) of the TASK-1482 plan in a different way than offered. **Task:** TASK-1482, TASK-1390. **Open:** plan choice (a), whether the boot still sends the hand-back (CS=0, CH=1, MM=T) when a valid restored state exists, or keeps SAT's last setpoint on the bus until the first tick (asked next, Q62).
+
+## 127. Hourly PWM start limit: keep the sliding hour (2026-10-29, settles entry 123's open point)
+
+**Source:** #alpha-testing, 2026-10-29 20:21 UTC, reply to our FYI (msg 1565458086590812394):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565460698874511522
+
+**Quoted:**
+
+> Ok, we can use the sliding hour approach. I agree
+
+(The maintainer, number3nl, 20:20 UTC: "Sliding hour approach is even better, than reset once per hour. That way there will never be more that three heat cycles per hour!")
+
+**Settled:** the firmware keeps its sliding one-hour window for the PWM start limit (SATcycles.ino:328-344) instead of thermo-nova's restarting window (pwm.py:138-141). A deliberate deviation from the pin, agreed by Sergeant D and the maintainer.
+
+**Changes an earlier entry:** settles entry 123 point 4. **Task:** none (no code change); recorded in sat-comparison.md. **Open:** none.
