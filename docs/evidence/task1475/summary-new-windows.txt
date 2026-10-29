@@ -1,0 +1,54 @@
+OTGW MQTT diagnostic capture
+Run folder: <scratch>\bench-new-windows\20261029-234818
+Started: 2026-10-29T23:48:18+01:00
+DeviceHost: 192.168.88.63
+TelnetPort: 23
+TelnetConnectTimeoutSeconds: 6
+TelnetPostDisconnectDelayMilliseconds: 1000
+TelnetReconnectDelayMilliseconds: 500
+TelnetIdleCheckSeconds: 60
+BrokerHost: 127.0.0.1
+BrokerPort: 18830
+Topic: #
+Username supplied: False
+DurationSeconds: 60
+SkipBrowserCapture: True
+SkipCrashlogCapture: False
+SkipHttpProbes: False
+HttpProbeTimeoutSeconds: 10
+CrashlogPollSeconds: 30
+Tool stderr log: <scratch>\bench-new-windows\20261029-234818\error.txt
+Settings prefill saved: <scratch>\bench-settings.json
+Telnet timeout strategy: adaptive (base + retry backoff, capped at 20s)
+Telnet idle check: 60s (health probe gated)
+Python: 3.14.2 (%USERPROFILE%\AppData\Local\Programs\Python\Python314\python.exe)
+Platform: win32
+Browser capture: disabled (--skip-browser-capture).
+Crash-log endpoint: http://192.168.88.63/api/v2/device/crashlog
+Crash-log reboot-log file: http://192.168.88.63/reboot_log.txt
+Crash-log poll interval: 30s
+Crash-log capture started (polling, writing crashlog.log).
+MQTT capture started: paho-mqtt, broker 127.0.0.1:18830, topic '#' (writing mqtt.log).
+Capture started: 2026-10-29T23:48:18+01:00
+MQTT connected: 127.0.0.1:18830, subscribed to '#'
+Telnet connect started: 192.168.88.63:23 (timeout 6s)
+Telnet connected: 2026-10-29T23:48:18+01:00
+Telnet keepalive: idle 10s interval 5s count fixed by Windows (10) (applied: SO_KEEPALIVE, SIO_KEEPALIVE_VALS, TCP_KEEPIDLE, TCP_KEEPINTVL, TCP_KEEPCNT)
+Debug toggle actions: OTmsg=already-on; REST API=on (sent '2'); MQTT=on (sent '3'); Sensors=on (sent '4'); SAT=already-on; OTDirect=already-on; SATBLE=already-on; MQTTGate=already-on; NTP=on (sent 'n'); SensorSim=skipped (simulator)
+Settings dump: sent 'q' (read settings) + 'D' (dump settings/state)
+Capture stop reason: duration elapsed
+Stopping: 2026-10-29T23:49:19+01:00
+MQTT capture: 1 message(s) written to mqtt.log.
+Crash-log capture: completed normally.
+Debug toggles restored to their state at capture start: REST API, MQTT, Sensors, NTP
+Telnet gaps: 0, total 0 s
+HTTP probes: ran 8 request(s) -> curl-probes.log
+ResolvedHostname: OTGW
+ResolvedFirmwareVersion: 2.0.0-alpha.521+2425108 (28-10-2026)
+ResolvedUniqueId: otgw-<mac>
+ResolvedPicDeviceId: pic16f1847
+ResolvedDeviceIdForFilename: otgw-<mac>
+Metadata sources: firmware_version=telnet.log, hostname=telnet.log, unique_id=telnet.log, pic_device_id=telnet.log
+Transcript filename: transcript-20261029-234818-2.0.0-alpha.521+2425108-(28-10-2026)-OTGW-otgw-<mac>.txt
+Finished: 2026-10-29T23:49:22+01:00
+

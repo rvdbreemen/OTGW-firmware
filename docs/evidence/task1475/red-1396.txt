@@ -1,0 +1,2 @@
+OLD worker (origin/dev .sh): keys received during setup = '13qD'; q sent: True; D sent: True
+NEW otgw_capture.py: keys received during setup = '1313'; q sent: False; D sent: False

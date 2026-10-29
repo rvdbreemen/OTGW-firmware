@@ -3,11 +3,11 @@ id: TASK-1475
 title: >-
   Capture tool: one Python implementation replaces capture-mqtt-debug .bat/.sh
   (local first)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T14:05:00Z'
-updated_date: '2026-10-29T22:18:00Z'
+updated_date: '2026-10-29T23:03:00Z'
 labels:
   - tooling
 milestone: 2.0.0
@@ -24,11 +24,11 @@ Robert 2026-10-29 (TASK-1472, interactive choice 'Unify on Python'): rebuild cap
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ADR (Proposed via adr-kit) for the Python capture tool, its bootstrap and the paho-mqtt dependency
-- [ ] #2 One Python implementation collects every source today's scripts collect; transcript format compatible (diff of section headers against a current .bat and .sh capture)
-- [ ] #3 Launchers run on stock Windows 11 without a preinstalled Python, and on macOS and Linux; evidence = a capture run on each available OS
-- [ ] #4 TASK-1396 and TASK-1453 behaviour fixed in the new tool (tests red on the old scripts' behaviour, green)
-- [ ] #5 Old .bat/.sh payloads removed; docs/guides and the flash-zip README updated
+- [x] #1 ADR (Proposed via adr-kit) for the Python capture tool, its bootstrap and the paho-mqtt dependency
+- [x] #2 One Python implementation collects every source today's scripts collect; transcript format compatible (diff of section headers against a current .bat and .sh capture)
+- [x] #3 Launchers run on stock Windows 11 without a preinstalled Python, and on macOS and Linux; evidence = a capture run on each available OS
+- [x] #4 TASK-1396 and TASK-1453 behaviour fixed in the new tool (tests red on the old scripts' behaviour, green)
+- [x] #5 Old .bat/.sh payloads removed; docs/guides and the flash-zip README updated
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -46,4 +46,23 @@ Robert 2026-10-29 (TASK-1472, interactive choice 'Unify on Python'): rebuild cap
 - Tests: tests/test_capture_tool.py 17 cases. Windows 11 / Python 3.12.9: 16 ok + 1 skipped (SIGTERM is POSIX). WSL Ubuntu / Python 3.12.3: 17/17 ok. One earlier full-suite Windows run had case h fail once (gap length bound under CPU load); 8 solo reruns and the next full run were green. tests/test_build.py: red on old build.py (KeyError: no item named 'otgw_capture.py'), green on new (13/13).
 - Z/Y hang keys on the .61 exploratory build (wt-1479 handleDebug.ino:484-488) are not toggles; toggle keys are 1-7,g,n,d,s/S,b, so neither old nor new tool can send them.
 - Not yet done: bench baselines (AC#2), per-OS capture runs (AC#3), stock Windows without Python bootstrap run, shellcheck.
+
+2026-10-30 bench (.63, read-only) + evidence in docs/evidence/task1475/README.md.
+- Side finding (old .bat, now replaced): with a saved BrokerHost in capture-settings.json and stdin redirected, the old .bat does not stop with 'BrokerHost is required.'; it pre-fills the saved broker and starts a capture with no end (observed 23:55, stopped by hand). The new tool never prompts with stdin redirected and treats an empty broker as 'skip MQTT'.
+- AC#3 scope: Windows (launcher run on bench; no-Python bootstrap with stripped PATH + empty LOCALAPPDATA, tamper refusal) and Linux (WSL2 bench run). macOS not available on this machine: not run.
+- AC#5: payloads removed (launchers only); flash-zip README (build.py EN/NL) and scripts/README.md updated. docs/guides has no page about the capture scripts, so nothing to change there.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+One Python capture tool, scripts/otgw_capture.py, replaces the PowerShell payload of capture-mqtt-debug.bat and the bash + heredoc workers of capture-mqtt-debug.sh (ADR-202, Proposed). Launchers only find or bootstrap Python 3.9+ (Windows: SHA-256-checked embeddable CPython 3.12.10 in %LOCALAPPDATA%\OTGW-capture, plain .NET calls so it also works from a pwsh 7 terminal). MQTT uses vendored paho-mqtt 2.1.0 via zipimport, no mosquitto_sub. TASK-1396 and TASK-1453 folded in. build.py ships otgw_capture.py + vendor/ in the flash zip.
+Evidence per AC (docs/evidence/task1475/README.md):
+- AC#1: docs/adr/ADR-202-...md Proposed via adr-kit, adr-lint 0 FAIL; OSS table (paho-mqtt, gmqtt, aiomqtt, amqtt) with PyPI/GitHub data and hashes.
+- AC#2: bench .63 section headers: new (Windows, Linux) identical to old .bat (10); old .sh has 2 extra duplicate stderr sections; mqtt.log identical in all broker runs.
+- AC#3: Windows launcher bench run (picked py -3 = 3.14.2); no-Python bootstrap 11 s / cached 1.5 s / tampered hash refused; bootstrapped 3.12.10 runs the suite; Linux WSL2 bench run. macOS not available, not run.
+- AC#4: red-1396.txt (old worker sends q/D during setup, new does not); toggle restore red on old .bat/.sh, green on new Windows/Linux; no-broker red on old .sh, green on new; tests/test_capture_tool.py 17 cases (Windows 16 ok + 1 POSIX-only skip on 3.9.13/3.12/3.14; Linux 17/17).
+- AC#5: payloads gone, launchers only; tests/test_build.py red on old build.py (KeyError otgw_capture.py) and green (13/13); README EN/NL + scripts/README.md updated.
+Also: python evaluate.py --quick 79 passed, 0 failed; shellcheck 0.11.0 and bash -n clean on both .sh files.
+Not verified: macOS; a physically clean Windows 11 install (simulated with stripped PATH). Open question in ADR-202 for Robert: port to otgw-1.x.x or dev-only.
+<!-- SECTION:FINAL_SUMMARY:END -->

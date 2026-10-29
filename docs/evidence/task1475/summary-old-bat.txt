@@ -1,0 +1,51 @@
+OTGW MQTT diagnostic capture
+Run folder: <scratch>\bench-old-bat\20261029-235009
+Started: 2026-10-29T23:50:09.7639704+01:00
+DeviceHost: 192.168.88.63
+TelnetPort: 23
+TelnetConnectTimeoutSeconds: 6
+TelnetPostDisconnectDelayMilliseconds: 1000
+TelnetReconnectDelayMilliseconds: 500
+TelnetIdleCheckSeconds: 60
+BrokerHost: 127.0.0.1
+BrokerPort: 18830
+Topic: #
+Username supplied: False
+DurationSeconds: 60
+SkipToolInstall: True
+Tool stderr log: <scratch>\bench-old-bat\20261029-235009\error.txt
+Settings prefill saved: %USERPROFILE%\AppData\Local\OTGW-capture\capture-settings.json
+Telnet timeout strategy: adaptive (base + retry backoff, capped at 20s)
+Telnet idle check: 60s (health probe gated)
+Browser capture: disabled (-SkipBrowserCapture).
+Crash-log endpoint: http://192.168.88.63/api/v2/device/crashlog
+Crash-log reboot-log file: http://192.168.88.63/reboot_log.txt
+Crash-log poll interval: 30s
+Crash-log capture started (polling, writing crashlog.log).
+mosquitto_sub: C:\Program Files\mosquitto\mosquitto_sub.exe
+mosquitto_sub source: PATH
+Mosquitto installed by script: False
+Mosquitto directory added to current PATH: False
+Mosquitto directory added to user PATH: False
+mosquitto_sub started: pid 36816
+Capture started: 2026-10-29T23:50:14.4107518+01:00
+Telnet connect started: 192.168.88.63:23 (timeout 6s)
+Telnet connected: 2026-10-29T23:50:14.9576437+01:00
+Telnet keepalive: idle 10s interval 5s count fixed by Windows (10) (applied: SO_KEEPALIVE, SIO_KEEPALIVE_VALS idle 10000ms interval 5000ms)
+Debug toggle actions: OTmsg=already-on; REST API=on (sent '2'); MQTT=on (sent '3'); Sensors=on (sent '4'); SAT=already-on; OTDirect=already-on; SATBLE=already-on; MQTTGate=already-on; NTP=on (sent 'n'); SensorSim=skipped (simulator)
+Settings dump: sent 'q' (read settings) + 'D' (dump settings/state)
+Capture stop reason: duration elapsed
+Telnet gaps: 0, total 0 s
+Stopping: 2026-10-29T23:51:14.4414338+01:00
+mosquitto_sub stopped by script.
+Crash-log capture: completed normally.
+HTTP probes: ran 8 request(s) -> curl-probes.log
+ResolvedHostname: OTGW
+ResolvedFirmwareVersion: 2.0.0-alpha.521+2425108 (28-10-2026)
+ResolvedUniqueId: otgw-<mac>
+ResolvedPicDeviceId: pic16f1847
+ResolvedDeviceIdForFilename: otgw-<mac>
+Metadata sources: FirmwareVersion=telnet.log, Hostname=telnet.log, UniqueId=telnet.log, PicDeviceId=telnet.log
+Finished: 2026-10-29T23:51:20.1612731+01:00
+Transcript filename: transcript-20261029-235009-2.0.0-alpha.521+2425108-(28-10-2026)-OTGW-otgw-<mac>.txt
+

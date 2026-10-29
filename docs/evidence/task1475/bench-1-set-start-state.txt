@@ -1,0 +1,6 @@
+before: OTmsg=1, REST API=1, MQTT=1, Sensors=1, SAT=1, OTDirect=1, SATBLE=1, MQTTGate=1, NTP=1, SensorSim=0
+sent '2' for REST API
+sent '3' for MQTT
+sent '4' for Sensors
+sent 'n' for NTP
+after:  OTmsg=1, REST API=0, MQTT=0, Sensors=0, SAT=1, OTDirect=1, SATBLE=1, MQTTGate=1, NTP=0, SensorSim=0

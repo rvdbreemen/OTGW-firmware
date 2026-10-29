@@ -1,0 +1,52 @@
+OTGW MQTT diagnostic capture
+Run folder: <scratch>/bench-new-linux/20261029-235421
+Started: 2026-10-29T23:54:21+01:00
+DeviceHost: 192.168.88.63
+TelnetPort: 23
+TelnetConnectTimeoutSeconds: 6
+TelnetPostDisconnectDelayMilliseconds: 1000
+TelnetReconnectDelayMilliseconds: 500
+TelnetIdleCheckSeconds: 60
+BrokerHost: (none)
+BrokerPort: 1883
+Topic: #
+Username supplied: False
+DurationSeconds: 45
+SkipBrowserCapture: True
+SkipCrashlogCapture: False
+SkipHttpProbes: False
+HttpProbeTimeoutSeconds: 10
+CrashlogPollSeconds: 30
+Tool stderr log: <scratch>/bench-new-linux/20261029-235421/error.txt
+Settings prefill saved: /tmp/otgw-bench-settings.json
+Telnet timeout strategy: adaptive (base + retry backoff, capped at 20s)
+Telnet idle check: 60s (health probe gated)
+Python: 3.12.3 (/usr/bin/python3)
+Platform: linux
+Browser capture: disabled (--skip-browser-capture).
+Crash-log endpoint: http://192.168.88.63/api/v2/device/crashlog
+Crash-log reboot-log file: http://192.168.88.63/reboot_log.txt
+Crash-log poll interval: 30s
+Crash-log capture started (polling, writing crashlog.log).
+MQTT capture skipped: no BrokerHost given (telnet, probe and crash log still run).
+Capture started: 2026-10-29T23:54:21+01:00
+Telnet connect started: 192.168.88.63:23 (timeout 6s)
+Telnet connected: 2026-10-29T23:54:21+01:00
+Telnet keepalive: idle 10s interval 5s count 3 (applied: SO_KEEPALIVE, TCP_KEEPIDLE, TCP_KEEPINTVL, TCP_KEEPCNT)
+Debug toggle actions: OTmsg=already-on; REST API=on (sent '2'); MQTT=on (sent '3'); Sensors=on (sent '4'); SAT=already-on; OTDirect=already-on; SATBLE=already-on; MQTTGate=already-on; NTP=on (sent 'n'); SensorSim=skipped (simulator)
+Settings dump: sent 'q' (read settings) + 'D' (dump settings/state)
+Capture stop reason: duration elapsed
+Stopping: 2026-10-29T23:55:06+01:00
+Crash-log capture: completed normally.
+Debug toggles restored to their state at capture start: REST API, MQTT, Sensors, NTP
+Telnet gaps: 0, total 0 s
+HTTP probes: ran 8 request(s) -> curl-probes.log
+ResolvedHostname: OTGW
+ResolvedFirmwareVersion: 2.0.0-alpha.521+2425108 (28-10-2026)
+ResolvedUniqueId: otgw-<mac>
+ResolvedPicDeviceId: pic16f1847
+ResolvedDeviceIdForFilename: otgw-<mac>
+Metadata sources: firmware_version=telnet.log, hostname=telnet.log, unique_id=telnet.log, pic_device_id=telnet.log
+Transcript filename: transcript-20261029-235421-2.0.0-alpha.521+2425108-(28-10-2026)-OTGW-otgw-<mac>.txt
+Finished: 2026-10-29T23:55:09+01:00
+
