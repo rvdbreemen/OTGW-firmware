@@ -162,11 +162,13 @@ This project also uses adr-kit. Use the repository's adr-kit workflow when autho
 
 ## Build and Verification Commands
 
+**Builds on this machine (maintainer directive, 2026-10-29): one build at a time across ALL agents and sessions, never two in parallel, also not in different worktrees; at most 4 compiler jobs (`build.py` caps `pio_jobs()` at 4, TASK-1456); on `dev` build `esp32-combo` only (the plain wrapper), no separate esp32 / esp32-classic builds, also not for `HAS_*`/platform changes.** A session announces its build to the coordinating 2.0.0 session before it starts and when it ends.
+
 Use `build.py` rather than calling PlatformIO directly:
 
 ```bash
 python build.py             # firmware + filesystem, esp32-combo only (default)
-python build.py --target all  # every target: esp32, esp32-classic, esp32-combo
+python build.py --target all  # not used on dev: combo only (maintainer 2026-10-29)
 python build.py --firmware
 python build.py --clean
 python evaluate.py

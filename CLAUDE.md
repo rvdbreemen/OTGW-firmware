@@ -294,12 +294,14 @@ Per **ADR-080**, a new pattern-level ADR MUST either reference its CI gate (in `
 
 ## Build Commands
 
+**Builds on this machine (maintainer directive, 2026-10-29): one build at a time across ALL agents and sessions, never two in parallel, also not in different worktrees; at most 4 compiler jobs (`build.py` caps `pio_jobs()` at 4, TASK-1456); on `dev` build `esp32-combo` only (the plain wrapper), no separate esp32 / esp32-classic builds, also not for `HAS_*`/platform changes.** A session announces its build to the coordinating 2.0.0 session before it starts and when it ends.
+
 **ALWAYS use the `.bat`/`.sh` wrappers — they are the only sanctioned CI/agent entrypoints.** On Windows use `build.bat`; on macOS/Linux use `./build.sh`. The wrapper bootstraps a correct Python venv **and downloads the full PlatformIO toolchain** if missing, so it works on any host. **NEVER invoke `python build.py` or `python flash_esp.py` directly** (maintainer directive, 2026-07-05): the host default Python is often 3.14, which the espressif32 platform rejects (needs 3.10–3.13), and `build.py` masks that failure with a lying exit 0 — leaving a stale `littlefs.bin` while claiming success. `build.bat`/`build.sh` are the entrypoints; `flash_otgw.bat` (not `flash_esp.py`) is the flash entrypoint. The `python build.py ...` forms below document what the wrapper runs underneath — invoke them directly only if the wrapper itself is genuinely unavailable, and then verify the output SUCCESS line + `firmware.bin`/`littlefs.bin` freshness by hand.
 
 ```bash
 ./build.sh                   # Preferred — firmware + filesystem (handles venv)
 python build.py              # Build firmware + filesystem, esp32-combo only (default)
-python build.py --target all             # On request only: --target esp32 | esp32-classic | all
+python build.py --target all             # Not used on dev: combo only (maintainer 2026-10-29)
 python build.py --firmware   # Firmware only (also the push-policy gate)
 python build.py --clean      # Clean build
 python evaluate.py           # Code quality check (PROGMEM, unsafe patterns)
@@ -502,7 +504,7 @@ The default Claude Code instruction is "do not push without explicit user permis
 
 Concrete rules that override the default "ask first":
 
-- **`origin/dev`** push: allowed once a task is committed locally AND the build verifies (`python build.py` returns exit 0 for the relevant ESP32 target — `dev` is 2.0.0 ESP32-S3, no esp8266 target here; a plain build makes esp32-combo only, so add `--target all` when the change touches `HAS_*`-gated code, `boards.h`/platform headers or `platformio.ini`) AND the evaluator is green (`python evaluate.py --quick` shows no new failures). Mention the push in the user-facing summary. **Docs-only commits** (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) may skip both gates — they cannot affect firmware compilation.
+- **`origin/dev`** push: allowed once a task is committed locally AND the build verifies (`python build.py` returns exit 0 for the relevant ESP32 target — `dev` is 2.0.0 ESP32-S3, no esp8266 target here; a plain build makes esp32-combo only, which is the only target built on dev, also for `HAS_*`/`boards.h`/platform/`platformio.ini` changes: maintainer 2026-10-29) AND the evaluator is green (`python evaluate.py --quick` shows no new failures). Mention the push in the user-facing summary. **Docs-only commits** (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) may skip both gates — they cannot affect firmware compilation.
 - **`origin/otgw-1.x.x`** push: allowed under the same conditions as `origin/dev` (task committed locally, build green for the esp8266 target, evaluator green; docs-only commits skip both gates). This is the 1.5.x/1.6.x maintenance/LTS line (the former `dev`).
 - **`origin/main`** push: **`main` is ALWAYS the latest public release.** Never auto-pushed; every push requires explicit per-instance confirmation and is part of the release flow only.
 - **Force-push** to any branch: still requires explicit per-instance confirmation. Force-push to main is forbidden regardless.

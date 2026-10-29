@@ -135,9 +135,11 @@ behaviour choice (logging, UI, graphs, docs) do not wait.
    check first where you can.
 2. Implementation agent (`sonnet`): give it the plan, the files and the exact rules
    that apply; it edits, adds tests, updates docs, and does not build, bump or commit.
-3. Run the gates (main session or a `haiku` runner, one build at a time):
-   - `build.bat` by its full path (firmware + filesystem, esp32-combo); add
-     `--target all` when `HAS_*`, `boards.h`, platform headers or `platformio.ini`
+3. Run the gates (main session or a `haiku` runner). One build at a time across ALL
+   agents and sessions on the machine, at most 4 jobs (`build.py` caps it), esp32-combo
+   only (maintainer 2026-10-29, TASK-1456):
+   - `build.bat` by its full path (firmware + filesystem, esp32-combo); no
+     `--target all`, also when `HAS_*`, `boards.h`, platform headers or `platformio.ini`
      changed. Check the SUCCESS line and fresh artifact timestamps; exit 0 alone is
      not proof.
    - `python evaluate.py --quick` (no new FAIL) and the relevant tests in `tests/`.

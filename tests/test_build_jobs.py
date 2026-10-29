@@ -1,4 +1,4 @@
-"""TASK-1335: build.py caps PlatformIO compiler jobs.
+"""TASK-1335, TASK-1456: build.py caps PlatformIO compiler jobs at 4 (maintainer 2026-10-29).
 
 Run: python tests/test_build_jobs.py
 """
@@ -25,22 +25,25 @@ class PioJobs(unittest.TestCase):
              mock.patch.object(build, "print_info"):
             return build.pio_jobs()
 
-    def test_default_capped_at_8(self):
-        self.assertEqual(self.jobs(cpus=16), 8)
+    def test_default_capped_at_4(self):
+        self.assertEqual(self.jobs(cpus=16), 4)
 
     def test_default_follows_small_machine(self):
-        self.assertEqual(self.jobs(cpus=4), 4)
+        self.assertEqual(self.jobs(cpus=2), 2)
 
     def test_unknown_cpu_count(self):
         self.assertEqual(self.jobs(cpus=None), 1)
 
-    def test_override(self):
-        self.assertEqual(self.jobs("12", cpus=16), 12)
+    def test_override_below_the_cap(self):
         self.assertEqual(self.jobs("2", cpus=16), 2)
+
+    def test_override_never_above_4(self):
+        self.assertEqual(self.jobs("12", cpus=16), 4)
+        self.assertEqual(self.jobs("8", cpus=32), 4)
 
     def test_invalid_override_falls_back(self):
         for bad in ("0", "-3", "eight", "1.5"):
-            self.assertEqual(self.jobs(bad, cpus=16), 8, bad)
+            self.assertEqual(self.jobs(bad, cpus=16), 4, bad)
 
     def test_every_platformio_run_passes_jobs(self):
         src = (REPO_ROOT / "build.py").read_text(encoding="utf-8")

@@ -2425,20 +2425,22 @@ def check_platformio():
     sys.exit(1)
 
 
-PIO_MAX_JOBS = 8
+PIO_MAX_JOBS = 4
 
 
 def pio_jobs():
-    """Compiler jobs for `platformio run` (TASK-1335). scons defaults to one per
-    logical core, which saturates a machine that also runs agent sessions.
-    Default min(8, cpu_count); OTGW_BUILD_JOBS=<n> overrides it."""
+    """Compiler jobs for `platformio run` (TASK-1335, TASK-1456). scons defaults to
+    one per logical core, which saturates a machine that also runs agent sessions;
+    with several sessions, more than 4 jobs gets builds killed on commit charge.
+    Default min(4, cpu_count); OTGW_BUILD_JOBS=<n> may lower it, never above 4
+    (maintainer 2026-10-29)."""
     default = min(PIO_MAX_JOBS, os.cpu_count() or 1)
     raw = os.environ.get("OTGW_BUILD_JOBS", "").strip()
     if raw:
         try:
             n = int(raw)
             if n >= 1:
-                return n
+                return min(n, PIO_MAX_JOBS)
         except ValueError:
             pass
         print_info(f"Ignoring OTGW_BUILD_JOBS={raw!r}: not a positive integer")
