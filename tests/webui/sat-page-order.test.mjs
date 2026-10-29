@@ -20,8 +20,9 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.OTGW_DATA_DIR || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
-const PORT = 8152;
-const CDP_PORT = 9352;
+// TASK-1489: both ports are picked by the OS (listen(0), --remote-debugging-port=0), so a
+// parallel run, or another session running the same test, cannot collide on them.
+let PORT = 0;
 
 const CHROME = [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -73,18 +74,21 @@ const srv = http.createServer((q, s) => {
     fs.createReadStream(f).pipe(s);
   } else { s.writeHead(404); s.end('nf'); }
 });
-await new Promise((r) => srv.listen(PORT, '127.0.0.1', r));
+await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+PORT = srv.address().port;
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'otgw-cdp-'));
 const chrome = spawn(CHROME, [
-  '--headless=new', `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${profile}`,
+  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu', 'about:blank',
 ], { stdio: 'ignore' });
 
+// Chrome writes the port it bound to the first line of <profile>/DevToolsActivePort.
 async function cdpTarget() {
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 150; i++) {
     try {
-      const r = await fetch(`http://127.0.0.1:${CDP_PORT}/json/new?about:blank`, { method: 'PUT' });
+      const cdpPort = fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0].trim();
+      const r = await fetch(`http://127.0.0.1:${cdpPort}/json/new?about:blank`, { method: 'PUT' });
       if (r.ok) return await r.json();
     } catch { /* not up yet */ }
     await new Promise((r) => setTimeout(r, 200));
@@ -126,13 +130,18 @@ function check(pass, msg) {
 }
 
 // Loads the page, opens the SAT page, waits for a status poll, then lets it settle.
+// TASK-1489: the .seg buttons are static HTML, but the loader injects v2.js only after the
+// CSS, so a click before init() has bound the handlers does nothing. init() sets
+// window.OTGWv2 as its last step: wait for that before clicking.
 async function openSat(view) {
   const before = statusHits;
   await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/v2.html` });
-  for (let i = 0; i < 100; i++) {
+  let ready = false;
+  for (let i = 0; i < 300 && !ready; i++) {
     await sleep(100);
-    if (await evalJs(`!!document.querySelector('.seg[data-page="sat"]')`).catch(() => false)) break;
+    ready = await evalJs(`!!window.OTGWv2`).catch(() => false);
   }
+  if (!ready) throw new Error('v2.js init() did not finish within 30 s (window.OTGWv2 not set)');
   await evalJs(`document.querySelector('.seg[data-page="sat"]').click()`);
   for (let i = 0; i < 100 && statusHits <= before; i++) await sleep(100);
   if (view) await evalJs(`document.querySelector('.satview-btn[data-sv="${view}"]').click()`);

@@ -13,8 +13,11 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.OTGW_DATA_DIR || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
-const PORT = 8162;
-const CDP_PORT = 9362;
+let PORT = 0;   // TASK-1489: HTTP and CDP ports are picked by the OS, so parallel runs and
+                // other sessions running the same test cannot collide on them.
+// Chrome started with --remote-debugging-port=0 writes the port it bound to the first
+// line of <profile>/DevToolsActivePort; it throws until Chrome is up.
+function cdpPort() { return fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0].trim(); }
 
 const CHROME_CANDIDATES = [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -68,12 +71,13 @@ const srv = http.createServer((q, s) => {
     s.end('nf');
   }
 });
-await new Promise((r) => srv.listen(PORT, '127.0.0.1', r));
+await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+PORT = srv.address().port;
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'otgw-cdp-'));
 const chrome = spawn(CHROME, [
   '--headless=new',
-  `--remote-debugging-port=${CDP_PORT}`,
+  '--remote-debugging-port=0',
   `--user-data-dir=${profile}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu',
   '--window-size=1400,900',
@@ -83,7 +87,7 @@ const chrome = spawn(CHROME, [
 async function cdpTarget() {
   for (let i = 0; i < 100; i++) {
     try {
-      const r = await fetch(`http://127.0.0.1:${CDP_PORT}/json/new?about:blank`, { method: 'PUT' });
+      const r = await fetch(`http://127.0.0.1:${cdpPort()}/json/new?about:blank`, { method: 'PUT' });
       if (r.ok) return await r.json();
     } catch { /* not up yet */ }
     await new Promise((r) => setTimeout(r, 200));
