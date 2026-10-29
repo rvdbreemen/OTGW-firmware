@@ -308,25 +308,27 @@ SAT topics no longer publish on every control cycle. Each topic under `sat/*` us
 
 **Maximum observation delay:** 11 minutes in the worst case (silent value, first heartbeat not yet due). Retained topics recover immediately from broker memory on reconnect; non-retained topics re-appear within 11 minutes.
 
-**MQTT reconnect:** SAT shadows are **not** reset on reconnect. Retained topics are already present on the broker. Non-retained topics re-publish within 11 minutes via the scheduled heartbeat. This is an intentional divergence from the OT publish contract (ADR-052), whose trackers are reset on a reconnect after more than 5 minutes offline.
+**MQTT reconnect:** most SAT shadows are **not** reset on reconnect. Retained topics are already present on the broker. Non-retained topics re-publish within 11 minutes via the scheduled heartbeat. This is an intentional divergence from the OT publish contract (ADR-052), whose trackers are reset on a reconnect after more than 5 minutes offline. Exception: the full republish (`requestMQTTRepublishAll()`) also resets the core-state shadows (`satRepublishCoreState()`, TASK-1284), so `sat/enabled`, `sat/active`, `sat/safety_tripped`, `sat/fallback_active`, `sat/push_refused`, `sat/room_temp_lost`, `sat/ot_link_lost`, `sat/external_temp_enable`, `sat/mode`, `sat/control_mode` and `sat/preset` publish again on the next pass.
 
-**Home Assistant restart:** the ADR-174 republish resets only the OT trackers. SAT shadows keep their last-published state, so non-retained `sat/*` topics (the BLE values included) wait for their next change or heartbeat, up to 11 minutes.
+**Home Assistant restart:** the ADR-174 republish resets the OT trackers and the SAT core-state shadows listed above. The other SAT shadows keep their last-published state, so the other non-retained `sat/*` topics (the BLE values included) wait for their next change or heartbeat, up to 11 minutes.
+
+**Exceptions to on-change + heartbeat:** the multi-zone diagnostics `sat/zone/<n>/*` are published retained on every multi-zone control pass, and when preset `"none"` restores the saved target, `sat/target` is published at once (retained) before the next regular pass.
 
 **Float tolerance constants** (from `SATmqttPublish.h`):
 
 | Constant | Value | Used for |
 |---|---|---|
 | `SAT_EPS_TEMP` | 0.05 °C | `setpoint`, `target`, `room_temp`, `outside_temp` |
-| `SAT_EPS_TEMP_COARSE` | 0.1 °C | `heating_curve`, `thermal_drop_rate` display |
+| `SAT_EPS_TEMP_COARSE` | 0.1 °C | `heating_curve`, `overshoot_margin`, `max_setpoint`, `requested_setpoint` |
 | `SAT_EPS_PID_OUTPUT` | 0.5 °C | `pid_output` (derivative jitter damping) |
 | `SAT_EPS_PID_TERM` | 0.1 °C | `pid_p`, `pid_i`, `pid_d` |
-| `SAT_EPS_ERROR` | 0.05 °C | `error` |
+| `SAT_EPS_ERROR` | 0.05 °C | `error`, `error_mean` |
 | `SAT_EPS_KP` | 0.01 | `kp` |
 | `SAT_EPS_KI` | 0.00001 | `ki` |
 | `SAT_EPS_KD` | 0.1 | `kd` |
-| `SAT_EPS_DERIVATIVE` | 0.0005 | `raw_derivative` |
-| `SAT_EPS_FRACTION` | 0.005 | `duty_ratio`, `overshoot_fraction` |
-| `SAT_EPS_PRESSURE` | 0.02 bar | `pressure`, `pressure_drop_rate` |
+| `SAT_EPS_DERIVATIVE` | 0.0005 | `raw_derivative`, `thermal_coeff`, `thermal_drop_rate` |
+| `SAT_EPS_FRACTION` | 0.005 | `duty_ratio`, `overshoot_fraction`, `pwm_duty`, `pressure_drop_rate`, `error_stddev` |
+| `SAT_EPS_PRESSURE` | 0.02 bar | `pressure`, `ch_pressure` |
 | `SAT_EPS_POWER` | 0.05 kW | `power` |
 | `SAT_EPS_ENERGY` | 0.005 kWh | `energy_total` |
 | `SAT_EPS_PV_W` | 25 W | PV topics |
@@ -352,6 +354,12 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/heating_curve` | `"42.3"` | yes | Heating curve calculated value (°C) |
 | `sat/pid_output` | `"43.1"` | yes | PID output = curve + P + I + D (°C) |
 | `sat/overshoot_margin` | `"2.0"` | yes | Configured overshoot margin (°C) |
+| `sat/requested_setpoint` | `"43.0"` | no | Requested flow setpoint including the solar offset, clamped to the minimum setpoint and `sat/max_setpoint` (°C) |
+| `sat/max_setpoint` | `"62.0"` | yes | Maximum flow setpoint in use (°C): 62 for radiators, 45 for underfloor, at most 40 for a heat pump |
+| `sat/modulation_state` | `"OFF"` / `"HOT_WATER"` / `"PWM_OFF"` / `"COLD"` / `"ACTIVE"` | no | Modulation state. `"OFF"` while SAT is not active; `"COLD"` = flow temperature below 22 °C |
+| `sat/pwm_state` | `"IDLE"` / `"ON"` / `"OFF"` | no | PWM phase; `"IDLE"` when the control mode is not PWM |
+| `sat/current_modulation` | `"45"` | no | Current boiler modulation (%) |
+| `sat/sim/last_cmd` | command string | no | Last PIC / OT-Direct command that simulation mode kept off the bus. Published only while simulation is on |
 
 #### PID Components
 
@@ -361,12 +369,12 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/pid_p` | `"0.82"` | no | Proportional term (°C) |
 | `sat/pid_i` | `"0.03"` | no | Integral term (°C) |
 | `sat/pid_d` | `"-0.04"` | no | Derivative term (°C) |
-| `sat/pid_attributes` | JSON | no | Extended PID attributes (`kp`, `ki`, `kd`, `p_term`, `i_term`, `d_term`, `raw_derivative`) |
+| `sat/pid_attributes` | JSON | no | PID attributes `{"error","proportional","integral","derivative"}` (°C, two decimals); republished when one of the four PID topics changes |
 | `sat/raw_derivative` | `"-0.04"` | no | Raw (unfiltered) derivative term |
 | `sat/kp` | `"5.0"` | no | Current Kp gain |
 | `sat/ki` | `"0.5"` | no | Current Ki gain |
 | `sat/kd` | `"0.05"` | no | Current Kd gain |
-| `sat/error_mean` | `"0.12"` | no | Mean PID error over ring buffer (when error monitoring enabled) |
+| `sat/error_mean` | `"0.12"` | no | Mean PID error over the ring buffer (published regardless of the error-monitoring setting) |
 | `sat/error_stddev` | `"0.34"` | no | Std deviation of PID error over ring buffer |
 
 #### Temperature Sensors
@@ -378,6 +386,9 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/estimated_room` | `"20.5"` | no | Estimated room temp during sensor fallback (°C) |
 | `sat/humidity` | `"58.0"` | no | Indoor humidity % (when humidity sensor active) |
 | `sat/humidity_valid` | `"true"` / `"false"` | no | Whether humidity reading is valid |
+| `sat/pre_custom_temperature` | `"20.5"` | no | Target saved when a preset was activated, restored by preset `"none"` (°C). Published only when > 0 |
+| `sat/pre_activity_temperature` | `"20.5"` | no | Target saved when window detection switched to the Activity preset (°C). Published only when > 0 |
+| `sat/area/<n>` | `"21.3"` | no | Area temperature n (0-3) as used by multi-area averaging (°C). Published only while multi-area is on, for the first `SATmultiareacount` areas |
 
 Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone, together with the topics `sat/comfort_offset`, `sat/comfort_adjust_enable`, `sat/comfort_humidity` and `sat/comfort_max_offset`, the command topics `sat/comfort_adjust`, `sat/comfort_humidity` and `sat/comfort_max_offset`, and the `sat_comfort_adjust_enable` switch. Home Assistant drops the old switch because the firmware empties its retained discovery config. Humidity is still used by Thermal comfort (`sat/thermal_comfort`, Summer Simmer Index).
 
@@ -385,15 +396,32 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
-| `sat/boiler_status` | `"3"` | no | Boiler status code (see table below) |
-| `sat/flame_status` | `"healthy"` | no | Flame health status string (see table below) |
-| `sat/flame_health` | `"ON"` / `"OFF"` | yes | Binary: ON = flame healthy |
+| `sat/boiler_status` | `"at_setpoint"` | no | Boiler status name (see table below) |
+| `sat/flame_status` | `"HEALTHY"` | no | Flame health status string, upper case (see table below) |
+| `sat/flame_health` | `"ON"` / `"OFF"` | yes | Problem binary: ON = flame problem (`STUCK_ON`, `STUCK_OFF`, `PWM_SHORT`, `SHORT_CYCLING`), OFF = no problem. Not published while the flame status is `INSUFFICIENT_DATA` |
 | `sat/cycle_class` | `"good"` | no | Last cycle classification string (see table below) |
-| `sat/cycle_attributes` | JSON | no | Extended cycle attributes (`class`, `duration_sec`, `max_flow`, `overshoot_sec`, `kind`, `duty_ratio`) |
+| `sat/cycle_attributes` | JSON | no | Cycle attributes `{"kind","sample_count","duration_seconds","max_flow_temperature","fraction_space_heating","fraction_domestic_hot_water"}`; `kind` is `UNKNOWN` / `CENTRAL_HEATING` / `DOMESTIC_HOT_WATER` / `MIXED`. Republished when a cycle ends |
+| `sat/cycle_health` | `"ON"` / `"OFF"` | yes | Problem binary: ON when the last cycle class is `overshoot`, `underheat`, `underheat_pwm` or `short` |
 | `sat/cycle_phase` | `"startup"` / `"steady"` / `"cooldown"` / `"idle"` | no | Current cycle phase |
+| `sat/cycles_this_hour` | `"3"` | no | Burner cycles in the current hour |
 | `sat/pwm_duty` | `"0.65"` | no | PWM duty cycle (0.00-1.00) |
 | `sat/duty_ratio` | `"0.70"` | no | EMA duty ratio (flame-on fraction) |
 | `sat/overshoot_fraction` | `"0.12"` | no | EMA fraction of cycles with overshoot |
+| `sat/device_health` | `"ON"` / `"OFF"` | yes | ON when the boiler status is `off` |
+
+**4-hour cycle statistics** (rolling 4-hour window, all non-retained):
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/4h_cycles` | `"12"` | no | Cycles in the window |
+| `sat/4h_avg_on_sec` | `"540.0"` | no | Average flame-on time per cycle (s) |
+| `sat/4h_avg_off_sec` | `"900.0"` | no | Average off time between cycles (s) |
+| `sat/4h_avg_flow_temp` | `"45.2"` | no | Average flow temperature (°C) |
+| `sat/4h_duty_ratio` | `"0.375"` | no | Flame-on fraction (0-1) |
+| `sat/4h_overshoot_fraction` | `"0.083"` | no | Fraction of cycles classed overshoot (0-1) |
+| `sat/4h_underheat_fraction` | `"0.000"` | no | Fraction of cycles classed underheat (0-1) |
+| `sat/4h_flow_ret_delta_p50` | `"8.5"` | no | Median flow-return temperature difference (°C) |
+| `sat/4h_flow_ret_delta_p90` | `"12.0"` | no | 90th percentile flow-return temperature difference (°C) |
 
 #### System Health and Safety
 
@@ -402,7 +430,9 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 | `sat/safety_tripped` | `"true"` / `"false"` | yes | Safety shutdown active. Published `"true"` when a safety trip disables SAT (with `sat/active` false and `sat/mode` off), `"false"` again when SAT is re-enabled |
 | `sat/valves_open` | `"true"` / `"false"` | no | Whether TRV valves are reported open |
 | `sat/window_open` | `"false"` | no | Window-open detection state |
-| `sat/ch_sync` | `"ON"` / `"OFF"` | yes | CH sync health (ON = OK) |
+| `sat/ch_sync` | `"ON"` / `"OFF"` | yes | Problem binary: ON when SAT active and the boiler CH-active bit (MsgID 0) have disagreed for 60 s |
+| `sat/setpoint_sync` | `"ON"` / `"OFF"` | yes | Problem binary: ON when, with SAT active, the SAT setpoint and the boiler TSet (MsgID 1) have differed by more than 0.5 °C for 60 s |
+| `sat/modulation_sync` | `"ON"` / `"OFF"` | yes | Problem binary: ON when, with SAT active, `SATmaxmodulation` and the boiler max relative modulation setting (MsgID 14) have differed for 60 s |
 | `sat/modulation_reliable` | `"true"` | no | Whether boiler modulation feedback is reliable |
 | `sat/setpoint_mismatch` | `"false"` | no | Setpoint mismatch between SAT and OT bus detected |
 
@@ -413,8 +443,9 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 | `sat/pressure` | `"1.5"` | no | Smoothed system pressure (bar) |
 | `sat/pressure_drop_rate` | `"-0.02"` | no | Pressure drop rate (bar/hour, negative = dropping) |
 | `sat/pressure_alarm` | `"false"` | no | Pressure alarm active |
-| `sat/pressure_health` | `"ON"` / `"OFF"` | yes | Binary: ON = pressure healthy |
-| `sat/pressure_health_attr` | JSON | no | Extended pressure health attributes |
+| `sat/pressure_health` | `"ON"` / `"OFF"` | yes | Binary: ON = pressure healthy (opposite polarity of the other `*_health` topics) |
+| `sat/ch_pressure` | `"1.52"` | no | CH water pressure as reported by the boiler (bar, two decimals) |
+| `sat/ch_pressure_status` | `"ok"` / `"low"` / `"high"` | no | Pressure status. `"low"` / `"high"` only while the pressure alarm is confirmed and the smoothed pressure is outside the min/max band; a drop-rate alarm reports `"ok"` |
 
 #### Power and Energy
 
@@ -429,7 +460,8 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
 | `sat/curve_recommendation` | `"increase"` / `"decrease"` / `"hold"` / `"insufficient"` | no | Automatic heating curve recommendation |
-| `sat/curve_recommendation_attributes` | JSON | no | Extended recommendation attributes (error stats, sample count) |
+| `sat/curve_recommendation_attributes` | JSON | no | Recommendation attributes `{"error_threshold","daily_mean_error","daily_sample_count","recent_mean_error"}`; republished when `sat/curve_recommendation` changes |
+| `sat/heating_curve_recommendation` | `"INCREASE"` / `"DECREASE"` / `"HOLD"` / `"insufficient"` | yes | Recommendation from the daily-median history (consecutive days above or below the threshold). Note the mixed case: `"insufficient"` is lower case, the other values upper case |
 
 #### Presets
 
@@ -444,27 +476,45 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 
 #### Settings Echo Topics
 
-The following topics are published (retained) when SAT settings change. They echo the current configured values.
+The following topics echo the current configured values. They are retained and published on change plus heartbeat, except `sat/auto_tune_rate` (see its row).
 
 | Topic | Example | Description |
 | ----- | ------- | ----------- |
-| `sat/heating_curve_coeff` | `"1.5"` | Heating curve coefficient |
+| `sat/heating_curve_coeff` | `"1.5"` | Heating curve coefficient (set with the `sat/heating_curve` command) |
 | `sat/deadband` | `"0.25"` | PID deadband (°C) |
-| `sat/control_interval` | `"30"` | Control loop interval (seconds) |
+| `sat/control_interval` | `"30"` | Control loop interval (seconds; set with the `sat/interval` command) |
 | `sat/max_modulation` | `"100"` | Max relative modulation % |
 | `sat/flame_off_offset` | `"18.0"` | PWM ON phase only: hold offset above the return temperature while waiting for the flame (°C) |
 | `sat/flow_offset` | `"2.0"` | Continuous mode max setpoint drop (°C) |
+| `sat/mod_sup_delay` | `"20.0"` | Seconds after ignition before SAT suppresses modulation |
+| `sat/mod_sup_offset` | `"1.0"` | While suppressing modulation, the setpoint sits this far below the flow temperature (°C) |
 | `sat/boiler_capacity` | `"24.0"` | Boiler capacity (kW) |
 | `sat/dhw_capacity` | `"0.0"` | Capacity (kW) while the boiler reports DHW active (0 = use boiler capacity) |
+| `sat/boiler_rated_kw` | `"24.0"` | Rated boiler input (kW, `satboilerratedkw`); 0 disables `sat/energy_estimated_kwh` |
+| `sat/boiler_efficiency` | `"0.90"` | Boiler efficiency used for the estimated gas input (`satboilerefficiency`) |
 | `sat/summer_threshold` | `"18.0"` | Summer simmer outdoor temperature threshold (°C) |
-| `sat/ovp_value` | `"52.5"` | OPV calibrated maximum flow temperature (°C) |
-| `sat/ovp_enabled` | `"false"` | Whether OPV is enabled |
+| `sat/target_temp_step` | `"0.5"` | Target temperature step (°C) |
+| `sat/min_pressure` | `"0.8"` | Min pressure alarm threshold (bar) |
+| `sat/max_pressure` | `"2.5"` | Max pressure alarm threshold (bar) |
+| `sat/max_pressure_drop` | `"0.10"` | Max acceptable pressure drop rate |
+| `sat/dhw_setpoint` | `"55.0"` | DHW setpoint (°C) |
 | `sat/heating_system` | `"1"` | Heating system type (0=auto, 1=radiators, 2=heat pump, 3=underfloor) |
-| `sat/simulation` | `"ON"` / `"OFF"` | Simulation mode active |
-| `sat/auto_tune` | `"ON"` / `"OFF"` | Auto-tune analysis active |
 | `sat/manufacturer` | `"Remeha"` | Detected/configured boiler manufacturer name |
+| `sat/manufacturer_id` | `"5"` | Configured manufacturer setting as a number (`SATmanufacturer`) |
+| `sat/simulation` | `"ON"` / `"OFF"` | Simulation mode setting (same value as `sat/simulation_enable`, other payload) |
+| `sat/auto_tune` | `"ON"` / `"OFF"` | Auto-tune setting (same value as `sat/auto_tune_enable`, other payload) |
+| `sat/auto_tune_rate` | `"0.020"` | Auto-tune learning rate. Not retained, and published only while auto-tune is on |
+| `sat/sensor_max_age` | `"300"` | Max age for external sensor readings (s) |
+| `sat/humidity_timeout_s` | `"600"` | Humidity reading timeout (s) |
+| `sat/error_monitoring` | `"true"` / `"false"` | Error-monitoring setting. It has no other effect today |
+| `sat/auto_gains_value` | `"1.00"` | Auto-gain factor. Stored and published; the PID does not read it today |
+| `sat/heating_mode` | `"comfort"` / `"eco"` | Heating mode. Stored and published; the control loop does not use it today |
+| `sat/cycles_per_hour` | `"3"` | Target PWM cycles per hour |
+| `sat/valve_offset` | `"0.00"` | Valve offset. Stored and published; the control loop does not use it today |
+| `sat/solar_freeze_integral` | `"true"` / `"false"` | Freeze the PID integral during solar gain |
+| `sat/thermal_comfort` | `"true"` / `"false"` | Thermal comfort: use the Summer Simmer comfort index instead of the OpenTherm room temperature |
 
-Settings echo topics are retained. More settings echo topics exist; the full list is in the [SAT MQTT topics reference](../../backlog/docs/doc-1%20-%20sat-mqtt-topics.md).
+The example values are illustrative, not the defaults.
 
 #### Thermal Model
 
@@ -474,13 +524,22 @@ Settings echo topics are retained. More settings echo topics exist; the full lis
 | `sat/thermal_drop_rate` | `"0.03"` | no | Current thermal drop rate sample |
 | `sat/thermal_model_valid` | `"true"` | yes | Whether thermal model has sufficient data |
 
+#### Auto-tune
+
+Published only while auto-tune is on (`SATautotune`).
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/auto_tune_score` | `"0.85"` | no | Auto-tune PID score |
+| `sat/auto_tune_active` | `"true"` / `"false"` | no | Auto-tune analysis running |
+
 #### Solar Gain
 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
 | `sat/solar_gain` | `"true"` / `"false"` | no | Solar gain compensation currently active |
 | `sat/indoor_rise_rate` | `"0.8"` | no | Measured indoor temperature rise rate (°C/hr) |
-| `sat/solar_gain_sun_elevation` | `"32.5"` | no | Current sun elevation (degrees) |
+| `sat/solar_gain_sun_elevation` | `"32.5"` | no | Current sun elevation (degrees). Published only while a valid sun elevation is known |
 
 #### Summer Simmer
 
@@ -488,10 +547,60 @@ Settings echo topics are retained. More settings echo topics exist; the full lis
 | ----- | ----- | -------- | ----------- |
 | `sat/summer_active` | `"false"` | no | Summer simmer mode currently suppressing heating |
 | `sat/summer_hours_above` | `"4.5"` | no | Hours outdoor temp has been above threshold |
+| `sat/summer_simmer_index` | `"24.3"` | no | Summer Simmer Index from room temperature and humidity (°C, one decimal). Published only with a valid humidity |
+| `sat/ssi` | `"24.30"` | no | Same Summer Simmer Index as `sat/summer_simmer_index`, two decimals |
+| `sat/summer_simmer_perception` | `"Comfortable"` | no | Perception label: `Cool`, `Slightly Cool`, `Comfortable`, `Slightly Warm`, `Increasing Discomfort`, `Extremely Warm`, `Danger Of Heatstroke`, `Extreme Danger Of Heatstroke`, `Circulatory Collapse Imminent` |
+
+#### PV-surplus Boost (TASK-640)
+
+All retained.
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/pv_boost_enabled` | `"1"` / `"0"` | yes | PV boost setting (payload `"1"`/`"0"`, not `"true"`/`"false"`) |
+| `sat/pv_boost_threshold_w` | `"1500"` | yes | Surplus threshold to start a boost (W) |
+| `sat/pv_boost_hold_s` | `"120"` | yes | Hold time (s) |
+| `sat/pv_boost_delta_c` | `"1.0"` | yes | Target raise during a boost (°C) |
+| `sat/pv_boost_max_indoor_c` | `"23.0"` | yes | No boost above this room temperature (°C) |
+| `sat/pv_boost_max_duration_min` | `"240"` | yes | Maximum boost duration (min) |
+| `sat/pv_surplus_w` | `"1800"` | yes | Last pushed PV surplus (W). Published only while PV boost is on |
+| `sat/pv_surplus_valid` | `"true"` / `"false"` | yes | Whether the pushed surplus is fresh. Published only while PV boost is on |
+| `sat/pv_boost_active` | `"true"` / `"false"` | yes | Boost active. Published only while PV boost is on |
+| `sat/pv_boost_applied_c` | `"1.0"` | yes | Raise currently applied (°C). Published only while PV boost is on |
+
+#### Weather (Open-Meteo)
+
+Published only while weather is enabled (`SATweatherenable`) and the last poll was valid. Non-retained. Units are the raw provider values; Home Assistant discovery converts wind to m/s.
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/weather/temperature` | `"8.4"` | no | Outdoor temperature (°C) |
+| `sat/weather/apparent_temp` | `"5.9"` | no | Apparent temperature (°C) |
+| `sat/weather/humidity` | `"82"` | no | Relative humidity (%) |
+| `sat/weather/wind_speed` | `"14.4"` | no | Wind speed (km/h) |
+| `sat/weather/cloud_cover` | `"75"` | no | Cloud cover (%) |
+| `sat/weather/wind_direction` | `"230"` | no | Wind direction (degrees). Forecast builds only (`HAS_WEATHER_FORECAST`) |
+| `sat/weather/wind_gusts` | `"28.8"` | no | Wind gusts (km/h). Forecast builds only |
+| `sat/weather/pressure_msl` | `"1013.2"` | no | Sea-level pressure (hPa). Forecast builds only |
+| `sat/weather/precipitation` | `"0.2"` | no | Precipitation (mm). Forecast builds only |
+| `sat/weather/rain` | `"0.2"` | no | Rain (mm). Forecast builds only |
+| `sat/weather/snowfall` | `"0.0"` | no | Snowfall (raw Open-Meteo value, no unit parameter in the request; Home Assistant discovery labels it mm). Forecast builds only |
+| `sat/weather/weather_code` | `"3"` | no | WMO weather code. Forecast builds only |
+| `sat/weather/is_day` | `"1"` / `"0"` | no | Daylight (payload `"1"`/`"0"`). Forecast builds only |
+
+#### Multi-zone Diagnostics
+
+Published retained on every multi-zone control pass, for each configured zone n (1-based). These topics bypass the on-change + heartbeat helpers.
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/zone/<n>/active` | `"true"` / `"false"` | yes | Zone has fresh room temperature and setpoint and is not off |
+| `sat/zone/<n>/output` | `"42.5"` | yes | Zone PID output (°C) |
+| `sat/zone/<n>/error` | `"0.50"` | yes | Zone setpoint minus zone room temperature (°C) |
 
 #### SAT Switch State Topics (TASK-284)
 
-State topics for the 14 SAT boolean switches. Payloads are `"true"` / `"false"`. All retained.
+State topics for the SAT boolean switches. Payloads are `"true"` / `"false"`. All retained.
 
 | Topic | Description |
 | ----- | ----------- |
@@ -505,23 +614,25 @@ State topics for the 14 SAT boolean switches. Payloads are `"true"` / `"false"`.
 | `sat/push_setpoint_enable` | Push-setpoint enable state |
 | `sat/follow_thermostat_enable` | Follow-thermostat enable state: a setpoint change on the thermostat becomes the SAT target |
 | `sat/external_temp_enable` | Use the MQTT/REST indoor temperature (`sat/indoor_temp`) as the room source (`SATexternaltemp`) |
-| `sat/ovp_enabled` | OPV (overshoot-protection value) enabled state |
 | `sat/preset_sync_enable` | Preset-sync enable state |
-| `sat/dhw_enabled` | DHW heating enable state |
+| `sat/dhw_enabled` | DHW heating enable state (`SATdhwenabled`): SAT sends the DHW setpoint only while on |
+| `sat/dhw_enable` | Master hot-water enable (`SATdhwenable`, `HW=` command); only acted on when the boiler reports a storage tank (MsgID 3 HB3) |
+
+The OPV calibration (`sat/ovp_*`) was removed in TASK-891.6; its topics no longer exist.
 
 #### Climate Entity Attributes
 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
-| `sat/climate_attributes` | JSON | no | HA climate entity JSON attributes (mode, setpoint, heating_curve, pid_output, error, boiler_status, cycle_class, safety_tripped) |
+| `sat/climate_attributes` | JSON | no | `json_attributes_topic` of the thermostat climate entity. Keys: `optimal_coefficient`, `coefficient_derivative`, `minimum_setpoint`, `boiler_flame_timing`, `boiler_temperature_cold`, `boiler_temperature_tracking`, `boiler_temperature_derivative`, `error_source`, `error_pid`, `integral_enabled`, `derivative_enabled`, `derivative_raw`, `current_kp`, `current_ki`, `current_kd`, `relative_modulation_enabled`. Several are fixed values (`coefficient_derivative` 0.0, `boiler_temperature_tracking` false, `boiler_temperature_derivative` 0.0, `error_source` "main", `integral_enabled` / `derivative_enabled` true). Heartbeat only |
 
 #### BLE Temperature Sensor (ESP32 only)
 
-These topics are only available when BLE is enabled on ESP32 hardware.
+These topics are only available when BLE is enabled on ESP32 hardware. `sat/ble_temp`, `sat/ble_humidity`, `sat/ble_sensor_rssi` and `sat/ble_battery` are published only while `sat/ble_temp_valid` is `"true"`.
 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
-| `sat/ble_temp` | `"20.5"` | no | BLE sensor temperature (°C). Best/configured slot only — for multi-sensor visibility see the per-MAC topics below. |
+| `sat/ble_temp` | `"20.50"` | no | BLE sensor temperature (°C, two decimals). Selected sensor only; see also the per-MAC topics below. |
 | `sat/ble_humidity` | `"55.0"` | no | BLE sensor humidity (%) |
 | `sat/ble_sensor_rssi` | `"-72"` | no | BLE sensor RSSI (dBm) |
 | `sat/ble_battery` | `"85"` | no | BLE sensor battery level (%) |
@@ -530,11 +641,11 @@ These topics are only available when BLE is enabled on ESP32 hardware.
 
 ##### Per-MAC topics (since 2.0.0, TASK-488)
 
-Every BLE sensor that is currently in a valid slot publishes its full set of
-state values under a per-MAC topic prefix. The MAC is rendered as 12 lowercase
-hex characters with no separators. These topics let multi-sensor deployments
-see every sensor independently, where the legacy flat topics above only cover
-the best/configured slot used as SAT control input.
+The sensor the user selected (`SATblemac`, must be in the roster) publishes its
+state values under a per-MAC topic prefix, as long as it was seen within the
+stale window. Other roster sensors do not publish here since TASK-508; they are
+visible in `GET /api/v2/sat/ble/discovery`. The MAC is rendered as 12 lowercase
+hex characters with no separators.
 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
@@ -544,13 +655,13 @@ the best/configured slot used as SAT control input.
 | `sat/ble/<mac>/rssi` | `"-72"` | no | Per-sensor RSSI (dBm) |
 
 Example: a Xiaomi LYWSD03MMC at MAC `A4:C1:38:12:34:56` publishes under
-`OTGW/sat/ble/a4c138123456/temp` etc. The per-MAC topics update at the
+`OTGW/value/<uniqueId>/sat/ble/a4c138123456/temp` etc. The per-MAC topics update at the
 `iBleInterval` cadence (see `Advanced Settings`) on top of every BLE
 advertisement that the radio sees (continuous scan since 2.0.0).
 
 ##### Home Assistant auto-discovery (since 2.0.0, TASK-488)
 
-For each first-seen MAC, the firmware publishes four retained
+For the selected sensor's MAC, the firmware publishes four retained
 auto-discovery configs to the standard HA prefix so the sensor appears
 in Home Assistant without manual yaml. Discovery is one-shot per MAC
 per session; subsequent scans of the same MAC do not re-publish.
@@ -574,11 +685,11 @@ silently dropped (TASK-489 + TASK-493).
 
 #### Value Tables
 
-**Boiler status codes** (`sat/boiler_status`): 0=Off, 1=Idle, 2=Preheating, 3=At Setpoint, 4=Modulating Up, 5=Modulating Down, 6=Ignition Surge, 7=Stalled Ignition, 8=Anti-Cycling, 9=Pump Starting, 10=Waiting Flame, 11=Overshoot Cooling, 12=Post-Cycle, 13=Heating, 14=Cooling
+**Boiler status names** (`sat/boiler_status`): `off`, `idle`, `preheating`, `at_setpoint`, `modulating_up`, `modulating_down`, `ignition_surge`, `stalled_ignition`, `anti_cycling`, `pump_starting`, `waiting_flame`, `overshoot_cooling`, `post_cycle`, `heating`, `cooling`, `heating_hot_water`
 
-**Cycle class** (`sat/cycle_class`): `none`, `good`, `overshoot`, `underheat`, `short`, `uncertain`
+**Cycle class** (`sat/cycle_class`): `none`, `good`, `overshoot`, `underheat`, `short`, `uncertain`, `underheat_pwm`, `insufficient`
 
-**Flame status** (`sat/flame_status`): `insufficient_data`, `healthy`, `idle_ok`, `stuck_on`, `stuck_off`, `pwm_short`, `short_cycling`
+**Flame status** (`sat/flame_status`): `INSUFFICIENT_DATA`, `HEALTHY`, `IDLE_OK`, `STUCK_ON`, `STUCK_OFF`, `PWM_SHORT`, `SHORT_CYCLING`
 
 ### Raw OpenTherm Message (Optional)
 
@@ -919,14 +1030,19 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 | `sat/sun_elevation` | `"32.5"` | Push sun elevation in degrees (from HA sun entity) |
 | `sat/solar_min_elevation` | `"12.0"` | Set minimum sun elevation for solar gain activation |
 
-**OPV Calibration:**
+**PV-surplus Boost (TASK-640):**
 
 | Topic Suffix | Payload | Description |
 | ------------ | ------- | ----------- |
-| `sat/ovp_start` | (any) | Start OPV calibration sequence |
-| `sat/ovp_stop` | (any) | Cancel OPV calibration |
-| `sat/ovp_value` | `"52.5"` | Manually set OPV value (°C) |
-| `sat/ovp_enabled` | `"true"` / `"false"` | Enable or disable OPV |
+| `sat/pv_surplus_w` | `"1800"` | Push the current PV surplus (W, 0-50000) |
+| `sat/pv_boost_enabled` | `"1"` / `"0"` / `"true"` | Enable or disable the PV boost |
+| `sat/pv_boost_threshold_w` | `"1500"` | Surplus threshold (W), setting `SATpvboostthresholdw` |
+| `sat/pv_boost_hold_s` | `"120"` | Hold time (s), setting `SATpvboostholds` |
+| `sat/pv_boost_delta_c` | `"1.0"` | Target raise (°C), setting `SATpvboostdeltac` |
+| `sat/pv_boost_max_indoor_c` | `"23.0"` | Max room temperature for a boost (°C), setting `SATpvboostmaxindoorc` |
+| `sat/pv_boost_max_duration_min` | `"240"` | Max boost duration (min), setting `SATpvboostmaxdurationmin` |
+
+The OPV calibration commands (`sat/ovp_start`, `sat/ovp_stop`, `sat/ovp_value`, `sat/ovp_enabled`) were removed in TASK-891.6 and are ignored.
 
 **PID Control and Maintenance:**
 
@@ -938,7 +1054,7 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 
 **Feature Switches (TASK-284, bound to HA switch entities):**
 
-Payloads: `"true"` / `"false"`. Each of these corresponds to one of the 14 auto-discovered SAT switches.
+Payloads: `"true"` / `"false"`. Each of these corresponds to one of the auto-discovered SAT switches (see SAT Discovery Entities).
 
 | Topic Suffix | Bound SAT setting | Description |
 | ------------ | ----------------- | ----------- |
@@ -952,9 +1068,9 @@ Payloads: `"true"` / `"false"`. Each of these corresponds to one of the 14 auto-
 | `sat/push_setpoint` | `SATpushsetpoint` | Enable pushing setpoint changes to boiler |
 | `sat/external_temp` | `SATexternaltemp` | Prefer the MQTT/REST indoor temperature (`sat/indoor_temp`) over the thermostat room temperature. State: `sat/external_temp_enable` |
 | `sat/follow_thermostat` | `SATfollowthermostat` | A room setpoint change on the thermostat (MsgID 16) becomes the SAT target and clears an active preset. Defaults to the push-setpoint value on units with no stored value |
-| `sat/ovp_enabled` | `SATovpenabled` | Enable OPV (overshoot-protection value) |
 | `sat/preset_sync` | `SATpresetsync` | Enable HA preset-sync subscription |
 | `sat/dhw_enabled` | `SATdhwenabled` | Enable DHW heating |
+| `sat/dhw_enable` | `SATdhwenable` | Master hot-water enable (`HW=`); only acted on with a storage tank (MsgID 3 HB3). Its switch is discovered only then |
 
 `sat/mqtt_fallback` (key `SATmqttfallback`) is a settings command, not an auto-discovered switch, and has no Home Assistant entity. "Take over when MQTT is lost": after more than 5 minutes without MQTT, SAT controls the boiler until MQTT is back; off (default): the thermostat keeps control. It only starts after MQTT was connected at least once since boot, so a simultaneous power cut of broker and OTGW does not trigger it. Switching SAT off yourself during the outage ends the takeover and it does not restart until MQTT has been back. Also settable through `POST /api/v2/settings` (`satmqttfallback`).
 
@@ -970,22 +1086,22 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 
 | Topic Suffix | Bound SAT setting | Notes |
 | ------------ | ----------------- | ----- |
-| `sat/heating_curve` | `SATcoefficient` | Heating curve coefficient |
+| `sat/heating_curve` | `SATcoefficient` | Heating curve coefficient (state echo: `sat/heating_curve_coeff`; the state topic `sat/heating_curve` is the computed curve value) |
 | `sat/deadband` | `SATdeadband` | PID deadband (°C) |
 | `sat/interval` | `SATinterval` | Control loop interval (seconds) |
 | `sat/overshoot_margin` | `SATovershootmargin` | Overshoot margin (°C) |
 | `sat/manufacturer` | `SATmanufacturer` | Boiler manufacturer name |
 | `sat/max_modulation` | `SATmaxmodulation` | Max relative modulation % |
 | `sat/dhw_setpoint` | `SATdhwsetpoint` | DHW setpoint (°C) |
-| `sat/ovp_value` | `SATovpvalue` | OPV calibrated value (°C) |
 | `sat/flame_off_offset` | `SATflameoffset` | Setpoint offset when flame is off |
 | `sat/flow_offset` | `SATflowoffset` | Continuous mode max setpoint drop (°C) |
 | `sat/summer_threshold` | `SATsummerthreshold` | Summer simmer outdoor threshold (°C) |
 | `sat/summer_min_hours` | `SATsummerminhours` | Hours above threshold to activate summer mode |
-| `sat/thermal_comfort` | `SATthermalcomfort` | Thermal comfort tuning |
+| `sat/thermal_comfort` | `SATthermalcomfort` | `"true"` / `"false"`: use the Summer Simmer comfort index instead of the OpenTherm room temperature (not used with a BLE, multi-area or pushed indoor value) |
 | `sat/humidity_timeout_s` | `SAThumiditytimeout` | Humidity reading timeout (s) |
 | `sat/ble_enable` | `SATbleenable` | Enable BLE sensor (ESP32 only) |
 | `sat/ble_mac` | `SATblemac` | BLE sensor MAC address |
+| `sat/ble_failover` | `SATblefailover` | When the chosen BLE sensor goes stale, use another fresh sensor from the roster |
 | `sat/ble_interval` | `SATbleinterval` | BLE poll interval (s) |
 | `sat/preset_sync_topic` | `SATpresetsynctopic` | Preset-sync MQTT topic to subscribe to |
 | `sat/auto_tune_rate` | `SATautotunerate` | Auto-tune learning rate |
@@ -1005,11 +1121,11 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 | `sat/preset_activity` | `SATpresetactivity` | Activity preset temperature |
 | `sat/preset_home` | `SATpresethome` | Home preset temperature |
 | `sat/sensor_max_age` | `SATsensormaxage` | Max age for external sensor readings (s) |
-| `sat/error_monitoring` | `SATerrormon` | Enable PID error ring-buffer monitoring |
-| `sat/auto_gains_value` | `SATautogains` | Auto-gains multiplier |
+| `sat/error_monitoring` | `SATerrormon` | Error-monitoring flag. Stored and published as `sat/error_monitoring`; it has no other effect today |
+| `sat/auto_gains_value` | `SATautogains` | Auto-gain factor. Stored and published; the PID does not read it today |
 | `sat/heating_mode` | `SATheatingmode` | Heating mode: `"eco"`, `"comfort"`, or numeric |
 | `sat/cycles_per_hour` | `SATcyclesperhour` | Target PWM cycles per hour |
-| `sat/valve_offset` | `SATvalveoffset` | Valve offset compensation |
+| `sat/valve_offset` | `SATvalveoffset` | Valve offset (-1 to 1). Stored and published; the control loop does not use it today |
 | `sat/solar_freeze_integral` | `SATsolarfreezeint` | Freeze PID integral during solar gain |
 
 The full reference with payload ranges and defaults is in the [SAT MQTT topics document](../../backlog/docs/doc-1%20-%20sat-mqtt-topics.md).
@@ -1157,113 +1273,123 @@ There is no `{entity}_gateway` variant; gateway override is observable via diver
 
 ### SAT Discovery Entities
 
-When SAT is enabled, the following HA entities are auto-discovered. Entities marked **ESP32 only** require BLE to be enabled and are published only on ESP32 builds.
+SAT entities are announced with the non-OT discovery IDs 251 to 255 (`queueNonOTDiscoveryIds()` in `MQTTstuff.ino`), and the SAT switches and select with the climate pass (ID 0). They all sit on the SAT device route (`HaDevice::Sat`). The tables list each entity by its state topic suffix under `%mqtt_pub_topic%`. Most `sat/*` state topics are only published while SAT is enabled, so these entities read `unknown` until then.
 
-**Climate Entity:**
+**Thermostat climate entity:** there is no separate SAT climate entity. The thermostat climate entity (`<HaPrefix>/climate/<node>/climate/config`, room temperature from `Tr`, target from `TrSet`) carries `json_attributes_topic` = `sat/climate_attributes`.
 
-| Entity Type | Entity ID | Description |
-|-------------|-----------|-------------|
-| `climate` | `sat_climate` | Climate entity: target temp control, mode (off/heat), current room temp from OT bus. `json_attributes_topic` provides extended state. `action_topic` maps off/pwm/continuous to off/heating. |
+**Sensor entities, SAT control (ID 252):**
 
-**Sensor Entities:**
+| State topic | Unit | Notes |
+|-------------|------|-------|
+| `sat/target` | °C | Target room temperature |
+| `sat/mode` | - | Actual control mode (off/continuous/pwm) |
+| `sat/setpoint` | °C | Flow setpoint sent to the boiler |
+| `sat/heating_curve` | °C | Heating curve value |
+| `sat/pid_output` | °C | `json_attributes_topic` = `sat/pid_attributes` |
+| `sat/error` | °C | PID error |
+| `sat/room_temp` | °C | Room temperature used by the PID |
+| `sat/outside_temp` | °C | Outside temperature used by the heating curve |
+| `sat/pid_p`, `sat/pid_i`, `sat/pid_d` | °C | PID terms |
+| `sat/raw_derivative` | - | Raw derivative |
+| `sat/kp`, `sat/ki`, `sat/kd` | - | PID gains |
+| `sat/boiler_status` | - | Boiler status name |
+| `sat/cycle_class` | - | `json_attributes_topic` = `sat/cycle_attributes` |
+| `sat/pwm_duty` | % | `value_template` multiplies the raw 0-1 value by 100 |
+| `sat/duty_ratio` | % | Raw 0-1 value x 100 |
+| `sat/overshoot_fraction` | % | Raw 0-1 value x 100 |
+| `sat/cycle_phase` | - | Cycle phase |
+| `sat/overshoot_margin` | °C | Overshoot margin |
+| `sat/cycles_this_hour` | - | `state_class` `total_increasing` |
+| `sat/4h_cycles` | - | 4-hour cycle count |
+| `sat/4h_avg_on_sec`, `sat/4h_avg_off_sec` | s | 4-hour averages |
+| `sat/4h_avg_flow_temp` | °C | 4-hour average flow temperature |
+| `sat/4h_duty_ratio`, `sat/4h_overshoot_fraction`, `sat/4h_underheat_fraction` | % | Raw 0-1 value x 100 |
+| `sat/4h_flow_ret_delta_p50`, `sat/4h_flow_ret_delta_p90` | °C | Flow-return difference percentiles |
+| `sat/power` | kW | `device_class` `power`, `state_class` `measurement` (TASK-1276) |
+| `sat/energy_total` | kWh | `device_class` `energy`, `state_class` `total_increasing` for the HA Energy dashboard (TASK-1276) |
+| `sat/energy_estimated_kwh` | kWh | Name "SAT Estimated Gas Input"; `device_class` `energy`, `state_class` `total_increasing`. Published only when `satboilerratedkw` > 0, so the entity reads `unknown` until then (TASK-1276) |
 
-| Entity Type | Entity ID | Unit | Notes |
-|-------------|-----------|------|-------|
-| `sensor` | `sat_setpoint` | °C | Flow temperature setpoint sent to boiler |
-| `sensor` | `sat_heating_curve` | °C | Heating curve calculated value |
-| `sensor` | `sat_pid_output` | °C | PID output; `json_attributes_topic` = `sat/pid_attributes` |
-| `sensor` | `sat_error` | °C | PID error (target - room temp) |
-| `sensor` | `sat_mode` | - | Control mode string (off/continuous/pwm) |
-| `sensor` | `sat_boiler_status` | - | Boiler status code (0-14) |
-| `sensor` | `sat_pwm_duty` | % | PWM duty cycle (value_template multiplies raw 0.00-1.00 by 100) |
-| `sensor` | `sat_room_temp` | °C | Room temperature used by PID |
-| `sensor` | `sat_outside_temp` | °C | Outside temperature used by heating curve |
-| `sensor` | `sat_estimated_room` | °C | Estimated room temp during sensor fallback |
-| `sensor` | `sat_humidity` | % | Indoor humidity |
-| `sensor` | `sat_current_modulation` | % | Current boiler modulation (from `sat/current_modulation`) |
-| `sensor` | `sat_pressure` | bar | Smoothed system pressure |
-| `sensor` | `sat_pressure_drop_rate` | bar/h | Pressure drop rate |
-| `sensor` | `sat_power` | kW | Current boiler power; `device_class` `power`, `state_class` `measurement` (TASK-1276) |
-| `sensor` | `sat_energy_total` | kWh | Cumulative energy; `device_class` `energy`, `state_class` `total_increasing` for the HA Energy dashboard (TASK-1276) |
-| `sensor` | `sat_energy_estimated_kwh` | kWh | Estimated gas input (name "SAT Estimated Gas Input"); `device_class` `energy`, `state_class` `total_increasing`. The topic is published only when `satboilerratedkw` > 0, so the entity reads `unknown` until then (TASK-1276) |
-| `sensor` | `sat_duty_ratio` | - | EMA duty ratio (flame-on fraction) |
-| `sensor` | `sat_manufacturer` | - | Detected/configured boiler manufacturer |
-| `sensor` | `sat_pid_p` | °C | Proportional PID term |
-| `sensor` | `sat_pid_i` | °C | Integral PID term |
-| `sensor` | `sat_pid_d` | °C | Derivative PID term |
-| `sensor` | `sat_kp` | - | Current Kp gain |
-| `sensor` | `sat_ki` | - | Current Ki gain |
-| `sensor` | `sat_kd` | - | Current Kd gain |
-| `sensor` | `sat_raw_derivative` | - | Raw (unfiltered) derivative term |
-| `sensor` | `sat_error_mean` | °C | Mean PID error over ring buffer |
-| `sensor` | `sat_error_stddev` | °C | Std deviation of PID error |
-| `sensor` | `sat_thermal_coeff` | - | Learned thermal drop coefficient |
-| `sensor` | `sat_thermal_drop_rate` | °C/h | Current thermal drop rate sample |
-| `sensor` | `sat_indoor_rise_rate` | °C/h | Measured indoor temperature rise rate |
-| `sensor` | `sat_overshoot_fraction` | - | EMA fraction of cycles with overshoot |
-| `sensor` | `sat_cycle_class` | - | Cycle classification string; `json_attributes_topic` = `sat/cycle_attributes` |
-| `sensor` | `sat_curve_recommendation` | - | Heating curve recommendation; `json_attributes_topic` = `sat/curve_recommendation_attributes` |
-| `sensor` | `sat_flame_status` | - | Flame health status string |
-| `sensor` | `sat_summer_hours_above` | h | Hours outdoor temp above summer threshold |
-| `sensor` | `sat_auto_tune_score` | - | Auto-tune PID score |
-| `sensor` | `sat_consumption` | m³/h | Gas consumption |
-| `sensor` | `sat_ble_temp` | °C | BLE sensor temperature (ESP32 only) |
-| `sensor` | `sat_ble_humidity` | % | BLE sensor humidity (ESP32 only) |
-| `sensor` | `sat_ble_rssi` | dBm | BLE sensor RSSI, diagnostic category (ESP32 only) |
+**Sensor entities, BLE, pressure and weather (ID 253):**
 
-**Binary Sensor Entities:**
+| State topic | Unit | Notes |
+|-------------|------|-------|
+| `sat/ble_temp` | °C | BLE temperature of the selected sensor (ESP32 only) |
+| `sat/ble_humidity` | % | BLE humidity of the selected sensor (ESP32 only) |
+| `sat/ch_pressure` | bar | CH water pressure |
+| `sat/weather/temperature`, `sat/weather/apparent_temp` | °C | Weather |
+| `sat/weather/humidity` | % | Weather |
+| `sat/weather/wind_speed`, `sat/weather/wind_gusts` | m/s | `value_template` converts the published km/h to m/s |
+| `sat/weather/wind_direction` | ° | Weather |
+| `sat/weather/cloud_cover` | % | Weather |
+| `sat/weather/pressure_msl` | hPa | Weather |
+| `sat/weather/precipitation`, `sat/weather/rain`, `sat/weather/snowfall` | mm | Weather |
+| `sat/weather/weather_code` | - | WMO weather code |
 
-| Entity Type | Entity ID | Device Class | Notes |
-|-------------|-----------|--------------|-------|
-| `binary_sensor` | `sat_flame_health` | problem | ON = flame healthy |
-| `binary_sensor` | `sat_active` | - | Whether SAT is actively controlling |
-| `binary_sensor` | `sat_safety_tripped` | problem | Safety shutdown active |
-| `binary_sensor` | `sat_valves_open` | - | TRV valves reported open |
-| `binary_sensor` | `sat_window_open` | window | Window open detection |
-| `binary_sensor` | `sat_pressure_alarm` | problem | Pressure alarm active |
-| `binary_sensor` | `sat_pressure_health` | problem | Pressure healthy; `json_attributes_topic` = `sat/pressure_health_attr` |
-| `binary_sensor` | `sat_modulation_reliable` | - | Boiler modulation feedback reliable |
-| `binary_sensor` | `sat_setpoint_mismatch` | problem | Setpoint mismatch detected on OT bus |
-| `binary_sensor` | `sat_thermal_model_valid` | - | Thermal model has sufficient data |
-| `binary_sensor` | `sat_solar_gain` | - | Solar gain compensation active |
-| `binary_sensor` | `sat_summer_active` | - | Summer simmer suppressing heating |
-| `binary_sensor` | `sat_humidity_valid` | - | Humidity reading is valid |
-| `binary_sensor` | `sat_auto_tune_active` | - | Auto-tune analysis running |
-| `binary_sensor` | `sat_setpoint_sync` | problem | Setpoint sync health |
-| `binary_sensor` | `sat_modulation_sync` | problem | Modulation sync health |
-| `binary_sensor` | `sat_ch_sync` | problem | CH sync health |
+**Sensor entities, diagnostic category (ID 251):**
 
-**Number Entity:**
+| State topic | Unit | Notes |
+|-------------|------|-------|
+| `sat/ble_sensor_rssi` | - | BLE RSSI (dBm value, no unit in discovery) |
+| `sat/ble_battery` | % | BLE battery |
+| `sat/ble_sensor_count` | - | BLE sensors seen |
+| `sat/ble_temp_valid` | - | Announced as a sensor, not a binary sensor |
+| `sat/ch_pressure_status` | - | `ok` / `low` / `high` |
 
-| Entity Type | Entity ID | Unit | Description |
-|-------------|-----------|------|-------------|
-| `number` | `sat_dhw_setpoint` | °C | DHW setpoint slider (30-60 °C, 0.5 step) |
+**Sensor entity, flame status (ID 254):** `sat/flame_status`, no unit.
 
-**Switch Entities (TASK-284, 13 switches; `sat_comfort_adjust_enable` removed in TASK-1282, entry 114):**
+**Binary sensor entities:**
 
-Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and takes commands on `%mqtt_sub_topic%/sat/<command>`. Payloads are literal `"true"` / `"false"` (`pl_on` / `pl_off`).
+| State topic | Device class | Payloads | Notes |
+|-------------|--------------|----------|-------|
+| `sat/active` | - | `true` / `false` | SAT actively controlling |
+| `sat/safety_tripped` | problem | `true` / `false` | Safety shutdown |
+| `sat/flame_health` | problem | `ON` / `OFF` | ON = flame problem |
+| `sat/valves_open` | - | `true` / `false` | TRV valves reported open |
+| `sat/weather/is_day` | - | `1` / `0` | Daylight (ID 253) |
 
-| Entity ID | Command topic suffix | State topic suffix | Icon |
-|-----------|----------------------|--------------------|------|
-| `sat_solar_gain_enable` | `sat/solar_gain` | `sat/solar_gain_enable` | `mdi:white-balance-sunny` |
-| `sat_summer_simmer_enable` | `sat/summer_simmer` | `sat/summer_simmer_enable` | `mdi:weather-sunny-alert` |
-| `sat_multi_area_enable` | `sat/multi_area` | `sat/multi_area_enable` | `mdi:home-group` |
-| `sat_auto_tune_enable` | `sat/auto_tune` | `sat/auto_tune_enable` | `mdi:auto-fix` |
-| `sat_simulation_enable` | `sat/simulation` | `sat/simulation_enable` | `mdi:flask` |
-| `sat_window_detection_enable` | `sat/window_detection` | `sat/window_detection_enable` | `mdi:window-open-variant` |
-| `sat_overshoot_protection_enable` | `sat/overshoot_protection` | `sat/overshoot_protection_enable` | `mdi:shield-check` |
-| `sat_push_setpoint_enable` | `sat/push_setpoint` | `sat/push_setpoint_enable` | `mdi:upload` |
-| `sat_follow_thermostat_enable` | `sat/follow_thermostat` | `sat/follow_thermostat_enable` | `mdi:thermostat` |
-| `sat_external_temp_enable` | `sat/external_temp` | `sat/external_temp_enable` | `mdi:home-thermometer` |
-| `sat_ovp_enabled` | `sat/ovp_enabled` | `sat/ovp_enabled` | `mdi:shield-check` |
-| `sat_preset_sync_enable` | `sat/preset_sync` | `sat/preset_sync_enable` | `mdi:sync` |
-| `sat_dhw_enabled` | `sat/dhw_enabled` | `sat/dhw_enabled` | `mdi:water-boiler` |
+**Multi-zone entities (ID 255):** for each configured zone n, and for a zone that still has fresh data: `sat_zone_<n>_active` (binary sensor, `sat/zone/<n>/active`, `true` / `false`), `sat_zone_<n>_output` and `sat_zone_<n>_error` (sensors, °C, `sat/zone/<n>/output` and `sat/zone/<n>/error`).
 
-**Select Entity (TASK-284):**
+**PV-surplus boost entities (ID 255, TASK-640):** always announced: switch `sat_pv_boost_enabled` (state and command `sat/pv_boost_enabled`, payloads `1` / `0`) and numbers `sat_pv_boost_threshold_w` (100-10000 W), `sat_pv_boost_hold_s` (30-600 s), `sat_pv_boost_delta_c` (0.5-5 °C), `sat_pv_boost_max_indoor_c` (18-28 °C), `sat_pv_boost_max_duration_min` (30-1440 min), each with state and command topic `sat/pv_boost_*`. Only while PV boost is on: sensors `sat_pv_surplus_w` (W) and `sat_pv_boost_applied_c` (°C), binary sensor `sat_pv_boost_active`.
 
-| Entity ID | Command topic suffix | State topic suffix | Options |
+**BLE per-MAC entities:** see "Home Assistant auto-discovery" under BLE Temperature Sensor.
+
+The topics `sat/estimated_room`, `sat/humidity`, `sat/current_modulation`, `sat/pressure`, `sat/pressure_drop_rate`, `sat/manufacturer`, `sat/error_mean`, `sat/error_stddev`, `sat/thermal_*`, `sat/indoor_rise_rate`, `sat/curve_recommendation`, `sat/summer_*`, `sat/auto_tune_score`, `sat/window_open`, `sat/pressure_alarm`, `sat/pressure_health`, `sat/modulation_reliable`, `sat/setpoint_mismatch`, `sat/solar_gain`, `sat/humidity_valid`, `sat/auto_tune_active`, `sat/*_sync`, `sat/device_health` and `sat/cycle_health` are published but have no discovery entity. There is no SAT DHW-setpoint number entity.
+
+**Switch entities (TASK-284):**
+
+Each switch publishes its state to `%mqtt_pub_topic%/<state topic>` and takes commands on `%mqtt_sub_topic%/<command topic>`. Payloads are literal `"true"` / `"false"` (`pl_on` / `pl_off`).
+
+| uniq_id suffix | Command topic suffix | State topic suffix | Icon |
+|----------------|----------------------|--------------------|------|
+| `-sat-solar-gain-enable` | `sat/solar_gain` | `sat/solar_gain_enable` | `mdi:white-balance-sunny` |
+| `-sat-summer-simmer-enable` | `sat/summer_simmer` | `sat/summer_simmer_enable` | `mdi:weather-sunny-alert` |
+| `-sat-external-temp-enable` | `sat/external_temp` | `sat/external_temp_enable` | `mdi:home-thermometer` |
+| `-sat-multi-area-enable` | `sat/multi_area` | `sat/multi_area_enable` | `mdi:home-group` |
+| `-sat-auto-tune-enable` | `sat/auto_tune` | `sat/auto_tune_enable` | `mdi:auto-fix` |
+| `-sat-simulation-enable` | `sat/simulation` | `sat/simulation_enable` | `mdi:flask` |
+| `-sat-window-detection-enable` | `sat/window_detection` | `sat/window_detection_enable` | `mdi:window-open-variant` |
+| `-sat-push-setpoint-enable` | `sat/push_setpoint` | `sat/push_setpoint_enable` | `mdi:upload` |
+| `-sat-preset-sync-enable` | `sat/preset_sync` | `sat/preset_sync_enable` | `mdi:sync` |
+| `-sat-dhw-enabled` | `sat/dhw_enabled` | `sat/dhw_enabled` | `mdi:water-boiler` |
+| `-sat-dhw-enable` | `sat/dhw_enable` | `sat/dhw_enable` | `mdi:water-boiler`; announced only when the boiler reports a storage tank (MsgID 3 HB3) |
+| `-sat-overshoot-protection-enable` | `sat/overshoot_protection` | `sat/overshoot_protection_enable` | `mdi:shield-check` |
+| `-sat-follow-thermostat-enable` | `sat/follow_thermostat` | `sat/follow_thermostat_enable` | `mdi:thermostat` |
+
+**Select entity (TASK-284):**
+
+| Object id | Command topic suffix | State topic suffix | Options |
 |-----------|----------------------|--------------------|---------|
 | `sat_heating_system` | `sat/heating_system` | `sat/heating_system` | `"0"`, `"1"`, `"2"`, `"3"` |
+
+**Retired SAT entities (`kRetiredSatEntities`):** on every SAT discovery pass the firmware empties the retained discovery config and the retained state topic of these removed switches, so Home Assistant drops them:
+
+| Component | Object id | State topic | Removed by |
+|-----------|-----------|-------------|------------|
+| switch | `sat_force_pwm_enable` | `sat/force_pwm_enable` | TASK-1332 |
+| switch | `sat_pwm_auto_switch_enable` | `sat/pwm_auto_switch_enable` | TASK-1341 |
+| switch | `sat_comfort_adjust_enable` | `sat/comfort_adjust_enable` | TASK-1282 |
+
+The OPV switch (`sat_ovp_enabled`) is not in this list; it was removed earlier (TASK-891.6).
 
 ### Retained discovery verification (v1.4.1+)
 
