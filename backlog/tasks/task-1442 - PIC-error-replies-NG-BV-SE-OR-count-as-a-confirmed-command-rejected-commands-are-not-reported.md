@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T05:14:00Z'
-updated_date: '2026-10-29T06:26:00Z'
+updated_date: '2026-10-29T06:27:00Z'
 labels:
   - bug
   - mqtt
@@ -28,8 +28,11 @@ Evidence: C:\Users\rvdbr\AppData\Local\OTGW-capture\bench-68-beta8-20261029-0559
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Maintainer decided whether and how a PIC error reply to a queued command is reported
-- [ ] #2 An error reply no longer clears command_retry_exceeded as if the command was confirmed, or the decision explicitly keeps that behaviour
+- [x] #1 Maintainer decided whether and how a PIC error reply to a queued command is reported
+- [ ] #2 A queued command answered with a PIC error code (NG, BV, SE, OR, NS, NF, OE) is published once on otgw-firmware/command_dropped as '<command> (<code>)' (not retained), counts in cmd_dropped, latches command_retry_exceeded ON and is removed without retry; host harness on the real queue code is red on HEAD and green with the fix
+- [ ] #3 An error reply never sets command_retry_exceeded OFF; a normal confirmation still does (same harness)
+- [ ] #4 Bench .68: ZZ=1 via MQTT gives command_dropped 'ZZ=1 (NG)', flag ON, cmd_dropped +1; a following confirmed TT= sets the flag OFF
+- [ ] #5 build.bat and evaluate.py --quick green; docs/api/MQTT.md and CHANGELOG describe the rejected-command report
 <!-- AC:END -->
 
 ## Implementation Notes
