@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.531
+**  Version  : v2.0.0-alpha.532
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -613,7 +613,6 @@ static void _satTargetTempCmd(const char* v)     { satHandleTargetTemp(v); }
 static void _satExtTempCmd(const char* v)        { satHandleExternalTemp(v); }
 static void _satExtOutdoorCmd(const char* v)     { satHandleExternalOutdoor(v); }
 static void _satPvSurplusCmd(const char* v)      { satHandlePvSurplus(v); }                  // TASK-640
-static void _satPvBoostEnabledCmd(const char* v) { satHandlePvBoostEnabled(v); }             // TASK-640
 static void _satHumidityCmd(const char* v)       { satHandleHumidity(v); }
 static void _satSunElevationCmd(const char* v)   { satHandleSunElevation(v); }
 
@@ -659,8 +658,10 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "outdoor_temp",           nullptr,                _satExtOutdoorCmd },
   // TASK-640: PV-surplus boost. set/<nodeId>/sat/pv_surplus_w (watts),
   //                              set/<nodeId>/sat/pv_boost_enabled (0/1).
+  // pv_boost_enabled is a stored setting: it goes through updateSetting() like the other
+  // switches, so it survives a reboot; that branch also clears a running boost on disable (TASK-1459).
   { "pv_surplus_w",           nullptr,                _satPvSurplusCmd },
-  { "pv_boost_enabled",       nullptr,                _satPvBoostEnabledCmd },
+  { "pv_boost_enabled",       "SATpvboostenabled",    nullptr },
   { "enabled",                nullptr,                satHandleEnabled },
   { "control_mode",           nullptr,                satHandleControlMode },
   { "preset",                 nullptr,                satHandlePreset },

@@ -1960,20 +1960,6 @@ bool satHandlePvSurplus(const char* value)
   return true;
 }
 
-bool satHandlePvBoostEnabled(const char* value)
-{
-  if (!value || !*value) return false;
-  bool en = (strcasecmp_P(value, PSTR("true")) == 0 || atoi(value) != 0);
-  settings.sat.bPvBoostEnabled = en;
-  if (!en) {
-    state.sat.bPvBoostActive = false;
-    state.sat.fPvBoostAppliedC = 0.0f;
-    state.sat.iPvBoostStartedMs = 0;
-  }
-  SATDebugTf(PSTR("SAT: PV boost %s\r\n"), en ? "enabled" : "disabled");
-  return true;
-}
-
 // satUpdatePvBoost — TASK-640. Called once per control cycle BEFORE the
 // heating-curve calculation. Owns activation/deactivation logic including:
 //   - stale-input expiry (reuses iSensorMaxAgeS)
