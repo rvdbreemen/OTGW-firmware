@@ -11,7 +11,7 @@ OTGW-firmware already publishes **Home Assistant MQTT Discovery** messages. Mode
 ## Prerequisites
 
 - A running MQTT broker (e.g. Mosquitto) reachable by both OTGW and Domoticz.
-- OTGW MQTT enabled and connected (Settings → MQTT). Confirm with `mosquitto_sub -h <broker> -v -t '<haprefix>/#'` — you should see retained `.../config` messages.
+- OTGW MQTT enabled and connected (Settings → *MQTT Enabled*). Confirm with `mosquitto_sub -h <broker> -v -t '<haprefix>/#'`. You should see retained `.../config` messages.
 - A recent Domoticz release (the *MQTT Auto Discovery Client Gateway* hardware type, which supports the Home Assistant discovery convention).
 
 ## Step 1 — Add the Auto Discovery Client hardware
@@ -28,7 +28,7 @@ Fill in:
 
 ## Step 2 — Match the discovery prefix
 
-Domoticz's *Auto Discovery Prefix* must equal OTGW's discovery prefix, the setting **`settings.mqtt.sHaprefix`** (Web UI: *MQTT → HA prefix*; REST/JSON key `mqtthaprefix` / `MQTThaprefix`).
+Domoticz's *Auto Discovery Prefix* must equal OTGW's discovery prefix, the setting **`settings.mqtt.sHaprefix`** (Web UI: Settings → *MQTT Auto-Discovery Prefix*; REST/JSON key `mqtthaprefix` / `MQTThaprefix`).
 
 | Side | Setting | Default |
 |------|---------|---------|

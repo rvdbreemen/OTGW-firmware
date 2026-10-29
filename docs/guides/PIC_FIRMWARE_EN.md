@@ -126,16 +126,23 @@ recommended method because the upgrade routine (originally from Schelte Bron's N
 firmware) handles all the low-level PIC programming protocol steps automatically.
 
 1. Open the Web UI in your browser (e.g. `http://<device-ip>/`).
-2. Navigate to **Settings → PIC Firmware** (or the **Update** tab, depending on your version).
-3. The current PIC firmware type and version are shown.
-4. Click **Check for update** to compare the installed version against the latest available on
-   [otgw.tclcode.com](https://otgw.tclcode.com/).
-5. If an update is available (or if you want to switch firmware type), select the firmware
-   image: **gateway**, **interface**, or **diagnose**.
-6. Click **Flash** (or **Upgrade**). The firmware downloads the `.hex` file from
-   `otgw.tclcode.com` over HTTP and programs it into the PIC directly from the ESP8266.
-7. Progress is displayed in the UI. Do not power off the device during programming.
-8. After completion, the PIC reboots automatically and the new version is shown.
+2. Navigate to **Advanced > PIC firmware**. This menu item only appears when a PIC is
+   detected.
+3. The PIC device, PIC type and PIC firmware version are shown.
+4. When the page opens, it checks [otgw.tclcode.com](https://otgw.tclcode.com/) for a newer
+   version by itself. A banner shows the result, for example "New PIC firmware available:
+   X → Y. Click ↺ to download, then ↓ to flash."
+5. The table lists the firmware files stored on the gateway (such as `gateway.hex` and
+   `diagnose.hex`) with their version and size. Each row has two icons.
+6. Click the refresh icon (tooltip **Update firmware from web**) to download the latest
+   version of that file from `otgw.tclcode.com` over HTTP. This only updates the stored
+   file; it does not flash the PIC.
+7. Click the install icon (tooltip **Install firmware onto pic**) on the row you want. This
+   programs that file into the PIC directly from the ESP8266. Flashing starts at once,
+   without a confirmation question. To switch firmware type, use the install icon on the
+   row of the other type.
+8. Progress is displayed in the UI. Do not power off the device during programming.
+9. After completion, the PIC reboots automatically and the new version is shown.
 
 > **Security note:** The `.hex` file is downloaded over plain HTTP from `otgw.tclcode.com`.
 > Make sure the device is on a trusted local network.
@@ -150,9 +157,12 @@ firmware) handles all the low-level PIC programming protocol steps automatically
 > custom or patched `.hex` file. If you are not sure whether you need this, use the
 > Web UI upgrade described above instead.
 
-1. Open the filesystem explorer at `http://<device-ip>/fs`.
-2. Upload your `.hex` file (e.g. `gateway.hex`) to the root of the filesystem.
-3. Trigger the upgrade via the Web UI as described above.
+1. Open the filesystem explorer: **Advanced > File system contents**, or
+   `http://<device-ip>/FSexplorer`.
+2. Open the folder named after your PIC (`pic16f1847` or `pic16f88`) and upload your `.hex`
+   file (e.g. `gateway.hex`) there. Files in the root of the filesystem are not listed.
+3. Open **Advanced > PIC firmware** and click the install icon on the row of your file, as
+   described above.
 
 ---
 

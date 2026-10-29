@@ -54,13 +54,13 @@ All sensors share the same bus — connect them in parallel to the same data lin
 
 ### Default GPIO Pin
 
-The default pin is **GPIO10** (labelled **SD3** on most NodeMCU/Wemos D1 mini boards). This pin was chosen because it is not used by the OTGW serial communication or other core functions on the Nodo board.
+The default pin is **GPIO10**. On a NodeMCU board it is the pin labelled **SD3**. A Wemos D1 mini does not break out GPIO10, so on a D1 mini you must pick another free GPIO pin and set it in **GPIO Sensor Pin**. This pin was chosen because it is not used by the OTGW serial communication or other core functions on the Nodo board.
 
 > **Note:** Changing the GPIO pin in settings requires a **reboot** before the new pin takes effect.
 
 ## Settings
 
-Configure Dallas sensors in the Web UI under **Settings**, or via the REST API at `POST /api/v1/otgw/settings`.
+Configure Dallas sensors in the Web UI under **Settings**, or via the REST API at `POST /api/v2/settings`.
 
 | Setting | JSON Key | Default | Description |
 |---|---|---|---|
@@ -157,8 +157,8 @@ The file uses **zero backend RAM** — labels are streamed directly from LittleF
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/v1/sensors/labels` | Returns all labels as a JSON object. Returns `{}` if no labels file exists. |
-| POST | `/api/v1/sensors/labels` | Replaces all labels. Request body must be valid JSON. Returns `{"success": true}`. |
+| GET | `/api/v2/sensors/labels` | Returns all labels as a JSON object. Returns `{}` if no labels file exists. |
+| POST | `/api/v2/sensors/labels` | Replaces all labels. Request body must be valid JSON. Returns `{"success": true}`. |
 
 The frontend uses a **read-modify-write** pattern: it fetches all labels, updates the one being edited, and POSTs the full set back. This avoids per-sensor endpoints and keeps the backend simple.
 
@@ -176,7 +176,7 @@ Dallas sensors are **automatically added** to the real-time temperature graph (t
 When performing a **filesystem flash** (OTA update of the LittleFS partition), the Web UI:
 
 1. **Before flash**: Downloads both `settings.ini` and `dallas_labels.ini` as backup files to the user's browser (timestamped filenames). The labels backup is non-fatal — if the file doesn't exist, the flash proceeds normally.
-2. **After reboot**: The OTA completion page automatically **restores labels** from the parent window's in-memory cache (`dallasLabelsCache`) by POSTing them back to `/api/v1/sensors/labels`. This happens after a 5-second stabilization delay.
+2. **After reboot**: The OTA completion page automatically **restores labels** by POSTing them back to `/api/v2/sensors/labels`. Before the flash, the page stores the labels in the browser's `localStorage` (key `otgw_dallas_restore`). The restore runs once `/api/v2/health` answers again.
 
 > **Note:** `settings.ini` is auto-restored from ESP memory (it persists across filesystem flashes). Dallas labels require the active restore because they only exist on the filesystem.
 

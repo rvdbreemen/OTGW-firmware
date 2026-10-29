@@ -34,9 +34,9 @@ MsgID is seen on the OpenTherm bus after the ESP (re)starts, then the broker
 
 1. **Wait ~5 minutes** with normal OT traffic after the last full ESP restart.
    Most active entities self-populate in that window as their MsgIDs are seen.
-2. **Force a full re-announce.** Open the OTGW web interface → **MQTT** tab →
-   **Re-publish discovery** (or REST: `curl -X POST http://otgw.local/api/v2/discovery/republish`,
-   or the Serial/telnet debug command **`F`**). This queues *every* known MsgID
+2. **Force a full re-announce.** The web interface has no button for this. Use
+   REST: `curl -X POST http://otgw.local/api/v2/discovery/republish`, or press
+   **`F`** in the telnet debug console (port 23). This queues *every* known MsgID
    for discovery immediately; they then drip out over a few minutes. Safe to
    repeat — the broker deduplicates identical retained configs, so no Home
    Assistant churn.
@@ -81,17 +81,18 @@ firmware publish fresh ones.
 
 ## Step 1 — Find your device's Unique ID
 
-Every OTGW device has a unique identifier (based on the ESP chip ID). You need this to
-locate your specific discovery topics on the broker.
+Every OTGW device has a unique identifier. By default it is `otgw-` followed by the
+12 hex digits of the WiFi MAC address, in uppercase. You need this to locate your
+specific discovery topics on the broker.
 
 1. Open the OTGW web interface: go to `http://otgw.local` or `http://<your device IP>` in a browser.
 2. Click **Settings** in the top menu.
-3. Find the **MQTT** section.
-4. Look for the field labeled **Unique ID** — it will look something like `otgw-a1b2c3`.
+3. Settings are one list without sections. Find the row labeled **MQTT Unique ID**.
+4. It will look something like `otgw-A1B2C3D4E5F6`.
 
-Write this value down. You will use it in all the steps below.
+Write this value down exactly. MQTT topics are case-sensitive. You will use it in all the steps below.
 
-> If you changed the **HA prefix** setting from the default `homeassistant`, note that value
+> If you changed the **MQTT Auto-Discovery Prefix** setting from the default `homeassistant`, note that value
 > too. The steps below assume the default.
 
 ---
@@ -118,7 +119,7 @@ browse and delete retained messages. It runs on Windows, macOS, and Linux.
 **Delete the stale topics:**
 1. In the topic tree on the left, expand **`homeassistant`**.
 2. Expand **`sensor`**, then look for a folder that matches your Unique ID
-   (e.g. `otgw-a1b2c3`).
+   (e.g. `otgw-A1B2C3D4E5F6`).
 3. Right-click that folder and choose **Delete retained messages** (the exact wording
    may differ slightly by version — it is the option that sends an empty retained payload
    to all sub-topics).
@@ -147,7 +148,7 @@ then **publish** an empty retained message to each one to delete it.
    ```
    Replace `<your Unique ID>` with the value from Step 1, e.g.:
    ```
-   homeassistant/+/otgw-a1b2c3/+/config
+   homeassistant/+/otgw-A1B2C3D4E5F6/+/config
    ```
 3. Click **Start listening**.
 4. Wait about 30 seconds. Any retained discovery topics will appear in the log below.
@@ -177,7 +178,7 @@ If you have `mosquitto_sub` and `mosquitto_pub` installed on your system:
 BROKER="192.168.1.100"
 USER="mqttuser"
 PASS="mqttpassword"
-NODE_ID="otgw-a1b2c3"
+NODE_ID="otgw-A1B2C3D4E5F6"
 
 # Step 1: collect all retained discovery topics for this device
 mosquitto_sub -h "$BROKER" -u "$USER" -P "$PASS" \
@@ -203,7 +204,7 @@ discovery configs the next time it connects to MQTT — usually within 1–2 min
 the broker being available.
 
 To trigger it immediately without waiting:
-- Open the OTGW web interface → **MQTT** tab → click **Re-publish discovery**.
+- Press **`F`** in the telnet debug console (port 23).
 - Or use the REST API: `curl -X POST http://otgw.local/api/v2/discovery/republish`
 
 ---
@@ -237,7 +238,7 @@ The release notes for each version will call out when a cleanup is recommended.
 | Symptom | Likely cause | What to do |
 |---------|-------------|------------|
 | Entities still duplicated after cleanup | HA entity registry not updated | Restart Home Assistant |
-| No topics found when listening | Wrong Unique ID or HA prefix | Check OTGW Settings → MQTT for the exact values |
+| No topics found when listening | Wrong Unique ID or HA prefix | Check **MQTT Unique ID** and **MQTT Auto-Discovery Prefix** in OTGW Settings for the exact values |
 | Entities disappeared and did not come back | Firmware not yet re-published | Wait 2 min or use Re-publish discovery button |
 | DHW setpoint shows 43 °C | Stale discovery config with old `initial` value | Complete this cleanup, then re-publish |
 | `_2` entity still present after restart | HA entity registry has a ghost entry | Delete manually via Settings → Devices & Services |

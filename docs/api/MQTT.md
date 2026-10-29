@@ -36,13 +36,13 @@ On MQTT connect:
 4. **Subscribes** to `{TopTopic}/set/{UniqueId}/#` for incoming commands
 5. **Subscribes** to `homeassistant/status` for Home Assistant lifecycle detection
 6. **Publishes** version info, state information, and cached PIC settings
-7. **Conditional OT republish**: Re-publishes all retained OT values only if the offline duration exceeded 5 minutes (the broker-loss threshold). Short outages are treated as network blips — the broker still holds retained topics. First boot and first-enable scenarios do not trigger a republish; the first-seen mechanism publishes each value naturally as it appears on the OT bus. On assumed broker restart (offline duration exceeded threshold), the discovery done/pending bitmaps are also reset and non-OT configs are re-queued, so JIT re-publishes OT configs as messages arrive.
+7. **Conditional OT republish**: Re-publishes all OT values only if the offline duration exceeded 5 minutes (the broker-loss threshold). Short outages are treated as network blips, and no republish is done. OT values are not retained, so after a short outage each value comes back the next time it is published. First boot and first-enable scenarios do not trigger a republish; the first-seen mechanism publishes each value naturally as it appears on the OT bus. On assumed broker restart (offline duration exceeded threshold), the discovery done/pending bitmaps are also reset and non-OT configs are re-queued, so JIT re-publishes OT configs as messages arrive.
 
 ---
 
 ## Published Topics
 
-All published topics are under the publish namespace `{TopTopic}/value/{UniqueId}/` unless otherwise noted. Topics are published with `retain = true` by default.
+All published topics are under the publish namespace `{TopTopic}/value/{UniqueId}/` unless otherwise noted. Topics are published with `retain = false` by default, so OpenTherm values are not retained. These are retained: the birth and Last Will messages, Home Assistant discovery configs, `otgw-firmware/hostname`, `otgw-firmware/stats/*`, `otgw-firmware/boiler/unsupported_msgids`, `otgw-firmware/command_retry_exceeded` and `{label}/override`.
 
 ### Firmware & Device Information
 
@@ -294,48 +294,6 @@ Published when GPIO sensors are enabled (`settings.sensors.bEnabled`):
 | `{sensor_address}` | `"21.5"` | Temperature in Celsius |
 
 Where `{sensor_address}` is the Dallas 1-Wire address (e.g., `28FF64D1841703F1`). The address format depends on the `gpiosensorslegacyformat` setting.
-
-### SAT (Smart Autotune) Topics
-
-Published when the SAT subsystem is active (`settings.sat.bEnabled`). Topics are published under the standard publish namespace, i.e. at `{TopTopic}/value/{UniqueId}/sat/<metric>`.
-
-#### SAT Pressure Topics
-
-| Topic | Value | Description |
-| ----- | ----- | ----------- |
-| `sat/pressure` | `"1.45"` | Current CH water pressure in bar |
-| `sat/pressure_drop_rate` | `"-0.002"` | Pressure drop rate in bar/hour |
-| `sat/pressure_alarm` | `"true"` / `"false"` | Pressure alarm active |
-| `sat/pressure_health` | `"ON"` / `"OFF"` | Pressure health status (retained) |
-
-Note: the `sat/pressure_health_attr` JSON attributes topic was removed in v1.5.1-beta.3. The individual scalar topics (`sat/pressure`, `sat/pressure_drop_rate`, `sat/pressure_alarm`) remain and provide the same data without a JSON bundle.
-
-#### SAT Climate Attributes Topic
-
-| Topic | Value | Description |
-| ----- | ----- | ----------- |
-| `sat/climate_attributes` | JSON object | Extra state attributes for the HA thermostat climate entity; wired as `json_attributes_topic` in the discovery config |
-
-The `sat/climate_attributes` payload is a JSON object containing PID and heating-curve state fields. Home Assistant reads this topic as `json_attributes_topic` on the SAT thermostat entity. Fields published:
-
-| JSON key | Type | Description |
-| -------- | ---- | ----------- |
-| `optimal_coefficient` | float | Heating curve coefficient |
-| `coefficient_derivative` | float | Coefficient derivative (0.0, not tracked) |
-| `minimum_setpoint` | float | Minimum boiler setpoint (SAT_MIN_SETPOINT) |
-| `boiler_flame_timing` | float | Duration of last completed flame cycle in seconds |
-| `boiler_temperature_cold` | float | Boiler temperature when flame is off |
-| `boiler_temperature_tracking` | bool | EMA tracking state (always false) |
-| `boiler_temperature_derivative` | float | Temperature derivative (0.0, not tracked) |
-| `error_source` | string | Error source zone (always `"main"`) |
-| `error_pid` | float | Current PID error (target minus room) |
-| `integral_enabled` | bool | Integral term active |
-| `derivative_enabled` | bool | Derivative term active |
-| `derivative_raw` | float | Raw filtered derivative before PID scaling |
-| `current_kp` | float | Current proportional gain |
-| `current_ki` | float | Current integral gain |
-| `current_kd` | float | Current derivative gain |
-| `relative_modulation_enabled` | bool | Relative modulation active (false when manufacturer quirk disables it) |
 
 ### Source-Separated Topics (Optional)
 
@@ -715,7 +673,7 @@ The firmware publishes heap-pressure and discovery counters as 20 individual ret
 
 **Cadence**: once per hour, on the wall-clock hour boundary. Publishing is dispatched by the unified time handler introduced in ADR-064, which also drives the daily discovery-verify trigger. No publish happens while MQTT is disconnected.
 
-**Device identity**: to map `{UniqueId}` (e.g. `otgw-a1b2c3`) back to a human-readable device name, subscribe to `{TopTopic}/value/{UniqueId}/otgw-firmware/hostname` (retained, published on every MQTT (re)connect).
+**Device identity**: to map `{UniqueId}` (e.g. `otgw-A1B2C3D4E5F6`) back to a human-readable device name, subscribe to `{TopTopic}/value/{UniqueId}/otgw-firmware/hostname` (retained, published on every MQTT (re)connect).
 
 **Metrics**: most topics carry *session counters* that reset to zero on reboot; a few are *live samples* measured at publish time; three are *last-known* values captured at the end of the previous discovery verify run. Payloads are plain ASCII decimal numbers.
 
@@ -774,7 +732,7 @@ The `canPublishMQTT()` function checks heap health before each publish. When fre
 
 ### Republish on Reconnect
 
-On MQTT (re)connect, the firmware checks how long the connection was offline. If the offline duration exceeded 5 minutes (`MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS`), a full republish is triggered on the assumption that the broker may have lost its retained state (for example, mosquitto restarted without persistence). Short outages (under 5 minutes) are treated as network blips — the broker still holds all retained topics, so no republish is performed.
+On MQTT (re)connect, the firmware checks how long the connection was offline. If the offline duration exceeded 5 minutes (`MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS`), a full republish is triggered on the assumption that the broker may have lost its retained state (for example, mosquitto restarted without persistence). Short outages (under 5 minutes) are treated as network blips, so no republish is performed. The broker still holds the retained topics (discovery configs and the retained status topics). OT values are not retained; they reappear the next time each value is published.
 
 First boot and first-enable scenarios are treated as zero offline duration, so no republish is triggered. Instead, the first-seen mechanism publishes each OT value naturally the first time it appears on the OT bus.
 

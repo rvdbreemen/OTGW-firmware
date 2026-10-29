@@ -130,18 +130,25 @@ is de aanbevolen methode omdat de upgraderoutine (oorspronkelijk afkomstig van S
 NodeMCU-firmware) alle low-level PIC-programmeerprotocolstappen automatisch afhandelt.
 
 1. Open de webinterface in je browser (bijv. `http://<apparaat-ip>/`).
-2. Ga naar **Instellingen → PIC Firmware** (of het tabblad **Update**, afhankelijk van
-   je versie).
-3. Het huidige PIC-firmware-type en -versie worden weergegeven.
-4. Klik op **Controleer op update** om de geïnstalleerde versie te vergelijken met de
-   nieuwste beschikbare versie op [otgw.tclcode.com](https://otgw.tclcode.com/).
-5. Als er een update beschikbaar is (of als je van firmware-type wilt wisselen), selecteer
-   het gewenste image: **gateway**, **interface** of **diagnose**.
-6. Klik op **Flash** (of **Upgrade**). De firmware downloadt het `.hex`-bestand van
-   `otgw.tclcode.com` via HTTP en programmeert het direct vanuit de ESP8266 in de PIC.
-7. De voortgang wordt weergegeven in de interface. Schakel het apparaat niet uit tijdens
+2. Ga naar **Advanced > PIC firmware**. Dit menu-item zie je alleen als er een PIC is
+   gevonden.
+3. Je ziet het PIC-apparaat, het PIC-type en de PIC-firmwareversie.
+4. Bij het openen van de pagina kijkt de firmware zelf op
+   [otgw.tclcode.com](https://otgw.tclcode.com/) of er een nieuwere versie is. Een
+   melding toont het resultaat, bijvoorbeeld "New PIC firmware available: X → Y. Click ↺
+   to download, then ↓ to flash."
+5. De tabel toont de firmwarebestanden die op de gateway staan (zoals `gateway.hex` en
+   `diagnose.hex`), met versie en grootte. Elke regel heeft twee pictogrammen.
+6. Klik op het vernieuw-pictogram (tooltip **Update firmware from web**) om de nieuwste
+   versie van dat bestand via HTTP van `otgw.tclcode.com` te downloaden. Dit werkt alleen
+   het opgeslagen bestand bij; de PIC wordt nog niet geflasht.
+7. Klik op het installeer-pictogram (tooltip **Install firmware onto pic**) op de regel
+   die je wilt. De ESP8266 programmeert dat bestand dan direct in de PIC. Het flashen
+   begint meteen, zonder bevestigingsvraag. Wil je van firmware-type wisselen, gebruik dan
+   het installeer-pictogram op de regel van het andere type.
+8. De voortgang wordt weergegeven in de interface. Schakel het apparaat niet uit tijdens
    het programmeren.
-8. Na voltooiing herstart de PIC automatisch en wordt de nieuwe versie weergegeven.
+9. Na voltooiing herstart de PIC automatisch en wordt de nieuwe versie weergegeven.
 
 > **Beveiligingsopmerking:** Het `.hex`-bestand wordt gedownload via onbeveiligd HTTP van
 > `otgw.tclcode.com`. Zorg ervoor dat het apparaat op een vertrouwd lokaal netwerk is
@@ -157,9 +164,13 @@ NodeMCU-firmware) alle low-level PIC-programmeerprotocolstappen automatisch afha
 > gebruikers die een eigen of gepatcht `.hex`-bestand hebben. Als je niet zeker weet of je
 > dit nodig hebt, gebruik dan de hierboven beschreven webinterface-upgrade.
 
-1. Open de bestandssysteemverkenner op `http://<apparaat-ip>/fs`.
-2. Upload je `.hex`-bestand (bijv. `gateway.hex`) naar de root van het bestandssysteem.
-3. Start de upgrade via de webinterface zoals hierboven beschreven.
+1. Open de bestandssysteemverkenner: **Advanced > File system contents**, of
+   `http://<apparaat-ip>/FSexplorer`.
+2. Open de map met de naam van je PIC (`pic16f1847` of `pic16f88`) en upload je
+   `.hex`-bestand (bijv. `gateway.hex`) daarin. Bestanden in de root van het
+   bestandssysteem worden niet getoond.
+3. Open **Advanced > PIC firmware** en klik op het installeer-pictogram op de regel van
+   je bestand, zoals hierboven beschreven.
 
 ---
 

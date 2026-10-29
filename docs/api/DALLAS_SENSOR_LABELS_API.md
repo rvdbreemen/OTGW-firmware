@@ -16,7 +16,7 @@ The Dallas Temperature Sensor Labels feature provides custom labeling for Dallas
 ### Architecture
 
 ```
-┌─────────────┐     GET /api/v1/sensors/labels      ┌──────────────┐
+┌─────────────┐     GET /api/v2/sensors/labels      ┌──────────────┐
 │   Web UI    │ ──────────────────────────────────> │   Backend    │
 │             │                                      │              │
 │ (Browser)   │ <────────────────────────────────── │  (ESP8266)   │
@@ -24,7 +24,7 @@ The Dallas Temperature Sensor Labels feature provides custom labeling for Dallas
 └─────────────┘                                      └──────────────┘
       │                                                      │
       │                                                      │
-      │ POST /api/v1/sensors/labels                        │
+      │ POST /api/v2/sensors/labels                        │
       │ {"addr": "New Label", ...}                         │
       └────────────────────────────────────────────────────┘
                                                              │
@@ -33,7 +33,7 @@ The Dallas Temperature Sensor Labels feature provides custom labeling for Dallas
                                                     │  LittleFS File  │
                                                     │                 │
                                                     │ dallas_labels.  │
-                                                    │     json        │
+                                                    │     ini         │
                                                     └─────────────────┘
 ```
 
@@ -46,11 +46,11 @@ The Dallas Temperature Sensor Labels feature provides custom labeling for Dallas
 
 ## REST API Specification
 
-### GET /api/v1/sensors/labels
+### GET /api/v2/sensors/labels
 
 Retrieves all Dallas temperature sensor labels from `/dallas_labels.ini` file.
 
-**URL:** `http://{device-ip}/api/v1/sensors/labels`
+**URL:** `http://{device-ip}/api/v2/sensors/labels`
 
 **Method:** `GET`
 
@@ -72,31 +72,23 @@ Retrieves all Dallas temperature sensor labels from `/dallas_labels.ini` file.
 {}
 ```
 
-**Response (Error):**
-
-```json
-{
-  "success": false,
-  "error": "Failed to read labels file"
-}
-```
-
 **HTTP Status Codes:**
 - `200 OK`: Labels retrieved successfully (even if empty)
-- `500 Internal Server Error`: Failed to read or parse labels file
+- `503 Service Unavailable`: Not enough free memory to stream the file right now; retry later
 
 **Notes:**
-- Returns empty object `{}` if file doesn't exist or no labels are set
+- Returns empty object `{}` if the file doesn't exist
+- The file is sent as stored; the backend does not parse it
 - Web UI should use sensor address as default label if not found in response
 - Minimal backend memory usage (dynamic allocation during request only)
 
-### POST /api/v1/sensors/labels
+### POST /api/v2/sensors/labels
 
 Writes all Dallas temperature sensor labels to `/dallas_labels.ini` file.
 
-**URL:** `http://{device-ip}/api/v1/sensors/labels`
+**URL:** `http://{device-ip}/api/v2/sensors/labels`
 
-**Method:** `POST`
+**Method:** `POST` (`PUT` is accepted too)
 
 **Content-Type:** `application/json`
 
@@ -112,46 +104,40 @@ Writes all Dallas temperature sensor labels to `/dallas_labels.ini` file.
 **Request Body Schema:**
 - Type: JSON object
 - Keys: 16-character hexadecimal sensor address (e.g., "28FF64D1841703F1")
-- Values: Custom label string (max 16 characters recommended)
+- Values: Custom label string (max 16 characters recommended); keys and values must both be quoted strings
+- Maximum body size: 2048 bytes
 - Empty object `{}` to clear all labels
 
 **Response (Success):**
 
 ```json
-{
-  "success": true,
-  "message": "Labels updated successfully"
-}
+{"success":true}
 ```
 
-**Response (Error - Invalid JSON):**
+**Response (Error - Invalid body):**
 
 ```json
-{
-  "success": false,
-  "error": "Invalid JSON"
-}
+{"success":false,"error":"Empty or invalid JSON body"}
 ```
+
+Other `400` error texts: `"Body too large (max 2048 bytes)"`, `"Invalid JSON: expected quoted key"`, `"Invalid JSON: unterminated key"`, `"Invalid JSON: expected colon"`, `"Invalid JSON: expected quoted value"`, `"Invalid JSON: unterminated value"`.
 
 **Response (Error - Write Failed):**
 
 ```json
-{
-  "success": false,
-  "error": "Failed to write labels file"
-}
+{"success":false,"error":"Failed to open file for writing"}
 ```
 
 **HTTP Status Codes:**
 - `200 OK`: Labels updated successfully
-- `400 Bad Request`: Invalid JSON format in request body
-- `500 Internal Server Error`: Failed to write labels file
+- `400 Bad Request`: Empty, too large or malformed request body
+- `500 Internal Server Error`: Could not open the labels file for writing
 
 **Notes:**
 - Replaces entire file contents (not incremental update)
 - Does not validate sensor existence (allows pre-configuration)
 - Creates file automatically if it doesn't exist
-- Atomic file write operation
+- The write is not atomic: the file is truncated and then rewritten
 
 ## Usage Patterns
 
@@ -160,7 +146,7 @@ Writes all Dallas temperature sensor labels to `/dallas_labels.ini` file.
 ```javascript
 async function loadSensorLabels() {
   try {
-    const response = await fetch('/api/v1/sensors/labels');
+    const response = await fetch('/api/v2/sensors/labels');
     const labels = await response.json();
     
     // Store in memory for fast lookup
@@ -185,14 +171,14 @@ function getSensorLabel(address) {
 async function updateSensorLabel(address, newLabel) {
   try {
     // 1. Fetch all labels
-    const response = await fetch('/api/v1/sensors/labels');
+    const response = await fetch('/api/v2/sensors/labels');
     const labels = await response.json();
     
     // 2. Modify one label
     labels[address] = newLabel;
     
     // 3. Write all labels back
-    const updateResponse = await fetch('/api/v1/sensors/labels', {
+    const updateResponse = await fetch('/api/v2/sensors/labels', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(labels)
@@ -219,7 +205,7 @@ async function updateSensorLabel(address, newLabel) {
 ```javascript
 // Export labels for backup
 async function exportLabels() {
-  const response = await fetch('/api/v1/sensors/labels');
+  const response = await fetch('/api/v2/sensors/labels');
   const labels = await response.json();
   
   const dataStr = JSON.stringify(labels, null, 2);
@@ -236,7 +222,7 @@ async function importLabels(file) {
   const text = await file.text();
   const labels = JSON.parse(text);
   
-  const response = await fetch('/api/v1/sensors/labels', {
+  const response = await fetch('/api/v2/sensors/labels', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(labels)
@@ -251,7 +237,7 @@ async function importLabels(file) {
 
 ```javascript
 async function clearAllLabels() {
-  const response = await fetch('/api/v1/sensors/labels', {
+  const response = await fetch('/api/v2/sensors/labels', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({}) // Empty object clears all
@@ -399,9 +385,8 @@ function detectAndRegisterSensors(data) {
 ### JSON Injection Prevention
 
 **Backend:**
-- Uses ArduinoJson library for safe JSON handling
-- No manual string concatenation
-- Proper escaping of special characters
+- No JSON library: a small hand-written check verifies that the body is an object of quoted string keys and values
+- The validated body is written to the file as received
 
 **Frontend:**
 - Validates input before sending
@@ -411,9 +396,9 @@ function detectAndRegisterSensors(data) {
 ### Input Validation
 
 **Backend:**
-- Validates JSON format before accepting
-- Handles malformed JSON gracefully
-- Returns appropriate error codes
+- Checks the body structure before accepting it
+- Rejects bodies larger than 2048 bytes
+- Returns `400` with an error text on a malformed body
 
 **Frontend:**
 - Limits label length (UI enforced)
@@ -422,15 +407,13 @@ function detectAndRegisterSensors(data) {
 
 ### File System Safety
 
-**Atomic Writes:**
-- File write operations are atomic
-- No partial writes on failure
-- File integrity maintained
+**Writes:**
+- The file is truncated and rewritten; the write is not atomic
+- A reset or power loss during the write can leave a partial file
 
 **Error Handling:**
 - Gracefully handles missing file
 - Returns empty object instead of error
-- Logs errors for debugging
 
 ## Troubleshooting
 
@@ -445,7 +428,7 @@ function detectAndRegisterSensors(data) {
 **Solution:**
 ```javascript
 // Check API response
-const response = await fetch('/api/v1/sensors/labels', {
+const response = await fetch('/api/v2/sensors/labels', {
   method: 'POST',
   body: JSON.stringify(labels)
 });
@@ -464,7 +447,7 @@ console.log('Update result:', result);
 **Solution:**
 ```javascript
 // Debug label loading
-fetch('/api/v1/sensors/labels')
+fetch('/api/v2/sensors/labels')
   .then(r => r.json())
   .then(labels => console.log('Loaded labels:', labels))
   .catch(err => console.error('Load error:', err));
@@ -473,19 +456,16 @@ fetch('/api/v1/sensors/labels')
 ### File Corruption
 
 **Symptoms:**
-- GET request returns error
-- Empty labels object despite previous configuration
-- Error: "Failed to read labels file"
+- GET returns content that is not valid JSON
+- The Web UI shows sensor addresses instead of labels despite previous configuration
 
 **Solution:**
 ```bash
-# Via serial console or telnet
-# Delete corrupted file
-LittleFS.remove("/dallas_labels.ini");
+# Delete /dallas_labels.ini on the File System page (/FSexplorer)
 
-# Or via Web UI
+# Or overwrite it via the REST API
 # POST empty object to recreate file
-curl -X POST http://{device-ip}/api/v1/sensors/labels \
+curl -X POST http://{device-ip}/api/v2/sensors/labels \
   -H "Content-Type: application/json" \
   -d '{}'
 ```
@@ -523,8 +503,8 @@ curl -X POST http://{device-ip}/api/v1/sensors/labels \
 - Single sensor update via `/api/v1/sensors/label` (POST)
 
 **After:**
-- Labels fetched separately via `/api/v1/sensors/labels` (GET)
-- Bulk update only via `/api/v1/sensors/labels` (POST)
+- Labels fetched separately via `/api/v2/sensors/labels` (GET)
+- Bulk update only via `/api/v2/sensors/labels` (POST)
 - Read-modify-write pattern for single sensor updates
 
 **Code Changes Required:**
@@ -540,9 +520,9 @@ await fetch('/api/v1/sensors/label', {
 });
 
 // NEW (bulk API with read-modify-write)
-const labels = await fetch('/api/v1/sensors/labels').then(r => r.json());
+const labels = await fetch('/api/v2/sensors/labels').then(r => r.json());
 labels['28FF64D1841703F1'] = 'Living Room';
-await fetch('/api/v1/sensors/labels', {
+await fetch('/api/v2/sensors/labels', {
   method: 'POST',
   body: JSON.stringify(labels)
 });
@@ -551,7 +531,7 @@ await fetch('/api/v1/sensors/labels', {
 ## OpenAPI Specification
 
 A complete OpenAPI 3.0 specification is available at:
-- **File:** `docs/openapi-dallas-sensors.yaml`
+- **File:** `docs/api/openapi-dallas-sensors.yaml`
 - **Format:** YAML (OpenAPI 3.0.3)
 - **Tools:** Compatible with Swagger UI, Postman, etc.
 
@@ -561,20 +541,19 @@ A complete OpenAPI 3.0 specification is available at:
 python -m http.server 8000
 
 # Open in browser
-http://localhost:8000/docs/openapi-dallas-sensors.yaml
+http://localhost:8000/docs/api/openapi-dallas-sensors.yaml
 ```
 
 ## Related Documentation
 
 - **API Documentation:** `example-api/api-call-responses.txt`
 - **API Changes:** `example-api/API_CHANGES_v1.0.0.md`
-- **Implementation Guide:** `docs/TEMPERATURE_SENSOR_GRAPH_IMPLEMENTATION.md`
+- **Implementation Guide:** `docs/features/TEMPERATURE_SENSOR_GRAPH_IMPLEMENTATION.md`
 - **Architecture Decision:** `docs/adr/ADR-033-dallas-sensor-custom-labels-graph-visualization.md`
-- **OpenAPI Spec:** `docs/openapi-dallas-sensors.yaml`
+- **OpenAPI Spec:** `docs/api/openapi-dallas-sensors.yaml`
 
 ## References
 
 - Dallas DS18B20 Datasheet: [Maxim Integrated](https://datasheets.maximintegrated.com/en/ds/DS18B20.pdf)
-- ArduinoJson Library: [arduinojson.org](https://arduinojson.org/)
 - LittleFS: [GitHub](https://github.com/littlefs-project/littlefs)
 - OpenAPI Specification: [swagger.io](https://swagger.io/specification/)

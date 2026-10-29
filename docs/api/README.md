@@ -777,7 +777,7 @@ These routes are served directly by the web server (not under `/api`):
 | `/update` | OTA firmware update (provided by ESP8266HTTPUpdateServer) |
 | `/FSexplorer` or `/FSexplorer.html` | Filesystem explorer (debug builds only) |
 
-**Deprecated unversioned routes** (will be removed in v1.3.0):
+**Deprecated unversioned routes** (planned for removal in v1.3.0, but still registered; the File System page `FSexplorer.html` still uses `/api/listfiles`):
 | Route | Replacement |
 |-------|-------------|
 | `/api/firmwarefilelist` | `GET /api/v2/firmware/files` |

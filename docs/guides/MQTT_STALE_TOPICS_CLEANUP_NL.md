@@ -36,19 +36,19 @@ Tijd: ongeveer 10 minuten. Geen voorkennis nodig.
 
 ## Stap 1 — Zoek je OTGW Unique ID op
 
-Je OTGW heeft een unieke naam, zoiets als `otgw-a1b2c3`. Die heb je straks nodig
+Je OTGW heeft een unieke naam, zoiets als `otgw-A1B2C3D4E5F6`: `otgw-` met daarachter
+de 12 tekens van het WiFi MAC-adres, in hoofdletters. Die heb je straks nodig
 om je apparaat in MQTT Explorer terug te vinden.
 
 1. Open een browser en ga naar je OTGW: `http://otgw.local` of
    `http://<IP-adres>`.
 2. Klik bovenaan op **Settings**.
-3. Scroll naar het kopje **MQTT**.
-4. Bij het veldje **Unique ID** zie je een waarde zoals `otgw-a1b2c3`. Schrijf
-   die op.
+3. De instellingen staan in één lijst, zonder kopjes. Zoek de regel
+   **MQTT Unique ID**.
+4. Daar zie je een waarde zoals `otgw-A1B2C3D4E5F6`. Schrijf die precies zo op:
+   MQTT maakt verschil tussen hoofdletters en kleine letters.
 
-> Tip: laat dit tabblad open staan, je hebt het in Stap 6 nog een keer nodig.
-
-> Heb je de **HA prefix** veranderd van het standaard `homeassistant` naar iets
+> Heb je de **MQTT Auto-Discovery Prefix** veranderd van het standaard `homeassistant` naar iets
 > anders? Onthoud dan ook die waarde — overal waar hieronder `homeassistant`
 > staat, gebruik je jouw eigen prefix.
 
@@ -94,7 +94,7 @@ Aan de linkerkant zie je een lijst met topics in een boomstructuur.
 2. Daaronder zie je mappen zoals **`sensor`**, **`binary_sensor`**,
    **`climate`** en **`number`**.
 3. Klap **`sensor`** uit.
-4. Zoek de map met jouw Unique ID (bijvoorbeeld `otgw-a1b2c3`).
+4. Zoek de map met jouw Unique ID (bijvoorbeeld `otgw-A1B2C3D4E5F6`).
 
 Heb je hem gevonden? Mooi — daar staan de oude discovery boodschappen.
 
@@ -127,11 +127,12 @@ De map verdwijnt uit de boom. Dat is precies de bedoeling.
 
 Nu de oude boodschappen weg zijn, vragen we de OTGW om frisse versies.
 
-**Optie 1 — via de webinterface (makkelijkst):**
+**Optie 1: zelf een seintje geven**
 
-1. Ga terug naar je OTGW webinterface.
-2. Open het **MQTT** tabblad.
-3. Klik op de knop **Re-publish discovery**.
+De webinterface heeft hier geen knop voor. Kies een van deze twee manieren:
+
+- Via de REST API: `curl -X POST http://otgw.local/api/v2/discovery/republish`
+- Via telnet (poort 23): druk op **`F`**.
 
 **Optie 2 — gewoon even wachten:**
 

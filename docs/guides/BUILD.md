@@ -18,14 +18,13 @@ Windows examples assume Command Prompt. In PowerShell, use `.\build.bat` unless 
 
 The build script will automatically:
 
-1. Check for required dependencies
-2. Check for unresolved merge-conflict markers in source files
-2. Install arduino-cli if not present
-3. Update version information
-4. Build the firmware and filesystem
-5. Create versioned build artifacts in the `build/` directory
-
-If unresolved Git merge markers such as `<<<<<<<`, `=======`, or `>>>>>>>` are present, `build.py` now fails early with the affected file paths instead of letting the compiler emit harder-to-diagnose downstream errors.
+1. Check the Python version
+2. Initialise missing git submodules (vendored libraries under `src/libraries/`)
+3. Install arduino-cli if not present
+4. Install the ESP8266 core and the required libraries
+5. Update version information
+6. Build the firmware and filesystem
+7. Create versioned build artifacts in the `build/` directory
 
 ## Prerequisites
 
@@ -39,17 +38,7 @@ If unresolved Git merge markers such as `<<<<<<<`, `=======`, or `>>>>>>>` are p
    - Windows: <https://git-scm.com/download/win>
    - Mac: Install via Xcode Command Line Tools (see below)
 
-3. **make**
-   - **Mac**: Install Xcode Command Line Tools
-
-     ```bash
-     xcode-select --install
-     ```
-
-   - **Windows**: Install via one of these methods:
-     - Chocolatey: `choco install make`
-     - GnuWin32: <http://gnuwin32.sourceforge.net/packages/make.htm>
-     - MinGW/MSYS2: <https://www.msys2.org/>
+`make` is not needed. `build.py` runs arduino-cli and mklittlefs directly. You only need `make` if you want to use the Makefile (see [Using Makefile Directly](#using-makefile-directly)).
 
 ### Automatic Dependencies
 
@@ -76,7 +65,7 @@ You can customize the following variable in `config.py` or via environment varia
 
 - `OTGW_BUILD_DIR`: Override the build output directory (default: `build`)
 
-Example `config.py` (checked into repository):
+Excerpt of `config.py` (checked into repository):
 
 ```python
 import os
@@ -131,11 +120,15 @@ This removes all build artifacts and downloaded dependencies.
 ### Additional Options
 
 ```bash
-build --no-rename       # Build without renaming artifacts with version
+build --distclean       # Remove build artifacts plus downloaded cores/libraries
+build --merged          # Also create one merged binary with firmware and filesystem
+build --no-archive      # Skip the per-build archive copy (see below)
 build --no-install-cli  # Skip arduino-cli installation check
 build --no-color        # Disable colored output
 build --help            # Show all options
 ```
+
+By default every build is also stored as one `<version>.zip` in `../OTGW-build-archive` (outside the repository), so the matching `.elf` stays available. Set `OTGW_ARCHIVE_DIR` to use another folder.
 
 ## Build Output
 
@@ -161,7 +154,7 @@ build/
 
 ### macOS
 
-1. **Install Xcode Command Line Tools** (includes make and git):
+1. **Install Xcode Command Line Tools** (includes git):
 
    ```bash
    xcode-select --install
@@ -180,33 +173,13 @@ build/
 1. **Install Python 3**: Download from <https://www.python.org/downloads/>
    - Check "Add Python to PATH" during installation
 
-2. **Install make**: Choose one of these options:
-   - **Chocolatey** (recommended if you have it):
+2. **arduino-cli installation path**: `%LOCALAPPDATA%\Arduino15\bin\arduino-cli.exe`
 
-     ```cmd
-     choco install make
-     ```
-
-   - **GnuWin32**: Download from <http://gnuwin32.sourceforge.net/packages/make.htm>
-   - **MSYS2**: Full Unix-like environment for Windows
-
-3. **arduino-cli installation path**: `%LOCALAPPDATA%\Arduino15\bin\arduino-cli.exe`
-
-4. **PATH configuration**: You may need to add arduino-cli to your PATH:
+3. **PATH configuration**: You may need to add arduino-cli to your PATH:
    - Open "Environment Variables" in Windows settings
    - Add `%LOCALAPPDATA%\Arduino15\bin` to your PATH
 
 ## Troubleshooting
-
-### "make not found"
-
-**Mac**:
-
-```bash
-xcode-select --install
-```
-
-**Windows**: Install make using one of the methods mentioned above.
 
 ### "arduino-cli not found" (after installation)
 
@@ -261,7 +234,13 @@ chmod +x build.sh
 
 ### Using Makefile Directly
 
-`build.py` (and the `build.sh`/`build.bat` wrappers) use the Makefile underneath. You can also invoke `make` directly, though this bypasses the automatic venv setup that the wrappers provide:
+`build.py` (and the `build.sh`/`build.bat` wrappers) do not use the Makefile. The Makefile is an older alternative that needs `make` and is not used for release builds. It differs from `build.py`, so its output does not match a release build:
+
+- `make filesystem` creates a 1 MB image (`mklittlefs -s 1024000`), while the firmware uses a 2 MB filesystem partition. Do not flash that image with `make upload-fs` or `make install`.
+- It installs WiFiManager 2.0.17 and TelnetStream; `build.py` installs WiFiManager 2.0.15-rc.1 and no TelnetStream.
+- It does not initialise the git submodules and does not apply the ESP8266 core mDNS patch that `build.py` applies.
+
+The targets are:
 
 ```bash
 make -j$(nproc)              # Build firmware (parallel)
@@ -272,7 +251,7 @@ make distclean              # Deep clean (removes arduino-cli, libraries, etc.)
 
 ### Custom Build Flags
 
-Edit the `Makefile` to customize build flags:
+For `make` builds, edit the `Makefile` to customize build flags. `build.py` sets its flags in `build_firmware()` and does not read the Makefile:
 
 ```make
 CFLAGS = $(CFLAGS_DEFAULT) -DYOUR_FLAG
@@ -284,7 +263,7 @@ CFLAGS = $(CFLAGS_DEFAULT) -DYOUR_FLAG
 make debug
 ```
 
-This builds with debug output enabled.
+This builds with debug output enabled. `build.py` has no debug option.
 
 ## Manual arduino-cli Installation
 
@@ -318,7 +297,7 @@ The `build.py` script replicates the GitHub Actions CI/CD workflow locally:
 
 ## Continuous Integration
 
-The GitHub Actions workflow (`.github/workflows/main.yml`) uses the same Makefile and processes as this local build script, ensuring consistency between local and CI builds.
+The release workflow (`.github/workflows/beta-prerelease.yml`) runs `python build.py`, so local and CI builds use the same script.
 
 ## Further Reading
 

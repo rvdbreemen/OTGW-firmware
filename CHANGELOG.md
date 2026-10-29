@@ -58,6 +58,8 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 - **The MQTT guide now says that a command sent while the gateway reconnects is lost.** The gateway connects with a clean session and subscribes at QoS 0, so the broker keeps nothing for it while it is away: a setpoint sent from Home Assistant during a reconnect of even a few seconds never reaches the boiler, and Home Assistant keeps showing the value the gateway reports. This stays as it is on purpose: a persistent session would make the broker queue commands without expiry during an outage of hours and replay a stale setpoint afterwards. See `docs/guides/MQTT_LWT.md`. Raised on GH #682. (TASK-1212)
 
+- **The 1.x guides match the code again.** FLASH_GUIDE (EN/NL) no longer sends you to a Settings > Export that does not exist, and no longer says settings survive a USB flash: save `settings.ini` first. The triple-reset guide now says the saved WiFi login is kept and only presses of the reset button count. MQTT.md now says OpenTherm values are not retained, and drops SAT topics that do not exist on 1.x. The Dallas labels API doc uses `/api/v2` and `dallas_labels.ini`. The PIC firmware, BUILD, DOMOTICZ, stale-topics and upgrade-from-0.x guides use the real menu labels, options and links.
+
 ## [1.7.7] - 2026-10-04
 
 ### Added

@@ -10,7 +10,8 @@ To provide reliable recovery without extra hardware buttons, OTGW-firmware suppo
 
 - Press reset **3 times within 10 seconds**
 - On the third reset, firmware forces the WiFiManager configuration portal
-- Stored WiFi credentials are cleared first
+- Stored WiFi credentials are kept; the portal opens even when the saved network is reachable
+- Only presses of the reset button count; a power cycle resets the count
 
 ## Recovery steps
 
@@ -24,7 +25,9 @@ To provide reliable recovery without extra hardware buttons, OTGW-firmware suppo
 
 - This trigger is only for manual recovery and should not affect normal startup.
 - If resets are too slow (outside the 10-second window), forced recovery is not triggered.
-- Existing Web UI reset path (`/ResetWireless`) continues to work and also clears WiFi settings.
+- The count is also cleared when start-up completes, so press reset again before the device has finished booting.
+- If you leave the portal without saving, the device restarts after 240 seconds and connects to the saved network again.
+- The Web UI reset path (`/ResetWireless`, the **Reset Wireless** button on the FSexplorer page) is different: it clears the stored WiFi credentials before it reboots.
 
 ## Troubleshooting
 

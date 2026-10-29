@@ -19,7 +19,7 @@ This guide is available in English and Dutch. Choose your language below.
 | `flash_otgw.sh` / `flash_otgw.bat` | **No** | End users — run from terminal or double-click the `.bat` |
 | `flash_esp.py` | Yes (Python 3.6+) | Developers, OTA download, advanced options |
 
-Both tools are included in each release download and in the repository root.
+`flash_otgw.sh` and `flash_otgw.bat` are attached to each release and included in the flash bundle. `flash_esp.py` is only in the repository root.
 
 ---
 
@@ -44,7 +44,7 @@ Depending on your board and OS, install drivers as needed:
 
 ## Fresh Installation (First-Time Flash)
 
-> **Important**: A fresh install requires BOTH the firmware binary (`OTGW-firmware-<version>.ino.bin`) and the filesystem binary (`OTGW-firmware-<version>.ino.littlefs.bin`). Flashing only the firmware will cause the device to spend several minutes reformatting an empty filesystem on first boot — or, in the worst case, result in a bootloop.
+> **Important**: A fresh install requires BOTH the firmware binary (`OTGW-firmware-<version>.ino.bin`) and the filesystem binary (`OTGW-firmware.<version>.littlefs.bin`). Flashing only the firmware will cause the device to spend several minutes reformatting an empty filesystem on first boot or, in the worst case, result in a bootloop.
 
 ### Simple method (no Python required)
 
@@ -65,9 +65,9 @@ chmod +x flash_otgw.sh
 flash_otgw.bat
 ```
 
-The script downloads esptool on first run, auto-detects your serial port, erases flash, and writes both binaries — no prompts, no extra software needed.
+The script downloads esptool on first run and auto-detects your serial port. It then shows a summary and asks `Continue? [y/N]`. Without an answer it cancels after 30 seconds. After you confirm, it erases the entire flash and writes both binaries. Pass `--yes` to skip the question. No extra software is needed.
 
-If multiple serial ports are present, the first one is used. Pass `--port` to pick a specific one:
+The script picks the first port that belongs to a known USB-serial adapter (CP210x, CH340 or FTDI). If none matches, it uses the first serial port it finds. If the Windows script finds no port at all, it asks you to type one. Pass `--port` to pick a specific one:
 ```bash
 ./flash_otgw.sh --port /dev/ttyUSB1
 ```
@@ -83,13 +83,13 @@ python3 flash_esp.py --download --erase
 ```
 
 This does everything in one step:
-1. Downloads the latest `OTGW-firmware-<version>.ino.bin` (firmware) and `OTGW-firmware-<version>.ino.littlefs.bin` (filesystem) from GitHub
+1. Downloads the latest `OTGW-firmware-<version>.ino.bin` (firmware) and `OTGW-firmware.<version>.littlefs.bin` (filesystem) from GitHub
 2. Erases the entire flash chip before writing (removes any stale data from older versions)
 3. Flashes firmware at `0x0` and filesystem at `0x200000` in a single esptool operation
 
 ### Why `--erase` matters for a fresh install
 
-Older firmware versions (v1.3.x and below) used a different filesystem partition layout (1 MB LittleFS at `0x300000`). If you skip `--erase`, remnants of the old filesystem at the old address may remain. The new firmware will find no valid filesystem at the new address (`0x200000`) and will either:
+Older firmware versions (v1.3.x and below) wrote a 1 MB filesystem image. v1.4.x and later write a 2 MB image. Both start at `0x200000`. If you skip `--erase`, data from the old filesystem may remain in flash. The new firmware may then find no valid filesystem and will either:
 - Spend 5–10 minutes silently reformatting the flash (device appears unresponsive — not a bootloop)
 - Boot repeatedly into an error state that looks like a bootloop
 
@@ -103,27 +103,30 @@ When upgrading from **v1.3.x or earlier** to **v1.4.x or later**, the LittleFS p
 
 ### Upgrade procedure (USB, preserving settings where possible)
 
-For upgrading v1.4.x → v1.5.x (same partition layout, no reformat needed):
+Every USB flash that includes the filesystem image replaces `settings.ini` with the default settings from that image. `flash_esp.py` does not back up your settings. `flash_otgw.sh` and `flash_otgw.bat` erase the entire flash, which also removes your WiFi credentials.
+
+> **Note**: To keep your settings, prefer the Web UI OTA update described below. If you flash over USB, save `settings.ini` first and put it back afterwards.
+
+**Save your settings first.** In the Web UI, open **Advanced > File system contents**, or browse to `http://<device-ip>/FSexplorer`. Click **Download** next to `settings.ini` and keep the file.
+
+For upgrading v1.4.x or later (same partition layout, no reformat needed):
 
 ```bash
 python3 flash_esp.py --download
 ```
 
-Both firmware and filesystem are written in a single operation. No erase is needed; settings stored in the filesystem are preserved.
-
-> **Note**: `flash_otgw.sh` and `flash_otgw.bat` always erase the entire flash before writing. They are not suitable for settings-preserving upgrades. Use `flash_esp.py --download` (without `--erase`) when you want to keep your settings.
+Both firmware and filesystem are written in a single operation. No erase is needed.
 
 For upgrading v1.3.x or earlier → v1.4.x+ (partition layout change, settings will be lost):
 
 ```bash
-# Back up settings from the Web UI first (Settings → Export), then:
 python3 flash_esp.py --download --erase
 # or the no-Python scripts, which also erase:
 ./flash_otgw.sh      # Linux/macOS
 flash_otgw.bat       # Windows
 ```
 
-After the flash, re-import your settings via the Web UI.
+**Restore your settings afterwards.** If the flash erased the chip, first set up WiFi again (see [After Flashing](#after-flashing)). Then open **Advanced > File system contents**, upload the saved file and click **ReBoot** right away. The file must be named exactly `settings.ini`; rename it first if your browser or the Flash utility saved it under another name.
 
 ---
 
@@ -133,13 +136,15 @@ After the flash, re-import your settings via the Web UI.
 
 **Correct OTA order for v1.3.x → v1.4.x upgrades:**
 
-1. Export your settings via the Web UI (Settings page → Export)
-2. On the Web UI Update page, upload `OTGW-firmware-*.littlefs.bin` first and wait for the reboot
+1. Save your settings: browse to `http://<device-ip>/FSexplorer` and click **Download** next to `settings.ini`
+2. Open the Flash utility (`http://<device-ip>/update`, or **Update Firmware** on the FSexplorer page), upload `OTGW-firmware*.littlefs.bin` first and wait for the reboot
 3. Upload `OTGW-firmware-*.ino.bin` second and wait for the reboot
 4. Hard-refresh the browser (Ctrl+F5)
-5. Re-import your settings
+5. If your settings are gone, open **Advanced > File system contents**, upload the saved file (named exactly `settings.ini`) and click **ReBoot**
 
-**This order requirement does NOT apply to v1.4.x → v1.5.x upgrades** (the partition layout is identical).
+**This order requirement does NOT apply to upgrades from v1.4.x or later** (the partition layout is identical).
+
+When the device already runs v1.5.0 or later, a filesystem OTA update keeps your settings: after the flash the firmware writes the settings it holds in memory back to `settings.ini`. The Flash utility also downloads a backup copy named `settings-<date-time>.ini` when **Download backups** is ticked (the default).
 
 ---
 
@@ -163,14 +168,10 @@ The script downloads esptool on first run (no Python needed), erases flash, and 
 ### Download latest release and flash (Python)
 
 ```bash
-python3 flash_esp.py
-```
-
-Or explicitly:
-
-```bash
 python3 flash_esp.py --download
 ```
+
+Without options, `python3 flash_esp.py` opens a menu where you choose to build locally, flash existing build files or download the latest release.
 
 ### Developer mode — build and flash from source
 
@@ -181,7 +182,7 @@ python3 flash_esp.py --build
 ### Manual mode — use existing binary files
 
 ```bash
-python3 flash_esp.py --firmware OTGW-firmware-1.5.0.ino.bin --filesystem OTGW-firmware-1.5.0.ino.littlefs.bin
+python3 flash_esp.py --firmware OTGW-firmware-1.5.0.ino.bin --filesystem OTGW-firmware.1.5.0.littlefs.bin
 ```
 
 ---
@@ -220,9 +221,9 @@ Python:
 python3 flash_esp.py --download --erase
 ```
 
-### 2. Upgrading from v1.3.x without erasing (stale filesystem at wrong offset)
+### 2. Upgrading from v1.3.x without erasing (stale filesystem data)
 
-v1.4.x moved the filesystem partition from `0x300000` (1 MB) to `0x200000` (2 MB). If the old filesystem data is still present, the new firmware may behave unexpectedly.
+v1.4.x changed the filesystem image from 1 MB to 2 MB, both at `0x200000`. If the old filesystem data is still present, the new firmware may behave unexpectedly.
 
 **Fix:**
 

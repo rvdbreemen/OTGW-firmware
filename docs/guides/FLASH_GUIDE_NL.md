@@ -90,14 +90,16 @@ bevragen of bedienen:
 Een ruwe TCP-socket op poort **25238** stelt het OTGW-seriële protocol beschikbaar zodat
 OTmonitor en andere tools met de PIC kunnen communiceren. De OTGW-firmware detecteert
 ser2net-verkeer en pauzeert zijn eigen commandowachtrij om conflicten te voorkomen.
+De poort staat standaard uit. Je zet hem aan met de instelling
+**Legacy: enable otmonitor TCP port 25238**.
 
 ### Betrouwbaarheid en netwerk
 
 - **NTP-tijdsynchronisatie** met instelbare tijdzone.
 - **Niet-blokkerend WiFi-herverbindingsstatemachine** — verwarming gaat door terwijl WiFi
   herstelt.
-- **Drievoudige-reset WiFi-herstel** — drie snelle stroomonderbrekingen openen de
-  WiFiManager-captive portal opnieuw zonder flashen.
+- **Drievoudige-reset WiFi-herstel**: druk drie keer snel op de resetknop en de
+  WiFiManager-captive portal gaat weer open, zonder flashen. Stroom eraf en erop telt niet.
 - Hardware-watchdog herstart bij een vastgelopen firmware.
 - Optionele HTTP Basic Auth voor instellingen- en onderhoudseindpunten.
 - Telnet-diagnosticserver (poort 23) voor veldprobleemoplossing.
@@ -120,7 +122,8 @@ vanuit de webinterface, zonder programmeerapparaat of seriële kabel. De PIC-var
 | `flash_otgw.sh` / `flash_otgw.bat` | **Nee** | Eindgebruikers — uitvoeren vanuit terminal of dubbelklikken op `.bat` |
 | `flash_esp.py` | Ja (Python 3.6+) | Ontwikkelaars, OTA-download, geavanceerde opties |
 
-Beide tools zijn opgenomen in elke release-download en in de root van de repository.
+`flash_otgw.sh` en `flash_otgw.bat` zitten bij elke release en in de flash-bundel.
+`flash_esp.py` staat alleen in de root van de repository.
 
 ---
 
@@ -151,7 +154,7 @@ Afhankelijk van je bord en besturingssysteem installeer je de benodigde stuurpro
 
 > **Belangrijk**: Een eerste installatie vereist ZOWEL het firmware-binair
 > (`OTGW-firmware-<versie>.ino.bin`) ALS het bestandssysteem-binair
-> (`OTGW-firmware-<versie>.ino.littlefs.bin`). Alleen de firmware flashen zorgt ervoor
+> (`OTGW-firmware.<versie>.littlefs.bin`). Alleen de firmware flashen zorgt ervoor
 > dat het apparaat bij de eerste opstart enkele minuten bezig is met het formatteren van
 > een leeg bestandssysteem — of in het slechtste geval resulteert in een opstartlus.
 
@@ -175,11 +178,15 @@ chmod +x flash_otgw.sh
 flash_otgw.bat
 ```
 
-Het script downloadt esptool bij de eerste uitvoering, detecteert automatisch je seriële
-poort, wist de flash en schrijft beide binaire bestanden — zonder vragen, zonder extra
-software.
+Het script downloadt esptool bij de eerste uitvoering en zoekt zelf je seriële poort.
+Daarna toont het een overzicht en vraagt `Continue? [y/N]`. Geef je geen antwoord, dan
+stopt het na 30 seconden. Na je bevestiging wist het de volledige flash en schrijft het
+beide binaire bestanden. Met `--yes` sla je de vraag over. Je hebt geen extra software
+nodig.
 
-Als er meerdere seriële poorten aanwezig zijn, wordt de eerste gebruikt. Geef `--port`
+Het script kiest de eerste poort van een bekende USB-seriële adapter (CP210x, CH340 of
+FTDI). Is die er niet, dan neemt het de eerste seriële poort die het vindt. Vindt het
+Windows-script helemaal geen poort, dan vraagt het je er een in te typen. Geef `--port`
 mee om een specifieke poort te kiezen:
 ```bash
 ./flash_otgw.sh --port /dev/ttyUSB1
@@ -197,7 +204,7 @@ python3 flash_esp.py --download --erase
 
 Dit doet alles in één stap:
 1. Downloadt de nieuwste `OTGW-firmware-<versie>.ino.bin` (firmware) en
-   `OTGW-firmware-<versie>.ino.littlefs.bin` (bestandssysteem) van GitHub
+   `OTGW-firmware.<versie>.littlefs.bin` (bestandssysteem) van GitHub
 2. Wist de volledige flashchip voor het schrijven (verwijdert verouderde data van
    oudere versies)
 3. Flasht firmware op `0x0` en bestandssysteem op `0x200000` in één enkele esptool-
@@ -205,10 +212,10 @@ Dit doet alles in één stap:
 
 #### Waarom `--erase` belangrijk is bij een eerste installatie
 
-Oudere firmwareversies (v1.3.x en eerder) gebruikten een andere bestandssysteempartitie-
-indeling (1 MB LittleFS op `0x300000`). Als je `--erase` overslaat, kunnen resten van het
-oude bestandssysteem op het oude adres achterblijven. De nieuwe firmware vindt dan geen
-geldig bestandssysteem op het nieuwe adres (`0x200000`) en zal:
+Oudere firmwareversies (v1.3.x en eerder) schreven een bestandssysteem-image van 1 MB.
+v1.4.x en later schrijven een image van 2 MB. Beide beginnen op `0x200000`. Als je
+`--erase` overslaat, kan data van het oude bestandssysteem in de flash achterblijven. De
+nieuwe firmware vindt dan mogelijk geen geldig bestandssysteem en zal:
 - 5–10 minuten bezig zijn met het stil formatteren van de flash (apparaat lijkt niet te
   reageren — geen opstartlus)
 - Herhaaldelijk opstarten in een foutstatus die op een opstartlus lijkt
@@ -225,32 +232,44 @@ bestandssysteemherformattering bij de eerste opstart en **wist al je instellinge
 
 #### Upgradeprocedure (USB, instellingen waar mogelijk bewaren)
 
-Voor upgraden v1.4.x → v1.5.x (zelfde partitie-indeling, geen herformattering nodig):
+Elke USB-flash met het bestandssysteem-image vervangt `settings.ini` door de
+standaardinstellingen uit dat image. `flash_esp.py` maakt geen back-up van je
+instellingen. `flash_otgw.sh` en `flash_otgw.bat` wissen de volledige flash, en
+daarmee ook je WiFi-gegevens.
+
+> **Let op**: Wil je je instellingen houden, gebruik dan liever de OTA-update via de
+> webinterface (zie hieronder). Flash je toch via USB, bewaar dan eerst `settings.ini`
+> en zet het bestand daarna terug.
+
+**Bewaar eerst je instellingen.** Open in de webinterface **Advanced > File system
+contents**, of ga naar `http://<apparaat-ip>/FSexplorer`. Klik op **Download** naast
+`settings.ini` en bewaar het bestand.
+
+Voor upgraden vanaf v1.4.x of later (zelfde partitie-indeling, geen herformattering
+nodig):
 
 ```bash
 python3 flash_esp.py --download
 ```
 
 Zowel firmware als bestandssysteem worden in één bewerking geschreven. Wissen is niet
-nodig; instellingen opgeslagen in het bestandssysteem blijven bewaard.
-
-> **Let op**: `flash_otgw.sh` en `flash_otgw.bat` wissen altijd de volledige flash voor
-> het schrijven. Ze zijn niet geschikt voor upgrades waarbij instellingen bewaard moeten
-> blijven. Gebruik `flash_esp.py --download` (zonder `--erase`) als je je instellingen
-> wilt bewaren.
+nodig.
 
 Voor upgraden v1.3.x of eerder → v1.4.x+ (partitie-indeling gewijzigd, instellingen
 gaan verloren):
 
 ```bash
-# Maak eerst een back-up van instellingen via de webinterface (Instellingen → Exporteren)
 python3 flash_esp.py --download --erase
 # of de no-Python-scripts, die ook wissen:
 ./flash_otgw.sh      # Linux/macOS
 flash_otgw.bat       # Windows
 ```
 
-Importeer na het flashen je instellingen opnieuw via de webinterface.
+**Zet daarna je instellingen terug.** Heeft de flash de chip gewist, stel dan eerst je
+WiFi opnieuw in (zie [Na het flashen](#na-het-flashen)). Open daarna **Advanced > File
+system contents**, upload het bewaarde bestand en klik direct op **ReBoot**. Het bestand moet precies
+`settings.ini` heten; geef het eerst die naam als je browser of de Flash utility het
+onder een andere naam heeft opgeslagen.
 
 ---
 
@@ -264,14 +283,23 @@ Importeer na het flashen je instellingen opnieuw via de webinterface.
 
 **Juiste OTA-volgorde voor v1.3.x → v1.4.x upgrades:**
 
-1. Exporteer je instellingen via de webinterface (Instellingenpagina → Exporteren)
-2. Upload op de OTA-pagina eerst `OTGW-firmware-*.littlefs.bin` en wacht op de herstart
+1. Bewaar je instellingen: ga naar `http://<apparaat-ip>/FSexplorer` en klik op
+   **Download** naast `settings.ini`
+2. Open de Flash utility (`http://<apparaat-ip>/update`, of **Update Firmware** op de
+   FSexplorer-pagina), upload eerst `OTGW-firmware*.littlefs.bin` en wacht op de herstart
 3. Upload daarna `OTGW-firmware-*.ino.bin` en wacht op de herstart
 4. Vernieuw de browser hard (Ctrl+F5)
-5. Importeer je instellingen opnieuw
+5. Zijn je instellingen weg, open dan **Advanced > File system contents**, upload het
+   bewaarde bestand (met precies de naam `settings.ini`) en klik op **ReBoot**
 
-**Deze volgorde-eis geldt NIET voor v1.4.x → v1.5.x upgrades** (de partitie-indeling
-is identiek).
+**Deze volgorde-eis geldt NIET voor upgrades vanaf v1.4.x of later** (de
+partitie-indeling is identiek).
+
+Draait het apparaat al v1.5.0 of later, dan houdt een OTA-update van het
+bestandssysteem je instellingen: na het flashen schrijft de firmware de instellingen
+uit het geheugen terug naar `settings.ini`. De Flash utility downloadt ook een
+back-up met de naam `settings-<datum-tijd>.ini` als **Download backups** aangevinkt is
+(dat is de standaard).
 
 ---
 
@@ -297,14 +325,11 @@ en schrijft beide images in één stap.
 #### Nieuwste release downloaden en flashen (Python)
 
 ```bash
-python3 flash_esp.py
-```
-
-Of expliciet:
-
-```bash
 python3 flash_esp.py --download
 ```
+
+Zonder opties opent `python3 flash_esp.py` een menu. Daarin kies je tussen lokaal
+bouwen, bestaande buildbestanden flashen of de nieuwste release downloaden.
 
 #### Ontwikkelaarsmodus — bouwen vanuit broncode en flashen
 
@@ -315,7 +340,7 @@ python3 flash_esp.py --build
 #### Handmatige modus — bestaande binaire bestanden gebruiken
 
 ```bash
-python3 flash_esp.py --firmware OTGW-firmware-1.5.0.ino.bin --filesystem OTGW-firmware-1.5.0.ino.littlefs.bin
+python3 flash_esp.py --firmware OTGW-firmware-1.5.0.ino.bin --filesystem OTGW-firmware.1.5.0.littlefs.bin
 ```
 
 ---
@@ -355,10 +380,10 @@ Python:
 python3 flash_esp.py --download --erase
 ```
 
-#### 2. Upgraden van v1.3.x zonder wissen (verouderd bestandssysteem op verkeerd adres)
+#### 2. Upgraden van v1.3.x zonder wissen (verouderde bestandssysteemdata)
 
-v1.4.x verplaatste de bestandssysteempartitie van `0x300000` (1 MB) naar `0x200000`
-(2 MB). Als de oude bestandssysteemdata nog aanwezig is, kan de nieuwe firmware onverwacht
+v1.4.x veranderde het bestandssysteem-image van 1 MB naar 2 MB, beide op `0x200000`.
+Als de oude bestandssysteemdata nog aanwezig is, kan de nieuwe firmware onverwacht
 gedrag vertonen.
 
 **Oplossing:**
