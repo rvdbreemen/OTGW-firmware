@@ -285,7 +285,6 @@ On ESP32 the firmware requests the full Open-Meteo current-conditions set: tempe
 
 Weather data provides:
 - Outdoor temperature for the heating curve (fallback or primary, depending on configuration).
-- Humidity data for thermal comfort.
 - Sun elevation data for solar gain gating.
 - Forecast data for proactive setpoint planning.
 
@@ -520,7 +519,7 @@ With `satthermalcomfort` on, SAT replaces the room temperature the PID sees with
 
 The separate humidity-based target adjustment (`satcomfortadjust`, `satcomforthumidity`, `satcomfortmaxoffset`) was removed in TASK-1282 (Sergeant D entry 114). An old `settings.ini` that still holds those keys loads without error; the keys are ignored.
 
-A pushed humidity value counts as stale after `sathumiditytimeout` seconds (default 1800).
+Thermal comfort uses indoor humidity only: a value pushed over MQTT (`sat/humidity`) or REST, or the humidity of the BLE room sensor. The most recent reading wins. Outdoor weather humidity is not used. A reading counts as stale after `sathumiditytimeout` seconds (default 1800). Without a fresh indoor humidity SAT uses the raw room temperature, and the Summer Simmer Index topics (`sat/ssi`, `sat/summer_simmer_index`, `sat/summer_simmer_perception`) are not published (TASK-1441, Sergeant D entry 117).
 
 ---
 

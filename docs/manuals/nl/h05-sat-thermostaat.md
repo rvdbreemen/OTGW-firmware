@@ -554,7 +554,7 @@ Met `satthermalcomfort` aan vervangt SAT de kamertemperatuur die de PID ziet doo
 
 De aparte vochtigheidscorrectie op het doel (`satcomfortadjust`, `satcomforthumidity`, `satcomfortmaxoffset`) is verwijderd in TASK-1282 (Sergeant D entry 114). Een oude `settings.ini` met die sleutels laadt zonder fout; de sleutels worden genegeerd.
 
-Een gepushte vochtigheidswaarde geldt als verlopen na `sathumiditytimeout` seconden (standaard 1800).
+Thermisch comfort gebruikt alleen binnenvochtigheid: een waarde via MQTT (`sat/humidity`) of REST, of de vochtigheid van de BLE-kamersensor. De meest recente meting wint. Buitenvochtigheid van de weerdienst wordt niet gebruikt. Een meting geldt als verlopen na `sathumiditytimeout` seconden (standaard 1800). Zonder verse binnenvochtigheid gebruikt SAT de kamertemperatuur zelf en worden de Summer Simmer Index-topics (`sat/ssi`, `sat/summer_simmer_index`, `sat/summer_simmer_perception`) niet gepubliceerd (TASK-1441, Sergeant D entry 117).
 
 ---
 

@@ -89,6 +89,7 @@ static_assert(BLE_SCAN_WINDOW_MS <= BLE_SCAN_INTERVAL_MS,
 struct BLERuntime {
   float    fTemperature;        // 2 decimal precision
   float    fHumidity;
+  uint32_t iHumidityMs;          // TASK-1441: when the sensor last reported a humidity (0 = never)
   uint8_t  iBattery;
   int8_t   iRssi;
   uint32_t iLastSeenMs;          // 0 = never seen since boot
@@ -594,7 +595,10 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
     // TASK-931: merge only the fields this advert decoded (sentinel = absent),
     // so a single-object frame keeps the slot's last value for the others.
     if (!isnan(temp))  _bleRuntime[slot].fTemperature = temp;
-    if (!isnan(hum))   _bleRuntime[slot].fHumidity    = hum;
+    if (!isnan(hum)) {
+      _bleRuntime[slot].fHumidity    = hum;
+      _bleRuntime[slot].iHumidityMs  = millis();
+    }
     if (batt != 0xFF)  _bleRuntime[slot].iBattery     = batt;
     _bleRuntime[slot].iRssi        = static_cast<int8_t>(dev->getRSSI());
     _bleRuntime[slot].iLastSeenMs  = millis();
@@ -890,6 +894,7 @@ void satBLEUpdateState()
   portEXIT_CRITICAL(&_bleSensorsMux);
   state.sat.fBleTemp       = snap.fTemperature;
   state.sat.fBleHumidity   = snap.fHumidity;
+  satNoteBleHumidity(snap.fHumidity, snap.iHumidityMs);   // entry 117: the BLE room sensor humidity is an indoor source
   state.sat.iBleBattery    = snap.iBattery;
   state.sat.iBleRssi       = snap.iRssi;
   state.sat.bBleTempValid  = true;

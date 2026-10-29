@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.528
+**  Version  : v2.0.0-alpha.529
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -374,6 +374,7 @@ void satPublishMQTT();
 void satRepublishCoreState();  // TASK-1284: re-arm the enabled/active/mode/... shadows so the next pass re-publishes (ADR-174)
 bool satHandleExternalTemp(const char* value);
 bool satHandleExternalOutdoor(const char* value);
+void satNoteBleHumidity(float humidity, uint32_t readingMs);
 bool satHandleTargetTemp(const char* value);
 bool satHandleZoneRoomTemp(uint8_t zone, const char* value);
 bool satHandleZoneSetpoint(uint8_t zone, const char* value);

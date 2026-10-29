@@ -52,18 +52,15 @@ class ComfortAdjustRemoved(unittest.TestCase):
         self.assertIn("float effectiveTarget = settings.sat.fTargetTemp;", body)
         self.assertIn("fPvBoostAppliedC", body)
 
-    def test_weather_humidity_fallback_is_untouched(self):
-        # out of scope here (TASK-1441): the block stays exactly as it was
+    def test_weather_humidity_fallback_is_gone(self):
+        # TASK-1441 (entry 117): the outdoor weather humidity is not an indoor humidity source
         sat = read("SATcontrol.ino")
-        self.assertIn("if (!state.sat.bHumidityValid && state.sat.weather.bValid) {\n"
-                      "    state.sat.fHumidity = state.sat.weather.fHumidity;\n"
-                      "    state.sat.bHumidityValid = true;\n"
-                      "    state.sat.iHumidityLastMs = state.sat.weather.iLastUpdateMs;\n"
-                      "  }", sat.replace("\r\n", "\n"))
+        self.assertNotIn("state.sat.fHumidity = state.sat.weather.fHumidity", sat)
 
-    def test_thermal_comfort_ssi_path_is_untouched(self):
+    def test_thermal_comfort_ssi_path_uses_the_one_validity_rule(self):
         sat = read("SATcontrol.ino")
-        self.assertIn("settings.sat.bThermalComfort && state.sat.bHumidityValid", sat)
+        self.assertIn("settings.sat.bThermalComfort", sat)
+        self.assertIn("satHumidityFresh(millis())", sat)
         self.assertIn("satCalcSimmerIndex(otRoom, state.sat.fHumidity)", sat)
         self.assertIn("settings.sat.iHumidityTimeoutS", sat)
         self.assertIn('"SATthermalcomfort"', read("settingStuff.ino"))

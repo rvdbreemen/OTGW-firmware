@@ -2948,7 +2948,7 @@ This section covers these firmware features:
 
 **Solar gain compensation.** Detects that the room is warming while the boiler modulates low, and then lowers the requested setpoint by a fixed offset before the clamp, the mode step and the cold cutoff, and, with `bSolarFreezeIntegral` on, skips the PID integral update (corrected 2026-10-24, TASK-1351); TASK-1323. The code comment names it "Solar Gain Compensation (Task #23)" (SATcontrol.ino:4206-4207). It is off by default (SATtypes.h:494).
 
-**Summer Simmer index and thermal comfort.** The index function carries the comment "Matches SAT Python summer_simmer.py formula exactly" (SATcontrol.ino:2576-2577). It is published as MQTT topics whenever a humidity value is valid (SATcontrol.ino:3012-3019). When `bThermalComfort` is on, the index replaces the room temperature used by the controller (SATcontrol.ino:1258-1270). That option is off by default (SATtypes.h:522).
+**Summer Simmer index and thermal comfort.** The index function carries the comment "Matches SAT Python summer_simmer.py formula exactly" (SATcontrol.ino:2576-2577). It is published as MQTT topics whenever a fresh indoor humidity value is present (`satHumidityFresh()`, TASK-1441). When `bThermalComfort` is on, the index replaces the room temperature used by the controller (SATcontrol.ino:1258-1270). That option is off by default (SATtypes.h:522).
 
 **Summer mode (`bSummerSimmer`, firmware only).** When the outside temperature has stayed at or above a threshold for a number of hours, SAT stops heating: it sends control setpoint 10 °C and CH off and skips the rest of the control tick (SATcontrol.ino:4764-4776). Off by default (SATtypes.h:499).
 
@@ -2986,9 +2986,11 @@ Configuration: `bSolarGainEnable`, `fSolarMinRiseRate`, `fSolarSetpointOffset`, 
 **Summer Simmer index** inputs: a temperature in °C and a humidity value, which the function treats as percent (it rejects values outside 0 to 100) (SATcontrol.ino:2577-2582). The humidity is `state.sat.fHumidity`, which comes from:
 
 - MQTT `set/<nodeId>/sat/humidity` (MQTTstuff.ino:617, MQTTstuff.ino:667, MQTTstuff.ino:868) or the REST SAT sub-route `humidity` (restAPI.ino:1547-1560), both through `satHandleHumidity`, which accepts 0 to 100 and stamps the time (SATcontrol.ino:1635-1647);
-- as a fallback, the weather service value when no valid humidity is present (SATcontrol.ino:4816-4822). That value is Open-Meteo `relative_humidity_2m` from the `current` block (SATweather.ino:63, SATweather.ino:70, SATweather.ino:261), which is outdoor humidity at 2 m.
+- the BLE room sensor humidity, through `satNoteBleHumidity` (SATcontrol.ino), once per new reading (SATble.ino `iHumidityMs` is stamped only when an advert carried a humidity). The most recent valid reading from either source wins.
 
-The BLE sensor humidity is stored in `state.sat.fBleHumidity` (SATble.ino:892) and published as `sat/ble_humidity` (SATble.ino:933). A search of the firmware for assignments to `fHumidity`, `bHumidityValid` and `iHumidityLastMs` found only `satHandleHumidity`, the weather fallback and the comfort stale check (SATcontrol.ino:1642-1644, SATcontrol.ino:3230, SATcontrol.ino:4819-4821). So BLE humidity does not feed the index or thermal comfort.
+There is no weather fallback since TASK-1441 (Sergeant D entry 117, Q57 A): the Open-Meteo `relative_humidity_2m` is outdoor humidity and is no longer copied into `fHumidity`. Without a fresh indoor humidity Thermal comfort uses the raw room temperature (thermo-nova climate.py:282-287).
+
+The BLE sensor humidity is stored in `state.sat.fBleHumidity` (SATble.ino) and published as `sat/ble_humidity`. Since TASK-1441 a new humidity reading of the selected BLE sensor (the same slot that supplies the BLE room temperature) also feeds `fHumidity`, `bHumidityValid` and `iHumidityLastMs`, so it feeds the index and thermal comfort. One validity rule, `satHumidityFresh()`: `bHumidityValid` and the reading is no older than `iHumidityTimeoutS`. It gates the thermal comfort input and the published index (entry 117, TASK-1441).
 
 **Summer mode** inputs: `satGetOutsideTemp()` (SATcontrol.ino:4326), which returns, in order, the simulated value, a non-stale MQTT external outdoor temperature, the weather temperature when the OT outside temperature is exactly 0.0, else the OT outside temperature (SATcontrol.ino:1283-1302). The OT outside temperature defaults to 0.0 (OTGW-Core.h:82). Settings: `fSummerThreshold`, `iSummerMinHours` (SATtypes.h:500-501).
 
@@ -3041,7 +3043,7 @@ Order inside one tick (SATcontrol.ino:4614-5018):
 8. Daily-median intra-day sample, `satHCRAddSample()` (SATcontrol.ino:4799, SATcycles.ino:1201-1243). Called every control tick (not every 15 min as its comment says, SATcycles.ino:1199), also before the PID update. Details under "Formulas".
 9. Setpoint sync check `satCheckSetpointSync()` (SATcontrol.ino:4808). It runs before this tick's new final setpoint is computed, so it compares the previous tick's final setpoint with the boiler's reported TSet (derived from SATcontrol.ino:4808, SATcontrol.ino:4946, SATcontrol.ino:3593-3594).
 10. Boiler status update (feeds device health) (SATcontrol.ino:4814).
-11. Humidity weather fallback: if humidity is not valid and weather data is valid, copy the weather humidity, mark it valid and give it the weather update time (SATcontrol.ino:4816-4822).
+11. Humidity weather fallback: removed in TASK-1441 (Sergeant D entry 117). The step no longer exists.
 12. PV boost. The effective target is `fTargetTemp`, plus a PV boost when active (SATcontrol.ino:4831-4833). This effective target drives both the heating curve and the PID (SATcontrol.ino:4836-4839). The comfort offset step (`satUpdateComfort()`) was removed in TASK-1282.
 13. PID update with the filtered room temperature (SATcontrol.ino:4839). Integral freeze (corrected 2026-10-24, TASK-1351); TASK-1323: at the start of the integral update, before the deadband test, `if (state.sat.bSolarGainActive && settings.sat.bSolarFreezeIntegral) return;` (SATpid.ino:157). Order inside `_pidUpdateIntegral`:
     - if solar gain is active and the freeze setting is on: return, nothing changes (SATpid.ino:157);
@@ -3162,7 +3164,7 @@ No rounding is applied to the result (SATcontrol.ino:2582).
 
 There is no "Unknown" label; the topics are simply not published without valid humidity (SATcontrol.ino:3014).
 
-**Thermal comfort substitution** (SATcontrol.ino:1264-1272): only in the OT room temperature path, and only when the room value is not a "ghost" and thermal comfort is on and humidity is valid and humidity is at most `iHumidityTimeoutS` old: return the index of (OT room temperature, humidity). Otherwise the raw OT room temperature is used. BLE, multi-area and MQTT external room temperatures return earlier and are never converted (SATcontrol.ino:1208-1231).
+**Thermal comfort substitution** (SATcontrol.ino:1264-1272): only in the OT room temperature path, and only when the room value is not a "ghost" and thermal comfort is on and the indoor humidity is fresh (`satHumidityFresh()`: valid and at most `iHumidityTimeoutS` old; pushed or BLE only, no weather fallback, TASK-1441): return the index of (OT room temperature, humidity). Otherwise the raw OT room temperature is used. BLE, multi-area and MQTT external room temperatures return earlier and are never converted (SATcontrol.ino:1208-1231).
 
 **Humidity comfort offset.** Removed in TASK-1282 (Sergeant D entry 114). The formula and `effectiveTarget = fTargetTemp + offset` no longer apply; `effectiveTarget = fTargetTemp (+ PV boost)`.
 
@@ -3349,7 +3351,7 @@ The "No" entries mean that no save code for them was found; the persistence entr
 | `sat/solar_gain_sun_elevation` | last sun elevation, only while valid | SATcontrol.ino:2945-2947 |
 | `sat/summer_active`, `sat/summer_hours_above` | summer mode and hour counter | SATcontrol.ino:2949-2950 |
 | `sat/humidity`, `sat/humidity_valid` | humidity input | SATcontrol.ino:2952-2954 |
-| `sat/ssi`, `sat/summer_simmer_index`, `sat/summer_simmer_perception` | index of `satGetRoomTemp()` and humidity, and its label; only when humidity is valid and > 0 | SATcontrol.ino:3012-3019 |
+| `sat/ssi`, `sat/summer_simmer_index`, `sat/summer_simmer_perception` | index of `satGetRoomTemp()` and humidity, and its label; only when the indoor humidity is fresh (`satHumidityFresh()`, TASK-1441) and > 0 | SATcontrol.ino:3012-3019 |
 | `sat/error` | `fError`, °C | SATcontrol.ino:2737 |
 | `sat/curve_recommendation` | hourly ring: insufficient / increase / decrease / hold | SATcontrol.ino:2899-2905 |
 | `sat/curve_recommendation_attributes` | JSON: `error_threshold`, `daily_mean_error` (the hourly ring mean), `daily_sample_count` (the hourly ring count), `recent_mean_error` (the last `fError`) | SATcontrol.ino:2906-2915 |
@@ -3383,8 +3385,8 @@ The "No" entries mean that no save code for them was found; the persistence entr
 - **Integral during solar gain.** With `bSolarFreezeIntegral` on (default) the integral is neither accumulated nor reset while solar gain is active; with it off, the normal deadband rules apply (SATpid.ino:157-163) (corrected 2026-10-24, TASK-1351); TASK-1323.
 - **Thermal comfort with a BLE, multi-area or external room sensor.** No index is used, because those sources return before the thermal comfort code (SATcontrol.ino:1208-1231, SATcontrol.ino:1264).
 - **Thermal comfort without fresh humidity.** The PID keeps running on the raw OT room temperature and a debug line is written (SATcontrol.ino:1271). Thermo-nova instead skips the PID tick (a7-features-thermonova.md:349-350).
-- **Thermal comfort with only weather data.** When no direct humidity is valid and weather data is valid, the outdoor humidity is copied in and used for the index, as long as the weather update is not older than `iHumidityTimeoutS` (SATcontrol.ino:4816-4822, SATcontrol.ino:1265).
-- **Weather humidity loop.** Removed in TASK-1282 (Sergeant D entry 114). The 30 min stale check that marked humidity invalid lived in `satUpdateComfort()` and is gone. The weather humidity fallback itself is unchanged and belongs to TASK-1441.
+- **Thermal comfort with only weather data.** Not used since TASK-1441 (Sergeant D entry 117): outdoor weather humidity is not an indoor source, so the raw room temperature is used.
+- **Weather humidity loop.** Removed in TASK-1282 (Sergeant D entry 114). The 30 min stale check that marked humidity invalid lived in `satUpdateComfort()` and is gone. The weather humidity fallback was removed in TASK-1441 (entry 117).
 - **Summer mode without any outdoor source.** The OT outside temperature defaults to 0.0 (OTGW-Core.h:82), so the threshold (minimum 5 °C) is never reached (derived from SATcontrol.ino:4331 and settingStuff.ino:1087). Summer mode reads `satGetOutsideTemp()` directly, not the clamped copy used by the heating curve (SATcontrol.ino:4326, SATcontrol.ino:4721-4723).
 - **Summer mode release time.** Any check with outside at or above threshold - 2 °C refills the counter, so release needs `iSummerMinHours` of continuous checks below threshold - 2 °C (derived from SATcontrol.ino:4344-4356).
 - **Simmer index below 58 °F (about 14.4 °C).** The index returns the input temperature unchanged and unrounded (SATcontrol.ino:2580).
@@ -3402,7 +3404,7 @@ The "No" entries mean that no save code for them was found; the persistence entr
 - **Device health counts STALLED_IGNITION only in REST.** MQTT checks only OFF (SATcontrol.ino:3001); REST also treats STALLED_IGNITION as unhealthy (restAPI.ino:1026-1027).
 - **Window with several sensors.** There is one input flag; any "closed" message ends the Activity preset (MQTTstuff.ino:627-632, restAPI.ino:1393-1396, SATcontrol.ino:1109-1122).
 - **Setpoint mismatch latch.** `satCheckSetpointSync()` returns early when `fFinalSetpoint` < 1.0 (SATcontrol.ino:3597), and `satDisable()` sets it to 0 (SATcontrol.ino:2169). A `bSetpointMismatch` that was true at disable therefore stays true until SAT controls again (derived).
-- **Humidity validity is never cleared.** The only code that set `bHumidityValid` false was `satUpdateComfort()` (removed in TASK-1282). Once a humidity value has arrived the flag stays true; thermal comfort still checks the value age against `iHumidityTimeoutS` (SATcontrol.ino:1696). The humidity source rules are TASK-1441.
+- **Humidity validity is never cleared.** `bHumidityValid` stays true once a value has arrived, but since TASK-1441 every use goes through `satHumidityFresh()`, which also checks the age against `iHumidityTimeoutS`: the thermal comfort input and the published index both stop on a stale value.
 - **Simulation scenario `solar_gain`.** In simulation mode an injected event warms the simulated room by a set amount per minute for a set time (SATcontrol.ino:3882-3897, SATcontrol.ino:4032-4041). It only changes the simulated temperature; detection runs through the normal code above (derived).
 
 <a id="s7-not-found-in-the-code-unclear"></a>
@@ -3419,7 +3421,7 @@ The "No" entries mean that no save code for them was found; the persistence entr
 8. **Two setpoint sync checks with different tolerances** (0.5 °C at SATcontrol.ino:3088 and 1.0 °C at SATcontrol.ino:3600). No comment explains why both exist.
 9. **Modulation sync compares the configured maximum** (SATcontrol.ino:3098-3099), not the MM value sent (SATcontrol.ino:4981). Whether this is intended is not stated.
 10. **Meaning of boiler status mask 0x02.** The code names it `boilerActive` / `boilerCHActive` (SATcontrol.ino:3110, restAPI.ino:1023) but does not say which OpenTherm status bit it is in a comment there.
-12. **Weather humidity is outdoor humidity** (SATweather.ino:63, SATweather.ino:261), used as an indoor humidity fallback (SATcontrol.ino:4816-4822). No comment discusses this.
+12. **Weather humidity is outdoor humidity** (SATweather.ino:63, SATweather.ino:261). It is no longer used as an indoor humidity fallback (TASK-1441, entry 117).
 13. **No persistence of solar, summer, hourly ring and pressure state.** No save code was found for them (SATcontrol.ino:2128-2136). The documentation does not say whether this is intended.
 14. **REST and MQTT health definitions differ** (restAPI.ino:1020-1031 vs SATcontrol.ino:3000-3009 and SATcontrol.ino:3083-3118). No comment explains the difference.
 15. **Summer simmer formula origin.** The code says it matches the SAT Python formula (SATcontrol.ino:2576) but gives no primary reference.

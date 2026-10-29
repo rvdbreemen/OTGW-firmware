@@ -384,7 +384,7 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/room_temp` | `"20.8"` | no | Room temperature used by PID (°C) |
 | `sat/outside_temp` | `"8.0"` | no | Outside temperature used by heating curve (°C) |
 | `sat/estimated_room` | `"20.5"` | no | Estimated room temp during sensor fallback (°C) |
-| `sat/humidity` | `"58.0"` | no | Indoor humidity % (when humidity sensor active) |
+| `sat/humidity` | `"58.0"` | no | Indoor humidity % (pushed or BLE room sensor; no weather fallback). `sat/ssi`, `sat/summer_simmer_index` and `sat/summer_simmer_perception` are published only while it is fresh (`humidity_timeout_s`) |
 | `sat/humidity_valid` | `"true"` / `"false"` | no | Whether humidity reading is valid |
 | `sat/pre_custom_temperature` | `"20.5"` | no | Target saved when a preset was activated, restored by preset `"none"` (°C). Published only when > 0 |
 | `sat/pre_activity_temperature` | `"20.5"` | no | Target saved when window detection switched to the Activity preset (°C). Published only when > 0 |

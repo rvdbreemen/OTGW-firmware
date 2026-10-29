@@ -1620,6 +1620,14 @@ static bool satRoomTempValid(float roomTemp)
   return !isnan(roomTemp) && roomTemp >= -10.0f && roomTemp <= 50.0f;
 }
 
+// One validity rule for the indoor humidity (entry 117, TASK-1441): a reading is usable while it is
+// no older than iHumidityTimeoutS. The Thermal comfort input and the published Summer Simmer Index both use it.
+static bool satHumidityFresh(uint32_t nowMs)
+{
+  return state.sat.bHumidityValid &&
+         (uint32_t)(nowMs - state.sat.iHumidityLastMs) <= ((uint32_t)settings.sat.iHumidityTimeoutS * 1000UL);
+}
+
 static float satGetRoomTemp()
 {
   // Simulation mode overrides all other sources
@@ -1692,14 +1700,16 @@ static float satGetRoomTemp()
   // Only active when bThermalComfort is enabled AND humidity data is fresh (< iHumidityTimeoutS).
   // TASK-521: skip SSI when otRoom is a ghost zero -- SSI(0,H) is meaningless and would mask
   // the no-source condition from the control-loop NaN guard.
-  if (!trGhost && settings.sat.bThermalComfort && state.sat.bHumidityValid) {
-    if ((millis() - state.sat.iHumidityLastMs) <= ((uint32_t)settings.sat.iHumidityTimeoutS * 1000UL)) {
+  // Indoor humidity only (entry 117, TASK-1441): pushed over MQTT/REST or read from the BLE room sensor.
+  // Without a fresh indoor value the raw room temperature is used (climate.py:282-287).
+  if (!trGhost && settings.sat.bThermalComfort) {
+    if (satHumidityFresh(millis())) {
       float ssi = satCalcSimmerIndex(otRoom, state.sat.fHumidity);
       SATDebugTf(PSTR("SAT: thermal_comfort: raw=%.1f SSI=%.1f H=%.0f%%\r\n"),
               otRoom, ssi, state.sat.fHumidity);
       return ssi;
     }
-    SATDebugTln(F("SAT: thermal_comfort: humidity stale, using raw room temp"));
+    SATDebugTln(F("SAT: thermal_comfort: no fresh indoor humidity, using raw room temp"));
   }
 
   // TASK-521: ghost-Tr final guard. If no other source returned, and Tr has never been
@@ -2076,6 +2086,20 @@ bool satHandleHumidity(const char* value)
   state.sat.iHumidityLastMs = millis();
   SATDebugTf(PSTR("SAT: humidity set to %.0f%%\r\n"), h);
   return true;
+}
+
+// BLE room sensor humidity as an indoor source (entry 117, TASK-1441). `readingMs` is the time the sensor
+// last reported a humidity (0 = it never did). Only a new reading is taken over, so the most recent valid
+// reading from either source wins and a cached value does not refresh the stamp.
+void satNoteBleHumidity(float humidity, uint32_t readingMs)
+{
+  static uint32_t s_lastReadingMs = 0;
+  if (readingMs == 0 || readingMs == s_lastReadingMs) return;
+  if (isnan(humidity) || humidity < 0.0f || humidity > 100.0f) return;
+  s_lastReadingMs = readingMs;
+  state.sat.fHumidity = humidity;
+  state.sat.bHumidityValid = true;
+  state.sat.iHumidityLastMs = readingMs;
 }
 
 // --- Sun elevation handler (Task #68) ---
@@ -3649,9 +3673,9 @@ void satPublishMQTT()
   }
 
   // ---------------------------------------------------------------------------
-  // Summer Simmer Index (Task #64): requires valid humidity.
+  // Summer Simmer Index (Task #64): requires fresh indoor humidity (satHumidityFresh, entry 117).
   // ---------------------------------------------------------------------------
-  if (state.sat.bHumidityValid && state.sat.fHumidity > 0) {
+  if (satHumidityFresh(millis()) && state.sat.fHumidity > 0) {
     float simmerIdx = satCalcSimmerIndex(satGetRoomTemp(), state.sat.fHumidity);
     publishIfChangedF(F("sat/ssi"),                 simmerIdx, s_ssi,                 SAT_EPS_ERROR,       2, false);
     publishIfChangedF(F("sat/summer_simmer_index"), simmerIdx, s_summer_simmer_index, SAT_EPS_TEMP_COARSE, 1, false);
@@ -5510,13 +5534,10 @@ static void satControlLoopRun()
   // --- Update boiler status ---
   satUpdateBoilerStatus();
 
-  // --- Humidity input (Task #28/#47) ---
-  // Weather humidity fallback: if no direct humidity input, use weather API
-  if (!state.sat.bHumidityValid && state.sat.weather.bValid) {
-    state.sat.fHumidity = state.sat.weather.fHumidity;
-    state.sat.bHumidityValid = true;
-    state.sat.iHumidityLastMs = state.sat.weather.iLastUpdateMs;
-  }
+  // A stale indoor humidity is no longer valid, so sat/humidity_valid, the REST status and the debug
+  // dump report the same freshness rule as Thermal comfort (entry 117, TASK-1441). A new pushed or BLE
+  // reading sets it valid again.
+  if (state.sat.bHumidityValid && !satHumidityFresh(millis())) state.sat.bHumidityValid = false;
 
   // --- PV-surplus setpoint boost (TASK-640) ---
   // Run before heating-curve calc so the boost is reflected in this cycle.
