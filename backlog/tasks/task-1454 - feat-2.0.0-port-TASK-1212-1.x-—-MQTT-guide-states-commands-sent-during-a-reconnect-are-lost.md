@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:26:00Z'
-updated_date: '2026-10-29T06:55:00Z'
+updated_date: '2026-10-29T06:59:00Z'
 labels:
   - port-from-1.x
   - mqtt
@@ -71,6 +71,8 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-29 verified on dev a632e8e68+: MQTTstuff.ino:1328 MQTTclient.setCleanSession(true); onMqttConnect() MQTTstuff.ino:1524-1574 subscribe(topic, 0) at :1569 and subscribe("homeassistant/status", 0) at :1574, also :308 and :1787 at QoS 0; vendored espMqttClient default _cleanSession(true) (src/libraries/espMqttClient/src/MqttClient.cpp:32). Dev does not queue or replay inbound set/ commands: with a clean session the broker stores nothing for the client, so the 1.x statement holds unchanged on dev. Only 2.0.0 difference: opt-in SAT MQTT-loss takeover (SATmqttfallback, docs/api/MQTT.md:959), mentioned in one line. Out-of-scope drift seen: MQTT_LWT.md Step 1 still quotes the 1.x PubSubClient connect(clientId, willTopic, 0, true, "offline") at MQTTstuff.ino:790-795 and the intro says ESP8266; dev uses MQTTclient.setWill(MQTTPubNamespace, 0, true, "offline", 7) at MQTTstuff.ino:1347.
+
+2026-10-29 addendum (C5 request): MQTT_LWT.md now describes dev instead of 1.x. LWT via MQTTclient.setWill(MQTTPubNamespace, 0, true, "offline", 7) in the setServer block (MQTTstuff.ino:1347) instead of the PubSubClient connect(...) call; birth via publishBirthOnline() from onMqttConnect() (MQTTstuff.ino:1539, 2052-2062) plus 5-min re-assert timerMQTTbirthreassert (:1293, :1418); ESP8266 -> ESP32-S3; HA avty_t from MQTTHaDiscovery.cpp:2425 instead of the retired data/mqttha.cfg; line numbers replaced by function names; em dashes removed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
