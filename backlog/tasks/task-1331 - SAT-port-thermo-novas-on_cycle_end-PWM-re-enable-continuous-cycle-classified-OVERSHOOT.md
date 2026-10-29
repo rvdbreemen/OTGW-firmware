@@ -3,11 +3,11 @@ id: TASK-1331
 title: >-
   SAT: port thermo-nova's on_cycle_end PWM re-enable (continuous cycle
   classified OVERSHOOT)
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-23T19:43:00Z'
-updated_date: '2026-10-27T23:45:00Z'
+updated_date: '2026-10-29T05:09:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -57,4 +57,6 @@ From the TASK-1327 review: thermo-nova re-enables PWM in two ways after a disabl
 2026-10-25 Q4 answered (entry 55: classifier matches classifier.py exactly) -> prerequisite task TASK-1387.
 
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
+
+2026-10-29 maintainer decision (Robert, in session): back to To Do. All Sergeant D decisions are recorded (entries 15, 18, 36, 37, 55); implementation waits on TASK-1405, TASK-1412.14, TASK-1412.4 and TASK-1412.7. The parked stash predates TASK-1345/1341/1344/1387: re-apply by hand on resume, do not pop it blindly.
 <!-- SECTION:NOTES:END -->
