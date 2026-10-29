@@ -493,7 +493,7 @@ class BypassSource(unittest.TestCase):
         self.assertRegex(self.loop, "(?m)" + EXITS_GATE_RE, "the satCycleCheckPwmExits gate has no else branch resetting the sustain guards")
 
     def test_satdisable_clears_the_start(self):
-        a = self.src.index("void satDisable()\n{")
+        a = self.src.index("void satDisable(bool persistPid)\n{")
         self.assertIn("satCycleSkipAutoSwitch();", self.src[a:self.src.index("\n}\n", a)])
 
     def test_mode_change_clears_the_start(self):

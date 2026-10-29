@@ -2613,7 +2613,9 @@ bool satOwnsControlSetpoint()
 }
 
 //=== Cleanly disable SAT and release boiler control ===
-void satDisable()
+// persistPid=false skips the PID file write: satOtLinkStep() passes it when the OpenTherm loss comes before
+// the first room reading, so a restored (or not yet restored) saved PID state stays on flash (entry 115).
+void satDisable(bool persistPid)
 {
   SATDebugTf(PSTR("SAT: satDisable called (safety=%d fallback=%d)\r\n"),
              (int)state.sat.bSafetyTripped, (int)state.sat.bFallbackActive);
@@ -2635,7 +2637,7 @@ void satDisable()
   state.sat.bActive = false;
   state.sat.fFinalSetpoint = 0.0f;
   satPidReset();
-  satSavePidState();         // Persist zeros after reset so next boot cold-starts (AC #5)
+  if (persistPid) satSavePidState();   // Persist zeros after reset so next boot cold-starts (AC #5)
   satSaveEnergyState();      // Persist energy total before reset (Task #196)
   satSaveEstimatedEnergy();  // Persist estimated gas energy before reset (Task #232)
   satHCRReset();        // Reset daily-median recommendation (Task #228)
@@ -2672,9 +2674,9 @@ void satDisable()
 // TASK-1365, Sergeant D entries 39 and 47: when SAT sees no valid OpenTherm it hands the boiler back
 // once, with the same commands as a user switch-off (satDisable(): CS=0, CH=1, MM=T), and then sends
 // nothing to the boiler until a boiler reply arrives again. SAT stays enabled; settings are untouched.
-// PROVISIONAL, not confirmed by Sergeant D (entry 47, Open; queued as Q33 and Q34 in
-// docs/sat/open-questions.md): what counts as "no valid OpenTherm" and the automatic resume.
-// Current reading: no boiler reply (B frame) for 30 s. Any B frame counts, a Data-Invalid reply
+// Decided: what counts as "no valid OpenTherm" is Q33 A (Robert, 2026-10-26) and the automatic resume
+// is Q34 A (Sergeant D, entry 79; docs/sat/open-questions.md).
+// Rule: no boiler reply (B frame) for 30 s. Any B frame counts, a Data-Invalid reply
 // included (OTDirect.ino bridges it as 'B'; the PIC prints it as a B line). Measured with millis()
 // (state.otBus.iBoilerLastSeenMs), because time() jumps at NTP sync. Silence is measured from the
 // later of the last B frame and _sat_otLinkBaseMs: SAT's first pass after boot, the last pass on
@@ -2682,7 +2684,8 @@ void satDisable()
 // or an exempt period therefore does not count as silence.
 // Resume: the first B frame stamped after the hand-back (a changed stamp, so a millis() wrap during
 // a long loss cannot fake one). The hand-back is satDisable(), which also resets PID, PWM and the
-// curve recommendation and persists the zeroed PID; SAT stays enabled and keeps owning MsgID 1.
+// curve recommendation and persists the zeroed PID, except for a loss before the first room reading
+// (entry 115, TASK-1365 AC#4: the saved PID state stays on flash); SAT stays enabled and keeps owning MsgID 1.
 // Exempt: SAT simulation (satSimulationBlocksBusTx() keeps every SAT command off the bus, so a
 // simulation started during a loss leaves the loss state) and PIC PS=1 summary mode (the PIC
 // prints no B lines; the loss state is held, so only a boiler reply resumes). OT-Direct in PS=1
@@ -2728,7 +2731,11 @@ static bool satOtLinkStep()
   }
   if (action == SAT_OTLINK_LOST) {
     DebugTln(F("SAT: no boiler reply for 30 s, boiler handed back (CS=0, CH=1, MM=T)"));
-    satDisable();                          // the one hand-back: CS=0, CH=1, MM=T, cache reset
+    // Read before satDisable(): its satPidReset() clears the flag. No room reading yet (entry 115) or no NTP
+    // time yet leaves the saved PID file alone (TASK-1365 AC#4): before NTP the NTP-gated satLoadPidState()
+    // has not run, and zeros stamped with an unsynced time would make that restore discard the file.
+    const bool persistPid = satPidRoomSeen() && isNTPtimeSet();
+    satDisable(persistPid);                // the one hand-back: CS=0, CH=1, MM=T, cache reset
     state.sat.bOtLinkLost = true;          // after satDisable(), which clears it
     _sat_otLinkLostStamp = state.otBus.iBoilerLastSeenMs;
     satNarrate_P(PSTR("OpenTherm lost: boiler handed back"));

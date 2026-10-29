@@ -205,7 +205,7 @@ class SourceGuards(unittest.TestCase):
         self.assertIn("state.sat.bRoomTempLost = !roomValid;", self.src, "set from the control tick: true during the loss, false after recovery")
         self.assertIn('publishIfChangedB(F("sat/room_temp_lost"),   state.sat.bRoomTempLost,     s_core_room_temp_lost,   true);', self.src)
         self.assertIn('je.field(F("room_temp_lost"),       snap->st.sat.bRoomTempLost);', self.src)
-        for head in ("void satDisable()", "void satClearSafetyTrip()"):
+        for head in ("void satDisable(bool persistPid)", "void satClearSafetyTrip()"):
             with self.subTest(head):
                 b = self._body(head)
                 self.assertIn("state.sat.bRoomTempLost = false;", b)

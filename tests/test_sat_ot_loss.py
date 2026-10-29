@@ -82,7 +82,14 @@ static void satPwmReset() {}
 static void satCycleSkipAutoSwitch() {}   // TASK-1367: called by satDisable(); the overshoot timer is not under test here
 static float _sat_lastControlCS = 0, _sat_requestedSetpoint = 0;
 static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false;
-static void satPidReset() {} static void satSavePidState() {} static void satSaveEnergyState() {}
+// PID persistence (TASK-1365 AC#4): g_pidFile stands for the saved PID file, g_roomSeen for satPidRoomSeen().
+// satPidReset() clears the room flag like the real one; satSavePidState() overwrites the file with the reset (zero) state.
+static bool g_roomSeen = false; static int g_pidSaves = 0; static const char* g_pidFile = "saved";
+static bool satPidRoomSeen() { return g_roomSeen; }
+static bool g_ntp = true; static bool isNTPtimeSet() { return g_ntp; }   // loss_room_nontp: NTP never synced
+static void satPidReset() { g_roomSeen = false; }
+static void satSavePidState() { g_pidSaves++; g_pidFile = "zeros"; }
+static void satSaveEnergyState() {}
 static void satSaveEstimatedEnergy() {} static void satHCRReset() {}
 struct Timer { uint32_t next; uint32_t iv; };
 static Timer timerSATControl = {0, 60000}, timerSAT4hStats = {0, 60000}, timerSATPublishRetry = {0, 500};
@@ -90,6 +97,7 @@ static bool _sat_publishRetryPending = false;   // TASK-1339 retry: MQTT publish
 static void satPublishMQTT() {}
 static bool due(Timer& t) { if ((int32_t)(g_ms - t.next) >= 0) { t.next = g_ms + t.iv; return true; } return false; }
 #define DUE(t) due(t)
+@DECL@
 @SENDERS@
 @DISABLE@
 @LINK@
@@ -99,7 +107,7 @@ static bool prePass() {
 }
 // boiler schedule per scenario: does the boiler reply in second t (seconds since boot)?
 static bool boiler(const char* sc, uint32_t t) {
-  if (!strcmp(sc, "loss"))    return t < 120;
+  if (!strcmp(sc, "loss") || !strcmp(sc, "loss_room") || !strcmp(sc, "loss_room_nontp")) return t < 120;
   if (!strcmp(sc, "invalid")) return true;                     // Data-Invalid replies: B frames all the time
   if (!strcmp(sc, "resume"))  return t < 120 || t >= 420;
   if (!strcmp(sc, "sim"))     return false;
@@ -122,6 +130,7 @@ int main(int argc, char** argv) {
   uint32_t endS = (uint32_t)atoi(argv[2]);
   g_ms = (argc > 3 ? (uint32_t)atoi(argv[3]) : 1) * 1000;     // SAT's first pass (late: after a slow setup())
   settings.sat.bSimulation = !strcmp(sc, "sim");
+  g_ntp = strcmp(sc, "loss_room_nontp") != 0;
   g_pic = strcmp(sc, "otd_ps") != 0;
   g_iface = strcmp(sc, "noiface") != 0;
   bool enabled = true;
@@ -135,6 +144,7 @@ int main(int argc, char** argv) {
     if (b && !late) state.otBus.iBoilerLastSeenMs = g_ms;
     // off_during_loss: the user switches SAT off at 300 s (settingStuff.ino SATenabled=0 -> satDisable());
     // the loop's disabled branch returns before the span from then on.
+    if ((!strcmp(sc, "loss_room") || !strcmp(sc, "loss_room_nontp")) && g_ms / 1000 == 10) g_roomSeen = true;   // first room reading, then the loss at 149 s
     if (!strcmp(sc, "off_during_loss") && g_ms / 1000 == 300) { satDisable(); enabled = false; }
     // trip: a safety trip at 50 s (it calls satDisable()), cleared by a re-enable at 300 s
     if (!strcmp(sc, "trip") && g_ms / 1000 == 50)  { state.sat.bSafetyTripped = true; satDisable(); }
@@ -147,6 +157,7 @@ int main(int argc, char** argv) {
     }
     if (b && late) state.otBus.iBoilerLastSeenMs = g_ms;
   }
+  fprintf(stderr, "PIDSAVES %d file=%s\n", g_pidSaves, g_pidFile);
   printf("END lost=%d\n", (int)state.sat.bOtLinkLost);
   return 0;
 }
@@ -156,11 +167,12 @@ int main(int argc, char** argv) {
 def build_cpp(src: str) -> str:
     a = src.index("static const uint32_t SAT_CMD_REFRESH_MS")
     senders = src[a:src.index("// TASK-1272, Sergeant D entry 14", a)]
-    d0 = src.index("void satDisable()")
+    d0 = src.index("void satDisable(")
     d1 = src.index("//=== Flush short-lived", d0)
     if "// --- satOtLink begin" in src:
         d1 = min(d1, src.index("// --- satOtLink begin"))
     disable = src[d0:d1]
+    decl = "void satDisable(bool persistPid = true);" if "bool persistPid" in disable else ""
     link = ""
     if "// --- satOtLink begin" in src:
         link = src[src.index("// --- satOtLink begin"):src.index("// --- satOtLink end")]
@@ -168,7 +180,7 @@ def build_cpp(src: str) -> str:
     end = "  if (!DUE(timerSATControl)) return;"
     span = src[s0:src.index(end, s0) + len(end)].replace("return;", "return false;")
     return (STUBS.replace("@SENDERS@", senders).replace("@DISABLE@", disable)
-            .replace("@LINK@", link).replace("@SPAN@", span))
+            .replace("@LINK@", link).replace("@DECL@", decl).replace("@SPAN@", span))
 
 
 class OtLoss(unittest.TestCase):
@@ -187,8 +199,9 @@ class OtLoss(unittest.TestCase):
     def run_sc(self, sc, end_s, start_s=1):
         if not self.exe:
             self.skipTest("no host C++ compiler")
-        out = subprocess.run([str(self.exe), sc, str(end_s), str(start_s)], capture_output=True, text=True,
-                             check=True).stdout
+        run = subprocess.run([str(self.exe), sc, str(end_s), str(start_s)], capture_output=True, text=True, check=True)
+        out = run.stdout
+        self.err = run.stderr.strip()
         lines = out.strip().split("\n")
         cmds = [(int(t), c) for t, c in (ln.split(" ", 1) for ln in lines[:-1])]
         return cmds, lines[-1]
@@ -296,6 +309,30 @@ class OtLoss(unittest.TestCase):
         self.assertNotIn("MM=T", [c for _, c in cmds], "no OpenTherm-loss hand-back without a command interface")
         self.assertEqual(end, "END lost=0")
 
+    def test_o_loss_before_first_room_reading_keeps_the_saved_pid(self):
+        # Entry 115, TASK-1365 AC#4: a boiler that never answers is lost 30 s after SAT's first pass, before any room
+        # reading. The hand-back must not overwrite the saved PID file with zeros (the NTP-gated restore may still be
+        # pending, or it has run and the restored state must stay on flash). The restore itself is not executed here.
+        cmds, end = self.run_sc("never", 600)
+        self.assertEqual([(t, c) for t, c in cmds if t >= 31], [(31, "CS=0"), (31, "CH=1"), (31, "MM=T")], "hand-back still goes out")
+        self.assertEqual(self.err, "PIDSAVES 0 file=saved", "the saved PID file is not overwritten")
+        self.assertEqual(end, "END lost=1")
+
+    def test_p_loss_after_room_reading_persists_zeros(self):
+        # Existing behaviour kept: with a room reading seen, the hand-back persists the reset PID.
+        cmds, end = self.run_sc("loss_room", 720)
+        self.assertEqual([(t, c) for t, c in cmds if t >= 149], [(149, "CS=0"), (149, "CH=1"), (149, "MM=T")])
+        self.assertEqual(self.err, "PIDSAVES 1 file=zeros", "zeros persisted once")
+        self.assertEqual(end, "END lost=1")
+
+    def test_q_loss_with_room_reading_but_no_ntp_keeps_the_saved_pid(self):
+        # Review finding: a room reading arrives before NTP, then the loss. Zeros stamped with an unsynced time would
+        # make the NTP-gated satLoadPidState() discard the file, so the hand-back must not write it either.
+        cmds, end = self.run_sc("loss_room_nontp", 720)
+        self.assertEqual([(t, c) for t, c in cmds if t >= 149], [(149, "CS=0"), (149, "CH=1"), (149, "MM=T")])
+        self.assertEqual(self.err, "PIDSAVES 0 file=saved", "no PID write before NTP time")
+        self.assertEqual(end, "END lost=1")
+
 
 class SourceGuards(unittest.TestCase):
     """What the harness cannot execute: the wiring in satControlLoopRun(), processOT() and OT-Direct."""
@@ -323,7 +360,7 @@ class SourceGuards(unittest.TestCase):
         run = self._body("static void satControlLoopRun()\n{")
         self.assertIn("_sat_otLinkBaseMs = millis();", run)
         self.assertIn("if (!satIsEnabled()) state.sat.bOtLinkLost = false;", run)
-        self.assertIn("state.sat.bOtLinkLost = false;", self._body("void satDisable()"))
+        self.assertIn("state.sat.bOtLinkLost = false;", self._body("void satDisable(bool persistPid)"))
         self.assertIn("if (state.sat.bSafetyTripped) _sat_otLinkBaseMs = millis();", run)
 
     def test_decision_uses_millis_not_time(self):
@@ -331,7 +368,8 @@ class SourceGuards(unittest.TestCase):
         blk = self.sat[a:self.sat.index("// --- satOtLink end")]
         self.assertIn("state.otBus.iBoilerLastSeenMs", blk)
         self.assertNotIn("time(", blk.replace("time() jumps", ""))
-        self.assertIn("satDisable();", blk, "the hand-back is satDisable()'s own CS=0, CH=1, MM=T")
+        self.assertIn("satDisable(persistPid);", blk, "the hand-back is satDisable()'s own CS=0, CH=1, MM=T")
+        self.assertIn("const bool persistPid = satPidRoomSeen() && isNTPtimeSet();", blk, "read before satDisable() resets the flag")
 
     def test_every_b_frame_is_stamped(self):
         b = self.core.index("if (buf[0]=='B'){")

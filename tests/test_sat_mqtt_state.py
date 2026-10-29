@@ -89,7 +89,7 @@ class DisabledStateIsPublished(unittest.TestCase):
     # --- B: publish on the loop task only ---------------------------------------------------
     def test_async_reachable_functions_do_not_publish(self):
         # satDisable()/satClearSafetyTrip() are reached from the async_tcp task (REST, settings POST)
-        self.assertNotIn("satPublishCoreState", body(self.sat, "void satDisable()"))
+        self.assertNotIn("satPublishCoreState", body(self.sat, "void satDisable(bool persistPid)"))
         self.assertNotIn("satPublishCoreState", body(self.sat, "void satClearSafetyTrip()"))
         self.assertNotIn("satPublishCoreState", body(self.sat, "void satHandleEnabled(const char* value)"))
 

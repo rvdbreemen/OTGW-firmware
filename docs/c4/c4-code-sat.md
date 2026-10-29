@@ -72,8 +72,8 @@ Central control loop, heating curve calculation, setpoint management, SAT-owned 
 - `satDetectManufacturer(uint8_t slaveMemberID): void`
   - Auto-detects boiler manufacturer from OT MsgID 3 slave MemberID
 
-- `satDisable(): void`, `satFlushShortLivedData(): void`
-  - `satDisable()` releases control (`CS=0` via `satEnqueueOwnCS`), resets and persists PID/energy state, resets the command cache. `satFlushShortLivedData()` clears PID integral and the cycle window
+- `satDisable(bool persistPid = true): void`, `satFlushShortLivedData(): void`
+  - `satDisable()` releases control (`CS=0` via `satEnqueueOwnCS`), resets and persists PID/energy state, resets the command cache. `persistPid=false` skips only the PID file write; the OpenTherm-loss hand-back (`satOtLinkStep()`) passes `satPidRoomSeen() && isNTPtimeSet()`, so a loss before the first room reading or before NTP time leaves the saved PID state on flash (TASK-1365 AC#4, entry 115). The loss rule is decided: 30 s without a boiler reply, Data-Invalid counts as a reply (Q33 A, Robert 2026-10-26), automatic resume on the first boiler reply (Q34 A, entry 79). `satFlushShortLivedData()` clears PID integral and the cycle window
 
 - `satUpdateBoilerStatus()` (static), `satUpdateFlameStatus()`, `satUpdatePressure()`, `satUpdatePowerEnergy()`, `satUpdateSolarGain()`, `satUpdateSummerSimmer()`, `satUpdateComfort()`, `satUpdateCurveRecommendation()`, `satUpdateModulationReliability()`, `satCheckSetpointSync()`, `satUpdateThermalLearning()`, `satAutoTuneUpdate()` (all static)
   - Per-tick analysis steps called from `satControlLoop()`

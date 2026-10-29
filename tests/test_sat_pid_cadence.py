@@ -596,10 +596,11 @@ class SourceTruth(unittest.TestCase):
         self.assertNotIn("satPidRoomSeen", sat[a:a + 200])
         self.assertIn("if (satPidRoomSeen()) satSavePidState();", sat)
         self.assertIn(">= 300000UL && satPidRoomSeen()) {", sat)
-        for fn in ("void satDisable(", "void satFlushShortLivedData("):
+        for fn, save in (("void satDisable(", "satPidReset();\n  if (persistPid) satSavePidState();"),
+                         ("void satFlushShortLivedData(", "satPidReset();\n  satSavePidState();")):
             b = sat.index(fn)
             body = sat[b:sat.index("\n}\n", b)]
-            self.assertIn("satPidReset();\n  satSavePidState();", body, fn)
+            self.assertIn(save, body, fn)
 
 
 class RoomFilter(unittest.TestCase):

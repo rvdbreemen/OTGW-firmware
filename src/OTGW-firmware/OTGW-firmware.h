@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.523
+**  Version  : v2.0.0-alpha.524
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -379,7 +379,7 @@ bool satHandleZoneRoomTemp(uint8_t zone, const char* value);
 bool satHandleZoneSetpoint(uint8_t zone, const char* value);
 void satHandleEnabled(const char* value);
 void satHandleHeatingMode(const char* value);
-void satDisable();
+void satDisable(bool persistPid = true);
 void satHandleControlMode(const char* value);
 void satCycleOnFlameChange(bool flameOn);
 // SAT test-observability narration (TASK-815): one source, two sinks
