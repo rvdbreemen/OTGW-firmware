@@ -1002,7 +1002,6 @@ Onderwerp: `{TopTopic}/set/{UniqueId}/sat/<commando>`. Commandonamen zijn niet h
 | `sat/indoor_temp` | `"20.8"` | Externe kamertemperatuur doorgeven (°C) |
 | `sat/outdoor_temp` | `"7.5"` | Externe buitentemperatuur doorgeven (°C) |
 | `sat/pv_surplus_w` | `"1500"` (0 tot 50000) | PV-overschot (W) doorgeven voor PV-boost |
-| `sat/pv_boost_enabled` | `"1"` / `"0"` / `"true"` | PV-boost in- of uitschakelen |
 | `sat/enabled` | `"true"` / `"false"` (ook `"on"` / `"off"`, `"1"` / `"0"`) | SAT in- of uitschakelen |
 | `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (of `"1"` / `"2"` / `"0"`) / `"off"` | Bedrijfsmodus instellen. `"off"` zet SAT uit, net als `sat/enabled` 0. Elke andere niet-numerieke waarde geldt als `"auto"` |
 | `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` / `"activity"` / `"home"` / `"none"` | Voorinstelling activeren; `"none"` wist de voorinstelling |
@@ -1079,6 +1078,7 @@ De onderstaande commando's geven de payload ongewijzigd door aan de genoemde ins
 | `sat/zone_timeout_s` | `SATzonetimeout` |
 | `sat/solar_min_elevation` | `SATsolarminelev` |
 | `sat/flush_threshold_h` | `SATflushtreshold` |
+| `sat/pv_boost_enabled` | `SATpvboostenabled` |
 | `sat/pv_boost_threshold_w` | `SATpvboostthresholdw` |
 | `sat/pv_boost_hold_s` | `SATpvboostholds` |
 | `sat/pv_boost_delta_c` | `SATpvboostdeltac` |

@@ -1211,7 +1211,6 @@ Topic: `{TopTopic}/set/{UniqueId}/sat/<command>`. Command names are matched case
 | `sat/indoor_temp` | `"20.8"` | Push external room temperature (°C) |
 | `sat/outdoor_temp` | `"7.5"` | Push external outdoor temperature (°C) |
 | `sat/pv_surplus_w` | `"1500"` (0 to 50000) | Push PV surplus power (W) for PV boost |
-| `sat/pv_boost_enabled` | `"1"` / `"0"` / `"true"` | Enable / disable PV boost |
 | `sat/enabled` | `"true"` / `"false"` (also `"on"` / `"off"`, `"1"` / `"0"`) | Enable / disable SAT |
 | `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (or `"1"` / `"2"` / `"0"`) / `"off"` | Set control mode. `"off"` switches SAT off, the same as `sat/enabled` 0. Any other non-numeric value is treated as `"auto"` |
 | `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` / `"activity"` / `"home"` / `"none"` | Apply a preset; `"none"` clears it |
@@ -1288,6 +1287,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/zone_timeout_s` | `SATzonetimeout` |
 | `sat/solar_min_elevation` | `SATsolarminelev` |
 | `sat/flush_threshold_h` | `SATflushtreshold` |
+| `sat/pv_boost_enabled` | `SATpvboostenabled` |
 | `sat/pv_boost_threshold_w` | `SATpvboostthresholdw` |
 | `sat/pv_boost_hold_s` | `SATpvboostholds` |
 | `sat/pv_boost_delta_c` | `SATpvboostdeltac` |
