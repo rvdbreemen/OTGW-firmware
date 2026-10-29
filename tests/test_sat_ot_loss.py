@@ -76,6 +76,7 @@ static void satCycleSample() {}
 static void satGetWindow4hStats() {}
 static void satGetWindow24hStats() {}
 static void satPwmSuppressionRefresh() {}
+static void satPidService(uint32_t) {}   // TASK-1368: the 60 s PID service is not under test here
 static void satSetControlMode(int m) { state.sat.eControlMode = m; }
 static void satPwmReset() {}
 static void satCycleSkipAutoSwitch() {}   // TASK-1367: called by satDisable(); the overshoot timer is not under test here

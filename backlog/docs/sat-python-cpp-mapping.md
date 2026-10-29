@@ -22,9 +22,9 @@ Legend:
 | `PID.kp` (manual) | `state.sat.fKp` from `settings.sat.fPropGain` | PARTIAL (manual mode present but less tested) |
 | `PID._update_integral()` | `_pidUpdateIntegral()` | FULL (deadband reset, Ki*error*60s, clamp to [0, curveValue]) |
 | `PID._update_derivative()` | `_pidUpdateDerivative()` | FULL (temperature-based, negative sign, adaptive alpha, cap +-5) |
-| `PID.output` | `satPidUpdate()` return value = curve + P + I + D | FULL |
+| `PID.output` | `satPidOutput()` return value = curve + P + I + D (current curve, held error/I/raw derivative) | FULL |
 | `PID.reset()` | `satPidReset()` | FULL |
-| `PID.update(state, freeze_integral)` | `satPidUpdate(roomTemp, targetTemp, curveValue, boilerTemp)` | PARTIAL (freeze_integral from solar gain state, not parameter) |
+| `PID.update(state, freeze_integral)` | `satPidStep(roomTemp, targetTemp, curveValue, nowMs)`, called by `satPidService()` every 60 s | PARTIAL (freeze_integral from solar gain state, not parameter) |
 | `PID.async_added_to_hass()` (restore state) | No equivalent | MISSING (firmware restarts with zeroed PID state) |
 | `PID._async_save_state()` (persist) | No equivalent | MISSING |
 | `PID` dispatcher signal `SIGNAL_PID_UPDATED` | MQTT publish of PID values | PARTIAL (MQTT publish, not in-process signal) |

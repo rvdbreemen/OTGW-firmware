@@ -4,11 +4,11 @@
 `state.sat.fHeatingCurveValue` feeds MQTT `sat/heating_curve`, the REST/WS status field
 `heating_curve` (SATcontrol.ino satStatus JSON, restAPI.ino `state.sat.heating_curve`) and the
 telnet debug dump. Before the fix satCalcHeatingCurve() wrote it on every call, and each zone
-step (satZonePidStep) calls it again with the zone's own target, so with zones on the published
+step (satZonePidOutput, satZonePidAdvance) calls it again with the zone's own target, so with zones on the published
 value was the last zone's curve.
 
 The code under test is NOT re-implemented: the test cuts the real satCalcHeatingCurve(),
-satZonePidExclude(), satZonePidStep() and the real control-loop segment from
+satZonePidExclude(), satZoneUsable(), satZoneKp(), satZonePidOutput() and the real control-loop segment from
 "// --- Calculate heating curve ---" up to the deadband restore (main curve, main PID call and
 the whole multi-zone block) out of src/OTGW-firmware/SATcontrol.ino, wraps them in stubs and
 compiles them with a host C++ compiler (g++, clang++ or MSVC cl via vswhere). Without a compiler
@@ -61,7 +61,7 @@ static float satGetBaseOffset() { return 27.2f; }
 static float satGetMaxSetpoint() { return 62.0f; }
 static float satGetFlowTemp() { return 40.0f; }
 static float satPidError(float t, float r) { return roundf((t - r) * 100.0f) / 100.0f; }
-static float satPidUpdate(float, float, float curve, float) { return curve; }
+static float satPidOutput(float curve) { return curve; }   // TASK-1368: the tick only reads the PID output
 static const bool roomValid = true;                       // TASK-1364: room temperature valid in these scenarios
 static float satPidCurveOnly(float curve) { return curve; }
 static void satPublishZoneDiagnostics() { }
@@ -97,11 +97,13 @@ def _fn(src: str, sig: str) -> str:
 def extract(src: str) -> str:
     curve = _fn(src, r"static float satCalcHeatingCurve\(")
     excl = _fn(src, r"static inline float satZonePidExclude\(")
-    step = _fn(src, r"static float satZonePidStep\(")
+    usable = _fn(src, r"static bool satZoneUsable\(")
+    kp = _fn(src, r"static float satZoneKp\(")
+    step = _fn(src, r"static float satZonePidOutput\(")
     a = src.index("  // --- Calculate heating curve ---")
     b = src.index("  // Task #21: Restore original deadband", a)
     loop = src[a:b]
-    return (curve + "\n" + excl + "\n" + step + "\n"
+    return (curve + "\n" + excl + "\n" + usable + "\n" + kp + "\n" + step + "\n"
             "static float tick(float effectiveTarget, float outsideTemp) {\n"
             "  float roomTemp = effectiveTarget - 0.5f;\n" + loop + "\n  return pidOutput;\n}\n")
 

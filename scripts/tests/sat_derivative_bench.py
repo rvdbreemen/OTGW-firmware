@@ -10,7 +10,7 @@ nothing that outranks the external temperature (BLE, multi-area). No boiler is n
 The script feeds the external room temperature, 18.00 C and then +0.1 C every 150 s
 (16 steps), through POST /api/v2/sat/externaltemp/<v>. It polls GET /api/v2/sat/status
 every 15 s, one request at a time (the REST gate caps in-flight calls at 2). On the
-device the room EMA (TASK-894, tau 45 s) smooths every step before satPidUpdate(), so
+device the room EMA (TASK-894, tau 45 s) smooths every step before satPidStep(), so
 this measures the derivative on the real device path.
 
 Output: one JSON line per feed and per poll, then a summary line with the mean

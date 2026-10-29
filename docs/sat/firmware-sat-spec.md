@@ -121,7 +121,7 @@ The four most important facts:
 
 1. **SAT is initialised once, at the end of `setup()`**, by `initSAT()` (`OTGW-firmware.ino:567`, `SATcontrol.ino:3681-3738`). It always sends `CS=0` first when an OpenTherm command interface exists, even when SAT is disabled (`SATcontrol.ino:3702-3710`). Only when SAT is enabled at boot does it also send `PM=3`, `PM=15`, `PM=48` and, for some manufacturers, `MI=500` (`SATcontrol.ino:3721-3734`).
 2. **Control runs from one timer**, the control tick, every `iControlInterval` seconds (default 30 s, allowed 10 to 300 s; `SATtypes.h:444`, `settingStuff.ino:1001`). The PID is updated inside that tick, not on its own timer (`SATcontrol.ino:4614`, `SATcontrol.ino:4839`). Between ticks, every pass runs some fast work: flame edge detection, cycle sampling, a 30 s CS keepalive on PIC boards and a 3 s PWM suppression refresh (`SATcontrol.ino:4591-4611`).
-3. **The first tick does not send the computed setpoint.** On its first call the PID returns its stored output, which is 0 after the reset in `initSAT()` (`SATpid.ino:264-280`, `SATpid.ino:109`, `SATcontrol.ino:3683`). The control tick raises that to 10 °C and, because it is below the cold setpoint, commands the boiler off: `CS=10`, `MM=100`, `CH=0` (`SATcontrol.ino:4911`, `SATcontrol.ino:4971-4975`, `SATcontrol.ino:4980-4983`). With a steady room temperature and the default 30 s interval, the first computed PID output appears on the third tick (details in Phase E).
+3. **The PID takes a start-up step before the first tick (TASK-1368, entries 42 and 83).** After the reset in `initSAT()` (or any `satPidReset()`), the next `satPidService()` call is a start-up step and restarts the 60 s timer, so the first tick reads a computed output instead of the stored 0. That output has D = 0 (entry 95 Q39b: `satPidOutput()` leaves D out of the first output after a reset). Without a room temperature yet the start-up step is `satPidCurveOnly()` and the output is the heating curve. The earlier behaviour (stored 0, raised to 10 °C, `CS=10`, `MM=100`, `CH=0` until the third tick) is gone. Open point for Sergeant D: when the start-up step finds no room temperature, `satPidCurveOnly()` zeroes the restored integral and raw derivative (entry 46), where entry 83 asks to send the restored I.
 4. **After a restart, little control state is restored.** The PID integral and filtered derivative come back only when the clock is NTP-synced and the saved file is at most 30 minutes old (`SATcontrol.ino:1993`, `SATcontrol.ino:2026-2042`). The control mode, PWM state, cycle history and last-sent command values always start fresh (`SATcontrol.ino:3688-3700`).
 
 A grep for `warm|settle|preheat|startup|start-up|boot` over `SATcontrol.ino`, `SATpid.ino` and `SATcycles.ino` finds no warm-up or settle period in the control path. It finds:
@@ -265,7 +265,7 @@ At the first computed update, the restored values are used as follows:
 1. Set SAT active; if the mode is OFF, set it to CONTINUOUS (`SATcontrol.ino:4616-4619`).
 2. **DHW check.** DHW is active when slave status bit 2 is set (or a simulated DHW draw runs) (`SATcontrol.ino:4625-4629`). Power and energy are updated first (`SATcontrol.ino:4632-4633`). While DHW is active the tick sends `SW=` once on DHW entry (only with DHW control enabled and a valid DHW setpoint), publishes, and stops. CS, MM and CH are not touched and the PID does not run (`SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]`).
 3. Read room, outside and target temperature (`SATcontrol.ino:4656-4658`).
-4. **Room temperature check (TASK-1364, entries 38 and 46).** `satRoomTempValid()` is false when the room temperature is NAN or outside -10 to 50 °C. There is no trip and no skip: the tick goes on with the room temperature treated as lost. The room low-pass filter, the MQTT-takeover thermal block, auto-tune, the curve recommendation and the daily median sample are skipped, and PV boost does not start. The PID step is replaced by `satPidCurveOnly()` (P, I, D and the raw derivative are 0, `state.sat.fError` reads 0, the requested setpoint is the heating curve value). The solar offset, clamps, cold cutoff, PWM, MM, CS and CH then run as on any tick. The PIC-fail trip (5 ticks without a command interface) is unchanged. When a valid reading returns, `satPidUpdate()` runs again on that tick. The integral restarts from 0. The first D after recovery is computed over the whole gap, from the last pre-loss temperature to the new one, as thermo-nova does (`pid.py:134-137` keeps `_last_temperature`, `pid.py:209-232`), so D need not start at 0. The status field `room_temp_lost` (REST `sat/status`, MQTT `sat/room_temp_lost`) is true while the loss lasts.
+4. **Room temperature check (TASK-1364, entries 38 and 46).** `satRoomTempValid()` is false when the room temperature is NAN or outside -10 to 50 °C. There is no trip and no skip: the tick goes on with the room temperature treated as lost. The room low-pass filter, the MQTT-takeover thermal block, auto-tune, the curve recommendation and the daily median sample are skipped, and PV boost does not start. The PID step is replaced by `satPidCurveOnly()` (P, I, D and the raw derivative are 0, `state.sat.fError` reads 0, the requested setpoint is the heating curve value). The solar offset, clamps, cold cutoff, PWM, MM, CS and CH then run as on any tick. The PIC-fail trip (5 ticks without a command interface) is unchanged. When a valid reading returns, the output stays the curve alone (P, I and D 0) until the next 60 s PID step stores a real error, up to 60 s later. The integral restarts from 0. The first D after recovery is computed over the whole gap, from the last pre-loss temperature to the new one, as thermo-nova does (`pid.py:134-137` keeps `_last_temperature`, `pid.py:209-232`), so D need not start at 0. The status field `room_temp_lost` (REST `sat/status`, MQTT `sat/room_temp_lost`) is true while the loss lasts.
 5. **Room low-pass filter** with time constant 45 s. The first valid reading seeds the filter; later ticks move toward the raw value (`SATcontrol.ino:4694-4713`).
 6. **Boiler fault flag** (slave status bit 0): stop this tick (`SATcontrol.ino:4716-4719`).
 7. Outside temperature outside -40 to 50 °C is replaced by 10 °C (`SATcontrol.ino:4721-4723`).
@@ -284,7 +284,7 @@ At the first computed update, the restored values are used as follows:
 20. Record the tick time; save the PID state when 300 s passed since the last save (`SATcontrol.ino:5007-5012`). The last-save time starts at 0 (`SATcontrol.ino:1989`), so the first save happens on the first full tick after 300 s of uptime.
 21. Publish the SAT MQTT topics (`SATcontrol.ino:5018`).
 
-**What decides the first setpoint value.** On the first tick that reaches step 12, the PID returns 0 (E2). Step 13 raises it to 10 °C. Step 18 then applies, because 10 is below both cold setpoints: the setpoint becomes 10 °C and the modulation 100, whatever the control mode returned in step 15 (`SATcontrol.ino:4911`, `SATcontrol.ino:4971-4975`). Step 19 sends `CS=10.0`, `MM=100` and `CH=0`. The same happens on every tick until the PID computes a real output.
+**What decides the first setpoint value.** The PID service has taken its start-up step before the first tick (TASK-1368), so the PID output read in step 12 is already computed (curve + P + I, D = 0 on this first output), or the curve alone when there is no room temperature yet. Step 13 raises an output below 10 °C to 10 °C. Step 18 applies when that value is below both cold setpoints: the setpoint becomes 10 °C and the modulation 100, whatever the control mode returned in step 15. Step 19 then sends `CS=10.0`, `MM=100` and `CH=0`.
 
 **E4. First outputs to the boiler.** In time order after boot:
 
@@ -310,7 +310,7 @@ All SAT commands go through the shared command queue (`addCommandToQueue`). SAT'
 |---|---|---|---|
 | Main loop pass | every loop iteration, not a fixed period | `satControlLoop()` | `OTGW-firmware.ino:1157` |
 | Control tick | `iControlInterval`, default 30 s, range 10 to 300 s; first tick one interval after `initSAT()` | the tick body (E3) | `SATcontrol.ino:4614`, `SATcontrol.ino:3719`, `SATtypes.h:444`, `settingStuff.ino:1001` |
-| PID update | inside the tick; computes only when ≥ 10 s passed and (error changed or ≥ 60 s passed) | `satPidUpdate` | `SATpid.ino:276-285` |
+| PID update | on its own 60 s timer `timerSATPid`, independent of the control tick, plus one start-up step; no time gate and no unchanged-error gate (TASK-1368, entries 42, 75, 111). The tick reads the output | `satPidService`, `satPidStep`, `satPidOutput` | `SATpid.ino` |
 | Window statistics | 60 s | 4 h and 24 h stats | `SATcontrol.ino:478`, `SATcontrol.ino:4602-4605` |
 | PWM suppression refresh | 3 s | CS during the PWM ON phase after the hold | `SATcontrol.ino:480`, `SATcontrol.ino:894-918` |
 | PIC CS keepalive | checked every pass, sends after 30 s | re-send last CS | `SATcontrol.ino:403-414` |
@@ -481,7 +481,7 @@ else: control = max(pidOutput, Tboiler - fFlowOffset)        (fFlowOffset defaul
 | Delay of the first tick after `initSAT()` | one interval | s | `SATcontrol.ino:3719`, `safeTimers.h:131-135` |
 | Control timer type after `initSAT()` | `SKIP_MISSED_TICKS` (0) | - | `safeTimers.h:96`, `safeTimers.h:135`, `safeTimers.h:247-258` |
 | Timer "too far behind" limit | 10 intervals | - | `safeTimers.h:186-189` |
-| `SAT_PID_SAMPLE_TIME_LIMIT` | 10 | s | `SATpid.ino:21` |
+| `SAT_PID_SAMPLE_TIME_LIMIT` | removed: the 10 s minimum between updates is gone (TASK-1368, entry 75) | - | - |
 | `SAT_PID_UPDATE_INTERVAL` (integral dt, skip window, derivative gate) | 60 | s | `SATpid.ino:22` |
 | `fDeadband` default | 0.1 | °C | `SATtypes.h:443` |
 | `SAT_PID_DERIVATIVE_CAP` | 5.0 | °C/s (raw slope) | `SATpid.ino:24` |
@@ -642,7 +642,7 @@ There is one main PID with its own internal state held in file-level static vari
 | Gains config | `settings.sat.bAutoGains`, `fKpManual`, `fKiManual`, `fKdManual`, `fHeatingCurveCoeff` | SATpid.ino:120-142, SATtypes.h:442, SATtypes.h:518-521 |
 | Deadband | `settings.sat.fDeadband`, a setting (not a constant) | SATpid.ino:151, SATpid.ino:189, SATtypes.h:443 |
 | Freeze flag | `state.sat.bSolarGainActive` and `settings.sat.bSolarFreezeIntegral` (corrected 2026-10-24, TASK-1351) | SATpid.ino:157 |
-| `boilerTemp` argument | `satGetFlowTemp()` is passed in, but `satPidUpdate` never reads it (see "Not found / unclear") | SATcontrol.ino:4839, SATpid.ino:251-320 |
+| `boilerTemp` argument | gone with `satPidUpdate()` (TASK-1368): `satPidStep()` and `satPidOutput()` do not take the flow temperature | SATpid.ino |
 
 Differs from thermo-nova: the room temperature passes an extra EMA filter before the PID (SATcontrol.ino:4686-4693 states the reason in a comment). Thermal comfort (Summer Simmer index) only applies when the room temperature comes from the OT Tr path, because the BLE, multi-area and external sources return earlier (SATcontrol.ino:1208-1231, SATcontrol.ino:1264-1270).
 
@@ -657,24 +657,21 @@ Differs from thermo-nova: the room temperature passes an extra EMA filter before
 
 **B. Start-up** (boot)
 
-1. `initSAT()` is called from `setup()` (OTGW-firmware.ino:256, OTGW-firmware.ino:567). It first calls `satPidReset()` (SATcontrol.ino:3683). The reset sets error, integral, raw derivative, last room temperature to 0.0, sets `_pid_lastUpdateMs` and `_pid_lastDerivativeMs` to `millis()`, sets `_pid_initialized = false`, and zeroes the published values `fPidP`, `fPidI`, `fPidD`, `fPidOutput`, `fKp`, `fKi`, `fKd`, `fRawDerivative` (SATpid.ino:96-113).
+1. `initSAT()` is called from `setup()` (OTGW-firmware.ino:256, OTGW-firmware.ino:567). It first calls `satPidReset()` (SATcontrol.ino:3683). The reset sets error, integral, raw derivative, last room temperature to 0.0, sets `_pid_lastDerivativeMs` to `millis()`, sets `_pid_initialized = false` and `_pid_startupPending = true` (the next `satPidService()` call takes the start-up step, TASK-1368), and zeroes the published values `fPidP`, `fPidI`, `fPidD`, `fPidOutput`, `fKp`, `fKi`, `fKd`, `fRawDerivative` (SATpid.ino:96-113).
 2. It then calls `satLoadPidState()` (SATcontrol.ino:3684). This reads `/sat_pid_state.json` (SATcontrol.ino:1988, SATcontrol.ino:2010-2024). If NTP time is not set yet (`time < 1000000`), nothing is restored (SATcontrol.ino:2027-2032). If the saved timestamp is missing or more than 1800 s old, nothing is restored (SATcontrol.ino:1993, SATcontrol.ino:2033-2037). Otherwise it sets the displayed `fPidD` and `fError` (SATcontrol.ino:2038-2039) and calls `satPidRestoreState(i, rd)` (SATcontrol.ino:2042), which sets `_pid_integral` and `_pid_rawDerivative` and their published copies (SATpid.ino:75-80). `_pid_initialized` stays false (SATpid.ino:72-74). `fPidOutput` is not restored (SATpid.ino:75-83).
 3. `initSAT()` sends `CS=0` when an OT command interface is available, to release any stale control setpoint (SATcontrol.ino:3702-3710). It sets the control timer to `settings.sat.iControlInterval` (SATcontrol.ino:3719).
 4. `loop()` calls `satControlLoop()` (OTGW-firmware.ino:1094, OTGW-firmware.ino:1157). On the first pass where NTP time is set, `satLoadPidState()` runs once more (SATcontrol.ino:4515-4519). This retry sits before the "SAT enabled" check (SATcontrol.ino:4568).
 5. Computed from the code (not stated in it): if NTP becomes available only after the PID has already run, this one-time retry loads the file and overwrites `_pid_integral` and `_pid_rawDerivative`, provided the file is no more than 30 minutes old (SATcontrol.ino:4516-4518, SATcontrol.ino:2033-2042, SATpid.ino:77-78). This can only happen when NTP arrives before this boot's first save. `_pidLastSaveMs` starts at 0, so the first periodic save comes on the first full control tick after about 300 s of uptime (SATcontrol.ino:1989, SATcontrol.ino:5010-5011). That save stores `time(nullptr)` (SATcontrol.ino:2000-2001). If NTP is not synced then, and the clock value is below 1000000 as the check at SATcontrol.ino:2028 assumes, the retry finds the file older than 1800 s and discards it (SATcontrol.ino:2033).
-6. The PID runs only on a control tick, every `iControlInterval` seconds (SATcontrol.ino:476, SATcontrol.ino:4614). The default is 30 s (SATtypes.h:444); the setting accepts 10 to 300 s (settingStuff.ino:1001-1002).
-7. **First PID call after boot or after any `satPidReset()`.** Traced through the code:
-   1. The initialisation block sets `_pid_lastError = error`, `_pid_lastUpdateMs = now`, `_pid_lastDerivativeMs` = the time the current room temperature was first seen, and `_pid_derivRefTemp = roomTemp` (SATpid.ino:264-273).
-   2. `elapsed` is then 0, which is below the 10 s limit, so the call returns `state.sat.fPidOutput` without computing anything (SATpid.ino:21, SATpid.ino:276-280). After a reset that value is 0.0 (SATpid.ino:109).
-   3. The control tick clamps 0.0 up to `SAT_MIN_SETPOINT` = 10.0 (SATcontrol.ino:4911, SATcontrol.ino:54).
-   4. 10.0 is below the cold setpoint (28.2 radiators, 21.0 underfloor), so `finalSetpoint` is set to 10.0 and modulation to 100 (SATcontrol.ino:4971-4975, SATcontrol.ino:55-56, SATcontrol.ino:264-268).
-   5. The boiler gets `CS=10`, and `CH=0` because the requested setpoint 10 is at or below the cold setpoint (`satChEnableDecide()`, SATchEnable.h).
-   6. On the next tick, if the error changed by less than 0.001 and less than 60 s has passed since the initialisation stamp, the call returns the stored 0.0 again (SATpid.ino:283-285), with the same result.
-   7. Computed from the code: with the default 30 s interval, heating is commanded off for the first one or two control ticks after boot or a reset, until the first real PID computation. With multiple zones configured, an active zone output replaces this value (SATcontrol.ino:4846-4896), so the trace above holds for the single-zone default.
+6. The PID steps on its own 60 s timer `timerSATPid` (`DECLARE_TIMER_SEC(timerSATPid, 60, SKIP_MISSED_TICKS)` in SATpid.ino), not on the control tick (TASK-1368, Sergeant D entries 42, 28, 111; thermo-nova `climate.py:712-716`, `pid.py:20`). `satControlLoopRun()` calls `satPidService(millis())` on every loop pass, after the SAT-off, flash, trip and OpenTherm-loss returns and before `if (!DUE(timerSATControl)) return;`. The control tick (default 30 s, setting 10 to 300 s) only reads the output.
+7. **First PID step after boot or after any `satPidReset()`.** `satPidReset()` sets `_pid_startupPending`, so the first `satPidService()` call takes one start-up step at once (thermo-nova `climate.py:137`, `:143`) and restarts the 60 s timer; later steps follow every 60 s. In that step:
+   1. The initialisation block sets `_pid_lastError = error`, `_pid_lastDerivativeMs` = the time the current room temperature was first seen, and `_pid_derivRefTemp = roomTemp`.
+   2. The step then runs in full: gains, integral, derivative (no time gate, entry 75).
+   3. Until a room temperature exists the start-up step is curve-only (`satPidCurveOnly()`), and the output is the heating curve.
+   4. What the first output contains after a restore, and `D = 0` on the first tick (entry 95 Q39b), belong to TASK-1270 and are not changed here: after a restore `satPidOutput()` adds `kd * restored raw derivative` from the first tick on.
 
 **C. Every control tick** (SATcontrol.ino:4510-5019)
 
-The PID is not called on every tick. The control tick returns before `satPidUpdate` in these cases, in this order:
+The PID is not stepped by the tick (TASK-1368). `satPidService()` runs before the tick's early returns and steps the PID on its 60 s timer; the tick only reads the output (`satPidOutput(curveValue)`). The PID service does not run (and the PID does not step) in these cases: SAT disabled or a flash update running, MQTT takeover, safety trip latched, OpenTherm link lost (an OpenTherm loss turns SAT off, so the next pass after the link returns takes a start-up step). The control tick itself returns, in this order:
 
 1. SAT disabled or a flash update running (SATcontrol.ino:4568-4573).
 2. Safety trip latched (SATcontrol.ino:4581).
@@ -686,7 +683,7 @@ The PID is not called on every tick. The control tick returns before `satPidUpda
 8. Summer simmer active (SATcontrol.ino:4766-4776).
 9. All valves closed (SATcontrol.ino:4779-4790).
 
-Differs from thermo-nova: in the firmware the PID does not update while SAT is disabled, during DHW, with a boiler fault, in summer simmer or with closed valves.
+As thermo-nova (entry 111), the PID steps on its own timer also during DHW, with a boiler fault, in the thermal-safe fallback, in summer simmer and with closed valves; it stops only when SAT is off.
 
 When none of these apply:
 
@@ -695,27 +692,27 @@ When none of these apply:
 3. Solar gain detection runs (SATcontrol.ino:4762), see section E for its effect on the integral.
 4. The auto-tune step may change the heating curve coefficient (SATcontrol.ino:4793), see "Formulas".
 5. `effectiveTarget` is built (SATcontrol.ino:4831-4833) and the heating curve is computed (SATcontrol.ino:4836).
-6. `satPidUpdate(roomTemp, effectiveTarget, curveValue, satGetFlowTemp())` runs (SATcontrol.ino:4839). Inside it (SATpid.ino:251-320):
+6. `satPidOutput(curveValue)` runs (without a room temperature `satPidCurveOnly(curveValue)`). The 60 s `satPidStep(room, target, curve, nowMs)` that moved the held state ran earlier, in `satPidService()`. Inside the step:
    1. `error = satPidError(target, room)` = `target - room` rounded to 3 decimals (SATpid.ino:253, SATpid.ino:63-66).
    2. If the room temperature differs by 0.001 or more from the last value seen, the "changed" timestamp is set to now. This happens before any early return (SATpid.ino:256-261).
    3. On the first call after a reset, the initialisation block runs (SATpid.ino:264-273).
-   4. If less than 10 s passed since the last real update: return the stored `fPidOutput` (SATpid.ino:276-280).
-   5. If the error changed by less than 0.001 and less than 60 s passed: return the stored `fPidOutput` (SATpid.ino:283-285).
+   4. No time gate (the 10 s minimum was removed, entry 75).
+   5. No unchanged-error gate (removed, entry 42; thermo-nova `pid.py:159-171`).
    6. Gains are calculated from the current curve value (SATpid.ino:288), see "Formulas".
    7. The integral is updated (SATpid.ino:291), see section E.
    8. The derivative is updated (SATpid.ino:294), see section D.
-   9. P, I, D and the output are computed and stored in `state.sat` (SATpid.ino:297-310).
-   10. `_pid_lastError`, `_pid_lastUpdateMs` and the other tracking values are stored (SATpid.ino:313-317).
+   9. The error, the integral and the raw derivative are stored in `state.sat`. P, D and the output are computed by `satPidOutput()` on every control tick from the current curve: `curve + kp(curve) * held error + I + kd(curve) * held raw derivative` (`pid.py:60-132`).
+   10. `_pid_lastError` and the other tracking values are stored.
 
 Differs from thermo-nova: the integral is updated before the derivative (SATpid.ino:291, SATpid.ino:294). The two updates do not read each other's state (SATpid.ino:149-247), so the order does not change the result.
 
-Computed from the code: with the default 30 s tick, a real update happens on every tick when the error changes by 0.001 or more, and on every second tick (once 60 s has passed) when it does not (SATpid.ino:276-285, SATtypes.h:444).
+Computed from the code: the PID steps once per 60 s whatever the tick interval (10 to 300 s); between steps the output follows the current curve (TASK-1368).
 
-The zone PID (when the zone count is above 1) runs on every control tick that reaches SATcontrol.ino:4846, with no 10 s or 60 s gate (SATcontrol.ino:4853-4861, SATcontrol.ino:1806-1867).
+The zone PID (when the zone count is above 1) takes its integral step in `satZonePidAdvanceAll()` on the same 60 s timer (`area.py:183-190`, entry 111) and its output in `satZonePidOutput()` on every control tick that reaches the zone block.
 
 **D. Derivative update** (SATpid.ino:187-247), in the order the code checks:
 
-1. First time: handled by the initialisation block in `satPidUpdate`, which sets the timestamp and the reference temperature (SATpid.ino:270-271). There is no separate first-time branch in the derivative function.
+1. First time: handled by the initialisation block in `satPidStep`, which sets the timestamp and the reference temperature. There is no separate first-time branch in the derivative function.
 2. Error inside the deadband (`fabsf(error) <= deadband`): the timestamp is set to the "changed" time, the reference temperature is set to the current room temperature, and the function stops. `_pid_rawDerivative` keeps its value (SATpid.ino:199-204).
 3. `tempDelta = roomTemp - _pid_derivRefTemp`. If `fabsf(tempDelta) < 0.001`: timestamp and reference are updated and the function stops (SATpid.ino:208-213).
 4. `deltaTime = (changedMs - _pid_lastDerivativeMs) / 1000` in seconds (SATpid.ino:215). If `deltaTime <= 60`: stop. Neither the timestamp nor the reference temperature moves (SATpid.ino:217-219).
@@ -727,7 +724,7 @@ Differs from thermo-nova:
 - The temperature delta is measured against `_pid_derivRefTemp`, which moves together with the timestamp. A change that comes within 60 s is kept and carried into the next calculation (SATpid.ino:49-56, SATpid.ino:217-219).
 - The "changed" time is when a PID call first saw the new value, so its resolution is one control tick (SATpid.ino:256-261, SATpid.ino:42-45).
 - The "no change" test uses a tolerance of 0.001 instead of an exact zero (SATpid.ino:209).
-- Computed from the code: because of the room EMA (SATcontrol.ino:4708-4710), a sensor step reaches the PID as a series of small changes over several ticks. The comment at SATpid.ino:53-54 states that this is about 8 control ticks.
+- Computed from the code: because of the room EMA (`satRoomFiltered()`), a sensor step reaches the PID as a series of small changes over several ticks. The comment at SATpid.ino:53-54 states that this is about 8 control ticks.
 
 **E. Integral update** (SATpid.ino:149-179)
 
@@ -759,7 +756,7 @@ Differs from thermo-nova: there the output is recomputed on each read. Here noth
 
 **G. Combination into the requested setpoint** (SATcontrol.ino:4839-4946)
 
-1. `pidOutput = satPidUpdate(...)` (SATcontrol.ino:4839).
+1. `pidOutput = satPidOutput(curveValue)` (the 60 s `satPidService()` stepped the PID earlier).
 2. Zones, only when `iZoneCount > 1` (SATcontrol.ino:4846). Each zone step returns its output, or 10.0 when the zone is excluded. A zone counts as active when its output is above 10.0 (SATcontrol.ino:4853-4861).
    1. No active zone: `pidOutput` stays the main PID output (SATcontrol.ino:4863-4864).
    2. One active zone: `pidOutput` is replaced by that zone's output. The main PID output is not compared with it (SATcontrol.ino:4865-4868).
@@ -821,7 +818,7 @@ Variable names as in the code.
 - else: `alpha = deltaTime / (60 + deltaTime)`; `_pid_rawDerivative = clamp(alpha * rawDeriv + (1 - alpha) * _pid_rawDerivative, -5.0, 5.0)`
 - `D = fKd * _pid_rawDerivative`
 
-**Output** (SATpid.ino:309): `output = heatingCurveValue + P + I + D`, no rounding and no limit inside the PID. Limits are applied in the control tick (SATcontrol.ino:4911-4912).
+**Output** (`satPidOutput()`, SATpid.ino:343-363): `output = heatingCurveValue + P + I + D`, computed on every control tick from the current curve, with Kp and Kd recomputed from it and the error, integral and raw derivative held from the last PID step. D is left out of the first output after a reset (entry 95 Q39b). No rounding and no limit inside the PID. Limits are applied in the control tick.
 
 **Zone PID** (SATcontrol.ino:1828-1866), per zone:
 - `curveValue` from the zone target and outside temperature.
@@ -853,7 +850,7 @@ With the firmware default coefficient of 1.5 (SATtypes.h:442) and the same input
 | Name | Value | Unit | Citation |
 |---|---|---|---|
 | `SAT_PID_UPDATE_INTERVAL` (integral step, derivative minimum interval and filter constant) | 60 | s | SATpid.ino:22 |
-| `SAT_PID_SAMPLE_TIME_LIMIT` (minimum time between real updates) | 10 | s | SATpid.ino:21 |
+| `SAT_PID_SAMPLE_TIME_LIMIT` (minimum time between real updates) | removed (TASK-1368, entry 75) | - | - |
 | Error-unchanged tolerance | 0.001 | degrees | SATpid.ino:283 |
 | `SAT_PID_DERIVATIVE_CAP` | 5.0 | degrees per s (raw derivative) | SATpid.ino:24 |
 | `SAT_PID_DEADBAND_DEFAULT` (defined, not used by the code) | 0.1 | degrees | SATpid.ino:20 |
@@ -909,8 +906,8 @@ With the firmware default coefficient of 1.5 (SATtypes.h:442) and the same input
 |---|---|---|---|---|
 | `_pid_integral` | Accumulated integral (already multiplied by Ki) | yes, as `"i"` (from `state.sat.fPidI`) | yes (0.0) | SATpid.ino:34, SATpid.ino:98, SATcontrol.ino:2001-2002 |
 | `_pid_rawDerivative` | Filtered temperature slope (degrees per s, negated) | yes, as `"rd"` | yes (0.0) | SATpid.ino:35, SATpid.ino:99, SATcontrol.ino:2001-2002 |
-| `_pid_lastError` | Error of the last real update; used only for the "error unchanged" gate | no (`"err"` is saved but restores only the display value `fError`) | yes (0.0) | SATpid.ino:32, SATpid.ino:96, SATpid.ino:283, SATcontrol.ino:2039 |
-| `_pid_lastUpdateMs` | Time of the last real update (10 s and 60 s gates) | no | set to now | SATpid.ino:38, SATpid.ino:102, SATpid.ino:317 |
+| `_pid_lastError` | Error held by the last PID step; `satPidOutput()` multiplies it by Kp. NAN means no held error (room temperature lost): the output is the curve alone | no (`"err"` is saved but restores only the display value `fError`) | yes (0.0) | SATpid.ino:31, SATpid.ino:105, SATpid.ino:137, SATpid.ino:350, SATcontrol.ino:2039 |
+| `_pid_lastUpdateMs` | removed with the 10 s and 60 s gates (TASK-1368); the 60 s cadence is the timer `timerSATPid` | - | - | - |
 | `_pid_lastDerivativeMs` | Start of `deltaTime` | no | set to now, then overwritten by the init block | SATpid.ino:39, SATpid.ino:103, SATpid.ino:270 |
 | `_pid_derivRefTemp` | Room temperature at `_pid_lastDerivativeMs` | no | no (set by the init block) | SATpid.ino:56, SATpid.ino:271 |
 | `_pid_roomTempSeen`, `_pid_roomTempChangedMs` | Last room temperature seen and when it first appeared | no | no | SATpid.ino:42-47, SATpid.ino:258-261 |
@@ -990,7 +987,7 @@ Computed from the code: `satCalcHeatingCurve` returns the curve and writes no st
 6. **Derivative inside the band.** `_pid_rawDerivative` is held, so D keeps its last value while the error is within the deadband (SATpid.ino:199-204, SATpid.ino:299).
 7. **Room temperature unchanged.** A change below 0.001 moves the timestamp and reference and keeps `_pid_rawDerivative` (SATpid.ino:208-213).
 8. **Large slope.** At `|rawDeriv| >= 5.0` the filter is bypassed and the value is clamped to ±5.0 (SATpid.ino:226-233).
-9. **Stale or missing room temperature.** (TASK-1364) The tick calls `satPidCurveOnly()` instead of `satPidUpdate()`: integral, raw derivative, P, I, D and the published error are 0 and the output is the heating curve. No trip. After recovery the integral restarts from 0; the first D is computed over the whole gap from the last pre-loss temperature (as pid.py:209-232).
+9. **Stale or missing room temperature.** (TASK-1364) The PID service and the tick call `satPidCurveOnly()` instead of stepping and reading the PID: integral, raw derivative, P, I, D and the published error are 0 and the output is the heating curve. No trip. After recovery the integral restarts from 0; the first D is computed over the whole gap from the last pre-loss temperature (as pid.py:209-232).
 10. **Integral time step is fixed.** The integral always adds `ki * error * 60`, whatever the control interval (10 to 300 s) or the actual time since the last update (SATpid.ino:166, settingStuff.ino:1001).
 11. **Manual gains.** No setting, REST or MQTT path that writes `bAutoGains` or the manual gains was found, so the manual branch is not reachable at run time (see "Not found / unclear").
 12. **Thermal comfort on.** The error is computed against the Summer Simmer index only when the room temperature comes from OT Tr and the humidity is fresh (SATcontrol.ino:1264-1270).
@@ -1005,7 +1002,7 @@ Computed from the code: `satCalcHeatingCurve` returns the curve and writes no st
 
 1. **`bAutoGains` and the manual gains have no writer.** A case-insensitive search of the firmware sources for `autogains`, `auto_gains`, `KpManual`, `kp_manual`, `SATkp`, `SATki`, `SATkd` and assignments to these fields found only the defaults (SATtypes.h:518-521), the reads (SATpid.ino:122-126) and read-only publishing (SATcontrol.ino:2527-2530, restAPI.ino:2312, handleDebug.ino:116). The setting named `SATautogains` writes `fAutoGainsValue`, not `bAutoGains` (settingStuff.ino:1103). So the PID always uses automatic gains.
 2. **`fAutoGainsValue` is never read by the PID.** It is stored, settable and published (SATtypes.h:517, settingStuff.ino:1103, SATcontrol.ino:2977). The search found no use in SATpid.ino. This matches thermo-nova unclear item 1.
-3. **`boilerTemp` parameter is unused.** `satPidUpdate` receives `satGetFlowTemp()` but its body does not read it (SATpid.ino:251-320).
+3. **`boilerTemp` parameter was unused.** `satPidUpdate` received `satGetFlowTemp()` and never read it; the parameter went away with `satPidUpdate` (TASK-1368).
 4. **Unused tracking values.** `_pid_previousError`, `_pid_lastRoomTemp` and `_pid_lastCurveValue` are written (SATpid.ino:266-268, SATpid.ino:313-316) but never read. A search for `_pid_` in all firmware sources outside SATpid.ino found no other use (only the comment at SATcontrol.ino:2040 and the generated, untracked `OTGW-firmware.ino.cpp`). `SAT_PID_DEADBAND_DEFAULT` is defined but not used (SATpid.ino:20).
 5. **ECO / COMFORT heating mode has no effect on control.** `iHeatingMode` is set by `satHandleHeatingMode` and the settings parser (SATcontrol.ino:2211-2221, settingStuff.ino:1104). In the SAT files it is only read for publishing (SATcontrol.ino:2533, SATcontrol.ino:2978). No ECO branch was found in the requested setpoint path (SATcontrol.ino:4839-4946).
 6. **Preset change "integral reset" is display only.** The comments say the integral is reset (SATcontrol.ino:997, SATcontrol.ino:1006), but only `state.sat.fPidI` is written. The controller value `_pid_integral` is a file-level static in SATpid.ino (SATpid.ino:34). Outside SATpid.ino, no firmware source writes it: the `_pid_` search found only the comment at SATcontrol.ino:2040 and the generated `OTGW-firmware.ino.cpp`. The code does not show whether a real reset was intended.
@@ -1057,7 +1054,7 @@ This section covers layers 1 and 2 and the continuous-mode part of layer 3. The 
 | Heating system | `settings.sat.iHeatingSystem`: 0 auto, 1 radiators, 2 underfloor. Auto is treated as radiators | SATtypes.h:41-43, SATtypes.h:438, settingStuff.ino:994, SATcontrol.ino:194-201 |
 | Heating source | `settings.sat.iHeatingSource`: auto, gas boiler, heat pump, hybrid. Auto is treated as gas boiler. It changes the maximum setpoint, not the curve | SATtypes.h:48-51, SATtypes.h:439, SATcontrol.ino:209-214, SATcontrol.ino:233 |
 | Heating curve coefficient | `settings.sat.fHeatingCurveCoeff`, default 2.0 (TASK-1347; 1.5 before), accepted range 0.1 to 5.0. Read on every curve calculation. Auto-tune can change it | SATtypes.h:442, settingStuff.ino:998, SATcontrol.ino:488, SATcontrol.ino:4444-4485 |
-| PID terms (P, I, D) | `satPidUpdate()` fed with the smoothed room temperature and the effective target | SATcontrol.ino:4839, SATpid.ino:251-320 |
+| PID terms (P, I, D) | `satPidStep()` on the 60 s timer, fed with the smoothed room temperature and the effective target by `satPidGatherInputs()`; `satPidOutput()` on every tick | SATcontrol.ino, SATpid.ino |
 | Zones (secondary rooms) | Up to 4 zones, each with a room temperature and a setpoint pushed over MQTT. Used only when `iZoneCount` > 1 (default 1, range 1 to 4) | SATcontrol.ino:1726-1729, SATcontrol.ino:1753-1784, MQTTstuff.ino:895, SATtypes.h:531, settingStuff.ino:1112, SATcontrol.ino:4846 |
 | Heating mode | `settings.sat.iHeatingMode` (0 comfort, 1 eco). Stored and published, but not read by the control path (see "Not found") | SATtypes.h:524, settingStuff.ino:1104, SATcontrol.ino:2211-2221 |
 | Solar gain state | `state.sat.bSolarGainActive` from `satUpdateSolarGain()`, and the offset `fSolarSetpointOffset` | SATcontrol.ino:4215-4299, SATtypes.h:496 |
@@ -1119,19 +1116,19 @@ When zones are used, every active zone also calls `satCalcHeatingCurve()` with i
 - **PID update:** no timer of its own. It runs inside the control tick (SATcontrol.ino:4839) with its own rate limits (see next subsection).
 - **PWM suppression refresh:** every 3 s, between ticks, PWM only (SATcontrol.ino:480, SATcontrol.ino:894-918).
 - **PIC CS keepalive:** every 30 s on PIC boards (SATcontrol.ino:403-414, SATcontrol.ino:4608).
-- **Zones:** no timer of their own. When `iZoneCount` > 1, each zone PID runs inside the tick (SATcontrol.ino:4846, SATcontrol.ino:4853-4855).
+- **Zones:** no timer of their own. When `iZoneCount` > 1, each zone PID steps on the 60 s PID timer (`satZonePidAdvanceAll()`, called by `satPidService()`) and the tick only reads the zone outputs (`satZonePidOutput()`).
 
-#### PID update pass (inside the control tick, not on a separate 60 s timer)
+#### PID step (on its own 60 s timer, TASK-1368)
 
-The PID is called on every tick that reaches it with a valid room temperature. There is no stale-sensor reset step inside `satPidUpdate()`. A lost room temperature is handled before it: the control tick calls `satPidCurveOnly()` instead (TASK-1364), which sets the integral, the raw derivative, P, I, D and the published error to 0 and returns the heating curve value. `_pid_lastError` is set to NAN so the first update after the loss is never swallowed by the unchanged-error gate.
+The PID steps on its 60 s timer with a valid room temperature. There is no stale-sensor reset step inside `satPidStep()`. A lost room temperature is handled before it: the PID service and the control tick call `satPidCurveOnly()` instead (TASK-1364), which sets the integral, the raw derivative, P, I, D and the published error to 0 and returns the heating curve value. `_pid_lastError` is set to NAN, which `satPidOutput()` reads as "no held error": the output is the curve alone, never NaN, until the next step stores a real error.
 
 1. The error is `target - room`, rounded to 3 decimals (SATpid.ino:63-66, SATpid.ino:253).
-2. On the first call the tracking variables are initialised (SATpid.ino:264-273).
-3. If less than 10 s passed since the last update, the previous output is returned (SATpid.ino:21, SATpid.ino:276-280).
-4. If the error changed by less than 0.001 and less than 60 s passed, the previous output is returned (SATpid.ino:282-285). That previous output contains the previous curve value (SATpid.ino:309-310). So a new curve value is only picked up when the error changes, or at least 60 s after the last update.
+2. On the first step after a reset the tracking variables are initialised (`satPidStep()`).
+3. There is no time gate and no unchanged-error gate (entries 42 and 75): every call of `satPidStep()` moves the state once, and `satPidService()` calls it at start-up and then once per 60 s.
+4. The control tick does not step the PID. It reads `satPidOutput()`, which uses the current curve, so a new curve value reaches the output on the next tick while the error, integral and raw derivative stay as the last step left them.
 5. Gains are recomputed from the current curve value (SATpid.ino:288, SATpid.ino:120-142).
 6. The integral and the derivative are updated (SATpid.ino:291-294). The integral update is skipped entirely, reset included, while solar gain is active and `bSolarFreezeIntegral` is on (SATpid.ino:157) (corrected 2026-10-24, TASK-1351); TASK-1323.
-7. Output = curve + P + I + D, not rounded (SATpid.ino:297-310).
+7. Output (`satPidOutput()`) = curve + P + I + D, not rounded; D is 0 on the first output after a reset.
 
 PID internals belong to the PID section. In short: with automatic gains (default on, SATtypes.h:518), `kp = fHeatingCurveCoeff * curveValue / 4` for underfloor and `/ 3` otherwise (SATpid.ino:130-135), `ki = kp / 8400` (SATpid.ino:136), `kd = 0.07 * 8400 * kp` (SATpid.ino:137). The integral is reset to 0 whenever |error| > `fDeadband` (default 0.1, SATtypes.h:443, SATpid.ino:154-156). Inside the deadband it adds `ki * error * 60` per update (SATpid.ino:166), clamped to plus or minus the curve value and to plus or minus 20 (SATpid.ino:172-178).
 
@@ -1225,7 +1222,7 @@ The heating source (heat pump, hybrid) does not change the base offset (SATcontr
 **Requested setpoint** (no ECO/COMFORT split, SATcontrol.ino:4839-4912):
 
 ```
-pidOutput = satPidUpdate(...)                                  (4839)
+pidOutput = satPidOutput(curveValue) | satPidCurveOnly(curveValue)  (the 60 s satPidService() stepped the PID earlier)
 if iZoneCount > 1 and at least one zone output > 10:
     pidOutput = zone aggregate (below)                          (4846-4899)
 pidOutput = clamp(pidOutput, 10, satEffectiveMaxSetpoint())    (4908-4912)
@@ -1319,7 +1316,7 @@ Derived from the curve formula and the cold setpoints (computed, not stated in t
 | `SAT_FLOW_OFFSET_CONTINUOUS` | 5.0 | °C | SATcontrol.ino:58 (defined; no use found by grep) |
 | `fDeadband` default | 0.1 | °C | SATtypes.h:443 |
 | `fDeadband` accepted range | 0.05 to 2.0 | °C | settingStuff.ino:999 |
-| PID sample-time limit | 10 | s | SATpid.ino:21 |
+| PID sample-time limit | removed (TASK-1368, entry 75) | - | - |
 | PID "update interval" factor | 60 | s | SATpid.ino:22 |
 | PID integral absolute cap | 20 | °C | SATpid.ino:176 |
 | `iControlInterval` default | 30 | s | SATtypes.h:444 |
@@ -1451,7 +1448,7 @@ Neither mechanism writes the coefficient. Only auto-tune does (SATcontrol.ino:44
 9. **`SAT_FLOW_OFFSET_CONTINUOUS` = 5.0** (SATcontrol.ino:58) is defined, but a grep found no use.
 10. **Three different maxima.** The clamp uses the effective maximum (SATcontrol.ino:4908-4912); the PWM-disable check, the zone clamp, the PWM override, `sat/requested_setpoint` and `sat/max_setpoint` use the system cap (SATcontrol.ino:4909, 1859, 879, 3055, 3050). The code does not say whether that difference is intended.
 11. **Published heating curve with zones.** With `iZoneCount` > 1, `sat/heating_curve` shows the last zone's curve (SATcontrol.ino:498, 1828, 4854, 2732). The code does not say whether that is intended.
-12. **Zone integral step size.** The zone integral adds `ki * error * 60` per tick (SATcontrol.ino:1846) while the tick runs every 30 s by default (SATtypes.h:444); the main PID has a 60 s "unchanged error" rule (SATpid.ino:283), the zone PID has none. The intent is not stated.
+12. **Zone integral step size (settled by TASK-1368).** The zone integral adds `ki * error * 60` per zone step, and the zone steps run on the same 60 s PID timer as the main PID (`satZonePidAdvance()`), so the step size equals the interval. The unchanged-error rule of the main PID is gone as well (entry 42).
 13. **Daily-median sample rate.** The code comment says "~every 15 min" (SATcycles.ino:1199) but the function is called every control tick (SATcontrol.ino:4799). Derived from the defaults: at a 30 s tick a day has 2880 samples and the 1440-slot ring (boards.h:124) keeps only the last 12 h of each day.
 14. **Two recommendation sign conventions.** Mechanism 1 uses `target - room` (SATcontrol.ino:3507), mechanism 2 uses `room - target` (SATcycles.ino:1205). Both map "room too cold" to increase. Which one the user interface treats as leading is outside this section and was not checked.
 15. **Cold cutoff and modulation quirks.** The cutoff sets modulation to `iMaxRelModulation` after `satComputeMM()` applied the Geminox and Immergas quirks (SATcontrol.ino:1108, SATcontrol.ino:5196-5214), so neither quirk applies in that case. thermo-nova's heater-off branch does the same (heating_control.py:234) (corrected 2026-10-24, TASK-1351); TASK-1327. The cutoff, summer simmer and valves closed also skip `satComputeMM()`'s heat-pump/hybrid zero guard and the Geminox floor (SATcontrol.ino:385-386). With `SATmaxmodulation` = 0 (allowed, settingStuff.ino:1014) a heat pump receives MM=0, and a Geminox boiler with a maximum below 10 receives less than 10. This conflicts with entry 21 ("never 0 for heat pumps and hybrids, Geminox at least 10") and is open, to put to Sergeant D (corrected 2026-10-24, TASK-1351).
@@ -2567,7 +2564,7 @@ There are no state-change listeners. MQTT and REST commands call their handler d
 
 There is no per-area PID. Areas only feed the weighted average of step "Inputs" (SATcontrol.ino:1696-1719).
 
-The closest counterpart is the per-zone PID step `satZonePidStep()`, run for each configured zone on each control tick when `iZoneCount > 1` (SATcontrol.ino:4846-4854, SATcontrol.ino:1806-1867):
+The closest counterpart is the per-zone PID: `satZonePidAdvance()` (integral and error, on the 60 s PID timer via `satZonePidAdvanceAll()`, TASK-1368) and `satZonePidOutput()` (output, on each control tick), for each configured zone when `iZoneCount > 1` (SATcontrol.ino:4846-4854, SATcontrol.ino:1806-1867):
 
 1. If the zone is OFF, has no room temperature or no setpoint yet, has not been updated within `iZoneTimeoutS`, has a room temperature outside -10 to 50 °C or a setpoint outside 5 to 30 °C: the zone's integral and previous error are set to 0, its output to 10 °C, and 10 °C is returned (SATcontrol.ino:1790-1796, SATcontrol.ino:1814-1825). Nothing sets the OFF flag (see Not found, item 1).
 2. Otherwise compute the zone's heating curve from its own setpoint and the shared outside temperature (SATcontrol.ino:1828).
@@ -3653,7 +3650,7 @@ When `settings.sat.bSimulation` is on:
   - Lower bound everywhere is `SAT_MIN_SETPOINT` = 10 (`SATcontrol.ino:54`).
 - **Maximum setpoint versus PWM.** `pidOutput >= sysMax` (the system cap, not the effective maximum) leaves PWM for CONTINUOUS (`SATcontrol.ino:4909`, `SATcontrol.ino:4917-4920`), unless `bForcePWM` is on (`SATcontrol.ino:4923-4925`). (Removed in TASK-1332, 2026-10-23: the Force PWM option no longer exists.)
 - **Open point (TASK-1364): solar gain during a loss.** `satUpdateSolarGain()` keeps its last state while the room temperature is NaN (it returns and publishes the held rise rate). Before TASK-1364 a non-NaN out-of-range value (a sensor fault such as 85 or -127) reached its rise-rate EMA; it is now skipped like NaN through `satRoomTempValid()`, so it cannot switch solar gain on. Whether solar gain should switch off during a loss is not decided.
-- **Room temperature lost.** NaN or out of range: SAT keeps heating on the heating curve alone, P, I and D are 0, no trip and no time limit (TASK-1364, entries 38 and 46). The room low-pass filter, the MQTT-takeover thermal block (and its 2 h safe 45 °C setpoint), auto-tune, the curve recommendation, the daily median sample and a new PV boost are skipped while it lasts. When a valid reading returns, `satPidUpdate()` runs again on that tick. The integral restarts from 0. The first D after recovery is computed over the whole gap, from the last pre-loss temperature to the new one, as thermo-nova does (`pid.py:134-137` keeps `_last_temperature`, `pid.py:209-232`), so D need not start at 0. The status field `room_temp_lost` (REST `sat/status`, MQTT `sat/room_temp_lost`) is true while the loss lasts. The sources mark themselves stale as listed in Inputs; the stale time per source (entry 27) is still open.
+- **Room temperature lost.** NaN or out of range: SAT keeps heating on the heating curve alone, P, I and D are 0, no trip and no time limit (TASK-1364, entries 38 and 46). The room low-pass filter, the MQTT-takeover thermal block (and its 2 h safe 45 °C setpoint), auto-tune, the curve recommendation, the daily median sample and a new PV boost are skipped while it lasts. When a valid reading returns, the output stays the curve alone (P, I and D 0) until the next 60 s PID step stores a real error, up to 60 s later. The integral restarts from 0. The first D after recovery is computed over the whole gap, from the last pre-loss temperature to the new one, as thermo-nova does (`pid.py:134-137` keeps `_last_temperature`, `pid.py:209-232`), so D need not start at 0. The status field `room_temp_lost` (REST `sat/status`, MQTT `sat/room_temp_lost`) is true while the loss lasts. The sources mark themselves stale as listed in Inputs; the stale time per source (entry 27) is still open.
 - **OpenTherm lost (TASK-1365, entries 39 and 47).** "No valid OpenTherm" is no boiler reply (B frame) for 30 s. Any B frame counts: a Data-Invalid reply (OT-Direct bridges it as `B`, `OTDirect.ino:1510-1512`; the PIC prints it as a B line), an OT-Direct loopback answer and a replayed line, the same frames that set `bBoilerState`. processOT() stamps `state.otBus.iBoilerLastSeenMs` with `millis()` (never 0, one store) for every B frame (`OTGW-Core.ino:5244-5245`, `OTBustypes.h:44`); `time()` is not used because it jumps at NTP sync. Silence is counted from the later of the last B frame and the last pass on which SAT was disabled, a flash ran (`_sat_otLinkBaseMs`, `SATcontrol.ino:4904`), SAT was tripped (`SATcontrol.ino:4915`) or the check was exempt, and from SAT's first pass after boot (seeded in `satOtLinkStep()`), so a boiler that never answers counts as lost 30 s after SAT's first pass. On entering the loss, the loop task calls `satDisable()` once: `CS=0` through `satEnqueueOwnCS()`, `CH=1`, `MM=T`, mode OFF, PWM and PID reset, command cache reset. It then sets `state.sat.bOtLinkLost` and keeps the boiler stamp of that moment. SAT stays enabled and no setting is written. While the flag is set every pass returns before any sender: no `CS`, `MM`, `CH`, `TC`, `SW=` or `TP=`, no PIC keepalive and no PWM refresh. The first B frame after the hand-back (a stamp different from the kept one, so a `millis()` wrap after about 49.7 days of loss cannot fake a reply) clears the flag and resets the command cache (`satResetCmdCache()`), so the next control tick sends `CS`, `MM`, `CH` (and `TC=` with push setpoint on) again; the PID starts from 0 because `satDisable()` reset it. Exempt: SAT simulation (`satSimulationBlocksBusTx()` keeps every SAT command off the bus; a simulation started during a loss clears the flag) and PS=1 summary mode on a PIC (the PIC prints no B lines; the flag is held, so only a boiler reply resumes, and leaving PS=1 starts a fresh 30 s window). OT-Direct in PS=1 still bridges every B frame (`OTDirect.ino` `bridgeFrameToParser()`), so the check runs there. So on a PIC in PS=1 a loss is not detected. Without a command interface (no PIC, not OT-Direct; `SATcontrol.ino:2475`) the check is skipped as well, so the 5-tick interface safety trip (`SAT_MAX_PIC_FAILS`) still latches as before TASK-1365; a loss set earlier is held. During the loss SAT stays enabled, so `satOwnsControlSetpoint()` stays true: external `CS=` is still refused (ADR-179, TASK-1236) and the OT-Direct heating curve stays disarmed (to be named against entries 26 and 47 in Q34). `satDisable()` as the hand-back also persists the zeroed PID, resets PWM and the daily curve recommendation and writes the energy totals, on every loss of 30 s or more. A user switch-off during the loss (`settingStuff.ino:989`) and the MQTT-takeover lift (`satMqttFallbackStep()`) call `satDisable()`, which sees the flag (`SATcontrol.ino:2388`, `:2406-2410`) and skips `CS=0`, `CH=1` and `MM=T`, so the hand-back goes out once per loss; it still saves the PID and energy files and clears the flag. The loop's disabled branch also clears it. Status: `ot_link_lost` (REST `sat/status`, MQTT `sat/ot_link_lost`, v2 SAT page hint "OpenTherm lost: boiler handed back"). Entry 39 is an exception to entry 29: thermo-nova has no stop on a lost link. Our design, not yet confirmed by Sergeant D (entry 47, Open): the 30 s definition, Data-Invalid as a reply, and the automatic resume, queued as Q33 and Q34 in `open-questions.md`.
 - **Safety trip.** Sets `bSafetyTripped`, narrates "SAFETY TRIPPED", and calls `satDisable()` (`SATcontrol.ino:4678-4680`, `SATcontrol.ino:5000-5002`). `satDisable()` (`SATcontrol.ino:2160-2187`):
   - mode OFF, PWM reset, `bActive` false, final setpoint 0;

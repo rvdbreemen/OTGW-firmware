@@ -124,38 +124,57 @@ int main(int argc, char** argv) {
         finally:
             hp.MAIN = old_main
 
-        # Compile the COMPLETE SATpid.ino, including its own update guards.
-        pid_prelude = r'''
+        # Compile the COMPLETE SATpid.ino, including the 60 s PID timer behind satPidService() and the real safeTimers.h.
+        # TASK-1368: the PID steps on its own 60 s timer; the control tick only reads the output. A loop pass is
+        # simulated every second; the tick runs every `interval` seconds. changing=1 is a smoothly moving error, so a
+        # step taken at another moment integrates another error. Old-vs-fix: run it with --repo pointing at a git copy of
+        # HEAD (the runner clears OTGW_SAT* environment overrides on purpose). HEAD (satPidUpdate on the tick) fails here:
+        # changing=1 integrates 1.6794 at a 10 s tick against 0.2988 at 60 s. tests/test_sat_pid_cadence.py counts the steps.
+        pid_prelude = r"""
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <cstdarg>
 #define F(x) x
 #define PSTR(x) x
 #define SATDebugTf(...) ((void)0)
 #define DebugTln(...) ((void)0)
 enum { SAT_HSYS_RADIATORS=1, SAT_HSYS_UNDERFLOOR=2 };
+typedef uint8_t byte;
+static uint32_t g_ms=1000000;
+static uint32_t millis(){return g_ms;}
+static long random(long a,long){return a;}
+#include "@TIMERS@"
 struct Settings { struct { bool bAutoGains=false,bSolarFreezeIntegral=false;
  float fKpManual=0,fKiManual=.01f,fKdManual=0,fHeatingCurveCoeff=2,fDeadband=.1f; } sat; } settings;
 struct State { struct { bool bSolarGainActive=false;
  float fPidP=0,fPidI=0,fPidD=0,fPidOutput=0,fKp=0,fKi=0,fKd=0,fRawDerivative=0,fError=0; } sat; } state;
-static uint32_t g_ms=1000000;
-static uint32_t millis(){return g_ms;}
 static int satGetEffectiveHeatingSystem(){return SAT_HSYS_RADIATORS;}
-'''
-        pid_main = r'''
+static bool g_changing=false;
+static float roomAtElapsed(int elapsed){ const float error=g_changing ? (float)(.05+.04*sin(elapsed/97.0)) : .05f; return 21-error; }
+bool satPidGatherInputs(float* room,float* target,float* curve,float* dbx){
+  *room=roomAtElapsed((int)((g_ms-1000000UL)/1000UL)); *target=21; *curve=40; *dbx=0; return true; }
+void satZonePidAdvanceAll(){}
+""".replace("@TIMERS@", (repo / "src/OTGW-firmware/safeTimers.h").as_posix())
+        pid_main = r"""
 int main(int argc,char** argv) {
- const int interval=atoi(argv[1]); const bool changing=atoi(argv[2])!=0;
- satPidReset(); satPidUpdate(20.95f,21,40,45);
- for(int elapsed=interval;elapsed<=600;elapsed+=interval) {
+ const int interval=atoi(argv[1]); g_changing=atoi(argv[2])!=0;
+ satPidReset();
+ for(int elapsed=0;elapsed<=600;elapsed++) {
    g_ms=1000000UL+elapsed*1000UL;
-   const float error=.05f+(changing && ((elapsed/30)%2) ? .01f : 0.0f);
-   satPidUpdate(21-error,21,40,45);
+#ifdef HAVE_SERVICE
+   satPidService(g_ms);
+   if(elapsed%interval==0) { satPidNoteRoom(roomAtElapsed(elapsed),g_ms); satPidOutput(40); }
+#else
+   if(elapsed%interval==0) satPidUpdate(roomAtElapsed(elapsed),21,40,45);
+#endif
  }
- printf("interval_s=%d changing=%d integral=%.6f\n",interval,(int)changing,state.sat.fPidI);
+ printf("interval_s=%d changing=%d integral=%.6f\n",interval,(int)g_changing,state.sat.fPidI);
 }
-'''
-        pid_source = pid_prelude + (repo / "src/OTGW-firmware/SATpid.ino").read_text(encoding="utf-8") + pid_main
+"""
+        pid_text = Path(os.environ.get("OTGW_SATPID_INO", repo / "src/OTGW-firmware/SATpid.ino")).read_text(encoding="utf-8")   # HEAD copy for old-vs-fix
+        pid_source = pid_prelude + pid_text + ("#define HAVE_SERVICE 1\n" if "void satPidService(" in pid_text else "") + pid_main
         rows = compile_run(base.compile_cpp, work / "pid", pid_source, ("60", "0"))
         pid_exe = work / "pid/probe.exe"
         for changing in (0, 1):
@@ -168,8 +187,9 @@ int main(int argc,char** argv) {
         okay = all(abs(row["integral"] - references[row["changing"]]) <= .0001 for row in rows)
         results.append({"id": "LL-003", "status": "pass" if okay else "fail", "observed": rows,
             "expected": "Same 600 s physical error trace: integral independent of control tick (60 s reference)",
-            "scope": "Whole SATpid.ino under the current shared-tick call contract; scheduler integration remains LL-020",
-            "authority": "Sergeant D entry 42 / TASK-1368; adapter must be reviewed when PID scheduling is separated"})
+            "scope": "Whole SATpid.ino with its 60 s timer (satPidService, real safeTimers.h), stubbed clock/sensors; "
+                     "the order against the tick's early returns is tests/test_sat_pid_cadence.py (structural); the full jitter sweep remains LL-020",
+            "authority": "Sergeant D entries 42, 28, 111 / TASK-1368"})
 
         # Reuse the actual sustain-state/function extraction; assert wall time
         # since the FIRST qualifying sample, rather than preserving old timing.

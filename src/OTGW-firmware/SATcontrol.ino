@@ -1614,7 +1614,7 @@ static float satApplyContinuous(float pidOutput)
 //=== Get Room Temperature (OT bus or external) ===
 //=====================================================================
 // A room temperature the control loop can use: a number inside -10..50 C.
-// Plain types on purpose: the 60 s PID timer (entry 42) can call it later.
+// Plain types on purpose: the 60 s PID service (entry 42) calls it as well as the control tick.
 static bool satRoomTempValid(float roomTemp)
 {
   return !isnan(roomTemp) && roomTemp >= -10.0f && roomTemp <= 50.0f;
@@ -2227,48 +2227,39 @@ static inline float satZonePidExclude(SATZoneState& z)
   return SAT_MIN_SETPOINT;
 }
 
-// Run a simplified PID step for a single zone and return requested CH setpoint.
-// Uses zone-local integral + prev_error state. Reuses heating curve from zone setpoint
-// and shared gain calculation for consistent behavior.
-// Returns SAT_MIN_SETPOINT (10°C) if the zone is OFF (HVACMode.OFF), inactive, or
-// its inputs are invalid. Returning SAT_MIN_SETPOINT makes the caller's
-// `zOut > SAT_MIN_SETPOINT` gate (satControlLoop) drop the zone from the P75
-// aggregation, so excluded zones contribute neither output nor overshoot (TASK-593,
-// ports SAT Python PR #172 which returns None for OFF zones in area.py).
-static float satZonePidStep(uint8_t idx, float outsideTemp)
+// A zone whose inputs can drive its PID: not OFF, room and setpoint received, not stale, both in range.
+static bool satZoneUsable(const SATZoneState& z, uint32_t now)
+{
+  uint32_t timeoutMs = (uint32_t)settings.sat.iZoneTimeoutS * 1000UL;
+  if (z.bOff) return false;                               // TASK-593: HVACMode.OFF (area.py returns None)
+  if (!z.bRoomValid || !z.bSpValid) return false;
+  if ((now - z.iLastUpdateMs) > timeoutMs) return false;
+  if (z.fRoomTemp < -10.0f || z.fRoomTemp > 50.0f) return false;
+  if (z.fSetpoint < 5.0f || z.fSetpoint > 30.0f) return false;
+  return true;
+}
+
+// Kp of a zone: the shared auto-gain formula (zone uses same Kp/Ki as primary).
+// Constants mirror SATpid.ino: KP_DIVISOR_FLOOR=4, KP_DIVISOR_RAD=3. Underfloor takes the floor
+// divisor, radiators and AUTO the radiator one, as in _pidCalculateGains() and pid.py kp() (TASK-1197).
+static float satZoneKp(float curveValue)
+{
+  float divisor = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? 4.0f : 3.0f;
+  return (settings.sat.fHeatingCurveCoeff * curveValue) / divisor;
+}
+
+// Zone PID step, run on the 60 s PID timer (TASK-1368, entries 42 and 111; thermo-nova area.py:183-190,
+// :202-208 steps every area PID on its own 60 s timer, plus one call at start-up). Moves the zone's held
+// state once: integral and error. An unusable zone is excluded and its PID memory reset (TASK-593).
+// Integral only inside the deadband, clamped to the curve (TASK-588) and, firmware-only, to +-20.
+static void satZonePidAdvance(uint8_t idx, float outsideTemp)
 {
   SATZoneState& z = satZones[idx];
-  uint32_t timeoutMs = (uint32_t)settings.sat.iZoneTimeoutS * 1000UL;
-  uint32_t now = millis();
+  if (!satZoneUsable(z, millis())) { satZonePidExclude(z); return; }
 
-  // TASK-593: zone thermostat in HVACMode.OFF -- exclude entirely and reset PID
-  // memory, mirroring SAT Python PR #172 (area.py returns None when HVACMode.OFF).
-  if (z.bOff) return satZonePidExclude(z);
-
-  // Mark zone inactive if stale
-  if (!z.bRoomValid || !z.bSpValid) return satZonePidExclude(z);
-  if ((now - z.iLastUpdateMs) > timeoutMs) return satZonePidExclude(z);
-
-  float roomTemp = z.fRoomTemp;
-  float target   = z.fSetpoint;
-
-  // Validate inputs
-  if (roomTemp < -10.0f || roomTemp > 50.0f) return satZonePidExclude(z);
-  if (target < 5.0f || target > 30.0f) return satZonePidExclude(z);
-
-  // Heating curve for this zone's target
-  float curveValue = satCalcHeatingCurve(target, outsideTemp);
-
-  // Gains from shared auto-gain formula (zone uses same Kp/Ki as primary).
-  // Constants mirror SATpid.ino: KP_DIVISOR_FLOOR=4, KP_DIVISOR_RAD=3, AGGRESSION=8400.
-  // Underfloor takes the floor divisor, radiators and AUTO the radiator one, as in
-  // _pidCalculateGains() and pid.py kp() (TASK-1197).
-  float coeff   = settings.sat.fHeatingCurveCoeff;
-  float divisor = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? 4.0f : 3.0f;
-  float kp      = (coeff * curveValue) / divisor;
-  float ki      = kp / 8400.0f;   // SAT_PID_AGGRESSION_V3
-
-  float error = satPidError(target, roomTemp);   // rounded like pid.py, so 0.1 stays inside the deadband (TASK-1195)
+  float curveValue = satCalcHeatingCurve(z.fSetpoint, outsideTemp);
+  float ki       = satZoneKp(curveValue) / 8400.0f;   // SAT_PID_AGGRESSION_V3
+  float error    = satPidError(z.fSetpoint, z.fRoomTemp);   // rounded like pid.py, so 0.1 stays inside the deadband (TASK-1195)
   float deadband = settings.sat.fDeadband;
 
   // Integral: only inside deadband (matches SAT Python convention).
@@ -2283,18 +2274,37 @@ static float satZonePidStep(uint8_t idx, float outsideTemp)
   } else {
     z.fPidIntegral = 0.0f;
   }
+  z.fPrevError = error;   // the held error: satZonePidOutput() reads it until the next step (pid.py:100)
+}
 
-  float P = kp * error;
-  float I = z.fPidIntegral;
+// All zone steps; the PID service calls it on the 60 s timer, in the same pass as the main PID step.
+void satZonePidAdvanceAll()
+{
+  if (settings.sat.iZoneCount <= 1) return;
+  uint8_t zoneCount = settings.sat.iZoneCount;
+  if (zoneCount > SAT_MAX_ZONES) zoneCount = SAT_MAX_ZONES;
+  float outsideTemp = satOutsideTempOrDefault(satGetOutsideTemp());
+  for (uint8_t z = 0; z < zoneCount; z++) satZonePidAdvance(z, outsideTemp);
+}
 
-  float output = curveValue + P + I;
+// Zone PID output, computed on every control tick from the CURRENT zone curve (pid.py:126-132):
+// curve + kp(curve) * held error + held integral, clamped. Returns SAT_MIN_SETPOINT (10°C) if the zone is
+// OFF (HVACMode.OFF), inactive, or its inputs are invalid. Returning SAT_MIN_SETPOINT makes the caller's
+// `zOut > SAT_MIN_SETPOINT` gate (satControlLoop) drop the zone from the P75
+// aggregation, so excluded zones contribute neither output nor overshoot (TASK-593, ports SAT Python PR #172
+// which returns None for OFF zones in area.py). Zones have no D term here, unlike thermo-nova areas (outside TASK-1368).
+static float satZonePidOutput(uint8_t idx, float outsideTemp)
+{
+  SATZoneState& z = satZones[idx];
+  if (!satZoneUsable(z, millis())) return satZonePidExclude(z);
+
+  float curveValue = satCalcHeatingCurve(z.fSetpoint, outsideTemp);
+  float output = curveValue + satZoneKp(curveValue) * z.fPrevError + z.fPidIntegral;
   float sysMax = satGetMaxSetpoint();
   if (output < SAT_MIN_SETPOINT) output = SAT_MIN_SETPOINT;
   if (output > sysMax)           output = sysMax;
 
   z.fPidOutput = output;
-  z.fPrevError = error;
-
   return output;
 }
 
@@ -2313,7 +2323,7 @@ static void satPublishZoneDiagnostics()
     feedWatchDog();
     SATZoneState& z = satZones[i];
     // TASK-593: an OFF zone (HVACMode.OFF) reports inactive, matching its exclusion
-    // from PID + P75 aggregation in satZonePidStep().
+    // from PID + P75 aggregation in satZonePidOutput().
     bool active = !z.bOff && z.bRoomValid && z.bSpValid && ((now - z.iLastUpdateMs) <= timeoutMs);
 
     // sat/zone/<n>/active
@@ -2431,8 +2441,10 @@ void satSavePidState()
   if (!f) return;
   char buf[192];
   time_t ts = time(nullptr);
+  float i, d, rd, err;
+  satPidGetPersistState(&i, &d, &rd, &err);   // the held controller state, not the published copies (round 3)
   snprintf_P(buf, sizeof(buf), PSTR("{\"i\":%.4f,\"d\":%.4f,\"rd\":%.4f,\"err\":%.2f,\"ts\":%lu}"),
-             state.sat.fPidI, state.sat.fPidD, state.sat.fRawDerivative, state.sat.fError, (unsigned long)ts);
+             i, d, rd, err, (unsigned long)ts);
   f.print(buf);
   f.close();
   _pidLastSaveMs = millis();
@@ -2471,7 +2483,7 @@ void satLoadPidState()
   state.sat.fPidD  = d;
   state.sat.fError = err;
   // satPidRestoreState() sets _pid_integral and _pid_rawDerivative directly
-  // so the next satPidUpdate() warm-starts instead of cold-starting at zero.
+  // so the next satPidStep() warm-starts instead of cold-starting at zero.
   satPidRestoreState(i, rd);
   SATDebugTf(PSTR("SAT: PID state restored (I=%.4f D=%.4f rd=%.4f err=%.2f age=%lus)\r\n"),
           i, d, rd, err, (unsigned long)(nowTs - (time_t)savedTs));
@@ -2561,7 +2573,7 @@ static void satLoadEstimatedEnergy()
 void satPersistAllToFs()
 {
   if (!LittleFSmounted) return;
-  satSavePidState();
+  if (satPidRoomSeen()) satSavePidState();   // entry 115: a restored state with no room reading yet stays on flash
   satSaveEnergyState();
   satSaveEstimatedEnergy();
   satHCRSaveState();
@@ -5088,6 +5100,82 @@ bool satMqttFallbackStep()
 }
 
 //=====================================================================
+//=== PID inputs shared by the 60 s PID step and the control tick (TASK-1368) ===
+//=====================================================================
+// TASK-894 (George): EMA low-pass on the RAW room sensor before it drives control.
+// Tames sensor jitter (e.g. BLE +-0.05 C) at the SOURCE so the controller sees a
+// smooth signal and the PID D-term stops swinging on a stable temperature. The PID
+// core is left untouched (George: "leave the pid untouched, add a filter to the raw
+// sensor"); this keeps it byte-identical to pid.py, which is fed an already-smoothed
+// HA sensor entity. Time-based EMA (tau ~45 s) so it is robust to variable control
+// cadence and self-heals after a source gap (large dt -> alpha ~1 -> snaps to raw).
+// The PID step and the control tick both call it: the filter advances by the time since its last
+// call, so a second call in the same pass changes nothing and the value is never filtered twice.
+// sat/room_temp MQTT still publishes the raw satGetRoomTemp() reading.
+static float satRoomFiltered(float rawRoomTemp)
+{
+  static const float SAT_ROOM_FILTER_TAU_S = 45.0f;   // room temp is slow; ~45 s constant
+  static float    _roomFiltered     = 0.0f;
+  static uint32_t _roomFilterLastMs = 0;
+  static bool     _roomFilterSeeded = false;
+  uint32_t nowF = millis();
+  if (!_roomFilterSeeded) {
+    _roomFiltered = rawRoomTemp;          // seed from first valid reading (no ramp-from-zero)
+    _roomFilterLastMs = nowF;
+    _roomFilterSeeded = true;
+  } else {
+    float dtF = (float)(nowF - _roomFilterLastMs) / 1000.0f;
+    _roomFilterLastMs = nowF;
+    if (dtF > 0.0f) {
+      float alphaF = dtF / (SAT_ROOM_FILTER_TAU_S + dtF);
+      _roomFiltered += alphaF * (rawRoomTemp - _roomFiltered);
+    }
+  }
+  return _roomFiltered;                   // the controller uses the smoothed value
+}
+
+// Target the PID regulates to: setpoint + comfort offset + PV boost (both are set by the control tick).
+static float satEffectiveTarget()
+{
+  float effectiveTarget = settings.sat.fTargetTemp + state.sat.fComfortOffset;
+  if (state.sat.bPvBoostActive)
+    effectiveTarget += state.sat.fPvBoostAppliedC;
+  return effectiveTarget;
+}
+
+static float satOutsideTempOrDefault(float outsideTemp)
+{
+  if (outsideTemp < -40.0f || outsideTemp > 50.0f) return 10.0f;  // Safe fallback
+  return outsideTemp;
+}
+
+// Task #21 AC#4: widen the deadband proportionally to the time without real room data (uncertainty
+// grows): 0.5 C per hour of estimation on top of the normal deadband.
+static float satEstDeadbandExtra(uint32_t estElapsedMs)
+{
+  return 0.5f * ((float)estElapsedMs / 3600000.0f);
+}
+
+// Inputs of one PID step: filtered room temperature, effective target, heating curve and the thermal
+// deadband widening that applies while the room temperature is estimated. Returns false when there is no
+// valid room temperature (entries 38, 46); the curve is filled in then too. Called by satPidService().
+bool satPidGatherInputs(float* room, float* target, float* curve, float* deadbandExtra)
+{
+  float rawRoom = satGetRoomTemp();
+  const bool valid = satRoomTempValid(rawRoom);
+  *room = valid ? satRoomFiltered(rawRoom) : rawRoom;
+  *target = satEffectiveTarget();
+  *curve = satCalcHeatingCurve(*target, satOutsideTempOrDefault(satGetOutsideTemp()));
+  *deadbandExtra = 0.0f;
+  if (valid && state.sat.bFallbackActive && state.sat.iLastKnownRoomMs > 0) {
+    const uint32_t estElapsed = millis() - state.sat.iLastKnownRoomMs;
+    if (estElapsed < SAT_THERMAL_MAX_EST_MS)   // the tick returns at the limit, before it widens
+      *deadbandExtra = satEstDeadbandExtra(estElapsed);
+  }
+  return valid;
+}
+
+//=====================================================================
 //=== Main Control Loop (called from doBackgroundTasks) ===
 //=====================================================================
 // TASK-1284: every return path of the pass (enabled, disabled, tripped, fallback lift) ends in
@@ -5191,6 +5279,13 @@ static void satControlLoopRun()
   // Refresh the PWM suppression CS between control ticks (TASK-1268)
   satPwmSuppressionRefresh();
 
+  // The PID steps on its own 60 s timer plus a start-up step (TASK-1368, entries 42, 111; thermo-nova
+  // climate.py:712-716), whatever the control tick does: it sits before every return of the tick (hot
+  // water, boiler fault, thermal-safe fallback, summer simmer, valves closed). It is reached only while SAT
+  // is enabled (an MQTT takeover counts: satIsEnabled() is true then), not tripped, not flashing, with a live
+  // OpenTherm link: the returns above end SAT's control (satDisable() resets the PID), so the PID has nothing to regulate.
+  satPidService(millis());
+
   // Main control loop on timer
   if (!DUE(timerSATControl)) return;
   // One time for the whole tick, read once here: the sustained switches and the DHW guard all use it. The timer
@@ -5269,33 +5364,12 @@ static void satControlLoopRun()
     satNarrate_P(PSTR("Room temperature back: regulation resumes"));
   }
 
-  // TASK-894 (George): EMA low-pass on the RAW room sensor before it drives control.
-  // Tames sensor jitter (e.g. BLE +-0.05 C) at the SOURCE so the controller sees a
-  // smooth signal and the PID D-term stops swinging on a stable temperature. The PID
-  // core is left untouched (George: "leave the pid untouched, add a filter to the raw
-  // sensor"); this keeps it byte-identical to pid.py, which is fed an already-smoothed
-  // HA sensor entity. Time-based EMA (tau ~45 s) so it is robust to variable control
-  // cadence and self-heals after a source gap (large dt -> alpha ~1 -> snaps to raw).
-  // sat/room_temp MQTT still publishes the raw satGetRoomTemp() reading.
+  // TASK-894 (George): the room sensor goes through the time-based EMA before it drives control (satRoomFiltered()).
+  // The PID step calls it too, so both see the same smoothed value. The tick also stamps the new temperature
+  // for the PID derivative timer at tick resolution (satPidNoteRoom(), TASK-1195).
   if (roomValid) {
-    static const float SAT_ROOM_FILTER_TAU_S = 45.0f;   // room temp is slow; ~45 s constant
-    static float    _roomFiltered     = 0.0f;
-    static uint32_t _roomFilterLastMs = 0;
-    static bool     _roomFilterSeeded = false;
-    uint32_t nowF = millis();
-    if (!_roomFilterSeeded) {
-      _roomFiltered = roomTemp;          // seed from first valid reading (no ramp-from-zero)
-      _roomFilterLastMs = nowF;
-      _roomFilterSeeded = true;
-    } else {
-      float dtF = (float)(nowF - _roomFilterLastMs) / 1000.0f;
-      _roomFilterLastMs = nowF;
-      if (dtF > 0.0f) {
-        float alphaF = dtF / (SAT_ROOM_FILTER_TAU_S + dtF);
-        _roomFiltered += alphaF * (roomTemp - _roomFiltered);
-        roomTemp = _roomFiltered;        // controller uses the smoothed value
-      }
-    }
+    roomTemp = satRoomFiltered(roomTemp);
+    satPidNoteRoom(roomTemp, _sat_tickMs);
   }
 
   // Task #38: OT error flag monitoring -- check for critical boiler faults
@@ -5305,9 +5379,7 @@ static void satControlLoopRun()
     return; // Skip this control cycle, let boiler handle the fault
   }
 
-  if (outsideTemp < -40.0f || outsideTemp > 50.0f) {
-    outsideTemp = 10.0f;  // Safe fallback
-  }
+  outsideTemp = satOutsideTempOrDefault(outsideTemp);
 
   // --- Task #21: Thermal estimation fallback ---
   // AC#5: After 2+ hours of estimation without real data, switch to fixed safe setpoint
@@ -5333,10 +5405,8 @@ static void satControlLoopRun()
       satPublishMQTT();
       return;
     }
-    // AC#4: Widen deadband proportionally to estimation time (uncertainty grows)
-    // Add 0.5C per hour of estimation on top of normal deadband
-    float estHours = (float)estElapsed / 3600000.0f;
-    settings.sat.fDeadband += 0.5f * estHours;
+    // AC#4: Widen deadband proportionally to estimation time (uncertainty grows), as the PID step does
+    settings.sat.fDeadband += satEstDeadbandExtra(estElapsed);
     thermalDeadbandWidened = true;
   }
 
@@ -5375,7 +5445,7 @@ static void satControlLoopRun()
       satEnqueueIfChangedMM(settings.sat.iMaxRelModulation);
       satEnqueueIfChangedCH(0);
     }
-    // Don't update PID integral or record error statistics
+    // No PID output or error statistics this tick; the PID service keeps stepping the held state (entry 111)
     satPublishMQTT();
     return;
   }
@@ -5418,17 +5488,17 @@ static void satControlLoopRun()
   // additive on effectiveTarget only.
   satUpdatePvBoost();
 
-  float effectiveTarget = targetTemp + state.sat.fComfortOffset;
-  if (state.sat.bPvBoostActive)
-    effectiveTarget += state.sat.fPvBoostAppliedC;
+  float effectiveTarget = satEffectiveTarget();
 
   // --- Calculate heating curve ---
   float curveValue = satCalcHeatingCurve(effectiveTarget, outsideTemp);
   state.sat.fHeatingCurveValue = curveValue;   // published curve = the main curve, also with zones on (TASK-1353)
 
   // --- Calculate PID output (includes heating curve value) ---
+  // The tick only reads the PID: the output is the CURRENT curve + kp(curve) * held error + I + kd(curve) * held raw
+  // derivative (thermo-nova pid.output, pid.py:126-132), while the 60 s satPidService() moves the held state (TASK-1368).
   // Without a room temperature there is no error: P, I and D are 0, the setpoint is the curve (entries 38, 46).
-  float pidOutput = roomValid ? satPidUpdate(roomTemp, effectiveTarget, curveValue, satGetFlowTemp())
+  float pidOutput = roomValid ? satPidOutput(curveValue)
                               : satPidCurveOnly(curveValue);
 
   // --- Multi-zone PID override (Task #233) ---
@@ -5444,7 +5514,7 @@ static void satControlLoopRun()
     if (zoneCount > SAT_MAX_ZONES) zoneCount = SAT_MAX_ZONES;
 
     for (uint8_t z = 0; z < zoneCount; z++) {
-      float zOut = satZonePidStep(z, outsideTemp);
+      float zOut = satZonePidOutput(z, outsideTemp);
       if (zOut > SAT_MIN_SETPOINT) {
         zoneOutputs[activeZones++] = zOut;
         // Track overshoot: room above setpoint means this zone is over-heated
@@ -5627,7 +5697,9 @@ static void satControlLoopRun()
   state.sat.iLastControlMs = millis();
 
   // Periodically save PID state to LittleFS (every 5 min)
-  if ((millis() - _pidLastSaveMs) >= 300000UL) {
+  // Entry 115: not while no room temperature has been seen since boot or reset, so a restored state stays on
+  // flash. The explicit resets (satDisable, flush) still persist their zeros.
+  if ((millis() - _pidLastSaveMs) >= 300000UL && satPidRoomSeen()) {
     satSavePidState();
   }
   SATDebugTf(PSTR("SAT: room=%.1f target=%.1f outside=%.1f curve=%.1f pid=%.1f final=%.1f mode=%d\r\n"),

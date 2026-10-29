@@ -57,7 +57,7 @@ Central control loop, heating curve calculation, setpoint management, SAT-owned 
 - `satHandleWindow(bool isOpen): void` and `_satCheckWindowTimer()`
   - Window open/close events for anti-heating response
 
-- Area and zone inputs: `satSetAreaTemp(area, temp)` (sensor polling path, TASK-587), `satHandleAreaTemp(area, value)` (MQTT/REST push), `satGetWeightedRoomTemp()` (static, weighted average of up to `SAT_MAX_AREAS` = 4 areas, each stale after `SAT_AREA_STALE_MS` of 5 min), `satHandleZoneRoomTemp`, `satHandleZoneSetpoint`, `satZonePidStep()` (static, per-zone PID), `satPublishZoneDiagnostics()`
+- Area and zone inputs: `satSetAreaTemp(area, temp)` (sensor polling path, TASK-587), `satHandleAreaTemp(area, value)` (MQTT/REST push), `satGetWeightedRoomTemp()` (static, weighted average of up to `SAT_MAX_AREAS` = 4 areas, each stale after `SAT_AREA_STALE_MS` of 5 min), `satHandleZoneRoomTemp`, `satHandleZoneSetpoint`, `satZonePidAdvance()` / `satZonePidAdvanceAll()` (per-zone PID integral step on the 60 s PID timer) and `satZonePidOutput()` (static, per-zone output on every control tick), `satPublishZoneDiagnostics()`
   - Multi-zone (Task #233): with `iZoneCount > 1` each active zone runs its own PID; the aggregate is the P75 of zone outputs plus `fZoneAggregationHeadroom`, reduced by the largest zone overshoot
 
 - `satUpdatePvBoost(): void` (static, TASK-640, ADR-110)
@@ -141,7 +141,7 @@ PID controller with automatic gain calculation, deadband mode, temperature-based
 
 - `satPidError(float target, float room): float`
   - target - room rounded to 3 decimals, like pid.py's `TemperatureState.error`, so an error of exactly 0.1 is inside the 0.1 deadband (TASK-1195)
-  - Used by `satPidUpdate()` and by the zone PID (`satZonePidStep()` in SATcontrol.ino)
+  - Used by `satPidStep()` and by the zone PID (`satZonePidAdvance()` in SATcontrol.ino)
 
 - `satPidReset(): void`
   - Full PID state reset. Leaves the room-temperature change stamp alone, as pid.py's `reset()` keeps its timers
@@ -163,13 +163,20 @@ PID controller with automatic gain calculation, deadband mode, temperature-based
 - `_pidUpdateDerivative(float roomTemp, float error): void` (static)
   - Temperature-based derivative with adaptive low-pass filter, alpha = dt/(60+dt), +-5 cap
   - Freezes inside deadband, updates outside
-  - Timed by when the room temperature changed (`_pid_roomTempChangedMs`, stamped in `satPidUpdate()`), not by when the PID ran: pid.py times it by the sensor's `last_changed` (TASK-1195)
+  - Timed by when the room temperature changed (`_pid_roomTempChangedMs`, stamped by `satPidNoteRoom()`, called by the control tick and by `satPidStep()`), not by when the PID ran: pid.py times it by the sensor's `last_changed` (TASK-1195)
   - The reference temperature (`_pid_derivRefTemp`) moves only together with the timer, so a step that the TASK-894 room EMA spreads over several control ticks counts in full; pid.py overwrites its `last_temperature` on every update and comes out low on such input
   - Proof: `python test/host/test_sat_pid_derivative.py --old-rev <rev>`
 
-- `satPidUpdate(float roomTemp, float targetTemp, float heatingCurveValue, float boilerTemp): float`
-  - Stamps the moment a new room temperature appears, before any early return
-  - Returns heatingCurveValue + P + I + D
+- `satPidService(uint32_t nowMs): void` (TASK-1368, entries 42, 28, 111)
+  - Called every loop pass of `satControlLoopRun()` while SAT is enabled, not tripped, not flashing and with a live OpenTherm link, before the control tick's early returns
+  - Takes one start-up step after `satPidReset()`, then one step per expiry of `timerSATPid` (`DECLARE_TIMER_SEC(timerSATPid, 60, SKIP_MISSED_TICKS)`, thermo-nova `climate.py:712-716`); a loop stall gives one step
+  - Gets its inputs from `satPidGatherInputs()` (SATcontrol.ino: filtered room temperature, effective target, heating curve, thermal deadband widening); no room temperature: `satPidCurveOnly()`; then `satZonePidAdvanceAll()`
+- `satPidStep(float roomTemp, float targetTemp, float heatingCurveValue, uint32_t nowMs): void`
+  - Moves the held state once (gains, integral, derivative, error); no time gate and no unchanged-error gate (`pid.py:159-171`)
+- `satPidOutput(float heatingCurveValue): float`
+  - Called on every control tick: curve + kp(curve) * held error + I + kd(curve) * held raw derivative (`pid.py:60-132`); NAN held error gives the curve alone
+- `satPidNoteRoom(float roomTemp, uint32_t nowMs): void`
+  - Stamps the moment a new room temperature shows up, before the derivative timer reads it
 
 ### Module: SATpressure.ino
 

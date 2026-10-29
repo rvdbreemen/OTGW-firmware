@@ -2,8 +2,9 @@
 """TASK-1364: host test for "room temperature lost or missing -> heating on the curve only" (entries 38, 46).
 
 Nothing is re-implemented. The test cuts the real code and compiles it with a host C++ compiler:
-  - SATpid.ino from "// --- PID Constants ---" to the end: satPidUpdate(), its integral/derivative/gain helpers
-    and (fix) satPidCurveOnly();
+  - SATpid.ino from "// --- PID Constants ---" up to "//=== PID service": satPidStep() and satPidOutput() (HEAD:
+    satPidUpdate()), their integral/derivative/gain helpers and satPidCurveOnly(). TASK-1368: the harness stands
+    in for the PID service by calling satPidStep() once per valid tick;
   - from SATcontrol.ino the room-validity block of the control tick and the `float pidOutput = ...;` statement.
     Fix: from "const bool roomValid" up to the room EMA comment, plus satRoomTempValid().
     HEAD: from "if (isnan(roomTemp) || roomTemp < -10.0f" through "_sat_consecutiveSkips = 0;" (skip counter and trip).
@@ -57,6 +58,9 @@ static float satGetFlowTemp() { return 40.0f; }
 static const uint8_t SAT_MAX_SKIP_COUNT = 10;          // HEAD only: the real constant is not part of the cut
 static uint8_t _sat_consecutiveSkips = 0;               // HEAD only
 static bool _sat_roomLostActive = false;                // fix only
+typedef uint8_t byte; static long random(long a, long) { return a; }   // safeTimers.h needs them (timerSATPid in SATpid.ino)
+#include <cstdarg>
+#include "@TIMERS@"
 @PID@
 @HELPER@
 static void tick(float roomTemp, bool* ran, float* out) {
@@ -64,6 +68,7 @@ static void tick(float roomTemp, bool* ran, float* out) {
   *ran = false; *out = -1.0f;
   @ROOMBLOCK@
   *ran = true;
+  @STEPLINE@
   @PIDLINE@
   *out = pidOutput;
 }
@@ -82,7 +87,9 @@ int main(int argc, char** argv) {
 
 
 def build_cpp(sat_src: str, pid_src: str) -> str:
-    pid = pid_src[pid_src.index("// --- PID Constants ---"):]
+    pid_end = pid_src.find("//=== PID service")
+    pid = pid_src[pid_src.index("// --- PID Constants ---"):pid_end if pid_end >= 0 else len(pid_src)]
+    step = "if (roomValid) satPidStep(roomTemp, effectiveTarget, curveValue, g_ms);" if pid_end >= 0 else ""
     if "const bool roomValid" in sat_src:
         a = sat_src.index("  const bool roomValid")
         b = sat_src.index("  // TASK-894 (George)")
@@ -97,7 +104,8 @@ def build_cpp(sat_src: str, pid_src: str) -> str:
         helper = ""
     c = sat_src.index("float pidOutput =")
     pidline = sat_src[c:sat_src.index(";", c) + 1]
-    return (STUBS.replace("@PID@", pid).replace("@HELPER@", helper)
+    timers = (REPO / "src" / "OTGW-firmware" / "safeTimers.h").as_posix()
+    return (STUBS.replace("@TIMERS@", timers).replace("@STEPLINE@", step).replace("@PID@", pid).replace("@HELPER@", helper)
             .replace("@ROOMBLOCK@", roomblock).replace("@PIDLINE@", pidline))
 
 
@@ -182,7 +190,8 @@ class SourceGuards(unittest.TestCase):
         self.assertIn("SAT_MAX_PIC_FAILS", self.src)
 
     def test_blocks_skipped_during_the_loss(self):
-        self.assertIn("if (roomValid) {\n    static const float SAT_ROOM_FILTER_TAU_S", self.src, "room EMA")
+        self.assertIn("if (roomValid) {\n    roomTemp = satRoomFiltered(roomTemp);", self.src, "room EMA")
+        self.assertIn("satPidOutput(curveValue)", self.src)
         self.assertIn("if (roomValid && state.sat.bFallbackActive && state.sat.iLastKnownRoomMs > 0)", self.src, "MQTT takeover thermal block")
         self.assertIn("if (roomValid) {\n    satAutoTuneUpdate();", self.src, "auto-tune and statistics")
         self.assertIn("&& !roomLost) {", self.src, "PV boost start")

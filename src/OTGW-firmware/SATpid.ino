@@ -18,8 +18,7 @@
 
 // --- PID Constants ---
 static const float SAT_PID_DEADBAND_DEFAULT     = 0.1f;   // Matches Python DEADBAND=0.1 (const.py)
-static const float SAT_PID_SAMPLE_TIME_LIMIT    = 10.0f;   // seconds
-static const float SAT_PID_UPDATE_INTERVAL      = 60.0f;   // seconds
+static const float SAT_PID_UPDATE_INTERVAL      = 60.0f;   // seconds (pid.py:20, PID_UPDATE_INTERVAL)
 // Derivative alpha is now adaptive: alpha = dt / (PID_UPDATE_INTERVAL + dt)
 static const float SAT_PID_DERIVATIVE_CAP       = 5.0f;    // Max raw derivative magnitude
 static const float SAT_PID_AGGRESSION_V3        = 8400.0f;
@@ -35,9 +34,23 @@ static float  _pid_integral           = 0.0f;
 static float  _pid_rawDerivative      = 0.0f;
 static float  _pid_lastRoomTemp       = 0.0f;
 static float  _pid_lastCurveValue     = 0.0f;
-static uint32_t _pid_lastUpdateMs     = 0;
 static uint32_t _pid_lastDerivativeMs = 0;
 static bool   _pid_initialized        = false;
+
+// The PID moves on its own 60 s timer, not on the control tick (Sergeant D entry 42; thermo-nova
+// climate.py:712-716, PID_UPDATE_INTERVAL = pid.py:20), plus one start-up step (climate.py:137, :143).
+// The type is explicit: nothing re-sets this timer, and an untyped CHANGE_INTERVAL_SEC would turn it into
+// SKIP_MISSED_TICKS (entry 109). SKIP_MISSED_TICKS: a loop stall gives one step, never a catch-up burst.
+DECLARE_TIMER_SEC(timerSATPid, 60, SKIP_MISSED_TICKS);
+// Set by satPidReset(): the next satPidService() call takes the start-up step and restarts the timer.
+static bool   _pid_startupPending     = true;
+// Set at boot and by satPidReset(): the first satPidOutput() leaves the D term out (entry 95 Q39b: D = 0 on the
+// first tick after boot or SAT enable), also when satPidRestoreState() pre-loaded a raw derivative.
+static bool   _pid_firstOutputPending = true;
+// False at boot and after satPidReset(), true from the first valid room temperature on (entry 115). While it is
+// false a missing room temperature keeps the restored integral and raw derivative (satPidCurveOnly()).
+static bool   _pid_roomSeen           = false;
+bool satPidRoomSeen() { return _pid_roomSeen; }
 
 // When the PID first saw the current room temperature (TASK-1195). It stands in
 // for HA's last_changed, by which pid.py times the derivative (climate.py:314).
@@ -59,7 +72,7 @@ static float    _pid_derivRefTemp      = 0.0f;
 // target - room, rounded to 3 decimals the way pid.py rounds TemperatureState.error
 // (temperature/state.py). Unrounded, 21.0f - 20.9f is 0.1000004 and an error of 0.1
 // falls just outside the 0.1 deadband, where pid.py keeps it inside (TASK-1195).
-// The zone PID (satZonePidStep) uses it too.
+// The zone PID (satZonePidAdvance) uses it too.
 float satPidError(float target, float room)
 {
   return roundf((target - room) * 1000.0f) / 1000.0f;
@@ -68,21 +81,35 @@ float satPidError(float target, float room)
 //=== Restore PID internal state from persistence (Task #589) ===
 // Called from satLoadPidState() after staleness validation.
 // Sets _pid_integral and _pid_rawDerivative directly so the very next
-// satPidUpdate() call warm-starts instead of cold-starting from zero.
-// _pid_initialized stays false so the first call still initialises
+// satPidStep() call warm-starts instead of cold-starting from zero.
+// satPidReset() leaves _pid_initialized false, so the first step after it still initialises
 // timestamps and lastRoomTemp from live data — we only pre-load the
 // accumulated values that take many minutes to rebuild.
 void satPidRestoreState(float integral, float rawDerivative)
 {
   _pid_integral      = integral;
   _pid_rawDerivative = rawDerivative;
+  _pid_firstOutputPending = true;   // a restore landing after the first output still gives D = 0 on the next one (entry 95 Q39b)
+  // A restore that lands late overwrites the live integral and raw derivative; it does not wait for a reset.
   state.sat.fPidI    = integral;
   state.sat.fRawDerivative = rawDerivative;
   SATDebugTf(PSTR("SAT: PID internal state pre-loaded (I=%.4f rawD=%.4f)\r\n"),
              integral, rawDerivative);
 }
 
-//=== Integral-only Reset (debug tool) ===
+//=== Controller state for persistence (round 3) ===
+// The held state itself, not the published copies: satPidOutput() publishes I = 0 and D = 0 while no error is held,
+// which must never reach the file. lastError is 0 while none is held (NAN). D is kd * raw derivative, the term a
+// restored state resumes from.
+void satPidGetPersistState(float* integral, float* d, float* rawDerivative, float* lastError)
+{
+  *integral      = _pid_integral;
+  *rawDerivative = _pid_rawDerivative;
+  *d             = state.sat.fKd * _pid_rawDerivative;
+  *lastError     = isnan(_pid_lastError) ? 0.0f : _pid_lastError;
+}
+
+//=== Integral-only Reset (debug tool) ====
 void satResetIntegral()
 {
   _pid_integral = 0.0f;
@@ -99,9 +126,11 @@ void satPidReset()
   _pid_rawDerivative      = 0.0f;
   _pid_lastRoomTemp       = 0.0f;
   _pid_lastCurveValue     = 0.0f;
-  _pid_lastUpdateMs       = millis();
   _pid_lastDerivativeMs   = millis();
   _pid_initialized        = false;
+  _pid_startupPending     = true;     // the next satPidService() call takes the start-up step (TASK-1368)
+  _pid_firstOutputPending = true;     // the first output after the reset has D = 0
+  _pid_roomSeen           = false;
 
   state.sat.fPidP = 0.0f;
   state.sat.fPidI = 0.0f;
@@ -116,19 +145,24 @@ void satPidReset()
 //=== PID without a room temperature (TASK-1364, entries 38 and 46) ===
 // Lost or missing room temperature: no error, so P, I and D are 0 and the output is the
 // heating curve. Integral and raw derivative are reset (thermo-nova pid.reset(),
-// pid.py:134-137), not frozen. _pid_initialized stays set, so the first update after the
-// loss is a normal one (satPidReset() would hand back 0 there). _pid_lastError = NAN keeps the
-// unchanged-error gate in satPidUpdate() from returning this curve-only output after recovery.
+// pid.py:134-137), not frozen. _pid_initialized stays set, so the first step after the
+// loss is a normal one. _pid_lastError = NAN marks "no held error": satPidOutput() then
+// returns the curve alone (never NaN) until the next step stores a real error.
+// Exception (entry 115): while no valid room temperature has been seen since the boot or the last satPidReset(),
+// the integral and raw derivative restored from flash are kept (and shown), and only P and D are 0: the output is
+// the curve, and satSavePidState() does not write (satPidRoomSeen()) so the restored state is not overwritten.
 // state.sat.fError reads 0 meanwhile: no NaN reaches the publishers, the persisted state or the statistics.
 float satPidCurveOnly(float heatingCurveValue)
 {
-  _pid_integral      = 0.0f;
-  _pid_rawDerivative = 0.0f;
   _pid_lastError     = NAN;
+  if (_pid_roomSeen) {                  // a reading was lost: reset (entries 38, 46)
+    _pid_integral      = 0.0f;
+    _pid_rawDerivative = 0.0f;
+    state.sat.fPidI = 0.0f;
+    state.sat.fRawDerivative = 0.0f;
+  }
   state.sat.fPidP = 0.0f;
-  state.sat.fPidI = 0.0f;
   state.sat.fPidD = 0.0f;
-  state.sat.fRawDerivative = 0.0f;
   state.sat.fError = 0.0f;
   state.sat.fPidOutput = heatingCurveValue;
   return heatingCurveValue;
@@ -270,42 +304,41 @@ static void _pidUpdateDerivative(float roomTemp, float error)
   _pid_derivRefTemp     = roomTemp;
 }
 
-//=== Main PID Update ===
-// Returns the PID output = heatingCurveValue + P + I + D
-float satPidUpdate(float roomTemp, float targetTemp, float heatingCurveValue, float boilerTemp)
+//=== Room temperature stamp ===
+// Stamps the moment a new room temperature shows up. The control tick calls it every tick and the
+// PID step calls it too, so the derivative timer keeps the resolution it had when the PID ran on the
+// tick (TASK-1195); calls that see the same temperature leave the stamp alone.
+void satPidNoteRoom(float roomTemp, uint32_t nowMs)
 {
-  float error = satPidError(targetTemp, roomTemp);
-  uint32_t now = millis();
-
-  // Stamp the moment a new room temperature shows up, before any early return.
-  // Calls that see the same temperature leave the stamp alone (TASK-1195).
   if (!(fabsf(roomTemp - _pid_roomTempSeen) < 0.001f)) {   // true on the first call: Seen starts as NAN
     _pid_roomTempSeen      = roomTemp;
-    _pid_roomTempChangedMs = now;
+    _pid_roomTempChangedMs = nowMs;
   }
+}
 
-  // Initialize on first call
+//=== One PID step (TASK-1368, entry 42) ===
+// Moves the held state once: gains, integral, derivative, error. Run by satPidService() every 60 s
+// and once at start-up, as thermo-nova pid.update() (pid.py:159-171): no time gate and no
+// unchanged-error gate (entry 75 removes the 10 s gate, entry 42 the unchanged-error skip).
+// Only the error, the integral, the raw derivative and the last temperature are held between steps;
+// satPidOutput() builds the output from them.
+void satPidStep(float roomTemp, float targetTemp, float heatingCurveValue, uint32_t nowMs)
+{
+  float error = satPidError(targetTemp, roomTemp);
+  satPidNoteRoom(roomTemp, nowMs);
+  // Marked here, not in satPidNoteRoom(): a reading the tick sees first must still trigger the immediate
+  // first-reading step in satPidService() (entry 115).
+  _pid_roomSeen = true;
+
+  // Initialize on first step
   if (!_pid_initialized) {
     _pid_lastError        = error;
     _pid_previousError    = error;
     _pid_lastRoomTemp     = roomTemp;
     _pid_lastCurveValue   = heatingCurveValue;
-    _pid_lastUpdateMs     = now;
     _pid_lastDerivativeMs = _pid_roomTempChangedMs;   // when the current temperature appeared
     _pid_derivRefTemp     = roomTemp;
     _pid_initialized      = true;
-  }
-
-  // Check sample time limit — don't update too frequently
-  float elapsed = (float)(now - _pid_lastUpdateMs) / 1000.0f;
-  if (elapsed < SAT_PID_SAMPLE_TIME_LIMIT) {
-    // Return previous output
-    return state.sat.fPidOutput;
-  }
-
-  // Skip if error hasn't changed meaningfully
-  if (fabsf(error - _pid_lastError) < 0.001f && elapsed < SAT_PID_UPDATE_INTERVAL) {
-    return state.sat.fPidOutput;
   }
 
   // Calculate gains based on current heating curve
@@ -317,29 +350,81 @@ float satPidUpdate(float roomTemp, float targetTemp, float heatingCurveValue, fl
   // Update derivative (temperature-based); pass the current error for the deadband freeze
   _pidUpdateDerivative(roomTemp, error);
 
-  // Calculate P, I, D terms
-  float P = state.sat.fKp * error;
-  float I = _pid_integral;
-  float D = state.sat.fKd * _pid_rawDerivative;
-
-  // Store state
-  state.sat.fPidP = P;
-  state.sat.fPidI = I;
-  state.sat.fPidD = D;
   state.sat.fError = error;
+  state.sat.fPidI = _pid_integral;
   state.sat.fRawDerivative = _pid_rawDerivative;
-
-  // PID output = heatingCurveValue + P + I + D (thermo-nova style)
-  float output = heatingCurveValue + P + I + D;
-  state.sat.fPidOutput = output;
 
   // Update tracking variables
   _pid_previousError  = _pid_lastError;
   _pid_lastError      = error;
   _pid_lastRoomTemp   = roomTemp;
   _pid_lastCurveValue = heatingCurveValue;
-  _pid_lastUpdateMs   = now;
+}
 
+//=== PID output (TASK-1368, entry 28) ===
+// Computed on every read from the CURRENT curve, as thermo-nova pid.output (pid.py:126-132, read every
+// loop at climate.py:375): curve + kp(curve) * held error + I + kd(curve) * held raw derivative.
+// kp and kd follow the live curve (pid.py:60-93), so a changed target or outside temperature reaches the
+// output on the next control tick, while error, integral and raw derivative stay as the last step left them.
+// A held error of NAN (satPidCurveOnly(): no room temperature) gives the curve alone.
+float satPidOutput(float heatingCurveValue)
+{
+  _pidCalculateGains(heatingCurveValue);
+  float P = 0.0f;
+  float I = 0.0f;
+  float D = 0.0f;
+  if (!isnan(_pid_lastError)) {
+    P = state.sat.fKp * _pid_lastError;
+    I = _pid_integral;
+    if (!_pid_firstOutputPending) D = state.sat.fKd * _pid_rawDerivative;   // entry 95 Q39b: D = 0 on the first output with PID terms
+    _pid_firstOutputPending = false;   // only an output that includes the PID terms counts; a curve-only output leaves it set
+  }
+  state.sat.fPidP = P;
+  state.sat.fPidI = I;
+  state.sat.fPidD = D;
+  state.sat.fRawDerivative = _pid_rawDerivative;
+
+  // PID output = heatingCurveValue + P + I + D (thermo-nova style)
+  float output = heatingCurveValue + P + I + D;
+  state.sat.fPidOutput = output;
   return output;
 }
 
+//=== PID service: the 60 s timer (TASK-1368, entry 42, entry 111) ===
+// Called every loop pass of satControlLoopRun() while SAT is enabled and not tripped, flashing or
+// waiting on a lost OpenTherm link. It sits before the control tick's early returns (hot water, boiler
+// fault, thermal-safe fallback, summer simmer, valves closed): thermo-nova steps its PID on its own timer
+// whatever the heating control does (climate.py:712-716), and Sergeant D chose the same (entry 111).
+// It stops only when SAT stops; an OpenTherm loss turns SAT off (satDisable() -> satPidReset()), so the
+// next pass after the link returns takes a start-up step again.
+// Steps: one start-up step after satPidReset(), then one per timerSATPid expiry. No room temperature
+// (entries 38, 46): no integration, curve only with P, I and D reset. The zone PIDs ride the same timer.
+// While the room temperature is estimated (MQTT takeover) the thermal-estimation deadband widening applies to the
+// main step and to the zone steps alike, as it did when both ran inside the control tick; satPidGatherInputs()
+// returns 0 once the estimate is older than SAT_THERMAL_MAX_EST_MS, where the tick used to return before widening.
+void satPidService(uint32_t nowMs)
+{
+  const bool startup = _pid_startupPending;
+  const bool due = startup || DUE(timerSATPid);
+  if (!due && _pid_roomSeen) return;
+  if (startup) {
+    _pid_startupPending = false;
+    RESTART_TIMER(timerSATPid);
+  }
+
+  float room = 0.0f, target = 0.0f, curve = 0.0f, deadbandExtra = 0.0f;
+  const bool roomValid = satPidGatherInputs(&room, &target, &curve, &deadbandExtra);
+  if (!due) {
+    // Entry 115: no valid room temperature seen since the boot or reset, so the restored state is held. The first
+    // valid reading takes a step at once, as the start-up step would, and restarts the timer; until then the pass
+    // between two timer expiries does nothing.
+    if (!roomValid) return;
+    RESTART_TIMER(timerSATPid);
+  }
+  const float savedDeadband = settings.sat.fDeadband;
+  settings.sat.fDeadband += deadbandExtra;   // 0 without a valid room temperature
+  if (roomValid) satPidStep(room, target, curve, nowMs);
+  else           satPidCurveOnly(curve);
+  satZonePidAdvanceAll();
+  settings.sat.fDeadband = savedDeadband;
+}

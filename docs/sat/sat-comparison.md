@@ -301,7 +301,7 @@ What matches: the core PID itself. The error, the heating curve formula, the aut
 
 1. Whether the firmware's start-up "boiler off for one or two ticks" (row 28) was intended. The code does not say. The comment at SATpid.ino:70-71 says the restore is meant to "warm-start", but `fPidOutput` is not restored (SATpid.ino:75-83).
 2. Whether the late NTP restore (SATcontrol.ino:4515-4519) can overwrite a live integral in practice. That depends on what `time(nullptr)` returns before NTP sync, which was not checked.
-3. `satPidUpdate` receives `boilerTemp` but does not use it (SATpid.ino:251-320). This has no effect on heating.
+3. `satPidUpdate` received `boilerTemp` but did not use it; the parameter is gone with `satPidUpdate` (TASK-1368). The PID now steps on its own 60 s timer as thermo-nova (`climate.py:712-716`) and the tick reads `satPidOutput()`.
 4. Thermo-nova side: whether a wizard choice of manual gains reaches the PID cannot be confirmed from the code (thermo-nova input, unclear item 12). Row 8 therefore compares only the code paths.
 5. Thermo-nova side: the `reset_integral` service is registered twice (climate.py:222, services.py:41-46). Both registrations clear the integral and the raw derivative, so row 36 holds either way.
 6. Thermo-nova side: area PIDs can be reset repeatedly on climate events outside the HOME preset (climate.py:785-795). The firmware zone code has no equivalent, and the code does not show whether the thermo-nova behaviour is intended, so it is not scored as a row.

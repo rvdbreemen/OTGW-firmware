@@ -7,19 +7,24 @@
 
 test_sat_pid_derivative.cpp is compiled against code cut out of one revision, never
 copied by hand: SATpid.ino (the whole file, with its function anchors checked),
-satGetEffectiveHeatingSystem() and the zone PID step (SAT_MIN_SETPOINT, satZones[],
-satZonePidExclude(), satZonePidStep()) from SATcontrol.ino, and SATtypes.h, so every
+satGetEffectiveHeatingSystem(), the zone PID (SAT_MIN_SETPOINT, satZones[], satZonePidExclude(),
+satZoneUsable(), satZoneKp(), satZonePidAdvance(), satZonePidAdvanceAll(), satZonePidOutput())
+and satRoomFiltered() from SATcontrol.ino, safeTimers.h and SATtypes.h, so every
 default in settings.sat and state.sat is the firmware's own. Each side gets its own directory
 under test/host/generated/, and src/ is not on the include path, so one revision's
 header can never leak into the other side's build.
 
-The driver runs a stepped heat-up on the control-tick grid (0.1 C every 300 s, the
-step phase swept 0..29 s, loop latency off and on) next to a transcription of pid.py
+The PID moves in satPidService(): one start-up step, then one step per 60 s timer expiry
+(TASK-1368, Sergeant D entry 42); the control tick only stamps a new room temperature.
+The driver runs a loop pass every second and the control tick every iControlInterval seconds
+over a stepped heat-up (0.1 C every 300 s, the step phase swept 0..29 s, loop latency off and
+on) next to a transcription of pid.py
 (a reference oracle, not code under test), and prints one "CHECK <id> PASS|FAIL" line
 per check.
 
 FIX side (working tree or --rev): every check must pass.
-OLD side (--old-rev): the pid.py rules the fix keeps (C1, C2, C2b, C3, C5a, C6, C7) and
+OLD side (--old-rev; it must be a revision that already has satPidService(): the slices and
+the driver use the service API, and an older revision stops on the anchor check): the pid.py rules the fix keeps (C1, C2, C2b, C3, C5a, C6, C7) and
 the harness self-check H1 must pass; the defect checks must fail: the derivative timer
 (A2_reach, A2_dt, A2_oracle), the derivative on the device path through the TASK-894
 room EMA and on a fast sensor (E1, R1), and the deadband boundary at an error of 0.1
@@ -38,16 +43,16 @@ import subprocess
 import sys
 
 from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars, slice_by_anchor
-from test_pic_banner_dispatch import slice_range
 
 FW = "src/OTGW-firmware/"
 PID_INO, CONTROL_INO, TYPES_H = FW + "SATpid.ino", FW + "SATcontrol.ino", FW + "SATtypes.h"
-PID_ANCHORS = [r"^static void _pidUpdateDerivative\(", r"^float satPidUpdate\(", r"^void satPidReset\("]
+PID_ANCHORS = [r"^static void _pidUpdateDerivative\(", r"^void satPidStep\(", r"^void satPidService\(", r"^void satPidReset\("]
 HSYS_ANCHOR = r"^static uint8_t satGetEffectiveHeatingSystem\("
-ZONE_ANCHORS = [r"^static const float SAT_MIN_SETPOINT\b", r"^static SATZoneState satZones\[",
-                r"^static inline float satZonePidExclude\(", r"^static float satZonePidStep\("]
-# The EMA block in satControlLoop(): from its comment through the bare block that follows.
-EMA_START, EMA_BLOCK = r"^\s*// TASK-894 \(George\): EMA low-pass on the RAW room sensor", r"^\s*\{\s*$"
+ZONE_ANCHORS = [r"^static const float SAT_MIN_SETPOINT\b", r"^static const uint8_t SAT_MAX_ZONES\b", r"^static SATZoneState satZones\[",
+                r"^static inline float satZonePidExclude\(", r"^static float satOutsideTempOrDefault\(",
+                r"^static bool satZoneUsable\(", r"^static float satZoneKp\(", r"^static void satZonePidAdvance\(",
+                r"^void satZonePidAdvanceAll\(", r"^static float satZonePidOutput\("]
+EMA_ANCHOR = r"^static float satRoomFiltered\("   # the TASK-894 room EMA, shared by the PID step and the tick
 
 KEEP = ["C1", "C2", "C2b", "C3", "C5a", "C6", "C7", "H1"]   # pid.py rules + self-check: pass on both sides
 # The TASK-1195 defects: fail on OLD, pass on FIX.
@@ -102,7 +107,8 @@ def prepare(side, rev, mutations=(), target="pid"):
         once(ctl_lines, a)
     hsys = slice_by_anchor(ctl_lines, HSYS_ANCHOR)
     zone = "\n\n".join(slice_by_anchor(ctl_lines, a) for a in ZONE_ANCHORS)
-    ema = slice_range(ctl_lines, EMA_START, EMA_BLOCK)
+    once(ctl_lines, EMA_ANCHOR)
+    ema = slice_by_anchor(ctl_lines, EMA_ANCHOR)
 
     d = GEN / f"sat_pid_{side}"
     d.mkdir(parents=True, exist_ok=True)
@@ -112,6 +118,7 @@ def prepare(side, rev, mutations=(), target="pid"):
     (d / "sat_zone_slice.inc").write_text(head.format(CONTROL_INO) + zone + "\n", encoding="utf-8")
     (d / "sat_ema_slice.inc").write_text(head.format(CONTROL_INO) + ema + "\n", encoding="utf-8")
     (d / "SATtypes.h").write_text(read(rev, TYPES_H), encoding="utf-8")
+    (d / "safeTimers.h").write_text(read(rev, FW + "safeTimers.h"), encoding="utf-8")
     return d
 
 
