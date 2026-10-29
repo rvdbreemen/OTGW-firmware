@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-21 09:32
-updated_date: '2026-10-28T20:50:00Z'
+updated_date: '2026-10-29T05:11:00Z'
 labels:
   - sat
   - humidity
@@ -25,10 +25,10 @@ Report gruijter 2026-10-21 (#alpha-testing). Comfort / thermal-comfort fall back
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Sergeant D's OK on the plan recorded
-- [ ] #2 Indoor humidity comes only from MQTT/REST/BLE; no weather fallback (host test red on the old code)
-- [ ] #3 Comfort adjust no longer depends on summer simmer and uses humidity_timeout_s (host test)
-- [ ] #4 The UI shows the active humidity source
+- [x] #1 Sergeant D's decision recorded (entry 114, Q32 C) before implementation
+- [ ] #2 Comfort adjust is removed: satUpdateComfort and every call site, the bComfortAdjust setting and its REST, MQTT (incl. HA discovery), web UI and debug exposure; a stored SATcomfortadjust value in settings is ignored without error (host/source test red on HEAD, green on fix)
+- [ ] #3 Thermal comfort (Summer Simmer Index in the PID, climate.py:276-277) is unchanged (existing tests green)
+- [ ] #4 Docs updated: firmware-sat-spec, sat-comparison, MQTT/REST API docs, c4-code-sat; build and evaluate --quick green
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -48,4 +48,6 @@ Plan: 1) indoor sources only: MQTT/REST push (existing), and BLE humidity from t
 2026-10-25 gruijter re-reported all four points (#alpha-testing 1563792462328111185); verified at HEAD by a workflow with a refuting second reader (wf_16ada525): weather fallback SATcontrol.ino:5052-5059, gate on bSummerSimmer :3460, hardcoded 1800000UL :3465-3467 (also clears bHumidityValid, which turns Thermal comfort off; iHumidityTimeoutS used at :1469), BLE humidity never copied into fHumidity. Gate fix conflicts with Sergeant D entry 32 (humidity only when Summer Simmer index / Thermal comfort is on): queued as Q32. Answered gruijter 1563816427851354243.
 
 2026-10-28 Q32 answered C (entry 114): remove the firmware-only comfort adjust (satUpdateComfort, bComfortAdjust, its REST/MQTT/UI/docs); humidity only via Thermal comfort (SSI as PID input), as thermo-nova climate.py:276-277. Scope rewritten from 'fix the gate' to removal. Touches SATcontrol.ino: after TASK-1368.
+
+2026-10-29 scope narrowed to entry 114 (Q32 C): remove comfort adjust. The weather-humidity fallback (SATcontrol.ino ~5486) and BLE humidity as indoor source affect Thermal comfort's SSI input and are NOT decided by entry 114: moved to a follow-up task with a question for Sergeant D.
 <!-- SECTION:NOTES:END -->

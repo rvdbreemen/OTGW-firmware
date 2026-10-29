@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-26T06:05:00Z'
+updated_date: '2026-10-28T21:09:00Z'
 labels:
   - pic
   - bug
@@ -25,3 +26,9 @@ Bench 2026-10-26 (Classic + S3 Mini .63, alpha.508, after a same-version gateway
 - [ ] #1 A non-printable or non-ASCII PR=Q reply is stored as unknown (or escaped), and /api/v2/pic/settings stays valid UTF-8 JSON (host test with a 0xFF answer, red on HEAD)
 - [ ] #2 The v2 PR= table shows a readable value for that case
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28: 1.x sibling TASK-1430 (GH #688, field report on 1.7.8-beta.5) stores a non-printable PR= answer as "0x" + uppercase hex of every byte (0xFF -> "0xFF"), printable answers unchanged, via header-only copyPicSettingValue() (picSettingValue.h). Port the same representation so both lines publish the same value.
+<!-- SECTION:NOTES:END -->

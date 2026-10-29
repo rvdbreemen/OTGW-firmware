@@ -4600,3 +4600,20 @@ Option A as posted: "Port thermo-nova's zone logic as it is."
 **Changes an earlier entry:** entry 35 (port upstream PR #172 for multiple areas) left open whether PR #172 is in the pinned commit; this entry makes the pinned `area.py` the target regardless. Consistent with entry 35.
 
 **Task:** TASK-1440. **Open:** the zone PID itself (no D term, output and integral clamps, `SATcontrol.ino:2270-2305`) differs from `pid.py` too; that is covered by the PID tasks (TASK-1414..1418, TASK-1423) where they apply to zone PIDs, and is not decided by this entry.
+
+## 117. Q57 A: Thermal comfort humidity comes from indoor sources only (MQTT/REST or the BLE room sensor), no weather fallback (2026-10-29)
+
+**Source:** #alpha-testing, 2026-10-29 05:14 UTC, answer to Q57 (msg 1565232005094973572):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565232358192455792
+
+**Quoted:**
+
+> Q57: A
+
+Option A as posted: "Indoor only, as thermo-nova: humidity pushed over MQTT/REST, or the BLE room sensor's humidity; no weather fallback. Without indoor humidity Thermal comfort uses the room temperature."
+
+**Settled (our reading of a one-letter reply, against the posted option text):** as thermo-nova, which takes humidity only from the configured humidity sensor and has none without one (`climate.py:282-287`). The firmware's outdoor-weather fallback (`SATcontrol.ino:5484-5488`) is removed. The BLE room sensor's humidity (`SATble.ino:892`, `state.sat.fBleHumidity`) becomes an indoor source. With no valid indoor humidity, Thermal comfort uses the room temperature, as with no humidity in thermo-nova.
+
+**Changes an earlier entry:** none; consistent with entry 114 (humidity only through Thermal comfort) and entry 32.
+
+**Task:** TASK-1441. **Open:** the priority between a pushed MQTT/REST value and the BLE sensor when both are present is not settled by this answer; our reading for the implementation: the most recent valid reading wins (to be confirmed if it matters).
