@@ -4442,24 +4442,12 @@ components:
         summer_min_hours:
           type: integer
           description: "Minimum hours above threshold to enter summer mode"
-        comfort_adjust:
-          type: boolean
-          description: "Humidity comfort adjustment active"
         humidity:
           type: integer
           description: "Relative humidity (%)"
         humidity_valid:
           type: boolean
           description: "Humidity reading valid"
-        comfort_offset:
-          type: number
-          description: "Applied comfort setpoint offset (C)"
-        comfort_ref_humidity:
-          type: integer
-          description: "Reference humidity for comfort adjustment (%)"
-        comfort_max_offset:
-          type: number
-          description: "Maximum comfort offset (C)"
         simulation:
           type: boolean
           description: "Simulation mode active"
@@ -4642,12 +4630,8 @@ components:
         summer_hours_above: 0.0
         summer_threshold: 18.0
         summer_min_hours: 6
-        comfort_adjust: false
         humidity: 0
         humidity_valid: false
-        comfort_offset: 0.0
-        comfort_ref_humidity: 50
-        comfort_max_offset: 1.0
         simulation: false
         sim_available: true
         auto_tune: false

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.524
+**  Version  : v2.0.0-alpha.525
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -693,9 +693,6 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "summer_min_hours",       "SATsummerminhours",    nullptr },
   { "thermal_comfort",        "SATthermalcomfort",    nullptr },
   { "humidity_timeout_s",     "SAThumiditytimeout",   nullptr },
-  { "comfort_adjust",         "SATcomfortadjust",     nullptr },
-  { "comfort_humidity",       "SATcomforthumidity",   nullptr },
-  { "comfort_max_offset",     "SATcomfortmaxoffset",  nullptr },
   { "simulation",             "SATsimulation",        nullptr },
   { "ble_enable",             "SATbleenable",         nullptr },
   { "ble_failover",           "SATblefailover",       nullptr },

@@ -415,7 +415,6 @@ Controls autonomous heating/cooling via OpenTherm. Includes:
 - **Simulation**: enable, heat/cool rates, thermal coefficient
 - **Solar gain**: enable, min rise rate, setpoint offset, min elevation angle
 - **Summer simmer**: enable, outdoor threshold, min hours to trigger
-- **Comfort adjustment**: humidity-based setpoint correction
 - **Multi-area**: weighted multi-room temperature (1-4 areas)
 - **Window detection**: via MQTT, min open time
 - **Flow/pressure**: min/max pressure, pressure drop alarm, flow offset, DHW setpoint

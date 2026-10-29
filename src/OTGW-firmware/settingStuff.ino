@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.524
+**  Version  : v2.0.0-alpha.525
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -370,9 +370,6 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("SATsummersimmer"), settings.sat.bSummerSimmer);
   writeJsonFloatKV(file, F("SATsummerthreshold"), settings.sat.fSummerThreshold);
   writeJsonIntKV(file, F("SATsummerminhours"), settings.sat.iSummerMinHours);
-  writeJsonBoolKV(file, F("SATcomfortadjust"), settings.sat.bComfortAdjust);
-  writeJsonFloatKV(file, F("SATcomforthumidity"), settings.sat.fComfortHumidity);
-  writeJsonFloatKV(file, F("SATcomfortmaxoffset"), settings.sat.fComfortMaxOffset);
   writeJsonBoolKV(file, F("SATmultiarea"), settings.sat.bMultiArea);
   writeJsonIntKV(file, F("SATmultiareacount"), settings.sat.iMultiAreaCount);
   writeJsonFloatKV(file, F("SATareaweight0"), settings.sat.fAreaWeight[0]);
@@ -1088,9 +1085,6 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATsummersimmer")) == 0) settings.sat.bSummerSimmer = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATsummerthreshold")) == 0) settings.sat.fSummerThreshold = clampSettingFloat(newValue, settings.sat.fSummerThreshold, 5.0f, 35.0f);
   else if (strcasecmp_P(field, PSTR("SATsummerminhours")) == 0) settings.sat.iSummerMinHours = constrain(atoi(newValue), 1, 48);
-  else if (strcasecmp_P(field, PSTR("SATcomfortadjust")) == 0) settings.sat.bComfortAdjust = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("SATcomforthumidity")) == 0) settings.sat.fComfortHumidity = clampSettingFloat(newValue, settings.sat.fComfortHumidity, 10.0f, 90.0f);
-  else if (strcasecmp_P(field, PSTR("SATcomfortmaxoffset")) == 0) settings.sat.fComfortMaxOffset = clampSettingFloat(newValue, settings.sat.fComfortMaxOffset, 0.0f, 3.0f);
   else if (strcasecmp_P(field, PSTR("SATmultiarea")) == 0) settings.sat.bMultiArea = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATmultiareacount")) == 0) settings.sat.iMultiAreaCount = constrain(atoi(newValue), 0, 4);
   else if (strcasecmp_P(field, PSTR("SATareaweight0")) == 0) settings.sat.fAreaWeight[0] = clampSettingFloat(newValue, settings.sat.fAreaWeight[0], 0.0f, 10.0f);

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.524
+**  Version  : v2.0.0-alpha.525
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -380,7 +380,6 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fHumidity              = 0.0f;   // Current indoor humidity %
   bool     bHumidityValid         = false;  // Humidity reading available
   uint32_t iHumidityLastMs        = 0;      // Last humidity update timestamp
-  float    fComfortOffset         = 0.0f;   // Current comfort adjustment (C)
   // Multi-area room temperature (Task #25)
   float    fAreaTemp[4]           = {0};    // Temperature per area
   bool     bAreaValid[4]          = {false};// Area has valid reading
@@ -523,10 +522,6 @@ struct SATSection {
   bool     bSummerSimmer      = false;  // Enable summer simmer auto-disable
   float    fSummerThreshold   = 18.0f;  // Outdoor temp threshold for summer mode (C)
   uint8_t  iSummerMinHours    = 6;      // Consecutive hours above threshold to trigger
-  // Thermal comfort adjustment (Task #28/#47) — humidity-based setpoint correction
-  bool     bComfortAdjust     = false;  // Enable thermal comfort (humidity) adjustment
-  float    fComfortHumidity   = 50.0f;  // Reference humidity % (no adjustment at this level)
-  float    fComfortMaxOffset  = 1.0f;   // Max target temp adjustment from humidity (C)
   // Multi-area room temperature (Task #25)
   bool     bMultiArea         = false;  // Enable multi-area weighted temperature
   uint8_t  iMultiAreaCount    = 0;      // Number of configured areas (0-4)

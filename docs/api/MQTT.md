@@ -374,7 +374,8 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/estimated_room` | `"20.5"` | no | Estimated room temp during sensor fallback (°C) |
 | `sat/humidity` | `"58.0"` | no | Indoor humidity % (when humidity sensor active) |
 | `sat/humidity_valid` | `"true"` / `"false"` | no | Whether humidity reading is valid |
-| `sat/comfort_offset` | `"0.5"` | no | Comfort adjustment applied to target (°C) |
+
+Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone, together with the topics `sat/comfort_offset`, `sat/comfort_adjust_enable`, `sat/comfort_humidity` and `sat/comfort_max_offset`, the command topics `sat/comfort_adjust`, `sat/comfort_humidity` and `sat/comfort_max_offset`, and the `sat_comfort_adjust_enable` switch. Home Assistant drops the old switch because the firmware empties its retained discovery config. Humidity is still used by Thermal comfort (`sat/thermal_comfort`, Summer Simmer Index).
 
 #### Boiler and Cycle Status
 
@@ -492,7 +493,6 @@ State topics for the 14 SAT boolean switches. Payloads are `"true"` / `"false"`.
 | ----- | ----------- |
 | `sat/solar_gain_enable` | Solar gain compensation enable state |
 | `sat/summer_simmer_enable` | Summer simmer enable state |
-| `sat/comfort_adjust_enable` | Humidity-based comfort adjust enable state |
 | `sat/multi_area_enable` | Multi-area averaging enable state |
 | `sat/auto_tune_enable` | Auto-tune analysis enable state |
 | `sat/simulation_enable` | Simulation mode enable state |
@@ -940,7 +940,6 @@ Payloads: `"true"` / `"false"`. Each of these corresponds to one of the 14 auto-
 | ------------ | ----------------- | ----------- |
 | `sat/solar_gain` | `SATsolargain` | Enable solar gain compensation |
 | `sat/summer_simmer` | `SATsummersimmer` | Enable summer simmer suppression |
-| `sat/comfort_adjust` | `SATcomfortadjust` | Enable humidity-based comfort adjust |
 | `sat/multi_area` | `SATmultiarea` | Enable multi-area temperature averaging |
 | `sat/auto_tune` | `SATautotune` | Enable auto-tune analysis |
 | `sat/simulation` | `SATsimulation` | Enable simulation mode |
@@ -981,8 +980,6 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 | `sat/summer_min_hours` | `SATsummerminhours` | Hours above threshold to activate summer mode |
 | `sat/thermal_comfort` | `SATthermalcomfort` | Thermal comfort tuning |
 | `sat/humidity_timeout_s` | `SAThumiditytimeout` | Humidity reading timeout (s) |
-| `sat/comfort_humidity` | `SATcomforthumidity` | Reference humidity for comfort (%) |
-| `sat/comfort_max_offset` | `SATcomfortmaxoffset` | Max comfort offset (°C) |
 | `sat/ble_enable` | `SATbleenable` | Enable BLE sensor (ESP32 only) |
 | `sat/ble_mac` | `SATblemac` | BLE sensor MAC address |
 | `sat/ble_interval` | `SATbleinterval` | BLE poll interval (s) |
@@ -1179,7 +1176,6 @@ When SAT is enabled, the following HA entities are auto-discovered. Entities mar
 | `sensor` | `sat_outside_temp` | °C | Outside temperature used by heating curve |
 | `sensor` | `sat_estimated_room` | °C | Estimated room temp during sensor fallback |
 | `sensor` | `sat_humidity` | % | Indoor humidity |
-| `sensor` | `sat_comfort_offset` | °C | Comfort adjustment applied to target |
 | `sensor` | `sat_current_modulation` | % | Current boiler modulation (from `sat/current_modulation`) |
 | `sensor` | `sat_pressure` | bar | Smoothed system pressure |
 | `sensor` | `sat_pressure_drop_rate` | bar/h | Pressure drop rate |
@@ -1239,7 +1235,7 @@ When SAT is enabled, the following HA entities are auto-discovered. Entities mar
 |-------------|-----------|------|-------------|
 | `number` | `sat_dhw_setpoint` | °C | DHW setpoint slider (30-60 °C, 0.5 step) |
 
-**Switch Entities (TASK-284, 14 switches):**
+**Switch Entities (TASK-284, 13 switches; `sat_comfort_adjust_enable` removed in TASK-1282, entry 114):**
 
 Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and takes commands on `%mqtt_sub_topic%/sat/<command>`. Payloads are literal `"true"` / `"false"` (`pl_on` / `pl_off`).
 
@@ -1247,7 +1243,6 @@ Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and take
 |-----------|----------------------|--------------------|------|
 | `sat_solar_gain_enable` | `sat/solar_gain` | `sat/solar_gain_enable` | `mdi:white-balance-sunny` |
 | `sat_summer_simmer_enable` | `sat/summer_simmer` | `sat/summer_simmer_enable` | `mdi:weather-sunny-alert` |
-| `sat_comfort_adjust_enable` | `sat/comfort_adjust` | `sat/comfort_adjust_enable` | `mdi:water-thermometer` |
 | `sat_multi_area_enable` | `sat/multi_area` | `sat/multi_area_enable` | `mdi:home-group` |
 | `sat_auto_tune_enable` | `sat/auto_tune` | `sat/auto_tune_enable` | `mdi:auto-fix` |
 | `sat_simulation_enable` | `sat/simulation` | `sat/simulation_enable` | `mdi:flask` |

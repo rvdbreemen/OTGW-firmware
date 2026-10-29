@@ -3,11 +3,11 @@ id: TASK-1282
 title: >-
   SAT humidity: comfort adjust falls back to outdoor weather humidity, ignores
   BLE humidity, and only runs with summer simmer on
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: 2026-10-21 09:32
-updated_date: '2026-10-29T05:11:00Z'
+updated_date: '2026-10-29T05:54:00Z'
 labels:
   - sat
   - humidity
@@ -26,9 +26,9 @@ Report gruijter 2026-10-21 (#alpha-testing). Comfort / thermal-comfort fall back
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Sergeant D's decision recorded (entry 114, Q32 C) before implementation
-- [ ] #2 Comfort adjust is removed: satUpdateComfort and every call site, the bComfortAdjust setting and its REST, MQTT (incl. HA discovery), web UI and debug exposure; a stored SATcomfortadjust value in settings is ignored without error (host/source test red on HEAD, green on fix)
-- [ ] #3 Thermal comfort (Summer Simmer Index in the PID, climate.py:276-277) is unchanged (existing tests green)
-- [ ] #4 Docs updated: firmware-sat-spec, sat-comparison, MQTT/REST API docs, c4-code-sat; build and evaluate --quick green
+- [x] #2 Comfort adjust is removed: satUpdateComfort and every call site, the bComfortAdjust setting and its REST, MQTT (incl. HA discovery), web UI and debug exposure; a stored SATcomfortadjust value in settings is ignored without error (host/source test red on HEAD, green on fix)
+- [x] #3 Thermal comfort (Summer Simmer Index in the PID, climate.py:276-277) is unchanged (existing tests green)
+- [x] #4 Docs updated: firmware-sat-spec, sat-comparison, MQTT/REST API docs, c4-code-sat; build and evaluate --quick green
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -51,3 +51,9 @@ Plan: 1) indoor sources only: MQTT/REST push (existing), and BLE humidity from t
 
 2026-10-29 scope narrowed to entry 114 (Q32 C): remove comfort adjust. The weather-humidity fallback (SATcontrol.ino ~5486) and BLE humidity as indoor source affect Thermal comfort's SSI input and are NOT decided by entry 114: moved to a follow-up task with a question for Sergeant D.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Comfort adjust removed (Sergeant D entry 114, Q32 C): satUpdateComfort and its call, settings bComfortAdjust / fComfortHumidity / fComfortMaxOffset, state fComfortOffset, REST fields and settings schema, MQTT command rows and state topics, the HA switch (cleaned up in HA through kRetiredSatEntities: empty retained config + state, TASK-1332 pattern), web UI fields, debug lines, help text, goldens, docs (API, manuals en/nl, c4, firmware-sat-spec, sat-comparison, CHANGELOG). satEffectiveTarget() is fTargetTemp + PV boost. An old SATcomfortadjust key in settings.ini is ignored (updateSetting has no catch-all). Evidence: tests/test_sat_comfort_adjust_removed.py 9 OK on fix, FAILED (failures=6) on HEAD acab024d7 (source-level checks: names, dispatch, call, HA switch/retire, settings key); Thermal comfort untouched (test_sat_pid_cadence 26 OK compiles the real satEffectiveTarget; SSI path unchanged); mqtt_state 26, pwm_override 73, room_loss 12, manual_sat_commands 6, static_integrity 33, test_evaluate 80 OK; node --check v2.js OK; evaluate --quick 0 FAIL; build.bat esp32-combo SUCCESS 06:53. Review (opus): no defect; external_temp HA entity identical after the switch reorder (ids from strings, not the case number); dhw_enable gate still index 10. Not done: sat/comfort_humidity and sat/comfort_max_offset retained topics stay on brokers (no HA entity; clutter only). Not verified: HA actually dropping the switch on a live broker; test/host/test_ha_discovery_json.py cannot run (pre-existing compile failure, TASK-1443). Humidity validity follow-up moved to TASK-1441.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -350,7 +350,6 @@ Switches:
 |---|---|
 | `SAT_Solar_Gain` | Zon-gain compensatie inschakelen |
 | `SAT_Summer_Simmer` | Summer simmer auto-disable inschakelen |
-| `SAT_Comfort_Adjust` | Comfort adjust inschakelen |
 | `SAT_Multi_Area` | Multi-area gewogen ruimtetemperatuur inschakelen |
 | `SAT_Auto_Tune` | Automatische PID-gain tuning inschakelen |
 | `SAT_Simulation` | SAT draaien in simulatiemodus (geen echte ketelregeling) |

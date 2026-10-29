@@ -3208,9 +3208,6 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/summer_min_hours` | `SATsummerminhours` |
 | `sat/thermal_comfort` | `SATthermalcomfort` |
 | `sat/humidity_timeout_s` | `SAThumiditytimeout` |
-| `sat/comfort_adjust` | `SATcomfortadjust` |
-| `sat/comfort_humidity` | `SATcomforthumidity` |
-| `sat/comfort_max_offset` | `SATcomfortmaxoffset` |
 | `sat/simulation` | `SATsimulation` |
 | `sat/ble_enable` | `SATbleenable` |
 | `sat/ble_failover` | `SATblefailover` |

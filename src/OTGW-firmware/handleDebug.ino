@@ -106,7 +106,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("simulation: %s\r\n"), settings.sat.bSimulation ? "true" : "false");
     Debugf(PSTR("solar_gain_enable: %s\r\n"), settings.sat.bSolarGainEnable ? "true" : "false");
     Debugf(PSTR("summer_simmer: %s\r\n"), settings.sat.bSummerSimmer ? "true" : "false");
-    Debugf(PSTR("comfort_adjust: %s\r\n"), settings.sat.bComfortAdjust ? "true" : "false");
     Debugf(PSTR("multi_area: %s\r\n"), settings.sat.bMultiArea ? "true" : "false");
     Debugf(PSTR("auto_tune: %s\r\n"), settings.sat.bAutoTune ? "true" : "false");
     Debugf(PSTR("max_setpoint: %.1f\r\n"), settings.sat.fMaxSetpoint);
@@ -257,7 +256,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("summer_active: %s\r\n"), state.sat.bSummerActive ? "true" : "false");
     Debugf(PSTR("humidity: %.1f\r\n"), state.sat.fHumidity);
     Debugf(PSTR("humidity_valid: %s\r\n"), state.sat.bHumidityValid ? "true" : "false");
-    Debugf(PSTR("comfort_offset: %.2f\r\n"), state.sat.fComfortOffset);
     Debugf(PSTR("area0_temp: %.1f\r\n"), state.sat.fAreaTemp[0]);
     Debugf(PSTR("area1_temp: %.1f\r\n"), state.sat.fAreaTemp[1]);
     Debugf(PSTR("area2_temp: %.1f\r\n"), state.sat.fAreaTemp[2]);

@@ -75,7 +75,7 @@ Central control loop, heating curve calculation, setpoint management, SAT-owned 
 - `satDisable(bool persistPid = true): void`, `satFlushShortLivedData(): void`
   - `satDisable()` releases control (`CS=0` via `satEnqueueOwnCS`), resets and persists PID/energy state, resets the command cache. `persistPid=false` skips only the PID file write; the OpenTherm-loss hand-back (`satOtLinkStep()`) passes `satPidRoomSeen() && isNTPtimeSet()`, so a loss before the first room reading or before NTP time leaves the saved PID state on flash (TASK-1365 AC#4, entry 115). The loss rule is decided: 30 s without a boiler reply, Data-Invalid counts as a reply (Q33 A, Robert 2026-10-26), automatic resume on the first boiler reply (Q34 A, entry 79). `satFlushShortLivedData()` clears PID integral and the cycle window
 
-- `satUpdateBoilerStatus()` (static), `satUpdateFlameStatus()`, `satUpdatePressure()`, `satUpdatePowerEnergy()`, `satUpdateSolarGain()`, `satUpdateSummerSimmer()`, `satUpdateComfort()`, `satUpdateCurveRecommendation()`, `satUpdateModulationReliability()`, `satCheckSetpointSync()`, `satUpdateThermalLearning()`, `satAutoTuneUpdate()` (all static)
+- `satUpdateBoilerStatus()` (static), `satUpdateFlameStatus()`, `satUpdatePressure()`, `satUpdatePowerEnergy()`, `satUpdateSolarGain()`, `satUpdateSummerSimmer()`, `satUpdateCurveRecommendation()`, `satUpdateModulationReliability()`, `satCheckSetpointSync()`, `satUpdateThermalLearning()`, `satAutoTuneUpdate()` (all static)
   - Per-tick analysis steps called from `satControlLoop()`
 
 - `satApplyPWM(float)` and `satApplyContinuous(float)` (static)
@@ -274,7 +274,7 @@ All SAT settings are stored in `settings.sat` (`SATSection` in SATtypes.h, 100+ 
 - Presets: `fPresetComfort/Eco/Away/Sleep/Activity/Home`, `bPresetSync`, `sPresetSyncTopic`
 - PID: `bAutoGains`, `fKpManual/fKiManual/fKdManual`, `fAutoGainsValue`, `bAutoTune`, `fAutoTuneRate`
 - Output: `bOvershootProtection` (default on), `fOvershootMargin` (default 2.0), `iMaxRelModulation`, `fFlameOffOffset`, `fFlowOffset`, `fModSupDelay/Offset`, `bPushSetpoint` (TC=), `bFollowThermostat` (TASK-1259: `satOnThermostatSetpoint()` is called by `processOT()` for each thermostat MsgID 16 Write-Data T frame; `satFollowThermostatDecide()` is the pure edge/echo test; `satAdoptThermostatSetpoint()` sets the target and clears the preset without the none-restore; default = push-setpoint when no stored key), `iCyclesPerHour`, DHW (`bDhwEnabled`, `bDhwEnable`, `fDhwSetpoint`)
-- Environment: weather (`bWeatherEnable`, `fWeatherLat/Lon`, `iWeatherInterval`), solar gain, summer simmer, comfort adjust, window detection, pressure limits
+- Environment: weather (`bWeatherEnable`, `fWeatherLat/Lon`, `iWeatherInterval`), solar gain, summer simmer, window detection, pressure limits
 - Inputs: `bMultiArea`, `iMultiAreaCount`, `fAreaWeight[4]`, `sSensorArea[4][18]` (Dallas address or BLE MAC), `iZoneCount`, `iZoneTimeoutS`, `fZoneAggregationHeadroom`, PV boost (`bPvBoostEnabled`, `iPvBoostThresholdW`, `iPvBoostHoldS`, `fPvBoostDeltaC`, `fPvBoostMaxIndoorC`, `iPvBoostMaxDurationMin`)
 - Simulation: `bSimulation`, `fSimHeatRate`, `fSimCoolRate`
 - BLE: `bBleEnable`, `bBleRiskAck`, `bBleFailover`, `sBleMAC`, `iBleInterval`, `sBleNamePrefix`, `bBleNameFilterIngest`, roster `sBleMac[8]/sBleLabel[8]/sBleBindkey[8]`

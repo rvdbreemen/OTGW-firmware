@@ -192,7 +192,7 @@ The Expert view adds sections for:
 - **Control status**: current mode, boiler status, active preset, heating system type, PID output, error, coefficient, deadband, overshoot margin, modulation values, and OVP calibration.
 - **PID controller**: individual P, I, D terms and tuning parameters (Kp, Ki, Kd).
 - **PWM and cycle tracking**: duty cycle, flame status, cycle count, overshoot data.
-- **Smart features**: solar gain, summer mode, thermal learning, comfort offset, simmer index, auto-tune status.
+- **Smart features**: solar gain, summer mode, thermal learning, simmer index, auto-tune status.
 - **External sensors**: status indicators for indoor and outdoor sensor sources.
 
 The Diagnostics view adds:

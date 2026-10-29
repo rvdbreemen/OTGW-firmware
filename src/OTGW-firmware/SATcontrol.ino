@@ -3035,13 +3035,9 @@ void satSendStatusJSON()
     je.field(F("summer_hours_above"),   snap->st.sat.fSummerHoursAbove);
     je.field(F("summer_threshold"),     settings.sat.fSummerThreshold);
     je.field(F("summer_min_hours"),     (int32_t)settings.sat.iSummerMinHours);
-    // Thermal comfort (Task #28/#47)
-    je.field(F("comfort_adjust"),       settings.sat.bComfortAdjust);
+    // Humidity input of Thermal comfort (Task #28/#47)
     je.field(F("humidity"),             snap->st.sat.fHumidity);
     je.field(F("humidity_valid"),       snap->st.sat.bHumidityValid);
-    je.field(F("comfort_offset"),       snap->st.sat.fComfortOffset);
-    je.field(F("comfort_ref_humidity"), settings.sat.fComfortHumidity);
-    je.field(F("comfort_max_offset"),   settings.sat.fComfortMaxOffset);
     // Simulation (Task #37 + TASK-795)
     je.field(F("simulation"),           settings.sat.bSimulation);
     // §4.2: mirrors the inverse of the boiler-hardware-present check (frozen above)
@@ -3252,7 +3248,7 @@ void satPublishMQTT()
   static SATShadowF s_power, s_energy_total, s_energy_estimated_kwh;
   static SATShadowF s_thermal_coeff, s_thermal_drop_rate, s_estimated_room;
   static SATShadowF s_indoor_rise_rate, s_sun_elevation;
-  static SATShadowF s_summer_hours_above, s_humidity, s_comfort_offset;
+  static SATShadowF s_summer_hours_above, s_humidity;
   static SATShadowF s_auto_tune_score, s_auto_tune_rate, s_auto_gains_value;
   static SATShadowF s_valve_offset;
   static SATShadowF s_area_0, s_area_1, s_area_2, s_area_3;
@@ -3261,7 +3257,6 @@ void satPublishMQTT()
   static SATShadowF s_heating_curve_coeff, s_deadband;
   static SATShadowF s_flame_off_offset, s_flow_offset, s_mod_sup_delay, s_mod_sup_offset;
   static SATShadowF s_boiler_capacity, s_dhw_capacity, s_boiler_rated_kw, s_boiler_efficiency;
-  static SATShadowF s_comfort_humidity, s_comfort_max_offset;
   static SATShadowF s_summer_threshold, s_target_temp_step;
   static SATShadowF s_min_pressure, s_max_pressure, s_max_pressure_drop;
   static SATShadowF s_preset_comfort, s_preset_eco, s_preset_away;
@@ -3284,7 +3279,7 @@ void satPublishMQTT()
   static SATShadowB s_error_monitoring, s_solar_freeze_integral;
   static SATShadowB s_device_health, s_cycle_health;
   static SATShadowB s_setpoint_sync, s_modulation_sync, s_ch_sync;
-  static SATShadowB s_solar_gain_enable, s_summer_simmer_enable, s_comfort_adjust_enable;
+  static SATShadowB s_solar_gain_enable, s_summer_simmer_enable;
   static SATShadowB s_thermal_comfort, s_multi_area_enable, s_auto_tune_enable;
   static SATShadowB s_simulation_enable, s_window_detection_enable, s_overshoot_protection_enable, s_follow_thermostat_enable;
   static SATShadowB s_push_setpoint_enable, s_preset_sync_enable;
@@ -3527,7 +3522,6 @@ void satPublishMQTT()
 
   publishIfChangedF(F("sat/humidity"),       state.sat.fHumidity,       s_humidity,        SAT_EPS_TEMP_COARSE, 1, false);
   publishIfChangedB(F("sat/humidity_valid"), state.sat.bHumidityValid,  s_humidity_valid,  false);
-  publishIfChangedF(F("sat/comfort_offset"), state.sat.fComfortOffset,  s_comfort_offset,  SAT_EPS_ERROR, 2, false);
 
   // ---------------------------------------------------------------------------
   // Simulation, auto-tune. Both use "ON"/"OFF" payloads historically.
@@ -3712,8 +3706,6 @@ void satPublishMQTT()
   publishIfChangedF(F("sat/dhw_capacity"),        settings.sat.fDhwCapacity,       s_dhw_capacity,        SAT_EPS_POWER,       1, true);
   publishIfChangedF(F("sat/boiler_rated_kw"),     settings.sat.fBoilerRatedKW,     s_boiler_rated_kw,     SAT_EPS_POWER,       1, true);
   publishIfChangedF(F("sat/boiler_efficiency"),   settings.sat.fBoilerEfficiency,  s_boiler_efficiency,   SAT_EPS_FRACTION,    2, true);
-  publishIfChangedF(F("sat/comfort_humidity"),    settings.sat.fComfortHumidity,   s_comfort_humidity,    SAT_EPS_DURATION,    0, true);
-  publishIfChangedF(F("sat/comfort_max_offset"),  settings.sat.fComfortMaxOffset,  s_comfort_max_offset,  SAT_EPS_TEMP_COARSE, 1, true);
   publishIfChangedF(F("sat/summer_threshold"),    settings.sat.fSummerThreshold,   s_summer_threshold,    SAT_EPS_TEMP_COARSE, 1, true);
   publishIfChangedF(F("sat/target_temp_step"),    settings.sat.fTargetTempStep,    s_target_temp_step,    SAT_EPS_TEMP_COARSE, 1, true);
   publishIfChangedF(F("sat/min_pressure"),        settings.sat.fMinPressure,       s_min_pressure,        SAT_EPS_PRESSURE,    1, true);
@@ -3730,7 +3722,6 @@ void satPublishMQTT()
 
   publishIfChangedB(F("sat/solar_gain_enable"),       settings.sat.bSolarGainEnable,  s_solar_gain_enable,       true);
   publishIfChangedB(F("sat/summer_simmer_enable"),    settings.sat.bSummerSimmer,     s_summer_simmer_enable,    true);
-  publishIfChangedB(F("sat/comfort_adjust_enable"),   settings.sat.bComfortAdjust,    s_comfort_adjust_enable,   true);
   publishIfChangedB(F("sat/thermal_comfort"),         settings.sat.bThermalComfort,   s_thermal_comfort,         true);
   publishIfChangedI(F("sat/humidity_timeout_s"),      (int32_t)settings.sat.iHumidityTimeoutS, s_humidity_timeout_s, true);
   publishIfChangedB(F("sat/multi_area_enable"),       settings.sat.bMultiArea,        s_multi_area_enable,       true);
@@ -3791,35 +3782,6 @@ void satPublishMQTT()
   satBLEPublishMQTT();
 
   _sat_publishRetryPending = satPublishDeferred();   // TASK-1339: a topic of this pass was skipped
-}
-
-//=====================================================================
-//=== Thermal Comfort Adjustment (Task #28/#47) ===
-//=====================================================================
-static void satUpdateComfort()
-{
-  if (!settings.sat.bComfortAdjust || !state.sat.bHumidityValid || !settings.sat.bSummerSimmer) {
-    state.sat.fComfortOffset = 0.0f;
-    return;
-  }
-  // Stale check: humidity older than 30 min is invalid
-  if (millis() - state.sat.iHumidityLastMs > 1800000UL) {
-    state.sat.bHumidityValid = false;
-    state.sat.fComfortOffset = 0.0f;
-    return;
-  }
-  // Use weather API humidity as fallback if direct humidity is stale
-  // (already validated above, so this only applies when bHumidityValid was
-  //  set from weather data in satControlLoop)
-
-  // Comfort model: humidity above reference makes it feel warmer (reduce setpoint)
-  // humidity below reference makes it feel cooler (increase setpoint)
-  float delta = (state.sat.fHumidity - settings.sat.fComfortHumidity) / 100.0f;
-  float offset = -delta * settings.sat.fComfortMaxOffset * 2.0f;
-  // Clamp to max offset
-  if (offset > settings.sat.fComfortMaxOffset) offset = settings.sat.fComfortMaxOffset;
-  if (offset < -settings.sat.fComfortMaxOffset) offset = -settings.sat.fComfortMaxOffset;
-  state.sat.fComfortOffset = offset;
 }
 
 //=====================================================================
@@ -5141,10 +5103,10 @@ static float satRoomFiltered(float rawRoomTemp)
   return _roomFiltered;                   // the controller uses the smoothed value
 }
 
-// Target the PID regulates to: setpoint + comfort offset + PV boost (both are set by the control tick).
+// Target the PID regulates to: setpoint + PV boost (set by the control tick).
 static float satEffectiveTarget()
 {
-  float effectiveTarget = settings.sat.fTargetTemp + state.sat.fComfortOffset;
+  float effectiveTarget = settings.sat.fTargetTemp;
   if (state.sat.bPvBoostActive)
     effectiveTarget += state.sat.fPvBoostAppliedC;
   return effectiveTarget;
@@ -5480,14 +5442,13 @@ static void satControlLoopRun()
   // --- Update boiler status ---
   satUpdateBoilerStatus();
 
-  // --- Thermal comfort adjustment (Task #28/#47) ---
+  // --- Humidity input (Task #28/#47) ---
   // Weather humidity fallback: if no direct humidity input, use weather API
   if (!state.sat.bHumidityValid && state.sat.weather.bValid) {
     state.sat.fHumidity = state.sat.weather.fHumidity;
     state.sat.bHumidityValid = true;
     state.sat.iHumidityLastMs = state.sat.weather.iLastUpdateMs;
   }
-  satUpdateComfort();
 
   // --- PV-surplus setpoint boost (TASK-640) ---
   // Run before heating-curve calc so the boost is reflected in this cycle.

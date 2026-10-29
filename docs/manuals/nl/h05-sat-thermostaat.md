@@ -61,7 +61,7 @@ Onderwerp: OTGW/set/otgw-AABBCCDDEEFF/sat/enabled
 Waarde:    true
 ```
 
-Elke configureerbare SAT-parameter heeft een MQTT-commandotopic van de vorm `%mqtt_sub_topic%/sat/<naam>`. De volledige set wordt gedeclareerd in `MQTTstuff.ino` (`handleMQTTcallback`) en omvat onder andere: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+Elke configureerbare SAT-parameter heeft een MQTT-commandotopic van de vorm `%mqtt_sub_topic%/sat/<naam>`. De volledige set wordt gedeclareerd in `MQTTstuff.ino` (`handleMQTTcallback`) en omvat onder andere: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
 
 Voor booleaanse topics werken `ON` / `OFF` / `true` / `false` / `1` / `0`. Numerieke topics accepteren de gebruikelijke decimale notatie.
 
@@ -540,17 +540,13 @@ BLE-temperatuurwaarden vervallen na 5 minuten zonder nieuw advertisement. SAT va
 
 ---
 
-### 5.16 Thermisch comfort (vochtigheidscorrectie)
+### 5.16 Thermisch comfort (Summer Simmer Index)
 
-SAT kan de effectieve doeltemperatuur aanpassen op basis van binnenlucht-vochtigheid. Bij hoge luchtvochtigheid voelt de lucht warmer aan, dus kan het doel licht worden verlaagd. Bij lage luchtvochtigheid wordt het doel licht verhoogd.
+Met `satthermalcomfort` aan vervangt SAT de kamertemperatuur die de PID ziet door de Summer Simmer Index, die kamertemperatuur en vochtigheid combineert. Het is het enige vochtigheidsgebruik in de setpoint-logica.
 
-| Parameter | Standaard | Bereik | Omschrijving |
-|---|---|---|---|
-| `satcomfortadjust` | `false` | bool | Vochtigheidsgebaseerde doelaanpassing inschakelen |
-| `satcomforthumidity` | `50.0` | 20-80 % | Referentievochtigheid (geen aanpassing bij dit niveau) |
-| `satcomfortmaxoffset` | `1.0` | 0-3 C | Maximale doeltemperatuur-aanpassing |
+De aparte vochtigheidscorrectie op het doel (`satcomfortadjust`, `satcomforthumidity`, `satcomfortmaxoffset`) is verwijderd in TASK-1282 (Sergeant D entry 114). Een oude `settings.ini` met die sleutels laadt zonder fout; de sleutels worden genegeerd.
 
-Vochtigheidsdata komt van: BLE-sensor, MQTT-push, of weather API fallback. Waarden vervallen na 30 minuten (`iHumidityTimeoutS`).
+Een gepushte vochtigheidswaarde geldt als verlopen na `sathumiditytimeout` seconden (standaard 1800).
 
 ---
 
@@ -641,7 +637,7 @@ Sinds 2.0.0 worden alle bestuurbare SAT-parameters als aparte HA-entiteiten gepu
 | HA-component | Aantal | Voorbeelden |
 |---|---|---|
 | `number` | ~25 | verwarmingscurve-coefficient, deadband, overshoot-marge, regelinterval, max modulatie, flame-off offset, flow offset, mod-sup delay/offset, ketelcapaciteit, comfort-vochtigheid, zomerdrempel, auto-tune rate, preset-temperaturen (comfort/eco/away/sleep/activity/home), min/max druk, max drukval, target temp step |
-| `switch` | 14 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable` |
+| `switch` | 13 | `solar_gain`, `summer_simmer`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable` |
 | `select` | 1 | `sat_heating_system` met opties `0` (auto), `1` (radiatoren), `2` (warmtepomp), `3` (vloerverwarming) |
 
 Elke entiteit schrijft naar het bijbehorende `%mqtt_sub_topic%/sat/<parameter>` commandotopic en leest uit het bijbehorende state-topic. Alle wijzigingen lopen via `updateSetting()` en worden dus naar flash gepersisteerd en binnen veilige grenzen geklemd.

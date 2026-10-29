@@ -68,7 +68,7 @@ struct SatSettings { bool bAutoGains = false, bSolarFreezeIntegral = false;
   int iZoneCount = 1; int iZoneTimeoutS = 900; };
 struct Settings { SatSettings sat; };
 struct SatState { bool bSolarGainActive = false, bFallbackActive = false, bPvBoostActive = false;
-  uint32_t iLastKnownRoomMs = 0; float fComfortOffset = 0, fPvBoostAppliedC = 0;
+  uint32_t iLastKnownRoomMs = 0; float fPvBoostAppliedC = 0;
   float fPidP = 0, fPidI = 0, fPidD = 0, fPidOutput = 0, fKp = 0, fKi = 0, fKd = 0, fRawDerivative = 0, fError = 0; };
 struct State { SatState sat; };
 struct SATZoneState { float fRoomTemp = 0, fSetpoint = 0, fPidOutput = 0, fPidIntegral = 0, fPrevError = 0;

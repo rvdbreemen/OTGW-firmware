@@ -91,7 +91,6 @@ Each domain section lists:
 | DS18B20 1-Wire support | COVERED | 2.0.0 adds configurable GPIO, web labels, simulation |
 | Multi-source room temp priority stack | ADVANTAGE | OT-Thing: single fixed source |
 | Multi-area weighted averaging (4 zones) | ADVANTAGE | Not in OT-Thing |
-| Thermal comfort adjustment (humidity → setpoint) | ADVANTAGE | Not in OT-Thing |
 | Fallback thermal estimation | ADVANTAGE | Not in OT-Thing |
 | Full SAT control loop (PID, heating curve, auto-gains) | ADVANTAGE | Not in OT-Thing |
 | Multi-zone PID (up to 4 zones) | ADVANTAGE | Not in OT-Thing |

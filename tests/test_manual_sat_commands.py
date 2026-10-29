@@ -88,7 +88,7 @@ class SatCommandDocs(unittest.TestCase):
         cls.expected = set(cls.fw) | SUB_TOKEN
 
     def test_parser_found_the_table(self):
-        self.assertGreater(len(self.fw), 80, "kSatMqttCmds[] parse looks incomplete")
+        self.assertGreater(len(self.fw), 70, "kSatMqttCmds[] parse looks incomplete")
         self.assertIn("overshoot_protection", self.fw)
         self.assertNotIn("ovp_enabled", self.fw)
 

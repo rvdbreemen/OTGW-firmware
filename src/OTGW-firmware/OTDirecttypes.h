@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirecttypes.h
-**  Version  : v2.0.0-alpha.524
+**  Version  : v2.0.0-alpha.525
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

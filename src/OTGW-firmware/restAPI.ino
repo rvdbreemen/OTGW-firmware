@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.524
+**  Version  : v2.0.0-alpha.525
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1656,12 +1656,6 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATsummerthreshold", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("summer_min_hours")) == 0) {
       updateSetting("SATsummerminhours", val); handled = true;
-    } else if (strcasecmp_P(settingName, PSTR("comfort_adjust")) == 0) {
-      updateSetting("SATcomfortadjust", val); handled = true;
-    } else if (strcasecmp_P(settingName, PSTR("comfort_humidity")) == 0) {
-      updateSetting("SATcomforthumidity", val); handled = true;
-    } else if (strcasecmp_P(settingName, PSTR("comfort_max_offset")) == 0) {
-      updateSetting("SATcomfortmaxoffset", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("simulation")) == 0) {
       // TASK-795 §4.2: refuse to enable simulation while a real boiler is on the
       // bus — sim is a boiler-absent bench mode, not a co-existence mode.
@@ -2290,7 +2284,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.simulation"), settings.sat.bSimulation);
     je.field(F("settings.sat.solar_gain_enable"), settings.sat.bSolarGainEnable);
     je.field(F("settings.sat.summer_simmer"), settings.sat.bSummerSimmer);
-    je.field(F("settings.sat.comfort_adjust"), settings.sat.bComfortAdjust);
     je.field(F("settings.sat.multi_area"), settings.sat.bMultiArea);
     je.field(F("settings.sat.auto_tune"), settings.sat.bAutoTune);
     je.field(F("settings.sat.max_setpoint"), settings.sat.fMaxSetpoint);
@@ -2413,7 +2406,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("state.sat.summer_active"), snap->st.sat.bSummerActive);
     je.field(F("state.sat.humidity"), snap->st.sat.fHumidity);
     je.field(F("state.sat.humidity_valid"), snap->st.sat.bHumidityValid);
-    je.field(F("state.sat.comfort_offset"), snap->st.sat.fComfortOffset);
     je.field(F("state.sat.area0_temp"), snap->st.sat.fAreaTemp[0]);
     je.field(F("state.sat.area1_temp"), snap->st.sat.fAreaTemp[1]);
     je.field(F("state.sat.area2_temp"), snap->st.sat.fAreaTemp[2]);
@@ -3968,15 +3960,6 @@ void sendDeviceSettings()
     addNum(F("satsummerthreshold"), tmpBuf, "f", 5, 35);
   }
   addInt(F("satsummerminhours"), settings.sat.iSummerMinHours, "i", 1, 48);
-  // --- SAT Thermal Comfort settings (Task #28/#47) ---
-  addBool(F("satcomfortadjust"), settings.sat.bComfortAdjust, "b");
-  {
-    char tmpBuf[8];
-    dtostrf(settings.sat.fComfortHumidity, 1, 0, tmpBuf);
-    addNum(F("satcomforthumidity"), tmpBuf, "f", 10, 90);
-    dtostrf(settings.sat.fComfortMaxOffset, 1, 1, tmpBuf);
-    addNum(F("satcomfortmaxoffset"), tmpBuf, "f", 0, 3);
-  }
   // --- SAT Multi-area settings (Task #25) ---
   addBool(F("satmultiarea"), settings.sat.bMultiArea, "b");
   addInt(F("satmultiareacount"), settings.sat.iMultiAreaCount, "i", 0, 4);
@@ -4191,7 +4174,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satautotune", "satautotunerate",
   "satbleenable", "satbleriskack", "satblefailover", "satbleinterval", "satblemac",
   "satblenamefilteringest", "satblenameprefix",  // TASK-895 filter; TASK-1231 made them settable
-  "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient", "satcomfortadjust", "satcomforthumidity", "satcomfortmaxoffset",
+  "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient",
   "satdeadband", "satdhwcapacity", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
   "satflameoffset", "satflowoffset", "satflushtreshold", "satfollowthermostat", "sathumiditytimeout",
   "satinterval", "satmanufacturer", "satmaxpressdrop", "satmaxpressure", "satminpressure",

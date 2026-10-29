@@ -585,7 +585,7 @@ Update a named SAT setting. Authentication required.
 
 **Parameters:** `{name}` is the setting name. The handler accepts the full SAT setting vocabulary, including:
 
-`heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `push_setpoint`, `follow_thermostat`, `flame_off_offset`, `overshoot_protection`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `auto_tune`, `auto_tune_rate`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`.
+`heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `push_setpoint`, `follow_thermostat`, `flame_off_offset`, `overshoot_protection`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `auto_tune`, `auto_tune_rate`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`.
 
 **Request body:** New value as plain string or JSON `{"value": "..."}`. The `reset_integral` setting name takes no value (the action is implicit).
 
@@ -1249,9 +1249,6 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/summer_min_hours` | `SATsummerminhours` |
 | `sat/thermal_comfort` | `SATthermalcomfort` |
 | `sat/humidity_timeout_s` | `SAThumiditytimeout` |
-| `sat/comfort_adjust` | `SATcomfortadjust` |
-| `sat/comfort_humidity` | `SATcomforthumidity` |
-| `sat/comfort_max_offset` | `SATcomfortmaxoffset` |
 | `sat/simulation` | `SATsimulation` |
 | `sat/ble_enable` | `SATbleenable` |
 | `sat/ble_failover` | `SATblefailover` |

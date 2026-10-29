@@ -2118,9 +2118,6 @@
     satsummersimmer:     { cat: 'sat', sub: 'Summer simmer', label: 'Enable summer simmer' },
     satsummerthreshold:  { cat: 'sat', sub: 'Summer simmer', label: 'Summer threshold', hint: '°C' },
     satsummerminhours:   { cat: 'sat', sub: 'Summer simmer', label: 'Min summer hours', hint: 'Hours' },
-    satcomfortadjust:    { cat: 'sat', sub: 'Thermal comfort', label: 'Comfort humidity adjust' },
-    satcomforthumidity:  { cat: 'sat', sub: 'Thermal comfort', label: 'Target humidity', hint: '%' },
-    satcomfortmaxoffset: { cat: 'sat', sub: 'Thermal comfort', label: 'Max comfort offset', hint: '°C' },
     satmultiarea:        { cat: 'sat', sub: 'Multi-area', label: 'Enable multi-area' },
     satmultiareacount:   { cat: 'sat', sub: 'Multi-area', label: 'Area count' },
     satareaweight0:      { cat: 'sat', sub: 'Multi-area', label: 'Area 0 weight' },
@@ -2173,7 +2170,7 @@
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
     ['Boiler', ['satmanufacturer', 'satboilerratedkw', 'satboilerefficiency', 'satboilercapacity', 'satdhwcapacity',
                 'satminpressure', 'satmaxpressure', 'satmaxpressdrop']],
-    ['Thermal', ['satthermalcomfort', 'satcomfortadjust', 'satcomforthumidity', 'satcomfortmaxoffset', 'sathumiditytimeout',
+    ['Thermal', ['satthermalcomfort', 'sathumiditytimeout',
                  'satthermalcoeff', 'satsolargain', 'satsolarminrise', 'satsolaroffset', 'satsolarminelev']],
     ['Sensors', ['saterrormon', 'satzonetimeout', 'satzoneheadroom']],
     ['PV boost', ['satpvboostenabled', 'satpvboostthresholdw', 'satpvboostholds', 'satpvboostdeltac',
@@ -4673,7 +4670,6 @@
       ['Solar gain', d.solar_gain_active ? 'Active' : 'Inactive'],
       ['Summer mode', summer],
       ['Thermal learning', thermal],
-      ['Comfort offset', (d.comfort_offset != null && d.comfort_offset !== 0) ? satFmt(d.comfort_offset, 2, ' °C') : 'Off'],
       ['PV boost', d.pv_boost_active ? ('Active ' + satFmt(d.pv_boost_applied_c, 1, ' °C')) : 'Off'],
       ['Window detection', d.window_detection ? 'On' : 'Off']
     ]);

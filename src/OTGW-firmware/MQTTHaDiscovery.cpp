@@ -3380,9 +3380,9 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
       break;
     case 2:
       published = streamSatBoolSwitch(ctx,
-        PSTR("-sat-comfort-adjust-enable"),   PSTR("_SAT_Comfort_Adjust"),
-        PSTR("/sat/comfort_adjust"),          PSTR("/sat/comfort_adjust_enable"),
-        PSTR("mdi:water-thermometer"));
+        PSTR("-sat-external-temp-enable"),    PSTR("_SAT_External_Temp"),
+        PSTR("/sat/external_temp"),           PSTR("/sat/external_temp_enable"),
+        PSTR("mdi:home-thermometer"));
       break;
     case 3:
       published = streamSatBoolSwitch(ctx,
@@ -3445,12 +3445,6 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
         PSTR("-sat-follow-thermostat-enable"), PSTR("_SAT_Follow_Thermostat"),
         PSTR("/sat/follow_thermostat"),       PSTR("/sat/follow_thermostat_enable"),
         PSTR("mdi:thermostat"));
-      break;
-    case 13:
-      published = streamSatBoolSwitch(ctx,
-        PSTR("-sat-external-temp-enable"),    PSTR("_SAT_External_Temp"),
-        PSTR("/sat/external_temp"),           PSTR("/sat/external_temp_enable"),
-        PSTR("mdi:home-thermometer"));
       break;
     default:
       return false;
@@ -3740,6 +3734,7 @@ struct RetiredSatEntity {
 static const RetiredSatEntity kRetiredSatEntities[] PROGMEM = {
   { "switch", "sat_force_pwm_enable", "/sat/force_pwm_enable" },   // RETIRED-SAT-ENTITY TASK-1332
   { "switch", "sat_pwm_auto_switch_enable", "/sat/pwm_auto_switch_enable" },   // RETIRED-SAT-ENTITY TASK-1341
+  { "switch", "sat_comfort_adjust_enable", "/sat/comfort_adjust_enable" },   // RETIRED-SAT-ENTITY TASK-1282
 };
 
 void clearRetiredSatEntities(const HaDiscoveryContext &ctx) {
