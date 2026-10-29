@@ -926,6 +926,9 @@
   var logPaused = false, logSearch = '', logShowTs = true, logAutoScroll = true;
   // TASK-970: SAT-only filter, auto-download timer, stream-to-file writer
   var logSatOnly = false, logAutoDlTimer = null, logStreamWriter = null;
+  // TASK-1476: on the plain-HTTP device page showSaveFilePicker does not exist (secure
+  // context only), so Stream to file collects the new frames and downloads them in parts.
+  var logStreamChunk = null, logStreamTimer = null;
   var SAT_LINE_RE = /^\d{2}:\d{2}:\d{2}\s+S\s/;   // "HH:MM:SS S ..." SAT narration prefix
   function pushLog(line) {
     // WS frames arrive with a trailing "\r\n"; strip it so renderLog's join('\n')
@@ -937,6 +940,7 @@
     while (logRecvTimes.length && now - logRecvTimes[0] > 10000) logRecvTimes.shift();
     // Stream to file captures every frame regardless of the display Pause.
     if (logStreamWriter) { try { logStreamWriter.write(line + '\n'); } catch (e) { } }
+    else if (logStreamChunk) { logStreamChunk.push(line); if (logStreamChunk.length >= LOG_CAPTURE) flushStreamChunk(); }
     if (logPaused) return;
     logBuf.push(line);
     // Trim in batches: shift() on a 200k array per frame is O(n).
@@ -3539,9 +3543,17 @@
     if (logAutoDlTimer) { clearInterval(logAutoDlTimer); logAutoDlTimer = null; chip.classList.remove('on'); }
     else { logAutoDlTimer = setInterval(downloadLog, 900000); chip.classList.add('on'); }   // every 15 min
   }
+  function flushStreamChunk() {   // TASK-1476: download the frames since the last part
+    if (!logStreamChunk || !logStreamChunk.length) return;
+    downloadBlob(new Blob([logStreamChunk.join('\n') + '\n'], { type: 'text/plain' }), 'otgw-stream-' + ts() + '.txt');
+    logStreamChunk = [];
+  }
   function toggleStream(chip) {
     if (logStreamWriter) { try { logStreamWriter.close(); } catch (e) { } logStreamWriter = null; chip.classList.remove('on'); return; }
-    if (!window.showSaveFilePicker) return;   // Chrome/Edge only (feature-detected in init)
+    if (logStreamChunk) { clearInterval(logStreamTimer); logStreamTimer = null; flushStreamChunk(); logStreamChunk = null; chip.classList.remove('on'); return; }
+    if (!window.showSaveFilePicker) {   // plain HTTP (or Firefox/Safari): part files every 5 min
+      logStreamChunk = []; logStreamTimer = setInterval(flushStreamChunk, 300000); chip.classList.add('on'); return;
+    }
     window.showSaveFilePicker({ suggestedName: 'otgw-log-' + ts() + '.txt', types: [{ description: 'Text log', accept: { 'text/plain': ['.txt'] } }] })
       .then(function (h) { return h.createWritable(); })
       .then(function (w) { logStreamWriter = w; chip.classList.add('on'); })
@@ -5752,7 +5764,7 @@
     var cad = document.getElementById('chipAutoDl');
     if (cad) cad.addEventListener('click', function () { toggleAutoDl(cad); });
     var cst = document.getElementById('chipStream');
-    if (cst) { if (!window.showSaveFilePicker) { cst.style.opacity = '.5'; cst.title = 'Stream to file needs Chrome / Edge'; } cst.addEventListener('click', function () { toggleStream(cst); }); }
+    if (cst) { if (!window.showSaveFilePicker) cst.title = 'Save every frame: downloads the new frames as a file every 5 minutes and when you switch it off'; cst.addEventListener('click', function () { toggleStream(cst); }); }
     var cs = document.getElementById('chipScroll');
     if (cs) cs.addEventListener('click', function () { logAutoScroll = !logAutoScroll; cs.classList.toggle('on', logAutoScroll); });
     var ct = document.getElementById('chipTs');
