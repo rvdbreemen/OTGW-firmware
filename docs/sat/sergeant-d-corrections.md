@@ -4632,3 +4632,19 @@ Option A as posted: "As thermo-nova: in ECO no solar gain offset either."
 **Settled:** in ECO mode the requested setpoint follows the main room's PID only: no other rooms (entry 116) and no solar gain offset, as thermo-nova `climate.py:376-379`, which returns before the solar offset at `:391-392`. The firmware subtracted the offset in ECO too (`SATcontrol.ino:5540`, no ECO check).
 
 **Changes an earlier entry:** none; completes entry 116 for ECO. **Task:** TASK-1440 (same ECO branch). **Open:** thermo-nova's ECO return also rounds the primary to 0.1; rounding of PID values is covered by entry 95 / TASK-1423, not by this entry.
+
+## 119. Field assessment of gruijter's alpha.527 run: regulation works as intended (2026-10-29)
+
+**Source:** #alpha-testing, 2026-10-29 13:22 and 13:33 UTC, replies to gruijter's field capture (msg 1565344493475995819):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565355195939033089
+https://discord.com/channels/812969634638725140/1514720723980259460/1565357952821624863
+
+**Quoted:**
+
+> I am very pleased with the regulation. It works as intended
+
+> Also you boiler holds a nice ΔΤ. It works at 40/30 ( median 38.5/28.7 ) when CH is ON. Verdict: SAT passed the test to handle The most difficult boiler in control terms. But the real test is the WAF test 😂
+
+**Settled:** this is an assessment, not a correction or a design decision. Sergeant D judges the control on gruijter's Intergas (field run on 2.0.0-alpha.527+fd491ff, capture from 08:58 local) as working as intended, with a supply/return of about 40/30 (median 38.5/28.7) while CH is on. Context from gruijter (msg 1565361639304339506): the boiler itself was tuned last year for a low return temperature (reduced power, minimum supply temperature 28, pump min/max and delay-off adapted). It changes no thermo-nova comparison and no firmware behaviour.
+
+**Changes an earlier entry:** none. **Task:** TASK-1474 (analysis of the same capture); field evidence for Robert's "beta after field proof" decision (TASK-1469). **Open:** the run was on alpha.527, so the alpha.528-532 changes (zones/ECO, humidity source, previous-CS clamp, HA cleanups) are not covered by this assessment; the "WAF test" (household acceptance over a longer period) is still to come.

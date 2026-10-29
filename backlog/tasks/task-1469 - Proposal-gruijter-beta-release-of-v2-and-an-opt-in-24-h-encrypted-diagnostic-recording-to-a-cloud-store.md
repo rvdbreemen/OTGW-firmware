@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-29T08:49:00Z'
-updated_date: '2026-10-29T10:50:00Z'
+updated_date: '2026-10-29T12:46:00Z'
 labels:
   - proposal
   - tester
@@ -36,6 +36,8 @@ Points for the decision: privacy (data leaves the house, GDPR), an outbound inte
 2026-10-29 Robert decided (interactive, in session): (1) beta only after field proof: a green field run on a real boiler (gruijter) plus the open PID tasks (TASK-1414..1418, TASK-1423) and the TASK-1412 bench/field gates. (2) Recording: first local, cloud later: TASK-1470 (local recording, web UI download, host replay). The cloud part waits until the local step works and Robert has settled account and key ownership.
 
 Constraint from martreides (#alpha-testing msg 1565312598595993792, 2026-10-29): units may run in a restricted VLAN with all outbound internet blocked. Recording must work fully local with no cloud dependency; a later cloud upload must fail quietly (buffer/drop, no stall, no reboot). See TASK-1471 for the existing outbound paths.
+
+Robert 2026-10-29: local first; cloud upload parked as a later feature (task-1473). Captures and recordings stay on the user's own network.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

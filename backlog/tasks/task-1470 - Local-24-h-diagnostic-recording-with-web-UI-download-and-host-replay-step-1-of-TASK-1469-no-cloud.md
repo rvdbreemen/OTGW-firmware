@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T09:03:00Z'
-updated_date: '2026-10-29T10:50:00Z'
+updated_date: '2026-10-29T12:46:00Z'
 labels:
   - sat
   - diagnostics
@@ -34,4 +34,6 @@ Maintainer decision 2026-10-29 on TASK-1469 (gruijter's proposal): first a LOCAL
 
 <!-- SECTION:NOTES:BEGIN -->
 Constraint from martreides (#alpha-testing msg 1565312598595993792, 2026-10-29): units may run in a restricted VLAN with all outbound internet blocked. Recording must work fully local with no cloud dependency; a later cloud upload must fail quietly (buffer/drop, no stall, no reboot). See TASK-1471 for the existing outbound paths.
+
+Robert 2026-10-29: local first; cloud upload parked as a later feature (task-1473). Captures and recordings stay on the user's own network.
 <!-- SECTION:NOTES:END -->
