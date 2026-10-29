@@ -86,7 +86,7 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `sattargettemp` | `20.0` | 5-30 C | Gewenste ruimtetemperatuur |
 | `satcoefficient` | `1.5` | 0.1-5.0 | Steilheid van de verwarmingscurve |
 | `satdeadband` | `0.1` | 0.05-2.0 C | PID-deadband breedte |
-| `satinterval` | `30` | 10-300 s | Regelinterval |
+| `satinterval` | `30` | 10-300 s | Regelinterval: hoe vaak SAT het setpoint berekent en verstuurt. De PID-toestand volgt dit niet: die schuift op met een eigen vaste timer van 60 s (zie PID-tuning) |
 | `satexternaltemp` | `false` | bool | Externe ruimtetemperatuurbron gebruiken |
 | `satovershootprotection` | `true` | bool | PWM-start en modulatie-onderdrukking (zie 5.6). Geldt voor elke warmtebron |
 | `satmaxrelmod` | `100` | 0-100 % | Maximale relatieve modulatie naar ketel (MM= commando) |
@@ -127,6 +127,8 @@ Een **cold cutoff** per systeem (COLD_SETPOINT: 28,2 C voor radiatoren, 21,0 C v
 | `satautotunerate` | `0.02` | 0-1 | Bijstellingspercentage per afstemcyclus (2%) |
 
 De integraalterm gebruikt een **symmetrische clamp** `[-curveValue, +curveValue]` met een harde veiligheidsgrens van `+/-20 C` (alpha.28 / alpha.30). Negatieve accumulatie is nodig bij mild weer zodat de regelaar het flow-setpoint onder de verwarmingscurve kan trekken wanneer de kamer licht boven het doel zit. De PID-integraal en de ruwe-afgeleide-toestand worden bij elke save gepersisteerd en bij de volgende boot **warm gestart** (alpha.32), dus een power cycle leidt niet tot een cold start. `sat/flush` of een expliciete `satdisable` wist de gepersisteerde state.
+
+**PID-timing (TASK-1368).** De integraal en de afgeleide schuiven één keer per 60 s op, met een eigen timer, zoals in thermo-nova (Sergeant D entries 42 en 111). Dat staat los van `satinterval`: elke regeltik berekent de uitvoer opnieuw uit de actuele verwarmingscurve, maar alleen de stap van 60 s verandert de PID-toestand. Vóór TASK-1368 deed elke tik van 30 s een PID-stap, waardoor de integraal twee keer zo snel groeide. De afgeleide is 0 bij de eerste uitvoer na een reset of herstel. Zone-PID's stappen op dezelfde timer. Na een boot blijft de herstelde toestand ongewijzigd tot de eerste geldige kamertemperatuur binnenkomt; die meting doet direct een stap (entry 115). De eerste tik na het inschakelen van SAT stuurt een berekend setpoint, niet het SAT-minimum `CS=10`.
 
 #### Geavanceerde regeling
 
@@ -232,7 +234,7 @@ SAT implementeert zes onafhankelijke verdedigingslagen. Bij elke activering van 
 
 **Fundamentele veiligheidsprincipes:**
 - **Veilig bij falen:** elke fout resulteert in `CS=0`. De ketel valt terug op de wandthermostaat.
-- **Geen automatisch herstel:** SAT blijft uitgeschakeld totdat de gebruiker het expliciet opnieuw inschakelt.
+- **Geen automatisch herstel na een veiligheidsafsluiting:** SAT blijft uitgeschakeld totdat de gebruiker het expliciet opnieuw inschakelt. Een verloren OpenTherm-verbinding is geen veiligheidsafsluiting; zie "OpenTherm weg" hieronder.
 - **Onafhankelijke lagen:** een bug in een laag raakt de andere lagen niet.
 
 **Laag 1: Opstart-veiligheid.** Bij elke opstart, herstart of stroomuitval stuurt SAT als eerste handeling `CS=0` naar de PIC. Zo wordt voorkomen dat de ketel onbeperkt op het laatste setpoint blijft draaien terwijl de ESP nog opstart.
@@ -253,6 +255,10 @@ SAT implementeert zes onafhankelijke verdedigingslagen. Bij elke activering van 
 2. SAT blijft inactief totdat de gebruiker hem expliciet opnieuw inschakelt.
 3. Herstel via webinterface: SAT-schakelaar uit en opnieuw aan.
 4. Herstel via MQTT: publiceer `true` naar `OTGW/set/{UniqueId}/sat/enabled`.
+
+**OpenTherm weg (TASK-1365).** Als SAT 30 s geen antwoord van de ketel heeft gezien, geldt de OpenTherm-verbinding als verloren. Elk ketelantwoord telt, ook een Data-Invalid-antwoord (maintainer, Q33 A). Bij het begin van het verlies stuurt SAT één keer de overdracht, dezelfde als bij uitschakelen: `CS=0`, `CH=1`, `MM=T` (Sergeant D entries 39 en 47). Daarna stuurt SAT niets meer naar de ketel zolang het verlies duurt. SAT blijft ingeschakeld en er wordt geen instelling geschreven. Bij het eerste nieuwe ketelantwoord gaat SAT vanzelf verder en neemt MsgID 1 terug; de PID begint opnieuw bij 0 (entry 79). De toestand is zichtbaar als `sat/ot_link_lost` via MQTT en als `ot_link_lost` in `GET /api/v2/sat/status`.
+
+De overdracht reset de PID. Die nullen worden ook op flash opgeslagen, behalve als het verlies komt vóór de eerste kamertemperatuur sinds de boot, of voordat de klok via NTP is gezet. Dan blijft de opgeslagen PID-toestand op flash staan, zodat een ketel die vlak na een boot traag antwoordt de warmstart-toestand niet wist (d06005d7d, entry 115).
 
 ---
 
@@ -636,7 +642,7 @@ Sinds 2.0.0 worden alle bestuurbare SAT-parameters als aparte HA-entiteiten gepu
 
 | HA-component | Aantal | Voorbeelden |
 |---|---|---|
-| `number` | ~25 | verwarmingscurve-coefficient, deadband, overshoot-marge, regelinterval, max modulatie, flame-off offset, flow offset, mod-sup delay/offset, ketelcapaciteit, comfort-vochtigheid, zomerdrempel, auto-tune rate, preset-temperaturen (comfort/eco/away/sleep/activity/home), min/max druk, max drukval, target temp step |
+| `number` | ~25 | verwarmingscurve-coefficient, deadband, overshoot-marge, regelinterval, max modulatie, flame-off offset, flow offset, mod-sup delay/offset, ketelcapaciteit, zomerdrempel, auto-tune rate, preset-temperaturen (comfort/eco/away/sleep/activity/home), min/max druk, max drukval, target temp step |
 | `switch` | 13 | `solar_gain`, `summer_simmer`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable` |
 | `select` | 1 | `sat_heating_system` met opties `0` (auto), `1` (radiatoren), `2` (warmtepomp), `3` (vloerverwarming) |
 

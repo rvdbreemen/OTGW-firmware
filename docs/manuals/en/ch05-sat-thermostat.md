@@ -80,7 +80,7 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `sattargettemp` | 20.0 | 5-30 C | Desired room temperature |
 | `satcoefficient` | 1.5 | 0.1-5.0 | Heating curve steepness |
 | `satdeadband` | 0.1 | 0.05-2.0 C | PID deadband width |
-| `satinterval` | 30 | 10-300 s | Control loop interval |
+| `satinterval` | 30 | 10-300 s | Control loop interval: how often SAT computes and sends the setpoint. The PID state does not follow it: it advances on its own fixed 60 s timer (see PID tuning) |
 | `satexternaltemp` | false | bool | Use external indoor sensor via MQTT |
 | `satovershootprotection` | true | bool | PWM start-up and modulation suppression (see 5.6). Applies to every heating source |
 | `satmaxrelmod` | 100 | 0-100 % | Maximum relative modulation sent to boiler (MM= command) |
@@ -121,6 +121,8 @@ A per-system **cold cutoff** (COLD_SETPOINT: 28.2 C for radiators, 21.0 C for un
 | `satautotunerate` | 0.02 | 0-1 | Adjustment rate per tuning cycle (2%) |
 
 The integral term uses a **symmetric clamp** `[-curveValue, +curveValue]` with a `+/-20 C` hard safety cap (alpha.28 / alpha.30). Negative accumulation is required in mild weather so the controller can nudge the flow setpoint below the heating curve when the room is slightly above target. The PID integral and raw derivative state are persisted on every save and **warm-started** on the next boot (alpha.32), so a power cycle does not reset to a cold start. `sat/flush` or an explicit `satdisable` clears the persisted state.
+
+**PID timing (TASK-1368).** The integral and derivative advance once every 60 s on their own timer, as in thermo-nova (Sergeant D entries 42 and 111). This is independent of `satinterval`: each control tick recomputes the output from the current heating curve, but only the 60 s step moves the PID state. Before TASK-1368 every 30 s tick stepped the PID, so the integral grew twice as fast. The derivative is 0 on the first output after a reset or restore. Zone PIDs step on the same timer. After a boot the restored state is held unchanged until the first valid room temperature arrives; that reading takes a step at once (entry 115). The first tick after enabling SAT sends a computed setpoint, not the SAT minimum `CS=10`.
 
 #### Advanced control
 
@@ -205,7 +207,7 @@ SAT implements six independent safety layers. Any single layer tripping sends `C
 
 **Fundamental safety principles:**
 - Fail-safe: every error results in `CS=0`. The boiler falls back to the wall thermostat.
-- No automatic recovery: SAT stays disabled until the user explicitly re-enables it.
+- No automatic recovery after a safety trip: SAT stays disabled until the user explicitly re-enables it. A lost OpenTherm link is not a safety trip; see "OpenTherm lost" below.
 - Independent layers: a bug in one layer does not affect the others.
 
 **Layer 1: Boot safety.** At every startup, restart, or power failure, SAT sends `CS=0` before the first control cycle. This prevents the boiler from running indefinitely at the last setpoint while the ESP is still booting.
@@ -225,6 +227,10 @@ SAT implements six independent safety layers. Any single layer tripping sends `C
 2. SAT stays inactive until the user explicitly re-enables it.
 3. Recovery via web interface: toggle the SAT switch off and back on.
 4. Recovery via MQTT: publish `true` to `OTGW/set/{UniqueId}/sat/enabled`.
+
+**OpenTherm lost (TASK-1365).** When SAT has seen no boiler reply for 30 s, the OpenTherm link counts as lost. Any boiler reply counts, a Data-Invalid reply included (maintainer, Q33 A). On entering the loss SAT sends one hand-back, the same as a switch-off: `CS=0`, `CH=1`, `MM=T` (Sergeant D entries 39 and 47). After that it sends nothing to the boiler while the loss lasts. SAT stays enabled and no setting is written. On the first new boiler reply SAT resumes by itself and takes MsgID 1 back; the PID restarts from 0 (entry 79). The state is visible as `sat/ot_link_lost` over MQTT and as `ot_link_lost` in `GET /api/v2/sat/status`.
+
+The hand-back resets the PID. It also saves the zeros to flash, except when the loss comes before the first room temperature reading since boot, or before the clock is set by NTP. In those cases the saved PID state stays on flash, so a boiler that is slow to answer right after a boot does not wipe the warm-start state (d06005d7d, entry 115).
 
 ---
 

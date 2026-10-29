@@ -1135,7 +1135,8 @@ Published every SAT control loop interval (default 30 seconds) when SAT is enabl
 | `sat/boiler_status` | no | Boiler state code (0=Off ... 14=Cooling) |
 | `sat/flame_status` | no | `"healthy"`, `"stuck_on"`, `"short_cycling"`, etc. |
 | `sat/cycle_class` | no | `"good"`, `"overshoot"`, `"underheat"`, `"short"` |
-| `sat/safety_tripped` | no | `"true"` when safety shutdown is active |
+| `sat/safety_tripped` | yes | `"true"` when safety shutdown is active |
+| `sat/ot_link_lost` | yes | `"true"` while SAT has seen no boiler reply for 30 s (TASK-1365) |
 | `sat/pressure` | no | Smoothed system water pressure (bar) |
 | `sat/pressure_alarm` | no | `"true"` when pressure alarm is active |
 | `sat/power` | no | Estimated boiler power (kW) |

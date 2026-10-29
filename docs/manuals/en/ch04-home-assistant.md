@@ -394,6 +394,7 @@ State-only topics (published and retained, but without a Home Assistant entity; 
 | `sat/control_mode` | Requested control mode: `auto`, `continuous`, or `pwm` (`sat/mode` is the mode in use) |
 | `sat/preset` | Active preset (`none`, `away`, `eco`, ...) |
 | `sat/fallback_active` | MQTT-loss fallback switched SAT on. Reads `false` over MQTT, because the fallback only runs while MQTT is down; REST `/api/v2/sat/status` shows it live |
+| `sat/ot_link_lost` | `true` while SAT has seen no boiler reply for 30 s; SAT handed the boiler back once and resumes by itself on the next reply (see chapter 5, Safety System) |
 | `sat/simulation` | Simulation mode `ON`/`OFF` |
 
 **SAT command topics (gateway subscribes to these):**
