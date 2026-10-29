@@ -24,6 +24,13 @@ const SRC = path.join(HERE, '..', '..', 'src', 'OTGW-firmware');
 const V2JS = process.env.OTGW_V2_JS || path.join(SRC, 'data', 'v2.js');
 const CORE = process.env.OTGW_CORE_INO || path.join(SRC, 'OTGW-Core.ino');
 
+// TASK-1491: wait for the chain's end signal instead of a fixed 60/80 ms, so timer latency
+// under machine load cannot cut the chain short. The cap only stops a broken chain.
+async function waitFor(cond, capMs = 5000) {
+  const t0 = Date.now();
+  while (!cond() && Date.now() - t0 < capMs) await new Promise((r) => setTimeout(r, 5));
+}
+
 // Same brace-matching cutter as settings-error-toast.test.mjs (returns null if absent).
 function extractFunction(src, name) {
   const start = src.indexOf('function ' + name + '(');
@@ -223,7 +230,7 @@ test('picAfterFlash() runs the real refresh functions one request at a time', as
   const doc = { getElementById: () => null };
   const after = new Function('document', 'fetch', 'log', 'setTimeout', body)(doc, fetchStub, log, setTimeout);
   after();
-  await new Promise((r) => setTimeout(r, 60));
+  await waitFor(() => log.includes('fetchPicSettings full=true'));   // last step of the chain
   assert.deepEqual(log, [
     'device/info devInfoTs=0', 'GET /api/v2/firmware/files', 'renderPicFiles',
     'GET /api/v2/pic/update-check?recheck=1', 'banner 6.8', 'fetchPicSettings full=true',
@@ -254,7 +261,8 @@ function runPoll(failures) {
     { getElementById: (id) => (id === 'picBanner' ? banner : null) }, fetchStub, (f) => setTimeout(f, 1), log, banner);
   let done = 0;
   fn(() => { done++; }, true);
-  return new Promise((r) => setTimeout(r, 80)).then(() => ({ log, banner, done }));
+  // Wait for the done callback, then a short settle so a second (wrong) call is still seen.
+  return waitFor(() => done > 0).then(() => new Promise((r) => setTimeout(r, 30))).then(() => ({ log, banner, done }));
 }
 
 test('picUpdatePoll: one timed-out GET after "checking" is retried and the banner shows the result', async () => {
