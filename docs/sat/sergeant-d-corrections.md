@@ -4789,3 +4789,9 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156546069887
 **Settled:** the firmware keeps its sliding one-hour window for the PWM start limit (SATcycles.ino:328-344) instead of thermo-nova's restarting window (pwm.py:138-141). A deliberate deviation from the pin, agreed by Sergeant D and the maintainer.
 
 **Changes an earlier entry:** settles entry 123 point 4. **Task:** none (no code change); recorded in sat-comparison.md. **Open:** none.
+
+## 128. Correction of our entry 125: the develop flow+10 block is pwm.py:139-142 as entry 65 cites it (2026-10-29, our finding)
+
+**Not a Sergeant D statement.** Source: second-reader review, TASK-1412.1. At develop pwm.py@7d43560 the block reads `elif flame.is_inactive` at :139, `+10` at :140, `force` at :141 and the log at :142. Entry 125's "138-141, off by one at both ends" is wrong: :138 is the previous branch's debug log. Entry 65's 139-142 stands.
+
+**Changes an earlier entry:** entry 125 (that sentence only). **Task:** TASK-1412.1. **Open:** none.
