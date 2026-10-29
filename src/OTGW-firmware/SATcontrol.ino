@@ -1371,6 +1371,130 @@ static void satSyncPresetTopic(SATPreset p)
   }
 }
 
+// --- satPresetPersist begin
+// TASK-1487: the active preset, the temperature from before the preset (pre-custom) and the window
+// pre-target survive a reboot. thermo-nova restores preset_mode, pre_activity_temperature and
+// pre_custom_temperature after a restart (climate.py:187-188, :190-191, :193-194) and the target the
+// climate had (climate.py:176-182). They stay in state (ADR-051) and are kept in their own LittleFS
+// file, /sat/sat_preset.json, like the PID and energy state. settings.ini keeps the user's own
+// target (satUserTargetTemp()), so a settings save never stores a preset temperature as the target.
+// tests/test_sat_preset_persist.py compiles this block as it is.
+
+// The user's own target: the temperature from before the preset or the window switch, else the target.
+float satUserTargetTemp()
+{
+  if (state.sat.eActivePreset != SAT_PRESET_NONE && state.sat.fPreCustomTemp > 0.0f) return state.sat.fPreCustomTemp;
+  if (state.sat.eActivePreset == SAT_PRESET_ACTIVITY && state.sat.fPreWindowTarget > 0.0f) return state.sat.fPreWindowTarget;
+  return settings.sat.fTargetTemp;
+}
+
+// File contents for the preset state. "t" is the target only while a preset or a window switch holds
+// it (0 otherwise), so a manual target change alone does not rewrite the file.
+static size_t satPresetStateFormat(char* buf, size_t n)
+{
+  const bool held = (state.sat.eActivePreset != SAT_PRESET_NONE) || (state.sat.fPreWindowTarget > 0.0f);
+  int len = snprintf_P(buf, n, PSTR("{\"p\":%u,\"t\":%.2f,\"pc\":%.2f,\"pw\":%.2f,\"pwp\":%u}"),
+                       (unsigned)state.sat.eActivePreset, held ? settings.sat.fTargetTemp : 0.0f,
+                       state.sat.fPreCustomTemp, state.sat.fPreWindowTarget,
+                       (unsigned)state.sat.iPreWindowPreset);
+  return (len > 0) ? (size_t)len : 0;
+}
+
+static float satPresetTempOrZero(float v) { return (v >= 5.0f && v <= 30.0f) ? v : 0.0f; }
+
+// Restore the preset state from the file contents (initSAT(), after readSettings()). No age limit:
+// thermo-nova restores these unconditionally. Returns false and changes nothing on bad contents.
+static bool satPresetStateApply(const char* buf)
+{
+  const char* p = strstr(buf, "\"p\":");
+  if (p == nullptr) return false;
+  const unsigned long preset = strtoul(p + 4, nullptr, 10);
+  if (preset > (unsigned long)SAT_PRESET_HOME) return false;
+  float t = 0.0f, pc = 0.0f, pw = 0.0f;
+  unsigned long pwp = 0;
+  if ((p = strstr(buf, "\"t\":"))   != nullptr) t   = (float)atof(p + 4);
+  if ((p = strstr(buf, "\"pc\":"))  != nullptr) pc  = (float)atof(p + 5);
+  if ((p = strstr(buf, "\"pw\":"))  != nullptr) pw  = (float)atof(p + 5);
+  if ((p = strstr(buf, "\"pwp\":")) != nullptr) pwp = strtoul(p + 6, nullptr, 10);
+  t  = satPresetTempOrZero(t);
+  pc = satPresetTempOrZero(pc);
+  pw = satPresetTempOrZero(pw);
+  if (pwp > (unsigned long)SAT_PRESET_HOME) pwp = SAT_PRESET_NONE;
+  const bool held = (preset != SAT_PRESET_NONE) || (pw > 0.0f);
+  if (held && t == 0.0f) return false;
+  state.sat.eActivePreset    = (SATPreset)preset;
+  state.sat.fPreCustomTemp   = pc;
+  state.sat.fPreWindowTarget = pw;
+  state.sat.fPreActivityTemp = pw;
+  state.sat.iPreWindowPreset = (uint8_t)pwp;
+  if (held) settings.sat.fTargetTemp = t;
+  return true;
+}
+
+// A target that really changes is the user's own (updateSetting("SATtargettemp")): it clears an
+// active preset, as a manual temperature does in thermo-nova (climate.py:567), and a window switch,
+// whose close then has nothing to restore. A window that switched already does not switch again.
+void satPresetClearForUserTarget()
+{
+  const bool hadPreset = (state.sat.eActivePreset != SAT_PRESET_NONE);
+  if (state.sat.fPreWindowTarget > 0.0f) state.sat.iWindowOpenSinceMs = 0;
+  state.sat.eActivePreset    = SAT_PRESET_NONE;
+  state.sat.fPreCustomTemp   = 0.0f;
+  state.sat.fPreWindowTarget = 0.0f;
+  state.sat.fPreActivityTemp = 0.0f;
+  if (hadPreset) satSyncPresetTopic(SAT_PRESET_NONE);
+}
+// --- satPresetPersist end
+
+//=== Preset state file (TASK-1487) ===
+static const char SAT_PRESET_FILE[] PROGMEM = "/sat/sat_preset.json";
+static char _sat_presetSaved[96] = "";   // file contents last written or loaded
+
+void satSavePresetState()
+{
+  char buf[sizeof(_sat_presetSaved)];
+  satPresetStateFormat(buf, sizeof(buf));
+  char path[sizeof(SAT_PRESET_FILE)];
+  strncpy_P(path, SAT_PRESET_FILE, sizeof(path));
+  File f = LittleFS.open(path, "w", true);   // create /sat when missing
+  if (!f) return;
+  f.print(buf);
+  f.close();
+  strlcpy(_sat_presetSaved, buf, sizeof(_sat_presetSaved));
+  SATDebugTf(PSTR("SAT: preset state saved %s\r\n"), buf);
+}
+
+static void satLoadPresetState()
+{
+  char path[sizeof(SAT_PRESET_FILE)];
+  strncpy_P(path, SAT_PRESET_FILE, sizeof(path));
+  File f = LittleFS.open(path, "r");
+  if (f) {
+    char buf[sizeof(_sat_presetSaved)];
+    size_t len = f.readBytes(buf, sizeof(buf) - 1);
+    buf[len] = 0;
+    f.close();
+    if (satPresetStateApply(buf)) {
+      SATDebugTf(PSTR("SAT: preset state restored (preset=%u target=%.1f user=%.1f)\r\n"),
+                 (unsigned)state.sat.eActivePreset, settings.sat.fTargetTemp, satUserTargetTemp());
+    }
+  }
+  satPresetStateFormat(_sat_presetSaved, sizeof(_sat_presetSaved));   // nothing to write until it changes
+}
+
+// Write the file when the preset state changed. Called on the loop task from satControlLoop(): the
+// preset is changed from REST (AsyncTCP task), MQTT and processOT() (OT lock), where no file is written.
+// satControlLoop() runs on every loop() pass, also while SAT is disabled; the check runs once a second.
+DECLARE_TIMER_SEC(timerSATPresetPersist, 1, SKIP_MISSED_TICKS);
+static void satPresetPersistIfChanged()
+{
+  if (!DUE(timerSATPresetPersist)) return;
+  if (!LittleFSmounted || isFlashing()) return;
+  char buf[sizeof(_sat_presetSaved)];
+  satPresetStateFormat(buf, sizeof(buf));
+  if (strcmp(buf, _sat_presetSaved) != 0) satSavePresetState();
+}
+
 void satHandlePreset(const char* value)
 {
   SATPreset newPreset = SAT_PRESET_NONE;
@@ -1384,6 +1508,17 @@ void satHandlePreset(const char* value)
   else if (strcasecmp_P(value, PSTR("home")) == 0)     { newPreset = SAT_PRESET_HOME;     newTarget = settings.sat.fPresetHome; }
   else if (strcasecmp_P(value, PSTR("none")) == 0)     { newPreset = SAT_PRESET_NONE; }
   else return; // Unknown preset
+
+  // TASK-1487: a preset other than activity, chosen while the window switch holds the activity
+  // preset, ends the window switch. thermo-nova restores the pre-activity target on a close only
+  // while the preset is still ACTIVITY (climate.py:830-832), so the user's choice stays. The open
+  // window does not switch again until it closes and opens (iWindowOpenSinceMs = 0).
+  if (state.sat.fPreWindowTarget > 0.0f && newPreset != SAT_PRESET_ACTIVITY) {
+    state.sat.fPreWindowTarget   = 0.0f;
+    state.sat.fPreActivityTemp   = 0.0f;
+    state.sat.iPreWindowPreset   = (uint8_t)SAT_PRESET_NONE;
+    state.sat.iWindowOpenSinceMs = 0;
+  }
 
   state.sat.eActivePreset = newPreset;
   if (newPreset != SAT_PRESET_NONE) {
@@ -1530,14 +1665,22 @@ void satHandleWindow(bool isOpen)
     state.sat.iWindowOpenSinceMs = millis();
     SATDebugTln(F("SAT: window opened, starting timer"));
   }
-  else if (!isOpen && state.sat.bWindowOpen) {
-    // Window closed - restore previous state
+  else if (!isOpen && (state.sat.bWindowOpen || state.sat.fPreWindowTarget > 0.0f)) {
+    // Window closed - restore previous state. A window switch restored after a reboot
+    // (TASK-1487) has bWindowOpen false: the close still restores, as thermo-nova restores on
+    // a close while the ACTIVITY preset is on (climate.py:830-832).
+    if (state.sat.bWindowOpen) satNarrate_P(PSTR("Window closed: heating resumes"));
     state.sat.bWindowOpen = false;
-    satNarrate_P(PSTR("Window closed: heating resumes"));
     state.sat.iWindowOpenSinceMs = 0;
+    if (state.sat.fPreWindowTarget > 0.0f && state.sat.eActivePreset != SAT_PRESET_ACTIVITY) {
+      // The preset left ACTIVITY during the switch: nothing to restore (climate.py:830).
+      state.sat.fPreWindowTarget = 0.0f;
+      state.sat.fPreActivityTemp = 0.0f;
+    }
     if (state.sat.fPreWindowTarget > 0.0f) {
       settings.sat.fTargetTemp = state.sat.fPreWindowTarget;
       state.sat.eActivePreset = (SATPreset)state.sat.iPreWindowPreset;
+      if (state.sat.eActivePreset == SAT_PRESET_NONE) state.sat.fPreCustomTemp = 0.0f;  // back to the user's own target
       state.sat.fPreWindowTarget = 0.0f;
       state.sat.fPreActivityTemp = 0.0f;  // Task #67: clear MQTT-visible pre-activity temp
       satResetIntegral();
@@ -1558,6 +1701,9 @@ static void _satCheckWindowTimer()
     state.sat.fPreWindowTarget = settings.sat.fTargetTemp;
     state.sat.fPreActivityTemp = settings.sat.fTargetTemp;  // Task #67: mirror for MQTT visibility
     state.sat.iPreWindowPreset = (uint8_t)state.sat.eActivePreset;
+    // The switch is a preset change (climate.py:819 -> async_set_preset_mode): from no preset it
+    // keeps the user's own target as the pre-custom temperature (climate.py:619-620, TASK-1487).
+    if (state.sat.eActivePreset == SAT_PRESET_NONE) state.sat.fPreCustomTemp = settings.sat.fTargetTemp;
     state.sat.eActivePreset = SAT_PRESET_ACTIVITY;
     settings.sat.fTargetTemp = settings.sat.fPresetActivity;
     satResetIntegral();
@@ -2659,6 +2805,7 @@ void satPersistAllToFs()
   if (satPidRoomSeen()) satSavePidState();   // entry 115: a restored state with no room reading yet stays on flash
   satSaveEnergyState();
   satSaveEstimatedEnergy();
+  satSavePresetState();      // TASK-1487
   satHCRSaveState();
   SATDebugTln(F("SAT: learned state written to the filesystem"));
 }
@@ -4293,6 +4440,7 @@ void initSAT()
   satLoadPidState();         // Restore PID state from LittleFS after reset (Task #222)
   satLoadEnergyState();      // Restore energy total from LittleFS after reset (Task #196)
   satLoadEstimatedEnergy();  // Restore estimated gas energy from LittleFS (Task #232)
+  satLoadPresetState();      // Restore preset + window target after readSettings() (TASK-1487)
   satHCRLoadState();         // Restore daily-median recommendation ring from LittleFS (Task #228)
   satCycleInit();
   satPwmReset();
@@ -5222,6 +5370,7 @@ static void satControlLoopRun();
 void satControlLoop()
 {
   satWsEventDrain();              // TASK-1337: SAT lines posted from any task, sent here (loop task)
+  satPresetPersistIfChanged();    // TASK-1487: preset state file, written on the loop task
   satControlLoopRun();
   satPublishCoreState();
 }

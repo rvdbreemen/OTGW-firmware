@@ -304,7 +304,7 @@ All SAT runtime state is stored in `state.sat` (`SATRuntimeSection` in SATtypes.
 - **Solar Gain Compensation**: Freezes integral when indoor temp rises unexpectedly (Task #23)
 - **Pressure Monitoring**: EMA smoothing and drop-rate detection (Task #226)
 - **Energy Tracking**: Power = modulation x the active capacity: `fDhwCapacity` while the boiler reports DHW (0 = use `fBoilerCapacity`), `fBoilerCapacity` otherwise (Task #45, TASK-1258). Estimated gas input = power / `fBoilerEfficiency`, switched on and capped by `fBoilerRatedKW` (Task #232, TASK-1258). `satUpdatePowerEnergy()` and `satPersistEnergyIfDue()` run right after DHW detection, before the DHW and summer-simmer early returns, so power and energy keep moving during hot water; persisted to `/sat_energy.json` and `/sat_energy_estimate.json`
-- **Persistence files**: `/sat_pid_state.json`, `/sat/sat_cycles.json`, `/sat/sat_hcr.json`, `/sat_markers.json` (written by restAPI.ino)
+- **Persistence files**: `/sat_pid_state.json`, `/sat/sat_preset.json` (active preset, pre-custom and window pre-target, TASK-1487), `/sat/sat_cycles.json`, `/sat/sat_hcr.json`, `/sat_markers.json` (written by restAPI.ino)
 - **Heating Curve Recommendation**: Daily median error tracking for coefficient adjustment (Task #228)
 - **Window Detection**: Detects rapid indoor temp drop; summer simmer disables heating (Task #24/#29)
 - **PID Auto-Tuning**: Analyzes cycle performance, adjusts gains incrementally (Task #27)

@@ -126,7 +126,7 @@ External inputs arrive via MQTT set commands (`sat/target`, `sat/indoor_temp`, `
 
 ### External Systems
 
-- **LittleFS**: `/sat_pid_state.json`, `/sat_energy.json`, `/sat_energy_estimate.json`, `/sat/sat_cycles.json`, `/sat/sat_hcr.json`, `/sat_markers.json` (calibration markers, TASK-586)
+- **LittleFS**: `/sat_pid_state.json`, `/sat_energy.json`, `/sat_energy_estimate.json`, `/sat/sat_preset.json` (preset state, TASK-1487), `/sat/sat_cycles.json`, `/sat/sat_hcr.json`, `/sat_markers.json` (calibration markers, TASK-586)
 - **Open-Meteo API** (`SATweather.ino`): Free HTTP weather service (no API key); fetched for outdoor temperature + 24-hour forecast when not provided via MQTT or OT MsgID 27.
 - **NimBLE-Arduino 2.x** (`SATble.ino`, ADR-092): Continuous passive BLE scanning, callback-only mode, roster-backed by settings
 
