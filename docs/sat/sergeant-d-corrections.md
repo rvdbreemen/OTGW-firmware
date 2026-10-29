@@ -4795,3 +4795,24 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156546069887
 **Not a Sergeant D statement.** Source: second-reader review, TASK-1412.1. At develop pwm.py@7d43560 the block reads `elif flame.is_inactive` at :139, `+10` at :140, `force` at :141 and the log at :142. Entry 125's "138-141, off by one at both ends" is wrong: :138 is the previous branch's debug log. Entry 65's 139-142 stands.
 
 **Changes an earlier entry:** entry 125 (that sentence only). **Task:** TASK-1412.1. **Open:** none.
+
+## 129. Q62 A: with a valid restored state SAT sends nothing at boot until its first tick (2026-10-29, settles entry 126's open point)
+
+**Source:** #alpha-testing, 2026-10-29 20:37 UTC, answer to Q62 (msg 1565464249927598262):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565464538709491954
+
+**Quoted:**
+
+> @BlueFlame Bot Q62: A
+
+Option A as posted: "Nothing until its first tick. The PIC keeps SAT's last setpoint on the bus for about a minute after a gateway restart, so the boiler sees no change, and SAT takes over within seconds."
+
+**Settled (our reading of a one-letter reply, against the posted option text):**
+
+- When the restored state is valid at boot (saved PID state, and a saved outside temperature younger than 1 hour, entry 126), SAT sends no command at boot: no CS=0, no CH, no MM. It takes over on its first control tick.
+- Without a valid restored state SAT stays quiet as in entry 121: the hand-back of entry 47 (CS=0, CH=1, MM=T), then nothing until a boiler reply and a valid outside temperature exist.
+- The boot CS=0 of today (`SATcontrol.ino:4317-4325`) goes in the valid case.
+
+**Compared with thermo-nova and the firmware:** thermo-nova has no gateway boot; after a Home Assistant restart it restores its state (`climate.py:169-190`, `heating_control.py:181-191`) and its next control pass sends the setpoint, with nothing sent in between. Firmware relies on the PIC keeping a CS= for about 63-126 s without a refresh (CLAUDE.md architecture rules, `satPicCSKeepalive()`); on OT-Direct boards there is no such holdover, so the first tick must come quickly there (not decided by this answer; noted for the plan).
+
+**Changes an earlier entry:** settles entry 126 Open; consistent with entries 121 and 47. **Task:** TASK-1482, TASK-1390. **Open:** the OT-Direct case (no PIC holdover) is noted for the TASK-1482 plan.

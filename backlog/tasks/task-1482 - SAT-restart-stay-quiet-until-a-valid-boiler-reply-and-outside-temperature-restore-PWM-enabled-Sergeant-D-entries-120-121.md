@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T19:01:00Z'
-updated_date: '2026-10-29T20:36:00Z'
+updated_date: '2026-10-29T21:44:00Z'
 labels:
   - sat
   - bug
@@ -49,4 +49,6 @@ Open points to Sergeant D: (a) boot hand-back full vs CS=0 only (advice full); (
 2026-10-29: plan posted to Sergeant D for OK with open points (a) full boot hand-back, (b) MsgID 27 validity (msg in #alpha-testing). Implementation waits for his answer (skill step 4).
 
 2026-10-29 Sergeant D entry 126 (and maintainer): outside temperature valid < 1 h, saved with the PID state and restored at boot, so SAT resumes on its first tick; entry 127: sliding hour kept. Q62 asked (boot send with a valid restored state: A nothing / B hand-back; advice A). Implementation waits for Q62.
+
+2026-10-29 Q62 A (entry 129): with a valid restored state (PID + outside temperature < 1 h) SAT sends nothing at boot and takes over at its first tick; otherwise entry 121 quiet hand-back. OT-Direct has no PIC CS holdover: first tick must come quickly there (plan point). Unblocked: implement in batch 2.
 <!-- SECTION:NOTES:END -->
