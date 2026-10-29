@@ -132,6 +132,8 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satsolarminelev":"Solar gain only counts when the sun is above this elevation (-10 to 45). Needs a sun elevation pushed over MQTT; without it the gate is skipped.",
 "satboilerratedkw":"Gas input of your boiler in kW. Turns on the gas input estimate and caps it. 0 = off.",
 "satboilerefficiency":"Efficiency used to estimate gas input from heat output, 0.5 to 1.0. Default 0.92.",
+"satminconsumption":"Gas use of your boiler in m3/h at minimum modulation, 0 to 8. With the max value it drives sat/consumption; 0 = off.",
+"satmaxconsumption":"Gas use of your boiler in m3/h at full modulation, 0 to 8. sat/consumption is published only when min and max are both above 0.",
 "satcyclesperhour":"Target boiler cycles per hour, 2 to 6. Default 3. Sets the PWM period.",
 "satvalveoffset":"Valve offset, -1 to 1. Stored and published, but the control loop does not use it today.",
 "satsensormaxage":"Seconds an MQTT or REST indoor temperature stays valid, 60 to 86400. Default 21600 (6 h).",

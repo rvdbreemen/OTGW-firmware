@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.537
+**  Version  : v2.0.0-alpha.538
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4044,6 +4044,8 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fSolarMinElevation,       1, 1, tmpBuf); addNum(F("satsolarminelev"),     tmpBuf, "f", -10, 45);
     dtostrf(settings.sat.fBoilerRatedKW,           1, 1, tmpBuf); addNum(F("satboilerratedkw"),    tmpBuf, "f", 0, 200);
     dtostrf(settings.sat.fBoilerEfficiency,        1, 2, tmpBuf); addNum(F("satboilerefficiency"), tmpBuf, "f", 0, 1);
+    dtostrf(settings.sat.fMinConsumption,          1, 2, tmpBuf); addNum(F("satminconsumption"),   tmpBuf, "f", 0, 8);
+    dtostrf(settings.sat.fMaxConsumption,          1, 2, tmpBuf); addNum(F("satmaxconsumption"),   tmpBuf, "f", 0, 8);
   }
 #if HAS_SAT_BLE
   // --- SAT BLE Sensor settings (Task #20). TASK-742: gated on HAS_SAT_BLE. ---
@@ -4171,7 +4173,8 @@ static const char* const PROGMEM knownSettings[] = {
   "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient",
   "satdeadband", "satdhwcapacity", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
   "satflameoffset", "satflowoffset", "satflushtreshold", "satfollowthermostat", "sathumiditytimeout",
-  "satinterval", "satmanufacturer", "satmaxpressdrop", "satmaxpressure", "satminpressure",
+  "satinterval", "satmanufacturer", "satmaxconsumption", "satmaxpressdrop", "satmaxpressure",
+  "satminconsumption", "satminpressure",
   "satmodsupdelay", "satmodsupoffset", "satmqttfallback", "satmultiarea", "satmultiareacount",
   "satovershootmargin", "satovershootprotection", "satpresetactivity", "satpresetaway", "satpresetcomfort", "satpreseteco",
   "satpresethome", "satpresetsleep",  // TASK-1254: activity/home/sleep had GET + dispatch but were POST-blocked

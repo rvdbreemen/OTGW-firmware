@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.537
+**  Version  : v2.0.0-alpha.538
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -357,6 +357,8 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATdhwcapacity"), settings.sat.fDhwCapacity);
   writeJsonFloatKV(file, F("SATboilerratedkw"), settings.sat.fBoilerRatedKW);
   writeJsonFloatKV(file, F("SATboilerefficiency"), settings.sat.fBoilerEfficiency);
+  writeJsonFloatKV(file, F("SATminconsumption"), settings.sat.fMinConsumption);
+  writeJsonFloatKV(file, F("SATmaxconsumption"), settings.sat.fMaxConsumption);
   writeJsonBoolKV(file, F("SATpresetsync"), settings.sat.bPresetSync);
   writeJsonStringKV(file, F("SATpresetsynctopic"), settings.sat.sPresetSyncTopic);
   writeJsonBoolKV(file, F("SATsimulation"), settings.sat.bSimulation);
@@ -1060,6 +1062,8 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATdhwcapacity")) == 0) settings.sat.fDhwCapacity = clampSettingFloat(newValue, settings.sat.fDhwCapacity, 0.0f, 100.0f);
   else if (strcasecmp_P(field, PSTR("SATboilerratedkw")) == 0)   settings.sat.fBoilerRatedKW = clampSettingFloat(newValue, settings.sat.fBoilerRatedKW, 0.0f, 200.0f);
   else if (strcasecmp_P(field, PSTR("SATboilerefficiency")) == 0) settings.sat.fBoilerEfficiency = clampSettingFloat(newValue, settings.sat.fBoilerEfficiency, 0.5f, 1.0f);
+  else if (strcasecmp_P(field, PSTR("SATminconsumption")) == 0)   settings.sat.fMinConsumption = clampSettingFloat(newValue, settings.sat.fMinConsumption, 0.0f, 8.0f);
+  else if (strcasecmp_P(field, PSTR("SATmaxconsumption")) == 0)   settings.sat.fMaxConsumption = clampSettingFloat(newValue, settings.sat.fMaxConsumption, 0.0f, 8.0f);
   else if (strcasecmp_P(field, PSTR("SATpresetsync")) == 0) settings.sat.bPresetSync = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATpresetsynctopic")) == 0) strlcpy(settings.sat.sPresetSyncTopic, newValue, sizeof(settings.sat.sPresetSyncTopic));
   else if (strcasecmp_P(field, PSTR("SATsimulation")) == 0) {

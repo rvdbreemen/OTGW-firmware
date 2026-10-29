@@ -2081,6 +2081,8 @@
     satsolarminelev:     { cat: 'sat', label: 'Solar min elevation', hint: '°' },
     satboilerratedkw:    { cat: 'sat', label: 'Boiler rated input', hint: 'kW gas input. Enables the gas estimate and caps it (0 = off)' },
     satboilerefficiency: { cat: 'sat', label: 'Boiler efficiency', hint: 'fraction 0.5–1.0' },
+    satminconsumption:   { cat: 'sat', label: 'Gas use at min modulation', hint: 'm³/h (0 = off)' },
+    satmaxconsumption:   { cat: 'sat', label: 'Gas use at max modulation', hint: 'm³/h (0 = off)' },
     // TASK-933 P2: keys that already had GET + dispatch but lacked a whitelist token
     // (now POST-able).
     satcyclesperhour:    { cat: 'sat', label: 'Cycles per hour' },
@@ -2167,7 +2169,8 @@
     ['PID / PWM', ['satovershootprotection', 'satcyclesperhour', 'satmaxmodulation',
                    'satinterval', 'sathpcycle', 'satautotune', 'satautotunerate', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
-    ['Boiler', ['satmanufacturer', 'satboilerratedkw', 'satboilerefficiency', 'satboilercapacity', 'satdhwcapacity',
+    ['Boiler', ['satmanufacturer', 'satboilerratedkw', 'satboilerefficiency', 'satminconsumption', 'satmaxconsumption',
+                'satboilercapacity', 'satdhwcapacity',
                 'satminpressure', 'satmaxpressure', 'satmaxpressdrop']],
     ['Thermal', ['satthermalcomfort', 'sathumiditytimeout',
                  'satthermalcoeff', 'satsolargain', 'satsolarminrise', 'satsolaroffset', 'satsolarminelev']],

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.537
+**  Version  : v2.0.0-alpha.538
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -504,6 +504,10 @@ struct SATSection {
   // Gas consumption estimation (Task #232)
   float    fBoilerRatedKW     = 0.0f;   // Rated boiler input in kW: enables the gas estimate (>0) and caps it (0=disabled)
   float    fBoilerEfficiency  = 0.92f;  // Boiler efficiency (0.0-1.0, default 0.92)
+  // Gas consumption in m3/h at minimum and maximum modulation (TASK-1484). sat/consumption
+  // is published only when both are > 0 (thermo-nova sensor.py:62-66).
+  float    fMinConsumption    = 0.0f;   // m3/h at 0% modulation (0..8, 0 = off)
+  float    fMaxConsumption    = 0.0f;   // m3/h at 100% modulation (0..8, 0 = off)
   // Preset sync (Task #46) — broadcast preset changes to secondary entities
   bool     bPresetSync        = false;         // Sync preset to secondary entities via MQTT
   char     sPresetSyncTopic[65] = "";          // MQTT topic for preset sync

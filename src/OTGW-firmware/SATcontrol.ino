@@ -3852,17 +3852,23 @@ void satPublishMQTT()
     publishIfChangedF(F("sat/requested_setpoint"), reqSp, s_requested_setpoint, SAT_EPS_TEMP_COARSE, 1, false);
   }
 
-  // Gas consumption m3/h (Task #52). The original code reads minCons/maxCons
-  // as 0.0 placeholders — the entire block is currently dead. Refactor it
-  // through the helper anyway, so when minCons/maxCons get real settings
-  // hooks the on-change pattern is already in place.
+  // Gas consumption m3/h (Task #52). TASK-1484: from the satminconsumption /
+  // satmaxconsumption settings, thermo-nova "Current Consumption (Device)":
+  // published only when both are > 0 (sensor.py:62-66); 0 unless the boiler is
+  // in CH mode and the flame is on, else min + modulation/100 * (max - min),
+  // 3 decimals (sensor.py:252-259). "CH mode" is the boiler's status bit 1, the
+  // bit thermo-nova's OpenTherm-Gateway-via-MQTT coordinator reads as `active`
+  // (coordinator/mqtt/opentherm.py:60-61, our centralheating topic), so a hot-water
+  // draw reads 0. Simulation has no boiler status: its flame stands in for CH mode,
+  // as the thermo-nova simulator (coordinator/simulator/__init__.py:58-63).
   {
-    float minCons = 0.0f;
-    float maxCons = 0.0f;
+    float minCons = settings.sat.fMinConsumption;
+    float maxCons = settings.sat.fMaxConsumption;
     if (minCons > 0 && maxCons > 0) {
       float consumption = 0.0f;
       bool flame = satIsFlameOn();
-      if (state.sat.bActive && flame) {
+      bool chActive = settings.sat.bSimulation ? flame : isCentralHeatingActive();
+      if (chActive && flame) {
         float modFrac = OTcurrentSystemState.RelModLevel / 100.0f;
         consumption = minCons + (modFrac * (maxCons - minCons));
       }

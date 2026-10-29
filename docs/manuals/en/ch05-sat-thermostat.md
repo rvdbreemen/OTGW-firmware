@@ -555,8 +555,10 @@ SAT estimates boiler power output and tracks cumulative energy consumption.
 | `satdhwcapacity` | 0.0 | 0-100 kW | Capacity used instead of `satboilercapacity` while the boiler reports DHW active. Set it when your boiler reports modulation relative to a separate DHW limit. 0 = use the boiler capacity |
 | `satboilerratedkw` | 0.0 | 0-200 kW | Rated boiler gas input. Enables the estimated gas input (> 0) and is its upper limit; it is not the multiplier. 0 = estimate off |
 | `satboilerefficiency` | 0.92 | 0.5-1.0 | Boiler efficiency. Estimated gas input (`energy_estimated_kwh`) = `sat/power` / efficiency |
+| `satminconsumption` | 0.0 | 0-8 m³/h | Gas consumption at minimum modulation. With `satmaxconsumption`, it sets `sat/consumption`. 0 = off |
+| `satmaxconsumption` | 0.0 | 0-8 m³/h | Gas consumption at maximum modulation. `sat/consumption` = minimum + modulation/100 x (maximum - minimum) while the boiler reports CH mode and the flame is on, else 0. Published only when both settings are above 0 |
 
-Published to MQTT as `sat/power` (kW) and `sat/energy_total` (kWh).
+Published to MQTT as `sat/power` (kW) and `sat/energy_total` (kWh), and as `sat/consumption` (m³/h) when both consumption settings are above 0.
 
 ---
 

@@ -590,8 +590,10 @@ SAT schat het ketelvermogen en houdt het cumulatieve energieverbruik bij.
 | `satdhwcapacity` | `0.0` | 0-100 kW | Capaciteit die in plaats van `satboilercapacity` geldt zolang de ketel DHW actief meldt. Stel dit in als uw ketel modulatie meldt ten opzichte van een aparte DHW-limiet. 0 = ketelcapaciteit gebruiken |
 | `satboilerratedkw` | `0.0` | 0-200 kW | Nominaal gasingangsvermogen van de ketel. Schakelt de geschatte gasinput in (> 0) en is de bovengrens ervan; het is niet de vermenigvuldiger. 0 = schatting uit |
 | `satboilerefficiency` | `0.92` | 0.5-1.0 | Ketelrendement. Geschatte gasinput (`energy_estimated_kwh`) = `sat/power` / rendement |
+| `satminconsumption` | `0.0` | 0-8 m³/h | Gasverbruik bij de laagste modulatie. Samen met `satmaxconsumption` bepaalt dit `sat/consumption`. 0 = uit |
+| `satmaxconsumption` | `0.0` | 0-8 m³/h | Gasverbruik bij de hoogste modulatie. `sat/consumption` = minimum + modulatie/100 x (maximum - minimum) zolang de ketel CH-modus meldt en de vlam brandt, anders 0. Wordt alleen gepubliceerd als beide instellingen boven 0 staan |
 
-Gepubliceerd via MQTT als `sat/power` (kW) en `sat/energy_total` (kWh).
+Gepubliceerd via MQTT als `sat/power` (kW) en `sat/energy_total` (kWh), en als `sat/consumption` (m³/h) wanneer beide verbruiksinstellingen boven 0 staan.
 
 ---
 
