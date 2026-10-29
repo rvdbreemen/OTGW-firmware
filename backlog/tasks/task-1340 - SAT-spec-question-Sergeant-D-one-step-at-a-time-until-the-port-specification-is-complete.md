@@ -3,11 +3,11 @@ id: TASK-1340
 title: >-
   SAT spec: question Sergeant D one step at a time until the port specification
   is complete
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-24T09:19:00Z'
-updated_date: '2026-10-29T04:39:00Z'
+updated_date: '2026-10-29T05:03:00Z'
 labels:
   - sat
   - spec
@@ -25,8 +25,8 @@ Maintainer directive 2026-10-24: unclear SAT behaviour is resolved interactively
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every question in docs/sat/open-questions.md is answered (recorded as a corrections entry) or dropped with a reason
-- [ ] #2 Every answered question has a backlog task that implements it, linked from the queue
+- [x] #1 Every question in docs/sat/open-questions.md is answered (recorded as a corrections entry) or dropped with a reason
+- [x] #2 Every answered question has a backlog task that implements it, linked from the queue
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -48,3 +48,9 @@ Maintainer directive 2026-10-24: unclear SAT behaviour is resolved interactively
 
 2026-10-29 close-out audit (workflow, 5 agents): all 70 queue rows checked. Fixed in open-questions.md: Q7b now links TASK-1390; Q36b closed as informational (heads-up, entry 81); Q42 states why there is no task. Q18: two independent readers (one tasked to refute) found the firmware zone aggregation differs from area.py/climate.py in eight ways (citations verified in session: area.py:166-175, 286-301, 312-333; climate.py:372-392; SATcontrol.ino:5516-5566). Redrafted and asked of Sergeant D (msg 1565223339390275625). Remaining for AC#1: Q18 answer; then AC#2 (task for the answer).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+All 70 rows of docs/sat/open-questions.md are answered (each with its corrections entry) or closed/withdrawn with a reason; every answered question that needs code links a task. Close-out audit 2026-10-29 (workflow, 5 agents) fixed Q7b (-> TASK-1390), Q36b (closed, informational, entry 81) and Q42 (no task: answer rules out the mapping). Q18 was redrafted from the code (two independent readers, eight differences, citations verified), asked, and answered A by Sergeant D 04:48 UTC (msg 1565225896418345072): recorded as entry 116 before any change, implementing task TASK-1440. Not covered: new questions that come up later are handled the same way but outside this task.
+<!-- SECTION:FINAL_SUMMARY:END -->

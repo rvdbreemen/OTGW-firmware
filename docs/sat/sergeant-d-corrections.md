@@ -4583,3 +4583,20 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156511785461
 **Changes an earlier entry:** entry 46 (reset when the room temperature is lost or missing): "missing" no longer covers the time before the first reading after boot. Consistent with entry 83 (the restored I is used once a reading arrives).
 
 **Task:** TASK-1368. **Open:** none.
+
+## 116. Q18 A: zones follow thermo-nova's area.py aggregation as it is (2026-10-29, settles entry 35's open point)
+
+**Source:** #alpha-testing, 2026-10-29 04:48 UTC, answer to Q18 (msg 1565223339390275625):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565225896418345072
+
+**Quoted:**
+
+> Q18: A
+
+Option A as posted: "Port thermo-nova's zone logic as it is."
+
+**Settled (our reading of a one-letter reply, against the posted option text):** the firmware's multi-zone aggregation is replaced by thermo-nova's. thermo-nova (`climate.py:372-392`): the primary PID output is kept and only raised, `setpoint = max(primary, areas output)` (`:385-386`); the areas output is the `int(0.75 * N)` percentile, so the highest output for N <= 4, capped at `baseline + 5.0` (`area.py:286-301`); a room more than 0.3 above its target sets a ceiling `22 + 10 - 4 x degrees over`, the minimum over rooms, floored at 22, applied as `min(setpoint, cap)` (`area.py:312-333`, `climate.py:388-389`); a room counts only with output above 22 or a valve at least 10 % open (`area.py:166-175`); ECO mode skips both steps (`climate.py:377-379`). The firmware (`SATcontrol.ino:5516-5566`) differs in eight ways: it replaces the primary output, uses `ceil(0.75N)-1`, adds the headroom on top, subtracts the largest overshoot with no 0.3 margin and floors at 10, applies no cap with one zone, counts zones above 10, and runs only with two or more zones, also in ECO. Two independent readers compared both sides (TASK-1340 audit, 2026-10-29); the citations were opened in that session.
+
+**Changes an earlier entry:** entry 35 (port upstream PR #172 for multiple areas) left open whether PR #172 is in the pinned commit; this entry makes the pinned `area.py` the target regardless. Consistent with entry 35.
+
+**Task:** TASK-1440. **Open:** the zone PID itself (no D term, output and integral clamps, `SATcontrol.ino:2270-2305`) differs from `pid.py` too; that is covered by the PID tasks (TASK-1414..1418, TASK-1423) where they apply to zone PIDs, and is not decided by this entry.
