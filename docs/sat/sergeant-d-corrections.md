@@ -4648,3 +4648,20 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156535795282
 **Settled:** this is an assessment, not a correction or a design decision. Sergeant D judges the control on gruijter's Intergas (field run on 2.0.0-alpha.527+fd491ff, capture from 08:58 local) as working as intended, with a supply/return of about 40/30 (median 38.5/28.7) while CH is on. Context from gruijter (msg 1565361639304339506): the boiler itself was tuned last year for a low return temperature (reduced power, minimum supply temperature 28, pump min/max and delay-off adapted). It changes no thermo-nova comparison and no firmware behaviour.
 
 **Changes an earlier entry:** none. **Task:** TASK-1474 (analysis of the same capture); field evidence for Robert's "beta after field proof" decision (TASK-1469). **Open:** the run was on alpha.527, so the alpha.528-532 changes (zones/ECO, humidity source, previous-CS clamp, HA cleanups) are not covered by this assessment; the "WAF test" (household acceptance over a longer period) is still to come.
+
+## 120. Restart: "this is SAT's bug", SAT stays quiet without valid OpenTherm; Q59 to be re-evaluated (2026-10-29)
+
+**Source:** #alpha-testing, 2026-10-29 15:21 UTC, reply to Q59 (msg 1565378592890683554):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565385159803670560
+
+**Quoted:**
+
+> @BlueFlame Bot this is SAT's bug. We agreed in the open questions that when we don't have a valid OT response we keep sat quiet. Reevaluate Q59.
+
+**Settled:** the restart behaviour seen in gruijter's alpha.527 capture (TASK-1474) is a SAT defect, not a design option. None of Q59's options A/B/C is chosen; he asks us to re-evaluate the question against the earlier decisions.
+
+**Interpretation (ours, to be confirmed with the re-asked Q59):** the decisions he refers to are entry 39 (no valid OpenTherm: SAT stops and then sends nothing), entry 47 (that stop is the user switch-off hand-back CS=0, CH=1, MM=T, then silent), entry 79 (SAT resumes on the first new boiler reply) and entry 56 (outside temperature missing or old: SAT stops at once). Read together for a restart: SAT has no valid boiler reply and no outside temperature yet, so it should stay quiet (hand-back state, no CS/CH/MM of its own) and take over only once both are valid. In the capture it did the opposite: at 12:57:24 it sent CS=34.1, MM=100 and CH=1 with outside 0.0 °C (no weather fetched yet), until the weather arrived at 13:01:54.
+
+**Compared with thermo-nova and the firmware:** thermo-nova skips a control pass while the outside temperature is None (`climate.py:544-545`) and restores "PWM enabled" and the last setpoint after a Home Assistant restart (`pwm.py:111-114`, `heating_control.py:181-191`, `climate.py:169-174`). Firmware: boot sends CS=0 (`SATcontrol.ino:4317-4325`), starts in continuous mode (`:4338`) and the outside-temperature fallback ends at MsgID 27 / 0.0 (entry 56 comparison, TASK-1390).
+
+**Changes an earlier entry:** none; it applies entries 39, 47, 56 and 79 to the restart case. **Task:** TASK-1390 (outside temperature missing), restart hand-over task to be filed after the re-asked Q59. **Open:** whether "quiet" at a restart also waits for a valid outside temperature, and whether the PWM state is restored.
