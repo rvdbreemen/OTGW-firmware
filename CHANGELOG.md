@@ -37,6 +37,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BLE temperature-sensor support on ESP32-S3 OTGW32** (TASK-487 NimBLE port + TASK-494 continuous-scan + TASK-488 HA discovery). Replaces the classic Bluedroid stack with NimBLE-Arduino 2.x (~400 KB flash freed). Async continuous scan matches the OT-Thing reference: sensors are discovered within seconds of boot. Per-MAC MQTT topics under `<TopTopic>/sat/ble/<mac>/{temp,rh,bat,rssi}` plus retained Home Assistant auto-discovery configs. Supports ATC/pvvx custom firmware (UUID `0x181A`) and BTHome v2 (UUID `0xFCD2`). ADR-092 covers the dependency adoption.
 - **OTDirect command-queue coalesce-by-MsgID** (TASK-494). Multi-channel fan-in (MQTT/REST/WebUI/serial) now collapses repeated WRITE_DATA commands targeting the same MsgID into the latest value, matching PIC's "latest WRITE_DATA per MsgID wins" semantics on the OT bus. High-water mark counter exposed via telnet debug for diagnostic visibility. ADR-068 amended.
 
+- **SAT hands the boiler back when OpenTherm is lost, and resumes by itself** (TASK-1365; Sergeant D entries 39, 47, 79). After 30 s without a boiler reply SAT sends `CS=0`, `CH=1`, `MM=T` once, then nothing until the boiler answers again; `sat/ot_link_lost` shows the state, and a loss right after boot no longer wipes the saved PID state.
+
 ### Changed
 - **SAT PWM: the hourly start limit counts only PWM's own ON phases, and the first phase after PWM is entered is ON** (TASK-1401, TASK-1369; Sergeant D entries 43 and 59). Hot-water ignitions and relights no longer count against cycles per hour, so a shower no longer blocks heating. When SAT switches into PWM the first phase starts ON without waiting an off time; a burner that is already burning keeps burning for its ON time instead of being cut on the next tick. `cycles_this_hour` (REST, MQTT, SAT page) now shows PWM ON-phase starts only: it reads 0 in continuous mode and can drop as starts leave the rolling hour (its Home Assistant `state_class` is still `total_increasing`; not changed here).
 - **SAT switches PWM off on the cold cutoff and when all valves are closed** (TASK-1327; Sergeant D, 2026-10-23, as thermo-nova heating_control.py:229-234). When the requested setpoint drops to the cold setpoint or below (28.2 radiators, 21 underfloor), or all valves close, SAT resets the PWM phase, the overshoot/underheat/saturation guards and the remembered setpoint (10), sends the maximum relative modulation, and leaves PWM mode. Before, it stayed in PWM and could resume with an old setpoint such as 45.
@@ -58,6 +60,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **MQTT on-change publishing is now the default** (TASK-791, ADR-116). New setting `MQTTonChangePublishing` defaults to `true`, and the publish interval defaults to `60` seconds: changed OpenTherm values publish immediately, unchanged values refresh once per minute. On upgrade, a config that still has `MQTTinterval=0` is migrated once to `60` (persisted via the deferred settings write, no boot-time rewrite). Untick "MQTT Publish On-Change" (or set `MQTTonChangePublishing=false`) to restore legacy publish-every-message behaviour. The TASK-400 status-bit heartbeat is independent and unchanged.
 - **`settings.sat.iBleInterval` semantics** (TASK-494). Repurposed from "BLE scan rate" to "publish/state-update cadence". The BLE radio scans continuously on ESP32 since this release; existing user configs continue to load and round-trip cleanly. WebUI tooltip updated.
 - **MQTT `resetgateway` command** now requires payload `"1"` (matching the HA-discovery `payload_press` value already shipped) and is rate-limited to one PIC reset per 5 seconds. Non-matching payloads are logged and ignored; rapid retries inside the cooldown window are silently dropped with a log line. Closes the unauthenticated-LAN reset-storm path raised by the dev review (TASK-668, port of dev TASK-661).
+
+- **The SAT PID steps on its own 60 s timer, as thermo-nova** (TASK-1368, TASK-1270; Sergeant D entries 42, 111, 115). Before, every 30 s control tick stepped the PID, so the integral grew twice as fast; the first tick after enabling SAT now sends a computed setpoint instead of `CS=10`.
 
 ### Removed
 
@@ -132,6 +136,8 @@ These classic web UI features are not in v2 (details in `docs/history/2026-10-15
 - **WiFi association without DHCP/IP after reboot** (TASK-432, ported from `dev`). Removed three `platformRestartDHCP()` call sites in `networkStuff.ino` (startWiFi catch-all, WIFI_RECONNECTED, startNTP) and the function itself from `platform_esp8266.h` and `platform_esp32.h`. Calling `wifi_station_dhcpc_stop/start` while the station is connected takes DHCP ownership away from the SDK and breaks subsequent `setAutoReconnect()`-driven DHCP. Returns to v1.2.0 baseline pattern: SDK manages DHCP autonomously.
 - **MQTT publish gating per source topic** (TASK-478, ported from `dev`). Implements ADR-066: the base topic `{prefix}/value/{id}/{label}` publishes only thermostat-side intent (Read-Ack and Write-Data); slave Write-Ack values no longer flow to the base topic. The `/boiler` subtopic (when `bSeparateSources=true`) is gated by a per-MsgID `bSlaveEchoesValue` flag for the six OpenTherm v4.2 messages whose slave Write-Ack data byte is per-spec undefined (`Tr` 24, `TrSet` 16, `MaxRelModLevelSetting` 14, `TrSetCH2` 23, `TRoomCH2` 37, `RFstrengthbatterylevel` 98). Spec-audit covering all OT v4.2 MsgIDs lives in `docs/api/MQTT-message-id-echo-audit.md`.
 
+- **SAT no longer detects solar gain without a valid sun elevation** (TASK-1408). With no elevation, or one older than 1 hour, solar gain stays off and its hold is cleared; before, the indoor rise rate alone could switch it on.
+
 ### Added
 
 - ADR-066 documenting the source-aware MQTT publish gating decision (ported verbatim from `dev`)
@@ -141,6 +147,10 @@ These classic web UI features are not in v2 (details in `docs/history/2026-10-15
 - Added tools/generate_release_sha256sums.py + docs/MANUAL.md release-verification section (TASK-501 4B-M4)
 - Added docs/templates/hardware-verification-log.md template for AC evidence capture (TASK-501 4B-M5)
 - Polished 8 comment / `static_cast` / named-constant Lows from Phase 1-4 review (TASK-502): BLE_STALE_MS static_assert tripwire, malformed-MAC debug log in satBLEMacToCompact, NimBLE 0.625 ms tick conversion comment, OT_OVERRIDE_*_DELTA_F88 float-truncation foot-gun note, satBLEPublishHaDiscovery / OTGW-firmware.h "publish cycle vs scan" wording refresh, named BLE_SCAN_INTERVAL_TICKS / BLE_SCAN_WINDOW_TICKS / BLE_SCAN_MAX_RESULTS constants, static_cast<int8_t> for getRSSI(), shared BLE_MAC_COMPACT_SIZE constant.
+
+### Documentation
+
+- **The SAT manual chapters and the MQTT guides match the code again** (TASK-1368, TASK-1365, TASK-1282, TASK-1454). The manuals describe the 60 s PID timer and the OpenTherm-loss hand-back, and MQTT_LWT.md now says that a command sent while the gateway reconnects is lost.
 
 ## [2.0.0-beta] - 2026-04-11
 
