@@ -153,7 +153,7 @@ DISC_MUTANTS = [
     ("M27", "MQTT-enabled check removed from publishDHWWaterMeter()", "gen_disc_mqtt.inc",
      [(PUBLISH_GATES, "  if (!dhwWaterMeterHasData()) return;\n")], "D9", ["D7"]),
     ("M6", "MQTT_HA_SENSOR_COUNT left at 389", "gen_disc_table.inc",
-     [("const uint16_t MQTT_HA_SENSOR_COUNT = 393;", "const uint16_t MQTT_HA_SENSOR_COUNT = 392;")], "D1", []),
+     [("const uint16_t MQTT_HA_SENSOR_COUNT = 394;", "const uint16_t MQTT_HA_SENSOR_COUNT = 393;")], "D1", []),   # 394 since TASK-1439
     ("M11", "publisher formats with dtostrf into msg[24] (the pre-fixup code)", "gen_disc_mqtt.inc",
      [('snprintf_P(msg, sizeof(msg), PSTR("%.1f"), dhwWaterTotalL);', "dtostrf(dhwWaterTotalL, 0, 1, msg);")],
      "D11", ["D7", "D10"], True),
@@ -257,7 +257,8 @@ WIRING = [
 ]
 FAUX_IDS = ["OTGWdallasdataid", "OTGWs0dataid", "OTGWheapstatsid", "OTGWpiccontrolsid", "OTGWfwinfoid",
             "OTGWpicinfoid", "OTGWpicsettingsid", "OTGWotdirectid", "OTGWdiag200id", "OTGWsatcoreid",
-            "OTGWsatweatherid", "OTGWsatbinaryid", "OTGWsatzoneid", "OTGWhvacid", "OTGWdhwmeterid"]
+            "OTGWsatweatherid", "OTGWsatbinaryid", "OTGWsatzoneid", "OTGWhvacid", "OTGWdhwmeterid",
+            "OTGWcmddropid"]   # 240, TASK-1439: queued by queueNonOTDiscoveryIds()
 
 
 def read(path, rev):
