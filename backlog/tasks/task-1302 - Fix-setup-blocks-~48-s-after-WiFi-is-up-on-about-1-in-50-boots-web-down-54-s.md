@@ -3,11 +3,11 @@ id: TASK-1302
 title: >-
   Fix: setup() blocks ~48 s after WiFi is up on about 1 in 50 boots (web down 54
   s)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-22T14:49:00Z'
-updated_date: '2026-10-28T22:14:00Z'
+updated_date: '2026-10-29T05:17:00Z'
 labels:
   - bug
 dependencies: []
@@ -23,13 +23,6 @@ Diag ring 15:54:52 (fix build 87da863 + stage markers): ev35 after startWebserve
 A field gateway that hits this is unreachable for ~50 s after a restart, and the loop (OT handling) does not run meanwhile.
 Diag patch with corrected markers (ev36, ev37, ev42-ev46 incl. around hostByName): scratchpad t1262/diag_plus_fix1301.patch (temporary, not for commit).
 <!-- SECTION:DESCRIPTION:END -->
-
-## Acceptance Criteria
-<!-- AC:BEGIN -->
-- [ ] #1 The blocking call is identified from a bench capture of a slow boot (stage markers or telnet)
-- [ ] #2 With the fix no boot in a series of at least 100 RTS resets blocks setup() for more than 10 s after WiFi is up, old build vs fix on the same rig
-- [ ] #3 esp8266 build and evaluate.py --quick green
-<!-- AC:END -->
 
 ## Implementation Plan
 
@@ -56,4 +49,16 @@ Diag patch with corrected markers (ev36, ev37, ev42-ev46 incl. around hostByName
 Post-merge check: code hunks still apply (git apply --check --exclude='*version.h' --exclude='*version.hash'); only the generated version files conflict, regenerate them instead.
 
 2026-10-28: bench .68 will be reflashed with the beta.8 candidate (TASK-1434/1431 verification), replacing the no-GARP diag build.
+
+2026-10-29: closed as 'cannot reproduce on current builds' (maintainer decision, relayed via the 2.0.0 session otgw-firmware-c5): 0/250 slow boots on HEAD with GARP plus stage markers, 0/40 with GARP commented out, against 2/110 earlier. ACs explicitly dropped. Diag patch stays parked at %LOCALAPPDATA%\OTGW-capture\parked\task1302-temp-boot-diag-20261028.patch. Bench .68 now runs released beta.8 (no diag build). Reopen with a new capture if a slow boot is seen again.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as cannot reproduce on current builds; no firmware change.
+
+Two slow boots (setup() blocked ~48 s after WiFi up, web down 54 s) were seen in 110 resets on older builds. On builds since then: 0 slow in 250 RTS resets on HEAD with stage markers, and 0 slow in 40 resets with the TASK-1290 gratuitous ARP commented out. At the earlier rate 0/250 is about 1% likely, so something changed, but the blocking call was never captured.
+
+Code read ruled out startMQTT() alone (one hostByName, 10 s timeout) and initWatchDog() (100 ms plus two I2C transfers). The stage-marker diag patch is parked under %LOCALAPPDATA%\OTGW-capture\parked\ for a future capture. ACs dropped by maintainer decision.
+<!-- SECTION:FINAL_SUMMARY:END -->
