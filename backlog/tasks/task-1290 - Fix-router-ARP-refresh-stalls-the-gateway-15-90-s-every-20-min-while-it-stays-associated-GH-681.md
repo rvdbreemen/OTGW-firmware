@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-22T04:23:00Z'
-updated_date: '2026-10-22T16:05:00Z'
+updated_date: '2026-10-29T06:26:00Z'
 labels:
   - bug
   - wifi
@@ -45,4 +45,6 @@ AC#2 reworded (was: 'router ARP entry expiry no longer stalls traffic > 2 s on t
 Primary source for AC#2: FreeBSD sys/netinet/if_ether.c in_arpinput(): for a received ARP whose sender has an existing llentry, la = lla_lookup(...); arp_check_update_lle(...) always calls arp_mark_lle_reachable(), which sets la_expire = time_uptime + V_arpt_keep and reschedules arptimer (non-static entries). The packet is then dropped at the reply stage (not our target), after the cache update. OPNsense is FreeBSD-based. Linux-based routers (MikroTik bench) only mark the entry STALE on an unsolicited ARP, so there the GARP does not prevent their own unicast probes (seen on the bench: probes continued).
 
 - 2026-10-22: committed as 001e81e05 (CHANGELOG + networkStuff.h/.ino). adr-judge declarative pass: 72 ADRs checked, 0 violations, 56 advisory; LLM pass skipped (ADR_KIT_NO_LLM=1, maintainer approved, after the full-hook run was killed for low memory). Stays In Progress for AC#4 (reporter confirmation on OPNsense, GH #681).
+
+2026-10-29: GH #681 issuecomment-6489614178 asks theaprilhare to run beta.8 without the static ARP entry on OPNsense for ~24 h (maintainer approved the text). AC#4 waits for that report.
 <!-- SECTION:NOTES:END -->
