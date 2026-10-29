@@ -27,6 +27,7 @@ Known issue: `backlog task list` may return empty in this repository. Prefer Bac
 - Minimal change surface: keep changes small, focused, and justified by the task.
 - Comments describe the present system. Avoid defensive comments about hypothetical modes or future work; if the concern is real, create a Backlog task.
 - Fix the documentation before renaming identifiers when the identifier is still semantically correct and only the comment or docstring is stale.
+- Open questions go to Robert, interactively, with a weighed recommendation (maintainer directive, 2026-10-29): when a decision is open (scope, a trade-off, an AC that cannot be evidenced, a waiver, a priority, anything only the maintainer can weigh), ask Robert in the session with an interactive question (the agent's interactive question tool where available): one question per decision, the concrete options with their consequences, and your recommendation, critically weighed (what you considered, the trade-off, why it wins, the main risk). Do not decide it silently, do not leave it only in task notes, and do not bundle several open decisions in one prose message. SAT design questions still go to Sergeant D under the SAT ground truth rules.
 
 ---
 
