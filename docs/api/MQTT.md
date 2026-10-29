@@ -66,6 +66,10 @@ Published at startup, on MQTT (re)connect, and every 5 minutes.
 | `otgw-firmware/hardware_mode` | `"pic"` / `"otdirect"` | Active hardware mode |
 | `otgw-firmware/network_mode` | `"wifi"` / `"ethernet"` / `"ap"` | Active network mode |
 | `otgw-firmware/error` | `"LittleFS mount failed..."` | Error messages (not retained, only when applicable) |
+| `otgw-firmware/command_dropped` | `"TT=22.0"` | A command the PIC did not confirm after 5 tries, published once per drop (not retained). Includes the gateway's own `PR=` readouts. Home Assistant sensor "Last Dropped Command". |
+| `otgw-firmware/command_retry_exceeded` | `"ON"` / `"OFF"` | `ON` after a dropped command, `OFF` again after the next confirmed command that is not a `PR=` readout or a SAT `PM=` message (retained; republished as `OFF` after a reboot). Home Assistant binary sensor "Command Dropped". The total count is `cmd_dropped` in `/api/v2/device/info`. A drop while MQTT is disconnected is not published afterwards. |
+
+Commands go through a queue on PIC boards. A new command replaces one with the same two-letter code that is still waiting (so `TT=20` followed by `TT=21` sends only `TT=21`), except `TP=` commands: each `TP=` is queued behind the others. Commands from MQTT and most internal ones are always queued, never replaced. A command the PIC does not confirm after 5 tries is dropped and reported on `otgw-firmware/command_dropped`. An error answer such as `NG` counts as a confirmation. OT-Direct boards (OTGW32) answer each command on the spot, so nothing is dropped there.
 
 ### OT-bus state (generic, since 2.0.0)
 
@@ -110,7 +114,7 @@ Published at startup, on MQTT (re)connect, every 5 minutes, and when settings ar
 | `otgw-pic/settings/thermostat_detect` | `"I"` | Thermostat detection mode |
 | `otgw-pic/settings/builddate` | `"2023-01-01"` | PIC firmware build date |
 | `otgw-pic/settings/clock_mhz` | `"4"` | PIC clock speed |
-| `otgw-pic/settings/reset_cause` | `"Power-on"` | Last PIC reset cause |
+| `otgw-pic/settings/reset_cause` | `"Power-on"` | Last PIC reset cause. An answer that is not plain text (after a PIC firmware update the PIC can answer with the byte `0xFF`) is published as hex, for example `"0xFF"` |
 | `otgw-pic/settings/standalone_interval` | `"0"` | Standalone mode interval |
 | `otgw-pic/settings/voltage_ref` | `"3.3"` | Voltage reference |
 

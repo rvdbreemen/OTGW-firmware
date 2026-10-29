@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.525
+**  Version  : v2.0.0-alpha.526
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -936,6 +936,10 @@ byte      OTGWhvacid         = 242;
 // Assistant Energy dashboard; the first free slot below 242. queueNonOTDiscoveryIds()
 // queues it at boot like the other faux ids; the state waits for a MsgID 19 sample.
 byte      OTGWdhwmeterid     = 241;
+// Dropped-command discovery pseudo-ID (TASK-1439; 1.x TASK-1431 uses 241 there):
+// anchors the otgw-firmware/command_dropped sensor and the
+// otgw-firmware/command_retry_exceeded binary sensor. First free slot below 241.
+byte      OTGWcmddropid      = 240;
 // Cumulative DHW water total (TASK-1123), see dhwWaterMeter.ino.
 extern double dhwWaterTotalL;
 void updateDHWWaterMeter(float flowLitresPerMin, uint32_t nowMs);

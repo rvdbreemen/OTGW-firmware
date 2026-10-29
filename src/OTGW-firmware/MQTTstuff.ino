@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.525
+**  Version  : v2.0.0-alpha.526
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1580,6 +1580,7 @@ static void onMqttConnect(bool sessionPresent) {
   DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
   sendMQTTversioninfo();
   publishAllPICsettings();
+  publishCommandDroppedState();      // TASK-1439: replaces a retained ON left from before a reboot
   publishBoilerUnsupportedMsgids();  // TASK-692 port: republish the retained CSV so HA/dashboards see it after every reconnect.
   clearBoilerUnsupportedDirty();
   DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
@@ -2238,6 +2239,7 @@ static void queueNonOTDiscoveryIds()
 {
   setMQTTConfigPending(0);                  // climate: thermostat + DHW control
   setMQTTConfigPending(27);                 // number: outside temperature override
+  setMQTTConfigPending(OTGWcmddropid);      // 240 TASK-1439 command_dropped + command_retry_exceeded
   if (dhwWaterMeterHasData()) setMQTTConfigPending(OTGWdhwmeterid);     // 241 DHW water total, just in time (ADR-182)
   setMQTTConfigPending(OTGWhvacid);         // 242 TASK-942 hvac_mode/hvac_action companions
   setMQTTConfigPending(OTGWotdirectid);     // 243 ADR-124 OTDirect flame metrics
@@ -2842,6 +2844,7 @@ static HaDevice deviceForOTId(byte OTid) {
   // Real OT message IDs (DATA_*): the Boiler route, the one they are announced on.
   if (OTid <= 127) return HaDevice::Boiler;
   switch (OTid) {
+    case 240: return HaDevice::Gateway;     // TASK-1439 dropped-command sensor + binary sensor
     case 241: return HaDevice::Sensors;     // TASK-1123 DHW water total: fixed "sensors_" uniq_id prefix
     case 242: return HaDevice::OtCore;      // TASK-942 hvac_mode/hvac_action companion sensors
     case 243: return HaDevice::OtCore;      // otdirect flame metrics (ADR-140, was ADR-124)

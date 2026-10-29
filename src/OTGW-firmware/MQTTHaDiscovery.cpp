@@ -384,6 +384,10 @@ const char ha_lbl_thermostat_connected[] PROGMEM = "thermostat_connected";
 // -> "otgw-pic/gateway_mode"; otgw_connected is bare (ADR-102, base namespace).
 const char ha_lbl_gateway_mode[] PROGMEM = "gateway_mode";
 const char ha_lbl_otgw_connected[] PROGMEM = "otgw_connected";
+// Dropped PIC commands (faux dataid 240, TASK-1439 = 1.x TASK-1431). Bare labels: the
+// topics are the 1.x ones, otgw-firmware/command_dropped and command_retry_exceeded.
+const char ha_lbl_cmd_dropped[] PROGMEM = "otgw-firmware/command_dropped";
+const char ha_lbl_cmd_retry_exceeded[] PROGMEM = "otgw-firmware/command_retry_exceeded";
 const char ha_lbl_master_configuration_smart_power[] PROGMEM = "master_configuration_smart_power";
 const char ha_lbl_ch2_present[] PROGMEM = "ch2_present";
 const char ha_lbl_control_type_modulation[] PROGMEM = "control_type_modulation";
@@ -746,6 +750,8 @@ const char ha_name_boiler_connected[] PROGMEM = "Boiler_Connected";
 const char ha_name_thermostat_connected[] PROGMEM = "Thermostat_Connected";
 const char ha_name_gateway_mode[] PROGMEM = "Gateway_Mode";
 const char ha_name_otgw_connected[] PROGMEM = "OTGW_Connected";
+const char ha_name_cmd_dropped[] PROGMEM = "Last_Dropped_Command";        // TASK-1439
+const char ha_name_cmd_retry_exceeded[] PROGMEM = "Command_Dropped";       // TASK-1439
 const char ha_name_master_configuration_smart_power[] PROGMEM = "master_configuration_smart_power";
 const char ha_name_ch2_present[] PROGMEM = "CH2_present";
 const char ha_name_control_type_modulation[] PROGMEM = "control_type_modulation";
@@ -825,8 +831,8 @@ const char ha_name_alias_ventilation_diagnostic[]                            PRO
 const char ha_name_alias_ventilation_system_type[]                           PROGMEM = "Ventilation_system_type";
 const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
 const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
-// ========== Sensor array (393 entries) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 393;  // +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276)
+// ========== Sensor array (394 entries) ==========
+const uint16_t MQTT_HA_SENSOR_COUNT = 394;  // +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276), +1 command_dropped (faux id 240, TASK-1439)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1372,15 +1378,17 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     // device_class water with unit L and state_class total_increasing is what the Home
     // Assistant Energy dashboard accepts as a water source; the same fields as the 1.x line.
     {241, 0x00, ha_lbl_dhw_water_total,            ha_name_dhw_water_total,            HaDeviceClass::water,       HaUnit::L,       HaStateClass::total_increasing, HaIcon::water,  HaEntityCat::none, true, nullptr,              nullptr},
+    // --- Faux ID 240 (OTGWcmddropid): last command dropped after 5 unanswered tries, TASK-1439 ---
+    {240, 0x00, ha_lbl_cmd_dropped,                ha_name_cmd_dropped,                HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::alert_circle,  HaEntityCat::diagnostic, true},
 };
 
-// ========== Binary sensor array (60 indexed entries) ==========
-// ADR-105: first 60 rows are indexed via mqttHaBinSensorIndex[] (per-id contiguous).
-// Rows 60..96 are HA-core aliases, NOT contiguous by OT id and NOT covered by
+// ========== Binary sensor array (61 indexed entries) ==========
+// ADR-105: first 61 rows are indexed via mqttHaBinSensorIndex[] (per-id contiguous).
+// Rows 61..97 are HA-core aliases, NOT contiguous by OT id and NOT covered by
 // the index. The discovery dispatcher walks the alias tail separately when
 // settings.mqtt.bPublishHaCoreAliases is on (see MQTTstuff.ino).
-const uint16_t MQTT_HA_BINSENSOR_COUNT         = 97;
-const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 60;
+const uint16_t MQTT_HA_BINSENSOR_COUNT         = 98;
+const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 61;
 
 const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
 //  {id, flags, label, friendlyName, icon, entityCat, enabledByDefault}
@@ -1462,11 +1470,13 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     SAT_BIN(254, sat_valves_open,    HaIcon::radiator,        HaEntityCat::none, true, nullptr,           HaBinaryPayload::true_false),
 
     // --- Pseudo-ID 244: gateway/OTGW connection status (HaDevice::Gateway) ---
-    // Last rows of the INDEXED region (index covers rows 0..INDEXED_COUNT-1).
     // Values publish "ON"/"OFF" via CCONOFF; the on_off payload writes no
     // pl_on/pl_off, so HA's default ON/OFF payloads apply and match.
     {244, 0x08, ha_lbl_gateway_mode,   ha_name_gateway_mode,   HaIcon::lan_connect, HaEntityCat::diagnostic, true},
     {244, 0x00, ha_lbl_otgw_connected, ha_name_otgw_connected, HaIcon::lan_connect, HaEntityCat::diagnostic, true},
+    // --- Pseudo-ID 240: a command was dropped after 5 unanswered tries (TASK-1439) ---
+    // ON on a drop, OFF on the next confirmed command; ON/OFF via CCONOFF.
+    {240, 0x00, ha_lbl_cmd_retry_exceeded, ha_name_cmd_retry_exceeded, HaIcon::alert_circle, HaEntityCat::diagnostic, true},
 
     // ---------------------------------------------------------------------------
     // ADR-105: HA-core aliases (37 rows) — gated by settings.mqtt.bPublishHaCoreAliases
@@ -1759,7 +1769,7 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 237
     0xFFFF, // id 238
     0xFFFF, // id 239
-    0xFFFF, // id 240
+    393, // id 240, 1 entry (TASK-1439: OTGWcmddropid command_dropped)
     392, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
     390, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
     332, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
@@ -2018,11 +2028,11 @@ const uint16_t PROGMEM mqttHaBinSensorIndex[256] = {
     0xFFFF, // id 237
     0xFFFF, // id 238
     0xFFFF, // id 239
-    0xFFFF, // id 240
+    60,     // id 240, 1 entry (TASK-1439: command_retry_exceeded; last of indexed region)
     0xFFFF, // id 241
     0xFFFF, // id 242
     0xFFFF, // id 243
-    58,     // id 244, 2 entries (gateway_mode, otgw_connected; last of indexed region)
+    58,     // id 244, 2 entries (gateway_mode, otgw_connected)
     0xFFFF, // id 245
     0xFFFF, // id 246
     0xFFFF, // id 247
@@ -3775,6 +3785,7 @@ static const char *topoDeviceName(HaDevice d) {
 // there; this local copy exists solely to avoid cross-TU access to a static).
 static HaDevice topoDeviceForPseudoId(uint8_t otId) {
   switch (otId) {
+    case 240: return HaDevice::Gateway;     // TASK-1439 dropped-command sensor + binary sensor
     case 241: return HaDevice::Sensors;     // TASK-1123 DHW water total
     case 242: return HaDevice::OtCore;      // TASK-942 hvac_mode/hvac_action companion sensors
     case 243: return HaDevice::OtCore;      // otdirect flame metrics (ADR-140, was ADR-124)

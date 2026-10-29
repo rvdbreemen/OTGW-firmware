@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.525
+**  Version  : v2.0.0-alpha.526
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3345,6 +3345,8 @@ void sendDeviceInfoV2()
     // --- Reliability drops (heap-pressure side effects) ---
     je.field(F("hd_ws_drops"),         snap->st.heapdiag.iWsDropsTotal);
     je.field(F("hd_mqtt_drops"),       snap->st.heapdiag.iMqttDropsTotal);
+    // TASK-1439: PIC commands dropped after OTGW_CMD_RETRY tries.
+    je.field(F("cmd_dropped"),         snap->st.pic.iCmdDropped);
 
     // --- MQTT Discovery telemetry (ADR-062 / TASK-349 / TASK-361) ---
     je.field(F("disc_published_topics"),     snap->st.discovery.iPublishedTopicCount);

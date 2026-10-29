@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : PICtypes.h
-**  Version  : v2.0.0-alpha.525
+**  Version  : v2.0.0-alpha.526
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -43,6 +43,10 @@ struct PICSection {            // state.pic — PIC microcontroller identity/sta
   // one — same pattern as the accepted pendingUpgradePath single-slot bridge.
   char    sLatestFw[32]    = "";                 // latest version from the server ("" until first OK check)
   uint8_t iUpdateCheck     = PIC_UPDATE_IDLE;    // PicUpdateCheck state
+
+  // TASK-1439 (1.x TASK-1431): commands dropped from the queue after OTGW_CMD_RETRY tries.
+  uint32_t iCmdDropped       = 0;
+  bool     bCmdRetryExceeded = false;  // latched by a drop, cleared by the next confirmed command (not PR=/PM=)
 };
 
 struct PicSettingsSection {    // state.picSettings — settings polled from PIC via PR= commands
@@ -67,7 +71,7 @@ struct PicSettingsSection {    // state.picSettings — settings polled from PIC
   // --- Diagnostics ---
   char sBuilddate[24]         = "";  // PR=B: firmware build date/time (e.g. "17:52 12-03-2023")
   char sClockMHz[8]           = "";  // PR=C: PIC clock speed in MHz (e.g. "4", "4 MHz")
-  char sResetCause[4]         = "";  // PR=Q: last reset cause ("W"=watchdog, "B"=brownout, "P"=power-on)
+  char sResetCause[8]         = "";  // PR=Q: last reset cause ("W"=watchdog, "B"=brownout, "P"=power-on); a non-text answer is stored as hex, e.g. "0xFF" (TASK-1406)
   char sStandaloneInterval[8] = "";  // PR=N: message interval in standalone mode (seconds)
   char sVoltageRef[4]         = "";  // PR=V: voltage reference setting (numeric)
 };

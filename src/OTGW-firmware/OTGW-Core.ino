@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.525
+**  Version  : v2.0.0-alpha.526
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -42,6 +42,7 @@
 */
 
 #include "PICreturnSensor.h"
+#include "picSettingValue.h"
 
 #define OTDebugTln(...) ({ if (state.debug.bOTmsg) DebugTln(__VA_ARGS__);    })
 #define OTDebugln(...)  ({ if (state.debug.bOTmsg) Debugln(__VA_ARGS__);    })
@@ -1380,9 +1381,15 @@ static void handlePRresponse(const char* buf, size_t len) {
       return;
   }
 
-  bool changed = (strcmp(stateField, value) != 0);
+  // A PR= answer is not always text: after a PIC reprogram PR=Q answered with
+  // the single byte 0xFF, which is not valid UTF-8 in MQTT or JSON. Store the
+  // cleaned value and compare against that, so a raw answer is not re-published
+  // on every poll (TASK-1406, GH #688).
+  char cleaned[sizeof(state.picSettings.sBuilddate)];
+  copyPicSettingValue(cleaned, fieldSize < sizeof(cleaned) ? fieldSize : sizeof(cleaned), value);
+  bool changed = (strcmp(stateField, cleaned) != 0);
   if (changed) {
-    strlcpy(stateField, value, fieldSize);
+    strlcpy(stateField, cleaned, fieldSize);
     OTDebugTf(PSTR("handlePRresponse: PR=%c updated to [%s]\r\n"), reg, stateField);
     sendMQTTData(mqttTopic, stateField);
   }
@@ -3665,6 +3672,31 @@ static uint32_t lastSer2netCmdMs = 0 - SER2NET_QUIET_MS;  // expired at boot
 #define OTGW_DELAY_SEND_MS 1000
 #define MAX_QUEUE_MSGSIZE 127
 
+// Dropped-command feedback (TASK-1439, same contract as 1.x TASK-1431). A drop
+// publishes the command once (not retained, nothing to clear) and latches
+// command_retry_exceeded ON (retained) until the next confirmed command. A drop
+// while MQTT is down is not replayed; the counter in /api/v2/device/info still
+// has it. OT-Direct answers each command on the spot (handleOTDirectCommand), so
+// only the PIC queue can drop one.
+void publishCommandDroppedState() {
+  sendMQTTData(F("otgw-firmware/command_retry_exceeded"), CCONOFF(state.pic.bCmdRetryExceeded), true);
+}
+
+static void reportCommandDropped(const char* cmd) {
+  state.pic.iCmdDropped++;
+  sendMQTTData(F("otgw-firmware/command_dropped"), cmd, false);
+  if (!state.pic.bCmdRetryExceeded) {
+    state.pic.bCmdRetryExceeded = true;
+    publishCommandDroppedState();
+  }
+}
+
+static void clearCommandDropped() {
+  if (!state.pic.bCmdRetryExceeded) return;
+  state.pic.bCmdRetryExceeded = false;
+  publishCommandDroppedState();
+}
+
 // Remove entry at index from the command queue, shifting remaining entries down.
 static void removeFromCmdQueue(int index) {
   for (int j = index; j < (cmdQueueSize - 1); j++) {
@@ -3744,7 +3776,9 @@ void addCommandToQueue(const char* buf, const int len, const bool forceQueue, co
   //check to see if the cmd is in queue
   bool foundcmd = false;
   int8_t insertptr = cmdQueueSize; //set insertptr to next empty slot
-  if (!forceQueue){
+  // TP= commands are never replaced: each one goes behind the others (TASK-1439).
+  const bool appendOnly = forceQueue || (buf[0] == 'T' && buf[1] == 'P');
+  if (!appendOnly){
     char cmd[3];
     memset(cmd, 0, sizeof(cmd));
     memcpy(cmd, buf, 2);
@@ -3827,6 +3861,7 @@ void handleCommandQueue(){
         OTDebugTf(PSTR("CmdQueue: Delete [%d] from queue\r\n"), i);
         snprintf_P(cMsg, sizeof(cMsg), PSTR("%s [dropped]"), cmdqueue[i].cmd);
         sendEventToWebSocket('!', cMsg);
+        reportCommandDropped(cmdqueue[i].cmd);
         removeFromCmdQueue(i);
         i--; // re-check current index after shift
       }
@@ -3885,6 +3920,9 @@ void checkCommandResponse(const char *buf, unsigned int len){
       OTDebugTf(PSTR("CmdQueue: Found cmd [%2s]==>[%d]:[%s]\r\n"), cmd, i, cmdqueue[i].cmd);
         OTDebugTf(PSTR("CmdQueue: Found value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd);
         OTDebugTf(PSTR("CmdQueue: Remove from queue [%d]:[%s] from queue\r\n"), i, cmdqueue[i].cmd);
+        // PR= readouts and the SAT PM= chain run on their own, so only a confirmed
+        // command that was sent on purpose clears the dropped flag (TASK-1439).
+        if (!(cmd[0] == 'P' && (cmd[1] == 'R' || cmd[1] == 'M'))) clearCommandDropped();
         removeFromCmdQueue(i);
         break;
       // } else OTDebugTf(PSTR("Error: Did not find value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd); 

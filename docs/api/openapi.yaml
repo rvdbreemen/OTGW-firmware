@@ -732,6 +732,9 @@ paths:
                         type: integer
                       mqttconnected:
                         type: boolean
+                      cmd_dropped:
+                        type: integer
+                        description: PIC commands dropped after 5 unconfirmed tries since boot (TASK-1439). Each drop is also published on MQTT otgw-firmware/command_dropped.
                       thermostatconnected:
                         type: boolean
                       boilerconnected:
