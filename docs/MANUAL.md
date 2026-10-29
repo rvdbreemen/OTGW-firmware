@@ -3218,7 +3218,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/multi_area_count` | `SATmultiareacount` |
 | `sat/auto_tune` | `SATautotune` |
 | `sat/auto_tune_rate` | `SATautotunerate` |
-| `sat/heating_curve` | `SATcoefficient` |
+| `sat/heating_curve_coeff` | `SATcoefficient` |
 | `sat/deadband` | `SATdeadband` |
 | `sat/mod_sup_delay` | `SATmodsupdelay` |
 | `sat/mod_sup_offset` | `SATmodsupoffset` |

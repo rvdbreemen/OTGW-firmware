@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed (breaking)
+
+- **SAT MQTT contract cleanup** (TASK-1485, Robert's decisions 2-5 in TASK-1466). Home Assistant automations or templates that read these topics need an update:
+  - `sat/heating_curve_recommendation` is all lower case: `increase` / `decrease` / `hold` / `insufficient` (was `INCREASE` / `DECREASE` / `HOLD` / `insufficient`). The REST/WS field `heating_curve_recommendation` changes with it. `sat/curve_recommendation` is unchanged.
+  - `sat/ssi` is removed; read `sat/summer_simmer_index` (same value, one decimal). The firmware empties the retained `sat/ssi` topic on every SAT discovery pass.
+  - `sat/pressure_health` is ON on a pressure problem (was: ON = healthy), as thermo-nova and the other `*_health` topics.
+  - `sat/device_health` is ON while the boiler status has not been evaluated yet since boot (thermo-nova `INSUFFICIENT_DATA`), no longer described as "boiler off". The evaluator never reports `off` after its first run, so the payloads on the wire do not change.
+  - The MQTT command `set/<node>/sat/heating_curve` is renamed `set/<node>/sat/heating_curve_coeff`, without an alias: the old command is ignored. The state topic `sat/heating_curve` stays the computed curve value. The REST setting name `sat/settings/heating_curve` is unchanged.
+
 ### Added
 
 - **SAT gas consumption in m³/h** (TASK-1484). Two new SAT settings, `satminconsumption` and `satmaxconsumption` (gas use at minimum and maximum modulation, 0 to 8 m³/h, under SAT > Technical > Boiler), make `sat/consumption` real: minimum + modulation/100 × (maximum − minimum) while the boiler reports CH mode and the flame is on, else 0 (so a hot-water draw reads 0). This follows thermo-nova's Current Consumption sensor with the CH-mode bit its OpenTherm Gateway (MQTT) coordinator reads; in simulation the simulated flame stands in for CH mode. The topic is published only when both settings are above 0 (default 0 = off). No Home Assistant entity yet.

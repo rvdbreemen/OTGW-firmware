@@ -1353,11 +1353,11 @@ const char* satHeatingCurveRecommendation()
 
   const char* rec;
   if (consecIncrease == HCR_SUSTAIN_DAYS) {
-    rec = "INCREASE";
+    rec = "increase";
   } else if (consecDecrease == HCR_SUSTAIN_DAYS) {
-    rec = "DECREASE";
+    rec = "decrease";
   } else {
-    rec = "HOLD";
+    rec = "hold";
   }
 
   strlcpy(state.sat.sHeatCurveRec, rec, sizeof(state.sat.sHeatCurveRec));

@@ -385,7 +385,7 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/room_temp` | `"20.8"` | no | Room temperature used by PID (°C) |
 | `sat/outside_temp` | `"8.0"` | no | Outside temperature used by heating curve (°C) |
 | `sat/estimated_room` | `"20.5"` | no | Estimated room temp during sensor fallback (°C) |
-| `sat/humidity` | `"58.0"` | no | Indoor humidity % (pushed or BLE room sensor; no weather fallback). `sat/ssi`, `sat/summer_simmer_index` and `sat/summer_simmer_perception` are published only while it is fresh (`humidity_timeout_s`) |
+| `sat/humidity` | `"58.0"` | no | Indoor humidity % (pushed or BLE room sensor; no weather fallback). `sat/summer_simmer_index` and `sat/summer_simmer_perception` are published only while it is fresh (`humidity_timeout_s`) |
 | `sat/humidity_valid` | `"true"` / `"false"` | no | Whether humidity reading is valid |
 | `sat/pre_custom_temperature` | `"20.5"` | no | Target saved when a preset was activated, restored by preset `"none"` (°C). Also set when window detection switches to the Activity preset from no preset (thermo-nova `climate.py:819`, `:619-620`). Kept over a reboot in `/sat/sat_preset.json` (TASK-1487). Published only when > 0 |
 | `sat/pre_activity_temperature` | `"20.5"` | no | Target saved when window detection switched to the Activity preset (°C), restored when the window closes while Activity is still the preset. Choosing another preset during the switch clears it, and the close then keeps that preset (thermo-nova `climate.py:830-832`). Kept over a reboot (TASK-1487). Published only when > 0 |
@@ -408,7 +408,7 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 | `sat/pwm_duty` | `"0.65"` | no | PWM duty cycle (0.00-1.00) |
 | `sat/duty_ratio` | `"0.70"` | no | EMA duty ratio (flame-on fraction) |
 | `sat/overshoot_fraction` | `"0.12"` | no | EMA fraction of cycles with overshoot |
-| `sat/device_health` | `"ON"` / `"OFF"` | yes | ON when the boiler status is `off` |
+| `sat/device_health` | `"ON"` / `"OFF"` | yes | Binary, ON = problem: ON while the boiler status has not been evaluated yet since boot (thermo-nova `INSUFFICIENT_DATA`). Before TASK-1485 the description said "ON when the boiler status is `off`" |
 
 **4-hour cycle statistics** (rolling 4-hour window, all non-retained):
 
@@ -444,7 +444,7 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 | `sat/pressure` | `"1.5"` | no | Smoothed system pressure (bar) |
 | `sat/pressure_drop_rate` | `"-0.02"` | no | Pressure drop rate (bar/hour, negative = dropping) |
 | `sat/pressure_alarm` | `"false"` | no | Pressure alarm active |
-| `sat/pressure_health` | `"ON"` / `"OFF"` | yes | Binary: ON = pressure healthy (opposite polarity of the other `*_health` topics) |
+| `sat/pressure_health` | `"ON"` / `"OFF"` | yes | Binary, ON = pressure problem (too low, too high or dropping too fast, confirmed), the same polarity as the other `*_health` topics. Breaking (TASK-1485): before, ON meant healthy |
 | `sat/ch_pressure` | `"1.52"` | no | CH water pressure as reported by the boiler (bar, two decimals) |
 | `sat/ch_pressure_status` | `"ok"` / `"low"` / `"high"` | no | Pressure status. `"low"` / `"high"` only while the pressure alarm is confirmed and the smoothed pressure is outside the min/max band; a drop-rate alarm reports `"ok"` |
 
@@ -463,7 +463,7 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 | ----- | ----- | -------- | ----------- |
 | `sat/curve_recommendation` | `"increase"` / `"decrease"` / `"hold"` / `"insufficient"` | no | Automatic heating curve recommendation |
 | `sat/curve_recommendation_attributes` | JSON | no | Recommendation attributes `{"error_threshold","daily_mean_error","daily_sample_count","recent_mean_error"}`; republished when `sat/curve_recommendation` changes |
-| `sat/heating_curve_recommendation` | `"INCREASE"` / `"DECREASE"` / `"HOLD"` / `"insufficient"` | yes | Recommendation from the daily-median history (consecutive days above or below the threshold). Note the mixed case: `"insufficient"` is lower case, the other values upper case |
+| `sat/heating_curve_recommendation` | `"increase"` / `"decrease"` / `"hold"` / `"insufficient"` | yes | Recommendation from the daily-median history (consecutive days above or below the threshold). All lower case since TASK-1485 (before: `INCREASE` / `DECREASE` / `HOLD`) |
 
 #### Presets
 
@@ -482,7 +482,7 @@ The following topics echo the current configured values. They are retained and p
 
 | Topic | Example | Description |
 | ----- | ------- | ----------- |
-| `sat/heating_curve_coeff` | `"1.5"` | Heating curve coefficient (set with the `sat/heating_curve` command) |
+| `sat/heating_curve_coeff` | `"1.5"` | Heating curve coefficient (set with the `sat/heating_curve_coeff` command) |
 | `sat/deadband` | `"0.25"` | PID deadband (°C) |
 | `sat/control_interval` | `"30"` | Control loop interval (seconds; set with the `sat/interval` command) |
 | `sat/max_modulation` | `"100"` | Max relative modulation % |
@@ -549,7 +549,6 @@ Published only while auto-tune is on (`SATautotune`).
 | `sat/summer_active` | `"false"` | no | Summer simmer mode currently suppressing heating |
 | `sat/summer_hours_above` | `"4.5"` | no | Hours outdoor temp has been above threshold |
 | `sat/summer_simmer_index` | `"24.3"` | no | Summer Simmer Index from room temperature and humidity (°C, one decimal). Published only with a valid humidity |
-| `sat/ssi` | `"24.30"` | no | Same Summer Simmer Index as `sat/summer_simmer_index`, two decimals |
 | `sat/summer_simmer_perception` | `"Comfortable"` | no | Perception label: `Cool`, `Slightly Cool`, `Comfortable`, `Slightly Warm`, `Increasing Discomfort`, `Extremely Warm`, `Danger Of Heatstroke`, `Extreme Danger Of Heatstroke`, `Circulatory Collapse Imminent` |
 
 #### PV-surplus Boost (TASK-640)
@@ -1087,7 +1086,7 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 
 | Topic Suffix | Bound SAT setting | Notes |
 | ------------ | ----------------- | ----- |
-| `sat/heating_curve` | `SATcoefficient` | Heating curve coefficient (state echo: `sat/heating_curve_coeff`; the state topic `sat/heating_curve` is the computed curve value) |
+| `sat/heating_curve_coeff` | `SATcoefficient` | Heating curve coefficient (state echo: `sat/heating_curve_coeff`; the state topic `sat/heating_curve` is the computed curve value). Renamed from `sat/heating_curve` in TASK-1485, no alias: the old command is ignored |
 | `sat/deadband` | `SATdeadband` | PID deadband (°C) |
 | `sat/interval` | `SATinterval` | Control loop interval (seconds) |
 | `sat/overshoot_margin` | `SATovershootmargin` | Overshoot margin (°C) |

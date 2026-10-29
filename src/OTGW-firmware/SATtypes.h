@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.541
+**  Version  : v2.0.0-alpha.542
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -150,6 +150,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool            bActive        = false;
   SATControlMode  eControlMode   = SAT_MODE_OFF;
   SATBoilerStatus eBoilerStatus  = SAT_BS_OFF;
+  bool            bBoilerStatusKnown = false;  // set by the first satUpdateBoilerStatus(); false = thermo-nova INSUFFICIENT_DATA (TASK-1485)
   // Heating curve + PID
   float fHeatingCurveValue       = 0.0f;
   float fPidOutput               = 0.0f;  // = curve + P + I + D
@@ -271,7 +272,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fMeanError             = 0.0f;
   float    fErrorStdDev           = 0.0f;
   uint8_t  iErrorSampleCount      = 0;     // Number of samples in error ring buffer
-  // Daily median recommendation (Task #228): "INCREASE", "DECREASE", "HOLD", or "insufficient"
+  // Daily median recommendation (Task #228): "increase", "decrease", "hold" or "insufficient" (all lower case, TASK-1485)
   char     sHeatCurveRec[13]      = "insufficient";  // result string for MQTT / status JSON
   // Flame health (Task #70/#71)
   SATFlameStatus eFlameStatus     = SAT_FS_INSUFFICIENT_DATA;

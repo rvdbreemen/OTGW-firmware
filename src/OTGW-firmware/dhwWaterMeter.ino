@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : dhwWaterMeter.ino
-**  Version  : v2.0.0-alpha.541
+**  Version  : v2.0.0-alpha.542
 **
 **  Copyright (c) 2026 Robert van den Breemen
 **

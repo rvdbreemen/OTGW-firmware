@@ -755,6 +755,7 @@ static void satUpdateBoilerStatus()
   }
 
   state.sat.eBoilerStatus = newStatus;
+  state.sat.bBoilerStatusKnown = true;   // sat/device_health: no longer insufficient data (TASK-1485)
   _bs_prevFlame = flame;
   _bs_prevModulation = mod;
   _bs_prevBoilerTemp = boilerTemp;
@@ -3669,7 +3670,7 @@ void satPublishMQTT()
   static SATShadowF s_auto_tune_score, s_auto_tune_rate;
   static SATShadowF s_valve_offset;
   static SATShadowF s_area_0, s_area_1, s_area_2, s_area_3;
-  static SATShadowF s_ssi, s_summer_simmer_index;
+  static SATShadowF s_summer_simmer_index;
   static SATShadowF s_dhw_setpoint, s_max_setpoint, s_requested_setpoint, s_consumption;
   static SATShadowF s_heating_curve_coeff, s_deadband;
   static SATShadowF s_flame_off_offset, s_flow_offset, s_mod_sup_delay, s_mod_sup_offset;
@@ -3870,8 +3871,8 @@ void satPublishMQTT()
   publishIfChangedF(F("sat/pressure"),           state.sat.fSmoothedPressure, s_pressure,           SAT_EPS_PRESSURE, 2, false);
   publishIfChangedF(F("sat/pressure_drop_rate"), state.sat.fPressureDropRate, s_pressure_drop_rate, SAT_EPS_FRACTION, 3, false);
   publishIfChangedB(F("sat/pressure_alarm"),     state.sat.bPressureAlarm,    s_pressure_alarm,     false);
-  // pressure_health uses "ON"/"OFF" payload.
-  publishIfChangedBStr(F("sat/pressure_health"), state.sat.bPressureHealthy, s_pressure_health, "ON", "OFF", true);
+  // pressure_health: ON = pressure problem, as thermo-nova binary_sensor.py:239 (PROBLEM) and :293-295 (TASK-1485).
+  publishIfChangedBStr(F("sat/pressure_health"), !state.sat.bPressureHealthy, s_pressure_health, "ON", "OFF", true);
   satPressureHealthPublish();
 
   // ---------------------------------------------------------------------------
@@ -3981,10 +3982,12 @@ void satPublishMQTT()
   }
 
   // ---------------------------------------------------------------------------
-  // Device + Cycle health binary sensors ("ON"/"OFF" payloads).
+  // Device + Cycle health binary sensors ("ON"/"OFF" payloads, ON = problem).
   // ---------------------------------------------------------------------------
+  // device_health is ON while the boiler status has not been evaluated yet, as thermo-nova
+  // binary_sensor.py:404-406 (BoilerStatus.INSUFFICIENT_DATA, device/__init__.py:44-49) (TASK-1485).
   publishIfChangedBStr(F("sat/device_health"),
-                       (state.sat.eBoilerStatus == SAT_BS_OFF),
+                       !state.sat.bBoilerStatusKnown,
                        s_device_health, "ON", "OFF", true);
   {
     const SATCycleClass lcc = satReportedLastCycleClass(state.sat, millis());
@@ -4000,7 +4003,6 @@ void satPublishMQTT()
   // ---------------------------------------------------------------------------
   if (satHumidityFresh(millis()) && state.sat.fHumidity > 0) {
     float simmerIdx = satCalcSimmerIndex(satGetRoomTemp(), state.sat.fHumidity);
-    publishIfChangedF(F("sat/ssi"),                 simmerIdx, s_ssi,                 SAT_EPS_ERROR,       2, false);
     publishIfChangedF(F("sat/summer_simmer_index"), simmerIdx, s_summer_simmer_index, SAT_EPS_TEMP_COARSE, 1, false);
     publishIfChangedS(F("sat/summer_simmer_perception"), satSimmerPerception(simmerIdx), s_summer_simmer_perception, false);
   }
