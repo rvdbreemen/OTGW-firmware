@@ -1273,6 +1273,8 @@ There is no `{entity}_gateway` variant; gateway override is observable via diver
 
 SAT entities are announced with the non-OT discovery IDs 251 to 255 (`queueNonOTDiscoveryIds()` in `MQTTstuff.ino`), and the SAT switches and select with the climate pass (ID 0). They all sit on the SAT device route (`HaDevice::Sat`). The tables list each entity by its state topic suffix under `%mqtt_pub_topic%`. Most `sat/*` state topics are only published while SAT is enabled, so these entities read `unknown` until then.
 
+Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-audit.md`](../sat/sat-ha-entity-audit.md) (TASK-1486) lists the 91 published `sat/*` state topics without one, with a decision per topic: add an entity, MQTT-only, or open.
+
 **Thermostat climate entity:** there is no separate SAT climate entity. The thermostat climate entity (`<HaPrefix>/climate/<node>/climate/config`, room temperature from `Tr`, target from `TrSet`) carries `json_attributes_topic` = `sat/climate_attributes`.
 
 **Sensor entities, SAT control (ID 252):**
