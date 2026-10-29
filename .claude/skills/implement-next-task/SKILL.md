@@ -202,6 +202,11 @@ Every alpha tag that reaches `dev` is published, also one another session built:
 "Every alpha tag on `dev` is published" protocol in CLAUDE.md (build from the pushed HEAD, post
 the zip, report to the coordinating session, ledger check before each post).
 
+Batch cadence (maintainer directive, 2026-10-29, CLAUDE.md "Batch cadence"): steps 5-7 run per task
+with host tests, the evaluator, a bump and a local commit, but the build, push, post, step 8 report
+and bench smoke run once every 4 completed firmware tasks. Until the 4th, go straight to the next
+task after the local commit.
+
 After the push, build once more from the pushed HEAD with `build.bat` so the githash
 in the file names matches the code. Leave
 `build/OTGW-firmware-esp32-combo-<version>+<hash>-flash.zip` (the complete package:
