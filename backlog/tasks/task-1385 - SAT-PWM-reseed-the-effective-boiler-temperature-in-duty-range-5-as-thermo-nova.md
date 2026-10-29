@@ -3,10 +3,11 @@ id: TASK-1385
 title: >-
   SAT PWM: reseed the effective boiler temperature in duty range 5 as
   thermo-nova
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-10-25T10:40:00Z'
-updated_date: '2026-10-29T20:09:00Z'
+updated_date: '2026-10-29T20:41:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -26,7 +27,7 @@ From TASK-1273 review 2026-10-22: range 5 (continuous ON) does not reseed the ef
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A host test on the real PWM code asserts the effective boiler temperature is reseeded from the live flow at a duty range-5 ON start (red when the reseed in satPwmBeginOn is removed, green on dev)
+- [x] #1 A host test on the real PWM code asserts the effective boiler temperature is reseeded from the live flow at a duty range-5 ON start (red when the reseed in satPwmBeginOn is removed, green on dev)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -38,3 +39,9 @@ TASK-1412.1 records review (R20): 2026-10-29. revalidation against TASK-1401 (TA
 
 Robert 2026-10-29 (interactive): narrowed to a test task. The reseed exists since alpha.514 (TASK-1401/1369, satPwmBeginOn); only the host test is missing. No firmware change, no Sergeant D OK needed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Test-only (Robert 2026-10-29 narrowed the task: the reseed exists since alpha.514, TASK-1401/1369). tests/test_sat_pwm_start_limit.py gains reseed5lit/reseed5ign on the real SATcontrol.ino: a duty range-5 ON start with the flame lit sets _pwm_effectiveBoilerTemp (SATcontrol.ino:801) to the live flow (reseed at :887, thermo-nova pwm.py:164-167); with the flame off it is not reseeded at the start and is reseeded at the ignition sync (:1074). Evidence (re-run by the lead): real file Ran 21 OK; copy with only line :887 removed (diff checked) -> test_c_range5_on_start_with_flame_lit_reseeds_effective_temp_from_live_flow FAIL (40.0 != 55.0), FAILED (failures=1). test_sat_pwm_anchors.py Ran 32 OK. Not separately red-checked: the ignition-sync reseed at :1074.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -199,6 +199,23 @@ int main(int argc, char** argv) {
     printf("req=%d start=%u later=%u\n", r, atStart, cnt());
     return 0;
   }
+  if (!strcmp(sc, "reseed5lit")) {           // TASK-1385: range-5 ON start with the flame lit reseeds BT from the live flow (pwm.py:164-167)
+    edge(true); g_ms += 600000UL;
+    _pwm_effectiveBoilerTemp = 40.0f;        // the old effective temperature, different from the live flow
+    g_flow = 55.0f; g_pid = 50.0f;           // duty 1.0: range 5
+    step();
+    printf("req=%d eff=%.1f\n", req(), _pwm_effectiveBoilerTemp);
+    return 0;
+  }
+  if (!strcmp(sc, "reseed5ign")) {           // TASK-1385: range-5 ON start with the flame off keeps BT, the ignition sync reseeds it (pwm.py:186-193)
+    _pwm_effectiveBoilerTemp = 40.0f;
+    g_flow = 55.0f; g_pid = 50.0f;
+    step();
+    const float atStart = _pwm_effectiveBoilerTemp; const int r = req();
+    g_ms += 10000UL; edge(true); step();
+    printf("req=%d start=%.1f ign=%.1f\n", r, atStart, _pwm_effectiveBoilerTemp);
+    return 0;
+  }
   if (!strcmp(sc, "range5")) {               // (c) duty range 5 ON start with the flame off: counted at ignition, once (a relight is not a start)
     g_pid = 50.0f;
     step();
@@ -440,6 +457,20 @@ class SatPwmStartLimit(unittest.TestCase):
         self.assertEqual((r["req"], r["start"]), ("1", "1"), r)   # counted at the start tick although no flame burns yet
         self.assertEqual(r["lit"], "1", "range-5 ON phase: the ignition added a count: %r" % r)
         self.assertEqual(r["later"], "1", "a relight inside the range-5 ON phase was counted: %r" % r)
+
+    # TASK-1385 (thermo-nova pwm.py:164-167): a range-5 ON start with the flame lit reseeds the effective boiler
+    # temperature from the live flow. Red when the reseed in satPwmBeginOn() is removed (eff stays 44.5 via the EMA).
+    def test_c_range5_on_start_with_flame_lit_reseeds_effective_temp_from_live_flow(self):
+        r = self.run_sc("reseed5lit")
+        self.assertEqual(r["req"], "1", r)
+        self.assertEqual(float(r["eff"]), 55.0, "effective boiler temperature not reseeded from the live flow at the range-5 ON start: %r" % r)
+
+    # TASK-1385 (pwm.py:164, :186-193): with the flame off the start keeps the old value, the ignition sync reseeds it.
+    def test_c_range5_on_start_with_flame_off_reseeds_at_ignition(self):
+        r = self.run_sc("reseed5ign")
+        self.assertEqual(r["req"], "1", r)
+        self.assertEqual(float(r["start"]), 40.0, "flame-off range-5 start must not reseed yet: %r" % r)
+        self.assertEqual(float(r["ign"]), 55.0, "ignition sync did not reseed the effective temperature: %r" % r)
 
     # TASK-1421, entry 90 (Q49 B, pwm.py:159-160): every ON start counts, lit or not, so flameless ON restarts (R3 / Q35: phases that
     # end at their ON time) do use up the hourly limit. Before (first-flame counting): count=1 more=2. Now: count=2 more=1 (cph 3).
