@@ -58,7 +58,8 @@ static void satNarratef_P(const char *fmt, ...) {   // SAT log sink: one "N <tex
 enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 typedef int SATControlMode;
 struct SatSettings { @FORCEFIELD@ @AUTOFIELD@ float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false;
-                     int iMaxRelModulation=80; float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2; };
+                     int iMaxRelModulation=80; float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2;
+                     int iHeatingMode=0; };   // TASK-1440: ECO gate on the zones and the solar offset
 struct Settings { SatSettings sat; };
 struct SatState { int iCurrentModulation=0; float fFinalSetpoint=0, fPwmDutyCycle=0, fPidOutput=0; bool bPwmFlameRequested=false, bDhwActive=false,
                   bActive=true, bSafetyTripped=false, bValvesOpen=true, bSummerActive=false, bSolarGainActive=false;

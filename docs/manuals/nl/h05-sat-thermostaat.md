@@ -463,22 +463,24 @@ Elke area-waarde vervalt na 5 minuten zonder update. Verlopen zones worden uitge
 
 ### 5.14 Multi-zone PID-regeling
 
-Voor woningen met meerdere onafhankelijk geregelde verwarmingszones (bijv. aparte radiatorcircuits of zoneafsluiters) ondersteunt SAT tot 4 PID-zones. Elke zone voert zijn eigen PID-berekening uit. De zones worden vervolgens geaggregeerd tot een enkel ketel-setpoint (alpha.29 / alpha.30):
+Voor woningen met meerdere onafhankelijk geregelde verwarmingszones (bijv. aparte radiatorcircuits of zoneafsluiters) ondersteunt SAT tot 4 PID-zones. Elke zone voert zijn eigen PID-berekening uit. SAT combineert de zones met de PID van de hoofdruimte tot een enkel ketel-setpoint, volgens dezelfde methode als de thermo-nova-referentie-implementatie:
 
-- **P75-selectie**: de per-zone PID-uitvoeren worden gesorteerd en de waarde op het 75e percentiel (afgerond naar boven) wordt gekozen. Bij 4 zones filtert dit een enkele uitschietende veeleisende zone weg in plaats van die dominant te laten zijn.
-- **Headroom**: een vaste offset (`satzoneheadroom`, standaard 5,0 C) wordt boven op de P75-uitkomst opgeteld zodat de ketel marge heeft voor de zones met hogere vraag.
-- **Overshoot-cap**: als er al een zone boven zijn doel zit, wordt het aggregaat-setpoint verlaagd om over-verhitting van conformerende zones te voorkomen.
+- **Welke zones tellen mee**: een zone telt mee als er recente, geldige temperatuur- en doelwaarden zijn (niet uit, niet verlopen, binnen bereik) en de eigen PID-uitvoer boven het koude setpoint ligt (28,2 C bij radiatoren, 21,0 C bij vloerverwarming). Een zone zonder gegevens telt niet mee.
+- **Vraag van de zones**: uit de meetellende zones neemt SAT de PID-uitvoer op het 75e percentiel, nooit hoger dan de hoogste zone-uitvoer. Bij maximaal 4 zones is dat de hoogste uitvoer, dus de zones vragen wat de meest veeleisende zone nodig heeft. De instelling `satzoneheadroom` (standaard 5,0 C) is het meeste dat de zones boven die P75-uitvoer mogen vragen. Bij 4 zones of minder heeft ze geen merkbaar effect.
+- **Hoofdruimte**: het ketel-setpoint is de hoogste van de eigen PID-uitvoer van de hoofdruimte en de vraag van de zones. De zones kunnen de vraag van de hoofdruimte alleen verhogen, nooit verlagen.
+- **Overshoot-cap**: als een meetellende zone meer dan 0,3 C boven zijn doel zit, wordt het setpoint begrensd op het koude setpoint plus 10 C, min 4 C per graad dat de zone te warm is. De cap komt nooit onder het koude setpoint en de laagste cap van alle zones geldt. De cap kan het setpoint onder de vraag van de hoofdruimte brengen. Voorbeeld bij radiatoren: een zone die 1 C te warm is, begrenst het setpoint op 34,2 C; een zone die 4 C te warm is, begrenst het op 28,2 C, het koude setpoint (op of onder die waarde zet SAT de centrale verwarming uit).
+- **ECO-verwarmingsmodus**: in ECO worden de zones genegeerd en telt alleen de PID van de hoofdruimte.
 - Elke zone-PID gebruikt een symmetrische integral-clamp `[-curveValue, +curveValue]` zodat een zone die net boven zijn doel zit zijn aandeel van het setpoint onder de verwarmingscurve kan trekken.
 
-Zones ontvangen hun temperatuur en doel via MQTT. Zone 1 komt altijd overeen met de primaire SAT-doeltemperatuur. Zones 2-4 ontvangen onafhankelijke doelen en temperatuurinvoer.
+Zones ontvangen hun temperatuur en doel via MQTT. Elke zone, ook zone 1, is een extra kamer naast de hoofdkamer, met een eigen doel en temperatuurinvoer.
 
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
 | `satzonecount` | `1` | 1-4 | Aantal actieve verwarmingszones |
 | `satzonetimeout` | `300` | 60-3600 s | Seconden zonder update voordat een zone inactief wordt |
-| `satzoneheadroom` | `5.0` | 0-15 C | Headroom boven op het P75-zone-aggregaat |
+| `satzoneheadroom` | `5.0` | 0-15 C | Meeste dat de zones boven hun P75-uitvoer mogen vragen (geen effect bij 4 zones of minder) |
 
-Wanneer `satzonecount` 1 is (standaard), werkt SAT in single-zone modus en heeft deze functie geen overhead.
+Wanneer `satzonecount` 1 is (standaard), gebruikt SAT een zone alleen als er ruimte- en doelwaarden voor worden gepusht. Een zone zonder gegevens telt niet mee, dus een opstelling zonder zonegegevens gedraagt zich zoals voorheen. De MQTT-diagnosewaarden per zone (`sat/zone/<n>/...`) worden alleen gepubliceerd bij meer dan een geconfigureerde zone.
 
 ---
 

@@ -158,6 +158,13 @@ int main(int argc, char** argv) {
     settings.sat.iZoneCount = 2;
     satZones[0].fRoomTemp = 20.95f; satZones[0].fSetpoint = 21.0f; satZones[0].bRoomValid = satZones[0].bSpValid = true;
   }
+  if (!strcmp(sc, "zone1")) {                       // TASK-1440: zone count 1, zone 1 pushes data
+    settings.sat.iZoneCount = 1;
+    satZones[0].fRoomTemp = 20.95f; satZones[0].fSetpoint = 21.0f; satZones[0].bRoomValid = satZones[0].bSpValid = true;
+  }
+  if (!strcmp(sc, "zone1none")) {                   // TASK-1440: zone count 1 (the default), no zone data pushed
+    settings.sat.iZoneCount = 1;
+  }
   const bool widen = !strcmp(sc, "widen");          // REAL satPidGatherInputs: argv[4] = age of the estimate (ms), argv[5] = takeover active
   const uint32_t estMs = argc > 4 ? (uint32_t)strtoul(argv[4], 0, 10) : 0;
   const bool takeover = argc > 5 && atoi(argv[5]) != 0;
@@ -218,7 +225,7 @@ int main(int argc, char** argv) {
     } else if (!strcmp(sc, "first") || !strcmp(sc, "late")) {
       float out = tickPid(t, g_curveNow);
       printf("t=%d out=%.5f D=%.5f rawD=%.5f kd=%.5f\n", t, out, state.sat.fPidD, state.sat.fRawDerivative, state.sat.fKd);
-    } else if (!strcmp(sc, "zone")) {
+    } else if (!strcmp(sc, "zone") || !strcmp(sc, "zone1") || !strcmp(sc, "zone1none")) {
       tickPid(t, g_curveNow);
       float zo = tickZone();
       if (t == 600) printf("zoneI=%.6f zoneOut=%.5f steps=%d\n", satZones[0].fPidIntegral, zo, g_gathers);
@@ -401,6 +408,23 @@ class Cadence(unittest.TestCase):
             curve = 27.2 + (1.6 / 4.0) * (4.0 * (21.0 - 20.0) + 0.03 * 15.0 ** 2 + 0.4 * 15.0)
             ki = (1.6 * curve / 3.0) / 8400.0
             self.assertAlmostEqual(zi[10], ki * 0.05 * 60.0 * steps, delta=1e-4, msg="zone I = steps * ki*error*60")
+
+    def test_g2_zone_count_1_steps_zone_1_and_leaves_an_unconfigured_zone_excluded(self):
+        """TASK-1440: the zone block counts a single zone, so zone 1 steps at zone count 1 too.
+        A zone that never received data stays excluded (satZoneUsable): integral 0, output 10,
+        so a default single-room setup sees no change."""
+        if self.head:
+            self.skipTest("HEAD has no step counter")
+        two = float(self.run_sc("zone", 60)[-1]["zoneI"])
+        one = self.run_sc("zone1", 60)[-1]
+        print(f"\n  zone I after 600 s: count 2 {two:.6f}, count 1 {float(one['zoneI']):.6f}")
+        self.assertGreater(two, 0.0)
+        self.assertAlmostEqual(float(one["zoneI"]), two, delta=1e-6,
+                               msg="zone 1 must step at zone count 1 as it does at count 2")
+        none = self.run_sc("zone1none", 60)[-1]
+        self.assertEqual(float(none["zoneI"]), 0.0, "an unconfigured zone accumulates nothing")
+        self.assertAlmostEqual(float(none["zoneOut"]), 10.0, places=4,
+                               msg="an unconfigured zone returns SAT_MIN_SETPOINT, so it does not count")
 
     def test_h_first_output_after_a_reset_has_no_d_term(self):
         """Entry 95 Q39b: D = 0 on the first tick after boot or SAT enable, although a restored raw derivative is held."""

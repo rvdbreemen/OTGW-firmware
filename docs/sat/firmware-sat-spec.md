@@ -273,7 +273,7 @@ At the first computed update, the restored values are used as follows:
 9. Window timer, pressure, solar gain (`SATcontrol.ino:4755-4762`).
 10. **Summer simmer active:** send `CS=10`, `MM=<max>`, `CH=0` and stop (`SATcontrol.ino:4765-4776`). **All valves closed:** the same (`SATcontrol.ino:4779-4790`).
 11. Auto-tune, curve recommendation, modulation reliability, setpoint sync, flame status, boiler status, comfort and PV boost (`SATcontrol.ino:4793-4829`).
-12. Heating curve and PID (`SATcontrol.ino:4836-4839`); multi-zone override when more than one zone is configured (`SATcontrol.ino:4846-4899`).
+12. Heating curve and PID (`SATcontrol.ino:5529-5538`); zone block for every configured zone, which raises the main PID output to the zones output and applies the overshoot cap (`SATcontrol.ino:5540-5561`, `satAggregateZoneSetpoint()` at `SATcontrol.ino:2329-2377`, TASK-1440).
 13. Subtract `fSolarSetpointOffset` from the PID output when solar gain is active and enabled (TASK-1323; thermo-nova `climate.py:391-392`), then clamp it to 10 °C .. effective maximum (`SATcontrol.ino:4908-4912`). The result is the requested setpoint (thermo-nova `climate.py:394`); it is kept in `_sat_requestedSetpoint` for the 3 s refresh and the `sat/requested_setpoint` topic, while `state.sat.fPidOutput` stays the raw PID output.
 14. Switch PWM to continuous when the output reaches the system maximum; force PWM when configured (`SATcontrol.ino:4917-4925`). (Removed in TASK-1332, 2026-10-23: the Force PWM option no longer exists. Removed in TASK-1341, 2026-10-24: the PWM auto switch setting no longer exists, entry 19.)
 15. Compute the control setpoint for the active mode (`SATcontrol.ino:4928-4933`), clamp it again (`SATcontrol.ino:4936-4937`) and remember it as the last control setpoint (`SATcontrol.ino:4939`). There is no solar subtraction on the control setpoint any more (moved to step 13, TASK-1323).
@@ -605,7 +605,7 @@ else: control = max(pidOutput, Tboiler - fFlowOffset)        (fFlowOffset defaul
 5. **Meaning of `PM=3`, `PM=15`, `PM=48` and `MI=500`.** The firmware comment says they follow SAT Python and that `MI=500` is for faster OT polling (`SATcontrol.ino:3724`, `SATcontrol.ino:3729`). What the PIC or OT-Direct does with them is outside the SAT code.
 6. **Loop pass rate.** How often the main loop runs is not fixed by the code, so the exact tick and keepalive times can be later than the nominal values.
 7. **Persistence of the fallback enable.** Closed by TASK-1345: the MQTT fallback no longer writes `settings.sat.bEnabled`; it sets only `state.sat.bFallbackActive` (see the MQTT fallback paragraph).
-8. **Multi-zone start-up.** With more than one zone, the zone PIDs can replace the main PID output (`SATcontrol.ino:4846-4899`). I did not trace the start-up of the zone PID (`SATcontrol.ino:1806`).
+8. **Multi-zone start-up.** The zone block runs for every configured zone and can raise the main PID output or cap it (`SATcontrol.ino:5540-5561`, TASK-1440). I did not trace the start-up of the zone PID (`satZonePidAdvance()`, `SATcontrol.ino:2255`).
 9. **PWM first cycle after boot.** The PWM OFF phase compares against the flame-off start time set at boot (`SATcontrol.ino:836-837`, `SATcycles.ino:192`). I did not work out the first PWM ON timing for each duty range.
 10. **Outside temperature NAN.** The -40 to 50 °C check (`SATcontrol.ino:4721`) does not catch NAN. I did not check whether any outside source can deliver NAN.
 11. **What the boiler or PIC does with the last commands** after `CS=0` or during the gap before the first tick. That is gateway and boiler behaviour outside this code.
@@ -624,7 +624,7 @@ Source: OTGW-firmware, branch `dev`, commit `51df6b486`. All paths are relative 
 
 The PID controller turns the room temperature error into a correction on top of the heating curve. Its output is a flow temperature request in degrees: `output = heatingCurveValue + P + I + D` (SATpid.ino:308-310). The control tick uses that output as `pidOutput`, which then drives the control setpoint sent to the boiler (SATcontrol.ino:4839, SATcontrol.ino:4906-4933).
 
-There is one main PID with its own internal state held in file-level static variables (SATpid.ino:31-56). There is a separate, simpler per-zone PID for up to `SAT_MAX_ZONES` zones, used only when the zone count setting is above 1 (SATcontrol.ino:1806-1867, SATcontrol.ino:4846). The zone count default is 1 (SATtypes.h:531). Each zone PID computes its own heating curve from the zone target and the shared outside temperature (SATcontrol.ino:1828).
+There is one main PID with its own internal state held in file-level static variables (SATpid.ino:31-56). There is a separate, simpler per-zone PID for up to `SAT_MAX_ZONES` zones (SATcontrol.ino:2255-2310, SATcontrol.ino:5540-5561). It runs for every configured zone, also at zone count 1; a zone without usable inputs is excluded, so a setup that pushes no zone data is unchanged (TASK-1440). The zone count default is 1 (SATtypes.h:531). Each zone PID computes its own heating curve from the zone target and the shared outside temperature (satZonePidAdvance(), SATcontrol.ino:2255).
 
 <a id="s2-inputs"></a>
 
@@ -708,7 +708,7 @@ Differs from thermo-nova: the integral is updated before the derivative (SATpid.
 
 Computed from the code: the PID steps once per 60 s whatever the tick interval (10 to 300 s); between steps the output follows the current curve (TASK-1368).
 
-The zone PID (when the zone count is above 1) takes its integral step in `satZonePidAdvanceAll()` on the same 60 s timer (`area.py:183-190`, entry 111) and its output in `satZonePidOutput()` on every control tick that reaches the zone block.
+The zone PID (every configured zone, also at zone count 1) takes its integral step in `satZonePidAdvanceAll()` on the same 60 s timer (`area.py:183-190`, entry 111) and its output in `satZonePidOutput()` on every control tick that reaches the zone block.
 
 **D. Derivative update** (SATpid.ino:187-247), in the order the code checks:
 
@@ -754,14 +754,16 @@ Differs from thermo-nova: there the output is recomputed on each read. Here noth
 - by the cycle tracker at flame-off (SATcycles.ino:789);
 - by the MQTT publisher (SATcontrol.ino:2733, SATcontrol.ino:3053-3058).
 
-**G. Combination into the requested setpoint** (SATcontrol.ino:4839-4946)
+**G. Combination into the requested setpoint** (SATcontrol.ino:5538-5585)
 
 1. `pidOutput = satPidOutput(curveValue)` (the 60 s `satPidService()` stepped the PID earlier).
-2. Zones, only when `iZoneCount > 1` (SATcontrol.ino:4846). Each zone step returns its output, or 10.0 when the zone is excluded. A zone counts as active when its output is above 10.0 (SATcontrol.ino:4853-4861).
-   1. No active zone: `pidOutput` stays the main PID output (SATcontrol.ino:4863-4864).
-   2. One active zone: `pidOutput` is replaced by that zone's output. The main PID output is not compared with it (SATcontrol.ino:4865-4868).
-   3. Two or more: the outputs are sorted ascending. `p75idx = ceil(0.75 * N) - 1` and `aggregate = outputs[p75idx] + fZoneAggregationHeadroom`. The largest `room - setpoint` over the active zones, if positive, is subtracted. The floor is 10.0. The result replaces `pidOutput` (SATcontrol.ino:4869-4892).
-3. Clamp to [10.0, `satEffectiveMaxSetpoint()`] (SATcontrol.ino:4906-4912). The ceiling is the lowest of:
+2. Zones, for every configured zone (`iZoneCount` 1 to 4), through `satAggregateZoneSetpoint()` (SATcontrol.ino:5540-5561, SATcontrol.ino:2329-2377). Ported from thermo-nova climate.py:369-394 and area.py:166-175, :264-333 (entry 116, TASK-1440). Each zone step returns its output, or 10.0 when the zone is not usable (OFF, stale, never pushed, out of range: `satZoneUsable()`, SATcontrol.ino:2231). A zone without usable inputs does not count, so a setup without zone data is unchanged.
+   1. ECO (`iHeatingMode` 1): `pidOutput` stays the main PID output (climate.py:377-379). The zone outputs are still computed, for the diagnostics.
+   2. A zone counts when it is usable and its output is above the cold setpoint: 28.2 °C radiators, 21.0 °C underfloor (`satGetColdSetpoint()`, ADR-199; thermo-nova uses `COLD_SETPOINT` 22 at area.py:175). The firmware has no per-zone valve position, so only the output test of area.py:166-175 applies.
+   3. Zones output (area.py:264-301): the counted outputs sorted ascending, `baseline = outputs[int(N * 0.75)]` (clamped to N - 1), `chosen = min(highest, baseline + fZoneAggregationHeadroom)`, rounded to 1 decimal. No counted zone gives 10.0 (`SAT_MIN_SETPOINT`), which leaves the main PID output alone (area.py:291-292).
+   4. `pidOutput = max(main PID output, zones output)` (climate.py:385-386). The zones only raise the demand of the main room, they never lower it.
+   5. Overshoot cap (area.py:303-333, climate.py:388-389): every counted zone more than 0.3 °C above its target gives `cold + 10 - 4 * degrees over`. The lowest wins, floored at the cold setpoint and rounded to 1 decimal. Then `pidOutput = min(pidOutput, cap)`. The cap can lower `pidOutput` below the main PID output, as in thermo-nova.
+3. Clamp to [10.0, `satEffectiveMaxSetpoint()`] (SATcontrol.ino:5583-5585). The ceiling is the lowest of:
    - the boiler's MaxTSet, or 75 when MaxTSet is below 30;
    - the system cap (62 radiators, 45 underfloor, 40 for a heat pump source);
    - the hard maximum (80 radiators, 50 underfloor);
@@ -827,11 +829,13 @@ Variable names as in the code.
 - `output = curveValue + kp * error + integral`, with no derivative term.
 - The output is clamped to [10.0, `satGetMaxSetpoint()`].
 
-**Zone aggregation** (SATcontrol.ino:4869-4892):
-- `p75idx = ceil(0.75 * N) - 1`.
-- `aggregate = sorted[p75idx] + fZoneAggregationHeadroom - maxOvershoot`, floor 10.0.
-- `maxOvershoot` is the largest positive `fRoomTemp - fSetpoint` over the active zones (SATcontrol.ino:4857-4859).
-- Computed from the formula (not stated in the code): N = 2 gives index 1 (the highest), N = 3 gives index 2 (the highest), N = 4 gives index 2 (the second highest). The headroom (default 5.0, SATtypes.h:533) is always added, not used as a cap.
+**Zone aggregation** (`satAggregateZoneSetpoint()`, SATcontrol.ino:2329-2377; ports thermo-nova area.py:264-333 and climate.py:369-394, entry 116, TASK-1440):
+- A zone counts when it is usable and its output is above the cold setpoint (`satGetColdSetpoint()`: 28.2 radiators, 21.0 underfloor, ADR-199).
+- `baseline = sorted[int(N * 0.75)]`, clamped to N - 1.
+- `chosen = min(highest, baseline + fZoneAggregationHeadroom)`, rounded to 1 decimal. No counted zone gives 10.0.
+- `requested = max(main PID output, chosen)`.
+- Overshoot cap: for each counted zone with `target - room` below -0.3, `cap = cold + 10 - 4 * (room - target)`. The lowest cap wins, floored at the cold setpoint, rounded to 1 decimal. `requested = min(requested, cap)`.
+- Computed from the formula (not stated in the code): `int(N * 0.75)` is 0, 1, 2, 3 for N = 1, 2, 3, 4, which is always the highest output. With at most 4 zones the headroom therefore never binds; it would only matter with 5 or more zones.
 
 **Illustrative arithmetic (not from the code, computed from the formulas above, same inputs as the thermo-nova example).** Radiators, coefficient 2.0, target 20, outside 0:
 - `curveValue = 20.0`, `setpoint = 27.2 + 0.5 * 20 = 37.2`.
@@ -892,8 +896,9 @@ With the firmware default coefficient of 1.5 (SATtypes.h:442) and the same input
 | PID state maximum age on restore | 1800 | s | SATcontrol.ino:1993 |
 | PID state periodic save | 300 | s | SATcontrol.ino:5010 |
 | `iZoneCount` default | 1 | zones | SATtypes.h:531 |
-| `fZoneAggregationHeadroom` default | 5.0 | degrees | SATtypes.h:533 |
-| Zone P75 fraction | 0.75 | fraction | SATcontrol.ino:4881 |
+| `fZoneAggregationHeadroom` default (most the zones may ask above their P75 output) | 5.0 | degrees | SATtypes.h:552 |
+| Zone P75 fraction | 0.75 | fraction | SATcontrol.ino:2360 |
+| Zone overshoot margin / cooling headroom / cooling slope | 0.3 / 10.0 / 4.0 | degrees, degrees, degrees per degree | SATcontrol.ino:2335-2337 |
 | Zone timeout default | 300 | s | SATtypes.h:532 |
 | Thermal estimation deadband widening | 0.5 | degrees per hour | SATcontrol.ino:4750 |
 | `iHeatingMode` default (not used by control) | 0 (COMFORT) | enum | SATtypes.h:524 |
@@ -994,7 +999,7 @@ Computed from the code: `satCalcHeatingCurve` returns the curve and writes no st
 13. **SAT disabled.** The PID does not tick (SATcontrol.ino:4568-4573), and `satDisable()` resets it (SATcontrol.ino:2170).
 14. **First tick after boot or reset.** The PID returns the stored 0.0, and the boiler is commanded off for one or two ticks (section B, step 7).
 15. **Deadband during thermal estimation.** The deadband grows by 0.5 per hour of estimation for that tick, which affects both the integral and derivative band tests (SATcontrol.ino:4747-4751, SATpid.ino:151, SATpid.ino:189).
-16. **Single active zone.** Its output replaces the main PID output, even if the main output is higher (SATcontrol.ino:4865-4868).
+16. **Single counted zone.** It no longer replaces the main PID output. The requested setpoint is the maximum of the main PID output and the zones output, so a single zone can only raise it (SATcontrol.ino:2367, thermo-nova climate.py:385-386; changed in TASK-1440, the old replace-the-primary behaviour is gone).
 
 <a id="s2-not-found-in-the-code-unclear"></a>
 
@@ -1014,7 +1019,7 @@ Computed from the code: `satCalcHeatingCurve` returns the curve and writes no st
    - Cold setpoint 28.2 / 21.0 (SATcontrol.ino:55-56); thermo-nova uses 22.
    - The firmware does not round the curve, gains, P, I, D or output. Only the error is rounded (SATpid.ino:63-66, SATcontrol.ino:496, SATpid.ino:135-137, SATpid.ino:297-309).
 9. **Outside temperature `NaN`.** The range check at SATcontrol.ino:4721 does not catch `NaN`, because comparisons with `NaN` are false. Whether `OTcurrentSystemState.Toutside` or the other outside sources can be `NaN` was not checked for this section (SATcontrol.ino:1283-1303).
-10. **Zone overshoot cap.** The firmware subtracts the largest positive `room - setpoint` 1:1 from the aggregate (SATcontrol.ino:4884-4889). There is no 0.3 margin, no slope of 4.0 and no floor at the cold setpoint, as found in thermo-nova area.py. The floor is 10.0 (SATcontrol.ino:4891). The code does not explain this choice.
+10. **Zone overshoot cap.** Ported from thermo-nova area.py:303-333 (TASK-1440): every counted zone more than 0.3 °C above its target gives `cold + 10 - 4 * degrees over`, the lowest wins, floored at the cold setpoint, and the requested setpoint is `min(requested, cap)` (SATcontrol.ino:2335-2337, SATcontrol.ino:2342-2350, SATcontrol.ino:2368-2372). The old rule (subtract the largest overshoot 1:1, no margin, floor 10.0) is gone. The cold setpoint is the per-system one (ADR-199), not thermo-nova's 22.
 11. **Integral rate at control intervals other than 60 s.** The fixed 60 s step (SATpid.ino:166), combined with the 10 s and 60 s gates (SATpid.ino:276-285), means the integral gain per minute depends on the control interval and on how often the error changes. The code does not state whether this is intended.
 12. **Units of Ki and Kd.** The code does not name units. The origin of 8400 and 0.07 is not explained (SATpid.ino:25, SATpid.ino:137).
 13. **Integral reset on a target change.** Thermo-nova resets the PID on a target change. No such reset was found in the firmware target paths (SATcontrol.ino:1903-1934, SATcontrol.ino:1034-1045, settingStuff.ino:997). The window paths are the exception: they clear the integral when they change the target (SATcontrol.ino:1119, SATcontrol.ino:1139).
@@ -1034,10 +1039,10 @@ Source: OTGW-firmware, branch `dev`, git HEAD 51df6b486. All cited files are in 
 The firmware works out a boiler flow temperature in the same three layers, but all three run inside one periodic control tick (SATcontrol.ino:4510-5019):
 
 1. **Heating curve.** A weather-compensation value from the effective room target and the outside temperature (SATcontrol.ino:485-500, SATcontrol.ino:4836).
-2. **Requested setpoint.** There is no separate function for it. It is the local variable `pidOutput`: the curve plus the PID correction (SATcontrol.ino:4839, SATpid.ino:309), optionally replaced by a multi-zone aggregate (SATcontrol.ino:4846-4899), then clamped to [10, effective maximum] (SATcontrol.ino:4908-4912).
+2. **Requested setpoint.** There is no separate function for it. It is the local variable `pidOutput`: the curve plus the PID correction (SATcontrol.ino:5538, SATpid.ino:309), raised to the zones output and limited by the zone overshoot cap (`satAggregateZoneSetpoint()`, SATcontrol.ino:5540-5561, TASK-1440), then clamped to [10, effective maximum] (SATcontrol.ino:5583-5585).
 3. **Control setpoint.** What is sent to the boiler as `CS=`. It is derived from `pidOutput` by the continuous rule or the PWM override (SATcontrol.ino:4928-4933), clamped again (SATcontrol.ino:4936-4937) and forced to 10 °C by the cold-setpoint cutoff; solar gain lowers `pidOutput` before this (TASK-1323), not the control setpoint (SATcontrol.ino:4971-4975).
 
-The order inside one tick is: curve, PID, zone override, solar reduction, clamp, mode (continuous or PWM), final clamp, auto-switch, modulation, cold cutoff, send (SATcontrol.ino:5414-5418, 5423-5486, 5488-5494, 5496-5511, 5513-5534, 5536-5546, 5552-5560, 5562-5570, 5572-5579). The solar reduction is applied to the requested setpoint before the clamp, as in thermo-nova (climate.py:391-394) (corrected 2026-10-24, TASK-1351); TASK-1323.
+The order inside one tick is: curve, PID, zone block (raise to the zones output, overshoot cap), solar reduction, clamp, mode (continuous or PWM), final clamp, auto-switch, modulation, cold cutoff, send (SATcontrol.ino:5414-5418, 5423-5486, 5488-5494, 5496-5511, 5513-5534, 5536-5546, 5552-5560, 5562-5570, 5572-5579). The solar reduction is applied to the requested setpoint before the clamp, as in thermo-nova (climate.py:391-394) (corrected 2026-10-24, TASK-1351); TASK-1323.
 
 This section covers layers 1 and 2 and the continuous-mode part of layer 3. The PWM override is only summarised (see "Cross-reference: PWM override").
 
@@ -1055,8 +1060,8 @@ This section covers layers 1 and 2 and the continuous-mode part of layer 3. The 
 | Heating source | `settings.sat.iHeatingSource`: auto, gas boiler, heat pump, hybrid. Auto is treated as gas boiler. It changes the maximum setpoint, not the curve | SATtypes.h:48-51, SATtypes.h:439, SATcontrol.ino:209-214, SATcontrol.ino:233 |
 | Heating curve coefficient | `settings.sat.fHeatingCurveCoeff`, default 2.0 (TASK-1347; 1.5 before), accepted range 0.1 to 5.0. Read on every curve calculation. Auto-tune can change it | SATtypes.h:442, settingStuff.ino:998, SATcontrol.ino:488, SATcontrol.ino:4444-4485 |
 | PID terms (P, I, D) | `satPidStep()` on the 60 s timer, fed with the smoothed room temperature and the effective target by `satPidGatherInputs()`; `satPidOutput()` on every tick | SATcontrol.ino, SATpid.ino |
-| Zones (secondary rooms) | Up to 4 zones, each with a room temperature and a setpoint pushed over MQTT. Used only when `iZoneCount` > 1 (default 1, range 1 to 4) | SATcontrol.ino:1726-1729, SATcontrol.ino:1753-1784, MQTTstuff.ino:895, SATtypes.h:531, settingStuff.ino:1112, SATcontrol.ino:4846 |
-| Heating mode | `settings.sat.iHeatingMode` (0 comfort, 1 eco). Stored and published, but not read by the control path (see "Not found") | SATtypes.h:524, settingStuff.ino:1104, SATcontrol.ino:2211-2221 |
+| Zones (secondary rooms) | Up to 4 zones, each with a room temperature and a setpoint pushed over MQTT. Every configured zone (`iZoneCount`, default 1, range 1 to 4) runs its PID each tick. A zone without usable inputs does not count, so with no zone data pushed the zone block changes nothing | SATcontrol.ino:2158-2161, SATcontrol.ino:2185-2216, MQTTstuff.ino:895, SATtypes.h:550, settingStuff.ino:1112, SATcontrol.ino:5540-5561 |
+| Heating mode | `settings.sat.iHeatingMode` (0 comfort, 1 eco). Stored and published. The control path reads it only in the zone block, where ECO skips the zone aggregation (`satAggregateZoneSetpoint()`, SATcontrol.ino:2333); the main PID is the same in both modes (see "Not found") | SATtypes.h:524, settingStuff.ino:1104, SATcontrol.ino:2211-2221 |
 | Solar gain state | `state.sat.bSolarGainActive` from `satUpdateSolarGain()`, and the offset `fSolarSetpointOffset` | SATcontrol.ino:4215-4299, SATtypes.h:496 |
 | Maximum setpoint | Three different values are used (see Formulas): the effective maximum `satEffectiveMaxSetpoint()`, the system cap `satGetMaxSetpoint()`, and the per-system hard ceiling | SATcontrol.ino:228-252 |
 | Boiler maximum (MaxTSet) | OpenTherm MsgID 57, an input to the effective maximum | OTGW-Core.ino:4294, SATcontrol.ino:242-243 |
@@ -1116,7 +1121,7 @@ When zones are used, every active zone also calls `satCalcHeatingCurve()` with i
 - **PID update:** no timer of its own. It runs inside the control tick (SATcontrol.ino:4839) with its own rate limits (see next subsection).
 - **PWM suppression refresh:** every 3 s, between ticks, PWM only (SATcontrol.ino:480, SATcontrol.ino:894-918).
 - **PIC CS keepalive:** every 30 s on PIC boards (SATcontrol.ino:403-414, SATcontrol.ino:4608).
-- **Zones:** no timer of their own. When `iZoneCount` > 1, each zone PID steps on the 60 s PID timer (`satZonePidAdvanceAll()`, called by `satPidService()`) and the tick only reads the zone outputs (`satZonePidOutput()`).
+- **Zones:** no timer of their own. For every configured zone (also at `iZoneCount` 1), each zone PID steps on the 60 s PID timer (`satZonePidAdvanceAll()`, called by `satPidService()`) and the tick only reads the zone outputs (`satZonePidOutput()`).
 
 #### PID step (on its own 60 s timer, TASK-1368)
 
@@ -1132,7 +1137,7 @@ The PID steps on its 60 s timer with a valid room temperature. There is no stale
 
 PID internals belong to the PID section. In short: with automatic gains (default on, SATtypes.h:518), `kp = fHeatingCurveCoeff * curveValue / 4` for underfloor and `/ 3` otherwise (SATpid.ino:130-135), `ki = kp / 8400` (SATpid.ino:136), `kd = 0.07 * 8400 * kp` (SATpid.ino:137). The integral is reset to 0 whenever |error| > `fDeadband` (default 0.1, SATtypes.h:443, SATpid.ino:154-156). Inside the deadband it adds `ki * error * 60` per update (SATpid.ino:166), clamped to plus or minus the curve value and to plus or minus 20 (SATpid.ino:172-178).
 
-**Zone PID** (SATcontrol.ino:1806-1867). A zone is excluded (output 10, integral cleared) when it is off, has no valid room or setpoint, is older than `iZoneTimeoutS`, or has a room outside -10 to 50 °C or a setpoint outside 5 to 30 °C (SATcontrol.ino:1790-1796, SATcontrol.ino:1814-1825). Otherwise it computes its own curve (SATcontrol.ino:1828), `kp` with the same divisor rule and `ki = kp / 8400` (SATcontrol.ino:1834-1837), an integral with the same deadband, clamp and 20 °C cap (SATcontrol.ino:1845-1853), and output `curve + P + I` (no D term) clamped to [10, system cap] (SATcontrol.ino:1855-1861). It runs on every tick when `iZoneCount` > 1 (SATcontrol.ino:4846, SATcontrol.ino:4853-4855). Derived from line 1846 and the 30 s default tick: the zone integral step is sized for 60 s but is applied every 30 s.
+**Zone PID** (SATcontrol.ino:1806-1867). A zone is excluded (output 10, integral cleared) when it is off, has no valid room or setpoint, is older than `iZoneTimeoutS`, or has a room outside -10 to 50 °C or a setpoint outside 5 to 30 °C (SATcontrol.ino:1790-1796, SATcontrol.ino:1814-1825). Otherwise it computes its own curve (SATcontrol.ino:1828), `kp` with the same divisor rule and `ki = kp / 8400` (SATcontrol.ino:1834-1837), an integral with the same deadband, clamp and 20 °C cap (SATcontrol.ino:1845-1853), and output `curve + P + I` (no D term) clamped to [10, system cap] (SATcontrol.ino:1855-1861). It runs on every tick for every configured zone, also at `iZoneCount` 1 (SATcontrol.ino:5540-5561). Derived from line 1846 and the 30 s default tick: the zone integral step is sized for 60 s but is applied every 30 s.
 
 #### Control loop pass (every `iControlInterval`, 30 s by default)
 
@@ -1153,7 +1158,7 @@ Before the timer check, every loop pass handles the fallback enable, the disable
 13. **Effective target** = target (+ PV boost) (SATcontrol.ino:4831-4833).
 14. **Heating curve** (SATcontrol.ino:4836).
 15. **PID** (SATcontrol.ino:4839).
-16. **Zone override** when `iZoneCount` > 1 (SATcontrol.ino:4846-4899, see Formulas). The zone result replaces the main PID output. It is not combined with it by a maximum.
+16. **Zone block** for every configured zone (SATcontrol.ino:5540-5561, `satAggregateZoneSetpoint()` SATcontrol.ino:2329-2377, see Formulas). The requested setpoint becomes the maximum of the main PID output and the zones output, then the overshoot cap is applied as a minimum. In ECO (`iHeatingMode` 1) the main PID output is kept.
 17. **Requested setpoint clamp:** `pidOutput` is clamped to [10, `satEffectiveMaxSetpoint()`] (SATcontrol.ino:4908-4912).
 18. **PWM disable:** if `pidOutput` ≥ the system cap `satGetMaxSetpoint()` and the mode is PWM, the mode becomes continuous (SATcontrol.ino:4909, SATcontrol.ino:4917-4920). If `bForcePWM` is on, the mode becomes PWM (SATcontrol.ino:4923-4925). (Removed in TASK-1332, 2026-10-23: the Force PWM option no longer exists.)
 19. **Mode rule:** PWM override or continuous rule (SATcontrol.ino:4928-4933).
@@ -1219,29 +1224,33 @@ The heating source (heat pump, hybrid) does not change the base offset (SATcontr
 
 **PID output** (SATpid.ino:309): `output = heatingCurveValue + P + I + D`, not rounded.
 
-**Requested setpoint** (no ECO/COMFORT split, SATcontrol.ino:4839-4912):
+**Requested setpoint** (ECO skips the zones only, SATcontrol.ino:5538-5585):
 
 ```
 pidOutput = satPidOutput(curveValue) | satPidCurveOnly(curveValue)  (the 60 s satPidService() stepped the PID earlier)
-if iZoneCount > 1 and at least one zone output > 10:
-    pidOutput = zone aggregate (below)                          (4846-4899)
-pidOutput = clamp(pidOutput, 10, satEffectiveMaxSetpoint())    (4908-4912)
+pidOutput = satAggregateZoneSetpoint(pidOutput, zones, ...)    (5541-5563; function 2329-2377)
+pidOutput = pidOutput - fSolarSetpointOffset  if solar gain is active and enabled
+pidOutput = clamp(pidOutput, 10, satEffectiveMaxSetpoint())    (5581-5586)
 ```
 
-**Zone aggregate** (SATcontrol.ino:4846-4896). Only zones whose output is > 10 count as active (SATcontrol.ino:4855-4856). For each active zone, `overshoot = room - setpoint`, and the largest positive one is kept (SATcontrol.ino:4858-4859).
+**Zone aggregate** (`satAggregateZoneSetpoint()`, SATcontrol.ino:2329-2377). A port of thermo-nova climate.py:369-394 and area.py:166-175, :264-333 (entry 116, TASK-1440). It runs for every zone count (1 to 4). A zone counts when `satZoneUsable()` is true (SATcontrol.ino:2231) and its output is above the cold setpoint (`satGetColdSetpoint()`: 28.2 radiators, 21.0 underfloor, ADR-199; SATcontrol.ino:2343). For each counted zone, `error = target - room` rounded to 3 decimals (`satPidError()`); the cap uses the ones below -0.3.
 
 ```
-0 active zones : pidOutput unchanged                            (4863-4864)
-1 active zone  : pidOutput = that zone's output (no headroom)  (4865-4867)
-2 or more      : sort ascending                                 (4871-4879)
-                 p75idx    = ceil(0.75 * N) - 1                 (4881)
-                 aggregate = outputs[p75idx] + fZoneAggregationHeadroom   (4882)
-                 aggregate = aggregate - maxOvershoot   if maxOvershoot > 0 (4886-4889)
-                 aggregate = max(aggregate, 10)                 (4891)
-                 pidOutput = aggregate                          (4892)
+ECO (iHeatingMode == 1)  : pidOutput unchanged                    (2333)
+counted outputs sorted ascending                                  (2354-2359)
+idx        = int(N * 0.75), at most N - 1                         (2360-2361)
+chosen     = min(highest, outputs[idx] + fZoneAggregationHeadroom)  (2362-2363)
+zonesOut   = round1(chosen);  N == 0 gives 10                     (2352, 2364)
+setpoint   = max(pidOutput, zonesOut)                             (2367)
+per counted zone with error < -0.3:
+    c = cold + 10 - 4 * (-error)                                  (2345)
+cap        = min of the c values, at least cold, round1           (2346, 2369-2370)
+setpoint   = min(setpoint, cap)  if there is a cap                (2371)
 ```
 
-Derived from line 4881 (computed, not stated in the code): N = 2 picks index 1 (the highest), N = 3 picks index 2 (the highest), N = 4 picks index 2 (the third of four). `fZoneAggregationHeadroom` defaults to 5.0 °C, range 0 to 15 (SATtypes.h:533, settingStuff.ino:1114). There is no cap at the highest zone output.
+Derived from line 2360 (computed, not stated in the code): `int(N * 0.75)` is 0, 1, 2, 3 for N = 1, 2, 3, 4, always the highest output, so with at most 4 zones `min(highest, baseline + headroom)` is the highest output and `fZoneAggregationHeadroom` never binds. It would only bind with 5 or more zones. `fZoneAggregationHeadroom` defaults to 5.0 °C, range 0 to 15 (SATtypes.h:552, settingStuff.ino:1110); its meaning changed in TASK-1440: before it was added on top of the P75 value, now it is the most the zones may ask above their P75 output. No settings migration.
+
+Computed examples (radiators, cold 28.2, 4.0 per degree, headroom irrelevant): 1.0 °C over a target gives a cap of 34.2; 4.0 °C over gives 22.2, floored to 28.2; exactly 0.3 °C over gives no cap (the test is strictly below -0.3).
 
 **Effective maximum** used by the clamps (SATcontrol.ino:240-252):
 
@@ -1321,8 +1330,9 @@ Derived from the curve formula and the cold setpoints (computed, not stated in t
 | `fTargetTemp` accepted range | 5 to 30 | °C | settingStuff.ino:997 |
 | Preset comfort / eco / away / sleep / activity / home | 21 / 18 / 15 / 16 / 10 / 18 | °C | SATtypes.h:446-451 |
 | `iZoneCount` default | 1 | | SATtypes.h:531 |
-| `fZoneAggregationHeadroom` default | 5.0 | °C | SATtypes.h:533 |
-| Zone percentile | 0.75 (rank `ceil(0.75 N) - 1`) | | SATcontrol.ino:4881 |
+| `fZoneAggregationHeadroom` default (most the zones may ask above their P75 output) | 5.0 | °C | SATtypes.h:552 |
+| Zone percentile | 0.75 (index `int(N * 0.75)`, at most N - 1) | | SATcontrol.ino:2360-2361 |
+| Zone overshoot margin / cooling headroom / cooling slope | 0.3 / 10.0 / 4.0 | °C, °C, °C per °C | SATcontrol.ino:2335-2337 |
 | `fSolarSetpointOffset` default | 2.0 | °C | SATtypes.h:496 |
 | `bSolarGainEnable` default | off | | SATtypes.h:494 |
 | `bThermalComfort` default | off | | SATtypes.h:522 |
@@ -1388,10 +1398,10 @@ On PIC boards the last `CS=` (when ≥ 8 °C) is re-sent every 30 s (SATcontrol.
 - `sat/heating_curve` = `state.sat.fHeatingCurveValue` (SATcontrol.ino:2732). With zones, see "When the heating curve is recalculated".
 - `sat/pid_output` = `state.sat.fPidOutput`, the raw PID output before zones and clamps (SATcontrol.ino:2733, SATpid.ino:310).
 - `sat/target` = `settings.sat.fTargetTemp` (the target without the PV boost) (SATcontrol.ino:2734).
-- `sat/requested_setpoint` = `state.sat.fPidOutput` clamped to [10, system cap] (SATcontrol.ino:3053-3058). This is not the `pidOutput` variable the controller uses: it ignores the zone override and uses the system cap instead of the effective maximum.
+- `sat/requested_setpoint` = `_sat_requestedSetpoint`, the `pidOutput` of the last control tick after the zone block and the solar offset, clamped to [10, effective maximum] (SATcontrol.ino:3692-3696, SATcontrol.ino:5583-5584). With zones, the value therefore includes the zones output and the overshoot cap.
 - `sat/max_setpoint` = the system cap `satGetMaxSetpoint()`, not the effective maximum (SATcontrol.ino:3050).
 - `sat/heating_curve_coeff` (SATcontrol.ino:3126).
-- Per-zone `sat/zone/<n>/active`, `/output`, `/error` (SATcontrol.ino:1871-1900).
+- Per-zone `sat/zone/<n>/active`, `/output`, `/error` (`satPublishZoneDiagnostics()`, SATcontrol.ino:2382-2412). They are published only when `iZoneCount` > 1 (SATcontrol.ino:5561), on purpose: no new retained MQTT traffic for single-room setups, although the zone block now runs at zone count 1 (TASK-1440).
 - The REST status JSON carries `heating_curve` and `coefficient` (SATcontrol.ino:2354, SATcontrol.ino:2365).
 
 **Heating curve recommendation** (advisory only). Two separate mechanisms exist:
@@ -1418,8 +1428,8 @@ Neither mechanism writes the coefficient. Only auto-tune does (SATcontrol.ino:44
 - **Thermal comfort on.** The Summer Simmer index replaces the room temperature only when the room temperature comes from OpenTherm `Tr` and humidity is fresh (SATcontrol.ino:1264-1270). BLE, multi-area and external sources return earlier (SATcontrol.ino:1208-1231). The curve uses the effective target and the outside temperature only (SATcontrol.ino:4836).
 - **Requested setpoint at or above the system cap.** PWM is switched to continuous (SATcontrol.ino:4917-4920). Derived from lines 4908-4912 and 4917: the clamp uses the effective maximum, which can be below the system cap (for example when the boiler's MaxTSet is lower), and then `pidOutput` can never reach the system cap, so this switch cannot trigger.
 - **Continuous mode, boiler hotter than the request, flame on.** The setpoint stays at least `boiler - 2.0` °C by default (SATcontrol.ino:1179-1184). There is no hold on a falling request.
-- **Multiple zones, one active.** Its output replaces the main PID output, also when it is lower than the main output (SATcontrol.ino:4865-4867).
-- **Multiple zones, several active.** The main PID output is discarded; the aggregate of the zone outputs is used (SATcontrol.ino:4892).
+- **Zones, one counted.** Its output raises the main PID output when it is higher; it never lowers it (SATcontrol.ino:2367). The old replace-the-primary behaviour is gone (TASK-1440).
+- **Zones, several counted.** The main PID output is kept and raised to the zones output, which is the highest counted output with up to 4 zones (SATcontrol.ino:2360-2367). An overshooting zone caps the result (SATcontrol.ino:2368-2372).
 - **Rounding.** The curve and PID output are not rounded (SATcontrol.ino:496, SATpid.ino:309). The PID error is rounded to 3 decimals (SATpid.ino:65). The `CS=` command is formatted with one decimal (SATcontrol.ino:390). The thermal safe fallback truncates to a whole degree (SATcontrol.ino:4740).
 - **Heat pump.** Same base offset as radiators (SATcontrol.ino:255-260), system cap 40 °C (SATcontrol.ino:233), modulation 100 outside PWM (SATcontrol.ino:307), and it enters PWM through the same 60 s auto-switch as every other source (entry 87; SATcontrol.ino:5542-5546). A heat pump has no hourly PWM start limit (entry 81; SATcycles.ino:320-327).
 - **Heating system auto.** Treated as radiators for base offset, cold setpoint and caps (SATcontrol.ino:198-199).
@@ -1476,7 +1486,7 @@ Per tick, the PWM code reads:
 
 | Input | Meaning | Source |
 |---|---|---|
-| `pidOutput` | Requested flow setpoint (heating curve + PID, multi-zone override, clamped to [10, effective maximum]) | SATcontrol.ino:4836-4839, SATcontrol.ino:4846-4899, SATcontrol.ino:4911-4912 |
+| `pidOutput` | Requested flow setpoint (heating curve + PID, raised to the zones output and capped by the zone overshoot cap, minus the solar offset, clamped to [10, effective maximum]) | SATcontrol.ino:5529-5538, SATcontrol.ino:5540-5561, SATcontrol.ino:5583-5585 |
 | Flow temperature | `OTcurrentSystemState.Tboiler` (OpenTherm MsgID 25 per the comment), or the simulated value | SATcontrol.ino:1325-1329 |
 | Return temperature | `OTcurrentSystemState.Tret` (MsgID 28 per the comment), or simulated | SATcontrol.ino:1331-1335 |
 | Flame | Status bit 3 of `OTcurrentSystemState.Statusflags`, or simulated | SATcontrol.ino:1337-1341 |
@@ -1518,7 +1528,7 @@ On a tick, in this fixed order:
 5. Thermal safe fallback (after 2 h without a real room temperature): CS = 45 °C capped, MM = `iMaxRelModulation`, CH = 1, return (SATcontrol.ino:4729-4746, SATcontrol.ino:82-83).
 6. Summer simmer active: CS = 10, MM = `iMaxRelModulation`, CH = 0, return (SATcontrol.ino:4764-4776).
 7. All valves closed: CS = 10, MM = `iMaxRelModulation`, CH = 0, return (SATcontrol.ino:4778-4790).
-8. PID and heating curve give `pidOutput` (SATcontrol.ino:4835-4839), multi-zone may replace it (SATcontrol.ino:4846-4899).
+8. PID and heating curve give `pidOutput` (SATcontrol.ino:5529-5538), the zone block may raise it to the zones output or cap it (SATcontrol.ino:5540-5561).
 9. Clamp `pidOutput` to [10, `satEffectiveMaxSetpoint()`] (SATcontrol.ino:4908-4912).
 10. If `pidOutput >= satGetMaxSetpoint()` and the mode is PWM, switch to CONTINUOUS (SATcontrol.ino:4917-4920).
 11. If `bForcePWM` and the mode is not PWM, switch to PWM (SATcontrol.ino:4923-4925). (Removed in TASK-1332, 2026-10-23: the Force PWM option no longer exists.)
@@ -1959,7 +1969,7 @@ There is no event like `sat_cycle_started` / `sat_cycle_ended`: searches for `on
 | Value | Source |
 |---|---|
 | requested setpoint for the classifier | `_sat_requestedSetpoint` at the flame-off moment (SATcycles.ino:807): the requested setpoint of the last control tick, after the multi-zone block and the solar offset, clamped (SATcontrol.ino:808) |
-| requested setpoint for the auto-switch | the local `pidOutput` of the control tick, after the multi-zone override and the min/max clamp (SATcontrol.ino:4839-4912, SATcontrol.ino:4952) |
+| requested setpoint for the auto-switch | the local `pidOutput` of the control tick, after the zone block and the min/max clamp (SATcontrol.ino:5538-5585) |
 | PWM mode | `state.sat.eControlMode == SAT_MODE_PWM` (SATcycles.ino:790) |
 | PWM on-time | `satPwmLastOnTimeMs()` (SATcycles.ino:791, SATcontrol.ino:946), set by the PWM schedule (SATcontrol.ino:780, SATcontrol.ino:810) |
 | PWM off-time | `satPwmLastOffTimeMs()` (SATcycles.ino:1010, SATcontrol.ino:942) |
@@ -2471,7 +2481,7 @@ The firmware runs one SAT controller with one target room temperature `settings.
 | Mechanism | What it is | Effect | Citation |
 |---|---|---|---|
 | Multi-area ("areas", `bMultiArea`) | Up to 4 pushed room temperatures with a weight each | Their weighted average becomes the main room temperature that the single main PID uses | SATcontrol.ino:86, SATcontrol.ino:1217-1222, SATcontrol.ino:1696-1719 |
-| Multi-zone ("zones", `iZoneCount`) | Up to 4 pushed (room temperature, setpoint) pairs, each with its own PID | When `iZoneCount > 1` and at least one zone is active, the zone result replaces the main PID output | SATcontrol.ino:1726-1729, SATcontrol.ino:4841-4899 |
+| Multi-zone ("zones", `iZoneCount`) | Up to 4 pushed (room temperature, setpoint) pairs, each with its own PID | Every counted zone feeds the zones output; the requested setpoint is the maximum of the main PID output and that output, then limited by the zone overshoot cap. A zone without usable inputs does not count | SATcontrol.ino:2158-2161, SATcontrol.ino:5540-5561 |
 
 This section also covers:
 
@@ -2544,7 +2554,7 @@ There is no restore of the active preset, of the pre-custom temperature or of th
 |---|---|---|
 | Control loop tick (main PID, zone PIDs, window timer check, commands) | `iControlInterval`, default 30 s, range 10 to 300 s | SATcontrol.ino:476, SATtypes.h:444, settingStuff.ino:1000-1003 |
 | Main PID minimum time between updates | 10 s | SATpid.ino:21, SATpid.ino:274-279 |
-| Zone PID update | every control tick (no own timer) | SATcontrol.ino:4846-4854 |
+| Zone PID output | every control tick, for every configured zone (no own timer; the integral step is on the 60 s PID timer) | SATcontrol.ino:5552-5556 |
 | Window minimum open time | checked once per control tick | SATcontrol.ino:4755, SATcontrol.ino:1126-1143 |
 | Re-send of an unchanged `TC=` | never (TASK-1272); only after a cache reset or push off and on | SATcontrol.ino:540-553 |
 | Area value staleness | 5 min | SATcontrol.ino:87, SATcontrol.ino:1706-1711 |
@@ -2556,7 +2566,7 @@ There are no state-change listeners. MQTT and REST commands call their handler d
 
 There is no per-area PID. Areas only feed the weighted average of step "Inputs" (SATcontrol.ino:1696-1719).
 
-The closest counterpart is the per-zone PID: `satZonePidAdvance()` (integral and error, on the 60 s PID timer via `satZonePidAdvanceAll()`, TASK-1368) and `satZonePidOutput()` (output, on each control tick), for each configured zone when `iZoneCount > 1` (SATcontrol.ino:4846-4854, SATcontrol.ino:1806-1867):
+The closest counterpart is the per-zone PID: `satZonePidAdvance()` (integral and error, on the 60 s PID timer via `satZonePidAdvanceAll()`, TASK-1368) and `satZonePidOutput()` (output, on each control tick), for each configured zone, also at `iZoneCount` 1 (SATcontrol.ino:5552-5556, SATcontrol.ino:2255-2310):
 
 1. If the zone is OFF, has no room temperature or no setpoint yet, has not been updated within `iZoneTimeoutS`, has a room temperature outside -10 to 50 °C or a setpoint outside 5 to 30 °C: the zone's integral and previous error are set to 0, its output to 10 °C, and 10 °C is returned (SATcontrol.ino:1790-1796, SATcontrol.ino:1814-1825). Nothing sets the OFF flag (see Not found, item 1).
 2. Otherwise compute the zone's heating curve from its own setpoint and the shared outside temperature (SATcontrol.ino:1828).
@@ -2577,18 +2587,19 @@ The requested setpoint is formed as follows (SATcontrol.ino:4831-4912):
 
 1. `effectiveTarget = fTargetTemp (+ PV boost when active)` (SATcontrol.ino:4831-4833). The PV boost belongs to another section.
 2. Main heating curve from `effectiveTarget` and the outside temperature, then main PID output (SATcontrol.ino:4836-4839).
-3. If `iZoneCount > 1` (SATcontrol.ino:4846):
-   1. Run every configured zone's PID. A zone counts as active when its output is above 10 °C (SATcontrol.ino:4853-4856).
-   2. For each active zone, track `maxOvershoot = max(room - setpoint)`, starting at 0, so only zones above their setpoint raise it (SATcontrol.ino:4849, SATcontrol.ino:4857-4859).
-   3. No active zone: keep the main PID output (SATcontrol.ino:4863-4864).
-   4. One active zone: use that zone's output as is, with no headroom and no overshoot correction (SATcontrol.ino:4865-4868).
-   5. Two or more active zones: sort ascending, take index `ceil(0.75 * N) - 1`, add the headroom `fZoneAggregationHeadroom`, subtract `maxOvershoot` if it is above 0, raise to at least 10 °C, and use this instead of the main PID output (SATcontrol.ino:4869-4892).
-   6. Publish zone diagnostics (SATcontrol.ino:4898).
-4. Clamp between 10 °C and the effective maximum setpoint (SATcontrol.ino:4908-4912, SATcontrol.ino:240-254).
+3. Zone block, for every zone count 1 to 4 (SATcontrol.ino:5540-5561, `satAggregateZoneSetpoint()` SATcontrol.ino:2329-2377; ports thermo-nova climate.py:369-394, area.py:166-175, :264-333, entry 116, TASK-1440):
+   1. Run every configured zone's PID. A zone that is not usable (OFF, stale, never pushed, out of range: `satZoneUsable()`) does not count, so a setup without zone data is unchanged (SATcontrol.ino:5552-5556).
+   2. ECO (`iHeatingMode` 1): keep the main PID output; the zone outputs are still computed for the diagnostics (SATcontrol.ino:2333).
+   3. A zone counts when it is usable and its output is above the cold setpoint: 28.2 °C radiators, 21.0 °C underfloor (`satGetColdSetpoint()`, ADR-199). No counted zone gives a zones output of 10 °C, which leaves the main output alone (SATcontrol.ino:2343, SATcontrol.ino:2352).
+   4. Zones output: sort the counted outputs ascending, `baseline = outputs[int(N * 0.75)]` (at most N - 1), `chosen = min(highest, baseline + fZoneAggregationHeadroom)`, rounded to 1 decimal (SATcontrol.ino:2354-2364).
+   5. `requested = max(main PID output, zones output)` (SATcontrol.ino:2367). The zones only raise the demand of the main room.
+   6. Overshoot cap: each counted zone more than 0.3 °C above its target gives `cold + 10 - 4 * degrees over`; the lowest wins, floored at the cold setpoint, rounded to 1 decimal; `requested = min(requested, cap)`. The cap can lower `requested` below the main PID output (SATcontrol.ino:2342-2350, SATcontrol.ino:2368-2372).
+   7. Publish zone diagnostics, only when `iZoneCount` > 1 (SATcontrol.ino:5561).
+4. Solar gain offset, then clamp between 10 °C and the effective maximum setpoint (SATcontrol.ino:5578-5585, SATcontrol.ino:240-254).
 
-With zones in use, the main PID still runs but its output is replaced, not combined with `max()` (SATcontrol.ino:4839, SATcontrol.ino:4867, SATcontrol.ino:4892). After this point the value goes into PWM or continuous control, the solar gain offset and the cold-setpoint cutoff (SATcontrol.ino:4927-4975); those belong to other sections.
+The main PID always runs. With the zones, `requested` is the maximum of the main PID output and the zones output, then the cap is applied as a minimum (SATcontrol.ino:2367-2372). The old behaviour is gone: the `ceil(0.75 * N) - 1` index, the headroom added on top of the P75 output, the 1:1 subtraction of the largest overshoot with a floor of 10 °C, a single active zone replacing the main output, counting zones above 10 °C, and running only with 2 or more zones and also in ECO. After this point the value goes into PWM or continuous control and the cold-setpoint cutoff; those belong to other sections.
 
-Heating mode ECO or COMFORT: the setting `iHeatingMode` exists (0 = comfort, 1 = eco) and can be set over MQTT and REST (SATtypes.h:524, SATcontrol.ino:2211-2221, settingStuff.ino:1104). A grep of all `.ino`, `.h` and `.cpp` files for `HeatingMode` found only the setting, its handler, publishing, REST, debug output and the settings file (MQTTstuff.ino:668, SATcontrol.ino:2533, SATcontrol.ino:2978, handleDebug.ino:119, restAPI.ino:1642, restAPI.ino:2315, restAPI.ino:4021, settingStuff.ino:387). It is not read in the control path, so ECO and COMFORT behave the same.
+Heating mode ECO or COMFORT: the setting `iHeatingMode` exists (0 = comfort, 1 = eco) and can be set over MQTT and REST (SATtypes.h:524, SATcontrol.ino:2211-2221, settingStuff.ino:1104). The control path reads it in one place: the zone block passes `iHeatingMode == 1` to `satAggregateZoneSetpoint()`, so ECO follows the main PID only (SATcontrol.ino:5558, SATcontrol.ino:2333; thermo-nova climate.py:377-379). Everywhere else ECO and COMFORT behave the same. ECO still applies the solar offset in the firmware, which thermo-nova does not (it returns before it); this is open question Q58 to Sergeant D.
 
 The valve threshold, room "requires heat" test and the median error recording of thermo-nova have no counterpart. The only valve input is the single `valves_open` flag (MQTTstuff.ino:634-639). The valve offset setting `fValveOffset` (range -1 to 1) is stored, published and shown, but a grep found no use in control (SATtypes.h:526, settingStuff.ino:1106, SATcontrol.ino:2535, SATcontrol.ino:2980, handleDebug.ino:121, restAPI.ino:2317, restAPI.ino:4025).
 
@@ -2735,27 +2746,32 @@ else:
 output = clamp(curve + kp * error + I, 10, system_max)
 ```
 
-Zone aggregation, with `N` active zones (output above 10 °C), `headroom = fZoneAggregationHeadroom` (default 5.0) (SATcontrol.ino:4846-4896):
+Zone aggregation (`satAggregateZoneSetpoint()`, SATcontrol.ino:2329-2377), with `N` counted zones (usable and output above the cold setpoint `cold`: 28.2 radiators, 21.0 underfloor), `headroom = fZoneAggregationHeadroom` (default 5.0), `primary` the main PID output:
 
 ```
-if N == 0: result = main PID output
-if N == 1: result = that zone's output
-if N >= 2:
+if ECO: result = primary
+if N == 0: zones = 10
+else:
     outputs sorted ascending
-    idx       = ceil(0.75 * N) - 1
-    aggregate = outputs[idx] + headroom
-    if maxOvershoot > 0: aggregate -= maxOvershoot      # maxOvershoot = max(room - setpoint), floor 0
-    result    = max(aggregate, 10)
+    idx    = min(int(N * 0.75), N - 1)
+    chosen = min(outputs[N-1], outputs[idx] + headroom)
+    zones  = round1(chosen)
+result = max(primary, zones)
+for each counted zone with error = round3(target - room) < -0.3:
+    c = cold + 10 - 4 * (-error)
+cap = min of the c values, at least cold, round1
+if there is a cap: result = min(result, cap)
 ```
 
-Computed examples (default headroom 5.0, no zone above its setpoint):
+Computed examples (radiators, cold 28.2, default headroom 5.0, main PID output 30, no zone above its target):
 
-- N = 2, outputs 30, 40: idx 1, result 40 + 5 = 45.
-- N = 3, outputs 30, 35, 45: idx 2, result 45 + 5 = 50.
-- N = 4, outputs 30, 32, 34, 48: idx 2, result 34 + 5 = 39. The highest zone (48) is not served.
-- N = 3, outputs 30, 35, 45, one zone 0.5 °C above its setpoint: result 50 - 0.5 = 49.5.
+- N = 2, zone outputs 30, 40: idx 1, chosen min(40, 40 + 5) = 40, result max(30, 40) = 40.
+- N = 4, zone outputs 30, 32, 34, 48: idx 3, chosen min(48, 48 + 5) = 48, result 48. The highest zone is served (before: 34 + 5 = 39).
+- One zone with output 25 (not above 28.2): not counted, result 30.
+- One zone with output 40, 1.0 °C over its target: zones 40, cap 28.2 + 10 - 4 = 34.2, result min(40, 34.2) = 34.2.
+- Same zone 4.0 °C over: cap 22.2, floored to 28.2, result 28.2.
 
-The result is then clamped between 10 °C and the effective maximum setpoint (SATcontrol.ino:4911-4912).
+The result is then reduced by the solar offset when solar gain is active, and clamped between 10 °C and the effective maximum setpoint (SATcontrol.ino:5578-5585).
 
 System maximum for the zone output clamp: 45 °C underfloor, 62 °C otherwise, 40 °C for a heat-pump source (SATcontrol.ino:228-234). Effective maximum for the requested setpoint: the boiler's `MaxTSet` (75 °C if below 30), limited by the system maximum, a hard ceiling (50 underfloor, 80 otherwise) and the global maximum `fMaxSetpoint` (default 65) (SATcontrol.ino:240-254, SATcontrol.ino:57, SATcontrol.ino:62-64, SATtypes.h:514).
 
@@ -2775,8 +2791,9 @@ switch when (millis() - iWindowOpenSinceMs) / 1000 >= iWindowMinOpenSec
 | `SAT_MAX_AREAS` | 4 | areas | SATcontrol.ino:86 |
 | `SAT_AREA_STALE_MS` | 300000 (5 min) | ms | SATcontrol.ino:87 |
 | `SAT_MAX_ZONES` | 4 | zones | SATcontrol.ino:1729 |
-| Zone aggregation percentile | 0.75, ceiling rank | fraction | SATcontrol.ino:4880-4881 |
-| `fZoneAggregationHeadroom` default / range | 5.0 / 0 to 15 | °C | SATtypes.h:533, settingStuff.ino:1114 |
+| Zone aggregation percentile | 0.75, index `int(N * 0.75)` clamped to N - 1 | fraction | SATcontrol.ino:2360-2361 |
+| Zone overshoot margin / cooling headroom / cooling slope | 0.3 / 10.0 / 4.0 | °C, °C, °C per °C | SATcontrol.ino:2335-2337 |
+| `fZoneAggregationHeadroom` default / range (most the zones may ask above their P75 output) | 5.0 / 0 to 15 | °C | SATtypes.h:552, settingStuff.ino:1110 |
 | `iZoneCount` default / range | 1 / 1 to 4 | zones | SATtypes.h:531, settingStuff.ino:1112 |
 | `iZoneTimeoutS` default / range | 300 / 30 to 3600 | s | SATtypes.h:532, settingStuff.ino:1113 |
 | Zone room temperature accepted | -10 to 50 | °C | SATcontrol.ino:1760 |
@@ -2868,11 +2885,11 @@ Home Assistant discovery: one climate entity "Thermostat" whose temperature comm
 
 ### Edge cases
 
-1. Zones off by default: with `iZoneCount = 1` the zone block does not run at all, and pushed zone values are stored but unused (SATcontrol.ino:4846, SATtypes.h:531).
-2. One active zone: its output is used without headroom and without the overshoot correction, and the main PID output is discarded (SATcontrol.ino:4865-4868).
-3. With 4 active zones the percentile picks the second highest output, so the highest zone can be under-served, and the 5 °C headroom is added on top of the picked output (SATcontrol.ino:4881-4882, computed example in Formulas).
-4. The overshoot correction subtracts the raw temperature excess of the warmest active zone from the aggregate (SATcontrol.ino:4857-4859, SATcontrol.ino:4886-4888). It is a subtraction, not a cap.
-5. A zone counts as active only when its PID output is above 10 °C (SATcontrol.ino:4855). A zone whose output was clamped to exactly 10 °C is excluded like an invalid zone.
+1. Zones without data change nothing: the zone block runs at every zone count (1 to 4), but a zone that was never pushed, is OFF, stale or out of range does not count, and with no counted zone the zones output is 10 °C, which leaves the main PID output alone (SATcontrol.ino:5540-5561, SATcontrol.ino:2231, SATcontrol.ino:2352). Zone MQTT diagnostics are still published only at `iZoneCount` > 1 (SATcontrol.ino:5561).
+2. One counted zone: it can raise the main PID output, never lower it (`max()`, SATcontrol.ino:2367). It does not replace it.
+3. With up to 4 counted zones the percentile index is always the highest output, so the highest zone is served and the headroom never binds (computed example in Formulas). The headroom would only bind with 5 or more zones.
+4. A warm zone caps the result instead of being subtracted: more than 0.3 °C over its target gives `cold + 10 - 4 * degrees over`, floored at the cold setpoint, and the result is the minimum of it and the requested setpoint. The cap can lower the setpoint below the main PID output (SATcontrol.ino:2342-2350, SATcontrol.ino:2368-2372). Exactly 0.3 °C over gives no cap.
+5. A zone counts only when it is usable and its output is above the cold setpoint (28.2 °C radiators, 21.0 °C underfloor), not above 10 °C (SATcontrol.ino:2343). The firmware has no per-zone valve position, so the valve test of thermo-nova area.py:166-175 is absent.
 6. Zone timeout uses one timestamp for both values (SATcontrol.ino:1764, SATcontrol.ino:1781, SATcontrol.ino:1818). A zone whose setpoint keeps arriving but whose room temperature stopped stays active on its last room temperature (follows from the code, not run).
 7. The zone integral adds a 60 s step on every control tick (SATcontrol.ino:1846). With the default 30 s tick it therefore grows twice as fast in real time as a step-per-60 s integral would (follows from the code, not run).
 8. Zone gains always use the automatic formula, also when the main PID is set to manual gains (SATcontrol.ino:1834-1837, SATpid.ino:122-128).
@@ -3526,7 +3543,7 @@ Steps 1 to 9 run on every pass. Steps 10 onward run only when the control timer 
 18. **Summer simmer.** If summer mode is active and enabled: `CS=10`, `MM=iMaxRelModulation`, `CH=0`, return (`SATcontrol.ino:4765-4776`).
 19. **Valves closed.** If `bValvesOpen` is false: `CS=10`, `MM=iMaxRelModulation`, `CH=0`, return (`SATcontrol.ino:4779-4790`).
 20. Auto-tune, curve recommendation, modulation reliability (skipped for `SAT_QUIRK_NO_REL_MOD`), setpoint sync check, flame status, boiler status, comfort, PV boost (`SATcontrol.ino:4793-4829`).
-21. Heating curve and PID give `pidOutput`; multi-zone may replace it (`SATcontrol.ino:4831-4899`). PID and curve sections.
+21. Heating curve and PID give `pidOutput`; the zone block may raise it or cap it (`SATcontrol.ino:5529-5561`). PID and curve sections.
 22. **Clamp of `pidOutput`** to [10, effective maximum] (`SATcontrol.ino:4908-4912`). See G.
 23. **Mode choice.** `pidOutput >= sysMax` while in PWM switches to CONTINUOUS (`SATcontrol.ino:4917-4920`). `bForcePWM` then forces PWM (`SATcontrol.ino:4923-4925`). (Removed in TASK-1332, 2026-10-23: the Force PWM option no longer exists.)
 24. **Setpoint.** PWM branch `satApplyPWM()` or continuous branch `satApplyContinuous()` (`SATcontrol.ino:4928-4933`). Facts that matter for the write:

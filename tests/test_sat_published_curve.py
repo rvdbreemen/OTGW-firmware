@@ -48,7 +48,7 @@ STUBS = r"""
 #define SAT_HSYS_UNDERFLOOR 2
 static const float SAT_HC_REF_TEMP = 20.0f;
 struct SatSettings { float fHeatingCurveCoeff = 1.6f; int iZoneCount = 1; int iZoneTimeoutS = 900;
-                     float fDeadband = 0.1f; float fZoneAggregationHeadroom = 0.0f; };
+                     float fDeadband = 0.1f; float fZoneAggregationHeadroom = 0.0f; int iHeatingMode = 0; };
 struct Settings { SatSettings sat; };
 struct SatState { float fHeatingCurveValue = 0.0f; };
 struct State { SatState sat; };
@@ -57,6 +57,7 @@ struct SATZoneState { float fRoomTemp = 0, fSetpoint = 0, fPidOutput = 0, fPidIn
 static Settings settings; static State state; static SATZoneState satZones[SAT_MAX_ZONES];
 static uint32_t millis() { return 1000; }
 static uint8_t satGetEffectiveHeatingSystem() { return 1; }   // radiators
+static float satGetColdSetpoint() { return 28.2f; }           // radiators (SAT_COLD_SETPOINT_RAD)
 static float satGetBaseOffset() { return 27.2f; }
 static float satGetMaxSetpoint() { return 62.0f; }
 static float satGetFlowTemp() { return 40.0f; }
@@ -100,6 +101,8 @@ def extract(src: str) -> str:
     usable = _fn(src, r"static bool satZoneUsable\(")
     kp = _fn(src, r"static float satZoneKp\(")
     step = _fn(src, r"static float satZonePidOutput\(")
+    if "satAggregateZoneSetpoint(" in src:                    # TASK-1440: the zone block calls it
+        step += "\n" + _fn(src, r"static float satAggregateZoneSetpoint\(")
     a = src.index("  // --- Calculate heating curve ---")
     b = src.index("  // Task #21: Restore original deadband", a)
     loop = src[a:b]

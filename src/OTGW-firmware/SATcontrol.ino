@@ -2278,9 +2278,10 @@ static void satZonePidAdvance(uint8_t idx, float outsideTemp)
 }
 
 // All zone steps; the PID service calls it on the 60 s timer, in the same pass as the main PID step.
+// Every configured zone steps, also at zone count 1: the zone block counts a single zone too
+// (TASK-1440, thermo-nova aggregates any number of areas), and a zone without usable inputs is excluded.
 void satZonePidAdvanceAll()
 {
-  if (settings.sat.iZoneCount <= 1) return;
   uint8_t zoneCount = settings.sat.iZoneCount;
   if (zoneCount > SAT_MAX_ZONES) zoneCount = SAT_MAX_ZONES;
   float outsideTemp = satOutsideTempOrDefault(satGetOutsideTemp());
@@ -2289,9 +2290,9 @@ void satZonePidAdvanceAll()
 
 // Zone PID output, computed on every control tick from the CURRENT zone curve (pid.py:126-132):
 // curve + kp(curve) * held error + held integral, clamped. Returns SAT_MIN_SETPOINT (10°C) if the zone is
-// OFF (HVACMode.OFF), inactive, or its inputs are invalid. Returning SAT_MIN_SETPOINT makes the caller's
-// `zOut > SAT_MIN_SETPOINT` gate (satControlLoop) drop the zone from the P75
-// aggregation, so excluded zones contribute neither output nor overshoot (TASK-593, ports SAT Python PR #172
+// OFF (HVACMode.OFF), inactive, or its inputs are invalid. Such a zone is not usable, so
+// satAggregateZoneSetpoint() leaves it out of the zones output and the overshoot cap (TASK-1440),
+// so excluded zones contribute neither output nor overshoot (TASK-593, ports SAT Python PR #172
 // which returns None for OFF zones in area.py). Zones have no D term here, unlike thermo-nova areas (outside TASK-1368).
 static float satZonePidOutput(uint8_t idx, float outsideTemp)
 {
@@ -2306,6 +2307,74 @@ static float satZonePidOutput(uint8_t idx, float outsideTemp)
 
   z.fPidOutput = output;
   return output;
+}
+
+// Requested setpoint with the zones (secondary rooms, thermo-nova "areas") folded in, as thermo-nova
+// requested_setpoint (climate.py:369-394) with area.py at 7beaaf5; entry 116 (Q18 A, "port as it is").
+// Per zone i: zoneOut[i] its PID output, zoneErr[i] target - room rounded to 3 (satPidError),
+// zoneUsable[i] its inputs are usable (area.pid.available). zoneOut is used as scratch and reordered.
+// - ECO follows the primary PID only (climate.py:377-379).
+// - A zone counts when it is usable and its output is above the cold setpoint (requires_heat,
+//   area.py:166-175; the firmware has no per-zone valve position, so only the output test applies).
+// - Zones output (area.py:286-301): the counted outputs sorted, baseline = outputs[int(N * 0.75)],
+//   chosen = min(highest, baseline + headroom), rounded to 1 decimal; no counted zone gives
+//   SAT_MIN_SETPOINT (area.py:291-292). With at most SAT_MAX_ZONES (4) zones the baseline is always the
+//   highest output, so the headroom only binds with more zones than the firmware has.
+// - setpoint = max(primary, zones output): the zones only raise the primary (climate.py:385-386).
+// - Overshoot cap (area.py:303-333): a counted zone more than 0.3 above its target gives
+//   cold + 10 - 4 * degrees over; the lowest wins, floored at cold, rounded to 1 decimal, applied as
+//   min(setpoint, cap) (climate.py:388-389). The cap can lower the primary, as in thermo-nova.
+// The cold setpoint is the per-system one (28.2 radiators, 21.0 underfloor), not thermo-nova's
+// COLD_SETPOINT 22: ADR-199, Robert's decision of 2026-10-24 for area.py:175, :322 and :331.
+static float satAggregateZoneSetpoint(float primary, float *zoneOut, const float *zoneErr,
+                                      const bool *zoneUsable, uint8_t zoneCount,
+                                      float coldSp, float headroom, bool eco)
+{
+  if (eco) return primary;
+
+  const float overshootMargin = 0.3f;    // area.py:33 OVERSHOOT_MARGIN
+  const float coolingHeadroom = 10.0f;   // area.py:34 COOLING_HEADROOM
+  const float coolingSlope    = 4.0f;    // area.py:32 COOLING_SLOPE
+
+  uint8_t n = 0;
+  bool  haveCap = false;
+  float cap = 0.0f;
+  for (uint8_t i = 0; i < zoneCount; i++) {
+    if (!zoneUsable[i] || !(zoneOut[i] > coldSp)) continue;   // area.py:279, :309, :175
+    if (zoneErr[i] < -overshootMargin) {                      // area.py:315
+      float c = coldSp + coolingHeadroom - coolingSlope * (-zoneErr[i]);   // area.py:319-322
+      if (!haveCap || c < cap) cap = c;                       // area.py:328
+      haveCap = true;
+    }
+    zoneOut[n++] = zoneOut[i];                                // compact the counted outputs
+  }
+
+  float zonesOut = SAT_MIN_SETPOINT;                          // area.py:291-292
+  if (n > 0) {
+    for (uint8_t i = 1; i < n; i++) {                         // insertion sort, ascending (area.py:294)
+      float v = zoneOut[i];
+      uint8_t j = i;
+      while (j > 0 && zoneOut[j - 1] > v) { zoneOut[j] = zoneOut[j - 1]; j--; }
+      zoneOut[j] = v;
+    }
+    uint8_t idx = (uint8_t)((float)n * 0.75f);               // area.py:295 int(len * percentile)
+    if (idx > n - 1) idx = n - 1;
+    float allowed = zoneOut[idx] + headroom;                  // area.py:298
+    float chosen  = (zoneOut[n - 1] < allowed) ? zoneOut[n - 1] : allowed;   // area.py:299
+    zonesOut = roundf(chosen * 10.0f) / 10.0f;                // area.py:301
+  }
+
+  float setpoint = (zonesOut > primary) ? zonesOut : primary; // climate.py:385-386
+  if (haveCap) {
+    if (cap < coldSp) cap = coldSp;                           // area.py:331
+    cap = roundf(cap * 10.0f) / 10.0f;                        // area.py:333
+    if (setpoint > cap) setpoint = cap;                       // climate.py:388-389
+  }
+  if (n > 0) {   // only when a zone counts: no line per tick for single-room setups
+    SATDebugTf(PSTR("SAT: zones %u counted, zones out=%.1f cap=%.1f -> %.1f (primary %.1f)\r\n"),
+               n, zonesOut, haveCap ? cap : 0.0f, setpoint, primary);
+  }
+  return setpoint;
 }
 
 // Publish per-zone diagnostics to MQTT (retained).
@@ -2323,7 +2392,7 @@ static void satPublishZoneDiagnostics()
     feedWatchDog();
     SATZoneState& z = satZones[i];
     // TASK-593: an OFF zone (HVACMode.OFF) reports inactive, matching its exclusion
-    // from PID + P75 aggregation in satZonePidOutput().
+    // from the zone PID and satAggregateZoneSetpoint().
     bool active = !z.bOff && z.bRoomValid && z.bSpValid && ((now - z.iLastUpdateMs) <= timeoutMs);
 
     // sat/zone/<n>/active
@@ -5468,64 +5537,28 @@ static void satControlLoopRun()
   float pidOutput = roomValid ? satPidOutput(curveValue)
                               : satPidCurveOnly(curveValue);
 
-  // --- Multi-zone PID override (Task #233) ---
-  // When sat_zone_count > 1: run each zone's PID and use the most-demanding setpoint.
-  // Zone 1 is always computed; its output replaces the primary PID output.
-  // Zones 2-4 are only evaluated when sat_zone_count > 1.
-  // If all zones are inactive, falls back to single-zone (primary) pidOutput.
-  if (settings.sat.iZoneCount > 1) {
-    float zoneOutputs[SAT_MAX_ZONES];
-    uint8_t activeZones = 0;
-    float maxOvershoot = 0.0f;
+  // --- Multi-zone (secondary rooms) on the requested setpoint (thermo-nova climate.py:381-389, entry 116) ---
+  // Every configured zone (zone count 1-4) runs its PID output; satAggregateZoneSetpoint() keeps the
+  // primary output, raises it to the zones output and applies the overshoot cap, or does nothing in ECO.
+  // A zone without usable inputs counts as no zone, so a setup that pushes no zone data is unchanged.
+  {
     uint8_t zoneCount = settings.sat.iZoneCount;
     if (zoneCount > SAT_MAX_ZONES) zoneCount = SAT_MAX_ZONES;
-
+    float zoneOut[SAT_MAX_ZONES];
+    float zoneErr[SAT_MAX_ZONES];
+    bool  zoneUse[SAT_MAX_ZONES];
+    const uint32_t zoneNow = millis();
     for (uint8_t z = 0; z < zoneCount; z++) {
-      float zOut = satZonePidOutput(z, outsideTemp);
-      if (zOut > SAT_MIN_SETPOINT) {
-        zoneOutputs[activeZones++] = zOut;
-        // Track overshoot: room above setpoint means this zone is over-heated
-        float overshoot = satZones[z].fRoomTemp - satZones[z].fSetpoint;
-        if (overshoot > maxOvershoot) maxOvershoot = overshoot;
-      }
+      zoneOut[z] = satZonePidOutput(z, outsideTemp);
+      zoneUse[z] = satZoneUsable(satZones[z], zoneNow);
+      zoneErr[z] = satPidError(satZones[z].fSetpoint, satZones[z].fRoomTemp);   // area temperature_state.error
     }
-
-    if (activeZones == 0) {
-      // No active zones: keep primary pidOutput
-    } else if (activeZones < 2) {
-      // Single active zone: use its output directly (backward compat, AC#5)
-      pidOutput = zoneOutputs[0];
-      SATDebugTf(PSTR("SAT: multi-zone 1 active zone, setpoint=%.1f\r\n"), pidOutput);
-    } else {
-      // P75 aggregation: sort ascending (bubble sort, max 4 elements)
-      for (uint8_t i = 0; i < activeZones - 1; i++) {
-        for (uint8_t j = 0; j < activeZones - 1 - i; j++) {
-          if (zoneOutputs[j] > zoneOutputs[j + 1]) {
-            float tmp = zoneOutputs[j];
-            zoneOutputs[j] = zoneOutputs[j + 1];
-            zoneOutputs[j + 1] = tmp;
-          }
-        }
-      }
-      // P75 index: ceiling rank method — ceil(0.75 * N) - 1, 0-based
-      uint8_t p75idx = (uint8_t)(ceilf(0.75f * (float)activeZones)) - 1;
-      float aggregate = zoneOutputs[p75idx] + settings.sat.fZoneAggregationHeadroom;
-
-      // Overshoot cap: reduce aggregate by the maximum zone overshoot
-      // so over-heated zones are not driven further above their setpoint
-      if (maxOvershoot > 0.0f) {
-        aggregate -= maxOvershoot;
-        SATDebugTf(PSTR("SAT: overshoot cap %.1f applied\r\n"), maxOvershoot);
-      }
-
-      if (aggregate < SAT_MIN_SETPOINT) aggregate = SAT_MIN_SETPOINT;
-      pidOutput = aggregate;
-      SATDebugTf(PSTR("SAT: multi-zone P75[%u/%u]=%.1f hdroom=%.1f overshoot=%.1f -> %.1f\r\n"),
-                 p75idx, activeZones, zoneOutputs[p75idx],
-                 settings.sat.fZoneAggregationHeadroom, maxOvershoot, pidOutput);
-    }
-    // Publish zone diagnostics (retained MQTT)
-    satPublishZoneDiagnostics();
+    pidOutput = satAggregateZoneSetpoint(pidOutput, zoneOut, zoneErr, zoneUse, zoneCount,
+                                         satGetColdSetpoint(), settings.sat.fZoneAggregationHeadroom,
+                                         settings.sat.iHeatingMode == 1);   // 1 = ECO
+    // Zone diagnostics stay gated at more than one zone: no new retained MQTT traffic for
+    // single-room setups (deliberate, TASK-1440).
+    if (settings.sat.iZoneCount > 1) satPublishZoneDiagnostics();
   }
 
   // Task #21: Restore original deadband after PID used the widened value
@@ -5536,8 +5569,9 @@ static void satControlLoopRun()
   // --- Solar gain compensation on the requested setpoint (thermo-nova climate.py:391-392) ---
   // The offset lowers the requested setpoint BEFORE the PWM/continuous step, the cold cutoff and the CH
   // rule, so every one of them sees the same value. The hold (heating_control.py:398) and the
-  // suppression flow offset (:441) have no solar term.
-  if (state.sat.bSolarGainActive && settings.sat.bSolarGainEnable) {
+  // suppression flow offset (:441) have no solar term. ECO (iHeatingMode 1) takes no solar offset:
+  // thermo-nova returns before this step in ECO (climate.py:377-379), Sergeant D entry 118 (Q58 A).
+  if (state.sat.bSolarGainActive && settings.sat.bSolarGainEnable && settings.sat.iHeatingMode != 1) {
     pidOutput -= settings.sat.fSolarSetpointOffset;
   }
 

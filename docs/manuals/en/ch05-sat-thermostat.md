@@ -18,7 +18,7 @@ With SAT, every control loop cycle (default 30 seconds):
 2. Reads outdoor temperature (from the OT bus, an external MQTT push, or the built-in Open-Meteo weather API).
 3. Calculates the heating curve value: the base flow temperature needed given current outdoor conditions.
 4. Applies a PID v3 correction on top of the heating curve (with automatic or manual gain selection).
-5. Applies optional adjustments: solar gain compensation, multi-zone override.
+5. Applies optional adjustments: multi-zone demand (zones can raise the setpoint or cap it), solar gain compensation.
 6. Clamps the result within safety limits.
 7. Sends a `CS=` command to the PIC gateway to inject the setpoint into the OpenTherm stream.
 8. Publishes all state to MQTT and the web UI dashboard.
@@ -429,22 +429,24 @@ Each area value expires after 5 minutes without an update. Stale areas are exclu
 
 ### 5.15 Multi-Zone PID Control
 
-For homes with multiple independently controlled heating zones (e.g., separate radiator circuits or zone valves), SAT supports up to 4 PID zones. Each zone runs its own PID calculation. The zones are aggregated into a single boiler setpoint as follows (alpha.29 / alpha.30):
+For homes with multiple independently controlled heating zones (e.g., separate radiator circuits or zone valves), SAT supports up to 4 PID zones. Each zone runs its own PID calculation. SAT combines the zones with the PID of the main room into a single boiler setpoint, using the same method as the thermo-nova reference implementation:
 
-- **P75 selection**: the per-zone PID outputs are sorted and the 75th-percentile value is picked (ceiling rank). For 4 zones this filters out a single highest-demand outlier instead of letting it dominate.
-- **Headroom**: a fixed offset (`satzoneheadroom`, default 5.0 C) is added to the P75 result, giving the boiler enough margin to satisfy the upper-demand zones.
-- **Overshoot cap**: if any zone is already above its target, the aggregate setpoint is reduced to prevent over-heating compliant zones.
+- **Which zones count**: a zone counts when it has recent, valid temperature and target data (not off, not expired, within range) and its own PID output is above the cold setpoint (28.2 C for radiators, 21.0 C for underfloor heating). A zone without data does not count.
+- **Zone demand**: from the counted zones SAT takes the 75th-percentile PID output, never above the highest zone output. With up to 4 zones this is the highest output, so the zones ask for what the most demanding zone needs. The setting `satzoneheadroom` (default 5.0 C) is the most the zones may ask above that 75th-percentile output. With 4 zones or fewer it has no visible effect.
+- **Main room**: the boiler setpoint is the higher of the main room's own PID output and the zone demand. The zones can only raise the demand of the main room, never lower it.
+- **Overshoot cap**: when a counted zone is more than 0.3 C above its target, the setpoint is capped at the cold setpoint plus 10 C, minus 4 C for every degree the zone is too warm. The cap never goes below the cold setpoint, and the lowest cap of all zones applies. The cap can pull the setpoint below the demand of the main room. Example for radiators: a zone 1 C too warm limits the setpoint to 34.2 C; a zone 4 C too warm limits it to 28.2 C, which is the cold setpoint (at or below it SAT switches central heating off).
+- **ECO heating mode**: in ECO the zones are ignored and only the PID of the main room counts.
 - Each zone PID uses a symmetric integral clamp `[-curveValue, +curveValue]` so a zone that is slightly above its target can pull its share of the setpoint below the heating curve.
 
-Zones receive their temperature and target via MQTT. Zone 1 always maps to the primary SAT target temperature. Zones 2-4 receive independent targets and temperature inputs.
+Zones receive their temperature and target via MQTT. Each zone, zone 1 included, is an extra room next to the main room, with its own target and temperature input.
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
 | `satzonecount` | 1 | 1-4 | Number of active heating zones |
 | `satzonetimeout` | 300 | 60-3600 s | Seconds without update before a zone goes inactive |
-| `satzoneheadroom` | 5.0 | 0-15 C | Headroom added to the P75 zone-aggregate setpoint |
+| `satzoneheadroom` | 5.0 | 0-15 C | Most the zones may ask above their 75th-percentile output (no effect with 4 zones or fewer) |
 
-When `satzonecount` is 1 (default), SAT operates in single-zone mode and this feature has no overhead.
+When `satzonecount` is 1 (default), SAT only uses a zone if room and target data is pushed for it. A zone without data does not count, so a setup without zone data behaves as before. The per-zone MQTT diagnostics (`sat/zone/<n>/...`) are published only when more than one zone is configured.
 
 ---
 

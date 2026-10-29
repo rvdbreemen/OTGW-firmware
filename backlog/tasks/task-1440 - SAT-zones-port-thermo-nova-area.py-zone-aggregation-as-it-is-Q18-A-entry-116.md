@@ -3,9 +3,11 @@ id: TASK-1440
 title: >-
   SAT zones: port thermo-nova area.py zone aggregation as it is (Q18 A, entry
   116)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T05:02:00Z'
+updated_date: '2026-10-29T07:04:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -22,6 +24,20 @@ Sergeant D 2026-10-29 Q18 A (entry 116): port thermo-nova's zone logic as it is.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Zone aggregation follows climate.py:372-392 and area.py:166-175, 286-301, 312-333 (host test red on HEAD, green on fix: N=4 picks the highest output, headroom caps, main PID never lowered, overshoot ceiling floored at 22, ECO ignores zones)
-- [ ] #2 Settings and docs that only served the old aggregation (fZoneAggregationHeadroom) handled and documented; firmware-sat-spec and sat-comparison updated
+- [x] #1 Zone aggregation follows climate.py:372-392 and area.py:166-175, 286-301, 312-333 (host test red on HEAD, green on fix: N=4 picks the highest output, headroom caps, main PID never lowered, overshoot ceiling floored at 22, ECO ignores zones)
+- [x] #2 Settings and docs that only served the old aggregation (fZoneAggregationHeadroom) handled and documented; firmware-sat-spec and sat-comparison updated
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Sources (opened 2026-10-29 at 7beaaf5, UPSTREAM_COMMIT verified): climate.py:369-394 requested_setpoint; area.py:166-175 requires_heat, :264-301 _PIDs.output (percentile 0.75, headroom 5.0, none -> MINIMUM_SETPOINT), :303-333 overshoot_cap (OVERSHOOT_MARGIN 0.3, COOLING_HEADROOM 10, COOLING_SLOPE 4, area.py:32-34). Decisions: entry 116 (Q18 A, port as it is) combined with ADR-199 (Robert 2026-10-24, ADR-199 Resolved: area.py:175/:322/:331 use the per-system cold setpoint): every thermo-nova COLD_SETPOINT 22 in area.py becomes satGetColdSetpoint() (28.2 radiators, 21.0 underfloor). Confirmed by C5 2026-10-29. Change: new pure helper satAggregateZoneSetpoint(primary, zoneOut[], zoneErr[], zoneUsable[], n, coldSp, headroom, eco) next to satZonePidOutput; the tick keeps calling satZonePidOutput(z, outsideTemp) per zone and passes the results. Counted zone = usable && output > cold (no per-zone valve in the firmware). areas = MIN 10 when none, else idx=max(0,min(n-1,int(0.75n))), min(highest, baseline+headroom), round 1. setpoint = max(primary, areas); cap = min over counted zones with error < -0.3 of cold+10-4*over, floored at cold, round 1; setpoint = min(setpoint, cap). ECO (iHeatingMode 1): primary only. Runs for every zone count (1-4), not only >1. Kept deliberately: zone diagnostics stay gated at iZoneCount > 1 (no new MQTT traffic for default users, C5 2026-10-29). Not touched: ECO solar/rounding difference (C5 asks Sergeant D as Q58), zone PID itself (TASK-1414..1418/1423). fZoneAggregationHeadroom kept as the cap headroom (default 5.0 = area.py:267); meaning changes from 'added' to 'maximum above the P75 baseline'; help text + spec + comparison updated. Tests: new tests/test_sat_zone_aggregation.py compiles the real helper and the real tick segment; red on a632e8e68, green on the fix. Existing slicing tests (test_sat_published_curve, test_sat_pid_cadence, test_sat_pid_derivative) kept green. Build: combo only, OTGW_BUILD_JOBS=4, after C5's signal; bump after rebase.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-29 evidence. Red on a632e8e68: python tests/test_sat_zone_aggregation.py -> Ran 14, FAILED (failures=12): ECO 52.0 (want 35), four zones 49.0 (want 46, old ceil(0.75N)-1 + headroom), primary 50 lowered to 37.0, one zone at count 1 35.0 (want 45, block skipped), overshoot 1.0 over 35.0 (want 34.2), floor 35.0 (want 28.2), margin, underfloor 20.0 (want 25.0), helper missing. Green on the fix: Ran 14, OK. Self-review found satZonePidAdvanceAll() returned at iZoneCount <= 1, so a counted zone 1 at count 1 would have been curve-only: fixed (every configured zone steps); new test_sat_pid_cadence test_g2: zone I after 600 s at count 1 0.000000 on a632e8e68 vs 0.071029 on the fix (= count 2); an unconfigured zone at count 1 stays excluded (I 0, output 10), so default single-room users see no change. Kept green: test_sat_published_curve (5, stubs extended for satGetColdSetpoint/iHeatingMode/helper), test_sat_pid_cadence (27), test/host/test_sat_pid_derivative (exit 0), settings-help.test.mjs (28/28, help JSON within 18 KB), test_sat_comfort_adjust_removed (9), test_sat_ground_truth_block (6). evaluate.py --quick: 85 checks, 0 failed, 0 warnings. Refute review vs climate.py:369-394 / area.py:166-175, 264-333: matches; remaining known differences documented: no per-zone valve, zone output clamped [10, max] by the zone PID (TASK-1414..1418/1423), roundf vs Python round-half-even only on exact ties, ECO does not round the primary or skip solar (Q58, C5). Debug line limited to ticks where a zone counts.
+
+Docs (AC2): firmware-sat-spec.md, sat-comparison.md, c4-code-sat.md, c4-component-smart-thermostat.md, manuals en/nl, CHANGELOG updated by a docs agent and checked: content matches the helper; 39 shifted SATcontrol.ino cites in the new text corrected after the rebase on 2698f3e06; stale texts fixed (settingsHelp satzonecount, two P75 code comments, manuals 'Zone 1 always maps to the primary target', which the code does not do: zone setpoints only come from a push, SATcontrol.ino:2211). fZoneAggregationHeadroom kept as the cap headroom, documented as not binding with <= 4 zones. ECO solar (entry 118, Q58 A): tests/test_sat_zone_aggregation.py test_eco_applies_no_solar_offset red on the old code (37.0 with a 3.0 offset, want 40.0), green on the fix; COMFORT still applies it (37.0). All tests/test_sat_*.py OK after the rebase; test_sat_pwm_override stub extended (iHeatingMode). Not touched: ECO 0.1 rounding (entry 95, TASK-1423).
+<!-- SECTION:NOTES:END -->
