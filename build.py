@@ -2968,10 +2968,99 @@ Examples:
     return parser
 
 
+def build_lock_path():
+    """One lock file for every worktree and session of this user (TASK-1488)."""
+    base = os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), ".cache")
+    return Path(base) / "OTGW-build" / "build.lock"
+
+
+def _pid_alive(pid):
+    """True when a process with this pid still runs."""
+    if pid <= 0:
+        return False
+    if platform.system() == "Windows":
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        kernel32.CloseHandle(handle)
+        return bool(ok) and code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def acquire_build_lock(project_dir, wait_minutes=None, poll_seconds=10, lock_path=None):
+    """Machine-wide build lock (maintainer 2026-10-29: never more than one build at a time).
+
+    Creates the lock file exclusively. While another live build holds it, waits and prints the
+    holder; a lock whose pid is dead is taken over. OTGW_BUILD_LOCK_WAIT=<minutes> bounds the
+    wait (0 = refuse at once). Returns the lock path; the caller releases it with
+    release_build_lock().
+    """
+    import time
+    lock = Path(lock_path) if lock_path else build_lock_path()
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    if wait_minutes is None:
+        raw = os.environ.get("OTGW_BUILD_LOCK_WAIT", "").strip()
+        wait_minutes = float(raw) if raw else 120.0
+    deadline = time.time() + wait_minutes * 60.0
+    told = False
+    while True:
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(f"{os.getpid()}\n{project_dir}\n{time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            return lock
+        except FileExistsError:
+            try:
+                lines = lock.read_text(encoding="utf-8").splitlines()
+                holder_pid = int(lines[0]) if lines else 0
+            except (OSError, ValueError):
+                lines, holder_pid = [], 0
+            if not _pid_alive(holder_pid):
+                print_warning(f"Removing stale build lock (pid {holder_pid} is not running): {lock}")
+                try:
+                    lock.unlink()
+                except FileNotFoundError:
+                    pass
+                continue
+            holder = " | ".join(lines) if lines else "unknown"
+            if time.time() >= deadline:
+                print_error(f"Another build is running ({holder}); not starting a second one. Lock: {lock}")
+                sys.exit(3)
+            if not told:
+                print_info(f"Waiting for the running build to finish ({holder}); lock: {lock}")
+                told = True
+            time.sleep(poll_seconds)
+
+
+def release_build_lock(lock):
+    """Remove the lock if this process still owns it."""
+    try:
+        lines = Path(lock).read_text(encoding="utf-8").splitlines()
+        if lines and int(lines[0]) == os.getpid():
+            Path(lock).unlink()
+    except (OSError, ValueError):
+        pass
+
+
 def main():
     """Main build script entry point"""
     args = build_arg_parser().parse_args()
-    
+
+    # TASK-1488: one build at a time on this machine, across all sessions and worktrees.
+    import atexit
+    _lock = acquire_build_lock(Path(__file__).parent.resolve())
+    atexit.register(release_build_lock, _lock)
+
     # Disable colors if requested or on Windows (unless ANSICON is present)
     if args.no_color or (platform.system() == "Windows" and not os.environ.get("ANSICON")):
         Colors.disable()
