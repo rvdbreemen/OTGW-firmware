@@ -73,7 +73,7 @@ The deferred-write pattern (`settingsDirty` + `timerFlushSettings`) coalesces ra
   - `settings.outputs.bEnabled`, `.iPin`, `.iTriggerBit`
   - `settings.webhook.bEnabled`, `.sURLon`, `.sURLoff`, `.iTriggerBit`, `.sPayload`, `.sContentType`
   - `settings.ui.bOnboarded`, `.bSatOnboarded`
-  - `settings.sat.*` - ~100 fields: `bEnabled`, `iHeatingSystem`, `iHeatingSource`, `fTargetTemp`, `fHeatingCurveCoeff`, `bAutoGains`, `fKpManual`, `sSensorArea[4][18]`, BLE roster, etc.
+  - `settings.sat.*` - ~100 fields: `bEnabled`, `iHeatingSystem`, `iHeatingSource`, `fTargetTemp`, `fHeatingCurveCoeff`, `sSensorArea[4][18]`, BLE roster, etc.
   - `settings.otd.*` (`HAS_DIRECT_OT`) - `iMode`, `bAutoDetect`, `bHasBypassRelay`, `fSetbackTemp`, `bRoomCompEnabled`, heating curve, hysteresis, ventilation
   - `settings.eth.*` (`HAS_ETH_CAPABLE`) - `bStaticIP`, `sIPaddress[16]`, `sGateway[16]`, `sSubnet[16]`, `sDNS[16]`
 - **Key state fields**:

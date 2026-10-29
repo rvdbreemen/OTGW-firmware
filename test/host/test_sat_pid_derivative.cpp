@@ -430,8 +430,8 @@ static void zoneGainCases() {
 
 int main() {
   printf("== TASK-1195 SAT PID derivative harness\n");
-  printf("   settings.sat: fDeadband=%.3f iControlInterval=%u s bAutoGains=%d fHeatingCurveCoeff=%.2f\n",
-         settings.sat.fDeadband, (unsigned)settings.sat.iControlInterval, (int)settings.sat.bAutoGains,
+  printf("   settings.sat: fDeadband=%.3f iControlInterval=%u s fHeatingCurveCoeff=%.2f\n",
+         settings.sat.fDeadband, (unsigned)settings.sat.iControlInterval,
          settings.sat.fHeatingCurveCoeff);
   printf("   SATpid.ino: SAT_PID_UPDATE_INTERVAL=%.0f s SAT_PID_DERIVATIVE_CAP=%.1f\n",
          (double)SAT_PID_UPDATE_INTERVAL, (double)SAT_PID_DERIVATIVE_CAP);

@@ -420,10 +420,10 @@ baseOffset = 20 underfloor, 27.2 otherwise                (SATcontrol.ino:49-50,
 **Gains** (`SATpid.ino:120-142`):
 
 ```
-bAutoGains on (default):  kp = fHeatingCurveCoeff * curveValue / divisor   (divisor 4 underfloor, 3 otherwise)
-                          ki = kp / 8400
-                          kd = 0.07 * 8400 * kp
-bAutoGains off:           kp, ki, kd = fKpManual, fKiManual, fKdManual (defaults 5.0, 0.0005, 0.0; SATtypes.h:519-521)
+kp = fHeatingCurveCoeff * curveValue / divisor   (divisor 4 underfloor, 3 otherwise)
+ki = kp / 8400
+kd = 0.07 * 8400 * kp
+(automatic gains only; the manual-gain switch and its fields were removed, TASK-1357)
 ```
 
 **PID terms** (`SATpid.ino:149-246`, `SATpid.ino:297-309`):
@@ -510,7 +510,6 @@ else: min = Tboiler - fFlowOffset                            (fFlowOffset defaul
 | `fHeatingCurveCoeff` default | 2.0 (TASK-1347, entry 24) | - | `SATtypes.h:443` |
 | `fTargetTemp` default | 20.0 | °C | `SATtypes.h:441` |
 | `bEnabled` default | false | - | `SATtypes.h:437` |
-| `bAutoGains` default | true | - | `SATtypes.h:518` |
 | `iMaxRelModulation` default | 100 | % | `SATtypes.h:453` |
 | `fFlowOffset` default | 2.0 | °C | `SATtypes.h:467` |
 | `fModSupDelay` / `fModSupOffset` defaults | 20 / 1.0 | s / °C | `SATtypes.h:455-456` |
@@ -641,7 +640,7 @@ There is one main PID with its own internal state held in file-level static vari
 | Heating curve value | `satCalcHeatingCurve(effectiveTarget, outsideTemp)`, recomputed every control tick | SATcontrol.ino:4836, SATcontrol.ino:485-500 |
 | Outside temperature | `satGetOutsideTemp()`: simulation, external MQTT (10 min stale limit), weather API when OT Toutside is 0.0, else OT MsgID 27; values outside -40 to 50 are replaced by 10.0 | SATcontrol.ino:4657, SATcontrol.ino:1283-1303, SATcontrol.ino:4721-4723 |
 | Heating system type | `satGetEffectiveHeatingSystem()`: the setting, with AUTO mapped to radiators | SATcontrol.ino:194-201, SATtypes.h:438 |
-| Gains config | `settings.sat.bAutoGains`, `fKpManual`, `fKiManual`, `fKdManual`, `fHeatingCurveCoeff` | SATpid.ino:120-142, SATtypes.h:442, SATtypes.h:518-521 |
+| Gains config | `settings.sat.fHeatingCurveCoeff` (automatic gains only, TASK-1357) | SATpid.ino `_pidCalculateGains`, SATtypes.h:442 |
 | Deadband | `settings.sat.fDeadband`, a setting (not a constant) | SATpid.ino:151, SATpid.ino:189, SATtypes.h:443 |
 | Freeze flag | `state.sat.bSolarGainActive` and `settings.sat.bSolarFreezeIntegral` (corrected 2026-10-24, TASK-1351) | SATpid.ino:157 |
 | `boilerTemp` argument | gone with `satPidUpdate()` (TASK-1368): `satPidStep()` and `satPidOutput()` do not take the flow temperature | SATpid.ino |
@@ -795,14 +794,14 @@ Variable names as in the code.
 `baseOffset = 20.0` for underfloor, `27.2` otherwise (SATcontrol.ino:49-50, SATcontrol.ino:258-259).
 `coeff` is `settings.sat.fHeatingCurveCoeff` (SATcontrol.ino:488).
 
-**Automatic gains** (when `bAutoGains` is true) (SATpid.ino:130-141):
+**Automatic gains** (the only gain mode since TASK-1357) (`_pidCalculateGains` in SATpid.ino):
 - `divisor = 4` for underfloor, otherwise `3` (SATpid.ino:133, SATpid.ino:28-29).
 - `kp = (coeff * curveValue) / divisor` (SATpid.ino:135).
 - `ki = kp / 8400` (SATpid.ino:136, SATpid.ino:25).
 - `kd = 0.07 * 8400 * kp`, that is `588 * kp` (SATpid.ino:137).
 - No rounding.
 
-**Manual gains** (when `bAutoGains` is false): `fKp = fKpManual`, `fKi = fKiManual`, `fKd = fKdManual` (SATpid.ino:122-127). See "Not found / unclear": no code path that sets `bAutoGains` was found.
+**Manual gains.** Removed (TASK-1357). The switch `bAutoGains` and the fields `fKpManual`, `fKiManual`, `fKdManual` were never reachable (no setting, REST or MQTT path wrote them); the settings key `SATautogains` and its REST, MQTT and Web UI surface (`auto_gains_value`, `kp_manual`, `ki_manual`, `kd_manual`) went with them. An old `settings.ini` that still has `SATautogains` is ignored on load.
 
 **Auto-tune of the coefficient** (only when `bAutoTune` is true, default false (SATtypes.h:511)): once per hour, after at least 6 cycles, the coefficient is multiplied by `(1 - 2*rate)`, `(1 - rate)`, `(1 + rate)` or `(1 + 0.5*rate)`, depending on the counts of oscillation, overshoot, undershoot and slow convergence. It is then clamped to 0.3 to 5.0 and saved (SATcontrol.ino:4384-4385, SATcontrol.ino:4428-4486). `rate` defaults to 0.02 (SATtypes.h:512). Because the automatic gains use the coefficient, this changes Kp, Ki and Kd (SATpid.ino:130-137).
 
@@ -826,7 +825,7 @@ Variable names as in the code.
 
 **Zone PID** (SATcontrol.ino:1828-1866), per zone:
 - `curveValue` from the zone target and outside temperature.
-- `kp = (coeff * curveValue) / divisor` and `ki = kp / 8400`, always automatic, not dependent on `bAutoGains`.
+- `kp = (coeff * curveValue) / divisor` and `ki = kp / 8400`, always automatic, like the main PID.
 - The same deadband rule for the integral, with the clamps ±curveValue and ±20.
 - `output = curveValue + kp * error + integral`, with no derivative term.
 - The output is clamped to [10.0, `satGetMaxSetpoint()`].
@@ -868,9 +867,6 @@ With the firmware default coefficient of 1.5 (SATtypes.h:442) and the same input
 | Kd factor | 0.07 * 8400 = 588 | not stated in the code | SATpid.ino:137 |
 | Integral absolute cap | 20.0 | degrees | SATpid.ino:176 |
 | Ki minimum for accumulation | 1e-9 | none | SATpid.ino:160 |
-| `bAutoGains` default | true | bool | SATtypes.h:518 |
-| `fKpManual` / `fKiManual` / `fKdManual` defaults | 5.0 / 0.0005 / 0.0 | none | SATtypes.h:519-521 |
-| `fAutoGainsValue` default (not read by the PID) | 2.0 | none | SATtypes.h:517 |
 | `fHeatingCurveCoeff` default | 2.0 (TASK-1347, entry 24) | none | SATtypes.h:443 |
 | Heating curve coefficient setting range | 0.1 to 5.0 | none | settingStuff.ino:998 |
 | Auto-tune coefficient range | 0.3 to 5.0 | none | SATcontrol.ino:4475-4476 |
@@ -996,7 +992,7 @@ Computed from the code: `satCalcHeatingCurve` returns the curve and writes no st
 8. **Large slope.** At `|rawDeriv| >= 5.0` the filter is bypassed and the value is clamped to ±5.0 (SATpid.ino:226-233).
 9. **Stale or missing room temperature.** (TASK-1364) The PID service and the tick call `satPidCurveOnly()` instead of stepping and reading the PID: integral, raw derivative, P, I, D and the published error are 0 and the output is the heating curve. No trip. After recovery the integral restarts from 0; the first D is computed over the whole gap from the last pre-loss temperature (as pid.py:209-232).
 10. **Integral time step is fixed.** The integral always adds `ki * error * 60`, whatever the control interval (10 to 300 s) or the actual time since the last update (SATpid.ino:166, settingStuff.ino:1001).
-11. **Manual gains.** No setting, REST or MQTT path that writes `bAutoGains` or the manual gains was found, so the manual branch is not reachable at run time (see "Not found / unclear").
+11. **Gains.** Automatic only (removed manual branch and `SATautogains`, TASK-1357).
 12. **Thermal comfort on.** The error is computed against the Summer Simmer index only when the room temperature comes from OT Tr and the humidity is fresh (SATcontrol.ino:1264-1270).
 13. **SAT disabled.** The PID does not tick (SATcontrol.ino:4568-4573), and `satDisable()` resets it (SATcontrol.ino:2170).
 14. **First tick after boot or reset.** The PID returns the stored 0.0, and the boiler is commanded off for one or two ticks (section B, step 7).
@@ -1007,8 +1003,8 @@ Computed from the code: `satCalcHeatingCurve` returns the curve and writes no st
 
 ### Not found in the code / unclear
 
-1. **`bAutoGains` and the manual gains have no writer.** A case-insensitive search of the firmware sources for `autogains`, `auto_gains`, `KpManual`, `kp_manual`, `SATkp`, `SATki`, `SATkd` and assignments to these fields found only the defaults (SATtypes.h:518-521), the reads (SATpid.ino:122-126) and read-only publishing (SATcontrol.ino:2527-2530, restAPI.ino:2312, handleDebug.ino:116). The setting named `SATautogains` writes `fAutoGainsValue`, not `bAutoGains` (settingStuff.ino:1103). So the PID always uses automatic gains.
-2. **`fAutoGainsValue` is never read by the PID.** It is stored, settable and published (SATtypes.h:517, settingStuff.ino:1103, SATcontrol.ino:2977). The search found no use in SATpid.ino. This matches thermo-nova unclear item 1.
+1. **Manual gains and `SATautogains`.** Removed (TASK-1357): they had no writer or no reader. The PID always uses the automatic gains.
+2. **`fAutoGainsValue`.** Removed together with `SATautogains` (TASK-1357). It was never read by the PID; this matches thermo-nova unclear item 1.
 3. **`boilerTemp` parameter was unused.** `satPidUpdate` received `satGetFlowTemp()` and never read it; the parameter went away with `satPidUpdate` (TASK-1368).
 4. **Unused tracking values.** `_pid_previousError`, `_pid_lastRoomTemp` and `_pid_lastCurveValue` are written (SATpid.ino:266-268, SATpid.ino:313-316) but never read. A search for `_pid_` in all firmware sources outside SATpid.ino found no other use (only the comment at SATcontrol.ino:2040 and the generated, untracked `OTGW-firmware.ino.cpp`). `SAT_PID_DEADBAND_DEFAULT` is defined but not used (SATpid.ino:20).
 5. **ECO / COMFORT heating mode has no effect on control.** `iHeatingMode` is set by `satHandleHeatingMode` and the settings parser (SATcontrol.ino:2211-2221, settingStuff.ino:1104). In the SAT files it is only read for publishing (SATcontrol.ino:2533, SATcontrol.ino:2978). No ECO branch was found in the requested setpoint path (SATcontrol.ino:4839-4946).
@@ -1311,7 +1307,6 @@ Derived from the curve formula and the cold setpoints (computed, not stated in t
 | `fAutoTuneRate` default | 0.02 | per tuning | SATtypes.h:512 |
 | `iHeatingSystem` default | 0 (auto, treated as radiators) | | SATtypes.h:438, SATcontrol.ino:198-199 |
 | `iHeatingMode` default | 0 (comfort), not used in control | | SATtypes.h:524 |
-| `bAutoGains` default | on | | SATtypes.h:518 |
 | `SAT_MIN_SETPOINT` | 10.0 | °C | SATcontrol.ino:54 |
 | `SAT_COLD_SETPOINT_RAD` | 28.2 | °C | SATcontrol.ino:55 |
 | `SAT_COLD_SETPOINT_FLOOR` | 21.0 | °C | SATcontrol.ino:56 |
@@ -1451,7 +1446,7 @@ Neither mechanism writes the coefficient. Only auto-tune does (SATcontrol.ino:44
 4. **Weather data never expires.** `state.sat.weather.bValid` is set true after a successful fetch (SATweather.ino:376); a grep found no code that sets it false.
 5. **PID reset on target change.** No reset was found on a plain target change (SATcontrol.ino:1903-1934, settingStuff.ino:997). Presets only zero the display copy `fPidI` (SATcontrol.ino:998, SATcontrol.ino:1006). Whether that is intended is not stated; the code comment at SATcontrol.ino:997 says "Reset PID integral to prevent overshoot on large temp jumps".
 6. **`bSolarFreezeIntegral`.** Resolved: the PID now reads it, `if (state.sat.bSolarGainActive && settings.sat.bSolarFreezeIntegral) return;` (SATpid.ino:157), default on (SATtypes.h:549) (corrected 2026-10-24, TASK-1351); TASK-1323, entry 11 answer 3.
-7. **`bAutoGains` and the manual gains have no settings key.** `bAutoGains` is read by the PID (SATpid.ino:122), but a grep found no settings-file key or handler that writes it. A grep for `fKpManual`, `fKiManual` and `fKdManual` found only their defaults (SATtypes.h:519-521), the PID read (SATpid.ino:124-126) and a JSON status output (SATcontrol.ino:2528-2530), no writer. The settings key `SATautogains` writes `fAutoGainsValue` instead (settingStuff.ino:1103), and a grep found no read of `fAutoGainsValue` in the control path (only restAPI.ino:4018 and settingStuff.ino:386).
+7. **`bAutoGains` and the manual gains.** Removed (TASK-1357); they had no settings key and no writer.
 8. **`fMaxSetpoint` has no settings key.** It is used by the effective maximum (SATcontrol.ino:248) but a grep found no code that writes it, so it stays at 65 °C (SATtypes.h:514).
 9. **`SAT_FLOW_OFFSET_CONTINUOUS` = 5.0** (SATcontrol.ino:58) is defined, but a grep found no use.
 10. **Three different maxima.** The clamp uses the effective maximum (SATcontrol.ino:4908-4912); the PWM-disable check, the zone clamp, the PWM override, `sat/requested_setpoint` and `sat/max_setpoint` use the system cap (SATcontrol.ino:4909, 1859, 879, 3055, 3050). The code does not say whether that difference is intended.
@@ -2574,7 +2569,7 @@ The closest counterpart is the per-zone PID: `satZonePidAdvance()` (integral and
 
 1. If the zone is OFF, has no room temperature or no setpoint yet, has not been updated within `iZoneTimeoutS`, has a room temperature outside -10 to 50 °C or a setpoint outside 5 to 30 °C: the zone's integral and previous error are set to 0, its output to 10 °C, and 10 °C is returned (SATcontrol.ino:1790-1796, SATcontrol.ino:1814-1825). Nothing sets the OFF flag (see Not found, item 1).
 2. Otherwise compute the zone's heating curve from its own setpoint and the shared outside temperature (SATcontrol.ino:1828).
-3. Gains: `kp = coefficient * curve / divisor` (divisor 4 for underfloor, 3 otherwise) and `ki = kp / 8400` (SATcontrol.ino:1834-1837). This automatic formula is used even when the main PID is set to manual gains (compare SATpid.ino:122-128).
+3. Gains: `kp = coefficient * curve / divisor` (divisor 4 for underfloor, 3 otherwise) and `ki = kp / 8400` (SATcontrol.ino:1834-1837). This is the same automatic formula as the main PID.
 4. Error `satPidError(setpoint, room)`, rounded to 3 decimals (SATcontrol.ino:1839, SATpid.ino:63-66).
 5. Integral: inside the deadband, add `ki * error * 60`, then clamp to plus or minus the curve value and to plus or minus 20; outside the deadband, set it to 0 (SATcontrol.ino:1840-1853).
 6. Output `curve + P + I`, with no D term, clamped between 10 °C and the system maximum (SATcontrol.ino:1855-1866, SATcontrol.ino:228-234).
@@ -2896,7 +2891,7 @@ Home Assistant discovery: one climate entity "Thermostat" whose temperature comm
 5. A zone counts only when it is usable and its output is above the cold setpoint (28.2 °C radiators, 21.0 °C underfloor), not above 10 °C (SATcontrol.ino:2343). The firmware has no per-zone valve position, so the valve test of thermo-nova area.py:166-175 is absent.
 6. Zone timeout uses one timestamp for both values (SATcontrol.ino:1764, SATcontrol.ino:1781, SATcontrol.ino:1818). A zone whose setpoint keeps arriving but whose room temperature stopped stays active on its last room temperature (follows from the code, not run).
 7. The zone integral adds a 60 s step on every control tick (SATcontrol.ino:1846). With the default 30 s tick it therefore grows twice as fast in real time as a step-per-60 s integral would (follows from the code, not run).
-8. Zone gains always use the automatic formula, also when the main PID is set to manual gains (SATcontrol.ino:1834-1837, SATpid.ino:122-128).
+8. Zone gains use the automatic formula (SATcontrol.ino:1834-1837), like the main PID.
 9. Multi-area overrides the external indoor temperature and `Tr`, but not BLE (SATcontrol.ino:1208-1231). When every area is stale or has weight 0, the next source is used (SATcontrol.ino:1717, SATcontrol.ino:1219-1221).
 10. Preset auto-selection by temperature: the order is comfort, eco, away, sleep, activity, home (SATcontrol.ino:1913-1920). With the defaults eco and home are both 18 °C, so setting 18 °C selects `eco` (SATtypes.h:447, SATtypes.h:451).
 11. A manual target that matches no preset leaves the old preset name active and keeps `fPreCustomTemp` (SATcontrol.ino:1928-1931). A later preset `none` then restores the value saved before the first preset, not the manual value (SATcontrol.ino:1004-1005; follows from the code, not run).
@@ -3768,7 +3763,6 @@ Variable names are as in the code.
 | `fTargetTempStep` (`SATtempstep`) | 0.5 | °C | 0.1-1 | `SATtypes.h:468` | `settingStuff.ino:1037` | `target_temp_step` |
 | `fHeatingCurveCoeff` (`SATcoefficient`) | 1.5 | - | 0.1-5 | `SATtypes.h:442` | `settingStuff.ino:998` | `heating_curve` |
 | `iHeatingMode` (`SATheatingmode`) | 0 (comfort) | - | 0-1 | `SATtypes.h:524` | `settingStuff.ino:1104` | `heating_mode` (handler) |
-| `fAutoGainsValue` (`SATautogains`) | 2.0 | - | 0.1-10 | `SATtypes.h:517` | `settingStuff.ino:1103` | `auto_gains_value` |
 | presets comfort / eco / away / sleep / activity / home | 21 / 18 / 15 / 16 / 10 / 18 | °C | see citations | `SATtypes.h:446-451` | `settingStuff.ino:1005-1010` | `preset_*` |
 | `bSummerSimmer` (`SATsummersimmer`) | false | - | bool | `SATtypes.h:499` | `settingStuff.ino:1086` | `summer_simmer` |
 | `bSolarGainEnable` / `fSolarSetpointOffset` | false / 2.0 | - / °C | bool / 0.5-10 | `SATtypes.h:494`, `SATtypes.h:496` | `settingStuff.ino:1082`, `settingStuff.ino:1084` | `solar_gain` |

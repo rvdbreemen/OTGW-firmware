@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.532
+**  Version  : v2.0.0-alpha.533
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -381,7 +381,6 @@ void writeSettings(bool show)
   // SAT Python parity settings (Task #82)
   writeJsonIntKV(file, F("SATsensormaxage"), settings.sat.iSensorMaxAgeS);
   writeJsonBoolKV(file, F("SATerrormon"), settings.sat.bErrorMonitoring);
-  writeJsonFloatKV(file, F("SATautogains"), settings.sat.fAutoGainsValue);
   writeJsonIntKV(file, F("SATheatingmode"), settings.sat.iHeatingMode);
   writeJsonIntKV(file, F("SATcyclesperhour"), settings.sat.iCyclesPerHour);
   writeJsonFloatKV(file, F("SATvalveoffset"), settings.sat.fValveOffset);
@@ -1096,7 +1095,6 @@ void updateSetting(const char *field, const char *newValue)
   // SAT Python parity settings (Task #82)
   else if (strcasecmp_P(field, PSTR("SATsensormaxage")) == 0)  settings.sat.iSensorMaxAgeS = constrain((uint32_t)atol(newValue), 60UL, 86400UL);
   else if (strcasecmp_P(field, PSTR("SATerrormon")) == 0)      settings.sat.bErrorMonitoring = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("SATautogains")) == 0)     settings.sat.fAutoGainsValue = clampSettingFloat(newValue, settings.sat.fAutoGainsValue, 0.1f, 10.0f);
   else if (strcasecmp_P(field, PSTR("SATheatingmode")) == 0)   settings.sat.iHeatingMode = constrain(atoi(newValue), 0, 1);
   else if (strcasecmp_P(field, PSTR("SATcyclesperhour")) == 0) settings.sat.iCyclesPerHour = constrain(atoi(newValue), 2, 6);
   else if (strcasecmp_P(field, PSTR("SATvalveoffset")) == 0)   settings.sat.fValveOffset = clampSettingFloat(newValue, settings.sat.fValveOffset, -1.0f, 1.0f);

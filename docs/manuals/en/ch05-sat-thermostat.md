@@ -17,7 +17,7 @@ With SAT, every control loop cycle (default 30 seconds):
 1. Reads room temperature (from the OT bus, an external sensor pushed via MQTT, a BLE sensor on ESP32, or a weighted multi-area average).
 2. Reads outdoor temperature (from the OT bus, an external MQTT push, or the built-in Open-Meteo weather API).
 3. Calculates the heating curve value: the base flow temperature needed given current outdoor conditions.
-4. Applies a PID v3 correction on top of the heating curve (with automatic or manual gain selection).
+4. Applies a PID v3 correction on top of the heating curve (gains computed from the heating curve).
 5. Applies optional adjustments: multi-zone demand (zones can raise the setpoint or cap it), solar gain compensation.
 6. Clamps the result within safety limits.
 7. Sends a `CS=` command to the PIC gateway to inject the setpoint into the OpenTherm stream.
@@ -55,7 +55,7 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/enabled" -m "tru
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.0"
 ```
 
-Every configurable SAT parameter has a matching MQTT command topic of the form `%mqtt_sub_topic%/sat/<name>`. The full set is declared in `MQTTstuff.ino` (`handleMQTTcallback`) and covers: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+Every configurable SAT parameter has a matching MQTT command topic of the form `%mqtt_sub_topic%/sat/<name>`. The full set is declared in `MQTTstuff.ino` (`handleMQTTcallback`) and covers: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `heating_mode`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
 
 Sending `ON` / `OFF` / `true` / `false` / `1` / `0` works for boolean topics. Numeric topics accept the usual decimal representation.
 
@@ -113,10 +113,6 @@ A per-system **cold cutoff** (COLD_SETPOINT: 28.2 C for radiators, 21.0 C for un
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
-| `satautogains` | true | bool | Automatic PID gain calculation from heating curve |
-| `satkpmanual` | 5.0 | 0-100 | Manual proportional gain (when autogains = false) |
-| `satkimanual` | 0.0005 | 0-1 | Manual integral gain |
-| `satkdmanual` | 0.0 | 0-10 | Manual derivative gain |
 | `satautotune` | false | bool | Enable automatic PID gains tuning |
 | `satautotunerate` | 0.02 | 0-1 | Adjustment rate per tuning cycle (2%) |
 

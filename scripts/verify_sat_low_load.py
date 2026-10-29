@@ -146,8 +146,9 @@ static uint32_t g_ms=1000000;
 static uint32_t millis(){return g_ms;}
 static long random(long a,long){return a;}
 #include "@TIMERS@"
-struct Settings { struct { bool bAutoGains=false,bSolarFreezeIntegral=false;
- float fKpManual=0,fKiManual=.01f,fKdManual=0,fHeatingCurveCoeff=2,fDeadband=.1f; } sat; } settings;
+struct Settings { struct { bool bSolarFreezeIntegral=false;
+ float fHeatingCurveCoeff=2,fDeadband=.1f;
+ bool bAutoGains=true; float fKpManual=5,fKiManual=.0005f,fKdManual=0; } sat; } settings;  // pre-TASK-1357 fields: old copies compile
 struct State { struct { bool bSolarGainActive=false;
  float fPidP=0,fPidI=0,fPidD=0,fPidOutput=0,fKp=0,fKi=0,fKd=0,fRawDerivative=0,fError=0; } sat; } state;
 static int satGetEffectiveHeatingSystem(){return SAT_HSYS_RADIATORS;}

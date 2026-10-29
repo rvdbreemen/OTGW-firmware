@@ -3748,6 +3748,7 @@ static const RetiredSatEntity kRetiredSatEntities[] PROGMEM = {
   { "switch", "sat_comfort_adjust_enable", "/sat/comfort_adjust_enable" },   // RETIRED-SAT-ENTITY TASK-1282
   { "switch", "sat_ovp_enabled", "/sat/ovp_enabled" },   // RETIRED-SAT-ENTITY TASK-1460 (removed in TASK-891.6)
   { nullptr, nullptr, "/sat/ovp_value" },   // RETIRED-SAT-ENTITY TASK-1460: retained value topic, no entity
+  { nullptr, nullptr, "/sat/auto_gains_value" },   // RETIRED-SAT-ENTITY TASK-1357: retained value topic, no entity
 };
 
 void clearRetiredSatEntities(const HaDiscoveryContext &ctx) {

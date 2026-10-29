@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_sat_pwm_override import compile_cpp  # noqa: E402
 
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino"))
+KP = 1.0 * 45.0 / 3.0   # automatic gains, coefficient 1.0, curve 45, radiators (the only gain mode)
 PID_INO = Path(os.environ.get("OTGW_SATPID_INO", REPO / "src" / "OTGW-firmware" / "SATpid.ino"))
 
 STUBS = r"""
@@ -40,8 +41,10 @@ STUBS = r"""
 #define SATDebugTf(...) ((void)0)
 #define SATDebugTln(x) ((void)0)
 #define SAT_HSYS_UNDERFLOOR 1
-struct SatSettings { float fDeadband = 0.1f; bool bAutoGains = false; float fKpManual = 2.0f, fKiManual = 1.0f, fKdManual = 100.0f;
-                     float fHeatingCurveCoeff = 1.0f; bool bSolarFreezeIntegral = false; };
+struct SatSettings { float fDeadband = 0.1f;
+                     float fHeatingCurveCoeff = 1.0f; bool bSolarFreezeIntegral = false;
+                     // pre-TASK-1357 fields at their old defaults, so an old SATpid.ino copy still compiles
+                     bool bAutoGains = true; float fKpManual = 5.0f, fKiManual = 0.0005f, fKdManual = 0.0f; };
 struct Settings { SatSettings sat; };
 struct SatState { float fPidP=0, fPidI=0, fPidD=0, fPidOutput=0, fKp=0, fKi=0, fKd=0, fRawDerivative=0, fError=0;
                   bool bSolarGainActive=false, bSafetyTripped=false, bRoomTempLost=false; };
@@ -161,10 +164,11 @@ class RoomLoss(unittest.TestCase):
         pre_i = r[len(PRE) - 1]["I"]
         x = r[-1]
         self.assertEqual(x["ran"], 1)
-        # Ki=1, error 0.05 (inside the deadband), 60 s per update: I restarts at 0 and gains 3.0 on the first update.
-        self.assertAlmostEqual(x["I"], 3.0, places=3, msg="I must restart from 0 (pre-loss I was %.3f)" % pre_i)
+        # Automatic gains (TASK-1357): coefficient 1.0, curve 45, radiators -> kp = 15, ki = kp / 8400.
+        # Error 0.05 (inside the deadband), 60 s per update: I restarts at 0 and gains ki * 0.05 * 60 on the first update.
+        self.assertAlmostEqual(x["I"], KP / 8400.0 * 0.05 * 60.0, places=4, msg="I must restart from 0 (pre-loss I was %.3f)" % pre_i)
         self.assertEqual(x["D"], 0.0, "D must restart from 0 (inside the deadband it stays frozen at the reset value)")
-        self.assertAlmostEqual(x["P"], 2.0 * 0.05, places=3)
+        self.assertAlmostEqual(x["P"], KP * 0.05, places=3)
         self.assertAlmostEqual(x["out"], 45.0 + x["P"] + x["I"] + x["D"], places=3)
         self.assertNotAlmostEqual(x["out"], 45.0, places=2, msg="the PID must have run again, not handed back the curve")
 
@@ -172,7 +176,7 @@ class RoomLoss(unittest.TestCase):
         # One lost tick, then a valid temperature again within 60 s: the unchanged-error gate must not return the curve-only output.
         r = self.run_seq(PRE + ["nan", "20.96"])
         self.assertNotAlmostEqual(r[-1]["out"], 45.0, places=2)
-        self.assertAlmostEqual(r[-1]["P"], 2.0 * 0.04, places=3)
+        self.assertAlmostEqual(r[-1]["P"], KP * 0.04, places=3)
 
 
 class SourceGuards(unittest.TestCase):

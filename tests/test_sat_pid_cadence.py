@@ -38,6 +38,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_sat_pwm_override import compile_cpp  # noqa: E402
 
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino"))
+# Automatic gains are the only mode (TASK-1357): kd = 0.07 * 8400 * kp, kp = coefficient * curve / 3 (radiators).
+KD_AT_CURVE_40 = 0.07 * 8400.0 * (1.6 * 40.0 / 3.0)
 PID_INO = Path(os.environ.get("OTGW_SATPID_INO", REPO / "src" / "OTGW-firmware" / "SATpid.ino"))
 TIMERS = (REPO / "src" / "OTGW-firmware" / "safeTimers.h").as_posix()
 
@@ -63,8 +65,10 @@ static uint32_t g_ms = 0;
 static uint32_t millis() { return g_ms; }
 static long random(long a, long) { return a; }
 #include "@TIMERS@"
-struct SatSettings { bool bAutoGains = false, bSolarFreezeIntegral = false;
-  float fKpManual = 2.0f, fKiManual = 0.01f, fKdManual = 100.0f, fHeatingCurveCoeff = 1.6f, fDeadband = 0.1f, fTargetTemp = 21.0f;
+// bAutoGains/fK*Manual: pre-TASK-1357 fields at their old defaults, so an old SATpid.ino copy still compiles.
+struct SatSettings { bool bSolarFreezeIntegral = false; bool bAutoGains = true;
+  float fKpManual = 5.0f, fKiManual = 0.0005f, fKdManual = 0.0f;
+  float fHeatingCurveCoeff = 1.6f, fDeadband = 0.1f, fTargetTemp = 21.0f;
   int iZoneCount = 1; int iZoneTimeoutS = 900; };
 struct Settings { SatSettings sat; };
 struct SatState { bool bSolarGainActive = false, bFallbackActive = false, bPvBoostActive = false;
@@ -153,7 +157,7 @@ static float tickZone() {
 int main(int argc, char** argv) {
   const char* sc = argv[1]; const int tick = atoi(argv[2]); g_base = (uint32_t)strtoul(argv[3], 0, 10);
   g_ms = g_base; satPidReset();
-  if (!strcmp(sc, "ramp")) { g_trace = 1; settings.sat.bAutoGains = true; }
+  if (!strcmp(sc, "ramp")) { g_trace = 1; }
   if (!strcmp(sc, "zone")) {
     settings.sat.iZoneCount = 2;
     satZones[0].fRoomTemp = 20.95f; satZones[0].fSetpoint = 21.0f; satZones[0].bRoomValid = satZones[0].bSpValid = true;
@@ -172,7 +176,7 @@ int main(int argc, char** argv) {
     settings.sat.iZoneCount = 2;
     satZones[0].fRoomTemp = 20.5f; satZones[0].fSetpoint = 21.0f; satZones[0].bRoomValid = satZones[0].bSpValid = true;
   }
-  if (!strcmp(sc, "fresh")) { g_trace = 1; settings.sat.bAutoGains = true; }   // SAT enable, no restore: room 19.0 against target 21.0
+  if (!strcmp(sc, "fresh")) { g_trace = 1; }   // SAT enable, no restore: room 19.0 against target 21.0
   if (!strcmp(sc, "first")) { satPidRestoreState(0.5f, 0.02f); }
   if (!strcmp(sc, "hold") || !strcmp(sc, "holdsave")) { satPidRestoreState(0.5f, 0.02f); g_roomValid = false; }   // boot: state restored, no room reading yet
   for (int t = 0; t <= 600; t++) {
@@ -532,12 +536,12 @@ class Cadence(unittest.TestCase):
 
     def test_m_first_output_with_pid_terms_has_d_zero_then_d(self):
         """Entry 95 Q39b (round 3): the first output that includes the PID terms has D = 0, also when it comes after a restore and
-        a stretch of curve-only outputs; the next output has D = kd * raw derivative (kd 100, raw 0.02 -> 2)."""
+        a stretch of curve-only outputs; the next output has D = kd * raw derivative (curve 40, coefficient 1.6: kd = 0.07 * 8400 * 1.6 * 40 / 3 = 12544, raw 0.02 -> 250.88)."""
         if self.head:
             self.fail("HEAD has no restore hold")
         rows = {int(r["t"]): r for r in self.run_sc("holdsave", 10)}
         self.assertEqual(float(rows[200]["D"]), 0.0, rows[200])
-        self.assertAlmostEqual(float(rows[210]["D"]), 2.0, places=3, msg=str(rows[210]))
+        self.assertAlmostEqual(float(rows[210]["D"]), KD_AT_CURVE_40 * 0.02, places=3, msg=str(rows[210]))
 
     def test_n_late_restore_gives_d_zero_on_the_next_output(self):
         """Round 3: the deferred restore (after NTP) lands at t=45 after the first outputs. It re-arms the first-output rule, so the
@@ -549,7 +553,7 @@ class Cadence(unittest.TestCase):
         self.assertEqual(float(rows[40]["rawD"]), 0.0, "premise: nothing restored yet at t=40: %s" % rows[40])
         self.assertAlmostEqual(float(rows[50]["rawD"]), 0.02, places=4, msg=str(rows[50]))
         self.assertEqual(float(rows[50]["D"]), 0.0, "the first output after the restore has D = 0: %s" % rows[50])
-        self.assertAlmostEqual(float(rows[60]["D"]), 2.0, places=3, msg=str(rows[60]))
+        self.assertAlmostEqual(float(rows[60]["D"]), KD_AT_CURVE_40 * 0.02, places=3, msg=str(rows[60]))
 
 
 class Widening(unittest.TestCase):
@@ -588,8 +592,8 @@ class Widening(unittest.TestCase):
 
     def test_takeover_estimate_widens_main_and_zone_step(self):
         r = self.run_widen(1 * self.HOUR, 1)               # 1 h of estimation: deadband 0.1 + 0.5 = 0.6 > error 0.5
-        self.assertGreater(float(r["I"]), 1.0, "main PID integrates inside the widened deadband: %s" % r)
-        self.assertGreater(float(r["zoneI"]), 0.1, "the zone step sees the same widened value: %s" % r)
+        self.assertGreater(float(r["I"]), 0.0, "main PID integrates inside the widened deadband: %s" % r)
+        self.assertGreater(float(r["zoneI"]), 0.0, "the zone step sees the same widened value: %s" % r)
         self.assertAlmostEqual(float(r["deadband"]), 0.1, places=6, msg="the deadband is restored after the service")
 
     def test_no_widening_without_takeover(self):

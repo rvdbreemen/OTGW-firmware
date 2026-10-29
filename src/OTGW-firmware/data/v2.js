@@ -2087,7 +2087,6 @@
     satvalveoffset:      { cat: 'sat', label: 'Valve offset', hint: '°C' },
     satsensormaxage:     { cat: 'sat', label: 'Sensor max age', hint: 'Seconds' },
     saterrormon:         { cat: 'sat', label: 'Error monitoring' },
-    satautogains:        { cat: 'sat', label: 'Auto-gain factor' },
     satsolarfreezeint:   { cat: 'sat', label: 'Solar freeze integral' },
     satmaxmodulation:    { cat: 'sat', label: 'Max modulation', hint: '%' },
     // --- SAT long-tail: curated labels + hints + sub-groups for the older SAT keys
@@ -2165,7 +2164,7 @@
   ];
   var SAT_L3 = [
     ['Curve', ['satcoefficient', 'satdeadband', 'sattempstep', 'satovershootmargin']],
-    ['PID / PWM', ['satovershootprotection', 'satcyclesperhour', 'satautogains', 'satmaxmodulation',
+    ['PID / PWM', ['satovershootprotection', 'satcyclesperhour', 'satmaxmodulation',
                    'satinterval', 'sathpcycle', 'satautotune', 'satautotunerate', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
     ['Boiler', ['satmanufacturer', 'satboilerratedkw', 'satboilerefficiency', 'satboilercapacity', 'satdhwcapacity',
@@ -5418,7 +5417,6 @@
       mfr: setData.satmanufacturer ? ('' + setData.satmanufacturer.value) : '0',
       tuning: 'auto',
       slope: (setData.satcoefficient && setData.satcoefficient.value != null && !isNaN(parseFloat(setData.satcoefficient.value))) ? parseFloat(setData.satcoefficient.value) : 2.0,   // current stored slope (TASK-1347)
-      gains: (setData.satautogains && setData.satautogains.value != null) ? ('' + setData.satautogains.value) : '1.0',
       finishing: false
     };
 
@@ -5442,7 +5440,6 @@
     function slopePct(v) { return Math.round(((v - 0.2) / (2.4 - 0.2)) * 100); }
     function syncInputs() {
       var mf = back.querySelector('#satOnbMfr'); if (mf) st.mfr = mf.value;
-      var gn = back.querySelector('#satOnbGains'); if (gn) st.gains = gn.value;
       var sl = back.querySelector('#satOnbSlope'); if (sl) st.slope = parseFloat(sl.value);
     }
     function optCard(sel) {
@@ -5453,10 +5450,7 @@
     function recBadge() { return '<span style="font-weight:600;font-size:9.5px;letter-spacing:.05em;color:var(--accent);border:1px solid var(--accent);border-radius:20px;padding:2px 8px">RECOMMENDED</span>'; }
 
     // Written at Finish: satsystem + satmanufacturer + satcoefficient (Manual only) +
-    // satautogains + satenabled + sat_onboarded. Heat pump also writes satsource=2.
-    // satautogains is still written (stored value on Manual, 1.0 on Automatic) but the
-    // PID does not read it (SATpid.ino _pidCalculateGains), so the wizard no longer
-    // offers it as a choice (TASK-1354).
+    // satenabled + sat_onboarded. Heat pump also writes satsource=2.
     function commit(then) {
       var m = SAT_SYS[st.system] || SAT_SYS.radiators;
       // Land the settings ONE AT A TIME (never a concurrent burst). The REST
@@ -5469,7 +5463,6 @@
       var kv = [['satsystem', m.sys], ['satmanufacturer', st.mfr]];
       if (st.tuning === 'manual') kv.push(['satcoefficient', '' + st.slope]);   // Automatic keeps the stored slope (TASK-1347)
       if (st.system === 'hp') kv.push(['satsource', 2]);
-      kv.push(['satautogains', st.tuning === 'manual' ? ('' + st.gains) : '1.0']);
       kv.push(['satenabled', true]);       // SAT enabled ONLY here, after the tuning writes land
       kv.push(['sat_onboarded', true]);    // onboarding flag last, once everything else persisted
       // then(true)=all persisted, then(false)=a POST failed (any reject aborts the chain,
@@ -5637,9 +5630,9 @@
         if (st.finishing) return; st.finishing = true; st.finishErr = false; render();
         commit(function (ok) { st.finishing = false; if (ok) { st.screen = 'done'; } else { st.finishErr = true; } render(); });
       }
-      else if (a === 'restart') { st.screen = 'welcome'; st.system = 'radiators'; st.mfr = '0'; st.tuning = 'auto'; st.gains = '1.0'; render(); }
+      else if (a === 'restart') { st.screen = 'welcome'; st.system = 'radiators'; st.mfr = '0'; st.tuning = 'auto'; render(); }
       // TASK-1318: the keys this wizard just saved win over older unsaved edits of them.
-      else if (a === 'go') { ['satsystem', 'satmanufacturer', 'satcoefficient', 'satsource', 'satautogains', 'satenabled', 'sat_onboarded'].forEach(function (k) { delete setDirty[k]; }); close(); fetchSettings(); showPage('sat'); }
+      else if (a === 'go') { ['satsystem', 'satmanufacturer', 'satcoefficient', 'satsource', 'satenabled', 'sat_onboarded'].forEach(function (k) { delete setDirty[k]; }); close(); fetchSettings(); showPage('sat'); }
     });
     render();
   }

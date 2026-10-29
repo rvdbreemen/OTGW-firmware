@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.532
+**  Version  : v2.0.0-alpha.533
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1726,8 +1726,6 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATsensormaxage", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("error_monitoring")) == 0) {
       updateSetting("SATerrormon", val); handled = true;
-    } else if (strcasecmp_P(settingName, PSTR("auto_gains_value")) == 0) {
-      updateSetting("SATautogains", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("cycles_per_hour")) == 0) {
       updateSetting("SATcyclesperhour", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("valve_offset")) == 0) {
@@ -2289,7 +2287,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.max_setpoint"), settings.sat.fMaxSetpoint);
     je.field(F("settings.sat.sensor_max_age"), (uint32_t)settings.sat.iSensorMaxAgeS);
     je.field(F("settings.sat.error_monitoring"), settings.sat.bErrorMonitoring);
-    je.field(F("settings.sat.auto_gains"), settings.sat.bAutoGains);
     je.field(F("settings.sat.thermal_comfort"), settings.sat.bThermalComfort);
     je.field(F("settings.sat.humidity_timeout"), (uint32_t)settings.sat.iHumidityTimeoutS);
     je.field(F("settings.sat.heating_mode"), (uint32_t)settings.sat.iHeatingMode);
@@ -3986,11 +3983,6 @@ void sendDeviceSettings()
   // --- SAT Python parity settings (Task #82) ---
   addInt(F("satsensormaxage"), (int32_t)settings.sat.iSensorMaxAgeS, "i", 60, 86400);
   addBool(F("saterrormon"), settings.sat.bErrorMonitoring, "b");
-  {
-    char tmpBuf[8];
-    dtostrf(settings.sat.fAutoGainsValue, 1, 2, tmpBuf);
-    addNum(F("satautogains"), tmpBuf, "f", 0, 10);
-  }
   addInt(F("satheatingmode"), settings.sat.iHeatingMode, "i", 0, 1);
   addInt(F("satcyclesperhour"), settings.sat.iCyclesPerHour, "i", 2, 6);
   {
@@ -4198,7 +4190,7 @@ static const char* const PROGMEM knownSettings[] = {
   // whitelist (POST-blocked). isKnownSetting is a
   // linear scan so position is cosmetic; grouped here for traceability.
   "sat_onboarded",   // TASK-1012: SAT onboarding wizard persist flag (POST-writable)
-  "satautogains", "satcyclesperhour", "saterrormon", "satheatingmode", "sathpcycle",
+  "satcyclesperhour", "saterrormon", "satheatingmode", "sathpcycle",
   "satmaxmodulation", "satsensormaxage", "satsolarfreezeint", "satvalveoffset",
   "ui_onboarded",
   "webhookcontenttype", "webhookenable", "webhookenabled",

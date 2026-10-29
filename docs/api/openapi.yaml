@@ -4478,21 +4478,6 @@ components:
         error_monitoring:
           type: boolean
           description: "Error monitoring enabled"
-        auto_gains_value:
-          type: number
-          description: "Auto-gains aggressiveness value"
-        auto_gains:
-          type: boolean
-          description: "Automatic PID gain scheduling enabled"
-        kp_manual:
-          type: number
-          description: "Manual Kp gain (used when auto_gains off)"
-        ki_manual:
-          type: number
-          description: "Manual Ki gain"
-        kd_manual:
-          type: number
-          description: "Manual Kd gain"
         thermal_comfort:
           type: boolean
           description: "Thermal-comfort mode active"
@@ -4644,11 +4629,6 @@ components:
         auto_tune_rate: 0.02
         sensor_max_age: 21600
         error_monitoring: false
-        auto_gains_value: 2.0
-        auto_gains: true
-        kp_manual: 5.0
-        ki_manual: 0.0005
-        kd_manual: 0.0
         thermal_comfort: false
         heating_mode: "comfort"
         cycles_per_hour: 3

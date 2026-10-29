@@ -3238,7 +3238,6 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/window_detection` | `SATwindowdetect` |
 | `sat/sensor_max_age` | `SATsensormaxage` |
 | `sat/error_monitoring` | `SATerrormon` |
-| `sat/auto_gains_value` | `SATautogains` |
 | `sat/cycles_per_hour` | `SATcyclesperhour` |
 | `sat/valve_offset` | `SATvalveoffset` |
 | `sat/solar_freeze_integral` | `SATsolarfreezeint` |

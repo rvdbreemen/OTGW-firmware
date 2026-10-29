@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.532
+**  Version  : v2.0.0-alpha.533
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -533,11 +533,6 @@ struct SATSection {
   float    fMaxSetpoint        = 65.0f; // Global safety ceiling for all heating systems (Python MAXIMUM_SETPOINT)
   uint32_t iSensorMaxAgeS     = 21600; // Max age of sensor reading before considered stale (seconds, 6h default)
   bool     bErrorMonitoring   = false; // Enable detailed error stats tracking
-  float    fAutoGainsValue    = 2.0f;  // Multiplier for auto-tune PID gain calculation
-  bool     bAutoGains         = true;  // true=automatic gain formula; false=use fKpManual/fKiManual/fKdManual
-  float    fKpManual          = 5.0f;  // Manual proportional gain (used when bAutoGains=false)
-  float    fKiManual          = 0.0005f; // Manual integral gain (used when bAutoGains=false)
-  float    fKdManual          = 0.0f;  // Manual derivative gain (used when bAutoGains=false)
   bool     bThermalComfort    = false; // true=use SummerSimmer index as PID room temp input
   uint16_t iHumidityTimeoutS  = 1800; // Seconds before humidity reading is considered stale (default 30 min)
   uint8_t  iHeatingMode       = 0;     // 0=COMFORT, 1=ECO

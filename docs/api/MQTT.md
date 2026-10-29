@@ -507,7 +507,6 @@ The following topics echo the current configured values. They are retained and p
 | `sat/sensor_max_age` | `"300"` | Max age for external sensor readings (s) |
 | `sat/humidity_timeout_s` | `"600"` | Humidity reading timeout (s) |
 | `sat/error_monitoring` | `"true"` / `"false"` | Error-monitoring setting. It has no other effect today |
-| `sat/auto_gains_value` | `"1.00"` | Auto-gain factor. Stored and published; the PID does not read it today |
 | `sat/heating_mode` | `"comfort"` / `"eco"` | Heating mode. Stored and published; the control loop does not use it today |
 | `sat/cycles_per_hour` | `"3"` | Target PWM cycles per hour |
 | `sat/valve_offset` | `"0.00"` | Valve offset. Stored and published; the control loop does not use it today |
@@ -1122,7 +1121,6 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 | `sat/preset_home` | `SATpresethome` | Home preset temperature |
 | `sat/sensor_max_age` | `SATsensormaxage` | Max age for external sensor readings (s) |
 | `sat/error_monitoring` | `SATerrormon` | Error-monitoring flag. Stored and published as `sat/error_monitoring`; it has no other effect today |
-| `sat/auto_gains_value` | `SATautogains` | Auto-gain factor. Stored and published; the PID does not read it today |
 | `sat/heating_mode` | `SATheatingmode` | Heating mode: `"eco"`, `"comfort"`, or numeric |
 | `sat/cycles_per_hour` | `SATcyclesperhour` | Target PWM cycles per hour |
 | `sat/valve_offset` | `SATvalveoffset` | Valve offset (-1 to 1). Stored and published; the control loop does not use it today |

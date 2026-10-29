@@ -154,7 +154,6 @@ PID controller with automatic gain calculation, deadband mode, temperature-based
 
 - `_pidCalculateGains(float curveValue): void` (static)
   - Auto-calculates Kp/Ki/Kd from heating curve value
-  - Respects manual gains (`fKpManual/fKiManual/fKdManual`) if `bAutoGains=false`
 
 - `_pidUpdateIntegral(float error, float curveValue, bool force): void` (static)
   - Updates integral term only inside deadband
@@ -272,7 +271,7 @@ All SAT settings are stored in `settings.sat` (`SATSection` in SATtypes.h, 100+ 
 
 - Core: `bEnabled`, `iHeatingSystem` (auto/radiators/underfloor), `iHeatingSource` (auto/gas_boiler/heat_pump/hybrid), `iHpCycleSeconds`, `fTargetTemp`, `fHeatingCurveCoeff`, `fDeadband`, `iControlInterval`, `bUseExternalTemp`, `iSensorMaxAgeS`, `fMaxSetpoint`
 - Presets: `fPresetComfort/Eco/Away/Sleep/Activity/Home`, `bPresetSync`, `sPresetSyncTopic`
-- PID: `bAutoGains`, `fKpManual/fKiManual/fKdManual`, `fAutoGainsValue`, `bAutoTune`, `fAutoTuneRate`
+- PID: `bAutoTune`, `fAutoTuneRate`
 - Output: `bOvershootProtection` (default on), `fOvershootMargin` (default 2.0), `iMaxRelModulation`, `fFlameOffOffset`, `fFlowOffset`, `fModSupDelay/Offset`, `bPushSetpoint` (TC=), `bFollowThermostat` (TASK-1259: `satOnThermostatSetpoint()` is called by `processOT()` for each thermostat MsgID 16 Write-Data T frame; `satFollowThermostatDecide()` is the pure edge/echo test; `satAdoptThermostatSetpoint()` sets the target and clears the preset without the none-restore; default = push-setpoint when no stored key), `iCyclesPerHour`, DHW (`bDhwEnabled`, `bDhwEnable`, `fDhwSetpoint`)
 - Environment: weather (`bWeatherEnable`, `fWeatherLat/Lon`, `iWeatherInterval`), solar gain, summer simmer, window detection, pressure limits
 - Inputs: `bMultiArea`, `iMultiAreaCount`, `fAreaWeight[4]`, `sSensorArea[4][18]` (Dallas address or BLE MAC), `iZoneCount`, `iZoneTimeoutS`, `fZoneAggregationHeadroom`, PV boost (`bPvBoostEnabled`, `iPvBoostThresholdW`, `iPvBoostHoldS`, `fPvBoostDeltaC`, `fPvBoostMaxIndoorC`, `iPvBoostMaxDurationMin`)

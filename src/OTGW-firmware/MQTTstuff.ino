@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.532
+**  Version  : v2.0.0-alpha.533
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -725,7 +725,6 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "window_detection",       "SATwindowdetect",      nullptr },
   { "sensor_max_age",         "SATsensormaxage",      nullptr },
   { "error_monitoring",       "SATerrormon",          nullptr },
-  { "auto_gains_value",       "SATautogains",         nullptr },
   { "cycles_per_hour",        "SATcyclesperhour",     nullptr },
   { "valve_offset",           "SATvalveoffset",       nullptr },
   { "solar_freeze_integral",  "SATsolarfreezeint",    nullptr },

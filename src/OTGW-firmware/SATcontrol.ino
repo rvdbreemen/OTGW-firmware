@@ -3166,12 +3166,6 @@ void satSendStatusJSON()
     // SAT Python parity settings (Task #82)
     je.field(F("sensor_max_age"),       (int32_t)settings.sat.iSensorMaxAgeS);
     je.field(F("error_monitoring"),     settings.sat.bErrorMonitoring);
-    je.field(F("auto_gains_value"),     settings.sat.fAutoGainsValue);
-    // TASK-193: manual gains mode
-    je.field(F("auto_gains"),           settings.sat.bAutoGains);
-    je.field(F("kp_manual"),            settings.sat.fKpManual, 6);
-    je.field(F("ki_manual"),            settings.sat.fKiManual, 6);
-    je.field(F("kd_manual"),            settings.sat.fKdManual, 6);
     // TASK-204: thermal comfort mode (SSI as PID room temp)
     je.field(F("thermal_comfort"),      settings.sat.bThermalComfort);
     je.field(F("heating_mode"),         settings.sat.iHeatingMode == 1 ? "eco" : "comfort");
@@ -3332,7 +3326,7 @@ void satPublishMQTT()
   static SATShadowF s_thermal_coeff, s_thermal_drop_rate, s_estimated_room;
   static SATShadowF s_indoor_rise_rate, s_sun_elevation;
   static SATShadowF s_summer_hours_above, s_humidity;
-  static SATShadowF s_auto_tune_score, s_auto_tune_rate, s_auto_gains_value;
+  static SATShadowF s_auto_tune_score, s_auto_tune_rate;
   static SATShadowF s_valve_offset;
   static SATShadowF s_area_0, s_area_1, s_area_2, s_area_3;
   static SATShadowF s_ssi, s_summer_simmer_index;
@@ -3627,7 +3621,6 @@ void satPublishMQTT()
   // ---------------------------------------------------------------------------
   publishIfChangedI(F("sat/sensor_max_age"),       (int32_t)settings.sat.iSensorMaxAgeS,  s_sensor_max_age,       true);
   publishIfChangedB(F("sat/error_monitoring"),     settings.sat.bErrorMonitoring,         s_error_monitoring,     true);
-  publishIfChangedF(F("sat/auto_gains_value"),     settings.sat.fAutoGainsValue,          s_auto_gains_value,     SAT_EPS_FRACTION, 2, true);
   publishIfChangedS(F("sat/heating_mode"),         settings.sat.iHeatingMode == 1 ? "eco" : "comfort", s_heating_mode, true);
   publishIfChangedI(F("sat/cycles_per_hour"),      (int32_t)settings.sat.iCyclesPerHour,  s_cycles_per_hour,      true);
   publishIfChangedF(F("sat/valve_offset"),         settings.sat.fValveOffset,             s_valve_offset,         SAT_EPS_FRACTION, 2, true);

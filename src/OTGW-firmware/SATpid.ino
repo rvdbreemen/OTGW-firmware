@@ -169,19 +169,9 @@ float satPidCurveOnly(float heatingCurveValue)
 }
 
 //=== Auto-Gain Calculation (Version 3) ===
-// When settings.sat.bAutoGains is true (default): automatic formula from heating curve.
-// When settings.sat.bAutoGains is false: pass through manual fKpManual/fKiManual/fKdManual
-// directly to state, matching Python pid.py automatic_gains=False behavior.
+// Automatic gains from the heating curve (thermo-nova pid.py automatic_gains=True).
 static void _pidCalculateGains(float curveValue)
 {
-  if (!settings.sat.bAutoGains) {
-    // Manual gains mode: user-configured values bypass the formula entirely
-    state.sat.fKp = settings.sat.fKpManual;
-    state.sat.fKi = settings.sat.fKiManual;
-    state.sat.fKd = settings.sat.fKdManual;
-    return;
-  }
-
   float coeff = settings.sat.fHeatingCurveCoeff;
   // Underfloor uses the floor divisor, radiators the radiator divisor. (TASK-891.8: was keyed
   // on '==1'/radiators, which inverted the mapping; now via the heating-system axis.)

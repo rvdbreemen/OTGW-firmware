@@ -111,7 +111,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("max_setpoint: %.1f\r\n"), settings.sat.fMaxSetpoint);
     Debugf(PSTR("sensor_max_age_s: %lu\r\n"), (unsigned long)settings.sat.iSensorMaxAgeS);
     Debugf(PSTR("error_monitoring: %s\r\n"), settings.sat.bErrorMonitoring ? "true" : "false");
-    Debugf(PSTR("auto_gains: %s\r\n"), settings.sat.bAutoGains ? "true" : "false");
     Debugf(PSTR("thermal_comfort: %s\r\n"), settings.sat.bThermalComfort ? "true" : "false");
     Debugf(PSTR("humidity_timeout_s: %u\r\n"), (unsigned)settings.sat.iHumidityTimeoutS);
     Debugf(PSTR("heating_mode: %u\r\n"), (unsigned)settings.sat.iHeatingMode);

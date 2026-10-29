@@ -136,7 +136,6 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satvalveoffset":"Valve offset, -1 to 1. Stored and published, but the control loop does not use it today.",
 "satsensormaxage":"Seconds an MQTT or REST indoor temperature stays valid, 60 to 86400. Default 21600 (6 h).",
 "saterrormon":"Published as sat/error_monitoring. It has no other effect today.",
-"satautogains":"Auto-gain factor, 0.1 to 10. Stored and published; the PID does not read it today.",
 "satsolarfreezeint":"Meant to freeze the PID integral during solar gain. The firmware freezes it regardless of this setting.",
 "satmaxmodulation":"Highest relative modulation SAT sends to the boiler (MM=), 0 to 100 %. Default 100.",
 "satexternaltemp":"Use an indoor temperature you send to SAT. MQTT: publish e.g. 20.8 to <prefix>/set/<node>/sat/indoor_temp. REST: POST /api/v2/sat/externaltemp. Expires after Sensor max age.",
