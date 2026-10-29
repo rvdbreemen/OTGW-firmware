@@ -61,6 +61,12 @@ static bool satCommandInFlight() { return false; }
 static void triggerPICsettingsReadout() {}
 static char cMsg[128];
 static void sendEventToWebSocket(char, const char*) {}
+// Dropped-command feedback (TASK-1439) sits inside the cut-out range.
+struct PicState { bool bCmdRetryExceeded = false; uint32_t iCmdDropped = 0; };
+struct State { PicState pic; };
+static State state;
+#define CCONOFF(b) ((b) ? "ON" : "OFF")
+static void sendMQTTData(const char*, const char*, bool) {}
 static size_t strlcpy(char* d, const char* s, size_t n) { size_t l = strlen(s); if (n) { size_t c = l < n - 1 ? l : n - 1; memcpy(d, s, c); d[c] = 0; } return l; }
 static char g_sent[512];
 static void sendPICSerial(const char* b, int n) { strncat(g_sent, b, n); strcat(g_sent, ";"); }

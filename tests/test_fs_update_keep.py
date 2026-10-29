@@ -229,8 +229,18 @@ class TestSatWriteBack(unittest.TestCase):
     def test_calls_every_saver(self):
         body = function_body(SATCTL, r"\nvoid satPersistAllToFs\(\)")
         for fn in list(self.SAVERS) + ["satHCRSaveState"]:
+            if fn == "satSavePidState":
+                continue   # gated on a room reading, see test_pid_save_gated_on_room_seen
             self.assertTrue(is_plain_statement(body, fn + "();"), fn + " is not called unconditionally")
         self.assertIn("if (!LittleFSmounted) return;", body)
+
+    def test_pid_save_gated_on_room_seen(self):
+        """Sergeant D entry 115 (TASK-1365): a PID state restored at boot, with no room reading
+        since, stays on flash; satPersistAllToFs saves it only once a room reading was seen."""
+        body = function_body(SATCTL, r"\nvoid satPersistAllToFs\(\)")
+        self.assertRegex(body, r"if\s*\(\s*satPidRoomSeen\(\)\s*\)\s*satSavePidState\(\);")
+        self.assertFalse(is_plain_statement(body, "satSavePidState();"),
+                         "satSavePidState must stay gated on satPidRoomSeen() (entry 115)")
 
     def test_savers_write_unconditionally(self):
         """The 'due' guards (hourly timer, 0.1 kWh boundary, 5 min PID timer) belong to the
