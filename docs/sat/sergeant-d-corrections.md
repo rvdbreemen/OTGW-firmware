@@ -4665,3 +4665,24 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156538515980
 **Compared with thermo-nova and the firmware:** thermo-nova skips a control pass while the outside temperature is None (`climate.py:544-545`) and restores "PWM enabled" and the last setpoint after a Home Assistant restart (`pwm.py:111-114`, `heating_control.py:181-191`, `climate.py:169-174`). Firmware: boot sends CS=0 (`SATcontrol.ino:4317-4325`), starts in continuous mode (`:4338`) and the outside-temperature fallback ends at MsgID 27 / 0.0 (entry 56 comparison, TASK-1390).
 
 **Changes an earlier entry:** none; it applies entries 39, 47, 56 and 79 to the restart case. **Task:** TASK-1390 (outside temperature missing), restart hand-over task to be filed after the re-asked Q59. **Open:** whether "quiet" at a restart also waits for a valid outside temperature, and whether the PWM state is restored.
+
+## 121. Q59 A: after a restart SAT stays quiet until a valid boiler reply and a valid outside temperature, then takes over; "PWM enabled" is restored (2026-10-29, settles entry 120's open points)
+
+**Source:** #alpha-testing, 2026-10-29 15:41 UTC, answer to the re-asked Q59 (msg 1565388319968206928):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565390183174770699
+
+**Quoted:**
+
+> Q59: A
+
+Option A as posted: "After a restart SAT stays quiet (hand-back state, nothing of its own) until it has a valid boiler reply AND a valid outside temperature, then takes over. It restores "PWM enabled" as thermo-nova does (pwm.py:111-114)."
+
+**Settled (our reading of a one-letter reply, against the posted option text):**
+
+- After a gateway restart SAT sends nothing of its own (no CS, CH or MM computed by SAT) while it has no valid boiler reply or no valid outside temperature. The boiler stays in the hand-back state of entry 47 (the thermostat's request reaches it) until both are valid.
+- Then SAT takes over at its next control tick.
+- SAT restores whether PWM was enabled before the restart, as thermo-nova restores `pulse_width_modulation_enabled` (`pwm.py:111-114`, called through `heating_control.py:181-184` from `climate.py:169-174`). Only the enabled flag is restored; thermo-nova does not restore the PWM phase or its timers.
+
+**Compared with thermo-nova and the firmware:** thermo-nova has no gateway boot; on a Home Assistant restart it restores the PWM flag, the control setpoint and the modulation value (`heating_control.py:181-191`) and skips a control pass while the outside temperature is None (`climate.py:544-545`). Firmware at f4b8be6d9: boot sends CS=0 (`SATcontrol.ino:4317-4325`), starts in continuous mode (`:4338`), and the first tick after boot computes a setpoint even with outside 0.0 °C from the MsgID 27 fallback (entry 56 comparison). Not restored here: the control setpoint and modulation value (not part of option A).
+
+**Changes an earlier entry:** settles entry 120's open points; consistent with entries 39, 47, 56 and 79. **Task:** restart hand-over task (filed with this entry), TASK-1390 (outside temperature missing). **Open:** what counts as a "valid" outside temperature at boot follows entries 56/57 (missing, or older than one hour).
