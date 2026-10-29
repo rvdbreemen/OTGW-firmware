@@ -114,6 +114,7 @@ struct FSStub { File open(const char*, const char*) { return File(); } };
 static FSStub LittleFS;
 static uint32_t _pidLastSaveMs = 0;
 static const char* SAT_PID_STATE_FILE = "/x.json";
+static int satPidStateAppendOutside(char*, int n, size_t, time_t) { return n; }   // TASK-1482: tested in test_sat_restart_quiet.py
 """
 
 GATHER_STUB = r"""

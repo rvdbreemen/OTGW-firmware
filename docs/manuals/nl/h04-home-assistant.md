@@ -409,6 +409,7 @@ Topics zonder Home Assistant-entiteit (wel gepubliceerd en retained; te gebruike
 | `sat/preset` | Actief preset (`none`, `away`, `eco`, ...) |
 | `sat/fallback_active` | De MQTT-verlies-terugval heeft SAT ingeschakeld. Staat via MQTT altijd op `false`, omdat de terugval alleen draait zolang MQTT weg is; REST `/api/v2/sat/status` toont de live waarde |
 | `sat/ot_link_lost` | `true` zolang SAT 30 s geen ketelantwoord heeft gezien; SAT heeft de ketel één keer overgedragen en gaat vanzelf verder bij het volgende antwoord (zie hoofdstuk 5, veiligheidssysteem) |
+| `sat/outside_temp_missing` | `true` zolang SAT geen buitentemperatuur heeft die jonger is dan 1 uur; SAT heeft de ketel één keer overgedragen en gaat vanzelf verder zodra er weer een is (zie hoofdstuk 5, veiligheidssysteem) |
 | `sat/simulation` | Simulatiemodus `ON`/`OFF` |
 
 **SAT-commando-topics (firmware abonneert hierop):**

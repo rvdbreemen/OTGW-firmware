@@ -47,11 +47,11 @@ STUBS = r"""
 #define snprintf_P snprintf
 #define SATDebugTf(...) ((void)0)
 #define SATDebugTln(x) ((void)0)
-enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1 };
+enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 struct SatSettings { bool bSimulation = false; };
 struct Settings { SatSettings sat; };
 struct SatState { bool bLastSentValid=false, bTCAccountedValid=false, bActive=false, bSafetyTripped=false, bFallbackActive=false,
-                  bPushRefused=false, bRoomTempLost=false, bOtLinkLost=false;
+                  bPushRefused=false, bRoomTempLost=false, bOtLinkLost=false, bOutsideTempMissing=false;
                   uint32_t iLastSentCSMs=0, iLastSentMMMs=0, iLastSentCHMs=0, iTCPushMs=0;
                   float fLastSentCS=0, fFinalSetpoint=0; uint8_t iLastSentMM=0, iLastSentCH=0; int eControlMode=0; uint32_t iSimDhwExpiryMs=0; };
 struct OTSys { uint8_t SlaveStatus = 0; }; static OTSys OTcurrentSystemState;
@@ -76,6 +76,8 @@ static void satCycleSample() {}
 static void satGetWindow4hStats() {}
 static void satGetWindow24hStats() {}
 static void satPwmSuppressionRefresh() {}
+static bool satRestartStep() { return false; }   // TASK-1482: the restart and outside gates are tested in test_sat_restart_quiet.py
+static void satSavePwmEnabled(bool) {}
 static void satPidService(uint32_t) {}   // TASK-1368: the 60 s PID service is not under test here
 static void satSetControlMode(int m) { state.sat.eControlMode = m; }
 static void satPwmReset() {}
@@ -351,7 +353,9 @@ class SourceGuards(unittest.TestCase):
         run = self._body("static void satControlLoopRun()\n{")
         g = run.index("if (satOtLinkStep()) return;")
         self.assertGreater(g, run.index("if (state.sat.bSafetyTripped) return;"))
-        for later in ("if (!_sat_bootCS0sent && hasOTCommandInterface())", "  satPicCSKeepalive();",
+        boot = ("if (satRestartStep()) return;" if "if (satRestartStep()) return;" in run
+                else "if (!_sat_bootCS0sent && hasOTCommandInterface())")   # TASK-1482 replaced the boot CS=0
+        for later in (boot, "  satPicCSKeepalive();",
                       "  satPwmSuppressionRefresh();", "if (!DUE(timerSATControl)) return;"):
             with self.subTest(later):
                 self.assertLess(g, run.index(later))

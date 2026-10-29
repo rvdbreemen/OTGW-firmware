@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.539
+**  Version  : v2.0.0-alpha.540
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5613,6 +5613,12 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
       }
       if (OTdata.id == 24 && OTdata.rsptype == OTGW_THERMOSTAT && OTdata.type == OT_WRITE_DATA) {
         stampThermostatRoomTemp();
+      }
+      // TASK-1390: the boiler's own outside temperature, from a live Read-Ack only (entries 57, 126).
+      if (OTdata.id == 27 && OTdata.rsptype == OTGW_BOILER && OTdata.type == OT_READ_ACK &&
+          !OTdata.skipthis && !OTdata.bGatewaySubstituted) {
+        state.otBus.iToutsideBoilerMs = millis();
+        if (state.otBus.iToutsideBoilerMs == 0) state.otBus.iToutsideBoilerMs = 1;
       }
 
       if (OTdata.skipthis || OTdata.bGatewaySubstituted) AddLog(" <ignored> ");

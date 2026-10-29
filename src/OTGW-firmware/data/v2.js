@@ -4638,6 +4638,7 @@
     var pr = document.getElementById('satPushRefused'); if (pr) pr.hidden = !(enabled && d.push_refused);
     var rl = document.getElementById('satRoomLost'); if (rl) rl.hidden = !(enabled && d.room_temp_lost);
     var ol = document.getElementById('satOtLost'); if (ol) ol.hidden = !(enabled && d.ot_link_lost);
+    var om = document.getElementById('satOutsideMissing'); if (om) om.hidden = !(enabled && d.outside_temp_missing);
     satRenderPresets(d);
 
     // L2 — history + tiles + dhw + burner cycle + curve + control status

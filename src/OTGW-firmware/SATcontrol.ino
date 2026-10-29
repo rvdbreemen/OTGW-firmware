@@ -414,7 +414,6 @@ static const char* satGetHeatingSourceName()
 
 static bool    _sat_roomLostActive     = false;   // room temperature lost: heating on the curve only (TASK-1364)
 static uint8_t _sat_picFailCount      = 0;
-static bool    _sat_bootCS0sent       = false;  // One-shot: ensure CS=0 is sent once PIC is available
 static bool    _sat_prevDhwActive     = false;  // Track DHW transition to send SW= on entry (TASK-437)
 static bool    _sat_prevOTOnline      = false;  // Track OT-bus online edge for cache reset (TASK-565)
 
@@ -1289,6 +1288,7 @@ void satPwmReset()
 // sustained-overshoot start, so no path (the control_mode command included) can carry a start from one
 // continuous stint into the next. Firmware choice: thermo-nova has no mode command; it clears the start on
 // the next update while PWM is enabled (heating_control.py:264-266).
+
 static void satSetControlMode(SATControlMode m)
 {
   if (m != state.sat.eControlMode) {
@@ -1870,28 +1870,72 @@ static float satGetRoomTemp()
   return otRoom;
 }
 
-//=== Get Outside Temperature (OT bus or external) ===
+// --- satOutside begin
+//=== Get Outside Temperature (external, OT bus, weather, restored) ===
+// TASK-1390 / TASK-1482, Sergeant D entries 56, 57, 126: an outside temperature is valid while it is younger
+// than 1 hour, whatever its source; with none SAT hands back (satRestartOutsideStep()). Order, first match wins:
+//   1. external (MQTT/REST) younger than 10 min (SAT_STALE_OUTDOOR_MS);
+//   2. boiler MsgID 27 from a live Read-Ack younger than 1 h (state.otBus.iToutsideBoilerMs), when not 0.0;
+//   3. weather fetched less than 1 h ago;
+//   4. boiler MsgID 27 0.0 from a live Read-Ack younger than 1 h (a real 0 C reading);
+//   5. external younger than 1 h (after 10 min it only loses priority);
+//   6. the value restored from the PID state file at boot, measured less than 1 h ago (entry 126).
+// A PS=1 summary repeats stored values with no age (ADR-181), so it never stamps MsgID 27.
+// No side effects: the REST snapshot (async_tcp) and the MQTT publish call this too.
+// Returns false with the bus value (0.0 without a sensor) when no source is valid.
+static const uint32_t SAT_OUTSIDE_VALID_MS = 3600000UL;   // entry 57: old after 1 hour
+static bool satResolveOutsideTemp(float* out, uint32_t* sampleMs)
+{
+  const uint32_t nowMs = millis();
+  *sampleMs = nowMs;
+  if (settings.sat.bSimulation) { *out = state.sat.fSimOutdoorTemp; return true; }
+  const bool extSet = state.sat.bExternalOutdoorValid;
+  const uint32_t extAge = (uint32_t)(nowMs - state.sat.iExternalOutdoorLastMs);
+  const float otVal = OTcurrentSystemState.Toutside;
+  const bool otFresh = state.otBus.iToutsideBoilerMs != 0 &&
+                       (uint32_t)(nowMs - state.otBus.iToutsideBoilerMs) < SAT_OUTSIDE_VALID_MS;
+  const bool wxFresh = state.sat.weather.bValid && state.sat.weather.iLastUpdateMs != 0 &&
+                       (uint32_t)(nowMs - state.sat.weather.iLastUpdateMs) < SAT_OUTSIDE_VALID_MS;
+  if (extSet && extAge <= SAT_STALE_OUTDOOR_MS) { *out = state.sat.fExternalOutdoor; *sampleMs = state.sat.iExternalOutdoorLastMs; return true; }
+  if (otFresh && otVal != 0.0f) { *out = otVal; *sampleMs = state.otBus.iToutsideBoilerMs; return true; }
+  if (wxFresh) { *out = state.sat.weather.fTemperature; *sampleMs = state.sat.weather.iLastUpdateMs; return true; }
+  if (otFresh) { *out = otVal; *sampleMs = state.otBus.iToutsideBoilerMs; return true; }
+  if (extSet && extAge < SAT_OUTSIDE_VALID_MS) { *out = state.sat.fExternalOutdoor; *sampleMs = state.sat.iExternalOutdoorLastMs; return true; }
+  if (state.sat.bRestoredOutdoorValid &&
+      (uint32_t)(nowMs - state.sat.iRestoredOutdoorMs) < SAT_OUTSIDE_VALID_MS) {
+    *out = state.sat.fRestoredOutdoor; *sampleMs = state.sat.iRestoredOutdoorMs; return true;
+  }
+  *out = otVal;
+  return false;
+}
+
+static bool satOutsideTempFresh()
+{
+  float v; uint32_t ms;
+  return satResolveOutsideTemp(&v, &ms);
+}
+
 static float satGetOutsideTemp()
 {
-  // Simulation mode overrides all other sources
-  if (settings.sat.bSimulation) {
-    return state.sat.fSimOutdoorTemp;
-  }
-  if (state.sat.bExternalOutdoorValid) {
-    // Check staleness — if no update for 10 min, fall back to OT bus
-    if ((millis() - state.sat.iExternalOutdoorLastMs) > SAT_STALE_OUTDOOR_MS) {
-      state.sat.bExternalOutdoorValid = false;
-      SATDebugTln(F("SAT: external outdoor temp stale, falling back to OT bus"));
-    } else {
-      return state.sat.fExternalOutdoor;
-    }
-  }
-  // Weather API fallback: use fetched outdoor temp when OT bus has no sensor
-  if (state.sat.weather.bValid && OTcurrentSystemState.Toutside == 0.0f) {
-    return state.sat.weather.fTemperature;
-  }
-  return OTcurrentSystemState.Toutside;  // OT message ID 27
+  float v; uint32_t ms;
+  satResolveOutsideTemp(&v, &ms);
+  return v;
 }
+
+// Entry 126 (TASK-1482): satSavePidState() appends the last valid outside temperature and the wall-clock time
+// it was measured, so a restart within the hour resumes without waiting for a new weather fetch. Only with a
+// set clock and outside simulation. Returns the new length; buf keeps room for the closing brace.
+static int satPidStateAppendOutside(char* buf, int n, size_t size, time_t ts)
+{
+  float outside; uint32_t sampleMs;
+  if (n <= 0 || ts < 1000000L || settings.sat.bSimulation || !satResolveOutsideTemp(&outside, &sampleMs)) return n;
+  const unsigned long measuredTs = (unsigned long)ts - (unsigned long)((uint32_t)(millis() - sampleMs) / 1000UL);
+  int m = snprintf_P(buf + n, size - n - 1, PSTR(",\"ot\":%.2f,\"ots\":%lu"), outside, measuredTs);
+  if (m > 0 && (size_t)(n + m) < size - 2) return n + m;
+  buf[n] = '\0';
+  return n;
+}
+// --- satOutside end
 
 //=====================================================================
 //=== SAT boiler-side wrappers (TASK-795: simulation contract) ===
@@ -2672,18 +2716,28 @@ void satSavePidState()
   time_t ts = time(nullptr);
   float i, d, rd, err;
   satPidGetPersistState(&i, &d, &rd, &err);   // the held controller state, not the published copies (round 3)
-  snprintf_P(buf, sizeof(buf), PSTR("{\"i\":%.4f,\"d\":%.4f,\"rd\":%.4f,\"err\":%.2f,\"ts\":%lu}"),
-             i, d, rd, err, (unsigned long)ts);
+  int n = snprintf_P(buf, sizeof(buf), PSTR("{\"i\":%.4f,\"d\":%.4f,\"rd\":%.4f,\"err\":%.2f,\"ts\":%lu"),
+                     i, d, rd, err, (unsigned long)ts);
+  if (n < 0 || (size_t)n >= sizeof(buf) - 2) n = 0;
+  n = satPidStateAppendOutside(buf, n, sizeof(buf), ts);   // entry 126 (TASK-1482)
+  buf[n] = '}';
+  buf[n + 1] = '\0';
   f.print(buf);
   f.close();
   _pidLastSaveMs = millis();
 }
 
-void satLoadPidState()
+// Restore the PID state, and the outside temperature saved with it (entry 126). Returns SAT_PIDLOAD_RESTORED when
+// the PID state was restored, SAT_PIDLOAD_WAIT_NTP when a file exists but the clock is not set yet (the control
+// loop retries after NTP), else SAT_PIDLOAD_NONE (no file, stale, or no time stamp).
+static const uint8_t SAT_PIDLOAD_NONE     = 0;
+static const uint8_t SAT_PIDLOAD_RESTORED = 1;
+static const uint8_t SAT_PIDLOAD_WAIT_NTP = 2;
+uint8_t satLoadPidState()
 {
   File f = LittleFS.open(FPSTR(SAT_PID_STATE_FILE), "r");
-  if (!f) return;
-  char buf[160];
+  if (!f) return SAT_PIDLOAD_NONE;
+  char buf[192];
   size_t len = f.readBytes(buf, sizeof(buf) - 1);
   buf[len] = 0;
   f.close();
@@ -2696,18 +2750,34 @@ void satLoadPidState()
   if ((p = strstr(buf, "\"rd\":"))  != nullptr) rd     = atof(p + 5);
   if ((p = strstr(buf, "\"err\":")) != nullptr) err    = atof(p + 6);
   if ((p = strstr(buf, "\"ts\":"))  != nullptr) savedTs = strtoul(p + 5, nullptr, 10);
+  float outside = 0.0f;
+  unsigned long outsideTs = 0;
+  const bool hasOutside = (p = strstr(buf, "\"ot\":")) != nullptr;   // a file from before TASK-1482 has none
+  if (hasOutside) outside = atof(p + 5);
+  if ((p = strstr(buf, "\"ots\":")) != nullptr) outsideTs = strtoul(p + 6, nullptr, 10);
 
   // Staleness guard (Task #222): discard if NTP not yet synced or saved > 30 min ago.
   time_t nowTs = time(nullptr);
   if (nowTs < 1000000L) {
     // NTP not yet synced at boot — skip restore; PID starts from zero.
     SATDebugTln(F("SAT: PID state skipped (NTP not synced yet)"));
-    return;
+    return SAT_PIDLOAD_WAIT_NTP;
+  }
+  // Entry 126: the saved outside temperature counts while it was measured less than 1 hour ago. Restored apart
+  // from the PID staleness check, so after a longer stop it still bridges the wait for a new weather fetch.
+  if (hasOutside && outsideTs != 0 && (time_t)outsideTs <= nowTs &&
+      (uint32_t)(nowTs - (time_t)outsideTs) < SAT_OUTSIDE_VALID_MS / 1000UL &&
+      outside > -50.0f && outside < 100.0f) {
+    const uint32_t ageS = (uint32_t)(nowTs - (time_t)outsideTs);
+    state.sat.fRestoredOutdoor      = outside;
+    state.sat.iRestoredOutdoorMs    = millis() - ageS * 1000UL;
+    state.sat.bRestoredOutdoorValid = true;
+    SATDebugTf(PSTR("SAT: outside temperature restored (%.1f C, age=%lus)\r\n"), outside, (unsigned long)ageS);
   }
   if (savedTs == 0 || (uint32_t)(nowTs - (time_t)savedTs) > SAT_PID_STALE_SEC) {
     SATDebugTf(PSTR("SAT: PID state discarded (stale, age=%lus)\r\n"),
             (unsigned long)(nowTs - (time_t)savedTs));
-    return;
+    return SAT_PIDLOAD_NONE;
   }
   state.sat.fPidD  = d;
   state.sat.fError = err;
@@ -2716,7 +2786,45 @@ void satLoadPidState()
   satPidRestoreState(i, rd);
   SATDebugTf(PSTR("SAT: PID state restored (I=%.4f D=%.4f rd=%.4f err=%.2f age=%lus)\r\n"),
           i, d, rd, err, (unsigned long)(nowTs - (time_t)savedTs));
+  return SAT_PIDLOAD_RESTORED;
 }
+
+// --- satPwmFlag begin
+// Entry 121 (TASK-1482): whether PWM was enabled survives a restart, as thermo-nova restores
+// pulse_width_modulation_enabled (pwm.py:111-114, via heating_control.py:181-182 from climate.py:169-174).
+// Only the flag: the phase and its timers start fresh (satPwmReset()). Written when the mode changes between
+// continuous and PWM, never for OFF, so a switch-off, trip or hand-back (satDisable()) keeps the flag. Saved from
+// satControlLoopRun() on the loop task (satRestartStep() passed), so a REST mode change never writes the flash itself.
+static const char SAT_PWM_STATE_FILE[] PROGMEM = "/sat_pwm_state.json";
+static int8_t _sat_pwmSavedFlag = -1;   // -1 = not read yet
+
+static bool satLoadPwmEnabled()
+{
+  if (_sat_pwmSavedFlag < 0) {
+    _sat_pwmSavedFlag = 0;
+    File f = LittleFS.open(FPSTR(SAT_PWM_STATE_FILE), "r");
+    if (f) {
+      char buf[24];
+      size_t len = f.readBytes(buf, sizeof(buf) - 1);
+      buf[len] = 0;
+      f.close();
+      const char* p = strstr(buf, "\"pwm\":");
+      if (p != nullptr && atoi(p + 6) == 1) _sat_pwmSavedFlag = 1;
+    }
+  }
+  return _sat_pwmSavedFlag == 1;
+}
+
+static void satSavePwmEnabled(bool enabled)
+{
+  if (_sat_pwmSavedFlag == (enabled ? 1 : 0)) return;   // unchanged: no flash write
+  File f = LittleFS.open(FPSTR(SAT_PWM_STATE_FILE), "w");
+  if (!f) return;
+  f.print(enabled ? F("{\"pwm\":1}") : F("{\"pwm\":0}"));
+  f.close();
+  _sat_pwmSavedFlag = enabled ? 1 : 0;
+}
+// --- satPwmFlag end
 
 //=== Energy State Persistence (Task #196) ===
 static const char* SAT_ENERGY_FILE PROGMEM = "/sat_energy.json";
@@ -2856,7 +2964,8 @@ void satDisable(bool persistPid)
   // TASK-1365: during an OpenTherm loss the hand-back below already went out once (the loss path's own
   // satDisable() call, made with the flag still false). A user switch-off or the MQTT-takeover lift during
   // the loss only ends the loss state; the commands are not sent a second time.
-  const bool handedBack = state.sat.bOtLinkLost;
+  const bool handedBack = state.sat.bOtLinkLost || state.sat.bOutsideTempMissing;   // TASK-1390: the outside-missing hand-back counts too
+  state.sat.bOutsideTempMissing = false;   // the outside-temperature gate sets it again after this call (TASK-1390)
   state.sat.bOtLinkLost = false;       // a switch-off ends the OpenTherm-loss state; the loss path sets it again after this call (TASK-1365)
   satSetControlMode(SAT_MODE_OFF);
   satCycleSkipAutoSwitch();            // no overshoot start survives a switch-off, trip or OT loss (TASK-1367; firmware choice: thermo-nova keeps it, climate.py:544-545 returns before update())
@@ -2978,6 +3087,88 @@ static bool satOtLinkStep()
   return state.sat.bOtLinkLost;
 }
 // --- satOtLink end
+
+// --- satRestart begin
+// TASK-1482 / TASK-1390, Sergeant D entries 121, 126, 129 (restart) and 56, 57 (outside temperature), with the
+// hand-back of entry 47 and the resume of entry 79. Runs from satControlLoopRun() right after satOtLinkStep(),
+// before every SAT sender; returns true while SAT must send nothing of its own. In time order after a boot:
+//   1. initSAT() sends no SAT command (the boot CS=0 is gone, entry 129).
+//   2. Decide once whether the restored state is valid: the PID state restored (satLoadPidState(), which needs
+//      the clock) and a valid outside temperature (restored or live, < 1 h). While the PID file waits for NTP SAT
+//      sends nothing, at most SAT_BOOT_DECIDE_MS; after that the state counts as not valid.
+//      - valid: nothing is sent; the PIC keeps SAT's last CS for about a minute (entry 129).
+//      - not valid: the entry-47 hand-back once (CS=0, CH=1, MM=T), then quiet (entry 121).
+//   3. SAT also waits for a boiler reply after boot (entry 121), except in simulation.
+//   4. While no valid outside temperature exists: the hand-back once (satDisable(), as an OpenTherm loss), then
+//      quiet; the first pass with a valid one resumes (entries 56, 57, 79). Status: state.sat.bOutsideTempMissing.
+//   5. The first pass through all gates after a boot makes the control tick due at once, so SAT takes over within
+//      a pass and not one interval later: OT-Direct boards have no PIC that holds the last CS.
+// thermo-nova skips a control pass while the outside temperature is None (climate.py:544-545); it has no gateway
+// boot and restores only the PWM flag, setpoint and modulation value at a Home Assistant restart
+// (heating_control.py:181-191).
+static const uint32_t SAT_BOOT_DECIDE_MS = 60000UL;   // longest wait for NTP before the restored state counts as not valid
+static uint8_t  _sat_bootPidLoad      = SAT_PIDLOAD_NONE;
+static bool     _sat_bootDecided      = false;
+static bool     _sat_bootTakeover     = false;   // first pass through the gates after boot still to come
+static bool     _sat_quietHandedBack  = false;   // the boot hand-back is on the bus and SAT sent nothing of its own since
+static uint32_t _sat_bootStartMs      = 0;
+
+static void satRestartNotePidLoad(uint8_t result)
+{
+  if (!_sat_bootDecided) _sat_bootPidLoad = result;
+}
+
+static bool satRestartStep()
+{
+  const uint32_t nowMs = millis();
+  if (!_sat_bootDecided) {
+    const bool waitNtp = (_sat_bootPidLoad == SAT_PIDLOAD_WAIT_NTP) &&
+                         (uint32_t)(nowMs - _sat_bootStartMs) < SAT_BOOT_DECIDE_MS;
+    if (waitNtp) return true;
+    const bool valid = (_sat_bootPidLoad == SAT_PIDLOAD_RESTORED) && satOutsideTempFresh();
+    if (!valid && !hasOTCommandInterface()) return true;   // the hand-back goes out once an interface is ready
+    _sat_bootDecided = true;
+    _sat_bootTakeover = true;
+    if (valid) {
+      DebugTln(F("SAT: restored state valid, SAT takes over on its first tick (nothing sent at boot)"));
+      satNarrate_P(PSTR("Restart: restored state valid, SAT resumes"));
+    } else {
+      satEnqueueOwnCS("CS=0");
+      addCommandToQueue("CH=1", 4, false, 0);
+      addCommandToQueue("MM=T", 4, false, 0);
+      satResetCmdCache();
+      _sat_quietHandedBack = true;
+      DebugTln(F("SAT: no valid restored state, boiler handed back (CS=0, CH=1, MM=T) until a boiler reply and an outside temperature"));
+      satNarrate_P(PSTR("Restart: boiler handed back until OpenTherm and outside temperature are valid"));
+    }
+  }
+  if (!settings.sat.bSimulation && state.otBus.iBoilerLastSeenMs == 0) return true;   // no boiler reply since boot
+  if (!satOutsideTempFresh()) {
+    if (!state.sat.bOutsideTempMissing) {
+      if (!_sat_quietHandedBack) {
+        const bool persistPid = satPidRoomSeen() && isNTPtimeSet();   // as the OpenTherm loss (entry 115, TASK-1365 AC#4)
+        satDisable(persistPid);            // the one hand-back: CS=0, CH=1, MM=T, cache reset
+      }
+      state.sat.bOutsideTempMissing = true;   // after satDisable(), which clears it
+      DebugTln(F("SAT: no outside temperature younger than 1 h, boiler handed back (CS=0, CH=1, MM=T)"));
+      satNarrate_P(PSTR("Outside temperature missing: boiler handed back"));
+    }
+    return true;
+  }
+  if (state.sat.bOutsideTempMissing) {
+    state.sat.bOutsideTempMissing = false;
+    satResetCmdCache();                    // the next control tick re-sends CS, MM and CH
+    DebugTln(F("SAT: outside temperature valid again, SAT resumes"));
+    satNarrate_P(PSTR("Outside temperature back: SAT resumes"));
+  }
+  _sat_quietHandedBack = false;
+  if (_sat_bootTakeover) {
+    _sat_bootTakeover = false;
+    timerSATControl_due = nowMs;           // takeover in this pass, not one control interval after boot
+  }
+  return false;
+}
+// --- satRestart end
 
 //=== Flush short-lived SAT data (Task #237) ===
 // Clears PID integral and cycle window from both memory and LittleFS.
@@ -3199,6 +3390,7 @@ void satSendStatusJSON()
     je.field(F("push_refused"),         snap->st.sat.bPushRefused);
     je.field(F("room_temp_lost"),       snap->st.sat.bRoomTempLost);
     je.field(F("ot_link_lost"),         snap->st.sat.bOtLinkLost);
+    je.field(F("outside_temp_missing"), snap->st.sat.bOutsideTempMissing);   // TASK-1390
     je.field(F("fallback_reason"),      (int32_t)snap->st.sat.eFallbackReason);
     je.field(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
     je.field(F("current_modulation"),   (int32_t)snap->st.sat.iCurrentModulation);
@@ -3389,7 +3581,7 @@ static const char* satSimmerPerception(float indexC) {
 // the ADR-111 heartbeat keeps the retained values fresh. A REST or settings disable therefore
 // reaches the broker on the next loop pass. Shadows are file-scope so satRepublishCoreState()
 // can reset them.
-static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_room_temp_lost, s_core_ot_link_lost, s_core_external_temp_enable;
+static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_room_temp_lost, s_core_ot_link_lost, s_core_outside_temp_missing, s_core_external_temp_enable;
 static SATShadowS s_core_mode, s_core_preset, s_core_control_mode;
 
 static void satPublishCoreState()
@@ -3403,6 +3595,7 @@ static void satPublishCoreState()
   publishIfChangedB(F("sat/push_refused"),     state.sat.bPushRefused,      s_core_push_refused,     true);
   publishIfChangedB(F("sat/room_temp_lost"),   state.sat.bRoomTempLost,     s_core_room_temp_lost,   true);
   publishIfChangedB(F("sat/ot_link_lost"),     state.sat.bOtLinkLost,       s_core_ot_link_lost,     true);
+  publishIfChangedB(F("sat/outside_temp_missing"), state.sat.bOutsideTempMissing, s_core_outside_temp_missing, true);   // TASK-1390
   publishIfChangedB(F("sat/external_temp_enable"), settings.sat.bUseExternalTemp, s_core_external_temp_enable, true);
 
   // sat/mode is the ACTUAL control mode; sat/control_mode is the one the control_mode command
@@ -3429,6 +3622,7 @@ void satRepublishCoreState()
   memset(&s_core_push_refused, 0, sizeof(s_core_push_refused));
   memset(&s_core_room_temp_lost, 0, sizeof(s_core_room_temp_lost));
   memset(&s_core_ot_link_lost, 0, sizeof(s_core_ot_link_lost));
+  memset(&s_core_outside_temp_missing, 0, sizeof(s_core_outside_temp_missing));
   memset(&s_core_external_temp_enable, 0, sizeof(s_core_external_temp_enable));
   memset(&s_core_mode, 0, sizeof(s_core_mode));
   memset(&s_core_control_mode, 0, sizeof(s_core_control_mode));
@@ -4443,8 +4637,8 @@ static void satUpdateFlameStatus()
 void initSAT()
 {
   satPidReset();
-  satLoadPidState();         // Restore PID state from LittleFS after reset (Task #222)
-  satLoadEnergyState();      // Restore energy total from LittleFS after reset (Task #196)
+  satRestartNotePidLoad(satLoadPidState());   // Restore PID state (and the outside temperature, entry 126) after reset (Task #222)
+  satLoadEnergyState();     // Restore energy total from LittleFS after reset (Task #196)
   satLoadEstimatedEnergy();  // Restore estimated gas energy from LittleFS (Task #232)
   satLoadPresetState();      // Restore preset + window target after readSettings() (TASK-1487)
   satHCRLoadState();         // Restore daily-median recommendation ring from LittleFS (Task #228)
@@ -4455,24 +4649,15 @@ void initSAT()
   state.sat.bSafetyTripped = false;
   _sat_roomLostActive = false;
   _sat_picFailCount = 0;
-  _sat_bootCS0sent = false;
   _sat_prevOTOnline = false;
   // TASK-565: cache starts invalid; first call to satEnqueueIfChanged*()
   // will always emit. Defensive reset in case the struct's default
   // initialiser is bypassed by a non-zero state.sat memcpy somewhere.
   satResetCmdCache();
 
-  // BOOT SAFETY: Release any stale PIC control setpoint override.
-  // After a crash/reboot, the PIC may still hold the last CS= value.
-  // Send CS=0 so the thermostat controls the boiler until SAT's first
-  // control loop iteration computes a proper setpoint (~30s).
-  if (hasOTCommandInterface()) {
-    satEnqueueOwnCS("CS=0");
-    _sat_bootCS0sent = true;
-    SATDebugTln(F("SAT: boot safety - sent CS=0 to release stale control override"));
-  }
-  // If no OT command interface is ready yet, _sat_bootCS0sent stays false and
-  // the control loop will send CS=0 on its first call when one becomes available.
+  // Entries 121, 126, 129 (TASK-1482): no SAT command at boot. satRestartStep() decides on the control loop
+  // whether the restored state is valid (takeover on the first tick) or SAT hands back and stays quiet.
+  _sat_bootStartMs = millis();
 
   // Initialize BLE sensor scanning (Task #20).
   // TASK-742: satBLEInit() is a no-op stub on ESP8266 (no BLE radio).
@@ -4482,8 +4667,11 @@ void initSAT()
   CHANGE_INTERVAL_SEC(timerSATControl, settings.sat.iControlInterval);
 
   if (settings.sat.bEnabled) {
-    state.sat.eControlMode = SAT_MODE_CONTINUOUS;
-    DebugTln(F("SAT: initialized and enabled (continuous mode)"));
+    // Entry 121: PWM enabled before the restart comes back as PWM, from a fresh phase (pwm.py:111-114).
+    if (satLoadPwmEnabled()) satSetControlMode(SAT_MODE_PWM);
+    else state.sat.eControlMode = SAT_MODE_CONTINUOUS;
+    DebugTf(PSTR("SAT: initialized and enabled (%s mode)\r\n"),
+            state.sat.eControlMode == SAT_MODE_PWM ? "PWM" : "continuous");
     // Boot sequence: send priority messages PM=3,15,48 per SAT Python
     if (hasOTCommandInterface()) {
       pmChainStart();   // PIC: PM=3, then 15 and 48 as the boiler answers; OT-Direct: all three directly (TASK-1315)
@@ -5389,7 +5577,7 @@ static void satControlLoopRun()
   static bool _pidStateRestoreAttempted = false;
   if (!_pidStateRestoreAttempted && isNTPtimeSet()) {
     _pidStateRestoreAttempted = true;
-    satLoadPidState();
+    satRestartNotePidLoad(satLoadPidState());   // TASK-1482: satRestartStep() decides the boot on this result
   }
 
   // TASK-795 §4.2: drain the boiler-detected edge flag in cooperative context.
@@ -5419,6 +5607,7 @@ static void satControlLoopRun()
     }
     _sat_otLinkBaseMs = millis();          // TASK-1365: a flash or a switch-off is not OpenTherm silence
     if (!satIsEnabled()) state.sat.bOtLinkLost = false;
+    if (!satIsEnabled()) state.sat.bOutsideTempMissing = false;   // TASK-1390: a switch-off ends the outside-missing state
     return;
   }
 
@@ -5440,13 +5629,9 @@ static void satControlLoopRun()
   // returns. Placed before every SAT sender below (boot CS=0, PIC keepalive, PWM refresh, control tick).
   if (satOtLinkStep()) return;
 
-  // Boot safety deferred: if CS=0 wasn't sent during initSAT(), send it on the
-  // first call where an OT command interface is available.
-  if (!_sat_bootCS0sent && hasOTCommandInterface()) {
-    satEnqueueOwnCS("CS=0");
-    _sat_bootCS0sent = true;
-    SATDebugTln(F("SAT: deferred boot safety — sent CS=0"));
-  }
+  // TASK-1482 / TASK-1390: restart and outside-temperature gates (entries 121, 126, 129, 56, 57).
+  if (satRestartStep()) return;
+  if (state.sat.eControlMode != SAT_MODE_OFF) satSavePwmEnabled(state.sat.eControlMode == SAT_MODE_PWM);   // TASK-1482, entry 121
 
   // Flame edge detection — always process, independent of timer
   bool currentFlame = satIsFlameOn();

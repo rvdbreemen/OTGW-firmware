@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.539
+**  Version  : v2.0.0-alpha.540
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -401,6 +401,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iTCPushMs              = 0;      // millis() of the last TC= push (0 = none since boot/off/adopt), TASK-1343
   bool     bRoomTempLost          = false;  // the control tick sees no valid room temperature: heating on the curve only (TASK-1364)
   bool     bOtLinkLost            = false;  // no boiler reply for 30 s: SAT handed the boiler back once and sends nothing until a reply returns (TASK-1365)
+  bool     bOutsideTempMissing    = false;  // no valid outside temperature (none younger than 1 h): SAT handed the boiler back once and sends nothing until one returns (TASK-1390, entries 56, 57)
+  bool     bRestoredOutdoorValid  = false;  // fRestoredOutdoor came from the PID state file at boot (entry 126, TASK-1482)
+  float    fRestoredOutdoor       = 0.0f;
+  uint32_t iRestoredOutdoorMs     = 0;      // millis()-based measurement time of fRestoredOutdoor (may lie before boot, unsigned age maths)
   bool     bPushRefused           = false;  // the thermostat keeps its own setpoint >= 5 min after a TC= push (status only, TASK-1343)
   bool     bTCAccountedValid      = false;  // fLastSentTC is the value the thermostat push has dealt with; false after boot, a cache reset or push off: the next tick sends TC= (TASK-1272)
   float    fThermostatTrSet       = 0.0f;   // last thermostat room setpoint seen for follow-thermostat (TASK-1259)

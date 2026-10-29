@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTBustypes.h
-**  Version  : v2.0.0-alpha.539
+**  Version  : v2.0.0-alpha.540
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -47,4 +47,8 @@ struct OTBusState {          // state.otBus — OpenTherm protocol & bus state (
   // (the master scheduler re-sending its write cache, TR= overrides) do not stamp
   // it, so a vanished thermostat's value ages out for SAT (TASK-1157).
   uint32_t iTrThermostatMs   = 0;
+  // millis() of the last live boiler Read-Ack for MsgID 27 (outside temperature); 0 = never. The PS=1
+  // summary does not stamp it: it repeats stored values with no age (ADR-181). SAT counts MsgID 27 as a
+  // valid outside temperature only while this is younger than 1 hour (TASK-1390, entries 57, 126).
+  uint32_t iToutsideBoilerMs = 0;
 };

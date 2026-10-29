@@ -916,6 +916,7 @@ Op standaard ESP8266+PIC wordt alleen `otgw-otdirect/available` gepubliceerd met
 | `sat/cycle_class` | nee | Cyclusclassificatie (`good`, `overshoot`, ...) |
 | `sat/safety_tripped` | ja | Veiligheidsuitschakeling actief |
 | `sat/ot_link_lost` | ja | `"true"` zolang SAT 30 s geen ketelantwoord heeft gezien (TASK-1365) |
+| `sat/outside_temp_missing` | ja | `"true"` zolang SAT geen buitentemperatuur heeft die jonger is dan 1 uur (TASK-1390) |
 | `sat/pressure` | nee | CV-systeemdruk, glad (bar) |
 | `sat/pressure_alarm` | nee | Druk-alarm actief |
 | `sat/power` | nee | Geschat ketelvermogen (kW) |
