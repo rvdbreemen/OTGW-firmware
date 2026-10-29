@@ -3,11 +3,11 @@ id: TASK-1291
 title: >-
   Investigate: daytime packet loss on a fixed 9-minute rhythm while the gateway
   stays associated (GH #682)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-22T04:25:00Z'
-updated_date: '2026-10-28T20:32:00Z'
+updated_date: '2026-10-29T05:16:00Z'
 labels:
   - bug
   - wifi
@@ -27,7 +27,7 @@ mrfox7688 (GH #682, 2026-10-21 20:24Z, 1.7.8-beta.2, ASUS RT-AX88U Broadcom, ch 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 beta.5 Link/Drop banner data from the reporter classifies the 9-minute losses as associated-but-silent or as real disassociations
+- [x] #1 beta.5 Link/Drop banner data from the reporter classifies the 9-minute losses as associated-but-silent or as real disassociations
 - [x] #2 Every firmware, SDK and lwIP periodic timer near 9 min (including DHCP renewal) is listed with its period, and each is ruled in or out against the reporter's timestamps
 <!-- AC:END -->
 
@@ -41,4 +41,16 @@ mrfox7688 (GH #682, 2026-10-21 20:24Z, 1.7.8-beta.2, ASUS RT-AX88U Broadcom, ch 
 - Not a firmware period. Ruled in/out per item needs the reporter's DHCP lease time and group-key interval; the strict daytime window (09:25-17:38, none at night) argues for something external that runs by day. AC#1 waits for the beta.5 Link/Drop data.
 
 2026-10-28 triage: GH #682 comment 2026-10-22 20:54Z (mrfox7688, first full day on beta.5): banner shows only 2 real WiFi outages in ~16.5 h (reason 7 NOT_ASSOCED roam attic->office node, down 0 s; reason 200 BEACON_TIMEOUT, down 6 s) while ping loss stays ~20%/h on both APs -> associated-but-silent. Dead-link check never past 2/8. 45 of 52 '(1/8)' gaps exactly 9.0 min. 16 Mosquitto disconnects 11:13-17:17. Reporter asks: (1) outage count + last drop record via REST/MQTT (device/info), (2) any 9-min timer in firmware/WiFi stack. New lead: solar inverter + Pocket LAN dongle 40 cm from gateway, active hours roughly match loss window (correlation only). Unanswered on GH.
+
+2026-10-29: AC#1 closed on the evidence already in the 2026-10-28 triage note (GH #682, mrfox7688 beta.5 banner: 2 real outages in ~16.5 h, ping loss ~20%/h on both APs -> associated-but-silent). Classification confirmed by the maintainer on GH #682 2026-10-28 21:10Z. Close decision relayed by the maintainer via the 2.0.0 session (otgw-firmware-c5).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Classified the daytime 9-minute packet loss from GH #682 as associated-but-silent, not as disassociations: the beta.5 Link/Drop banner shows only 2 real WiFi outages in ~16.5 h while ~20% of pings fail every daytime hour on both mesh nodes.
+
+AC#2: every firmware, lwIP and SDK periodic timer near 9 min was listed and none matches (firmware 1/3/60 s ticks, 5 and 15 min bursts; ARP_MAXAGE 300 s; DHCP T1 router-dependent). The strict daytime window points to something outside the gateway.
+
+Follow-up lives in TASK-1434 (outage record in device/info, shipped beta.8) and the GH #682 field thread. No firmware change in this task.
+<!-- SECTION:FINAL_SUMMARY:END -->
