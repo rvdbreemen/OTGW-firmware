@@ -3,11 +3,11 @@ id: TASK-1223
 title: >-
   Epic: WiFi firmware OTA on 4MB ESP32-S3 boards via a safeboot factory
   partition
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: 2026-10-13 19:45
-updated_date: '2026-10-22T07:01:00Z'
+updated_date: '2026-10-29T05:10:00Z'
 labels:
   - epic
   - esp32
@@ -33,9 +33,9 @@ Gate: TASK-1222 (spike) must end in GO before any child task starts.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All child tasks are Done, or explicitly dropped with a reason
-- [ ] #2 A 4MB bench unit takes a firmware update over WiFi end to end (main -> safeboot -> new main) with settings and WiFi preserved, shown by a bench transcript
-- [ ] #3 An interrupted or corrupt update leaves the unit recoverable over WiFi through safeboot, without USB, shown by a bench transcript
+- [x] #1 All child tasks are Done, or explicitly dropped with a reason
+- [x] #2 A 4MB bench unit takes a firmware update over WiFi end to end (main -> safeboot -> new main) with settings and WiFi preserved, shown by a bench transcript
+- [x] #3 An interrupted or corrupt update leaves the unit recoverable over WiFi through safeboot, without USB, shown by a bench transcript
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -55,3 +55,9 @@ Maintainer decisions 2026-10-15:
 
 2026-10-22 cycle: 17 of 18 children Done; 1223.4 AC4 (safeboot silent on the PIC UART0 line) needs a serial capture on the Classic-S3, not connected. AC2 of this epic is covered by today's bench runs (firmware via POST /safeboot + upload, settings diff empty afterwards: TASK-1286/1279 evidence); AC3 by the 2026-10-15 truncated-upload transcript in 1223.4. Epic stays open until 1223.4 AC4 is captured.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+WiFi firmware OTA on 4MB ESP32-S3 boards through a safeboot factory partition (ADR-191). All 18 child tasks Done; TASK-1223.4 AC#4 (PIC UART0 silence) dropped as a measurement by the maintainer 2026-10-29, verified by code reading only. AC#2 and AC#3: TASK-1223.9 bench validation on both board types (PIC Classic-S3 and OTGW32): handover main -> safeboot -> new main with settings and WiFi kept (settings-before/after json), truncated and interrupted uploads recovered over WiFi through safeboot, crash-loop rollback; transcripts .tmp/bench-migrate/ota.log and .tmp/bench-migrate-otgw32/. Not verified: the PIC UART0 line during safeboot.
+<!-- SECTION:FINAL_SUMMARY:END -->
