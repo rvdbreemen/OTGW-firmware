@@ -1,15 +1,20 @@
 ---
 id: "ADR-069"
 title: "SAT PID v3 Controller Implementation"
-status: "Accepted"
-date: null
+status: "Superseded"
+date: "2026-10-29"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-197"
 ---
+
+## Status
+
+Superseded by ADR-197, 2026-10-29.
+
 # ADR-069: SAT PID v3 Controller Implementation
 
 **Status:** Accepted
@@ -156,3 +161,19 @@ Public state copies in `state.sat.fPidP/I/D/Output/Kp/Ki/Kd/fRawDerivative/fErro
 - `SATpid.ino`: Implementation
 - `OTGW-firmware.h`: `state.sat` fields for PID telemetry
 - SAT upstream: https://github.com/Alexwijn/SAT (thermo-nova branch, `pid.py`)
+
+## Status History
+
+```yaml
+status_history:
+  - date: 2026-04-09
+    status: Accepted
+    changed_by: unknown
+    reason: "Recovered from the record as it stood before this transition; this ADR predates the status_history convention. The actor was never recorded and is not guessed here. The Status line read: "
+    changed_via: unrecorded
+  - date: 2026-10-29
+    status: Superseded
+    changed_by: Robert van den Breemen
+    reason: Maintainer OK in session 2026-10-29 (TASK-1355)
+    changed_via: adr-kit lifecycle
+```

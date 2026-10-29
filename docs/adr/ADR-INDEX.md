@@ -74,7 +74,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-066 | Accepted | - | When bAutoDetect is enabled (default: true) and the configured mode is Gateway: |
 | ADR-067 | Accepted | - | Replace Adafruit SSD1306 + Adafruit GFX with the SSD1306Ascii library (greiman/SSD1306Ascii, pinned at version 1.3.5). |
 | ADR-068 | Accepted | - | All constants listed above are Accepted as implemented. |
-| ADR-069 | Accepted | - | Implement SAT PID v3 as defined in the SAT Python pid.py (thermo-nova branch), ported to C in SATpid.ino. |
+| ADR-069 | Superseded | - | Implement SAT PID v3 as defined in the SAT Python pid.py (thermo-nova branch), ported to C in SATpid.ino. |
 | ADR-070 | Accepted | - | All SAT algorithm state uses static file-scope variables (never heap, never large stack locals, never String class). |
 | ADR-071 | Superseded | - | Implement the SAT polynomial heating curve exactly as used in the SAT Python thermo-nova branch, ported to C in SATco... |
 | ADR-072 | Accepted | - | SAT source files contain no platform preprocessor guards. |
@@ -200,10 +200,10 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-192 | Accepted | - | The 2.0.0 line ships the v2 web UI as its only device web UI. |
 | ADR-193 | Accepted | - | The firmware keeps a ring of 14-byte slots and serves it through an HTTP (Hypertext Transfer Protocol) GET request on... |
 | ADR-194 | Accepted | - | Static text assets that users never need to upload may be compiled into the firmware image and served or read from PR... |
-| ADR-195 | Accepted | - | While SAT is the active controller, one per-heating-system cold setpoint stands in for thermo-nova's COLDSETPOINT 22... |
+| ADR-195 | Superseded | - | While SAT is the active controller, one per-heating-system cold setpoint stands in for thermo-nova's COLDSETPOINT 22... |
 | ADR-196 | Accepted | - | For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low... |
-| ADR-197 | Proposed | - | The SAT PID follows thermo-nova pid.py at 7beaaf5 term by term (entry 28), implemented in src/OTGW-firmware/SATpid.in... |
+| ADR-197 | Accepted | - | The SAT PID follows thermo-nova pid.py at 7beaaf5 term by term (entry 28), implemented in src/OTGW-firmware/SATpid.in... |
 | ADR-198 | Accepted | - | SAT keeps thermo-nova's convex heating curve with one user coefficient, default 2.0, and a base offset chosen by the... |
-| ADR-199 | Proposed | - | While SAT is the active controller, one per-heating-system cold setpoint replaces thermo-nova's COLDSETPOINT 22 at ev... |
+| ADR-199 | Accepted | - | While SAT is the active controller, one per-heating-system cold setpoint replaces thermo-nova's COLDSETPOINT 22 at ev... |
 | ADR-200 | Accepted | - | The GPIO output follows one bit of the 16-bit MsgID 0 status word Statusflags = (MasterStatus << 8) \| SlaveStatus (OT... |
 | ADR-201 | Accepted | - | On the combo board, boot detection persists only a positive PIC verdict, and every boot that is not already a persist... |

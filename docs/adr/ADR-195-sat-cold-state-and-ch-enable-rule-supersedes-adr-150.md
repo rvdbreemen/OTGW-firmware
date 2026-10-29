@@ -1,15 +1,15 @@
 ---
 id: "ADR-195"
 title: "SAT cold state and CH-enable rule (proposed successor to ADR-150)"
-status: "Accepted"
-date: "2026-10-24"
+status: "Superseded"
+date: "2026-10-29"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes:
   - "ADR-150"
-superseded_by: null
+superseded_by: "ADR-199"
 topics:
   - "sat"
   - "cold-setpoint"
@@ -43,7 +43,7 @@ format: "canonical"
 
 ## Status
 
-Accepted, 2026-10-24.
+Superseded by ADR-199, 2026-10-29.
 
 This ADR is the proposed successor to ADR-150. ADR-150 stays Accepted and its front matter is untouched while this ADR is Proposed, so the `supersedes` list here is empty: adr-kit writes both sides of a supersession at once (`adr supersede`), and running it now would retire ADR-150 before this decision is accepted.
 
@@ -67,6 +67,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-29
+    status: Superseded
+    changed_by: Robert van den Breemen
+    reason: Maintainer OK in session 2026-10-29 (TASK-1355); open questions answered by Sergeant D
     changed_via: adr-kit lifecycle
 ```
 
