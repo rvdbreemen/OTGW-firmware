@@ -2997,7 +2997,7 @@ The BLE sensor humidity is stored in `state.sat.fBleHumidity` (SATble.ino) and p
 
 **Temperature history** input: `state.sat.fError`, the error of the most recent primary PID update (SATcontrol.ino:3507, SATcycles.ino:1205). It is computed as `target - room` rounded to 3 decimals (SATpid.ino:63-66, SATpid.ino:253) and stored at SATpid.ino:305. There is no median over areas: in single-zone mode the PID receives the single value from `satGetRoomTemp()` after a filter (SATcontrol.ino:4656, SATcontrol.ino:4694-4713, SATcontrol.ino:4839). Multi-area mode instead makes `satGetRoomTemp()` return a weighted area temperature (SATcontrol.ino:1217-1222).
 
-**Pressure health** inputs: `OTcurrentSystemState.CHPressure` in bar (default 0.0) (SATcontrol.ino:3340, OTGW-Core.h:73), `state.sat.bActive` (SATcontrol.ino:3344), settings `fMinPressure`, `fMaxPressure`, `fMaxPressureDrop` (SATtypes.h:469-471).
+**Pressure health** inputs: `OTcurrentSystemState.CHPressure` in bar (default 0.0) (SATcontrol.ino:3964, OTGW-Core.h:73), the master CH enable bit `OTcurrentSystemState.Statusflags & 0x0100` (SATcontrol.ino:3968, TASK-1480), settings `fMinPressure`, `fMaxPressure`, `fMaxPressureDrop` (SATtypes.h:469-471).
 
 **Other health outputs** inputs: `state.sat.fFinalSetpoint` vs `OTcurrentSystemState.TSet` (SATcontrol.ino:3086-3088, SATcontrol.ino:3593-3594); setting `iMaxRelModulation` vs `OTcurrentSystemState.MaxRelModLevelSetting` (SATcontrol.ino:3098-3100); `state.sat.bActive` vs boiler status bit mask 0x02, which the code names `boilerActive` (SATcontrol.ino:3110-3112); `state.sat.eBoilerStatus` (SATcontrol.ino:3000-3002); `state.sat.eLastCycleClass` (SATcontrol.ino:3004-3008).
 
@@ -3013,7 +3013,7 @@ The firmware has one control loop, not a separate 60 s PID tick and 5 s heating 
 2. Solar gain state is in static RAM variables that start at zero (SATcontrol.ino:4209-4213). Its state fields start inactive (SATtypes.h:368-373). No save or load code for them was found; `satPersistAllToFs()` saves only PID, energy, estimated energy and the daily-median ring (SATcontrol.ino:2128-2136).
 3. Summer mode starts inactive with 0 hours (SATtypes.h:375-376). Humidity starts invalid (SATtypes.h:378-380). Sun elevation starts invalid (SATtypes.h:371-373).
 4. The hourly error ring (`_cr_*`) starts empty (SATcontrol.ino:3488-3492). The recommendation enum starts at "insufficient" (SATtypes.h:268).
-5. Pressure state starts empty: ring, timers and the "last active" flag are static zero values (SATcontrol.ino:3326-3336), and the smoothed pressure starts at 0.0 (SATtypes.h:253). Nothing is restored.
+5. Pressure state starts empty: sample FIFO, timers and the "last active" flag are static zero values (SATcontrol.ino:3940-3960), and the smoothed pressure starts at 0.0 (SATtypes.h:253). Nothing is restored.
 6. On the first `satControlLoop()` calls, before the timer is due, the loop already runs other per-call work (cycle sampling, the 60 s stats timer, the 3 s PWM refresh) (SATcontrol.ino:4591-4611). The features in this section run only inside the timed body (SATcontrol.ino:4614, SATcontrol.ino:4755-4823).
 
 #### Per PID tick (firmware: per control tick, default every 30 s, `satControlLoopRun`)
@@ -3022,7 +3022,7 @@ Order inside one tick (SATcontrol.ino:4614-5018):
 
 1. Early exits that skip everything in this section: SAT disabled or flashing (SATcontrol.ino:4568-4573), safety tripped (SATcontrol.ino:4581), DHW active (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]), boiler fault bit set (SATcontrol.ino:4716-4719), thermal-estimation safe setpoint (SATcontrol.ino:4730-4746).
 2. Window timer check (SATcontrol.ino:4755). See "Window" below.
-3. Pressure update, then pressure status text (SATcontrol.ino:4758-4759).
+3. Pressure update, then pressure status text (SATcontrol.ino:5456-5457).
 4. Solar gain update, `satUpdateSolarGain()` (SATcontrol.ino:4762, SATcontrol.ino:4215-4299):
    1. If the feature is disabled: active flag false, rise rate shown as 0, condition timer and "was active" cleared, return. The stored previous sample and the rise-rate average are not cleared (SATcontrol.ino:4217-4223).
    2. Read the unfiltered room temperature. If it is NaN, keep the previous rise rate and return (SATcontrol.ino:4225-4232).
@@ -3069,16 +3069,16 @@ Evaluation rate: the sync debouncers and the health topics live in `satPublishMQ
 - `sat/ch_sync`: mismatch when "SAT active" differs from the boiler status bit with mask 0x02 (SATcontrol.ino:3110-3117). `bActive` is set true on every control tick (SATcontrol.ino:4616) and stays true while the tick commands CH=0 (summer mode, valves closed, cold cutoff) (SATcontrol.ino:4766-4790, SATcontrol.ino:4971-4983). In those states the topic can report a problem after 60 s (derived).
 - A second, separate setpoint check `satCheckSetpointSync()` sets `bSetpointMismatch` (topic `sat/setpoint_mismatch`) when |`fFinalSetpoint` - `TSet`| > 1.0 °C for at least 60 s, and does nothing while `fFinalSetpoint` < 1.0 (SATcontrol.ino:3590-3614, SATcontrol.ino:2894).
 
-**Pressure** (`satUpdatePressure`, SATcontrol.ino:3338-3483), once per control tick:
+**Pressure** (`satUpdatePressure`, SATcontrol.ino:3962-4092), once per control tick:
 
-1. Track SAT's own `bActive` flag (not the boiler's heating state). On the first call only store it. On a change, suspend the drop-rate check for 600 s and clear the sample ring (SATcontrol.ino:3343-3355).
-2. If the raw pressure is below 0.01 bar, return without changing anything else (SATcontrol.ino:3358). There is no "stale reading" alarm: `iLastSeenPressureMs` is written (SATcontrol.ino:3360) but an unfiltered search of the firmware found no reader of it, only this write and the declaration (SATtypes.h:260).
-3. Smoothed pressure: initialise to the raw value when the smoothed value is below 0.01, else EMA with alpha 0.05 (SATcontrol.ino:3362-3368).
-4. Store a raw sample in a 20-slot ring at most once per 30 s, and evict samples older than 3600 s (SATcontrol.ino:3326, SATcontrol.ino:3370-3399).
-5. Drop rate by least squares when not suspended, with at least 3 samples spanning at least 300 s (SATcontrol.ino:3401-3437). See "Formulas".
-6. Published drop rate: 0 while suspended; the new value when it is >= 0; otherwise the previous value is kept (SATcontrol.ino:3439-3444). Expired suspension is cleared (SATcontrol.ino:3446-3449).
-7. Raw alarm = smoothed < `fMinPressure`, or smoothed > `fMaxPressure`, or (not suspended and drop rate >= 0 and drop rate > `fMaxPressureDrop`) (SATcontrol.ino:3455-3460).
-8. Confirmation: the raw alarm must hold for at least 120 s; then `bPressureAlarm` = true and `bPressureHealthy` = false. Any tick without raw alarm clears the timer and, if set, the alarm (SATcontrol.ino:3462-3482).
+1. Track the master CH enable bit, Statusflags bit 8 (thermo-nova `coordinator.active` of the serial coordinator, `coordinator/serial/__init__.py:53-55`, as in SATcycles.ino for the cycle kind). On the first call only store it. On a change, suspend the drop-rate check for 600 s and clear the samples (SATcontrol.ino:3967-3979; thermo-nova `binary_sensor.py:335-345`). Until TASK-1480 this followed SAT's own `bActive` flag. SAT itself clears master CH enable in every PWM OFF phase (Sergeant D entries 5, 9, 17), so every PWM phase change also suspends the drop rate and clears the samples.
+2. If the raw pressure is below 0.01 bar, return without changing anything else (SATcontrol.ino:3982). There is no "stale reading" alarm: `iLastSeenPressureMs` is written (SATcontrol.ino:3984) but an unfiltered search of the firmware found no reader of it, only this write and the declaration (SATtypes.h:260).
+3. Smoothed pressure: initialise to the raw value when the smoothed value is below 0.01, else EMA with alpha 0.05 (SATcontrol.ino:3987-3992).
+4. Store a raw sample at most once per 30 s in a 121-slot FIFO (3600 / 30 + 1) and evict samples older than 3600 s, so the drop rate covers the last hour (SATcontrol.ino:3940-3953, SATcontrol.ino:3994-4011; thermo-nova `max(pressure_max_value_age, 3600)`, `binary_sensor.py:357-365`; the firmware has no max-age setting). Until TASK-1480 the ring held 20 slots, about 10 min, and the 3600 s eviction never ran. thermo-nova adds a sample on every evaluation; the firmware at most every 30 s.
+5. Drop rate by least squares when not suspended, with at least 3 samples spanning at least 300 s (SATcontrol.ino:4013-4046). See "Formulas".
+6. Published drop rate: 0 while suspended; the new value when it is >= 0; otherwise the previous value is kept (SATcontrol.ino:4048-4053). Expired suspension is cleared (SATcontrol.ino:4055-4058); the suspension is an elapsed-time test from its start, so it also holds across the `millis()` wrap (TASK-1480).
+7. Raw alarm = smoothed < `fMinPressure`, or smoothed > `fMaxPressure`, or (not suspended and drop rate >= 0 and drop rate > `fMaxPressureDrop`) (SATcontrol.ino:4064-4069).
+8. Confirmation: the raw alarm must hold for at least 120 s; then `bPressureAlarm` = true and `bPressureHealthy` = false. Any tick without raw alarm clears the timer and, if set, the alarm (SATcontrol.ino:4071-4091).
 9. `satPressureHealthUpdate()` copies the raw pressure into `fBoilerPressure` and sets the text status "ok", "low" or "high"; a confirmed alarm caused only by the drop rate is reported as "ok" (SATpressure.ino:33-54).
 
 **Device health**: `sat/device_health` is ON when `eBoilerStatus` is `SAT_BS_OFF` (SATcontrol.ino:3000-3002). `SAT_BS_OFF` is the initial value (SATtypes.h:152). In `satUpdateBoilerStatus()` every branch assigns another status (SATcontrol.ino:546-637), and a search found no other assignment of `eBoilerStatus` (SATcontrol.ino:643). A search found `satUpdateBoilerStatus()` called only at SATcontrol.ino:4814. So the topic is ON from boot until the first control tick that reaches that call, and OFF afterwards (derived). There is no delay.
@@ -3217,7 +3217,7 @@ median = sorted[n / 2] (upper middle element for even n)
 
 The sign is the opposite of the hourly ring: here positive means the room is warmer than the target (SATcycles.ino:1200, SATcycles.ino:1205). The day boundary is `unixTime / 86400`, which is a UTC day (derived from SATcycles.ino:1214-1216). With a 30 s tick the 1440-slot intra-day ring holds about 12 h, so the daily median covers roughly the last 12 h of the day (derived from SATcycles.ino:1207-1209 and ../libraries/Platform/src/boards.h:124). The ring sizes are 30 days and 1440 samples (../libraries/Platform/src/boards.h:123-124). The code comment says "lower-middle for even n" (SATcycles.ino:1092); `sorted[n / 2]` with zero-based indexing is the upper of the two middle elements for even n (arithmetic, SATcycles.ino:1093).
 
-**Pressure smoothing** (SATcontrol.ino:3362-3367), per control tick with a reading:
+**Pressure smoothing** (SATcontrol.ino:3987-3991), per control tick with a reading:
 
 ```
 smoothed = raw                               (when smoothed < 0.01)
@@ -3226,14 +3226,14 @@ smoothed = 0.05 * raw + 0.95 * smoothed      (afterwards)
 
 With a 30 s tick, 1 / 0.05 = 20 ticks, about 10 min (arithmetic).
 
-**Pressure drop rate** (SATcontrol.ino:3405-3435): least-squares slope over all samples in the ring, with time in seconds from the oldest sample:
+**Pressure drop rate** (SATcontrol.ino:4011-4044): least-squares slope over all samples in the FIFO, with time in seconds and pressure in bar measured from the oldest sample (same slope as thermo-nova's absolute sums, `binary_sensor.py:367-388`, with less float32 rounding):
 
 ```
 slope = (n*Σ(t*p) - Σt*Σp) / (n*Σ(t²) - (Σt)²)      (skipped when |denominator| <= 0.001)
 dropRate = -slope * 3600                              (bar/h, positive = falling)
 ```
 
-The ring holds 20 samples taken at least 30 s apart (SATcontrol.ino:3326, SATcontrol.ino:3371). In steady operation the ring is full long before the 3600 s eviction applies, so the regression spans about the last 20 samples, roughly 10 min at a 30 s tick (derived).
+The FIFO holds up to 121 samples taken at least 30 s apart and evicts samples older than 3600 s (SATcontrol.ino:3945-3947, SATcontrol.ino:3995, SATcontrol.ino:4007), so the regression spans the last hour since the most recent master CH enable change (TASK-1480). Before TASK-1480 the ring held 20 samples, roughly 10 min at a 30 s tick.
 
 **Gas consumption** (SATcontrol.ino:3061-3077): the code exists, but `minCons` and `maxCons` are hard-coded 0.0, so the block never publishes; the comment calls it "currently dead".
 
@@ -3284,14 +3284,14 @@ The ring holds 20 samples taken at least 30 s apart (SATcontrol.ino:3326, SATcon
 | Sync sensor delay | 60 | s | SATcontrol.ino:3092, SATcontrol.ino:3104, SATcontrol.ino:3116 |
 | Setpoint sync tolerance (`sat/setpoint_sync`) | 0.5 | °C | SATcontrol.ino:3088 |
 | Setpoint mismatch tolerance (`sat/setpoint_mismatch`) | 1.0 | °C | SATcontrol.ino:3600 |
-| Pressure drop-rate suspension | 600 | s | SATcontrol.ino:3349 |
-| Pressure EMA alpha | 0.05 | per control tick | SATcontrol.ino:3366 |
-| Pressure alarm confirmation | 120 | s | SATcontrol.ino:3467 |
-| Pressure drop-rate minimum span | 300 | s | SATcontrol.ino:3414 |
-| Pressure drop-rate minimum samples | 3 | samples | SATcontrol.ino:3405 |
-| Pressure ring size | 20 | samples | SATcontrol.ino:3326 |
-| Pressure sample interval | >= 30 | s | SATcontrol.ino:3371 |
-| Pressure sample eviction age | 3600 | s | SATcontrol.ino:3383 |
+| Pressure drop-rate suspension | 600 | s | SATcontrol.ino:4014 |
+| Pressure EMA alpha | 0.05 | per control tick | SATcontrol.ino:3990 |
+| Pressure alarm confirmation | 120 | s | SATcontrol.ino:4076 |
+| Pressure drop-rate minimum span | 300 | s | SATcontrol.ino:4022 |
+| Pressure drop-rate minimum samples | 3 | samples | SATcontrol.ino:4017 |
+| Pressure FIFO size | 121 | samples | SATcontrol.ino:3947 |
+| Pressure sample interval | >= 30 | s | SATcontrol.ino:3946, SATcontrol.ino:3995 |
+| Pressure sample eviction age | 3600 | s | SATcontrol.ino:3945, SATcontrol.ino:4007 |
 | `fMinPressure` default / range | 0.8 / 0 to 3 | bar | SATtypes.h:469, settingStuff.ino:1041 |
 | `fMaxPressure` default / range | 2.5 / 1 to 4 | bar | SATtypes.h:470, settingStuff.ino:1042 |
 | `fMaxPressureDrop` default / range | 0.3 / 0.05 to 2 | bar/h | SATtypes.h:471, settingStuff.ino:1043 |
@@ -3319,9 +3319,9 @@ The ring holds 20 samples taken at least 30 s apart (SATcontrol.ino:3326, SATcon
 | Daily median | `_hcr_dailyMedian`, head, count | up to 30 daily medians | Yes, `/sat/sat_hcr.json` on each day commit and in `satPersistAllToFs()`; cleared in RAM by `satDisable()` | SATcycles.ino:167-173, SATcycles.ino:1097-1133, SATcycles.ino:1241, SATcontrol.ino:2134, SATcontrol.ino:2174 |
 | Daily median | `_hcr_samples` intra-day ring | today's room errors | Up to 96 saved and loaded, but emptied again by `satCycleInit()` at start-up | SATcycles.ino:1116-1126, SATcycles.ino:1166-1182, SATcycles.ino:254-256, SATcontrol.ino:3687-3688 |
 | Daily median | `_hcr_lastDayNum` | last committed day | No | SATcycles.ino:180 |
-| Pressure | `_press_ring`, count, head, last sample time | raw samples | No | SATcontrol.ino:3326-3331 |
-| Pressure | `_press_lastActive`, `_press_lastActiveInit`, `_press_suspendUntilMs` | SAT active tracking and suspension end | No | SATcontrol.ino:3334-3336 |
-| Pressure | `fSmoothedPressure`, `fPressureDropRate`, `bPressureAlarm`, `bPressureHealthy`, `iPressureAlarmSinceMs` | smoothed value, rate, alarm | No | SATtypes.h:253-257, SATcontrol.ino:3463-3479 |
+| Pressure | `_press_ring` (121 slots), count, tail, last sample time | raw samples of the last 3600 s | No | SATcontrol.ino:3945-3953 |
+| Pressure | `_press_lastActive`, `_press_lastActiveInit`, `_press_suspended`, `_press_suspendStartMs` | master CH enable tracking and suspension start | No | SATcontrol.ino:3957-3960 |
+| Pressure | `fSmoothedPressure`, `fPressureDropRate`, `bPressureAlarm`, `bPressureHealthy`, `iPressureAlarmSinceMs` | smoothed value, rate, alarm | No | SATtypes.h:253-257, SATcontrol.ino:4071-4091 |
 | Sync | three static "mismatch since" times | start of each mismatch | No | SATcontrol.ino:3084, SATcontrol.ino:3096, SATcontrol.ino:3108 |
 | Sync | `iMismatchSinceMs`, `bSetpointMismatch` | second setpoint check | No | SATcontrol.ino:3603-3612 |
 | Window | `bWindowOpen`, `iWindowOpenSinceMs`, `fPreWindowTarget`, `iPreWindowPreset` | window state and saved target | No | SATcontrol.ino:1102-1139 |
@@ -3359,7 +3359,7 @@ The "No" entries mean that no save code for them was found; the persistence entr
 | `sat/setpoint_sync`, `sat/modulation_sync`, `sat/ch_sync` | "ON" = problem after 60 s | SATcontrol.ino:3083-3118 |
 | `sat/setpoint_mismatch`, `sat/modulation_reliable` | second setpoint check; modulation reliability | SATcontrol.ino:2893-2894 |
 | `sat/pressure`, `sat/pressure_drop_rate`, `sat/pressure_alarm` | smoothed pressure, drop rate, confirmed alarm (true = problem) | SATcontrol.ino:2882-2884 |
-| `sat/pressure_health` | "ON" when `bPressureHealthy` is true, that is when there is no alarm | SATcontrol.ino:2885-2886, SATcontrol.ino:3468-3479 |
+| `sat/pressure_health` | "ON" when `bPressureHealthy` is true, that is when there is no alarm | SATcontrol.ino:2885-2886, SATcontrol.ino:4071-4091 |
 | `sat/ch_pressure`, `sat/ch_pressure_status` | raw pressure and "ok"/"low"/"high" | SATpressure.ino:62-70 |
 | `sat/device_health` | "ON" while boiler status is OFF | SATcontrol.ino:3000-3002 |
 | `sat/cycle_health` | "ON" for OVERSHOOT, UNDERHEAT, UNDERHEAT_PWM, SHORT | SATcontrol.ino:3003-3009 |
@@ -3394,10 +3394,11 @@ The "No" entries mean that no save code for them was found; the persistence entr
 - **History sample is one tick old.** Both history functions run before this tick's PID update and read `fError` from the previous update (SATcontrol.ino:4796-4799, SATcontrol.ino:4839, SATpid.ino:305) (derived).
 - **Daily recommendation after restart.** The text is "insufficient" until the next UTC day boundary recomputes it, even when 3 or more days were restored (SATcycles.ino:254-257, SATcycles.ino:1224-1242) (derived).
 - **Daily recommendation after a SAT disable.** `satDisable()` clears the daily ring in RAM (SATcontrol.ino:2174, SATcycles.ino:1189-1197). The file is overwritten at the next save (SATcycles.ino:1097-1133) (derived).
-- **Pressure reading missing.** Values below 0.01 bar return early, so alarm and status keep their last state and no stale problem is raised (SATcontrol.ino:3358).
-- **SAT active flag, not boiler heating.** The drop-rate suspension follows SAT's own active flag, which a search found written only at start-up, in `satDisable()` (disable, trip, fallback lift) and on each control tick (SATcontrol.ino:3344, SATcontrol.ino:3690, SATcontrol.ino:2168, SATcontrol.ino:4616) (derived). Burner starts and stops do not suspend the drop-rate check (derived).
-- **Drop rate sign.** Only falling pressure counts; negative rates are neither stored nor alarmed (SATcontrol.ino:3442-3443, SATcontrol.ino:3456-3457). The field comment "negative when suspended" (SATtypes.h:254) conflicts with the code, which writes 0 while suspended (SATcontrol.ino:3440-3441).
-- **Pressure limits use the smoothed value, drop rate uses raw samples** (SATcontrol.ino:3373-3374, SATcontrol.ino:3458-3459).
+- **Pressure reading missing.** Values below 0.01 bar return early, so alarm and status keep their last state and no stale problem is raised (SATcontrol.ino:3982).
+- **Master CH enable, not SAT on/off (TASK-1480).** The drop-rate suspension and the sample clear follow the master CH enable bit, Statusflags bit 8 (SATcontrol.ino:3968), as thermo-nova's serial coordinator (`coordinator/serial/__init__.py:53-55`). thermo-nova's MQTT OpenTherm coordinator uses `centralheating` instead (`coordinator/mqtt/opentherm.py:23`, `:60-61`), which in this firmware is the boiler's CH-mode bit (bit 1); which of the two SAT means is an open interpretation. SAT clears CH enable in each PWM OFF phase (Sergeant D entries 5, 9, 17), so in PWM the drop rate is suspended for 600 s after every phase change; on gruijter's TASK-1474 capture it was suspended in 61% of the evaluations. Switching SAT off or on no longer clears the samples.
+- **Remaining differences with thermo-nova (TASK-1480, display only).** (1) Sample cadence: thermo-nova adds a sample on every evaluation, the firmware at most every 30 s (SATcontrol.ino:3995). (2) Negative rates: thermo-nova returns them, the firmware keeps the previous value (SATcontrol.ino:4048-4053). (3) Call site: thermo-nova evaluates on every coordinator update whether SAT runs or not; the firmware runs `satUpdatePressure()` only inside the control tick, after the DHW, thermal-safe and other early returns (SATcontrol.ino:5456), so a CH enable change that starts and ends inside skipped ticks is missed, and samples from before a gap of under 1 h are regressed together with new ones. (4) No stale-reading alarm (see above).
+- **Drop rate sign.** Only falling pressure counts; negative rates are neither stored nor alarmed (SATcontrol.ino:4051-4052, SATcontrol.ino:4065-4066). The field comment "negative when suspended" (SATtypes.h:254) conflicts with the code, which writes 0 while suspended (SATcontrol.ino:4049-4050).
+- **Pressure limits use the smoothed value, drop rate uses raw samples** (SATcontrol.ino:4002-4003, SATcontrol.ino:4067-4068).
 - **Drop-rate-only alarm shows "ok" in `sat/ch_pressure_status`** while `sat/pressure_alarm` is true (SATpressure.ino:49-52).
 - **Polarity differs between outputs.** `sat/pressure_health` ON = healthy (SATcontrol.ino:2886). `sat/device_health`, `sat/cycle_health` and the sync topics ON = problem (SATcontrol.ino:3000-3009, SATcontrol.ino:3083-3118). In the REST JSON `device_health` and `cycle_health` true = healthy (restAPI.ino:1026-1031).
 - **Device health counts STALLED_IGNITION only in REST.** MQTT checks only OFF (SATcontrol.ino:3001); REST also treats STALLED_IGNITION as unhealthy (restAPI.ino:1026-1027).
@@ -3468,7 +3469,7 @@ The PID, heating curve, PWM schedule and cycle classification are only reference
 | Relative modulation | `RelModLevel` (MsgID 17) | `SATcontrol.ino:1343-1347` |
 | Control setpoint as reported | `TSet` (MsgID 1), used only for the sync check | `SATcontrol.ino:3590-3594`, `OTGW-Core.ino:4272` |
 | Boiler maximum CH setpoint | `MaxTSet` (MsgID 57), default 0 until received | `SATcontrol.ino:242`, `OTGW-Core.ino:4294`, `OTGW-Core.h:103` |
-| CH water pressure | `CHPressure` | `SATcontrol.ino:3340` |
+| CH water pressure | `CHPressure` | `SATcontrol.ino:3964` |
 | Manufacturer (member ID) | MsgID 3 low byte, fed to `satDetectManufacturer()` | `OTGW-Core.ino:3076`, `SATcontrol.ino:175-190` |
 | Outside temperature | simulation, else external MQTT/REST value (stale after 10 min), else the weather feed when `Toutside` is exactly 0, else `Toutside` (MsgID 27, default 0.0) | `SATcontrol.ino:1283-1303`, `SATcontrol.ino:67`, `OTGW-Core.h:82` |
 | Room temperature | simulation, BLE (stale after 5 min), multi-area average, external MQTT/REST (stale after `iSensorMaxAgeS`), thermostat `Tr` (MsgID 24, stale 5 min after the thermostat last sent it) | `SATcontrol.ino:1192-1280`, `SATcontrol.ino:65-66` |
@@ -3663,7 +3664,7 @@ When `settings.sat.bSimulation` is on:
 - **MQTT lost (fallback).** See C.3. The fallback reason enum also has `SAT_FB_THERMOSTAT_LOST` (`SATtypes.h:60`), but no code sets it (search of all firmware files).
 - **Thermal safe fallback.** Fixed `CS=45` after 2 h in fallback without room data (C.16).
 - **Overheating.** No code was found that compares the flow temperature with a hard limit and cuts the burner. The only hard limits are the setpoint clamps above.
-- **Pressure.** `satUpdatePressure()` computes an EMA (alpha 0.05), a least-squares drop rate over 30 s samples (at least 3 samples spanning 300 s, window 3600 s), and an alarm confirmed after 120 s (`SATcontrol.ino:3338-3483`). The drop rate is suspended for 600 s after SAT's own `bActive` changes (`SATcontrol.ino:3344-3354`). It sends no command; no `addCommandToQueue` or `satDisable` call exists in `SATpressure.ino` or in `satUpdatePressure()` (search). It runs only inside the control tick, after the DHW, room and fault returns (`SATcontrol.ino:4758-4759`). With no pressure reading it returns early and raises nothing (`SATcontrol.ino:3358`).
+- **Pressure.** `satUpdatePressure()` computes an EMA (alpha 0.05), a least-squares drop rate over 30 s samples (at least 3 samples spanning 300 s, window 3600 s), and an alarm confirmed after 120 s (`SATcontrol.ino:3962-4092`). The drop rate is suspended for 600 s and the samples are cleared after the master CH enable bit changes (`SATcontrol.ino:3967-3979`, TASK-1480). It sends no command; no `addCommandToQueue` or `satDisable` call exists in `SATpressure.ino` or in `satUpdatePressure()` (search). It runs only inside the control tick, after the DHW, room and fault returns (`SATcontrol.ino:5456`). With no pressure reading it returns early and raises nothing (`SATcontrol.ino:3982`).
   - Compare: thermo-nova also raises an alarm when pressure stops arriving (`pressure_max_value_age`); no such timeout was found in the firmware.
 - **Setpoint synchronisation.** A mismatch of more than 1.0 °C between the sent setpoint and the reported `TSet`, lasting 60 s, sets `bSetpointMismatch` (`SATcontrol.ino:3590-3613`). Display only; no command follows.
 - **Manufacturer limits.**
@@ -3722,7 +3723,7 @@ Variable names are as in the code.
 | `SER2NET_QUIET_MS` | 2000 | ms | `OTGW-Core.ino:3590` | queue pause after bridge traffic |
 | `CMDQUEUE_MAX` | 20 | entries | `OTGW-Core.h:772` | PIC command queue |
 | `OT_CSC2_EXPIRY_MS` | 60000 | ms | `OTDirect.ino:456` | OT-Direct CS heartbeat (skipped while SAT owns CS) |
-| Pressure EMA alpha; confirm; drop-rate suspend; min window; sample; eviction | 0.05; 120; 600; 300; 30; 3600 | -; s; s; s; s; s | `SATcontrol.ino:3366`, `:3467`, `:3349`, `:3414`, `:3371`, `:3383` | display |
+| Pressure EMA alpha; confirm; drop-rate suspend; min window; sample; eviction | 0.05; 120; 600; 300; 30; 3600 | -; s; s; s; s; s | `SATcontrol.ino:3990`, `:4076`, `:4014`, `:4022`, `:3995`, `:4007` | display |
 | Setpoint sync tolerance; delay | 1.0; 60 | °C; s | `SATcontrol.ino:3600`, `:3607` | display |
 | `MI=` value for quirk | 500 | ms (OT-Direct range 100 to 1275) | `SATcontrol.ino:3731`, `OTDirect.ino:3574-3575` | boot |
 | Manufacturer member IDs | Atag 4, Baxi 4, Brotge 4, DeDietrich 4, Ferroli 9, Geminox 4, Ideal 6, Immergas 27, Intergas 173, Itho 29, Nefit 131, Radiant 41, Remeha 11, Sime 27, Vaillant 24, Viessmann 33, Worcester 95, Other 0 | - | `SATcontrol.ino:120-140` | detection |

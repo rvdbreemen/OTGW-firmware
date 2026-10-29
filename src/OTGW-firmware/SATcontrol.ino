@@ -3937,34 +3937,43 @@ static void satUpdatePowerEnergy()
 //=== Pressure Monitoring (Task #10, enhanced Task #39, Task #59) ===
 //=====================================================================
 
-// --- Pressure sample ring buffer for linear regression drop rate ---
-static const uint8_t  PRESS_RING_SIZE = 20;          // max samples in history
+// --- Pressure sample FIFO for the least-squares drop rate (TASK-1480) ---
+// thermo-nova keeps every sample for max(pressure_max_value_age, 3600 s) (binary_sensor.py:357-365);
+// the firmware has no max-age setting, so the window is 3600 s. One sample per >= 30 s gives at most
+// 3600 / 30 + 1 = 121 samples inside the window, so the FIFO never overwrites a sample that is still
+// in the window (8 bytes per slot, ~1 KB static RAM).
+static const uint32_t PRESS_WINDOW_MS     = 3600000UL;
+static const uint32_t PRESS_SAMPLE_MS     = 30000UL;
+static const uint8_t  PRESS_RING_SIZE     = (uint8_t)(PRESS_WINDOW_MS / PRESS_SAMPLE_MS + 1);
 struct PressSample { uint32_t ms; float val; };
 static PressSample _press_ring[PRESS_RING_SIZE];
 static uint8_t  _press_ringCount = 0;
-static uint8_t  _press_ringHead  = 0;                // next write position
+static uint8_t  _press_ringTail  = 0;                // oldest sample; slot i is (tail + i) % size
 static uint32_t _press_lastSampleMs = 0;
 
-// --- CH active state tracking for 600s suspension ---
+// --- CH active tracking for the 600 s suspension (thermo-nova binary_sensor.py:335-345) ---
+// coordinator.active = master CH enable for the OTGW serial coordinator
+// (coordinator/serial/__init__.py:53-55): Statusflags bit 8, as in SATcycles.ino (TASK-1387).
 static bool     _press_lastActive     = false;
 static bool     _press_lastActiveInit = false;
-static uint32_t _press_suspendUntilMs = 0;
+static bool     _press_suspended      = false;
+static uint32_t _press_suspendStartMs = 0;            // elapsed-time test, safe across the millis() wrap
 
 static void satUpdatePressure()
 {
   float raw = OTcurrentSystemState.CHPressure;
   uint32_t now = millis();
 
-  // --- Track CH active state transitions (600s drop rate suspension) ---
-  bool active = state.sat.bActive;
+  // --- Track CH active transitions: suspend the drop rate 600 s and clear the samples ---
+  bool active = (OTcurrentSystemState.Statusflags & 0x0100) != 0;
   if (!_press_lastActiveInit) {
     _press_lastActive = active;
     _press_lastActiveInit = true;
   } else if (_press_lastActive != active) {
-    _press_suspendUntilMs = now + 600000UL;
-    // Clear sample history on state transition
+    _press_suspended      = true;
+    _press_suspendStartMs = now;
     _press_ringCount = 0;
-    _press_ringHead  = 0;
+    _press_ringTail  = 0;
     _press_lastSampleMs = 0;
   }
   _press_lastActive = active;
@@ -3982,61 +3991,46 @@ static void satUpdatePressure()
   }
   float smoothed = state.sat.fSmoothedPressure;
 
-  // --- Record raw pressure sample every ~30s ---
-  if (_press_lastSampleMs == 0 || (now - _press_lastSampleMs) >= 30000UL) {
+  // --- Record a raw pressure sample at most every 30 s, keep the last 3600 s ---
+  if (_press_lastSampleMs == 0 || (now - _press_lastSampleMs) >= PRESS_SAMPLE_MS) {
     _press_lastSampleMs = now;
-    _press_ring[_press_ringHead].ms  = now;
-    _press_ring[_press_ringHead].val = raw;
-    _press_ringHead = (_press_ringHead + 1) % PRESS_RING_SIZE;
-    if (_press_ringCount < PRESS_RING_SIZE) _press_ringCount++;
+    if (_press_ringCount == PRESS_RING_SIZE) {               // cannot happen at >= 30 s spacing
+      _press_ringTail = (_press_ringTail + 1) % PRESS_RING_SIZE;
+      _press_ringCount--;
+    }
+    uint8_t w = (_press_ringTail + _press_ringCount) % PRESS_RING_SIZE;
+    _press_ring[w].ms  = now;
+    _press_ring[w].val = raw;
+    _press_ringCount++;
 
-    // Evict samples older than 3600s (matches SAT Python drop_window_seconds)
-    while (_press_ringCount > 0) {
-      uint8_t oldest = (_press_ringCount < PRESS_RING_SIZE)
-                       ? 0
-                       : _press_ringHead;  // in a full ring, head IS oldest
-      if ((now - _press_ring[oldest].ms) > 3600000UL) {
-        if (_press_ringCount < PRESS_RING_SIZE) {
-          // Partial ring: shift array left
-          for (uint8_t i = 0; i < _press_ringCount - 1; i++) {
-            _press_ring[i] = _press_ring[i + 1];
-          }
-          if (_press_ringHead > 0) _press_ringHead--;
-        } else {
-          // Full ring: advance head past oldest
-          _press_ringHead = (_press_ringHead + 1) % PRESS_RING_SIZE;
-        }
-        _press_ringCount--;
-      } else {
-        break;
-      }
+    // Evict samples older than the window (binary_sensor.py:364-365, strict >)
+    while (_press_ringCount > 0 && (now - _press_ring[_press_ringTail].ms) > PRESS_WINDOW_MS) {
+      _press_ringTail = (_press_ringTail + 1) % PRESS_RING_SIZE;
+      _press_ringCount--;
     }
   }
 
-  // --- Linear regression for drop rate (min 3 samples, 300s window) ---
-  bool dropRateSuspended = (_press_suspendUntilMs != 0 && now < _press_suspendUntilMs);
+  // --- Least-squares drop rate: >= 3 samples spanning >= 300 s (binary_sensor.py:367-388) ---
+  bool dropRateSuspended = (_press_suspended && (now - _press_suspendStartMs) < 600000UL);
   float dropRate = -1.0f;  // sentinel: not calculated
 
   if (!dropRateSuspended && _press_ringCount >= 3) {
-    uint8_t oldestIdx = (_press_ringCount < PRESS_RING_SIZE) ? 0 : _press_ringHead;
-    uint8_t newestIdx = (_press_ringHead == 0)
-                        ? (PRESS_RING_SIZE - 1) : (_press_ringHead - 1);
-    if (_press_ringCount < PRESS_RING_SIZE) {
-      newestIdx = _press_ringCount - 1;
-    }
+    uint8_t oldestIdx = _press_ringTail;
+    uint8_t newestIdx = (_press_ringTail + _press_ringCount - 1) % PRESS_RING_SIZE;
     uint32_t elapsed = _press_ring[newestIdx].ms - _press_ring[oldestIdx].ms;
 
     if (elapsed >= 300000UL) {  // 300s minimum window
+      // Time from the oldest sample and pressure from the oldest value: the slope is the same as
+      // thermo-nova's absolute-time sums, and float32 keeps its precision over 121 samples.
       float sum_t = 0.0f, sum_p = 0.0f, sum_tp = 0.0f, sum_t2 = 0.0f;
       uint8_t n = _press_ringCount;
       uint32_t t0 = _press_ring[oldestIdx].ms;
+      float    p0 = _press_ring[oldestIdx].val;
 
       for (uint8_t i = 0; i < n; i++) {
-        uint8_t idx = (_press_ringCount < PRESS_RING_SIZE)
-                      ? i
-                      : (oldestIdx + i) % PRESS_RING_SIZE;
+        uint8_t idx = (oldestIdx + i) % PRESS_RING_SIZE;
         float t = (float)(_press_ring[idx].ms - t0) / 1000.0f;
-        float p = _press_ring[idx].val;
+        float p = _press_ring[idx].val - p0;
         sum_t  += t;
         sum_p  += p;
         sum_tp += t * p;
@@ -4059,8 +4053,8 @@ static void satUpdatePressure()
   }
 
   // Clear suspension once expired
-  if (_press_suspendUntilMs != 0 && now >= _press_suspendUntilMs) {
-    _press_suspendUntilMs = 0;
+  if (_press_suspended && !dropRateSuspended) {
+    _press_suspended = false;
   }
 
   // --- Update last pressure tracking ---
