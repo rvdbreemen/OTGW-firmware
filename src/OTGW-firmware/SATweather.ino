@@ -125,7 +125,7 @@ static void wstreamSkipString(WiFiClient* s, HTTPClient* h)
 static void wstreamSkipArray(WiFiClient* s, HTTPClient* h)
 {
   int depth = 1, c;
-  while ((c = wstreamGet(s, h)) >= 0 && depth > 0) {
+  while (depth > 0 && (c = wstreamGet(s, h)) >= 0) {   // test depth first: never read a byte past the closing ']'
     if      (c == '[') depth++;
     else if (c == ']') depth--;
     else if (c == '"') wstreamSkipString(s, h);
@@ -182,6 +182,9 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
       #if HAS_WEATHER_FORECAST
       if (  depth < hourlyDepth)  inHourly  = false;
       #endif
+      // The top-level object is closed: everything is parsed. Return now so
+      // the parser does not wait for the idle-timeout on a socket that stays open.
+      if (depth == 0) return;
       continue;
     }
     if (c != '"') continue;  // commas, whitespace — skip
@@ -365,6 +368,9 @@ static void weatherFetchOpenMeteo()
     return;
   }
 
+  // HTTP/1.0: the server closes after the body, no keep-alive tail and no
+  // chunked transfer encoding, so the raw stream holds only JSON bytes.
+  http.useHTTP10(true);
   yield();
   int httpCode = http.GET();
   yield();

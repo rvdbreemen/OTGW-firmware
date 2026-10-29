@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T14:36:00Z'
-updated_date: '2026-10-29T15:02:00Z'
+updated_date: '2026-10-29T15:08:00Z'
 labels:
   - sat
   - weather
@@ -26,7 +26,13 @@ Found in gruijter's field capture (TASK-1474, alpha.527, 2026-10-29). All 18-20 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A host or bench reproduction shows the ~5 s tail on the current code (old) and a fetch that ends within 1 s of the last JSON byte on the fix (new)
-- [ ] #2 The parser stops at the end of the top-level JSON object or the response is read with HTTP/1.0 / Connection: close, and chunk-size lines can no longer reach the number parser
+- [x] #1 A host or bench reproduction shows the ~5 s tail on the current code (old) and a fetch that ends within 1 s of the last JSON byte on the fix (new)
+- [x] #2 The parser stops at the end of the top-level JSON object or the response is read with HTTP/1.0 / Connection: close, and chunk-size lines can no longer reach the number parser
 - [ ] #3 On the bench no [loop-stall] >= 1000 ms line appears around a weather fetch over at least 4 fetches
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-29 lead: fix = http.useHTTP10(true) before GET (HTTPClient.cpp:487-489, :1139-1160: HTTP/1.0, _reuse=false, no chunked), early return when the top-level object closes, and a latent wstreamSkipArray bug (loop read one byte past the closing ']', swallowing the '}' of hourly after the skipped cloud_cover_low/mid arrays, so depth never reached 0). Host test tests/test_weather_stream_tail.py on the real parser: HEAD tail_ms=5002 (2 failures: tail + source check), fix tail_ms=0, Ran 4 OK; parsed current and forecast values identical on both. evaluate --quick 0 FAIL. Review: lead read the 10-line diff against the HTTPClient source; no separate reviewer team for this size. AC#3 needs a bench run with weather enabled.
+<!-- SECTION:NOTES:END -->
