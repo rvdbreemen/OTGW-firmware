@@ -41,7 +41,12 @@ def settings_path():
     base = os.environ.get("OTGW_CAPTURE_SETTINGS")
     if base:
         return base
-    return os.path.join(os.environ.get("LOCALAPPDATA", ""), "OTGW-capture", "capture-settings.json")
+    local = os.environ.get("LOCALAPPDATA")
+    if local:
+        return os.path.join(local, "OTGW-capture", "capture-settings.json")
+    # macOS / Linux: the location scripts/otgw_capture.py uses (ADR-202).
+    config = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(config, "otgw-capture", "capture-settings.json")
 
 
 def _load_file():

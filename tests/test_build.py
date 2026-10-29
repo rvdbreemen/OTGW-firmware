@@ -201,8 +201,9 @@ class TestDistributionZipComplete(unittest.TestCase):
         (proj / "scripts").mkdir()
         for name in ("flash_otgw.bat", "flash_otgw.sh"):
             shutil.copy(REPO_ROOT / name, proj / name)
-        for name in ("capture-mqtt-debug.bat", "capture-mqtt-debug.sh", "capture-mqtt-debug-macos.sh"):
+        for name in ("capture-mqtt-debug.bat", "capture-mqtt-debug.sh", "capture-mqtt-debug-macos.sh", "otgw_capture.py"):
             shutil.copy(REPO_ROOT / "scripts" / name, proj / "scripts" / name)
+        shutil.copytree(REPO_ROOT / "scripts" / "vendor", proj / "scripts" / "vendor")
         semver = "2.0.0-alpha.1+abc1234"
         stem = f"OTGW-firmware-{self.build.asset_slug('esp32-combo')}-{semver}"
         images = {
@@ -232,6 +233,12 @@ class TestDistributionZipComplete(unittest.TestCase):
                              "capture-mqtt-debug.sh", "capture-mqtt-debug-macos.sh",
                              "README.txt", "README_NL.txt"):
                     self.assertIn(name, names)
+                # ADR-202: the launchers run otgw_capture.py, which imports paho-mqtt
+                # from the vendored wheel; both must ship byte-identical.
+                self.assertEqual(zf.read("otgw_capture.py"), (REPO_ROOT / "scripts" / "otgw_capture.py").read_bytes())
+                wheels = [n for n in names if n.startswith("vendor/paho_mqtt-") and n.endswith(".whl")]
+                self.assertEqual(len(wheels), 1, sorted(names))
+                self.assertEqual(zf.read(wheels[0]), (REPO_ROOT / "scripts" / wheels[0]).read_bytes())
                 for bat in ("flash_otgw.bat", "capture-mqtt-debug.bat"):
                     body = zf.read(bat)
                     self.assertNotIn(b"\n", body.replace(b"\r\n", b""), f"{bat} must be CRLF only")

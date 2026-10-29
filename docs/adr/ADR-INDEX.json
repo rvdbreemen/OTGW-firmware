@@ -7289,6 +7289,67 @@
         ],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-202",
+      "title": "Replace the two capture scripts with one Python capture tool behind thin launchers",
+      "path": "ADR-202-replace-the-two-capture-scripts-with-one-python-capture-tool-behind-thin-launchers.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-29",
+      "decision_summary": "One standard-library Python program, scripts/otgwcapture.py, replaces both payloads.",
+      "topics": [
+        "diagnostic-capture",
+        "host-tooling",
+        "mqtt-client-dependency",
+        "python-bootstrap"
+      ],
+      "aliases": [
+        "capture script",
+        "capture-mqtt-debug",
+        "embeddable python",
+        "otgw_capture.py",
+        "paho-mqtt"
+      ],
+      "components": [
+        "Diagnostic capture tool"
+      ],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep one implementation of capture behaviour in scripts/otgwcapture.py. Launchers only locate or bootstrap Python and forward arguments.",
+          "Keep the merged transcript's section headers compatible with the old scripts, so existing readers and skills keep working.",
+          "Pin every downloaded or vendored artefact by version and SHA-256: the embeddable CPython zip per architecture and the paho-mqtt wheel.",
+          "Degrade per source. A missing broker, wheel, browser or crash-log endpoint skips that source with a summary line; it never aborts the capture.",
+          "Stay local: write only to the local output folder and the saved-settings file. No upload anywhere (TASK-1473 is parked)."
+        ],
+        "must_not": [
+          "Must not call pip install at run time, or require network access, when a Python 3.9+ interpreter is already present.",
+          "Must not use telnetlib, or any other module removed in Python 3.13.",
+          "Must not reintroduce mosquittosub, winget or brew installs into the capture path.",
+          "Must not send uppercase debug keys that are not toggles listed in the banner (some bench builds bind test hang keys)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "python tests/testcapturetool.py runs the real tool against an in-test fake device (telnet, HTTP and an MQTT stub). It covers the TASK-1299 cases a–h, TASK-1396 and TASK-1453.",
+          "tests/testbuild.py asserts that the flash zip contains the launchers, otgwcapture.py and the vendored wheel.",
+          "Capture runs on Windows 11 without Python on PATH, on macOS and on Linux, recorded in TASK-1475."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -12978,6 +13039,24 @@
       "source": "ADR-201",
       "target": "ADR-164",
       "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-202",
+      "target": "ADR-014",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-202",
+      "target": "ADR-083",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-202",
+      "target": "ADR-190",
+      "type": "related",
       "resolved": true
     }
   ]

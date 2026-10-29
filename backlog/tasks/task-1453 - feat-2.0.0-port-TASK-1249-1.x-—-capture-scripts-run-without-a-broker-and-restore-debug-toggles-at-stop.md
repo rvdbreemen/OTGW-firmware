@@ -3,9 +3,11 @@ id: TASK-1453
 title: >-
   feat-2.0.0: port TASK-1249 (1.x) — capture scripts run without a broker and
   restore debug toggles at stop
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T06:25:00Z'
+updated_date: '2026-10-29T22:18:00Z'
 labels:
   - port-from-1.x
   - tooling
@@ -101,6 +103,12 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 - [ ] #6 Simulator toggles (SensorSim, OTGW-Sim) are never sent by the restore.
 - [ ] #7 When the device is unreachable at stop, the restore logs 'Debug toggles restore failed (device likely gone)' within a bounded time, and the capture still finishes and merges the transcript with the same exit code as without the restore.
 - [ ] #8 tests/test_capture_telnet_worker.py (or a sibling test) runs the real extracted Python worker against the fake device and covers the restore: red on the current worker, green on the fix.
-- [ ] #9 .bat payload parses with 0 PowerShell parser errors; bash -n and shellcheck clean on capture-mqtt-debug.sh.
-- [ ] #10 Build for esp32, esp32-classic and esp32-combo green and python evaluate.py --quick green (no firmware change expected; confirms nothing else regressed).
+- [ ] #9 The new tool (scripts/otgw_capture.py, TASK-1475) compiles on Python 3.9+, the .sh launcher passes bash -n and shellcheck, the .bat launcher runs on cmd (replaces the PowerShell-parser AC: the payloads are gone, ADR-202)
+- [ ] #10 python evaluate.py --quick green (host tooling only: no firmware change, so no firmware build; replaces the esp32/classic/combo build AC, combo-only directive 2026-10-29)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-29 (b1, TASK-1475 lane): AC#9 and AC#10 rewritten. The old ACs named the PowerShell payload parser check and a three-target firmware build; the payloads are replaced by one Python tool (ADR-202) and this is host tooling, so neither applies. Lead otgw-firmware-da agreed to the rewrite on 2026-10-29. Implementation lives in TASK-1475 (scripts/otgw_capture.py TelnetCapture.restore_debug_toggles, broker optional in main/resolve_inputs).
+<!-- SECTION:NOTES:END -->

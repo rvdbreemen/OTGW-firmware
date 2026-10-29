@@ -3,9 +3,11 @@ id: TASK-1396
 title: >-
   capture-mqtt-debug: send q/D only after setup finished, keep hd_min_* in the
   device/info probe
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T18:40:00Z'
+updated_date: '2026-10-29T21:42:00Z'
 labels:
   - tooling
   - capture

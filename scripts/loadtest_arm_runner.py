@@ -32,7 +32,6 @@ import argparse
 import json
 import os
 import re
-import shutil
 import socket
 import subprocess
 import sys
@@ -248,14 +247,11 @@ def main():
     p.add_argument("--host", required=True, help="Device IP")
     p.add_argument("--arm-name", required=True, help="Arm label, e.g. N4 (used as the transcript subdirectory)")
     p.add_argument("--duration", type=float, default=60.0, help="Arm duration in seconds")
-    p.add_argument("--broker-host", default="homeassistant.local", help="MQTT broker host for capture-mqtt-debug.bat (non-interactive - required even if unreachable)")
+    p.add_argument("--broker-host", default="homeassistant.local", help="MQTT broker host for capture-mqtt-debug.bat (empty skips the MQTT stream)")
     p.add_argument("--output-root", default="logs/loadtest-sweep", help="Root directory; one subdir per arm is created under it")
     p.add_argument("--heap-floor", type=int, default=DEFAULT_HEAP_FLOOR_BYTES, help="Abort the arm if min_free_heap drops below this many bytes")
     p.add_argument("--poll-interval", type=float, default=5.0, help="Watchdog poll interval in seconds")
     args = p.parse_args()
-
-    if shutil.which("pwsh") is None and shutil.which("powershell") is None:
-        print("WARNING: neither pwsh nor powershell found on PATH - capture-mqtt-debug.bat will fail to launch", file=sys.stderr)
 
     result = run_arm(args)
     print(json.dumps(result, indent=2, default=str))

@@ -75,90 +75,86 @@ pwsh -File scripts/branch-hygiene-queue.ps1 -Remote origin -BaseBranch dev -Inac
 4. Adds owner/decision/notes columns for manual review
 5. Exports a sorted review queue CSV for branch governance
 
-## capture-mqtt-debug.sh
+## capture-mqtt-debug (.bat / .sh) and otgw_capture.py
 
-macOS/Linux equivalent of `capture-mqtt-debug.bat` for collecting OTGW telnet
-debug output, MQTT broker traffic, and browser DevTools output into one
-uploadable transcript. Both launchers use the shared `capture-mqtt-debug`
-basename; only the platform-specific `.bat` / `.sh` extension differs. The old
-`capture-mqtt-debug-macos.sh` path remains as a compatibility wrapper.
+One diagnostic capture tool for every platform (ADR-202, TASK-1475). The
+capture itself is `otgw_capture.py` (standard-library Python 3.9+). Thin
+launchers find a Python and run it:
 
-### MQTT Debug Capture Usage
+- `capture-mqtt-debug.bat` (Windows) tries `py -3`, `python` and `python3`. When
+  none is 3.9 or newer it downloads the portable Python 3.12.10 from python.org
+  once, checks its SHA-256 and unpacks it into `%LOCALAPPDATA%\OTGW-capture\`.
+- `capture-mqtt-debug.sh` (Linux, macOS) runs `python3`.
+  `capture-mqtt-debug-macos.sh` is a compatibility wrapper around it.
+
+MQTT uses paho-mqtt 2.1.0, imported straight from
+`vendor/paho_mqtt-2.1.0-py3-none-any.whl`. No `mosquitto_sub` is needed and
+nothing is installed. Without the wheel, the MQTT stream is skipped and the
+other sources still run. The flash zip ships the launchers, `otgw_capture.py`
+and `vendor/`; keep them together.
+
+### Usage
 
 ```bash
 scripts/capture-mqtt-debug.sh
-scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10
 scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --duration 120
-scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --skip-browser-capture
-scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --topic '#'
+scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker ""          # no MQTT stream
 ```
 
-The script prompts for the OTGW device host, MQTT broker host, and optional MQTT
-credentials when they are not supplied. Use `--no-prompt` for unattended runs.
+```bat
+scripts\capture-mqtt-debug.bat
+scripts\capture-mqtt-debug.bat -DeviceHost 192.168.1.50 -BrokerHost 192.168.1.10 -DurationSeconds 120
+```
 
-### MQTT Debug Capture Options
+Both spellings work on every platform (`--device` or `-DeviceHost`,
+`--duration` or `-DurationSeconds`, and so on). Missing values are prompted for
+only when stdin is a terminal; `--no-prompt` / `-NoPrompt` never prompts. An
+empty broker skips the MQTT stream and writes one summary line saying so
+(TASK-1453). Press `Q` or Ctrl+C to stop; the transcript is still written.
 
-- `--device` / `-DeviceHost` - OTGW device IP address or hostname
-- `--broker` / `-BrokerHost` - MQTT broker IP address or hostname
-- `--broker-port` / `-BrokerPort` - MQTT broker port (default: `1883`)
-- `--topic` / `-Topic` - MQTT topic filter (default: `#`)
-- `--user` / `-Username` - MQTT username
-- `--password` / `-Password` - MQTT password
-- `--duration` / `-DurationSeconds` - Stop automatically after fixed seconds
-- `--output-root` / `-OutputRoot` - Output folder root (default: `logs/mqtt-diagnostics`)
-- `--mosquitto-sub-path` / `-MosquittoSubPath` - Explicit `mosquitto_sub` path
-- `--skip-tool-install` / `-SkipToolInstall` - Do not attempt Homebrew install
-- `--skip-browser-capture` / `-SkipBrowserCapture` - Disable browser capture
-- `--browser-url` / `-BrowserUrl` - Page to load (default: `http://<device>/`)
-- `--browser-debug-port` / `-BrowserDebugPort` - CDP port (default: `9222`)
-- `--browser-path` / `-BrowserPath` - Explicit Chrome/Edge executable path
-- `--skip-crashlog-capture` / `-SkipCrashlogCapture` - Disable crash-log polling
-- `--crashlog-url` / `-CrashlogUrl` - Crash-log endpoint (default: `http://<device>/api/v2/device/crashlog`)
-- `--crashlog-poll-seconds` / `-CrashlogPollSeconds` - Crash-log poll interval (default: `30`)
-- `--skip-http-probes` / `-SkipHttpProbes` - Disable post-capture HTTP probes
-- `--http-probe-timeout-seconds` / `-HttpProbeTimeoutSeconds` - Per-request HTTP probe timeout (default: `10`)
+### Options
 
-### MQTT Debug Capture Notes
+- `--device` / `-DeviceHost`: OTGW device IP address or hostname
+- `--broker` / `-BrokerHost`: MQTT broker; empty skips the MQTT stream
+- `--broker-port` / `-BrokerPort`: MQTT broker port (default `1883`)
+- `--topic` / `-Topic`: MQTT topic filter (default `#`)
+- `--username` / `--user` / `-Username`, `--password` / `-Password`: MQTT credentials
+- `--save-secrets` / `-SaveSecrets`: also store the MQTT password in the settings file (for unattended runs)
+- `--duration` / `-DurationSeconds`: stop after N seconds
+- `--output-root` / `-OutputRoot`: output folder root (default `logs/mqtt-diagnostics`)
+- `--no-prompt` / `-NoPrompt`: never prompt
+- `--telnet-connect-timeout-seconds`, `--telnet-reconnect-delay-ms`, `--telnet-post-disconnect-delay-ms`, `--telnet-idle-check-seconds` (and the `-Telnet...` names): telnet reconnect tuning (TASK-1299)
+- `--skip-browser-capture`, `--browser-url`, `--browser-debug-port`, `--browser-path`: headless Edge/Chrome/Chromium devtools capture
+- `--skip-crashlog-capture`, `--crashlog-url`, `--crashlog-poll-seconds`: crash log and `reboot_log.txt` polling
+- `--skip-http-probes`, `--http-probe-timeout-seconds`: post-capture HTTP probes
 
-The script requires `python3` and `mosquitto_sub`. On macOS, it can install the
-Mosquitto client with Homebrew unless `--skip-tool-install` is passed. Press `Q`
-or use Ctrl+C to stop manually; timed captures also stop the MQTT, telnet, and
-browser workers cleanly before writing the final transcript.
+`-MosquittoSubPath` and `-SkipToolInstall` are still accepted and ignored.
 
-On each Telnet connection, including reconnects after a disconnect or reboot,
-the script parses the firmware's debug-toggle banner and enables every logging
-toggle that is currently off. It supports the different 1.x and 2.0.0/OTGW32
-toggle keys and leaves simulator options such as `SensorSim` and `OTGW-Sim`
-unchanged. It then sends `q` and `D` to capture the current settings and state.
+### Saved settings
 
-Browser DevTools capture is enabled by default when Microsoft Edge, Google Chrome,
-or Chromium can be found. On macOS, the script checks the standard `.app`
-locations under `/Applications` and `~/Applications`; use `--browser-path` if the
-browser is installed elsewhere. Browser output is written to `browser.log` and
-browser stderr is written to `browser.stderr.log`.
+The last-used device, broker, port, topic and username pre-fill the next run's
+prompts. They are stored in `%LOCALAPPDATA%\OTGW-capture\capture-settings.json`
+(Windows) or `~/.config/otgw-capture/capture-settings.json` (macOS, Linux); the
+environment variable `OTGW_CAPTURE_SETTINGS` overrides the path. The MQTT
+password is stored only with `--save-secrets`. Keys that other tools added
+(WifiSsid, Hardware, ...) are kept. `scripts/_secrets.py` reads the same file.
 
-Crash-log capture is enabled by default and polls `/api/v2/device/crashlog` plus
-`/reboot_log.txt` into `crashlog.log`. This is useful for decoded ESP exception
-state during reboot loops; devices without the endpoint log the HTTP/failure
-status and the capture continues. After capture stops, HTTP probes hit `/`,
-`/index.html`, `/v2.js`, and key REST endpoints with bounded timeouts and
-write status/timing/size details to `curl-probes.log`.
+### What it collects
 
-All logs are merged into
-`transcript-<date-time>-<firmware-version>-<hostname>-<uniqueid>.txt`. The
-working files use the same names as the Windows capture:
-`summary.txt`, `telnet.log`, `mqtt.log`, `mqtt.stderr.log`, `browser.log`,
-`browser.stderr.log`, `crashlog.log`, `curl-probes.log`, `error.txt`, and
-`script.error.log`, under `logs/mqtt-diagnostics/<yyyyMMdd-HHmmss>/`. After a
-successful merge, those intermediate files are removed; upload only the named
-transcript.
+- **Telnet debug (port 23).** It reconnects with a gap report and a TCP keepalive, and a health-probe watchdog checks a silent link (TASK-1299). On each connection it switches on every debug toggle that is off, and simulator toggles (`SensorSim`, `OTGW-Sim`) are left alone. At stop it restores every toggle to its state at capture start (TASK-1453). The `q` / `D` settings dump is sent only after `Setup finished!` was seen or the uptime is above 0 minutes (TASK-1396).
+- **MQTT.** One `topic payload` line per message in `mqtt.log`, the same format as `mosquitto_sub -v`.
+- **Browser devtools.** Console, exceptions, log entries and network timing of the device page in `browser.log`. On Windows (job object) and Linux (parent-death signal), the headless browser also dies when the tool is killed.
+- **Crash log.** `/api/v2/device/crashlog` and `/reboot_log.txt`, polled into `crashlog.log`.
+- **HTTP probes.** At stop, `/`, `/index.html`, `/v2.js` and key REST endpoints with status, timing and size. Bodies are cut at 200 characters, except `/api/v2/health` and `/api/v2/device/info`, which are kept whole up to 8 KB so the `hd_min_*` heap fields survive (TASK-1396).
 
-The deliberate platform differences are the launcher extension (`.sh` instead
-of `.bat`), command-line option style, Homebrew-based Mosquitto installation,
-macOS/Linux browser executable paths, and portable Python HTTP probes rather
-than Windows `curl.exe`. Windows unattended `-SaveSecrets` storage is not ported:
-the shell script does not store MQTT passwords in generated files or local
-settings; prefer the interactive password prompt.
+Everything is merged into
+`transcript-<date-time>-<firmware-version>-<hostname>-<uniqueid>.txt`, under
+`logs/mqtt-diagnostics/<yyyyMMdd-HHmmss>/`. Secrets (password/token/key values,
+`-P` arguments) are redacted. After a successful merge, the intermediate files
+are removed. Upload only the transcript.
+
+Tests: `python tests/test_capture_tool.py` runs the tool against fake telnet,
+HTTP and MQTT servers.
 
 ## sat_boiler_emulator.py
 

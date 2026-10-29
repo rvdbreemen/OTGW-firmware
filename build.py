@@ -1139,6 +1139,7 @@ def create_distribution_zip(project_dir, semver, target):
         OTGW-firmware-<target>-<semver>.ino.bin / .littlefs.bin
         flash_otgw.bat, flash_otgw.sh
         capture-mqtt-debug.bat, capture-mqtt-debug.sh, capture-mqtt-debug-macos.sh
+        otgw_capture.py, vendor/paho_mqtt-<ver>-py3-none-any.whl (ADR-202)
         README.txt, README_NL.txt
 
     The loose .ino.bin / .littlefs.bin are what /update takes over WiFi, and
@@ -1189,11 +1190,16 @@ def create_distribution_zip(project_dir, semver, target):
         )
         return None
 
-    # Capture scripts for log reports (Windows .bat, Linux and macOS .sh).
+    # Capture tool for log reports (ADR-202): the Python tool, its vendored
+    # paho-mqtt wheel, and the Windows .bat / Linux and macOS .sh launchers.
     scripts_dir = project_dir / "scripts"
     capture_bat = scripts_dir / "capture-mqtt-debug.bat"
     capture_shs = [scripts_dir / "capture-mqtt-debug.sh", scripts_dir / "capture-mqtt-debug-macos.sh"]
-    missing = [p.name for p in [capture_bat, *capture_shs] if not p.exists()]
+    capture_py = scripts_dir / "otgw_capture.py"
+    capture_wheels = sorted((scripts_dir / "vendor").glob("paho_mqtt-*-py3-none-any.whl"))
+    missing = [p.name for p in [capture_bat, *capture_shs, capture_py] if not p.exists()]
+    if not capture_wheels:
+        missing.append("vendor/paho_mqtt-*.whl")
     if missing:
         print_warning(
             f"Skipping distribution zip for {tcfg['name']}: missing capture script(s): "
@@ -1212,7 +1218,7 @@ def create_distribution_zip(project_dir, semver, target):
     print_info(f"  + {fs_bin.name}  (filesystem, WiFi update / --update)")
     print_info(f"  + flash_otgw.bat")
     print_info(f"  + flash_otgw.sh")
-    print_info(f"  + capture-mqtt-debug.bat / .sh / -macos.sh")
+    print_info(f"  + capture-mqtt-debug.bat / .sh / -macos.sh + otgw_capture.py + vendor/{capture_wheels[0].name}")
     print_info(f"  + README.txt      (English)")
     print_info(f"  + README_NL.txt   (Nederlands)")
 
@@ -1247,6 +1253,11 @@ def create_distribution_zip(project_dir, semver, target):
                 sh_info.compress_type = zipfile.ZIP_DEFLATED
                 sh_info.external_attr = (0o100755 << 16)
                 zf.writestr(sh_info, sh_bytes)
+
+            # The capture tool the launchers run, and the MQTT client it imports
+            # straight from the wheel (zipimport), so the wheel ships as-is.
+            zf.write(capture_py, arcname=capture_py.name)
+            zf.write(capture_wheels[0], arcname=f"vendor/{capture_wheels[0].name}")
 
             zf.writestr("README.txt", readme_en)
             zf.writestr("README_NL.txt", readme_nl)
@@ -1415,7 +1426,10 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      Record a debug log for a bug report: the telnet debug log,\n"
         f"      the MQTT stream and device info in one transcript. Run with\n"
         f"      --help for the options, and attach the transcript to your\n"
-        f"      report on Discord or GitHub.\n"
+        f"      report on Discord or GitHub. They run otgw_capture.py and\n"
+        f"      need Python 3.9 or newer; on Windows without Python the\n"
+        f"      .bat downloads a portable Python once (about 11 MB).\n"
+        f"      Keep otgw_capture.py and the vendor folder next to them.\n"
         f"\n"
         f"  README.txt        This file (English).\n"
         f"  README_NL.txt     Dutch translation of this file.\n"
@@ -1697,7 +1711,11 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      Leggen een debuglog vast voor een foutmelding: de telnet-\n"
         f"      debuglog, de MQTT-stroom en de device-info in een\n"
         f"      transcript. Draai met --help voor de opties en voeg het\n"
-        f"      transcript toe aan je melding op Discord of GitHub.\n"
+        f"      transcript toe aan je melding op Discord of GitHub. Ze\n"
+        f"      starten otgw_capture.py en hebben Python 3.9 of nieuwer\n"
+        f"      nodig; staat Python niet op je Windows-pc, dan haalt de\n"
+        f"      .bat eenmalig een losse Python op (ongeveer 11 MB).\n"
+        f"      Laat otgw_capture.py en de map vendor ernaast staan.\n"
         f"\n"
         f"  README.txt        Engelse versie van dit bestand.\n"
         f"  README_NL.txt     Dit bestand (Nederlands).\n"

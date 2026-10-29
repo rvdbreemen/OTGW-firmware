@@ -207,3 +207,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-199 | Accepted | - | While SAT is the active controller, one per-heating-system cold setpoint replaces thermo-nova's COLDSETPOINT 22 at ev... |
 | ADR-200 | Accepted | - | The GPIO output follows one bit of the 16-bit MsgID 0 status word Statusflags = (MasterStatus << 8) \| SlaveStatus (OT... |
 | ADR-201 | Accepted | - | On the combo board, boot detection persists only a positive PIC verdict, and every boot that is not already a persist... |
+| ADR-202 | Proposed | - | One standard-library Python program, scripts/otgwcapture.py, replaces both payloads. |
