@@ -21,7 +21,7 @@ External inputs arrive via MQTT set commands (`sat/target`, `sat/indoor_temp`, `
 
 - **Heating curve**: `baseOffset + (coeff/4) * [4*(target-20) + 0.03*(outside-20)^2 - 0.4*(outside-20)]`; base offset 27.2 (radiators) or 20.0 (underfloor), configurable coefficient
 - **PID controller (v3)**: Auto-calculated Kp/Ki/Kd from heating curve value; deadband-gated integral (accumulates only within +-0.1 C of target, default `fDeadband`); temperature-based derivative with adaptive low-pass filter timed by sensor change (TASK-1195); manual gain override mode; 45 s time-constant EMA on the raw room sensor before control (TASK-894)
-- **Heating system and source**: heating system (auto/radiators/underfloor) and heating source (auto/gas_boiler/heat_pump/hybrid, TASK-891.8) are independent settings; heat-pump source forces MM=100 and 2 cycles/hour
+- **Heating system and source**: heating system (auto/radiators/underfloor) and heating source (auto/gas_boiler/heat_pump/hybrid, TASK-891.8) are independent settings; heat-pump source forces MM=100 today (entry 113, Q54 B, decides the configured maximum; TASK-1426 To Do) and has no hourly PWM start limit (entry 81, TASK-1419)
 - **Anti-cycling**: Enforces minimum OFF time (180 s) and max cycles/hour (no hourly limit for a heat pump, whose PWM period is 1800 or 2400 s; otherwise `iCyclesPerHour` 2-6, default 3; fallback 3 underfloor / 4 radiators)
 - **COLD_SETPOINT cutoff** (ADR-150, TASK-891.2): when the requested setpoint falls below 28.2 C (radiators) or 21 C (underfloor) the boiler is commanded off (`CS` to minimum, `CH=0`)
 - **Command emission**: write-on-change for CS/MM/CH/TC (TASK-565), refreshed every `SAT_CMD_REFRESH_MS` (300 s) or after an OT-bus offline-to-online edge

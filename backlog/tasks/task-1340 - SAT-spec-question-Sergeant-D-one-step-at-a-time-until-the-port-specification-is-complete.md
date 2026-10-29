@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-24T09:19:00Z'
-updated_date: '2026-10-29T05:03:00Z'
+updated_date: '2026-10-29T19:16:00Z'
 labels:
   - sat
   - spec
@@ -47,6 +47,8 @@ Maintainer directive 2026-10-24: unclear SAT behaviour is resolved interactively
 2026-10-24 21:14-21:18 UTC: Sergeant D answered Q2,Q3,Q6,Q8,Q9,Q10,Q11,Q13 -> entries 36-38,40-44 (second-read), OT-loss rule entry 39; tasks 1364-1370; ADR-197 (Q10) and ADR-199 (Q13) answers recorded. Q4 and Q12 asked again with detail, Q7 clarification asked.
 
 2026-10-29 close-out audit (workflow, 5 agents): all 70 queue rows checked. Fixed in open-questions.md: Q7b now links TASK-1390; Q36b closed as informational (heads-up, entry 81); Q42 states why there is no task. Q18: two independent readers (one tasked to refute) found the firmware zone aggregation differs from area.py/climate.py in eight ways (citations verified in session: area.py:166-175, 286-301, 312-333; climate.py:372-392; SATcontrol.ino:5516-5566). Redrafted and asked of Sergeant D (msg 1565223339390275625). Remaining for AC#1: Q18 answer; then AC#2 (task for the answer).
+
+TASK-1412.1 records review (R34): 2026-10-29. (TASK-1412.1 R34 reconciliation): the Final Summary 'All 70 rows answered' was true at close. Afterwards Q59 was queued (d6487a294) and re-asked after entry 120 (3baed73d8), and the confirmations of interpretation entries 104/107/108 remain unrecorded. The queue is therefore not empty. This task stays Done for its original scope; the live queue is tracked in open-questions.md (2026-10-29 update).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

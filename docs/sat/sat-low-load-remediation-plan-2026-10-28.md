@@ -111,6 +111,12 @@ Priorities here are recommendations, not silent changes to existing task metadat
 | R41 | No complete OT-requirement-to-test mapping or coherent release proof | WP8 / TASK-1411 plan + NEW-VALIDATION | All LL gates; no missing physical checks hidden by host green |
 | R42 | Efficiency/comfort/compressor claims lack matched measured comparisons | WP7/WP8 / NEW-FIELD | LL-015/LL-016; pre-registered matched protocol and uncertainty |
 
+> **2026-10-29 reconciliation notes (TASK-1412.1; the original rows and text above and below stay as written).** The current resolution index, with separate decision, implementation, host-test and physical-verification state per item, is [sat-low-load-resolution-index-2026-10-29.md](sat-low-load-resolution-index-2026-10-29.md).
+>
+> - R26: the owner is TASK-1412.1 (execution backlog R26 -> TASK-1412.1). TASK-1340 is Done but covers only the question queue, not the index. The text of WP1 step 4 "via Backlog MCP" reads "via the backlog CLI" (project rule: CLI only, never the MCP server).
+> - R29: Q41 was answered after this plan was written (entry 100): MaxTSet bounds come from MsgID 49 with a 20/80 fallback, the value is always sent as MsgID 57 (SH=), there is no MsgID 6 gate, and SAT caps the CS itself. "ID6 support/writability" at lines 60 and 170 therefore means observation and rejected-write read-back only, not a precondition. TASK-1373 AC#1 and TASK-1412.13 AC#1 were aligned on this date. Underfloor default 50 per entry 110; the heat-pump default is still open.
+> - R37: the trigger is met. Q48-Q51 are decided (entries 89-91, 95, 97). Q49 B is implemented in TASK-1421 (932cda228) after the Q35 fix TASK-1382 (de23e3ea1). Maintainer provenance is kept in entry 89 and TASK-1369. Remaining: TASK-1412.9 AC#2 host verification.
+
 ## 4. Work packages and implementation sequence
 
 ### WP1 - Repair the operational record without erasing history
@@ -237,7 +243,7 @@ The exact develop snapshot named in entries64-66 is **older**, not a newer succe
 | `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb` -> `7d43560342ca9d854e92b8b5a91bdfbf9cbc2152` | behind | 0 | 294 | develop snapshot |
 | develop snapshot -> release pin | ahead | 294 | 0 | develop snapshot |
 
-Reproduce using the [pin-to-develop API comparison](https://api.github.com/repos/Alexwijn/SAT/compare/7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb...7d43560342ca9d854e92b8b5a91bdfbf9cbc2152) and [reverse comparison](https://api.github.com/repos/Alexwijn/SAT/compare/7d43560342ca9d854e92b8b5a91bdfbf9cbc2152...7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb). This corrects the review conversation's unverified 'newer develop' wording. It does not settle which algorithm is preferable, reinterpret a quote as new approval, or authorize moving the pin. Entry64's ancestry statement matches this graph; entry66's opposite interpretation needs an attributed technical clarification.
+Reproduce using the [pin-to-develop API comparison](https://api.github.com/repos/Alexwijn/SAT/compare/7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb...7d43560342ca9d854e92b8b5a91bdfbf9cbc2152) and [reverse comparison](https://api.github.com/repos/Alexwijn/SAT/compare/7d43560342ca9d854e92b8b5a91bdfbf9cbc2152...7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb). This corrects the review conversation's unverified 'newer develop' wording. It does not settle which algorithm is preferable, reinterpret a quote as new approval, or authorize moving the pin. Entry64's ancestry statement matches this graph; entry66's opposite interpretation needs an attributed technical clarification. (Written 2026-10-29 as sergeant-d-corrections.md entry 125.)
 
 ## 9. Primary source locations supporting the register
 

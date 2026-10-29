@@ -6,8 +6,8 @@ title: >-
 status: Done
 assignee:
   - '@claude'
-created_date: '2026-10-20 18:15'
-updated_date: '2026-10-21 09:41'
+created_date: 2026-10-20 18:15
+updated_date: '2026-10-29T19:17:00Z'
 labels:
   - bug
   - sat
@@ -81,6 +81,10 @@ Round 1 fixes done (underheat ON-only, range-5 tick==refresh, solar ratchet via 
 2026-10-21 suppression + 3 s refresh now bench-proven via TASK-1277 replay: new firmware CS = flow-1 refreshed with every flow frame (~6 s), old firmware PID / 10 / 45 on the 30 s tick only. Still open: AC3 (protection off, sim or field run).
 
 2026-10-21 AC3 bench (alpha.444+a7bbacc, TASK-1277 replay, protection OFF, force PWM): 259 ON-phase samples with the flame burning and the flow rising 44.5 -> 57.1 C, CS stayed 37.36 throughout (the previous control setpoint, first taken from the PID setpoint because the previous CS was 10), no flow-1 and no CS 10: no override, thermo-nova parity. Compare protection ON on the same replay: CS = flow-1 every ~6 s. MM=0 in PWM is not visible in the replay (bus MaxRelMod empty), evidenced by tests/test_sat_pwm_override.py (real satComputeMM). Bench restored, settings diff 0. Evidence %TEMP%\bench-1277\green-protoff.json.
+
+TASK-1412.1 records review (R38): 2026-10-29. current-status annotation (R38, reviewed at 3baed73d8): the 19:46 UTC note's rule 'override when overshoot_protection OR SAT_QUIRK_NO_REL_MOD' was replaced by the 20:09-20:14 decision (entry 20: on by default for all heating systems, user can switch it off). Current code gates the PWM CS override only on settings.sat.bOvershootProtection (SATcontrol.ino:1210, :1221, :1249; default true SATtypes.h:489). The brand quirk no longer forces it. The real-boiler verification gap named in the final summary still stands.
+
+TASK-1412.1 records review (R39): 2026-10-29. correction to the note of 2026-10-21 'suppression + 3 s refresh now bench-proven via TASK-1277 replay' (R39, LL-023). The replay shows that CS = flow-1 follows each new flow frame (~6 s, the fixture cadence). It does not show the 3 s cadence (CS goes out write-on-change from the cached flow, SATcontrol.ino:463-478, with a 300 s same-value resend at :427, :845-851, :1240-1265), and it does not show the hold before ignition (flame on from the first frame). Entry 23's '~3 s' decision stands. The bench evidence for it is ~6 s, limited by the input cadence. The Final Summary's 'Not verified' list (real boiler, MM=0 on the bus, hold on a real ignition delay) still applies. Follow-up: TASK-1412.12 / TASK-1412.23; the cadence relation to entry 44 is open in TASK-1370.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

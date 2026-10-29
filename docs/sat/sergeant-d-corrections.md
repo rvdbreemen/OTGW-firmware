@@ -4686,3 +4686,62 @@ Option A as posted: "After a restart SAT stays quiet (hand-back state, nothing o
 **Compared with thermo-nova and the firmware:** thermo-nova has no gateway boot; on a Home Assistant restart it restores the PWM flag, the control setpoint and the modulation value (`heating_control.py:181-191`) and skips a control pass while the outside temperature is None (`climate.py:544-545`). Firmware at f4b8be6d9: boot sends CS=0 (`SATcontrol.ino:4317-4325`), starts in continuous mode (`:4338`), and the first tick after boot computes a setpoint even with outside 0.0 °C from the MsgID 27 fallback (entry 56 comparison). Not restored here: the control setpoint and modulation value (not part of option A).
 
 **Changes an earlier entry:** settles entry 120's open points; consistent with entries 39, 47, 56 and 79. **Task:** restart hand-over task (filed with this entry), TASK-1390 (outside temperature missing). **Open:** what counts as a "valid" outside temperature at boot follows entries 56/57 (missing, or older than one hour).
+
+## 122. Correction of our own record in entry 31: the 180 s is SAT's commanded ON hold, not a physical burn minimum; P versus 2P is a policy difference, not wording (2026-10-29, our finding)
+
+**Source:** none new. Our records review, TASK-1412.1, items R11 and R30 of `sat-low-load-remediation-plan-2026-10-28.md`. This is not a statement by Sergeant D. His quoted words in entry 31 stay as they are.
+
+**Corrects entry 31, in four places. The quotes stay as they are.**
+
+1. **The Settled bullet "Once the flame is on, it stays on at least 180 s (no short cycling)" is our paraphrase of his intent. It is not a burner guarantee.** His words: "SAT always keeps the flame on for at least 180 seconds". In thermo-nova the 180 s (`HEATER_STARTUP_TIMEFRAME`, `const.py:18`) works in three places:
+   - Start gate: an ON phase starts only when the mapped on-time is at least 180 s (`pwm.py:155`; firmware `SATcontrol.ino:1164-1166`; entry 80 Q38 A).
+   - Ignition wait: up to 180 s from the ON start, then the timer runs anyway (`pwm.py:194-199`; `SATcontrol.ino:1143-1148`; entry 80 Q35 A).
+   - Hold: SAT does not end the ON phase itself within 180 s of the phase's first flame (`pwm.py:201-203`; `SATcontrol.ino:1151`, skipped after a hot-water resume, entries 95/103/104).
+2. **What can end a burn sooner.** A relight inside the phase keeps the first-flame anchor (`pwm.py:144-146`; `SATcontrol.ino:1053-1060`, `:1068-1075`), so a second burn can be shorter. The cold cutoff (`SATcontrol.ino:1322-1327`, entry 12), a missing flow temperature (`:1019`; `pwm.py:122-128`), a mode switch (`:1295`), a disable, safety trip or OT loss (`:2716`) and a resume after hot water (`:1151`, entries 103 B and 104) end or skip the hold. The boiler can stop the flame by itself: maximum-temperature cutout, anti-cycling, lockout or flame loss. Commanded phase time, counted starts and measured burn time are separate quantities (TASK-1412.9 AC#3). Entries 40 and 50 ("minimum ON 180 s" for heat pumps) mean the commanded minimum ON time of the mapper (`pwm.py:53`), not a compressor runtime guarantee.
+3. **The bullet "If the flame is already on, it first completes 180 s" describes the range-1 mapping only.** With the flame on and no hot water the mapping gives ON 180 s, OFF 2P-180 (`pwm.py:246-255`; firmware `SATcontrol.ino:1105-1108`). The mapping does not check how long the flame has already burned and does not extend a flame that burns during an OFF phase.
+4. **The Firmware line ("not re-opened") and the Open line ("C6 ... is a wording point") are stale, and P versus 2P is a real difference.** At f4b8be6d9 (unchanged at 3baed73d8, docs only) the firmware matches the pin: `maxMs = upperMs * 2` (`SATcontrol.ino:1045`), range 1 (`:1103-1113`), range-2 off cap 2P-180 (`:1118`). thermo-nova: `pwm.py:55`, `:247-265`; its own test pins (0, 1800) and (180, 1620) at 4 per hour (`tests/test_pwm.py:108-117`), and our host test `tests/test_sat_hp_pwm.py:224-228` pins the same values. His quoted numbers (900 s at 4 per hour, 1200 s at 3) equal the period P, not 2P: the longest cycle is 2P in the code and P in his words. Since Q38 A (entry 80, TASK-1383) an ON phase starts only when the ON time is at least 180 s (`SATcontrol.ino:1166`), so the no-flame 2P value no longer schedules a start. P versus 2P still changes the range-1 off time with flame (1620 s versus about 720 s at 4 per hour), the range-2 off cap and the logged `pwm_off=` seconds (TASK-1407).
+
+**Effect on his answers:** none. Entries 31, 40, 50, 80, 103 and 104 stand.
+
+**Decision state:** the 180 s gate, wait and hold are decided and implemented (entries 80, 103, 104; TASK-1382/1383, de23e3ea1). The firmware follows the pin for P versus 2P. The basis is our reading of entry 29 ("Python always wins", given after entry 31); applying it here is our interpretation. He has not ruled on P versus 2P himself. Status: open, confirmation queued as Q60 (not asked yet).
+
+**Changes an earlier entry:** entry 31, first Settled bullet and the Firmware/Open lines: our wording was too broad or stale and is narrowed here.
+
+**Task:** TASK-1412.1 (R11, R30). Physical runtimes per ignition are measured under TASK-1412.9 AC#3 (bench/simulation) and TASK-1412.23 AC#2 (real equipment); P versus 2P is TASK-1412.9 AC#1. **Open:** Q60.
+
+## 123. Correction of our own description in entries 58 and 59: thermo-nova's hourly window is anchored, its cap does not bind at the default, and counting is not the ON-clock pause (2026-10-29, our finding)
+
+**Source:** none new. Our records review, TASK-1412.1, item R31. This is not a statement by Sergeant D, and no quote is invented.
+
+1. **Window shape.** Entry 59 and the TASK-1401 description call the thermo-nova window "a rolling hour (`pwm.py:138-141`)". The code resets `_current_cycle` once more than 3600 s have passed since `_first_duty_cycle_start`. That is an anchored window that restarts (the log text at `pwm.py:141` calls it "rolling"), and `reset()` clears it (`pwm.py:90`). Entry 58 uses "rolling hour" only for the firmware (:2917). Only the firmware window slides (`SATcycles.ino:328-344`, Task #203).
+2. **"Never blocks."** Entry 58 (:2910-2911) and entry 59 (:2944) mean the default `duty_cycle` 00:13:00 = 780 s (`const.py:167`, `entry_data.py:220`). Each ON start needs `on_time >= 180 s` (`pwm.py:155`), so the default cannot bind. No `config_flow` writer of `CONF_DUTY_CYCLE` was found at the pin (not found in the code).
+3. **Counting versus pause.** Entry 58's "pause" is his wording. Its effect, that a hot-water flame never counts, is the firmware's counting rule (entries 59, 89, 95, 105, 106). The firmware's pause of the ON clock during a draw is a separate deviation he decided (entry 95 Q48b; entries 103/104; TASK-1422). thermo-nova pauses neither (`heating_control.py:211`).
+4. **Sliding versus anchored** is a firmware choice, not a Sergeant D decision. Entry 59 sets only what counts and the limit. Status: open; not decided by Sergeant D; the port keeps the sliding ring per remediation plan WP3 item 6; raised to Robert, no question to Sergeant D queued.
+
+Not yet second-read: no independent reader has tried to refute the anchored-versus-sliding claim. Not checked: a `duty_cycle` options path outside the `*.py` files (translations).
+
+**Changes an earlier entry:** none; it corrects our own analysis text in entries 58/59. **Task:** TASK-1412.1 (R31); the LL-019 verification stays in TASK-1412.9. **Open:** the sliding-versus-anchored choice (Robert).
+
+## 124. Interpretation: entry 28's "derivative frozen inside the deadband" means the raw derivative; D = kd(curve) x held raw derivative still moves with the curve (2026-10-29, our reading)
+
+**Source:** none new. This is a reading of entry 28 against the pinned code, not a new statement by Sergeant D.
+
+**Reading.** Inside the deadband thermo-nova keeps `_raw_derivative` (`pid.py:205-207`). D is computed on every read as `round(kd * raw_derivative, 3)` (`pid.py:109-114`). With automatic gains, `kd = round(0.07*8400*kp, 6)` and `kp = round(coef*curve/(4|3), 6)` (`pid.py:61-93`), so the weighted D changes whenever the curve or the coefficient changes while the raw value stays fixed. Entry 28 asks for "identical to pid.py" and entry 29 says "Python always wins", so we act on the pid.py behaviour. Our reading of entry 28's "keeps the last derivative value" is therefore "the raw derivative".
+
+**Firmware (HEAD 3baed73d8; SATpid.ino unchanged since TASK-1368):** this already matches. `satPidOutput()` recomputes the gains from the current curve and sets `D = fKd * _pid_rawDerivative` (`SATpid.ino:360-369`, TASK-1368 commit 8b2f5f7f9). The code comments at `SATpid.ino:233-234` and `:244` ("FREEZES ... persists as heating curve offset") are stale for D; only the raw derivative freezes. Firmware `kd` is not rounded to 6 decimals as in `pid.py`; that is TASK-1423 (entry 95, Q28a).
+
+**Changes an earlier entry:** none (entry 28 stays as recorded). **Task:** TASK-1412.10 AC#2 (characterize inside the deadband). **Open:** none for Sergeant D unless the bench shows a D drift he did not expect; then we report it to him with the data.
+
+## 125. Correction of our own record in entries 63-66: branch ancestry, message order and quote/code attribution (2026-10-29, our finding)
+
+**Not a Sergeant D or maintainer decision.** This corrects our own wording only. Robert's decisions in entries 64 and 65 (keep the pin 7beaaf5) stand unchanged. Entries 63-66 stay as they are. Source: our records review, TASK-1412.1, item R33.
+
+**Ancestry (GitHub compare API, both directions, R33 audit 2026-10-29; the same comparison is recorded in the remediation plan section 8, lines 236-238):** 7beaaf5...7d43560 = behind, ahead 0 / behind 294, merge base 7d43560. 7d43560...7beaaf5 = ahead 294 / behind 0. develop HEAD is still 7d43560342ca9d854e92b8b5a91bdfbf9cbc2152 (2026-03-01). releases/thermo-nova HEAD is 7beaaf5 (2026-03-18). The published develop is an ancestor of the pin, so it is older. Entry 64's ancestry sentence is correct. Entry 66's Interpretation ("294 commits ahead of the pin") and its Settles wording ("develop ... a newer version than the published thermo-nova release") are wrong. The behaviour Alex described is in develop 7d43560 `pwm.py:124-131` (raw flow after the start-up EMA) and `pwm.py:138-141` (flow + 10 while the flame is off and the average on-time is under 60 s or unknown). Entry 64 cites 123-131 (off by one at the start) and entry 65 cites 139-142 (off by one at both ends). The release line no longer has that behaviour at the pin. Which commit or branch Alex means by "the newer version" is not found in the published history (an unpublished or private branch was not verified).
+
+**Message order (Discord IDs decoded to UTC):** entry 64 Alex 19:17, entry 63 19:20, our question 19:23, entry 66 Alex 19:26, entry 65 Alex 19:30. The 19:26 reply answers our 19:23 question about the PWM duty temperature (entry 64) only. It came before the 19:30 reignition statement. Entry 66's claim that it also confirms the reignition boost (entry 65) is our own extension, and its remark that the entry 65 decision was "taken before this confirmation" does not hold in posting order.
+
+**Quote versus code:** the quoted sentences in entries 64-66 are Alex's. Every file:line, branch and SHA in those entries is our reading. Entry 63's "only cleared at init and reset (pwm.py:49, :100)" is incomplete: at the pin the learned ON temperature is also seeded from live flow at `pwm.py:129-131`, `:166-167` and `:191`, the EMA runs inside the start-up window (`:145-149`) and the duty uses it at `:232`. Firmware: `SATcontrol.ino:1033`, `:1057-1063`, `:1074`, `:1278`; there is no flow + 10 boost in `SAT*.ino`.
+
+**Status updates:** entry 64's "Open: Alex's answer" is answered by entry 66. Entry 66 Open (a)/(b) stays open with Robert and is revisited only if Alex names a concrete commit newer than 7beaaf5 (following the 2026-10-26 decision in entry 64).
+
+**Changes an earlier entry:** entries 63, 64, 65, 66, wording only, as listed. **Task:** TASK-1412.1 (R33). **Open:** entry 66 Open (a)/(b), Robert.

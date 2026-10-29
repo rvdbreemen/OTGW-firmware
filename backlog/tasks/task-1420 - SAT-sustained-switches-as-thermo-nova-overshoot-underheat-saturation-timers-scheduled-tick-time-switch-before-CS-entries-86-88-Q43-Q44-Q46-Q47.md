@@ -8,7 +8,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-28T06:47:00Z'
-updated_date: '2026-10-28T22:18:00Z'
+updated_date: '2026-10-29T19:15:00Z'
 labels:
   - sat
   - sergeant-d
@@ -65,6 +65,8 @@ Verification: host tests calling the real extracted functions (tests/test_sat_ov
 2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): TASK-1412.3 dependency removed: the task is Done with its own red/green host tests (same waiver as TASK-1419); TASK-1412.3 absorbs them into LL-004/LL-020.
 
 2026-10-28 bench old vs new on the Classic+S3 (.63), replayed boiler, old = alpha.519+49135fe (same SAT code as alpha.520 for gas), new = alpha.521+2425108, overshoot margin 3.0 (bench value, not the decided default 2.0). Logs: %TEMP%\otgw-bench-1420\{A_519,C_521}. Raw lines checked by the main session. S13 overshoot: old 'sustained overshoot (flow=41.6 > sp=34.6 + 3.0)' 20:55:47, CS still continuous, 'PWM ON' one tick later 20:56:17; new '(flow=41.6 >= sp=35.6 + 3.0)' 22:22:51.194 with 'PWM ON' and cmd[CS=40.6] on the same tick. Underheat: old 150.05 s after the first qualifying tick (20:56:47 -> 20:59:17), new 180.02 s (22:23:51 -> 22:26:51). S4 saturation: old 270.13 s, new 300.03 s after the PWM ON with pwm_off=0. S2 hot-water guard: old switch 90 s after the last DHW tick (guard never arms), new 360.1 s (300 s guard + 60 s). Not shown on the bench: equality boundaries, jitter, skip paths, the exits guard (entry 108); host tests only.
+
+TASK-1412.1 records review (R27): 2026-10-29. evidence-class clarification (TASK-1412.1 R27/LL-023): the Final Summary line 'Not verified: a real boiler/bench run' means no real heating plant. The notes record a bench replay of old vs new on the Classic+S3 (.63) with a replayed boiler and overshoot margin 3.0, which is not the 2.0 default (commit 42796032f). Evidence classes: host red/green = yes; bench replay = yes; physical heating plant = no. This Done task is not a physical-performance certificate. Entry 108 (exit DHW guard) is our interpretation pending its confirmation (already queued, open-questions.md Conf-108/104/107); the exit order after the CS is our reading pending Q47b.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

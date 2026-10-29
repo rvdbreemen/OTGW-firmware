@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T11:34:00Z'
-updated_date: '2026-10-25T23:24:00Z'
+updated_date: '2026-10-29T19:17:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -45,6 +45,8 @@ Test: tests/test_sat_cycle_classifier.py cuts the real satCycleOnFlameChange/sat
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-26 implemented (workflow wf_fdae7eb9: implement, two refuting reviews Opus correctness + Sonnet SAT records/rules, fix). Reviews: 6 HIGH/MEDIUM findings; 5 fixed (switch-tick IDLE, simulation cycles all UNCERTAIN, DHW early in a short cycle, stale docs, idle flag without real-code test), 1 deferred (per-sample setpoint, TASK-1405), 1 rejected with evidence (IDLE kept at the hour-limit return, pwm.py:156-158 + entry 59). Main-session re-run on commit 9f91a8812: tests/test_sat_cycle_classifier.py 25 OK on the fix; same file against HEAD~ copies FAILED (failures=18); test_sat_pwm_override 72 OK; all tests/test_sat_*.py and test_otd_ch_override OK; evaluate --quick Failed 0. Deviations kept and documented: cold 28.2/21 (entry 11), margin 2.0 (entries 15/37), UNDERHEAT_PWM label, controlSp/requestedSp <= 0 as missing-data stand-ins, approximated PWM IDLE, no tail warm-up exclusion in the percentiles, floor-index percentiles, per-cycle setpoints. Visible effects: fewer SHORT (no continuous SHORT, PWM SHORT only in the ON phase), more OVERSHOOT (no 10 s gate), more UNCERTAIN; fLastCycleFractionCH is now the real CH fraction (ch/n). ORDERING: TASK-1331 must not land before TASK-1405.
+
+TASK-1412.1 records review (R40): 2026-10-29. scope note (TASK-1412.1, R40): 'exactly' in the title and AC#1 means classifier.py's rule set and rule order give the same results on the same metrics. The AC#1 test feeds the real classifier.py with metrics, not samples. It is not input or semantic equivalence. Still different at HEAD: one control setpoint per cycle (SATcycles.ino:782, :867-870; thermo-nova per sample, cycles/tracker.py:267-271; TASK-1405), one requested setpoint per cycle (SATcycles.ino:857; no implementation task), no warm-up exclusion for the tail percentiles (tracker.py:113-116), floor-index instead of interpolated percentiles (helpers.py:187-203), the <=0 missing-data stand-ins, the approximated PWM IDLE and the UNDERHEAT_PWM label. Only margin 2.0 (entries 15/37) and the cold setpoint (entries 7/11) are decided deviations; entry 55 approves none of the others. The plan's 'new task' for warm-up exclusion and interpolation was never filed. Input-parity proof is TASK-1412.14. This Done status is host evidence only, not a device or physical-performance certificate. Also kept and not decided: the PWM IDLE approximation rests on TASK-1387's review with pwm.py:156-158 and entry 59 as the implementer's basis (entry 59 decides only the hourly start count), and a cycle with fewer than 3 samples is classified INSUFFICIENT (tracker.py:98-100).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

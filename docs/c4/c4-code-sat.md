@@ -91,7 +91,7 @@ Central control loop, heating curve calculation, setpoint management, SAT-owned 
 
 - `satManufacturerTable[]` (PROGMEM): MemberID to name and quirk flags (18 entries, index matches `SATManufacturer`, AUTO=0 is skipped). Quirks: `SAT_QUIRK_MIN_MOD_10`, `SAT_QUIRK_IMMERGAS_TP`, `SAT_QUIRK_NO_REL_MOD`, `SAT_QUIRK_MI_500_BOOT`
 - `SAT_CMD_REFRESH_MS` (300 s), `SAT_PIC_CS_KEEPALIVE_MS` (30 s), `SAT_MIN_SETPOINT` (10 C), `SAT_GLOBAL_MAX_SETPOINT` (65 C), `SAT_HARD_MAX_FLOOR` (50 C), `SAT_HARD_MAX_RAD` (80 C), `SAT_COLD_SETPOINT_RAD` (28.2 C) and `SAT_COLD_SETPOINT_FLOOR` (21 C, below which the boiler is commanded off, TASK-891.2)
-- Heating system (`SAT_HSYS_AUTO/RADIATORS/UNDERFLOOR`) and heating source (`SAT_SRC_AUTO/GAS_BOILER/HEAT_PUMP/HYBRID`, TASK-891.8) are separate settings. Heat-pump source forces MM=100 outside PWM (the configured maximum in PWM), a 2-starts-per-hour cap and a user-selectable PWM cycle length (`iHpCycleSeconds`, 1800 or 2400 s; the minimum on-time is 180 s for every source, TASK-1366)
+- Heating system (`SAT_HSYS_AUTO/RADIATORS/UNDERFLOOR`) and heating source (`SAT_SRC_AUTO/GAS_BOILER/HEAT_PUMP/HYBRID`, TASK-891.8) are separate settings. Heat-pump source forces MM=100 outside PWM (the configured maximum in PWM), no hourly PWM start limit (entry 81, TASK-1419) and a user-selectable PWM cycle length (`iHpCycleSeconds`, 1800 or 2400 s; the minimum on-time is 180 s for every source, TASK-1366)
 
 #### State machines
 

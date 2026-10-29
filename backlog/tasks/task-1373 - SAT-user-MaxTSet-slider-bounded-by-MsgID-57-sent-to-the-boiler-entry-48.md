@@ -4,7 +4,7 @@ title: 'SAT: user MaxTSet slider bounded by MsgID 57, sent to the boiler (entry 
 status: To Do
 assignee: []
 created_date: '2026-10-25T06:31:00Z'
-updated_date: '2026-10-28T19:19:00Z'
+updated_date: '2026-10-29T19:15:00Z'
 labels:
   - sat
   - webui
@@ -27,7 +27,7 @@ Sergeant D 2026-10-25 05:56/06:10 UTC (#alpha-testing 1563793351961223221, 15637
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A MaxTSet slider in the v2 SAT page bounded by MsgID 57 (fallback 20..80) sets the value, the gateway sends it to the boiler (SH= on PIC, MsgID 57 write on OT-Direct) and SAT uses it as its ceiling (host test + bench capture); HA number entity + MQTT documented
+- [ ] #1 A MaxTSet slider in the v2 SAT page bounded by the boiler's MsgID 49 MaxTSet upper/lower bounds (fallback 20..80 when MsgID 49 is not reported; entry 100, Q41 A) sets the value; the gateway always sends it to the boiler as MsgID 57 (SH= on PIC, MsgID 57 write on OT-Direct) with no MsgID 6 gate (entry 100), and SAT caps every CS it sends at that value, ignition hold included (entries 51, 54) (host test + bench capture); HA number entity + MQTT documented
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -44,4 +44,6 @@ Entry 54 (2026-10-25 07:31): with the slider at 48 SAT never sends a CS above 48
 2026-10-28 Q41 A (entry 100, msg 1564918647338700851): bounds from MsgID 49 (20/80 fallback), always send SH= (MsgID 57), no MsgID 6 gate, SAT caps CS itself. Defaults 62/55 (entry 67) wait on Q15b (underfloor 50 C ceiling, heat-pump default).
 
 2026-10-28 entry 110 (Q15b B): keep the 50 C underfloor ceiling; underfloor default max flow 50 C (was 55 in entry 67); radiators 62. Heat-pump default still open.
+
+TASK-1412.1 records review (R29): 2026-10-29. TASK-1412.1 R29 reconciliation: AC#1 aligned with entry 100 (Q41 A). Bounds from MsgID 49 (OTGW-Core.h:423), value MsgID 57 (OTGW-Core.h:431, OTDirect.ino:143), 20/80 fallback, no MsgID 6 gate. The title keeps entry 48's original wording as history; entry 100 is the dated correction. Defaults: radiators 62 (entry 67), underfloor 50 (entry 110, changes entry 67). The heat-pump default and whether an unchosen default is written to the boiler are still OPEN (entry 110 'Open', not asked yet). Do not implement a heat-pump default by assumption. The 2026-10-25 citation SATcontrol.ino:1030-1032 (ignition hold) no longer matches the current source. Re-locate it under TASK-1412.13 AC#2. Not implemented: no user MaxTSet setting exists in the current source (SATtypes.h:533 is the global 65 ceiling; SATcontrol.ino:302-309 fixed caps).
 <!-- SECTION:NOTES:END -->

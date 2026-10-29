@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T14:36:00Z'
-updated_date: '2026-10-29T15:08:00Z'
+updated_date: '2026-10-29T15:28:00Z'
 labels:
   - sat
   - weather
@@ -35,4 +35,6 @@ Found in gruijter's field capture (TASK-1474, alpha.527, 2026-10-29). All 18-20 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-29 lead: fix = http.useHTTP10(true) before GET (HTTPClient.cpp:487-489, :1139-1160: HTTP/1.0, _reuse=false, no chunked), early return when the top-level object closes, and a latent wstreamSkipArray bug (loop read one byte past the closing ']', swallowing the '}' of hourly after the skipped cloud_cover_low/mid arrays, so depth never reached 0). Host test tests/test_weather_stream_tail.py on the real parser: HEAD tail_ms=5002 (2 failures: tail + source check), fix tail_ms=0, Ran 4 OK; parsed current and forecast values identical on both. evaluate --quick 0 FAIL. Review: lead read the 10-line diff against the HTTPClient source; no separate reviewer team for this size. AC#3 needs a bench run with weather enabled.
+
+2026-10-29: alpha.534+f4b8be6 built (2 jobs, SUCCESS), pushed, posted (msg 1565386732751556780). AC#3 pending: bench .61 (weather enabled, hd_max_loop_gap_ms 8176 on alpha.512) will run alpha.535 after TASK-1479; Taken session captures ~1 h of fetches there. .63 offline.
 <!-- SECTION:NOTES:END -->

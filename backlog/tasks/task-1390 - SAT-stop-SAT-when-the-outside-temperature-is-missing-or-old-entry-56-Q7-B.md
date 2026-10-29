@@ -1,10 +1,11 @@
 ---
 id: TASK-1390
 title: 'SAT: stop SAT when the outside temperature is missing or old (entry 56, Q7 B)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T13:17:00Z'
-updated_date: '2026-10-29T14:39:00Z'
+updated_date: '2026-10-29T19:05:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -39,4 +40,6 @@ Sergeant D 2026-10-25 (Q7: B, entry 56): when the outside temperature is missing
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
 
 Field evidence 2026-10-29 (gruijter, alpha.527, TASK-1474): after a Task-watchdog reboot at 12:56:52 SAT ran with outside=0.0 in every control tick 12:57:24-13:01:24 (curve 33.2 instead of 28.0, CS 33.3-34.1) until the first weather fetch at 13:01:53. No MsgID 27 on that bus; satGetOutsideTemp falls back to the bus value 0.0 while weather is invalid (SATcontrol.ino ~1730-1733) and weatherLoop waits WEATHER_POLL_MIN_SEC = 300 s on purpose (SATweather.ino:28, ~418-420).
+
+2026-10-29: implemented together with TASK-1482 (same validity rule); plan in TASK-1482, waits for Sergeant D's OK on the open points.
 <!-- SECTION:NOTES:END -->
