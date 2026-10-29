@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-24T10:11:00Z'
-updated_date: '2026-10-24T13:21:00Z'
+updated_date: '2026-10-29T20:58:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -29,6 +29,8 @@ Found by the SAT port audit 2026-10-24 (docs/sat/sat-port-audit-2026-10-24.md), 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-24 evidence: tests/test_sat_wizard_coefficient.py 4/4 OK on fix, 4 failures on HEAD v2.js/SATtypes.h (presets 1.4/0.6/0.8, unconditional satcoefficient write, slider not from stored value, default 1.5). Other SAT tests, settings whitelist, webui asset versioning OK; evaluate --quick 0 failed; build.bat SUCCESS 15:19. Bench (OTA, settings 178 keys unchanged): stored SATcoefficient 0.60 before and after the upgrade (0.60 itself was written by the old wizard's underfloor preset). Range 0.1-5 vs thermo-nova 0.1-12 left as is (audit #28, not asked yet). Not verified: the wizard run in a browser (Playwright MCP not connected).
+
+2026-10-29: Sergeant D entry 70 (2026-10-27): coefficients written by the old wizard (1.4/0.6/0.8) stay as they are; this task already implements that (stored values kept, default 2.0 per entry 24). No scope change.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
