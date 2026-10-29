@@ -952,8 +952,8 @@ class ForcePwmRemoved(unittest.TestCase):
     def test_retired_entity_table_clears_the_old_discovery_and_state_topic(self):
         src = (REPO / "src" / "OTGW-firmware" / "MQTTHaDiscovery.cpp").read_text(encoding="utf-8")
         rows = [l for l in src.splitlines() if "RETIRED-SAT-ENTITY" in l and "{" in l]
-        self.assertEqual(len(rows), 3)
-        self.assertIn('"switch", "sat_force_pwm_enable", "/sat/force_pwm_enable"', rows[0])
+        # the table grows with every retired entity (TASK-1341, 1282, 1460): check this row, not the count
+        self.assertTrue(any('"switch", "sat_force_pwm_enable", "/sat/force_pwm_enable"' in r for r in rows), rows)
         self.assertIn("clearRetiredSatEntities(ctx);", (REPO / "src" / "OTGW-firmware" / "MQTTstuff.ino").read_text(encoding="utf-8"))
 
     def test_old_settings_key_is_ignored_silently(self):

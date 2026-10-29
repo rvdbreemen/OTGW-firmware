@@ -3737,7 +3737,8 @@ static bool publishEmptyRetained(const char *topic) {
 // here and its retained topics are emptied on every SAT discovery pass. Lines
 // marked RETIRED-SAT-ENTITY are the only places the removed names may remain.
 struct RetiredSatEntity {
-  const char *component;     // HA component type: the discovery topic is <prefix>/<component>/<node>/<objectId>/config
+  const char *component;     // HA component type: the discovery topic is <prefix>/<component>/<node>/<objectId>/config,
+                             // or nullptr (with objectId nullptr) for a retained state topic that had no discovery config
   const char *objectId;
   const char *stateSub;      // retained state topic below mqttPubTopic, or nullptr
 };
@@ -3745,6 +3746,8 @@ static const RetiredSatEntity kRetiredSatEntities[] PROGMEM = {
   { "switch", "sat_force_pwm_enable", "/sat/force_pwm_enable" },   // RETIRED-SAT-ENTITY TASK-1332
   { "switch", "sat_pwm_auto_switch_enable", "/sat/pwm_auto_switch_enable" },   // RETIRED-SAT-ENTITY TASK-1341
   { "switch", "sat_comfort_adjust_enable", "/sat/comfort_adjust_enable" },   // RETIRED-SAT-ENTITY TASK-1282
+  { "switch", "sat_ovp_enabled", "/sat/ovp_enabled" },   // RETIRED-SAT-ENTITY TASK-1460 (removed in TASK-891.6)
+  { nullptr, nullptr, "/sat/ovp_value" },   // RETIRED-SAT-ENTITY TASK-1460: retained value topic, no entity
 };
 
 void clearRetiredSatEntities(const HaDiscoveryContext &ctx) {
@@ -3752,8 +3755,10 @@ void clearRetiredSatEntities(const HaDiscoveryContext &ctx) {
   for (size_t i = 0; i < sizeof(kRetiredSatEntities) / sizeof(kRetiredSatEntities[0]); i++) {
     RetiredSatEntity e;
     memcpy_P(&e, &kRetiredSatEntities[i], sizeof(e));
-    snprintf_P(topic, sizeof(topic), PSTR("%s/%s/%s/%s/config"), ctx.haPrefix, e.component, ctx.nodeId, e.objectId);
-    publishEmptyRetained(topic);
+    if (e.component && e.objectId) {
+      snprintf_P(topic, sizeof(topic), PSTR("%s/%s/%s/%s/config"), ctx.haPrefix, e.component, ctx.nodeId, e.objectId);
+      publishEmptyRetained(topic);
+    }
     if (e.stateSub) {
       snprintf_P(topic, sizeof(topic), PSTR("%s%s"), ctx.mqttPubTopic, e.stateSub);
       publishEmptyRetained(topic);

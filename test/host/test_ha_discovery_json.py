@@ -290,9 +290,11 @@ def retired_sat_topic_tails(rev=None):
     """Topic tails that clearRetiredSatEntities() empties, read from kRetiredSatEntities[] in the
     revision's MQTTHaDiscovery.cpp (the RETIRED-SAT-ENTITY rows), never kept by hand: TASK-1282
     added a row there and a hand-kept copy here missed it (TASK-1443)."""
-    rows = re.findall(r'\{\s*"\w+",\s*"(\w+)",\s*(?:"([^"]+)"|nullptr)\s*\},\s*//\s*RETIRED-SAT-ENTITY',
-                      read(DISC, rev))
-    return tuple(t for obj, sub in rows for t in (f"/{obj}/config", sub) if t)
+    # A row is { component, objectId, stateSub }; component and objectId are nullptr for a retired
+    # retained state topic that never had a discovery config (TASK-1460: sat/ovp_value).
+    rows = re.findall(r'\{\s*(?:"\w+"|nullptr),\s*(?:"(\w+)"|nullptr),\s*(?:"([^"]+)"|nullptr)\s*\},'
+                      r'\s*//\s*RETIRED-SAT-ENTITY', read(DISC, rev))
+    return tuple(t for obj, sub in rows for t in ((f"/{obj}/config" if obj else ""), sub) if t)
 
 
 # The working tree's list. An older revision (--old-rev) has the same rows or fewer, and a row it
@@ -596,6 +598,14 @@ def main():
     state_topic3 = f"{fix[0]['pub']}/sat/comfort_adjust_enable"
     checks.append((f"TASK-1282 FIX: the run emits the empty retained publish to {cfg_topic3} and {state_topic3}",
                    cfg_topic3 in emitted and state_topic3 in emitted))
+    # TASK-1460: the OVP switch removed in ad8f7fb9d (TASK-891.6), and its retained value topic
+    # (sat/ovp_value had no discovery entity, so only the state topic is emptied)
+    cfg_topic4 = f"{fix[0]['prefix']}/switch/{fix[0]['node']}/sat_ovp_enabled/config"
+    state_topic4 = f"{fix[0]['pub']}/sat/ovp_enabled"
+    value_topic4 = f"{fix[0]['pub']}/sat/ovp_value"
+    checks.append((f"TASK-1460 FIX: the run emits the empty retained publish to {cfg_topic4}, {state_topic4} "
+                   f"and {value_topic4}",
+                   cfg_topic4 in emitted and state_topic4 in emitted and value_topic4 in emitted))
     # TASK-1201: one config topic per uniq_id, and the one-time clear never empties a live config.
     fix_dups = dup_uniq_ids(fix)
     checks.append((f"TASK-1201 FIX: no uniq_id on two config topics in any permutation (got {fix_dups})",
