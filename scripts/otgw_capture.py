@@ -1362,13 +1362,17 @@ def load_settings():
 def save_settings(args, persist_password):
     """Remember the last-used values to pre-fill the next run's prompts. The MQTT
     password is written only with -SaveSecrets and a non-empty password; a stored
-    one is otherwise kept as it was (TASK-833, TASK-879)."""
+    one is otherwise kept as it was (TASK-833, TASK-879). A run without a broker
+    leaves the saved MQTT values alone, so the next run still pre-fills them
+    (TASK-1453)."""
     path = settings_path()
     try:
         previous = load_settings()
         data = dict(previous)  # keep keys other tools added (WifiSsid, Hardware, ...)
-        data.update({"DeviceHost": args.device, "BrokerHost": args.broker or "", "BrokerPort": args.broker_port,
-                     "Topic": args.topic, "Username": args.username or ""})
+        data["DeviceHost"] = args.device
+        if args.broker:
+            data.update({"BrokerHost": args.broker, "BrokerPort": args.broker_port,
+                         "Topic": args.topic, "Username": args.username or ""})
         if persist_password and args.password:
             data["MqttPassword"] = args.password
         path.parent.mkdir(parents=True, exist_ok=True)

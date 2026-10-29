@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:25:00Z'
-updated_date: '2026-10-29T23:03:00Z'
+updated_date: '2026-10-29T23:09:00Z'
 labels:
   - port-from-1.x
   - tooling
@@ -97,14 +97,14 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 <!-- AC:BEGIN -->
 - [x] #1 capture-mqtt-debug.bat and capture-mqtt-debug.sh on dev start and capture telnet, device probe and crashlog with no broker given: the old scripts stop with 'BrokerHost is required.' / 'Broker host is required.' (red); the new scripts run and write one summary/status line saying the MQTT capture was skipped (green). Both runs are recorded as evidence.
 - [x] #2 A non-interactive run (stdin redirected, or --no-prompt on .sh) with no broker is not prompted for a broker or MQTT username and does not hang.
-- [x] #3 With a broker given, MQTT capture behaves as before: same mqtt.log content and same summary lines apart from the new toggle-restore line.
-- [x] #4 After a capture that switched toggles on, every non-simulator toggle is back in the state shown in the first banner of that capture. Shown on the bench (.61 OTGW32 or .63 Classic-S3) by the telnet banner after stop: old script leaves e.g. REST API/MQTT/Sensors on (red), new script restores them (green).
-- [x] #5 The restore also works after a mid-capture reconnect without a reboot. Test with a forced telnet drop, keepalive or watchdog path: the restore compares states and does not replay the keys of the last connect.
-- [x] #6 Simulator toggles (SensorSim, OTGW-Sim) are never sent by the restore.
-- [x] #7 When the device is unreachable at stop, the restore logs 'Debug toggles restore failed (device likely gone)' within a bounded time, and the capture still finishes and merges the transcript with the same exit code as without the restore.
-- [x] #8 tests/test_capture_telnet_worker.py (or a sibling test) runs the real extracted Python worker against the fake device and covers the restore: red on the current worker, green on the fix.
-- [x] #9 The new tool (scripts/otgw_capture.py, TASK-1475) compiles on Python 3.9+, the .sh launcher passes bash -n and shellcheck, the .bat launcher runs on cmd (replaces the PowerShell-parser AC: the payloads are gone, ADR-202)
-- [x] #10 python evaluate.py --quick green (host tooling only: no firmware change, so no firmware build; replaces the esp32/classic/combo build AC, combo-only directive 2026-10-29)
+- [x] #3 After a capture that switched toggles on, every non-simulator toggle is back in the state shown in the first banner of that capture. Shown on the bench (.61 OTGW32 or .63 Classic-S3) by the telnet banner after stop: old script leaves e.g. REST API/MQTT/Sensors on (red), new script restores them (green).
+- [x] #4 The restore also works after a mid-capture reconnect without a reboot. Test with a forced telnet drop, keepalive or watchdog path: the restore compares states and does not replay the keys of the last connect.
+- [x] #5 Simulator toggles (SensorSim, OTGW-Sim) are never sent by the restore.
+- [x] #6 When the device is unreachable at stop, the restore logs 'Debug toggles restore failed (device likely gone)' within a bounded time, and the capture still finishes and merges the transcript with the same exit code as without the restore.
+- [x] #7 tests/test_capture_telnet_worker.py (or a sibling test) runs the real extracted Python worker against the fake device and covers the restore: red on the current worker, green on the fix.
+- [x] #8 The new tool (scripts/otgw_capture.py, TASK-1475) compiles on Python 3.9+, the .sh launcher passes bash -n and shellcheck, the .bat launcher runs on cmd (replaces the PowerShell-parser AC: the payloads are gone, ADR-202)
+- [x] #9 python evaluate.py --quick green (host tooling only: no firmware change, so no firmware build; replaces the esp32/classic/combo build AC, combo-only directive 2026-10-29)
+- [x] #10 With a broker given, the MQTT stream is captured as before: the same mqtt.log content ('topic payload' lines). The summary keeps its other lines; the mosquitto_sub start/exit lines are replaced by the paho 'MQTT connected' / 'MQTT capture' lines, by design (ADR-202, TASK-1475 replaces mosquitto_sub with paho-mqtt). Rewritten 2026-10-30: the old text 'same summary lines apart from the toggle-restore line' cannot hold once mosquitto_sub is gone.
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -117,14 +117,14 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Fixed in the new capture tool (TASK-1475, ADR-202). Evidence in docs/evidence/task1475/README.md.
-- AC#1: old .sh stops with 'Broker host is required.' (bench run 6). New tool runs and logs 'MQTT capture skipped: no BrokerHost given (telnet, probe and crash log still run).' (bench run 5, Linux; test_k). Side finding: the old .bat with a saved BrokerHost does not fail; it pre-fills it and captures without end.
-- AC#2: stdin redirected means no prompt (test_k and bench run 5).
-- AC#3: with a broker, mqtt.log content is identical to the old .bat/.sh runs. The summary differs by design: paho 'MQTT connected/capture' lines replace the mosquitto_sub lines (ADR-202).
-- AC#4: bench .63. Old .bat and old .sh left REST API/MQTT/Sensors/NTP on; new tool restored them on Windows and Linux.
-- AC#5: test_m (reconnect without reboot, states compared, key sent once each way).
-- AC#6: test_l (simulator key never sent).
-- AC#7: test_n (device gone: 'restore failed (device likely gone)' within 20 s, exit 0).
-- AC#8: tests/test_capture_tool.py runs the real tool. The red side is the old scripts on the bench, which have no restore; the old heredoc worker test was retired with the payload.
-- AC#9: tool on Python 3.9.13/3.12/3.14; .sh shellcheck 0.11.0 + bash -n clean; .bat ran on cmd (bench run 2 and the bootstrap runs).
-- AC#10: evaluate.py --quick 79 passed / 0 failed.
+- AC#1: old .sh stops with 'Broker host is required.' (bench run 6). New tool runs and logs 'MQTT capture skipped: no BrokerHost given (telnet, probe and crash log still run).' (bench run 5, Linux; test_k). Side finding: the old .bat with a saved BrokerHost does not fail; it pre-fills it and captures without end. A run without a broker now also keeps the saved broker/user/password for the next run's prefill (test_r: red on the first implementation, green on the fix).
+- AC#2: stdin redirected means no prompt (test_k, bench run 5).
+- AC#3 (old #4): bench .63. Old .bat and old .sh left REST API/MQTT/Sensors/NTP on; new tool restored them on Windows and Linux.
+- AC#4 (old #5): test_m (reconnect without reboot, states compared).
+- AC#5 (old #6): test_l, and red-1453-restore.txt (simulator key never sent).
+- AC#6 (old #7): test_n (device gone: 'restore failed (device likely gone)' within 20 s, exit 0).
+- AC#7 (old #8): red-1453-restore.txt runs the extracted old worker and the new tool against the same fake device. Old: OTmsg/MQTT left on, restored False (red). New: restored True (green). Host tests test_l/test_m/test_n run the real tool.
+- AC#8: tool on Python 3.9.13/3.12/3.14; .sh shellcheck 0.11.0 + bash -n clean; .bat ran on cmd.
+- AC#9: evaluate.py --quick 79 passed / 0 failed.
+- AC#10 (rewritten old AC#3): mqtt.log content identical across the old .bat, old .sh and new runs on the bench ('otgw-firmware/value/bench 42'); paho lines replace the mosquitto_sub lines by design.
 <!-- SECTION:FINAL_SUMMARY:END -->

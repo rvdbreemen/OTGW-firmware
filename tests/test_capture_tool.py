@@ -515,6 +515,24 @@ class ToolCase(unittest.TestCase):
             self.assertEqual(saved["DeviceHost"], "127.0.0.1")
             self.assertNotIn("MqttPassword", saved)
 
+    def test_r_run_without_broker_keeps_saved_mqtt_prefill(self):
+        """TASK-1453 risk: saving an empty BrokerHost must not break the next run's prefill."""
+        dev = FakeDevice()
+        self.addCleanup(dev.shutdown)
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = Path(tmp) / "s.json"
+            seeded = {"DeviceHost": "old-host", "BrokerHost": "broker.lan", "BrokerPort": 1884, "Topic": "otgw/#",
+                      "Username": "otgw", "MqttPassword": "kept-secret", "WifiSsid": "bench"}
+            settings.write_text(json.dumps(seeded), encoding="utf-8")
+            env = dict(os.environ, OTGW_CAPTURE_SETTINGS=str(settings))
+            r = subprocess.run([sys.executable, str(TOOL), "--device", "127.0.0.1", "--broker", "", "--duration", "2",
+                                "--output-root", tmp, "--skip-browser-capture", "--skip-crashlog-capture", "--skip-http-probes",
+                                "--telnet-idle-check-seconds", "0", "--telnet-port", str(dev.telnet_port),
+                                "--http-port", str(dev.http_port)], stdin=subprocess.DEVNULL, capture_output=True, env=env, timeout=60)
+            self.assertEqual(r.returncode, 0, r.stdout.decode(errors="replace"))
+            saved = json.loads(settings.read_text(encoding="utf-8"))
+            self.assertEqual(saved, dict(seeded, DeviceHost="127.0.0.1"))
+
     def test_q_browser_child_dies_with_the_tool(self):
         if not (os.name == "nt" or sys.platform.startswith("linux")):
             self.skipTest("kill-with-parent is implemented for Windows and Linux")

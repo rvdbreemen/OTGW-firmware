@@ -67,4 +67,16 @@ Collected 2026-10-29/30 by session otgw-firmware-b1 in worktree `wt-1475`.
 - `test_l`: simulators are never sent (key `8`).
 - `test_n`: the device is gone at stop. The tool reports `restore failed (device likely gone)` within 20 s, and exit 0.
 
-The red side is the old scripts on the bench: neither has a restore at all.
+The red side is the old scripts on the bench: neither has a restore at all. Host-level red/green comes from `red-1453-restore.txt` (script `red_1453.py`). The extracted old worker and the new tool run against the same fake device:
+- old: OTmsg and MQTT are left on (`restored: False`);
+- new: `restored: True`;
+- neither sends the simulator key.
+
+**TASK-1453 risk: prefill after a run without a broker.** Host test `test_r`:
+1. Seed the settings file with broker, user and password.
+2. Run with `--broker ""`.
+3. Every MQTT value must survive.
+
+It is red on the first implementation, which wrote `BrokerHost: ''`, and green on the fix.
+
+Helper scripts used above: `toggles.py`, `red_1396.py`, `red_1453.py` (they read the old `.sh` from a scratch copy of `origin/dev:scripts/capture-mqtt-debug.sh`).

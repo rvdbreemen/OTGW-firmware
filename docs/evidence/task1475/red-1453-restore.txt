@@ -1,0 +1,2 @@
+OLD worker (origin/dev .sh): start {'OTmsg': '0', 'REST API': '1', 'MQTT': '0', 'SensorSim': '0'} -> after stop {'OTmsg': '1', 'REST API': '1', 'MQTT': '1', 'SensorSim': '0'}; restored: False; simulator key sent: False
+NEW otgw_capture.py: start {'OTmsg': '0', 'REST API': '1', 'MQTT': '0', 'SensorSim': '0'} -> after stop {'OTmsg': '0', 'REST API': '1', 'MQTT': '0', 'SensorSim': '0'}; restored: True; simulator key sent: False
