@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T10:49:00Z'
+updated_date: '2026-10-29T14:39:00Z'
 labels:
   - needs-maintainer-ok
   - sat
@@ -28,3 +29,9 @@ Tester martreides (#alpha-testing msg 1565312598595993792, 2026-10-29) runs the 
 - [ ] #2 Bench test with outbound internet blocked (router firewall drop rule, MikroTik): no loop gap above the normal maximum, no reboot, SAT keeps running on its fallbacks; evidence = capture transcript
 - [ ] #3 Each failure path logs at most once per retry interval and backs off; any path that fails this gets a fix or its own task
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Related: TASK-1478 (found in gruijter's capture, TASK-1474): even with working internet every Open-Meteo fetch blocks the loop ~5 s because the stream parser waits for the 5 s byte timeout on a keep-alive socket. Same class as this task; fix them together or in order.
+<!-- SECTION:NOTES:END -->
