@@ -1,11 +1,11 @@
 ---
 id: TASK-1261
 title: 'Fix: ESP8266 stays in modem-sleep, AP drops it for inactivity (GH #681)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: 2026-10-19 18:02
-updated_date: '2026-10-22T04:25:00Z'
+updated_date: '2026-10-29T05:16:00Z'
 labels:
   - bug
 dependencies: []
@@ -27,8 +27,7 @@ Verified in code: the 1.x source and vendored libraries never call WiFi.setSleep
 <!-- AC:BEGIN -->
 - [x] #1 1.x calls WiFi.setSleepMode(WIFI_NONE_SLEEP) after every successful WiFi connect, including reconnects, verified on the bench unit via telnet log or WiFi.getSleepMode()
 - [x] #2 Bench gateway current/heap impact noted (free heap before/after, no new instability over 24 h)
-- [ ] #3 theaprilhare reports AP inactivity disassociations with router scb_activity_time back at 5 s, on a beta carrying the change
-- [x] #4 esp8266 build and evaluate.py --quick green
+- [x] #3 esp8266 build and evaluate.py --quick green
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -61,4 +60,16 @@ Approved by Robert 2026-10-19. No push (check_otgw_issues rule).
 2026-10-21 07:3x AC #2 PASS (bench .88.68, 1.7.8-beta.5+d92c03f): bootcount 8 (unchanged since baseline 2026-10-20 04:33:50), device uptime 1d02:54, MikroTik wlan2 registration uptime 1d02:56:31 (>= 24h; last disconnect in /log is the 04:32:54 RTS reset, deauth reason 3), freeheap 16800 (baseline 17608, range seen 16608-18072), RSSI -72. Remaining open: AC #3 (theaprilhare field report, not self-verifiable).
 
 2026-10-22: theaprilhare (#681, 2026-10-21 12:02Z) ran beta.4 25 h with router scb_activity_time still at 60 (not 5, so AC#3 stays open): sleep mode 0 confirmed via telnet r; 7 AP episodes in 25 h (4 during a disturbed-laptop window) vs ~2-4/day on 1.7.7; MQTT disconnects 0.84/h -> 0.44/h; no stuck WiFi ending in a self-reboot (was twice in 3 days). Episodes still start with 'Disassociated due to inactivity (4)' + '(8)' in the same second, then a few '(2)' handshake failures, now recovering in 20-100 s. Separate 20-min ARP-expiry stalls split off to TASK-1290.
+
+2026-10-29: maintainer decision (relayed via the 2.0.0 session otgw-firmware-c5): AC#3 is dropped. The reporter will not set scb_activity_time back to 5 s; the fix is closed on bench evidence (AC#1, AC#2 24 h PASS) plus the field report on beta.4 (sleep mode 0 confirmed, AP episodes and MQTT disconnects roughly halved, no stuck-WiFi self-reboots). Remaining inactivity drops are tracked in TASK-1262 and TASK-1290.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+1.x now calls WiFi.setSleepMode(WIFI_NONE_SLEEP) after every successful connect and reconnect, so the ESP8266 no longer sits in modem-sleep and the AP has less reason to drop it for inactivity (GH #681). Shipped in v1.7.8-beta.4.
+
+Verification: bench .68 readout sleep mode 2 (MODEM_SLEEP) on the old logic, 0 with the fix, also after two AP kicks; heap unchanged (16.6-18.1 KB); 24 h bench run without reboot or disassociation (registration uptime 1d02:56). Field (theaprilhare, beta.4, 25 h): sleep mode 0 confirmed, AP episodes and MQTT disconnects roughly halved, no stuck-WiFi self-reboots.
+
+Dropped AC: a field run with the router's scb_activity_time back at 5 s (maintainer decision). Remaining inactivity drops: TASK-1262, TASK-1290.
+<!-- SECTION:FINAL_SUMMARY:END -->
