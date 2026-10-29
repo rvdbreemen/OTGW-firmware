@@ -4007,10 +4007,10 @@ paths:
         `heating_curve`, `deadband`, `boiler_capacity`, `heating_system`,
         `overshoot_margin`, `manufacturer`, `simulation`, `auto_tune`, etc.).
 
-        Special no-value commands (`reset_integral`, `ovp_start`, `ovp_stop`) are
-        also accepted here without a body.
+        The special no-value command `reset_integral` is also accepted here
+        without a body.
 
-        See the [SAT MQTT topics reference](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/backlog/docs/doc-1%20-%20sat-mqtt-topics.md)
+        See the [SAT section of the MQTT reference](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/api/MQTT.md#sat-smart-autotune-thermostat)
         for the full list of setting names and valid payload formats.
       operationId: setSatSetting
       parameters:

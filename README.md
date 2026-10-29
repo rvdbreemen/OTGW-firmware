@@ -138,7 +138,7 @@ Commands via MQTT or the REST API (`/api/v2/sat/*`) control all SAT parameters a
 | Reference | Link |
 |---|---|
 | MQTT topics | [docs/api/MQTT.md](docs/api/MQTT.md) |
-| Full SAT topic list | [backlog/docs/doc-1 - sat-mqtt-topics.md](backlog/docs/doc-1%20-%20sat-mqtt-topics.md) |
+| Full SAT topic list | [docs/api/MQTT.md, section SAT](docs/api/MQTT.md#sat-smart-autotune-thermostat) |
 | REST API | [docs/api/openapi.yaml](docs/api/openapi.yaml) |
 | OPV calibration guide | [backlog/docs/doc-2 - sat-opv-calibration.md](backlog/docs/doc-2%20-%20sat-opv-calibration.md) |
 | Preset configuration | [backlog/docs/doc-4 - sat-preset-configuration.md](backlog/docs/doc-4%20-%20sat-preset-configuration.md) |

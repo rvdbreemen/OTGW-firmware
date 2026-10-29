@@ -930,7 +930,7 @@ Op standaard ESP8266+PIC wordt alleen `otgw-otdirect/available` gepubliceerd met
 | `sat/solar_gain` | nee | Zonne-opbrengstcompensatie actief |
 | `sat/summer_active` | nee | Zomer-simmeronderdrukking actief |
 
-Aanvullende settings echo topics, BLE-sensoronderwerpen en multi-zone-onderwerpen zijn gedocumenteerd in `backlog/docs/doc-1 - sat-mqtt-topics.md`.
+Aanvullende settings echo topics, BLE-sensoronderwerpen en multi-zone-onderwerpen zijn gedocumenteerd in `docs/api/MQTT.md`, sectie "SAT (Smart Autotune Thermostat)".
 
 **Dallas temperatuursensoren**:
 

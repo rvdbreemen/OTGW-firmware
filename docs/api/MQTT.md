@@ -295,7 +295,7 @@ The exact set of published topics depends on which OpenTherm message IDs the the
 
 ### SAT (Smart Autotune Thermostat)
 
-Topics are under the standard publish namespace when SAT is enabled. The complete topic inventory is in [backlog/docs/doc-1 - sat-mqtt-topics.md](../../backlog/docs/doc-1%20-%20sat-mqtt-topics.md).
+Topics are under the standard publish namespace when SAT is enabled. This section is the complete topic inventory; the SAT Home Assistant entities are in [SAT Discovery Entities](#sat-discovery-entities).
 
 #### Publish semantics (ADR-111, since 2.0.0-alpha.72)
 
@@ -1126,7 +1126,7 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 | `sat/valve_offset` | `SATvalveoffset` | Valve offset (-1 to 1). Stored and published; the control loop does not use it today |
 | `sat/solar_freeze_integral` | `SATsolarfreezeint` | Freeze PID integral during solar gain |
 
-The full reference with payload ranges and defaults is in the [SAT MQTT topics document](../../backlog/docs/doc-1%20-%20sat-mqtt-topics.md).
+The full list of SAT topics, with payload formats, is in [SAT (Smart Autotune Thermostat)](#sat-smart-autotune-thermostat) above; setting ranges and defaults are in the SAT chapter of the user manual (`docs/manuals/en/ch05-sat-thermostat.md`).
 
 **Example**  - Set SAT target to 21.5°C:
 ```bash
@@ -1214,15 +1214,15 @@ Where:
 
 ### Entity Inventory
 
-The firmware emits the following entity categories (verified against `MQTTHaDiscovery.cpp` on `feature-dev-2.0.0-otgw32-esp32-sat-support`):
+The firmware emits the following entity categories (`MQTTHaDiscovery.cpp` and the discovery loop in `MQTTstuff.ino` on `dev`):
 
 | Component | Count | Source | Notes |
 |-----------|-------|--------|-------|
-| `sensor` | 289 | PROGMEM table `mqttHaSensorCfg[]` (indexed via `mqttHaSensorIndex[256]`) | Covers all OT numeric fields, status decoding, RBP, VH, solar, SAT sensor fan-out |
-| `binary_sensor` | 53 | PROGMEM table `mqttHaBinSensorCfg[]` (indexed via `mqttHaBinSensorIndex[256]`) | Master/slave status bits, ASF flags, SAT health binaries. 37 of these rows have HA-core-style alias siblings (ADR-106); the discovery streamer publishes exactly one of the two name sets depending on `settings.mqtt.bUseLegacyOtTopics`. |
+| `sensor` | 394 (`MQTT_HA_SENSOR_COUNT`) | PROGMEM table `mqttHaSensors[]` (indexed via `mqttHaSensorIndex[256]`) | Covers all OT numeric fields, status decoding, RBP, VH, solar, SAT sensor fan-out |
+| `binary_sensor` | 98 (`MQTT_HA_BINSENSOR_COUNT`) | PROGMEM table `mqttHaBinSensors[]` (first 61 rows indexed via `mqttHaBinSensorIndex[256]`) | Master/slave status bits, ASF flags, SAT health binaries. 37 of these rows have HA-core-style alias siblings (ADR-106); the discovery streamer publishes exactly one of the two name sets depending on `settings.mqtt.bUseLegacyOtTopics`. |
 | `climate` | 2 | `streamClimateDiscovery(idx=0/1)` | 0 = Thermostat, 1 = DHW Control |
 | `number` | 1 | `streamNumberDiscovery()` | `Toutside_override` slider |
-| `switch` (SAT, TASK-284) | 13 | `streamSatSwitchDiscovery(idx=0..12)` | See list below |
+| `switch` (SAT, TASK-284) | 13 (`SAT_HA_SWITCH_COUNT`) | `streamSatSwitchDiscovery(idx=0..12)` | See list below; idx 10 (`dhw_enable`) only when the boiler reports a storage tank (MsgID 3 HB3) |
 | `select` (SAT, TASK-284) | 1 | `streamSatSelectDiscovery(idx=0)` | `sat_heating_system` (options `"0"`..`"3"`) |
 | `button` (PIC control) | 1 | `streamButtonDiscovery()` | `resetgateway` — pseudo-ID 244 |
 | `select` (PIC control) | 8 | `streamSelectDiscovery(idx=0..7)` | `gpioa`/`gpiob` + `leda`–`ledf` — pseudo-ID 244 |

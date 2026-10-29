@@ -1151,7 +1151,7 @@ Published every SAT control loop interval (default 30 seconds) when SAT is enabl
 | `sat/solar_gain` | no | Solar gain compensation active |
 | `sat/summer_active` | no | Summer simmer suppression active |
 
-Additional settings echo topics, BLE sensor topics, and multi-zone topics are documented in `backlog/docs/doc-1 - sat-mqtt-topics.md`.
+Additional settings echo topics, BLE sensor topics, and multi-zone topics are documented in `docs/api/MQTT.md`, section "SAT (Smart Autotune Thermostat)".
 
 ##### Raw OpenTherm Message (Optional)
 
