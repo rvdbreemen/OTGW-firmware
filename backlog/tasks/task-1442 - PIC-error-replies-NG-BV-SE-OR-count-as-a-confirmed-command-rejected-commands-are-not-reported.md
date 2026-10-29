@@ -3,12 +3,13 @@ id: TASK-1442
 title: >-
   PIC error replies (NG/BV/SE/OR) count as a confirmed command: rejected
   commands are not reported
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T05:14:00Z'
+updated_date: '2026-10-29T06:26:00Z'
 labels:
   - bug
-  - needs-maintainer-ok
   - mqtt
   - pic
 dependencies: []
@@ -30,3 +31,9 @@ Evidence: C:\Users\rvdbr\AppData\Local\OTGW-capture\bench-68-beta8-20261029-0559
 - [ ] #1 Maintainer decided whether and how a PIC error reply to a queued command is reported
 - [ ] #2 An error reply no longer clears command_retry_exceeded as if the command was confirmed, or the decision explicitly keeps that behaviour
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-29 maintainer decision: report a PIC error reply on the existing topic. A queued command answered with an error code (NG, BV, SE, OR, NS, NF, OE) is published on otgw-firmware/command_dropped as '<cmd> (<code>)', e.g. 'ZZ=1 (NG)', counts in cmd_dropped, latches command_retry_exceeded ON and is removed without retry; it does not clear the flag. Port to 2.0.0 afterwards. Beta.9: after this fix plus field feedback on beta.8.
+<!-- SECTION:NOTES:END -->
