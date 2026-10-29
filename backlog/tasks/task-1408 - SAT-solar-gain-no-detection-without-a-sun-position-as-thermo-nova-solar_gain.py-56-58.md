@@ -3,11 +3,11 @@ id: TASK-1408
 title: >-
   SAT solar gain: no detection without a sun position, as thermo-nova
   (solar_gain.py:56-58)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-26T18:41:00Z'
-updated_date: '2026-10-29T05:39:00Z'
+updated_date: '2026-10-29T06:37:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,7 +24,7 @@ Found in gruijter's alpha.513 capture 2026-10-26 (second reader checked the cita
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Plan quotes thermo-nova solar_gain.py and gets Sergeant D's OK (recorded entry)
-- [ ] #2 Without a sun position solar gain stays inactive (host test red on HEAD)
+- [x] #2 Without a sun position solar gain stays inactive (host test red on HEAD)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -40,3 +40,9 @@ thermo-nova solar_gain.py:56-58: 'if sun_elevation is None: self._hold_until = N
 
 2026-10-29 AC#1: Robert's maintainer override of 2026-10-26 (commit 8b2e154c0) replaces the wait for Sergeant D; plan quotes solar_gain.py:56-58 (opened in session).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Without a valid sun elevation (never received, or older than 1 h) solar gain is off and its hold cleared, as thermo-nova solar_gain.py:56-58 (maintainer override 2026-10-26 replaces the wait for Sergeant D). Before, the firmware detected solar gain from the rise rate alone and kept it on after the elevation went stale. Evidence: tests/test_sat_solar_gain_no_sun.py runs the real satUpdateSolarGain(): on HEAD b07e3194a FAILED (failures=2: no sun -> active at minutes 12-20; stale -> still active at minute 86), on the fix 4 OK; evaluate --quick 0 FAIL; combo build in the commit gate. Out of scope (not decided): EMA vs two-sample rate, 10 min sustain vs 600 s hold, default off. Not verified: on a device with a real sun-elevation feed.
+<!-- SECTION:FINAL_SUMMARY:END -->

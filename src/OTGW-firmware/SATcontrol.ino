@@ -4783,21 +4783,20 @@ static void satUpdateSolarGain()
 
   state.sat.fIndoorRiseRate = _solar_riseRateEma;
 
-  // Sun elevation gating (Task #68): if we have valid sun elevation, gate on minimum elevation
-  if (state.sat.bSunElevationValid) {
-    // Stale check: sun elevation older than 1 hour is invalid
-    if ((now - state.sat.iSunElevLastMs) > 3600000UL) {
-      state.sat.bSunElevationValid = false;
-      SATDebugTln(F("SAT: sun elevation data stale, falling back to rise rate"));
-    } else if (state.sat.fSunElevation < settings.sat.fSolarMinElevation) {
-      // Sun too low, no solar gain regardless of rise rate
-      state.sat.bSolarGainActive = false;
-      _solar_wasActive = false;
-      _solar_conditionMs = 0;
-      return;
-    }
+  // Sun elevation gate. Without a valid sun elevation solar gain is off and any hold is cleared, as in
+  // thermo-nova (solar_gain.py:56-58; TASK-1408, maintainer override 2026-10-26). "Valid" means received
+  // and not older than 1 hour. The rise-rate average above keeps updating either way.
+  if (state.sat.bSunElevationValid && (now - state.sat.iSunElevLastMs) > 3600000UL) {
+    state.sat.bSunElevationValid = false;
+    SATDebugTln(F("SAT: sun elevation data stale, solar gain off"));
   }
-  // else: no sun elevation data, rely on rise rate alone (AC#6)
+  if (!state.sat.bSunElevationValid || state.sat.fSunElevation < settings.sat.fSolarMinElevation) {
+    // No sun data, or the sun is too low: no solar gain regardless of rise rate
+    state.sat.bSolarGainActive = false;
+    _solar_wasActive = false;
+    _solar_conditionMs = 0;
+    return;
+  }
 
   // Detect solar gain condition: rising fast + low boiler modulation + at least one valve open.
   // Python solar_gain.py ANDs valves_open into the detection; bValvesOpen defaults true when no
