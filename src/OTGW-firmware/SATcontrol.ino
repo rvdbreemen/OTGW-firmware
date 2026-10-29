@@ -823,7 +823,7 @@ static uint32_t    _pwm_dhwEndMs   = 0;   // millis() of the first control tick 
 // _pwm_flameOnMs anchor (pwm.py:144-146 path) and the first-ignition sync, also when the draw came during the ignition wait.
 static bool        _pwm_dhwResumed = false;
 static float    _sat_requestedSetpoint      = 0.0f;  // Requested setpoint of the last control tick: PID output after the multi-zone block and the solar offset, clamped (thermo-nova requested_setpoint, climate.py:370-394). state.sat.fPidOutput stays the raw PID output.
-static float    _sat_lastControlCS          = 0.0f;  // Control setpoint of the last control tick or refresh (the "previous CS" PWM keeps without an override)
+static float    _sat_lastControlCS          = 0.0f;  // Control setpoint of the last control tick or refresh (the "previous CS": PWM keeps it without an override, satApplyContinuous() clamps against it, entry 112, TASK-1381)
 static bool     _sat_thermalSafeActive      = false; // The thermal safe fallback owns CS: the 3 s PWM refresh stays out
 // Python HEATER_STARTUP_TIMEFRAME 180 s (pwm.py const): the ignition wait at the start of an ON phase before the
 // ON timer runs anyway, the minimum flame-on hold, and the start-up EMA window. Nothing aborts the phase.
@@ -1216,7 +1216,7 @@ static float satApplyPWM(float pidOutput)
   const float prevCS = (_sat_lastControlCS > SAT_MIN_SETPOINT) ? _sat_lastControlCS : pidOutput;
   satPwmSchedule(pidOutput);
   if (satGetFlowTemp() <= 0.0f) {
-    return satApplyContinuous(pidOutput);   // PWM idle without a flow temperature (heating_control.py:149-150)
+    return satApplyContinuous(pidOutput, _sat_lastControlCS);   // PWM idle without a flow temperature (heating_control.py:149-150)
   }
   if (!settings.sat.bOvershootProtection || state.sat.bDhwActive || pidOutput <= satGetColdSetpoint()) {
     return prevCS;
@@ -1569,7 +1569,8 @@ static void _satCheckWindowTimer()
 //=====================================================================
 //=== Continuous Control Mode ===
 //=====================================================================
-static float satApplyContinuous(float pidOutput)
+// previousCS: the last CS SAT sent (0 after enable or boot, SAT_MIN_SETPOINT after heater-off or the cold cutoff).
+static float satApplyContinuous(float pidOutput, float previousCS)
 {
   // Asymmetric setpoint clamping (Task #44, SAT Python heating_control.py):
   // minimum_allowed = boiler_temp - flow_offset (configurable, default 2.0C)
@@ -1600,14 +1601,17 @@ static float satApplyContinuous(float pidOutput)
     return pidOutput;
   }
 
+  // Entry 112 (TASK-1381), heating_control.py:485-489: the previous CS is the last CS SAT sent. A rising request
+  // follows max(request, flow - offset); a falling or equal one keeps max(request, min(flow - offset, previous CS)),
+  // so the CS does not chase a rising flow temperature.
   float flowOffset = settings.sat.fFlowOffset;
   float minAllowed = boilerTemp - flowOffset;
 
-  if (pidOutput < minAllowed) {
-    return minAllowed;
+  if (pidOutput > previousCS) {
+    return (pidOutput > minAllowed) ? pidOutput : minAllowed;
   }
-
-  return pidOutput;
+  const float heldFloor = (minAllowed < previousCS) ? minAllowed : previousCS;
+  return (pidOutput > heldFloor) ? pidOutput : heldFloor;
 }
 
 //=====================================================================
@@ -5456,6 +5460,7 @@ static void satControlLoopRun()
       state.sat.fFinalSetpoint = SAT_THERMAL_SAFE_FLOW;
       float sysMax = satGetMaxSetpoint();
       if (state.sat.fFinalSetpoint > sysMax) state.sat.fFinalSetpoint = sysMax;
+      _sat_lastControlCS = (float)(int)state.sat.fFinalSetpoint;   // the CS sent below is the previous CS (entry 112, TASK-1381)
       if (hasOTCommandInterface()) {
         // TASK-565: write-on-change. Thermal safe-fallback path.
         satEnqueueIfChangedCS((float)(int)state.sat.fFinalSetpoint);
@@ -5485,6 +5490,7 @@ static void satControlLoopRun()
   satUpdateSummerSimmer();
   if (state.sat.bSummerActive && settings.sat.bSummerSimmer) {
     state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
+    _sat_lastControlCS = SAT_MIN_SETPOINT;   // the CS sent below is the previous CS (entry 112, TASK-1381)
     if (hasOTCommandInterface()) {
       // TASK-565: write-on-change. Summer-simmer path.
       satEnqueueIfChangedCS(10.0f);
@@ -5639,7 +5645,7 @@ static void satControlLoopRun()
     // send CH=0 with the ON-phase CS on the switch tick.
     pwmOn = state.sat.bPwmFlameRequested;
   } else {
-    finalSetpoint = satApplyContinuous(pidOutput);
+    finalSetpoint = satApplyContinuous(pidOutput, _sat_lastControlCS);   // previous CS: read before this tick overwrites it below
   }
 
   // Final clamp (including hard ceiling)

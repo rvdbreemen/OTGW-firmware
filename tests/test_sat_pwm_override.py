@@ -74,7 +74,7 @@ static int g_csSent = 0; static float g_csLast = 0;
 static uint32_t millis() { return g_ms; }
 static bool satIsFlameOn() { return g_flame; }
 static float satGetFlowTemp() { return g_flow; }
-static float satApplyContinuous(float p) { return 1000.0f + p; }   // marker value: "the continuous setpoint was sent"
+static float satApplyContinuous(float p, float /*previousCS*/) { return 1000.0f + p; }   // marker value: "the continuous setpoint was sent"
 void satPwmReset();                                                 // defined later in the cut block (the .ino gets Arduino prototypes)
 static float satGetReturnTemp() { return g_ret; }
 static float satGetBaseOffset() { return 27.2f; }

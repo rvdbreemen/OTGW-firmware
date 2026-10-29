@@ -466,7 +466,9 @@ maxSetpoint = min(maxSetpoint, systemCap (62 radiators, 45 underfloor, 40 heat p
 
 ```
 if flame off, or Tboiler <= 0 or > 100, or Tboiler <= pidOutput: control = pidOutput
-else: control = max(pidOutput, Tboiler - fFlowOffset)        (fFlowOffset default 2.0)
+else: min = Tboiler - fFlowOffset                            (fFlowOffset default 2.0)
+      control = max(pidOutput, min)                if pidOutput > previousCS
+      control = max(pidOutput, min(min, previousCS)) otherwise   (heating_control.py:485-489, entry 112)
 ```
 
 **Modulation** (`SATcontrol.ino:304-314`): continuous gas boiler gives `iMaxRelModulation`; PWM gives 0 (heat pump or hybrid keep the maximum, never 0); Geminox floor 10; Immergas cap 80.
@@ -1177,16 +1179,20 @@ The "heater off" decisions are made in three places: summer simmer (SATcontrol.i
 
 #### Continuous-mode control setpoint rule
 
-`satApplyContinuous(pidOutput)` (SATcontrol.ino:1148-1187). In plain terms: the setpoint follows the request, except that while the flame burns and the boiler is hotter than the request, the setpoint is not allowed below `boiler - fFlowOffset`.
+`satApplyContinuous(pidOutput, previousCS)` (`SATcontrol.ino`, search the name). In plain terms: the setpoint follows the request, except that while the flame burns and the boiler is hotter than the request, the setpoint is clamped against `boiler - fFlowOffset` and the previous CS, as thermo-nova (`heating_control.py:485-489`; Sergeant D entry 112, TASK-1381).
 
 Step by step:
 
 1. If the flame is off: control setpoint = requested (SATcontrol.ino:1161-1165).
 2. Read the boiler flow temperature. If it is ≤ 0 or > 100 °C (treated as unknown): control setpoint = requested (SATcontrol.ino:1167-1172).
 3. If boiler temperature ≤ requested: control setpoint = requested (SATcontrol.ino:1174-1177).
-4. Otherwise `minAllowed = boilerTemp - fFlowOffset` (SATcontrol.ino:1179-1180). Control setpoint = `minAllowed` if requested < `minAllowed`, else requested (SATcontrol.ino:1182-1186).
+4. Otherwise `minAllowed = boilerTemp - fFlowOffset`. If requested > previous CS: control setpoint = `max(requested, minAllowed)`. Else: `max(requested, min(minAllowed, previous CS))`, so a falling request does not follow a rising flow temperature.
 
-Differences visible in the code itself: the order of checks is flame first, then boiler validity, then boiler versus request. There is no "previous setpoint" input and no separate branch for a falling request; the rule is only `max(requested, boiler - offset)`. The result is bounded from above by the final clamp (SATcontrol.ino:4936-4937). `fFlowOffset` defaults to 2.0 °C, range 0.5 to 10 (SATtypes.h:467, settingStuff.ino:1040).
+**Previous CS** is `_sat_lastControlCS`, the last CS SAT sent: 0 after SAT enable or boot (`satDisable()`, no restore after a reboot), 10 (`SAT_MIN_SETPOINT`) after heater-off (`satPwmDisableOnHeaterOff()`: cold cutoff and valves closed) and after the summer simmer CS=10, the thermal-safe CS (`SAT_THERMAL_SAFE_FLOW`, clamped, whole degrees) while that fallback runs (the last two are our reading of entry 112), and otherwise the final CS of the previous tick or the PWM 3 s suppression refresh. The control tick reads it before it writes this tick's CS.
+
+Differences visible in the code itself: the order of checks is flame first, then boiler validity, then boiler versus request; the previous-CS branch comes last. The result is bounded from above by the final clamp (the clamp right before `_sat_lastControlCS = finalSetpoint;` in the control tick).
+
+Where the previous CS differs from thermo-nova (TASK-1381 review, 2026-10-29): (a) no restore after a reboot (entry 112, option C not chosen); (b) the DHW and boiler-fault returns of the control tick send no CS and leave the previous CS frozen, while thermo-nova keeps computing the continuous setpoint during hot water; (c) thermal-safe and summer simmer write the CS they send as the previous CS (our reading in entry 112), which PWM's no-override paths also return afterwards; (d) the PWM-to-continuous exit is checked after the PWM step in the firmware, so continuous starts one tick later than in thermo-nova (pre-existing, TASK-1468). `fFlowOffset` defaults to 2.0 °C, range 0.5 to 10 (SATtypes.h:467, settingStuff.ino:1040).
 
 #### Cross-reference: PWM override (summary only)
 
@@ -1473,7 +1479,7 @@ Reading guide. "Tick" means one pass of the timed SAT control block inside `satC
 
 The firmware computes a requested flow setpoint `pidOutput` from the heating curve and the PID (SATcontrol.ino:4836-4839), clamps it (SATcontrol.ino:4906-4912), and then turns it into a CS in one of two ways:
 
-- **Continuous mode**: `satApplyContinuous()` sends `pidOutput`, with a clamp that keeps CS from dropping more than `fFlowOffset` below the flow temperature while the flame burns (SATcontrol.ino:1148-1187).
+- **Continuous mode**: `satApplyContinuous()` sends `pidOutput`, with a clamp against `flow - fFlowOffset` and the previous CS while the flame burns (`heating_control.py:485-489`, entry 112, TASK-1381).
 - **PWM mode**: `satApplyPWM()` runs the PWM schedule (`satPwmSchedule()`, SATcontrol.ino:727-856) and then overrides CS: CS = 10 °C in the OFF phase, a "flame-off hold" setpoint while the flame is off in the ON phase, and the "suppression" setpoint `flow - fModSupOffset` after a delay once the flame burns (SATcontrol.ino:868-889). MM is 0 in both PWM phases for a gas boiler (SATcontrol.ino:299-314, SATcontrol.ino:4960-4967).
 
 Important framing for the reader: in the firmware, as in the description of the option, "modulation suppression" does **not** write a modulation value. It writes CS (SATcontrol.ino:709-717, SATcontrol.ino:884-888, SATcontrol.ino:907-917). Modulation is limited separately by MM = 0 for the whole time the mode is PWM (SATcontrol.ino:308, SATcontrol.ino:4962). The code comment says so directly: "Modulation suppression is handled via CS sequence in satApplyPWM() (PWM ON only)" (SATcontrol.ino:4955). The state flag `bModSuppressed` is set to false on every tick and never set to true (SATcontrol.ino:4956-4957; a search for `bModSuppressed` finds only this write, the declaration at SATtypes.h:214 and the read-outs in handleDebug.ino:237, restAPI.ino:2405 and SATcontrol.ino:2393). The comment on the offset setting says "°C below setpoint" (SATtypes.h:456), but the code subtracts it from the flow temperature (SATcontrol.ino:713).
@@ -1680,14 +1686,12 @@ So for a gas boiler MM = 0 on every PWM tick that reaches the tick end with `pid
 
 #### 7. Continuous mode CS (for comparison)
 
-`satApplyContinuous(pidOutput)` (SATcontrol.ino:1148-1187):
+`satApplyContinuous(pidOutput, previousCS)` (SATcontrol.ino, search the name):
 
 1. Flame off: CS = `pidOutput` (SATcontrol.ino:1161-1165).
 2. Flow temperature <= 0 or > 100 (treated as invalid): CS = `pidOutput` (SATcontrol.ino:1167-1172).
 3. Flow <= `pidOutput`: CS = `pidOutput` (SATcontrol.ino:1174-1177).
-4. Otherwise `minAllowed = flow - fFlowOffset` (default 2.0 °C); CS = `minAllowed` if `pidOutput < minAllowed`, else `pidOutput` (SATcontrol.ino:1179-1186, SATtypes.h:467).
-
-There is no dependence on the previous CS in this function (SATcontrol.ino:1148-1187). MM is handled only by step 6.
+4. Otherwise `minAllowed = flow - fFlowOffset` (default 2.0 °C, SATtypes.h:467). `pidOutput > previousCS`: CS = `max(pidOutput, minAllowed)`; else CS = `max(pidOutput, min(minAllowed, previousCS))` (heating_control.py:485-489; entry 112, TASK-1381). `previousCS` is `_sat_lastControlCS`, see "Continuous-mode control setpoint rule". MM is handled only by step 6.
 
 #### 8. Timeline example (firmware defaults, radiators, gas boiler, `bOvershootProtection` on)
 

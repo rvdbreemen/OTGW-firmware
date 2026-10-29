@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T17:21:00Z'
+updated_date: '2026-10-28T20:33:00Z'
 labels:
   - needs-maintainer-ok
   - tooling
@@ -26,3 +27,9 @@ martreides (Marthreides, #alpha-testing 1563963515872608460, 2026-10-25) and Sch
 - [ ] #1 A board enumerating as 303A:4001 is found without --port (repro with the PID filter, red on HEAD), both .bat and .sh
 - [ ] #2 README/usage text names both IDs
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28 triage: Schelte (.otgw, #nederlandse-ondersteuning 1563931061094981744, 2026-10-25) also reports: after WiFi provisioning the browser could not connect although the board answered ping; a power cycle fixed it. Possibly separate from the VID/PID detection; needs its own repro if it recurs.
+<!-- SECTION:NOTES:END -->

@@ -70,7 +70,7 @@ static float satGetColdSetpoint() { return 28.2f; }
 static float satGetBaseOffset() { return 27.2f; }
 static float satGetMaxSetpoint() { return 62.0f; }
 static float satEffectiveMaxSetpoint() { return 62.0f; }
-static float satApplyContinuous(float p) { return 1000.0f + p; }
+static float satApplyContinuous(float p, float /*previousCS*/) { return 1000.0f + p; }
 static uint32_t satGetMinOnTimeSec() { return 180; }
 static uint8_t satGetMaxCyclesPerHour() { return g_cph; }
 static uint32_t satGetPwmPeriodSec() { return 3600UL / g_cph; }

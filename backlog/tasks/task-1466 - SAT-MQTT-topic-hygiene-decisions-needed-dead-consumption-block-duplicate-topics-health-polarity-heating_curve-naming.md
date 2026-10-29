@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T07:23:00Z'
+updated_date: '2026-10-29T07:58:00Z'
 labels:
   - sat
   - mqtt
@@ -26,3 +27,9 @@ From the sat/* MQTT.md audit (docs session, 2026-10-29, dev 549e93312); code rea
 <!-- AC:BEGIN -->
 - [ ] #1 Each decision asked of Robert and recorded in the notes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-29 (Taken session, TASK-1459 work): the MQTT preset and window handlers set settings.sat.fTargetTemp in RAM only (not persisted), probably deliberate (a temporary target while a preset/window is active), unconfirmed. Add as decision 7: is a preset/window target meant to survive a reboot?
+<!-- SECTION:NOTES:END -->
