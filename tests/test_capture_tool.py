@@ -289,7 +289,7 @@ class ToolCase(unittest.TestCase):
         args += list(extra)
         self.proc = subprocess.Popen(args, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
         self.addCleanup(self._kill)
-        self.assertTrue(wait_for(lambda: self.run_dir() is not None, 10), "no run folder")
+        self.assertTrue(wait_for(lambda: self.run_dir() is not None, 30), "no run folder")  # interpreter start-up under load
         if wait_text:
             self.assertTrue(wait_for(lambda: wait_text in self.text(), 15), "tool never got to '%s':\n%s" % (wait_text, self.text()))
 

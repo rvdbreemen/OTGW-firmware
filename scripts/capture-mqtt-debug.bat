@@ -64,7 +64,11 @@ echo Python 3.9 or newer was not found.
 echo Downloading portable Python %PY_VER% (%ARCH%, about 11 MB) from python.org into
 echo   %PY_DIR%
 echo This happens once; later runs reuse it. Installing Python 3.9+ yourself also works.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -Uri $env:PY_URL -OutFile $env:PY_ZIP; $h = (Get-FileHash -Algorithm SHA256 -LiteralPath $env:PY_ZIP).Hash.ToLower(); if ($h -ne $env:PY_SHA) { Remove-Item -LiteralPath $env:PY_ZIP -Force; throw ('SHA-256 mismatch: ' + $h) }; if (Test-Path -LiteralPath $env:PY_DIR) { Remove-Item -LiteralPath $env:PY_DIR -Recurse -Force }; Expand-Archive -LiteralPath $env:PY_ZIP -DestinationPath $env:PY_DIR -Force; Remove-Item -LiteralPath $env:PY_ZIP -Force"
+rem Plain .NET calls only: started from a PowerShell 7 terminal, Windows
+rem PowerShell 5.1 inherits a PSModulePath it cannot load cmdlets such as
+rem Get-FileHash or Expand-Archive from. The empty PSModulePath does the rest.
+set "PSModulePath="
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object Net.WebClient).DownloadFile($env:PY_URL, $env:PY_ZIP); $sha = [Security.Cryptography.SHA256]::Create(); $fs = [IO.File]::OpenRead($env:PY_ZIP); $h = ([BitConverter]::ToString($sha.ComputeHash($fs))).Replace('-', '').ToLower(); $fs.Close(); if ($h -ne $env:PY_SHA) { [IO.File]::Delete($env:PY_ZIP); throw ('SHA-256 mismatch: ' + $h) }; if ([IO.Directory]::Exists($env:PY_DIR)) { [IO.Directory]::Delete($env:PY_DIR, $true) }; Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::ExtractToDirectory($env:PY_ZIP, $env:PY_DIR); [IO.File]::Delete($env:PY_ZIP)"
 if errorlevel 1 (
     echo ERROR: could not download or verify portable Python from %PY_URL%>&2
     echo Install Python 3.9 or newer from https://www.python.org/downloads/ and run this again.>&2
