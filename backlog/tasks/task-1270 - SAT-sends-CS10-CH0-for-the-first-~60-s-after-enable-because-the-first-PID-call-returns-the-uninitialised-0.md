@@ -3,11 +3,11 @@ id: TASK-1270
 title: >-
   SAT sends CS=10/CH=0 for the first ~60 s after enable because the first PID
   call returns the uninitialised 0
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: 2026-10-20 18:16
-updated_date: '2026-10-28T20:08:00Z'
+updated_date: '2026-10-29T04:14:00Z'
 labels:
   - bug
   - sat
@@ -30,15 +30,13 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 First control tick after enable sends a computed setpoint (host test or telnet transcript, red on old code)
+- [x] #1 First control tick after enable sends a computed setpoint (host test or telnet transcript, red on old code)
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Parity with thermo-nova pid.py: there 'output' is a property, always round(heating_curve + P + I + D, 1), so a valid setpoint exists from the first call (pid.py ~127-131); update() only moves the terms. Ours (SATpid.ino ~262-285) returns the stored state.sat.fPidOutput while elapsed < SAT_PID_SAMPLE_TIME_LIMIT or the error is unchanged, and that value is 0 until the first real update ~60 s after enable, so SAT sends CS=10 / CH=0 twice (field log gruijter 11:38:49 and 11:39:19).
-Change: when the PID has not produced an output yet (first call after init/enable/restore, or fPidOutput == 0 with a valid curve), return the output computed from the current terms: curve + Kp*error + I (restored integral or 0) + D (0, no slope yet), without advancing the integral/derivative state or the sample timer. The sample-time and unchanged-error gates stay as they are for later calls.
-Verification: host test compiling the real satPidUpdate() path (first call returns curve + Kp*error, red on HEAD = 0); bench SAT simulation or replay: telnet 'SAT:' line of the first control tick after enable shows pid = computed value, not 10; CS on the first tick > 10 when heat is needed.
+Superseded by TASK-1368's start-up step: satPidService takes one PID step at enable/init/restore before the first tick, and satPidOutput computes curve + Kp*error + I with D = 0 on the first output (entry 95 Q39b), so the first tick no longer returns the uninitialised 0. This task adds the AC#1 evidence only (test_o in tests/test_sat_pid_cadence.py) and closes once the TASK-1368 code is committed and built.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -63,6 +61,8 @@ Verification: host test compiling the real satPidUpdate() path (first call retur
 2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): TASK-1412.3 dependency removed (own host-test AC#1; decisions entries 83, 95). TASK-1368 kept: both change the SATpid.ino update gates.
 
 2026-10-28: the current plan keeps the sample-time and unchanged-error gates that TASK-1368 removes (entry 75 :3425; TASK-1368 plan). Plan superseded until TASK-1368's update/output split lands; then rewrite it (start-up state + D = 0, Q39b).
+
+2026-10-29 test_o_first_tick_after_enable_sends_a_computed_setpoint (real SATpid.ino/SATcontrol.ino via the cadence harness, room 19 vs target 21, tick 30): working tree first tick out=82.667 = curve 40 + kp 21.333 * err 2 + I 0, D=0; Ran 26 OK. HEAD copies: 'AssertionError: 0.0 not greater than 10.0 : first tick must not send the SAT minimum CS=10, first output is 0.00000'. Waiting for the TASK-1368 build (last attempt stopped by Claude Code for low memory).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -77,3 +77,13 @@ Robert requested this builder handoff from Codex. Read docs/sat/sat-low-load-exe
 
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed by TASK-1368 (8b2f5f7f9, alpha.523): satPidService() takes the start-up step on the first tick after enable, so the first output is curve + P instead of the uninitialised 0 that made SAT send its minimum CS=10.
+
+AC#1 evidence (this session): tests/test_sat_pid_cadence.py test_o_first_tick_after_enable_sends_a_computed_setpoint drives the real SATpid/SATcontrol code. On HEAD 42796032f it FAILS: first output 0.00000 ('0.0 not greater than 10.0'). On the fix it passes: out 82.667 = curve 40 + Kp 21.333 x error 2 + I 0, D 0. test_o lives in the 1368 test file and was committed there.
+
+Not verified: real boiler; telnet transcript on the bench follows with the 1368 bench run.
+<!-- SECTION:FINAL_SUMMARY:END -->
