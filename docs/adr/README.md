@@ -462,8 +462,11 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-021: S0 Pulse Counter Hardware Interrupt Architecture](ADR-021-s0-pulse-counter-interrupt-architecture.md)**  
   ISR-driven energy meter pulse counting with debounce logic and real-time power calculation.
 
-- **[ADR-022: GPIO Output Control (Bit-Flag Triggered Relays)](ADR-022-gpio-output-bit-flag-control.md)**  
-  Stateless relay control based on OpenTherm status bit flags for external device activation.
+- **[ADR-022: GPIO Output Control (Bit-Flag Triggered Relays)](ADR-022-gpio-output-bit-flag-control.md)** *(Superseded)*  
+  Superseded by ADR-200. Stateless relay control based on OpenTherm status bit flags for external device activation.
+
+- **[ADR-200: GPIO output trigger bit indexes the MsgID 0 status word (proposed successor to ADR-022)](ADR-200-gpio-output-trigger-bit-indexes-the-msgid-0-status-word-supersedes-adr-022.md)** 🆕 *(Accepted)*  
+  Supersedes ADR-022. The GPIO output follows one bit of the 16-bit MsgID 0 status word `(MasterStatus << 8) | SlaveStatus`; `GPIOOUTPUTStriggerBit` selects it, range 0-15, slave (boiler) bits 0-7 and master (thermostat) bits 8-15. Guideline-level, no CI gate.
 
 - **[ADR-023: File System Explorer HTTP Architecture](ADR-023-filesystem-explorer-http-api.md)**  
   Browser-based LittleFS file management with streaming upload/download and OTA firmware updates.
@@ -561,8 +564,11 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-160: Combo board: AUTO hardware detection re-probes every boot and never persists its verdict](ADR-160-combo-auto-board-detect-per-boot-no-persist.md)** *(Superseded by ADR-164)*  
   Superseded by ADR-164. Combo-board AUTO detection was specified to re-probe every boot and never persist its verdict; that never-persist rule was reverted to persist-once in shipped code (see ADR-164). Amends ADR-127.
 
-- **[ADR-164: Combo AUTO board detection persists its PIC verdict once (supersedes ADR-160)](ADR-164-combo-auto-board-detect-persist-once-supersedes-adr160.md)** 🆕 *(Accepted)*  
-  Accepted (2026-07-04). Combo AUTO detection persists its PIC verdict once (with a 3x `detectPIC` retry) instead of re-probing every boot; supersedes ADR-160's never-persist rule after it hung boot on-device and was reverted to persist-once. Related to ADR-126, ADR-127, ADR-158.
+- **[ADR-164: Combo AUTO board detection persists its PIC verdict once (supersedes ADR-160)](ADR-164-combo-auto-board-detect-persist-once-supersedes-adr160.md)** 🆕 *(Superseded)*  
+  Superseded by ADR-201. Accepted (2026-07-04). Combo AUTO detection persists its PIC verdict once (with a 3x `detectPIC` retry) instead of re-probing every boot; supersedes ADR-160's never-persist rule after it hung boot on-device and was reverted to persist-once. Related to ADR-126, ADR-127, ADR-158.
+
+- **[ADR-201: Combo board detection persists only a positive PIC verdict and re-probes every boot (supersedes ADR-164)](ADR-201-combo-board-detection-persists-only-a-positive-pic-verdict-and-re-probes-every-boot-supersedes-adr-164.md)** 🆕 *(Accepted)*  
+  Supersedes ADR-164. On the combo board only a found PIC is persisted (Classic); a miss runs OT-Direct for that boot only and is never written to `iBoardMode`, so every boot that is not a persisted Classic board probes again. Forced OT-Direct still probes once as a recovery check.
 
 - **[ADR-113: Hardware-Type as Codepath-Selection Contract](ADR-113-hardware-type-codepath-selection-contract.md)** 🆕  
   Guideline-level (ADR-080). `hardware_type` selects code paths (deprecating `picavailable`); amended by ADR-125 so the combo board resolves it at boot detection (runtime).
@@ -593,14 +599,20 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-085: SAT (Smart Autotune Thermostat) Integration](ADR-085-sat-smart-autotune-thermostat-integration.md)** 🆕  
   Top-level decision to fold SAT into the firmware as an optional, opt-in controller (renumbered from earlier ADR-062 to resolve duplicate numbering, content unchanged).
 
-- **[ADR-069: SAT PID v3 Controller Implementation](ADR-069-sat-pid-v3-implementation.md)** 🆕  
-  Centralised PID controller implementation for the Smart Autotune Thermostat with anti-windup and adaptive-gain support.
+- **[ADR-069: SAT PID v3 Controller Implementation](ADR-069-sat-pid-v3-implementation.md)** 🆕 *(Superseded)*  
+  Superseded by ADR-197. Centralised PID controller implementation for the Smart Autotune Thermostat with anti-windup and adaptive-gain support.
+
+- **[ADR-197: SAT PID v3 controller (proposed successor to ADR-069)](ADR-197-sat-pid-v3-controller-supersedes-adr-069.md)** 🆕 *(Accepted)*  
+  Supersedes ADR-069. The SAT PID follows thermo-nova `pid.py` at `7beaaf5` term by term (entry 28) in `SATpid.ino`: output = curve + P + I + D, automatic gains from the curve value, and Sergeant D's recorded deviations (such as rounding every value to 3 decimals) with their implementing tasks. Guideline-level, no CI gate.
 
 - **[ADR-070: SAT Memory Allocation Strategy](ADR-070-sat-memory-allocation-strategy.md)** 🆕  
   File-static buffers for SAT working state with ring-buffer sizing tuned per platform (smaller on ESP8266, expanded on ESP32) to fit the heap envelope on each target.
 
-- **[ADR-071: SAT Heating Curve Algorithm](ADR-071-sat-heating-curve-algorithm.md)** 🆕  
-  Adaptive heating-curve advisor (INCREASE/DECREASE/HOLD) driving setpoint adjustments based on outdoor and indoor data with stalled-ignition adaptation.
+- **[ADR-071: SAT Heating Curve Algorithm](ADR-071-sat-heating-curve-algorithm.md)** 🆕 *(Superseded)*  
+  Superseded by ADR-198. Adaptive heating-curve advisor (INCREASE/DECREASE/HOLD) driving setpoint adjustments based on outdoor and indoor data with stalled-ignition adaptation.
+
+- **[ADR-198: SAT heating curve (proposed successor to ADR-071)](ADR-198-sat-heating-curve-supersedes-adr-071.md)** 🆕 *(Accepted)*  
+  Supersedes ADR-071. SAT keeps thermo-nova's convex heating curve with one user coefficient (default 2.0) and a base offset chosen by the heating system alone; the firmware's known differences from thermo-nova are recorded as differences, not as an exact port. Guideline-level, no CI gate.
 
 - **[ADR-073: SAT MQTT Topic Structure](ADR-073-sat-mqtt-topic-structure.md)** 🆕  
   Topic layout for SAT inputs (room sensor, humidity), outputs (computed setpoint, mode), and configuration; integrates with the broader OT-bus topic strategy in ADR-084.
@@ -644,10 +656,13 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-179: Name the owner of the OpenTherm control setpoint while SAT is enabled](ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md)** 🆕 *(Accepted)*  
   While SAT is enabled it owns MsgID 1 (TSet). One predicate, `satOwnsControlSetpoint()`, is consulted by every TSet writer; SAT's own `CS=` goes through `satEnqueueOwnCS()`, and an external `CS=` is refused and reported. The thermostat-timeout setback stays a fail-safe exception.
 
-- **[ADR-195: SAT cold state and CH-enable rule (proposed successor to ADR-150)](ADR-195-sat-cold-state-and-ch-enable-rule-supersedes-adr-150.md)** 🆕 *(Proposed)*  
-  Proposed successor to ADR-150 (`adr supersede` runs on acceptance). The per-system cold setpoint (28.2 radiators, 21.0 underfloor) replaces thermo-nova's COLD_SETPOINT 22 at every site. Requested setpoint `<=` cold: CS=10, CH=0, MM at the configured maximum relative modulation, PWM off (unless Force PWM) and its state, guards and held CS reset (TASK-1327, shipped in c3aa767a0). CH from `satChEnableDecide`: CH=0 when cold or in the PWM OFF phase, CH=1 otherwise, including PWM ON (a deliberate departure from thermo-nova). Guideline-level, no CI gate. Waits on Sergeant D's confirmation (TASK-1316 AC3).
+- **[ADR-195: SAT cold state and CH-enable rule (proposed successor to ADR-150)](ADR-195-sat-cold-state-and-ch-enable-rule-supersedes-adr-150.md)** 🆕 *(Superseded)*  
+  Superseded by ADR-199, which keeps its correct parts and fixes two wrong statements. Superseded ADR-150. The per-system cold setpoint (28.2 radiators, 21.0 underfloor) replaces thermo-nova's COLD_SETPOINT 22 at every site. Requested setpoint `<=` cold: CS=10, CH=0, MM at the configured maximum relative modulation, PWM off (unless Force PWM) and its state, guards and held CS reset (TASK-1327, shipped in c3aa767a0). CH from `satChEnableDecide`: CH=0 when cold or in the PWM OFF phase, CH=1 otherwise, including PWM ON (a deliberate departure from thermo-nova). Guideline-level, no CI gate. Waits on Sergeant D's confirmation (TASK-1316 AC3).
 
-- **[ADR-196: SAT behaviour ground truth: Sergeant D's recorded decisions, then pinned thermo-nova, then specs, then firmware](ADR-196-sat-behaviour-ground-truth-sergeant-d-s-recorded-decisions-then-pinned-thermo-nova-then-specs-then-firmware.md)** 🆕 *(Proposed)*  
+- **[ADR-199: SAT cold state and CH-enable rule (supersedes ADR-195)](ADR-199-sat-cold-state-and-ch-enable-rule-supersedes-adr-195.md)** 🆕 *(Accepted)*  
+  Supersedes ADR-195. While SAT is the active controller one per-heating-system cold setpoint (28.2 C radiators, 21.0 C underfloor) replaces thermo-nova's `COLD_SETPOINT` 22 at every ported site, with the cutoff at `<=`, and the CH bit is set only in the listed places, each with its reason. Guideline-level, no CI gate.
+
+- **[ADR-196: SAT behaviour ground truth: Sergeant D's recorded decisions, then pinned thermo-nova, then specs, then firmware](ADR-196-sat-behaviour-ground-truth-sergeant-d-s-recorded-decisions-then-pinned-thermo-nova-then-specs-then-firmware.md)** 🆕 *(Accepted)*  
   Source order for every SAT statement or change: `docs/sat/sergeant-d-corrections.md` entries, then thermo-nova at 7beaaf5 (`file:line`), then `thermo-nova-spec.md`, then the firmware and its docs, which are never the authority. Read the corrections file first, cite the entry or say none covers it, put conflicts to Sergeant D. Guideline-level, no CI gate.
 
 ### ADR Governance
