@@ -95,7 +95,9 @@ async function cdpTarget() {
   }
   throw new Error('Chrome DevTools endpoint never came up');
 }
+const cdpT0 = Date.now();
 const target = await cdpTarget();
+console.log(`INFO: Chrome DevTools endpoint up after ${Date.now() - cdpT0} ms`);
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
 
