@@ -3,9 +3,11 @@ id: TASK-1454
 title: >-
   feat-2.0.0: port TASK-1212 (1.x) — MQTT guide states commands sent during a
   reconnect are lost
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-10-29T06:26:00Z'
+updated_date: '2026-10-29T06:55:00Z'
 labels:
   - port-from-1.x
   - mqtt
@@ -59,8 +61,20 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 docs/guides/MQTT_LWT.md on the 2.0.0 line contains a section stating that a command published to a set/ topic while the gateway is disconnected or reconnecting is lost, and that the user should resend it once the availability topic shows 'online'
-- [ ] #2 The section names the mechanism with references that exist on the 2.0.0 code: clean session (MQTTclient.setCleanSession(true) in MQTTstuff.ino) and QoS 0 subscriptions (MQTTclient.subscribe(..., 0) in onMqttConnect()); a grep of origin/dev MQTTstuff.ino confirms both still hold at commit time
-- [ ] #3 The section records the rationale (persistent session + QoS 1 would make Mosquitto replay hours-old setpoints after a long outage) and cites TASK-1212 (1.x) and GH #682
-- [ ] #4 No source files under src/ change (git diff --stat shows only docs/ and backlog/ paths); because this is a docs-only commit, the build and evaluate.py gates may be skipped under the project's docs-only push policy
+- [x] #1 docs/guides/MQTT_LWT.md on the 2.0.0 line contains a section stating that a command published to a set/ topic while the gateway is disconnected or reconnecting is lost, and that the user should resend it once the availability topic shows 'online'
+- [x] #2 The section names the mechanism with references that exist on the 2.0.0 code: clean session (MQTTclient.setCleanSession(true) in MQTTstuff.ino) and QoS 0 subscriptions (MQTTclient.subscribe(..., 0) in onMqttConnect()); a grep of origin/dev MQTTstuff.ino confirms both still hold at commit time
+- [x] #3 The section records the rationale (persistent session + QoS 1 would make Mosquitto replay hours-old setpoints after a long outage) and cites TASK-1212 (1.x) and GH #682
+- [x] #4 No source files under src/ change (git diff --stat shows only docs/ and backlog/ paths); because this is a docs-only commit, the build and evaluate.py gates may be skipped under the project's docs-only push policy
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-29 verified on dev a632e8e68+: MQTTstuff.ino:1328 MQTTclient.setCleanSession(true); onMqttConnect() MQTTstuff.ino:1524-1574 subscribe(topic, 0) at :1569 and subscribe("homeassistant/status", 0) at :1574, also :308 and :1787 at QoS 0; vendored espMqttClient default _cleanSession(true) (src/libraries/espMqttClient/src/MqttClient.cpp:32). Dev does not queue or replay inbound set/ commands: with a clean session the broker stores nothing for the client, so the 1.x statement holds unchanged on dev. Only 2.0.0 difference: opt-in SAT MQTT-loss takeover (SATmqttfallback, docs/api/MQTT.md:959), mentioned in one line. Out-of-scope drift seen: MQTT_LWT.md Step 1 still quotes the 1.x PubSubClient connect(clientId, willTopic, 0, true, "offline") at MQTTstuff.ino:790-795 and the intro says ESP8266; dev uses MQTTclient.setWill(MQTTPubNamespace, 0, true, "offline", 7) at MQTTstuff.ino:1347.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Docs-only port of 1.x TASK-1212 (GH #682). docs/guides/MQTT_LWT.md gains '## Commands sent while the gateway is reconnecting are lost' before 'How Home Assistant Uses This'. AC1: section states set/ commands during a disconnect or reconnect are lost, resend once availability shows online. AC2: names setCleanSession(true) in the setServer block (MQTTstuff.ino:1328) and subscribe(..., 0) in onMqttConnect() (:1569, :1574); grep at commit time: setCleanSession(true) count 1, QoS-0 subscribe calls present. AC3: rationale (persistent session + QoS 1 replays hours-old setpoints) with TASK-1212 (1.x) and GH #682. AC4: diff touches only docs/guides/MQTT_LWT.md and this task file; no build or evaluator needed (docs-only). Dev behaves as 1.x here: no queue or replay of inbound commands. Not verified on a device.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -74,6 +74,16 @@ Broker detects TCP timeout
 Broker publishes "offline" on OTGW/value/otgw-XX  (retained)  <-- LWT
 ```
 
+## Commands sent while the gateway is reconnecting are lost
+
+The firmware connects with a clean session (`MQTTclient.setCleanSession(true)` in the `setServer` block of `MQTTstuff.ino`) and subscribes to its command topics at QoS 0 (`MQTTclient.subscribe(..., 0)` in `onMqttConnect()`). The broker therefore keeps nothing for the gateway while it is disconnected. A command that Home Assistant publishes to a `set/` topic during a reconnect, even one of a few seconds, is dropped by the broker and never reaches the boiler.
+
+You can see this in Home Assistant: the entity keeps showing the value the gateway reports, not the value you asked for. Send the command again once the availability topic shows `online`.
+
+This is a deliberate choice (TASK-1212 on the 1.x line, GH #682). A persistent session with QoS 1 would keep commands, but Mosquitto queues them without an expiry time, also during an outage of hours. After such an outage the gateway would apply every queued command at once, including a setpoint that is hours old.
+
+This applies to commands that arrive over MQTT. With the opt-in SAT setting "Take over when MQTT is lost" (`SATmqttfallback`, off by default), SAT controls the boiler itself after more than 5 minutes without MQTT; see `docs/api/MQTT.md`.
+
 ## How Home Assistant Uses This
 
 In the HA auto-discovery configuration (`data/mqttha.cfg`), every entity includes an `avty_t` (availability topic):
