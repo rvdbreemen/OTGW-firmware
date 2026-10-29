@@ -4617,3 +4617,18 @@ Option A as posted: "Indoor only, as thermo-nova: humidity pushed over MQTT/REST
 **Changes an earlier entry:** none; consistent with entry 114 (humidity only through Thermal comfort) and entry 32.
 
 **Task:** TASK-1441. **Open:** the priority between a pushed MQTT/REST value and the BLE sensor when both are present is not settled by this answer; our reading for the implementation: the most recent valid reading wins (to be confirmed if it matters).
+
+## 118. Q58 A: in ECO mode no solar gain offset either, as thermo-nova (2026-10-29)
+
+**Source:** #alpha-testing, 2026-10-29 06:47 UTC, answer to Q58 (msg 1565251228106096672):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565255839856726017
+
+**Quoted:**
+
+> Q58: A
+
+Option A as posted: "As thermo-nova: in ECO no solar gain offset either."
+
+**Settled:** in ECO mode the requested setpoint follows the main room's PID only: no other rooms (entry 116) and no solar gain offset, as thermo-nova `climate.py:376-379`, which returns before the solar offset at `:391-392`. The firmware subtracted the offset in ECO too (`SATcontrol.ino:5540`, no ECO check).
+
+**Changes an earlier entry:** none; completes entry 116 for ECO. **Task:** TASK-1440 (same ECO branch). **Open:** thermo-nova's ECO return also rounds the primary to 0.1; rounding of PID values is covered by entry 95 / TASK-1423, not by this entry.

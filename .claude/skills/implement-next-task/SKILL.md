@@ -198,6 +198,10 @@ plainly what is not verified yet.
 
 ## Step 9: leave the build ready
 
+Every alpha tag that reaches `dev` is published, also one another session built: follow the
+"Every alpha tag on `dev` is published" protocol in CLAUDE.md (build from the pushed HEAD, post
+the zip, report to the coordinating session, ledger check before each post).
+
 After the push, build once more from the pushed HEAD with `build.bat` so the githash
 in the file names matches the code. Leave
 `build/OTGW-firmware-esp32-combo-<version>+<hash>-flash.zip` (the complete package:

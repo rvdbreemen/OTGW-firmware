@@ -164,6 +164,12 @@ This project also uses adr-kit. Use the repository's adr-kit workflow when autho
 
 **Builds on this machine (maintainer directive, 2026-10-29): one build at a time across ALL agents and sessions, never two in parallel, also not in different worktrees; at most 4 compiler jobs (`build.py` caps `pio_jobs()` at 4, TASK-1456); on `dev` build `esp32-combo` only (the plain wrapper), no separate esp32 / esp32-classic builds, also not for `HAS_*`/platform changes.** A session announces its build to the coordinating 2.0.0 session before it starts and when it ends.
 
+**Every alpha tag on `dev` is published (maintainer directive, 2026-10-29), also when another session or agent built it.** Protocol:
+1. The session that pushes a firmware commit (new `_VERSION_PRERELEASE`) builds esp32-combo from its pushed HEAD (or from the committed HEAD it is about to push, after the final rebase) and runs `bash scripts/discord-post-build.sh -m "TASK-NNN: <one-line change>"` from that worktree. The script refuses unless the zip githash is HEAD and `src/` is clean, so a pre-rebase build cannot be posted: rebuild after the rebase.
+2. When the build slot or memory does not allow a separate build, the next posted zip covers the tag; its post and `-m` line name every covered tag.
+3. The pushing session messages the coordinating 2.0.0 session with tag, commit, tasks and evidence. The coordinator posts the plain-language report in #alpha-testing (several tags may share one message) and keeps the ledger `.claude/alpha-build-ledger.local.md` in the main dev tree (gitignored).
+4. Before every post the coordinator compares the ledger with `git log -G"_VERSION_PRERELEASE" origin/dev -- src/OTGW-firmware/version.h`; any tag that is neither posted nor named as covered is published with the next zip.
+
 Use `build.py` rather than calling PlatformIO directly:
 
 ```bash
