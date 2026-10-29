@@ -219,11 +219,7 @@ static void _pidUpdateIntegral(float error, float curveValue, bool force)
   // the integral must be able to nudge flow setpoint below the heating curve.
   if (_pid_integral < -curveValue) _pid_integral = -curveValue;
   if (_pid_integral >  curveValue) _pid_integral =  curveValue;
-
-  // Hard absolute cap — symmetric safety bound against runaway in both directions
-  static const float SAT_PID_INTEGRAL_ABS_MAX = 20.0f;
-  if (_pid_integral >  SAT_PID_INTEGRAL_ABS_MAX) _pid_integral =  SAT_PID_INTEGRAL_ABS_MAX;
-  if (_pid_integral < -SAT_PID_INTEGRAL_ABS_MAX) _pid_integral = -SAT_PID_INTEGRAL_ABS_MAX;
+  // The curve value is the only bound (pid.py:192); the firmware's +-20 cap is gone (entry 75, Q25, TASK-1416).
 }
 
 //=== Derivative Update ===

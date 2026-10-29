@@ -734,12 +734,12 @@ Differs from thermo-nova:
 3. If `fKi < 1e-9`: stop without change (SATpid.ino:160).
 4. Otherwise: `_pid_integral += fKi * error * 60` (SATpid.ino:165-166). The 60 is the constant `SAT_PID_UPDATE_INTERVAL`, not the measured time between updates (SATpid.ino:22).
 5. The integral is clamped to [-curveValue, +curveValue] (SATpid.ino:172-173).
-6. Then it is clamped to [-20.0, +20.0] (SATpid.ino:176-178).
+6. No further clamp: the firmware's absolute cap of +-20 is removed (TASK-1416, entry 75, Q25), as pid.py:191-192.
 
 So, as in thermo-nova, the integral only accumulates while the error is within the deadband and is wiped when the error leaves it.
 
 Differs from thermo-nova:
-- There is an extra absolute ±20 cap (SATpid.ino:176-178).
+- (Closed by TASK-1416: the extra absolute ±20 cap is removed; entry 75.)
 - Computed from the code: at the default 30 s tick with a changing error, the fixed 60 s step is added up to twice per minute. That is up to twice the thermo-nova accumulation per minute of real time (SATpid.ino:166, SATpid.ino:276-285, SATtypes.h:444).
 
 Solar gain active requires `bSolarGainEnable` (SATcontrol.ino:4217-4223), default false (SATtypes.h:494). It turns on after the room rise rate stays above the threshold, with modulation under 20 % and valves open, for more than 10 minutes. It turns off after the rise rate stays below the threshold for more than 10 minutes (SATcontrol.ino:4264-4298). A low sun elevation forces it off (SATcontrol.ino:4249-4260). The freeze needs `bSolarFreezeIntegral` as well (default true, SATtypes.h:527; thermo-nova `const.py:136` default True), since TASK-1323.
@@ -826,7 +826,7 @@ Variable names as in the code.
 **Zone PID** (SATcontrol.ino:1828-1866), per zone:
 - `curveValue` from the zone target and outside temperature.
 - `kp = (coeff * curveValue) / divisor` and `ki = kp / 8400`, always automatic, like the main PID.
-- The same deadband rule for the integral, with the clamps ±curveValue and ±20.
+- The same deadband rule for the integral, with the clamp ±curveValue only (the ±20 cap is removed, TASK-1416; entry 75 read for zones, as `area.py:208` runs the same PID).
 - `output = curveValue + kp * error + integral`, with no derivative term.
 - The output is clamped to [10.0, `satGetMaxSetpoint()`].
 

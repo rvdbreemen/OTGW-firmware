@@ -2455,7 +2455,8 @@ static float satZoneKp(float curveValue)
 // Zone PID step, run on the 60 s PID timer (TASK-1368, entries 42 and 111; thermo-nova area.py:183-190,
 // :202-208 steps every area PID on its own 60 s timer, plus one call at start-up). Moves the zone's held
 // state once: integral and error. An unusable zone is excluded and its PID memory reset (TASK-593).
-// Integral only inside the deadband, clamped to the curve (TASK-588) and, firmware-only, to +-20.
+// Integral only inside the deadband, clamped to the curve only (TASK-588; pid.py:192 via area.py:208). The
+// firmware's +-20 cap is gone: entry 75 (Q25), read for zones as for the primary PID (TASK-1416).
 static void satZonePidAdvance(uint8_t idx, float outsideTemp)
 {
   SATZoneState& z = satZones[idx];
@@ -2473,8 +2474,6 @@ static void satZonePidAdvance(uint8_t idx, float outsideTemp)
     z.fPidIntegral += ki * error * 60.0f;   // SAT_PID_UPDATE_INTERVAL = 60s
     if (z.fPidIntegral < -curveValue) z.fPidIntegral = -curveValue;
     if (z.fPidIntegral >  curveValue) z.fPidIntegral =  curveValue;
-    if (z.fPidIntegral >  20.0f)     z.fPidIntegral =  20.0f;
-    if (z.fPidIntegral < -20.0f)     z.fPidIntegral = -20.0f;
   } else {
     z.fPidIntegral = 0.0f;
   }
