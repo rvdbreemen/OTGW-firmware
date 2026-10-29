@@ -48,6 +48,7 @@ struct {
 struct {
   struct { OTGWHardwareMode eMode = HW_MODE_PIC; } hw;
   struct { bool bConnected = true; } mqtt;
+  struct { OTGWNetworkMode eMode = NET_WIFI; } net;       // buildDiscoveryContext(): active transport
 } state;
 typedef uint8_t DeviceAddress[8];                         // DallasTemperature.h
 
@@ -60,7 +61,17 @@ void incPublishedTopicCount() {}
 void PrintMQTTError()         {}
 bool mqttIsConnected()        { return true; }
 static struct { bool connected() const { return true; } } MQTTclient;   // espMqttClient, connected
-struct IPAddress {};
+// IPAddress and the two transports: buildDiscoveryContext() (TASK-1377.1) formats the active
+// transport's address into configuration_url with ip[0]..ip[3]. Documentation addresses
+// (RFC 5737), one per transport, so a payload shows which one was read.
+struct IPAddress {
+  uint8_t b[4] = {0, 0, 0, 0};
+  IPAddress() = default;
+  IPAddress(uint8_t b0, uint8_t b1, uint8_t b2, uint8_t b3) : b{b0, b1, b2, b3} {}
+  uint8_t operator[](int i) const { return b[i]; }
+};
+static struct { IPAddress localIP() const { return IPAddress(192, 0, 2, 10); } } WiFi;
+static struct { IPAddress localIP() const { return IPAddress(198, 51, 100, 20); } } Ethernet;
 static IPAddress MQTTbrokerIP;
 static bool isValidIP(const IPAddress &) { return true; }
 static void configSensors() {}       // part B: no 1-Wire sensors; part A runs the Dallas path

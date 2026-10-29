@@ -87,6 +87,7 @@ DISC, MQTT_H, MQTT_INO = FW + "MQTTHaDiscovery.cpp", FW + "MQTTstuff.h", FW + "M
 BOARDS_H = "src/libraries/Platform/src/boards.h"
 CORE_H, CORE_INO, FW_H, HELPER_H = FW + "OTGW-Core.h", FW + "OTGW-Core.ino", FW + "OTGW-firmware.h", FW + "helperStuff.h"
 HW_H, DEV_H, SENS_H, SENS_INO = FW + "Hardwaretypes.h", FW + "Devicetypes.h", FW + "Sensorstypes.h", FW + "sensors_ext.ino"
+NET_H = FW + "Networktypes.h"   # OTGWNetworkMode, read by buildDiscoveryContext() (TASK-1377.1)
 CPP, SHIM = "test_ha_discovery_json.cpp", HERE / "ha_disc_shim"
 
 # The two composers TASK-1202 fixes, with the config topic each one owns.
@@ -133,10 +134,12 @@ def export(rev, out_dir):
     origin = f"git {rev}" if rev else "the working tree"
     for path in (DISC, MQTT_H, BOARDS_H):                 # verbatim
         (out_dir / Path(path).name).write_text(read(path, rev), encoding="utf-8")
-    src = {p: read(p, rev).splitlines() for p in (MQTT_INO, CORE_H, CORE_INO, FW_H, HELPER_H, HW_H, DEV_H, SENS_H, SENS_INO)}
+    src = {p: read(p, rev).splitlines()
+           for p in (MQTT_INO, CORE_H, CORE_INO, FW_H, HELPER_H, HW_H, DEV_H, SENS_H, SENS_INO, NET_H)}
     ch, fwh, mino = src[CORE_H], src[FW_H], src[MQTT_INO]
     write(out_dir, "gen_types.inc", origin, [
         construct(src[HW_H], r"^enum OTGWHardwareMode\b"),
+        construct(src[NET_H], r"^enum OTGWNetworkMode\b"),
         construct(src[DEV_H], r"^struct DeviceSection\b"),
         construct(src[SENS_H], r"^struct SensorsSection\b"),
         line(src[HELPER_H], r"^#define PROGMEM_readAnything\(src, dest\)"),
@@ -283,8 +286,18 @@ def component(topic, ctx):
     return topic[len(ctx["prefix"]) + 1:].split("/")[0]
 
 
-RETIRED_SAT_TOPIC_TAILS = ("/sat_force_pwm_enable/config", "/sat/force_pwm_enable",
-                           "/sat_pwm_auto_switch_enable/config", "/sat/pwm_auto_switch_enable")
+def retired_sat_topic_tails(rev=None):
+    """Topic tails that clearRetiredSatEntities() empties, read from kRetiredSatEntities[] in the
+    revision's MQTTHaDiscovery.cpp (the RETIRED-SAT-ENTITY rows), never kept by hand: TASK-1282
+    added a row there and a hand-kept copy here missed it (TASK-1443)."""
+    rows = re.findall(r'\{\s*"\w+",\s*"(\w+)",\s*(?:"([^"]+)"|nullptr)\s*\},\s*//\s*RETIRED-SAT-ENTITY',
+                      read(DISC, rev))
+    return tuple(t for obj, sub in rows for t in (f"/{obj}/config", sub) if t)
+
+
+# The working tree's list. An older revision (--old-rev) has the same rows or fewer, and a row it
+# lacks is a topic it never publishes, so the working-tree list serves both builds.
+RETIRED_SAT_TOPIC_TAILS = retired_sat_topic_tails()
 
 
 def gate(p, ctx):
@@ -578,6 +591,11 @@ def main():
     state_topic2 = f"{fix[0]['pub']}/sat/pwm_auto_switch_enable"
     checks.append((f"TASK-1341 FIX: the run emits the empty retained publish to {cfg_topic2} and {state_topic2}",
                    cfg_topic2 in emitted and state_topic2 in emitted))
+    # TASK-1282: same for the removed comfort adjust switch
+    cfg_topic3 = f"{fix[0]['prefix']}/switch/{fix[0]['node']}/sat_comfort_adjust_enable/config"
+    state_topic3 = f"{fix[0]['pub']}/sat/comfort_adjust_enable"
+    checks.append((f"TASK-1282 FIX: the run emits the empty retained publish to {cfg_topic3} and {state_topic3}",
+                   cfg_topic3 in emitted and state_topic3 in emitted))
     # TASK-1201: one config topic per uniq_id, and the one-time clear never empties a live config.
     fix_dups = dup_uniq_ids(fix)
     checks.append((f"TASK-1201 FIX: no uniq_id on two config topics in any permutation (got {fix_dups})",
