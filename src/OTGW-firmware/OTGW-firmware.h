@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.542
+**  Version  : v2.0.0-alpha.543
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -125,6 +125,7 @@ void setLed(uint8_t, uint8_t);
 #define _HOSTNAME       "OTGW2"  // default hostname of the 2.0.0 line; 1.x keeps "OTGW" (TASK-1293)
 #define MQTT_NAME_DEFAULT "OTGW"  // MQTT top-topic fallback and client-id prefix, independent of the hostname default
 #define SETTINGS_FILE         "/settings.ini"
+#define FS_UPDATE_INCOMPLETE_FILE "/.fs_update_incomplete"  // TASK-1495: set by an interrupted filesystem update, gone after a complete one
 #define NTP_DEFAULT_TIMEZONE "Europe/Amsterdam"
 #define NTP_HOST_DEFAULT "pool.ntp.org"
 #define NTP_RESYNC_TIME 86400 //seconds = once per day. Was 1800 (30 min); raised on the 1.x line under TASK-1046 while hunting a recurring SNTP allocation cycle, and ported here as TASK-1051. NTP still syncs at boot, and 24h of drift stays far below the 1s the UI displays.
@@ -290,7 +291,7 @@ enum class StatusMessage : uint8_t {
 };
 
 void readSettings(bool show);
-void writeSettings(bool show);
+bool writeSettings(bool show);
 void updateSetting(const char *field, const char *newValue);
 bool checkGPIOConflict(int pin, GPIOConflictCaller caller);
 const __FlashStringHelper* getStatusMessageText();

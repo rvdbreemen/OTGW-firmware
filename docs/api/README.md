@@ -167,6 +167,7 @@ Returns comprehensive device information as a flat JSON map. Boolean values are 
     "uptime": "2d 3h 45m",
     "lastreset": "Software/System restart",
     "bootcount": 42,
+    "fsupdateincomplete": false,
     "mqttconnected": true,
     "thermostatconnected": true,
     "boilerconnected": true,

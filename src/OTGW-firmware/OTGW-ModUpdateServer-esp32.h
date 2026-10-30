@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-alpha.542
+**  Version  : v2.0.0-alpha.543
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -53,8 +53,9 @@ extern OTGWState state;
 extern bool LittleFSmounted;
 extern bool updateLittleFSStatus(const char *probePath);
 extern bool updateLittleFSStatus(const __FlashStringHelper *probePath);
-extern void writeSettings(bool show);
+extern bool writeSettings(bool show);
 extern void settingsMarkClean();
+extern void settingsMarkDirty();
 extern void satPersistAllToFs();           // TASK-1286: SAT learned state, RAM -> LittleFS
 extern void saveOtSupportFilesForced();    // TASK-1286: OT profile files, RAM -> LittleFS
 extern void blinkLEDnow(uint8_t);
@@ -457,12 +458,13 @@ private:
         } else if (LittleFSmounted) {
           updateLittleFSStatus(F("/.ota_post"));
           logBootSignature("[OTA] post-remount");    // third probe (FS-OTA only): after LittleFS.begin() remount
-          if (_serial_output) DebugTln(F("[OTA] Restoring settings to filesystem"));
-          writeSettings(false);
-          settingsMarkClean();
-          _restoreKeptFiles();           // TASK-1266/1286: files without a RAM copy, from the heap
-          saveOtSupportFilesForced();    // TASK-1286: the OT profiles live in RAM, so no heap copy is needed
-          satPersistAllToFs();           // TASK-1286: SAT learned state from RAM, even when it was saved less than an hour ago
+          _restoreRuntimeFiles();
+          // TASK-1495: version.hash sits in the first blocks, so it does not prove the
+          // rest of the image arrived. A short upload is an error and gets the marker.
+          if (_uploadExpectedBytes > 0 && _uploadWrittenBytes != _uploadExpectedBytes) {
+            strlcpy(_updaterError, "incomplete filesystem image (short upload)", sizeof(_updaterError));
+            _markFsUpdateIncomplete();
+          }
         } else {
           LittleFSmounted = false;
           if (_serial_output) DebugTln(F("[OTA] Error: LittleFS mount failed"));
@@ -482,6 +484,32 @@ private:
     _resetUploadTracking();
   }
 
+  // After a filesystem write (complete or aborted) and a successful remount: put
+  // back what lives in RAM or in the heap copies, while bESPactive is still up so
+  // the loop task stays off these files.
+  void _restoreRuntimeFiles() {
+    if (_serial_output) DebugTln(F("[OTA] Restoring settings to filesystem"));
+    bool saved = writeSettings(false);
+    settingsMarkClean();           // no deferred service restarts in the reboot window
+    if (!saved) settingsMarkDirty();  // TASK-1495: the next flush (at the latest the restart) tries again
+    _restoreKeptFiles();           // TASK-1266/1286: files without a RAM copy, from the heap
+    saveOtSupportFilesForced();    // TASK-1286: the OT profiles live in RAM, so no heap copy is needed
+    satPersistAllToFs();           // TASK-1286: SAT learned state from RAM, even when it was saved less than an hour ago
+  }
+
+  // TASK-1495: the web assets may be partly old and partly new. The marker is not
+  // in KEEP_LIST, so the next complete filesystem image removes it.
+  void _markFsUpdateIncomplete() {
+    File f = LittleFS.open(FS_UPDATE_INCOMPLETE_FILE, "w");
+    if (f) {
+      f.printf("%u of %u bytes\n", static_cast<unsigned>(_uploadWrittenBytes),
+               static_cast<unsigned>(_uploadExpectedBytes));
+      f.close();
+    }
+    DebugTf(PSTR("[OTA] Filesystem update incomplete (%u of %u bytes): the web UI may not work, upload the filesystem again\r\n"),
+            static_cast<unsigned>(_uploadWrittenBytes), static_cast<unsigned>(_uploadExpectedBytes));
+  }
+
   // Abort path. Async has no UPLOAD_FILE_ABORTED; request->onDisconnect() drives
   // this. onDisconnect also fires on a normal close after a clean upload, so the
   // _updateFinalized guard makes this a no-op in that case.
@@ -490,7 +518,6 @@ private:
     if (!::state.flash.bESPactive) return;  // never started / already cleaned up
 
     Update.end();
-    _dropKeptFiles();
     if (_serial_output) {
       DebugTf(PSTR("[OTA] Abort: after %u bytes\r\n"), static_cast<unsigned>(_uploadWrittenBytes));
     }
@@ -501,7 +528,16 @@ private:
       if (_serial_output) {
         DebugTf(PSTR("[OTA] Abort: LittleFS remount %s\r\n"), LittleFSmounted ? "OK" : "FAILED");
       }
+      // TASK-1495: the sectors written so far stay written (no rollback for U_SPIFFS),
+      // so settings.ini can already be the new image's shipped default and the later
+      // blocks of large files still hold the old image. Put the runtime files back
+      // from RAM, as the end handler does, and mark the filesystem as incomplete.
+      if (LittleFSmounted) {
+        _restoreRuntimeFiles();
+        if (_uploadWrittenBytes > 0) _markFsUpdateIncomplete();
+      }
     }
+    _dropKeptFiles();          // no-op after a restore; frees the copies when there was none
     ::state.flash.bESPactive = false;
     _authenticated = false;  // force re-authentication on next upload
     _resetUploadTracking();

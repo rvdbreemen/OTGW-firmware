@@ -730,6 +730,9 @@ paths:
                         type: string
                       bootcount:
                         type: integer
+                      fsupdateincomplete:
+                        type: boolean
+                        description: The last filesystem update was interrupted; the web UI may be partly old and partly new. Upload the filesystem again. Cleared by a complete filesystem update.
                       mqttconnected:
                         type: boolean
                       cmd_dropped:

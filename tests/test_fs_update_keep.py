@@ -123,6 +123,8 @@ def keep_list():
 
 
 END = r"void _handleUploadEnd\(size_t totalSize\)"
+ABORT = r"void _handleUploadAbort\(\)"
+RESTORE = r"void _restoreRuntimeFiles\(\)"
 START = r"void _handleUploadStart\(AsyncWebServerRequest \*request, const String &filename\)"
 
 
@@ -196,20 +198,28 @@ class TestOrdering(unittest.TestCase):
         self.assertTrue(is_plain_statement(start, "_keepFiles();"))
         self.assertLess(start.index("_keepFiles();"), start.index("LittleFS.end()"))
 
-    def test_writeback_after_remount(self):
-        end = function_body(UPD, END)
-        order = ["LittleFSmounted = LittleFS.begin()", "writeSettings(false);", "settingsMarkClean();",
+    def test_writeback_steps_in_order(self):
+        restore = function_body(UPD, RESTORE)
+        order = ["bool saved = writeSettings(false);", "settingsMarkClean();", "if (!saved) settingsMarkDirty();",
                  "_restoreKeptFiles();", "saveOtSupportFilesForced();", "satPersistAllToFs();"]
-        pos = [end.find(s) for s in order]
+        pos = [restore.find(s) for s in order]
         self.assertTrue(all(p >= 0 for p in pos), dict(zip(order, pos)))
         self.assertEqual(pos, sorted(pos), "write-back steps out of order: " + str(dict(zip(order, pos))))
-        for stmt in order[1:]:
-            self.assertTrue(is_plain_statement(end, stmt), stmt + " is guarded or not a statement of its own")
-        # all inside the "remount worked and the image is complete" branch
-        self.assertLess(end.index("version.hash"), pos[1])
-        self.assertLess(pos[-1], end.index("LittleFS mount failed"))
+        for stmt in order:
+            self.assertTrue(is_plain_statement(restore, stmt), stmt + " is guarded or not a statement of its own")
+
+    def test_writeback_after_remount(self):
+        end = function_body(UPD, END)
+        call = "_restoreRuntimeFiles();"
+        self.assertTrue(is_plain_statement(end, call), "end handler: " + call + " missing or guarded")
+        pos = end.index(call)
+        self.assertLess(end.index("LittleFSmounted = LittleFS.begin()"), pos)
+        # inside the "remount worked and the image is complete" branch
+        self.assertLess(end.index("version.hash"), pos)
+        self.assertLess(pos, end.index("LittleFS mount failed"))
         # still while the update flag is up (the loop task stays off these files)
-        self.assertLess(pos[-1], end.index("bESPactive = false"))
+        self.assertLess(pos, end.index("bESPactive = false"))
+
 
     def test_declarations(self):
         self.assertRegex(UPD, r"extern void satPersistAllToFs\(\);")
@@ -217,6 +227,88 @@ class TestOrdering(unittest.TestCase):
         hdr = code(*FWDIR, "OTGW-firmware.h")
         self.assertRegex(hdr, r"void satPersistAllToFs\(\);")
         self.assertRegex(hdr, r"void saveOtSupportFilesForced\(\);")
+
+
+class TestAbortRestore(unittest.TestCase):
+    """TASK-1495: an interrupted filesystem upload leaves the sectors written so far
+    (no rollback for U_SPIFFS), so settings.ini can be the new image's shipped default
+    while RAM holds the user's settings. The abort path must write them back."""
+
+    def setUp(self):
+        self.abort = function_body(UPD, ABORT)
+
+    def test_abort_restores_after_remount(self):
+        self.assertRegex(self.abort, r"if \(LittleFSmounted\) \{\s*_restoreRuntimeFiles\(\);",
+                         "abort must restore the runtime files once the remount worked")
+        pos = self.abort.index("_restoreRuntimeFiles();")
+        self.assertLess(self.abort.index("LittleFSmounted = LittleFS.begin()"), pos)
+        self.assertLess(pos, self.abort.index("bESPactive = false"))
+
+    def test_abort_drops_copies_only_after_the_restore(self):
+        drops = [m.start() for m in re.finditer(r"_dropKeptFiles\(\);", self.abort)]
+        self.assertEqual(len(drops), 1, "abort frees the heap copies once")
+        self.assertLess(self.abort.index("_restoreRuntimeFiles();"), drops[0],
+                        "the copies are freed before the restore could use them")
+        self.assertTrue(is_plain_statement(self.abort, "_dropKeptFiles();"))
+
+    def test_abort_marks_the_filesystem_incomplete(self):
+        self.assertRegex(self.abort, r"if \(_uploadWrittenBytes > 0\) _markFsUpdateIncomplete\(\);",
+                         "a 0-byte abort left the old image intact and needs no marker")
+        self.assertLess(self.abort.index("_restoreRuntimeFiles();"), self.abort.index("_markFsUpdateIncomplete();"))
+
+    def test_short_upload_at_end_is_an_error_with_marker(self):
+        end = function_body(UPD, END)
+        m = re.search(r"if \(_uploadExpectedBytes > 0 && _uploadWrittenBytes != _uploadExpectedBytes\) \{([^}]*)\}", end)
+        self.assertTrue(m, "the end handler must not trust version.hash alone")
+        self.assertIn("_updaterError", m.group(1))
+        self.assertIn("_markFsUpdateIncomplete();", m.group(1))
+
+    def test_marker_is_not_kept_and_is_reported(self):
+        self.assertNotIn(".fs_update_incomplete", keep_list(), "a complete image must remove the marker")
+        mark = function_body(UPD, r"void _markFsUpdateIncomplete\(\)")
+        self.assertIn("LittleFS.open(FS_UPDATE_INCOMPLETE_FILE", mark)
+        hdr = code(*FWDIR, "OTGW-firmware.h")
+        self.assertRegex(hdr, r'#define FS_UPDATE_INCOMPLETE_FILE\s+"/\.fs_update_incomplete"')
+        rest = code(*FWDIR, "restAPI.ino")
+        self.assertRegex(rest, r'je\.field\(F\("fsupdateincomplete"\), LittleFSmounted && LittleFS\.exists\(F\(FS_UPDATE_INCOMPLETE_FILE\)\)\);')
+
+
+class TestSettingsPersistence(unittest.TestCase):
+    """TASK-1495: a failed settings write must not clear the dirty flag, and an empty or
+    unreadable settings.ini must be rewritten from RAM at the next flush."""
+
+    def setUp(self):
+        self.st = code(*FWDIR, "settingStuff.ino")
+
+    def test_write_settings_reports_failure(self):
+        self.assertRegex(code(*FWDIR, "OTGW-firmware.h"), r"bool writeSettings\(bool show\);")
+        self.assertRegex(UPD, r"extern bool writeSettings\(bool show\);")
+        body = function_body(self.st, r"bool writeSettings\(bool show\)")
+        self.assertRegex(body, r"if \(!file\)\s*\{[^}]*return false;", "open failure")
+        # open("w") truncates first: a later short write must be caught by reading the size back
+        self.assertIn("file.position()", body)
+        self.assertRegex(body, r"File check = LittleFS\.open\(SETTINGS_FILE, \"r\"\);")
+        self.assertRegex(body, r"if \(!tailWritten \|\| intended == 0 \|\| onFlash != intended\) \{[^}]*return false;",
+                         "short write")
+        self.assertTrue(body.rstrip("}").rstrip().endswith("return true;"))
+
+    def test_failed_restore_write_stays_dirty(self):
+        """The abort path writes onto a half-written partition, where writeSettings is most
+        likely to fail; clearing dirty there would bring the defaults back at the reboot."""
+        mark = function_body(self.st, r"void settingsMarkDirty\(\)")
+        self.assertIn("settingsDirty = true;", mark)
+        self.assertRegex(UPD, r"extern void settingsMarkDirty\(\);")
+
+    def test_flush_keeps_dirty_on_failure(self):
+        body = function_body(self.st, r"void flushSettings\(\)")
+        self.assertRegex(body, r"if \(writeSettings\(false\)\) \{\s*settingsDirty = false;\s*\}",
+                         "dirty may only be cleared after a successful write")
+        self.assertEqual(body.count("settingsDirty = false;"), 1)
+
+    def test_empty_or_unreadable_file_marks_dirty(self):
+        body = function_body(self.st, r"void readSettings\(bool show\)")
+        self.assertRegex(body, r"if \(!file\) \{[^}]*settingsDirty = true;\s*return;", "unreadable file")
+        self.assertRegex(body, r"if \(file\.size\(\) == 0\) \{[^}]*settingsDirty = true;\s*return;", "empty file")
 
 
 class TestSatWriteBack(unittest.TestCase):

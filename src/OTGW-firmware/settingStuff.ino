@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.542
+**  Version  : v2.0.0-alpha.543
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -57,13 +57,22 @@ void settingsMarkClean()
   pendingSideEffects = 0;
 }
 
+// TASK-1495: a direct writeSettings() that failed leaves the settings for the next flush.
+void settingsMarkDirty()
+{
+  settingsDirty = true;
+}
+
 void flushSettings()
 {
   if (!settingsDirty) return;
 
   DebugTln(F("[Settings] Flushing deferred settings write..."));
-  writeSettings(false);
-  settingsDirty = false;
+  if (writeSettings(false)) {
+    settingsDirty = false;
+  } else {
+    DebugTln(F("[Settings] Flush failed; the settings stay dirty for the next flush"));
+  }
 
   // Apply deferred side effects — exactly once per service per save batch
   if (pendingSideEffects & SIDE_EFFECT_MDNS) {
@@ -245,7 +254,7 @@ static void writeJsonIndexedStringKV(File& file, PGM_P keyBase, unsigned index, 
 }
 
 //=======================================================================
-void writeSettings(bool show)
+bool writeSettings(bool show)
 {
 
   DebugTf(PSTR("[Settings] State: writeSettings called (show=%s)\r\n"), show ? "true" : "false");
@@ -254,7 +263,7 @@ void writeSettings(bool show)
   if (!file)
   {
     DebugTf(PSTR("[Settings] Error: open(%s, 'w') FAILED!!! --> Bailout\r\n"), SETTINGS_FILE);
-    return;
+    return false;
   }
 
   DebugT(F("[Settings] State: Writing JSON settings... "));
@@ -480,11 +489,23 @@ void writeSettings(bool show)
   writeJsonStringKV(file, F("WifiGateway"),  settings.wifi.sGateway);
   writeJsonStringKV(file, F("WifiDns1"),     settings.wifi.sDns1);
   writeJsonStringKV(file, F("WifiDns2"),     settings.wifi.sDns2);
-  file.print(F("\n}\n"));
+  size_t tail = file.print(F("\n}\n"));
+  bool tailWritten = (tail == 3);
+  size_t intended = file.position();
   Debugln(F("\r\n[Settings] State: File write complete, closing file"));
   file.close();  // Close write handle before any subsequent read
-  DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);
   safebootSyncNvs(settings.sHostname, settings.sHTTPpasswd);  // ADR-191: safeboot reads these from NVS
+  // TASK-1495: open("w") truncates first, so a write that fails later (full or
+  // partly written filesystem) leaves a short or empty file. Read the size back.
+  File check = LittleFS.open(SETTINGS_FILE, "r");
+  size_t onFlash = check ? check.size() : 0;
+  if (check) check.close();
+  if (!tailWritten || intended == 0 || onFlash != intended) {
+    DebugTf(PSTR("[Settings] Error: %s short write (%u of %u bytes)\r\n"), SETTINGS_FILE,
+            static_cast<unsigned>(onFlash), static_cast<unsigned>(intended));
+    return false;
+  }
+  DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);
 
   if (show) {
     DebugTln(F("\r\n[Settings] JSON content:"));
@@ -494,7 +515,7 @@ void writeSettings(bool show)
     }
     if (showFile) showFile.close();
   }
-
+  return true;
 } // writeSettings()
 
 
@@ -522,11 +543,13 @@ void readSettings(bool show)
   File file = LittleFS.open(SETTINGS_FILE, "r");
   if (!file) {
     DebugTln(F("Failed to open settings file, use existing defaults."));
+    settingsDirty = true;  // TASK-1495: the next flush rewrites it from RAM
     return;
   }
   if (file.size() == 0) {
     file.close();
     DebugTln(F("Settings file is empty, use existing defaults."));
+    settingsDirty = true;  // TASK-1495: an empty file would otherwise stay empty
     return;
   }
   // Own line buffer — prevents cMsg clobber if readSettings() is called from an

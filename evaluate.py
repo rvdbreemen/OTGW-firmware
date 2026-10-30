@@ -2340,7 +2340,8 @@ class WorkspaceEvaluator:
         problems = []
         if re.search(r"\bwithComma\b", src):
             problems.append("a writeJson*KV helper still takes withComma")
-        start = src.find("void writeSettings(bool show)")
+        m = re.search(r"\b(?:void|bool) writeSettings\(bool show\)", src)
+        start = m.start() if m else -1
         end = src.find("} // writeSettings()", start)
         if start < 0 or end < 0:
             problems.append("writeSettings() not found")
