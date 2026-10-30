@@ -4910,3 +4910,62 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156558233138
 - Q68: the boot hand-back keeps the restored PID integral and the saved PWM flag (`SATcontrol.ino:2643-2649`); a hand-back during operation still resets the PID (entry 79, TASK-1390). thermo-nova also restores the PID state (`pid.py:147-155`).
 
 **Task:** TASK-1482 (matches the change). **Open:** (1) the optional refinement offered with Q68 (drop the integral when the wait outlasts 30 min from the save time) was not answered: no change. (2) The Q67 correction found that entry 129 rested on a false premise (the PIC does not keep SAT's last CS over a gateway restart); that follow-up question is still to be asked.
+
+## 141. Q64 B: MI=500 on PIC boards once the firmware knows there is no return temperature or the boiler is Ideal/Intergas/Nefit; no reset (2026-10-30, settles entry 45 open point 2)
+
+**Source:** #alpha-testing, 2026-10-30 05:31 UTC, answer to our re-ask (msg 1565590912858587217):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565598981973868666
+
+**Quoted:**
+
+> @BlueFlame Bot Q64: B
+> Q65: B
+
+**Option B as posted (re-ask):** "PIC boards only, once the firmware knows the boiler has no return temperature or is Ideal/Intergas/Nefit. No reset when SAT turns off."
+
+**Settled (our reading of a one-letter reply, against the posted option text and the 2026-10-29 correction msg 1565506406487163002):** on PIC boards SAT sends MI=500 once it is known that the boiler has no return temperature (entries 45, 135: Unknown-DataID on MsgID 28 and no valid board sensor) or the manufacturer resolves to Ideal, Intergas or Nefit (detected or set by hand), after detection, not in initSAT(). Never on OT-Direct boards (the correction's point 2; B said "PIC boards only"). No MI=1000 when SAT turns off; the PIC keeps MI in EEPROM (otgw-6.6 gateway.asm:4564-4571, as cited in the correction).
+
+**Compared:** thermo-nova sends MI=500 once at boot for Ideal, Intergas and Nefit only (coordinator/mqtt/opentherm.py:171-172, as cited in the question; not re-opened in this session). Firmware today checks in initSAT() while the manufacturer is still AUTO, so MI=500 is in practice never sent (audit #45, per the correction). **Task:** TASK-1371. **Open:** none.
+
+## 142. Q65 B: the 20 s CS/PM=25 flood also runs on the CH relight after a hot-water draw (2026-10-30, replaces the reading of entry 137)
+
+**Source:** the same message as entry 141 (05:31 UTC), answer to our check that the 04:13 short list had swapped the letters.
+
+**Option B as posted (check, msg 1565590912858587217):** "flood also on the CH relight after a draw."
+
+**Settled:** for a boiler without a return temperature (entries 135, 138), every CH ignition in a PWM ON phase gets the entry 45 flood, including the relight after a hot-water draw (only a real off-to-on of the CH flame; a flame that stays lit is no ignition, correction msg 1565506416721006653 point 3). This is the advice of our original question and correction.
+
+**Changes an earlier entry:** entry 137 recorded his first "A" with the literal reading "no flood" and flagged it for confirmation; this entry replaces that reading. **Task:** TASK-1371. **Open:** none.
+
+## 143. Q60 A: ultra-low duty keeps 180 s ON and extends OFF, up to twice the period; ultra-high duty is the mirror (2026-10-30, settles entry 122 / R30)
+
+**Source:** #alpha-testing, 2026-10-30 05:57 UTC:
+https://discord.com/channels/812969634638725140/1514720723980259460/1565605444062285845
+
+**Quoted:**
+
+> @BlueFlame Bot
+> Q60: Ultra low-duty cycles is also known as extended duty cycles. When we are entering in an ultra low duty cycle we keep the 180s minimum PWM ON time and we extend the PWM OFF cycle. The limit is the twice the period. So correct answer is  A.
+>
+> Moreover the opposite happens when we have an ultra-high duty cycle. We extend the PWM ON cycle and keep the PWM OFF cycle to 180s. Also here the limit is twice the period
+
+**Settled:** A, twice the period (1800 s at 4 cycles/h, 2400 s at 3). His 900/1200 s in entry 31 was the normal cycle period (his "the limit is twice the period" answers our question back; our interpretation of the wording). New statement, the mirror case: at high duty the ON time is extended and OFF stays 180 s, again limited to twice the period.
+
+**Compared with thermo-nova (opened in this session, pinned 7beaaf5):** `pwm.py:53-55` (180 s lower threshold, period = 3600 / cycles per hour, maximum = 2 x period); ultra-low: `pwm.py:247-260` (flame on: 180 on / 2P-180 off; no flame: 0 on / 2P off); high range: `pwm.py:285-294` (on = 180/(1-d) - 180, off = 180); above the maximum duty: `pwm.py:296-298` (on = 2P, off = 0). His description matches the code. **Firmware:** `SATcontrol.ino:1078-1123` at 8ded885eb maps the same five ranges (range 5 at `:1087-1101` reports on = maxMs, off = 0; range 1 at `:1103-1113`). One boundary differs: at exactly d == dutyMax the firmware takes range 5 (`duty >= dutyMax`, `:1087`) where thermo-nova takes the high range (`<= max`, `pwm.py:285`); a single point, no practical effect (our assessment). No change needed for Q60.
+
+**Task:** TASK-1412.9 (no change). **Open:** none.
+
+## 144. Q69: split gas consumption into a CH sensor and a DHW sensor (2026-10-30, answer to Q69; interpretation to confirm)
+
+**Source:** #alpha-testing, 2026-10-30 06:42 UTC, reply to Q69 (msg 1565614951077388299):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565616780511154177
+
+**Quoted:**
+
+> @BlueFlame Bot you can have a split gas consumption sensors. CH gas consumption and DHW gas consumption
+
+**Reading (our interpretation; he chose none of A/B/C, so it is put back to him as a yes/no):** two consumption values instead of one. CH consumption: as today, the flame is on and the boiler's CH mode bit is set (Q69 option A, the OpenTherm-Gateway-via-MQTT coordinator's `active`). DHW consumption: the flame is on and the boiler's DHW-active bit is set. Both use the same formula, min + modulation/100 * (max - min), from the satminconsumption / satmaxconsumption settings. So no draw is lost and none is counted as heating.
+
+**Compared:** thermo-nova has a single "Current Consumption (Device)" sensor, 0 unless `coordinator.active` and the flame is on (`sensor.py:219-259`, opened in this session); no DHW sensor (not found in sensor.py). Firmware today: one `sat/consumption`, gated on CH mode + flame (`SATcontrol.ino:4059-4071` at 5544e8a63). A DHW sensor is a firmware extension on his direction, not thermo-nova parity (feedback: best SAT, not parity).
+
+**Task:** follow-up of TASK-1484 (filed 2026-10-30). **Open:** his confirmation of the reading (asked in the acknowledgement); the topic names (sat/consumption kept for CH, new sat/consumption_dhw, our proposal); whether the old single sensor stays as the sum (not asked).

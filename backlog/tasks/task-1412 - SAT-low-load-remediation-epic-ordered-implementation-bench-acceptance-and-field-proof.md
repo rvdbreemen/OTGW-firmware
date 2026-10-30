@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-27T23:40:00Z'
-updated_date: '2026-10-28T20:11:00Z'
+updated_date: '2026-10-30T06:19:00Z'
 labels:
   - epic
   - sat
@@ -82,6 +82,8 @@ stays; the order inside it changes so that this defect is fixed first, with old-
 2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): removed TASK-1412.3 from TASK-1420 (Done), 1368, 1270, 1381, 1413, 1409; replaced it by TASK-1368/1270 on 1417/1414. Reason (precedent TASK-1419): these tasks carry their own red/green host tests and recorded decisions; TASK-1412.3 absorbs them into LL-003/LL-004/LL-020 later. Kept on 1412.4-.6 (LL-010/011/017 PENDING and contracts missing). Added 1428/1429 to 1412.8, 1423 to 1412.10, 1425 to 1412.15, 1426 to 1412.18, 1412.5 to 1428. Not changed: Done tasks 1380/1382/1383/1407 still list 1412.3 (history). docs/sat/sat-low-load-execution-backlog-2026-10-28.md and the backlog-order JSON are now stale on these edges. Real blockers outside the graph: TASK-1381 AC#2 (Sergeant D OK, Q53 queued), TASK-1426 (entry 21, Q54 queued), TASK-1415 AC#3 (Robert: write cadence, entry 74).
 
 2026-10-28 Codex execution-graph update completed at Robert's request: preserved reconciliation 6dda1e15a, linked 1422/1424 into 1412.7 and 1413 into 1412.16, encoded the serial PID writer chain without Q53 blocking independent fixes, refreshed markdown/JSON and audit. Audit: 63 nodes, zero cycles, 42 issue owners, all relevant SAT follow-ups in the epic closure, bench required for formal field stages; injected cycle and bench-bypass controls rejected. Builder handoff published in comments on 1368/1409/1270 and this epic, linked from AGENTS.md and CLAUDE.md. No direct active builder endpoint was available and no acknowledgement is claimed. Active builders retain ownership of 1368/1409 and all firmware edits. No control change or task completion claimed.
+
+Robert 2026-10-30 (session, coordinator otgw-firmware-b8): WAIVER of the field-validation order for the first 2.0.0 beta (target Sun 2026-11-01). SAT ships experimental / opt-in (default off); SAT field data may come from named testers who enable it knowingly, before 1412.21/.22 bench and equipment acceptance. The epic stays the route to 'SAT stable'; this waiver covers field-data collection only, not a stable claim.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

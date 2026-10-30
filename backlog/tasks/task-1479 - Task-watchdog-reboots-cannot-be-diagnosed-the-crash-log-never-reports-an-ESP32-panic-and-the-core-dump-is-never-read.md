@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T14:37:00Z'
-updated_date: '2026-10-30T00:00:00Z'
+updated_date: '2026-10-30T05:50:00Z'
 labels:
   - bug
   - stability
@@ -58,4 +58,6 @@ Bench .61 (OTGW32-class test unit, alpha.512 -> exploratory local build alpha.53
 5. Not yet proven: the field case (loop task stalled, async_tcp idle). exc_task is the task running on the core that took the TWDT interrupt; whether that is loopTask when loopTask spins is untested. Next: second exploratory build with the hang in loop() (key Z) and the async hang kept on key Y.
 
 Committed without the loop-hang bench proof (coordinator 75, 2026-10-30: .61 unplugged). Rebased onto origin/dev c00c5f025 (alpha.542). Fresh evidence on the rebased tree: tests/test_crashlog_coredump.py FIX 7/7 OK (exit 0); same test against c00c5f025's platform_esp32.h + helperStuff.ino (OTGW_PLATFORM_H/OTGW_HELPER_INO) FAILED failures=4 skipped=1 (exit 1); evaluate.py --quick 79 passed, 0 warn, 0 fail. AC#2 checked on bench run 1 (crashlog available:true, item 3) plus the host test. AC#3 checked: OTGW-Core.ino TWDT comment names the loop task and AsyncTCP async_tcp (espMqttClient internal task not used). AC#1 OPEN: proven for a hang in async_tcp only; the loop-task stall (key Z, exc_task when loopTask spins) waits for .61. No firmware build in this commit (batch cadence; coordinator builds). Hang test code (OTGW_TEST_TWDT_HANG) not committed; kept as a local patch.
+
+Bench 2026-10-30 (coordinator otgw-firmware-b8, Classic-S3 .63, PIC 6.8): batch rebuilt after the 05:50 PC restart; esp32-combo alpha.547+6240b05 and alpha.548+8ded885 built (artifacts 06:12 / 06:42, githash = HEAD), evaluate --quick 79/0/0 on both; OTA app via safeboot + FS via /update?cmd=100, 174 settings keys kept. TASK-1479 (alpha.545): /api/v2/device/crashlog -> available:false with only software resets in reboot_log.txt (correct for no panic). No forced panic on this release build (no test hook); the panic path evidence remains the exploratory build on .61 (notes above). AC#1 loop-stall case still open (.61 offline).
 <!-- SECTION:NOTES:END -->
