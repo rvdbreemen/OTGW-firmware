@@ -4816,3 +4816,97 @@ Option A as posted: "Nothing until its first tick. The PIC keeps SAT's last setp
 **Compared with thermo-nova and the firmware:** thermo-nova has no gateway boot; after a Home Assistant restart it restores its state (`climate.py:169-190`, `heating_control.py:181-191`) and its next control pass sends the setpoint, with nothing sent in between. Firmware relies on the PIC keeping a CS= for about 63-126 s without a refresh (CLAUDE.md architecture rules, `satPicCSKeepalive()`); on OT-Direct boards there is no such holdover, so the first tick must come quickly there (not decided by this answer; noted for the plan).
 
 **Changes an earlier entry:** settles entry 126 Open; consistent with entries 121 and 47. **Task:** TASK-1482, TASK-1390. **Open:** the OT-Direct case (no PIC holdover) is noted for the TASK-1482 plan.
+
+## 130. Answers to the all-at-once round, 2026-10-30: shared source and reading (entries 130-140)
+
+**Source:** #alpha-testing, 2026-10-30 04:25 UTC, one message answering the short list he asked for (his request msg 1565578110831693956, our list msgs 1565579465327775755 and 1565579476530630758):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565582331387977849
+
+**Quoted (whole message):**
+
+> @BlueFlame Bot
+> Conf-108: A
+> Conf-104: Case1: C, Case 2: Yes
+> Conf-107: A
+> Q47b: A
+> Q61: A
+> Q63: A
+> Q65: A
+> Q65b: A
+> Q66: A
+> Q67: A
+> Q68: A
+
+**Reading:** each letter is read against the option text of the short list (04:13 UTC), which carries the corrected options of the 2026-10-29 23:23 correction round; where the short list abbreviates, the correction post of that question gives the full text. Entries 131-140 record the answers; each is our interpretation of a one-letter reply. Citations below are the ones posted with the questions (open-questions.md rows); they were not re-opened in this session. **Not answered:** Q60 and Q64 (both in the list, absent from his reply) stay open; Q69-Q71 were not asked yet.
+
+## 131. Conf-108 A: PWM exit timers restart during a draw and for 300 s after it, as thermo-nova (2026-10-30, confirms entry 108)
+
+**Source:** entry 130. **Option A as posted:** "yes, restart (as thermo-nova)".
+
+**Settled:** the underheat (180 s), saturation (300 s) and overshoot-entry (60 s) timers restart from zero while the boiler DHW-active bit is set and for 300 s after it clears (`heating_control.py:313-315`, `const.py:19`); the same guard blocks the 60 s overshoot switch into PWM (`heating_control.py:272-274`). Reason accepted with it: an exit timer is evidence that a condition held without a break, and a draw breaks it, unlike the ON timer that entries 95/103 pause.
+
+**Compared:** identical to thermo-nova; the firmware already does this under TASK-1420. **Task:** TASK-1420 (no change). **Open:** none.
+
+## 132. Conf-104: case 1 C (ignition sync after a draw), case 2 yes (rest of the original 180 s hold counts) (2026-10-30, changes entry 104)
+
+**Source:** entry 130. **Options as posted (short list, from the correction msg 1565506356251983914):** case 1, A = count the wait as used ON time (today), C = start the ON time and the 180 s hold at the first CH flame after the draw; case 2: does the rest of the original 180 s hold still count after the draw? Yes / No.
+
+**Settled:**
+- Case 1 (draw while the ON phase still waits for its first CH flame): the ON time and the 180 s ON hold start at the first CH flame after the draw; without a flame within 180 s of the draw end the timer starts anyway (thermo-nova ignition sync, `pwm.py:186-189`, `:201-203`). No new boiler-temperature seed and no start-up EMA from the hot flow (`pwm.py:148-149`); the value from before this phase stays.
+- Case 2 (short draw inside the first 180 s after a CH ignition): continue with the ON time left, no new measurement (103 B), and the remaining part of the original 180 s hold, draw time excluded, still counts after the draw. Today the firmware drops it (`SATcontrol.ino:1151`).
+
+**Changes an earlier entry:** entry 104 (our reading "103 B for every interrupted ON phase") is replaced for case 1; case 2 extends 103 B with the hold rule. **Task:** TASK-1422 (rework). **Open:** none.
+
+## 133. Conf-107 A: the hot-water-flame hold of a PWM ON start applies only while PWM drives the setpoint (2026-10-30, confirms entry 107)
+
+**Source:** entry 130. **Option A as posted:** "yes, only then".
+
+**Settled:** the hold applies only with overshoot protection on, no hot water and the requested setpoint above the cold setpoint (the test of `heating_control.py:385`); a flame counts as a hot-water flame when the DHW-active bit is set at its ignition. **Compared:** thermo-nova has no such hold; this is the firmware rule of TASK-1424 and stays. **Task:** TASK-1424 (no change). **Open:** none.
+
+## 134. Q47b A: PWM exits to continuous send the continuous CS in the same tick, as thermo-nova (2026-10-30, settles entry 88 Open)
+
+**Source:** entry 130. **Option A as posted:** "same tick (as thermo-nova)".
+
+**Settled:** on the tick an underheat or saturation exit fires, the continuous CS (and CH=1) goes out in that tick: run the PWM schedule, then the exits, then the setpoint (`heating_control.py:211-228`). In the firmware this is a reorder: `satPwmSchedule()` (`SATcontrol.ino:997`) stays first so saturation reads this tick's off time; the exits move before the final CS (today after it, `SATcontrol.ino:5641-5645`). **Task:** TASK-1420 follow-up / TASK-1412.8 (to implement). **Open:** none.
+
+## 135. Q61 A: a valid board return sensor ('R') counts as a return temperature; no entry 45 flood (2026-10-30, narrows entry 45 / Q40 B)
+
+**Source:** entry 130. **Option A as posted:** "yes, use the sensor value, no entry 45 flood".
+
+**Settled:** entry 45 (flow-based start, CS/PM=25 flood, MI=500) applies only when MsgID 28 is Unknown-DataID AND no valid board-sensor value exists. With a valid 'R' sensor value the thermo-nova flame-off hold from return + offset applies (`heating_control.py:397-405`). Fact given with the question: with the sensor set to 'R' the PIC itself answers MsgID 28 with the sensor value (otgw-6.6 `gateway.asm:3073-3086`). **Task:** TASK-1371, TASK-1412.5. **Open:** the maximum age of a sensor value and the fallback for '-' (entry 84 open point 3).
+
+## 136. Q63 A: inside the deadband the raw room slope is frozen, as pid.py (2026-10-30, settles entry 28's reading)
+
+**Source:** entry 130. **Option A as posted:** "the raw room slope (as pid.py)". The correction (msg 1565506396504465559) said to choose B only if "acts as a heating curve move up/down" meant a fixed offset in degrees; he chose A.
+
+**Settled:** freeze the raw derivative (`pid.py:205-207`); D = kd x raw derivative keeps following kd and thus the curve with automatic gains (`pid.py:61-93`, `:108-114`). **Compared:** identical to pid.py; the firmware already does this (`SATpid.ino:360-369`). **Task:** TASK-1412.10 (no change). **Open:** none.
+
+## 137. Q65 A: read as "no flood on the CH relight after a hot-water draw" - NEEDS CONFIRMATION (2026-10-30, entry 45 open point 4, first half)
+
+**Source:** entry 130. **Option A as posted in the 04:13 short list:** "Should the 20 s CS/PM=25 flood (entry 45) also run when the CH flame relights after a hot-water draw? A = no. B = yes. Advice: A."
+
+**Conflict, flagged:** the original question (2026-10-29 23:06, msg 1565502196815233235) had A = "Yes. Flood every CH ignition ..., also the relight after a draw" and B = "No", with advice A; the correction (23:23, msg 1565506416721006653) kept "advice stays A" in that original meaning. The 04:13 short list inverted the letters (A = no, B = yes) and kept "Advice: A". His "A" was given against the short list, so the literal reading is **no flood after a draw** (normal CS cadence, CS = flow minus offset), which is the opposite of what our earlier posts advised. The error is ours (the short list). Not acted on: confirm with him which he meant before TASK-1371 builds the flood.
+
+**Task:** TASK-1371. **Open:** confirmation question to Sergeant D.
+
+## 138. Q65b A: the flood applies only to boilers without a return temperature (2026-10-30, entry 45 open point 4, second half)
+
+**Source:** entry 130. **Option A as posted:** "no, only boilers without one" (same letters in every post).
+
+**Settled:** flood only for boilers that answer Unknown-DataID on MsgID 28 without a valid board sensor (entries 84, 135). All others keep thermo-nova's hold: return + flame-off offset (default 18) for the hold delay (default 20 s), then flow - 1 (`heating_control.py:397-448`). **Task:** TASK-1371. **Open:** none.
+
+## 139. Q66 A: an external outside temperature comes first for its whole valid hour (2026-10-30, refines entries 57 and 126)
+
+**Source:** entry 130. **Option A as posted:** "external sensor first for its whole valid hour, then the boiler sensor (MsgID 27), then weather".
+
+**Settled, order:** external sensor (MQTT/REST, valid < 1 h), MsgID 27, weather service, MsgID 27 reading 0.0, restored value (entry 126). The 10-minute priority window (`SATcontrol.ino:1753-1757` at 4339d35af) goes. Caveat accepted with it: an external source should publish at least every few minutes. **Compared:** thermo-nova has sensors before weather with one age limit (`climate.py:317-343`, default 6 h `const.py:170`); our limit stays 1 h (entry 57). **Task:** TASK-1482, TASK-1390. **Open:** none.
+
+## 140. Q67 A and Q68 A: wait up to 60 s for NTP; the boot hand-back keeps the restored PID integral and PWM flag (2026-10-30, refines entries 121, 126, 129)
+
+**Source:** entry 130. **Options as posted:** Q67 A = "60 s, then the hand-back"; Q68 A = "keep both (as thermo-nova)".
+
+**Settled:**
+- Q67: if the clock is still unknown 60 s after boot, the saved state counts as not valid and SAT sends the hand-back once (CS=0, CH=1, MM=T, entry 121) (`SATcontrol.ino:2962`, `:2974-3022` at 4339d35af). Reason given with the corrected question: every gateway boot resets the PIC, which clears any CS override, so the wait only bounds the rare case where NTP never comes.
+- Q68: the boot hand-back keeps the restored PID integral and the saved PWM flag (`SATcontrol.ino:2643-2649`); a hand-back during operation still resets the PID (entry 79, TASK-1390). thermo-nova also restores the PID state (`pid.py:147-155`).
+
+**Task:** TASK-1482 (matches the change). **Open:** (1) the optional refinement offered with Q68 (drop the integral when the wait outlasts 30 min from the save time) was not answered: no change. (2) The Q67 correction found that entry 129 rested on a false premise (the PIC does not keep SAT's last CS over a gateway restart); that follow-up question is still to be asked.
