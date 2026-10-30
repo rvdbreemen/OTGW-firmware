@@ -97,6 +97,9 @@ static void satPwmSuppressionRefresh() {}
 static void satMaxTSetSendStep() {}   // TASK-1373: the user MaxTSet SH= step is tested in test_sat_max_tset.py
 static void satPidService(uint32_t) {}
 static void satDhwSetpointSync() {}   // TASK-1376: SW= is covered by test_sat_dhw_sw_sync.py
+static void satMiStep() {}   // TASK-1371: MI=500 is tested in test_sat_no_return_ignition.py
+static void satNoReturnFloodOnFlameEdge(bool, bool) {}
+static void satNoReturnFloodStep() {}
 static void satSetControlMode(SATControlMode m) { state.sat.eControlMode = m; }
 static void satPwmReset() {}
 static void satCycleSkipAutoSwitch() {}

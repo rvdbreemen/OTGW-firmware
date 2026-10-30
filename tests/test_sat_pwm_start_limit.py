@@ -64,6 +64,7 @@ static const float SAT_MIN_SETPOINT = 10.0f;   // SATcontrol.ino:129
 static uint32_t millis() { return g_ms; }
 static float satGetFlowTemp() { return g_flow; }
 static float satGetReturnTemp() { return 30.0f; }
+static bool satNoReturnTemp() { return false; }   // TASK-1371: a boiler with a return temperature; the no-return hold is tested in test_sat_no_return_ignition.py
 static bool satIsFlameOn() { return g_flame; }
 static bool satIsEnabled() { return true; }
 static float satGetColdSetpoint() { return 28.2f; }

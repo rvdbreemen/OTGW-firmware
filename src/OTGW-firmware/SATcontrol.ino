@@ -924,10 +924,12 @@ static const uint32_t PWM_IGNITION_TIMEOUT_MS = 180000UL; // 180s ignition timeo
 
 // Flame-off hold setpoint of the PWM ON phase (thermo-nova flame_off_hold_setpoint): return
 // temperature + fFlameOffOffset, clamped to COLD_SETPOINT..max. The only place the flame-off
-// offset is used (TASK-1268).
+// offset is used (TASK-1268). A boiler without a return temperature (satNoReturnTemp(), entries 135, 149, 151) has the
+// flow temperature in its place: flow + fFlameOffOffset, same clamp (thermo-nova keeps the previous CS there, heating_control.py:392-395).
 static float satPwmFlameOffHold(float maxSetpoint)
 {
-  float cs = satGetReturnTemp() + settings.sat.fFlameOffOffset;
+  const float base = satNoReturnTemp() ? satGetFlowTemp() : satGetReturnTemp();
+  float cs = base + settings.sat.fFlameOffOffset;
   if (cs < satGetColdSetpoint()) cs = satGetColdSetpoint();  // floor at the cold setpoint (28.2 rad / 21 floor): a cold start never sends a setpoint below it (TASK-891.2; Sergeant D 2026-10-23)
   if (cs > maxSetpoint) cs = maxSetpoint;
   return cs;
@@ -1071,7 +1073,7 @@ static void satPwmOnDhwEnd(bool flame)
 // Post-draw wait (entry 103 A): the ON clock stays frozen until the CH flame burns or 180 s after the draw end have passed,
 // then runs on with the remaining ON time. True while held (flame off); the schedule then skips the ON state machine. What runs
 // meanwhile is satApplyPWM()'s flame-off path (ON requested, flame off: the flame-off hold setpoint). The start-up flood of
-// entry 45 (CS/PM=25 for 20 s, MI=500) is not implemented yet (TASK-1371).
+// entry 45 for a boiler without a return temperature (CS/PM=25 for 20 s) runs on the CH relight too: satNoReturnFloodStep().
 static bool satPwmDhwHold(bool flame)
 {
   if (_pwm_dhwPhase != PwmDhwPhase::Wait) return false;
@@ -1324,7 +1326,10 @@ static float satApplyPWM(float pidOutput)
     return _pwm_flameOffHoldSetpoint;
   }
   if (!satPwmHoldElapsed()) {                                     // flame lit, inside the fModSupDelay hold
-    return (_pwm_flameOffHoldSetpoint > 0.0f) ? _pwm_flameOffHoldSetpoint : prevCS;
+    if (_pwm_flameOffHoldSetpoint <= 0.0f) return prevCS;
+    // No return temperature: the hold follows the rising flow, as the start-up flood does (TASK-1371, entry 45), so a tick CS
+    // never lowers the flood's value to the one stored before ignition.
+    return satNoReturnTemp() ? satPwmFlameOffHold(maxSetpoint) : _pwm_flameOffHoldSetpoint;
   }
   _pwm_flameOffHoldSetpoint = 0.0f;
   return satPwmSuppressionSetpoint(maxSetpoint);
@@ -1339,7 +1344,9 @@ static void satPwmSuppressionRefresh()
   if (!satIsEnabled() || !state.sat.bActive || state.sat.bSafetyTripped) return;
   if (_sat_thermalSafeActive) return;                             // the thermal safe fallback owns CS
   if (state.sat.eControlMode != SAT_MODE_PWM || !state.sat.bPwmFlameRequested) return;
-  if (!settings.sat.bOvershootProtection || state.sat.bDhwActive) return;
+  // Hot water is read live (the bit below; the simulation's draw through bDhwActive): bDhwActive is only refreshed by the control tick
+  // and stays set after a draw until the next one, which kept the refresh out after a relight (TASK-1371).
+  if (!settings.sat.bOvershootProtection || (settings.sat.bSimulation && state.sat.bDhwActive)) return;
   if (OTcurrentSystemState.SlaveStatus & 0x05) return;          // fault flag / DHW active: the control tick skips these too
   if (!state.sat.bValvesOpen || (state.sat.bSummerActive && settings.sat.bSummerSimmer)) return;
   if (!satIsFlameOn() || !satPwmHoldElapsed()) return;
@@ -1436,6 +1443,99 @@ uint32_t satPwmLastOnTimeMs() { return _pwm_lastOnTimeMs; }
 // temperature went missing. The end-of-cycle classifier returns UNCERTAIN for an idle PWM cycle
 // (cycles/classifier.py:28-29, TASK-1387).
 bool satPwmIsIdle() { return _pwm_idle; }
+
+// Start-up flood for a boiler without a return temperature (TASK-1371, Sergeant D entries 45, 142, 149, 151). From every CH flame
+// off->on in a PWM ON phase (the relight after a hot-water draw included), for fModSupDelay (20 s), one command per second:
+// CS = the flame-off hold (flow + fFlameOffOffset, clamped to [cold setpoint, effective max]) at t = 0, 2, 4 ... and PM=25 (flow
+// temperature, MsgID 25) at t = 1, 3, 5 ... After that the suppression CS = flow - fModSupOffset (satPwmSuppressionSetpoint()) takes over.
+// The CS goes through satSendCS(), so the cache the 5 s satCmdResend() repeats always holds the last flood CS (never a stale tick value)
+// and the 3 s suppression refresh only starts after the same delay. PM=25 is skipped while another PM= is pending (the boot chain, a
+// user PM=): a PIC keeps one priority message and a second PM= would replace it.
+static bool     _flood_active   = false;
+static uint32_t _flood_startMs  = 0;
+static int16_t  _flood_lastStep = -1;
+
+// Same gates as the 3 s suppression refresh, except the hot-water check: the relight after a draw can come before the control tick
+// clears bDhwActive, so only the live boiler bits (fault, DHW active) count.
+static bool satNoReturnFloodAllowed()
+{
+  if (!satIsEnabled() || !state.sat.bActive || state.sat.bSafetyTripped || _sat_thermalSafeActive) return false;
+  if (state.sat.eControlMode != SAT_MODE_PWM || !state.sat.bPwmFlameRequested) return false;
+  if (!settings.sat.bOvershootProtection || (OTcurrentSystemState.SlaveStatus & 0x05)) return false;
+  if (!state.sat.bValvesOpen || (state.sat.bSummerActive && settings.sat.bSummerSimmer)) return false;
+  if (_sat_requestedSetpoint <= satGetColdSetpoint() || state.sat.fFinalSetpoint <= SAT_MIN_SETPOINT) return false;
+  return satGetFlowTemp() > 0.0f && hasOTCommandInterface();
+}
+
+// Flame edge from the control loop (after satCycleOnFlameChange()). dhwFlame: the boiler DHW-active bit is set, so the flame is a
+// hot-water flame and no CH ignition.
+static void satNoReturnFloodOnFlameEdge(bool flame, bool dhwFlame)
+{
+  _flood_active = false;
+  if (!flame || dhwFlame || !satNoReturnTemp() || !satNoReturnFloodAllowed()) return;
+  _flood_active   = true;
+  _flood_startMs  = millis();
+  _flood_lastStep = -1;
+  SATDebugTln(F("SAT: start-up flood (no return temperature): CS/PM=25 for the suppression delay"));
+}
+
+static void satNoReturnFloodStep()
+{
+  if (!_flood_active) return;
+  const uint32_t sinceMs = millis() - _flood_startMs;
+  if (!satIsFlameOn() || !satNoReturnFloodAllowed()) {
+    _flood_active = false;
+    return;
+  }
+  if (sinceMs >= (uint32_t)(settings.sat.fModSupDelay * 1000.0f)) {
+    // Hand over to the suppression at once: one CS = flow - fModSupOffset through satSendCS(), so the cache the 5 s resend repeats
+    // holds the suppression value and never the last flood value (the flood re-armed the resend after a hot-water tick had
+    // disarmed it, and the 3 s refresh stays out as long as the live DHW bit is set).
+    float cs = satPwmSuppressionSetpoint(satGetMaxSetpoint());
+    const float maxSetpoint = satEffectiveMaxSetpoint();
+    if (cs > maxSetpoint) cs = maxSetpoint;
+    _pwm_flameOffHoldSetpoint = 0.0f;
+    _sat_lastControlCS        = cs;
+    state.sat.fFinalSetpoint  = cs;
+    satSendCS(cs);
+    _flood_active = false;
+    return;
+  }
+  const int16_t step = (int16_t)(sinceMs / 1000UL);
+  if (step == _flood_lastStep) return;
+  _flood_lastStep = step;
+  if ((step & 1) == 0) {
+    const float cs = satPwmFlameOffHold(satEffectiveMaxSetpoint());
+    _pwm_flameOffHoldSetpoint = cs;
+    _sat_lastControlCS        = cs;            // the "previous CS" the next tick keeps
+    state.sat.fFinalSetpoint  = cs;
+    satSendCS(cs);
+  } else if (!pmChainBusy()) {
+    addCommandToQueue("PM=25", 5, false, 0);
+  }
+}
+
+// MI=500 to the PIC, once per boot (Sergeant D entries 45, 141): for the manufacturer quirk (Ideal, Intergas, Nefit) at once, for a
+// boiler without a return temperature only after satNoReturnTemp() has been true for SAT_NO_RETURN_MI_MS without a break, and only on
+// a PIC board (never on OT-Direct, entry 141). Checked every pass, because both facts arrive after boot (MsgID 3 gives the
+// manufacturer, MsgID 28 the Unknown-DataID verdict). No MI=1000 when SAT turns off: the PIC keeps MI in its EEPROM.
+static const uint32_t SAT_NO_RETURN_MI_MS = 300000UL;   // our implementation choice, with the 5 min validity of a board sensor reading
+static bool     _sat_miSent = false;
+static uint32_t _sat_noReturnSinceMs = 0;               // 0 = satNoReturnTemp() is not true
+static void satMiStep()
+{
+  if (_sat_miSent || !isPICEnabled() || !hasOTCommandInterface()) return;
+  if (satNoReturnTemp()) {
+    if (_sat_noReturnSinceMs == 0) _sat_noReturnSinceMs = millis() ? millis() : 1UL;   // 0 means "not true"
+  } else {
+    _sat_noReturnSinceMs = 0;
+  }
+  const bool noReturnLong = _sat_noReturnSinceMs != 0 && (uint32_t)(millis() - _sat_noReturnSinceMs) >= SAT_NO_RETURN_MI_MS;
+  if (!(satGetManufacturerQuirks() & SAT_QUIRK_MI_500_BOOT) && !noReturnLong) return;
+  addCommandToQueue("MI=500", 6, false, 0);
+  _sat_miSent = true;
+  SATDebugTln(F("SAT: MI=500 sent (no return temperature or manufacturer quirk)"));
+}
 
 //=====================================================================
 //=== Preset Handling ===
@@ -2061,6 +2161,22 @@ static float satGetReturnTemp()
 {
   if (settings.sat.bSimulation) return state.sat.fSimReturnTemp + satSimNoiseOffset();
   return OTcurrentSystemState.Tret;        // OT MsgID 28 (return water temp)
+}
+
+// A boiler without a return temperature (TASK-1371, Sergeant D entries 84, 135): MsgID 28 was answered Unknown-DataID
+// (provisional, "for now") AND no valid board sensor 'R' reading in the last 5 minutes. Only this boiler type gets the flow-based
+// start-up hold, the CS/PM=25 flood and MI=500; every other boiler keeps thermo-nova's hold from the return temperature.
+// The simulation models a return temperature, so it never counts.
+// Both facts need evidence from THIS boot (our implementation choice; entry 84 open points 1 and 3 are open with Sergeant D):
+// the Unknown-DataID verdict is restored from /ot-boiler.json at boot, but the sensor readout (PR=D, PR=E every 60 s) is not,
+// so a restored verdict alone would wrongly count a board with an 'R' sensor for its first minutes.
+//  (a) a boiler frame of this boot confirmed Unknown-DataID for MsgID 28 (boilerMsgId28UnknownConfirmed()),
+//  (b) it is settled that no board sensor gives a reading: no valid reading in the last 5 minutes and, when the PR=E poll runs,
+//      at least one poll result of this boot (picBoardTretAbsent()).
+static bool satNoReturnTemp()
+{
+  if (settings.sat.bSimulation) return false;
+  return isBoilerMsgIdUnsupportedRead(28) && boilerMsgId28UnknownConfirmed() && picBoardTretAbsent();
 }
 
 static bool satIsFlameOn()
@@ -4769,11 +4885,7 @@ void initSAT()
     // Boot sequence: send priority messages PM=3,15,48 per SAT Python
     if (hasOTCommandInterface()) {
       pmChainStart();   // PIC: PM=3, then 15 and 48 as the boiler answers; OT-Direct: all three directly (TASK-1315)
-      // Manufacturer boot quirk: MI=500 for faster OT polling
-      if (satGetManufacturerQuirks() & SAT_QUIRK_MI_500_BOOT) {
-        addCommandToQueue("MI=500", 6, false, 0);
-        SATDebugTln(F("SAT: MI=500 sent (manufacturer boot quirk)"));
-      }
+      // MI=500 is sent by satMiStep() once the manufacturer or the missing return temperature is known (TASK-1371, entry 141)
     }
   } else {
     DebugTln(F("SAT: initialized but disabled"));
@@ -5735,6 +5847,7 @@ static void satControlLoopRun()
   // TASK-1482 / TASK-1390: restart and outside-temperature gates (entries 121, 126, 129, 56, 57).
   if (satRestartStep()) return;
   satMaxTSetSendStep();   // TASK-1373: SH= on a change of the user MaxTSet and once after a restart
+  satMiStep();            // TASK-1371: MI=500 once, PIC boards only
   if (state.sat.eControlMode != SAT_MODE_OFF) satSavePwmEnabled(state.sat.eControlMode == SAT_MODE_PWM);   // TASK-1482, entry 121
 
   // Flame edge detection — always process, independent of timer
@@ -5742,7 +5855,9 @@ static void satControlLoopRun()
   if (currentFlame != _sat_prevFlameState) {
     satCycleOnFlameChange(currentFlame);
     // live boiler DHW-active bit (the control tick reads it later): a draw shorter than one tick still marks its flame (entries 105, 106)
-    satPwmNoteDhwFlameEdge(currentFlame, (settings.sat.bSimulation && state.sat.iSimDhwExpiryMs != 0) || (OTcurrentSystemState.SlaveStatus & 0x04) != 0);
+    const bool dhwBitNow = (settings.sat.bSimulation && state.sat.iSimDhwExpiryMs != 0) || (OTcurrentSystemState.SlaveStatus & 0x04) != 0;
+    satPwmNoteDhwFlameEdge(currentFlame, dhwBitNow);
+    satNoReturnFloodOnFlameEdge(currentFlame, dhwBitNow);   // TASK-1371: CH ignition of a boiler without a return temperature
     _sat_prevFlameState = currentFlame;
   }
 
@@ -5757,6 +5872,9 @@ static void satControlLoopRun()
 
   // Keep the PIC's CS override alive between control ticks (TASK-1236)
   satPicCSKeepalive();
+
+  // Start-up flood for a boiler without a return temperature, first suppression delay after a CH ignition (TASK-1371)
+  satNoReturnFloodStep();
 
   // Refresh the PWM suppression CS between control ticks (TASK-1268)
   satPwmSuppressionRefresh();

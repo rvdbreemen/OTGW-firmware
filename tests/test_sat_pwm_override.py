@@ -57,7 +57,7 @@ static void satNarratef_P(const char *fmt, ...) {   // SAT log sink: one "N <tex
 #define SAT_QUIRK_IMMERGAS_TP 0x02
 enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 typedef int SATControlMode;
-struct SatSettings { @FORCEFIELD@ @AUTOFIELD@ float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false;
+struct SatSettings { @FORCEFIELD@ @AUTOFIELD@ float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false, bSimulation=false;
                      int iMaxRelModulation=80; float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2;
                      int iHeatingMode=0; };   // TASK-1440: ECO gate on the zones and the solar offset
 struct Settings { SatSettings sat; };
@@ -77,6 +77,7 @@ static float satGetFlowTemp() { return g_flow; }
 static float satApplyContinuous(float p, float /*previousCS*/) { return 1000.0f + p; }   // marker value: "the continuous setpoint was sent"
 void satPwmReset();                                                 // defined later in the cut block (the .ino gets Arduino prototypes)
 static float satGetReturnTemp() { return g_ret; }
+static bool satNoReturnTemp() { return false; }   // TASK-1371: a boiler with a return temperature; the no-return hold is tested in test_sat_no_return_ignition.py
 static float satGetBaseOffset() { return 27.2f; }
 static float g_cold = 28.2f;
 static float satGetColdSetpoint() { return g_cold; }
@@ -340,7 +341,8 @@ int main(int argc, char** argv) {
   }
   if (!strcmp(sc, "refresh")) {
     if (argc > 3) {
-      if (!strcmp(argv[3], "dhw")) state.sat.bDhwActive = true;
+      if (!strcmp(argv[3], "dhw")) { state.sat.bDhwActive = true; OTcurrentSystemState.SlaveStatus = 0x04; }   // TASK-1371: the live DHW bit gates the refresh
+      if (!strcmp(argv[3], "stale")) state.sat.bDhwActive = true;   // the control tick has not yet noticed that the draw ended: the refresh runs
       if (!strcmp(argv[3], "cont")) state.sat.eControlMode = SAT_MODE_CONTINUOUS;
       if (!strcmp(argv[3], "cold")) { state.sat.fPidOutput = 20.0f; SETREQ(20.0f); }
       if (!strcmp(argv[3], "solar")) { state.sat.bSolarGainActive = true; settings.sat.bSolarGainEnable = true; }
@@ -677,6 +679,10 @@ class SatPwmOverride(unittest.TestCase):
                            ("cold", "requested setpoint below cold"), ("closed", "valves closed")):
             with self.subTest(why):
                 self.assertEqual(self.run_sc("refresh", 1, extra)["sent"], "0")
+
+    def test_refresh_runs_with_a_stale_dhw_flag_and_a_clear_live_bit(self):
+        # TASK-1371: bDhwActive is only refreshed by the control tick; after a draw it stayed set and kept the refresh out.
+        self.assertEqual(self.run_sc("refresh", 1, "stale")["sent"], "1")
 
     def test_refresh_idle_with_protection_off(self):
         self.assertEqual(self.run_sc("refresh", 0)["sent"], "0")

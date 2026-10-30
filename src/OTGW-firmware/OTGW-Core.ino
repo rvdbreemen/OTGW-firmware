@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.555
+**  Version  : v2.0.0-alpha.556
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1112,6 +1112,17 @@ void queryOTGWgatewaymode(){
 */
 static void applyFramelessTret(float value);  // defined after the PS=1 summary code
 
+// TASK-1371, Sergeant D entry 135: a valid PR=E reading of the board return sensor ('R') counts as a return temperature
+// for at most PIC_BOARD_TRET_VALID_MS (5 missed 60 s polls). "-", garbage and a sensor function other than R do not count.
+static const uint32_t PIC_BOARD_TRET_VALID_MS = 300000UL;
+static uint32_t picBoardTretMs = 0;
+static bool     picBoardTretSeen = false;
+static uint16_t picTretPollResults = 0;   // PR=E results of this boot, valid or not
+bool picBoardTretValid()
+{
+  return picBoardTretSeen && (uint32_t)(millis() - picBoardTretMs) < PIC_BOARD_TRET_VALID_MS;
+}
+
 static bool picSensorTretPollActive()
 {
 #if HAS_PIC
@@ -1120,6 +1131,28 @@ static bool picSensorTretPollActive()
                          state.pic.sFwversion, state.picSettings.sTempSensor[0]);
 #else
   return false;
+#endif
+}
+
+// TASK-1371: it is settled in this boot that no board return sensor gives a reading. A restored Unknown-DataID verdict is
+// known at boot, the PIC sensor readout (PR=D, then PR=E every 60 s) is not, so "no sensor" needs positive evidence:
+//  - a valid 'R' reading in the last 5 minutes: false;
+//  - OT-Direct (no PIC, no sensor): true;
+//  - the PR=E poll is running: true only after at least one result of this boot, none of them valid in the last 5 minutes;
+//  - the poll is not running: sensor function 'R' (PS=1 mode, flashing): false, unknown; another function: true;
+//    function not read yet: true only for a PIC older than 6.6, which cannot have the sensor.
+// Our implementation choice; entry 84 open points 1 and 3 are still open with Sergeant D.
+bool picBoardTretAbsent()
+{
+  if (picBoardTretValid()) return false;
+#if HAS_PIC
+  if (!isPICEnabled()) return true;
+  if (picSensorTretPollActive()) return picTretPollResults > 0;
+  const char fn = state.picSettings.sTempSensor[0];
+  if (fn == 'R') return false;
+  return fn != '\0' || !picVersionAtLeast(state.pic.sFwversion, 6, 6);
+#else
+  return true;
 #endif
 }
 
@@ -1315,13 +1348,18 @@ static void handlePRresponse(const char* buf, size_t len) {
     static bool prevEKnown = false;
     float tret = 0.0f;
     const PicSensorEResult res = picParseSensorE(value, tret);
+    if (picTretPollResults < 0xFFFF) picTretPollResults++;
     if (!prevEKnown || res != prevE) {
       prevE = res;
       prevEKnown = true;
       DebugTf(PSTR("Return water: PR=E %s\r\n"),
               res == PIC_SENSOR_E_VALID ? "valid" : (res == PIC_SENSOR_E_NO_READING ? "no reading (-)" : "unreadable"));
     }
-    if (res == PIC_SENSOR_E_VALID && state.picSettings.sTempSensor[0] == 'R') applyFramelessTret(tret);
+    if (res == PIC_SENSOR_E_VALID && state.picSettings.sTempSensor[0] == 'R') {
+      picBoardTretMs = millis();
+      picBoardTretSeen = true;
+      applyFramelessTret(tret);
+    }
     return;
   }
 
@@ -4046,6 +4084,18 @@ void pmChainOnBoilerResponse(uint8_t id) {
   if (idx >= 0 && id == kPmChainIds[idx]) pmChainAnswered = id;
 }
 
+// TASK-1371: true while a PM= other than PM=25 is pending (the chain) or waits in the queue. A PIC keeps one pending
+// priority message and addCommandToQueue() replaces a queued PM= with the next one, so SAT's PM=25 must not be added then.
+// OT-Direct answers each PM= on its own: nothing queues there and this stays false.
+bool pmChainBusy() {
+  if (pmChainIdx >= 0) return true;
+  for (int i = 0; i < cmdQueueSize; i++) {
+    if (cmdqueue[i].cmd[0] != 'P' || cmdqueue[i].cmd[1] != 'M') continue;
+    if (!(cmdqueue[i].cmdlen == 5 && cmdqueue[i].cmd[3] == '2' && cmdqueue[i].cmd[4] == '5')) return true;
+  }
+  return false;
+}
+
 // Called from handleCommandQueue().
 void pmChainTick() {
   if (pmChainIdx < 0) return;
@@ -5144,6 +5194,8 @@ static uint8_t boilerAckedWrite[32]         = {0};
 static uint8_t thermostatSentRead[32]       = {0};
 static uint8_t thermostatSentWrite[32]      = {0};
 static bool boilerUnsupportedDirty = false;  // MQTT CSV republish gate (1-min cadence)
+static bool boilerUnknown28ThisBoot = false; // a boiler frame of this boot said Unknown-DataID for MsgID 28 (TASK-1371)
+bool boilerMsgId28UnknownConfirmed() { return boilerUnknown28ThisBoot; }
 static bool boilerFileDirty        = false;  // /ot-boiler.json   write gate (15-min cadence)
 static bool thermostatFileDirty    = false;  // /ot-thermo.json   write gate (15-min cadence)
 
@@ -5500,6 +5552,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
               boilerUnsupportedDirty = true;
               boilerFileDirty        = true;
             }
+            if (OTdata.id == 28 && OTdata.rsptype == OTGW_BOILER && boilerEvidence) boilerUnknown28ThisBoot = false;
           } else if (OTdata.type == OT_WRITE_ACK) {
             if (boilerEvidence && (boilerAckedWrite[idx] & mask) == 0) {
               boilerAckedWrite[idx] |= mask;
@@ -5519,6 +5572,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
             // is skipped: no boiler said it (TASK-1086).
             const bool isWriteCtx = (boilerLastMasterWasWrite[idx] & mask) != 0;
             uint8_t * const bitmap = isWriteCtx ? boilerUnsupportedWrite : boilerUnsupportedRead;
+            if (!isWriteCtx && OTdata.id == 28) boilerUnknown28ThisBoot = true;   // also when the verdict was restored from file
             if ((bitmap[idx] & mask) == 0) {
               bitmap[idx] |= mask;
               boilerUnsupportedDirty = true;  // MQTT republish (1-min cadence)

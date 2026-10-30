@@ -190,7 +190,7 @@ class TickPaths(unittest.TestCase):
     def test_tick_paths_use_always_send_helpers(self):
         for name in ("satSendCS", "satSendMM", "satSendCH"):
             # one definition (+ the resend helper's own call) + four control-tick paths
-            self.assertEqual(len(re.findall(r"\b%s\(" % name, self.code)), 1 + 4 + 1, name)
+            self.assertEqual(len(re.findall(r"\b%s\(" % name, self.code)), 1 + 4 + 1 + (2 if name == "satSendCS" else 0), name)   # + the start-up flood CS and its hand-over to the suppression (TASK-1371)
         for old in ("satEnqueueIfChangedMM", "satEnqueueIfChangedCH"):
             self.assertNotIn(old, self.code)
         # the only change-checked CS callers left: its definition and the suppression refresh
