@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "diagnostic-capture"
   - "host-tooling"
@@ -25,6 +24,7 @@ components:
   - "Diagnostic capture tool"
 symbols: []
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -161,7 +161,7 @@ The paho-mqtt wheel SHA-256 is `6db9ba9b34ed5bc6b6e3812718c7e06e2fd7444540df2455
 
 ## Open Questions
 
-- [ ] Port to the 1.x line (`otgw-1.x.x`, which has its own capture scripts) or keep this dev-only? The default in TASK-1475 is dev-only.
+- [x] Port to the 1.x line (`otgw-1.x.x`, which has its own capture scripts) or keep this dev-only? The default in TASK-1475 is dev-only. — **Answered 2026-10-30 by Robert van den Breemen (via Claude, TASK-1475):** dev only for now; revisit when a 1.x capture bug needs it (Robert, interactive choice in session otgw-firmware-b1)
 
 ## Related Decisions
 

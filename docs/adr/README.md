@@ -431,6 +431,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-194: Serve static text assets without an upload role from firmware flash](ADR-194-serve-static-text-assets-without-an-upload-role-from-firmware-flash.md)** 🆕 *(Accepted)*  
   Narrows ADR-190 and ADR-139. A text asset users never upload, whose content changes with the firmware, may live in PROGMEM instead of the LittleFS image: served through `serveProgmemAsset()` with an ETag of the firmware git hash plus path (`/settings-help.json`), or read internally (the built-in replay fixture, which an uploaded `/otgw_simulation.log` still overrides). Still no gzip; the UI shell, JS, CSS and fonts stay on LittleFS. TASK-1294 moved the LittleFS budget from 664 to 628 KiB (local tree; release images saved 20 KiB).
 
+- **[ADR-202: Replace the two capture scripts with one Python capture tool behind thin launchers](ADR-202-replace-the-two-capture-scripts-with-one-python-capture-tool-behind-thin-launchers.md)** 🆕 *(Proposed)*  
+  One standard-library Python program, `scripts/otgw_capture.py`, replaces the PowerShell payload of `capture-mqtt-debug.bat` and the bash + heredoc workers of `capture-mqtt-debug.sh`. The launchers only find a Python 3.9+, or on Windows bootstrap a SHA-256-checked embeddable CPython 3.12.10. MQTT uses the vendored paho-mqtt 2.1.0 wheel (zipimport) instead of `mosquitto_sub`. Each source degrades on its own and nothing is uploaded (TASK-1475; TASK-1473 parked).
+
 ### Core Services
 
 - **[ADR-015: NTP and AceTime for Time Management](ADR-015-ntp-acetime-time-management.md)**  
