@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.563
+**  Version  : v2.0.0-alpha.564
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -409,6 +409,7 @@ const char* satHeatingCurveRecommendation();
 // Cycle window persistence and flush (Task #237, defined in SATcycles.ino / SATcontrol.ino)
 void satFlushCycleWindow();
 void satFlushShortLivedData();
+void satResetControlState();               // TASK-1414: PID integral + raw derivative (primary and zones), SATcontrol.ino
 void satPersistAllToFs();                  // TASK-1286: write the SAT learned state from RAM (filesystem update write-back)
 float satUserTargetTemp();                 // TASK-1487: the user's own target (settings.ini), never a preset temperature
 void satPresetClearForUserTarget();        // TASK-1487: a changed SATtargettemp clears an active preset / window switch
