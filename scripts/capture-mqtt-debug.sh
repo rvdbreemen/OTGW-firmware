@@ -32,20 +32,43 @@ PBS_BASE="https://github.com/astral-sh/python-build-standalone/releases/download
 PY_MIN_CHECK='import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)'
 
 # Prints the folder the portable runtime lives in. macOS keeps it under
-# Library/Application Support, Linux under XDG_DATA_HOME.
+# Library/Application Support, Linux under XDG_DATA_HOME. Prints nothing when
+# neither HOME nor XDG_DATA_HOME is set: a shared folder such as /tmp is never used.
 runtime_parent() {
   if [[ "$(uname -s)" == "Darwin" ]]; then
-    echo "${HOME:-/tmp}/Library/Application Support/otgw-capture"
-  else
-    echo "${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/otgw-capture"
+    [[ -n "${HOME:-}" ]] && echo "$HOME/Library/Application Support/otgw-capture"
+  elif [[ -n "${XDG_DATA_HOME:-}" ]]; then
+    echo "$XDG_DATA_HOME/otgw-capture"
+  elif [[ -n "${HOME:-}" ]]; then
+    echo "$HOME/.local/share/otgw-capture"
   fi
+  return 0
+}
+
+# True when every folder from the runtime parent down to the interpreter's bin
+# folder belongs to this user and is not writable by group or others, so no
+# other account can have placed the interpreter.
+runtime_dirs_private() {
+  local d
+  for d in "$1" "$1/python-${PY_VER}" "$1/python-${PY_VER}/python" "$1/python-${PY_VER}/python/bin"; do
+    [[ -d "$d" && -O "$d" ]] || return 1
+    [[ -z "$(find "$d" -maxdepth 0 \( -perm -020 -o -perm -002 \) 2>/dev/null)" ]] || return 1
+  done
+  return 0
 }
 
 # Step 2: a runtime unpacked by an earlier run, used without any network access.
 use_cached_python() {
-  local cached
-  cached="$(runtime_parent)/python-${PY_VER}/python/bin/python3"
-  if [[ -x "$cached" ]] && "$cached" -c "$PY_MIN_CHECK" >/dev/null 2>&1; then
+  local parent cached
+  parent="$(runtime_parent)"
+  [[ -n "$parent" ]] || return 1
+  cached="$parent/python-${PY_VER}/python/bin/python3"
+  [[ -x "$cached" ]] || return 1
+  if ! runtime_dirs_private "$parent"; then
+    echo "WARNING: not using $cached: a folder on its path is not private to this user." >&2
+    return 1
+  fi
+  if "$cached" -c "$PY_MIN_CHECK" >/dev/null 2>&1; then
     exec "$cached" "$TOOL" "$@"
   fi
   return 1
@@ -109,6 +132,7 @@ download_python() {
   asset="cpython-${PY_VER}+${PBS_TAG}-${triple}-install_only.tar.gz"
   url="$PBS_BASE/cpython-${PY_VER}%2B${PBS_TAG}-${triple}-install_only.tar.gz"
   parent="$(runtime_parent)"
+  [[ -n "$parent" ]] || boot_fail "neither HOME nor XDG_DATA_HOME is set, so there is no private folder for the portable Python."
   final="$parent/python-${PY_VER}"
 
   echo "Downloading portable Python $PY_VER ($triple, about 65 MB) from github.com into"
@@ -116,6 +140,9 @@ download_python() {
   echo "This happens once; later runs reuse it. Installing Python 3.9+ yourself also works."
 
   mkdir -p "$parent" 2>/dev/null || boot_fail "cannot create $parent"
+  if [[ ! -O "$parent" || -n "$(find "$parent" -maxdepth 0 \( -perm -020 -o -perm -002 \) 2>/dev/null)" ]]; then
+    boot_fail "$parent is not private to this user (owner or group/other write permission)."
+  fi
   BOOT_TMP="$(mktemp -d "$parent/.bootstrap.XXXXXX" 2>/dev/null)" || boot_fail "cannot create a temporary folder in $parent"
   trap boot_cleanup EXIT
   trap 'boot_cleanup; exit 130' INT TERM
