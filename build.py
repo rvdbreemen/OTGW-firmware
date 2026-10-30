@@ -39,6 +39,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 
 # Ensure stdout/stderr can handle Unicode on Windows
 if sys.platform == 'win32':
@@ -1129,6 +1130,27 @@ def copy_flash_scripts(project_dir):
         print_info(f"Copied flash scripts to build/: {', '.join(copied)}")
 
 
+def _zip_add(zf, arcname, data, mode=0o644, mtime=None):
+    """Add one entry to a distribution zip with a Unix mode and a real date.
+
+    zipfile on Windows stamps create_system=0 (MS-DOS); Info-ZIP unzip on Linux
+    then ignores the Unix mode in external_attr, so a .sh unpacks as
+    -rw-r--r-- (TASK-1505). Forcing create_system=3 makes unzip honour the mode.
+    mtime is a POSIX timestamp (default: now), clamped to the zip minimum of 1980.
+    """
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+    year, month, day, hour, minute, sec = time.localtime(
+        time.time() if mtime is None else mtime)[:6]
+    if year < 1980:
+        year, month, day, hour, minute, sec = 1980, 1, 1, 0, 0, 0
+    info = zipfile.ZipInfo(arcname, (year, month, day, hour, minute, sec))
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.create_system = 3  # Unix
+    info.external_attr = (0o100000 | mode) << 16
+    zf.writestr(info, data, compresslevel=9)
+
+
 def create_distribution_zip(project_dir, semver, target):
     """Create a per-target distribution zip: one complete package for USB
     flashing, the one-time migration, WiFi updates and capture logs.
@@ -1228,39 +1250,41 @@ def create_distribution_zip(project_dir, semver, target):
     try:
         with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
             # Factory-reset bin used by the flash scripts.
-            zf.write(merged_full, arcname=merged_full.name)
+            # Every entry goes through _zip_add (Unix mode, real date; TASK-1505).
+            def add_file(path, arcname=None, data=None, mode=0o644):
+                _zip_add(zf, arcname or path.name,
+                         path.read_bytes() if data is None else data,
+                         mode, path.stat().st_mtime)
+
+            add_file(merged_full)
             # TASK-1223.8: migration images for the one-time move to the
             # safeboot layout (flash_otgw --migrate), when this build made them.
             for part in migration_slice_paths(merged_full):
                 if part.exists():
-                    zf.write(part, arcname=part.name)
+                    add_file(part)
                     print_info(f"  + {part.name}  (one-time layout migration)")
-            zf.write(app_bin, arcname=app_bin.name)
-            zf.write(fs_bin, arcname=fs_bin.name)
+            add_file(app_bin)
+            add_file(fs_bin)
 
             # Windows batch scripts: force CRLF line endings for cmd.exe.
             for bat in (flash_bat, capture_bat):
                 bat_text = bat.read_text(encoding="utf-8")
                 bat_text = bat_text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
-                zf.writestr(bat.name, bat_text.encode("utf-8"))
+                add_file(bat, data=bat_text.encode("utf-8"))
 
-            # Unix shell scripts: force LF endings and set the executable bit
-            # on the zip entry so unpacking on POSIX preserves +x.
+            # Unix shell scripts: force LF endings and mode 0755 (create_system=3
+            # makes Info-ZIP unzip keep +x on Linux).
             for sh in (flash_sh, *capture_shs):
-                with open(sh, "rb") as f:
-                    sh_bytes = f.read().replace(b"\r\n", b"\n")
-                sh_info = zipfile.ZipInfo(sh.name)
-                sh_info.compress_type = zipfile.ZIP_DEFLATED
-                sh_info.external_attr = (0o100755 << 16)
-                zf.writestr(sh_info, sh_bytes)
+                add_file(sh, data=sh.read_bytes().replace(b"\r\n", b"\n"), mode=0o755)
 
-            # The capture tool the launchers run, and the MQTT client it imports
-            # straight from the wheel (zipimport), so the wheel ships as-is.
-            zf.write(capture_py, arcname=capture_py.name)
-            zf.write(capture_wheels[0], arcname=f"vendor/{capture_wheels[0].name}")
+            # The capture tool the launchers run (they start it via python, so
+            # it needs no +x), and the MQTT client it imports straight from the
+            # wheel (zipimport), so the wheel ships as-is.
+            add_file(capture_py)
+            add_file(capture_wheels[0], arcname=f"vendor/{capture_wheels[0].name}")
 
-            zf.writestr("README.txt", readme_en)
-            zf.writestr("README_NL.txt", readme_nl)
+            _zip_add(zf, "README.txt", readme_en)
+            _zip_add(zf, "README_NL.txt", readme_nl)
 
         size_kb = zip_path.stat().st_size / 1024
         print_success(f"Created distribution zip: {zip_name} ({size_kb:.1f} KB)")
