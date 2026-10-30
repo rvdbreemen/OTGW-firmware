@@ -5071,3 +5071,19 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Settled:** the SAT page card that holds the max flow setpoint slider (TASK-1373) is renamed "Central Heating Settings" and gets a second slider, Max relative modulation, 0-100 %.
 
 **Reading (our interpretation, told to him for correction):** the slider edits the existing setting settings.sat.iMaxRelModulation (satmaxmodulation, default 100 as thermo-nova const.py:38, :148), which already caps every MM= SAT sends (SATcontrol.ino MM send paths) and, since TASK-1370 / ADR-203, goes to the boiler every 5 s. "Same specs" read as: a slider built like the max flow setpoint slider, with HA number and MQTT, persisted, applied at once. Unlike the max flow setpoint there is no "not chosen" state: the default 100 means no cap, as thermo-nova. Field note: some boilers reject MsgID 14 writes (gruijter's Intergas, capture 2026-10-30), where the slider has no effect. **Task:** TASK-1514.
+
+## 154. Entry 153 reading confirmed: the modulation slider edits the existing max relative modulation setting (2026-10-30)
+
+**Source:** sergeantd, 2026-10-30 15:20 UTC, msg 1565747152355991706 (https://discord.com/channels/812969634638725140/1514720723980259460/1565747152355991706), reply to our reading of entry 153 (msg 1565746692081582181).
+
+**Quoted:** "@BlueFlame Bot Entry 153: correct"
+
+**Settled:** the interpretation recorded under entry 153 stands: the Max relative modulation slider edits settings.sat.iMaxRelModulation (default 100 = no cap, thermo-nova const.py:148), which caps every MM= SAT sends (every 5 s since TASK-1370); HA number and MQTT as for the max flow setpoint; no "not chosen" state. Implemented in alpha.558. **Task:** TASK-1514 (Done). **Open:** none.
+
+## 155. Q-c A: heat pumps default to a 40 C max flow setpoint; a chosen value replaces it (2026-10-30)
+
+**Source:** sergeantd, 2026-10-30 16:22 UTC, msg 1565762899904041122 (https://discord.com/channels/812969634638725140/1514720723980259460/1565762899904041122), answer to Q-c (msg 1565761530824499311).
+
+**Quoted:** "@BlueFlame Bot TASK-1513: A"
+
+**Settled (option A as posted):** when the heat source is a heat pump and the user chose no max flow setpoint, the default cap is 40 C; a chosen slider value replaces it (as entry 152 for boilers), within the MsgID 49 bounds and the underfloor 50 limit. thermo-nova has no heat-pump cap (default 55, underfloor 50, helpers.py:97-99), so 40 C is Sergeant D's choice. Firmware alpha.558: 40 C applies to CS also above a chosen value (SATcontrol.ino SAT_MAXTSET_HEAT_PUMP_CAP). **Task:** TASK-1513 AC2. **Open:** none.

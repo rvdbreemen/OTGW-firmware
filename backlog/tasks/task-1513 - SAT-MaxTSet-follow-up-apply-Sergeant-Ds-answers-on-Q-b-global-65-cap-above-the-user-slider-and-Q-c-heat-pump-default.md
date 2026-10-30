@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-30T14:35:00Z'
-updated_date: '2026-10-30T16:34:00Z'
+updated_date: '2026-10-30T16:36:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -35,4 +35,6 @@ Q-b answered A (entry 152, msg 1565732208885633145): no global 65 C cap once the
 AC1 implemented (sonnet lane, integrated on 4903f891b as alpha.557): chosen max flow setpoint is the only cap (MsgID 49 bounds, underfloor 50), no global 65 cap when chosen; not chosen unchanged; heat-pump 40 internal to CS (Q-c open). tests/test_sat_max_tset.py: base Ran 25 FAILED (failures=4: e.g. bounds later gave SH=65 not SH=75, global 60 gave SH=60 not SH=70), fix 25 OK; webui sat-max-tset 8/8; full suite 69/70 (float roundtrip pre-existing); evaluate EXIT 0.
 
 Bench .63 alpha.558 (contains 557): satmaxsetpoint 70 -> one SH=70 queued (alpha.554: SH=65); status max_setpoint_system 70. AC1 done; AC2 (Q-c, heat pumps) asked 2026-10-30 17:15 UTC (msg 1565761530824499311), task stays In Progress for it.
+
+Q-c answered A (entry 155, msg 1565762899904041122): heat pumps default 40 C when nothing chosen; a chosen value replaces it. AC2 implementation started in wt-1513b.
 <!-- SECTION:NOTES:END -->
