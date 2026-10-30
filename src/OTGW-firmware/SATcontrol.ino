@@ -292,7 +292,7 @@ static uint8_t satGetEffectiveHeatingSource()
 // a default ceiling and sends no SH=, so the installer's MaxTSet stays (entry 148).
 static const float SAT_MAXTSET_DEFAULT_RAD   = 62.0f;   // not chosen, radiators (entry 67)
 static const float SAT_MAXTSET_DEFAULT_FLOOR = 50.0f;   // not chosen, underfloor (entry 110)
-static const float SAT_MAXTSET_HEAT_PUMP_CAP = 40.0f;   // heat pump source: tighter cap, unchanged (open question to Sergeant D)
+static const float SAT_MAXTSET_HEAT_PUMP_CAP = 40.0f;   // heat pump source, not chosen (entry 155)
 
 // Slider bounds from the boiler's MsgID 49 (high byte upper, low byte lower bound). Valid when the
 // message was reported (raw != 0), upper > lower and upper <= 100; otherwise 20..80 (entry 100).
@@ -315,8 +315,8 @@ static float satGlobalMaxSetpoint()
 // The value sent to the boiler as SH= and used as the CS cap of a boiler: the user value (or the default
 // while not chosen), cut into the boiler bounds, then the hard ceiling of the heating system (underfloor 50,
 // radiators 80). The global SAT max setpoint (65) caps only the default: a value the user chose is the only
-// cap (Sergeant D entry 152). `chosen` tells whether the user picked a value. The heat-pump 40 cap stays out
-// of SH= (Q-c, the heat-pump default, is still open).
+// cap (Sergeant D entry 152). `chosen` tells whether the user picked a value. The heat-pump default 40 is
+// not part of this value: it applies only while no value is chosen, and then no SH= is sent (entries 148, 155).
 static float satMaxTSetBoilerValue(float user, bool underfloor, uint16_t rawBounds, float globalMax, bool* chosen)
 {
   float lo, hi;
@@ -332,11 +332,14 @@ static float satMaxTSetBoilerValue(float user, bool underfloor, uint16_t rawBoun
   return v;
 }
 
-// The value SAT works with as MaxTSet (the CS cap): the boiler value above, then the heat pump cap.
+// The value SAT works with as MaxTSet (the CS cap): the boiler value above. A heat pump without a chosen
+// value gets the 40 default cap; a chosen value replaces it, as for a boiler (entry 155).
 static float satMaxTSetCeiling(float user, bool underfloor, bool heatPump, uint16_t rawBounds, float globalMax, bool* chosen)
 {
-  float v = satMaxTSetBoilerValue(user, underfloor, rawBounds, globalMax, chosen);
-  if (heatPump && v > SAT_MAXTSET_HEAT_PUMP_CAP) v = SAT_MAXTSET_HEAT_PUMP_CAP;
+  bool isChosen = false;
+  float v = satMaxTSetBoilerValue(user, underfloor, rawBounds, globalMax, &isChosen);
+  if (chosen) *chosen = isChosen;
+  if (heatPump && !isChosen && v > SAT_MAXTSET_HEAT_PUMP_CAP) v = SAT_MAXTSET_HEAT_PUMP_CAP;
   return v;
 }
 

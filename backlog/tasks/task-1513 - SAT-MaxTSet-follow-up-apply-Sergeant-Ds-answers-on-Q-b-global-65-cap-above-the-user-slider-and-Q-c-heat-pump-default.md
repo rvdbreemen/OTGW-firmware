@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-30T14:35:00Z'
-updated_date: '2026-10-30T16:36:00Z'
+updated_date: '2026-10-30T17:01:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,7 +24,7 @@ Follow-up of TASK-1373 (alpha.554). Interim today: SH= and CS capped at the glob
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Q-b answer recorded and implemented with host test red/green
-- [ ] #2 Q-c asked, answered, recorded and implemented
+- [x] #2 Q-c asked, answered, recorded and implemented
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -37,4 +37,6 @@ AC1 implemented (sonnet lane, integrated on 4903f891b as alpha.557): chosen max 
 Bench .63 alpha.558 (contains 557): satmaxsetpoint 70 -> one SH=70 queued (alpha.554: SH=65); status max_setpoint_system 70. AC1 done; AC2 (Q-c, heat pumps) asked 2026-10-30 17:15 UTC (msg 1565761530824499311), task stays In Progress for it.
 
 Q-c answered A (entry 155, msg 1565762899904041122): heat pumps default 40 C when nothing chosen; a chosen value replaces it. AC2 implementation started in wt-1513b.
+
+AC2 (entry 155, Q-c A) implemented: heat pump + nothing chosen -> CS cap 40, no SH=; chosen value replaces it (within MsgID 49 bounds, underfloor 50). tests/test_sat_max_tset.py: base Ran 28 FAILED (failures=2: chosen 55 gave 40), fix 28 OK; webui 8/8; full suite 70/71 by exit code (float roundtrip pre-existing); evaluate EXIT 0. Committed as alpha.559.
 <!-- SECTION:NOTES:END -->

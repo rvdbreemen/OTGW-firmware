@@ -4620,8 +4620,8 @@
       if (eff !== null) slider.value = Math.round(eff);
       txt('satMaxR', eff !== null ? 'default (' + Math.round(eff) + '°C)' : 'default');
     } else {
-      // Chosen: show the ceiling SAT really works with (the boiler bounds, the heating system
-      // and a heat pump cap can cut the chosen value); name the chosen value when it differs.
+      // Chosen: show the ceiling SAT really works with (the boiler bounds and the heating system
+      // can cut the chosen value); name the chosen value when it differs.
       var shown = eff !== null ? Math.round(eff) : Math.round(user);
       slider.value = shown;
       txt('satMaxR', shown + '°C' + (shown !== Math.round(user) ? ' (chosen ' + Math.round(user) + '°C)' : ''));

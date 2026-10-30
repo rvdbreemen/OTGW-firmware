@@ -11,7 +11,7 @@ tests are skipped, they do not pass silently.
 Covered: not chosen -> no SH= ever, CS capped at 62 radiators / 50 underfloor; chosen 70 -> SH=70 once and
 CS capped at 70 (no global 65 cap over a chosen value, entry 152); not chosen + global 60 -> CS 60; chosen 60 ->
 SH=60 once, CS cap 60; a boot with a chosen value -> exactly one SH=; MsgID 49 bounds clamp; underfloor
-<= 50; SH= never carries the heat pump 40 cap; going back to 0 sends nothing; the setter rejects a
+<= 50; heat pump not chosen -> CS cap 40 and no SH=, heat pump chosen 55 -> SH=55 and CS cap 55 (underfloor 50, entry 155); going back to 0 sends nothing; the setter rejects a
 typo 1..19.
 
 Each process run is one boot: _sat_lastSentSH starts at -1 exactly as after a restart.
@@ -274,16 +274,32 @@ class SatMaxTSet(unittest.TestCase):
         r = self.boot(0, system=RAD, boiler=80, steps=["glob=10"])
         self.assertEqual(float(r["effCS"]), 62.0)   # default 62 < 65; out-of-range global must not lower it
 
-    # --- heat pump: the 40 cap stays inside the CS cap, never in SH= ---
-    def test_heat_pump_cap_in_cs_not_in_sh(self):
+    # --- heat pump: default cap 40 while not chosen; a chosen value replaces it (entry 155) ---
+    def test_heat_pump_chosen_55_is_the_cap_and_sh(self):
         r = self.boot(55, source=HP, steps=["tick"])
         self.assertEqual(r["queue"], ["SH=55"])
-        self.assertEqual(float(r["effCS"]), 40.0)
-        self.assertEqual(float(r["sysMax"]), 40.0)
+        self.assertEqual(float(r["effCS"]), 55.0)
+        self.assertEqual(float(r["sysMax"]), 55.0)
+
+    def test_heat_pump_chosen_55_underfloor_is_cut_to_50(self):
+        r = self.boot(55, system=FLOOR, source=HP, steps=["tick"])
+        self.assertEqual(r["queue"], ["SH=50"])
+        self.assertEqual(float(r["effCS"]), 50.0)
+
+    def test_heat_pump_chosen_below_40_is_the_cap(self):
+        r = self.boot(35, source=HP, steps=["tick"])
+        self.assertEqual(r["queue"], ["SH=35"])
+        self.assertEqual(float(r["effCS"]), 35.0)
 
     def test_heat_pump_not_chosen_sends_nothing_cs_40(self):
         r = self.boot(0, source=HP, steps=["tick"])
         self.assertEqual(r["queue"], [])
+        self.assertEqual(float(r["effCS"]), 40.0)
+        self.assertEqual(float(r["sysMax"]), 40.0)
+
+    def test_heat_pump_chosen_then_back_to_zero_caps_at_40_again(self):
+        r = self.boot(55, source=HP, steps=["tick", "set=0", "tick"])
+        self.assertEqual(r["queue"], ["SH=55"])
         self.assertEqual(float(r["effCS"]), 40.0)
 
     # --- setter: 0 = not chosen, 1..19 is a typo ---
