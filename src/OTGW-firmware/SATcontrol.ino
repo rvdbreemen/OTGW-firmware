@@ -2718,7 +2718,8 @@ void satSavePidState()
   satPidGetPersistState(&i, &d, &rd, &err);   // the held controller state, not the published copies (round 3)
   int n = snprintf_P(buf, sizeof(buf), PSTR("{\"i\":%.4f,\"d\":%.4f,\"rd\":%.4f,\"err\":%.2f,\"ts\":%lu"),
                      i, d, rd, err, (unsigned long)ts);
-  if (n < 0 || (size_t)n >= sizeof(buf) - 2) n = 0;
+  // A clamp, not a guard: the file is always written (the forced write of satPersistAllToFs() relies on it).
+  n = (n > 0 && (size_t)n < sizeof(buf) - 2) ? n : 0;
   n = satPidStateAppendOutside(buf, n, sizeof(buf), ts);   // entry 126 (TASK-1482)
   buf[n] = '}';
   buf[n + 1] = '\0';
