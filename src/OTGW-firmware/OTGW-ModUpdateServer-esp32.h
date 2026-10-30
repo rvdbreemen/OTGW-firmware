@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-alpha.548
+**  Version  : v2.0.0-alpha.549
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -447,21 +447,23 @@ private:
       if (_serial_output) DebugTf(PSTR("[OTA] End: success (%u bytes)\r\n"), static_cast<unsigned>(totalSize));
       logBootSignature("[OTA] post-end");    // second probe: after Update.end(true) commits the image
       if (_uploadTarget == UploadTarget::Filesystem) {
-        LittleFSmounted = LittleFS.begin();
-        // TASK-958: Update.end(true) finalizes even a truncated write, so a short
-        // upload could report "success" with a broken/old filesystem. A complete
-        // image always carries /version.hash; its absence after remount means the
-        // write did NOT take. Surface it as an error instead of a silent success.
-        if (LittleFSmounted && !LittleFS.exists(F("/version.hash"))) {
+        // Update.end(true) finalizes even a truncated write (TASK-958). A short upload
+        // leaves a filesystem that accepts no writes, so it is formatted before the
+        // remount (TASK-1495); the restore below then puts the runtime files back.
+        const bool shortUpload = _uploadExpectedBytes > 0 && _uploadWrittenBytes != _uploadExpectedBytes;
+        LittleFSmounted = _remountAfterFsWrite(shortUpload);
+        // TASK-958: a complete image always carries /version.hash; its absence after
+        // remount means the write did NOT take. Surface it as an error instead of a
+        // silent success. A short upload was formatted and has no version.hash.
+        if (LittleFSmounted && !shortUpload && !LittleFS.exists(F("/version.hash"))) {
           strlcpy(_updaterError, "incomplete filesystem image (version.hash missing)", sizeof(_updaterError));
           if (_serial_output) DebugTln(F("[OTA] Error: filesystem image incomplete (no version.hash)"));
         } else if (LittleFSmounted) {
           updateLittleFSStatus(F("/.ota_post"));
           logBootSignature("[OTA] post-remount");    // third probe (FS-OTA only): after LittleFS.begin() remount
           _restoreRuntimeFiles();
-          // TASK-1495: version.hash sits in the first blocks, so it does not prove the
-          // rest of the image arrived. A short upload is an error and gets the marker.
-          if (_uploadExpectedBytes > 0 && _uploadWrittenBytes != _uploadExpectedBytes) {
+          // TASK-1495: a short upload is an error and gets the marker.
+          if (shortUpload) {
             strlcpy(_updaterError, "incomplete filesystem image (short upload)", sizeof(_updaterError));
             _markFsUpdateIncomplete();
           }
@@ -484,6 +486,23 @@ private:
     _resetUploadTracking();
   }
 
+  // Mount LittleFS after a filesystem write. The partition is unmounted here
+  // (_handleUploadStart called LittleFS.end()). A partial image has no rollback for
+  // U_SPIFFS and leaves a LittleFS that accepts no writes (bench 2026-10-30: "short
+  // write (0 of 1512 bytes)"), so it is formatted first; the web UI files are gone
+  // and the restore puts settings and the other runtime files back.
+  bool _remountAfterFsWrite(bool partial) {
+    if (partial) {
+      if (_serial_output) DebugTln(F("[OTA] Filesystem image incomplete: formatting LittleFS"));
+      unsigned long t0 = millis();
+      bool formatted = LittleFS.format();
+      if (_serial_output) {
+        DebugTf(PSTR("[OTA] LittleFS format %s (%lu ms)\r\n"), formatted ? "OK" : "FAILED", millis() - t0);
+      }
+    }
+    return LittleFS.begin();
+  }
+
   // After a filesystem write (complete or aborted) and a successful remount: put
   // back what lives in RAM or in the heap copies, while bESPactive is still up so
   // the loop task stays off these files.
@@ -497,8 +516,9 @@ private:
     satPersistAllToFs();           // TASK-1286: SAT learned state from RAM, even when it was saved less than an hour ago
   }
 
-  // TASK-1495: the web assets may be partly old and partly new. The marker is not
-  // in KEEP_LIST, so the next complete filesystem image removes it.
+  // TASK-1495: the filesystem was formatted after an incomplete image, so the web UI
+  // files are missing. The marker is not in KEEP_LIST, so the next complete
+  // filesystem image removes it.
   void _markFsUpdateIncomplete() {
     File f = LittleFS.open(FS_UPDATE_INCOMPLETE_FILE, "w");
     if (f) {
@@ -506,7 +526,7 @@ private:
                static_cast<unsigned>(_uploadExpectedBytes));
       f.close();
     }
-    DebugTf(PSTR("[OTA] Filesystem update incomplete (%u of %u bytes): the web UI may not work, upload the filesystem again\r\n"),
+    DebugTf(PSTR("[OTA] Filesystem update incomplete (%u of %u bytes): LittleFS was formatted and restored, the web UI files are missing: upload the filesystem again\r\n"),
             static_cast<unsigned>(_uploadWrittenBytes), static_cast<unsigned>(_uploadExpectedBytes));
   }
 
@@ -522,18 +542,17 @@ private:
       DebugTf(PSTR("[OTA] Abort: after %u bytes\r\n"), static_cast<unsigned>(_uploadWrittenBytes));
     }
     // Remount LittleFS if a filesystem upload was aborted mid-flight (we called
-    // LittleFS.end() at start, so a dropped FS upload leaves assets gone).
+    // LittleFS.end() at start). Written bytes mean a partial image: it is formatted
+    // first. With 0 bytes written the old filesystem is intact and only remounts.
     // LittleFSmounted cannot gate this: the start keeps it true across LittleFS.end()
     // because isFlashing() relies on it.
     if (_uploadTarget == UploadTarget::Filesystem) {
-      LittleFSmounted = LittleFS.begin();
+      LittleFSmounted = _remountAfterFsWrite(_uploadWrittenBytes > 0);
       if (_serial_output) {
         DebugTf(PSTR("[OTA] Abort: LittleFS remount %s\r\n"), LittleFSmounted ? "OK" : "FAILED");
       }
-      // TASK-1495: the sectors written so far stay written (no rollback for U_SPIFFS),
-      // so settings.ini can already be the new image's shipped default and the later
-      // blocks of large files still hold the old image. Put the runtime files back
-      // from RAM, as the end handler does, and mark the filesystem as incomplete.
+      // TASK-1495: put the runtime files back from RAM and the heap copies, as the
+      // end handler does, and mark a formatted (partial) filesystem as incomplete.
       if (LittleFSmounted) {
         _restoreRuntimeFiles();
         if (_uploadWrittenBytes > 0) _markFsUpdateIncomplete();

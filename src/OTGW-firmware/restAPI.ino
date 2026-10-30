@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.548
+**  Version  : v2.0.0-alpha.549
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3253,7 +3253,7 @@ void sendDeviceInfoV2()
     je.field(F("uptime"), snap->uptimeStr);
     je.field(F("lastreset"), lastReset);
     je.field(F("bootcount"), snap->st.uptime.iRebootCount);
-    je.field(F("fsupdateincomplete"), LittleFSmounted && LittleFS.exists(F(FS_UPDATE_INCOMPLETE_FILE)));  // TASK-1495: last filesystem update interrupted, upload it again
+    je.field(F("fsupdateincomplete"), LittleFSmounted && LittleFS.exists(F(FS_UPDATE_INCOMPLETE_FILE)));  // TASK-1495: last filesystem update interrupted: formatted and restored, web UI files missing until uploaded again
 
     // --- Connection status (MQTT, OTGW, thermostat, boiler) ---
     je.field(F("mqttconnected"), snap->st.mqtt.bConnected);

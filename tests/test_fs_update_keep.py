@@ -213,7 +213,7 @@ class TestOrdering(unittest.TestCase):
         call = "_restoreRuntimeFiles();"
         self.assertTrue(is_plain_statement(end, call), "end handler: " + call + " missing or guarded")
         pos = end.index(call)
-        self.assertLess(end.index("LittleFSmounted = LittleFS.begin()"), pos)
+        self.assertLess(end.index("LittleFSmounted = _remountAfterFsWrite("), pos)
         # inside the "remount worked and the image is complete" branch
         self.assertLess(end.index("version.hash"), pos)
         self.assertLess(pos, end.index("LittleFS mount failed"))
@@ -241,7 +241,7 @@ class TestAbortRestore(unittest.TestCase):
         self.assertRegex(self.abort, r"if \(LittleFSmounted\) \{\s*_restoreRuntimeFiles\(\);",
                          "abort must restore the runtime files once the remount worked")
         pos = self.abort.index("_restoreRuntimeFiles();")
-        self.assertLess(self.abort.index("LittleFSmounted = LittleFS.begin()"), pos)
+        self.assertLess(self.abort.index("LittleFSmounted = _remountAfterFsWrite("), pos)
         self.assertLess(pos, self.abort.index("bESPactive = false"))
 
     def test_abort_drops_copies_only_after_the_restore(self):
@@ -258,10 +258,31 @@ class TestAbortRestore(unittest.TestCase):
 
     def test_short_upload_at_end_is_an_error_with_marker(self):
         end = function_body(UPD, END)
-        m = re.search(r"if \(_uploadExpectedBytes > 0 && _uploadWrittenBytes != _uploadExpectedBytes\) \{([^}]*)\}", end)
+        m = re.search(r"if \(shortUpload\) \{([^}]*)\}", end)
         self.assertTrue(m, "the end handler must not trust version.hash alone")
         self.assertIn("_updaterError", m.group(1))
         self.assertIn("_markFsUpdateIncomplete();", m.group(1))
+
+    def test_partial_write_formats_before_remount_and_restore(self):
+        """Bench 2026-10-30: after a dropped upload at ~90% the sectors written so far stay
+        (no rollback for U_SPIFFS) and the LittleFS accepts no writes ("short write (0 of
+        1512 bytes)"), so the restore was lost. A partial image is formatted first."""
+        helper = function_body(UPD, r"bool _remountAfterFsWrite\(bool partial\)")
+        self.assertRegex(helper, r"if \(partial\) \{[^}]*LittleFS\.format\(\)")
+        self.assertLess(helper.index("LittleFS.format()"), helper.index("LittleFS.begin()"),
+                        "format the unmounted partition, then mount it")
+        self.assertIn("millis()", helper, "the format duration is logged")
+        self.assertRegex(self.abort, r"LittleFSmounted = _remountAfterFsWrite\(_uploadWrittenBytes > 0\);")
+        self.assertLess(self.abort.index("_remountAfterFsWrite("), self.abort.index("_restoreRuntimeFiles();"))
+        self.assertNotIn("LittleFS.begin()", self.abort, "the abort remounts through the helper only")
+
+    def test_short_upload_at_end_formats_before_restore(self):
+        end = function_body(UPD, END)
+        self.assertRegex(end, r"const bool shortUpload = _uploadExpectedBytes > 0 && _uploadWrittenBytes != _uploadExpectedBytes;")
+        self.assertRegex(end, r"LittleFSmounted = _remountAfterFsWrite\(shortUpload\);")
+        self.assertLess(end.index("_remountAfterFsWrite("), end.index("_restoreRuntimeFiles();"))
+        self.assertRegex(end, r"LittleFSmounted && !shortUpload && !LittleFS\.exists\(F\(\"/version\.hash\"\)\)",
+                         "a formatted short upload has no version.hash; that is not the version.hash error")
 
     def test_abort_remount_not_gated_on_mounted_flag(self):
         """Bench-found bug of 2026-10-30: _handleUploadStart calls LittleFS.end() but keeps
@@ -271,7 +292,7 @@ class TestAbortRestore(unittest.TestCase):
         self.assertIn("LittleFS.end();", start)
         self.assertNotRegex(start, r"LittleFSmounted\s*=\s*false",
                             "the start keeps the flag true across LittleFS.end()")
-        m = re.search(r"if \(([^\n]*)\) \{\s*LittleFSmounted = LittleFS\.begin\(\);", self.abort)
+        m = re.search(r"if \(([^\n]*)\) \{\s*LittleFSmounted = _remountAfterFsWrite\(", self.abort)
         self.assertTrue(m, "abort must remount the filesystem")
         self.assertIn("UploadTarget::Filesystem", m.group(1))
         self.assertNotIn("!LittleFSmounted", m.group(1),

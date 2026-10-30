@@ -732,7 +732,7 @@ paths:
                         type: integer
                       fsupdateincomplete:
                         type: boolean
-                        description: The last filesystem update was interrupted; the web UI may be partly old and partly new. Upload the filesystem again. Cleared by a complete filesystem update.
+                        description: The last filesystem update was interrupted. The gateway formatted the filesystem and restored settings, kept files, OT profiles and SAT state, so the web UI files are missing until the filesystem is uploaded again (the fallback page offers the Flash Utility / FSexplorer upload). Cleared by a complete filesystem update.
                       mqttconnected:
                         type: boolean
                       cmd_dropped:
