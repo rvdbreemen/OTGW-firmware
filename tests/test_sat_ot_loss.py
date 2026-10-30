@@ -77,6 +77,7 @@ static void satGetWindow4hStats() {}
 static void satGetWindow24hStats() {}
 static void satPwmSuppressionRefresh() {}
 static void satMaxTSetSendStep() {}   // TASK-1373: the user MaxTSet SH= step is tested in test_sat_max_tset.py
+static void satDhwSetpointSync() {}   // TASK-1376: the SW= sync is tested in test_sat_dhw_sw_sync.py
 static bool satRestartStep() { return false; }   // TASK-1482: the restart and outside gates are tested in test_sat_restart_quiet.py
 static void satSavePwmEnabled(bool) {}
 static void satPidService(uint32_t) {}   // TASK-1368: the 60 s PID service is not under test here

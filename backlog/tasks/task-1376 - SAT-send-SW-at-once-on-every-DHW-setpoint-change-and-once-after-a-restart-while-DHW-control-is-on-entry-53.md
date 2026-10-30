@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-25T08:29:00Z'
-updated_date: '2026-10-30T09:13:00Z'
+updated_date: '2026-10-30T14:17:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -36,4 +36,6 @@ Sergeant D entry 53 (2026-10-25, answer to Q17: A). Entry 33: a DHW setpoint cha
 2026-10-30: Sergeant D entry 146: must be in beta 1 (TASK-1504, target Sun 2026-11-01). Priority raised to high.
 
 Robert 2026-10-30: SW= sync only while SAT is enabled (not when SAT is off with DHW control on). Plan drafted: satDhwSetpointSync() after satRestartStep() (strict entry 121 reading), drop the draw-edge send if Sergeant D agrees.
+
+2026-10-30 coordinator (session 80): lane reviewed (opus, ready after dropping the duplicated corrections hunk); known limits documented in firmware-sat-spec.md (no SW= after a boiler power cycle / OT-link recovery, queue-full drop not retried, HA DHW climate entity bypasses settings.sat.fDhwSetpoint so the restart send restores SAT's stored value). Integrated on alpha.554 as alpha.555; conflicts with 1370 resolved (draw-edge SW= removed, 1370's resend disarm kept); test_sat_ot_loss harness got a satDhwSetpointSync stub. Gates: evaluate --quick EXIT 0; 68/69 Python test files OK (test_settings_float_roundtrip pre-existing); test_sat_dhw_sw_sync red on base (2 failures, 3 errors, 7 skipped: function absent), 13 OK on fix.
 <!-- SECTION:NOTES:END -->

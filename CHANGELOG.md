@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **SAT sends the hot-water setpoint when it changes** (TASK-1376, Sergeant D entries 33, 53, 150). With SAT on and DHW control on, `SW=<setpoint>` goes out at once when the setpoint changes and once after a restart, no longer at the start of every hot-water draw.
 - **SAT sends CS, MM and CH every control tick and repeats them every 5 s** (TASK-1370, Sergeant D entry 44, ADR-203), as thermo-nova, instead of only on change or every 5 min. The repeat pauses during hot water and a boiler fault.
 
 ### Changed (breaking)

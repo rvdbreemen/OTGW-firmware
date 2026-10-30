@@ -263,7 +263,7 @@ At the first computed update, the restored values are used as follows:
 **E3. First control tick.** The first tick comes one interval after `initSAT()` restarted the timer (default 30 s, `SATcontrol.ino:3719`, `SATtypes.h:444`), provided the pass reaches the timer check at that time. In order (`SATcontrol.ino:4616-5018`):
 
 1. Set SAT active; if the mode is OFF, set it to CONTINUOUS (`SATcontrol.ino:4616-4619`).
-2. **DHW check.** DHW is active when slave status bit 2 is set (or a simulated DHW draw runs) (`SATcontrol.ino:4625-4629`). Power and energy are updated first (`SATcontrol.ino:4632-4633`). While DHW is active the tick sends `SW=` once on DHW entry (only with DHW control enabled and a valid DHW setpoint), publishes, and stops. CS, MM and CH are not touched and the PID does not run (`SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]`).
+2. **DHW check.** DHW is active when slave status bit 2 is set (or a simulated DHW draw runs) (`SATcontrol.ino:4625-4629`). Power and energy are updated first (`SATcontrol.ino:4632-4633`). While DHW is active the tick sends no `SW=` (TASK-1376, entry 150); it publishes and stops. CS, MM and CH are not touched and the PID does not run (`SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]`).
 3. Read room, outside and target temperature (`SATcontrol.ino:4656-4658`).
 4. **Room temperature check (TASK-1364, entries 38 and 46).** `satRoomTempValid()` is false when the room temperature is NAN or outside -10 to 50 °C. There is no trip and no skip: the tick goes on with the room temperature treated as lost. The room low-pass filter, the MQTT-takeover thermal block, auto-tune, the curve recommendation and the daily median sample are skipped, and PV boost does not start. The PID step is replaced by `satPidCurveOnly()` (P, I, D and the raw derivative are 0, `state.sat.fError` reads 0, the requested setpoint is the heating curve value). The solar offset, clamps, cold cutoff, PWM, MM, CS and CH then run as on any tick. The PIC-fail trip (5 ticks without a command interface) is unchanged. When a valid reading returns, the output stays the curve alone (P, I and D 0) until the next 60 s PID step stores a real error, up to 60 s later. The integral restarts from 0. The first D after recovery is computed over the whole gap, from the last pre-loss temperature to the new one, as thermo-nova does (`pid.py:134-137` keeps `_last_temperature`, `pid.py:209-232`), so D need not start at 0. The status field `room_temp_lost` (REST `sat/status`, MQTT `sat/room_temp_lost`) is true while the loss lasts.
 5. **Room low-pass filter** with time constant 45 s. The first valid reading seeds the filter; later ticks move toward the raw value (`SATcontrol.ino:4694-4713`).
@@ -569,7 +569,7 @@ else: min = Tboiler - fFlowOffset                            (fFlowOffset defaul
 | Same tick, push setpoint on | `TC=<target>`, on target change only, no re-push (TASK-1272) | `SATcontrol.ino:5172-5176`, `SATcontrol.ino:540-553` |
 | Tick in summer simmer or with all valves closed | `CS=10.0`, `MM=<max>`, `CH=0` | `SATcontrol.ino:4766-4773`, `SATcontrol.ino:4779-4786` |
 | Tick in the thermal safe fallback (2 h of estimation) | `CS=45` (capped at the system max), `MM=<max>`, `CH=1` | `SATcontrol.ino:4732-4743` |
-| Tick entering DHW with DHW control on | `SW=<DHW setpoint>`, once per DHW entry | `SATcontrol.ino:4640-4648` |
+| DHW setpoint changed, or first pass after a restart, with SAT on and DHW control on and a valid setpoint (`satDhwSetpointSync()`, every pass, TASK-1376) | `SW=<DHW setpoint>`, integer, once per change | `SATcontrol.ino` `satDhwSetpointSync()` |
 | PIC boards, every 30 s once CS ≥ 8 °C | `CS=<last CS>` | `SATcontrol.ino:405-414` |
 | Every 3 s in the PWM ON phase after the hold | `CS=<flow - offset>`, write-on-change | `SATcontrol.ino:894-918` |
 | Disable, safety trip, fallback lift | `CS=0` | `SATcontrol.ino:2179`, `SATcontrol.ino:4561`, `SATcontrol.ino:4680`, `SATcontrol.ino:5002` |
@@ -1143,7 +1143,7 @@ PID internals belong to the PID section. In short: with automatic gains (default
 Before the timer check, every loop pass handles the fallback enable, the disabled and safety-tripped exits, the deferred boot `CS=0`, the PIC keepalive and the PWM refresh (SATcontrol.ino:4537-4611). Then (SATcontrol.ino:4614):
 
 1. **Mark active.** If the mode is OFF it becomes continuous (SATcontrol.ino:4616-4619).
-2. **DHW.** If DHW is active, `SW=` is sent on entry when configured, and the tick ends. No CS, MM or CH is sent (SATcontrol.ino:4851-4883 [lines refreshed 2026-10-24, TASK-1351]).
+2. **DHW.** If DHW is active the tick ends (no `SW=` here since TASK-1376). No CS, MM or CH is sent (SATcontrol.ino:4851-4883 [lines refreshed 2026-10-24, TASK-1351]).
 3. **Read inputs**. If the room temperature is NaN or outside -10 to 50 °C the tick does not end any more (TASK-1364): it runs on the heating curve alone (see step 4 in the Phase E list). No skip count, no trip.
 4. **Smooth the room temperature** (EMA, tau 45 s) (SATcontrol.ino:4694-4713).
 5. **Boiler fault flag** set: the tick ends (SATcontrol.ino:4716-4719).
@@ -1523,7 +1523,7 @@ The tick timer is `DECLARE_TIMER_SEC(timerSATControl, settings.sat.iControlInter
 On a tick, in this fixed order:
 
 1. `bActive = true`; OFF becomes CONTINUOUS (SATcontrol.ino:4616-4619).
-2. DHW is read. **If DHW is active the tick returns here** (after an optional `SW=`), before any PWM, CS, MM or CH code (SATcontrol.ino:4621-4652).
+2. DHW is read. **If DHW is active the tick returns here** (no `SW=` is sent there since TASK-1376), before any PWM, CS, MM or CH code (SATcontrol.ino:4621-4652).
 3. Invalid room temperature: the tick goes on, curve only (TASK-1364); it does not return and does not trip.
 4. Boiler fault flag: the tick returns (SATcontrol.ino:4716-4719).
 5. Thermal safe fallback (after 2 h without a real room temperature): CS = 45 °C capped, MM = `iMaxRelModulation`, CH = 1, return (SATcontrol.ino:4729-4746, SATcontrol.ino:82-83).
@@ -3535,7 +3535,7 @@ Steps 1 to 9 run on every pass. Steps 10 onward run only when the control timer 
    - PIC CS keepalive (`SATcontrol.ino:4608`): on a PIC board, if a CS of 8 or more was sent, it is re-sent unchanged when 30 s have passed since the last CS (`SATcontrol.ino:405-414`). The comment says the PIC drops a CS of 8 or more about 63 to 126 s after the last one (`SATcontrol.ino:398-402`).
    - PWM suppression refresh (`SATcontrol.ino:4611`): every 3 s, only in PWM ON phase with the flame on, after the hold delay, with overshoot protection on, no DHW and no fault flag (`SATcontrol.ino:894-905`). It sends `CS = flow - fModSupOffset`, clamped to [10, system cap] and then to the effective maximum; no solar offset (`SATcontrol.ino:1045-1065`) (corrected 2026-10-24, TASK-1351). This belongs to the PWM section.
 10. **Control tick gate.** If the timer is not due, the pass ends (`SATcontrol.ino:4614`). Otherwise `bActive` = true, and control mode OFF becomes CONTINUOUS (`SATcontrol.ino:4616-4619`).
-11. **DHW check.** `bDhwActive` is set from slave status bit 2, or forced true during a simulated draw (`SATcontrol.ino:4625-4629`). Power and energy are updated (`SATcontrol.ino:4632-4633`). If DHW is active, SAT sends `SW=` on the transition only (see Behaviour F) and returns (`SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]`). **No CS, MM or CH is written during DHW.**
+11. **DHW check.** `bDhwActive` is set from slave status bit 2, or forced true during a simulated draw (`SATcontrol.ino:4625-4629`). Power and energy are updated (`SATcontrol.ino:4632-4633`). If DHW is active, SAT returns (`SW=` follows the setpoint, not the draw: see Behaviour F) (`SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]`). **No CS, MM or CH is written during DHW.**
 12. **Room temperature check.** If the room temperature is NaN or outside [-10, 50] °C the tick goes on as room-temperature-lost (TASK-1364): curve only, no trip. See Behaviour G.
 13. Room temperature EMA filter, tau 45 s (`SATcontrol.ino:4694-4713`). PID section.
 14. **Boiler fault flag.** If slave status bit 0 is set, the tick returns without writing (`SATcontrol.ino:4716-4719`).
@@ -3616,9 +3616,10 @@ When `settings.sat.bSimulation` is on:
 #### F. DHW handling
 
 - **What SAT writes for DHW.**
-  - On the control tick where DHW turns active, SAT sends `SW=<fDhwSetpoint>` once (`SATcontrol.ino:4640-4648`). Conditions: DHW was not active on the previous tick, `bDhwEnabled` is true, `fDhwSetpoint` is between 30 and 60 °C, and a command interface exists (`SATcontrol.ino:4640-4643`, `SATtypes.h:433-434`).
-  - Defaults: `bDhwEnabled` false and `fDhwSetpoint` 0 (`SATtypes.h:457-458`). So with defaults no `SW=` is ever sent.
-  - `SW=` is not repeated while DHW stays active, and nothing is sent when DHW ends (`SATcontrol.ino:4649`, `SATcontrol.ino:4653`).
+  - `satDhwSetpointSync()` (TASK-1376, Sergeant D entries 33, 53, 69, 121, 150; thermo-nova `number.py:72-74` is its only SW sender) runs on every control-loop pass while SAT is enabled, after `satRestartStep()` and before the control tick. It sends `SW=<int(fDhwSetpoint)>` when `bDhwEnabled` is true, `fDhwSetpoint` is between 30 and 60 °C and a command interface exists, and the value differs from the last one sent or none has been sent yet: so at once on a setpoint change (REST, MQTT or the web UI) and once after a restart, once SAT has taken over. Nothing is sent at the start of a hot-water draw.
+  - The cache resets while SAT is off or flashing and while DHW control is off or the setpoint invalid, so switching SAT or DHW control back on sends the setpoint again.
+  - Known limits. A boiler power cycle or an OT-link recovery does not re-send `SW=`; only a firmware restart, a setpoint change, or a DHW-control or SAT toggle does. `addCommandToQueue()` drops a command silently when the queue is full and the cache still counts it as sent, so a lost `SW=` is retried only on the next change or restart. The Home Assistant "DHW Control" climate entity publishes `SW=` straight to the command topic (`MQTTHaDiscovery.cpp`, around line 3074) and does not update `settings.sat.fDhwSetpoint`; while SAT is on, the send after a restart restores SAT's stored setpoint.
+  - Defaults: `bDhwEnabled` false and `fDhwSetpoint` 0 (`SATtypes.h`). So with defaults no `SW=` is ever sent.
   - The `dhw_enable` option (`bDhwEnable`, default true, `SATtypes.h:459`) sends `HW=1` or `HW=0` when its value changes, but only if the boiler reported MsgID 3 bit HB3 (storage tank) (`settingStuff.ino:1018-1031`). It is not tied to the control loop.
   - Compare: thermo-nova never writes a DHW setpoint from the control loop; it writes `SW` only from the user number entity.
 - **Effect of DHW active on control.**

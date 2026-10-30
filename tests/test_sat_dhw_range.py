@@ -75,18 +75,13 @@ class FirmwareUsesConstants(unittest.TestCase):
 
     def test_sw_send_condition_uses_constants(self):
         i = SAT.index('PSTR("SW=%d")')
-        window = SAT[max(0, i - 700):i]
+        window = SAT[max(0, i - 900):i]
         self.assertIn("SAT_DHW_SETPOINT_MIN", window)
         self.assertIn("SAT_DHW_SETPOINT_MAX", window)
-        # No behaviour change (review finding): the whole SW= send condition stays as it was,
-        # only the range literals became constants.
-        cond = re.search(r"if \((!_sat_prevDhwActive.*?hasOTCommandInterface\(\))\)", window, re.S)
+        cond = re.search(r"if \((!settings\.sat\.bDhwEnabled \|\| sp < .*?)\) \{", SAT[SAT.index("static void satDhwSetpointSync()"):], re.S)
         self.assertIsNotNone(cond, "SW= send condition not found")
         self.assertEqual(" ".join(cond.group(1).split()),
-                         "!_sat_prevDhwActive && settings.sat.bDhwEnabled && "
-                         "settings.sat.fDhwSetpoint >= (float)SAT_DHW_SETPOINT_MIN && "
-                         "settings.sat.fDhwSetpoint <= (float)SAT_DHW_SETPOINT_MAX && "
-                         "hasOTCommandInterface()")
+                         "!settings.sat.bDhwEnabled || sp < (float)SAT_DHW_SETPOINT_MIN || sp > (float)SAT_DHW_SETPOINT_MAX")
 
     def test_sim_check_uses_constants(self):
         m = re.search(r"if \(dhwDraw\) \{(.*?)\}", SAT, re.S)

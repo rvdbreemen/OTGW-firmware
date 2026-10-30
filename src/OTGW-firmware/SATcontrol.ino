@@ -480,8 +480,10 @@ static const char* satGetHeatingSourceName()
 
 static bool    _sat_roomLostActive     = false;   // room temperature lost: heating on the curve only (TASK-1364)
 static uint8_t _sat_picFailCount      = 0;
-static bool    _sat_prevDhwActive     = false;  // Track DHW transition to send SW= on entry (TASK-437)
+static bool    _sat_prevDhwActive     = false;  // Track the DHW draw edges for the PWM ON clock (entries 95, 105, 106)
 static bool    _sat_prevOTOnline      = false;  // Track OT-bus online edge for cache reset (TASK-565)
+static int     _sat_lastSentSW        = 0;      // DHW setpoint last sent with SW= (TASK-1376)
+static bool    _sat_swSentValid       = false;  // false: SW= still has to go out (restart, SAT switched on, DHW control switched on)
 
 // --- SAT command cadence (TASK-1370, Sergeant D entry 44, ADR-203) ---
 // As thermo-nova's heating loop (climate.py:707-708 every 5 s; heating_control.py:236-238 sends CS, MM and CH at the
@@ -5637,6 +5639,27 @@ bool satPidGatherInputs(float* room, float* target, float* curve)
 //=====================================================================
 //=== Main Control Loop (called from doBackgroundTasks) ===
 //=====================================================================
+// TASK-1376 (Sergeant D entries 33, 53, 69, 121, 150; thermo-nova number.py:72-74 is its only SW sender): while SAT is
+// enabled and DHW control is on with a valid setpoint, SW=<int> goes out at once when the DHW setpoint changes (REST,
+// MQTT or the web UI) and once after a restart, after satRestartStep() has let SAT act. It runs every pass, not on the
+// control tick, and not at the start of a hot-water draw.
+static void satDhwSetpointSync()
+{
+  const float sp = settings.sat.fDhwSetpoint;
+  if (!settings.sat.bDhwEnabled || sp < (float)SAT_DHW_SETPOINT_MIN || sp > (float)SAT_DHW_SETPOINT_MAX) {
+    _sat_swSentValid = false;   // switching DHW control on again sends the setpoint once more
+    return;
+  }
+  if (!hasOTCommandInterface()) return;
+  if (_sat_swSentValid && (int)sp == _sat_lastSentSW) return;
+  char swCmd[16];
+  snprintf_P(swCmd, sizeof(swCmd), PSTR("SW=%d"), (int)sp);
+  addCommandToQueue(swCmd, strlen(swCmd), false, 0);
+  _sat_lastSentSW = (int)sp;
+  _sat_swSentValid = true;
+  SATDebugTf(PSTR("SAT: DHW setpoint, sent %s\r\n"), swCmd);
+}
+
 // TASK-1284: every return path of the pass (enabled, disabled, tripped, fallback lift) ends in
 // the one core-state publish, on the loop task.
 static void satControlLoopRun();
@@ -5685,6 +5708,7 @@ static void satControlLoopRun()
       satDisable();
     }
     _sat_otLinkBaseMs = millis();          // TASK-1365: a flash or a switch-off is not OpenTherm silence
+    _sat_swSentValid = false;              // TASK-1376: SAT sends the DHW setpoint again when it is back
     if (!satIsEnabled()) state.sat.bOtLinkLost = false;
     if (!satIsEnabled()) state.sat.bOutsideTempMissing = false;   // TASK-1390: a switch-off ends the outside-missing state
     return;
@@ -5747,6 +5771,8 @@ static void satControlLoopRun()
   // OpenTherm link: the returns above end SAT's control (satDisable() resets the PID), so the PID has nothing to regulate.
   satPidService(millis());
 
+  satDhwSetpointSync();   // TASK-1376: SW= on a DHW setpoint change and once after a restart, between the control ticks
+
   // Main control loop on timer
   if (!DUE(timerSATControl)) return;
   // One time for the whole tick, read once here: the sustained switches and the DHW guard all use it. The timer
@@ -5777,18 +5803,7 @@ static void satControlLoopRun()
 
   if (state.sat.bDhwActive) {
     // DHW has priority - don't adjust CH setpoint, boiler manages itself.
-    // TASK-437: On transition into DHW mode, send SW= (DHW setpoint, MsgID 56).
-    // Was TW=, which is not a PIC command (gateway.asm) and is not implemented
-    // by OTDirect, so the command was rejected as NG on every DHW transition.
-    if (!_sat_prevDhwActive && settings.sat.bDhwEnabled &&
-        settings.sat.fDhwSetpoint >= (float)SAT_DHW_SETPOINT_MIN &&
-        settings.sat.fDhwSetpoint <= (float)SAT_DHW_SETPOINT_MAX &&
-        hasOTCommandInterface()) {
-      char swCmd[16];
-      snprintf_P(swCmd, sizeof(swCmd), PSTR("SW=%d"), (int)settings.sat.fDhwSetpoint);
-      addCommandToQueue(swCmd, strlen(swCmd), false, 0);
-      SATDebugTf(PSTR("SAT: DHW active, sent %s\r\n"), swCmd);
-    }
+    // The DHW setpoint goes out as SW= on a change, not here (TASK-1376, entry 150).
     _sat_cmdResendArmed = false;                   // nothing is sent on this tick: no resend of pre-draw values (TASK-1370)
     if (!_sat_prevDhwActive) satPwmOnDhwStart();   // freeze the ON clock (entry 95)
     satPwmNoteDhwFlame(satIsFlameOn());            // a flame burning with the DHW bit set is a hot-water flame (entries 105, 106)
