@@ -177,8 +177,8 @@ the gates are green and the review findings are resolved:
   (`src/OTGW-firmware/**`, `src/libraries/**`); when the bump would also touch
   unrelated uncommitted source files, `git stash` those first;
 - one commit per task with a descriptive title, explicit `git add <paths>` (never
-  `git add -A`), never `--no-verify`; push to `origin/dev` once build and evaluator
-  are green (docs-only commits may skip both gates);
+  `git add -A`), never `--no-verify`; push to `origin/dev` only after the build, the
+  evaluator and the bench test of step 9 are green (docs-only commits may skip all three);
 - commit and push directly on `dev`, no sub-branch (maintainer directive 2026-06-19).
   A worktree lane only for genuine parallel work, deleted right after the merge
   (`git branch -d`, `git push origin --delete`, `git worktree remove`);
@@ -202,13 +202,16 @@ Every alpha tag that reaches `dev` is published, also one another session built:
 "Every alpha tag on `dev` is published" protocol in CLAUDE.md (build from the pushed HEAD, post
 the zip, report to the coordinating session, ledger check before each post).
 
-Batch cadence (maintainer directive, 2026-10-29, CLAUDE.md "Batch cadence"): steps 5-7 run per task
-with host tests, the evaluator, a bump and a local commit, but the build, push, post, step 8 report
-and bench smoke run once every 4 completed firmware tasks. Until the 4th, go straight to the next
-task after the local commit.
+Per-task cadence (maintainer directive, 2026-10-30, CLAUDE.md "Per-task cadence", replaces the
+2026-10-29 batch of 4 tasks): after the commit of step 7, build esp32-combo, OTA-flash a bench unit
+and bench-test this task's behaviour. Only after a passing bench test: push, post the zip and the
+step 8 report. A failed bench test publishes nothing: fix it, then build and bench-test again.
+Tasks that are ready at the same moment may share one build, but each task's behaviour is
+bench-tested before the zip is posted. At most 3 hours between two builds while work lands.
 
-After the push, build once more from the pushed HEAD with `build.bat` so the githash
-in the file names matches the code. Leave
+Post the zip of the bench-tested build, so the githash in the file names matches the
+pushed code. When the push needed a rebase, build once more from the rebased HEAD with
+`build.bat` first (the post script refuses a zip whose githash is not HEAD). Leave
 `build/OTGW-firmware-esp32-combo-<version>+<hash>-flash.zip` (the complete package:
 `.ino.bin`, `.littlefs.bin`, USB images, flash tools, capture scripts, READMEs) and
 give its full path to the maintainer in the session. Then post it to #alpha-testing
