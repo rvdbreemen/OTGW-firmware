@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:11:00Z'
-updated_date: '2026-10-30T13:03:00Z'
+updated_date: '2026-10-30T13:42:00Z'
 labels:
   - sat sergeant-d
 milestone: 2.0.0
@@ -39,6 +39,8 @@ Second-reader checked 2026-10-30 (C18, C19 confirmed). satResolveOutsideTemp() S
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-30: Sergeant D entry 146: must be in beta 1 (TASK-1504, target Sun 2026-11-01). Priority raised to high.
+
+Bench expiry (.63 alpha.552, sim off, weather 14.6 valid): external 3.0 pushed 12:40:21 UTC -> 13:30:05 (50 min) outside_temp 3; 13:42:33 (62 min) outside_temp 14.6 (weather). The external_outdoor_valid flag stays true; selection uses the 1 h age (SATcontrol.ino satResolveOutsideTemp).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

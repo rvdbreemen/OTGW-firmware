@@ -1,11 +1,11 @@
 ---
 id: TASK-1373
 title: 'SAT: user MaxTSet slider bounded by MsgID 57, sent to the boiler (entry 48)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T06:31:00Z'
-updated_date: '2026-10-30T13:41:00Z'
+updated_date: '2026-10-30T14:35:00Z'
 labels:
   - sat
   - webui
@@ -28,7 +28,7 @@ Sergeant D 2026-10-25 05:56/06:10 UTC (#alpha-testing 1563793351961223221, 15637
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A MaxTSet slider in the v2 SAT page bounded by the boiler's MsgID 49 MaxTSet upper/lower bounds (fallback 20..80 when MsgID 49 is not reported; entry 100, Q41 A) sets the value; the gateway always sends it to the boiler as MsgID 57 (SH= on PIC, MsgID 57 write on OT-Direct) with no MsgID 6 gate (entry 100), and SAT caps every CS it sends at that value, ignition hold included (entries 51, 54) (host test + bench capture); HA number entity + MQTT documented
+- [x] #1 A MaxTSet slider in the v2 SAT page bounded by the boiler's MsgID 49 MaxTSet upper/lower bounds (fallback 20..80 when MsgID 49 is not reported; entry 100, Q41 A) sets the value; the gateway always sends it to the boiler as MsgID 57 (SH= on PIC, MsgID 57 write on OT-Direct) with no MsgID 6 gate (entry 100), and SAT caps every CS it sends at that value, ignition hold included (entries 51, 54) (host test + bench capture); HA number entity + MQTT documented
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -53,4 +53,12 @@ TASK-1412.1 records review (R29): 2026-10-29. TASK-1412.1 R29 reconciliation: AC
 Robert 2026-10-30: the TASK-1412.3 dependency is met for this task by its own host tests that are red on HEAD and green on the fix (recorded in TASK-1412.3 too); TASK-1412.3 stays open for the broader low-load regression set.
 
 2026-10-30 coordinator (session 80): entry 148 A narrows AC1's 'always sends' (entry 100): SH= goes out only after the user chose a value (on change + once after restart); not chosen = SAT caps CS at the default, sends nothing. Lane reviewed (opus); fixes: real host test tests/test_sat_max_tset.py (corrupt NUL file replaced; 22 tests, mutants for typo/global-cap/heat-pump leaks go red), HA unit bytes fixed, interim (Q-b/Q-c open with Sergeant D): SH= = user value within MsgID 49 bounds and the global SAT max-setpoint cap (65), heat-pump 40 cap internal to CS only; 1..19 rejected (REST 400), 0 = not chosen; help text shortened to fit the 18 KB settings-help budget. Integrated on alpha.553 as alpha.554: evaluate --quick EXIT 0; 67/68 Python test files OK (test_settings_float_roundtrip pre-existing), all 28 web UI node test files pass (sat-max-tset 7/7, settings-help 28/28).
+
+Bench .63 alpha.554 (PIC, SAT sim): POST satmaxsetpoint 70 -> one SH=65 queued (interim global cap 65 applied, as designed), no repeat in the next 80 s; POST 15 -> HTTP 200 but value kept at 70 (generic settings POST keeps the old value; the dedicated sat/settings/max_setpoint route answers 400). Restored to 0. OT-Direct MsgID 57 write not benched (unit offline). Q-b (global 65 cap) asked to Sergeant D 14:03 UTC (msg 1565727831172845599).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+alpha.554 (c39b8e9f7, pushed in 5e8366d3f, zip alpha.555). MaxTSet slider (settings.sat.fMaxTSetUser, 0 = not chosen) bounded by MsgID 49 (20..80 fallback), underfloor <= 50; chosen value goes out as SH= on change and once after restart; not chosen = nothing sent, CS capped at default 62/50 (entry 148 A, which narrows AC1's 'always sends' of entry 100); every CS path capped incl. ignition hold; HA number entity, MQTT sat/max_setpoint, REST, docs/manuals. Interim until Q-b/Q-c: SH= and CS also respect the global 65 cap, heat-pump 40 cap internal to CS; values 1..19 refused. Evidence: tests/test_sat_max_tset.py compiles the real functions, 22 OK, red on mutants (typo accepted 2 F, SH= without global cap 4 F, heat-pump leak 1 F; base has no such functions -> errors); webui sat-max-tset 7/7; settings-help 28/28 after shortening the help text (18420/18432 bytes); evaluate EXIT 0. Bench .63 alpha.554: POST 70 -> one SH=65; POST 15 -> kept 70. NOT verified: OT-Direct MsgID 57 write (unit offline), browser screenshot of the slider. Follow-up for Q-b/Q-c: TASK-1513.
+<!-- SECTION:FINAL_SUMMARY:END -->

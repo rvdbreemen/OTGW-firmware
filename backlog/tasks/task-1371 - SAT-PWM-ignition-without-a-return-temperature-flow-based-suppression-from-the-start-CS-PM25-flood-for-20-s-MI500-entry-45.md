@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T22:32:00Z'
-updated_date: '2026-10-30T12:31:00Z'
+updated_date: '2026-10-30T14:19:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -32,6 +32,17 @@ Sergeant D 2026-10-24 21:34 UTC (Q14, entry 45, a deliberate deviation from ther
 - [ ] #1 Without a return temperature the PWM ON phase suppresses to flow - offset from ignition and sends CS/PM=25 alternately each second for 20 s (host test of the command sequence red on HEAD, green); MI=500 sent for such boilers on PIC boards; plan OK'd by Sergeant D first
 <!-- AC:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Basis: plan posted 2026-10-30 09:26 (msg 1565658169429196822) as amended by entries 149 + 151. Scope ONLY boilers without a return temperature: MsgID 28 answered Unknown-DataID AND no valid 'R' board sensor (a reading counts for 5 min; entries 84, 135). All other boilers keep thermo-nova's hold unchanged (heating_control.py:397-448).
+1. Start-up hold (entries 149, 151): at the start of the PWM ON phase and at every CH flame off->on (also the relight after a hot-water draw, entry 142), for 20 s: alternate CS = flow + flame-off offset (default 18), clamped to [cold setpoint, effective max setpoint incl. TASK-1373 user MaxTSet] (as heating_control.py:397-405 does for return + offset), at t = 0, 2, 4 ..., and PM=25 at t = 1, 3, 5 .... After 20 s: suppression CS = flow - 1 (heating_control.py:439-448). Before the flame lights the hold value applies (no flow - 1 below the boiler water).
+2. PM=25 goes through the PIC command queue without wiping the boot PM=3/15/48 chain (pmChain); OT-Direct: the equivalent read request of MsgID 25.
+3. Coupling TASK-1370 (ADR-203): the flood's CS goes through satSendCS() so the 5 s resend repeats the flood value, or the resend pauses during the 20 s; no stale tick CS may interleave (PIC queue replaces a pending same-prefix CS=, OTGW-Core.ino:3809-3818). The 3 s PWM ON refresh must not overwrite the flood either.
+4. MI=500 (entry 141): once on PIC boards after the no-return detection (and for the Ideal/Intergas/Nefit quirk as today), never on OT-Direct, no reset. Today MI=500 also goes out at boot on OT-Direct (SATcontrol.ino boot block 'Manufacturer boot quirk'): gate it to PIC.
+Files: SATcontrol.ino (PWM ON / flame edge / hold), SATtypes.h (state), tests. Verification: host test of the command sequence (CS/PM=25 alternation for 20 s with flow + 18 clamped, then flow - 1; relight after DHW; normal boiler unchanged; MI=500 PIC only, not OT-Direct; resend does not interleave) red on HEAD 5e8366d3f, green on fix; bench on .63 in simulation if the sim can model a missing MsgID 28 (else host evidence + note). Cross-line: dev only.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -52,4 +63,6 @@ Robert 2026-10-30: a valid board 'R' sensor reading counts as a return temperatu
 2026-10-30 11:30 UTC: Sergeant D answered the follow-up with A (msg 1565666884467298335), recorded as entry 151: the CS/PM=25 flood runs inside the 20 s hold with CS = flow + 18, then suppression flow - 1. Plan cleared to build.
 
 2026-10-30 coordinator (session 80): plan inputs before implementation. (1) Entries 149+151 replace the title's 'flow-based suppression from the start': first 20 s after each CH flame off->on (incl. relight after a draw, entry 142) alternate CS = flow + 18 (t=0,2,4..) and PM=25 (t=1,3,5..), then suppression CS = flow - 1. (2) Coupling with TASK-1370/ADR-203: satCmdResend re-sends the cached fLastSentCS every 5 s; the flood must send CS through satSendCS() (updating the cache) or pause the resend during the flood, else a stale tick CS interleaves (on PIC boards addCommandToQueue replaces a pending same-prefix CS=, OTGW-Core.ino:3809-3818). (3) Coupling with TASK-1373: flow + 18 is clamped to the effective max setpoint (entry 151 clamp to [cold, max]), i.e. satEffectiveMaxSetpoint incl. the user MaxTSet. Implement on top of the integrated 1370+1373 code.
+
+Plan correction (self-review against heating_control.py:392-433): timing follows thermo-nova's hold, with flow in place of return. (a) PWM ON, flame not yet lit: hold CS = flow + flame-off offset (18), clamped to [cold, effective max], refreshed as the normal PWM ON refresh (as :397-407 with return). (b) From each CH flame off->on (incl. relight after a draw, entry 142), for the suppression delay (20 s, :414-433): the flood: CS = the same held value at t = 0, 2, 4 ... and PM=25 at t = 1, 3, 5 ... (entry 151 A). (c) After 20 s from flame-on: suppression CS = flow - 1 (:439-448). The flood therefore starts at flame-on, not at the PWM ON start.
 <!-- SECTION:NOTES:END -->
