@@ -263,6 +263,20 @@ class TestAbortRestore(unittest.TestCase):
         self.assertIn("_updaterError", m.group(1))
         self.assertIn("_markFsUpdateIncomplete();", m.group(1))
 
+    def test_abort_remount_not_gated_on_mounted_flag(self):
+        """Bench-found bug of 2026-10-30: _handleUploadStart calls LittleFS.end() but keeps
+        LittleFSmounted true (isFlashing() relies on it), so an abort condition that also
+        required !LittleFSmounted never ran: no remount, no restore, no marker."""
+        start = function_body(UPD, START)
+        self.assertIn("LittleFS.end();", start)
+        self.assertNotRegex(start, r"LittleFSmounted\s*=\s*false",
+                            "the start keeps the flag true across LittleFS.end()")
+        m = re.search(r"if \(([^\n]*)\) \{\s*LittleFSmounted = LittleFS\.begin\(\);", self.abort)
+        self.assertTrue(m, "abort must remount the filesystem")
+        self.assertIn("UploadTarget::Filesystem", m.group(1))
+        self.assertNotIn("!LittleFSmounted", m.group(1),
+                         "the flag is still true after the start's LittleFS.end(), so it cannot gate the remount")
+
     def test_marker_is_not_kept_and_is_reported(self):
         self.assertNotIn(".fs_update_incomplete", keep_list(), "a complete image must remove the marker")
         mark = function_body(UPD, r"void _markFsUpdateIncomplete\(\)")

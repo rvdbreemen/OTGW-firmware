@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-alpha.547
+**  Version  : v2.0.0-alpha.548
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -523,7 +523,9 @@ private:
     }
     // Remount LittleFS if a filesystem upload was aborted mid-flight (we called
     // LittleFS.end() at start, so a dropped FS upload leaves assets gone).
-    if (_uploadTarget == UploadTarget::Filesystem && !LittleFSmounted) {
+    // LittleFSmounted cannot gate this: the start keeps it true across LittleFS.end()
+    // because isFlashing() relies on it.
+    if (_uploadTarget == UploadTarget::Filesystem) {
       LittleFSmounted = LittleFS.begin();
       if (_serial_output) {
         DebugTf(PSTR("[OTA] Abort: LittleFS remount %s\r\n"), LittleFSmounted ? "OK" : "FAILED");
