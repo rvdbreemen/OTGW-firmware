@@ -4,9 +4,10 @@ title: >-
   SAT PID: persist and restore all PID state as thermo-nova, no age check (entry
   74, Q24)
 status: To Do
-assignee: []
+assignee:
+  - '@claude'
 created_date: '2026-10-28T06:45:00Z'
-updated_date: '2026-10-28T21:41:00Z'
+updated_date: '2026-10-30T18:40:00Z'
 labels:
   - sat
   - sergeant-d
@@ -51,4 +52,6 @@ Execution-graph update requested by Robert: serialize pending SATpid.ino writers
 2026-10-28 maintainer decision (Robert, in session): write cadence: write the PID checkpoint only when a stored value has changed (no fixed interval). Read with docs/design/pid-checkpoint-ten-year-spec.md, which proposed a 5-minute maximum. Risk reported to Robert in the session: with the 60 s PID (TASK-1368) integral, error and temperature change on almost every step while heating, so 'only on change' is close to one write per minute during the heating season; the spec's 62-byte simulation (1538 max erases per 100k updates, dedicated dir + tmp/rename) puts that near or above the 50,000-erase ten-year budget. The endurance gate of the spec (section 10) must be measured on the final record before Done.
 
 2026-10-28 maintainer decision (Robert, in session), replaces the earlier 'only on change' note: write the PID checkpoint at most once every 15 minutes, and only when a stored value changed (the spec proposed 5 minutes). Planned restarts and SAT disable still flush immediately (spec section 10 exceptional events). Wear estimate from docs/design/pid-checkpoint-ten-year-spec.md (LittleFS simulation, 62-byte record, dedicated dir + tmp/rename: max 1538 erases on one sector per 100k updates; not a hardware test, the final 180-byte record must be re-measured): worst case every interval writes = 35,040 writes/yr -> ~539 erases/yr on the hottest sector -> ~5,400 in 10 years (+~560 for 36,525 flushes) = ~12% of the spec's 50,000 ten-year budget, ~6% of the 100,000 rated cycles. 5 min would be ~16,200 (+560) in 10 years; 60 s ~80,800 (over budget). Cost: up to 15 min of learned PID state lost on an unplanned reset (power cut, crash).
+
+2026-10-30 coordinator: picked up and put back: Robert's SATpid.ino writer order is 1416 -> 1417 -> 1418 -> 1414 -> 1423 -> 1415; TASK-1414 is not Done yet.
 <!-- SECTION:NOTES:END -->

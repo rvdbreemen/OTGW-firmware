@@ -3,10 +3,11 @@ id: TASK-1405
 title: >-
   SAT classifier: store the control setpoint per tail sample, as thermo-nova
   (entry 36, Q2 A)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T21:44:00Z'
-updated_date: '2026-10-27T23:46:00Z'
+updated_date: '2026-10-30T18:55:00Z'
 labels:
   - sat
 milestone: 2.0.0

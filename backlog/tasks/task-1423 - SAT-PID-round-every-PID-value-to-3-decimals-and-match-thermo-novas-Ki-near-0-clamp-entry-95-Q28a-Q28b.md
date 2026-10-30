@@ -4,9 +4,10 @@ title: >-
   SAT PID: round every PID value to 3 decimals and match thermo-nova's Ki-near-0
   clamp (entry 95, Q28a/Q28b)
 status: To Do
-assignee: []
+assignee:
+  - '@claude'
 created_date: '2026-10-28T07:51:00Z'
-updated_date: '2026-10-28T20:07:00Z'
+updated_date: '2026-10-30T18:40:00Z'
 labels:
   - sat
   - sergeant-d
@@ -40,4 +41,6 @@ Sergeant D 2026-10-28 (entry 95): Q28a 'Round all the values to 3 decimals not o
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-28 Robert requested this execution-graph update. Preserve the earlier reconciliation. Pending PID writers run 1368 -> 1270 -> 1416 -> 1417 -> 1418 -> 1414 -> 1423 -> 1415; 1381 remains a separate branch after 1270 and Q53. Revalidate task premises against preceding commits. Integration also requires the DHW and auto-tune outcomes through their linked verification gates. Approval and bench gates remain in force.
+
+2026-10-30 coordinator: picked up and put back: Robert's SATpid.ino writer order is 1416 -> 1417 -> 1418 -> 1414 -> 1423 -> 1415; TASK-1414 is not Done yet.
 <!-- SECTION:NOTES:END -->

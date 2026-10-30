@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T10:39:00Z'
-updated_date: '2026-10-27T23:46:00Z'
+updated_date: '2026-10-30T18:56:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -34,4 +34,6 @@ From TASK-1273 and sat-port-audit-2026-10-24.md #44: the PM/MI commands sent at 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
+
+2026-10-30 coordinator: skipped in this cycle: AC2 needs Sergeant D's OK first (not recorded). Note TASK-1371 already moved MI=500 to satMiStep() after satRestartStep(), which also runs when SAT is enabled at runtime; the PM chain is still boot-only. Question to queue.
 <!-- SECTION:NOTES:END -->

@@ -3,10 +3,11 @@ id: TASK-1413
 title: >-
   SAT: remove the firmware-only hourly heating-curve coefficient auto-tune
   (entry 72, Q22)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-28T06:44:00Z'
-updated_date: '2026-10-28T19:14:00Z'
+updated_date: '2026-10-30T18:55:00Z'
 labels:
   - sat
   - sergeant-d

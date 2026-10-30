@@ -3,9 +3,11 @@ id: TASK-1506
 title: >-
   SAT gas consumption: split into CH and DHW consumption sensors (entry 144,
   Q69)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-30T06:45:00Z'
+updated_date: '2026-10-30T18:55:00Z'
 labels:
   - sat sergeant-d mqtt
 milestone: 2.0.0
