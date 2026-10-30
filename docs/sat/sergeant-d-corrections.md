@@ -5054,3 +5054,20 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Settled (option A as posted):** for a boiler without a return temperature (entries 84, 135), during the first 20 s after every CH flame off-to-on (also the relight after a hot-water draw, entry 142) the flood of entry 45 stays: CS = flow + 18 at t = 0, 2, 4 ... and PM=25 at t = 1, 3, 5 ... After those 20 s, suppression CS = flow - 1 (heating_control.py:439-448). The + 18 is the flame-off offset with thermo-nova's clamp to [cold setpoint, maximum setpoint] (heating_control.py:397-405, there applied to the return temperature). Entry 149 thus reads: flow + 18 replaces return + 18, and the flood carries that value.
 
 **Compared:** thermo-nova has no flood and no hold without a return temperature (keeps the previous CS, heating_control.py:392-395); the flood is Sergeant D's addition (entries 45, 142). Firmware today: return + 18 floored at the cold setpoint, a raw Tret of 0 gives the floor (SATcontrol.ino:835-841); no flood. **Task:** TASK-1371 (cleared to build). **Open:** none from this answer; MI=500 on PIC after detection (entry 141) unchanged.
+## 152. Q-b A: no global 65 C cap once the user chose a max flow setpoint (2026-10-30, follow-up of entry 148)
+
+**Source:** sergeantd, 2026-10-30 14:20 UTC, msg 1565732208885633145 (https://discord.com/channels/812969634638725140/1514720723980259460/1565732208885633145), answer to Q-b (msg 1565727831172845599).
+
+**Quoted:** "@BlueFlame Bot  follow-up on TASK-1373 (max flow setpoint slider), question Q-b: A"
+
+**Settled (option A as posted):** once the user has chosen a max flow setpoint, that value (within the boiler's MsgID 49 range, underfloor at most 50) is the only cap: SH= carries it and SAT caps CS at it, without the firmware's global 65 C ceiling. Without a user value the defaults stay 62 radiators / 50 underfloor (entry 148). thermo-nova: MAXIMUM_SETPOINT = 65 is defined but unused (const.py:36); the user maximum 10..100 is the only cap (config_flow.py:612-613, entry_data.py:229-233). Firmware alpha.554: SH= and CS still capped at 65 (interim). **Task:** TASK-1513. **Open:** Q-c (heat-pump default), to ask next.
+
+## 153. "Central Heating Settings" card with a max relative modulation slider (2026-10-30)
+
+**Source:** sergeantd, 2026-10-30 14:42 UTC, msg 1565737668627660861 (https://discord.com/channels/812969634638725140/1514720723980259460/1565737668627660861), unprompted.
+
+**Quoted:** "@BlueFlame Bot Rename the “Max flow Setpoint” to ~~“Boiler settings”~~ “Central Heating Settings” and add a Max relative modulation slider in this card. Max relative modulation slider should be 0-100%. This slider should follow the same specs as the Max flow Setpoint specs."
+
+**Settled:** the SAT page card that holds the max flow setpoint slider (TASK-1373) is renamed "Central Heating Settings" and gets a second slider, Max relative modulation, 0-100 %.
+
+**Reading (our interpretation, told to him for correction):** the slider edits the existing setting settings.sat.iMaxRelModulation (satmaxmodulation, default 100 as thermo-nova const.py:38, :148), which already caps every MM= SAT sends (SATcontrol.ino MM send paths) and, since TASK-1370 / ADR-203, goes to the boiler every 5 s. "Same specs" read as: a slider built like the max flow setpoint slider, with HA number and MQTT, persisted, applied at once. Unlike the max flow setpoint there is no "not chosen" state: the default 100 means no cap, as thermo-nova. Field note: some boilers reject MsgID 14 writes (gruijter's Intergas, capture 2026-10-30), where the slider has no effect. **Task:** TASK-1514.

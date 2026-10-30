@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T22:32:00Z'
-updated_date: '2026-10-30T14:19:00Z'
+updated_date: '2026-10-30T14:48:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -65,4 +65,6 @@ Robert 2026-10-30: a valid board 'R' sensor reading counts as a return temperatu
 2026-10-30 coordinator (session 80): plan inputs before implementation. (1) Entries 149+151 replace the title's 'flow-based suppression from the start': first 20 s after each CH flame off->on (incl. relight after a draw, entry 142) alternate CS = flow + 18 (t=0,2,4..) and PM=25 (t=1,3,5..), then suppression CS = flow - 1. (2) Coupling with TASK-1370/ADR-203: satCmdResend re-sends the cached fLastSentCS every 5 s; the flood must send CS through satSendCS() (updating the cache) or pause the resend during the flood, else a stale tick CS interleaves (on PIC boards addCommandToQueue replaces a pending same-prefix CS=, OTGW-Core.ino:3809-3818). (3) Coupling with TASK-1373: flow + 18 is clamped to the effective max setpoint (entry 151 clamp to [cold, max]), i.e. satEffectiveMaxSetpoint incl. the user MaxTSet. Implement on top of the integrated 1370+1373 code.
 
 Plan correction (self-review against heating_control.py:392-433): timing follows thermo-nova's hold, with flow in place of return. (a) PWM ON, flame not yet lit: hold CS = flow + flame-off offset (18), clamped to [cold, effective max], refreshed as the normal PWM ON refresh (as :397-407 with return). (b) From each CH flame off->on (incl. relight after a draw, entry 142), for the suppression delay (20 s, :414-433): the flood: CS = the same held value at t = 0, 2, 4 ... and PM=25 at t = 1, 3, 5 ... (entry 151 A). (c) After 20 s from flame-on: suppression CS = flow - 1 (:439-448). The flood therefore starts at flame-on, not at the PWM ON start.
+
+2026-10-30 implementation (sonnet lane in wt-1371, uncommitted): satNoReturnTemp() = isBoilerMsgIdUnsupportedRead(28) && !picBoardTretValid() (new, 5 min after a valid PR=E with sensor R); hold uses flow + offset for such boilers; flood steps (CS even s via satSendCS, PM=25 odd s, skipped while pmChainBusy()) for fModSupDelay after each CH flame-on; MI=500 moved to satMiStep() after satRestartStep, PIC only. Host test tests/test_sat_no_return_ignition.py: base Ran 15 FAILED (failures=10), fix 15 OK. Interpretations recorded (not silent): (1) flood CS recomputed live = flow + 18 each even second, read from entry 45 ('flow gives responsiveness', 'frequent CS updates'); thermo-nova freezes its hold value (heating_control.py:418-423) - to confirm with Sergeant D after Q-b; (2) flood length follows the suppression-delay setting (default 20 s); (3) flood only in PWM ON with overshoot protection, same gates as the 3 s refresh. Detection premise (entry 84 open points 1/3) unconfirmed; no simulation of a missing MsgID 28 exists, so bench evidence is limited to normal-boiler non-regression. Reviewers (opus correctness, sonnet SAT-entries) running.
 <!-- SECTION:NOTES:END -->

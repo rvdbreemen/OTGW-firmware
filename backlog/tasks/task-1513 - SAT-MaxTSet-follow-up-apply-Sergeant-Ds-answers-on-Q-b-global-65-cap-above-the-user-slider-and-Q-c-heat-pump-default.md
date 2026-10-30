@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-30T14:35:00Z'
+updated_date: '2026-10-30T15:18:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -25,3 +26,9 @@ Follow-up of TASK-1373 (alpha.554). Interim today: SH= and CS capped at the glob
 - [ ] #1 Q-b answer recorded and implemented with host test red/green
 - [ ] #2 Q-c asked, answered, recorded and implemented
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Q-b answered A (entry 152, msg 1565732208885633145): no global 65 C cap once the user chose a value. AC1 unblocked. Q-c (heat-pump default) still to ask.
+<!-- SECTION:NOTES:END -->
