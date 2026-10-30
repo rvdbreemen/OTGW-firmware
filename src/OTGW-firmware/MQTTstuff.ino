@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.557
+**  Version  : v2.0.0-alpha.558
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2963,6 +2963,8 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     if (streamSatSelectDiscovery(0, ctx)) result = true;
     feedWatchDog();
     if (streamSatNumberDiscovery(0, ctx)) result = true;   // TASK-1373: Max flow setpoint
+    feedWatchDog();
+    if (streamSatNumberDiscovery(1, ctx)) result = true;   // TASK-1514: Max relative modulation
     clearRetiredSatEntities(ctx);
   }
   // Number (OT ID 27): Thermostat (room temperature outside override is thermostat-side).

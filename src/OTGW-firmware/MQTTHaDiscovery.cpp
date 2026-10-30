@@ -3522,18 +3522,22 @@ bool streamSatSelectDiscovery(uint8_t selectIdx,
   return true;
 }
 
-// SAT number entity (TASK-1373): Max flow setpoint. stat_t sat/max_setpoint is the ceiling SAT works
-// with, cmd_t set/<node>/sat/max_setpoint sets the user value (0 = not chosen is not offered: min 20).
+// SAT number entities. idx 0 (TASK-1373): Max flow setpoint. stat_t sat/max_setpoint is the ceiling SAT
+// works with, cmd_t set/<node>/sat/max_setpoint sets the user value (0 = not chosen is not offered: min 20).
+// idx 1 (TASK-1514): Max relative modulation, 0 to 100 %. stat_t and cmd_t are sat/max_modulation.
 bool streamSatNumberDiscovery(uint8_t numberIdx,
                               HaDiscoveryContext &ctx)
 {
-  if (numberIdx != 0) return false;
+  if (numberIdx > 1) return false;
+  const bool isModulation = (numberIdx == 1);
   if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
   if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
   char topic[STREAM_TOPIC_MAX];
-  snprintf_P(topic, sizeof(topic), PSTR("%s/number/%s/sat_max_setpoint/config"),
+  snprintf_P(topic, sizeof(topic),
+             isModulation ? PSTR("%s/number/%s/sat_max_modulation/config")
+                          : PSTR("%s/number/%s/sat_max_setpoint/config"),
              ctx.haPrefix, ctx.nodeId);
 
   auto compose = [&](MqttJsonWriter &w) -> bool {
@@ -3550,29 +3554,33 @@ bool streamSatNumberDiscovery(uint8_t numberIdx,
     if (!w.writeRam(ctx.nodeId)) return false;
     if (!w.writeChar('-')) return false;
     if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
-    if (!w.writeProgmem(PSTR("sat-max-setpoint\""))) return false;
+    if (!w.writeProgmem(isModulation ? PSTR("sat-max-modulation\"") : PSTR("sat-max-setpoint\""))) return false;
     if (!writeJsonComma(w)) return false;
 
-    if (!writeJsonKV_P(w, kDevCls, PSTR("temperature"))) return false;
-    if (!writeJsonComma(w)) return false;
+    if (!isModulation) {
+      if (!writeJsonKV_P(w, kDevCls, PSTR("temperature"))) return false;
+      if (!writeJsonComma(w)) return false;
+    }
     if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
-    if (!w.writeProgmem(PSTR("SAT Max Flow Setpoint\""))) return false;
+    if (!w.writeProgmem(isModulation ? PSTR("SAT Max Relative Modulation\"") : PSTR("SAT Max Flow Setpoint\""))) return false;
     if (!writeJsonComma(w)) return false;
 
     if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttSubTopic)) return false;
-    if (!w.writeProgmem(PSTR("/sat/max_setpoint\""))) return false;
+    if (!w.writeProgmem(isModulation ? PSTR("/sat/max_modulation\"") : PSTR("/sat/max_setpoint\""))) return false;
     if (!writeJsonComma(w)) return false;
 
     if (!w.writeProgmem(PSTR("\"stat_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttPubTopic)) return false;
-    if (!w.writeProgmem(PSTR("/sat/max_setpoint\""))) return false;
+    if (!w.writeProgmem(isModulation ? PSTR("/sat/max_modulation\"") : PSTR("/sat/max_setpoint\""))) return false;
     if (!writeJsonComma(w)) return false;
 
-    if (!w.writeProgmem(PSTR("\"unit_of_measurement\":\"\xC2\xB0""C\",\"min\":20,\"max\":80,\"step\":1,\"mode\":\"slider\""))) return false;
+    if (!w.writeProgmem(isModulation
+            ? PSTR("\"unit_of_measurement\":\"%\",\"min\":0,\"max\":100,\"step\":1,\"mode\":\"slider\"")
+            : PSTR("\"unit_of_measurement\":\"\xC2\xB0""C\",\"min\":20,\"max\":80,\"step\":1,\"mode\":\"slider\""))) return false;
     if (!writeJsonComma(w)) return false;
 
-    if (!writeJsonKV_P(w, kIcon, PSTR("mdi:thermometer-high"))) return false;
+    if (!writeJsonKV_P(w, kIcon, isModulation ? PSTR("mdi:percent") : PSTR("mdi:thermometer-high"))) return false;
     if (!writeJsonComma(w)) return false;
 
     if (!writeOriginBlock(w, ctx)) return false;

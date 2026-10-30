@@ -474,12 +474,13 @@
         </div>
       </details>
       <details class="grp" data-grp="sat-maxflow" id="satMaxGrp">
-        <summary>Max flow setpoint</summary>
+        <summary>Central Heating Settings</summary>
         <div class="grp-body">
           <div class="kv">
             <div class="kv-row"><span class="kv-k">Max flow setpoint</span><span class="kv-v"><input type="range" min="20" max="80" value="62" id="satMaxSlider" class="sat-slider" aria-label="Max flow setpoint"> <b id="satMaxR">—</b></span></div>
+            <div class="kv-row"><span class="kv-k">Max relative modulation</span><span class="kv-v"><input type="range" min="0" max="100" value="100" id="satModSlider" class="sat-slider" aria-label="Max relative modulation"> <b id="satModR">—</b></span></div>
           </div>
-          <div class="sat-hint" id="satMaxHint">SAT never sends a flow setpoint above this. Until you move the slider SAT uses 62 °C (50 °C underfloor) and sends nothing to the boiler; a chosen value is also sent to the boiler (SH=).</div>
+          <div class="sat-hint" id="satMaxHint">SAT never sends a flow setpoint above this. Until you move the slider SAT uses 62 °C (50 °C underfloor) and sends nothing to the boiler; a chosen value is also sent to the boiler (SH=). Max relative modulation caps the modulation SAT sends (MM=); 100 % is no cap. Some boilers ignore it.</div>
         </div>
       </details>
     </div>

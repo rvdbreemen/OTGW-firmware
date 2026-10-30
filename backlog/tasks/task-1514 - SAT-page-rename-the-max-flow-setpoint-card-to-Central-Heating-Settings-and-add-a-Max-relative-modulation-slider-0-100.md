@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-30T15:16:00Z'
+updated_date: '2026-10-30T16:15:00Z'
 labels:
   - sat
   - webui
@@ -27,3 +28,9 @@ Sergeant D entry 153 (msg 1565737668627660861). The card from TASK-1373 is renam
 - [ ] #2 Moving the modulation slider changes satmaxmodulation and the next MM= carries it (bench telnet capture)
 - [ ] #3 HA number entity + MQTT set topic for max relative modulation, docs/api/MQTT.md updated
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented (sonnet lane, integrated on alpha.557 as alpha.558): card 'Central Heating Settings' with satModSlider 0-100 (existing setting satmaxmodulation via REST sat/settings/max_modulation, existing MQTT set/state topic sat/max_modulation), new HA number entity sat_max_modulation (streamSatNumberDiscovery index 1), MQTT.md and CHANGELOG. tests/webui/sat-max-modulation.test.mjs 7/7 (old v2.js: 1 pass 6 fail); tests/test_sat_max_modulation_1514.py 5 OK (source-text checks only); full suite 70/71 (float roundtrip pre-existing); evaluate EXIT 0. Before screenshot alpha.556: card 'Max flow setpoint', one slider.
+<!-- SECTION:NOTES:END -->

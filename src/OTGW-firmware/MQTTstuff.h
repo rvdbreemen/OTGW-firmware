@@ -574,7 +574,7 @@ void clearRetiredSatEntities(const HaDiscoveryContext &ctx);
 bool streamSatSelectDiscovery(uint8_t selectIdx,
                               HaDiscoveryContext &ctx);
 
-// SAT number entities (sliders). numberIdx = 0 (sat_max_setpoint, TASK-1373).
+// SAT number entities (sliders). numberIdx = 0 (sat_max_setpoint, TASK-1373), 1 (sat_max_modulation, TASK-1514).
 bool streamSatNumberDiscovery(uint8_t numberIdx,
                               HaDiscoveryContext &ctx);
 

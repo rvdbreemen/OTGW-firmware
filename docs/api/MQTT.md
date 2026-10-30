@@ -484,7 +484,7 @@ The following topics echo the current configured values. They are retained and p
 | ----- | ------- | ----------- |
 | `sat/heating_curve_coeff` | `"1.5"` | Heating curve coefficient (set with the `sat/heating_curve_coeff` command) |
 | `sat/control_interval` | `"30"` | Control loop interval (seconds; set with the `sat/interval` command) |
-| `sat/max_modulation` | `"100"` | Max relative modulation % |
+| `sat/max_modulation` | `"100"` | Max relative modulation % (0 to 100; 100 = no cap). The state topic of the Home Assistant number entity `SAT Max Relative Modulation` (TASK-1514) |
 | `sat/flame_off_offset` | `"18.0"` | PWM ON phase only: hold offset above the return temperature while waiting for the flame (°C) |
 | `sat/flow_offset` | `"2.0"` | Continuous mode max setpoint drop (°C) |
 | `sat/mod_sup_delay` | `"20.0"` | Seconds after ignition before SAT suppresses modulation |
@@ -1089,7 +1089,7 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 | `sat/interval` | `SATinterval` | Control loop interval (seconds) |
 | `sat/overshoot_margin` | `SATovershootmargin` | Overshoot margin (°C) |
 | `sat/manufacturer` | `SATmanufacturer` | Boiler manufacturer name |
-| `sat/max_modulation` | `SATmaxmodulation` | Max relative modulation % |
+| `sat/max_modulation` | `SATmaxmodulation` | Max relative modulation % (0 to 100; 100 = no cap). Caps every `MM=` SAT sends. Home Assistant discovers it as the number entity `SAT Max Relative Modulation` (0 to 100, step 1); the SAT page has a slider for it in the Central Heating Settings card (TASK-1514) |
 | `sat/dhw_setpoint` | `SATdhwsetpoint` | DHW setpoint (°C) |
 | `sat/max_setpoint` | `SATmaxsetpoint` | Max flow setpoint (MaxTSet) (°C, 20 to 80; 0 = not chosen). A chosen value is sent to the boiler as `SH=` (MsgID 57) when it changes and once after a restart; nothing is sent while 0. Home Assistant discovers it as the number entity `SAT Max Flow Setpoint` (20 to 80, step 1) |
 | `sat/flame_off_offset` | `SATflameoffset` | Setpoint offset when flame is off |

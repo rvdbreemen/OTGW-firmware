@@ -4476,6 +4476,7 @@
   var SAT_DHW_SETPOINT_MIN = 30, SAT_DHW_SETPOINT_MAX = 60;   // = SAT_DHW_SETPOINT_MIN/MAX in SATtypes.h (below MIN = off)
   var SAT_MAXTSET_MIN = 20, SAT_MAXTSET_MAX = 80;             // = SAT_MAXTSET_MIN/MAX in SATtypes.h (TASK-1373)
   var satMaxDirty = false;              // user dragging the Max flow slider — defer status echo
+  var satModDirty = false;              // user dragging the Max relative modulation slider (TASK-1514)
   var SAT_MODE_LABELS = ['Off', 'Continuous', 'PWM'];      // control_mode enum
   var SAT_CYCLE_LABELS = ['None', 'Good', 'Overshoot', 'Underheat', 'Short', 'Uncertain', 'Underheat (PWM)', 'Insufficient'];  // last_cycle_class (6/7 added TASK-891.4)
   var SAT_PRESET_NAMES = ['None', 'Away', 'Eco', 'Comfort', 'Sleep', 'Activity', 'Home'];   // active_preset enum
@@ -4627,6 +4628,16 @@
     }
   }
 
+  // TASK-1514: Max relative modulation slider, 0-100 %. 100 = no cap (there is no "not chosen" state).
+  function satRenderMaxMod(d) {
+    var slider = document.getElementById('satModSlider');
+    if (!slider || satModDirty) return;
+    var v = satNum(d.max_rel_modulation);
+    if (v === null) { txt('satModR', '—'); return; }
+    slider.value = Math.round(v);
+    txt('satModR', Math.round(v) + ' %');
+  }
+
   // TASK-1232: a click on the curve plot adds a calibration marker; the list deletes
   // them. POST sat/markers {outside_temp,flow_temp,label} -> 201 {status,id}, 400 out of
   // range (-15..25 / 10..90), 409 at 20; DELETE sat/markers/<id> -> 200, 404 unknown id
@@ -4722,6 +4733,7 @@
     txt('satTargetT', satFmt(d.target_temp, 1, '°'));
     satRenderDhw(d);
     satRenderMaxTSet(d);
+    satRenderMaxMod(d);
     satRenderCycle(d);
     satDrawCurve(d);
     satKv('satControlStatus', [
@@ -5102,6 +5114,15 @@
       ms.addEventListener('change', function () {
         satMaxDirty = false;
         satPost('settings/max_setpoint', ms.value).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
+      });
+    }
+
+    var mm = document.getElementById('satModSlider');
+    if (mm) {
+      mm.addEventListener('input', function () { satModDirty = true; txt('satModR', mm.value + ' %'); });
+      mm.addEventListener('change', function () {
+        satModDirty = false;
+        satPost('settings/max_modulation', mm.value).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
       });
     }
 
