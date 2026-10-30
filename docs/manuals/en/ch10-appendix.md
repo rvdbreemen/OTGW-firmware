@@ -170,7 +170,6 @@ These are the factory defaults. All settings are configurable via the web UI Set
 | `satboilercapacity` | `24.0` | Boiler nominal capacity (kW) |
 | `satsumthreshold` | `18.0` | Summer simmer outdoor temperature threshold (°C) |
 | `satcontrolinterval` | `30` | Control loop interval (seconds) |
-| `satautotune` | `false` | Automatic PID gain tuning enabled |
 | `satheatingsystem` | `1` | 0=auto, 1=radiators, 2=heat pump, 3=underfloor |
 
 ---

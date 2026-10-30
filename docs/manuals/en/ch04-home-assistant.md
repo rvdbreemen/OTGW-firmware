@@ -337,7 +337,6 @@ Switches:
 | `SAT_Solar_Gain` | Enable solar gain compensation |
 | `SAT_Summer_Simmer` | Enable summer simmer index auto-disable |
 | `SAT_Multi_Area` | Enable multi-area weighted room temperature |
-| `SAT_Auto_Tune` | Enable automatic PID gain tuning |
 | `SAT_Simulation` | Run SAT in simulation mode (no real boiler control) |
 | `SAT_Window_Detection` | Enable window-open detection |
 | `SAT_Overshoot_Protection` | PWM start-up and modulation suppression (CS override in the PWM phases) |

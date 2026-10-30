@@ -2135,8 +2135,6 @@
     satpvboostdeltac:    { cat: 'sat', sub: 'PV boost', label: 'Setpoint boost', hint: '°C' },
     satpvboostmaxindoorc:{ cat: 'sat', sub: 'PV boost', label: 'Max indoor temp', hint: '°C' },
     satpvboostmaxdurationmin: { cat: 'sat', sub: 'PV boost', label: 'Max duration', hint: 'Minutes' },
-    satautotune:         { cat: 'sat', sub: 'PID auto-tune', label: 'Enable auto-tune' },
-    satautotunerate:     { cat: 'sat', sub: 'PID auto-tune', label: 'Auto-tune rate' },
     satsimulation:       { cat: 'sat', sub: 'Simulation', label: 'Enable simulation' },
     satsimheatrate:      { cat: 'sat', sub: 'Simulation', label: 'Heat rate', hint: '°C/min' },
     satsimcoolrate:      { cat: 'sat', sub: 'Simulation', label: 'Cool rate', hint: '°C/min' },
@@ -2171,7 +2169,7 @@
   var SAT_L3 = [
     ['Curve', ['satcoefficient', 'sattempstep', 'satovershootmargin']],
     ['PID / PWM', ['satovershootprotection', 'satcyclesperhour', 'satmaxmodulation',
-                   'satinterval', 'sathpcycle', 'satautotune', 'satautotunerate', 'satsolarfreezeint']],
+                   'satinterval', 'sathpcycle', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
     ['Boiler', ['satmanufacturer', 'satboilerratedkw', 'satboilerefficiency', 'satminconsumption', 'satmaxconsumption',
                 'satboilercapacity', 'satdhwcapacity', 'satmaxsetpoint',

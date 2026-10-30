@@ -480,7 +480,7 @@ Produced entity categories:
 - `binary_sensor`: 53 entries (PROGMEM table)
 - `climate`: 2 (Thermostat + DHW Control)
 - `number`: 1 (`Toutside_override`)
-- `switch` (SAT, TASK-284): 13 (solar gain, summer simmer, multi-area, auto-tune, simulation, window detection, push setpoint, preset sync, DHW enabled, DHW enable, overshoot protection, follow thermostat, external temp)
+- `switch` (SAT, TASK-284): 12 (solar gain, summer simmer, multi-area, simulation, window detection, push setpoint, preset sync, DHW enabled, DHW enable, overshoot protection, follow thermostat, external temp)
 - `select` (SAT, TASK-284): 1 (`sat_heating_system`, options `"0"`..`"3"`)
 - `sensor` (Dallas): runtime, one per detected 1-Wire address
 

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.561
+**  Version  : v2.0.0-alpha.562
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1056,10 +1056,6 @@ static void satSendHealthJSON()
     je.field(F("cycle_health"),        cycleHealth);
     je.field(F("cycle_class"),         ccNames[ccIdx]);
 
-    // Auto-tune (AC#8)
-    je.field(F("auto_tune_score"),     state.sat.fAutoTuneScore);
-    je.field(F("auto_tune_cycles"),    (int32_t)state.sat.iAutoTuneCycles);
-
     je.endObject();                   // close root
   }
   restFinalize();
@@ -1683,10 +1679,6 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATpresetsynctopic", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("multi_area")) == 0) {
       updateSetting("SATmultiarea", val); handled = true;
-    } else if (strcasecmp_P(settingName, PSTR("auto_tune")) == 0) {
-      updateSetting("SATautotune", val); handled = true;
-    } else if (strcasecmp_P(settingName, PSTR("auto_tune_rate")) == 0) {
-      updateSetting("SATautotunerate", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("multi_area_count")) == 0) {
       updateSetting("SATmultiareacount", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("heating_curve")) == 0) {
@@ -2284,7 +2276,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.solar_gain_enable"), settings.sat.bSolarGainEnable);
     je.field(F("settings.sat.summer_simmer"), settings.sat.bSummerSimmer);
     je.field(F("settings.sat.multi_area"), settings.sat.bMultiArea);
-    je.field(F("settings.sat.auto_tune"), settings.sat.bAutoTune);
     je.field(F("settings.sat.max_setpoint"), settings.sat.fMaxSetpoint);
     je.field(F("settings.sat.sensor_max_age"), (uint32_t)settings.sat.iSensorMaxAgeS);
     je.field(F("settings.sat.error_monitoring"), settings.sat.bErrorMonitoring);
@@ -2408,9 +2399,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("state.sat.area1_temp"), snap->st.sat.fAreaTemp[1]);
     je.field(F("state.sat.area2_temp"), snap->st.sat.fAreaTemp[2]);
     je.field(F("state.sat.area3_temp"), snap->st.sat.fAreaTemp[3]);
-    je.field(F("state.sat.auto_tune_active"), snap->st.sat.bAutoTuneActive);
-    je.field(F("state.sat.auto_tune_cycles"), (uint32_t)snap->st.sat.iAutoTuneCycles);
-    je.field(F("state.sat.auto_tune_score"), snap->st.sat.fAutoTuneScore);
 #if HAS_SAT_BLE
     je.field(F("state.sat.ble_temp"), snap->st.sat.fBleTemp);
     je.field(F("state.sat.ble_humidity"), snap->st.sat.fBleHumidity);
@@ -3973,13 +3961,6 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fAreaWeight[3], 1, 2, tmpBuf);
     addNum(F("satareaweight3"), tmpBuf, "f", 0, 10);
   }
-  // --- SAT PID Auto-Tuning settings (Task #27) ---
-  addBool(F("satautotune"), settings.sat.bAutoTune, "b");
-  {
-    char tmpBuf[8];
-    dtostrf(settings.sat.fAutoTuneRate, 1, 3, tmpBuf);
-    addNum(F("satautotunerate"), tmpBuf, "f", 0, 1);
-  }
   // --- SAT Python parity settings (Task #82) ---
   addInt(F("satsensormaxage"), (int32_t)settings.sat.iSensorMaxAgeS, "i", 60, 86400);
   addBool(F("saterrormon"), settings.sat.bErrorMonitoring, "b");
@@ -4168,7 +4149,6 @@ static const char* const PROGMEM knownSettings[] = {
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "satareaweight0", "satareaweight1", "satareaweight2", "satareaweight3",
-  "satautotune", "satautotunerate",
   "satbleenable", "satbleriskack", "satblefailover", "satbleinterval", "satblemac",
   "satblenamefilteringest", "satblenameprefix",  // TASK-895 filter; TASK-1231 made them settable
   "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient",

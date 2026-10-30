@@ -478,7 +478,7 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 
 #### Settings Echo Topics
 
-The following topics echo the current configured values. They are retained and published on change plus heartbeat, except `sat/auto_tune_rate` (see its row).
+The following topics echo the current configured values. They are retained and published on change plus heartbeat.
 
 | Topic | Example | Description |
 | ----- | ------- | ----------- |
@@ -503,8 +503,6 @@ The following topics echo the current configured values. They are retained and p
 | `sat/manufacturer` | `"Remeha"` | Detected/configured boiler manufacturer name |
 | `sat/manufacturer_id` | `"5"` | Configured manufacturer setting as a number (`SATmanufacturer`) |
 | `sat/simulation` | `"ON"` / `"OFF"` | Simulation mode setting (same value as `sat/simulation_enable`, other payload) |
-| `sat/auto_tune` | `"ON"` / `"OFF"` | Auto-tune setting (same value as `sat/auto_tune_enable`, other payload) |
-| `sat/auto_tune_rate` | `"0.020"` | Auto-tune learning rate. Not retained, and published only while auto-tune is on |
 | `sat/sensor_max_age` | `"300"` | Max age for external sensor readings (s) |
 | `sat/humidity_timeout_s` | `"600"` | Humidity reading timeout (s) |
 | `sat/error_monitoring` | `"true"` / `"false"` | Error-monitoring setting. It has no other effect today |
@@ -523,15 +521,6 @@ The example values are illustrative, not the defaults.
 | `sat/thermal_coeff` | `"0.05"` | yes | Learned thermal drop coefficient (°C/hr per °C delta) |
 | `sat/thermal_drop_rate` | `"0.03"` | no | Current thermal drop rate sample |
 | `sat/thermal_model_valid` | `"true"` | yes | Whether thermal model has sufficient data |
-
-#### Auto-tune
-
-Published only while auto-tune is on (`SATautotune`).
-
-| Topic | Value | Retained | Description |
-| ----- | ----- | -------- | ----------- |
-| `sat/auto_tune_score` | `"0.85"` | no | Auto-tune PID score |
-| `sat/auto_tune_active` | `"true"` / `"false"` | no | Auto-tune analysis running |
 
 #### Solar Gain
 
@@ -606,7 +595,6 @@ State topics for the SAT boolean switches. Payloads are `"true"` / `"false"`. Al
 | `sat/solar_gain_enable` | Solar gain compensation enable state |
 | `sat/summer_simmer_enable` | Summer simmer enable state |
 | `sat/multi_area_enable` | Multi-area averaging enable state |
-| `sat/auto_tune_enable` | Auto-tune analysis enable state |
 | `sat/simulation_enable` | Simulation mode enable state |
 | `sat/window_detection_enable` | Window detection enable state |
 | `sat/overshoot_protection_enable` | PWM overshoot protection (start-up and modulation suppression) enable state |
@@ -1060,7 +1048,6 @@ Payloads: `"true"` / `"false"`. Each of these corresponds to one of the auto-dis
 | `sat/solar_gain` | `SATsolargain` | Enable solar gain compensation |
 | `sat/summer_simmer` | `SATsummersimmer` | Enable summer simmer suppression |
 | `sat/multi_area` | `SATmultiarea` | Enable multi-area temperature averaging |
-| `sat/auto_tune` | `SATautotune` | Enable auto-tune analysis |
 | `sat/simulation` | `SATsimulation` | Enable simulation mode |
 | `sat/window_detection` | `SATwindowdetect` | Enable automatic window detection |
 | `sat/overshoot_protection` | `SATovershootprotection` | PWM overshoot protection: CS override in the PWM phases (default on) |
@@ -1103,7 +1090,6 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 | `sat/ble_failover` | `SATblefailover` | When the chosen BLE sensor goes stale, use another fresh sensor from the roster |
 | `sat/ble_interval` | `SATbleinterval` | BLE poll interval (s) |
 | `sat/preset_sync_topic` | `SATpresetsynctopic` | Preset-sync MQTT topic to subscribe to |
-| `sat/auto_tune_rate` | `SATautotunerate` | Auto-tune learning rate |
 | `sat/multi_area_count` | `SATmultiareacount` | Number of multi-area inputs |
 | `sat/mod_sup_delay` | `SATmodsupdelay` | Modulation suppression delay |
 | `sat/mod_sup_offset` | `SATmodsupoffset` | Modulation suppression offset |
@@ -1353,7 +1339,7 @@ Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-aud
 
 **BLE per-MAC entities:** see "Home Assistant auto-discovery" under BLE Temperature Sensor.
 
-The topics `sat/estimated_room`, `sat/humidity`, `sat/current_modulation`, `sat/pressure`, `sat/pressure_drop_rate`, `sat/manufacturer`, `sat/error_mean`, `sat/error_stddev`, `sat/thermal_*`, `sat/indoor_rise_rate`, `sat/curve_recommendation`, `sat/summer_*`, `sat/auto_tune_score`, `sat/window_open`, `sat/pressure_alarm`, `sat/pressure_health`, `sat/modulation_reliable`, `sat/setpoint_mismatch`, `sat/solar_gain`, `sat/humidity_valid`, `sat/auto_tune_active`, `sat/*_sync`, `sat/device_health` and `sat/cycle_health` are published but have no discovery entity. There is no SAT DHW-setpoint number entity.
+The topics `sat/estimated_room`, `sat/humidity`, `sat/current_modulation`, `sat/pressure`, `sat/pressure_drop_rate`, `sat/manufacturer`, `sat/error_mean`, `sat/error_stddev`, `sat/thermal_*`, `sat/indoor_rise_rate`, `sat/curve_recommendation`, `sat/summer_*`, `sat/window_open`, `sat/pressure_alarm`, `sat/pressure_health`, `sat/modulation_reliable`, `sat/setpoint_mismatch`, `sat/solar_gain`, `sat/humidity_valid`, `sat/*_sync`, `sat/device_health` and `sat/cycle_health` are published but have no discovery entity. There is no SAT DHW-setpoint number entity.
 
 **Switch entities (TASK-284):**
 
@@ -1365,7 +1351,6 @@ Each switch publishes its state to `%mqtt_pub_topic%/<state topic>` and takes co
 | `-sat-summer-simmer-enable` | `sat/summer_simmer` | `sat/summer_simmer_enable` | `mdi:weather-sunny-alert` |
 | `-sat-external-temp-enable` | `sat/external_temp` | `sat/external_temp_enable` | `mdi:home-thermometer` |
 | `-sat-multi-area-enable` | `sat/multi_area` | `sat/multi_area_enable` | `mdi:home-group` |
-| `-sat-auto-tune-enable` | `sat/auto_tune` | `sat/auto_tune_enable` | `mdi:auto-fix` |
 | `-sat-simulation-enable` | `sat/simulation` | `sat/simulation_enable` | `mdi:flask` |
 | `-sat-window-detection-enable` | `sat/window_detection` | `sat/window_detection_enable` | `mdi:window-open-variant` |
 | `-sat-push-setpoint-enable` | `sat/push_setpoint` | `sat/push_setpoint_enable` | `mdi:upload` |
@@ -1388,6 +1373,9 @@ Each switch publishes its state to `%mqtt_pub_topic%/<state topic>` and takes co
 | switch | `sat_force_pwm_enable` | `sat/force_pwm_enable` | TASK-1332 |
 | switch | `sat_pwm_auto_switch_enable` | `sat/pwm_auto_switch_enable` | TASK-1341 |
 | switch | `sat_comfort_adjust_enable` | `sat/comfort_adjust_enable` | TASK-1282 |
+| switch | `sat_auto_tune_enable` | `sat/auto_tune_enable` | TASK-1413 |
+
+TASK-1413 also empties the retained value topics `sat/auto_tune` and `sat/auto_tune_rate` (no discovery entity). The hourly heating-curve coefficient auto-tune is gone, with the `SATautotune` / `SATautotunerate` settings and the `auto_tune*` REST fields.
 
 The OPV switch (`sat_ovp_enabled`) is not in this list; it was removed earlier (TASK-891.6).
 

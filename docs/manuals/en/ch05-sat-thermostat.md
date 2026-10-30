@@ -55,7 +55,7 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/enabled" -m "tru
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.0"
 ```
 
-Every configurable SAT parameter has a matching MQTT command topic of the form `%mqtt_sub_topic%/sat/<name>`. The full set is declared in `MQTTstuff.ino` (`handleMQTTcallback`) and covers: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `heating_mode`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+Every configurable SAT parameter has a matching MQTT command topic of the form `%mqtt_sub_topic%/sat/<name>`. The full set is declared in `MQTTstuff.ino` (`handleMQTTcallback`) and covers: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `heating_mode`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
 
 Sending `ON` / `OFF` / `true` / `false` / `1` / `0` works for boolean topics. Numeric topics accept the usual decimal representation.
 
@@ -112,8 +112,6 @@ A per-system **cold cutoff** (COLD_SETPOINT: 28.2 C for radiators, 21.0 C for un
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
-| `satautotune` | false | bool | Enable automatic PID gains tuning |
-| `satautotunerate` | 0.02 | 0-1 | Adjustment rate per tuning cycle (2%) |
 
 The integral term uses a **symmetric clamp** `[-curveValue, +curveValue]` with a `+/-20 C` hard safety cap (alpha.28 / alpha.30). Negative accumulation is required in mild weather so the controller can nudge the flow setpoint below the heating curve when the room is slightly above target. The PID integral and raw derivative state are persisted on every save and **warm-started** on the next boot (alpha.32), so a power cycle does not reset to a cold start. `sat/flush` or an explicit `satdisable` clears the persisted state.
 
@@ -599,8 +597,8 @@ Inbound thermostat MsgID 16 frames are observed by the OTDirect state machine; t
 
 | HA component | Count | Examples |
 |---|---|---|
-| `number` | ~25 | heating curve coefficient, deadband, overshoot margin, control interval, max modulation, flame-off offset, flow offset, modulation-suppression delay/offset, boiler capacity, summer threshold, auto-tune rate, preset temperatures (comfort/eco/away/sleep/activity/home), min/max pressure, max pressure drop, target temp step |
-| `switch` | 13 | `solar_gain`, `summer_simmer`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable` |
+| `number` | ~25 | heating curve coefficient, deadband, overshoot margin, control interval, max modulation, flame-off offset, flow offset, modulation-suppression delay/offset, boiler capacity, summer threshold, preset temperatures (comfort/eco/away/sleep/activity/home), min/max pressure, max pressure drop, target temp step |
+| `switch` | 12 | `solar_gain`, `summer_simmer`, `multi_area`, `simulation`, `window_detection`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable` |
 | `select` | 1 | `sat_heating_system` with options `0` (auto), `1` (radiators), `2` (heat pump), `3` (underfloor) |
 
 Each entity writes to its matching `%mqtt_sub_topic%/sat/<parameter>` command topic and reads from the corresponding state topic. All changes go through `updateSetting()` so they are persisted to flash and clamped to safe bounds.
@@ -628,7 +626,6 @@ Each entity writes to its matching `%mqtt_sub_topic%/sat/<parameter>` command to
 | `binary_sensor.otgw_sat_setpoint_mismatch` | `sat/setpoint_mismatch` | Setpoint mismatch between SAT and boiler |
 | `binary_sensor.otgw_sat_thermal_model_valid` | `sat/thermal_model_valid` | Whether the thermal model has enough data |
 | `binary_sensor.otgw_sat_solar_gain` | `sat/solar_gain` | Solar gain compensation active |
-| `binary_sensor.otgw_sat_auto_tune_active` | `sat/auto_tune_active` | Auto-tune in progress |
 | `binary_sensor.otgw_sat_summer_active` | `sat/summer_active` | Summer suppression active |
 
 **Using an external sensor from Home Assistant**:

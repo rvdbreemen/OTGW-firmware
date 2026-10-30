@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.561
+**  Version  : v2.0.0-alpha.562
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -231,7 +231,7 @@ static void writeJsonIntKV(File& file, const __FlashStringHelper* key, int value
 }
 
 // decimals: 2 for every ordinary setting; coordinates need 5 (~1 m) and the
-// learned thermal coefficient / auto-tune rate need 4 (TASK-1336).
+// learned thermal coefficient needs 4 (TASK-1336).
 static void writeJsonFloatKV(File& file, const __FlashStringHelper* key, float value, uint8_t decimals = 2)
 {
   char valBuf[20];
@@ -387,8 +387,6 @@ bool writeSettings(bool show)
   writeJsonFloatKV(file, F("SATareaweight1"), settings.sat.fAreaWeight[1]);
   writeJsonFloatKV(file, F("SATareaweight2"), settings.sat.fAreaWeight[2]);
   writeJsonFloatKV(file, F("SATareaweight3"), settings.sat.fAreaWeight[3]);
-  writeJsonBoolKV(file, F("SATautotune"), settings.sat.bAutoTune);
-  writeJsonFloatKV(file, F("SATautotunerate"), settings.sat.fAutoTuneRate, 4);
   // SAT Python parity settings (Task #82)
   writeJsonIntKV(file, F("SATsensormaxage"), settings.sat.iSensorMaxAgeS);
   writeJsonBoolKV(file, F("SATerrormon"), settings.sat.bErrorMonitoring);
@@ -1149,8 +1147,6 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATareaweight1")) == 0) settings.sat.fAreaWeight[1] = clampSettingFloat(newValue, settings.sat.fAreaWeight[1], 0.0f, 10.0f);
   else if (strcasecmp_P(field, PSTR("SATareaweight2")) == 0) settings.sat.fAreaWeight[2] = clampSettingFloat(newValue, settings.sat.fAreaWeight[2], 0.0f, 10.0f);
   else if (strcasecmp_P(field, PSTR("SATareaweight3")) == 0) settings.sat.fAreaWeight[3] = clampSettingFloat(newValue, settings.sat.fAreaWeight[3], 0.0f, 10.0f);
-  else if (strcasecmp_P(field, PSTR("SATautotune")) == 0) settings.sat.bAutoTune = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("SATautotunerate")) == 0) settings.sat.fAutoTuneRate = clampSettingFloat(newValue, settings.sat.fAutoTuneRate, 0.005f, 0.1f);
   // SAT Python parity settings (Task #82)
   else if (strcasecmp_P(field, PSTR("SATsensormaxage")) == 0)  settings.sat.iSensorMaxAgeS = constrain((uint32_t)atol(newValue), 60UL, 86400UL);
   else if (strcasecmp_P(field, PSTR("SATerrormon")) == 0)      settings.sat.bErrorMonitoring = EVALBOOLEAN(newValue);

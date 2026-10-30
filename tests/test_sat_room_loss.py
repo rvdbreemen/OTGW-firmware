@@ -198,7 +198,7 @@ class SourceGuards(unittest.TestCase):
         self.assertIn("if (roomValid) {\n    roomTemp = satRoomFiltered(roomTemp);", self.src, "room EMA")
         self.assertIn("satPidOutput(curveValue)", self.src)
         self.assertIn("if (roomValid && state.sat.bFallbackActive && state.sat.iLastKnownRoomMs > 0)", self.src, "MQTT takeover thermal block")
-        self.assertIn("if (roomValid) {\n    satAutoTuneUpdate();", self.src, "auto-tune and statistics")
+        self.assertIn("if (roomValid) {\n    satUpdateCurveRecommendation();", self.src, "curve recommendation and statistics")
         self.assertIn("&& !roomLost) {", self.src, "PV boost start")
         self.assertIn("satPidCurveOnly(curveValue)", self.src)
 

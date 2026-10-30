@@ -2667,7 +2667,7 @@ paths:
 
         Add `?detail=full` to get the compact health view instead: a SEPARATE
         22-field object (schema `SatHealth`) focused on cycle/flame/device health,
-        sync flags, error statistics, pressure trend, and auto-tune progress. It is
+        sync flags, error statistics, and pressure trend. It is
         not a superset of the standard status.
       operationId: getSatStatus
       parameters:
@@ -4008,7 +4008,7 @@ paths:
         Updates any named SAT setting. This mirrors all MQTT `sat/<name>` command
         handlers. The setting name corresponds to the MQTT subtopic (e.g.,
         `heating_curve`, `deadband`, `boiler_capacity`, `heating_system`,
-        `overshoot_margin`, `manufacturer`, `simulation`, `auto_tune`, etc.).
+        `overshoot_margin`, `manufacturer`, `simulation`, etc.).
 
         The special no-value command `reset_integral` is also accepted here
         without a body.
@@ -4460,21 +4460,6 @@ components:
         sim_available:
           type: boolean
           description: "Simulation mode available on this build"
-        auto_tune:
-          type: boolean
-          description: "Auto-tune enabled"
-        auto_tune_active:
-          type: boolean
-          description: "Auto-tune currently running"
-        auto_tune_cycles:
-          type: integer
-          description: "Auto-tune cycles completed"
-        auto_tune_score:
-          type: number
-          description: "Auto-tune fit score"
-        auto_tune_rate:
-          type: number
-          description: "Auto-tune learning rate"
         sensor_max_age:
           type: integer
           description: "Maximum sensor age before stale (s)"
@@ -4626,11 +4611,6 @@ components:
         humidity_valid: false
         simulation: false
         sim_available: true
-        auto_tune: false
-        auto_tune_active: false
-        auto_tune_cycles: 0
-        auto_tune_score: 0.0
-        auto_tune_rate: 0.02
         sensor_max_age: 21600
         error_monitoring: false
         thermal_comfort: false
@@ -4652,7 +4632,7 @@ components:
         Compact SAT health view returned by `GET /v2/sat/status?detail=full`.
         This is a SEPARATE 22-field object, not a superset of `SatStatus`:
         it focuses on cycle/flame/device health, sync flags, error statistics,
-        pressure trend, and auto-tune progress. Consumers must ignore unknown keys.
+        and pressure trend. Consumers must ignore unknown keys.
       properties:
         sync_setpoint:
           type: boolean
@@ -4711,12 +4691,6 @@ components:
         cycle_class:
           type: string
           description: "Last cycle classification (none/good/overshoot/underheat/short/uncertain)"
-        auto_tune_score:
-          type: number
-          description: "Auto-tune fit score"
-        auto_tune_cycles:
-          type: integer
-          description: "Auto-tune cycles completed"
         ovp_phase:
           type: integer
           description: "Overshoot-protection calibration phase"
@@ -4740,8 +4714,6 @@ components:
         device_health: false
         cycle_health: true
         cycle_class: "none"
-        auto_tune_score: 0.0
-        auto_tune_cycles: 0
         ovp_phase: 0
 
     ApiError:

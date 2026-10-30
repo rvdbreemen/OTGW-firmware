@@ -61,7 +61,7 @@ Onderwerp: OTGW/set/otgw-AABBCCDDEEFF/sat/enabled
 Waarde:    true
 ```
 
-Elke configureerbare SAT-parameter heeft een MQTT-commandotopic van de vorm `%mqtt_sub_topic%/sat/<naam>`. De volledige set wordt gedeclareerd in `MQTTstuff.ino` (`handleMQTTcallback`) en omvat onder andere: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `heating_mode`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+Elke configureerbare SAT-parameter heeft een MQTT-commandotopic van de vorm `%mqtt_sub_topic%/sat/<naam>`. De volledige set wordt gedeclareerd in `MQTTstuff.ino` (`handleMQTTcallback`) en omvat onder andere: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `heating_mode`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
 
 Voor booleaanse topics werken `ON` / `OFF` / `true` / `false` / `1` / `0`. Numerieke topics accepteren de gebruikelijke decimale notatie.
 
@@ -118,8 +118,6 @@ Een **cold cutoff** per systeem (COLD_SETPOINT: 28,2 C voor radiatoren, 21,0 C v
 
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
-| `satautotune` | `false` | bool | Automatische PID-gains bijsturing inschakelen |
-| `satautotunerate` | `0.02` | 0-1 | Bijstellingspercentage per afstemcyclus (2%) |
 
 De integraalterm gebruikt een **symmetrische clamp** `[-curveValue, +curveValue]` met een harde veiligheidsgrens van `+/-20 C` (alpha.28 / alpha.30). Negatieve accumulatie is nodig bij mild weer zodat de regelaar het flow-setpoint onder de verwarmingscurve kan trekken wanneer de kamer licht boven het doel zit. De PID-integraal en de ruwe-afgeleide-toestand worden bij elke save gepersisteerd en bij de volgende boot **warm gestart** (alpha.32), dus een power cycle leidt niet tot een cold start. `sat/flush` of een expliciete `satdisable` wist de gepersisteerde state.
 
@@ -645,8 +643,8 @@ Sinds 2.0.0 worden alle bestuurbare SAT-parameters als aparte HA-entiteiten gepu
 
 | HA-component | Aantal | Voorbeelden |
 |---|---|---|
-| `number` | ~25 | verwarmingscurve-coefficient, deadband, overshoot-marge, regelinterval, max modulatie, flame-off offset, flow offset, mod-sup delay/offset, ketelcapaciteit, zomerdrempel, auto-tune rate, preset-temperaturen (comfort/eco/away/sleep/activity/home), min/max druk, max drukval, target temp step |
-| `switch` | 13 | `solar_gain`, `summer_simmer`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable` |
+| `number` | ~25 | verwarmingscurve-coefficient, deadband, overshoot-marge, regelinterval, max modulatie, flame-off offset, flow offset, mod-sup delay/offset, ketelcapaciteit, zomerdrempel, preset-temperaturen (comfort/eco/away/sleep/activity/home), min/max druk, max drukval, target temp step |
+| `switch` | 12 | `solar_gain`, `summer_simmer`, `multi_area`, `simulation`, `window_detection`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable` |
 | `select` | 1 | `sat_heating_system` met opties `0` (auto), `1` (radiatoren), `2` (warmtepomp), `3` (vloerverwarming) |
 
 Elke entiteit schrijft naar het bijbehorende `%mqtt_sub_topic%/sat/<parameter>` commandotopic en leest uit het bijbehorende state-topic. Alle wijzigingen lopen via `updateSetting()` en worden dus naar flash gepersisteerd en binnen veilige grenzen geklemd.
@@ -676,7 +674,6 @@ SAT publiceert ook afzonderlijke diagnostische entiteiten via auto-discovery:
 | `binary_sensor.otgw_sat_setpoint_mismatch` | `sat/setpoint_mismatch` | Setpoint-mismatch tussen SAT en ketel |
 | `binary_sensor.otgw_sat_thermal_model_valid` | `sat/thermal_model_valid` | Of het thermisch model voldoende data heeft |
 | `binary_sensor.otgw_sat_solar_gain` | `sat/solar_gain` | Solar gain compensatie actief |
-| `binary_sensor.otgw_sat_auto_tune_active` | `sat/auto_tune_active` | Auto-tune bezig |
 | `binary_sensor.otgw_sat_summer_active` | `sat/summer_active` | Zomeronderdrukking actief |
 
 #### Externe ruimtetemperatuur doorsturen

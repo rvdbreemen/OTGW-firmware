@@ -3402,9 +3402,9 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
       break;
     case 4:
       published = streamSatBoolSwitch(ctx,
-        PSTR("-sat-auto-tune-enable"),        PSTR("_SAT_Auto_Tune"),
-        PSTR("/sat/auto_tune"),               PSTR("/sat/auto_tune_enable"),
-        PSTR("mdi:auto-fix"));
+        PSTR("-sat-follow-thermostat-enable"), PSTR("_SAT_Follow_Thermostat"),
+        PSTR("/sat/follow_thermostat"),       PSTR("/sat/follow_thermostat_enable"),
+        PSTR("mdi:thermostat"));
       break;
     case 5:
       published = streamSatBoolSwitch(ctx,
@@ -3449,12 +3449,6 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
         PSTR("-sat-overshoot-protection-enable"), PSTR("_SAT_Overshoot_Protection"),
         PSTR("/sat/overshoot_protection"),    PSTR("/sat/overshoot_protection_enable"),
         PSTR("mdi:shield-check"));
-      break;
-    case 12:
-      published = streamSatBoolSwitch(ctx,
-        PSTR("-sat-follow-thermostat-enable"), PSTR("_SAT_Follow_Thermostat"),
-        PSTR("/sat/follow_thermostat"),       PSTR("/sat/follow_thermostat_enable"),
-        PSTR("mdi:thermostat"));
       break;
     default:
       return false;
@@ -3820,6 +3814,9 @@ static const RetiredSatEntity kRetiredSatEntities[] PROGMEM = {
   { nullptr, nullptr, "/sat/ovp_value" },   // RETIRED-SAT-ENTITY TASK-1460: retained value topic, no entity
   { nullptr, nullptr, "/sat/auto_gains_value" },   // RETIRED-SAT-ENTITY TASK-1357: retained value topic, no entity
   { nullptr, nullptr, "/sat/ssi" },   // RETIRED-SAT-ENTITY TASK-1485: duplicate of sat/summer_simmer_index, no entity
+  { "switch", "sat_auto_tune_enable", "/sat/auto_tune_enable" },   // RETIRED-SAT-ENTITY TASK-1413: hourly coefficient auto-tune removed (entry 72)
+  { nullptr, nullptr, "/sat/auto_tune" },   // RETIRED-SAT-ENTITY TASK-1413: retained state topic, no entity
+  { nullptr, nullptr, "/sat/auto_tune_rate" },   // RETIRED-SAT-ENTITY TASK-1413: retained value topic, no entity
   { nullptr, nullptr, "/sat/deadband" },   // RETIRED-SAT-ENTITY TASK-1417: retained value topic, no entity (entry 76)
 };
 

@@ -219,7 +219,7 @@ De Expert-weergave voegt secties toe voor:
 - **Control status**: huidige modus, ketelstatus, actieve preset, verwarmingssysteemtype, PID-output, fout, coefficient, deadband, overshoot margin, modulatiewaarden en OVP-kalibratie.
 - **PID-controller**: individuele P-, I-, D-termen en afstemparameters (Kp, Ki, Kd).
 - **PWM en cyclustracking**: duty cycle, vlamstatus, cyclusaantal, overshoot-data.
-- **Slimme functies**: solar gain, zomermodus, thermisch leren, simmer index, auto-tune status.
+- **Slimme functies**: solar gain, zomermodus, thermisch leren, simmer index.
 - **Externe sensoren**: statusindicatoren voor binnen- en buitensensorbronnen.
 
 De Diagnostics-weergave voegt toe:

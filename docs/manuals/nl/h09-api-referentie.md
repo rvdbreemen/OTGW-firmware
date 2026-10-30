@@ -417,7 +417,7 @@ Meest recente crash-logboek opvragen. Retourneert een leeg object als er geen cr
 
 Smart Autotune Thermostat status opvragen. Authenticatie vereist. Alias: `GET /api/v2/sat/status`.
 
-Voeg `?detail=full` toe voor uitgebreide diagnostiek, waaronder synchronisatie-gezondheid, drukmetrieken, cyclusdiagnostiek, PID-foutstatistieken en auto-tune scores.
+Voeg `?detail=full` toe voor uitgebreide diagnostiek, waaronder synchronisatie-gezondheid, drukmetrieken, cyclusdiagnostiek, PID-foutstatistieken.
 
 **Antwoord (fragment):**
 ```json
@@ -502,7 +502,7 @@ Buitentemperatuur aanleveren vanuit een externe bron. Overschrijft de OT MsgID 2
 
 ##### POST /api/v2/sat/settings/{naam}
 
-Het volledige instellingenvocabulaire bevat onder andere: `heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `max_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `push_setpoint`, `follow_thermostat`, `flame_off_offset`, `overshoot_protection`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `auto_tune`, `auto_tune_rate`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `sensor_max_age`, `error_monitoring`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`. De naam `reset_integral` accepteert geen waarde. Onbekende namen retourneren HTTP 404.
+Het volledige instellingenvocabulaire bevat onder andere: `heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `max_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `push_setpoint`, `follow_thermostat`, `flame_off_offset`, `overshoot_protection`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `sensor_max_age`, `error_monitoring`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`. De naam `reset_integral` accepteert geen waarde. Onbekende namen retourneren HTTP 404.
 
 ##### GET / POST / DELETE /api/v2/sat/markers
 
@@ -1051,8 +1051,6 @@ De onderstaande commando's geven de payload ongewijzigd door aan de genoemde ins
 | `sat/preset_sync_topic` | `SATpresetsynctopic` |
 | `sat/multi_area` | `SATmultiarea` |
 | `sat/multi_area_count` | `SATmultiareacount` |
-| `sat/auto_tune` | `SATautotune` |
-| `sat/auto_tune_rate` | `SATautotunerate` |
 | `sat/heating_curve_coeff` | `SATcoefficient` |
 | `sat/mod_sup_delay` | `SATmodsupdelay` |
 | `sat/mod_sup_offset` | `SATmodsupoffset` |

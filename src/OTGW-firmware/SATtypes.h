@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.561
+**  Version  : v2.0.0-alpha.562
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -385,10 +385,6 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fAreaTemp[4]           = {0};    // Temperature per area
   bool     bAreaValid[4]          = {false};// Area has valid reading
   uint32_t iAreaLastMs[4]         = {0};    // Last update per area
-  // PID auto-tuning (Task #27)
-  bool     bAutoTuneActive        = false;  // Currently running auto-tune analysis
-  uint16_t iAutoTuneCycles        = 0;      // Cycles analyzed since last adjustment
-  float    fAutoTuneScore         = 0.0f;   // Current performance score (-1 to +1)
   // Last-sent OT command cache (TASK-565). Write-on-change for the
   // CS/MM/CH/TC commands the SAT loop emits every control cycle, so an
   // unchanged value is not re-enqueued every 30 s. Refreshed every
@@ -545,9 +541,6 @@ struct SATSection {
   bool     bMultiArea         = false;  // Enable multi-area weighted temperature
   uint8_t  iMultiAreaCount    = 0;      // Number of configured areas (0-4)
   float    fAreaWeight[4]     = {1.0f, 1.0f, 1.0f, 1.0f};  // Weight per area
-  // PID auto-tuning (Task #27)
-  bool     bAutoTune          = false;  // Enable automatic PID gains tuning
-  float    fAutoTuneRate      = 0.02f;  // Adjustment rate per tuning cycle (2%)
   // SAT Python parity settings (Task #82)
   float    fMaxSetpoint        = 65.0f; // Global safety ceiling for all heating systems (Python MAXIMUM_SETPOINT)
   uint32_t iSensorMaxAgeS     = 21600; // Max age of sensor reading before considered stale (seconds, 6h default)

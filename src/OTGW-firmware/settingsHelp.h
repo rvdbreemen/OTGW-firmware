@@ -175,8 +175,6 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satpvboostdeltac":"Target increase during the boost, 0.5 to 5 °C. Default 1.5.",
 "satpvboostmaxindoorc":"No boost at or above this indoor temperature, 18 to 28 °C. Default 23.",
 "satpvboostmaxdurationmin":"Longest continuous boost in minutes, 30 to 1440. Default 240. A 30 minute cooldown follows.",
-"satautotune":"Let SAT tune the heating curve coefficient itself (kept between 0.3 and 5). Default off.",
-"satautotunerate":"Size of each tuning adjustment as a fraction. Default 0.02 (2 %).",
 "satsimulation":"Run SAT against a simulated boiler; nothing reaches the real one. Refused when a boiler answers.",
 "satsimheatrate":"Simulated room heating rate in °C per minute while the flame is on. Default 0.5.",
 "satsimcoolrate":"Simulated room cooling rate in °C per minute. Default 0.1.",

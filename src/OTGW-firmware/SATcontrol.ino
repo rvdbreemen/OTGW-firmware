@@ -3742,12 +3742,6 @@ void satSendStatusJSON()
         je.endArray();
       }
     }
-    // PID auto-tuning (Task #27)
-    je.field(F("auto_tune"),            settings.sat.bAutoTune);
-    je.field(F("auto_tune_active"),     snap->st.sat.bAutoTuneActive);
-    je.field(F("auto_tune_cycles"),     (int32_t)snap->st.sat.iAutoTuneCycles);
-    je.field(F("auto_tune_score"),      snap->st.sat.fAutoTuneScore);
-    je.field(F("auto_tune_rate"),       settings.sat.fAutoTuneRate);
     // SAT Python parity settings (Task #82)
     je.field(F("sensor_max_age"),       (int32_t)settings.sat.iSensorMaxAgeS);
     je.field(F("error_monitoring"),     settings.sat.bErrorMonitoring);
@@ -3913,7 +3907,6 @@ void satPublishMQTT()
   static SATShadowF s_thermal_coeff, s_thermal_drop_rate, s_estimated_room;
   static SATShadowF s_indoor_rise_rate, s_sun_elevation;
   static SATShadowF s_summer_hours_above, s_humidity;
-  static SATShadowF s_auto_tune_score, s_auto_tune_rate;
   static SATShadowF s_valve_offset;
   static SATShadowF s_area_0, s_area_1, s_area_2, s_area_3;
   static SATShadowF s_summer_simmer_index;
@@ -3938,13 +3931,13 @@ void satPublishMQTT()
   static SATShadowB s_thermal_model_valid;
   static SATShadowB s_solar_gain_active, s_summer_active;
   static SATShadowB s_humidity_valid;
-  static SATShadowB s_simulation, s_auto_tune, s_auto_tune_active;
+  static SATShadowB s_simulation;
   static SATShadowS s_sim_last_cmd;  // TASK-795 §4.3: sat/sim/last_cmd trace
   static SATShadowB s_error_monitoring, s_solar_freeze_integral;
   static SATShadowB s_device_health, s_cycle_health;
   static SATShadowB s_setpoint_sync, s_modulation_sync, s_ch_sync;
   static SATShadowB s_solar_gain_enable, s_summer_simmer_enable;
-  static SATShadowB s_thermal_comfort, s_multi_area_enable, s_auto_tune_enable;
+  static SATShadowB s_thermal_comfort, s_multi_area_enable;
   static SATShadowB s_simulation_enable, s_window_detection_enable, s_overshoot_protection_enable, s_follow_thermostat_enable;
   static SATShadowB s_push_setpoint_enable, s_preset_sync_enable;
   static SATShadowB s_dhw_enabled, s_dhw_enable;
@@ -4188,19 +4181,13 @@ void satPublishMQTT()
   publishIfChangedB(F("sat/humidity_valid"), state.sat.bHumidityValid,  s_humidity_valid,  false);
 
   // ---------------------------------------------------------------------------
-  // Simulation, auto-tune. Both use "ON"/"OFF" payloads historically.
+  // Simulation. It uses "ON"/"OFF" payloads historically.
   // ---------------------------------------------------------------------------
   publishIfChangedBStr(F("sat/simulation"), settings.sat.bSimulation, s_simulation, "ON", "OFF", true);
   // TASK-795 §4.3: surface the last would-be (blocked) command while simulating.
   // Publish-on-change, NOT retained — its meaning is transient and ends with sim.
   if (settings.sat.bSimulation) {
     publishIfChangedS(F("sat/sim/last_cmd"), state.sat.sLastBlockedCmd, s_sim_last_cmd, false);
-  }
-  publishIfChangedBStr(F("sat/auto_tune"),  settings.sat.bAutoTune,   s_auto_tune,  "ON", "OFF", true);
-  if (settings.sat.bAutoTune) {
-    publishIfChangedF(F("sat/auto_tune_score"),  state.sat.fAutoTuneScore,    s_auto_tune_score,  SAT_EPS_FRACTION, 2, false);
-    publishIfChangedF(F("sat/auto_tune_rate"),   settings.sat.fAutoTuneRate,  s_auto_tune_rate,   SAT_EPS_FRACTION, 3, false);
-    publishIfChangedB(F("sat/auto_tune_active"), state.sat.bAutoTuneActive,   s_auto_tune_active, false);
   }
 
   // ---------------------------------------------------------------------------
@@ -4394,7 +4381,6 @@ void satPublishMQTT()
   publishIfChangedB(F("sat/thermal_comfort"),         settings.sat.bThermalComfort,   s_thermal_comfort,         true);
   publishIfChangedI(F("sat/humidity_timeout_s"),      (int32_t)settings.sat.iHumidityTimeoutS, s_humidity_timeout_s, true);
   publishIfChangedB(F("sat/multi_area_enable"),       settings.sat.bMultiArea,        s_multi_area_enable,       true);
-  publishIfChangedB(F("sat/auto_tune_enable"),        settings.sat.bAutoTune,         s_auto_tune_enable,        true);
   publishIfChangedB(F("sat/simulation_enable"),       settings.sat.bSimulation,       s_simulation_enable,       true);
   publishIfChangedB(F("sat/window_detection_enable"), settings.sat.bWindowDetection,  s_window_detection_enable, true);
   publishIfChangedB(F("sat/overshoot_protection_enable"), settings.sat.bOvershootProtection, s_overshoot_protection_enable, true);
@@ -5548,144 +5534,6 @@ static void satUpdateSummerSimmer()
   }
 }
 
-//=====================================================================
-//=== PID Auto-Tuning (Task #27) ===
-//=====================================================================
-// Performance-based PID gain self-tuning. Monitors overshoot/undershoot/
-// oscillation over time and applies small conservative adjustments once
-// per hour (with at least 6 heating cycles of data).
-
-// Gain clamp ranges
-static const float AT_KP_MIN = 0.5f;
-static const float AT_KP_MAX = 50.0f;
-static const float AT_KI_MIN = 0.0001f;
-static const float AT_KI_MAX = 0.01f;
-static const float AT_KD_MIN = 0.0f;
-static const float AT_KD_MAX = 500.0f;
-
-// Tracking state (static, never persisted)
-static uint16_t _at_overshootCount    = 0;
-static uint16_t _at_undershootCount   = 0;
-static uint16_t _at_oscillationCount  = 0;
-static float    _at_convergenceSum    = 0.0f;  // sum of convergence times (minutes)
-static uint16_t _at_convergenceN      = 0;     // number of convergence samples
-static uint32_t _at_lastTuneMs        = 0;
-static uint32_t _at_cyclesSinceTune   = 0;
-static bool     _at_prevOvershoot     = false;  // for oscillation detection
-static const uint32_t AT_TUNE_INTERVAL_MS = 3600000UL; // 1 hour
-static const uint8_t  AT_MIN_CYCLES       = 6;
-
-static void satAutoTuneUpdate()
-{
-  if (!settings.sat.bAutoTune || !state.sat.bActive) {
-    state.sat.bAutoTuneActive = false;
-    return;
-  }
-  state.sat.bAutoTuneActive = true;
-
-  // --- Accumulate per-cycle metrics from cycle tracker ---
-  // Check if a new cycle just completed (cycle count changed)
-  static uint32_t _at_lastCycleCount = 0;
-  if (state.sat.iCycleCount > _at_lastCycleCount) {
-    _at_lastCycleCount = state.sat.iCycleCount;
-    _at_cyclesSinceTune++;
-
-    // Classify the completed cycle
-    bool isOvershoot = (state.sat.eLastCycleClass == SAT_CYCLE_OVERSHOOT);
-    bool isUnderheat = (state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT ||
-                        state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT_PWM);
-
-    if (isOvershoot) _at_overshootCount++;
-    if (isUnderheat) _at_undershootCount++;
-
-    // Oscillation: alternating overshoot/undershoot
-    if (isOvershoot && !_at_prevOvershoot && _at_undershootCount > 0) _at_oscillationCount++;
-    if (isUnderheat && _at_prevOvershoot && _at_overshootCount > 0) _at_oscillationCount++;
-    _at_prevOvershoot = isOvershoot;
-
-    // Track convergence time from cycle overshoot seconds (proxy for settling)
-    if (state.sat.fCycleOvershootSec > 0.0f) {
-      _at_convergenceSum += state.sat.fCycleOvershootSec / 60.0f;
-      _at_convergenceN++;
-    }
-  }
-
-  state.sat.iAutoTuneCycles = _at_cyclesSinceTune;
-
-  // --- Check if it is time to tune ---
-  uint32_t now = millis();
-  if (_at_lastTuneMs == 0) _at_lastTuneMs = now;
-
-  if ((now - _at_lastTuneMs) < AT_TUNE_INTERVAL_MS) return;
-  if (_at_cyclesSinceTune < AT_MIN_CYCLES) return;
-
-  // --- Analyze and adjust ---
-  float rate = settings.sat.fAutoTuneRate;
-  uint16_t totalCycles = _at_overshootCount + _at_undershootCount;
-  if (totalCycles == 0) totalCycles = 1;  // avoid divide-by-zero
-
-  // Score: positive = overshoot dominant, negative = undershoot dominant
-  float score = (float)((int16_t)_at_overshootCount - (int16_t)_at_undershootCount) / (float)totalCycles;
-  state.sat.fAutoTuneScore = score;
-
-  float avgConvergence = (_at_convergenceN > 0) ? (_at_convergenceSum / (float)_at_convergenceN) : 0.0f;
-
-  // Read current gains from PID auto-gain calculation (state.sat.fKp/fKi/fKd)
-  // We adjust the heating curve coefficient which drives gain calculation
-  float coeff = settings.sat.fHeatingCurveCoeff;
-  bool adjusted = false;
-
-  // Oscillation dominates: strong damping needed
-  if (_at_oscillationCount > _at_cyclesSinceTune / 3) {
-    coeff *= (1.0f - rate * 2.0f);
-    adjusted = true;
-    SATDebugTf(PSTR("SAT AutoTune: oscillation detected (%u/%lu), reducing coeff\r\n"),
-            _at_oscillationCount, (unsigned long)_at_cyclesSinceTune);
-  }
-  // Overshoot dominant: reduce aggression
-  else if (score > 0.3f) {
-    coeff *= (1.0f - rate);
-    adjusted = true;
-    SATDebugTf(PSTR("SAT AutoTune: overshoot dominant (score=%.2f), reducing coeff\r\n"), score);
-  }
-  // Undershoot dominant: increase aggression
-  else if (score < -0.3f) {
-    coeff *= (1.0f + rate);
-    adjusted = true;
-    SATDebugTf(PSTR("SAT AutoTune: undershoot dominant (score=%.2f), increasing coeff\r\n"), score);
-  }
-
-  // Slow convergence: slightly increase coefficient (faster response)
-  if (avgConvergence > 30.0f && !adjusted) {
-    coeff *= (1.0f + rate * 0.5f);
-    adjusted = true;
-    SATDebugTf(PSTR("SAT AutoTune: slow convergence (%.1f min), increasing coeff\r\n"), avgConvergence);
-  }
-
-  // Clamp coefficient to reasonable range
-  if (coeff < 0.3f) coeff = 0.3f;
-  if (coeff > 5.0f) coeff = 5.0f;
-
-  if (adjusted) {
-    settings.sat.fHeatingCurveCoeff = coeff;
-    SATDebugTf(PSTR("SAT AutoTune: new coefficient=%.2f (cycles=%lu, os=%u, us=%u, osc=%u)\r\n"),
-            coeff, (unsigned long)_at_cyclesSinceTune,
-            _at_overshootCount, _at_undershootCount, _at_oscillationCount);
-
-    // Persist updated coefficient
-    writeSettings(false);
-  }
-
-  // Reset counters for next tuning window
-  _at_overshootCount   = 0;
-  _at_undershootCount  = 0;
-  _at_oscillationCount = 0;
-  _at_convergenceSum   = 0.0f;
-  _at_convergenceN     = 0;
-  _at_cyclesSinceTune  = 0;
-  _at_lastTuneMs       = now;
-}
-
 // MQTT-loss takeover (Task #19, opt-in since TASK-1345). Lives in state only: it sets
 // state.sat.bFallbackActive and never writes settings.sat.bEnabled, so a settings save during an
 // outage cannot persist it. Returns true when the control loop must stop for this tick.
@@ -6079,10 +5927,9 @@ static void satControlLoopRun()
     return;
   }
 
-  // --- PID auto-tuning (Task #27), curve recommendation, daily median sample ---
+  // --- Curve recommendation, daily median sample ---
   // They learn from the room error, so they stand still while the room temperature is lost.
   if (roomValid) {
-    satAutoTuneUpdate();
     satUpdateCurveRecommendation();   // Heating curve recommendation
     satHCRAddSample();                // Task #228: collect intra-day sample
   }

@@ -1135,7 +1135,6 @@ When MQTT is enabled, SAT entities are automatically discovered by Home Assistan
 | `binary_sensor.otgw_sat_setpoint_mismatch` | `sat/setpoint_mismatch` | Setpoint mismatch between SAT and boiler |
 | `binary_sensor.otgw_sat_thermal_model_valid` | `sat/thermal_model_valid` | Whether the thermal model has enough data |
 | `binary_sensor.otgw_sat_solar_gain` | `sat/solar_gain` | Solar gain compensation active |
-| `binary_sensor.otgw_sat_auto_tune_active` | `sat/auto_tune_active` | Auto-tune in progress |
 
 **Using an external sensor from Home Assistant**:
 
@@ -3216,8 +3215,6 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/preset_sync_topic` | `SATpresetsynctopic` |
 | `sat/multi_area` | `SATmultiarea` |
 | `sat/multi_area_count` | `SATmultiareacount` |
-| `sat/auto_tune` | `SATautotune` |
-| `sat/auto_tune_rate` | `SATautotunerate` |
 | `sat/heating_curve_coeff` | `SATcoefficient` |
 | `sat/mod_sup_delay` | `SATmodsupdelay` |
 | `sat/mod_sup_offset` | `SATmodsupoffset` |
@@ -3521,7 +3518,6 @@ These are the factory defaults. All settings are configurable via the web UI Set
 | `satdhwcapacity` | `0.0` | Capacity (kW) used while the boiler reports DHW active; 0 = use `satboilercapacity` |
 | `satsumthreshold` | `18.0` | Summer simmer outdoor temperature threshold (°C) |
 | `satcontrolinterval` | `30` | Control loop interval (seconds) |
-| `satautotune` | `false` | Automatic PID gain tuning enabled |
 | `satheatingsystem` | `1` | 0=auto, 1=radiators, 2=heat pump, 3=underfloor |
 
 ---

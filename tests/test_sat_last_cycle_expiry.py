@@ -110,9 +110,9 @@ class PublishersUseIt(unittest.TestCase):
                              name + " reads the raw last cycle class")
         self.assertIn("satReportedLastCycleClass", self.src("restAPI.ino"))
 
-    def test_sat_control_raw_reads_only_in_autotune(self):
+    def test_sat_control_has_no_raw_last_cycle_class_read(self):
         raw = [l for l in self.src("SATcontrol.ino").splitlines() if "state.sat.eLastCycleClass" in l]
-        self.assertEqual(len(raw), 3, raw)   # satAutoTuneUpdate(): reads right after a new cycle, never stale
+        self.assertEqual(len(raw), 0, raw)   # the only raw reader was the removed auto-tune (TASK-1413)
         self.assertIn("satReportedLastCycleClass", self.src("SATcontrol.ino"))
 
     def test_end_time_recorded_with_class(self):

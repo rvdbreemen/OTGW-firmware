@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.561
+**  Version  : v2.0.0-alpha.562
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -704,8 +704,6 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "preset_sync_topic",      "SATpresetsynctopic",   nullptr },
   { "multi_area",             "SATmultiarea",         nullptr },
   { "multi_area_count",       "SATmultiareacount",    nullptr },
-  { "auto_tune",              "SATautotune",          nullptr },
-  { "auto_tune_rate",         "SATautotunerate",      nullptr },
   { "heating_curve_coeff",    "SATcoefficient",       nullptr },  // TASK-1485: was "heating_curve"
   { "mod_sup_delay",          "SATmodsupdelay",       nullptr },
   { "mod_sup_offset",         "SATmodsupoffset",      nullptr },

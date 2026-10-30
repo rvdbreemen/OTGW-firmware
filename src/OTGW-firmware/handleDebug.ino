@@ -106,7 +106,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("solar_gain_enable: %s\r\n"), settings.sat.bSolarGainEnable ? "true" : "false");
     Debugf(PSTR("summer_simmer: %s\r\n"), settings.sat.bSummerSimmer ? "true" : "false");
     Debugf(PSTR("multi_area: %s\r\n"), settings.sat.bMultiArea ? "true" : "false");
-    Debugf(PSTR("auto_tune: %s\r\n"), settings.sat.bAutoTune ? "true" : "false");
     Debugf(PSTR("max_setpoint: %.1f\r\n"), settings.sat.fMaxSetpoint);
     Debugf(PSTR("sensor_max_age_s: %lu\r\n"), (unsigned long)settings.sat.iSensorMaxAgeS);
     Debugf(PSTR("error_monitoring: %s\r\n"), settings.sat.bErrorMonitoring ? "true" : "false");
@@ -258,9 +257,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("area1_temp: %.1f\r\n"), state.sat.fAreaTemp[1]);
     Debugf(PSTR("area2_temp: %.1f\r\n"), state.sat.fAreaTemp[2]);
     Debugf(PSTR("area3_temp: %.1f\r\n"), state.sat.fAreaTemp[3]);
-    Debugf(PSTR("auto_tune_active: %s\r\n"), state.sat.bAutoTuneActive ? "true" : "false");
-    Debugf(PSTR("auto_tune_cycles: %u\r\n"), (unsigned)state.sat.iAutoTuneCycles);
-    Debugf(PSTR("auto_tune_score: %.3f\r\n"), state.sat.fAutoTuneScore);
 #if HAS_SAT_BLE
     Debugf(PSTR("ble_temp: %.2f\r\n"), state.sat.fBleTemp);
     Debugf(PSTR("ble_humidity: %.1f\r\n"), state.sat.fBleHumidity);

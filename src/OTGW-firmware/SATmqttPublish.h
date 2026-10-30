@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-alpha.561
+**  Version  : v2.0.0-alpha.562
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -190,7 +190,7 @@ bool publishIfChangedS(const __FlashStringHelper* topic, const char* current,
 // binary_sensor entities whose state payload convention isn't true/false:
 // sat/flame_health, sat/device_health, sat/cycle_health, sat/setpoint_sync,
 // sat/modulation_sync, sat/ch_sync, sat/pressure_health, sat/simulation,
-// sat/auto_tune, sat/pv_boost_enabled, sat/weather/is_day.
+// sat/pv_boost_enabled, sat/weather/is_day.
 bool publishIfChangedBStr(const __FlashStringHelper* topic, bool current,
                           SATShadowB& shadow, const char* onLabel,
                           const char* offLabel, bool retained);

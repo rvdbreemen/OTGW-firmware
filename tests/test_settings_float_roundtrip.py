@@ -41,7 +41,6 @@ NEEDED_DECIMALS = {
     "SATweatherlat": 5,    # 52.13550 = ~1 m; the Web UI sends toFixed(4), users type more
     "SATweatherlon": 5,
     "SATthermalcoeff": 4,  # range 0.005..0.3, learned as an EMA
-    "SATautotunerate": 4,  # range 0.005..0.1
 }
 
 HARNESS = r"""
