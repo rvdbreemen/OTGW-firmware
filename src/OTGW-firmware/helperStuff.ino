@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.544
+**  Version  : v2.0.0-alpha.545
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -228,7 +228,8 @@ static bool isRebootLogDetailLine(const char* line)
 {
   return (line != nullptr &&
           (strncmp_P(line, PSTR("ESP register contents:"), 22) == 0 ||
-           strncmp_P(line, PSTR("External Reason:"), 16) == 0));
+           strncmp_P(line, PSTR("External Reason:"), 16) == 0 ||
+           strncmp_P(line, PSTR("Core dump:"), 10) == 0));   // ESP32 panic/watchdog (TASK-1479)
 }
 
 static void trimRebootLogLine(char* line)
@@ -293,6 +294,33 @@ bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t
   return false;
 }
 
+// Copy up to maxLines older reboot-log lines from infh to outfh, each ending in "\r\n".
+// A line ends at '\r' or '\n' ("\r\n" counts once), so a file written by older firmware,
+// which dropped the '\n' of every copied line and left them joined by '\r' (TASK-1479),
+// gets its line breaks back on the next write. Lines of 3 chars or less are skipped.
+static void copyOlderRebootLogLines(File &infh, File &outfh, int maxLines)
+{
+  int copied = 0;
+  while (infh.available() && copied < maxLines) {
+    char line[140] = {0};   // LOG_LINE_LENGTH; char buffer avoids heap allocation (ADR-004)
+    int n = 0;
+    while (infh.available() && n < (int)sizeof(line) - 1) {
+      int c = infh.read();
+      if (c == '\r' || c == '\n') {
+        if (c == '\r' && infh.peek() == '\n') infh.read();
+        break;
+      }
+      line[n++] = (char)c;
+    }
+    line[n] = '\0';
+    if (n > 3) {
+      outfh.print(line);
+      outfh.print(F("\r\n"));
+    }
+    copied++;
+  }
+}
+
 bool updateRebootLog(String text)
 {
   #define REBOOTLOG_FILE "/reboot_log.txt"
@@ -343,20 +371,8 @@ bool updateRebootLog(String text)
 
       File infh = LittleFS.open(REBOOTLOG_FILE, "r");
       
-      int i = 1;
       if (infh) {
-        //read from file
-        while (infh.available() && (i < LOG_LINES)){
-          //read the next line — char buffer avoids heap allocation (ADR-004)
-          char line[LOG_LINE_LENGTH] = {0};
-          int n = infh.readBytesUntil('\n', line, sizeof(line) - 1);
-          line[n] = '\0';
-          // Filter out empty or very short lines (< 3 chars) to keep log file clean
-          if (n > 3) {
-            outfh.print(line);
-          }
-          i++;
-        }
+        copyOlderRebootLogLines(infh, outfh, LOG_LINES - 1);
         infh.close();
       }
       outfh.close();

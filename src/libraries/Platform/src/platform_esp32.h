@@ -28,6 +28,7 @@
 #include <esp_mac.h>
 #include <esp_netif.h>
 #include <esp_flash.h>
+#include <esp_core_dump.h>       // core-dump summary for the reboot log (platformResetRegisterDump, TASK-1479)
 #include <hal/usb_serial_jtag_ll.h>  // platformUsbJtagPutc (TASK-1217)
 #include <esp_sntp.h>            // esp_sntp_servermode_dhcp() (platformIgnoreDhcpNtp)
 #include <lwip/priv/tcp_priv.h>  // tcp_active_pcbs (platformTcpActivePcbCount)
@@ -523,9 +524,64 @@ inline uint32_t platformResetCode() {
   return (uint32_t)esp_reset_reason();
 }
 
-// Register dump — not available on ESP32 via esp_reset_reason() API
+// Reboot-log detail line for the reset that just happened (TASK-1479).
+// The ESP32 reset info has no register dump; the crash is in the ESP-IDF core dump
+// (coredump partition, ELF format, written by the panic handler, also on a task-watchdog
+// panic). When a dump is present that was not reported before, buf gets
+// "Core dump: <task> pc=0x.. bt=0x.. ..\r\n" (backtrace PCs capped to fit; a trailing '!'
+// marks a corrupted backtrace). Only the summary is read, not the whole dump. The dump
+// stays in flash for an offline esp-coredump decode; a fingerprint in NVS keeps the same
+// dump from being reported on every boot. The current reset reason is not checked, because
+// an OTA after a crash boots with a software reset while the dump is still unreported.
+// A panic or watchdog reset without a readable dump gives "Core dump: none (reset N)".
 inline void platformResetRegisterDump(char *buf, size_t bufLen) {
+  if (buf == nullptr || bufLen == 0) return;
   buf[0] = '\0';
+
+  esp_core_dump_summary_t sum;
+  size_t addr = 0, size = 0;
+  bool haveDump = (esp_core_dump_image_check() == ESP_OK) &&
+                  (esp_core_dump_image_get(&addr, &size) == ESP_OK) &&
+                  (esp_core_dump_get_summary(&sum) == ESP_OK);
+  if (haveDump) {
+    uint32_t depth = sum.exc_bt_info.depth;
+    if (depth > 16) depth = 16;
+    uint32_t fp = (uint32_t)size ^ sum.exc_pc ^ (depth ? sum.exc_bt_info.bt[0] : 0U) ^
+                  ((uint32_t)sum.app_elf_sha256[0] << 24) ^ ((uint32_t)sum.app_elf_sha256[1] << 16) ^
+                  ((uint32_t)sum.app_elf_sha256[2] << 8) ^ (uint32_t)sum.app_elf_sha256[3];
+    if (fp == 0) fp = 1;  // 0 is the "nothing reported yet" value
+    uint32_t reported = 0;
+    Preferences prefs;
+    if (prefs.begin("otgw_cd", false)) {
+      reported = prefs.getUInt("fp", 0);
+      if (reported != fp) prefs.putUInt("fp", fp);
+      prefs.end();
+    }
+    if (reported == fp) return;  // this dump is already in the reboot log
+
+    sum.exc_task[sizeof(sum.exc_task) - 1] = '\0';
+    sum.app_elf_sha256[sizeof(sum.app_elf_sha256) - 1] = 0;   // hex string of the crashing app's ELF
+    int n = snprintf_P(buf, bufLen, PSTR("Core dump: %s pc=0x%08lx elf=%.8s bt="),
+                       sum.exc_task, (unsigned long)sum.exc_pc, (const char *)sum.app_elf_sha256);
+    if (n < 0 || (size_t)n >= bufLen) { buf[0] = '\0'; return; }
+    size_t pos = (size_t)n;
+    for (uint32_t i = 0; i < depth; i++) {
+      if (pos + 11 + 4 > bufLen) break;  // " 0x12345678" + "!\r\n" + NUL must still fit
+      n = snprintf_P(buf + pos, bufLen - pos, PSTR("%s0x%08lx"), i ? " " : "",
+                     (unsigned long)sum.exc_bt_info.bt[i]);
+      if (n < 0) break;
+      pos += (size_t)n;
+    }
+    if (sum.exc_bt_info.corrupted && pos + 1 + 3 <= bufLen) buf[pos++] = '!';
+    if (pos + 3 <= bufLen) { buf[pos++] = '\r'; buf[pos++] = '\n'; buf[pos] = '\0'; }
+    return;
+  }
+
+  esp_reset_reason_t reason = esp_reset_reason();
+  if (reason == ESP_RST_PANIC || reason == ESP_RST_INT_WDT ||
+      reason == ESP_RST_TASK_WDT || reason == ESP_RST_WDT) {
+    snprintf_P(buf, bufLen, PSTR("Core dump: none (reset %d)\r\n"), (int)reason);
+  }
 }
 
 // Exception cause — not available on ESP32 via esp_reset_reason() API

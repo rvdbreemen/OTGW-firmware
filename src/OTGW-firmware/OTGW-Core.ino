@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.544
+**  Version  : v2.0.0-alpha.545
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1478,9 +1478,14 @@ void sendPICBootCommands(){
 //      ADR-135). The DISARM is still sent unconditionally (safe; boot disarm runs
 //      before detection). The only PIC-presence probe is reset->ETX in detectPIC().
 //   2. !HAS_PIC_WATCHDOG (OTGW32): ESP32 TWDT only — no external chip.
-// The TWDT subscribes the loop task only (esp_task_wdt_add(NULL) from the loop
+// The firmware subscribes the loop task (esp_task_wdt_add(NULL) from the loop
 // context); see ADR-135 §"PIC task subscription" for the explicit decision not
-// to subscribe the dedicated PIC-UART task.
+// to subscribe the dedicated PIC-UART task. AsyncTCP subscribes its own
+// async_tcp service task too (CONFIG_ASYNC_TCP_USE_WDT defaults to 1 in
+// AsyncTCP.h and is not overridden here), so a Task-watchdog reset means the
+// loop task or the async_tcp task stalled for timeout_ms. The panic writes an
+// ESP-IDF core dump; the next boot puts its summary in the reboot log
+// (platformResetRegisterDump, TASK-1479).
 #if HAS_PIC_WATCHDOG
 // esp32-classic + combo: TWDT primary, external 0x26 optional secondary.
 #include <esp_task_wdt.h>
