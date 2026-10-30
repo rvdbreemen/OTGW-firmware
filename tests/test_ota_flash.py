@@ -38,6 +38,11 @@ class FakeDevice(http.server.BaseHTTPRequestHandler):
     respond = False
     write_lands = True
     fs_hash = OLD_HASH
+    # TASK-1497: how /v2.js comes back ("whole", "short": Content-Length 256745 but the
+    # connection closes after 65536 bytes, as on .63, "empty") and the device/info flag
+    # (None = the field is absent, as on firmware before TASK-1495).
+    v2js = "whole"
+    fs_incomplete = None
 
     def log_message(self, *args):
         pass
@@ -56,7 +61,24 @@ class FakeDevice(http.server.BaseHTTPRequestHandler):
         elif self.path == "/api/v2/settings":
             self._send(json.dumps({"settings": {"hostname": {"value": "otgw"}}}))
         elif self.path == "/api/v2/device/info":
-            self._send(json.dumps({"device": {"fwversion": "2.0.0-alpha.542"}}))
+            dev = {"fwversion": "2.0.0-alpha.542"}
+            if type(self).fs_incomplete is not None:
+                dev["fsupdateincomplete"] = type(self).fs_incomplete
+            self._send(json.dumps({"device": dev}))
+        elif self.path == "/v2.js":
+            mode = type(self).v2js
+            if mode == "busy_once":  # the file-serve gate answers 503 once, then serves it
+                type(self).v2js = "whole"
+                self.send_error(503)
+                return
+            full = 256745 if mode != "empty" else 0
+            sent = {"whole": full, "short": 65536, "empty": 0}[mode]
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript")
+            self.send_header("Content-Length", str(full))
+            self.end_headers()
+            self.wfile.write(b"x" * sent)
+            self.close_connection = True
         else:
             self.send_error(404)
 
@@ -76,6 +98,8 @@ class OtaFlashDroppedResponse(unittest.TestCase):
         FakeDevice.respond = False
         FakeDevice.write_lands = True
         FakeDevice.fs_hash = OLD_HASH
+        FakeDevice.v2js = "whole"
+        FakeDevice.fs_incomplete = None
         self.srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), FakeDevice)
         threading.Thread(target=self.srv.serve_forever, daemon=True).start()
         self.host = f"127.0.0.1:{self.srv.server_address[1]}"
@@ -127,6 +151,44 @@ class OtaFlashDroppedResponse(unittest.TestCase):
             self.fail("ota_flash.py has no _image_githash()")
         self.assertEqual(self.mod._image_githash(self.fs), NEW_HASH)
         self.assertIsNone(self.mod._image_githash("my.littlefs.bin"))
+
+    # TASK-1497: a new /version.hash is not proof that the whole image arrived.
+    def test_short_v2js_stops_before_the_app_step(self):
+        FakeDevice.respond = True
+        FakeDevice.v2js = "short"
+        with self.assertRaises(SystemExit) as cm:
+            self.run_main()
+        msg = str(cm.exception.code)
+        self.assertIn("/v2.js served short (65536 of 256745 bytes)", msg)
+        self.assertIn("app step skipped", msg)
+
+    def test_empty_v2js_stops_before_the_app_step(self):
+        FakeDevice.respond = True
+        FakeDevice.v2js = "empty"
+        with self.assertRaises(SystemExit) as cm:
+            self.run_main()
+        self.assertIn("/v2.js is empty", str(cm.exception.code))
+
+    def test_device_flag_stops_before_the_app_step(self):
+        FakeDevice.respond = True
+        FakeDevice.fs_incomplete = True
+        with self.assertRaises(SystemExit) as cm:
+            self.run_main()
+        self.assertIn("fsupdateincomplete", str(cm.exception.code))
+
+    def test_busy_v2js_is_retried(self):
+        FakeDevice.respond = True
+        FakeDevice.v2js = "busy_once"
+        rc, out = self.run_main()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("/v2.js complete: 256745 bytes", out)
+
+    def test_whole_v2js_and_clear_flag_continue(self):
+        FakeDevice.respond = True
+        FakeDevice.fs_incomplete = False
+        rc, out = self.run_main()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("/v2.js complete: 256745 bytes", out)
 
 
 if __name__ == "__main__":

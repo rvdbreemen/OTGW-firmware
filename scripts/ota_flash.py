@@ -11,10 +11,15 @@ The device can close the connection without an HTTP response after the filesyste
 shows the new image's githash (the "+<githash>" in the .littlefs.bin name; without one, any
 hash other than the one before the write), and only then goes on to the app step. If the
 hash does not change within FS_VERIFY_TIMEOUT it stops with an error before the app step.
-Stopping between the two steps leaves the old app on the new filesystem; that mix can serve
-the new web assets cut short (seen on a unit with an alpha.521 app and an alpha.542
-filesystem: v2.js cut at 64 KB, the v2 UI does not start), so rerun the
-script with --no-fs to flash the app.
+
+A new /version.hash does not prove the whole image arrived: it sits in the first blocks, and
+an interrupted upload leaves the later blocks of large files old, so they read back short
+(seen on .63: v2.js cut at 64 KB of 251 KB, the v2 UI does not start; a clean re-upload
+served it whole). After the hash the script therefore stops before the app step when
+device/info reports fsupdateincomplete (firmware with TASK-1495; an absent field is not
+checked) or when GET /v2.js returns fewer bytes than its Content-Length or none at all.
+Then upload the filesystem again. Stopping between the two steps leaves the old app on the
+new filesystem; rerun the script, or with --no-fs once the filesystem is complete.
 
 Usage:
   python scripts/ota_flash.py --host 192.168.88.61 [--app build/...ino.bin] [--fs build/...littlefs.bin]
@@ -136,6 +141,37 @@ def flash_fs(host, password, fs):
                          f"{want or 'a new hash'} (was {old}); app step skipped")
     print(f"  filesystem confirmed: /version.hash {old} -> {h}")
     _wait(lambda: _main_up(host), "main firmware after filesystem update", 120)
+    _check_fs_complete(host)
+
+
+def _check_fs_complete(host):
+    """/version.hash is in the first blocks; a large file shows whether the rest arrived."""
+    try:
+        dev = _get_json(host, "/api/v2/device/info")["device"]
+    except Exception:
+        dev = {}
+    if dev.get("fsupdateincomplete") is True:
+        raise SystemExit("device reports fsupdateincomplete: the filesystem update did not finish; "
+                         "upload the filesystem again (app step skipped)")
+    for attempt in range(1, 4):
+        try:
+            with urllib.request.urlopen(f"http://{host}/v2.js", timeout=60) as r:
+                n = len(r.read())
+                length = r.headers.get("Content-Length")
+            break
+        except http.client.IncompleteRead as e:
+            got = len(e.partial)
+            raise SystemExit(f"/v2.js served short ({got} of {got + (e.expected or 0)} bytes): the filesystem "
+                             "image is incomplete; upload the filesystem again (app step skipped)")
+        except urllib.error.HTTPError as e:
+            # the file-serve gate (ADR-147) answers 503 under load: try again
+            if attempt == 3:
+                raise SystemExit(f"/v2.js could not be checked (HTTP {e.code}); app step skipped")
+            time.sleep(3)
+    if n == 0:
+        raise SystemExit("/v2.js is empty: the filesystem image is incomplete; upload the filesystem "
+                         "again (app step skipped)")
+    print(f"  /v2.js complete: {n} bytes" + (f" (Content-Length {length})" if length else ""))
 
 
 def newest(pattern):
