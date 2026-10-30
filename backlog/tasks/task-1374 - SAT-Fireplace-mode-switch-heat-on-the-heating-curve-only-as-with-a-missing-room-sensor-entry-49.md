@@ -3,9 +3,11 @@ id: TASK-1374
 title: >-
   SAT: Fireplace mode switch - heat on the heating curve only, as with a missing
   room sensor (entry 49)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T06:32:00Z'
+updated_date: '2026-10-30T19:46:00Z'
 labels:
   - sat
   - webui

@@ -1,9 +1,11 @@
 ---
 id: TASK-1362
 title: 'SAT: summer simmer cutoff leaves PWM and resets its state like the cold cutoff'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-24T20:26:00Z'
+updated_date: '2026-10-30T20:07:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -22,3 +24,9 @@ Robert 2026-10-24 (ADR-199 open question 2), audit #49: the firmware-only summer
 <!-- AC:BEGIN -->
 - [ ] #1 After a summer simmer cutoff PWM is off and its state reset (host test red on HEAD, green)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented (sonnet lane wt-1362): summer simmer block calls satPwmDisableOnHeaterOff() after fFinalSetpoint = SAT_MIN_SETPOINT (same helper as the cold cutoff and valves-closed paths); _sat_lastControlCS line kept. tests/test_sat_pwm_override.py: base Ran 79 FAILED (failures=3: PWM still requested/hold 48 after summer; recovery CS 40 stale vs 62 fresh; source check), fix 79 OK. Interactions checked: ADR-203 cache still CS=10/MM max/CH 0; flood and 3 s refresh need PWM; TASK-1502 DHW pause state cleared by satPwmReset. Self-review only (one helper call, same as cold cutoff); full suite at integration.
+<!-- SECTION:NOTES:END -->

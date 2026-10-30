@@ -3,9 +3,11 @@ id: TASK-1458
 title: >-
   SAT: published Summer Simmer Index is computed from the SSI itself when
   Thermal comfort is on (double SSI)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T07:03:00Z'
+updated_date: '2026-10-30T20:13:00Z'
 labels:
   - sat
   - mqtt

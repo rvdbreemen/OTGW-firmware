@@ -5101,3 +5101,18 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 - Q-1502b (probe P3): a draw after the first-flame wait had already timed out; the CH flame after the draw gets no 180 s hold today (phase ends at 330 s). Should it get the hold, as without a draw?
 
 **Compared:** thermo-nova pwm.py:140-210 (ignition sync, hold anchor); firmware TASK-1502 lane (SATcontrol.ino satPwmOnDhwStart / satPwmDhwResume / hold-anchor guard). **Task:** TASK-1502.
+
+## 157. TASK-1414: our readings of entry 73 in the implementation, one point put to him (2026-10-30, interpretation, not his words)
+
+**Source:** coordinator, 2026-10-30, from the TASK-1414 implementation and its review. Not a statement by Sergeant D; recorded so the readings we act on are visible before the change lands.
+
+**What follows thermo-nova directly:** the reset zeroes only the integral and the raw derivative (pid.py:134-137 `reset`), keeps the last error, timers and start flags; it runs on reset_integral (climate.py:219-220, services.py:38-39), on a real target change (climate.py:643-660), preset change and clear (:616, :624), window switch and restore (:819, :832) and HVAC off (:583, firmware satDisable).
+
+**Readings acted on (interpretation):**
+- HVAC on resets on the off-to-on transition only. thermo-nova resets on every async_set_hvac_mode call (climate.py:570-583, entry 73 says "every call"); here an MQTT `sat/enabled=1` re-send or a retained re-delivery while already on resets nothing, so a reconnect does not wipe the integral.
+- "Target changed" means a change of at least 0.05 C (the firmware's existing rule for preset clear and auto-map). thermo-nova uses exact equality (climate.py:643); our one-decimal echoes of the target would otherwise count as changes.
+- A requested reset from REST is applied on the next control-loop pass (request flag), not on the REST task.
+
+**Open, queued as a question (Q-1414a in docs/sat/open-questions.md):** zone (area) PID reset. thermo-nova resets an area's PID when that room's climate target differs from `_rooms[entity]` (the room's HOME preset temperature), climate.py:785-795; outside the HOME preset that can fire on every state event of that climate. The firmware has no `_rooms` and resets a zone integral when that zone's setpoint really changes (the first setpoint resets nothing). Is that acceptable, or should the firmware mirror the HOME-preset comparison?
+
+**Task:** TASK-1414. ADR: Proposed ADR-204 replaces ADR-197 decision 8.

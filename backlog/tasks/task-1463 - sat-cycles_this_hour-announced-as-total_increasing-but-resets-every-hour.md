@@ -1,9 +1,11 @@
 ---
 id: TASK-1463
 title: sat/cycles_this_hour announced as total_increasing but resets every hour
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T07:21:00Z'
+updated_date: '2026-10-30T20:12:00Z'
 labels:
   - sat
   - mqtt

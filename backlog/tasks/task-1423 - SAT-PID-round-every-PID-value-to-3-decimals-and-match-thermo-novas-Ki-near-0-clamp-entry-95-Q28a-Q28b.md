@@ -3,11 +3,11 @@ id: TASK-1423
 title: >-
   SAT PID: round every PID value to 3 decimals and match thermo-nova's Ki-near-0
   clamp (entry 95, Q28a/Q28b)
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-28T07:51:00Z'
-updated_date: '2026-10-30T18:40:00Z'
+updated_date: '2026-10-30T20:03:00Z'
 labels:
   - sat
   - sergeant-d

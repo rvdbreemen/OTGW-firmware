@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-30T06:19:00Z'
-updated_date: '2026-10-30T17:21:00Z'
+updated_date: '2026-10-30T21:11:00Z'
 labels:
   - release beta
 milestone: 2.0.0
@@ -44,4 +44,6 @@ Robert 2026-10-30 decisions: (1) SAT experimental, opt-in, default off, named so
 AC4 draft updated (docs/releases/RELEASE_NOTES_2.0.0-beta.1.md): today's SAT items, three new BREAKING items (cycles 3/4, max_setpoint meaning + underfloor default 50, cycles_this_hour), known issues 1498/1438/1480 + 1371 not field-run. Open for Robert's review: crash-log endpoint claim (only in the old 2.0.0-beta CHANGELOG section), port 25238 bridge opt-in and ADR-084 topics (only in RELEASE_GITHUB_2.0.0.md), older [Unreleased] items whose cycle is unclear, release date, macOS result, soak result.
 
 AC3 soak started: alpha.559+ccda6eb (beta-1 candidate) on .63 Classic+S3 Mini, 2026-10-30 17:20:43 UTC, bootcount 26, detached monitor %LOCALAPPDATA%/OTGW-capture/soak/soak.py (PID 14212) logging every 300 s to %LOCALAPPDATA%/OTGW-capture/soak/soak-559.log; ends 2026-10-31 17:20 UTC. Do not flash .63 until then.
+
+2026-10-30 21:10 UTC (session 07): AC3 soak of alpha.559 on .63 interrupted. Last good poll 20:25:46 UTC (uptime 3:08, bootcount 26, minfree 29564, maxblk 20468, no reboot). The monitor process (PID 14212) ended with the coordinator session; .63 was then unplugged by Robert to connect the OTGW32 (confirmed by Robert 21:10 UTC; COM8 gone, router ARP stale). Not a firmware fault. Robert's decision: restart the 24 h soak later on the next beta candidate (the integrated 564+ line) once .63 is back; lane bench tests run on .61 (OTGW32) meanwhile.
 <!-- SECTION:NOTES:END -->

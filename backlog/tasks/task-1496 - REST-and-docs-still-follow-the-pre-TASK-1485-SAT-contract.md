@@ -1,9 +1,11 @@
 ---
 id: TASK-1496
 title: REST and docs still follow the pre-TASK-1485 SAT contract
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-30T00:10:00Z'
+updated_date: '2026-10-30T20:13:00Z'
 labels:
   - sat
   - mqtt

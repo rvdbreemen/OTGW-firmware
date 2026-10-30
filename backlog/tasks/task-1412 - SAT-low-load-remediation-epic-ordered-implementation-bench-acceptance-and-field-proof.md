@@ -3,10 +3,11 @@ id: TASK-1412
 title: >-
   SAT low-load remediation epic: ordered implementation, bench acceptance and
   field proof
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-27T23:40:00Z'
-updated_date: '2026-10-30T06:19:00Z'
+updated_date: '2026-10-30T21:06:00Z'
 labels:
   - epic
   - sat
