@@ -1,15 +1,17 @@
 ---
 id: TASK-1473
 title: >-
-  Parked: opt-in cloud upload of diagnostic recordings (later feature, after
-  TASK-1470)
+  On hold: continuous opt-in cloud recording (debug + timed OT stream) to
+  Cloudflare R2 EU over outbound TLS, PSRAM boards
 status: To Do
 assignee: []
 created_date: '2026-10-29T12:45:00Z'
-updated_date: '2026-10-30T06:12:00Z'
+updated_date: '2026-10-30T06:13:00Z'
 labels:
   - parked
+  - on-hold
   - needs-maintainer-ok
+  - diagnostics
   - tooling
 dependencies: []
 priority: low
@@ -19,13 +21,61 @@ ordinal: 633000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Robert 2026-10-29: local first; the cloud upload from gruijter's proposal (TASK-1469: encrypted batches over plain HTTP to a Cloudflare store, offline key) is parked as a later feature. Not to be picked up until Robert releases it, and not before the local recording (TASK-1470) works. Constraints already recorded: must fail quietly on a LAN with internet blocked (martreides, TASK-1471); no TLS on the device (encrypt the payload instead); account and key ownership undecided.
+ON HOLD (Robert 2026-10-30): worked out, NOT to be implemented until Robert says it is the right moment. Low priority. Do not pick this up in /implement-next-task.
+
+Goal: a capture-like recording without a separate script, so Robert can check how the firmware, the boiler, the thermostat and SAT behave after the fact. Two separate streams:
+1. Debug stream: a copy of all telnet debug output (all modules), with timestamps.
+2. OT stream: every OpenTherm frame (T/B/R/A, source PIC/OTDirect/replay) with its reception time in microseconds (epoch), compact, so a day can be replayed with the real timing.
+
+Decisions (Robert, interactive, 2026-10-30):
+- Continuous streaming from the device itself (not a browser relay, not local-only).
+- Backend: Cloudflare Worker + R2 bucket with EU jurisdiction (free tier, serverless, minimal maintenance).
+- Transport: outbound TLS client (HTTPS POST batches), on PSRAM boards only (precedent ADR-169). Web server stays HTTP. Needs a new ADR that partly supersedes ADR-003.
+- Opt-in, off by default; local-first stays the default (TASK-1470 shares the recording format).
+Hard constraints: fail quietly on a LAN with internet blocked (TASK-1471): drop/buffer, no loop stall, no reboot, no log flood. No ArduinoJson (ADR-146). No String in hot paths (ADR-180). No blocking network call in the loop or on async_tcp (ADR-137). Raw PIC stream rules (ADR-177) apply to any new consumer. Secrets redacted. GDPR: consent text, retention, controller named.
+Rejected alternatives and research: see notes (2026-10-30).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Robert releases this task (removes the parked label) before any design work
+- [ ] #2 Bench measurement of TLS heap peak/steady state on a PSRAM board recorded in notes; go/no-go decided
+- [ ] #3 Proposed ADR (outbound TLS client on PSRAM boards, recording format) accepted by Robert
+- [ ] #4 OT frames carry a microsecond reception timestamp set at enqueue; a recorded day replays with the original timing (old fixed-750 ms vs new paced, demonstrated)
+- [ ] #5 Debug and OT streams upload continuously to an R2 EU bucket via the Worker; 24 h bench run shows no loop gap above normal and the real volume per stream
+- [ ] #6 With outbound internet blocked the upload fails quietly: no loop stall, no reboot, at most one log line per retry interval (capture transcript)
+- [ ] #7 Opt-in off by default, consent text in the web UI, secrets redacted, retention lifecycle rule set on the bucket
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Phase 0 - gates before any code (when Robert releases the task):
+- Robert removes the on-hold/parked labels.
+- Bench measurement on a LOLIN S3 Mini (PSRAM): heap peak and steady state of one persistent TLS connection to *.workers.dev with the Arduino core NetworkClientSecure (mbedTLS) + CA bundle; check whether mbedTLS can allocate in PSRAM with the prebuilt Arduino libs. Go/no-go for the ADR.
+- Verify on a free Cloudflare account: R2 bucket with jurisdiction eu can be created on the free plan; whether a payment method is required; set a lifecycle rule (retention, e.g. 30 days).
+- Open-source check per CLAUDE.md (>=2 candidates) for any helper (e.g. compression, ring buffer).
+
+Phase 1 - ADR (adr-kit, Proposed -> Accepted by Robert):
+- Outbound TLS client only, PSRAM boards only, opt-in; server side stays HTTP (partial supersede of ADR-003; ADR-003 text 'reject any PR adding TLS' needs the explicit carve-out).
+- Recording format shared with TASK-1470: OT record = epoch_us (or delta), source, frame type, 32-bit frame; debug record = epoch_us + text line (<=255 B). Chunk header: device id (random, not MAC), firmware version, board, sequence number, gap counter.
+
+Phase 2 - firmware (shared with TASK-1470 where possible):
+- Timestamp at reception: add a us timestamp to OTFrameMsg (OTGW-Core.h:577) set in enqueueOTFrame (PIC task, OTDirect bridge, replay), instead of millis() at dequeue (OTGW-Core.ino:5371).
+- Debug tee: wrap the three debugTelnet.print points (debugStuff.h:69-70, debugStuff.ino:40, :113) into a recorder sink; note the banner and file dump bypass the macros.
+- Recorder: two ring buffers in PSRAM (platformPsramAllocOnce), drop-oldest with a gap counter.
+- Uploader: own FreeRTOS task like the webhook task (webhook.ino, ADR-136/137): every 10-30 s one HTTPS POST per stream over a persistent connection, bearer token per device, exponential backoff, one log line per retry interval; HAS_* flag + psramFound() gate.
+- Settings (ADR-051): enable, endpoint URL, token, streams on/off, debug module filter. Web UI toggle + consent text.
+
+Phase 3 - Worker (repo dir e.g. tools/cloud-recorder/, ~100-200 lines):
+- POST /ingest/{stream}: check token, write chunk to R2 (key device/stream/date/seq), no processing of content; rate limit per token.
+- Download for the developers (authenticated) -> host tool converts OT chunks to a timed replay file.
+
+Phase 4 - replay:
+- Replay with timestamp pacing instead of the fixed 750 ms (debugStuff.h:59, OTGW-Core.ino:4278); host tool that turns an R2 OT stream into that format.
+
+Phase 5 - verification: 24 h bench run with upload on, then with outbound blocked (TASK-1471 method); measure real volume per stream; replay a recorded day and compare with the original timing.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
