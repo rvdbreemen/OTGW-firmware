@@ -6,6 +6,16 @@ settings.ini and its other kept files across the new image), then the app throug
 safeboot updater (POST /safeboot, wait for the updater, POST /update), then wait until the
 main firmware answers again and report its version and whether the settings survived.
 
+The device can close the connection without an HTTP response after the filesystem write
+(during the remount). The script then does not abort: it polls GET /version.hash until it
+shows the new image's githash (the "+<githash>" in the .littlefs.bin name; without one, any
+hash other than the one before the write), and only then goes on to the app step. If the
+hash does not change within FS_VERIFY_TIMEOUT it stops with an error before the app step.
+Stopping between the two steps leaves the old app on the new filesystem; that mix can serve
+the new web assets cut short (seen on a unit with an alpha.521 app and an alpha.542
+filesystem: v2.js cut at 64 KB, the v2 UI does not start), so rerun the
+script with --no-fs to flash the app.
+
 Usage:
   python scripts/ota_flash.py --host 192.168.88.61 [--app build/...ino.bin] [--fs build/...littlefs.bin]
                               [--password <admin pw>]
@@ -15,8 +25,10 @@ Stdlib only.
 import argparse
 import base64
 import glob
+import http.client
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -24,6 +36,7 @@ import urllib.error
 import urllib.request
 
 BOUNDARY = "----otgwota7MA4YWxkTrZu0gW"
+FS_VERIFY_TIMEOUT = 120
 
 
 def _headers(host, password, extra=None):
@@ -82,12 +95,55 @@ def _safeboot_up(host):
         return r.status == 200 and b"safeboot" in r.read().lower()
 
 
+def _version_hash(host):
+    with urllib.request.urlopen(f"http://{host}/version.hash", timeout=4) as r:
+        return r.read().decode("ascii", "replace").strip()
+
+
+def _image_githash(path):
+    m = re.search(r"\+([0-9a-f]{7,40})\.littlefs\.bin$", os.path.basename(path))
+    return m.group(1) if m else None
+
+
+def flash_fs(host, password, fs):
+    """Filesystem OTA, then wait until /version.hash shows the new image."""
+    want = _image_githash(fs)
+    try:
+        old = _version_hash(host)
+    except Exception:
+        old = None
+    body, n = _multipart(fs)
+    print(f"filesystem OTA: {os.path.basename(fs)} ({n} bytes)")
+    try:
+        st, out = _post(host, f"/update?cmd=100&size={n}", password, body,
+                        f"multipart/form-data; boundary={BOUNDARY}", timeout=180)
+        print("  ->", st, out[:120].decode("latin-1", "replace").strip())
+    except urllib.error.HTTPError:
+        raise
+    except (http.client.HTTPException, OSError) as e:
+        # The write can complete and the device drop the connection while it remounts.
+        print(f"  -> no response ({type(e).__name__}: {e}); checking /version.hash")
+    time.sleep(5)
+
+    def _new_fs():
+        h = _version_hash(host)
+        return h if (h == want if want else (h and h != old)) else None
+
+    try:
+        h = _wait(_new_fs, "the new filesystem", FS_VERIFY_TIMEOUT)
+    except SystemExit:
+        raise SystemExit(f"filesystem update not confirmed: /version.hash did not change to "
+                         f"{want or 'a new hash'} (was {old}); app step skipped")
+    print(f"  filesystem confirmed: /version.hash {old} -> {h}")
+    _wait(lambda: _main_up(host), "main firmware after filesystem update", 120)
+
+
 def newest(pattern):
     files = sorted(glob.glob(pattern), key=os.path.getmtime)
     return files[-1] if files else None
 
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", required=True)
     ap.add_argument("--app")
@@ -95,7 +151,7 @@ def main():
     ap.add_argument("--password", default="")
     ap.add_argument("--no-app", action="store_true")
     ap.add_argument("--no-fs", action="store_true")
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
     app = None if a.no_app else (a.app or newest("build/*esp32-combo*.ino.bin"))
     fs = None if a.no_fs else (a.fs or newest("build/*esp32-combo*.littlefs.bin"))
     if not app and not fs:
@@ -105,13 +161,7 @@ def main():
     print("running:", _main_up(a.host))
 
     if fs:
-        body, n = _multipart(fs)
-        print(f"filesystem OTA: {os.path.basename(fs)} ({n} bytes)")
-        st, out = _post(a.host, f"/update?cmd=100&size={n}", a.password, body,
-                        f"multipart/form-data; boundary={BOUNDARY}", timeout=180)
-        print("  ->", st, out[:120].decode("latin-1", "replace").strip())
-        time.sleep(5)
-        _wait(lambda: _main_up(a.host), "main firmware after filesystem update", 120)
+        flash_fs(a.host, a.password, fs)
 
     if app:
         print("handover to safeboot")
