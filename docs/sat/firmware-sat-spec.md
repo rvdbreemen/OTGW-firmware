@@ -665,7 +665,7 @@ Differs from thermo-nova: the room temperature passes an extra EMA filter before
 5. Computed from the code (not stated in it): if NTP becomes available only after the PID has already run, this one-time retry loads the file and overwrites `_pid_integral` and `_pid_rawDerivative`, provided the file is no more than 30 minutes old (SATcontrol.ino:4516-4518, SATcontrol.ino:2033-2042, SATpid.ino:77-78). This can only happen when NTP arrives before this boot's first save. `_pidLastSaveMs` starts at 0, so the first periodic save comes on the first full control tick after about 300 s of uptime (SATcontrol.ino:1989, SATcontrol.ino:5010-5011). That save stores `time(nullptr)` (SATcontrol.ino:2000-2001). If NTP is not synced then, and the clock value is below 1000000 as the check at SATcontrol.ino:2028 assumes, the retry finds the file older than 1800 s and discards it (SATcontrol.ino:2033).
 6. The PID steps on its own 60 s timer `timerSATPid` (`DECLARE_TIMER_SEC(timerSATPid, 60, SKIP_MISSED_TICKS)` in SATpid.ino), not on the control tick (TASK-1368, Sergeant D entries 42, 28, 111; thermo-nova `climate.py:712-716`, `pid.py:20`). `satControlLoopRun()` calls `satPidService(millis())` on every loop pass, after the SAT-off, flash, trip and OpenTherm-loss returns and before `if (!DUE(timerSATControl)) return;`. The control tick (default 30 s, setting 10 to 300 s) only reads the output.
 7. **First PID step after boot or after any `satPidReset()`.** `satPidReset()` sets `_pid_startupPending`, so the first `satPidService()` call takes one start-up step at once (thermo-nova `climate.py:137`, `:143`) and restarts the 60 s timer; later steps follow every 60 s. In that step:
-   1. The initialisation block sets `_pid_lastError = error`, `_pid_lastDerivativeMs` = the time the current room temperature was first seen, and `_pid_derivRefTemp = roomTemp`.
+   1. The initialisation block sets `_pid_lastError = error`, `_pid_lastDerivativeMs` = the time the current room temperature was first seen, and `_pid_lastRoomTemp = roomTemp` (TASK-1418: the derivative's previous temperature).
    2. The step then runs in full: gains, integral, derivative (no time gate, entry 75).
    3. Until a room temperature exists the start-up step is curve-only (`satPidCurveOnly()`), and the output is the heating curve.
    4. What the first output contains after a restore, and `D = 0` on the first tick (entry 95 Q39b), belong to TASK-1270 and are not changed here: after a restore `satPidOutput()` adds `kd * restored raw derivative` from the first tick on.
@@ -713,19 +713,19 @@ The zone PID (every configured zone, also at zone count 1) takes its integral st
 
 **D. Derivative update** (SATpid.ino:187-247), in the order the code checks:
 
-1. First time: handled by the initialisation block in `satPidStep`, which sets the timestamp and the reference temperature. There is no separate first-time branch in the derivative function.
-2. Error inside the deadband (`fabsf(error) <= deadband`): the timestamp is set to the "changed" time, the reference temperature is set to the current room temperature, and the function stops. `_pid_rawDerivative` keeps its value (SATpid.ino:199-204).
-3. `tempDelta = roomTemp - _pid_derivRefTemp`. If `fabsf(tempDelta) < 0.001`: timestamp and reference are updated and the function stops (SATpid.ino:208-213).
-4. `deltaTime = (changedMs - _pid_lastDerivativeMs) / 1000` in seconds (SATpid.ino:215). If `deltaTime <= 60`: stop. Neither the timestamp nor the reference temperature moves (SATpid.ino:217-219).
+1. First time: handled by the initialisation block in `satPidStep`, which sets the timestamp and the previous temperature. There is no separate first-time branch in the derivative function.
+2. Error inside the deadband (`fabsf(error) <= deadband`): the timestamp is set to the "changed" time and the function stops. `_pid_rawDerivative` keeps its value (SATpid.ino:199-204).
+3. `tempDelta = roomTemp - _pid_lastRoomTemp`, the room temperature of the previous PID step (overwritten at the end of every step, as pid.py:171). If `tempDelta == 0.0` exactly (pid.py:211): the timestamp is updated and the function stops (TASK-1418, entry 77).
+4. `deltaTime = (changedMs - _pid_lastDerivativeMs) / 1000` in seconds (SATpid.ino:215). If `deltaTime <= 60`: stop. The timestamp stays; the previous temperature still moves on at the end of the step (pid.py:215-218, :171).
 5. `rawDeriv = -tempDelta / deltaTime` (SATpid.ino:223). A rising room gives a negative value.
-6. If `fabsf(rawDeriv) >= 5.0`: the value is clamped to [-5.0, +5.0], stored without filtering, timestamp and reference are updated, and the function stops (SATpid.ino:226-233, SATpid.ino:24).
-7. Otherwise: `alpha = deltaTime / (60 + deltaTime)`, `filtered = alpha * rawDeriv + (1 - alpha) * _pid_rawDerivative`, clamped to ±5.0, then stored with the new timestamp and reference (SATpid.ino:237-246).
+6. If `fabsf(rawDeriv) >= 5.0`: the value is clamped to [-5.0, +5.0], stored without filtering, the timestamp is updated, and the function stops (SATpid.ino:226-233, SATpid.ino:24).
+7. Otherwise: `alpha = deltaTime / (60 + deltaTime)`, `filtered = alpha * rawDeriv + (1 - alpha) * _pid_rawDerivative`, clamped to ±5.0, then stored with the new timestamp.
 
 Differs from thermo-nova:
-- The temperature delta is measured against `_pid_derivRefTemp`, which moves together with the timestamp. A change that comes within 60 s is kept and carried into the next calculation (SATpid.ino:49-56, SATpid.ino:217-219).
+- (Closed by TASK-1418, entry 77: the separate reference `_pid_derivRefTemp` is gone; the delta is taken against the previous step's temperature, as pid.py.)
 - The "changed" time is when a PID call first saw the new value, so its resolution is one control tick (SATpid.ino:256-261, SATpid.ino:42-45).
-- The "no change" test uses a tolerance of 0.001 instead of an exact zero (SATpid.ino:209).
-- Computed from the code: because of the room EMA (`satRoomFiltered()`), a sensor step reaches the PID as a series of small changes over several ticks. The comment at SATpid.ino:53-54 states that this is about 8 control ticks.
+- (Closed by TASK-1418: the "no change" test is an exact zero, as pid.py:211.)
+- Measured on the host (TASK-1418, `tests/test_sat_pid_derivative.py`): because of the room EMA (`satRoomFiltered()`), a sensor step reaches the PID as a series of small changes, and with the PID stepping every 60 s pid.py's rule skips every other step and keeps the newer delta only. For a sensor rising 0.1 °C every 10 min (true slope 1.67e-4 °C/s) the mean raw derivative is 6.97e-5 °C/s with the pid.py rule against 1.87e-4 °C/s with the former separate reference (factor 2.68). Without the EMA (step-wise sensor) both give 1.565e-4. Reported for Sergeant D (entry 77, Consequence to verify); the bench measurement is still open.
 
 **E. Integral update** (SATpid.ino:149-179)
 
