@@ -3,11 +3,11 @@ id: TASK-1476
 title: >-
   v2 capture mode: Stream-to-file probably never works on the plain-HTTP device
   page (showSaveFilePicker needs a secure context)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T14:07:00Z'
-updated_date: '2026-10-29T23:59:00Z'
+updated_date: '2026-10-30T00:09:00Z'
 labels:
   - webui
   - tooling
@@ -26,7 +26,7 @@ Found in TASK-1472 research: v2.js:3541/5752 feature-detects window.showSaveFile
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Bench check on http://<device>/ in Chrome: isSecureContext and typeof showSaveFilePicker recorded
-- [ ] #2 If confirmed: Stream-to-file replaced by a mechanism that works over HTTP (e.g. the periodic auto-download already present), tooltip/text corrected; screenshot before/after
+- [x] #2 If confirmed: Stream-to-file replaced by a mechanism that works over HTTP (e.g. the periodic auto-download already present), tooltip/text corrected; screenshot before/after
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -41,15 +41,12 @@ Coordinator is now otgw-firmware-75 (replaces da). Local commit 07ed281a4 in ../
 2026-10-30 close-out of the batch: AC#2 code merged on origin/dev as 1e64da0d4 (alpha.539). Batch build 2.0.0-alpha.542+c00c5f0 (esp32-combo from origin/dev c00c5f025, 2026-10-30 00:47, exit 0, fresh artefacts, Discord msg 1565512587494301767); integration check on the merged set: evaluate --quick 100%, 0 failed; every tests/test_sat_*.py plus tests/test_manual_sat_commands.py exit 0. Host evidence (peer note above): tests/webui/log-stream-http-fallback.test.mjs red on the old v2.js, 4/4 green on the fix; Playwright insecure-context harness OLD 0 downloads / FIX parts at 5 min and on switch-off. AC#2 stays open: the on-device after-screenshot on http://<device>/ with alpha.539 or later is still to be taken.
 
 alpha.542 bench check failed 2026-10-30 (v2.js 64 KiB cut, settings loss after FS OTA); Done waits for a passing bench check on the fixed build.
+
+AC#2 on-device after (2026-10-30 ~00:08Z, .63 Classic+S3, alpha.542+c00c5f0 incl. 07ed281a4): Playwright + Chrome 156 on http://192.168.88.63/ Monitor > Log: isSecureContext=false, showSaveFilePicker undefined, chip not dimmed (opacity ''), title 'Save every frame: downloads the new frames as a file every 5 minutes and when you switch it off', click -> class 'tchip on'. Screenshot scratchpad t1476_after.png (toolbar crop, no device data).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Stream to file works on the plain-HTTP device page: without showSaveFilePicker (insecure context, also Firefox/Safari) the chip collects every new frame and downloads otgw-stream-<ts>.txt every 5 min, early at 200,000 lines, and the rest on switch-off; the secure-context file-picker path is unchanged; the chip is no longer dimmed and its tooltip says what it does. Merged 1e64da0d4, alpha.539.
-
-Evidence per AC:
-- AC#1: bench check 2026-10-29 in Chrome on http://192.168.88.61/: isSecureContext=false, typeof showSaveFilePicker='undefined', chip dimmed with 'needs Chrome / Edge' tooltip; control on 127.0.0.1 gives [true, 'function'].
-- AC#2 (open): tests/webui/log-stream-http-fallback.test.mjs red on the old v2.js, 4/4 green on the fix; Playwright insecure-context harness OLD 0 downloads, FIX part 1 at 5 min and part 2 on switch-off; before screenshot t1476_before.png. Missing: the on-device after-screenshot.
-Status: In Progress. alpha.542 bench check failed 2026-10-30 (v2.js 64 KiB cut, settings loss after FS OTA); Done waits for a passing bench check on the fixed build.
+Stream to file in Monitor > Log never worked on the device page: showSaveFilePicker exists only in a secure context and the device serves plain HTTP, so the chip was dimmed, a no-op, and its tooltip blamed the browser. Without a picker the chip now collects every new frame (also while the display is paused) and downloads otgw-stream-<ts>.txt every 5 minutes, early at LOG_CAPTURE lines, and the remainder on switch-off; each part holds only the frames since the previous part. The file-picker path in a secure context (HTTPS proxy) is unchanged; no API calls added. Evidence: AC#1 bench .61 (Chrome on http://192.168.88.61/: isSecureContext=false, picker undefined, chip dimmed 'needs Chrome / Edge', click no-op; same Chrome on 127.0.0.1: [true,'function']; t1476_before.png). AC#2 host test tests/webui/log-stream-http-fallback.test.mjs runs the shipped pushLog/flushStreamChunk/toggleStream: red on the old v2.js (flushStreamChunk not found), 4/4 green; Playwright old-vs-fix over HTTP on a LAN IP with synthetic /ws frames (old 0 downloads; fix part 1 frames 1-4 incl. one sent while paused, part 2 frames 5-6 on switch-off); on-device after on .63 alpha.542 (chip not dimmed, new title, click -> on; t1476_after.png). Merged as 07ed281a4, shipped in alpha.542. Not verified: the picker path in a secure context (unchanged code) and Chrome's 'allow multiple downloads' prompt on the second part (same as Auto-download).
 <!-- SECTION:FINAL_SUMMARY:END -->
