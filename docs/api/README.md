@@ -309,7 +309,7 @@ Update a single device setting.
 - `401` - Authentication required
 - `403` - CSRF protection: invalid origin
 
-**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttonchangepublishing`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `ui_onboarded`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satdeadband`, `satinterval`, `satexternaltemp`, `satpresetcomfort`, `satpreseteco`, `satpresetaway`, `satbleriskack`
+**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttonchangepublishing`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `ui_onboarded`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, `satexternaltemp`, `satpresetcomfort`, `satpreseteco`, `satpresetaway`, `satbleriskack`
 
 **Nightly restart settings**:
 
@@ -326,7 +326,6 @@ Update a single device setting.
 | `satsystem` | int | 0-1 | `0` | Heating system (0=radiator, 1=underfloor) |
 | `sattargettemp` | float | 5-30 | `20.0` | Target room temperature (°C) |
 | `satcoefficient` | float | 0-5 | `1.5` | Heating curve coefficient |
-| `satdeadband` | float | 0-2 | `0.25` | PID deadband (°C) |
 | `satinterval` | int | 10-300 | `30` | Control loop interval (seconds) |
 | `satexternaltemp` | bool | - | `false` | Prefer external indoor sensor over OT bus |
 | `satpresetcomfort` | float | 15-28 | `21.0` | Comfort preset temperature (°C) |
@@ -995,7 +994,6 @@ Returns the full SAT runtime state including temperatures, PID terms, cycle data
   "ki": 0.000195,
   "kd": 960.60,
   "coefficient": 1.5,
-  "deadband": 0.25,
   "cycle_count": 12,
   "last_cycle_class": 1,
   "cycle_max_flow": 45.2,

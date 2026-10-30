@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.545
+**  Version  : v2.0.0-alpha.546
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -429,6 +429,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   int8_t   iBleRssi               = 0;      // RSSI of primary BLE sensor
 };
 
+// PID deadband: fixed 0.1 C as thermo-nova DEADBAND (const.py:16, used at pid.py:187 and :205). No user setting and
+// no widening during room-temperature estimation (Sergeant D entry 76, Q26, TASK-1417).
+static const float SAT_PID_DEADBAND = 0.1f;
+
 // thermo-nova drops the last cycle 6 h after it ended (cycles/history.py:48-57,
 // LAST_CYCLE_MAX_AGE_SECONDS = 6*3600 in cycles/const.py:14). The firmware keeps
 // state.sat.eLastCycleClass for the control paths; the reporting paths ask here.
@@ -469,7 +473,6 @@ struct SATSection {
   uint16_t iHpCycleSeconds    = 1800;          // Heat-pump PWM cycle length (period): 1800s=2/hr (default) or 2400s=1.5/hr (entries 40/50, TASK-1366)
   float    fTargetTemp        = 20.0f;  // Default room target °C
   float    fHeatingCurveCoeff = 2.0f;   // Heating curve coefficient; 2.0 as thermo-nova const.py:182 (Sergeant D entry 24, TASK-1347). A stored value is kept
-  float    fDeadband          = 0.1f;   // PID deadband °C (matches Python DEADBAND=0.1)
   uint16_t iControlInterval   = 30;     // Control loop interval (seconds)
   bool     bUseExternalTemp   = false;  // Prefer MQTT-pushed indoor temp over OT msg 24
   float    fPresetComfort     = 21.0f;  // Preset: Comfort

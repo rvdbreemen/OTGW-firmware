@@ -2466,7 +2466,7 @@ static void satZonePidAdvance(uint8_t idx, float outsideTemp)
   float curveValue = satCalcHeatingCurve(z.fSetpoint, outsideTemp);
   float ki       = satZoneKp(curveValue) / 8400.0f;   // SAT_PID_AGGRESSION_V3
   float error    = satPidError(z.fSetpoint, z.fRoomTemp);   // rounded like pid.py, so 0.1 stays inside the deadband (TASK-1195)
-  float deadband = settings.sat.fDeadband;
+  const float deadband = SAT_PID_DEADBAND;   // entry 76 (TASK-1417)
 
   // Integral: only inside deadband (matches SAT Python convention).
   // Symmetric clamp [-curveValue, +curveValue] mirrors primary PID (TASK-588).
@@ -3348,7 +3348,6 @@ void satSendStatusJSON()
     je.field(F("kd"),                   snap->st.sat.fKd, 6);
     je.field(F("raw_derivative"),       snap->st.sat.fRawDerivative);
     je.field(F("coefficient"),          settings.sat.fHeatingCurveCoeff);
-    je.field(F("deadband"),             settings.sat.fDeadband);
     je.field(F("overshoot_margin"),     settings.sat.fOvershootMargin);
     je.field(F("cycle_count"),          snap->st.sat.iCycleCount);
     je.field(F("cycles_this_hour"),     (int32_t)snap->cyclesThisHour);
@@ -3673,7 +3672,7 @@ void satPublishMQTT()
   static SATShadowF s_area_0, s_area_1, s_area_2, s_area_3;
   static SATShadowF s_summer_simmer_index;
   static SATShadowF s_dhw_setpoint, s_max_setpoint, s_requested_setpoint, s_consumption;
-  static SATShadowF s_heating_curve_coeff, s_deadband;
+  static SATShadowF s_heating_curve_coeff;
   static SATShadowF s_flame_off_offset, s_flow_offset, s_mod_sup_delay, s_mod_sup_offset;
   static SATShadowF s_boiler_capacity, s_dhw_capacity, s_boiler_rated_kw, s_boiler_efficiency;
   static SATShadowF s_summer_threshold, s_target_temp_step;
@@ -3897,7 +3896,7 @@ void satPublishMQTT()
     char jBuf[180];
     snprintf_P(jBuf, sizeof(jBuf),
       PSTR("{\"error_threshold\":%.2f,\"daily_mean_error\":%.2f,\"daily_sample_count\":%u,\"recent_mean_error\":%.2f}"),
-      settings.sat.fDeadband * 2.0f,
+      SAT_PID_DEADBAND * 2.0f,
       state.sat.fMeanError,
       (unsigned)state.sat.iErrorSampleCount,
       state.sat.fError);
@@ -4120,7 +4119,6 @@ void satPublishMQTT()
   // SAT settings as individual HA-entity state topics (Task #81)
   // ---------------------------------------------------------------------------
   publishIfChangedF(F("sat/heating_curve_coeff"), settings.sat.fHeatingCurveCoeff, s_heating_curve_coeff, SAT_EPS_TEMP_COARSE, 1, true);
-  publishIfChangedF(F("sat/deadband"),            settings.sat.fDeadband,          s_deadband,            SAT_EPS_ERROR,       2, true);
   publishIfChangedI(F("sat/control_interval"),    (int32_t)settings.sat.iControlInterval, s_control_interval, true);
   publishIfChangedI(F("sat/max_modulation"),      (int32_t)settings.sat.iMaxRelModulation, s_max_modulation, true);
   publishIfChangedF(F("sat/flame_off_offset"),    settings.sat.fFlameOffOffset,    s_flame_off_offset,    SAT_EPS_TEMP_COARSE, 1, true);
@@ -4492,7 +4490,7 @@ static void satUpdateCurveRecommendation()
   state.sat.fErrorStdDev = sqrtf(sumSq / (float)_cr_bufferCount);
 
   // Compare with 2*deadband threshold
-  float threshold = settings.sat.fDeadband * 2.0f;
+  float threshold = SAT_PID_DEADBAND * 2.0f;   // thermo-nova _ERROR_THRESHOLD = DEADBAND * 2 (sensor.py:301)
   if (mean > threshold) {
     state.sat.eCurveRecommendation = SAT_CR_INCREASE;  // Room too cold
   } else if (mean < -threshold) {
@@ -5531,29 +5529,16 @@ static float satOutsideTempOrDefault(float outsideTemp)
   return outsideTemp;
 }
 
-// Task #21 AC#4: widen the deadband proportionally to the time without real room data (uncertainty
-// grows): 0.5 C per hour of estimation on top of the normal deadband.
-static float satEstDeadbandExtra(uint32_t estElapsedMs)
-{
-  return 0.5f * ((float)estElapsedMs / 3600000.0f);
-}
-
-// Inputs of one PID step: filtered room temperature, effective target, heating curve and the thermal
-// deadband widening that applies while the room temperature is estimated. Returns false when there is no
-// valid room temperature (entries 38, 46); the curve is filled in then too. Called by satPidService().
-bool satPidGatherInputs(float* room, float* target, float* curve, float* deadbandExtra)
+// Inputs of one PID step: filtered room temperature, effective target and heating curve. Returns false when there is
+// no valid room temperature (entries 38, 46); the curve is filled in then too. Called by satPidService(). The deadband
+// widening during room-temperature estimation is gone (entry 76, TASK-1417).
+bool satPidGatherInputs(float* room, float* target, float* curve)
 {
   float rawRoom = satGetRoomTemp();
   const bool valid = satRoomTempValid(rawRoom);
   *room = valid ? satRoomFiltered(rawRoom) : rawRoom;
   *target = satEffectiveTarget();
   *curve = satCalcHeatingCurve(*target, satOutsideTempOrDefault(satGetOutsideTemp()));
-  *deadbandExtra = 0.0f;
-  if (valid && state.sat.bFallbackActive && state.sat.iLastKnownRoomMs > 0) {
-    const uint32_t estElapsed = millis() - state.sat.iLastKnownRoomMs;
-    if (estElapsed < SAT_THERMAL_MAX_EST_MS)   // the tick returns at the limit, before it widens
-      *deadbandExtra = satEstDeadbandExtra(estElapsed);
-  }
   return valid;
 }
 
@@ -5763,8 +5748,6 @@ static void satControlLoopRun()
 
   // --- Task #21: Thermal estimation fallback ---
   // AC#5: After 2+ hours of estimation without real data, switch to fixed safe setpoint
-  float savedDeadband = settings.sat.fDeadband;
-  bool thermalDeadbandWidened = false;
   _sat_thermalSafeActive = false;
   // Not while the room temperature is lost: entries 38/46 (curve only) outrank this takeover safeguard.
   if (roomValid && state.sat.bFallbackActive && state.sat.iLastKnownRoomMs > 0) {
@@ -5786,9 +5769,6 @@ static void satControlLoopRun()
       satPublishMQTT();
       return;
     }
-    // AC#4: Widen deadband proportionally to estimation time (uncertainty grows), as the PID step does
-    settings.sat.fDeadband += satEstDeadbandExtra(estElapsed);
-    thermalDeadbandWidened = true;
   }
 
   // --- Window detection timer check ---
@@ -5901,11 +5881,6 @@ static void satControlLoopRun()
     // Zone diagnostics stay gated at more than one zone: no new retained MQTT traffic for
     // single-room setups (deliberate, TASK-1440).
     if (settings.sat.iZoneCount > 1) satPublishZoneDiagnostics();
-  }
-
-  // Task #21: Restore original deadband after PID used the widened value
-  if (thermalDeadbandWidened) {
-    settings.sat.fDeadband = savedDeadband;
   }
 
   // --- Solar gain compensation on the requested setpoint (thermo-nova climate.py:391-392) ---

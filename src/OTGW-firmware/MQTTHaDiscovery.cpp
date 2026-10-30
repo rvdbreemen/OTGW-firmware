@@ -3750,6 +3750,7 @@ static const RetiredSatEntity kRetiredSatEntities[] PROGMEM = {
   { nullptr, nullptr, "/sat/ovp_value" },   // RETIRED-SAT-ENTITY TASK-1460: retained value topic, no entity
   { nullptr, nullptr, "/sat/auto_gains_value" },   // RETIRED-SAT-ENTITY TASK-1357: retained value topic, no entity
   { nullptr, nullptr, "/sat/ssi" },   // RETIRED-SAT-ENTITY TASK-1485: duplicate of sat/summer_simmer_index, no entity
+  { nullptr, nullptr, "/sat/deadband" },   // RETIRED-SAT-ENTITY TASK-1417: retained value topic, no entity (entry 76)
 };
 
 void clearRetiredSatEntities(const HaDiscoveryContext &ctx) {

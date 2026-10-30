@@ -41,6 +41,7 @@ STUBS = r"""
 #define SATDebugTf(...) ((void)0)
 #define SATDebugTln(x) ((void)0)
 #define SAT_HSYS_UNDERFLOOR 1
+static const float SAT_PID_DEADBAND = 0.1f;   // TASK-1417: SATtypes.h (an old SATpid.ino copy ignores it)
 struct SatSettings { float fDeadband = 0.1f;
                      float fHeatingCurveCoeff = 1.0f; bool bSolarFreezeIntegral = false;
                      // pre-TASK-1357 fields at their old defaults, so an old SATpid.ino copy still compiles

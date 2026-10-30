@@ -91,7 +91,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("hp_cycle_seconds: %u\r\n"), (unsigned)settings.sat.iHpCycleSeconds);
     Debugf(PSTR("target_temp: %.1f\r\n"), settings.sat.fTargetTemp);
     Debugf(PSTR("curve_coeff: %.2f\r\n"), settings.sat.fHeatingCurveCoeff);
-    Debugf(PSTR("deadband: %.2f\r\n"), settings.sat.fDeadband);
     Debugf(PSTR("control_interval: %u\r\n"), (unsigned)settings.sat.iControlInterval);
     Debugf(PSTR("use_external_temp: %s\r\n"), settings.sat.bUseExternalTemp ? "true" : "false");
     Debugf(PSTR("max_rel_mod: %u\r\n"), (unsigned)settings.sat.iMaxRelModulation);

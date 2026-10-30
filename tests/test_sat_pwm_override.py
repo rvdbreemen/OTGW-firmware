@@ -509,6 +509,7 @@ PID_HARNESS = r"""
 #include <cstdlib>
 #include <cmath>
 #define SAT_PID_UPDATE_INTERVAL 60.0f
+static const float SAT_PID_DEADBAND = 0.1f;   // TASK-1417: SATtypes.h (an old SATpid.ino copy ignores it)
 struct SatSettings { float fDeadband = 0.1f; bool bSolarFreezeIntegral = true; };
 struct Settings { SatSettings sat; };
 struct SatState { float fKi = 0.01f; bool bSolarGainActive = false; };

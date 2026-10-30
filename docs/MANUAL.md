@@ -1037,7 +1037,6 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.0
 | `satsystem` | 0 | 0-1 | 0 = radiator, 1 = underfloor |
 | `sattargettemp` | 20.0 | 5-30 °C | Desired room temperature |
 | `satcoefficient` | 1.5 | 0.1-5.0 | Heating curve steepness |
-| `satdeadband` | 0.25 | 0.05-2.0 °C | PID deadband width |
 | `satinterval` | 30 | 10-300 s | Control loop interval |
 | `satexternaltemp` | false | bool | Use external indoor sensor via MQTT |
 
@@ -3219,7 +3218,6 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/auto_tune` | `SATautotune` |
 | `sat/auto_tune_rate` | `SATautotunerate` |
 | `sat/heating_curve_coeff` | `SATcoefficient` |
-| `sat/deadband` | `SATdeadband` |
 | `sat/mod_sup_delay` | `SATmodsupdelay` |
 | `sat/mod_sup_offset` | `SATmodsupoffset` |
 | `sat/boiler_capacity` | `SATboilercapacity` |
@@ -3521,7 +3519,6 @@ These are the factory defaults. All settings are configurable via the web UI Set
 | `satboilercapacity` | `24.0` | Boiler nominal capacity (kW) |
 | `satdhwcapacity` | `0.0` | Capacity (kW) used while the boiler reports DHW active; 0 = use `satboilercapacity` |
 | `satsumthreshold` | `18.0` | Summer simmer outdoor temperature threshold (°C) |
-| `satdeadband` | `0.25` | PID deadband (°C) |
 | `satcontrolinterval` | `30` | Control loop interval (seconds) |
 | `satautotune` | `false` | Automatic PID gain tuning enabled |
 | `satheatingsystem` | `1` | 0=auto, 1=radiators, 2=heat pump, 3=underfloor |

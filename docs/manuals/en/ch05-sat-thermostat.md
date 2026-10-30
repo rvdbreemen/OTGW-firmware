@@ -79,7 +79,6 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `satsource` | 0 | 0-3 | Heating SOURCE (energy device): 0 = auto, 1 = gas boiler, 2 = heat pump, 3 = hybrid |
 | `sattargettemp` | 20.0 | 5-30 C | Desired room temperature |
 | `satcoefficient` | 1.5 | 0.1-5.0 | Heating curve steepness |
-| `satdeadband` | 0.1 | 0.05-2.0 C | PID deadband width |
 | `satinterval` | 30 | 10-300 s | Control loop interval: how often SAT computes and sends the setpoint. The PID state does not follow it: it advances on its own fixed 60 s timer (see PID tuning) |
 | `satexternaltemp` | false | bool | Use external indoor sensor via MQTT |
 | `satovershootprotection` | true | bool | PWM start-up and modulation suppression (see 5.6). Applies to every heating source |

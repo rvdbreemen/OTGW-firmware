@@ -17,7 +17,8 @@
 */
 
 // --- PID Constants ---
-static const float SAT_PID_DEADBAND_DEFAULT     = 0.1f;   // Matches Python DEADBAND=0.1 (const.py)
+// SAT_PID_DEADBAND (0.1, thermo-nova const.py:16) lives in SATtypes.h: SATcontrol.ino (the zone PID, the curve
+// recommendation) is concatenated before this file and reads it too.
 static const float SAT_PID_UPDATE_INTERVAL      = 60.0f;   // seconds (pid.py:20, PID_UPDATE_INTERVAL)
 // Derivative alpha is now adaptive: alpha = dt / (PID_UPDATE_INTERVAL + dt)
 static const float SAT_PID_DERIVATIVE_CAP       = 5.0f;    // Max raw derivative magnitude
@@ -193,7 +194,7 @@ static void _pidCalculateGains(float curveValue)
 // role. Clamp to [-curveValue, +curveValue] — symmetric (Python: clamp_to_range).
 static void _pidUpdateIntegral(float error, float curveValue, bool force)
 {
-  float deadband = settings.sat.fDeadband;
+  const float deadband = SAT_PID_DEADBAND;
 
   // Solar gain freeze (Task #23, TASK-1323): while solar gain is active and the freeze setting is on,
   // the whole integral update is skipped, including the reset outside the deadband. thermo-nova:
@@ -230,7 +231,7 @@ static void _pidUpdateIntegral(float error, float curveValue, bool force)
 // heating curve offset). Outside deadband: derivative actively updates.
 static void _pidUpdateDerivative(float roomTemp, float error)
 {
-  float deadband = settings.sat.fDeadband;
+  const float deadband = SAT_PID_DEADBAND;
 
   // The timer runs on when the room temperature changed, not on when the PID ran:
   // pid.py stamps every branch with the sensor's last_changed, so dt is the time
@@ -385,9 +386,8 @@ float satPidOutput(float heatingCurveValue)
 // next pass after the link returns takes a start-up step again.
 // Steps: one start-up step after satPidReset(), then one per timerSATPid expiry. No room temperature
 // (entries 38, 46): no integration, curve only with P, I and D reset. The zone PIDs ride the same timer.
-// While the room temperature is estimated (MQTT takeover) the thermal-estimation deadband widening applies to the
-// main step and to the zone steps alike, as it did when both ran inside the control tick; satPidGatherInputs()
-// returns 0 once the estimate is older than SAT_THERMAL_MAX_EST_MS, where the tick used to return before widening.
+// The deadband is the fixed 0.1 for the main step and the zone steps alike, also while the room temperature is
+// estimated (MQTT takeover): the widening is gone (entry 76, TASK-1417; pid.py:187, :205 use DEADBAND).
 void satPidService(uint32_t nowMs)
 {
   const bool startup = _pid_startupPending;
@@ -398,8 +398,8 @@ void satPidService(uint32_t nowMs)
     RESTART_TIMER(timerSATPid);
   }
 
-  float room = 0.0f, target = 0.0f, curve = 0.0f, deadbandExtra = 0.0f;
-  const bool roomValid = satPidGatherInputs(&room, &target, &curve, &deadbandExtra);
+  float room = 0.0f, target = 0.0f, curve = 0.0f;
+  const bool roomValid = satPidGatherInputs(&room, &target, &curve);
   if (!due) {
     // Entry 115: no valid room temperature seen since the boot or reset, so the restored state is held. The first
     // valid reading takes a step at once, as the start-up step would, and restarts the timer; until then the pass
@@ -407,10 +407,7 @@ void satPidService(uint32_t nowMs)
     if (!roomValid) return;
     RESTART_TIMER(timerSATPid);
   }
-  const float savedDeadband = settings.sat.fDeadband;
-  settings.sat.fDeadband += deadbandExtra;   // 0 without a valid room temperature
   if (roomValid) satPidStep(room, target, curve, nowMs);
   else           satPidCurveOnly(curve);
   satZonePidAdvanceAll();
-  settings.sat.fDeadband = savedDeadband;
 }

@@ -174,7 +174,8 @@ def _helper(src):
 
 def tick_program(src):
     a = src.index("  // --- Calculate heating curve ---")
-    b = src.index("  // Task #21: Restore original deadband", a)
+    b = (src.index("  // Task #21: Restore original deadband", a) if "  // Task #21: Restore original deadband" in src
+         else src.index("  // --- Solar gain compensation on the requested setpoint", a))   # TASK-1417 removed the restore
     helper = _helper(src) or ""
     return (STUBS + _common(src) + helper + "\n" + ZONE_OUT +
             "static float tick(float effectiveTarget, float outsideTemp) {\n"
@@ -313,7 +314,8 @@ class ZoneAggregation(unittest.TestCase):
     # --- source checks ------------------------------------------------------------------------
     def test_tick_calls_the_helper_with_the_cold_setpoint(self):
         a = self.src.index("  // --- Calculate heating curve ---")
-        b = self.src.index("  // Task #21: Restore original deadband", a)
+        b = (self.src.index("  // Task #21: Restore original deadband", a) if "  // Task #21: Restore original deadband" in self.src
+             else self.src.index("  // --- Solar gain compensation on the requested setpoint", a))   # TASK-1417 removed the restore
         seg = self.src[a:b]
         self.assertIn("satAggregateZoneSetpoint(", seg)
         self.assertIn("satGetColdSetpoint()", seg)

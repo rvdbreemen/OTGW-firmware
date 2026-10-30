@@ -60,6 +60,7 @@ PRELUDE = r"""
 #define SAT_MAX_ZONES 4
 #define SAT_HSYS_UNDERFLOOR 2
 static const float SAT_HC_REF_TEMP = 20.0f;
+static const float SAT_PID_DEADBAND = 0.1f;   // TASK-1417: SATtypes.h (an old SATpid.ino copy ignores it)
 typedef uint8_t byte;
 static uint32_t g_ms = 0;
 static uint32_t millis() { return g_ms; }
@@ -170,7 +171,10 @@ int main(int argc, char** argv) {
   if (!strcmp(sc, "zone1none")) {                   // TASK-1440: zone count 1 (the default), no zone data pushed
     settings.sat.iZoneCount = 1;
   }
-  const bool widen = !strcmp(sc, "widen");          // REAL satPidGatherInputs: argv[4] = age of the estimate (ms), argv[5] = takeover active
+  // REAL satPidGatherInputs: argv[4] = age of the estimate (ms), argv[5] = takeover active. "stored": a stored SATdeadband
+  // of 2.0 (TASK-1417: no longer read; before, the PID used it)
+  const bool widen = !strcmp(sc, "widen") || !strcmp(sc, "stored");
+  if (!strcmp(sc, "stored")) settings.sat.fDeadband = 2.0f;
   const uint32_t estMs = argc > 4 ? (uint32_t)strtoul(argv[4], 0, 10) : 0;
   const bool takeover = argc > 5 && atoi(argv[5]) != 0;
   if (widen) {
@@ -275,7 +279,8 @@ def real_gather_source(sat: str) -> str:
     if not limit:
         raise AssertionError("SAT_THERMAL_MAX_EST_MS not found")
     return "\n".join([limit.group(0), _fn(sat, r"static bool satRoomTempValid\("), _fn(sat, r"static float satRoomFiltered\("),
-                      _fn(sat, r"static float satEffectiveTarget\("), _fn(sat, r"static float satEstDeadbandExtra\("),
+                      _fn(sat, r"static float satEffectiveTarget\("),
+                      _fn(sat, r"static float satEstDeadbandExtra\(") if "satEstDeadbandExtra(" in sat else "",   # gone in TASK-1417
                       _fn(sat, r"bool satPidGatherInputs\(")])
 
 
@@ -283,12 +288,19 @@ def save_source(sat: str) -> str:
     return SAVE_STUBS + _fn(sat, r"void satSavePidState\(")
 
 
+def adapt(sat: str, text: str) -> str:
+    """TASK-1417 removed the deadbandExtra argument of satPidGatherInputs(): match the stubs to the source."""
+    if "float* deadbandExtra" in sat:
+        return text
+    return text.replace(", float* deadbandExtra", "").replace(" *deadbandExtra = 0.0f;", "")
+
+
 def build_cpp(sat: str, pid: str, real_gather: bool = False) -> str:
     pid = pid[pid.index("// --- PID Constants ---"):]
     main = ("#define HAVE_SERVICE 1\n" if "void satPidService(" in pid else "") + MAIN
     gather = real_gather_source(sat) if real_gather else GATHER_STUB
-    return (PRELUDE.replace("@TIMERS@", TIMERS).replace("@ZONE@", zone_source(sat)).replace("@PID@", pid)
-            .replace("@GATHER@", gather).replace("@SAVE@", save_source(sat)) + main)
+    return adapt(sat, PRELUDE.replace("@TIMERS@", TIMERS).replace("@ZONE@", zone_source(sat)).replace("@PID@", pid)
+                 .replace("@GATHER@", gather).replace("@SAVE@", save_source(sat)) + main)
 
 
 def parse(line):
@@ -558,10 +570,11 @@ class Cadence(unittest.TestCase):
 
 
 class Widening(unittest.TestCase):
-    """The thermal-estimation deadband widening through the REAL satPidGatherInputs / satEstDeadbandExtra / satEffectiveTarget /
-    satRoomFiltered path, with the real satPidService: the main step and the zone step both see the widened deadband while
-    the room temperature is estimated (MQTT takeover), the widening ends where the control tick returns (2 h), and the
-    deadband is restored afterwards. Room 20.5 against target 21.0 is an error of 0.5, outside the normal 0.1 deadband."""
+    """TASK-1417 (Sergeant D entry 76, Q26: "fixed 0.1"): the deadband is thermo-nova's DEADBAND 0.1 (const.py:16,
+    pid.py:187), with no widening while the room temperature is estimated and no stored setting. Driven through the
+    REAL satPidGatherInputs / satEffectiveTarget / satRoomFiltered path and the real satPidService, main and zone
+    step. Room 20.5 against target 21.0 is an error of 0.5, outside 0.1: no integration. Red on origin/dev, where
+    1 h of MQTT-takeover estimation widened the deadband to 0.6 and a stored SATdeadband of 2.0 was used."""
 
     HOUR = 3600000
 
@@ -591,11 +604,19 @@ class Widening(unittest.TestCase):
                              check=True).stdout
         return parse(out.strip().split("\n")[-1])
 
-    def test_takeover_estimate_widens_main_and_zone_step(self):
-        r = self.run_widen(1 * self.HOUR, 1)               # 1 h of estimation: deadband 0.1 + 0.5 = 0.6 > error 0.5
-        self.assertGreater(float(r["I"]), 0.0, "main PID integrates inside the widened deadband: %s" % r)
-        self.assertGreater(float(r["zoneI"]), 0.0, "the zone step sees the same widened value: %s" % r)
-        self.assertAlmostEqual(float(r["deadband"]), 0.1, places=6, msg="the deadband is restored after the service")
+    def test_takeover_estimate_does_not_widen_main_or_zone_step(self):
+        r = self.run_widen(1 * self.HOUR, 1)               # 1 h of estimation: was 0.1 + 0.5 = 0.6 > error 0.5
+        self.assertEqual(float(r["I"]), 0.0, "main PID: error 0.5 stays outside the fixed 0.1: %s" % r)
+        self.assertEqual(float(r["zoneI"]), 0.0, "zone PID: the same fixed 0.1: %s" % r)
+
+    def test_stored_deadband_setting_is_not_used(self):
+        if not self.exe:
+            self.skipTest("no host C++ compiler")
+        out = subprocess.run([str(self.exe), "stored", "30", "1000000", "0", "0"], capture_output=True, text=True,
+                             check=True).stdout
+        r = parse(out.strip().split("\n")[-1])
+        self.assertEqual(float(r["I"]), 0.0, "a stored SATdeadband of 2.0 must not widen the main PID: %s" % r)
+        self.assertEqual(float(r["zoneI"]), 0.0, "nor the zone PID: %s" % r)
 
     def test_no_widening_without_takeover(self):
         r = self.run_widen(1 * self.HOUR, 0)
@@ -603,10 +624,34 @@ class Widening(unittest.TestCase):
         self.assertEqual(float(r["zoneI"]), 0.0, r)
 
     def test_no_widening_once_the_estimate_is_older_than_the_tick_limit(self):
-        r = self.run_widen(3 * self.HOUR, 1)               # the tick returned before widening from 2 h on
+        r = self.run_widen(3 * self.HOUR, 1)
         self.assertEqual(float(r["I"]), 0.0, r)
         self.assertEqual(float(r["zoneI"]), 0.0, r)
-        self.assertAlmostEqual(float(r["deadband"]), 0.1, places=6)
+
+
+class DeadbandSettingGone(unittest.TestCase):
+    """STRUCTURAL (TASK-1417 AC#2, entry 76): the deadband setting and its REST, MQTT and UI exposure are removed; a stored
+    SATdeadband is ignored because no parser branch reads it, and the retained sat/deadband topic is cleared like the other
+    retired SAT topics. Red on origin/dev."""
+
+    @classmethod
+    def setUpClass(cls):
+        src = REPO / "src" / "OTGW-firmware"
+        cls.files = {p.name: p.read_text(encoding="utf-8") for p in
+                     [src / n for n in ("SATtypes.h", "SATpid.ino", "SATcontrol.ino", "settingStuff.ino", "restAPI.ino",
+                                        "MQTTstuff.ino", "settingsHelp.h", "handleDebug.ino")] + [src / "data" / "v2.js"]}
+        cls.disc = (src / "MQTTHaDiscovery.cpp").read_text(encoding="utf-8")
+
+    def test_no_setting_rest_mqtt_or_ui_left(self):
+        for name, text in self.files.items():
+            for token in ("fDeadband", "SATdeadband", "satdeadband", "sat/deadband", "satEstDeadbandExtra"):
+                self.assertNotIn(token, text, f"{name} still has {token}")
+
+    def test_retained_topic_is_retired(self):
+        self.assertIn('{ nullptr, nullptr, "/sat/deadband" },   // RETIRED-SAT-ENTITY TASK-1417', self.disc)
+
+    def test_single_constant(self):
+        self.assertIn("static const float SAT_PID_DEADBAND = 0.1f;", self.files["SATtypes.h"])
 
 
 class SourceTruth(unittest.TestCase):

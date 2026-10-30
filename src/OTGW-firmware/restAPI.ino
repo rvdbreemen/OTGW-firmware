@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.545
+**  Version  : v2.0.0-alpha.546
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1688,8 +1688,6 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATmultiareacount", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("heating_curve")) == 0) {
       updateSetting("SATcoefficient", val); handled = true;
-    } else if (strcasecmp_P(settingName, PSTR("deadband")) == 0) {
-      updateSetting("SATdeadband", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("mod_sup_delay")) == 0) {
       updateSetting("SATmodsupdelay", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("mod_sup_offset")) == 0) {
@@ -2264,7 +2262,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.hp_cycle_seconds"), (uint32_t)settings.sat.iHpCycleSeconds);
     je.field(F("settings.sat.target_temp"), settings.sat.fTargetTemp);
     je.field(F("settings.sat.curve_coeff"), settings.sat.fHeatingCurveCoeff);
-    je.field(F("settings.sat.deadband"), settings.sat.fDeadband);
     je.field(F("settings.sat.control_interval"), (uint32_t)settings.sat.iControlInterval);
     je.field(F("settings.sat.use_external_temp"), settings.sat.bUseExternalTemp);
     je.field(F("settings.sat.max_rel_mod"), (uint32_t)settings.sat.iMaxRelModulation);
@@ -3878,8 +3875,6 @@ void sendDeviceSettings()
     addNum(F("sattempstep"), tmpBuf, "f", 0.1, 1.0);
     dtostrf(settings.sat.fHeatingCurveCoeff, 1, 1, tmpBuf);
     addNum(F("satcoefficient"), tmpBuf, "f", 0, 5);
-    dtostrf(settings.sat.fDeadband, 1, 2, tmpBuf);
-    addNum(F("satdeadband"), tmpBuf, "f", 0, 2);
   }
   addInt(F("satinterval"), settings.sat.iControlInterval, "i", 10, 300);
   addBool(F("satexternaltemp"), settings.sat.bUseExternalTemp, "b");
@@ -4172,7 +4167,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satbleenable", "satbleriskack", "satblefailover", "satbleinterval", "satblemac",
   "satblenamefilteringest", "satblenameprefix",  // TASK-895 filter; TASK-1231 made them settable
   "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient",
-  "satdeadband", "satdhwcapacity", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
+  "satdhwcapacity", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
   "satflameoffset", "satflowoffset", "satflushtreshold", "satfollowthermostat", "sathumiditytimeout",
   "satinterval", "satmanufacturer", "satmaxconsumption", "satmaxpressdrop", "satmaxpressure",
   "satminconsumption", "satminpressure",

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.545
+**  Version  : v2.0.0-alpha.546
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -330,7 +330,6 @@ bool writeSettings(bool show)
   writeJsonIntKV(file, F("SAThpcycle"), settings.sat.iHpCycleSeconds);
   writeJsonFloatKV(file, F("SATtargettemp"), satUserTargetTemp());   // the user's own target, never a preset (TASK-1487)
   writeJsonFloatKV(file, F("SATcoefficient"), settings.sat.fHeatingCurveCoeff);
-  writeJsonFloatKV(file, F("SATdeadband"), settings.sat.fDeadband);
   writeJsonIntKV(file, F("SATinterval"), settings.sat.iControlInterval);
   writeJsonBoolKV(file, F("SATexternaltemp"), settings.sat.bUseExternalTemp);
   writeJsonFloatKV(file, F("SATpresetcomfort"), settings.sat.fPresetComfort);
@@ -1027,7 +1026,6 @@ void updateSetting(const char *field, const char *newValue)
     if (fabsf(settings.sat.fTargetTemp - before) >= 0.05f) satPresetClearForUserTarget();
   }
   else if (strcasecmp_P(field, PSTR("SATcoefficient")) == 0)     settings.sat.fHeatingCurveCoeff = clampSettingFloat(newValue, settings.sat.fHeatingCurveCoeff, 0.1f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("SATdeadband")) == 0)        settings.sat.fDeadband = clampSettingFloat(newValue, settings.sat.fDeadband, 0.05f, 2.0f);
   else if (strcasecmp_P(field, PSTR("SATinterval")) == 0) {
     settings.sat.iControlInterval = constrain(atoi(newValue), 10, 300);
     CHANGE_INTERVAL_SEC(timerSATControl, settings.sat.iControlInterval);

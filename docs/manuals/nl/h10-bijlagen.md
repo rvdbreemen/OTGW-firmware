@@ -188,7 +188,6 @@ De volgende tabel toont de belangrijkste instellingen met hun standaardwaarden. 
 | `sattargettemp` | `20.0` | Doel-kamertemperatuur (°C) |
 | `satheatingcurvecoeff` | `1.5` | Stooklijncoëfficiënt |
 | `satcontrolinterval` | `30` | Regelinterval (seconden) |
-| `satdeadband` | `0.1` | PID-dode band (°C) |
 | `satpresetcomfort` | `21.0` | Comfortvoorinstelling (°C) |
 | `satpreseteco` | `18.0` | Eco-voorinstelling (°C) |
 | `satpresetaway` | `15.0` | Afwezig-voorinstelling (°C) |

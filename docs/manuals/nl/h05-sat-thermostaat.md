@@ -85,7 +85,6 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `satsource` | `0` | 0-3 | WarmteBRON (energie-apparaat): 0=auto, 1=gasketel, 2=warmtepomp, 3=hybride |
 | `sattargettemp` | `20.0` | 5-30 C | Gewenste ruimtetemperatuur |
 | `satcoefficient` | `1.5` | 0.1-5.0 | Steilheid van de verwarmingscurve |
-| `satdeadband` | `0.1` | 0.05-2.0 C | PID-deadband breedte |
 | `satinterval` | `30` | 10-300 s | Regelinterval: hoe vaak SAT het setpoint berekent en verstuurt. De PID-toestand volgt dit niet: die schuift op met een eigen vaste timer van 60 s (zie PID-tuning) |
 | `satexternaltemp` | `false` | bool | Externe ruimtetemperatuurbron gebruiken |
 | `satovershootprotection` | `true` | bool | PWM-start en modulatie-onderdrukking (zie 5.6). Geldt voor elke warmtebron |

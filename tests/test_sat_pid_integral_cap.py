@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
 
 def build_cpp(sat: str, pid: str) -> str:
     pid = pid[pid.index("// --- PID Constants ---"):]
-    return (cad.PRELUDE.replace("@TIMERS@", cad.TIMERS).replace("@ZONE@", cad.zone_source(sat)).replace("@PID@", pid)
+    return cad.adapt(sat, cad.PRELUDE.replace("@TIMERS@", cad.TIMERS).replace("@ZONE@", cad.zone_source(sat)).replace("@PID@", pid)
             .replace("@GATHER@", cad.GATHER_STUB).replace("@SAVE@", cad.save_source(sat)) + MAIN)
 
 

@@ -104,7 +104,8 @@ def extract(src: str) -> str:
     if "satAggregateZoneSetpoint(" in src:                    # TASK-1440: the zone block calls it
         step += "\n" + _fn(src, r"static float satAggregateZoneSetpoint\(")
     a = src.index("  // --- Calculate heating curve ---")
-    b = src.index("  // Task #21: Restore original deadband", a)
+    b = (src.index("  // Task #21: Restore original deadband", a) if "  // Task #21: Restore original deadband" in src
+         else src.index("  // --- Solar gain compensation on the requested setpoint", a))   # TASK-1417 removed the restore
     loop = src[a:b]
     return (curve + "\n" + excl + "\n" + usable + "\n" + kp + "\n" + step + "\n"
             "static float tick(float effectiveTarget, float outsideTemp) {\n"

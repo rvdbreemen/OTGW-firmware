@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.545
+**  Version  : v2.0.0-alpha.546
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -706,7 +706,6 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "auto_tune",              "SATautotune",          nullptr },
   { "auto_tune_rate",         "SATautotunerate",      nullptr },
   { "heating_curve_coeff",    "SATcoefficient",       nullptr },  // TASK-1485: was "heating_curve"
-  { "deadband",               "SATdeadband",          nullptr },
   { "mod_sup_delay",          "SATmodsupdelay",       nullptr },
   { "mod_sup_offset",         "SATmodsupoffset",      nullptr },
   { "boiler_capacity",        "SATboilercapacity",    nullptr },

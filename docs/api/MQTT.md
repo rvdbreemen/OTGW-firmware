@@ -483,7 +483,6 @@ The following topics echo the current configured values. They are retained and p
 | Topic | Example | Description |
 | ----- | ------- | ----------- |
 | `sat/heating_curve_coeff` | `"1.5"` | Heating curve coefficient (set with the `sat/heating_curve_coeff` command) |
-| `sat/deadband` | `"0.25"` | PID deadband (°C) |
 | `sat/control_interval` | `"30"` | Control loop interval (seconds; set with the `sat/interval` command) |
 | `sat/max_modulation` | `"100"` | Max relative modulation % |
 | `sat/flame_off_offset` | `"18.0"` | PWM ON phase only: hold offset above the return temperature while waiting for the flame (°C) |
@@ -1087,7 +1086,6 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 | Topic Suffix | Bound SAT setting | Notes |
 | ------------ | ----------------- | ----- |
 | `sat/heating_curve_coeff` | `SATcoefficient` | Heating curve coefficient (state echo: `sat/heating_curve_coeff`; the state topic `sat/heating_curve` is the computed curve value). Renamed from `sat/heating_curve` in TASK-1485, no alias: the old command is ignored |
-| `sat/deadband` | `SATdeadband` | PID deadband (°C) |
 | `sat/interval` | `SATinterval` | Control loop interval (seconds) |
 | `sat/overshoot_margin` | `SATovershootmargin` | Overshoot margin (°C) |
 | `sat/manufacturer` | `SATmanufacturer` | Boiler manufacturer name |

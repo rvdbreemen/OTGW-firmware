@@ -641,7 +641,7 @@ There is one main PID with its own internal state held in file-level static vari
 | Outside temperature | `satGetOutsideTemp()`: simulation, external MQTT (10 min stale limit), weather API when OT Toutside is 0.0, else OT MsgID 27; values outside -40 to 50 are replaced by 10.0 | SATcontrol.ino:4657, SATcontrol.ino:1283-1303, SATcontrol.ino:4721-4723 |
 | Heating system type | `satGetEffectiveHeatingSystem()`: the setting, with AUTO mapped to radiators | SATcontrol.ino:194-201, SATtypes.h:438 |
 | Gains config | `settings.sat.fHeatingCurveCoeff` (automatic gains only, TASK-1357) | SATpid.ino `_pidCalculateGains`, SATtypes.h:442 |
-| Deadband | `settings.sat.fDeadband`, a setting (not a constant) | SATpid.ino:151, SATpid.ino:189, SATtypes.h:443 |
+| Deadband | constant `SAT_PID_DEADBAND` = 0.1 (TASK-1417, entry 76; was the setting `fDeadband`) | `SATtypes.h`, used in `SATpid.ino` `_pidUpdateIntegral()` / `_pidUpdateDerivative()` and `satZonePidAdvance()` |
 | Freeze flag | `state.sat.bSolarGainActive` and `settings.sat.bSolarFreezeIntegral` (corrected 2026-10-24, TASK-1351) | SATpid.ino:157 |
 | `boilerTemp` argument | gone with `satPidUpdate()` (TASK-1368): `satPidStep()` and `satPidOutput()` do not take the flow temperature | SATpid.ino |
 
@@ -689,7 +689,7 @@ As thermo-nova (entry 111), the PID steps on its own timer also during DHW, with
 When none of these apply:
 
 1. The room temperature is EMA-filtered (SATcontrol.ino:4694-4713).
-2. During thermal estimation (fallback active, under 2 h), the deadband setting is temporarily widened by `0.5 * hours of estimation` (SATcontrol.ino:4747-4751). It is restored after the PID and zone steps (SATcontrol.ino:4901-4904).
+2. (Removed by TASK-1417, entry 76: the deadband is no longer widened during thermal estimation. Before: widened by `0.5 * hours of estimation` while the fallback was active, under 2 h.)
 3. Solar gain detection runs (SATcontrol.ino:4762), see section E for its effect on the integral.
 4. The auto-tune step may change the heating curve coefficient (SATcontrol.ino:4793), see "Formulas".
 5. `effectiveTarget` is built (SATcontrol.ino:4831-4833) and the heating curve is computed (SATcontrol.ino:4836).
@@ -859,8 +859,7 @@ With the firmware default coefficient of 1.5 (SATtypes.h:442) and the same input
 | Error-unchanged tolerance | 0.001 | degrees | SATpid.ino:283 |
 | `SAT_PID_DERIVATIVE_CAP` | 5.0 | degrees per s (raw derivative) | SATpid.ino:24 |
 | `SAT_PID_DEADBAND_DEFAULT` (defined, not used by the code) | 0.1 | degrees | SATpid.ino:20 |
-| `settings.sat.fDeadband` default | 0.1 | degrees | SATtypes.h:443 |
-| Deadband setting range | 0.05 to 2.0 | degrees | settingStuff.ino:999 |
+| `SAT_PID_DEADBAND` (fixed, TASK-1417) | 0.1 | degrees | SATtypes.h |
 | Kp divisor, underfloor | 4 | none | SATpid.ino:28 |
 | Kp divisor, radiators (and AUTO) | 3 | none | SATpid.ino:29, SATcontrol.ino:198-199 |
 | `SAT_PID_AGGRESSION_V3` (Ki divisor) | 8400 | not stated in the code | SATpid.ino:25 |
@@ -898,7 +897,7 @@ With the firmware default coefficient of 1.5 (SATtypes.h:442) and the same input
 | Zone P75 fraction | 0.75 | fraction | SATcontrol.ino:2360 |
 | Zone overshoot margin / cooling headroom / cooling slope | 0.3 / 10.0 / 4.0 | degrees, degrees, degrees per degree | SATcontrol.ino:2335-2337 |
 | Zone timeout default | 300 | s | SATtypes.h:532 |
-| Thermal estimation deadband widening | 0.5 | degrees per hour | SATcontrol.ino:4750 |
+| Thermal estimation deadband widening | removed (TASK-1417, entry 76) | - | - |
 | `iHeatingMode` default (not used by control) | 0 (COMFORT) | enum | SATtypes.h:524 |
 
 <a id="s2-state-kept-between-passes"></a>
@@ -1318,8 +1317,7 @@ Derived from the curve formula and the cold setpoints (computed, not stated in t
 | `fFlowOffset` default | 2.0 | °C | SATtypes.h:467 |
 | `fFlowOffset` accepted range | 0.5 to 10 | °C | settingStuff.ino:1040 |
 | `SAT_FLOW_OFFSET_CONTINUOUS` | 5.0 | °C | SATcontrol.ino:58 (defined; no use found by grep) |
-| `fDeadband` default | 0.1 | °C | SATtypes.h:443 |
-| `fDeadband` accepted range | 0.05 to 2.0 | °C | settingStuff.ino:999 |
+| `SAT_PID_DEADBAND` (fixed; the `fDeadband` setting is removed, TASK-1417) | 0.1 | °C | SATtypes.h |
 | PID sample-time limit | removed (TASK-1368, entry 75) | - | - |
 | PID "update interval" factor | 60 | s | SATpid.ino:22 |
 | PID integral absolute cap | 20 | °C | SATpid.ino:176 |

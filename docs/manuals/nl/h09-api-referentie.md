@@ -171,7 +171,7 @@ De firmware valideert elk veld afzonderlijk en coalesceert flash-schrijfbewerkin
 {"status": "ok", "saved": true}
 ```
 
-**Settings whitelist:** Alleen bekende instellingsnamen worden geaccepteerd. De volledige lijst omvat onder andere: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satdeadband`, `satinterval`, en nog veel meer SAT-gerelateerde instellingen.
+**Settings whitelist:** Alleen bekende instellingsnamen worden geaccepteerd. De volledige lijst omvat onder andere: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, en nog veel meer SAT-gerelateerde instellingen.
 
 ---
 
@@ -1053,7 +1053,6 @@ De onderstaande commando's geven de payload ongewijzigd door aan de genoemde ins
 | `sat/auto_tune` | `SATautotune` |
 | `sat/auto_tune_rate` | `SATautotunerate` |
 | `sat/heating_curve_coeff` | `SATcoefficient` |
-| `sat/deadband` | `SATdeadband` |
 | `sat/mod_sup_delay` | `SATmodsupdelay` |
 | `sat/mod_sup_offset` | `SATmodsupoffset` |
 | `sat/boiler_capacity` | `SATboilercapacity` |

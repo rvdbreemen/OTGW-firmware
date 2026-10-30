@@ -195,7 +195,7 @@ Update one or more settings. Authentication required.
 
 Settings are validated server-side. Invalid values are silently ignored or constrained to safe ranges. Side effects (MQTT reconnect, NTP resync, mDNS restart) are applied within 2 seconds via a deferred-write timer.
 
-**Settings whitelist:** Only known setting names are accepted. The full list includes: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `darktheme`, `gpiosensorsenabled`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satdeadband`, `satinterval`, and many more SAT-related settings.
+**Settings whitelist:** Only known setting names are accepted. The full list includes: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `darktheme`, `gpiosensorsenabled`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, and many more SAT-related settings.
 
 ---
 
@@ -1262,7 +1262,6 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/auto_tune` | `SATautotune` |
 | `sat/auto_tune_rate` | `SATautotunerate` |
 | `sat/heating_curve_coeff` | `SATcoefficient` |
-| `sat/deadband` | `SATdeadband` |
 | `sat/mod_sup_delay` | `SATmodsupdelay` |
 | `sat/mod_sup_offset` | `SATmodsupoffset` |
 | `sat/boiler_capacity` | `SATboilercapacity` |

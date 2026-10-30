@@ -4196,9 +4196,6 @@ components:
         coefficient:
           type: number
           description: "Heating-curve coefficient (steepness)"
-        deadband:
-          type: number
-          description: "PID deadband (C) around the target"
         overshoot_margin:
           type: number
           description: "Allowed overshoot above target before a cycle is classed as overshoot (C)"
@@ -4537,7 +4534,6 @@ components:
         kd: 0.0
         raw_derivative: 0.0
         coefficient: 1.5
-        deadband: 0.1
         overshoot_margin: 2.0
         cycle_count: 0
         cycles_this_hour: 0

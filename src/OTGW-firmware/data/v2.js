@@ -2021,7 +2021,6 @@
     sattargettemp:   { cat: 'sat', label: 'Target temperature', hint: '°C' },
     sattempstep:     { cat: 'sat', label: 'Setpoint step', hint: '°C' },
     satcoefficient:  { cat: 'sat', label: 'Heating curve slope' },
-    satdeadband:     { cat: 'sat', label: 'Deadband', hint: '°C' },
     satheatingmode:  { cat: 'sat', label: 'Heating mode' },
     satmanufacturer: { cat: 'sat', label: 'Manufacturer' },
     satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' },
@@ -2169,7 +2168,7 @@
     ['Season', ['satsummersimmer', 'satsummerthreshold', 'satsummerminhours', 'satwindowdetect', 'satwindowminsec']]
   ];
   var SAT_L3 = [
-    ['Curve', ['satcoefficient', 'satdeadband', 'sattempstep', 'satovershootmargin']],
+    ['Curve', ['satcoefficient', 'sattempstep', 'satovershootmargin']],
     ['PID / PWM', ['satovershootprotection', 'satcyclesperhour', 'satmaxmodulation',
                    'satinterval', 'sathpcycle', 'satautotune', 'satautotunerate', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
@@ -4656,7 +4655,6 @@
       ['Active preset', SAT_PRESET_NAMES[d.active_preset | 0] || '—'],
       ['Manufacturer', d.manufacturer || '—'],
       ['Coefficient', satFmt(d.coefficient, 2)],
-      ['Deadband', satFmt(d.deadband, 2, ' °C')],
       ['PID output', satFmt(d.pid_output, 1, ' °C')],
       ['Error', satFmt(d.error, 2, ' °C')],
       ['Modulation', d.current_modulation != null ? d.current_modulation + ' %' : '—'],
