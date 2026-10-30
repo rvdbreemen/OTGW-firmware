@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-30T06:19:00Z'
-updated_date: '2026-10-30T16:41:00Z'
+updated_date: '2026-10-30T17:21:00Z'
 labels:
   - release beta
 milestone: 2.0.0
@@ -42,4 +42,6 @@ Robert 2026-10-30 decisions: (1) SAT experimental, opt-in, default off, named so
 2026-10-30 coordinator (session 80): AC1 (1495, 1500, 1503), AC6 (1371 alpha.556, 1501 alpha.551, 1370 alpha.553, 1373 alpha.554, 1375 alpha.552, 1376 alpha.555, each bench-tested on .63 and published) and AC7 (1505, 1507) all Done with evidence in their final summaries. Also in: TASK-1513 (alpha.557, entry 152; AC2 entry 155 in progress) and TASK-1514 (alpha.558, entry 153). Remaining: AC2 macOS capture by a tester, AC3 24 h soak of the candidate (starts after the TASK-1513 AC2 build), AC4 release notes update (in progress), AC5 Robert's go.
 
 AC4 draft updated (docs/releases/RELEASE_NOTES_2.0.0-beta.1.md): today's SAT items, three new BREAKING items (cycles 3/4, max_setpoint meaning + underfloor default 50, cycles_this_hour), known issues 1498/1438/1480 + 1371 not field-run. Open for Robert's review: crash-log endpoint claim (only in the old 2.0.0-beta CHANGELOG section), port 25238 bridge opt-in and ADR-084 topics (only in RELEASE_GITHUB_2.0.0.md), older [Unreleased] items whose cycle is unclear, release date, macOS result, soak result.
+
+AC3 soak started: alpha.559+ccda6eb (beta-1 candidate) on .63 Classic+S3 Mini, 2026-10-30 17:20:43 UTC, bootcount 26, detached monitor %LOCALAPPDATA%/OTGW-capture/soak/soak.py (PID 14212) logging every 300 s to %LOCALAPPDATA%/OTGW-capture/soak/soak-559.log; ends 2026-10-31 17:20 UTC. Do not flash .63 until then.
 <!-- SECTION:NOTES:END -->

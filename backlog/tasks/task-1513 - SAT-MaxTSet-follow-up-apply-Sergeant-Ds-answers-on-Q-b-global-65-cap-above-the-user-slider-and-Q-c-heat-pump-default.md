@@ -3,10 +3,10 @@ id: TASK-1513
 title: >-
   SAT MaxTSet follow-up: apply Sergeant D's answers on Q-b (global 65 cap above
   the user slider) and Q-c (heat-pump default)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30T14:35:00Z'
-updated_date: '2026-10-30T17:01:00Z'
+updated_date: '2026-10-30T17:21:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -39,4 +39,12 @@ Bench .63 alpha.558 (contains 557): satmaxsetpoint 70 -> one SH=70 queued (alpha
 Q-c answered A (entry 155, msg 1565762899904041122): heat pumps default 40 C when nothing chosen; a chosen value replaces it. AC2 implementation started in wt-1513b.
 
 AC2 (entry 155, Q-c A) implemented: heat pump + nothing chosen -> CS cap 40, no SH=; chosen value replaces it (within MsgID 49 bounds, underfloor 50). tests/test_sat_max_tset.py: base Ran 28 FAILED (failures=2: chosen 55 gave 40), fix 28 OK; webui 8/8; full suite 70/71 by exit code (float roundtrip pre-existing); evaluate EXIT 0. Committed as alpha.559.
+
+Bench .63 alpha.559: satsource 2 (heat pump) + nothing chosen -> max_setpoint_system 40; chosen 55 -> one SH=55, system cap 55; restored (gas boiler, 0) -> 62. Pushed ccda6ebaa, zip msg 1565776786720165938.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+alpha.557 (e56ef7c45) AC1 entry 152 + alpha.559 (ccda6ebaa) AC2 entry 155, both pushed and published. A chosen max flow setpoint is the only cap (no 65 C ceiling); heat pumps default to 40 C when nothing is chosen, a chosen value replaces it. Evidence: tests/test_sat_max_tset.py old code red (4 then 2 failures), fix 25 then 28 OK; full suite by exit code 70/71 (pre-existing float roundtrip); bench .63: boiler chosen 70 -> SH=70 (alpha.554 sent 65); heat pump nothing chosen -> cap 40, chosen 55 -> SH=55 cap 55. NOT verified: OT-Direct (unit offline).
+<!-- SECTION:FINAL_SUMMARY:END -->
