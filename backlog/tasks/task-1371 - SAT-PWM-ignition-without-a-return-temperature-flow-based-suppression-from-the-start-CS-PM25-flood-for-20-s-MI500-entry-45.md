@@ -3,11 +3,11 @@ id: TASK-1371
 title: >-
   SAT PWM ignition without a return temperature: flow-based suppression from the
   start, CS/PM=25 flood for 20 s, MI=500 (entry 45)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-24T22:32:00Z'
-updated_date: '2026-10-30T15:34:00Z'
+updated_date: '2026-10-30T15:56:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -29,7 +29,7 @@ Sergeant D 2026-10-24 21:34 UTC (Q14, entry 45, a deliberate deviation from ther
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Without a return temperature the PWM ON phase suppresses to flow - offset from ignition and sends CS/PM=25 alternately each second for 20 s (host test of the command sequence red on HEAD, green); MI=500 sent for such boilers on PIC boards; plan OK'd by Sergeant D first
+- [x] #1 Without a return temperature the PWM ON phase suppresses to flow - offset from ignition and sends CS/PM=25 alternately each second for 20 s (host test of the command sequence red on HEAD, green); MI=500 sent for such boilers on PIC boards; plan OK'd by Sergeant D first
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -70,3 +70,9 @@ Plan correction (self-review against heating_control.py:392-433): timing follows
 
 Review round (opus correctness + sonnet SAT-entries): entries 23/45/51/54/84/121/135/138/141/142/148/149/151 agree; two MEDIUM findings fixed: (1) boot window: satNoReturnTemp() now needs a MsgID 28 Unknown-DataID from a boiler frame of THIS boot (boilerEvidence path, gateway-made frames excluded, TASK-1086) plus picBoardTretAbsent() (poll result seen, none valid in 5 min); the no-return MI=500 waits for 5 min of continuous detection; (2) after a relight following a draw the flood hands over to the suppression CS at its end and the 3 s refresh gates on the live DHW bit (probe showed CS=58 repeated where 39 belonged). Gates on a176fae6e + lane: evaluate --quick EXIT 0; 69/70 Python test files OK (float roundtrip pre-existing); all web UI node tests pass; test_sat_no_return_ignition 19 OK, base Ran 15 FAILED (failures=10), per-fix reverts red (3 and 1+1 failures). Committed as alpha.556.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+alpha.556 (4903f891b, pushed, zip msg 1565756093546631228). For a boiler without return temperature (MsgID 28 Unknown-DataID confirmed by a boiler frame this boot, no valid PIC 'R' board sensor for 5 min, poll result seen): PWM ON hold = flow + flame-off offset clamped to cold..effective max; from each CH flame-on (incl. relight after a draw) for the suppression delay: CS even s / PM=25 odd s (skipped while a PM chain is pending), then hand-over to suppression flow - 1; MI=500 once on PIC after 5 min continuous detection (quirk at once), never OT-Direct; boot MI=500 on all boards removed. Plan OK'd by Sergeant D (entries 146/149/151). Evidence: tests/test_sat_no_return_ignition.py on the real code: base Ran 15 FAILED (failures=10), fix 19 OK, per-fix reverts red; full suite 69/70 (pre-existing float roundtrip), all web UI node tests, evaluate EXIT 0; reviewers opus (correctness) + sonnet (all SAT entries agree), 2 MEDIUM findings fixed. Bench .63 alpha.556 (PIC, normal boiler, sim): CS/MM/CH 30x each in 150 s, boot PM=3/15/48 intact, no PM=25, no MI=500, 0 queue errors, settings kept. NOT verified: a real boiler without return temperature (sim cannot model it) and OT-Direct. Open interpretations recorded: flood CS live (flow + 18 per even second), length = suppression-delay setting, PWM ON + overshoot protection only.
+<!-- SECTION:FINAL_SUMMARY:END -->
