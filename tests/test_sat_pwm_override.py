@@ -789,7 +789,7 @@ class SatPwmOverride(unittest.TestCase):
         self.assertEqual(float(self.run_sc("cutoff", 0)["sustain"]), 0.0)
 
     def test_cutoff_sets_the_max_relative_modulation(self):
-        # heating_control.py:234; the MM= of the cutoff tick is state.sat.iCurrentModulation (satEnqueueIfChangedMM)
+        # heating_control.py:234; the MM= of the cutoff tick is state.sat.iCurrentModulation (satSendMM)
         self.assertEqual(self.run_sc("cutoff", 0)["mm"], "80")
 
     def test_closed_valves_reset_pwm_like_the_cold_cutoff(self):
@@ -977,7 +977,7 @@ class ChEnableSource(unittest.TestCase):
         # TASK-1323: CH = 0 on the cold cutoff or the PWM OFF phase driving the CS, else 1
         src = SAT_INO.read_text(encoding="utf-8")
         loop = src[src.index("void satControlLoop"):]
-        self.assertIn("satEnqueueIfChangedCH(satChEnableDecide(pidOutput, satGetColdSetpoint(), pwmDrivesSetpoint, pwmOn))", loop)
+        self.assertIn("satSendCH(satChEnableDecide(pidOutput, satGetColdSetpoint(), pwmDrivesSetpoint, pwmOn))", loop)
         # The PWM phase must be read before satCycleCheckPwmExits(): a switch to continuous
         # runs satPwmReset(), which clears bPwmFlameRequested and would send CH=0 mid-burn.
         self.assertLess(loop.index("pwmOn = state.sat.bPwmFlameRequested;"),

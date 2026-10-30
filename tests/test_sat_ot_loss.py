@@ -3,13 +3,13 @@
 
 Nothing is re-implemented. The test cuts the real code out of SATcontrol.ino and compiles it with a host C++ compiler:
   - the SAT command cache and senders, from "static const uint32_t SAT_CMD_REFRESH_MS" up to the TC= comment
-    (satResetCmdCache, satEnqueueOwnCS, satEnqueueIfChangedCS/MM/CH and the PIC keepalive satPicCSKeepalive);
+    (satResetCmdCache, satEnqueueOwnCS, satEnqueueIfChangedCS, satSendCS/MM/CH, the PIC keepalive satPicCSKeepalive and the 5 s resend satCmdResend);
   - satDisable() (the hand-back: CS=0, CH=1, MM=T);
   - fix only: the block between "// --- satOtLink begin" and "// --- satOtLink end" (satOtLinkDecide, satOtLinkStep);
   - the part of satControlLoopRun() from "If safety tripped" up to "if (!DUE(timerSATControl)) return;"
     (fix: with the satOtLinkStep() gate; HEAD: without it).
 The harness runs that pass once per simulated second and, when the control timer is due, stands in for the control
-tick by calling the real satEnqueueIfChangedCS/MM/CH with fixed values (45.0, 100, 1). The boiler is modelled by
+tick by calling the real satSendCS/MM/CH with fixed values (45.0, 100, 1). The boiler is modelled by
 stamping state.otBus.iBoilerLastSeenMs, which processOT() does for every B frame.
 
 Not executed here: processOT() itself and the OT-Direct Data-Invalid path. A Data-Invalid reply keeps the link alive
@@ -153,9 +153,9 @@ int main(int argc, char** argv) {
     if (!strcmp(sc, "trip") && g_ms / 1000 == 300) state.sat.bSafetyTripped = false;
     if (enabled && prePass()) {                                           // control tick: the real senders, fixed values
       state.sat.bActive = true;
-      satEnqueueIfChangedCS(45.0f);
-      satEnqueueIfChangedMM(100);
-      satEnqueueIfChangedCH(1);
+      satSendCS(45.0f);
+      satSendMM(100);
+      satSendCH(1);
     }
     if (b && late) state.otBus.iBoilerLastSeenMs = g_ms;
   }
@@ -212,6 +212,8 @@ class OtLoss(unittest.TestCase):
         cmds, _ = self.run_sc("invalid", 720)
         self.assertIn((1, "CS=45.0"), cmds, "premise: the first control tick sends CS/MM/CH")
         self.assertTrue(any(c == "CS=45.0" and t > 300 for t, c in cmds), "premise: the PIC keepalive runs")
+        # TASK-1370 premise: between control ticks (60 s) the 5 s resend repeats CS/MM/CH, so test_b's silence is a real check
+        self.assertEqual([c for t, c in cmds if t == 6], ["CS=45.0", "MM=100", "CH=1"], "premise: the 5 s resend runs after the tick at 1 s")
 
     def test_b_loss_hands_back_once_then_silence(self):
         # Last boiler reply at t=119 s. Expected: CS=0, CH=1, MM=T at t=149 s (30 s silence), then nothing up to 720 s.

@@ -413,22 +413,24 @@ static uint8_t _sat_picFailCount      = 0;
 static bool    _sat_prevDhwActive     = false;  // Track DHW transition to send SW= on entry (TASK-437)
 static bool    _sat_prevOTOnline      = false;  // Track OT-bus online edge for cache reset (TASK-565)
 
-// --- Write-on-change refresh window for SAT-emitted OT commands (TASK-565) ---
-// Even when CS/MM/CH values are unchanged, re-emit at this cadence so a
-// rebooted PIC or a boiler whose internal state has drifted from our last
-// command resyncs to the current SAT intent. 5 min keeps tester-visible
-// latency on PIC reboot bounded while cutting steady-state OT traffic ~20x.
-// TC= is not in this list: it is event-driven (TASK-1272, see satEnqueueIfChangedTC).
+// --- SAT command cadence (TASK-1370, Sergeant D entry 44, ADR-203) ---
+// As thermo-nova's heating loop (climate.py:707-708 every 5 s; heating_control.py:236-238 sends CS, MM and CH at the
+// end of every update, unchanged values included): every control tick sends CS=, MM= and CH= through satSendCS/MM/CH(),
+// and satCmdResend() repeats the last sent values every SAT_CMD_RESEND_MS between ticks. A rebooted PIC or a boiler
+// whose state drifted resyncs within 5 s. TC= is not in this list: it is event-driven (TASK-1272, see satEnqueueIfChangedTC).
+// SAT_CMD_REFRESH_MS is the staleness window of the one change-checked sender left, satEnqueueIfChangedCS(), which the
+// 3 s PWM suppression refresh uses (entry 23).
 static const uint32_t SAT_CMD_REFRESH_MS = 300000UL; // 5 min
+static const uint32_t SAT_CMD_RESEND_MS  = 5000UL;   // thermo-nova climate.py:707-708
 
 // Reset the SAT last-sent OT command cache so the next call to
-// satEnqueueIfChanged*() always enqueues. Used on offline->online edges,
+// satEnqueueIfChangedCS() always enqueues and satCmdResend() stays quiet until the next control tick sends. Used on offline->online edges,
 // safety/disable paths, and at boot.
 // bLastSentValid is shared by CS/MM/CH and the first helper to send sets it, so it
 // cannot force the later ones. The per-command timestamps are therefore set one refresh
 // window in the past: every command is stale (uint32_t arithmetic, also right when
 // millis() < SAT_CMD_REFRESH_MS shortly after boot or across the 49-day wrap) and the
-// next satEnqueueIfChanged*() call resends even an unchanged value (TASK-1324).
+// next satEnqueueIfChangedCS() call resends even an unchanged value (TASK-1324).
 static inline void satResetCmdCache() {
   const uint32_t stale = millis() - SAT_CMD_REFRESH_MS;
   state.sat.bLastSentValid = false;
@@ -472,6 +474,19 @@ static bool satEnqueueIfChangedCS(float setpoint) {
   return true;
 }
 
+// Control tick senders (TASK-1370): send every time, unchanged values included. Each one updates the last-sent
+// cache that satEnqueueIfChangedCS(), satPicCSKeepalive() and satCmdResend() read.
+static bool _sat_cmdResendArmed = false;   // set by a tick send; the DHW and boiler-fault tick paths clear it
+static void satSendCS(float setpoint) {
+  _sat_cmdResendArmed = true;
+  char buf[16];
+  snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), setpoint);
+  satEnqueueOwnCS(buf);
+  state.sat.fLastSentCS     = (float)(int16_t)lroundf(setpoint * 10.0f) / 10.0f;
+  state.sat.iLastSentCSMs   = millis();
+  state.sat.bLastSentValid  = true;
+}
+
 // TASK-1236: the PIC drops a CS= of 8 C or more when no new CS= arrived within its
 // expiry period (gateway.asm CommandExpiry, ~63 to ~126 s after the last CS=). SAT's
 // own cadence is far slower (SAT_CMD_REFRESH_MS, and a control interval of up to 300 s),
@@ -490,29 +505,39 @@ static void satPicCSKeepalive() {
   state.sat.iLastSentCSMs = now;
 }
 
-static bool satEnqueueIfChangedMM(uint8_t mm) {
-  uint32_t now = millis();
-  bool stale = (now - state.sat.iLastSentMMMs) >= SAT_CMD_REFRESH_MS;
-  if (state.sat.bLastSentValid && mm == state.sat.iLastSentMM && !stale) return false;
+static void satSendMM(uint8_t mm) {
   char buf[8];
   snprintf_P(buf, sizeof(buf), PSTR("MM=%u"), mm);
   addCommandToQueue(buf, strlen(buf), false, 0);
   state.sat.iLastSentMM     = mm;
-  state.sat.iLastSentMMMs   = now;
+  state.sat.iLastSentMMMs   = millis();
   state.sat.bLastSentValid  = true;
-  return true;
 }
 
 // ch is 0 or 1 (CH=0 / CH=1). Both string forms are 4 chars.
-static bool satEnqueueIfChangedCH(uint8_t ch) {
-  uint32_t now = millis();
-  bool stale = (now - state.sat.iLastSentCHMs) >= SAT_CMD_REFRESH_MS;
-  if (state.sat.bLastSentValid && ch == state.sat.iLastSentCH && !stale) return false;
+static void satSendCH(uint8_t ch) {
   addCommandToQueue(ch ? "CH=1" : "CH=0", 4, false, 0);
   state.sat.iLastSentCH     = ch;
-  state.sat.iLastSentCHMs   = now;
+  state.sat.iLastSentCHMs   = millis();
   state.sat.bLastSentValid  = true;
-  return true;
+}
+
+// Between control ticks, every SAT_CMD_RESEND_MS after the last CS= (a tick or the suppression refresh),
+// repeat the LAST SENT CS, MM and CH (not recomputed). Gates: the callers' (SAT enabled, not tripped, OpenTherm
+// link alive, restart and outside-temperature gates passed) plus bLastSentValid, which satResetCmdCache()
+// clears on every hand-back, so nothing is repeated after SAT released the boiler. A tick that ends on hot
+// water or on the boiler fault flag sends nothing and disarms the resend until a later tick sends again, and
+// the live fault and DHW status bits (SlaveStatus & 0x05) pause it, so pre-draw values are never repeated.
+// PIC boards reach their
+// command queue, where a pending command with the same prefix is replaced, so resends do not pile up.
+// Raw millis() window, not DECLARE_TIMER_MS/DUE(): it must restart on every CS send from any sender (tick, PWM refresh, PIC keepalive), like satPicCSKeepalive().
+static void satCmdResend() {
+  if (!_sat_cmdResendArmed || !state.sat.bLastSentValid || !state.sat.bActive || !hasOTCommandInterface()) return;
+  if (OTcurrentSystemState.SlaveStatus & 0x05) return;
+  if ((uint32_t)(millis() - state.sat.iLastSentCSMs) < SAT_CMD_RESEND_MS) return;
+  satSendCS(state.sat.fLastSentCS);
+  satSendMM(state.sat.iLastSentMM);
+  satSendCH(state.sat.iLastSentCH);
 }
 
 // TASK-1272, Sergeant D entry 14 and the maintainer decision of 2026-10-24: TC= is pushed when the
@@ -1235,7 +1260,7 @@ static float satApplyPWM(float pidOutput)
 
 // 3 s refresh of the suppression CS during the PWM ON phase after the hold (OpenTherm application
 // text 2.1.1.2.5: CS = actual boiler temperature, or 1 K lower, updated every 2-3 s). Same formula and
-// same write-on-change CS helper as satApplyPWM(), so it cannot fight the 30 s control tick.
+// same change-checked CS helper, so it cannot fight the control tick or the 5 s resend (both read fLastSentCS).
 static void satPwmSuppressionRefresh()
 {
   if (!DUE(timerSATSuppress)) return;
@@ -2997,7 +3022,7 @@ void satDisable(bool persistPid)
   // OT-Direct (MM= handler, clearWriteOverride(14)); otherwise the thermostat gets the
   // boiler back with maximum modulation 0 %.
   addCommandToQueue("MM=T", 4, false, 0);
-  // TASK-565: clear the write-on-change cache so the next satControlLoop
+  // TASK-565: clear the last-sent cache so the next satControlLoop
   // (re-enable, fallback, or recommissioning) re-emits all four SAT commands.
   satResetCmdCache();
   SATDebugTln(F("SAT: disabled, sent CS=0 to release boiler control"));
@@ -4646,7 +4671,7 @@ void initSAT()
   _sat_roomLostActive = false;
   _sat_picFailCount = 0;
   _sat_prevOTOnline = false;
-  // TASK-565: cache starts invalid; first call to satEnqueueIfChanged*()
+  // TASK-565: cache starts invalid; first send
   // will always emit. Defensive reset in case the struct's default
   // initialiser is bypassed by a non-zero state.sat memcpy somewhere.
   satResetCmdCache();
@@ -5570,7 +5595,7 @@ static void satControlLoopRun()
   satConsumeBoilerDetected();
   if (settings.sat.bSimulation && satBoilerHardwarePresent()) satOnBoilerDetected();
 
-  // TASK-565: detect OT-bus offline->online edge and reset write-on-change
+  // TASK-565: detect OT-bus offline->online edge and reset the last-sent
   // cache so a recovering boiler immediately receives the current SAT state
   // (CS/MM/CH and TC) instead of waiting for the staleness window to expire.
   bool otOnline = state.otBus.bOnline;
@@ -5640,6 +5665,9 @@ static void satControlLoopRun()
   // Refresh the PWM suppression CS between control ticks (TASK-1268)
   satPwmSuppressionRefresh();
 
+  // Repeat the last CS, MM and CH every 5 s between control ticks (TASK-1370, entry 44)
+  satCmdResend();
+
   // The PID steps on its own 60 s timer plus a start-up step (TASK-1368, entries 42, 111; thermo-nova
   // climate.py:712-716), whatever the control tick does: it sits before every return of the tick (hot
   // water, boiler fault, thermal-safe fallback, summer simmer, valves closed). It is reached only while SAT
@@ -5689,6 +5717,7 @@ static void satControlLoopRun()
       addCommandToQueue(swCmd, strlen(swCmd), false, 0);
       SATDebugTf(PSTR("SAT: DHW active, sent %s\r\n"), swCmd);
     }
+    _sat_cmdResendArmed = false;                   // nothing is sent on this tick: no resend of pre-draw values (TASK-1370)
     if (!_sat_prevDhwActive) satPwmOnDhwStart();   // freeze the ON clock (entry 95)
     satPwmNoteDhwFlame(satIsFlameOn());            // a flame burning with the DHW bit set is a hot-water flame (entries 105, 106)
     _sat_prevDhwActive = true;
@@ -5736,6 +5765,7 @@ static void satControlLoopRun()
   // Task #38: OT error flag monitoring -- check for critical boiler faults
   if (OTcurrentSystemState.SlaveStatus & 0x01) { // Bit 0 = fault indication
     SATDebugTln(F("SAT: boiler fault flag detected, skipping control cycle"));
+    _sat_cmdResendArmed = false;   // nothing is sent on this tick: no resend (TASK-1370)
     satCycleSkipAutoSwitch();   // a skipped tick is not a qualifying overshoot sample (firmware choice: no thermo-nova fault skip, TASK-1367)
     return; // Skip this control cycle, let boiler handle the fault
   }
@@ -5756,10 +5786,10 @@ static void satControlLoopRun()
       if (state.sat.fFinalSetpoint > sysMax) state.sat.fFinalSetpoint = sysMax;
       _sat_lastControlCS = (float)(int)state.sat.fFinalSetpoint;   // the CS sent below is the previous CS (entry 112, TASK-1381)
       if (hasOTCommandInterface()) {
-        // TASK-565: write-on-change. Thermal safe-fallback path.
-        satEnqueueIfChangedCS((float)(int)state.sat.fFinalSetpoint);
-        satEnqueueIfChangedMM(settings.sat.iMaxRelModulation);
-        satEnqueueIfChangedCH(1);
+        // TASK-1370: sent every tick. Thermal safe-fallback path.
+        satSendCS((float)(int)state.sat.fFinalSetpoint);
+        satSendMM(settings.sat.iMaxRelModulation);
+        satSendCH(1);
       }
       satCycleSkipAutoSwitch();   // thermal-safe fallback: no overshoot sample this tick (firmware-only path, TASK-1367)
       satPublishMQTT();
@@ -5783,10 +5813,10 @@ static void satControlLoopRun()
     state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
     _sat_lastControlCS = SAT_MIN_SETPOINT;   // the CS sent below is the previous CS (entry 112, TASK-1381)
     if (hasOTCommandInterface()) {
-      // TASK-565: write-on-change. Summer-simmer path.
-      satEnqueueIfChangedCS(10.0f);
-      satEnqueueIfChangedMM(settings.sat.iMaxRelModulation);
-      satEnqueueIfChangedCH(0);
+      // TASK-1370: sent every tick. Summer-simmer path.
+      satSendCS(10.0f);
+      satSendMM(settings.sat.iMaxRelModulation);
+      satSendCH(0);
     }
     satCycleSkipAutoSwitch();   // summer simmer: no overshoot sample this tick (firmware-only path, TASK-1367)
     satPublishMQTT();   // power/energy keep moving here (DHW in summer), so publish them (TASK-1258)
@@ -5798,10 +5828,10 @@ static void satControlLoopRun()
     state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
     satPwmDisableOnHeaterOff();   // heater state OFF in thermo-nova too (heating_control.py:69-70)
     if (hasOTCommandInterface()) {
-      // TASK-565: write-on-change. Valves-closed path.
-      satEnqueueIfChangedCS(10.0f);
-      satEnqueueIfChangedMM(settings.sat.iMaxRelModulation);
-      satEnqueueIfChangedCH(0);
+      // TASK-1370: sent every tick. Valves-closed path.
+      satSendCS(10.0f);
+      satSendMM(settings.sat.iMaxRelModulation);
+      satSendCH(0);
     }
     // No PID output or error statistics this tick; the PID service keeps stepping the held state (entry 111)
     satPublishMQTT();
@@ -5977,12 +6007,12 @@ static void satControlLoopRun()
 
   // --- Send CS= and MM= commands to boiler when an OT command interface is available ---
   if (hasOTCommandInterface()) {
-    // TASK-565: write-on-change. Main control block.
-    satEnqueueIfChangedCS(finalSetpoint);
-    satEnqueueIfChangedMM(state.sat.iCurrentModulation);
+    // TASK-1370: sent every tick. Main control block.
+    satSendCS(finalSetpoint);
+    satSendMM(state.sat.iCurrentModulation);
     // CH rule of Sergeant D 2026-10-23 (see satChEnableDecide in SATchEnable.h): CH=0 with CS=10 when the
     // requested setpoint is at or below the cold setpoint or the PWM OFF phase drives the CS, else CH=1.
-    satEnqueueIfChangedCH(satChEnableDecide(pidOutput, satGetColdSetpoint(), pwmDrivesSetpoint, pwmOn));
+    satSendCH(satChEnableDecide(pidOutput, satGetColdSetpoint(), pwmDrivesSetpoint, pwmOn));
     // Immergas quirk: send TP=11:12=<setpoint> alongside MM=. Kept on
     // unconditional enqueue per TASK-565: rare quirk path, not steady loop.
     if (satGetManufacturerQuirks() & SAT_QUIRK_IMMERGAS_TP) {

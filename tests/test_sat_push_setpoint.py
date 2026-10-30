@@ -2,12 +2,12 @@
 """TASK-1272: host test for the SAT TC= push (Sergeant D entry 14, docs/sat/sergeant-d-corrections.md).
 
 The real code is cut out of src/OTGW-firmware/SATcontrol.ino and compiled with a host C++ compiler:
-the write-on-change block (SAT_CMD_REFRESH_MS up to the Thermal Drop section: satResetCmdCache(),
+the command-cache block (SAT_CMD_REFRESH_MS up to the Thermal Drop section: satResetCmdCache(),
 satEnqueueIfChangedTC(), satTCNoteAdopted(), satTCPushOff()) and satFollowThermostatDecide().
 Nothing is re-implemented. Not reachable from here: that satAdoptThermostatSetpoint() calls
 satTCNoteAdopted() and that satControlLoopRun() calls the push helper with the else-branch satTCPushOff()
 (source-level checks below). OTGW_SAT_INO points at another copy (e.g. `git show HEAD:...`) for old-vs-fix
-runs. HEAD has the 5-min TC= refresh and pushes an adopted value back, so a, d, e, g, h, x and the wiring test
+runs. HEAD has the 5-min TC= refresh (scenario r needs the lane's satCmdResend) and pushes an adopted value back, so a, d, e, g, h, x and the wiring test
 fail there.
 
 Run: python tests/test_sat_push_setpoint.py
@@ -35,9 +35,11 @@ STUBS = r"""
 #define snprintf_P snprintf
 struct SatState { bool bLastSentValid=false; float fLastSentCS=0; uint8_t iLastSentMM=0, iLastSentCH=0; float fLastSentTC=0;
                   bool bTCAccountedValid=false; uint32_t iTCPushMs=0; bool bPushRefused=false;
-                  uint32_t iLastSentCSMs=0, iLastSentMMMs=0, iLastSentCHMs=0, iLastSentTCMs=0; };  // iLastSentTCMs: only HEAD still has it
+                  bool bActive=true; uint32_t iLastSentCSMs=0, iLastSentMMMs=0, iLastSentCHMs=0, iLastSentTCMs=0; };  // iLastSentTCMs: only HEAD still has it
 struct State { SatState sat; };
 static State state;
+struct OTSys { uint8_t SlaveStatus = 0; }; static OTSys OTcurrentSystemState;   // read by satCmdResend() (TASK-1370)
+static bool hasOTCommandInterface() { return true; }
 static uint32_t g_ms = 0;
 static uint32_t millis() { return g_ms; }
 static bool isPICEnabled() { return true; }
@@ -91,6 +93,9 @@ int main(int argc, char** argv) {
     at(130);
   } else if (sc[0] == 'f') {               // cache reset (offline->online) forces one resend
     at(100); at(130); satResetCmdCache(); at(160); at(190);
+  } else if (sc[0] == 'r') {               // TASK-1370: the 5 s CS/MM/CH resend never carries TC=; TC= stays event-driven
+    at(100); satSendCS(45.0f); satSendMM(100); satSendCH(1);
+    for (uint32_t s = 101; s <= 115; s++) { g_ms = s * 1000UL; g_sent[0] = 0; satCmdResend(); tick(); if (g_sent[0]) printf("%u:%s ", s, g_sent); }
   } else if (sc[0] == 'g') {               // no re-push of any kind, whatever MsgID 9 does: 10 min
     for (uint32_t s = 100; s <= 700; s += 10) at(s);
   }
@@ -153,6 +158,10 @@ class PushSetpoint(unittest.TestCase):
 
     def test_e_push_off_on_resends(self):
         self.assertEqual(self.run_sc("e"), "100:TC=20.0; 130:TC=20.0;")
+
+    def test_r_cmd_resend_is_not_a_tc_repush(self):
+        # only on the lane: HEAD has no resend
+        self.assertEqual(self.run_sc("r"), "100:TC=20.0; 105:CS=45.0;MM=100;CH=1; 110:CS=45.0;MM=100;CH=1; 115:CS=45.0;MM=100;CH=1;")
 
     def test_f_cache_reset_forces_resend(self):
         self.assertEqual(self.run_sc("f"), "100:TC=20.0; 160:TC=20.0;")

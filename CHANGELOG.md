@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- **SAT sends CS, MM and CH every control tick and repeats them every 5 s** (TASK-1370, Sergeant D entry 44, ADR-203), as thermo-nova, instead of only on change or every 5 min. The repeat pauses during hot water and a boiler fault.
+
 ### Changed (breaking)
 
 - **SAT PWM cycles per hour is 3 or 4 only, default 3** (TASK-1375, Sergeant D entries 30, 52, 99). Gas boilers and hybrids, radiators and underfloor alike; the Settings page shows a choice. This narrows an accepted range: a stored 2 becomes 3, a stored 5 or 6 becomes 4 (a settings file with such a value is corrected on the next deferred write), and the same snap applies to REST and MQTT writes. Heat pumps are unchanged (heat-pump PWM cycle, no hourly limit).

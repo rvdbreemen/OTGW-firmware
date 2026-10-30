@@ -14,7 +14,7 @@ Nothing is re-implemented. The test cuts the real code out of SATcontrol.ino and
   - for the PWM flag: the enabled branch of initSAT() that sets the control mode.
 LittleFS is a thin wrapper over real files in a temp directory, so "reboot" = a second process on the same files.
 The harness runs one pass per simulated second. When the control timer is due it stands in for the control tick
-by sending CS = 40 - outside through the real satEnqueueIfChangedCS/MM/CH, so a tick computed with the 0.0 fallback
+by sending CS = 40 - outside through the real satSendCS/MM/CH, so a tick computed with the 0.0 fallback
 shows as CS=40.0 (the gruijter capture of TASK-1474: CS=34.1 with outside 0.0).
 
 On HEAD (OTGW_SAT_INO=<copy of origin/dev SATcontrol.ino>) the boot sends CS=0, the first tick sends CS=40.0 with
@@ -220,9 +220,9 @@ int main(int argc, char** argv) {
     if (prePass()) {                                                              // control tick stand-in
       state.sat.bActive = true;
       float outside = satGetOutsideTemp();
-      satEnqueueIfChangedCS(40.0f - outside);
-      satEnqueueIfChangedMM(100);
-      satEnqueueIfChangedCH(1);
+      satSendCS(40.0f - outside);
+      satSendMM(100);
+      satSendCH(1);
     }
   }
   printf("END missing=%d\n", (int)state.sat.bOutsideTempMissing);
@@ -345,6 +345,8 @@ class OutsideTemperature(unittest.TestCase):
     def test_weather_older_than_one_hour_hands_back_once_and_resumes(self):
         # Entries 56, 57, 79: the weather value of 1 s expires at 3601 s -> one hand-back, then silence, then SAT
         # resumes when the fetch at 4000 s succeeds. Red on HEAD: the hour-old value keeps being used.
+        # TASK-1370: the 5 s satCmdResend() is armed by the ticks before 3601 s and sits behind the same gate, so the
+        # exact-equality check on `mid` also proves it stays silent while the outside temperature is missing.
         cmds, out = run("weather_stale", 4010)
         mid = [(t, c) for t, c in cmds if 3601 <= t < 4000]
         self.assertEqual(mid, [(3601, c) for c in HANDBACK], cmds[-12:])

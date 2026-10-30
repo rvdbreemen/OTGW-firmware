@@ -17,7 +17,7 @@ Central control loop, heating curve calculation, setpoint management, SAT-owned 
 #### Key Functions
 
 - `satControlLoop(): void`
-  - Main control loop entry point. Order of work: deferred PID restore (needs NTP), boiler-detected teardown for simulation, command-cache reset on an OT-bus offline-to-online edge, fallback detection (MQTT lost >5 min), early bail when SAT is disabled or a flash is running, `satUpdateSimulation()`, `satUpdateThermalLearning()`, flame edge detection, `satCycleSample()`, once-a-minute 4 h and 24 h window stats, `satPicCSKeepalive()`, `satPwmSuppressionRefresh()` (3 s, TASK-1268), then (on the `timerSATControl` tick) DHW detection, power/energy update and save (also during DHW, TASK-1258), the DHW branch, room/outside inputs, 45 s room-temperature EMA (TASK-894), pressure, solar gain, summer simmer, TRV valves, auto-tune, curve recommendation, boiler status, comfort, PV boost, heating curve, PID, optional multi-zone P75 aggregation, clamping, PWM or continuous mode, modulation value, COLD_SETPOINT cutoff, and finally the write-on-change CS/MM/CH/TC enqueues and `satPublishMQTT()`
+  - Main control loop entry point. Order of work: deferred PID restore (needs NTP), boiler-detected teardown for simulation, command-cache reset on an OT-bus offline-to-online edge, fallback detection (MQTT lost >5 min), early bail when SAT is disabled or a flash is running, `satUpdateSimulation()`, `satUpdateThermalLearning()`, flame edge detection, `satCycleSample()`, once-a-minute 4 h and 24 h window stats, `satPicCSKeepalive()`, `satPwmSuppressionRefresh()` (3 s, TASK-1268), `satCmdResend()` (5 s repeat of the last CS/MM/CH, TASK-1370, ADR-203), then (on the `timerSATControl` tick) DHW detection, power/energy update and save (also during DHW, TASK-1258), the DHW branch, room/outside inputs, 45 s room-temperature EMA (TASK-894), pressure, solar gain, summer simmer, TRV valves, auto-tune, curve recommendation, boiler status, comfort, PV boost, heating curve, PID, optional multi-zone P75 aggregation, clamping, PWM or continuous mode, modulation value, COLD_SETPOINT cutoff, and finally the CS/MM/CH sends (every tick, TASK-1370), the TC enqueue (on change only) and `satPublishMQTT()`
   - Safety trips (`bSafetyTripped`, then `satDisable()`) after `SAT_MAX_SKIP_COUNT` (10) consecutive invalid room readings or `SAT_MAX_PIC_FAILS` (5) control ticks without an OT command interface
 
 - `initSAT(): void`
@@ -36,8 +36,8 @@ Central control loop, heating curve calculation, setpoint management, SAT-owned 
 - `satEnqueueOwnCS(const char* cmd): void` (static) and `satCommandInFlight(): bool`
   - Every SAT-originated `CS=` (including the `CS=0` releases in `satDisable()`, boot safety and the keepalive) goes through `satEnqueueOwnCS()`, which sets `_satCmdInFlight` around `addCommandToQueue()`. `handleOTDirectCommand()` (OTDirect.ino) and `addCommandToQueue()` (OTGW-Core.ino, TASK-1236) refuse any `CS=` while `satOwnsControlSetpoint() && !satCommandInFlight()`, so an external CS= is rejected on both transports (OT-Direct answers `NG`). Bytes written straight to the PIC over TCP port 25238 bypass the queue and stay unfiltered (ADR-177)
 
-- `satEnqueueIfChangedCS/MM/CH/TC(...): bool` (static)
-  - Write-on-change (TASK-565): enqueue only when the quantised value changed (CS and TC rounded to 0.1) or `SAT_CMD_REFRESH_MS` (300 s) elapsed. `satResetCmdCache()` forces re-emission after an OT-bus offline-to-online edge, on `satDisable()` and at boot. Only CS goes through `satEnqueueOwnCS()`; MM, CH, TC use plain `addCommandToQueue()`
+- `satSendCS/MM/CH(...)`, `satCmdResend()`, `satEnqueueIfChangedCS/TC(...): bool` (static)
+  - Command cadence (TASK-1370, ADR-203, Sergeant D entry 44): the four control-tick paths call `satSendCS/MM/CH()`, which send every tick, unchanged values included, and update the last-sent cache. `satCmdResend()` repeats the last sent CS, MM and CH every `SAT_CMD_RESEND_MS` (5 s) after the last CS send; it is gated like the other senders and disarmed by a DHW or boiler-fault tick. `satEnqueueIfChangedCS/TC()` stay change-checked (CS and TC rounded to 0.1, or `SAT_CMD_REFRESH_MS` (300 s) elapsed): CS for the 3 s PWM suppression refresh, TC because it is event-driven (TASK-1272). `satResetCmdCache()` (OT-bus offline-to-online edge, `satDisable()`, boot) stops the resend until the next tick sends. Only CS goes through `satEnqueueOwnCS()`; MM, CH, TC use plain `addCommandToQueue()`
 
 - `satPicCSKeepalive(): void` (static, TASK-1236)
   - PIC boards only (`isPICEnabled()`): re-sends the last CS every `SAT_PIC_CS_KEEPALIVE_MS` (30 s) while the last value is 8 C or more, because the PIC drops a CS 63-126 s after the last one (gateway.asm CommandExpiry) and SAT's own cadence is slower. OT-Direct needs no keepalive: it skips its CS heartbeat expiry while SAT owns MsgID 1
@@ -90,7 +90,7 @@ Central control loop, heating curve calculation, setpoint management, SAT-owned 
 #### Constants and tables
 
 - `satManufacturerTable[]` (PROGMEM): MemberID to name and quirk flags (18 entries, index matches `SATManufacturer`, AUTO=0 is skipped). Quirks: `SAT_QUIRK_MIN_MOD_10`, `SAT_QUIRK_IMMERGAS_TP`, `SAT_QUIRK_NO_REL_MOD`, `SAT_QUIRK_MI_500_BOOT`
-- `SAT_CMD_REFRESH_MS` (300 s), `SAT_PIC_CS_KEEPALIVE_MS` (30 s), `SAT_MIN_SETPOINT` (10 C), `SAT_GLOBAL_MAX_SETPOINT` (65 C), `SAT_HARD_MAX_FLOOR` (50 C), `SAT_HARD_MAX_RAD` (80 C), `SAT_COLD_SETPOINT_RAD` (28.2 C) and `SAT_COLD_SETPOINT_FLOOR` (21 C, below which the boiler is commanded off, TASK-891.2)
+- `SAT_CMD_RESEND_MS` (5 s), `SAT_CMD_REFRESH_MS` (300 s), `SAT_PIC_CS_KEEPALIVE_MS` (30 s), `SAT_MIN_SETPOINT` (10 C), `SAT_GLOBAL_MAX_SETPOINT` (65 C), `SAT_HARD_MAX_FLOOR` (50 C), `SAT_HARD_MAX_RAD` (80 C), `SAT_COLD_SETPOINT_RAD` (28.2 C) and `SAT_COLD_SETPOINT_FLOOR` (21 C, below which the boiler is commanded off, TASK-891.2)
 - Heating system (`SAT_HSYS_AUTO/RADIATORS/UNDERFLOOR`) and heating source (`SAT_SRC_AUTO/GAS_BOILER/HEAT_PUMP/HYBRID`, TASK-891.8) are separate settings. Heat-pump source forces MM=100 outside PWM (the configured maximum in PWM), no hourly PWM start limit (entry 81, TASK-1419) and a user-selectable PWM cycle length (`iHpCycleSeconds`, 1800 or 2400 s; the minimum on-time is 180 s for every source, TASK-1366)
 
 #### State machines
@@ -284,7 +284,7 @@ All SAT runtime state is stored in `state.sat` (`SATRuntimeSection` in SATtypes.
 
 - `bActive`, `eControlMode` (OFF/CONTINUOUS/PWM), `eBoilerStatus`, `bSafetyTripped`, `bFallbackActive`/`eFallbackReason`
 - `fHeatingCurveValue`, `fPidOutput`, `fFinalSetpoint`, `iCurrentModulation`
-- Write-on-change cache: `bLastSentValid`, `fLastSentCS`, `iLastSentMM`, `iLastSentCH`, `fLastSentTC` and the `iLastSent*Ms` stamps
+- Last-sent cache (read by the 5 s resend, the PIC keepalive and the change-checked CS/TC helpers): `bLastSentValid`, `fLastSentCS`, `iLastSentMM`, `iLastSentCH`, `fLastSentTC` and the `iLastSent*Ms` stamps
 - Cycles: `eLastCycleClass`, `iCycleCount`, `iCyclesThisHour`, 4 h averages, `fDutyRatio`
 - Pressure: `fBoilerPressure`, `fSmoothedPressure`, `sPressureStatus`
 - `weather.*`, `fCurrentPower`, `fEnergyTotal`, `bSolarGainActive`, `bSummerActive`, `bValvesOpen`
@@ -295,7 +295,7 @@ All SAT runtime state is stored in `state.sat` (`SATRuntimeSection` in SATtypes.
 ## Notes
 
 - **Command ownership**: SAT owns MsgID 1 while enabled. External `CS=` is refused on OT-Direct and on the PIC command queue; SAT's own CS= is the only one let through (marker `satCommandInFlight()`). The thermostat-timeout setback in OTDirect.ino is the one documented exception (fail-safe)
-- **Write-on-change**: CS/MM/CH/TC are re-sent only on change or after 300 s; on PIC boards a 30 s CS keepalive covers the PIC's CS expiry
+- **Command cadence**: CS/MM/CH are sent every control tick and repeated every 5 s between ticks (TASK-1370, ADR-203); TC= is sent on change only; the 3 s PWM suppression CS refresh stays change-checked; on PIC boards the 30 s CS keepalive stays silent while the resend runs
 - **Simulation mode**: blocks all bus TX (`satSimulationBlocksBusTx`), requires boiler absence and switches itself off for good when a real boiler answers (Task #37, TASK-795)
 - **PROGMEM Safety**: Manufacturer lookup in flash; safe string access with pgm_read_byte
 - **Re-entrancy**: Static locals preserve state across doBackgroundTasks re-entry
