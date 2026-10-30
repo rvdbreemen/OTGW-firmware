@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """OTGW diagnostic capture: telnet debug, MQTT, browser devtools, crash log and
-HTTP probes, merged into one transcript file (ADR-202, TASK-1475).
+HTTP probes, merged into one transcript file (ADR-202, TASK-1475). A raw
+OpenTherm frame recorder writes otframes.log and otgw_simulation.log next to it
+(TASK-1503).
 
 This is the one implementation behind the launchers capture-mqtt-debug.bat
 (Windows), capture-mqtt-debug.sh (Linux/macOS) and capture-mqtt-debug-macos.sh.
@@ -80,6 +82,23 @@ BANNER_FOOTER = re.compile(r"Press 'h' for command menu|\bOTGW-Sim\b", re.MULTIL
 REBOOT_MARKER = re.compile(r"ESP\.restart\(\)")
 SETUP_FINISHED = "Setup finished!"
 UPTIME = re.compile(r"(\d+)\(d\)-(\d+):(\d+)\(H:m\)")
+
+# TASK-1503: raw OpenTherm frame recorder. Source: the device's /ws (the OT log
+# WebSocket of the web UI), which is on by default on PIC and OT-Direct boards.
+FRAMES_LOG = "otframes.log"
+SIM_LOG = "otgw_simulation.log"
+FRAMES_HEADER = ("# OTGW raw frame log (TASK-1503). Columns, tab separated: "
+                 "host_time (receive time on this computer, ISO-8601, ms, local time with UTC offset) | "
+                 "device_time (HH:MM:SS.uuuuuu, device local time as printed in its OT log; the device logs a "
+                 "frame one frame late, so both times belong to the NEXT frame's arrival: the difference "
+                 "between consecutive lines is the frame gap, shifted by one frame) | "
+                 "source letter (T B R A E) | 8 hex digits. Lines starting with # are notes (connects, disconnects).")
+# One line of the device OT log: "HH:MM:SS.uuuuuu <direction label> <L><8 hex> <id> ..." (OTGW-Core.ino processOT()).
+OT_LOG_LINE = re.compile(
+    r"^(\d{2}:\d{2}:\d{2}\.\d{6}) (?:Boiler|Thermostat|Request Boiler|Answer Thermostat|Parity Error|Unknown)\s+"
+    r"([A-Z])([0-9A-F]{8})\s+\d+(?:\s|$)")
+WS_RECONNECT_MIN = 3.0
+WS_RECONNECT_MAX = 30.0
 
 KEEPALIVE_IDLE = 10
 KEEPALIVE_INTERVAL = 5
@@ -877,10 +896,17 @@ class WebSocket:
         header.extend(mask)
         self.sock.sendall(bytes(header) + bytes(b ^ mask[i % 4] for i, b in enumerate(data)))
 
+    def send_pong(self, payload=b""):
+        mask = os.urandom(4)
+        self.sock.sendall(bytes([0x8A, 0x80 | len(payload)]) + mask +
+                          bytes(b ^ mask[i % 4] for i, b in enumerate(payload)))
+
     def recv_text(self):
         chunks = []
         while True:
+            self._in_frame = False
             first = self._read_exact(2)
+            self._in_frame = True
             fin, opcode = first[0] & 0x80, first[0] & 0x0F
             masked, length = first[1] & 0x80, first[1] & 0x7F
             if length == 126:
@@ -893,6 +919,9 @@ class WebSocket:
                 data = bytes(b ^ mask[i % 4] for i, b in enumerate(data))
             if opcode == 8:
                 return None
+            if opcode == 9:
+                self.send_pong(data[:125])
+                continue
             if opcode in (1, 0):
                 chunks.append(data)
             if fin:
@@ -900,8 +929,16 @@ class WebSocket:
 
     def _read_exact(self, count):
         data = b""
+        started = time.monotonic()
         while len(data) < count:
-            chunk = self.sock.recv(count - len(data))
+            try:
+                chunk = self.sock.recv(count - len(data))
+            except socket.timeout:
+                # A timeout between frames is the caller's idle tick. Inside a frame it must not
+                # lose the bytes already read (TASK-1503), so keep reading for up to 10 s.
+                if (data or getattr(self, "_in_frame", False)) and time.monotonic() - started < 10:
+                    continue
+                raise
             if not chunk:
                 raise ConnectionError("websocket closed")
             data += chunk
@@ -1151,6 +1188,113 @@ class CrashlogCapture(threading.Thread):
                 pass
         finally:
             self.cap.summary(result)
+
+
+# --------------------------------------------------------------------------- #
+# Raw OpenTherm frames (TASK-1503)
+# --------------------------------------------------------------------------- #
+
+def parse_ot_log_line(text):
+    """One device OT log line -> (device_time, source letter, 8 hex digits), or None
+    for event lines (> < ! *), keepalives and anything else."""
+    match = OT_LOG_LINE.match(text.strip("\r\n"))
+    return match.groups() if match else None
+
+
+class FrameLogWriter:
+    """Writes otframes.log (timed) and otgw_simulation.log (bare frames, the format the
+    firmware replay reads). Both are LF-terminated on every platform."""
+
+    def __init__(self, frames_path, sim_path):
+        self.count = 0
+        self._lock = threading.Lock()
+        self._frames = open(frames_path, "w", encoding="utf-8", newline="\n", buffering=1)
+        self._sim = open(sim_path, "w", encoding="ascii", newline="\n", buffering=1)
+        self._frames.write(FRAMES_HEADER + "\n")
+
+    def write(self, host_time, device_time, letter, frame):
+        host = host_time.astimezone().isoformat(timespec="milliseconds")
+        with self._lock:
+            self._frames.write(f"{host}\t{device_time}\t{letter}\t{frame}\n")
+            self._sim.write(f"{letter}{frame}\n")
+            self.count += 1
+
+    def comment(self, text):
+        with self._lock:
+            self._frames.write(f"# {now_iso()} {text}\n")
+
+    def close(self):
+        with self._lock:
+            for f in (self._frames, self._sim):
+                try:
+                    f.close()
+                except OSError:
+                    pass
+
+
+class FrameCapture(threading.Thread):
+    """Reads the device's /ws (the web UI's OT log stream) and records every frame.
+    One extra WebSocket client; the device allows 3. Reconnects with a growing delay."""
+
+    def __init__(self, cap, host, port=80):
+        super().__init__(name="otframes", daemon=True)
+        self.cap = cap
+        self.host = host
+        self.port = port
+        self.writer = None
+
+    def run(self):
+        result = "Frame recorder: completed normally."
+        try:
+            self.writer = FrameLogWriter(self.cap.path(FRAMES_LOG), self.cap.path(SIM_LOG))
+        except OSError as exc:
+            self.cap.script_error(f"otframes: cannot create {FRAMES_LOG}/{SIM_LOG}: {exc}")
+            self.cap.summary(f"Frame recorder: error - {exc}")
+            return
+        delay = WS_RECONNECT_MIN
+        last_error = None
+        try:
+            while not self.cap.stopping():
+                ws = None
+                try:
+                    ws = WebSocket(f"ws://{self.host}:{self.port}/ws")
+                    ws.sock.settimeout(1)
+                    self.writer.comment("connected to /ws")
+                    last_error = None
+                    delay = WS_RECONNECT_MIN
+                    self._read(ws)
+                    self.writer.comment("disconnected from /ws")
+                except Exception as exc:
+                    text = f"{type(exc).__name__}: {exc}"
+                    if text != last_error:   # one line per distinct failure, not one per retry
+                        self.cap.script_error(f"otframes: /ws on {self.host}:{self.port} - {text}")
+                        last_error = text
+                finally:
+                    if ws is not None:
+                        ws.close()
+                self.cap.wait(delay)
+                delay = min(delay * 2, WS_RECONNECT_MAX)
+        except Exception as exc:
+            result = f"Frame recorder: error - {exc}"
+            self.cap.script_error(f"otframes: worker error {type(exc).__name__}: {exc}")
+        finally:
+            count = self.writer.count
+            self.writer.close()
+            self.cap.summary(f"{result} {count} frame(s) -> {FRAMES_LOG}, {SIM_LOG}")
+
+    def _read(self, ws):
+        while not self.cap.stopping():
+            try:
+                text = ws.recv_text()
+            except socket.timeout:
+                continue
+            if text is None:
+                return
+            received = datetime.now().astimezone()
+            for line in text.splitlines():
+                parsed = parse_ot_log_line(line)
+                if parsed:
+                    self.writer.write(received, *parsed)
 
 
 # --------------------------------------------------------------------------- #
@@ -1474,6 +1618,8 @@ def build_parser():
     p.add_argument("--browser-path")
     p.add_argument("--skip-http-probes", action="store_true")
     p.add_argument("--http-probe-timeout-seconds", type=ranged(1, 60), default=10)
+    p.add_argument("--skip-frame-capture", action="store_true",
+                   help="do not record otframes.log / otgw_simulation.log (raw OpenTherm frames)")
     p.add_argument("--skip-crashlog-capture", action="store_true")
     p.add_argument("--crashlog-url")
     p.add_argument("--crashlog-poll-seconds", type=ranged(5, 3600), default=30)
@@ -1598,6 +1744,7 @@ def main(argv=None):
     s(f"DurationSeconds: {args.duration or 'until manual stop'}", echo=False)
     s(f"SkipBrowserCapture: {args.skip_browser_capture}", echo=False)
     s(f"SkipCrashlogCapture: {args.skip_crashlog_capture}", echo=False)
+    s(f"SkipFrameCapture: {args.skip_frame_capture}", echo=False)
     s(f"SkipHttpProbes: {args.skip_http_probes}", echo=False)
     s(f"HttpProbeTimeoutSeconds: {args.http_probe_timeout_seconds}", echo=False)
     s(f"CrashlogPollSeconds: {args.crashlog_poll_seconds}", echo=False)
@@ -1641,6 +1788,14 @@ def main(argv=None):
         crash.start()
         workers.append((crash, 25))
         s("Crash-log capture started (polling, writing crashlog.log).")
+
+    if args.skip_frame_capture:
+        s("Frame recorder: disabled (--skip-frame-capture).")
+    else:
+        frames = FrameCapture(cap, args.device, args.http_port)
+        frames.start()
+        workers.append((frames, 10))
+        s(f"Frame recorder started: ws://{args.device}:{args.http_port}/ws -> {FRAMES_LOG}, {SIM_LOG} (kept next to the transcript).")
 
     mqtt_capture = None
     if not args.broker:
@@ -1733,6 +1888,9 @@ def main(argv=None):
     if browser is not None:
         import shutil
         shutil.rmtree(browser.profile_dir, ignore_errors=True)
+    for name in (FRAMES_LOG, SIM_LOG):
+        if cap.path(name).exists():
+            print(f"Raw OpenTherm frames (kept, for replays): {cap.path(name)}")
     print(f"Merged transcript (single upload): {transcript}")
     print(f"Diagnostic capture folder: {run_path}")
     signalled = cap.stop_reason in ("Ctrl+C/Ctrl+Break", "terminated (SIGTERM)", "terminal closed (SIGHUP)")

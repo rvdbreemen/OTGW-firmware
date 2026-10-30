@@ -133,6 +133,7 @@ empty broker skips the MQTT stream and writes one summary line saying so
 - `--telnet-connect-timeout-seconds`, `--telnet-reconnect-delay-ms`, `--telnet-post-disconnect-delay-ms`, `--telnet-idle-check-seconds` (and the `-Telnet...` names): telnet reconnect tuning (TASK-1299)
 - `--skip-browser-capture`, `--browser-url`, `--browser-debug-port`, `--browser-path`: headless Edge/Chrome/Chromium devtools capture
 - `--skip-crashlog-capture`, `--crashlog-url`, `--crashlog-poll-seconds`: crash log and `reboot_log.txt` polling
+- `--skip-frame-capture`: do not record the raw OpenTherm frames (`otframes.log`, `otgw_simulation.log`)
 - `--skip-http-probes`, `--http-probe-timeout-seconds`: post-capture HTTP probes
 
 `-MosquittoSubPath` and `-SkipToolInstall` are still accepted and ignored.
@@ -152,13 +153,27 @@ password is stored only with `--save-secrets`. Keys that other tools added
 - **MQTT.** One `topic payload` line per message in `mqtt.log`, the same format as `mosquitto_sub -v`.
 - **Browser devtools.** Console, exceptions, log entries and network timing of the device page in `browser.log`. On Windows (job object) and Linux (parent-death signal), the headless browser also dies when the tool is killed.
 - **Crash log.** `/api/v2/device/crashlog` and `/reboot_log.txt`, polled into `crashlog.log`.
+- **Raw OpenTherm frames (TASK-1503).** One WebSocket client on the device's `/ws` (the stream the web UI's OT log uses) records every frame into two files that stay in the run folder next to the transcript (they are not merged into it and not deleted):
+  - `otframes.log`: a `#` header line, then one line per frame, tab separated: host receive time (ISO-8601, milliseconds, local time with UTC offset), the device timestamp (`HH:MM:SS.uuuuuu`, device local time), the source letter (`T` thermostat, `B` boiler, `R` request to the boiler, `A` answer to the thermostat, `E` parity error) and the 8 hex digits. Lines starting with `#` are notes (connect, disconnect). The device logs a frame one frame late, so both times belong to the arrival of the next frame; the difference between two consecutive lines is the frame gap, shifted by one frame.
+  - `otgw_simulation.log`: the same frames in exactly the replay format, `T10010A00` per line, LF endings. No frame is filtered; the letters are kept so a replay tool can drop frames by letter.
+  The stream is on by default on PIC and OT-Direct boards, so no setting is changed. It is one extra client of the 3 the device allows: with the headless browser capture also running, the user's own browser still gets a slot, a second browser tab may be refused. Under heap pressure the device may drop log lines (`canSendWebSocket()`), so a gap in the file is not proof of a gap on the bus. If `/ws` cannot be opened, the recorder retries with a growing delay and logs the reason in `script.error.log`; the rest of the capture continues. The summary lists the files and the frame count.
 - **HTTP probes.** At stop, `/`, `/index.html`, `/v2.js` and key REST endpoints with status, timing and size. Bodies are cut at 200 characters, except `/api/v2/health` and `/api/v2/device/info`, which are kept whole up to 8 KB so the `hd_min_*` heap fields survive (TASK-1396).
 
-Everything is merged into
+Everything except the two frame files is merged into
 `transcript-<date-time>-<firmware-version>-<hostname>-<uniqueid>.txt`, under
 `logs/mqtt-diagnostics/<yyyyMMdd-HHmmss>/`. Secrets (password/token/key values,
 `-P` arguments) are redacted. After a successful merge, the intermediate files
-are removed. Upload only the transcript.
+are removed. Upload only the transcript; keep `otframes.log` and `otgw_simulation.log` for replays.
+
+#### Replaying a capture on a bench unit
+
+Not on a live heating system (see "Simulation" in `docs/api/README.md`). The firmware replay reads `/otgw_simulation.log` from LittleFS, one frame every 750 ms, and ignores the recorded timing:
+
+1. Upload the file under that name: `curl -F "upload=@otgw_simulation.log" http://<ip>/upload` (the `/upload` handler, field `upload`; add `-u` credentials when an admin password is set). It replaces an earlier copy.
+2. Start it with `POST /api/v2/simulate/start`, check it with `GET /api/v2/simulate`, stop it with `POST /api/v2/simulate/stop`. `source` is `file` while the uploaded file is used.
+3. Delete the file from LittleFS afterwards to return to the built-in fixture.
+
+A replay that honours the timing in `otframes.log` is a separate follow-up.
 
 Tests: `python tests/test_capture_tool.py` runs the tool against fake telnet,
 HTTP and MQTT servers.
