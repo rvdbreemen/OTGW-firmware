@@ -159,6 +159,10 @@ The paho-mqtt wheel SHA-256 is `6db9ba9b34ed5bc6b6e3812718c7e06e2fd7444540df2455
 - The vendored wheel has to be bumped by hand for security fixes. Mitigation: the version and hash live in one constant, and the advisory check is repeated whenever this ADR is reviewed.
 - PowerShell-only behaviour, such as reading DPAPI-protected values, is gone. The saved-settings file was already plain JSON (`capture-mqtt-debug.bat` Save-CaptureSettings), so nothing changes there.
 
+## Note 2026-10-30 (TASK-1500)
+
+The Decision text above is unchanged. `capture-mqtt-debug.sh` now bootstraps a portable Python on Linux and macOS the way the `.bat` does on Windows: `python3` or `python` on PATH first, then a runtime cached by an earlier run, then a one-time download of python-build-standalone release 20261026 (CPython 3.12.16, `install_only` tarball, about 65 MB). Five SHA-256 values are pinned in the launcher (x86_64, aarch64 and armv7 Linux glibc; x86_64 and arm64 macOS), taken from the release's `SHA256SUMS`. The runtime is unpacked into `${XDG_DATA_HOME:-$HOME/.local/share}/otgw-capture/python-3.12.16` (Linux) or `$HOME/Library/Application Support/otgw-capture/python-3.12.16` (macOS). Linux with musl libc and other CPU types get a clear message and the advice to install Python 3.9+.
+
 ## Open Questions
 
 - [x] Port to the 1.x line (`otgw-1.x.x`, which has its own capture scripts) or keep this dev-only? The default in TASK-1475 is dev-only. — **Answered 2026-10-30 by Robert van den Breemen (via Claude, TASK-1475):** dev only for now; revisit when a 1.x capture bug needs it (Robert, interactive choice in session otgw-firmware-b1)

@@ -84,7 +84,14 @@ launchers find a Python and run it:
 - `capture-mqtt-debug.bat` (Windows) tries `py -3`, `python` and `python3`. When
   none is 3.9 or newer it downloads the portable Python 3.12.10 from python.org
   once, checks its SHA-256 and unpacks it into `%LOCALAPPDATA%\OTGW-capture\`.
-- `capture-mqtt-debug.sh` (Linux, macOS) runs `python3`.
+- `capture-mqtt-debug.sh` (Linux, macOS) tries `python3` and `python`. When none is 3.9
+  or newer it uses a portable CPython 3.12.16 (python-build-standalone, release
+  20261026) from an earlier run, or downloads it once (about 65 MB), checks its
+  SHA-256 and unpacks it into `~/.local/share/otgw-capture/` (Linux, or
+  `$XDG_DATA_HOME/otgw-capture/`) or `~/Library/Application Support/otgw-capture/`
+  (macOS). Needs `curl` or `wget`, and `sha256sum` or `shasum`. Linux with musl
+  libc (Alpine) and CPU types other than x86_64, aarch64 and armv7 (Linux) or
+  x86_64 and arm64 (macOS) are not covered: install Python 3.9+ there.
   `capture-mqtt-debug-macos.sh` is a compatibility wrapper around it.
 
 MQTT uses paho-mqtt 2.1.0, imported straight from
