@@ -1,7 +1,7 @@
 ---
 id: "ADR-203"
 title: "SAT sends CS MM and CH on every control update (supersedes ADR-199 decision 4)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-10-30"
 binding: false
 gate: null
@@ -9,6 +9,8 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-199"
 topics:
   - "sat"
   - "opentherm"
@@ -41,11 +43,11 @@ format: "canonical"
 
 <!-- markdownlint-disable MD025 -->
 
-# ADR-203 SAT sends CS MM and CH on every control update (supersedes ADR-199 decision 4)
+# ADR-203 SAT (Smart Autotune Thermostat) sends CS MM and CH on every control update (supersedes ADR-199 decision 4)
 
 ## Status
 
-Proposed, 2026-10-30. Guideline-level per ADR-080: no CI (continuous integration) gate. Acceptance needs the maintainer's explicit OK.
+Accepted, 2026-10-30. Guideline-level per ADR-080: no CI (continuous integration) gate.
 
 The cadence is Sergeant D's decision in entry 44 (Q13, "Follow thermo-nova": CS, MM and CH every 5 s, a 5 s floor for every command). There is no open point on the cadence. Revised the same day on a maintainer decision (2026-10-30): an earlier draft of this ADR chose "every SAT control tick (10-300 s)" and left a question open, which conflicted with entry 44.
 
@@ -60,13 +62,23 @@ status_history:
     changed_by: "Agent: Claude"
     reason: Initial proposal; resolves the ADR-199 decision 4 versus entry 44 contradiction (maintainer decision 2026-10-30)
     changed_via: adr-kit
+  - date: 2026-10-30
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-199
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-30
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer OK in session 2026-10-30 (TASK-1370); Sergeant D entry 44 Q13 'Follow thermo-nova'
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-SAT (Smart Autotune Thermostat) is the firmware's port of the thermo-nova Home Assistant component. Ground truth for SAT behaviour is, in order: Sergeant D's recorded decisions (`docs/sat/sergeant-d-corrections.md`), then thermo-nova at commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`, then the specs, then the firmware (ADR-196). thermo-nova paths below are relative to `custom_components/sat` in the local copy `other-projects/SAT-releases-thermo-nova/`. That checkout reports git HEAD `c5211afee` and does not contain the object `7beaaf531`; CLAUDE.md records its content as identical to the pinned commit (verified 2026-10-22). That identity was not re-verified for this ADR. Firmware paths are relative to `src/OTGW-firmware/` at HEAD `6e02216bf` (`src/` clean).
+SAT (Smart Autotune Thermostat) is the firmware's port of the thermo-nova Home Assistant component. Ground truth for SAT behaviour is, in order: Sergeant D's recorded decisions (`docs/sat/sergeant-d-corrections.md`), then thermo-nova at commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`, then the specs, then the firmware (ADR-196). thermo-nova paths below are relative to `custom_components/sat` in the local copy `other-projects/SAT-releases-thermo-nova/`. That checkout reports git `HEAD` `c5211afee` and does not contain the object `7beaaf531`; CLAUDE.md records its content as identical to the pinned commit (verified 2026-10-22). That identity was not re-verified for this ADR. Firmware paths are relative to `src/OTGW-firmware/` at `HEAD` `6e02216bf` (`src/` clean).
 
-Terms: CS (Control Setpoint, MsgID 1) is the gateway command for the CH water target, MM (Maximum relative Modulation, MsgID 14) the modulation cap, CH (central heating) the enable-bit command, TC the remote room setpoint override, OT (OpenTherm) the boiler protocol, PIC (Microchip peripheral interface controller) the coprocessor on the OTGW (OpenTherm Gateway) board, PM (priority message) the PIC command that requests one OT message, OT-Direct the PIC-less boards where the ESP32 drives the bus itself, MI (minimum interval) the OT-Direct minimum gap between two frames, PWM (pulse width modulation) SAT's on/off duty-cycle mode, PID (proportional-integral-derivative) SAT's controller, DHW (domestic hot water) the tap water function, HVAC (heating, ventilation and air conditioning) the Home Assistant climate mode, MQTT (Message Queuing Telemetry Transport) the broker protocol thermo-nova's coordinator publishes on, EEPROM (electrically erasable programmable read-only memory) the PIC's non-volatile memory. HEAD is the current git commit; CLAUDE.md is the project's agent instruction file.
+Terms: CS (Control Setpoint, MsgID 1) is the gateway command for the CH water target, MM (Maximum relative Modulation, MsgID 14) the modulation cap, CH (central heating) the enable-bit command, TC the remote room setpoint override, OT (OpenTherm) the boiler protocol, PIC (Microchip peripheral interface controller) the coprocessor on the OTGW (OpenTherm Gateway) board, PM (priority message) the PIC command that requests one OT message, OT-Direct the PIC-less boards where the ESP32 drives the bus itself, MI (minimum interval) the OT-Direct minimum gap between two frames, PWM (pulse width modulation) SAT's on/off duty-cycle mode, PID (proportional-integral-derivative) SAT's controller, DHW (domestic hot water) the tap water function, HVAC (heating, ventilation and air conditioning) the Home Assistant climate mode, MQTT (Message Queuing Telemetry Transport) the broker protocol thermo-nova's coordinator publishes on, EEPROM (electrically erasable programmable read-only memory) the PIC's non-volatile memory. `HEAD` is the current git commit; CLAUDE.md is the project's agent instruction file.
 
 **The contradiction.** ADR-199 (Accepted 2026-10-29) says two incompatible things about the same cadence:
 
@@ -174,7 +186,7 @@ Implementation is TASK-1370.
 - **PIC serial traffic.** 3 commands per 5 s, 0.6 commands/s, when the control interval is a multiple of 5 s (the 30 s default); the worst case is an 11 s interval, 3 sets in 11 s or about 0.82 commands/s. That is against about 0.003/s for an unchanged value under the 300 s refresh. The TASK-565 rationale for write-on-change ("cutting steady-state OT traffic ~20x", `SATcontrol.ino:421-425`) is given up. Mitigations: `addCommandToQueue` replaces a pending command with the same two-letter prefix in place (`OTGW-Core.ino:3803-3818`; only `TP=` is append-only), so a CS/MM/CH still waiting for its PIC reply is overwritten, not stacked. `handleCommandQueue` runs once a second (`OTGW-firmware.ino:762-764`) and sends every due entry in that pass (`OTGW-Core.ino:3879-3897`); a sent entry is retried every 5 s (`OTGW_CMD_INTERVAL_MS`, `:3674`) until the PIC replies.
 - **No PIC EEPROM wear.** On the PIC, `CS=` writes `controlsetpt1/2` and sets `HeartbeatCS` (`gateway.asm:4187-4198`), `CH=` sets or clears `CHModeOff` (`:4372-4378`) and `MM=` writes `MaxModLevel` (`:4752-4763`). All three are RAM (random access memory); none of these handlers calls `WriteEpromData`/`StoreEpromData` (`:4592-4595`). Checked in this session for these three handlers only.
 - **OT bus on PIC boards.** The PIC holds CS and MM as stored overrides applied to the thermostat's frames, so an unchanged resend writes the same value and adds no OT frames. Verified for the CS path (`gateway.asm:1619-1629`); the MM and CH frame handling in the PIC was not traced.
-- **OT-Direct.** OT-Direct has no PIC command queue: `addCommandToQueue` calls `handleOTDirectCommand` synchronously (`OTGW-Core.ino:3761-3767`). CS= and MM= each enqueue a WRITE frame (`OTDirect.ino:2785-2796` for MsgID 1, `:2912-2921` for MsgID 14); CH= only sets `otChModeOff` and sends no frame (`:3020-3025`). The resend therefore adds 2 WRITE frames per 5 s, 0.4 frames/s, into the 12-slot frame queue (`:313`), which coalesces a pending frame with the same MsgID in place (`:349-367`). The OT-Direct schedule already rewrites MsgID 1 and 14 every 15 s (`OT_WRITE_INTERVAL_MS`, `:59`; entries `:135`, `:138`), and a command does not reset that schedule (`updateWriteCache`, `:603-611`), so the extra cost is 0.4 frames/s on top of about 0.13 frames/s.
+- **OT-Direct.** OT-Direct has no PIC command queue: `addCommandToQueue` calls `handleOTDirectCommand` synchronously (`OTGW-Core.ino:3761-3767`). CS= and MM= each enqueue a `WRITE` frame (`OTDirect.ino:2785-2796` for MsgID 1, `:2912-2921` for MsgID 14); CH= only sets `otChModeOff` and sends no frame (`:3020-3025`). The resend therefore adds 2 `WRITE` frames per 5 s, 0.4 frames/s, into the 12-slot frame queue (`:313`), which coalesces a pending frame with the same MsgID in place (`:349-367`). The OT-Direct schedule already rewrites MsgID 1 and 14 every 15 s (`OT_WRITE_INTERVAL_MS`, `:59`; entries `:135`, `:138`), and a command does not reset that schedule (`updateWriteCache`, `:603-611`), so the extra cost is 0.4 frames/s on top of about 0.13 frames/s.
 - **Interaction with MI=500 on OT-Direct.** For Ideal, Intergas and Nefit SAT sends `MI=500` at start-up (`SAT_QUIRK_MI_500_BOOT`, `SATcontrol.ino:202`, `:204`, `:206`, `:4679-4680`), and the OT-Direct scheduler then sends at most one frame per 500 ms (`OTDirect.ino:1547`), about 2 frames/s. Estimate, not measured: MsgID 0 already takes up to 1.25 frames/s (every 800 ms, `:55`), so the resend's 0.4 frames/s uses about a fifth of that ceiling, and pending commands go before scheduled polls (`:1549-1551`), so reads are delayed rather than the resend. The bench check above must include an MI=500 unit or a forced `MI=500`.
 - **No CI gate.** Mitigation: the host test above, extended under TASK-1370, plus review against the Decision Contract.
 

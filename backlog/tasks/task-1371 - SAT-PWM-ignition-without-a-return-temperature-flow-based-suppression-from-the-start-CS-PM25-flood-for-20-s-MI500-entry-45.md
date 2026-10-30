@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T22:32:00Z'
-updated_date: '2026-10-30T11:54:00Z'
+updated_date: '2026-10-30T12:31:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -50,4 +50,6 @@ TASK-1412.1 records review (R35): 2026-10-29. R35 audit (TASK-1412.1): entry 84 
 Robert 2026-10-30: a valid board 'R' sensor reading counts as a return temperature for at most 5 minutes (5 missed PR=E polls) before the boiler counts as without return temperature (entry 135 open point / TASK-1412.5). Plan drafted: satNoReturnTemp() = isBoilerMsgIdUnsupportedRead(28) && !picBoardTretValid(); flood helper on the CH flame-on edge; MI=500 on PIC only after detection, initSAT() send removed (live entry 141 bug on OT-Direct); open question to Sergeant D: CS before the flame lights.
 
 2026-10-30 11:30 UTC: Sergeant D answered the follow-up with A (msg 1565666884467298335), recorded as entry 151: the CS/PM=25 flood runs inside the 20 s hold with CS = flow + 18, then suppression flow - 1. Plan cleared to build.
+
+2026-10-30 coordinator (session 80): plan inputs before implementation. (1) Entries 149+151 replace the title's 'flow-based suppression from the start': first 20 s after each CH flame off->on (incl. relight after a draw, entry 142) alternate CS = flow + 18 (t=0,2,4..) and PM=25 (t=1,3,5..), then suppression CS = flow - 1. (2) Coupling with TASK-1370/ADR-203: satCmdResend re-sends the cached fLastSentCS every 5 s; the flood must send CS through satSendCS() (updating the cache) or pause the resend during the flood, else a stale tick CS interleaves (on PIC boards addCommandToQueue replaces a pending same-prefix CS=, OTGW-Core.ino:3809-3818). (3) Coupling with TASK-1373: flow + 18 is clamped to the effective max setpoint (entry 151 clamp to [cold, max]), i.e. satEffectiveMaxSetpoint incl. the user MaxTSet. Implement on top of the integrated 1370+1373 code.
 <!-- SECTION:NOTES:END -->

@@ -1,11 +1,11 @@
 ---
 id: TASK-1375
 title: 'SAT: gas boiler PWM cycles per hour 3 or 4 only, default 3 (entries 30, 52)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T07:21:00Z'
-updated_date: '2026-10-30T09:20:00Z'
+updated_date: '2026-10-30T13:03:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,9 +24,9 @@ Sergeant D entry 52 (2026-10-25, answer to Q16): default 3 cycles per hour for g
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Setting accepts only 3 or 4 for gas boilers; other values clamp to the nearest; default stays 3
-- [ ] #2 v2 UI offers 3 and 4 for gas boilers
-- [ ] #3 Host test shows HEAD accepts 2/5/6 and the fix rejects them
+- [x] #1 Setting accepts only 3 or 4 for gas boilers; other values clamp to the nearest; default stays 3
+- [x] #2 v2 UI offers 3 and 4 for gas boilers
+- [x] #3 Host test shows HEAD accepts 2/5/6 and the fix rejects them
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -48,3 +48,9 @@ Second-reader checked 2026-10-30 (C25-C27 confirmed). Setter settingStuff.ino:11
 
 Robert 2026-10-30: the TASK-1412.3 dependency is met for this task by its own host tests that are red on HEAD and green on the fix (recorded in TASK-1412.3 too); TASK-1412.3 stays open for the broader low-load regression set.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+alpha.552 (03ba9847c, pushed). Gas boilers and hybrids: cycles per hour 3 or 4 only, default 3; stored/new values snap (<=2 -> 3, >=5 -> 4) on every input path; getter fallback 3; REST metadata 3..4; v2 UI 3/4 choice. Heat pumps unchanged. Evidence: AC1+AC3 host test tests/test_sat_hp_pwm.py on the real setter/getter, 12 sub-test failures on old code, 27/27 OK on fix (re-run this session in wt-1501: Ran 27 OK). Bench .63 Classic+S3 Mini alpha.552 OTA (settings 174 keys unchanged): POST 2/5/6/4/1/3 read back 3/4/4/4/3/3, metadata min 3 max 4 (alpha.550: 2..6). AC2: device serves v2.js with satcyclesperhour options [[3,'3 per hour (default)'],[4,'4 per hour']] (grep of served asset; no browser screenshot taken). Gates: evaluate --quick EXIT 0 (86 checks, 0 FAIL); full tests 64/67, the 3 others pre-existing on dev or a stale build artefact (test_sat_mqtt_state OK after removing the generated .ino.cpp). Build esp32-combo exit 0, artefacts 13:36-13:37 +03ba984. Zip posted msg 1565712393663811664.
+<!-- SECTION:FINAL_SUMMARY:END -->

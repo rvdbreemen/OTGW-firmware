@@ -10,6 +10,8 @@ verified_in: []
 supersedes:
   - "ADR-195"
 superseded_by: null
+related:
+  - "ADR-203"
 topics:
   - "sat"
   - "cold-setpoint"
@@ -68,6 +70,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: Maintainer OK in session 2026-10-29 (TASK-1355); open questions answered by Sergeant D
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-30
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-203
     changed_via: adr-kit lifecycle
 ```
 

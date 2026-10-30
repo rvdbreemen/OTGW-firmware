@@ -7080,7 +7080,7 @@
       "path": "ADR-199-sat-cold-state-and-ch-enable-rule-supersedes-adr-195.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-29",
+      "date": "2026-10-30",
       "decision_summary": "While SAT is the active controller, one per-heating-system cold setpoint replaces thermo-nova's COLDSETPOINT 22 at ev...",
       "topics": [
         "ch-enable",
@@ -7356,7 +7356,7 @@
       "title": "SAT sends CS MM and CH on every control update (supersedes ADR-199 decision 4)",
       "path": "ADR-203-sat-sends-cs-mm-and-ch-on-every-control-update-supersedes-adr-199-decision-4.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-10-30",
       "decision_summary": "While SAT is the active controller, a 5 s resend timer sends the latest CS=, MM= and CH= values again, unchanged valu...",
       "topics": [
@@ -13051,6 +13051,12 @@
     {
       "source": "ADR-199",
       "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-199",
+      "target": "ADR-203",
       "type": "related",
       "resolved": true
     },
