@@ -62,11 +62,18 @@ test('a chosen value moves the thumb and shows the value', () => {
   assert.equal(el.satMaxR.textContent, '48°C');
 });
 
-test('a chosen value the firmware cut (global 65 cap) shows the effective value and names the chosen one', () => {
+test('a chosen value the firmware cut (heat pump 40 cap) shows the effective value and names the chosen one', () => {
   const el = makeCard(), f = load(el);
-  f.satRenderMaxTSet({ max_setpoint_user: 70, max_setpoint_system: 65 });
-  assert.equal(String(el.satMaxSlider.value), '65');
-  assert.equal(el.satMaxR.textContent, '65°C (chosen 70°C)');
+  f.satRenderMaxTSet({ max_setpoint_user: 55, max_setpoint_system: 40 });
+  assert.equal(String(el.satMaxSlider.value), '40');
+  assert.equal(el.satMaxR.textContent, '40°C (chosen 55°C)');
+});
+
+test('a chosen value above 65 is shown as chosen, the global 65 cap no longer cuts it (entry 152)', () => {
+  const el = makeCard(), f = load(el);
+  f.satRenderMaxTSet({ max_setpoint_user: 70, max_setpoint_system: 70 });
+  assert.equal(String(el.satMaxSlider.value), '70');
+  assert.equal(el.satMaxR.textContent, '70°C');
 });
 
 test('not chosen (0) shows "default" with the ceiling SAT works with', () => {

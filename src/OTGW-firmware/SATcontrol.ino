@@ -314,9 +314,9 @@ static float satGlobalMaxSetpoint()
 
 // The value sent to the boiler as SH= and used as the CS cap of a boiler: the user value (or the default
 // while not chosen), cut into the boiler bounds, then the hard ceiling of the heating system (underfloor 50,
-// radiators 80) and the global SAT max setpoint. `chosen` tells whether the user picked a value.
-// INTERIM CHOICE (coordinator, pending Sergeant D's open points Q-b global 65 cap and Q-c heat-pump
-// default): SH= and the CS cap use the same global ceiling; the heat-pump 40 cap stays out of SH=.
+// radiators 80). The global SAT max setpoint (65) caps only the default: a value the user chose is the only
+// cap (Sergeant D entry 152). `chosen` tells whether the user picked a value. The heat-pump 40 cap stays out
+// of SH= (Q-c, the heat-pump default, is still open).
 static float satMaxTSetBoilerValue(float user, bool underfloor, uint16_t rawBounds, float globalMax, bool* chosen)
 {
   float lo, hi;
@@ -328,7 +328,7 @@ static float satMaxTSetBoilerValue(float user, bool underfloor, uint16_t rawBoun
   if (v > hi) v = hi;
   const float hard = underfloor ? SAT_HARD_MAX_FLOOR : SAT_HARD_MAX_RAD;
   if (v > hard) v = hard;
-  if (v > globalMax) v = globalMax;
+  if (!isChosen && v > globalMax) v = globalMax;
   return v;
 }
 
@@ -379,18 +379,20 @@ static void satMaxTSetSendStep()
 }
 
 // Effective ceiling for the CS= the boiler is sent: the boiler's own MaxTSet, the system / source cap,
-// the hard safety ceiling and the global cap (Python MAXIMUM_SETPOINT). Shared by the control tick and
+// the hard safety ceiling and, while the user has not chosen a max flow setpoint, the global cap (entry 152).
+// Shared by the control tick and
 // the 3 s PWM suppression refresh so both clamp identically.
 static float satEffectiveMaxSetpoint()
 {
   float maxSetpoint = OTcurrentSystemState.MaxTSet;
   if (maxSetpoint < 30.0f) maxSetpoint = SAT_MAX_SETPOINT_DEFAULT;
-  float sysMax = satGetMaxSetpoint();
+  bool chosen = false;
+  float sysMax = satUserMaxTSet(satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP, &chosen);
   float hardMax = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? SAT_HARD_MAX_FLOOR : SAT_HARD_MAX_RAD;
   if (maxSetpoint > sysMax) maxSetpoint = sysMax;
   if (maxSetpoint > hardMax) maxSetpoint = hardMax;
   const float globalMax = satGlobalMaxSetpoint();
-  if (maxSetpoint > globalMax) maxSetpoint = globalMax;
+  if (!chosen && maxSetpoint > globalMax) maxSetpoint = globalMax;
   return maxSetpoint;
 }
 

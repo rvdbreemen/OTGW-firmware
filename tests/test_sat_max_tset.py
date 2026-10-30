@@ -8,8 +8,8 @@ satMaxTSetInputOk() out of SATtypes.h, wraps them in stubs (settings, OT state, 
 compiles them with a host C++ compiler (g++, clang++ or MSVC cl via vswhere). Without a compiler the
 tests are skipped, they do not pass silently.
 
-Covered: not chosen -> no SH= ever, CS capped at 62 radiators / 50 underfloor; chosen 70 -> SH=65 once
-(the global SAT ceiling caps CS and SH= alike, interim choice pending Sergeant D's Q-b); chosen 60 ->
+Covered: not chosen -> no SH= ever, CS capped at 62 radiators / 50 underfloor; chosen 70 -> SH=70 once and
+CS capped at 70 (no global 65 cap over a chosen value, entry 152); not chosen + global 60 -> CS 60; chosen 60 ->
 SH=60 once, CS cap 60; a boot with a chosen value -> exactly one SH=; MsgID 49 bounds clamp; underfloor
 <= 50; SH= never carries the heat pump 40 cap; going back to 0 sends nothing; the setter rejects a
 typo 1..19.
@@ -185,11 +185,22 @@ class SatMaxTSet(unittest.TestCase):
         self.assertEqual(r["queue"], [])
 
     # --- chosen ---
-    def test_chosen_70_global_cap_sh_equals_cs_cap(self):
-        # interim choice (Q-b pending): the 65 global ceiling caps CS and SH= alike
+    def test_chosen_70_no_global_cap_sh_and_cs_at_70(self):
+        # entry 152 (Q-b A): a chosen value is the only cap, the global 65 does not cut it
         r = self.boot(70, boiler=70, steps=["tick", "tick", "tick"])
-        self.assertEqual(r["queue"], ["SH=65"])
-        self.assertEqual(float(r["effCS"]), 65.0)
+        self.assertEqual(r["queue"], ["SH=70"])
+        self.assertEqual(float(r["effCS"]), 70.0)
+        self.assertEqual(float(r["sysMax"]), 70.0)
+
+    def test_chosen_70_underfloor_still_50(self):
+        r = self.boot(70, system=FLOOR, boiler=70, steps=["tick"])
+        self.assertEqual(r["queue"], ["SH=50"])
+        self.assertEqual(float(r["effCS"]), 50.0)
+
+    def test_chosen_90_radiators_hard_80_and_bounds(self):
+        r = self.boot(75, bounds=raw(20, 90), boiler=90, steps=["tick"])
+        self.assertEqual(r["queue"], ["SH=75"])
+        self.assertEqual(float(r["effCS"]), 75.0)
 
     def test_chosen_60_sends_sh_once_and_caps_cs_at_60(self):
         r = self.boot(60, boiler=60, steps=["tick", "tick", "tick"])
@@ -227,7 +238,7 @@ class SatMaxTSet(unittest.TestCase):
 
     def test_bounds_arriving_later_resend_the_clamped_value(self):
         r = self.boot(75, steps=["tick", "raw=%d" % raw(30, 55), "tick"])
-        self.assertEqual(r["queue"], ["SH=65", "SH=55"])
+        self.assertEqual(r["queue"], ["SH=75", "SH=55"])
 
     def test_invalid_bounds_fall_back_to_20_80(self):
         # upper below lower and upper above 100 are not valid: 20..80 applies
@@ -249,14 +260,19 @@ class SatMaxTSet(unittest.TestCase):
         self.assertEqual(float(r["effCS"]), 42.0)
 
     # --- global SAT ceiling (settings.sat.fMaxSetpoint) shared by CS and SH= ---
-    def test_global_ceiling_from_settings_caps_sh_and_cs(self):
-        r = self.boot(70, steps=["glob=60", "tick"])
-        self.assertEqual(r["queue"], ["SH=60"])
+    def test_global_ceiling_caps_default_not_chosen(self):
+        r = self.boot(0, boiler=62, steps=["glob=60", "tick"])
+        self.assertEqual(r["queue"], [])
         self.assertEqual(float(r["effCS"]), 60.0)
 
-    def test_global_ceiling_out_of_range_falls_back_to_65(self):
-        r = self.boot(70, steps=["glob=10", "tick"])
-        self.assertEqual(r["queue"], ["SH=65"])
+    def test_global_ceiling_does_not_cap_chosen(self):
+        r = self.boot(70, boiler=70, steps=["glob=60", "tick"])
+        self.assertEqual(r["queue"], ["SH=70"])
+        self.assertEqual(float(r["effCS"]), 70.0)
+
+    def test_not_chosen_global_out_of_range_falls_back_to_65(self):
+        r = self.boot(0, system=RAD, boiler=80, steps=["glob=10"])
+        self.assertEqual(float(r["effCS"]), 62.0)   # default 62 < 65; out-of-range global must not lower it
 
     # --- heat pump: the 40 cap stays inside the CS cap, never in SH= ---
     def test_heat_pump_cap_in_cs_not_in_sh(self):
