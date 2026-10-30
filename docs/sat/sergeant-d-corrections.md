@@ -5003,3 +5003,54 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156562050450
 - TASK-1376: SW= at once on every DHW setpoint change and once after a restart while DHW control is on.
 
 **Compared:** not a behaviour statement; a release-scope decision. Each task carries its own thermo-nova comparison in its plan. **Task:** TASK-1504 (beta blockers extended). **Open:** whether TASK-1502/1468/1414 etc. may stay after beta 1 is our reading of his silence on them; Robert asked him to confirm "if nothing"; he named these six.
+
+## 147. OK for the TASK-1501 and TASK-1375 plans as posted (2026-10-30)
+
+**Source:** #alpha-testing, 2026-10-30 09:26 UTC, reply to our plan message for TASK-1501 and TASK-1375 (msg 1565656570702987396):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565658072079409193
+
+**Quoted:**
+
+> @BlueFlame Bot OK
+
+**Settled (his OK to the question "OK to build both as written?"):** TASK-1501: the external outside temperature comes first for its whole valid hour; order external (< 1 h), MsgID 27, weather, MsgID 27 reading 0.0, restored value; validity (1 h, entry 57) and restart behaviour (126/129) unchanged. TASK-1375: gas boilers and hybrids 3 or 4 cycles per hour, default 3, stored 2 -> 3 and 5/6 -> 4, 3/4 choice in the UI, fallback 3; heat pumps unchanged. Both plans were second-reader checked before posting (C18-C19, C25-C27 confirmed).
+
+**Compared:** thermo-nova climate.py:317-343 / const.py:170 and config_flow.py:695-702 / const.py:119 / pwm.py:54 as cited in the plan message; firmware SATcontrol.ino:1900/:1904 and :350-353, settingStuff.ino:1131. **Task:** TASK-1501, TASK-1375 (cleared to build). **Open:** none.
+## 148. TASK-1373 A: no default MaxTSet is sent to the boiler until the user moves the slider (2026-10-30)
+
+**Source:** #alpha-testing, 2026-10-30 09:34 UTC, answer to our TASK-1373 plan question (msg 1565658167743094788):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565660158514696253
+
+**Quoted (whole message):**
+
+> @BlueFlame Bot TASK-1373: A
+> TASK-1371: the start up sequence should start with flow water + 18 instead of return + 18, after the first 20 seconds we start the suppression mode.
+> TASK-1376: A
+
+**Settled (1373, option A as posted):** while the user has not chosen a value, SAT sends no SH= to the boiler, so the installer's MaxTSet stays; SAT still caps every CS at the default (62 radiators, 50 underfloor). SH= goes out when the user sets a value (change, and once after a restart). thermo-nova sends SH= only on a user change (number.py:125-127, second-reader checked). The rest of the plan (bounds from MsgID 49 or 20/80, underfloor 50, CS cap incl. the ignition hold, HA number) stands as posted; he raised nothing on the PIC MsgID 6 note. **Task:** TASK-1373 (cleared to build). **Open:** Q-b (the old global 65 cap) and Q-c (heat-pump default) still to ask, one at a time.
+
+## 149. TASK-1371: for a boiler without a return temperature the start-up hold is flow + 18 for the first 20 s, then suppression (2026-10-30, changes the plan of entries 45/142)
+
+**Source:** the same message as entry 148 (09:34 UTC), answer to our TASK-1371 question (msg 1565658169429196822: before the flame lights, CS = flow - 1 (A) or another CS (B)?).
+
+**Quoted:** "TASK-1371: the start up sequence should start with flow water + 18 instead of return + 18, after the first 20 seconds we start the suppression mode."
+
+**Reading (our interpretation, put back to him as one confirmation question):** for a boiler without a return temperature (Unknown-DataID on MsgID 28 and no valid 'R' board sensor, entries 84, 135), the start-up hold uses the flow temperature in place of the missing return temperature: CS = flow + flame-off offset (default 18), with thermo-nova's clamp to [cold setpoint, maximum setpoint] (heating_control.py:397-405 does return + offset), for the first 20 s (the suppression delay, heating_control.py:414-433), then suppression CS = flow - 1 (heating_control.py:439-448). This replaces our plan's "flow - 1 from the start" and answers our question with option B (another CS before and at light-off: flow + 18). **Open (asked):** whether the 20 s CS/PM=25 alternation of entry 45/142 still runs inside those 20 s with CS = flow + 18, or whether the hold replaces the flood. MI=500 on PIC after detection (entry 141) is not touched by this answer.
+
+**Compared:** thermo-nova has no hold without a return temperature (keeps the previous CS, heating_control.py:392-395); firmware today: return + 18 floored at the cold setpoint, with a raw Tret of 0 giving the floor (SATcontrol.ino:835-841). **Changes an earlier entry:** entry 45's "flow-based suppression from the start" becomes "flow + 18 for 20 s, then suppression". **Task:** TASK-1371.
+
+## 150. TASK-1376 A: no extra SW= at the start of a hot-water draw (2026-10-30, settles entry 53's open point)
+
+**Source:** the same message as entry 148 (09:34 UTC), answer to msg 1565658171090141186.
+
+**Settled (option A as posted):** the SW= at the start of every draw (SATcontrol.ino:5686-5694) is removed, as thermo-nova (no SW on a draw, number.py:72-74 is the only sender). SW= goes out at once on every DHW setpoint change and once after a restart after SAT has taken over (entry 121), only while DHW control and SAT are on (Robert 2026-10-30). **Task:** TASK-1376 (cleared to build). **Open:** none.
+
+## 151. TASK-1371 follow-up A: the CS/PM=25 flood runs inside the 20 s flow + 18 hold (2026-10-30, settles entry 149's open point)
+
+**Source:** sergeantd, 2026-10-30 10:01 UTC, msg 1565666884467298335 (https://discord.com/channels/812969634638725140/1514720723980259460/1565666884467298335), answer to our follow-up msg 1565666007056388218.
+
+**Quoted:** "TASK-1371 ( follow-up question ): A"
+
+**Settled (option A as posted):** for a boiler without a return temperature (entries 84, 135), during the first 20 s after every CH flame off-to-on (also the relight after a hot-water draw, entry 142) the flood of entry 45 stays: CS = flow + 18 at t = 0, 2, 4 ... and PM=25 at t = 1, 3, 5 ... After those 20 s, suppression CS = flow - 1 (heating_control.py:439-448). The + 18 is the flame-off offset with thermo-nova's clamp to [cold setpoint, maximum setpoint] (heating_control.py:397-405, there applied to the return temperature). Entry 149 thus reads: flow + 18 replaces return + 18, and the flood carries that value.
+
+**Compared:** thermo-nova has no flood and no hold without a return temperature (keeps the previous CS, heating_control.py:392-395); the flood is Sergeant D's addition (entries 45, 142). Firmware today: return + 18 floored at the cold setpoint, a raw Tret of 0 gives the floor (SATcontrol.ino:835-841); no flood. **Task:** TASK-1371 (cleared to build). **Open:** none from this answer; MI=500 on PIC after detection (entry 141) unchanged.

@@ -3,11 +3,11 @@ id: TASK-1503
 title: >-
   Capture tool: raw OpenTherm frame log with timing, in a format the replay can
   read (field data for replays)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:15:00Z'
-updated_date: '2026-10-30T06:55:00Z'
+updated_date: '2026-10-30T08:55:00Z'
 labels:
   - tooling capture replay
 milestone: 2.0.0
@@ -37,3 +37,9 @@ Design constraints (coordinator review 2026-10-30): (1) the source must work by 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-30 (coordinator otgw-firmware-b8, wt-1503 on top of TASK-1500). Source: the device /ws OT log stream (on by default on PIC and OT-Direct; OTGW-Core.ino processOT ~5353-5581, sent :5652 via sendLogToWebSocket webSocketStuff.ino:289; timestamp getOTLogTimestamp helperStuff.ino:19). Rejected: port 25238 (off by default, MQTTstuff.h:73), telnet (needs debug toggles, later timestamp), no REST stream. WS cap 3 clients (webSocketStuff.ino:60, :169): recorder + headless browser leave one slot for the user's browser (README). Files: otframes.log (TSV: host ISO time ms+offset, device timestamp, letter, 8 hex; # header) and otgw_simulation.log (bare frames, LF). tests/test_capture_otframes.py: 6 errors before the implementation, 6 OK after (re-run by the coordinator: OK). Bench .63 alpha.549: 75 s run -> 75 frames, all R80000200 (no boiler/thermostat on the bench), median device gap 0.9995 s, telnet cross-check within ~3 ms, /api/v2/otgw/messages/0 = 512 = 0x0200. AC#3: the captured otgw_simulation.log uploaded via /upload (750 B served), POST /api/v2/simulate/start -> source:file, active; stopped and deleted afterwards (404, source builtin). Limits: live and replayed frames are identical on this bench, so decoding of replayed frames is not distinguishable from live ones; replay interval is a fixed 750 ms vs the recorded 1.0 s -> follow-up TASK-1508. Not verified: OT-Direct (no unit), T/B/A/E letters live (parser tests only), reconnect against the real device, frame loss under heap pressure.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+otgw_capture.py records every OT frame from the device /ws log stream into otframes.log (host time, device timestamp, letter, frame) and otgw_simulation.log (replay format). Evidence: tests/test_capture_otframes.py 6 errors -> 6 OK; bench .63 75 frames in 75 s, median gap 0.9995 s, telnet cross-check ~3 ms, MsgID 0 value matches REST; the captured file replays via /simulate (source=file) and was removed after. Ships in the alpha.549+6e02216 zip. Not verified: OT-Direct, live T/B/A/E letters, reconnect, frame loss under heap pressure. Timed replay: TASK-1508.
+<!-- SECTION:FINAL_SUMMARY:END -->

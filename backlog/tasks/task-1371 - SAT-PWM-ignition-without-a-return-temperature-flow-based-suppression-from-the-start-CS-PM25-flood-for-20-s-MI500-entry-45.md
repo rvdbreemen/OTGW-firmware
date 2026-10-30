@@ -3,10 +3,11 @@ id: TASK-1371
 title: >-
   SAT PWM ignition without a return temperature: flow-based suppression from the
   start, CS/PM=25 flood for 20 s, MI=500 (entry 45)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-24T22:32:00Z'
-updated_date: '2026-10-30T06:58:00Z'
+updated_date: '2026-10-30T11:54:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -45,4 +46,8 @@ TASK-1412.1 records review (R28): 2026-10-29. record reconciliation (TASK-1412.1
 TASK-1412.1 records review (R35): 2026-10-29. R35 audit (TASK-1412.1): entry 84 settles 'no return temperature' = Unknown-DataID on MsgID 28 only, provisionally. Still open before this task's plan goes to Sergeant D: (a) entry 84 Open #2, board sensor 'R' Tret vs an Unknown-DataID verdict on 28 (queued as Q61 in docs/sat/open-questions.md, not asked yet); (b) entry 84 Open #3, Data-Invalid/stale Tret, his "reconsider later", tracked under TASK-1412.5; (c) entry 84 Open #1, whether a verdict is ever formed (OT-Direct 10 s poll, OTDirect.ino:147; boilerEvidence not traced). At f4b8be6d9 SAT reads raw Tret (SATcontrol.ino:1776-1780) and does not call isBoilerMsgIdUnsupportedRead (OTGW-Core.ino:5112-5113).
 
 2026-10-30: Sergeant D entry 146: must be in beta 1 (TASK-1504, target Sun 2026-11-01). Priority raised to high.
+
+Robert 2026-10-30: a valid board 'R' sensor reading counts as a return temperature for at most 5 minutes (5 missed PR=E polls) before the boiler counts as without return temperature (entry 135 open point / TASK-1412.5). Plan drafted: satNoReturnTemp() = isBoilerMsgIdUnsupportedRead(28) && !picBoardTretValid(); flood helper on the CH flame-on edge; MI=500 on PIC only after detection, initSAT() send removed (live entry 141 bug on OT-Direct); open question to Sergeant D: CS before the flame lights.
+
+2026-10-30 11:30 UTC: Sergeant D answered the follow-up with A (msg 1565666884467298335), recorded as entry 151: the CS/PM=25 flood runs inside the 20 s hold with CS = flow + 18, then suppression flow - 1. Plan cleared to build.
 <!-- SECTION:NOTES:END -->

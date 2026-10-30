@@ -7350,6 +7350,85 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-203",
+      "title": "SAT sends CS MM and CH on every control update (supersedes ADR-199 decision 4)",
+      "path": "ADR-203-sat-sends-cs-mm-and-ch-on-every-control-update-supersedes-adr-199-decision-4.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-30",
+      "decision_summary": "While SAT is the active controller, a 5 s resend timer sends the latest CS=, MM= and CH= values again, unchanged valu...",
+      "topics": [
+        "ch-enable",
+        "command-cadence",
+        "control-setpoint",
+        "opentherm",
+        "sat"
+      ],
+      "aliases": [
+        "5 s resend",
+        "CH cadence",
+        "CS MM CH refresh cadence",
+        "every control update",
+        "Q13",
+        "SAT_CMD_REFRESH_MS",
+        "write-on-change"
+      ],
+      "components": [
+        "SAT control-tick command output"
+      ],
+      "symbols": [
+        "SAT_CMD_REFRESH_MS",
+        "satControlLoopRun",
+        "satEnqueueIfChangedCH",
+        "satEnqueueIfChangedCS",
+        "satEnqueueIfChangedMM",
+        "satEnqueueOwnCS",
+        "satPicCSKeepalive",
+        "satPwmSuppressionRefresh",
+        "satRestartStep"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "On each of the four control-tick send paths, enqueue CS=, MM= and CH= on every tick that reaches the path, without a change check or refresh window.",
+          "Between ticks, resend the cached CS, MM and CH every 5 s while SAT is the active controller, with a tick send restarting the 5 s window.",
+          "Place the resend after every gate in satControlLoopRun (MQTT fallback, disabled or flashing, safety trip, OpenTherm link lost, satRestartStep) and require bLastSentValid.",
+          "Disarm the resend after a tick that ends on DHW active or the boiler fault flag, and skip it while the live DHW or fault bit is set.",
+          "Keep updating the last-sent CS, MM and CH cache fields and bLastSentValid on every tick send and every resend.",
+          "Send SAT's CS= through satEnqueueOwnCS() (ADR-179).",
+          "Keep satPicCSKeepalive() and its 30 s condition on PIC boards.",
+          "Keep the CH bit values and the list of CH-queueing paths of ADR-199 decision 2."
+        ],
+        "must_not": [
+          "Apply a change check or the 300 s refresh to CS/MM/CH on the four control-tick paths or in the 5 s resend.",
+          "Recompute the PID output, the setpoint or the CH decision in the 5 s resend, or change the control tick interval.",
+          "Resend anything during the restart quiet period, after a safety trip, while SAT is disabled, or while the outside temperature is missing.",
+          "Make TC= periodic (entries 14, 16).",
+          "Make the 3 s PWM suppression refresh unconditional, or remove it (entry 23).",
+          "Bypass satEnqueueOwnCS() for SAT's CS=."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatcmdcache.py compiles the real command helpers cut out of SATcontrol.ino (satResetCmdCache, satEnqueueOwnCS, satEnqueueIfChangedCS/MM/CH/TC, satPicCSKeepalive). It covers the write-on-change behaviour of TASK-1324. Under TASK...",
+          "Bench check before shipping (entry 44, \"Open\"): a telnet or capture transcript over at least three control ticks on a PIC board and on an OT-Direct board, showing CS, MM and CH about every 5 s, nothing during the restart quiet period, an...",
+          "Source anchors: the four call sites in the table under Context; the gates at SATcontrol.ino:5586-5620; heatingcontrol.py:236-238; climate.py:708, :530, :544-545."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -13056,6 +13135,30 @@
     {
       "source": "ADR-202",
       "target": "ADR-190",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-203",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-203",
+      "target": "ADR-179",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-203",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-203",
+      "target": "ADR-199",
       "type": "related",
       "resolved": true
     }
