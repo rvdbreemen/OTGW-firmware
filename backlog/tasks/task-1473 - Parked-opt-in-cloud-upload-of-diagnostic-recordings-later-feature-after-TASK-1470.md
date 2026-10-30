@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T12:45:00Z'
-updated_date: '2026-10-30T06:13:00Z'
+updated_date: '2026-10-30T06:14:00Z'
 labels:
   - parked
   - on-hold
@@ -38,13 +38,13 @@ Rejected alternatives and research: see notes (2026-10-30).
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Robert releases this task (removes the parked label) before any design work
-- [ ] #2 Bench measurement of TLS heap peak/steady state on a PSRAM board recorded in notes; go/no-go decided
-- [ ] #3 Proposed ADR (outbound TLS client on PSRAM boards, recording format) accepted by Robert
-- [ ] #4 OT frames carry a microsecond reception timestamp set at enqueue; a recorded day replays with the original timing (old fixed-750 ms vs new paced, demonstrated)
-- [ ] #5 Debug and OT streams upload continuously to an R2 EU bucket via the Worker; 24 h bench run shows no loop gap above normal and the real volume per stream
-- [ ] #6 With outbound internet blocked the upload fails quietly: no loop stall, no reboot, at most one log line per retry interval (capture transcript)
-- [ ] #7 Opt-in off by default, consent text in the web UI, secrets redacted, retention lifecycle rule set on the bucket
+- [ ] #1 Bench measurement of TLS heap peak/steady state on a PSRAM board recorded in notes; go/no-go decided
+- [ ] #2 Proposed ADR (outbound TLS client on PSRAM boards, recording format) accepted by Robert
+- [ ] #3 OT frames carry a microsecond reception timestamp set at enqueue; a recorded day replays with the original timing (old fixed-750 ms vs new paced, demonstrated)
+- [ ] #4 Debug and OT streams upload continuously to an R2 EU bucket via the Worker; 24 h bench run shows no loop gap above normal and the real volume per stream
+- [ ] #5 With outbound internet blocked the upload fails quietly: no loop stall, no reboot, at most one log line per retry interval (capture transcript)
+- [ ] #6 Opt-in off by default, consent text in the web UI, secrets redacted, retention lifecycle rule set on the bucket
+- [ ] #7 Robert releases this task for implementation (removes the on-hold and parked labels); until then nothing beyond this worked-out design is done
 <!-- AC:END -->
 
 ## Implementation Plan
