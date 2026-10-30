@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:14:00Z'
-updated_date: '2026-10-30T17:42:00Z'
+updated_date: '2026-10-30T18:11:00Z'
 labels:
   - sat sergeant-d
 milestone: 2.0.0
@@ -30,3 +30,9 @@ Sergeant D 2026-10-30 Conf-104: case 1 C, case 2 yes (entry 132). Rework of TASK
 - [ ] #3 Host test case 2: short draw 60 s after ignition: the remaining 120 s of hold still applies after the draw; no new temperature seed
 - [ ] #4 build + evaluate green; firmware-sat-spec.md updated
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-30 review (opus): case 1/case 2 correct, no early phase end, reset paths clean; findings: case-1 hold untested (probe P1, mutant passes), late flame after the case-1 fallback gets no hold (P2, fixed per thermo-nova pwm.py:144-146 in the fix round), P4 and P3 genuinely open -> entry 156 (interpretation) + Q-1502a/Q-1502b queued; stale comments/spec. Fix round running.
+<!-- SECTION:NOTES:END -->

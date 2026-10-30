@@ -5087,3 +5087,17 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot TASK-1513: A"
 
 **Settled (option A as posted):** when the heat source is a heat pump and the user chose no max flow setpoint, the default cap is 40 C; a chosen slider value replaces it (as entry 152 for boilers), within the MsgID 49 bounds and the underfloor 50 limit. thermo-nova has no heat-pump cap (default 55, underfloor 50, helpers.py:97-99), so 40 C is Sergeant D's choice. Firmware alpha.558: 40 C applies to CS also above a chosen value (SATcontrol.ino SAT_MAXTSET_HEAT_PUMP_CAP). **Task:** TASK-1513 AC2. **Open:** none.
+
+## 156. TASK-1502: our readings of entry 132 in the implementation, two points put to him (2026-10-30, interpretation, not his words)
+
+**Source:** coordinator, 2026-10-30, from the TASK-1502 implementation and its review (probe scenarios in the TASK-1502 notes). Not a statement by Sergeant D; recorded so the readings we act on are visible before the change lands (CLAUDE.md SAT rules).
+
+**Readings acted on (interpretation):**
+- A CH flame that is still burning at the end of a draw counts as the first CH flame after the draw (entry 103 C applied to case 1 of entry 132).
+- After the case-1 fallback (no CH flame within 180 s of the draw end, ON timer started anyway), a CH flame that lights later in that ON phase gets the 180 s minimum-burn hold, as thermo-nova sets `_flame_on_at` for a flame after the wait timed out (pwm.py:144-146, :201-203, which entry 132 cites). No start-up EMA and no new boiler-temperature seed.
+
+**Open, queued as questions (Q-1502a, Q-1502b in docs/sat/open-questions.md):**
+- Q-1502a (probe P4): with a burning start, a draw, and no CH flame after the draw, the firmware keeps the hold clock frozen through the 180 s post-draw wait and still applies the rest of the hold although no flame returns (ON phase ends at 390 s instead of 270 s). Is that intended?
+- Q-1502b (probe P3): a draw after the first-flame wait had already timed out; the CH flame after the draw gets no 180 s hold today (phase ends at 330 s). Should it get the hold, as without a draw?
+
+**Compared:** thermo-nova pwm.py:140-210 (ignition sync, hold anchor); firmware TASK-1502 lane (SATcontrol.ino satPwmOnDhwStart / satPwmDhwResume / hold-anchor guard). **Task:** TASK-1502.
