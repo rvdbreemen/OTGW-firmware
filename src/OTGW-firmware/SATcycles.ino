@@ -1065,8 +1065,8 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
 }
 
 //=== Sustained underheat and saturation: PWM -> continuous (thermo-nova _maybe_disable_pwm_runtime, heating_control.py:307-372) ===
-// Called after satApplyPWM() in the same tick (saturation reads this tick's off time), with the tick time
-// (entry 95, Q46b). Returns true if the mode was switched.
+// Called after satPwmSchedule() and before the control setpoint of the same tick (saturation reads this tick's off time; an exit
+// that fires sends the continuous CS in that tick, entry 134), with the tick time (entry 95, Q46b). Returns true if the mode was switched.
 // Both timers reset while PWM is not the mode (:308-311), during hot water and within 300 s after it (:313-315,
 // entry 108), and outside the PWM ON phase (:321-323): in the OFF phase the flow is low by design.
 // Underheat counts while flow <= requested - 3 and resets on a higher flow (:337-340); 180 s from the first
@@ -1092,7 +1092,7 @@ bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
     _sustain_underheatRunning = false;
   }
 
-  // satPwmLastOffTimeMs() is recorded by satApplyPWM() earlier in the same control tick.
+  // satPwmLastOffTimeMs() is recorded by satPwmSchedule() earlier in the same control tick.
   if (satPwmLastOffTimeMs() == 0) {
     if (satSustainedFor(_sustain_saturationRunning, _sustain_saturationStartMs, tickMs, SAT_SATURATION_SUSTAIN_MS)) {
       SATDebugTln(F("SAT: PWM saturation (off_time=0 sustained), switching to continuous mode"));

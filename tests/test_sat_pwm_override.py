@@ -189,6 +189,29 @@ int main(int argc, char** argv) {
 #endif
     return 0;
   }
+  if (!strcmp(sc, "exittick")) {           // TASK-1468 loop level: schedule, exits and apply step of ONE tick. argv[3]=uh|sat
+#ifdef HAS_SWITCH_TICK
+    const bool uh = !strcmp(argv[3], "uh");
+    const float p = uh ? 35.0f : 46.0f;    // uh: duty 0.39, ON time 351 s; sat: duty 0.94 = range 5 (off_time 0)
+    SETREQ(p); state.sat.fPidOutput = p;
+    state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flame = true;
+    _pwm_effectiveBoilerTemp = 47.2f; _pwm_waitingForFlame = false; _pwm_lastUpdateMs = g_ms;
+    _pwm_flameOnMs = g_ms - 200000UL; g_flameOnStart = g_ms - 200000UL;   // the 180 s start-up hold is over
+    g_flow = uh ? 20.0f : 46.0f;           // uh: flow <= request - 3; sat: on target
+    _pwm_lastOffTimeMs = 1; setPrev(40.0f);
+    float cs = 0, prev = 0; int ticks = 0;
+    for (; ticks < 60; ticks++) {
+      g_ms += 30000UL; _sat_tickMs = g_ms; prev = cs;
+      cs = tickRunSw(p);
+      if (state.sat.eControlMode != SAT_MODE_PWM) break;
+    }
+    const int ch = (int)satChEnableDecide(p, satGetColdSetpoint(), g_swDrives, g_swPwmOn);
+    printf("mode=%d ticks=%d cs=%.1f prev=%.1f cont_marker=%d ch=%d\n", state.sat.eControlMode, ticks + 1, cs, prev, (int)(cs >= 61.9f), ch);
+#else
+    printf("mode=-1\n");
+#endif
+    return 0;
+  }
   if (!strcmp(sc, "uh")) {                 // uh protection pwmFlameRequested: 200 s of low flow, 1 s calls
     state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = atoi(argv[3]) != 0;
     state.sat.fFinalSetpoint = pid; g_flow = 20.0f; SYNC_SUSTAIN_CLOCK();
@@ -371,9 +394,17 @@ def extract_tick(src: str) -> str:
     if ov >= 0:
         # TASK-1420: the overshoot switch sits between the max-setpoint check and the mode step, the exits after the
         # final clamp. The switches are not under test here (tests/test_sat_overshoot_sustain.py), so both are cut out.
-        ap = loop.index("  // --- Apply control mode ---", ov)
-        ex = loop.index("  // --- Sustained underheat and saturation", ap)
-        seg = loop[a:ov] + loop[ap:ex]
+        sch = loop.find("  // --- PWM schedule, then the PWM -> continuous exits", ov)
+        if sch >= 0:
+            # TASK-1468: schedule, then the exits, then the apply step. Keep the schedule and the apply step, cut the exits.
+            ex = loop.index("  // --- Sustained underheat and saturation", sch)
+            ap = loop.index("  // --- Apply control mode ---", ex)
+            end = loop.index("  // Modulation suppression", ap)
+            seg = loop[a:ov] + loop[sch:ex] + loop[ap:end]
+        else:
+            ap = loop.index("  // --- Apply control mode ---", ov)
+            ex = loop.index("  // --- Sustained underheat and saturation", ap)
+            seg = loop[a:ov] + loop[ap:ex]
     else:
         seg = loop[a:loop.index("  // --- Auto-switch between continuous and PWM modes")]
     return ("\nstatic float tickRun(float pidOutput) {\n" + seg +
@@ -389,9 +420,12 @@ def extract_switch_tick(src: str) -> str:
     solar = loop.find("  // --- Solar gain compensation on the requested setpoint")
     a = solar if solar >= 0 else loop.index("  // --- Clamp to valid range ---")
     ex = loop.index("  // --- Sustained underheat and saturation", ov)
+    # TASK-1468: the segment runs up to the modulation step, so it holds the real exits gate in whichever place the source has it
+    # (after the apply step on HEAD, between the schedule and the apply step since entry 134); the exits run on the tick clock.
+    body = loop[a:loop.index("  // Modulation suppression", ex)] if ex < loop.index("  // Modulation suppression", ov) else loop[a:ex]
     return ("\n#define HAS_SWITCH_TICK 1\nstatic uint32_t _sat_tickMs = 0; static bool g_swPwmOn = false, g_swDrives = false;\n"
             "bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs);\n"
-            "static float tickRunSw(float pidOutput) {\n" + loop[a:ex] +
+            "static float tickRunSw(float pidOutput) {\n" + body +
             "\n  g_swPwmOn = pwmOn; g_swDrives = pwmDrivesSetpoint;\n  return state.sat.fFinalSetpoint;\n}\n")
 
 
@@ -770,6 +804,26 @@ class SatPwmOverride(unittest.TestCase):
         self.assertEqual(r["drives"], "1", r)
         self.assertEqual(r["ch"], "1", r)
 
+    # TASK-1468, Q47b A (entry 134), LOOP LEVEL: the real schedule, exits gate and apply step of satControlLoopRun() in ONE
+    # tick (tickRunSw; the exits are the real satCycleCheckPwmExits()). thermo-nova heating_control.py:211-228: on the tick an
+    # underheat or saturation exit fires, the continuous setpoint goes out in that tick (the continuous stub returns 1000+p, which
+    # the final clamp cuts to 62), and CH is 1. The ticks before it stay in PWM and send the ON-phase suppression CS (flow - 1).
+    # Not covered: the CS enqueue after the segment, and the real satApplyContinuous() clamp (stubbed here, see tests/test_sat_previous_cs_clamp.py).
+    def _exit_tick(self, kind, ticks, prev_cs):
+        r = self.run_sc("exittick", 1, kind)
+        self.assertNotEqual(r["mode"], "-1", "no switch tick segment in this SATcontrol.ino")
+        self.assertEqual(r["mode"], "1", r)                          # the exit fired
+        self.assertEqual(r["ticks"], ticks, r)                       # first qualifying tick starts the timer; the exit ticks are unchanged
+        self.assertEqual(r["prev"], prev_cs, r)                      # the tick before stayed in PWM: suppression CS = flow - 1
+        self.assertEqual(r["cont_marker"], "1", "the exit tick still sent a PWM CS, the continuous one came a tick later: %r" % r)
+        self.assertEqual(r["ch"], "1", r)
+
+    def test_underheat_exit_tick_sends_the_continuous_setpoint(self):
+        self._exit_tick("uh", "7", "19.0")        # 180 s after the first qualifying tick at 30 s steps
+
+    def test_saturation_exit_tick_sends_the_continuous_setpoint(self):
+        self._exit_tick("sat", "11", "45.0")      # 300 s; the off time 0 of the tick's own schedule step counts from tick 1
+
     def test_mode_switch_resets_pwm_state(self):
         r = self.run_sc("reset", 1, "mode")
         self.assertEqual((r["req"], r["wait"], r["mode"]), ("0", "0", "1"))
@@ -879,7 +933,7 @@ class SolarSource(unittest.TestCase):
         loop = src[src.index("static void satControlLoopRun() {") if "static void satControlLoopRun() {" in src else src.index("static void satControlLoopRun()\n"):]
         solar = loop.index("pidOutput -= settings.sat.fSolarSetpointOffset;")
         self.assertLess(solar, loop.index("if (pidOutput < SAT_MIN_SETPOINT) pidOutput = SAT_MIN_SETPOINT;"))
-        self.assertLess(solar, loop.index("finalSetpoint = satApplyPWM(pidOutput);"))
+        self.assertLess(solar, loop.index("finalSetpoint = satApplyPWM(pidOutput, true);"))
         self.assertNotIn("finalSetpoint -= settings.sat.fSolarSetpointOffset", loop)
 
     def test_refresh_has_no_solar_term_and_reads_the_requested_setpoint(self):
@@ -984,10 +1038,12 @@ class ChEnableSource(unittest.TestCase):
         src = SAT_INO.read_text(encoding="utf-8")
         loop = src[src.index("void satControlLoop"):]
         self.assertIn("satSendCH(satChEnableDecide(pidOutput, satGetColdSetpoint(), pwmDrivesSetpoint, pwmOn))", loop)
-        # The PWM phase must be read before satCycleCheckPwmExits(): a switch to continuous
-        # runs satPwmReset(), which clears bPwmFlameRequested and would send CH=0 mid-burn.
-        self.assertLess(loop.index("pwmOn = state.sat.bPwmFlameRequested;"),
-                        loop.index("satCycleCheckPwmExits(pidOutput, _sat_tickMs);"))
+        # TASK-1468 (entry 134): the exits run before the mode is read. An exit that fired has left PWM, so pwmOn and
+        # pwmDrivesSetpoint stay false and CH is 1 with the continuous CS; the PWM phase is read only when the tick stays in PWM.
+        self.assertLess(loop.index("satCycleCheckPwmExits(pidOutput, _sat_tickMs);"),
+                        loop.index("const bool pwmMode = (state.sat.eControlMode == SAT_MODE_PWM);"))
+        self.assertLess(loop.index("const bool pwmMode = (state.sat.eControlMode == SAT_MODE_PWM);"),
+                        loop.index("pwmOn = state.sat.bPwmFlameRequested;"))
         self.assertNotIn("finalSetpoint > SAT_MIN_SETPOINT", loop)
 
 

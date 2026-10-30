@@ -1336,10 +1336,12 @@ static bool satPwmDrivesSetpoint(float pidOutput)
          && pidOutput > satGetColdSetpoint();
 }
 
-static float satApplyPWM(float pidOutput)
+// scheduleDone: the control tick runs satPwmSchedule() and the PWM exits itself, before this setpoint step (thermo-nova order,
+// entry 134), and passes true. The default runs the schedule here, for callers that want both steps in one call.
+static float satApplyPWM(float pidOutput, bool scheduleDone = false)
 {
   const float prevCS = (_sat_lastControlCS > SAT_MIN_SETPOINT) ? _sat_lastControlCS : pidOutput;
-  satPwmSchedule(pidOutput);
+  if (!scheduleDone) satPwmSchedule(pidOutput);
   if (satGetFlowTemp() <= 0.0f) {
     return satApplyContinuous(pidOutput, _sat_lastControlCS);   // PWM idle without a flow temperature (heating_control.py:149-150)
   }
@@ -1431,7 +1433,7 @@ static void satSetControlMode(SATControlMode m)
     satCycleSkipAutoSwitch();
     // thermo-nova runs pwm.update() in the same update() pass that enables PWM (heating_control.py:206-215),
     // so with a flow temperature the status leaves IDLE at once (pwm.py:154-180). The overshoot switch runs
-    // before the mode step of its tick (entry 88), so satApplyPWM() takes its first schedule step on the switch
+    // before the mode step of its tick (entry 88), so the tick takes its first schedule step on the switch
     // tick; the flag is set here for the other mode changes (control_mode command), whose first step comes with
     // the next tick, and so that the cycle classifier never sees IDLE in between (classifier.py:28-29,
     // TASK-1387). Only the classifier reads the flag, so this does not change what the boiler is sent.
@@ -6187,18 +6189,33 @@ static void satControlLoopRun()
     satCycleSkipAutoSwitch();   // requested <= cold setpoint clears the start (heating_control.py:280-282)
   }
 
+  // --- PWM schedule, then the PWM -> continuous exits, before the control setpoint ---
+  // thermo-nova order (heating_control.py:211-228, Sergeant D entry 134, Q47b A): pwm.update, the underheat and saturation exits
+  // (_maybe_disable_pwm_runtime), then the control setpoint of whichever mode is left. So on the tick an exit fires, the continuous
+  // setpoint (and CH=1) goes out in that same tick, not one tick later. The schedule runs first: saturation reads this tick's off time.
+  if (state.sat.eControlMode == SAT_MODE_PWM) {
+    satPwmSchedule(pidOutput);
+  }
+
+  // --- Sustained underheat and saturation: PWM -> continuous (Tasks #42/#43) ---
+  // Delegated to satCycleCheckPwmExits() in SATcycles.ino (180 s underheat, 300 s saturation from the first
+  // qualifying tick, entries 86, 95). At or below the cold setpoint the timers reset (heating_control.py:317-319).
+  if (pidOutput > satGetColdSetpoint()) {
+    satCycleCheckPwmExits(pidOutput, _sat_tickMs);
+  } else {
+    satCycleResetSustainGuards();
+  }
+
   // --- Apply control mode ---
+  // Read after the exits: an exit that fired has left PWM, so the continuous rule computes this tick's CS from the previous CS.
   float finalSetpoint;
   const bool pwmMode = (state.sat.eControlMode == SAT_MODE_PWM);
   bool pwmDrivesSetpoint = false;
   bool pwmOn = false;
   if (pwmMode) {
-    finalSetpoint = satApplyPWM(pidOutput);
+    finalSetpoint = satApplyPWM(pidOutput, true);   // the schedule ran above
     pwmDrivesSetpoint = satPwmDrivesSetpoint(pidOutput);
-    // The phase that produced this tick's CS. Read here: satCycleCheckPwmExits() below
-    // can switch to continuous and satPwmReset() clears bPwmFlameRequested, which would
-    // send CH=0 with the ON-phase CS on the switch tick.
-    pwmOn = state.sat.bPwmFlameRequested;
+    pwmOn = state.sat.bPwmFlameRequested;           // the phase that produced this tick's CS
   } else {
     finalSetpoint = satApplyContinuous(pidOutput, _sat_lastControlCS);   // previous CS: read before this tick overwrites it below
   }
@@ -6209,16 +6226,6 @@ static void satControlLoopRun()
 
   _sat_lastControlCS = finalSetpoint;   // the "previous CS" a PWM tick without override keeps
   state.sat.fFinalSetpoint = finalSetpoint;
-
-  // --- Sustained underheat and saturation: PWM -> continuous (Tasks #42/#43) ---
-  // After satApplyPWM(): saturation reads this tick's off time. Delegated to satCycleCheckPwmExits() in
-  // SATcycles.ino (180 s underheat, 300 s saturation from the first qualifying tick, entries 86, 95). At or below
-  // the cold setpoint the timers reset (heating_control.py:317-319).
-  if (pidOutput > satGetColdSetpoint()) {
-    satCycleCheckPwmExits(pidOutput, _sat_tickMs);
-  } else {
-    satCycleResetSustainGuards();
-  }
 
   // Modulation suppression is handled via CS sequence in satApplyPWM() (PWM ON only)
   state.sat.bModSuppressed = false;

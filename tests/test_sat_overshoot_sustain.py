@@ -546,20 +546,23 @@ class TickClockAndLoopOrder(unittest.TestCase):
             self.assertNotIn("millis()", code, head)
 
     # Q47 A (entry 88): the overshoot switch runs after the max-setpoint check and before the control mode is
-    # applied, so satApplyPWM() sends the first PWM CS on the switch tick; the exits stay after satApplyPWM().
+    # applied, so the tick sends the first PWM CS on the switch tick. Entry 134 (TASK-1468): the order is schedule, exits,
+    # then the control setpoint, so the continuous CS goes out on the tick an exit fires.
     def test_overshoot_switch_precedes_apply_control_mode(self):
         loop = self.loop
         i_max = loop.index("satSetControlMode(SAT_MODE_CONTINUOUS);\n    SATDebugTln(F(\"SAT: PID at system max")
         i_os = loop.index("satCycleCheckOvershootSwitch(pidOutput, _sat_tickMs);")
         i_apply = loop.index("// --- Apply control mode ---")
         i_mode = loop.index("const bool pwmMode = (state.sat.eControlMode == SAT_MODE_PWM);")
-        i_pwm = loop.index("finalSetpoint = satApplyPWM(pidOutput);")
+        i_pwm = loop.index("finalSetpoint = satApplyPWM(pidOutput, true);")
+        i_sched = loop.index("satPwmSchedule(pidOutput);")
         i_exit = loop.index("satCycleCheckPwmExits(pidOutput, _sat_tickMs);")
         self.assertLess(i_max, i_os)
         self.assertLess(i_os, i_apply)
-        self.assertLess(i_apply, i_mode, "pwmMode must be read after the overshoot switch")
+        self.assertLess(i_sched, i_exit, "the exits must run after the schedule: saturation reads this tick's off time")
+        self.assertLess(i_exit, i_apply, "the exits must run before the control setpoint: the exit tick sends the continuous CS (entry 134)")
+        self.assertLess(i_apply, i_mode, "pwmMode must be read after the overshoot switch and the exits")
         self.assertLess(i_mode, i_pwm)
-        self.assertLess(i_pwm, i_exit, "the exits must run after satApplyPWM(): saturation reads this tick's off time")
         self.assertNotIn("return", loop[i_os:i_apply], "a return between the overshoot switch and the apply step would skip the first PWM CS")
 
 
