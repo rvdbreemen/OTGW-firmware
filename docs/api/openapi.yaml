@@ -4306,7 +4306,10 @@ components:
           description: "OpenTherm slave member ID"
         max_setpoint_system:
           type: number
-          description: "System maximum flow setpoint (C)"
+          description: "Maximum flow setpoint SAT works with (C): the user's Max flow setpoint cut into the boiler's MsgID 49 bounds (20..80 without them), at most 50 underfloor, 40 heat pump, 65 global; 62 / 50 / 40 while max_setpoint_user is 0 (TASK-1373)"
+        max_setpoint_user:
+          type: number
+          description: "The user's Max flow setpoint (C), 0 = not chosen. Set with POST /v2/sat/settings/max_setpoint (20..80). A chosen value is sent to the boiler as SH= (MsgID 57); nothing is sent while 0 (TASK-1373)"
         external_temp_valid:
           type: boolean
           description: "External room temperature input valid"
@@ -4572,6 +4575,7 @@ components:
         manufacturer_detected: 18
         slave_memberid: 0
         max_setpoint_system: 62.0
+        max_setpoint_user: 0.0
         external_temp_valid: false
         external_outdoor_valid: false
         pv_surplus_w: 0

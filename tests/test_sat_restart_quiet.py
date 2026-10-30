@@ -94,6 +94,7 @@ static void satCycleSample() {}
 static void satGetWindow4hStats() {}
 static void satGetWindow24hStats() {}
 static void satPwmSuppressionRefresh() {}
+static void satMaxTSetSendStep() {}   // TASK-1373: the user MaxTSet SH= step is tested in test_sat_max_tset.py
 static void satPidService(uint32_t) {}
 static void satSetControlMode(SATControlMode m) { state.sat.eControlMode = m; }
 static void satPwmReset() {}

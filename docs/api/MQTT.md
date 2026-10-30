@@ -356,7 +356,7 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/pid_output` | `"43.1"` | yes | PID output = curve + P + I + D (°C) |
 | `sat/overshoot_margin` | `"2.0"` | yes | Configured overshoot margin (°C) |
 | `sat/requested_setpoint` | `"43.0"` | no | Requested flow setpoint including the solar offset, clamped to the minimum setpoint and `sat/max_setpoint` (°C) |
-| `sat/max_setpoint` | `"62.0"` | yes | Maximum flow setpoint in use (°C): 62 for radiators, 45 for underfloor, at most 40 for a heat pump |
+| `sat/max_setpoint` | `"62.0"` | yes | Maximum flow setpoint SAT works with (°C) (TASK-1373): the user's Max flow setpoint (`set/<node>/sat/max_setpoint`) cut into the boiler's MsgID 49 bounds (20 to 80 without them), at most 50 for underfloor, 40 for a heat pump and 65 (the old global ceiling). While the user has not chosen a value: 62 for radiators, 50 for underfloor, 40 for a heat pump. Before TASK-1373 this was the fixed 62 / 45 / 40 table |
 | `sat/modulation_state` | `"OFF"` / `"HOT_WATER"` / `"PWM_OFF"` / `"COLD"` / `"ACTIVE"` | no | Modulation state. `"OFF"` while SAT is not active; `"COLD"` = flow temperature below 22 °C |
 | `sat/pwm_state` | `"IDLE"` / `"ON"` / `"OFF"` | no | PWM phase; `"IDLE"` when the control mode is not PWM |
 | `sat/current_modulation` | `"45"` | no | Current boiler modulation (%) |
@@ -1091,6 +1091,7 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 | `sat/manufacturer` | `SATmanufacturer` | Boiler manufacturer name |
 | `sat/max_modulation` | `SATmaxmodulation` | Max relative modulation % |
 | `sat/dhw_setpoint` | `SATdhwsetpoint` | DHW setpoint (°C) |
+| `sat/max_setpoint` | `SATmaxsetpoint` | Max flow setpoint (MaxTSet) (°C, 20 to 80; 0 = not chosen). A chosen value is sent to the boiler as `SH=` (MsgID 57) when it changes and once after a restart; nothing is sent while 0. Home Assistant discovers it as the number entity `SAT Max Flow Setpoint` (20 to 80, step 1) |
 | `sat/flame_off_offset` | `SATflameoffset` | Setpoint offset when flame is off |
 | `sat/flow_offset` | `SATflowoffset` | Continuous mode max setpoint drop (°C) |
 | `sat/summer_threshold` | `SATsummerthreshold` | Summer simmer outdoor threshold (°C) |

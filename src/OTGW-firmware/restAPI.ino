@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.553
+**  Version  : v2.0.0-alpha.554
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1627,6 +1627,9 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATmaxmodulation", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("dhw_setpoint")) == 0) {
       updateSetting("SATdhwsetpoint", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("max_setpoint")) == 0) {
+      if (!satMaxTSetInputOk(strtof(val, nullptr))) { sendApiError(400, F("max_setpoint must be 0 (not chosen) or 20 to 80")); return; }
+      updateSetting("SATmaxsetpoint", val); handled = true;   // TASK-1373: user Max flow setpoint (MaxTSet), 0 = not chosen
     } else if (strcasecmp_P(settingName, PSTR("dhw_enabled")) == 0) {
       updateSetting("SATdhwenabled", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("dhw_enable")) == 0) {
@@ -2270,6 +2273,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.follow_thermostat"), settings.sat.bFollowThermostat);
     je.field(F("settings.sat.mqtt_fallback"), settings.sat.bMqttFallback);
     je.field(F("settings.sat.dhw_setpoint"), settings.sat.fDhwSetpoint);
+    je.field(F("settings.sat.user_max_setpoint"), settings.sat.fMaxTSetUser);
     je.field(F("settings.sat.dhw_enabled"), settings.sat.bDhwEnabled);
     je.field(F("settings.sat.dhw_enable"), settings.sat.bDhwEnable);
     je.field(F("settings.sat.window_detection"), settings.sat.bWindowDetection);
@@ -4029,6 +4033,7 @@ void sendDeviceSettings()
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fDhwSetpoint,             1, 1, tmpBuf); addNum(F("satdhwsetpoint"),      tmpBuf, "f", 0, SAT_DHW_SETPOINT_MAX);
+    dtostrf(settings.sat.fMaxTSetUser,             1, 1, tmpBuf); addNum(F("satmaxsetpoint"),      tmpBuf, "f", 0, SAT_MAXTSET_MAX);
     dtostrf(settings.sat.fFlameOffOffset,          1, 1, tmpBuf); addNum(F("satflameoffset"),      tmpBuf, "f", 0, 30);
     dtostrf(settings.sat.fFlowOffset,              1, 1, tmpBuf); addNum(F("satflowoffset"),       tmpBuf, "f", 0, 10);
     dtostrf(settings.sat.fModSupDelay,             1, 1, tmpBuf); addNum(F("satmodsupdelay"),      tmpBuf, "f", 0, 120);
@@ -4169,7 +4174,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient",
   "satdhwcapacity", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
   "satflameoffset", "satflowoffset", "satflushtreshold", "satfollowthermostat", "sathumiditytimeout",
-  "satinterval", "satmanufacturer", "satmaxconsumption", "satmaxpressdrop", "satmaxpressure",
+  "satinterval", "satmanufacturer", "satmaxconsumption", "satmaxsetpoint", "satmaxpressdrop", "satmaxpressure",
   "satminconsumption", "satminpressure",
   "satmodsupdelay", "satmodsupoffset", "satmqttfallback", "satmultiarea", "satmultiareacount",
   "satovershootmargin", "satovershootprotection", "satpresetactivity", "satpresetaway", "satpresetcomfort", "satpreseteco",

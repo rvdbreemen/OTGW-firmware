@@ -3191,6 +3191,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/manufacturer` | `SATmanufacturer` |
 | `sat/max_modulation` | `SATmaxmodulation` |
 | `sat/dhw_setpoint` | `SATdhwsetpoint` |
+| `sat/max_setpoint` | `SATmaxsetpoint` |
 | `sat/dhw_enabled` | `SATdhwenabled` |
 | `sat/dhw_enable` | `SATdhwenable` |
 | `sat/interval` | `SATinterval` |

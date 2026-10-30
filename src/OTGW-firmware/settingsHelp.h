@@ -120,6 +120,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satsensorarea1":"DS18B20 or BLE sensor that feeds area 1 of the room temperature.",
 "satsensorarea2":"DS18B20 or BLE sensor that feeds area 2 of the room temperature.",
 "satsensorarea3":"DS18B20 or BLE sensor that feeds area 3 of the room temperature.",
+"satmaxsetpoint":"Highest flow setpoint SAT may use; sent to the boiler as SH=. 0: not chosen, SAT caps at 62 °C (underfloor 50) and sends nothing.",
 "satdhwsetpoint":"Hot-water setpoint, 30 to 60 °C. Below 30 means off. Sent only while standalone DHW control is on.",
 "satflameoffset":"With overshoot protection, the PWM ON setpoint is return temperature plus this until the suppression delay after ignition. 0 to 30, default 18.",
 "satflowoffset":"Continuous mode: largest drop of the setpoint below the boiler temperature. 0.5 to 10 °C, default 2.",

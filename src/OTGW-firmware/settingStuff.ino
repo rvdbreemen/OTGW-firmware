@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.553
+**  Version  : v2.0.0-alpha.554
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -343,6 +343,7 @@ bool writeSettings(bool show)
   writeJsonFloatKV(file, F("SATmodsupdelay"), settings.sat.fModSupDelay);
   writeJsonFloatKV(file, F("SATmodsupoffset"), settings.sat.fModSupOffset);
   writeJsonFloatKV(file, F("SATdhwsetpoint"), settings.sat.fDhwSetpoint);
+  writeJsonFloatKV(file, F("SATmaxsetpoint"), settings.sat.fMaxTSetUser);
   writeJsonBoolKV(file, F("SATdhwenabled"), settings.sat.bDhwEnabled);
   writeJsonBoolKV(file, F("SATdhwenable"), settings.sat.bDhwEnable);
   writeJsonBoolKV(file, F("SATpushsetpoint"), settings.sat.bPushSetpoint);
@@ -747,6 +748,19 @@ static float clampSettingFloat(const char* newValue, float current, float lo, fl
   return constrain(v, lo, hi);
 }
 
+// TASK-1373: user Max flow setpoint. 0 = not chosen; 1..19 (a typo) and non-finite input keep the current
+// value, anything else is cut at SAT_MAXTSET_MAX.
+static float parseMaxTSetUser(const char* newValue, float current)
+{
+  // -1 as the lower bound keeps a negative input out of 0 ("not chosen"): it fails satMaxTSetInputOk() below.
+  const float v = clampSettingFloat(newValue, current, -1.0f, (float)SAT_MAXTSET_MAX);
+  if (!satMaxTSetInputOk(v)) {
+    DebugTf(PSTR("[Settings] Ignoring SATmaxsetpoint [%s], keeping %.1f\r\n"), newValue, current);
+    return current;
+  }
+  return v;
+}
+
 //=======================================================================
 void updateSetting(const char *field, const char *newValue)
 { //do not just trust the caller to do the right thing, server side validation is here!
@@ -1054,6 +1068,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATmodsupdelay")) == 0)    settings.sat.fModSupDelay = clampSettingFloat(newValue, settings.sat.fModSupDelay, 0.0f, 120.0f);
   else if (strcasecmp_P(field, PSTR("SATmodsupoffset")) == 0)   settings.sat.fModSupOffset = clampSettingFloat(newValue, settings.sat.fModSupOffset, 0.0f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATdhwsetpoint")) == 0)    settings.sat.fDhwSetpoint = clampSettingFloat(newValue, settings.sat.fDhwSetpoint, 0.0f, (float)SAT_DHW_SETPOINT_MAX);
+  else if (strcasecmp_P(field, PSTR("SATmaxsetpoint")) == 0)    settings.sat.fMaxTSetUser = parseMaxTSetUser(newValue, settings.sat.fMaxTSetUser);
   else if (strcasecmp_P(field, PSTR("SATdhwenabled")) == 0)     settings.sat.bDhwEnabled = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATdhwenable")) == 0) {
     // TASK-516: master DHW enable. Persist always; only emit HW= when boiler

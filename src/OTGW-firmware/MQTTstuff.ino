@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.553
+**  Version  : v2.0.0-alpha.554
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -679,6 +679,7 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "manufacturer",           "SATmanufacturer",      nullptr },
   { "max_modulation",         "SATmaxmodulation",     nullptr },
   { "dhw_setpoint",           "SATdhwsetpoint",       nullptr },
+  { "max_setpoint",           "SATmaxsetpoint",       nullptr }, // TASK-1373: user Max flow setpoint (MaxTSet), 0 = not chosen
   { "dhw_enabled",            "SATdhwenabled",        nullptr },
   { "dhw_enable",             "SATdhwenable",         nullptr }, // TASK-516: master DHW enable (HW= command, gated on MsgID 3 HB3)
   { "interval",               "SATinterval",          nullptr },
@@ -2960,6 +2961,8 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     }
     feedWatchDog();
     if (streamSatSelectDiscovery(0, ctx)) result = true;
+    feedWatchDog();
+    if (streamSatNumberDiscovery(0, ctx)) result = true;   // TASK-1373: Max flow setpoint
     clearRetiredSatEntities(ctx);
   }
   // Number (OT ID 27): Thermostat (room temperature outside override is thermostat-side).

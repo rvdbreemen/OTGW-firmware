@@ -2074,6 +2074,7 @@
     satsensorarea2:      { cat: 'sat', label: 'Area 2 sensor' },
     satsensorarea3:      { cat: 'sat', label: 'Area 3 sensor' },
     satdhwsetpoint:      { cat: 'sat', label: 'DHW setpoint', hint: '°C (below 30 = off, 30-60)' },
+    satmaxsetpoint:      { cat: 'sat', label: 'Max flow setpoint', hint: '°C (0 = not chosen, default 62 / 50 underfloor)' },
     satflameoffset:      { cat: 'sat', label: 'Flame-off offset', hint: '°C' },
     satflowoffset:       { cat: 'sat', label: 'Flow offset', hint: '°C' },
     satmodsupdelay:      { cat: 'sat', label: 'Modulation suppression delay', hint: 'Seconds' },
@@ -2173,7 +2174,7 @@
                    'satinterval', 'sathpcycle', 'satautotune', 'satautotunerate', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
     ['Boiler', ['satmanufacturer', 'satboilerratedkw', 'satboilerefficiency', 'satminconsumption', 'satmaxconsumption',
-                'satboilercapacity', 'satdhwcapacity',
+                'satboilercapacity', 'satdhwcapacity', 'satmaxsetpoint',
                 'satminpressure', 'satmaxpressure', 'satmaxpressdrop']],
     ['Thermal', ['satthermalcomfort', 'sathumiditytimeout',
                  'satthermalcoeff', 'satsolargain', 'satsolarminrise', 'satsolaroffset', 'satsolarminelev']],
@@ -4473,6 +4474,8 @@
   var satDhwDirty = false;              // user dragging the DHW slider — defer status echo
   var satEnPending = false, satDhwEnPending = false, satDhwEnabledPending = false, satSimPending = false;  // in-flight POST guards
   var SAT_DHW_SETPOINT_MIN = 30, SAT_DHW_SETPOINT_MAX = 60;   // = SAT_DHW_SETPOINT_MIN/MAX in SATtypes.h (below MIN = off)
+  var SAT_MAXTSET_MIN = 20, SAT_MAXTSET_MAX = 80;             // = SAT_MAXTSET_MIN/MAX in SATtypes.h (TASK-1373)
+  var satMaxDirty = false;              // user dragging the Max flow slider — defer status echo
   var SAT_MODE_LABELS = ['Off', 'Continuous', 'PWM'];      // control_mode enum
   var SAT_CYCLE_LABELS = ['None', 'Good', 'Overshoot', 'Underheat', 'Short', 'Uncertain', 'Underheat (PWM)', 'Insufficient'];  // last_cycle_class (6/7 added TASK-891.4)
   var SAT_PRESET_NAMES = ['None', 'Away', 'Eco', 'Comfort', 'Sleep', 'Activity', 'Home'];   // active_preset enum
@@ -4504,7 +4507,7 @@
     // Markers once, then the DHW bounds on every visit, one after the other (no burst).
     var mk = satMarkersLoaded ? Promise.resolve() : fetchSatMarkers();
     satMarkersLoaded = true;
-    mk.then(fetchDhwBounds);
+    mk.then(fetchDhwBounds).then(fetchMaxTSetBounds);   // one after the other: at most 2 API calls in flight
     if (satPollTimer) clearInterval(satPollTimer);
     satPollTimer = setInterval(fetchSatPage, 5000);
     // TASK-1012: existing SAT users see the wizard once on first SAT-page visit.
@@ -4585,6 +4588,43 @@
         if (satLastData) satRenderDhw(satLastData);
       })
       .catch(function () { });
+  }
+
+  // TASK-1373: Max flow slider bounds from boiler MsgID 49 (value = UB<<8 | LB, 0 = never reported).
+  // Same validity rule as the firmware (satMaxTSetBounds): raw != 0, UB > LB, UB <= 100; otherwise 20-80.
+  function fetchMaxTSetBounds() {
+    return fetch(APIGW + 'v2/otgw/messages/49')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var s = document.getElementById('satMaxSlider'); if (!s || !j) return;
+        var raw = parseInt(j.value, 10) || 0, ub = (raw >> 8) & 0xFF, lb = raw & 0xFF;
+        var ok = raw > 0 && ub > lb && ub <= 100;
+        var lo = ok ? lb : SAT_MAXTSET_MIN, hi = ok ? ub : SAT_MAXTSET_MAX;
+        s.min = lo; s.max = hi;
+        s.title = ok ? 'Boiler range ' + lb + '–' + ub + ' °C (MsgID 49)'
+                     : 'Default range ' + SAT_MAXTSET_MIN + '–' + SAT_MAXTSET_MAX + ' °C (no MsgID 49 from the boiler)';
+        if (satLastData) satRenderMaxTSet(satLastData);
+      })
+      .catch(function () { });
+  }
+
+  // TASK-1373: Max flow slider. max_setpoint_user 0 = not chosen: the slider shows the ceiling SAT works
+  // with (max_setpoint_system) and the readout says "default".
+  function satRenderMaxTSet(d) {
+    var slider = document.getElementById('satMaxSlider');
+    if (!slider || satMaxDirty) return;
+    var user = satNum(d.max_setpoint_user), eff = satNum(d.max_setpoint_system);
+    if (user === null) { txt('satMaxR', '—'); return; }
+    if (user <= 0) {
+      if (eff !== null) slider.value = Math.round(eff);
+      txt('satMaxR', eff !== null ? 'default (' + Math.round(eff) + '°C)' : 'default');
+    } else {
+      // Chosen: show the ceiling SAT really works with (the boiler bounds, the heating system, the global 65 cap
+      // and a heat pump cap can cut the chosen value); name the chosen value when it differs.
+      var shown = eff !== null ? Math.round(eff) : Math.round(user);
+      slider.value = shown;
+      txt('satMaxR', shown + '°C' + (shown !== Math.round(user) ? ' (chosen ' + Math.round(user) + '°C)' : ''));
+    }
   }
 
   // TASK-1232: a click on the curve plot adds a calibration marker; the list deletes
@@ -4681,6 +4721,7 @@
     txt('satRoom', satFmt(d.room_temp, 1, '°'));
     txt('satTargetT', satFmt(d.target_temp, 1, '°'));
     satRenderDhw(d);
+    satRenderMaxTSet(d);
     satRenderCycle(d);
     satDrawCurve(d);
     satKv('satControlStatus', [
@@ -5052,6 +5093,15 @@
       ds.addEventListener('change', function () {
         satDhwDirty = false;
         satPost('settings/dhw_setpoint', ds.value).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
+      });
+    }
+
+    var ms = document.getElementById('satMaxSlider');
+    if (ms) {
+      ms.addEventListener('input', function () { satMaxDirty = true; txt('satMaxR', ms.value + '°C'); });
+      ms.addEventListener('change', function () {
+        satMaxDirty = false;
+        satPost('settings/max_setpoint', ms.value).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
       });
     }
 

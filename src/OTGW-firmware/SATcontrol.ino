@@ -286,25 +286,96 @@ static uint8_t satGetEffectiveHeatingSource()
   return settings.sat.iHeatingSource;
 }
 
-// Returns max boiler setpoint for the current heating system.
-//
-// Task #230 -- 62C vs Python 55C for radiators: intentional and correct.
-// Python SAT calculate_default_maximum_setpoint() returns 55C as a conservative default
-// for modern condensing boilers with weather compensation. The C++ value of 62C is the
-// correct ceiling for traditional European high-temperature radiator systems (EN 12831,
-// typical design at -10C outdoor temp requires 70/60C or 75/65C flow/return). Modern
-// condensing boilers are typically limited by their own MaxTSet OT parameter (read in
-// satControlLoop), which caps this value in practice. 62C is therefore the right upper
-// bound for legacy radiators; the Python 55C is a conservative out-of-the-box default
-// for new installs and does not represent an OT spec requirement.
-// Heat pump: C++ 40C matches Python's heat pump cap -- no discrepancy there.
+// --- User Max flow setpoint (MaxTSet), TASK-1373, Sergeant D entries 48, 51, 54, 67, 100, 110, 148 ---
+// The user picks one value on a slider; SAT caps every CS it sends at it (the PWM ignition hold included)
+// and sends it to the boiler as SH= (MsgID 57). While the user has not chosen a value (stored 0) SAT uses
+// a default ceiling and sends no SH=, so the installer's MaxTSet stays (entry 148).
+static const float SAT_MAXTSET_DEFAULT_RAD   = 62.0f;   // not chosen, radiators (entry 67)
+static const float SAT_MAXTSET_DEFAULT_FLOOR = 50.0f;   // not chosen, underfloor (entry 110)
+static const float SAT_MAXTSET_HEAT_PUMP_CAP = 40.0f;   // heat pump source: tighter cap, unchanged (open question to Sergeant D)
+
+// Slider bounds from the boiler's MsgID 49 (high byte upper, low byte lower bound). Valid when the
+// message was reported (raw != 0), upper > lower and upper <= 100; otherwise 20..80 (entry 100).
+static void satMaxTSetBounds(uint16_t raw, float* lo, float* hi)
+{
+  const float ub = (float)((raw >> 8) & 0xFF), lb = (float)(raw & 0xFF);
+  if (raw != 0 && ub > lb && ub <= 100.0f) { *lo = lb; *hi = ub; }
+  else                                     { *lo = (float)SAT_MAXTSET_MIN; *hi = (float)SAT_MAXTSET_MAX; }
+}
+
+// The global SAT max setpoint (settings.sat.fMaxSetpoint, 65 when unset or out of range). It caps the CS
+// SAT sends and, for boilers, the SH= value too, so the two never disagree.
+static float satGlobalMaxSetpoint()
+{
+  float g = settings.sat.fMaxSetpoint;
+  if (g < 30.0f || g > SAT_HARD_MAX_RAD) g = SAT_GLOBAL_MAX_SETPOINT;   // sanity
+  return g;
+}
+
+// The value sent to the boiler as SH= and used as the CS cap of a boiler: the user value (or the default
+// while not chosen), cut into the boiler bounds, then the hard ceiling of the heating system (underfloor 50,
+// radiators 80) and the global SAT max setpoint. `chosen` tells whether the user picked a value.
+// INTERIM CHOICE (coordinator, pending Sergeant D's open points Q-b global 65 cap and Q-c heat-pump
+// default): SH= and the CS cap use the same global ceiling; the heat-pump 40 cap stays out of SH=.
+static float satMaxTSetBoilerValue(float user, bool underfloor, uint16_t rawBounds, float globalMax, bool* chosen)
+{
+  float lo, hi;
+  satMaxTSetBounds(rawBounds, &lo, &hi);
+  const bool isChosen = user > 0.0f;
+  if (chosen) *chosen = isChosen;
+  float v = isChosen ? user : (underfloor ? SAT_MAXTSET_DEFAULT_FLOOR : SAT_MAXTSET_DEFAULT_RAD);
+  if (v < lo) v = lo;
+  if (v > hi) v = hi;
+  const float hard = underfloor ? SAT_HARD_MAX_FLOOR : SAT_HARD_MAX_RAD;
+  if (v > hard) v = hard;
+  if (v > globalMax) v = globalMax;
+  return v;
+}
+
+// The value SAT works with as MaxTSet (the CS cap): the boiler value above, then the heat pump cap.
+static float satMaxTSetCeiling(float user, bool underfloor, bool heatPump, uint16_t rawBounds, float globalMax, bool* chosen)
+{
+  float v = satMaxTSetBoilerValue(user, underfloor, rawBounds, globalMax, chosen);
+  if (heatPump && v > SAT_MAXTSET_HEAT_PUMP_CAP) v = SAT_MAXTSET_HEAT_PUMP_CAP;
+  return v;
+}
+
+static float satUserMaxTSet(bool heatPump, bool* chosen)
+{
+  return satMaxTSetCeiling(settings.sat.fMaxTSetUser,
+                           satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR,
+                           heatPump,
+                           OTcurrentSystemState.MaxTSetUBMaxTSetLB, satGlobalMaxSetpoint(), chosen);
+}
+
+// Returns the max boiler setpoint SAT works with: the user MaxTSet above (heat pump cap included).
 static float satGetMaxSetpoint()
 {
-  // System cap (distribution): underfloor 45C, radiators 62C (see comment above).
-  float cap = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? 45.0f : 62.0f;
-  // Source cap: heat pumps are limited to ~40C flow -> take the tighter of the two.
-  if (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP && cap > 40.0f) cap = 40.0f;
-  return cap;
+  return satUserMaxTSet(satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP, nullptr);
+}
+
+// Sends the user MaxTSet to the boiler as SH= (MsgID 57): once after a restart (the PIC skips an identical
+// EEPROM byte, OT-Direct loses its override at a reboot) and whenever the value changes (slider, REST, MQTT,
+// bounds that arrive later). Nothing while the user has not chosen a value (entry 148), also not after the
+// value goes back to 0 (the boiler keeps the last user value); no MsgID 6 check (entry 100). Never per
+// tick: only the first pass and a change send. A queued SH= the PIC drops is not retried until the next
+// change or restart. The value is the boiler value (no heat pump cap), the same cap a boiler's CS gets.
+static int16_t _sat_lastSentSH = -1;                        // -1 = nothing sent since boot
+static void satMaxTSetSendStep()
+{
+  if (!satIsEnabled() || !hasOTCommandInterface()) return;
+  bool chosen = false;
+  const float v = satMaxTSetBoilerValue(settings.sat.fMaxTSetUser,
+                                        satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR,
+                                        OTcurrentSystemState.MaxTSetUBMaxTSetLB, satGlobalMaxSetpoint(), &chosen);
+  if (!chosen) return;
+  const int16_t iv = (int16_t)lroundf(v);
+  if (iv == _sat_lastSentSH) return;
+  char cmd[12];
+  snprintf_P(cmd, sizeof(cmd), PSTR("SH=%d"), (int)iv);
+  addCommandToQueue(cmd, strlen(cmd), false, 0);
+  _sat_lastSentSH = iv;
+  SATDebugTf(PSTR("SAT: user MaxTSet, sent %s\r\n"), cmd);
 }
 
 // Effective ceiling for the CS= the boiler is sent: the boiler's own MaxTSet, the system / source cap,
@@ -318,8 +389,7 @@ static float satEffectiveMaxSetpoint()
   float hardMax = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? SAT_HARD_MAX_FLOOR : SAT_HARD_MAX_RAD;
   if (maxSetpoint > sysMax) maxSetpoint = sysMax;
   if (maxSetpoint > hardMax) maxSetpoint = hardMax;
-  float globalMax = settings.sat.fMaxSetpoint;
-  if (globalMax < 30.0f || globalMax > SAT_HARD_MAX_RAD) globalMax = SAT_GLOBAL_MAX_SETPOINT; // sanity
+  const float globalMax = satGlobalMaxSetpoint();
   if (maxSetpoint > globalMax) maxSetpoint = globalMax;
   return maxSetpoint;
 }
@@ -3423,6 +3493,7 @@ void satSendStatusJSON()
     je.field(F("manufacturer_detected"), (int32_t)snap->st.sat.iDetectedManufacturer);
     je.field(F("slave_memberid"),       (int32_t)snap->st.sat.iSlaveMemberID);
     je.field(F("max_setpoint_system"),  snap->maxSetpoint);
+    je.field(F("max_setpoint_user"),    settings.sat.fMaxTSetUser);   // TASK-1373: 0 = not chosen (default in use)
     je.field(F("external_temp_valid"),  snap->st.sat.bExternalTempValid);
     je.field(F("external_outdoor_valid"), snap->st.sat.bExternalOutdoorValid);
     // PV-surplus boost (TASK-640)
@@ -5639,6 +5710,7 @@ static void satControlLoopRun()
 
   // TASK-1482 / TASK-1390: restart and outside-temperature gates (entries 121, 126, 129, 56, 57).
   if (satRestartStep()) return;
+  satMaxTSetSendStep();   // TASK-1373: SH= on a change of the user MaxTSet and once after a restart
   if (state.sat.eControlMode != SAT_MODE_OFF) satSavePwmEnabled(state.sat.eControlMode == SAT_MODE_PWM);   // TASK-1482, entry 121
 
   // Flame edge detection — always process, independent of timer

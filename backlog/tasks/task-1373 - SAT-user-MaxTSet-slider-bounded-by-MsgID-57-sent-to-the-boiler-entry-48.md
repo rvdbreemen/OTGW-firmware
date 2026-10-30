@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-25T06:31:00Z'
-updated_date: '2026-10-30T09:13:00Z'
+updated_date: '2026-10-30T13:41:00Z'
 labels:
   - sat
   - webui
@@ -51,4 +51,6 @@ TASK-1412.1 records review (R29): 2026-10-29. TASK-1412.1 R29 reconciliation: AC
 2026-10-30: Sergeant D entry 146: must be in beta 1 (TASK-1504, target Sun 2026-11-01). Priority raised to high.
 
 Robert 2026-10-30: the TASK-1412.3 dependency is met for this task by its own host tests that are red on HEAD and green on the fix (recorded in TASK-1412.3 too); TASK-1412.3 stays open for the broader low-load regression set.
+
+2026-10-30 coordinator (session 80): entry 148 A narrows AC1's 'always sends' (entry 100): SH= goes out only after the user chose a value (on change + once after restart); not chosen = SAT caps CS at the default, sends nothing. Lane reviewed (opus); fixes: real host test tests/test_sat_max_tset.py (corrupt NUL file replaced; 22 tests, mutants for typo/global-cap/heat-pump leaks go red), HA unit bytes fixed, interim (Q-b/Q-c open with Sergeant D): SH= = user value within MsgID 49 bounds and the global SAT max-setpoint cap (65), heat-pump 40 cap internal to CS only; 1..19 rejected (REST 400), 0 = not chosen; help text shortened to fit the 18 KB settings-help budget. Integrated on alpha.553 as alpha.554: evaluate --quick EXIT 0; 67/68 Python test files OK (test_settings_float_roundtrip pre-existing), all 28 web UI node test files pass (sat-max-tset 7/7, settings-help 28/28).
 <!-- SECTION:NOTES:END -->

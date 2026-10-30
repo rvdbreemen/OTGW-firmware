@@ -473,6 +473,15 @@
           <div class="sat-hint" id="satDhwHint">SAT sends this setpoint to the boiler only while standalone DHW control is on.</div>
         </div>
       </details>
+      <details class="grp" data-grp="sat-maxflow" id="satMaxGrp">
+        <summary>Max flow setpoint</summary>
+        <div class="grp-body">
+          <div class="kv">
+            <div class="kv-row"><span class="kv-k">Max flow setpoint</span><span class="kv-v"><input type="range" min="20" max="80" value="62" id="satMaxSlider" class="sat-slider" aria-label="Max flow setpoint"> <b id="satMaxR">—</b></span></div>
+          </div>
+          <div class="sat-hint" id="satMaxHint">SAT never sends a flow setpoint above this. Until you move the slider SAT uses 62 °C (50 °C underfloor) and sends nothing to the boiler; a chosen value is also sent to the boiler (SH=).</div>
+        </div>
+      </details>
     </div>
 
     <!-- L2 Control: burner cycle mode, live tiles, heating curve, control status, weather -->

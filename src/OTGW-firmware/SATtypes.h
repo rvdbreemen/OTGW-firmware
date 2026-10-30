@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.553
+**  Version  : v2.0.0-alpha.554
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -465,6 +465,12 @@ static inline SATCycleClass satReportedLastCycleClass(const SATRuntimeSection& s
 // inactive (SAT sends no SW=); the settings clamp caps it at SAT_DHW_SETPOINT_MAX.
 #define SAT_DHW_SETPOINT_MIN 30
 #define SAT_DHW_SETPOINT_MAX 60
+// TASK-1373: user Max flow setpoint (MaxTSet) slider. 0 = not chosen; the settings clamp caps it at
+// SAT_MAXTSET_MAX, the slider falls back to MIN..MAX when the boiler reports no MsgID 49 bounds.
+#define SAT_MAXTSET_MIN 20
+#define SAT_MAXTSET_MAX 80
+// A user value is 0 (not chosen) or at least SAT_MAXTSET_MIN; 1..19 is a typo and is rejected (NaN fails both tests).
+static inline bool satMaxTSetInputOk(float v) { return v == 0.0f || v >= (float)SAT_MAXTSET_MIN; }
 
 struct SATSection {
   bool     bEnabled           = false;
@@ -486,6 +492,7 @@ struct SATSection {
   float    fModSupDelay       = 20.0f;  // Modulation suppression delay (seconds)
   float    fModSupOffset      = 1.0f;   // Modulation suppression offset (°C below setpoint)
   float    fDhwSetpoint       = 0.0f;   // DHW setpoint (0=inactive, 30-60°C)
+  float    fMaxTSetUser       = 0.0f;   // TASK-1373: user Max flow setpoint (MaxTSet) °C, 0 = not chosen (SAT uses its default and sends no SH=)
   bool     bDhwEnabled        = false;  // Enable DHW control in standalone/fallback mode
   bool     bDhwEnable         = true;   // TASK-516: master DHW enable (HW= command). Only acted on when boiler reports MsgID 3 HB3=1 (storage tank). Default true keeps boiler-default DHW enabled.
   bool     bPushSetpoint      = false;  // Push SAT target to thermostat display (TC= command)
