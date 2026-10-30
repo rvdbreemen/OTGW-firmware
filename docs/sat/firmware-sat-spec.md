@@ -1724,7 +1724,7 @@ Thresholds, recomputed on every call (SATcontrol.ino:875-877, SATcontrol.ino:904
 
 ```
 minOnMs   = 180 000 ms (every heating source, pwm.py:53)   (SATcontrol.ino:357-363)
-cyclesHr  = 2 (heat pump); else iCyclesPerHour if 2..6; else 3 (underfloor) / 4 (radiators)   (SATcontrol.ino:345-355)
+cyclesHr  = 2 (heat pump); else 4 if iCyclesPerHour >= 4, else 3 (radiators and underfloor alike)   (SATcontrol.ino:345-355, TASK-1375)
 upperMs   = iHpCycleSeconds x 1000, 1 800 000 or 2 400 000 (heat pump); else 3 600 000 / cyclesHr   (SATcontrol.ino:365-374)
 maxMs     = 2 x upperMs
 dutyLower = minOnMs / upperMs
@@ -1808,9 +1808,9 @@ CH command (SATcontrol.ino:5223): `CH = satChEnableDecide(pidOutput, coldSetpoin
 | Effective temperature filter window (the same constant as the ignition timeout) | 180 000 | ms | SATcontrol.ino:812, SATcontrol.ino:883 |
 | Filter weight on the new sample | 0.3 | - | SATcontrol.ino:884 |
 | Effective temperature floor | base + 1 | °C | SATcontrol.ino:867 |
-| `iCyclesPerHour` default / allowed | 3 / 2 to 6 | per hour | SATtypes.h:525, settingStuff.ino:1105 (search result) |
+| `iCyclesPerHour` default / allowed | 3 / 3 or 4 (setter snaps: 2 and lower to 3, 5 and higher to 4; Sergeant D entries 30, 52, 99, TASK-1375) | per hour | SATtypes.h:525, settingStuff.ino:1105 (search result) |
 | Cycles per hour, heat pump (no hourly start limit, entry 81; the PWM period is `iHpCycleSeconds`) | none | | SATcycles.ino:320-327 |
-| Cycles per hour when `iCyclesPerHour` is outside 2..6 | 3 underfloor / 4 radiators | per hour | SATcontrol.ino:354 |
+| Cycles per hour when `iCyclesPerHour` is not 4 (getter fallback) | 3, every heating system | per hour | SATcontrol.ino:345-349 |
 | Rolling-hour ring size | 6 | entries | SATcycles.ino:37 |
 | Rolling-hour window | 3600 | s | SATcycles.ino:285 |
 | `iMaxRelModulation` default / allowed | 100 / 0 to 100 | % | SATtypes.h:453, settingStuff.ino:1012 (search result) |
@@ -2184,7 +2184,7 @@ This was not checked on a running device.
   The full mode logic belongs to the PWM section of this spec.
 - **Hot water guard (TASK-1420, entry 108).** `satCycleNoteDhwTick()` (SATcycles.ino:200-205) is called from the DHW early return (SATcontrol.ino:5241): it sets `_sustain_dhwEndMs` to the tick time, sets `_sustain_dhwSeen` and clears the three starts. `satDhwGuardActive()` (SATcycles.ino:164-168) then blocks the overshoot switch and resets the PWM exits during the draw and for 300 s after it (`heating_control.py:272-274`, `:313-315`).
 - **Flame-on time for the PWM schedule.** The PWM hold ends `fModSupDelay` (default 20 s, SATtypes.h:455) after the cycle tracker's flame-on time (SATcontrol.ino:720-723, SATcontrol.ino:884-888). The PWM ON phase ends when the time since that flame-on is >= on-time and >= minimum on-time (SATcontrol.ino:813-820). That test does not check whether the flame is on, and it runs before the 180 s ignition timeout (SATcontrol.ino:824-832). While a new ON phase waits for ignition, the cycle tracker's flame-on time still belongs to the previous cycle, so the ON phase can end on the next control tick before the flame lights (derived from the order of the code; see Edge cases). The PWM controller also keeps its own `_pwm_flameOnMs` for the effective temperature EMA (SATcontrol.ino:764-782).
-- **Flame-off time and per-hour count for the PWM schedule.** The OFF phase ends when the time since the cycle tracker's flame-off is >= off-time (or at once on the first step after PWM entry, TASK-1369), unless the rolling-hour count of PWM ON phases (TASK-1401; hot-water ignitions excluded) has reached `satGetMaxCyclesPerHour()` (SATcontrol.ino:1043-1078, SATcycles.ino:297-326). A heat pump has no hourly start limit (entry 81, SATcycles.ino:320-327); for other sources the maximum is the configured value when it is 2 to 6, else 3 (underfloor) or 4 (SATcontrol.ino:345-353).
+- **Flame-off time and per-hour count for the PWM schedule.** The OFF phase ends when the time since the cycle tracker's flame-off is >= off-time (or at once on the first step after PWM entry, TASK-1369), unless the rolling-hour count of PWM ON phases (TASK-1401; hot-water ignitions excluded) has reached `satGetMaxCyclesPerHour()` (SATcontrol.ino:1043-1078, SATcycles.ino:297-326). A heat pump has no hourly start limit (entry 81, SATcycles.ino:320-327); for other sources the maximum is 4 when the configured value is 4 or more, else 3, for radiators and underfloor alike (SATcontrol.ino:345-349, TASK-1375).
 - **PWM on-time into the classifier**: the PWM SHORT test (SATcycles.ino:689-692, SATcycles.ino:812).
 - **Last cycle duration into the boiler status**: stall threshold (SATcontrol.ino:571-575).
 - **Modulation reliability** is used only for the modulation direction in the boiler status (SATcontrol.ino:616-622) and is published (SATcontrol.ino:2893, restAPI.ino:1021). A search for `bModulationReliable` found no other reader.
@@ -3743,7 +3743,7 @@ Variable names are as in the code.
 | `fModSupOffset` (`SATmodsupoffset`) | 1.0 | °C | 0-5 | `SATtypes.h:456` | `settingStuff.ino:1015` | `mod_sup_offset` |
 | `fFlowOffset` (`SATflowoffset`) | 2.0 | °C | 0.5-10 | `SATtypes.h:467` | `settingStuff.ino:1040` | `flow_offset` |
 | `fOvershootMargin` (`SATovershootmargin`) | 2.0 | °C | 0.5-5 | `SATtypes.h:454` | `settingStuff.ino:1013` | `overshoot_margin` |
-| `iCyclesPerHour` (`SATcyclesperhour`) | 3 | 1/h | 2-6 | `SATtypes.h:525` | `settingStuff.ino:1105` | `cycles_per_hour` |
+| `iCyclesPerHour` (`SATcyclesperhour`) | 3 | 1/h | 3 or 4 | `SATtypes.h:525` | `settingStuff.ino:1105` | `cycles_per_hour` |
 | `fMaxSetpoint` | 65.0 | °C | no setter found | `SATtypes.h:514` | - | none |
 | `fDhwSetpoint` (`SATdhwsetpoint`) | 0 (inactive) | °C | 0-60; `SW=` only for 30-60 | `SATtypes.h:457` | `settingStuff.ino:1016`, `SATcontrol.ino:4641-4642` | `dhw_setpoint` |
 | `bDhwEnabled` (`SATdhwenabled`) | false | - | bool | `SATtypes.h:458` | `settingStuff.ino:1017` | `dhw_enabled` |

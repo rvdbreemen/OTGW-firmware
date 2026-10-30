@@ -344,12 +344,9 @@ static float satGetColdSetpoint()
 static uint8_t satGetMaxCyclesPerHour()
 {
   // A heat pump has no hourly start limit (Sergeant D entry 81, satCycleIsHourLimitReached()); its PWM
-  // period comes from iHpCycleSeconds (satGetPwmPeriodSec). Gas boilers and hybrids: the user-configured
-  // value if set (Task #82); else system defaults.
-  if (settings.sat.iCyclesPerHour >= 2 && settings.sat.iCyclesPerHour <= 6) {
-    return settings.sat.iCyclesPerHour;
-  }
-  return (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? 3 : 4;
+  // period comes from iHpCycleSeconds (satGetPwmPeriodSec). Gas boilers and hybrids: 3 or 4 per hour,
+  // default 3, for radiators and underfloor alike (Sergeant D entries 30 and 52, TASK-1375).
+  return (settings.sat.iCyclesPerHour >= 4) ? 4 : 3;
 }
 
 // Returns the PWM minimum ON time in seconds: 180 s for every heating source

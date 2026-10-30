@@ -2088,7 +2088,7 @@
     satmaxconsumption:   { cat: 'sat', label: 'Gas use at max modulation', hint: 'm³/h (0 = off)' },
     // TASK-933 P2: keys that already had GET + dispatch but lacked a whitelist token
     // (now POST-able).
-    satcyclesperhour:    { cat: 'sat', label: 'Cycles per hour' },
+    satcyclesperhour:    { cat: 'sat', label: 'Cycles per hour', hint: 'Gas boilers and hybrids; heat pumps use the heat-pump PWM cycle' },
     satvalveoffset:      { cat: 'sat', label: 'Valve offset', hint: '°C' },
     satsensormaxage:     { cat: 'sat', label: 'Sensor max age', hint: 'Seconds' },
     saterrormon:         { cat: 'sat', label: 'Error monitoring' },
@@ -3040,6 +3040,7 @@
     satsource: [[0, 'Auto'], [1, 'Gas Boiler'], [2, 'Heat Pump'], [3, 'Hybrid']],
     satsystem: [[0, 'Auto'], [1, 'Radiators'], [2, 'Underfloor']],
     sathpcycle: [[1800, '1800 s (2 per hour, default)'], [2400, '2400 s (1.5 per hour)']],
+    satcyclesperhour: [[3, '3 per hour (default)'], [4, '4 per hour']],
     // boardmode is the real 3-value hardware override (ADR-127); the mockup's
     // 4-option ESP8266/OTGW32/LOLIN list was semantically wrong.
     boardmode: [[0, 'Auto-detect'], [1, 'PIC (Classic)'], [2, 'OT-Direct (OTGW32)']],

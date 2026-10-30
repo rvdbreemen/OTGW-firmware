@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.551
+**  Version  : v2.0.0-alpha.552
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -522,6 +522,7 @@ bool writeSettings(bool show)
 // TASK-648: set true while parsing if the file carries the MQTTuseLegacyOtTopics key.
 // Absent on a 1.x.x config (predates ADR-106) -> readSettings defaults to legacy topics.
 static bool g_sawLegacyTopicsKey = false;
+static bool g_satCphOutOfSet = false;    // TASK-1375: set when the file carried a SATcyclesperhour other than 3 or 4; the deferred flush then rewrites the snapped value
 static bool g_sawSatFollowKey = false;   // TASK-1259: set when SATfollowthermostat is parsed; its absence means "default to the push-setpoint value"
 static bool g_sawOnboardedKey = false;   // TASK-997: set when ui_onboarded is parsed; its absence marks a pre-feature (existing) install
 
@@ -530,6 +531,7 @@ void readSettings(bool show)
   DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
   g_sawLegacyTopicsKey = false;  // reset per parse; updateSetting() sets it when the key is seen
   g_sawOnboardedKey = false;     // TASK-997: same sentinel pattern for the first-time-setup flag
+  g_satCphOutOfSet = false;      // TASK-1375: same sentinel pattern for SATcyclesperhour
   g_sawSatFollowKey = false;     // TASK-1259: same sentinel pattern for SATfollowthermostat
   if (!LittleFS.exists(SETTINGS_FILE))
   {  //create settings file if it does not exist yet.
@@ -573,6 +575,10 @@ void readSettings(bool show)
     }
 
     if (parseJsonKVLine(lineBuf, keyBuf, sizeof(keyBuf), valueBuf, sizeof(valueBuf))) {
+      if (strcasecmp_P(keyBuf, PSTR("SATcyclesperhour")) == 0) {
+        const int cph = atoi(valueBuf);
+        if (cph != 3 && cph != 4) g_satCphOutOfSet = true;
+      }
       updateSetting(keyBuf, valueBuf);
     }
   }
@@ -619,6 +625,12 @@ void readSettings(bool show)
     settings.ui.bOnboarded = true;
     settingsDirty = true;              // persist the key so this migration runs once
     DebugTln(F("[Settings] existing install (no ui_onboarded key): marking as already onboarded."));
+  }
+  // TASK-1375: an out-of-set SATcyclesperhour (2, 5, 6 from earlier builds) was snapped to 3 or 4 by the
+  // setter; persist the snapped value through the deferred flush, not a write here.
+  if (g_satCphOutOfSet) {
+    settingsDirty = true;
+    DebugTf(PSTR("[Settings] SATcyclesperhour out of set, snapped to %u\r\n"), (unsigned)settings.sat.iCyclesPerHour);
   }
   // TASK-1259: a unit that has no stored SATfollowthermostat yet follows the thermostat exactly when it
   // pushes the SAT target to it (Sergeant D: on when push-setpoint is on). Applied here, after the whole
@@ -1128,7 +1140,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATsensormaxage")) == 0)  settings.sat.iSensorMaxAgeS = constrain((uint32_t)atol(newValue), 60UL, 86400UL);
   else if (strcasecmp_P(field, PSTR("SATerrormon")) == 0)      settings.sat.bErrorMonitoring = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATheatingmode")) == 0)   settings.sat.iHeatingMode = constrain(atoi(newValue), 0, 1);
-  else if (strcasecmp_P(field, PSTR("SATcyclesperhour")) == 0) settings.sat.iCyclesPerHour = constrain(atoi(newValue), 2, 6);
+  else if (strcasecmp_P(field, PSTR("SATcyclesperhour")) == 0) settings.sat.iCyclesPerHour = (atoi(newValue) >= 4) ? 4 : 3;  // gas boilers and hybrids: 3 or 4 PWM cycles per hour only (entries 30/52); 2 and lower snap to 3, 5 and higher to 4
   else if (strcasecmp_P(field, PSTR("SATvalveoffset")) == 0)   settings.sat.fValveOffset = clampSettingFloat(newValue, settings.sat.fValveOffset, -1.0f, 1.0f);
   else if (strcasecmp_P(field, PSTR("SATthermalcomfort")) == 0) settings.sat.bThermalComfort = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SAThumiditytimeout")) == 0) settings.sat.iHumidityTimeoutS = (uint16_t)constrain(atoi(newValue), 60, 65535);

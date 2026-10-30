@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.551
+**  Version  : v2.0.0-alpha.552
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -548,7 +548,7 @@ struct SATSection {
   bool     bThermalComfort    = false; // true=use SummerSimmer index as PID room temp input
   uint16_t iHumidityTimeoutS  = 1800; // Seconds before humidity reading is considered stale (default 30 min)
   uint8_t  iHeatingMode       = 0;     // 0=COMFORT, 1=ECO
-  uint8_t  iCyclesPerHour     = 3;     // Target cycles per hour (2-6)
+  uint8_t  iCyclesPerHour     = 3;     // Target cycles per hour (3 or 4)
   float    fValveOffset       = 0.0f;  // Offset for TRV valve position detection (-1 to 1)
   bool     bSolarFreezeIntegral = true; // Freeze PID integral during solar gain compensation
   // LittleFS persistence (Task #237)

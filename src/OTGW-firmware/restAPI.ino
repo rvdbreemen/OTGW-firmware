@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.551
+**  Version  : v2.0.0-alpha.552
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3980,7 +3980,7 @@ void sendDeviceSettings()
   addInt(F("satsensormaxage"), (int32_t)settings.sat.iSensorMaxAgeS, "i", 60, 86400);
   addBool(F("saterrormon"), settings.sat.bErrorMonitoring, "b");
   addInt(F("satheatingmode"), settings.sat.iHeatingMode, "i", 0, 1);
-  addInt(F("satcyclesperhour"), settings.sat.iCyclesPerHour, "i", 2, 6);
+  addInt(F("satcyclesperhour"), settings.sat.iCyclesPerHour, "i", 3, 4);
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fValveOffset, 1, 2, tmpBuf);

@@ -51,6 +51,16 @@ int main(int argc, char** argv) {
     printf("stored=%d\n", (int)hpCycleSetter(argv[2]));
     return 0;
   }
+  if (!strcmp(argv[1], "cphsetter")) {       // cphsetter value: the real SATcyclesperhour right-hand side
+    printf("stored=%d\n", (int)cphSetter(argv[2]));
+    return 0;
+  }
+  if (!strcmp(argv[1], "getter")) {          // getter source system stored: max cycles per hour and PWM period
+    reset();
+    g_source = atoi(argv[2]); g_system = atoi(argv[3]); settings.sat.iCyclesPerHour = (uint8_t)atoi(argv[4]);
+    printf("max=%u period=%lu\n", (unsigned)satGetMaxCyclesPerHour(), (unsigned long)satGetPwmPeriodSec());
+    return 0;
+  }
   if (!strcmp(argv[1], "r3")) {              // r3 source hpSec cyclesPerHour ratio: ON start, flame not lit yet
     reset();
     g_source = atoi(argv[2]); settings.sat.iHpCycleSeconds = (uint16_t)atoi(argv[3]); settings.sat.iCyclesPerHour = atoi(argv[4]);
@@ -98,6 +108,14 @@ def extract_setter() -> str:
     return ("static int hpCycleSetter(const char* newValue) { return (uint16_t)(" + m.group(1) + "); }\n")
 
 
+def extract_cph_setter() -> str:
+    src = SETTINGS_INO.read_text(encoding="utf-8")
+    m = re.search(r'PSTR\("SATcyclesperhour"\)\)\s*==\s*0\)\s*settings\.sat\.iCyclesPerHour\s*=\s*(.*?);[ \t]*(?://.*)?\r?$', src, re.M)
+    if not m:
+        raise AssertionError("SATcyclesperhour setter not found in settingStuff.ino")
+    return ("static int cphSetter(const char* newValue) { return (uint8_t)(" + m.group(1) + "); }\n")
+
+
 def build(workdir: Path):
     src = SAT_INO.read_text(encoding="utf-8")
     body = base.extract(src)
@@ -135,11 +153,12 @@ enum { SAT_HSYS_AUTO = 0, SAT_HSYS_RADIATORS = 1, SAT_HSYS_UNDERFLOOR = 2 };
 enum { SAT_SRC_AUTO = 0, SAT_SRC_GAS_BOILER = 1, SAT_SRC_HEAT_PUMP = 2, SAT_SRC_HYBRID = 3 };
 static int g_source = SAT_SRC_GAS_BOILER;
 static uint8_t satGetEffectiveHeatingSource() { return (uint8_t)g_source; }
-static uint8_t satGetEffectiveHeatingSystem() { return SAT_HSYS_RADIATORS; }
+static int g_system = SAT_HSYS_RADIATORS;
+static uint8_t satGetEffectiveHeatingSystem() { return (uint8_t)g_system; }
 template <typename T> static T constrain(T v, T lo, T hi) { return v < lo ? lo : (v > hi ? hi : v); }
 """
     cpp = workdir / "hp.cpp"
-    cpp.write_text(flag + stubs + src_stubs + extract_getters(src) + pre + body + cycles + extract_setter() + MAIN,
+    cpp.write_text(flag + stubs + src_stubs + extract_getters(src) + pre + body + cycles + extract_setter() + extract_cph_setter() + MAIN,
                    encoding="utf-8")
     return base.compile_cpp(cpp, workdir / "hp.exe")
 
@@ -259,6 +278,37 @@ class SatHeatPumpPwm(unittest.TestCase):
         for given, stored in (("1800", 1800), ("2400", 2400), ("2100", 2400), ("2099", 1800), ("0", 1800), ("9999", 2400)):
             with self.subTest(given=given):
                 self.assertEqual(int(self.run_sc("setter", given)["stored"]), stored)
+
+    # --- TASK-1375: gas boilers and hybrids run 3 or 4 PWM cycles per hour only (entries 30, 52, 99) ---
+    def test_cph_setter_snaps_to_3_or_4(self):
+        for given, stored in (("2", 3), ("5", 4), ("6", 4), ("0", 3), ("x", 3), ("9", 4), ("3", 3), ("4", 4)):
+            with self.subTest(given=given):
+                self.assertEqual(int(self.run_sc("cphsetter", given)["stored"]), stored)
+
+    def test_cph_getter_out_of_set_values_snap(self):
+        for stored, period in ((2, 1200), (6, 900), (3, 1200), (4, 900), (0, 1200), (9, 900)):
+            for system in (1, 2):
+                with self.subTest(stored=stored, system=system):
+                    r = self.run_sc("getter", SRC_GAS, system, stored)
+                    self.assertEqual(int(r["period"]), period)
+                    self.assertEqual(int(r["max"]), 3600 // period)
+
+    def test_cph_getter_hybrid_follows_gas(self):
+        r = self.run_sc("getter", SRC_HYB, 1, 4)
+        self.assertEqual((int(r["max"]), int(r["period"])), (4, 900))
+
+    def test_cph_getter_heat_pump_period_ignores_cph(self):
+        for stored in (2, 3, 4, 6):
+            with self.subTest(stored=stored):
+                self.assertEqual(int(self.run_sc("getter", SRC_HP, 1, stored)["period"]), 1800)
+
+    def test_cph_ui_and_metadata_offer_3_and_4(self):
+        js = (REPO / "src" / "OTGW-firmware" / "data" / "v2.js").read_text(encoding="utf-8")
+        m = re.search(r"satcyclesperhour:\s*\[(\[.*?\])\],", js)
+        self.assertIsNotNone(m, "no ENUM_OPTS entry for satcyclesperhour in v2.js")
+        self.assertEqual(re.findall(r"\[(\d+),", m.group(1)), ["3", "4"])
+        api = (REPO / "src" / "OTGW-firmware" / "restAPI.ino").read_text(encoding="utf-8")
+        self.assertRegex(api, r'addInt\(F\("satcyclesperhour"\),[^;]*"i", 3, 4\);')
 
 
 if __name__ == "__main__":

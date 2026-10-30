@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed (breaking)
 
+- **SAT PWM cycles per hour is 3 or 4 only, default 3** (TASK-1375, Sergeant D entries 30, 52, 99). Gas boilers and hybrids, radiators and underfloor alike; the Settings page shows a choice. This narrows an accepted range: a stored 2 becomes 3, a stored 5 or 6 becomes 4 (a settings file with such a value is corrected on the next deferred write), and the same snap applies to REST and MQTT writes. Heat pumps are unchanged (heat-pump PWM cycle, no hourly limit).
 - **SAT MQTT contract cleanup** (TASK-1485, Robert's decisions 2-5 in TASK-1466). Home Assistant automations or templates that read these topics need an update:
   - `sat/heating_curve_recommendation` is all lower case: `increase` / `decrease` / `hold` / `insufficient` (was `INCREASE` / `DECREASE` / `HOLD` / `insufficient`). The REST/WS field `heating_curve_recommendation` changes with it. `sat/curve_recommendation` is unchanged.
   - `sat/ssi` is removed; read `sat/summer_simmer_index` (same value, one decimal). The firmware empties the retained `sat/ssi` topic on every SAT discovery pass.

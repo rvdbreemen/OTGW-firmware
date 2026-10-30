@@ -1,10 +1,11 @@
 ---
 id: TASK-1375
 title: 'SAT: gas boiler PWM cycles per hour 3 or 4 only, default 3 (entries 30, 52)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T07:21:00Z'
-updated_date: '2026-10-30T06:59:00Z'
+updated_date: '2026-10-30T09:20:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -28,6 +29,12 @@ Sergeant D entry 52 (2026-10-25, answer to Q16): default 3 cycles per hour for g
 - [ ] #3 Host test shows HEAD accepts 2/5/6 and the fix rejects them
 <!-- AC:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Second-reader checked 2026-10-30 (C25-C27 confirmed). Setter settingStuff.ino:1131 -> (atoi>=4)?4:3 (covers file load, REST, MQTT; mark settings dirty when a loaded value snapped); getter SATcontrol.ino:350-353 -> (>=4)?4:3 (fallback 3); REST metadata restAPI.ino:3983 addInt 3..4; v2.js ENUM_OPTS satcyclesperhour [[3,'3 per hour (default)'],[4,'4 per hour']]; settingsHelp.h; docs MQTT.md, openapi.yaml, firmware-sat-spec.md. Heat pumps untouched. Host test: extend tests/test_sat_hp_pwm.py with the real setter (2,5,6,0,garbage,9 -> 3,4,4,3,3,4; red on HEAD) and getter period. Bench: old-vs-new stored 6 -> 4 after OTA app-only; POST 2 -> 3; MQTT 5 -> 4; screenshots of the 3/4 choice. Waiting for Sergeant D's OK (msg 1565656570702987396).
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -38,4 +45,6 @@ Sergeant D entry 52 (2026-10-25, answer to Q16): default 3 cycles per hour for g
 2026-10-28 Q16 A (entry 99, msg 1564910294709571667): gas boilers 3 or 4 only, default 3, radiators and underfloor; stored 2->3, 5/6->4; hybrids follow (entry 82). Decision complete, task unblocked.
 
 2026-10-30: Sergeant D entry 146: must be in beta 1 (TASK-1504, target Sun 2026-11-01). Priority raised to high.
+
+Robert 2026-10-30: the TASK-1412.3 dependency is met for this task by its own host tests that are red on HEAD and green on the fix (recorded in TASK-1412.3 too); TASK-1412.3 stays open for the broader low-load regression set.
 <!-- SECTION:NOTES:END -->

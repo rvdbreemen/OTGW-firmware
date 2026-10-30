@@ -1121,7 +1121,7 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 | `sat/sensor_max_age` | `SATsensormaxage` | Max age for external sensor readings (s) |
 | `sat/error_monitoring` | `SATerrormon` | Error-monitoring flag. Stored and published as `sat/error_monitoring`; it has no other effect today |
 | `sat/heating_mode` | `SATheatingmode` | Heating mode: `"eco"`, `"comfort"`, or numeric |
-| `sat/cycles_per_hour` | `SATcyclesperhour` | Target PWM cycles per hour |
+| `sat/cycles_per_hour` | `SATcyclesperhour` | PWM cycles per hour for gas boilers and hybrids: 3 or 4, default 3 (2 and lower store 3, 5 and higher store 4) |
 | `sat/valve_offset` | `SATvalveoffset` | Valve offset (-1 to 1). Stored and published; the control loop does not use it today |
 | `sat/solar_freeze_integral` | `SATsolarfreezeint` | Freeze PID integral during solar gain |
 

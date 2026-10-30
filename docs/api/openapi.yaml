@@ -4486,7 +4486,8 @@ components:
           description: "Heating mode label (comfort/eco/etc.)"
         cycles_per_hour:
           type: integer
-          description: "Target maximum boiler cycles per hour"
+          description: "PWM cycles per hour for gas boilers and hybrids: 3 or 4, default 3 (other values are stored as the nearer of the two). Heat pumps use the heat-pump PWM cycle."
+          enum: [3, 4]
         valve_offset:
           type: number
           description: "Valve compensation offset (C)"
