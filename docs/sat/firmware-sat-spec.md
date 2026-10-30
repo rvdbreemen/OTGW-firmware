@@ -935,10 +935,10 @@ The saved integral is `state.sat.fPidI`, the published copy, not `_pid_integral`
 | Boot (`initSAT`) | Full `satPidReset()`, then restore from file if fresh | SATcontrol.ino:3683-3684 |
 | `satDisable()`: SAT switched off, fallback lifted, safety trip or OT command failures | Full `satPidReset()`, then zeros saved | SATcontrol.ino:2170-2171, SATcontrol.ino:4561, SATcontrol.ino:4569-4571, SATcontrol.ino:4680, SATcontrol.ino:5002 |
 | Flush command (MQTT `sat/flush` or REST `POST /api/v2/sat/flush`) | Full `satPidReset()`, then zeros saved | SATcontrol.ino:2189-2197, restAPI.ino:1377-1380 |
-| `reset_integral` command (MQTT, REST `/api/v2/sat/reset_integral`, and the settings-style REST path) | Integral only: `_pid_integral = 0`; the raw derivative is kept | SATpid.ino:86-91, MQTTstuff.ino:620, MQTTstuff.ino:672, restAPI.ino:1372-1375, restAPI.ino:1624-1626 |
-| Window open longer than `iWindowMinOpenSec` (target switches to the Activity preset) | Integral only | SATcontrol.ino:1126-1142 |
-| Window closed after that (target restored) | Integral only | SATcontrol.ino:1109-1121 |
-| Preset change, or preset cleared with a saved target | Display only: `state.sat.fPidI = 0`. `_pid_integral` is not touched, so the next real update writes the old value back to `fPidI`. A search for `_pid_` in all firmware sources outside SATpid.ino found only a comment (SATcontrol.ino:2040) and the generated, untracked build file `OTGW-firmware.ino.cpp`, which is a copy of the same code | SATcontrol.ino:996-999, SATcontrol.ino:1004-1006, SATpid.ino:298, SATpid.ino:303 |
+| `reset_integral` command (MQTT, REST `/api/v2/sat/reset_integral`, and the settings-style REST path) | `satResetControlState()`: main integral and raw derivative and every zone integral to 0; timers, `_pid_initialized`, the start-up flags and the last error stay (TASK-1414, entry 73) | `SATpid.ino` `satPidResetTerms()`, `SATcontrol.ino` `satResetControlState()`, MQTTstuff.ino `_satResetIntegralCmd`, restAPI.ino |
+| Window open longer than `iWindowMinOpenSec` (target switches to the Activity preset) | `satResetControlState()` when the target changes by 0.05 C or more: main integral and raw derivative and every zone integral to 0 (TASK-1414, entry 73); the request is applied on the loop task at the start of the next control pass | `SATcontrol.ino` `_satCheckWindowTimer()`, `satResetControlStateIfTargetChanged()` |
+| Window closed after that (target restored) | Same as the switch: `satResetControlState()` when the restored target differs | `SATcontrol.ino` `satHandleWindow()` |
+| Preset change, or preset cleared with a saved target | Same: `satResetControlState()` when the new target differs by 0.05 C or more; a preset that leaves the target unchanged resets nothing (thermo-nova climate.py:610-611, :643-644) | `SATcontrol.ino` `satHandlePreset()` |
 | Target temperature changed (MQTT/REST `target`, settings) | None | SATcontrol.ino:1903-1934, settingStuff.ino:997 |
 | Target adopted from the thermostat (follow thermostat) | None | SATcontrol.ino:1034-1045 |
 | Heating mode (ECO/COMFORT) changed | None | SATcontrol.ino:2211-2221 |
@@ -1365,10 +1365,10 @@ Derived from the curve formula and the cold setpoints (computed, not stated in t
 
 **What resets state.**
 
-- A target change through `satHandleTargetTemp()` or `updateSetting("SATtargettemp")` resets nothing in the PID (SATcontrol.ino:1903-1934, settingStuff.ino:997).
-- A preset change, and clearing a preset, set `state.sat.fPidI = 0` (SATcontrol.ino:998, SATcontrol.ino:1006). `fPidI` is only a display copy: the PID computes with `_pid_integral` (SATpid.ino:298) and overwrites `fPidI` from it on the next update (SATpid.ino:303). A grep found no code that copies `fPidI` back into `_pid_integral`. So a preset change does not reset the integral that is used.
-- The window-open switch and the window-close restore call `satResetIntegral()`, which clears `_pid_integral` (SATcontrol.ino:1119, SATcontrol.ino:1139, SATpid.ino:86-91). The MQTT and REST `reset_integral` commands call the same function (MQTTstuff.ino:620, restAPI.ino:1374, restAPI.ino:1625).
-- Disabling SAT, and a safety trip, call `satPidReset()`, which clears integral, derivative, gains and the error history, and saves the zeros (SATcontrol.ino:2160-2171, SATpid.ino:94-114).
+- A target change through `satHandleTargetTemp()` or `updateSetting("SATtargettemp")` that moves the target by 0.05 C or more calls `satResetControlState()` (TASK-1414, entry 73; thermo-nova climate.py:643-644, :660). The call raises a flag; the loop task zeroes the terms at the start of its next pass, so a REST request cannot lose a reset to a concurrent PID update.
+- A preset change, and clearing a preset, reset the control state through the same helper when the target changes (see the PID reset trigger rows above). The old display-only `state.sat.fPidI = 0` is gone.
+- PID resets (TASK-1414, Sergeant D entry 73, thermo-nova `reset_control_state()` climate.py:461-464 with `PID.reset()` pid.py:134-137): `satResetControlState()` zeroes the main integral and raw derivative (`satPidResetTerms()`) and every zone integral, and nothing else (timers, `_pid_initialized`, start-up flags, last error stay, so the TASK-1270 first-tick failure cannot return). It runs on a target that really changes (>= 0.05 C; thermo-nova climate.py:643-644, :660): the SATtargettemp setting (REST, MQTT, the adopted thermostat setpoint), a preset change or clear whose target differs, the window-open switch to activity and the window-close restore when the target differs; on the SATenabled off to on transition (HVAC HEAT, climate.py:570-583; a settings POST that carries SATenabled=1 again resets nothing); on `reset_integral` (MQTT and both REST paths); and on a changed zone setpoint for that zone only (area setpoint, climate.py:785-795; the first setpoint resets nothing, :788). A preset or window change that leaves the target unchanged resets nothing, as thermo-nova returns early (climate.py:610-611, :643-644).
+- Disabling SAT, and a safety trip, call `satPidReset()`, which clears integral, derivative, gains and the error history, and saves the zeros; `satDisable()` also zeroes the zone integrals (HVAC OFF, climate.py:583; `satPidReset()` is the broad reset and is not used for the target, preset, window and enable triggers).
 - `satFlushShortLivedData()` also resets the PID and saves zeros (SATcontrol.ino:2192-2201).
 - The integral also resets by itself whenever |error| > deadband (SATpid.ino:154-156).
 - Switching control mode resets PWM state only (SATcontrol.ino:934-938).
@@ -2682,8 +2682,8 @@ No PID is reset (SATcontrol.ino:1205-1217). The value is not pushed back to the 
 4. On each control tick that reaches the timer check (SATcontrol.ino:4755), if the window is open, not yet switched, and open for at least `iWindowMinOpenSec`:
    1. Save the current target in `fPreWindowTarget` and `fPreActivityTemp`, and the current preset in `iPreWindowPreset` (SATcontrol.ino:1134-1136).
    2. Set the preset to `activity` and write `fPresetActivity` (default 10 °C) into the target (SATcontrol.ino:1137-1138, SATtypes.h:450).
-   3. Reset the main integral with `satResetIntegral()`, which clears `_pid_integral` and `fPidI` (SATcontrol.ino:1139, SATpid.ino:86-91).
-5. Closed while open: mark closed, clear the open time, log "Window closed: heating resumes" (SATcontrol.ino:1109-1113). If the switch to activity had happened: restore the saved target and the saved preset directly (not through the preset handler), clear both saved values and reset the main integral (SATcontrol.ino:1114-1121).
+   3. Reset the main and zone integrals and the raw derivative with `satResetControlState()`, when the target changed (TASK-1414, entry 73).
+5. Closed while open: mark closed, clear the open time, log "Window closed: heating resumes" (SATcontrol.ino:1109-1113). If the switch to activity had happened: restore the saved target and the saved preset directly (not through the preset handler), clear both saved values and, when the target changed, reset the control state (SATcontrol.ino:1114-1121).
 6. Closed while already closed: no change (SATcontrol.ino:1109).
 
 Timing (follows from the code, not run): the main loop reads `targetTemp` at SATcontrol.ino:4658, before the window check at SATcontrol.ino:4755. The heating curve uses that local copy (SATcontrol.ino:4831, SATcontrol.ino:4836), so the activity target drives the PID from the next tick. The `TC=` at SATcontrol.ino:4993 reads `settings.sat.fTargetTemp` directly, so, when push-setpoint is on and the tick reaches the command block (SATcontrol.ino:4977-4994), it already sends the activity temperature on the same tick.
@@ -2698,7 +2698,7 @@ There are no sensor-change events. Room and outside temperatures are read at the
 
 #### 12. Service: reset integral
 
-MQTT `sat/reset_integral` and REST `sat/reset_integral` or `sat/settings/reset_integral` call `satResetIntegral()` (MQTTstuff.ino:620, MQTTstuff.ino:672, restAPI.ino:1372-1376, restAPI.ino:1624-1627). It clears the main integral only (SATpid.ino:86-91). Zone integrals are not touched.
+MQTT `sat/reset_integral` and REST `sat/reset_integral` or `sat/settings/reset_integral` call `satResetControlState()` (TASK-1414, entry 73): the main integral and raw derivative and every zone integral go to 0, as thermo-nova `reset_control_state()` (climate.py:217-220, :461-464). Timers, `_pid_initialized`, the start-up flags and the last error are kept.
 
 #### 13. Shutdown
 

@@ -1725,6 +1725,15 @@ static void satPresetPersistIfChanged()
   if (strcmp(buf, _sat_presetSaved) != 0) satSavePresetState();
 }
 
+void satResetControlState();   // defined after satZones
+
+// thermo-nova resets the control state only when the target really changes (climate.py:643-644, :660).
+// 0.05 C is the firmware's definition of a changed target (settingStuff.ino SATtargettemp).
+static void satResetControlStateIfTargetChanged(float before)
+{
+  if (fabsf(settings.sat.fTargetTemp - before) >= 0.05f) satResetControlState();
+}
+
 void satHandlePreset(const char* value)
 {
   SATPreset newPreset = SAT_PRESET_NONE;
@@ -1750,6 +1759,7 @@ void satHandlePreset(const char* value)
     state.sat.iWindowOpenSinceMs = 0;
   }
 
+  const float targetBefore = settings.sat.fTargetTemp;
   state.sat.eActivePreset = newPreset;
   if (newPreset != SAT_PRESET_NONE) {
     // Save pre-custom temperature before changing target (Task #67)
@@ -1757,16 +1767,15 @@ void satHandlePreset(const char* value)
       state.sat.fPreCustomTemp = settings.sat.fTargetTemp;
     }
     settings.sat.fTargetTemp = newTarget;
-    // Reset PID integral to prevent overshoot on large temp jumps
-    state.sat.fPidI = 0.0f;
-    SATDebugTf(PSTR("SAT: preset '%s' -> target %.1f, integral reset\r\n"), satGetPresetName(newPreset), newTarget);
+    satResetControlStateIfTargetChanged(targetBefore);   // thermo-nova: preset -> async_set_target_temperature (climate.py:616, :660)
+    SATDebugTf(PSTR("SAT: preset '%s' -> target %.1f\r\n"), satGetPresetName(newPreset), newTarget);
   } else {
     // Preset cleared: restore pre-custom temperature if one was saved (Task #219).
     // Mirrors Python climate.py:614-616: preset_mode=PRESET_NONE restores the temperature
     // that was active before the preset was activated, so the user's manual setpoint survives.
     if (state.sat.fPreCustomTemp > 0.0f) {
       settings.sat.fTargetTemp = state.sat.fPreCustomTemp;
-      state.sat.fPidI = 0.0f;  // Reset integral to avoid overshoot on temp jump
+      satResetControlStateIfTargetChanged(targetBefore);   // thermo-nova: preset none -> target change (climate.py:624, :660)
       SATDebugTf(PSTR("SAT: preset cleared, restored pre-custom target %.1f\r\n"), settings.sat.fTargetTemp);
       // Publish restored target immediately so MQTT stays in sync.
       // ADR-111 exception: event-driven echo on preset-clear (latency matters
@@ -1908,12 +1917,13 @@ void satHandleWindow(bool isOpen)
       state.sat.fPreActivityTemp = 0.0f;
     }
     if (state.sat.fPreWindowTarget > 0.0f) {
+      const float targetBefore = settings.sat.fTargetTemp;
       settings.sat.fTargetTemp = state.sat.fPreWindowTarget;
       state.sat.eActivePreset = (SATPreset)state.sat.iPreWindowPreset;
       if (state.sat.eActivePreset == SAT_PRESET_NONE) state.sat.fPreCustomTemp = 0.0f;  // back to the user's own target
       state.sat.fPreWindowTarget = 0.0f;
       state.sat.fPreActivityTemp = 0.0f;  // Task #67: clear MQTT-visible pre-activity temp
-      satResetIntegral();
+      satResetControlStateIfTargetChanged(targetBefore);   // climate.py:832 -> target-change reset
       SATDebugTf(PSTR("SAT: window closed, restored target %.1f\r\n"), settings.sat.fTargetTemp);
     }
   }
@@ -1934,9 +1944,10 @@ static void _satCheckWindowTimer()
     // The switch is a preset change (climate.py:819 -> async_set_preset_mode): from no preset it
     // keeps the user's own target as the pre-custom temperature (climate.py:619-620, TASK-1487).
     if (state.sat.eActivePreset == SAT_PRESET_NONE) state.sat.fPreCustomTemp = settings.sat.fTargetTemp;
+    const float targetBefore = settings.sat.fTargetTemp;
     state.sat.eActivePreset = SAT_PRESET_ACTIVITY;
     settings.sat.fTargetTemp = settings.sat.fPresetActivity;
-    satResetIntegral();
+    satResetControlStateIfTargetChanged(targetBefore);   // climate.py:819 -> target-change reset
     SATDebugTf(PSTR("SAT: window open > %us, switched to Activity (%.1f)\r\n"),
             settings.sat.iWindowMinOpenSec, settings.sat.fPresetActivity);
   }
@@ -2607,6 +2618,28 @@ static float satGetWeightedRoomTemp()
 // Static zone state array — BSS, not stack. 4 zones × 28 bytes ≈ 112 bytes.
 static SATZoneState satZones[4];
 
+// thermo-nova reset_control_state(): the main PID and every area PID (climate.py:461-464, area.py:335-338).
+// Callable from any task: REST handlers and updateSetting() run on the async_tcp task, while the PID read-modify-writes
+// run on the loop task, so a direct zeroing from REST could be lost in the middle of an update. The caller only raises
+// this flag; satControlLoopRun() applies it on the loop task (same pattern as g_mqttRepublishAllPending, TASK-1176).
+// One producer-side byte store, one consumer; volatile keeps the loop task from caching it.
+static volatile bool _sat_resetControlStatePending = false;
+
+void satResetControlState()
+{
+  _sat_resetControlStatePending = true;
+}
+
+// Loop task only. Clears the flag first: a request raised after that line is served on the next pass, so no request
+// is lost. An area PID has no raw derivative here; its held error (fPrevError) stays, like _last_error.
+static void satApplyControlStateReset()
+{
+  if (!_sat_resetControlStatePending) return;
+  _sat_resetControlStatePending = false;
+  satPidResetTerms();
+  for (uint8_t i = 0; i < sizeof(satZones) / sizeof(satZones[0]); i++) satZones[i].fPidIntegral = 0.0f;
+}
+
 // Maximum number of zones supported
 static const uint8_t SAT_MAX_ZONES = 4;
 
@@ -2658,6 +2691,8 @@ bool satHandleZoneSetpoint(uint8_t zone, const char* value)
   if (endp == value || *endp != '\0') return false;
   if (sp < 5.0f || sp > 30.0f) return false;
   uint8_t idx = zone - 1;
+  // A changed setpoint resets that area's PID (climate.py:785-795); the first one has nothing to compare with (:788).
+  if (satZones[idx].bSpValid && fabsf(satZones[idx].fSetpoint - sp) >= 0.05f) satZones[idx].fPidIntegral = 0.0f;
   satZones[idx].fSetpoint     = sp;
   satZones[idx].bSpValid      = true;
   satZones[idx].iLastUpdateMs = millis();
@@ -3221,6 +3256,7 @@ void satDisable(bool persistPid)
   _sat_thermalSafeActive = false;
   state.sat.bActive = false;
   state.sat.fFinalSetpoint = 0.0f;
+  satResetControlState();              // zone integrals too (thermo-nova HVAC OFF, climate.py:583), applied on the loop task: satDisable() also runs on the async_tcp task (updateSetting)
   satPidReset();
   if (persistPid) satSavePidState();   // Persist zeros after reset so next boot cold-starts (AC #5)
   satSaveEnergyState();      // Persist energy total before reset (Task #196)
@@ -5669,6 +5705,7 @@ void satControlLoop()
 
 static void satControlLoopRun()
 {
+  satApplyControlStateReset();    // TASK-1414: a reset requested from any task (REST, MQTT, SAT itself) is applied here, once
   // Deferred PID state restore (Task #222): satLoadPidState() is called at initSAT()
   // but NTP may not yet be synced at that point, so the restore is skipped there.
   // Retry here once after NTP becomes available so freshness can be verified.

@@ -101,12 +101,18 @@ void satPidGetPersistState(float* integral, float* d, float* rawDerivative, floa
   *lastError     = isnan(_pid_lastError) ? 0.0f : _pid_lastError;
 }
 
-//=== Integral-only Reset (debug tool) ====
-void satResetIntegral()
+//=== Reset of the integral and the raw derivative (thermo-nova PID.reset(), pid.py:134-137) ====
+// Zeroes exactly what thermo-nova zeroes and nothing else: the last error, the last room temperature, the
+// timers, _pid_initialized and the start-up flags stay, so the next PID step is a normal step and the
+// TASK-1270 first-tick failure cannot come back (satPidReset() is the broad reset and is not used here).
+void satPidResetTerms()
 {
-  _pid_integral = 0.0f;
-  state.sat.fPidI = 0.0f;
-  DebugTln(F("SAT: PID integral reset"));
+  _pid_integral      = 0.0f;
+  _pid_rawDerivative = 0.0f;
+  state.sat.fPidI          = 0.0f;
+  state.sat.fPidD          = 0.0f;
+  state.sat.fRawDerivative = 0.0f;
+  DebugTln(F("SAT: PID integral and raw derivative reset"));
 }
 
 //=== PID Reset ===

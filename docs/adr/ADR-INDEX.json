@@ -6930,7 +6930,7 @@
       "path": "ADR-197-sat-pid-v3-controller-supersedes-adr-069.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-29",
+      "date": "2026-10-30",
       "decision_summary": "The SAT PID follows thermo-nova pid.py at 7beaaf5 term by term (entry 28), implemented in src/OTGW-firmware/SATpid.in...",
       "topics": [
         "deadband",
@@ -7416,6 +7416,73 @@
           "tests/testsatcmdcache.py compiles the real command helpers cut out of SATcontrol.ino (satResetCmdCache, satEnqueueOwnCS, satEnqueueIfChangedCS/MM/CH/TC, satPicCSKeepalive). It covers the write-on-change behaviour of TASK-1324. Under TASK...",
           "Bench check before shipping (entry 44, \"Open\"): a telnet or capture transcript over at least three control ticks on a PIC board and on an OT-Direct board, showing CS, MM and CH about every 5 s, nothing during the restart quiet period, an...",
           "Source anchors: the four call sites in the table under Context; the gates at SATcontrol.ino:5586-5620; heatingcontrol.py:236-238; climate.py:708, :530, :544-545."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-204",
+      "title": "SAT PID reset triggers (supersedes ADR-197 decision 8)",
+      "path": "ADR-204-sat-pid-reset-triggers-supersedes-adr-197-decision-8.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-30",
+      "decision_summary": "SAT resets exactly the integral and the raw derivative of the main PID, and the integral of every zone PID, on the tr...",
+      "topics": [
+        "integral",
+        "pid",
+        "reset",
+        "sat",
+        "threading"
+      ],
+      "aliases": [
+        "integral reset",
+        "PID reset triggers",
+        "Q23",
+        "reset_control_state",
+        "target change reset"
+      ],
+      "components": [
+        "SAT PID controller"
+      ],
+      "symbols": [
+        "satApplyControlStateReset",
+        "satControlLoopRun",
+        "satHandleZoneSetpoint",
+        "satPidResetTerms",
+        "satResetControlState",
+        "satResetControlStateIfTargetChanged"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Zero only the main integral, the raw derivative and the zone integrals on the triggers of decision 2.",
+          "Request the reset through satResetControlState() and apply it only in satApplyControlStateReset() on the loop task.",
+          "Leave the timers, pidinitialized, the start-up flags and the last error untouched by a reset.",
+          "Reset a zone on a changed setpoint for that zone only."
+        ],
+        "must_not": [
+          "Write the PID terms directly from a REST handler or from updateSetting().",
+          "Reset on a target change below 0.05 C, on a preset or window change that leaves the target unchanged, or on a repeated SATenabled=1.",
+          "Reset on a coefficient change.",
+          "Use satPidReset() for the trigger set of decision 2."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatpidresets.py compiles the real SATpid.ino and the real reset and trigger code cut out of SATcontrol.ino, settingStuff.ino and MQTTstuff.ino. Per trigger it checks that the integral, the raw derivative and the zone integrals...",
+          "Not verified: the threading claim is argued from the task model and the existing pattern, not measured on a unit. The bench check is a target change from REST during a running PID, with the integral shown to be 0 on the next pass."
         ]
       },
       "scope": {
@@ -12947,6 +13014,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-197",
+      "target": "ADR-204",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-198",
       "target": "ADR-069",
       "type": "related",
@@ -13165,6 +13238,18 @@
     {
       "source": "ADR-203",
       "target": "ADR-199",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-204",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-204",
+      "target": "ADR-197",
       "type": "related",
       "resolved": true
     }

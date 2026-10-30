@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-28T06:44:00Z'
-updated_date: '2026-10-30T04:20:00Z'
+updated_date: '2026-10-30T20:03:00Z'
 labels:
   - sat
   - sergeant-d
@@ -31,9 +31,9 @@ Sergeant D 2026-10-27 (entry 73, Q23: follow thermo-nova). Reset integral + raw 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test per trigger (target, preset, window, HVAC, reset_integral): integral and raw derivative are 0 after it; red on HEAD for the triggers HEAD misses
-- [ ] #2 Timers and the initialised flag are not cleared by this reset
-- [ ] #3 ADR-197 Decision 8 / open question updated
+- [x] #1 Host test per trigger (target, preset, window, HVAC, reset_integral): integral and raw derivative are 0 after it; red on HEAD for the triggers HEAD misses
+- [x] #2 Timers and the initialised flag are not cleared by this reset
+- [x] #3 ADR-197 Decision 8 / open question updated
 - [ ] #4 build + evaluate green
 <!-- AC:END -->
 
@@ -66,4 +66,6 @@ Tests: new tests/test_sat_pid_resets.py splicing the real satHandlePreset/satHan
 2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): TASK-1412.3 dependency replaced by TASK-1270: entry 73 Open says the reset must not reintroduce the TASK-1270 first-tick behaviour; own host-test AC#1.
 
 Execution-graph update requested by Robert: serialize pending SATpid.ino writers after TASK-1368 -> TASK-1270: TASK-1416 -> TASK-1417 -> TASK-1418 -> TASK-1414 -> TASK-1423 -> TASK-1415. TASK-1381 remains a parallel branch after TASK-1270, gated separately by Q53. Revalidate the task premise after the preceding fix; if already addressed, record evidence and re-scope/close through the normal review, rather than applying a duplicate change. Persistence write cadence remains Robert's decision.
+
+Fix round: reset requests go through a volatile flag applied on the loop task (satApplyControlStateReset first in satControlLoopRun); docs/comments fixed; ADR-204 (replaces ADR-197 decision 8) written, open question answered (Robert), Accepted 2026-10-30, related to ADR-197. Integrated on alpha.562 as alpha.563: full suite 73/73 rc=0, evaluate EXIT 0; tests/test_sat_pid_resets.py 16 OK, base 10 F, mutant satPidReset 8 F. Interpretations in entry 157; Q-1414a queued.
 <!-- SECTION:NOTES:END -->

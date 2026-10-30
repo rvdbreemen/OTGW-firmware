@@ -91,7 +91,8 @@ static SettingsT settings;
 static StateT state;
 static uint32_t g_ms = 1000;
 static uint32_t millis() { return g_ms; }
-static void satResetIntegral() {}
+static void satResetIntegral() {}   // HEAD
+static void satResetControlState() {}   // TASK-1414: the reset itself is tested in test_sat_pid_resets.py
 static void satNarrate_P(PGM_P) {}
 static void sendMQTTData(const char*, const char*, bool) {}
 static char* dtostrf(double v, signed char w, unsigned char p, char* b) { sprintf(b, "%*.*f", w, p, v); return b; }
@@ -176,6 +177,8 @@ def extract(sat: str, st: str) -> str:
     marker = re.search(r"// --- satPresetPersist begin\n(.*?)// --- satPresetPersist end", sat, re.S)
     if marker:
         parts.append("#define HAVE_PRESET_PERSIST 1\n" + marker.group(1))
+    if "satResetControlStateIfTargetChanged(" in sat:
+        parts.append(_fn(sat, r"static void satResetControlStateIfTargetChanged\(", SAT_INO))
     parts += [_fn(sat, r"void satHandlePreset\(", SAT_INO),
               _fn(sat, r"void satHandleWindow\(", SAT_INO),
               _fn(sat, r"static void _satCheckWindowTimer\(", SAT_INO),

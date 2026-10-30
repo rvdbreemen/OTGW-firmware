@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.562
+**  Version  : v2.0.0-alpha.563
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1037,6 +1037,11 @@ void updateSetting(const char *field, const char *newValue)
     if (!wasEnabled && settings.sat.bEnabled && state.bSetupComplete) {
       satClearSafetyTrip();
     }
+    // HVAC off -> heat: thermo-nova resets the control state on a mode call (climate.py:570-583). Another client
+    // or a retained MQTT message can repeat SATenabled=1, so only the real off -> on transition resets.
+    if (!wasEnabled && settings.sat.bEnabled && state.bSetupComplete) {
+      satResetControlState();
+    }
   }
   else if (strcasecmp_P(field, PSTR("SATsystem")) == 0)          settings.sat.iHeatingSystem = constrain(atoi(newValue), 0, 2);  // 0=auto,1=radiators,2=underfloor
   else if (strcasecmp_P(field, PSTR("SATsource")) == 0)          settings.sat.iHeatingSource = constrain(atoi(newValue), 0, 3);  // 0=auto,1=gas_boiler,2=heat_pump,3=hybrid (TASK-891.8)
@@ -1047,7 +1052,10 @@ void updateSetting(const char *field, const char *newValue)
     // shown target, keeps them.
     const float before = settings.sat.fTargetTemp;
     settings.sat.fTargetTemp = clampSettingFloat(newValue, settings.sat.fTargetTemp, 5.0f, 30.0f);
-    if (fabsf(settings.sat.fTargetTemp - before) >= 0.05f) satPresetClearForUserTarget();
+    if (fabsf(settings.sat.fTargetTemp - before) >= 0.05f) {
+      satPresetClearForUserTarget();
+      satResetControlState();   // thermo-nova: a target that really changes resets the control state (climate.py:643-660)
+    }
   }
   else if (strcasecmp_P(field, PSTR("SATcoefficient")) == 0)     settings.sat.fHeatingCurveCoeff = clampSettingFloat(newValue, settings.sat.fHeatingCurveCoeff, 0.1f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATinterval")) == 0) {

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.562
+**  Version  : v2.0.0-alpha.563
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -616,7 +616,7 @@ static void _satPvSurplusCmd(const char* v)      { satHandlePvSurplus(v); }     
 static void _satHumidityCmd(const char* v)       { satHandleHumidity(v); }
 static void _satSunElevationCmd(const char* v)   { satHandleSunElevation(v); }
 
-static void _satResetIntegralCmd(const char* v)  { (void)v; satResetIntegral(); }
+static void _satResetIntegralCmd(const char* v)  { (void)v; satResetControlState(); }
 static void _satFlushCmd(const char* v) {
   (void)v;
   satFlushShortLivedData();

@@ -10,6 +10,8 @@ verified_in: []
 supersedes:
   - "ADR-069"
 superseded_by: null
+related:
+  - "ADR-204"
 topics:
   - "sat"
   - "pid"
@@ -75,6 +77,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: Maintainer OK in session 2026-10-29 (TASK-1355)
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-30
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-204
     changed_via: adr-kit lifecycle
 ```
 

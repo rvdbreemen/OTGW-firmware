@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.562
+**  Version  : v2.0.0-alpha.563
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1342,7 +1342,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   }
   else if (strcasecmp_P(sub, PSTR("reset_integral")) == 0) {
     if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
-    satResetIntegral();
+    satResetControlState();
     webSend(200, F("application/json"), F("{\"status\":\"ok\",\"integral\":0}"));
   }
   else if (strcasecmp_P(sub, PSTR("flush")) == 0) {
@@ -1593,7 +1593,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     bool needsVal = true;
     // No-value commands
     if (strcasecmp_P(settingName, PSTR("reset_integral")) == 0) {
-      satResetIntegral();
+      satResetControlState();
       handled = true; needsVal = false;
     }
     if (handled && !needsVal) {

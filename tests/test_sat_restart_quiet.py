@@ -108,6 +108,7 @@ static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false;
 static bool g_roomSeen = false;
 static bool satPidRoomSeen() { return g_roomSeen; }
 static void satPidReset() { g_roomSeen = false; }
+static void satResetControlState() {}   // TASK-1414: zone integrals, tested in test_sat_pid_resets.py
 static int g_pidRestored = 0;
 static void satPidRestoreState(float, float) { g_pidRestored = 1; }
 static void satPidGetPersistState(float* i, float* d, float* rd, float* e) { *i = 1.5f; *d = 0; *rd = 0; *e = 0.2f; }

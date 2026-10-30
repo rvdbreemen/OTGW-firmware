@@ -95,6 +95,7 @@ static bool g_roomSeen = false; static int g_pidSaves = 0; static const char* g_
 static bool satPidRoomSeen() { return g_roomSeen; }
 static bool g_ntp = true; static bool isNTPtimeSet() { return g_ntp; }   // loss_room_nontp: NTP never synced
 static void satPidReset() { g_roomSeen = false; }
+static void satResetControlState() {}   // TASK-1414: zone integrals, tested in test_sat_pid_resets.py
 static void satSavePidState() { g_pidSaves++; g_pidFile = "zeros"; }
 static void satSaveEnergyState() {}
 static void satSaveEstimatedEnergy() {} static void satHCRReset() {}
