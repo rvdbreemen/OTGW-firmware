@@ -139,7 +139,6 @@ static const float    SAT_HARD_MAX_RAD       = 80.0f;   // Absolute ceiling for 
 static const float    SAT_GLOBAL_MAX_SETPOINT = 65.0f;  // Python MAXIMUM_SETPOINT: global safety ceiling for all heating systems
 static const uint32_t SAT_STALE_TEMP_BLE_MS  = 300000UL; // 5 min: BLE indoor temp considered stale
 static const uint32_t SAT_STALE_TEMP_MS      = 300000UL; // 5 min: thermostat-sourced Tr older than this is stale for SAT (TASK-1157)
-static const uint32_t SAT_STALE_OUTDOOR_MS   = 600000UL; // 10 min: external outdoor temp considered stale
 static const uint8_t  SAT_MAX_PIC_FAILS      = 5;        // Consecutive PIC comm failures before disable
 
 // --- Thermal Drop Learning Constants (Task #21) ---
@@ -1873,14 +1872,15 @@ static float satGetRoomTemp()
 
 // --- satOutside begin
 //=== Get Outside Temperature (external, OT bus, weather, restored) ===
-// TASK-1390 / TASK-1482, Sergeant D entries 56, 57, 126: an outside temperature is valid while it is younger
-// than 1 hour, whatever its source; with none SAT hands back (satRestartOutsideStep()). Order, first match wins:
-//   1. external (MQTT/REST) younger than 10 min (SAT_STALE_OUTDOOR_MS);
+// TASK-1390 / TASK-1482 / TASK-1501, Sergeant D entries 56, 57, 126, 139: an outside temperature is valid while it
+// is younger than 1 hour, whatever its source; with none SAT hands back (satRestartOutsideStep()). The external
+// value (MQTT/REST) wins for its whole valid hour. Order, first match wins:
+//   1. external (MQTT/REST) younger than 1 h;
 //   2. boiler MsgID 27 from a live Read-Ack younger than 1 h (state.otBus.iToutsideBoilerMs), when not 0.0;
 //   3. weather fetched less than 1 h ago;
 //   4. boiler MsgID 27 0.0 from a live Read-Ack younger than 1 h (a real 0 C reading);
-//   5. external younger than 1 h (after 10 min it only loses priority);
-//   6. the value restored from the PID state file at boot, measured less than 1 h ago (entry 126).
+//   5. the value restored from the PID state file at boot, measured less than 1 h ago (entry 126).
+// Simulation comes before all of them.
 // A PS=1 summary repeats stored values with no age (ADR-181), so it never stamps MsgID 27.
 // No side effects: the REST snapshot (async_tcp) and the MQTT publish call this too.
 // Returns false with the bus value (0.0 without a sensor) when no source is valid.
@@ -1897,11 +1897,10 @@ static bool satResolveOutsideTemp(float* out, uint32_t* sampleMs)
                        (uint32_t)(nowMs - state.otBus.iToutsideBoilerMs) < SAT_OUTSIDE_VALID_MS;
   const bool wxFresh = state.sat.weather.bValid && state.sat.weather.iLastUpdateMs != 0 &&
                        (uint32_t)(nowMs - state.sat.weather.iLastUpdateMs) < SAT_OUTSIDE_VALID_MS;
-  if (extSet && extAge <= SAT_STALE_OUTDOOR_MS) { *out = state.sat.fExternalOutdoor; *sampleMs = state.sat.iExternalOutdoorLastMs; return true; }
+  if (extSet && extAge < SAT_OUTSIDE_VALID_MS) { *out = state.sat.fExternalOutdoor; *sampleMs = state.sat.iExternalOutdoorLastMs; return true; }
   if (otFresh && otVal != 0.0f) { *out = otVal; *sampleMs = state.otBus.iToutsideBoilerMs; return true; }
   if (wxFresh) { *out = state.sat.weather.fTemperature; *sampleMs = state.sat.weather.iLastUpdateMs; return true; }
   if (otFresh) { *out = otVal; *sampleMs = state.otBus.iToutsideBoilerMs; return true; }
-  if (extSet && extAge < SAT_OUTSIDE_VALID_MS) { *out = state.sat.fExternalOutdoor; *sampleMs = state.sat.iExternalOutdoorLastMs; return true; }
   if (state.sat.bRestoredOutdoorValid &&
       (uint32_t)(nowMs - state.sat.iRestoredOutdoorMs) < SAT_OUTSIDE_VALID_MS) {
     *out = state.sat.fRestoredOutdoor; *sampleMs = state.sat.iRestoredOutdoorMs; return true;

@@ -3,10 +3,11 @@ id: TASK-1501
 title: >-
   SAT: external outside temperature first for its whole valid hour (entry 139,
   Q66 A)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-30T06:11:00Z'
-updated_date: '2026-10-30T06:59:00Z'
+updated_date: '2026-10-30T09:20:00Z'
 labels:
   - sat sergeant-d
 milestone: 2.0.0
@@ -27,6 +28,12 @@ Sergeant D 2026-10-30 Q66 A (entry 139): order external sensor (MQTT/REST, valid
 - [ ] #2 The restored-value and MsgID 27 = 0.0 fallbacks keep their order; docs/sat/firmware-sat-spec.md updated
 - [ ] #3 build + evaluate green
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Second-reader checked 2026-10-30 (C18, C19 confirmed). satResolveOutsideTemp() SATcontrol.ino:1888-1911: change :1900 to extSet && extAge < SAT_OUTSIDE_VALID_MS, delete :1904 and SAT_STALE_OUTDOOR_MS (:142, only user :1900; comment :1878). Validity (satOutsideTempFresh, restart gate, saved ots) unchanged. Host test tests/test_sat_outside_order.py on the real satOutside block (red on HEAD: 30 min external loses to MsgID 27/weather). Bench with simulation off: external 3.0 via POST /api/v2/sat/externaloutdoor, read sat/status outside_temp at 5/11/59/61 min. Docs: firmware-sat-spec.md, sat-comparison.md, MQTT.md/openapi wording. Waiting for Sergeant D's OK (msg 1565656570702987396).
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
