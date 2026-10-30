@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T14:38:00Z'
-updated_date: '2026-10-30T00:00:00Z'
+updated_date: '2026-10-30T00:11:00Z'
 labels:
   - sat
   - pressure
@@ -39,6 +39,8 @@ Open interpretation (implementer, not a ruling): thermo-nova's coordinator.activ
 AC#2 open: Sergeant D's answer on whether a pump-head step should count is not recorded yet.
 
 alpha.542 bench check failed 2026-10-30 (v2.js 64 KiB cut, settings loss after FS OTA); Done waits for a passing bench check on the fixed build.
+
+2026-10-30: the coordinator.active mapping question and AC#2 (pump-head step) are now queued for Sergeant D as Q70 in docs/sat/open-questions.md (queued, not asked; advice: boiler CH-mode bit, same mapping as Q69 A). Supersedes the 'not yet queued' remarks above.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
