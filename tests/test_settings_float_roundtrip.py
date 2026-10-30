@@ -136,6 +136,24 @@ class FloatRoundTrip(unittest.TestCase):
             except ValueError:
                 hi = 1000.0  # symbolic bound (SAT_DHW_SETPOINT_MAX)
             cls.rng[m.group(1)] = (float(m.group(2)), hi)
+        # block form: `else if (... PSTR("key")) == 0) { ...; settings.x = clampSettingFloat(newValue, ...); ... }`
+        # (SATtargettemp since TASK-1487). The block ends at the first line that is just `  }`.
+        for m in re.finditer(r'PSTR\("(\w+)"\)\) == 0\) \{\n((?:(?!\n  \}).)*)', src, re.S):
+            c = re.search(r'settings\.[\w.\[\]]+ = clampSettingFloat\(newValue,[^,]+,\s*(-?[\d.]+)f?,\s*(.+?)\);', m.group(2))
+            if not c:
+                continue
+            hi = c.group(2).strip().rstrip("f")
+            try:
+                hi = float(hi)
+            except ValueError:
+                hi = 1000.0
+            cls.rng[m.group(1)] = (float(c.group(1)), hi)
+        # helper form: `settings.x = parseMaxTSetUser(newValue, ...)` (TASK-1373). It accepts 0 ("not chosen")
+        # and values up to SAT_MAXTSET_MAX; the helper's own clampSettingFloat(-1..MAX) lower bound is a
+        # guard against negatives, not an accepted value, so the round trip uses 0..SAT_MAXTSET_MAX.
+        mx = re.search(r'^#define\s+SAT_MAXTSET_MAX\s+(\d+)', (REPO / "src" / "OTGW-firmware" / "SATtypes.h").read_text(encoding="utf-8", errors="replace"), re.M)
+        for m in re.finditer(r'PSTR\("(\w+)"\)\) == 0\)\s+settings\.[\w.\[\]]+ = parseMaxTSetUser\(newValue,', src):
+            cls.rng[m.group(1)] = (0.0, float(mx.group(1)))
 
         call = ("writeJsonFloatKV(f, F(key), (float)val, (uint8_t)dec);" if cls.has_decimals
                 else "writeJsonFloatKV(f, F(key), (float)val);")
