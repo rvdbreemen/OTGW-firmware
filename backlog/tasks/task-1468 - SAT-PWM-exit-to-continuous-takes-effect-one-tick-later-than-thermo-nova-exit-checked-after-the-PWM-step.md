@@ -3,9 +3,11 @@ id: TASK-1468
 title: >-
   SAT: PWM exit to continuous takes effect one tick later than thermo-nova (exit
   checked after the PWM step)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T08:42:00Z'
+updated_date: '2026-10-30T17:42:00Z'
 labels:
   - sat
 milestone: 2.0.0

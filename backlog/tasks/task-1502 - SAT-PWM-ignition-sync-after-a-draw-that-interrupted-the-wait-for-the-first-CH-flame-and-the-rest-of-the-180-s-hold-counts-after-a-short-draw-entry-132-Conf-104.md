@@ -4,9 +4,11 @@ title: >-
   SAT PWM: ignition sync after a draw that interrupted the wait for the first CH
   flame, and the rest of the 180 s hold counts after a short draw (entry 132,
   Conf-104)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-30T06:14:00Z'
+updated_date: '2026-10-30T17:42:00Z'
 labels:
   - sat sergeant-d
 milestone: 2.0.0

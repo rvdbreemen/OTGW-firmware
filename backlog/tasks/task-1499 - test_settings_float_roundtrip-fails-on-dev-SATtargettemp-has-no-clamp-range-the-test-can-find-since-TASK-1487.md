@@ -3,9 +3,11 @@ id: TASK-1499
 title: >-
   test_settings_float_roundtrip fails on dev: SATtargettemp has no clamp range
   the test can find (since TASK-1487?)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-30T05:35:00Z'
+updated_date: '2026-10-30T17:42:00Z'
 labels:
   - tests sat
 milestone: 2.0.0
