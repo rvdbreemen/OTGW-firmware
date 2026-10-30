@@ -3,9 +3,11 @@ id: TASK-1507
 title: >-
   SAT beta notice: warn on enable and on the SAT page that SAT is experimental
   and field data is needed, with an invitation to share capture logs
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-30T06:47:00Z'
+updated_date: '2026-10-30T07:03:00Z'
 labels:
   - sat webui beta
 milestone: 2.0.0

@@ -115,6 +115,7 @@ Node test files, run one at a time with `node --test tests/webui/<name>.test.mjs
     in the whole run). A request log asserts the DHW setpoint and standalone DHW controls POST the
     same endpoint and body as before. Ports 8152/9352. Old-vs-fix needs a COMPLETE data dir (copy `data/`, then
     overwrite `v2.html v2.js v2.css v2-bundle.css ds-tokens.css` with `git show HEAD:` copies).
+  - `sat-beta-notice`: TASK-1507. Enabling SAT opens the setup wizard on a beta-notice step first (Continue disabled until the box is ticked, Cancel leaves SAT off and POSTs nothing); the SAT page shows the same notice on a prerelease firmware version and not on a release one, Dismiss is kept in sessionStorage only. `SHOT_DIR=<dir>` saves screenshots.
   - `tret-pr-events`: TASK-1314. A stub WebSocket feeds `< PR: D=R` / `< PR: E=41.20` log lines
     through the page's own `onmessage`; the Home return readout takes the E value only while the
     sensor function is R (not for `E=-`, out-of-range values or function O), and an OT MsgID 28

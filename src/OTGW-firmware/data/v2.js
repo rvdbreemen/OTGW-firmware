@@ -4433,6 +4433,38 @@
   // across polls (no firmware history endpoint, by design — as in the former classic SAT page).
   var satPollTimer = null;
   var satLastData = null;
+  // TASK-1507: SAT beta notice. One text for the wizard's first step and the SAT page notice.
+  var SAT_BETA_HEAD = 'SAT is experimental in this beta and it controls your boiler.';
+  var SAT_BETA_BODY = 'We need field data to validate it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #alpha-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).';
+  var SAT_BETA_DISMISS_KEY = 'otgw-v2-satbeta-dismissed';
+  // A prerelease firmware has a "-alpha.N" / "-beta.N" part after major.minor.patch (+build metadata dropped).
+  function isPrereleaseFw(v) {
+    return /^\d+\.\d+\.\d+-[A-Za-z]/.test(('' + (v || '')).trim().replace(/^v/i, '').split('+')[0]);
+  }
+  var _satBetaSynced = false;
+  function syncSatBetaNotice() {
+    if (_satBetaSynced) return;
+    var box = document.getElementById('satBetaNotice'), tx = document.getElementById('satBetaNoticeText');
+    if (!box || !tx) return;
+    _satBetaSynced = true;
+    var closed = false;
+    try { closed = sessionStorage.getItem(SAT_BETA_DISMISS_KEY) === '1'; } catch (e) { }
+    var cb = document.getElementById('satBetaNoticeClose');
+    if (cb && !cb._wired) {
+      cb._wired = true;
+      cb.addEventListener('click', function () {
+        box.style.display = 'none';
+        try { sessionStorage.setItem(SAT_BETA_DISMISS_KEY, '1'); } catch (e) { }
+      });
+    }
+    if (closed) return;
+    withDeviceInfo(function (d) {   // existing device/info snapshot (cached), no extra request path
+      if (!d) { _satBetaSynced = false; return; }   // unknown: try again on the next poll
+      if (!isPrereleaseFw(d.fwversion)) return;
+      tx.textContent = SAT_BETA_HEAD + ' ' + SAT_BETA_BODY;
+      box.style.display = '';
+    });
+  }
   var satMarkers = [];
   var satMarkersLoaded = false;
   var satHist = { set: [], flow: [], room: [], out: [], pid: [] };
@@ -4510,6 +4542,7 @@
         }
         if (nd) nd.style.display = 'none'; if (body) body.style.display = '';
         satLastData = d;
+        syncSatBetaNotice();   // TASK-1507: once per page load
         try { renderSatPage(d); } catch (e) { }
       })
       .catch(function () {
@@ -5426,7 +5459,7 @@
     var curSys = setData.satsystem ? ('' + setData.satsystem.value) : '0';
     var curSrc = setData.satsource ? ('' + setData.satsource.value) : '1';
     var st = {
-      screen: 'welcome',
+      screen: (reason === 'enable') ? 'beta' : 'welcome',   // TASK-1507: enabling SAT starts with the beta notice
       system: curSys === '1' ? 'radiators' : curSys === '2' ? 'underfloor' : (curSrc === '2' ? 'hp' : 'radiators'),
       mfr: setData.satmanufacturer ? ('' + setData.satmanufacturer.value) : '0',
       tuning: 'auto',
@@ -5529,7 +5562,15 @@
           '<span style="font-weight:600;font-size:12px;color:var(--text)">' + ['Heating system', 'Manufacturer', 'Tuning', 'Sources health'][idx] + '</span></div>' +
           '<div style="height:5px;border-radius:3px;background:var(--bg);overflow:hidden"><span style="display:block;height:100%;border-radius:3px;background:var(--accent);transition:width .25s;width:' + Math.round(((idx + 1) / total) * 100) + '%"></span></div></div>';
       }
-      if (st.screen === 'welcome') {
+      if (st.screen === 'beta') {
+        h += '<div style="' + CARD + ';padding:30px 28px"><h1 style="font-weight:700;font-size:23px;color:var(--text);margin:0 0 10px">Before you enable SAT</h1>' +
+          '<p style="font:400 13.5px/1.65 inherit;color:var(--text);margin:0 0 8px"><b>' + esc(SAT_BETA_HEAD) + '</b></p>' +
+          '<p style="font:400 13px/1.65 inherit;color:var(--muted);margin:0 0 16px">' + esc(SAT_BETA_BODY) + '</p>' +
+          '<label style="display:flex;align-items:flex-start;gap:10px;margin:0 0 22px;cursor:pointer;font-weight:600;font-size:13px;color:var(--text)">' +
+          '<input type="checkbox" id="satOnbBetaOk" style="margin-top:3px;width:18px;height:18px;flex:0 0 auto"> <span>I understand that SAT is experimental and controls my boiler.</span></label>' +
+          '<div style="display:flex;gap:10px;align-items:center"><button data-sa="notnow" style="' + GHOST + '">Cancel</button>' +
+          '<button data-sa="beta-ok" id="satOnbBetaGo" disabled style="' + PRIM + ';opacity:.5">Continue</button></div></div>';
+      } else if (st.screen === 'welcome') {
         h += '<div style="' + CARD + ';padding:34px 30px;text-align:center">' +
           '<div style="width:54px;height:54px;border-radius:14px;background:color-mix(in srgb,var(--accent) 18%,transparent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px"><span style="width:16px;height:16px;border-radius:4px;background:var(--accent);box-shadow:0 0 12px var(--accent)"></span></div>' +
           '<h1 style="font-weight:700;font-size:25px;color:var(--text);margin:0 0 8px">Let\'s tune SAT for your system</h1>' +
@@ -5624,10 +5665,17 @@
       if (mf) mf.addEventListener('change', function () { st.mfr = mf.value; render(); });
     }
 
+    // TASK-1507: the beta step's Continue stays disabled until the box is ticked (no re-render, keeps focus).
+    back.addEventListener('change', function (ev) {
+      if (!ev.target || ev.target.id !== 'satOnbBetaOk') return;
+      var go = back.querySelector('#satOnbBetaGo');
+      if (go) { go.disabled = !ev.target.checked; go.style.opacity = ev.target.checked ? '' : '.5'; }
+    });
     back.addEventListener('click', function (ev) {
       var t = ev.target.closest && ev.target.closest('[data-sa]'); if (!t) return;
       var a = t.getAttribute('data-sa');
-      if (a === 'begin') { st.screen = 'system'; render(); }
+      if (a === 'beta-ok') { var bk = back.querySelector('#satOnbBetaOk'); if (bk && bk.checked) { st.screen = 'welcome'; render(); } }
+      else if (a === 'begin') { st.screen = 'system'; render(); }
       else if (a === 'notnow') { dismiss(); }
       else if (a === 'sys-radiators' || a === 'sys-underfloor' || a === 'sys-hp') { st.system = a.slice(4); render(); }
       else if (a === 'back-welcome') { st.screen = 'welcome'; render(); }

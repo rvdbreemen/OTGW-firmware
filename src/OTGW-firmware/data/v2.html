@@ -431,6 +431,12 @@
   <!-- no-data banner: shown when /api/v2/sat/status is unreachable (older firmware / build without SAT) -->
   <div class="card" id="satNoData" style="display:none;text-align:center;color:var(--muted)">SAT status is unavailable on this device.</div>
 
+  <!-- TASK-1507: beta notice, filled and shown by v2.js only on a prerelease firmware; dismissed per browser session -->
+  <div id="satBetaNotice" class="pic-banner warn" role="note" style="display:none">
+    <div id="satBetaNoticeText"></div>
+    <button id="satBetaNoticeClose" class="fs-btn" type="button" style="margin-top:8px">Dismiss for this session</button>
+  </div>
+
   <div id="satBody" class="sv-simple">
     <!-- L1 Thermostat: dial + presets + hint (the header toggle already carries enable/disable),
          then the temperature history, then the collapsed Hot water group (TASK-1310) -->
