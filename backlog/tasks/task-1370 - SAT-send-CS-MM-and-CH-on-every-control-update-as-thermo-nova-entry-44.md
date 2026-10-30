@@ -4,7 +4,7 @@ title: 'SAT: send CS, MM and CH on every control update as thermo-nova (entry 44
 status: To Do
 assignee: []
 created_date: '2026-10-24T21:44:00Z'
-updated_date: '2026-10-27T23:45:00Z'
+updated_date: '2026-10-30T06:59:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -32,4 +32,6 @@ Sergeant D 2026-10-24 (Q13, entry 44): follow thermo-nova, send CS/MM/CH every u
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
+
+2026-10-30: Sergeant D entry 146: must be in beta 1 (TASK-1504, target Sun 2026-11-01). Priority raised to high.
 <!-- SECTION:NOTES:END -->

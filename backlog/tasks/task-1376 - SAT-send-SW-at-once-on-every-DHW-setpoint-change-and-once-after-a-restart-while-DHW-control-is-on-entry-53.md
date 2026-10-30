@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T08:29:00Z'
-updated_date: '2026-10-29T20:58:00Z'
+updated_date: '2026-10-30T06:59:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -31,4 +31,6 @@ Sergeant D entry 53 (2026-10-25, answer to Q17: A). Entry 33: a DHW setpoint cha
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-29: Sergeant D entry 69 (2026-10-27, Q17: yes) re-confirms entries 33 and 53: SW= at once on every change and once after a restart while DHW control is on; slider bounded by MsgID 48. No change to scope. Open (from entry 69): whether the SW= on a draw edge also stays; decide in the plan.
+
+2026-10-30: Sergeant D entry 146: must be in beta 1 (TASK-1504, target Sun 2026-11-01). Priority raised to high.
 <!-- SECTION:NOTES:END -->

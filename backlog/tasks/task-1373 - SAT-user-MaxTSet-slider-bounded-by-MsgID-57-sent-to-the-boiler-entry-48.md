@@ -4,7 +4,7 @@ title: 'SAT: user MaxTSet slider bounded by MsgID 57, sent to the boiler (entry 
 status: To Do
 assignee: []
 created_date: '2026-10-25T06:31:00Z'
-updated_date: '2026-10-29T19:15:00Z'
+updated_date: '2026-10-30T06:59:00Z'
 labels:
   - sat
   - webui
@@ -46,4 +46,6 @@ Entry 54 (2026-10-25 07:31): with the slider at 48 SAT never sends a CS above 48
 2026-10-28 entry 110 (Q15b B): keep the 50 C underfloor ceiling; underfloor default max flow 50 C (was 55 in entry 67); radiators 62. Heat-pump default still open.
 
 TASK-1412.1 records review (R29): 2026-10-29. TASK-1412.1 R29 reconciliation: AC#1 aligned with entry 100 (Q41 A). Bounds from MsgID 49 (OTGW-Core.h:423), value MsgID 57 (OTGW-Core.h:431, OTDirect.ino:143), 20/80 fallback, no MsgID 6 gate. The title keeps entry 48's original wording as history; entry 100 is the dated correction. Defaults: radiators 62 (entry 67), underfloor 50 (entry 110, changes entry 67). The heat-pump default and whether an unchosen default is written to the boiler are still OPEN (entry 110 'Open', not asked yet). Do not implement a heat-pump default by assumption. The 2026-10-25 citation SATcontrol.ino:1030-1032 (ignition hold) no longer matches the current source. Re-locate it under TASK-1412.13 AC#2. Not implemented: no user MaxTSet setting exists in the current source (SATtypes.h:533 is the global 65 ceiling; SATcontrol.ino:302-309 fixed caps).
+
+2026-10-30: Sergeant D entry 146: must be in beta 1 (TASK-1504, target Sun 2026-11-01). Priority raised to high.
 <!-- SECTION:NOTES:END -->

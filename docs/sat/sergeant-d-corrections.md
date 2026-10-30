@@ -4969,3 +4969,37 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156561678051
 **Compared:** thermo-nova has a single "Current Consumption (Device)" sensor, 0 unless `coordinator.active` and the flame is on (`sensor.py:219-259`, opened in this session); no DHW sensor (not found in sensor.py). Firmware today: one `sat/consumption`, gated on CH mode + flame (`SATcontrol.ino:4059-4071` at 5544e8a63). A DHW sensor is a firmware extension on his direction, not thermo-nova parity (feedback: best SAT, not parity).
 
 **Task:** follow-up of TASK-1484 (filed 2026-10-30). **Open:** his confirmation of the reading (asked in the acknowledgement); the topic names (sat/consumption kept for CH, new sat/consumption_dhw, our proposal); whether the old single sensor stays as the sum (not asked).
+
+## 145. Split gas consumption confirmed; CH consumption also requires the DHW bit to be clear (2026-10-30, refines entry 144)
+
+**Source:** #alpha-testing, 2026-10-30 06:49 UTC, reply to our entry 144 yes/no (msg 1565617986272755723):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565618631159717950
+
+**Quoted:**
+
+> @BlueFlame Bot
+>
+> - CH gas consumption: flame on AND the boiler's CH mode bit set and not DHW bit set is the correct statement
+
+**Settled (our reading: he corrected only the CH line, so the split and the DHW line stand as proposed):** CH consumption = flame on AND boiler CH mode bit set AND boiler DHW-active bit clear. DHW consumption = flame on AND boiler DHW-active bit set (entry 144 as proposed). Same formula for both: min + modulation/100 x (max - min).
+
+**Compared:** thermo-nova has one sensor gated on `coordinator.active` (CH mode on the MQTT OTGW coordinator) and the flame (`sensor.py:252-253`, opened in this session); no DHW clause, no DHW sensor. Firmware today: CH mode + flame, no DHW clause (`SATcontrol.ino:4059-4071` at 5544e8a63). **Changes an earlier entry:** entry 144 (CH clause gains "and not DHW"). **Task:** TASK-1506. **Open:** none.
+
+## 146. Beta 1 must include TASK-1371, 1501, 1370, 1373, 1375 and 1376 (2026-10-30, answer to the Beta-OK question)
+
+**Source:** #alpha-testing, 2026-10-30 06:56 UTC, after Robert's message "You can go thru the list, and tell @BlueFlame Bot what is a MUST for beta.1, if nothing, then also confirm that please." (msg 1565620156477079653) and our Beta-OK question (msgs 1565619458205159427 .. 1565619462546395198):
+https://discord.com/channels/812969634638725140/1514720723980259460/1565620504503517256
+
+**Quoted:**
+
+> @BlueFlame Bot Tasks 1371, 1501, 1370, 1373, 1375, 1376 should be in the b1.
+
+**Settled:** a public opt-in beta is acceptable to him once these six are in it (our reading: the rest of the posted list may follow after beta 1; he named no other must). The six, with the entries they implement:
+- TASK-1371: ignition without a return temperature: flow-based start, CS/PM=25 flood (also after a draw), MI=500 on PIC boards (entries 45, 135, 138, 141, 142).
+- TASK-1501: external outside temperature first for its whole valid hour (entry 139).
+- TASK-1370: send CS, MM and CH on every control update (entry 44).
+- TASK-1373: user MaxTSet slider bounded by MsgID 57, sent to the boiler (entry 48).
+- TASK-1375: gas boiler PWM cycles per hour 3 or 4, default 3 (entries 30, 52).
+- TASK-1376: SW= at once on every DHW setpoint change and once after a restart while DHW control is on.
+
+**Compared:** not a behaviour statement; a release-scope decision. Each task carries its own thermo-nova comparison in its plan. **Task:** TASK-1504 (beta blockers extended). **Open:** whether TASK-1502/1468/1414 etc. may stay after beta 1 is our reading of his silence on them; Robert asked him to confirm "if nothing"; he named these six.

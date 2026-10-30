@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-30T06:11:00Z'
+updated_date: '2026-10-30T06:59:00Z'
 labels:
   - sat sergeant-d
 milestone: 2.0.0
@@ -26,3 +27,9 @@ Sergeant D 2026-10-30 Q66 A (entry 139): order external sensor (MQTT/REST, valid
 - [ ] #2 The restored-value and MsgID 27 = 0.0 fallbacks keep their order; docs/sat/firmware-sat-spec.md updated
 - [ ] #3 build + evaluate green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-30: Sergeant D entry 146: must be in beta 1 (TASK-1504, target Sun 2026-11-01). Priority raised to high.
+<!-- SECTION:NOTES:END -->
