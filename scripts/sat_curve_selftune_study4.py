@@ -35,6 +35,7 @@ EXCLUDE_ATMIN = False # True (round 5b): hours with the heat source off or at mi
 PID_D_HOLD = False    # True (round 7): PID derivative held inside the 0.1 C deadband, thermo-nova pid.py:205-207
 SIGNAL = "CI"         # round 7, entry 170: CI (setpoint - curve) | CI+D | I+D | I | CI+guard
 GUARD_KPH = 0.1
+STEP_KEEPS_PID = False # True (round 10): a coefficient step leaves the PID integral and derivative alone, as ADR-204 requires
 COLD_K = 0.3          # EXCLUDE_ATMIN = "cold" (round 5e): a PWM / minimum-output hour counts only when the hour-mean room is more than COLD_K below target       # CI+guard: an hour whose room temperature moved more than this is not clean
 UPPER, LOWER = 1200.0, 180.0
 DUTY_LO, DUTY_HI = LOWER / UPPER, 1 - LOWER / UPPER
@@ -191,7 +192,9 @@ def run(args):
             if new_c != c:
                 dr = 1 if new_c > c else -1
                 if last_dir and dr != last_dir: flips += 1
-                last_dir = dr; writes += 1; c = new_c; integ = 0.0; rd = 0.0; stepped = True
+                last_dir = dr; writes += 1; c = new_c
+                stepped = True
+                if not STEP_KEEPS_PID: integ = 0.0; rd = 0.0
         if m % 1440 == 1439:
             st.day_err = day_err_sum / day_err_n if day_err_n else None   # mean room - target over all heating minutes (round 5f)
             st.day_swing = day_tmax - day_tmin if day_err_n else None; st.day_capped = day_capped   # round 5g guards
@@ -200,7 +203,8 @@ def run(args):
             if new_c != c:
                 dr = 1 if new_c > c else -1
                 if last_dir and dr != last_dir: flips += 1
-                last_dir = dr; writes += 1; c = new_c; integ = 0.0; rd = 0.0
+                last_dir = dr; writes += 1; c = new_c
+                if not STEP_KEEPS_PID: integ = 0.0; rd = 0.0
     if trace is not None: return {"spec": st.name, "trace": trace}
     days = minutes / 1440
     return {"spec": st.name, "source": source, "era": era, "mass": mass, "kr": kr, "c_off": c_off, "start_loss_kJ": start_loss, "seed": seed,

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-31T05:53:00Z'
-updated_date: '2026-10-31T12:31:00Z'
+updated_date: '2026-10-31T13:21:00Z'
 labels:
   - sat
   - design
@@ -57,4 +57,6 @@ Robert 2026-10-31 05:51 UTC in #alpha-testing (msg 1565966404304248853): 'I want
 2026-10-31 ~12:20 UTC round 8 (Robert: another year, 2-day window): 2024-25 Open-Meteo, same houses/radiators (out of sample), rule as decided. 2025-26 runs reproduce round 5d 150/150. Cliff below ~1.2 + plateau hold, optima move 0.1-0.3. Rule safe: worst pair +2 gas / +8 hp30 / 0 hp60, flips <= 0.5. Rescue from 1.0 slower in the milder winter (gas median -29 vs -106, hp60 -2 vs -55) because fewer clean hours (hp60 25-30/winter). Decisions recorded: entry 172 (Q-1519d B, Sergeant D), 173 (Q-1519e A, Sergeant D + Robert), 174 (Q-1519g A + extra logging, Robert). Git frozen by session ea (TASK-1521 bump) - files edited, not yet committed: corrections 173/174, open-questions, report section 9, study8.py, round8_runs.json, weather_2024_25/2025_26.json.
 
 2026-10-31 round 9 (Robert: twenty years of runs): 20 winters 2005-06..2024-25, 11,100 winters, 2-day and 3-day window, radiators from 2025-26 (out of sample); 2024-25 equals round 8 300/300. Worst pair over 20 winters +33 min/day (hp60 2 d), 0.9-4.3 % of pairs worse by > 5 min/day. Gain scales with cold (gas rescue from 1.0: -415 in 2009-11, ~0 in 2013-14/2019-20). Flips concentrate in hp30 near the optimum; 3 d halves them (88 -> 25 runs >= 3 flips, mean 0.31 -> 0.17) and lowers worst pairs (hp30 +28 -> +19, hp60 +33 -> +21) at a slower rescue (gas -33 -> -19, hp60 -5 -> 0). Q-1519h is a real trade-off; report section 9. Simulation paused once for session ea's alpha.569 build (2 workers during the build).
+
+2026-10-31 rounds 10-11 + evaluation (Robert: critical evaluation vs OT AFS v1.1f low-load 2.1.1, KISS). Round 10: PID kept on a coefficient step (ADR-204 Must Not) changes -5..+2 min/day, 443/450 same end coefficient. Round 11: margin 2.0 vs 3.0 calibrated: gas 2.0 better (median -6..-13, 75-85 % pairs), hp30 neutral, hp60 +2-3; starts and fuel unchanged; hp60 ~27-33 starts/day (concern for heat pumps). AFS gap found: ID3 HB bit 4 (mandatory master check) read only for MQTT (OTGW-Core.ino:3186), SAT ignores it; thermo-nova too. Report docs/sat/sim-1519/evaluation-2026-10-31.md. ADR-205 created as Proposed skeleton (not yet filled/committed).
 <!-- SECTION:NOTES:END -->
