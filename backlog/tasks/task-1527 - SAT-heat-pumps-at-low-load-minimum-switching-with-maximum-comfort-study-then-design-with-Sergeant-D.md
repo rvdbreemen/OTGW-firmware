@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-31T13:48:00Z'
-updated_date: '2026-10-31T14:13:00Z'
+updated_date: '2026-10-31T14:30:00Z'
 labels:
   - sat
   - design
@@ -31,4 +31,8 @@ Robert 2026-10-31: 'de warmtepomp moet minimaal schakelen. Dus goal voor warmtep
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-31 round 12 (docs/sat/sim-hp-lowload/round12.md, scripts/sat_hp_onoff_study12.py): on/off ground-source HP on underfloor (maarten_41762 msg 1566089657492705431). own control 2.4 starts/day 0.144 C; time-proportional PWM 180/240 min 7.5/5.6 starts; today's 1800 s PWM 42 starts 0.285 C. Robert (entry 181): two behaviours per setting, 'heat pump controls itself' and 'long time-proportional PWM in minutes per cycle'; Q-1527a to Sergeant D (OK + default).
+
+2026-10-31 Robert asked whether this heat pump can run in continuous mode. Code: the continuous->PWM switch (SATcontrol.ino:6136-6146, satCycleCheckOvershootSwitch SATcycles.ino:1103) applies to every source incl. heat pumps per Sergeant D entry 87 (Q45 A); bOvershootProtection only changes the PWM CS (SATcontrol.ino:1345, 1358), not the entry. So today a HP cannot stay continuous; 'own control' = skip that switch for HPs = changes entry 87 (added to Q-1527a, msg after 1566093012524605644). Model (own, on/off HP, underfloor): on 33-53 % of the time on average, max day 57-84 %, 0 of 106 days fully on (HP sized for -10 C +10 %), median runs 132-406 min, 1.3-4.3 starts/day.
+
+2026-10-31 Robert (entry 182): for heat pumps the firmware may deviate from thermo-nova; parity is no argument for heat pumps. Sergeant D's entries 40/50/87 stay until he revises them (Q-1527a, on the merits).
 <!-- SECTION:NOTES:END -->
