@@ -2103,7 +2103,7 @@
     satmaxconsumption:   { cat: 'sat', label: 'Gas use at max modulation', hint: 'm³/h (0 = off)' },
     // TASK-933 P2: keys that already had GET + dispatch but lacked a whitelist token
     // (now POST-able).
-    satcyclesperhour:    { cat: 'sat', label: 'Cycles per hour', hint: 'Gas boilers and hybrids; heat pumps use the heat-pump PWM cycle' },
+    satcyclesperhour:    { cat: 'sat', label: 'Cycles per hour', hint: 'Gas boilers; heat pumps and hybrids use the heat-pump PWM cycle' },
     satvalveoffset:      { cat: 'sat', label: 'Valve offset', hint: '°C' },
     satsensormaxage:     { cat: 'sat', label: 'Sensor max age', hint: 'Seconds' },
     saterrormon:         { cat: 'sat', label: 'Error monitoring' },
@@ -2198,11 +2198,11 @@
   // TASK-1530: satmaxmodulation is set only by the Max relative modulation slider (Central Heating Settings).
   var SAT_NOT_IN_FORMS = { satenabled: 1, satmaxmodulation: 1 };
   // TASK-1529: the PWM card shows only the cycle setting the firmware uses for the chosen appliance type:
-  // heat pump (satsource 2) -> sathpcycle, otherwise (Auto = gas, gas, hybrid) -> satcyclesperhour
+  // heat pump (satsource 2) and hybrid (3, entry 188) -> sathpcycle, otherwise (Auto = gas, gas) -> satcyclesperhour
   // (satGetPwmPeriodSec / satGetEffectiveHeatingSource in SATcontrol.ino).
   function satFieldShown(k) {
     if (k !== 'sathpcycle' && k !== 'satcyclesperhour') return true;
-    var hp = !!setData.satsource && curVal('satsource') === '2';
+    var hp = !!setData.satsource && (curVal('satsource') === '2' || curVal('satsource') === '3');
     return (k === 'sathpcycle') === hp;
   }
   // TASK-1012: internal onboarding-completion flags. Hidden from the settings LIST only

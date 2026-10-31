@@ -430,8 +430,9 @@ static float satGetColdSetpoint()
 static uint8_t satGetMaxCyclesPerHour()
 {
   // A heat pump has no hourly start limit (Sergeant D entry 81, satCycleIsHourLimitReached()); its PWM
-  // period comes from iHpCycleSeconds (satGetPwmPeriodSec). Gas boilers and hybrids: 3 or 4 per hour,
-  // default 3, for radiators and underfloor alike (Sergeant D entries 30 and 52, TASK-1375).
+  // period comes from iHpCycleSeconds (satGetPwmPeriodSec), a hybrid's too (entry 188). Gas boilers and
+  // hybrids: hourly start limit 3 or 4, default 3, for radiators and underfloor alike (Sergeant D entries
+  // 30 and 52, TASK-1375).
   return (settings.sat.iCyclesPerHour >= 4) ? 4 : 3;
 }
 
@@ -443,11 +444,12 @@ static uint32_t satGetMinOnTimeSec()
 }
 
 // Returns the PWM cycle length (period) in seconds, thermo-nova's _on_time_upper_threshold
-// (pwm.py:54). Heat-pump source: iHpCycleSeconds, 1800 s (2 per hour, default) or 2400 s
-// (1.5 per hour), Sergeant D entries 40 and 50. Otherwise 3600 / cycles per hour.
+// (pwm.py:54). Heat pump and hybrid: iHpCycleSeconds, 1800 s (2 per hour, default) or 2400 s
+// (1.5 per hour), Sergeant D entries 40, 50 and 188 (TASK-1531). Otherwise 3600 / cycles per hour.
 static uint32_t satGetPwmPeriodSec()
 {
-  if (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP) {
+  const uint8_t src = satGetEffectiveHeatingSource();
+  if (src == SAT_SRC_HEAT_PUMP || src == SAT_SRC_HYBRID) {
     return (settings.sat.iHpCycleSeconds == 2400) ? 2400UL : 1800UL;
   }
   return 3600UL / satGetMaxCyclesPerHour();

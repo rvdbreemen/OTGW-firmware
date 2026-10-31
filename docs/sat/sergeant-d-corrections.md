@@ -5340,3 +5340,11 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot in the PWM card the max modulation number field reports different value than the central heating settings card Max relative modulation slider. They must be the same. In both we control the Max relative modulation of the boiler" and "@BlueFlame Bot remove the Max relative modulation number field from the PWM card and keep it only in the Central Heating Settings Card"
 
 **Settled (UI request, no behaviour change):** the PWM card no longer shows the Max modulation field; the Central Heating Settings slider (TASK-1514) is the only place to set it. Fact check: both edit the same setting, `settings.sat.iMaxRelModulation` (settings key satmaxmodulation, `restAPI.ino:3903`; slider reads `max_rel_modulation`, `SATcontrol.ino:3790`), so the difference he saw is a stale copy on the page, not two settings. Compared: thermo-nova has no web UI. **Task:** TASK-1530. **Open:** none.
+
+## 188. Q-1531a answered: Hybrid takes only the heat-pump PWM cycle (Sergeant D, 2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 19:12 UTC, #alpha-testing, msg 1566167931191304233 (https://discord.com/channels/812969634638725140/1514720723980259460/1566167931191304233), answering Q-1531a (msg 1566163570969026637).
+
+**Quoted:** "@BlueFlame Bot Q-1531a: A"
+
+**Settled (narrows entry 186):** option A. For the Hybrid appliance type (satsource 3) the PWM cycle is the heat-pump cycle (iHpCycleSeconds, 1800 or 2400 s, entries 40/50) instead of 3600 / cycles per hour, and the SAT page's PWM card shows the heat-pump cycle field for Hybrid (TASK-1529 layout). Everything else stays as for a gas boiler: the hourly start limit (3 or 4 per hour, entries 30/52), the max-flow defaults 62/50 C (entries 67/110), and the MM= rule that already never sends 0 to a hybrid (`SATcontrol.ino` satComputeMM). Compared: thermo-nova has no hybrid type (not found in the code). **Task:** TASK-1531. **Open:** none.

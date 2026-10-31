@@ -293,6 +293,10 @@ await shotPwm('pwm-card-heatpump.png');
 check(!!hp && hp.hp && !hp.cph && hp.interval && !hp.otherCycle, `heat pump selected: heat-pump cycle shown, cycles per hour hidden at once (${JSON.stringify(hp)})`);
 const dirtySrc = await evalJs(`(function(){ var r = document.querySelector('#satSetL2 .srow[data-key="satsource"]'); return !!r && r.classList.contains('dirty') && r.querySelector('select').value === '2'; })()`);
 check(dirtySrc === true, 'the re-render keeps the unsaved appliance type (dirty, still Heat Pump)');
+// TASK-1531 (Sergeant D entry 188): a hybrid takes the heat-pump PWM cycle, so the card shows that field
+await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); sel.value = '3'; sel.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+const hyb = await until(`(function(){ var r = ${pwmCard}; var s = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); return s && s.value === '3' && r.cph !== undefined ? r : null; })()`);
+check(!!hyb && hyb.hp && !hyb.cph && !hyb.otherCycle, `hybrid selected: heat-pump cycle shown, cycles per hour hidden (${JSON.stringify(hyb)})`);
 
 // ---- 1530 SAT: Max relative modulation only in the Central Heating Settings card ----
 const mmForm = await evalJs(`(function(){ return document.querySelectorAll('#satSetL2 .srow[data-key="satmaxmodulation"], #satSetL3 .srow[data-key="satmaxmodulation"]').length; })()`);

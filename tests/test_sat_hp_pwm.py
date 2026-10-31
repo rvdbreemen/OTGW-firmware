@@ -268,10 +268,15 @@ class SatHeatPumpPwm(unittest.TestCase):
         r = self.run_sc("r3", SRC_GAS, 1800, 4, 0.50)
         self.assertEqual(r["req"], "1", "ON phase ended 30 s after its start, before the flame lit (R3)")
 
-    # --- Hybrid: unchanged by this task (entries 50/52 leave hybrids open) ---
-    def test_hybrid_unchanged(self):
-        self.assertMap(SRC_HYB, 2400, 3, 0.50, False, (600, 600))
-        self.assertMap(SRC_HYB, 2400, 3, 0.10, False, (180, 1620))
+    # --- TASK-1531, Sergeant D entry 188 (Q-1531a A): a hybrid takes the heat-pump PWM cycle ---
+    def test_hybrid_uses_the_heat_pump_cycle(self):
+        for hp_sec in (1800, 2400):
+            for ratio, flame in ((0.50, False), (0.10, False), (0.60, True), (0.03, True)):
+                with self.subTest(hp_sec=hp_sec, ratio=ratio):
+                    hyb = self.run_sc("map", SRC_HYB, hp_sec, 3, ratio, int(flame))
+                    hp = self.run_sc("map", SRC_HP, hp_sec, 3, ratio, int(flame))
+                    self.assertEqual((hyb["on"], hyb["off"]), (hp["on"], hp["off"]), (hyb, hp))
+        self.assertMap(SRC_HYB, 2400, 3, 0.50, False, (1200, 1200))
 
     # --- Setter: two options only (entry 30 "just 2 options"); old values snap to the nearer one ---
     def test_setter_snaps_to_two_options(self):
@@ -293,9 +298,10 @@ class SatHeatPumpPwm(unittest.TestCase):
                     self.assertEqual(int(r["period"]), period)
                     self.assertEqual(int(r["max"]), 3600 // period)
 
-    def test_cph_getter_hybrid_follows_gas(self):
+    def test_cph_getter_hybrid_period_from_hp_cycle_hour_limit_from_cph(self):
+        # entry 188: the PWM period follows the heat-pump cycle; the hourly start limit stays the gas one
         r = self.run_sc("getter", SRC_HYB, 1, 4)
-        self.assertEqual((int(r["max"]), int(r["period"])), (4, 900))
+        self.assertEqual((int(r["max"]), int(r["period"])), (4, 1800))
 
     def test_cph_getter_heat_pump_period_ignores_cph(self):
         for stored in (2, 3, 4, 6):

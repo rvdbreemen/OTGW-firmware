@@ -3,9 +3,11 @@ id: TASK-1531
 title: >-
   SAT: treat the Hybrid appliance type as a heat pump (scope per Sergeant D
   Q-1531a)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-31T18:51:00Z'
+updated_date: '2026-10-31T20:39:00Z'
 labels:
   - sat
   - beta.1
