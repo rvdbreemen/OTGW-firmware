@@ -26,6 +26,7 @@ from sat_curve_selftune_study import curve, TARGET, DT
 PMIN, PMAX, CLOOP, MCP = 3000.0, 24000.0, 250e3, 628.0
 BASE_OFF = 27.2
 TRACE_EVERY = 10
+EXCLUDE_PWM = False   # True: hours with SAT PWM active do not count as clean for the tuner
 UPPER, LOWER = 1200.0, 180.0
 DUTY_LO, DUTY_HI = LOWER / UPPER, 1 - LOWER / UPPER
 DUTY_MIN = DUTY_LO / 2
@@ -152,7 +153,7 @@ def run(args):
                 sq += err * err; n += 1; heat += qrad * DT
                 if abs(Ta - TARGET) > 0.3: out_band += 1
                 if Ta > TARGET + 0.3: over += 1
-        clean &= heating and not draw and sw < 50.0
+        clean &= heating and not draw and sw < 50.0 and not (EXCLUDE_PWM and pwm)
         if trace is not None and m % TRACE_EVERY == 0:
             trace.append((m / 60, round(tout, 2), round(Ta, 3), round(flow, 1), round(tret, 1), sp, round(P), int(pwm), c))
         if m % 60 == 59:

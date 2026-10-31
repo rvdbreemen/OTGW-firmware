@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-31T05:53:00Z'
-updated_date: '2026-10-31T08:39:00Z'
+updated_date: '2026-10-31T08:53:00Z'
 labels:
   - sat
   - design
@@ -45,4 +45,6 @@ Robert 2026-10-31 05:51 UTC in #alpha-testing (msg 1565966404304248853): 'I want
 2026-10-31 08:19 Robert: round 5 = firmware + thermo-nova settings for gas and heat pumps, explore the optimum, explain the current choice. 08:27 Robert: detect oscillation; estimate thermal mass from cool-down behaviour. Firmware defaults read: coeff 2.0, fOvershootMargin 2.0 (TASK-1268; thermo-nova 3.0), iCyclesPerHour 3, fMaxSetpoint 65 global, SAT_MAXTSET_HEAT_PUMP_CAP 40 (entry 155), SAT_MIN_SETPOINT 10, fFlameOffOffset 18, fModSupOffset 1.0. Round 3 first run had an unclamped setpoint (model error), rerun with the [10, 80] clamp; round 4 restarted after it.
 
 2026-10-31 simulation plan posted (msg 1566008766565195867): ~33,300 winters. R1 11,520 done; R2 5,940 done; R3 3,960 rerun (clamp); R4 1,200 queued (gas + HP30/HP60, PWM per heating_control.py:262-350); R5 10,656 (firmware settings, overshoot margin 2.0 vs 3.0, 8 houses x 3 sources x 3 starts x 2 seeds x 37 tuners: window 48/72/96 h, threshold 0.5/1/1.5, step 0.05/0.1, band none/+-0.4, + none); R6 36 winters + trace re-analysis (time-constant estimate from night cool-down, oscillation detection).
+
+2026-10-31 round 4 (indicative; boiler cycling not validated: flame fraction matches the field at 2000 W/K boiler gain, starts/h do not). Design rule found: exclude SAT-PWM hours from the tuner's clean hours. Eras 1983+, gas, KISS daily: PWM counted 20.5 writes / 4.0 flips / 271 min/d out of band (no tuner 262); PWM excluded 4.1 writes / 0.2 flips / 200 min/d, RMS 0.261 -> 0.215 (scratchpad curvesim/pwmtest.py, EXCLUDE_PWM flag in scripts/sat_curve_selftune_study4.py). Heat pump 30 %: tuner still slightly worse than none (0.212 vs 0.194 RMS), open. Gas effect of tuning < 1 %; aim-low saves 2-8 % HP electricity at a large comfort cost. Posted msg 1566012204472471723.
 <!-- SECTION:NOTES:END -->
