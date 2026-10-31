@@ -73,6 +73,7 @@ DESC = {
  "flame_off_offset": "Flame-off setpoint offset (C)",
  "overshoot_protection": "PWM overshoot protection: CS override in the PWM phases",
  "follow_thermostat": "SAT target follows the thermostat room setpoint",
+ "curve_self_tune": "Heating curve self-tune enabled (ADR-205): coefficient changes by 0.1 at most once a day",
  "flow_offset": "Flow-temperature offset applied (C)",
  "pressure": "System water pressure (bar)",
  "pressure_drop_rate": "Pressure drop rate (bar/min)",

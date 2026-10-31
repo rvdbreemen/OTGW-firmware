@@ -43,6 +43,7 @@ SAT_INO = Path(os.environ.get("OTGW_SAT_INO", SRC / "SATcontrol.ino"))
 
 STUBS = r"""
 #include <cstdint>
+static bool _sat_tuneGatesPassed = false;   // TASK-1525: set by the span of satControlLoopRun() under test
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

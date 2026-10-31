@@ -105,6 +105,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satovershootprotection":"In PWM, SAT overrides the control setpoint (CS) to keep the burner at its lowest level. Default on.",
 "satpushsetpoint":"Send the SAT target to the thermostat display (TC= override). A thermostat can refuse a remote setpoint; the SAT page then says so. Default off.",
 "satfollowthermostat":"A setpoint change on the wall thermostat becomes the SAT target. Needs SAT enabled.",
+"satcurveselftune":"Let SAT adjust the heating curve slope by 0.1 at most once a day, from the last 3 days of heating at low sun and without hot water. Every hour, day and change is logged. Off keeps the current slope. Default on.",
 "satmqttfallback":"When MQTT has been lost for more than 5 minutes, SAT controls the boiler until MQTT is back. Needs MQTT to have been connected once since boot. Off: the thermostat keeps control.",
 "satwindowdetect":"Lower the target to the Activity preset while a window is reported open (MQTT sat/window).",
 "satwindowminsec":"Seconds a window must stay open before SAT reacts, 10 to 600. Default 60.",

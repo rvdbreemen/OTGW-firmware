@@ -5,6 +5,8 @@ The firmware logs (telnet debug key '5', on by default):
   SATTICK room=.. target=.. out=.. curve=.. p=.. i=.. d=.. pid=.. cs=.. mm=.. ch=.. mode=.. pwm=.. duty=.. flame=.. flow=.. ret=..
   SATBOOT phase=decide|takeover ms=.. ...; SATMODE from= to=; SATTC push= | refused=; SATFOLLOW recorded=;
   SATDHW start|end (event column)
+  SATTUNEH hour= mean= ticks= counted= reason=; SATTUNED day= clean= counted= days_in_window= mean3= decision= reason=;
+  SATTUNER restored= coeff=; SATTUNE old= new= mean3=  (heating curve self-tune, TASK-1525)
 Each line starts with the device time "HH:MM:SS.uuuuuu". Output: one CSV per record type, columns = "time" plus the
 keys in the order of their first appearance. A capture transcript (capture-otgw / capture-mqtt-debug) works as input.
 
@@ -16,7 +18,7 @@ import re
 import sys
 from pathlib import Path
 
-KINDS = ("SATTICK", "SATBOOT", "SATMODE", "SATTC", "SATFOLLOW", "SATDHW")
+KINDS = ("SATTICK", "SATBOOT", "SATMODE", "SATTC", "SATFOLLOW", "SATDHW", "SATTUNEH", "SATTUNED", "SATTUNER", "SATTUNE")
 LINE = re.compile(r"^(\d\d:\d\d:\d\d\.\d+) .*?\b(" + "|".join(KINDS) + r") (.*)$")
 KV = re.compile(r"(\w+)=(\S+)")
 

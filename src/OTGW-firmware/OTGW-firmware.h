@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.571
+**  Version  : v2.0.0-alpha.572
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -369,6 +369,8 @@ bool satOwnsControlSetpoint();
 // command queue, so the CS= handler can refuse an EXTERNAL setpoint without refusing
 // SAT's own.
 bool satCommandInFlight();
+void satCurveTuneNoteManualChange();      // TASK-1525: a coefficient change that is not the self-tune's own empties its window
+void satCurveTuneSetHourS(uint32_t s);    // TASK-1525: simulation-only bench hook, tuner hour length in seconds
 void satOnThermostatSetpoint(float tr);  // TASK-1259: thermostat MsgID 16 Write-Data (T frame), edge detector for follow-thermostat
 void satClearSafetyTrip();  // TASK-1159: the one place a SAT safety trip is cleared
 void satPublishMQTT();

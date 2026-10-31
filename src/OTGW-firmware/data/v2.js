@@ -2071,6 +2071,7 @@
     satovershootprotection: { cat: 'sat', label: 'PWM overshoot protection' },
     satpushsetpoint:     { cat: 'sat', label: 'Push setpoint to thermostat' },
     satfollowthermostat: { cat: 'sat', label: 'Follow thermostat setpoint' },
+    satcurveselftune:    { cat: 'sat', label: 'Heating curve self-tune' },
     satmqttfallback:     { cat: 'sat', label: 'Take over when MQTT is lost' },
     satwindowdetect:     { cat: 'sat', label: 'Window detection' },
     satwindowminsec:     { cat: 'sat', label: 'Window min open time', hint: 'Seconds' },
@@ -2180,7 +2181,7 @@
     ['Season', ['satsummersimmer', 'satsummerthreshold', 'satsummerminhours', 'satwindowdetect', 'satwindowminsec']]
   ];
   var SAT_L3 = [
-    ['Curve', ['satcoefficient', 'sattempstep', 'satovershootmargin']],
+    ['Curve', ['satcoefficient', 'satcurveselftune', 'sattempstep', 'satovershootmargin']],
     ['PID / PWM', ['satovershootprotection', 'satcyclesperhour', 'satmaxmodulation',
                    'satinterval', 'sathpcycle', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],

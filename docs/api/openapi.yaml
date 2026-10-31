@@ -2917,6 +2917,10 @@ paths:
         - `dhw_demand` — triggers a DHW draw for `duration_s` (default 120 s,
           TASK-800): forces DHW-active (flame-steal, CH suppressed) so the cycle
           classifier sees DHW/MIXED cycles. `value` 0 + no duration cancels.
+        - `tune_hour` — bench hook for the heating curve self-tune (TASK-1525),
+          runtime only: `value` = tuner hour length in seconds (60..3600; 0 or more
+          restores 3600). Restarts the tuner with an empty window. Outside
+          simulation the hour is always 3600 s.
 
         `duration_s` is optional (default 600 s; 120 s for `dhw_demand`).
         `pressure_drop` is deferred (SATpressure coupling); `pv_surplus` has its
@@ -2932,7 +2936,7 @@ paths:
               properties:
                 event:
                   type: string
-                  enum: [window_open, solar_gain, sensor_noise, sensor_dropout, dhw_demand]
+                  enum: [window_open, solar_gain, sensor_noise, sensor_dropout, dhw_demand, tune_hour]
                   example: window_open
                 value:
                   type: number
@@ -4349,6 +4353,9 @@ components:
         follow_thermostat:
           type: boolean
           description: "A room setpoint change on the thermostat (MsgID 16 Write-Data) becomes the SAT target and clears an active preset. A value within 0.25 C of the last TC= SAT pushed is the SAT echo and is ignored while push_setpoint is on; with push on a change is adopted only when the previous thermostat value was within 0.25 C of it. Units with no stored value get the push_setpoint value. Settable through POST /api/v2/sat/follow_thermostat."
+        curve_self_tune:
+          type: boolean
+          description: "Heating curve self-tune (ADR-205, default on). SAT changes the curve coefficient by 0.1 at most once a day from the last 3 days of clean heating hours. Off keeps the current coefficient. Settable through POST /api/v2/sat/curve_self_tune."
         flame_off_offset:
           type: number
           description: "Flame-off setpoint offset (C)"
@@ -4574,6 +4581,7 @@ components:
         window_detection: false
         push_setpoint: false
         follow_thermostat: false
+        curve_self_tune: true
         flame_off_offset: 0.0
         overshoot_protection: true
         flow_offset: 2.0

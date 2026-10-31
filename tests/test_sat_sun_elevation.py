@@ -118,10 +118,83 @@ class SunElevation(unittest.TestCase):
         self.assertLess(self.elev(52.37, 4.90, noon - 4 * 3600), 12.0)
 
 
+STEP_MAIN = r"""
+struct SatS { float fWeatherLat = 0, fWeatherLon = 0; }; struct Sett { SatS sat; };
+struct SatT { float fSunElevation = 0; bool bSunElevationValid = false, bSunElevationLocal = false; uint32_t iSunElevLastMs = 0, iSunElevExtMs = 0; };
+struct Stt { SatT sat; };
+static Sett settings; static Stt state;
+// usage: t.exe lat lon  then steps: E:now:elev (external value) | S:now:ntp:epoch (satSunElevationStepAt)
+int main(int argc, char** argv) {
+  settings.sat.fWeatherLat = (float)atof(argv[1]); settings.sat.fWeatherLon = (float)atof(argv[2]);
+  for (int i = 3; i < argc; i++) {
+    unsigned long now; int ntp; long long ep; float el;
+    if (sscanf(argv[i], "E:%lu:%f", &now, &el) == 2) {
+      state.sat.fSunElevation = el; state.sat.bSunElevationValid = true; state.sat.iSunElevLastMs = (uint32_t)now;
+      state.sat.iSunElevExtMs = now ? (uint32_t)now : 1; state.sat.bSunElevationLocal = false;
+    } else if (sscanf(argv[i], "S:%lu:%d:%lld", &now, &ntp, &ep) == 3) satSunElevationStepAt((uint32_t)now, ntp != 0, ep);
+  }
+  printf("valid=%d local=%d elev=%.1f\n", (int)state.sat.bSunElevationValid, (int)state.sat.bSunElevationLocal, state.sat.fSunElevation);
+  return 0;
+}
+"""
+
+
+class SunElevationStep(unittest.TestCase):
+    """TASK-1525 review: the staleness rule of an external value lives in satSunElevationStep, not in satUpdateSolarGain."""
+
+    @classmethod
+    def setUpClass(cls):
+        src = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+        a, b = src.find("// --- satSunElevation begin"), src.find("// --- satSunElevation end")
+        c, d = src.find("// --- satSunElevationStep begin"), src.find("// --- satSunElevationStep end")
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.exe = None
+        cls.missing = min(a, b, c, d) < 0
+        if cls.missing:
+            return
+        cpp = Path(cls.tmp.name) / "s.cpp"
+        decl, _, rest = STEP_MAIN.partition("// usage")
+        cpp.write_text(STUBS + decl + src[a:b] + src[c:d] + "// usage" + rest, encoding="utf-8")
+        cls.exe = compile_cpp(cpp, Path(cls.tmp.name) / "s.exe")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def run_steps(self, lat, lon, *steps):
+        self.assertFalse(self.missing, "satSunElevationStepAt block not found in SATcontrol.ino")
+        if not self.exe:
+            self.skipTest("no host C++ compiler")
+        out = subprocess.run([str(self.exe), str(lat), str(lon), *steps], capture_output=True, text=True, check=True).stdout
+        return dict(kv.split("=") for kv in out.split())
+
+    H = 3600000
+
+    def test_stale_external_value_without_local_source_becomes_invalid(self):
+        r = self.run_steps(0, 0, "E:1000:30.0", f"S:{1000 + self.H - 1}:0:0")
+        self.assertEqual((r["valid"], r["elev"]), ("1", "30.0"), "still fresh just under 1 h")
+        r = self.run_steps(0, 0, "E:1000:30.0", f"S:{1000 + self.H + 1}:0:0")
+        self.assertEqual(r["valid"], "0")
+
+    def test_stale_external_value_without_ntp_becomes_invalid(self):
+        r = self.run_steps(52.37, 4.90, "E:1000:30.0", f"S:{1000 + self.H + 1}:0:0")
+        self.assertEqual(r["valid"], "0")
+
+    def test_stale_external_value_is_replaced_by_the_local_one(self):
+        r = self.run_steps(52.37, 4.90, "E:1000:30.0", f"S:{1000 + self.H + 1}:1:{utc(2026, 6, 21, 12, 0) - 3600}")
+        self.assertEqual((r["valid"], r["local"]), ("1", "1"))
+        self.assertNotEqual(r["elev"], "30.0")
+
+    def test_external_value_wins_while_fresh_even_with_a_location(self):
+        r = self.run_steps(52.37, 4.90, "E:1000:30.0", f"S:{1000 + self.H - 1}:1:{utc(2026, 6, 21, 12, 0)}")
+        self.assertEqual((r["valid"], r["local"], r["elev"]), ("1", "0", "30.0"))
+
+
+
 class SourceChecks(unittest.TestCase):
     def test_external_value_wins_while_fresh(self):
         src = SAT_INO.read_text(encoding="utf-8")
-        i = src.find("static void satSunElevationStep()")
+        i = src.find("static void satSunElevationStepAt(")
         self.assertGreater(i, 0)
         body = src[i:src.index("\n}\n", i)]
         self.assertRegex(body, r"iSunElevExtMs != 0 && \(uint32_t\)\(now - state\.sat\.iSunElevExtMs\) < 3600000UL\) return;")

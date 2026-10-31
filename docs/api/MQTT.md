@@ -600,6 +600,7 @@ State topics for the SAT boolean switches. Payloads are `"true"` / `"false"`. Al
 | `sat/overshoot_protection_enable` | PWM overshoot protection (start-up and modulation suppression) enable state |
 | `sat/push_setpoint_enable` | Push-setpoint enable state |
 | `sat/follow_thermostat_enable` | Follow-thermostat enable state: a setpoint change on the thermostat becomes the SAT target |
+| `sat/curve_self_tune_enable` | Heating curve self-tune enable state (`SATcurveselftune`) |
 | `sat/external_temp_enable` | Use the MQTT/REST indoor temperature (`sat/indoor_temp`) as the room source (`SATexternaltemp`) |
 | `sat/preset_sync_enable` | Preset-sync enable state |
 | `sat/dhw_enabled` | DHW heating enable state (`SATdhwenabled`): SAT sends the DHW setpoint only while on |
@@ -1054,6 +1055,7 @@ Payloads: `"true"` / `"false"`. Each of these corresponds to one of the auto-dis
 | `sat/push_setpoint` | `SATpushsetpoint` | Enable pushing setpoint changes to boiler |
 | `sat/external_temp` | `SATexternaltemp` | Prefer the MQTT/REST indoor temperature (`sat/indoor_temp`) over the thermostat room temperature. State: `sat/external_temp_enable` |
 | `sat/follow_thermostat` | `SATfollowthermostat` | A room setpoint change on the thermostat (MsgID 16) becomes the SAT target and clears an active preset. Defaults to the push-setpoint value on units with no stored value |
+| `sat/curve_self_tune` | `SATcurveselftune` | Heating curve self-tune on/off (default on): SAT changes the curve slope by 0.1 at most once a day, from the last 3 days of clean heating hours (ADR-205). State: `sat/curve_self_tune_enable` |
 | `sat/preset_sync` | `SATpresetsync` | Enable HA preset-sync subscription |
 | `sat/dhw_enabled` | `SATdhwenabled` | Enable DHW heating |
 | `sat/dhw_enable` | `SATdhwenable` | Master hot-water enable (`HW=`); only acted on with a storage tank (MsgID 3 HB3). Its switch is discovered only then |
@@ -1359,6 +1361,7 @@ Each switch publishes its state to `%mqtt_pub_topic%/<state topic>` and takes co
 | `-sat-dhw-enable` | `sat/dhw_enable` | `sat/dhw_enable` | `mdi:water-boiler`; announced only when the boiler reports a storage tank (MsgID 3 HB3) |
 | `-sat-overshoot-protection-enable` | `sat/overshoot_protection` | `sat/overshoot_protection_enable` | `mdi:shield-check` |
 | `-sat-follow-thermostat-enable` | `sat/follow_thermostat` | `sat/follow_thermostat_enable` | `mdi:thermostat` |
+| `-sat-curve-self-tune-enable` | `sat/curve_self_tune` | `sat/curve_self_tune_enable` | `mdi:auto-fix` |
 
 **Select entity (TASK-284):**
 

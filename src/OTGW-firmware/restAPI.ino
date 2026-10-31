@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.571
+**  Version  : v2.0.0-alpha.572
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1342,7 +1342,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     float   value = extractJsonField(body, F("value"), valBuf, sizeof(valBuf)) ? atof(valBuf) : 0.0f;
     int32_t durS  = extractJsonField(body, F("duration_s"), durBuf, sizeof(durBuf)) ? atoi(durBuf) : 0;
     if (!satSimInjectEvent(evtBuf, value, durS)) {
-      sendApiError(400, F("Unknown or unsupported event (window_open, solar_gain, sensor_noise, sensor_dropout, dhw_demand)"));
+      sendApiError(400, F("Unknown or unsupported event (window_open, solar_gain, sensor_noise, sensor_dropout, dhw_demand, tune_hour)"));
       return;
     }
     webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
@@ -1650,6 +1650,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATovershootprotection", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("follow_thermostat")) == 0) {
       updateSetting("SATfollowthermostat", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("curve_self_tune")) == 0) {
+      updateSetting("SATcurveselftune", val); handled = true;   // TASK-1525
     } else if (strcasecmp_P(settingName, PSTR("mqtt_fallback")) == 0) {
       updateSetting("SATmqttfallback", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("external_temp")) == 0) {
@@ -2270,6 +2272,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.overshoot_margin"), settings.sat.fOvershootMargin);
     je.field(F("settings.sat.overshoot_protection"), settings.sat.bOvershootProtection);
     je.field(F("settings.sat.follow_thermostat"), settings.sat.bFollowThermostat);
+    je.field(F("settings.sat.curve_self_tune"), settings.sat.bCurveSelfTune);   // TASK-1525
     je.field(F("settings.sat.mqtt_fallback"), settings.sat.bMqttFallback);
     je.field(F("settings.sat.dhw_setpoint"), settings.sat.fDhwSetpoint);
     je.field(F("settings.sat.user_max_setpoint"), settings.sat.fMaxTSetUser);
@@ -4001,6 +4004,7 @@ void sendDeviceSettings()
   addBool(F("satovershootprotection"), settings.sat.bOvershootProtection, "b");
   addBool(F("satpushsetpoint"),   settings.sat.bPushSetpoint, "b");
   addBool(F("satfollowthermostat"), settings.sat.bFollowThermostat, "b");
+  addBool(F("satcurveselftune"), settings.sat.bCurveSelfTune, "b");   // TASK-1525
   addBool(F("satmqttfallback"), settings.sat.bMqttFallback, "b");
   addBool(F("satwindowdetect"),   settings.sat.bWindowDetection, "b");
   addInt (F("satwindowminsec"),   settings.sat.iWindowMinOpenSec, "i", 10, 600);
@@ -4159,7 +4163,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satareaweight0", "satareaweight1", "satareaweight2", "satareaweight3",
   "satbleenable", "satbleriskack", "satblefailover", "satbleinterval", "satblemac",
   "satblenamefilteringest", "satblenameprefix",  // TASK-895 filter; TASK-1231 made them settable
-  "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient",
+  "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient", "satcurveselftune",
   "satdhwcapacity", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
   "satflameoffset", "satflowoffset", "satflushtreshold", "satfollowthermostat", "sathumiditytimeout",
   "satinterval", "satmanufacturer", "satmaxconsumption", "satmaxsetpoint", "satmaxpressdrop", "satmaxpressure",

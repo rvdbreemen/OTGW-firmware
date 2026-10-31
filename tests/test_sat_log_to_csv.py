@@ -47,7 +47,8 @@ class SourceHasRecords(unittest.TestCase):
     def test_event_records_present(self):
         for kind in ("SATBOOT phase=decide", "SATBOOT phase=boiler", "SATBOOT phase=outside", "SATBOOT phase=takeover",
                      "dhw=1", "SATMODE from=", "SATTC push=",
-                     "SATTC refused=", "SATFOLLOW recorded=", "SATDHW start", "SATDHW end"):
+                     "SATTC refused=", "SATFOLLOW recorded=", "SATDHW start", "SATDHW end",
+                     "SATTUNEH hour=", "SATTUNED day=", "SATTUNE old="):
             self.assertIn(kind, self.src, kind)
 
     def test_trace_level_is_a_separate_default_off_toggle(self):
@@ -72,6 +73,21 @@ class Parser(unittest.TestCase):
         self.assertEqual(rows[0]["time"], "10:04:38.127074")
         self.assertAlmostEqual(float(rows[0]["cs"]), 37.8)
         self.assertEqual(rows[0]["mm"], "100")
+
+    def test_tune_records_parse(self):
+        """TASK-1525: the three self-tune records, as the firmware prints them (see tests/test_sat_curve_selftune.py)."""
+        pre = "11:11:44.856188 (  76940| 31732) satTuneRoll(6192): "
+        rec = p.parse([
+            pre + "SATTUNEH hour=7 mean=1.25 ticks=120 counted=1 reason=none",
+            pre + "SATTUNEH hour=8 mean=na ticks=0 counted=0 reason=no_ticks",
+            pre + "SATTUNED day=2 clean=24 counted=1 days_in_window=3 mean3=1.50 decision=raise reason=outside_band",
+            pre + "SATTUNE old=2.0 new=2.1 mean3=1.50",
+        ])
+        self.assertEqual([r["reason"] for r in rec["SATTUNEH"]], ["none", "no_ticks"])
+        self.assertEqual(rec["SATTUNEH"][1]["mean"], "na")
+        self.assertEqual((rec["SATTUNED"][0]["decision"], rec["SATTUNED"][0]["mean3"]), ("raise", "1.50"))
+        self.assertEqual((rec["SATTUNE"][0]["old"], rec["SATTUNE"][0]["new"]), ("2.0", "2.1"))
+        self.assertEqual(len(rec["SATTUNE"]), 1, "SATTUNEH / SATTUNED lines are not SATTUNE lines")
 
     def test_transcript_to_csv_files(self):
         lines = [

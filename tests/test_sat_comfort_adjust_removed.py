@@ -81,7 +81,7 @@ class ComfortAdjustRemoved(unittest.TestCase):
         body = body[:body.index("default:")]
         cases = [int(c) for c in re.findall(r"^\s*case (\d+):", body, re.M)]
         self.assertEqual(cases, list(range(count)))
-        self.assertEqual(count, 12)
+        self.assertEqual(count, 13)   # TASK-1525 added the curve self-tune switch as case 12
         # the dhw_enable gate in the discovery loop still points at its case
         self.assertIn("if (swIdx == 10 && !dhwEnableSwitchAllowed) continue;", read("MQTTstuff.ino"))
         case10 = body[body.index("case 10:"):]

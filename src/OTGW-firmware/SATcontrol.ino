@@ -2628,15 +2628,27 @@ static float satSunElevationDeg(float latDeg, float lonDeg, int64_t utcEpoch)
 // TASK-1410: keep state.sat.fSunElevation current. An external MQTT value younger than 1 h wins; otherwise, with a
 // location set and NTP time, the elevation is computed here. Called on every control pass (the self-tune of
 // TASK-1525 needs it also when solar gain is off).
-static void satSunElevationStep()
+// --- satSunElevationStep begin
+// The step with its inputs given, so tests/test_sat_sun_elevation.py compiles it as it is. The staleness rule lives here
+// and not in satUpdateSolarGain(), which returns early (solar gain off, room invalid) before it: an external value older
+// than 1 h that cannot be replaced by a local computation (no NTP time, or latitude and longitude both 0) is invalid.
+static void satSunElevationStepAt(uint32_t now, bool ntpSet, int64_t epoch)
 {
-  const uint32_t now = millis();
-  if (state.sat.iSunElevExtMs != 0 && (uint32_t)(now - state.sat.iSunElevExtMs) < 3600000UL) return;
-  if (!isNTPtimeSet() || (settings.sat.fWeatherLat == 0.0f && settings.sat.fWeatherLon == 0.0f)) return;
-  state.sat.fSunElevation = satSunElevationDeg(settings.sat.fWeatherLat, settings.sat.fWeatherLon, (int64_t)time(nullptr));
+  if (state.sat.iSunElevExtMs != 0 && (uint32_t)(now - state.sat.iSunElevExtMs) < 3600000UL) return;   // external wins while fresh
+  if (!ntpSet || (settings.sat.fWeatherLat == 0.0f && settings.sat.fWeatherLon == 0.0f)) {
+    if (state.sat.bSunElevationValid && (uint32_t)(now - state.sat.iSunElevLastMs) > 3600000UL) state.sat.bSunElevationValid = false;
+    return;
+  }
+  state.sat.fSunElevation = satSunElevationDeg(settings.sat.fWeatherLat, settings.sat.fWeatherLon, epoch);
   state.sat.bSunElevationValid = true;
   state.sat.bSunElevationLocal = true;
   state.sat.iSunElevLastMs = now ? now : 1;
+}
+// --- satSunElevationStep end
+
+static void satSunElevationStep()
+{
+  satSunElevationStepAt(millis(), isNTPtimeSet(), (int64_t)time(nullptr));
 }
 
 // Float variant for sensor polling path (TASK-587)
@@ -3802,6 +3814,7 @@ void satSendStatusJSON()
     je.field(F("flame_off_offset"),     settings.sat.fFlameOffOffset);
     je.field(F("overshoot_protection"),  settings.sat.bOvershootProtection);
     je.field(F("follow_thermostat"),    settings.sat.bFollowThermostat);
+    je.field(F("curve_self_tune"),      settings.sat.bCurveSelfTune);   // TASK-1525
     je.field(F("flow_offset"),          settings.sat.fFlowOffset);
     je.field(F("pressure"),             snap->st.sat.fSmoothedPressure);
     je.field(F("pressure_drop_rate"),   snap->st.sat.fPressureDropRate);
@@ -4076,7 +4089,7 @@ void satPublishMQTT()
   static SATShadowB s_setpoint_sync, s_modulation_sync, s_ch_sync;
   static SATShadowB s_solar_gain_enable, s_summer_simmer_enable;
   static SATShadowB s_thermal_comfort, s_multi_area_enable;
-  static SATShadowB s_simulation_enable, s_window_detection_enable, s_overshoot_protection_enable, s_follow_thermostat_enable;
+  static SATShadowB s_simulation_enable, s_window_detection_enable, s_overshoot_protection_enable, s_follow_thermostat_enable, s_curve_self_tune_enable;
   static SATShadowB s_push_setpoint_enable, s_preset_sync_enable;
   static SATShadowB s_dhw_enabled, s_dhw_enable;
   // JSON-blob heartbeat counters (BSS zero-init == first-seen sentinel).
@@ -4524,6 +4537,7 @@ void satPublishMQTT()
   publishIfChangedB(F("sat/overshoot_protection_enable"), settings.sat.bOvershootProtection, s_overshoot_protection_enable, true);
   publishIfChangedB(F("sat/push_setpoint_enable"),    settings.sat.bPushSetpoint,     s_push_setpoint_enable,    true);
   publishIfChangedB(F("sat/follow_thermostat_enable"), settings.sat.bFollowThermostat, s_follow_thermostat_enable, true);
+  publishIfChangedB(F("sat/curve_self_tune_enable"), settings.sat.bCurveSelfTune, s_curve_self_tune_enable, true);   // TASK-1525
   publishIfChangedB(F("sat/preset_sync_enable"),      settings.sat.bPresetSync,       s_preset_sync_enable,      true);
   publishIfChangedB(F("sat/dhw_enabled"),             settings.sat.bDhwEnabled,       s_dhw_enabled,             true);
   publishIfChangedB(F("sat/dhw_enable"),              settings.sat.bDhwEnable,        s_dhw_enable,              true);
@@ -5323,6 +5337,496 @@ static void satUpdateSimulation()
   }
 }
 
+//=====================================================================
+//=== Heating curve self-tune (TASK-1525, ADR-205) ===
+//=====================================================================
+// Hourly evaluation, daily decision on the curve integral. Design: ADR-205, Sergeant D entries 160-180.
+// The tuner changes only settings.sat.fHeatingCurveCoeff; it never touches the PID terms (ADR-204).
+//
+// Signal variable (ADR-205 decision 1): signal = clamp(pidRaw, SAT_MIN_SETPOINT, satGetMaxSetpoint()) - curveValue,
+// where pidRaw is curve + P + I + D straight from satPidOutput() (the SATTICK "praw" field). The SATTICK "pid" field
+// is NOT used: it is the requested setpoint after zones, the solar offset and the MaxTSet clamp, so it carries more
+// than what the PID adds on top of the curve. pidRaw is before the PWM override as well, because PWM acts on the
+// control setpoint (finalSetpoint) later in the tick.
+//
+// Clock: an hour is a block of 3600 s on millis() (the tuner's own clock, not the wall clock); a day is 24 consecutive
+// tuner hours. The clock starts when the tuner starts (boot, switch on, SAT enabled); the window lives in RAM only.
+
+// --- satCurveTune begin (pure: no settings, no state, no Arduino calls; tests/test_sat_curve_selftune.py compiles it as it is)
+#define SAT_CT_WINDOW_DAYS      3      // counted days the decision looks at (entries 172, 175)
+#define SAT_CT_MIN_CLEAN_HOURS  6      // clean hours a day needs to count (entry 164)
+#define SAT_CT_HOURS_PER_DAY    24
+#define SAT_CT_SUN_MAX_DEG      12.0f  // clean hours need the sun below this (entry 161)
+#define SAT_CT_BAND_C           1.0f   // decision threshold, symmetric (entry 165)
+#define SAT_CT_STEP             0.1f   // fixed step (entry 165)
+#define SAT_CT_COEFF_MIN        0.1f   // coefficient setting range (settingStuff.ino, ADR-198)
+#define SAT_CT_COEFF_MAX        5.0f
+#define SAT_CT_DEFAULT_MIN_MOD  5.0f   // minimum modulation when MsgID 15 was never seen (entry 174)
+#define SAT_CT_MIN_TICK_FRACTION  0.75f  // an hour counts only with this share of its expected control ticks (hour length / control interval)
+// Hours with a lost room temperature: the signal is then 0 (curve only), which dilutes the mean. 0 = such hours still count,
+// 1 = they are excluded with reason no_room. Pending Sergeant D (Q-1525a); a bench or test build may define it as 1.
+#ifndef SAT_CT_EXCLUDE_ROOM_LOST
+#define SAT_CT_EXCLUDE_ROOM_LOST  0
+#endif
+
+enum SatTuneReason : uint8_t {
+  SATT_NONE = 0, SATT_NOT_SAT, SATT_DHW, SATT_NO_SUN, SATT_SUN, SATT_PWM, SATT_FLAME_OFF, SATT_MIN_MOD,
+  SATT_COEFF_CHANGED, SATT_NO_TICKS, SATT_NOT_CONTROLLING, SATT_FEW_TICKS, SATT_NO_ROOM
+};
+
+static const char* satTuneReasonName(uint8_t r)
+{
+  switch (r) {
+    case SATT_NONE:          return PSTR("none");
+    case SATT_NOT_SAT:       return PSTR("not_sat");
+    case SATT_DHW:           return PSTR("dhw");
+    case SATT_NO_SUN:        return PSTR("no_sun");
+    case SATT_SUN:           return PSTR("sun");
+    case SATT_PWM:           return PSTR("pwm");
+    case SATT_FLAME_OFF:     return PSTR("flame_off");
+    case SATT_MIN_MOD:       return PSTR("min_mod");
+    case SATT_COEFF_CHANGED: return PSTR("coeff_changed");
+    case SATT_NOT_CONTROLLING: return PSTR("not_controlling");
+    case SATT_FEW_TICKS:     return PSTR("few_ticks");
+    case SATT_NO_ROOM:       return PSTR("no_room");
+    default:                 return PSTR("no_ticks");
+  }
+}
+
+// What one control tick tells the tuner. Hot-water ticks and ticks while SAT is not the active controller carry no signal.
+struct SatTuneTickIn {
+  bool  satActive;     // SAT is the active controller
+  bool  dhw;           // hot water in progress (state.sat.bDhwActive)
+  bool  sunValid;      // a sun elevation is known
+  float sunElevation;  // degrees
+  bool  pwm;           // SAT is in PWM mode
+  bool  chOn;          // CH enabled (CH=1 sent)
+  bool  flameOn;
+  bool  roomLost;      // no valid room temperature on this tick (heating on the curve only)
+  float relMod;        // MsgID 17 relative modulation, %
+  float minMod;        // MsgID 15 low byte, %; 0 = never seen
+  float signal;        // curve integral sample, C (ignored for dhw / not-active ticks)
+};
+
+// First exclusion that applies to one tick, in the order of ADR-205 decision 2. SATT_NONE = the tick is clean.
+static uint8_t satTuneTickReason(const SatTuneTickIn& in)
+{
+  if (!in.satActive)                            return SATT_NOT_SAT;
+  if (in.dhw)                                   return SATT_DHW;
+  if (!in.sunValid)                             return SATT_NO_SUN;
+  if (in.sunElevation >= SAT_CT_SUN_MAX_DEG)  return SATT_SUN;
+  if (in.pwm)                                   return SATT_PWM;
+  if (in.chOn && !in.flameOn)                   return SATT_FLAME_OFF;
+  const float minMod = (in.minMod > 0.0f) ? in.minMod : SAT_CT_DEFAULT_MIN_MOD;
+  if (!(in.relMod > minMod))                    return SATT_MIN_MOD;   // also true when relMod is NaN
+#if SAT_CT_EXCLUDE_ROOM_LOST
+  if (in.roomLost)                              return SATT_NO_ROOM;
+#endif
+  return SATT_NONE;
+}
+
+struct SatTune {
+  // current hour
+  uint32_t ticks;        // ticks noted this hour
+  uint32_t sigTicks;     // ticks that carried a signal
+  float    sigSum;       // sum of the signals
+  uint8_t  reason;       // first exclusion seen this hour (SATT_NONE while every tick was clean)
+  bool     coeffChanged; // the coefficient changed during this hour
+  // current day
+  uint8_t  hoursInDay;
+  uint8_t  cleanInDay;
+  float    cleanSumInDay;   // sum of the signal means of the clean hours
+  // window of counted days
+  uint8_t  winDays;
+  uint8_t  winClean[SAT_CT_WINDOW_DAYS];
+  float    winSum[SAT_CT_WINDOW_DAYS];
+  // counters for the log
+  uint32_t hourNo;
+  uint32_t dayNo;
+};
+
+struct SatTuneHourOut {
+  uint32_t hour;
+  uint32_t ticks;
+  bool     haveMean;
+  float    mean;        // mean signal of the hour (all ticks that carried one)
+  bool     counted;
+  uint8_t  reason;
+  bool     dayComplete; // this hour was the last of the day: call satTuneCloseDay()
+};
+
+struct SatTuneDayOut {
+  uint32_t    day;
+  uint8_t     clean;        // clean hours of the day
+  bool        counted;
+  uint8_t     daysInWindow; // counted days the decision used (before a change empties the window)
+  bool        haveMean3;
+  float       mean3;
+  int8_t      decision;     // +1 raise, -1 lower, 0 hold
+  const char* reason;       // PSTR: why hold, or what drove the change
+  float       newCoeff;     // equals the old coefficient unless decision != 0
+};
+
+static void satTuneEmptyWindow(SatTune& t)
+{
+  t.winDays = 0;
+  for (uint8_t i = 0; i < SAT_CT_WINDOW_DAYS; i++) { t.winClean[i] = 0; t.winSum[i] = 0.0f; }
+}
+
+static void satTuneReset(SatTune& t)
+{
+  t.ticks = 0; t.sigTicks = 0; t.sigSum = 0.0f; t.reason = SATT_NONE; t.coeffChanged = false;
+  t.hoursInDay = 0; t.cleanInDay = 0; t.cleanSumInDay = 0.0f;
+  satTuneEmptyWindow(t);
+  t.hourNo = 0; t.dayNo = 0;
+}
+
+// Note one exclusion for the current hour. "First reason" means first in time: the earliest exclusion noted in the hour
+// stays, later ones (also other kinds, such as a tick path against a service mark) do not replace it.
+static void satTuneMarkReason(SatTune& t, uint8_t reason)
+{
+  if (t.reason == SATT_NONE) t.reason = reason;
+}
+
+// Add one control tick to the current hour.
+static void satTuneAddTick(SatTune& t, const SatTuneTickIn& in)
+{
+  t.ticks++;
+  const uint8_t r = satTuneTickReason(in);
+  if (r != SATT_NONE) satTuneMarkReason(t, r);
+  if (in.satActive && !in.dhw && isfinite(in.signal)) { t.sigSum += in.signal; t.sigTicks++; }
+}
+
+// A coefficient change: the current hour does not count. A manual change also empties the window and the clean-hour counters of
+// the current day (ADR-205 decision 7);
+// the tuner's own change empties it in satTuneCloseDay() instead.
+static void satTuneNoteCoeffChange(SatTune& t, bool manual)
+{
+  t.coeffChanged = true;
+  if (manual) { satTuneEmptyWindow(t); t.cleanInDay = 0; t.cleanSumInDay = 0.0f; }   // the day so far was on the old coefficient too
+}
+
+// Close the current hour and start the next. An hour counts with at least one tick that carried a signal and no exclusion.
+// minTicks = the least control ticks the hour needs (SAT_CT_MIN_TICK_FRACTION of the expected number).
+static void satTuneCloseHour(SatTune& t, SatTuneHourOut& out, uint32_t minTicks)
+{
+  if (t.coeffChanged) satTuneMarkReason(t, SATT_COEFF_CHANGED);
+  if (t.ticks == 0)   satTuneMarkReason(t, SATT_NO_TICKS);
+  else if (t.ticks < minTicks) satTuneMarkReason(t, SATT_FEW_TICKS);
+  out.hour     = t.hourNo;
+  out.ticks    = t.ticks;
+  out.haveMean = (t.sigTicks > 0);
+  out.mean     = out.haveMean ? t.sigSum / (float)t.sigTicks : 0.0f;
+  out.reason   = t.reason;
+  if (t.reason == SATT_NONE && !out.haveMean) out.reason = SATT_NO_TICKS;
+  out.counted  = (out.reason == SATT_NONE);
+  if (out.counted) { t.cleanInDay++; t.cleanSumInDay += out.mean; }
+  t.hoursInDay++;
+  t.hourNo++;
+  out.dayComplete = (t.hoursInDay >= SAT_CT_HOURS_PER_DAY);
+  t.ticks = 0; t.sigTicks = 0; t.sigSum = 0.0f; t.reason = SATT_NONE; t.coeffChanged = false;
+}
+
+static float satTuneClampCoeff(float c)
+{
+  if (c < SAT_CT_COEFF_MIN) return SAT_CT_COEFF_MIN;
+  if (c > SAT_CT_COEFF_MAX) return SAT_CT_COEFF_MAX;
+  return c;
+}
+
+// Close the day and decide. The mean is hour-weighted: the sum of all clean-hour means of the counted days in the window
+// divided by their number of clean hours. The decision runs once a day, on a counted day, when the window holds
+// SAT_CT_WINDOW_DAYS counted days. A change empties the window (3 new counted days are needed).
+static void satTuneCloseDay(SatTune& t, float coeff, SatTuneDayOut& out)
+{
+  out.day = t.dayNo;
+  out.clean = t.cleanInDay;
+  out.counted = (t.cleanInDay >= SAT_CT_MIN_CLEAN_HOURS);
+  out.decision = 0;
+  out.newCoeff = coeff;
+  out.haveMean3 = false;
+  out.mean3 = 0.0f;
+  out.reason = PSTR("day_not_counted");
+  if (out.counted) {
+    if (t.winDays >= SAT_CT_WINDOW_DAYS) {   // drop the oldest
+      for (uint8_t i = 1; i < SAT_CT_WINDOW_DAYS; i++) { t.winClean[i - 1] = t.winClean[i]; t.winSum[i - 1] = t.winSum[i]; }
+      t.winDays = SAT_CT_WINDOW_DAYS - 1;
+    }
+    t.winClean[t.winDays] = t.cleanInDay;
+    t.winSum[t.winDays]   = t.cleanSumInDay;
+    t.winDays++;
+    out.reason = PSTR("few_days");
+    if (t.winDays >= SAT_CT_WINDOW_DAYS) {
+      float sum = 0.0f; uint32_t n = 0;
+      for (uint8_t i = 0; i < SAT_CT_WINDOW_DAYS; i++) { sum += t.winSum[i]; n += t.winClean[i]; }
+      out.haveMean3 = (n > 0);
+      out.mean3 = (n > 0) ? sum / (float)n : 0.0f;
+      out.reason = PSTR("inside_band");
+      float target = coeff;
+      if (out.mean3 > SAT_CT_BAND_C)       { target = coeff + SAT_CT_STEP; out.decision = 1; }
+      else if (out.mean3 < -SAT_CT_BAND_C) { target = coeff - SAT_CT_STEP; out.decision = -1; }
+      if (out.decision != 0) {
+        target = satTuneClampCoeff(floorf(target * 100.0f + 0.5f) / 100.0f);
+        if (target == coeff) { out.decision = 0; out.reason = PSTR("at_limit"); }   // clamped: nothing to change, the window stays
+        else { out.newCoeff = target; out.reason = PSTR("outside_band"); out.daysInWindow = t.winDays; satTuneEmptyWindow(t); }
+      }
+    }
+    if (out.decision == 0 || out.newCoeff == coeff) out.daysInWindow = t.winDays;
+  } else {
+    out.daysInWindow = t.winDays;
+  }
+  t.dayNo++;
+  t.hoursInDay = 0; t.cleanInDay = 0; t.cleanSumInDay = 0.0f;
+}
+
+// Window file /sat_tune.json (item 4 of the TASK-1525 review, Sergeant D log entry 183): the counted days of the window and the
+// coefficient they belong to, written once a day at the daily decision. Hand-written JSON:
+//   {"coeff":2.10,"n":2,"c0":24,"s0":36.000,"c1":23,"s1":30.500}
+// The partial counters of the current day are not kept: at the daily decision they are zero.
+static void satTuneFormat(const SatTune& t, float coeff, char* out, size_t n)
+{
+  int pos = snprintf_P(out, n, PSTR("{\"coeff\":%.2f,\"n\":%u"), (double)coeff, (unsigned)t.winDays);
+  for (uint8_t i = 0; i < t.winDays && pos > 0 && (size_t)pos < n; i++)
+    pos += snprintf_P(out + pos, n - (size_t)pos, PSTR(",\"c%u\":%u,\"s%u\":%.3f"), (unsigned)i, (unsigned)t.winClean[i], (unsigned)i, (double)t.winSum[i]);
+  if (pos > 0 && (size_t)pos < n) snprintf_P(out + pos, n - (size_t)pos, PSTR("}"));
+}
+
+static bool satTuneJsonNum(const char* json, const char* key, double& v)
+{
+  char pat[12];
+  snprintf_P(pat, sizeof(pat), PSTR("\"%s\":"), key);
+  const char* p = strstr(json, pat);
+  if (!p) return false;
+  v = atof(p + strlen(pat));
+  return true;
+}
+
+// Restore the window from the file text. Only when the stored coefficient equals `coeff` (a manual change empties the window).
+// Returns the number of days restored; 0 = nothing restored (t is left empty).
+static uint8_t satTuneParse(const char* json, SatTune& t, float coeff)
+{
+  satTuneEmptyWindow(t);
+  double c = 0, n = 0;
+  if (!satTuneJsonNum(json, "coeff", c) || !satTuneJsonNum(json, "n", n)) return 0;
+  if (fabs(c - (double)coeff) > 0.005) return 0;
+  if (n < 1 || n > SAT_CT_WINDOW_DAYS) return 0;
+  for (uint8_t i = 0; i < (uint8_t)n; i++) {
+    char kc[4], ks[4];
+    snprintf_P(kc, sizeof(kc), PSTR("c%u"), (unsigned)i);
+    snprintf_P(ks, sizeof(ks), PSTR("s%u"), (unsigned)i);
+    double cv = 0, sv = 0;
+    if (!satTuneJsonNum(json, kc, cv) || !satTuneJsonNum(json, ks, sv) || cv < SAT_CT_MIN_CLEAN_HOURS || cv > SAT_CT_HOURS_PER_DAY) {
+      satTuneEmptyWindow(t);
+      return 0;
+    }
+    t.winClean[i] = (uint8_t)cv;
+    t.winSum[i] = (float)sv;
+  }
+  t.winDays = (uint8_t)n;
+  return t.winDays;
+}
+// --- satCurveTune end (pure)
+
+// File access for the window (LittleFS). Outside the extracted blocks: the host test stubs these three.
+static const char SAT_CT_FILE[] PROGMEM = "/sat_tune.json";
+static bool satTuneFileRead(char* buf, size_t n)
+{
+  File f = LittleFS.open(FPSTR(SAT_CT_FILE), "r");
+  if (!f) return false;
+  size_t len = f.readBytes(buf, n - 1);
+  buf[len] = 0;
+  f.close();
+  return true;
+}
+static void satTuneFileWrite(const char* json)
+{
+  File f = LittleFS.open(FPSTR(SAT_CT_FILE), "w");
+  if (!f) return;
+  f.print(json);
+  f.close();
+}
+static void satTuneFileRemove()
+{
+  if (LittleFS.exists(FPSTR(SAT_CT_FILE))) LittleFS.remove(FPSTR(SAT_CT_FILE));
+}
+
+// --- satCurveTune glue begin (settings, state, logging; tests/test_sat_curve_selftune.py compiles it against stubs)
+static SatTune  _sat_tune;
+static volatile bool _sat_tuneRunning = false;
+static uint32_t _sat_tuneHourStartMs = 0;
+static uint32_t _sat_tuneHourS       = 3600;   // runtime only, never persisted; shortened only in simulation (sim event tune_hour)
+// The tuner is writing the coefficient (loop task): that write is not a manual change. volatile because a REST/MQTT task reads it in
+// satCurveTuneNoteManualChange(). Remaining window: a manual write from another task that lands exactly while the loop task is
+// inside its own updateSetting() call (microseconds, once a day at most) is taken for the tuner's own and does not empty the window.
+static volatile bool _sat_tuneApplying = false;
+static bool     _sat_tuneBootRestoreTried = false;   // the window is read from flash once per boot
+static bool     _sat_tuneSim         = false;        // settings.sat.bSimulation when the tuner started
+static volatile bool _sat_tuneManualPending = false;  // set from any task (REST, MQTT), applied by satCurveTuneService() on the loop task
+
+// Hour length in ms. Outside simulation the hour is always 3600 s.
+static uint32_t satTuneHourMs()
+{
+  uint32_t s = settings.sat.bSimulation ? _sat_tuneHourS : 3600UL;
+  if (s < 60UL) s = 60UL;
+  if (s > 3600UL) s = 3600UL;
+  return s * 1000UL;
+}
+
+// Simulation-only bench hook (sim event tune_hour): hour length in seconds, 60..3600; 0 or more restores 3600.
+// The tuner restarts with an empty window so hours of different lengths never mix.
+void satCurveTuneSetHourS(uint32_t s)
+{
+  if (s == 0 || s > 3600UL) s = 3600UL;
+  if (s < 60UL) s = 60UL;
+  _sat_tuneHourS = s;
+  _sat_tuneRunning = false;
+}
+
+// The window is discarded: the file goes too. Simulation never touches the file (its days are not real).
+static void satTuneForgetFile()
+{
+  if (!settings.sat.bSimulation) satTuneFileRemove();
+}
+
+// Write the window after the daily decision (at most once a day). An empty window has no file.
+static void satTuneSaveWindow()
+{
+  if (settings.sat.bSimulation) return;
+  if (_sat_tune.winDays == 0) { satTuneFileRemove(); return; }
+  char buf[128];
+  satTuneFormat(_sat_tune, settings.sat.fHeatingCurveCoeff, buf, sizeof(buf));
+  satTuneFileWrite(buf);
+}
+
+// Once per boot, when the tuner first starts outside simulation: take the window back from flash if it belongs to the
+// current coefficient; otherwise the file is stale and goes.
+static void satTuneRestoreWindow()
+{
+  char buf[160];
+  if (!satTuneFileRead(buf, sizeof(buf))) return;
+  const uint8_t days = satTuneParse(buf, _sat_tune, settings.sat.fHeatingCurveCoeff);
+  SATDebugTf(PSTR("SATTUNER restored=%u coeff=%.2f\r\n"), (unsigned)days, (double)settings.sat.fHeatingCurveCoeff);
+  if (days == 0) satTuneFileRemove();
+}
+
+// Tick paths that return early from the control loop (boiler fault, thermal-safe, summer simmer, valves closed, OT link, restart
+// hold, MQTT fallback, safety): SAT is not controlling, the hour does not count (ADR-205 decision 2, "for the whole hour").
+static bool _sat_tuneGatesPassed = false;   // set by satControlLoopRun() once it is past its gates, read by satControlLoop()
+static void satCurveTuneNoteNotControlling()
+{
+  if (_sat_tuneRunning) satTuneMarkReason(_sat_tune, SATT_NOT_CONTROLLING);
+}
+
+// A coefficient change that did not come from the tuner (REST, MQTT, UI, settings load): empties the window, the hour does not count.
+void satCurveTuneNoteManualChange()
+{
+  if (_sat_tuneApplying) return;   // the tuner's own write (loop task)
+  _sat_tuneManualPending = true;
+}
+
+static void satTuneCoeffStr(char* out, size_t n, float c)
+{
+  const float tenths = c * 10.0f;
+  if (fabsf(tenths - floorf(tenths + 0.5f)) < 0.005f) snprintf_P(out, n, PSTR("%.1f"), (double)c);
+  else                                                snprintf_P(out, n, PSTR("%.2f"), (double)c);
+}
+
+// Hand the tuner's new coefficient to the settings path: the same updateSetting() a manual change uses, so the range
+// clamp, the debounced settings.ini write and the MQTT publish happen as for a manual change. Called only on a change.
+static void satTuneApplyCoeff(float newCoeff)
+{
+  char buf[12];
+  snprintf_P(buf, sizeof(buf), PSTR("%.2f"), (double)newCoeff);
+  _sat_tuneApplying = true;
+  updateSetting("SATcoefficient", buf);
+  _sat_tuneApplying = false;
+}
+
+static void satTuneLogHour(const SatTuneHourOut& h)
+{
+  char m[12];
+  if (h.haveMean) snprintf_P(m, sizeof(m), PSTR("%.2f"), (double)h.mean); else strlcpy(m, "na", sizeof(m));
+  SATDebugTf(PSTR("SATTUNEH hour=%lu mean=%s ticks=%lu counted=%d reason=%s\r\n"),
+             (unsigned long)h.hour, m, (unsigned long)h.ticks, (int)h.counted, satTuneReasonName(h.reason));
+}
+
+static void satTuneLogDay(const SatTuneDayOut& d)
+{
+  char m[12];
+  if (d.haveMean3) snprintf_P(m, sizeof(m), PSTR("%.2f"), (double)d.mean3); else strlcpy(m, "na", sizeof(m));
+  SATDebugTf(PSTR("SATTUNED day=%lu clean=%u counted=%d days_in_window=%u mean3=%s decision=%s reason=%s\r\n"),
+             (unsigned long)d.day, (unsigned)d.clean, (int)d.counted, (unsigned)d.daysInWindow, m,
+             d.decision > 0 ? PSTR("raise") : (d.decision < 0 ? PSTR("lower") : PSTR("hold")), d.reason);
+}
+
+// Close one tuner hour: hourly record, and at the end of the day the daily record and, on a decision, the change.
+static void satTuneRollHour()
+{
+  SatTuneHourOut h;
+  const uint32_t intervalMs = (settings.sat.iControlInterval > 0 ? (uint32_t)settings.sat.iControlInterval : 1UL) * 1000UL;
+  uint32_t minTicks = (uint32_t)ceilf((float)satTuneHourMs() / (float)intervalMs * SAT_CT_MIN_TICK_FRACTION);
+  if (minTicks < 1) minTicks = 1;
+  satTuneCloseHour(_sat_tune, h, minTicks);
+  satTuneLogHour(h);
+  if (!h.dayComplete) return;
+  const float oldCoeff = settings.sat.fHeatingCurveCoeff;
+  SatTuneDayOut d;
+  satTuneCloseDay(_sat_tune, oldCoeff, d);
+  satTuneLogDay(d);
+  if (d.decision == 0) { satTuneSaveWindow(); return; }
+  satTuneApplyCoeff(d.newCoeff);   // the one settings.ini write: only here, only on a change
+  satTuneSaveWindow();
+  char o[12], n[12];
+  satTuneCoeffStr(o, sizeof(o), oldCoeff);
+  satTuneCoeffStr(n, sizeof(n), settings.sat.fHeatingCurveCoeff);
+  SATDebugTf(PSTR("SATTUNE old=%s new=%s mean3=%.2f\r\n"), o, n, (double)d.mean3);
+  satNarratef_P(PSTR("Heating curve self-tune: coefficient %s -> %s (3-day mean %+.2f C %s the curve)"),
+                o, n, (double)d.mean3, d.decision > 0 ? PSTR("above") : PSTR("below"));
+}
+
+// Called every pass of satControlLoopRun(), before any early return. Starts, stops and rolls the tuner clock.
+static void satCurveTuneService(uint32_t nowMs)
+{
+  const bool want = settings.sat.bCurveSelfTune && satIsEnabled();
+  if (!want) {                                        // off, or SAT off: nothing is evaluated, the coefficient stays
+    if (_sat_tuneRunning) satTuneForgetFile();        // the window is gone, so is its file
+    _sat_tuneRunning = false; _sat_tuneManualPending = false;
+    return;
+  }
+  if (_sat_tuneRunning && settings.sat.bSimulation != _sat_tuneSim) {   // simulated days never feed a real decision (and the reverse)
+    _sat_tuneRunning = false;
+    satTuneForgetFile();                              // no-op when entering simulation; leaving it drops the pre-simulation file
+  }
+  if (!_sat_tuneRunning) {                            // (re)start with an empty window
+    satTuneReset(_sat_tune);
+    _sat_tuneManualPending = false;
+    _sat_tuneRunning = true;
+    _sat_tuneSim = settings.sat.bSimulation;
+    _sat_tuneHourStartMs = nowMs;
+    if (!_sat_tuneBootRestoreTried && !_sat_tuneSim) { _sat_tuneBootRestoreTried = true; satTuneRestoreWindow(); }
+  }
+  if (_sat_tuneManualPending) {                       // a manual coefficient change: this hour does not count, window and day counters empty
+    _sat_tuneManualPending = false;
+    satTuneNoteCoeffChange(_sat_tune, true);
+    satTuneForgetFile();
+  }
+  if (!state.sat.bActive || state.sat.bSafetyTripped) satTuneMarkReason(_sat_tune, SATT_NOT_SAT);
+  const uint32_t hourMs = satTuneHourMs();
+  uint8_t guard = 0;
+  while ((uint32_t)(nowMs - _sat_tuneHourStartMs) >= hourMs) {
+    if (++guard > 30) { _sat_tuneHourStartMs = nowMs; break; }   // a very long stall: resync, do not replay the hours
+    _sat_tuneHourStartMs += hourMs;
+    satTuneRollHour();
+  }
+}
+
+// One control tick (normal or hot water) for the current hour.
+static void satCurveTuneNoteTick(const SatTuneTickIn& in)
+{
+  if (_sat_tuneRunning) satTuneAddTick(_sat_tune, in);
+}
+// --- satCurveTune glue end
+
 // Scenario-event injector (TASK-797 / plan §12 F2). Called from the REST
 // handler. Returns false on unknown event or when simulation is inactive.
 // value/durationS are pre-parsed; durationS<=0 falls back to a default window.
@@ -5385,6 +5889,13 @@ bool satSimInjectEvent(const char* event, float value, int32_t durationS)
       if (state.sat.iSimDropoutExpiryMs == 0) state.sat.iSimDropoutExpiryMs = 1;
       SATDebugTf(PSTR("SAT SIM: sensor_dropout for %lds\r\n"), (long)(durMs / 1000UL));
     }
+    return true;
+  }
+  if (strcasecmp_P(event, PSTR("tune_hour")) == 0) {
+    // TASK-1525 bench hook, runtime only: value = heating curve self-tune hour length in seconds (60..3600;
+    // 0 or more restores 3600). Restarts the tuner with an empty window. Outside simulation the hour is 3600 s.
+    satCurveTuneSetHourS((uint32_t)(value > 0.0f ? value : 0.0f));
+    SATDebugTf(PSTR("SAT SIM: tune_hour %lu s\r\n"), (unsigned long)(value > 0.0f ? value : 0.0f));
     return true;
   }
   if (strcasecmp_P(event, PSTR("dhw_demand")) == 0) {
@@ -5801,13 +6312,16 @@ void satControlLoop()
 {
   satWsEventDrain();              // TASK-1337: SAT lines posted from any task, sent here (loop task)
   satPresetPersistIfChanged();    // TASK-1487: preset state file, written on the loop task
+  _sat_tuneGatesPassed = false;
   satControlLoopRun();
   satPublishCoreState();
+  if (!_sat_tuneGatesPassed) satCurveTuneNoteNotControlling();   // TASK-1525: a gate held SAT back this pass: the tuner hour does not count
 }
 
 static void satControlLoopRun()
 {
   satApplyControlStateReset();    // TASK-1414: a reset requested from any task (REST, MQTT, SAT itself) is applied here, once
+  satCurveTuneService(millis());  // TASK-1525: starts, stops and rolls the self-tune clock; before every early return
   // Deferred PID state restore (Task #222): satLoadPidState() is called at initSAT()
   // but NTP may not yet be synced at that point, so the restore is skipped there.
   // Retry here once after NTP becomes available so freshness can be verified.
@@ -5873,6 +6387,7 @@ static void satControlLoopRun()
 
   // TASK-1482 / TASK-1390: restart and outside-temperature gates (entries 121, 126, 129, 56, 57).
   if (satRestartStep()) return;
+  _sat_tuneGatesPassed = true;   // TASK-1525: every gate above (disabled, flashing, MQTT fallback, safety, OT link, restart) let SAT control this pass
   satMaxTSetSendStep();   // TASK-1373: SH= on a change of the user MaxTSet and once after a restart
   satMiStep();            // TASK-1371: MI=500 once, PIC boards only
   if (state.sat.eControlMode != SAT_MODE_OFF) satSavePwmEnabled(state.sat.eControlMode == SAT_MODE_PWM);   // TASK-1482, entry 121
@@ -5956,6 +6471,11 @@ static void satControlLoopRun()
       satNarrate_P(PSTR("Hot water: heating control paused"));
     }
     satPwmNoteDhwFlame(satIsFlameOn());            // a flame burning with the DHW bit set is a hot-water flame (entries 105, 106)
+    {   // TASK-1525: a hot-water tick returns early below, so the tuner is told here that this hour had hot water
+      SatTuneTickIn ti = {};
+      ti.satActive = true; ti.dhw = true;
+      satCurveTuneNoteTick(ti);
+    }
     _sat_prevDhwActive = true;
     SATDebugTf(PSTR("SATTICK target=%.1f mode=%d flame=%d flow=%.1f ret=%.1f dhw=1\r\n"),   // TASK-1521
                settings.sat.fTargetTemp, (int)state.sat.eControlMode, (int)satIsFlameOn(),
@@ -6010,6 +6530,7 @@ static void satControlLoopRun()
   if (OTcurrentSystemState.SlaveStatus & 0x01) { // Bit 0 = fault indication
     SATDebugTln(F("SAT: boiler fault flag detected, skipping control cycle"));
     _sat_cmdResendArmed = false;   // nothing is sent on this tick: no resend (TASK-1370)
+    satCurveTuneNoteNotControlling();   // TASK-1525
     satCycleSkipAutoSwitch();   // a skipped tick is not a qualifying overshoot sample (firmware choice: no thermo-nova fault skip, TASK-1367)
     return; // Skip this control cycle, let boiler handle the fault
   }
@@ -6029,6 +6550,7 @@ static void satControlLoopRun()
       float sysMax = satGetMaxSetpoint();
       if (state.sat.fFinalSetpoint > sysMax) state.sat.fFinalSetpoint = sysMax;
       _sat_lastControlCS = (float)(int)state.sat.fFinalSetpoint;   // the CS sent below is the previous CS (entry 112, TASK-1381)
+      satCurveTuneNoteNotControlling();   // TASK-1525
       if (hasOTCommandInterface()) {
         // TASK-1370: sent every tick. Thermal safe-fallback path.
         satSendCS((float)(int)state.sat.fFinalSetpoint);
@@ -6057,6 +6579,7 @@ static void satControlLoopRun()
   if (state.sat.bSummerActive && settings.sat.bSummerSimmer) {
     state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
     _sat_lastControlCS = SAT_MIN_SETPOINT;   // the CS sent below is the previous CS (entry 112, TASK-1381)
+    satCurveTuneNoteNotControlling();   // TASK-1525
     if (hasOTCommandInterface()) {
       // TASK-1370: sent every tick. Summer-simmer path.
       satSendCS(10.0f);
@@ -6071,6 +6594,7 @@ static void satControlLoopRun()
   // --- TRV valve detection (Task #29): skip heating when all valves closed ---
   if (!state.sat.bValvesOpen) {
     state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
+    satCurveTuneNoteNotControlling();   // TASK-1525
     satPwmDisableOnHeaterOff();   // heater state OFF in thermo-nova too (heating_control.py:69-70)
     if (hasOTCommandInterface()) {
       // TASK-1370: sent every tick. Valves-closed path.
@@ -6309,6 +6833,21 @@ static void satControlLoopRun()
   // flash. The explicit resets (satDisable, flush) still persist their zeros.
   if ((millis() - _pidLastSaveMs) >= 300000UL && satPidRoomSeen()) {
     satSavePidState();
+  }
+  {   // TASK-1525: heating curve self-tune sample, see the satCurveTune block (signal = clamp(praw) - curve)
+    SatTuneTickIn ti = {};
+    ti.satActive = true; ti.dhw = false;
+    ti.sunValid = state.sat.bSunElevationValid; ti.sunElevation = state.sat.fSunElevation;
+    ti.pwm = pwmMode;
+    ti.roomLost = !roomValid;
+    ti.chOn = (state.sat.iLastSentCH != 0); ti.flameOn = satIsFlameOn();
+    ti.relMod = OTcurrentSystemState.RelModLevel;
+    ti.minMod = (float)(OTcurrentSystemState.MaxCapacityMinModLevel & 0xFF);   // MsgID 15 low byte; 0 = never seen
+    float sigPid = pidRaw;
+    if (sigPid < SAT_MIN_SETPOINT) sigPid = SAT_MIN_SETPOINT;
+    if (sigPid > sysMax) sigPid = sysMax;
+    ti.signal = sigPid - curveValue;
+    satCurveTuneNoteTick(ti);
   }
   // TASK-1521: one key=value line per control tick (low volume), parsed by scripts/sat_log_to_csv.py.
   // praw = curve + p + i + d when rv=1 (p/i/d come from the last 60 s PID step); pid = requested setpoint after

@@ -3452,6 +3452,12 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
         PSTR("/sat/overshoot_protection"),    PSTR("/sat/overshoot_protection_enable"),
         PSTR("mdi:shield-check"));
       break;
+    case 12:   // TASK-1525: heating curve self-tune
+      published = streamSatBoolSwitch(ctx,
+        PSTR("-sat-curve-self-tune-enable"),  PSTR("_SAT_Curve_Self_Tune"),
+        PSTR("/sat/curve_self_tune"),         PSTR("/sat/curve_self_tune_enable"),
+        PSTR("mdi:auto-fix"));
+      break;
     default:
       return false;
   }
