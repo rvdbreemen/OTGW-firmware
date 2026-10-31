@@ -1,0 +1,23 @@
+TASK-1521 bench, OTGW32 .61, SAT simulation, 2026-10-31
+alpha.568 baseline 300 s: maxLoopGap 320 ms, minFree 40540, maxBlk 31732, 758 lines/min
+alpha.569 key5 only 300 s: maxLoopGap 316 ms, minFree 64824, maxBlk 36852, 240 lines/min, SATTICK 10, 'SAT loop:' 0
+alpha.569 key5+key8 300 s: maxLoopGap 317 ms, 825 lines/min (2953 satSimulationBlocksBusTx trace lines), 'SAT loop:' 10; key 8 toggled off again, REST sat_trace false
+SATTICK consistency: 15 rows rv=1, max |curve+p+i+d-praw| 0.01
+--- boot records
+13:01:04.815256 (  94396| 49140) satRestartSt(3463): SATBOOT phase=decide ms=12492 valid=1 pidload=1 ntp=1 tc=0
+13:01:04.815767 (  94396| 49140) satRestartSt(3469): SATBOOT phase=boiler ms=12492
+13:01:04.816134 (  94396| 49140) satRestartSt(3491): SATBOOT phase=outside ms=12492
+13:01:04.816489 (  94396| 49140) satRestartSt(3497): SATBOOT phase=takeover ms=12492 since_sat_start_ms=41
+--- events
+13:04:04.831969 (  82248| 36852) satControlLo(5902): SATDHW start
+13:04:04.834714 (  82248| 36852) satNarrate_P( 103): SAT: Hot water: heating control paused
+13:04:04.835311 (  82248| 36852) satControlLo(5907): SATTICK target=20.0 mode=1 flame=1 flow=0.0 ret=0.0 dhw=1
+13:04:34.834193 (  82296| 36852) satControlLo(5907): SATTICK target=20.0 mode=1 flame=0 flow=0.0 ret=0.0 dhw=1
+13:05:04.837114 (  78960| 36852) satControlLo(5921): SATDHW end
+13:05:04.838267 (  78960| 36852) satNarrate_P( 103): SAT: Hot water done: heating control resumes
+13:05:04.859416 (  78960| 36852) satEnqueueIf( 657): SATTC push=20.0
+13:05:04.861775 (  78960| 36852) satNarratef_( 113): SAT: Thermostat setpoint set to 20.0 (push setpoint)
+--- sample SATTICK
+12:49:37.761322 (  82040| 38900) satControlLo(6262): SATTICK room=19.98 raw=19.96 rv=1 target=20.0 out=8.8 osrc=S curve=21.23 p=0.00 i=0.00 d=1.69 praw=22.92 pid=22.92 cs=22.9 mm=100 ch=1 mode=1 pwm=0 duty=0.00 flame=0 flow=0.0 ret=0.0 dhw=0
+12:50:07.762765 (  81940| 38900) satControlLo(6262): SATTICK room=19.99 raw=19.99 rv=1 target=20.0 out=8.8 osrc=S curve=21.23 p=0.04 i=0.00 d=1.69 praw=22.96 pid=22.96 cs=23.0 mm=100 ch=1 mode=1 pwm=0 duty=0.00 flame=0 flow=0.0 ret=0.0 dhw=0
+12:50:37.766672 (  81896| 38900) satControlLo(6262): SATTICK room=19.97 raw=19.95 rv=1 target=20.0 out=8.8 osrc=S curve=21.23 p=0.04 i=0.00 d=1.69 praw=22.96 pid=22.96 cs=23.0 mm=100 ch=1 mode=1 pwm=0 duty=0.00 flame=0 flow=0.0 ret=0.0 dhw=0
