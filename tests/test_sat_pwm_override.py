@@ -333,6 +333,23 @@ int main(int argc, char** argv) {
            holdAfter, modeAfter, lastAfter, mmAfter, sus, rec);
     return 0;
   }
+  if (!strcmp(sc, "summer")) {             // TASK-1362: the real summer simmer block, dirty PWM state, then summer ends
+    settings.sat.bOvershootProtection = false; settings.sat.bSummerSimmer = true;
+    state.sat.eControlMode = SAT_MODE_PWM;
+    state.sat.bPwmFlameRequested = true; _pwm_flameOffHoldSetpoint = 48.0f; _pwm_waitingForFlame = true;
+    g_flameOffStart = g_ms - 600000UL; _pwm_lastUpdateMs = g_ms - 600000UL;
+    setPrev(45.0f); state.sat.iCurrentModulation = 55;
+    state.sat.bSummerActive = true;
+    summerRun();                           // the summer cutoff tick
+    const int reqAfter = (int)state.sat.bPwmFlameRequested; const float holdAfter = _pwm_flameOffHoldSetpoint;
+    const int modeAfter = state.sat.eControlMode; const float lastAfter = _sat_lastControlCS; const int waitAfter = (int)_pwm_waitingForFlame;
+    state.sat.bSummerActive = false;       // summer mode ends: the next tick decides PWM afresh
+    SETREQ(40.0f);
+    const float rec = tickRun(40.0f);
+    printf("req=%d hold=%.1f mode=%d last=%.1f wait=%d mm=%d recovery=%.1f\n", reqAfter, holdAfter, modeAfter, lastAfter, waitAfter,
+           state.sat.iCurrentModulation, rec);
+    return 0;
+  }
   if (!strcmp(sc, "solar")) {              // three ticks, no override (protection off), solar offset subtracted after each
     setPrev(48.0f); state.sat.fFinalSetpoint = 46.0f;
     float cs = 0;
@@ -436,6 +453,15 @@ def extract_switch_tick(src: str) -> str:
             "\n  g_swPwmOn = pwmOn; g_swDrives = pwmDrivesSetpoint;\n  return state.sat.fFinalSetpoint;\n}\n")
 
 
+def extract_summer(src: str) -> str:
+    """TASK-1362: the real summer simmer early-return block of satControlLoopRun(), compiled as summerRun()."""
+    a = src.index("  // --- Summer simmer (Task #24)")
+    b = src.index("  // --- TRV valve detection", a)
+    return ("\nstatic void satUpdateSummerSimmer() {}\nstatic void satSendCS(float) {}\nstatic void satSendMM(int) {}\n"
+            "static void satSendCH(int) {}\nstatic void satPublishMQTT() {}\n"
+            "static void summerRun() {\n" + src[a:b] + "\n}\n")
+
+
 def extract(src: str) -> str:
     a = src.index("static float    _pwm_effectiveBoilerTemp")
     b = src.index("// Last PWM off-phase duration in ms")
@@ -519,6 +545,7 @@ def build(workdir: Path):
         ("_sat_lastControlCS", "static float _sat_lastControlCS = 0;"),
         ("_sat_thermalSafeActive", "static bool _sat_thermalSafeActive = false;"),
         ("satPwmDisableOnHeaterOff", "static void satPwmDisableOnHeaterOff(){ }"),   # HEAD: no cutoff reaction
+        ("satCurveTuneNoteNotControlling", "static void satCurveTuneNoteNotControlling(){ }"),   # TASK-1525 tuner hook, not under test here
     ):
         if name not in body:   # HEAD lacks these: keep the harness compiling so the cases fail, not the build
             pre += stub + "\n"
@@ -543,7 +570,7 @@ def build(workdir: Path):
     if "_pwm_idle" in body:
         flag += "#define HAS_IDLE 1\n"
     chenable = (REPO / "src" / "OTGW-firmware" / "SATchEnable.h").as_posix()
-    cpp.write_text(flag + STUBS.replace("@FORCEFIELD@", "bool bForcePWM=false;" if has_force else "").replace("@AUTOFIELD@", "bool bPwmAutoSwitch=true;" if has_auto else "").replace("@CHENABLE@", chenable) + pre + body + cycles + extract_switch_tick(SAT_INO.read_text(encoding="utf-8")) + MAIN, encoding="utf-8")
+    cpp.write_text(flag + STUBS.replace("@FORCEFIELD@", "bool bForcePWM=false;" if has_force else "").replace("@AUTOFIELD@", "bool bPwmAutoSwitch=true;" if has_auto else "").replace("@CHENABLE@", chenable) + pre + body + cycles + extract_switch_tick(SAT_INO.read_text(encoding="utf-8")) + extract_summer(SAT_INO.read_text(encoding="utf-8")) + MAIN, encoding="utf-8")
     return compile_cpp(cpp, workdir / "t.exe")
 
 
@@ -867,6 +894,17 @@ class SatPwmOverride(unittest.TestCase):
         self.assertEqual(r["mode"], "1")
         self.assertEqual(float(r["recovery"]), 62.0)      # continuous marker, not the stale 45, after the valves reopen
 
+    # --- TASK-1362: the summer simmer cutoff resets PWM like the cold cutoff (ADR-199 open question 2, audit 49) ---
+    def test_summer_simmer_cutoff_disables_pwm_and_resets_its_state(self):
+        r = self.run_sc("summer", 0)
+        self.assertEqual((r["req"], float(r["hold"]), r["wait"], float(r["last"])), ("0", 0.0, "0", 10.0))
+        self.assertEqual(r["mode"], "1")                   # PWM off: continuous, as the cold cutoff
+        self.assertEqual(r["mm"], "80")                    # MM back to the maximum relative modulation
+
+    def test_summer_end_starts_a_fresh_decision_not_the_stale_held_cs(self):
+        r = self.run_sc("summer", 0)
+        self.assertEqual(float(r["recovery"]), 62.0)       # continuous marker, not the held 45 of the old PWM phase
+
     def test_refresh_idle_while_thermal_safe_fallback_active(self):
         self.assertEqual(self.run_sc("refresh", 1, "thermal")["sent"], "0")
 
@@ -973,6 +1011,15 @@ class ColdCutoffSource(unittest.TestCase):
         src = SAT_INO.read_text(encoding="utf-8")
         loop = src[src.index("void satControlLoop"):]
         block = loop[loop.index("if (!state.sat.bValvesOpen) {"):]
+        block = block[:block.index("return;")]
+        self.assertIn("satPwmDisableOnHeaterOff();", block)
+
+
+class SummerCutoffSource(unittest.TestCase):
+    def test_summer_simmer_block_calls_the_pwm_disable(self):
+        src = SAT_INO.read_text(encoding="utf-8")
+        loop = src[src.index("void satControlLoop"):]
+        block = loop[loop.index("if (state.sat.bSummerActive && settings.sat.bSummerSimmer) {"):]
         block = block[:block.index("return;")]
         self.assertIn("satPwmDisableOnHeaterOff();", block)
 

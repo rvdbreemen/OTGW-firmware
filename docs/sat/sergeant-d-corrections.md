@@ -5354,3 +5354,9 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Source:** Robert (maintainer), 2026-10-31, in session, interactive question on TASK-1458 (asked twice). Chosen: "Close as won't fix (parity)".
 
 **Decision:** with Thermal comfort on, the published `sat/summer_simmer_index` / `sat/summer_simmer_perception` stay the index of the control temperature (the index of the index), exactly as thermo-nova: `climate.py:244-245` publishes `SummerSimmer.index(self.current_temperature, ...)` and `current_temperature` returns the index under Thermal comfort (`climate.py:276-277`). Rejected: publishing from the raw room temperature (a deviation). The control path is not affected either way. **Task:** TASK-1458 (closed, won't fix). **Open:** none; Q-1458a withdrawn, not asked.
+
+## 190. Summer simmer cutoff leaves PWM like the cold cutoff (maintainer, 2026-10-31)
+
+**Source:** Robert (maintainer), 2026-10-31, in session, interactive question on TASK-1362. Chosen: "Merge now, inform Sergeant D". Confirms his own ADR-199 open-question-2 choice (A) of 2026-10-24.
+
+**Decision:** when the firmware-only summer simmer cutoff (kept by entry 32) turns heating off, SAT also disables PWM, resets its PWM state and sends MM back to the maximum, as the cold cutoff does (entry 12) and as thermo-nova's heater-OFF branch does (`heating_control.py:230-234`, `pwm.py:106-109`). Before, CS=10/CH=0 went out but PWM kept running, so one odd PWM period followed when summer mode ended. **Conflict noted:** this changes SAT control without Sergeant D's prior OK; Q-1362a is posted to him as a notice he can overrule. **Task:** TASK-1362. **Open:** Sergeant D's reaction to Q-1362a.
