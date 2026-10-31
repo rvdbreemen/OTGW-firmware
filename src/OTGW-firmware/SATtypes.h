@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.570
+**  Version  : v2.0.0-alpha.571
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -371,9 +371,11 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool     bSolarGainActive       = false;
   float    fIndoorRiseRate        = 0.0f;  // Current indoor temp rise rate (C/hr)
   // Sun elevation (Task #68)
-  float    fSunElevation          = 0.0f;  // Current sun elevation from HA (degrees)
+  float    fSunElevation          = 0.0f;  // Current sun elevation (degrees): external MQTT value, else computed (TASK-1410)
   bool     bSunElevationValid     = false; // Whether we have valid sun elevation data
   uint32_t iSunElevLastMs         = 0;     // Timestamp of last sun elevation update
+  uint32_t iSunElevExtMs          = 0;     // TASK-1410: time of the last external (MQTT) value; 0 = never
+  bool     bSunElevationLocal     = false; // TASK-1410: fSunElevation was computed from lat/lon + NTP time
   // Summer simmer (Task #24)
   bool     bSummerActive          = false;  // Summer mode currently suppressing heating
   float    fSummerHoursAbove      = 0.0f;   // Hours outdoor temp has been above threshold

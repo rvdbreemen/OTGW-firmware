@@ -2582,8 +2582,61 @@ bool satHandleSunElevation(const char* value)
   state.sat.fSunElevation = elev;
   state.sat.bSunElevationValid = true;
   state.sat.iSunElevLastMs = millis();
+  state.sat.iSunElevExtMs = state.sat.iSunElevLastMs ? state.sat.iSunElevLastMs : 1;   // TASK-1410: external wins while fresh
+  state.sat.bSunElevationLocal = false;
   SATTraceTf(PSTR("SAT: sun elevation set to %.1f deg\r\n"), elev);
   return true;
+}
+
+// --- satSunElevation begin
+// TASK-1410 (gruijter 2026-10-26, Robert's OK, entry 178): sun elevation computed from latitude, longitude and UTC
+// time with NOAA's solar calculator algorithm (Meeus, "Astronomical Algorithms", low-precision sun: mean longitude,
+// mean anomaly, equation of centre, apparent longitude, obliquity, then declination, equation of time and hour
+// angle). Accurate to about 0.01 degree for this century, no atmospheric refraction. thermo-nova reads HA's sun.sun
+// instead (climate.py:504-506). Pure: tests/test_sat_sun_elevation.py compiles it as it is.
+static float satSunElevationDeg(float latDeg, float lonDeg, int64_t utcEpoch)
+{
+  const double PI_ = 3.14159265358979323846, D2R = PI_ / 180.0;
+  const double jd = (double)utcEpoch / 86400.0 + 2440587.5;
+  const double T = (jd - 2451545.0) / 36525.0;                                               // Julian centuries J2000
+  const double L0 = fmod(280.46646 + T * (36000.76983 + T * 0.0003032), 360.0);              // mean longitude
+  const double M = 357.52911 + T * (35999.05029 - 0.0001537 * T);                            // mean anomaly
+  const double e = 0.016708634 - T * (0.000042037 + 0.0000001267 * T);                       // eccentricity
+  const double C = sin(M * D2R) * (1.914602 - T * (0.004817 + 0.000014 * T))
+                 + sin(2 * M * D2R) * (0.019993 - 0.000101 * T) + sin(3 * M * D2R) * 0.000289;  // equation of centre
+  const double omega = 125.04 - 1934.136 * T;
+  const double lambda = L0 + C - 0.00569 - 0.00478 * sin(omega * D2R);                      // apparent longitude
+  const double eps0 = 23.0 + (26.0 + (21.448 - T * (46.815 + T * (0.00059 - T * 0.001813))) / 60.0) / 60.0;
+  const double eps = eps0 + 0.00256 * cos(omega * D2R);                                      // corrected obliquity
+  const double decl = asin(sin(eps * D2R) * sin(lambda * D2R));                              // radians
+  const double y = tan(eps * D2R / 2.0) * tan(eps * D2R / 2.0);
+  const double eqTime = 4.0 / D2R * (y * sin(2 * L0 * D2R) - 2 * e * sin(M * D2R)
+                        + 4 * e * y * sin(M * D2R) * cos(2 * L0 * D2R)
+                        - 0.5 * y * y * sin(4 * L0 * D2R) - 1.25 * e * e * sin(2 * M * D2R)); // minutes
+  double secOfDay = fmod((double)utcEpoch, 86400.0);
+  if (secOfDay < 0) secOfDay += 86400.0;
+  const double tst = secOfDay / 60.0 + eqTime + 4.0 * lonDeg;                                 // true solar time, minutes
+  const double ha = (tst / 4.0 - 180.0) * D2R;                                                // hour angle
+  const double lat = latDeg * D2R;
+  double cz = sin(lat) * sin(decl) + cos(lat) * cos(decl) * cos(ha);
+  if (cz > 1.0) cz = 1.0;
+  if (cz < -1.0) cz = -1.0;
+  return (float)(90.0 - acos(cz) * 180.0 / PI_);
+}
+// --- satSunElevation end
+
+// TASK-1410: keep state.sat.fSunElevation current. An external MQTT value younger than 1 h wins; otherwise, with a
+// location set and NTP time, the elevation is computed here. Called on every control pass (the self-tune of
+// TASK-1525 needs it also when solar gain is off).
+static void satSunElevationStep()
+{
+  const uint32_t now = millis();
+  if (state.sat.iSunElevExtMs != 0 && (uint32_t)(now - state.sat.iSunElevExtMs) < 3600000UL) return;
+  if (!isNTPtimeSet() || (settings.sat.fWeatherLat == 0.0f && settings.sat.fWeatherLon == 0.0f)) return;
+  state.sat.fSunElevation = satSunElevationDeg(settings.sat.fWeatherLat, settings.sat.fWeatherLon, (int64_t)time(nullptr));
+  state.sat.bSunElevationValid = true;
+  state.sat.bSunElevationLocal = true;
+  state.sat.iSunElevLastMs = now ? now : 1;
 }
 
 // Float variant for sensor polling path (TASK-587)
@@ -5996,6 +6049,7 @@ static void satControlLoopRun()
   satPressureHealthUpdate();  // Task #226: update fBoilerPressure + sPressureStatus
 
   // --- Solar gain compensation (Task #23) ---
+  satSunElevationStep();   // TASK-1410: local sun elevation when no fresh external value
   satUpdateSolarGain();
 
   // --- Summer simmer (Task #24): skip heating if summer mode active ---
