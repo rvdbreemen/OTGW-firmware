@@ -7502,7 +7502,7 @@
       "title": "SAT heating curve self-tune: hourly evaluation, daily decision on the curve integral",
       "path": "ADR-205-sat-heating-curve-self-tune-hourly-evaluation-daily-decision-on-the-curve-integral.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-10-31",
       "decision_summary": "SAT gets an on/off self-tune, on by default, that evaluates every clean hour, logs it, and changes the heating curve...",
       "topics": [
@@ -7538,7 +7538,7 @@
         "must_not": [
           "Use the SAT PID integral or a derivative term as the signal (entries 163, 171).",
           "Count PWM hours, flame-off-with-CH hours or minimum-modulation hours, also not one-sided (rounds 5d-5g: selection bias drifts the curve up).",
-          "Run without a valid sun elevation (entry 160, interpretation).",
+          "Count hours without a valid sun elevation (entries 160, 178).",
           "Change the coefficient more than once per day or by more than 0.2 (entry 165)."
         ],
         "exceptions": [

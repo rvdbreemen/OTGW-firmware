@@ -1,7 +1,7 @@
 ---
 id: "ADR-205"
 title: "SAT heating curve self-tune: hourly evaluation, daily decision on the curve integral"
-status: "Proposed"
+status: "Accepted"
 date: "2026-10-31"
 binding: false
 gate: null
@@ -38,7 +38,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-10-31.
+Accepted, 2026-10-31.
 
 **Decision Makers:** Sergeant D (SAT design, entries 160-174) and Robert van den Breemen (maintainer, entries 173-176).
 Drafted by Agent: Claude from the TASK-1519 study.
@@ -61,6 +61,11 @@ status_history:
     status: Proposed
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-204
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-31
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: "Accepted by Robert in session 2026-10-31 (interactive question) and in #dev-sat-mqtt msg 1566083570903027713; design from Sergeant D entries 160-178"
     changed_via: adr-kit lifecycle
 ```
 
@@ -150,7 +155,7 @@ outside +-1.0 C of flow.
 - Use the SAT PID integral or a derivative term as the signal (entries 163, 171).
 - Count PWM hours, flame-off-with-CH hours or minimum-modulation hours, also not one-sided (rounds 5d-5g: selection
   bias drifts the curve up).
-- Run without a valid sun elevation (entry 160, interpretation).
+- Count hours without a valid sun elevation (entries 160, 178).
 - Change the coefficient more than once per day or by more than 0.2 (entry 165).
 
 ### Exceptions
@@ -193,22 +198,23 @@ outside +-1.0 C of flow.
 
 **Negative:**
 
-- **Blind spot:** in houses whose boiler or heat pump cannot modulate below the demand (2015, BENG), a curve far too
+- **Blind spot:** in houses whose boiler or heat pump cannot modulate below the demand (2015, BENG (the Dutch nearly-zero-energy building standard of 2021)), a curve far too
   low drives SAT into PWM and the tuner sees no clean hours. Mitigation: the log says so (entry 174); revisit with
   field data.
 - **Slower in mild winters:** fewer clean hours, so gas and 60 % heat pumps barely move in the mildest winters.
 - **A stored user setting changes without an explicit choice** when the default is on. Mitigation: small logged
   steps, the setting can be switched off, a manual change resets the window; Sergeant D asked (Q-1519i).
-- **Needs a sun elevation source.** The firmware gets it only over MQTT/REST (`SATcontrol.ino:2574-2588`); without it
-  the tuner does nothing. A local computation is TASK-1410.
+- **Needs a sun elevation source.** The firmware gets it only over MQTT (Message Queuing Telemetry Transport) or REST (Representational State Transfer) today (`SATcontrol.ino:2574-2588`);
+  without it the tuner holds and logs why. Mitigation: TASK-1410 (local sun elevation from latitude / longitude and
+  NTP (Network Time Protocol) time) is a prerequisite of the implementation (entry 178).
 - **Model limits.** Absolute coefficient values and all start and gas numbers are model-dependent (the boiler's own
   cycling is not validated: starts per hour 1.5 in the model, 2.5 in the field capture). The simulation used solar
   radiation < 50 W/m2 instead of the sun elevation rule.
 
 ## Open Questions
 
-- [ ] Q-1519i: is "on by default" also right for existing units, given entry 24 ("Leave existing settings alone")? Asked to Sergeant D 2026-10-31 (msg 1566080794131439660).
-- [ ] Should the tuner run without a sun elevation source until TASK-1410 lands (entry 160 interpretation says no)? Needs a maintainer decision.
+- [x] Q-1519i: is "on by default" also right for existing units, given entry 24 ("Leave existing settings alone")? Asked to Sergeant D 2026-10-31 (msg 1566080794131439660). — **Answered 2026-10-31 by Agent: Claude:** Sergeant D 2026-10-31 13:28 UTC (msg 1566081440956026972): A, on by default also for existing units; entry 177 confirms entry 176.
+- [x] Should the tuner run without a sun elevation source until TASK-1410 lands (entry 160 interpretation says no)? Needs a maintainer decision. — **Answered 2026-10-31 by User: Robert van den Breemen:** Robert (maintainer) 2026-10-31 in session (entry 178): no; without a valid sun elevation the tuner holds and logs it, and TASK-1410 (local sun elevation from lat/lon and NTP time) is a prerequisite of the implementation.
 
 ## Related Decisions
 

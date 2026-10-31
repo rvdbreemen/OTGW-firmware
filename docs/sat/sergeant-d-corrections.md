@@ -5262,3 +5262,31 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Source:** Robert (maintainer), 2026-10-31, in session, interactive question on the default of the self-tune on/off setting (his own requirement in the TASK-1519 description left the default "to be decided"). Chosen: "Standaard aan".
 
 **Decision (chosen option):** the self-tune is on by default. Rejected: off by default (opt-in), and on only for new installations. Evidence given with the question: safe in 20 winters (worst run +33 min/day outside +-0.3 C, 1-4 % of runs slightly worse), large gains only after a bad manual setting, little effect at the default 2.0, 2-3 writes of the coefficient to settings.ini per winter on average (at most 14), round 9 (`docs/sat/sim-1519/round5b-round7.md` section 9). **Relation to entry 24 (reported, not resolved by us):** entry 24 says "Leave existing settings alone" about migrating a stored coefficient to the new default 2.0 at an upgrade. A self-tune that is on by default changes a stored coefficient without the user's explicit choice, gradually and logged. We read entry 24 as being about a one-time migration, so this is no direct conflict, but the principle touches it; Sergeant D is asked whether he objects. Compared: thermo-nova has no tuner. **Task:** TASK-1519 (ADR-205). **Open:** Sergeant D's view on entry 24 vs this default.
+
+## 177. Q-1519i A: the self-tune is on by default, also for existing units (2026-10-31; confirms entry 176)
+
+**Source:** sergeantd, 2026-10-31 13:28 UTC, #dev-sat-mqtt, msg 1566081440956026972 (https://discord.com/channels/812969634638725140/1105556725714649128/1566081440956026972), answer to Q-1519i (msg 1566080794131439660).
+
+**Quoted:** "@BlueFlame Bot Q-1519i: A"
+
+**Settled (option A as posted):** the self-tune is on by default, also on existing units after an update; entry 24 ("Leave existing settings alone") was about a one-time migration of the default and does not forbid a tuner. Confirms entry 176 (Robert). Compared: thermo-nova has no tuner. **Task:** TASK-1519 (ADR-205). **Open:** none.
+
+## 178. TASK-1519: without a sun elevation source the self-tune holds; the local sun elevation (TASK-1410) comes first (maintainer, 2026-10-31)
+
+**Source:** Robert (maintainer), 2026-10-31, in session, interactive question (ADR-205 open question 2). Chosen: "Wachten + TASK-1410 eerst".
+
+**Decision (chosen option):** without a valid sun elevation the self-tune does not count hours and logs "no sun elevation" (entry 160, interpretation, now a decision). TASK-1410 (local sun elevation from latitude / longitude and NTP time, an external MQTT value keeps precedence while fresh) becomes a prerequisite of the self-tune implementation, so the tuner works for every unit at release. This also gives TASK-1410 the maintainer OK its description asked for. Rejected: only holding (the tuner would be on but idle for units without Home Assistant's sun), and a fixed time-of-day window as a fallback (an approximation: around noon the sun is above 12 degrees in November and February, below in December). Compared: thermo-nova reads the sun from Home Assistant's sun.sun (TASK-1410 description, `climate.py:504-506`, not re-opened in this session). **Task:** TASK-1519, TASK-1410. **Open:** none.
+
+## 179. Honour OpenTherm MsgID 3 HB bit 4 in SAT: build it after Sergeant D's OK (maintainer, 2026-10-31)
+
+**Source:** Robert (maintainer), 2026-10-31, in session, interactive question on the AFS gap found in `docs/sat/sim-1519/evaluation-2026-10-31.md` (section 3, improvement 1). Chosen: "Direct bouwen" (SAT does not enter PWM when bit 4 = 1, after Sergeant D's OK, without first collecting tester data).
+
+**Decision (chosen option):** a boiler that reports MsgID 3 HB bit 4 = 1 ("Master low-off & pump control function: not allowed", OpenTherm protocol spec v4.2 `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.md:1610`; AFS v1.1f 2.1.1.2.10: "It's mandatory for the master to read ID3 at start-up and check bit 4") does not get SAT PWM; SAT stays in modulating control. The firmware reads the bit only for MQTT today (`OTGW-Core.ino:3168-3186`); thermo-nova only shows it as a binary sensor (`coordinator/serial/binary_sensor.py:54`, from the research agent, not re-opened). Rejected: first collecting the bit from testers; parking it. Because thermo-nova does not do this, it is a firmware addition that needs Sergeant D's OK first (ADR-196); asked as Q-1519j. **Task:** TASK-1412.4 (already in the low-load epic; a duplicate filed the same day was archived). **Open:** Sergeant D's OK, asked within the TASK-1412 sequence.
+
+## 180. Sergeant D accepts ADR-205 (SAT heating curve self-tune) (2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 13:46 UTC, #dev-sat-mqtt, msg 1566085956145123349 (https://discord.com/channels/812969634638725140/1105556725714649128/1566085956145123349), after reading ADR-205 (msg 1566081500615806980) and Robert's acceptance (msg 1566083570903027713).
+
+**Quoted:** "@BlueFlame Bot @Robert van den Breemen I read it and I accept this ADR"
+
+**Settled:** ADR-205 as written (Accepted 2026-10-31 by Robert in session) matches what Sergeant D meant; no change requested. Compared: thermo-nova has no tuner. **Task:** TASK-1519, TASK-1525 (implementation). Robert 13:47 UTC (msg 1566086252254601217): build it before beta.1, priority high. **Open:** none.

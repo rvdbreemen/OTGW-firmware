@@ -3,11 +3,11 @@ id: TASK-1519
 title: >-
   SAT: design and plan an hourly heating-curve self-tune with Sergeant D
   (opt-in, logged); revisits entry 72
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-31T05:53:00Z'
-updated_date: '2026-10-31T13:28:00Z'
+updated_date: '2026-10-31T13:53:00Z'
 labels:
   - sat
   - design
@@ -24,9 +24,9 @@ Robert 2026-10-31 05:51 UTC in #alpha-testing (msg 1565966404304248853): 'I want
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Sergeant D's answers on the design points recorded in docs/sat/sergeant-d-corrections.md (entry 72 is revisited by name)
-- [ ] #2 An ADR (adr-kit) records the design: signal, step, bounds, blocks, write cadence, setting and default
-- [ ] #3 Implementation tasks filed from the ADR with host-test ACs (red/green) and a bench AC
+- [x] #1 Sergeant D's answers on the design points recorded in docs/sat/sergeant-d-corrections.md (entry 72 is revisited by name)
+- [x] #2 An ADR (adr-kit) records the design: signal, step, bounds, blocks, write cadence, setting and default
+- [x] #3 Implementation tasks filed from the ADR with host-test ACs (red/green) and a bench AC
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -62,3 +62,15 @@ Robert 2026-10-31 05:51 UTC in #alpha-testing (msg 1565966404304248853): 'I want
 
 2026-10-31 ADR-205 drafted (Proposed) via adr-kit: curve integral, clean-hour rule (PWM, flame off with CH, modulation <= ID15 minimum, DHW, sun elevation < 12, SAT in charge), daily on 3 counted days (>= 6 clean h), +-1.0 C, step 0.1, clamp 0.1-5.0, PID untouched (ADR-204), persist on change, hourly/daily/change log, on by default. Strict lint 0 FAIL. Related to ADR-198 and ADR-204 (adr relate, both sides). Entry 176 (Robert: default on); Q-1519i to Sergeant D (entry 24 'leave existing settings alone'). Open in ADR: Q-1519i; run without sun elevation source until TASK-1410? (maintainer). AC #1 (answers recorded) done except Q-1519i; AC #2 ADR drafted, not accepted; AC #3 implementation tasks pending acceptance.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Design and plan for the SAT heating-curve self-tune, settled with Sergeant D one question at a time and tested in simulation.
+
+AC1: Sergeant D's answers recorded as entries 160-180 in docs/sat/sergeant-d-corrections.md (Q-1519a-i; maintainer decisions 173-176, 178-179 marked as such); entry 72 (removal of the old auto-tune) is revisited by name in ADR-205 Context and in entries 160ff.
+AC2: ADR-205 'SAT heating curve self-tune: hourly evaluation, daily decision on the curve integral' created and accepted through adr-kit (adr new / answer / accept --confirm; strict lint 0 FAIL; related to ADR-198 and ADR-204 on both sides). Accepted by Robert in session and in #dev-sat-mqtt (msg 1566083570903027713); Sergeant D accepted it 13:46 UTC (entry 180). Decision: curve integral only; clean hours exclude PWM, flame off with CH, minimum modulation, DHW, sun >= 12 deg or no sun elevation; daily on 3 counted days, +-1.0 C, step 0.1, clamp 0.1-5.0; PID untouched (ADR-204); persist on change; hourly/daily/change log; on by default.
+AC3: TASK-1525 filed (priority high, before beta.1, depends on TASK-1410) with host-test ACs red/green against the real tuner functions, log-record ACs and a bench AC. Follow-ups: TASK-1527 (heat pumps at low load: minimum compressor starts, maximum comfort), TASK-1412.4 note (MsgID 3 HB bit 4, entry 179).
+
+Evidence: ~50,000 simulated winters, rounds 1-11 (docs/sat/sim-1519/round5b-round7.md sections 1-9, evaluation-2026-10-31.md incl. rounds 10-11); scripts scripts/sat_curve_selftune_study*.py; data docs/sat/sim-1519/data/; round 5 reproduced bit-exact after every model change, repo scripts reproduced scratch runs (0 diffs, 1,455 runs), round 9 2024-25 = round 8 (300/300). Not verified: absolute coefficient values and start/gas numbers (boiler cycling not validated against the field; starts/h 1.5 model vs 2.5 field); the firmware implementation (TASK-1525).
+<!-- SECTION:FINAL_SUMMARY:END -->
