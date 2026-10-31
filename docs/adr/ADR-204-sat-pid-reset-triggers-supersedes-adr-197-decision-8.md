@@ -11,6 +11,7 @@ supersedes: []
 superseded_by: null
 related:
   - "ADR-197"
+  - "ADR-205"
 topics:
   - "sat"
   - "pid"
@@ -64,6 +65,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: Maintainer OK in session 2026-10-30 (TASK-1414); Sergeant D entry 73 Q23 'follow thermo-nova'
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-31
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-205
     changed_via: adr-kit lifecycle
 ```
 

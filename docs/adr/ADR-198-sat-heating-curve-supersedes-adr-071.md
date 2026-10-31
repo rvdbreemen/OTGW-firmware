@@ -10,6 +10,8 @@ verified_in: []
 supersedes:
   - "ADR-071"
 superseded_by: null
+related:
+  - "ADR-205"
 topics:
   - "sat"
   - "heating-curve"
@@ -62,6 +64,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: Superseded by ADR-198, accepted by the maintainer 2026-10-28
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-31
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-205
     changed_via: adr-kit lifecycle
 ```
 

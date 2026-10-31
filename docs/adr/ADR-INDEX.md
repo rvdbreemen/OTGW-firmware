@@ -210,3 +210,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-202 | Proposed | - | One standard-library Python program, scripts/otgwcapture.py, replaces both payloads. |
 | ADR-203 | Accepted | - | While SAT is the active controller, a 5 s resend timer sends the latest CS=, MM= and CH= values again, unchanged valu... |
 | ADR-204 | Accepted | - | SAT resets exactly the integral and the raw derivative of the main PID, and the integral of every zone PID, on the tr... |
+| ADR-205 | Proposed | - | SAT gets an on/off self-tune, on by default, that evaluates every clean hour, logs it, and changes the heating curve... |
