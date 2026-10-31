@@ -40,6 +40,14 @@ STUBS = r"""
 #define PSTR(x) x
 #define SATDebugTln(x) ((void)0)
 #define SATDebugTf(...) ((void)0)
+// TASK-1521 log helpers
+static void satNarrate_P(const char*) {}
+static void satNarratef_P(const char*, ...) {}
+static bool _sat_followNarrPending = false;
+static bool _sat_narrAtMax = false;
+static bool _sat_narrCold = false;
+static bool _sat_bootBoilerLogged = false;
+static bool _sat_bootOutsideLogged = false;
 enum SATPreset { SAT_PRESET_NONE = 0, SAT_PRESET_AWAY = 1, SAT_PRESET_ECO = 2 };
 struct SatSettings { bool bEnabled=true, bFollowThermostat=true, bPushSetpoint=false; float fTargetTemp=21.0f; };
 struct Settings { SatSettings sat; };

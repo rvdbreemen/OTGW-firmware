@@ -58,6 +58,8 @@ typedef const char* PGM_P;
 #include <strings.h>
 #endif
 #define DebugTf(...) ((void)0)
+#define SATTraceTf(...) ((void)0)
+#define SATTraceTln(x) ((void)0)
 #define strcasecmp_P strcasecmp
 #define strcmp_P strcmp
 #define snprintf_P snprintf

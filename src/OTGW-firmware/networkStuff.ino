@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.568
+**  Version  : v2.0.0-alpha.569
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -599,9 +599,10 @@ static void sendTelnetBanner(const char* ip)
     state.debug.bMQTTGate ? "1" : "0",
     state.debug.bNTP      ? "1" : "0");
 #endif
-  _debugPrintf_P(PSTR("    d SensorSim [%s]    OTGW-Sim    [%s]\r\n"),
+  _debugPrintf_P(PSTR("    d SensorSim [%s]    OTGW-Sim    [%s]    8 SATtrace  [%s]\r\n"),
     state.debug.bSensorSim       ? "1" : "0",
-    state.debug.bOTGWSimulation  ? "1" : "0");
+    state.debug.bOTGWSimulation  ? "1" : "0",
+    state.debug.bSATTrace        ? "1" : "0");
   debugTelnet.println(F("--------------------------------------------"));
   debugTelnet.println(F("  Press 'h' for command menu."));
   _debugPrintf_P(PSTR("  Connected from: %s\r\n"), ip);

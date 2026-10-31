@@ -170,6 +170,7 @@ static void dumpDebugInfo() {
     Debugf(PSTR("sensor_sim: %s\r\n"), state.debug.bSensorSim ? "true" : "false");
     Debugf(PSTR("otgw_sim: %s\r\n"), state.debug.bOTGWSimulation ? "true" : "false");
     Debugf(PSTR("sat: %s\r\n"), state.debug.bSAT ? "true" : "false");
+    Debugf(PSTR("sat_trace: %s\r\n"), state.debug.bSATTrace ? "true" : "false");
     Debugf(PSTR("otdirect: %s\r\n"), state.debug.bOTDirect ? "true" : "false");
 #if HAS_SAT_BLE
     Debugf(PSTR("sat_ble: %s\r\n"), state.debug.bSATBLE ? "true" : "false");
@@ -298,6 +299,7 @@ void handleDebugChar(char c){
                 Debugln(F("  1) OT message parsing       2) REST API handling"));
                 Debugln(F("  3) MQTT module              4) Sensor modules"));
                 Debugln(F("  5) SAT control loop         6) OTDirect frame handling"));
+                Debugln(F("  8) SAT high-volume trace (per pass, PID detail; default off)"));
 #if HAS_SAT_BLE
                 Debugln(F("  7) SAT BLE sensor scan"));
 #endif
@@ -407,6 +409,10 @@ void handleDebugChar(char c){
             case '5':
                 state.debug.bSAT = !state.debug.bSAT;
                 DebugTf(PSTR("\r\nDebug SAT: %s\r\n"), CBOOLEAN(state.debug.bSAT));
+                break;
+            case '8':
+                state.debug.bSATTrace = !state.debug.bSATTrace;
+                DebugTf(PSTR("\r\nDebug SAT trace (high volume): %s\r\n"), CBOOLEAN(state.debug.bSATTrace));
                 break;
             case '6':
                 state.debug.bOTDirect = !state.debug.bOTDirect;

@@ -19,6 +19,9 @@
 #define SATDebugTf(fmt, ...)  do { if (state.debug.bSAT) DebugTf(fmt,  ##__VA_ARGS__); } while(0)
 #define SATDebugTln(s)        do { if (state.debug.bSAT) DebugTln(s);                  } while(0)
 #define SATDebugf(fmt, ...)   do { if (state.debug.bSAT) Debugf(fmt,   ##__VA_ARGS__); } while(0)
+// High-volume SAT trace (per pass, PID detail), key '8', default off (TASK-1521)
+#define SATTraceTf(fmt, ...)  do { if (state.debug.bSATTrace) DebugTf(fmt, ##__VA_ARGS__); } while(0)
+#define SATTraceTln(s)        do { if (state.debug.bSATTrace) DebugTln(s);                 } while(0)
 
 // --- Cycle Kind & Phase enums are in OTGW-firmware.h ---
 
@@ -466,7 +469,7 @@ void satGetWindow4hStats()
     state.sat.f4hFlowRetDeltaP90 = deltas[idx90];
   }
 
-  SATDebugTf(PSTR("SAT 4h: n=%u avgOn=%.0fs avgOff=%.0fs flow=%.1f duty=%.2f overshoot=%.2f underheat=%.2f dP50=%.1f dP90=%.1f\r\n"),
+  SATTraceTf(PSTR("SAT 4h: n=%u avgOn=%.0fs avgOff=%.0fs flow=%.1f duty=%.2f overshoot=%.2f underheat=%.2f dP50=%.1f dP90=%.1f\r\n"),
           nValid,
           state.sat.f4hAvgOnSec, state.sat.f4hAvgOffSec,
           state.sat.f4hAvgFlow,
@@ -547,7 +550,7 @@ void satGetWindow24hStats()
   state.sat.f24hUnderheatFraction = (float)nU / fn;
   state.sat.f24hLongCycleFraction = (float)nL / fn;
 
-  SATDebugTf(PSTR("SAT 24h: n=%lu duty=%.2f overshoot=%.2f underheat=%.2f long=%.2f\r\n"),
+  SATTraceTf(PSTR("SAT 24h: n=%lu duty=%.2f overshoot=%.2f underheat=%.2f long=%.2f\r\n"),
           (unsigned long)nC, state.sat.f24hDutyRatio,
           state.sat.f24hOvershootFraction, state.sat.f24hUnderheatFraction,
           state.sat.f24hLongCycleFraction);
@@ -890,7 +893,7 @@ void satCycleOnFlameChange(bool flameOn)
     float tailP90 = (_tail_sampleCount >= 10) ? _tailPercentile(90) : p90;
     float tailP10 = (_tail_sampleCount >= 10) ? _tailPercentile(10) : p10;
     float tailP50 = (_tail_sampleCount >= 10) ? _tailPercentile(50) : (p90 + p10) * 0.5f;
-    SATDebugTf(PSTR("SAT cycle classify: fullP90=%.1f tailP90=%.1f tailP50=%.1f tailP10=%.1f tailN=%u\r\n"),
+    SATTraceTf(PSTR("SAT cycle classify: fullP90=%.1f tailP90=%.1f tailP50=%.1f tailP10=%.1f tailN=%u\r\n"),
                p90, tailP90, tailP50, tailP10, (unsigned)_tail_sampleCount);
     // Classifier inputs (TASK-1387, cycles/classifier.py). Snapshot the PID requested setpoint at
     // flame-off (it drifts across a multi-minute cycle). pwm_state at cycle end: enabled = PWM mode,
@@ -1032,7 +1035,7 @@ void satCycleSample()
 
     if (++_flow_logTick >= 30) {   // one debug line per 30 samples (30 s)
       _flow_logTick = 0;
-      SATDebugTf(PSTR("SAT sample: flow=%.1f n=%u sp=%.1f os=%.0fs\r\n"),
+      SATTraceTf(PSTR("SAT sample: flow=%.1f n=%u sp=%.1f os=%.0fs\r\n"),
                  flowTemp, (unsigned)_flow_sampleCount, _cycle_setpointAtStart, _cycle_overshootSec);
     }
   }
@@ -1114,6 +1117,9 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
              (unsigned long)((uint32_t)(tickMs - _sustain_overshootStartMs) / 1000UL), flowTemp, requestedSetpoint,
              settings.sat.fOvershootMargin);
   satSetControlMode(SAT_MODE_PWM);
+  satNarratef_P(PSTR("Control mode: PWM (flow %.1f stayed above setpoint %.1f + %.1f for %lu s)"), flowTemp,
+                requestedSetpoint, settings.sat.fOvershootMargin,
+                (unsigned long)(SAT_OVERSHOOT_SUSTAIN_MS / 1000UL));   // TASK-1521
   satCycleResetSustainGuards();   // _reset_pwm_disable_guards() after pwm.enable() (heating_control.py:304-305)
   return true;
 }
@@ -1139,6 +1145,7 @@ bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
     if (satSustainedFor(_sustain_underheatRunning, _sustain_underheatStartMs, tickMs, SAT_UNDERHEAT_SUSTAIN_MS)) {
       SATDebugTln(F("SAT: sustained underheat detected, switching to continuous mode"));
       satSetControlMode(SAT_MODE_CONTINUOUS);
+      satNarrate_P(PSTR("Control mode: continuous (flow stayed below the setpoint, PWM ended)"));   // TASK-1521
       satCycleResetSustainGuards();
       return true;
     }
@@ -1151,6 +1158,7 @@ bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
     if (satSustainedFor(_sustain_saturationRunning, _sustain_saturationStartMs, tickMs, SAT_SATURATION_SUSTAIN_MS)) {
       SATDebugTln(F("SAT: PWM saturation (off_time=0 sustained), switching to continuous mode"));
       satSetControlMode(SAT_MODE_CONTINUOUS);
+      satNarrate_P(PSTR("Control mode: continuous (PWM had no off time left)"));   // TASK-1521
       satCycleResetSustainGuards();
       return true;
     }
@@ -1344,7 +1352,7 @@ void satHCRAddSample()
   _hcr_samples[_hcr_sHead] = roomError;
   _hcr_sHead = (_hcr_sHead + 1) % HCR_INTRADAY_SIZE;
   if (_hcr_sCount < HCR_INTRADAY_SIZE) _hcr_sCount++;
-  SATDebugTf(PSTR("SAT HCR: sample err=%.2f n=%u\r\n"),
+  SATTraceTf(PSTR("SAT HCR: sample err=%.2f n=%u\r\n"),
              roomError, (unsigned)_hcr_sCount);
 
   // Check for day boundary: commit previous day's data

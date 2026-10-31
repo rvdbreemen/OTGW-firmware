@@ -40,6 +40,13 @@ STUBS = r"""
 #define snprintf_P snprintf
 #define SATDebugTln(x) ((void)0)
 #define SATDebugTf(...) ((void)0)
+// TASK-1521 log helpers
+static void satNarrate_P(const char*) {}
+static bool _sat_followNarrPending = false;
+static bool _sat_narrAtMax = false;
+static bool _sat_narrCold = false;
+static bool _sat_bootBoilerLogged = false;
+static bool _sat_bootOutsideLogged = false;
 static void satNarratef_P(const char *fmt, ...) { (void)fmt; }
 #define SAT_MIN_SETPOINT 10.0f
 #define SAT_QUIRK_MIN_MOD_10 0x01

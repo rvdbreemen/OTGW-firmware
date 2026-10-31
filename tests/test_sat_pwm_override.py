@@ -49,6 +49,13 @@ STUBS = r"""
 #define PSTR(x) x
 #define SATDebugTln(x) ((void)0)
 #define SATDebugTf(...) ((void)0)
+// TASK-1521 log helpers
+static void satNarrate_P(const char*) {}
+static bool _sat_followNarrPending = false;
+static bool _sat_narrAtMax = false;
+static bool _sat_narrCold = false;
+static bool _sat_bootBoilerLogged = false;
+static bool _sat_bootOutsideLogged = false;
 static void satNarratef_P(const char *fmt, ...) {   // SAT log sink: one "N <text>" line on stderr (stdout carries the timeline)
   char b[96]; va_list ap; va_start(ap, fmt); vsnprintf(b, sizeof(b), fmt, ap); va_end(ap); fprintf(stderr, "N %s\n", b);
 }

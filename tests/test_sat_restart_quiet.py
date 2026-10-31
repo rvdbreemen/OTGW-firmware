@@ -57,6 +57,13 @@ typedef long long time_t_;
 #define snprintf_P snprintf
 #define strncpy_P strncpy
 #define SATDebugTf(...) ((void)0)
+// TASK-1521 log helpers
+static void satNarratef_P(const char*, ...) {}
+static bool _sat_followNarrPending = false;
+static bool _sat_narrAtMax = false;
+static bool _sat_narrCold = false;
+static bool _sat_bootBoilerLogged = false;
+static bool _sat_bootOutsideLogged = false;
 #define SATDebugTln(x) ((void)0)
 #define DebugTf(...) ((void)0)
 enum SATControlMode { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };

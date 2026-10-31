@@ -3,10 +3,11 @@ id: TASK-1521
 title: >-
   SAT instrumentation: log every SAT decision, boot phase and loop metric for
   field replay and simulation
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-31T09:40:00Z'
-updated_date: '2026-10-31T09:42:00Z'
+updated_date: '2026-10-31T11:37:00Z'
 labels:
   - sat
   - instrumentation
@@ -38,4 +39,6 @@ Maintainer request 2026-10-31. Field captures (gruijter TASK-1520) show the SAT 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-31 Robert: 'Make sure like other logging we can turn the SAT logging on and off, with a debug toggle. Default it should be low volume, but if you need to you should be able to have a high volume of logging available.' Mind: telnet debug keys are TOGGLES (memory reference_telnet_drops_under_mqtt_burst), and high volume can drop telnet lines under MQTT burst: the tick line must stay short.
+
+Inventory (AC1): docs/sat/sat-instrumentation-inventory-2026-10-31.md (delegated read-only inventory, spot-checked). Log format: docs/sat/sat-log-format.md. Advisor review applied: raw room, osrc, rv, praw, dhw in SATTICK; SATBOOT phase=boiler/outside; reasons in mode narration at each caller (duplicate removed from satSetControlMode); TC push, follow adopt (via loop flag), cold cutoff and max clamp edge narrations. 19 host harnesses got stubs for the new macros/statics. Full tests: 75 files, only test_capture_tool failing mid-edit by the TASK-1523 agent (now Ran 28 OK twice); evaluate --quick Failed 0, 100 %.
 <!-- SECTION:NOTES:END -->

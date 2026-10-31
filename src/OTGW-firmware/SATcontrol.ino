@@ -20,6 +20,9 @@
 #define SATDebugTf(fmt, ...)  do { if (state.debug.bSAT) DebugTf(fmt,  ##__VA_ARGS__); } while(0)
 #define SATDebugTln(s)        do { if (state.debug.bSAT) DebugTln(s);                  } while(0)
 #define SATDebugf(fmt, ...)   do { if (state.debug.bSAT) Debugf(fmt,   ##__VA_ARGS__); } while(0)
+// High-volume SAT trace (per pass, PID detail), key '8', default off (TASK-1521)
+#define SATTraceTf(fmt, ...)  do { if (state.debug.bSATTrace) DebugTf(fmt, ##__VA_ARGS__); } while(0)
+#define SATTraceTln(s)        do { if (state.debug.bSATTrace) DebugTln(s);                 } while(0)
 
 // --- SAT test-observability narration (TASK-815) ---
 // Emits one plain-language line to BOTH sinks so Telnet and the Web UI live-log
@@ -484,6 +487,11 @@ static const char* satGetHeatingSourceName()
 }
 
 static bool    _sat_roomLostActive     = false;   // room temperature lost: heating on the curve only (TASK-1364)
+static bool    _sat_narrCold           = false;   // TASK-1521: last narrated cold-cutoff state (edge narration)
+static bool    _sat_narrAtMax          = false;   // TASK-1521: last narrated max-clamp state (edge narration)
+static bool    _sat_followNarrPending  = false;   // TASK-1521: follow-thermostat adoption to narrate on the loop task
+static bool    _sat_bootBoilerLogged   = false;   // TASK-1521: SATBOOT phase=boiler logged this boot
+static bool    _sat_bootOutsideLogged  = false;   // TASK-1521: SATBOOT phase=outside logged this boot
 static uint8_t _sat_picFailCount      = 0;
 static bool    _sat_prevDhwActive     = false;  // Track the DHW draw edges for the PWM ON clock (entries 95, 105, 106)
 static bool    _sat_prevOTOnline      = false;  // Track OT-bus online edge for cache reset (TASK-565)
@@ -646,6 +654,8 @@ static bool satEnqueueIfChangedTC(float tc) {
   state.sat.bTCAccountedValid = true;
   state.sat.iTCPushMs         = millis() ? millis() : 1;   // 0 means "no push"
   state.sat.bPushRefused      = false;                     // a new push gets a fresh 5 minutes
+  SATDebugTf(PSTR("SATTC push=%.1f\r\n"), state.sat.fLastSentTC);   // TASK-1521
+  satNarratef_P(PSTR("Thermostat setpoint set to %.1f (push setpoint)"), state.sat.fLastSentTC);
   return true;
 }
 
@@ -1429,6 +1439,8 @@ void satPwmReset()
 static void satSetControlMode(SATControlMode m)
 {
   if (m != state.sat.eControlMode) {
+    // TASK-1521: every mode change in one place; the callers narrate their own reason
+    SATDebugTf(PSTR("SATMODE from=%d to=%d\r\n"), (int)state.sat.eControlMode, (int)m);
     satPwmReset();
     satCycleSkipAutoSwitch();
     // thermo-nova runs pwm.update() in the same update() pass that enables PWM (heating_control.py:206-215),
@@ -1460,6 +1472,7 @@ static void satPwmDisableOnHeaterOff()
 {
   if (state.sat.eControlMode == SAT_MODE_PWM) {
     satSetControlMode(SAT_MODE_CONTINUOUS);
+    satNarrate_P(PSTR("Control mode: continuous (heating off, PWM ended)"));   // TASK-1521
   }
   satPwmReset();                              // phase, ignition wait, hold
   satCycleResetSustainGuards();
@@ -1811,6 +1824,7 @@ static void satAdoptThermostatSetpoint(float tr)
   state.sat.eActivePreset  = SAT_PRESET_NONE;
   state.sat.fPreCustomTemp = 0.0f;
   updateSetting("SATtargettemp", valBuf);
+  _sat_followNarrPending = true;   // TASK-1521: narrated on the loop task (processOT holds the OT lock here)
   satTCNoteAdopted(settings.sat.fTargetTemp);   // the thermostat already has it: no TC= back (TASK-1272)
   SATDebugTf(PSTR("SAT: follow thermostat: target %.1f from thermostat setpoint%s\r\n"),
              settings.sat.fTargetTemp, hadPreset ? ", preset cleared" : "");
@@ -1879,15 +1893,28 @@ static bool satPushRefusedDecide(bool pushOn, bool pushed, uint32_t sincePushMs,
 void satOnThermostatSetpoint(float tr)
 {
   const bool active = satIsEnabled() && settings.sat.bFollowThermostat;
+  const bool hadBaseline = state.sat.bThermostatTrSetValid;
+  const float baseline   = state.sat.fThermostatTrSet;
   if (satFollowThermostatDecide(tr, active, settings.sat.bPushSetpoint, state.sat.fLastSentTC,
                                 state.sat.fThermostatTrSet, state.sat.bThermostatTrSetValid,
                                 state.sat.fThermostatTrSetCand, state.sat.bThermostatTrSetCandValid)) {
     satAdoptThermostatSetpoint(tr);
+  } else if (active && state.sat.bThermostatTrSetValid &&
+             (!hadBaseline || state.sat.fThermostatTrSet != baseline)) {
+    // TASK-1521: a new thermostat value was recorded but not adopted (first value, echo of SAT's TC=, or no TC=
+    // since boot). Telnet only: processOT() holds the OT lock, so no narration (WebSocket) from here.
+    SATDebugTf(PSTR("SATFOLLOW recorded=%.1f adopted=0 last_tc=%.1f push=%d\r\n"), state.sat.fThermostatTrSet,
+               state.sat.fLastSentTC, (int)settings.sat.bPushSetpoint);
   }
   // processOT() holds the OT lock: only a state flag is set here, no MQTT publish and no enqueue.
+  const bool wasRefused = state.sat.bPushRefused;
   state.sat.bPushRefused = satPushRefusedDecide(settings.sat.bPushSetpoint,
       state.sat.bTCAccountedValid && state.sat.iTCPushMs != 0 && state.sat.fLastSentTC > 0.0f,
       millis() - state.sat.iTCPushMs, tr, state.sat.fLastSentTC, state.sat.bPushRefused);
+  if (state.sat.bPushRefused != wasRefused) {
+    SATDebugTf(PSTR("SATTC refused=%d thermostat=%.1f pushed=%.1f\r\n"), (int)state.sat.bPushRefused, tr,
+               state.sat.fLastSentTC);
+  }
 }
 
 //=====================================================================
@@ -2096,11 +2123,11 @@ static float satGetRoomTemp()
   if (!trGhost && settings.sat.bThermalComfort) {
     if (satHumidityFresh(millis())) {
       float ssi = satCalcSimmerIndex(otRoom, state.sat.fHumidity);
-      SATDebugTf(PSTR("SAT: thermal_comfort: raw=%.1f SSI=%.1f H=%.0f%%\r\n"),
+      SATTraceTf(PSTR("SAT: thermal_comfort: raw=%.1f SSI=%.1f H=%.0f%%\r\n"),
               otRoom, ssi, state.sat.fHumidity);
       return ssi;
     }
-    SATDebugTln(F("SAT: thermal_comfort: no fresh indoor humidity, using raw room temp"));
+    SATTraceTln(F("SAT: thermal_comfort: no fresh indoor humidity, using raw room temp"));
   }
 
   // TASK-521: ghost-Tr final guard. If no other source returned, and Tr has never been
@@ -2126,11 +2153,15 @@ static float satGetRoomTemp()
 // No side effects: the REST snapshot (async_tcp) and the MQTT publish call this too.
 // Returns false with the bus value (0.0 without a sensor) when no source is valid.
 static const uint32_t SAT_OUTSIDE_VALID_MS = 3600000UL;   // entry 57: old after 1 hour
+// TASK-1521: which source the last resolve used, for the SATTICK osrc field: S simulation, E external (MQTT/REST),
+// O OpenTherm MsgID 27, W weather service, R restored from flash, N none valid.
+static char _sat_outsideSrc = 'N';
+
 static bool satResolveOutsideTemp(float* out, uint32_t* sampleMs)
 {
   const uint32_t nowMs = millis();
   *sampleMs = nowMs;
-  if (settings.sat.bSimulation) { *out = state.sat.fSimOutdoorTemp; return true; }
+  if (settings.sat.bSimulation) { *out = state.sat.fSimOutdoorTemp; _sat_outsideSrc = 'S'; return true; }
   const bool extSet = state.sat.bExternalOutdoorValid;
   const uint32_t extAge = (uint32_t)(nowMs - state.sat.iExternalOutdoorLastMs);
   const float otVal = OTcurrentSystemState.Toutside;
@@ -2138,15 +2169,16 @@ static bool satResolveOutsideTemp(float* out, uint32_t* sampleMs)
                        (uint32_t)(nowMs - state.otBus.iToutsideBoilerMs) < SAT_OUTSIDE_VALID_MS;
   const bool wxFresh = state.sat.weather.bValid && state.sat.weather.iLastUpdateMs != 0 &&
                        (uint32_t)(nowMs - state.sat.weather.iLastUpdateMs) < SAT_OUTSIDE_VALID_MS;
-  if (extSet && extAge < SAT_OUTSIDE_VALID_MS) { *out = state.sat.fExternalOutdoor; *sampleMs = state.sat.iExternalOutdoorLastMs; return true; }
-  if (otFresh && otVal != 0.0f) { *out = otVal; *sampleMs = state.otBus.iToutsideBoilerMs; return true; }
-  if (wxFresh) { *out = state.sat.weather.fTemperature; *sampleMs = state.sat.weather.iLastUpdateMs; return true; }
-  if (otFresh) { *out = otVal; *sampleMs = state.otBus.iToutsideBoilerMs; return true; }
+  if (extSet && extAge < SAT_OUTSIDE_VALID_MS) { *out = state.sat.fExternalOutdoor; *sampleMs = state.sat.iExternalOutdoorLastMs; _sat_outsideSrc = 'E'; return true; }
+  if (otFresh && otVal != 0.0f) { *out = otVal; *sampleMs = state.otBus.iToutsideBoilerMs; _sat_outsideSrc = 'O'; return true; }
+  if (wxFresh) { *out = state.sat.weather.fTemperature; *sampleMs = state.sat.weather.iLastUpdateMs; _sat_outsideSrc = 'W'; return true; }
+  if (otFresh) { *out = otVal; *sampleMs = state.otBus.iToutsideBoilerMs; _sat_outsideSrc = 'O'; return true; }
   if (state.sat.bRestoredOutdoorValid &&
       (uint32_t)(nowMs - state.sat.iRestoredOutdoorMs) < SAT_OUTSIDE_VALID_MS) {
-    *out = state.sat.fRestoredOutdoor; *sampleMs = state.sat.iRestoredOutdoorMs; return true;
+    *out = state.sat.fRestoredOutdoor; *sampleMs = state.sat.iRestoredOutdoorMs; _sat_outsideSrc = 'R'; return true;
   }
   *out = otVal;
+  _sat_outsideSrc = 'N';   // none valid
   return false;
 }
 
@@ -2255,7 +2287,7 @@ bool satSimulationBlocksBusTx(const char* cmd,
 {
   if (!(state.debug.bOTGWSimulation || settings.sat.bSimulation)) return false;
   const char* tag = settings.sat.bSimulation ? "SAT-SIM" : "OTGW-SIM";
-  SATDebugTf(PSTR("%s trace: %s (src=%S)\r\n"), tag, cmd ? cmd : "", source);
+  SATTraceTf(PSTR("%s trace: %s (src=%S)\r\n"), tag, cmd ? cmd : "", source);
   // TASK-818: no per-tx WS event here — it fired ~10x/sec and flooded the
   // live-log. Isolation is already visible via the telnet trace above, the
   // last-blocked-cmd + trace ring below (SAT dashboard), and the TASK-815
@@ -2386,7 +2418,7 @@ bool satHandleExternalTemp(const char* value)
     state.sat.fExternalTemp = temp;
     state.sat.bExternalTempValid = true;
     state.sat.iExternalTempLastMs = millis();
-    SATDebugTf(PSTR("SAT: external indoor temp set to %.1f°C\r\n"), temp);
+    SATTraceTf(PSTR("SAT: external indoor temp set to %.1f°C\r\n"), temp);
     return true;
   }
   return false;
@@ -2403,7 +2435,7 @@ bool satHandlePvSurplus(const char* value)
   state.sat.fExternalPvSurplusW = w;
   state.sat.bExternalPvSurplusValid = true;
   state.sat.iExternalPvSurplusLastMs = millis();
-  SATDebugTf(PSTR("SAT: PV surplus set to %.0fW\r\n"), w);
+  SATTraceTf(PSTR("SAT: PV surplus set to %.0fW\r\n"), w);
   return true;
 }
 
@@ -2504,7 +2536,7 @@ bool satHandleExternalOutdoor(const char* value)
     state.sat.fExternalOutdoor = temp;
     state.sat.bExternalOutdoorValid = true;
     state.sat.iExternalOutdoorLastMs = millis();
-    SATDebugTf(PSTR("SAT: external outdoor temp set to %.1f°C\r\n"), temp);
+    SATTraceTf(PSTR("SAT: external outdoor temp set to %.1f°C\r\n"), temp);
     return true;
   }
   return false;
@@ -2521,7 +2553,7 @@ bool satHandleHumidity(const char* value)
   state.sat.fHumidity = h;
   state.sat.bHumidityValid = true;
   state.sat.iHumidityLastMs = millis();
-  SATDebugTf(PSTR("SAT: humidity set to %.0f%%\r\n"), h);
+  SATTraceTf(PSTR("SAT: humidity set to %.0f%%\r\n"), h);
   return true;
 }
 
@@ -2550,7 +2582,7 @@ bool satHandleSunElevation(const char* value)
   state.sat.fSunElevation = elev;
   state.sat.bSunElevationValid = true;
   state.sat.iSunElevLastMs = millis();
-  SATDebugTf(PSTR("SAT: sun elevation set to %.1f deg\r\n"), elev);
+  SATTraceTf(PSTR("SAT: sun elevation set to %.1f deg\r\n"), elev);
   return true;
 }
 
@@ -2562,7 +2594,7 @@ void satSetAreaTemp(uint8_t area, float temp)
     state.sat.fAreaTemp[area] = temp;
     state.sat.bAreaValid[area] = true;
     state.sat.iAreaLastMs[area] = millis();
-    SATDebugTf(PSTR("SAT: area %u temp set to %.1f (sensor)\r\n"), area, temp);
+    SATTraceTf(PSTR("SAT: area %u temp set to %.1f (sensor)\r\n"), area, temp);
   }
 }
 
@@ -2578,7 +2610,7 @@ bool satHandleAreaTemp(uint8_t area, const char* value)
     state.sat.fAreaTemp[area] = temp;
     state.sat.bAreaValid[area] = true;
     state.sat.iAreaLastMs[area] = millis();
-    SATDebugTf(PSTR("SAT: area %u temp set to %.1f\r\n"), area, temp);
+    SATTraceTf(PSTR("SAT: area %u temp set to %.1f\r\n"), area, temp);
     return true;
   }
   return false;
@@ -2677,7 +2709,7 @@ bool satHandleZoneRoomTemp(uint8_t zone, const char* value)
   satZones[idx].fRoomTemp     = temp;
   satZones[idx].bRoomValid    = true;
   satZones[idx].iLastUpdateMs = millis();
-  SATDebugTf(PSTR("SAT zone %u: room_temp=%.1f\r\n"), zone, temp);
+  SATTraceTf(PSTR("SAT zone %u: room_temp=%.1f\r\n"), zone, temp);
   return true;
 }
 
@@ -2696,7 +2728,7 @@ bool satHandleZoneSetpoint(uint8_t zone, const char* value)
   satZones[idx].fSetpoint     = sp;
   satZones[idx].bSpValid      = true;
   satZones[idx].iLastUpdateMs = millis();
-  SATDebugTf(PSTR("SAT zone %u: setpoint=%.1f\r\n"), zone, sp);
+  SATTraceTf(PSTR("SAT zone %u: setpoint=%.1f\r\n"), zone, sp);
   return true;
 }
 
@@ -2855,7 +2887,7 @@ static float satAggregateZoneSetpoint(float primary, float *zoneOut, const float
     if (setpoint > cap) setpoint = cap;                       // climate.py:388-389
   }
   if (n > 0) {   // only when a zone counts: no line per tick for single-room setups
-    SATDebugTf(PSTR("SAT: zones %u counted, zones out=%.1f cap=%.1f -> %.1f (primary %.1f)\r\n"),
+    SATTraceTf(PSTR("SAT: zones %u counted, zones out=%.1f cap=%.1f -> %.1f (primary %.1f)\r\n"),
                n, zonesOut, haveCap ? cap : 0.0f, setpoint, primary);
   }
   return setpoint;
@@ -3157,7 +3189,7 @@ static void satSaveEstimatedEnergy()
   f.print(buf);
   f.close();
   state.sat.fEstEnergyLastSavedKWh = state.sat.fEnergyEstimatedKWh;
-  SATDebugTf(PSTR("SAT: estimated energy saved (%.3f kWh)\r\n"), state.sat.fEnergyEstimatedKWh);
+  SATTraceTf(PSTR("SAT: estimated energy saved (%.3f kWh)\r\n"), state.sat.fEnergyEstimatedKWh);
 }
 
 static void satLoadEstimatedEnergy()
@@ -3427,8 +3459,15 @@ static bool satRestartStep()
     // the first control tick, which waits for a boiler reply and an outside temperature (gruijter: 5 min). Follow
     // thermostat adopts a dial change only after a TC= since boot (entry 2), so a change in that wait was lost.
     if (settings.sat.bPushSetpoint) satEnqueueIfChangedTC(settings.sat.fTargetTemp);
+    // TASK-1521: boot milestone, ms since boot (parsed by scripts/sat_log_to_csv.py)
+    SATDebugTf(PSTR("SATBOOT phase=decide ms=%lu valid=%d pidload=%u ntp=%d tc=%d\r\n"), (unsigned long)nowMs,
+               (int)valid, (unsigned)_sat_bootPidLoad, (int)isNTPtimeSet(), (int)settings.sat.bPushSetpoint);
   }
   if (!settings.sat.bSimulation && state.otBus.iBoilerLastSeenMs == 0) return true;   // no boiler reply since boot
+  if (!_sat_bootBoilerLogged) {            // TASK-1521: boot milestone, first pass with a boiler reply
+    _sat_bootBoilerLogged = true;
+    SATDebugTf(PSTR("SATBOOT phase=boiler ms=%lu\r\n"), (unsigned long)nowMs);
+  }
   if (!satOutsideTempFresh()) {
     if (!state.sat.bOutsideTempMissing) {
       if (!_sat_quietHandedBack) {
@@ -3447,10 +3486,16 @@ static bool satRestartStep()
     DebugTln(F("SAT: outside temperature valid again, SAT resumes"));
     satNarrate_P(PSTR("Outside temperature back: SAT resumes"));
   }
+  if (!_sat_bootOutsideLogged) {           // TASK-1521: boot milestone, first pass with a valid outside temperature
+    _sat_bootOutsideLogged = true;
+    SATDebugTf(PSTR("SATBOOT phase=outside ms=%lu\r\n"), (unsigned long)nowMs);
+  }
   _sat_quietHandedBack = false;
   if (_sat_bootTakeover) {
     _sat_bootTakeover = false;
     timerSATControl_due = nowMs;           // takeover in this pass, not one control interval after boot
+    SATDebugTf(PSTR("SATBOOT phase=takeover ms=%lu since_sat_start_ms=%lu\r\n"), (unsigned long)nowMs,
+               (unsigned long)(nowMs - _sat_bootStartMs));
   }
   return false;
 }
@@ -3919,7 +3964,7 @@ void satPublishMQTT()
   if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
   if (!satIsEnabled()) return;
 
-  SATDebugTln(F("SAT: publishing MQTT state (ADR-111 on-change + heartbeat)"));
+  SATTraceTln(F("SAT: publishing MQTT state (ADR-111 on-change + heartbeat)"));
 
   // ---------------------------------------------------------------------------
   // ADR-111: per-topic shadows.
@@ -5044,14 +5089,14 @@ static void satUpdateSimulation()
       state.sat.bSimFlameOn        = true;
       state.sat.iSimFlameOnSinceMs = now;
       satCycleOnFlameChange(true);
-      SATDebugTln(F("SAT SIM: flame ON"));
+      SATTraceTln(F("SAT SIM: flame ON"));
     }
   } else {
     if (!heatRequested || flowAboveSP) {
       state.sat.bSimFlameOn         = false;
       state.sat.iSimFlameOffSinceMs = now;
       satCycleOnFlameChange(false);
-      SATDebugTln(F("SAT SIM: flame OFF"));
+      SATTraceTln(F("SAT SIM: flame OFF"));
     }
   }
 
@@ -5767,6 +5812,10 @@ static void satControlLoopRun()
 
   // TASK-1365: no boiler reply for 30 s -> one hand-back, then nothing to the boiler until a reply
   // returns. Placed before every SAT sender below (boot CS=0, PIC keepalive, PWM refresh, control tick).
+  if (_sat_followNarrPending) {   // TASK-1521: set by satAdoptThermostatSetpoint() under the OT lock
+    _sat_followNarrPending = false;
+    satNarratef_P(PSTR("Target %.1f taken over from the thermostat (follow thermostat)"), settings.sat.fTargetTemp);
+  }
   if (satOtLinkStep()) return;
 
   // TASK-1482 / TASK-1390: restart and outside-temperature gates (entries 121, 126, 129, 56, 57).
@@ -5848,9 +5897,16 @@ static void satControlLoopRun()
     // DHW has priority - don't adjust CH setpoint, boiler manages itself.
     // The DHW setpoint goes out as SW= on a change, not here (TASK-1376, entry 150).
     _sat_cmdResendArmed = false;                   // nothing is sent on this tick: no resend of pre-draw values (TASK-1370)
-    if (!_sat_prevDhwActive) satPwmOnDhwStart();   // freeze the ON clock (entry 95)
+    if (!_sat_prevDhwActive) {
+      satPwmOnDhwStart();                          // freeze the ON clock (entry 95)
+      SATDebugTln(F("SATDHW start"));              // TASK-1521
+      satNarrate_P(PSTR("Hot water: heating control paused"));
+    }
     satPwmNoteDhwFlame(satIsFlameOn());            // a flame burning with the DHW bit set is a hot-water flame (entries 105, 106)
     _sat_prevDhwActive = true;
+    SATDebugTf(PSTR("SATTICK target=%.1f mode=%d flame=%d flow=%.1f ret=%.1f dhw=1\r\n"),   // TASK-1521
+               settings.sat.fTargetTemp, (int)state.sat.eControlMode, (int)satIsFlameOn(),
+               OTcurrentSystemState.Tboiler, OTcurrentSystemState.Tret);
     // Hot water: refreshes the end of the draw (the 300 s guards, heating_control.py:272-274, :313-315) and
     // clears the overshoot, underheat and saturation starts (:268-270, :313-315; entry 108).
     satCycleNoteDhwTick(_sat_tickMs);
@@ -5860,7 +5916,11 @@ static void satControlLoopRun()
   // The branch above returns before satPwmSchedule(), so the PWM ON clock does not run during hot water. thermo-nova
   // keeps updating it (heating_control.py:202-215); Sergeant D pauses it instead (entries 95, 103): the end of the draw
   // shifts the anchor by the draw length before the schedule runs.
-  if (_sat_prevDhwActive) satPwmOnDhwEnd(satIsFlameOn());
+  if (_sat_prevDhwActive) {
+    satPwmOnDhwEnd(satIsFlameOn());
+    SATDebugTln(F("SATDHW end"));                  // TASK-1521
+    satNarrate_P(PSTR("Hot water done: heating control resumes"));
+  }
   _sat_prevDhwActive = false;
 
   // --- Read inputs (staleness is checked inside these functions) ---
@@ -5868,8 +5928,9 @@ static void satControlLoopRun()
   float outsideTemp = satGetOutsideTemp();
   float targetTemp = settings.sat.fTargetTemp;
 
-  SATDebugTf(PSTR("SAT loop: room=%.1f target=%.1f mode=%d enabled=%d\r\n"),
+  SATTraceTf(PSTR("SAT loop: room=%.1f target=%.1f mode=%d enabled=%d\r\n"),
              roomTemp, targetTemp, (int)state.sat.eControlMode, (int)satIsEnabled());
+  const float rawRoom = roomTemp;   // TASK-1521: unfiltered room temperature for SATTICK
 
   // TASK-1364 (entries 38, 46): a lost or missing room temperature (NaN or outside -10..50 C)
   // is no fault. SAT keeps heating on the heating curve alone: P, I and D are 0 and the
@@ -6013,6 +6074,7 @@ static void satControlLoopRun()
   // Without a room temperature there is no error: P, I and D are 0, the setpoint is the curve (entries 38, 46).
   float pidOutput = roomValid ? satPidOutput(curveValue)
                               : satPidCurveOnly(curveValue);
+  const float pidRaw = pidOutput;   // TASK-1521: before zones, solar offset and clamps (SATTICK praw)
 
   // --- Multi-zone (secondary rooms) on the requested setpoint (thermo-nova climate.py:381-389, entry 116) ---
   // Every configured zone (zone count 1-4) runs its PID output; satAggregateZoneSetpoint() keeps the
@@ -6052,6 +6114,13 @@ static void satControlLoopRun()
   float maxSetpoint = satEffectiveMaxSetpoint();
   float sysMax = satGetMaxSetpoint();
 
+  // TASK-1521: narrate the edge into and out of the maximum clamp (the reason a CS stops rising)
+  const bool atMax = (pidOutput > maxSetpoint);
+  if (atMax != _sat_narrAtMax) {
+    _sat_narrAtMax = atMax;
+    if (atMax) satNarratef_P(PSTR("Setpoint limited to the maximum %.1f (SAT asked %.1f)"), maxSetpoint, pidOutput);
+    else       satNarratef_P(PSTR("Setpoint below the maximum %.1f again"), maxSetpoint);
+  }
   if (pidOutput < SAT_MIN_SETPOINT) pidOutput = SAT_MIN_SETPOINT;
   if (pidOutput > maxSetpoint) pidOutput = maxSetpoint;
   _sat_requestedSetpoint = pidOutput;   // thermo-nova requested_setpoint (climate.py:394), read by the 3 s refresh and the MQTT publish
@@ -6062,6 +6131,7 @@ static void satControlLoopRun()
   if (pidOutput >= sysMax && state.sat.eControlMode == SAT_MODE_PWM) {
     satSetControlMode(SAT_MODE_CONTINUOUS);
     SATDebugTln(F("SAT: PID at system max, switching to continuous mode"));
+    satNarrate_P(PSTR("Control mode: continuous (demand at the maximum setpoint)"));   // TASK-1521
   }
 
   // --- Sustained overshoot: continuous -> PWM (Tasks #42/#43) ---
@@ -6133,6 +6203,12 @@ static void satControlLoopRun()
   // cold setpoint => no heating needed; command the boiler OFF (CS=MINIMUM => CH=0, MM=100 restore).
   // At or below, like thermo-nova (heating_control.py:72, :385) and the satApplyPWM gate.
   const bool coldCutoff = satColdCutoff(pidOutput, satGetColdSetpoint());
+  if (coldCutoff != _sat_narrCold) {   // TASK-1521: narrate the edge, with the numbers that decided it
+    _sat_narrCold = coldCutoff;
+    satNarratef_P(coldCutoff ? PSTR("Heating off: requested %.1f is at or below the cold setpoint %.1f")
+                             : PSTR("Heating on: requested %.1f is above the cold setpoint %.1f"),
+                  pidOutput, satGetColdSetpoint());
+  }
   if (coldCutoff) {
     finalSetpoint = SAT_MIN_SETPOINT;
     state.sat.fFinalSetpoint = finalSetpoint;
@@ -6180,9 +6256,15 @@ static void satControlLoopRun()
   if ((millis() - _pidLastSaveMs) >= 300000UL && satPidRoomSeen()) {
     satSavePidState();
   }
-  SATDebugTf(PSTR("SAT: room=%.1f target=%.1f outside=%.1f curve=%.1f pid=%.1f final=%.1f mode=%d\r\n"),
-          roomTemp, targetTemp, outsideTemp, curveValue, pidOutput, finalSetpoint,
-          (int)state.sat.eControlMode);
+  // TASK-1521: one key=value line per control tick (low volume), parsed by scripts/sat_log_to_csv.py.
+  // praw = curve + p + i + d when rv=1 (p/i/d come from the last 60 s PID step); pid = requested setpoint after
+  // zones, solar offset and clamps; osrc see _sat_outsideSrc. Hot-water ticks log a short SATTICK with dhw=1.
+  SATDebugTf(PSTR("SATTICK room=%.2f raw=%.2f rv=%d target=%.1f out=%.1f osrc=%c curve=%.2f p=%.2f i=%.2f d=%.2f praw=%.2f pid=%.2f cs=%.1f mm=%u ch=%u mode=%d pwm=%d duty=%.2f flame=%d flow=%.1f ret=%.1f dhw=0\r\n"),
+          roomTemp, rawRoom, (int)roomValid, targetTemp, outsideTemp, _sat_outsideSrc, curveValue,
+          state.sat.fPidP, state.sat.fPidI, state.sat.fPidD, pidRaw,
+          pidOutput, finalSetpoint, (unsigned)state.sat.iCurrentModulation, (unsigned)state.sat.iLastSentCH,
+          (int)state.sat.eControlMode, (int)pwmOn, state.sat.fPwmDutyCycle, (int)satIsFlameOn(),
+          OTcurrentSystemState.Tboiler, OTcurrentSystemState.Tret);
 
   // --- Publish to MQTT ---
   satPublishMQTT();

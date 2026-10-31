@@ -41,6 +41,8 @@ STUBS = r"""
 #include <cmath>
 #define F(x) x
 #define PSTR(x) x
+#define SATTraceTf(...) ((void)0)
+#define SATTraceTln(x) ((void)0)
 #define SATDebugTln(x) ((void)0)
 #define SATDebugTf(...) ((void)0)
 #define SAT_MIN_SETPOINT 10.0f

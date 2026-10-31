@@ -86,6 +86,13 @@ static void _dailyRecord(uint32_t, uint32_t, uint32_t, SATCycleClass, float) {}
 static size_t strlcpy_P(char* d, const char* s, size_t n) { snprintf(d, n, "%s", s); return strlen(s); }
 #define SATDebugTln(x) ((void)0)
 #define SATDebugTf(...) ((void)0)
+// TASK-1521 log helpers
+static void satNarrate_P(const char*) {}
+static bool _sat_followNarrPending = false;
+static bool _sat_narrAtMax = false;
+static bool _sat_narrCold = false;
+static bool _sat_bootBoilerLogged = false;
+static bool _sat_bootOutsideLogged = false;
 #define SATDebugf(...) ((void)0)
 #define DUE(t) (false)
 #define timerSATSuppress 0

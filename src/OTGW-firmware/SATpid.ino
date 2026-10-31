@@ -112,7 +112,7 @@ void satPidResetTerms()
   state.sat.fPidI          = 0.0f;
   state.sat.fPidD          = 0.0f;
   state.sat.fRawDerivative = 0.0f;
-  DebugTln(F("SAT: PID integral and raw derivative reset"));
+  SATDebugTln(F("SAT: PID integral and raw derivative reset"));
 }
 
 //=== PID Reset ===

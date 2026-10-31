@@ -32,6 +32,18 @@ STUBS = r"""
 #include <cstdlib>
 #include <cmath>
 #define PSTR(x) x
+#define SATTraceTf(...) ((void)0)
+#define SATTraceTln(x) ((void)0)
+#define SATDebugTf(...) ((void)0)
+// TASK-1521 log helpers
+static void satNarrate_P(const char*) {}
+static void satNarratef_P(const char*, ...) {}
+static bool _sat_followNarrPending = false;
+static bool _sat_narrAtMax = false;
+static bool _sat_narrCold = false;
+static bool _sat_bootBoilerLogged = false;
+static bool _sat_bootOutsideLogged = false;
+#define SATDebugTln(x) ((void)0)
 #define snprintf_P snprintf
 struct SatState { bool bLastSentValid=false; float fLastSentCS=0; uint8_t iLastSentMM=0, iLastSentCH=0; float fLastSentTC=0;
                   bool bTCAccountedValid=false; uint32_t iTCPushMs=0; bool bPushRefused=false;

@@ -86,6 +86,8 @@ PRELUDE = r"""
 #include <cmath>
 #define F(x) x
 #define PSTR(x) x
+#define SATTraceTf(...) ((void)0)
+#define SATTraceTln(x) ((void)0)
 #define PROGMEM
 #define PGM_P const char*
 #define SAT_TAIL_SAMPLE_SIZE 180

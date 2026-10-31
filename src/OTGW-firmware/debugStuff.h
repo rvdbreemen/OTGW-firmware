@@ -53,7 +53,8 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
   bool     bNTP                   = true;   // NTP time sync telemetry (on by default for diagnostics)
   bool     bSensorSim             = false;  // was bDebugSensorSimulation
   bool     bOTGWSimulation        = false;  // was bDebugOTGWSimulation
-  bool     bSAT                   = true;   // SAT control loop + cycle + HCR trace (default on)
+  bool     bSAT                   = true;   // SAT decisions, one line per control tick, boot milestones (default on, low volume)
+  bool     bSATTrace              = false;  // SAT high-volume trace: per-pass detail, PID internals, MQTT publish passes (TASK-1521, default off)
   bool     bOTDirect              = true;   // OTDirect frame handling + PI loop trace (default on)
   bool     bSATBLE                = false;  // SAT BLE scan/parse/match/update trace (ESP32-only, default off: log-spam on busy advert bursts)
   uint32_t iOTGWSimulationIntervalMs = 750;

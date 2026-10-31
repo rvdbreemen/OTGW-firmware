@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.568
+**  Version  : v2.0.0-alpha.569
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2341,6 +2341,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("state.debug.sensor_sim"), snap->st.debug.bSensorSim);
     je.field(F("state.debug.otgw_sim"), snap->st.debug.bOTGWSimulation);
     je.field(F("state.debug.sat"), snap->st.debug.bSAT);
+    je.field(F("state.debug.sat_trace"), snap->st.debug.bSATTrace);
     je.field(F("state.debug.otdirect"), snap->st.debug.bOTDirect);
 #if HAS_SAT_BLE
     je.field(F("state.debug.sat_ble"), snap->st.debug.bSATBLE);

@@ -47,6 +47,8 @@ STUBS = r"""
 #include <cmath>
 #define F(x) x
 #define PSTR(x) x
+#define SATTraceTf(...) ((void)0)
+#define SATTraceTln(x) ((void)0)
 #define SATDebugTf(...) ((void)0)
 #define SATDebugTln(x) ((void)0)
 struct SatSettings { bool bSimulation=false, bBleEnable=false, bMultiArea=false, bUseExternalTemp=false, bThermalComfort=true;
