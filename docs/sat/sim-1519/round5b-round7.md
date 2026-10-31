@@ -143,8 +143,51 @@ an open design question (Q-1519g, queued for Sergeant D), not a parameter to tun
 - Known gap: a curve far too low in a 2015/BENG house whose boiler or heat pump minimum is above the demand is not
   corrected. The user sees a cold room; the log should say why the tuner holds ("no clean hours: PWM / minimum output").
 
-## 8. Limits
+## 8. Round 8: a second winter (2024-25), 2-day window (Robert 2026-10-31)
 
-One weather year; 2 seeds; boiler and heat-pump cycling not validated (round 4); radiator size calibrated to an
+Script `scripts/sat_curve_selftune_study8.py`; data `round8_runs.json`, weather `weather_2024_25.json` (Open-Meteo
+archive, same grid cell 52.13N 6.13E, 2024-11-01..2025-02-28) next to `weather_2025_26.json`. Same houses and radiator
+sizes (calibrated on 2025-26, so 2024-25 is out of sample). Rule as decided (entries 163, 165, 167, 171-174): curve
+integral, clean hours without PWM and minimum output, daily on 2 days, symmetric 1 C, step 0.1. Check: the 2025-26
+rule runs equal round 5d bit for bit (150 / 150).
+
+Winters: 2024-25 is milder at the extremes (minimum -5.1 vs -9.4 C, coldest day -2.1 vs -4.5 C, 353 vs 445 frost
+hours) but slightly colder on average (heating mean 4.46 vs 4.69 C), with less sun (644 vs 708 hours >= 50 W/m2).
+
+Fixed sweep, minutes per day outside +-0.3 C at 1.0 / 1.2 / 1.8 / 2.4, 2024-25 (2025-26 in brackets):
+
+| house, source | 1.0 | 1.2 | 1.8 | 2.4 | optimum |
+|---|---|---|---|---|---|
+| gas 1992-2012 heavy | 138 (177) | 30 (36) | 20 (23) | 23 (28) | 1.5 (1.7) |
+| gas 1992-2012 light | 259 (304) | 80 (97) | 301 (282) | 678 (653) | 1.3 (1.3) |
+| gas BENG heavy | 133 (175) | 35 (50) | 51 (57) | 64 (72) | 1.2 (1.3) |
+| hp30 1992-2012 heavy | 493 (534) | 45 (64) | 17 (25) | 26 (33) | 1.9 (1.7) |
+| hp60 1992-2012 heavy | 121 (169) | 58 (71) | 41 (45) | 64 (73) | 2.0 (1.7) |
+
+The cliff below about 1.2 and the plateau above it hold in the second winter; optima move 0.1-0.3, inside the
+plateau. The light (fast) house keeps its narrow window (1.2-1.6).
+
+Rule against no tuner, paired, 2024-25 (2025-26 in brackets):
+
+| source | from 1.0, median | from 1.2-1.4, median | from 1.8-2.4, median | worst pair | changes / flips per winter | clean hours |
+|---|---|---|---|---|---|---|
+| gas | -29 (-106) | 0 (0) | 0 (0) | +2 (0) | 1.2 / 0.0 (1.4 / 0.0) | 72 (67) |
+| hp30 | -470 (-504) | -7 (-16) | 0 (-1) | +8 (+14) | 5.0 / 0.4 (5.7 / 0.9) | 561 (563) |
+| hp60 | -2 (-55) | 0 (0) | 0 (0) | 0 (+2) | 0.7 / 0.0 (1.5 / 0.0) | 25 (42) |
+
+Findings:
+1. The rule stays safe in a second winter: worst pair +2 / +8 / 0 min/day, at most 0.5 flips per winter.
+2. The rescue from a curve that is too low is slower in the milder winter for gas and hp60 (median -29 vs -106,
+   -2 vs -55): fewer cold hours mean more PWM / minimum-output hours, so fewer clean hours (hp60: 25-30 per winter).
+   This is the blind spot of entry 174 in a milder form, and the hourly log (entry 172) is what makes it visible.
+3. The 2-day window did not chase its own steps in either winter (flips <= 0.9). Entry 168 (60-72 h response) and the
+   2-day window: after a step the rule waits for 2 new qualifying days, which with >= 6 clean hours per day takes
+   at least 48 h and in practice longer. Rounds 1 and 5 compared windows of 1-4 days: comfort was the same; the 1-day
+   window made more changes (about 11 vs 6.6 per winter for 3 days, round 1), 2 and 3 days were close (round 5).
+   Whether 2 days is long enough for entry 168 is a judgement for Sergeant D; the simulation shows no harm from it.
+
+## 9. Limits
+
+Two weather years (2025-26, and 2024-25 in round 8 only); 2 seeds; boiler and heat-pump cycling not validated (round 4); radiator size calibrated to an
 anchor (entry 166) rather than measured; noise-free room sensor (a real 0.1 C sensor makes a per-minute slope spiky,
 which would make D noisier, not more informative).
