@@ -5348,3 +5348,9 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot Q-1531a: A"
 
 **Settled (narrows entry 186):** option A. For the Hybrid appliance type (satsource 3) the PWM cycle is the heat-pump cycle (iHpCycleSeconds, 1800 or 2400 s, entries 40/50) instead of 3600 / cycles per hour, and the SAT page's PWM card shows the heat-pump cycle field for Hybrid (TASK-1529 layout). Everything else stays as for a gas boiler: the hourly start limit (3 or 4 per hour, entries 30/52), the max-flow defaults 62/50 C (entries 67/110), and the MM= rule that already never sends 0 to a hybrid (`SATcontrol.ino` satComputeMM). Compared: thermo-nova has no hybrid type (not found in the code). **Task:** TASK-1531. **Open:** none.
+
+## 189. Published Summer Simmer Index stays as thermo-nova computes it (maintainer, 2026-10-31)
+
+**Source:** Robert (maintainer), 2026-10-31, in session, interactive question on TASK-1458 (asked twice). Chosen: "Close as won't fix (parity)".
+
+**Decision:** with Thermal comfort on, the published `sat/summer_simmer_index` / `sat/summer_simmer_perception` stay the index of the control temperature (the index of the index), exactly as thermo-nova: `climate.py:244-245` publishes `SummerSimmer.index(self.current_temperature, ...)` and `current_temperature` returns the index under Thermal comfort (`climate.py:276-277`). Rejected: publishing from the raw room temperature (a deviation). The control path is not affected either way. **Task:** TASK-1458 (closed, won't fix). **Open:** none; Q-1458a withdrawn, not asked.
