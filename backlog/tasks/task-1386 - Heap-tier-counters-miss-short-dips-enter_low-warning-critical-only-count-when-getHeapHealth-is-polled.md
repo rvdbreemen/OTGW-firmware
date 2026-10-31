@@ -3,9 +3,11 @@ id: TASK-1386
 title: >-
   Heap tier counters miss short dips: enter_low/warning/critical only count when
   getHeapHealth() is polled
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T11:08:00Z'
+updated_date: '2026-10-31T13:48:00Z'
 labels:
   - heap
   - telemetry
@@ -25,3 +27,9 @@ Found in TASK-1339 (2026-10-25 bench): boot min free heap 4596 B with hd_enter_w
 - [ ] #1 Decision recorded (derive from the low-water mark, or document as sampled) with the trade-off
 - [ ] #2 If changed: host or bench test shows a short dip below 5120 counted (red on HEAD)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-31 Robert (AskUserQuestion): 'Also count from watermark' - keep the sampled counters and add a check against the allocator low-water mark; a tier threshold crossed that sampling never saw counts one entry, marked as from-watermark. Trigger: bench .61 alpha.570 minfree 2240 B with entered_crit 0 (TASK-1504 notes).
+<!-- SECTION:NOTES:END -->

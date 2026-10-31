@@ -3,10 +3,11 @@ id: TASK-1525
 title: >-
   SAT: implement the heating curve self-tune (ADR-205): hourly evaluation and
   log, daily decision on the curve integral, on by default
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-31T13:45:00Z'
-updated_date: '2026-10-31T13:50:00Z'
+updated_date: '2026-10-31T13:59:00Z'
 labels:
   - sat
 dependencies:

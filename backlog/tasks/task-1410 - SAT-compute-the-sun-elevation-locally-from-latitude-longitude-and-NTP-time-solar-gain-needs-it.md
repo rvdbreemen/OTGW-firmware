@@ -3,14 +3,16 @@ id: TASK-1410
 title: >-
   SAT: compute the sun elevation locally from latitude/longitude and NTP time
   (solar gain needs it)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-26T20:13:00Z'
-updated_date: '2026-10-30T21:56:00Z'
+updated_date: '2026-10-31T13:52:00Z'
 labels:
   - sat
 milestone: 2.0.0
 dependencies: []
+priority: high
 ordinal: 548000
 ---
 
@@ -30,4 +32,6 @@ gruijter 2026-10-26 19:29 (#alpha-testing msg 1564360234938540185): 'why was my 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-30 maintainer decision (Robert, in session otgw-firmware-ea): released for pickup ('vrijgeven'); label needs-maintainer-ok removed. Priority after beta-1 blockers unless it is one.
+
+2026-10-31: prerequisite of TASK-1525 (ADR-205 self-tune, entry 178: without a sun elevation the tuner holds); Robert's OK for the local computation given in session (entry 178); priority high with TASK-1525 (before beta.1).
 <!-- SECTION:NOTES:END -->

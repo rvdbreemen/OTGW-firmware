@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:19:00Z'
-updated_date: '2026-10-31T13:39:00Z'
+updated_date: '2026-10-31T14:03:00Z'
 labels:
   - release beta
 milestone: 2.0.0
@@ -51,4 +51,10 @@ AC3 soak started: alpha.559+ccda6eb (beta-1 candidate) on .63 Classic+S3 Mini, 2
 2026-10-31 14:35 Robert (in session, AskUserQuestion): 'Soak on OTGW32 now, beta Sun'. AC3 soak runs on the OTGW32 (.61, OT-Direct, no PIC) with alpha.570, starting now; the TASK-1523 6 h capture run (with a planned reboot ~14:31, network drop ~15:01-15:04, broker restart ~16:01) is part of it and those events are explained. Not soaked: the PIC path of the Classic board (.63 offline) -> to be stated in the release notes.
 
 Soak started 2026-10-31 14:38:57 local: detached python soak.py .61 24 h (PID 37604) -> %LOCALAPPDATA%/OTGW-capture/soak/soak-570-otgw32.log; START fw alpha.570 bootcount 3. Reboot 14:28:33 = planned TASK-1523 fault (faults1523b.sh log '14:28:33 reboot: 200'). OBSERVATION: runtime.heap_min_free 2240 B within 10 min after that boot (entered_crit 0, so a short dip the 1 s tier sampling missed), with the capture's telnet + /ws + MQTT + 5-min snapshots + SAT sim + OT replay reconnecting after the reboot; the alpha.559 soak on .63 had minfree 29564. To watch during the soak; if it repeats or a reboot follows, it becomes its own task (heap at boot under capture load).
+
+2026-10-31 13:47 UTC Robert (#dev-sat-mqtt msg 1566086252254601217): the SAT heating curve self-tune (ADR-205, TASK-1525, prerequisite TASK-1410 local sun elevation) is to be built before beta.1, priority high.
+
+2026-10-31 ~15:00 Robert: 'Of je stopt de soak nu en bouwt eerst de nieuwe feature en dan voer je de soak uit.' Soak of alpha.570 stopped (PID 37604 killed); the 24 h soak restarts on the final beta.1 candidate with TASK-1410 + TASK-1525 (ADR-205 self-tune) + TASK-1386.
+
+2026-10-31 Robert: 'Make sure to label 1412 epic and all its tasks as high priority. And include it for beta.1.' -> TASK-1412 and 1412.1-1412.26 set to priority high with label beta.1.
 <!-- SECTION:NOTES:END -->

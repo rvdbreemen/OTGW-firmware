@@ -7,11 +7,12 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-27T23:40:00Z'
-updated_date: '2026-10-30T21:06:00Z'
+updated_date: '2026-10-31T14:02:00Z'
 labels:
   - epic
   - sat
   - low-load
+  - beta.1
 milestone: 2.0.0
 dependencies:
   - TASK-1412.26
@@ -22,7 +23,7 @@ documentation:
   - docs/sat/sat-low-load-execution-backlog-2026-10-28.json
   - docs/sat/evidence/2026-10-28-low-load-backlog-order.json
   - docs/sat/sat-low-load-agent-handoff-2026-10-28.md
-priority: medium
+priority: high
 type: feature
 ordinal: 550000
 ---
