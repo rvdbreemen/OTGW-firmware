@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-31T13:48:00Z'
-updated_date: '2026-10-31T20:27:00Z'
+updated_date: '2026-10-31T20:33:00Z'
 labels:
   - sat
   - design
@@ -43,4 +43,6 @@ Robert 2026-10-31: 'de warmtepomp moet minimaal schakelen. Dus goal voor warmtep
 2026-10-31 rounds 16-17 (docs/sat/sim-hp-lowload/round16.md, round17.md, charts round16_vs_current.png, round17_period_sweep.png): degree minutes on all HP types vs today's SAT PWM 30 min, and SAT's own PWM extended to 240 min. Extending SAT PWM always trades starts for comfort (fixed ON time per period); at equal starts degree minutes are far better on radiators (hp30 3.7 starts 0.224 C vs PWM120 3.6 starts 0.365 C); on underfloor time-proportional improves with period, SAT PWM worsens; DM best. DM benefit depends on emitter mass (UFH -90 % starts and better comfort; radiators trade-off).
 
 2026-10-31 entry 186 (Hybrid = heat pump, scope open as Q-1531a): read against rounds 15-17. Low-load PWM is the regime where a hybrid runs its heat pump alone (the gas boiler assists only at high load), so the heat-pump results (HP PWM cycle, degree minutes) apply to a hybrid at low load without a new simulation. Not modelled: switch-over between heat pump and gas boiler, and gas assist during a degree-minute run. A hybrid case is only needed if Q-1531a = B (every heat-pump rule, incl. max flow 40) or if a hybrid tester reports switch-over behaviour.
+
+2026-10-31 Q-1531a answered A (Sergeant D 19:12 UTC, msg 1566167931191304233; ea records it as entry 188): a hybrid uses the heat-pump PWM cycle, the rest stays gas. So no hybrid simulation is needed. Consequence for the TASK-1527 design: whatever replaces the heat-pump PWM (degree minutes or a longer cycle, Q-1527a) also reaches the hybrid's heat pump, while the gas start limit and the max-flow defaults stay. Q-1527a must say so explicitly.
 <!-- SECTION:NOTES:END -->
