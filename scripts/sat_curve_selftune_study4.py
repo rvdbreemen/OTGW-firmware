@@ -35,6 +35,10 @@ EXCLUDE_ATMIN = False # True (round 5b): hours with the heat source off or at mi
 PID_D_HOLD = False    # True (round 7): PID derivative held inside the 0.1 C deadband, thermo-nova pid.py:205-207
 SIGNAL = "CI"         # round 7, entry 170: CI (setpoint - curve) | CI+D | I+D | I | CI+guard
 GUARD_KPH = 0.1
+HP_CTRL = "sat"        # round 16, heat pumps only: "sat" = SAT PWM as today; "own" = SAT never switches to PWM, the heat pump
+                       # modulates and cycles itself; "dm" = degree minutes start/stop, the heat pump modulates while running
+HP_DM_START = 120.0    # degree minutes: start when DM <= -HP_DM_START, stop when DM >= 0
+HP_MIN_ON, HP_MIN_OFF = 20, 10   # compressor protection for "dm" (minutes, assumption)
 HP_PERIOD_S = 1800     # heat-pump PWM period; round 14 tests 2400 and 7200 (Sergeant D 2026-10-31 14:46)
 STEP_KEEPS_PID = False # True (round 10): a coefficient step leaves the PID integral and derivative alone, as ADR-204 requires
 COLD_K = 0.3          # EXCLUDE_ATMIN = "cold" (round 5e): a PWM / minimum-output hour counts only when the hour-mean room is more than COLD_K below target       # CI+guard: an hour whose room temperature moved more than this is not clean
@@ -71,7 +75,7 @@ def run(args):
     else:
         Heff_ = s3.house(era, mass, kr)[4]
         pmax = max(4000.0, round(1.1 * Heff_ * (TARGET + 10.0), -2))   # sized to the design load at -10 C (+10 %)
-        pmin = pmax * (0.3 if source == "hp30" else 0.6); upper = float(HP_PERIOD_S)   # entry 40: HP cycles 1800 s (round 14: 2400 / 7200)
+        pmin = pmax * {"hp30": 0.3, "hp60": 0.6, "hp100": 1.0}[source]; upper = float(HP_PERIOD_S)   # entry 40: HP cycles 1800 s (round 14: 2400 / 7200)
     spmax = MAX_SP_GAS if source == "gas" else MAX_SP_HP
     duty_lo = LOWER / upper; duty_hi = 1 - duty_lo; duty_min = duty_lo / 2
     tm, sm = base.WEATHER["w"]; minutes = len(tm)
@@ -93,6 +97,7 @@ def run(args):
     integ = 0.0; last = None; rd = 0.0
     pwm = False; pwm_phase_on = False; pwm_left = 0; pwm_new = False; t_on = 40.0; Pcur = 0.0
     ov_s = uh_s = sat_s = 0; last_draw_m = -10**6; last_off_s = 1
+    dm_acc = 0.0
     corr_acc = 0.0; corr_n = 0; clean = True; stepped = False; hour_ta0 = TARGET; rdt = 0.0; hour_lowload = False; hour_ta_sum = 0.0; day_err_sum = 0.0; day_err_n = 0; day_tmax = -99.0; day_tmin = 99.0; day_capped = 0
     sq = n = out_band = over = 0.0; fuel = 0.0; heat = 0.0; starts = 0; short_burns = 0; pwm_min = 0; flame_min = 0
     writes = flips = 0; last_dir = 0; clean_h = 0
@@ -128,6 +133,7 @@ def run(args):
             ov_s = 0; uh_s = 0; sat_s = 0
             if not heating or sp <= 10.0: pwm = False
         if draw: last_draw_m = m
+        if source != "gas" and HP_CTRL in ("own", "dm"): pwm = False
         if pwm:
             if pwm_left <= 0:
                 duty = min(max((sp - BASE_OFF) / max(t_on - BASE_OFF, 1.0), 0.0), 1.0)
@@ -145,6 +151,10 @@ def run(args):
         else:
             # boiler's own modulation and anti-cycling
             if not heating or draw or sp <= 10.0: want = False
+            elif source != "gas" and HP_CTRL == "dm":
+                dm_acc = max(-1500.0, min(100.0, dm_acc + (flow - sp)))
+                if burner: want = dm_acc < 0.0 or on_min < HP_MIN_ON
+                else: want = dm_acc <= -HP_DM_START and off_min >= HP_MIN_OFF
             elif burner: want = not (flow > sp + 5.0)
             else: want = off_min >= 3 and flow < sp - 5.0
             P = min(pmax, max(pmin, qrad + 2000.0 * (sp - flow))) if want else 0.0   # boiler's own flow loop (2000 W/K matched the field flame fraction best)
