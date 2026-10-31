@@ -46,7 +46,7 @@ if __name__ == "__main__":
     for w in sorted(glob.glob(os.path.join(arg("--seasondir"), "season_*.json"))):
         label = os.path.basename(w)[7:-5]; dest = os.path.join(part, label + ".json")
         if os.path.exists(dest): res[label] = json.load(open(dest)); print(label, "exists, skipped", flush=True); continue
-        with Pool(8, initializer=_init, initargs=(w, krs)) as p: res[label] = p.map(job, jobs(), chunksize=2)
+        with Pool(int(arg("--workers")) if "--workers" in sys.argv else 8, initializer=_init, initargs=(w, krs)) as p: res[label] = p.map(job, jobs(), chunksize=2)
         tmp = dest + ".tmp"; json.dump(res[label], open(tmp, "w")); os.replace(tmp, dest)
         print(label, "done", len(res[label]), flush=True)
     json.dump(res, open(os.path.join(arg("--outdir"), "round16_hp_dm_runs.json"), "w"))
