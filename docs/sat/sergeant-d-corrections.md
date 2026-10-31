@@ -5149,3 +5149,59 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 
 **Settled:** the tuner runs only while SAT is the active controller, and only without sun (entry 160).
 **Conflict, put back to him as Q-1519b (not resolved by us):** he chooses the integral as the signal. thermo-nova zeroes the integral whenever |error| > DEADBAND 0.1 (pid.py `_update_integral`, opened at the pin 2026-10-31), so with a wrong curve the integral stays 0. In our simulation (scripts/sat_curve_selftune_sim.py) the integral-sign tuner therefore never moved from a too-low curve and hunted within the deadband (325-379 flash writes in 3 weeks). The PID correction (setpoint minus curve, our A3) worked both ways. **Task:** TASK-1519. **Open:** Q-1519b.
+
+## 162. TASK-1519: daily data sets, not hourly (2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 06:30 UTC, #dev-sat-mqtt, msg 1565976214189908032 (https://discord.com/channels/812969634638725140/1105556725714649128/1565976214189908032).
+
+**Quoted:** "@BlueFlame Bot moreover we need daily data sets, because hourly are not consistent. There are some factors that may confuse the procedure ( e.g cooking, playing kinds, activity, party )"
+
+**Settled:** the tuner decides on a day of data, not on one hour; household activity makes single hours unreliable. **Conflict with Robert's requirement** (TASK-1519, 2026-10-31 05:51: "I want an hourly evaluation"), not resolved by us: put to Robert. **Interpretation offered to both (ours, not his words):** collect and screen per hour (entries 160, 161), decide once per day on the valid hours. **Task:** TASK-1519. **Open:** Robert's choice.
+
+## 163. Q-1519b A: the self-tune uses a separate curve integral (2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 06:33 UTC, #dev-sat-mqtt, msg 1565976914605113448 (https://discord.com/channels/812969634638725140/1105556725714649128/1565976914605113448), answer to Q-1519b (msg 1565976153540530227).
+
+**Quoted:** "Excellent choice @BlueFlame Bot. We will use the curve integral for this procedure. Q-159b: A"
+
+**Settled (option A as posted; 'Q-159b' read as Q-1519b):** the tuner's signal is a separate curve integral, everything the PID adds on top of the curve (setpoint minus curve) summed over the evaluation window. The SAT PID integral itself (pid.py _update_integral, DEADBAND 0.1) is unchanged. **Task:** TASK-1519. **Open:** none on the signal; the window length follows entry 162.
+
+## 164. TASK-1519: change the coefficient in small daily increments and compare before and after (2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 06:34 UTC, #dev-sat-mqtt, msg 1565977328410959936 (https://discord.com/channels/812969634638725140/1105556725714649128/1565977328410959936).
+
+**Quoted:** "@BlueFlame Bot When we are about to start the heating curve coefficient change, we should do it in small increments daily and see how home responds into these changes. Compare previous to new data"
+
+**Settled:** at most one small change per day; after a change the next day's data is compared with the previous day's before the next step. **Interpretation (ours):** a step whose next day does not reduce the curve integral is not repeated (or is undone); to be confirmed in the design. **Task:** TASK-1519. **Open:** what 'compare' acts on (undo, hold, or continue).
+
+## 165. TASK-1519: a coefficient change is never more than +-0.2 from the previous curve (2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 06:39 UTC, #dev-sat-mqtt, msg 1565978440094584853 (https://discord.com/channels/812969634638725140/1105556725714649128/1565978440094584853).
+
+**Quoted:** "@BlueFlame Bot The coefficient changes should never be more than ± 0.2 than the previous curve."
+
+**Settled:** the bound is 0.2 per change. **Ambiguous, asked as Q-1519c:** per daily step relative to the day before, or as a total band around the user's own coefficient. The simulation used 0.1 per step, which fits either reading. **Task:** TASK-1519. **Open:** Q-1519c.
+
+## 166. TASK-1519: most homes need a curve coefficient between 1.6 and 2.4 (2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 06:56 UTC, #dev-sat-mqtt, msg 1565982872039325807 (https://discord.com/channels/812969634638725140/1105556725714649128/1565982872039325807).
+
+**Quoted:** "@BlueFlame Bot keep in mind that most homes need curves between 1.6-2.4"
+
+**Settled (design input, not a limit):** the realistic range of the heating-curve coefficient is 1.6-2.4. The simulation study weights its conclusions on houses whose best coefficient falls in that range; houses outside it are reported as edge cases. Compared: thermo-nova default 2.0 (const.py:182, entry 24), firmware range 0.1-5.0 (entry 72, ADR-198). **Interpretation (ours):** not a clamp for the tuner; the tuner's bounds stay with Q-1519c. **Task:** TASK-1519. **Open:** none.
+
+## 167. Q-1519c: the 0.2 limit applies to each new curve, and the coefficient may carry 3 decimals (2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 07:08 UTC, #dev-sat-mqtt, msg 1565985841287798876 (https://discord.com/channels/812969634638725140/1105556725714649128/1565985841287798876), answer to Q-1519c (msg 1565979273221902401).
+
+**Quoted:** "@BlueFlame Bot The limit is 0.2 for the new curve, keep in mind that you can use up to 3 decimals for the new curve. E.g. old coefficient 2.0 -> new coefficient 2.121"
+
+**Settled (closest to option A as posted; his words, not our options):** each new coefficient differs at most 0.2 from the previous one; it is not a total band around the user's value. Steps need not be 0.1: the coefficient may carry 3 decimals, so a step can be sized to the measured offset (his example +0.121). Compared: thermo-nova has no tuner; the firmware stores the coefficient as a float with range 0.1-5.0 (ADR-198, entry 72); the REST/MQTT/UI resolution of 3 decimals still has to be checked. **Task:** TASK-1519. **Open:** whether the UI and settings round the coefficient (0.1 slider steps) and must show 3 decimals.
+
+## 168. TASK-1519: the walls are a thermal battery that takes about 3 days to charge; the system response is 60-72 hours (2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 07:23 UTC, #dev-sat-mqtt, msg 1565989617910681664 (https://discord.com/channels/812969634638725140/1105556725714649128/1565989617910681664).
+
+**Quoted:** "@BlueFlame Bot keep in mind that the walls of the house work as a thermal battery. It is the thermal barrier of the indoor to outdoor. The walls need about 3 days to be "thermally charged". So every major heating curve change may affect calculation days later. Changing the thermal inertia of a home is a very slow process. So keep in mind that the system response is about 60-72 hours"
+
+**Settled (design input):** after a curve change the house needs 60-72 h to settle, so the tuner must not judge a change, or take the next one, before that time; a major change shows its effect days later. Compared: thermo-nova has no tuner; our simulation so far used one thermal mass (time constant 40-150 h, fitted ratio about 110 h on a 4 h field capture), which lumps air and walls together and cannot show a fast air node against slow wall charging. **Interpretation (ours):** a two-mass house model (air + wall) replaces the one-mass model for the TASK-1519 study, and decision windows / waiting times of at least 60-72 h are part of the candidate set. **Task:** TASK-1519. **Open:** none.
