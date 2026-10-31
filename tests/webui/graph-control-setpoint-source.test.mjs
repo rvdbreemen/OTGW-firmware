@@ -104,7 +104,21 @@ test('c2) a dropped R frame does not bring back the thermostat value; T counts a
   h.setClock(BASE + 10000);  h.feed(wsLine('T10010A00'));   // R of this exchange lost: still 45
   assert.equal(h.model.chSet, 45);
   h.setClock(BASE + 40200);  h.feed(wsLine('T10010A00'));   // no R for > 30 s: gateway no longer overrides
+  h.setClock(BASE + 41000);  h.feed(wsLine('BD0010A00'));   // TASK-1522: the T counts once 500 ms passed without R
   assert.equal(h.model.chSet, 10);
+});
+
+test('i) TASK-1522 gruijter 09:47: T 29.7 at the end of a slot, R 10.0 just after the boundary: no slot shows 29.7', () => {
+  const h = load();
+  // Thermostat and SAT agree on 10.0 for > 30 s: T frames only, the PIC sends no R.
+  for (let i = 0; i < 8; i++) { h.setClock(BASE + i * 5000); h.feed(wsLine('T10010A00')); h.setClock(BASE + i * 5000 + 900); h.feed(wsLine('BD0010A00')); }
+  // The thermostat asks 29.7 at 4.96 s into a slot; the PIC replaces it, the R lands 90 ms later in the next slot.
+  const s = BASE + 8 * 5000;
+  h.setClock(s + 4960); h.feed(wsLine('T90011DB3'));
+  h.setClock(s + 5050); h.feed(wsLine('R10010A00'));
+  h.setClock(s + 5060); h.feed(wsLine('BD0010A00'));
+  h.setClock(s + 5900); h.feed(wsLine('A50011DB3'));
+  assert.ok(slotValues(h).every((v) => v === 10), 'slots: ' + JSON.stringify(slotValues(h)));
 });
 
 test('d) non-echo boiler: T/R 27.22 then Write-Ack data 0 keeps 27.22', () => {

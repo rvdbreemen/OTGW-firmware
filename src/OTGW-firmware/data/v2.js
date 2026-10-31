@@ -474,6 +474,10 @@
     var isAck = (type === 4 || type === 5);       // boiler answer carries data
     var isWrite = (type === 1 || type === 5);     // thermostat/boiler write
     var changed = false;
+    // TASK-1522: a provisional thermostat TSet (see case 1) counts once 500 ms passed without an R for MsgID 1.
+    if (model.tsetPending && Date.now() - model.tsetPending.t >= 500) {
+      model.chSet = model.tsetPending.v; model.tsetPending = null; changed = true;
+    }
     switch (id) {
       case 0:  // Status — slave status in LB
         if (isAck) {
@@ -488,11 +492,20 @@
                // answer 0, and the A echo to the thermostat showed its own value (TASK-1271).
                // A T frame counts only when no R frame for MsgID 1 came in the last 30 s, so a
                // dropped R frame cannot bring back the thermostat's own value.
-               if (type === 1) {
+               // TASK-1522: an accepted T is provisional. It counts at the first frame at least 500 ms later
+               // (the firmware's T/R pairing window, OTGW-Core.ino processOT) unless an R for MsgID 1 came
+               // first: the PIC sends R right after T, sometimes across a 5 s graph slot boundary.
+               if (type === 5 && model.tsetPending && raw.charAt(0).toUpperCase() === 'B') {
+                 // The boiler acknowledged MsgID 1 with no R in between: it got the thermostat's own value.
+                 model.chSet = model.tsetPending.v; model.tsetPending = null; changed = true;
+               } else if (type === 1) {
                  var nowSp = Date.now();
-                 if (raw.charAt(0).toUpperCase() === 'R') model.tsetGatewayMs = nowSp;
-                 else if (nowSp - (model.tsetGatewayMs || 0) < 30000) break;
-                 model.chSet = f88(u16); changed = true;
+                 if (raw.charAt(0).toUpperCase() === 'R') {
+                   model.tsetGatewayMs = nowSp; model.tsetPending = null;
+                   model.chSet = f88(u16); changed = true;
+                 } else if (nowSp - (model.tsetGatewayMs || 0) >= 30000) {
+                   model.tsetPending = { v: f88(u16), t: nowSp };
+                 }
                }
                break;
       case 16: if (type === 1) { model.roomSet = f88(u16); changed = true; } break;  // TrSet (thermostat setpoint); Write-Ack data is undefined too
