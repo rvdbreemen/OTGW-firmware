@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-31T05:53:00Z'
-updated_date: '2026-10-31T11:16:00Z'
+updated_date: '2026-10-31T12:31:00Z'
 labels:
   - sat
   - design
@@ -55,4 +55,6 @@ Robert 2026-10-31 05:51 UTC in #alpha-testing (msg 1565966404304248853): 'I want
 2026-10-31 ~11:00-12:15 UTC rounds 5c-5g (data docs/sat/sim-1519/data/round5c..5g_runs.json, scripts study5c/5d/5f, report sections 6-7). Robert asked in session whether the ADR becomes measure-hourly/decide-daily: answer Ask Sergeant -> Q-1519d re-ask first when Sergeant D is back (silent since 09:33). Q-1519e option B simulated: refuted (no gain, more churn), advice A. Optimum elsewhere: balance 2.4 from 1.8 ends 2.1-2.4, balance 1.6 ends 1.7. Blind spot: 2015/BENG at curve 1.0 -> PWM at minimum -> 0 clean hours, tuner holds (room 144-278 min/day out of band); one-sided exclusion (5d/5e) and a cold-day net (5f) rescue it but drift up on the plateau (selection bias) or run away in the light house (PID swing feedback, coefficient to 3.4); swing/cap guard (5g) removes harm and rescue alike. Queued Q-1519g. Round 5 reproduced bit-exact after every model change.
 
 2026-10-31 ~12:20 UTC round 8 (Robert: another year, 2-day window): 2024-25 Open-Meteo, same houses/radiators (out of sample), rule as decided. 2025-26 runs reproduce round 5d 150/150. Cliff below ~1.2 + plateau hold, optima move 0.1-0.3. Rule safe: worst pair +2 gas / +8 hp30 / 0 hp60, flips <= 0.5. Rescue from 1.0 slower in the milder winter (gas median -29 vs -106, hp60 -2 vs -55) because fewer clean hours (hp60 25-30/winter). Decisions recorded: entry 172 (Q-1519d B, Sergeant D), 173 (Q-1519e A, Sergeant D + Robert), 174 (Q-1519g A + extra logging, Robert). Git frozen by session ea (TASK-1521 bump) - files edited, not yet committed: corrections 173/174, open-questions, report section 9, study8.py, round8_runs.json, weather_2024_25/2025_26.json.
+
+2026-10-31 round 9 (Robert: twenty years of runs): 20 winters 2005-06..2024-25, 11,100 winters, 2-day and 3-day window, radiators from 2025-26 (out of sample); 2024-25 equals round 8 300/300. Worst pair over 20 winters +33 min/day (hp60 2 d), 0.9-4.3 % of pairs worse by > 5 min/day. Gain scales with cold (gas rescue from 1.0: -415 in 2009-11, ~0 in 2013-14/2019-20). Flips concentrate in hp30 near the optimum; 3 d halves them (88 -> 25 runs >= 3 flips, mean 0.31 -> 0.17) and lowers worst pairs (hp30 +28 -> +19, hp60 +33 -> +21) at a slower rescue (gas -33 -> -19, hp60 -5 -> 0). Q-1519h is a real trade-off; report section 9. Simulation paused once for session ea's alpha.569 build (2 workers during the build).
 <!-- SECTION:NOTES:END -->

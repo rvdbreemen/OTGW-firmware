@@ -186,8 +186,63 @@ Findings:
    window made more changes (about 11 vs 6.6 per winter for 3 days, round 1), 2 and 3 days were close (round 5).
    Whether 2 days is long enough for entry 168 is a judgement for Sergeant D; the simulation shows no harm from it.
 
-## 9. Limits
+## 9. Round 9: twenty winters (2005-06 .. 2024-25), 2-day and 3-day window (Robert 2026-10-31)
 
-Two weather years (2025-26, and 2024-25 in round 8 only); 2 seeds; boiler and heat-pump cycling not validated (round 4); radiator size calibrated to an
+Script `scripts/sat_curve_selftune_study9.py`; weather `data/weather20/` (Open-Meteo archive, same grid cell, Nov-Feb,
+120 days each); results per winter in `data/round9/<winter>.json`. Radiators as calibrated on 2025-26 (all 20 winters
+out of sample). Per winter: coarse sweep (c = 1.0-2.4, seed 1) and the decided rule with a 2-day and a 3-day window
+against no tuner, starts 1.0 / 1.2 / 1.4 / 1.8 / 2.4, 2 seeds, gas / hp30 / hp60: 11,100 winters in total. Check:
+round 9's 2024-25 runs equal round 8 (300 / 300).
+
+The 20 winters range from a heating-hour mean of 2.38 C (2010-11) to 6.78 C (2006-07), minimum -15.5 C (February
+2021), 62 to 1,029 frost hours.
+
+Rescue from a curve of 1.0 (median min/day outside +-0.3 C, tuner minus no tuner, 2 d / 3 d), and worst pair (2 d):
+
+| winter | gas | hp30 | hp60 | worst pair gas / hp30 / hp60 |
+|---|---|---|---|---|
+| 2005-06 | -181 / -157 | -702 / -697 | -113 / -91 | 0 / +4 / +5 |
+| 2006-07 (mildest) | -20 / -9 | -167 / -170 | -2 / -2 | +16 / +3 / +5 |
+| 2009-10 | -418 / -390 | -660 / -651 | -268 / -259 | 0 / +27 / +17 |
+| 2010-11 (coldest) | -415 / -393 | -665 / -668 | -265 / -256 | 0 / +25 / +29 |
+| 2013-14 (fewest frost h) | 0 / 0 | -198 / -201 | 0 / 0 | +13 / +8 / 0 |
+| 2019-20 | 0 / 0 | -215 / -219 | 0 / 0 | +4 / +11 / 0 |
+| 2020-21 (-15.5 C) | -62 / -30 | -382 / -378 | 0 / -2 | +3 / +3 / +4 |
+| 2024-25 | -29 / -9 | -470 / -470 | -2 / 0 | +2 / +8 / 0 |
+
+(all 20 rows: `data/round9/`; table above is a selection.)
+
+All pairs over 20 winters (1,000 per source and window):
+
+| source, window | median | mean | worst pair | pairs worse by > 5 min/day | rescue from 1.0, median | flips per winter, mean | runs with >= 3 flips |
+|---|---|---|---|---|---|---|---|
+| gas, 2 d | 0 | -30.5 | +16 | 1.2 % | -33 | | |
+| gas, 3 d | 0 | -28.7 | +16 | 1.8 % | -19 | | |
+| hp30, 2 d | -4.1 | -85.4 | +28 | 4.3 % | -384 | | |
+| hp30, 3 d | -4.0 | -84.3 | +19 | 3.2 % | -375 | | |
+| hp60, 2 d | 0 | -11.8 | +33 | 2.0 % | -5 | | |
+| hp60, 3 d | 0 | -10.1 | +21 | 0.9 % | 0 | | |
+| all, 2 d | | | | | | 0.31 | 88 / 3,000 |
+| all, 3 d | | | | | | 0.17 | 25 / 3,000 |
+
+Changes per winter: mean 2.9 (2 d) and 2.4 (3 d), at most 17 and 14.
+
+Findings:
+1. Over 20 winters the rule never makes comfort much worse: worst pair +33 min/day (hp60, 2 d), and 0.9-4.3 % of
+   pairs are worse by more than 5 min/day.
+2. The gain scales with the cold: in cold winters (2009-10, 2010-11) the rescue from a curve of 1.0 is -415 min/day
+   for gas; in mild winters (2013-14, 2019-20) the gas and hp60 tuners hardly move, because nearly every hour is at
+   minimum output (the blind spot of entry 174). hp30 rescues in every winter.
+3. Flips concentrate in hp30 houses near the optimum (start 1.8): with ~560 clean hours a winter the rule decides
+   often and steps +-0.1 around a right value that moves with the weather. 3 days halves that (88 -> 25 runs with
+   >= 3 flips) and lowers the worst pairs (hp30 +28 -> +19, hp60 +33 -> +21).
+4. The price of 3 days is a slower rescue for gas and hp60 (median -33 -> -19 and -5 -> 0 from a curve of 1.0).
+5. The sweep optimum of the 1992-2012 heavy house moves between 1.6 and 2.0 from winter to winter (coarse grid).
+
+The 2-day / 3-day choice (Q-1519h) is a trade-off: 2 days rescues faster, 3 days is steadier and matches entry 168.
+
+## 10. Limits
+
+Weather: 2025-26 for rounds 1-7, plus 2024-25 (round 8) and 20 winters 2005-06 .. 2024-25 (round 9); 2 seeds; boiler and heat-pump cycling not validated (round 4); radiator size calibrated to an
 anchor (entry 166) rather than measured; noise-free room sensor (a real 0.1 C sensor makes a per-minute slope spiky,
 which would make D noisier, not more informative).
