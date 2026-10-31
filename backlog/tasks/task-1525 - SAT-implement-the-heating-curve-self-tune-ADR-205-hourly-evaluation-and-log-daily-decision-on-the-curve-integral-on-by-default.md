@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-31T13:45:00Z'
-updated_date: '2026-10-31T16:10:00Z'
+updated_date: '2026-10-31T18:56:00Z'
 labels:
   - sat
 dependencies:
@@ -40,4 +40,6 @@ Implements ADR-205 (Accepted 2026-10-31) from TASK-1519. Design source: Sergeant
 Robert 2026-10-31 13:47 UTC #dev-sat-mqtt (msg 1566086252254601217): 'we have a go. Please add this feature to backlog to build before beta.1. Priority: high'. Sergeant D accepted ADR-205 13:46 (entry 180). Prerequisite TASK-1410 raised to high with it.
 
 2026-10-31 evidence (alpha.575+081ee4d): tests/test_sat_curve_selftune.py HEAD 55/55 OK (calls the extracted firmware blocks + SATcurveTune.h); pre-change source: 'no satCurveTune pure block' (red). ExclusionMutation OK; manual mutants dropping the PWM or SUN exclusion -> test_each_exclusion FAILED (AC2 red-when-removed). AC5: REST debug settings.sat.curve_self_tune=true default (bench_check PASS), MQTT sat/curve_self_tune in ch09/h09/MANUAL.md (test_manual_sat_commands OK), settings-help 28/28. AC6: bench .61 SATTUNEH hour=0/1/2 mean=2.74/2.83/2.93 ticks=6 counted=0 reason=flame_off. AC8: evaluate --quick 80/0/0, combo build OK. AC7 OPEN: built-in SAT simulation toggles the flame every tick (flow 37 > setpoint 23.6), so every simulated hour ends flame_off and no day counts; the OT frame replay has CH on with flame off. A 4-day bench run needs a scenario with a steady flame (boiler emulator) or field data. Found on the way: the tick fed RelModLevel instead of satGetActualModulation() (simulation only); fixed in the working tree, ships with the next build.
+
+Correction 2026-10-31 (alpha session, after Robert questioned it): the earlier note that the built-in simulation 'toggles the flame every tick' was wrong. Measured in the bench logs: SATTICK flame=0 on every 30 s tick and SATTUNEH reason=flame_off every (60 s sim) hour. Cause from the model equations: the synthetic boiler short-cycles, 37-54 starts/h with 5-12 s burns, because its minimum output (1.2 kW) always exceeds its emitter loss (0.1-0.6 kW) and its water mass is ~170x too small. Filed as TASK-1532; AC7 waits on it.
 <!-- SECTION:NOTES:END -->

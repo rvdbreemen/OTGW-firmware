@@ -5324,3 +5324,19 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot currently in the PID / PWM card we display the cycles of both systems radiators and heat pumps. It is confusing for the user. So when an Appliance Type is selected keep only the cycles for this specific appliance type. More over rename the card name from " PID/PWM" to "PWM"."
 
 **Settled (UI request, no behaviour change):** on the SAT settings page the card "PID / PWM" is renamed "PWM", and it shows only the cycle setting that applies to the selected appliance type: cycles per hour for a gas boiler (or hybrid), the heat-pump cycle length for a heat pump; the shown field follows a change of the type. The settings themselves (SATcyclesperhour, SAThpcycle) and what SAT sends to the boiler do not change. Compared: thermo-nova's options flow shows the cycles-per-hour choice per heating system already (`config_flow.py:686-700`: heat pumps 2/3 per hour, radiators 3/4 per hour), so this matches its presentation. **Task:** TASK-1529 (UI only). **Open:** none; a possible third heat-pump option (entry 184, TASK-1527) would appear in the same field.
+
+## 186. The Hybrid appliance type is treated as a heat pump (Sergeant D, 2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 15:27 UTC, #alpha-testing, msg 1566111477927116892 (https://discord.com/channels/812969634638725140/1514720723980259460/1566111477927116892), right after the TASK-1529 acknowledgement (msg 1566111334372872364). Not acknowledged at the time; recorded at 18:5x UTC by the alpha session.
+
+**Quoted:** "@BlueFlame Bot Hybrid Appliance type should be considered as heat pump"
+
+**Settled:** Hybrid (satsource 3) follows the heat-pump path, not the gas path. Today the firmware treats hybrid as gas everywhere except the MM= rule (`SATcontrol.ino:471-482`, heat pump and hybrid never get MM=0): PWM period 3600 / cycles per hour (`SATcontrol.ino:440-446`), the hourly start limit, the max-flow defaults 62/50 instead of the heat-pump cap 40 (`SATcontrol.ino:292-298`), and the PWM card shows cycles per hour (TASK-1529, entry 185). Compared: thermo-nova has no hybrid type (not found in the code; only `HeatingSystem.HEAT_PUMP`, `config_flow.py:686`, `const.py:190`). **Interpretation (ours, to confirm):** the scope is not stated, so it is asked as Q-1531a: A) the PWM cycle and the PWM card only, B) every heat-pump rule. **Task:** TASK-1531. **Open:** Q-1531a.
+
+## 187. SAT page: Max relative modulation is edited only in the Central Heating Settings card (Sergeant D, 2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 18:24 UTC, #alpha-testing, msg 1566155941357944883 (https://discord.com/channels/812969634638725140/1514720723980259460/1566155941357944883), and 18:26 UTC, msg 1566156455160062037 (https://discord.com/channels/812969634638725140/1514720723980259460/1566156455160062037).
+
+**Quoted:** "@BlueFlame Bot in the PWM card the max modulation number field reports different value than the central heating settings card Max relative modulation slider. They must be the same. In both we control the Max relative modulation of the boiler" and "@BlueFlame Bot remove the Max relative modulation number field from the PWM card and keep it only in the Central Heating Settings Card"
+
+**Settled (UI request, no behaviour change):** the PWM card no longer shows the Max modulation field; the Central Heating Settings slider (TASK-1514) is the only place to set it. Fact check: both edit the same setting, `settings.sat.iMaxRelModulation` (settings key satmaxmodulation, `restAPI.ino:3903`; slider reads `max_rel_modulation`, `SATcontrol.ino:3790`), so the difference he saw is a stale copy on the page, not two settings. Compared: thermo-nova has no web UI. **Task:** TASK-1530. **Open:** none.
