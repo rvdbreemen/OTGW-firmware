@@ -4,11 +4,12 @@ title: 'Epic: prove native ESP32-S3 HTTPS/WSS and accurate browser geolocation'
 status: To Do
 assignee: []
 created_date: '2026-10-24T10:55:00Z'
-updated_date: '2026-10-24T19:11:00Z'
+updated_date: '2026-10-31T14:14:00Z'
 labels:
   - epic
   - https
   - esp32-s3
+  - paused
 dependencies: []
 references:
   - >-
@@ -44,4 +45,6 @@ The ESP32-S3 migration makes encrypted local browser access feasible, but the cu
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-24 Robert: parked ('Even parkeren'). Not created in this session; conflicts with the 'never HTTPS/WSS' project rule, so no work until he decides.
+
+2026-10-31 13:55 UTC Robert (#alpha-testing msg 1566088247665229925): 'Pauze 1349 for post. Beta.1 release.' Paused until after the beta.1 release (TASK-1504); do not pick up this epic or its subtasks before then. Status and priority left as they were.
 <!-- SECTION:NOTES:END -->
