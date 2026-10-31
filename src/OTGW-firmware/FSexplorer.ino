@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.589
+**  Version  : v2.0.0-alpha.590
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -58,12 +58,12 @@ const char Helper[] PROGMEM =
   "  <li>FSexplorer.html</li>\n"
   "  <li>FSexplorer.css</li>\n"
   "</ul>\n"
-  "<form method=\"POST\" action=\"/upload\" enctype=\"multipart/form-data\">\n"
+  "<form method=\"POST\" action=\"upload\" enctype=\"multipart/form-data\">\n"
   "  <input type=\"file\" name=\"upload\">\n"
   "  <input type=\"submit\" value=\"Upload\">\n"
   "</form>\n"
   "<br/><b>or</b> you can use the <i>Flash Utility</i> to flash firmware or LittleFS!\n"
-  "<form action='/update' method='GET'>\n"
+  "<form action='update' method='GET'>\n"
   "  <input type='submit' name='SUBMIT' value='Flash Utility'/>\n"
   "</form>\n";
 const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
@@ -780,7 +780,7 @@ void reBootESP(AsyncWebServerRequest *request)
   webBeginRequest(request);
   if (!checkHttpAuth()) return;
   DebugTln(F("Redirect and ReBoot .."));
-  doRedirect("Reboot OTGW firmware ..", 120, "/", true);
+  doRedirect("Reboot OTGW firmware ..", 120, "./", true);   // TASK-1445: page-relative, also behind a proxy prefix
 } // reBootESP()
 
 void resetWirelessButton(AsyncWebServerRequest *request)
@@ -789,7 +789,7 @@ void resetWirelessButton(AsyncWebServerRequest *request)
   if (!checkHttpAuth()) return;
   DebugTln(F("Reset Wireless settings.."));
   resetWiFiSettings();
-  doRedirect("Reboot OTGW firmware with reset wireless settings..", 120, "/", true);
+  doRedirect("Reboot OTGW firmware with reset wireless settings..", 120, "./", true);   // TASK-1445
 }
 //=====================================================================================
 // Emits the bounded redirect/countdown page into the per-request response stream

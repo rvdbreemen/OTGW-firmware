@@ -3,9 +3,11 @@ id: TASK-1445
 title: >-
   feat-2.0.0: port TASK-1378 (1.x) — FSexplorer reboot redirect and helper forms
   relative, so they work behind a reverse proxy
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T06:15:00Z'
+updated_date: '2026-10-31T22:56:00Z'
 labels:
   - port-from-1.x
   - webui
