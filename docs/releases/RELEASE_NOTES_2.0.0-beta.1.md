@@ -50,6 +50,8 @@ These apply only when SAT is on.
 - **PWM cycles per hour** is 3 or 4 only, default 3 (TASK-1375). See the breaking changes.
 - **Gas consumption in m3/h** (TASK-1484): two new settings, `satminconsumption` and `satmaxconsumption` (0 to 8), make `sat/consumption` real. Off while both are 0. No Home Assistant entity yet.
 - **SAT hands the boiler back when OpenTherm is lost** (TASK-1365). After 30 s without a boiler reply it sends `CS=0`, `CH=1`, `MM=T` once, then waits until the boiler answers again.
+- **Follow thermostat after a reboot** (TASK-1520): with push setpoint on, SAT sends its target to the thermostat at the restart decision (at most 60 s after boot), so a dial change made while SAT waits for a boiler reply and an outside temperature is no longer lost. A change in the first 60 s after boot is still only recorded.
+- **SAT log you can follow** (TASK-1521): telnet key 5 is now a quiet SAT log with one `SATTICK` line per control step and `SATBOOT` lines for the restart; key 8 is a separate high-volume trace, off by default. The SAT log in the web UI says why SAT changed mode, pushed a setpoint, cut heating at the cold setpoint or hit the maximum. Field format: `docs/sat/sat-log-format.md`; `scripts/sat_log_to_csv.py` turns a capture into CSV.
 - **Smaller changes:** the PID steps on its own 60 s timer (TASK-1368); the PWM hourly start limit counts only PWM's own ON phases, and `cycles_this_hour` now shows only those; PWM switches off at the cold cutoff and when all valves close (TASK-1327); CH is 0 below the cold setpoint (TASK-1316); the overshoot margin default is 2.0 C (was 3.0 C, stored values are kept); the Continuous/PWM buttons on the SAT page are gone (the mode is shown, SAT decides); a SAT preset and the window switch survive a reboot (TASK-1487); a setpoint change on the thermostat becomes the SAT target (setting `satfollowthermostat`, TASK-1259).
 
 ---
@@ -78,7 +80,7 @@ curl http://<ip>/api/v2/settings -o settings-backup.json
 
 - **v2 web UI.** The only web UI in 2.0.0. Live value table, help text for every setting (the **i** button), settings rail with card panels, SAT page.
 - **Firmware updates over WiFi.** A small safeboot updater next to the firmware. If an upload fails or a new firmware crashes in its first 30 seconds, the unit returns to safeboot and stays reachable. One-action update page for the release zip.
-- **Monitor graph with history.** The graph opens with the last hour the gateway kept (24 hours on boards with PSRAM).
+- **Monitor graph with history.** The graph opens with the last hour the gateway kept (24 hours on boards with PSRAM). The control setpoint line now shows what the boiler got, also when the thermostat briefly asks something else that the gateway replaces (TASK-1522).
 - **Works behind a reverse proxy**, including a Home Assistant sidebar panel (ingress). Guide: `docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md`.
 - **Home Assistant.** A "Visit" link to the gateway, SAT power and energy sensors for the Energy dashboard, a cumulative hot water total (`dhw_water_total`), and a "Command Dropped" sensor when the PIC never confirms a command.
 - **Return water temperature every minute** from a wired sensor (PIC firmware 6.6 or later, `TS=R`).
@@ -111,7 +113,9 @@ capture-mqtt-debug.bat --device 192.168.1.50 --broker 192.168.1.10 --duration 36
 
 Without arguments the tool asks for the device address. `--help` lists the options. Unzip the whole flash zip first: the launcher needs `otgw_capture.py` next to it.
 
-**What to post:** the capture folder under `logs/mqtt-diagnostics` (the transcript, `otframes.log` and `otgw_simulation.log`). Post it in Discord #alpha-testing or attach it to a GitHub issue. Check the files before you share them: they contain your device address and your MQTT topics. Leave the broker out if you do not want it in the log.
+**Capturing for days** (TASK-1523): add `--long-run`, or give a `--duration` above 2 hours (3 days: `--duration 259200`). The tool then keeps one folder per hour and zips every finished hour, with CSV files of that hour (SAT records, OpenTherm frames, MQTT). Every disconnect (device reboot, WiFi drop, broker restart) is marked with its start, end and reason. Every 5 minutes it saves the device status. It stops cleanly when the disk gets full. About 6 MB per hour before zipping and well under 1 MB zipped on our bench. Keep the PC awake.
+
+**What to post:** at the end the tool prints `Upload this one file: ...-upload.zip`. That single file holds everything (for a short run: the transcript, `otframes.log`, `otgw_simulation.log` and the CSV files). Post it in Discord #alpha-testing or attach it to a GitHub issue. Check the files before you share them: they contain your device address and your MQTT topics. Leave the broker out if you do not want it in the log.
 
 [macOS: verified by <name> / not verified] <!-- TODO(maintainer): fill in after the tester run. -->
 
@@ -177,7 +181,10 @@ The wording below is quoted from the CHANGELOG. Check your Home Assistant automa
 - **Updating through the Home Assistant panel** completed in 2 of 3 bench runs (one 502 during the upload). Update by IP when you can.
 - The first install of the release that introduces the one-action update page is still the two-step flow, because the unit serves the page before the update.
 
-<!-- TODO(maintainer): add anything the 24 h soak shows, and any item you could not verify. -->
+- **Soak test on the OT-Direct board only.** The 24 h soak of this build ran on the OT-Direct board, not on an OTGW Classic with a PIC (maintainer decision 2026-10-31, the Classic test unit was not available). The PIC path of the Classic is covered by the alpha bench tests, not by a soak.
+- **Filesystem update while a capture runs** (TASK-1524): on our bench a filesystem update failed once while a long capture was connected, and the unit served the file explorer upload page until a second update. Settings were kept. Stop the capture before you update.
+
+<!-- TODO(maintainer): add the soak result (soak-570-otgw32.log) and anything else you could not verify. -->
 
 ---
 
