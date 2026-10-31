@@ -3,11 +3,11 @@ id: TASK-1386
 title: >-
   Heap tier counters miss short dips: enter_low/warning/critical only count when
   getHeapHealth() is polled
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T11:08:00Z'
-updated_date: '2026-10-31T13:48:00Z'
+updated_date: '2026-10-31T16:10:00Z'
 labels:
   - heap
   - telemetry
@@ -24,12 +24,20 @@ Found in TASK-1339 (2026-10-25 bench): boot min free heap 4596 B with hd_enter_w
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Decision recorded (derive from the low-water mark, or document as sampled) with the trade-off
-- [ ] #2 If changed: host or bench test shows a short dip below 5120 counted (red on HEAD)
+- [x] #1 Decision recorded (derive from the low-water mark, or document as sampled) with the trade-off
+- [x] #2 If changed: host or bench test shows a short dip below 5120 counted (red on HEAD)
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-31 Robert (AskUserQuestion): 'Also count from watermark' - keep the sampled counters and add a check against the allocator low-water mark; a tier threshold crossed that sampling never saw counts one entry, marked as from-watermark. Trigger: bench .61 alpha.570 minfree 2240 B with entered_crit 0 (TASK-1504 notes).
+
+2026-10-31 evidence (alpha.575+081ee4d): decision recorded (Robert AskUserQuestion: also count from watermark). tests/test_heap_tier_watermark.py HEAD 5/5 OK; on pre-change helperStuff.ino (f0722fdfb~1, OTGW_HELPER_INO) 3/5 FAILED (the dip-only-in-watermark cases). Bench .61: /api/v2/debug state.heap.entered_from_watermark present (bench_check PASS).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+getHeapHealth() keeps the sampled tier counters and adds heapWatermarkTiers(): a tier threshold crossed only by the allocator low-water mark counts one entry, also counted in state.heapdiag.iEnteredFromWatermark (REST state.heap.entered_from_watermark). Evidence: host test 5/5 green on HEAD, 3 red on the old source; bench REST field present on alpha.575. Shipped alpha.573, published in the alpha.575 zip.
+<!-- SECTION:FINAL_SUMMARY:END -->

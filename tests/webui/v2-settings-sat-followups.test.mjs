@@ -265,6 +265,16 @@ const dhw2 = await until(`(function(){ var s = document.getElementById('satDhwSl
 check(dhw2 === '30-60', `with MsgID 48 = 0 the slider falls back to 30-60 (got ${dhw2})`);
 
 // ---- 1529 SAT: the PWM card shows only the cycle setting of the selected appliance type ----
+// OTGW_SHOT_DIR=<dir> also saves a PNG of the PWM card per appliance type (evidence, synthetic data).
+async function shotPwm(name) {
+  if (!process.env.OTGW_SHOT_DIR) return;
+  const r = await evalJs(`(function(){ var c = null; document.querySelectorAll('#satSetL3 .set-group h3').forEach(function (h) { if (h.textContent === 'PWM') c = h.parentNode; });
+    if (!c) return null; c.scrollIntoView({ block: 'center' }); var b = c.getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; })()`);
+  if (!r) return;
+  await sleep(300);
+  const img = await send('Page.captureScreenshot', { format: 'png' });
+  fs.writeFileSync(path.join(process.env.OTGW_SHOT_DIR, name), Buffer.from((img.result || img).data, 'base64'));
+}
 const pwmCard = `(function(){ var hs = document.querySelectorAll('#satSetL3 .set-group h3'), c = null, other = null, titles = [];
   hs.forEach(function (h) { titles.push(h.textContent); if (h.textContent === 'PWM') c = h.parentNode; if (h.textContent === 'Other') other = h.parentNode; });
   if (!c) return { titles: titles };
@@ -273,9 +283,11 @@ const pwmCard = `(function(){ var hs = document.querySelectorAll('#satSetL3 .set
            otherCycle: has(other, 'satcyclesperhour') || has(other, 'sathpcycle') }; })()`;
 const gas = await until(`(function(){ var r = ${pwmCard}; return r.cph !== undefined ? r : null; })()`);
 check(!!gas && gas.titles.indexOf('PWM') >= 0 && gas.titles.indexOf('PID / PWM') < 0, `card is titled "PWM", not "PID / PWM" (${gas && gas.titles.join('|')})`);
+await shotPwm('pwm-card-gas.png');
 check(!!gas && gas.cph && !gas.hp && gas.interval && !gas.otherCycle, `gas boiler: cycles per hour shown, heat-pump cycle hidden, not moved to Other (${JSON.stringify(gas)})`);
 await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); sel.value = '2'; sel.dispatchEvent(new Event('change', { bubbles: true })); })()`);
 const hp = await until(`(function(){ var r = ${pwmCard}; return r.hp ? r : null; })()`);
+await shotPwm('pwm-card-heatpump.png');
 check(!!hp && hp.hp && !hp.cph && hp.interval && !hp.otherCycle, `heat pump selected: heat-pump cycle shown, cycles per hour hidden at once (${JSON.stringify(hp)})`);
 const dirtySrc = await evalJs(`(function(){ var r = document.querySelector('#satSetL2 .srow[data-key="satsource"]'); return !!r && r.classList.contains('dirty') && r.querySelector('select').value === '2'; })()`);
 check(dirtySrc === true, 'the re-render keeps the unsaved appliance type (dirty, still Heat Pump)');
