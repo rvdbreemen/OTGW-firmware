@@ -3,11 +3,11 @@ id: TASK-1487
 title: >-
   SAT presets and window target survive a reboot as thermo-nova (TASK-1466
   decision 7)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T20:32:00Z'
-updated_date: '2026-10-30T00:11:00Z'
+updated_date: '2026-10-31T05:21:00Z'
 labels:
   - sat
   - bug
@@ -36,6 +36,8 @@ Robert 2026-10-29: as thermo-nova climate.py:169-190 (restore preset_mode, pre-c
 alpha.542 bench check failed 2026-10-30 (v2.js 64 KiB cut, settings loss after FS OTA); Done waits for a passing bench check on the fixed build.
 
 2026-10-30: Sergeant D's confirmation that a preset chosen during a window switch ends the switch (climate.py:830-832) is now queued as Q71 in docs/sat/open-questions.md (queued, not asked; advice A, keep). Supersedes the 'not queued' remark above.
+
+2026-10-31 close-out (session otgw-firmware-ea): the shared blocker is resolved. The alpha.542 FS-OTA failure is fixed in later builds; the OTA of alpha.564+d6dd798 to OTGW32 .61 confirmed /v2.js complete (261520 B = Content-Length) and 173 settings keys kept. Bench on alpha.564 (.61): POST /api/v2/sat/preset/away -> active_preset 1, target 15, /sat/sat_preset.json {"p":1,"t":15.00,"pc":20.00,...}; after /ReBoot active_preset 1 and target 15 remained, and settings.ini kept SATtargettemp 20.00 (the user's own target, not the preset). Note: POSTing the preset as a form body returns {"status":"ok"} but applies nothing (no plain argument); the path form works. The window-switch question to Sergeant D is queued as Q71.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

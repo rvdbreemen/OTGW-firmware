@@ -3,11 +3,11 @@ id: TASK-1478
 title: >-
   Weather fetch blocks the main loop ~5 s on every fetch: the stream parser
   waits for the 5 s byte timeout on a keep-alive connection
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T14:36:00Z'
-updated_date: '2026-10-29T15:28:00Z'
+updated_date: '2026-10-31T05:24:00Z'
 labels:
   - sat
   - weather
@@ -28,7 +28,7 @@ Found in gruijter's field capture (TASK-1474, alpha.527, 2026-10-29). All 18-20 
 <!-- AC:BEGIN -->
 - [x] #1 A host or bench reproduction shows the ~5 s tail on the current code (old) and a fetch that ends within 1 s of the last JSON byte on the fix (new)
 - [x] #2 The parser stops at the end of the top-level JSON object or the response is read with HTTP/1.0 / Connection: close, and chunk-size lines can no longer reach the number parser
-- [ ] #3 On the bench no [loop-stall] >= 1000 ms line appears around a weather fetch over at least 4 fetches
+- [x] #3 On the bench no [loop-stall] >= 1000 ms line appears around a weather fetch over at least 4 fetches
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -37,4 +37,6 @@ Found in gruijter's field capture (TASK-1474, alpha.527, 2026-10-29). All 18-20 
 2026-10-29 lead: fix = http.useHTTP10(true) before GET (HTTPClient.cpp:487-489, :1139-1160: HTTP/1.0, _reuse=false, no chunked), early return when the top-level object closes, and a latent wstreamSkipArray bug (loop read one byte past the closing ']', swallowing the '}' of hourly after the skipped cloud_cover_low/mid arrays, so depth never reached 0). Host test tests/test_weather_stream_tail.py on the real parser: HEAD tail_ms=5002 (2 failures: tail + source check), fix tail_ms=0, Ran 4 OK; parsed current and forecast values identical on both. evaluate --quick 0 FAIL. Review: lead read the 10-line diff against the HTTPClient source; no separate reviewer team for this size. AC#3 needs a bench run with weather enabled.
 
 2026-10-29: alpha.534+f4b8be6 built (2 jobs, SUCCESS), pushed, posted (msg 1565386732751556780). AC#3 pending: bench .61 (weather enabled, hd_max_loop_gap_ms 8176 on alpha.512) will run alpha.535 after TASK-1479; Taken session captures ~1 h of fetches there. .63 offline.
+
+2026-10-31 bench (session otgw-firmware-ea): OTGW32 .61 on 2.0.0-alpha.564+d6dd798 (contains f4b8be6d9), weather enabled (52.1355, 6.1827). Four Open-Meteo fetches triggered with telnet key w, 25 s apart, telnet captured throughout (196 lines): 4 'manual Open-Meteo fetch' lines, 4 weather-state dumps, the only [loop-stall] line was 207 ms; no gap >= 1000 ms. Transcript: scratchpad telnet-1478.txt.
 <!-- SECTION:NOTES:END -->

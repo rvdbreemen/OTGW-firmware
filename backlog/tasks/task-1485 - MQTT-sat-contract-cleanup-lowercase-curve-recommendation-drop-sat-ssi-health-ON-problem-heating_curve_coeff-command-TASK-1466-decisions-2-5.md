@@ -3,11 +3,11 @@ id: TASK-1485
 title: >-
   MQTT sat/* contract cleanup: lowercase curve recommendation, drop sat/ssi,
   health ON = problem, heating_curve_coeff command (TASK-1466 decisions 2-5)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T20:30:00Z'
-updated_date: '2026-10-29T23:58:00Z'
+updated_date: '2026-10-31T05:21:00Z'
 labels:
   - sat
   - mqtt
@@ -34,6 +34,8 @@ Robert 2026-10-29 (TASK-1466): (2) sat/heating_curve_recommendation all lowercas
 2026-10-30 close-out: merged on origin/dev as c00c5f025 (alpha.542). Batch build 2.0.0-alpha.542+c00c5f0 (esp32-combo from origin/dev c00c5f025, 2026-10-30 00:47, exit 0, fresh artefacts, Discord msg 1565512587494301767); integration check on the merged set: evaluate --quick 100%, 0 failed; every tests/test_sat_*.py plus tests/test_manual_sat_commands.py exit 0. Workflow journal: red OTGW_SRC_REV=a5efbf83d python tests/test_sat_mqtt_contract_1485.py Ran 15, FAILED (failures=12); green Ran 15, OK; an independent verifier reproduced both counts; all 33 tests/test_sat_*.py rc=0; evaluate --quick 79 passed / 0 failed. Fresh rerun this session on c00c5f025: Ran 15, OK. device_health is red at source level only: the wire payload is unchanged (satUpdateBoilerStatus never assigns OFF), the change makes the meaning explicit. Follow-ups outside this AC: REST still accepts heating_curve and reports device_health/flame_health as true = healthy (restAPI.ino ~1000, ~1689), a decision for Robert; docs/sat/firmware-sat-spec.md and sat-comparison.md P7 still describe the old pressure_health/device_health polarity, sat/ssi and upper-case HCR.
 
 alpha.542 bench check failed 2026-10-30 (v2.js 64 KiB cut, settings loss after FS OTA); Done waits for a passing bench check on the fixed build.
+
+2026-10-31 close-out (session otgw-firmware-ea): the shared blocker is resolved. The alpha.542 FS-OTA failure is fixed in later builds; the OTA of alpha.564+d6dd798 to OTGW32 .61 confirmed /v2.js complete (261520 B = Content-Length) and 173 settings keys kept. Broker capture on alpha.564 (.61, 70 s of OTGW/value/<id>/sat/#): heating_curve_recommendation = 'insufficient' (lower case); no sat/ssi topic published; pressure_health OFF and device_health OFF on a healthy bench. MQTT command OTGW/set/<id>/sat/heating_curve_coeff 0.7 -> satcoefficient 0.7; the old command sat/heating_curve 0.9 was ignored (no alias). REST naming and polarity continue in TASK-1496.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
