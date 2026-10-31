@@ -183,6 +183,7 @@ static void dumpDebugInfo() {
     Debugf(PSTR("entered_low: %lu\r\n"), (unsigned long)state.heapdiag.iEnteredLowCount);
     Debugf(PSTR("entered_warning: %lu\r\n"), (unsigned long)state.heapdiag.iEnteredWarningCount);
     Debugf(PSTR("entered_critical: %lu\r\n"), (unsigned long)state.heapdiag.iEnteredCriticalCount);
+    Debugf(PSTR("entered_from_watermark: %lu\r\n"), (unsigned long)state.heapdiag.iEnteredFromWatermark);
     Debugf(PSTR("drip_slow_mode: %lu\r\n"), (unsigned long)state.heapdiag.iDripSlowModeCount);
     Debugf(PSTR("max_loop_gap_ms: %lu\r\n"), (unsigned long)state.heapdiag.iMaxLoopGapMs);
     Debugf(PSTR("min_max_block: %lu\r\n"), (unsigned long)state.heapdiag.iMinMaxBlock);

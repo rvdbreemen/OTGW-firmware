@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.572
+**  Version  : v2.0.0-alpha.573
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2355,6 +2355,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("state.heap.entered_low"), (uint32_t)snap->st.heapdiag.iEnteredLowCount);
     je.field(F("state.heap.entered_warn"), (uint32_t)snap->st.heapdiag.iEnteredWarningCount);
     je.field(F("state.heap.entered_crit"), (uint32_t)snap->st.heapdiag.iEnteredCriticalCount);
+    je.field(F("state.heap.entered_from_watermark"), (uint32_t)snap->st.heapdiag.iEnteredFromWatermark);
     je.field(F("state.heap.drip_slow"), (uint32_t)snap->st.heapdiag.iDripSlowModeCount);
 
     je.field(F("state.disco.published"), (uint32_t)snap->st.discovery.iPublishedTopicCount);

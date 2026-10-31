@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.572
+**  Version  : v2.0.0-alpha.573
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -469,6 +469,7 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint32_t iEnteredLowCount         = 0; // transitions into HEAP_LOW tier (from HEALTHY)
   uint32_t iEnteredWarningCount     = 0; // transitions into HEAP_WARNING tier
   uint32_t iEnteredCriticalCount    = 0; // transitions into HEAP_CRITICAL tier
+  uint32_t iEnteredFromWatermark    = 0; // TASK-1386: how many of the iEntered* counts came from the low-water mark (a dip sampling missed)
   uint32_t iDripActiveBurstSkipCount = 0; // drip ticks skipped DURING active Status-burst (TASK-342)
   uint32_t iDripCooldownSkipCount   = 0; // drip ticks skipped in post-burst cooldown window (TASK-347)
   uint32_t iDripSlowModeCount       = 0; // transitions to 10s slow-mode due to heap pressure

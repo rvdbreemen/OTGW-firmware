@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.572
+**  Version  : v2.0.0-alpha.573
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -466,6 +466,7 @@ void resetHeapWatermark() {
   state.heapdiag.iEnteredLowCount          = 0;
   state.heapdiag.iEnteredWarningCount      = 0;
   state.heapdiag.iEnteredCriticalCount     = 0;
+  state.heapdiag.iEnteredFromWatermark     = 0;   // the since-boot watermark is not reset, so its tiers do not count again
   state.heapdiag.iDripActiveBurstSkipCount = 0;
   state.heapdiag.iDripCooldownSkipCount    = 0;
   state.heapdiag.iDripSlowModeCount        = 0;
@@ -922,8 +923,25 @@ static uint32_t mqttDropCount = 0;
 // and on the telnet heap page. Keeping them satisfies ADR-167's own
 // observability mitigation and avoids breaking those published contracts.
 //===========================================================================================
+// --- heapWatermarkTiers begin
+// TASK-1386 (maintainer decision 2026-10-31): the sampled tier entries below miss a short dip between two
+// getHeapHealth() calls (bench: min free 2240 B with entered_critical 0). The allocator low-water mark sees every
+// dip, so a tier threshold it crossed that was never counted counts one entry, once per tier per boot (the
+// watermark never rises). Bit 0/1/2 = LOW/WARNING/CRITICAL already counted, by sampling or by the watermark.
+// Pure: every input is an argument, tests/test_heap_tier_watermark.py compiles it as it is.
+static uint8_t heapWatermarkTiers(uint32_t minFree, uint8_t seen, uint32_t &low, uint32_t &warn, uint32_t &crit,
+                                  uint32_t &fromWatermark)
+{
+  if (minFree < HEAP_LOW_THRESHOLD      && !(seen & 1)) { seen |= 1; low++;  fromWatermark++; }
+  if (minFree < HEAP_WARNING_THRESHOLD  && !(seen & 2)) { seen |= 2; warn++; fromWatermark++; }
+  if (minFree < HEAP_CRITICAL_THRESHOLD && !(seen & 4)) { seen |= 4; crit++; fromWatermark++; }
+  return seen;
+}
+// --- heapWatermarkTiers end
+
 HeapHealthLevel getHeapHealth() {
   static HeapHealthLevel lastLevel = HEAP_HEALTHY;
+  static uint8_t tiersSeen = 0;   // TASK-1386: tiers counted since boot (bit 0 LOW, 1 WARNING, 2 CRITICAL)
   uint32_t freeHeap = platformFreeHeap();
 
   HeapHealthLevel level;
@@ -941,11 +959,16 @@ HeapHealthLevel getHeapHealth() {
   // Only count when moving INTO a stricter tier than the previous call;
   // recovery back to HEALTHY is not counted (focus is on pressure events).
   if (level != lastLevel && level > lastLevel) {
-    if (level == HEAP_LOW)      state.heapdiag.iEnteredLowCount++;
-    if (level == HEAP_WARNING)  state.heapdiag.iEnteredWarningCount++;
-    if (level == HEAP_CRITICAL) state.heapdiag.iEnteredCriticalCount++;
+    if (level == HEAP_LOW)      { state.heapdiag.iEnteredLowCount++;      tiersSeen |= 1; }
+    if (level == HEAP_WARNING)  { state.heapdiag.iEnteredWarningCount++;  tiersSeen |= 2; }
+    if (level == HEAP_CRITICAL) { state.heapdiag.iEnteredCriticalCount++; tiersSeen |= 4; }
   }
   lastLevel = level;
+  if (tiersSeen != 7) {   // all three counted: the watermark can add nothing more this boot
+    tiersSeen = heapWatermarkTiers(platformMinFreeHeap(), tiersSeen, state.heapdiag.iEnteredLowCount,
+                                   state.heapdiag.iEnteredWarningCount, state.heapdiag.iEnteredCriticalCount,
+                                   state.heapdiag.iEnteredFromWatermark);
+  }
   return level;
 }
 
