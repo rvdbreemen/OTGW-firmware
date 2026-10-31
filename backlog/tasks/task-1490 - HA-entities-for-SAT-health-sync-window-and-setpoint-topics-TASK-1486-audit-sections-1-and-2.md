@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T22:35:00Z'
+updated_date: '2026-10-31T05:26:00Z'
 labels:
   - sat
   - mqtt
@@ -32,3 +33,9 @@ TASK-1486 audited the 91 published sat/* state topics without a Home Assistant e
 - [ ] #4 Flash and static-RAM delta measured from a before/after esp32-combo build (estimate ~0.9 KB flash for section 1, ~1.5 KB with all recommended section-2 adds, 0 B static RAM)
 - [ ] #5 MQTT.md entity counts and CHANGELOG updated
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-31: TASK-1486 decision (Robert): add also binary_sensor problem (diagnostic) for sat/fallback_active, room_temp_lost, ot_link_lost, push_refused; switch for sat/enabled; select for sat/preset. See docs/sat/sat-ha-entity-audit.md section 2.
+<!-- SECTION:NOTES:END -->
