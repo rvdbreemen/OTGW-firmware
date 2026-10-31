@@ -67,7 +67,8 @@ Findings:
 2. The tuner's value is the rescue from a curve that is too low. From 1.8 it does nothing; from 2.4 it lowers slowly.
 3. Excluding minimum-output hours removes the cases where the tuner made comfort worse, at the cost of a slower and
    less complete rescue (gas from 1.0 ends at 1.32 instead of 1.50; hp60 at 1.23 instead of 1.48).
-4. The cliff/plateau shape supports asymmetric thresholds (Q-1519e option B: raise readily, lower carefully).
+4. ~~The cliff/plateau shape supports asymmetric thresholds (Q-1519e option B).~~ Withdrawn: round 5c simulated B and
+   found no comfort gain and more churn (section 6).
 
 ## 4. Round 7: I + D against the curve integral (entry 170, 540 winters)
 
@@ -97,7 +98,52 @@ Findings:
 3. D as a per-hour guard at 0.1 C/h changes nothing measurable.
 4. If D is to matter, it has to act on a shorter horizon than the daily decision (open question for Sergeant D).
 
-## 5. Limits
+## 6. Rounds 5c-5g: the clean-hour rule, option B, and the blind spot in low-load houses
+
+Scripts `scripts/sat_curve_selftune_study5c.py`, `study5d.py` (with `--cold` for 5e), `study5f.py` (with `--guard`
+for 5g); data `round5c_runs.json` .. `round5g_runs.json`. All on the round 5b model, daily rule 2 days, step 0.1,
+paired against no tuner; starts 1.0 / 1.2 / 1.4 / 1.8 / 2.4 on houses balanced at 1.8. `clean_h` = clean hours the
+tuner saw per winter (scored days).
+
+**Option B (Q-1519e: raise at 0.5 C, lower at 1.0 C) is refuted.** Against the symmetric 1.0 C rule: no comfort
+gain (gas rescue from 1.0: median -85 vs -97 min/day), more churn (hp30 from 1.0: 14.3 vs 10.4 changes, 5.0 vs 1.8
+flips per winter). Advice for Q-1519e stays A.
+
+**The optimum elsewhere is found, slowly.** Houses balanced at 2.4 started at 1.8 end at 2.1-2.4 (hp30 -6 to -17
+min/day); houses balanced at 1.6 end at 1.7. Some BENG runs do not move (too few clean hours).
+
+**Blind spot.** In 2015 and BENG houses a curve of 1.0 drives SAT into PWM at minimum output, so with the round 5b rule
+the tuner sees 0 clean hours all winter and stays at 1.0, while the room is outside +-0.3 C for 144-278 min/day
+(mostly too cold). Every attempt to fill it was tested:
+
+| variant | rescue new houses from 1.0 (gas / hp60, median min/day) | plateau starts 1.8-2.4, gas worst pair |
+|---|---|---|
+| round 5b rule (PWM + minimum excluded both ways) | 0 / 0 | 0 |
+| 5d: exclude PWM / minimum only while room above target (per minute) | -118 / -166 | +416 |
+| 5e: count a PWM / minimum hour only if its hour-mean room < -0.3 C | -80 / -69 | +363 |
+| 5f: cold-day net (2-day mean over all heating minutes < -0.2 C -> step up) | -112 / -159 | +509 |
+| 5f: same at -0.3 C | 0 / -67 | +145 |
+| 5g: net -0.2 / -0.3 C, skipping days with swing > 0.5 C or > 60 min at max flow | 0 / 0 | 0 |
+
+Why each fails: a one-sided selection on room temperature (5d, 5e) keeps the cold half of the cycling and drifts the
+curve up on the plateau (selection bias). The cold-day net (5f) has no selection, but in the light 1992-2012 house a
+high curve makes the PID swing, the swing reads as cold days, the net raises the curve, kp grows (kp = coefficient x
+curve / 3) and the curve runs to 3.3-3.4 (the round 3 feedback loop). The swing guard (round 6) stops that, but the
+low-load rescue days also swing > 0.5 C (PWM cycling), so it blocks the rescue too. With the signals in the model,
+"cold because the curve is too low at low load" and "cold on average because the PID oscillates" look alike. This is
+an open design question (Q-1519g, queued for Sergeant D), not a parameter to tune further.
+
+## 7. Where the evidence points (to be confirmed by Sergeant D and in the field)
+
+- Signal: curve integral (setpoint - curve), entry 163. Adding D changes nothing (round 7); the PID integral cannot
+  rescue a curve that is too low.
+- Clean hours: SAT heating, no hot water, no sun, SAT not in PWM and the heat source not at minimum output, both ways
+  (round 5b rule). Worst pair over rounds 5c-5g with this rule: +0 min/day (gas), +14 (hp30), +2 (hp60).
+- Decision: daily on 2-3 days, symmetric 1 C, step 0.1, at most 0.2 per change (entries 165/167). No asymmetry.
+- Known gap: a curve far too low in a 2015/BENG house whose boiler or heat pump minimum is above the demand is not
+  corrected. The user sees a cold room; the log should say why the tuner holds ("no clean hours: PWM / minimum output").
+
+## 8. Limits
 
 One weather year; 2 seeds; boiler and heat-pump cycling not validated (round 4); radiator size calibrated to an
 anchor (entry 166) rather than measured; noise-free room sensor (a real 0.1 C sensor makes a per-minute slope spiky,

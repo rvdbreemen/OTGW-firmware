@@ -29,11 +29,13 @@ TRACE_EVERY = 10
 OVERSHOOT_MARGIN = 3.0   # thermo-nova cycles/const.py:10-11; the firmware uses 2.0 (fOvershootMargin, TASK-1268)
 MAX_SP_GAS = 80.0        # firmware: 62 radiators when the user chose nothing (entry 152), 65 global
 MAX_SP_HP = 80.0         # firmware: 40 for a heat pump when nothing is chosen (entry 155, SAT_MAXTSET_HEAT_PUMP_CAP)
-EXCLUDE_PWM = False   # True: hours with SAT PWM active do not count as clean for the tuner
-EXCLUDE_ATMIN = False # True (round 5b): hours with the heat source off or at minimum output do not count as clean
+EXCLUDE_PWM = False   # True: hours with SAT PWM active do not count as clean for the tuner; "above" (round 5d): only while the room is above target
+EXCLUDE_ATMIN = False # True (round 5b): hours with the heat source off or at minimum output do not count as clean;
+                      # "above" (round 5c): only while the room is above target (a cold room at minimum output still counts)
 PID_D_HOLD = False    # True (round 7): PID derivative held inside the 0.1 C deadband, thermo-nova pid.py:205-207
 SIGNAL = "CI"         # round 7, entry 170: CI (setpoint - curve) | CI+D | I+D | I | CI+guard
-GUARD_KPH = 0.1       # CI+guard: an hour whose room temperature moved more than this is not clean
+GUARD_KPH = 0.1
+COLD_K = 0.3          # EXCLUDE_ATMIN = "cold" (round 5e): a PWM / minimum-output hour counts only when the hour-mean room is more than COLD_K below target       # CI+guard: an hour whose room temperature moved more than this is not clean
 UPPER, LOWER = 1200.0, 180.0
 DUTY_LO, DUTY_HI = LOWER / UPPER, 1 - LOWER / UPPER
 DUTY_MIN = DUTY_LO / 2
@@ -89,9 +91,9 @@ def run(args):
     integ = 0.0; last = None; rd = 0.0
     pwm = False; pwm_phase_on = False; pwm_left = 0; pwm_new = False; t_on = 40.0; Pcur = 0.0
     ov_s = uh_s = sat_s = 0; last_draw_m = -10**6; last_off_s = 1
-    corr_acc = 0.0; corr_n = 0; clean = True; stepped = False; hour_ta0 = TARGET; rdt = 0.0
+    corr_acc = 0.0; corr_n = 0; clean = True; stepped = False; hour_ta0 = TARGET; rdt = 0.0; hour_lowload = False; hour_ta_sum = 0.0; day_err_sum = 0.0; day_err_n = 0; day_tmax = -99.0; day_tmin = 99.0; day_capped = 0
     sq = n = out_band = over = 0.0; fuel = 0.0; heat = 0.0; starts = 0; short_burns = 0; pwm_min = 0; flame_min = 0
-    writes = flips = 0; last_dir = 0
+    writes = flips = 0; last_dir = 0; clean_h = 0
     for m in range(minutes):
         day = m // 1440; tout, sw = tm[m], sm[m]; heating = tout < 15
         cv = curve(c, tout); kp = c * cv / 3; ki = kp / 8400; kd = 588.0 * kp
@@ -168,21 +170,32 @@ def run(args):
                 sq += err * err; n += 1; heat += qrad * DT
                 if abs(Ta - TARGET) > 0.3: out_band += 1
                 if Ta > TARGET + 0.3: over += 1
-        clean &= heating and not draw and sw < 50.0 and not (EXCLUDE_PWM and pwm)
-        if EXCLUDE_ATMIN and heating and (not burner or P <= pmin + 1e-6): clean = False
+        clean &= heating and not draw and sw < 50.0 and not (EXCLUDE_PWM and pwm and (EXCLUDE_PWM is True or Ta > TARGET))
+        if EXCLUDE_ATMIN == "cold":
+            if heating and (pwm or not burner or P <= pmin + 1e-6): hour_lowload = True
+        elif EXCLUDE_ATMIN and heating and (not burner or P <= pmin + 1e-6) and (EXCLUDE_ATMIN is True or Ta > TARGET): clean = False
+        hour_ta_sum += Ta
+        if heating:
+            day_err_sum += Ta - TARGET; day_err_n += 1; day_tmax = max(day_tmax, Ta); day_tmin = min(day_tmin, Ta)
+            if cv + kp * err + integ + kd * rd > spmax: day_capped += 1
         if trace is not None and m % TRACE_EVERY == 0:
             trace.append((m / 60, round(tout, 2), round(Ta, 3), round(flow, 1), round(tret, 1), sp, round(P), int(pwm), c))
         if m % 60 == 0: hour_ta0 = Ta
         if m % 60 == 59:
             if SIGNAL == "CI+guard" and abs(Ta - hour_ta0) > GUARD_KPH: clean = False
+            if hour_lowload and hour_ta_sum / 60.0 - TARGET > -COLD_K: clean = False
             mc = corr_acc / corr_n if corr_n else 0.0
+            if clean and not stepped and corr_n > 0 and day >= 14: clean_h += 1
             new_c = st.hour(c, day, mc, clean and not stepped and corr_n > 0)
-            corr_acc = 0.0; corr_n = 0; clean = True; stepped = False
+            corr_acc = 0.0; corr_n = 0; clean = True; stepped = False; hour_lowload = False; hour_ta_sum = 0.0
             if new_c != c:
                 dr = 1 if new_c > c else -1
                 if last_dir and dr != last_dir: flips += 1
                 last_dir = dr; writes += 1; c = new_c; integ = 0.0; rd = 0.0; stepped = True
         if m % 1440 == 1439:
+            st.day_err = day_err_sum / day_err_n if day_err_n else None   # mean room - target over all heating minutes (round 5f)
+            st.day_swing = day_tmax - day_tmin if day_err_n else None; st.day_capped = day_capped   # round 5g guards
+            day_err_sum = 0.0; day_err_n = 0; day_tmax = -99.0; day_tmin = 99.0; day_capped = 0
             new_c = st.end_of_day(c, day)
             if new_c != c:
                 dr = 1 if new_c > c else -1
@@ -194,7 +207,7 @@ def run(args):
             "rms": math.sqrt(sq / n), "out_band_min_d": out_band / (n / 1440), "over_min_d": over / (n / 1440),
             "fuel_J": fuel, "heat_J": heat, "starts_per_day": starts / days, "short_burns_per_day": short_burns / days,
             "pwm_frac": pwm_min / minutes, "flame_frac": flame_min / minutes, "writes": writes, "flips": flips,
-            "c_end": c, "cbest": cbest}
+            "c_end": c, "cbest": cbest, "clean_h": clean_h}
 
 def validate(wpath):
     """Mild-day check against the field capture (4 h, 9-15 C outside): flame on 24 % of the time, 4.0 starts per hour,

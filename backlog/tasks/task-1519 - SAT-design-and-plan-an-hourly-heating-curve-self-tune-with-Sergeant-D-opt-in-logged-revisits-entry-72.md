@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-31T05:53:00Z'
-updated_date: '2026-10-31T10:05:00Z'
+updated_date: '2026-10-31T10:47:00Z'
 labels:
   - sat
   - design
@@ -51,4 +51,6 @@ Robert 2026-10-31 05:51 UTC in #alpha-testing (msg 1565966404304248853): 'I want
 2026-10-31 HANDOVER (Robert: alpha session leaves TASK-1519 to the dev session). Done: rounds 1-4 and 6 posted + pushed. Round 5 finished (7,992 runs, firmware settings margin 2.0/3.0, max 62/40, PWM hours excluded, 36 daily variants): raw results docs/sat/sim-1519/data/round5_results_raw.json, script scripts/sat_curve_selftune_study5.py; NOT yet analysed or posted. Open: (1) round 5 analysis + optimum explanation; (2) Sergeant D msg 1566008707366785035 asks a re-run with the curve derivative (derivative not frozen in the deadband); holding answer msg 1566021979608322139 gives our reading and asks him to confirm, run as round 7; (3) heat-pump tuner result unexplained (round 4); (4) Q-1519d/e waiting.
 
 2026-10-31 ~10:00-10:50 UTC (session 9c took over the study from session ea, Robert's instruction). Round 5 (7,992 runs) analysed: its reference best_coeff2 (study3.py:30-33, flow = mean + 5 C, no gains) was 1.80 everywhere and wrong for the round-4 hydraulics (flow = mean + Q/2MCP, ~135 W gains); signal ablation: clamping < 2 % of hours and positive (not the cause), minimum-output hours strongly negative, modulating hours at 1.8 also negative. Round 4/5 claim 'tuner does not help heat pumps' withdrawn (posted msgs 1566028632797880353/1566028634341384213). Round 5b: radiators calibrated per house to balance at 1.8 (entry 166 anchor), fixed sweep shows cliff below ~1.2, plateau 1.3-2.4; 630 paired winters: rescue from 1.0 gas -97/-106, hp30 -503, hp60 -50 min/day; from 1.8 nothing; excluding minimum-output hours removes worsening pairs (worst +100 -> 0 gas). Entry 170 recorded (Sergeant D 09:33: I + D, D never frozen). Round 7 (540 winters): CI+D = CI (89/90 same end coefficient), D window mean <= 0.024 C vs CI 0.74-2.25; PID integral (I, I+D) cannot rescue a too-low curve; guard 0.1 C/h no effect. Report docs/sat/sim-1519/round5b-round7.md; study4.py flags EXCLUDE_ATMIN / PID_D_HOLD / SIGNAL (defaults reproduce round 5 bit-exact, checked).
+
+2026-10-31 ~11:00-12:15 UTC rounds 5c-5g (data docs/sat/sim-1519/data/round5c..5g_runs.json, scripts study5c/5d/5f, report sections 6-7). Robert asked in session whether the ADR becomes measure-hourly/decide-daily: answer Ask Sergeant -> Q-1519d re-ask first when Sergeant D is back (silent since 09:33). Q-1519e option B simulated: refuted (no gain, more churn), advice A. Optimum elsewhere: balance 2.4 from 1.8 ends 2.1-2.4, balance 1.6 ends 1.7. Blind spot: 2015/BENG at curve 1.0 -> PWM at minimum -> 0 clean hours, tuner holds (room 144-278 min/day out of band); one-sided exclusion (5d/5e) and a cold-day net (5f) rescue it but drift up on the plateau (selection bias) or run away in the light house (PID swing feedback, coefficient to 3.4); swing/cap guard (5g) removes harm and rescue alike. Queued Q-1519g. Round 5 reproduced bit-exact after every model change.
 <!-- SECTION:NOTES:END -->
