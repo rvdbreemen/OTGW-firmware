@@ -404,7 +404,7 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 | `sat/cycle_attributes` | JSON | no | Cycle attributes `{"kind","sample_count","duration_seconds","max_flow_temperature","fraction_space_heating","fraction_domestic_hot_water"}`; `kind` is `UNKNOWN` / `CENTRAL_HEATING` / `DOMESTIC_HOT_WATER` / `MIXED`. Republished when a cycle ends |
 | `sat/cycle_health` | `"ON"` / `"OFF"` | yes | Problem binary: ON when the last cycle class is `overshoot`, `underheat`, `underheat_pwm` or `short` |
 | `sat/cycle_phase` | `"startup"` / `"steady"` / `"cooldown"` / `"idle"` | no | Current cycle phase |
-| `sat/cycles_this_hour` | `"3"` | no | Burner cycles in the current hour |
+| `sat/cycles_this_hour` | `"3"` | no | PWM ON-phase starts in the last 3600 s (rolling window; falls as starts leave it) |
 | `sat/pwm_duty` | `"0.65"` | no | PWM duty cycle (0.00-1.00) |
 | `sat/duty_ratio` | `"0.70"` | no | EMA duty ratio (flame-on fraction) |
 | `sat/overshoot_fraction` | `"0.12"` | no | EMA fraction of cycles with overshoot |
@@ -1285,7 +1285,7 @@ Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-aud
 | `sat/overshoot_fraction` | % | Raw 0-1 value x 100 |
 | `sat/cycle_phase` | - | Cycle phase |
 | `sat/overshoot_margin` | °C | Overshoot margin |
-| `sat/cycles_this_hour` | - | `state_class` `total_increasing` |
+| `sat/cycles_this_hour` | - | `state_class` `measurement` (rolling-hour count, falls as starts leave the hour) |
 | `sat/4h_cycles` | - | 4-hour cycle count |
 | `sat/4h_avg_on_sec`, `sat/4h_avg_off_sec` | s | 4-hour averages |
 | `sat/4h_avg_flow_temp` | °C | 4-hour average flow temperature |

@@ -128,6 +128,14 @@ class SatEnergyDiscovery(unittest.TestCase):
                 else:
                     self.assertEqual(pos, 0xFFFF)
 
+    def test_cycles_this_hour_is_a_measurement_not_a_meter(self):
+        # TASK-1463: the value falls back as starts leave the rolling hour, so total_increasing
+        # would make HA read every drop as a meter reset.
+        hits = self.row_for("sat/cycles_this_hour")
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0]["sc"], "measurement")
+        self.assertEqual(hits[0]["id"], 252)
+
 
 if __name__ == "__main__":
     unittest.main()
