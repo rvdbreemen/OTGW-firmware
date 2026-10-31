@@ -173,6 +173,13 @@ inline void platformResetReason(char *buf, size_t len) {
     case ESP_RST_DEEPSLEEP: str = "Deep sleep wake"; break;
     case ESP_RST_BROWNOUT: str = "Brownout";         break;
     case ESP_RST_SDIO:     str = "SDIO reset";       break;
+    // TASK-1438: ESP-IDF esp_system.h values 11-15. USB (0xb) is the S3's USB-Serial-JTAG peripheral:
+    // the host toggling the serial lines (a tool opening the COM port) resets the chip.
+    case ESP_RST_USB:        str = "USB reset (host)";  break;
+    case ESP_RST_JTAG:       str = "JTAG reset";        break;
+    case ESP_RST_EFUSE:      str = "eFuse error";       break;
+    case ESP_RST_PWR_GLITCH: str = "Power glitch";      break;
+    case ESP_RST_CPU_LOCKUP: str = "CPU lock-up";       break;
     default:               str = "Unknown";          break;
   }
   strlcpy(buf, str, len);

@@ -3,9 +3,11 @@ id: TASK-1438
 title: >-
   Bench Classic+S3: three reboots 'reboot cause: Unknown (b)' within 90 s on
   alpha.519 during a replay run
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-28T22:18:00Z'
+updated_date: '2026-10-31T22:58:00Z'
 labels:
   - bug
 milestone: 2.0.0
