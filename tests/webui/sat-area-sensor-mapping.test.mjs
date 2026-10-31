@@ -195,7 +195,9 @@ check(!!body && body.value === BLE_MAC, `the POST carries the full 17-char BLE M
 
 try { ws.close(); } catch { /* ignore */ }
 chrome.kill(); srv.close();
-try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* ignore */ }
+// TASK-1492: Chrome holds the profile until it has exited; wait for that, then retry the removal.
+await new Promise((r) => { if (chrome.exitCode !== null || chrome.signalCode !== null) return r(); chrome.once('exit', r); setTimeout(r, 5000); });
+try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (e) { console.log('profile cleanup failed: ' + e.message); }
 
 console.log('\n' + results.filter((p) => !p).length + ' failures of ' + results.length + ' checks');
 process.exit(ok ? 0 : 1);
