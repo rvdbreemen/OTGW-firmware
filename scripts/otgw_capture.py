@@ -10,16 +10,21 @@ Standard library only, Python 3.9+. MQTT uses paho-mqtt, imported straight from
 the vendored wheel in vendor/ next to this file; without it the MQTT stream is
 skipped and every other source still runs.
 
+Long runs (TASK-1523): --long-run (or any --duration above 2 hours) writes one segment per
+wall-clock hour and packs every finished hour into hours/YYYYMMDD-HH.zip, plus index.csv.
+
 Run with --help for the options. Both spellings work: --device / -DeviceHost.
 """
 
 import argparse
 import base64
+import csv
 import ctypes
 import json
 import os
 import re
 import select
+import shutil
 import signal
 import socket
 import struct
@@ -29,6 +34,8 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import zipfile
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -54,7 +61,15 @@ ERROR_SECTIONS = (
 INTERMEDIATE_FILES = (
     "summary.txt", "telnet.log", "mqtt.log", "mqtt.stderr.log", "browser.log",
     "browser.stderr.log", "crashlog.log", "curl-probes.log", "script.error.log",
-    "error.txt", ".stop",
+    "error.txt", ".stop", "gaps.log",
+)
+# Long-run transcript (TASK-1523): short on purpose. The data lives in hours/*.zip.
+HOURLY_SECTIONS = (
+    ("SUMMARY (summary.txt)", "summary.txt"),
+    ("TOOL ERRORS (error.txt)", "error.txt"),
+    ("GAP MARKERS (gaps.log)", "gaps.log"),
+    ("HOUR INDEX (index.csv)", "index.csv"),
+    ("HTTP PROBES (curl-probes.log)", "curl-probes.log"),
 )
 PROBE_PATHS = (
     "/", "/index.html", "/v2.js", "/api/v2/health", "/api/v2/device/info",
@@ -72,6 +87,8 @@ REDACT_PATTERNS = (
 )
 
 SIMULATOR_LABELS = {"SensorSim", "OTGW-Sim"}
+# High-volume traces stay off unless asked for (TASK-1523/1521: key 8 'SATtrace' adds ~10 lines/s in SAT simulation).
+HIGH_VOLUME_LABELS = {"SATtrace"}
 DEBUG_TOGGLE = re.compile(
     r"(?:^|\s)(?P<key>\S)\s+"
     r"(?P<label>[A-Za-z][A-Za-z0-9 /]*?)\s*"
@@ -104,6 +121,57 @@ KEEPALIVE_IDLE = 10
 KEEPALIVE_INTERVAL = 5
 KEEPALIVE_COUNT = 3
 
+# TASK-1523: long-run mode.
+LONG_RUN_AUTO_SECONDS = 2 * 3600          # --duration above this switches to hourly segments
+SNAPSHOT_SECONDS_DEFAULT = 300
+SNAPSHOT_TIMEOUT = 10
+SNAPSHOT_BODY_CAP = 262144
+SNAPSHOT_PATHS = ("/api/v2/device/info", "/api/v2/sat?detail=full")
+SNAPSHOTS_LOG = "snapshots.log"
+SNAPSHOTS_HEADER = ("# OTGW device snapshots (TASK-1523). Columns, tab separated: host_time (ISO-8601, ms, local time) | "
+                    "request path | HTTP status or ERROR | body on one line (secrets redacted) or the error text.\n")
+GAPS_LOG = "gaps.log"
+INDEX_CSV = "index.csv"
+INDEX_COLUMNS = ("hour", "stream", "lines", "bytes", "first_ts", "last_ts", "gaps")
+MQTT_HOURLY_HEADER = ("# OTGW MQTT stream (TASK-1523). Columns, tab separated: host_time (ISO-8601, ms, local time) | "
+                      "retain flag (0 or 1) | topic | payload (CR and LF escaped as \\r and \\n).\n")
+TAIL_LINES = 300
+DISK_FLOOR_GB_DEFAULT = 1.0
+DISK_CHECK_SECONDS = 300
+# Rough size model for the printed estimate: one 45 min field capture (12 MB merged transcript, TASK-1523)
+# scaled to a day; zip ratio assumed 7:1 for text. Neither number is measured over a long run.
+EST_RAW_MB_PER_DAY = 400
+EST_ZIP_RATIO = 7
+RETRY_PACK_SECONDS = 60
+UPLOAD_SUFFIX = "-upload.zip"
+PARTIAL_LINE_CAP = 65536     # a telnet chunk without a newline is written anyway beyond this many characters
+OT_MSG_TYPES = ("READ-DATA", "WRITE-DATA", "INVALID-DATA", "RESERVED", "READ-ACK", "WRITE-ACK",
+                "DATA-INVALID", "UNKNOWN-DATAID")
+OTFRAMES_CSV_COLUMNS = ("host_time", "device_time", "source", "frame", "msgid", "type", "value_hb", "value_lb", "f88", "u16")
+MQTT_CSV_COLUMNS = ("host_time", "retain", "topic", "payload")
+# Device identity lines of the telnet stream (banner and settings dump). Kept in memory while the run goes on,
+# so a long run still knows them at stop, when the first hour is long gone from disk.
+METADATA_PATTERNS = {
+    "hostname": re.compile(r"^\s*hostname:\s*(.+?)\s*$", re.IGNORECASE),
+    "firmware_version": re.compile(r"^\s*version:\s*(.+?)\s*$", re.IGNORECASE),
+    "unique_id": re.compile(r"^\s*unique_id:\s*(.+?)\s*$", re.IGNORECASE),
+    "pic_device_id": re.compile(r"^\s*device_id:\s*(.+?)\s*$", re.IGNORECASE),
+}
+METADATA_KEEP_FIRST = {"hostname", "firmware_version"}
+# The periodic pollers (device snapshots, crash log) share one slot: never more than one in flight (ADR-165).
+HTTP_SLOT = threading.Semaphore(1)
+
+# Streams and the file settings each one needs: header written when a file is created, newline mode.
+DEFAULT_STREAMS = {
+    "telnet.log": {"header": None, "newline": None},
+    "mqtt.log": {"header": None, "newline": None},
+    "browser.log": {"header": None, "newline": None},
+    "crashlog.log": {"header": None, "newline": None},
+    SNAPSHOTS_LOG: {"header": SNAPSHOTS_HEADER, "newline": "\n"},
+    "otframes.log": {"header": FRAMES_HEADER + "\n", "newline": "\n"},
+    "otgw_simulation.log": {"header": None, "newline": "\n"},
+}
+
 
 def now_iso():
     return datetime.now().astimezone().isoformat(timespec="seconds")
@@ -120,18 +188,538 @@ def redact(text):
 
 
 # --------------------------------------------------------------------------- #
+# CSV conversion of an hour (TASK-1523) and verified zip writing
+# --------------------------------------------------------------------------- #
+
+def decode_ot_frame(frame):
+    """8 hex digits -> (msgid, type name, value_hb, value_lb, f8.8 as signed number, u16), or None."""
+    if not re.fullmatch(r"[0-9A-Fa-f]{8}", frame or ""):
+        return None
+    word = int(frame, 16)
+    u16 = word & 0xFFFF
+    signed = u16 - 0x10000 if u16 & 0x8000 else u16
+    return ((word >> 16) & 0xFF, OT_MSG_TYPES[(word >> 28) & 7], u16 >> 8, u16 & 0xFF, signed / 256.0, u16)
+
+
+def convert_otframes_csv(src, dst):
+    """otframes.log -> otframes.csv. Notes (#) and gap lines are skipped. Returns the row count."""
+    rows = 0
+    with open(src, "r", encoding="utf-8", errors="replace") as f, \
+            open(dst, "w", encoding="utf-8", newline="") as out:
+        writer = csv.writer(out, lineterminator="\n")
+        writer.writerow(OTFRAMES_CSV_COLUMNS)
+        for line in f:
+            if line.startswith("#"):
+                continue
+            parts = line.rstrip("\r\n").split("\t")
+            if len(parts) != 4:
+                continue
+            decoded = decode_ot_frame(parts[3])
+            if decoded is None:
+                continue
+            msgid, mtype, hb, lb, f88, u16 = decoded
+            writer.writerow([parts[0], parts[1], parts[2], parts[3], msgid, mtype, hb, lb, repr(f88), u16])
+            rows += 1
+    return rows
+
+
+def convert_mqtt_csv(src, dst):
+    """mqtt.log (long-run format: host_time TAB retain TAB topic TAB payload) -> mqtt.csv. Returns the row count."""
+    rows = 0
+    with open(src, "r", encoding="utf-8", errors="replace") as f, \
+            open(dst, "w", encoding="utf-8", newline="") as out:
+        writer = csv.writer(out, lineterminator="\n")
+        writer.writerow(MQTT_CSV_COLUMNS)
+        for line in f:
+            if line.startswith("#"):
+                continue
+            parts = line.rstrip("\r\n").split("\t", 3)
+            if len(parts) != 4 or parts[1] not in ("0", "1"):
+                continue
+            writer.writerow(parts)
+            rows += 1
+    return rows
+
+
+def convert_sat_csv(src, out_dir):
+    """telnet.log -> sattick.csv, satboot.csv, ... via scripts/sat_log_to_csv.py. Empty kinds are skipped.
+    Returns the list of files written."""
+    if str(HERE) not in sys.path:
+        sys.path.insert(0, str(HERE))
+    import sat_log_to_csv
+    with open(src, "r", encoding="utf-8", errors="replace") as f:
+        records = sat_log_to_csv.parse(f)
+    written = []
+    for kind, rows in records.items():
+        if rows:
+            path = Path(out_dir) / f"{kind.lower()}.csv"
+            sat_log_to_csv.write_csv(rows, path)
+            written.append(path)
+    return written
+
+
+def convert_logs_to_csv(directory, out_dir, on_error):
+    """Convert the logs found in `directory` into CSV files in `out_dir`. Each conversion stands alone: an error is
+    reported through on_error and never stops the others, nor the zip. Returns the CSV paths written."""
+    directory, out_dir = Path(directory), Path(out_dir)
+    written = []
+
+    def run(name, work):
+        try:
+            out_dir.mkdir(parents=True, exist_ok=True)
+            written.extend(work())
+        except Exception as exc:
+            on_error(f"csv conversion of {name} failed, the raw log is zipped anyway: {type(exc).__name__}: {exc}")
+
+    def one(convert, source, target):
+        def work():
+            dst = out_dir / target
+            if convert(directory / source, dst):
+                return [dst]
+            dst.unlink()
+            return []
+        return work
+
+    if (directory / "telnet.log").is_file():
+        run("telnet.log", lambda: convert_sat_csv(directory / "telnet.log", out_dir))
+    if (directory / FRAMES_LOG).is_file():
+        run(FRAMES_LOG, one(convert_otframes_csv, FRAMES_LOG, "otframes.csv"))
+    if (directory / "mqtt.log").is_file():
+        run("mqtt.log", one(convert_mqtt_csv, "mqtt.log", "mqtt.csv"))
+    return written
+
+
+def write_zip_verified(target, items):
+    """Write a zip of (path, arcname) items next to `target`, read it back, flush it to disk and move it into
+    place. Raises on any problem and leaves no half-written target. A .zip item is stored, not compressed again."""
+    target = Path(target)
+    tmp = target.with_name(target.name + ".tmp")
+    try:
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
+            for path, arcname in items:
+                z.write(path, arcname=arcname,
+                        compress_type=zipfile.ZIP_STORED if str(arcname).endswith(".zip") else zipfile.ZIP_DEFLATED)
+        with zipfile.ZipFile(tmp) as z:
+            bad = z.testzip()
+            if bad is not None:
+                raise RuntimeError(f"zip verification failed at {bad}")
+            for path, arcname in items:
+                if z.getinfo(arcname).file_size != Path(path).stat().st_size:
+                    raise RuntimeError(f"zip size mismatch for {arcname}")
+        with open(tmp, "r+b") as f:   # on disk before the plain files are deleted
+            os.fsync(f.fileno())
+        os.replace(tmp, target)
+    except BaseException:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+
+
+# --------------------------------------------------------------------------- #
+# Segment store: plain files, or one directory per wall-clock hour packed into a zip
+# --------------------------------------------------------------------------- #
+
+class SegmentStore:
+    """Every stream writes through here (TASK-1523).
+
+    hourly=False: one plain file per stream in the run folder (the behaviour of short runs).
+    hourly=True:  files go to live/YYYYMMDD-HH/. When the wall clock enters a new hour, the
+    handles are closed under the lock (a line in flight lands in either hour, never in none)
+    and the finished hour is packed into hours/YYYYMMDD-HH.zip. The plain files are deleted
+    only after the zip was written and read back with testzip(); a failed pack keeps them
+    and is retried. index.csv gets one row per stream and hour."""
+
+    def __init__(self, run_path, hourly=False, now_fn=None, background=True, on_error=None, retry_seconds=RETRY_PACK_SECONDS):
+        self.run_path = Path(run_path)
+        self.hourly = hourly
+        self.now_fn = now_fn or datetime.now
+        self.background = background
+        self.on_error = on_error or (lambda line: None)
+        self.retry_seconds = retry_seconds
+        self.live_root = self.run_path / "live"
+        self.hours_root = self.run_path / "hours"
+        self.index_path = self.run_path / INDEX_CSV
+        self._lock = threading.Lock()
+        self._pack_lock = threading.Lock()
+        self._streams = {name: dict(spec) for name, spec in DEFAULT_STREAMS.items()}
+        self._handles = {}
+        self._key = None
+        self._stats = {}
+        self._closed_stats = {}
+        self._jobs = []
+        self._packers = []
+        self._retry_at = None
+        self._write_errors = 0
+        self._closed = False
+        self._packed = set()   # hours whose zip exists: never packed again, only their leftover directory is deleted
+
+    # -- configuration ---------------------------------------------------------
+    def register(self, stream, header=None, newline=None):
+        with self._lock:
+            self._streams[stream] = {"header": header, "newline": newline}
+
+    # -- hour bookkeeping (call with the lock held) ---------------------------
+    @staticmethod
+    def _key_of(now):
+        return now.strftime("%Y%m%d-%H")
+
+    def _dir_locked(self):
+        return self.live_root / self._key if self.hourly else self.run_path
+
+    def _close_handles_locked(self):
+        for handle in self._handles.values():
+            try:
+                handle.close()
+            except OSError:
+                pass
+        self._handles = {}
+
+    def _roll_locked(self, now):
+        if not self.hourly:
+            return
+        key = self._key_of(now)
+        if self._key is not None and key < self._key:
+            # The clock jumped back (NTP step, manual change). Hours that are queued or packed are never reopened:
+            # writes stay in the newest open hour until the clock passes it again.
+            key = self._key
+        if self._key is None:
+            self._key = key
+        elif key != self._key:
+            self._close_handles_locked()
+            self._closed_stats[self._key] = self._stats
+            self._jobs.append(self._key)
+            self._key = key
+            self._stats = {}
+
+    def _take_jobs_locked(self):
+        jobs, self._jobs = self._jobs, []
+        return jobs
+
+    def _handle_locked(self, stream):
+        handle = self._handles.get(stream)
+        if handle is not None:
+            return handle
+        spec = self._streams.get(stream) or {"header": None, "newline": None}
+        directory = self._dir_locked()
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / stream
+        fresh = not path.exists() or path.stat().st_size == 0
+        handle = open(path, "a", encoding="utf-8", errors="replace", newline=spec["newline"])
+        if fresh and spec["header"]:
+            handle.write(spec["header"])
+            handle.flush()
+        self._handles[stream] = handle
+        return handle
+
+    def _stat_locked(self, stream):
+        return self._stats.setdefault(stream, {"lines": 0, "bytes": 0, "first": None, "last": None, "gaps": 0})
+
+    # -- public API ------------------------------------------------------------
+    def stream_path(self, stream):
+        with self._lock:
+            if not self.hourly:
+                return self.run_path / stream
+            key = self._key or self._key_of(self.now_fn())
+            return self.live_root / key / stream
+
+    def touch(self, stream):
+        """Create the file of the current hour now (writes its header)."""
+        with self._lock:
+            if self._closed:
+                return
+            self._roll_locked(self.now_fn())
+            try:
+                self._handle_locked(stream)
+            except OSError as exc:
+                self._write_failed(exc)
+
+    def write(self, stream, text):
+        return self.write_many(((stream, text),))
+
+    def write_many(self, items):
+        """Write several (stream, text) pairs into the same hour. True when all were written."""
+        ok = True
+        with self._lock:
+            if self._closed:
+                return False
+            now = self.now_fn()
+            self._roll_locked(now)
+            jobs = self._take_jobs_locked()
+            try:
+                stamp = now.astimezone().isoformat(timespec="milliseconds")
+                for stream, text in items:
+                    handle = self._handle_locked(stream)
+                    handle.write(text)
+                    handle.flush()
+                    if self.hourly:
+                        stat = self._stat_locked(stream)
+                        stat["lines"] += text.count("\n")
+                        stat["bytes"] += len(text.encode("utf-8", "replace"))
+                        stat["first"] = stat["first"] or stamp
+                        stat["last"] = stamp
+            except (OSError, ValueError) as exc:
+                ok = False
+                self._write_failed(exc)
+        if jobs:
+            self._dispatch(jobs)
+        return ok
+
+    def note_gap(self, stream):
+        if not self.hourly:
+            return
+        with self._lock:
+            if self._closed:
+                return
+            self._roll_locked(self.now_fn())
+            jobs = self._take_jobs_locked()
+            self._stat_locked(stream)["gaps"] += 1
+        if jobs:
+            self._dispatch(jobs)
+
+    def tick(self):
+        """Roll to a new hour even when nothing is written, and retry a failed pack.
+        Returns True when an hour was finished."""
+        if not self.hourly:
+            return False
+        with self._lock:
+            if self._closed:
+                return False
+            self._roll_locked(self.now_fn())
+            jobs = self._take_jobs_locked()
+            retry = (not jobs and self._retry_at is not None and time.monotonic() >= self._retry_at)
+        if retry:
+            jobs = [None]
+        if jobs:
+            self._dispatch(jobs)
+        return bool(jobs)
+
+    def tail_text(self, lines=TAIL_LINES):
+        """The last `lines` lines of every file of the current hour, redacted (long-run transcript)."""
+        if not self.hourly:
+            return ""
+        with self._lock:
+            if self._key is None or not (self.live_root / self._key).is_dir():
+                return ""
+            key = self._key
+            files = sorted(p for p in (self.live_root / key).iterdir() if p.is_file())
+        parts = []
+        for path in files:
+            tail = deque(maxlen=lines)
+            try:
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                    for line in f:
+                        tail.append(line.rstrip("\r\n"))
+            except OSError:
+                continue
+            parts.append(f"--- {path.name} (last {len(tail)} lines of hour {key}) ---\n")
+            parts.extend(redact(line) + "\n" for line in tail)
+            parts.append("\n")
+        return "".join(parts)
+
+    def close(self):
+        """Close the handles, pack the last (partial) hour and wait for running packers."""
+        with self._lock:
+            if self._closed:
+                return
+            self._close_handles_locked()
+            if self.hourly and self._key is not None:
+                self._closed_stats[self._key] = self._stats
+                self._jobs.append(self._key)
+            self._key = None
+            self._stats = {}
+            self._closed = True
+            jobs = self._take_jobs_locked()
+        for packer in list(self._packers):
+            packer.join(timeout=300)
+        for key in jobs:
+            self._pack_job(key)
+        if self.hourly:
+            self._pack_job(None)   # leftovers of an earlier failed pack
+
+    # -- packing ---------------------------------------------------------------
+    def _write_failed(self, exc):
+        self._write_errors += 1
+        if self._write_errors in (1, 10, 100, 1000, 10000):
+            self.on_error(f"segment store: write failed ({self._write_errors} so far): {type(exc).__name__}: {exc}")
+
+    def _dispatch(self, jobs):
+        for key in jobs:
+            if self.background:
+                packer = threading.Thread(target=self._pack_job, args=(key,), name="pack", daemon=True)
+                self._packers = [p for p in self._packers if p.is_alive()] + [packer]
+                packer.start()
+            else:
+                self._pack_job(key)
+
+    def _pack_job(self, key):
+        with self._pack_lock:
+            self._retry_at = None
+            try:
+                if key is not None:
+                    self._pack_dir(key)
+                with self._lock:
+                    current = self._key
+                if self.live_root.is_dir():
+                    for directory in sorted(p for p in self.live_root.iterdir() if p.is_dir()):
+                        if directory.name != current:
+                            self._pack_dir(directory.name)
+            except Exception as exc:
+                self.on_error(f"segment store: pack failed: {type(exc).__name__}: {exc}")
+                self._retry_at = time.monotonic() + self.retry_seconds
+
+    def _zip_target(self, name):
+        target = self.hours_root / f"{name}.zip"
+        n = 2
+        while target.exists():   # the repeated hour of a DST change must not overwrite the first
+            target = self.hours_root / f"{name}-{n}.zip"
+            n += 1
+        return target
+
+    def _remove_packed_dir(self, directory):
+        """Delete the plain files of an hour whose zip is safe. The directory is renamed to <hour>.packed first, so
+        a half-failed delete is recognisable; a later pass retries the delete and never packs the hour again."""
+        if not directory.name.endswith(".packed"):
+            renamed = directory.with_name(directory.name + ".packed")
+            try:
+                os.replace(directory, renamed)
+                directory = renamed
+            except OSError:
+                pass   # stays under its own name; the packed set still prevents a second zip
+        shutil.rmtree(directory, ignore_errors=True)
+        if directory.exists():
+            self.on_error(f"segment store: could not delete {directory.name} after packing; retrying later")
+            self._retry_at = time.monotonic() + self.retry_seconds
+
+    def _pack_dir(self, name):
+        directory = self.live_root / name
+        if not directory.is_dir():
+            return
+        if name.endswith(".packed") or name in self._packed:
+            self._remove_packed_dir(directory)
+            return
+        with self._lock:
+            stats = self._closed_stats.pop(name, None)
+        files = sorted(p for p in directory.iterdir() if p.is_file())
+        if not files:
+            shutil.rmtree(directory, ignore_errors=True)
+            return
+        self.hours_root.mkdir(parents=True, exist_ok=True)
+        target = self._zip_target(name)
+        csv_dir = self.run_path / f"csv-{name}.tmp"
+        try:
+            # The CSVs of the hour go into the same zip; a conversion error is reported and the raw logs are zipped anyway.
+            csv_files = convert_logs_to_csv(directory, csv_dir, self.on_error)
+            write_zip_verified(target, [(p, p.name) for p in files] + [(p, p.name) for p in csv_files])
+        except Exception as exc:
+            with self._lock:
+                if stats is not None:
+                    self._closed_stats[name] = stats
+            self.on_error(f"segment store: could not pack hour {name}, plain files kept: {type(exc).__name__}: {exc}")
+            self._retry_at = time.monotonic() + self.retry_seconds
+            return
+        finally:
+            shutil.rmtree(csv_dir, ignore_errors=True)
+        self._packed.add(name)
+        self._append_index(name, files, stats)
+        self._remove_packed_dir(directory)
+
+    def _append_index(self, name, files, stats):
+        try:
+            fresh = not self.index_path.exists()
+            with open(self.index_path, "a", encoding="utf-8", newline="") as f:
+                writer = csv.writer(f, lineterminator="\n")
+                if fresh:
+                    writer.writerow(INDEX_COLUMNS)
+                for path in files:
+                    stat = (stats or {}).get(path.name)
+                    if stat is None:   # no live counters (a leftover of an earlier run): read the file
+                        data = path.read_bytes()
+                        stat = {"lines": data.count(b"\n"), "bytes": len(data), "first": "", "last": "", "gaps": 0}
+                    writer.writerow([name, path.name, stat["lines"], stat["bytes"], stat["first"] or "",
+                                     stat["last"] or "", stat["gaps"]])
+        except OSError as exc:
+            self.on_error(f"segment store: could not update {INDEX_CSV}: {exc}")
+
+
+class StreamWriter:
+    """File-like adapter (write/flush) over one stream of the store, for the worker threads."""
+
+    def __init__(self, store, stream):
+        self.store = store
+        self.stream = stream
+
+    def write(self, text):
+        self.store.write(self.stream, text)
+
+    def flush(self):
+        pass
+
+
+class DiskGuard:
+    """Stops the run cleanly when the free space of the output drive falls below the floor."""
+
+    def __init__(self, path, floor_bytes, free_fn=None):
+        self.path = path
+        self.floor = floor_bytes
+        self.free_fn = free_fn or (lambda p: shutil.disk_usage(p).free)
+
+    def check(self, cap):
+        try:
+            free = self.free_fn(self.path)
+        except OSError as exc:
+            cap.script_error(f"disk guard: cannot read free space: {exc}")
+            return True
+        if free < self.floor:
+            gb = 1024 ** 3
+            cap.summary(f"Stopping: free disk space {free / gb:.2f} GB is below the floor of {self.floor / gb:.2f} GB. "
+                        f"Everything captured so far is kept and packed.")
+            cap.request_stop(f"free disk space below {self.floor / gb:.1f} GB")
+            return False
+        return True
+
+
+def disk_estimate_line(duration_seconds, floor_bytes):
+    gb = 1024 ** 3
+    zipped_day = EST_RAW_MB_PER_DAY / EST_ZIP_RATIO
+    floor = f"the run stops cleanly when free space drops below {floor_bytes / gb:.1f} GB"
+    if duration_seconds:
+        hours = duration_seconds / 3600
+        total = zipped_day * hours / 24 / 1024
+        span = f"{hours:g} h run: about {total:.2f} GB zipped plus one live hour of about {EST_RAW_MB_PER_DAY / 24:.0f} MB"
+    else:
+        span = f"until stopped: about {zipped_day:.0f} MB per day zipped plus one live hour of about {EST_RAW_MB_PER_DAY / 24:.0f} MB"
+    return (f"Disk budget (estimate, not measured over a long run): {span}; plain text is about "
+            f"{EST_RAW_MB_PER_DAY} MB per day before zipping. {floor[0].upper() + floor[1:]}.")
+
+
+# --------------------------------------------------------------------------- #
 # Run context: paths, summary, stop signal
 # --------------------------------------------------------------------------- #
 
 class Capture:
     """Shared state of one capture run. Every worker writes through this object."""
 
-    def __init__(self, run_path, echo=True):
+    def __init__(self, run_path, echo=True, hourly=False, store=None):
         self.run_path = Path(run_path)
         self.stop_event = threading.Event()
         self.stop_reason = None
         self.echo = echo
         self._lock = threading.Lock()
+        self.metadata_seen = {}   # first telnet banner / settings dump values, kept for resolve_metadata at stop
+        self.store = store or SegmentStore(self.run_path, hourly=hourly, on_error=self.script_error)
+
+    def note_metadata(self, text):
+        """Remember the device identity lines (hostname, version, unique_id, device_id) of the telnet stream."""
+        if len(self.metadata_seen) >= len(METADATA_PATTERNS):
+            return
+        for line in text.splitlines():
+            for name, pattern in METADATA_PATTERNS.items():
+                if name not in self.metadata_seen:
+                    match = pattern.match(line)
+                    if match:
+                        self.metadata_seen[name] = match.group(1)
 
     def path(self, name):
         return self.run_path / name
@@ -151,6 +739,20 @@ class Capture:
             try:
                 with open(self.path("script.error.log"), "a", encoding="utf-8") as f:
                     f.write(f"{now_iso()}  {line}\n")
+            except OSError:
+                pass
+
+    def gap(self, stream, start, end, reason):
+        """A stream was down from `start` to `end` (aware datetimes): counted in index.csv and,
+        in long-run mode, listed in gaps.log."""
+        self.store.note_gap(stream)
+        if not self.store.hourly:
+            return
+        secs = int(round(end.timestamp() - start.timestamp()))
+        with self._lock:
+            try:
+                with open(self.path(GAPS_LOG), "a", encoding="utf-8") as f:
+                    f.write(f"{start.isoformat(timespec='seconds')}\t{end.isoformat(timespec='seconds')}\t{secs}\t{stream}\t{reason}\n")
             except OSError:
                 pass
 
@@ -246,6 +848,7 @@ def apply_keepalive(sock):
 
 
 class TelnetCapture(threading.Thread):
+    include_trace = False   # --sat-trace: also switch on the HIGH_VOLUME_LABELS toggles
     def __init__(self, cap, host, port, http_base, base_timeout, reconnect_delay,
                  post_disconnect_delay, idle_check):
         super().__init__(name="telnet", daemon=True)
@@ -258,6 +861,7 @@ class TelnetCapture(threading.Thread):
         self.post_disconnect_delay = post_disconnect_delay
         self.idle_check = idle_check
         self.writer = None
+        self.partial = ""   # long-run mode: the unfinished last line of the stream, written once its newline arrives
         self.sock = None
         self.last_byte_mono = time.monotonic()
         self.last_byte_wall = datetime.now(timezone.utc).astimezone()
@@ -291,10 +895,31 @@ class TelnetCapture(threading.Thread):
             self.last_byte_mono = time.monotonic()
             self.last_byte_wall = datetime.now(timezone.utc).astimezone()
             text = data.decode("ascii", "replace")
-            self.writer.write(text)
-            self.writer.flush()
+            self.emit(text)
             chunks.append(text)
         return "".join(chunks)
+
+    def emit(self, text):
+        """Write received telnet text. In long-run mode only whole lines are written, so a line is never split over
+        two hours; the unfinished tail waits for its newline (flush_partial at a disconnect and at stop)."""
+        if self.cap.store.hourly:
+            text = self.partial + text
+            cut = text.rfind("\n")
+            if cut < 0 and len(text) >= PARTIAL_LINE_CAP:
+                cut = len(text) - 1
+            self.partial = text[cut + 1:]
+            text = text[:cut + 1]
+        if text:
+            self.cap.note_metadata(text)
+            self.writer.write(text)
+            self.writer.flush()
+
+    def flush_partial(self):
+        """Write the unfinished last line (the link ended inside it), closed with a newline."""
+        if self.partial and self.writer is not None:
+            tail, self.partial = self.partial, ""
+            self.writer.write(tail + "\n")
+            self.writer.flush()
 
     def read_banner(self, timeout):
         chunks = []
@@ -350,6 +975,8 @@ class TelnetCapture(threading.Thread):
         for label, (key, state) in toggles.items():
             if label in SIMULATOR_LABELS:
                 results.append(f"{label}=skipped (simulator)")
+            elif label in HIGH_VOLUME_LABELS and not self.include_trace and state == "0":
+                results.append(f"{label}=left off (high volume; --sat-trace turns it on)")
             elif state == "0":
                 self.sock.sendall(key.encode("ascii"))
                 self.current_toggles[label] = (key, "1")
@@ -488,8 +1115,12 @@ class TelnetCapture(threading.Thread):
         if self.gap is not None:
             self.gap["end_wall"] = datetime.now(timezone.utc).astimezone()
             self.gap["secs"] = int(round(self.gap["end_wall"].timestamp() - self.gap["start_wall"].timestamp()))
-            self.writer.write(f"\n### capture: telnet reconnected after {self.gap['secs']} s gap ({self.gap['reason']})\n")
+            g = self.gap
+            self.writer.write(f"\n### capture: telnet reconnected after {g['secs']} s gap ({g['reason']}); "
+                              f"gap start={g['start_wall'].isoformat(timespec='seconds')} "
+                              f"end={g['end_wall'].isoformat(timespec='seconds')}\n")
             self.writer.flush()
+            self.cap.gap("telnet.log", g["start_wall"], g["end_wall"], g["reason"])
 
     def after_connect(self):
         """Banner, toggles and the settings dump. Runs once the link is up, so a
@@ -503,6 +1134,7 @@ class TelnetCapture(threading.Thread):
         self.maybe_send_dump()
 
     def close_socket(self):
+        self.flush_partial()
         if self.sock is not None:
             try:
                 self.sock.close()
@@ -523,14 +1155,14 @@ class TelnetCapture(threading.Thread):
 
     def run(self):
         try:
-            with open(self.cap.path("telnet.log"), "a", encoding="utf-8", errors="replace") as writer:
-                self.writer = writer
-                self.loop()
-                try:
-                    self.restore_debug_toggles()
-                except Exception as exc:
-                    self.cap.summary(f"Debug toggles restore failed (device likely gone): {exc}")
-                self.close_socket()
+            self.writer = StreamWriter(self.cap.store, "telnet.log")
+            self.cap.store.touch("telnet.log")
+            self.loop()
+            try:
+                self.restore_debug_toggles()
+            except Exception as exc:
+                self.cap.summary(f"Debug toggles restore failed (device likely gone): {exc}")
+            self.close_socket()
         except Exception as exc:
             self.cap.summary(f"Telnet capture: error - {exc}")
             self.cap.script_error(f"Telnet worker error: {type(exc).__name__}: {exc}")
@@ -675,6 +1307,8 @@ class MqttCapture:
         self.err = None
         self.messages = 0
         self.connected_once = False
+        self.gap_start = None
+        self.gap_reason = None
 
     def errline(self, line):
         try:
@@ -685,7 +1319,8 @@ class MqttCapture:
 
     def start(self):
         mqtt = load_paho()
-        self.log = open(self.cap.path("mqtt.log"), "a", encoding="utf-8", errors="replace")
+        self.log = StreamWriter(self.cap.store, "mqtt.log")
+        self.cap.store.touch("mqtt.log")
         self.err = open(self.cap.path("mqtt.stderr.log"), "a", encoding="utf-8", errors="replace")
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2,
                              client_id=f"otgw-capture-{os.getpid()}", protocol=mqtt.MQTTv311)
@@ -702,10 +1337,21 @@ class MqttCapture:
                 self.cap.summary(f"MQTT connected: {self.host}:{self.port}, subscribed to '{self.topic}'")
             else:
                 self.cap.summary(f"MQTT reconnected: {now_iso()}")
+                if self.gap_start is not None:
+                    end = datetime.now().astimezone()
+                    secs = int(round(end.timestamp() - self.gap_start.timestamp()))
+                    self.log.write(f"### capture: mqtt reconnected after {secs} s gap ({self.gap_reason}); "
+                                   f"gap start={self.gap_start.isoformat(timespec='seconds')} "
+                                   f"end={end.isoformat(timespec='seconds')}\n")
+                    self.cap.gap("mqtt.log", self.gap_start, end, self.gap_reason)
+                    self.gap_start = None
 
         def on_disconnect(c, userdata, flags, reason_code, properties):
             if not self.cap.stopping():
                 self.errline(f"Disconnected: {reason_code}; paho reconnects")
+                if self.connected_once and self.gap_start is None:
+                    self.gap_start = datetime.now().astimezone()
+                    self.gap_reason = f"disconnected: {reason_code}"
 
         def on_connect_fail(c, userdata):
             self.errline(f"Connect to {self.host}:{self.port} failed; retrying")
@@ -713,8 +1359,13 @@ class MqttCapture:
         def on_message(c, userdata, msg):
             self.messages += 1
             try:
-                self.log.write(f"{msg.topic} {msg.payload.decode('utf-8', 'replace')}\n")
-                self.log.flush()
+                payload = msg.payload.decode("utf-8", "replace")
+                if self.cap.store.hourly:
+                    payload = payload.replace("\r", "\\r").replace("\n", "\\n")
+                    stamp = datetime.now().astimezone().isoformat(timespec="milliseconds")
+                    self.log.write(f"{stamp}\t{int(bool(msg.retain))}\t{msg.topic}\t{payload}\n")
+                else:
+                    self.log.write(f"{msg.topic} {payload}\n")
             except Exception:
                 pass
 
@@ -737,12 +1388,13 @@ class MqttCapture:
                 self.client.loop_stop()
             except Exception:
                 pass
-        for handle in (self.log, self.err):
-            try:
-                if handle:
-                    handle.close()
-            except Exception:
-                pass
+        try:
+            if self.err:
+                self.err.close()
+        except Exception:
+            pass
+        if self.gap_start is not None:
+            self.cap.summary(f"MQTT gap still open at stop: since {self.gap_start.isoformat(timespec='seconds')} ({self.gap_reason})")
         self.cap.summary(f"MQTT capture: {self.messages} message(s) written to mqtt.log.")
 
 
@@ -964,8 +1616,7 @@ class BrowserCapture(threading.Thread):
         self.result = "Browser capture: completed normally."
 
     def log(self, line):
-        with open(self.cap.path("browser.log"), "a", encoding="utf-8") as f:
-            f.write(f"{clock()}  {line}\n")
+        self.cap.store.write("browser.log", f"{clock()}  {line}\n")
 
     def run(self):
         ws = None
@@ -1128,13 +1779,13 @@ class CrashlogCapture(threading.Thread):
         self.poll_seconds = poll_seconds
 
     def log(self, line):
-        with open(self.cap.path("crashlog.log"), "a", encoding="utf-8") as f:
-            f.write(f"{clock()}  {line}\n")
+        self.cap.store.write("crashlog.log", f"{clock()}  {line}\n")
 
     def get(self, url):
         result = None
         for attempt in range(2):
-            status, body, err, _ctype = http_get(url, 10)
+            with HTTP_SLOT:
+                status, body, err, _ctype = http_get(url, 10)
             result = (status, body.decode("utf-8", "replace"), err)
             if status is not None:
                 return result
@@ -1205,9 +1856,14 @@ class FrameLogWriter:
     """Writes otframes.log (timed) and otgw_simulation.log (bare frames, the format the
     firmware replay reads). Both are LF-terminated on every platform."""
 
-    def __init__(self, frames_path, sim_path):
+    def __init__(self, frames_path, sim_path, store=None):
         self.count = 0
         self._lock = threading.Lock()
+        self._store = store
+        if store is not None:   # TASK-1523: both files follow the store's hour segments
+            store.touch(FRAMES_LOG)
+            store.touch(SIM_LOG)
+            return
         self._frames = open(frames_path, "w", encoding="utf-8", newline="\n", buffering=1)
         self._sim = open(sim_path, "w", encoding="ascii", newline="\n", buffering=1)
         self._frames.write(FRAMES_HEADER + "\n")
@@ -1215,15 +1871,24 @@ class FrameLogWriter:
     def write(self, host_time, device_time, letter, frame):
         host = host_time.astimezone().isoformat(timespec="milliseconds")
         with self._lock:
-            self._frames.write(f"{host}\t{device_time}\t{letter}\t{frame}\n")
-            self._sim.write(f"{letter}{frame}\n")
+            if self._store is not None:
+                self._store.write_many(((FRAMES_LOG, f"{host}\t{device_time}\t{letter}\t{frame}\n"),
+                                        (SIM_LOG, f"{letter}{frame}\n")))
+            else:
+                self._frames.write(f"{host}\t{device_time}\t{letter}\t{frame}\n")
+                self._sim.write(f"{letter}{frame}\n")
             self.count += 1
 
     def comment(self, text):
         with self._lock:
-            self._frames.write(f"# {now_iso()} {text}\n")
+            if self._store is not None:
+                self._store.write(FRAMES_LOG, f"# {now_iso()} {text}\n")
+            else:
+                self._frames.write(f"# {now_iso()} {text}\n")
 
     def close(self):
+        if self._store is not None:
+            return   # the store owns the files
         with self._lock:
             for f in (self._frames, self._sim):
                 try:
@@ -1246,26 +1911,44 @@ class FrameCapture(threading.Thread):
     def run(self):
         result = "Frame recorder: completed normally."
         try:
-            self.writer = FrameLogWriter(self.cap.path(FRAMES_LOG), self.cap.path(SIM_LOG))
+            self.writer = FrameLogWriter(self.cap.path(FRAMES_LOG), self.cap.path(SIM_LOG), store=self.cap.store)
         except OSError as exc:
             self.cap.script_error(f"otframes: cannot create {FRAMES_LOG}/{SIM_LOG}: {exc}")
             self.cap.summary(f"Frame recorder: error - {exc}")
             return
         delay = WS_RECONNECT_MIN
         last_error = None
+        started = datetime.now().astimezone()
+        ever_connected = False
+        gap_start = None
+        gap_reason = None
         try:
             while not self.cap.stopping():
                 ws = None
                 try:
                     ws = WebSocket(f"ws://{self.host}:{self.port}/ws")
                     ws.sock.settimeout(1)
+                    try:
+                        apply_keepalive(ws.sock)   # a /ws that died without a FIN is noticed in ~25 s
+                    except Exception:
+                        pass
+                    ever_connected = True
+                    if gap_start is not None:
+                        self._close_gap(gap_start, gap_reason)
+                        gap_start = None
                     self.writer.comment("connected to /ws")
                     last_error = None
                     delay = WS_RECONNECT_MIN
                     self._read(ws)
                     self.writer.comment("disconnected from /ws")
+                    if not self.cap.stopping():
+                        gap_start = datetime.now().astimezone()
+                        gap_reason = "/ws closed by the device"
                 except Exception as exc:
                     text = f"{type(exc).__name__}: {exc}"
+                    if gap_start is None:
+                        gap_start = datetime.now().astimezone() if ever_connected else started
+                    gap_reason = text
                     if text != last_error:   # one line per distinct failure, not one per retry
                         self.cap.script_error(f"otframes: /ws on {self.host}:{self.port} - {text}")
                         last_error = text
@@ -1278,9 +1961,18 @@ class FrameCapture(threading.Thread):
             result = f"Frame recorder: error - {exc}"
             self.cap.script_error(f"otframes: worker error {type(exc).__name__}: {exc}")
         finally:
+            if gap_start is not None:
+                self.writer.comment(f"GAP still open at stop: start={gap_start.isoformat(timespec='seconds')} reason={gap_reason}")
             count = self.writer.count
             self.writer.close()
             self.cap.summary(f"{result} {count} frame(s) -> {FRAMES_LOG}, {SIM_LOG}")
+
+    def _close_gap(self, start, reason):
+        end = datetime.now().astimezone()
+        secs = int(round(end.timestamp() - start.timestamp()))
+        self.writer.comment(f"GAP start={start.isoformat(timespec='seconds')} end={end.isoformat(timespec='seconds')} "
+                            f"secs={secs} reason={reason}")
+        self.cap.gap(FRAMES_LOG, start, end, reason)
 
     def _read(self, ws):
         while not self.cap.stopping():
@@ -1295,6 +1987,51 @@ class FrameCapture(threading.Thread):
                 parsed = parse_ot_log_line(line)
                 if parsed:
                     self.writer.write(received, *parsed)
+
+
+# --------------------------------------------------------------------------- #
+# Periodic device snapshots (TASK-1523)
+# --------------------------------------------------------------------------- #
+
+class SnapshotCapture(threading.Thread):
+    """Every `interval` seconds: GET each of SNAPSHOT_PATHS, one request at a time, one line each
+    into snapshots.log. Heap and loop-gap counters are inside device/info. A failed request is
+    one ERROR line; the thread never stops before the capture does."""
+
+    def __init__(self, cap, http_base, interval, paths=SNAPSHOT_PATHS):
+        super().__init__(name="snapshots", daemon=True)
+        self.cap = cap
+        self.http_base = http_base
+        self.interval = interval
+        self.paths = paths
+        self.rounds = 0
+
+    def snapshot_once(self):
+        for path in self.paths:
+            if self.cap.stopping():
+                return
+            with HTTP_SLOT:
+                status, body, err, _ctype = http_get(self.http_base + path, SNAPSHOT_TIMEOUT, SNAPSHOT_BODY_CAP + 1)
+            stamp = datetime.now().astimezone().isoformat(timespec="milliseconds")
+            if status is None:
+                self.cap.store.write(SNAPSHOTS_LOG, f"{stamp}\t{path}\tERROR\t{err}\n")
+                continue
+            cut = len(body) > SNAPSHOT_BODY_CAP
+            text = " ".join(body[:SNAPSHOT_BODY_CAP].decode("utf-8", "replace").split())
+            self.cap.store.write(SNAPSHOTS_LOG, f"{stamp}\t{path}\t{status}\t{redact(text)}{' ...[truncated]' if cut else ''}\n")
+
+    def run(self):
+        try:
+            self.cap.store.touch(SNAPSHOTS_LOG)
+            while not self.cap.stopping():
+                try:
+                    self.snapshot_once()
+                    self.rounds += 1
+                except Exception as exc:
+                    self.cap.script_error(f"snapshots: {type(exc).__name__}: {exc}")
+                self.cap.wait(self.interval)
+        finally:
+            self.cap.summary(f"Device snapshots: {self.rounds} round(s) every {self.interval} s -> {SNAPSHOTS_LOG}")
 
 
 # --------------------------------------------------------------------------- #
@@ -1361,19 +2098,16 @@ def resolve_metadata(cap, device_host, http_base, run_name):
             raise RuntimeError(err or f"HTTP {status}")
         return json.loads(body.decode("utf-8"))
 
-    patterns = {
-        "hostname": re.compile(r"^\s*hostname:\s*(.+?)\s*$", re.IGNORECASE),
-        "firmware_version": re.compile(r"^\s*version:\s*(.+?)\s*$", re.IGNORECASE),
-        "unique_id": re.compile(r"^\s*unique_id:\s*(.+?)\s*$", re.IGNORECASE),
-        "pic_device_id": re.compile(r"^\s*device_id:\s*(.+?)\s*$", re.IGNORECASE),
-    }
+    for name, value in cap.metadata_seen.items():   # seen on the first connection, also when that hour is long gone
+        add(name, value, "telnet (kept in memory)", prefer_existing=name in METADATA_KEEP_FIRST)
+    patterns = METADATA_PATTERNS
     try:
-        with open(cap.path("telnet.log"), "r", encoding="utf-8", errors="replace") as f:
+        with open(cap.store.stream_path("telnet.log"), "r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 for name, pattern in patterns.items():
                     match = pattern.match(line)
                     if match:
-                        add(name, match.group(1), "telnet.log", prefer_existing=name in {"hostname", "firmware_version"})
+                        add(name, match.group(1), "telnet.log", prefer_existing=name in METADATA_KEEP_FIRST)
     except OSError:
         pass
 
@@ -1469,15 +2203,60 @@ def build_tool_error_log(cap):
         write_sections(out, cap, ERROR_SECTIONS, empty_marker="(empty)")
 
 
-def merge_transcript(cap, transcript):
+def merge_transcript(cap, transcript, tail=None):
+    """Short runs: every log merged. Long runs (tail is the last hour's text): summary, errors, gap
+    markers, hour index and that tail only; the data stays in hours/*.zip."""
     tmp = transcript.with_name(transcript.name + ".tmp")
     with open(tmp, "w", encoding="utf-8") as out:
         out.write("OTGW capture - merged transcript\n")
         out.write(f"Generated: {now_iso()}\n")
         out.write(f"Run folder: {cap.run_path}\n")
-        out.write("Upload THIS single file; it contains every capture log below.\n\n")
-        write_sections(out, cap, TRANSCRIPT_SECTIONS)
+        if tail is None:
+            out.write("This transcript holds every capture log below; it is also inside the upload zip next to the run folder.\n\n")
+            write_sections(out, cap, TRANSCRIPT_SECTIONS)
+        else:
+            out.write("Long-run capture: the data is in hours/*.zip (with CSV files per hour) in the run folder. This file holds the\n")
+            out.write("summary, errors, gap markers, the hour index and the tail of the last hour. The upload zip next to the run\n")
+            out.write("folder holds this file, the hour zips, index.csv and gaps.log: that one file is what you upload.\n\n")
+            write_sections(out, cap, HOURLY_SECTIONS)
+            out.write(f"{SECTION_RULE}\n=== LAST HOUR TAIL (the final {TAIL_LINES} lines per stream, redacted)\n{SECTION_RULE}\n")
+            out.write(tail or "(none)\n")
     os.replace(tmp, transcript)
+
+
+def upload_zip_path(run_path):
+    run_path = Path(run_path)
+    return run_path.parent / (run_path.name + UPLOAD_SUFFIX)
+
+
+def build_upload_zip(cap, transcript, hourly):
+    """The one file a tester uploads, next to the run folder. Long run: the transcript, summary, gaps.log, index.csv and
+    every hours/*.zip (these already hold the CSVs). Short run: the transcript, the raw frame files and the CSVs
+    converted from the logs. Written with the same verify-and-flush rules as the hour zips."""
+    items = []
+
+    def add(path, arcname):
+        if Path(path).is_file():
+            items.append((path, arcname))
+
+    add(transcript, Path(transcript).name)
+    csv_dir = cap.run_path / "csv-run.tmp"
+    try:
+        if hourly:
+            for name in ("summary.txt", GAPS_LOG, INDEX_CSV):
+                add(cap.path(name), name)
+            for path in sorted(cap.store.hours_root.glob("*.zip")):
+                add(path, f"hours/{path.name}")
+        else:
+            for name in (FRAMES_LOG, SIM_LOG):
+                add(cap.path(name), name)
+            for path in convert_logs_to_csv(cap.run_path, csv_dir, cap.script_error):
+                add(path, f"csv/{path.name}")
+        target = upload_zip_path(cap.run_path)
+        write_zip_verified(target, items)
+    finally:
+        shutil.rmtree(csv_dir, ignore_errors=True)
+    return target
 
 
 # --------------------------------------------------------------------------- #
@@ -1558,6 +2337,8 @@ ALIASES = {
     "-SkipHttpProbes": "--skip-http-probes", "-HttpProbeTimeoutSeconds": "--http-probe-timeout-seconds",
     "-SkipCrashlogCapture": "--skip-crashlog-capture", "-CrashlogUrl": "--crashlog-url",
     "-CrashlogPollSeconds": "--crashlog-poll-seconds", "-NoPrompt": "--no-prompt",
+    "-LongRun": "--long-run", "-Hourly": "--long-run", "-SnapshotSeconds": "--snapshot-seconds",
+    "-MinFreeGb": "--min-free-gb",
     "-Help": "--help", "-?": "--help", "/?": "--help",
     "--user": "--username", "--duration-seconds": "--duration",
     "--telnet-reconnect-delay-milliseconds": "--telnet-reconnect-delay-ms",
@@ -1594,7 +2375,12 @@ def build_parser():
         prog="capture-mqtt-debug",
         description="OTGW diagnostic capture: telnet debug, MQTT, browser devtools, crash log and HTTP "
                     "probes, merged into ONE transcript file to upload. Press Q or Ctrl+C to stop.",
-        epilog="PowerShell-style names work too: -DeviceHost, -BrokerHost, -DurationSeconds, -SaveSecrets, ...",
+        epilog="3-day capture: add --long-run --duration 259200 (also switched on by any --duration above 2 h). "
+               "Every stream then writes one segment per wall-clock hour, each finished hour is packed into "
+               "hours/YYYYMMDD-HH.zip, index.csv lists lines, bytes, first/last time and gaps per hour and stream, "
+               "the device is snapshotted every 5 min and the run stops cleanly when free disk space drops below "
+               "--min-free-gb. "
+               "PowerShell-style names work too: -DeviceHost, -BrokerHost, -DurationSeconds, -SaveSecrets, -LongRun, ...",
         allow_abbrev=False)
     p.add_argument("--device", metavar="HOST", help="OTGW device host or IP (prompted when missing)")
     p.add_argument("--broker", metavar="HOST", help="MQTT broker host; empty = skip the MQTT stream")
@@ -1605,7 +2391,16 @@ def build_parser():
     p.add_argument("--save-secrets", action="store_true",
                    help="also store the MQTT password in the local settings file, for unattended runs")
     p.add_argument("--output-root", default="logs/mqtt-diagnostics")
-    p.add_argument("--duration", type=ranged(1, 2147483647), help="stop after N seconds (default: until Q/Ctrl+C)")
+    p.add_argument("--duration", type=ranged(1, 2147483647),
+                   help="stop after N seconds (default: until Q/Ctrl+C); 259200 = 3 days. Above 7200 s the long-run mode starts by itself")
+    p.add_argument("--long-run", "--hourly", action="store_true", dest="long_run",
+                   help="long-run mode (TASK-1523): one segment per wall-clock hour, each finished hour zipped into "
+                        "hours/YYYYMMDD-HH.zip, index.csv instead of one merged transcript, device snapshots, disk guard")
+    p.add_argument("--snapshot-seconds", type=ranged(1, 86400, allow_zero=True), default=None,
+                   help="device snapshot interval in seconds: /api/v2/device/info and /api/v2/sat?detail=full into "
+                        "snapshots.log, one request at a time (default 300 in long-run mode, off otherwise; 0 = off)")
+    p.add_argument("--min-free-gb", type=float, default=DISK_FLOOR_GB_DEFAULT,
+                   help="long-run mode: stop cleanly when free disk space drops below this many GB (default 1.0)")
     p.add_argument("--no-prompt", action="store_true", help="never prompt; fail when the device host is missing")
     p.add_argument("--telnet-connect-timeout-seconds", type=ranged(2, 60), default=6)
     p.add_argument("--telnet-reconnect-delay-ms", type=ranged(250, 60000), default=500)
@@ -1620,6 +2415,8 @@ def build_parser():
     p.add_argument("--http-probe-timeout-seconds", type=ranged(1, 60), default=10)
     p.add_argument("--skip-frame-capture", action="store_true",
                    help="do not record otframes.log / otgw_simulation.log (raw OpenTherm frames)")
+    p.add_argument("--sat-trace", action="store_true",
+                   help="also switch on the high-volume SAT trace (telnet key 8, off by default)")
     p.add_argument("--skip-crashlog-capture", action="store_true")
     p.add_argument("--crashlog-url")
     p.add_argument("--crashlog-poll-seconds", type=ranged(5, 3600), default=30)
@@ -1708,9 +2505,13 @@ def main(argv=None):
     run_name = datetime.now().strftime("%Y%m%d-%H%M%S")
     run_path = Path(args.output_root).resolve() / run_name
     run_path.mkdir(parents=True, exist_ok=True)
-    cap = Capture(run_path)
-    for name in ("summary.txt", "telnet.log", "mqtt.log", "mqtt.stderr.log", "browser.log",
-                 "browser.stderr.log", "crashlog.log", "script.error.log"):
+    long_run = bool(args.long_run or (args.duration and args.duration > LONG_RUN_AUTO_SECONDS))
+    cap = Capture(run_path, hourly=long_run)
+    flat_files = ("summary.txt", "mqtt.stderr.log", "browser.stderr.log", "script.error.log")
+    if not long_run:
+        flat_files = ("summary.txt", "telnet.log", "mqtt.log", "mqtt.stderr.log", "browser.log",
+                      "browser.stderr.log", "crashlog.log", "script.error.log")
+    for name in flat_files:
         cap.path(name).touch()
 
     def on_signal(reason):
@@ -1748,6 +2549,20 @@ def main(argv=None):
     s(f"SkipHttpProbes: {args.skip_http_probes}", echo=False)
     s(f"HttpProbeTimeoutSeconds: {args.http_probe_timeout_seconds}", echo=False)
     s(f"CrashlogPollSeconds: {args.crashlog_poll_seconds}", echo=False)
+    snapshot_seconds = args.snapshot_seconds if args.snapshot_seconds is not None else (SNAPSHOT_SECONDS_DEFAULT if long_run else 0)
+    s(f"LongRun: {long_run}", echo=False)
+    s(f"SnapshotSeconds: {snapshot_seconds or 'off'}", echo=False)
+    disk_guard = None
+    if long_run:
+        why = "--long-run" if args.long_run else f"--duration {args.duration} s is above {LONG_RUN_AUTO_SECONDS} s"
+        s(f"LONG-RUN MODE IS ACTIVE ({why}): one segment per hour, every finished hour zipped with its CSV files. "
+          f"When the capture ends, ONE file is made for you to upload: {upload_zip_path(run_path)}")
+        cap.store.register("mqtt.log", header=MQTT_HOURLY_HEADER)
+        disk_guard = DiskGuard(run_path, int(args.min_free_gb * 1024 ** 3))
+        s(f"Long-run mode: one segment per wall-clock hour in live/, each finished hour zipped into hours/YYYYMMDD-HH.zip, "
+          f"index.csv in {run_path}")
+        s(disk_estimate_line(args.duration, disk_guard.floor))
+        disk_guard.check(cap)
     s(f"Tool stderr log: {cap.path('error.txt')}", echo=False)
     if saved_path:
         s(f"Settings prefill saved: {saved_path}", echo=False)
@@ -1797,6 +2612,12 @@ def main(argv=None):
         workers.append((frames, 10))
         s(f"Frame recorder started: ws://{args.device}:{args.http_port}/ws -> {FRAMES_LOG}, {SIM_LOG} (kept next to the transcript).")
 
+    if snapshot_seconds:
+        snapshots = SnapshotCapture(cap, http_base, snapshot_seconds)
+        snapshots.start()
+        workers.append((snapshots, SNAPSHOT_TIMEOUT + 5))
+        s(f"Device snapshots started: every {snapshot_seconds} s, {', '.join(SNAPSHOT_PATHS)} -> {SNAPSHOTS_LOG}")
+
     mqtt_capture = None
     if not args.broker:
         s("MQTT capture skipped: no BrokerHost given (telnet, probe and crash log still run).")
@@ -1813,6 +2634,7 @@ def main(argv=None):
     telnet = TelnetCapture(cap, args.device, args.telnet_port, http_base, args.telnet_connect_timeout_seconds,
                            args.telnet_reconnect_delay_ms / 1000.0, args.telnet_post_disconnect_delay_ms / 1000.0,
                            args.telnet_idle_check_seconds)
+    telnet.include_trace = args.sat_trace
     telnet.start()
     s(f"Capture started: {now_iso()}", echo=False)
     print(f"Capturing into {run_path}")
@@ -1820,11 +2642,18 @@ def main(argv=None):
 
     keys = KeyReader()
     started = time.monotonic()
+    next_disk_check = started + DISK_CHECK_SECONDS
     try:
         while not cap.stopping():
             if args.duration and time.monotonic() - started >= args.duration:
                 cap.request_stop("duration elapsed")
                 break
+            if long_run:
+                cap.store.tick()
+                if time.monotonic() >= next_disk_check:
+                    next_disk_check = time.monotonic() + DISK_CHECK_SECONDS
+                    if not disk_guard.check(cap):
+                        break
             key = keys.key()
             if key in ("q", "Q"):
                 cap.request_stop("Q key")
@@ -1871,13 +2700,21 @@ def main(argv=None):
     s(f"Transcript filename: {filename}", echo=False)
     s(f"Finished: {now_iso()}", echo=False)
 
+    tail = cap.store.tail_text(TAIL_LINES) if long_run else None
+    cap.store.close()   # long run: packs the last partial hour into hours/ and finishes index.csv
+
     try:
         build_tool_error_log(cap)
-        merge_transcript(cap, transcript)
+        merge_transcript(cap, transcript, tail)
     except Exception as exc:
         print(f"Could not build the merged transcript ({exc}); intermediate capture files were kept.", file=sys.stderr)
         print(f"Diagnostic capture folder: {run_path}")
         return 1
+    upload = None
+    try:
+        upload = build_upload_zip(cap, transcript, long_run)   # before the intermediate files are removed
+    except Exception as exc:
+        print(f"Could not build the upload zip ({exc}); the transcript and the run folder were kept.", file=sys.stderr)
     for name in INTERMEDIATE_FILES:
         try:
             cap.path(name).unlink()
@@ -1891,9 +2728,15 @@ def main(argv=None):
     for name in (FRAMES_LOG, SIM_LOG):
         if cap.path(name).exists():
             print(f"Raw OpenTherm frames (kept, for replays): {cap.path(name)}")
-    print(f"Merged transcript (single upload): {transcript}")
+    if long_run:
+        print(f"Hour archives: {cap.store.hours_root} (one zip per hour, CSV files inside), index: {cap.store.index_path}")
     print(f"Diagnostic capture folder: {run_path}")
+    print(f"Merged transcript: {transcript}")
+    if upload is not None:
+        print(f"Upload this one file: {upload}", flush=True)
     signalled = cap.stop_reason in ("Ctrl+C/Ctrl+Break", "terminated (SIGTERM)", "terminal closed (SIGHUP)")
+    if upload is None:
+        return 1
     return 130 if signalled else 0
 
 

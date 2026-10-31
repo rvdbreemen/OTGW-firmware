@@ -127,7 +127,10 @@ empty broker skips the MQTT stream and writes one summary line saying so
 - `--topic` / `-Topic`: MQTT topic filter (default `#`)
 - `--username` / `--user` / `-Username`, `--password` / `-Password`: MQTT credentials
 - `--save-secrets` / `-SaveSecrets`: also store the MQTT password in the settings file (for unattended runs)
-- `--duration` / `-DurationSeconds`: stop after N seconds
+- `--duration` / `-DurationSeconds`: stop after N seconds (`259200` = 3 days; above 2 hours the long-run mode starts by itself)
+- `--long-run` / `--hourly` / `-LongRun`: long-run mode, see "3-day capture" below
+- `--snapshot-seconds` / `-SnapshotSeconds`: device snapshot interval (default 300 in long-run mode, off otherwise, `0` = off)
+- `--min-free-gb` / `-MinFreeGb`: long-run mode stops cleanly below this much free disk space (default `1.0`)
 - `--output-root` / `-OutputRoot`: output folder root (default `logs/mqtt-diagnostics`)
 - `--no-prompt` / `-NoPrompt`: never prompt
 - `--telnet-connect-timeout-seconds`, `--telnet-reconnect-delay-ms`, `--telnet-post-disconnect-delay-ms`, `--telnet-idle-check-seconds` (and the `-Telnet...` names): telnet reconnect tuning (TASK-1299)
@@ -150,7 +153,7 @@ password is stored only with `--save-secrets`. Keys that other tools added
 ### What it collects
 
 - **Telnet debug (port 23).** It reconnects with a gap report and a TCP keepalive, and a health-probe watchdog checks a silent link (TASK-1299). On each connection it switches on every debug toggle that is off, and simulator toggles (`SensorSim`, `OTGW-Sim`) are left alone. At stop it restores every toggle to its state at capture start (TASK-1453). The `q` / `D` settings dump is sent only after `Setup finished!` was seen or the uptime is above 0 minutes (TASK-1396).
-- **MQTT.** One `topic payload` line per message in `mqtt.log`, the same format as `mosquitto_sub -v`.
+- **MQTT.** One `topic payload` line per message in `mqtt.log`, the same format as `mosquitto_sub -v` (in long-run mode with time stamp and retain flag, see below).
 - **Browser devtools.** Console, exceptions, log entries and network timing of the device page in `browser.log`. On Windows (job object) and Linux (parent-death signal), the headless browser also dies when the tool is killed.
 - **Crash log.** `/api/v2/device/crashlog` and `/reboot_log.txt`, polled into `crashlog.log`.
 - **Raw OpenTherm frames (TASK-1503).** One WebSocket client on the device's `/ws` (the stream the web UI's OT log uses) records every frame into two files that stay in the run folder next to the transcript (they are not merged into it and not deleted):
@@ -163,7 +166,36 @@ Everything except the two frame files is merged into
 `transcript-<date-time>-<firmware-version>-<hostname>-<uniqueid>.txt`, under
 `logs/mqtt-diagnostics/<yyyyMMdd-HHmmss>/`. Secrets (password/token/key values,
 `-P` arguments) are redacted. After a successful merge, the intermediate files
-are removed. Upload only the transcript; keep `otframes.log` and `otgw_simulation.log` for replays.
+are removed. At the end the tool also writes ONE upload file next to the run folder, `<run folder>-upload.zip`, and prints
+its path as the last line (`Upload this one file: ...`). It holds the merged transcript, the two frame files and the CSV files
+converted from the logs (`csv/sattick.csv` and the other SAT record types from the telnet log, `csv/otframes.csv`). Upload that
+one file; keep `otframes.log` and `otgw_simulation.log` in the run folder for replays.
+
+### 3-day capture (long-run mode, TASK-1523)
+
+For a run of many hours or days, for example the field data for the SAT replay work:
+
+```bash
+scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --long-run --duration 259200
+```
+
+```bat
+scripts\capture-mqtt-debug.bat -DeviceHost 192.168.1.50 -BrokerHost 192.168.1.10 -LongRun -DurationSeconds 259200
+```
+
+`--long-run` is switched on by itself for any `--duration` above 2 hours (7200 s); the tool then prints a
+`LONG-RUN MODE IS ACTIVE` line with the path of the single upload zip. Leave `--duration` out to run until you press `Q`. What changes compared with a short run:
+
+- **One segment per wall-clock hour.** Telnet, MQTT, raw frames (`otframes.log`, `otgw_simulation.log`), browser, crash log and snapshots write into `live/YYYYMMDD-HH/`. At each full hour the finished hour is packed into one zip, `hours/YYYYMMDD-HH.zip`. The plain files of that hour are deleted only after the zip was written and read back (`testzip`); if packing fails they are kept and packed again later. The live hour stays plain text, so you can `tail` it. On stop, the last partial hour is zipped too. A line that arrives at the hour change lands in the old or the new hour, never in neither.
+- **CSV files in every hour zip.** Before an hour is zipped, its logs are converted and the CSVs go into the same zip: `sattick.csv`, `satboot.csv`, `satmode.csv`, `sattc.csv`, `satfollow.csv`, `satdhw.csv` (SAT records of the telnet log, via `sat_log_to_csv.py`; kinds without lines are left out), `otframes.csv` (columns `host_time, device_time, source, frame, msgid, type, value_hb, value_lb, f88, u16`; `type` is the OpenTherm message type such as `READ-DATA` or `WRITE-ACK`, `f88` the signed 8.8 reading of the value, `u16` the raw value; note and gap lines are skipped) and `mqtt.csv` (`host_time, retain, topic, payload`). A conversion error is logged in `script.error.log` and the raw logs are zipped anyway. A line is never split over two hours.
+- **`index.csv`** instead of one merged multi-GB transcript: per hour and stream the number of lines, bytes, first and last time and the number of gaps. A small `transcript-*.txt` stays in the run folder; it holds the summary, errors, `gaps.log`, the index and the last 300 lines per stream of the final hour.
+- **One file to upload.** At stop the tool writes `<run folder>-upload.zip` next to the run folder and prints `Upload this one file: <path>` as its last line. It holds all `hours/*.zip`, `index.csv`, `gaps.log`, `summary.txt` (with the device identity) and the short transcript. It needs as much free disk space again as the hour zips take (they are stored, not compressed twice).
+- **MQTT lines** carry a time stamp and the retain flag: `host_time<TAB>retain<TAB>topic<TAB>payload`, one line per message (CR and LF in a payload are escaped). Short runs keep the `mosquitto_sub -v` format.
+- **Gaps.** Telnet, MQTT and the `/ws` frame recorder reconnect without end. Each outage leaves a marker with start, end and reason in the stream, one line in `gaps.log` and a count in `index.csv`. A gap in the frame file is not proof of a gap on the OpenTherm bus (the device may drop log lines under heap pressure).
+- **Snapshots every 5 minutes** (`snapshots.log`): `GET /api/v2/device/info` (heap and loop-gap counters are in there) and `GET /api/v2/sat?detail=full`, one request at a time. A failed request is one `ERROR` line. The snapshot poller and the crash-log poller share one request slot, so together they never have more than one request in flight.
+- **Disk guard.** The start prints an estimate (roughly 400 MB per day of plain text, about 60 MB per day zipped; extrapolated from one 45-minute capture, not measured over days). Free space is checked every 5 minutes, and the run stops cleanly, with everything packed, below `--min-free-gb` (default 1 GB).
+
+Practical notes: keep the PC awake (a sleeping PC records nothing and the gap shows up only as a long pause), keep the output folder on a drive with a few GB free, and prefer `--skip-browser-capture` when you only need the data streams, because the headless page polls the device for the whole run. Upload the one `<run folder>-upload.zip` file. Hour zips are written to a temporary file, read back, flushed to disk and only then moved into place; an hour whose plain files could not be deleted afterwards is never zipped a second time. If the PC clock jumps back, writes stay in the newest open hour.
 
 #### Replaying a capture on a bench unit
 
@@ -176,7 +208,7 @@ Not on a live heating system (see "Simulation" in `docs/api/README.md`). The fir
 A replay that honours the timing in `otframes.log` is a separate follow-up.
 
 Tests: `python tests/test_capture_tool.py` runs the tool against fake telnet,
-HTTP and MQTT servers.
+HTTP and MQTT servers, and the long-run segment store with an injected clock.
 
 ## sat_boiler_emulator.py
 
