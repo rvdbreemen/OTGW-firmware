@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-31T11:00:00Z'
-updated_date: '2026-10-31T12:20:00Z'
+updated_date: '2026-10-31T15:08:00Z'
 labels:
   - capture
   - alpha
@@ -42,4 +42,8 @@ Maintainer request 2026-10-31 (in session): 'Kan je het capture script zo maken 
 2026-10-31 Robert: 'Kan je het script robuust de logging laten doen over langere tijd. Bv. per uur een logfile en zippen.' -> segments per hour, one .zip per finished hour holding all streams of that hour (otframes, mqtt, telnet, snapshots); the live hour stays plain text. Implementation delegated to an agent (scripts only, no firmware).
 
 2026-10-31 Robert: 'Zorg ervoor dat in de logfile die gezipt wordt, ook de CSV-bestanden terechtkomen. Dus de logs moeten ook geconverteerd worden voordat er een zip van gemaakt wordt. Uiteindelijk moet er een bestand zijn die geupload wordt naar mij toe voor diagnose.' -> each hour zip also holds CSVs converted from that hour (scripts/sat_log_to_csv.py on telnet: sattick/satboot/... CSVs; otframes as CSV); at stop one upload bundle (all hour zips + index.csv + summary transcript + gaps.log) as a single file.
+
+Bench run 1 (code before the review fixes, 13:09-14:12, OTGW32 .61 alpha.569/570, SAT sim + OT replay): reboot 13:14 -> telnet gap 12 s, /ws gap 14 s; network drop via MikroTik bridge filter 13:37-13:40 -> telnet 183 s, /ws 158 s; two OTA reboots 13:47; broker kill+restart 14:11:20 -> MQTT gap 39 s, reconnected 14:12:00; hour rotation 14:00 -> hours/20261031-13.zip (650 KB, testzip OK); clean stop by .stop file: 2 hour zips, live/ empty, SATtrace toggle restored; 5670 MQTT msgs, 1850 frames, 13 snapshots. Finding: the run turned on key 8 (SATtrace) -> fixed (--sat-trace, default off). Run 2 on the final code (8527824aa) started 14:16 for 6 h with reboot +15 min, net drop +45 min, broker restart +105 min.
+
+2026-10-31 16:08: scripts/bench_check.py (scripted bench checks, JSON checks, transcript) with --telnet-log to read a running capture's telnet stream (one telnet client per device); live 4/4 PASS on .61 during run 2. discord-post-build.sh refuses an already-published or older prerelease tag (published-tags.txt), part of the speed-up of 2026-10-31.
 <!-- SECTION:NOTES:END -->

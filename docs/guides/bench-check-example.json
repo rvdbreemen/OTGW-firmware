@@ -1,0 +1,10 @@
+{
+  "checks": [
+    {"name": "running build", "type": "version", "regex": "^2\\.0\\.0-alpha\\.\\d+\\+[0-9a-f]+$"},
+    {"name": "health 200", "type": "rest", "path": "/api/v2/health", "expect_code": 200},
+    {"name": "SAT debug flag on", "type": "rest", "path": "/api/v2/debug",
+     "json": [{"path": "debug.state.debug.sat", "equals": true}]},
+    {"name": "SATTICK seen twice in 70 s", "type": "telnet", "timeout": 70,
+     "regex": "SATTICK", "count_min": 2}
+  ]
+}
