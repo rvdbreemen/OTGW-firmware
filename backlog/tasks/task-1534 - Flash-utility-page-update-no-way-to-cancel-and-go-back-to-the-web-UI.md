@@ -1,9 +1,11 @@
 ---
 id: TASK-1534
 title: 'Flash utility page (/update): no way to cancel and go back to the web UI'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-31T20:34:00Z'
+updated_date: '2026-10-31T20:47:00Z'
 labels:
   - webui
   - needs-maintainer-ok

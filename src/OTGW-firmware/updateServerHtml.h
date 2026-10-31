@@ -83,6 +83,7 @@ static const char UpdateServerIndex[] PROGMEM =
 <body>
 <div id='pageForm'>
   <h1>OTGW firmware Flash utility</h1>
+  <p id='backUi'><a href='./'>&larr; Back to the web UI</a></p>
   <div id='oneBox'>
     <h2>Update to a new release</h2>
     <div id='oneIntro'>
@@ -715,7 +716,7 @@ var OTGWUpd = (function () {
     var r = plan.r;
     running = true;
     window.addEventListener('beforeunload', guard);
-    show('oneIntake', false); show('oneIntro', false); show('oneWarn', false); show('manual', false); show('oneRun', true);
+    show('oneIntake', false); show('oneIntro', false); show('oneWarn', false); show('manual', false); show('backUi', false); show('oneRun', true);
     show('oneRetry', false); show('oneBack', false); show('oneOpen', false);
     setText('oneErr', ''); setText('oneRec', '');
     $('oneBar').style.width = '0%'; setText('oneBarText', '');
@@ -739,7 +740,7 @@ var OTGWUpd = (function () {
         $('oneRetry').onclick = function () { go(res.stage); };
         show('oneRetry', true);
       }
-      $('oneBack').onclick = function () { show('oneRun', false); show('oneIntake', true); show('oneIntro', true); show('oneWarn', true); show('manual', true); preflight().then(function () { setFiles($('oneFiles').files); }); };
+      $('oneBack').onclick = function () { show('oneRun', false); show('oneIntake', true); show('oneIntro', true); show('oneWarn', true); show('manual', true); show('backUi', true); preflight().then(function () { setFiles($('oneFiles').files); }); };
       show('oneBack', true);
     });
   }
