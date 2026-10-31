@@ -3073,6 +3073,10 @@
       .catch(function () { /* leave the text inputs in place */ });
   }
 
+  var TRIGGER_BITS = [[0, 'Boiler: fault'], [1, 'Boiler: CH active'], [2, 'Boiler: DHW active'], [3, 'Boiler: flame on'],
+    [4, 'Boiler: cooling active'], [5, 'Boiler: CH2 active'], [6, 'Boiler: diagnostic'], [7, 'Boiler: electricity production'],
+    [8, 'Thermostat: CH enable'], [9, 'Thermostat: DHW enable'], [10, 'Thermostat: cooling enable'], [11, 'Thermostat: OTC active'],
+    [12, 'Thermostat: CH2 enable'], [13, 'Thermostat: summer/winter'], [14, 'Thermostat: DHW blocking'], [15, 'Thermostat: bit 7 (reserved)']];
   var ENUM_OPTS = {
     satsource: [[0, 'Auto'], [1, 'Gas Boiler'], [2, 'Heat Pump'], [3, 'Hybrid']],
     satsystem: [[0, 'Auto'], [1, 'Radiators'], [2, 'Underfloor']],
@@ -3081,9 +3085,10 @@
     // boardmode is the real 3-value hardware override (ADR-127); the mockup's
     // 4-option ESP8266/OTGW32/LOLIN list was semantically wrong.
     boardmode: [[0, 'Auto-detect'], [1, 'PIC (Classic)'], [2, 'OT-Direct (OTGW32)']],
-    // Bit numbers of the boiler status byte (OT MsgID 0 LB): the firmware tests Statusflags & (1 << n).
-    gpiooutputstriggerbit: [[0, 'Fault'], [1, 'CH active'], [2, 'DHW active'], [3, 'Flame']],
-    webhooktriggerbit: [[0, 'Fault'], [1, 'CH active'], [2, 'DHW active'], [3, 'Flame']],
+    // TASK-1358 (ADR-200): the firmware tests Statusflags & (1 << n), Statusflags = (master << 8) | slave
+    // (OT MsgID 0), so bits 0-7 are the boiler status and bits 8-15 the thermostat status (OT v4.2).
+    gpiooutputstriggerbit: TRIGGER_BITS,
+    webhooktriggerbit: TRIGGER_BITS,
     satheatingmode: [[0, 'Comfort'], [1, 'Eco']],
     // OT-Direct gateway mode — labels from OTDirecttypes.h (NOT the mockup's
     // Off/On-Off/PID list, which was a different, wrong concept).

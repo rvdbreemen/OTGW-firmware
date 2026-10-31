@@ -15,13 +15,23 @@ const v2 = readFileSync(process.env.OTGW_V2_JS || path.join(root, 'src', 'OTGW-f
 const help = readFileSync(process.env.OTGW_SETTINGS_HELP_H || path.join(root, 'src', 'OTGW-firmware', 'settingsHelp.h'), 'utf8');
 const fixture = readFileSync(path.join(root, 'tests', 'webui', 'fixtures', 'status-bits-replay.txt'), 'utf8');
 
+// TASK-1358 (ADR-200): both selects use the shared TRIGGER_BITS list of all 16 Statusflags bits.
 function enumOpts(key) {
-  const m = v2.match(new RegExp('^\\s*' + key + ':\\s*(\\[\\[.*\\]\\]),?\\s*$', 'm'));
+  const m = v2.match(new RegExp('^\\s*' + key + ':\\s*(\\[\\[.*\\]\\]|TRIGGER_BITS),?\\s*$', 'm'));
   assert.ok(m, 'ENUM_OPTS entry for ' + key);
-  return JSON.parse(m[1].replace(/'/g, '"'));
+  let lit = m[1];
+  if (lit === 'TRIGGER_BITS') {
+    const t = v2.match(/var TRIGGER_BITS = (\[\[[\s\S]*?\]\]);/);
+    assert.ok(t, 'TRIGGER_BITS list');
+    lit = t[1];
+  }
+  return JSON.parse(lit.replace(/'/g, '"'));
 }
 
-const EXPECTED = [[0, 'Fault'], [1, 'CH active'], [2, 'DHW active'], [3, 'Flame']];
+const EXPECTED = [[0, 'Boiler: fault'], [1, 'Boiler: CH active'], [2, 'Boiler: DHW active'], [3, 'Boiler: flame on'],
+  [4, 'Boiler: cooling active'], [5, 'Boiler: CH2 active'], [6, 'Boiler: diagnostic'], [7, 'Boiler: electricity production'],
+  [8, 'Thermostat: CH enable'], [9, 'Thermostat: DHW enable'], [10, 'Thermostat: cooling enable'], [11, 'Thermostat: OTC active'],
+  [12, 'Thermostat: CH2 enable'], [13, 'Thermostat: summer/winter'], [14, 'Thermostat: DHW blocking'], [15, 'Thermostat: bit 7 (reserved)']];
 
 for (const key of ['gpiooutputstriggerbit', 'webhooktriggerbit']) {
   test(key + ' options name the bit the firmware tests', () => {
@@ -30,7 +40,7 @@ for (const key of ['gpiooutputstriggerbit', 'webhooktriggerbit']) {
   test(key + ' help text gives the bit numbers', () => {
     const m = help.match(new RegExp('"' + key + '":"([^"]*)"'));
     assert.ok(m, 'help text for ' + key);
-    for (const part of ['0 = fault', '1 = CH active', '2 = DHW active', '3 = flame']) {
+    for (const part of ['0 = fault', '1 = CH active', '2 = DHW active', '3 = flame', '8-15 thermostat']) {
       assert.ok(m[1].includes(part), key + ' help text names ' + part);
     }
   });

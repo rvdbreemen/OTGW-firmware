@@ -56,6 +56,7 @@ const SETTINGS = {
   // TASK-1530: a stale form copy (100) next to the live status value (80), as Sergeant D saw it
   satmaxmodulation: { value: 100, type: 'i', min: 0, max: 100 },
   satfireplace: { value: false, type: 'b' },   // TASK-1374
+  gpiooutputsenabled: { value: true, type: 'b' }, gpiooutputstriggerbit: { value: 0, type: 'i', min: 0, max: 15 },   // TASK-1358
 };
 // device/info (restAPI.ino:3227-3240): ipaddress = active transport; WiFi active here.
 const DEVINFO = { device: {
@@ -200,6 +201,24 @@ const saved = log.filter((l) => l.startsWith('POST /api/v2/settings')).map((l) =
 const sv = Object.fromEntries(saved.map((b) => [b.name, b.value]));
 check(sv.wifistaticip === '192.168.88.77' && sv.wifisubnet === '255.255.255.0' && sv.wifigateway === '192.168.88.1' && sv.boardmode === '2',
   `a valid static group saves (${JSON.stringify(sv)})`);
+
+// ---- 1358 GPIO output trigger bit: 16 named Statusflags bits (ADR-200) ----
+await rail('outputs');
+const tb = await until(`(function(){ var s = document.querySelector('.srow[data-key="gpiooutputstriggerbit"] select'); if (!s) return null;
+  return { n: s.options.length, l8: s.options[8] ? s.options[8].textContent : '' }; })()`);
+check(!!tb && tb.n === 16 && /Thermostat: CH enable/.test(tb.l8), `the GPIO trigger-bit select offers 16 named bits (${JSON.stringify(tb)})`);
+const nTb = log.length;
+await evalJs(`(function(){ var s = document.querySelector('.srow[data-key="gpiooutputstriggerbit"] select'); s.value = '8'; s.dispatchEvent(new Event('change', { bubbles: true }));
+  document.getElementById('btnSave').click(); })()`);
+await sleep(800);
+if (process.env.OTGW_SHOT_DIR) {
+  await evalJs(`document.querySelector('.srow[data-key="gpiooutputstriggerbit"]').scrollIntoView({ block: 'center' })`);
+  await sleep(300);
+  const img = await send('Page.captureScreenshot', { format: 'png' });
+  fs.writeFileSync(path.join(process.env.OTGW_SHOT_DIR, 'trigger-bit-8.png'), Buffer.from((img.result || img).data, 'base64'));
+}
+const tbPost = log.slice(nTb).find((l) => /"name":"gpiooutputstriggerbit","value":"8"/.test(l));
+check(!!tbPost, `saving bit 8 posts gpiooutputstriggerbit = 8 (${tbPost})`);
 
 // ---- 1230a Ethernet on a Wi-Fi-connected unit ----
 await rail('network');

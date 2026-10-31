@@ -1,9 +1,11 @@
 ---
 id: TASK-1358
 title: 'v2 UI: offer all 16 GPIO output trigger bits (0-15) with their OpenTherm names'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-24T19:14:00Z'
+updated_date: '2026-10-31T22:50:00Z'
 labels:
   - webui
 milestone: 2.0.0
