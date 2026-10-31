@@ -6764,7 +6764,7 @@ static void satControlLoopRun()
     ti.pwm = pwmMode;
     ti.roomLost = !roomValid;
     ti.chOn = (state.sat.iLastSentCH != 0); ti.flameOn = satIsFlameOn();
-    ti.relMod = OTcurrentSystemState.RelModLevel;
+    ti.relMod = (float)satGetActualModulation();   // same source as satIsFlameOn(): the simulated value in SAT simulation
     ti.minMod = (float)(OTcurrentSystemState.MaxCapacityMinModLevel & 0xFF);   // MsgID 15 low byte; 0 = never seen
     float sigPid = pidRaw;
     if (sigPid < SAT_MIN_SETPOINT) sigPid = SAT_MIN_SETPOINT;

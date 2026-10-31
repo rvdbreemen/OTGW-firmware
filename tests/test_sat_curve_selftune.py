@@ -644,7 +644,7 @@ class SourceChecks(unittest.TestCase):
     def test_tick_passes_every_exclusion_input(self):
         for frag in ("ti.sunValid = state.sat.bSunElevationValid", "ti.sunElevation = state.sat.fSunElevation",
                      "ti.pwm = pwmMode", "ti.chOn = (state.sat.iLastSentCH != 0)", "ti.flameOn = satIsFlameOn()",
-                     "ti.relMod = OTcurrentSystemState.RelModLevel",
+                     "ti.relMod = (float)satGetActualModulation()",
                      "OTcurrentSystemState.MaxCapacityMinModLevel & 0xFF"):
             self.assertIn(frag, self.src)
 
