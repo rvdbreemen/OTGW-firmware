@@ -3423,6 +3423,10 @@ static bool satRestartStep()
       DebugTln(F("SAT: no valid restored state, boiler handed back (CS=0, CH=1, MM=T) until a boiler reply and an outside temperature"));
       satNarrate_P(PSTR("Restart: boiler handed back until OpenTherm and outside temperature are valid"));
     }
+    // TASK-1520 (maintainer decision 2026-10-31): push SAT's target to the thermostat at the boot decision, not at
+    // the first control tick, which waits for a boiler reply and an outside temperature (gruijter: 5 min). Follow
+    // thermostat adopts a dial change only after a TC= since boot (entry 2), so a change in that wait was lost.
+    if (settings.sat.bPushSetpoint) satEnqueueIfChangedTC(settings.sat.fTargetTemp);
   }
   if (!settings.sat.bSimulation && state.otBus.iBoilerLastSeenMs == 0) return true;   // no boiler reply since boot
   if (!satOutsideTempFresh()) {

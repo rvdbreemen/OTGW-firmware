@@ -61,7 +61,7 @@ typedef long long time_t_;
 #define DebugTf(...) ((void)0)
 enum SATControlMode { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 struct Weather { bool bValid = false; uint32_t iLastUpdateMs = 0; float fTemperature = 0.0f; };
-struct SatSettings { bool bSimulation = false; bool bEnabled = true; };
+struct SatSettings { bool bSimulation = false; bool bEnabled = true; bool bPushSetpoint = false; float fTargetTemp = 15.0f; };
 struct Settings { SatSettings sat; };
 struct SatState { bool bLastSentValid=false, bTCAccountedValid=false, bActive=false, bSafetyTripped=false, bFallbackActive=false,
                   bPushRefused=false, bRoomTempLost=false, bOtLinkLost=false, bOutsideTempMissing=false;
@@ -69,7 +69,7 @@ struct SatState { bool bLastSentValid=false, bTCAccountedValid=false, bActive=fa
                   float fLastSentCS=0, fFinalSetpoint=0; uint8_t iLastSentMM=0, iLastSentCH=0; int eControlMode=0; uint32_t iSimDhwExpiryMs=0;
                   float fSimOutdoorTemp = 0, fExternalOutdoor = 0; bool bExternalOutdoorValid = false; uint32_t iExternalOutdoorLastMs = 0;
                   bool bRestoredOutdoorValid = false; float fRestoredOutdoor = 0; uint32_t iRestoredOutdoorMs = 0;
-                  float fPidD = 0, fError = 0; Weather weather; };
+                  float fPidD = 0, fError = 0, fLastSentTC = 0; Weather weather; };
 struct OTSys { uint8_t SlaveStatus = 0; float Toutside = 0.0f; }; static OTSys OTcurrentSystemState;
 struct OtBusState { uint32_t iBoilerLastSeenMs = 0; bool bPSmode = false; uint32_t iToutsideBoilerMs = 0; };
 struct State { SatState sat; OtBusState otBus; };
@@ -193,6 +193,7 @@ int main(int argc, char** argv) {
     return 0;
   }
   // --- control passes, one per second ---
+  if (!strncmp(sc, "push_", 5)) { settings.sat.bPushSetpoint = true; sc += 5; }   // TASK-1520: push setpoint on
   const bool valid = !strcmp(sc, "boot_valid") || !strcmp(sc, "boot_valid_late_ntp") || !strcmp(sc, "boiler_late");
   if (valid) savePidFile(wall0 - 120, wall0 - 600, true);                   // PID 2 min old, outside 10 min old
   if (!strcmp(sc, "ntp_never")) savePidFile(wall0 - 120, wall0 - 600, true);
@@ -252,6 +253,7 @@ def build_cpp(src: str) -> str:
     persist = _between(src, "//=== PID State Persistence", "//=== Energy State Persistence")
     a = src.index("static const uint32_t SAT_CMD_REFRESH_MS")
     senders = src[a:src.index("// TASK-1272, Sergeant D entry 14", a)]
+    senders += _between(src, "// TASK-1272, Sergeant D entry 14", "// Push setpoint switched off")   # TC= (TASK-1520)
     disable = _between(src, "void satDisable(", "// --- satOtLink begin")
     decl = "void satDisable(bool persistPid = true);" if "bool persistPid" in disable else ""
     link = _between(src, "// --- satOtLink begin", "// --- satOtLink end")
@@ -312,6 +314,23 @@ def sat_cs(cmds):
 
 
 class Restart(unittest.TestCase):
+    def test_push_on_boot_without_state_sends_tc_at_the_decision_not_after_the_outside_wait(self):
+        # TASK-1520 (gruijter alpha.567): with push setpoint on, SAT's TC= goes out at the boot decision, so follow
+        # thermostat can adopt a dial change made while SAT waits for an outside temperature. Red on the old code: the
+        # first TC= comes with the takeover at 300 s.
+        cmds, _ = run("push_boot_nostate", 320)
+        tc = [(t, c) for t, c in cmds if c.startswith("TC=")]
+        self.assertEqual(tc, [(1, "TC=15.0")], cmds)
+        self.assertEqual([c for t, c in cmds if t < 300 and not c.startswith("TC=")], HANDBACK, cmds)
+
+    def test_push_on_boot_with_valid_state_sends_tc_once(self):
+        cmds, _ = run("push_boot_valid", 40)
+        self.assertEqual([(t, c) for t, c in cmds if c.startswith("TC=")], [(1, "TC=15.0")], cmds)
+
+    def test_push_off_boot_sends_no_tc(self):
+        cmds, _ = run("boot_nostate", 320)
+        self.assertEqual([c for _, c in cmds if c.startswith("TC=")], [], cmds)
+
     def test_boot_without_state_hands_back_and_stays_quiet_until_outside_valid(self):
         # Entry 121: no valid restored state -> hand-back once, then nothing of SAT's own until a boiler reply AND a
         # valid outside temperature; the first weather fetch at 300 s lets SAT take over. Red on HEAD: CS=40.0 at 31 s
