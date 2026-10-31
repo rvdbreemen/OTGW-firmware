@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-31T13:48:00Z'
-updated_date: '2026-10-31T14:37:00Z'
+updated_date: '2026-10-31T15:00:00Z'
 labels:
   - sat
   - design
@@ -37,4 +37,6 @@ Robert 2026-10-31: 'de warmtepomp moet minimaal schakelen. Dus goal voor warmtep
 2026-10-31 Robert (entry 182): for heat pumps the firmware may deviate from thermo-nova; parity is no argument for heat pumps. Sergeant D's entries 40/50/87 stay until he revises them (Q-1527a, on the merits).
 
 2026-10-31 round 13 (docs/sat/sim-hp-lowload/round13.md): 16 options, heat-pump mode only, 576 winters. Degree minutes (NIBE method) and room hysteresis dominate long PWM and minimum-run PWM; dm 120: 4.2 starts/day 0.136 C; rh 0.1: 5.3 / 0.102 C; today's pwm 40: 32 / 0.296 C. Recommendation: degree-minute mode for on/off heat pumps (start -120 DM, stop 0, min 20 on / 10 off).
+
+2026-10-31 round 14 (entry 184, docs/sat/sim-hp-lowload/round14.md): third HP PWM option 7200 s. Real-code test via the tests/test_sat_hp_pwm.py harness on patched copies: 9/9 new 7200 s cases pass, 26/27 existing pass (the setter test now sees 3 options, intended). Sim: on/off UFH 42 -> 10 starts/day, abs err 0.29 -> 0.31-0.36; hp30 radiators 6.4 -> 3.4 starts, RMS 0.155 -> 0.331; hp60 30 -> 19, RMS 0.183 -> 0.452. Time-proportional 120 keeps the starts with better comfort; degree minutes best.
 <!-- SECTION:NOTES:END -->
