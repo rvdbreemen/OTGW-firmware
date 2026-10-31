@@ -30,6 +30,10 @@ OVERSHOOT_MARGIN = 3.0   # thermo-nova cycles/const.py:10-11; the firmware uses 
 MAX_SP_GAS = 80.0        # firmware: 62 radiators when the user chose nothing (entry 152), 65 global
 MAX_SP_HP = 80.0         # firmware: 40 for a heat pump when nothing is chosen (entry 155, SAT_MAXTSET_HEAT_PUMP_CAP)
 EXCLUDE_PWM = False   # True: hours with SAT PWM active do not count as clean for the tuner
+EXCLUDE_ATMIN = False # True (round 5b): hours with the heat source off or at minimum output do not count as clean
+PID_D_HOLD = False    # True (round 7): PID derivative held inside the 0.1 C deadband, thermo-nova pid.py:205-207
+SIGNAL = "CI"         # round 7, entry 170: CI (setpoint - curve) | CI+D | I+D | I | CI+guard
+GUARD_KPH = 0.1       # CI+guard: an hour whose room temperature moved more than this is not clean
 UPPER, LOWER = 1200.0, 180.0
 DUTY_LO, DUTY_HI = LOWER / UPPER, 1 - LOWER / UPPER
 DUTY_MIN = DUTY_LO / 2
@@ -85,7 +89,7 @@ def run(args):
     integ = 0.0; last = None; rd = 0.0
     pwm = False; pwm_phase_on = False; pwm_left = 0; pwm_new = False; t_on = 40.0; Pcur = 0.0
     ov_s = uh_s = sat_s = 0; last_draw_m = -10**6; last_off_s = 1
-    corr_acc = 0.0; corr_n = 0; clean = True; stepped = False
+    corr_acc = 0.0; corr_n = 0; clean = True; stepped = False; hour_ta0 = TARGET; rdt = 0.0
     sq = n = out_band = over = 0.0; fuel = 0.0; heat = 0.0; starts = 0; short_burns = 0; pwm_min = 0; flame_min = 0
     writes = flips = 0; last_dir = 0
     for m in range(minutes):
@@ -93,7 +97,10 @@ def run(args):
         cv = curve(c, tout); kp = c * cv / 3; ki = kp / 8400; kd = 588.0 * kp
         err = TARGET - Ta
         if last is not None:
-            d_ = Ta - last; rd = 0.0 if d_ == 0 else -d_ / DT
+            d_ = Ta - last; rdt = -d_ / DT   # tuner's own derivative, every step (entry 170)
+            if not PID_D_HOLD: rd = 0.0 if d_ == 0 else -d_ / DT
+            elif abs(err) > 0.1 and d_ != 0: rd = -d_ / DT
+        else: rdt = 0.0
         last = Ta
         if abs(err) > 0.1: integ = 0.0
         else: integ = max(-cv, min(cv, integ + ki * err * DT))
@@ -152,15 +159,22 @@ def run(args):
         Ta += (qrad + gains[m] + 0.5 * solar - qaw - Gao * (Ta - tout)) * DT / Ca
         Tw += (qaw + 0.5 * solar - Gwo * (Tw - tout)) * DT / Cw
         if heating:
-            corr_acc += sp - cv; corr_n += 1
+            if SIGNAL == "I": sig = integ
+            elif SIGNAL == "I+D": sig = integ + kd * rdt
+            elif SIGNAL == "CI+D": sig = (sp - cv) + kd * rdt
+            else: sig = sp - cv
+            corr_acc += sig; corr_n += 1
             if day >= 14:
                 sq += err * err; n += 1; heat += qrad * DT
                 if abs(Ta - TARGET) > 0.3: out_band += 1
                 if Ta > TARGET + 0.3: over += 1
         clean &= heating and not draw and sw < 50.0 and not (EXCLUDE_PWM and pwm)
+        if EXCLUDE_ATMIN and heating and (not burner or P <= pmin + 1e-6): clean = False
         if trace is not None and m % TRACE_EVERY == 0:
             trace.append((m / 60, round(tout, 2), round(Ta, 3), round(flow, 1), round(tret, 1), sp, round(P), int(pwm), c))
+        if m % 60 == 0: hour_ta0 = Ta
         if m % 60 == 59:
+            if SIGNAL == "CI+guard" and abs(Ta - hour_ta0) > GUARD_KPH: clean = False
             mc = corr_acc / corr_n if corr_n else 0.0
             new_c = st.hour(c, day, mc, clean and not stepped and corr_n > 0)
             corr_acc = 0.0; corr_n = 0; clean = True; stepped = False
