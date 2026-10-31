@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-31T05:53:00Z'
-updated_date: '2026-10-31T13:53:00Z'
+updated_date: '2026-10-31T15:43:00Z'
 labels:
   - sat
   - design
@@ -61,6 +61,8 @@ Robert 2026-10-31 05:51 UTC in #alpha-testing (msg 1565966404304248853): 'I want
 2026-10-31 rounds 10-11 + evaluation (Robert: critical evaluation vs OT AFS v1.1f low-load 2.1.1, KISS). Round 10: PID kept on a coefficient step (ADR-204 Must Not) changes -5..+2 min/day, 443/450 same end coefficient. Round 11: margin 2.0 vs 3.0 calibrated: gas 2.0 better (median -6..-13, 75-85 % pairs), hp30 neutral, hp60 +2-3; starts and fuel unchanged; hp60 ~27-33 starts/day (concern for heat pumps). AFS gap found: ID3 HB bit 4 (mandatory master check) read only for MQTT (OTGW-Core.ino:3186), SAT ignores it; thermo-nova too. Report docs/sat/sim-1519/evaluation-2026-10-31.md. ADR-205 created as Proposed skeleton (not yet filled/committed).
 
 2026-10-31 ADR-205 drafted (Proposed) via adr-kit: curve integral, clean-hour rule (PWM, flame off with CH, modulation <= ID15 minimum, DHW, sun elevation < 12, SAT in charge), daily on 3 counted days (>= 6 clean h), +-1.0 C, step 0.1, clamp 0.1-5.0, PID untouched (ADR-204), persist on change, hourly/daily/change log, on by default. Strict lint 0 FAIL. Related to ADR-198 and ADR-204 (adr relate, both sides). Entry 176 (Robert: default on); Q-1519i to Sergeant D (entry 24 'leave existing settings alone'). Open in ADR: Q-1519i; run without sun elevation source until TASK-1410? (maintainer). AC #1 (answers recorded) done except Q-1519i; AC #2 ADR drafted, not accepted; AC #3 implementation tasks pending acceptance.
+
+2026-10-31 follow-up: ADR-205 added to the hand-written category list in docs/adr/README.md (tests/test_adr_governance.py failed on it, reported by session ea); test 15/15 OK after the fix.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

@@ -671,6 +671,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-204: SAT PID reset triggers (supersedes ADR-197 decision 8)](ADR-204-sat-pid-reset-triggers-supersedes-adr-197-decision-8.md)** 🆕 *(Accepted)*  
   Zeroes the integral and raw derivative of the main PID and the zone integrals on a changed target, preset change or clear, window switch and restore, SAT off to on, the reset_integral command and a changed zone setpoint (Sergeant D entry 73). The request is a flag applied on the loop task, so a REST reset cannot be lost to a concurrent PID update. Replaces ADR-197 decision 8 only. Guideline-level, no CI gate.
 
+- **[ADR-205: SAT heating curve self-tune: hourly evaluation, daily decision on the curve integral](ADR-205-sat-heating-curve-self-tune-hourly-evaluation-daily-decision-on-the-curve-integral.md)** 🆕 *(Accepted)*  
+  An on/off self-tune, on by default, that logs every clean hour and changes the heating curve coefficient at most once a day by 0.1 when the mean curve integral (setpoint minus curve) of the last 3 counted days is outside +-1.0 C; PWM, minimum-output, hot-water, sunny and no-sun-elevation hours do not count, and a step leaves the PID alone (ADR-204). Revisits Sergeant D entry 72; design from entries 160-178, tested in the TASK-1519 simulations. Guideline-level, no CI gate.
+
 - **[ADR-196: SAT behaviour ground truth: Sergeant D's recorded decisions, then pinned thermo-nova, then specs, then firmware](ADR-196-sat-behaviour-ground-truth-sergeant-d-s-recorded-decisions-then-pinned-thermo-nova-then-specs-then-firmware.md)** 🆕 *(Accepted)*  
   Source order for every SAT statement or change: `docs/sat/sergeant-d-corrections.md` entries, then thermo-nova at 7beaaf5 (`file:line`), then `thermo-nova-spec.md`, then the firmware and its docs, which are never the authority. Read the corrections file first, cite the entry or say none covers it, put conflicts to Sergeant D. Guideline-level, no CI gate.
 
