@@ -3,11 +3,11 @@ id: TASK-1532
 title: >-
   SAT simulation: the synthetic boiler short-cycles at every setpoint (water
   mass ~170x too small, emitter loss too low)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-31T18:55:00Z'
-updated_date: '2026-10-31T20:16:00Z'
+updated_date: '2026-10-31T20:45:00Z'
 labels:
   - sat
   - simulation
@@ -25,11 +25,11 @@ Found while answering Robert (2026-10-31) on TASK-1525 AC7. satUpdateSimulation(
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test on the real satUpdateSimulation() (red on the old model): at a steady low-load setpoint the simulated boiler burns continuously at a modulation above minimum for at least one simulated hour, and still cycles when the load is below the minimum output
-- [ ] #2 Room temperature follows the emitter heat output instead of a fixed heat rate
-- [ ] #3 SATTICK flow and ret show the simulated values in SAT simulation
-- [ ] #4 Existing SAT simulation and PWM tests stay green
-- [ ] #5 Bench run in SAT simulation: at least one SATTUNEH hour counted=1 (unblocks TASK-1525 AC7)
+- [x] #1 Host test on the real satUpdateSimulation() (red on the old model): at a steady low-load setpoint the simulated boiler burns continuously at a modulation above minimum for at least one simulated hour, and still cycles when the load is below the minimum output
+- [x] #2 Room temperature follows the emitter heat output instead of a fixed heat rate
+- [x] #3 SATTICK flow and ret show the simulated values in SAT simulation
+- [x] #4 Existing SAT simulation and PWM tests stay green
+- [x] #5 Bench run in SAT simulation: at least one SATTUNEH hour counted=1 (unblocks TASK-1525 AC7)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -44,3 +44,11 @@ Model change in satUpdateSimulation() only (SATcontrol.ino ~5113-5212); flame st
 6. Help text satsimheatrate/satsimcoolrate updated to the new meaning (heat rate at 15 kW emitter output; cool rate per 10 K indoor-outdoor difference). Multi-zone/area sim (:5293-5330) stays flame-keyed: out of scope, noted.
 Verification: host test compiling the real satUpdateSimulation() (pattern of test_sat_curve_selftune / test_sat_hp_pwm extract): old model red (short-cycles: >20 starts/h at outdoor 8), new green (continuous burn >= 1 sim hour with mod > minimum at outdoor 8 and setpoint 40; cycles at outdoor 17 with low setpoint); SATTICK source check; full tests via run_tests.py; bench SAT simulation on .61: SATTUNEH counted=1 at least once. Not a SAT control change (simulation only), so no Sergeant D gate.
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+satUpdateSimulation() now has a water node with real heat capacity (400 kJ/K), an emitter (radiators 0.33, underfloor 0.70 kW per K of flow above room; zero during a DHW draw, which takes 15 kW), and a room heated by that output (fSimHeatRate per 15 kW) and cooled toward outdoor (fSimCoolRate per 10 K). SATTICK flow/ret (both lines) print satGetFlowTemp()/satGetReturnTemp(); the self-tune minimum modulation reads satSimMinMod() in simulation (a replayed MsgID 15 no longer applies). Help texts of satsimheatrate/satsimcoolrate describe the new meaning.
+Evidence: AC1/AC2/AC3 tests/test_sat_sim_boiler_model.py compiles the real satUpdateSimulation() (MSVC): new 6/6 OK; old code (git show HEAD~:SATcontrol.ino via OTGW_SAT_INO) 4 FAIL: 59 and 57 starts/h at the curve setpoint (rad 31.8 / ufh 24.6, outside 8), room clamped at target with a 50 C flow (17.18 C), SATTICK source; the low-load case cycles on both (invariant). AC4 run_tests.py -j 4: 79/79 files PASS; evaluate --quick 0 FAIL. AC5 bench .61 alpha.579+b3451a1 (OTA app+fs, settings kept; OT replay off; bench test setting satcoefficient 2.0 instead of a leftover 0.6, satinterval 10, sim hour 60 s): bench_check 8/8 PASS, SATTICK flame=1 flow=20.6..21.2 (simulated, was 0.0), SATTUNEH hour=0 counted=1 reason=none. Transcript scratchpad bench-check-192.168.88.61-20261031-214408.txt.
+Not verified / limits: the multi-zone and multi-area sim rooms stay flame-keyed (out of scope); physics runs in real time while the sim tuner hour is 60 s, so the run proves counted hours, not tuner quality.
+<!-- SECTION:FINAL_SUMMARY:END -->

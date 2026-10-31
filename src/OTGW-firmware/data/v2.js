@@ -960,8 +960,19 @@
     if (logBuf.length > LOG_MAX + (LOG_MAX >> 4)) logBuf = logBuf.slice(-LOG_MAX);
     if (isMonitorLogVisible() && !logRenderPending) {   // one render per animation frame
       logRenderPending = true;
-      requestAnimationFrame(function () { logRenderPending = false; renderLog(); });
+      // TASK-1533: with auto-scroll off the shown lines stay put (new lines wait in logBuf);
+      // only the counters move until auto-scroll is switched on again.
+      requestAnimationFrame(function () { logRenderPending = false; if (logAutoScroll) renderLog(); else renderLogCounts(); });
     }
+  }
+  function setLogAutoScroll(on) {
+    logAutoScroll = !!on;
+    var cs = document.getElementById('chipScroll'); if (cs) cs.classList.toggle('on', logAutoScroll);
+    if (logAutoScroll && isMonitorLogVisible()) renderLog();   // catch up with the lines that arrived meanwhile
+  }
+  function renderLogCounts() {
+    var cnt = document.getElementById('logCount'); if (cnt) cnt.textContent = logBuf.length;
+    var rate = document.getElementById('logRate'); if (rate) rate.textContent = (logRecvTimes.length / 10).toFixed(1);
   }
   var logRenderPending = false;
   function isMonitorLogVisible() {
@@ -1000,8 +1011,7 @@
     }
     el.appendChild(frag);
     if (logAutoScroll) el.scrollTop = el.scrollHeight;
-    var cnt = document.getElementById('logCount'); if (cnt) cnt.textContent = logBuf.length;
-    var rate = document.getElementById('logRate'); if (rate) rate.textContent = (logRecvTimes.length / 10).toFixed(1);
+    renderLogCounts();
   }
 
   function connectWs() {
@@ -5910,7 +5920,7 @@
     var cst = document.getElementById('chipStream');
     if (cst) { if (!window.showSaveFilePicker) cst.title = 'Save every frame: downloads the new frames as a file every 5 minutes and when you switch it off'; cst.addEventListener('click', function () { toggleStream(cst); }); }
     var cs = document.getElementById('chipScroll');
-    if (cs) cs.addEventListener('click', function () { logAutoScroll = !logAutoScroll; cs.classList.toggle('on', logAutoScroll); });
+    if (cs) cs.addEventListener('click', function () { setLogAutoScroll(!logAutoScroll); });
     var ct = document.getElementById('chipTs');
     if (ct) ct.addEventListener('click', function () { logShowTs = !logShowTs; ct.classList.toggle('on', logShowTs); if (isMonitorLogVisible()) renderLog(); });
     var vs = document.getElementById('valSearch');   // TASK-1223.14

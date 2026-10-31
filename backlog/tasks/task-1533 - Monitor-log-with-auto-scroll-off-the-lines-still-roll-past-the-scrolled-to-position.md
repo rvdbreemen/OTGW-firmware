@@ -3,10 +3,11 @@ id: TASK-1533
 title: >-
   Monitor log: with auto-scroll off the lines still roll past the scrolled-to
   position
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-31T20:33:00Z'
-updated_date: '2026-10-31T20:36:00Z'
+updated_date: '2026-10-31T20:44:00Z'
 labels:
   - webui
   - needs-maintainer-ok
