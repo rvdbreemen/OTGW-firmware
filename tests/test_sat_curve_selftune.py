@@ -136,7 +136,16 @@ BLOCKS = (
 
 
 def extract(src: str) -> str:
-    out = []
+    # constants and types live in SATcurveTune.h (Arduino prototype hoisting); a pre-header copy of SATcontrol.ino
+    # (OTGW_SAT_INO, old-vs-fix runs) still carries them inline, so the header is only added when the source lacks them
+    hdr = SAT_INO.with_name("SATcurveTune.h")
+    if "struct SatTune {" not in src and hdr.exists():
+        src_hdr = hdr.read_text(encoding="utf-8").replace("#pragma once", "")
+    elif "struct SatTune {" not in src:
+        src_hdr = (Path(__file__).resolve().parent.parent / "src" / "OTGW-firmware" / "SATcurveTune.h").read_text(encoding="utf-8").replace("#pragma once", "")
+    else:
+        src_hdr = ""
+    out = [src_hdr]
     for rx, name in BLOCKS:
         m = re.search(rx, src, re.S)
         if not m:
@@ -622,7 +631,8 @@ class SourceChecks(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.src = SAT_INO.read_text(encoding="utf-8")
+        hdr = SAT_INO.with_name("SATcurveTune.h")
+        cls.src = SAT_INO.read_text(encoding="utf-8") + (hdr.read_text(encoding="utf-8") if hdr.exists() else "")
         cls.settings = (SRC / "settingStuff.ino").read_text(encoding="utf-8")
 
     def test_signal_is_the_clamped_praw_minus_the_curve(self):

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.573
+**  Version  : v2.0.0-alpha.574
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -30,6 +30,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "SATcurveTune.h"   // TASK-1525: self-tune types must precede the Arduino-generated prototypes
 
 //====================================================================
 //=== SAT runtime enums ===
