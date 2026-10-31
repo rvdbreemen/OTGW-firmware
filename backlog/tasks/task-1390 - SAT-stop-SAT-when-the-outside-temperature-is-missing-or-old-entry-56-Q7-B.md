@@ -1,11 +1,11 @@
 ---
 id: TASK-1390
 title: 'SAT: stop SAT when the outside temperature is missing or old (entry 56, Q7 B)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T13:17:00Z'
-updated_date: '2026-10-30T00:01:00Z'
+updated_date: '2026-10-31T05:47:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -26,7 +26,7 @@ Sergeant D 2026-10-25 (Q7: B, entry 56): when the outside temperature is missing
 <!-- AC:BEGIN -->
 - [x] #1 With no fresh outside temperature from any source SAT hands back once and stays silent; resumes when a fresh value returns (host test red on HEAD)
 - [x] #2 Weather value expires after the agreed age (Q7b)
-- [ ] #3 Status shown (REST/MQTT/UI), docs updated
+- [x] #3 Status shown (REST/MQTT/UI), docs updated
 - [x] #4 Weather value older than 1 hour is not used (maintainer 2026-10-25); poll interval stays <= 3600 s
 <!-- AC:END -->
 
@@ -46,16 +46,14 @@ Field evidence 2026-10-29 (gruijter, alpha.527, TASK-1474): after a Task-watchdo
 2026-10-30 close-out: implemented with TASK-1482, merged on origin/dev as f07db1ec5 (alpha.540). Batch build 2.0.0-alpha.542+c00c5f0 (esp32-combo from origin/dev c00c5f025, 2026-10-30 00:47, exit 0, fresh artefacts, Discord msg 1565512587494301767); integration check on the merged set: evaluate --quick 100%, 0 failed; every tests/test_sat_*.py plus tests/test_manual_sat_commands.py exit 0. Evidence collected this session on c00c5f025: python tests/test_sat_restart_quiet.py Ran 17, OK; red on f07db1ec5^ (failures=13, errors=1). AC#1: test_weather_older_than_one_hour_hands_back_once_and_resumes red on the old code (CS=34.0 keeps going at t=3601 s) and green (one hand-back CS=0/CH=1/MM=T at t=3601 s, then resume); also boot without an outside temperature stays quiet. AC#2: agreed age 1 hour (entry 57), SAT_OUTSIDE_VALID_MS = 3600000; external value valid for the whole hour (test red/green). AC#4: weather older than 1 h not used (same test); the poll interval setter clamps 900..3600 s (settingStuff.ino:1058). MsgID 27 counts only with a live boiler Read-Ack (tests red/green). AC#3 left open: the status is in REST (outside_temp_missing field), MQTT (sat/outside_temp_missing, retained) and the v2 UI hint (satOutsideMissing), and MQTT.md plus EN/NL manuals are updated, but the evidence is source-level only (test_status_published) and no webui test or screenshot shows the hint rendered: to do after the batch flash on the bench. This task still declares a dependency on TASK-1412.5 (To Do); not changed here.
 
 alpha.542 bench check failed 2026-10-30 (v2.js 64 KiB cut, settings loss after FS OTA); Done waits for a passing bench check on the fixed build.
+
+2026-10-31 bench (session otgw-firmware-ea), OTGW32 .61 on 2.0.0-alpha.565+a958d39: with weather disabled, no external outside value and SAT enabled, all three status surfaces show the state: REST /api/v2/sat outside_temp_missing true; MQTT retained OTGW/value/otgw-1020BA21B4F8/sat/outside_temp_missing true; v2 SAT page (real page, headless Edge over CDP on the live device) shows the hint 'No outside temperature for 1 hour: boiler handed back' visible (screenshot scratchpad shot/1390-outside-missing.png, script shot/live-hint.mjs). Docs were already updated (MQTT.md, EN/NL manuals). Observation, not changed: disabling the weather source drops its value at once (the last fetch was 21 min old), so in that path the hint's 'for 1 hour' wording is not literally true; the entry 56/57 rule applies the 1 h age to a source that is still configured. Bench restored (weather on, simulation off).
+
+Screenshot archived as docs/evidence/task-1390-outside-missing-hint-alpha565.png.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-With no outside temperature younger than 1 hour from any source (external sensor, MsgID 27 with a live boiler Read-Ack, weather, value restored with the PID state) SAT hands back once (CS=0, CH=1, MM=T) and stays silent, and resumes when a fresh value returns (entries 56, 57). Status sat/outside_temp_missing in REST/MQTT/v2 UI. Implemented with TASK-1482, merged f07db1ec5, alpha.540.
-
-Evidence per AC:
-- AC#1, AC#2, AC#4: tests/test_sat_restart_quiet.py red on f07db1ec5^ (failures=13, errors=1), green 17/17 on c00c5f025 (rerun 2026-10-30): weather older than 1 h hands back once and resumes; external value valid for the hour; MsgID 27 only with a live Read-Ack; poll interval clamp 900..3600 s (settingStuff.ino:1058).
-- AC#3 (open): status and docs are in place (REST field, retained MQTT topic, v2 hint, MQTT.md, EN/NL manuals) but evidenced at source level only; the hint is not shown rendered.
-Dependency on TASK-1412.5 (To Do) still declared.
-Status: In Progress. alpha.542 bench check failed 2026-10-30 (v2.js 64 KiB cut, settings loss after FS OTA); Done waits for a passing bench check on the fixed build.
+With no outside temperature younger than 1 hour from any source, SAT hands back once (CS=0, CH=1, MM=T) and stays silent, resuming when a fresh value returns (Sergeant D entries 56 B, 57 A). Status on REST (outside_temp_missing), retained MQTT sat/outside_temp_missing and a v2 SAT-page hint; docs updated. Evidence: host tests per the earlier notes; bench alpha.565 on OTGW32 shows the state on all three surfaces, including the rendered hint. Observation: switching weather off drops the value immediately, so the hint wording '1 hour' is not literal in that path.
 <!-- SECTION:FINAL_SUMMARY:END -->
