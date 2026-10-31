@@ -171,8 +171,16 @@ static const uint32_t SAT_SIM_WARMUP_MS      = 300000UL; // 5 min warmup period
 static const float    SAT_SIM_FLAME_HYST_LO     = 0.5f;    // °C below setpoint to (re)ignite
 static const uint32_t SAT_SIM_MIN_OFF_MS        = 60000UL; // anti-cycle floor between flame cycles
 static const float    SAT_SIM_MOD_KP            = 20.0f;   // synthetic modulation %% per °C of error
-static const float    SAT_SIM_FLOW_LOSS_K       = 0.02f;   // linear flow heat-loss coefficient
-static const float    SAT_SIM_FLOW_THERMAL_GAIN = 0.4f;    // °C/s per kW net (tuned ~2°C/s at full mod, 24 kW)
+// TASK-1532: the water of boiler and pipes holds heat, the emitters hand it to the room, and the house
+// loses it to outside. With these values the boiler burns continuously at the SAT curve setpoint for
+// outdoor 2-17 C (load 1.8-5.4 kW, above the 1.2 kW minimum of 5 % x 24 kW) and cycles only when the
+// load drops below its minimum output, as a real boiler does.
+static const float    SAT_SIM_WATER_KJ_PER_K    = 400.0f;  // heat capacity of the water (~100 l incl. boiler)
+static const float    SAT_SIM_EMITTER_RAD_KW_K  = 0.33f;   // radiators: kW per K of flow above room (6.6 kW at 20 K)
+static const float    SAT_SIM_EMITTER_UFH_KW_K  = 0.70f;   // underfloor: larger surface, lower flow (3.5 kW at 5 K)
+static const float    SAT_SIM_EMITTER_REF_KW    = 15.0f;   // emitter output at which the room warms by fSimHeatRate °C/min
+static const float    SAT_SIM_COOL_REF_K        = 10.0f;   // indoor-outdoor difference at which the room cools by fSimCoolRate °C/min
+static const float    SAT_SIM_DHW_LOAD_KW       = 15.0f;   // heat taken by the hot-water coil during a draw
 
 // --- Synthetic diurnal outdoor-temperature model (TASK-796 / plan §12 F1) ---
 // Triangle wave (no transcendental — cheap, and the params read directly):
@@ -5177,10 +5185,15 @@ static void satUpdateSimulation()
     state.sat.iSimModulation = 0;
   }
 
-  // --- Flow temperature (plan §5.4, modulation-coupled) ---
-  const float power_in  = ((float)state.sat.iSimModulation / 100.0f) * settings.sat.fBoilerCapacity;
-  const float heat_loss = SAT_SIM_FLOW_LOSS_K * (state.sat.fSimFlowTemp - state.sat.fSimRoomTemp);
-  state.sat.fSimFlowTemp += (power_in - heat_loss) * SAT_SIM_FLOW_THERMAL_GAIN * dtSec;
+  // --- Flow temperature (plan §5.4; TASK-1532: water mass and emitter output) ---
+  // During a hot-water draw the diverter valve sends the water to the DHW coil instead of the emitters.
+  const float power_in = ((float)state.sat.iSimModulation / 100.0f) * settings.sat.fBoilerCapacity;
+  const float emitKwK  = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? SAT_SIM_EMITTER_UFH_KW_K
+                                                                                 : SAT_SIM_EMITTER_RAD_KW_K;
+  float emitKw = emitKwK * (state.sat.fSimFlowTemp - state.sat.fSimRoomTemp);
+  if (emitKw < 0.0f || dhwDraw) emitKw = 0.0f;
+  const float heat_out = dhwDraw ? SAT_SIM_DHW_LOAD_KW : emitKw;
+  state.sat.fSimFlowTemp += (power_in - heat_out) / SAT_SIM_WATER_KJ_PER_K * dtSec;
   if (state.sat.fSimFlowTemp < state.sat.fSimRoomTemp)   state.sat.fSimFlowTemp = state.sat.fSimRoomTemp;
   if (state.sat.fSimFlowTemp > settings.sat.fMaxSetpoint) state.sat.fSimFlowTemp = settings.sat.fMaxSetpoint;
 
@@ -5189,23 +5202,14 @@ static void satUpdateSimulation()
   state.sat.fSimReturnTemp = state.sat.fSimFlowTemp - delta_tr;
   if (state.sat.fSimReturnTemp < state.sat.fSimRoomTemp) state.sat.fSimReturnTemp = state.sat.fSimRoomTemp;
 
-  // --- Room temperature (plan §5.6) — heating keyed on the synthetic flame ---
+  // --- Room temperature (plan §5.6; TASK-1532: heated by the emitter output, cooled toward outdoor) ---
+  // fSimHeatRate: °C/min at SAT_SIM_EMITTER_REF_KW of emitter output. fSimCoolRate: °C/min per
+  // SAT_SIM_COOL_REF_K of indoor-outdoor difference; window_open (TASK-797) multiplies it.
   const float dtMin = dtSec / 60.0f;
-  if (state.sat.bSimFlameOn) {
-    const float target = settings.sat.fTargetTemp;
-    if (state.sat.fSimRoomTemp < target) {
-      state.sat.fSimRoomTemp += settings.sat.fSimHeatRate * dtMin;
-      if (state.sat.fSimRoomTemp > target) state.sat.fSimRoomTemp = target;
-    }
-  } else {
-    // window_open (TASK-797): multiply the cooling rate for the active window.
-    float coolRate = settings.sat.fSimCoolRate;
-    if (state.sat.iSimWindowExpiryMs != 0) coolRate *= state.sat.fSimWindowLossMult;
-    if (state.sat.fSimRoomTemp > state.sat.fSimOutdoorTemp) {
-      state.sat.fSimRoomTemp -= coolRate * dtMin;
-      if (state.sat.fSimRoomTemp < state.sat.fSimOutdoorTemp) state.sat.fSimRoomTemp = state.sat.fSimOutdoorTemp;
-    }
-  }
+  float coolRate = settings.sat.fSimCoolRate;
+  if (state.sat.iSimWindowExpiryMs != 0) coolRate *= state.sat.fSimWindowLossMult;
+  state.sat.fSimRoomTemp += (settings.sat.fSimHeatRate * emitKw / SAT_SIM_EMITTER_REF_KW
+                             - coolRate * (state.sat.fSimRoomTemp - state.sat.fSimOutdoorTemp) / SAT_SIM_COOL_REF_K) * dtMin;
 
   // --- Scenario injection (TASK-797 / plan §12 F2) ---
   // solar_gain: additive room warming, independent of flame, while active.
@@ -6402,7 +6406,7 @@ static void satControlLoopRun()
     _sat_prevDhwActive = true;
     SATDebugTf(PSTR("SATTICK target=%.1f mode=%d flame=%d flow=%.1f ret=%.1f dhw=1\r\n"),   // TASK-1521
                settings.sat.fTargetTemp, (int)state.sat.eControlMode, (int)satIsFlameOn(),
-               OTcurrentSystemState.Tboiler, OTcurrentSystemState.Tret);
+               satGetFlowTemp(), satGetReturnTemp());   // TASK-1532: the simulated values in SAT simulation
     // Hot water: refreshes the end of the draw (the 300 s guards, heating_control.py:272-274, :313-315) and
     // clears the overshoot, underheat and saturation starts (:268-270, :313-315; entry 108).
     satCycleNoteDhwTick(_sat_tickMs);
@@ -6765,7 +6769,8 @@ static void satControlLoopRun()
     ti.roomLost = !roomValid;
     ti.chOn = (state.sat.iLastSentCH != 0); ti.flameOn = satIsFlameOn();
     ti.relMod = (float)satGetActualModulation();   // same source as satIsFlameOn(): the simulated value in SAT simulation
-    ti.minMod = (float)(OTcurrentSystemState.MaxCapacityMinModLevel & 0xFF);   // MsgID 15 low byte; 0 = never seen
+    ti.minMod = settings.sat.bSimulation ? (float)satSimMinMod()   // TASK-1532: the simulated boiler's minimum, not a replayed MsgID 15
+                                         : (float)(OTcurrentSystemState.MaxCapacityMinModLevel & 0xFF);   // MsgID 15 low byte; 0 = never seen
     float sigPid = pidRaw;
     if (sigPid < SAT_MIN_SETPOINT) sigPid = SAT_MIN_SETPOINT;
     if (sigPid > sysMax) sigPid = sysMax;
@@ -6780,7 +6785,7 @@ static void satControlLoopRun()
           state.sat.fPidP, state.sat.fPidI, state.sat.fPidD, pidRaw,
           pidOutput, finalSetpoint, (unsigned)state.sat.iCurrentModulation, (unsigned)state.sat.iLastSentCH,
           (int)state.sat.eControlMode, (int)pwmOn, state.sat.fPwmDutyCycle, (int)satIsFlameOn(),
-          OTcurrentSystemState.Tboiler, OTcurrentSystemState.Tret);
+          satGetFlowTemp(), satGetReturnTemp());   // TASK-1532: the simulated values in SAT simulation
 
   // --- Publish to MQTT ---
   satPublishMQTT();

@@ -3,9 +3,11 @@ id: TASK-1532
 title: >-
   SAT simulation: the synthetic boiler short-cycles at every setpoint (water
   mass ~170x too small, emitter loss too low)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-31T18:55:00Z'
+updated_date: '2026-10-31T20:16:00Z'
 labels:
   - sat
   - simulation
@@ -29,3 +31,16 @@ Found while answering Robert (2026-10-31) on TASK-1525 AC7. satUpdateSimulation(
 - [ ] #4 Existing SAT simulation and PWM tests stay green
 - [ ] #5 Bench run in SAT simulation: at least one SATTUNEH hour counted=1 (unblocks TASK-1525 AC7)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Model change in satUpdateSimulation() only (SATcontrol.ino ~5113-5212); flame state machine, modulation P-law, scenario injection, DHW schedule unchanged.
+1. Water node with real mass: SAT_SIM_WATER_KJ_PER_K 400 (~100 l incl. boiler): dFlow/dt = (P_in - Q_out) / 400 per s, P_in = mod% x fBoilerCapacity.
+2. Emitter: Q_emit = SAT_SIM_EMITTER_KW_PER_K 0.15 x max(0, flow - room) (6 kW at 40 K). During a DHW draw the 3-way valve sends the water to the DHW coil: Q_emit = 0, Q_out = SAT_SIM_DHW_LOAD_KW 15.
+3. Room: dRoom/dt (C/min) = fSimHeatRate x Q_emit / SAT_SIM_EMITTER_REF_KW (15 kW) - fSimCoolRate x (room - outdoor) / 10 K. Heats and cools continuously (no flame keying); solar/window injection as before (window multiplies the cool term). Equilibrium at outdoor 2..14 C: 5.4..1.8 kW, above the 1.2 kW minimum (5 % of 24 kW) -> continuous burn; outdoor near 17 C -> load below minimum -> it cycles, as a real boiler does.
+4. Return temp formula unchanged; drop SAT_SIM_FLOW_LOSS_K / SAT_SIM_FLOW_THERMAL_GAIN (wrong comment ~2 C/s).
+5. SATTICK flow/ret (both lines, :6403 and :6783) print satGetFlowTemp()/satGetReturnTemp().
+6. Help text satsimheatrate/satsimcoolrate updated to the new meaning (heat rate at 15 kW emitter output; cool rate per 10 K indoor-outdoor difference). Multi-zone/area sim (:5293-5330) stays flame-keyed: out of scope, noted.
+Verification: host test compiling the real satUpdateSimulation() (pattern of test_sat_curve_selftune / test_sat_hp_pwm extract): old model red (short-cycles: >20 starts/h at outdoor 8), new green (continuous burn >= 1 sim hour with mod > minimum at outdoor 8 and setpoint 40; cycles at outdoor 17 with low setpoint); SATTICK source check; full tests via run_tests.py; bench SAT simulation on .61: SATTUNEH counted=1 at least once. Not a SAT control change (simulation only), so no Sergeant D gate.
+<!-- SECTION:PLAN:END -->
