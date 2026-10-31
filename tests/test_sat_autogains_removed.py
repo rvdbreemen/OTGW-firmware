@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """TASK-1357: the dead SAT settings satautogains (fAutoGainsValue) and the manual-gain switch
-(bAutoGains, fKpManual/fKiManual/fKdManual) are gone, and the PID gains did not change.
+(bAutoGains, fKpManual/fKiManual/fKdManual) are gone, and the PID gains did not change, except for the 3-decimal rounding of TASK-1423 (Sergeant D entry 95, Q28a).
 
 Two parts:
   1. Source check: no firmware source (src/OTGW-firmware, every file type, the web UI included) still names
@@ -9,8 +9,9 @@ Two parts:
   2. Behaviour: the REAL _pidCalculateGains() is cut out of SATpid.ino and compiled with a host C++ compiler; the Kp/Ki/Kd it
      computes for a grid of heating-curve inputs are compared with the automatic formula as it stood on HEAD
      (pid.py automatic_gains: kp = coeff * curve / divisor, ki = kp / 8400, kd = 0.07 * 8400 * kp; divisor 4 underfloor,
-     3 radiators). The stub settings carry the old fields at their old defaults (bAutoGains true), so the same harness
-     also compiles the pre-removal SATpid.ino: gains are identical before and after.
+     3 radiators), each rounded to 3 decimals since TASK-1423 (entry 95, Q28a; Ki and Kd from the rounded Kp, pid.py:82, :93;
+     pid.py itself rounds to 6). The stub settings carry the old fields at their old defaults (bAutoGains true), so the same
+     harness also compiles the pre-removal SATpid.ino; it only matches while that file does not round.
 
 OTGW_FW_DIR points at another copy of src/OTGW-firmware (e.g. a `git show HEAD:` export) for the old-vs-fix run.
 
@@ -48,6 +49,7 @@ struct State { SatState sat; };
 static Settings settings; static State state;
 static int g_system = 1;
 static int satGetEffectiveHeatingSystem() { return g_system; }
+#include <cmath>
 @CODE@
 int main(int argc, char** argv) {
   // argv: coefficient curveValue heatingSystem
@@ -66,13 +68,14 @@ def extract_gain_code(src: str) -> str:
     assert len(consts) == 3, consts
     a = src.index("static void _pidCalculateGains(float curveValue)")
     b = src.index("\n}\n", a) + 3
-    return "\n".join(consts) + "\n" + src[a:b]
+    r = src.index("float satPidRound3(float v)")
+    return "\n".join(consts) + "\n" + src[r:src.index("\n}\n", r) + 3] + "\n" + src[a:b]
 
 
 def expected_gains(coeff: float, curve: float, system: int):
     divisor = 4.0 if system == 2 else 3.0
-    kp = coeff * curve / divisor
-    return kp, kp / 8400.0, 0.07 * 8400.0 * kp
+    kp = round(coeff * curve / divisor, 3)   # TASK-1423: 3 decimals, Ki and Kd from the rounded Kp
+    return kp, round(kp / 8400.0, 3), round(0.07 * 8400.0 * kp, 3)
 
 
 class AutoGainsNamesGone(unittest.TestCase):
@@ -120,7 +123,7 @@ class GainsUnchanged(unittest.TestCase):
                                          capture_output=True, text=True, check=True).stdout.split()
                     got = [float(x) for x in out]
                     for g, e, what in zip(got, expected_gains(coeff, curve, system), ("kp", "ki", "kd")):
-                        self.assertAlmostEqual(g, e, delta=max(1e-6, abs(e) * 2e-6),
+                        self.assertAlmostEqual(g, e, delta=max(1.5e-6, abs(e) * 2e-6),
                                                msg=f"{what} coeff={coeff} curve={curve} system={system}")
                     n += 1
         self.assertEqual(n, 24)

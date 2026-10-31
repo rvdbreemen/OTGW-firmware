@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-28T07:51:00Z'
-updated_date: '2026-10-30T20:03:00Z'
+updated_date: '2026-10-31T22:20:00Z'
 labels:
   - sat
   - sergeant-d
@@ -43,4 +43,8 @@ Sergeant D 2026-10-28 (entry 95): Q28a 'Round all the values to 3 decimals not o
 2026-10-28 Robert requested this execution-graph update. Preserve the earlier reconciliation. Pending PID writers run 1368 -> 1270 -> 1416 -> 1417 -> 1418 -> 1414 -> 1423 -> 1415; 1381 remains a separate branch after 1270 and Q53. Revalidate task premises against preceding commits. Integration also requires the DHW and auto-tune outcomes through their linked verification gates. Approval and bench gates remain in force.
 
 2026-10-30 coordinator: picked up and put back: Robert's SATpid.ino writer order is 1416 -> 1417 -> 1418 -> 1414 -> 1423 -> 1415; TASK-1414 is not Done yet.
+
+2026-10-31 worktree cleanup: unmerged work of this task sits in lane wt-1423 (archived as D:\Users\Robert\Documents\GitHub\RvdB\lane-archive-20261031\wt-1423.uncommitted.patch); the lane is kept and will be merged into dev (Robert: merge lanes where possible).
+
+Correction: the 2026-10-30 note that TASK-1414 is not Done is stale; 1414, 1368, 1416, 1417, 1418 are Done.
 <!-- SECTION:NOTES:END -->

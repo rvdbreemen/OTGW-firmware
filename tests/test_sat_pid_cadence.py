@@ -39,7 +39,7 @@ from test_sat_pwm_override import compile_cpp  # noqa: E402
 
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino"))
 # Automatic gains are the only mode (TASK-1357): kd = 0.07 * 8400 * kp, kp = coefficient * curve / 3 (radiators).
-KD_AT_CURVE_40 = 0.07 * 8400.0 * (1.6 * 40.0 / 3.0)
+KD_AT_CURVE_40 = round(0.07 * 8400.0 * round(1.6 * 40.0 / 3.0, 3), 3)   # the gains are rounded to 3 decimals since TASK-1423 (entry 95, Q28a)
 PID_INO = Path(os.environ.get("OTGW_SATPID_INO", REPO / "src" / "OTGW-firmware" / "SATpid.ino"))
 TIMERS = (REPO / "src" / "OTGW-firmware" / "safeTimers.h").as_posix()
 
@@ -84,6 +84,7 @@ static float satGetBaseOffset() { return 27.2f; }
 static float satGetMaxSetpoint() { return 62.0f; }
 static float satGetOutsideTemp() { return 5.0f; }
 float satPidError(float target, float room);
+float satPidRound3(float v);   // TASK-1423; unused by an old SATpid.ino copy
 bool satPidGatherInputs(float* room, float* target, float* curve, float* deadbandExtra);
 static float satGetRoomTemp();
 @ZONE@
@@ -204,7 +205,7 @@ int main(int argc, char** argv) {
       g_curveNow = 40.0f + 0.1f * (float)t;                          // outside/target change reaches the curve between steps
       float out = tickPid(t, g_curveNow);
       printf("t=%d curve=%.4f out=%.5f I=%.9f err=%.9f rawD=%.9f P=%.5f D=%.5f kp=%.9f kd=%.9f\n", t, g_curveNow, out,
-             state.sat.fPidI, state.sat.fError, state.sat.fRawDerivative, state.sat.fPidP, state.sat.fPidD, state.sat.fKp, state.sat.fKd);
+             _pid_integral, state.sat.fError, _pid_rawDerivative, state.sat.fPidP, state.sat.fPidD, state.sat.fKp, state.sat.fKd);   // the HELD I and raw derivative: the published copies are rounded to 3 decimals (TASK-1423)
     } else if (!strcmp(sc, "nan")) {
       float out = tickPid(t, g_curveNow);
 #ifdef HAVE_SERVICE
@@ -383,7 +384,7 @@ class Cadence(unittest.TestCase):
             curve, out = float(r["curve"]), float(r["out"])
             kp, kd = float(r["kp"]), float(r["kd"])
             self.assertAlmostEqual(kp, 1.6 * curve / 3.0, places=3, msg="kp follows the CURRENT curve (pid.py:60-93)")
-            self.assertAlmostEqual(out, curve + kp * float(r["err"]) + float(r["I"]) + kd * float(r["rawD"]), delta=2e-3,
+            self.assertAlmostEqual(out, curve + kp * float(r["err"]) + float(r["I"]) + kd * float(r["rawD"]), delta=3e-3,   # P, I, D and the output are each rounded to 3 decimals (TASK-1423)
                                    msg="output = curve + kp(curve)*held error + I + kd(curve)*held raw derivative (pid.py:126-132)")
         for key, group in by_step.items():
             if key < 0:
@@ -554,7 +555,7 @@ class Cadence(unittest.TestCase):
             self.fail("HEAD has no restore hold")
         rows = {int(r["t"]): r for r in self.run_sc("holdsave", 10)}
         self.assertEqual(float(rows[200]["D"]), 0.0, rows[200])
-        self.assertAlmostEqual(float(rows[210]["D"]), KD_AT_CURVE_40 * 0.02, places=3, msg=str(rows[210]))
+        self.assertAlmostEqual(float(rows[210]["D"]), round(KD_AT_CURVE_40 * 0.02, 3), places=3, msg=str(rows[210]))
 
     def test_n_late_restore_gives_d_zero_on_the_next_output(self):
         """Round 3: the deferred restore (after NTP) lands at t=45 after the first outputs. It re-arms the first-output rule, so the
@@ -566,7 +567,7 @@ class Cadence(unittest.TestCase):
         self.assertEqual(float(rows[40]["rawD"]), 0.0, "premise: nothing restored yet at t=40: %s" % rows[40])
         self.assertAlmostEqual(float(rows[50]["rawD"]), 0.02, places=4, msg=str(rows[50]))
         self.assertEqual(float(rows[50]["D"]), 0.0, "the first output after the restore has D = 0: %s" % rows[50])
-        self.assertAlmostEqual(float(rows[60]["D"]), KD_AT_CURVE_40 * 0.02, places=3, msg=str(rows[60]))
+        self.assertAlmostEqual(float(rows[60]["D"]), round(KD_AT_CURVE_40 * 0.02, 3), places=3, msg=str(rows[60]))
 
 
 class Widening(unittest.TestCase):

@@ -70,6 +70,17 @@ float satPidError(float target, float room)
   return roundf((target - room) * 1000.0f) / 1000.0f;
 }
 
+//=== PID rounding (entry 95, Q28a) ===
+// Every PID value is rounded to 3 decimals: the gains, P, I, D, the raw derivative and the output. thermo-nova
+// rounds the gains to 6 (pid.py:71, :82, :93), P, I, D and the raw derivative to 3 (:101, :106, :114, :119) and
+// the output to 1 (:132); Sergeant D chose 3 for all (entry 95: "Round all the values to 3 decimals not only the
+// Output"), a deliberate deviation for the gains and the output. As in pid.py the rounding is on read: the held
+// integral and raw derivative stay unrounded (pid.py:191-192, :229-230), the integral step uses the rounded Ki.
+float satPidRound3(float v)
+{
+  return roundf(v * 1000.0f) / 1000.0f;
+}
+
 //=== Restore PID internal state from persistence (Task #589) ===
 // Called from satLoadPidState() after staleness validation.
 // Sets _pid_integral and _pid_rawDerivative directly so the very next
@@ -83,8 +94,8 @@ void satPidRestoreState(float integral, float rawDerivative)
   _pid_rawDerivative = rawDerivative;
   _pid_firstOutputPending = true;   // a restore landing after the first output still gives D = 0 on the next one (entry 95 Q39b)
   // A restore that lands late overwrites the live integral and raw derivative; it does not wait for a reset.
-  state.sat.fPidI    = integral;
-  state.sat.fRawDerivative = rawDerivative;
+  state.sat.fPidI    = satPidRound3(integral);
+  state.sat.fRawDerivative = satPidRound3(rawDerivative);
   SATDebugTf(PSTR("SAT: PID internal state pre-loaded (I=%.4f rawD=%.4f)\r\n"),
              integral, rawDerivative);
 }
@@ -162,12 +173,14 @@ float satPidCurveOnly(float heatingCurveValue)
   state.sat.fPidP = 0.0f;
   state.sat.fPidD = 0.0f;
   state.sat.fError = 0.0f;
-  state.sat.fPidOutput = heatingCurveValue;
-  return heatingCurveValue;
+  const float output = satPidRound3(heatingCurveValue);   // pid.output with P, I and D at 0, rounded (entry 95, Q28a)
+  state.sat.fPidOutput = output;
+  return output;
 }
 
 //=== Auto-Gain Calculation (Version 3) ===
-// Automatic gains from the heating curve (thermo-nova pid.py automatic_gains=True).
+// Automatic gains from the heating curve (thermo-nova pid.py automatic_gains=True), each rounded to 3 decimals
+// (entry 95, Q28a; pid.py rounds to 6). Ki and Kd derive from the rounded Kp, as pid.py reads self.kp (:82, :93).
 static void _pidCalculateGains(float curveValue)
 {
   float coeff = settings.sat.fHeatingCurveCoeff;
@@ -175,9 +188,9 @@ static void _pidCalculateGains(float curveValue)
   // on '==1'/radiators, which inverted the mapping; now via the heating-system axis.)
   float divisor = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? SAT_PID_KP_DIVISOR_FLOOR : SAT_PID_KP_DIVISOR_RAD;
 
-  float kp = (coeff * curveValue) / divisor;
-  float ki = kp / SAT_PID_AGGRESSION_V3;
-  float kd = 0.07f * SAT_PID_AGGRESSION_V3 * kp;
+  float kp = satPidRound3((coeff * curveValue) / divisor);
+  float ki = satPidRound3(kp / SAT_PID_AGGRESSION_V3);
+  float kd = satPidRound3(0.07f * SAT_PID_AGGRESSION_V3 * kp);
 
   state.sat.fKp = kp;
   state.sat.fKi = ki;
@@ -205,8 +218,8 @@ static void _pidUpdateIntegral(float error, float curveValue, bool force)
     return;
   }
 
-  // Inside deadband: integral acts as compensator
-  if (state.sat.fKi < 1e-9f) return;
+  // Inside deadband: integral acts as compensator. No special case for a Ki of 0 (entry 95, Q28b): pid.py always
+  // adds and clamps (pid.py:191-192), so a Ki that rounds to 0 adds nothing and the clamp below still applies.
 
   // Accumulate: Ki * error * PID_UPDATE_INTERVAL (fixed 60s per SAT Python)
   _pid_integral += state.sat.fKi * error * SAT_PID_UPDATE_INTERVAL;
@@ -333,8 +346,8 @@ void satPidStep(float roomTemp, float targetTemp, float heatingCurveValue, uint3
   _pidUpdateDerivative(roomTemp, error);
 
   state.sat.fError = error;
-  state.sat.fPidI = _pid_integral;
-  state.sat.fRawDerivative = _pid_rawDerivative;
+  state.sat.fPidI = satPidRound3(_pid_integral);
+  state.sat.fRawDerivative = satPidRound3(_pid_rawDerivative);
 
   // Update tracking variables
   _pid_previousError  = _pid_lastError;
@@ -356,18 +369,19 @@ float satPidOutput(float heatingCurveValue)
   float I = 0.0f;
   float D = 0.0f;
   if (!isnan(_pid_lastError)) {
-    P = state.sat.fKp * _pid_lastError;
-    I = _pid_integral;
-    if (!_pid_firstOutputPending) D = state.sat.fKd * _pid_rawDerivative;   // entry 95 Q39b: D = 0 on the first output with PID terms
+    P = satPidRound3(state.sat.fKp * _pid_lastError);        // pid.py:101
+    I = satPidRound3(_pid_integral);                           // pid.py:106
+    if (!_pid_firstOutputPending) D = satPidRound3(state.sat.fKd * _pid_rawDerivative);   // pid.py:114; entry 95 Q39b: D = 0 on the first output with PID terms
     _pid_firstOutputPending = false;   // only an output that includes the PID terms counts; a curve-only output leaves it set
   }
   state.sat.fPidP = P;
   state.sat.fPidI = I;
   state.sat.fPidD = D;
-  state.sat.fRawDerivative = _pid_rawDerivative;
+  state.sat.fRawDerivative = satPidRound3(_pid_rawDerivative);   // pid.py:119
 
-  // PID output = heatingCurveValue + P + I + D (thermo-nova style)
-  float output = heatingCurveValue + P + I + D;
+  // PID output = heatingCurveValue + P + I + D (thermo-nova style), the sum of the rounded terms rounded to 3
+  // decimals (entry 95, Q28a; pid.py:132 rounds to 1)
+  float output = satPidRound3(heatingCurveValue + P + I + D);
   state.sat.fPidOutput = output;
   return output;
 }
