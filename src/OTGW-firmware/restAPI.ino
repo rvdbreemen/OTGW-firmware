@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.588
+**  Version  : v2.0.0-alpha.589
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3795,12 +3795,17 @@ void sendDeviceSettings()
       je.field(F("max"),   (int32_t)maxValue);
       je.endObject();
     };
-    auto addNum = [&](const __FlashStringHelper* name, const char* numStr, const char* type, int minValue, int maxValue) {
+    // TASK-1359: min/max are floats so a fractional bound (0.1) reaches the UI; whole bounds stay integers.
+    auto addBound = [&](const __FlashStringHelper* key, float b) {
+      if (b == (float)(int32_t)b) je.field(key, (int32_t)b);
+      else                        je.field(key, b, 2);
+    };
+    auto addNum = [&](const __FlashStringHelper* name, const char* numStr, const char* type, float minValue, float maxValue) {
       je.beginObject(name);
       je.fieldRaw(F("value"), numStr);  // raw number token, exact digits
       je.field(F("type"),  type);
-      je.field(F("min"),   (int32_t)minValue);
-      je.field(F("max"),   (int32_t)maxValue);
+      addBound(F("min"), minValue);
+      addBound(F("max"), maxValue);
       je.endObject();
     };
     auto addBool = [&](const __FlashStringHelper* name, bool value, const char* type) {
@@ -3881,7 +3886,7 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fTargetTempStep, 1, 1, tmpBuf);
     addNum(F("sattempstep"), tmpBuf, "f", 0.1, 1.0);
     dtostrf(settings.sat.fHeatingCurveCoeff, 1, 1, tmpBuf);
-    addNum(F("satcoefficient"), tmpBuf, "f", 0, 5);
+    addNum(F("satcoefficient"), tmpBuf, "f", 0.1f, 5.0f);   // TASK-1359: the setter clamps 0.1-5.0
   }
   addInt(F("satinterval"), settings.sat.iControlInterval, "i", 10, 300);
   addBool(F("satexternaltemp"), settings.sat.bUseExternalTemp, "b");

@@ -3,9 +3,11 @@ id: TASK-1359
 title: >-
   SAT coefficient range: make REST metadata and the wizard slider match the
   0.1-5.0 setting clamp
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-24T20:21:00Z'
+updated_date: '2026-10-31T22:53:00Z'
 labels:
   - sat
   - webui

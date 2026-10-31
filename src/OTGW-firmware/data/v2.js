@@ -5597,7 +5597,7 @@
     }
     function close() { if (back.parentNode) back.parentNode.removeChild(back); }
     function dismiss() { if (migrate) { post('sat_onboarded', true).then(function () { }, function () { }); } close(); }
-    function slopePct(v) { return Math.round(((v - 0.2) / (2.4 - 0.2)) * 100); }
+    function slopePct(v) { return Math.round(((v - 0.1) / (5.0 - 0.1)) * 100); }   // TASK-1359: slider 0.1-5.0, the setting's range
     function syncInputs() {
       var mf = back.querySelector('#satOnbMfr'); if (mf) st.mfr = mf.value;
       var sl = back.querySelector('#satOnbSlope'); if (sl) st.slope = parseFloat(sl.value);
@@ -5728,7 +5728,7 @@
           h += '<div style="margin-top:16px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px">' +
             '<div style="display:flex;align-items:baseline;margin-bottom:12px"><div><span style="font-weight:600;font-size:13px;color:var(--text)">Heating curve slope</span><p style="font:400 11px inherit;color:var(--muted);margin:2px 0 0">Flow temp rise per °C of outdoor drop · <span style="' + MONO + '">satcoefficient</span></p></div>' +
             '<span id="satOnbSlopeVal" style="margin-left:auto;font-weight:600;font-size:17px;' + MONO + ';color:var(--accent)">' + st.slope.toFixed(1) + '</span></div>' +
-            '<input id="satOnbSlope" type="range" class="satonb-slope" min="0.2" max="2.4" step="0.1" value="' + st.slope + '" style="width:100%;background-image:linear-gradient(90deg,var(--accent) ' + pct + '%,var(--tile-off,#54565a) ' + pct + '%)">' +
+            '<input id="satOnbSlope" type="range" class="satonb-slope" min="0.1" max="5.0" step="0.1" value="' + st.slope + '" style="width:100%;background-image:linear-gradient(90deg,var(--accent) ' + pct + '%,var(--tile-off,#54565a) ' + pct + '%)">' +
             '<div style="display:flex;justify-content:space-between;margin-top:7px;font-weight:500;font-size:10px;color:var(--muted)"><span>Gentle · underfloor</span><span>Steep · radiators</span></div></div>';
         }
         h += '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-mfr" style="' + GHOST + '">Back</button><button data-sa="to-sources" style="' + PRIM + '">Continue</button></div></div>';
