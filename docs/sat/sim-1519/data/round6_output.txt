@@ -1,0 +1,20 @@
+(a) time constant from a 4 h night cool-down (heat off, no sun, outside 3 C)
+era          mass   true fast h true slow h estimated h room drop C
+1_pre1965    heavy          0.3        14.1        14.0        6.14
+1_pre1965    light          0.1         6.0         6.0        9.63
+2_1965-75    heavy          0.3        19.9        19.8        4.66
+2_1965-75    light          0.1         8.4         8.4        7.62
+3_1983-92    heavy          0.3        35.2        35.0        2.84
+3_1983-92    light          0.1        14.9        14.9        4.87
+4_1992-2012  heavy          0.3        54.9        54.5        1.89
+4_1992-2012  light          0.1        23.2        23.2        3.32
+5_2015       heavy          0.3        91.9        91.2        1.15
+5_2015       light          0.1        38.9        38.9        2.06
+6_BENG2021   heavy          0.3       108.8       108.0        0.98
+6_BENG2021   light          0.1        46.0        46.0        1.76
+
+(b) oscillation detector on round-3 runs (no tuner, right curve)
+  4_1992-2012  heavy  sign changes per hour  0.25   median daily swing  0.17 C
+  6_BENG2021   heavy  sign changes per hour  0.14   median daily swing  0.23 C
+  1_pre1965    heavy  sign changes per hour  0.28   median daily swing  0.25 C
+  1_pre1965    light  sign changes per hour  0.02   median daily swing  0.72 C

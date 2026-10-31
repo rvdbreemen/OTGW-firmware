@@ -26,6 +26,9 @@ from sat_curve_selftune_study import curve, TARGET, DT
 PMIN, PMAX, CLOOP, MCP = 3000.0, 24000.0, 250e3, 628.0
 BASE_OFF = 27.2
 TRACE_EVERY = 10
+OVERSHOOT_MARGIN = 3.0   # thermo-nova cycles/const.py:10-11; the firmware uses 2.0 (fOvershootMargin, TASK-1268)
+MAX_SP_GAS = 80.0        # firmware: 62 radiators when the user chose nothing (entry 152), 65 global
+MAX_SP_HP = 80.0         # firmware: 40 for a heat pump when nothing is chosen (entry 155, SAT_MAXTSET_HEAT_PUMP_CAP)
 EXCLUDE_PWM = False   # True: hours with SAT PWM active do not count as clean for the tuner
 UPPER, LOWER = 1200.0, 180.0
 DUTY_LO, DUTY_HI = LOWER / UPPER, 1 - LOWER / UPPER
@@ -61,6 +64,7 @@ def run(args):
         Heff_ = s3.house(era, mass, kr)[4]
         pmax = max(4000.0, round(1.1 * Heff_ * (TARGET + 10.0), -2))   # sized to the design load at -10 C (+10 %)
         pmin = pmax * (0.3 if source == "hp30" else 0.6); upper = 1800.0   # entry 40: HP cycles 1800 s
+    spmax = MAX_SP_GAS if source == "gas" else MAX_SP_HP
     duty_lo = LOWER / upper; duty_hi = 1 - duty_lo; duty_min = duty_lo / 2
     tm, sm = base.WEATHER["w"]; minutes = len(tm)
     Ca, Cw, Gao, Gwo, Heff, K = s3.house(era, mass, kr)
@@ -93,7 +97,7 @@ def run(args):
         last = Ta
         if abs(err) > 0.1: integ = 0.0
         else: integ = max(-cv, min(cv, integ + ki * err * DT))
-        sp = round(min(80.0, max(10.0, cv + kp * err + integ + kd * rd)), 1) if heating else 10.0   # SAT clamps CS to [MINIMUM_SETPOINT 10, maximum]
+        sp = round(min(spmax, max(10.0, cv + kp * err + integ + kd * rd)), 1) if heating else 10.0   # SAT clamps CS to [MINIMUM_SETPOINT 10, maximum]
         draw = (420 <= m % 1440 < 430) or (1140 <= m % 1440 < 1150)
         dT = qrad / MCP; flow = Tloop + dT / 2; tret = Tloop - dT / 2
         # ---- SAT PWM enable/disable, thermo-nova heating_control.py:262-350 at the pin:
@@ -103,10 +107,10 @@ def run(args):
         guard = draw or (m - last_draw_m) * 60 < 300
         if heating and not guard and sp > 10.0:
             if not pwm:
-                ov_s = ov_s + 60 if (burner and flow >= sp + 3.0) else 0
+                ov_s = ov_s + 60 if (burner and flow >= sp + OVERSHOOT_MARGIN) else 0
                 if ov_s >= 60: pwm = True; pwm_new = True; pwm_left = 0; ov_s = 0; uh_s = 0; sat_s = 0
             elif pwm_phase_on:
-                uh_s = uh_s + 60 if flow <= sp - 3.0 else 0
+                uh_s = uh_s + 60 if flow <= sp - OVERSHOOT_MARGIN else 0
                 sat_s = sat_s + 60 if last_off_s == 0 else 0
                 if uh_s >= 180 or sat_s >= 300: pwm = False; uh_s = 0; sat_s = 0
         else:
