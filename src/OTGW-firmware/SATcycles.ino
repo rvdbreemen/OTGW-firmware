@@ -101,6 +101,14 @@ static float    _tail_samples[SAT_TAIL_SAMPLE_SIZE];
 static uint8_t  _tail_sampleHead  = 0;
 static uint8_t  _tail_sampleCount = 0;
 static uint32_t _tail_lastSampleMs = 0;
+// Control-setpoint error per tail sample (TASK-1405, entry 36), same index as _tail_samples[]:
+// flow minus the control setpoint (state.sat.fFinalSetpoint) at that second, as thermo-nova's
+// flow_control_setpoint_error (cycles/tracker.py:267-271, sample.control_setpoint from
+// heating_control.py:255). int16 hundredths of a degree (+-327 C), 2 bytes per sample;
+// SAT_TAIL_CTRL_ERR_NONE marks a second without a control setpoint (thermo-nova: None, left out
+// of the percentile, tracker.py:243-250).
+static const int16_t SAT_TAIL_CTRL_ERR_NONE = INT16_MIN;
+static int16_t  _tail_ctrlErr[SAT_TAIL_SAMPLE_SIZE];
 
 // --- Current Cycle State ---
 static bool     _cycle_flameOn          = false;
@@ -270,6 +278,7 @@ void satCycleInit()
   _flow_sampleCount = 0;
   // Tail ring buffer (180s window)
   memset(_tail_samples, 0, sizeof(_tail_samples));
+  memset(_tail_ctrlErr, 0, sizeof(_tail_ctrlErr));
   _tail_sampleHead  = 0;
   _tail_sampleCount = 0;
   _tail_lastSampleMs = 0;
@@ -607,6 +616,35 @@ static float _tailPercentile(uint8_t pct)
   return sorted[idx];
 }
 
+//=== Control-setpoint error percentile over the tail (TASK-1405) ===
+// Percentile (same floor-index rule as _tailPercentile) of the per-sample flow-minus-control-setpoint
+// errors of the tail ring; seconds without a control setpoint are left out. Returns false when no
+// sample has one (thermo-nova: p50/p90 None, classifier.py:71-72).
+static bool _tailCtrlErrPercentiles(float &p50, float &p90)
+{
+  int16_t sorted[SAT_TAIL_SAMPLE_SIZE];
+  uint16_t n = 0;
+  for (uint16_t i = 0; i < _tail_sampleCount; i++) {
+    uint16_t src = (_tail_sampleHead + SAT_TAIL_SAMPLE_SIZE - _tail_sampleCount + i) % SAT_TAIL_SAMPLE_SIZE;
+    if (_tail_ctrlErr[src] == SAT_TAIL_CTRL_ERR_NONE) continue;
+    sorted[n++] = _tail_ctrlErr[src];
+  }
+  if (n == 0) return false;
+
+  for (uint16_t i = 1; i < n; i++) {
+    int16_t key = sorted[i];
+    int16_t j = (int16_t)i - 1;
+    while (j >= 0 && sorted[j] > key) {
+      sorted[j + 1] = sorted[j];
+      j--;
+    }
+    sorted[j + 1] = key;
+  }
+  p50 = (float)sorted[(uint32_t)50 * (n - 1) / 100] / 100.0f;
+  p90 = (float)sorted[(uint32_t)90 * (n - 1) / 100] / 100.0f;
+  return true;
+}
+
 //=== Cycle kind (TASK-1387): thermo-nova cycles/tracker.py:101-108 and _determine_cycle_kind :314-324 ===
 // Inputs are counted at 1 Hz in satCycleSample():
 //   DHW = slave DHW-mode bit, Statusflags bit 2 (device_state.hot_water_active,
@@ -691,11 +729,15 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
 //   - overshoot margin settings.sat.fOvershootMargin (2.0, `>=`, entries 15 and 37), not
 //     OVERSHOOT_MARGIN_CELSIUS 3.0 (cycles/const.py:10);
 //   - PWM underheat is labelled SAT_CYCLE_UNDERHEAT_PWM, continuous underheat SAT_CYCLE_UNDERHEAT;
-//   - a missing percentile (thermo-nova: p50/p90 None) has these stand-ins: controlSp <= 0 for the
-//     control-setpoint error (cls:71-72), requestedSp <= 0 for the requested-setpoint error (cls:42-43);
-//   - both setpoints are one value per cycle (controlSp = state.sat.fFinalSetpoint at flame-on,
-//     requestedSp = _sat_requestedSetpoint at flame-off), so percentile(flow - sp) = tailPxx - sp.
-//     thermo-nova uses the per-sample setpoints (tracker.py:267-271); that port is TASK-1405;
+//   - a missing percentile (thermo-nova: p50/p90 None) has this stand-in for the requested-setpoint
+//     error: requestedSp <= 0 (cls:42-43); the control-setpoint error is missing when no tail second
+//     has a control setpoint (cls:71-72);
+//   - the control-setpoint error comes per sample from the tail ring (_tail_ctrlErr, TASK-1405,
+//     entry 36; tracker.py:267-271), as ctrlErrP50/ctrlErrP90 with ctrlErrKnown = false for "p50/p90
+//     missing". The requested setpoint is still one value per cycle (requestedSp = _sat_requestedSetpoint
+//     at flame-off, so percentile(flow - sp) = tailPxx - sp); the per-sample requested setpoint is
+//     not ported. controlSp (state.sat.fFinalSetpoint at flame-on) is only the continuous
+//     underheat fallback when no requested setpoint exists (cls:81-83);
 //   - fewer than 3 samples is recorded as INSUFFICIENT; tracker.py:98-100 drops such a cycle;
 //   - pwmIdle comes from satPwmIsIdle(), an approximation of pwm.py's IDLE status;
 //   - the tail percentiles come from the last 180 s ring without tracker.py's warm-up exclusion
@@ -706,6 +748,7 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
 static SATCycleClass _cycleClassify(float durationSec, uint32_t sampleCount, SATCycleKind kind,
                                     bool dhwInTail, bool pwmEnabled, bool pwmIdle, bool pwmOn,
                                     float onTimeSec, float tailP90, float tailP50,
+                                    bool ctrlErrKnown, float ctrlErrP50, float ctrlErrP90,
                                     float controlSp, float requestedSp)
 {
   // cls:19-20 (and the firmware's < 3 samples, see above)
@@ -743,9 +786,7 @@ static SATCycleClass _cycleClassify(float durationSec, uint32_t sampleCount, SAT
 
   // cls:34-35 -> _classify_continuous, cls:69-90
   // cls:71-72: flow_control_setpoint_error p50/p90 missing
-  if (controlSp <= 0.0f) return SAT_CYCLE_UNCERTAIN;
-  const float ctrlErrP90 = tailP90 - controlSp;
-  const float ctrlErrP50 = tailP50 - controlSp;
+  if (!ctrlErrKnown) return SAT_CYCLE_UNCERTAIN;
   // cls:74, 77-78: overshoot is tested first
   if (ctrlErrP90 >= settings.sat.fOvershootMargin) return SAT_CYCLE_OVERSHOOT;
   // cls:75, 80-88
@@ -803,6 +844,7 @@ void satCycleOnFlameChange(bool flameOn)
     _flow_sampleCount = 1;
     // Reset tail ring buffer (Task #590: 180s end-of-cycle window)
     memset(_tail_samples, 0, sizeof(_tail_samples));
+    memset(_tail_ctrlErr, 0, sizeof(_tail_ctrlErr));
     _tail_sampleHead  = 0;
     _tail_sampleCount = 0;
     _tail_lastSampleMs = now;
@@ -864,10 +906,13 @@ void satCycleOnFlameChange(bool flameOn)
     const float tailStartSec = fmaxf(fminf(60.0f, 0.25f * durationSec), durationSec - 180.0f);
     bool  dhwInTail   = (_cycle_dhwSamples > 0) &&
                         ((float)_cycle_lastDhwMs / 1000.0f >= tailStartSec);
+    float ctrlErrP50 = 0.0f, ctrlErrP90 = 0.0f;
+    const bool ctrlErrKnown = _tailCtrlErrPercentiles(ctrlErrP50, ctrlErrP90);   // per-sample setpoints (TASK-1405)
     SATCycleClass cls = _cycleClassify(durationSec, _cycle_totalSamples, _cycleDetectKind(),
                                        dhwInTail, pwmEnabled, satPwmIsIdle(),
                                        state.sat.bPwmFlameRequested, onTimeSec,
-                                       tailP90, tailP50, _cycle_setpointAtStart, requestedSp);
+                                       tailP90, tailP50, ctrlErrKnown, ctrlErrP50, ctrlErrP90,
+                                       _cycle_setpointAtStart, requestedSp);
     _cycleRecord(cls, durationSec, _cycle_maxFlowTemp, _cycle_overshootSec);
 
     // Expose the 2nd error metric (AC#1) + shape metrics (AC#4) for state/JSON.
@@ -948,6 +993,15 @@ void satCycleSample()
     if (_flow_sampleCount < SAT_FLOW_SAMPLE_SIZE) _flow_sampleCount++;
 
     _tail_samples[_tail_sampleHead] = flowTemp;
+    {
+      // Per-sample control setpoint error (TASK-1405); fFinalSetpoint <= 0 = no control setpoint, and a
+      // non-finite flow is left out too (thermo-nova skips a sample without flow, tracker.py:268).
+      // Percentiles use the lower neighbour, not thermo-nova's interpolation (helpers.py:187-203).
+      const float sp = state.sat.fFinalSetpoint;
+      _tail_ctrlErr[_tail_sampleHead] = (sp > 0.0f && isfinite(flowTemp))
+          ? (int16_t)lroundf(fmaxf(-300.0f, fminf(300.0f, flowTemp - sp)) * 100.0f)
+          : SAT_TAIL_CTRL_ERR_NONE;
+    }
     _tail_sampleHead = (_tail_sampleHead + 1) % SAT_TAIL_SAMPLE_SIZE;
     if (_tail_sampleCount < SAT_TAIL_SAMPLE_SIZE) _tail_sampleCount++;
     _tail_lastSampleMs = nowMs;

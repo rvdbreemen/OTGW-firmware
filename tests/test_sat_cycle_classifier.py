@@ -20,7 +20,7 @@ SAT enums/structs (SATRuntimeSection, SATSection) come from SATtypes.h. Compiled
 Seam contract (what the fix must keep reachable):
   - fFinalSetpoint (control setpoint) and _sat_requestedSetpoint (requested setpoint, also mirrored to
     state.sat.fPidOutput) are set before satCycleOnFlameChange(true) and stay constant over the cycle
-    (per-sample setpoints are out of scope, TASK-1405).
+    (a segment may change the control setpoint mid-cycle with its optional 6th field, TASK-1405; 0 = none).
   - Per 1 Hz sample: millis() += 1000, then flow, OTcurrentSystemState.Statusflags, state.sat.bDhwActive
     (= Statusflags & 0x04), state.sat.eControlMode and state.sat.bPwmFlameRequested are set and
     satCycleSample() is called. The cycle ends with satCycleOnFlameChange(false) at the last sample's time,
@@ -167,7 +167,8 @@ static int twoCycle() {
   }
   return 0;
 }
-// argv: ctrlSp reqSp onTimeSec idle sim seg...   seg = count:flow:flags:mode:pwmOn
+// argv: ctrlSp reqSp onTimeSec idle sim seg...   seg = count:flow:flags:mode:pwmOn[:ctrl]
+// ctrl (TASK-1405) = the control setpoint (fFinalSetpoint) from this segment on; ctrlSp is the one at flame-on.
 int main(int argc, char** argv) {
   if (argc > 1 && strcmp(argv[1], "twocycle") == 0) return twoCycle();
   if (argc < 6) return 2;
@@ -181,9 +182,11 @@ int main(int argc, char** argv) {
   state.sat.fPidOutput = reqSp;
   int first = 1;
   for (int i = 6; i < argc; i++) {
-    unsigned cnt = 0, flags = 0; float flow = 0; int mode = 1, pwmOn = 0;
-    if (sscanf(argv[i], "%u:%f:%i:%d:%d", &cnt, &flow, &flags, &mode, &pwmOn) != 5) return 3;
+    unsigned cnt = 0, flags = 0; float flow = 0, segCtrl = 0; int mode = 1, pwmOn = 0;
+    int nf = sscanf(argv[i], "%u:%f:%i:%d:%d:%f", &cnt, &flow, &flags, &mode, &pwmOn, &segCtrl);
+    if (nf != 5 && nf != 6) return 3;
     if (first) { apply(flow, flags, mode, pwmOn); satCycleOnFlameChange(true); first = 0; }
+    if (nf == 6) state.sat.fFinalSetpoint = segCtrl;
     for (unsigned k = 0; k < cnt; k++) {
       g_ms += 1000;
       apply(flow, flags, mode, pwmOn);
@@ -254,8 +257,8 @@ def build(wd: Path):
 
 # --- scenarios ------------------------------------------------------------------------------------------
 # seg(count, flow, flags=CH, mode=CONT, pwmOn=0)
-def seg(n, flow, flags=CH, mode=CONT, on=0):
-    return (n, flow, flags, mode, on)
+def seg(n, flow, flags=CH, mode=CONT, on=0, ctrl=None):
+    return (n, flow, flags, mode, on) if ctrl is None else (n, flow, flags, mode, on, ctrl)
 
 
 class Case:
@@ -323,6 +326,21 @@ CASES = {
     "C4b_40s": Case([seg(40, 50.0)], "GOOD"),
     "C4b_90s": Case([seg(90, 50.0)], "GOOD"),
     # kind (tracker.py:314-324): 15 % DHW, 15 % CH-only, 70 % neither -> MIXED (HEAD: CH, dhwFrac < 0.2)
+    # TASK-1405 (entry 36, tracker.py:267-271): the tail error uses each sample's own control setpoint.
+    # T1: setpoint 50 at flame-on, raised to 54 after 100 s; flow 54 throughout. Per cycle (HEAD) the error
+    # is +4 -> OVERSHOOT; per sample the whole tail is on 54: error 0 -> GOOD.
+    "T1_raised_setpoint": Case([seg(100, 54.0), seg(200, 54.0, ctrl=54.0)], "GOOD"),
+    # T2: mirror: flow 50 on a setpoint that rises to 54 after 100 s. Per cycle error 0 -> GOOD;
+    # per sample the tail error is -4 -> UNDERHEAT.
+    "T2_raised_setpoint_underheat": Case([seg(100, 50.0), seg(200, 50.0, ctrl=54.0)], "UNDERHEAT"),
+    # T3: the setpoint changes only inside the warm part of the cycle, before the 180 s tail: the tail
+    # is constant at 50, flow 54 -> OVERSHOOT, same as a constant setpoint.
+    "T3_change_before_tail": Case([seg(100, 54.0, ctrl=46.0), seg(200, 54.0, ctrl=50.0)], "OVERSHOOT", ctrl=46.0),
+    # T4: the first half of the tail has no control setpoint (0 = none) and flow 58; those seconds are left
+    # out, the rest is error 0 -> GOOD. HEAD compares all flows with the cycle setpoint 54: p90 error +4 -> OVERSHOOT.
+    "T4_missing_samples_left_out": Case([seg(120, 54.0), seg(90, 58.0, ctrl=0.0), seg(90, 54.0, ctrl=54.0)], "GOOD", ctrl=54.0),
+    # T5: no sample in the tail has a control setpoint -> p50/p90 missing -> UNCERTAIN (cls:71-72)
+    "T5_all_missing": Case([seg(300, 50.0, ctrl=0.0)], "UNCERTAIN", ctrl=50.0),
     "kind_mixed": Case([seg(45, 50.0, DHW), seg(45, 50.0, CH), seg(210, 50.0, NONE)], None, kind="MIXED", oracle=False),
 }
 
@@ -342,7 +360,7 @@ class CycleClassifier(unittest.TestCase):
             self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
         c = CASES[name]
         args = [str(self.exe), repr(c.ctrl), repr(c.req), repr(float(c.on_time)), "1" if c.idle else "0", "1" if c.sim else "0"]
-        args += ["%d:%r:0x%X:%d:%d" % s for s in c.segs]
+        args += [("%d:%r:0x%X:%d:%d" % s[:5]) + ("" if len(s) < 6 else ":%r" % s[5]) for s in c.segs]
         r = subprocess.run(args, capture_output=True, text=True, timeout=20)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr[-300:])
         m = re.match(r"cls=(\d+) kind=(\d+)", r.stdout)
@@ -441,6 +459,19 @@ class CycleClassifier(unittest.TestCase):
         with self.subTest("90 s (HEAD: blanket < 120 s UNCERTAIN)"):
             self.check("C4b_90s")
 
+    def test_task1405_tail_error_uses_the_per_sample_control_setpoint(self):
+        for name in ("T1_raised_setpoint", "T2_raised_setpoint_underheat", "T3_change_before_tail",
+                     "T4_missing_samples_left_out", "T5_all_missing"):
+            with self.subTest(name):
+                self.check(name)
+
+    def test_task1405_tail_buffer_costs_two_bytes_per_sample(self):
+        # static RAM of the per-sample control error ring: SAT_TAIL_SAMPLE_SIZE x int16
+        src = CYCLES_INO.read_text(encoding="utf-8")
+        if "_tail_ctrlErr" not in src:
+            self.skipTest("no per-sample control error ring in this copy")
+        self.assertRegex(src, r"static int16_t\s+_tail_ctrlErr\[SAT_TAIL_SAMPLE_SIZE\];")
+
     def test_task1409_off_gap_and_duty_come_from_the_previous_flame_off_edge(self):
         """Cycle 1: 300 s on, then 600 s off, cycle 2: 300 s on. The stored off gap of cycle 2 is 600 s and its
         duty is 300 / 900. HEAD zeroed the gap (flameOffStart was overwritten before use) and gave duty 1.0."""
@@ -536,17 +567,24 @@ def _kind(samples, tntypes):
 
 def oracle(c: Case):
     clf, T = _load_classifier()
-    samples = [(flow, flags) for (n, flow, flags, _m, _o) in c.segs for _ in range(n)]
+    samples = [(flow, flags) for (n, flow, flags, _m, _o, *_c) in c.segs for _ in range(n)]
+    # per-sample control setpoint (tracker.py:267-271, a None setpoint leaves the sample out)
+    ctrls, cur = [], c.ctrl
+    for sg in c.segs:
+        if len(sg) > 5:
+            cur = sg[5]
+        ctrls += [cur] * sg[0]
     # tracker.py:113-116, :237-241: sample k (1-based) at start + k s, the cycle ends at the last sample;
     # the tail is every sample at or after max(start + min(60, 0.25 * duration), end - 180). The firmware's
     # flow percentiles skip the warm-up exclusion (a recorded deviation); no case has a non-uniform flow in it.
     dur = float(len(samples))
     tail_start = max(min(60.0, 0.25 * dur), dur - 180.0)
     tail = [s_ for k, s_ in enumerate(samples, start=1) if k >= tail_start]
+    tail_ctrl = [x for k, x in enumerate(ctrls, start=1) if k >= tail_start]
     flows = [f for f, _ in tail]
-    ctrl_ok = c.ctrl > 0
+    errs = [f - sp for f, sp in zip(flows, tail_ctrl) if sp > 0]
     P = T.Percentiles
-    ctrl_err = P(_pct([f - c.ctrl for f in flows], .5), _pct([f - c.ctrl for f in flows], .9)) if ctrl_ok else P()
+    ctrl_err = P(_pct(errs, .5), _pct(errs, .9)) if errs else P()
     req_err = P(_pct([f - c.req for f in flows], .5), _pct([f - c.req for f in flows], .9))
     tm = pytypes.SimpleNamespace(flow_control_setpoint_error=ctrl_err, flow_requested_setpoint_error=req_err,
                                  requested_setpoint=P(c.req, c.req),
@@ -555,7 +593,7 @@ def oracle(c: Case):
     enabled = last[3] == PWM
     status = T.PWMStatus.IDLE if c.idle else (T.PWMStatus.ON if last[4] else T.PWMStatus.OFF)
     pwm = pytypes.SimpleNamespace(enabled=enabled, status=status, on_time_seconds=float(c.on_time))
-    dev = pytypes.SimpleNamespace(setpoint=c.ctrl)
+    dev = pytypes.SimpleNamespace(setpoint=c.ctrl)   # device-setpoint fallback (cls:81-83)
     res = clf.CycleClassifier.classify(device_state=dev, duration_seconds=float(len(samples)), kind=_kind(samples, T),
                                        pwm_state=pwm, tail_metrics=tm)
     name = {"insufficient_data": "INSUFFICIENT", "short_cycling": "SHORT"}.get(res.value.lower(), res.name)
@@ -582,7 +620,7 @@ class ThermoNovaOracle(unittest.TestCase):
     def test_kind_mixed_matches_tracker(self):
         _, T = _load_classifier()
         c = CASES["kind_mixed"]
-        samples = [(flow, flags) for (n, flow, flags, _m, _o) in c.segs for _ in range(n)]
+        samples = [(flow, flags) for (n, flow, flags, _m, _o, *_c) in c.segs for _ in range(n)]
         self.assertEqual(_kind(samples, T), T.CycleKind.MIXED)
 
 
