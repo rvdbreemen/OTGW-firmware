@@ -214,7 +214,7 @@ Onder de motorkap roept het script `python -m esptool` aan (esptool.py v5 of nie
 - USB-kabel (micro-USB voor ESP8266, USB-C voor ESP32-S3/OTGW32)
 - De juiste USB-to-UART driver:
   - ESP8266: CP210x driver (NodeMCU) of CH340 driver (Wemos D1 mini klonen)
-  - ESP32-S3 OTGW32: gebruikt de ingebouwde ESP32-S3 USB-Serial/JTAG interface (Espressif VID 0x303A, PID 0x1001), normaal geen extra driver nodig
+  - ESP32-S3 OTGW32: gebruikt de ingebouwde ESP32-S3 USB-Serial/JTAG interface (Espressif VID 0x303A, PID 0x1001), normaal geen extra driver nodig. Een nieuw board met nog de fabrieksfirmware kan tot de eerste flash als PID 0x4001 verschijnen; `flash_otgw` vindt beide zonder `--port`
   - Linux: voeg uw gebruiker toe aan de `dialout`-groep (`sudo usermod -aG dialout $USER`, dan uitloggen en weer inloggen)
 
 **Stappen:**

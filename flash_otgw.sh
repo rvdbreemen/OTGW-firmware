@@ -71,7 +71,8 @@ Default:
 
 Targeting:
   --port <dev>         Serial port (e.g. /dev/cu.usbmodem-XXXX). The script
-                       falls back to the USB VID/PID filter (303A:1001) when
+                       falls back to the USB VID/PID filter (303A:1001, or
+                       303A:4001 on a fresh board with factory firmware) when
                        no --port is given.
   --bin <file>         Firmware path. Use a merged-full image.
   --board esp32        Force board type (Nodoshop OTGW32 = ESP32-S3).
@@ -263,7 +264,7 @@ migrate_flow() {
     local port_args baud auth=() backup=""
     baud="${ARG_BAUD:-921600}"
     if [ -n "$ARG_PORT" ]; then port_args="--port $ARG_PORT"
-    else port_args="--port-filter vid=0x303A --port-filter pid=0x1001"; fi
+    else port_args="--port-filter vid=0x303A --port-filter pid=0x1001 --port-filter pid=0x4001"; fi
     [ -n "$ARG_PASSWORD" ] && auth=(-u "admin:$ARG_PASSWORD")
 
     if [ "$ARG_NOBACKUP" != "1" ]; then
@@ -418,15 +419,17 @@ ok "Board:    $BOARD_NAME"
 ok "Baud:     $ARG_BAUD"
 
 # ---- Step 5: locate serial port --------------------------------------------
-# ESP32-S3 has a fixed USB VID/PID (303A:1001 = built-in USB-Serial JTAG), so
-# esptool can find it itself via --port-filter when no explicit --port is given.
+# ESP32-S3 has a fixed USB VID/PID: 303A:1001 is the built-in USB-Serial JTAG
+# (any board after our first flash), 303A:4001 the USB CDC of a fresh board's
+# factory firmware (TASK-1394). esptool ORs repeated pid filters, so it finds
+# either itself when no explicit --port is given.
 PORT_ARGS=""
 if [ -n "$ARG_PORT" ]; then
     PORT_ARGS="--port $ARG_PORT"
     ok "Port:     $ARG_PORT"
 else
-    PORT_ARGS="--port-filter vid=0x303A --port-filter pid=0x1001"
-    ok "Port:     auto-detect via USB VID/PID 303A:1001"
+    PORT_ARGS="--port-filter vid=0x303A --port-filter pid=0x1001 --port-filter pid=0x4001"
+    ok "Port:     auto-detect via USB VID/PID 303A:1001 or 303A:4001"
 fi
 
 ok "Firmware: $BIN_NAME"

@@ -180,12 +180,14 @@ echo [OK] Board:    %BOARD_NAME%
 echo [OK] Baud:     %ARG_BAUD%
 
 REM ---- Step 4: locate serial port -------------------------------------------
-REM   ESP32-S3 has a fixed USB VID/PID (303A:1001 = built-in USB-Serial JTAG),
-REM   so esptool can find it itself via --port-filter when no explicit --port
-REM   is given. With more than one S3 attached, pass --port COMx to disambiguate.
+REM   ESP32-S3 has a fixed USB VID/PID: 303A:1001 is the built-in USB-Serial
+REM   JTAG (any board after our first flash), 303A:4001 the USB CDC of a fresh
+REM   board's factory firmware (TASK-1394). esptool ORs repeated pid filters, so
+REM   it finds either itself when no explicit --port is given. With more than one
+REM   S3 attached, pass --port COMx to disambiguate.
 if "%ARG_PORT%"=="" (
-    set "ESPTOOL_PORT_ARGS=--port-filter vid=0x303A --port-filter pid=0x1001"
-    echo [OK] Port:     auto-detect via USB VID/PID 303A:1001
+    set "ESPTOOL_PORT_ARGS=--port-filter vid=0x303A --port-filter pid=0x1001 --port-filter pid=0x4001"
+    echo [OK] Port:     auto-detect via USB VID/PID 303A:1001 or 303A:4001
 ) else (
     set "ESPTOOL_PORT_ARGS=--port %ARG_PORT%"
     echo [OK] Port:     %ARG_PORT%
@@ -566,7 +568,8 @@ echo.
 echo   --update checks the unit's partition table first and refuses when it needs --migrate.
 echo.
 echo Targeting:
-echo   --port COMx          Serial port (auto-detect via USB VID/PID 303A:1001).
+echo   --port COMx          Serial port (auto-detect via USB VID/PID 303A:1001, or
+echo                        303A:4001 on a fresh board with factory firmware).
 echo                        Pass explicitly when more than one ESP32-S3 is attached.
 echo   --board esp32        Force board type (all 2.0.0 S3 targets).
 echo   --baud N             Override baud rate (default: 921600).

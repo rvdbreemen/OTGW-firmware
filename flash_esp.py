@@ -56,6 +56,7 @@ BOARD_CONFIGS = {
         # ESP32-S3 built-in USB-Serial/JTAG (same VID/PID as OT-Thing)
         "usb_ids": [
             (0x303A, 0x1001),  # Espressif ESP32-S3 USB-Serial/JTAG
+            (0x303A, 0x4001),  # USB CDC of a fresh board's factory firmware (TASK-1394)
         ],
     },
 }

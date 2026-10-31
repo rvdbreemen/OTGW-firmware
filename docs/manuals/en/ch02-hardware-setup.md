@@ -191,7 +191,7 @@ Under the hood the script calls `python -m esptool` (esptool.py v5 or newer) usi
 - A USB cable connected between your computer and the ESP module (micro-USB for ESP8266, USB-C for ESP32-S3/OTGW32)
 - The correct USB-to-UART driver installed for your board:
   - ESP8266: CP210x driver (NodeMCU) or CH340 driver (Wemos D1 mini clones)
-  - ESP32-S3 OTGW32: uses the built-in ESP32-S3 USB-Serial/JTAG interface (Espressif VID 0x303A, PID 0x1001), typically no extra driver needed
+  - ESP32-S3 OTGW32: uses the built-in ESP32-S3 USB-Serial/JTAG interface (Espressif VID 0x303A, PID 0x1001), typically no extra driver needed. A fresh board that still runs its factory firmware can show up as PID 0x4001 until the first flash; `flash_otgw` finds both without `--port`
   - Linux: add your user to the `dialout` group (`sudo usermod -aG dialout $USER`, then log out and back in)
 
 **Steps:**
