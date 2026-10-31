@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-31T05:53:00Z'
-updated_date: '2026-10-31T07:32:00Z'
+updated_date: '2026-10-31T08:39:00Z'
 labels:
   - sat
   - design
@@ -41,4 +41,8 @@ Robert 2026-10-31 05:51 UTC in #alpha-testing (msg 1565966404304248853): 'I want
 2026-10-31 06:55 Robert: run TASK-1519 with high priority. 06:56 Sergeant D entry 166: most homes need 1.6-2.4. Study: house model validated on gruijter's alpha.549-era graph capture (4 h, 2870 samples): ratios K/H ~ 1 and tau ~ 110 h identifiable (RMSE 0.033 C fit half, 0.069 C held-out half), absolute scale not (ridge). Real weather Open-Meteo archive 52.1N 6.2E 2025-11-01..2026-02-28. Study scripts/sat_curve_selftune_study.py: 63 strategies x 18 houses (tau 40/110/150 h, K/H 0.6/1.0/1.6, solar 0.5/2.5 m2) x 5 start offsets x 2 seeds. K/H to best coefficient at 4.8 C: 0.6->3.0, 0.75->2.4, 0.8->2.3, 1.0->1.8, 1.2->1.5, 1.6->1.1; realistic subset per entry 166 = K/H 0.75-1.2.
 
 2026-10-31 07:23 Sergeant D entry 168 (walls = thermal battery, ~3 days, response 60-72 h). 07:30 Robert: research thermal battery, house model by Dutch regulation eras and German codes, show how to use the battery. Research agent running -> docs/sat/sim-1519/house-typology-research.md; next model = two-node (air + wall) RC.
+
+2026-10-31 08:19 Robert: round 5 = firmware + thermo-nova settings for gas and heat pumps, explore the optimum, explain the current choice. 08:27 Robert: detect oscillation; estimate thermal mass from cool-down behaviour. Firmware defaults read: coeff 2.0, fOvershootMargin 2.0 (TASK-1268; thermo-nova 3.0), iCyclesPerHour 3, fMaxSetpoint 65 global, SAT_MAXTSET_HEAT_PUMP_CAP 40 (entry 155), SAT_MIN_SETPOINT 10, fFlameOffOffset 18, fModSupOffset 1.0. Round 3 first run had an unclamped setpoint (model error), rerun with the [10, 80] clamp; round 4 restarted after it.
+
+2026-10-31 simulation plan posted (msg 1566008766565195867): ~33,300 winters. R1 11,520 done; R2 5,940 done; R3 3,960 rerun (clamp); R4 1,200 queued (gas + HP30/HP60, PWM per heating_control.py:262-350); R5 10,656 (firmware settings, overshoot margin 2.0 vs 3.0, 8 houses x 3 sources x 3 starts x 2 seeds x 37 tuners: window 48/72/96 h, threshold 0.5/1/1.5, step 0.05/0.1, band none/+-0.4, + none); R6 36 winters + trace re-analysis (time-constant estimate from night cool-down, oscillation detection).
 <!-- SECTION:NOTES:END -->

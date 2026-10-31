@@ -64,7 +64,7 @@ def run(args):
         last = Ta
         if abs(err) > 0.1: integ = 0.0
         else: integ = max(-cv, min(cv, integ + ki * err * DT))
-        sp = round(cv + kp * err + integ + kd * rd, 1) if heating else 10.0
+        sp = round(min(80.0, max(10.0, cv + kp * err + integ + kd * rd)), 1) if heating else 10.0   # SAT clamps CS to [MINIMUM_SETPOINT 10, maximum]
         draw = (420 <= m % 1440 < 430) or (1140 <= m % 1440 < 1150)
         flow += ((min(sp, 70.0) if not draw else Ta) - flow) * DT / 300.0
         q = K * max(flow - 5.0 - Ta, 0.0) ** 1.3 if not draw else 0.0
