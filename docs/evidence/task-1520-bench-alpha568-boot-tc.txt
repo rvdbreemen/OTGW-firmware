@@ -1,0 +1,11 @@
+6:  FW   : 2.0.0-alpha.568+a602239 (31-10-2026) #7602  fs:ok
+7:  Boot : Software reset
+38:  FW   : 2.0.0-alpha.568+a602239 (31-10-2026) #7602  fs:ok
+39:  Boot : Software reset
+113:11:11:14.817421 (  91568| 47092) satRestartSt(3423): SAT: no valid restored state, boiler handed back (CS=0, CH=1, MM=T) until a boiler reply and an outside temperature
+115:11:11:14.821095 (  91568| 47092) handleOTDire(2752): OTD: cmd "TC=20.0" (len=7)
+137:11:11:14.845404 (  91568| 47092) satControlLo(6183): SAT: room=20.0 target=20.0 outside=5.0 curve=21.9 pid=21.9 final=21.9 mode=1
+602:11:11:44.856188 (  76940| 31732) satControlLo(6183): SAT: room=20.0 target=20.0 outside=7.2 curve=21.5 pid=21.5 final=21.5 mode=1
+1034:11:12:14.855254 (  57908| 31732) satControlLo(6183): SAT: room=20.0 target=20.0 outside=7.2 curve=21.5 pid=21.6 final=21.6 mode=1
+1482:11:12:44.861101 (  64112| 31732) satControlLo(6183): SAT: room=20.0 target=20.0 outside=7.2 curve=21.5 pid=21.6 final=21.6 mode=1
+1924:11:13:14.869197 (  75744| 31732) satControlLo(6183): SAT: room=19.9 target=20.0 outside=7.2 curve=21.5 pid=21.7 final=21.7 mode=1

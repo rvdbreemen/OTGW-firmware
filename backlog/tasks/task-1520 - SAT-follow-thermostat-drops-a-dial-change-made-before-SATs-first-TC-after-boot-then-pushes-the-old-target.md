@@ -3,11 +3,11 @@ id: TASK-1520
 title: >-
   SAT follow-thermostat drops a dial change made before SAT's first TC= after
   boot, then pushes the old target
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-31T09:30:00Z'
-updated_date: '2026-10-31T09:37:00Z'
+updated_date: '2026-10-31T10:14:00Z'
 labels:
   - sat
   - bug
@@ -24,9 +24,9 @@ gruijter alpha.567 (Discord #alpha-testing msg 1566018068998783016, capture 2026
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test: with push setpoint on, TC=<target> goes out at the boot decision (t=1 s), also in the hand-back branch; red on HEAD, green on the fix (tests/test_sat_restart_quiet.py)
-- [ ] #2 Push off: no TC= at boot; existing restart, follow-thermostat and cmd-cache tests stay green (full tests folder)
-- [ ] #3 Bench: after an OTA reboot with push on, the telnet log shows TC= at the boot decision, before SAT's first control tick
+- [x] #1 Host test: with push setpoint on, TC=<target> goes out at the boot decision (t=1 s), also in the hand-back branch; red on HEAD, green on the fix (tests/test_sat_restart_quiet.py)
+- [x] #2 Push off: no TC= at boot; existing restart, follow-thermostat and cmd-cache tests stay green (full tests folder)
+- [x] #3 Bench: after an OTA reboot with push on, the telnet log shows TC= at the boot decision, before SAT's first control tick
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -42,3 +42,9 @@ Graph: docs/evidence/task-1520-gruijter-alpha567-follow-gap.png (room, thermosta
 
 2026-10-31 Robert in session: 'prioritize task 1520' (maintainer OK).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+alpha.568 (a6022396e): satRestartStep() sends TC=<target> at the boot decision when push setpoint is on (maintainer decision, entry 169). Evidence: AC1 tests/test_sat_restart_quiet.py new cases red on HEAD (2 failures: [] != [(1,'TC=15.0')]), green on the fix (20 tests OK). AC2 full tests folder 0 failing files, evaluate --quick 100 %, push-off case sends no TC=. AC3 bench OTGW32 .61 OTA alpha.568, SAT simulation + push on, reboot: boot decision 11:11:14.817, OTD cmd TC=20.0 at .821, first control tick .845, exactly one TC= (docs/evidence/task-1520-bench-alpha568-boot-tc.txt; graph of the field case docs/evidence/task-1520-gruijter-alpha567-follow-gap.png). Not verified: a PIC board (Classic .63 offline); the field case itself (gruijter). Remaining gap: a dial change in the first <=60 s after boot is still only recorded. Posted msg 1566032509127360536.
+<!-- SECTION:FINAL_SUMMARY:END -->
