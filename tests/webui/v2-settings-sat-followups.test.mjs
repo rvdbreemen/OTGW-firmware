@@ -55,6 +55,7 @@ const SETTINGS = {
   satinterval: { value: 30, type: 'i', min: 10, max: 300 },
   // TASK-1530: a stale form copy (100) next to the live status value (80), as Sergeant D saw it
   satmaxmodulation: { value: 100, type: 'i', min: 0, max: 100 },
+  satfireplace: { value: false, type: 'b' },   // TASK-1374
 };
 // device/info (restAPI.ino:3227-3240): ipaddress = active transport; WiFi active here.
 const DEVINFO = { device: {
@@ -307,6 +308,10 @@ await evalJs(`(function(){ var s = document.getElementById('satModSlider'); s.va
 await sleep(400);
 const mmPost = log.find((l) => l.startsWith('POST /api/v2/sat/settings/max_modulation'));
 check(!!mmPost && /65/.test(mmPost), `moving the slider POSTs sat/settings/max_modulation 65 (${mmPost})`);
+
+// ---- 1374 SAT: Fireplace mode switch on the SAT settings page ----
+const fp = await until(`(function(){ var r = document.querySelector('.srow[data-key="satfireplace"]'); if (!r) return null; var i = r.querySelector('input[type=checkbox]'); return { label: r.textContent.indexOf('Fireplace mode') >= 0, cb: !!i }; })()`);
+check(!!fp && fp.label && fp.cb, `Fireplace mode renders as a labelled switch on the SAT settings page (${JSON.stringify(fp)})`);
 
 check(exceptions.length === 0, `no uncaught page exceptions (${exceptions.join(' ; ')})`);
 console.log('peak /api/ requests in flight at the fake device: ' + peak);

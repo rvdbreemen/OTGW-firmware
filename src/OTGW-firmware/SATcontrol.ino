@@ -500,6 +500,7 @@ static const char* satGetHeatingSourceName()
   }
 }
 
+static bool    _sat_fireplaceActive    = false;   // Fireplace mode narrated as on (TASK-1374)
 static bool    _sat_roomLostActive     = false;   // room temperature lost: heating on the curve only (TASK-1364)
 static bool    _sat_narrCold           = false;   // TASK-1521: last narrated cold-cutoff state (edge narration)
 static bool    _sat_narrAtMax          = false;   // TASK-1521: last narrated max-clamp state (edge narration)
@@ -2052,6 +2053,14 @@ static bool satRoomTempValid(float roomTemp)
   return !isnan(roomTemp) && roomTemp >= -10.0f && roomTemp <= 50.0f;
 }
 
+// A room temperature SAT may regulate on. Fireplace mode (TASK-1374, entry 49) makes it unusable although the sensor
+// works: SAT then runs the same curve-only path as for a missing sensor (entries 38, 46). The reading itself stays
+// shown, published and recorded.
+static bool satRoomTempUsable(float roomTemp)
+{
+  return !settings.sat.bFireplaceMode && satRoomTempValid(roomTemp);
+}
+
 // One validity rule for the indoor humidity (entry 117, TASK-1441): a reading is usable while it is
 // no older than iHumidityTimeoutS. The Thermal comfort input and the published Summer Simmer Index both use it.
 static bool satHumidityFresh(uint32_t nowMs)
@@ -2503,7 +2512,7 @@ static void satUpdatePvBoost()
   float threshold = (float)settings.sat.iPvBoostThresholdW;
   float roomTemp = satGetRoomTemp();
   bool atCeiling = (!isnan(roomTemp) && roomTemp >= settings.sat.fPvBoostMaxIndoorC);
-  bool roomLost  = !satRoomTempValid(roomTemp);   // no new boost without a room temperature (TASK-1364)
+  bool roomLost  = !satRoomTempUsable(roomTemp);   // no new boost without a room temperature (TASK-1364)
 
   if (!state.sat.bPvBoostActive) {
     // Deactivated: check if conditions are met to start the hold-time
@@ -3051,6 +3060,7 @@ void satClearSafetyTrip()
   satNarrate_P(PSTR("Safety cleared: SAT may resume"));
   state.sat.bRoomTempLost = false;
   _sat_roomLostActive = false;
+  _sat_fireplaceActive = false;
   _sat_picFailCount = 0;
 }
 
@@ -3353,6 +3363,7 @@ void satDisable(bool persistPid)
   state.sat.bPushRefused = false;
   state.sat.bRoomTempLost = false;     // narration and status start clean after a re-enable (TASK-1364)
   _sat_roomLostActive = false;
+  _sat_fireplaceActive = false;
   // TASK-1365: during an OpenTherm loss the hand-back below already went out once (the loss path's own
   // satDisable() call, made with the flag still false). A user switch-off or the MQTT-takeover lift during
   // the loss only ends the loss state; the commands are not sent a second time.
@@ -3829,6 +3840,7 @@ void satSendStatusJSON()
     je.field(F("overshoot_protection"),  settings.sat.bOvershootProtection);
     je.field(F("follow_thermostat"),    settings.sat.bFollowThermostat);
     je.field(F("curve_self_tune"),      settings.sat.bCurveSelfTune);   // TASK-1525
+    je.field(F("fireplace_mode"),       settings.sat.bFireplaceMode);
     je.field(F("flow_offset"),          settings.sat.fFlowOffset);
     je.field(F("pressure"),             snap->st.sat.fSmoothedPressure);
     je.field(F("pressure_drop_rate"),   snap->st.sat.fPressureDropRate);
@@ -4103,7 +4115,7 @@ void satPublishMQTT()
   static SATShadowB s_setpoint_sync, s_modulation_sync, s_ch_sync;
   static SATShadowB s_solar_gain_enable, s_summer_simmer_enable;
   static SATShadowB s_thermal_comfort, s_multi_area_enable;
-  static SATShadowB s_simulation_enable, s_window_detection_enable, s_overshoot_protection_enable, s_follow_thermostat_enable, s_curve_self_tune_enable;
+  static SATShadowB s_simulation_enable, s_window_detection_enable, s_overshoot_protection_enable, s_follow_thermostat_enable, s_curve_self_tune_enable, s_fireplace_mode;
   static SATShadowB s_push_setpoint_enable, s_preset_sync_enable;
   static SATShadowB s_dhw_enabled, s_dhw_enable;
   // JSON-blob heartbeat counters (BSS zero-init == first-seen sentinel).
@@ -4560,6 +4572,7 @@ void satPublishMQTT()
   publishIfChangedB(F("sat/push_setpoint_enable"),    settings.sat.bPushSetpoint,     s_push_setpoint_enable,    true);
   publishIfChangedB(F("sat/follow_thermostat_enable"), settings.sat.bFollowThermostat, s_follow_thermostat_enable, true);
   publishIfChangedB(F("sat/curve_self_tune_enable"), settings.sat.bCurveSelfTune, s_curve_self_tune_enable, true);   // TASK-1525
+  publishIfChangedB(F("sat/fireplace_mode"),          settings.sat.bFireplaceMode,    s_fireplace_mode,          true);   // TASK-1374
   publishIfChangedB(F("sat/preset_sync_enable"),      settings.sat.bPresetSync,       s_preset_sync_enable,      true);
   publishIfChangedB(F("sat/dhw_enabled"),             settings.sat.bDhwEnabled,       s_dhw_enabled,             true);
   publishIfChangedB(F("sat/dhw_enable"),              settings.sat.bDhwEnable,        s_dhw_enable,              true);
@@ -5054,6 +5067,7 @@ void initSAT()
   state.sat.eControlMode = SAT_MODE_OFF;
   state.sat.bSafetyTripped = false;
   _sat_roomLostActive = false;
+  _sat_fireplaceActive = false;
   _sat_picFailCount = 0;
   _sat_prevOTOnline = false;
   // TASK-565: cache starts invalid; first send
@@ -5890,7 +5904,7 @@ static void satUpdateThermalLearning()
 
   // Learning: only when flame is OFF, room temp valid, outdoor temp valid
   // AC#6: Learning only runs when SAT has valid room temp AND outside temp simultaneously
-  if (!flame && roomValid && outdoorValid) {
+  if (!flame && roomValid && outdoorValid && !settings.sat.bFireplaceMode) {   // a stove heating the room would corrupt the learned coefficient (TASK-1374)
     float delta = roomTemp - outsideTemp;
     if (delta < SAT_THERMAL_MIN_DELTA) {
       // Indoor-outdoor delta too small for meaningful measurement
@@ -5995,7 +6009,7 @@ static void satUpdateSolarGain()
 
   // TASK-521: NaN room temp means no valid source -- skip rate calc to avoid corrupting EMA.
   // TASK-1364: an out-of-range reading (a sensor fault such as 85 or -127) is skipped the same way.
-  if (!satRoomTempValid(roomTemp)) {
+  if (!satRoomTempUsable(roomTemp)) {   // fireplace mode: a stove heating the room is no solar gain (TASK-1374)
     state.sat.fIndoorRiseRate = _solar_riseRateEma;
     return;
   }
@@ -6216,7 +6230,7 @@ static float satOutsideTempOrDefault(float outsideTemp)
 bool satPidGatherInputs(float* room, float* target, float* curve)
 {
   float rawRoom = satGetRoomTemp();
-  const bool valid = satRoomTempValid(rawRoom);
+  const bool valid = satRoomTempUsable(rawRoom);
   *room = valid ? satRoomFiltered(rawRoom) : rawRoom;
   *target = satEffectiveTarget();
   *curve = satCalcHeatingCurve(*target, satOutsideTempOrDefault(satGetOutsideTemp()));
@@ -6450,12 +6464,15 @@ static void satControlLoopRun()
   // TASK-1364 (entries 38, 46): a lost or missing room temperature (NaN or outside -10..50 C)
   // is no fault. SAT keeps heating on the heating curve alone: P, I and D are 0 and the
   // normal pipeline (solar offset, clamps, cold cutoff, PWM, MM, CS/CH) runs as usual.
-  const bool roomValid = satRoomTempValid(roomTemp);
-  state.sat.bRoomTempLost = !roomValid;
-  if (!roomValid && !_sat_roomLostActive) {
+  // TASK-1374 (entry 49): Fireplace mode takes the same path with a working sensor: roomValid (regulate on it) is false,
+  // roomPresent (the sensor works) is not, so room_temp_lost stays about the sensor and the reading keeps its smoothing.
+  const bool roomPresent = satRoomTempValid(roomTemp);
+  const bool roomValid = roomPresent && !settings.sat.bFireplaceMode;
+  state.sat.bRoomTempLost = !roomPresent;
+  if (!roomPresent && !_sat_roomLostActive) {
     _sat_roomLostActive = true;
     satNarrate_P(PSTR("Room temperature lost: heating on the heating curve only"));
-  } else if (roomValid && _sat_roomLostActive) {
+  } else if (roomPresent && _sat_roomLostActive) {
     _sat_roomLostActive = false;
     satNarrate_P(PSTR("Room temperature back: regulation resumes"));
   }
@@ -6463,9 +6480,16 @@ static void satControlLoopRun()
   // TASK-894 (George): the room sensor goes through the time-based EMA before it drives control (satRoomFiltered()).
   // The PID step calls it too, so both see the same smoothed value. The tick also stamps the new temperature
   // for the PID derivative timer at tick resolution (satPidNoteRoom(), TASK-1195).
-  if (roomValid) {
+  if (roomPresent) {
     roomTemp = satRoomFiltered(roomTemp);
     satPidNoteRoom(roomTemp, _sat_tickMs);
+  }
+
+  // TASK-1374 (entry 49): the narration follows the switch, once per change.
+  if (settings.sat.bFireplaceMode != _sat_fireplaceActive) {
+    _sat_fireplaceActive = settings.sat.bFireplaceMode;
+    satNarrate_P(_sat_fireplaceActive ? PSTR("Fireplace mode on: heating on the heating curve only")
+                                      : PSTR("Fireplace mode off: regulation resumes"));
   }
 
   // Task #38: OT error flag monitoring -- check for critical boiler faults

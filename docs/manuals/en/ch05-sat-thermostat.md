@@ -55,7 +55,7 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/enabled" -m "tru
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.0"
 ```
 
-Every configurable SAT parameter has a matching MQTT command topic of the form `%mqtt_sub_topic%/sat/<name>`. The full set is declared in `MQTTstuff.ino` (`handleMQTTcallback`) and covers: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `heating_mode`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+Every configurable SAT parameter has a matching MQTT command topic of the form `%mqtt_sub_topic%/sat/<name>`. The full set is declared in `MQTTstuff.ino` (`handleMQTTcallback`) and covers: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `heating_mode`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `fireplace_mode`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
 
 Sending `ON` / `OFF` / `true` / `false` / `1` / `0` works for boolean topics. Numeric topics accept the usual decimal representation.
 
@@ -130,6 +130,7 @@ The integral term uses a **symmetric clamp** `[-curveValue, +curveValue]` with a
 | `satcyclesperhour` | 3 | 2-6 | Target cycles per hour |
 | `satpushsetpoint` | false | bool | Push SAT target to thermostat display (TC= command). SAT pushes the room setpoint to the thermostat when the target changes (as thermo-nova); a thermostat that rejects the remote override keeps its own setpoint, and SAT does not keep re-pushing |
 | `satfollowthermostat` | on when `satpushsetpoint` is on, else off | bool | A setpoint change on the thermostat becomes the SAT target (see 5.21). A unit with no stored value gets the `satpushsetpoint` value once; a stored value always wins |
+| `satfireplace` | off | bool | Fireplace mode: SAT heats on the heating curve only, as with no room temperature (see 5.21). MQTT `sat/fireplace_mode` |
 
 #### Choosing the heating curve coefficient
 
@@ -586,6 +587,8 @@ A second climate entity (`climate.<hostname>_dhw_control`) exposes DHW setpoint 
 - CH enable is unchanged: while SAT is enabled it drives the boiler through its own CS and CH, and the thermostat's CH enable does not decide. When SAT is off, or has tripped a safety, the thermostat controls the boiler again.
 - A unit that has no stored `satfollowthermostat` takes the `satpushsetpoint` value the first time it starts; the value is then saved and a later change of `satpushsetpoint` does not move it.
 
+**Fireplace mode (TASK-1374)**: for a home where a stove or air conditioner heats the room that holds the room sensor. With `satfireplace` on (HA switch "Fireplace mode", MQTT `sat/fireplace_mode`, SAT page setting), SAT sends only the heating curve value to the control loop, with P, I and D at 0, exactly as when the room temperature is missing; the rest of the house keeps getting heat although the sensor room reached its setpoint. The room temperature stays visible and is still recorded, but SAT does not regulate on it, learn from it, or start a PV boost from it. Switching the mode off lets the normal PID control resume.
+
 **TT= and TC= remote-override semantics (TASK-466)**: When `satpushsetpoint` is enabled, SAT pushes its target to the thermostat display using PIC-parity remote-override semantics on OpenTherm MsgID 16 + MsgID 100 (`RemoteOverrideFunction`). The two commands carry different priorities:
 
 - `TT=<v>` -  program-priority override; auto-clears when the thermostat sends three consecutive MsgID 16 frames within 0.25 C of the override, then the next frame differs by more than 0.5 C (typically a scheduled program change).
@@ -598,7 +601,7 @@ Inbound thermostat MsgID 16 frames are observed by the OTDirect state machine; t
 | HA component | Count | Examples |
 |---|---|---|
 | `number` | ~25 | heating curve coefficient, deadband, overshoot margin, control interval, max modulation, flame-off offset, flow offset, modulation-suppression delay/offset, boiler capacity, summer threshold, preset temperatures (comfort/eco/away/sleep/activity/home), min/max pressure, max pressure drop, target temp step |
-| `switch` | 12 | `solar_gain`, `summer_simmer`, `multi_area`, `simulation`, `window_detection`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable` |
+| `switch` | 13 | `solar_gain`, `summer_simmer`, `multi_area`, `simulation`, `window_detection`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `fireplace_mode`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable` |
 | `select` | 1 | `sat_heating_system` with options `0` (auto), `1` (radiators), `2` (heat pump), `3` (underfloor) |
 
 Each entity writes to its matching `%mqtt_sub_topic%/sat/<parameter>` command topic and reads from the corresponding state topic. All changes go through `updateSetting()` so they are persisted to flash and clamped to safe bounds.

@@ -3464,6 +3464,11 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
         PSTR("-sat-curve-self-tune-enable"),  PSTR("_SAT_Curve_Self_Tune"),
         PSTR("/sat/curve_self_tune"),         PSTR("/sat/curve_self_tune_enable"),
         PSTR("mdi:auto-fix"));
+    case 13:   // TASK-1374 (entry 49): appended last so the existing indices and ids stay where they are
+      published = streamSatBoolSwitch(ctx,
+        PSTR("-sat-fireplace-mode"),          PSTR("_SAT_Fireplace_Mode"),
+        PSTR("/sat/fireplace_mode"),          PSTR("/sat/fireplace_mode"),
+        PSTR("mdi:fireplace"));
       break;
     default:
       return false;

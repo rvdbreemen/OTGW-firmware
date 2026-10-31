@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.586
+**  Version  : v2.0.0-alpha.587
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -497,6 +497,7 @@ struct SATSection {
   bool     bPushSetpoint      = false;  // Push SAT target to thermostat display (TC= command)
   bool     bFollowThermostat  = false;  // A thermostat room setpoint change (MsgID 16) becomes the SAT target (TASK-1259). Units with no stored SATfollowthermostat get bPushSetpoint (readSettings); a stored value wins
   bool     bCurveSelfTune     = true;   // TASK-1525 (ADR-205, entry 176): the heating curve self-tune may change fHeatingCurveCoeff by 0.1 at most once a day. Default on
+  bool     bFireplaceMode     = false;  // TASK-1374 (entry 49): SAT heats on the heating curve only, P/I/D 0, as with a missing room temperature. For a home whose sensor room has its own stove or air conditioner. Default off
   bool     bMqttFallback      = false;  // Opt-in (TASK-1345): SAT takes over (state.sat.bFallbackActive, never settings.sat.bEnabled) once MQTT has been lost for more than 5 minutes. Default off
   float    fFlameOffOffset    = 18.0f;  // Flame-off hold offset above return temp during PWM (Python flame_off_setpoint_offset_celsius=18.0): primes the boiler for fast, clean re-ignition
   bool     bWindowDetection   = false;  // Enable window open detection via MQTT

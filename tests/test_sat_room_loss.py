@@ -42,7 +42,7 @@ STUBS = r"""
 #define SATDebugTln(x) ((void)0)
 #define SAT_HSYS_UNDERFLOOR 1
 static const float SAT_PID_DEADBAND = 0.1f;   // TASK-1417: SATtypes.h (an old SATpid.ino copy ignores it)
-struct SatSettings { float fDeadband = 0.1f;
+struct SatSettings { bool bFireplaceMode = false; float fDeadband = 0.1f;
                      float fHeatingCurveCoeff = 1.0f; bool bSolarFreezeIntegral = false;
                      // pre-TASK-1357 fields at their old defaults, so an old SATpid.ino copy still compiles
                      bool bAutoGains = true; float fKpManual = 5.0f, fKiManual = 0.0005f, fKdManual = 0.0f; };
@@ -95,7 +95,7 @@ def build_cpp(sat_src: str, pid_src: str) -> str:
     pid = pid_src[pid_src.index("// --- PID Constants ---"):pid_end if pid_end >= 0 else len(pid_src)]
     step = "if (roomValid) satPidStep(roomTemp, effectiveTarget, curveValue, g_ms);" if pid_end >= 0 else ""
     if "const bool roomValid" in sat_src:
-        a = sat_src.index("  const bool roomValid")
+        a = sat_src.index("  const bool roomPresent") if "const bool roomPresent" in sat_src else sat_src.index("  const bool roomValid")
         b = sat_src.index("  // TASK-894 (George)")
         roomblock = sat_src[a:b]
         h0 = sat_src.index("static bool satRoomTempValid(float roomTemp)")
@@ -197,7 +197,7 @@ class SourceGuards(unittest.TestCase):
         self.assertIn("SAT_MAX_PIC_FAILS", self.src)
 
     def test_blocks_skipped_during_the_loss(self):
-        self.assertIn("if (roomValid) {\n    roomTemp = satRoomFiltered(roomTemp);", self.src, "room EMA")
+        self.assertIn("if (roomPresent) {\n    roomTemp = satRoomFiltered(roomTemp);", self.src, "room EMA (a working sensor in Fireplace mode keeps its smoothing, TASK-1374)")
         self.assertIn("satPidOutput(curveValue)", self.src)
         self.assertIn("if (roomValid && state.sat.bFallbackActive && state.sat.iLastKnownRoomMs > 0)", self.src, "MQTT takeover thermal block")
         self.assertIn("if (roomValid) {\n    satUpdateCurveRecommendation();", self.src, "curve recommendation and statistics")
@@ -209,7 +209,7 @@ class SourceGuards(unittest.TestCase):
         return self.src[a:self.src.index("\n}\n", a)]
 
     def test_room_temp_lost_flag_set_published_and_cleared(self):
-        self.assertIn("state.sat.bRoomTempLost = !roomValid;", self.src, "set from the control tick: true during the loss, false after recovery")
+        self.assertIn("state.sat.bRoomTempLost = !roomPresent;", self.src, "set from the control tick: true during the loss, false after recovery")
         self.assertIn('publishIfChangedB(F("sat/room_temp_lost"),   state.sat.bRoomTempLost,     s_core_room_temp_lost,   true);', self.src)
         self.assertIn('je.field(F("room_temp_lost"),       snap->st.sat.bRoomTempLost);', self.src)
         for head in ("void satDisable(bool persistPid)", "void satClearSafetyTrip()"):
@@ -225,7 +225,7 @@ class SourceGuards(unittest.TestCase):
 
     def test_solar_gain_skips_out_of_range_like_nan(self):
         b = self._body("static void satUpdateSolarGain()")
-        self.assertIn("if (!satRoomTempValid(roomTemp)) {", b)
+        self.assertIn("if (!satRoomTempUsable(roomTemp)) {", b)
         self.assertNotIn("if (isnan(roomTemp))", b)
 
     def test_stale_comments_are_gone(self):

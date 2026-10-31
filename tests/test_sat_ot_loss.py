@@ -96,7 +96,7 @@ static void satSetControlMode(int m) { state.sat.eControlMode = m; }
 static void satPwmReset() {}
 static void satCycleSkipAutoSwitch() {}   // TASK-1367: called by satDisable(); the overshoot timer is not under test here
 static float _sat_lastControlCS = 0, _sat_requestedSetpoint = 0;
-static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false;
+static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false, _sat_fireplaceActive = false;   // TASK-1374: satDisable() resets it
 // PID persistence (TASK-1365 AC#4): g_pidFile stands for the saved PID file, g_roomSeen for satPidRoomSeen().
 // satPidReset() clears the room flag like the real one; satSavePidState() overwrites the file with the reset (zero) state.
 static bool g_roomSeen = false; static int g_pidSaves = 0; static const char* g_pidFile = "saved";

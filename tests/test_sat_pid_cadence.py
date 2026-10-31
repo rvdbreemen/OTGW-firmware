@@ -67,7 +67,7 @@ static uint32_t millis() { return g_ms; }
 static long random(long a, long) { return a; }
 #include "@TIMERS@"
 // bAutoGains/fK*Manual: pre-TASK-1357 fields at their old defaults, so an old SATpid.ino copy still compiles.
-struct SatSettings { bool bSolarFreezeIntegral = false; bool bAutoGains = true;
+struct SatSettings { bool bSolarFreezeIntegral = false; bool bFireplaceMode = false; bool bAutoGains = true;
   float fKpManual = 5.0f, fKiManual = 0.0005f, fKdManual = 0.0f;
   float fHeatingCurveCoeff = 1.6f, fDeadband = 0.1f, fTargetTemp = 21.0f;
   int iZoneCount = 1; int iZoneTimeoutS = 900; };
@@ -279,7 +279,9 @@ def real_gather_source(sat: str) -> str:
     limit = re.search(r"^static const uint32_t SAT_THERMAL_MAX_EST_MS[^\n]*", sat, re.M)
     if not limit:
         raise AssertionError("SAT_THERMAL_MAX_EST_MS not found")
-    return "\n".join([limit.group(0), _fn(sat, r"static bool satRoomTempValid\("), _fn(sat, r"static float satRoomFiltered\("),
+    return "\n".join([limit.group(0), _fn(sat, r"static bool satRoomTempValid\("),
+                      _fn(sat, r"static bool satRoomTempUsable\(") if "satRoomTempUsable(" in sat else "",   # TASK-1374
+                      _fn(sat, r"static float satRoomFiltered\("),
                       _fn(sat, r"static float satEffectiveTarget\("),
                       _fn(sat, r"static float satEstDeadbandExtra\(") if "satEstDeadbandExtra(" in sat else "",   # gone in TASK-1417
                       _fn(sat, r"bool satPidGatherInputs\(")])

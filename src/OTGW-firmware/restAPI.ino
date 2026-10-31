@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.586
+**  Version  : v2.0.0-alpha.587
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1652,6 +1652,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATfollowthermostat", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("curve_self_tune")) == 0) {
       updateSetting("SATcurveselftune", val); handled = true;   // TASK-1525
+    } else if (strcasecmp_P(settingName, PSTR("fireplace_mode")) == 0) {
+      updateSetting("SATfireplace", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("mqtt_fallback")) == 0) {
       updateSetting("SATmqttfallback", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("external_temp")) == 0) {
@@ -2273,6 +2275,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.overshoot_protection"), settings.sat.bOvershootProtection);
     je.field(F("settings.sat.follow_thermostat"), settings.sat.bFollowThermostat);
     je.field(F("settings.sat.curve_self_tune"), settings.sat.bCurveSelfTune);   // TASK-1525
+    je.field(F("settings.sat.fireplace_mode"), settings.sat.bFireplaceMode);
     je.field(F("settings.sat.mqtt_fallback"), settings.sat.bMqttFallback);
     je.field(F("settings.sat.dhw_setpoint"), settings.sat.fDhwSetpoint);
     je.field(F("settings.sat.user_max_setpoint"), settings.sat.fMaxTSetUser);
@@ -4006,6 +4009,7 @@ void sendDeviceSettings()
   addBool(F("satpushsetpoint"),   settings.sat.bPushSetpoint, "b");
   addBool(F("satfollowthermostat"), settings.sat.bFollowThermostat, "b");
   addBool(F("satcurveselftune"), settings.sat.bCurveSelfTune, "b");   // TASK-1525
+  addBool(F("satfireplace"), settings.sat.bFireplaceMode, "b");
   addBool(F("satmqttfallback"), settings.sat.bMqttFallback, "b");
   addBool(F("satwindowdetect"),   settings.sat.bWindowDetection, "b");
   addInt (F("satwindowminsec"),   settings.sat.iWindowMinOpenSec, "i", 10, 600);
@@ -4166,7 +4170,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satblenamefilteringest", "satblenameprefix",  // TASK-895 filter; TASK-1231 made them settable
   "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient", "satcurveselftune",
   "satdhwcapacity", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
-  "satflameoffset", "satflowoffset", "satflushtreshold", "satfollowthermostat", "sathumiditytimeout",
+  "satfireplace", "satflameoffset", "satflowoffset", "satflushtreshold", "satfollowthermostat", "sathumiditytimeout",
   "satinterval", "satmanufacturer", "satmaxconsumption", "satmaxsetpoint", "satmaxpressdrop", "satmaxpressure",
   "satminconsumption", "satminpressure",
   "satmodsupdelay", "satmodsupoffset", "satmqttfallback", "satmultiarea", "satmultiareacount",

@@ -3197,6 +3197,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/push_setpoint` | `SATpushsetpoint` |
 | `sat/follow_thermostat` | `SATfollowthermostat` |
 | `sat/curve_self_tune` | `SATcurveselftune` |
+| `sat/fireplace_mode` | `SATfireplace` |
 | `sat/mqtt_fallback` | `SATmqttfallback` |
 | `sat/external_temp` | `SATexternaltemp` |
 | `sat/flame_off_offset` | `SATflameoffset` |

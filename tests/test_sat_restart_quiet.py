@@ -112,7 +112,7 @@ static void satSetControlMode(SATControlMode m) { state.sat.eControlMode = m; }
 static void satPwmReset() {}
 static void satCycleSkipAutoSwitch() {}
 static float _sat_lastControlCS = 0, _sat_requestedSetpoint = 0;
-static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false;
+static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false, _sat_fireplaceActive = false;   // TASK-1374: satDisable() resets it
 static bool g_roomSeen = false;
 static bool satPidRoomSeen() { return g_roomSeen; }
 static void satPidReset() { g_roomSeen = false; }

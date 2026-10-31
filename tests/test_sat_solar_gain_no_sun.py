@@ -50,6 +50,7 @@ static uint32_t millis() { return g_ms; }
 static float g_room = 20.0f;
 static float satGetRoomTemp() { return g_room; }
 static bool satRoomTempValid(float t) { return !isnan(t) && t >= -10.0f && t <= 50.0f; }
+static bool satRoomTempUsable(float t) { return satRoomTempValid(t); }   // TASK-1374: Fireplace mode is off here
 @SPAN@
 int main(int argc, char** argv) {
   const char* sc = argv[1];

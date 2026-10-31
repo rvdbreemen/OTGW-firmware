@@ -4356,6 +4356,9 @@ components:
         curve_self_tune:
           type: boolean
           description: "Heating curve self-tune (ADR-205, default on). SAT changes the curve coefficient by 0.1 at most once a day from the last 3 days of clean heating hours. Off keeps the current coefficient. Settable through POST /api/v2/sat/curve_self_tune."
+        fireplace_mode:
+          type: boolean
+          description: "Fireplace mode (default false): SAT heats on the heating curve only with P, I and D at 0, as with a missing room temperature. Settable through POST /api/v2/sat/settings/fireplace_mode."
         flame_off_offset:
           type: number
           description: "Flame-off setpoint offset (C)"
@@ -4582,6 +4585,7 @@ components:
         push_setpoint: false
         follow_thermostat: false
         curve_self_tune: true
+        fireplace_mode: false
         flame_off_offset: 0.0
         overshoot_protection: true
         flow_offset: 2.0

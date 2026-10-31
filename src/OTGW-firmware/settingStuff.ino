@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.586
+**  Version  : v2.0.0-alpha.587
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -349,6 +349,7 @@ bool writeSettings(bool show)
   writeJsonBoolKV(file, F("SATpushsetpoint"), settings.sat.bPushSetpoint);
   writeJsonBoolKV(file, F("SATfollowthermostat"), settings.sat.bFollowThermostat);
   writeJsonBoolKV(file, F("SATcurveselftune"), settings.sat.bCurveSelfTune);   // TASK-1525
+  writeJsonBoolKV(file, F("SATfireplace"), settings.sat.bFireplaceMode);
   writeJsonFloatKV(file, F("SATflameoffset"), settings.sat.fFlameOffOffset);
   writeJsonBoolKV(file, F("SATwindowdetect"), settings.sat.bWindowDetection);
   writeJsonIntKV(file, F("SATwindowminsec"), settings.sat.iWindowMinOpenSec);
@@ -1099,6 +1100,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATpushsetpoint")) == 0)   settings.sat.bPushSetpoint = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATcurveselftune")) == 0)  settings.sat.bCurveSelfTune = EVALBOOLEAN(newValue);   // TASK-1525: the tuner clock sees the change and starts or stops with an empty window
   else if (strcasecmp_P(field, PSTR("SATfollowthermostat")) == 0) { settings.sat.bFollowThermostat = EVALBOOLEAN(newValue); g_sawSatFollowKey = true; }  // TASK-1259: key presence = stored value (see readSettings default)
+  else if (strcasecmp_P(field, PSTR("SATfireplace")) == 0)     settings.sat.bFireplaceMode = EVALBOOLEAN(newValue);  // TASK-1374
   else if (strcasecmp_P(field, PSTR("SATmqttfallback")) == 0)  settings.sat.bMqttFallback = EVALBOOLEAN(newValue);  // TASK-1345
   else if (strcasecmp_P(field, PSTR("SATflameoffset")) == 0)    settings.sat.fFlameOffOffset = clampSettingFloat(newValue, settings.sat.fFlameOffOffset, 0.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("SATwindowdetect")) == 0)  settings.sat.bWindowDetection = EVALBOOLEAN(newValue);

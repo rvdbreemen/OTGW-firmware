@@ -2082,6 +2082,7 @@
     satpushsetpoint:     { cat: 'sat', label: 'Push setpoint to thermostat' },
     satfollowthermostat: { cat: 'sat', label: 'Follow thermostat setpoint' },
     satcurveselftune:    { cat: 'sat', label: 'Heating curve self-tune' },
+    satfireplace:        { cat: 'sat', label: 'Fireplace mode' },
     satmqttfallback:     { cat: 'sat', label: 'Take over when MQTT is lost' },
     satwindowdetect:     { cat: 'sat', label: 'Window detection' },
     satwindowminsec:     { cat: 'sat', label: 'Window min open time', hint: 'Seconds' },
@@ -2180,7 +2181,7 @@
   // satenabled is the SAT header toggle, so no form shows it. A SAT key that is not
   // listed here lands in L3 "Other", so a new firmware setting is never hidden.
   var SAT_L2 = [
-    ['System', ['satsystem', 'satsource', 'satheatingmode', 'sattargettemp', 'satpushsetpoint', 'satfollowthermostat', 'satmqttfallback']],
+    ['System', ['satsystem', 'satsource', 'satheatingmode', 'sattargettemp', 'satpushsetpoint', 'satfollowthermostat', 'satfireplace', 'satmqttfallback']],
     ['Presets', ['satpresetcomfort', 'satpreseteco', 'satpresetaway', 'satpresetsleep', 'satpresetactivity',
                  'satpresethome', 'satpresetsync', 'satpresetsynctopic']],
     ['Indoor temperature', ['satexternaltemp', 'satsensormaxage']],

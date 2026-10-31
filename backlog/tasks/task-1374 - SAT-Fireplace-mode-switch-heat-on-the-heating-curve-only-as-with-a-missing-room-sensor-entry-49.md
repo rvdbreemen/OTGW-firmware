@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-25T06:32:00Z'
-updated_date: '2026-10-30T19:46:00Z'
+updated_date: '2026-10-31T22:20:00Z'
 labels:
   - sat
   - webui
@@ -28,3 +28,9 @@ Sergeant D 2026-10-25 06:18 UTC (#alpha-testing 1563799007157817405): 'Create a 
 <!-- AC:BEGIN -->
 - [ ] #1 With Fireplace mode on SAT heats on the curve only with P/I/D 0 (host test red without the switch, green); switch on REST/MQTT/HA/v2 (browser test); off restores PID control
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-31 worktree cleanup: unmerged work of this task sits in lane wt-1374 (archived as D:\Users\Robert\Documents\GitHub\RvdB\lane-archive-20261031\wt-1374.uncommitted.patch); the lane is kept and will be merged into dev (Robert: merge lanes where possible).
+<!-- SECTION:NOTES:END -->
