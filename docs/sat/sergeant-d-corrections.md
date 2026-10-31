@@ -5116,3 +5116,11 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Open, queued as a question (Q-1414a in docs/sat/open-questions.md):** zone (area) PID reset. thermo-nova resets an area's PID when that room's climate target differs from `_rooms[entity]` (the room's HOME preset temperature), climate.py:785-795; outside the HOME preset that can fire on every state event of that climate. The firmware has no `_rooms` and resets a zone integral when that zone's setpoint really changes (the first setpoint resets nothing). Is that acceptable, or should the firmware mirror the HOME-preset comparison?
 
 **Task:** TASK-1414. ADR: Proposed ADR-204 replaces ADR-197 decision 8.
+
+## 158. Q-1502a B: with no CH flame after a draw, the minimum-burn hold lapses and the ON phase ends on its normal ON time (2026-10-31, settles entry 156 first open point)
+
+**Source:** sergeantd, 2026-10-31 04:33 UTC, msg 1565946810353057936 (https://discord.com/channels/812969634638725140/1514720723980259460/1565946810353057936), answer to Q-1502a (msg 1565847278617493595).
+
+**Quoted:** "@BlueFlame Bot TASK-1502: B"
+
+**Settled (option B as posted):** a PWM ON phase that started with the flame burning, is interrupted by a hot-water draw, and gets no CH flame after the draw: the 180 s minimum-burn hold lapses and the ON phase ends on its normal ON time (270 s in the posted example, not 390 s). The hold protects a burning flame only. Compared: thermo-nova measures the hold from the flame-on time by the clock and never freezes it (pwm.py:144-146, :200-202, opened at the pin before the question); firmware alpha.564 (TASK-1502, SATcontrol.ino satPwmOnDhwStart / satPwmDhwResume / hold-anchor guard) freezes the hold clock through the draw and the post-draw wait and then applies the rest of the hold without a flame (option A, today). **Task:** TASK-1518 (implement). **Open:** Q-1502b (a draw after the first-flame wait had already timed out) is asked next.
