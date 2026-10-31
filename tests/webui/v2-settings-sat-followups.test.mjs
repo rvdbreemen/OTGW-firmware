@@ -53,6 +53,8 @@ const SETTINGS = {
   satsource: { value: 1, type: 'i', min: 0, max: 3 },
   satcyclesperhour: { value: 3, type: 'i', min: 3, max: 4 }, sathpcycle: { value: 1800, type: 'i', min: 1800, max: 2400 },
   satinterval: { value: 30, type: 'i', min: 10, max: 300 },
+  // TASK-1530: a stale form copy (100) next to the live status value (80), as Sergeant D saw it
+  satmaxmodulation: { value: 100, type: 'i', min: 0, max: 100 },
 };
 // device/info (restAPI.ino:3227-3240): ipaddress = active transport; WiFi active here.
 const DEVINFO = { device: {
@@ -61,7 +63,7 @@ const DEVINFO = { device: {
   wifi_current_dns1: '192.168.88.1', wifi_current_dns2: '0.0.0.0',
   eth_current_subnet: '255.255.0.0', eth_current_gateway: '10.1.0.1', eth_current_dns: '10.1.0.1',
 } };
-const SAT_STATUS = { enabled: true, coefficient: 1.5, target_temp: 20, heating_system: 1, outside_temp: 8, final_setpoint: 45, dhw_setpoint: 50, control_mode: 1 };
+const SAT_STATUS = { enabled: true, coefficient: 1.5, target_temp: 20, heating_system: 1, outside_temp: 8, final_setpoint: 45, dhw_setpoint: 50, control_mode: 1, max_rel_modulation: 80 };
 let msg48 = (60 << 8) | 35;          // UB 60, LB 35
 let markers = [];
 
@@ -291,6 +293,16 @@ await shotPwm('pwm-card-heatpump.png');
 check(!!hp && hp.hp && !hp.cph && hp.interval && !hp.otherCycle, `heat pump selected: heat-pump cycle shown, cycles per hour hidden at once (${JSON.stringify(hp)})`);
 const dirtySrc = await evalJs(`(function(){ var r = document.querySelector('#satSetL2 .srow[data-key="satsource"]'); return !!r && r.classList.contains('dirty') && r.querySelector('select').value === '2'; })()`);
 check(dirtySrc === true, 'the re-render keeps the unsaved appliance type (dirty, still Heat Pump)');
+
+// ---- 1530 SAT: Max relative modulation only in the Central Heating Settings card ----
+const mmForm = await evalJs(`(function(){ return document.querySelectorAll('#satSetL2 .srow[data-key="satmaxmodulation"], #satSetL3 .srow[data-key="satmaxmodulation"]').length; })()`);
+check(mmForm === 0, `no settings card (PWM, Other or any other) shows satmaxmodulation (${mmForm} rows)`);
+const mmSl = await until(`(function(){ var s = document.getElementById('satModSlider'), r = document.getElementById('satModR'); return s && r && r.textContent !== '—' ? { v: s.value, r: r.textContent } : null; })()`);
+check(!!mmSl && mmSl.v === '80' && /80 %/.test(mmSl.r), `the Central Heating Settings slider shows the live value 80 % (${JSON.stringify(mmSl)})`);
+await evalJs(`(function(){ var s = document.getElementById('satModSlider'); s.value = '65'; s.dispatchEvent(new Event('input')); s.dispatchEvent(new Event('change')); })()`);
+await sleep(400);
+const mmPost = log.find((l) => l.startsWith('POST /api/v2/sat/settings/max_modulation'));
+check(!!mmPost && /65/.test(mmPost), `moving the slider POSTs sat/settings/max_modulation 65 (${mmPost})`);
 
 check(exceptions.length === 0, `no uncaught page exceptions (${exceptions.join(' ; ')})`);
 console.log('peak /api/ requests in flight at the fake device: ' + peak);

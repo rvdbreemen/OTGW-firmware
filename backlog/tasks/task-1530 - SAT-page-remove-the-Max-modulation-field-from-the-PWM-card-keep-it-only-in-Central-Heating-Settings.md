@@ -3,9 +3,11 @@ id: TASK-1530
 title: >-
   SAT page: remove the Max modulation field from the PWM card, keep it only in
   Central Heating Settings
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-31T18:50:00Z'
+updated_date: '2026-10-31T19:17:00Z'
 labels:
   - sat
   - webui

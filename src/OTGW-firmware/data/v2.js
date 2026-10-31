@@ -2182,7 +2182,7 @@
   ];
   var SAT_L3 = [
     ['Curve', ['satcoefficient', 'satcurveselftune', 'sattempstep', 'satovershootmargin']],
-    ['PWM', ['satovershootprotection', 'satcyclesperhour', 'satmaxmodulation',
+    ['PWM', ['satovershootprotection', 'satcyclesperhour',
              'satinterval', 'sathpcycle', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
     ['Boiler', ['satmanufacturer', 'satboilerratedkw', 'satboilerefficiency', 'satminconsumption', 'satmaxconsumption',
@@ -2195,7 +2195,8 @@
                   'satpvboostmaxindoorc', 'satpvboostmaxdurationmin']],
     ['Simulation', ['satsimulation', 'satsimheatrate', 'satsimcoolrate']]
   ];
-  var SAT_NOT_IN_FORMS = { satenabled: 1 };
+  // TASK-1530: satmaxmodulation is set only by the Max relative modulation slider (Central Heating Settings).
+  var SAT_NOT_IN_FORMS = { satenabled: 1, satmaxmodulation: 1 };
   // TASK-1529: the PWM card shows only the cycle setting the firmware uses for the chosen appliance type:
   // heat pump (satsource 2) -> sathpcycle, otherwise (Auto = gas, gas, hybrid) -> satcyclesperhour
   // (satGetPwmPeriodSec / satGetEffectiveHeatingSource in SATcontrol.ino).

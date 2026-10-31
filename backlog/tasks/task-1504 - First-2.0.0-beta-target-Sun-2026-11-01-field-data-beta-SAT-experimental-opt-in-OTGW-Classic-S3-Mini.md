@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:19:00Z'
-updated_date: '2026-10-31T14:03:00Z'
+updated_date: '2026-10-31T20:15:00Z'
 labels:
   - release beta
 milestone: 2.0.0
@@ -57,4 +57,6 @@ Soak started 2026-10-31 14:38:57 local: detached python soak.py .61 24 h (PID 37
 2026-10-31 ~15:00 Robert: 'Of je stopt de soak nu en bouwt eerst de nieuwe feature en dan voer je de soak uit.' Soak of alpha.570 stopped (PID 37604 killed); the 24 h soak restarts on the final beta.1 candidate with TASK-1410 + TASK-1525 (ADR-205 self-tune) + TASK-1386.
 
 2026-10-31 Robert: 'Make sure to label 1412 epic and all its tasks as high priority. And include it for beta.1.' -> TASK-1412 and 1412.1-1412.26 set to priority high with label beta.1.
+
+2026-10-31 ~21:15 local: soak of alpha.577 on OTGW32 .61 stopped after 224 min uptime on Robert's order ('Stop soak, flash now', to bench TASK-1530/1532 for beta.1). Result so far: 632 snapshots, 0 reboots, free heap 72 KB, max block 31.7 KB, low-water hd_min_free_heap 960 B (one dip through low/warning/critical, TASK-1528), max loop gap 1028 ms, 1 REST 503, 0 MQTT/WS drops. A new 24 h soak starts on the next candidate.
 <!-- SECTION:NOTES:END -->
