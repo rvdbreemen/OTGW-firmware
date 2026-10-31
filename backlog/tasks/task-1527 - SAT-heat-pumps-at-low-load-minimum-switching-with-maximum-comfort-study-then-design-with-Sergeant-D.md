@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-31T13:48:00Z'
-updated_date: '2026-10-31T14:30:00Z'
+updated_date: '2026-10-31T14:37:00Z'
 labels:
   - sat
   - design
@@ -35,4 +35,6 @@ Robert 2026-10-31: 'de warmtepomp moet minimaal schakelen. Dus goal voor warmtep
 2026-10-31 Robert asked whether this heat pump can run in continuous mode. Code: the continuous->PWM switch (SATcontrol.ino:6136-6146, satCycleCheckOvershootSwitch SATcycles.ino:1103) applies to every source incl. heat pumps per Sergeant D entry 87 (Q45 A); bOvershootProtection only changes the PWM CS (SATcontrol.ino:1345, 1358), not the entry. So today a HP cannot stay continuous; 'own control' = skip that switch for HPs = changes entry 87 (added to Q-1527a, msg after 1566093012524605644). Model (own, on/off HP, underfloor): on 33-53 % of the time on average, max day 57-84 %, 0 of 106 days fully on (HP sized for -10 C +10 %), median runs 132-406 min, 1.3-4.3 starts/day.
 
 2026-10-31 Robert (entry 182): for heat pumps the firmware may deviate from thermo-nova; parity is no argument for heat pumps. Sergeant D's entries 40/50/87 stay until he revises them (Q-1527a, on the merits).
+
+2026-10-31 round 13 (docs/sat/sim-hp-lowload/round13.md): 16 options, heat-pump mode only, 576 winters. Degree minutes (NIBE method) and room hysteresis dominate long PWM and minimum-run PWM; dm 120: 4.2 starts/day 0.136 C; rh 0.1: 5.3 / 0.102 C; today's pwm 40: 32 / 0.296 C. Recommendation: degree-minute mode for on/off heat pumps (start -120 DM, stop 0, min 20 on / 10 off).
 <!-- SECTION:NOTES:END -->
