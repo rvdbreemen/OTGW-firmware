@@ -5228,3 +5228,11 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot Q-1519f: Keep only the curve integral, do not use at all derivative"
 
 **Settled:** the autotuner signal is the curve integral alone (setpoint minus curve, entry 163); no derivative term, also not logged as a tuner input. This changes entry 170 (I + D) after round 7 showed curve integral + D behaves as the curve integral alone (89/90 runs same end coefficient; D window mean <= 0.024 C against 0.74-2.25 C), `docs/sat/sim-1519/round5b-round7.md` section 4. Compared: thermo-nova has no tuner; its PID integral resets outside DEADBAND 0.1 (`pid.py:187-189`) and its derivative is held inside it (`pid.py:205-207`); both stay as they are. He chose "do not use at all" over our option A ("log D next to it"); we read that as: no D in the tuner and no D tuner log line. **Interpretation (ours) of the 10:28 message:** "my statement" is entry 166 (most homes need 1.6-2.4); our reply explains that the calibrated simulation assumes 1.8 rather than proving it. **Task:** TASK-1519. **Open:** none on the signal.
+
+## 172. Q-1519d B: the autotuner measures and logs every hour and decides once a day (2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 10:52 UTC, #dev-sat-mqtt, msg 1566042248171360347 (https://discord.com/channels/812969634638725140/1105556725714649128/1566042248171360347), answer to Q-1519d as re-asked on Robert's instruction (msg 1566041464792817697; first asked 06:49 UTC, msg 1565981115259420765).
+
+**Quoted:** "@BlueFlame Bot Q-1519d: B"
+
+**Settled (option B as posted):** every hour the tuner evaluates the hour and writes a log line with what it saw, or why the hour did not count as clean; the coefficient changes at most once a day, decided on the clean hours of the last 2-3 days. This reconciles Robert's fixed requirement "hourly evaluation" (TASK-1519 description, 05:51 UTC) with entries 162 and 164 (daily data sets, small daily steps). Robert put the choice to Sergeant D in session ("Ask Sergeant."). Evidence: rounds 1-2 (`docs/sat/sim-1519/`), daily on 3 days about 7 changes, 0 flips and 0 wrong-way steps per winter at the same comfort as hourly-with-guards (about 10 changes, 2 flips). Compared: thermo-nova has no tuner. **Task:** TASK-1519. **Open:** window length 2 or 3 days (both simulated, 2 days used in rounds 5b-5g).
