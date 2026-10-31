@@ -48,7 +48,8 @@ static int g_flameChanges = 0;
 static void satCycleOnFlameChange(bool) { g_flameChanges++; }
 static float g_out = 8.0f;
 static float satSimOutdoorTemp() { return g_out; }
-static uint8_t satSimMinMod() { return 5; }
+#define SAT_QUIRK_MIN_MOD_10 0x01
+static uint8_t satGetManufacturerQuirks() { return 0; }
 static const int SAT_DHW_SETPOINT_MIN = 30, SAT_DHW_SETPOINT_MAX = 65;
 static const uint8_t SAT_MAX_ZONES = 4, SAT_MAX_AREAS = 4;
 enum { SAT_HSYS_AUTO = 0, SAT_HSYS_RADIATORS = 1, SAT_HSYS_UNDERFLOOR = 2 };
@@ -79,7 +80,7 @@ int main(int argc, char** argv) {
   state.sat.fFinalSetpoint = (float)atof(argv[3]); const int secs = atoi(argv[4]);
   if (argc > 5) state.sat.fSimRoomTemp = state.sat.fSimFlowTemp = state.sat.fSimReturnTemp = (float)atof(argv[5]);
   satUpdateSimulation();                                         // first call only stamps the time
-  int starts = 0, onTicks = 0, ticks = 0, minMod = 101; bool prev = state.sat.bSimFlameOn;
+  int starts = 0, onTicks = 0, ticks = 0, minMod = 101, above = 0, maxAbove = 0; bool prev = state.sat.bSimFlameOn;
   const float room0 = state.sat.fSimRoomTemp;
   for (int s = 1; s <= secs; s++) {
     g_ms += 1000; state.sat.iSimDhwNextSchedMs = g_ms + 0x7FFFFFFFUL;   // no scheduled hot-water draws
@@ -88,11 +89,13 @@ int main(int argc, char** argv) {
       ticks++;
       if (state.sat.bSimFlameOn) { onTicks++; if (state.sat.iSimModulation < minMod) minMod = state.sat.iSimModulation; }
       if (state.sat.bSimFlameOn && !prev) starts++;
+      above = (state.sat.fSimFlowTemp >= state.sat.fFinalSetpoint + 2.0f) ? above + 1 : 0;   // SAT's overshoot test
+      if (above > maxAbove) maxAbove = above;
     }
     prev = state.sat.bSimFlameOn;
   }
-  printf("starts=%d on=%.3f minmod=%d room0=%.2f room=%.2f flow=%.2f\n", starts, ticks ? (double)onTicks / ticks : 0.0,
-         minMod == 101 ? 0 : minMod, room0, state.sat.fSimRoomTemp, state.sat.fSimFlowTemp);
+  printf("starts=%d on=%.3f minmod=%d above=%d room0=%.2f room=%.2f flow=%.2f\n", starts, ticks ? (double)onTicks / ticks : 0.0,
+         minMod == 101 ? 0 : minMod, maxAbove, room0, state.sat.fSimRoomTemp, state.sat.fSimFlowTemp);
   return 0;
 }
 """
@@ -102,9 +105,12 @@ def cut_sources(text):
     m = re.search(r"^static void satUpdateSimulation\(\)\n\{.*?^\}\n", text, re.S | re.M)
     if not m:
         raise AssertionError("satUpdateSimulation() not found in " + str(SAT_INO))
+    mm = re.search(r"^static uint8_t satSimMinMod\(\)\n\{.*?^\}\n", text, re.S | re.M)
+    if not mm:
+        raise AssertionError("satSimMinMod() not found in " + str(SAT_INO))
     consts = [l for l in text.splitlines()
               if re.match(r"\s*static const \w+\s+(SAT_SIM_\w+|SAT_MIN_SETPOINT)\s*=", l)]
-    return "\n".join(consts) + "\n" + m.group(0)
+    return "\n".join(consts) + "\n" + mm.group(0) + m.group(0)
 
 
 class SimBoilerModel(unittest.TestCase):
@@ -158,8 +164,21 @@ class SimBoilerModel(unittest.TestCase):
         self.assertGreater(hi["room"], 20.5, hi)
         # and a flow too low for the house lets it cool below the target although the boiler burns
         lo = self.run_model(1, 2, 27.0)
-        self.assertEqual(lo["on"], 1.0, lo)
+        self.assertGreater(lo["on"], 0.5, lo)
         self.assertLess(lo["room"], 19.5, lo)
+
+
+    # --- TASK-1535: a normal 24 kW combi (minimum 20 %, own switch-off hysteresis) ---
+    def test_low_load_flow_stays_above_cs_plus_2_long_enough_for_sats_pwm_switch(self):
+        # radiators, outside 14 C, SAT curve 28.9 C: the load is below the boiler's minimum
+        r = self.run_model(1, 14, 28.9)
+        self.assertGreaterEqual(r["above"], 60, r)
+        self.assertGreaterEqual(r["minmod"], 20, r)
+
+    def test_cold_weather_still_burns_continuously_above_the_minimum(self):
+        r = self.run_model(1, 2, 35.7)
+        self.assertEqual((r["starts"], r["on"]), (0, 1.0), r)
+        self.assertGreater(r["minmod"], 20, r)
 
 
 class SatTickSource(unittest.TestCase):

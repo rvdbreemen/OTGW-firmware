@@ -181,6 +181,10 @@ static const float    SAT_SIM_EMITTER_UFH_KW_K  = 0.70f;   // underfloor: larger
 static const float    SAT_SIM_EMITTER_REF_KW    = 15.0f;   // emitter output at which the room warms by fSimHeatRate °C/min
 static const float    SAT_SIM_COOL_REF_K        = 10.0f;   // indoor-outdoor difference at which the room cools by fSimCoolRate °C/min
 static const float    SAT_SIM_DHW_LOAD_KW       = 15.0f;   // heat taken by the hot-water coil during a draw
+// TASK-1535: a normal combi boiler (Robert 2026-10-31): minimum output and its own switch-off hysteresis,
+// independent of SAT's overshoot margin, so the flow overshoots after switch-off as on a real boiler.
+static const uint8_t  SAT_SIM_MIN_MOD_PCT       = 20;      // % of fBoilerCapacity (estimate, typical combi)
+static const float    SAT_SIM_BOILER_HYST_K     = 5.0f;    // the boiler stops at flow >= setpoint + 5 K (estimate)
 
 // --- Synthetic diurnal outdoor-temperature model (TASK-796 / plan §12 F1) ---
 // Triangle wave (no transcendental — cheap, and the params read directly):
@@ -5079,11 +5083,12 @@ void initSAT()
 //=====================================================================
 //=== Simulation Mode (Task #37) ===
 //=====================================================================
-// Synthetic minimum modulation floor: Geminox-class boilers idle at 10%, the
-// rest at 5%. Reuses the manufacturer-quirk infrastructure (plan §5.3).
+// Synthetic minimum modulation floor (TASK-1535): a normal 24 kW combi does not modulate below
+// about 20 % (4.8 kW; an estimate for a typical boiler, not a per-brand value), so the simulated
+// boiler meets low load the way real ones do. The Geminox floor of 10 % lies below it.
 static uint8_t satSimMinMod()
 {
-  return (satGetManufacturerQuirks() & SAT_QUIRK_MIN_MOD_10) ? 10 : 5;
+  return SAT_SIM_MIN_MOD_PCT;
 }
 
 // Synthetic boiler model (TASK-795, plan §5.2-§5.6). Drives the boiler-side
@@ -5159,7 +5164,7 @@ static void satUpdateSimulation()
   const bool heatRequested = dhwDraw ||
                              (state.sat.bActive && sp > (SAT_MIN_SETPOINT + 1.0f));
   const bool flowBelowSP   = state.sat.fSimFlowTemp <  (sp - SAT_SIM_FLAME_HYST_LO);
-  const bool flowAboveSP   = state.sat.fSimFlowTemp >= (sp + settings.sat.fOvershootMargin);
+  const bool flowAboveSP   = state.sat.fSimFlowTemp >= (sp + SAT_SIM_BOILER_HYST_K);   // TASK-1535: the boiler's own hysteresis
   const bool offLongEnough = (now - state.sat.iSimFlameOffSinceMs) >= SAT_SIM_MIN_OFF_MS;
   if (!state.sat.bSimFlameOn) {
     if (heatRequested && flowBelowSP && offLongEnough) {
