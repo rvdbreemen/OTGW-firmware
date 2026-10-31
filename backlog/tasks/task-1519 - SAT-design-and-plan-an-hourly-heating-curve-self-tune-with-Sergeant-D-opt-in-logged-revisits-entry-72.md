@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-31T05:53:00Z'
-updated_date: '2026-10-31T06:06:00Z'
+updated_date: '2026-10-31T06:30:00Z'
 labels:
   - sat
   - design
@@ -35,4 +35,6 @@ Robert 2026-10-31 05:51 UTC in #alpha-testing (msg 1565966404304248853): 'I want
 2026-10-31: Robert asked to start now. Design question Q-1519a posted to Sergeant D 05:55 UTC (msg 1565967378234347582) with proposal A (integral offload) and alternatives B (daily HCR auto-apply) and C (classified cycles). Waiting for his answer; record it in sergeant-d-corrections.md before any design or code.
 
 2026-10-31 simulation (Robert asked 06:02, msg 1565969242921246821): scripts/sat_curve_selftune_sim.py (thermo-nova curve + PID at the pin; invented one-mass house, continuous modulation only). Results posted msg 1565970072823144611: A (integral sign) never moves with a too-low curve (integral zeroed outside DEADBAND 0.1, pid.py _update_integral) and hunts inside it (325-379 writes/3 weeks); A2 (mean error) and B (daily HCR) do not see a too-high curve (kp = c*curve/3 hides it); A3 (hourly mean PID correction = setpoint - curve > 1.5 C flow, 0.1 step, max 1 step / 3 h) converges both ways, RMS 0.04-0.06 C, 2-10 writes. Best coefficient varies with outside temperature in this model (1.4 at -10 C to 2.6 at +10 C). Q-1519a proposal corrected from A to A3 in the same post.
+
+2026-10-31 06:10-06:28 Sergeant D in #dev-sat-mqtt: entries 159 (channel), 160 (sun elevation < 12 deg), 161 (SAT in charge, integral as the clue, no sun). Conflict with the deadband integral put back as Q-1519b (msg 1565976153540530227), advice: a separate tuner 'curve integral' (A3).
 <!-- SECTION:NOTES:END -->

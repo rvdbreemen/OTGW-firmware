@@ -1,11 +1,11 @@
 ---
 id: TASK-1496
 title: REST and docs still follow the pre-TASK-1485 SAT contract
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-30T00:10:00Z'
-updated_date: '2026-10-30T20:13:00Z'
+updated_date: '2026-10-31T06:53:00Z'
 labels:
   - sat
   - mqtt
@@ -35,7 +35,21 @@ A REST rename or a polarity/meaning change of the health JSON is a breaking API 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Per item (heating_curve command, flame_health, device_health, cycle_health) a decision is recorded in the task notes: follow the MQTT contract (name, polarity and meaning) or keep REST as is, with the reason; a REST rename or polarity change is listed as a breaking API change in docs/api/openapi.yaml and the changelog
-- [ ] #2 A host test on the real restAPI.ino code (handleSAT settings dispatch and satSendHealthJSON) is red on HEAD and green on the fix for every item decided as 'follow MQTT'
-- [ ] #3 docs/sat/firmware-sat-spec.md (lines listed in the description) and docs/sat/sat-comparison.md (P7, rows 10 and 48) describe the post-TASK-1485 contract: lower-case recommendation, no sat/ssi, pressure_health/device_health ON = problem, sat/heating_curve_coeff, and the REST outcome
+- [x] #1 Per item (heating_curve command, flame_health, device_health, cycle_health) a decision is recorded in the task notes: follow the MQTT contract (name, polarity and meaning) or keep REST as is, with the reason; a REST rename or polarity change is listed as a breaking API change in docs/api/openapi.yaml and the changelog
+- [x] #2 A host test on the real restAPI.ino code (handleSAT settings dispatch and satSendHealthJSON) is red on HEAD and green on the fix for every item decided as 'follow MQTT'
+- [x] #3 docs/sat/firmware-sat-spec.md (lines listed in the description) and docs/sat/sat-comparison.md (P7, rows 10 and 48) describe the post-TASK-1485 contract: lower-case recommendation, no sat/ssi, pressure_health/device_health ON = problem, sat/heating_curve_coeff, and the REST outcome
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-31 maintainer decision (Robert, in session otgw-firmware-ea): REST follows the MQTT contract, breaking, no alias: flame_health / device_health / cycle_health true = problem (flame_health null while the flame status is INSUFFICIENT_DATA), REST setting heating_curve renamed heating_curve_coeff without alias. Listed as breaking in openapi.yaml and the CHANGELOG. The v2 UI reads none of these fields (grep of v2.js), so only external REST users are affected; the alpha phase makes this the cheap moment.
+
+2026-10-31 (session otgw-firmware-ea): lane wt-v1496 applied on dev as 279b802c5 (alpha.567) after Robert's decision (follow MQTT, breaking, no alias). Evidence: tests/test_sat_rest_contract_1496.py on the real restAPI.ino: OTGW_SRC_REV=HEAD (old) FAILED (10), fix OK (16); all 74 tests/test_*.py OK; evaluate --quick Failed 0. Bench OTGW32 .61 alpha.567: GET /api/v2/sat?detail=full -> flame_health null, device_health true, cycle_health false; POST /api/v2/sat/settings/heating_curve_coeff 0.7 -> 200, satcoefficient 0.7; POST .../heating_curve -> 404 Unknown setting name; restored 0.6. Zip msg 1565981997267030066.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT REST follows the MQTT contract (Robert 2026-10-31, breaking): /api/v2/sat flame/device/cycle_health true = problem (flame_health null with insufficient data), REST setting heating_curve renamed heating_curve_coeff without alias; openapi.yaml, CHANGELOG, MQTT.md, beta-1 notes, SAT spec and comparison updated. Evidence: host test old FAIL (10) / fix OK (16); bench on alpha.567 shows the new fields and the rename. Published as 2.0.0-alpha.567+279b802.
+<!-- SECTION:FINAL_SUMMARY:END -->
