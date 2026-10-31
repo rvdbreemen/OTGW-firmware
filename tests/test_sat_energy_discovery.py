@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TASK-1276: Home Assistant discovery for the SAT power and energy topics.
+"""TASK-1276 / TASK-1506: Home Assistant discovery for the SAT power, energy and gas consumption topics.
 
 SATcontrol.ino publishes sat/power (kW), sat/energy_total (kWh) and sat/energy_estimated_kwh
 (kWh, estimated gas input). The manuals promise HA sensors for them, so MQTTHaDiscovery.cpp
@@ -29,6 +29,9 @@ EXPECTED = {
     "sat/power":                ("power",  "kW",  "measurement",      False),
     "sat/energy_total":         ("energy", "kWh", "total_increasing", True),
     "sat/energy_estimated_kwh": ("energy", "kWh", "total_increasing", True),
+    # TASK-1506: gas consumption split in CH and DHW; a rate, so volume_flow_rate in m3/h (HA rejects gas with a rate unit)
+    "sat/consumption":          ("volume_flow_rate", "m3_h", "measurement", False),
+    "sat/consumption_dhw":      ("volume_flow_rate", "m3_h", "measurement", False),
 }
 
 ROW = re.compile(
@@ -101,7 +104,8 @@ class SatEnergyDiscovery(unittest.TestCase):
             key = r["lbl"][len("ha_lbl_"):]
             self.assertTrue(self.decl[key][1].startswith("SAT_"), topic)
             names.append(self.decl[key][1])
-        self.assertEqual(names[:2], ["SAT_Power", "SAT_Energy_Total"])   # sensor.otgw_sat_power / _energy_total in the manuals
+        self.assertEqual(names[:2], ["SAT_Power", "SAT_Energy_Total"])
+        self.assertEqual(names[3:], ["SAT_CH_Gas_Consumption", "SAT_DHW_Gas_Consumption"])   # sensor.otgw_sat_power / _energy_total in the manuals
         every_name = [n for _, n in self.decl.values()]
         for n in names:
             self.assertEqual(every_name.count(n), 1, n + " is declared twice")

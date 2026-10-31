@@ -375,13 +375,15 @@ When SAT is enabled, the firmware also auto-discovers diagnostic sensor entities
 | `sat/active` | Whether SAT is actively controlling | bool |
 | `sat/safety_tripped` | Whether a safety layer has tripped | bool |
 
-**Power and energy sensors (3 entities, usable in the Home Assistant Energy dashboard):**
+**Power, energy and gas consumption sensors (5 entities; the power and energy ones are usable in the Home Assistant Energy dashboard):**
 
 | Topic suffix | Home Assistant entity | Description | Unit | Device class / state class |
 |---|---|---|---|---|
 | `sat/power` | `SAT Power` | Estimated boiler heat output: modulation x boiler capacity (`satboilercapacity`, or `satdhwcapacity` while hot water runs). Not retained | kW | `power` / `measurement` |
 | `sat/energy_total` | `SAT Energy Total` | Cumulative heat output since the counter started. Retained, survives a reboot | kWh | `energy` / `total_increasing` |
 | `sat/energy_estimated_kwh` | `SAT Estimated Gas Input` | Estimated gas input: `sat/power` divided by `satboilerefficiency`, capped by `satboilerratedkw`. Retained. Published only when `satboilerratedkw` is above 0; until then the entity reads `unknown` | kWh | `energy` / `total_increasing` |
+| `sat/consumption` | `SAT CH Gas Consumption` | Gas use for central heating: `satminconsumption` + modulation/100 x (`satmaxconsumption` - `satminconsumption`) while the flame is on, the boiler is in CH mode and not making hot water; else 0. Not retained. Published only when both settings are above 0; until then the entity reads `unknown` | m³/h | `volume_flow_rate` / `measurement` |
+| `sat/consumption_dhw` | `SAT DHW Gas Consumption` | Gas use for hot water: the same formula while the flame is on and the boiler reports hot-water active; else 0. Not retained. Published under the same condition | m³/h | `volume_flow_rate` / `measurement` |
 
 The entity ids follow the naming of the other SAT sensors, for example `sensor.<device name>_sat_power`. See section 5.20 for the settings.
 

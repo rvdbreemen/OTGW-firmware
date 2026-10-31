@@ -389,13 +389,15 @@ Wanneer SAT is ingeschakeld, worden ook diagnostische sensor-entiteiten automati
 | `sat/active` | Of SAT actief is | bool |
 | `sat/safety_tripped` | Of een veiligheidslaag is geactiveerd | bool |
 
-**Vermogen- en energiesensoren (3 entiteiten, bruikbaar in het Energy-dashboard van Home Assistant):**
+**Vermogen-, energie- en gasverbruiksensoren (5 entiteiten; de vermogen- en energiesensoren zijn bruikbaar in het Energy-dashboard van Home Assistant):**
 
 | Topic-suffix | Home Assistant-entiteit | Omschrijving | Eenheid | Device class / state class |
 |---|---|---|---|---|
 | `sat/power` | `SAT Power` | Geschat warmtevermogen van de ketel: modulatie x ketelcapaciteit (`satboilercapacity`, of `satdhwcapacity` zolang warm tapwater loopt). Niet retained | kW | `power` / `measurement` |
 | `sat/energy_total` | `SAT Energy Total` | Opgetelde warmteafgifte sinds de teller startte. Retained, blijft bewaard na een herstart | kWh | `energy` / `total_increasing` |
 | `sat/energy_estimated_kwh` | `SAT Estimated Gas Input` | Geschatte gasinput: `sat/power` gedeeld door `satboilerefficiency`, begrensd door `satboilerratedkw`. Retained. Alleen gepubliceerd als `satboilerratedkw` groter is dan 0; tot die tijd staat de entiteit op `unknown` | kWh | `energy` / `total_increasing` |
+| `sat/consumption` | `SAT CH Gas Consumption` | Gasverbruik voor verwarming: `satminconsumption` + modulatie/100 x (`satmaxconsumption` - `satminconsumption`) zolang de vlam brandt, de ketel in CV-modus staat en geen warm tapwater maakt; anders 0. Niet retained. Alleen gepubliceerd als beide instellingen boven 0 staan; tot die tijd staat de entiteit op `unknown` | m³/h | `volume_flow_rate` / `measurement` |
+| `sat/consumption_dhw` | `SAT DHW Gas Consumption` | Gasverbruik voor warm tapwater: dezelfde formule zolang de vlam brandt en de ketel warm tapwater actief meldt; anders 0. Niet retained. Zelfde publicatievoorwaarde | m³/h | `volume_flow_rate` / `measurement` |
 
 De entiteit-id's volgen de naamgeving van de andere SAT-sensoren, bijvoorbeeld `sensor.<apparaatnaam>_sat_power`. De instellingen staan in paragraaf 5.20.
 

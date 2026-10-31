@@ -455,7 +455,8 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 | `sat/power` | `"12.5"` | no | Current boiler power (kW, modulation × capacity) |
 | `sat/energy_total` | `"234.5"` | yes | Cumulative energy (kWh, retained for HA energy dashboard) |
 | `sat/energy_estimated_kwh` | `"256.1"` | yes | Estimated gas input (kWh, `sat/power` / `satboilerefficiency`, capped by `satboilerratedkw`). Published only when `satboilerratedkw` > 0 |
-| `sat/consumption` | `"1.180"` | no | Current gas consumption (m³/h, 3 decimals): `satminconsumption` + modulation/100 × (`satmaxconsumption` − `satminconsumption`) while the boiler reports CH mode (status bit 1, as `centralheating`) and the flame is on, else `0`, so a hot-water draw reads `0`. In simulation the simulated flame stands in for CH mode. Published only when both settings are > 0; with either at 0 (the default) the topic is not published (TASK-1484) |
+| `sat/consumption` | `"1.180"` | no | CH gas consumption (m³/h, 3 decimals): `satminconsumption` + modulation/100 × (`satmaxconsumption` − `satminconsumption`) while the flame is on, the boiler reports CH mode (status bit 1, as `centralheating`) and not hot-water active (status bit 2, as `dhwmode`), else `0`. In simulation the simulated flame stands in for CH mode. Published only when both settings are > 0; with either at 0 (the default) the topic is not published (TASK-1484, split TASK-1506) |
+| `sat/consumption_dhw` | `"2.500"` | no | DHW gas consumption (m³/h, 3 decimals), the same formula while the flame is on and the boiler reports hot-water active (status bit 2), else `0`. During a hot-water draw `sat/consumption` reads `0` and this topic carries the value. Always `0` in simulation. Published under the same condition as `sat/consumption` (TASK-1506) |
 
 #### Heating Curve Recommendation
 

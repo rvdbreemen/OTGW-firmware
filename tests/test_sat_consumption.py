@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""TASK-1484: sat/consumption (gas m3/h) follows the min/max consumption settings.
+"""TASK-1484 / TASK-1506: sat/consumption (CH) and sat/consumption_dhw (gas m3/h) follow the min/max settings.
 
 thermo-nova "Current Consumption (Device)" (custom_components/sat/sensor.py:219-262, pinned
 7beaaf5): the sensor exists only when minimum and maximum consumption are both > 0
 (sensor.py:62-66); its value is 0 unless the coordinator is active (for the OpenTherm Gateway via MQTT: the boiler's
 CH-mode bit, coordinator/mqtt/opentherm.py:60-61) and the flame is on (sensor.py:252), otherwise
 min + modulation/100 * (max - min), rounded to 3 decimals (sensor.py:252-259).
+
+TASK-1506 (Sergeant D entries 144, 145): the consumption is split. sat/consumption is the CH value:
+flame on AND the boiler's CH-mode bit (0x02) set AND the DHW-active bit (0x04) not set. The new
+sat/consumption_dhw is flame on AND the DHW-active bit. Both are 0 with the flame off.
 
 Behaviour part: the test cuts the REAL "Gas consumption m3/h" block out of satPublishMQTT() in
 src/OTGW-firmware/SATcontrol.ino (brace-matched from its comment anchor), wraps it in stubs
@@ -36,7 +40,7 @@ from test_sat_published_curve import compile_cpp  # noqa: E402
 REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / "src" / "OTGW-firmware"
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", SRC / "SATcontrol.ino"))
-ANCHOR = "// Gas consumption m3/h (Task #52)."
+ANCHOR = "// Gas consumption m3/h (Task #52)"
 
 STUBS = r"""
 #include <cstdio>
@@ -51,19 +55,25 @@ struct State { SatState sat; };
 struct OTSys { float RelModLevel = 0; unsigned char SlaveStatus = 0; };
 struct SATShadowF { float last; unsigned nextRepublishMs; bool valid; };
 static Settings settings; static State state; static OTSys OTcurrentSystemState;
-static SATShadowF s_consumption;
+static SATShadowF s_consumption, s_consumption_dhw;
 static const float SAT_EPS_FRACTION = 0.005f;
 static bool g_flame = false;
 static bool satIsFlameOn() { return g_flame; }
 static bool isCentralHeatingActive() { return OTcurrentSystemState.SlaveStatus & 0x02; }
-static int g_pub = 0; static char g_topic[64] = ""; static float g_val = -1;
+static bool isDomesticHotWaterActive() { return OTcurrentSystemState.SlaveStatus & 0x04; }
+static int g_pub = 0; static float g_ch = -1, g_dhw = -1; static bool g_haveCh = false, g_haveDhw = false;
 static bool publishIfChangedF(const __FlashStringHelper* t, float v, SATShadowF&, float, int dec, bool) {
-  g_pub++; snprintf(g_topic, sizeof g_topic, "%s", reinterpret_cast<const char*>(t)); g_val = v; (void)dec; return true;
+  g_pub++; (void)dec;
+  const char* n = reinterpret_cast<const char*>(t);
+  if (!strcmp(n, "sat/consumption")) { g_ch = v; g_haveCh = true; }
+  else if (!strcmp(n, "sat/consumption_dhw")) { g_dhw = v; g_haveDhw = true; }
+  else { g_pub += 100; }   // unexpected topic
+  return true;
 }
 """
 
 MAIN = r"""
-// argv: min max satActive flame mod chMode sim
+// argv: min max satActive flame mod slaveStatusBits sim
 int main(int argc, char** argv) {
   if (argc != 8) return 2;
   settings.sat.fMinConsumption = (float)atof(argv[1]);
@@ -71,10 +81,10 @@ int main(int argc, char** argv) {
   state.sat.bActive = atoi(argv[3]) != 0;
   g_flame = atoi(argv[4]) != 0;
   OTcurrentSystemState.RelModLevel = (float)atof(argv[5]);
-  OTcurrentSystemState.SlaveStatus = atoi(argv[6]) ? 0x02 : 0x04;  // CH mode, else DHW mode
+  OTcurrentSystemState.SlaveStatus = (unsigned char)atoi(argv[6]);
   settings.sat.bSimulation = atoi(argv[7]) != 0;
   run_block();
-  printf("pub=%d topic=%s val=%.4f\n", g_pub, g_pub ? g_topic : "-", g_val);
+  printf("pub=%d ch=%s%.4f dhw=%s%.4f\n", g_pub, g_haveCh ? "" : "none:", g_ch, g_haveDhw ? "" : "none:", g_dhw);
   return 0;
 }
 """
@@ -107,41 +117,61 @@ class ConsumptionPublish(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def run_block(self, mn, mx, active, flame, mod, ch=True, sim=False):
+    CH, DHW = 0x02, 0x04
+
+    def run_block(self, mn, mx, active, flame, mod, status=0x02, sim=False):
+        """Returns (publish count, CH value or None, DHW value or None)."""
         if not self.exe:
             self.skipTest("no host C++ compiler")
         out = subprocess.run([str(self.exe), str(mn), str(mx), str(int(active)), str(int(flame)), str(mod),
-                              str(int(ch)), str(int(sim))],
+                              str(status), str(int(sim))],
                              capture_output=True, text=True, check=True).stdout
-        m = re.match(r"pub=(\d+) topic=(\S+) val=(-?[\d.]+)", out)
+        m = re.match(r"pub=(\d+) ch=(none:)?(-?[\d.]+) dhw=(none:)?(-?[\d.]+)", out)
         self.assertIsNotNone(m, out)
-        return int(m.group(1)), m.group(2), float(m.group(3))
+        return (int(m.group(1)), None if m.group(2) else float(m.group(3)),
+                None if m.group(4) else float(m.group(5)))
 
-    def test_formula_when_active_and_flame_on(self):
-        pub, topic, val = self.run_block(0.3, 2.5, True, True, 40)
-        self.assertEqual((pub, topic), (1, "sat/consumption"), "sat/consumption must be published when min/max > 0")
-        self.assertAlmostEqual(val, 0.3 + 0.40 * (2.5 - 0.3), places=4)
+    def flow(self, mod, mn=0.3, mx=2.5):
+        return mn + mod / 100.0 * (mx - mn)
+
+    def test_ch_mode_flame_on_ch_value_dhw_zero(self):
+        pub, ch, dhw = self.run_block(0.3, 2.5, True, True, 40, self.CH)
+        self.assertEqual(pub, 2, "both topics are published when min/max > 0")
+        self.assertAlmostEqual(ch, self.flow(40), places=4)
+        self.assertEqual(dhw, 0.0)
 
     def test_full_and_zero_modulation(self):
-        self.assertAlmostEqual(self.run_block(0.3, 2.5, True, True, 100)[2], 2.5, places=4)
-        self.assertAlmostEqual(self.run_block(0.3, 2.5, True, True, 0)[2], 0.3, places=4)
+        self.assertAlmostEqual(self.run_block(0.3, 2.5, True, True, 100)[1], 2.5, places=4)
+        self.assertAlmostEqual(self.run_block(0.3, 2.5, True, True, 0)[1], 0.3, places=4)
+
+    def test_dhw_active_flame_on_dhw_value_ch_zero(self):
+        pub, ch, dhw = self.run_block(0.3, 2.5, True, True, 40, self.DHW)
+        self.assertEqual(pub, 2)
+        self.assertAlmostEqual(dhw, self.flow(40), places=4)
+        self.assertEqual(ch, 0.0, "a hot-water draw is not CH consumption")
+
+    def test_dhw_active_with_ch_bit_still_set_counts_as_dhw_only(self):
+        # Entry 145: CH consumption is flame AND CH bit AND NOT DHW bit. A boiler that keeps the CH
+        # bit while it makes hot water must not be counted twice.
+        _, ch, dhw = self.run_block(0.3, 2.5, True, True, 40, self.CH | self.DHW)
+        self.assertEqual(ch, 0.0)
+        self.assertAlmostEqual(dhw, self.flow(40), places=4)
 
     def test_zero_when_flame_off(self):
-        self.assertEqual(self.run_block(0.3, 2.5, True, False, 40)[:2], (1, "sat/consumption"))
-        self.assertEqual(self.run_block(0.3, 2.5, True, False, 40)[2], 0.0)
+        for status in (self.CH, self.DHW, self.CH | self.DHW):
+            pub, ch, dhw = self.run_block(0.3, 2.5, True, False, 40, status)
+            self.assertEqual((pub, ch, dhw), (2, 0.0, 0.0), f"status {status:#x}")
 
-    def test_zero_when_boiler_not_in_ch_mode(self):
-        # thermo-nova sensor.py:252 returns 0 unless coordinator.active, which the OTGW-via-MQTT
-        # coordinator reads from the boiler's CH-mode bit (coordinator/mqtt/opentherm.py:60-61).
-        # A hot-water draw (DHW bit, flame on, SAT loop running) is not CH: 0.
-        self.assertEqual(self.run_block(0.3, 2.5, True, True, 40, ch=False)[:2], (1, "sat/consumption"))
-        self.assertEqual(self.run_block(0.3, 2.5, True, True, 40, ch=False)[2], 0.0, "DHW draw must read 0")
+    def test_flame_on_without_ch_or_dhw_bit_is_zero(self):
+        self.assertEqual(self.run_block(0.3, 2.5, True, True, 40, 0x00)[1:], (0.0, 0.0))
 
     def test_simulation_flame_stands_in_for_ch_mode(self):
         # Simulation has no boiler status; the thermo-nova simulator's flame implies active
-        # (coordinator/simulator/__init__.py:58-63).
-        self.assertAlmostEqual(self.run_block(0.3, 2.5, True, True, 40, ch=False, sim=True)[2], 0.3 + 0.4 * 2.2, places=4)
-        self.assertEqual(self.run_block(0.3, 2.5, True, False, 40, ch=False, sim=True)[2], 0.0)
+        # (coordinator/simulator/__init__.py:58-63). No DHW draw in simulation.
+        _, ch, dhw = self.run_block(0.3, 2.5, True, True, 40, 0x00, sim=True)
+        self.assertAlmostEqual(ch, self.flow(40), places=4)
+        self.assertEqual(dhw, 0.0)
+        self.assertEqual(self.run_block(0.3, 2.5, True, False, 40, 0x00, sim=True)[1:], (0.0, 0.0))
 
     def test_not_published_unless_both_settings_above_zero(self):
         for mn, mx in ((0, 0), (0.3, 0), (0, 2.5)):

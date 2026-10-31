@@ -3240,7 +3240,7 @@ dropRate = -slope * 3600                              (bar/h, positive = falling
 
 The FIFO holds up to 121 samples taken at least 30 s apart and evicts samples older than 3600 s (SATcontrol.ino:3945-3947, SATcontrol.ino:3995, SATcontrol.ino:4007), so the regression spans the last hour since the most recent master CH enable change (TASK-1480). Before TASK-1480 the ring held 20 samples, roughly 10 min at a 30 s tick.
 
-**Gas consumption** (SATcontrol.ino:3061-3077): the code exists, but `minCons` and `maxCons` are hard-coded 0.0, so the block never publishes; the comment calls it "currently dead".
+**Gas consumption** (SATcontrol.ino, block "Gas consumption m3/h"): from the `satminconsumption` / `satmaxconsumption` settings (TASK-1484); published only when both are > 0. Two topics (TASK-1506, Sergeant D entries 144/145): `sat/consumption` = min + modulation/100 x (max - min) while the flame is on AND the boiler CH-mode bit (status bit 1) is set AND the DHW-active bit (status bit 2) is not set, else 0; `sat/consumption_dhw` = the same value while the flame is on AND the DHW-active bit is set, else 0. Both are 0 with the flame off. thermo-nova has one sensor (sensor.py:219-259); the split is the firmware's. Simulation: the simulated flame stands in for CH mode and there is no DHW draw. Home Assistant sensors `SAT CH Gas Consumption` / `SAT DHW Gas Consumption` (`volume_flow_rate`, m³/h, `measurement`).
 
 <a id="s7-constants-and-defaults-table-name-value-unit-cit"></a>
 

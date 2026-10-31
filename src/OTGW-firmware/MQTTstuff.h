@@ -180,6 +180,7 @@ enum class HaUnit : uint8_t {
     kW_percent,         // "kW/%" (MaxCapacity composite)
     bytes,              // "B" (bytes, used by heap-diag sensors)
     L,                  // "L" (litres, dhw_water_total; TASK-1123)
+    m3_h,               // "m³/h" (gas consumption rate, sat/consumption; TASK-1506)
     _count
 };
 

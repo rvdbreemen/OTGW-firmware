@@ -4075,7 +4075,7 @@ void satPublishMQTT()
   static SATShadowF s_valve_offset;
   static SATShadowF s_area_0, s_area_1, s_area_2, s_area_3;
   static SATShadowF s_summer_simmer_index;
-  static SATShadowF s_dhw_setpoint, s_max_setpoint, s_requested_setpoint, s_consumption;
+  static SATShadowF s_dhw_setpoint, s_max_setpoint, s_requested_setpoint, s_consumption, s_consumption_dhw;
   static SATShadowF s_heating_curve_coeff;
   static SATShadowF s_flame_off_offset, s_flow_offset, s_mod_sup_delay, s_mod_sup_offset;
   static SATShadowF s_boiler_capacity, s_dhw_capacity, s_boiler_rated_kw, s_boiler_efficiency;
@@ -4445,27 +4445,35 @@ void satPublishMQTT()
     publishIfChangedF(F("sat/requested_setpoint"), reqSp, s_requested_setpoint, SAT_EPS_TEMP_COARSE, 1, false);
   }
 
-  // Gas consumption m3/h (Task #52). TASK-1484: from the satminconsumption /
-  // satmaxconsumption settings, thermo-nova "Current Consumption (Device)":
-  // published only when both are > 0 (sensor.py:62-66); 0 unless the boiler is
-  // in CH mode and the flame is on, else min + modulation/100 * (max - min),
-  // 3 decimals (sensor.py:252-259). "CH mode" is the boiler's status bit 1, the
-  // bit thermo-nova's OpenTherm-Gateway-via-MQTT coordinator reads as `active`
-  // (coordinator/mqtt/opentherm.py:60-61, our centralheating topic), so a hot-water
-  // draw reads 0. Simulation has no boiler status: its flame stands in for CH mode,
-  // as the thermo-nova simulator (coordinator/simulator/__init__.py:58-63).
+  // Gas consumption m3/h (Task #52), split in CH and DHW (TASK-1506, Sergeant D entries
+  // 144/145). Both come from the satminconsumption / satmaxconsumption settings, thermo-nova
+  // "Current Consumption (Device)" formula: published only when both are > 0 (sensor.py:62-66);
+  // 0 while the flame is off, else min + modulation/100 * (max - min), 3 decimals
+  // (sensor.py:252-259). thermo-nova has one sensor, so the split is ours:
+  //   sat/consumption     flame on AND boiler CH-mode bit (status bit 1, thermo-nova's `active`,
+  //                       coordinator/mqtt/opentherm.py:60-61) AND NOT the DHW-active bit (bit 2);
+  //   sat/consumption_dhw flame on AND the DHW-active bit.
+  // A hot-water draw therefore reads 0 on the CH topic and the full value on the DHW topic.
+  // Simulation has no boiler status: its flame stands in for CH mode (as the thermo-nova
+  // simulator, coordinator/simulator/__init__.py:58-63) and it has no DHW draw.
   {
     float minCons = settings.sat.fMinConsumption;
     float maxCons = settings.sat.fMaxConsumption;
     if (minCons > 0 && maxCons > 0) {
-      float consumption = 0.0f;
+      float chConsumption = 0.0f;
+      float dhwConsumption = 0.0f;
       bool flame = satIsFlameOn();
-      bool chActive = settings.sat.bSimulation ? flame : isCentralHeatingActive();
-      if (chActive && flame) {
+      if (flame) {
+        bool sim = settings.sat.bSimulation;
+        bool dhwActive = !sim && isDomesticHotWaterActive();
+        bool chActive = sim ? true : (isCentralHeatingActive() && !dhwActive);
         float modFrac = OTcurrentSystemState.RelModLevel / 100.0f;
-        consumption = minCons + (modFrac * (maxCons - minCons));
+        float flow = minCons + (modFrac * (maxCons - minCons));
+        if (dhwActive)    dhwConsumption = flow;
+        else if (chActive) chConsumption = flow;
       }
-      publishIfChangedF(F("sat/consumption"), consumption, s_consumption, SAT_EPS_FRACTION, 3, false);
+      publishIfChangedF(F("sat/consumption"),     chConsumption,  s_consumption,     SAT_EPS_FRACTION, 3, false);
+      publishIfChangedF(F("sat/consumption_dhw"), dhwConsumption, s_consumption_dhw, SAT_EPS_FRACTION, 3, false);
     }
   }
 
