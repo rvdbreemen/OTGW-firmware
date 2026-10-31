@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-31T13:48:00Z'
-updated_date: '2026-10-31T15:00:00Z'
+updated_date: '2026-10-31T16:15:00Z'
 labels:
   - sat
   - design
@@ -39,4 +39,6 @@ Robert 2026-10-31: 'de warmtepomp moet minimaal schakelen. Dus goal voor warmtep
 2026-10-31 round 13 (docs/sat/sim-hp-lowload/round13.md): 16 options, heat-pump mode only, 576 winters. Degree minutes (NIBE method) and room hysteresis dominate long PWM and minimum-run PWM; dm 120: 4.2 starts/day 0.136 C; rh 0.1: 5.3 / 0.102 C; today's pwm 40: 32 / 0.296 C. Recommendation: degree-minute mode for on/off heat pumps (start -120 DM, stop 0, min 20 on / 10 off).
 
 2026-10-31 round 14 (entry 184, docs/sat/sim-hp-lowload/round14.md): third HP PWM option 7200 s. Real-code test via the tests/test_sat_hp_pwm.py harness on patched copies: 9/9 new 7200 s cases pass, 26/27 existing pass (the setter test now sees 3 options, intended). Sim: on/off UFH 42 -> 10 starts/day, abs err 0.29 -> 0.31-0.36; hp30 radiators 6.4 -> 3.4 starts, RMS 0.155 -> 0.331; hp60 30 -> 19, RMS 0.183 -> 0.452. Time-proportional 120 keeps the starts with better comfort; degree minutes best.
+
+2026-10-31 rounds 16-17 (docs/sat/sim-hp-lowload/round16.md, round17.md, charts round16_vs_current.png, round17_period_sweep.png): degree minutes on all HP types vs today's SAT PWM 30 min, and SAT's own PWM extended to 240 min. Extending SAT PWM always trades starts for comfort (fixed ON time per period); at equal starts degree minutes are far better on radiators (hp30 3.7 starts 0.224 C vs PWM120 3.6 starts 0.365 C); on underfloor time-proportional improves with period, SAT PWM worsens; DM best. DM benefit depends on emitter mass (UFH -90 % starts and better comfort; radiators trade-off).
 <!-- SECTION:NOTES:END -->

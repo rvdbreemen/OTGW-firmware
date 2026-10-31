@@ -178,7 +178,47 @@ def tune_rounds():
         style(ax, "Overshoot margin, no tuner: minutes per day outside +-0.3 C (lower = better)", "winter / heat source", "minutes per day")
         save(f, os.path.join(TUNE, "round11_margin.png"), "TASK-1519 round 11: calibrated model, indicative (acts through PWM entry). Source: data/round11_runs.json")
 
+def period_sweep():
+    """Round 17: SAT PWM period 30..240 min against degree minutes (round 15/16) and time-proportional, per type."""
+    R = load("round17_hp_period_sweep_runs.json"); r16 = load("round16_hp_dm_runs.json"); r15 = load("round15_hp_season_runs.json")
+    if not (R and r16 and r15): return
+    import matplotlib.pyplot as plt
+    f, grid = plt.subplots(2, 3, figsize=(15, 9), facecolor=SURFACE)
+    panels = [("rad", "hp30", "Radiators, modulating 30 %"), ("rad", "hp60", "Radiators, modulating 60 %"), ("rad", "hp100", "Radiators, on/off"),
+              ("ufh", True, "Underfloor, on/off, heavy floor"), ("ufh", False, "Underfloor, on/off, light floor")]
+    grid[1][2].axis("off")
+    def curve(ax, pts, fam, name):
+        c, mk, _ = FAM[fam]
+        xs = [x for x, y, l in pts]; ys = [y for x, y, l in pts]
+        ax.plot(xs, ys, color=c, linewidth=2, zorder=2)
+        ax.scatter(xs, ys, s=50, color=c, marker=mk, edgecolors=SURFACE, linewidths=1.5, zorder=3, label=name)
+        for x, y, l in pts: ax.annotate(l, (x, y), xytext=(5, 3), textcoords="offset points", fontsize=7, color=INK)
+    for ax, (plant, key, title) in zip([grid[0][0], grid[0][1], grid[0][2], grid[1][0], grid[1][1]], panels):
+        if plant == "rad":
+            pw = [(st.mean(r["starts_per_day"] for w, rs in R.items() for r in rs if r["plant"] == "rad" and r["source"] == key and r["period_min"] == p),
+                   st.mean(r["rms"] for w, rs in R.items() for r in rs if r["plant"] == "rad" and r["source"] == key and r["period_min"] == p), f"{p}") for p in (30, 40, 60, 90, 120, 180, 240)]
+            dm = [(st.mean(r["starts_per_day"] for w, rs in r16.items() for r in rs if r["source"] == key and r["mode"] == "dm" and r["par"] == d),
+                   st.mean(r["rms"] for w, rs in r16.items() for r in rs if r["source"] == key and r["mode"] == "dm" and r["par"] == d), f"-{d}") for d in (60, 120, 240, 480)]
+            curve(ax, pw, "today", "SAT PWM, period in minutes"); curve(ax, dm, "dm", "degree minutes, start at -S")
+            yl = "room RMS error (C)"
+        else:
+            sel = lambda r: r["plant"] == "ufh" and (r["screed"] > 5e6) == key
+            pw = [(st.mean(r["starts_per_day"] for w, rs in R.items() for r in rs if sel(r) and r["variant"] == "pwm" and r["period_min"] == p),
+                   st.mean(r["mean_abs_err"] for w, rs in R.items() for r in rs if sel(r) and r["variant"] == "pwm" and r["period_min"] == p), f"{p}") for p in (30, 40, 60, 90, 120, 180, 240)]
+            tp = [(st.mean(r["starts_per_day"] for w, rs in R.items() for r in rs if sel(r) and r["variant"] == "tp" and r["period_min"] == p),
+                   st.mean(r["mean_abs_err"] for w, rs in R.items() for r in rs if sel(r) and r["variant"] == "tp" and r["period_min"] == p), f"{p}") for p in (60, 120, 240)]
+            sel15 = lambda r: r.get("plant") == "onoff_ufh" and (r["screed"] > 5e6) == key
+            dm = [(st.mean(r["starts_per_day"] for w, rs in r15.items() for r in rs if sel15(r) and r["variant"] == "dm" and r["par"] == d),
+                   st.mean(r["mean_abs_err"] for w, rs in r15.items() for r in rs if sel15(r) and r["variant"] == "dm" and r["par"] == d), f"-{d}") for d in (120, 240)]
+            curve(ax, pw, "today", "SAT PWM, period in minutes"); curve(ax, tp, "tp", "time-proportional, period"); curve(ax, dm, "dm", "degree minutes")
+            yl = "mean |room - target| (C)"
+        ax.set_xscale("log"); ax.set_xticks([1, 2, 5, 10, 20, 50]); ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter()); ax.minorticks_off()
+        ax.legend(fontsize=7, frameon=False, labelcolor=INK, loc="lower right")
+        style(ax, title, "starts per day (log scale)", yl)
+    save(f, os.path.join(HP, "round17_period_sweep.png"), "TASK-1527 round 17: SAT's own PWM period extended 30 -> 240 min (labels = minutes) vs degree minutes (rounds 15/16). "
+         "Right = more starts, up = worse comfort; today = SAT PWM 30. Full seasons Oct-Apr. Model, indicative.")
+
 if __name__ == "__main__":
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else "all"
-    if only in ("all", "hp"): hp_rounds()
+    if only in ("all", "hp"): hp_rounds(); period_sweep()
     if only in ("all", "tune"): tune_rounds()
