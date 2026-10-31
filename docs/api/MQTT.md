@@ -399,7 +399,7 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 | ----- | ----- | -------- | ----------- |
 | `sat/boiler_status` | `"at_setpoint"` | no | Boiler status name (see table below) |
 | `sat/flame_status` | `"HEALTHY"` | no | Flame health status string, upper case (see table below) |
-| `sat/flame_health` | `"ON"` / `"OFF"` | yes | Problem binary: ON = flame problem (`STUCK_ON`, `STUCK_OFF`, `PWM_SHORT`, `SHORT_CYCLING`), OFF = no problem. Not published while the flame status is `INSUFFICIENT_DATA` |
+| `sat/flame_health` | `"ON"` / `"OFF"` | yes | Problem binary: ON = flame problem (`STUCK_ON`, `STUCK_OFF`, `PWM_SHORT`, `SHORT_CYCLING`), OFF = no problem. Not published while the flame status is `INSUFFICIENT_DATA`. The REST `detail=full` health JSON `flame_health`, `device_health` and `cycle_health` use the same polarity and meaning since TASK-1496 (`flame_health` is `null` instead of unpublished) |
 | `sat/cycle_class` | `"good"` | no | Last cycle classification string (see table below) |
 | `sat/cycle_attributes` | JSON | no | Cycle attributes `{"kind","sample_count","duration_seconds","max_flow_temperature","fraction_space_heating","fraction_domestic_hot_water"}`; `kind` is `UNKNOWN` / `CENTRAL_HEATING` / `DOMESTIC_HOT_WATER` / `MIXED`. Republished when a cycle ends |
 | `sat/cycle_health` | `"ON"` / `"OFF"` | yes | Problem binary: ON when the last cycle class is `overshoot`, `underheat`, `underheat_pwm` or `short` |
@@ -1072,7 +1072,7 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 
 | Topic Suffix | Bound SAT setting | Notes |
 | ------------ | ----------------- | ----- |
-| `sat/heating_curve_coeff` | `SATcoefficient` | Heating curve coefficient (state echo: `sat/heating_curve_coeff`; the state topic `sat/heating_curve` is the computed curve value). Renamed from `sat/heating_curve` in TASK-1485, no alias: the old command is ignored |
+| `sat/heating_curve_coeff` | `SATcoefficient` | Heating curve coefficient (state echo: `sat/heating_curve_coeff`; the state topic `sat/heating_curve` is the computed curve value). Renamed from `sat/heating_curve` in TASK-1485, no alias: the old command is ignored. The REST setting `POST /api/v2/sat/settings/heating_curve_coeff` uses the same name since TASK-1496 |
 | `sat/interval` | `SATinterval` | Control loop interval (seconds) |
 | `sat/overshoot_margin` | `SATovershootmargin` | Overshoot margin (°C) |
 | `sat/manufacturer` | `SATmanufacturer` | Boiler manufacturer name |

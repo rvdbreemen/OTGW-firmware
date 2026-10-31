@@ -5124,3 +5124,28 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot TASK-1502: B"
 
 **Settled (option B as posted):** a PWM ON phase that started with the flame burning, is interrupted by a hot-water draw, and gets no CH flame after the draw: the 180 s minimum-burn hold lapses and the ON phase ends on its normal ON time (270 s in the posted example, not 390 s). The hold protects a burning flame only. Compared: thermo-nova measures the hold from the flame-on time by the clock and never freezes it (pwm.py:144-146, :200-202, opened at the pin before the question); firmware alpha.564 (TASK-1502, SATcontrol.ino satPwmOnDhwStart / satPwmDhwResume / hold-anchor guard) freezes the hold clock through the draw and the post-draw wait and then applies the rest of the hold without a flame (option A, today). **Task:** TASK-1518 (implement). **Open:** Q-1502b (a draw after the first-flame wait had already timed out) is asked next.
+
+## 159. TASK-1519 is developed in #dev-sat-mqtt (2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 06:10 UTC, #dev-sat-mqtt, msg 1565971111873875971 (https://discord.com/channels/812969634638725140/1105556725714649128/1565971111873875971).
+
+**Quoted:** "@BlueFlame Bot let's keep development of the task-1519 in this channel. Ask any related questions here"
+
+**Settled:** questions and results for TASK-1519 (heating-curve self-tune) go to #dev-sat-mqtt, in line with Robert's rule of the same morning (new developments in the dev channel, existing features in #alpha-testing). Not a behaviour statement. **Task:** TASK-1519. **Open:** none.
+
+## 160. TASK-1519: the self-tune runs only with the sun elevation below 12 degrees (2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 06:17 UTC, #dev-sat-mqtt, msg 1565972984202657914 (https://discord.com/channels/812969634638725140/1105556725714649128/1565972984202657914), on Q-1519a.
+
+**Quoted:** "@BlueFlame Bot the self tuning should be started as procedure when the sun elevation is below 12°. This way we will have real data because sun affects the calculation"
+
+**Settled:** an evaluation hour counts only while the sun elevation is below 12 degrees, so solar gain does not bias the signal. Compared: thermo-nova has no curve self-tune (entry 72 removed the firmware one); the firmware has a sun elevation only when it is pushed over MQTT/REST (SATcontrol.ino:2543-2551 satHandleSunElevation); a local computation is TASK-1410 (To Do). **Interpretation (ours):** without a valid sun elevation the tuner does not run. **Task:** TASK-1519 (design), TASK-1410 (dependency). **Open:** what to do when no sun elevation is available.
+
+## 161. TASK-1519: tune only while SAT is in charge; the integral is the signal; no sun during the calculation (2026-10-31)
+
+**Source:** sergeantd, 2026-10-31 06:28 UTC, #dev-sat-mqtt, msg 1565975696591953951 (https://discord.com/channels/812969634638725140/1105556725714649128/1565975696591953951), on Q-1519a and the simulation.
+
+**Quoted:** "@BlueFlame Bot we should start the autotune of the curve when SAT is in charge. As you said integral is the most crucial part. This will give us the clue about the curve needs to be higher-lower. Also there must be no sun during the calculation."
+
+**Settled:** the tuner runs only while SAT is the active controller, and only without sun (entry 160).
+**Conflict, put back to him as Q-1519b (not resolved by us):** he chooses the integral as the signal. thermo-nova zeroes the integral whenever |error| > DEADBAND 0.1 (pid.py `_update_integral`, opened at the pin 2026-10-31), so with a wrong curve the integral stays 0. In our simulation (scripts/sat_curve_selftune_sim.py) the integral-sign tuner therefore never moved from a too-low curve and hunted within the deadband (325-379 flash writes in 3 weeks). The PID correction (setpoint minus curve, our A3) worked both ways. **Task:** TASK-1519. **Open:** Q-1519b.

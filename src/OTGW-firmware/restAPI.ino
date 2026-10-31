@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.566
+**  Version  : v2.0.0-alpha.567
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -996,14 +996,20 @@ static void satSendHealthJSON()
   // CH sync: computed the same way as the MQTT publisher (SATcontrol.ino)
   bool boilerCHActive  = (OTcurrentSystemState.SlaveStatus & 0x02) != 0;
   bool syncCH          = (state.sat.bActive != boilerCHActive);
-  bool flameHealth     = !state.sat.bSafetyTripped;
-  bool deviceHealth    = (state.sat.eBoilerStatus != SAT_BS_OFF)
-                      && (state.sat.eBoilerStatus != SAT_BS_STALLED_IGNITION);
+  // The three health fields follow the MQTT sat/*_health contract (TASK-1496, TASK-1485):
+  // true = problem, same meaning as the topics in SATcontrol.ino satPublishMQTT().
+  // flame_health is null while the flame status is INSUFFICIENT_DATA (MQTT publishes nothing then).
+  const SATFlameStatus fs = state.sat.eFlameStatus;
+  const bool flameKnown   = (fs != SAT_FS_INSUFFICIENT_DATA);
+  bool flameProblem    = (fs == SAT_FS_STUCK_ON || fs == SAT_FS_STUCK_OFF ||
+                          fs == SAT_FS_PWM_SHORT || fs == SAT_FS_SHORT_CYCLING);
+  // device_health: true while the boiler status has not been evaluated yet since boot
+  bool deviceProblem   = !state.sat.bBoilerStatusKnown;
   const SATCycleClass lcc = satReportedLastCycleClass(state.sat, millis());
-  bool cycleHealth     = (lcc != SAT_CYCLE_OVERSHOOT)
-                      && (lcc != SAT_CYCLE_UNDERHEAT)
-                      && (lcc != SAT_CYCLE_UNDERHEAT_PWM)
-                      && (lcc != SAT_CYCLE_SHORT);
+  bool cycleProblem    = (lcc == SAT_CYCLE_OVERSHOOT)
+                      || (lcc == SAT_CYCLE_UNDERHEAT)
+                      || (lcc == SAT_CYCLE_UNDERHEAT_PWM)
+                      || (lcc == SAT_CYCLE_SHORT);
 
   // --- Cycle class / kind names (kept in PROGMEM via static const) ---
   static const char* const ccNames[] = {
@@ -1050,10 +1056,11 @@ static void satSendHealthJSON()
     je.field(F("error_samples"),       (int32_t)state.sat.iErrorSampleCount);
     je.field(F("heating_curve_recommendation"), state.sat.sHeatCurveRec);
 
-    // Health booleans (AC#7)
-    je.field(F("flame_health"),        flameHealth);
-    je.field(F("device_health"),       deviceHealth);
-    je.field(F("cycle_health"),        cycleHealth);
+    // Problem booleans, true = problem (TASK-1496; AC#7)
+    if (flameKnown) je.field(F("flame_health"), flameProblem);
+    else            je.fieldRawP(F("flame_health"), PSTR("null"));
+    je.field(F("device_health"),       deviceProblem);
+    je.field(F("cycle_health"),        cycleProblem);
     je.field(F("cycle_class"),         ccNames[ccIdx]);
 
     je.endObject();                   // close root
@@ -1681,7 +1688,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATmultiarea", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("multi_area_count")) == 0) {
       updateSetting("SATmultiareacount", val); handled = true;
-    } else if (strcasecmp_P(settingName, PSTR("heating_curve")) == 0) {
+    } else if (strcasecmp_P(settingName, PSTR("heating_curve_coeff")) == 0) {
       updateSetting("SATcoefficient", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("mod_sup_delay")) == 0) {
       updateSetting("SATmodsupdelay", val); handled = true;

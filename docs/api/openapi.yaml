@@ -4007,7 +4007,7 @@ paths:
       description: |
         Updates any named SAT setting. This mirrors all MQTT `sat/<name>` command
         handlers. The setting name corresponds to the MQTT subtopic (e.g.,
-        `heating_curve`, `deadband`, `boiler_capacity`, `heating_system`,
+        `heating_curve_coeff`, `deadband`, `boiler_capacity`, `heating_system`,
         `overshoot_margin`, `manufacturer`, `simulation`, etc.).
 
         The special no-value command `reset_integral` is also accepted here
@@ -4022,8 +4022,8 @@ paths:
           required: true
           schema:
             type: string
-          description: SAT setting name (e.g., `heating_curve`, `deadband`, `boiler_capacity`)
-          example: "heating_curve"
+          description: SAT setting name (e.g., `heating_curve_coeff`, `deadband`, `boiler_capacity`)
+          example: "heating_curve_coeff"
       requestBody:
         required: false
         content:
@@ -4375,10 +4375,10 @@ components:
           description: "Boiler flow setpoint differs from commanded"
         curve_recommendation:
           type: string
-          description: "Heating-curve tuning recommendation (insufficient/raise/lower/ok)"
+          description: "Hourly heating-curve recommendation: insufficient / increase / decrease / hold"
         heating_curve_recommendation:
           type: string
-          description: "Heating-curve recommendation (duplicate of curve_recommendation)"
+          description: "Daily-median heating-curve recommendation: insufficient / increase / decrease / hold (lower case since TASK-1485)"
         mean_error:
           type: number
           description: "Mean PID error over the sample window (C)"
@@ -4678,16 +4678,26 @@ components:
           description: "Number of PID error samples collected"
         heating_curve_recommendation:
           type: string
-          description: "Heating-curve tuning recommendation (insufficient/raise/lower/ok)"
+          description: "Daily-median heating-curve recommendation: insufficient / increase / decrease / hold (lower case since TASK-1485)"
         flame_health:
-          type: boolean
-          description: "Flame behaviour considered healthy"
+          type: [boolean, "null"]
+          description: |
+            Problem flag, same meaning as MQTT `sat/flame_health`: true = flame problem
+            (STUCK_ON, STUCK_OFF, PWM_SHORT or SHORT_CYCLING), false = no problem, null while
+            the flame status is INSUFFICIENT_DATA. BREAKING (TASK-1496): before, true = no
+            safety trip.
         device_health:
           type: boolean
-          description: "Overall device health OK"
+          description: |
+            Problem flag, same meaning as MQTT `sat/device_health`: true while the boiler
+            status has not been evaluated yet since boot. BREAKING (TASK-1496): before,
+            true = status not OFF and not STALLED_IGNITION.
         cycle_health:
           type: boolean
-          description: "Cycling behaviour considered healthy"
+          description: |
+            Problem flag, same meaning as MQTT `sat/cycle_health`: true when the last cycle
+            class is overshoot, underheat, underheat_pwm or short. BREAKING (TASK-1496):
+            the polarity is inverted, before true = no such class.
         cycle_class:
           type: string
           description: "Last cycle classification (none/good/overshoot/underheat/short/uncertain)"
@@ -4710,9 +4720,9 @@ components:
         error_stddev: 0.0
         error_samples: 0
         heating_curve_recommendation: "insufficient"
-        flame_health: true
-        device_health: false
-        cycle_health: true
+        flame_health: null
+        device_health: true
+        cycle_health: false
         cycle_class: "none"
         ovp_phase: 0
 

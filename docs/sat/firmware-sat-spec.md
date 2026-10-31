@@ -1404,7 +1404,7 @@ On PIC boards the last `CS=` (when ≥ 8 °C) is re-sent every 30 s (SATcontrol.
 **Heating curve recommendation** (advisory only). Two separate mechanisms exist:
 
 1. Hourly (SATcontrol.ino:3495-3545): once per hour, while SAT is active, the PID error (target minus room) is stored in a 24-slot ring. With fewer than 6 samples the result is `insufficient`. Otherwise the mean is compared with `2 * fDeadband`: above gives `increase` (room too cold), below the negative gives `decrease`, otherwise `hold`. Published as `sat/curve_recommendation` with attributes (SATcontrol.ino:2899-2914).
-2. Daily median (SATcycles.ino:1201-1289): on every control tick a sample `room - target` is stored (SATcontrol.ino:4799, SATcycles.ino:1205), the opposite sign of mechanism 1. At each new UTC day (time / 86400) the median of that day's samples is committed (SATcycles.ino:1214-1233). With 3 days stored, 3 days in a row below -0.5 give `INCREASE`, above 0.5 give `DECREASE`, otherwise `HOLD` (SATcycles.ino:1254-1278). Published as `sat/heating_curve_recommendation` (SATcontrol.ino:2917).
+2. Daily median (SATcycles.ino:1201-1289): on every control tick a sample `room - target` is stored (SATcontrol.ino:4799, SATcycles.ino:1205), the opposite sign of mechanism 1. At each new UTC day (time / 86400) the median of that day's samples is committed (SATcycles.ino:1214-1233). With 3 days stored, 3 days in a row below -0.5 give `increase`, above 0.5 give `decrease`, otherwise `hold` (SATcycles.ino:1254-1278; lower case since TASK-1485). Published as `sat/heating_curve_recommendation` (SATcontrol.ino:2917).
 
 Neither mechanism writes the coefficient. The firmware-only hourly auto-tune that did was removed (TASK-1413, entry 72).
 
@@ -2422,10 +2422,10 @@ The buffer sizes are the same for the OTGW32, Classic-S3 and combo builds: the c
 - `sat/4h_*` (SATcontrol.ino:2802-2810).
 - `sat/flame_status`, and `sat/flame_health` ON when STUCK_ON, STUCK_OFF, PWM_SHORT or SHORT_CYCLING, not published while INSUFFICIENT_DATA (SATcontrol.ino:2826-2847).
 - `sat/modulation_reliable` (SATcontrol.ino:2893).
-- `sat/device_health`: ON when the boiler status is `OFF` (SATcontrol.ino:3000-3002).
+- `sat/device_health`: ON while the boiler status has not been evaluated yet since boot (`!bBoilerStatusKnown`), thermo-nova's `INSUFFICIENT_DATA` (SATcontrol.ino:4258-4260; TASK-1485).
 - `sat/cycle_health`: ON when the last class is OVERSHOOT, UNDERHEAT, UNDERHEAT_PWM or SHORT (SATcontrol.ino:3003-3009).
 
-**REST / status JSON:** cycle count, cycles this hour, last class, maximum flow, overshoot seconds, EMAs, the TASK-891.4 metrics, the 24 h values, phase and phase duration (SATcontrol.ino:2368-2389). The `detail=full` health JSON reports `sync_modulation` = not reliable, `device_health` = status not OFF and not STALLED_IGNITION, `cycle_health` = class not OVERSHOOT/UNDERHEAT/UNDERHEAT_PWM/SHORT (restAPI.ino:1017-1031), and cycle kind, duration, count and fractions (restAPI.ino:1066-1070). Note that MQTT `device_health` ON means a problem, while REST `device_health` true means healthy (SATcontrol.ino:3000-3002, restAPI.ino:1026-1027).
+**REST / status JSON:** cycle count, cycles this hour, last class, maximum flow, overshoot seconds, EMAs, the TASK-891.4 metrics, the 24 h values, phase and phase duration (SATcontrol.ino:2368-2389). The `detail=full` health JSON reports `sync_modulation` = not reliable, and `flame_health`, `device_health` and `cycle_health` with the same polarity and meaning as the MQTT topics, true = problem (restAPI.ino:998-1012, restAPI.ino:1059-1063; TASK-1496): `flame_health` true for STUCK_ON, STUCK_OFF, PWM_SHORT or SHORT_CYCLING and `null` while the flame status is INSUFFICIENT_DATA, `device_health` true while the boiler status has not been evaluated yet, `cycle_health` true for class OVERSHOOT/UNDERHEAT/UNDERHEAT_PWM/SHORT. Before TASK-1496 the three were true = healthy with a different meaning (`flame_health` = no safety trip, `device_health` = status not OFF and not STALLED_IGNITION). The JSON also carries cycle kind, duration, count and fractions.
 
 <a id="s5-edge-cases"></a>
 
@@ -2965,7 +2965,7 @@ This section covers these firmware features:
 
 The firmware also has "Rolling 4-hour window statistics" and a "Rolling 24-hour DAILY window" (SATcycles.ino:303-308, SATcycles.ino:399-475). These are statistics of heating cycles (on/off times, overshoot and underheat fractions), not of the room error (SATcycles.ino:325-340, SATcycles.ino:445-454). They belong to the cycle section of this specification.
 
-**Health sensors.** MQTT topics with payload "ON"/"OFF" for setpoint sync, modulation sync, CH sync, pressure health, device health and cycle health (SATcontrol.ino:3083-3118, SATcontrol.ino:2886, SATcontrol.ino:3000-3009). A tree-wide search of `src/OTGW-firmware` for the strings `pressure_health`, `device_health`, `cycle_health`, `setpoint_sync`, `modulation_sync` and `ch_sync` found them only in SATcontrol.ino and SATmqttPublish.h, plus `device_health` and `cycle_health` in restAPI.ino (the generated `OTGW-firmware.ino.cpp` build copy aside), so no Home Assistant discovery entry for them was found (search result, see "Not found" item 1). Window detection is a single flag set by an MQTT or REST command, not a group of sensors (MQTTstuff.ino:627-632, restAPI.ino:1383-1397, SATcontrol.ino:1098-1123).
+**Health sensors.** MQTT topics with payload "ON"/"OFF" for setpoint sync, modulation sync, CH sync, pressure health, device health and cycle health (SATcontrol.ino:4150, SATcontrol.ino:4258-4267). A tree-wide search of `src/OTGW-firmware` for the strings `pressure_health`, `device_health`, `cycle_health`, `setpoint_sync`, `modulation_sync` and `ch_sync` found them only in SATcontrol.ino and SATmqttPublish.h, plus `device_health` and `cycle_health` in restAPI.ino (the generated `OTGW-firmware.ino.cpp` build copy aside), so no Home Assistant discovery entry for them was found (search result, see "Not found" item 1). Window detection is a single flag set by an MQTT or REST command, not a group of sensors (MQTTstuff.ino:627-632, restAPI.ino:1383-1397, SATcontrol.ino:1098-1123).
 
 <a id="s7-inputs"></a>
 
@@ -3004,7 +3004,7 @@ The BLE sensor humidity is stored in `state.sat.fBleHumidity` (SATble.ino) and p
 
 **Pressure health** inputs: `OTcurrentSystemState.CHPressure` in bar (default 0.0) (SATcontrol.ino:3964, OTGW-Core.h:73), the master CH enable bit `OTcurrentSystemState.Statusflags & 0x0100` (SATcontrol.ino:3968, TASK-1480), settings `fMinPressure`, `fMaxPressure`, `fMaxPressureDrop` (SATtypes.h:469-471).
 
-**Other health outputs** inputs: `state.sat.fFinalSetpoint` vs `OTcurrentSystemState.TSet` (SATcontrol.ino:3086-3088, SATcontrol.ino:3593-3594); setting `iMaxRelModulation` vs `OTcurrentSystemState.MaxRelModLevelSetting` (SATcontrol.ino:3098-3100); `state.sat.bActive` vs boiler status bit mask 0x02, which the code names `boilerActive` (SATcontrol.ino:3110-3112); `state.sat.eBoilerStatus` (SATcontrol.ino:3000-3002); `state.sat.eLastCycleClass` (SATcontrol.ino:3004-3008).
+**Other health outputs** inputs: `state.sat.fFinalSetpoint` vs `OTcurrentSystemState.TSet` (SATcontrol.ino:3086-3088, SATcontrol.ino:3593-3594); setting `iMaxRelModulation` vs `OTcurrentSystemState.MaxRelModLevelSetting` (SATcontrol.ino:3098-3100); `state.sat.bActive` vs boiler status bit mask 0x02, which the code names `boilerActive` (SATcontrol.ino:3110-3112); `state.sat.bBoilerStatusKnown` for device health (SATcontrol.ino:4258-4260, set at SATcontrol.ino:856; TASK-1485); `state.sat.eLastCycleClass` (SATcontrol.ino:3004-3008).
 
 <a id="s7-behaviour-step-by-step-in-time-order"></a>
 
@@ -3086,7 +3086,7 @@ Evaluation rate: the sync debouncers and the health topics live in `satPublishMQ
 8. Confirmation: the raw alarm must hold for at least 120 s; then `bPressureAlarm` = true and `bPressureHealthy` = false. Any tick without raw alarm clears the timer and, if set, the alarm (SATcontrol.ino:4071-4091).
 9. `satPressureHealthUpdate()` copies the raw pressure into `fBoilerPressure` and sets the text status "ok", "low" or "high"; a confirmed alarm caused only by the drop rate is reported as "ok" (SATpressure.ino:33-54).
 
-**Device health**: `sat/device_health` is ON when `eBoilerStatus` is `SAT_BS_OFF` (SATcontrol.ino:3000-3002). `SAT_BS_OFF` is the initial value (SATtypes.h:152). In `satUpdateBoilerStatus()` every branch assigns another status (SATcontrol.ino:546-637), and a search found no other assignment of `eBoilerStatus` (SATcontrol.ino:643). A search found `satUpdateBoilerStatus()` called only at SATcontrol.ino:4814. So the topic is ON from boot until the first control tick that reaches that call, and OFF afterwards (derived). There is no delay.
+**Device health**: `sat/device_health` is ON while `bBoilerStatusKnown` is false (SATcontrol.ino:4258-4260; TASK-1485), the counterpart of thermo-nova's `INSUFFICIENT_DATA`. The flag is set by the first `satUpdateBoilerStatus()` (SATcontrol.ino:856), which is called only from the control tick. So the topic is ON from boot until the first control tick that reaches that call, and OFF afterwards (derived). There is no delay. The REST health JSON `device_health` is the same boolean (true = problem; TASK-1496).
 
 **Cycle health**: `sat/cycle_health` is ON when the last cycle class is OVERSHOOT, UNDERHEAT, UNDERHEAT_PWM or SHORT (SATcontrol.ino:3003-3009). Before any cycle the class is NONE (SATtypes.h:166), so the topic is OFF. The class is set in the cycle code (SATcycles.ino:566), covered in the cycle section.
 
@@ -3214,9 +3214,9 @@ when dayNum increases:
     if intra-day count >= 2: dailyMedian[head] = median(intra-day), ring of 30 days
     clear intra-day ring; recompute recommendation; save to LittleFS
 recommendation (needs >= 3 stored days):
-    last 3 daily medians all < -0.5 °C -> INCREASE
-    last 3 daily medians all > +0.5 °C -> DECREASE
-    else -> HOLD
+    last 3 daily medians all < -0.5 °C -> increase
+    last 3 daily medians all > +0.5 °C -> decrease
+    else -> hold
 median = sorted[n / 2] (upper middle element for even n)
 ```
 
@@ -3355,24 +3355,24 @@ The "No" entries mean that no save code for them was found; the persistence entr
 | `sat/solar_gain_sun_elevation` | last sun elevation, only while valid | SATcontrol.ino:2945-2947 |
 | `sat/summer_active`, `sat/summer_hours_above` | summer mode and hour counter | SATcontrol.ino:2949-2950 |
 | `sat/humidity`, `sat/humidity_valid` | humidity input | SATcontrol.ino:2952-2954 |
-| `sat/ssi`, `sat/summer_simmer_index`, `sat/summer_simmer_perception` | index of `satGetRoomTemp()` and humidity, and its label; only when the indoor humidity is fresh (`satHumidityFresh()`, TASK-1441) and > 0 | SATcontrol.ino:3012-3019 |
+| `sat/summer_simmer_index`, `sat/summer_simmer_perception` (`sat/ssi` was removed in TASK-1485 and is emptied as a retired topic) | index of `satGetRoomTemp()` and humidity, and its label; only when the indoor humidity is fresh (`satHumidityFresh()`, TASK-1441) and > 0 | SATcontrol.ino:3012-3019 |
 | `sat/error` | `fError`, °C | SATcontrol.ino:2737 |
 | `sat/curve_recommendation` | hourly ring: insufficient / increase / decrease / hold | SATcontrol.ino:2899-2905 |
 | `sat/curve_recommendation_attributes` | JSON: `error_threshold`, `daily_mean_error` (the hourly ring mean), `daily_sample_count` (the hourly ring count), `recent_mean_error` (the last `fError`) | SATcontrol.ino:2906-2915 |
-| `sat/heating_curve_recommendation` | daily-median text: insufficient / INCREASE / DECREASE / HOLD (retained) | SATcontrol.ino:2917, SATcycles.ino:1271-1280 |
+| `sat/heating_curve_recommendation` | daily-median text: insufficient / increase / decrease / hold, lower case since TASK-1485 (retained) | SATcontrol.ino:2917, SATcycles.ino:1271-1280 |
 | `sat/error_mean`, `sat/error_stddev` | hourly ring mean and standard deviation | SATcontrol.ino:2919-2920 |
 | `sat/setpoint_sync`, `sat/modulation_sync`, `sat/ch_sync` | "ON" = problem after 60 s | SATcontrol.ino:3083-3118 |
 | `sat/setpoint_mismatch`, `sat/modulation_reliable` | second setpoint check; modulation reliability | SATcontrol.ino:2893-2894 |
 | `sat/pressure`, `sat/pressure_drop_rate`, `sat/pressure_alarm` | smoothed pressure, drop rate, confirmed alarm (true = problem) | SATcontrol.ino:2882-2884 |
-| `sat/pressure_health` | "ON" when `bPressureHealthy` is true, that is when there is no alarm | SATcontrol.ino:2885-2886, SATcontrol.ino:4071-4091 |
+| `sat/pressure_health` | "ON" on a pressure problem (`!bPressureHealthy`); ON = problem since TASK-1485, as thermo-nova | SATcontrol.ino:4149-4150 |
 | `sat/ch_pressure`, `sat/ch_pressure_status` | raw pressure and "ok"/"low"/"high" | SATpressure.ino:62-70 |
-| `sat/device_health` | "ON" while boiler status is OFF | SATcontrol.ino:3000-3002 |
+| `sat/device_health` | "ON" while the boiler status has not been evaluated yet since boot (`!bBoilerStatusKnown`) | SATcontrol.ino:4258-4260 |
 | `sat/cycle_health` | "ON" for OVERSHOOT, UNDERHEAT, UNDERHEAT_PWM, SHORT | SATcontrol.ino:3003-3009 |
 | `sat/flame_health` | "ON" for a flame problem state | SATcontrol.ino:2837-2847 |
 | `sat/window_open` | window flag | SATcontrol.ino:2859 |
 | `sat/solar_gain_enable`, `sat/summer_simmer_enable`, `sat/thermal_comfort`, `sat/humidity_timeout_s`, `sat/solar_freeze_integral` | setting echoes | SATcontrol.ino:3154-3158, SATcontrol.ino:2981 |
 | Home Assistant switches | solar gain and summer simmer enables | MQTTHaDiscovery.cpp:3364-3380 |
-| REST health JSON (`satSendHealthJSON`) | `sync_setpoint` = `bSetpointMismatch`; `sync_modulation` = NOT `bModulationReliable`; `sync_ch` = undelayed CH comparison; `device_health` true = healthy (not OFF and not STALLED_IGNITION); `cycle_health` true = healthy; plus pressure, error statistics and the daily-median text | restAPI.ino:1016-1082 |
+| REST health JSON (`satSendHealthJSON`) | `sync_setpoint` = `bSetpointMismatch`; `sync_modulation` = NOT `bModulationReliable`; `sync_ch` = undelayed CH comparison; `flame_health`, `device_health`, `cycle_health` true = problem with the MQTT meaning (`flame_health` null while INSUFFICIENT_DATA; TASK-1496); plus pressure, error statistics and the daily-median text | restAPI.ino:991-1075 |
 
 <a id="s7-edge-cases"></a>
 
@@ -3405,8 +3405,8 @@ The "No" entries mean that no save code for them was found; the persistence entr
 - **Drop rate sign.** Only falling pressure counts; negative rates are neither stored nor alarmed (SATcontrol.ino:4051-4052, SATcontrol.ino:4065-4066). The field comment "negative when suspended" (SATtypes.h:254) conflicts with the code, which writes 0 while suspended (SATcontrol.ino:4049-4050).
 - **Pressure limits use the smoothed value, drop rate uses raw samples** (SATcontrol.ino:4002-4003, SATcontrol.ino:4067-4068).
 - **Drop-rate-only alarm shows "ok" in `sat/ch_pressure_status`** while `sat/pressure_alarm` is true (SATpressure.ino:49-52).
-- **Polarity differs between outputs.** `sat/pressure_health` ON = healthy (SATcontrol.ino:2886). `sat/device_health`, `sat/cycle_health` and the sync topics ON = problem (SATcontrol.ino:3000-3009, SATcontrol.ino:3083-3118). In the REST JSON `device_health` and `cycle_health` true = healthy (restAPI.ino:1026-1031).
-- **Device health counts STALLED_IGNITION only in REST.** MQTT checks only OFF (SATcontrol.ino:3001); REST also treats STALLED_IGNITION as unhealthy (restAPI.ino:1026-1027).
+- **Polarity is the same on every output since TASK-1485 and TASK-1496.** `sat/pressure_health`, `sat/device_health`, `sat/cycle_health`, `sat/flame_health` and the sync topics ON = problem (SATcontrol.ino:4150, SATcontrol.ino:4258-4267). In the REST JSON `flame_health`, `device_health` and `cycle_health` true = problem (restAPI.ino:1059-1063).
+- **Device health is the same boolean in MQTT and REST.** Both read only `bBoilerStatusKnown` (SATcontrol.ino:4258-4260, restAPI.ino:1007). Before TASK-1496 REST also treated STALLED_IGNITION as unhealthy; it no longer does.
 - **Window with several sensors.** There is one input flag; any "closed" message ends the Activity preset (MQTTstuff.ino:627-632, restAPI.ino:1393-1396, SATcontrol.ino:1109-1122).
 - **Setpoint mismatch latch.** `satCheckSetpointSync()` returns early when `fFinalSetpoint` < 1.0 (SATcontrol.ino:3597), and `satDisable()` sets it to 0 (SATcontrol.ino:2169). A `bSetpointMismatch` that was true at disable therefore stays true until SAT controls again (derived).
 - **Humidity validity is never cleared.** `bHumidityValid` stays true once a value has arrived, but since TASK-1441 every use goes through `satHumidityFresh()`, which also checks the age against `iHumidityTimeoutS`: the thermal comfort input and the published index both stop on a stale value.
@@ -3416,7 +3416,7 @@ The "No" entries mean that no save code for them was found; the persistence entr
 
 ### Not found in the code / unclear
 
-1. **Home Assistant discovery for the health topics, the index and the recommendations.** A tree-wide search of `src/OTGW-firmware` for `pressure_health`, `device_health`, `cycle_health`, `setpoint_sync`, `modulation_sync`, `ch_sync`, `curve_recommendation`, `heating_curve_recommendation`, `summer_simmer_index`, `sat/ssi` and `indoor_rise_rate` found no discovery code. The SAT discovery list (MQTTHaDiscovery.cpp:300-357) includes `sat/flame_health` but none of these. This conflicts with a code comment that calls `sat/device_health`, `sat/cycle_health`, the three sync topics and `sat/pressure_health` "HA binary_sensor entities" (SATmqttPublish.h:171-176). The two sources disagree; this section does not pick one. If no discovery exists, the device class and how Home Assistant shows them are not defined in the firmware. For `sat/pressure_health` the ON = healthy polarity matters if some external configuration declares it a PROBLEM sensor.
+1. **Home Assistant discovery for the health topics, the index and the recommendations.** A tree-wide search of `src/OTGW-firmware` for `pressure_health`, `device_health`, `cycle_health`, `setpoint_sync`, `modulation_sync`, `ch_sync`, `curve_recommendation`, `heating_curve_recommendation`, `summer_simmer_index`, `sat/ssi` (removed in TASK-1485) and `indoor_rise_rate` found no discovery code. The SAT discovery list (MQTTHaDiscovery.cpp:300-357) includes `sat/flame_health` but none of these. This conflicts with a code comment that calls `sat/device_health`, `sat/cycle_health`, the three sync topics and `sat/pressure_health` "HA binary_sensor entities" (SATmqttPublish.h:171-176). The two sources disagree; this section does not pick one. If no discovery exists, the device class and how Home Assistant shows them are not defined in the firmware. For `sat/pressure_health` the polarity is ON = problem since TASK-1485, so a PROBLEM sensor declaration would be correct.
 2. **`bSolarFreezeIntegral`.** Resolved: read by the PID since TASK-1323 (SATpid.ino:157; entry 11 answer 3) (corrected 2026-10-24, TASK-1351).
 3. **Boiler modulation with the flame off.** The solar rule uses the reported relative modulation without a flame check (SATcontrol.ino:4267-4269). What a given boiler reports while the flame is off is not in the firmware.
 4. **Exact solar sampling cadence at a 30 s tick.** The "more than 30 s" test (SATcontrol.ino:4235) against a 30 s timer (SATcontrol.ino:476) makes the cadence depend on loop timing, which the code does not fix.
@@ -3768,7 +3768,7 @@ Variable names are as in the code.
 | `fBoilerCapacity` / `fDhwCapacity` | 24.0 / 0.0 | kW | 1-100 / 0-100 | `SATtypes.h:479-480` | `settingStuff.ino:1054-1055` | `boiler_capacity`, `dhw_capacity` |
 | `fValveOffset` (`SATvalveoffset`) | 0.0 | °C | -1 to 1 | `SATtypes.h:526` | `settingStuff.ino:1106` | `valve_offset` |
 | `fTargetTempStep` (`SATtempstep`) | 0.5 | °C | 0.1-1 | `SATtypes.h:468` | `settingStuff.ino:1037` | `target_temp_step` |
-| `fHeatingCurveCoeff` (`SATcoefficient`) | 1.5 | - | 0.1-5 | `SATtypes.h:442` | `settingStuff.ino:998` | `heating_curve` |
+| `fHeatingCurveCoeff` (`SATcoefficient`) | 1.5 | - | 0.1-5 | `SATtypes.h:442` | `settingStuff.ino:998` | `heating_curve_coeff` (MQTT since TASK-1485, REST since TASK-1496; no `heating_curve` alias on either) |
 | `iHeatingMode` (`SATheatingmode`) | 0 (comfort) | - | 0-1 | `SATtypes.h:524` | `settingStuff.ino:1104` | `heating_mode` (handler) |
 | presets comfort / eco / away / sleep / activity / home | 21 / 18 / 15 / 16 / 10 / 18 | °C | see citations | `SATtypes.h:446-451` | `settingStuff.ino:1005-1010` | `preset_*` |
 | `bSummerSimmer` (`SATsummersimmer`) | false | - | bool | `SATtypes.h:499` | `settingStuff.ino:1086` | `summer_simmer` |
