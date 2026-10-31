@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-15 15:47
-updated_date: '2026-10-22T07:00:00Z'
+updated_date: '2026-10-30T21:56:00Z'
 labels:
   - sat
   - otdirect
@@ -33,4 +33,6 @@ Moved out of ADR-179's open questions (TASK-1237). In gateway mode the gateway s
 2026-10-17: maintainer decision: measure first (AC1 bench capture with a live thermostat), then choose A/B. Blocked until the OTGW32 is reachable.
 
 2026-10-22 cycle: skipped, AC1 needs a live thermostat on the OT-Direct bench (none attached) and the decision touches SAT control behaviour, which now goes through docs/sat/thermo-nova-spec.md and Sergeant D (TASK-1292).
+
+2026-10-30 maintainer decision (Robert, in session otgw-firmware-ea): option B. While SAT is the active controller in OT-Direct gateway mode with a live thermostat, SAT's CH-enable bit is applied to the relayed thermostat READ_DATA MsgID 0 frame. This is new relay semantics and needs its own ADR via adr-kit (AC#2) before implementation; the ADR must cover what the boiler sees, the thermostat's own CH bit while SAT is off, and the bus-offline probe (unchanged under B).
 <!-- SECTION:NOTES:END -->

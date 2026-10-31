@@ -6,9 +6,9 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-26T20:13:00Z'
+updated_date: '2026-10-30T21:56:00Z'
 labels:
   - sat
-  - needs-maintainer-ok
 milestone: 2.0.0
 dependencies: []
 ordinal: 548000
@@ -25,3 +25,9 @@ gruijter 2026-10-26 19:29 (#alpha-testing msg 1564360234938540185): 'why was my 
 - [ ] #1 Sun elevation computed from lat/lon + NTP time within 0.5 degree of a reference (host test vs known values)
 - [ ] #2 An external MQTT value still takes precedence while fresh
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-30 maintainer decision (Robert, in session otgw-firmware-ea): released for pickup ('vrijgeven'); label needs-maintainer-ok removed. Priority after beta-1 blockers unless it is one.
+<!-- SECTION:NOTES:END -->

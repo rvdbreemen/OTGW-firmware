@@ -6,8 +6,8 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T19:48:00Z'
+updated_date: '2026-10-30T21:56:00Z'
 labels:
-  - needs-maintainer-ok
   - wifi
 milestone: 2.0.0
 dependencies: []
@@ -25,3 +25,9 @@ maarten_41762 2026-10-25 (#alpha-testing 1563987220115890257, alpha.500): the un
 <!-- AC:BEGIN -->
 - [ ] #1 Unit joins the strongest AP of its SSID at (re)connect (bench with two APs, before/after RSSI)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-30 maintainer decision (Robert, in session otgw-firmware-ea): released for pickup ('vrijgeven'); label needs-maintainer-ok removed. Priority after beta-1 blockers unless it is one.
+<!-- SECTION:NOTES:END -->

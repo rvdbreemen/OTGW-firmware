@@ -3696,5 +3696,77 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-10-28T08:00:00Z"
+  },
+  {
+    "id": "bug-8660",
+    "timestamp": "2026-10-28T19:40:00Z",
+    "error_message": "SAT 300 s overshoot guard after hot water never armed; underheat/saturation exits fired 150 s/120 s after first sample and never above a 60 s tick",
+    "file": "src/OTGW-firmware/SATcycles.ino",
+    "root_cause": "DHW end time refreshed only inside satCycleCheckAutoSwitch, which the DHW early return never reaches; exits summed dt incl. the first call and bailed on gaps >60 s",
+    "fix": "satCycleNoteDhwTick on the DHW tick + seen flag; satSustainedFor start-timestamp timers (thermo-nova sustained_runtime); split overshoot switch before CS (TASK-1420)",
+    "tags": [
+      "sat",
+      "pwm",
+      "dhw",
+      "timer",
+      "thermo-nova"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-28T19:40:00Z"
+  },
+  {
+    "id": "bug-8661",
+    "timestamp": "2026-10-29T05:30:00Z",
+    "error_message": "SAT PID stepped on every 30 s control tick (integral twice as fast as thermo-nova); first tick after enable sent CS=10 (TASK-1368/TASK-1270)",
+    "file": "src/OTGW-firmware/SATpid.ino, SATcontrol.ino",
+    "root_cause": "PID update was driven by the control tick instead of its own 60 s timer; first call returned the uninitialised 0 output",
+    "fix": "satPidService() on timerSATPid 60 s SKIP_MISSED_TICKS, step/output split, start-up step on first tick, D=0 first output, hold restored state until first room reading (entry 115)",
+    "tags": [
+      "sat",
+      "pid",
+      "timer",
+      "cadence"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-29T05:30:00Z"
+  },
+  {
+    "id": "bug-8662",
+    "timestamp": "2026-10-29T23:50:00Z",
+    "error_message": "ota_flash.py: filesystem OTA POST /update?cmd=100 -> http.client.RemoteDisconnected after ~15 s; script aborted before the app step",
+    "file": "scripts/ota_flash.py",
+    "root_cause": "Not verified: the fs image was written (served /version.hash = new hash) but the firmware closed the connection without a response; the script treats that as fatal and leaves app N-1 + fs N. The old app then truncates the larger new v2.js at 65536 bytes (curl exit 18), so the v2 UI breaks.",
+    "fix": "Not fixed (bench run told to stop and report). Proposed: after a dropped fs response, poll /version.hash and continue with the app step when it matches; or run the app step alone with --no-fs.",
+    "tags": [
+      "ota",
+      "safeboot",
+      "littlefs",
+      "bench",
+      "ota_flash.py",
+      "mismatch"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-29T23:50:00Z"
+  },
+  {
+    "id": "bug-8663",
+    "timestamp": "2026-10-30T23:20:00Z",
+    "error_message": "MQTTstuff.ino:619:60: error: 'satResetControlState' was not declared in this scope (esp32-combo build of alpha.560-563 stack)",
+    "file": "src/OTGW-firmware/OTGW-firmware.h",
+    "root_cause": "TASK-1414 renamed satResetIntegral -> satResetControlState and put a forward declaration inside SATcontrol.ino; the Arduino prototype pass skips functions already declared in their own file, so MQTTstuff.ino (earlier in the TU) had no prototype. Host tests compile SATcontrol.ino alone and passed.",
+    "fix": "Prototype added to OTGW-firmware.h with the other SAT functions (alpha.564, d6dd798f1).",
+    "tags": [
+      "build",
+      "arduino-prototypes",
+      "translation-unit",
+      "sat",
+      "host-tests-blind-spot"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-30T23:20:00Z"
   }
 ]

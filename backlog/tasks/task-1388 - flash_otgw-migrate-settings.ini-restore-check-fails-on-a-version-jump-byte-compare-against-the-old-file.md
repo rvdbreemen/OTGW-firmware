@@ -6,9 +6,8 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T11:36:00Z'
-updated_date: '2026-10-25T15:10:00Z'
-labels:
-  - needs-maintainer-ok
+updated_date: '2026-10-30T21:56:00Z'
+labels: []
 milestone: 2.0.0
 dependencies: []
 ordinal: 527000
@@ -31,4 +30,6 @@ maarten_41762 2026-10-25 (#alpha-testing 1563871156329775135): migrate from alph
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-25 tester feedback: needs Robert's OK before implementation (testers have no admin control).
+
+2026-10-30 maintainer decision (Robert, in session otgw-firmware-ea): released for pickup ('vrijgeven'); label needs-maintainer-ok removed. Priority after beta-1 blockers unless it is one.
 <!-- SECTION:NOTES:END -->

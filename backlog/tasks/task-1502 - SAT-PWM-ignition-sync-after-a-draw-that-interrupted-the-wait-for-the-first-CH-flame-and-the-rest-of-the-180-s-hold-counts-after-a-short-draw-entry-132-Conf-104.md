@@ -4,11 +4,11 @@ title: >-
   SAT PWM: ignition sync after a draw that interrupted the wait for the first CH
   flame, and the rest of the 180 s hold counts after a short draw (entry 132,
   Conf-104)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:14:00Z'
-updated_date: '2026-10-30T18:38:00Z'
+updated_date: '2026-10-31T05:10:00Z'
 labels:
   - sat sergeant-d
 milestone: 2.0.0
@@ -28,7 +28,7 @@ Sergeant D 2026-10-30 Conf-104: case 1 C, case 2 yes (entry 132). Rework of TASK
 - [x] #1 Host test case 1: draw during the wait for the first CH flame, then flame: ON time and 180 s hold start at that flame (red on HEAD: 10 s burn in the 170 s example)
 - [x] #2 Host test case 1 fallback: no CH flame within 180 s of the draw end starts the timer anyway
 - [x] #3 Host test case 2: short draw 60 s after ignition: the remaining 120 s of hold still applies after the draw; no new temperature seed
-- [ ] #4 build + evaluate green; firmware-sat-spec.md updated
+- [x] #4 build + evaluate green; firmware-sat-spec.md updated
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -37,4 +37,12 @@ Sergeant D 2026-10-30 Conf-104: case 1 C, case 2 yes (entry 132). Rework of TASK
 2026-10-30 review (opus): case 1/case 2 correct, no early phase end, reset paths clean; findings: case-1 hold untested (probe P1, mutant passes), late flame after the case-1 fallback gets no hold (P2, fixed per thermo-nova pwm.py:144-146 in the fix round), P4 and P3 genuinely open -> entry 156 (interpretation) + Q-1502a/Q-1502b queued; stale comments/spec. Fix round running.
 
 Fix round done: probe P1 as test m1c (case-1 hold), late flame after the case-1 fallback gets the hold (P2, m2b; thermo-nova pwm.py:144-146), P3/P4 pinned as open (m4, m5; Q-1502a/b), comments and spec rewritten. tests/test_sat_pwm_anchors.py 40 OK; mutants noCase1Hold 2 F, head 10 F, noCase2 3 F, resumedSkip 4 F. Integrated on b3ac0ce67 as alpha.560: full suite 71/71 rc=0, evaluate EXIT 0. Build/bench after the alpha.559 soak (AC4 build part pending).
+
+2026-10-31 close-out: Shipped in 2.0.0-alpha.564+d6dd798 (pushed origin/dev 8744d985a..d6dd798f1, zip Discord msg 1565955628164186185, report msg 1565955677522894960). Build: esp32-combo SUCCESS (alpha.564 includes the TASK-1414 prototype fix d6dd798f1). evaluate --quick on d6dd798f1: Failed 0, 100%. All 73 tests/test_*.py files OK on d6dd798f1 (one file at a time, no build running). Bench: OTGW32 .61, OTA app + filesystem via scripts/ota_flash.py, 173 settings keys kept. Fresh old-vs-fix: tests/test_sat_pwm_anchors.py with OTGW_SAT_INO = SATcontrol.ino of 073946033 (pre-fix): FAILED (failures=10); on d6dd798f1: Ran 40 OK. The stacked commit 98cb3c2ca carries the review fix round (late flame after the case-1 fallback gets the hold, pwm.py:144-146). docs/sat/firmware-sat-spec.md updated in 98cb3c2ca. Bench limitation (Robert approved publishing with it stated): a replay (CH no flame, draw, no flame, CH flame) ran on .61 without fault or restart but could not line up a PWM ON phase with the draw. Open with Sergeant D: Q-1502a (asked 2026-10-30, msg 1565847278617493595), Q-1502b queued.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A hot-water draw while the PWM ON phase waits for its first CH flame: the ON time and the 180 s hold start at the first CH flame after the draw, or the ON timer 180 s after the draw end without one; a short draw inside the hold keeps the rest of the hold (Sergeant D entry 132, readings entry 156). Evidence: AC#1-#3 tests/test_sat_pwm_anchors.py old FAILED (10), fix 40 OK; AC#4 build alpha.564 SUCCESS, evaluate 100%, firmware-sat-spec.md updated. alpha.560, published in alpha.564+d6dd798. Not verified on hardware: the timing around a real draw. Open: Q-1502a/b.
+<!-- SECTION:FINAL_SUMMARY:END -->

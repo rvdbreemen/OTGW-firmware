@@ -6,9 +6,8 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T17:21:00Z'
-updated_date: '2026-10-28T20:33:00Z'
+updated_date: '2026-10-30T21:56:00Z'
 labels:
-  - needs-maintainer-ok
   - tooling
   - flash
 milestone: 2.0.0
@@ -32,4 +31,6 @@ martreides (Marthreides, #alpha-testing 1563963515872608460, 2026-10-25) and Sch
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-28 triage: Schelte (.otgw, #nederlandse-ondersteuning 1563931061094981744, 2026-10-25) also reports: after WiFi provisioning the browser could not connect although the board answered ping; a power cycle fixed it. Possibly separate from the VID/PID detection; needs its own repro if it recurs.
+
+2026-10-30 maintainer decision (Robert, in session otgw-firmware-ea): released for pickup ('vrijgeven'); label needs-maintainer-ok removed. Priority after beta-1 blockers unless it is one.
 <!-- SECTION:NOTES:END -->

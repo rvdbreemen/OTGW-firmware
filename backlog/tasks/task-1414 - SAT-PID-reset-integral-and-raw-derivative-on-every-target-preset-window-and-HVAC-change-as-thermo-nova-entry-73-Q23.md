@@ -3,11 +3,11 @@ id: TASK-1414
 title: >-
   SAT PID: reset integral and raw derivative on every target, preset, window and
   HVAC change as thermo-nova (entry 73, Q23)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-28T06:44:00Z'
-updated_date: '2026-10-30T20:03:00Z'
+updated_date: '2026-10-31T05:10:00Z'
 labels:
   - sat
   - sergeant-d
@@ -34,7 +34,7 @@ Sergeant D 2026-10-27 (entry 73, Q23: follow thermo-nova). Reset integral + raw 
 - [x] #1 Host test per trigger (target, preset, window, HVAC, reset_integral): integral and raw derivative are 0 after it; red on HEAD for the triggers HEAD misses
 - [x] #2 Timers and the initialised flag are not cleared by this reset
 - [x] #3 ADR-197 Decision 8 / open question updated
-- [ ] #4 build + evaluate green
+- [x] #4 build + evaluate green
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -68,4 +68,12 @@ Tests: new tests/test_sat_pid_resets.py splicing the real satHandlePreset/satHan
 Execution-graph update requested by Robert: serialize pending SATpid.ino writers after TASK-1368 -> TASK-1270: TASK-1416 -> TASK-1417 -> TASK-1418 -> TASK-1414 -> TASK-1423 -> TASK-1415. TASK-1381 remains a parallel branch after TASK-1270, gated separately by Q53. Revalidate the task premise after the preceding fix; if already addressed, record evidence and re-scope/close through the normal review, rather than applying a duplicate change. Persistence write cadence remains Robert's decision.
 
 Fix round: reset requests go through a volatile flag applied on the loop task (satApplyControlStateReset first in satControlLoopRun); docs/comments fixed; ADR-204 (replaces ADR-197 decision 8) written, open question answered (Robert), Accepted 2026-10-30, related to ADR-197. Integrated on alpha.562 as alpha.563: full suite 73/73 rc=0, evaluate EXIT 0; tests/test_sat_pid_resets.py 16 OK, base 10 F, mutant satPidReset 8 F. Interpretations in entry 157; Q-1414a queued.
+
+2026-10-31 close-out: Shipped in 2.0.0-alpha.564+d6dd798 (pushed origin/dev 8744d985a..d6dd798f1, zip Discord msg 1565955628164186185, report msg 1565955677522894960). Build esp32-combo SUCCESS; evaluate --quick on d6dd798f1 Failed 0, 100%; all 73 tests/test_*.py files OK. Bench OTGW32 .61, OTA app + filesystem, 173 settings keys kept. tests/test_sat_pid_resets.py 16 OK on d6dd798f1 (the commit recorded red-on-HEAD per trigger). Build fix: the rename left no prototype for MQTTstuff.ino (Arduino prototype pass skips functions with an in-file declaration); fixed as alpha.564 d6dd798f1, bug logged. Bench: target 19.3 -> 19.4 with I = -0.000728 inside the 0.1 deadband: 6 s later I = 0 with the error unchanged (-0.032), so no PID step in between. Finding: a 0.05 C target step does not reset (float 19.549999 - 19.5 < 0.05f); thermo-nova resets on any change (climate.py:643) -> TASK-1517. AC#3: ADR-204 (Accepted) supersedes ADR-197 decision 8. Open with Sergeant D: Q-1414a (zone reset reference).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PID integral and raw derivative reset on every target, preset, window and HVAC change and on the reset command, as thermo-nova reset_control_state (pid.py:134-137, entry 73); timers and the initialised flag stay. Evidence: AC#1 tests/test_sat_pid_resets.py 16 OK (red on HEAD per trigger in the commit); AC#2 same test; AC#3 ADR-204; AC#4 alpha.564 build + evaluate green; bench I -0.0007 -> 0 within 6 s of a target change. Follow-ups: TASK-1517 (0.05 C step), Q-1414a. alpha.563 + build fix alpha.564, published in alpha.564+d6dd798.
+<!-- SECTION:FINAL_SUMMARY:END -->

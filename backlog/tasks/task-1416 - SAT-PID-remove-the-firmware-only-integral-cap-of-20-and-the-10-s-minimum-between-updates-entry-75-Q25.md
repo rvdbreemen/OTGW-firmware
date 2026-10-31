@@ -3,11 +3,11 @@ id: TASK-1416
 title: >-
   SAT PID: remove the firmware-only integral cap of +-20 and the 10 s minimum
   between updates (entry 75, Q25)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-28T06:45:00Z'
-updated_date: '2026-10-29T23:58:00Z'
+updated_date: '2026-10-30T21:45:00Z'
 labels:
   - sat
   - sergeant-d
@@ -46,6 +46,8 @@ Execution-graph update requested by Robert: serialize pending SATpid.ino writers
 2026-10-30 close-out: merged on origin/dev as b28f57ca7 (alpha.541). AC#3: Batch build 2.0.0-alpha.542+c00c5f0 (esp32-combo from origin/dev c00c5f025, 2026-10-30 00:47, exit 0, fresh artefacts, Discord msg 1565512587494301767); integration check on the merged set: evaluate --quick 100%, 0 failed; every tests/test_sat_*.py plus tests/test_manual_sat_commands.py exit 0. Fresh rerun this session on c00c5f025: python tests/test_sat_pid_integral_cap.py Ran 5, OK.
 
 alpha.542 bench check failed 2026-10-30 (v2.js 64 KiB cut, settings loss after FS OTA); Done waits for a passing bench check on the fixed build.
+
+2026-10-30 close-out (session otgw-firmware-ea): blocker resolved. The alpha.542 bench failure (v2.js cut, settings loss) was fixed in later builds; alpha.547/548 OTA on Classic-S3 .63 kept 174 settings keys (coordinator b8 bench note on TASK-1418), and alpha.559+ccda6eb (posted, msg 1565776786720165938) contains b28f57ca7 (git merge-base --is-ancestor). Fresh evidence this session on src == origin/dev 8744d985a: python tests/test_sat_pid_integral_cap.py -> Ran 5 tests OK; python evaluate.py --quick -> Failed 0, Health 100%. Still not verified on a bench: a live run with the integral above 20 (needs a long cold-room run; the host test covers the arithmetic on the real SATpid.ino/SATcontrol.ino code).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
