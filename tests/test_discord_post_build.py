@@ -63,7 +63,8 @@ class DiscordPostBuildRefusals(unittest.TestCase):
         return z
 
     def run_script(self, *args, webhook="/nonexistent/hook.url"):
-        env = dict(os.environ, OTGW_REPO=str(self.tmp), OTGW_DISCORD_WEBHOOK_FILE=webhook)
+        env = dict(os.environ, OTGW_REPO=str(self.tmp), OTGW_DISCORD_WEBHOOK_FILE=webhook,
+                   OTGW_PUBLISHED_TAGS=str(Path(self.tmp) / "published-tags.txt"))   # never the real list
         return subprocess.run([BASH, str(SCRIPT), *args], env=env,
                               capture_output=True, text=True, timeout=60)
 

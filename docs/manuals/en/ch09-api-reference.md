@@ -585,7 +585,7 @@ Update a named SAT setting. Authentication required.
 
 **Parameters:** `{name}` is the setting name. The handler accepts the full SAT setting vocabulary, including:
 
-`heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `max_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `push_setpoint`, `follow_thermostat`, `flame_off_offset`, `overshoot_protection`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `sensor_max_age`, `error_monitoring`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`.
+`heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `max_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `push_setpoint`, `follow_thermostat`, `curve_self_tune`, `flame_off_offset`, `overshoot_protection`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `sensor_max_age`, `error_monitoring`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`.
 
 **Request body:** New value as plain string or JSON `{"value": "..."}`. The `reset_integral` setting name takes no value (the action is implicit).
 
@@ -1241,6 +1241,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/interval` | `SATinterval` |
 | `sat/push_setpoint` | `SATpushsetpoint` |
 | `sat/follow_thermostat` | `SATfollowthermostat` |
+| `sat/curve_self_tune` | `SATcurveselftune` |
 | `sat/mqtt_fallback` | `SATmqttfallback` |
 | `sat/external_temp` | `SATexternaltemp` |
 | `sat/flame_off_offset` | `SATflameoffset` |
