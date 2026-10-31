@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-31T13:48:00Z'
+updated_date: '2026-10-31T14:13:00Z'
 labels:
   - sat
   - design
@@ -25,3 +26,9 @@ Robert 2026-10-31: 'de warmtepomp moet minimaal schakelen. Dus goal voor warmtep
 - [ ] #2 Simulation of candidate settings (PWM period, minimum on/off time, flow cap, MM in PWM, hysteresis) scored on compressor starts per day first and comfort second, paired against current settings, over at least 5 winters; data and scripts in docs/sat/sim-hp-lowload/
 - [ ] #3 Options with numbers posted to Sergeant D one question at a time; his answers recorded in docs/sat/sergeant-d-corrections.md
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-31 round 12 (docs/sat/sim-hp-lowload/round12.md, scripts/sat_hp_onoff_study12.py): on/off ground-source HP on underfloor (maarten_41762 msg 1566089657492705431). own control 2.4 starts/day 0.144 C; time-proportional PWM 180/240 min 7.5/5.6 starts; today's 1800 s PWM 42 starts 0.285 C. Robert (entry 181): two behaviours per setting, 'heat pump controls itself' and 'long time-proportional PWM in minutes per cycle'; Q-1527a to Sergeant D (OK + default).
+<!-- SECTION:NOTES:END -->
