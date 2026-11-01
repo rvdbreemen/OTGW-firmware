@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-31T13:48:00Z'
-updated_date: '2026-11-01T09:22:00Z'
+updated_date: '2026-11-01T09:41:00Z'
 labels:
   - sat
   - design
@@ -47,4 +47,6 @@ Robert 2026-10-31: 'de warmtepomp moet minimaal schakelen. Dus goal voor warmtep
 2026-10-31 Q-1531a answered A (Sergeant D 19:12 UTC, msg 1566167931191304233; ea records it as entry 188): a hybrid uses the heat-pump PWM cycle, the rest stays gas. So no hybrid simulation is needed. Consequence for the TASK-1527 design: whatever replaces the heat-pump PWM (degree minutes or a longer cycle, Q-1527a) also reaches the hybrid's heat pump, while the gas start limit and the max-flow defaults stay. Q-1527a must say so explicitly.
 
 2026-11-01: Sergeant D's position on degree minutes (comfort vs efficiency, spark gap, minimum capacity is the lever) recorded as entry 192; answered in #dev-sat-mqtt msgs 1566380852735254659 / 1566381192104779827 with analysis of his UK charts. Field test plan (switchback, same house, both methods, pre-registered H1-H3) in docs/sat/sim-hp-lowload/field-test-plan.md. Next in the model: round 18 = start-loss term (Cd 0.05/0.10), spark-gap cost with SAT-on-gas reference, and the field protocol simulated to size the test. Q-1527a still open.
+
+2026-11-01 Robert: field test without a new control mechanism, only longer heat-pump PWM periods 1.5/2/3 h (entry 193) -> TASK-1542; round 18 deferred -> TASK-1543 (label simulatie); testers may be asked. field-test-plan.md updated to arms 1800 s vs 10800 s (underfloor) / 5400 s (radiators).
 <!-- SECTION:NOTES:END -->
