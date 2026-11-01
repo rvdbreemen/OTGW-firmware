@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:15:00Z'
-updated_date: '2026-11-01T08:50:00Z'
+updated_date: '2026-11-01T09:08:00Z'
 labels:
   - port-from-1.x
   - webui
@@ -83,7 +83,6 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 - [ ] #3 The Helper page served when FSexplorer.html is absent posts its upload to <page directory>/upload and opens <page directory>/update. Check by grepping the served HTML for action="upload" and action='update', with no leading slash.
 - [x] #4 v2.js, FSexplorer.html, updateServerHtml.h and the CSRF checks are unchanged (git diff limited to src/OTGW-firmware/FSexplorer.ino plus the version bump files version.h and data/version.hash).
 - [ ] #5 The /ReBoot response carries the header 'Refresh: 120;url=./' and the body contains window.location.replace('./'); old firmware shows url=/. Captured with curl -i before and after the change (this check reboots the device).
-- [ ] #6 The 1.x rig scripts pic_flash_dryrun.py, pic_flash_ui_sim.py and pic_flash_via_proxy.py and the polling text in REVERSE_PROXY_AND_HA_INGRESS.md exist on dev (ported or recorded as not needed with a reason)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -92,4 +91,6 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 2026-10-31: code done in 39a3d9bf4 (alpha.590): doRedirect './' at both reboot handlers, Helper forms action="upload" / action='update'. tests/test_fsexplorer_relative_urls.py new 2/2, old 2 FAIL; evaluate 0 FAIL. AC4: diff limited to FSexplorer.ino + bump files + the new test. Open: AC2/AC6 bench curl -i /ReBoot on .61 after the next build (blocked by low memory); AC1 ingress rig run; AC5 now esp32-combo only (maintainer 2026-10-29); AC7 rig scripts port not done.
 
 2026-11-01 Robert: drop the multi-target build AC (dev builds esp32-combo only). Evidence so far: tests/test_fsexplorer_relative_urls.py 2/2 OK; bench .61 alpha.597 served FSexplorer forms action='upload', 'update', 'ReBoot', './' (09:3x). Open: ReBoot via the ingress rig and direct, and curl -i /ReBoot header capture; these reboot a bench unit, deferred while the other session tests the benches (.61 went offline ~09:46, .63 restarted ~09:42).
+
+2026-11-01 Robert: drop the AC on porting the 1.x rig scripts (pic_flash_dryrun.py, pic_flash_ui_sim.py, pic_flash_via_proxy.py, polling text).
 <!-- SECTION:NOTES:END -->
