@@ -7,17 +7,17 @@
 De OpenTherm-specificatie definieert 256 bericht-ID's (0–127 voor master→slave en 128–255 voor slave→master antwoorden). De OTGW verwerkt alle gedefinieerde ID's. De onderstaande tabel toont de meest gebruikte ID's.
 
 **Datatypes:**
-- `FLAG8` — 8 statusbits als vlaggen
-- `F8.8` — 16-bits vaste komma getal (hoog byte geheel, laag byte breuk), bereik ±128 met 1/256 resolutie
-- `U8` — 8-bits unsigned integer (0–255)
-- `S8` — 8-bits signed integer (-128–127)
-- `U16` — 16-bits unsigned integer (0–65535)
-- `S16` — 16-bits signed integer
-- `U8/U8` — twee afzonderlijke 8-bits waarden in hoog en laag byte
+- `FLAG8`: 8 statusbits als vlaggen
+- `F8.8`: 16-bits vaste komma getal (hoog byte geheel, laag byte breuk), bereik ±128 met 1/256 resolutie
+- `U8`: 8-bits unsigned integer (0–255)
+- `S8`: 8-bits signed integer (-128–127)
+- `U16`: 16-bits unsigned integer (0–65535)
+- `S16`: 16-bits signed integer
+- `U8/U8`: twee afzonderlijke 8-bits waarden in hoog en laag byte
 
 **Richtingen:**
-- `M→B` — master (thermostaat) naar boiler (WRITE of READ verzoek)
-- `B→M` — boiler naar master (READ antwoord of ACK)
+- `M→B`: master (thermostaat) naar boiler (WRITE of READ verzoek)
+- `B→M`: boiler naar master (READ antwoord of ACK)
 
 | ID | Naam | Richting | Datatype | Eenheid | OTGW-label |
 |----|------|----------|----------|---------|-----------|
@@ -27,7 +27,7 @@ De OpenTherm-specificatie definieert 256 bericht-ID's (0–127 voor master→sla
 | 3 | Slave Config/MemberID | `B→M` | FLAG8 / U8 | - | `slave_configuration` |
 | 5 | Fault Flags / Code | `B→M` | FLAG8 / U8 | - | `ASF_flags` |
 | 6 | Remote Parameter Settings | `B→M` | FLAG8 / FLAG8 | - | `RBP_flags_transfer_enable` |
-| 9 | Remote Room Setpoint | `M→B` | F8.8 | °C | — |
+| 9 | Remote Room Setpoint | `M→B` | F8.8 | °C | - |
 | 14 | Maximum Relative Modulation Level | `M→B` | F8.8 | % | `maxrelmodlvl` |
 | 16 | Room Setpoint | `M→B` | F8.8 | °C | `roomsetpoint` |
 | 17 | Relative Modulation Level | `B→M` | F8.8 | % | `relmodlvl` |
@@ -46,7 +46,7 @@ De OpenTherm-specificatie definieert 256 bericht-ID's (0–127 voor master→sla
 | 70 | Status V/H (Ventilatie) | `B→M` | FLAG8 / FLAG8 | - | `status_vh_slave` |
 | 100 | Remote Override Function | `B→M` | FLAG8 | - | `remote_override_function` |
 
-Statusvlaggen (bericht-ID 0) — Master (hoog byte):
+Statusvlaggen (bericht-ID 0), master (hoog byte):
 
 | Bit | Naam | Beschrijving |
 |-----|------|-------------|
@@ -58,7 +58,7 @@ Statusvlaggen (bericht-ID 0) — Master (hoog byte):
 | 5 | Summer/winter mode | Zomer/winter schakelaar |
 | 6 | DHW blocking | Warmwater blokkering |
 
-Statusvlaggen (bericht-ID 0) — Slave (laag byte):
+Statusvlaggen (bericht-ID 0), slave (laag byte):
 
 | Bit | Naam | Beschrijving |
 |-----|------|-------------|
@@ -78,44 +78,42 @@ Volledige specificatie: `docs/opentherm specification/OpenTherm-Protocol-Specifi
 
 | Term | Uitleg |
 |------|--------|
-| **ADR** | Architecture Decision Record — document dat een architectuurkeuze met context en afweging vastlegt. Zie `docs/adr/`. |
-| **BLE** | Bluetooth Low Energy — draadloze verbinding voor SAT-temperatuursensoren (ESP32 only). |
-| **boards.h** | Board-specifiek pin-mapping headerbestand. Definieert GPIO-toewijzingen per hardwarevariant (bijv. `BOARD_NODOSHOP_ESP32`). Locatie: `src/OTGW-firmware/boards.h`. |
+| **ADR** | Architecture Decision Record: document dat een architectuurkeuze met context en afweging vastlegt. Zie `docs/adr/`. |
+| **BLE** | Bluetooth Low Energy: draadloze verbinding voor SAT-temperatuursensoren, werkt op de ESP32-S3 (LOLIN S3 Mini of S3 Mini Pro). |
+| **boards.h** | Board-specifiek pin-mapping headerbestand. Definieert GPIO-toewijzingen en `HAS_*`-capability flags per build (bijv. `BOARD_NODOSHOP_ESP32_COMBO`). Locatie: `src/libraries/Platform/src/boards.h`. |
 | **BTHome** | Open BLE-protocol voor thuisautomatisensoren, ondersteund door SAT. |
-| **C4** | C4-model — architectuurvisualisatiemethode in vier niveaus: Context, Container, Component, Code. Zie `docs/c4/`. |
-| **CH** | Central Heating — ruimteverwarming (de CV). |
-| **DHW** | Domestic Hot Water — warmwatervoorziening (sanitair warm water). |
-| **ESP8266** | Espressif microcontroller met ingebouwde WiFi, gebruikt op het Nodoshop OTGW-bord (~40 KB bruikbaar DRAM). |
-| **ESP32** | Espressif microcontroller met WiFi, Bluetooth en meer RAM, gebruikt op het OTGW32-bord. |
-| **Frame Bridge** | Abstractielaag (ADR-087) die een uniforme OpenTherm frame-interface biedt, ongeacht of het onderliggende transport PIC UART (ESP8266) of OTDirect GPIO (ESP32) is. |
+| **C4** | C4-model: architectuurvisualisatiemethode in vier niveaus: Context, Container, Component, Code. Zie `docs/c4/`. |
+| **CH** | Central Heating: ruimteverwarming (de CV). |
+| **DHW** | Domestic Hot Water: warmwatervoorziening (sanitair warm water). |
+| **ESP8266** | Espressif microcontroller met ingebouwde WiFi op de Wemos D1 mini, gebruikt door de 1.x-firmware (~40 KB bruikbaar DRAM). Terug naar 1.x betekent de Wemos D1 mini terugplaatsen in de OTGW Classic. |
+| **ESP32** | Espressif ESP32-S3 op de LOLIN S3 Mini of S3 Mini Pro, met WiFi, Bluetooth en meer RAM; gebruikt door de 2.x-firmware in de OTGW Classic. |
+| **Frame Bridge** | Abstractielaag (ADR-087) die een uniforme OpenTherm frame-interface biedt, ongeacht of het onderliggende transport de PIC UART (PIC-gatewaymodus) of OTDirect (OT-Direct-modus) is. |
 | **F8.8** | OpenTherm-getal met vaste komma: 16 bits, waarvan 8 bit geheel en 8 bit breuk (resolutie 1/256 ≈ 0,004). |
-| **HA** | Home Assistant — open source domotica-platform, primaire integratiedoelstelling. |
-| **LLMNR** | Link-Local Multicast Name Resolution — naamresolutie op Windows-netwerken, poort 5355 UDP. |
-| **LittleFS** | Bestandssysteem voor flash-geheugen op ESP8266/ESP32, gebruikt voor instellingen, HTML, bestanden. |
-| **LWT** | Last Will and Testament — MQTT-bericht dat automatisch wordt gepubliceerd bij verbreking van de verbinding. |
-| **mDNS** | Multicast DNS — zorgt dat het apparaat bereikbaar is als `<hostname>.local`. Poort 5353 UDP. |
-| **MQTT** | Message Queuing Telemetry Transport — lichtgewicht publish/subscribe-protocol voor IoT. Poort 1883 TCP. |
-| **NTP** | Network Time Protocol — tijdsynchronisatie via internet. Poort 123 UDP. |
-| **OLED** | Organic Light Emitting Diode — klein display op het OTGW32-bord, aangestuurd via I2C (SSD1306). |
-| **OT** | OpenTherm — communicatieprotocol tussen thermostaat en cv-ketel. |
-| **OTGW** | OpenTherm Gateway — de hardware die de OT-bus afluistert en stuurt; hier ook: het hele project. |
-| **OTGW32** | Nieuwe ESP32-S3 boardvariant met directe OT-busaansluiting (geen PIC nodig). |
-| **OTDirect** | ESP32-implementatie die direct via GPIO de OT-bus communiceert, zonder PIC-microcontroller. Ondersteunt gateway, monitor, bypass, master en loopback operating modes (ADR-064). |
+| **HA** | Home Assistant: open source domotica-platform, primaire integratiedoelstelling. |
+| **LLMNR** | Link-Local Multicast Name Resolution: naamresolutie op Windows-netwerken, poort 5355 UDP. |
+| **LittleFS** | Bestandssysteem voor flash-geheugen op de ESP32-S3, gebruikt voor instellingen, HTML, bestanden. |
+| **LWT** | Last Will and Testament: MQTT-bericht dat automatisch wordt gepubliceerd bij verbreking van de verbinding. |
+| **mDNS** | Multicast DNS: zorgt dat het apparaat bereikbaar is als `<hostname>.local`. Poort 5353 UDP. |
+| **MQTT** | Message Queuing Telemetry Transport: lichtgewicht publish/subscribe-protocol voor IoT. Poort 1883 TCP. |
+| **NTP** | Network Time Protocol: tijdsynchronisatie via internet. Poort 123 UDP. |
+| **OLED** | Organic Light Emitting Diode: optioneel klein display op de I2C-header van de OTGW Classic, aangestuurd via I2C (SSD1306). |
+| **OT** | OpenTherm: communicatieprotocol tussen thermostaat en cv-ketel. |
+| **OTGW** | OpenTherm Gateway: de hardware die de OT-bus afluistert en stuurt; hier ook: het hele project. |
+| **OTDirect** | De directe OT-businterface van de firmware, gebruikt in OT-Direct-modus op hardware zonder PIC. Ondersteunt gateway, monitor, bypass, master en loopback operating modes (ADR-064). |
 | **OPV** | Overshoot Protection Value. SAT-kalibratieparameter (ADR-076) die overshoot van de aanvoertemperatuur bij branderstart beperkt door het initiële setpoint-boost te begrenzen. |
-| **OTA** | Over-The-Air — firmware-update via WiFi. |
-| **PIC** | Microchip PIC16F-microcontroller op het Nodoshop OTGW-bord; verzorgt de OT-buscommunicatie op ESP8266. |
-| **PID** | Proportioneel-Integrerend-Differentiërend — regelalgoritme gebruikt door SAT voor ruimtetemperatuurregeling. |
-| **platform.h** | Unified platform abstraction header (ADR-061). Biedt `#define`-guards en typedefs die ESP8266- en ESP32-specifieke code achter een enkele interface isoleren. |
-| **PROGMEM** | Flash-geheugenopslag voor constante tekenreeksen op AVR/ESP8266; via `F()` en `PSTR()` in code. |
-| **REST** | Representational State Transfer — architectuurstijl voor HTTP-API's. |
+| **OTA** | Over-The-Air: firmware-update via WiFi. |
+| **PIC** | Microchip PIC16F-microcontroller op het Nodoshop OTGW Classic-bord; verzorgt de OT-buscommunicatie in PIC-gatewaymodus. |
+| **PID** | Proportioneel-Integrerend-Differentiërend: regelalgoritme gebruikt door SAT voor ruimtetemperatuurregeling. |
+| **platform.h** | Platform abstraction header (ADR-061), in `src/libraries/Platform/src/`. Biedt `platformXxx()`-shims en typedefs die platformspecifieke code achter een enkele interface houden; de `HAS_*`-capability flags komen uit `boards.h`. |
+| **PROGMEM** | Flash-geheugenopslag voor constante tekenreeksen; via `F()` en `PSTR()` in code. De regel komt uit de 1.x-lijn (ESP8266, ~40 KB RAM) en geldt ook op 2.x. |
+| **REST** | Representational State Transfer: architectuurstijl voor HTTP-API's. |
 | **S0** | Pulsteller-interface (DIN 43864) voor energiemeters; geeft pulsen per kWh. |
-| **SAT** | Smart Autotune Thermostat — ingebedde PID-ruimtetemperatuurregelaar in de firmware. |
+| **SAT** | Smart Autotune Thermostat: ingebedde PID-ruimtetemperatuurregelaar in de firmware. |
 | **SimpleTelnet** | Meegeleverde multi-client Telnet-bibliotheek (1.0.0) met zowel streaming- als regel-invoer (CLI) modus. Vervangt de eerdere TelnetStream- en ESPTelnet-bibliotheken. Gebruikt voor de debugconsole op poort 23 en de PIC-seriële TCP-brug op poort 25238. Locatie: `src/libraries/SimpleTelnet/`. |
-| **SSD1306** | I2C OLED-displaycontroller, 128×64 pixels. |
-| **TCP** | Transmission Control Protocol — verbindingsgericht transportprotocol. |
-| **TRV** | Thermostatic Radiator Valve — thermostatische radiatorkraan. |
-| **UDP** | User Datagram Protocol — verbindingsloos transportprotocol (NTP, mDNS). |
-| **W5500** | Wiznet hardwarecontroller voor wired Ethernet, gebruikt op OTGW32. |
+| **SSD1306** | I2C OLED-displaycontroller, 128×64 pixels; voor het optionele OLED op de I2C-header van de OTGW Classic. |
+| **TCP** | Transmission Control Protocol: verbindingsgericht transportprotocol. |
+| **TRV** | Thermostatic Radiator Valve: thermostatische radiatorkraan. |
+| **UDP** | User Datagram Protocol: verbindingsloos transportprotocol (NTP, mDNS). |
 | **WebSocket** | Protocol voor tweerichtingscommunicatie over HTTP-poort; gebruikt voor realtime OT-logstroom. |
 | **WiFiManager** | Arduino-bibliotheek voor WiFi-configuratie via een tijdelijk access point. |
 
@@ -222,8 +220,7 @@ De firmware opent de volgende netwerk-poorten. Alle diensten zijn beschikbaar op
 | Beschrijving | URL |
 |-------------|-----|
 | GitHub-repository | `https://github.com/rvdbreemen/OTGW-firmware` |
-| NodoShop OTGW-hardware (ESP8266) | `https://www.nodo-shop.nl/nl/opentherm-gateway` |
-| NodoShop OTGW32-hardware (ESP32) | `https://www.nodo-shop.nl/nl/` (zoek op OTGW32) |
+| NodoShop OTGW-hardware (OTGW Classic) | `https://www.nodo-shop.nl/nl/opentherm-gateway` |
 | Firmware releases | `https://github.com/rvdbreemen/OTGW-firmware/releases` |
 | Wijzigingslogboek | `CHANGELOG.md` in de repository |
 
@@ -244,7 +241,6 @@ De firmware opent de volgende netwerk-poorten. Alle diensten zijn beschikbaar op
 | Bericht-ID referentie (uitgebreid) | `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2-message-id-reference.md` |
 | OTGW PIC-firmware (Schelte Bron) | `https://otgw.tclcode.com/firmware.html` |
 | OTmonitor (referentieclient) | `https://otgw.tclcode.com/` |
-| OT-Thing (ESP32 referentie) | `other-projects/OT-Thing-OTGW32/` (lokale kopie) |
 | SAT Python-referentie (thermo-nova) | `other-projects/SAT-releases-thermo-nova/` (lokale kopie) |
 | PIC-firmware broncode | `other-projects/otgw-6.6/` (lokale kopie) |
 
@@ -264,10 +260,10 @@ Vastgeprikte versies staan in `platformio.ini`. Meegeleverde bibliotheken bevind
 | NetApiHelpers | 1.0.2 | Build-time gepatcht voor Arduino Core 3.x compatibiliteit |
 | OneWire | 2.3.8 | 1-Wire transport voor DS18B20 |
 | DallasTemperature | 4.0.6 | DS18B20 temperatuursensoren (`https://github.com/milesburton/Arduino-Temperature-Control-Library`) |
-| EthernetESP32 | 1.0.2 (alleen ESP32) | W5500 SPI Ethernet-driver voor OTGW32 |
-| OpenTherm Library | 1.1.5 (meegeleverd, alleen ESP32) | OTDirect GPIO OT-transport (`https://github.com/ihormelnyk/opentherm_library`) |
-| OTGWSerial (Schelte Bron) | meegeleverd (alleen ESP8266) | PIC-microcontroller UART-protocol |
-| SSD1306Ascii | geïnstalleerd (alleen ESP32) | OLED-display driver (ADR-067) |
+| EthernetESP32 | 1.0.2 | W5500 SPI Ethernet-driver, alleen gebruikt met Ethernet-hardware |
+| OpenTherm Library | 1.1.5 (meegeleverd) | OT-transport voor OT-Direct-modus (`https://github.com/ihormelnyk/opentherm_library`) |
+| OTGWSerial (Schelte Bron) | meegeleverd | PIC-microcontroller UART-protocol (PIC-gatewaymodus) |
+| SSD1306Ascii | 1.3.5 | OLED-display driver (ADR-067) |
 
 ---
 
@@ -280,13 +276,11 @@ Het volledige wijzigingslogboek staat in `CHANGELOG.md` in de repository. Hieron
 Dit is een grote versiesprong met uitgebreide nieuwe functionaliteit:
 
 **Nieuw:**
-- Dual-platform ondersteuning: één codebase voor ESP8266 (Nodoshop OTGW) en ESP32 (OTGW32)
-- OTDirect: directe GPIO OpenTherm-communicatie op ESP32 zonder PIC-microcontroller
-- W5500 Ethernet-ondersteuning op OTGW32 met automatische WiFi/Ethernet-overschakeling
+- ESP32-S3-lijn: 2.0.0 draait op de Nodoshop OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro in de Wemos D1 mini-voet; de PIC blijft zitten. Eén `esp32-combo`-image detecteert de PIC bij het opstarten. De 1.x-firmware voor de Wemos D1 mini (ESP8266) gaat door als eigen onderhoudslijn
 - SAT (Smart Autotune Thermostat): volledig PID-regelalgoritme met stooklijnadvies, multi-zone, drukbewaking, zomerschemaschakelaar, BLE-sensoren
-- OLED-display via SSD1306 (ESP32)
+- Optioneel OLED-display via SSD1306 op de I2C-header van de OTGW Classic
 - AP-fallback modus (beta builds): tijdelijk access point bij ontbrekend WiFi
-- PlatformIO-ondersteuning voor ESP32-builds
+- PlatformIO-ondersteuning voor de ESP32-S3-build
 
 **Opgelost:**
 - Foutieve MQTT-routering van OTGW-antwoordberichten
@@ -296,11 +290,10 @@ Dit is een grote versiesprong met uitgebreide nieuwe functionaliteit:
 
 **Gewijzigd:**
 - Settings/state architectuur: 62+ vlakke globals vervangen door `OTGWSettings` en `OTGWState` structs (ADR-051)
-- Netwerktoegang geabstraheerd via `isNetworkUp()` en `getActiveIP()`
 - LittleFS-bestandenindeling voor SAT hernoemd naar `/sat/`
 - Async bitmap-driven MQTT discovery drip publisher: HA auto-discovery payloads worden nu asynchroon in kleine batches gepubliceerd via een bitmap-scheduler, waardoor geheugenpieken bij MQTT-verbinding worden voorkomen
 - Nachtelijke herstart: instelbare geplande herstart om heap-geheugen vrij te maken bij lange uptimes; via REST API en instellingen configureerbaar
-- 16 nieuwe ADR's (061-076) voor unified platform abstraction, OTGW32 hardware, OTDirect operating modes, SAT PID v3, heating curve algorithm, SAT MQTT topics, BLE platform compatibility en WiFi reconnect timeout tuning. Zie sectie 10.8 voor de volledige referentie
+- Nieuwe ADR's (061-076) voor unified platform abstraction, OTDirect operating modes, SAT PID v3, heating curve algorithm, SAT MQTT topics, BLE platform compatibility en WiFi reconnect timeout tuning. Zie sectie 10.8 voor de volledige referentie
 
 #### v1.3.5 (6 april 2026)
 
@@ -335,31 +328,13 @@ Dit is een grote versiesprong met uitgebreide nieuwe functionaliteit:
 - Home Assistant auto-discovery aanzienlijk uitgebreid
 - SAT-subsysteem geïntroduceerd in vroege versies
 - REST API v2 dispatchtabel ingevoerd
-- OTDirect eerste ESP32-implementaties
 - Diverse PROGMEM- en stack-bugfixes
 
-Voor de volledige historiek van alle versies, zie `CHANGELOG.md`. Alle releases zijn beschikbaar als GitHub Release met bijbehorende firmware-binaries voor ESP8266 en ESP32.
+Voor de volledige historiek van alle versies, zie `CHANGELOG.md`. Alle releases zijn beschikbaar als GitHub Release met bijbehorende firmware-binaries: voor de 2.x-lijn het `esp32-combo`-zipbestand, voor de 1.x-lijn de Wemos D1 mini (ESP8266).
 
 ---
 
 ### 10.7 Bekende beperkingen en voorbehouden
-
-#### ESP8266 geheugen
-
-De ESP8266 beschikt over ongeveer 40 KB bruikbaar DRAM. Dit stelt harde grenzen aan:
-- Maximaal aantal gelijktijdig verbonden WebSocket-clients (20)
-- Omvang van JSON-antwoorden (chunked transfer voor alles boven ~2 KB)
-- SAT-ringbuffer: slechts 30 slots op ESP8266 versus meer op ESP32
-- MQTT-clientbuffer: 384 bytes voor inkomende berichten
-
-Wanneer het vrije heap-geheugen onder drempelwaarden zakt, weigert de firmware nieuwe WebSocket-verbindingen en MQTT-publicaties om crash te voorkomen. De gezondheidsdrempelwaarden:
-
-| Niveau | Vrij heap | Gedrag |
-|--------|-----------|--------|
-| `healthy` | > 15 KB | Normaal |
-| `low` | 10–15 KB | Waarschuwing in gezondheids-API |
-| `warning` | 6–10 KB | WebSocket-berichten gepauzeerd |
-| `critical` | < 6 KB | Noodmodus, gedeeltelijke sluiting |
 
 #### Geen HTTPS of WSS
 
@@ -387,13 +362,12 @@ De volledige ADR-index met onderwerpindeling en afhankelijkheiddiagrammen staat 
 
 #### Nieuwe ADR's sinds v1.3.5
 
-Deze ADR's zijn toegevoegd tijdens de v2.0.0-ontwikkelcyclus (ESP32/OTGW32 dual-platform ondersteuning, SAT thermostat en gerelateerd werk):
+Deze ADR's zijn toegevoegd tijdens de v2.0.0-ontwikkelcyclus (de ESP32-S3-port, SAT thermostat en gerelateerd werk):
 
 | ADR | Titel | Status |
 |-----|-------|--------|
 | 061 | Unified ESP8266/ESP32 Platform Abstraction | Accepted |
 | 062 | SAT Smart Autotune Thermostat Integration | Accepted |
-| 063 | OTGW32 Hardware Support | Accepted |
 | 064 | OTDirect Operating Mode Architecture | Accepted |
 | 065 | Frame Bridge Pattern | Accepted |
 | 066 | Thermostat Auto-Detection Master Mode | Accepted |
@@ -415,7 +389,7 @@ Deze ADR's zijn toegevoegd tijdens de v2.0.0-ontwikkelcyclus (ESP32/OTGW32 dual-
 | 001 | Accepted | Superseded by ADR-061 |
 | 047 | Superseded by ADR-061 | Superseded by ADR-075 |
 
-#### Volledige ADR-catalogus (alle 76 ADR's)
+#### ADR-catalogus (001 t/m 076)
 
 | ADR | Titel | Status |
 |-----|-------|--------|
@@ -481,7 +455,6 @@ Deze ADR's zijn toegevoegd tijdens de v2.0.0-ontwikkelcyclus (ESP32/OTGW32 dual-
 | 060 | PIC Availability Guard Pattern | Accepted |
 | 061 | Unified ESP8266/ESP32 Platform Abstraction | Accepted |
 | 062 | SAT Smart Autotune Thermostat Integration | Accepted |
-| 063 | OTGW32 Hardware Support | Accepted |
 | 064 | OTDirect Operating Mode Architecture | Accepted |
 | 065 | Frame Bridge Pattern | Accepted |
 | 066 | Thermostat Auto-Detection Master Mode | Accepted |
