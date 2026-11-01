@@ -136,6 +136,7 @@ ADRs live in `docs/adr/`. Read relevant ADRs before architecture, NFR, API contr
 - **ADR-101**: Flat per-value MQTT topics over aggregated JSON payloads (gated by `bin/adr-judge`)
 - **ADR-146**: No ArduinoJson: the hand-rolled streaming JSON writer (JsonEmit) on the ESP32-S3 REST path (gated by `check_no_arduinojson` in evaluate.py)
 - **ADR-177**: Keep the PIC byte stream verbatim from the serial task to every consumer (gated by the adr-judge declarative rules on the raw-path files)
+- **ADR-201**: Combo board detection persists only a positive PIC verdict and re-probes every boot (gated by `tests/test_board_detect_persist_gate.py`, which compiles the real detection blocks and fails on a mutant that persists a no-PIC verdict)
 
 **Structural / architectural ADRs** (reviewed at PR, no automated gate — see ADR-080):
 - **ADR-044**: Single-point-of-instantiation for globals

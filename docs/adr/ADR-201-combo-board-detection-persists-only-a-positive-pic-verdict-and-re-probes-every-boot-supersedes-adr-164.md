@@ -3,8 +3,8 @@ id: "ADR-201"
 title: "Combo board detection persists only a positive PIC verdict and re-probes every boot (supersedes ADR-164)"
 status: "Accepted"
 date: "2026-10-25"
-binding: false
-gate: null
+binding: true
+gate: "tests/test_board_detect_persist_gate.py"
 documents_shipped: true
 verified_in:
   - "commit:2a820ac11"
