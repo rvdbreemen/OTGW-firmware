@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T19:14:00Z'
-updated_date: '2026-10-31T22:50:00Z'
+updated_date: '2026-11-01T08:42:00Z'
 labels:
   - webui
 milestone: 2.0.0
@@ -24,3 +24,11 @@ Robert 2026-10-24 (ADR-200 open question 2): the v2 UI lists only bits 0-3 (data
 <!-- AC:BEGIN -->
 - [ ] #1 The trigger-bit selector shows 16 named options, saving bit 8 stores 8 (browser test red on HEAD, green; screenshot)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Evidence 2026-10-31: tests/webui/v2-settings-sat-followups.test.mjs new 37/37, old v2.js fails 'select offers 16 named bits' (n=4) and 'saving bit 8 posts 8'; trigger-bit-labels.test.mjs new 5/5, old 4 FAIL. Screenshot scratchpad shots1358/new/trigger-bit-8.png. Pending: bench (build alpha.588 was blocked by low memory).
+
+2026-11-01 evidence on alpha.597: browser test v2-settings-sat-followups.test.mjs PASS 'GPIO trigger-bit select offers 16 named bits' and 'saving bit 8 posts gpiooutputstriggerbit = 8'; trigger-bit-labels.test.mjs 5/5; served bench v2.js carries TRIGGER_BITS with 16 named entries. Open: the screenshot the AC asks for (Chrome extension not connected this session).
+<!-- SECTION:NOTES:END -->

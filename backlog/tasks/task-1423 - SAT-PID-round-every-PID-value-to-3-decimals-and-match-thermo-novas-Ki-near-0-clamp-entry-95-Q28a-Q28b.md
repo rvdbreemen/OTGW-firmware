@@ -3,11 +3,11 @@ id: TASK-1423
 title: >-
   SAT PID: round every PID value to 3 decimals and match thermo-nova's Ki-near-0
   clamp (entry 95, Q28a/Q28b)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-28T07:51:00Z'
-updated_date: '2026-10-31T22:20:00Z'
+updated_date: '2026-11-01T08:41:00Z'
 labels:
   - sat
   - sergeant-d
@@ -31,10 +31,10 @@ Sergeant D 2026-10-28 (entry 95): Q28a 'Round all the values to 3 decimals not o
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test: gains, P, I, D, raw derivative and output are rounded to 3 decimals (red on HEAD, green on fix)
-- [ ] #2 Host test: integral clamp with Ki near 0 behaves as pid.py (red on HEAD where it differs)
-- [ ] #3 ADR-197 updated with entry 95
-- [ ] #4 build + evaluate green
+- [x] #1 Host test: gains, P, I, D, raw derivative and output are rounded to 3 decimals (red on HEAD, green on fix)
+- [x] #2 Host test: integral clamp with Ki near 0 behaves as pid.py (red on HEAD where it differs)
+- [x] #3 ADR-197 updated with entry 95
+- [x] #4 build + evaluate green
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -48,3 +48,9 @@ Sergeant D 2026-10-28 (entry 95): Q28a 'Round all the values to 3 decimals not o
 
 Correction: the 2026-10-30 note that TASK-1414 is not Done is stale; 1414, 1368, 1416, 1417, 1418 are Done.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1/AC2: tests/test_sat_pid_cadence.py 31/31 OK; bench MQTT sat/pid_attributes shows rounded terms. AC3: ADR-197 records entry 95 (Q28a rounding, Q28b Ki-near-0) at lines 117 and 121; its 'pending in TASK-1423' wording is now stale but ADR-197 is Accepted and not edited. Build: esp32-combo 2.0.0-alpha.597+d458ac3 (build/…-flash.zip 08:51, built and posted by the coordinating session); the task commit is an ancestor of d458ac3 (git merge-base --is-ancestor). evaluate.py --quick 2026-11-01: 0 FAIL, Health 100%. Bench .61 (OT-Direct) runs 2.0.0-alpha.597+d458ac3 (/api/v2/device/info), up 25 min without reboot.
+<!-- SECTION:FINAL_SUMMARY:END -->

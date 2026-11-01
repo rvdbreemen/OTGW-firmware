@@ -1,11 +1,11 @@
 ---
 id: TASK-1362
 title: 'SAT: summer simmer cutoff leaves PWM and resets its state like the cold cutoff'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-24T20:26:00Z'
-updated_date: '2026-10-31T22:20:00Z'
+updated_date: '2026-11-01T08:41:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -22,7 +22,7 @@ Robert 2026-10-24 (ADR-199 open question 2), audit #49: the firmware-only summer
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 After a summer simmer cutoff PWM is off and its state reset (host test red on HEAD, green)
+- [x] #1 After a summer simmer cutoff PWM is off and its state reset (host test red on HEAD, green)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -34,3 +34,9 @@ Implemented (sonnet lane wt-1362): summer simmer block calls satPwmDisableOnHeat
 
 2026-10-31 worktree cleanup: unmerged work sits in lane wt-1362 (archived as D:\Users\Robert\Documents\GitHub\RvdB\lane-archive-20261031\wt-1362.uncommitted.patch). Not merged: it changes SAT behaviour and its Sergeant D question (Q-1362 a) is still queued, never asked; ask it, then merge.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: tests/test_sat_pwm_override.py 79/79 OK incl. test_summer_simmer_cutoff_disables_pwm_and_resets_its_state, test_summer_end_starts_a_fresh_decision_not_the_stale_held_cs, test_summer_simmer_block_calls_the_pwm_disable. Build: esp32-combo 2.0.0-alpha.597+d458ac3 (build/…-flash.zip 08:51, built and posted by the coordinating session); the task commit is an ancestor of d458ac3 (git merge-base --is-ancestor). evaluate.py --quick 2026-11-01: 0 FAIL, Health 100%. Bench .61 (OT-Direct) runs 2.0.0-alpha.597+d458ac3 (/api/v2/device/info), up 25 min without reboot.
+<!-- SECTION:FINAL_SUMMARY:END -->

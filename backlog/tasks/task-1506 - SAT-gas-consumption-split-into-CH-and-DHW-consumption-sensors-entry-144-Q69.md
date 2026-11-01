@@ -3,11 +3,11 @@ id: TASK-1506
 title: >-
   SAT gas consumption: split into CH and DHW consumption sensors (entry 144,
   Q69)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:45:00Z'
-updated_date: '2026-10-31T22:20:00Z'
+updated_date: '2026-11-01T08:41:00Z'
 labels:
   - sat sergeant-d mqtt
 milestone: 2.0.0
@@ -25,9 +25,9 @@ Sergeant D 2026-10-30 06:42 on Q69: 'you can have a split gas consumption sensor
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Sergeant D's confirmation of the entry 144 reading recorded in sergeant-d-corrections.md
-- [ ] #2 Host test on the real publish path: flame + CH mode -> CH value, DHW 0; flame + DHW active -> DHW value, CH 0; no flame -> both 0 (red on HEAD for the DHW topic)
-- [ ] #3 HA discovery entity for sat/consumption_dhw; docs/api/MQTT.md and firmware-sat-spec.md updated
-- [ ] #4 build + evaluate green
+- [x] #2 Host test on the real publish path: flame + CH mode -> CH value, DHW 0; flame + DHW active -> DHW value, CH 0; no flame -> both 0 (red on HEAD for the DHW topic)
+- [x] #3 HA discovery entity for sat/consumption_dhw; docs/api/MQTT.md and firmware-sat-spec.md updated
+- [x] #4 build + evaluate green
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -39,3 +39,9 @@ Review (sonnet, contract lens): PASS. No discovery id/topic derives from the tab
 
 2026-10-31 worktree cleanup: unmerged work of this task sits in lane wt-1506 (archived as D:\Users\Robert\Documents\GitHub\RvdB\lane-archive-20261031\wt-1506.uncommitted.patch); the lane is kept and will be merged into dev (Robert: merge lanes where possible).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC2: tests/test_sat_consumption.py 10/10 OK (real publish path). AC3: bench retained discovery homeassistant/sensor/otgw-1020BA21B4F8/sat_sat_consumption_dhw/config 'SAT DHW Gas Consumption' m3/h volume_flow_rate, plus sat_sat_consumption 'SAT CH Gas Consumption'; docs/api/MQTT.md:459 and firmware-sat-spec.md:3245 describe sat/consumption_dhw; test_sat_energy_discovery 6/6 OK. Build: esp32-combo 2.0.0-alpha.597+d458ac3 (build/…-flash.zip 08:51, built and posted by the coordinating session); the task commit is an ancestor of d458ac3 (git merge-base --is-ancestor). evaluate.py --quick 2026-11-01: 0 FAIL, Health 100%. Bench .61 (OT-Direct) runs 2.0.0-alpha.597+d458ac3 (/api/v2/device/info), up 25 min without reboot.
+<!-- SECTION:FINAL_SUMMARY:END -->
