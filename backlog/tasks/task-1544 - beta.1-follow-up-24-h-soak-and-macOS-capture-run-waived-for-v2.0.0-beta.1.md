@@ -4,6 +4,7 @@ title: 'beta.1 follow-up: 24 h soak and macOS capture run (waived for v2.0.0-bet
 status: To Do
 assignee: []
 created_date: '2026-11-01T15:47:00Z'
+updated_date: '2026-11-01T15:50:00Z'
 labels:
   - beta
   - release
@@ -23,4 +24,6 @@ TASK-1504 AC2 (macOS capture run by a tester) and AC3 (24 h soak on Classic + S3
 <!-- AC:BEGIN -->
 - [ ] #1 24 h soak of a beta build on the Classic + S3 Mini without an unexplained reboot; crashlog and reboot_log quoted
 - [ ] #2 Capture run from the release zip on macOS by a named tester, with transcript
+- [ ] #3 Capture runs from the beta zip on Windows and Linux, each with a transcript (TASK-1504 AC2 asked for all three OSes)
+- [ ] #4 Update over WiFi with the release zip through the /update page (the path the release notes give users), then device/info shows the new version and settings are kept
 <!-- AC:END -->
