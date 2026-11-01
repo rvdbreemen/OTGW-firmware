@@ -7,10 +7,9 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T16:30:00Z'
-updated_date: '2026-11-01T20:36:00Z'
+updated_date: '2026-11-01T22:31:00Z'
 labels:
   - sat
-  - needs-maintainer-ok
 dependencies: []
 priority: medium
 ordinal: 702000
@@ -41,4 +40,6 @@ Reported by gruijter (tester), #alpha-testing msg 1566487960164110377 (alpha.597
 2026-11-01 17:55 Sergeant D: thermo-nova's 22 C was a mistaken request, 28.2 intended (entry 200); confirms option A.
 
 2026-11-01 shipped as 2.0.1-alpha.1 (bf57355dd), posted with alpha.2 (Discord msg 1566551398550737136). Evidence: host tests tests/test_sat_cold_hysteresis.cpp (gruijter's request sequence: bare rule 17 CH changes, latched 3; does not compile on the old header) and tests/test_sat_cold_hysteresis_source.py (4 failures on old, 4/4 on fix); PWM harnesses green (pwm_override 79, hp_pwm 27, overshoot_sustain 43, no_return_ignition 19, pwm_start_limit 22); full tests folder: only the 3 failures that also fail on clean origin/dev (manual_sat_commands, sat_mqtt_contract_1485, sat_preset_persist). evaluate --quick 80/0. Bench .63 Classic+S3 PIC 6.8, OTA 2.0.1-alpha.2+6f44f9d, SAT simulation: narration 21:19:11 'Heating on: requested 29.8 is above the cold setpoint 28.2 + 0.5 hysteresis'; 41 control ticks, CS=10 exactly when CH=0 (0 mismatches); stable 9 min after reboot. NOT shown on the bench: a request held inside 28.2-28.7 staying off (the simulation's D term jumps past the band on every target change); that case rests on the host replay. AC#3 (mild-day replay with fewer starts and no heat loss) stays open: the field capture from a tester on alpha.2 is the evidence; In Progress until then.
+
+2026-11-01: needs-maintainer-ok dropped (Robert gave the OK; built as 2.0.1-alpha.1, contained in 2.0.0-beta.2). AC#3 closes with gruijter's next capture or a mild-day replay through the TASK-1532 simulation boiler comparing heat delivered.
 <!-- SECTION:NOTES:END -->
