@@ -131,6 +131,6 @@ Before you begin, you need:
 - For MQTT and Home Assistant integration: a running MQTT broker (such as Mosquitto) on your local network.
 - For full Home Assistant auto-discovery: Home Assistant with the MQTT integration enabled.
 
-The firmware does not require an internet connection for normal operation. An internet connection is used optionally for: NTP time synchronization, one-click OTA updates from GitHub, and the Open-Meteo weather API used by SAT for outdoor temperature and solar data.
+The firmware does not require an internet connection for normal operation. An internet connection is used optionally for: NTP time synchronization and the Open-Meteo weather API used by SAT for outdoor temperature and solar data.
 
 ---

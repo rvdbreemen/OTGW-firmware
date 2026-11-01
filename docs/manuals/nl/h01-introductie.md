@@ -25,7 +25,7 @@ Zonder firmware is de OpenTherm Gateway een slimme maar moeilijk toegankelijke h
 - Weergegevens ophaalt via Open-Meteo voor buitentemperatuur en zonnestand wanneer er geen lokale sensor beschikbaar is
 - Een nachtelijke herstart kan inplannen om heap-fragmentatie op te lossen bij langlopende apparaten
 
-De firmware is ontworpen voor een vertrouwd thuisnetwerk. Er is geen clouddienst, geen app-store-account en geen internetverbinding vereist. NTP-tijdsynchronisatie, optionele OTA-updates via GitHub en de optionele weergegevens voor SAT via Open-Meteo zijn de enige online functies.
+De firmware is ontworpen voor een vertrouwd thuisnetwerk. Er is geen clouddienst, geen app-store-account en geen internetverbinding vereist. NTP-tijdsynchronisatie en de optionele weergegevens voor SAT via Open-Meteo zijn de enige online functies.
 
 ---
 
@@ -157,7 +157,7 @@ Voor gebruik van OTGW-firmware heeft u nodig:
 - Een USB-kabel om de S3 Mini de eerste keer te flashen
 - Het flash-script uit de zip: `flash_otgw.bat` (Windows) of `./flash_otgw.sh` (Linux, macOS)
 
-De firmware vereist geen internetverbinding voor normaal gebruik. Een internetverbinding wordt optioneel gebruikt voor: NTP-tijdsynchronisatie, OTA-updates via GitHub, en de Open-Meteo weer-API voor buitentemperatuur en zonnestand in SAT.
+De firmware vereist geen internetverbinding voor normaal gebruik. Een internetverbinding wordt optioneel gebruikt voor: NTP-tijdsynchronisatie en de Open-Meteo weer-API voor buitentemperatuur en zonnestand in SAT.
 
 ---
 

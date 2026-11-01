@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T17:57:00Z'
-updated_date: '2026-11-01T18:19:00Z'
+updated_date: '2026-11-01T18:29:00Z'
 labels:
   - docs
 dependencies: []
@@ -30,4 +30,6 @@ Robert 2026-11-01 (AskUserQuestion after TASK-1548): one cleanup task. docs/manu
 
 <!-- SECTION:NOTES:BEGIN -->
 ch01/h01 done: OTGW32 EN 7->0, NL 6->0; ESP8266 EN 13->5, NL 17->6 (all 1.x context or 'Wemos D1 mini socket'). NL flash_esp.py lines (158,178,112) replaced by flash_otgw.bat/.sh. Renamed headings: 'Both Platforms (ESP8266 and ESP32)' -> 'Standard Features', 'ESP32 / OTGW32 Only' -> 'Hardware-Dependent Features', NL 'Platformvergelijking: ESP8266 vs ESP32' -> 'Platformvergelijking'; no inbound links. NL RAM row dropped (no source for S3 figure); NL bug-report field 'platformtype' -> 'firmwarelijn (1.x of 2.x)'. docs/MANUAL.md in scope too (combined manual, hand-maintained, diverged from chapters: targeted edits only). scripts/docs-scope-2x.sh findings now cover NL + MANUAL.md with the widened pattern.
+
+ch02/h02 done: OTGW32 EN 13->0, NL 16->0; ESP8266 EN 27->5, NL 27->6 (socket wording or 1.x context). Supported-hardware, pin-map and flash sections rewritten for Classic + S3 Mini/Mini Pro and flash_otgw.bat/.sh; W5500 section cut to one neutral sentence; BLE/OLED labels corrected; Dallas default doc'd as GPIO 10 from code (Sensorstypes.h:23) - wiring on S3 not verified. Fixed by lead: ch01/h01 'one-click OTA from GitHub' removed (no GitHub API call in src), broken ../docs/BREAKING_CHANGES.md link -> ../../BREAKING_CHANGES.md in ch02/h02. Out-of-scope findings: flash_otgw.sh/.bat banners and --help print 'Nodoshop OTGW32' (user-visible); docs/MANUAL.md line 13 names OTGW32 (handled in the MANUAL.md pass).
 <!-- SECTION:NOTES:END -->

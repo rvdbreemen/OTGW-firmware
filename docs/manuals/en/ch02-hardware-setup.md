@@ -2,108 +2,58 @@
 
 ### Supported Hardware
 
-#### ESP8266 OTGW (NodoShop)
+#### OTGW Classic with LOLIN S3 Mini or S3 Mini Pro (NodoShop)
 
-The NodoShop OpenTherm Gateway with an ESP8266 module is the primary and longest-supported hardware target. Two board revisions exist:
-
-| NodoShop OTGW version | ESP8266 module |
-|---|---|
-| 1.x through 2.0 | NodeMCU ESP8266 |
-| 2.3 and later | Wemos D1 mini ESP8266 |
-
-Both revisions use the same firmware binary. The NodeMCU and Wemos D1 mini modules are pin-compatible from the firmware's perspective.
+The 2.x firmware runs on the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro (ESP32-S3) in the Wemos D1 mini socket. The S3 Mini fits the Wemos D1 mini socket: each Classic signal lands on the S3 GPIO at the matching hole. The PIC stays in place. You flash one image, `esp32-combo`, which detects the PIC at boot and runs in PIC gateway mode.
 
 Characteristics:
 
-- ESP8266 at 160 MHz (configured in `platformio.ini`), approximately 80 KB usable RAM
 - PIC16F88 or PIC16F1847 co-processor for the OpenTherm bus
-- 4 MB SPI flash, `eagle.flash.4m2m.ld` linker layout: 1 MB firmware, 2 MB LittleFS, 1 MB reserved for OTA
-- Micro-USB connector for power and flashing
-- I2C pins for optional OLED display and external watchdog
-- 1-Wire GPIO for Dallas DS18B20 temperature sensors
-
-The PlatformIO environment is `esp8266` (board `d1_mini`, platform `espressif8266@4.2.1`, Arduino Core 3.1.2). The same binary runs on both NodeMCU and D1 mini variants.
-
-#### ESP32-S3 OTGW32 (NodoShop)
-
-The OTGW32 is a separate board from NodoShop built around an ESP32-S3 module. It includes onboard OpenTherm bus circuitry that allows the ESP32-S3 to communicate directly on the OpenTherm bus without a PIC co-processor. The PIC firmware chip is optional: when present, it provides the classic serial bridge path; when absent, OTDirect GPIO mode takes over.
-
-Characteristics:
-
-- ESP32-S3 at 240 MHz, approximately 300 KB usable RAM
-- No PIC co-processor: OpenTherm is handled natively via OTDirect on GPIO
-- OTDirect master/slave GPIO pins for direct OpenTherm bus communication
-- Step-up converter (18V) for OT bus power, controlled via GPIO
-- Bypass relay output (GPIO 47)
-- W5500 SPI Ethernet header for wired networking
-- I2C header for SSD1306 OLED display
-- Bluetooth LE radio for BLE temperature sensors (Xiaomi LYWSD03MMC)
+- ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the Wemos D1 mini socket
 - 4 MB SPI flash with a safeboot partition layout: one firmware slot plus an updater for firmware updates over WiFi (see Partition Table below)
-- USB-C connector
-- Two buttons: boot button (GPIO 0) and config button (GPIO 9)
-- Three LEDs: OT red (GPIO 2), status (GPIO 8), and OT green (GPIO 48)
+- I2C header for the external watchdog and an optional SSD1306 OLED display
+- 1-Wire GPIO for Dallas DS18B20 temperature sensors
+- Bluetooth LE radio for BLE temperature sensors
+- The on-board RGB pixel of the LOLIN module shows the WiFi status
+- No Ethernet and no OT-Direct hardware
 
-#### ESP32 (generic, experimental)
-
-Standard (non-S3) ESP32 modules are selected by defining `BOARD_NODOSHOP_ESP32` and compiling with the ESP32 toolchain, but the pin map in `boards.h` targets the OTGW32 (ESP32-S3) board. On a plain ESP32, the OTDirect GPIO pins and the W5500 SPI assignments may not match the module breakout. Treat this as a developer target.
+The Wemos D1 mini (ESP8266) runs the 1.x firmware. Going back to 1.x means putting the Wemos D1 mini back: a 1.x zip does not run on an S3.
 
 #### Other Boards
 
-Other ESP8266 or ESP32 boards may compile and run the firmware but are not tested or supported. GPIO pin assignments for Dallas sensors, OLED, and the S0 counter may need adjustment in the settings.
+Other ESP32-S3 boards may compile and run the firmware but are not tested or supported. GPIO pin assignments for Dallas sensors, OLED, and the S0 counter may need adjustment in the settings.
 
 ### Hardware Capability Flags (boards.h)
 
-The `boards.h` header defines compile-time capability flags that control which code is included in each firmware binary. Understanding these flags helps when reading build logs or contributing to the firmware.
+The `boards.h` header defines compile-time capability flags that control which code is included in the firmware binary. Understanding these flags helps when reading build logs or contributing to the firmware.
 
-| Flag | ESP8266 OTGW | ESP32-S3 OTGW32 | Meaning |
-|---|---|---|---|
-| `HAS_PIC` | 1 | 0 | PIC co-processor present. Includes OTGWSerial, PIC detection, PIC firmware upgrade, and I2C watchdog code. |
-| `HAS_DIRECT_OT` | 0 | 1 | Direct GPIO OpenTherm bus interface present. Includes OTDirect.ino, the opentherm_library, step-up converter control, and GPIO OT pins. |
-| `HAS_ETH_CAPABLE` | 0 | 1 | W5500 SPI Ethernet hardware present. Includes Ethernet.ino and the EthernetESP32 library. |
+| Flag | Compiled into esp32-combo | Meaning |
+|---|---|---|
+| `HAS_PIC` | 1 | PIC co-processor support. Includes OTGWSerial, PIC detection, PIC firmware upgrade, and I2C watchdog code. |
+| `HAS_DIRECT_OT` | 1 | OT-Direct mode, used only on hardware without a PIC. Includes OTDirect.ino and the opentherm_library. |
+| `HAS_ETH_CAPABLE` | 1 | Ethernet support, used only with Ethernet hardware. Includes Ethernet.ino and the EthernetESP32 library. |
 
-These flags are mutually exclusive between the two build targets: a single firmware binary is not possible because the GPIO pin assignments for OT-direct and I2C conflict at the electrical level. The `python build.py` command (or `pio run`) builds both binaries from the same source tree.
+The `esp32-combo` image compiles in both the PIC path and the OT-Direct path and picks one at boot (`HAS_RUNTIME_HW_DETECT`). On the OTGW Classic it detects the PIC and runs in PIC gateway mode. `build.bat` (Windows) or `./build.sh` (Linux/macOS) builds this image.
 
 Application code guards platform-specific blocks with `#if HAS_PIC`, `#if HAS_DIRECT_OT`, and `#if HAS_ETH_CAPABLE`. User-facing runtime checks use the helper functions `isPICEnabled()` and `isOTDirectEnabled()`, which add a runtime detection layer on top of the compile-time flag.
 
 ### GPIO Pin Maps
 
-The following tables list the GPIO assignments defined in `boards.h` for each platform. Application code uses the `PIN_*` constants and never references Dx aliases or raw GPIO numbers directly.
+The following table lists the GPIO assignments defined in `boards.h` for the OTGW Classic. The S3 Mini and S3 Mini Pro sit in the Wemos D1 mini socket, so each signal is listed by its socket hole. The firmware detects at boot whether a Mini or a Mini Pro is fitted. Application code uses the `PIN_*` constants and never references hole labels or raw GPIO numbers directly.
 
-#### ESP8266 (Wemos D1 mini)
+#### OTGW Classic with LOLIN S3 Mini / S3 Mini Pro
 
-| Function | GPIO | Dx alias | Notes |
-|---|---|---|---|
-| I2C SCL | 5 | D1 | Watchdog + OLED |
-| I2C SDA | 4 | D2 | Watchdog + OLED |
-| Button | 0 | D3 | Config/reset, active LOW with pull-up |
-| LED1 | 2 | D4 | Active LOW, also onboard LED |
-| PIC reset | 14 | D5 | Resets the PIC co-processor |
-| LED2 | 16 | D0 | Active LOW |
-
-#### ESP32-S3 (OTGW32)
-
-| Function | GPIO | Notes |
-|---|---|---|
-| Boot button | 0 | Active LOW with pull-up |
-| Config button | 9 | Active LOW |
-| OT red LED | 2 | Active LOW |
-| Status LED | 8 | Active LOW |
-| OT green LED | 48 | Active HIGH |
-| I2C SCL | 17 | OLED display |
-| I2C SDA | 18 | OLED display |
-| OT master input | 21 | From boiler |
-| OT master output | 1 | To boiler |
-| OT slave input | 6 | From thermostat |
-| OT slave output | 7 | To thermostat |
-| Step-up enable | 10 | HIGH = enable 18V OT bus power |
-| 1-Wire (Dallas) | 4 | DS18B20 sensors |
-| Bypass relay | 47 | Relay output |
-| SPI CS (W5500) | 14 | Ethernet chip select |
-| SPI INT (W5500) | 15 | Ethernet interrupt |
-| SPI RST (W5500) | 16 | Ethernet reset |
-| SPI SCK | 12 | SPI clock |
-| SPI MISO | 13 | SPI data in |
-| SPI MOSI | 11 | SPI data out |
+| Function | Socket hole | S3 Mini GPIO | S3 Mini Pro GPIO | Notes |
+|---|---|---|---|---|
+| PIC UART (ESP TX to PIC RX) | TX | 43 | 43 | Serial link to the PIC |
+| PIC UART (ESP RX from PIC TX) | RX | 44 | 44 | Serial link to the PIC |
+| I2C SCL | D1 | 36 | 11 | Watchdog + OLED |
+| I2C SDA | D2 | 35 | 12 | Watchdog + OLED |
+| Button | D3 | 18 | 13 | Config/reset, active LOW |
+| LED1 | D4 | 16 | 14 | Active LOW |
+| PIC reset | D5 | 12 | 40 | Resets the PIC co-processor |
+| LED2 | D0 | 4 | 41 | Active LOW |
+| RGB status pixel | (on the module) | 47 | 8 | WiFi status |
 
 ### Physical Connections
 
@@ -125,7 +75,7 @@ The OTGW derives operating power from the OpenTherm bus itself when wired to a b
 
 ### ESP32-S3 Partition Table
 
-The ESP32-S3 boards use a custom partition layout for 4 MB flash (ADR-191). The firmware does not fit twice, so instead of two firmware slots there is one firmware slot plus a small updater (safeboot) that installs a new firmware over WiFi:
+The ESP32-S3 firmware uses a custom partition layout for 4 MB flash (ADR-191). The firmware does not fit twice, so instead of two firmware slots there is one firmware slot plus a small updater (safeboot) that installs a new firmware over WiFi:
 
 | Partition | Offset | Size | Purpose |
 |---|---|---|---|
@@ -136,17 +86,17 @@ The ESP32-S3 boards use a custom partition layout for 4 MB flash (ADR-191). The 
 | spiffs | 0x330000 | 768 KB | LittleFS filesystem (web UI, settings, PIC firmware) |
 | coredump | 0x3F0000 | 64 KB | Core dump storage |
 
-> **Note**: Units on the earlier layout need one USB migration (`flash_otgw --migrate`); after that, firmware updates work over WiFi. See [WiFi firmware updates](../../guides/WIFI_FIRMWARE_UPDATE.md).
+> **Note**: Units on the earlier layout (an early 2.0.0 alpha) need one USB migration (`flash_otgw --migrate --host <ip>`); after that, firmware updates work over WiFi. See [WiFi firmware updates](../../guides/WIFI_FIRMWARE_UPDATE.md).
 
 ### Optional Hardware
 
-#### Ethernet W5500 (OTGW32 / ESP32-S3 Only)
+#### Ethernet
 
-The W5500 SPI Ethernet module connects to the dedicated SPI header on the OTGW32 board. When a network cable is plugged in and the firmware detects a valid link, Ethernet is used automatically and Wi-Fi is switched off. Unplugging the cable causes automatic failover to Wi-Fi within approximately five seconds. No configuration change is required.
+The OTGW Classic has no Ethernet. The Ethernet settings in the web UI apply only to Ethernet hardware.
 
 #### OLED Display (SSD1306)
 
-A 128x64 SSD1306 I2C OLED display can be connected to both ESP8266 and ESP32 boards. The display shows four pages of information cycled by a button press:
+A 128x64 SSD1306 I2C OLED display can be connected to the I2C header of the OTGW Classic. The display shows four pages of information cycled by a button press:
 
 1. System status (device name, uptime, firmware version)
 2. Temperatures (room, boiler flow, boiler return, outside)
@@ -157,7 +107,7 @@ The display turns off automatically after a configurable idle timeout. Configure
 
 #### Dallas DS18B20 Temperature Sensors
 
-Up to 16 DS18B20 sensors can be connected on a single 1-Wire bus to a configurable GPIO pin (default GPIO 10 / SD3 on ESP8266, GPIO 4 on ESP32-S3). Each sensor is identified by its 64-bit address and can be given a custom label via the web interface. All sensors are published to MQTT and appear in Home Assistant auto-discovery.
+Up to 16 DS18B20 sensors can be connected on a single 1-Wire bus to a configurable GPIO pin (setting range 0 to 16, default GPIO 10). Each sensor is identified by its 64-bit address and can be given a custom label via the web interface. All sensors are published to MQTT and appear in Home Assistant auto-discovery.
 
 > **Note for users upgrading from versions before v1.0.0**: The default Dallas GPIO pin changed from GPIO 13 (D7) to GPIO 10 (SD3) in v1.0.0. If your sensors stopped working after an upgrade, check the Dallas GPIO setting in Settings and change it back to 13 if needed.
 
@@ -172,120 +122,72 @@ Wiring a DS18B20 sensor:
 
 The S0 pulse counter reads electricity pulses from an energy meter that has an S0 output (a standard impulse interface common on DIN-rail energy meters). Connect the S0 output to a configurable GPIO pin. Configure the pulses-per-kWh ratio in Settings. The firmware reports cumulative kWh and instantaneous power in watts to MQTT and Home Assistant.
 
-#### BLE Temperature Sensors (ESP32-S3 / OTGW32 Only)
+#### BLE Temperature Sensors
 
-Up to four Xiaomi LYWSD03MMC Bluetooth LE sensors are supported on the ESP32-S3. The firmware reads them passively using the BTHome v2 protocol (these sensors broadcast their readings as advertisements; no pairing is required). Room temperature and humidity from these sensors feed into the SAT multi-zone averaging and are published to Home Assistant as individual sensor entities.
+Up to four Xiaomi LYWSD03MMC Bluetooth LE sensors are supported on the ESP32-S3; the LOLIN S3 Mini and S3 Mini Pro both have the BLE radio. The firmware reads them passively using the BTHome v2 protocol (these sensors broadcast their readings as advertisements; no pairing is required). Room temperature and humidity from these sensors feed into the SAT multi-zone averaging and are published to Home Assistant as individual sensor entities.
 
 ### Flashing the Firmware
 
-#### First-Time Flashing with flash_esp.py (Recommended)
+#### First-Time Flashing with flash_otgw (Recommended)
 
-The `flash_esp.py` script handles everything automatically: it can download the latest release from GitHub, auto-detect your board and serial port by USB VID/PID, and flash the firmware. For ESP32-S3, the script uses a merged binary that contains the bootloader, partition table, firmware, and filesystem in a single image.
+The first flash of a new S3 Mini goes over USB. The release zip (`OTGW-firmware-esp32-combo-<version>-flash.zip`) contains the flash scripts `flash_otgw.bat` (Windows) and `flash_otgw.sh` (Linux/macOS) and a merged-full image that combines the bootloader, partition table, firmware, and filesystem in a single file flashed at address 0x0.
 
-Under the hood the script calls `python -m esptool` (esptool.py v5 or newer) using the v5 subcommand names: `erase-flash` and `write-flash` with hyphens. The underscored v4 forms (`erase_flash`, `write_flash`) are no longer accepted by esptool v5. The script installs esptool via `pip` if it is missing, so you normally do not need to manage this yourself.
+The scripts need no Python: on the first run they download Espressif's standalone esptool to `./tools/esptool/`. By default they do a factory reset: they erase the flash and write the merged-full image. WiFi credentials and settings are removed.
 
 **Prerequisites:**
 
-- Python 3.6 or higher
-- esptool v5 (installed automatically by `flash_esp.py` on first run)
-- A USB cable connected between your computer and the ESP module (micro-USB for ESP8266, USB-C for ESP32-S3/OTGW32)
-- The correct USB-to-UART driver installed for your board:
-  - ESP8266: CP210x driver (NodeMCU) or CH340 driver (Wemos D1 mini clones)
-  - ESP32-S3 OTGW32: uses the built-in ESP32-S3 USB-Serial/JTAG interface (Espressif VID 0x303A, PID 0x1001), typically no extra driver needed. A fresh board that still runs its factory firmware can show up as PID 0x4001 until the first flash; `flash_otgw` finds both without `--port`
-  - Linux: add your user to the `dialout` group (`sudo usermod -aG dialout $USER`, then log out and back in)
+- A USB cable between your computer and the USB port of the S3 Mini
+- The S3 Mini uses the built-in ESP32-S3 USB-Serial/JTAG interface (Espressif VID 0x303A, PID 0x1001), typically no extra driver needed. A fresh board that still runs its factory firmware can show up as PID 0x4001 until the first flash; `flash_otgw` finds both without `--port`
+- Linux: the script escalates with `sudo` when your user is not in the `dialout` group. To avoid that, add your user to the group (`sudo usermod -aG dialout $USER`, then log out and back in)
 
 **Steps:**
 
-1. Connect the USB cable to the ESP module (not to the OTGW board, but to the ESP module's own USB port, or to the OTGW board's USB connector if it has one).
+1. Unpack the release zip and connect the USB cable to the S3 Mini.
 
-2. Open a terminal and run:
+2. Open a terminal in the unpacked folder and run:
 
 ```bash
-python3 flash_esp.py
+flash_otgw.bat          # Windows
+./flash_otgw.sh         # Linux/macOS
 ```
 
-Without additional arguments, the script enters interactive mode: it asks you to select a board (ESP8266 or ESP32), then offers to flash existing build artifacts, rebuild from source, or download the latest GitHub release. Follow the prompts.
-
-3. For non-interactive use, specify the board and a mode:
+3. The script picks the merged-full image from the folder and auto-detects the serial port by USB VID/PID. If auto-detection fails, or more than one S3 is connected, specify the port explicitly:
 
 ```bash
-# Download latest release and flash (ESP8266)
-python3 flash_esp.py --board esp8266 --download
-
-# Download latest release and flash (ESP32)
-python3 flash_esp.py --board esp32 --download
-
-# Build from source and flash
-python3 flash_esp.py --board esp32 --build
+flash_otgw.bat --port COM5              # Windows
+./flash_otgw.sh --port /dev/ttyACM0     # Linux
+./flash_otgw.sh --port /dev/cu.usbmodem-XXXX  # macOS
 ```
 
-4. The script auto-detects the serial port by matching USB VID/PID to known board configurations. If auto-detection fails, specify the port explicitly:
+4. After flashing completes, the device reboots automatically.
+
+Later updates go over WiFi (see Upgrading from a Previous Version below). A unit on the old partition layout (an early 2.0.0 alpha) needs one `--migrate` run: `flash_otgw.bat --migrate --host <ip>` or `./flash_otgw.sh --migrate --host <ip>`. It saves `settings.ini` over HTTP, writes the new layout with WiFi kept, and restores the settings. Run the script with `--help` for all options.
+
+#### Building from Source
+
+On the 2.x line the only build is `esp32-combo`. Build it with the wrapper scripts, which set up their own Python environment and the PlatformIO toolchain:
 
 ```bash
-python3 flash_esp.py --port COM5          # Windows
-python3 flash_esp.py --port /dev/ttyUSB0  # Linux
-python3 flash_esp.py --port /dev/cu.usbserial-0001  # macOS
-```
-
-5. For a completely clean first-time install, use the `--erase` flag to wipe the flash first. Note: for ESP32-S3, the script always erases flash before writing to clear the otadata partition and prevent boot loops.
-
-```bash
-python3 flash_esp.py --board esp8266 --erase --download
-```
-
-6. After flashing completes, the device reboots automatically.
-
-**ESP32-S3 merged binary**: The flash tool uses the `merged-full` image for ESP32-S3. A merged-full binary combines the bootloader, partition table, firmware, and filesystem into a single file flashed at address 0x0. The helper scripts erase flash first, so the result is a factory reset with fresh firmware and filesystem.
-
-#### Flashing with PlatformIO (Build from Source)
-
-PlatformIO is the primary build system. The repository contains a `platformio.ini` with two environments: `esp8266` (Wemos D1 mini, ESP8266) and `esp32` (OTGW32, ESP32-S3).
-
-```bash
-# Install PlatformIO (as VS Code extension or via pip)
-pip install platformio
-
 # Clone the repository
-git clone https://github.com/rvdbreemen/OTGW-firmware.git
+git clone --recursive https://github.com/rvdbreemen/OTGW-firmware.git
 cd OTGW-firmware
 
-# Build and flash ESP8266
-pio run -e esp8266 --target upload
-pio run -e esp8266 --target uploadfs
-
-# Build and flash ESP32-S3 / OTGW32
-pio run -e esp32 --target upload
-pio run -e esp32 --target uploadfs
+build.bat                # Windows: firmware + filesystem, esp32-combo
+./build.sh               # Linux/macOS: firmware + filesystem, esp32-combo
+./build.sh --firmware    # Firmware only (skip filesystem)
+./build.sh --filesystem  # Filesystem only
+./build.sh --clean       # Clean build artifacts
 ```
 
-The `upload` target flashes the firmware binary. The `uploadfs` target flashes the LittleFS filesystem image containing web assets, the Home Assistant discovery configuration, and PIC firmware files.
-
-Both targets require the device to be connected via USB.
-
-Alternatively, use the `build.py` helper script. It wraps PlatformIO by default and can optionally use arduino-cli as a backend; invoke esptool v5 under the hood for any flashing it performs:
-
-```bash
-python build.py                      # Full build, both platforms, PlatformIO backend
-python build.py --target esp8266     # ESP8266 only
-python build.py --target esp32       # ESP32-S3 / OTGW32 only
-python build.py --firmware           # Firmware only (skip filesystem)
-python build.py --filesystem         # Filesystem only
-python build.py --merged             # Also produce a merged binary (ESP32)
-python build.py --merged --compress  # Merged and gzip-compressed
-python build.py --clean              # Clean build artifacts
-python build.py --distclean          # Also drop cached cores and libraries
-python build.py --arduino-cli        # Use the legacy arduino-cli backend
-```
-
-Run `python build.py --help` for the full, current list of flags.
+The build writes its output to `build/`, including the release-style zip with the merged-full image and the flash scripts. Flash it with `flash_otgw` as described above. Run `./build.sh --help` for the full, current list of flags. Chapter 8 covers the build in more detail.
 
 #### Manual Flashing with Existing Binaries
 
-If you already have firmware and filesystem binary files:
+If you already have a merged-full image, pass it explicitly:
 
 ```bash
-python3 flash_esp.py --board esp8266 --firmware OTGW-firmware-esp8266.ino.bin --filesystem OTGW-firmware-esp8266.littlefs.bin
-python3 flash_esp.py --board esp32 --firmware OTGW-firmware-esp32.ino.bin --filesystem OTGW-firmware-esp32.littlefs.bin
+flash_otgw.bat --bin OTGW-firmware-esp32-combo-<version>-merged-full.bin
+./flash_otgw.sh --bin OTGW-firmware-esp32-combo-<version>-merged-full.bin
 ```
 
 ### First-Time Setup: Connecting to Wi-Fi
@@ -308,32 +210,21 @@ The default hostname on 2.0.0 is `OTGW2`, so the AP will typically be named some
 
 5. Navigate to `http://otgw2.local/` in your browser to open the web interface. On Windows, the device also responds to `http://otgw2/` via LLMNR.
 
-> **ESP32-S3 with Ethernet**: If you have a W5500 Ethernet module and a network cable connected, the device obtains an IP address via DHCP on the wired interface at boot and does not open an AP. No Wi-Fi setup is needed.
-
-> **AP Fallback Mode (beta, ESP32-S3 only)**: If the configured Wi-Fi network becomes unavailable after initial setup, the device opens a fallback AP named `OTGW-<MAC>` with password `otgw1234` and IP `192.168.4.1`, keeping the web UI accessible.
+> **AP Fallback Mode (beta)**: If the configured Wi-Fi network becomes unavailable after initial setup, the device opens a fallback AP named `OTGW-<MAC>` with password `otgw1234` and IP `192.168.4.1`, keeping the web UI accessible.
 
 ### Filesystem Upload (LittleFS)
 
 The web assets (HTML, CSS, JavaScript, OLED icons, PIC firmware files, and the Home Assistant discovery configuration) are stored in a LittleFS partition on the flash. This partition must be flashed alongside the firmware binary.
 
-When using `flash_esp.py`, the filesystem is flashed automatically (either as part of a merged binary on ESP32-S3 or as a separate image on ESP8266). When using PlatformIO, run `pio run -e <env> --target uploadfs` after the firmware upload.
+When using `flash_otgw`, the filesystem is flashed automatically as part of the merged-full image.
 
-> **After a firmware update via OTA**: The web assets in LittleFS must match the firmware. On an ESP32-S3 with 4 MB flash the **Update** page installs both in one action (choose the release zip, press Update). Otherwise update the filesystem on the same page, or upload a new filesystem image manually via the File Manager.
+> **After a firmware update via OTA**: The web assets in LittleFS must match the firmware. The **Update** page installs both in one action (choose the release zip, press Update). You can also update only the filesystem on the same page, or upload a new filesystem image manually via the File Manager.
 
 ### Upgrading from a Previous Version
 
-#### OTA Upgrade (Recommended for ESP8266)
+#### OTA Upgrade (Recommended)
 
-From v1.3.0 onwards, the web interface provides a one-click OTA updater:
-
-1. Open the web interface and navigate to the **Update** tab (or the update icon in the header).
-2. The page fetches the list of available GitHub releases and shows Installed, Update, and Rollback badges next to each version.
-3. Click **Update** next to the version you want to install.
-4. The firmware downloads the new binary from GitHub, flashes it to the inactive OTA partition, and reboots.
-5. The web interface polls the device until it responds, then confirms success.
-6. Update the filesystem image using the same page to ensure web assets match the new firmware version.
-
-> **ESP32-S3 on 4 MB flash**: open `http://<ip>/update`, choose the release zip (or the `.ino.bin` and `.littlefs.bin` files) and press **Update**. The page hands over to the safeboot updater, installs the firmware, waits for the restart and then installs the web files; your settings and sensor names are kept. Keep the tab open for 2 to 3 minutes. A unit on the earlier layout needs one USB migration first (`flash_otgw --migrate`). Details: [WiFi firmware updates](../../guides/WIFI_FIRMWARE_UPDATE.md).
+Open `http://<ip>/update`, choose the release zip (or the `.ino.bin` and `.littlefs.bin` files) and press **Update**. The page hands over to the safeboot updater, installs the firmware, waits for the restart and then installs the web files; your settings and sensor names are kept. Keep the tab open for 2 to 3 minutes. A unit on the earlier layout needs one USB migration first (`flash_otgw --migrate --host <ip>`). Details: [WiFi firmware updates](../../guides/WIFI_FIRMWARE_UPDATE.md).
 
 #### Manual OTA Upload
 
@@ -345,14 +236,15 @@ If you have a firmware binary file and want to upload it directly:
 
 #### Notes When Upgrading from v1.x
 
+- Moving from 1.x to 2.x means replacing the Wemos D1 mini (ESP8266) with a LOLIN S3 Mini or S3 Mini Pro and flashing it over USB (see Flashing the Firmware). Going back to 1.x means putting the Wemos D1 mini back; a 1.x zip does not run on an S3.
 - No settings migration is required. Settings files from v1.3.x load without modification in v2.0.0.
 - MQTT topics and the REST API are unchanged from v1.x.
-- If you are upgrading from before v1.2.0, be aware that REST API v0 and v1 endpoints were removed in v1.2.0. Only `/api/v2/` endpoints are available. See [docs/BREAKING_CHANGES.md](../docs/BREAKING_CHANGES.md).
+- If you are upgrading from before v1.2.0, be aware that REST API v0 and v1 endpoints were removed in v1.2.0. Only `/api/v2/` endpoints are available. See [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md).
 - After upgrade, delete any orphaned Home Assistant entities and allow MQTT auto-discovery to recreate them to pick up any new or renamed entities.
 
 #### Important Warnings
 
 - **Never flash PIC firmware over Wi-Fi using OTmonitor.** This can brick the PIC microcontroller. Use the built-in PIC firmware upgrade feature in the web UI instead.
-- **When OTDirect is active (ESP32-S3 only)**, the PIC UART is bypassed. Do not attempt PIC firmware upgrades while OTDirect is the active OpenTherm path.
+- **In OT-Direct mode** (only on hardware without a PIC), the PIC UART is bypassed. Do not attempt PIC firmware upgrades while OT-Direct is the active OpenTherm path.
 
 ---
