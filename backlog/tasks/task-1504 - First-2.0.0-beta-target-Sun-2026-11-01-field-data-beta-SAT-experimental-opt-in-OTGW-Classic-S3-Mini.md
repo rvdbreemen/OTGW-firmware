@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:19:00Z'
-updated_date: '2026-11-01T10:29:00Z'
+updated_date: '2026-11-01T15:05:00Z'
 labels:
   - release beta
 milestone: 2.0.0
@@ -65,4 +65,6 @@ Maintainer decision 2026-11-01 (Robert, in session): release beta.1 today as-is.
 2026-11-01 (session, on Robert's request): updating docs/releases/RELEASE_NOTES_2.0.0-beta.1.md (AC4: fill the TODOs, add alpha.583-597 changes, correct the soak claim and the TASK-1438 known issue, add TASK-1538/1528 known issues, first-beta disclaimer) and README.md (current state, beta disclaimer).
 
 AC4 checked 2026-11-01 with one deviation from its wording: the AC lists TASK-1438 as a known issue, but 1438 is explained (cd5071ebb, reset reason 0xb = USB reset by the host) and Done, so the release notes drop it from Known issues and name the reset reason in Highlights instead. TASK-1498 stays listed. Evidence: docs/releases/RELEASE_NOTES_2.0.0-beta.1.md has the SAT experimental/opt-in section, the breaking list since 1.x (now incl. auto-tune removal, snowfall cm, self-tune default on), Known issues (1498, 1538, 1528, no 24 h soak, self-tune multi-day run, macOS), 'Before you flash' (save settings) and the Capture tool section. CHANGELOG [Unreleased] gained the 21 missing alpha.583-597 entries. The publish zip still needs the beta.1 prerelease bump and a rebuild (version.h is alpha.597).
+
+2026-11-01 Robert in session: 'Go for release' (AC5 go recorded before the tag). Release flow: _VERSION_PRERELEASE alpha.597 -> beta.1 (autoinc-semver --update-all, 49 banners), CHANGELOG [Unreleased] rolled to [2.0.0-beta.1] - 2026-11-01, then esp32-combo build, OTA bench check on the Classic (.63), annotated tag v2.0.0-beta.1, GitHub prerelease (draft first, assets incl. the flash zip with the capture tools, not marked latest; main untouched).
 <!-- SECTION:NOTES:END -->

@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.1] - 2026-11-01
+
 ### Changed
 
 - **`sat/cycles_this_hour` is announced to Home Assistant with `state_class` `measurement`** (TASK-1463). It counts PWM starts in the rolling hour and falls as starts leave it, so `total_increasing` made HA read every drop as a meter reset. Topic, entity name and unique_id are unchanged.
@@ -525,7 +527,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v1.3.5...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.1...HEAD
+[2.0.0-beta.1]: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.1
 [2.0.0-beta]: https://github.com/rvdbreemen/OTGW-firmware/compare/v1.3.5...HEAD
 [1.3.5]: https://github.com/rvdbreemen/OTGW-firmware/compare/v1.3.4...v1.3.5
 [1.3.4]: https://github.com/rvdbreemen/OTGW-firmware/compare/v1.3.3...v1.3.4
