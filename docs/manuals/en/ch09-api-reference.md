@@ -36,7 +36,7 @@ The device hostname defaults to `otgw2.local` (mDNS / LLMNR). Alternatively, use
 
 Internally, `/api/v2/` requests are dispatched by a static route table `kV2Routes[]` defined in `src/OTGW-firmware/restAPI.ino`. Each top-level resource segment maps to a single handler function:
 
-`health`, `settings`, `sensors`, `device`, `flash`, `pic`, `otdirect` (OTGW32 only), `firmware`, `filesystem`, `simulate`, `otgw`, `webhook`, `sat`, `discovery`, `debug`, `network`.
+`health`, `settings`, `sensors`, `device`, `flash`, `pic`, `otdirect` (OT-Direct mode only), `firmware`, `filesystem`, `simulate`, `otgw`, `webhook`, `sat`, `discovery`, `debug`, `network`.
 
 Adding a new endpoint is a two-line change: register a handler and add one entry to `kV2Routes[]`. This is why the API is stable across builds: the dispatch surface is small, explicit, and reviewed.
 
@@ -213,7 +213,8 @@ Returns hardware and platform information. No authentication required.
     "author": "Robert van den Breemen",
     "fwversion": "2.0.0",
     "hostname": "OTGW2",
-    "board": "esp8266",
+    "board": "Nodoshop OTGW Combo (ESP32-S3)",
+    "hardware_type": "otgw-classic",
     "hardwaremode": "pic",
     "networkmode": "wifi",
     "ipaddress": "192.168.1.50",
@@ -244,11 +245,13 @@ Returns hardware and platform information. No authentication required.
 
 The ESP32-S3 chip and memory fields feed the Debug screen (all integers, bytes unless noted): `psram_found` (`1` when PSRAM is present, `0` when absent), `status_pixel_gpio` (GPIO of the LOLIN on-board RGB status pixel the firmware drives, `47` on an S3 Mini or `8` on an S3 Mini Pro, `0` when none; combo and Classic builds only), `psram_size` (total PSRAM, 0 when absent), `psram_free` (free PSRAM), `flash_size` (flash chip size), `internal_free` (free internal, non-PSRAM heap), `internal_maxblk` (largest free internal heap block), and `chip_model_est` (string; best-effort ESP32-S3 package part number extrapolated from flash + PSRAM, for example `"ESP32-S3FH4R2"`, or `"ESP32-S3FN8"` when no PSRAM).
 
-On OTGW32 hardware: the `otdirectavailable` field is `true`, and additional `otd*` fields are included (`otdmode`, `otdbypass`, `otdmonitor`, `otdmaster`, `otdstepup`, `otdthermostat`, `otdsetback`, `otdschedtotal`, `otdschedactive`, `otdscheddisabled`, `otdoverrides`). On standard ESP8266+PIC builds, only `otdirectavailable: false` is present.
+`board` is the display name of the firmware image (`"Nodoshop OTGW Combo (ESP32-S3)"` for the esp32-combo build). `hardware_type` is the machine-readable hardware slug: `"otgw-classic"` on an OTGW Classic, where the firmware runs in PIC gateway mode.
+
+In OT-Direct mode (only on hardware without a PIC): the `otdirectavailable` field is `true`, and additional `otd*` fields are included (`otdmode`, `otdbypass`, `otdmonitor`, `otdmaster`, `otdstepup`, `otdthermostat`, `otdsetback`, `otdschedtotal`, `otdschedactive`, `otdscheddisabled`, `otdoverrides`). In PIC gateway mode, only `otdirectavailable: false` is present.
 
 The `otcommandinterface` field is a string identifying the active OT interface: `"PIC"`, `"OT-Direct"`, or `"None"` (compatibility note: earlier releases returned a boolean).
 
-On Ethernet-capable hardware (OTGW32), additional fields surface the wired-link state: `ethernetpresent` (PHY detected), `ethernetlink` (cable plugged in and link up). When the active network mode is `ethernet`, the `ssid` field returns the literal string `"Wired"` and `wifirssi` is reported as `0`. The runtime can fail over between WiFi and Ethernet without a reboot (TASK-581); `networkmode` reflects the currently active transport.
+Two fields surface the wired-link state, only meaningful with Ethernet hardware: `ethernetpresent` (PHY detected), `ethernetlink` (cable plugged in and link up). The OTGW Classic has no Ethernet. When the active network mode is `ethernet`, the `ssid` field returns the literal string `"Wired"` and `wifirssi` is reported as `0`. The runtime can fail over between WiFi and Ethernet without a reboot (TASK-581); `networkmode` reflects the currently active transport.
 
 When the device is running in AP-fallback mode (a prerelease-only safety net for unreachable WiFi), `apfallback: true` is included and `ssid` carries the AP SSID.
 
@@ -631,9 +634,9 @@ The BLE roster surfaces nearby BLE temperature sensors discovered by the ESP32-S
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/v2/sat/ble/discovery` | Stream the current roster as JSON (MAC, RSSI, label, last seen). |
-| POST | `/api/v2/sat/ble/select` | Body `{"mac": "AA:BB:CC:DD:EE:FF"}` — promote the roster entry to the active SAT BLE sensor. |
-| POST | `/api/v2/sat/ble/label` | Body `{"mac": "AA:BB:CC:DD:EE:FF", "label": "Living room"}` — set the persistent label for a roster slot. |
-| POST or DELETE | `/api/v2/sat/ble/forget` | Body `{"mac": "AA:BB:CC:DD:EE:FF"}` — drop the slot and clean up its HA discovery entries. |
+| POST | `/api/v2/sat/ble/select` | Body `{"mac": "AA:BB:CC:DD:EE:FF"}`: promote the roster entry to the active SAT BLE sensor. |
+| POST | `/api/v2/sat/ble/label` | Body `{"mac": "AA:BB:CC:DD:EE:FF", "label": "Living room"}`: set the persistent label for a roster slot. |
+| POST or DELETE | `/api/v2/sat/ble/forget` | Body `{"mac": "AA:BB:CC:DD:EE:FF"}`: drop the slot and clean up its HA discovery entries. |
 | POST or PUT | `/api/v2/sat/ble/bindkey` | Body `{"mac": "AA:BB:CC:DD:EE:FF", "key": "<32 hex>"}`: set the per-sensor encrypted-MiBeacon bindkey. If the MAC is new a roster slot is allocated for it; an empty `key` clears the stored bindkey. Returns HTTP 507 when the roster is full. |
 | POST or PUT | `/api/v2/sat/ble/rescan` | No body: trigger an on-demand active-scan burst to refresh advertised names. |
 
@@ -641,9 +644,9 @@ The BLE roster surfaces nearby BLE temperature sensors discovered by the ESP32-S
 
 ---
 
-#### OTDirect (ESP32 / OTGW32 only)
+#### OTDirect (OT-Direct mode only)
 
-These endpoints are only available on OTGW32 hardware (`HAS_DIRECT_OT`). On standard ESP8266+PIC hardware, all endpoints return 503 Service Unavailable.
+These endpoints are only available in OT-Direct mode, on hardware without a PIC. In PIC gateway mode, all endpoints return 503 Service Unavailable.
 
 ##### GET /api/v2/otdirect/status
 
@@ -824,7 +827,7 @@ Subject to a 60-second cooldown to prevent the drip queue being held permanently
 
 Returns a single flat JSON object summarising build identity, runtime state, settings, MQTT state, OT bus state, heap and discovery counters, SAT runtime, and OTDirect runtime where applicable. Authentication required.
 
-This is the primary diagnostic snapshot used when filing issues; the field set is intentionally broad and not part of the public contract — fields may be added in any release. Sensitive values (`http_passwd`, `mqtt.passwd`, `sat.weather_key`) are masked to `"***"` when set.
+This is the primary diagnostic snapshot used when filing issues; the field set is intentionally broad and not part of the public contract; fields may be added in any release. Sensitive values (`http_passwd`, `mqtt.passwd`, `sat.weather_key`) are masked to `"***"` when set.
 
 #### Monitor graph history
 
@@ -1006,7 +1009,7 @@ Published at startup, on reconnect, and every 5 minutes.
 | `otgw-firmware/reboot_count` | `"7"` | Total reboots since first flash |
 | `otgw-firmware/reboot_reason` | `"Software/System restart"` | Last reboot cause |
 | `otgw-firmware/uptime` | `"86400"` | Uptime in seconds (not retained) |
-| `otgw-firmware/board` | `"esp8266"` | Hardware board identifier |
+| `otgw-firmware/hardware_type` | `"otgw-classic"` | Hardware-type slug (`otgw-classic` on the OTGW Classic) |
 | `otgw-firmware/hardware_mode` | `"pic"` | Active hardware mode (`pic` or `otdirect`) |
 | `otgw-firmware/network_mode` | `"wifi"` | Network mode (`wifi`, `ethernet`, or `ap`) |
 
@@ -1023,9 +1026,9 @@ Published at startup, on reconnect, and every 5 minutes.
 | `otgw-pic/thermostat_connected` | `"ON"` / `"OFF"` | Thermostat OT traffic seen |
 | `otgw-pic/otgw_connected` | `"ON"` / `"OFF"` | Serial link to PIC alive |
 
-##### OT Direct Status (OTGW32 only)
+##### OT Direct Status (OT-Direct mode only)
 
-Published only when OT-direct hardware is enabled. On standard ESP8266+PIC, only `otgw-otdirect/available` is published with value `"OFF"`.
+Published only in OT-Direct mode, on hardware without a PIC. In PIC gateway mode, only `otgw-otdirect/available` is published with value `"OFF"`.
 
 | Topic suffix | Value | Description |
 |-------------|-------|-------------|
@@ -1295,15 +1298,6 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/pv_boost_delta_c` | `SATpvboostdeltac` |
 | `sat/pv_boost_max_indoor_c` | `SATpvboostmaxindoorc` |
 | `sat/pv_boost_max_duration_min` | `SATpvboostmaxdurationmin` |
-
-##### OTGW32 Command Topics
-
-On OTGW32 builds only, the following command topics are available under `{TopTopic}/set/{UniqueId}/otgw32/`:
-
-| Topic suffix | Payload | Description |
-|-------------|---------|-------------|
-| `otgw32/room_temp` | `"20.5"` | Set room temperature for OT-direct heating curve |
-| `otgw32/room_setpoint` | `"21.0"` | Set room setpoint for OT-direct |
 
 ##### Gateway Command Topics
 

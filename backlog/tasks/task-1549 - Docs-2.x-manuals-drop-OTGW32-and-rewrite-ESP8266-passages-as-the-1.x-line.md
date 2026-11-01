@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T17:57:00Z'
-updated_date: '2026-11-01T18:59:00Z'
+updated_date: '2026-11-01T19:04:00Z'
 labels:
   - docs
 dependencies: []
@@ -42,4 +42,6 @@ ch06/h06 done: OTGW32 2->0, ESP8266 EN 10->0 NL 12->0. Ethernet 6.2.1-6.2.5 cut 
 ch07/h07 done: OTGW32 7->0 both; ESP8266 EN 4->1, NL 7->1 (7.8 CONT stack, 1.x context). 7.12 'ESP32-Specific Troubleshooting (OTGW32)' became 'BLE Temperature Sensors' (OTDirect 18V and W5500 subsections removed); NL OTA-recovery and factory-flash steps now use safeboot + flash_otgw.bat/.sh (--migrate --host). Lead fixed EN 'section 7.9' -> '7.10' for the Telnet console. Not checked in code: ADR-047 two-layer recovery claim (7.10a), safeboot 'redo the update' wording (from ADR-191).
 
 ch08/h08 done: OTGW32 13->0 both; ESP8266 EN 39->3, NL 37->3 (socket wording, 1.x line, C4 L2 1.x PIC link). Build text now build.bat/build.sh (venv bootstrap, machine lock build.py:3015, 4 jobs build.py:2475), esp32-combo only; ESP8266 PlatformIO notes, Arduino IDE and W5500 runtime detection sections removed; ADR-063/072 rows dropped. Facts corrected: safeboot partition layout (partitions_otgw_esp32.csv:20-23), 'no RTOS' -> FreeRTOS tasks (ADR-123/130), '#ifdef ESP8266/ESP32' rule -> platform shims/HAS_* (evaluate.py check_esp_abstraction_boundary), MDNS_NEEDS_UPDATE 0, PIC UART 9600 baud. Stale, out of scope (finding): classic-UI asset table and 'Adding a setting' step 5, heap gate levels vs ADR-167, PubSubClient/sync-httpServer examples, ADR-004 listed as current, flash_esp.py internals subsection, platformio.ini:148 OTGW32 comment.
+
+ch09/h09 done: OTGW32 EN 10->0 NL 9->0, ESP8266 5->0, EN em dashes 4->0. OT-Direct routes/fields worded neutrally; device/info example board = 'Nodoshop OTGW Combo (ESP32-S3)' (boards.h:252) plus hardware_type 'otgw-classic' (restAPI.ino:3207, OTGW-firmware.h:660); MQTT row otgw-firmware/board (not published) -> hardware_type. Lead removed the OT-Direct command-topic block {TopTopic}/set/{UniqueId}/otgw32/room_temp|room_setpoint (MQTTstuff.ino:915, rejected unless OT-Direct): works only without a PIC and the path carries the board name. Findings for Robert: firmware contracts still carry the name (otgw32/ command topics, published otgw32/ch_suspended + flame_*, 503 text 'OTGW32 functions disabled' restAPI.ino:516, hardware_type 'otgw32' in OT-Direct mode, v2.html:830 UI string); stale ch09 content (otgw-otdirect/* status table vs MQTTstuff.ino:1994-2000, picavailable removed TASK-754, hardwaremode emits 'PIC'/'OT-Direct', cpufreq 80).
 <!-- SECTION:NOTES:END -->

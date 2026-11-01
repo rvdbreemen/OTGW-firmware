@@ -36,7 +36,7 @@ Er zijn drie gereserveerde prefixen; slechts een is actief:
 
 Intern worden `/api/v2/`-verzoeken afgehandeld door een statische routetabel `kV2Routes[]` in `src/OTGW-firmware/restAPI.ino`. Elk top-level resourcepadsegment wijst naar een handlerfunctie:
 
-`health`, `settings`, `sensors`, `device`, `flash`, `pic`, `otdirect` (alleen OTGW32), `firmware`, `filesystem`, `simulate`, `otgw`, `webhook`, `sat`, `discovery`, `debug`, `network`.
+`health`, `settings`, `sensors`, `device`, `flash`, `pic`, `otdirect` (alleen in OT-Direct-modus), `firmware`, `filesystem`, `simulate`, `otgw`, `webhook`, `sat`, `discovery`, `debug`, `network`.
 
 Een nieuw eindpunt toevoegen kost twee regels: registreer een handler en voeg een regel toe aan `kV2Routes[]`. Zo blijft de API stabiel over builds heen: het dispatch-oppervlak is klein, expliciet en herleesbaar.
 
@@ -350,7 +350,8 @@ Apparaatinformatie opvragen (firmware, hardware, netwerk). Geen authenticatie ve
     "author": "Robert van den Breemen",
     "fwversion": "2.0.0",
     "hostname": "OTGW2",
-    "board": "esp8266",
+    "board": "Nodoshop OTGW Combo (ESP32-S3)",
+    "hardware_type": "otgw-classic",
     "hardwaremode": "pic",
     "networkmode": "wifi",
     "ipaddress": "192.168.1.100",
@@ -373,11 +374,13 @@ Apparaatinformatie opvragen (firmware, hardware, netwerk). Geen authenticatie ve
 
 De ESP32-S3 chip- en geheugenvelden voeden het Debug-scherm (alle integers, bytes tenzij anders vermeld): `psram_found` (`1` als PSRAM aanwezig is, `0` als afwezig), `status_pixel_gpio` (GPIO van de RGB-statuspixel op de LOLIN die de firmware aanstuurt, `47` op een S3 Mini of `8` op een S3 Mini Pro, `0` als er geen is; alleen combo- en Classic-builds), `psram_size` (totale PSRAM, 0 indien afwezig), `psram_free` (vrije PSRAM), `flash_size` (grootte flash-chip), `internal_free` (vrij intern, niet-PSRAM heap), `internal_maxblk` (grootste vrije interne heap-blok) en `chip_model_est` (string; best-effort ESP32-S3 package-onderdeelnummer afgeleid uit flash + PSRAM, bijvoorbeeld `"ESP32-S3FH4R2"`, of `"ESP32-S3FN8"` zonder PSRAM).
 
-Op OTGW32-hardware: het veld `otdirectavailable` is `true` en aanvullende `otd*`-velden zijn aanwezig (`otdmode`, `otdbypass`, `otdmonitor`, `otdmaster`, `otdstepup`, `otdthermostat`, `otdsetback`, `otdschedtotal`, `otdschedactive`, `otdscheddisabled`, `otdoverrides`).
+`board` is de weergavenaam van het firmware-image (`"Nodoshop OTGW Combo (ESP32-S3)"` voor de esp32-combo-build). `hardware_type` is de machineleesbare hardware-slug: `"otgw-classic"` op een OTGW Classic, waar de firmware in PIC-gatewaymodus draait.
+
+In OT-Direct-modus (alleen op hardware zonder PIC): het veld `otdirectavailable` is `true` en aanvullende `otd*`-velden zijn aanwezig (`otdmode`, `otdbypass`, `otdmonitor`, `otdmaster`, `otdstepup`, `otdthermostat`, `otdsetback`, `otdschedtotal`, `otdschedactive`, `otdscheddisabled`, `otdoverrides`). In PIC-gatewaymodus is alleen `otdirectavailable: false` aanwezig.
 
 Het veld `otcommandinterface` is een string met de actieve OT-interface: `"PIC"`, `"OT-Direct"` of `"None"` (compatibiliteitsopmerking: eerdere versies retourneerden een boolean).
 
-Op Ethernet-capabele hardware (OTGW32) zijn aanvullende velden zichtbaar voor de bedrade-link-status: `ethernetpresent` (PHY gedetecteerd) en `ethernetlink` (kabel aangesloten en link actief). Wanneer de actieve netwerkmodus `ethernet` is, retourneert het `ssid`-veld de letterlijke string `"Wired"` en wordt `wifirssi` als `0` gerapporteerd. De runtime kan zonder reboot tussen WiFi en Ethernet failoveren (TASK-581); `networkmode` weerspiegelt het momenteel actieve transport.
+Twee velden tonen de status van de bedrade link en hebben alleen betekenis met Ethernet-hardware: `ethernetpresent` (PHY gedetecteerd) en `ethernetlink` (kabel aangesloten en link actief). De OTGW Classic heeft geen Ethernet. Wanneer de actieve netwerkmodus `ethernet` is, retourneert het `ssid`-veld de letterlijke string `"Wired"` en wordt `wifirssi` als `0` gerapporteerd. De runtime kan zonder reboot tussen WiFi en Ethernet failoveren (TASK-581); `networkmode` weerspiegelt het momenteel actieve transport.
 
 Wanneer het apparaat in AP-fallback-modus draait (alleen-prerelease vangnet voor onbereikbare WiFi), is `apfallback: true` aanwezig en bevat `ssid` de AP-SSID.
 
@@ -525,13 +528,13 @@ Beheer van de DS18B20-naar-SAT-area-mapping voor multi-area modus (TASK-587). El
 
 ##### SAT BLE-roster (alleen ESP32)
 
-De BLE-roster toont nabije BLE-temperatuursensoren die door de ESP32-S3 worden gedetecteerd en laat de gebruiker er een promoveren tot actieve kamertemperatuurbron (TASK-508). Alle vier de eindpunten retourneren HTTP 404 wanneer het opgegeven MAC-adres niet in de roster staat. Op ESP8266-builds zijn deze paden afwezig (route geeft 404).
+De BLE-roster toont nabije BLE-temperatuursensoren die door de ESP32-S3 worden gedetecteerd en laat de gebruiker er een promoveren tot actieve kamertemperatuurbron (TASK-508). Alle vier de eindpunten retourneren HTTP 404 wanneer het opgegeven MAC-adres niet in de roster staat. Op builds zonder BLE-ondersteuning zijn deze paden afwezig (route geeft 404).
 
 ---
 
-#### OTDirect (ESP32 / OTGW32)
+#### OTDirect (alleen in OT-Direct-modus)
 
-Deze eindpunten zijn alleen beschikbaar op OTGW32-hardware (`HAS_DIRECT_OT`). Op standaard ESP8266+PIC retourneren alle eindpunten 503 Service Unavailable.
+Deze eindpunten zijn alleen beschikbaar in OT-Direct-modus, op hardware zonder PIC. In PIC-gatewaymodus retourneren alle eindpunten 503 Service Unavailable.
 
 ##### GET /api/v2/otdirect/status
 
@@ -735,8 +738,8 @@ De WebSocket-server luistert op poort 81 (gescheiden van HTTP op poort 80). Alle
 #### Verbindingsstroom
 
 ```
-Browser                        ESP8266
-=======                        =======
+Browser                        ESP32-S3
+=======                        ========
                                [Luistert op poort 81]
 new WebSocket("ws://host:81/")
     |--- verbindingsverzoek --->|
@@ -831,7 +834,7 @@ Tenzij anders vermeld zijn alle gepubliceerde onderwerpen retained.
 | `otgw-firmware/uptime` | Uptime in seconden (niet retained) |
 | `otgw-firmware/reboot_count` | Aantal herstarts |
 | `otgw-firmware/reboot_reason` | Reden laatste herstart |
-| `otgw-firmware/board` | Hardware-identificatie |
+| `otgw-firmware/hardware_type` | Hardware-slug (`otgw-classic` op de OTGW Classic) |
 | `otgw-firmware/hardware_mode` | Hardwaremodus (`pic` of `otdirect`) |
 | `otgw-firmware/network_mode` | Netwerkmodus (`wifi`, `ethernet` of `ap`) |
 
@@ -846,7 +849,7 @@ Tenzij anders vermeld zijn alle gepubliceerde onderwerpen retained.
 | `otgw-pic/gateway_mode` | `"ON"` / `"OFF"` | Gateway-modus actief |
 | `otgw-pic/otgw_connected` | `"ON"` / `"OFF"` | Seriele verbinding met PIC |
 
-**OT Direct-info (alleen OTGW32)**:
+**OT Direct-info (alleen in OT-Direct-modus)**:
 
 | Onderwerp | Beschrijving |
 |-----------|-------------|
@@ -860,7 +863,7 @@ Tenzij anders vermeld zijn alle gepubliceerde onderwerpen retained.
 | `otgw-otdirect/boiler_connected` | Ketel OT-bus actief |
 | `otgw-otdirect/ot_online` | OT seriele bus actief |
 
-Op standaard ESP8266+PIC wordt alleen `otgw-otdirect/available` gepubliceerd met waarde `"OFF"`.
+In PIC-gatewaymodus wordt alleen `otgw-otdirect/available` gepubliceerd met waarde `"OFF"`.
 
 **OpenTherm numerieke waarden** (bij ontvangst):
 
@@ -1086,13 +1089,6 @@ De onderstaande commando's geven de payload ongewijzigd door aan de genoemde ins
 | `sat/pv_boost_delta_c` | `SATpvboostdeltac` |
 | `sat/pv_boost_max_indoor_c` | `SATpvboostmaxindoorc` |
 | `sat/pv_boost_max_duration_min` | `SATpvboostmaxdurationmin` |
-
-**OTGW32-commando's (alleen OTGW32)**:
-
-| Onderwerpsuffix | Payload | Beschrijving |
-|----------------|---------|-------------|
-| `otgw32/room_temp` | `"20.5"` | Kamertemperatuur voor OT-direct verwarmingscurve |
-| `otgw32/room_setpoint` | `"21.0"` | Kamersetpoint voor OT-direct |
 
 **Gateway-commando's (elk bord)**, onder `{TopTopic}/set/{UniqueId}/otgw/`:
 
