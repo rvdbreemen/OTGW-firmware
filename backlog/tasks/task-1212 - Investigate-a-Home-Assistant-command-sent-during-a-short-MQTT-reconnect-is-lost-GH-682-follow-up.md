@@ -3,13 +3,12 @@ id: TASK-1212
 title: >-
   Investigate: a Home Assistant command sent during a short MQTT reconnect is
   lost (GH #682 follow-up)
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-10-04 19:34
-updated_date: '2026-11-01T09:38:00Z'
+updated_date: '2026-11-01T09:59:00Z'
 labels:
   - bug
-  - needs-info
   - mqtt
 dependencies: []
 references:
@@ -47,3 +46,9 @@ Open questions:
 
 Audit 2026-11-01: moved To Do -> In Progress, labelled needs-info: AC2 is checked (option B, documented in 548934b85, docs/guides/MQTT_LWT.md). AC3 does not apply (no firmware change). AC1 waits on the reporter's mqtt_desync_drops / mqtt_sndbuf_skips counters.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed by maintainer decision (Robert, 2026-11-01). AC2 met: option B chosen (keep clean session plus QoS 0, document the limit), documented in 548934b85 (docs/guides/MQTT_LWT.md: commands sent while the gateway reconnects are lost). AC1 is NOT met and left unchecked on purpose: the cause of the reporter's two disconnects needs his mqtt_desync_drops / mqtt_sndbuf_skips counters, which never arrived, and it does not change decision B. AC3 does not apply (no firmware change). New task if the reporter sends the counters.
+<!-- SECTION:FINAL_SUMMARY:END -->
