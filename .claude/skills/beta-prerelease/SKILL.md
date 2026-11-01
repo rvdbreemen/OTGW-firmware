@@ -6,6 +6,8 @@ disable-model-invocation: true
 
 # /beta-prerelease - OTGW-firmware Beta Prerelease Skill
 
+> **1.x line only** (`otgw-1.x.x`, CI-built). For a 2.x (ESP32-S3) beta from `dev` use `/beta-release-2x` (TASK-1545).
+
 Publish a single beta build to field testers in Discord `#beta-testing`. Lightweight, repeatable many times within one minor cycle. Does NOT merge to main, does NOT touch the stable `_SEMVER_CORE`.
 
 ## Usage

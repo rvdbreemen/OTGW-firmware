@@ -6,6 +6,8 @@ disable-model-invocation: true
 
 # /release - OTGW-firmware Release Skill
 
+> **1.x line only** (ESP8266, `otgw-1.x.x` -> `main`). For a stable 2.x (ESP32-S3) release use `/release-2x`; for a 2.x beta use `/beta-release-2x` (TASK-1545). Once a 2.x stable is GitHub "Latest", publish 1.x releases with `--latest=false`.
+
 Prepare and execute a complete release of the OTGW-firmware project.
 
 ## Usage

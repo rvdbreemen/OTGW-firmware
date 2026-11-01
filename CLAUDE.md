@@ -517,9 +517,19 @@ Concrete rules that override the default "ask first":
 - **`origin/otgw-1.x.x`** push: allowed under the same conditions as `origin/dev` (task committed locally, build green for the esp8266 target, evaluator green; docs-only commits skip both gates). This is the 1.5.x/1.6.x maintenance/LTS line (the former `dev`).
 - **`origin/main`** push: **`main` is ALWAYS the latest public release.** Never auto-pushed; every push requires explicit per-instance confirmation and is part of the release flow only.
 - **Force-push** to any branch: still requires explicit per-instance confirmation. Force-push to main is forbidden regardless.
+- **`origin/release/2.x`** push: the stable 2.x line (maintainer decision 2026-11-01, TASK-1545). Pushed only inside `/release-2x`, after Robert's go for that release; never force-pushed. It never merges back into `dev` as a whole (its production commit comments out `_VERSION_PRERELEASE`); release docs go to `dev` by cherry-pick. `main` stays the 1.x stable line until 1.x is end-of-life.
 - **Sub-branches / other remote branches** (`feature-*`, `fix-*`, ad-hoc lanes): require explicit per-instance confirmation. Create a parallel lane only for genuine parallel work and delete it immediately after merging back (one-line policy, see Worktree layout).
 
 When in doubt about whether a push is "logical", err toward asking. The cost of one extra prompt is small; the cost of an unwanted force-push is large.
+
+## Release flows
+
+| Line | Beta / prerelease | Stable release |
+|---|---|---|
+| 2.x (`dev`, ESP32-S3) | `/beta-release-2x` (`.claude/skills/beta-release-2x/SKILL.md`): tag on `dev`, GitHub prerelease with `--latest=false` | `/release-2x` (`.claude/skills/release-2x/SKILL.md`): tag on `release/2.x` |
+| 1.x (`otgw-1.x.x`, ESP8266) | `/beta-prerelease` | `/release` (`otgw-1.x.x` -> `main`) |
+
+`dev` has no release CI: 2.x builds are local (esp32-combo) and assets are uploaded with `gh`, draft first (immutable releases).
 
 ## Versioning policy
 
