@@ -3,14 +3,14 @@ id: TASK-1331
 title: >-
   SAT: port thermo-nova's on_cycle_end PWM re-enable (continuous cycle
   classified OVERSHOOT)
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-23T19:43:00Z'
-updated_date: '2026-11-01T09:27:00Z'
+updated_date: '2026-11-01T22:28:00Z'
 labels:
-  - sat
   - blocked
+  - sat
 milestone: 2.0.0
 dependencies:
   - TASK-1405
@@ -62,4 +62,6 @@ From the TASK-1327 review: thermo-nova re-enables PWM in two ways after a disabl
 2026-10-29 maintainer decision (Robert, in session): back to To Do. All Sergeant D decisions are recorded (entries 15, 18, 36, 37, 55); implementation waits on TASK-1405, TASK-1412.14, TASK-1412.4 and TASK-1412.7. The parked stash predates TASK-1345/1341/1344/1387: re-apply by hand on resume, do not pop it blindly.
 
 Audit 2026-11-01: moved To Do -> In Progress: AC1 research is checked and the change is parked in stash@{1} ('TASK-1331 blocked by review'). Blocked on TASK-1412.14, 1412.4 and 1412.7. The stash predates later SAT changes: re-apply it by hand, do not pop it.
+
+Lead triage 2026-11-01 23:30 (Robert: lead decides): back to To Do + blocked, as Robert set on 10-29. Blocked on TASK-1412.14, .4 and .7 (all To Do); the parked stash predates TASK-1345/1341/1344/1387 and must be re-applied by hand when those land. Owner of the SAT chain: session otgw-firmware-67.
 <!-- SECTION:NOTES:END -->

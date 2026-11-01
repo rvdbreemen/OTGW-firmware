@@ -3,11 +3,11 @@ id: TASK-1528
 title: >-
   Heap low-water mark sinks to ~1.7 KB under a long-run capture (free stays ~71
   KB): find the transient large allocation
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-31T13:54:00Z'
-updated_date: '2026-10-31T14:07:00Z'
+updated_date: '2026-11-01T22:28:00Z'
 labels:
   - alpha
   - bug
@@ -37,4 +37,6 @@ Bench OTGW32 .61 alpha.570, 2026-10-31, TASK-1523 long-run capture running (teln
 2026-10-31 15:06 bench .61 alpha.570, TASK-1523 run 2: planned network drop 14:58:33-15:01:34 (MikroTik bridge filter, rules removed: count 0). After the drop the unit stayed associated (CAPsMAN uptime 36 min, DHCP bound) but answered no ARP/HTTP until 15:06:19 (~5 min; in run 1 the same drop recovered in 1 s). No reboot (uptime continuous). runtime.heap_min_free now 524 B (was 1752 at 13:48Z). So the reconnect wave after a network outage (telnet + /ws + MQTT + snapshot + crashlog clients, MQTT republish) drives the heap to within ~0.5 KB of exhaustion. Related: TASK-1450 (2.0.0 port of 'recover from a WiFi link that stays associated but passes no traffic') is still To Do.
 
 Response sizes measured 15:07 (one at a time): sat?detail=full 413 B, device/info 2767, device/crashlog 58, debug 6335, settings 9544, graph/history 2602. None explains a ~69 KB transient, so the snapshot requests are not the cause (suspect 1 dropped). Dips coincide with (re)connect moments: boot 14:28 (2240 B) and the network-drop recovery (524 B). Hypotheses for the next bench step, in order: (a) espMqttClient outbox mallocs per queued publish while TCP is slow or down (ADR-186), plus the HA discovery republish burst after reconnect; (b) AsyncSimpleTelnet TX buffering with all capture debug toggles on (~750 lines/min) while the client is slow/away; (c) AsyncTCP/lwIP pbufs for the /ws frame stream. Method: windowed heap minimum (platformHeapWindowStart) per phase with one stream enabled at a time (capture flags --skip-frame-capture, no broker, telnet toggles off), same network-drop fault, old vs fix.
+
+Lead triage 2026-11-01: not actively worked; back to To Do, priority stays high (known issue in the beta.1 notes). Needs a dedicated multi-hour bench slot (windowed heap minimum per stream + network-drop fault); possibly linked to TASK-1450.
 <!-- SECTION:NOTES:END -->

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T14:37:00Z'
-updated_date: '2026-11-01T09:27:00Z'
+updated_date: '2026-11-01T22:30:00Z'
 labels:
   - bug
   - stability
@@ -62,4 +62,6 @@ Committed without the loop-hang bench proof (coordinator 75, 2026-10-30: .61 unp
 Bench 2026-10-30 (coordinator otgw-firmware-b8, Classic-S3 .63, PIC 6.8): batch rebuilt after the 05:50 PC restart; esp32-combo alpha.547+6240b05 and alpha.548+8ded885 built (artifacts 06:12 / 06:42, githash = HEAD), evaluate --quick 79/0/0 on both; OTA app via safeboot + FS via /update?cmd=100, 174 settings keys kept. TASK-1479 (alpha.545): /api/v2/device/crashlog -> available:false with only software resets in reboot_log.txt (correct for no panic). No forced panic on this release build (no test hook); the panic path evidence remains the exploratory build on .61 (notes above). AC#1 loop-stall case still open (.61 offline).
 
 Audit 2026-11-01: the earlier note '.61 offline' is stale: .61 (OTGW32) ran alpha.597 today and is available for the forced loop-task stall check (AC1).
+
+Lead triage 2026-11-01: field half of AC#1 split to TASK-1554. Remaining for this task: the loop-task stall run (local build with -DOTGW_TEST_TWDT_HANG, key-Z hang in loop(), on .61) when the build slot is free after beta.3/beta.4.
 <!-- SECTION:NOTES:END -->

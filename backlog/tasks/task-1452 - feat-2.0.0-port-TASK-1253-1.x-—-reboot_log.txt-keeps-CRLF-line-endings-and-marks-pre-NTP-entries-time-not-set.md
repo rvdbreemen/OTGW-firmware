@@ -3,10 +3,10 @@ id: TASK-1452
 title: >-
   feat-2.0.0: port TASK-1253 (1.x) — reboot_log.txt keeps CRLF line endings and
   marks pre-NTP entries 'time not set'
-status: In Progress
+status: To Do
 assignee: []
 created_date: '2026-10-29T06:23:00Z'
-updated_date: '2026-11-01T09:27:00Z'
+updated_date: '2026-11-01T22:28:00Z'
 labels:
   - port-from-1.x
   - diagnostics
@@ -75,4 +75,6 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 <!-- SECTION:NOTES:BEGIN -->
 Audit 2026-11-01: moved To Do -> In Progress. The CRLF half is already in code under TASK-1479 (c0db93f72): copyOlderRebootLogLines in helperStuff.ino:298-322 repairs CR-only files and writes CRLF. Still open: the pre-NTP 'time not set' guard (helperStuff.ino:355-357 formats time(nullptr) unconditionally), the RED/GREEN bench evidence and the build AC.
+
+Lead triage 2026-11-01: CRLF half is on dev via TASK-1479 (c0db93f72), bench .61: reboot_log 21 lines / 21 CR / 21 LF. Pre-NTP 'time not set' guard is NOT done (helperStuff.ino:357 still formats time(nullptr) unconditionally). AC#6 (three targets) is outdated: dev builds esp32-combo only (maintainer 2026-10-29); read it as one combo build. Back to To Do (unassigned): needs a firmware change + bench red/green with NTP blocked via the MikroTik.
 <!-- SECTION:NOTES:END -->
