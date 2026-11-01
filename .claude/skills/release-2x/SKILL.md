@@ -141,8 +141,13 @@ Each push to `release/2.x` happens only inside this flow after checkpoint 1.
    grep "Build completed successfully" "$TMP/build-<v>.log"
    ls -la build | grep "<v>+"                                            # no -beta/-alpha in the name
    ```
-   The worktree needs its own `.build-python` (run `build.bat` once) or the main
-   tree's interpreter.
+   The worktree needs its own `.build-python` (run `build.bat` once in it). Do not
+   run the main tree's `.build-python/python.exe build.py` from a worktree: that
+   embedded Python (`python312._pth`) imports the main tree's `config.py`, so
+   `BUILD_DIR` is the main tree's `build/`, which it cleans (TASK-1553). If you
+   must, put the worktree first on `sys.path`:
+   `python.exe -c "import sys,runpy; sys.path.insert(0, r'<wt>'); sys.argv=['build.py']; runpy.run_path(r'<wt>\build.py', run_name='__main__')"`.
+   A fresh worktree also needs `mkdir build` first.
 2. Bench, at least the Classic + S3 Mini, preferably two units:
    - save settings, OTA with `scripts/ota_flash.py` (exit 0, `changed: none`);
    - the user route: `/update` with the release zip;
