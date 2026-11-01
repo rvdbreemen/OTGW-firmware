@@ -28,6 +28,9 @@ import sat_hp_onoff_study12 as h12
 from sat_curve_selftune_study import TARGET, DT
 
 MIN_ON, MIN_OFF = 20, 10
+KP_MODE = "sat"     # round 19: "sat" (SAT PID), "wc" (curve only) or a number (room factor, K flow per K room error)
+COEFF = 1.8         # round 19: heating curve coefficient (rounds 12-18: 1.8)
+SETBACK = None      # round 19: (delta K, start hour, end hour), e.g. (3.0, 23, 6); comfort scored outside it only
 
 def run(args):
     variant, par, era, mass, screed, seed = args
@@ -44,19 +47,26 @@ def run(args):
             for m in range(st, min(minutes, st + int(rnd.uniform(30, 120)))): gains[m] += w
         if d % 14 == 9:
             for m in range(d * 1440 + 1140, d * 1440 + 1440): gains[m] += 1500.0
-    c = 1.8; dflow = pmax / (2 * h12.MCP_UFH)
+    c = COEFF; dflow = pmax / (2 * h12.MCP_UFH)
     Ta = TARGET; Tw = (s3.G_AW * TARGET + Gwo * season) / (s3.G_AW + Gwo)
     Ts = h12.curve_ufh(c, season) - 2.0
     integ = 0.0; last = None; rd = 0.0
     on = False; on_for = 0; off_for = 999; starts = 0; run_lens = []; starts_day = {}
     pos = 0; on_m = 0; stopped = False; dm = 0.0; mr_off_left = 0
-    minon = 3 if variant == "pwm" else MIN_ON
-    minoff = 0 if variant in ("pwm", "own") else MIN_OFF
-    sq = n = out = absum = 0.0; elec = 0.0
+    minon = 3 if variant in ("pwm", "fw") else MIN_ON
+    minoff = 0 if variant in ("pwm", "own", "fw") else MIN_OFF
+    fw_phase_on = False; fw_el = 0; fw_entry = True
+    sq = n = out = absum = 0.0; elec = 0.0; fl_sum = 0.0; fl_n = 0
     for m in range(minutes):
         tout, sw = tm[m], sm[m]; heating = tout < 15
-        cv = h12.curve_ufh(c, tout); kp = c * cv / 4; ki = kp / 8400; kd = 588.0 * kp
-        err = TARGET - Ta
+        # Round 19 (2026-11-01) hooks; defaults keep rounds 12-18 unchanged.
+        tgt = TARGET
+        if SETBACK and ((m % 1440) // 60 >= SETBACK[1] or (m % 1440) // 60 < SETBACK[2]): tgt = TARGET - SETBACK[0]
+        cv = h12.curve_ufh(c, tout) - c * (TARGET - tgt)   # SAT's curve follows the target (4 * (target - 20) * c / 4)
+        if KP_MODE == "sat": kp = c * cv / 4; ki = kp / 8400; kd = 588.0 * kp
+        elif KP_MODE == "wc": kp = ki = kd = 0.0           # pure weather compensation, no room feedback
+        else: kp = float(KP_MODE); ki = kd = 0.0           # NIBE-style room factor: flow shift = factor x room error
+        err = tgt - Ta
         if last is not None and abs(err) > 0.1 and Ta != last: rd = -(Ta - last) / DT
         last = Ta
         if abs(err) > 0.1: integ = 0.0
@@ -73,6 +83,25 @@ def run(args):
                 on_m = int(round(duty * par))
                 if 0 < on_m < minon: on_m = minon if duty * par >= minon / 2 else 0
             want = pos < on_m; pos = (pos + 1) % par
+        elif variant == "fw":
+            # Round 18b (2026-11-01): the firmware's PWM as it runs (SATcontrol.ino satApplyPWM, thermo-nova pwm.py:135,
+            # :205): the 5-range mapper is re-evaluated every step from the current duty, the ON phase ends when its
+            # elapsed time reaches the current ON time, the OFF phase when it reaches the current OFF time; range 5
+            # (duty >= max) switches ON at once. par = (period min, minimum ON min). The 3 min flame hold is minon.
+            P, M = par[0], par[1]; MOFF = par[2] if len(par) > 2 else 0; dl = M / P; du = 1 - dl; dmin = dl / 2; dmax = 1 - dmin; mx = 2 * P
+            if duty >= dmax: on_t, off_t, cont = mx, 0.0, True
+            else:
+                cont = False
+                if duty < dmin: on_t, off_t = (M, mx - M) if on else (0.0, mx)
+                elif duty <= dl: on_t, off_t = M, min(M * (1 - duty) / duty, mx - M)
+                elif duty <= du: on_t, off_t = max(duty * P, M), P - duty * P
+                else: on_t, off_t = max(M / (1 - duty) - M, M), M
+            if fw_phase_on:
+                if not cont and fw_el >= on_t: fw_phase_on = False; fw_el = 0
+            elif (fw_entry or fw_el >= MOFF) and (cont or (on_t >= 3 and (fw_entry or fw_el >= off_t))):
+                fw_phase_on = True; fw_el = 0
+            fw_entry = False; fw_el += 1
+            want = fw_phase_on
         elif variant == "tp":
             tgt = int(round(duty * par))
             if 0 < tgt < minon: tgt = minon if duty * par >= minon / 2 else 0
@@ -111,7 +140,8 @@ def run(args):
         qaw = s3.G_AW * (Ta - Tw); solar = 1.5 * sw
         Ta += (q + gains[m] + 0.5 * solar - qaw - Gao * (Ta - tout)) * DT / Ca
         Tw += (qaw + 0.5 * solar - Gwo * (Tw - tout)) * DT / Cw
-        if heating and m >= 14 * 1440:
+        if P > 0 and m >= 14 * 1440: fl_sum += flow; fl_n += 1
+        if heating and m >= 14 * 1440 and tgt == TARGET:
             e = Ta - TARGET; sq += e * e; n += 1; absum += abs(e)
             if abs(e) > 0.3: out += 1
     sd = [v for d, v in starts_day.items() if d >= 14]
@@ -120,7 +150,8 @@ def run(args):
             "run_median_min": statistics.median(run_lens) if run_lens else 0,
             "run_short_frac": (sum(1 for r in run_lens if r < 20) / len(run_lens)) if run_lens else 0,
             "out_band_min_d": out / (n / 1440) if n else 0, "mean_abs_err": absum / n if n else 0,
-            "rms": math.sqrt(sq / n) if n else 0, "elec_kwh": elec / 3.6e6}
+            "rms": math.sqrt(sq / n) if n else 0, "elec_kwh": elec / 3.6e6,
+            "flow_on_mean": fl_sum / fl_n if fl_n else 0}
 
 def _init(w): base._init(w)
 
