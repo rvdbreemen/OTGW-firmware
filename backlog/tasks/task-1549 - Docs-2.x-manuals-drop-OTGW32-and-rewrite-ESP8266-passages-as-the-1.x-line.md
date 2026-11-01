@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T17:57:00Z'
-updated_date: '2026-11-01T18:36:00Z'
+updated_date: '2026-11-01T18:40:00Z'
 labels:
   - docs
 dependencies: []
@@ -36,4 +36,6 @@ ch02/h02 done: OTGW32 EN 13->0, NL 16->0; ESP8266 EN 27->5, NL 27->6 (socket wor
 ch03/h03 done: OTGW32 EN 10->0, NL 10->0 (incl. 'OTTHING-platform'); ESP8266 4->0 both. OT-Direct labels neutral; Ethernet indicator 'only with Ethernet hardware'; one-click GitHub update sections removed (2.x Update page takes the zip, updateServerHtml.h:88-107); EN heap throttle list replaced by ADR-167 critical-only gate (helperStuff.ino:894,995); NL overview file list corrected to v2.html/v2.js/v2-bundle.css. Findings: firmware UI string v2.html:830 names OTGW32 and has an em dash (needs a firmware task + bump); classic-UI sections in ch03 still outdated (index.js ETag flow); OT-Direct mode table ch03 vs NL ch01 mode list disagree, not checked against code.
 
 ch04/h04 done: OTGW32 1->0, ESP8266 1->1 (discovery paragraph now '1.x firmware on the ESP8266'); resetgateway no-op worded as OT-Direct mode (OTGW-Core.ino:1015); removed '(classic NodoShop OTGW, ESP32 OT-Shield, etc.)' from Device Manufacturer paragraph (judgement call). ch05/h05 done: OTGW32 EN 2->0 NL 3->0, ESP8266 2->0, em dashes 5->0 each; no SAT control statements changed; cycle tail window '180 s' (SATcycles.ino:103); PSRAM example now the LOLIN S3 Mini/Mini Pro (boards.h:305-307); 'Thermo-Nova' dropped from the BLE board list (no such board in boards.h).
+
+ch06/h06 done: OTGW32 2->0, ESP8266 EN 10->0 NL 12->0. Ethernet 6.2.1-6.2.5 cut to one sentence (boards.h:172, restAPI.ino:4106-4116); ESP8266 LLMNR, SDK time bug, lwIP/Core 3.1.2 sections removed; 6.1.2 DHCP re-announce claim corrected for 2.x (networkStuff.ino:258-262, 388-404; TASK-432). Numbering gap 6.6->6.8 left on purpose: four cross-refs cite 6.10.
 <!-- SECTION:NOTES:END -->

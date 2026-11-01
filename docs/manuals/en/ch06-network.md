@@ -1,6 +1,6 @@
 ## Chapter 6: Network Configuration
 
-This chapter covers everything the firmware does on the network: from first-time WiFi setup through Ethernet failover, hostname resolution, time synchronization, and OTA firmware updates.
+This chapter covers everything the firmware does on the network: from first-time WiFi setup through hostname resolution, time synchronization, and OTA firmware updates.
 
 ### 6.1 WiFi Setup
 
@@ -17,11 +17,11 @@ The firmware uses a two-tier reconnection strategy:
 1. The ESP SDK's built-in auto-reconnect (`WiFi.setAutoReconnect(true)`) handles short blips (typically under 30 seconds) transparently at the radio level.
 2. For longer outages, the application-level `loopWifi()` state machine takes over. The state machine is fully non-blocking: each call returns in well under a millisecond, so the watchdog, OpenTherm message processing, MQTT keepalives, and the web UI all keep running during reconnection. It retries with a 30-second window per attempt (enough for a full scan, association, and DHCP exchange) and gives up after 10 attempts, rebooting the device (max time before reboot: 300 seconds). In beta builds it enters AP fallback mode after 2 failed retries instead (see section 6.1.3). These timing parameters are codified in ADR-075 (which supersedes the original 5-second/15-retry values from ADR-047) to give `WiFi.begin()` a full association window and avoid cancelling the SDK auto-reconnect mid-flight.
 
-After a successful reconnect, the firmware re-applies the configured hostname, forces a DHCP re-announce so the router learns the correct hostname, and restarts Telnet, MQTT, and WebSocket services automatically. Per the fix for issue #525, the SDK DHCP client is only restarted while the station is disconnected. Touching `wifi_station_dhcpc_start()` on an associated station resets the IP to `0.0.0.0` and prevents recovery after a router reboot.
+After a successful reconnect, the firmware re-applies the configured hostname for the next DHCP exchange and restarts Telnet, MQTT, and WebSocket services automatically. It makes no DHCP calls of its own: the WiFi SDK handles DHCP as part of the reconnect.
 
 #### 6.1.3 AP Fallback Mode
 
-Available in beta builds (v2.0.0-beta and later, all platforms). When WiFi retries are exhausted at runtime, the device switches into AP fallback mode instead of rebooting indefinitely. In production releases the device reboots after 10 failed retries instead.
+Available in beta builds (v2.0.0-beta and later). When WiFi retries are exhausted at runtime, the device switches into AP fallback mode instead of rebooting indefinitely. In production releases the device reboots after 10 failed retries instead.
 
 At boot, if credentials are stored but WiFi is unreachable, beta builds also skip the WiFiManager config portal and go straight to AP fallback.
 
@@ -49,44 +49,9 @@ In AP fallback mode the device keeps attempting to reconnect to the configured W
 
 ---
 
-### 6.2 Ethernet (ESP32 + W5500)
+### 6.2 Ethernet
 
-Wired Ethernet is available on ESP32 boards with a W5500 SPI Ethernet controller. Not available on ESP8266.
-
-#### 6.2.1 Hardware Detection
-
-The firmware starts the W5500 driver at boot. The driver resets the chip and checks its SPI VERSION register (address 0x0039, expected 0x04). If the check passes, the chip is recognized as a W5500 and Ethernet support is activated, also when no cable is plugged in. No separate setting is needed: if the chip is present and correctly wired, it is used automatically.
-
-#### 6.2.2 GPIO Assignments
-
-The W5500 uses the SPI bus. The exact GPIO assignments depend on the board variant configured in `boards.h`. Consult the hardware documentation for your specific OTGW32 board for the precise pin numbers.
-
-Typical connections:
-
-| W5500 Signal | ESP32 GPIO |
-|---|---|
-| CS (chip select) | See boards.h `PIN_SPI_CS` |
-| INT (interrupt) | See boards.h `PIN_SPI_INT` |
-| RST (reset) | See boards.h `PIN_SPI_RST` |
-| SCK (SPI clock) | See boards.h `PIN_SPI_SCK` |
-| MISO | See boards.h `PIN_SPI_MISO` |
-| MOSI | See boards.h `PIN_SPI_MOSI` |
-
-#### 6.2.3 Priority over WiFi and runtime failover
-
-Ethernet always takes priority. When the W5500 is present and a cable is plugged in, WiFi is disabled. If the cable is unplugged at runtime, the firmware detects this (the link is polled every 5 seconds in `loopEthernet()`) and switches back to WiFi automatically. When the cable is reconnected, DHCP runs (2-second timeout on hot-plug) and the firmware switches back to Ethernet. This failover happens without a reboot and without configuration.
-
-On every transition the firmware re-registers mDNS on the new interface, restarts the MQTT client and the WebSocket server, and publishes a retained `otgw-firmware/network/mode` topic with value `wifi` or `ethernet`. The transition to `ethernet` is published as soon as the MQTT broker confirms the new connection (a deferred drain inside `loopEthernet()`). The transition to `wifi` is published before the cable-loss switch so the broker sees it while MQTT is still alive on the wired interface.
-
-The current transport is exposed to the web UI and Home Assistant through `/api/v2/device/info`, which adds three fields on OTGW32 hardware: `networkmode` (`wifi` or `ethernet`), `ethernetpresent` (W5500 detected), and `ethernetlink` (cable present). The header bar in the web UI polls `/api/v2/device/time` once per second to keep the network icon (WiFi or Ethernet) in sync with the active transport.
-
-#### 6.2.4 MAC Address
-
-The firmware derives a unique locally-administered MAC address from the ESP32 eFuse MAC. This MAC address differs from the WiFi MAC address but is unique per device and consistent across reboots.
-
-#### 6.2.5 Static IP on Ethernet
-
-Ethernet has its own static IP configuration, independent of the WiFi static IP. Configure it in the Settings page under the Ethernet section, or via the REST settings keys `ETHstaticip` (boolean), `ETHipaddress`, `ETHgateway`, `ETHsubnet`, and `ETHdns`. When `ETHstaticip` is false (the default), Ethernet uses DHCP with a 1-second timeout at boot and a 2-second timeout on cable hot-plug. When `ETHdns` is `0.0.0.0`, the gateway address is used as the DNS server.
+The OTGW Classic has no Ethernet, so it always uses WiFi; the Ethernet settings only appear on hardware with Ethernet.
 
 ---
 
@@ -110,9 +75,7 @@ The default hostname on 2.0.0 is `OTGW2`. After connecting to your network the d
 
 The 1.x firmware keeps the default `OTGW` (`otgw.local`), so a 1.x and a 2.0.0 gateway on the same network no longer claim the same name. A unit upgraded from 1.x keeps the hostname saved in its settings, usually `OTGW`; only a new install or a reset that discards `settings.ini` starts with `OTGW2`.
 
-mDNS works on both ESP8266 and ESP32. When the network interface changes (for example, switching from WiFi to Ethernet), the firmware re-registers the mDNS hostname on the new interface automatically.
-
-The firmware also registers an LLMNR responder on ESP8266, which allows Windows machines to resolve `otgw2` (without the `.local` suffix). LLMNR is not available on ESP32.
+The 2.x firmware has no LLMNR responder, so the device itself does not answer for the bare name `otgw2` (without `.local`): use `otgw2.local` or the IP address.
 
 Set the hostname in Settings. The new hostname propagates to the DHCP request, mDNS advertisement, MQTT client ID, and web UI title.
 
@@ -144,7 +107,7 @@ NTP time is also required for the nightly restart feature (see section 6.5.4) an
 
 #### 6.5.4 Nightly Restart for Heap Recovery
 
-The ESP8266 suffers from heap fragmentation over time. The firmware offers an optional scheduled nightly restart to reclaim memory. This feature is disabled by default.
+The firmware offers an optional scheduled nightly restart. This feature is disabled by default.
 
 | Setting | Default | Description |
 |---|---|---|
@@ -158,15 +121,11 @@ Requirements for the restart to trigger:
 
 The restart causes a brief service interruption of approximately 30 seconds.
 
-#### 6.5.5 ESP8266 SDK Time Bug
-
-The ESP8266 SDK initializes `time()` to `0xFFFFFFFF` (year 2106) before the first SNTP sync completes. The firmware detects this bogus value and ignores it, so timestamps are never poisoned by a wrong initial time.
-
 ---
 
 ### 6.6 OTA Firmware Updates
 
-The OTA update endpoint is at `/update`. It sits behind the protected-admin boundary defined in ADR-056 (which supersedes ADR-054). When `settingHTTPpasswd` is empty, the endpoint is open. When a password is set, the endpoint requires HTTP authentication with username `admin` (the main firmware challenges with Digest, the safeboot updater with Basic). The same password is propagated to the OTA update server at WiFi or Ethernet startup, so a settings change takes effect on the next reboot without re-flashing.
+The OTA update endpoint is at `/update`. It sits behind the protected-admin boundary defined in ADR-056 (which supersedes ADR-054). When `settingHTTPpasswd` is empty, the endpoint is open. When a password is set, the endpoint requires HTTP authentication with username `admin` (the main firmware challenges with Digest, the safeboot updater with Basic). The same password is propagated to the OTA update server at network startup, so a settings change takes effect on the next reboot without re-flashing.
 
 Browser requests to protected admin endpoints (including `/update`, `/upload`, `/ReBoot`, `/ResetWireless`, and `POST /api/v2/settings`) are additionally checked for `Origin`/`Referer` matching `Host`. This is a lightweight CSRF mitigation, not a full session framework: requests without `Origin` or `Referer` (curl, OTmonitor, scripts) are allowed for backward compatibility; mismatched origins are rejected with HTTP 403.
 
@@ -186,15 +145,6 @@ The OTA update page does not accept merged binaries (`*-merged*.bin`, `*-migrate
 #### 6.6.2 Limitations
 
 - Never flash PIC firmware via OTA. The OTA update page is for ESP firmware only. Flashing PIC firmware over the network with OTmonitor can permanently damage the PIC.
-- On ESP8266, the available OTA space is limited by flash size. The `build.py` tool reports the available space.
-
----
-
-### 6.7 ESP8266: lwIP Low Memory Variant and Arduino Core 3.1.2
-
-Since v2.0.0-beta, the ESP8266 build has moved from Arduino core 2.7.4 to 3.1.2 and is compiled with the lwIP v2 Low Memory variant (`ip=lm2f`, TCP MSS=536). Compared to the Higher Bandwidth variant this roughly halves the TCP receive/send buffers per socket, which matters on the ESP8266's ~40KB of usable RAM. The lwIP variant is a compile-time choice and requires no user configuration.
-
-On the MQTT publish path the firmware also enables WiFiClient sync mode (`setSync(true)`). This skips the temporary ~1KB `TCP_SND_BUF` copy inside the Arduino WiFiClient: writes flow straight into lwIP instead of being staged in an intermediate buffer. Combined with `setNoDelay(true)`, the data-plane RAM per MQTT connection drops from about 4.8KB to 3.7KB. This applies to the MQTT publish path only; the web server, WebSocket, and telnet sockets continue to use the default (buffered) WiFiClient behaviour.
 
 ---
 
@@ -207,8 +157,7 @@ On the MQTT publish path the firmware also enables WiFiClient sync mode (`setSyn
 | 23 | TCP / Telnet | Debug console | Plain-text debug log; served by SimpleTelnet library |
 | 25238 | TCP | Serial bridge (ser2net) | Raw OTGW PIC serial over TCP; served by SimpleTelnet library; OTmonitor compatible |
 | 123 | UDP (outbound) | NTP (SNTP) | Outbound only |
-| 5353 | UDP | mDNS | Local network name resolution (both platforms) |
-| 5355 | UDP | LLMNR | Windows name resolution (ESP8266 only) |
+| 5353 | UDP | mDNS | Local network name resolution |
 | 1883 | TCP (outbound) | MQTT | Outbound to your MQTT broker |
 
 ---

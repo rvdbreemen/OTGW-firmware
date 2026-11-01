@@ -26,15 +26,14 @@ De firmware implementeert een tweelaags herstelmechanisme:
 - **Laag 2**: Bij langere uitval neemt de toestandsmachine `loopWifi()` het over. Deze is volledig non-blocking: elke aanroep keert binnen minder dan een milliseconde terug, zodat de watchdog, de OpenTherm-berichtenverwerking, de MQTT-keepalives en de Web UI gewoon blijven draaien tijdens een herverbindingspoging. Per poging krijgt WiFi 30 seconden om scan, associatie en DHCP te voltooien. In productiebuilds herstart het apparaat na 10 mislukte pogingen (maximaal 300 seconden voor de reboot). In betabuilds activeert de firmware na 2 mislukte pogingen de AP-fallbackmodus (zie paragraaf 6.1.3) in plaats van te herstarten. Deze waarden zijn vastgelegd in ADR-075 (vervangt de oorspronkelijke 5 seconden / 15 retries uit ADR-047) om `WiFi.begin()` een volledig associatievenster te geven en te voorkomen dat de SDK auto-reconnect halverwege wordt afgebroken.
 
 Bij herstel van de verbinding:
-- Herstelt de firmware de geconfigureerde hostnaam.
-- Stuurt de firmware een DHCP-heraankondiging zodat de router de juiste hostnaam leert.
+- Zet de firmware de geconfigureerde hostnaam opnieuw voor de volgende DHCP-uitwisseling.
 - Worden MQTT, de WebSocket-verbinding en de Telnet-debugserver automatisch opnieuw gestart.
 
-Sinds de fix voor issue #525 wordt de SDK DHCP-client uitsluitend herstart wanneer het station *niet* verbonden is. Het aanroepen van `wifi_station_dhcpc_start()` op een geassocieerd station reset het IP-adres naar `0.0.0.0` en voorkomt herstel na een routerreboot.
+De firmware doet zelf geen DHCP-aanroepen: de WiFi SDK regelt DHCP als onderdeel van het herverbinden.
 
 #### 6.1.3 AP-fallbackmodus (beta)
 
-Beschikbaar in betabuilds (v2.0.0-beta en later, alle platformen). Wanneer WiFi-pogingen uitgeput zijn, schakelt het apparaat over naar AP-fallbackmodus in plaats van eindeloos te herstarten. In productiereleases herstart het apparaat na 10 mislukte pogingen.
+Beschikbaar in betabuilds (v2.0.0-beta en later). Wanneer WiFi-pogingen uitgeput zijn, schakelt het apparaat over naar AP-fallbackmodus in plaats van eindeloos te herstarten. In productiereleases herstart het apparaat na 10 mislukte pogingen.
 
 Bij opstart, als er credentials opgeslagen zijn maar WiFi niet bereikbaar is, slaan betabuilds de WiFiManager config portal over en gaan direct naar AP-fallback.
 
@@ -62,50 +61,15 @@ In AP-fallbackmodus probeert de firmware elke 5 minuten opnieuw verbinding te ma
 
 ---
 
-### 6.2 Ethernet (ESP32 + W5500)
+### 6.2 Ethernet
 
-Wired Ethernet is beschikbaar op ESP32-boards met een W5500 SPI Ethernet-controller. Niet beschikbaar op ESP8266.
-
-#### 6.2.1 Hardwaredetectie
-
-De firmware start bij het opstarten de W5500-driver. Die reset de chip en controleert het SPI VERSION-register (adres 0x0039, verwacht 0x04). Slaagt die controle, dan wordt de chip herkend als W5500 en wordt Ethernet-ondersteuning geactiveerd, ook zonder aangesloten kabel. Er is geen aparte instelling nodig: als de chip aanwezig en correct bedraad is, wordt hij automatisch gebruikt.
-
-#### 6.2.2 GPIO-aansluitingen
-
-De W5500 is aangesloten via de SPI-bus. De exacte pinout hangt af van het boardvariant dat is geconfigureerd in `boards.h`. Raadpleeg de hardwaredocumentatie van uw specifieke OTGW32-bord voor de precieze GPIO-nummers.
-
-Typische aansluitingen:
-
-| W5500 signaal | ESP32 GPIO |
-|---|---|
-| CS (chip select) | Zie boards.h `PIN_SPI_CS` |
-| INT (interrupt) | Zie boards.h `PIN_SPI_INT` |
-| RST (reset) | Zie boards.h `PIN_SPI_RST` |
-| SCK (SPI clock) | Zie boards.h `PIN_SPI_SCK` |
-| MISO | Zie boards.h `PIN_SPI_MISO` |
-| MOSI | Zie boards.h `PIN_SPI_MOSI` |
-
-#### 6.2.3 Prioriteit boven WiFi en runtime-failover
-
-Ethernet heeft altijd prioriteit. Wanneer de W5500 aanwezig is en een kabel is aangesloten, wordt WiFi uitgeschakeld. Als de kabel tijdens bedrijf wordt verwijderd, detecteert de firmware dit (de link wordt elke 5 seconden gepolld in `loopEthernet()`) en schakelt automatisch terug naar WiFi. Wordt de kabel teruggeplaatst, dan voert de firmware DHCP uit (timeout van 2 seconden bij hot-plug) en schakelt terug naar Ethernet. Deze failover verloopt zonder herstart en zonder configuratie.
-
-Bij elke wisseling registreert de firmware mDNS opnieuw op het nieuwe interface, herstart MQTT en de WebSocket-server, en publiceert een retained topic `otgw-firmware/network/mode` met waarde `wifi` of `ethernet`. De overgang naar `ethernet` wordt gepubliceerd zodra de MQTT-broker de nieuwe verbinding bevestigt (uitgestelde drain binnen `loopEthernet()`). De overgang naar `wifi` wordt gepubliceerd voordat de kabel-verloren-switch wordt uitgevoerd, zodat de broker dit nog ziet terwijl MQTT op de bekabelde verbinding actief is.
-
-Het actieve transport is voor de Web UI en Home Assistant zichtbaar via `/api/v2/device/info`, dat op OTGW32-hardware drie extra velden toevoegt: `networkmode` (`wifi` of `ethernet`), `ethernetpresent` (W5500 gedetecteerd) en `ethernetlink` (kabel aanwezig). De koptekstbalk in de Web UI peilt `/api/v2/device/time` één keer per seconde om het netwerkicoon (WiFi of Ethernet) gesynchroniseerd te houden met het actieve transport.
-
-#### 6.2.4 MAC-adres
-
-De firmware leidt een uniek lokaal-beheerd MAC-adres af van het ESP32-eFuse MAC. Dit MAC-adres verschilt van het WiFi MAC-adres maar is per apparaat uniek en consistent over herstarts.
-
-#### 6.2.5 Statisch IP op Ethernet
-
-Ethernet heeft een eigen statische IP-configuratie, los van het WiFi static IP. Configureer dit op de Settings-pagina onder het Ethernet-gedeelte, of via de REST-instellingen `ETHstaticip` (boolean), `ETHipaddress`, `ETHgateway`, `ETHsubnet` en `ETHdns`. Wanneer `ETHstaticip` op false staat (standaard), gebruikt Ethernet DHCP met een timeout van 1 seconde bij het opstarten en 2 seconden bij kabel-hot-plug. Als `ETHdns` op `0.0.0.0` staat, wordt het gateway-adres als DNS-server gebruikt.
+De OTGW Classic heeft geen Ethernet en gebruikt dus altijd WiFi; de Ethernet-instellingen verschijnen alleen op hardware met Ethernet.
 
 ---
 
 ### 6.3 Statisch IP vs. DHCP
 
-Standaard gebruikt het apparaat DHCP voor zowel WiFi als Ethernet. Dit is de aanbevolen instelling voor de meeste situaties. Als uw router DHCP-reserveringen ondersteunt, is het toewijzen van een vast IP-adres op basis van MAC-adres de beste aanpak.
+Standaard gebruikt het apparaat DHCP. Dit is de aanbevolen instelling voor de meeste situaties. Als uw router DHCP-reserveringen ondersteunt, is het toewijzen van een vast IP-adres op basis van MAC-adres de beste aanpak.
 
 Voor een statisch IP geconfigureerd in de firmware:
 
@@ -125,15 +89,9 @@ De standaard hostnaam op 2.0.0 is `OTGW2`. Het apparaat is hiermee bereikbaar al
 
 De 1.x-firmware houdt de standaardnaam `OTGW` (`otgw.local`). Een 1.x- en een 2.0.0-gateway in hetzelfde netwerk gebruiken dus niet meer dezelfde naam. Een apparaat dat van 1.x is bijgewerkt, houdt de hostnaam uit zijn instellingen, meestal `OTGW`. Alleen een nieuwe installatie of een reset waarbij `settings.ini` verloren gaat, begint met `OTGW2`.
 
-mDNS werkt op zowel ESP8266 als ESP32. Wanneer het netwerkinterface wisselt (bijvoorbeeld van WiFi naar Ethernet), registreert de firmware de mDNS-hostnaam automatisch opnieuw op het nieuwe interface.
-
-Op ESP8266 wordt ook LLMNR (Link-Local Multicast Name Resolution, UDP poort 5355) geregistreerd. Dit maakt het apparaat vindbaar onder de naam `<hostname>` (zonder `.local`) in Windows-netwerkomgevingen, ook zonder Bonjour. LLMNR is niet beschikbaar op ESP32.
+De 2.x-firmware heeft geen LLMNR-responder. Het apparaat reageert dus zelf niet op de kale naam `otgw2` (zonder `.local`): gebruik `otgw2.local` of het IP-adres.
 
 De hostnaam is instelbaar via de Settings-pagina. De nieuwe hostnaam werkt door in het DHCP-verzoek, de mDNS-advertentie, het MQTT client ID en de Web UI-titel.
-
-#### Bekende beperking op ESP8266
-
-De ESP8266 SDK bevat een bug waarbij `configTime()` (de NTP-initialisatiefunctie) de WiFi-hostnaam terugzet naar `ESP-XXXXXX`. De firmware detecteert dit en herstelt de hostnaam automatisch, gevolgd door een DHCP-heraankondiging. Dit gebeurt eenmalig na de eerste NTP-synchronisatie en is voor de gebruiker niet zichtbaar.
 
 ---
 
@@ -163,7 +121,7 @@ NTP-tijd is ook vereist voor de nachtelijke herstart (zie paragraaf 6.5.4) en vo
 
 #### 6.5.4 Nachtelijke herstart voor geheugenherstel
 
-De ESP8266 heeft last van heap-fragmentatie over langere tijd. De firmware biedt een optionele geplande nachtelijke herstart om geheugen terug te winnen. Deze functie is standaard uitgeschakeld.
+De firmware biedt een optionele geplande nachtelijke herstart. Deze functie is standaard uitgeschakeld.
 
 | Instelling | Standaard | Beschrijving |
 |---|---|---|
@@ -177,17 +135,13 @@ Voorwaarden voor de herstart:
 
 De herstart veroorzaakt een korte serviceonderbreking van ongeveer 30 seconden.
 
-#### 6.5.5 ESP8266 SDK-tijdbug
-
-De ESP8266 SDK initialiseert `time()` met de waarde `0xFFFFFFFF` (jaar 2106) voordat de eerste SNTP-synchronisatie is voltooid. De firmware herkent deze foutieve waarde en negeert deze, zodat tijdstempels nooit worden vergiftigd door een verkeerde begintijd.
-
 ---
 
 ### 6.6 OTA-updates
 
 OTA (Over-The-Air) staat voor draadloze firmware-updates. Hiermee kunt u de firmware bijwerken zonder USB-kabel.
 
-Het OTA-update-endpoint is `/update`. Het valt onder de beschermde-admin-grens uit ADR-056 (vervangt ADR-054). Wanneer `settingHTTPpasswd` leeg is, is het endpoint open. Wanneer een wachtwoord is ingesteld, vereist het endpoint HTTP-authenticatie met gebruikersnaam `admin` (de hoofdfirmware vraagt Digest, de safeboot-updater Basic). Hetzelfde wachtwoord wordt bij WiFi- of Ethernet-startup doorgegeven aan de OTA-updateserver, zodat een wijziging zonder her-flash actief wordt na de eerstvolgende reboot.
+Het OTA-update-endpoint is `/update`. Het valt onder de beschermde-admin-grens uit ADR-056 (vervangt ADR-054). Wanneer `settingHTTPpasswd` leeg is, is het endpoint open. Wanneer een wachtwoord is ingesteld, vereist het endpoint HTTP-authenticatie met gebruikersnaam `admin` (de hoofdfirmware vraagt Digest, de safeboot-updater Basic). Hetzelfde wachtwoord wordt bij het starten van het netwerk doorgegeven aan de OTA-updateserver, zodat een wijziging zonder her-flash actief wordt na de eerstvolgende reboot.
 
 Browserverzoeken naar beschermde admin-endpoints (waaronder `/update`, `/upload`, `/ReBoot`, `/ResetWireless` en `POST /api/v2/settings`) worden bovendien gecontroleerd op overeenkomst van `Origin`/`Referer` met `Host`. Dit is een lichte CSRF-mitigatie, geen volledig sessieframework: verzoeken zonder `Origin` of `Referer` (curl, OTmonitor, scripts) worden toegestaan voor achterwaartse compatibiliteit; afwijkende origins worden afgewezen met HTTP 403.
 
@@ -207,15 +161,6 @@ De OTA-updatepagina accepteert geen merged binaries (`*-merged*.bin`, `*-migrate
 #### 6.6.2 Beperkingen
 
 - Flash nooit PIC-firmware via OTA. De OTA-updatepagina is uitsluitend voor ESP-firmware. Het flashen van PIC-firmware over het netwerk met OTmonitor kan de PIC permanent beschadigen.
-- Op ESP8266 is de beschikbare OTA-ruimte beperkt door de flashgrootte. Het `build.py`-script rapporteert de beschikbare ruimte.
-
----
-
-### 6.7 ESP8266: lwIP Low Memory-variant en Arduino-core 3.1.2
-
-Sinds v2.0.0-beta is de ESP8266-build overgezet van Arduino-core 2.7.4 naar 3.1.2 en wordt gebouwd met de lwIP v2 Low Memory-variant (`ip=lm2f`, TCP MSS=536). Ten opzichte van de Higher Bandwidth-variant halveert dit ruwweg de TCP-ontvangst- en verzendbuffers per socket, wat belangrijk is gezien het beperkte werkgeheugen van de ESP8266 (~40KB bruikbaar RAM). De lwIP-variant is een keuze op buildtijd en vereist geen gebruikersconfiguratie.
-
-Op het MQTT-publicatiepad activeert de firmware bovendien WiFiClient sync-mode (`setSync(true)`). Hierdoor wordt de tijdelijke ~1KB `TCP_SND_BUF`-kopie binnen de Arduino WiFiClient overgeslagen: writes gaan rechtstreeks naar lwIP in plaats van via een tussenbuffer. Samen met `setNoDelay(true)` daalt het data-plane-RAM per MQTT-verbinding van ongeveer 4,8KB naar 3,7KB. Dit geldt uitsluitend voor het MQTT-publicatiepad; de webserver, WebSocket en telnet-sockets blijven de standaard (gebufferde) WiFiClient-modus gebruiken.
 
 ---
 
@@ -228,8 +173,7 @@ Op het MQTT-publicatiepad activeert de firmware bovendien WiFiClient sync-mode (
 | 23 | TCP / Telnet | Debugconsole | Tekstuele debuglog; bediend door SimpleTelnet-bibliotheek |
 | 25238 | TCP | Seriele bridge (ser2net) | Ruwe OTGW PIC-serieel over TCP; bediend door SimpleTelnet-bibliotheek; OTmonitor-compatibel |
 | 123 | UDP (uitgaand) | NTP (SNTP) | Alleen uitgaand |
-| 5353 | UDP | mDNS | Lokale naamresolutie (beide platformen) |
-| 5355 | UDP | LLMNR | Windows-naamresolutie (alleen ESP8266) |
+| 5353 | UDP | mDNS | Lokale naamresolutie |
 | 1883 | TCP (uitgaand) | MQTT | Uitgaand naar uw MQTT-broker |
 
 ---
