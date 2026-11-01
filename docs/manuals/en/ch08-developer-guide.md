@@ -27,7 +27,7 @@ All firmware code lives in `src/OTGW-firmware/` as Arduino `.ino` files plus a s
 | `settingStuff.ino` | Settings load/save (LittleFS JSON), `updateSetting()` validation, debounced flush, side-effect dispatch |
 | `webSocketStuff.ino` | WebSocket server on port 81, OT log streaming, heap backpressure gate |
 | `helperStuff.ino` | Heap health monitor, `canSendWebSocket()`, `canPublishMQTT()`, LittleFS status helpers |
-| `OTDirect.ino` | ESP32-only: direct GPIO OpenTherm bus via ISR, OTDirect operating modes, command queue coalesce-by-MsgID |
+| `OTDirect.ino` | OT-Direct engine (used only on hardware without a PIC): OTDirect operating modes, command queue coalesce-by-MsgID |
 | `SATcontrol.ino` | SAT control loop, heating curve, boiler state machine, setpoint injection, master enable/disable |
 | `SATpid.ino` | PID v3 implementation: proportional, integral, derivative with deadband |
 | `SATcycles.ino` | Cycle classification, overshoot detection, anti-cycling |
@@ -37,10 +37,16 @@ All firmware code lives in `src/OTGW-firmware/` as Arduino `.ino` files plus a s
 | `MQTTHaDiscovery.cpp` | Generated PROGMEM tables for MQTT Home Assistant auto-discovery (sensors, binary sensors, climate, number entities) |
 | `mqtt_discovery_verify.cpp` | Compile-time sanity checks for the discovery tables (no runtime cost) |
 | `sensors_ext.ino`, `s0PulseCount.ino`, `OLED.ino` | Dallas DS18B20 temperature sensors, S0 pulse counter, OLED display |
-| `Ethernet.ino` | W5500 SPI Ethernet runtime probe and failover (ESP32 only) |
-| `boards.h` | Board-specific pin maps and feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`) |
+| `Ethernet.ino` | Ethernet runtime probe and failover (only with Ethernet hardware) |
 | `safeTimers.h` | Timer macros: `DECLARE_TIMER_SEC()`, `DUE()`, `RESTART_TIMER()` |
-| `platform.h`, `platform_esp8266.h`, `platform_esp32.h` | Platform abstraction layer |
+
+The platform abstraction lives outside the sketch, in the project's own Platform library under `src/libraries/Platform/src/`:
+
+| File | Domain |
+|------|--------|
+| `platform.h` | Dispatcher, included by application code |
+| `platform_esp32.h` | ESP32-S3 includes, `platformXxx()` shims, type aliases |
+| `boards.h` | Board-specific pin maps and feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`, ...) |
 
 #### Web Assets
 
@@ -57,92 +63,58 @@ The browser SPA lives in `src/OTGW-firmware/data/`. These files are flashed to L
 
 | File / Directory | Purpose |
 |-----------------|---------|
-| `build.py` | Primary build script: invokes PlatformIO internally, packages firmware and LittleFS artifacts, produces per-target distribution zips |
-| `flash_esp.py` | Cross-platform flasher: detects port, downloads release zip, writes firmware + filesystem for ESP8266 and ESP32 |
-| `platformio.ini` | PlatformIO project: `esp8266` and `esp32` environments |
+| `build.bat` / `build.sh` | Build entrypoints: bootstrap their own Python venv, then run `build.py` |
+| `build.py` | Build script behind the wrappers: invokes PlatformIO internally, packages firmware and LittleFS artifacts, produces the distribution zip |
+| `flash_otgw.bat` / `flash_otgw.sh` | Flash entrypoints, shipped in the release zip: first USB flash, `--update`, `--migrate` |
+| `flash_esp.py` | Python flasher: detects port, writes firmware + filesystem to the ESP32-S3 |
+| `platformio.ini` | PlatformIO project: `esp32`, `esp32-classic` and `esp32-combo` environments; `esp32-combo` is the target that is built and shipped |
 | `evaluate.py` | Static code quality checker: PROGMEM usage, unsafe patterns, String class audit |
 | `scripts/` | PlatformIO pre-build scripts: version injection, library patching |
-| `libraries/` | Vendored Arduino libraries used by both build systems |
+| `src/libraries/` | The Platform library and vendored Arduino libraries |
 | `docs/` | C4 architecture docs, ADRs, API references, feature docs |
-| `other-projects/` | Read-only reference codebases (PIC firmware, OTmonitor, OT-Thing, SAT) |
+| `other-projects/` | Read-only reference codebases (PIC firmware, OTmonitor, SAT) |
 | `backlog/` | Project task management (Backlog.md) |
 
 ---
 
 ### Build System
 
-#### build.py (release builds)
+#### build.bat / build.sh (release builds)
 
-The primary build script for producing release artifacts. It invokes PlatformIO (or arduino-cli) internally, handles version embedding, filesystem packaging, and artifact collection.
+Build with the wrappers: `build.bat` on Windows, `./build.sh` on Linux and macOS. They bootstrap their own Python venv (`.build-python`) and then run `build.py`, which invokes PlatformIO internally and handles version embedding, filesystem packaging and artifact collection. Never call `python build.py` directly: the host default Python may be a version PlatformIO rejects.
 
 ```bash
-python build.py                                   # Full build for ESP8266 + ESP32 (PlatformIO, incremental)
-python build.py --target esp8266                  # Build for ESP8266 only
-python build.py --target esp32                    # Build for ESP32 only
-python build.py --target all                      # Build for both (default)
-python build.py --backend platformio              # Explicit PlatformIO backend (default)
-python build.py --backend arduino-cli             # Legacy arduino-cli backend (ESP8266 only)
-python build.py --pio                             # Shorthand for --backend platformio
-python build.py --arduino-cli                     # Shorthand for --backend arduino-cli
-python build.py --firmware                        # Build firmware only (skip filesystem)
-python build.py --filesystem                      # Build filesystem only
-python build.py --clean                           # Remove build artifacts, keep libdeps cache
-python build.py --distclean                       # Remove build artifacts + cores + library cache
-python build.py --merged                          # Produce a single merged firmware+filesystem binary
-python build.py --merged --compress               # Merged binary, gzip-compressed
-python build.py --no-install-cli                  # Skip arduino-cli install check (arduino-cli backend)
-python build.py --no-color                        # Disable coloured output
-python build.py --help                            # Show help
+./build.sh                         # Firmware + filesystem, esp32-combo (build.bat on Windows)
+./build.sh --firmware              # Build firmware only (skip filesystem)
+./build.sh --filesystem            # Build filesystem only
+./build.sh --clean                 # Remove build artifacts, keep libdeps cache
+./build.sh --distclean             # Remove build artifacts + cores + library cache
+./build.sh --no-merged             # Skip the merged binaries (faster dev builds)
+./build.sh --compress              # Gzip-compress the merged binary
+./build.sh --no-zip                # Skip the distribution zip
+./build.sh --no-color              # Disable coloured output
+./build.sh --help                  # Show help
 ```
 
-By default `build.py` uses the PlatformIO backend and builds both ESP8266 and ESP32 targets. The `--arduino-cli` flag selects the legacy arduino-cli backend, which supports only ESP8266. The script reads the Git tag to embed the version string and places output in the `build/` directory.
+By default the build produces `esp32-combo`, the target that is built and shipped, including the merged binaries and the distribution zip. The script reads the Git tag to embed the version string and places output in the `build/` directory.
 
-**Python version**: PlatformIO requires Python 3.10 through 3.13. Python 3.14 is rejected by PlatformIO's own guard. `build.py` will prefer the PlatformIO-bundled Python in `~/.platformio/penv/` (typically 3.11.x) when available, so a system-wide Python 3.14 installation does not prevent building as long as PlatformIO's virtualenv is present.
+**One build at a time**: `build.py` takes a machine-wide build lock (`%LOCALAPPDATA%/OTGW-build/build.lock`, shared by every worktree), so a second build waits until the first ends. It runs at most 4 compiler jobs.
 
-**esptool**: `build.py` uses esptool v5 for merged-binary creation (`--merged`). It is installed automatically on first use via `pip install esptool` if not already present.
+**esptool**: `build.py` uses esptool v5 for merged-binary creation. It is installed automatically on first use via `pip install esptool` if not already present.
 
 #### PlatformIO
 
-PlatformIO is the preferred build system and is used for both ESP8266 and ESP32. Two environments are defined in `platformio.ini`:
-
-| Environment | Target | Board | Core | CPU |
-|-------------|--------|-------|------|-----|
-| `esp8266` | Wemos D1 mini / NodeMCU (NodoShop OTGW) | `d1_mini` | Arduino Core 2.7.4 LTS via `espressif8266@2.6.3` (GCC 4.8.2) | 160 MHz |
-| `esp32` | NodoShop OTGW32 (ESP32-S3) | `esp32-s3-devkitc-1` | pioarduino espressif32 fork | 240 MHz |
-
-The ESP8266 environment is pinned to `espressif8266@2.6.3` (Arduino Core 2.7.4 LTS). It was briefly tested on `espressif8266@4.2.1` (Core 3.1.2 / GCC 10.3) but reverted after field reports of unaligned PROGMEM reads from word-aligned `strstr` / `strncmp` accesses against flash. Core 2.7.4 is the production target for the entire 1.5.x and 2.0.0 lines.
-
-The ESP8266 LittleFS partition size is 2 072 576 bytes (approximately 2 MB). The ESP32 layout is `4M2M` (2 MB LittleFS, `boot_app0.bin` included at `0xe000`, DIO flash mode). All of this is configured in `platformio.ini` via the board options.
-
-```bash
-pio run                          # Build all environments
-pio run -e esp8266               # Build ESP8266 only
-pio run -e esp32                 # Build ESP32 only
-pio run -e esp8266 -t upload     # Build and upload ESP8266
-pio run -e esp8266 -t uploadfs   # Upload LittleFS filesystem (ESP8266)
-pio run -e esp32 -t upload       # Build and upload ESP32
-pio run -e esp32 -t uploadfs     # Upload LittleFS filesystem (ESP32)
-```
+`build.py` drives PlatformIO. Three environments are defined in `platformio.ini`: `esp32` (the base environment), `esp32-classic` and `esp32-combo`; see Build Targets and Boards (2.0.0) below. Do not run `pio run` directly: it bypasses the build lock.
 
 PlatformIO's pre-build scripts in `scripts/` handle version injection (`platformio_version.py`) and library compatibility patching (`patch_pio_libs.py`).
 
-##### ESP8266-specific PlatformIO notes
-
-The ESP8266 build excludes `OTDirect.ino` (ESP32-only) via `build_src_filter`. PlatformIO's ctags scanner processes all `.ino` files regardless of the filter, so ESP32-specific types (`OpenThermResponseStatus`, `OTDirectMode`, `OTDirectRequestOrigin`) are stubbed out as `-D` flags to prevent ctags-generated forward declaration errors. These stubs have no runtime effect.
-
-The `OpenTherm Library` is explicitly excluded in `lib_ignore` because PlatformIO's LDF scanner ignores `#if` guards and would otherwise compile the ESP32-only OT library for ESP8266.
-
 ##### ESP32-specific PlatformIO notes
 
-PlatformIO's ctags scanner processes all `.ino` files regardless of `#if` guards and generates forward declarations for every function it finds. On ESP32 (`HAS_PIC=0`), `OTGWSerial.h` is never included, so `OTGWFirmware` (an enum type used as a parameter in `fwreportinfo()`) is unknown at ctags forward-declaration time. The flag `-DOTGWFirmware=int` stubs it out so the generated forward declaration compiles. The actual `fwreportinfo()` body is inside a `#if HAS_PIC` block and is never compiled on ESP32. This follows the same pattern as the OTDirect type stubs for ESP8266.
-
-#### Arduino IDE
-
-Arduino IDE is supported for ESP8266 only. Install the ESP8266 Arduino core, then open `src/OTGW-firmware/OTGW-firmware.ino`. Required libraries are in `libraries/`. Add that directory to your Arduino sketchbook library path. The IDE does not support the ESP32 target or `OTDirect.ino`.
+PlatformIO's ctags scanner processes all `.ino` files regardless of `#if` guards and generates forward declarations for every function it finds. In the `esp32` environment (`HAS_PIC=0`), `OTGWSerial.h` is never included, so `OTGWFirmware` (an enum type used as a parameter in `fwreportinfo()`) is unknown at ctags forward-declaration time. The flag `-DOTGWFirmware=int` stubs it out so the generated forward declaration compiles. The actual `fwreportinfo()` body is inside a `#if HAS_PIC` block and is never compiled in that environment. `esp32-classic` and `esp32-combo` include `OTGWSerial.h` and do not use this stub.
 
 #### evaluate.py
 
-Run the code quality checker after making changes to catch common ESP8266-specific mistakes:
+Run the code quality checker after making changes to catch common firmware mistakes:
 
 ```bash
 python evaluate.py                  # Full evaluation (all files)
@@ -186,20 +158,22 @@ The generated file is deliberately placed in its own `.cpp` translation unit to 
 
 ### Board Hardware Variants
 
-The firmware supports two official Nodoshop hardware variants, defined in `boards.h`. The board is selected at build time by a `BOARD_*` preprocessor flag set in `platformio.ini`. When no explicit flag is set, the board is auto-detected from the MCU type (`ESP8266` or `ESP32`).
+The supported 2.x hardware is the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket; the PIC stays in place. Board definitions live in `src/libraries/Platform/src/boards.h`. Each PlatformIO environment sets exactly one `BOARD_*` preprocessor flag in `platformio.ini`, and `boards.h` turns that flag into `HAS_*` capability flags.
 
-**These flags are board-level, not MCU-level.** The presence of a PIC, Ethernet hardware, or a direct OpenTherm GPIO interface is a property of the specific Nodoshop PCB, not of the MCU family. Replacing an ESP8266 with an ESP32 on the OTGW WiFi board is not an official Nodoshop configuration and is not modelled.
+**These flags are board-level, not MCU-level.** The presence of a PIC, Ethernet hardware, or a direct OpenTherm interface is a property of the specific Nodoshop PCB, not of the MCU family. Application code tests only the `HAS_*` flags, never the raw `BOARD_*` macros.
 
 #### Feature Flags
 
-Four compile-time flags in `boards.h` describe the hardware capabilities of each board:
+Four compile-time flags in `boards.h` describe the hardware capabilities of the board:
 
-| Flag | Type | OTGW WiFi (ESP8266) | OTGW32 (ESP32) | Meaning |
-|------|------|---------------------|----------------|---------|
-| `HAS_PIC` | `0` / `1` | `1` | `0` | Board has a PIC co-processor that handles the OpenTherm electrical bus over UART |
-| `HAS_DIRECT_OT` | `0` / `1` | `0` | `1` | Board drives the OpenTherm bus directly from GPIO via the OTDirect ISR |
-| `HAS_ETH_CAPABLE` | `0` / `1` | `0` | `1` | Board has a W5500 SPI Ethernet module |
-| `HAS_OLED_CAPABLE` | `0` / `1` | `0` | `1` | Board carries the onboard SSD1306 128x64 I2C OLED (runtime probe at address `0x3C`) |
+| Flag | Type | OTGW Classic + S3 Mini | Meaning |
+|------|------|------------------------|---------|
+| `HAS_PIC` | `0` / `1` | `1` | Board has a PIC co-processor that handles the OpenTherm electrical bus over UART |
+| `HAS_DIRECT_OT` | `0` / `1` | `0` | OT-Direct engine compiled in (used only on hardware without a PIC) |
+| `HAS_ETH_CAPABLE` | `0` / `1` | `0` | Ethernet support compiled in (only with Ethernet hardware; the Classic has none) |
+| `HAS_OLED_CAPABLE` | `0` / `1` | `1` | Optional SSD1306 128x64 I2C OLED on the Classic I2C header (runtime probe at address `0x3C`) |
+
+The shipped `esp32-combo` image links both OpenTherm engines and picks one at boot; it sets `HAS_RUNTIME_HW_DETECT=1` and gates the PIC-versus-OT-Direct choice at runtime instead of at compile time.
 
 Use these flags in conditional compilation:
 
@@ -217,41 +191,29 @@ Use these flags in conditional compilation:
 #endif
 ```
 
-#### W5500 Runtime Detection
-
-`HAS_ETH_CAPABLE=1` means the board design includes a W5500 module header, but the module may not be physically installed on every unit. At boot, `initEthernet()` in `Ethernet.ino` starts the W5500 driver the same way the OT-Thing reference does (`Ethernet.init()` + `Ethernet.begin()`). The ESP-IDF driver install resets the chip and polls its VERSION register for up to 100 ms:
-
-- If the driver accepts the chip, `Ethernet.hardwareStatus()` returns `EthernetHardwareFound`, `state.hw.bEthernetPresent` is set to `true` and Ethernet stays initialised, with or without a cable.
-- If the driver install fails, `state.hw.bEthernetPresent` is set to `false` and the firmware runs in WiFi-only mode.
-
-No user configuration is required. `loopEthernet()` guards itself with `if (!state.hw.bEthernetPresent) return;` so it is a no-op when no hardware is present.
-
 ---
 
 ### Build Targets and Boards (2.0.0)
 
-The `dev` line (firmware 2.0.0) is ESP32-S3-only, built on an async + FreeRTOS stack. ESP8266 has been dropped from this line and continues only on the `otgw-1.x.x` maintenance line. The dual arduino-cli/PlatformIO description and the `esp8266` environment covered above apply to the 1.x line; on 2.0.0 the build is PlatformIO-only and every target is an ESP32-S3.
+The `dev` line (firmware 2.0.0) is ESP32-S3-only, built on an async + FreeRTOS stack. The 1.x firmware for the Wemos D1 mini (ESP8266) continues only on the `otgw-1.x.x` maintenance line. On 2.0.0 the build is PlatformIO-only and every target is an ESP32-S3.
 
 #### Fixed Build Targets (ADR-126)
 
-The board is chosen at compile time. There is no runtime hardware detection on the two fixed single-engine targets; each links exactly one OpenTherm engine. Three environments are defined in `platformio.ini`:
+There is no runtime hardware detection on the two fixed single-engine targets; each links exactly one OpenTherm engine. Three environments are defined in `platformio.ini`:
 
 | Target (`--target`) | Hardware | OpenTherm engine |
 |---|---|---|
-| `esp32` | OTGW32 / OT-Thing PCB | OTDirect (direct GPIO bus) |
+| `esp32` | No PIC | OTDirect only |
 | `esp32-classic` | OTGW Classic + LOLIN S3 Mini | PIC (OTGWSerial over UART) |
-| `esp32-combo` | Either of the above, boot-detected | Both engines linked in |
+| `esp32-combo` | OTGW Classic + LOLIN S3 Mini or S3 Mini Pro, engine picked at boot | Both engines linked in |
 
-Build with the wrapper or `build.py`:
+`esp32-combo` is the target that is built and shipped, and the only one built on `dev`. Build it with the wrapper, without a target argument:
 
 ```bash
-./build.sh                             # firmware + filesystem, esp32-combo (default); --target all for all three
-python build.py --target esp32         # OTGW32 (OTDirect) only
-python build.py --target esp32-classic # S3-in-Classic-socket (PIC) only
-python build.py --target esp32-combo   # combo (boot-detected) only
+./build.sh                             # firmware + filesystem, esp32-combo (build.bat on Windows)
 ```
 
-`esp32` is the default PlatformIO environment. `esp32-classic` and `esp32-combo` extend it (`extends = env:esp32`), inheriting the platform, board, `lib_deps` and `build_unflags`, and override only `build_flags`, `lib_ignore` and (for combo) the partition table.
+`esp32` is the default PlatformIO environment. `esp32-classic` and `esp32-combo` extend it (`extends = env:esp32`), inheriting the platform, board, partition table, `lib_deps` and `build_unflags`, and override only `build_flags` and `lib_ignore`.
 
 #### Combo Boot Detection (ADR-127 / ADR-158 / ADR-160)
 
@@ -261,14 +223,14 @@ The `esp32-combo` binary links both OT engines and selects one at boot. The `iBo
 |---|---|---|
 | `0` | AUTO | re-probe PIC vs OTDirect (and S3 Mini vs S3 Mini Pro) at boot |
 | `1` | Force PIC | LOLIN S3 Mini in the Classic socket |
-| `2` | OTDirect | OTGW32 direct GPIO bus |
+| `2` | OT-Direct mode | only on hardware without a PIC |
 | `3` | Force PIC | LOLIN S3 Mini Pro in the Classic socket |
 
 The S3 Mini Pro is distinguished from the plain S3 Mini by its on-board QMI8658C IMU. The Pro reroutes its Classic I2C headers and needs a different Classic pin map; `state.hw.bClassicPro` records the result. AUTO re-probes the PIC on every boot: the detection is persist-once, but a wrong verdict is re-evaluated at the next boot rather than being frozen in place.
 
 #### PSRAM
 
-Every S3 build defines `BOARD_HAS_PSRAM` and selects the `qio_qspi` memory type (`board_build.arduino.memory_type`). PSRAM is therefore detected at runtime, not per board: `psramFound()` is the single discriminator and drives the PSRAM-aware BLE default (`bleActive()` in `SATble.ino`). A board without PSRAM boots gracefully (BOOT_INIT is off, so `psramInit()` returns false with no abort). A future PSRAM-equipped OTGW32 revision auto-enables BLE with the same firmware and no rebuild.
+Every S3 build defines `BOARD_HAS_PSRAM` and selects the `qio_qspi` memory type (`board_build.arduino.memory_type`). PSRAM is therefore detected at runtime, not per board: `psramFound()` is the single discriminator and drives the PSRAM-aware BLE default (`bleActive()` in `SATble.ino`). A board without PSRAM boots gracefully (BOOT_INIT is off, so `psramInit()` returns false with no abort).
 
 #### Async Web Stack Tuning
 
@@ -279,7 +241,7 @@ The async stack replaces the synchronous `WebServer` + `PubSubClient` path (ADR-
 
 #### Partition Layout
 
-The ESP32-S3 partition table `partitions_otgw_esp32.csv` (shared by `esp32` and `esp32-classic`) is a single-app (no OTA) 4 MB layout: a 2.375 MB app slot at `0x10000` and a 1.5 MB LittleFS (label `spiffs`) at offset `0x270000`, plus a 64 KB coredump. The `esp32-combo` target has its own partition table (`partitions_otgw_esp32_combo.csv`) because the both-engines binary is larger; giving combo its own table keeps the shared table's filesystem offset from moving.
+The ESP32-S3 partition table `partitions_otgw_esp32.csv` is used by every 4 MB target and is a safeboot layout (ADR-191): a 960 KB safeboot updater (factory) at `0x10000`, a 2240 KB main firmware slot (`app0`, ota_0) at `0x100000`, a 768 KB LittleFS (label `spiffs`) at `0x330000`, plus a 64 KB coredump. Firmware OTA over WiFi goes through the safeboot updater; the main firmware never writes its own app slot.
 
 #### Flashing (flash_esp.py)
 
@@ -304,13 +266,11 @@ The firmware uses a four-level C4 model documented in `docs/c4/`. Read the relev
 
 #### Level 1: Context (`c4-context.md`)
 
-The OTGW-firmware sits between the OpenTherm heating bus and the home automation network. External actors are: Room Thermostat, Boiler (via PIC co-processor or OTDirect GPIO on ESP32), MQTT Broker, Home Assistant, NTP Server, Web Browser, OTmonitor TCP client, Dallas/S0/BLE sensors.
+The OTGW-firmware sits between the OpenTherm heating bus and the home automation network. External actors are: Room Thermostat, Boiler (via PIC co-processor, or OTDirect in OT-Direct mode), MQTT Broker, Home Assistant, NTP Server, Web Browser, OTmonitor TCP client, Dallas/S0/BLE sensors.
 
 #### Level 2: Container (`c4-container.md`)
 
-Two deployment targets share one codebase:
-- **ESP8266 (OTGW)**: NodoShop board with PIC16F co-processor. PIC handles the OpenTherm electrical bus; ESP8266 communicates with it over UART at 9600 baud.
-- **ESP32 (OTGW32)**: NodoShop board with direct GPIO OpenTherm interface (`OTDirect`), W5500 Ethernet, BLE, and OLED. The PIC is absent; the ESP32 drives the OT bus directly via interrupt-driven Manchester coding.
+The 2.x firmware runs on an ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the NodoShop OTGW Classic. The PIC16F co-processor handles the OpenTherm electrical bus; the ESP32-S3 communicates with it over UART at 9600 baud. The 1.x firmware for the Wemos D1 mini (ESP8266) uses the same PIC link.
 
 #### Level 3: Component (`c4-component.md`)
 
@@ -336,13 +296,13 @@ Detailed function signatures, line numbers, and inter-file dependencies for ever
 
 #### Cooperative Scheduling
 
-The ESP8266 Arduino framework is single-threaded and cooperative. The main `loop()` calls `doBackgroundTasks()`, which in turn calls all subsystem handlers. There is no RTOS; `delay()` blocks everything and must never be used. Long operations must be broken into state machines checked on each `loop()` iteration.
+The application code runs cooperatively in the Arduino `loop()` task. The firmware itself runs on FreeRTOS (the async web stack, ADR-123, and the PIC-UART task, ADR-130, run in their own tasks), but the main `loop()` calls `doBackgroundTasks()`, which in turn calls all subsystem handlers one after the other. `delay()` blocks that loop and must never be used. Long operations must be broken into state machines checked on each `loop()` iteration.
 
 `feedWatchDog()` services the hardware watchdog. It does not call `yield()` (that line is intentionally commented out to prevent re-entrancy of `doBackgroundTasks()`). The background task re-entrancy that does exist comes from MQTT autoconfig's file-reading loop calling `handleOTGW()` mid-iteration.
 
 #### Static Buffers (ADR-004 / ADR-053)
 
-The ESP8266 has approximately 40 KB of usable heap. Dynamic allocation fragments the heap and leads to crashes after days of operation. All buffers are statically allocated:
+Dynamic allocation fragments the heap and leads to crashes after days of operation. This rule comes from the 1.x line and still holds on 2.x (ADR-180 for the `String` class). All buffers are statically allocated:
 
 - Use `char buf[SIZE]` with `snprintf_P(buf, sizeof(buf), PSTR(...))`.
 - Never use `String` class in hot paths (ISR, MQTT publish, OT processing loop).
@@ -364,11 +324,11 @@ For comparisons use `strcmp_P(ram_ptr, PSTR("keyword"))` or `strcasecmp_P()`. Ne
 
 Binary data (non-null-terminated buffers) must use `memcmp_P()`. Using `strncmp_P` or `strstr_P` on binary data causes an Exception 2 crash.
 
-The MQTT path adds two ESP8266 PROGMEM-safety helpers declared in `MQTTstuff.h`: `pgm_strncmp_PP()` (byte-by-byte PROGMEM/PROGMEM compare) and `writeMqttProgmemChunk()` (streams a PROGMEM payload to the broker without `read-into-RAM` first). Use them when both operands live in flash; never pass a `PGM_P` to `printf("%s", ...)` or `MQTTclient.write()`.
+The MQTT path adds a PROGMEM-safety helper in `MQTTstuff.h`: `pgm_strncmp_PP()` (byte-by-byte PROGMEM compare). Use it when the operand lives in flash; never pass a `PGM_P` to `printf("%s", ...)` or `MQTTclient.write()`.
 
 #### Platform Abstraction Layer (ADR-061)
 
-All ESP8266/ESP32 SDK differences are isolated in three files: `platform.h`, `platform_esp8266.h`, and `platform_esp32.h`. Application code includes only `platform.h` and calls the unified functions. Never call platform-specific SDK functions directly in `.ino` files.
+All platform SDK specifics are isolated in the Platform library under `src/libraries/Platform/src/`: `platform.h` (dispatcher), `platform_esp32.h` (shims) and `boards.h` (pin maps and `HAS_*` capability flags). Application code includes only `platform.h`, calls the `platformXxx()` shims and gates optional features with `HAS_*` flags. Never call platform-specific SDK functions directly in `.ino` files, and never write a raw `#ifdef ESP32` outside these files: `evaluate.py` (`check_esp_abstraction_boundary()`) fails on new violations.
 
 Key functions provided by the abstraction layer:
 
@@ -376,7 +336,6 @@ Key functions provided by the abstraction layer:
 |----------|-------------|
 | `platformSetHostname(hostname)` | Set the WiFi station hostname for DHCP |
 | `platformGetHostname()` | Read back the current hostname |
-| `platformRestartDHCP()` | Force a DHCP re-announce (e.g., after hostname change) |
 | `platformFreeHeap()` | Free heap in bytes |
 | `platformMaxFreeBlock()` | Largest contiguous free block (fragmentation indicator) |
 | `platformRestart()` | Platform-safe reboot |
@@ -384,9 +343,9 @@ Key functions provided by the abstraction layer:
 | `platformChipId()` | Unique chip identifier |
 | `platformGetMacAddress(mac)` | Fill a 6-byte buffer with the MAC address |
 
-On ESP8266, `MDNS_NEEDS_UPDATE` is defined as `1`, which means the main loop must call `MDNS.update()` on every iteration. On ESP32 this is not needed (`MDNS_NEEDS_UPDATE` is not defined). The main loop guards this with `#if defined(MDNS_NEEDS_UPDATE)`.
+`platform_esp32.h` defines `MDNS_NEEDS_UPDATE` as `0`: mDNS runs on a background task, so the main loop does not call `MDNS.update()`. The main loop guards that call with `#if MDNS_NEEDS_UPDATE`.
 
-The `PlatformDir` class in `platform.h` provides a unified directory iteration interface over LittleFS (ESP8266 uses `Dir`; ESP32 uses `File`-based iteration). Use `PlatformDir` instead of calling filesystem APIs directly.
+The `PlatformDir` class in `platform.h` provides a unified directory iteration interface over LittleFS. Use `PlatformDir` instead of calling filesystem APIs directly.
 
 #### No ArduinoJson
 
@@ -647,7 +606,7 @@ For a text field:
 - Never write to `Serial` after the boot sequence. The UART is the PIC serial link. Use `DebugTln(F("..."))` instead.
 - Never send OTGW commands directly to the serial port. Always use `addCommandToQueue(cmd, len)`.
 - Always validate buffer sizes before string operations. Use `strlcpy()`, `snprintf_P()`, never `strcpy()` or `sprintf()`.
-- Guard `#ifdef ESP8266` / `#ifdef ESP32` blocks where platform-specific hardware is involved, including debug macro sections that use platform-specific I/O.
+- Do not write raw platform conditionals (`#ifdef ESP32` and the like) in application code. Call a `platformXxx()` shim or gate on a `HAS_*` flag; `evaluate.py` (`check_esp_abstraction_boundary()`) enforces this.
 - Use `enum class` for internal discriminators, not string tokens.
 
 ---
@@ -656,7 +615,7 @@ For a text field:
 
 #### Telnet Debug Console (Port 23)
 
-The firmware streams diagnostic output to Telnet port 23 via the SimpleTelnet library (`SimpleTelnet<1> debugTelnet`, declared extern in `OTGW-firmware.h` and defined in `networkStuff.ino`). SimpleTelnet replaces the older TelnetStream and ESPTelnet libraries and provides a unified API on both ESP8266 and ESP32. Connect with any Telnet client:
+The firmware streams diagnostic output to Telnet port 23 via the SimpleTelnet library (`SimpleTelnet<1> debugTelnet`, declared extern in `OTGW-firmware.h` and defined in `networkStuff.ino`). SimpleTelnet replaces the older TelnetStream and ESPTelnet libraries. Connect with any Telnet client:
 
 ```bash
 telnet otgw2.local 23
@@ -703,7 +662,7 @@ The macros send output to the `debugTelnet` instance (a `SimpleTelnet<1>` on por
 | `state.debug.bMQTTGate` | (inline checks) | MQTT interval gating decisions |
 | `state.debug.bSensors` | `SensorDebugTln()`, `SensorDebugTf()` | Dallas, S0, sensor polling |
 | `state.debug.bSAT` | `SATDebugTln()`, `SATDebugTf()` | SAT control loop, cycles, heating curve |
-| `state.debug.bOTDirect` | `OTDDebugTln()`, `OTDDebugTf()` | OTDirect GPIO frame handling (ESP32) |
+| `state.debug.bOTDirect` | `OTDDebugTln()`, `OTDDebugTf()` | OTDirect frame handling (OT-Direct mode) |
 
 #### Browser Console Debug
 
@@ -717,7 +676,7 @@ After making changes, always run:
 python evaluate.py
 ```
 
-This checks for the patterns most likely to cause crashes on ESP8266. Address all warnings before submitting a pull request.
+This checks for the patterns most likely to cause crashes on the device. Address all warnings before submitting a pull request.
 
 ---
 
@@ -759,7 +718,7 @@ RESTART_TIMER(timerMQTTpublish);                                 // reset countd
 
 ### Command Queue
 
-All commands to the OTGW PIC must go through `addCommandToQueue()`. Direct UART writes are forbidden because the PIC requires response matching and command ordering. On OTGW32 (no PIC), the same API funnels into the OTDirect queue, which **coalesces by MsgID** (TASK-494): if a frame for the same OT MsgID is already pending, the older entry is replaced in place, so multiple producers issuing the same MsgID within one OT cycle (~115 ms) never flood the bus.
+All commands to the OTGW PIC must go through `addCommandToQueue()`. Direct UART writes are forbidden because the PIC requires response matching and command ordering. In OT-Direct mode (hardware without a PIC), the same API funnels into the OTDirect queue, which **coalesces by MsgID** (TASK-494): if a frame for the same OT MsgID is already pending, the older entry is replaced in place, so multiple producers issuing the same MsgID within one OT cycle (~115 ms) never flood the bus.
 
 ```cpp
 // Signature:
@@ -774,7 +733,7 @@ addCommandToQueue(PSTR("GW=1"), 4);                // gateway mode on
 addCommandToQueue(PSTR("PR=A"), 4, false, 500);    // custom 500 ms send delay
 ```
 
-The queue is processed in the OTGW-Core background task. Responses from the PIC are matched against outstanding commands and published to MQTT. On OTGW32 (OTDirect), the queue is handled internally by `loopOTDirect()`, which also exposes a high-water-mark diagnostic on the telnet console.
+The queue is processed in the OTGW-Core background task. Responses from the PIC are matched against outstanding commands and published to MQTT. In OT-Direct mode, the queue is handled internally by `loopOTDirect()`, which also exposes a high-water-mark diagnostic on the telnet console.
 
 Never call `addCommandToQueue()` from an ISR or from within the PIC response handler.
 
@@ -789,10 +748,10 @@ Boiler/Thermostat
        |
   OpenTherm bus (2-wire)
        |
-  PIC co-processor (ESP8266) or OTDirect GPIO ISR (ESP32)
+  PIC co-processor (PIC gateway mode) or OTDirect engine (OT-Direct mode)
        |
-  UART 9600 baud ASCII line (e.g., "BA000001\r")   [ESP8266]
-  or decoded OT frame struct                        [ESP32]
+  UART 9600 baud ASCII line (e.g., "BA000001\r")   [PIC gateway mode]
+  or decoded OT frame struct                        [OT-Direct mode]
        |
   handleOTGW() / OTGW-Core.ino
     - reads serial line byte by byte into sRead[256] (static)
@@ -841,7 +800,7 @@ Not required for: pure bug fixes, minor features within existing patterns.
 | ADR-003 | HTTP/WS only, no HTTPS/WSS | Plain HTTP and WebSocket only; trusted LAN security model |
 | ADR-004 | Static buffer allocation | No `String` in hot paths; all buffers `char[]` |
 | ADR-009 | PROGMEM string literals | All literals in flash via `F()` / `PSTR()` |
-| ADR-014 | Dual build system | `build.py` wraps PlatformIO (default) and arduino-cli (ESP8266-only) |
+| ADR-014 | Dual build system | `build.py` wraps PlatformIO; on 2.x run it through `build.bat` / `./build.sh` |
 | ADR-016 | OpenTherm command queue | Always use `addCommandToQueue()` |
 | ADR-019 | REST API versioning | `/api/v2/` is current; v0/v1 return 410 Gone |
 | ADR-028 | File streaming | Files >2 KB must use `streamFile()`, never load |
@@ -851,15 +810,13 @@ Not required for: pure bug fixes, minor features within existing patterns.
 | ADR-050 | Centralized API dispatch | Single `kV2Routes[]` table; no per-route router changes |
 | ADR-051 | Dual encapsulating structs | `OTGWSettings` / `OTGWState` architecture |
 | ADR-053 | Large feature buffer allocation | Static allocation for large per-feature buffers |
-| ADR-061 | ESP8266/ESP32 platform abstraction | Use `platform.h` abstractions, not direct SDK calls |
-| ADR-063 | OTGW32 hardware support | ESP32-S3 NodoShop OTGW32 board with direct GPIO OT bus |
-| ADR-064 | OTDirect operating-mode architecture | Gateway / Monitor / Thermostat / Off modes on ESP32 |
+| ADR-061 | Platform abstraction | Use `platform.h` abstractions, not direct SDK calls |
+| ADR-064 | OTDirect operating-mode architecture | Gateway / Monitor / Thermostat / Off modes in OT-Direct mode |
 | ADR-069 | SAT PID v3 implementation | Current PID control law for Smart Autotune Thermostat |
-| ADR-072 | SAT platform compatibility layer | SAT builds on both ESP8266 and ESP32 via shared abstractions |
 | ADR-079 | Per-component type headers | Each subsystem owns its state + settings structs in `<Component>types.h` |
 | ADR-081 | Types merge into `<Component>stuff.h` | Amendment to ADR-079: fold into the existing stuff sibling when one exists |
 | ADR-090 | Re-entrancy guard pattern for shared scratch buffers | `MQTTAutoConfigSessionLock` and the `inUse` flag on `publishToSourceTopic` |
-| ADR-092 | NimBLE-Arduino for BLE scanner | OTGW32 SAT BLE replaces Bluedroid with NimBLE-Arduino 2.x |
+| ADR-092 | NimBLE-Arduino for BLE scanner | SAT BLE scanner uses NimBLE-Arduino 2.x instead of Bluedroid |
 | ADR-100 | JIT HA discovery + smart reconnect | OT configs only published once the MsgID is seen; broker-restart heuristic gates republish |
 | ADR-101 | Flat per-value MQTT topics | One topic per value; no aggregated JSON payloads |
 | ADR-106 | Self-describing MQTT topic names | New default topic naming; legacy shape behind `bUseLegacyOtTopics` |
@@ -890,7 +847,7 @@ To reverse an Accepted ADR: create a new ADR that supersedes it and mark the old
 5. Write an implementation plan in the task before writing code.
 6. Implement the change. Mark acceptance criteria done as you go.
 7. Run `python evaluate.py` and fix all reported issues.
-8. Build for both targets and confirm no compile errors: `python build.py` (or `pio run` directly).
+8. Build and confirm no compile errors: `build.bat` (Windows) or `./build.sh` (Linux/macOS), which builds `esp32-combo`.
 9. Test on real hardware if possible. When hardware is unavailable, use the OTGW serial-simulation replay (`s` / `S` on the telnet debug console, backed by `state.debug.bOTGWSimulation`) or the Dallas sensor simulation (`d`).
 10. Write a final summary in the backlog task.
 11. Open a pull request against the `dev` branch, not `main`.
