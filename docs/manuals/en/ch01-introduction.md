@@ -118,7 +118,7 @@ This manual is structured for two audiences.
 - Chapter 9: Architecture Overview
 - Chapter 10: Contributing
 
-If you are upgrading from v1.x, start with Chapter 2 (the upgrade section) and the [CHANGELOG](../CHANGELOG.md) to check for any changes that affect your setup.
+If you are upgrading from v1.x, start with Chapter 2 (the upgrade section) and the [CHANGELOG](../../../CHANGELOG.md) to check for any changes that affect your setup.
 
 ### Prerequisites
 

@@ -8,19 +8,19 @@ This manual covers the full OTGW-firmware v2.0.0 product for both end users (Cha
 
 ### What Is OTGW-firmware?
 
-OTGW-firmware turns the NodoShop OpenTherm Gateway into a fully networked smart heating controller. It runs on the ESP32 Wi-Fi microcontroller built into the OTGW device, monitors the OpenTherm communication bus between your room thermostat and your boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API.
+OTGW-firmware turns the NodoShop OpenTherm Gateway into a fully networked smart heating controller. It runs on the ESP32-S3 Wi-Fi microcontroller (a LOLIN S3 Mini or S3 Mini Pro) plugged into the OTGW Classic, monitors the OpenTherm communication bus between your room thermostat and your boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API.
 
-The firmware ships as a single source tree that targets the ESP32-based OTGW (an ESP32-S3 such as the LOLIN S3 Mini on the OTGW board) and the ESP32-based OTGW32 board. The ESP8266 is no longer a 2.0.0 build target; if you are coming from a v1.x ESP8266 build, see the migration note in [Supported Hardware](#supported-hardware).
+The 2.0.0 line is ESP32-S3 only: it runs on the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket. The PIC stays in place, and one firmware image (`esp32-combo`) detects it at boot. The 1.x maintenance / LTS line is the firmware for the Wemos D1 mini (ESP8266); if you are coming from 1.x, see the migration note in [Supported Hardware](#supported-hardware).
 
 ### The OpenTherm Gateway Hardware
 
 OpenTherm is the communication protocol used by most modern central heating systems in Europe. A room thermostat and a boiler talk to each other over a two-wire OpenTherm bus, exchanging temperature requests, setpoints, modulation levels, fault codes, and dozens of other measurements.
 
-The NodoShop OpenTherm Gateway (OTGW) is a small hardware device that sits physically in-line on that two-wire bus, between the thermostat and the boiler. Inside the device is a PIC microcontroller (PIC16F88 or PIC16F1847) that implements the OpenTherm electrical interface. Alongside it sits an ESP32 Wi-Fi module. The PIC decodes every OpenTherm frame on the bus and forwards it to the ESP over a serial link. The ESP firmware then makes all of that data available on your home network.
+The NodoShop OpenTherm Gateway (OTGW) is a small hardware device that sits physically in-line on that two-wire bus, between the thermostat and the boiler. Inside the device is a PIC microcontroller (PIC16F88 or PIC16F1847) that implements the OpenTherm electrical interface. Alongside it sits the Wi-Fi module: on the 2.x line a LOLIN S3 Mini or S3 Mini Pro (ESP32-S3) in the Wemos D1 mini socket. The PIC decodes every OpenTherm frame on the bus and forwards it to the ESP over a serial link. The ESP firmware then makes all of that data available on your home network.
 
 On its own, the PIC does its job quietly. OTGW-firmware is the software that makes the entire system useful: it decodes, displays, stores, publishes, and acts on every message the thermostat and boiler exchange.
 
-On the OTGW32 board (ESP32), the hardware includes onboard OpenTherm circuitry that allows the ESP32 to communicate directly on the OpenTherm bus via GPIO, without requiring the PIC co-processor at all. This is the OTDirect mode.
+The firmware also has an OT-Direct mode, used only on hardware without a PIC. On the OTGW Classic the firmware detects the PIC at boot and runs in PIC gateway mode.
 
 ### Key Features
 
@@ -33,7 +33,8 @@ On the OTGW32 board (ESP32), the hardware includes onboard OpenTherm circuitry t
 - SAT (Smart Autotune Thermostat): an embedded, weather-compensated PID heating controller that runs entirely on the device and can replace the room thermostat's control role.
 - DS18B20 Dallas temperature sensors on the 1-Wire bus, with custom labels, up to 16 sensors.
 - S0 pulse-counting energy meter.
-- SSD1306 OLED display (128x64, I2C, four information pages).
+- Optional SSD1306 OLED display on the Classic I2C header (128x64, four information pages).
+- BLE room temperature and humidity sensors: up to four Xiaomi LYWSD03MMC sensors read passively via BTHome v2 protocol.
 - OTA firmware and filesystem updates via the web interface.
 - TCP serial bridge on port 25238, compatible with OTmonitor and the Home Assistant built-in OpenTherm Gateway integration.
 - Telnet debug log on port 23.
@@ -41,42 +42,44 @@ On the OTGW32 board (ESP32), the hardware includes onboard OpenTherm circuitry t
 - Triple-reset Wi-Fi credential recovery.
 - Optional HTTP Basic Auth for settings and maintenance endpoints.
 
-#### OTGW32 Hardware Features
-
-- OTDirect: direct GPIO OpenTherm bus communication with five operating modes (no PIC required).
-- W5500 Ethernet with automatic cable-detect failover between wired Ethernet and Wi-Fi.
-- BLE room temperature and humidity sensors: up to four Xiaomi LYWSD03MMC sensors read passively via BTHome v2 protocol.
 - AP fallback mode (beta): the web UI stays reachable even when the home network is unavailable.
+
+#### Hardware-Dependent Features
+
+- OT-Direct mode with five operating modes: only on hardware without a PIC.
+- Ethernet with runtime failover to and from Wi-Fi: only with Ethernet hardware. The OTGW Classic has no Ethernet.
 
 ### What Is New in v2.0.0
 
-Version 2.0.0 is a major platform release. It targets the ESP32 and OTGW32 platform; the ESP8266 is no longer a 2.0.0 build target. The whole firmware builds from a single source tree. There are no breaking changes to MQTT topics or the REST API from v1.x. Settings files from v1.3.x load without modification.
+Version 2.0.0 is a major platform release. It is the ESP32-S3-only line; ESP8266 has moved to the 1.x maintenance / LTS line. There are no breaking changes to MQTT topics or the REST API from v1.x. Settings files from v1.3.x load without modification.
 
 #### Highlights
 
-- **OTGW32 / ESP32 platform**: Native ESP32 support. The OTGW32 board combines an ESP32 with onboard OpenTherm circuitry. The PIC gateway chip is optional. Build with `pio run -e esp32`.
-- **OTDirect**: ESP32-only direct GPIO OpenTherm master/slave with five operating modes: thermostat, boiler, gateway, monitor, and a combined master+slave pair, all without a PIC co-processor.
-- **Ethernet (W5500)**: Wired Ethernet via W5500 SPI on the OTGW32 board. The firmware auto-detects cable presence and switches transparently between Ethernet and Wi-Fi in both directions.
-- **BLE temperature sensors**: On ESP32, up to four Xiaomi LYWSD03MMC sensors are read passively over Bluetooth LE. Room temperature and humidity feed directly into SAT and Home Assistant.
-- **OLED display**: 128x64 SSD1306 I2C display on both platforms. Four information pages cover status, temperatures, network, and boiler. A button cycles pages; the display turns off automatically after a configurable timeout.
+- **ESP32-S3 platform**: The OTGW Classic runs with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket. The PIC stays in place. One `esp32-combo` image detects the PIC at boot. Build with `build.bat` (Windows) or `./build.sh` (Linux/macOS).
+- **OT-Direct mode**: five operating modes (thermostat, boiler, gateway, monitor, and a combined master+slave pair), only on hardware without a PIC.
+- **Ethernet with runtime failover**: only with Ethernet hardware; the OTGW Classic has no Ethernet.
+- **BLE temperature sensors**: On the ESP32-S3, up to four Xiaomi LYWSD03MMC sensors are read passively over Bluetooth LE. Room temperature and humidity feed directly into SAT and Home Assistant.
+- **OLED display**: optional 128x64 SSD1306 I2C display on the Classic I2C header. Four information pages cover status, temperatures, network, and boiler. A button cycles pages; the display turns off automatically after a configurable timeout.
 - **SAT enhancements**: Summer Simmer Index, improved solar gain compensation, expanded multi-zone support, and BLE sensor integration.
 - **250+ Home Assistant entities**: Full climate entity, all SAT entities, pressure monitoring, BLE sensor entities, and OLED status, all via MQTT auto-discovery.
 - **Wi-Fi resilience**: AP fallback mode keeps the web UI reachable when the home network is unavailable. A Wi-Fi signal quality indicator appears in the web UI header. Triple-reset credential recovery wipes saved credentials without a reflash.
-- **PlatformIO build**: `platformio.ini` builds the `esp32` environment (default). The whole codebase builds from a single source tree.
+- **PlatformIO build**: One `esp32-combo` environment in `platformio.ini`, built through `build.bat` / `./build.sh`.
 
 ### Platform Comparison
 
-| Feature | ESP32 OTGW (with PIC) | ESP32 / OTGW32 |
-|---|---|---|
-| OpenTherm via PIC co-processor | Yes (required) | Yes (optional) |
-| OpenTherm via direct GPIO (OTDirect) | No | Yes |
-| Wi-Fi | Yes | Yes |
-| Ethernet (W5500) | No | Yes |
-| BLE sensors | No | Yes (up to 4) |
-| OLED display | Yes | Yes |
-| SAT thermostat | Yes | Yes |
-| Dallas sensors (DS18B20) | Yes | Yes |
-| S0 pulse counter | Yes | Yes |
+The 2.0.0 line runs on ESP32-S3 only. The table shows what it supports on the OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro.
+
+| Feature | OTGW Classic + LOLIN S3 Mini / S3 Mini Pro |
+|---|---|
+| OpenTherm via PIC co-processor | Yes |
+| OT-Direct mode | No (only on hardware without a PIC) |
+| Wi-Fi | Yes |
+| Ethernet | No |
+| BLE sensors | Yes (up to 4) |
+| OLED display | Optional (Classic I2C header) |
+| SAT thermostat | Yes |
+| Dallas sensors (DS18B20) | Yes |
+| S0 pulse counter | Yes |
 
 ### How to Use This Manual
 
@@ -103,14 +106,14 @@ If you are upgrading from v1.x, start with Chapter 2 (the upgrade section) and t
 
 Before you begin, you need:
 
-- A NodoShop OTGW device fitted with an ESP32 (an ESP32-S3 such as the LOLIN S3 Mini) or a NodoShop OTGW32 (ESP32). Other ESP32 boards may work but are not officially supported.
-- A USB cable (micro-USB) for initial flashing.
+- A NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro (ESP32-S3) in the Wemos D1 mini socket. Other boards are not officially supported.
+- A USB cable for the first flash of the S3 Mini.
 - A computer with a USB port and Python 3.6 or higher installed (for the flash script), or PlatformIO installed (for building from source).
 - A home Wi-Fi network with a 2.4 GHz access point (the ESP32-S3 Wi-Fi radio does not support 5 GHz).
 - For MQTT and Home Assistant integration: a running MQTT broker (such as Mosquitto) on your local network.
 - For full Home Assistant auto-discovery: Home Assistant with the MQTT integration enabled.
 
-The firmware does not require an internet connection for normal operation. An internet connection is used optionally for: NTP time synchronization, one-click OTA updates from GitHub, and the Open-Meteo weather API used by SAT.
+The firmware does not require an internet connection for normal operation. An internet connection is used optionally for: NTP time synchronization and the Open-Meteo weather API used by SAT.
 
 ---
 
@@ -118,9 +121,19 @@ The firmware does not require an internet connection for normal operation. An in
 
 ### Supported Hardware
 
-#### ESP32 OTGW (NodoShop, with PIC)
+#### OTGW Classic with LOLIN S3 Mini or S3 Mini Pro (NodoShop)
 
-The NodoShop OpenTherm Gateway fitted with an ESP32 is a primary hardware target. The classic OTGW board pairs the ESP module with the PIC co-processor; firmware v2.0.0 builds for an ESP32-S3 (such as the LOLIN S3 Mini) on that board.
+The 2.x firmware runs on the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro (ESP32-S3) in the Wemos D1 mini socket. The S3 Mini fits the Wemos D1 mini socket: each Classic signal lands on the S3 GPIO at the matching hole. The PIC stays in place. You flash one image, `esp32-combo`, which detects the PIC at boot and runs in PIC gateway mode.
+
+Characteristics:
+
+- PIC16F88 or PIC16F1847 co-processor for the OpenTherm bus
+- ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the Wemos D1 mini socket
+- 4 MB SPI flash with a safeboot partition layout: one firmware slot plus an updater for firmware updates over WiFi
+- I2C header for the external watchdog and an optional SSD1306 OLED display
+- 1-Wire GPIO for Dallas DS18B20 temperature sensors
+- Bluetooth LE radio for BLE temperature sensors
+- No Ethernet and no OT-Direct hardware
 
 ##### Migrating from ESP8266 (1.x)
 
@@ -131,29 +144,23 @@ Firmware v1.x ran on the ESP8266 module that shipped on earlier NodoShop OTGW bo
 | 1.x through 2.0 | NodeMCU ESP8266 |
 | 2.3 and later | Wemos D1 mini ESP8266 |
 
-The ESP8266 is no longer a 2.0.0 build target. To move an existing OTGW to v2.0.0, swap the Wemos D1 mini ESP8266 for a LOLIN S3 Mini (ESP32-S3) drop-in: it keeps the same OTGW board and PIC co-processor, and the firmware builds for it from the same source tree.
-
-#### ESP32 OTGW32 (NodoShop)
-
-The OTGW32 is a separate board from NodoShop built around an ESP32. It includes onboard OpenTherm bus circuitry that allows the ESP32 to communicate directly on the OpenTherm bus without a PIC co-processor. The PIC firmware chip is optional: when present, it provides the classic serial bridge path; when absent, OTDirect GPIO mode takes over.
-
-The OTGW32 also has a W5500 Ethernet SPI header, I2C header for an OLED display, and headers for BLE sensor configuration.
+The Wemos D1 mini (ESP8266) runs the 1.x firmware. To move an existing OTGW to v2.0.0, replace the Wemos D1 mini with a LOLIN S3 Mini or S3 Mini Pro: it keeps the same OTGW board and PIC co-processor. Going back to 1.x means putting the Wemos D1 mini back: a 1.x zip does not run on an S3.
 
 #### Other Boards
 
-Other ESP32 boards may compile and run the firmware but are not tested or supported. GPIO pin assignments for Dallas sensors, OLED, and the S0 counter may need adjustment in the settings.
+Other ESP32-S3 boards may compile and run the firmware but are not tested or supported. GPIO pin assignments for Dallas sensors, OLED, and the S0 counter may need adjustment in the settings.
 
 ### Hardware Capability Flags (boards.h)
 
-The `boards.h` header defines compile-time capability flags that control which code is included in each firmware binary. Understanding these flags helps when reading build logs or contributing to the firmware.
+The `boards.h` header defines compile-time capability flags that control which code is included in the firmware binary. Understanding these flags helps when reading build logs or contributing to the firmware.
 
-| Flag | ESP8266 OTGW | ESP32 OTGW32 | Meaning |
-|---|---|---|---|
-| `HAS_PIC` | 1 | 0 | PIC co-processor present. Includes OTGWSerial, PIC detection, PIC firmware upgrade, and I2C watchdog code. |
-| `HAS_DIRECT_OT` | 0 | 1 | Direct GPIO OpenTherm bus interface present. Includes OTDirect.ino, the opentherm_library, step-up converter control, and GPIO OT pins. |
-| `HAS_ETH_CAPABLE` | 0 | 1 | W5500 SPI Ethernet hardware present. Includes Ethernet.ino and the EthernetESP32 library. |
+| Flag | Compiled into esp32-combo | Meaning |
+|---|---|---|
+| `HAS_PIC` | 1 | PIC co-processor support. Includes OTGWSerial, PIC detection, PIC firmware upgrade, and I2C watchdog code. |
+| `HAS_DIRECT_OT` | 1 | OT-Direct mode, used only on hardware without a PIC. Includes OTDirect.ino and the opentherm_library. |
+| `HAS_ETH_CAPABLE` | 1 | Ethernet support, used only with Ethernet hardware. Includes Ethernet.ino and the EthernetESP32 library. |
 
-These flags are mutually exclusive between the two build targets: a single firmware binary is not possible because the GPIO pin assignments for OT-direct and I2C conflict at the electrical level. `python build.py --target all` (or `pio run`) builds every binary from the same source tree; a plain `python build.py` builds only the esp32-combo image.
+The `esp32-combo` image compiles in both the PIC path and the OT-Direct path and picks one at boot (`HAS_RUNTIME_HW_DETECT`). On the OTGW Classic it detects the PIC and runs in PIC gateway mode. `build.bat` (Windows) or `./build.sh` (Linux/macOS) builds this image.
 
 Application code guards platform-specific blocks with `#if HAS_PIC`, `#if HAS_DIRECT_OT`, and `#if HAS_ETH_CAPABLE`. User-facing runtime checks use the helper functions `isPICEnabled()` and `isOTDirectEnabled()`, which add a runtime detection layer on top of the compile-time flag.
 
@@ -177,13 +184,13 @@ The OTGW derives operating power from the OpenTherm bus itself when wired to a b
 
 ### Optional Hardware
 
-#### Ethernet W5500 (OTGW32 / ESP32 Only)
+#### Ethernet
 
-The W5500 SPI Ethernet module connects to the dedicated SPI header on the OTGW32 board. When a network cable is plugged in and the firmware detects a valid link, Ethernet is used automatically and Wi-Fi is switched off. Unplugging the cable causes automatic failover to Wi-Fi within approximately five seconds. No configuration change is required.
+The OTGW Classic has no Ethernet. The Ethernet settings in the web UI apply only to Ethernet hardware.
 
 #### OLED Display (SSD1306)
 
-A 128x64 SSD1306 I2C OLED display can be connected to both ESP8266 and ESP32 boards. The display shows four pages of information cycled by a button press:
+A 128x64 SSD1306 I2C OLED display can be connected to the I2C header of the OTGW Classic. The display shows four pages of information cycled by a button press:
 
 1. System status (device name, uptime, firmware version)
 2. Temperatures (room, boiler flow, boiler return, outside)
@@ -194,7 +201,7 @@ The display turns off automatically after a configurable idle timeout. Configure
 
 #### Dallas DS18B20 Temperature Sensors
 
-Up to 16 DS18B20 sensors can be connected on a single 1-Wire bus to a configurable GPIO pin (default GPIO 10 / SD3 on ESP8266). Each sensor is identified by its 64-bit address and can be given a custom label via the web interface. All sensors are published to MQTT and appear in Home Assistant auto-discovery.
+Up to 16 DS18B20 sensors can be connected on a single 1-Wire bus to a configurable GPIO pin (setting range 0 to 16, default GPIO 10). Each sensor is identified by its 64-bit address and can be given a custom label via the web interface. All sensors are published to MQTT and appear in Home Assistant auto-discovery.
 
 > **Note for users upgrading from versions before v1.0.0**: The default Dallas GPIO pin changed from GPIO 13 (D7) to GPIO 10 (SD3) in v1.0.0. If your sensors stopped working after an upgrade, check the Dallas GPIO setting in Settings and change it back to 13 if needed.
 
@@ -209,84 +216,78 @@ Wiring a DS18B20 sensor:
 
 The S0 pulse counter reads electricity pulses from an energy meter that has an S0 output (a standard impulse interface common on DIN-rail energy meters). Connect the S0 output to a configurable GPIO pin. Configure the pulses-per-kWh ratio in Settings. The firmware reports cumulative kWh and instantaneous power in watts to MQTT and Home Assistant.
 
-#### BLE Temperature Sensors (ESP32 / OTGW32 Only)
+#### BLE Temperature Sensors
 
-Up to four Xiaomi LYWSD03MMC Bluetooth LE sensors are supported on the ESP32. The firmware reads them passively using the BTHome v2 protocol (these sensors broadcast their readings as advertisements; no pairing is required). Room temperature and humidity from these sensors feed into the SAT multi-zone averaging and are published to Home Assistant as individual sensor entities.
+Up to four Xiaomi LYWSD03MMC Bluetooth LE sensors are supported on the ESP32-S3; the LOLIN S3 Mini and S3 Mini Pro both have the BLE radio. The firmware reads them passively using the BTHome v2 protocol (these sensors broadcast their readings as advertisements; no pairing is required). Room temperature and humidity from these sensors feed into the SAT multi-zone averaging and are published to Home Assistant as individual sensor entities.
 
 **Trust model and MAC filtering.** BLE advertisements are unauthenticated broadcasts: any device in radio range can publish a BTHome v2 or ATC/pvvx packet that the firmware will parse and accept. The firmware applies the following filter:
 
 - If a sensor MAC is configured (Settings → Sensors → BLE sensors), the firmware accepts only advertisements from that exact MAC.
 - If the configured-MAC list is empty, **the firmware accepts any parseable BTHome v2 / ATC sensor in range** and assigns it to a free slot until all four slots are filled. Once a slot is taken, only advertisements from that slot's MAC continue to update it (slot stickiness).
-- The firmware never writes to or queries BLE devices — reception only. There is no risk of leaking secrets or commands to a hostile sensor.
+- The firmware never writes to or queries BLE devices: reception only. There is no risk of leaking secrets or commands to a hostile sensor.
 
 In practice this means: in a typical home with one or two BTHome devices, default-allow is convenient and harmless. In a dense apartment building, or any environment where you do not control all nearby BLE devices, configure the MAC of each sensor explicitly so you do not pick up your neighbour's thermometer. Spoofing a configured MAC is theoretically possible but requires a hostile device with line-of-sight; the impact is bounded to feeding bogus temperature/humidity values into SAT.
 
 ### Flashing the Firmware
 
-#### First-Time Flashing with flash_esp.py (Recommended)
+#### First-Time Flashing with flash_otgw (Recommended)
 
-The `flash_esp.py` script handles everything automatically: it downloads the latest release from GitHub, auto-detects your serial port, and flashes both the firmware binary and the LittleFS filesystem image.
+The first flash of a new S3 Mini goes over USB. The release zip (`OTGW-firmware-esp32-combo-<version>-flash.zip`) contains the flash scripts `flash_otgw.bat` (Windows) and `flash_otgw.sh` (Linux/macOS) and a merged-full image that combines the bootloader, partition table, firmware, and filesystem in a single file flashed at address 0x0.
+
+The scripts need no Python: on the first run they download Espressif's standalone esptool to `./tools/esptool/`. By default they do a factory reset: they erase the flash and write the merged-full image. WiFi credentials and settings are removed.
 
 **Prerequisites:**
 
-- Python 3.6 or higher
-- A micro-USB cable connected between your computer and the ESP8266/ESP32 module
-- The correct USB-to-UART driver installed for your board:
-  - Windows: CP210x driver (NodeMCU) or CH340 driver (some Wemos D1 mini clones)
-  - macOS: usually included in recent versions
-  - Linux: add your user to the `dialout` group (`sudo usermod -aG dialout $USER`, then log out and back in)
+- A USB cable between your computer and the USB port of the S3 Mini
+- The S3 Mini uses the built-in ESP32-S3 USB-Serial/JTAG interface (Espressif VID 0x303A, PID 0x1001), typically no extra driver needed. A fresh board that still runs its factory firmware can show up as PID 0x4001 until the first flash; `flash_otgw` finds both without `--port`
+- Linux: the script escalates with `sudo` when your user is not in the `dialout` group. To avoid that, add your user to the group (`sudo usermod -aG dialout $USER`, then log out and back in)
 
 **Steps:**
 
-1. Connect the USB cable to the ESP module (not to the OTGW board, but to the ESP module's own USB port, or to the OTGW board's USB connector if it has one).
+1. Unpack the release zip and connect the USB cable to the S3 Mini.
 
-2. Open a terminal and run:
+2. Open a terminal in the unpacked folder and run:
 
 ```bash
-python3 flash_esp.py
+flash_otgw.bat          # Windows
+./flash_otgw.sh         # Linux/macOS
 ```
 
-This downloads the latest release, auto-detects the serial port, and flashes both the firmware and the filesystem. For a completely clean first-time install, use the `--erase` flag to wipe the flash first:
+3. The script picks the merged-full image from the folder and auto-detects the serial port by USB VID/PID. If auto-detection fails, or more than one S3 is connected, specify the port explicitly:
 
 ```bash
-python3 flash_esp.py --erase
-```
-
-3. If the script cannot auto-detect your port, specify it explicitly:
-
-```bash
-python3 flash_esp.py --port COM5          # Windows
-python3 flash_esp.py --port /dev/ttyUSB0  # Linux
-python3 flash_esp.py --port /dev/cu.usbserial-0001  # macOS
+flash_otgw.bat --port COM5              # Windows
+./flash_otgw.sh --port /dev/ttyACM0     # Linux
+./flash_otgw.sh --port /dev/cu.usbmodem-XXXX  # macOS
 ```
 
 4. After flashing completes, the device reboots automatically.
 
-#### Flashing with PlatformIO (Build from Source)
+Later updates go over WiFi (see Upgrading from a Previous Version below). A unit on the old partition layout (an early 2.0.0 alpha) needs one `--migrate` run: `flash_otgw.bat --migrate --host <ip>` or `./flash_otgw.sh --migrate --host <ip>`. It saves `settings.ini` over HTTP, writes the new layout with WiFi kept, and restores the settings. Run the script with `--help` for all options.
 
-If you have PlatformIO installed and want to build the firmware yourself:
+#### Building from Source
+
+On the 2.x line the only build is `esp32-combo`. Build it with the wrapper scripts, which set up their own Python environment and the PlatformIO toolchain:
 
 ```bash
-# Flash ESP32 / OTGW32
-pio run -e esp32 --target upload
-pio run -e esp32 --target uploadfs
+build.bat                # Windows: firmware + filesystem, esp32-combo
+./build.sh               # Linux/macOS: firmware + filesystem, esp32-combo
 ```
 
-The `upload` target flashes the firmware binary. The `uploadfs` target flashes the LittleFS filesystem image containing web assets, the Home Assistant discovery configuration, and PIC firmware files.
-
-Both targets require the device to be connected via USB.
+The build writes its output to `build/`, including the release-style zip with the merged-full image and the flash scripts. Flash it with `flash_otgw` as described above. Chapter 8 covers the build in more detail.
 
 #### Manual Flashing with Existing Binaries
 
-If you already have firmware and filesystem binary files:
+If you already have a merged-full image, pass it explicitly:
 
 ```bash
-python3 flash_esp.py --firmware OTGW-firmware-fw.bin --filesystem OTGW-firmware-fs.bin
+flash_otgw.bat --bin OTGW-firmware-esp32-combo-<version>-merged-full.bin
+./flash_otgw.sh --bin OTGW-firmware-esp32-combo-<version>-merged-full.bin
 ```
 
 ### Release artefact verification
 
-Every GitHub release for OTGW-firmware ships a `SHA256SUMS.txt` file alongside the binaries (`firmware-esp32.bin`, `firmware-nodemcuv2.bin`, `littlefs-esp32.bin`, etc.). The file lists the SHA-256 digest of each artefact in the canonical `sha256sum` format: 64 hex characters, two spaces, filename.
+Every GitHub release for OTGW-firmware ships a `SHA256SUMS` file alongside the binaries (the `-flash.zip`, `.ino.bin`, `.littlefs.bin`, `-merged-full.bin`, etc.). The file lists the SHA-256 digest of each artefact in the canonical `sha256sum` format: 64 hex characters, two spaces, filename.
 
 Verifying a download takes a few seconds and protects against three real failure modes:
 
@@ -296,20 +297,20 @@ Verifying a download takes a few seconds and protects against three real failure
 
 **Linux and macOS:**
 
-Place `SHA256SUMS.txt` in the same directory as the downloaded artefacts and run:
+Place `SHA256SUMS` in the same directory as the downloaded artefacts and run:
 
 ```bash
-sha256sum -c SHA256SUMS.txt
+sha256sum -c SHA256SUMS
 ```
 
 Each artefact prints `OK` on a successful match. Any mismatch prints `FAILED` and a non-zero exit code: do not flash that file.
 
 **Windows (PowerShell):**
 
-PowerShell's built-in `Get-FileHash` does the same job. Run it once per artefact and compare the printed digest against the matching line in `SHA256SUMS.txt`:
+PowerShell's built-in `Get-FileHash` does the same job. Run it once per artefact and compare the printed digest against the matching line in `SHA256SUMS`:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 firmware-esp32.bin
+Get-FileHash -Algorithm SHA256 OTGW-firmware-esp32-combo-<version>-flash.zip
 ```
 
 If the hashes match, the file is intact. If they do not match, redownload from the GitHub release page rather than from a mirror or cache.
@@ -332,43 +333,35 @@ The default hostname on 2.0.0 is `OTGW2`, so the AP will typically be named some
 
 4. The device connects to your home network, obtains a DHCP address, and announces itself as `otgw2.local` via mDNS.
 
-5. Navigate to `http://otgw2.local/` in your browser to open the web interface. On Windows, the device also responds to `http://otgw2/` via LLMNR.
+5. Navigate to `http://otgw2.local/` in your browser to open the web interface. If `.local` names do not resolve on your computer, use the IP address.
 
-> **ESP32 with Ethernet**: If you have a W5500 Ethernet module and a network cable connected, the device obtains an IP address via DHCP on the wired interface at boot and does not open an AP. No Wi-Fi setup is needed.
-
-> **AP Fallback Mode (beta, ESP32 only)**: If the configured Wi-Fi network becomes unavailable after initial setup, the device opens a fallback AP named `OTGW-<MAC>` with password `otgw1234` and IP `192.168.4.1`, keeping the web UI accessible.
+> **AP Fallback Mode (beta)**: If the configured Wi-Fi network becomes unavailable after initial setup, the device opens a fallback AP named `OTGW-<MAC>` with password `otgw1234` and IP `192.168.4.1`, keeping the web UI accessible.
 
 ### Filesystem Upload (LittleFS)
 
 The web assets (HTML, CSS, JavaScript, OLED icons, PIC firmware files, and the Home Assistant discovery configuration) are stored in a LittleFS partition on the flash. This partition must be flashed alongside the firmware binary.
 
-When using `flash_esp.py`, the filesystem is flashed automatically. When using PlatformIO, run `pio run -e <env> --target uploadfs` after the firmware upload.
+When using `flash_otgw`, the filesystem is flashed automatically as part of the merged-full image.
 
-> **After a firmware update via OTA**: The web assets in LittleFS are updated separately. Use the web UI's Update page to update both firmware and filesystem, or upload a new filesystem image manually via the File Manager.
+> **After a firmware update via OTA**: The web assets in LittleFS must match the firmware. The **Update** page installs both in one action (choose the release zip, press Update). You can also update only the filesystem on the same page, or upload a new filesystem image manually via the File Manager.
 
 ### Upgrading from a Previous Version
 
 #### OTA Upgrade (Recommended)
 
-From v1.3.0 onwards, the web interface provides a one-click OTA updater:
-
-1. Open the web interface and navigate to the **Update** tab (or the update icon in the header).
-2. The page fetches the list of available GitHub releases and shows Installed, Update, and Rollback badges next to each version.
-3. Click **Update** next to the version you want to install.
-4. The firmware downloads the new binary from GitHub, flashes it to the inactive OTA partition, and reboots.
-5. The web interface polls the device until it responds, then confirms success.
-6. Update the filesystem image using the same page to ensure web assets match the new firmware version.
+Open `http://<ip>/update`, choose the release zip (or the `.ino.bin` and `.littlefs.bin` files) and press **Update**. The page hands over to the safeboot updater, installs the firmware, waits for the restart and then installs the web files; your settings and sensor names are kept. Keep the tab open for 2 to 3 minutes. A unit on the earlier layout needs one USB migration first (`flash_otgw --migrate --host <ip>`). Details: [WiFi firmware updates](guides/WIFI_FIRMWARE_UPDATE.md).
 
 #### Manual OTA Upload
 
 If you have a firmware binary file and want to upload it directly:
 
 1. Navigate to the **Update** page in the web interface.
-2. Use the file upload area to select your `OTGW-firmware-fw.bin` file.
+2. Use the file upload area to select your firmware `.bin` file.
 3. The device flashes the binary and reboots.
 
 #### Notes When Upgrading from v1.x
 
+- Moving from 1.x to 2.x means replacing the Wemos D1 mini (ESP8266) with a LOLIN S3 Mini or S3 Mini Pro and flashing it over USB (see Flashing the Firmware). Going back to 1.x means putting the Wemos D1 mini back; a 1.x zip does not run on an S3.
 - No settings migration is required. Settings files from v1.3.x load without modification in v2.0.0.
 - MQTT topics and the REST API are unchanged from v1.x.
 - If you are upgrading from before v1.2.0, be aware that REST API v0 and v1 endpoints were removed in v1.2.0. Only `/api/v2/` endpoints are available. See [docs/BREAKING_CHANGES.md](../docs/BREAKING_CHANGES.md).
@@ -377,7 +370,7 @@ If you have a firmware binary file and want to upload it directly:
 #### Important Warnings
 
 - **Never flash PIC firmware over Wi-Fi using OTmonitor.** This can brick the PIC microcontroller. Use the built-in PIC firmware upgrade feature in the web UI instead.
-- **When OTDirect is active (ESP32 only)**, the PIC UART is bypassed. Do not attempt PIC firmware upgrades while OTDirect is the active OpenTherm path.
+- **In OT-Direct mode** (only on hardware without a PIC), the PIC UART is bypassed. Do not attempt PIC firmware upgrades while OT-Direct is the active OpenTherm path.
 
 ---
 
@@ -461,7 +454,7 @@ The header bar shows the current network status using a visual indicator:
 
 - **Wi-Fi signal bars**: shows signal quality from 0 to 4 bars based on RSSI, using a quadratic mapping that reflects actual usability rather than raw dBm values.
 - **AP badge**: displayed when the device is operating in AP or AP fallback mode.
-- **Ethernet indicator**: displayed on OTGW32 when a wired Ethernet link is active.
+- **Ethernet indicator**: displayed only with Ethernet hardware, when a wired link is active. The OTGW Classic has no Ethernet.
 
 Hovering over the indicator shows the exact SSID and signal quality percentage (Wi-Fi) or IP address (Ethernet).
 
@@ -550,26 +543,23 @@ A **Test** button sends a test webhook immediately so you can verify your endpoi
 
 The OpenTherm log on the Home tab is powered by a WebSocket connection to the device (port 80, path `/ws`). The firmware streams every decoded OpenTherm frame as it arrives. The browser maintains a circular buffer of recent messages and persists it to `localStorage`.
 
-**Heap backpressure**: On the ESP8266, available RAM is limited. The firmware monitors free heap and automatically reduces WebSocket streaming frequency when memory is low:
+**Heap backpressure**: The firmware monitors free heap. It streams frames immediately and pauses WebSocket streaming only while free heap is critical (below 3 KB, ADR-167), then resumes on its own.
 
-- Above 8 KB free: immediate streaming (HEALTHY).
-- 5-8 KB free: 50 ms throttle between frames (LOW).
-- 3-5 KB free: 200 ms throttle (WARNING).
-- Below 3 KB free: WebSocket streaming paused (CRITICAL).
-
-This prevents the device from crashing under heavy load. You may notice the log slowing down or pausing briefly during peak activity; this is normal and expected behavior.
+This prevents the device from crashing under heavy load. You may notice the log pausing briefly during peak activity; this is normal and expected behavior.
 
 ### OTA Firmware Update via the Web Interface
 
-The **Update** section (accessible from the Advanced tab or the update icon in the header) provides two ways to update the firmware.
+The **Update** section (accessible from the Advanced tab or the update icon in the header) provides two ways to update the firmware. The 2.x firmware does not download updates from GitHub itself: download the release zip and give it to the Update page.
 
-#### One-Click GitHub Release Update
+#### One-Action Update on ESP32-S3 (4 MB flash)
 
-1. The page fetches the list of available releases from GitHub and displays them with version badges: **Installed** (current version), **Update** (newer available), or **Rollback** (older version).
-2. Click **Update** next to the target release.
-3. The firmware binary is downloaded directly from GitHub to the device and flashed to the inactive OTA partition.
-4. The device reboots automatically. The web interface polls `/api/v2/health` until the device responds, confirming a successful update.
-5. Update the filesystem (LittleFS) using the same page to ensure web assets match the new firmware version.
+The flash utility at `http://<ip>/update` installs firmware and web files in one action:
+
+1. Open the page by IP address (not `otgw2.local`: the updater has no mDNS name).
+2. Choose the release zip, or the `.ino.bin` and `.littlefs.bin` files. The page checks the files by content and refuses USB images, the updater itself and mismatched pairs.
+3. Press **Update** and keep the tab open until it says Done (2 to 3 minutes). The unit restarts twice. The page switches to the safeboot updater, installs the firmware, waits for the new firmware, installs the web files and verifies both.
+
+Settings and sensor names are kept. Recovery steps and the full list of kept files: [WiFi firmware updates](guides/WIFI_FIRMWARE_UPDATE.md).
 
 #### Manual Binary Upload
 
@@ -1190,7 +1180,7 @@ External temperature values expire automatically (5 minutes for indoor, 10 minut
 | "External temp stale" in logs | MQTT push stopped | Check HA automation and broker connectivity |
 ## Chapter 6: Network Configuration
 
-This chapter covers everything the firmware does on the network: from first-time WiFi setup through Ethernet failover, hostname resolution, time synchronization, and OTA firmware updates.
+This chapter covers everything the firmware does on the network: from first-time WiFi setup through hostname resolution, time synchronization, and OTA firmware updates.
 
 ### 6.1 WiFi Setup
 
@@ -1211,7 +1201,7 @@ After reconnecting, the firmware re-applies the configured hostname, forces a DH
 
 #### 6.1.3 AP Fallback Mode
 
-Available in beta builds (v2.0.0-beta and later, all platforms). When WiFi retries are exhausted at runtime, the device switches into AP fallback mode instead of rebooting indefinitely. In production releases the device reboots after 10 failed retries instead.
+Available in beta builds (v2.0.0-beta and later). When WiFi retries are exhausted at runtime, the device switches into AP fallback mode instead of rebooting indefinitely. In production releases the device reboots after 10 failed retries instead.
 
 At boot, if credentials are stored but WiFi is unreachable, beta builds also skip the WiFiManager config portal and go straight to AP fallback.
 
@@ -1239,22 +1229,9 @@ In AP fallback mode the device keeps attempting to reconnect to the configured W
 
 ---
 
-### 6.2 Ethernet (ESP32 + W5500)
+### 6.2 Ethernet
 
-Wired Ethernet is available on ESP32 boards with a W5500 SPI Ethernet controller. Not available on ESP8266.
-
-The W5500 uses these default GPIO assignments:
-
-| W5500 Signal | ESP32 GPIO |
-|---|---|
-| CS (chip select) | GPIO 5 |
-| INT (interrupt) | GPIO 34 |
-| RST (reset) | GPIO 15 |
-| SCK (SPI clock) | GPIO 18 |
-| MISO | GPIO 19 |
-| MOSI | GPIO 23 |
-
-**Priority over WiFi**: Ethernet always takes priority. When the W5500 is present and a cable is plugged in, WiFi is disabled. If the cable is unplugged at runtime, the firmware detects this (checked every 5 seconds) and switches back to WiFi automatically.
+The OTGW Classic has no Ethernet, so it always uses WiFi; the Ethernet settings only appear on hardware with Ethernet.
 
 ---
 
@@ -1278,7 +1255,7 @@ The default hostname on 2.0.0 is `OTGW2`. After connecting to your network the d
 
 The 1.x firmware keeps the default `OTGW` (`otgw.local`), so a 1.x and a 2.0.0 gateway on the same network no longer claim the same name. A unit upgraded from 1.x keeps the hostname saved in its settings, usually `OTGW`; only a new install or a reset that discards `settings.ini` starts with `OTGW2`.
 
-The firmware also registers an LLMNR responder on ESP8266, which allows Windows machines to resolve `otgw2` (without the `.local` suffix).
+The 2.x firmware has no LLMNR responder, so the device itself does not answer for the bare name `otgw2` (without `.local`): use `otgw2.local` or the IP address.
 
 Set the hostname in Settings. The new hostname propagates to the DHCP request, mDNS advertisement, MQTT client ID, and web UI title.
 
@@ -1315,12 +1292,11 @@ OTA is available from AP fallback mode as well, so you can recover a device stuc
 | Port | Protocol | Service | Notes |
 |---|---|---|---|
 | 80 | TCP / HTTP | Web interface and REST API | All web UI routes, file serving, OTA update |
-| 81 | TCP / WebSocket | Live OpenTherm log stream | Used by the web UI for real-time data |
+| 80 | TCP / WebSocket (`/ws`) | Live OpenTherm log stream | Same port as the web UI, path `/ws` (port 81 was the 1.x line) |
 | 23 | TCP / Telnet | Debug console | Plain-text debug log; served by SimpleTelnet library |
 | 25238 | TCP | Serial bridge (ser2net) | Raw OTGW PIC serial over TCP; served by SimpleTelnet library; OTmonitor compatible |
 | 123 | UDP (outbound) | NTP (SNTP) | Outbound only |
 | 5353 | UDP | mDNS | Local network name resolution |
-| 5355 | UDP | LLMNR | Windows name resolution (ESP8266 only) |
 | 1883 | TCP (outbound) | MQTT | Outbound to your MQTT broker |
 
 ---
@@ -1426,7 +1402,7 @@ Common MQTT return codes:
 
 ### 7.7 Serial Overrun and OTGW Online-Offline Flapping
 
-**Root cause in versions before 2.0.0:** The `publishToSourceTopic()` function allocated approximately 1,600 bytes of local buffers on the cooperative stack. The ESP8266 CONT stack is only 4 KB. The fix in v2.0.0 converts those buffers to static or pre-allocated scratch memory.
+**Root cause in versions before 2.0.0:** The `publishToSourceTopic()` function allocated approximately 1,600 bytes of local buffers on the cooperative stack. On the 1.x firmware for the Wemos D1 mini (ESP8266) that CONT stack is only 4 KB. The fix in v2.0.0 converts those buffers to static or pre-allocated scratch memory.
 
 If you see this on v2.0.0: update to the latest build. If the problem persists, connect to the Telnet debug console and look for `Exception` or `Stack smashing` messages.
 
@@ -1434,7 +1410,22 @@ If you see this on v2.0.0: update to the latest build. If the problem persists, 
 
 ### 7.8 LED Patterns
 
-The firmware does not implement a dedicated LED status pattern on ESP8266 NodeMCU or Wemos D1 Mini boards.
+The firmware drives status LEDs to indicate the device state. On the S3 Mini the LEDs are PWM-dimmed for reduced brightness.
+
+| LED pattern | Meaning |
+|---|---|
+| LED2 blinks once per second, LED1 off | No WiFi connection. The device is attempting to reconnect. |
+| LED1 blinks once per second, LED2 blinks twice per second | WiFi is connected but no OpenTherm traffic has been received for more than 10 seconds. Check the PIC and boiler connection. |
+| Both LEDs off (normal operation) | WiFi connected, OpenTherm traffic flowing. LEDs are only used for brief blinks during processing. |
+| Rapid blinks during boot | Setup phase. Three quick blinks signal completion of a setup step. |
+
+An OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro also uses the LOLIN's on-board RGB pixel to show the WiFi state. It flashes once per second (the `LED blink` setting does not affect it):
+
+| Pixel colour | Meaning |
+|---|---|
+| Red | WiFi not connected. |
+| Purple | An access point is open: the WiFi config portal, or the AP fallback when the saved network is unreachable at boot. Connect to it to configure WiFi. |
+| Green | WiFi connected. |
 
 The physical OTGW board itself has indicator LEDs driven by the PIC:
 - **Green LED**: PIC is running and communicating.
@@ -1521,7 +1512,7 @@ All firmware code lives in `src/OTGW-firmware/` as Arduino `.ino` files. Arduino
 | `settingStuff.ino` | Settings load/save (LittleFS JSON), `updateSetting()` validation, side-effect dispatch |
 | `webSocketStuff.ino` | WebSocket server on port 81, OT log streaming, heap backpressure gate |
 | `helperStuff.ino` | Heap health monitor, `canSendWebSocket()`, `canPublishMQTT()`, LittleFS status helpers |
-| `OTDirect.ino` | ESP32-only: direct GPIO OpenTherm bus via ISR, OTDirect operating modes, frame bridge |
+| `OTDirect.ino` | OT-Direct engine (used only on hardware without a PIC): OTDirect operating modes, frame bridge |
 | `SAT.ino` | Smart Autotune Thermostat: master enable/disable, SAT settings bridge |
 | `SATcontrol.ino` | SAT control loop, heating curve, boiler state machine, setpoint injection |
 | `SATpid.ino` | PID v3 implementation: proportional, integral, derivative with deadband |
@@ -1531,7 +1522,7 @@ All firmware code lives in `src/OTGW-firmware/` as Arduino `.ino` files. Arduino
 | `sensorStuff.ino` | Dallas DS18B20 temperature sensors, S0 pulse counter, OLED display |
 | `boards.h` | Board-specific pin maps and feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`) |
 | `safeTimers.h` | Timer macros: `DECLARE_TIMER_SEC()`, `DUE()`, `RESTART_TIMER()` |
-| `platform.h`, `platform_esp8266.h`, `platform_esp32.h` | Platform abstraction layer |
+| `platform.h`, `platform_esp32.h` | Platform abstraction layer (Platform library under `src/libraries/Platform/src/`, with `boards.h`) |
 
 #### Web Assets
 
@@ -1539,7 +1530,7 @@ The browser SPA lives in `src/OTGW-firmware/data/`. These files are flashed to L
 
 | File | Purpose |
 |------|---------|
-| `index.html` | Single-page application shell (~11 KB — always stream, never load into RAM) |
+| `index.html` | Single-page application shell (~11 KB; always stream, never load into RAM) |
 | `index.js` | Main SPA JavaScript: live OT log, WebSocket client, settings forms |
 | `graph.js` | ECharts-based real-time temperature graphs |
 | `index.css` | Stylesheet with dark/light theme support |
@@ -1548,66 +1539,46 @@ The browser SPA lives in `src/OTGW-firmware/data/`. These files are flashed to L
 
 | File / Directory | Purpose |
 |-----------------|---------|
-| `build.py` | Primary build script: invokes PlatformIO internally, packages firmware and LittleFS artifacts |
-| `platformio.ini` | PlatformIO project: `esp8266` and `esp32` environments |
+| `build.bat` / `build.sh` | Build entrypoints: bootstrap their own Python venv, then run `build.py` |
+| `build.py` | Build script behind the wrappers: invokes PlatformIO internally, packages firmware and LittleFS artifacts |
+| `flash_otgw.bat` / `flash_otgw.sh` | Flash entrypoints, shipped in the release zip: first USB flash, `--update`, `--migrate` |
+| `platformio.ini` | PlatformIO project: `esp32`, `esp32-classic` and `esp32-combo` environments; `esp32-combo` is the target that is built and shipped |
 | `evaluate.py` | Static code quality checker: PROGMEM usage, unsafe patterns, String class audit |
 | `scripts/` | PlatformIO pre-build scripts: version injection, library patching |
 | `libraries/` | Vendored Arduino libraries used by both build systems |
 | `docs/` | C4 architecture docs, ADRs, API references, feature docs |
-| `other-projects/` | Read-only reference codebases (PIC firmware, OTmonitor, OT-Thing, SAT) |
+| `other-projects/` | Read-only reference codebases (PIC firmware, OTmonitor, SAT) |
 | `backlog/` | Project task management (Backlog.md) |
 
 ---
 
 ### Build System
 
-#### build.py (release builds)
+#### build.bat / build.sh (release builds)
 
-The primary build script for producing release artifacts. It invokes PlatformIO internally, handles version embedding, filesystem packaging, and artifact collection.
+Build with the wrappers: `build.bat` on Windows, `./build.sh` on Linux and macOS. They bootstrap their own Python venv and then run `build.py`, which invokes PlatformIO internally and handles version embedding, filesystem packaging and artifact collection. Never call `python build.py` directly: the host default Python may be a version PlatformIO rejects.
 
 ```bash
-python build.py              # Build firmware + LittleFS filesystem image
-python build.py --firmware   # Build firmware only (skip filesystem)
-python build.py --clean      # Clean build artifacts before building
-python build.py --upload     # Build and upload to connected device
+./build.sh                   # Firmware + filesystem, esp32-combo (build.bat on Windows)
+./build.sh --firmware        # Build firmware only (skip filesystem)
+./build.sh --clean           # Clean build artifacts before building
 ```
 
-The script reads the Git tag to embed the version string and places output in the `build/` directory.
+By default the build produces `esp32-combo`, the target that is built and shipped. The script reads the Git tag to embed the version string and places output in the `build/` directory.
 
 #### PlatformIO
 
-PlatformIO is the preferred build system for the ESP32 target. The default environment is defined in `platformio.ini`:
-
-| Environment | Target | Board | Core | CPU |
-|-------------|--------|-------|------|-----|
-| `esp32` | NodoShop OTGW32 | `esp32dev` | pioarduino espressif32 fork | 240 MHz |
-
-```bash
-pio run                          # Build the default environment (esp32)
-pio run -e esp32                 # Build ESP32 only
-pio run -e esp32 -t upload       # Build and upload ESP32
-pio run -e esp32 -t uploadfs     # Upload LittleFS filesystem (ESP32)
-```
+`build.py` drives PlatformIO. Three environments are defined in `platformio.ini`: `esp32` (the base environment), `esp32-classic` and `esp32-combo`. On the 2.x line only `esp32-combo` is built and shipped. Do not run `pio run` directly: it bypasses the build lock.
 
 PlatformIO's pre-build scripts in `scripts/` handle version injection (`platformio_version.py`) and library compatibility patching (`patch_pio_libs.py`).
 
-##### ESP8266-specific PlatformIO notes
-
-The ESP8266 build excludes `OTDirect.ino` (ESP32-only) via `build_src_filter`. PlatformIO's ctags scanner processes all `.ino` files regardless of the filter, so ESP32-specific types (`OpenThermResponseStatus`, `OTDirectMode`, `OTDirectRequestOrigin`) are stubbed out as `-D` flags to prevent ctags-generated forward declaration errors. These stubs have no runtime effect.
-
-The `OpenTherm Library` is explicitly excluded in `lib_ignore` because PlatformIO's LDF scanner ignores `#if` guards and would otherwise compile the ESP32-only OT library for ESP8266.
-
 ##### ESP32-specific PlatformIO notes
 
-PlatformIO's ctags scanner processes all `.ino` files regardless of `#if` guards and generates forward declarations for every function it finds. On ESP32 (`HAS_PIC=0`), `OTGWSerial.h` is never included, so `OTGWFirmware` (an enum type used as a parameter in `fwreportinfo()`) is unknown at ctags forward-declaration time. The flag `-DOTGWFirmware=int` stubs it out so the generated forward declaration compiles. The actual `fwreportinfo()` body is inside a `#if HAS_PIC` block and is never compiled on ESP32. This follows the same pattern as the OTDirect type stubs for ESP8266.
-
-#### Arduino IDE
-
-Arduino IDE is supported for ESP8266 only. Install the ESP8266 Arduino core, then open `src/OTGW-firmware/OTGW-firmware.ino`. Required libraries are in `libraries/` — add that directory to your Arduino sketchbook library path. The IDE does not support the ESP32 target or `OTDirect.ino`.
+PlatformIO's ctags scanner processes all `.ino` files regardless of `#if` guards and generates forward declarations for every function it finds. In the `esp32` environment (`HAS_PIC=0`), `OTGWSerial.h` is never included, so `OTGWFirmware` (an enum type used as a parameter in `fwreportinfo()`) is unknown at ctags forward-declaration time. The flag `-DOTGWFirmware=int` stubs it out so the generated forward declaration compiles. The actual `fwreportinfo()` body is inside a `#if HAS_PIC` block and is never compiled in that environment. `esp32-classic` and `esp32-combo` include `OTGWSerial.h` and do not use this stub.
 
 #### evaluate.py
 
-Run the code quality checker after making changes to catch common ESP8266-specific mistakes:
+Run the code quality checker after making changes to catch common firmware mistakes:
 
 ```bash
 python evaluate.py           # Full analysis (all files)
@@ -1625,19 +1596,22 @@ The checker flags:
 
 ### Board Hardware Variants
 
-The firmware supports two official Nodoshop hardware variants, defined in `boards.h`. The board is selected at build time by a `BOARD_*` preprocessor flag set in `platformio.ini`. When no explicit flag is set, the board is auto-detected from the MCU type (`ESP8266` or `ESP32`).
+The supported 2.x hardware is the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket; the PIC stays in place. Board definitions live in `src/libraries/Platform/src/boards.h`. Each PlatformIO environment sets exactly one `BOARD_*` preprocessor flag in `platformio.ini`, and `boards.h` turns that flag into `HAS_*` capability flags.
 
-**These flags are board-level, not MCU-level.** The presence of a PIC, Ethernet hardware, or a direct OpenTherm GPIO interface is a property of the specific Nodoshop PCB, not of the MCU family. Replacing an ESP8266 with an ESP32 on the OTGW WiFi board is not an official Nodoshop configuration and is not modelled.
+**These flags are board-level, not MCU-level.** The presence of a PIC, Ethernet hardware, or a direct OpenTherm interface is a property of the specific Nodoshop PCB, not of the MCU family. Application code tests only the `HAS_*` flags, never the raw `BOARD_*` macros.
 
 #### Feature Flags
 
-Three compile-time flags in `boards.h` describe the hardware capabilities of each board:
+Four compile-time flags in `boards.h` describe the hardware capabilities of the board:
 
-| Flag | Type | OTGW WiFi (ESP8266) | OTGW32 (ESP32) | Meaning |
-|------|------|---------------------|----------------|---------|
-| `HAS_PIC` | `0` / `1` | `1` | `0` | Board has a PIC co-processor that handles the OpenTherm electrical bus over UART |
-| `HAS_DIRECT_OT` | `0` / `1` | `0` | `1` | Board drives the OpenTherm bus directly from GPIO via the OTDirect ISR |
-| `HAS_ETH_CAPABLE` | `0` / `1` | `0` | `1` | Board has a W5500 SPI Ethernet module |
+| Flag | Type | OTGW Classic + S3 Mini | Meaning |
+|------|------|------------------------|---------|
+| `HAS_PIC` | `0` / `1` | `1` | Board has a PIC co-processor that handles the OpenTherm electrical bus over UART |
+| `HAS_DIRECT_OT` | `0` / `1` | `0` | OT-Direct engine compiled in (used only on hardware without a PIC) |
+| `HAS_ETH_CAPABLE` | `0` / `1` | `0` | Ethernet support compiled in (only with Ethernet hardware; the Classic has none) |
+| `HAS_OLED_CAPABLE` | `0` / `1` | `1` | Optional SSD1306 128x64 I2C OLED on the Classic I2C header (runtime probe at address `0x3C`) |
+
+The shipped `esp32-combo` image links both OpenTherm engines and picks one at boot; it sets `HAS_RUNTIME_HW_DETECT=1` and gates the PIC-versus-OT-Direct choice at runtime instead of at compile time.
 
 Use these flags in conditional compilation:
 
@@ -1655,15 +1629,6 @@ Use these flags in conditional compilation:
 #endif
 ```
 
-#### W5500 Runtime Detection
-
-`HAS_ETH_CAPABLE=1` means the board design includes a W5500 module header, but the module may not be physically installed on every unit. At boot, `initEthernet()` in `Ethernet.ino` starts the W5500 driver the same way the OT-Thing reference does (`Ethernet.init()` + `Ethernet.begin()`). The ESP-IDF driver install resets the chip and polls its VERSION register for up to 100 ms:
-
-- If the driver accepts the chip, `Ethernet.hardwareStatus()` returns `EthernetHardwareFound`, `state.hw.bEthernetPresent` is set to `true` and Ethernet stays initialised, with or without a cable.
-- If the driver install fails, `state.hw.bEthernetPresent` is set to `false` and the firmware runs in WiFi-only mode.
-
-No user configuration is required. `loopEthernet()` guards itself with `if (!state.hw.bEthernetPresent) return;` so it is a no-op when no hardware is present.
-
 ---
 
 ### C4 Architecture Overview
@@ -1672,13 +1637,11 @@ The firmware uses a four-level C4 model documented in `docs/c4/`. Read the relev
 
 #### Level 1: Context (`c4-context.md`)
 
-The OTGW-firmware sits between the OpenTherm heating bus and the home automation network. External actors are: Room Thermostat, Boiler (via PIC co-processor or OTDirect GPIO on ESP32), MQTT Broker, Home Assistant, NTP Server, Web Browser, OTmonitor TCP client, Dallas/S0/BLE sensors.
+The OTGW-firmware sits between the OpenTherm heating bus and the home automation network. External actors are: Room Thermostat, Boiler (via PIC co-processor, or OTDirect in OT-Direct mode), MQTT Broker, Home Assistant, NTP Server, Web Browser, OTmonitor TCP client, Dallas/S0/BLE sensors.
 
 #### Level 2: Container (`c4-container.md`)
 
-Two deployment targets share one codebase:
-- **ESP8266 (OTGW)**: NodoShop board with PIC16F co-processor. PIC handles the OpenTherm electrical bus; ESP8266 communicates with it over UART at 9600 baud.
-- **ESP32 (OTGW32)**: NodoShop board with direct GPIO OpenTherm interface (`OTDirect`), W5500 Ethernet, BLE, and OLED. The PIC is absent; the ESP32 drives the OT bus directly via interrupt-driven Manchester coding.
+The 2.x firmware runs on an ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the NodoShop OTGW Classic. The PIC16F co-processor handles the OpenTherm electrical bus; the ESP32-S3 communicates with it over UART at 9600 baud. The 1.x firmware for the Wemos D1 mini (ESP8266) uses the same PIC link.
 
 #### Level 3: Component (`c4-component.md`)
 
@@ -1704,13 +1667,13 @@ Detailed function signatures, line numbers, and inter-file dependencies for ever
 
 #### Cooperative Scheduling
 
-The ESP8266 Arduino framework is single-threaded and cooperative. The main `loop()` calls `doBackgroundTasks()`, which in turn calls all subsystem handlers. There is no RTOS; `delay()` blocks everything and must never be used. Long operations must be broken into state machines checked on each `loop()` iteration.
+The application code runs cooperatively in the Arduino `loop()` task. The firmware itself runs on FreeRTOS (the async web stack, ADR-123, and the PIC-UART task, ADR-130, run in their own tasks), but the main `loop()` calls `doBackgroundTasks()`, which in turn calls all subsystem handlers one after the other. `delay()` blocks that loop and must never be used. Long operations must be broken into state machines checked on each `loop()` iteration.
 
 `feedWatchDog()` services the hardware watchdog. It does not call `yield()` (that line is intentionally commented out to prevent re-entrancy of `doBackgroundTasks()`). The background task re-entrancy that does exist comes from MQTT autoconfig's file-reading loop calling `handleOTGW()` mid-iteration.
 
 #### Static Buffers (ADR-004 / ADR-053)
 
-The ESP8266 has approximately 40 KB of usable heap. Dynamic allocation fragments the heap and leads to crashes after days of operation. All buffers are statically allocated:
+Dynamic allocation fragments the heap and leads to crashes after days of operation. This rule comes from the 1.x line and still holds on 2.x (ADR-180 for the `String` class). All buffers are statically allocated:
 
 - Use `char buf[SIZE]` with `snprintf_P(buf, sizeof(buf), PSTR(...))`.
 - Never use `String` class in hot paths (ISR, MQTT publish, OT processing loop).
@@ -1734,7 +1697,7 @@ Binary data (non-null-terminated buffers) must use `memcmp_P()`. Using `strncmp_
 
 #### Platform Abstraction Layer (ADR-061)
 
-All ESP8266/ESP32 SDK differences are isolated in three files: `platform.h`, `platform_esp8266.h`, and `platform_esp32.h`. Application code includes only `platform.h` and calls the unified functions. Never call platform-specific SDK functions directly in `.ino` files.
+All platform SDK specifics are isolated in the Platform library under `src/libraries/Platform/src/`: `platform.h` (dispatcher), `platform_esp32.h` (shims) and `boards.h` (pin maps and `HAS_*` capability flags). Application code includes only `platform.h`, calls the `platformXxx()` shims and gates optional features with `HAS_*` flags. Never call platform-specific SDK functions directly in `.ino` files.
 
 Key functions provided by the abstraction layer:
 
@@ -1750,9 +1713,9 @@ Key functions provided by the abstraction layer:
 | `platformChipId()` | Unique chip identifier |
 | `platformGetMacAddress(mac)` | Fill a 6-byte buffer with the MAC address |
 
-On ESP8266, `MDNS_NEEDS_UPDATE` is defined as `1`, which means the main loop must call `MDNS.update()` on every iteration. On ESP32 this is not needed (`MDNS_NEEDS_UPDATE` is not defined). The main loop guards this with `#if defined(MDNS_NEEDS_UPDATE)`.
+`platform_esp32.h` defines `MDNS_NEEDS_UPDATE` as `0`: mDNS runs on a background task, so the main loop does not call `MDNS.update()`. The main loop guards that call with `#if MDNS_NEEDS_UPDATE`.
 
-The `PlatformDir` class in `platform.h` provides a unified directory iteration interface over LittleFS (ESP8266 uses `Dir`; ESP32 uses `File`-based iteration). Use `PlatformDir` instead of calling filesystem APIs directly.
+The `PlatformDir` class in `platform.h` provides a unified directory iteration interface over LittleFS. Use `PlatformDir` instead of calling filesystem APIs directly.
 
 #### No ArduinoJson
 
@@ -1831,7 +1794,7 @@ void handleMyFeature(const char words[][API_WORD_LEN], uint8_t wc,
 ```
 
 Rules:
-- Never use `Serial.print()` for debug — use `DebugTln()` or `DebugTf()`.
+- Never use `Serial.print()` for debug. Use `DebugTln()` or `DebugTf()`.
 - Use `CMSG_SIZE` (512 bytes) as the standard response buffer unless you need a larger response.
 - For responses larger than `CMSG_SIZE`, use `httpServer.sendContent()` in a chunked loop with `httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN)`.
 - All mutation endpoints (POST, PUT, DELETE) must call `checkHttpAuth()` and return immediately if it returns false.
@@ -1867,7 +1830,7 @@ void sendMQTTData(const __FlashStringHelper* topic, const __FlashStringHelper* v
 
 The function prepends the configured topic namespace (`{TopTopic}/value/{UniqueId}/`) automatically. It also checks `canPublishMQTT()` before sending.
 
-Example — publish a new float value:
+Example, publish a new float value:
 
 ```cpp
 if (canPublishMQTT()) {
@@ -1906,7 +1869,7 @@ For commands that do not map to a PIC command (e.g., SAT-specific topics), add a
 
 #### Home Assistant Auto-Discovery
 
-HA discovery payloads are generated from `mqttha.cfg` (stored in LittleFS). This is a template file processed by `doAutoConfigure()` / `doAutoConfigureMsgid()`. If your new topic needs a HA entity, add an entry to `mqttha.cfg` following the existing template format. The file is too large to document fully here — examine existing entries for the pattern.
+HA discovery payloads are generated from `mqttha.cfg` (stored in LittleFS). This is a template file processed by `doAutoConfigure()` / `doAutoConfigureMsgid()`. If your new topic needs a HA entity, add an entry to `mqttha.cfg` following the existing template format. The file is too large to document fully here; examine existing entries for the pattern.
 
 ---
 
@@ -2004,7 +1967,7 @@ For a text field:
 - Never write to `Serial` after the boot sequence. The UART is the PIC serial link. Use `DebugTln(F("..."))` instead.
 - Never send OTGW commands directly to the serial port. Always use `addCommandToQueue(cmd, len)`.
 - Always validate buffer sizes before string operations. Use `strlcpy()`, `snprintf_P()`, never `strcpy()` or `sprintf()`.
-- Guard `#ifdef ESP8266` / `#ifdef ESP32` blocks where platform-specific hardware is involved, including debug macro sections that use platform-specific I/O.
+- Do not write raw platform conditionals (`#ifdef ESP32` and the like) in application code. Call a `platformXxx()` shim or gate on a `HAS_*` flag; `evaluate.py` (`check_esp_abstraction_boundary()`) enforces this.
 - Use `enum class` for internal discriminators, not string tokens.
 
 ---
@@ -2013,7 +1976,7 @@ For a text field:
 
 #### Telnet Debug Console (Port 23)
 
-The firmware streams diagnostic output to Telnet port 23 via the SimpleTelnet library (`SimpleTelnet<1> debugTelnet`, declared extern in `OTGW-firmware.h` and defined in `networkStuff.ino`). SimpleTelnet replaces the older TelnetStream and ESPTelnet libraries and provides a unified API on both ESP8266 and ESP32. Connect with any Telnet client:
+The firmware streams diagnostic output to Telnet port 23 via the SimpleTelnet library (`SimpleTelnet<1> debugTelnet`, declared extern in `OTGW-firmware.h` and defined in `networkStuff.ino`). SimpleTelnet replaces the older TelnetStream and ESPTelnet libraries. Connect with any Telnet client:
 
 ```bash
 telnet otgw2.local 23
@@ -2060,7 +2023,7 @@ The macros send output to the `debugTelnet` instance (a `SimpleTelnet<1>` on por
 | `state.debug.bMQTTGate` | (inline checks) | MQTT interval gating decisions |
 | `state.debug.bSensors` | `SensorDebugTln()`, `SensorDebugTf()` | Dallas, S0, sensor polling |
 | `state.debug.bSAT` | `SATDebugTln()`, `SATDebugTf()` | SAT control loop, cycles, heating curve |
-| `state.debug.bOTDirect` | `OTDDebugTln()`, `OTDDebugTf()` | OTDirect GPIO frame handling (ESP32) |
+| `state.debug.bOTDirect` | `OTDDebugTln()`, `OTDDebugTf()` | OTDirect frame handling (OT-Direct mode) |
 
 #### Browser Console Debug
 
@@ -2074,7 +2037,7 @@ After making changes, always run:
 python evaluate.py
 ```
 
-This checks for the patterns most likely to cause crashes on ESP8266. Address all warnings before submitting a pull request.
+This checks for the patterns most likely to cause crashes on the device. Address all warnings before submitting a pull request.
 
 ---
 
@@ -2130,7 +2093,7 @@ addCommandToQueue(PSTR("CS=55.00"), 8, true);      // urgent: control setpoint, 
 addCommandToQueue(PSTR("GW=1"), 4);                // gateway mode on
 ```
 
-The queue is processed in the OTGW-Core background task. Responses from the PIC are matched against outstanding commands and published to MQTT. On OTGW32 (OTDirect), the queue is handled internally by `loopOTDirect()`.
+The queue is processed in the OTGW-Core background task. Responses from the PIC are matched against outstanding commands and published to MQTT. In OT-Direct mode, the queue is handled internally by `loopOTDirect()`.
 
 Never call `addCommandToQueue()` from an ISR or from within the PIC response handler.
 
@@ -2145,10 +2108,10 @@ Boiler/Thermostat
        |
   OpenTherm bus (2-wire)
        |
-  PIC co-processor (ESP8266) or OTDirect GPIO ISR (ESP32)
+  PIC co-processor (PIC gateway mode) or OTDirect engine (OT-Direct mode)
        |
-  UART 9600 baud ASCII line (e.g., "BA000001\r")   [ESP8266]
-  or decoded OT frame struct                        [ESP32]
+  UART 9600 baud ASCII line (e.g., "BA000001\r")   [PIC gateway mode]
+  or decoded OT frame struct                        [OT-Direct mode]
        |
   handleOTGW() / OTGW-Core.ino
     - reads serial line byte by byte into sRead[256] (static)
@@ -2205,7 +2168,7 @@ Not required for: pure bug fixes, minor features within existing patterns.
 | ADR-050 | Centralized API dispatch | Single `kV2Routes[]` table; no per-route router changes |
 | ADR-051 | Dual encapsulating structs | `OTGWSettings` / `OTGWState` architecture |
 | ADR-053 | Large feature buffer allocation | Static allocation for large per-feature buffers |
-| ADR-061 | ESP8266/ESP32 platform abstraction | Use `platform.h` abstractions, not direct SDK calls |
+| ADR-061 | Platform abstraction | Use `platform.h` abstractions, not direct SDK calls |
 
 #### Creating a New ADR
 
@@ -2233,7 +2196,7 @@ To reverse an Accepted ADR: create a new ADR that supersedes it and mark the old
 5. Write an implementation plan in the task before writing code.
 6. Implement the change. Mark acceptance criteria done as you go.
 7. Run `python evaluate.py` and fix all reported issues.
-8. Build for both targets and confirm no compile errors: `pio run`.
+8. Build and confirm no compile errors: `build.bat` (Windows) or `./build.sh` (Linux/macOS), which builds `esp32-combo`.
 9. Test on real hardware if possible; use the simulation mode in `state.debug.bOTGWSimulation` if hardware is unavailable.
 10. Write a final summary in the backlog task.
 11. Open a pull request against the `dev` branch, not `main`.
@@ -2258,7 +2221,7 @@ http://{device-ip}/api/v2/
 
 Older versions return HTTP 410 Gone. Never use `/api/v0/` or `/api/v1/` in new code.
 
-The device hostname defaults to `otgw2.local` (mDNS / LLMNR). Alternatively, use the IP address assigned by your DHCP server.
+The device hostname defaults to `otgw2.local` (mDNS). Alternatively, use the IP address assigned by your DHCP server.
 
 #### Transport
 
@@ -2412,22 +2375,30 @@ Returns hardware and platform information. No authentication required.
 
 ```json
 {
-  "hostname": "OTGW2",
-  "firmware_version": "2.0.0",
-  "platform": "ESP8266",
-  "board": "NODOSHOP_ESP8266",
-  "cpu_freq_mhz": 160,
-  "flash_size": 4194304,
-  "chip_id": "AABBCC",
-  "ssid": "MyHomeNetwork",
-  "ip": "192.168.1.50",
-  "mac": "AA:BB:CC:DD:EE:FF",
-  "reboot_count": 7,
-  "reboot_reason": "Software/System restart"
+  "device": {
+    "author": "Robert van den Breemen",
+    "fwversion": "2.0.0",
+    "hostname": "OTGW2",
+    "board": "Nodoshop OTGW Combo (ESP32-S3)",
+    "hardware_type": "otgw-classic",
+    "hardwaremode": "pic",
+    "networkmode": "wifi",
+    "ipaddress": "192.168.1.50",
+    "macaddress": "AA:BB:CC:DD:EE:FF",
+    "ssid": "MyHomeNetwork",
+    "chipid": "AABBCC",
+    "picavailable": true,
+    "picfwversion": "5.4",
+    "bootcount": 42,
+    "lastreset": "Software/System restart",
+    "otdirectavailable": false
+  }
 }
 ```
 
-On Ethernet (ESP32): `"ssid": "Wired"` and `"ip"` reflects the Ethernet address.
+The example is abridged. `board` is the display name of the firmware image (`"Nodoshop OTGW Combo (ESP32-S3)"` for the esp32-combo build). `hardware_type` is the machine-readable hardware slug: `"otgw-classic"` on an OTGW Classic, where the firmware runs in PIC gateway mode.
+
+With Ethernet hardware only (the OTGW Classic has none): when the active network mode is `ethernet`, `"ssid"` is `"Wired"`.
 
 ##### GET /api/v2/device/time
 
@@ -2768,9 +2739,9 @@ Update a named SAT setting. Authentication required.
 
 ---
 
-#### OTDirect (ESP32 / OTGW32 only)
+#### OTDirect (OT-Direct mode only)
 
-These endpoints are only available on OTGW32 hardware (`HAS_DIRECT_OT`).
+These endpoints are only available in OT-Direct mode, on hardware without a PIC. In PIC gateway mode, all endpoints return 503 Service Unavailable.
 
 ##### GET /api/v2/otdirect/status
 
@@ -2799,12 +2770,12 @@ Returns all active stored response overrides.
 Manage per-message-ID overrides.
 
 **Query parameters:**
-- `action=sr&msgid=X&value=HHHH` — set stored response for message ID X to 4-hex-digit value
-- `action=cr&msgid=X` — clear stored response for message ID X
-- `action=rm&msgid=X&value=HHHH` — set response modifier (mask applied to boiler response)
-- `action=cm&msgid=X` — clear response modifier
-- `action=ui&msgid=X` — mark message ID as unknown (gateway returns UNKNOWN_DATA_ID)
-- `action=ki&msgid=X` — mark message ID as known again
+- `action=sr&msgid=X&value=HHHH` : set stored response for message ID X to 4-hex-digit value
+- `action=cr&msgid=X` : clear stored response for message ID X
+- `action=rm&msgid=X&value=HHHH` : set response modifier (mask applied to boiler response)
+- `action=cm&msgid=X` : clear response modifier
+- `action=ui&msgid=X` : mark message ID as unknown (gateway returns UNKNOWN_DATA_ID)
+- `action=ki&msgid=X` : mark message ID as known again
 
 ---
 
@@ -2814,7 +2785,7 @@ Manage per-message-ID overrides.
 
 Trigger a test webhook delivery. Sends the configured webhook URL an HTTP POST with a test payload. No authentication required.
 
-**Query parameter:** `state=on|off|1|0` — payload state to simulate.
+**Query parameter:** `state=on|off|1|0`: payload state to simulate.
 
 ---
 
@@ -3351,7 +3322,6 @@ The output is the unprocessed ASCII stream from the PIC: lines like `T80000200`,
 | 1883 | TCP (MQTT) | MQTT broker connection (outbound) |
 | 123 | UDP (SNTP) | NTP time synchronization (outbound) |
 | 5353 | UDP (mDNS) | `otgw2.local` name resolution |
-| 5355 | UDP (LLMNR) | Windows name resolution |
 ## Chapter 10: Appendix
 
 ---
@@ -3383,23 +3353,23 @@ Data types:
 | 5 | ASFflags | flag8/u8 | S→M | Application-specific fault flags and OEM fault code |
 | 6 | RBPflags | flag8/flag8 | Both | Remote boiler parameter transfer-enable and read/write flags |
 | 7 | CoolingControl | f8.8 | M→S | Cooling control signal (0-100%) |
-| 9 | TrOverride | f8.8 | Both | Remote override room setpoint (°C) — used by gateway |
+| 9 | TrOverride | f8.8 | Both | Remote override room setpoint (°C), used by gateway |
 | 14 | MaxRelModLevelSetting | f8.8 | M→S | Maximum relative modulation level setting (%) |
-| 16 | TrSet | f8.8 | M→S | Room setpoint (°C) — requested room temperature |
+| 16 | TrSet | f8.8 | M→S | Room setpoint (°C): requested room temperature |
 | 17 | RelModLevel | f8.8 | S→M | Relative modulation level (%) |
 | 18 | CHPressure | f8.8 | S→M | CH water system pressure (bar) |
 | 19 | DHWFlowRate | f8.8 | S→M | DHW flow rate (l/min) |
-| 24 | Tr | f8.8 | M→S | Room temperature (°C) — measured by thermostat |
+| 24 | Tr | f8.8 | M→S | Room temperature (°C), measured by thermostat |
 | 25 | Tboiler | f8.8 | S→M | Boiler flow water temperature (°C) |
 | 26 | Tdhw | f8.8 | S→M | DHW temperature (°C) |
-| 27 | Toutside | f8.8 | Both | Outside temperature (°C) — sent by thermostat or overridden |
+| 27 | Toutside | f8.8 | Both | Outside temperature (°C), sent by thermostat or overridden |
 | 28 | Tret | f8.8 | S→M | Return water temperature (°C) |
 | 31 | TstorageTank | f8.8 | S→M | Solar storage tank temperature (°C) |
 | 33 | TExhaust | s16 | S→M | Boiler exhaust temperature (°C) |
 | 35 | HeatExchanger | f8.8 | S→M | Boiler heat exchanger outlet temperature (°C) |
 | 48 | TdhwSetUBTdhwSetLB | s8/s8 | S→M | DHW setpoint upper and lower bounds (°C) |
 | 49 | MaxTSetUBMaxTSetLB | s8/s8 | S→M | Max CH setpoint upper and lower bounds (°C) |
-| 56 | TdhwSet | f8.8 | Both | DHW setpoint (°C) — requested / confirmed |
+| 56 | TdhwSet | f8.8 | Both | DHW setpoint (°C), requested / confirmed |
 | 57 | MaxTSet | f8.8 | Both | Max CH water setpoint (°C) |
 | 70 | MasterMemberIDCode | flag8/u8 | M→S | Master (thermostat) configuration and member ID |
 | 100 | RemoteOverrideFunction | flag8 | S→M | Remote override function flags |
@@ -3420,7 +3390,7 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **ADR** | Architecture Decision Record. A short document capturing a significant design choice, its rationale, and its consequences. All ADRs live in `docs/adr/`. Once Accepted, an ADR is immutable. |
 | **AceTime** | Arduino timezone library used by the firmware for NTP time management and zone-aware timestamps. |
 | **ArduinoJson** | A popular Arduino JSON parsing library. Explicitly excluded from this project (ADR-042) due to RAM and flash cost. JSON is handled via manual `snprintf_P` construction and `parseJsonKVLine()` parsing. |
-| **BLE** | Bluetooth Low Energy. On ESP32 hardware (OTGW32), the firmware can receive room temperature and humidity from a BTHome-compatible BLE sensor (e.g., a Xiaomi sensor). |
+| **BLE** | Bluetooth Low Energy. On the ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro), the firmware can receive room temperature and humidity from a BTHome-compatible BLE sensor (e.g., a Xiaomi sensor). |
 | **BTHome** | An open BLE advertisement protocol for home sensor devices. Used by the SAT BLE integration for passive scanning of room temperature sensors. |
 | **C4 model** | A four-level architecture documentation model: Context, Container, Component, Code. The firmware's architecture is documented using C4 in `docs/c4/`. |
 | **CH** | Central Heating. Refers to the radiator or underfloor heating circuit, as opposed to DHW. |
@@ -3428,8 +3398,8 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **DallasTemperature** | Arduino library for DS18B20 1-Wire temperature sensors. Used by `sensorStuff.ino`. |
 | **DHW** | Domestic Hot Water. The circuit supplying hot tap water, as distinct from the central heating circuit. |
 | **DUE()** | A timer macro from `safeTimers.h`. Returns true when the declared timer's interval has elapsed, and false otherwise. Handles `millis()` rollover safely. |
-| **ESP8266** | The Espressif Wi-Fi microcontroller used in the NodoShop OTGW board. Runs at 80 or 160 MHz, approximately 40 KB usable heap. |
-| **ESP32** | The more powerful Espressif microcontroller used in the NodoShop OTGW32 board. Runs at 240 MHz, significantly more RAM and flash, supports BLE, Ethernet, and OTDirect. |
+| **ESP8266** | The Espressif Wi-Fi microcontroller on the Wemos D1 mini, used by the 1.x firmware. Runs at 80 or 160 MHz, approximately 40 KB usable heap. Going back to 1.x means putting the Wemos D1 mini back in the OTGW Classic. |
+| **ESP32** | The Espressif ESP32-S3 on the LOLIN S3 Mini or S3 Mini Pro, used by the 2.x firmware in the OTGW Classic. Runs at 240 MHz, with significantly more RAM and flash than the 1.x hardware, and supports BLE. |
 | **f8.8** | OpenTherm fixed-point data format: an 8-bit signed integer plus an 8-bit fractional part (1/256 per LSB). Used for all temperature values in the protocol. |
 | **HA** | Home Assistant. The primary target home automation platform for this firmware. |
 | **HEAP_CRITICAL** | Heap level below ~3 KB. Emergency mode: MQTT and WebSocket sends are blocked. |
@@ -3437,27 +3407,24 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **HEAP_LOW** | Heap level 5–8 KB. MQTT publish rate reduced. |
 | **HEAP_WARNING** | Heap level 3–5 KB. WebSocket sends blocked; MQTT aggressively throttled. |
 | **JIT discovery** | Just-in-time Home Assistant discovery. Rather than publishing all 200+ HA discovery payloads at once on connect, the firmware publishes a discovery payload for a given message ID the first time it receives data for that ID. This spreads the load over the first few minutes of operation. |
-| **LittleFS** | The flash filesystem used by the firmware for storing settings, web assets, discovery configs, sensor labels, SAT state, and crash logs. Mounted on the ESP8266/ESP32 SPI flash. |
+| **LittleFS** | The flash filesystem used by the firmware for storing settings, web assets, discovery configs, sensor labels, SAT state, and crash logs. Mounted on the ESP32-S3 SPI flash. |
 | **LLMNR** | Link-Local Multicast Name Resolution. Used for Windows name resolution of `otgw2.local` without a DNS server. |
 | **mDNS** | Multicast DNS. Allows the device to be reached as `otgw2.local` (or custom hostname + `.local`) on the local network without a DNS server. |
 | **MQTT** | Message Queuing Telemetry Transport. The lightweight publish-subscribe protocol used for integration with Home Assistant and other automation platforms. The firmware supports MQTT 3.1.1 via the PubSubClient library. |
 | **NTP** | Network Time Protocol. Used by the firmware for accurate wall-clock time (boiler clock sync, SAT calculations, log timestamps). Default server: `pool.ntp.org`. |
-| **NodeMCU** | An ESP8266 development board. Functionally equivalent to Wemos D1 mini for this firmware. |
 | **OT** | OpenTherm. The communication protocol used between room thermostats and central heating boilers. |
 | **OTGW** | OpenTherm Gateway. The NodoShop hardware device that sits in-line on the OpenTherm bus and allows monitoring and override of messages. Refers to both the hardware and to this firmware project. |
-| **OTGW32** | The NodoShop OpenTherm Gateway board based on ESP32 with direct GPIO OpenTherm interface (OTDirect), W5500 Ethernet, BLE, and OLED. |
-| **OTDirect** | The ESP32-native direct GPIO OpenTherm bus interface. Replaces the PIC co-processor on OTGW32 boards. Implemented in `OTDirect.ino` and guarded by `#if HAS_DIRECT_OT`. |
+| **OTDirect** | The firmware's direct OpenTherm bus interface, used in OT-Direct mode on hardware without a PIC. Implemented in `OTDirect.ino` and guarded by `#if HAS_DIRECT_OT`. |
 | **PIC** | The PIC16F88 or PIC16F1847 microcontroller co-processor on the NodoShop OTGW board. Handles the OpenTherm electrical bus and communicates with the ESP over UART at 9600 baud. |
-| **PROGMEM** | Program Memory. On ESP8266, string literals declared with `PROGMEM` (or wrapped in `F()` / `PSTR()`) are stored in flash memory instead of RAM, conserving the scarce ~40 KB RAM budget. |
+| **PROGMEM** | Program Memory. String literals declared with `PROGMEM` (or wrapped in `F()` / `PSTR()`) are stored in flash memory instead of RAM. The rule is carried over from the 1.x line, where the ESP8266 had a scarce ~40 KB RAM budget, and still applies on 2.x. |
 | **PubSubClient** | The Arduino MQTT client library used by the firmware. Pinned to version 2.8.0 in `platformio.ini`. |
-| **PlatformIO** | Cross-platform embedded development toolchain and IDE plugin. Used for building the ESP32 target and optionally ESP8266. Config: `platformio.ini`. |
+| **PlatformIO** | Cross-platform embedded development toolchain and IDE plugin. Used for building the `esp32-combo` firmware, driven by `build.bat` / `./build.sh`. Config: `platformio.ini`. |
 | **SAT** | Smart Autotune Thermostat. The embedded heating controller in the firmware that replaces the room thermostat's role. Combines a weather-compensated heating curve with a PID v3 control loop and automatic gain tuning. |
 | **SLINE_SIZE** | 1200-byte MQTT autoconfig line buffer. Used exclusively in `MQTTstuff.ino` for `mqttha.cfg` processing. Larger than `CMSG_SIZE` to accommodate HA discovery JSON lines up to ~900 bytes. |
 | **SNTP** | Simple Network Time Protocol. UDP-based time synchronization, subset of NTP used for embedded devices. Port 123. |
-| **SSD1306** | OLED display controller used on OTGW32 hardware. Driven by the `SSD1306Ascii` library. Displays device status at boot. |
-| **W5500** | SPI Ethernet chip used on OTGW32 hardware for wired Ethernet connectivity. Controlled by the `EthernetESP32` library. |
+| **SSD1306** | OLED display controller for the optional OLED on the OTGW Classic I2C header. Driven by the `SSD1306Ascii` library. Displays device status at boot. |
 | **WifiManager** | Arduino library that provides the captive portal for initial Wi-Fi configuration. When no credentials are saved, the device creates a temporary access point for setup. Pinned to version 2.0.17. |
-| **yield()** | Arduino/ESP8266 cooperative scheduling call. Allows the Wi-Fi/TCP stack to process pending events. Calling `yield()` from within a background task handler can cause re-entrancy. The firmware carefully avoids `yield()` in `feedWatchDog()` for this reason. |
+| **yield()** | Arduino cooperative scheduling call. Allows the Wi-Fi/TCP stack to process pending events. Calling `yield()` from within a background task handler can cause re-entrancy. The firmware carefully avoids `yield()` in `feedWatchDog()` for this reason. |
 
 ---
 
@@ -3535,7 +3502,6 @@ These are the factory defaults. All settings are configurable via the web UI Set
 | 1883 | TCP | Outbound | MQTT: connection to broker |
 | 123 | UDP | Outbound | SNTP: NTP time synchronization |
 | 5353 | UDP | Both | mDNS: `{hostname}.local` name resolution |
-| 5355 | UDP | Both | LLMNR: Windows LAN name resolution |
 
 All inbound services are unencrypted (HTTP, not HTTPS; WS, not WSS). The device is designed for trusted local network use only. For remote access, use a VPN or a reverse proxy that handles TLS termination.
 
@@ -3545,8 +3511,7 @@ All inbound services are unencrypted (HTTP, not HTTPS; WS, not WSS). The device 
 
 #### Hardware
 
-- NodoShop OpenTherm Gateway (ESP8266): [https://www.nodo-shop.nl/](https://www.nodo-shop.nl/)
-- NodoShop OpenTherm Gateway 32 (ESP32): see the NodoShop product page for the OTGW32 board
+- NodoShop OpenTherm Gateway (OTGW Classic): [https://www.nodo-shop.nl/](https://www.nodo-shop.nl/)
 
 #### Firmware
 
@@ -3593,15 +3558,11 @@ The full changelog is in `CHANGELOG.md` at the repository root.
 
 Version 2.0.0 is a major release. The headline changes are:
 
-**Dual platform support.** A single codebase now targets both ESP8266 (NodoShop OTGW) and ESP32 (NodoShop OTGW32). A unified platform abstraction layer (`platform.h`) isolates hardware differences. The ESP32 build includes OTDirect, W5500 Ethernet, BLE, and OLED features that are absent on ESP8266.
+**ESP32-S3 line.** Version 2.0.0 runs on the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket; the PIC stays in place. One `esp32-combo` image detects the PIC at boot. A platform abstraction layer (`platform.h`, `boards.h`) isolates hardware differences. The 1.x firmware for the Wemos D1 mini (ESP8266) continues on its own maintenance line.
 
-**OTDirect (OTGW32).** On ESP32, the PIC co-processor is replaced by a direct GPIO OpenTherm bus interface using interrupt-driven Manchester coding. OTDirect supports gateway, monitor, bypass, master, and loopback operating modes. It provides full OT-Thing protocol parity including the command scheduler, stored response overrides, and response modifiers.
-
-**SAT (Smart Autotune Thermostat).** The embedded PID thermostat is now a major feature. Version 2.0.0 adds PID v3 with deadband and anti-cycling, a heating curve advisor (INCREASE/DECREASE/HOLD), multi-zone room temperature averaging, Summer Simmer Index, solar gain compensation, DHW setpoint control, boiler gas consumption estimation, and BLE room temperature sensor support (ESP32).
+**SAT (Smart Autotune Thermostat).** The embedded PID thermostat is now a major feature. Version 2.0.0 adds PID v3 with deadband and anti-cycling, a heating curve advisor (INCREASE/DECREASE/HOLD), multi-zone room temperature averaging, Summer Simmer Index, solar gain compensation, DHW setpoint control, boiler gas consumption estimation, and BLE room temperature sensor support.
 
 **Settings/State architecture (ADR-051).** Over 62 global variables have been replaced by the `OTGWSettings settings` and `OTGWState state` structs. This eliminates naming collisions and makes the persistent-versus-transient boundary explicit.
-
-**W5500 Ethernet (OTGW32).** Hardware Ethernet with automatic WiFi/Ethernet failover. When an Ethernet cable is connected, WiFi is disabled. The `isNetworkUp()` / `getActiveIP()` abstraction provides a consistent network interface to all subsystems.
 
 **AP fallback mode (beta only).** When no saved WiFi is available, the device opens a fallback access point rather than going fully offline. Guarded by `_VERSION_PRERELEASE`.
 
@@ -3633,29 +3594,22 @@ First stable release. Static buffer allocation (ADR-004), heap monitoring system
 
 ### G. Build Artifact Reference
 
-When building, the following output files are produced:
+When building, the following output files are produced in `build/` (`<semver>` is the version with Git hash, for example `2.0.0-beta.1+2ec9ce9`):
 
 | File | Description |
 |------|-------------|
-| `build/OTGW-firmware.ino.bin` | ESP8266 firmware binary for OTA or direct flash |
-| `build/OTGW-firmware.ino.elf` | ELF debug file for crash address symbolication |
-| `build/OTGW-firmware.ino.map` | Linker map (symbol addresses and section sizes) |
-| `build/OTGW-firmware.ino.littlefs.bin` | LittleFS filesystem image (web assets, configs) |
-| `.pio/build/esp32/firmware.bin` | ESP32 firmware binary (PlatformIO build) |
-| `.pio/build/esp32/firmware.elf` | ESP32 ELF debug file |
+| `OTGW-firmware-esp32-combo-<semver>-flash.zip` | Distribution zip: images, `flash_otgw.bat` / `flash_otgw.sh`, capture scripts and README |
+| `OTGW-firmware-esp32-combo-<semver>.ino.bin` | Firmware binary for the WiFi update (`/update`) |
+| `OTGW-firmware-esp32-combo-<semver>.littlefs.bin` | LittleFS filesystem image (web assets, configs) |
+| `OTGW-firmware-esp32-combo-<semver>-merged-full.bin` | Complete flash image for a first USB flash |
+| `OTGW-firmware-esp32-combo-<semver>.elf` | ELF debug file for crash address symbolication |
 
 #### Crash Address Symbolication
 
-If the device crashes and prints a backtrace (ESP8266 exception dump), you can decode the stack addresses using the `.elf` file:
+If the device crashes and prints a backtrace, you can decode the stack addresses using the `.elf` file:
 
 ```bash
-# Install xtensa-lx106 toolchain (included with ESP8266 Arduino core)
-xtensa-lx106-elf-addr2line -fe build/OTGW-firmware.ino.elf 0x40215abc
-```
-
-For ESP32:
-```bash
-xtensa-esp32s3-elf-addr2line -fe .pio/build/esp32/firmware.elf 0x400d1abc
+xtensa-esp32s3-elf-addr2line -fe build/OTGW-firmware-esp32-combo-<semver>.elf 0x400d1abc
 ```
 
 The ELF file is included in GitHub release artifacts specifically to support crash debugging in the field.
@@ -3666,8 +3620,11 @@ The ELF file is included in GitHub release artifacts specifically to support cra
 
 | Environment | Target | Chip | Framework | Flash | Filesystem |
 |-------------|--------|------|-----------|-------|------------|
-| `esp8266` | Wemos D1 mini / NodoShop OTGW | ESP8266 | Arduino Core 3.1.2 (espressif8266@4.2.1) | 4 MB (DIO) | 2 MB LittleFS |
-| `esp32` | NodoShop OTGW32 | ESP32 | Arduino-ESP32 v3.3.5 (pioarduino fork) | ~4 MB (custom partition) | 768 KB LittleFS |
+| `esp32` | Base environment, no PIC | ESP32-S3 | Arduino-ESP32 v3.3.5 (pioarduino fork) | 4 MB (custom partition) | 768 KB LittleFS |
+| `esp32-classic` | OTGW Classic + LOLIN S3 Mini | ESP32-S3 | Arduino-ESP32 v3.3.5 (pioarduino fork) | 4 MB (custom partition) | 768 KB LittleFS |
+| `esp32-combo` | OTGW Classic + LOLIN S3 Mini or S3 Mini Pro, engine picked at boot (built and shipped) | ESP32-S3 | Arduino-ESP32 v3.3.5 (pioarduino fork) | 4 MB (custom partition) | 768 KB LittleFS |
+
+ESP32-S3 partition layout (`partitions_otgw_esp32.csv`, ADR-191): a 960 KB safeboot updater (factory), a 2240 KB main firmware slot (`app0`), 768 KB LittleFS and a 64 KB coredump. Firmware OTA over WiFi goes through the safeboot updater, and bootloader rollback returns to safeboot if a new image fails to boot.
 
 ESP32 partition layout (`partitions_otgw_esp32.csv`): two OTA application partitions of 1.5 MB each, plus 768 KB LittleFS. Safe OTA rollback is supported if an update fails to boot.
 
@@ -3701,7 +3658,7 @@ Check the `satheatingcurvecoeff` setting. A coefficient that is too high causes 
 
 **After a firmware update, the web UI shows a "version mismatch" warning.**
 
-This means the firmware version and the LittleFS (web assets) version do not match. Flash the filesystem image separately: `pio run -e esp32 -t uploadfs` or use the web UI Files page to upload the new `OTGW-firmware.ino.littlefs.bin`.
+This means the firmware version and the LittleFS (web assets) version do not match. Flash the filesystem image separately: upload the `OTGW-firmware-esp32-combo-<semver>.littlefs.bin` from the release zip on the `/update` page.
 
 **The REST API returns 503 for every request.**
 
@@ -3758,7 +3715,7 @@ Free heap is below 4 KB. The firmware's heap gate blocks new HTTP connections in
 
 ### K. OpenTherm PIC Command Reference
 
-These are the commands sent by the firmware to the PIC co-processor over UART (or to OTDirect on ESP32). Use them via `POST /api/v2/otgw/command` or the `command` MQTT topic.
+These are the commands sent by the firmware to the PIC co-processor over UART (or to OTDirect in OT-Direct mode). Use them via `POST /api/v2/otgw/command` or the `command` MQTT topic.
 
 #### Temperature Setpoint Commands
 
@@ -3785,10 +3742,10 @@ These are the commands sent by the firmware to the PIC co-processor over UART (o
 |---------|-------------|
 | `GW=1` | Gateway mode: intercept and substitute messages |
 | `GW=0` | Monitor mode: transparent pass-through |
-| `GW=S` | Standalone master mode (OTGW32 only) |
-| `GW=M` | Monitor mode with full frame logging (OTGW32 extension) |
-| `GW=L` | Loopback test mode (OTGW32 only) |
-| `GW=R` | Full gateway reset (OTGW32 only) |
+| `GW=S` | Standalone master mode (OT-Direct mode only) |
+| `GW=M` | Monitor mode with full frame logging (OT-Direct mode only) |
+| `GW=L` | Loopback test mode (OT-Direct mode only) |
+| `GW=R` | Full gateway reset (OT-Direct mode only) |
 
 #### Override and Schedule Commands
 
@@ -3822,33 +3779,20 @@ These are the commands sent by the firmware to the PIC co-processor over UART (o
 
 ### L. Wiring and GPIO Pin Reference
 
-#### ESP8266 (NodoShop OTGW) Pin Assignments
+#### OTGW Classic with LOLIN S3 Mini / S3 Mini Pro Pin Assignments
 
-The NodoShop OTGW board uses a fixed pin assignment. Do not attempt to remap PIC serial or OTGW-critical pins.
+The OTGW Classic uses a fixed pin assignment, defined in `boards.h`. The S3 Mini and S3 Mini Pro sit in the Wemos D1 mini socket, so each signal is listed by its socket hole; the firmware detects at boot whether a Mini or a Mini Pro is fitted. Do not attempt to remap PIC serial or OTGW-critical pins.
 
-| Function | GPIO | Arduino name | Notes |
-|----------|------|-------------|-------|
-| PIC UART TX | GPIO1 | TX | Serial to PIC (reserved, never write debug here) |
-| PIC UART RX | GPIO3 | RX | Serial from PIC |
-| PIC reset | GPIO5 | D1 | Active-low reset for PIC firmware upgrade |
-| LED 1 (status) | GPIO2 | D4 | Active-low; used for heartbeat and activity |
-| LED 2 (activity) | GPIO16 | D0 | Active-low; used during PIC upgrade |
-| I2C SDA | GPIO4 | D2 | Shared I2C bus (OLED, sensors) |
-| I2C SCL | GPIO5 | D1 | Shared I2C bus |
-| Button | GPIO0 | D3 | Boot mode / factory reset |
-| 1-Wire bus | GPIO14 | D5 | Default for Dallas DS18B20 sensors (configurable) |
-| S0 pulse input | GPIO12 | D6 | Default for S0 energy meter (configurable) |
-| GPIO relay | GPIO13 | D7 | Optional output relay (configurable) |
+| Function | Socket hole | S3 Mini GPIO | S3 Mini Pro GPIO | Notes |
+|---|---|---|---|---|
+| PIC UART (ESP TX to PIC RX) | TX | 43 | 43 | Serial link to the PIC (reserved, never write debug here) |
+| PIC UART (ESP RX from PIC TX) | RX | 44 | 44 | Serial link to the PIC |
+| I2C SCL | D1 | 36 | 11 | Watchdog + OLED |
+| I2C SDA | D2 | 35 | 12 | Watchdog + OLED |
+| Button | D3 | 18 | 13 | Config/reset, active LOW |
+| LED1 | D4 | 16 | 14 | Active LOW |
+| PIC reset | D5 | 12 | 40 | Resets the PIC co-processor |
+| LED2 | D0 | 4 | 41 | Active LOW |
+| RGB status pixel | (on the module) | 47 | 8 | WiFi status |
 
 GPIO pin assignments for Dallas sensors, S0 counter, and the output relay are configurable via settings. Check for GPIO conflicts if using non-default pins (the firmware detects and warns about conflicts between sensors, S0, and output functions).
-
-#### ESP32 (OTGW32) Pin Assignments
-
-On OTGW32 hardware, pin assignments are defined in `boards.h` under the `BOARD_NODOSHOP_ESP32` guard. The OTGW32 uses OTDirect GPIO pins for the OpenTherm bus instead of the PIC UART. Refer to the OTGW32 hardware documentation for the exact pinout.
-
-Key differences from ESP8266:
-- OTDirect uses two GPIO pins for OpenTherm (one read, one write), driven by ISR.
-- W5500 Ethernet uses SPI pins.
-- OLED display uses I2C.
-- BLE uses the integrated ESP32 radio; no additional hardware required.
-- The PIC UART pins are absent (no PIC co-processor).

@@ -1,11 +1,11 @@
 ---
 id: TASK-1549
 title: 'Docs: 2.x manuals drop OTGW32 and rewrite ESP8266 passages as the 1.x line'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-01T17:57:00Z'
-updated_date: '2026-11-01T19:15:00Z'
+updated_date: '2026-11-01T19:35:00Z'
 labels:
   - docs
 dependencies: []
@@ -20,10 +20,10 @@ Robert 2026-11-01 (AskUserQuestion after TASK-1548): one cleanup task. docs/manu
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 scripts/docs-scope-2x.sh reports OTGW32=0 for every EN chapter and the NL chapters grep clean
-- [ ] #2 ESP8266/Wemos mentions only in 1.x-line or going-back context, each remaining one listed in the notes
-- [ ] #3 EN and NL chapters stay in sync; no em dashes
-- [ ] #4 Done before the v2.0.0-beta.2 tag
+- [x] #1 scripts/docs-scope-2x.sh reports OTGW32=0 for every EN chapter and the NL chapters grep clean
+- [x] #2 ESP8266/Wemos mentions only in 1.x-line or going-back context, each remaining one listed in the notes
+- [x] #3 EN and NL chapters stay in sync; no em dashes
+- [x] #4 Done before the v2.0.0-beta.2 tag
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -46,4 +46,12 @@ ch08/h08 done: OTGW32 13->0 both; ESP8266 EN 39->3, NL 37->3 (socket wording, 1.
 ch09/h09 done: OTGW32 EN 10->0 NL 9->0, ESP8266 5->0, EN em dashes 4->0. OT-Direct routes/fields worded neutrally; device/info example board = 'Nodoshop OTGW Combo (ESP32-S3)' (boards.h:252) plus hardware_type 'otgw-classic' (restAPI.ino:3207, OTGW-firmware.h:660); MQTT row otgw-firmware/board (not published) -> hardware_type. Lead removed the OT-Direct command-topic block {TopTopic}/set/{UniqueId}/otgw32/room_temp|room_setpoint (MQTTstuff.ino:915, rejected unless OT-Direct): works only without a PIC and the path carries the board name. Findings for Robert: firmware contracts still carry the name (otgw32/ command topics, published otgw32/ch_suspended + flame_*, 503 text 'OTGW32 functions disabled' restAPI.ino:516, hardware_type 'otgw32' in OT-Direct mode, v2.html:830 UI string); stale ch09 content (otgw-otdirect/* status table vs MQTTstuff.ino:1994-2000, picavailable removed TASK-754, hardwaremode emits 'PIC'/'OT-Direct', cpufreq 80).
 
 ch10/h10 done: OTGW32 EN 22->0 NL 13->0; ESP8266 EN 23->9 NL 18->9 (1.x glossary/history, socket name, literal ADR-001/061 titles); em dashes EN 5->0 NL 33->0. Pin table = Classic + S3 Mini/Mini Pro (same as ch02); gpiosensorspin default 10 (Sensorstypes.h:23); build artefact and PlatformIO env tables match combo; ADR-063 row dropped. FINDING (firmware, not docs): default S0 pin GPIO 12 (S0types.h:22) is the PIC reset pin on the Classic+S3 map (boards.h:162) and default output GPIO 16 (Outputstypes.h:22) is LED1 (boards.h:163). Stale, left: ADR catalog stops at 076, HEAP_* glossary vs ADR-167, NL settings defaults differ from code (hostname OTGW vs OTGW2), NL 'geen preemptieve taakwisseling'.
+
+docs/MANUAL.md done (targeted edits, not regenerated): OTGW32 42->0, ESP8266 59->22 (socket wording + 1.x migration/history, listed by line in the agent report), em dashes 18->0; LLMNR/5355 removed per platform_esp32.h:82 HAS_LLMNR 0; SHA256SUMS name and combo asset list fixed. Lead fixed broken ch01 CHANGELOG link (../ -> ../../../). Final check over 21 files: OTGW32=0 everywhere (grep -Eci 'otgw[ _-]?32|ot-?thing'), em dashes 0 everywhere (baseline: ch05/h05 5, ch09 4, ch10 5, h10 33, MANUAL 18), relative links: 0 broken, in-file anchors: 0 broken. Remaining stale facts (no board/ESP8266 hit, out of scope): ch02:211 + ch09:33,1439 + ch10:185 still mention LLMNR/5355 (ch06 says no LLMNR); ch09:1433 + ch10:179 + MANUAL 3319,3500 list WebSocket port 81 (ch06: port 80 /ws); heap tier text vs ADR-167 (ch08, ch10 glossary, MANUAL ~1731, 3407); ch01/MANUAL prerequisites 'Python 3.6 for the flash script'; ch01 L59 still says 2.0.0 is in alpha. Firmware/tooling findings moved to TASK-1552 (needs-maintainer-ok).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Public 2.x manuals (docs/manuals/en ch01-ch10, docs/manuals/nl h01-h10, docs/MANUAL.md) no longer name the OTGW32 / OT-Thing and describe only the OTGW Classic with a LOLIN S3 Mini / S3 Mini Pro and the esp32-combo image. One background subagent per chapter, sequential, with one shared policy (scratchpad 1549-policy.md); lead verified each chapter by grep, fixed follow-ups and committed+pushed per chapter: 0bcd6ef98 ch01, 3ea7efc7b ch02, d8d53d7a6 ch03, 2bb7858f1 ch04-05, 6d981a790 ch06, fbbd01bc8 ch07, 0c9951e58 ch08, 467160acc ch09, 6a53e2c1c ch10, plus the MANUAL.md commit. Evidence per AC: AC1 OTGW32 count 0 in all 21 files (baseline 7-42 per file, total 222); AC2 remaining ESP8266/Wemos/D1 mini mentions (EN 1-9 per chapter, MANUAL 22) all socket wording, 1.x line/history or literal ADR titles, listed per chapter in the notes; AC3 EN and NL got the same changes per chapter and every em dash is gone (baseline 70 total), relative links 0 broken, anchors 0 broken; existing EN/NL structure drift (h07 60 vs ch07 21 heading lines, h09 84 vs ch09 118) predates this task and is unchanged; AC4 no v2.0.0-beta.2 tag exists. Corrected facts along the way: safeboot partition layout, flash_otgw.bat/.sh flashing, no GitHub one-click OTA in 2.x, Classic has no Ethernet, BLE works on the S3, FreeRTOS tasks, no LLMNR in ch06/MANUAL, Dallas default GPIO 10. Not verified: no rendered-page check; claims marked unchecked in the notes (ADR-047 recovery, safeboot redo wording, Dallas GPIO 10 wiring on the S3). Follow-ups: TASK-1552 (firmware/tooling board name, default pin collision); stale LLMNR/port-81/heap-tier text listed in the notes.
+<!-- SECTION:FINAL_SUMMARY:END -->
