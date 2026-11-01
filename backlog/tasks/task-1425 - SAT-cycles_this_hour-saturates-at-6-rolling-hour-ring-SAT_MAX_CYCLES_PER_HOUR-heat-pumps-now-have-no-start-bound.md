@@ -3,7 +3,7 @@ id: TASK-1425
 title: >-
   SAT: cycles_this_hour saturates at 6 (rolling-hour ring
   SAT_MAX_CYCLES_PER_HOUR); heat pumps now have no start bound
-status: Done
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-28T14:58:00Z'
@@ -25,8 +25,14 @@ Review finding on TASK-1419 (correctness lens, 2026-10-28). The rolling-hour rin
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Host test: 7 PWM starts in one rolling hour report cycles_this_hour 7 (red on HEAD, green on fix), or the cap is documented as intended telemetry ceiling
-- [x] #2 build + evaluate green
+- [ ] #2 build + evaluate green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Correction: AC2 (build green) unticked and status back to In Progress; the esp32-combo build of alpha.596 has not run yet (blocked since the low-memory stop). AC1 stands.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
