@@ -1,5 +1,11 @@
 # SAT low-load requirements crosswalk (2026-10-31)
 
+> **Errata after the independent second read (2026-11-01, `sat-low-load-requirements-crosswalk-2026-10-31.second-read.md`, 92 rows: 69 confirmed, 3 wrong, 17 imprecise, 3 unverifiable).** Every thermo-nova vs firmware difference below held up. Corrections that override the text:
+> 1. Section 5 summary: no input has all five measurement states. Outside temperature folds Unknown-DataID and Data-Invalid into "no fresh Read-Ack" (OTGW-Core.ino:5677-5681).
+> 2. Section 8: item 2 (three separate reply states for ID3/25/28) is a new contract derived from the spec, not recorded or implemented behaviour.
+> 3. Section 8 item 3: not every transmitted CS is capped by the effective ceiling. The thermal-safe fallback caps with satGetMaxSetpoint() (user MaxTSet only, SATcontrol.ino:6515-6522) instead of satEffectiveMaxSetpoint() (:405), and the 5 s resend (:634-641) and the PIC keepalive (:597-606) repeat the last CS without re-clamping after a limit change. Filed as its own task.
+> The 17 imprecise rows (wording, line numbers, a missed second PWM entry path pwm.on_cycle_end in thermo-nova, the REST/MQTT control_mode path to manual PWM) are listed with corrections in the second-read file; read both together.
+
 Deliverable of **TASK-1412.2** (review coverage R01, R06, R07, R08, R09, R14, R15, R17, R25, R41 of the [remediation plan](sat-low-load-remediation-plan-2026-10-28.md)).
 
 **What this document is.** A map from each OpenTherm clause and each recorded SAT decision to what the firmware does today, the contract an implementation task must meet, the test that proves it, and the approval it needs. It decides nothing. Open policy goes to section 9 ("Queued for Sergeant D") as proposed questions. It does not edit an ADR, a task, the question queue or the decision log.
