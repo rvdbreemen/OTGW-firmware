@@ -84,6 +84,7 @@ static float satColdThreshold() { return satGetColdSetpoint() + (_sat_coldCut ? 
 static float satGetMaxSetpoint() { return g_userMax; }
 static float satEffectiveMaxSetpoint() { return g_effMax; }
 static uint32_t satGetMinOnTimeSec() { return 180; }
+static uint32_t satGetMinOffTimeSec() { return 0; }   // TASK-1542: gas harness, no minimum OFF (the real getter is tested in test_sat_hp_pwm.py)
 static uint8_t satGetMaxCyclesPerHour() { return 4; }
 static uint32_t satGetPwmPeriodSec() { return 3600 / satGetMaxCyclesPerHour(); }
 static uint32_t satCycleGetFlameOnStartMs() { return g_flameOnStart; }

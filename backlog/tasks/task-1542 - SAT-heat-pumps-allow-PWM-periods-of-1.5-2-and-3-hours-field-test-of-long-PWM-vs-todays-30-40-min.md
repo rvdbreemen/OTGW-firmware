@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T09:38:00Z'
-updated_date: '2026-11-01T20:41:00Z'
+updated_date: '2026-11-01T22:20:00Z'
 labels:
   - sat
   - heat-pump
@@ -29,13 +29,13 @@ Evidence: docs/sat/sim-hp-lowload/round18b.md (rounds 18b/18c, PWM as the firmwa
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 satGetMinOnTimeSec returns 600 s for a heat pump (both the ordinary and the experimental type), 180 s for gas and hybrid; host test against the real code red on HEAD, green after
-- [ ] #2 Experimental type: setter/REST accept iHpCycleSeconds 10800 only together with the experimental appliance choice; the ordinary heat-pump type keeps 1800/2400; satGetPwmPeriodSec returns 10800 for it
-- [ ] #3 Host test against the real PWM mapper at 10800 s / 600 s: on/off times correct in all 5 duty ranges, ON phase ends at the current ON time, 600 s minimum holds
-- [ ] #4 Existing PWM, gas and hybrid tests stay green (tests/test_sat_hp_pwm.py and the other tests/test_sat_pwm_*.py)
-- [ ] #5 v2 UI: the experimental type appears in the appliance list labelled experimental, shown in hours ('cycle 3 hours, minimum run 10 minutes'), availability as decided in Q-1527b
+- [x] #1 satGetMinOnTimeSec returns 600 s for a heat pump (both the ordinary and the experimental type), 180 s for gas and hybrid; host test against the real code red on HEAD, green after
+- [x] #2 Experimental type: setter/REST accept iHpCycleSeconds 10800 only together with the experimental appliance choice; the ordinary heat-pump type keeps 1800/2400; satGetPwmPeriodSec returns 10800 for it
+- [x] #3 Host test against the real PWM mapper at 10800 s / 600 s: on/off times correct in all 5 duty ranges, ON phase ends at the current ON time, 600 s minimum holds
+- [x] #4 Existing PWM, gas and hybrid tests stay green (tests/test_sat_hp_pwm.py and the other tests/test_sat_pwm_*.py)
+- [x] #5 v2 UI: the experimental type appears in the appliance list labelled experimental, shown in hours ('cycle 3 hours, minimum run 10 minutes'), availability as decided in Q-1527b
 - [ ] #6 Bench run with satsimulation on the experimental type shows a full ON/OFF period with the expected times
-- [ ] #7 Minimum PWM OFF time 600 s for heat pumps (entry 198), also when the duty asks for continuous ON (range 5 must not restart within 600 s of a stop); gas unchanged; host test red on HEAD, green after
+- [x] #7 Minimum PWM OFF time 600 s for heat pumps (entry 198), also when the duty asks for continuous ON (range 5 must not restart within 600 s of a stop); gas unchanged; host test red on HEAD, green after
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -48,4 +48,6 @@ Evidence: docs/sat/sim-hp-lowload/round18b.md (rounds 18b/18c, PWM as the firmwa
 2026-11-01 entry 201 (Robert): UI/onboarding warning for the experimental type: always 'Experimental. Only for on/off heat pumps with a large thermal mass (underfloor heating or a buffer tank). Long runs of up to 3 hours.'; with heating system = radiators an extra confirm 'Not recommended without a buffer tank: the room may overheat.' Available for every heating system (entry 199).
 
 Renumbered 2026-11-01 before the commit (199-201 were taken on origin/dev by the TASK-1547/1480 lanes): the notes above that say entry 199 / entry 201 mean entry 202 / entry 204 in sergeant-d-corrections.md (199 = 202, 200 = 203, 201 = 204).
+
+2026-11-01 implementation (2.0.0-beta.4). satGetMinOnTimeSec 600 for a heat pump, 180 gas/hybrid; new satGetMinOffTimeSec 600 for a heat pump, enforced in mapper range 5 (ranges 2-4 already give OFF >= min ON); minimum burn hold follows minOnMs; satGetPwmPeriodSec 10800 only for a heat pump with iHpCycleSeconds 10800 (hybrid stays 1800/2400); setter snaps 1800/2400/10800; REST max 10800. UI per entries 202-204: appliance option 4 'On/off heat pump, 3 h cycle (experimental)' = satsource 2 + sathpcycle 10800, on any heating system, cycle field hidden, entry-204 warning text in the hint, on radiators a confirmed second warning ('Not recommended without a buffer tank: the room may overheat.'); leaving it resets sathpcycle to 1800. Evidence: tests/test_sat_hp_pwm.py old code FAILED 20, fix 33/33 (gas oracle and hybrid green on both); browser test v2-settings-sat-followups: beta.2 UI 4 FAIL, new all PASS (exit 0, peak 2 API in flight), screenshot pwm-card-onoff-heatpump-3h.png (session tmp); harness stubs for satGetMinOffTimeSec in pwm_override/no_return_ignition/pwm_start_limit; all SAT tests green except the 2 that also fail on clean origin/dev (mqtt_contract_1485, preset_persist); evaluate 80/0. Open: AC#6 bench run; the onboarding question 'on/off or modulating heat pump' that should offer this type (entry 202 'Open') is not built in this task. Known quirk: the Home gas/heat-pump toggle changes only satsource, so a stored 10800 cycle stays when toggling away and back.
 <!-- SECTION:NOTES:END -->

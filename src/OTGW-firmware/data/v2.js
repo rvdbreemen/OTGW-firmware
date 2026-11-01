@@ -2040,14 +2040,14 @@
     // humanised key under the SAT category (Phase 2: port full SAT metadata).
     satenabled:      { cat: 'sat', label: 'SAT enabled' },
     satsystem:       { cat: 'sat', label: 'Heating system' },
-    satsource:       { cat: 'sat', label: 'Appliance type' },
+    satsource:       { cat: 'sat', label: 'Appliance type', hint: 'On/off heat pump, 3 h cycle (experimental): Experimental. Only for on/off heat pumps with a large thermal mass (underfloor heating or a buffer tank). Long runs of up to 3 hours.' },
     sattargettemp:   { cat: 'sat', label: 'Target temperature', hint: '°C' },
     sattempstep:     { cat: 'sat', label: 'Setpoint step', hint: '°C' },
     satcoefficient:  { cat: 'sat', label: 'Heating curve slope' },
     satheatingmode:  { cat: 'sat', label: 'Heating mode' },
     satmanufacturer: { cat: 'sat', label: 'Manufacturer' },
     satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' },
-    sathpcycle:      { cat: 'sat', label: 'Heat-pump PWM cycle', hint: 'Cycle length; the minimum on time is 180 s' },
+    sathpcycle:      { cat: 'sat', label: 'Heat-pump PWM cycle', hint: 'Cycle length; a heat pump runs at least 10 minutes and stays off at least 10 minutes' },
     otdmode:         { cat: 'otd', label: 'OT-Direct mode' },
     // OT-Direct heating-curve / PI room-comp + ventilation (TASK-933 Phase 2)
     otdchmode:           { cat: 'otd', label: 'CH mode' },
@@ -2213,8 +2213,13 @@
   // (satGetPwmPeriodSec / satGetEffectiveHeatingSource in SATcontrol.ino).
   function satFieldShown(k) {
     if (k !== 'sathpcycle' && k !== 'satcyclesperhour') return true;
+    if (satHpLongCycle()) return false;   // TASK-1542: the experimental type fixes the cycle at 3 hours
     var hp = !!setData.satsource && (curVal('satsource') === '2' || curVal('satsource') === '3');
     return (k === 'sathpcycle') === hp;
+  }
+  // TASK-1542: the experimental on/off heat-pump type = heat pump (satsource 2) with the 10800 s cycle.
+  function satHpLongCycle() {
+    return !!setData.satsource && !!setData.sathpcycle && curVal('satsource') === '2' && curVal('sathpcycle') === '10800';
   }
   // TASK-1012: internal onboarding-completion flags. Hidden from the settings LIST only
   // (NOT from setData — satOnbNeeded()/the ui_onboarded logic read setData). Rendering them
@@ -2590,6 +2595,7 @@
     } else if (ENUM_OPTS[k]) {
       input = document.createElement('select');
       var cv = '' + curVal(k);
+      if (k === 'satsource' && satHpLongCycle()) cv = '4';   // TASK-1542: heat pump + 10800 s shows as the experimental type
       // Match the current value against the option set. Numeric enums store "2";
       // string enums store the literal value. Try raw first, then int-normalised —
       // the old parseInt-only path coerced every string enum to the 0th option.
@@ -2610,6 +2616,11 @@
         // TASK-1230: board mode is the one select whose wrong value bricks the gateway.
         if (k === 'boardmode' && input.value !== '' + setData[k].value &&
             !confirm('Board mode takes effect after a reboot. Forcing the wrong mode leaves the gateway non-functional until you set it back (or to Auto-detect). Continue?')) {
+          input.value = prevSel; return;
+        }
+        // TASK-1542, entry 204 (Robert): the experimental on/off heat-pump type on radiators needs a confirmed second warning.
+        if (k === 'satsource' && input.value === '4' && setData.satsystem && curVal('satsystem') === '1' &&
+            !confirm('Not recommended without a buffer tank: the room may overheat.')) {
           input.value = prevSel; return;
         }
         prevSel = input.value;
@@ -2733,6 +2744,16 @@
     });
   }
   function markDirty(k, val, row) {
+    // TASK-1542 (entry 195, Q-1527b B): "On/off heat pump, 3 h cycle (experimental)" is no firmware source of its own.
+    // It is stored as satsource 2 (heat pump) with sathpcycle 10800; leaving it resets the cycle to the 1800 s default.
+    if (k === 'satsource' && setData.sathpcycle) {
+      var hpLong = (val === '4');
+      if (hpLong) val = '2';
+      if (hpLong || satHpLongCycle()) {
+        var cyc = hpLong ? '10800' : '1800';
+        if (('' + setData.sathpcycle.value) === cyc) delete setDirty.sathpcycle; else setDirty.sathpcycle = cyc;
+      }
+    }
     // Password fields show empty; an empty value means "leave unchanged", so it is
     // never dirty and never POSTed (the GET-side value is a mask, not the secret).
     if ((isPwd(k) && val === '') || ('' + setData[k].value) === val) delete setDirty[k];
@@ -3078,7 +3099,7 @@
     [8, 'Thermostat: CH enable'], [9, 'Thermostat: DHW enable'], [10, 'Thermostat: cooling enable'], [11, 'Thermostat: OTC active'],
     [12, 'Thermostat: CH2 enable'], [13, 'Thermostat: summer/winter'], [14, 'Thermostat: DHW blocking'], [15, 'Thermostat: bit 7 (reserved)']];
   var ENUM_OPTS = {
-    satsource: [[0, 'Auto'], [1, 'Gas Boiler'], [2, 'Heat Pump'], [3, 'Hybrid']],
+    satsource: [[0, 'Auto'], [1, 'Gas Boiler'], [2, 'Heat Pump'], [3, 'Hybrid'], [4, 'On/off heat pump, 3 h cycle (experimental)']],
     satsystem: [[0, 'Auto'], [1, 'Radiators'], [2, 'Underfloor']],
     sathpcycle: [[1800, '1800 s (2 per hour, default)'], [2400, '2400 s (1.5 per hour)']],
     satcyclesperhour: [[3, '3 per hour (default)'], [4, '4 per hour']],

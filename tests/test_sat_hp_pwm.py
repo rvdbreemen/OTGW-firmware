@@ -73,6 +73,17 @@ int main(int argc, char** argv) {
     printf("start=%d req=%d\n", startReq, (int)state.sat.bPwmFlameRequested);
     return 0;
   }
+  if (!strcmp(argv[1], "offwait")) {         // offwait source hpSec cyclesPerHour ratio offAgoSec: OFF phase, stopped offAgoSec ago
+    reset();
+    g_source = atoi(argv[2]); settings.sat.iHpCycleSeconds = (uint16_t)atoi(argv[3]); settings.sat.iCyclesPerHour = atoi(argv[4]);
+    const float pid = 27.2f + (float)atof(argv[5]) * (50.0f - 27.2f);
+    g_flame = false; state.sat.bPwmFlameRequested = false; _pwm_idle = false; _pwm_entryPending = false;
+    const uint32_t ago = (uint32_t)atoi(argv[6]) * 1000UL;
+    g_flameOnStart = g_ms - ago - 1200000UL; g_flameOffStart = g_ms - ago; _pwm_lastUpdateMs = g_ms - ago;   // ON->OFF switch ago
+    satApplyPWM(pid);
+    printf("req=%d\n", (int)state.sat.bPwmFlameRequested);
+    return 0;
+  }
   // map source hpSec cyclesPerHour ratio flame [onAgoSec]
   reset();
   g_source = atoi(argv[2]); settings.sat.iHpCycleSeconds = (uint16_t)atoi(argv[3]); settings.sat.iCyclesPerHour = atoi(argv[4]);
@@ -142,6 +153,7 @@ def build(workdir: Path):
         if line not in stubs:
             raise AssertionError("getter stub not found in the shared harness: " + line)
         stubs = stubs.replace(line, "")
+    stubs = re.sub(r"^static uint32_t satGetMinOffTimeSec\(\).*\n", "", stubs, flags=re.M)   # TASK-1542: real getter below
     stubs = re.sub(r"^static uint32_t satGetPwmPeriodSec\(\).*\n", "", stubs, flags=re.M)
     stubs = stubs.replace("float fOvershootMargin=2.0f;",
                           "uint8_t iCyclesPerHour=3; uint16_t iHpCycleSeconds=1800; float fOvershootMargin=2.0f;")
@@ -189,24 +201,24 @@ class SatHeatPumpPwm(unittest.TestCase):
         self.assertLessEqual(abs(on - expected[0]), tol, msg)
         self.assertLessEqual(abs(off - expected[1]), tol, msg)
 
-    # --- Heat pump, 1800 s period: lower 0.10, upper 0.90, min 0.05, max 0.95 (pwm.py:53-61) ---
+    # --- Heat pump, 1800 s period, minimum ON 600 s (entry 197): lower 1/3, upper 2/3, min 1/6, max 5/6 ---
     def test_hp1800_mid_range_duty_060(self):
         self.assertMap(SRC_HP, 1800, 3, 0.60, True, (1080, 720))        # pwm.py:274-283: P*d, P*(1-d)
 
-    def test_hp1800_mid_range_duty_030(self):
-        self.assertMap(SRC_HP, 1800, 3, 0.30, True, (540, 1260))
+    def test_hp1800_low_range_duty_030(self):
+        self.assertMap(SRC_HP, 1800, 3, 0.30, True, (600, 1400))        # range 2: 600, 600/d - 600
 
     def test_hp1800_just_below_half(self):
         self.assertMap(SRC_HP, 1800, 3, 0.4999, True, (900, 900))
 
-    def test_hp1800_low_range(self):
-        self.assertMap(SRC_HP, 1800, 3, 0.08, False, (180, 2070))      # pwm.py:263-272: 180, 180/d - 180
+    def test_hp1800_ultra_low_without_flame_008(self):
+        self.assertMap(SRC_HP, 1800, 3, 0.08, False, (0, 3600))        # below min 1/6: no start
 
-    def test_hp1800_high_range(self):
-        self.assertMap(SRC_HP, 1800, 3, 0.92, False, (2070, 180))      # pwm.py:285-294: 180/(1-d) - 180, 180
+    def test_hp1800_over_max_092(self):
+        self.assertMap(SRC_HP, 1800, 3, 0.92, False, (3600, 0))        # above max 5/6: continuous ON
 
     def test_hp1800_ultra_low_with_flame(self):
-        self.assertMap(SRC_HP, 1800, 3, 0.03, True, (180, 3420))       # pwm.py:247-256: 180, 2P - 180
+        self.assertMap(SRC_HP, 1800, 3, 0.03, True, (600, 3000))       # pwm.py:247-256 with 600: 600, 2P - 600
 
     def test_hp1800_ultra_low_without_flame(self):
         self.assertMap(SRC_HP, 1800, 3, 0.03, False, (0, 3600))        # pwm.py:258-260: 0, 2P
@@ -214,31 +226,61 @@ class SatHeatPumpPwm(unittest.TestCase):
     def test_hp1800_over_max(self):
         self.assertMap(SRC_HP, 1800, 3, 0.97, False, (3600, 0))        # pwm.py:296-301: 2P, 0
 
-    # --- Heat pump, 2400 s period: lower 0.075, upper 0.925, min 0.0375, max 0.9625 ---
+    # --- Heat pump, 2400 s period, minimum ON 600 s: lower 0.25, upper 0.75, min 0.125, max 0.875 ---
     def test_hp2400_mid_range_duty_050(self):
         self.assertMap(SRC_HP, 2400, 3, 0.50, True, (1200, 1200))
 
     def test_hp2400_mid_range_duty_030(self):
         self.assertMap(SRC_HP, 2400, 3, 0.30, True, (720, 1680))
 
-    def test_hp2400_low_range(self):
-        self.assertMap(SRC_HP, 2400, 3, 0.07, True, (180, 2391))
+    def test_hp2400_ultra_low_with_flame_007(self):
+        self.assertMap(SRC_HP, 2400, 3, 0.07, True, (600, 4200))
 
-    def test_hp2400_high_range(self):
-        self.assertMap(SRC_HP, 2400, 3, 0.95, False, (3420, 180))
+    def test_hp2400_high_range_080(self):
+        self.assertMap(SRC_HP, 2400, 3, 0.80, False, (2400, 600))      # range 4: 600/(1-d) - 600, 600
 
     def test_hp2400_over_max(self):
         self.assertMap(SRC_HP, 2400, 3, 0.98, False, (4800, 0))
 
-    # --- ON phase end: min ON is 180 s, not the cycle length ---
+    # --- TASK-1542, entry 195: experimental on/off heat pump, 10800 s period, minimum ON 600 s ---
+    # lower 600/10800 = 0.0556, upper 0.9444, min 0.0278, max 0.9722
+    def test_hp10800_all_five_ranges(self):
+        for ratio, flame, exp in ((0.02, False, (0, 21600)), (0.02, True, (600, 21000)), (0.04, False, (600, 14400)),
+                                  (0.20, False, (2160, 8640)), (0.50, False, (5400, 5400)), (0.96, False, (14400, 600)),
+                                  (0.98, False, (21600, 0))):
+            with self.subTest(ratio=ratio, flame=flame):
+                self.assertMap(SRC_HP, 10800, 3, ratio, flame, exp)
+
+    def test_hp10800_on_phase_ends_at_the_current_on_time(self):
+        r = self.run_sc("map", SRC_HP, 10800, 3, 0.40, 1, 5000)        # ON 4320 s: lit 5000 s ago -> OFF
+        self.assertEqual(r["req"], "0")
+        r = self.run_sc("map", SRC_HP, 10800, 3, 0.50, 1, 5000)        # ON 5400 s: still ON
+        self.assertEqual(r["req"], "1")
+
+    def test_hybrid_never_gets_10800(self):
+        self.assertMap(SRC_HYB, 10800, 3, 0.50, False, (900, 900))     # 10800 stored, a hybrid runs 1800 s
+
+    # --- ON phase end: the minimum burn is 600 s for a heat pump (entry 197) ---
     def test_hp1800_on_phase_ends_after_on_time(self):
-        # duty 0.30 -> on 540 s; flame lit 600 s ago: the ON phase ends (HEAD held it to 1800 s)
-        r = self.run_sc("map", SRC_HP, 1800, 3, 0.30, 1, 600)
-        self.assertEqual(r["req"], "0", f"ON phase still requested after 600 s with on={r['on']} s")
+        # duty 0.60 -> on 1080 s; flame lit 1100 s ago: the ON phase ends
+        r = self.run_sc("map", SRC_HP, 1800, 3, 0.60, 1, 1100)
+        self.assertEqual(r["req"], "0", f"ON phase still requested after 1100 s with on={r['on']} s")
 
     def test_hp1800_on_phase_holds_before_on_time(self):
         r = self.run_sc("map", SRC_HP, 1800, 3, 0.30, 1, 300)
         self.assertEqual(r["req"], "1")
+
+    def test_hp_minimum_burn_600_holds(self):
+        self.assertEqual(self.run_sc("map", SRC_HP, 1800, 3, 0.20, 1, 590)["req"], "1")   # range 2, on 600: held
+        self.assertEqual(self.run_sc("map", SRC_HP, 1800, 3, 0.20, 1, 610)["req"], "0")
+
+    # --- TASK-1542, entry 198: minimum OFF 600 s for a heat pump, also in range 5 (continuous ON) ---
+    def test_hp_min_off_600_in_range5(self):
+        self.assertEqual(self.run_sc("offwait", SRC_HP, 1800, 3, 0.97, 300)["req"], "0", "restarted 300 s after a stop")
+        self.assertEqual(self.run_sc("offwait", SRC_HP, 1800, 3, 0.97, 610)["req"], "1")
+
+    def test_gas_range5_restarts_without_min_off(self):
+        self.assertEqual(self.run_sc("offwait", SRC_GAS, 1800, 4, 0.97, 30)["req"], "1")
 
     # --- Gas boiler: thermo-nova oracle tests/test_pwm.py:108-117 (4 per hour), unchanged ---
     def test_gas_oracle_4ph(self):
@@ -270,17 +312,18 @@ class SatHeatPumpPwm(unittest.TestCase):
 
     # --- TASK-1531, Sergeant D entry 188 (Q-1531a A): a hybrid takes the heat-pump PWM cycle ---
     def test_hybrid_uses_the_heat_pump_cycle(self):
-        for hp_sec in (1800, 2400):
-            for ratio, flame in ((0.50, False), (0.10, False), (0.60, True), (0.03, True)):
-                with self.subTest(hp_sec=hp_sec, ratio=ratio):
-                    hyb = self.run_sc("map", SRC_HYB, hp_sec, 3, ratio, int(flame))
-                    hp = self.run_sc("map", SRC_HP, hp_sec, 3, ratio, int(flame))
-                    self.assertEqual((hyb["on"], hyb["off"]), (hp["on"], hp["off"]), (hyb, hp))
-        self.assertMap(SRC_HYB, 2400, 3, 0.50, False, (1200, 1200))
+        # entry 188: the period follows iHpCycleSeconds; entry 197: a hybrid keeps the 180 s minimum ON (not 600 s)
+        for hp_sec, ratio, flame, exp in ((1800, 0.50, False, (900, 900)), (1800, 0.10, False, (180, 1620)),
+                                          (1800, 0.60, True, (1080, 720)), (1800, 0.03, True, (180, 3420)),
+                                          (2400, 0.50, False, (1200, 1200)), (2400, 0.10, False, (240, 2160)),
+                                          (2400, 0.60, True, (1440, 960)), (2400, 0.03, True, (180, 4620))):
+            with self.subTest(hp_sec=hp_sec, ratio=ratio):
+                self.assertMap(SRC_HYB, hp_sec, 3, ratio, flame, exp)
 
-    # --- Setter: two options only (entry 30 "just 2 options"); old values snap to the nearer one ---
-    def test_setter_snaps_to_two_options(self):
-        for given, stored in (("1800", 1800), ("2400", 2400), ("2100", 2400), ("2099", 1800), ("0", 1800), ("9999", 2400)):
+    # --- Setter: 1800 / 2400 (entries 30, 40, 50) and 10800 (entry 195); other values snap to the nearest ---
+    def test_setter_snaps_to_three_options(self):
+        for given, stored in (("1800", 1800), ("2400", 2400), ("2100", 2400), ("2099", 1800), ("0", 1800),
+                              ("6599", 2400), ("6600", 10800), ("9999", 10800), ("10800", 10800), ("20000", 10800)):
             with self.subTest(given=given):
                 self.assertEqual(int(self.run_sc("setter", given)["stored"]), stored)
 

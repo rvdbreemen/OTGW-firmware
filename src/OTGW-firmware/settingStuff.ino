@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.3
+**  Version  : v2.0.0-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1047,7 +1047,7 @@ void updateSetting(const char *field, const char *newValue)
   }
   else if (strcasecmp_P(field, PSTR("SATsystem")) == 0)          settings.sat.iHeatingSystem = constrain(atoi(newValue), 0, 2);  // 0=auto,1=radiators,2=underfloor
   else if (strcasecmp_P(field, PSTR("SATsource")) == 0)          settings.sat.iHeatingSource = constrain(atoi(newValue), 0, 3);  // 0=auto,1=gas_boiler,2=heat_pump,3=hybrid (TASK-891.8)
-  else if (strcasecmp_P(field, PSTR("SAThpcycle")) == 0)         settings.sat.iHpCycleSeconds = (atoi(newValue) >= 2100) ? 2400 : 1800;  // heat-pump PWM cycle length, two options only: 1800=2/hr, 2400=1.5/hr (entries 40/50); other values snap to the nearer one
+  else if (strcasecmp_P(field, PSTR("SAThpcycle")) == 0)         settings.sat.iHpCycleSeconds = (atoi(newValue) >= 6600) ? 10800 : ((atoi(newValue) >= 2100) ? 2400 : 1800);  // heat-pump PWM cycle length: 1800=2/hr, 2400=1.5/hr (entries 40/50), 10800=3 h for the experimental on/off heat-pump type (entry 195, TASK-1542); other values snap to the nearest one
   else if (strcasecmp_P(field, PSTR("SATtargettemp")) == 0) {
     // TASK-1487: a target that really changes clears an active preset or window switch
     // (thermo-nova climate.py:567). An unchanged value, e.g. a settings POST that carries the

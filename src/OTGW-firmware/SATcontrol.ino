@@ -453,19 +453,31 @@ static uint8_t satGetMaxCyclesPerHour()
   return (settings.sat.iCyclesPerHour >= 4) ? 4 : 3;
 }
 
-// Returns the PWM minimum ON time in seconds: 180 s for every heating source
-// (thermo-nova pwm.py:53; heat pumps too, Sergeant D entries 40 and 50).
+// Returns the PWM minimum ON time in seconds: 180 s for a gas boiler and a hybrid (thermo-nova pwm.py:53),
+// 600 s for a heat pump (TASK-1542; Robert and Sergeant D entry 197: a compressor must run at least 10 minutes).
+// It is the mapper's minOnMs and the minimum burn hold after the first flame of an ON phase.
 static uint32_t satGetMinOnTimeSec()
 {
-  return 180;
+  return (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP) ? 600UL : 180UL;
+}
+
+// Returns the PWM minimum OFF time in seconds: 600 s for a heat pump (TASK-1542, Sergeant D entry 198), 0 otherwise.
+// Ranges 2-4 of the mapper already give an OFF time of at least the minimum ON time; it matters for range 5, which
+// would start a new ON phase right after a stop.
+static uint32_t satGetMinOffTimeSec()
+{
+  return (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP) ? 600UL : 0UL;
 }
 
 // Returns the PWM cycle length (period) in seconds, thermo-nova's _on_time_upper_threshold
 // (pwm.py:54). Heat pump and hybrid: iHpCycleSeconds, 1800 s (2 per hour, default) or 2400 s
-// (1.5 per hour), Sergeant D entries 40, 50 and 188 (TASK-1531). Otherwise 3600 / cycles per hour.
+// (1.5 per hour), Sergeant D entries 40, 50 and 188 (TASK-1531). A heat pump may also have 10800 s, the
+// experimental on/off heat-pump cycle of 3 hours (entry 195, TASK-1542); a hybrid never gets it.
+// Otherwise 3600 / cycles per hour.
 static uint32_t satGetPwmPeriodSec()
 {
   const uint8_t src = satGetEffectiveHeatingSource();
+  if (src == SAT_SRC_HEAT_PUMP && settings.sat.iHpCycleSeconds == 10800) return 10800UL;
   if (src == SAT_SRC_HEAT_PUMP || src == SAT_SRC_HYBRID) {
     return (settings.sat.iHpCycleSeconds == 2400) ? 2400UL : 1800UL;
   }
@@ -1256,6 +1268,9 @@ static void satPwmSchedule(float pidOutput)
       if (satPwmHoldForDhwFlame(flame, pidOutput)) {   // held while a hot-water flame burns (entries 105, 106, 107); idle and entry stay as they are
         _pwm_idle = wasIdle;
         _pwm_entryPending = entry;
+      } else if (!wasIdle && !entry && (millis() - _pwm_lastUpdateMs) < satGetMinOffTimeSec() * 1000UL) {
+        // Heat pump: at least 600 s off after an ON phase ended, also when the duty asks for continuous ON
+        // (TASK-1542, entry 198). The OFF anchor _pwm_lastUpdateMs is the ON->OFF switch (satPwmEndOn).
       } else {
         satPwmBeginOn(flame, boilerTemp, maxMs, 0);
       }
@@ -1310,8 +1325,9 @@ static void satPwmSchedule(float pidOutput)
       _pwm_waitingForFlame = false;
       SATDebugTln(F("SAT PWM: no flame within 180s, starting the ON timer anyway"));
     }
-    // Minimum flame-on hold, 180 s from the first flame of the phase (pwm.py:201-203)
-    if (_pwm_flameOnMs != 0 && (millis() - _pwm_flameOnMs) < PWM_IGNITION_TIMEOUT_MS) return;
+    // Minimum flame-on hold from the first flame of the phase: 180 s (pwm.py:201-203), 600 s for a heat pump (entry 197)
+    const uint32_t minBurnMs = (minOnMs > PWM_IGNITION_TIMEOUT_MS) ? minOnMs : PWM_IGNITION_TIMEOUT_MS;
+    if (_pwm_flameOnMs != 0 && (millis() - _pwm_flameOnMs) < minBurnMs) return;
     if (elapsedMs >= onTimeMs) {
       // ON time expired: switch to OFF (pwm.py:205-209)
       satPwmEndOn(onTimeMs, offTimeMs);

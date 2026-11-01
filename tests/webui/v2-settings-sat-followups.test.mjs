@@ -51,6 +51,7 @@ const SETTINGS = {
   satblenameprefix: S('', 23), satblenamefilteringest: { value: false, type: 'b' },
   // TASK-1529: appliance type and the two PWM cycle settings
   satsource: { value: 1, type: 'i', min: 0, max: 3 },
+  satsystem: { value: 1, type: 'i', min: 0, max: 2 },   // TASK-1542: radiators, so the experimental type asks the second warning
   satcyclesperhour: { value: 3, type: 'i', min: 3, max: 4 }, sathpcycle: { value: 1800, type: 'i', min: 1800, max: 2400 },
   satinterval: { value: 30, type: 'i', min: 10, max: 300 },
   // TASK-1530: a stale form copy (100) next to the live status value (80), as Sergeant D saw it
@@ -317,6 +318,28 @@ check(dirtySrc === true, 'the re-render keeps the unsaved appliance type (dirty,
 await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); sel.value = '3'; sel.dispatchEvent(new Event('change', { bubbles: true })); })()`);
 const hyb = await until(`(function(){ var r = ${pwmCard}; var s = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); return s && s.value === '3' && r.cph !== undefined ? r : null; })()`);
 check(!!hyb && hyb.hp && !hyb.cph && !hyb.otherCycle, `hybrid selected: heat-pump cycle shown, cycles per hour hidden (${JSON.stringify(hyb)})`);
+// TASK-1542 (entries 195, 202-204): the experimental on/off heat-pump type in the appliance list, on any heating system,
+// with Robert's warning text; on radiators a second warning must be confirmed; stored as satsource 2 + sathpcycle 10800,
+// the 3-hour cycle is fixed (no cycle field)
+const hint = await evalJs(`(function(){ var r = document.querySelector('#satSetL2 .srow[data-key="satsource"]'); var o = r && r.querySelector('option[value="4"]');
+  return { opt: o ? o.textContent : null, hint: r ? r.textContent : '' }; })()`);
+check(!!hint && /experimental/i.test(hint.opt || '') && /Only for on\/off heat pumps with a large thermal mass \(underfloor heating or a buffer tank\)\. Long runs of up to 3 hours\./.test(hint.hint),
+  `appliance list offers the experimental 3 h type with the entry-204 warning (${JSON.stringify(hint && hint.opt)})`);
+const rad = await evalJs(`(function(){ var asked = []; window.confirm = function (m) { asked.push(m); return false; };
+  var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); var before = sel.value; sel.value = '4'; sel.dispatchEvent(new Event('change', { bubbles: true }));
+  return { asked: asked, kept: sel.value === before }; })()`);
+check(!!rad && rad.asked.length === 1 && /buffer tank: the room may overheat/.test(rad.asked[0]) && rad.kept,
+  `radiators: choosing the experimental type asks the buffer-tank warning; cancel keeps the old type (${JSON.stringify(rad)})`);
+await evalJs(`(function(){ window.confirm = function () { return true; }; var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); sel.value = '4'; sel.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+const hpl = await until(`(function(){ var r = ${pwmCard}; var s = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); return s && s.value === '4' && r.cph !== undefined ? r : null; })()`, 3000);
+await shotPwm('pwm-card-onoff-heatpump-3h.png');
+check(!!hpl && !hpl.hp && !hpl.cph, `experimental type selected: it stays selected after the re-render and no cycle field is shown (${JSON.stringify(hpl)})`);
+const nSave = log.length;
+await evalJs(`document.getElementById('satBtnSave').click()`);
+await until(`(document.getElementById('toast') || {}).textContent === 'Settings saved'`, 5000);
+const hpPosts = Object.fromEntries(log.slice(nSave).filter((l) => l.startsWith('POST /api/v2/settings'))
+  .map((l) => { try { const b = JSON.parse(l.slice(l.indexOf('{'))); return [b.name, '' + b.value]; } catch { return ['', '']; } }));
+check(hpPosts.satsource === '2' && hpPosts.sathpcycle === '10800', `saving the experimental type posts satsource 2 and sathpcycle 10800 (${JSON.stringify(hpPosts)})`);
 
 // ---- 1530 SAT: Max relative modulation only in the Central Heating Settings card ----
 const mmForm = await evalJs(`(function(){ return document.querySelectorAll('#satSetL2 .srow[data-key="satmaxmodulation"], #satSetL3 .srow[data-key="satmaxmodulation"]').length; })()`);

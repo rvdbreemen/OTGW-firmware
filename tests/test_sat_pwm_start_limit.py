@@ -77,6 +77,7 @@ static float satGetMaxSetpoint() { return 62.0f; }
 static float satEffectiveMaxSetpoint() { return 62.0f; }
 static float satApplyContinuous(float p, float /*previousCS*/) { return 1000.0f + p; }
 static uint32_t satGetMinOnTimeSec() { return 180; }
+static uint32_t satGetMinOffTimeSec() { return 0; }   // TASK-1542: gas harness, no minimum OFF (the real getter is tested in test_sat_hp_pwm.py)
 static uint8_t satGetMaxCyclesPerHour() { return g_cph; }
 static uint32_t satGetPwmPeriodSec() { return 3600UL / g_cph; }
 static int g_source = SAT_SRC_GAS_BOILER;            // TASK-1419: the heating source; the hour-limit check itself is the real code

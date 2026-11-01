@@ -5,7 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Fixed
+### Added
+
+- **SAT heat pumps: at least 10 minutes on and 10 minutes off, and an experimental on/off heat-pump type with a 3-hour cycle** (TASK-1542, 2.0.0-beta.4; Sergeant D entries 195, 197, 198; entries 202-204). A heat pump in SAT PWM now runs at least 600 s per ON phase (was 180 s, the gas value) and stays off at least 600 s after a stop, also when the demand asks for continuous ON; gas boilers and hybrids keep 180 s and no minimum OFF. New appliance type "On/off heat pump, 3 h cycle (experimental)" in the SAT settings: stored as heat pump with a 10800 s PWM cycle (`sathpcycle` 10800; the setter now snaps to 1800, 2400 or 10800); it can be chosen with any heating system (Sergeant D entries 202, 203) and always shows Robert's warning (entry 204): "Experimental. Only for on/off heat pumps with a large thermal mass (underfloor heating or a buffer tank). Long runs of up to 3 hours."; on radiators a second warning must be confirmed: "Not recommended without a buffer tank: the room may overheat." A hybrid never gets the 3-hour cycle. Host tests: `tests/test_sat_hp_pwm.py` (old code: 20 failures, fix 33/33), browser test `tests/webui/v2-settings-sat-followups.test.mjs`.
 
 - **PM= and TP= commands sent right after each other all reach the PIC** (TASK-1315, 2.0.0-beta.3). The command queue replaced a queued command by the next one with the same two letters, so PM=3, PM=15, PM=48 sent in a row (REST, MQTT) ended as PM=48 only. PM= and TP= are now unique per value: each different value gets its own queue entry and is sent and echoed on its own; only an exact repeat refreshes the queued entry. TP= was append-only (TASK-1439) and follows the same rule now. Both commands load the PIC's single priority-message slot (otgw-6.6 gateway.asm SetPrioMessage, SlaveParameter), so SAT's own boot chain still waits for the boiler's answer before the next PM=. Host test: `tests/test_pic_pm_chain.py` (old code: 3 PM= leave 1 entry, a TP= repeat is queued twice).
 

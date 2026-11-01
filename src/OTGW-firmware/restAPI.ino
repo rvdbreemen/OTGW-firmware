@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.3
+**  Version  : v2.0.0-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3877,7 +3877,7 @@ void sendDeviceSettings()
   addBool(F("satenabled"), settings.sat.bEnabled, "b");
   addInt(F("satsystem"), settings.sat.iHeatingSystem, "i", 0, 2);  // 0=auto,1=radiators,2=underfloor
   addInt(F("satsource"), settings.sat.iHeatingSource, "i", 0, 3);  // 0=auto,1=gas_boiler,2=heat_pump,3=hybrid (TASK-891.8)
-  addInt(F("sathpcycle"), settings.sat.iHpCycleSeconds, "i", 1800, 2400);  // heat-pump PWM cycle length: 1800=2/hr or 2400=1.5/hr (setter snaps to one of the two)
+  addInt(F("sathpcycle"), settings.sat.iHpCycleSeconds, "i", 1800, 10800);  // heat-pump PWM cycle length: 1800=2/hr, 2400=1.5/hr or 10800=3 h (experimental on/off heat pump, TASK-1542); the setter snaps to one of the three
   addInt(F("satmanufacturer"), settings.sat.iManufacturer, "i", 0, SAT_MFR_COUNT - 1);
   {
     char tmpBuf[8];
