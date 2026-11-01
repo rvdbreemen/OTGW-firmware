@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T09:38:00Z'
-updated_date: '2026-11-01T12:37:00Z'
+updated_date: '2026-11-01T20:41:00Z'
 labels:
   - sat
   - heat-pump
@@ -42,4 +42,10 @@ Evidence: docs/sat/sim-hp-lowload/round18b.md (rounds 18b/18c, PWM as the firmwa
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-01: entry 198 (Sergeant D): minimum PWM OFF 600 s, heat pumps only. With 600 s ON this gives >= 20 min start-to-start (NIBE F1345 p.18). Round 18d: no comfort or start effect in the model (safety net). Q-1527d answered.
+
+2026-11-01: Q-1527b answered (entry 199, interpretation): the experimental type is offered when the SAT onboarding answer is 'on/off heat pump' (Robert's onboarding question, msg 1566412826141130887), not limited to underfloor heating; experimental label keeps the large-thermal-mass warning. AC5 'availability as decided in Q-1527b' means this. Confirmation asked in #dev-sat-mqtt.
+
+2026-11-01 entry 201 (Robert): UI/onboarding warning for the experimental type: always 'Experimental. Only for on/off heat pumps with a large thermal mass (underfloor heating or a buffer tank). Long runs of up to 3 hours.'; with heating system = radiators an extra confirm 'Not recommended without a buffer tank: the room may overheat.' Available for every heating system (entry 199).
+
+Renumbered 2026-11-01 before the commit (199-201 were taken on origin/dev by the TASK-1547/1480 lanes): the notes above that say entry 199 / entry 201 mean entry 202 / entry 204 in sergeant-d-corrections.md (199 = 202, 200 = 203, 201 = 204).
 <!-- SECTION:NOTES:END -->

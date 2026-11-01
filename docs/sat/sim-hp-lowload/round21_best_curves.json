@@ -1,0 +1,22 @@
+{
+ "atag_energion_m_hybrid_5|sat": 1.6,
+ "atag_energion_m_hybrid_5|cont": 1.6,
+ "bosch_compress_7000i_aw_5|sat": 1.6,
+ "bosch_compress_7000i_aw_5|cont": 1.6,
+ "daikin_altherma3_r_erga04|sat": 1.0,
+ "daikin_altherma3_r_erga04|cont": 1.6,
+ "daikin_altherma3_r_erga08|sat": 1.0,
+ "daikin_altherma3_r_erga08|cont": 1.6,
+ "intergas_xtend_5|sat": 1.6,
+ "intergas_xtend_5|cont": 1.6,
+ "mitsubishi_ecodan_puz_wm50|sat": 1.6,
+ "mitsubishi_ecodan_puz_wm50|cont": 1.6,
+ "nibe_s2125_8|sat": 1.6,
+ "nibe_s2125_8|cont": 1.6,
+ "panasonic_aquarea_j_7|sat": 1.0,
+ "panasonic_aquarea_j_7|cont": 1.6,
+ "remeha_elga_ace_4|sat": 1.6,
+ "remeha_elga_ace_4|cont": 1.6,
+ "vaillant_arotherm_plus_7|sat": 1.0,
+ "vaillant_arotherm_plus_7|cont": 1.6
+}

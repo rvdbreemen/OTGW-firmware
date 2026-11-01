@@ -5442,3 +5442,68 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Source:** Robert (maintainer), 2026-11-01, in session, after the TASK-1480 status review: "Neem je advies over, gebruik het CH-modebit van de ketel. En laat de vraag aan Sergeant D maar zitten."
 
 **Decision:** the pressure-health drop rate suspends for 600 s and clears its samples on a change of the boiler's CH-mode bit (MsgID 0 slave byte bit 1, `Statusflags & 0x0002`, the same bit as `isCentralHeatingActive()`, OTGW-Core.ino:1819-1820), not the master CH enable bit (`Statusflags & 0x0100`) that TASK-1480 used (`SATcontrol.ino` satUpdatePressure). Reason: thermo-nova's MQTT coordinator maps `coordinator.active` to `centralheating == ON` (coordinator/mqtt/opentherm.py:23, :60-61), the boiler-side state; on gruijter's alpha.527 capture this gives 5 alarm episodes instead of 9 (TASK-1480 notes), and SAT's own PWM OFF phases (CH enable cleared, entries 5, 9, 17) no longer reset the pressure window. thermo-nova's serial coordinator uses the master CH enable (coordinator/serial/__init__.py:53-55); the choice between the two is ours. **Withdrawn:** Q70 (not asked) and TASK-1480 AC#2 (pump-head steps): Robert does not put them to Sergeant D. **Conflict check:** no Sergeant D entry covers the pressure signal; entry 60 (CH-mode bit) is not changed by this. **Task:** TASK-1480. **Open:** none.
+
+## 202. Q-1527b: the experimental on/off heat-pump type follows the onboarding question, not the heating system (Sergeant D, 2026-11-01, interpretation)
+
+**Numbering note:** entries 202-206 were written as 199-203 and renumbered before the commit, because 199-201 were taken on origin/dev by the TASK-1547 and TASK-1480 lanes the same evening. The #dev-sat-mqtt posts of 2026-11-01 18:35-20:25 UTC call them 199-203 (199 = 202, 200 = 203, 201 = 204, 202 = 205, 203 = 206); a correction was posted.
+
+**Source:** sergeantd, 2026-11-01 18:34 UTC, #dev-sat-mqtt, msg 1566520805976711241 (https://discord.com/channels/812969634638725140/1105556725714649128/1566520805976711241), answering the reminder of Q-1527b (msg 1566520224595972117). He points to Robert's message of 11:25 UTC, msg 1566412826141130887: "We will add one question to the onboarding: Is your heatpump an ON/OFF or a modulating heatpump."
+
+**Quoted:** "@BlueFlame Bot, @Robert van den Breemen already answered here https://discord.com/channels/812969634638725140/1105556725714649128/1566412826141130887"
+
+**Reading (interpretation, acted on, confirmation asked in the channel):** neither A nor B of Q-1527b. The experimental 3 hour type (entry 195) is offered when the SAT onboarding answer is "on/off heat pump"; it is not limited to underfloor heating. The experimental label keeps the large-thermal-mass warning (ours). Compared: thermo-nova has no heat-pump type question (`config_flow.py:686-692` only sets cycles per hour per heating system). **Task:** TASK-1542 (AC 5). **Open:** his confirmation of this reading; the onboarding question itself (who builds it, TASK-1542 or a separate task).
+
+## 203. Entry 202 stands; the warning texts for the experimental type are Robert's call (Sergeant D, 2026-11-01)
+
+**Source:** sergeantd, 2026-11-01 18:37 UTC, #dev-sat-mqtt, msg 1566521512742232217 (https://discord.com/channels/812969634638725140/1105556725714649128/1566521512742232217), reacting to the confirmation request of entry 202 (msg 1566521139147313163).
+
+**Quoted:** "@BlueFlame Bot maybe @Robert van den Breemen has some ideas about more warnings since I don't even know these systems"
+
+**Settled:** no objection to the reading of entry 202, so it stands: the experimental 3 hour type is offered when the onboarding answer is "on/off heat pump", not limited by heating system. Which warnings the UI shows is left to Robert. Compared: thermo-nova has no such type (not found in the code). **Task:** TASK-1542 (AC 5). **Open:** the warning texts (Robert).
+
+## 204. Warnings for the experimental on/off heat-pump type (maintainer, 2026-11-01)
+
+**Source:** Robert (maintainer), 2026-11-01, in session, interactive question following entry 203. Chosen: "Tekst + extra bij radiatoren".
+
+**Decision:** the experimental type always shows: "Experimental. Only for on/off heat pumps with a large thermal mass (underfloor heating or a buffer tank). Long runs of up to 3 hours." When it is chosen while the heating system is radiators, a second warning must be confirmed: "Not recommended without a buffer tank: the room may overheat." The type stays available for every heating system (entry 202). Compared: thermo-nova has no such type. **Task:** TASK-1542 (AC 5). **Open:** none.
+
+## 205. Q-1527e answered: C, no control change; log the curve integral in PWM hours too and decide on field data (Sergeant D, 2026-11-01)
+
+**Source:** sergeantd, 2026-11-01 18:43 UTC, #dev-sat-mqtt, msg 1566522996775194785 (https://discord.com/channels/812969634638725140/1105556725714649128/1566522996775194785), answering Q-1527e (msg 1566522209688887369); 18:54 UTC, msg 1566525966010810469. Robert in the channel 18:53-18:54 UTC (msgs 1566525579602169927, 1566525869722304585).
+
+**Quoted (Sergeant D):** "Q-1527e: C" / "I really don't an answer yet, SAT is designed for modulating systems. But we can see some data and evaluate later" / "Elga Ace is already tested and works"
+**Quoted (Robert):** "Heatpumps are a different beast. They are to run long and low. The control method you designed assumes you can turn on and off the flame as often as you like. I still need to see more data from the field to be convinced you can even drive heatpumps with SAT the same way." / "Plus like you said the idea is based on a modulating boiler with gas. And it works great for that."
+
+**Settled:** option C. No change to the self-tune (ADR-205 and entry 174 stay) or to the duty formula (thermo-nova `pwm.py:238`). For heat pumps the curve integral is also logged during PWM hours (marked as such, not used by the tuner), so the field test of the 3 hour type (entry 195) shows whether real houses run warm in PWM (round 19 finding 1). Sergeant D states SAT is designed for modulating systems and that the Remeha Elga Ace (a modulating heat pump) was tested and works (his statement, no data seen by us). **Task:** TASK-1551 (logging). **Open:** Elga Ace data (asked).
+
+## 206. Hybrids: a master SAT on the heat pump and a slave SAT on the boiler (Sergeant D, 2026-11-01, proposal)
+
+**Source:** sergeantd, 2026-11-01 20:19-20:24 UTC, #dev-sat-mqtt, msgs 1566547198370517174 (https://discord.com/channels/812969634638725140/1105556725714649128/1566547198370517174), 1566548160170557583, 1566548417964933233. Robert 20:20 UTC (msgs 1566547402607824958, 1566547468143829054, 1566547524817526835).
+
+**Quoted:** "For hybrid systems we can introduce a more intelligent type of detection. We need to introduce master SAT and slave SAT. An OTGW hooked directly to the heat pump will act as the master and a second OTGW hooked between heat pump and the boiler will act as the slave SAT. The master SAT will work in continuous mode always, but when the pump will send the CH=1 signal to the gas boiler slave SAT will control the gas boiler with the gas boiler algorithm. @Robert van den Breemen what do you think?" / "This idea is in my mind for more than 2 years. Because when Elga stops heating and instructs the gas boiler to run, gas boilers cycling like hell. My idea is to keep both systems running as efficiently as they can" / "My understanding is that Elga acts like a master to the boiler. Just like a thermostat." Robert: "Hmmmm, sounds complex." / "But I know what you are thinking, my elga ace has two OTGW's." / "But honest, not sure how many hybrides run that way."
+
+**Reading:** a design proposal, not a decision; addressed to Robert. Consistent with the Elga Ace manual: the heat pump controls the boiler over OpenTherm (Remeha marketing text; manual p.105-106 hybrid modes, p.128 backup start). Compared: thermo-nova has no hybrid or master/slave concept (not found in the code). **Task:** none yet. **Open:** Robert's decision.
+
+## 207. Entry 206 clarified: the slave SAT takes the Elga's CS as its requested setpoint and chooses PWM or continuous itself (Sergeant D, 2026-11-01)
+
+**Source:** sergeantd, 2026-11-01 20:36 UTC, #dev-sat-mqtt, msg 1566551441219522634 (https://discord.com/channels/812969634638725140/1105556725714649128/1566551441219522634). Context: his graph of 2024-11-04 (msg 1566549734766678166, boiler flow and requested setpoint 01:00-10:00) and "It looks like Elga passed the control to gas boiler when flow temp was above 38 C" (20:32, msg 1566550423764996289); Robert: "I don't think my boiler cycles like hell. It just kicks in during winter time" (20:28, msg 1566549581980762133).
+
+**Quoted:** "The slave SAT do not calculate any requested setpoint. Elga Ace passes the CS directly to the gas boiler. So slave SAT will use only this CS value and pass it as requested setpoint to the PWM controller. After that slave SAT will decide if will go into PWM or continuous mode. @BlueFlame Bot can you understand the concept?"
+
+**Settled (clarification of the proposal, not a decision):** the slave SAT has no curve and no PID of its own. Its requested setpoint is the CS the heat pump sends to the boiler; from there SAT's normal gas logic runs: continuous (CS passed on, the boiler modulates) until the overshoot switch (flow >= CS + 2 K for 60 s, entry 87) enters PWM, then the gas PWM (3 or 4 cycles per hour, 180 s minimum ON, ON-phase suppression), and back to continuous through the underheat and saturation exits (thermo-nova heating_control.py:262-329, :358-376). Correction of our own model: the first round 22 test ran the slave as gas PWM on every backup request, which is not his concept; the model is changed to his reading before the ten-season run. **Task:** TASK-1527 (simulation round 22). **Open:** Robert's decision on the proposal (entry 206).
+
+## 208. Entries 206/207 completed: CH=0 and CS=0 from the Elga stop the slave; the Elga Ace has a built-in hydraulic separator (Sergeant D, 2026-11-01)
+
+**Source:** sergeantd, 2026-11-01 20:43 UTC, #dev-sat-mqtt, msg 1566553372104986625 (https://discord.com/channels/812969634638725140/1105556725714649128/1566553372104986625), and 20:52 UTC, msg 1566555559371604009.
+
+**Quoted:** "moreover when the Elga sends the CH=0 and CS=0, slave SAT stops heating. That's it," / "Elga ece has an in-build hydronic separator which decouples these 2 appliances, which means no damage to circulation pumps may occur during this operation."
+
+**Settled (clarification):** the slave SAT ends its control when the heat pump drops its request (CH = 0, CS = 0); the round 22 model already does this (the request ends, the boiler stops). The hydraulic separator is new to the model: the boiler then heats its own short primary loop and the separator, not the whole system water, which in reality makes the boiler's flow rise faster than the round 22 model assumes (one shared water node). Not found in the Elga Ace manual text we extracted (searched for the separator; reading his statement as given). Compared: thermo-nova has no hybrid concept. **Task:** TASK-1527 (round 22: the separator is modelled, `SEPARATOR` in scripts/sat_hp_library_study21.py, loop 30 kJ/K and boiler pump 930 W/K as assumptions). **Open:** none on this entry; the round 22 results follow.
+
+## 209. Entry 208 corrected: the separator decouples the two primary circuits so they work as one source (Sergeant D, 2026-11-01)
+
+**Source:** sergeantd, 2026-11-01 20:58 UTC, #dev-sat-mqtt, msg 1566556968322334926 (https://discord.com/channels/812969634638725140/1105556725714649128/1566556968322334926), correcting our post msg 1566556132200153130 ("the boiler only heats its own short loop").
+
+**Quoted:** "No it is not only heats a short loop, it decouples these 2 primary systems, so they can work as a single entity"
+
+**Settled (correction of our wording):** the heat pump's and the boiler's primary circuits both feed the hydraulic separator, and the heating system draws from it; each source keeps its own primary flow (and its own flow sensor), and together they act as one heat source for the system. Check of the round 22 model against this: the boiler has its own primary node coupled to the system through the separator, and controls on its own primary flow; the heat pump's primary is still lumped into the system node (it does not get a separate loop). So the model matches the decoupling on the boiler side, which is the side that cycles; the heat-pump side is a simplification (A). Compared: thermo-nova has no hybrid concept. **Task:** TASK-1527 (round 22). **Open:** none.
