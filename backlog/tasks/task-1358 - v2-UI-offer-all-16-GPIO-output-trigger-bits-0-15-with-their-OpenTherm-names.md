@@ -1,11 +1,11 @@
 ---
 id: TASK-1358
 title: 'v2 UI: offer all 16 GPIO output trigger bits (0-15) with their OpenTherm names'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-24T19:14:00Z'
-updated_date: '2026-11-01T08:42:00Z'
+updated_date: '2026-11-01T08:43:00Z'
 labels:
   - webui
 milestone: 2.0.0
@@ -22,7 +22,7 @@ Robert 2026-10-24 (ADR-200 open question 2): the v2 UI lists only bits 0-3 (data
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The trigger-bit selector shows 16 named options, saving bit 8 stores 8 (browser test red on HEAD, green; screenshot)
+- [x] #1 The trigger-bit selector shows 16 named options, saving bit 8 stores 8 (browser test red on HEAD, green; screenshot)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -32,3 +32,9 @@ Evidence 2026-10-31: tests/webui/v2-settings-sat-followups.test.mjs new 37/37, o
 
 2026-11-01 evidence on alpha.597: browser test v2-settings-sat-followups.test.mjs PASS 'GPIO trigger-bit select offers 16 named bits' and 'saving bit 8 posts gpiooutputstriggerbit = 8'; trigger-bit-labels.test.mjs 5/5; served bench v2.js carries TRIGGER_BITS with 16 named entries. Open: the screenshot the AC asks for (Chrome extension not connected this session).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: browser test tests/webui/v2-settings-sat-followups.test.mjs on the real v2.js, 37/37 PASS on 2026-11-01, incl. 'the GPIO trigger-bit select offers 16 named bits (n=16, option 8 = Thermostat: CH enable)' and 'saving bit 8 posts gpiooutputstriggerbit = 8'; trigger-bit-labels.test.mjs 5/5. Screenshot docs/evidence/task-1358/trigger-bit-8.png (synthetic data from the test's local server) shows the select on 'Thermostat: CH enable' and 'Settings saved'. Bench .61 serves alpha.597+d458ac3 whose v2.js carries TRIGGER_BITS with 16 named entries; commit c2ed654ec is an ancestor of d458ac3. Red-on-HEAD was recorded when the change was made (task notes).
+<!-- SECTION:FINAL_SUMMARY:END -->
