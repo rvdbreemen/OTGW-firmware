@@ -77,7 +77,7 @@ Open the OTGW-firmware web UI and go to the Settings page. The MQTT section has 
 | Separate Sources | off | When on, publishes per-source sibling topics (`<topic>_thermostat` and `<topic>_boiler`) alongside the canonical topic (ADR-097). The canonical entity is always kept. |
 | Use Legacy OT Topics | off | When off (default), publishes the new self-describing binary_sensor labels. When on, publishes the legacy OT-spec labels instead. Mutually exclusive: never both at the same time. See section 4.4. |
 
-The manufacturer and model are now configurable so the same firmware can be labelled correctly when it runs on different hardware variants (classic NodoShop OTGW, ESP32 OT-Shield, etc.). These values appear in Home Assistant under Settings > Devices and Services > MQTT > OTGW. As a small nod to the origin of the project, a separate `otgw-pic/designer` topic is always published with the value `Schelte Bron`, to credit the original PIC firmware author.
+The manufacturer and model are now configurable so the same firmware can be labelled correctly for the hardware it runs on. These values appear in Home Assistant under Settings > Devices and Services > MQTT > OTGW. As a small nod to the origin of the project, a separate `otgw-pic/designer` topic is always published with the value `Schelte Bron`, to credit the original PIC firmware author.
 
 After saving, the firmware connects to the broker within a few seconds. The MQTT status indicator on the web UI main page turns green when the connection is established.
 
@@ -203,7 +203,7 @@ homeassistant/{component}/{node_id}/{entity_id}/config
 
 #### Streaming discovery architecture
 
-Starting with v2.0.0 the firmware uses a streaming discovery pipeline (implemented in `MQTTHaDiscovery.cpp`). Every discovery payload is composed on the fly and written to the MQTT client in 128-byte chunks, similar to how ESPHome builds its discovery messages. Nothing is buffered as a full JSON string in RAM. This keeps heap pressure low (around 200 bytes of working memory per entity) and avoids the heap fragmentation problems that the older approach suffered from on the ESP8266.
+Starting with v2.0.0 the firmware uses a streaming discovery pipeline (implemented in `MQTTHaDiscovery.cpp`). Every discovery payload is composed on the fly and written to the MQTT client in 128-byte chunks, similar to how ESPHome builds its discovery messages. Nothing is buffered as a full JSON string in RAM. This keeps heap pressure low (around 200 bytes of working memory per entity) and avoids the heap fragmentation problems that the older approach suffered from in the 1.x firmware on the ESP8266.
 
 The streaming functions (`streamSensorDiscovery`, `streamBinarySensorDiscovery`, `streamClimateDiscovery`, `streamNumberDiscovery`, `streamDallasSensorDiscovery`, `streamSatSwitchDiscovery`, `streamSatSelectDiscovery`) replace the older PROGMEM-template approach. Streaming is always on; there is no flag to turn it off.
 
@@ -453,7 +453,7 @@ action:
       payload: "1"
 ```
 
-The payload must be exactly `"1"`; any other value is ignored. A 5-second cooldown is applied so repeated triggers are rate-limited to one PIC reset per 5 seconds. This is a no-op on OTGW32 hardware (no PIC). The HA `Reset Gateway` button entity publishes this exact payload automatically.
+The payload must be exactly `"1"`; any other value is ignored. A 5-second cooldown is applied so repeated triggers are rate-limited to one PIC reset per 5 seconds. Without a PIC (OT-Direct mode) this is a no-op. The HA `Reset Gateway` button entity publishes this exact payload automatically.
 
 ---
 

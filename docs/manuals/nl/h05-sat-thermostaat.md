@@ -276,16 +276,16 @@ modelleert de simulator nu ook de **ketelzijde**, zodat de cyclusclassificatie, 
 vlam-toestandsmachine, de 4-uurs-statistieken, de dagelijkse verwarmingscurve-aanbeveling
 allemaal onder simulatie draaien:
 
-- **Vlam-toestandsmachine** — de gesimuleerde vlam ontsteekt en dooft op basis van
+- **Vlam-toestandsmachine**: de gesimuleerde vlam ontsteekt en dooft op basis van
   aanvoer versus setpoint, met realistische minimale aan/uit-tijden.
-- **Modulatie en aanvoer/retour-temperaturen** — modulatie volgt de vraag; de
+- **Modulatie en aanvoer/retour-temperaturen**: modulatie volgt de vraag; de
   aanvoertemperatuur stijgt tijdens branden en de retour volgt met een
   belastingsafhankelijke ΔT.
-- **Ruimtetemperatuur** — reageert op de gesimuleerde vlam met instelbare verwarmings- en
+- **Ruimtetemperatuur**: reageert op de gesimuleerde vlam met instelbare verwarmings- en
   afkoelsnelheden (`fSimHeatRate`, `fSimCoolRate`).
-- **Dag/nacht-buitentemperatuur** — een etmaalcurve voedt de weersafhankelijke
+- **Dag/nacht-buitentemperatuur**: een etmaalcurve voedt de weersafhankelijke
   verwarmingscurve (of de echte weerfeed wanneer geldig).
-- **Scenario-injectie** — korte testscenario's (bijv. sensorruis, een warmwatertapping)
+- **Scenario-injectie**: korte testscenario's (bijv. sensorruis, een warmwatertapping)
   kunnen worden geïnjecteerd om specifieke codepaden te beproeven.
 
 **Veiligheid bij ketelafwezigheid:** simulatie vereist dat geen echte ketel op de bus
@@ -313,7 +313,7 @@ curl -X POST -d '{"name":"satsimulation","value":"true"}' \
 
 SAT kan weerdata en een 24-uurs uurtemperatuurverwachting ophalen via de Open-Meteo API. Dit is een gratis API zonder API-sleutel.
 
-Op ESP32 vraagt de firmware de volledige Open-Meteo current-conditions set op: temperatuur, gevoelstemperatuur, luchtvochtigheid, windsnelheid / -richting / -vlagen, bewolking, zeespiegeldruk, neerslag / regen / sneeuwval, zonne-elevatie, WMO weather code, en de `is_day`-vlag. De uurarrays bevatten temperatuur, dauwpunt, bewolking en neerslagkans. ESP8266 blijft op een minimaal 5-velden-verzoek om binnen het geheugenbudget te passen.
+Op ESP32 vraagt de firmware de volledige Open-Meteo current-conditions set op: temperatuur, gevoelstemperatuur, luchtvochtigheid, windsnelheid / -richting / -vlagen, bewolking, zeespiegeldruk, neerslag / regen / sneeuwval, zonne-elevatie, WMO weather code, en de `is_day`-vlag. De uurarrays bevatten temperatuur, dauwpunt, bewolking en neerslagkans.
 
 Weerdata levert:
 - Buitentemperatuur voor de verwarmingscurve (als terugval of primaire bron).
@@ -372,7 +372,7 @@ SAT volgt vlam aan/uit-overgangen en classificeert elke voltooide verwarmingscyc
 - OVERSHOOT: aanvoertemperatuur overschreed setpoint + overshoot-marge langer dan 60 seconden.
 - UNDERHEAT: aanvoertemperatuur bleef meer dan 2 C onder het setpoint langer dan 180 seconden.
 
-Sinds alpha.31 gebruikt de classificatie **tail-window percentielen** (laatste 180 s op ESP32, 64 s op ESP8266) in plaats van de full-cycle P90/P10. Een cyclus die begon met overshoot maar zichzelf corrigeerde, wordt niet meer als OVERSHOOT bestempeld op basis van zijn vroege piek; de full-cycle P90 wordt voor diagnostiek wel naast de tail-waarde gelogd.
+Sinds alpha.31 gebruikt de classificatie **tail-window percentielen** (de laatste 180 s) in plaats van de full-cycle P90/P10. Een cyclus die begon met overshoot maar zichzelf corrigeerde, wordt niet meer als OVERSHOOT bestempeld op basis van zijn vroege piek; de full-cycle P90 wordt voor diagnostiek wel naast de tail-waarde gelogd.
 
 **Rolling statistieken:**
 - Cycli per uur teller (rollend 60-minuten venster, max 6).
@@ -484,7 +484,7 @@ Wanneer `satzonecount` 1 is (standaard), gebruikt SAT een zone alleen als er rui
 
 ### 5.15 BLE-temperatuursensor (alleen ESP32)
 
-Op ESP32-builds (OTGW32 / Thermo-Nova / LOLIN S3 Mini) scant SAT BLE-temperatuursensoren en kan er een als ruimtetemperatuurinvoer gebruiken. BLE-sensoren staan in de webinterface onder hun eigen categorie **Sensors** (niet meer verstopt onder SAT), naast de 1-Wire- en GPIO-sensoren. Scannen is een passieve, continue achtergrondactiviteit die **standaard aan** staat (onder voorbehoud van de PSRAM-poort hieronder), zodat sensoren vanzelf verschijnen. De BLE-stack is **NimBLE-Arduino** (ADR-092), die in 2.0.0 Bluedroid heeft vervangen en zo'n 400 KB flash bespaart. Ondersteunde advertising-formaten:
+Op de LOLIN S3 Mini en S3 Mini Pro scant SAT BLE-temperatuursensoren en kan er een als ruimtetemperatuurinvoer gebruiken. BLE-sensoren staan in de webinterface onder hun eigen categorie **Sensors** (niet meer verstopt onder SAT), naast de 1-Wire- en GPIO-sensoren. Scannen is een passieve, continue achtergrondactiviteit die **standaard aan** staat (onder voorbehoud van de PSRAM-poort hieronder), zodat sensoren vanzelf verschijnen. De BLE-stack is **NimBLE-Arduino** (ADR-092), die in 2.0.0 Bluedroid heeft vervangen en zo'n 400 KB flash bespaart. Ondersteunde advertising-formaten:
 
 - **ATC/pvvx custom firmware** (Xiaomi LYWSD03MMC met custom firmware): service data UUID 0x181A. Rapporteert temperatuur, luchtvochtigheid en batterijniveau.
 - **BTHome v2**: service data UUID 0xFCD2. Standaard BTHome-protocol voor temperatuur- en luchtvochtigheidssensoren. Versleutelde advertisements worden geweigerd.
@@ -496,8 +496,8 @@ De radio voert sinds 2.0.0 een **continue scan** uit vanaf boot (TASK-494). Elk 
 
 Er wordt een enkele gecombineerde firmware-image geleverd voor alle ESP32-boards; `psramFound()` bepaalt bij runtime of BLE daadwerkelijk scant:
 
-- **Boards MET PSRAM** (bijvoorbeeld de LOLIN S3 Mini): BLE draait standaard. Het extra RAM vangt de NimBLE-stack op zonder de rest van de firmware te destabiliseren.
-- **Boards ZONDER PSRAM** (bijvoorbeeld de OTGW32): BLE blijft slapend, ook als het is ingeschakeld. De webinterface toont een toestemmingsdialoog die waarschuwt voor het instabiliteitsrisico van BLE zonder PSRAM. Pas nadat u accepteert (instelling `satbleriskack`) start de radio met scannen.
+- **Boards MET PSRAM** (de LOLIN S3 Mini en S3 Mini Pro): BLE draait standaard. Het extra RAM vangt de NimBLE-stack op zonder de rest van de firmware te destabiliseren.
+- **Boards ZONDER PSRAM**: BLE blijft slapend, ook als het is ingeschakeld. De webinterface toont een toestemmingsdialoog die waarschuwt voor het instabiliteitsrisico van BLE zonder PSRAM. Pas nadat u accepteert (instelling `satbleriskack`) start de radio met scannen.
 
 Kort gezegd: BLE is actief wanneer het is ingeschakeld EN (het board PSRAM heeft OF u het risico heeft geaccepteerd).
 
@@ -723,7 +723,7 @@ De externe temperatuurwaarden vervallen automatisch na respectievelijk 5 minuten
 
 - Niet alle thermostaten sturen ruimtetemperatuur via OT MsgID 24. Als de uwe dat niet doet, gebruik dan een externe sensor via MQTT, REST API, BLE (ESP32) of een DS18B20-sensor gekoppeld aan een area.
 - Buitentemperatuur (MsgID 27) wordt zelden via de bus uitgewisseld. Een externe push, weather API fetch, of REST API push is doorgaans nodig.
-- BLE-temperatuursensoren zijn alleen beschikbaar op de ESP32 (OTGW32). Het roster heeft 8 slots; slechts een sensor tegelijk is geselecteerd als actieve SAT-invoer.
+- BLE-temperatuursensoren zijn alleen beschikbaar op de ESP32. Het roster heeft 8 slots; slechts een sensor tegelijk is geselecteerd als actieve SAT-invoer.
 - SAT bestuurt het aanvoertemperatuur-setpoint, maar de wandthermostaat bepaalt nog steeds of de verwarming is ingeschakeld of uitgeschakeld.
 - Multi-zone ondersteuning draait onafhankelijke PID-lussen per zone, maar SAT bestuurt een enkele ketel. Afzonderlijke ketelcircuits per zone worden niet ondersteund.
 - De PIC co-processor houdt het laatste `CS=`-setpoint vast als de ESP uitvalt. Laag 1 (opstart-veiligheid) corrigeert dit bij de volgende start.

@@ -249,15 +249,15 @@ simulator now models the **boiler side** too, so the cycle classifier, flame-hea
 machine, 4-hour statistics and the daily heating-curve recommendation
 all run under simulation:
 
-- **Flame state machine** — the synthetic flame ignites and extinguishes based on flow
+- **Flame state machine**: the synthetic flame ignites and extinguishes based on flow
   versus setpoint, with realistic minimum on/off timing.
-- **Modulation and flow/return temperatures** — modulation tracks demand; flow climbs
+- **Modulation and flow/return temperatures**: modulation tracks demand; flow climbs
   while firing and the return follows with a load-dependent ΔT.
-- **Room temperature** — responds to the synthetic flame using configurable heating and
+- **Room temperature**: responds to the synthetic flame using configurable heating and
   cooling rates (`fSimHeatRate`, `fSimCoolRate`).
-- **Diurnal outdoor temperature** — a day/night curve drives the weather-dependent
+- **Diurnal outdoor temperature**: a day/night curve drives the weather-dependent
   heating curve (or the real weather feed when valid).
-- **Scenario injection** — short test scenarios (e.g. sensor noise, a DHW draw) can be
+- **Scenario injection**: short test scenarios (e.g. sensor noise, a DHW draw) can be
   injected to exercise specific code paths.
 
 **Boiler-absence safety:** simulation requires that no real boiler answers the bus. If a
@@ -279,7 +279,7 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/simulation" -m "
 
 SAT can fetch outdoor weather data and a 24-hour hourly temperature forecast from the Open-Meteo API. This is a free API that requires no API key.
 
-On ESP32 the firmware requests the full Open-Meteo current-conditions set: temperature, apparent temperature, humidity, wind speed / direction / gusts, cloud cover, sea-level pressure, precipitation / rain / snowfall, sun elevation, WMO weather code, and the `is_day` flag. The hourly arrays include temperature, dew point, cloud cover, and precipitation probability. ESP8266 stays on a minimal 5-field request to fit memory.
+On ESP32 the firmware requests the full Open-Meteo current-conditions set: temperature, apparent temperature, humidity, wind speed / direction / gusts, cloud cover, sea-level pressure, precipitation / rain / snowfall, sun elevation, WMO weather code, and the `is_day` flag. The hourly arrays include temperature, dew point, cloud cover, and precipitation probability.
 
 Weather data provides:
 - Outdoor temperature for the heating curve (fallback or primary, depending on configuration).
@@ -337,7 +337,7 @@ SAT tracks flame on/off transitions and classifies each completed heating cycle.
 - OVERSHOOT: flow temperature exceeded setpoint plus overshoot margin for more than 60 seconds.
 - UNDERHEAT: flow temperature stayed more than 2 C below setpoint for more than 180 seconds.
 
-Since alpha.31, classification uses **tail-window percentiles** (last 180 s on ESP32, 64 s on ESP8266) rather than the full-cycle P90/P10. A cycle that started with overshoot but corrected itself is no longer flagged OVERSHOOT on the strength of its early peak; the full-cycle P90 is still logged alongside for diagnostics.
+Since alpha.31, classification uses **tail-window percentiles** (the last 180 s) rather than the full-cycle P90/P10. A cycle that started with overshoot but corrected itself is no longer flagged OVERSHOOT on the strength of its early peak; the full-cycle P90 is still logged alongside for diagnostics.
 
 **Rolling statistics:**
 - Cycles per hour counter (rolling 60-minute window, max 6).
@@ -449,7 +449,7 @@ When `satzonecount` is 1 (default), SAT only uses a zone if room and target data
 
 ### 5.16 BLE Temperature Sensor (ESP32 Only)
 
-On ESP32 builds (OTGW32 / Thermo-Nova / LOLIN S3 Mini), SAT scans for BLE temperature sensors and can use one as the room temperature input. BLE sensors are surfaced under their own **Sensors** category in the web UI (not buried under SAT), alongside the 1-Wire and GPIO sensors. Scanning is a passive, continuous background activity that is **on by default** (subject to the PSRAM gate below), so sensors appear on their own over time. The BLE stack is **NimBLE-Arduino** (ADR-092), which replaced Bluedroid in 2.0.0 and frees roughly 400 KB of flash. Supported advertising formats:
+On the LOLIN S3 Mini and S3 Mini Pro, SAT scans for BLE temperature sensors and can use one as the room temperature input. BLE sensors are surfaced under their own **Sensors** category in the web UI (not buried under SAT), alongside the 1-Wire and GPIO sensors. Scanning is a passive, continuous background activity that is **on by default** (subject to the PSRAM gate below), so sensors appear on their own over time. The BLE stack is **NimBLE-Arduino** (ADR-092), which replaced Bluedroid in 2.0.0 and frees roughly 400 KB of flash. Supported advertising formats:
 
 - **ATC/pvvx custom firmware** (Xiaomi LYWSD03MMC with custom firmware): service data UUID 0x181A. Reports temperature, humidity, and battery level.
 - **BTHome v2**: service data UUID 0xFCD2. Standard BTHome protocol for temperature and humidity sensors. Encrypted advertisements are rejected.
@@ -461,8 +461,8 @@ The radio runs a **continuous scan** from boot (TASK-494). Every format-pass adv
 
 One combined firmware image ships for all ESP32 boards; `psramFound()` decides at runtime whether BLE actually scans:
 
-- **Boards with PSRAM** (for example the LOLIN S3 Mini): BLE runs by default. The extra RAM absorbs the NimBLE stack without destabilising the rest of the firmware.
-- **Boards without PSRAM** (for example the OTGW32): BLE stays dormant even when enabled. The web UI shows a consent dialog that warns about the instability risk of running BLE without PSRAM. Only after you accept (setting `satbleriskack`) does the radio start scanning.
+- **Boards with PSRAM** (the LOLIN S3 Mini and S3 Mini Pro): BLE runs by default. The extra RAM absorbs the NimBLE stack without destabilising the rest of the firmware.
+- **Boards without PSRAM**: BLE stays dormant even when enabled. The web UI shows a consent dialog that warns about the instability risk of running BLE without PSRAM. Only after you accept (setting `satbleriskack`) does the radio start scanning.
 
 In short, BLE is active when it is enabled AND (the board has PSRAM OR you have acknowledged the risk).
 

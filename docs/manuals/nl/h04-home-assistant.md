@@ -62,7 +62,7 @@ Als u al een zelfstandige Mosquitto-installatie, EMQX, HiveMQ of een andere brok
 
 4. Klik op **Opslaan**.
 
-De velden Device Manufacturer en Device Model zijn nieuw in 2.0.0 en instelbaar, zodat dezelfde firmware op verschillende hardware (klassieke NodoShop OTGW, ESP32 OT-Shield, etc.) correct gelabeld wordt in Home Assistant (**Instellingen > Apparaten en services > MQTT > OTGW**). Als verwijzing naar de oorsprong van het project wordt het topic `otgw-pic/designer` altijd gepubliceerd met de waarde `Schelte Bron`, ter credit aan de auteur van de originele PIC-firmware.
+De velden Device Manufacturer en Device Model zijn nieuw in 2.0.0 en instelbaar, zodat dezelfde firmware passend bij de hardware waarop hij draait gelabeld wordt in Home Assistant (**Instellingen > Apparaten en services > MQTT > OTGW**). Als verwijzing naar de oorsprong van het project wordt het topic `otgw-pic/designer` altijd gepubliceerd met de waarde `Schelte Bron`, ter credit aan de auteur van de originele PIC-firmware.
 
 De firmware verbindt onmiddellijk met de broker en publiceert het geboorte-bericht (`online`). Daarna beginnen de auto-discovery payloads te verschijnen.
 
@@ -214,7 +214,7 @@ Voorbeeld van een discovery-payload voor de aanvoertemperatuur:
 
 #### Streaming discovery architectuur
 
-Vanaf v2.0.0 gebruikt de firmware een streaming discovery pipeline (geïmplementeerd in `MQTTHaDiscovery.cpp`). Elke discovery-payload wordt on the fly opgebouwd en in blokken van 128 bytes naar de MQTT-client geschreven, vergelijkbaar met hoe ESPHome zijn discovery-berichten opbouwt. Er wordt nooit een volledige JSON-string in RAM gebufferd. Dit houdt de geheugendruk laag (ongeveer 200 bytes werkgeheugen per entiteit) en voorkomt de heap-fragmentatieproblemen die de oudere aanpak op de ESP8266 opleverde.
+Vanaf v2.0.0 gebruikt de firmware een streaming discovery pipeline (geïmplementeerd in `MQTTHaDiscovery.cpp`). Elke discovery-payload wordt on the fly opgebouwd en in blokken van 128 bytes naar de MQTT-client geschreven, vergelijkbaar met hoe ESPHome zijn discovery-berichten opbouwt. Er wordt nooit een volledige JSON-string in RAM gebufferd. Dit houdt de geheugendruk laag (ongeveer 200 bytes werkgeheugen per entiteit) en voorkomt de heap-fragmentatieproblemen die de oudere aanpak in de 1.x-firmware op de ESP8266 opleverde.
 
 De streaming-functies (`streamSensorDiscovery`, `streamBinarySensorDiscovery`, `streamClimateDiscovery`, `streamNumberDiscovery`, `streamDallasSensorDiscovery`, `streamSatSwitchDiscovery`, `streamSatSelectDiscovery`) vervangen de eerdere PROGMEM-template aanpak. Streaming staat altijd aan; er is geen schakelaar om het uit te zetten.
 
@@ -480,7 +480,7 @@ data:
   payload: "1"
 ```
 
-De payload moet exact `"1"` zijn; elke andere waarde wordt genegeerd. Er geldt een cooldown van 5 seconden, dus opeenvolgende triggers worden beperkt tot één PIC-reset per 5 seconden. Op OTGW32-hardware (zonder PIC) is dit een no-op. De HA-`Reset Gateway`-button-entiteit publiceert deze payload automatisch.
+De payload moet exact `"1"` zijn; elke andere waarde wordt genegeerd. Er geldt een cooldown van 5 seconden, dus opeenvolgende triggers worden beperkt tot één PIC-reset per 5 seconden. Zonder PIC (OT-Direct-modus) is dit een no-op. De HA-`Reset Gateway`-button-entiteit publiceert deze payload automatisch.
 
 ---
 

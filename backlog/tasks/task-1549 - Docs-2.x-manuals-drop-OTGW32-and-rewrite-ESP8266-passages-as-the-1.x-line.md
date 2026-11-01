@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T17:57:00Z'
-updated_date: '2026-11-01T18:33:00Z'
+updated_date: '2026-11-01T18:36:00Z'
 labels:
   - docs
 dependencies: []
@@ -34,4 +34,6 @@ ch01/h01 done: OTGW32 EN 7->0, NL 6->0; ESP8266 EN 13->5, NL 17->6 (all 1.x cont
 ch02/h02 done: OTGW32 EN 13->0, NL 16->0; ESP8266 EN 27->5, NL 27->6 (socket wording or 1.x context). Supported-hardware, pin-map and flash sections rewritten for Classic + S3 Mini/Mini Pro and flash_otgw.bat/.sh; W5500 section cut to one neutral sentence; BLE/OLED labels corrected; Dallas default doc'd as GPIO 10 from code (Sensorstypes.h:23) - wiring on S3 not verified. Fixed by lead: ch01/h01 'one-click OTA from GitHub' removed (no GitHub API call in src), broken ../docs/BREAKING_CHANGES.md link -> ../../BREAKING_CHANGES.md in ch02/h02. Out-of-scope findings: flash_otgw.sh/.bat banners and --help print 'Nodoshop OTGW32' (user-visible); docs/MANUAL.md line 13 names OTGW32 (handled in the MANUAL.md pass).
 
 ch03/h03 done: OTGW32 EN 10->0, NL 10->0 (incl. 'OTTHING-platform'); ESP8266 4->0 both. OT-Direct labels neutral; Ethernet indicator 'only with Ethernet hardware'; one-click GitHub update sections removed (2.x Update page takes the zip, updateServerHtml.h:88-107); EN heap throttle list replaced by ADR-167 critical-only gate (helperStuff.ino:894,995); NL overview file list corrected to v2.html/v2.js/v2-bundle.css. Findings: firmware UI string v2.html:830 names OTGW32 and has an em dash (needs a firmware task + bump); classic-UI sections in ch03 still outdated (index.js ETag flow); OT-Direct mode table ch03 vs NL ch01 mode list disagree, not checked against code.
+
+ch04/h04 done: OTGW32 1->0, ESP8266 1->1 (discovery paragraph now '1.x firmware on the ESP8266'); resetgateway no-op worded as OT-Direct mode (OTGW-Core.ino:1015); removed '(classic NodoShop OTGW, ESP32 OT-Shield, etc.)' from Device Manufacturer paragraph (judgement call). ch05/h05 done: OTGW32 EN 2->0 NL 3->0, ESP8266 2->0, em dashes 5->0 each; no SAT control statements changed; cycle tail window '180 s' (SATcycles.ino:103); PSRAM example now the LOLIN S3 Mini/Mini Pro (boards.h:305-307); 'Thermo-Nova' dropped from the BLE board list (no such board in boards.h).
 <!-- SECTION:NOTES:END -->
