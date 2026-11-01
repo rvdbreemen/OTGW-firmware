@@ -79,6 +79,9 @@ int main() {
 
 MASTER_CH = 0x0100   # Statusflags bit 8: master CH enable
 SLAVE_CH = 0x0002    # Statusflags bit 1: slave CH mode
+# Entry 201 (Robert, 2026-11-01): the boiler's CH-mode bit stands for thermo-nova's coordinator.active, as its MQTT
+# coordinator does (coordinator/mqtt/opentherm.py:60-61). Before: the master CH enable (TASK-1480, alpha.536).
+CH_ACTIVE = SLAVE_CH
 
 
 def extract_block() -> str:
@@ -326,7 +329,7 @@ class SatPressureHealth(unittest.TestCase):
         return [(float(a), b == "1") for a, b in (l.split() for l in out.splitlines())]
 
     @staticmethod
-    def oracle(rows, bit=MASTER_CH):
+    def oracle(rows, bit=CH_ACTIVE):
         tn = ThermoNovaPressureHealth()
         return [tn.is_on(ms / 1000.0, p, (sf & bit) != 0) for ms, p, sf, _ in rows]
 
@@ -344,10 +347,10 @@ class SatPressureHealth(unittest.TestCase):
     def test_field_series_matches_thermo_nova(self):
         rows = field_series()
         fw, ref = self.firmware(rows), self.oracle(rows)
-        slave = self.oracle(rows, SLAVE_CH)
+        master = self.oracle(rows, MASTER_CH)
         print(f"  field series: {len(rows)} evaluations over {rows[-1][0] / 3.6e6:.1f} h; alarm episodes: "
-              f"firmware {episodes([a for _, a in fw])}, thermo-nova (master CH enable) "
-              f"{episodes([o[0] for o in ref])}, thermo-nova (slave CH-mode bit) {episodes([o[0] for o in slave])}")
+              f"firmware {episodes([a for _, a in fw])}, thermo-nova (slave CH-mode bit) "
+              f"{episodes([o[0] for o in ref])}, thermo-nova (master CH enable) {episodes([o[0] for o in master])}")
         self.assert_matches_oracle(rows)
 
     @unittest.skipUnless(os.environ.get("OTGW_PRESSURE_CAPTURE"),
@@ -355,28 +358,28 @@ class SatPressureHealth(unittest.TestCase):
     def test_capture_replay_matches_thermo_nova(self):
         rows, field = capture_series(os.environ["OTGW_PRESSURE_CAPTURE"])
         fw = self.firmware(rows)
-        ref, slave = self.oracle(rows), self.oracle(rows, SLAVE_CH)
+        ref, master = self.oracle(rows), self.oracle(rows, MASTER_CH)
         suspended = sum(1 for o in ref if not o[2]) / len(ref)
         print(f"  capture replay: {len(rows)} evaluations over {(rows[-1][0] - rows[0][0]) / 3.6e6:.2f} h; "
               f"alarm episodes: field (published sat/pressure_alarm) {field}, firmware under test "
-              f"{episodes([a for _, a in fw])}, thermo-nova (master CH enable) {episodes([o[0] for o in ref])}, "
-              f"thermo-nova (slave CH-mode bit) {episodes([o[0] for o in slave])}; "
-              f"drop rate suspended {suspended:.0%} of evaluations (master CH enable)")
+              f"{episodes([a for _, a in fw])}, thermo-nova (slave CH-mode bit) {episodes([o[0] for o in ref])}, "
+              f"thermo-nova (master CH enable) {episodes([o[0] for o in master])}; "
+              f"drop rate suspended {suspended:.0%} of evaluations (slave CH-mode bit)")
         self.assert_matches_oracle(rows)
 
     def test_ch_enable_transition_suspends_and_clears(self):
-        # SAT stays on; master CH enable drops at t=1800 s. 600 s suspension (drop rate 0), then the
+        # SAT stays on; the boiler's CH mode drops at t=1800 s. 600 s suspension (drop rate 0), then the
         # rate restarts from samples taken after the transition only.
         rows = []
         for i in range(120):
             ms = 1000 + i * 30000
-            ch = MASTER_CH if ms < 1800000 else 0
+            ch = CH_ACTIVE if ms < 1800000 else 0
             p = 2.0 if ms < 1800000 else 1.7
             rows.append((ms, p, ch, 1))
         fw = self.firmware(rows)
         for i, (ms, *_rest) in enumerate(rows):
             if 1800000 <= ms < 1800000 + 600000:
-                self.assertEqual(fw[i][0], 0.0, f"t={ms/1000:.0f}s: drop rate not suspended after CH enable fell")
+                self.assertEqual(fw[i][0], 0.0, f"t={ms/1000:.0f}s: drop rate not suspended after CH mode fell")
         self.assertFalse(any(a for _, a in fw), "the cleared samples must not raise an alarm")
         self.assert_matches_oracle(rows)
 
@@ -387,7 +390,7 @@ class SatPressureHealth(unittest.TestCase):
         rows = []
         for i in range(80):
             ms = wrap - 1800000 + i * 30000
-            ch = MASTER_CH if ms < wrap - 300000 else 0
+            ch = CH_ACTIVE if ms < wrap - 300000 else 0
             rows.append((ms, 2.0 - 0.0005 * i, ch, 1))
         fw = self.firmware(rows)
         for i, (ms, *_rest) in enumerate(rows):
@@ -400,7 +403,7 @@ class SatPressureHealth(unittest.TestCase):
         rows = []
         for i in range(60):
             ms = 1000 + i * 30000
-            rows.append((ms, 2.0 - 0.0001 * i, MASTER_CH, 1 if ms < 900000 else 0))
+            rows.append((ms, 2.0 - 0.0001 * i, CH_ACTIVE, 1 if ms < 900000 else 0))
         fw = self.firmware(rows)
         after = [r for (r, _), row in zip(fw, rows) if 900000 <= row[0] < 1500000]
         self.assertTrue(all(r > 0 for r in after), f"drop rate suspended on SAT on/off: {after[:5]}")
@@ -413,17 +416,31 @@ class SatPressureHealth(unittest.TestCase):
         while ms < 3 * 3600 * 1000:
             h = ms / 3.6e6
             p = 2.0 - 0.25 * min(h, 1.5) - (0.3 if h > 2.0 else 0.0)
-            rows.append((ms, round(p, 3), MASTER_CH, 1))
+            rows.append((ms, round(p, 3), CH_ACTIVE, 1))
             ms += 30000 + (k * 7919) % 7001
             k += 1
         fw, ref = self.assert_matches_oracle(rows)
         print(f"  long run: {len(rows)} evaluations, alarm episodes firmware {episodes([a for _, a in fw])}, "
               f"thermo-nova {episodes([o[0] for o in ref])}")
 
+    def test_pwm_off_phase_does_not_suspend(self):
+        # Entry 201: SAT clears the master CH enable in every PWM OFF phase (entries 5, 9, 17) while the boiler's
+        # CH mode (pump incl. overrun) stays on. Only the boiler's CH-mode bit may suspend the drop rate, so a
+        # PWM OFF phase must not reset the pressure window. Fails while the firmware follows the master bit.
+        rows = []
+        for i in range(80):
+            ms = 1000 + i * 30000
+            master = MASTER_CH if (ms // 600000) % 2 == 0 else 0   # PWM ON/OFF every 10 min
+            rows.append((ms, 2.0 - 0.0002 * i, master | SLAVE_CH, 1))
+        fw = self.firmware(rows)
+        suspended = [row[0] // 1000 for (r, _), row in zip(fw, rows) if r == 0.0 and row[0] > 300000]
+        self.assertEqual(suspended, [], f"drop rate suspended on a PWM OFF phase at t(s)={suspended[:5]}")
+        self.assert_matches_oracle(rows)
+
     def test_samples_up_to_one_hour_old_count(self):
         # 40 min at 2.0 bar, then 1.9 bar flat. thermo-nova still sees the step 15 min later
         # (window 3600 s); a 10-minute window sees a flat line.
-        rows = [(1000 + i * 30000, 2.0 if i < 80 else 1.9, MASTER_CH, 1) for i in range(110)]
+        rows = [(1000 + i * 30000, 2.0 if i < 80 else 1.9, CH_ACTIVE, 1) for i in range(110)]
         fw, ref = self.assert_matches_oracle(rows)
         self.assertGreater(fw[-1][0], 0.05, "a step 25 min back no longer shapes the drop rate")
 

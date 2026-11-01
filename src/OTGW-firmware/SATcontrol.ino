@@ -4745,7 +4745,10 @@ static void satUpdatePressure()
   uint32_t now = millis();
 
   // --- Track CH active transitions: suspend the drop rate 600 s and clear the samples ---
-  bool active = (OTcurrentSystemState.Statusflags & 0x0100) != 0;
+  // "CH active" is the boiler's CH-mode bit (MsgID 0 slave bit 1, pump incl. overrun), as thermo-nova's MQTT
+  // coordinator maps coordinator.active (coordinator/mqtt/opentherm.py:60-61); Robert, entry 201. The master CH
+  // enable (0x0100) is cleared by SAT in every PWM OFF phase and would reset the pressure window each time.
+  bool active = (OTcurrentSystemState.Statusflags & 0x0002) != 0;
   if (!_press_lastActiveInit) {
     _press_lastActive = active;
     _press_lastActiveInit = true;

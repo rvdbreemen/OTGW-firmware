@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T14:38:00Z'
-updated_date: '2026-10-30T00:11:00Z'
+updated_date: '2026-11-01T19:42:00Z'
 labels:
   - sat
   - pressure
@@ -26,7 +26,7 @@ Found in gruijter's field capture (TASK-1474, alpha.527): sat/pressure_alarm fir
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 satUpdatePressure follows thermo-nova binary_sensor.py:335-388 (window max(age,3600 s), suspension and sample clear on the CH-active transition), host test on the real function with the captured 2.0/1.7 bar series old vs new
-- [ ] #2 Sergeant D's answer on pump-head steps is recorded in sergeant-d-corrections.md before any behaviour beyond parity is changed
+- [x] #2 Sergeant D's answer on pump-head steps is recorded in sergeant-d-corrections.md before any behaviour beyond parity is changed
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -41,6 +41,8 @@ AC#2 open: Sergeant D's answer on whether a pump-head step should count is not r
 alpha.542 bench check failed 2026-10-30 (v2.js 64 KiB cut, settings loss after FS OTA); Done waits for a passing bench check on the fixed build.
 
 2026-10-30: the coordinator.active mapping question and AC#2 (pump-head step) are now queued for Sergeant D as Q70 in docs/sat/open-questions.md (queued, not asked; advice: boiler CH-mode bit, same mapping as Q69 A). Supersedes the 'not yet queued' remarks above.
+
+2026-11-01 (entry 201, Robert): AC#2 settled by the maintainer instead of Sergeant D; Q70 withdrawn, not asked. coordinator.active = the boiler's CH-mode bit (Statusflags & 0x0002), satUpdatePressure changed from 0x0100. tests/test_sat_pressure_health.py: new case test_pwm_off_phase_does_not_suspend; oracle default bit CH_ACTIVE = SLAVE_CH. Red on the old bit: FAILED (failures=4) incl. the new case; green on the fix: Ran 8, OK (skipped=1, capture replay needs the local field capture, not present in this session). Synthetic field series: firmware 0, thermo-nova slave bit 0, master bit 7 alarm episodes. evaluate --quick 80 passed 0 failed. Version 2.0.1-alpha.2.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
