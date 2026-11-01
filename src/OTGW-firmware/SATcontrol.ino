@@ -461,14 +461,14 @@ static uint32_t satGetPwmPeriodSec()
 
 // MM= value for the current mode (TASK-1268). Pure function of its arguments.
 //  - PWM: 0 in both phases (thermo-nova RelativeModulationState.OFF); otherwise the configured maximum.
-//  - Heat pump: 100 outside PWM (always max). Heat pump and hybrid never get 0 (a heat pump may stop
-//    on MM=0): they keep the configured maximum, or 100 when that is 0.
+//  - Heat pump and hybrid never get 0 (a heat pump may stop on MM=0): they get the configured maximum,
+//    in and outside PWM, or 100 when that is 0 (Sergeant D entries 21 and 113, TASK-1426).
 //  - Geminox (SAT_QUIRK_MIN_MOD_10): floor of 10, MM=0 included. Immergas: cap of 80.
 static uint8_t satComputeMM(bool pwmMode, bool heatPump, bool heatPumpOrHybrid, uint8_t maxRelMod, uint8_t quirks)
 {
   uint8_t mm;
-  if (heatPump && !pwmMode)  mm = 100;
-  else if (pwmMode)          mm = heatPumpOrHybrid ? maxRelMod : 0;
+  (void)heatPump;   // TASK-1426 (entry 113): no separate heat-pump case outside PWM any more
+  if (pwmMode)               mm = heatPumpOrHybrid ? maxRelMod : 0;
   else                       mm = maxRelMod;
   if (heatPumpOrHybrid && mm == 0) mm = 100;
   if ((quirks & SAT_QUIRK_MIN_MOD_10) && mm < 10) mm = 10;

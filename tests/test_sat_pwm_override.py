@@ -929,7 +929,10 @@ class SatPwmOverride(unittest.TestCase):
         self.assertEqual(self.mm(True, True, True, 70), 70)
         self.assertEqual(self.mm(True, False, True, 70), 70)
         self.assertEqual(self.mm(True, True, True, 0), 100)
-        self.assertEqual(self.mm(False, True, True, 70), 100)   # heat pump outside PWM: always max
+        # TASK-1426, Sergeant D entry 113 (Q54 B): a heat pump gets the configured max in AND outside PWM,
+        # 100 only when that is 0 (was: always 100 outside PWM)
+        self.assertEqual(self.mm(False, True, True, 70), 70)
+        self.assertEqual(self.mm(False, True, True, 0), 100)
 
     def test_immergas_cap(self):
         self.assertEqual(self.mm(False, False, False, 100, 0x02), 80)

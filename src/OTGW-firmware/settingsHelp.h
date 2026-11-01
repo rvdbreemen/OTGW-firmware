@@ -67,7 +67,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "nightlyrestarthour":"Local hour (0 to 23) of the nightly restart. Default 4.",
 "satenabled":"Master switch. On: SAT sets the boiler flow temperature itself. Off: the thermostat controls the boiler again.",
 "satsystem":"How heat is distributed: auto (treated as radiators), radiators or underfloor. Sets curve offset and flow limits.",
-"satsource":"Heat source: auto (gas boiler), gas boiler, heat pump or hybrid. Sets cycle timing; heat pumps keep full modulation.",
+"satsource":"Heat source: auto (gas boiler), gas boiler, heat pump or hybrid. Sets cycle timing; heat pumps never get modulation 0.",
 "sattargettemp":"Wanted room temperature, 5 to 30 °C. Default 20.",
 "sattempstep":"Step for target temperature changes, 0.1 to 1 °C. Default 0.5.",
 "satcoefficient":"Heating curve slope, 0.1 to 5. Default 2.0. Raise it if rooms stay cold, lower it if they overshoot.",
