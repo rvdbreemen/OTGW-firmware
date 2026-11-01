@@ -3,15 +3,14 @@ id: TASK-1143
 title: >-
   Investigate: temperatures and CH pressure shown without a decimal point on
   1.7.6-beta.3 (GH #684 follow-up)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: 2026-09-20 11:35
-updated_date: '2026-11-01T09:27:00Z'
+updated_date: '2026-11-01T09:49:00Z'
 labels:
   - bug
   - web-ui
-  - needs-info
 dependencies: []
 priority: high
 ordinal: 224000
@@ -51,3 +50,9 @@ mrfox7688 and jaronbor run beta.3 for the MQTT fix (#682) and have not reported 
 
 Audit 2026-11-01: moved To Do -> In Progress, labelled needs-info: AC1 is checked and the investigation is done (bench .88.68 on beta.7 did not reproduce; jsonStuff.ino:365-368 writes %.3f). Waits on the reporter's screenshot plus raw otmonitor output; GH #684 is closed and quiet for 4+ weeks.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as not reproduced by maintainer decision (Robert, 2026-11-01). AC1 met (reporter answered where the values were read). AC2 is NOT met and left unchecked on purpose: the bench 1.x unit .88.68 on beta.7 did not reproduce, and jsonStuff.ino:365-368 writes %.3f, but no stale-cache cause was shown either. AC3 does not apply (no defect found). GH #684 is closed and the reporter has been silent for 4+ weeks. Reopen as a new task on new evidence.
+<!-- SECTION:FINAL_SUMMARY:END -->
