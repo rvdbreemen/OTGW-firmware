@@ -63,13 +63,19 @@ esac
 # One tag per published build (maintainer 2026-10-31): refuse a tag that was already published or is not
 # newer than the newest published one. The list is machine-wide, shared by every worktree and session.
 PUBLISHED="${OTGW_PUBLISHED_TAGS:-${LOCALAPPDATA:-$HOME/.local/share}/OTGW-capture/published-tags.txt}"
+# Entries are "<core>-<prerelease>" (2.0.1-alpha.2); older entries carry only the prerelease (alpha.597) and
+# count as core 2.0.0, the line they were published on. The order check runs per core, so 2.0.1-alpha.1
+# follows 2.0.0-alpha.597 and 2.0.0-beta.1 (Robert 2026-11-01: dev builds after beta.1 are 2.0.1-alpha.N).
+core=${version%%-*}
+key="$core-$pre"
 num=${pre##*.}
 if [ -f "$PUBLISHED" ]; then
-  grep -qx "$pre" "$PUBLISHED" && refuse "prerelease $pre was already published: bump (bin/bump-prerelease.sh), commit, rebuild"
+  norm=$(tr -d '\r' < "$PUBLISHED" | sed -e '/^[0-9]*\.[0-9]*\.[0-9]*-/!s/^/2.0.0-/')
+  printf '%s\n' "$norm" | grep -qx "$key" && refuse "prerelease $key was already published: bump (bin/bump-prerelease.sh), commit, rebuild"
   word=${pre%.*}
-  maxn=$(sed -n "s/^$word\.\([0-9]*\)$/\1/p" "$PUBLISHED" | sort -n | tail -1)
+  maxn=$(printf '%s\n' "$norm" | sed -n "s/^$core-$word\.\([0-9]*\)$/\1/p" | sort -n | tail -1)
   if [ -n "$maxn" ] && [ "$num" -le "$maxn" ] 2>/dev/null; then
-    refuse "prerelease $pre is not newer than the newest published $word.$maxn"
+    refuse "prerelease $key is not newer than the newest published $core-$word.$maxn"
   fi
 fi
 
@@ -128,4 +134,4 @@ grep -q "\"size\": *$size[,}]" "$resp" \
 
 msg_id=$(python -I -c 'import json,sys; print(json.load(open(sys.argv[1])).get("id",""))' "$resp" 2>/dev/null || true)
 echo "POSTED: $name ($size bytes), http $code, message ${msg_id:-unknown}"
-mkdir -p "$(dirname "$PUBLISHED")" && echo "$pre" >> "$PUBLISHED"   # one tag per published build
+mkdir -p "$(dirname "$PUBLISHED")" && echo "$key" >> "$PUBLISHED"   # one tag per published build (core-prerelease)

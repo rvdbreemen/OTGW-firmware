@@ -3,11 +3,11 @@ id: TASK-1480
 title: >-
   SAT pressure-health drop rate differs from thermo-nova: 10-minute window and
   suspension on SAT on/off instead of CH active
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T14:38:00Z'
-updated_date: '2026-11-01T19:42:00Z'
+updated_date: '2026-11-01T20:36:00Z'
 labels:
   - sat
   - pressure
@@ -43,6 +43,8 @@ alpha.542 bench check failed 2026-10-30 (v2.js 64 KiB cut, settings loss after F
 2026-10-30: the coordinator.active mapping question and AC#2 (pump-head step) are now queued for Sergeant D as Q70 in docs/sat/open-questions.md (queued, not asked; advice: boiler CH-mode bit, same mapping as Q69 A). Supersedes the 'not yet queued' remarks above.
 
 2026-11-01 (entry 201, Robert): AC#2 settled by the maintainer instead of Sergeant D; Q70 withdrawn, not asked. coordinator.active = the boiler's CH-mode bit (Statusflags & 0x0002), satUpdatePressure changed from 0x0100. tests/test_sat_pressure_health.py: new case test_pwm_off_phase_does_not_suspend; oracle default bit CH_ACTIVE = SLAVE_CH. Red on the old bit: FAILED (failures=4) incl. the new case; green on the fix: Ran 8, OK (skipped=1, capture replay needs the local field capture, not present in this session). Synthetic field series: firmware 0, thermo-nova slave bit 0, master bit 7 alarm episodes. evaluate --quick 80 passed 0 failed. Version 2.0.1-alpha.2.
+
+2026-11-01 shipped as 2.0.1-alpha.2 (6f44f9da9), posted (Discord msg 1566551398550737136). Bench .63 alpha.2: firmware runs stable 9 min, no regressions seen; the pressure path itself is not exercised on the bench (no boiler, no MsgID 18), so AC#1 rests on tests/test_sat_pressure_health.py (old bit FAILED 4, fix 7/7). Done.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
