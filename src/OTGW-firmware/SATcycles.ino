@@ -37,8 +37,9 @@ static const uint32_t SAT_DHW_OVERSHOOT_GUARD_MS    = 300000UL; // 300s guard: n
 
 // --- Per-hour PWM start counter (rolling 60-minute window, Task #203, TASK-1401) ---
 // Holds PWM's own ON-phase starts only (thermo-nova pwm.py:159-160; Sergeant D entry 59): hot-water
-// ignitions and relights are not recorded. Max cycles/hour is capped at 6 by settings; the ring holds 6.
-static const uint8_t SAT_MAX_CYCLES_PER_HOUR = 6;
+// ignitions and relights are not recorded. The gas limit is 3 or 4 per hour, but a heat pump has none (entry 81)
+// and PWM entries are never held, so the ring holds 16 (TASK-1425): cycles_this_hour reports up to 16.
+static const uint8_t SAT_MAX_CYCLES_PER_HOUR = 16;
 static uint32_t _hourCycleTs[SAT_MAX_CYCLES_PER_HOUR]; // millis() of each PWM ON-phase start
 static uint8_t  _hourCycleHead  = 0;  // next write position
 static uint8_t  _hourCycleCount = 0;  // valid entries (0..SAT_MAX_CYCLES_PER_HOUR)

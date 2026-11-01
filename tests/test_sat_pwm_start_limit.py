@@ -181,6 +181,11 @@ int main(int argc, char** argv) {
     printf("restarts=%d count=%u more=%d after=%u\n", restarts, c1, more, cnt());
     return 0;
   }
+  if (!strcmp(sc, "seven")) {                // TASK-1425: 7 PWM starts in one rolling hour (the real recorder), all reported
+    for (int i = 0; i < 7; i++) { satCycleRecordPwmStart(); g_ms += 60000UL; }
+    printf("count=%u\n", (unsigned)cnt());
+    return 0;
+  }
   if (!strcmp(sc, "limit")) {                // (b) 3 PWM starts in the rolling hour at 3/h, then a 4th OFF->ON
     const int s = pwmCycles(3);
     const unsigned before = cnt();
@@ -435,6 +440,11 @@ class SatPwmStartLimit(unittest.TestCase):
         self.assertEqual(r["limit"], "0", "heat pump reports the hour limit reached: %r" % r)
         self.assertEqual(r["start"], "1", "heat pump 4th start in the hour was held by the hour limit: %r" % r)
         self.assertEqual(r["after"], "4", "the 4th heat-pump start is still recorded for cycles_this_hour: %r" % r)
+
+    # TASK-1425: the rolling-hour ring held 6, so a 7th start in the hour (heat pumps have no start limit,
+    # entry 81) overwrote the oldest and cycles_this_hour stayed at 6.
+    def test_seven_starts_in_an_hour_report_seven(self):
+        self.assertEqual(self.run_sc("seven")["count"], "7")
 
     def test_gas_and_hybrid_keep_the_hourly_start_limit(self):
         for src in (1, 3):                        # SAT_SRC_GAS_BOILER, SAT_SRC_HYBRID
