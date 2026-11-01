@@ -98,8 +98,9 @@ Each push to `release/2.x` happens only inside this flow after checkpoint 1.
 2. CHANGELOG: on release/2.x rename `## [Unreleased]` to `## [<v>] - <date>`, add an
    empty `[Unreleased]` and the link refs. The beta sections stay below it.
 3. README: no beta disclaimer, highlights for `<v>`.
-4. Optional: `/update-docs --release <v>` for the manuals and API docs. Check its
-   output against the 2.x code; it was written for the 1.x line.
+4. `/update-docs-2x --release <v>` in `../wt-release-2x` for the manuals, API docs,
+   C4 docs, `BREAKING_CHANGES.md` and the notes draft. It does not commit and skips
+   cleanup; its files are part of this checkpoint and of the Phase 7 cherry-pick.
 5. Every claim checked against code (`file:line`) or an ADR. Checks:
    ```bash
    grep -n -E "TODO|TBD|XXX|—" docs/releases/RELEASE_NOTES_<v>.md

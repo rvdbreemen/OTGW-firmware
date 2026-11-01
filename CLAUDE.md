@@ -529,6 +529,8 @@ When in doubt about whether a push is "logical", err toward asking. The cost of 
 | 2.x (`dev`, ESP32-S3) | `/beta-release-2x` (`.claude/skills/beta-release-2x/SKILL.md`): tag on `dev`, GitHub prerelease with `--latest=false` | `/release-2x` (`.claude/skills/release-2x/SKILL.md`): tag on `release/2.x` |
 | 1.x (`otgw-1.x.x`, ESP8266) | `/beta-prerelease` | `/release` (`otgw-1.x.x` -> `main`) |
 
+Docs: `/update-docs-2x` (`.claude/skills/update-docs-2x/SKILL.md`, scope from `scripts/docs-scope-2x.sh`) on the 2.x line, standalone or in release mode; `/update-docs` on the 1.x line.
+
 `dev` has no release CI: 2.x builds are local (esp32-combo) and assets are uploaded with `gh`, draft first (immutable releases).
 
 ## Versioning policy

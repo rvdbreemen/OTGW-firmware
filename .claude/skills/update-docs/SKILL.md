@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 Update all project documentation in one well-tracked sequential pass. Can be invoked standalone or as part of a release.
 
+> **1.x line only** (`otgw-1.x.x`, called from `/release`). For the 2.x line (`dev`, `release/2.x`) use `/update-docs-2x` (`.claude/skills/update-docs-2x/SKILL.md`): on dev its base tag, source map and release-doc locations differ.
+
 ## Why sequential and backlog-tracked
 
 This workflow used to spawn one subagent per affected manual chapter in parallel. Fast in theory, but on releases that touched four or more chapters it tripped Claude API concurrency limits and the run failed mid-flight. The new model has two properties:

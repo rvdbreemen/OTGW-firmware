@@ -84,6 +84,9 @@ from the file at create time.
    (`git log --oneline <prev>..HEAD -- src/`). Fill gaps now.
 4. README: beta disclaimer and highlights match the build. Docs-only commits may be
    pushed before the freeze.
+5. Optional, for a beta with many changes: `/update-docs-2x --release <semver>-beta.N`
+   updates the manuals, API and C4 docs and drafts items 1 and 4. It does not commit;
+   commit its files with the narrative.
 
 ### Phase 2: Version bump + CHANGELOG rollover (one commit)
 
