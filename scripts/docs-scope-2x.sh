@@ -121,9 +121,10 @@ else
 fi
 
 echo
-echo "Manual findings (report to Robert, do not rewrite on your own): OTGW32 / ESP8266-Wemos mentions per EN chapter"
-for f in docs/manuals/en/ch*.md; do
-  o=$(grep -ci 'otgw32' "$f" || true)
+echo "Manual findings: OTGW32 / ESP8266-Wemos mentions per manual file (TASK-1549 target: OTGW32=0;"
+echo "ESP8266 only in 1.x context). A non-zero OTGW32 count is a finding for Robert."
+for f in docs/manuals/en/ch*.md docs/manuals/nl/h*.md docs/MANUAL.md; do
+  o=$(grep -Eci 'otgw[ _-]?32|ot-thing' "$f" || true)
   e=$(grep -Eci 'esp8266|wemos|d1 mini' "$f" || true)
   printf '  %-40s OTGW32=%-3s ESP8266=%s\n' "$(basename "$f")" "$o" "$e"
 done

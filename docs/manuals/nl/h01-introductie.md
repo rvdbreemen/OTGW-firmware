@@ -2,9 +2,9 @@
 
 ### Wat is OTGW-firmware?
 
-OTGW-firmware is de open-source firmware voor de NodoShop OpenTherm Gateway (OTGW). De firmware draait op een ESP8266 of ESP32 Wi-Fi-microcontroller op het OTGW-printje en verbindt de OpenTherm verwarmingsbus in uw woning met uw thuisnetwerk, een domotica-platform en een webbrowser.
+OTGW-firmware is de open-source firmware voor de NodoShop OpenTherm Gateway (OTGW). De firmware draait op een ESP32-S3 Wi-Fi-microcontroller (een LOLIN S3 Mini of S3 Mini Pro) in de OTGW Classic en verbindt de OpenTherm verwarmingsbus in uw woning met uw thuisnetwerk, een domotica-platform en een webbrowser.
 
-De firmware kent twee actieve lijnen. De 2.0.0-lijn (de `dev`-branch die hier beschreven wordt) is uitsluitend voor de ESP32-S3: hij is gebouwd op een async web stack plus FreeRTOS en richt zich op het OTGW32 / OT-Thing-printje en de OTGW Classic aangestuurd door een LOLIN S3 Mini. ESP8266 is op deze lijn vervallen. De ESP8266-gebaseerde OTGW (NodeMCU of Wemos D1 mini) wordt nog ondersteund op de 1.x maintenance / LTS-lijn. Beide lijnen worden gebouwd vanuit dezelfde broncode via PlatformIO.
+De firmware kent twee actieve lijnen. De 2.0.0-lijn (de `dev`-branch die hier beschreven wordt) is uitsluitend voor de ESP32-S3: hij is gebouwd op een async web stack plus FreeRTOS en draait op de NodoShop OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro in de Wemos D1 mini-voet. De PIC blijft zitten; één firmware-image (`esp32-combo`) herkent hem bij het opstarten. De 1.x maintenance / LTS-lijn is de firmware voor de Wemos D1 mini (ESP8266); wie terug wil naar 1.x, plaatst de Wemos D1 mini terug. Beide lijnen worden gebouwd met PlatformIO.
 
 Nieuw in de 2.0.0-lijn:
 
@@ -41,17 +41,17 @@ Een OpenTherm-bus werkt op 24 V gelijkspanning. De communicatie verloopt via Man
 
 Het NodoShop OTGW-printje bevat een PIC16F88 of PIC16F1847 microcontroller die de OpenTherm bus elektrisch afhandelt. De PIC zit fysiek in serie op de bus tussen de thermostaat en de ketel. Berichten worden onderschept, doorgegeven en op verzoek aangepast. De PIC communiceert met de ESP via UART op 9600 baud als ASCII-regels.
 
-Op de ESP32 (OTGW32) is ook OTDirect beschikbaar: een directe GPIO-implementatie van OpenTherm zonder PIC, via hardware interrupts en Manchester-codering rechtstreeks op ESP32-GPIO-pinnen.
+De firmware kent ook een OT-Direct-modus, alleen voor hardware zonder PIC. Op de OTGW Classic herkent de firmware de PIC bij het opstarten en draait hij in PIC gateway mode.
 
 #### De ESP-module
 
-De ESP8266 of ESP32 op het printje voert de eigenlijke firmware uit. Hij verzorgt:
+De ESP32-S3 (LOLIN S3 Mini of S3 Mini Pro) in de Wemos D1 mini-voet voert de eigenlijke firmware uit. Hij verzorgt:
 
-- Wi-Fi (en optioneel bekabeld Ethernet via W5500 op de ESP32)
+- Wi-Fi
 - De webserver, WebSocket-server en REST API
 - MQTT-communicatie met PROGMEM-gebaseerde auto-discovery
 - SAT-regeling met weercompensatie via Open-Meteo
-- Temperatuursensoren (Dallas DS18B20, S0-puls, BLE op ESP32)
+- Temperatuursensoren (Dallas DS18B20, S0-puls, BLE)
 - OTA-updates
 - Telnet debug log via SimpleTelnet (multi-client)
 
@@ -69,12 +69,12 @@ v2.0.0 verkeert op het moment van schrijven nog in alpha. De bestaande functiona
 
 **Breaking change in deze release.** v2.0.0 gebruikt standaard een nieuwe, zelfbeschrijvende set MQTT-topicnamen (ADR-106). Zevenendertig OT-spec-georiënteerde binary_sensor-topics krijgen een duidelijker, Home Assistant-vriendelijk label (bijvoorbeeld: `master_ch_enable` wordt `central_heating_enabled`). Gebruikers met bestaande automations op de oude labels kunnen `settings.mqtt.bUseLegacyOtTopics` op `true` zetten om het v1.x-gedrag te behouden. De twee modi sluiten elkaar uit: of de nieuwe namen, of de oude namen worden gepubliceerd, nooit beide tegelijk. De REST API is ongewijzigd ten opzichte van v1.x.
 
-**ESP32 / OTGW32-ondersteuning**
-- Volledige compilatie en werking op ESP32 naast de bestaande ESP8266
-- OTDirect: directe GPIO-implementatie van OpenTherm, zonder PIC co-processor, met vijf werkingsmodi (thermostaat, ketel, gateway, monitor en gecombineerd master+slave)
-- W5500 SPI Ethernet: bekabeld netwerk met dynamische runtime-failover van en naar Wi-Fi (zonder reboot)
+**ESP32-S3-ondersteuning**
+- Draait op de OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro in de Wemos D1 mini-voet. De PIC blijft zitten; één `esp32-combo`-image herkent de PIC bij het opstarten.
+- OT-Direct-modus met vijf werkingsmodi (thermostaat, ketel, gateway, monitor en gecombineerd master+slave), alleen op hardware zonder PIC
+- Ethernet met runtime-failover van en naar Wi-Fi: alleen met Ethernet-hardware; de OTGW Classic heeft geen Ethernet
 - BLE temperatuursensoren: passieve Bluetooth LE-scan van Xiaomi MiBeacon (plaintext en encrypted v4/v5 via een per-sensor bindkey), ATC/pvvx custom firmware, en BTHome v2
-- Aangepaste partitietabel met twee OTA-sloten van 1,5 MB en 768 KB LittleFS
+- Aangepaste 4 MB-partitietabel: een safeboot-updater, één app-slot van 2240 KB en 768 KB LittleFS
 
 **SAT (Smart Autotune Thermostat)**
 - Ingebouwde weergecompenseerde PID-verwarmingsregelaar die volledig op het apparaat draait
@@ -98,41 +98,40 @@ v2.0.0 verkeert op het moment van schrijven nog in alpha. De bestaande functiona
 - AP-fallbackmodus: als Wi-Fi drie keer achter elkaar mislukt, opent het apparaat een accesspoint
 - Wi-Fi-signaalniveauindicator in de webinterface (balkjes-icoon)
 - Driedubbele reset-procedure om Wi-Fi-instellingen te wissen zonder serieel
-- Nachtelijke herstart: configureerbare automatische reboot (tijdstip en dagkeuze) om heap-fragmentatie op te lossen bij langlopende ESP8266-apparaten
+- Nachtelijke herstart: configureerbare automatische reboot (tijdstip en dagkeuze) om heap-fragmentatie op te lossen bij langlopende apparaten
 
 **Webinterface**
 - Herontworpen v2 Web UI (`v2.html`): mobielvriendelijk en de enige web-UI op de 2.0.0-lijn; de klassieke UI is verwijderd zodat alles in de LittleFS-partitie van de WiFi-update-indeling past. Bevat een first-time-setup onboarding wizard die eenmalig draait op een vers apparaat en opnieuw te starten is vanuit Instellingen.
-- De webinterface is uitsluitend Engelstalig. Resterende Nederlandse strings uit de OTTHING-platformport zijn verwijderd (TASK-569). Dit handboek blijft Nederlandstalig.
+- De webinterface is uitsluitend Engelstalig. Resterende Nederlandse strings zijn verwijderd (TASK-569). Dit handboek blijft Nederlandstalig.
 
 **Build en tooling**
-- Gecentraliseerde PlatformIO-build voor zowel ESP8266 als ESP32
+- PlatformIO-build met één `esp32-combo`-image, via `build.bat` (Windows) of `./build.sh` (Linux/macOS)
 - Platformabstractie via `boards.h` met feature flags per printvariant
 - SimpleTelnet: uniforme multi-client telnet-bibliotheek ter vervanging van TelnetStream en ESPTelnet uit v1.x
-- Toolchain: ESP8266-builds blijven op Arduino core 2.7.4 (de LTS-basis). De 1.4.x-lijn stapte tijdelijk over op core 3.1.2, maar de v1.5.x-LTS-lijn is teruggekeerd naar 2.7.4 voor veldgeteste stabiliteit (lwIP ging mee terug naar de 2.7.4-release). De tijdafhandeling is overgezet op AceTime 4.x; dat staat los van de core-versie en levert een kleinere, snellere tijd-bibliotheek op.
-- Verbeterd `build.py`-script en `flash_esp.py` met ESP32-ondersteuning
+- Toolchain: de tijdafhandeling is overgezet op AceTime 4.x; dat staat los van de core-versie en levert een kleinere, snellere tijd-bibliotheek op.
+- Flash-scripts `flash_otgw.bat` / `./flash_otgw.sh` in de zip voor de eerste USB-flash
 
 ---
 
-### Platformvergelijking: ESP8266 vs ESP32
+### Platformvergelijking
 
-De 2.0.0-lijn draait uitsluitend op ESP32-S3. De ESP8266-kolom hieronder geldt voor de 1.x maintenance / LTS-lijn.
+De 2.0.0-lijn draait uitsluitend op ESP32-S3. De tabel laat zien wat hij ondersteunt op de OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro.
 
-| Eigenschap | ESP8266 (OTGW v1.x) | ESP32 (OTGW32) |
-|---|---|---|
-| CPU | 80/160 MHz, 1 core | 240 MHz, 2 cores |
-| RAM | ~80 KB bruikbaar DRAM | ~300 KB bruikbaar DRAM |
-| Flash | 4 MB (2 MB voor LittleFS) | 4 MB (768 KB voor LittleFS) |
-| OpenTherm | Via PIC co-processor | Via PIC of OTDirect (GPIO) |
-| Ethernet | Niet ondersteund | W5500 SPI (optioneel) |
-| BLE sensoren | Niet ondersteund | Xiaomi LYWSD03MMC via BTHome v2 |
-| Bluetooth | Niet aanwezig | Aanwezig, passieve scan |
-| OLED-display | Ondersteund (I2C) | Ondersteund (I2C) |
-| Dallas DS18B20 | Ondersteund (1-Wire) | Ondersteund (1-Wire) |
-| S0-pulsteller | Ondersteund | Ondersteund |
-| PlatformIO target | `esp8266` | `esp32` |
-| Build flag | `BOARD_NODOSHOP_ESP8266` | `BOARD_NODOSHOP_ESP32` |
-| OTA-slots | 2 (standaard ESP8266) | 2 x 1,5 MB (custom partitie) |
-| Status | Productie | Nieuw in v2.0.0 |
+| Eigenschap | OTGW Classic + LOLIN S3 Mini / S3 Mini Pro |
+|---|---|
+| CPU | 240 MHz, 2 cores |
+| Flash | 4 MB (768 KB voor LittleFS) |
+| OpenTherm | Via PIC co-processor (OT-Direct-modus alleen op hardware zonder PIC) |
+| Ethernet | Niet aanwezig |
+| BLE sensoren | Xiaomi LYWSD03MMC via BTHome v2 |
+| Bluetooth | Aanwezig, passieve scan |
+| OLED-display | Optioneel (I2C-header van de Classic) |
+| Dallas DS18B20 | Ondersteund (1-Wire) |
+| S0-pulsteller | Ondersteund |
+| PlatformIO target | `esp32-combo` |
+| Build flag | `BOARD_NODOSHOP_ESP32_COMBO` |
+| OTA-slots | Safeboot-updater + één app-slot van 2240 KB |
+| Status | Nieuw in v2.0.0 |
 
 ---
 
@@ -141,10 +140,10 @@ De 2.0.0-lijn draait uitsluitend op ESP32-S3. De ESP8266-kolom hieronder geldt v
 Voor gebruik van OTGW-firmware heeft u nodig:
 
 **Hardware**
-- NodoShop OpenTherm Gateway met ESP8266 of ESP32 (OTGW32)
+- NodoShop OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro (ESP32-S3) in de Wemos D1 mini-voet
 - Een OpenTherm-compatibele cv-ketel
 - Een OpenTherm-compatibele thermostaat (of gebruik SAT als thermostaat)
-- Een thuisnetwerk met Wi-Fi (802.11 b/g/n, 2,4 GHz) of bekabeld Ethernet (alleen OTGW32 met W5500)
+- Een thuisnetwerk met Wi-Fi (802.11 b/g/n, 2,4 GHz)
 
 **Optioneel maar aanbevolen**
 - Een MQTT-broker op het thuisnetwerk (bijv. Mosquitto als Home Assistant add-on)
@@ -155,8 +154,8 @@ Voor gebruik van OTGW-firmware heeft u nodig:
 - Geen app-installatie, geen account, geen cloud
 
 **Firmware flashen (eenmalig)**
-- Een USB-kabel (micro-USB of USB-C, afhankelijk van de ESP-module) voor de eerste installatie
-- Python 3.x voor het `flash_esp.py`-script, of PlatformIO voor compilatie vanuit broncode
+- Een USB-kabel om de S3 Mini de eerste keer te flashen
+- Het flash-script uit de zip: `flash_otgw.bat` (Windows) of `./flash_otgw.sh` (Linux, macOS)
 
 De firmware vereist geen internetverbinding voor normaal gebruik. Een internetverbinding wordt optioneel gebruikt voor: NTP-tijdsynchronisatie, OTA-updates via GitHub, en de Open-Meteo weer-API voor buitentemperatuur en zonnestand in SAT.
 
@@ -176,7 +175,7 @@ Technische termen als MQTT, REST API, OTA, BLE, OLED, PROGMEM en PlatformIO word
 Codefragmenten en commando's staan in kaders:
 
 ```bash
-python flash_esp.py --port COM3 firmware.bin
+./flash_otgw.sh
 ```
 
 Tabellen met instellingen vermelden altijd de standaardwaarde en het geldige bereik.
@@ -189,13 +188,13 @@ Tabellen met instellingen vermelden altijd de standaardwaarde en het geldige ber
 De broncode, releases, bug tracker en pull requests staan op:
 `https://github.com/rvdbreemen/OTGW-firmware`
 
-Meld fouten en verbeterverzoeken via de GitHub Issues-pagina. Voeg bij een bugreport altijd toe: firmwareversie, platformtype (ESP8266/ESP32), een beschrijving van het probleem en indien beschikbaar de uitvoer van de telnet-debuglog (poort 23).
+Meld fouten en verbeterverzoeken via de GitHub Issues-pagina. Voeg bij een bugreport altijd toe: firmwareversie, firmwarelijn (1.x of 2.x), een beschrijving van het probleem en indien beschikbaar de uitvoer van de telnet-debuglog (poort 23).
 
 **Discord**
 De community is actief op de OTGW Discord-server. Hier kunt u terecht voor hulp bij installatie, configuratie en Home Assistant-integratie. Beginners zijn welkom; de community is internationaal en communiceert in het Engels.
 
 **Releases**
-Nieuwe releases worden gepubliceerd als GitHub Releases en bevatten voorgebouwde binaries voor zowel ESP8266 als ESP32. De webinterface biedt een ingebouwde update-functie waarmee u direct kunt updaten vanuit de lijst met beschikbare releases.
+Nieuwe releases worden gepubliceerd als GitHub Releases en bevatten voorgebouwde binaries: voor de 2.x-lijn de `esp32-combo`-zip, voor de 1.x-lijn de binaries voor de Wemos D1 mini (ESP8266). De webinterface biedt een ingebouwde update-functie waarmee u direct kunt updaten vanuit de lijst met beschikbare releases.
 
 **Documentatie**
 De volledige technische documentatie, inclusief C4-architectuurdiagrammen, API-referentie en ADR's, staat in de `docs/`-map van de repository.
