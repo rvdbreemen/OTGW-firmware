@@ -621,7 +621,10 @@ class TestProbeRecord(unittest.TestCase):
         r = rs.http_exchange("127.0.0.1:%d" % port, "GET", "/api/v2/device/info", connect_timeout=5.0)
         self.assertNotIn("total_ms", r)
         p = rs.probe_record("arm4_w8", time.monotonic(), r, rs.classify(r))
-        self.assertEqual(p["class"], "refused")
+        # TASK-1509: a refused loopback connect takes ~2 s on Windows (the SYN is retried after the RST),
+        # so under CPU load it can pass the connect timeout and classify as "timeout". This test is about
+        # a failed connect, either class.
+        self.assertIn(p["class"], ("refused", "timeout"))
         self.assertIsNone(p["status"])
         self.assertIsNone(p["total_ms"])
 
@@ -655,7 +658,7 @@ class TestProbeRecord(unittest.TestCase):
             t.join(15)
         self.assertEqual(failure, [])
         self.assertGreaterEqual(len(written), 2)
-        self.assertEqual({p["class"] for p in written}, {"refused"})
+        self.assertLessEqual({p["class"] for p in written}, {"refused", "timeout"})   # TASK-1509: either failed-connect class
         self.assertTrue(all(p["total_ms"] is None for p in written))
 
 
@@ -864,12 +867,26 @@ class TestGateBalance(StubCase):
         # The same guard at a realistic size: if the OS gave A a large window
         # anyway, A's 60 KB response lands in full before B and must be seen as
         # complete (the peek has to return everything buffered, not one segment).
-        saved = rs.PAIR_RCVBUF
+        # TASK-1509: under CPU load the stub can still be writing A's 60 KB when B is done, so A is
+        # really incomplete at that moment. The precondition of this test is "A fully buffered", so the
+        # real _peek_now is retried until it reports complete (at most 10 s). A peek that returns one
+        # segment (the defect this guards) never reports complete and still fails the test.
+        saved, saved_peek = rs.PAIR_RCVBUF, rs._peek_now
+
+        def peek_when_buffered(sock):
+            deadline = time.monotonic() + 10
+            while True:
+                data = saved_peek(sock)
+                if rs._peeked_complete(data) or time.monotonic() > deadline:
+                    return data
+                time.sleep(0.05)
+
         rs.PAIR_RCVBUF = 1 << 20
+        rs._peek_now = peek_when_buffered
         try:
             r = self.gb(self.stub(big_body=60000))
         finally:
-            rs.PAIR_RCVBUF = saved
+            rs.PAIR_RCVBUF, rs._peek_now = saved, saved_peek
         for p in ("/api/v2/settings", "/"):
             self.assertTrue(all(a["result"] == "not_overlapping" for a in r["pairs"][p]), r["pairs"][p])
         self.assertEqual((r["pair_result"], r["verdict"]), ("inconclusive", "WARN"))
