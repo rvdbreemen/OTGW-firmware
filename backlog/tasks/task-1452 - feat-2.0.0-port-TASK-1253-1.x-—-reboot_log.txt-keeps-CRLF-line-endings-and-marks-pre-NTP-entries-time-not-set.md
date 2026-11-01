@@ -3,9 +3,10 @@ id: TASK-1452
 title: >-
   feat-2.0.0: port TASK-1253 (1.x) — reboot_log.txt keeps CRLF line endings and
   marks pre-NTP entries 'time not set'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-29T06:23:00Z'
+updated_date: '2026-11-01T09:27:00Z'
 labels:
   - port-from-1.x
   - diagnostics
@@ -69,3 +70,9 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 - [ ] #5 Optional host check: a harness that #includes the real updateRebootLog copy loop against a fake File shows old code producing CR-only output and the fix producing CRLF from both CR-only and CRLF input
 - [ ] #6 Build for esp32, esp32-classic and esp32-combo succeeds and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Audit 2026-11-01: moved To Do -> In Progress. The CRLF half is already in code under TASK-1479 (c0db93f72): copyOlderRebootLogLines in helperStuff.ino:298-322 repairs CR-only files and writes CRLF. Still open: the pre-NTP 'time not set' guard (helperStuff.ino:355-357 formats time(nullptr) unconditionally), the RED/GREEN bench evidence and the build AC.
+<!-- SECTION:NOTES:END -->

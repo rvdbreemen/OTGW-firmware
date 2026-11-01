@@ -3,10 +3,10 @@ id: TASK-1393
 title: >-
   Command queue: dedup by 2-letter prefix merges different TP= reads; idea:
   write commands priority over periodic reads (maarten_41762)
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-25T15:21:00Z'
-updated_date: '2026-10-30T21:56:00Z'
+updated_date: '2026-11-01T09:27:00Z'
 labels:
   - mqtt
   - pic
@@ -32,4 +32,6 @@ maarten_41762 2026-10-25 (#alpha-testing 1563931557000126665, ground-source heat
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-30 maintainer decision (Robert, in session otgw-firmware-ea): released for pickup ('vrijgeven'); label needs-maintainer-ok removed. Priority after beta-1 blockers unless it is one.
+
+Audit 2026-11-01: moved To Do -> In Progress. TP= merging is fixed under TASK-1439 (f3b1351e4): TP= is append-only (OTGW-Core.ino:3843-3845), host test D4 in test/host/test_cmd_queue_drop.cpp:161-166. Still open: a full queue still drops a new command, including an HW= write ('Reached max queue'), and write-before-read priority is not built.
 <!-- SECTION:NOTES:END -->

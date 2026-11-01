@@ -3,7 +3,7 @@ id: TASK-1527
 title: >-
   SAT heat pumps at low load: minimum switching with maximum comfort (study,
   then design with Sergeant D)
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-31T13:48:00Z'
 updated_date: '2026-11-01T09:41:00Z'
@@ -49,4 +49,6 @@ Robert 2026-10-31: 'de warmtepomp moet minimaal schakelen. Dus goal voor warmtep
 2026-11-01: Sergeant D's position on degree minutes (comfort vs efficiency, spark gap, minimum capacity is the lever) recorded as entry 192; answered in #dev-sat-mqtt msgs 1566380852735254659 / 1566381192104779827 with analysis of his UK charts. Field test plan (switchback, same house, both methods, pre-registered H1-H3) in docs/sat/sim-hp-lowload/field-test-plan.md. Next in the model: round 18 = start-loss term (Cd 0.05/0.10), spark-gap cost with SAT-on-gas reference, and the field protocol simulated to size the test. Q-1527a still open.
 
 2026-11-01 Robert: field test without a new control mechanism, only longer heat-pump PWM periods 1.5/2/3 h (entry 193) -> TASK-1542; round 18 deferred -> TASK-1543 (label simulatie); testers may be asked. field-test-plan.md updated to arms 1800 s vs 10800 s (underfloor) / 5400 s (radiators).
+
+Audit 2026-11-01: moved To Do -> In Progress. Simulation rounds 12-17 are committed (9 commits, e.g. 7c718324d, 71a8b78f1, a38973b14, 9a6815991). Still open: AC1 (24 h heat-pump capture validating the start count within 25 %) and Sergeant D's answer to Q-1527a.
 <!-- SECTION:NOTES:END -->

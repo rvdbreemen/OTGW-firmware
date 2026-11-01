@@ -4,9 +4,10 @@ title: 'S3 Mini Pro: drive the onboard 0.85in TFT-LCD with the OLED status pages
 status: To Do
 assignee:
   - '@claude'
-created_date: '2026-07-09 18:37'
-updated_date: '2026-10-06 12:42'
-labels: []
+created_date: 2026-07-09 18:37
+updated_date: '2026-11-01T09:27:00Z'
+labels:
+  - parked
 dependencies: []
 ordinal: 244000
 ---
@@ -40,4 +41,6 @@ BLOCKED, 2026-07-31 (backlog-drain triage). Needs the S3 Mini Pro physically on 
 - Points to weigh when the hardware path is chosen (from the 2026-09-30 triage, not bench-verified): with D5 isolated, the PIC's own watchdog, the ATTiny85 watchdog and the RESET header still exist as recovery paths; bootloader entry by GW=R alone (no MCLR pulse) has not been tested for a PIC flash; a trace reroute is an alternative to lifting the pin.
 
 2026-10-06: maintainer decision: stays parked (To Do); no plan or code until asked.
+
+Audit 2026-11-01: stays To Do, labelled parked: no TFT code in src; investigation done; Robert parked it (2026-07-09, confirmed 2026-10-06) pending the hardware decision on D5/GPIO40 (PIC reset conflict). Commit 683789e3b '(TASK-1035)' belongs to an older task with the same id, not to this one.
 <!-- SECTION:NOTES:END -->
