@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:19:00Z'
-updated_date: '2026-11-01T10:21:00Z'
+updated_date: '2026-11-01T10:29:00Z'
 labels:
   - release beta
 milestone: 2.0.0
@@ -27,7 +27,7 @@ Robert 2026-10-30 decisions: (1) SAT experimental, opt-in, default off, named so
 - [x] #1 TASK-1495, TASK-1500 and TASK-1503 Done with bench/run evidence
 - [ ] #2 Capture runs from the release zip on Windows, Linux and macOS (macOS by a named tester), each with a transcript
 - [ ] #3 Candidate build soaked 24 h on the bench (Classic + S3 Mini) without an unexplained reboot; crashlog and reboot_log quoted
-- [ ] #4 Release notes: SAT experimental/opt-in, BREAKING changes since the last beta/release, known issues (1498, 1438), save settings before flashing, capture instructions
+- [x] #4 Release notes: SAT experimental/opt-in, BREAKING changes since the last beta/release, known issues (1498, 1438), save settings before flashing, capture instructions
 - [ ] #5 Robert's explicit go recorded before the tag; release published with all assets incl. capture tools
 - [x] #6 Sergeant D's beta-1 musts done with evidence (entry 146): TASK-1371, TASK-1501, TASK-1370, TASK-1373, TASK-1375, TASK-1376
 - [x] #7 TASK-1505 (zip exec bits) and TASK-1507 (SAT beta notice) Done
@@ -63,4 +63,6 @@ Soak started 2026-10-31 14:38:57 local: detached python soak.py .61 24 h (PID 37
 Maintainer decision 2026-11-01 (Robert, in session): release beta.1 today as-is. The 24 h soak (AC3, longest run 224 min) and the macOS run (AC2) are not met and ship as a known gap; TASK-1525, TASK-1528 and the TASK-1412 subtasks labelled beta.1 on 10-31 are not release blockers. Release-notes corrections still due before publishing (AC4): docs/releases/RELEASE_NOTES_2.0.0-beta.1.md:177 calls TASK-1438 unexplained, but 1438 is Done (cd5071ebb, 0xb = USB reset by the host); add TASK-1538 (field panic in heap_caps_malloc) and the TASK-1528 heap dips as known issues.
 
 2026-11-01 (session, on Robert's request): updating docs/releases/RELEASE_NOTES_2.0.0-beta.1.md (AC4: fill the TODOs, add alpha.583-597 changes, correct the soak claim and the TASK-1438 known issue, add TASK-1538/1528 known issues, first-beta disclaimer) and README.md (current state, beta disclaimer).
+
+AC4 checked 2026-11-01 with one deviation from its wording: the AC lists TASK-1438 as a known issue, but 1438 is explained (cd5071ebb, reset reason 0xb = USB reset by the host) and Done, so the release notes drop it from Known issues and name the reset reason in Highlights instead. TASK-1498 stays listed. Evidence: docs/releases/RELEASE_NOTES_2.0.0-beta.1.md has the SAT experimental/opt-in section, the breaking list since 1.x (now incl. auto-tune removal, snowfall cm, self-tune default on), Known issues (1498, 1538, 1528, no 24 h soak, self-tune multi-day run, macOS), 'Before you flash' (save settings) and the Capture tool section. CHANGELOG [Unreleased] gained the 21 missing alpha.583-597 entries. The publish zip still needs the beta.1 prerelease bump and a rebuild (version.h is alpha.597).
 <!-- SECTION:NOTES:END -->

@@ -246,7 +246,7 @@ More examples: [Outside Temperature Override](example-api/outside_temperature_ov
 
 ### Alternative: built-in HA OpenTherm Gateway integration
 
-The Home Assistant [OpenTherm Gateway integration](https://www.home-assistant.io/integrations/opentherm_gw/) can connect directly via the TCP serial bridge without MQTT:
+The Home Assistant [OpenTherm Gateway integration](https://www.home-assistant.io/integrations/opentherm_gw/) can connect directly via the TCP serial bridge without MQTT. The bridge is off by default: switch on "Legacy TCP port 25238" in the OTGW settings first.
 
 ```
 socket://<device-ip>:25238

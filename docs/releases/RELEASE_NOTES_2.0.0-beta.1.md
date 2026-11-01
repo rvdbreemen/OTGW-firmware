@@ -4,7 +4,7 @@
 **Branch:** dev
 **Compare:** there is no earlier 2.x release. Everything since the 1.x line is new to you.
 
-> **Disclaimer: this is the first beta of 2.0.0.** It is not a stable release. It has had alpha testing on a small group of units, but not the long field runs a release needs: the planned 24-hour soak test was not completed for this build (see Known issues). Expect bugs, and keep a way back: save your settings and keep the 1.x release zip at hand. If you need a gateway that just works, stay on the [1.x releases](https://github.com/rvdbreemen/OTGW-firmware/releases) for now.
+> **Disclaimer: this is the first beta of 2.0.0.** It is not a stable release. It has had alpha testing on a small group of units, but not the long field runs a release needs: the planned 24-hour soak test was not completed for this build (see Known issues). Expect bugs, and keep a way back: save your settings, and keep the flash zip of the 2.0.0 alpha you run now, so you can flash it back over USB. A 1.x zip is ESP8266 firmware and does not run on an S3 Mini; going back to 1.x means putting the Wemos D1 mini back in. If you need a gateway that just works, stay on the [1.x releases](https://github.com/rvdbreemen/OTGW-firmware/releases) for now.
 
 ## What this beta is
 
@@ -93,6 +93,8 @@ curl http://<ip>/api/v2/settings -o settings-backup.json
 
 **4. Do not flash the PIC over WiFi with OTmonitor.** That has not changed.
 
+**5. OTmonitor or the Home Assistant `opentherm_gw` integration?** They connect to the TCP serial bridge on port 25238, which is off by default, as in 1.x. Switch on "Legacy TCP port 25238" in the OTGW settings if you use either of them.
+
 ---
 
 ## Highlights
@@ -142,7 +144,7 @@ The Windows launcher is tested on our bench. The Linux/macOS launcher has not ye
 
 ## BREAKING changes since the 1.x line
 
-The wording below is quoted from the CHANGELOG. Check your Home Assistant automations, Node-RED flows and scripts against this list.
+The items below follow the CHANGELOG; quoted parts are in quotation marks. Check your Home Assistant automations, Node-RED flows and scripts against this list.
 
 ### MQTT and API
 
@@ -165,7 +167,6 @@ The wording below is quoted from the CHANGELOG. Check your Home Assistant automa
 - **`GET /api/v2/sat/weather/needs-setup`** no longer returns `has_key`, and `GET /api/v2/settings` no longer lists `SATweatherapikey`.
 - **While SAT is enabled it owns the control setpoint.** "a `CS=` from MQTT, REST or the serial bridge is refused."
 - **`TP=` commands are no longer replaced in the command queue.** Each `TP=` now waits its turn.
-- **The TCP serial bridge on port 25238 is off by default.** OTmonitor and the Home Assistant `opentherm_gw` integration connect to it. Do: switch on "Legacy TCP port 25238" in the OTGW settings if you use either of them.
 - **`sat/weather/snowfall` is in cm** (TASK-1464). It was announced in mm while Open-Meteo sends cm; the value itself did not change. Home Assistant may report a unit change for the long-term statistics of this sensor.
 - **Heating curve self-tune is on by default** (TASK-1525). On a unit with SAT enabled, the heating curve coefficient can now change by 0.1 at most once a day. Do: switch "Heating curve self-tune" off if you want to keep your coefficient fixed.
 
