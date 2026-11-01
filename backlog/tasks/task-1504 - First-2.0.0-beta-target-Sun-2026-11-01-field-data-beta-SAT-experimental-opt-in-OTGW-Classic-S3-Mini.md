@@ -3,11 +3,11 @@ id: TASK-1504
 title: >-
   First 2.0.0 beta (target Sun 2026-11-01): field-data beta, SAT experimental
   opt-in, OTGW Classic + S3 Mini
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:19:00Z'
-updated_date: '2026-11-01T15:24:00Z'
+updated_date: '2026-11-01T15:49:00Z'
 labels:
   - release beta
 milestone: 2.0.0
@@ -28,7 +28,7 @@ Robert 2026-10-30 decisions: (1) SAT experimental, opt-in, default off, named so
 - [ ] #2 Capture runs from the release zip on Windows, Linux and macOS (macOS by a named tester), each with a transcript
 - [ ] #3 Candidate build soaked 24 h on the bench (Classic + S3 Mini) without an unexplained reboot; crashlog and reboot_log quoted
 - [x] #4 Release notes: SAT experimental/opt-in, BREAKING changes since the last beta/release, known issues (1498, 1438), save settings before flashing, capture instructions
-- [ ] #5 Robert's explicit go recorded before the tag; release published with all assets incl. capture tools
+- [x] #5 Robert's explicit go recorded before the tag; release published with all assets incl. capture tools
 - [x] #6 Sergeant D's beta-1 musts done with evidence (entry 146): TASK-1371, TASK-1501, TASK-1370, TASK-1373, TASK-1375, TASK-1376
 - [x] #7 TASK-1505 (zip exec bits) and TASK-1507 (SAT beta notice) Done
 <!-- AC:END -->
@@ -70,3 +70,13 @@ AC4 checked 2026-11-01 with one deviation from its wording: the AC lists TASK-14
 
 2026-11-01 16:35 beta.1 RELEASED: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.1 (prerelease, not latest; latest stays v1.7.7; main untouched). Tag v2.0.0-beta.1 (annotated) -> 2ec9ce949. Build esp32-combo from 2ec9ce949: 'Successfully created ESP32S3 image' x2 + 'Build completed successfully!', artifacts 2.0.0-beta.1+2ec9ce9 16:15; evaluate --quick 80 pass/0 fail. Bench: OTA (scripts/ota_flash.py) to the Classic+S3 Mini .63, exit 0, fs hash d458ac3->2ec9ce9, settings 175 keys changed none; device/info fwversion 2.0.0-beta.1+2ec9ce9, PIC 6.8 gateway; after 5 min bootcount 31 (29 -> 31 = safeboot handover + new fw), freeheap 58992, maxblock 31732, crashlog available false. Before the flash .63 ran alpha.597 for 6 h 24 min without a reboot (same firmware code). Assets: flash zip (with capture tools + flash scripts), .ino.bin, .littlefs.bin, merged-full, .elf, safeboot, SHA256SUMS; downloaded zip SHA-256 matches (ccfabe71...).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+v2.0.0-beta.1 released 2026-11-01: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.1 (prerelease, not latest; latest stays v1.7.7; main untouched). Tag v2.0.0-beta.1 -> 2ec9ce949 (bump alpha.597 -> beta.1 + CHANGELOG rollover, no code change since alpha.597).
+AC1, AC6, AC7: evidence in the final summaries of the named tasks (see notes 2026-10-30).
+AC4: docs/releases/RELEASE_NOTES_2.0.0-beta.1.md (c34ee805e, ee6ac176d), one deviation: TASK-1438 is explained and dropped from Known issues.
+AC5: Robert's 'Go for release' recorded in the notes before the tag; release published with the flash zip (capture tools, flash scripts), .ino.bin, .littlefs.bin, merged-full, .elf, safeboot and SHA256SUMS; downloaded zip SHA-256 matches the local build. Bench: OTA on the Classic + S3 Mini (.63), settings kept, 5 min stable, no crashlog. Posted in #alpha-testing (webhook msg 1566478433909743648).
+AC2 and AC3 NOT met: waived by Robert for this release (2026-11-01, in session: release as-is, then Done with the waiver). Both carried to TASK-1544.
+<!-- SECTION:FINAL_SUMMARY:END -->
