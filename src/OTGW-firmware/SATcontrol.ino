@@ -1759,7 +1759,7 @@ void satResetControlState();   // defined after satZones
 // 0.05 C is the firmware's definition of a changed target (settingStuff.ino SATtargettemp).
 static void satResetControlStateIfTargetChanged(float before)
 {
-  if (fabsf(settings.sat.fTargetTemp - before) >= 0.05f) satResetControlState();
+  if (fabsf(settings.sat.fTargetTemp - before) >= SAT_TARGET_CHANGE_MIN_C) satResetControlState();
 }
 
 void satHandlePreset(const char* value)
@@ -2812,7 +2812,7 @@ bool satHandleZoneSetpoint(uint8_t zone, const char* value)
   if (sp < 5.0f || sp > 30.0f) return false;
   uint8_t idx = zone - 1;
   // A changed setpoint resets that area's PID (climate.py:785-795); the first one has nothing to compare with (:788).
-  if (satZones[idx].bSpValid && fabsf(satZones[idx].fSetpoint - sp) >= 0.05f) satZones[idx].fPidIntegral = 0.0f;
+  if (satZones[idx].bSpValid && fabsf(satZones[idx].fSetpoint - sp) >= SAT_TARGET_CHANGE_MIN_C) satZones[idx].fPidIntegral = 0.0f;
   satZones[idx].fSetpoint     = sp;
   satZones[idx].bSpValid      = true;
   satZones[idx].iLastUpdateMs = millis();

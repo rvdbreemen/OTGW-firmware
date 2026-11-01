@@ -130,6 +130,7 @@ int main(int argc, char** argv) {
       if      (!strcmp(sc, "none")) {}
       else if (!strcmp(sc, "target"))      upd("SATtargettemp", "23.0");
       else if (!strcmp(sc, "target_same")) upd("SATtargettemp", "21.0");
+      else if (!strcmp(sc, "target_005"))  upd("SATtargettemp", "21.05");   // TASK-1517: 21.05 is stored as 21.0499992
       else if (!strcmp(sc, "preset"))      satHandlePreset("comfort");        // 21.5 against 21.0
       else if (!strcmp(sc, "preset_same")) { settings.sat.fPresetComfort = 21.0f; satHandlePreset("comfort"); }
       else if (!strcmp(sc, "preset_clear")) {
@@ -165,7 +166,12 @@ def build_cpp(sat: str, pid: str, st: str, mq: str) -> str:
     pre = pre.replace("struct SatSettings { ", "struct SatSettings { float fPresetAway = 15, fPresetEco = 18, fPresetComfort = 21.5f, "
                       "fPresetSleep = 17, fPresetActivity = 16, fPresetHome = 20.5f; bool bWindowDetection = true; "
                       "uint16_t iWindowMinOpenSec = 60; bool bEnabled = true; ", 1)
-    pre = pre.replace("struct SatSettings {", EXTRA_TYPES + "struct SatSettings {", 1)
+    # TASK-1517: the target-change threshold lives in SATtypes.h; take the real line when it is there
+    types = (SRC / "SATtypes.h").read_text(encoding="utf-8") if not os.environ.get("OTGW_SATTYPES_H") else \
+        Path(os.environ["OTGW_SATTYPES_H"]).read_text(encoding="utf-8")
+    m_thr = re.search(r"^static const float SAT_TARGET_CHANGE_MIN_C = [^;]+;", types, re.M)
+    thr = (m_thr.group(0) + "\n") if m_thr else ""
+    pre = pre.replace("struct SatSettings {", thr + EXTRA_TYPES + "struct SatSettings {", 1)
     pre = pre.replace("struct SatState { ", "struct SatState { SATPreset eActivePreset = SAT_PRESET_NONE; float fPreCustomTemp = 0, "
                       "fPreWindowTarget = 0, fPreActivityTemp = 0; uint8_t iPreWindowPreset = 0; bool bWindowOpen = false; "
                       "uint32_t iWindowOpenSinceMs = 0; bool bFallbackSuppressed = false; ", 1)
@@ -257,6 +263,10 @@ class Resets(unittest.TestCase):
 
     def test_target_change(self):
         self.assertTermsCleared("target")
+
+    def test_target_change_of_exactly_0_05_resets(self):
+        # TASK-1517: a 0.05 C step is a change (entry 157 reading); the float difference is 0.0499992
+        self.assertTermsCleared("target_005")
 
     def test_target_unchanged_does_not_reset(self):
         self.assertUntouched("target_same")

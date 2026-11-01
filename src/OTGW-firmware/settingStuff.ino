@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.596
+**  Version  : v2.0.0-alpha.597
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1054,7 +1054,7 @@ void updateSetting(const char *field, const char *newValue)
     // shown target, keeps them.
     const float before = settings.sat.fTargetTemp;
     settings.sat.fTargetTemp = clampSettingFloat(newValue, settings.sat.fTargetTemp, 5.0f, 30.0f);
-    if (fabsf(settings.sat.fTargetTemp - before) >= 0.05f) {
+    if (fabsf(settings.sat.fTargetTemp - before) >= SAT_TARGET_CHANGE_MIN_C) {
       satPresetClearForUserTarget();
       satResetControlState();   // thermo-nova: a target that really changes resets the control state (climate.py:643-660)
     }

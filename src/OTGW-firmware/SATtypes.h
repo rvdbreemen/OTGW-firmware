@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.596
+**  Version  : v2.0.0-alpha.597
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -431,6 +431,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
 // PID deadband: fixed 0.1 C as thermo-nova DEADBAND (const.py:16, used at pid.py:187 and :205). No user setting and
 // no widening during room-temperature estimation (Sergeant D entry 76, Q26, TASK-1417).
 static const float SAT_PID_DEADBAND = 0.1f;
+// TASK-1517: a target change of 0.05 C or more is a real change (entry 157 reading). 0.0495 rather than 0.05,
+// because a 0.05 step is stored as e.g. 21.0499992 and its float difference falls just under 0.05.
+static const float SAT_TARGET_CHANGE_MIN_C = 0.0495f;
 
 // thermo-nova drops the last cycle 6 h after it ended (cycles/history.py:48-57,
 // LAST_CYCLE_MAX_AGE_SECONDS = 6*3600 in cycles/const.py:14). The firmware keeps
