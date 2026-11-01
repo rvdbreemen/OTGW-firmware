@@ -4,7 +4,7 @@
 
 The OTGW web interface is a single-page application (SPA) served directly by the device itself, with no cloud service or external server required. Open it in any modern browser by navigating to `http://otgw2.local/` or to the device's IP address: `http://<device-ip>/`.
 
-The supported browsers are the current and previous two major versions of Chrome, Firefox, and Safari. The UI is English-only on the 2.0.0 line: localised Dutch strings that used to appear in the OTTHING-platform port have been removed (TASK-569).
+The supported browsers are the current and previous two major versions of Chrome, Firefox, and Safari. The UI is English-only on the 2.0.0 line: the localised Dutch strings it used to carry have been removed (TASK-569).
 
 The interface provides:
 
@@ -12,7 +12,7 @@ The interface provides:
 - A full settings panel for all device configuration.
 - A real-time OpenTherm message log with search and export.
 - SAT thermostat controls and diagnostics (dedicated tab).
-- OT-Direct status and bus override controls (OTGW32 only).
+- OT-Direct status and bus override controls (only on hardware without a PIC).
 - OTA firmware updates.
 - A file manager for LittleFS.
 
@@ -60,7 +60,7 @@ The Settings page is driven by the REST API and presents settings with human-rea
 
 The Advanced page collects the power-user screens in four sub-tabs:
 
-- **PIC firmware**: shows PIC device, type, and firmware version, a "Check for updates" action, a list of available firmware files with a flash progress bar, and a cached gateway-settings (`PR=`) table. Hidden on boards without a PIC (OT-Direct / OTGW32).
+- **PIC firmware**: shows PIC device, type, and firmware version, a "Check for updates" action, a list of available firmware files with a flash progress bar, and a cached gateway-settings (`PR=`) table. Hidden on hardware without a PIC.
 - **Debug Information**: device info groups, the crash log (or a "no crash logs" note), friendly Wi-Fi labels, and a raw debug dump.
 - **File System**: an in-page FSexplorer (browse, upload, usage bar) with a link to the classic `/FSexplorer`.
 - **System**: live device status (link, OT-rewrite mode, simulation), and **System Actions** buttons: Update Firmware (OTA sketch / filesystem), ReBoot, **Run setup wizard**, Reset Wireless, and Home.
@@ -105,7 +105,7 @@ The log viewer includes:
 - **Auto-scroll**: the log follows new messages automatically. Click anywhere in the log to pause auto-scroll; click the scroll-to-bottom button to resume.
 - **Timestamps**, **Capture mode** (in-memory buffer up to about 1 M lines), and **Stream to file** (live append to a local file in Chrome/Edge).
 - **Download** the current buffer as a text file; **Auto-download** writes a snapshot every 15 minutes.
-- **Command bar**: send one-shot commands (`TT=20.5`, `GW=R`, etc.) directly from the log view and see the response in-line. On ESP8266, these are PIC commands. On OTGW32, the command bar is also available when OT-Direct provides the command interface.
+- **Command bar**: send one-shot commands (`TT=20.5`, `GW=R`, etc.) directly from the log view and see the response in-line. In PIC gateway mode, these are PIC commands. In OT-Direct mode, the command bar is also available when OT-Direct provides the command interface.
 
 The OpenTherm Monitor panel exposes three sub-tabs:
 
@@ -117,9 +117,9 @@ The browser persists the log buffer to `localStorage` between sessions, so a pag
 
 > **Simulation mode**: When the firmware is running in simulation mode (no physical OTGW connected), a `SIMULATION` badge appears in the log header. This mode is useful for testing dashboards and automations without hardware.
 
-#### OT-Direct Status Panel (OTGW32 Only)
+#### OT-Direct Status Panel (OT-Direct Mode Only)
 
-On OTGW32 devices with OT-Direct available, an OT-Direct status panel appears above the OpenTherm log on the Home tab. This panel shows:
+On hardware without a PIC, in OT-Direct mode, an OT-Direct status panel appears above the OpenTherm log on the Home tab. This panel shows:
 
 - **Mode**: the current OT-Direct operating mode (Bypass, Gateway, Monitor, Master/Standalone, or Loopback Test).
 - **OT Bus**: whether the OpenTherm bus is online, with a status indicator dot.
@@ -220,7 +220,7 @@ The header bar shows the current network status using a visual indicator:
 
 - **Wi-Fi signal bars**: shows signal quality from 0 to 4 bars based on RSSI, using a quadratic mapping that reflects actual usability rather than raw dBm values. The bars are visible in both light and dark themes.
 - **AP badge**: displayed when the device is operating in AP or AP fallback mode.
-- **Ethernet indicator**: displayed on OTGW32 when a wired Ethernet link is active, replacing the Wi-Fi icon.
+- **Ethernet indicator**: displayed only with Ethernet hardware, when a wired link is active, replacing the Wi-Fi icon. The OTGW Classic has no Ethernet.
 
 Hovering over the indicator shows the exact SSID and signal quality percentage (Wi-Fi) or IP address (Ethernet).
 
@@ -281,7 +281,7 @@ The firmware sends a clock synchronization command to the boiler PIC when NTP ti
 | Scheduled Nightly Restart | Enable or disable a daily automatic device restart to recover heap memory |
 | Nightly Restart Hour | Local hour (0-23) when the restart runs (default: `4`, meaning 04:00) |
 
-The nightly restart causes a brief service interruption of approximately 30 seconds. It is only active when NTP is enabled and synced, so the device knows the correct local time. This feature is useful on ESP8266 where long uptimes can lead to heap fragmentation.
+The nightly restart causes a brief service interruption of approximately 30 seconds. It is only active when NTP is enabled and synced, so the device knows the correct local time.
 
 #### Device
 
@@ -295,16 +295,16 @@ The nightly restart causes a brief service interruption of approximately 30 seco
 | OLED Address | I2C address of the SSD1306 OLED display (typically `0x3C` or `0x3D`) |
 | OLED Timeout | Display off timeout in seconds (0 = always on) |
 
-#### OT-Direct Mode (OTGW32 Only)
+#### OT-Direct Mode (Hardware Without a PIC)
 
-On OTGW32 devices, a dropdown appears in the settings to select the OT-Direct operating mode:
+On hardware without a PIC, a dropdown appears in the settings to select the OT-Direct operating mode:
 
 | Mode | Description |
 |---|---|
-| Bypass | Thermostat connected directly to boiler via relay; no OT processing |
+| Bypass | Thermostat connected straight through to the boiler; no OT processing |
 | Gateway | Full override processing (default) |
 | Monitor | Transparent pass-through; frames are logged but not modified |
-| Master / Standalone | No thermostat required; OTGW32 acts as sole OT master |
+| Master / Standalone | No thermostat required; the gateway acts as sole OT master |
 | Loopback Test | Simulated boiler data for testing (no real boiler communication) |
 
 Changing the mode prompts a confirmation dialog explaining the consequences before applying.
@@ -348,26 +348,13 @@ The OpenTherm log on the Home tab is powered by a plain WebSocket connection to 
 
 > **HTTP/WS only**: The firmware does not do HTTPS or WSS itself. Behind an HTTPS reverse proxy (or Home Assistant ingress) the whole interface works, the live log included: the page opens the WebSocket on its own path, as `wss://` when it was loaded over HTTPS, and the proxy forwards it to the device as plain `ws://`. See section 6.10. For remote access without such a proxy, use a VPN.
 
-**Heap backpressure**: On the ESP8266, available RAM is limited. The firmware monitors free heap and automatically reduces WebSocket streaming frequency when memory is low:
+**Heap backpressure**: The firmware monitors free heap. It streams frames immediately and pauses WebSocket streaming only while free heap is critical (below 3 KB, ADR-167), then resumes on its own.
 
-- Above 8 KB free: immediate streaming (HEALTHY).
-- 5-8 KB free: 50 ms throttle between frames (LOW).
-- 3-5 KB free: 200 ms throttle (WARNING).
-- Below 3 KB free: WebSocket streaming paused (CRITICAL).
-
-This prevents the device from crashing under heavy load. You may notice the log slowing down or pausing briefly during peak activity; this is normal and expected behavior.
+This prevents the device from crashing under heavy load. You may notice the log pausing briefly during peak activity; this is normal and expected behavior.
 
 ### OTA Firmware Update via the Web Interface
 
-The **Update** section (accessible from the Advanced tab or the update icon in the header) provides two ways to update the firmware.
-
-#### One-Click GitHub Release Update
-
-1. The page fetches the list of available releases from GitHub and displays them with version badges: **Installed** (current version), **Update** (newer available), or **Rollback** (older version).
-2. Click **Update** next to the target release.
-3. The firmware binary is downloaded directly from GitHub to the device and flashed to the inactive OTA partition.
-4. The device reboots automatically. The web interface polls `/api/v2/health` until the device responds, confirming a successful update.
-5. Update the filesystem (LittleFS) using the same page to ensure web assets match the new firmware version.
+The **Update** section (accessible from the Advanced tab or the update icon in the header) provides two ways to update the firmware. The 2.x firmware does not download updates from GitHub itself: download the release zip and give it to the Update page.
 
 #### One-Action Update on ESP32-S3 (4 MB flash)
 
@@ -401,7 +388,7 @@ Features:
 
 A **System Actions** panel below the file list provides quick buttons for **Update Firmware** (desktop browsers only), **ReBoot**, **Reset Wireless** (same action as Reset WiFi on the Settings page), and **Exit FSexplorer** (returns to the main page).
 
-This is useful for manually backing up or restoring `settings.ini`, `dallas_labels.ini`, the SAT PID state file, or custom web assets. The firmware always streams files rather than buffering them into RAM, so there is no hard upload size limit beyond the available LittleFS partition space. The main `index.html` (now several tens of kilobytes on 2.0.0) and all other assets are served via `streamFile()` to avoid loading them into the limited ESP8266 heap (TASK-668).
+This is useful for manually backing up or restoring `settings.ini`, `dallas_labels.ini`, the SAT PID state file, or custom web assets. The firmware always streams files rather than buffering them into RAM, so there is no hard upload size limit beyond the available LittleFS partition space. The main `index.html` (now several tens of kilobytes on 2.0.0) and all other assets are served via `streamFile()` to avoid loading them into RAM (TASK-668).
 
 When the FSexplorer routes detect that `index.html` is missing (filesystem not mounted or image not yet flashed), the routes serve `FSexplorer.html` directly so the user can still upload a filesystem image from the file manager.
 

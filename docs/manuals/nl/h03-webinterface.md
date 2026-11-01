@@ -6,9 +6,9 @@ De webinterface van OTGW-firmware is een single-page application (SPA) die door 
 
 De interface werkt in de huidige plus twee voorgaande major-versies van Google Chrome, Mozilla Firefox en Apple Safari. Andere browsers worden niet officieel ondersteund.
 
-**Let op:** op de 2.0.0-lijn is de webinterface Engelstalig. De resterende Nederlandse UI-strings die uit het OTTHING-platform waren overgenomen, zijn verwijderd (TASK-569). Deze handleiding blijft Nederlands; de schermteksten waarnaar verwezen wordt, zijn in het Engels.
+**Let op:** op de 2.0.0-lijn is de webinterface Engelstalig. De Nederlandse UI-teksten die er nog in zaten, zijn verwijderd (TASK-569). Deze handleiding blijft Nederlands; de schermteksten waarnaar verwezen wordt, zijn in het Engels.
 
-De SPA bestaat uit de bestanden `index.html`, `index.js`, `sat.js`, `graph.js`, `sat-slider.js`, `theme-toggle.js`, `echarts-theme.js`, en de design-system CSS (`ds-tokens.css`, `components.css`), allemaal opgeslagen op het LittleFS-bestandssysteem van het apparaat. ECharts wordt vanaf het jsDelivr CDN geladen met SRI-hash. Communicatie met de firmware verloopt via de REST API (JSON over HTTP) voor instellingen en opdrachten, en via WebSocket voor de realtime OpenTherm-log.
+De SPA bestaat uit de bestanden `v2.html`, `v2.js` en `v2-bundle.css`, opgeslagen op het LittleFS-bestandssysteem van het apparaat. Communicatie met de firmware verloopt via de REST API (JSON over HTTP) voor instellingen en opdrachten, en via WebSocket voor de realtime OpenTherm-log.
 
 Een persistent banner bovenaan elke pagina waarschuwt zodra de firmware-buildhash niet overeenkomt met de hash van het geflashte LittleFS-image, met een directe link naar de flash utility.
 
@@ -56,7 +56,7 @@ De Settings-pagina wordt aangestuurd door de REST API en presenteert instellinge
 
 De Advanced-pagina bundelt de power-user-schermen in vier sub-tabbladen:
 
-- **PIC firmware**: toont PIC-device, -type en -firmwareversie, een "Check for updates"-actie, een lijst van beschikbare firmwarebestanden met een flash-voortgangsbalk, en een gecachete gateway-instellingen (`PR=`)-tabel. Verborgen op boards zonder PIC (OT-Direct / OTGW32).
+- **PIC firmware**: toont PIC-device, -type en -firmwareversie, een "Check for updates"-actie, een lijst van beschikbare firmwarebestanden met een flash-voortgangsbalk, en een gecachete gateway-instellingen (`PR=`)-tabel. Verborgen op hardware zonder PIC.
 - **Debug Information**: apparaatinfo-groepen, de crash log (of een "geen crash logs"-melding), leesbare Wi-Fi-labels en een ruwe debug-dump.
 - **File System**: een in-pagina FSexplorer (bladeren, uploaden, gebruiksbalk) met een link naar de klassieke `/FSexplorer`.
 - **System**: live apparaatstatus (link, OT-rewrite-modus, simulatie) en **System Actions**-knoppen: Update Firmware (OTA sketch / filesystem), ReBoot, **Run setup wizard**, Reset Wireless en Home.
@@ -77,7 +77,7 @@ De overige secties van dit hoofdstuk beschrijven nog de verwijderde **klassieke 
 
 | Tabblad | Functie |
 |---|---|
-| **Home** | Startpagina met live OpenTherm-log, OT-Direct status (OTGW32) en temperatuurgrafieken |
+| **Home** | Startpagina met live OpenTherm-log, OT-Direct status (OT-Direct-modus) en temperatuurgrafieken |
 | **SAT** | SAT-thermostaat dashboard: temperatuurkaarten, presets, stooklijn, PID-diagnostiek |
 | **Settings** | Alle apparaat- en netwerkinstellingen, inclusief nachtelijke herstart |
 | **Advanced** | Uitklapmenu met PIC firmware, Webhook, Debug Information en File system contents (FSexplorer) |
@@ -137,13 +137,13 @@ De OpenTherm Monitor heeft drie sub-tabbladen:
 
 #### Commandobalk
 
-Onder de log bevindt zich een commandobalk waarmee u rechtstreeks opdrachten kunt versturen (bijv. `TT=20.5`, `GW=R`). Op ESP8266 zijn dit PIC-commando's. Op OTGW32 is de commandobalk ook beschikbaar wanneer OT-Direct de command interface levert.
+Onder de log bevindt zich een commandobalk waarmee u rechtstreeks opdrachten kunt versturen (bijv. `TT=20.5`, `GW=R`). In PIC gateway mode zijn dit PIC-commando's. In OT-Direct-modus is de commandobalk ook beschikbaar wanneer OT-Direct de command interface levert.
 
 ---
 
-### OT-Direct statuspaneel (alleen OTGW32)
+### OT-Direct statuspaneel (alleen in OT-Direct-modus)
 
-Op OTGW32-apparaten met OT-Direct verschijnt er een statuspaneel boven de OpenTherm-log op de startpagina. Dit paneel toont:
+Op hardware zonder PIC verschijnt in OT-Direct-modus een statuspaneel boven de OpenTherm-log op de startpagina. Dit paneel toont:
 
 - **Mode**: de huidige OT-Direct bedrijfsmodus (Bypass, Gateway, Monitor, Master/Standalone of Loopback Test).
 - **OT Bus**: of de OpenTherm-bus online is, met een statusindicator.
@@ -252,7 +252,7 @@ Rechtsboven in de navigatiebalk staat een netwerkindicator die de huidige verbin
 | Wi-Fi balkjes (1-4 gevuld) | Verbonden via Wi-Fi, signaalsterkte gebaseerd op RSSI met kwadratische mapping |
 | Wi-Fi balkjes (leeg) | Wi-Fi verbonden maar zwak signaal |
 | "AP" badge | Apparaat draait als accesspoint (fallbackmodus) |
-| Ethernet-icoon | Verbonden via bekabeld Ethernet (alleen OTGW32), vervangt het Wi-Fi-icoon |
+| Ethernet-icoon | Verbonden via bekabeld Ethernet (alleen met Ethernet-hardware; de OTGW Classic heeft geen Ethernet), vervangt het Wi-Fi-icoon |
 | Rood kruis | Geen netwerkverbinding |
 
 De indicator wordt automatisch bijgewerkt via de periodieke apparaattijd-poll (`/api/v2/device/time`) en bij het laden van de pagina via `/api/v2/device/info`. De Wi-Fi-balkjes zijn correct zichtbaar in zowel het lichte als het donkere thema.
@@ -314,7 +314,7 @@ Onder de Wi-Fi-sectie staat een Wi-Fi-scanpaneel (TASK-585). Met de knop **Scan*
 | Scheduled Nightly Restart | Dagelijkse automatische herstart in- of uitschakelen om heap-geheugen te herstellen | uitgeschakeld |
 | Nightly Restart Hour | Lokaal uur (0-23) waarop de herstart plaatsvindt | `4` (04:00) |
 
-De nachtelijke herstart veroorzaakt een korte onderbreking van ongeveer 30 seconden. De functie is alleen actief wanneer NTP is ingeschakeld en gesynchroniseerd, zodat het apparaat de juiste lokale tijd kent. Deze functie is vooral nuttig op ESP8266 waar lange uptimes tot heap-fragmentatie kunnen leiden.
+De nachtelijke herstart veroorzaakt een korte onderbreking van ongeveer 30 seconden. De functie is alleen actief wanneer NTP is ingeschakeld en gesynchroniseerd, zodat het apparaat de juiste lokale tijd kent.
 
 #### Apparaat sectie
 
@@ -325,16 +325,16 @@ De nachtelijke herstart veroorzaakt een korte onderbreking van ongeveer 30 secon
 | Dallas GPIO-pin | GPIO-pin voor de 1-Wire DS18B20 bus | (apparaatspecifiek) |
 | OLED | OLED-display inschakelen | uitgeschakeld |
 
-#### OT-Direct modus (alleen OTGW32)
+#### OT-Direct modus (hardware zonder PIC)
 
-Op OTGW32-apparaten verschijnt een dropdown om de OT-Direct bedrijfsmodus te selecteren:
+Op hardware zonder PIC verschijnt een dropdown om de OT-Direct bedrijfsmodus te selecteren:
 
 | Modus | Omschrijving |
 |---|---|
-| Bypass | Thermostaat direct verbonden met ketel via relais; geen OT-verwerking |
+| Bypass | Thermostaat rechtstreeks doorverbonden met de ketel; geen OT-verwerking |
 | Gateway | Volledige override-verwerking (standaard) |
 | Monitor | Transparante doorgifte; berichten worden gelogd maar niet gewijzigd |
-| Master / Standalone | Geen thermostaat nodig; OTGW32 fungeert als enige OT-master |
+| Master / Standalone | Geen thermostaat nodig; de gateway is de enige OT-master |
 | Loopback Test | Gesimuleerde keteldata voor testen (geen echte ketelcommunicatie) |
 
 Bij het wijzigen van de modus verschijnt een bevestigingsdialoog die de gevolgen uitlegt voordat de wijziging wordt toegepast.
@@ -372,25 +372,7 @@ Webhooks sturen een HTTP POST naar de opgegeven URL wanneer geselecteerde status
 
 ### OTA firmware-update via de webinterface
 
-#### GitHub release updater
-
-De update-pagina (onder **Geavanceerd > Firmware-update**) haalt automatisch de lijst van beschikbare releases op van GitHub. Naast elke release staat een badge:
-
-| Badge | Betekenis |
-|---|---|
-| Geinstalleerd | Dit is de huidige versie |
-| Update | Nieuwere versie beschikbaar |
-| Terugzetten | Oudere versie (downgrade mogelijk) |
-
-Klik op **Update** om de geselecteerde versie te installeren. De firmware:
-
-1. Downloadt de binary via HTTPS van GitHub
-2. Schrijft de binary naar het inactieve OTA-slot
-3. Herstart het apparaat
-4. De pagina pollt `/api/v2/health` totdat het apparaat weer reageert
-5. Toont bevestiging met het nieuwe versienummer
-
-**Internetverbinding vereist:** De download van GitHub vereist dat het apparaat internettoegang heeft. Als uw netwerk geen directe internettoegang biedt, gebruik dan handmatig uploaden.
+De 2.x-firmware haalt zelf geen updates van GitHub op: download de release-zip en geef die aan de update-pagina.
 
 #### Update in een keer op ESP32-S3 (4 MB flash)
 
@@ -406,9 +388,7 @@ Instellingen en sensornamen blijven behouden, en ook de SAT-geleerde waarden (en
 
 Als alternatief kunt u een firmwarebinary handmatig uploaden:
 
-1. Download het juiste `.bin`-bestand van de GitHub-releasepagina:
-   - `firmware-esp8266.bin` voor ESP8266
-   - `firmware-esp32.bin` voor ESP32
+1. Download de release-zip van de GitHub-releasepagina en pak het `.ino.bin`-bestand eruit.
 
 2. Op de update-pagina, selecteer **Handmatig uploaden**.
 
@@ -444,7 +424,7 @@ Onder de bestandenlijst staat een **System Actions**-paneel met snelkoppelingen 
 
 Wanneer `index.html` ontbreekt (bijvoorbeeld omdat het LittleFS-image nog niet is geflasht), serveren de FSexplorer-routes `FSexplorer.html` direct als fallback-pagina, zodat u alsnog een filesystem-image kunt uploaden.
 
-De firmware streamt alle bestanden in plaats van ze in RAM te bufferen, dus er is geen harde uploadlimiet anders dan de beschikbare ruimte in de LittleFS-partitie. Het `index.html`-bestand is op 2.0.0 enkele tientallen kilobytes groot en wordt altijd via `streamFile()` geserveerd om de beperkte ESP8266-heap te ontzien (TASK-668).
+De firmware streamt alle bestanden in plaats van ze in RAM te bufferen, dus er is geen harde uploadlimiet anders dan de beschikbare ruimte in de LittleFS-partitie. Het `index.html`-bestand is op 2.0.0 enkele tientallen kilobytes groot en wordt altijd via `streamFile()` geserveerd om het RAM te ontzien (TASK-668).
 
 #### Asset-caching en de ETag-flow
 
