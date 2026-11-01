@@ -2985,8 +2985,9 @@ static float satAggregateZoneSetpoint(float primary, float *zoneOut, const float
 // Topics: sat/zone/<n>/output, sat/zone/<n>/error, sat/zone/<n>/active  (n is 1-based)
 static void satPublishZoneDiagnostics()
 {
+  static SATShadowB s_zoneActive[SAT_MAX_ZONES];
+  static SATShadowF s_zoneOutput[SAT_MAX_ZONES], s_zoneError[SAT_MAX_ZONES];
   char topicBuf[48];
-  char valBuf[12];
   uint8_t zoneCount = settings.sat.iZoneCount;
   if (zoneCount > SAT_MAX_ZONES) zoneCount = SAT_MAX_ZONES;
   uint32_t timeoutMs = (uint32_t)settings.sat.iZoneTimeoutS * 1000UL;
@@ -2999,19 +3000,19 @@ static void satPublishZoneDiagnostics()
     // from the zone PID and satAggregateZoneSetpoint().
     bool active = !z.bOff && z.bRoomValid && z.bSpValid && ((now - z.iLastUpdateMs) <= timeoutMs);
 
+    // TASK-1465 (ADR-111): publish on change through per-zone shadows, as every other sat/* topic,
+    // instead of a retained publish of all three topics on every pass.
     // sat/zone/<n>/active
     snprintf_P(topicBuf, sizeof(topicBuf), PSTR("sat/zone/%u/active"), i + 1);
-    sendMQTTData(topicBuf, active ? "true" : "false", true);
+    publishIfChangedB(topicBuf, active, s_zoneActive[i], true);
 
     // sat/zone/<n>/output
-    dtostrf(z.fPidOutput, 1, 1, valBuf);
     snprintf_P(topicBuf, sizeof(topicBuf), PSTR("sat/zone/%u/output"), i + 1);
-    sendMQTTData(topicBuf, valBuf, true);
+    publishIfChangedF(topicBuf, z.fPidOutput, s_zoneOutput[i], SAT_EPS_PID_OUTPUT, 1, true);
 
     // sat/zone/<n>/error (target - room_temp)
-    dtostrf(z.fSetpoint - z.fRoomTemp, 1, 2, valBuf);
     snprintf_P(topicBuf, sizeof(topicBuf), PSTR("sat/zone/%u/error"), i + 1);
-    sendMQTTData(topicBuf, valBuf, true);
+    publishIfChangedF(topicBuf, z.fSetpoint - z.fRoomTemp, s_zoneError[i], SAT_EPS_ERROR, 2, true);
   }
 }
 

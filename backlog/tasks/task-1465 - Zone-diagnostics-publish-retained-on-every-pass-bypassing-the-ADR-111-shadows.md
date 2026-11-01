@@ -1,9 +1,11 @@
 ---
 id: TASK-1465
 title: Zone diagnostics publish retained on every pass, bypassing the ADR-111 shadows
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T07:23:00Z'
+updated_date: '2026-11-01T00:46:00Z'
 labels:
   - sat
   - mqtt
