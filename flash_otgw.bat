@@ -177,7 +177,7 @@ exit /b 1
 
 :board_esp32
 set "ESPTOOL_CHIP=esp32s3"
-set "BOARD_NAME=Nodoshop OTGW32 / OTGW-classic ESP32-S3"
+set "BOARD_NAME=Nodoshop OTGW ESP32-S3"
 if "%ARG_BAUD%"=="" set "ARG_BAUD=921600"
 goto board_done
 

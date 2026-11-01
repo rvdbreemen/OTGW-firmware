@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.1-alpha.2
+**  Version  : v2.0.0-beta.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -845,6 +845,53 @@ inline int activePicRst() {
   return (comboActivePinMap() == COMBO_MAP_CLASSIC_PRO) ? PIN_CLASSIC_PRO_PIC_RST : PIN_PIC_RST;
 }
 #endif
+
+// [board-pin-reserved:begin] TASK-1552
+// True when a user-configurable GPIO (S0 counter, Dallas bus, relay output)
+// would land on a pin the board itself drives. The defaults carried over from
+// 1.x (S0 = 12, output = 16) hit the PIC reset and LED1 on the S3 Mini and the
+// I2C SDA of the 0x26 watchdog on the S3 Mini Pro (boards.h pin tables), so
+// the callers refuse such a pin instead of reconfiguring it.
+// On every ESP32-S3: GPIO 19/20 are the native USB D-/D+ (USB flashing and the
+// console) and GPIO 26-32 carry the SPI flash / in-package PSRAM.
+inline bool boardPinReserved(int pin, ComboPinMap map) {
+  if (pin == 19 || pin == 20) return true;
+  if (pin >= 26 && pin <= 32) return true;
+#if HAS_RUNTIME_HW_DETECT
+  switch (map) {
+    case COMBO_MAP_CLASSIC:
+      return pin == PIN_PIC_RX || pin == PIN_PIC_TX || pin == PIN_PIC_RST ||
+             pin == PIN_CLASSIC_I2C_SCL || pin == PIN_CLASSIC_I2C_SDA ||
+             pin == PIN_CLASSIC_BUTTON || pin == PIN_CLASSIC_LED1 ||
+             pin == PIN_CLASSIC_LED2 || pin == PIN_PIXEL_MINI;
+    case COMBO_MAP_CLASSIC_PRO:
+      return pin == PIN_PIC_RX || pin == PIN_PIC_TX || pin == PIN_CLASSIC_PRO_PIC_RST ||
+             pin == PIN_CLASSIC_PRO_I2C_SCL || pin == PIN_CLASSIC_PRO_I2C_SDA ||
+             pin == PIN_CLASSIC_PRO_BUTTON || pin == PIN_CLASSIC_PRO_LED1 ||
+             pin == PIN_CLASSIC_PRO_LED2 || pin == PIN_PIXEL_PRO ||
+             pin == PIN_PIXEL_PRO_POWER;
+    default:
+      break;  // OT-Direct pin map: the board's own pins below
+  }
+#else
+  (void)map;
+#endif
+#if defined(PIN_OT_MASTER_IN)
+  return pin == PIN_BUTTON || pin == PIN_CONFIG_BUTTON || pin == PIN_LED1 ||
+         pin == PIN_LED2 || pin == PIN_LED_GREEN || pin == PIN_I2C_SCL ||
+         pin == PIN_I2C_SDA || pin == PIN_OT_MASTER_IN || pin == PIN_OT_MASTER_OUT ||
+         pin == PIN_OT_SLAVE_IN || pin == PIN_OT_SLAVE_OUT || pin == PIN_STEPUP_ENABLE ||
+         pin == PIN_BYPASS_RELAY || pin == PIN_SPI_CS || pin == PIN_SPI_INT ||
+         pin == PIN_SPI_RST || pin == PIN_SPI_SCK || pin == PIN_SPI_MISO ||
+         pin == PIN_SPI_MOSI;
+#else
+  return pin == PIN_PIC_RX || pin == PIN_PIC_TX || pin == PIN_PIC_RST ||
+         pin == PIN_I2C_SCL || pin == PIN_I2C_SDA || pin == PIN_BUTTON ||
+         pin == PIN_LED1 || pin == PIN_LED2;
+#endif
+}
+// [board-pin-reserved:end]
+inline bool isBoardReservedPin(int pin) { return boardPinReserved(pin, comboActivePinMap()); }
 
 //===================[ Global variables — not part of settings or state ]===================
 WiFiClient  wifiClient;

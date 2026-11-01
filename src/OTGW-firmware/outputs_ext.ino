@@ -1,6 +1,6 @@
 /*********
 **  Program  : output_ext.ino
-**  Version  : v2.0.1-alpha.2
+**  Version  : v2.0.0-beta.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -16,10 +16,19 @@ void setOutputState(bool set_HIGH);
 static bool outputsInitialized = false;
 
 static bool validateGPIOOutputsConfig() {
+  // evalOutputs() runs this on every OT frame: report a refused pin once, not per frame.
+  static int16_t lastRefusedPin = -1000;
   if (settings.outputs.iPin < 0 || settings.outputs.iPin > 16) {
-    DebugTf(PSTR("GPIO Outputs: invalid pin %d\r\n"), settings.outputs.iPin);
+    if (lastRefusedPin != settings.outputs.iPin) DebugTf(PSTR("GPIO Outputs: invalid pin %d\r\n"), settings.outputs.iPin);
+    lastRefusedPin = settings.outputs.iPin;
     return false;
   }
+  if (isBoardReservedPin(settings.outputs.iPin)) {   // TASK-1552: never drive a board pin
+    if (lastRefusedPin != settings.outputs.iPin) DebugTf(PSTR("GPIO Outputs: GPIO%d is used by the board, choose another pin\r\n"), settings.outputs.iPin);
+    lastRefusedPin = settings.outputs.iPin;
+    return false;
+  }
+  lastRefusedPin = -1000;
   if (settings.outputs.iTriggerBit < 0 || settings.outputs.iTriggerBit > 15) {
     DebugTf(PSTR("GPIO Outputs: invalid trigger bit %d\r\n"), settings.outputs.iTriggerBit);
     return false;

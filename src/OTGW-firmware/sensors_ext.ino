@@ -1,6 +1,6 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v2.0.1-alpha.2
+**  Version  : v2.0.0-beta.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -148,6 +148,10 @@ void initSensors() {
     return;
   }
 
+  if (isBoardReservedPin(settings.sensors.iPin)) {   // TASK-1552: never put the 1-Wire bus on a board pin
+    DebugTf(PSTR("Dallas sensors: GPIO%d is used by the board, choose another pin; sensors not started\r\n"), settings.sensors.iPin);
+    return;
+  }
   if (state.debug.bSensors)DebugTf(PSTR("init GPIO Temperature sensors on GPIO%d...\r\n"), settings.sensors.iPin);
 
   oneWire.begin(settings.sensors.iPin);

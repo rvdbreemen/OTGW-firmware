@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.1-alpha.2
+**  Version  : v2.0.0-beta.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -513,7 +513,7 @@ static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
 static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
-  if (!isOTDirectEnabled()) { sendApiError(503, F("No OT-direct hardware - OTGW32 functions disabled")); return; }
+  if (!isOTDirectEnabled()) { sendApiError(503, F("No OT-Direct hardware: OT-Direct functions disabled")); return; }
 
   if (wc > 4 && strcmp_P(words[4], PSTR("status")) == 0) {
     if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }

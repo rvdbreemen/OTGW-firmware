@@ -1968,7 +1968,7 @@
     { id: 'mqtt',     title: 'MQTT',                   icon: '📨', reboot: false, desc: 'Broker connection and Home Assistant publishing.' },
     { id: 'ntp',      title: 'Time / NTP',             icon: '🕐', reboot: false, desc: 'Clock synchronisation.' },
     { id: 'otgw',     title: 'OpenTherm Gateway',      icon: '🔥', reboot: false, desc: 'Commands sent to the PIC at boot.' },
-    { id: 'otd',      title: 'OT-Direct',              icon: '🎚', reboot: false, desc: 'Direct OpenTherm control (OTGW32).' },
+    { id: 'otd',      title: 'OT-Direct',              icon: '🎚', reboot: false, desc: 'Direct OpenTherm control (hardware without a PIC).' },
     { id: 'sensors',  title: 'Sensors',                icon: '🌡', reboot: false, desc: '1-Wire / GPIO temperature sensors and the BLE roster.' },
     { id: 'outputs',  title: 'GPIO Outputs',           icon: '🔌', reboot: false, desc: 'Drive a GPIO from OT state.' },
     { id: 's0',       title: 'S0 Pulse Counter',       icon: '⚡', reboot: false, desc: 'Energy pulse counting.' },
@@ -2070,7 +2070,7 @@
     otdventsetpoint:     { cat: 'otd', label: 'Ventilation setpoint', hint: '%' },
     otdhasbypassrelay:   { cat: 'otd', label: 'Bypass relay fitted' },
     // TASK-935: remaining OT-Direct config keys (were falling back to humanizeKey)
-    otdautodetect:       { cat: 'otd', label: 'Auto-detect OTGW32 mode' },
+    otdautodetect:       { cat: 'otd', label: 'Auto-detect OT-Direct mode' },
     otdsetbacktemp:      { cat: 'otd', label: 'Setback temperature', hint: '°C' },
     otdsetbacktimeout:   { cat: 'otd', label: 'Setback timeout', hint: 'Seconds' },   // OTDirect.ino multiplies by 1000 (TASK-1281)
     otdenableslave:      { cat: 'otd', label: 'Enable slave (thermostat) passthrough' },
@@ -3084,7 +3084,7 @@
     satcyclesperhour: [[3, '3 per hour (default)'], [4, '4 per hour']],
     // boardmode is the real 3-value hardware override (ADR-127); the mockup's
     // 4-option ESP8266/OTGW32/LOLIN list was semantically wrong.
-    boardmode: [[0, 'Auto-detect'], [1, 'PIC (Classic)'], [2, 'OT-Direct (OTGW32)']],
+    boardmode: [[0, 'Auto-detect'], [1, 'PIC (Classic)'], [2, 'OT-Direct (no PIC)']],
     // TASK-1358 (ADR-200): the firmware tests Statusflags & (1 << n), Statusflags = (master << 8) | slave
     // (OT MsgID 0), so bits 0-7 are the boiler status and bits 8-15 the thermostat status (OT v4.2).
     gpiooutputstriggerbit: TRIGGER_BITS,
@@ -3768,7 +3768,7 @@
   // ---------- Advanced > PIC firmware flash (TASK-972/982) ----------
   var PICBASE = location.protocol + '//' + location.host + BASE;   // /pic is a top-level route, not under /api/v2
   var picPollTimer = null, picBusy = false, picDevVer = '';
-  var PIC_NONE_MSG = 'No PIC detected — PIC firmware flashing is unavailable on this board (OT-Direct / OTGW32).';
+  var PIC_NONE_MSG = 'No PIC detected: PIC firmware flashing is unavailable in OT-Direct mode.';
   var picGateRetries = 0;
   // done (optional) runs once the header and file list are refreshed, so a caller
   // can chain the next request instead of firing it alongside (TASK-1255).

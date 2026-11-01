@@ -1,7 +1,7 @@
 /* 
  ***************************************************************************  
  **  Program  : s0PulseCount
- **  Version  : v2.0.1-alpha.2
+ **  Version  : v2.0.0-beta.2
  **
  **  Copyright (c) 2021-2024 Rob Roos / Robert van Breemen
  **     based on Framework ESP8266 from Willem Aandewiel
@@ -37,8 +37,12 @@
 
 
  void initS0Count()
- { 
+ {
    if (!settings.s0.bEnabled) return;
+   if (isBoardReservedPin(settings.s0.iPin)) {        // TASK-1552: never reconfigure a board pin
+     DebugTf(PSTR("S0 counter: GPIO%d is used by the board, choose another pin; S0 not started\r\n"), settings.s0.iPin);
+     return;
+   }
    //------------------------------------------------------------------------------------------------------------------------------
 
    pinMode(settings.s0.iPin, INPUT_PULLUP);         // Set interrupt pulse counting pin as input (Dig 3 / INT1)

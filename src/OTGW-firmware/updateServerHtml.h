@@ -88,7 +88,7 @@ static const char UpdateServerIndex[] PROGMEM =
     <h2>Update to a new release</h2>
     <div id='oneIntro'>
     <p>Choose the release zip and press <b>Update</b>. The update takes 2 to 3 minutes. <b>Keep this tab open until it says Done.</b></p>
-    <p class='note'>The unit does not control heating while the updater runs (1 to 2 minutes); on an OTGW32 the boiler then runs on its own settings.</p>
+    <p class='note'>The unit does not control heating while the updater runs (1 to 2 minutes); in OT-Direct mode the boiler then runs on its own settings.</p>
     <div id='unitInfo' class='note'>Reading the unit...</div>
     <details id='oneDetails'>
       <summary>Details: what is kept, what to expect</summary>

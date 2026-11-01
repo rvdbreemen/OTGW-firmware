@@ -12,7 +12,7 @@
 #    ./flash_otgw.sh
 #    ./flash_otgw.sh --port /dev/ttyACM0
 #    ./flash_otgw.sh --bin <merged-full.bin>
-#    ./flash_otgw.sh --board esp32       (Nodoshop OTGW32 / ESP32-S3)
+#    ./flash_otgw.sh --board esp32       (Nodoshop OTGW, ESP32-S3)
 #    ./flash_otgw.sh --baud N
 #    ./flash_otgw.sh --help
 # =============================================================================
@@ -113,7 +113,7 @@ Targeting:
                        303A:4001 on a fresh board with factory firmware) when
                        no --port is given.
   --bin <file>         Firmware path. Use a merged-full image.
-  --board esp32        Force board type (Nodoshop OTGW32 = ESP32-S3).
+  --board esp32        Force board type (Nodoshop OTGW, ESP32-S3).
   --baud N             Override baud rate (default: 921600).
 
 One-time layout migration (ADR-191, TASK-1223.8):
@@ -438,7 +438,7 @@ fi
 case "$ARG_BOARD" in
     esp32)
         ESPTOOL_CHIP="esp32s3"
-        BOARD_NAME="Nodoshop OTGW32 (ESP32-S3)"
+        BOARD_NAME="Nodoshop OTGW (ESP32-S3)"
         [ -z "$ARG_BAUD" ] && ARG_BAUD="921600"
         ;;
     "")
