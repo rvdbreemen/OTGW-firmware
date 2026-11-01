@@ -1,11 +1,10 @@
-# OTGW-firmware v2.0.0-beta.1 Release Notes (DRAFT)
+# OTGW-firmware v2.0.0-beta.1 Release Notes
 
-<!-- TODO(maintainer): final version name. Proposal: v2.0.0-beta.1. No v2.* tag or GitHub release exists yet. -->
-<!-- TODO(maintainer): release date. Target: Sunday 2026-11-01. -->
-
-**Release date:** [TODO: 2026-11-01?]
+**Release date:** 2026-11-01
 **Branch:** dev
 **Compare:** there is no earlier 2.x release. Everything since the 1.x line is new to you.
+
+> **Disclaimer: this is the first beta of 2.0.0.** It is not a stable release. It has had alpha testing on a small group of units, but not the long field runs a release needs: the planned 24-hour soak test was not completed for this build (see Known issues). Expect bugs, and keep a way back: save your settings and keep the 1.x release zip at hand. If you need a gateway that just works, stay on the [1.x releases](https://github.com/rvdbreemen/OTGW-firmware/releases) for now.
 
 ## What this beta is
 
@@ -15,7 +14,7 @@ The purpose of this beta is field data. We want more people to run it on real he
 
 **Supported hardware for this beta:** the OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro. Use the combo image (`esp32-combo`). The PIC stays in place.
 
-This is a beta. Expect rough edges. Read "Before you flash" and "Known issues" first.
+Read "Before you flash" and "Known issues" first.
 
 ---
 
@@ -48,11 +47,31 @@ These apply only when SAT is on.
 - **Hot water setpoint** (TASK-1376): `SW=` goes out when the setpoint changes and once after a restart, no longer at the start of every hot-water draw.
 - **Outside temperature** (TASK-1501): an MQTT or REST outside temperature younger than 1 hour now beats the boiler value and the weather value for that whole hour. Before, it lost priority after 10 minutes.
 - **PWM cycles per hour** is 3 or 4 only, default 3 (TASK-1375). See the breaking changes.
-- **Gas consumption in m3/h** (TASK-1484): two new settings, `satminconsumption` and `satmaxconsumption` (0 to 8), make `sat/consumption` real. Off while both are 0. No Home Assistant entity yet.
+- **Gas consumption in m3/h, split in central heating and hot water** (TASK-1484, TASK-1506): two settings, `satminconsumption` and `satmaxconsumption` (0 to 8), drive the estimate. `sat/consumption` is the central heating value only; the new `sat/consumption_dhw` carries the hot-water value. Home Assistant gets `SAT CH Gas Consumption` and `SAT DHW Gas Consumption`. Off while both settings are 0.
+- **Heating curve self-tune, on by default** (TASK-1525, ADR-205). SAT evaluates every clean hour (SAT in control, no hot water, no PWM, flame on, sun low) and logs the result. Once a day, when the last 3 counted days show the curve is too low or too high by more than 1.0 C, it moves the heating curve coefficient by 0.1, clamped to 0.1 to 5.0. Switch it off under Settings, SAT, Curve: "Heating curve self-tune" (`satcurveselftune`) to keep your coefficient fixed. A manual change of the coefficient restarts the evaluation. Each hour and each daily decision is logged (`SATTUNEH` / `SATTUNED` in the SAT log). See Known issues: the multi-day run is still to be done.
+- **Fireplace mode** (TASK-1374): a new switch (`satfireplace`, default off; Home Assistant switch `SAT Fireplace Mode`). While it is on, SAT heats on the heating curve only, as when the room temperature is missing, so a stove heating the room with the sensor no longer stops heating for the rest of the house.
+- **Hybrid systems use the heat-pump PWM cycle** (TASK-1531). The PWM card on the SAT page shows only the cycle setting of the selected appliance type (TASK-1529); Max modulation is edited only on the Central Heating Settings card (TASK-1530).
+- **A heat pump gets the configured max modulation outside PWM too** (TASK-1426).
+- **Summer simmer cutoff leaves PWM cleanly**, as the cold cutoff does (TASK-1362).
+- **PID values are rounded to 3 decimals**, and a Ki of 0 still clamps the integral (TASK-1423). The PID integral and derivative reset on a real target change, a preset change, the window switch and SAT off/on (TASK-1414); a target change of exactly 0.05 C counts (TASK-1517).
+- **`cycles_this_hour` no longer stops at 6** (TASK-1425).
+- **Zone diagnostics publish only on change** (TASK-1465), which cuts MQTT traffic.
+- **Heating curve coefficient range is 0.1 to 5.0** in the REST metadata and in the setup wizard slider (TASK-1359).
+- **SAT simulation** (bench only) now models a normal 24 kW combi boiler with water mass and emitter output (TASK-1532, TASK-1535).
 - **SAT hands the boiler back when OpenTherm is lost** (TASK-1365). After 30 s without a boiler reply it sends `CS=0`, `CH=1`, `MM=T` once, then waits until the boiler answers again.
 - **Follow thermostat after a reboot** (TASK-1520): with push setpoint on, SAT sends its target to the thermostat at the restart decision (at most 60 s after boot), so a dial change made while SAT waits for a boiler reply and an outside temperature is no longer lost. A change in the first 60 s after boot is still only recorded.
 - **SAT log you can follow** (TASK-1521): telnet key 5 is now a quiet SAT log with one `SATTICK` line per control step and `SATBOOT` lines for the restart; key 8 is a separate high-volume trace, off by default. The SAT log in the web UI says why SAT changed mode, pushed a setpoint, cut heating at the cold setpoint or hit the maximum. Field format: `docs/sat/sat-log-format.md`; `scripts/sat_log_to_csv.py` turns a capture into CSV.
-- **Smaller changes:** the PID steps on its own 60 s timer (TASK-1368); the PWM hourly start limit counts only PWM's own ON phases, and `cycles_this_hour` now shows only those; PWM switches off at the cold cutoff and when all valves close (TASK-1327); CH is 0 below the cold setpoint (TASK-1316); the overshoot margin default is 2.0 C (was 3.0 C, stored values are kept); the Continuous/PWM buttons on the SAT page are gone (the mode is shown, SAT decides); a SAT preset and the window switch survive a reboot (TASK-1487); a setpoint change on the thermostat becomes the SAT target (setting `satfollowthermostat`, TASK-1259).
+- **Earlier smaller changes:** the PID steps on its own 60 s timer (TASK-1368); the PWM hourly start limit counts only PWM's own ON phases, and `cycles_this_hour` now shows only those; PWM switches off at the cold cutoff and when all valves close (TASK-1327); CH is 0 below the cold setpoint (TASK-1316); the overshoot margin default is 2.0 C (was 3.0 C, stored values are kept); the Continuous/PWM buttons on the SAT page are gone (the mode is shown, SAT decides); a SAT preset and the window switch survive a reboot (TASK-1487); a setpoint change on the thermostat becomes the SAT target (setting `satfollowthermostat`, TASK-1259).
+
+---
+
+## Other changes since the last alpha
+
+- **Web UI:** the GPIO output and webhook trigger-bit selects offer all 16 status bits by their OpenTherm name (TASK-1358). The Monitor log with auto-scroll off keeps the lines you are reading in place (TASK-1533). The `/update` page links back to the web UI (TASK-1534).
+- **Reverse proxy:** the File Explorer reboot redirects and helper forms use page-relative links, so they also work behind a proxy prefix such as the Home Assistant panel (TASK-1445).
+- **Uptime** comes from the 64-bit boot clock and no longer wraps (TASK-1449).
+- **Flash tool:** `flash_otgw` also finds a fresh S3 that enumerates as USB id 303A:4001 (TASK-1394), and `--migrate` checks the restored settings key by key, so new keys and number precision no longer report an error (TASK-1388).
+- **Home Assistant:** `sat/weather/snowfall` is announced in cm, the unit Open-Meteo sends (TASK-1464). See the breaking changes.
 
 ---
 
@@ -84,7 +103,7 @@ curl http://<ip>/api/v2/settings -o settings-backup.json
 - **Works behind a reverse proxy**, including a Home Assistant sidebar panel (ingress). Guide: `docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md`.
 - **Home Assistant.** A "Visit" link to the gateway, SAT power and energy sensors for the Energy dashboard, a cumulative hot water total (`dhw_water_total`), and a "Command Dropped" sensor when the PIC never confirms a command.
 - **Return water temperature every minute** from a wired sensor (PIC firmware 6.6 or later, `TS=R`).
-- **Crash log endpoint.** `GET /api/v2/device/crashlog` for diagnostics. <!-- TODO(maintainer): the CHANGELOG [Unreleased] does not mention core dumps. Add them here only if they ship in this build. -->
+- **Crash log endpoint.** `GET /api/v2/device/crashlog` for diagnostics. After an ESP32 panic or watchdog reset it now holds a `Core dump:` line with the task, the program counter and a short backtrace (TASK-1479). `reboot_log.txt` names every ESP-IDF reset reason, including 0xb (USB reset by the host) (TASK-1438).
 - **Capture tool** with raw OpenTherm frame logging (next section).
 - **Relicensed to GNU GPLv3** (was MIT).
 
@@ -117,7 +136,7 @@ Without arguments the tool asks for the device address. `--help` lists the optio
 
 **What to post:** at the end the tool prints `Upload this one file: ...-upload.zip`. That single file holds everything (for a short run: the transcript, `otframes.log`, `otgw_simulation.log` and the CSV files). Post it in Discord #alpha-testing or attach it to a GitHub issue. Check the files before you share them: they contain your device address and your MQTT topics. Leave the broker out if you do not want it in the log.
 
-[macOS: verified by <name> / not verified] <!-- TODO(maintainer): fill in after the tester run. -->
+The Windows launcher is tested on our bench. The Linux/macOS launcher has not yet been run by a macOS tester; if you run it on a Mac, please tell us whether it worked.
 
 ---
 
@@ -146,6 +165,9 @@ The wording below is quoted from the CHANGELOG. Check your Home Assistant automa
 - **`GET /api/v2/sat/weather/needs-setup`** no longer returns `has_key`, and `GET /api/v2/settings` no longer lists `SATweatherapikey`.
 - **While SAT is enabled it owns the control setpoint.** "a `CS=` from MQTT, REST or the serial bridge is refused."
 - **`TP=` commands are no longer replaced in the command queue.** Each `TP=` now waits its turn.
+- **The TCP serial bridge on port 25238 is off by default.** OTmonitor and the Home Assistant `opentherm_gw` integration connect to it. Do: switch on "Legacy TCP port 25238" in the OTGW settings if you use either of them.
+- **`sat/weather/snowfall` is in cm** (TASK-1464). It was announced in mm while Open-Meteo sends cm; the value itself did not change. Home Assistant may report a unit change for the long-term statistics of this sensor.
+- **Heating curve self-tune is on by default** (TASK-1525). On a unit with SAT enabled, the heating curve coefficient can now change by 0.1 at most once a day. Do: switch "Heating curve self-tune" off if you want to keep your coefficient fixed.
 
 ### Settings and SAT features removed
 
@@ -153,6 +175,7 @@ The wording below is quoted from the CHANGELOG. Check your Home Assistant automa
 - **Force PWM.** "The setting `satforcepwm`, the REST field `force_pwm`, the MQTT command `sat/force_pwm`, the state topic `sat/force_pwm_enable` and the Home Assistant switch `SAT Force PWM` are removed."
 - **PWM auto switch.** "The setting `satpwmautoswitch`, the REST field `pwm_auto_switch`, the MQTT command `sat/pwm_auto_switch`, the state topic `sat/pwm_auto_switch_enable` and the Home Assistant switch `SAT PWM Auto Switch` are removed."
 - **Humidity comfort adjust.** "The settings `satcomfortadjust`, `satcomforthumidity` and `satcomfortmaxoffset`, the REST/MQTT fields and commands `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `comfort_offset`, `comfort_ref_humidity` and the Home Assistant switch `SAT_Comfort_Adjust` are removed."
+- **Hourly heating curve auto-tune** (TASK-1413). The firmware-only auto-tune that rewrote the coefficient and the PID gains every hour is removed. Gone: the settings `satautotune` and `satautotunerate`, the REST fields `auto_tune*`, the MQTT topics `sat/auto_tune*` and the Home Assistant switch `SAT Auto Tune`. The firmware empties the retained discovery and state topics. The daily self-tune above replaces it.
 - **Auto-gain setting.** "`satautogains` (`auto_gains_value`) ... and the manual-gain switch (`auto_gains`, `kp_manual`, `ki_manual`, `kd_manual`) ... are removed from the settings, REST, MQTT, the Web UI and the onboarding wizard."
 - **OpenWeatherMap** and the `SATweatherapikey` setting. "Open-Meteo is now the only weather source."
 - Old `settings.ini` files that hold these keys still load. The keys are ignored and dropped at the next save.
@@ -167,24 +190,21 @@ The wording below is quoted from the CHANGELOG. Check your Home Assistant automa
 - **GPIO output and webhook trigger-bit labels** were the wrong way round in the v2 settings page. Stored values are unchanged, so check the select after the update.
 - **Relicensed from MIT to GNU GPLv3.**
 
-<!-- TODO(maintainer): not verified, taken from the older RELEASE_NOTES_2.0.0.md, not from the CHANGELOG [Unreleased]: (a) the legacy otmonitor TCP bridge on port 25238 being opt-in, (b) the OT-bus presence topics moved to generic topics (ADR-084). Confirm against the build before listing them as breaking. -->
-
 ---
 
 ## Known issues
 
 - **An undecodable crash** was seen once on our bench (TASK-1498): a core dump with the program counter in IRAM, and no matching ELF file to decode it. It was seen once and is not reproduced. If you see a crash, the capture tool grabs the crash log.
-- **Unexplained reboots** were seen on an older alpha (alpha.519, TASK-1438): three reboots in 90 s with reason "Unknown (b)" and no crash log, during a replay run on the bench. The cause is not explained. Send the crash log and `reboot_log.txt` if it happens to you.
+- **No 24-hour soak test for this build.** The planned 24-hour run was interrupted every time; the longest uninterrupted run was 224 minutes (alpha.577). This beta ships without it, by maintainer decision. On the day of release the build was smoke-tested on two units, one with a PIC: update over WiFi with settings kept, no reboot, web UI, REST and MQTT working. Long-run stability is exactly what we need your field data for.
+- **One crash seen in the field** (alpha.566, TASK-1538): a panic inside a memory allocation, with a backtrace too short to name the caller. Not reproduced. If your unit reboots unexpectedly, send the crash log (`GET /api/v2/device/crashlog`) and `reboot_log.txt`.
+- **Free memory dips under heavy diagnostic load** (TASK-1528). During long capture runs the lowest free-heap mark fell to between 0.5 and 1.7 KB for a moment, while the free heap stays around 71 KB. No crash was linked to it. Under investigation.
+- **Heating curve self-tune has not run for several days yet** (TASK-1525). Its host tests pass and it counted a clean hour on the bench simulation; a multi-day run that shows a coefficient change is still to be done. Switch it off if you want a fixed coefficient.
 - **SAT is still being validated.** Some SAT decisions are open and follow after this beta. SAT behaviour can change between builds. The ignition logic for a boiler without a return temperature (TASK-1371) was bench-tested; it has not run on such a boiler in the field.
 - **Pressure alarm:** the SAT pressure drop alarm follows thermo-nova's rule (TASK-1480). A pump-head step of 0.3 bar after the pump stops can still raise it. It is display only and sends no command.
-- **macOS capture:** [macOS: verified by <name> / not verified] <!-- TODO(maintainer) -->
+- **macOS capture:** not verified by a macOS tester yet.
 - **Updating through the Home Assistant panel** completed in 2 of 3 bench runs (one 502 during the upload). Update by IP when you can.
 - The first install of the release that introduces the one-action update page is still the two-step flow, because the unit serves the page before the update.
-
-- **Soak test on the OT-Direct board only.** The 24 h soak of this build ran on the OT-Direct board, not on an OTGW Classic with a PIC (maintainer decision 2026-10-31, the Classic test unit was not available). The PIC path of the Classic is covered by the alpha bench tests, not by a soak.
 - **Filesystem update while a capture runs** (TASK-1524): on our bench a filesystem update failed once while a long capture was connected, and the unit served the file explorer upload page until a second update. Settings were kept. Stop the capture before you update.
-
-<!-- TODO(maintainer): add the soak result (soak-570-otgw32.log) and anything else you could not verify. -->
 
 ---
 

@@ -4,13 +4,11 @@
 [![GitHub release](https://img.shields.io/github/v/release/rvdbreemen/OTGW-firmware?style=flat-square)](https://github.com/rvdbreemen/OTGW-firmware/releases)
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
 
-> **Disclaimer: This is a development build, it is in Alpha state. This means it is not released nor supported at this point.**
+> **Disclaimer: v2.0.0-beta.1 is the first beta of the 2.0.0 line.** It is not a stable release. It has had alpha testing on a small group of units, but not yet the long field runs a stable release needs. Expect bugs, save your settings before you flash, and read the [beta.1 release notes](docs/releases/RELEASE_NOTES_2.0.0-beta.1.md) first, including the known issues.
 >
-> The 2.0.0 is unreleased software in the ALPHA state, only available for alpha testers at this point.
->
-> For the current 1.x.x releases, use the [`otgw-1.x.x` work branch](https://github.com/rvdbreemen/OTGW-firmware/tree/otgw-1.x.x) or the [published releases](https://github.com/rvdbreemen/OTGW-firmware/releases).
+> If you need a gateway that just works, stay on the 1.x line for now: the [`otgw-1.x.x` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/otgw-1.x.x) and the [published releases](https://github.com/rvdbreemen/OTGW-firmware/releases).
 
-OTGW-firmware turns the NodoShop OpenTherm Gateway into a networked smart heating controller. It runs on an ESP32-S3 (LOLIN S3 Mini) in the traditional NodoShop OTGW with the PIC co-processor, monitors the OpenTherm bus between your thermostat and boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API. That combination is the supported hardware.
+OTGW-firmware turns the NodoShop OpenTherm Gateway into a networked smart heating controller. It runs on an ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the traditional NodoShop OTGW with the PIC co-processor, monitors the OpenTherm bus between your thermostat and boiler, and connects your heating system to your home automation platform via MQTT, a browser-based web interface and a REST API. That combination is the supported hardware.
 
 A prototype ESP32 board that drives OpenTherm directly, without a PIC, also exists. It is a prototype and nothing more at this time.
 
@@ -18,21 +16,21 @@ A prototype ESP32 board that drives OpenTherm directly, without a PIC, also exis
 
 ## What's New in v2.0.0
 
-Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the traditional OTGW with PIC; the ESP8266 is no longer a 2.0.0 build target. The firmware builds from a single source tree via PlatformIO. If you are coming from a v1.x ESP8266 build, see [Migrating from ESP8266 (1.x)](#migrating-from-esp8266-1x).
+Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the traditional OTGW with PIC; the ESP8266 is no longer a 2.0.0 build target. If you are coming from a v1.x ESP8266 build, see [Migrating from ESP8266 (1.x)](#migrating-from-esp8266-1x).
 
 ### Highlights
 
-- **ESP32-S3 platform**: Native ESP32 support on the traditional OTGW with PIC, using a LOLIN S3 Mini in place of the old Wemos D1 mini. This is the supported hardware. Build with `pio run -e esp32`.
-- **OTDirect**: ESP32-only direct GPIO OpenTherm master/slave. Five operating modes let the ESP32 act as thermostat, boiler, gateway, monitor, or a combined master+slave pair, all without a PIC co-processor.
-- **Ethernet (W5500)**: Wired Ethernet via W5500 SPI on ESP32 hardware that provides it. The firmware auto-detects cable presence and switches between Ethernet and Wi-Fi, with transparent failover in both directions.
-- **BLE temperature sensors**: On ESP32, up to four Xiaomi LYWSD03MMC sensors are read passively over Bluetooth LE using the BTHome v2 protocol. Room temperature and humidity feed directly into SAT and Home Assistant.
-- **OLED display**: 128x64 SSD1306 I2C display on both platforms. Four information pages (status, temperatures, network, boiler). Button cycles pages; display auto-off after configurable timeout.
-- **SAT enhancements**: Summer Simmer Index, improved solar gain compensation, expanded multi-zone support, and BLE sensor integration.
-- **250+ Home Assistant entities**: Full climate entity, all SAT entities, pressure monitoring, BLE sensor entities, and OLED status — all via MQTT auto-discovery.
-- **Wi-Fi resilience**: AP fallback mode (beta) keeps the web UI reachable when the home network is unavailable. Wi-Fi signal quality indicator in the web UI header. Triple-reset credential recovery.
-- **PlatformIO build**: `platformio.ini` builds the `esp32` environment (default). The whole codebase builds from a single source tree.
+- **ESP32-S3 platform**: an asynchronous web server and FreeRTOS on a LOLIN S3 Mini (or S3 Mini Pro) in place of the old Wemos D1 mini. One firmware image (`esp32-combo`) detects the board at boot.
+- **v2 web UI**: the only web UI in 2.0.0. Live value table, graph with history, help text for every setting, SAT page. The File Explorer stays as the recovery page.
+- **Firmware updates over WiFi**: a small safeboot updater sits next to the firmware. If an update fails or a new firmware crashes in its first 30 seconds, the unit returns to safeboot and stays reachable. Units on an older flash layout need one USB migration first.
+- **SAT (Smart Autotune Thermostat), experimental and opt-in**: an embedded heating controller, off by default. See [SAT](#sat-smart-autotune-thermostat).
+- **Home Assistant**: MQTT auto-discovery for the OpenTherm values, SAT, sensors and diagnostics, including SAT power, energy and gas estimates for the Energy dashboard.
+- **Works behind a reverse proxy**, including a Home Assistant sidebar panel (ingress). Guide: [docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md](docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md).
+- **BLE room sensors**: Xiaomi LYWSD03MMC sensors (BTHome v2) are read passively over Bluetooth LE and feed SAT and Home Assistant.
+- **Diagnostics**: a capture tool (launchers for Windows and for Linux/macOS) that records telnet, MQTT, the crash log and raw OpenTherm frames in one upload file, and a crash log with core-dump details after a panic.
+- **Relicensed to GNU GPLv3** (was MIT).
 
-**One small MQTT breaking change**: three OT-bus presence topics (`boiler_connected`, `thermostat_connected`, `otgw_connected`) moved out of the hardware-specific `otgw-pic/*` and `otgw-otdirect/*` subtrees into the generic value namespace, regardless of hardware variant. Home Assistant users are unaffected (entity `unique_id`s are stable, discovery auto-republishes). The firmware self-heals retained payloads on the deprecated topics at first MQTT reconnect. Custom MQTT consumers should update their topic patterns: see the [migration guide](docs/api/MQTT.md#migration-from-14x--pre-release-200-ot-bus-state-topics) and [ADR-084](docs/adr/ADR-084-generic-ot-bus-state-topics.md). REST API and `settings.ini` format are unchanged from v1.x.
+**Breaking changes**: 2.0.0 changes MQTT topics, REST fields and settings compared with 1.x. Check your Home Assistant automations, Node-RED flows and scripts against the [breaking changes in the release notes](docs/releases/RELEASE_NOTES_2.0.0-beta.1.md#breaking-changes-since-the-1x-line) before you upgrade.
 
 ---
 
@@ -41,15 +39,15 @@ Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the tradit
 ### Core features
 
 - Full OpenTherm bus monitoring: all 80+ message IDs decoded in real time
-- MQTT integration with 250+ Home Assistant auto-discovery entities
+- MQTT integration with Home Assistant auto-discovery
 - Web interface: live OT log, real-time graphs, dark/light theme, settings panel
 - REST API v2 with consistent JSON and proper HTTP status codes
-- SAT (Smart Autotune Thermostat): weather-compensated PID heating controller
+- SAT (Smart Autotune Thermostat): weather-compensated PID heating controller, experimental and opt-in
 - DS18B20 Dallas temperature sensors with custom labels (up to 16)
 - S0 pulse-counting energy meter
-- SSD1306 OLED display (128x64, I2C, 4 pages)
-- OTA firmware and filesystem updates via the web interface
-- TCP serial bridge on port 25238 (OTmonitor, HA built-in integration)
+- Optional SSD1306 OLED display (128x64, I2C)
+- Firmware and filesystem updates over WiFi through a safeboot updater
+- TCP serial bridge on port 25238 for OTmonitor and the HA built-in integration (off by default)
 - Telnet debug log on port 23
 - Webhook callbacks on OpenTherm status bit changes
 - Triple-reset Wi-Fi credential recovery
@@ -91,16 +89,18 @@ This ESP32-S3 plus PIC combination is what the firmware supports.
 
 ## SAT: Smart Autotune Thermostat
 
-SAT is an embedded heating controller that runs entirely on the device. It replaces the room thermostat's role in controlling the boiler: it computes the optimal boiler flow temperature from outdoor temperature and room temperature error, learns your heating system's behaviour over time, and keeps your home at the target temperature without needing Home Assistant or any external controller to be involved in the control loop.
+> **SAT is experimental and off by default.** When you switch it on, it takes over the control setpoint of your boiler. The setup wizard asks you to confirm that first. SAT behaviour can still change between builds; see the [release notes](docs/releases/RELEASE_NOTES_2.0.0-beta.1.md#sat-is-experimental-and-opt-in). Without SAT, the gateway is a transparent OpenTherm gateway, as in 1.x.
+
+SAT is an embedded heating controller that runs entirely on the device, a port of the [SAT Home Assistant integration](https://github.com/Alexwijn/SAT). It replaces the room thermostat's role in controlling the boiler: it computes the boiler flow temperature from the outdoor temperature and the room temperature error, and keeps your home at the target temperature without needing Home Assistant or any external controller in the control loop.
 
 ### What SAT does
 
-SAT combines a **weather-compensated heating curve** with a **PID v3 controller**. The heating curve calculates a base flow setpoint from outdoor temperature using a configurable coefficient. The PID loop adds a correction on top, based on the difference between actual and target room temperature. Over several days, the auto-tune function analyses heating cycles and adjusts PID gains automatically.
+SAT combines a **weather-compensated heating curve** with a **PID controller**. The heating curve calculates a base flow setpoint from the outdoor temperature using a configurable coefficient. The PID loop adds a correction on top, based on the difference between actual and target room temperature. The PID gains follow from the heating curve coefficient. A daily **self-tune** (on by default, can be switched off) moves the coefficient by 0.1 when the last 3 days show the curve is clearly too low or too high.
 
 ### Key capabilities
 
-- **Weather compensation**: configurable heating curve coefficient; curve recommendation based on error statistics
-- **PID v3 control**: proportional + integral + derivative correction with automatic gain tuning
+- **Weather compensation**: configurable heating curve coefficient (0.1 to 5.0), a daily self-tune of that coefficient, and a curve recommendation based on error statistics
+- **PID control**: proportional + integral + derivative correction on top of the heating curve
 - **Two control modes**: continuous modulation (direct boiler modulation) and PWM flame cycling (on/off duty cycle)
 - **Heating system types**: radiators, underfloor heating, heat pump
 - **Six presets**: comfort, eco, away, sleep, activity, home, each with a configurable target temperature
@@ -117,11 +117,11 @@ SAT combines a **weather-compensated heating curve** with a **PID v3 controller*
 ### Quick start
 
 1. Open the OTGW web interface and go to **SAT** in the navigation.
-2. Enable SAT and set your target room temperature.
-3. Select your heating system type (radiators / underfloor / heat pump).
+2. Start the setup wizard. Read and confirm the "Before you enable SAT" step.
+3. Select your heating system type (radiators / underfloor / heat pump) and set your target room temperature.
 4. Enter your boiler capacity in kW.
-5. Set an initial heating curve coefficient (start with 1.0 for radiators, 0.6 for underfloor; the curve recommendation will guide further tuning).
-6. Save. SAT takes over the flow setpoint immediately. Let auto-tune run for a few days to optimize PID gains.
+5. Set an initial heating curve coefficient (start with 1.0 for radiators, 0.6 for underfloor; the curve recommendation and the self-tune guide further tuning).
+6. Save. SAT takes over the flow setpoint immediately. Please share a capture log with us if you run SAT: see the release notes, "Capture tool".
 
 For detailed setup including OPV calibration and Home Assistant automation examples, see the [SAT integration guide](backlog/docs/doc-3%20-%20sat-integration-guide.md).
 
@@ -172,7 +172,7 @@ Go to **Settings** and fill in your MQTT broker details. Enable **HA Discovery**
 
 ### 5. Check Home Assistant
 
-Go to **Settings > Devices and Services > MQTT**. The OTGW device appears with 250+ entities already created and ready to use.
+Go to **Settings > Devices and Services > MQTT**. The OTGW device appears with its entities already created and ready to use.
 
 ---
 
@@ -261,9 +261,9 @@ This provides basic thermostat control but does not expose the full range of dat
 | Port | Protocol | Purpose |
 |---|---|---|
 | 80 | HTTP | Web UI and REST API |
-| 81 | WebSocket | Live OpenTherm log stream |
+| 80 (`/ws`) | WebSocket | Live OpenTherm log stream |
 | 23 | Telnet | Debug log output |
-| 25238 | TCP | OTGW serial bridge (OTmonitor, HA built-in integration) |
+| 25238 | TCP | OTGW serial bridge (OTmonitor, HA built-in integration); off by default, switch on "Legacy TCP port 25238" |
 | 1883 | MQTT (outbound) | Home automation integration |
 
 The device also exposes a Wi-Fi configuration portal (AP mode) on first boot or after triple-reset recovery.
@@ -272,7 +272,7 @@ The device also exposes a Wi-Fi configuration portal (AP mode) on first boot or 
 
 ## Security Notes
 
-The web UI and APIs are designed for use on a trusted local network. Do not expose the device directly to the internet. Use a VPN for remote access. A reverse proxy works for the HTTP/REST interface, but WebSocket (live log) requires plain `ws://` and does not work through an HTTPS-terminating proxy.
+The web UI and APIs are designed for use on a trusted local network. The device itself speaks plain HTTP and WebSocket only. Do not expose it directly to the internet; use a VPN for remote access. A reverse proxy works, including an HTTPS-terminating one and the Home Assistant panel (ingress): the live log then runs over `wss://` through the proxy, as long as the proxy carries WebSocket. See [docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md](docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md).
 
 ### Protected endpoints (optional)
 
@@ -314,7 +314,7 @@ Live monitoring, sensor values, and the WebSocket stream remain open without aut
 ## Important Warnings
 
 - **Do not flash PIC firmware over Wi-Fi using OTmonitor.** This can brick the PIC microcontroller. Use the built-in PIC firmware upgrade feature in the web UI instead.
-- **Dallas GPIO default changed in v1.0.0**: The default pin moved from GPIO 13 (D7) to GPIO 10 (SD3). If upgrading from a version before v1.0.0, verify your wiring or change the setting back to 13.
+- **Dallas GPIO default changed in v1.0.0 (1.x, ESP8266)**: The default pin moved from GPIO 13 (D7) to GPIO 10 (SD3). If upgrading a 1.x unit from a version before v1.0.0, verify your wiring or change the setting back to 13.
 - **REST API v0/v1 removed in v1.2.0**: Only `/api/v2/` endpoints remain. See the [REST API reference](docs/api/README.md).
 - **MQTT topic corrections in v1.2.0**: A few spelling fixes changed topic names (`eletric_production` to `electric_production`, etc.). Delete orphaned Home Assistant entities and let discovery recreate them. Details: [breaking changes](docs/fixes/opentherm-v42-mqtt-breaking-changes.md).
 - **ESP32 OTDirect note**: When OTDirect is active, the PIC UART is bypassed. Do not attempt PIC firmware upgrades while OTDirect is the active OpenTherm path.
