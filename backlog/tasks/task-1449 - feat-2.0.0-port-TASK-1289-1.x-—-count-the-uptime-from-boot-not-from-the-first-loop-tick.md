@@ -3,9 +3,11 @@ id: TASK-1449
 title: >-
   feat-2.0.0: port TASK-1289 (1.x) — count the uptime from boot, not from the
   first loop tick
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T06:19:00Z'
+updated_date: '2026-11-01T01:26:00Z'
 labels:
   - port-from-1.x
   - core

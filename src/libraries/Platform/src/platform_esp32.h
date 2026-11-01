@@ -24,6 +24,7 @@
 #include <Preferences.h>
 #include <LittleFS.h>
 #include <esp_system.h>
+#include <esp_timer.h>          // esp_timer_get_time (platformUptimeSeconds, TASK-1449)
 #include <esp_heap_caps.h>      // heap_caps_malloc (platformPsramAllocOnce)
 #include <esp_mac.h>
 #include <esp_netif.h>
@@ -525,6 +526,12 @@ inline bool platformRtcWrite(uint32_t slot, const uint32_t *data, size_t len) {
 // Reset info
 inline bool platformIsExternalReset() {
   return (esp_reset_reason() == ESP_RST_EXT);
+}
+
+// Seconds since boot from the 64-bit boot clock (TASK-1449, port of 1.x TASK-1289): counts setup()
+// time and loop stalls too. Not micros(): that is 32-bit and wraps after ~71.6 minutes.
+inline uint32_t platformUptimeSeconds() {
+  return (uint32_t)(esp_timer_get_time() / 1000000LL);
 }
 
 inline uint32_t platformResetCode() {
