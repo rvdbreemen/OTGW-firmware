@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T16:30:00Z'
-updated_date: '2026-11-01T18:00:00Z'
+updated_date: '2026-11-01T18:07:00Z'
 labels:
   - sat
   - needs-maintainer-ok
@@ -36,4 +36,6 @@ Reported by gruijter (tester), #alpha-testing msg 1566487960164110377 (alpha.597
 2026-11-01 17:35 Sergeant D answered Q-1547a: A (hysteresis 0.5 C, keep 28.2/21; 1 C if issues remain). Recorded as entry 199. Ready for implementation by the dev session (Robert's OK: he asked to put it to Sergeant D with priority and to execute).
 
 2026-11-01 Robert: the main (lead) agent builds TASK-1547 once the beta release is done. Spec: entry 199 (0.5 C latched hysteresis on the cold cutoff, 28.2 rad / 21 floor kept; all cutoff users follow the same latched state).
+
+2026-11-01 17:55 Sergeant D: thermo-nova's 22 C was a mistaken request, 28.2 intended (entry 200); confirms option A.
 <!-- SECTION:NOTES:END -->
