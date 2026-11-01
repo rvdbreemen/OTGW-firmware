@@ -149,10 +149,6 @@ Wanneer een statisch IP is ingesteld dat ook door DHCP wordt uitgedeeld, kan een
 
 Wanneer het WiFi-signaal langdurig wegvalt, probeert de firmware maximaal 10 keer opnieuw te verbinden. Na 10 mislukte pogingen herstart het apparaat zichzelf. Dit is bedoeld als fail-safe, niet als normale werking. Controleer de WiFi-stabilteit als u regelmatige herstarts ziet.
 
-**ESP8266 SDK auto-reconnect race condition**
-
-In zeldzame gevallen kan een race condition in de ESP8266 SDK ervoor zorgen dat automatisch opnieuw verbinden mislukt. De tweelaagsige herstellogica van de firmware (ADR-047) is specifiek ontworpen om dit op te vangen.
-
 ---
 
 ### 7.5 OTA-update mislukt
@@ -167,8 +163,8 @@ In zeldzame gevallen kan een race condition in de ESP8266 SDK ervoor zorgen dat 
 
 | Probleem | Oplossing |
 |---------|-----------|
-| Verkeerd `.bin`-bestand | Zorg dat u het juiste platformbestand gebruikt (ESP8266 `.bin` op ESP8266, ESP32 `.bin` op ESP32) |
-| Bestand te groot | Controleer de beschikbare OTA-ruimte (zichtbaar in `build.py`-uitvoer) |
+| Verkeerd bestand | Gebruik de esp32-combo-zip van de release |
+| Bestand te groot | Gebruik de esp32-combo-zip van de release; die firmware past in het firmwareslot |
 | HTTP-wachtwoord vergeten | Stel het wachtwoord opnieuw in via seriele verbinding of reset de firmware |
 | Verbinding verbroken tijdens upload | Probeer opnieuw via een stabielere verbinding (bedraad netwerk of dichterbij de router) |
 | Browser cached versie | Ververs met Ctrl+F5 en probeer opnieuw |
@@ -177,9 +173,9 @@ In zeldzame gevallen kan een race condition in de ESP8266 SDK ervoor zorgen dat 
 
 Als de firmware niet meer reageert na een mislukte update:
 
-1. Verbind het apparaat via USB.
-2. Flash de firmware opnieuw via `build.py` of PlatformIO.
-3. De ESP8266/ESP32 bootloader is robuust: een mislukte OTA-update overschrijft de actieve firmware niet totdat de upload volledig is geverifieerd.
+1. Een firmware-update via WiFi loopt via de safeboot-updater. Start de nieuwe firmware niet goed op, dan keert de unit terug naar safeboot en kunt u de update opnieuw uitvoeren.
+2. Helpt dat niet, verbind de S3 Mini dan via USB en flash de zip opnieuw met `flash_otgw.bat` (Windows) of `./flash_otgw.sh` (Linux/macOS). Zonder opties wist het script de flash: WiFi-gegevens en instellingen gaan verloren.
+3. Een unit op de oude partitie-indeling (een vroege 2.0.0-alpha) heeft eenmalig `--migrate --host <ip>` nodig; dat bewaart `settings.ini` en zet de instellingen terug. Draai het script met `--help` voor alle opties.
 
 > **WAARSCHUWING: Flash PIC-firmware NOOIT via WiFi.**
 >
@@ -214,11 +210,11 @@ Open de Telnet-debuglog en probeer de pagina opnieuw te laden. Verschijnen er HT
 
 Als de LittleFS-partitie (het bestandssysteem met de webbestanden) niet kon worden gemount, zijn de HTML/CSS/JS-bestanden niet beschikbaar. De Telnet-log toont dan een melding als `LittleFS mount failed`.
 
-Oplossing: upload het filesysteem opnieuw via `build.py --filesystem` of PlatformIO.
+Oplossing: installeer de release-zip opnieuw via de `/update`-pagina, of upload de bestanden via `/fsexplorer`.
 
 #### Stap 4: Geheugengebrek
 
-Op ESP8266 is het beschikbare geheugen (~40KB DRAM) beperkt. Bij ernstig geheugengebrek kunnen HTTP-verzoeken mislukken. De Web UI toont de vrije heap in de voettekst. Zie paragraaf 7.7 voor de heap health tiers en wat u kunt doen bij een lage heap.
+Bij ernstig geheugengebrek kunnen HTTP-verzoeken mislukken. De Web UI toont de vrije heap in de voettekst. Zie paragraaf 7.7 voor de heap health tiers en wat u kunt doen bij een lage heap.
 
 ---
 
@@ -274,7 +270,7 @@ Seriële overruns duiden vaak op een achterliggend probleem:
 
 #### OTGW online-offline-flikkeringen opgelost in v2.0.0
 
-In versies voor 2.0.0 konden herhaalde disconnectie-events op de MQTT-verbinding zorgen voor een cascade van publicaties, waardoor de OTGW-beschikbaarheidsberichten snel achter elkaar `online` en `offline` publiceerden. De stackoverloopproblemen in `publishToSourceTopic` (te grote lokale buffers op de 4KB CONT-stack) zijn opgelost door alle grote buffers statisch te maken. Dit elimineert de crashes die de flikkeringen veroorzaakten.
+In versies voor 2.0.0 konden herhaalde disconnectie-events op de MQTT-verbinding zorgen voor een cascade van publicaties, waardoor de OTGW-beschikbaarheidsberichten snel achter elkaar `online` en `offline` publiceerden. De stackoverloopproblemen in `publishToSourceTopic` (te grote lokale buffers op de 4KB CONT-stack van de ESP8266 in de Wemos D1 mini, onder de 1.x-firmware) zijn opgelost door alle grote buffers statisch te maken. Dit elimineert de crashes die de flikkeringen veroorzaakten.
 
 Als u flikkeringen ziet na een upgrade naar v2.0.0, controleer dan:
 - Of u daadwerkelijk v2.0.0 draait (zie Web UI voettekst).
@@ -284,7 +280,7 @@ Als u flikkeringen ziet na een upgrade naar v2.0.0, controleer dan:
 
 ### 7.9 LED-patronen
 
-De firmware gebruikt status-LEDs om de apparaatstatus aan te geven. Op ESP32-borden (OTGW32) worden de LEDs via PWM gedimd voor een lagere helderheid.
+De firmware gebruikt status-LEDs om de apparaatstatus aan te geven. Op de S3 Mini worden de LEDs via PWM gedimd voor een lagere helderheid.
 
 | LED-patroon | Betekenis |
 |-------------|-----------|
@@ -301,7 +297,7 @@ Een OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro toont de WiFi-status ook m
 | Paars | Er staat een accesspoint open: het WiFi-configuratieportaal, of de AP-fallback als het opgeslagen netwerk bij het opstarten onbereikbaar is. Maak daarmee verbinding om WiFi in te stellen. |
 | Groen | WiFi verbonden. |
 
-De OTGW32 heeft zo'n pixel niet. `/api/v2/device/info` meldt de aangestuurde pixel-GPIO als `status_pixel_gpio` (`0` als er geen is).
+`/api/v2/device/info` meldt de aangestuurde pixel-GPIO als `status_pixel_gpio` (`0` als er geen is).
 
 De fysieke OTGW-print heeft ook indicator-LEDs die door de PIC worden aangestuurd:
 - **Groene LED**: PIC draait en communiceert.
@@ -349,7 +345,7 @@ Druk op elk moment op `h` om het helpmenu te tonen met de huidige apparaatstatus
 | 3 | MQTT-module |
 | 4 | Sensormodules |
 | 5 | SAT-regellus, cycles en HCR (standaard aan) |
-| 6 | OTDirect frame handling en PI-lus (standaard aan, alleen ESP32) |
+| 6 | OTDirect frame handling en PI-lus (standaard aan) |
 | g | MQTT interval gating (laat zien waarom een bericht wel of niet is gepubliceerd) |
 | n | NTP-tijdsynchronisatiedetails |
 | d | Dallas-sensor simulatiehelper |
@@ -442,33 +438,13 @@ Voeg bij het melden van een bug op GitHub altijd de crash log uitvoer toe. Het `
 
 ---
 
-### 7.12 ESP32-specifieke probleemoplossing (OTGW32)
+### 7.12 BLE-temperatuursensoren
 
-Het OTGW32-bord gebruikt een ESP32-S3 en beschikt over hardwaremogelijkheden die niet aanwezig zijn op de ESP8266-versie.
-
-#### OTDirect (direct OpenTherm zonder PIC)
-
-De OTGW32 heeft geen PIC-microcontroller. In plaats daarvan verwerkt de ESP32-S3 het OpenTherm-protocol rechtstreeks via GPIO (OTDirect). Als de OpenTherm-communicatie niet werkt:
-
-1. Controleer of de 18V step-up converter is ingeschakeld (hardwarevereiste voor OT-signalering).
-2. Bekijk de Telnet-debuglog voor OTDirect-gerelateerde berichten. Schakel debug-kanaal 6 in via de Telnet-console voor gedetailleerde OTDirect frame handling.
-3. Zorg dat de boiler en thermostaat op de juiste MASTER- en SLAVE-klemmen zijn aangesloten.
-
-#### BLE-temperatuursensoren
-
-De ESP32 ondersteunt BLE (Bluetooth Low Energy) temperatuursensor-scanning. Als BLE-sensoren niet verschijnen:
+De S3 Mini ondersteunt BLE (Bluetooth Low Energy) temperatuursensor-scanning. Als BLE-sensoren niet verschijnen:
 
 1. Controleer of BLE-scanning is ingeschakeld in Settings.
 2. BLE-sensoren worden gescand op een timer-bewaakt interval. Wacht minstens een volledige scancyclus na het inschakelen.
 3. Bekijk de Telnet-debuglog voor BLE-scanresultaten.
-
-#### Ethernet (W5500)
-
-Het OTGW32-bord ondersteunt een W5500 Ethernet-module als alternatief voor WiFi:
-
-1. Ethernet is alleen beschikbaar op borden waar `HAS_ETH_CAPABLE` is ingesteld (OTGW32).
-2. Wanneer Ethernet is aangesloten en actief, kan WiFi als fallback blijven functioneren.
-3. Bekijk de Telnet-debuglog voor Ethernet link status berichten.
 
 ---
 
@@ -498,13 +474,13 @@ Wilt u alleen de WiFi-verbinding herstellen maar overige instellingen bewaren:
 
 #### Methode 3: Firmware en filesysteem opnieuw flashen (volledige reset)
 
-Voor een volledige reset inclusief alle bestanden:
+Voor een volledige reset inclusief alle bestanden flasht u de release-zip via USB met `flash_otgw.bat` (Windows) of `./flash_otgw.sh` (Linux/macOS), zonder opties:
 
 ```bash
-python build.py --clean
+./flash_otgw.sh
 ```
 
-Dit wist alle opgeslagen gegevens inclusief instellingen, WiFi-gegevens en de LittleFS-bestandspartitie, en plaatst een volledig schone installatie.
+Het script wist de flash en schrijft firmware en filesysteem opnieuw. Alle opgeslagen gegevens verdwijnen, inclusief instellingen, WiFi-gegevens en de LittleFS-bestandspartitie.
 
 ---
 
@@ -520,7 +496,7 @@ https://github.com/rvdbreemen/OTGW-firmware/issues
 
 Voeg bij een bugrapport altijd het volgende mee:
 - Firmwareversie (zichtbaar in de Web UI voettekst of via `/api/v2/device/info`)
-- Platform (ESP8266 of ESP32)
+- Bord (bijvoorbeeld OTGW Classic met LOLIN S3 Mini)
 - Crash log (indien beschikbaar, via Web UI of `/api/v2/device/crashlog`)
 - Een beschrijving van het probleem en de stappen om het te reproduceren
 - Relevante uitvoer uit de Telnet-debuglog

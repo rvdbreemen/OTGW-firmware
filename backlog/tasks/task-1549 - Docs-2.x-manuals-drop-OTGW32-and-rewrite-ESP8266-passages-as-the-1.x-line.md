@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T17:57:00Z'
-updated_date: '2026-11-01T18:40:00Z'
+updated_date: '2026-11-01T18:44:00Z'
 labels:
   - docs
 dependencies: []
@@ -38,4 +38,6 @@ ch03/h03 done: OTGW32 EN 10->0, NL 10->0 (incl. 'OTTHING-platform'); ESP8266 4->
 ch04/h04 done: OTGW32 1->0, ESP8266 1->1 (discovery paragraph now '1.x firmware on the ESP8266'); resetgateway no-op worded as OT-Direct mode (OTGW-Core.ino:1015); removed '(classic NodoShop OTGW, ESP32 OT-Shield, etc.)' from Device Manufacturer paragraph (judgement call). ch05/h05 done: OTGW32 EN 2->0 NL 3->0, ESP8266 2->0, em dashes 5->0 each; no SAT control statements changed; cycle tail window '180 s' (SATcycles.ino:103); PSRAM example now the LOLIN S3 Mini/Mini Pro (boards.h:305-307); 'Thermo-Nova' dropped from the BLE board list (no such board in boards.h).
 
 ch06/h06 done: OTGW32 2->0, ESP8266 EN 10->0 NL 12->0. Ethernet 6.2.1-6.2.5 cut to one sentence (boards.h:172, restAPI.ino:4106-4116); ESP8266 LLMNR, SDK time bug, lwIP/Core 3.1.2 sections removed; 6.1.2 DHCP re-announce claim corrected for 2.x (networkStuff.ino:258-262, 388-404; TASK-432). Numbering gap 6.6->6.8 left on purpose: four cross-refs cite 6.10.
+
+ch07/h07 done: OTGW32 7->0 both; ESP8266 EN 4->1, NL 7->1 (7.8 CONT stack, 1.x context). 7.12 'ESP32-Specific Troubleshooting (OTGW32)' became 'BLE Temperature Sensors' (OTDirect 18V and W5500 subsections removed); NL OTA-recovery and factory-flash steps now use safeboot + flash_otgw.bat/.sh (--migrate --host). Lead fixed EN 'section 7.9' -> '7.10' for the Telnet console. Not checked in code: ADR-047 two-layer recovery claim (7.10a), safeboot 'redo the update' wording (from ADR-191).
 <!-- SECTION:NOTES:END -->

@@ -1,6 +1,6 @@
 ## Chapter 7: Troubleshooting
 
-This chapter covers the most common problems, their root causes, and step-by-step remedies. When in doubt, start with the Telnet debug log (section 7.9) and work forward from there.
+This chapter covers the most common problems, their root causes, and step-by-step remedies. When in doubt, start with the Telnet debug log (section 7.10) and work forward from there.
 
 ### 7.1 OTGW Appears Offline After Boot
 
@@ -13,7 +13,7 @@ This chapter covers the most common problems, their root causes, and step-by-ste
 | PIC firmware mode | If in diagnostic or interface mode from a previous OTmonitor session, use the web UI to reset the PIC |
 
 **Steps:**
-1. Connect to the Telnet debug console (see section 7.9).
+1. Connect to the Telnet debug console (see section 7.10).
 2. Look for `OTGW online` or `OTGW offline` messages.
 3. If you see `OTGW offline` repeating, the PIC is not responding on serial.
 4. Power-cycle the entire OTGW board (not just the ESP).
@@ -85,7 +85,7 @@ Common MQTT return codes:
 
 1. Confirm the device is on the network: ping `<ip>` or try the IP directly.
 2. mDNS resolution failure: on Windows without Bonjour, try the IP address.
-3. Filesystem not mounted: flash the filesystem image via `uploadfs` or upload files via `/fsexplorer`.
+3. Filesystem not mounted: install the release zip again on the `/update` page, or upload files via `/fsexplorer`.
 4. Device in AP fallback mode: connect to the fallback SSID (`OTGW-XXXXXX`) and browse to `http://192.168.4.1`.
 
 ---
@@ -122,7 +122,7 @@ To enable: go to Settings in the Web UI and enable "Nightly Restart", then choos
 
 ### 7.8 Serial Overrun and OTGW Online-Offline Flapping
 
-**Root cause in versions before 2.0.0:** The `publishToSourceTopic()` function allocated approximately 1,600 bytes of local buffers on the cooperative stack. The ESP8266 CONT stack is only 4 KB. The fix in v2.0.0 converts those buffers to static or pre-allocated scratch memory.
+**Root cause in versions before 2.0.0:** The `publishToSourceTopic()` function allocated approximately 1,600 bytes of local buffers on the cooperative stack. On the 1.x firmware for the Wemos D1 mini (ESP8266) that CONT stack is only 4 KB. The fix in v2.0.0 converts those buffers to static or pre-allocated scratch memory.
 
 If you see this on v2.0.0: update to the latest build. If the problem persists, connect to the Telnet debug console and look for `Exception` or `Stack smashing` messages.
 
@@ -130,7 +130,7 @@ If you see this on v2.0.0: update to the latest build. If the problem persists, 
 
 ### 7.9 LED Patterns
 
-The firmware drives status LEDs to indicate the device state. On ESP32 boards (OTGW32), LEDs are PWM-dimmed for reduced brightness.
+The firmware drives status LEDs to indicate the device state. On the S3 Mini the LEDs are PWM-dimmed for reduced brightness.
 
 | LED pattern | Meaning |
 |---|---|
@@ -147,7 +147,7 @@ An OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro also uses the LOLIN's on-boa
 | Purple | An access point is open: the WiFi config portal, or the AP fallback when the saved network is unreachable at boot. Connect to it to configure WiFi. |
 | Green | WiFi connected. |
 
-The OTGW32 has no such pixel. `/api/v2/device/info` reports the driven pixel GPIO as `status_pixel_gpio` (`0` when none).
+`/api/v2/device/info` reports the driven pixel GPIO as `status_pixel_gpio` (`0` when none).
 
 The physical OTGW board itself has indicator LEDs driven by the PIC:
 - **Green LED**: PIC is running and communicating.
@@ -183,7 +183,7 @@ Press `h` at any time to print the help menu with the current device status and 
 | 3 | MQTT module |
 | 4 | Sensor modules |
 | 5 | SAT control loop, cycles and HCR (enabled by default) |
-| 6 | OTDirect frame handling and PI loop (enabled by default, ESP32 only) |
+| 6 | OTDirect frame handling and PI loop (enabled by default) |
 | g | MQTT interval gating (shows why a message was or was not published) |
 | n | NTP time sync details |
 | d | Dallas sensor simulation helper |
@@ -265,33 +265,13 @@ When reporting a bug on GitHub, include the crash log output. The `summary` fiel
 
 ---
 
-### 7.12 ESP32-Specific Troubleshooting (OTGW32)
+### 7.12 BLE Temperature Sensors
 
-The OTGW32 board uses an ESP32-S3 and introduces hardware capabilities not present on the ESP8266 version.
-
-#### OTDirect (direct OpenTherm without PIC)
-
-The OTGW32 has no PIC microcontroller. Instead, the ESP32-S3 handles the OpenTherm protocol directly via GPIO (OTDirect). If OpenTherm communication is not working:
-
-1. Verify that the 18V step-up converter is enabled (hardware prerequisite for OT signalling).
-2. Check the Telnet debug log for OTDirect-related messages. Enable debug channel 6 in the Telnet console to see detailed OTDirect frame handling.
-3. Ensure the boiler and thermostat are connected to the correct MASTER and SLAVE terminals.
-
-#### BLE Temperature Sensors
-
-The ESP32 supports BLE (Bluetooth Low Energy) temperature sensor scanning. If BLE sensors are not appearing:
+The S3 Mini supports BLE (Bluetooth Low Energy) temperature sensor scanning. If BLE sensors are not appearing:
 
 1. Confirm BLE scanning is enabled in Settings.
 2. BLE sensors are polled on a timer-guarded interval. Allow at least one full scan cycle after enabling.
 3. Check the Telnet debug log for BLE scan results.
-
-#### Ethernet (W5500)
-
-The OTGW32 board supports a W5500 Ethernet module as an alternative to WiFi:
-
-1. Ethernet is only available on boards where `HAS_ETH_CAPABLE` is set (OTGW32).
-2. When Ethernet is connected and active, WiFi can remain as a fallback.
-3. Check the Telnet debug log for Ethernet link status messages.
 
 ---
 
@@ -303,7 +283,7 @@ The OTGW32 board supports a W5500 Ethernet module as an alternative to WiFi:
 3. Reboot the device.
 
 **Method 2: Triple-reset (forces the WiFi config portal)**
-Press and release the hardware reset button 3 times in a row, each press within 10 seconds of the previous one (wait for the board to boot between presses). On the 3rd press the device boots into the WiFiManager config portal so you can enter new credentials. Use the reset button, not a power-cycle, and do not hold it: a held reset cannot be detected on ESP8266. See section 6.1.4 and `docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md`.
+Press and release the hardware reset button 3 times in a row, each press within 10 seconds of the previous one (wait for the board to boot between presses). On the 3rd press the device boots into the WiFiManager config portal so you can enter new credentials. Use the reset button, not a power-cycle, and do not hold it. See section 6.1.4 and `docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md`.
 
 **Method 3: Telnet debug console**
 Connect on port 23 and type `resetwifi` to clear WiFi credentials only.
@@ -313,7 +293,7 @@ Connect on port 23 and type `resetwifi` to clear WiFi credentials only.
 ### 7.14 Where to Get Help
 
 1. **GitHub Issues:** `https://github.com/rvdbreemen/OTGW-firmware/issues`
-   Include: firmware version, board type (ESP8266 or ESP32), Telnet debug log, crash log (if available), and settings (redact passwords).
+   Include: firmware version, board (for example OTGW Classic with LOLIN S3 Mini), Telnet debug log, crash log (if available), and settings (redact passwords).
 
 2. **Discord:** Check the GitHub repository for the invite link.
 
