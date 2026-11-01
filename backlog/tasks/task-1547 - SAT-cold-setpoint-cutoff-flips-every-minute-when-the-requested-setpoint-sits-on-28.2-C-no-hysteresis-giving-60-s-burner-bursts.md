@@ -3,10 +3,11 @@ id: TASK-1547
 title: >-
   SAT: cold-setpoint cutoff flips every minute when the requested setpoint sits
   on 28.2 C (no hysteresis), giving 60 s burner bursts
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-01T16:30:00Z'
-updated_date: '2026-11-01T18:07:00Z'
+updated_date: '2026-11-01T19:10:00Z'
 labels:
   - sat
   - needs-maintainer-ok

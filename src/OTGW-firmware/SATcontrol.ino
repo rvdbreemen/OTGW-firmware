@@ -132,6 +132,7 @@ static const float SAT_HC_REF_TEMP           = 20.0f;   // Reference temperature
 static const float SAT_MIN_SETPOINT          = 10.0f;   // Minimum boiler setpoint °C
 static const float SAT_COLD_SETPOINT_RAD     = 28.2f;   // Radiators: requested setpoint below this => no heating, boiler off (TASK-891.2)
 static const float SAT_COLD_SETPOINT_FLOOR   = 21.0f;   // Underfloor: requested setpoint below this => no heating, boiler off
+static const float SAT_COLD_HYSTERESIS_C     = 0.5f;    // Once cut off, heat again only above cold + 0.5 (TASK-1547, Sergeant D entry 199)
 static const float SAT_MAX_SETPOINT_DEFAULT  = 75.0f;   // Default max boiler setpoint °C
 static const float SAT_FLOW_OFFSET_CONTINUOUS = 5.0f;   // Flow temp offset for continuous mode smoothing
 static const float SAT_PWM_MIN_ON_SEC        = 180.0f;  // Min flame-on time in PWM mode (matches Python HEATER_STARTUP_TIMEFRAME = 180s)
@@ -428,6 +429,18 @@ static float satGetColdSetpoint()
 {
   return (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? SAT_COLD_SETPOINT_FLOOR
                                                                  : SAT_COLD_SETPOINT_RAD;
+}
+
+// Cold cutoff state, latched once per control tick by satColdCutoffLatched (TASK-1547, entry 199).
+static bool _sat_coldCut = false;
+
+// Threshold every "requested setpoint at or below the cold setpoint" test compares against: the cold
+// setpoint while heating, cold + SAT_COLD_HYSTERESIS_C while cut off. After the tick's latch update,
+// "requested <= satColdThreshold()" equals _sat_coldCut, so the CS override, the CH bit, the PWM gates,
+// the overshoot switch, the PWM exits and the 3 s refresh all see the same state between ticks.
+static float satColdThreshold()
+{
+  return satGetColdSetpoint() + (_sat_coldCut ? SAT_COLD_HYSTERESIS_C : 0.0f);
 }
 
 // Returns max PWM cycles per hour for the current heating system
@@ -1358,7 +1371,7 @@ static void satPwmSchedule(float pidOutput)
 static bool satPwmDrivesSetpoint(float pidOutput)
 {
   return satGetFlowTemp() > 0.0f && settings.sat.bOvershootProtection && !state.sat.bDhwActive
-         && pidOutput > satGetColdSetpoint();
+         && pidOutput > satColdThreshold();
 }
 
 // scheduleDone: the control tick runs satPwmSchedule() and the PWM exits itself, before this setpoint step (thermo-nova order,
@@ -1370,7 +1383,7 @@ static float satApplyPWM(float pidOutput, bool scheduleDone = false)
   if (satGetFlowTemp() <= 0.0f) {
     return satApplyContinuous(pidOutput, _sat_lastControlCS);   // PWM idle without a flow temperature (heating_control.py:149-150)
   }
-  if (!settings.sat.bOvershootProtection || state.sat.bDhwActive || pidOutput <= satGetColdSetpoint()) {
+  if (!settings.sat.bOvershootProtection || state.sat.bDhwActive || pidOutput <= satColdThreshold()) {
     return prevCS;
   }
   if (!state.sat.bPwmFlameRequested) {
@@ -1407,7 +1420,7 @@ static void satPwmSuppressionRefresh()
   if (OTcurrentSystemState.SlaveStatus & 0x05) return;          // fault flag / DHW active: the control tick skips these too
   if (!state.sat.bValvesOpen || (state.sat.bSummerActive && settings.sat.bSummerSimmer)) return;
   if (!satIsFlameOn() || !satPwmHoldElapsed()) return;
-  if (_sat_requestedSetpoint <= satGetColdSetpoint()) return;
+  if (_sat_requestedSetpoint <= satColdThreshold()) return;
   if (state.sat.fFinalSetpoint <= SAT_MIN_SETPOINT) return;       // last tick commanded heating off
 
   float cs = satPwmSuppressionSetpoint(satGetMaxSetpoint());
@@ -1527,7 +1540,7 @@ static bool satNoReturnFloodAllowed()
   if (state.sat.eControlMode != SAT_MODE_PWM || !state.sat.bPwmFlameRequested) return false;
   if (!settings.sat.bOvershootProtection || (OTcurrentSystemState.SlaveStatus & 0x05)) return false;
   if (!state.sat.bValvesOpen || (state.sat.bSummerActive && settings.sat.bSummerSimmer)) return false;
-  if (_sat_requestedSetpoint <= satGetColdSetpoint() || state.sat.fFinalSetpoint <= SAT_MIN_SETPOINT) return false;
+  if (_sat_requestedSetpoint <= satColdThreshold() || state.sat.fFinalSetpoint <= SAT_MIN_SETPOINT) return false;
   return satGetFlowTemp() > 0.0f && hasOTCommandInterface();
 }
 
@@ -6670,6 +6683,8 @@ static void satControlLoopRun()
   if (pidOutput < SAT_MIN_SETPOINT) pidOutput = SAT_MIN_SETPOINT;
   if (pidOutput > maxSetpoint) pidOutput = maxSetpoint;
   _sat_requestedSetpoint = pidOutput;   // thermo-nova requested_setpoint (climate.py:394), read by the 3 s refresh and the MQTT publish
+  // Cold cutoff latch, once per tick before any user reads satColdThreshold() (TASK-1547, entry 199).
+  _sat_coldCut = satColdCutoffLatched(pidOutput, satGetColdSetpoint(), _sat_coldCut, SAT_COLD_HYSTERESIS_C);
 
   // AC#2: When PID output reaches the system maximum setpoint, use continuous mode
   // instead of PWM — matches Python behavior where requested_setpoint >= maximum_setpoint
@@ -6687,7 +6702,7 @@ static void satControlLoopRun()
   // qualifying tick on the tick time (entries 41, 86, 109), 300 s DHW guard. Heat pumps enter PWM through
   // this switch like every other source: thermo-nova's _maybe_enable_pwm_on_sustained_overshoot
   // (heating_control.py:262-305) has no heat-pump case (entry 87, Q45 A).
-  if (pidOutput > satGetColdSetpoint()) {
+  if (pidOutput > satColdThreshold()) {
     satCycleCheckOvershootSwitch(pidOutput, _sat_tickMs);
   } else {
     satCycleSkipAutoSwitch();   // requested <= cold setpoint clears the start (heating_control.py:280-282)
@@ -6704,7 +6719,7 @@ static void satControlLoopRun()
   // --- Sustained underheat and saturation: PWM -> continuous (Tasks #42/#43) ---
   // Delegated to satCycleCheckPwmExits() in SATcycles.ino (180 s underheat, 300 s saturation from the first
   // qualifying tick, entries 86, 95). At or below the cold setpoint the timers reset (heating_control.py:317-319).
-  if (pidOutput > satGetColdSetpoint()) {
+  if (pidOutput > satColdThreshold()) {
     satCycleCheckPwmExits(pidOutput, _sat_tickMs);
   } else {
     satCycleResetSustainGuards();
@@ -6748,12 +6763,13 @@ static void satControlLoopRun()
   // --- COLD_SETPOINT cutoff (TASK-891.2, George): requested setpoint below the per-heating-system
   // cold setpoint => no heating needed; command the boiler OFF (CS=MINIMUM => CH=0, MM=100 restore).
   // At or below, like thermo-nova (heating_control.py:72, :385) and the satApplyPWM gate.
-  const bool coldCutoff = satColdCutoff(pidOutput, satGetColdSetpoint());
+  const bool coldCutoff = _sat_coldCut;   // latched above; equals satColdCutoff(pidOutput, satColdThreshold())
   if (coldCutoff != _sat_narrCold) {   // TASK-1521: narrate the edge, with the numbers that decided it
     _sat_narrCold = coldCutoff;
-    satNarratef_P(coldCutoff ? PSTR("Heating off: requested %.1f is at or below the cold setpoint %.1f")
-                             : PSTR("Heating on: requested %.1f is above the cold setpoint %.1f"),
-                  pidOutput, satGetColdSetpoint());
+    if (coldCutoff) satNarratef_P(PSTR("Heating off: requested %.1f is at or below the cold setpoint %.1f"),
+                                  pidOutput, satGetColdSetpoint());
+    else            satNarratef_P(PSTR("Heating on: requested %.1f is above the cold setpoint %.1f + %.1f hysteresis"),
+                                  pidOutput, satGetColdSetpoint(), SAT_COLD_HYSTERESIS_C);
   }
   if (coldCutoff) {
     finalSetpoint = SAT_MIN_SETPOINT;
@@ -6768,7 +6784,7 @@ static void satControlLoopRun()
     satSendMM(state.sat.iCurrentModulation);
     // CH rule of Sergeant D 2026-10-23 (see satChEnableDecide in SATchEnable.h): CH=0 with CS=10 when the
     // requested setpoint is at or below the cold setpoint or the PWM OFF phase drives the CS, else CH=1.
-    satSendCH(satChEnableDecide(pidOutput, satGetColdSetpoint(), pwmDrivesSetpoint, pwmOn));
+    satSendCH(satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn));
     // Immergas quirk: send TP=11:12=<setpoint> alongside MM=. Kept on
     // unconditional enqueue per TASK-565: rare quirk path, not steady loop.
     if (satGetManufacturerQuirks() & SAT_QUIRK_IMMERGAS_TP) {

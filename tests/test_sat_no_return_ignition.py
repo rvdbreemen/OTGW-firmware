@@ -77,6 +77,10 @@ static float satGetReturnTemp() { return g_ret; }
 static float satApplyContinuous(float p, float) { return 1000.0f + p; }
 static float satGetBaseOffset() { return 27.2f; }
 static float satGetColdSetpoint() { return g_cold; }
+// TASK-1547: latched cold cutoff (SATcontrol.ino satColdThreshold/_sat_coldCut, outside the cut block); never cut here.
+static bool _sat_coldCut = false;
+static const float SAT_COLD_HYSTERESIS_C = 0.5f;
+static float satColdThreshold() { return satGetColdSetpoint() + (_sat_coldCut ? SAT_COLD_HYSTERESIS_C : 0.0f); }
 static float satGetMaxSetpoint() { return g_userMax; }
 static float satEffectiveMaxSetpoint() { return g_effMax; }
 static uint32_t satGetMinOnTimeSec() { return 180; }

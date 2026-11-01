@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATchEnable.h
-**  Version  : v2.0.0-beta.1
+**  Version  : v2.0.1-alpha.1
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -26,6 +26,16 @@
 static inline bool satColdCutoff(float requestedSetpoint, float coldSetpoint)
 {
   return requestedSetpoint <= coldSetpoint;
+}
+
+// Latched cold cutoff with hysteresis (TASK-1547, Sergeant D entry 199). The bare rule above flips every
+// tick when the requested setpoint hovers on the cold setpoint (gruijter, alpha.597: off at 28.1, on at
+// 28.8, off again a minute later, a 60 s burn each time). Once cut off, heating comes back only above
+// cold + band; while heating, it cuts off at or below cold as before. thermo-nova has no band
+// (heating_control.py:72) but uses COLD_SETPOINT 22, which Sergeant D calls a mistake (entry 200).
+static inline bool satColdCutoffLatched(float requestedSetpoint, float coldSetpoint, bool wasCut, float band)
+{
+  return wasCut ? (requestedSetpoint <= coldSetpoint + band) : (requestedSetpoint <= coldSetpoint);
 }
 
 // CH enable bit of the main SAT control block (TASK-1323, simplified from TASK-1316). Sergeant D,

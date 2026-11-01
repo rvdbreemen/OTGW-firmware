@@ -88,6 +88,11 @@ static bool satNoReturnTemp() { return false; }   // TASK-1371: a boiler with a 
 static float satGetBaseOffset() { return 27.2f; }
 static float g_cold = 28.2f;
 static float satGetColdSetpoint() { return g_cold; }
+// TASK-1547: the latched cold cutoff (SATcontrol.ino satColdThreshold/_sat_coldCut sit outside the cut block). Same one-line
+// definitions as the .ino; the harness ticks never cut off, so the threshold stays g_cold as before.
+static bool _sat_coldCut = false;
+static const float SAT_COLD_HYSTERESIS_C = 0.5f;
+static float satColdThreshold() { return satGetColdSetpoint() + (_sat_coldCut ? SAT_COLD_HYSTERESIS_C : 0.0f); }
 static float satGetMaxSetpoint() { return 62.0f; }
 static float satEffectiveMaxSetpoint() { return 62.0f; }
 static uint32_t satGetMinOnTimeSec() { return 180; }
@@ -988,12 +993,14 @@ class SolarSource(unittest.TestCase):
         src = SAT_INO.read_text(encoding="utf-8")
         refresh = src[src.index("static void satPwmSuppressionRefresh()"):src.index("void satPwmReset()")]
         self.assertNotIn("fSolarSetpointOffset", refresh)
-        self.assertIn("_sat_requestedSetpoint <= satGetColdSetpoint()", refresh)
+        self.assertIn("_sat_requestedSetpoint <= satColdThreshold()", refresh)   # TASK-1547: latched threshold
 
     def test_cold_cutoff_is_at_or_below_like_the_pwm_gate(self):
         src = SAT_INO.read_text(encoding="utf-8")
-        self.assertIn("coldCutoff = satColdCutoff(pidOutput, satGetColdSetpoint())", src)
-        self.assertIn("pidOutput <= satGetColdSetpoint()", src[src.index("static float satApplyPWM"):])
+        # TASK-1547: the cutoff is the latch, updated once per tick with satColdCutoffLatched; the PWM gate reads the same threshold
+        self.assertIn("_sat_coldCut = satColdCutoffLatched(pidOutput, satGetColdSetpoint(), _sat_coldCut, SAT_COLD_HYSTERESIS_C)", src)
+        self.assertIn("const bool coldCutoff = _sat_coldCut;", src)
+        self.assertIn("pidOutput <= satColdThreshold()", src[src.index("static float satApplyPWM"):])
         self.assertNotIn("(pidOutput < satGetColdSetpoint())", src)
 
     def test_pid_freeze_follows_the_setting(self):
@@ -1094,7 +1101,7 @@ class ChEnableSource(unittest.TestCase):
         # TASK-1323: CH = 0 on the cold cutoff or the PWM OFF phase driving the CS, else 1
         src = SAT_INO.read_text(encoding="utf-8")
         loop = src[src.index("void satControlLoop"):]
-        self.assertIn("satSendCH(satChEnableDecide(pidOutput, satGetColdSetpoint(), pwmDrivesSetpoint, pwmOn))", loop)
+        self.assertIn("satSendCH(satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn))", loop)   # TASK-1547
         # TASK-1468 (entry 134): the exits run before the mode is read. An exit that fired has left PWM, so pwmOn and
         # pwmDrivesSetpoint stay false and CH is 1 with the continuous CS; the PWM phase is read only when the tick stays in PWM.
         self.assertLess(loop.index("satCycleCheckPwmExits(pidOutput, _sat_tickMs);"),

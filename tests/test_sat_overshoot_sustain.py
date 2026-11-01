@@ -412,7 +412,11 @@ def extract_gate(sat_src: str) -> str:
     if len(consts) != 2 or not cold:
         raise AssertionError("satGetColdSetpoint() or its constants not found in %s" % SAT_INO)
     always = _fn(sat_src, "static bool satAlwaysMaxModulation()")   # empty when the source does not define it
-    return "\n".join(consts) + "\n" + cold + "\n" + always + "\nstatic void gate(float pidOutput) {\n" + blocks + "\n}\n"
+    # TASK-1547: the gate compares against the latched threshold; take the real latch, band and helper when the source has them
+    latch = "\n".join(re.findall(r"^static (?:bool _sat_coldCut|const float SAT_COLD_HYSTERESIS_C)\s*=[^;]*;", sat_src, re.M))
+    thr = _fn(sat_src, "static float satColdThreshold()")   # empty before TASK-1547
+    return ("\n".join(consts) + "\n" + cold + "\n" + latch + "\n" + thr + "\n" + always
+            + "\nstatic void gate(float pidOutput) {\n" + blocks + "\n}\n")
 
 
 class GateHeatPumpSwitch(unittest.TestCase):

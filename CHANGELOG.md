@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **SAT's cold cutoff no longer flips every minute on mild days** (TASK-1547, Sergeant D entries 199, 200). With the room on target the requested setpoint sits near the heating curve, and on a mild day that is right on the cold setpoint (28.2 C radiators, 21 C underfloor). The cutoff was a bare "at or below" test every 30 s tick, so it switched heating off and on again every minute and lit the boiler for about 60 s each time (reported on alpha.597). The cutoff is now latched with a 0.5 C band: heating stops at or below the cold setpoint as before, and starts again only above the cold setpoint + 0.5 C. The CS override, the CH bit, the PWM gates, the overshoot switch, the PWM exits and the 3 s suppression refresh all read the same latched state. The thresholds stay as Sergeant D chose them; thermo-nova's 22 C was a mistaken request (entry 200). Host tests: `tests/test_sat_cold_hysteresis.cpp`, `tests/test_sat_cold_hysteresis_source.py`.
+
 ## [2.0.0-beta.1] - 2026-11-01
 
 ### Changed

@@ -68,6 +68,10 @@ static bool satNoReturnTemp() { return false; }   // TASK-1371: a boiler with a 
 static bool satIsFlameOn() { return g_flame; }
 static bool satIsEnabled() { return true; }
 static float satGetColdSetpoint() { return 28.2f; }
+// TASK-1547: latched cold cutoff (SATcontrol.ino satColdThreshold/_sat_coldCut, outside the cut block); never cut here.
+static bool _sat_coldCut = false;
+static const float SAT_COLD_HYSTERESIS_C = 0.5f;
+static float satColdThreshold() { return satGetColdSetpoint() + (_sat_coldCut ? SAT_COLD_HYSTERESIS_C : 0.0f); }
 static float satGetBaseOffset() { return 27.2f; }
 static float satGetMaxSetpoint() { return 62.0f; }
 static float satEffectiveMaxSetpoint() { return 62.0f; }
