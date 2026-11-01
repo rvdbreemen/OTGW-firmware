@@ -3,11 +3,11 @@ id: TASK-1290
 title: >-
   Fix: router ARP refresh stalls the gateway 15-90 s every 20 min while it stays
   associated (GH #681)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-22T04:23:00Z'
-updated_date: '2026-10-29T06:26:00Z'
+updated_date: '2026-11-01T19:52:00Z'
 labels:
   - bug
   - wifi
@@ -47,4 +47,12 @@ Primary source for AC#2: FreeBSD sys/netinet/if_ether.c in_arpinput(): for a rec
 - 2026-10-22: committed as 001e81e05 (CHANGELOG + networkStuff.h/.ino). adr-judge declarative pass: 72 ADRs checked, 0 violations, 56 advisory; LLM pass skipped (ADR_KIT_NO_LLM=1, maintainer approved, after the full-hook run was killed for low memory). Stays In Progress for AC#4 (reporter confirmation on OPNsense, GH #681).
 
 2026-10-29: GH #681 issuecomment-6489614178 asks theaprilhare to run beta.8 without the static ARP entry on OPNsense for ~24 h (maintainer approved the text). AC#4 waits for that report.
+
+2026-11-01 Robert: closed after the v1.7.8 release (published 2026-11-01 17:45 UTC, tag v1.7.8 on main). The fix commits af536a6f2, 8dd8627d3 and df6178e72 are all ancestors of v1.7.8 (git merge-base --is-ancestor). AC#4 (reporter's field confirmation on OPNsense) is not received; Robert accepts the release as closure and waives AC#4. If the reporter still sees the 20-minute stalls on 1.7.8, reopen via GH-681.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Gratuitous ARP every 60 s while the gateway has an IP (also after a WiFi reconnect), so the router's ARP entry is refreshed and the 15-90 s stalls every ~20 min (GH-681) do not occur. Shipped in v1.7.8 (commits af536a6f2, 8dd8627d3, df6178e72). Evidence: AC#1-3 per the notes (bench capture old vs fix, esp8266 build and evaluate green, sniffer + router-OS primary source). AC#4 (reporter field confirmation) waived by Robert on 2026-11-01 at the v1.7.8 release; not verified in the field.
+<!-- SECTION:FINAL_SUMMARY:END -->
