@@ -3,11 +3,11 @@ id: TASK-1315
 title: >-
   SAT queues PM=3, PM=15 and PM=48 back to back but the PIC keeps only one
   pending priority message
-status: Done
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T09:37:00Z'
-updated_date: '2026-11-01T20:11:00Z'
+updated_date: '2026-11-01T22:15:00Z'
 labels:
   - pic
   - sat
@@ -43,6 +43,10 @@ Side finding of the TASK-1314 research (2026-10-23): src/OTGW-firmware/SATcontro
 2026-10-25 gruijter capture: not testable at runtime enable; pmChainStart() has one caller, initSAT() boot branch (SATcontrol.ino:4057, initSAT only from setup()). Needs a capture across a restart with SAT enabled (>= 5 min). Runtime enable gap is TASK-1384. Asked gruijter (msg 1563898245145428030).
 
 2026-11-01 bench evidence (Robert asked to close it): Classic+S3 .63, PIC 6.8 gateway, firmware 2.0.0-beta.1+2ec9ce9 (contains e344fa1f1), SAT enabled, SAT simulation switched off for the run (it blocks PIC TX), no boiler and no thermostat on the bus. Reboot 21:03:41, telnet from 21:03:55 (the boot PM=3 itself fell before the telnet connect). Telnet log: 21:04:49 'Sending to Serial [PM=15]' -> PIC 'PM: 15'; 21:05:49 [PM=48] -> 'PM: 48'; retry round of the unanswered ids: 21:06:49 [PM=3] -> 'PM: 3', 21:07:50 [PM=15] -> 'PM: 15', 21:08:50 [PM=48] -> 'PM: 48'; then no PM= up to 21:10:34 (chain stops after one retry). So each PM= reaches the PIC on its own, 60 s apart (timeout per step without a boiler answer), none overwritten in the queue; the PIC accepts each. AC#2 checked on that ESP->PIC evidence. Not shown: the boiler answering MsgID 3/15/48 (no boiler on this bench) and the old firmware on the bench (AC#1 'old' evidence rests on the 2026-10-24 code reading of addCommandToQueue's same-prefix overwrite, not a bench run). Robert asked to close the task on this test; AC#1 left unchecked as waived. Log kept locally (session tmp, telnet-run2-pmchain.log).
+
+2026-11-01 reopened by Robert: show that when three PM= commands arrive shortly after each other, all three really get through, not only the last.
+
+2026-11-01 fix (Robert: PM= unique in the queue, and TP= the same way): addCommandToQueue treats PM= and TP= as unique per value (exact repeat refreshes; TP= no longer append-only). tests/test_pic_pm_chain.py new cases user_three (3x PM= from REST/MQTT) and user_tp; old OTGW-Core.ino FAILED 2 ('1' != '3' queued; TP repeat '4' != '3'), fix 11/11 OK; queue-related tests (otd_ch_override, sat_cmd_cache, dhw_sw_sync, max_tset, no_return_ignition, ot_loss, push_setpoint, restart_quiet, pwm_override, hp_pwm) OK; evaluate --quick 80/0. Version 2.0.0-beta.3. Bench (.63 PIC 6.8): three PM= via REST in quick succession, expect three PIC echoes; boiler answers cannot be shown (no boiler on the bench).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

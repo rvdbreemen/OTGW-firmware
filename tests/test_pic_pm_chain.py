@@ -109,6 +109,34 @@ int main(int argc, char** argv) {
     printf("asked=%s\nqueued=%d\n", all, cmdQueueSize);
     return 0;
   }
+  if (!strcmp(sc, "user_three")) {       // TASK-1315 (Robert): three PM= from REST/MQTT right after each other, no forceQueue
+    addCommandToQueue("PM=3", 4);
+    addCommandToQueue("PM=15", 5);
+    addCommandToQueue("PM=48", 5);
+    addCommandToQueue("PM=15", 5);        // an exact repeat of a queued PM= is not queued twice
+    printf("queued_at_start=%d\n", cmdQueueSize);
+    char all[256] = "";
+    for (uint32_t t = 101000; t <= 110000; t += 1000) {   // the PIC echoes every PM= it receives
+      g_sent[0] = 0; loopAt(t);
+      char line[64]; const char* p = g_sent;
+      while (sscanf(p, "%63[^;];", line) == 1) {
+        strcat(all, line); strcat(all, ";");
+        char e[16]; snprintf(e, sizeof(e), "PM: %d", atoi(line + 3)); echo(e);
+        p = strchr(p, ';') + 1;
+      }
+    }
+    printf("sent=%s\nqueued=%d\n", all, cmdQueueSize);
+    return 0;
+  }
+  if (!strcmp(sc, "user_tp")) {          // TP= follows the same rule: unique per value, exact repeat not added twice
+    addCommandToQueue("TP=11:12=40", 11);
+    addCommandToQueue("TP=11:12=45", 11);
+    addCommandToQueue("TP=11:12=40", 11);   // exact repeat
+    addCommandToQueue("TP=11:13", 8);
+    printf("queued_at_start=%d\n", cmdQueueSize);
+    for (int i = 0; i < cmdQueueSize; i++) printf("q%d=%s\n", i, cmdqueue[i].cmd);
+    return 0;
+  }
 #ifdef PM_CHAIN_TIMEOUT_MS
   if (!strcmp(sc, "chain")) {            // all three answered, echo then response
     pmChainStart();
@@ -210,6 +238,21 @@ class PmChain(unittest.TestCase):
         out = self.run_sc("init")
         self.assertEqual(out["asked"], "PM=3;PM=15;PM=48;")
         self.assertEqual(out["queued"], "0")
+
+    def test_user_pm_three_in_a_row_all_reach_the_pic(self):
+        # Robert 2026-11-01: three PM= that arrive right after each other (REST/MQTT, no forceQueue) must all go
+        # to the PIC, not only the last. HEAD: the 2-letter prefix dedup keeps one PM= slot, so only PM=48 is sent.
+        out = self.run_sc("user_three")
+        self.assertEqual(out["queued_at_start"], "3")
+        self.assertEqual(out["sent"], "PM=3;PM=15;PM=48;")
+        self.assertEqual(out["queued"], "0")
+
+    def test_user_tp_unique_per_value(self):
+        # Robert 2026-11-01: TP= the same way as PM=. Different values each get an entry; an exact repeat does not.
+        # Before: TP= was append-only (TASK-1439), so the repeat of TP=11:12=40 was queued a second time.
+        out = self.run_sc("user_tp")
+        self.assertEqual(out["queued_at_start"], "3")
+        self.assertEqual([out["q0"], out["q1"], out["q2"]], ["TP=11:12=40", "TP=11:12=45", "TP=11:13"])
 
     def test_chain_in_order_on_responses(self):
         out = self.run_sc("chain")

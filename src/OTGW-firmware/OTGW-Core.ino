@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.2
+**  Version  : v2.0.0-beta.3
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3841,14 +3841,18 @@ void addCommandToQueue(const char* buf, const int len, const bool forceQueue, co
   //check to see if the cmd is in queue
   bool foundcmd = false;
   int8_t insertptr = cmdQueueSize; //set insertptr to next empty slot
-  // TP= commands are never replaced: each one goes behind the others (TASK-1439).
-  const bool appendOnly = forceQueue || (buf[0] == 'T' && buf[1] == 'P');
+  const bool appendOnly = forceQueue;
+  // PM= and TP= are unique per value (TASK-1315, Robert 2026-11-01; TP= was append-only since TASK-1439): both
+  // load the PIC's single priority-message slot, so PM=3, PM=15, PM=48 (or two different TP=) in a row are
+  // separate entries, each sent to the PIC; only an exact repeat of a queued command refreshes that entry.
+  const bool uniquePerValue = (buf[0] == 'P' && buf[1] == 'M') || (buf[0] == 'T' && buf[1] == 'P');
   if (!appendOnly){
     char cmd[3];
     memset(cmd, 0, sizeof(cmd));
     memcpy(cmd, buf, 2);
     for (int i=0; i<cmdQueueSize; i++){
-      if (cmdqueue[i].cmd[0] == cmd[0] && cmdqueue[i].cmd[1] == cmd[1]) {
+      if (cmdqueue[i].cmd[0] == cmd[0] && cmdqueue[i].cmd[1] == cmd[1] &&
+          (!uniquePerValue || (cmdqueue[i].cmdlen == len && memcmp(cmdqueue[i].cmd, buf, len) == 0))) {
         //found cmd exists, set the inertptr to found slot
         foundcmd = true;
         insertptr = i;
