@@ -73,6 +73,12 @@ set "ARG_PASSWORD="
 set "ARG_NOBACKUP=0"
 set "ARG_HELP=0"
 
+REM TASK-1388: --compare-settings <saved> <after> runs only the settings check (used by the tests).
+if /i "%~1"=="--compare-settings" (
+    call :compare_settings "%~2" "%~3"
+    exit /b !ERRORLEVEL!
+)
+
 REM ---- Parse arguments -------------------------------------------------------
 if not "%~1"=="" call :parse_args %*
 if errorlevel 1 exit /b %ERRORLEVEL%
@@ -496,13 +502,24 @@ ping -n 11 127.0.0.1 >nul
 call :wait_for_host
 if errorlevel 1 exit /b 1
 curl.exe -s -f --max-time 20 !CURL_AUTH! -o "!BACKUP_DIR!\settings-after.ini" "http://%ARG_HOST%/settings.ini"
-fc /b "!BACKUP_DIR!\settings.ini" "!BACKUP_DIR!\settings-after.ini" >nul
+call :compare_settings "!BACKUP_DIR!\settings.ini" "!BACKUP_DIR!\settings-after.ini"
 if errorlevel 1 (
-    echo [ERROR] settings.ini on the unit differs from the saved copy. Restore it by hand from !BACKUP_DIR!.
+    echo         Restore them by hand from !BACKUP_DIR!.
     exit /b 1
 )
-echo [OK] Settings restored and verified (byte-identical)
 exit /b 0
+
+
+:compare_settings
+REM TASK-1388: compare per key, not byte for byte. A newer firmware rewrites settings.ini in its own
+REM format (new keys, defaults, number precision), so every saved key must come back with the same
+REM value (numbers as numbers); new keys are fine. Only key names are printed, never values.
+REM PSModulePath is cleared so Windows PowerShell 5.1 finds its own modules when started from pwsh 7.
+set "CMP_A=%~1"
+set "CMP_B=%~2"
+set "PSModulePath="
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; try { $a = Get-Content -Raw -LiteralPath $env:CMP_A | ConvertFrom-Json; $b = Get-Content -Raw -LiteralPath $env:CMP_B | ConvertFrom-Json } catch { Write-Output ('[ERROR] Cannot read the settings files: ' + $_.Exception.Message); exit 2 }; $bad = @(); foreach ($p in $a.PSObject.Properties) { $q = $b.PSObject.Properties[$p.Name]; if ($null -eq $q) { $bad += ($p.Name + ' (missing)'); continue }; $x = $p.Value; $y = $q.Value; $nx = ($x -is [ValueType]) -and -not ($x -is [bool]); $ny = ($y -is [ValueType]) -and -not ($y -is [bool]); if ($nx -and $ny) { if ([math]::Abs([double]$x - [double]$y) -gt 1e-6 * [math]::Max(1, [math]::Abs([double]$x))) { $bad += $p.Name } } elseif ([string]$x -cne [string]$y) { $bad += $p.Name } }; if ($bad.Count) { Write-Output ('[ERROR] Settings changed after the restore: ' + ($bad -join ', ')); exit 1 }; Write-Output '[OK] Settings restored and verified (every saved key is back with the same value)'; exit 0"
+exit /b %ERRORLEVEL%
 
 
 :wait_for_host

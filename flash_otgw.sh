@@ -21,6 +21,44 @@ set -e
 set -u
 set -o pipefail 2>/dev/null || true
 
+# TASK-1388: compare settings.ini per key, not byte for byte. A newer firmware rewrites the file in its
+# own format (new keys, defaults, number precision), so every saved key must come back with the same
+# value (numbers as numbers); new keys are fine. Only key names are printed, never values.
+compare_settings() {
+    awk -v A="$1" -v B="$2" '
+    function load(f, m,   line, k, v, n) {
+        n = 0
+        while ((getline line < f) > 0) {
+            if (line !~ /^[ \t]*"[^"]+"[ \t]*:/) continue
+            k = line; sub(/^[ \t]*"/, "", k); sub(/".*/, "", k)
+            v = line; sub(/^[ \t]*"[^"]+"[ \t]*:[ \t]*/, "", v); sub(/[ \t]*,?[ \t\r]*$/, "", v)
+            m[k] = v; n++
+        }
+        close(f)
+        return n
+    }
+    function isnum(s) { return s ~ /^-?[0-9]+(\.[0-9]+)?([eE][-+]?[0-9]+)?$/ }
+    BEGIN {
+        if (load(A, a) == 0 || load(B, b) == 0) { print "[ERROR] Cannot read the settings files."; exit 2 }
+        bad = ""
+        for (k in a) {
+            if (!(k in b)) { bad = bad (bad != "" ? ", " : "") k " (missing)"; continue }
+            if (isnum(a[k]) && isnum(b[k])) {
+                d = a[k] - b[k]; if (d < 0) d = -d
+                t = a[k] < 0 ? -a[k] : a[k]; if (t < 1) t = 1
+                if (d > 1e-6 * t) bad = bad (bad != "" ? ", " : "") k
+            } else if (a[k] != b[k]) bad = bad (bad != "" ? ", " : "") k
+        }
+        if (bad != "") { print "[ERROR] Settings changed after the restore: " bad; exit 1 }
+        print "[OK] Settings restored and verified (every saved key is back with the same value)"
+        exit 0
+    }'
+}
+if [ "${1:-}" = "--compare-settings" ]; then   # used by the tests
+    compare_settings "${2:-}" "${3:-}"
+    exit $?
+fi
+
 ORIGINAL_ARGS=("$@")
 ESPTOOL_VERSION="v4.8.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -310,10 +348,8 @@ migrate_flow() {
     sleep 10
     wait_for_host
     curl -sf --max-time 20 ${auth[@]+"${auth[@]}"} -o "$backup/settings-after.ini" "http://$ARG_HOST/settings.ini" || true
-    if cmp -s "$backup/settings.ini" "$backup/settings-after.ini"; then
-        ok "Settings restored and verified (byte-identical)"
-    else
-        err "settings.ini on the unit differs from the saved copy. Restore it by hand from $backup."
+    if ! compare_settings "$backup/settings.ini" "$backup/settings-after.ini"; then
+        err "Restore them by hand from $backup."
         exit 1
     fi
     echo
