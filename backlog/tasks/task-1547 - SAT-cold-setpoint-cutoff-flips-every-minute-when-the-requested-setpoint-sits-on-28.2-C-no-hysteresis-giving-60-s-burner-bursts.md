@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T16:30:00Z'
+updated_date: '2026-11-01T17:29:00Z'
 labels:
   - sat
   - needs-maintainer-ok
@@ -26,3 +27,9 @@ Reported by gruijter (tester), #alpha-testing msg 1566487960164110377 (alpha.597
 - [ ] #2 Host test on the real satColdCutoff/satChEnableDecide code: a requested setpoint oscillating 28.1/28.8 every tick toggles CH every tick on the old code (red) and not on the fix (green)
 - [ ] #3 Replay or simulation of a mild day shows fewer starts with the fix and no loss of heat delivery
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-01 Robert: ask Sergeant D first, with priority, options hysteresis / lower to 22 C as thermo-nova / both (he first proposed 28.2 -> 22; entry 24 shows Sergeant D chose 28.2 over 22). Asked as Q-1547a in #alpha-testing msg 1566504412351041578, advice A (hysteresis, keep 28.2). No code until his answer is recorded.
+<!-- SECTION:NOTES:END -->
