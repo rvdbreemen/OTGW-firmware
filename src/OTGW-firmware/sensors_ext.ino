@@ -1,6 +1,6 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v1.7.8
+**  Version  : v1.7.9-beta.1
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
