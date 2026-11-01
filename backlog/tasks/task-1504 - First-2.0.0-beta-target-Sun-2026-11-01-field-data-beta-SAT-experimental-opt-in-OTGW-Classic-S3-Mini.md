@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:19:00Z'
-updated_date: '2026-11-01T15:05:00Z'
+updated_date: '2026-11-01T15:24:00Z'
 labels:
   - release beta
 milestone: 2.0.0
@@ -67,4 +67,6 @@ Maintainer decision 2026-11-01 (Robert, in session): release beta.1 today as-is.
 AC4 checked 2026-11-01 with one deviation from its wording: the AC lists TASK-1438 as a known issue, but 1438 is explained (cd5071ebb, reset reason 0xb = USB reset by the host) and Done, so the release notes drop it from Known issues and name the reset reason in Highlights instead. TASK-1498 stays listed. Evidence: docs/releases/RELEASE_NOTES_2.0.0-beta.1.md has the SAT experimental/opt-in section, the breaking list since 1.x (now incl. auto-tune removal, snowfall cm, self-tune default on), Known issues (1498, 1538, 1528, no 24 h soak, self-tune multi-day run, macOS), 'Before you flash' (save settings) and the Capture tool section. CHANGELOG [Unreleased] gained the 21 missing alpha.583-597 entries. The publish zip still needs the beta.1 prerelease bump and a rebuild (version.h is alpha.597).
 
 2026-11-01 Robert in session: 'Go for release' (AC5 go recorded before the tag). Release flow: _VERSION_PRERELEASE alpha.597 -> beta.1 (autoinc-semver --update-all, 49 banners), CHANGELOG [Unreleased] rolled to [2.0.0-beta.1] - 2026-11-01, then esp32-combo build, OTA bench check on the Classic (.63), annotated tag v2.0.0-beta.1, GitHub prerelease (draft first, assets incl. the flash zip with the capture tools, not marked latest; main untouched).
+
+2026-11-01 16:35 beta.1 RELEASED: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.1 (prerelease, not latest; latest stays v1.7.7; main untouched). Tag v2.0.0-beta.1 (annotated) -> 2ec9ce949. Build esp32-combo from 2ec9ce949: 'Successfully created ESP32S3 image' x2 + 'Build completed successfully!', artifacts 2.0.0-beta.1+2ec9ce9 16:15; evaluate --quick 80 pass/0 fail. Bench: OTA (scripts/ota_flash.py) to the Classic+S3 Mini .63, exit 0, fs hash d458ac3->2ec9ce9, settings 175 keys changed none; device/info fwversion 2.0.0-beta.1+2ec9ce9, PIC 6.8 gateway; after 5 min bootcount 31 (29 -> 31 = safeboot handover + new fw), freeheap 58992, maxblock 31732, crashlog available false. Before the flash .63 ran alpha.597 for 6 h 24 min without a reboot (same firmware code). Assets: flash zip (with capture tools + flash scripts), .ino.bin, .littlefs.bin, merged-full, .elf, safeboot, SHA256SUMS; downloaded zip SHA-256 matches (ccfabe71...).
 <!-- SECTION:NOTES:END -->
