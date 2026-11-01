@@ -181,6 +181,7 @@ enum class HaUnit : uint8_t {
     bytes,              // "B" (bytes, used by heap-diag sensors)
     L,                  // "L" (litres, dhw_water_total; TASK-1123)
     m3_h,               // "m³/h" (gas consumption rate, sat/consumption; TASK-1506)
+    cm,                 // "cm" (snowfall: Open-Meteo reports it in centimetres; TASK-1464)
     _count
 };
 

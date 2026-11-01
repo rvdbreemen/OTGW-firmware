@@ -3,9 +3,11 @@ id: TASK-1464
 title: >-
   Snowfall unit: discovery says mm, Open-Meteo request sets no unit (default may
   be cm)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T07:22:00Z'
+updated_date: '2026-11-01T01:15:00Z'
 labels:
   - sat
   - weather

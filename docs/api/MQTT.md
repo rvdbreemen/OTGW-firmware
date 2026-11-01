@@ -573,7 +573,7 @@ Published only while weather is enabled (`SATweatherenable`) and the last poll w
 | `sat/weather/pressure_msl` | `"1013.2"` | no | Sea-level pressure (hPa). Forecast builds only |
 | `sat/weather/precipitation` | `"0.2"` | no | Precipitation (mm). Forecast builds only |
 | `sat/weather/rain` | `"0.2"` | no | Rain (mm). Forecast builds only |
-| `sat/weather/snowfall` | `"0.0"` | no | Snowfall (raw Open-Meteo value, no unit parameter in the request; Home Assistant discovery labels it mm). Forecast builds only |
+| `sat/weather/snowfall` | `"0.0"` | no | Snowfall in cm (Open-Meteo reports snowfall in centimetres, `current_units.snowfall = "cm"`; Home Assistant discovery labels it cm, TASK-1464). Forecast builds only |
 | `sat/weather/weather_code` | `"3"` | no | WMO weather code. Forecast builds only |
 | `sat/weather/is_day` | `"1"` / `"0"` | no | Daylight (payload `"1"`/`"0"`). Forecast builds only |
 
@@ -1313,7 +1313,8 @@ Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-aud
 | `sat/weather/wind_direction` | ° | Weather |
 | `sat/weather/cloud_cover` | % | Weather |
 | `sat/weather/pressure_msl` | hPa | Weather |
-| `sat/weather/precipitation`, `sat/weather/rain`, `sat/weather/snowfall` | mm | Weather |
+| `sat/weather/precipitation`, `sat/weather/rain` | mm | Weather |
+| `sat/weather/snowfall` | cm | Weather |
 | `sat/weather/weather_code` | - | WMO weather code |
 
 **Sensor entities, diagnostic category (ID 251):**

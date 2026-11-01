@@ -1374,7 +1374,7 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {253, 0x00, ha_lbl_sat_weather_pressure_msl,   ha_name_sat_weather_pressure_msl,   HaDeviceClass::pressure,    HaUnit::hPa,     HaStateClass::measurement, HaIcon::gauge,         HaEntityCat::none, true, nullptr,              nullptr},
     {253, 0x00, ha_lbl_sat_weather_precipitation,  ha_name_sat_weather_precipitation,  HaDeviceClass::none,        HaUnit::mm,      HaStateClass::measurement, HaIcon::water,         HaEntityCat::none, true, nullptr,              nullptr},
     {253, 0x00, ha_lbl_sat_weather_rain,           ha_name_sat_weather_rain,           HaDeviceClass::none,        HaUnit::mm,      HaStateClass::measurement, HaIcon::water,         HaEntityCat::none, true, nullptr,              nullptr},
-    {253, 0x00, ha_lbl_sat_weather_snowfall,       ha_name_sat_weather_snowfall,       HaDeviceClass::none,        HaUnit::mm,      HaStateClass::measurement, HaIcon::snowflake,     HaEntityCat::none, true, nullptr,              nullptr},
+    {253, 0x00, ha_lbl_sat_weather_snowfall,       ha_name_sat_weather_snowfall,       HaDeviceClass::none,        HaUnit::cm,      HaStateClass::measurement, HaIcon::snowflake,     HaEntityCat::none, true, nullptr,              nullptr},
     {253, 0x00, ha_lbl_sat_weather_weather_code,   ha_name_sat_weather_weather_code,   HaDeviceClass::none,        HaUnit::none,    HaStateClass::measurement, HaIcon::information,   HaEntityCat::none, true, nullptr,              nullptr},
     // --- Pseudo-ID 254: TASK-543 SAT flame status string ---
     {254, 0x00, ha_lbl_sat_flame_status,           ha_name_sat_flame_status,           HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::fire,          HaEntityCat::none, true, nullptr,              nullptr},
@@ -2098,6 +2098,7 @@ PGM_P haUnitStr(HaUnit u) {
         case HaUnit::bytes: { static const char s[] PROGMEM = "B"; return s; }
         case HaUnit::L: { static const char s[] PROGMEM = "L"; return s; }
         case HaUnit::m3_h: { static const char s[] PROGMEM = "m³/h"; return s; }
+        case HaUnit::cm: { static const char s[] PROGMEM = "cm"; return s; }
         default: return nullptr;
     }
 }
