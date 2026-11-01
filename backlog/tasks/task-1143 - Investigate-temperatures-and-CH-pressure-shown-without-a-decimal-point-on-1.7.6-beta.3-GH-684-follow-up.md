@@ -3,11 +3,11 @@ id: TASK-1143
 title: >-
   Investigate: temperatures and CH pressure shown without a decimal point on
   1.7.6-beta.3 (GH #684 follow-up)
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
-created_date: '2026-09-20 11:35'
-updated_date: '2026-10-20 02:00'
+created_date: 2026-09-20 11:35
+updated_date: '2026-11-01T09:27:00Z'
 labels:
   - bug
   - web-ui
@@ -48,4 +48,6 @@ mrfox7688 and jaronbor run beta.3 for the MQTT fix (#682) and have not reported 
 - Asked the reporter on GH #684 (issuecomment-5877663741) for a dashboard screenshot plus the raw /api/v2/otgw/otmonitor output at the same moment, and browser/device/extension details, on beta.7. Waiting on that evidence (needs-info).
 
 2026-10-20: re-checked GH #684. Issue CLOSED; no reply from Appiejs since the 2026-09-28 evidence request (issuecomment-5877663741), 3 weeks. Bench reproduction already failed (see above), so AC #2 cannot move without the reporter's screenshot + raw /api/v2/otgw/otmonitor output. Back to To Do, needs-info kept. Unproven hypothesis worth asking about: browser page translation (e.g. Chrome translate to Dutch) rewriting "5.13" as a thousands-grouped number.
+
+Audit 2026-11-01: moved To Do -> In Progress, labelled needs-info: AC1 is checked and the investigation is done (bench .88.68 on beta.7 did not reproduce; jsonStuff.ino:365-368 writes %.3f). Waits on the reporter's screenshot plus raw otmonitor output; GH #684 is closed and quiet for 4+ weeks.
 <!-- SECTION:NOTES:END -->
