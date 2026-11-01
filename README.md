@@ -4,9 +4,24 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.7](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.7): the PIC temperature sensor reaches Home Assistant, and two tools on one computer share port 25238 again. If your gateway has an admin password set and still runs v1.7.4 or earlier, upgrade: those versions served `settings.ini`, which holds that password in cleartext, without authentication.
+> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.8](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.8): the gateway recovers by itself from silent WiFi links, failed broker lookups and access point outages, and says why it went down. If your gateway has an admin password set and still runs v1.7.4 or earlier, upgrade: those versions served `settings.ini`, which holds that password in cleartext, without authentication.
 
-## What's New in v1.7.7
+## What's New in v1.7.8
+
+v1.7.8 is a network reliability release for the 1.x (ESP8266) line, driven by long field captures on GH #681 and GH #682. No breaking changes versus v1.7.7.
+
+- **A WiFi link that stays associated but passes no traffic is detected and recovered**: the gateway pings its router and reconnects, then restarts, instead of staying off the network for over an hour. (TASK-1248)
+- **MQTT comes back after a failed broker name lookup**, the radio no longer dozes in modem-sleep, a gratuitous ARP every 60 s keeps the router's entry fresh, and after an access point outage the gateway rejoins in seconds instead of opening the setup portal. (TASK-1250, TASK-1261, TASK-1290, ADR-099, TASK-1262)
+- **The gateway says why it went down**: a restart reason in `reboot_log.txt`, and the last WiFi outage (802.11 reason, access point, duration) in the telnet banner and `/api/v2/device/info`. (TASK-1247, TASK-1278, TASK-1434)
+- **Dropped and refused PIC commands are reported** on `otgw-firmware/command_dropped` and in two Home Assistant entities. (TASK-1431, TASK-1442)
+- **The web interface works behind a reverse proxy and in a Home Assistant sidebar panel.** Guide: [docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md](docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md). (TASK-1378)
+
+Flash **both** firmware and filesystem. Settings are preserved.
+
+Full release notes: [RELEASE_NOTES_1.7.8.md](RELEASE_NOTES_1.7.8.md)
+Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
+
+## What was new in v1.7.7
 
 v1.7.7 is a small feature and fix release for the 1.x (ESP8266) line. No breaking changes versus v1.7.6.
 
@@ -182,14 +197,21 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-## Latest stable release: v1.7.7
+## Latest stable release: v1.7.8
 
-`v1.7.7` is the current stable release on `main`. It lets the temperature sensor wired to the PIC reach MQTT and Home Assistant, stops two tools on one computer from evicting each other on port 25238, and stops a web interface tab from starving a Telegraf scrape. No breaking changes.
+`v1.7.8` is the current stable release on `main`. It recovers by itself from a WiFi link without traffic, a failed broker name lookup and an access point outage, keeps the radio awake and the router's ARP entry fresh, reports dropped and refused PIC commands, records why the gateway went down, and works behind a reverse proxy. No breaking changes.
+
+Full release notes: [RELEASE_NOTES_1.7.8.md](RELEASE_NOTES_1.7.8.md)
+Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.8)
+
+## Previous stable release: v1.7.7
+
+`v1.7.7` let the temperature sensor wired to the PIC reach MQTT and Home Assistant, stopped two tools on one computer from evicting each other on port 25238, and stopped a web interface tab from starving a Telegraf scrape. No breaking changes.
 
 Full release notes: [RELEASE_NOTES_1.7.7.md](RELEASE_NOTES_1.7.7.md)
 Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.7)
 
-## Previous stable release: v1.7.6
+## Older stable release: v1.7.6
 
 `v1.7.6` fixed a chain of MQTT defects that ended in corrupted values and "malformed packet" disconnects, let the Home Assistant OpenTherm Gateway integration connect over port 25238 again, and brought back two clients on that port with one writer at a time. One breaking change: port 25238 accepted two clients again.
 

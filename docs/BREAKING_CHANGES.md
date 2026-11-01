@@ -4,6 +4,21 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## v1.7.8
+
+**No breaking changes versus v1.7.7.** No MQTT topic renames, no REST API removals, no settings-format changes, and no migration on upgrade.
+
+### Behaviour changes
+
+- **`TP=` commands are no longer replaced in the command queue** (TASK-1431). A new command still replaces a waiting one with the same two-letter code, except `TP=`: each `TP=` now waits its turn behind the others.
+- **A command the PIC refuses counts as dropped** (TASK-1442). An answer such as `ZZ: NG` or `PR: BV` used to remove the command as if it were confirmed and set `command_retry_exceeded` back to `OFF`. It is now published on `otgw-firmware/command_dropped`, counted in `cmd_dropped`, turns `command_retry_exceeded` `ON`, and is not retried.
+- **The WiFi radio stays on** (TASK-1261). Modem-sleep is switched off after every connect, which uses somewhat more power.
+- **The ESP8266 automatic WiFi connect at power-up is switched off in flash** (TASK-1301). The firmware now connects once by itself, with its hostname set.
+- **A WiFi link without traffic triggers a reconnect, then a restart** (TASK-1248). Only after the router answered a ping once, and never while MQTT, a REST client or a port 25238 tool shows the network works.
+- **Additions only**: MQTT topics `otgw-firmware/command_dropped` and `otgw-firmware/command_retry_exceeded`, keys `wifi_*` and `cmd_dropped` in `/api/v2/device/info`, and `configuration_url` in the Home Assistant discovery device block. Lines in `reboot_log.txt` can carry a reason after the reset cause.
+
+---
+
 ## v1.7.7
 
 **No breaking changes versus v1.7.6.** No MQTT topic renames, no REST API removals, no settings-format changes, and no migration on upgrade. The new PIC Temperature Sensor setting starts off.
