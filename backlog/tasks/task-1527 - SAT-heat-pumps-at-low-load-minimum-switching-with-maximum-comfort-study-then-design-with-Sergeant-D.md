@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-31T13:48:00Z'
-updated_date: '2026-10-31T20:33:00Z'
+updated_date: '2026-11-01T09:22:00Z'
 labels:
   - sat
   - design
@@ -45,4 +45,6 @@ Robert 2026-10-31: 'de warmtepomp moet minimaal schakelen. Dus goal voor warmtep
 2026-10-31 entry 186 (Hybrid = heat pump, scope open as Q-1531a): read against rounds 15-17. Low-load PWM is the regime where a hybrid runs its heat pump alone (the gas boiler assists only at high load), so the heat-pump results (HP PWM cycle, degree minutes) apply to a hybrid at low load without a new simulation. Not modelled: switch-over between heat pump and gas boiler, and gas assist during a degree-minute run. A hybrid case is only needed if Q-1531a = B (every heat-pump rule, incl. max flow 40) or if a hybrid tester reports switch-over behaviour.
 
 2026-10-31 Q-1531a answered A (Sergeant D 19:12 UTC, msg 1566167931191304233; ea records it as entry 188): a hybrid uses the heat-pump PWM cycle, the rest stays gas. So no hybrid simulation is needed. Consequence for the TASK-1527 design: whatever replaces the heat-pump PWM (degree minutes or a longer cycle, Q-1527a) also reaches the hybrid's heat pump, while the gas start limit and the max-flow defaults stay. Q-1527a must say so explicitly.
+
+2026-11-01: Sergeant D's position on degree minutes (comfort vs efficiency, spark gap, minimum capacity is the lever) recorded as entry 192; answered in #dev-sat-mqtt msgs 1566380852735254659 / 1566381192104779827 with analysis of his UK charts. Field test plan (switchback, same house, both methods, pre-registered H1-H3) in docs/sat/sim-hp-lowload/field-test-plan.md. Next in the model: round 18 = start-loss term (Cd 0.05/0.10), spark-gap cost with SAT-on-gas reference, and the field protocol simulated to size the test. Q-1527a still open.
 <!-- SECTION:NOTES:END -->
