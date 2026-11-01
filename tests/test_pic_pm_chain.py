@@ -115,17 +115,18 @@ int main(int argc, char** argv) {
     addCommandToQueue("PM=48", 5);
     addCommandToQueue("PM=15", 5);        // an exact repeat of a queued PM= is not queued twice
     printf("queued_at_start=%d\n", cmdQueueSize);
-    char all[256] = "";
-    for (uint32_t t = 101000; t <= 110000; t += 1000) {   // the PIC echoes every PM= it receives
+    char all[256] = "", times[256] = "";
+    for (uint32_t t = 101000; t <= 110000; t += 250) {    // 250 ms loop; the PIC echoes every PM= it receives
       g_sent[0] = 0; loopAt(t);
       char line[64]; const char* p = g_sent;
       while (sscanf(p, "%63[^;];", line) == 1) {
         strcat(all, line); strcat(all, ";");
+        char ts[24]; snprintf(ts, sizeof(ts), "%lu;", (unsigned long)(t - 101000)); strcat(times, ts);
         char e[16]; snprintf(e, sizeof(e), "PM: %d", atoi(line + 3)); echo(e);
         p = strchr(p, ';') + 1;
       }
     }
-    printf("sent=%s\nqueued=%d\n", all, cmdQueueSize);
+    printf("sent=%s\nsent_ms=%s\nqueued=%d\n", all, times, cmdQueueSize);
     return 0;
   }
   if (!strcmp(sc, "user_tp")) {          // TP= follows the same rule: unique per value, exact repeat not added twice
@@ -246,6 +247,9 @@ class PmChain(unittest.TestCase):
         self.assertEqual(out["queued_at_start"], "3")
         self.assertEqual(out["sent"], "PM=3;PM=15;PM=48;")
         self.assertEqual(out["queued"], "0")
+        # one second apart (Robert): the PIC keeps one pending priority message
+        ms = [int(x) for x in out["sent_ms"].strip(";").split(";")]
+        self.assertTrue(all(b - a >= 1000 for a, b in zip(ms, ms[1:])), f"PM= sent less than 1 s apart: {ms}")
 
     def test_user_tp_unique_per_value(self):
         # Robert 2026-11-01: TP= the same way as PM=. Different values each get an entry; an exact repeat does not.

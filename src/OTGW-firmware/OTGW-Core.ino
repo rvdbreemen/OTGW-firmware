@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.4
+**  Version  : v2.0.0-beta.5
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3913,6 +3913,12 @@ void addCommandToQueue(const char* buf, const int len, const bool forceQueue, co
   This checks the queue for message are due to be resent.
   If retry max is reached the cmd is delete from the queue
 */
+// PM= and TP= both load the PIC's single priority-message slot (otgw-6.6 gateway.asm SetPrioMessage, SlaveParameter):
+// send at most one of them per second, so three in a row go out one second apart (TASK-1315, Robert 2026-11-01).
+#define PRIO_MSG_SPACING_MS 1000UL
+static uint32_t s_lastPrioSendMs = 0;
+static bool     s_prioSent = false;
+
 void handleCommandQueue(){
   pmChainTick();
   // Pause queue processing briefly after ser2net activity to avoid collisions
@@ -3921,6 +3927,10 @@ void handleCommandQueue(){
   for (int i = 0; i < cmdQueueSize; i++) {
     // OTDebugTf(PSTR("CmdQueue: Checking due in queue slot[%d]:[%lu]=>[%lu]\r\n"), (int)i, (unsigned long)millis(), (unsigned long)cmdqueue[i].due);
     if ((int32_t)(now - cmdqueue[i].due) >= 0) {
+      const bool prio = (cmdqueue[i].cmd[0] == 'P' && cmdqueue[i].cmd[1] == 'M') ||
+                        (cmdqueue[i].cmd[0] == 'T' && cmdqueue[i].cmd[1] == 'P');
+      if (prio && s_prioSent && (now - s_lastPrioSendMs) < PRIO_MSG_SPACING_MS) continue;   // stays due, next pass
+      if (prio) { s_lastPrioSendMs = now; s_prioSent = true; }
       OTDebugTf(PSTR("CmdQueue: Queue slot [%d] due\r\n"), i);
       sendPICSerial(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
       cmdqueue[i].retrycnt++;

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T09:37:00Z'
-updated_date: '2026-11-01T22:15:00Z'
+updated_date: '2026-11-01T22:38:00Z'
 labels:
   - pic
   - sat
@@ -47,6 +47,8 @@ Side finding of the TASK-1314 research (2026-10-23): src/OTGW-firmware/SATcontro
 2026-11-01 reopened by Robert: show that when three PM= commands arrive shortly after each other, all three really get through, not only the last.
 
 2026-11-01 fix (Robert: PM= unique in the queue, and TP= the same way): addCommandToQueue treats PM= and TP= as unique per value (exact repeat refreshes; TP= no longer append-only). tests/test_pic_pm_chain.py new cases user_three (3x PM= from REST/MQTT) and user_tp; old OTGW-Core.ino FAILED 2 ('1' != '3' queued; TP repeat '4' != '3'), fix 11/11 OK; queue-related tests (otd_ch_override, sat_cmd_cache, dhw_sw_sync, max_tset, no_return_ignition, ot_loss, push_setpoint, restart_quiet, pwm_override, hp_pwm) OK; evaluate --quick 80/0. Version 2.0.0-beta.3. Bench (.63 PIC 6.8): three PM= via REST in quick succession, expect three PIC echoes; boiler answers cannot be shown (no boiler on the bench).
+
+2026-11-01 bench .63 on 2.0.0-beta.4+2905bd1 (SAT simulation off): three PM= via REST POST /api/v2/otgw/commands at 23:34:52 (HTTP 202 each, 26-65 ms) -> queue slots [0] PM=3, [1] PM=15, [2] PM=48 (no overwrite); 23:34:54.68 sent to the PIC PM=3, PM=15, PM=48 within 4 ms and echoed 'PM: 3', 'PM: 15', 'PM: 48'. Follow-up as 2.0.0-beta.5 (Robert: one second apart): handleCommandQueue sends at most one PM=/TP= per PRIO_MSG_SPACING_MS 1000 ms; tests/test_pic_pm_chain.py user_three now checks send times: beta.4 code FAILED ('sent less than 1 s apart: [0, 0, 0]'), fix 11/11; queue tests and evaluate 80/0 green.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
