@@ -3,11 +3,11 @@ id: TASK-1449
 title: >-
   feat-2.0.0: port TASK-1289 (1.x) — count the uptime from boot, not from the
   first loop tick
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:19:00Z'
-updated_date: '2026-11-01T01:29:00Z'
+updated_date: '2026-11-01T08:49:00Z'
 labels:
   - port-from-1.x
   - core
@@ -83,11 +83,8 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 state.uptime.iSeconds on 2.0.0 is derived from a boot clock (esp_timer_get_time() on ESP32, micros64() on ESP8266) instead of a per-tick ++ in doTaskEvery1s(). arduino-esp32 micros() is not used.
-- [ ] #2 Red/green bench on .61 OTGW32 or .63 Classic+S3: reset by RTS/EN with laptop timestamps, then compare GET /api/v2/device/info runtime.uptime_sec against the time since reset. Old build is behind by the full setup() duration. New build is within about 2 s. Record both numbers in the task notes.
-- [ ] #3 Red/green stall check: induce a loop stall of 2 s or more (e.g. MQTT broker pointed at an unreachable host, per commit 246294edc). Over 5 minutes the old build's uptime falls behind wall time and the new build's does not. Record the drift on both.
-- [x] #4 The 1.x loopSeconds boot-command gate is NOT ported. sendPICBootCommands() is still called from setup() unchanged.
-- [ ] #5 otgw-firmware/uptime MQTT, device/info 'uptime', the OLED device page and the telnet uptime line show the same new value. No API or MQTT payload shape changes.
-- [ ] #6 Build for esp32, esp32-classic and esp32-combo succeeds, and python evaluate.py --quick is green.
+- [x] #2 The 1.x loopSeconds boot-command gate is NOT ported. sendPICBootCommands() is still called from setup() unchanged.
+- [x] #3 otgw-firmware/uptime MQTT, device/info 'uptime', the OLED device page and the telnet uptime line show the same new value. No API or MQTT payload shape changes.
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -96,4 +93,12 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 2026-11-01: code in alpha.594: platformUptimeSeconds() (platform_esp32.h, esp_timer_get_time, explicit <esp_timer.h>), doTaskEvery1s assigns it. tests/test_uptime_boot_clock.py new 3/3, old 2 FAIL; evaluate 0 FAIL. Open: AC2/AC3 bench red/green on .61 (reset timing, induced loop stall), AC5 consumers on the device, AC6 now esp32-combo only (maintainer 2026-10-29). All wait for the next build.
 
 2026-11-01: code in alpha.594: platformUptimeSeconds() (platform_esp32.h, esp_timer_get_time, explicit <esp_timer.h>), doTaskEvery1s assigns it. tests/test_uptime_boot_clock.py new 3/3, old 2 FAIL; evaluate 0 FAIL. Open: AC2/AC3 bench red/green on .61 (reset timing, induced loop stall), AC5 consumers on the device, AC6 now esp32-combo only (maintainer 2026-10-29). All wait for the next build.
+
+2026-11-01 Robert: drop the red/green bench ACs (old AC2 reset timing, old AC3 stall check) and the multi-target build AC (old AC6; dev builds esp32-combo only).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: platformUptimeSeconds() = esp_timer_get_time()/1e6 in platform_esp32.h; OTGW-firmware.ino sets state.uptime.iSeconds from it; tests/test_uptime_boot_clock.py 3/3 OK (2026-11-01). AC2: sendPICBootCommands() still called from setup(), no loopSeconds gate (code read). AC3: every surface reads the one value state.uptime.iSeconds: MQTT otgw-firmware/uptime (MQTTstuff.ino:1866), REST runtime.uptime_sec (restAPI.ino:2212), the device/info uptime string (helperStuff.ino:683-685), OLED (OLED.ino:362), telnet (handleDebug.ino:29); payload shapes unchanged. Bench: Classic .63 on 2.0.0-alpha.597+d458ac3 (commit 884d2bb82 is an ancestor) reports uptime 0(d)-00:06 then 00:07 over REST. Not bench-observed: the MQTT topic (the bench broker refused connections at 09:49), OLED and telnet; they read the same variable. Dropped by Robert 2026-11-01: the red/green reset and stall bench checks and the esp32/esp32-classic builds. Build evidence: esp32-combo alpha.597 (coordinating session), evaluate.py --quick 0 FAIL.
+<!-- SECTION:FINAL_SUMMARY:END -->
