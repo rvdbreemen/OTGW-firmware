@@ -131,12 +131,21 @@ class FakeWs:
 
 
 class CaptureThreadTest(unittest.TestCase):
-    def run_capture(self, port, seconds):
+    def run_capture(self, port, seconds, done=None):
+        """Run the capture until done(tmp) is true (deadline 15 s) or, without done, for `seconds`.
+        TASK-1516: a fixed run time made both tests depend on machine load (handshake time; a refused
+        loopback connect takes ~2 s on Windows), so they now wait for the outcome they check."""
         tmp = tempfile.mkdtemp()
         cap = oc.Capture(tmp, echo=False)
         t = oc.FrameCapture(cap, "127.0.0.1", port)
         t.start()
-        cap.wait(seconds)
+        if done is None:
+            cap.wait(seconds)
+        else:
+            deadline = time.monotonic() + 15
+            cap.wait(seconds)
+            while not done(Path(tmp)) and time.monotonic() < deadline:
+                cap.wait(0.1)
         cap.request_stop("test")
         t.join(timeout=15)
         self.assertFalse(t.is_alive())
@@ -145,7 +154,10 @@ class CaptureThreadTest(unittest.TestCase):
     def test_records_frames(self):
         msgs = list(LINES.values())[:4] + EVENT_LINES + [LINES["E"]]
         ws = FakeWs(msgs)
-        cap, tmp = self.run_capture(ws.port, 1.5)
+        def five_frames(d):
+            f = d / oc.FRAMES_LOG
+            return f.exists() and sum(1 for l in f.read_text().splitlines() if l and not l.startswith("#")) >= 5
+        cap, tmp = self.run_capture(ws.port, 0.5, five_frames)
         rows = [l.split("\t") for l in (tmp / oc.FRAMES_LOG).read_text().splitlines() if not l.startswith("#")]
         self.assertEqual([r[2] + r[3] for r in rows], ["T10010A00", "B40000800", "R90190000", "A401920B0", "E00000000"])
         for r in rows:
@@ -158,7 +170,10 @@ class CaptureThreadTest(unittest.TestCase):
 
     def test_degrades_when_unreachable(self):
         s = socket.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()  # closed port
-        cap, tmp = self.run_capture(port, 1.0)
+        def logged(d):
+            f = d / "script.error.log"
+            return f.exists() and "otframes" in f.read_text()
+        cap, tmp = self.run_capture(port, 0.5, logged)
         self.assertIn("otframes", (tmp / "script.error.log").read_text())
         self.assertIn("0 frame(s)", (tmp / "summary.txt").read_text())
 
