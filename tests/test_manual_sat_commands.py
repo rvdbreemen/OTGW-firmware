@@ -101,10 +101,10 @@ class SatCommandDocs(unittest.TestCase):
         self.assertEqual(settings, want, f"{rel}: passthrough setting keys differ from kSatMqttCmds[]")
 
     def test_ch09_en_matches_firmware(self):
-        self._check_chapter(CH09, "##### SAT Command Topics", "##### OTGW32 Command Topics")
+        self._check_chapter(CH09, "##### SAT Command Topics", "##### Gateway Command Topics")
 
     def test_h09_nl_matches_firmware(self):
-        self._check_chapter(H09, "**SAT-commando's:**", "**OTGW32-commando's")
+        self._check_chapter(H09, "**SAT-commando's:**", "**Gateway-commando's")
 
     def test_manual_md_matches_firmware(self):
         self._check_chapter(MANUAL, "##### SAT Command Topics", "#### Home Assistant Auto-Discovery")

@@ -359,8 +359,10 @@ class TSource(unittest.TestCase):
         self.assertIn("`sat/heating_curve_coeff` | `SATcoefficient`", md)
         self.assertNotRegex(md, r"\"INCREASE\"|\"DECREASE\"|\"HOLD\"")
         cl = read("CHANGELOG.md", base=".")
+        # The entry moved from [Unreleased] into [2.0.0-beta.1] at the beta.1 rollover:
+        # look at the whole 2.x part of the changelog, up to the first 1.x section.
         unreleased = cl[cl.index("## [Unreleased]"):]
-        unreleased = unreleased[:unreleased.index("\n## [", 10)]
+        unreleased = unreleased[:unreleased.index("\n## [1.")]
         for needle in ("TASK-1485", "sat/ssi", "sat/pressure_health", "sat/device_health",
                        "sat/heating_curve_recommendation", "heating_curve_coeff"):
             self.assertIn(needle, unreleased)

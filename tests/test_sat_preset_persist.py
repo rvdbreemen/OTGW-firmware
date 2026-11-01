@@ -202,7 +202,10 @@ class SatPresetPersist(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
         cpp = Path(cls.tmp.name) / "t.cpp"
-        cpp.write_text(STUBS + extract(SAT_INO.read_text(encoding="utf-8"),
+        # TASK-1517 moved the target-change threshold into SATtypes.h: take the real line.
+        types = (REPO / "src" / "OTGW-firmware" / "SATtypes.h").read_text(encoding="utf-8")
+        threshold = re.search(r"static const float SAT_TARGET_CHANGE_MIN_C = [^;]+;", types).group(0)
+        cpp.write_text(STUBS + threshold + "\n" + extract(SAT_INO.read_text(encoding="utf-8"),
                                        SETTINGS_INO.read_text(encoding="utf-8")) + MAIN, encoding="utf-8")
         cls.exe = compile_cpp(cpp, Path(cls.tmp.name) / "t.exe")
 
