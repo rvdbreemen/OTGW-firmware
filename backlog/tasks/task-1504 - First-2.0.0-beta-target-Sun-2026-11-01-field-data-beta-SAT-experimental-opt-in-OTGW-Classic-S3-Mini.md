@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:19:00Z'
-updated_date: '2026-10-31T20:15:00Z'
+updated_date: '2026-11-01T09:32:00Z'
 labels:
   - release beta
 milestone: 2.0.0
@@ -59,4 +59,6 @@ Soak started 2026-10-31 14:38:57 local: detached python soak.py .61 24 h (PID 37
 2026-10-31 Robert: 'Make sure to label 1412 epic and all its tasks as high priority. And include it for beta.1.' -> TASK-1412 and 1412.1-1412.26 set to priority high with label beta.1.
 
 2026-10-31 ~21:15 local: soak of alpha.577 on OTGW32 .61 stopped after 224 min uptime on Robert's order ('Stop soak, flash now', to bench TASK-1530/1532 for beta.1). Result so far: 632 snapshots, 0 reboots, free heap 72 KB, max block 31.7 KB, low-water hd_min_free_heap 960 B (one dip through low/warning/critical, TASK-1528), max loop gap 1028 ms, 1 REST 503, 0 MQTT/WS drops. A new 24 h soak starts on the next candidate.
+
+Maintainer decision 2026-11-01 (Robert, in session): release beta.1 today as-is. The 24 h soak (AC3, longest run 224 min) and the macOS run (AC2) are not met and ship as a known gap; TASK-1525, TASK-1528 and the TASK-1412 subtasks labelled beta.1 on 10-31 are not release blockers. Release-notes corrections still due before publishing (AC4): docs/releases/RELEASE_NOTES_2.0.0-beta.1.md:177 calls TASK-1438 unexplained, but 1438 is Done (cd5071ebb, 0xb = USB reset by the host); add TASK-1538 (field panic in heap_caps_malloc) and the TASK-1528 heap dips as known issues.
 <!-- SECTION:NOTES:END -->
