@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:15:00Z'
-updated_date: '2026-11-01T09:08:00Z'
+updated_date: '2026-11-01T22:37:00Z'
 labels:
   - port-from-1.x
   - webui
@@ -93,4 +93,6 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 2026-11-01 Robert: drop the multi-target build AC (dev builds esp32-combo only). Evidence so far: tests/test_fsexplorer_relative_urls.py 2/2 OK; bench .61 alpha.597 served FSexplorer forms action='upload', 'update', 'ReBoot', './' (09:3x). Open: ReBoot via the ingress rig and direct, and curl -i /ReBoot header capture; these reboot a bench unit, deferred while the other session tests the benches (.61 went offline ~09:46, .63 restarted ~09:42).
 
 2026-11-01 Robert: drop the AC on porting the 1.x rig scripts (pic_flash_dryrun.py, pic_flash_ui_sim.py, pic_flash_via_proxy.py, polling text).
+
+Lead 2026-11-01 23:40: bench .61 offline (HTTP 000, ARP stale for 10:20:BA:21:B4:F8, no DHCP lease). Evidence collected without the unit: host test tests/test_fsexplorer_relative_urls.py fix 2/2 OK; same test with OTGW_FSEXPLORER_INO=39a3d9bf4~1 copy FAILED failures=2 (['/','/'] != ['./','./']; action="/upload"). Source: FSexplorer.ino:783/:792 doRedirect(...,120,"./",true) -> Refresh header + href + window.location.replace; :61 action="upload", :66 action='update'. RFC 3986 resolution: http://ip/ReBoot + ./ -> http://ip/ (AC#2); /api/hassio_ingress/TEST/ReBoot + ./ -> /api/hassio_ingress/TEST/ (old '/' -> proxy root). Remaining: curl -i /ReBoot capture (AC#5) and the ingress/proxy run (AC#1) on a live unit; planned on .63 after beta.3/beta.4.
 <!-- SECTION:NOTES:END -->
