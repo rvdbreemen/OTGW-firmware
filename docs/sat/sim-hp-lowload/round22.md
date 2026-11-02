@@ -18,7 +18,7 @@ Script `scripts/sat_hp_hybrid_backup_study22.py` (uses the round 21 library and 
   Without the separator the boiler cycled far less (first test, 2020-21: 768 vs 2925 starts), which is why the cycling
   Sergeant D describes only appeared once the separator was in.
 - "own": the boiler's own control on the heat pump's CS: on below CS - 2 K after a 3 min anti-cycling time, off above
-  CS + 2 K, modulating 3.1-26 kW (Calenta 28c datasheet) (A for the hysteresis and anti-cycling).
+  CS + 2 K, modulating 3.1-26 kW ("Calenta 28c datasheet", version not recorded, possibly the Calenta Ace; round 22b uses 5.5 kW) (A for the hysteresis and anti-cycling).
 - "slave": SAT's gas logic on the heat pump's CS: continuous, overshoot switch (boiler flow >= CS + 2 K for 60 s) to
   gas PWM (1200 s period, 180 s minimum ON, at most 3 starts per hour, ON phase at minimum modulation), back through
   the saturation (300 s) and underheat (180 s) exits (thermo-nova heating_control.py:262-329, :358-376).

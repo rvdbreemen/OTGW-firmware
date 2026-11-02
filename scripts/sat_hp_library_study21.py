@@ -163,7 +163,7 @@ def run(args):
     Tb = None; Pb_prev = 0.0
     spare = 0; b_req = False; s_pwm = False; s_on = False; s_el = 0; s_ov = 0; s_sat = s_uh = 0; s_eff = 0.0
     pwm = False; ov = 0; sat_s = 0; ph_on = False; ph_el = 0; eff_on = None
-    sq = n = out = absum = 0.0; elec = gas = heat_hp = 0.0; run_min = at_min = pwm_min = heat_min = boiler_min = 0
+    sq = n = out = absum = 0.0; elec = gas = heat_hp = 0.0; gas_ret = 0.0; run_min = at_min = pwm_min = heat_min = boiler_min = 0
     for m in range(minutes):
         tout, sw = tm[m], sm[m]; heating = tout < 15
         room_meas = round(Ta / SENSOR_RES) * SENSOR_RES
@@ -286,7 +286,12 @@ def run(args):
         if P > 0:
             elec += P * DT / cop(u, flow, tout); heat_hp += P * DT; run_min += 1
             if P <= pmin + 1: at_min += 1
-        if Pb > 0: gas += Pb * DT / BOILER_EFF; boiler_min += 1
+        if Pb > 0:
+            gas += Pb * DT / BOILER_EFF; boiler_min += 1
+            # round 22b: condensing efficiency from the boiler's return, proxied by the system node Ts (A):
+            # 0.97 at <= 30 C, linear to 0.87 at 60 C and above
+            eta_r = 0.97 - 0.10 * min(max((Ts - 30.0) / 30.0, 0.0), 1.0)
+            gas_ret += Pb * DT / eta_r
         Ts += (P + q_sys - qfloor) * DT / screed
         qaw = s3.G_AW * (Ta - Tw); solar = 1.5 * sw
         Ta += (qfloor + gains[m] + 0.5 * solar - qaw - Gao * (Ta - tout)) * DT / Ca
@@ -298,7 +303,7 @@ def run(args):
     return {"unit": unit_name, "variant": variant, "coeff": c, "era": era, "screed": screed,
             "starts_per_day": starts / days, "run_median_min": statistics.median(run_lens) if run_lens else 0,
             "mean_abs_err": absum / n if n else 0, "out_band_min_d": out / (n / 1440) if n else 0,
-            "elec_kwh": elec / 3.6e6, "gas_kwh": gas / 3.6e6, "scop": heat_hp / elec if elec else 0,
+            "elec_kwh": elec / 3.6e6, "gas_kwh": gas / 3.6e6, "gas_ret_kwh": gas_ret / 3.6e6, "boiler_min_w": BOILER_MIN, "scop": heat_hp / elec if elec else 0,
             "share_at_pmin": at_min / run_min if run_min else 0, "pwm_share": pwm_min / max(1, heat_min),
             "boiler_hours": boiler_min / 60, "boiler_starts": b_starts,
             "boiler_run_mean_min": (boiler_min / b_starts) if b_starts else 0, "hybrid_mode": HYBRID_MODE, "plant": PLANT, "separator": SEPARATOR}
