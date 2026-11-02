@@ -7295,8 +7295,8 @@
       "title": "Replace the two capture scripts with one Python capture tool behind thin launchers",
       "path": "ADR-202-replace-the-two-capture-scripts-with-one-python-capture-tool-behind-thin-launchers.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-10-29",
+      "status": "Accepted",
+      "date": "2026-11-02",
       "decision_summary": "One standard-library Python program, scripts/otgwcapture.py, replaces both payloads.",
       "topics": [
         "diagnostic-capture",
@@ -7336,7 +7336,7 @@
         "verification": [
           "python tests/testcapturetool.py runs the real tool against an in-test fake device (telnet, HTTP and an MQTT stub). It covers the TASK-1299 cases a–h, TASK-1396 and TASK-1453.",
           "tests/testbuild.py asserts that the flash zip contains the launchers, otgwcapture.py and the vendored wheel.",
-          "Capture runs on Windows 11 without Python on PATH, on macOS and on Linux, recorded in TASK-1475."
+          "Capture runs on Windows 11 without Python on PATH (the shell search path), on macOS and on Linux, recorded in TASK-1475."
         ]
       },
       "scope": {

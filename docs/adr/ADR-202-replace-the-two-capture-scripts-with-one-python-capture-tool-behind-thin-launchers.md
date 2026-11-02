@@ -1,8 +1,8 @@
 ---
 id: "ADR-202"
 title: "Replace the two capture scripts with one Python capture tool behind thin launchers"
-status: "Proposed"
-date: "2026-10-29"
+status: "Accepted"
+date: "2026-11-02"
 binding: false
 gate: null
 documents_shipped: false
@@ -33,7 +33,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-10-29.
+Accepted, 2026-11-02.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer) chose "Unify on Python" in TASK-1472 on 2026-10-29. The bootstrap and dependency details below are the agent's proposal under TASK-1475 and wait for his review.
 
@@ -46,6 +46,11 @@ status_history:
     changed_by: Agent (Claude, TASK-1475)
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-02
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: "Accepted by Robert in session 2026-11-02 (AskUserQuestion): implemented and shipped since late October; 1.x port answered dev-only 2026-10-30"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -53,8 +58,8 @@ status_history:
 Testers and the maintainer collect bug evidence with a capture script. It records five sources into one merged transcript:
 
 - the telnet debug stream on port 23;
-- MQTT;
-- the browser console over the Chrome DevTools Protocol (CDP);
+- MQTT (the broker messages);
+- the browser console over CDP (Chrome DevTools Protocol);
 - the crash log and reboot log;
 - REST (Representational State Transfer) probes.
 
@@ -64,7 +69,7 @@ Constraints that shape the decision:
 
 1. **Delivery.** `build.py:1194-1243` puts the capture launchers into every flash zip, and testers run them from the unzipped folder. A tester on stock Windows 11 has no Python. Typing `python` there either fails or starts the Microsoft Store "App Execution Alias".
 2. **MQTT.** Both scripts shell out to `mosquitto_sub`. When it is missing, the `.bat` installs it with winget and the `.sh` points the user at brew or apt. That install step is the most common first-run failure.
-3. **Python packaging.** The Windows embeddable CPython has no pip, and its `._pth` file fixes `sys.path`. PEP 668 blocks `pip install` into the system python3 on Debian/Ubuntu and Homebrew. On macOS, `/usr/bin/python3` can be the Xcode Command Line Tools stub.
+3. **Python packaging.** The Windows embeddable CPython has no pip, and its `._pth` file fixes `sys.path`. PEP (Python Enhancement Proposal) 668 blocks `pip install` into the system python3 on Debian/Ubuntu and Homebrew. On macOS, `/usr/bin/python3` can be the Xcode Command Line Tools stub.
 4. **Standard library.** `telnetlib` was removed in Python 3.13 (PEP 594). The `.sh` telnet worker already uses a raw socket.
 5. **Callers.** Scripts and skills call the `.bat` with PowerShell-style arguments (`-DeviceHost`, `-BrokerHost`, `-DurationSeconds`, `-Topic`, `-SaveSecrets`); see `scripts/otgw-test.py:137` and `scripts/loadtest_arm_runner.py:202`. The `.sh` callers use `--device`, `--broker` and `--duration` (`scripts/README.md:89-93`).
 
@@ -117,14 +122,14 @@ otgw_capture.py  -- sys.path.insert(0, "vendor/paho_mqtt-2.1.0-py3-none-any.whl"
 
 - `python tests/test_capture_tool.py` runs the real tool against an in-test fake device (telnet, HTTP and an MQTT stub). It covers the TASK-1299 cases a–h, TASK-1396 and TASK-1453.
 - `tests/test_build.py` asserts that the flash zip contains the launchers, `otgw_capture.py` and the vendored wheel.
-- Capture runs on Windows 11 without Python on PATH, on macOS and on Linux, recorded in TASK-1475.
+- Capture runs on Windows 11 without Python on PATH (the shell search path), on macOS and on Linux, recorded in TASK-1475.
 
 ## Alternatives Considered
 
 - **Keep both scripts and fix each bug twice.** Rejected. This is the drift that produced TASK-1299, 1320, 1396 and 1453, with each fix written two or three times (TASK-1472 research).
 - **Rewrite in JavaScript as a Node, Deno or Bun single binary (TASK-1472 route B).** Rejected. A binary is 62–150 MB per OS and breaks the small flash-zip delivery.
 - **Browser-only capture from the device page (TASK-1472 route A).** Rejected for now. The debug text is telnet-only (`networkStuff.ino:33`, 1 client), and background tabs get throttled over long runs.
-- **Hand-rolled MQTT 3.1.1 subscriber (about 150 lines, no dependency).** Rejected under the reuse-open-source rule. paho-mqtt already does CONNECT/SUBSCRIBE/PINGREQ, authentication, MQTT 5 and reconnects, and it is actively maintained.
+- **Hand-rolled MQTT 3.1.1 subscriber (about 150 lines, no dependency).** Rejected under the reuse-open-source rule. paho-mqtt already does the MQTT packets CONNECT (connection request)/SUBSCRIBE/PINGREQ, authentication, MQTT 5 and reconnects, and it is actively maintained.
 - **Install paho-mqtt with pip into a per-user venv.** Rejected. The embeddable CPython has no pip, PEP 668 blocks system installs, and the step would need network access on every fresh machine.
 - **Download the paho wheel at first run instead of vendoring it.** Rejected. It adds a network dependency and a second trust point for a 67 KB file. A vendored wheel also works offline on a LAN-only bench.
 - **gmqtt 0.8.0 (MIT, released 2026-10-08) or amqtt 0.12.1 (MIT).** Rejected. gmqtt is asyncio-only, which does not fit the thread-per-source design inherited from the `.sh` workers. amqtt pulls in psutil, pyyaml, websockets and four more packages, which is too heavy to vendor.
@@ -133,7 +138,7 @@ Open-source check (2026-10-29, primary sources: the PyPI JSON API and the GitHub
 
 | Candidate | Version / date | Licence | Size | Maintenance | Advisories |
 |---|---|---|---|---|---|
-| paho-mqtt | 2.1.0 / 2024-04-29 | EPL-2.0 OR BSD-3-Clause | 67,219 B wheel, no runtime dependencies | repo pushed 2026-10-24 (PR #961, OpenSSL 4 TLS fix) | none in the GitHub advisory database for pip/paho-mqtt |
+| paho-mqtt | 2.1.0 / 2024-04-29 | EPL-2.0 OR BSD-3-Clause (BSD: Berkeley Software Distribution licence) | 67,219 B wheel, no runtime dependencies | repo pushed 2026-10-24 (PR #961, OpenSSL 4 TLS fix) | none in the GitHub advisory database for pip/paho-mqtt |
 | gmqtt | 0.8.0 / 2026-10-08 | MIT | 37,679 B | active | not checked further (rejected on fit) |
 | aiomqtt | 2.5.1 / 2026-03-05 | BSD-3-Clause | 16,051 B | active | wraps paho-mqtt, so adds a layer without removing the dependency |
 | amqtt | 0.12.1 / 2026-09-16 | MIT | 129,862 B plus 7 dependencies | active | not checked further (rejected on weight) |
@@ -157,11 +162,11 @@ The paho-mqtt wheel SHA-256 is `6db9ba9b34ed5bc6b6e3812718c7e06e2fd7444540df2455
 - The flash zip grows by two files: `otgw_capture.py` and the 67 KB wheel. The `.bat` is no longer self-contained. Mitigation: `build.py` packs all of them and `tests/test_build.py` fails when one is missing.
 - A first run on Windows without Python needs internet access to python.org. Mitigation: the launcher reports this clearly and names the cache folder, and a tester can install Python 3.9+ instead.
 - The vendored wheel has to be bumped by hand for security fixes. Mitigation: the version and hash live in one constant, and the advisory check is repeated whenever this ADR is reviewed.
-- PowerShell-only behaviour, such as reading DPAPI-protected values, is gone. The saved-settings file was already plain JSON (`capture-mqtt-debug.bat` Save-CaptureSettings), so nothing changes there.
+- PowerShell-only behaviour, such as reading DPAPI-protected (DPAPI: Windows Data Protection API) values, is gone. The saved-settings file was already plain JSON (`capture-mqtt-debug.bat` Save-CaptureSettings), so nothing changes there.
 
 ## Note 2026-10-30 (TASK-1500)
 
-The Decision text above is unchanged. `capture-mqtt-debug.sh` now bootstraps a portable Python on Linux and macOS the way the `.bat` does on Windows: `python3` or `python` on PATH first, then a runtime cached by an earlier run, then a one-time download of python-build-standalone release 20261026 (CPython 3.12.16, `install_only` tarball, about 65 MB). Five SHA-256 values are pinned in the launcher (x86_64, aarch64 and armv7 Linux glibc; x86_64 and arm64 macOS), taken from the release's `SHA256SUMS`. The runtime is unpacked into `${XDG_DATA_HOME:-$HOME/.local/share}/otgw-capture/python-3.12.16` (Linux) or `$HOME/Library/Application Support/otgw-capture/python-3.12.16` (macOS). Linux with musl libc and other CPU types get a clear message and the advice to install Python 3.9+.
+The Decision text above is unchanged. `capture-mqtt-debug.sh` now bootstraps a portable Python on Linux and macOS the way the `.bat` does on Windows: `python3` or `python` on PATH first, then a runtime cached by an earlier run, then a one-time download of python-build-standalone release 20261026 (CPython 3.12.16, `install_only` tarball, about 65 MB). Five SHA-256 values are pinned in the launcher (x86_64, aarch64 and armv7 Linux glibc; x86_64 and arm64 macOS), taken from the release's `SHA256SUMS`. The runtime is unpacked into `${XDG_DATA_HOME:-$HOME/.local/share}/otgw-capture/python-3.12.16` (Linux) or `$HOME/Library/Application Support/otgw-capture/python-3.12.16` (macOS). Linux with musl libc and other CPU (processor) types get a clear message and the advice to install Python 3.9+.
 
 ## Open Questions
 
