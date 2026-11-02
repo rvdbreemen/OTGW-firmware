@@ -23,6 +23,9 @@ STRATS = {"base": (None, None), "cut": (None, (0.1, -0.1)), "f12": ({"hours": 12
           "f6s3": ({"hours": 6, "solar": 3.0}, None), "cut0": (None, (0.0, -0.2)),
           "f12s3cut0": ({"hours": 12, "solar": 3.0}, (0.0, -0.2)), "f12s3cut1": ({"hours": 12, "solar": 3.0}, (0.1, -0.1))}
 SWEEP = ("f6", "f12s2", "f12s3", "f6s3", "cut0", "f12s3cut0", "f12s3cut1")
+STRATS["f6err"] = ({"hours": 6, "error_k": 1.5}, None)
+# full run: SAT continuous with every candidate, SAT with PWM with the baseline and the best (round 25 quick: f6)
+FULL = [(s, "cont") for s in ("base", "cut0", "f6", "f12", "f6err")] + [(s, "sat") for s in ("base", "f6")]
 UNITS = ("mitsubishi_ecodan_puz_wm50", "nibe_s2125_8", "daikin_altherma3_r_erga04")
 WARM = 14 * 1440
 
@@ -54,15 +57,26 @@ if __name__ == "__main__":
         J = [(s, "nibe_s2125_8", v, "5_2015", 8.0e6, best[f"nibe_s2125_8|{v}"]) for s in STRATS for v in ("cont", "sat")]
         seasons = [w for w in sorted(glob.glob(os.path.join(arg("--seasondir"), "season_*.json"))) if "2024_25" in w]
     else:
-        J = [(s, u, v, e, sc, best[f"{u}|{v}"]) for s in STRATS for u in UNITS for v in ("cont", "sat") for e, sc in lib.HOUSES]
+        J = [(s, u, v, e, sc, best[f"{u}|{v}"]) for s, v in FULL for u in UNITS for e, sc in lib.HOUSES]
         seasons = sorted(glob.glob(os.path.join(arg("--seasondir"), "season_*.json")))
     tag = "round25_quick" if "--quick" in sys.argv else "round25"
     part = os.path.join(arg("--outdir"), tag + "_parts"); os.makedirs(part, exist_ok=True); res = {}
+    if "--season" in sys.argv: seasons = [w for w in seasons if arg("--season") in w]
+    if "--strats" in sys.argv:
+        keep = arg("--strats").split(","); J = [j for j in J if f"{j[0]}/{j[2]}" in keep]
     for w in seasons:
-        label = os.path.basename(w)[7:-5]; dest = os.path.join(part, label + ".json")
-        if os.path.exists(dest): res[label] = json.load(open(dest)); continue
-        with Pool(workers, initializer=_init, initargs=(w,)) as p: res[label] = p.map(job, J, chunksize=1)
-        json.dump(res[label], open(dest, "w")); print(label, "done", flush=True)
+        # one file per job, so a kill costs at most one job per worker and progress is a file count
+        label = os.path.basename(w)[7:-5]; sdir = os.path.join(part, label); os.makedirs(sdir, exist_ok=True)
+        fn = lambda j: os.path.join(sdir, f"{j[0]}_{j[2]}_{j[1]}_{j[3]}_{int(j[4])}.json")
+        todo = [j for j in J if not os.path.exists(fn(j))]
+        if todo:
+            with Pool(workers, initializer=_init, initargs=(w,)) as p:
+                for r in p.imap_unordered(job, todo):
+                    j = next(x for x in todo if x[0] == r["strategy"] and x[2] == r["variant"] and x[1] == r["unit"]
+                             and x[3] == r["era"] and int(x[4]) == int(r["screed"]))
+                    json.dump(r, open(fn(j), "w"))
+        res[label] = [json.load(open(fn(j))) for j in J if os.path.exists(fn(j))]
+        print(label, "done", len(res[label]), flush=True)
     json.dump(res, open(os.path.join(arg("--outdir"), tag + "_runs.json"), "w"))
     if "--quick" in sys.argv:
         for r in res[list(res)[0]]:
