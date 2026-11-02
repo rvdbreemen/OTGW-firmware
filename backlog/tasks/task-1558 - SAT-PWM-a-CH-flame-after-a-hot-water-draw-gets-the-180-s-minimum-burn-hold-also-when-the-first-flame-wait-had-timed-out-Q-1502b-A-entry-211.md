@@ -3,11 +3,11 @@ id: TASK-1558
 title: >-
   SAT PWM: a CH flame after a hot-water draw gets the 180 s minimum burn hold
   also when the first-flame wait had timed out (Q-1502b A, entry 211)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-02T05:45:00Z'
-updated_date: '2026-11-02T11:09:00Z'
+updated_date: '2026-11-02T12:00:00Z'
 labels:
   - sat
 dependencies: []
@@ -23,8 +23,8 @@ Sergeant D 2026-11-02 answered Q-1502b with A (entry 211): an ON phase whose 180
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test on the real code: timed-out wait, draw, CH flame -> the ON phase holds 180 s from that flame (red on HEAD, green)
-- [ ] #2 No change when the draw comes before the wait times out (TASK-1502 behaviour kept)
+- [x] #1 Host test on the real code: timed-out wait, draw, CH flame -> the ON phase holds 180 s from that flame (red on HEAD, green)
+- [x] #2 No change when the draw comes before the wait times out (TASK-1502 behaviour kept)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -40,3 +40,9 @@ One change in satPwmDhwResume() (SATcontrol.ino), shared with TASK-1518/1558 (sa
 
 Heat-pump paths (peer suggestion): harness cmd "src 2" (satGetMinOnTimeSec 600 s). New m7 (no CH flame after the draw, 600 s hold lapses: 270 s), m7b (control, flame back: rest of the 600 s hold, 660 s), m7c (timed-out wait, draw, CH flame: 600 s hold, 900 s). Fix: 46/46 OK. HEAD copy (OTGW_SAT_INO=git show HEAD): 5 FAIL = m4 330, m5 390, m6 510, m7 810, m7c 330; m5b, m5c, m7b green on both.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in 2.0.0-beta.9+8c9c1f1 (commit 8c9c1f181, tag v2.0.0-beta.9, GitHub prerelease, Latest stays v1.7.8; download sha256 ba6895fe... matches SHA256SUMS). Together with TASK-1518/TASK-1558 (one function, satPwmDhwResume). AC evidence: tests/test_sat_pwm_anchors.py 46/46 OK on the fix; HEAD copy (beta.8) FAILED 5: m4 330 vs 480, m5 390 vs 270, m6 510 vs 660, m7 (heat pump) 810 vs 270, m7c (heat pump) 330 vs 900; controls m5b, m5c, m7b and the TASK-1502 cases (g1, g2, m1, m1b, m1c, m2, m2b, m3) green on both. Full tests/ 93/93. evaluate --quick 0 failed, 100 %. esp32-combo build: 2x Successfully created ESP32S3 image, Build completed successfully, fresh artifacts 12:25. firmware-sat-spec.md updated (decisions replace the open-with-Sergeant-D sentence; citations refreshed). Review (opus): MEDIUM fixed (_pwm_dhwHoldLapsed, test m5c), 2 LOW fixed, 1 NEGLIGIBLE left (pre-existing anchor-0 sentinel). Bench .63 (PIC 6.8): OTA app+fs, 175 settings unchanged, bootcount 60 unchanged after 11 min, SAT simulation in PWM with an ON phase (duty 0.96-0.65, flame request on), restored to auto. Not verified: the draw itself on hardware (no boiler on the bench); Robert approved publishing with that stated (AskUserQuestion 2026-11-02), as for TASK-1502. Posts: #alpha-testing zip 1566783406363119751, report 1566783786652405762; #beta-testing 1566783713428242564.
+<!-- SECTION:FINAL_SUMMARY:END -->
