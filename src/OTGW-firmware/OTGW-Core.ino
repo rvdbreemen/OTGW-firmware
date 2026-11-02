@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.21
+**  Version  : v2.0.0-beta.22
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3968,6 +3968,23 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
 #define PRIO_MSG_SPACING_MS   1000UL
 static uint32_t s_lastPrioSendMs = 0;
 static bool     s_prioSent = false;
+
+// TASK-1572 (rule 3): the PIC's one priority-message slot. PM=<id> and TP=<id>:<entry> load it (gateway.asm
+// SetPrioMessage ~4984, SlaveParameter ~4454); the PIC asks the boiler only in an alternative slot (SendPriorityMsg
+// ~3436) and frees the slot when the boiler answers that DataID (HandleResponse ~2432). A newer PM=/TP= cancels the
+// older one ("there is no queue", otgw.tclcode.com/firmware.html). So after a PM=/TP= is sent, no other PM=/TP= goes
+// out until a boiler frame with its DataID arrives, or PRIO_SLOT_TIMEOUT_MS passes. Other commands keep draining.
+// The PIC echo is only a receipt. Limit: a PM= of a TSP/FHB count message makes the PIC read the entries itself;
+// the slot is released on the first answer, so a PM=/TP= right after it can cut that read short.
+#define PRIO_SLOT_FREE        0xFF
+#define PRIO_SLOT_TIMEOUT_MS  60000UL
+static volatile uint8_t s_prioSlotId = PRIO_SLOT_FREE;   // DataID the PIC's slot waits for
+static volatile bool    s_prioSlotAnswered = false;      // set by the boiler-frame hook (records only)
+static uint32_t         s_prioSlotSinceMs = 0;
+uint32_t                g_prioSlotTimeouts = 0;          // TASK-1573 visibility
+
+static bool isPrioCmd(const char* c) { return (c[0] == 'P' && c[1] == 'M') || (c[0] == 'T' && c[1] == 'P'); }
+static void prioSlotRelease() { s_prioSlotId = PRIO_SLOT_FREE; s_prioSlotAnswered = false; }
 static uint32_t s_lastQueueSendMs = 0;
 static bool     s_queueSent = false;
 static uint32_t s_lastEchoMs = 0;
@@ -4015,6 +4032,17 @@ void handleCommandQueue(){
     OTDebugTf(PSTR("CmdQueue: no echo for [%s] within %lu ms\r\n"), s_inflight.cmd, (unsigned long)QUEUE_ECHO_TIMEOUT_MS);
     s_inflight.active = false;   // the queue entry stays and is resent after OTGW_CMD_INTERVAL_MS
   }
+  if (s_prioSlotId != PRIO_SLOT_FREE) {
+    if (s_prioSlotAnswered) {
+      OTDebugTf(PSTR("CmdQueue: boiler answered priority DataID %u, slot free\r\n"), (unsigned)s_prioSlotId);
+      prioSlotRelease();
+    } else if ((now - s_prioSlotSinceMs) >= PRIO_SLOT_TIMEOUT_MS) {
+      OTDebugTf(PSTR("CmdQueue: no boiler answer for priority DataID %u in %lu s, slot free\r\n"),
+                (unsigned)s_prioSlotId, (unsigned long)(PRIO_SLOT_TIMEOUT_MS / 1000));
+      g_prioSlotTimeouts++;
+      prioSlotRelease();
+    }
+  }
   if (s_queueSent && (now - s_lastQueueSendMs) < QUEUE_MIN_GAP_MS) return;
   if (s_echoSeen && (now - s_lastEchoMs) < QUEUE_ECHO_GUARD_MS) return;
   // Strict FIFO (rule 5b, TASK-1569 review): send the first due entry in slot order. Slot order is offering order,
@@ -4022,20 +4050,25 @@ void handleCommandQueue(){
   // confirmation is moved to the back as well; so a few retrying commands cannot take every turn and starve a CS=
   // behind them (TASK-1567 20-deep test). The per-command delay (due) is still respected.
   int pick = -1;
-  const bool prioWait = s_prioSent && (now - s_lastPrioSendMs) < PRIO_MSG_SPACING_MS;
+  const bool prioSpacing = s_prioSent && (now - s_lastPrioSendMs) < PRIO_MSG_SPACING_MS;
   for (int k = 0; k < cmdQueueSize; k++) {
     if ((int32_t)(now - cmdqueue[k].due) < 0) continue;
     const bool prioCmd = (cmdqueue[k].cmd[0] == 'P' && cmdqueue[k].cmd[1] == 'M') ||
                          (cmdqueue[k].cmd[0] == 'T' && cmdqueue[k].cmd[1] == 'P');
-    if (prioCmd && prioWait) continue;
+    // the slot holds back a PM=/TP= for another DataID; the one that owns the slot may still be resent
+    if (prioCmd && (prioSpacing ||
+                    (s_prioSlotId != PRIO_SLOT_FREE && (uint8_t)atoi(cmdqueue[k].cmd + 3) != s_prioSlotId))) continue;
     pick = k;
     break;
   }
   if (pick >= 0) {
     const int i = pick;
     s_lastQueueSendMs = now; s_queueSent = true;
-    if ((cmdqueue[i].cmd[0] == 'P' && cmdqueue[i].cmd[1] == 'M') || (cmdqueue[i].cmd[0] == 'T' && cmdqueue[i].cmd[1] == 'P')) {
+    if (isPrioCmd(cmdqueue[i].cmd)) {
       s_lastPrioSendMs = now; s_prioSent = true;
+      s_prioSlotAnswered = false;
+      s_prioSlotId = (uint8_t)atoi(cmdqueue[i].cmd + 3);   // PM=10 -> 10, TP=11:12 -> 11
+      s_prioSlotSinceMs = now;
     }
     OTDebugTf(PSTR("CmdQueue: Queue slot [%d] due\r\n"), i);
     memcpy(s_inflight.cmd, cmdqueue[i].cmd, sizeof(s_inflight.cmd));
@@ -4051,6 +4084,7 @@ void handleCommandQueue(){
       snprintf_P(cMsg, sizeof(cMsg), PSTR("%s [dropped]"), cmdqueue[i].cmd);
       sendEventToWebSocket('!', cMsg);
       reportCommandDropped(cmdqueue[i].cmd);
+      if (isPrioCmd(cmdqueue[i].cmd)) prioSlotRelease();   // never echoed: do not hold the slot for it
       removeFromCmdQueue(i);
       // the last attempt is still on the wire: wait for its echo or the timeout before the next command
     } else if (i < cmdQueueSize - 1) {
@@ -4115,7 +4149,8 @@ void checkCommandResponse(const char *buf, unsigned int len){
         return;
       }
       if (rejected) {
-        OTDebugTf(PSTR("CmdQueue: PIC refused [%d]:[%s] with [%s]\r\n"), t, cmdqueue[t].cmd, code);
+        if (isPrioCmd(cmdqueue[t].cmd)) prioSlotRelease();   // the PIC refused it, so its slot never loaded
+        OTDebugTf(PSTR("CmdQueue: PIC refused [%d]:[%s] with [%s]@N@"), t, cmdqueue[t].cmd, code);
         reportCommandRejected(cmdqueue[t].cmd, code);
         removeFromCmdQueue(t);
         return;
@@ -4211,6 +4246,8 @@ static void pmChainSend() {
       if (cmdqueue[qi].cmdlen == pn && memcmp(cmdqueue[qi].cmd, prev, pn) == 0) { removeFromCmdQueue(qi); break; }
     }
   }
+  // the chain gave up on its previous PM= (answered, or timed out): that DataID no longer holds the PIC's slot
+  if (pmChainLastId != PM_CHAIN_NONE && s_prioSlotId == pmChainLastId) prioSlotRelease();
   pmChainLastId = kPmChainIds[pmChainIdx];
   const CmdQueueResult r = addCommandToQueue(cmd, n, true, 0);   // forceQueue: no prefix dedup
   // A PM= that did not get into the queue counts as missed after 5 s (re-asked once at the end), not after 60 s.
@@ -4251,6 +4288,7 @@ void pmChainStart() {
 
 // Called from processOT() for every boiler frame. Only records: no queueing under the OTStateLock.
 void pmChainOnBoilerResponse(uint8_t id) {
+  if (s_prioSlotId != PRIO_SLOT_FREE && id == s_prioSlotId) s_prioSlotAnswered = true;   // TASK-1572, records only
   const int8_t idx = pmChainIdx;
   if (idx >= 0 && id == kPmChainIds[idx]) pmChainAnswered = id;
 }

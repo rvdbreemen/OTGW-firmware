@@ -3,9 +3,11 @@ id: TASK-1572
 title: >-
   PIC command queue: PM= and TP= hold the priority-message slot until the boiler
   answers (rule 3)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-02T21:10:00Z'
+updated_date: '2026-11-02T21:46:00Z'
 labels:
   - pic
   - command-queue

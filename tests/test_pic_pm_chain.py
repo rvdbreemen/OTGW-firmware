@@ -140,6 +140,7 @@ int main(int argc, char** argv) {
         strcat(all, line); strcat(all, ";");
         char ts[24]; snprintf(ts, sizeof(ts), "%lu;", (unsigned long)(t - 101000)); strcat(times, ts);
         char e[16]; snprintf(e, sizeof(e), "PM: %d", atoi(line + 3)); echo(e);
+        pmChainOnBoilerResponse((uint8_t)atoi(line + 3));   // TASK-1572: the boiler answers the PM= (frees the slot)
         p = strchr(p, ';') + 1;
       }
     }
@@ -247,6 +248,57 @@ int main(int argc, char** argv) {
     printf("sent=%s\n", all);
     return 0;
   }
+  if (!strcmp(sc, "prio_slot")) {        // TASK-1572: PM=3 then PM=15; the PIC echoes, the boiler answers only at 20 s
+    addCommandToQueue("PM=3", 4, false, 0);
+    addCommandToQueue("PM=15", 5, false, 0);
+    addCommandToQueue("CS=45.0", 7, false, 0);
+    char times[256] = "";
+    for (uint32_t t = 100000; t <= 125000; t += 10) {
+      if (t == 120000) pmChainOnBoilerResponse(3);     // the boiler answers PM=3 at 20 s
+      g_sent[0] = 0; loopAt(t);
+      char line[32]; const char* p = g_sent;
+      while (sscanf(p, "%31[^;];", line) == 1) {
+        char ts[32]; snprintf(ts, sizeof(ts), "%s@%lu;", line, (unsigned long)(t - 100000)); strcat(times, ts);
+        char e[32]; snprintf(e, sizeof(e), "%c%c: %s", line[0], line[1], line + 3); echo(e);
+        p = strchr(p, ';') + 1;
+      }
+    }
+    printf("sent=%s\nqueued=%d\n", times, cmdQueueSize);
+    return 0;
+  }
+  if (!strcmp(sc, "prio_tp_pm")) {       // TASK-1572: TP=11:12=80 (Immergas) then a user PM=7; the boiler answers ID 11 at 5 s
+    addCommandToQueue("TP=11:12=80", 11, false, 0);
+    addCommandToQueue("PM=7", 4, false, 0);
+    char times[256] = "";
+    for (uint32_t t = 100000; t <= 110000; t += 10) {
+      if (t == 105000) pmChainOnBoilerResponse(11);
+      g_sent[0] = 0; loopAt(t);
+      char line[32]; const char* p = g_sent;
+      while (sscanf(p, "%31[^;];", line) == 1) {
+        char ts[32]; snprintf(ts, sizeof(ts), "%s@%lu;", line, (unsigned long)(t - 100000)); strcat(times, ts);
+        char e[32]; snprintf(e, sizeof(e), "%c%c: %s", line[0], line[1], line + 3); echo(e);
+        p = strchr(p, ';') + 1;
+      }
+    }
+    printf("sent=%s\n", times);
+    return 0;
+  }
+  if (!strcmp(sc, "prio_timeout")) {     // TASK-1572: the boiler never answers PM=3; PM=15 goes out after 60 s
+    addCommandToQueue("PM=3", 4, false, 0);
+    addCommandToQueue("PM=15", 5, false, 0);
+    long at15 = -1;
+    for (uint32_t t = 100000; t <= 170000 && at15 < 0; t += 100) {
+      g_sent[0] = 0; loopAt(t);
+      char line[32]; const char* p = g_sent;
+      while (sscanf(p, "%31[^;];", line) == 1) {
+        if (!strcmp(line, "PM=15")) at15 = (long)(t - 100000);
+        char e[32]; snprintf(e, sizeof(e), "%c%c: %s", line[0], line[1], line + 3); echo(e);
+        p = strchr(p, ';') + 1;
+      }
+    }
+    printf("pm15_ms=%ld\n", at15);
+    return 0;
+  }
   if (!strcmp(sc, "fifo")) {             // TASK-1569 rule 5b: an updated command moves to the back
     addCommandToQueue("MM=80", 5, false, 0);
     addCommandToQueue("CS=45.0", 7, false, 0);
@@ -269,7 +321,7 @@ int main(int argc, char** argv) {
     for (uint32_t t = 100000; t <= 106000; t += 1000) {
       g_sent[0] = 0; loopAt(t); strcat(all, g_sent);
       char line[32]; const char* p = g_sent;
-      while (sscanf(p, "%31[^;];", line) == 1) { char e[32]; snprintf(e, sizeof(e), "%c%c: %s", line[0], line[1], line + 3); echo(e); p = strchr(p, ';') + 1; }
+      while (sscanf(p, "%31[^;];", line) == 1) { char e[32]; snprintf(e, sizeof(e), "%c%c: %s", line[0], line[1], line + 3); echo(e); if (line[0] == 'T') pmChainOnBoilerResponse(11); p = strchr(p, ';') + 1; }
     }
     printf("sent=%s\n", all);
     return 0;
@@ -518,6 +570,38 @@ class PmChain(unittest.TestCase):
         sent = out["sent"].strip(";").split(";")
         self.assertEqual(sent[:2], ["BB=1", "CC=1"], out["sent"])
         self.assertIn("AA=1", sent[2:])
+
+    @staticmethod
+    def _times(sent):
+        out = {}
+        for item in sent.strip(";").split(";"):
+            cmd, ms = item.rsplit("@", 1)
+            out.setdefault(cmd, []).append(int(ms))
+        return out
+
+    def test_priority_slot_waits_for_the_boiler(self):
+        # TASK-1572 (rule 3): PM=15 is not sent while PM=3 waits for its boiler answer, even after the PIC's echo;
+        # CS=45.0 keeps draining meanwhile. HEAD (TASK-1571): PM=15 one second after PM=3.
+        out = self.run_sc("prio_slot")
+        t = self._times(out["sent"])
+        self.assertIn("CS=45.0", t)
+        self.assertLess(t["CS=45.0"][0], 2000, "CS= held back by the priority slot")
+        self.assertGreaterEqual(t["PM=15"][0], 20000, f"PM=15 sent before the boiler answered PM=3: {out['sent']}")
+        self.assertLess(t["PM=15"][0], 21500, f"PM=15 late after the answer: {out['sent']}")
+
+    def test_tp_and_pm_do_not_cancel_each_other(self):
+        # TASK-1572: a user PM=7 waits until the boiler answered the Immergas TP=11:12 (DataID 11).
+        out = self.run_sc("prio_tp_pm")
+        t = self._times(out["sent"])
+        self.assertEqual(t["TP=11:12=80"][0], 0)
+        self.assertGreaterEqual(t["PM=7"][0], 5000, out["sent"])
+
+    def test_priority_slot_frees_after_60_s(self):
+        # TASK-1572: a boiler that never answers holds the slot at most 60 s.
+        out = self.run_sc("prio_timeout")
+        ms = int(out["pm15_ms"])
+        self.assertGreaterEqual(ms, 60000, f"PM=15 sent at {ms} ms")
+        self.assertLess(ms, 62000, f"PM=15 sent at {ms} ms")
 
     def test_updated_command_moves_to_the_back(self):
         # TASK-1569 rule 5b (Robert 2026-11-02). HEAD: MM=90 kept MM=80's first slot and went out before CS=45.0.
