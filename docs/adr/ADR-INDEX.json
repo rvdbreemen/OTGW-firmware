@@ -7567,9 +7567,9 @@
       "title": "REST API sets the telnet debug log flags by name from one shared table",
       "path": "ADR-206-rest-api-sets-the-telnet-debug-log-flags-by-name-from-one-shared-table.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-02",
-      "decision_summary": "The debug log flags get one name table, src/OTGW-firmware/debugFlags.h (kDebugFlags: REST name, telnet key, DebugSect...",
+      "decision_summary": "All twelve debug flags get one name table, src/OTGW-firmware/debugFlags.h (kDebugFlags: REST name, telnet key, DebugS...",
       "topics": [
         "debug flags",
         "diagnostics",
@@ -7589,6 +7589,7 @@
       "symbols": [
         "DebugFlagDef",
         "debugFlagSet",
+        "debugFlagWrite",
         "DebugSection",
         "handleDebugChar",
         "handleDebugFlags",
@@ -7597,8 +7598,9 @@
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "Keep every debug log flag of DebugSection in kDebugFlags, with a unique REST name and a unique telnet key.",
-          "Toggle a log flag from telnet only through debugFlagByKey() and the table.",
+          "Keep every DebugSection bool flag in kDebugFlags, with a unique REST name and a unique telnet key.",
+          "Change a flag from telnet only through debugFlagByKey(), debugFlagWrite() and the table.",
+          "Run a simulation switch's side effect only on a real change of its value.",
           "Set a flag over REST only to an explicit value; answer 400 on an unknown name or a non-boolean value.",
           "Call checkHttpAuth() before any read or write on /api/v2/debug/flags.",
           "Emit the JSON with JsonEmit."
@@ -7606,21 +7608,18 @@
         "must_not": [
           "Persist a debug flag in settings or settings.ini.",
           "Offer a toggle verb on the REST API.",
-          "Put bSensorSim or bOTGWSimulation in the table or the API.",
           "Change the telnet output text of a flag key."
         ],
         "exceptions": [
           "None."
         ],
         "verification": [
-          "python tests/testdebugflagsapi.py (stdlib unittest): compiles debugFlags.h against the real DebugSection and checks explicit and idempotent sets, rejection without a change, unique names and keys, that every DebugSection bool is in the t...",
-          "On a bench unit: curl http:// /api/v2/debug/flags, then curl -X POST -d '{\"name\":\"sat\",\"value\":false}' http:// /api/v2/debug/flags twice (same answer both times), and the telnet banner shows the same state."
+          "python tests/testdebugflagsapi.py (stdlib unittest): compiles debugFlags.h against the real DebugSection and checks explicit and idempotent sets, rejection without a change, the simulation side effect only on a real change, the S key, un...",
+          "On a bench unit: curl http:// /api/v2/debug/flags, then curl -X POST -d '{\"name\":\"sat\",\"value\":false}' http:// /api/v2/debug/flags twice (same answer both times), and the telnet key still switches the same flag."
         ]
       },
       "scope": {
-        "path_globs": [
-          "src/OTGW-firmware/handleDebug.ino"
-        ]
+        "path_globs": []
       },
       "metadata": {
         "binding": false,

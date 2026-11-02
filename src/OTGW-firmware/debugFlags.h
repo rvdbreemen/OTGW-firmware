@@ -2,13 +2,14 @@
 ***************************************************************************
 **  Program  : debugFlags.h
 **
-**  The telnet debug log flags by name (TASK-1561): one table shared by the telnet
-**  keys (handleDebug.ino) and the REST API /api/v2/debug/flags (restAPI.ino), so a
-**  key and its REST name cannot drift apart.
+**  The telnet debug flags by name (TASK-1561, ADR-206): one table shared by the
+**  telnet keys (handleDebug.ino) and the REST API /api/v2/debug/flags (restAPI.ino),
+**  so a key and its REST name cannot drift apart.
 **
-**  Only the log flags are here. The simulation switches ('d' Dallas sensor
-**  simulation, 's' OTGW serial simulation) change behaviour and have side effects,
-**  so they stay telnet keys only.
+**  The ten log flags only switch debug output. The two simulation switches
+**  (sensorsim, key 'd': Dallas sensor simulation; otgwsim, key 's'/'S': OTGW serial
+**  replay) change behaviour, so their entry carries an onChange action, run only
+**  when the value really changes (Robert 2026-11-02: include them in the API).
 **
 **  Needs DebugSection (debugStuff.h) and the HAS_* flags (boards.h) before it.
 ***************************************************************************
@@ -17,26 +18,33 @@
 
 #include <string.h>
 
+// Side effects of the simulation switches; defined in handleDebug.ino.
+void debugFlagSensorSimChanged(bool on);   // initSensors(), and an immediate poll when switched on
+void debugFlagOtgwSimChanged(bool on);     // restart the replay timer, signal the replay task (TASK-1321)
+
 struct DebugFlagDef {
   const char* name;                   // REST name, lower case
   char        key;                    // telnet key
   bool DebugSection::* member;        // the flag in state.debug
   const char* label;                  // telnet text: "Debug <label>: true/false" (scripts parse it)
+  void      (*onChange)(bool on);     // nullptr for a log flag; run after a real change
 };
 
 static const DebugFlagDef kDebugFlags[] = {
-  { "otmsg",    '1', &DebugSection::bOTmsg,    "OTmsg" },
-  { "restapi",  '2', &DebugSection::bRestAPI,  "RestAPI" },
-  { "mqtt",     '3', &DebugSection::bMQTT,     "MQTT" },
-  { "sensors",  '4', &DebugSection::bSensors,  "Sensors" },
-  { "sat",      '5', &DebugSection::bSAT,      "SAT" },
-  { "otdirect", '6', &DebugSection::bOTDirect, "OTDirect" },
+  { "otmsg",     '1', &DebugSection::bOTmsg,          "OTmsg",                    nullptr },
+  { "restapi",   '2', &DebugSection::bRestAPI,        "RestAPI",                  nullptr },
+  { "mqtt",      '3', &DebugSection::bMQTT,           "MQTT",                     nullptr },
+  { "sensors",   '4', &DebugSection::bSensors,        "Sensors",                  nullptr },
+  { "sat",       '5', &DebugSection::bSAT,            "SAT",                      nullptr },
+  { "otdirect",  '6', &DebugSection::bOTDirect,       "OTDirect",                 nullptr },
 #if HAS_SAT_BLE
-  { "satble",   '7', &DebugSection::bSATBLE,   "SAT BLE" },
+  { "satble",    '7', &DebugSection::bSATBLE,         "SAT BLE",                  nullptr },
 #endif
-  { "sattrace", '8', &DebugSection::bSATTrace, "SAT trace (high volume)" },
-  { "mqttgate", 'g', &DebugSection::bMQTTGate, "MQTT Gating" },
-  { "ntp",      'n', &DebugSection::bNTP,      "NTP" },
+  { "sattrace",  '8', &DebugSection::bSATTrace,       "SAT trace (high volume)",  nullptr },
+  { "mqttgate",  'g', &DebugSection::bMQTTGate,       "MQTT Gating",              nullptr },
+  { "ntp",       'n', &DebugSection::bNTP,            "NTP",                      nullptr },
+  { "sensorsim", 'd', &DebugSection::bSensorSim,      "Dallas sensor simulation", debugFlagSensorSimChanged },
+  { "otgwsim",   's', &DebugSection::bOTGWSimulation, "OTGW serial simulation",   debugFlagOtgwSimChanged },
 };
 static const size_t kDebugFlagCount = sizeof(kDebugFlags) / sizeof(kDebugFlags[0]);
 
@@ -52,8 +60,10 @@ static inline bool debugFlagIEq(const char* a, const char* b)
   }
 }
 
+// 'S' is the second key of the serial simulation (kept from the old telnet switch).
 static inline const DebugFlagDef* debugFlagByKey(char key)
 {
+  if (key == 'S') key = 's';
   for (size_t i = 0; i < kDebugFlagCount; i++) {
     if (kDebugFlags[i].key == key) return &kDebugFlags[i];
   }
@@ -79,6 +89,15 @@ static inline int debugFlagParseBool(const char* v)
   return -1;
 }
 
+// Write a flag; the onChange action runs only when the value really changes.
+static inline void debugFlagWrite(DebugSection& d, const DebugFlagDef* f, bool on)
+{
+  bool& v = d.*(f->member);
+  const bool changed = (v != on);
+  v = on;
+  if (changed && f->onChange != nullptr) f->onChange(on);
+}
+
 // Set one flag explicitly (idempotent). Returns the flag, or nullptr with *err = 1 (unknown name) or 2 (value not a bool).
 static inline const DebugFlagDef* debugFlagSet(DebugSection& d, const char* name, const char* value, int* err)
 {
@@ -86,7 +105,7 @@ static inline const DebugFlagDef* debugFlagSet(DebugSection& d, const char* name
   if (f == nullptr) { if (err) *err = 1; return nullptr; }
   const int b = debugFlagParseBool(value);
   if (b < 0) { if (err) *err = 2; return nullptr; }
-  d.*(f->member) = (b == 1);
+  debugFlagWrite(d, f, b == 1);
   if (err) *err = 0;
   return f;
 }

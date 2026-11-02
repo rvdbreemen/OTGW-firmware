@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **The REST debug-flag API also switches the two simulations** (TASK-1561, 2.0.0-beta.14; Robert's choice when reviewing ADR-206). `sensorsim` (telnet `d`) and `otgwsim` (telnet `s`/`S`) are in the shared table; their side effects (sensor re-init and poll, replay start/stop) run only when the value changes. The telnet keys go through the same table. Host test `tests/test_debug_flags_api.py` 8/8 (beta.13: 4 fail).
+
+### Changed
+
 - **SAT PWM: the start hold while a hot-water flame still burns also applies without overshoot protection** (TASK-1562, 2.0.0-beta.13; Sergeant D entry 234, Q-1412.6a B, changes entry 133). `satPwmHoldForDhwFlame()` no longer checks the option itself: since beta.11 every OFF phase stops the boiler without protection too (entry 230), so the hot-water flame goes out and the start follows, as with protection on. Host test `tests/test_sat_pwm_anchors.py` k3 (beta.12: start at 1230 s, fix: 1350 s).
 
 ### Added

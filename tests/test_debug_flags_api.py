@@ -29,10 +29,13 @@ from test_sat_published_curve import compile_cpp  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 FW = Path(os.environ.get("OTGW_FW_DIR", REPO / "src" / "OTGW-firmware"))
-EXCLUDED = {"bSensorSim", "bOTGWSimulation"}   # behaviour switches with side effects: telnet keys only
+EXCLUDED = set()   # since Robert 2026-11-02 every DebugSection bool is in the table, the simulation switches included
 
 MAIN = r"""
 #include <cstdio>
+static int g_sens = 0, g_otgw = 0;
+void debugFlagSensorSimChanged(bool) { g_sens++; }
+void debugFlagOtgwSimChanged(bool) { g_otgw++; }
 int main() {
   DebugSection d;
   int err = -9;
@@ -51,6 +54,13 @@ int main() {
   printf("badval|%d|%d|%d\n", err, f ? 1 : 0, (int)d.bSAT);
   f = debugFlagSet(d, "mqtt", "1", &err);
   printf("mqtt|%d|%d\n", err, (int)d.bMQTT);
+  // simulation switches: the side effect runs only on a real change
+  debugFlagSet(d, "otgwsim", "true", &err);  printf("otgw1|%d|%d|%d\n", err, (int)d.bOTGWSimulation, g_otgw);
+  debugFlagSet(d, "otgwsim", "true", &err);  printf("otgw2|%d|%d|%d\n", err, (int)d.bOTGWSimulation, g_otgw);
+  debugFlagSet(d, "otgwsim", "false", &err); printf("otgw3|%d|%d|%d\n", err, (int)d.bOTGWSimulation, g_otgw);
+  debugFlagSet(d, "sensorsim", "on", &err);  printf("sens1|%d|%d|%d\n", err, (int)d.bSensorSim, g_sens);
+  debugFlagSet(d, "sat", "false", &err);     printf("nohook|%d|%d\n", g_sens, g_otgw);
+  printf("keyS|%s|%s\n", debugFlagByKey('S') ? debugFlagByKey('S')->name : "-", debugFlagByKey('s') ? debugFlagByKey('s')->name : "-");
   for (size_t i = 0; i < kDebugFlagCount; i++) printf("row|%s|%c|%s\n", kDebugFlags[i].name, kDebugFlags[i].key, kDebugFlags[i].label);
   return 0;
 }
@@ -98,6 +108,16 @@ class DebugFlagsApi(unittest.TestCase):
     def test_unknown_name_and_bad_value_are_rejected_without_a_change(self):
         self.assertEqual(self.rows["unknown"], ["1", "0"])
         self.assertEqual(self.rows["badval"], ["2", "0", "1"])
+
+    def test_simulation_switch_side_effect_runs_only_on_a_real_change(self):
+        self.assertEqual(self.rows["otgw1"], ["0", "1", "1"])
+        self.assertEqual(self.rows["otgw2"], ["0", "1", "1"])   # same value again: no second replay start
+        self.assertEqual(self.rows["otgw3"], ["0", "0", "2"])
+        self.assertEqual(self.rows["sens1"], ["0", "1", "1"])
+        self.assertEqual(self.rows["nohook"], ["1", "2"])        # a log flag has no side effect
+
+    def test_capital_s_is_the_serial_simulation_key_too(self):
+        self.assertEqual(self.rows["keyS"], ["otgwsim", "otgwsim"])
 
     def test_names_and_keys_are_unique(self):
         names = [r[0] for r in self.table]

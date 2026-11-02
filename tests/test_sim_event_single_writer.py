@@ -73,8 +73,11 @@ class SingleWriter(unittest.TestCase):
 
     def test_telnet_s_key_posts_instead_of_sending(self):
         # handleDebugChar runs from AsyncSimpleTelnet's onData handler, on the async_tcp task.
+        # Since TASK-1561 the 's' key (and REST otgwsim) go through the debug-flag table; its change action posts the event.
         dbg = read(os.environ.get("OTGW_DEBUG_INO", os.path.join(SRC, "handleDebug.ino")))
-        self.assertIn("requestOTGWSimulationEvent(state.debug.bOTGWSimulation)", dbg)
+        m = re.search(r"void debugFlagOtgwSimChanged\(bool on\)\s*\{(.*?)\n\}", dbg, re.S)
+        self.assertIsNotNone(m, "debugFlagOtgwSimChanged() not found in handleDebug.ino")
+        self.assertIn("requestOTGWSimulationEvent(on)", m.group(1))
         self.assertNotIn('PSTR("OTGW simulation enabled [replay active]")', dbg)
 
 

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-02T13:53:00Z'
-updated_date: '2026-11-02T15:04:00Z'
+updated_date: '2026-11-02T17:34:00Z'
 labels:
   - rest-api
   - debug
@@ -41,3 +41,9 @@ Robert 2026-11-02: 'Kan je niet een api call maken voor de debug toggles. Zodat 
 5. Bench .63: POST sat=false twice -> false both times, then true twice -> true; GET matches; telnet key 5 still toggles. Then switch scripts: the TASK-1412.6 bench script and otgw_capture.py (optional follow-up) to the API.
 OSS: not applicable (project-specific glue, a few dozen lines).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-02 Robert reviewed ADR-206: transient yes, simulation switches INCLUDED, no extra judge rule; ADR-206 rewritten and Accepted via adr-kit. sensorsim/otgwsim added with onChange (only on a real change). tests/test_debug_flags_api.py 8/8 (beta.13: 4 fail). test_sim_event_single_writer follows the 's' key into debugFlagOtgwSimChanged (same intent: post, never send). Full tests/ 94/94.
+<!-- SECTION:NOTES:END -->

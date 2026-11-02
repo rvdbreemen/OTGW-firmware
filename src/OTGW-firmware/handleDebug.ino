@@ -289,15 +289,29 @@ static void dumpDebugInfo() {
     Debugln(F("--- DUMP END ---"));
 }
 
+// Side effects of the two simulation switches in the debug-flag table (debugFlags.h, TASK-1561): the same work the telnet
+// keys 'd' and 's' did before. Run by debugFlagWrite() only when the value changes, from telnet or from REST (both async_tcp).
+void debugFlagSensorSimChanged(bool on)
+{
+  initSensors();
+  if (on) pollSensors();   // immediate sensor data so the panel and graph update right away
+}
+
+void debugFlagOtgwSimChanged(bool on)
+{
+  state.debug.iOTGWSimulationNextDueMs = 0;
+  requestOTGWSimulationEvent(on);   // TASK-1321: telnet and REST run on async_tcp
+}
+
 // Dispatch a single keypress from the telnet debug session.
 // Called from onTelnetInput() in networkStuff.ino via the SimpleTelnet
 // onInputReceived callback (line mode off — one char per call).
 void handleDebugChar(char c){
-        // The debug log flags: one table with the REST API /api/v2/debug/flags (debugFlags.h, TASK-1561). Same text as before.
+        // The debug flags: one table with the REST API /api/v2/debug/flags (debugFlags.h, TASK-1561). Same text as before.
         if (const DebugFlagDef* f = debugFlagByKey(c)) {
-            bool& v = state.debug.*(f->member);
-            v = !v;
-            DebugTf(PSTR("\r\nDebug %s: %s\r\n"), f->label, CBOOLEAN(v));
+            const bool on = !(state.debug.*(f->member));
+            DebugTf(PSTR("\r\nDebug %s: %s\r\n"), f->label, CBOOLEAN(on));
+            debugFlagWrite(state.debug, f, on);
             return;
         }
         switch (c){
@@ -399,23 +413,7 @@ void handleDebugChar(char c){
                     startMQTT();
                 } else DebugTln(F("MQTT is connected"));
                 break;
-            // keys 1-8, g, n: the debug log flags, handled above from debugFlags.h (TASK-1561)
-            case 'd':
-                state.debug.bSensorSim = !state.debug.bSensorSim;
-                DebugTf(PSTR("\r\nDebug Dallas sensor simulation: %s\r\n"), CBOOLEAN(state.debug.bSensorSim));
-                initSensors();
-                if (state.debug.bSensorSim)
-                {
-                  pollSensors();  // Force immediate sensor data so panel/graph update right away
-                }
-                break;
-            case 's':
-            case 'S':
-                state.debug.bOTGWSimulation = !state.debug.bOTGWSimulation;
-                state.debug.iOTGWSimulationNextDueMs = 0;
-                DebugTf(PSTR("\r\nDebug OTGW serial simulation: %s\r\n"), CBOOLEAN(state.debug.bOTGWSimulation));
-                requestOTGWSimulationEvent(state.debug.bOTGWSimulation);   // TASK-1321: telnet runs on async_tcp
-                break;
+            // keys 1-8, g, n, d, s/S: the debug flags, handled above from debugFlags.h (TASK-1561)
             case 'b':
                 DebugTln(F("Blink led 1"));
                 blinkLED(LED1, 5, 500);
