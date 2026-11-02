@@ -78,7 +78,7 @@ using std::min;
 #include <thread>
 #include <atomic>
 enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };
-struct CmdQueueEchoStats { uint32_t count, timeouts, minMs, maxMs, sumMs; uint32_t hist[8]; };
+@QUEUE_TYPES@
 static std::recursive_timed_mutex g_qmutex;
 struct CmdQueueLock {
   bool locked = false;
@@ -299,6 +299,25 @@ int main(int argc, char** argv) {
     printf("pm15_ms=%ld\n", at15);
     return 0;
   }
+  if (!strcmp(sc, "snap")) {             // TASK-1573: the queue snapshot behind /api/v2/device/info
+    addCommandToQueue("PM=3", 4, false, 0);
+    addCommandToQueue("CS=45.0", 7, false, 0);
+    g_sent[0] = 0; loopAt(100000);             // PM=3 sent, waiting for its echo
+    CmdQueueSnap a; cmdQueueSnapshot(&a);
+    printf("a_valid=%d\na_depth=%u\na_inflight=%s\na_prio=%u\na_sent=%lu\n", a.valid ? 1 : 0, (unsigned)a.depth, a.inflight,
+           (unsigned)a.prioSlot, (unsigned long)a.sent);
+    g_ms = 100030; echo("PM: 3");               // echo after 30 ms
+    g_sent[0] = 0; loopAt(100100);              // CS=45.0 goes, PM=3 still holds the slot (no boiler answer yet)
+    g_ms = 100105; echo("CS: 45.00");           // echo after 5 ms
+    addCommandToQueue("ZZ=1", 4, false, 0);
+    g_ms = 100150; echo("ZZ: NG");              // not outstanding: falls back to the 2-letter path, refused
+    CmdQueueSnap b; cmdQueueSnapshot(&b);
+    printf("b_depth=%u\nb_inflight=%s\nb_prio=%u\nb_sent=%lu\nb_rejected=%lu\nb_echo=%lu\nb_min=%lu\nb_max=%lu\nb_h0=%lu\nb_h2=%lu\n",
+           (unsigned)b.depth, b.inflight, (unsigned)b.prioSlot, (unsigned long)b.sent, (unsigned long)b.rejected,
+           (unsigned long)b.echo.count, (unsigned long)b.echo.minMs, (unsigned long)b.echo.maxMs,
+           (unsigned long)b.echo.hist[0], (unsigned long)b.echo.hist[2]);
+    return 0;
+  }
   if (!strcmp(sc, "fifo")) {             // TASK-1569 rule 5b: an updated command moves to the back
     addCommandToQueue("MM=80", 5, false, 0);
     addCommandToQueue("CS=45.0", 7, false, 0);
@@ -479,7 +498,11 @@ class PmChain(unittest.TestCase):
         cpp = d / "t.cpp"
         body = extract(CORE_INO.read_text(encoding="utf-8"))
         prefix = "#define OLD_VOID_ADD\n" if "\nvoid addCommandToQueue(" in body else ""
-        cpp.write_text(prefix + STUBS.replace("@BODY@", body), encoding="utf-8")
+        hdr = (REPO / "src" / "OTGW-firmware" / "OTGW-firmware.h").read_text(encoding="utf-8")
+        a = hdr.index("struct CmdQueueEchoStats")
+        b = hdr.index("void cmdQueueSnapshot(CmdQueueSnap* out);")
+        types = hdr[a:b].replace("extern CmdQueueEchoStats g_cmdQueueEcho;", "")   # the types from the real header
+        cpp.write_text(prefix + STUBS.replace("@QUEUE_TYPES@", types).replace("@BODY@", body), encoding="utf-8")
         cls.exe = compile_cpp(cpp, d / "t.exe")
 
     @classmethod
@@ -602,6 +625,18 @@ class PmChain(unittest.TestCase):
         ms = int(out["pm15_ms"])
         self.assertGreaterEqual(ms, 60000, f"PM=15 sent at {ms} ms")
         self.assertLess(ms, 62000, f"PM=15 sent at {ms} ms")
+
+    def test_queue_snapshot_for_device_info(self):
+        # TASK-1573 (rule 6): depth, the command in flight, the priority slot, counters and the echo histogram.
+        out = self.run_sc("snap")
+        self.assertEqual((out["a_valid"], out["a_depth"], out["a_inflight"], out["a_prio"], out["a_sent"]),
+                         ("1", "2", "PM=3", "3", "1"))
+        self.assertEqual(out["b_inflight"], "")
+        self.assertEqual(out["b_prio"], "3")          # still waiting for the boiler
+        self.assertEqual(out["b_sent"], "2")
+        self.assertEqual(out["b_rejected"], "1")
+        self.assertEqual((out["b_echo"], out["b_min"], out["b_max"]), ("2", "5", "30"))
+        self.assertEqual((out["b_h0"], out["b_h2"]), ("1", "1"))   # 5 ms -> <10 bucket, 30 ms -> <50 bucket
 
     def test_updated_command_moves_to_the_back(self):
         # TASK-1569 rule 5b (Robert 2026-11-02). HEAD: MM=90 kept MM=80's first slot and went out before CS=45.0.

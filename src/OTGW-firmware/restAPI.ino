@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.22
+**  Version  : v2.0.0-beta.23
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3121,6 +3121,7 @@ void sendOTmonitorV2()
 // Event-driven values (settings.*, board identity, set-once eMode/pic) stay live.
 struct DeviceInfoSnap {
   OTGWState st;                       // frozen copy of every state.* the emit reads
+  CmdQueueSnap cq;                    // TASK-1573: PIC command queue, frozen once under its lock
   bool      picEnabled;
   bool      otDirectEnabled;
   bool      hasOtCmd;
@@ -3172,6 +3173,7 @@ void sendDeviceInfoV2()
   snap->hasOtCmd        = hasOTCommandInterface();
   snap->gatewayFirmware = isGatewayFirmware();
   snap->freeHeap        = platformFreeHeap();
+  cmdQueueSnapshot(&snap->cq);
   snap->maxFreeBlock    = platformMaxFreeBlock();
   snap->heapMinFree     = platformMinFreeHeap();  // TASK-1017
   snap->fragPct         = getHeapFragmentation();
@@ -3391,6 +3393,26 @@ void sendDeviceInfoV2()
     je.field(F("hd_mqtt_drops"),       snap->st.heapdiag.iMqttDropsTotal);
     // TASK-1439: PIC commands dropped after OTGW_CMD_RETRY tries.
     je.field(F("cmd_dropped"),         snap->st.pic.iCmdDropped);
+    // TASK-1573: the PIC command queue (rule 6). cmdq_valid=false when its lock was busy for this request.
+    je.field(F("cmdq_valid"),          snap->cq.valid);
+    je.field(F("cmdq_depth"),          (uint32_t)snap->cq.depth);
+    je.field(F("cmdq_oldest"),         snap->cq.oldest);
+    je.field(F("cmdq_oldest_age_ms"),  snap->cq.oldestAgeMs);
+    je.field(F("cmdq_inflight"),       snap->cq.inflight);
+    je.field(F("cmdq_prio_slot"),      (int32_t)(snap->cq.prioSlot == 0xFF ? -1 : snap->cq.prioSlot));
+    je.field(F("cmdq_sent"),           snap->cq.sent);
+    je.field(F("cmdq_retried"),        snap->cq.retried);
+    je.field(F("cmdq_rejected"),       snap->cq.rejected);
+    je.field(F("cmdq_prio_timeouts"),  snap->cq.prioTimeouts);
+    // TASK-1571 measurement: echo latency of the outstanding command (ms buckets <10,<20,<50,<100,<200,<500,<1000,timeout)
+    je.field(F("cmdq_echo_count"),     snap->cq.echo.count);
+    je.field(F("cmdq_echo_timeouts"),  snap->cq.echo.timeouts);
+    je.field(F("cmdq_echo_min_ms"),    snap->cq.echo.minMs);
+    je.field(F("cmdq_echo_max_ms"),    snap->cq.echo.maxMs);
+    je.field(F("cmdq_echo_avg_ms"),    snap->cq.echo.count ? snap->cq.echo.sumMs / snap->cq.echo.count : 0u);
+    je.beginArray(F("cmdq_echo_hist"));
+    for (int b = 0; b < 8; b++) je.value(snap->cq.echo.hist[b]);
+    je.endArray();
 
     // --- MQTT Discovery telemetry (ADR-062 / TASK-349 / TASK-361) ---
     je.field(F("disc_published_topics"),     snap->st.discovery.iPublishedTopicCount);

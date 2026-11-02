@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.22
+**  Version  : v2.0.0-beta.23
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3776,7 +3776,9 @@ static bool isPicErrorReply(const char* code) {
 // A refused command is reported like a dropped one, with the code appended,
 // e.g. "ZZ=1 (NG)", and is not retried: the PIC would refuse it again
 // (TASK-1457, port of 1.x TASK-1442).
+static uint32_t g_cmdQueueSent = 0, g_cmdQueueRetried = 0, g_cmdQueueRejected = 0;   // TASK-1573
 static void reportCommandRejected(const char* cmd, const char* code) {
+  g_cmdQueueRejected++;
   char msg[sizeof(cmdqueue[0].cmd) + 6];
   snprintf_P(msg, sizeof(msg), PSTR("%s (%c%c)"), cmd, code[0], code[1]);
   reportCommandDropped(msg);
@@ -4076,6 +4078,8 @@ void handleCommandQueue(){
     s_inflight.active = true;
     s_inflight.sentMs = now;
     sendPICSerial(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
+    g_cmdQueueSent++;
+    if (cmdqueue[i].retrycnt > 0) g_cmdQueueRetried++;
     cmdqueue[i].retrycnt++;
     cmdqueue[i].due = now + OTGW_CMD_INTERVAL_MS;
     if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
@@ -4287,6 +4291,26 @@ void pmChainStart() {
 }
 
 // Called from processOT() for every boiler frame. Only records: no queueing under the OTStateLock.
+// TASK-1573: what /api/v2/device/info shows of the queue. Bounded lock (async_tcp caller).
+void cmdQueueSnapshot(CmdQueueSnap* out) {
+  memset(out, 0, sizeof(*out));
+  out->prioSlot = PRIO_SLOT_FREE;
+  CmdQueueLock qlock;
+  if (!qlock.locked) return;
+  const uint32_t now = millis();
+  out->valid = true;
+  out->depth = (uint8_t)cmdQueueSize;
+  if (cmdQueueSize > 0) {
+    strlcpy(out->oldest, cmdqueue[0].cmd, sizeof(out->oldest));
+    if ((int32_t)(now - cmdqueue[0].due) > 0) out->oldestAgeMs = now - cmdqueue[0].due;
+  }
+  if (s_inflight.active) strlcpy(out->inflight, s_inflight.cmd, sizeof(out->inflight));
+  out->prioSlot = s_prioSlotId;
+  out->sent = g_cmdQueueSent; out->retried = g_cmdQueueRetried; out->rejected = g_cmdQueueRejected;
+  out->prioTimeouts = g_prioSlotTimeouts;
+  out->echo = g_cmdQueueEcho;
+}
+
 void pmChainOnBoilerResponse(uint8_t id) {
   if (s_prioSlotId != PRIO_SLOT_FREE && id == s_prioSlotId) s_prioSlotAnswered = true;   // TASK-1572, records only
   const int8_t idx = pmChainIdx;

@@ -1,9 +1,11 @@
 ---
 id: TASK-1573
 title: 'PIC command queue: make the buffer visible in /api/v2/device/info (rule 6)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-02T21:11:00Z'
+updated_date: '2026-11-02T21:51:00Z'
 labels:
   - pic
   - command-queue

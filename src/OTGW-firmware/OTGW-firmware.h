@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.22
+**  Version  : v2.0.0-beta.23
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -249,6 +249,18 @@ CmdQueueResult addCommandToQueue(const char* ,  int , const bool = false, const 
 // Echo latency of the PIC command queue (TASK-1571): hist buckets <10,<20,<50,<100,<200,<500,<1000 ms, timeout.
 struct CmdQueueEchoStats { uint32_t count, timeouts, minMs, maxMs, sumMs; uint32_t hist[8]; };
 extern CmdQueueEchoStats g_cmdQueueEcho;
+// TASK-1573: one consistent snapshot of the PIC command queue for /api/v2/device/info, taken under the queue lock.
+struct CmdQueueSnap {
+  bool     valid;            // false: the queue lock was busy, the other fields are zero
+  uint8_t  depth;            // entries in the queue
+  char     oldest[15];       // first entry in send order ("" when empty)
+  uint32_t oldestAgeMs;      // how long that entry has been due (0 when not due yet)
+  char     inflight[15];     // command sent and waiting for its echo ("" when none)
+  uint8_t  prioSlot;         // DataID that holds the PIC's priority-message slot, 0xFF when free
+  uint32_t sent, retried, rejected, prioTimeouts;
+  CmdQueueEchoStats echo;
+};
+void cmdQueueSnapshot(CmdQueueSnap* out);
 void triggerPICsettingsReadout();
 void sendMQTTheapdiag();
 // TASK-692 / TASK-693 port (dev TASK-686 / TASK-688): OT-bus support-map
