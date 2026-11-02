@@ -3,11 +3,11 @@ id: TASK-1452
 title: >-
   feat-2.0.0: port TASK-1253 (1.x) — reboot_log.txt keeps CRLF line endings and
   marks pre-NTP entries 'time not set'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:23:00Z'
-updated_date: '2026-11-02T18:46:00Z'
+updated_date: '2026-11-02T20:42:00Z'
 labels:
   - port-from-1.x
   - diagnostics
@@ -64,10 +64,10 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 RED on current origin/dev build (bench .61 OTGW32 or .63 Classic+S3): after two software reboots, /reboot_log.txt byte counts show fewer LF than CR (CR-only older records), recorded with the exact command and counts; time(nullptr) value at updateRebootLog time recorded from telnet when NTP is not yet synced (e.g. WiFi unreachable or NTP server blocked via the MikroTik)
-- [ ] #2 GREEN on the fix build: after OTA plus two reboots every line in /reboot_log.txt ends in CRLF (CR count == LF count == line count), and a CR-only file inherited from the old build is repaired on the first boot
-- [ ] #3 With NTP unavailable at boot, the new entry reads 'time not set - reboot cause: ...' instead of a 1970 or 2106 date; with NTP synced, the entry still carries the real local date and time
-- [ ] #4 /api/v2/device/crashlog still returns the latest summary plus register/External Reason detail line after a crash-type reset (or a host harness that feeds a sample CRLF and 'time not set' file through the real readLatestCrashLog/isRebootLogSummaryLine shows the summary is found)
+- [x] #1 RED on current origin/dev build (bench .61 OTGW32 or .63 Classic+S3): after two software reboots, /reboot_log.txt byte counts show fewer LF than CR (CR-only older records), recorded with the exact command and counts; time(nullptr) value at updateRebootLog time recorded from telnet when NTP is not yet synced (e.g. WiFi unreachable or NTP server blocked via the MikroTik)
+- [x] #2 GREEN on the fix build: after OTA plus two reboots every line in /reboot_log.txt ends in CRLF (CR count == LF count == line count), and a CR-only file inherited from the old build is repaired on the first boot
+- [x] #3 With NTP unavailable at boot, the new entry reads 'time not set - reboot cause: ...' instead of a 1970 or 2106 date; with NTP synced, the entry still carries the real local date and time
+- [x] #4 /api/v2/device/crashlog still returns the latest summary plus register/External Reason detail line after a crash-type reset (or a host harness that feeds a sample CRLF and 'time not set' file through the real readLatestCrashLog/isRebootLogSummaryLine shows the summary is found)
 - [ ] #5 Optional host check: a harness that #includes the real updateRebootLog copy loop against a fake File shows old code producing CR-only output and the fix producing CRLF from both CR-only and CRLF input
 - [ ] #6 Build for esp32, esp32-classic and esp32-combo succeeds and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
@@ -82,4 +82,12 @@ Lead triage 2026-11-01: CRLF half is on dev via TASK-1479 (c0db93f72), bench .61
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: CRLF done (c0db93f72); helperStuff.ino:357-358 still formats time(nullptr) before NTP. Agent-doable.
 
 2026-11-02 (Robert: force to a close): pre-NTP guard implemented. helperStuff.ino: new rebootLogClockValid(now) (2020-01-01..2100-01-01 UTC); updateRebootLog() writes 'time not set - reboot cause: ...' when the clock is outside that range, else the dated line as before; the reader still matches ' - reboot cause: '. tests/test_reboot_log_time_not_set.py (cuts the real functions out of helperStuff.ino): fix 3/3 OK; origin/dev copy ERROR (no guard). test_crashlog_coredump.py 10/10 OK; evaluate --quick 0 failed. Committed without a bump; the lead takes it as beta.17 in one build with beta.15/16. Bench note: a software reboot keeps the ESP32 RTC time, so with NTP blocked a /ReBoot still logs a real date. AC#3 red/green needs NTP blocked plus a hardware (EN/USB or power) reset.
+
+2026-11-02 bench (lead session, beta.17 3e928d919 on .63 Classic+S3, zip msg 1566914637587415100): AC2 after OTA + 2 reboots /reboot_log.txt 20 lines, CR = LF = CRLF = 20; same after 4 more boots. AC3 NTPenable=false persisted (settings.ini read after the 2 s flush); USB/RTS reset via esptool COM8: entry still dated 2026-11-02 21:15:56 (RTC time survives a system reset, clock valid, correct); power cycle: 'time not set - reboot cause: Power on (1)'; NTP back on and synced, /ReBoot: '2026-11-02 21:33:07 - reboot cause: Software reset (3)'. AC4 crashlog available:false after these resets (no crash-type reset run); host harness tests/test_reboot_log_time_not_set.py 3/3 on the fix, red on the old helperStuff.ino (no rebootLogClockValid). Health: bootcount 66 -> 72 = the 6 resets, stable 5 min, no crashlog, settings diff vs pre-flash empty, NTP restored to true. AC1: the CR-only red is TASK-1479's (c0db93f72, fixed before this task); the time half's red is the host test on the old code; the raw pre-sync time(nullptr) value was NOT captured over telnet (power-on shows the guard fires, so it was outside 2020..2100).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Pre-NTP guard ported from 1.x TASK-1253: updateRebootLog() writes 'time not set - reboot cause: ...' when time(nullptr) is outside 2020-01-01..2100-01-01 UTC (rebootLogClockValid), else the dated line; the ' - reboot cause: ' contract for the readers is kept. The CRLF half was already on dev via TASK-1479. Shipped as beta.17 (3e928d919). Evidence: AC2 bench .63 20 lines CR=LF=CRLF=20 over 6 boots; AC3 power cycle with NTP off logs 'time not set - reboot cause: Power on (1)', NTP on logs '2026-11-02 21:33:07 - reboot cause: Software reset (3)', a USB/RTS reset keeps the valid RTC date (correct); AC4 host test test_reboot_log_time_not_set.py 3/3 green, red on the old code, crashlog endpoint consistent (available:false, no crash reset run). Not verified: the raw pre-sync time(nullptr) value on telnet (AC1 detail) and a crash-type reset on hardware (host harness covers the reader).
+<!-- SECTION:FINAL_SUMMARY:END -->
