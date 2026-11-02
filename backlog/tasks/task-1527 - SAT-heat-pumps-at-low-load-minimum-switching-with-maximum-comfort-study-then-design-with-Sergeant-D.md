@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-31T13:48:00Z'
-updated_date: '2026-11-02T05:39:00Z'
+updated_date: '2026-11-02T22:13:00Z'
 labels:
   - sat
   - design
@@ -61,4 +61,6 @@ Audit 2026-11-01: moved To Do -> In Progress. Simulation rounds 12-17 are commit
 2026-11-02 AC#2 checked again, now with SAT's own hysteresis: round 23c (600 runs, ten seasons, paired against current; docs/sat/sim-hp-lowload/round23.md findings 6-9, round23c_switch_runs.json). Period 2400 s (selectable) -19 % starts (17.0 -> 13.8/day) at +0.0007 C, 120/120 runs fewer starts. Switch as the firmware (one tick later than the model) -0.5 starts/day: rounds 21-23 conclusions stand. Dwell 300 s -0.9. Margin 3.0/4.0: SAT never enters PWM in the model, an artefact of the assumed heat-pump stop band (stops at CS+3 K, study21.py:206); with a 5 K band margin 3.0 gives 12.4 starts/day, 4.0 gives 9.0 (NIBE, 2015 house, 2024-25). Rule: the switch fires only when the unit's own stop overshoot exceeds SAT's margin; needs a capture (AC#1). Data added to Q-1527c (advice default 2400 s), new queued Q-1527f (margin). Port proof 4/4 OK on beta.5 (0ab3edd99).
 
 2026-11-02 AC#3: options with numbers put to Sergeant D (Q-1527c with round 23 data, Q-1527f with round 23c, Q-1527a confirm) in the one-time overview of 04:53 (#alpha-testing msg 1566676722768941168; one overview instead of one question at a time, maintainer exception). Answers 05:31 (msg 1566686069796114443) recorded as entries 227 (Q-1527a A), 228 (Q-1527c C: 60 min as a new choice, default unchanged = our interpretation, TASK-1557), 229 (Q-1527f C: margin after a heat-pump capture). Entry 210 (slave SAT rationale) recorded; round 22b (5.5 kW boiler minimum, return-temperature efficiency, start losses) running. Remaining: AC#1 (heat-pump capture).
+
+2026-11-02 evening: AC#1 still open. Asked maarten_41762 (Remeha/Techneco Toros on/off heat pump) for a >= 24 h long-run capture (msg 1566903649655853077, correction 1566903751040573582). Robert 2026-11-02: field data (24 h) expected soon; if that does not work out, the task may be closed without AC#1 (waiver, named in the Final Summary). maarten 21:23 UTC (msg 1566925806268186755): away until Thursday, no capture before then; written summary: ~9 kW on/off unit, 2017 A-label 175 m2 house, high-mass UFH, heat recovery; NOT SAT-driven (Honeywell floor controller, 180 min PWM, blocked 06-10 and 16-21); 1 and 2 Nov: 3 runs/day of 40-45 min, supply ~29.5 C, rooms 20.5-21 C. Not an AC#1 validation (SAT not in control, no capture); consistent with the model's long-period own-control range (round 12: 2.4 starts/day). Asked for a SAT-driven capture after Thursday (msg 1566938112548937809).
 <!-- SECTION:NOTES:END -->
