@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-28T15:19:00Z'
-updated_date: '2026-10-28T21:26:00Z'
+updated_date: '2026-11-02T04:39:00Z'
 labels:
   - web-ui
   - tester-feedback
@@ -33,4 +33,6 @@ Tester report, maarten_41762 (<@1544684325847703602>), #alpha-testing 2026-10-28
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-28 maintainer decision (Robert, in session): released ('vrijgeven'); label needs-maintainer-ok removed.
+
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: connRecency layout v2.js:1844 unchanged. Doable.
 <!-- SECTION:NOTES:END -->

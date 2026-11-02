@@ -6,14 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T18:57:00Z'
-updated_date: '2026-11-01T20:41:00Z'
+updated_date: '2026-11-02T04:37:00Z'
 labels:
   - sat
   - heat-pump
   - sat-selftune
 dependencies:
   - TASK-1525
-priority: low
+priority: medium
 ordinal: 704000
 ---
 
@@ -29,3 +29,9 @@ Sergeant D entry 205 (Q-1527e: C; written as entry 202 before the renumbering of
 - [ ] #2 Gas boilers and hybrids: hourly record unchanged
 - [ ] #3 MQTT/REST field documented in docs/api where the hourly record is published
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: PWM-tick signal summed (SATcontrol.ino:5486) and logged in SATTUNEH; reason first-wins (:5477), telnet only, no MQTT/REST field. Entry 205 decided.
+<!-- SECTION:NOTES:END -->

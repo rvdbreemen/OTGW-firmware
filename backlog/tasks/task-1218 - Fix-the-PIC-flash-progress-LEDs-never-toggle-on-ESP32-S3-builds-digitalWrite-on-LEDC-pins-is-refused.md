@@ -5,14 +5,15 @@ title: >-
   on LEDC pins is refused)
 status: To Do
 assignee: []
-created_date: '2026-10-11 23:22'
+created_date: 2026-10-11 23:22
+updated_date: '2026-11-02T04:37:00Z'
 labels:
   - bug
   - esp32
   - pic
   - led
 dependencies: []
-priority: low
+priority: medium
 ordinal: 338000
 ---
 
@@ -28,3 +29,9 @@ Seen on the Classic + LOLIN S3 Mini bench, 2026-10-12, while verifying TASK-1129
 - [ ] #2 Bench: during a PIC flash on the Classic + S3 Mini the LED toggles (photo or observation noted), and no 'is not set as GPIO' line appears (checked on a build without the console mute or via a debug counter)
 - [ ] #3 Build green for the three targets; evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: OTGW-Core.ino:6395 and OTGWSerial.cpp:1022 digitalWrite on LEDC-attached LED pins (OTGW-firmware.ino:664-669). TASK-1552 did not touch it. Agent-doable, AC2 bench on .63.
+<!-- SECTION:NOTES:END -->

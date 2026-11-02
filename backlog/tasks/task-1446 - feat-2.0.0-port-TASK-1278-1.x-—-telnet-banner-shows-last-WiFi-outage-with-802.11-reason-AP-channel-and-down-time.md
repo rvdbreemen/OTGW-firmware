@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T06:16:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -85,3 +86,9 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 - [ ] #8 After an Ethernet takeover (Ethernet.ino:103-104 disconnect plus WIFI_OFF), the banner's last drop is marked self-caused and is not counted as a field outage.
 - [ ] #9 Red/green on the same bench procedure: build current dev, connect telnet after a forced deauth and show there is no Link/Drop line; then show the lines after the change.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no event handlers/wifiReasonName in src. Agent-doable; prerequisite of TASK-1444.
+<!-- SECTION:NOTES:END -->

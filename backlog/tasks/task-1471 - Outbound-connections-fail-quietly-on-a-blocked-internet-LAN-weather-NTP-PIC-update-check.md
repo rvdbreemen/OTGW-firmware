@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T10:49:00Z'
-updated_date: '2026-10-29T20:09:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - sat
   - network
@@ -35,4 +35,6 @@ Tester martreides (#alpha-testing msg 1565312598595993792, 2026-10-29) runs the 
 Related: TASK-1478 (found in gruijter's capture, TASK-1474): even with working internet every Open-Meteo fetch blocks the loop ~5 s because the stream parser waits for the 5 s byte timeout on a keep-alive socket. Same class as this task; fix them together or in order.
 
 Robert 2026-10-29 (interactive): released, priority medium. TASK-1478 (alpha.534) already fixed the 5 s tail of a successful weather fetch; this task covers blocked (dropped/rejected) outbound traffic.
+
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: weather backoff SATweather.ino:438-455; outbound inventory (AC1) doable, rest needs a blocked-WAN bench.
 <!-- SECTION:NOTES:END -->

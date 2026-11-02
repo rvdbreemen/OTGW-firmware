@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T09:39:00Z'
+updated_date: '2026-11-02T04:39:00Z'
 labels:
   - simulatie
 dependencies: []
@@ -24,3 +25,9 @@ Deferred by Robert 2026-11-01, keep as a reminder. From TASK-1527 / entry 192: (
 - [ ] #1 Round 18 report in docs/sat/sim-hp-lowload/round18.md with charts, paired against today's control
 - [ ] #2 Previous rounds reproduce bit-exact with the new flags off
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no round18. Deferred by Robert.
+<!-- SECTION:NOTES:END -->

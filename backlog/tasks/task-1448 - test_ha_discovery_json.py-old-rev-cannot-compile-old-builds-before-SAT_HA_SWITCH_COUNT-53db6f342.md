@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T06:18:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - test
 milestone: 2.0.0
@@ -24,3 +25,9 @@ Found while fixing TASK-1443 (2026-10-29): test/host/test_ha_discovery_json.py -
 <!-- AC:BEGIN -->
 - [ ] #1 --old-rev against a revision before 53db6f342 either compiles or stops with a clear message naming the lower bound
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no guard for --old-rev in test/host/test_ha_discovery_json.py:559/622. Agent-doable.
+<!-- SECTION:NOTES:END -->

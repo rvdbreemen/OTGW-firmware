@@ -6,11 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T20:37:00Z'
+updated_date: '2026-11-02T04:37:00Z'
 labels:
   - combo
   - pic
 milestone: 2.0.0
 dependencies: []
+priority: medium
 ordinal: 541000
 ---
 
@@ -25,3 +27,9 @@ ADR-201 Open Question 1, Robert 2026-10-25: yes, fix. comboActivePinMap() return
 - [ ] #1 Forced mode 2 recovery probe on a Pro pulses GPIO 40, not GPIO 12 (code + host or bench evidence)
 - [ ] #2 Plain S3 Mini and OTGW32 behaviour unchanged
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: mode 2 resolves the OTGW32 map, activePicRst() = GPIO 12 (OTGW-firmware.h:781/845); TASK-1552 boardPinReserved only guards user pins. Code doable, bench needs a Mini Pro.
+<!-- SECTION:NOTES:END -->

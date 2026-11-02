@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T06:22:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - port-from-1.x
   - mqtt
@@ -109,3 +110,9 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 - [ ] #6 Re-resolve after every reconnect wait (dev TASK-873, MQTTstuff.ino:1449-1463) still works: once the name resolves again, MQTT connects without a reboot.
 - [ ] #7 Build for esp32, esp32-classic and esp32-combo succeeds and python evaluate.py --quick shows no new failures.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: MQTTstuff.ino:1319 hostByName overwrites MQTTbrokerIP. Code + host test doable.
+<!-- SECTION:NOTES:END -->

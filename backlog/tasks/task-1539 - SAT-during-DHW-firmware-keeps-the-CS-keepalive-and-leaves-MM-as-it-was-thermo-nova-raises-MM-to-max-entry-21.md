@@ -6,10 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T07:53:00Z'
+updated_date: '2026-11-02T04:39:00Z'
 labels:
   - sat
 dependencies: []
-priority: medium
+priority: low
 ordinal: 695000
 ---
 
@@ -24,3 +25,9 @@ Found by the TASK-1412.17 second read (docs/sat/sat-commissioning-profiles-2026-
 - [ ] #1 Sergeant D's answer recorded as a numbered entry (keep firmware behaviour, or follow thermo-nova/entry 21 for MM during DHW; keepalive during DHW yes/no)
 - [ ] #2 If a change is decided: host test on the real code red on HEAD and green on the fix
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no. Waits on Sergeant D Q-1539a.
+<!-- SECTION:NOTES:END -->

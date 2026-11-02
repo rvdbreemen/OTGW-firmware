@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-30T14:12:00Z'
+updated_date: '2026-11-02T04:37:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -25,3 +26,9 @@ Field evidence: gruijter's capture 20261030-092718 (alpha.549, Classic PIC, Inte
 - [ ] #1 Host test replays the capture's pressure + flame series and shows the false alarms on the current code
 - [ ] #2 After Q70 is answered and recorded, the alarm no longer fires on that series; a real slow leak series still alarms
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: fix landed 6f44f9da9 (TASK-1480, entry 201, SATcontrol.ino:4767); alpha.549 capture replay missing. Replay then likely close.
+<!-- SECTION:NOTES:END -->

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T05:14:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - ota
 milestone: 2.0.0
@@ -24,3 +25,9 @@ ordinal: 507000
 <!-- AC:BEGIN -->
 - [ ] #1 Reproduced or explained with a capture (crashlog / serial / rollback state); if a defect, fixed so a filesystem OTA never sends a unit to safeboot, or ota_flash.py orders app/fs so it cannot happen (red/green evidence)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no repro or fix; ota_flash.py still filesystem first. Needs bench repro; overlaps TASK-1524.
+<!-- SECTION:NOTES:END -->

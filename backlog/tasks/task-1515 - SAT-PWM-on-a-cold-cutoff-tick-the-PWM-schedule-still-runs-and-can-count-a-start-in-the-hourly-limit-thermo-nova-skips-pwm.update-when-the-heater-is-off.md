@@ -7,11 +7,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-30T18:16:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - sat
 milestone: 2.0.0
 dependencies: []
-priority: low
+priority: medium
 ordinal: 671000
 ---
 
@@ -26,3 +27,9 @@ Found in the TASK-1468 review (2026-10-30). In satControlLoopRun the PWM schedul
 - [ ] #1 thermo-nova behaviour on a heater-OFF tick cited (file:line, second reader)
 - [ ] #2 Host test: cold-cutoff tick in PWM does not count a start (red on HEAD, green on fix), after Sergeant D's OK if it changes behaviour
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: satPwmSchedule (SATcontrol.ino:6734) runs before the cold-cutoff disable (:6796). AC1 + red test doable; behaviour change needs Sergeant D OK.
+<!-- SECTION:NOTES:END -->

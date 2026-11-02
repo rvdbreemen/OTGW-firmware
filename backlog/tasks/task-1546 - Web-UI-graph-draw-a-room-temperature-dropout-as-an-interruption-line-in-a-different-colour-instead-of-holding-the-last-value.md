@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T15:56:00Z'
+updated_date: '2026-11-02T04:37:00Z'
 labels:
   - web-ui
   - sat
 dependencies: []
-priority: low
+priority: medium
 ordinal: 701000
 ---
 
@@ -27,3 +28,9 @@ Robert 2026-11-01, from gruijter's alpha.597 capture (#alpha-testing msg 1566431
 - [ ] #3 Browser test on the real page: red on the old page (frozen value drawn), green on the new one, screenshots before/after with synthetic data
 - [ ] #4 Works with SAT on and with SAT off (no thermostat MsgID 24 for longer than the timeout)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: pushGraphSlot (v2.js:1350) copies model.room without validity. Agent-doable.
+<!-- SECTION:NOTES:END -->

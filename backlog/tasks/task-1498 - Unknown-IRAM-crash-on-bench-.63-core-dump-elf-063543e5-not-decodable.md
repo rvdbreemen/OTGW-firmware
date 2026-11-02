@@ -4,6 +4,7 @@ title: 'Unknown IRAM crash on bench .63: core dump elf 063543e5, not decodable'
 status: To Do
 assignee: []
 created_date: '2026-10-30T04:19:00Z'
+updated_date: '2026-11-02T04:39:00Z'
 labels:
   - bug
   - esp32
@@ -40,3 +41,9 @@ Low priority: there is one occurrence and no build to match it. Reopen if a late
 - [ ] #1 If a matching ELF turns up (an older build-archive zip or another session's build), decode the backtrace with xtensa-esp32s3-elf-addr2line and record the frames
 - [ ] #2 If a new IRAM loopTask dump appears on a build with TASK-1479, link it here and decode it
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: ELF 063543e5 still missing. Close if no ELF turns up.
+<!-- SECTION:NOTES:END -->

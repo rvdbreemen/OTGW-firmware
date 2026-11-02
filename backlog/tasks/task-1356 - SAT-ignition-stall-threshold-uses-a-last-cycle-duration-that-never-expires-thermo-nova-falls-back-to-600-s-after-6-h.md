@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-24T16:44:00Z'
+updated_date: '2026-11-02T04:39:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,3 +25,9 @@ Found during TASK-1352: SATcontrol.ino:678 bases the stalled-ignition threshold 
 <!-- AC:BEGIN -->
 - [ ] #1 Plan with thermo-nova citations agreed by Sergeant D (entry recorded); then threshold matches thermo-nova (host test red/green)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: SATcontrol.ino:833-836 fLastCycleDuration no 6 h expiry. Plan to Sergeant D.
+<!-- SECTION:NOTES:END -->

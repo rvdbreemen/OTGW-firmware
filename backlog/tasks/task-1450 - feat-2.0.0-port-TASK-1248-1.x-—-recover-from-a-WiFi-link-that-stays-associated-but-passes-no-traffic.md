@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T06:21:00Z'
-updated_date: '2026-10-29T06:30:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -15,7 +15,7 @@ labels:
   - low-priority
 milestone: 2.0.0
 dependencies: []
-priority: low
+priority: medium
 ordinal: 610000
 ---
 
@@ -100,4 +100,6 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 <!-- SECTION:NOTES:BEGIN -->
 Do together with TASK-1455 (both touch the WiFi supervisor), per the port evaluation.
+
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no dead-link probe in src. Needs MikroTik fault-injection bench.
 <!-- SECTION:NOTES:END -->

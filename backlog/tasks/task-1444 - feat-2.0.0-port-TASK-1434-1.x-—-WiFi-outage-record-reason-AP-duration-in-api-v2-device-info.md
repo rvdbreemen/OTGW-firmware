@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T06:14:00Z'
-updated_date: '2026-10-29T06:30:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -87,3 +87,9 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 - [ ] #7 docs/api/openapi.yaml on dev documents the 15 keys, and the 2.0.0 CHANGELOG [Unreleased] has a user-facing entry referencing GH #682 and 1.x TASK-1434/TASK-1278.
 - [ ] #8 Build for esp32, esp32-classic and esp32-combo succeeds (check each env, since build.py can mask per-env failures), and python evaluate.py --quick shows no new failures.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no. Waits on TASK-1446.
+<!-- SECTION:NOTES:END -->

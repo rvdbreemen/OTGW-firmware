@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-31T13:54:00Z'
-updated_date: '2026-11-01T22:28:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - alpha
   - bug
@@ -39,4 +39,6 @@ Bench OTGW32 .61 alpha.570, 2026-10-31, TASK-1523 long-run capture running (teln
 Response sizes measured 15:07 (one at a time): sat?detail=full 413 B, device/info 2767, device/crashlog 58, debug 6335, settings 9544, graph/history 2602. None explains a ~69 KB transient, so the snapshot requests are not the cause (suspect 1 dropped). Dips coincide with (re)connect moments: boot 14:28 (2240 B) and the network-drop recovery (524 B). Hypotheses for the next bench step, in order: (a) espMqttClient outbox mallocs per queued publish while TCP is slow or down (ADR-186), plus the HA discovery republish burst after reconnect; (b) AsyncSimpleTelnet TX buffering with all capture debug toggles on (~750 lines/min) while the client is slow/away; (c) AsyncTCP/lwIP pbufs for the /ws frame stream. Method: windowed heap minimum (platformHeapWindowStart) per phase with one stream enabled at a time (capture flags --skip-frame-capture, no broker, telnet toggles off), same network-drop fault, old vs fix.
 
 Lead triage 2026-11-01: not actively worked; back to To Do, priority stays high (known issue in the beta.1 notes). Needs a dedicated multi-hour bench slot (windowed heap minimum per stream + network-drop fault); possibly linked to TASK-1450.
+
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: cause not found. Multi-hour bench run.
 <!-- SECTION:NOTES:END -->

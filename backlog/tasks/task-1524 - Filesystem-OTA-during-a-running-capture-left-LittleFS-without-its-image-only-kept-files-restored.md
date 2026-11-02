@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-31T12:49:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - alpha
   - bug
@@ -27,3 +28,9 @@ Bench 2026-10-31 13:42, OTGW32 .61 on alpha.569, a long-run capture running (tel
 - [ ] #2 Root cause named with evidence (load gate, WS/TCP pressure, timeout in the upload handler, or the kept-file restore path)
 - [ ] #3 Either fix it (e.g. refuse or pause other clients during filesystem OTA, or keep the old image until the new one is complete) or document the limit for testers; old-vs-fix bench run
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no repro or fix. Needs bench repro; overlaps TASK-1372.
+<!-- SECTION:NOTES:END -->

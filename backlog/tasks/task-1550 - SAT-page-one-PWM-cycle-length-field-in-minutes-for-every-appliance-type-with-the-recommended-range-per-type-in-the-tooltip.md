@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T18:56:00Z'
+updated_date: '2026-11-02T04:37:00Z'
 labels:
   - web-ui
   - sat
 dependencies: []
-priority: low
+priority: medium
 ordinal: 704000
 ---
 
@@ -27,3 +28,9 @@ Robert 2026-11-01 adopts maarten's proposal (#alpha-testing msg 1566524283092603
 - [ ] #3 Tooltip states the recommended range per type; the misleading 'minimum on time' hint is gone from the cycle field
 - [ ] #4 Browser test on the real page: red on the old page, green on the new one, screenshots before/after with synthetic data
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: v2.js:2050/:2117 still two fields (seconds, cycles per hour). UI only, no Sergeant D gate.
+<!-- SECTION:NOTES:END -->

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T06:17:00Z'
+updated_date: '2026-11-02T04:37:00Z'
 labels:
   - port-from-1.x
   - diagnostics
@@ -14,7 +15,7 @@ labels:
   - low-priority
 milestone: 2.0.0
 dependencies: []
-priority: low
+priority: medium
 ordinal: 607000
 ---
 
@@ -92,3 +93,9 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 - [ ] #6 No new NVS or LittleFS write in doRestart(); the record lives only in RTC_NOINIT memory
 - [ ] #7 python build.py builds esp32, esp32-classic and esp32-combo targets clean and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: no RTC_NOINIT/storeRebootReason; doRestart (helperStuff.ino:644) does not save the reason. Agent-doable.
+<!-- SECTION:NOTES:END -->

@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-30T14:13:00Z'
+updated_date: '2026-11-02T04:37:00Z'
 labels:
   - sat
 milestone: 2.0.0
 dependencies: []
-priority: low
+priority: medium
 ordinal: 668000
 ---
 
@@ -25,3 +26,9 @@ Field evidence: gruijter's capture 20261030-092718 (alpha.549). 14 DHW flame cyc
 - [ ] #1 thermo-nova behaviour for DHW cycles in the cycle windows cited (file:line, second reader)
 - [ ] #2 Firmware matches the decided behaviour; host test with a DHW cycle shows the window counts
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: SATcycles.ino:939-956 pushes every cycle into the 4 h window, DHW not filtered. AC1 thermo-nova citation first.
+<!-- SECTION:NOTES:END -->

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T08:16:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - sat
 dependencies: []
@@ -25,3 +26,9 @@ Decision Robert 2026-11-01 on OD-2 (docs/sat/sat-commissioning-profiles-2026-11-
 - [ ] #2 Host test on the real satDisable: after enable + disable, SH=/SW=/TP=/MI= are restored to the pre-SAT values and TC= is cleared (red on HEAD, green on the fix)
 - [ ] #3 Every disable path listed in the description covered or explicitly excluded with a reason
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: satDisable (SATcontrol.ino:3388+) sends only CS=0, CH=1, MM=T; plan with Sergeant D (no Q queued).
+<!-- SECTION:NOTES:END -->

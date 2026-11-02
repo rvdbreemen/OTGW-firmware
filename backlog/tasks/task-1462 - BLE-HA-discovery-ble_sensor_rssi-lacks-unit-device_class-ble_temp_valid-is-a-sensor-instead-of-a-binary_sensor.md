@@ -6,13 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T07:21:00Z'
+updated_date: '2026-11-02T04:37:00Z'
 labels:
   - ble
   - mqtt
   - ha-discovery
 milestone: 2.0.0
 dependencies: []
-priority: low
+priority: medium
 ordinal: 622000
 ---
 
@@ -26,3 +27,9 @@ From the sat/* MQTT.md audit (docs session, 2026-10-29, dev 549e93312); code rea
 <!-- AC:BEGIN -->
 - [ ] #1 rssi announced with unit dBm and device_class signal_strength; ble_temp_valid announced as binary_sensor and the old sensor config retired; discovery harness covers both
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: MQTTHaDiscovery.cpp:1316 rssi no unit/device_class, :1319 temp_valid is a sensor. Agent-doable (old config must be retired).
+<!-- SECTION:NOTES:END -->

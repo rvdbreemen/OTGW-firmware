@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T00:01:00Z'
+updated_date: '2026-11-02T04:37:00Z'
 labels:
   - sat
   - low-load
 dependencies: []
-priority: medium
+priority: high
 ordinal: 692000
 ---
 
@@ -25,3 +26,9 @@ Found by the TASK-1412.2 second read (2026-11-01): the thermal-safe fallback cap
 - [ ] #1 Host test on the real code: thermal-safe fallback, resend and keepalive never send a CS above satEffectiveMaxSetpoint(), also right after the limit is lowered (red on HEAD, green)
 - [ ] #2 Decision check against entries 148/152 recorded in the notes before the change
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: thermal-safe CS=45 capped by satGetMaxSetpoint (user MaxTSet) not satEffectiveMaxSetpoint (boiler MaxTSet), SATcontrol.ino:6549; resend :663 and keepalive :629 repeat last CS unclamped. Agent-doable now.
+<!-- SECTION:NOTES:END -->

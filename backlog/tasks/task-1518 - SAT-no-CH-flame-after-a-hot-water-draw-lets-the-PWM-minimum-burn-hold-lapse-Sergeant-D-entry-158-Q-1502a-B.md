@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-31T05:12:00Z'
+updated_date: '2026-11-02T04:37:00Z'
 labels:
   - sat
   - pwm
 dependencies: []
-priority: medium
+priority: high
 ordinal: 674000
 ---
 
@@ -26,3 +27,9 @@ Entry 158 (Q-1502a B): a PWM ON phase that started with the flame burning, is in
 - [ ] #2 TASK-1502 cases 1 and 2 (tests/test_sat_pwm_anchors.py) stay green
 - [ ] #3 build + evaluate green; firmware-sat-spec.md updated
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: hold clock still frozen through the draw (_pwm_dhwHoldValid, SATcontrol.ino:973-976); entry 158 decided. Agent-doable now.
+<!-- SECTION:NOTES:END -->

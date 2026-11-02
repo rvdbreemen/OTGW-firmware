@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-30T06:53:00Z'
+updated_date: '2026-11-02T04:37:00Z'
 labels:
   - replay capture tooling
 milestone: 2.0.0
@@ -26,3 +27,9 @@ TASK-1503 records otframes.log (host time, device timestamp, source letter, fram
 - [ ] #2 A capture with mixed gaps replays with each frame within 50 ms of its recorded gap (measured, old fixed-interval run shown as the red case)
 - [ ] #3 Bare-frame files keep replaying as today (regression test)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: OTGW-Core.ino:4327/4342 next frame = millis()+fixed 750 ms. Agent-doable, host testable.
+<!-- SECTION:NOTES:END -->

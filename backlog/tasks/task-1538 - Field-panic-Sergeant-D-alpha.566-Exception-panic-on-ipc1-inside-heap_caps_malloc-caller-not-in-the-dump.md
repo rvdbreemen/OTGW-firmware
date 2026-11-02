@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T07:50:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - crash
   - field
@@ -25,3 +26,9 @@ Reported by Sergeant D in #alpha-testing 2026-11-01 (msg 1566327932199116884): '
 - [ ] #1 Full core dump (or a longer backtrace) obtained from the unit or a reproduction, and the application caller named with file:line
 - [ ] #2 Cause identified with evidence (old-vs-fix reproduction) or, if not reproducible, the diagnostics gap closed so the next dump shows the caller
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: bt goes into log_line_regs[120] (helperStuff.ino:332, platform_esp32.h:578-588), ~6 frames, caller lost. AC2 diagnostics doable now; root cause needs a field dump.
+<!-- SECTION:NOTES:END -->

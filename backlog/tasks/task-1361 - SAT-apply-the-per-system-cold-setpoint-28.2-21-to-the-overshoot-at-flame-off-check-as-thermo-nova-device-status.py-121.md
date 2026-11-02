@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-24T20:26:00Z'
+updated_date: '2026-11-02T04:39:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,3 +25,9 @@ Robert 2026-10-24 (ADR-199 open question 1): port thermo-nova's COLD_SETPOINT us
 <!-- AC:BEGIN -->
 - [ ] #1 The firmware's overshoot-at-flame-off check ignores setpoints below the per-system cold setpoint (host test red on HEAD, green); plan posted to Sergeant D first
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no cold-setpoint gate at SATcontrol.ino:818. Decided (ADR-199), plan to Sergeant D.
+<!-- SECTION:NOTES:END -->

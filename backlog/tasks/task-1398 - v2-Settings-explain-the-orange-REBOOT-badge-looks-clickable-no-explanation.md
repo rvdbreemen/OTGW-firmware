@@ -4,7 +4,7 @@ title: 'v2 Settings: explain the orange REBOOT badge (looks clickable, no explan
 status: To Do
 assignee: []
 created_date: '2026-10-25T19:49:00Z'
-updated_date: '2026-10-30T21:56:00Z'
+updated_date: '2026-11-02T04:39:00Z'
 labels:
   - webui
 milestone: 2.0.0
@@ -28,4 +28,6 @@ maarten_41762 2026-10-25 (#alpha-testing 1563987220115890257): on Settings > Net
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-30 maintainer decision (Robert, in session otgw-firmware-ea): released for pickup ('vrijgeven'); label needs-maintainer-ok removed. Priority after beta-1 blockers unless it is one.
+
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: badge without title/aria (v2.js:2486/2509). Doable.
 <!-- SECTION:NOTES:END -->

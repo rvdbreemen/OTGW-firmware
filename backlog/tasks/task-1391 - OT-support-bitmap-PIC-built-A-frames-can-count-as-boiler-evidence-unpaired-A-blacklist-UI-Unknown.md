@@ -6,11 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T13:44:00Z'
+updated_date: '2026-11-02T04:39:00Z'
 labels:
   - opentherm
   - pic
 milestone: 2.0.0
 dependencies: []
+priority: low
 ordinal: 530000
 ---
 
@@ -25,3 +27,9 @@ From the boiler-capability research 2026-10-25 (docs/research/2026-10-25-boiler-
 - [ ] #1 Bench or field capture shows (or refutes) a PIC-built A frame setting the boiler bitmap
 - [ ] #2 If confirmed: only B frames set/retract boiler support bits (host test red on HEAD)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: only a genuine B retracts (OTGW-Core.ino:5564/5576); unpaired PIC A can still set (:5530/5545). Needs a capture.
+<!-- SECTION:NOTES:END -->

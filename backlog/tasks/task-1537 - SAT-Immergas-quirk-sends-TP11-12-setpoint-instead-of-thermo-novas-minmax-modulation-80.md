@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T02:01:00Z'
+updated_date: '2026-11-02T04:37:00Z'
 labels:
   - sat
   - bug
 dependencies: []
-priority: medium
+priority: high
 ordinal: 693000
 ---
 
@@ -25,3 +26,9 @@ Found by the TASK-1412.17 profile work, second-read 2026-11-01. Firmware SATcont
 - [ ] #1 Entry 21 and the Immergas quirk origin checked; conflict (if any) put to Sergeant D before the change
 - [ ] #2 Host test on the real code: with the Immergas quirk TP=11:12 carries min(max relative modulation, 80), sent with MM= (red on HEAD, green)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: SATcontrol.ino:6809-6812 still sends TP=11:12=<finalSetpoint>. Check entry 21 first. Agent-doable now.
+<!-- SECTION:NOTES:END -->

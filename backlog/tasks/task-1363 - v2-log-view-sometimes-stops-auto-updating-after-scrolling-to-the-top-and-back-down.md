@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-24T21:32:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - webui
 milestone: 2.0.0
@@ -24,3 +25,9 @@ maarten_41762 2026-10-24 17:57 UTC (#alpha-testing 1563612387402317837), alpha.4
 <!-- AC:BEGIN -->
 - [ ] #1 Reproduced in a browser test (scroll to top, then bottom: new lines must keep appearing and following resumes) red on the faulty build, green on the fix; or documented as not reproducible on the latest build with the test as evidence
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: follow state only changes via the chip since TASK-1533 (0f70009f4). Add a scroll browser test, likely close.
+<!-- SECTION:NOTES:END -->

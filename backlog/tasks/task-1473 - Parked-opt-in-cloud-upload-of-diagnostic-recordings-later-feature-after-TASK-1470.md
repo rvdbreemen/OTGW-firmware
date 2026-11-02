@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T12:45:00Z'
-updated_date: '2026-10-30T06:14:00Z'
+updated_date: '2026-11-02T04:39:00Z'
 labels:
   - parked
   - on-hold
@@ -92,4 +92,6 @@ Firmware facts found (code survey, spot-checked):
 - No WebSocket client lib, no TLS client in firmware code; webhook task (webhook.ino) is the pattern for an uploader task (ADR-136/137); must fail quietly per TASK-1471.
 - OTGW32 has no PSRAM (minFree ~24.7 KB), so TLS handshake (~40-50 KB peak, estimate) only on PSRAM boards.
 Open / unverified: EU jurisdiction on the R2/DO free plan; whether R2 asks for a payment method; mbedTLS allocation in PSRAM with the prebuilt Arduino libs; real data volume (estimates: OT ~9 MB/day, full debug up to ~260 MB/day). Task stays parked until Robert removes the parked label (AC #1).
+
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: parked on purpose.
 <!-- SECTION:NOTES:END -->

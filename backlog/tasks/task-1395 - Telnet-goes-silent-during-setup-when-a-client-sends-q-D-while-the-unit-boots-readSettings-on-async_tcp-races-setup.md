@@ -6,11 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T18:39:00Z'
+updated_date: '2026-11-02T04:38:00Z'
 labels:
   - telnet
   - debug
 milestone: 2.0.0
 dependencies: []
+priority: low
 ordinal: 534000
 ---
 
@@ -25,3 +27,9 @@ From Sergeant D's alpha.505 capture 2026-10-25 19:28 (TASK-1339 notes; analysis 
 - [ ] #1 Bench repro: reboot with the capture script attached so q/D arrive during setup(); telnet silent or not (without a W5500)
 - [ ] #2 If reproduced: telnet keeps streaming after a q during setup (red/green), and q does not run readSettings concurrently with setup()
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: 'q' runs readSettings(true) from async_tcp (handleDebug.ino:364); no setup gate. Repro first.
+<!-- SECTION:NOTES:END -->

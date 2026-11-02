@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-30T13:58:00Z'
-updated_date: '2026-10-30T21:56:00Z'
+updated_date: '2026-11-02T04:39:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -25,4 +25,6 @@ Feature request from tester gruijter in #alpha-testing (msg 1565717631510646795,
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-30 maintainer decision (Robert, in session otgw-firmware-ea): released for pickup ('vrijgeven'); label needs-maintainer-ok removed. Priority after beta-1 blockers unless it is one.
+
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no forecast use in control. New feature, not beta.
 <!-- SECTION:NOTES:END -->

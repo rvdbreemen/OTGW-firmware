@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T08:15:00Z'
+updated_date: '2026-11-02T04:39:00Z'
 labels:
   - sat
   - next-release
@@ -24,3 +25,9 @@ Open decision OD-1 from docs/sat/sat-commissioning-profiles-2026-11-01.md (TASK-
 <!-- AC:BEGIN -->
 - [ ] #1 Decision taken by Robert (A or B) and recorded in the task notes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: decision task, deferred by Robert to the next release.
+<!-- SECTION:NOTES:END -->
