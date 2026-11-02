@@ -53,7 +53,11 @@ static void satNarratef_P(PGM_P fmt, ...) { va_list ap; va_start(ap, fmt); g_app
 #define SATDebugTf(...) g_logf(__VA_ARGS__)
 static size_t strlcpy(char* d, const char* s, size_t n) { size_t l = strlen(s); if (n) { size_t c = l >= n ? n - 1 : l; memcpy(d, s, c); d[c] = 0; } return l; }
 
-struct SatSettings { bool bCurveSelfTune = true, bSimulation = false; float fHeatingCurveCoeff = 2.0f; uint32_t iControlInterval = 3600; };
+#ifndef SAT_SRC_HEAT_PUMP
+#define SAT_SRC_HEAT_PUMP 2
+#endif
+struct SatSettings { bool bCurveSelfTune = true, bSimulation = false; float fHeatingCurveCoeff = 2.0f; uint32_t iControlInterval = 3600;
+                     uint8_t iHeatingSource = 1; };   // TASK-1551: 1 gas, 2 heat pump, 3 hybrid
 struct Settings { SatSettings sat; };
 struct SatState { bool bActive = true, bSafetyTripped = false; float fPidI = 7.5f, fPidD = -1.25f; };
 struct State { SatState sat; };
@@ -114,6 +118,7 @@ int main() {
     else if (!strcmp(tok, "S")) satCurveTuneService(g_now);
     else if (!strncmp(tok, "M:", 2)) updateSetting("SATcoefficient", tok + 2);
     else if (!strncmp(tok, "C:", 2)) settings.sat.fHeatingCurveCoeff = (float)atof(tok + 2);
+    else if (!strncmp(tok, "src:", 4)) settings.sat.iHeatingSource = (uint8_t)atoi(tok + 4);   // TASK-1551
     else if (!strncmp(tok, "tune:", 5)) settings.sat.bCurveSelfTune = atoi(tok + 5) != 0;
     else if (!strncmp(tok, "sim:", 4)) settings.sat.bSimulation = atoi(tok + 4) != 0;
     else if (!strncmp(tok, "hourS:", 6)) satCurveTuneSetHourS((uint32_t)atol(tok + 6));
@@ -552,6 +557,27 @@ class SatCurveSelfTune(unittest.TestCase):
         o = self.run_tokens(toks)
         self.assertEqual(o.days[0]["clean"], "3")
         self.assertEqual(o.days[0]["counted"], "0")
+
+    # --- TASK-1551 (entry 205): heat pumps log the PWM ticks of an hour, the tuner ignores them -----------------------
+    def test_heat_pump_hour_logs_pwm_ticks_and_mean(self):
+        o = self.run_tokens(["src:2", tk(sig=2.0), tk(sig=4.0, pwm=1), tk(sig=3.0, pwm=1), f"A:{HOUR}"])
+        h = o.hours[0]
+        self.assertEqual((h["mean"], h["counted"], h["reason"], h.get("pwm")), ("3.00", "0", "pwm", "2"))
+
+    def test_heat_pump_pwm_mark_survives_an_earlier_exclusion(self):
+        o = self.run_tokens(["src:2", tk(dhw=1), tk(sig=2.0, pwm=1), f"A:{HOUR}"])
+        self.assertEqual((o.hours[0]["reason"], o.hours[0].get("pwm")), ("dhw", "1"))
+
+    def test_gas_and_hybrid_records_unchanged(self):
+        for src in ("src:1", "src:3"):
+            o = self.run_tokens([src, tk(sig=2.0), tk(sig=4.0, pwm=1), f"A:{HOUR}"])
+            self.assertRegex(o.log[0], r"^SATTUNEH hour=0 mean=3\.00 ticks=2 counted=0 reason=pwm$", src)
+
+    def test_heat_pump_logging_does_not_change_the_decision(self):
+        toks = day(1.5) * 3 + [tk(sig=2.0, pwm=1), f"A:{HOUR}"] + day(1.5) * 3
+        gas, hp = self.run_tokens(["src:1"] + toks), self.run_tokens(["src:2"] + toks)
+        self.assertEqual(gas.days, hp.days)
+        self.assertEqual([l for l in gas.log if l.startswith("RESULT")], [l for l in hp.log if l.startswith("RESULT")])
 
     def test_room_lost_hours_are_not_counted(self):
         # TASK-1559, Sergeant D entry 225 (Q-1525a A): an hour with a lost room temperature is not counted, reason no_room

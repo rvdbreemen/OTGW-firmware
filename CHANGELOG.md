@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **SAT curve self-tune: heat pumps log the PWM ticks of each hour** (TASK-1551, Sergeant D entry 205, Q-1527e C). For `satsource` = heat pump the `SATTUNEH` log record gets a `pwm=<ticks>` field, so the mean curve signal of PWM hours can be read in a field test; the tuner still excludes those hours, gas boilers and hybrids keep the old record. Host test `tests/test_sat_curve_selftune.py`.
 - **SAT curve self-tune: an hour without a room temperature is not counted** (TASK-1559, Sergeant D entry 225, Q-1525a A). Such an hour only carries the curve signal (0), which diluted the hourly mean. It is now excluded with reason `no_room` in the `SATTUNEH` record; the build switch `SAT_CT_EXCLUDE_ROOM_LOST` is gone. Host test `tests/test_sat_curve_selftune.py`.
 
 ### Fixed

@@ -43,6 +43,7 @@ struct SatTune {
   uint32_t ticks;        // ticks noted this hour
   uint32_t sigTicks;     // ticks that carried a signal
   float    sigSum;       // sum of the signals
+  uint32_t pwmTicks;     // ticks in SAT PWM this hour (logged for heat pumps, not used by the tuner; entry 205, TASK-1551)
   uint8_t  reason;       // first exclusion seen this hour (SATT_NONE while every tick was clean)
   bool     coeffChanged; // the coefficient changed during this hour
   // current day
@@ -63,6 +64,7 @@ struct SatTuneHourOut {
   uint32_t ticks;
   bool     haveMean;
   float    mean;        // mean signal of the hour (all ticks that carried one)
+  uint32_t pwmTicks;    // ticks in SAT PWM (TASK-1551)
   bool     counted;
   uint8_t  reason;
   bool     dayComplete; // this hour was the last of the day: call satTuneCloseDay()

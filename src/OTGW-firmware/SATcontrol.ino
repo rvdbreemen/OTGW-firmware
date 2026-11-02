@@ -5561,7 +5561,7 @@ static void satTuneEmptyWindow(SatTune& t)
 
 static void satTuneReset(SatTune& t)
 {
-  t.ticks = 0; t.sigTicks = 0; t.sigSum = 0.0f; t.reason = SATT_NONE; t.coeffChanged = false;
+  t.ticks = 0; t.sigTicks = 0; t.sigSum = 0.0f; t.reason = SATT_NONE; t.coeffChanged = false; t.pwmTicks = 0;
   t.hoursInDay = 0; t.cleanInDay = 0; t.cleanSumInDay = 0.0f;
   satTuneEmptyWindow(t);
   t.hourNo = 0; t.dayNo = 0;
@@ -5578,6 +5578,7 @@ static void satTuneMarkReason(SatTune& t, uint8_t reason)
 static void satTuneAddTick(SatTune& t, const SatTuneTickIn& in)
 {
   t.ticks++;
+  if (in.pwm) t.pwmTicks++;   // TASK-1551: logged for heat pumps, the tuner still excludes the hour (reason pwm)
   const uint8_t r = satTuneTickReason(in);
   if (r != SATT_NONE) satTuneMarkReason(t, r);
   if (in.satActive && !in.dhw && isfinite(in.signal)) { t.sigSum += in.signal; t.sigTicks++; }
@@ -5601,6 +5602,7 @@ static void satTuneCloseHour(SatTune& t, SatTuneHourOut& out, uint32_t minTicks)
   else if (t.ticks < minTicks) satTuneMarkReason(t, SATT_FEW_TICKS);
   out.hour     = t.hourNo;
   out.ticks    = t.ticks;
+  out.pwmTicks = t.pwmTicks;
   out.haveMean = (t.sigTicks > 0);
   out.mean     = out.haveMean ? t.sigSum / (float)t.sigTicks : 0.0f;
   out.reason   = t.reason;
@@ -5610,7 +5612,7 @@ static void satTuneCloseHour(SatTune& t, SatTuneHourOut& out, uint32_t minTicks)
   t.hoursInDay++;
   t.hourNo++;
   out.dayComplete = (t.hoursInDay >= SAT_CT_HOURS_PER_DAY);
-  t.ticks = 0; t.sigTicks = 0; t.sigSum = 0.0f; t.reason = SATT_NONE; t.coeffChanged = false;
+  t.ticks = 0; t.sigTicks = 0; t.sigSum = 0.0f; t.reason = SATT_NONE; t.coeffChanged = false; t.pwmTicks = 0;
 }
 
 static float satTuneClampCoeff(float c)
@@ -5832,8 +5834,15 @@ static void satTuneLogHour(const SatTuneHourOut& h)
 {
   char m[12];
   if (h.haveMean) snprintf_P(m, sizeof(m), PSTR("%.2f"), (double)h.mean); else strlcpy(m, "na", sizeof(m));
-  SATDebugTf(PSTR("SATTUNEH hour=%lu mean=%s ticks=%lu counted=%d reason=%s\r\n"),
-             (unsigned long)h.hour, m, (unsigned long)h.ticks, (int)h.counted, satTuneReasonName(h.reason));
+  // TASK-1551 (Sergeant D entry 205, Q-1527e C): for a heat pump the record also carries the ticks spent in SAT PWM, so a
+  // field test shows the curve signal of PWM hours; the tuner ignores those hours as before. Gas and hybrid unchanged.
+  if (settings.sat.iHeatingSource == SAT_SRC_HEAT_PUMP)
+    SATDebugTf(PSTR("SATTUNEH hour=%lu mean=%s ticks=%lu counted=%d reason=%s pwm=%lu\r\n"),
+               (unsigned long)h.hour, m, (unsigned long)h.ticks, (int)h.counted, satTuneReasonName(h.reason),
+               (unsigned long)h.pwmTicks);
+  else
+    SATDebugTf(PSTR("SATTUNEH hour=%lu mean=%s ticks=%lu counted=%d reason=%s\r\n"),
+               (unsigned long)h.hour, m, (unsigned long)h.ticks, (int)h.counted, satTuneReasonName(h.reason));
 }
 
 static void satTuneLogDay(const SatTuneDayOut& d)
