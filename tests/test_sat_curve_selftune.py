@@ -553,13 +553,13 @@ class SatCurveSelfTune(unittest.TestCase):
         self.assertEqual(o.days[0]["clean"], "3")
         self.assertEqual(o.days[0]["counted"], "0")
 
-    def test_room_lost_hours_count_by_default(self):
+    def test_room_lost_hours_are_not_counted(self):
+        # TASK-1559, Sergeant D entry 225 (Q-1525a A): an hour with a lost room temperature is not counted, reason no_room
         o = self.run_tokens([tk(sig=0.0, room=1), f"A:{HOUR}"])
-        self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("1", "none"))
+        self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("0", "no_room"))
 
-    def test_room_lost_hours_are_excluded_when_the_constant_is_set(self):
-        exe = build(Path(self.tmp.name), name="room1", prefix="#define SAT_CT_EXCLUDE_ROOM_LOST 1\n")
-        o = self.run_tokens([tk(sig=0.5), tk(sig=0.0, room=1), f"A:{HOUR}", tk(sig=0.5), f"A:{HOUR}"], exe=exe)
+    def test_room_lost_hour_excluded_then_a_clean_hour_counts(self):
+        o = self.run_tokens([tk(sig=0.5), tk(sig=0.0, room=1), f"A:{HOUR}", tk(sig=0.5), f"A:{HOUR}"])
         self.assertEqual([(h["counted"], h["reason"]) for h in o.hours], [("0", "no_room"), ("1", "none")])
 
     # --- simulation-only hour length -----------------------------------------------------------------------------

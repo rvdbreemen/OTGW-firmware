@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **SAT curve self-tune: an hour without a room temperature is not counted** (TASK-1559, Sergeant D entry 225, Q-1525a A). Such an hour only carries the curve signal (0), which diluted the hourly mean. It is now excluded with reason `no_room` in the `SATTUNEH` record; the build switch `SAT_CT_EXCLUDE_ROOM_LOST` is gone. Host test `tests/test_sat_curve_selftune.py`.
+
 ### Fixed
 
 - **SAT Immergas TP=11:12 only when "Immergas" is chosen explicitly** (TASK-1537, 2.0.0-beta.16; Robert's decision, entry 235). OpenTherm MemberID 27 is shared by Immergas and Sime, so the Auto manufacturer detection sent the Immergas TP=11:12 boiler-parameter write to Sime boilers too (up to beta.14 with the flow setpoint as value). Now `satImmergasTpActive()` reads only the explicit manufacturer setting; Auto still shows the detected name. thermo-nova makes the user confirm the manufacturer in its config step. Immergas owners on Auto: select Immergas under SAT settings (new hint). Host test `tests/test_sat_immergas_tp.py` (Auto/MemberID 27 and Sime send no TP).

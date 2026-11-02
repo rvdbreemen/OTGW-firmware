@@ -15,11 +15,8 @@
 #define SAT_CT_COEFF_MAX        5.0f
 #define SAT_CT_DEFAULT_MIN_MOD  5.0f   // minimum modulation when MsgID 15 was never seen (entry 174)
 #define SAT_CT_MIN_TICK_FRACTION  0.75f  // an hour counts only with this share of its expected control ticks (hour length / control interval)
-// Hours with a lost room temperature: the signal is then 0 (curve only), which dilutes the mean. 0 = such hours still count,
-// 1 = they are excluded with reason no_room. Pending Sergeant D (Q-1525a); a bench or test build may define it as 1.
-#ifndef SAT_CT_EXCLUDE_ROOM_LOST
-#define SAT_CT_EXCLUDE_ROOM_LOST  0
-#endif
+// An hour with a lost room temperature (signal 0, curve only) is not counted: reason no_room (Sergeant D entry 225,
+// Q-1525a A, TASK-1559).
 
 enum SatTuneReason : uint8_t {
   SATT_NONE = 0, SATT_NOT_SAT, SATT_DHW, SATT_NO_SUN, SATT_SUN, SATT_PWM, SATT_FLAME_OFF, SATT_MIN_MOD,

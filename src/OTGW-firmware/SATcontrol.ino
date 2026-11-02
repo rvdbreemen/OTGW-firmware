@@ -5549,9 +5549,7 @@ static uint8_t satTuneTickReason(const SatTuneTickIn& in)
   if (in.chOn && !in.flameOn)                   return SATT_FLAME_OFF;
   const float minMod = (in.minMod > 0.0f) ? in.minMod : SAT_CT_DEFAULT_MIN_MOD;
   if (!(in.relMod > minMod))                    return SATT_MIN_MOD;   // also true when relMod is NaN
-#if SAT_CT_EXCLUDE_ROOM_LOST
-  if (in.roomLost)                              return SATT_NO_ROOM;
-#endif
+  if (in.roomLost)                              return SATT_NO_ROOM;   // Sergeant D entry 225 (Q-1525a A), TASK-1559
   return SATT_NONE;
 }
 
