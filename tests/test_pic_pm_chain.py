@@ -46,7 +46,8 @@ STUBS = r"""
 #define DebugTln(...)
 #define CMDQUEUE_MAX 20
 #define HAS_DIRECT_OT 1
-struct OT_cmd_t { char cmd[15]; int cmdlen; int retrycnt; unsigned long due; };
+#define PIC_CMD_MAX_LEN @PICMAX@   // read from the real OTGW-Core.h (TASK-1576)
+struct OT_cmd_t { char cmd[PIC_CMD_MAX_LEN + 1]; int cmdlen; int retrycnt; unsigned long due; };
 static OT_cmd_t cmdqueue[CMDQUEUE_MAX];
 static int cmdQueueSize = 0;
 static uint32_t g_ms = 0;
@@ -318,6 +319,19 @@ int main(int argc, char** argv) {
            (unsigned long)b.echo.hist[0], (unsigned long)b.echo.hist[2]);
     return 0;
   }
+  if (!strcmp(sc, "maxlen")) {           // TASK-1576: 15 characters is the PIC maximum; 16 is refused, never cut
+    const char* c15 = "XX=123456789012";      // 15
+    const char* c16 = "YY=1234567890123";     // 16
+#ifdef OLD_VOID_ADD
+    addCommandToQueue(c15, 15, false, 0); addCommandToQueue(c16, 16, false, 0);
+    printf("r15=%d\nr16=%d\n", -1, -1);
+#else
+    printf("r15=%d\nr16=%d\n", (int)addCommandToQueue(c15, 15, false, 0), (int)addCommandToQueue(c16, 16, false, 0));
+#endif
+    g_sent[0] = 0; loopAt(100000);
+    printf("queued=%d\nsent=%s\n", cmdQueueSize, g_sent);
+    return 0;
+  }
   if (!strcmp(sc, "fifo")) {             // TASK-1569 rule 5b: an updated command moves to the back
     addCommandToQueue("MM=80", 5, false, 0);
     addCommandToQueue("CS=45.0", 7, false, 0);
@@ -502,7 +516,10 @@ class PmChain(unittest.TestCase):
         a = hdr.index("struct CmdQueueEchoStats")
         b = hdr.index("void cmdQueueSnapshot(CmdQueueSnap* out);")
         types = hdr[a:b].replace("extern CmdQueueEchoStats g_cmdQueueEcho;", "")   # the types from the real header
-        cpp.write_text(prefix + STUBS.replace("@QUEUE_TYPES@", types).replace("@BODY@", body), encoding="utf-8")
+        core_h = (REPO / "src" / "OTGW-firmware" / "OTGW-Core.h").read_text(encoding="utf-8")
+        m = re.search(r"^#define\s+PIC_CMD_MAX_LEN\s+(\d+)", core_h, re.M)
+        picmax = m.group(1) if m else "14"   # before TASK-1576: char cmd[15]
+        cpp.write_text(prefix + STUBS.replace("@QUEUE_TYPES@", types).replace("@PICMAX@", picmax).replace("@BODY@", body), encoding="utf-8")
         cls.exe = compile_cpp(cpp, d / "t.exe")
 
     @classmethod
@@ -637,6 +654,14 @@ class PmChain(unittest.TestCase):
         self.assertEqual(out["b_rejected"], "1")
         self.assertEqual((out["b_echo"], out["b_min"], out["b_max"]), ("2", "5", "30"))
         self.assertEqual((out["b_h0"], out["b_h2"]), ("1", "1"))   # 5 ms -> <10 bucket, 30 ms -> <50 bucket
+
+    def test_command_length_matches_the_pic_buffer(self):
+        # TASK-1576: the PIC rxbuffer holds 15 characters (gateway.asm rxbuffer res 16, SerialReceive). HEAD: the queue
+        # held 14, so the 15-character command was refused; a 16-character one must be refused, not cut by the PIC.
+        out = self.run_sc("maxlen")
+        self.assertEqual(out["sent"], "XX=123456789012;")
+        self.assertEqual(out["queued"], "1")
+        self.assertEqual(out["r16"], "3")   # Dropped
 
     def test_updated_command_moves_to_the_back(self):
         # TASK-1569 rule 5b (Robert 2026-11-02). HEAD: MM=90 kept MM=80's first slot and went out before CS=45.0.

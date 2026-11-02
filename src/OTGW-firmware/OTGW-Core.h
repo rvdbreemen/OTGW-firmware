@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-beta.23
+**  Version  : v2.0.0-beta.24
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -762,8 +762,12 @@ struct OTPublishGate {
   OTPublishGate& operator=(const OTPublishGate&) = delete;
 };
 
+// TASK-1576: the PIC takes at most 15 characters per command line. otgw-6.6 gateway.asm: rxbuffer res 16; SerialReceive
+// stops advancing rxpointer at 15 (addlw 1 / skpdc) and writes 0 over the CR, so a 16th character silently replaces
+// the 15th. The queue holds exactly that: 15 characters + NUL, and refuses anything longer instead of truncating.
+#define PIC_CMD_MAX_LEN 15
 struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcode.com/firmware.html
-	char cmd[15];
+	char cmd[PIC_CMD_MAX_LEN + 1];
 	int cmdlen;
 	int retrycnt;
 	unsigned long due;

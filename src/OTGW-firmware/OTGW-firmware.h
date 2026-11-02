@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.23
+**  Version  : v2.0.0-beta.24
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -253,9 +253,9 @@ extern CmdQueueEchoStats g_cmdQueueEcho;
 struct CmdQueueSnap {
   bool     valid;            // false: the queue lock was busy, the other fields are zero
   uint8_t  depth;            // entries in the queue
-  char     oldest[15];       // first entry in send order ("" when empty)
+  char     oldest[16];       // first entry in send order ("" when empty); PIC_CMD_MAX_LEN + 1
   uint32_t oldestAgeMs;      // how long that entry has been due (0 when not due yet)
-  char     inflight[15];     // command sent and waiting for its echo ("" when none)
+  char     inflight[16];     // command sent and waiting for its echo ("" when none); PIC_CMD_MAX_LEN + 1
   uint8_t  prioSlot;         // DataID that holds the PIC's priority-message slot, 0xFF when free
   uint32_t sent, retried, rejected, prioTimeouts;
   CmdQueueEchoStats echo;
