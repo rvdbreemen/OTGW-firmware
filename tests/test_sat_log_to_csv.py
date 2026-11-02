@@ -55,7 +55,8 @@ class SourceHasRecords(unittest.TestCase):
         dbg = (SRC / "debugStuff.h").read_text(encoding="utf-8")
         self.assertRegex(dbg, r"bool\s+bSATTrace\s*=\s*false;")
         self.assertRegex(dbg, r"bool\s+bSAT\s*=\s*true;")
-        self.assertIn("case '8':", (SRC / "handleDebug.ino").read_text(encoding="utf-8"))
+        # The trace has its own telnet key '8' (since TASK-1561 in the shared debug-flag table, debugFlags.h).
+        self.assertRegex((SRC / "debugFlags.h").read_text(encoding="utf-8"), r"'8',\s*&DebugSection::bSATTrace")
         self.assertIn("SATTraceTln(F(\"SAT: publishing MQTT state", self.src)
 
 

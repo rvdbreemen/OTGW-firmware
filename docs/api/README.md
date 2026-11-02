@@ -59,6 +59,7 @@ Optional HTTP Basic Auth. When a password is configured in device settings, muta
 - Simulation: `POST /api/v2/simulate/start`, `POST /api/v2/simulate/stop`
 - Webhook test: `POST /api/v2/webhook/test`
 - Debug dump: `GET /api/v2/debug`
+- Debug log flags: `GET` / `POST /api/v2/debug/flags`
 - All `POST/PUT/PATCH/DELETE` SAT endpoints (including markers, sensor-areas, and BLE roster)
 - File management, reboot, reset, and OTA update endpoints
 
@@ -875,6 +876,23 @@ Triggers a test webhook call to verify the configured webhook URL is reachable.
 ---
 
 ### Debug
+
+#### `GET /api/v2/debug/flags` / `POST /api/v2/debug/flags`
+
+The telnet debug log flags by name (TASK-1561). The same flags the telnet keys switch (1-8, g, n), from one table in `debugFlags.h`, so a script can read and set them without key presses. Unlike a telnet key, a POST sets a flag to a value: sending the same request twice leaves it as asked. The flags are transient: a reboot restores the defaults. The simulation switches (telnet `d` and `s`) are not part of this API.
+
+**Authentication**: Required (when password is configured)
+
+Names: `otmsg`, `restapi`, `mqtt`, `sensors`, `sat`, `otdirect`, `satble` (ESP32 builds with SAT BLE), `sattrace`, `mqttgate`, `ntp`.
+
+**Response** `200 OK` (GET, and after a successful POST):
+```json
+{ "flags": { "otmsg": true, "restapi": false, "mqtt": false, "sensors": false, "sat": true, "otdirect": true, "satble": false, "sattrace": false, "mqttgate": false, "ntp": true } }
+```
+
+**Set one flag**: `POST /api/v2/debug/flags` with `{"name":"sat","value":false}` (the shape of `POST /api/v2/settings`), or the path form `POST /api/v2/debug/flags/sat/off`. Values: `true`/`false`, `on`/`off`, `1`/`0`; the name is not case-sensitive.
+
+**Errors**: `400` for an unknown name or a value that is not one of the above (nothing changes); `405` for other methods.
 
 #### `GET /api/v2/debug`
 

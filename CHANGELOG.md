@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **REST API for the telnet debug log flags** (TASK-1561, 2.0.0-beta.12; ADR-206 Proposed). `GET /api/v2/debug/flags` lists the flags by name (otmsg, restapi, mqtt, sensors, sat, otdirect, satble, sattrace, mqttgate, ntp); `POST /api/v2/debug/flags` with `{"name":"sat","value":false}` (or `/api/v2/debug/flags/sat/off`) sets one to a value, so scripts no longer flip a flag by accident with a toggle key. One table (`debugFlags.h`) serves the telnet keys and the API; the telnet text is unchanged; the simulation switches (`d`, `s`) stay telnet-only. Admin route (ADR-056). Host test `tests/test_debug_flags_api.py` (set twice gives the same state, unknown name/value refused, drift guard against a flag outside the table).
+
 ## [2.0.0-beta.11] - 2026-11-02
 
 ### Changed

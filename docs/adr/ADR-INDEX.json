@@ -7278,8 +7278,8 @@
         "path_globs": []
       },
       "metadata": {
-        "binding": false,
-        "gate": null,
+        "binding": true,
+        "gate": "tests/test_board_detect_persist_gate.py",
         "documents_shipped": true,
         "verified_in": [
           "commit:2a820ac11"
@@ -7552,6 +7552,75 @@
       },
       "scope": {
         "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-206",
+      "title": "REST API sets the telnet debug log flags by name from one shared table",
+      "path": "ADR-206-rest-api-sets-the-telnet-debug-log-flags-by-name-from-one-shared-table.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-02",
+      "decision_summary": "The debug log flags get one name table, src/OTGW-firmware/debugFlags.h (kDebugFlags: REST name, telnet key, DebugSect...",
+      "topics": [
+        "debug flags",
+        "diagnostics",
+        "rest api",
+        "telnet debug toggles"
+      ],
+      "aliases": [
+        "/api/v2/debug/flags",
+        "debug toggles api",
+        "debugFlags.h",
+        "kDebugFlags"
+      ],
+      "components": [
+        "REST API v2",
+        "Telnet debug console"
+      ],
+      "symbols": [
+        "DebugFlagDef",
+        "debugFlagSet",
+        "DebugSection",
+        "handleDebugChar",
+        "handleDebugFlags",
+        "kDebugFlags"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep every debug log flag of DebugSection in kDebugFlags, with a unique REST name and a unique telnet key.",
+          "Toggle a log flag from telnet only through debugFlagByKey() and the table.",
+          "Set a flag over REST only to an explicit value; answer 400 on an unknown name or a non-boolean value.",
+          "Call checkHttpAuth() before any read or write on /api/v2/debug/flags.",
+          "Emit the JSON with JsonEmit."
+        ],
+        "must_not": [
+          "Persist a debug flag in settings or settings.ini.",
+          "Offer a toggle verb on the REST API.",
+          "Put bSensorSim or bOTGWSimulation in the table or the API.",
+          "Change the telnet output text of a flag key."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "python tests/testdebugflagsapi.py (stdlib unittest): compiles debugFlags.h against the real DebugSection and checks explicit and idempotent sets, rejection without a change, unique names and keys, that every DebugSection bool is in the t...",
+          "On a bench unit: curl http:// /api/v2/debug/flags, then curl -X POST -d '{\"name\":\"sat\",\"value\":false}' http:// /api/v2/debug/flags twice (same answer both times), and the telnet banner shows the same state."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/handleDebug.ino"
+        ]
       },
       "metadata": {
         "binding": false,
@@ -13351,6 +13420,36 @@
     {
       "source": "ADR-205",
       "target": "ADR-204",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-206",
+      "target": "ADR-051",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-206",
+      "target": "ADR-056",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-206",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-206",
+      "target": "ADR-146",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-206",
+      "target": "ADR-202",
       "type": "related",
       "resolved": true
     }

@@ -293,6 +293,13 @@ static void dumpDebugInfo() {
 // Called from onTelnetInput() in networkStuff.ino via the SimpleTelnet
 // onInputReceived callback (line mode off — one char per call).
 void handleDebugChar(char c){
+        // The debug log flags: one table with the REST API /api/v2/debug/flags (debugFlags.h, TASK-1561). Same text as before.
+        if (const DebugFlagDef* f = debugFlagByKey(c)) {
+            bool& v = state.debug.*(f->member);
+            v = !v;
+            DebugTf(PSTR("\r\nDebug %s: %s\r\n"), f->label, CBOOLEAN(v));
+            return;
+        }
         switch (c){
             case 'h':
                 Debugln();
@@ -392,48 +399,7 @@ void handleDebugChar(char c){
                     startMQTT();
                 } else DebugTln(F("MQTT is connected"));
                 break;
-            case '1':
-                state.debug.bOTmsg = !state.debug.bOTmsg;
-                DebugTf(PSTR("\r\nDebug OTmsg: %s\r\n"), CBOOLEAN(state.debug.bOTmsg));
-                break;
-            case '2':
-                state.debug.bRestAPI = !state.debug.bRestAPI;
-                DebugTf(PSTR("\r\nDebug RestAPI: %s\r\n"), CBOOLEAN(state.debug.bRestAPI));
-                break;
-            case '3':
-                state.debug.bMQTT = !state.debug.bMQTT;
-                DebugTf(PSTR("\r\nDebug MQTT: %s\r\n"), CBOOLEAN(state.debug.bMQTT));
-                break;
-            case '4':
-                state.debug.bSensors = !state.debug.bSensors;
-                DebugTf(PSTR("\r\nDebug Sensors: %s\r\n"), CBOOLEAN(state.debug.bSensors));
-                break;
-            case '5':
-                state.debug.bSAT = !state.debug.bSAT;
-                DebugTf(PSTR("\r\nDebug SAT: %s\r\n"), CBOOLEAN(state.debug.bSAT));
-                break;
-            case '8':
-                state.debug.bSATTrace = !state.debug.bSATTrace;
-                DebugTf(PSTR("\r\nDebug SAT trace (high volume): %s\r\n"), CBOOLEAN(state.debug.bSATTrace));
-                break;
-            case '6':
-                state.debug.bOTDirect = !state.debug.bOTDirect;
-                DebugTf(PSTR("\r\nDebug OTDirect: %s\r\n"), CBOOLEAN(state.debug.bOTDirect));
-                break;
-#if HAS_SAT_BLE
-            case '7':
-                state.debug.bSATBLE = !state.debug.bSATBLE;
-                DebugTf(PSTR("\r\nDebug SAT BLE: %s\r\n"), CBOOLEAN(state.debug.bSATBLE));
-                break;
-#endif
-            case 'g':
-                state.debug.bMQTTGate = !state.debug.bMQTTGate;
-                DebugTf(PSTR("\r\nDebug MQTT Gating: %s\r\n"), CBOOLEAN(state.debug.bMQTTGate));
-                break;
-            case 'n':
-                state.debug.bNTP = !state.debug.bNTP;
-                DebugTf(PSTR("\r\nDebug NTP: %s\r\n"), CBOOLEAN(state.debug.bNTP));
-                break;
+            // keys 1-8, g, n: the debug log flags, handled above from debugFlags.h (TASK-1561)
             case 'd':
                 state.debug.bSensorSim = !state.debug.bSensorSim;
                 DebugTf(PSTR("\r\nDebug Dallas sensor simulation: %s\r\n"), CBOOLEAN(state.debug.bSensorSim));

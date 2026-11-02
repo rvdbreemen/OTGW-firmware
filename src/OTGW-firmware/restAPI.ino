@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.11
+**  Version  : v2.0.0-beta.12
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2161,11 +2161,53 @@ struct DebugDumpSnap {
   char      manufacturer[12];
 };
 
+// TASK-1561: /api/v2/debug/flags. GET lists the telnet debug log flags by name; POST sets one explicitly (idempotent),
+// body {"name":"sat","value":true} (the POST /api/v2/settings shape) or the path form /api/v2/debug/flags/<name>/<on|off>.
+// The names come from the table the telnet keys use (debugFlags.h). Transient state, not saved. Admin route (ADR-056).
+static void handleDebugFlags(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method)
+{
+  if (!checkHttpAuth()) return;
+  if (method == HTTP_POST || method == HTTP_PUT) {
+    char name[16] = {0};
+    char value[8] = {0};
+    if (wc > 6) {
+      strlcpy(name, words[5], sizeof(name));
+      strlcpy(value, words[6], sizeof(value));
+    } else {
+      const char* body = bodyCompat();
+      if (body[0] != '{' || !extractJsonField(body, F("name"), name, sizeof(name))
+          || !extractJsonField(body, F("value"), value, sizeof(value))) {
+        sendApiError(400, F("Expected {\"name\":\"<flag>\",\"value\":true|false}"));
+        return;
+      }
+    }
+    int err = 0;
+    if (debugFlagSet(state.debug, name, value, &err) == nullptr) {
+      if (err == 1) sendApiError(400, F("Unknown debug flag name"));
+      else          sendApiError(400, F("Value must be true or false"));
+      return;
+    }
+    DebugTf(PSTR("REST: debug flag %s = %s\r\n"), name, CBOOLEAN(debugFlagParseBool(value) == 1));
+  } else if (method != HTTP_GET) {
+    sendApiMethodNotAllowed(F("GET, POST, PUT"));
+    return;
+  }
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();
+    je.beginObject(F("flags"));
+    for (size_t i = 0; i < kDebugFlagCount; i++) je.field(kDebugFlags[i].name, state.debug.*(kDebugFlags[i].member));
+    je.endObject();
+    je.endObject();
+  }
+  restFinalize();
+}
+
 static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
 {
-  (void)words;
-  (void)wc;
   (void)originalURI;
+  if (wc > 4 && strcasecmp_P(words[4], PSTR("flags")) == 0) { handleDebugFlags(words, wc, method); return; }
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
   if (!checkHttpAuth()) return;
   // The chunked path allocates only the small fixed snapshot (no whole-response
