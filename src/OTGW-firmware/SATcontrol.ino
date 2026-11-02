@@ -258,6 +258,12 @@ static uint8_t satGetManufacturerQuirks()
   return 0;
 }
 
+// Immergas quirk active: TP=11:12=<min(MM, 80)> goes before every MM= (satSendMM, Sergeant D entry 233, TASK-1537).
+static bool satImmergasTpActive()
+{
+  return (satGetManufacturerQuirks() & SAT_QUIRK_IMMERGAS_TP) != 0;
+}
+
 // Auto-detect manufacturer from OT MsgID 3 slave MemberID
 // Note: some MemberIDs are shared (e.g. 4 = Atag/Baxi/Brotge/DeDietrich/Geminox)
 // Returns first match; user should confirm via dropdown for ambiguous IDs
@@ -494,7 +500,8 @@ static uint32_t satGetPwmPeriodSec()
 //  - PWM: 0 in both phases (thermo-nova RelativeModulationState.OFF); otherwise the configured maximum.
 //  - Heat pump and hybrid never get 0 (a heat pump may stop on MM=0): they get the configured maximum,
 //    in and outside PWM, or 100 when that is 0 (Sergeant D entries 21 and 113, TASK-1426).
-//  - Geminox (SAT_QUIRK_MIN_MOD_10): floor of 10, MM=0 included. Immergas: cap of 80.
+//  - Geminox (SAT_QUIRK_MIN_MOD_10): floor of 10, MM=0 included. Immergas: no cap on MM (the 80 cap is on its TP=11:12,
+//    satSendMM, Sergeant D entry 233).
 static uint8_t satComputeMM(bool pwmMode, bool heatPump, bool heatPumpOrHybrid, uint8_t maxRelMod, uint8_t quirks)
 {
   uint8_t mm;
@@ -503,7 +510,6 @@ static uint8_t satComputeMM(bool pwmMode, bool heatPump, bool heatPumpOrHybrid, 
   else                       mm = maxRelMod;
   if (heatPumpOrHybrid && mm == 0) mm = 100;
   if ((quirks & SAT_QUIRK_MIN_MOD_10) && mm < 10) mm = 10;
-  if ((quirks & SAT_QUIRK_IMMERGAS_TP) && mm > 80) mm = 80;
   return mm;
 }
 
@@ -648,8 +654,16 @@ static void satPicCSKeepalive() {
   state.sat.iLastSentCSMs = now;
 }
 
+// Immergas (SAT_QUIRK_IMMERGAS_TP): TP=11:12=<min(mm, 80)> goes right before every MM=, as thermo-nova does
+// (coordinator/mqtt/opentherm.py:216-219); the TP writes the boiler's own max-modulation parameter, so the 80 cap is there
+// and MM itself is not capped (Sergeant D entry 233, TASK-1537). The PIC queue spaces PM=/TP= by up to 1 s (TASK-1315) and
+// MM= is not held, so right after another PM=/TP= the MM= can reach the PIC up to 1 s before this TP=.
 static void satSendMM(uint8_t mm) {
-  char buf[8];
+  char buf[16];
+  if (satImmergasTpActive()) {
+    snprintf_P(buf, sizeof(buf), PSTR("TP=11:12=%u"), (unsigned)(mm > 80 ? 80 : mm));
+    addCommandToQueue(buf, strlen(buf), false, 0);
+  }
   snprintf_P(buf, sizeof(buf), PSTR("MM=%u"), mm);
   addCommandToQueue(buf, strlen(buf), false, 0);
   state.sat.iLastSentMM     = mm;
@@ -6846,13 +6860,7 @@ static void satControlLoopRun()
     // CH rule of Sergeant D 2026-10-23 (see satChEnableDecide in SATchEnable.h): CH=0 with CS=10 when the
     // requested setpoint is at or below the cold setpoint or the PWM OFF phase drives the CS, else CH=1.
     satSendCH(satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn));
-    // Immergas quirk: send TP=11:12=<setpoint> alongside MM=. Kept on
-    // unconditional enqueue per TASK-565: rare quirk path, not steady loop.
-    if (satGetManufacturerQuirks() & SAT_QUIRK_IMMERGAS_TP) {
-      char cmdBuf[16];
-      snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("TP=11:12=%.0f"), finalSetpoint);
-      addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
-    }
+    // Immergas: its TP=11:12 goes with every MM= inside satSendMM() (entry 233, TASK-1537).
     // Push SAT target to thermostat display via TC= command (Task #31)
     if (settings.sat.bPushSetpoint) {
       satEnqueueIfChangedTC(settings.sat.fTargetTemp);

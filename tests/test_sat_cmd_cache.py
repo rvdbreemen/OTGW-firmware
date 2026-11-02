@@ -53,6 +53,7 @@ static uint32_t millis() { return g_ms; }
 static bool isPICEnabled() { return true; }
 static bool hasOTCommandInterface() { return true; }
 static float satEffectiveMaxSetpoint() { return 1000.0f; }   // TASK-1536: satCapRepeatCS() ceiling, no cap here
+static bool satImmergasTpActive() { return false; }   // TASK-1537: satSendMM Immergas TP
 struct OTSys { uint8_t SlaveStatus=0; }; static OTSys OTcurrentSystemState;
 static char g_sent[256];
 static void addCommandToQueue(const char* c, size_t n, bool, int) { strncat(g_sent, c, n); strcat(g_sent, ";"); }

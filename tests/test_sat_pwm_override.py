@@ -947,8 +947,10 @@ class SatPwmOverride(unittest.TestCase):
         self.assertEqual(self.mm(False, True, True, 70), 70)
         self.assertEqual(self.mm(False, True, True, 0), 100)
 
-    def test_immergas_cap(self):
-        self.assertEqual(self.mm(False, False, False, 100, 0x02), 80)
+    def test_immergas_mm_is_not_capped(self):
+        # Sergeant D entry 233 (TASK-1537): the 80 cap is on Immergas' TP=11:12 (satSendMM, tests/test_sat_immergas_tp.py),
+        # not on MM itself, as in thermo-nova. Before: 80.
+        self.assertEqual(self.mm(False, False, False, 100, 0x02), 100)
 
 
 class PidIntegralFreeze(unittest.TestCase):

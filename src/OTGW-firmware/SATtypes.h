@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.14
+**  Version  : v2.0.0-beta.15
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -94,7 +94,7 @@ enum SATManufacturer : uint8_t {
 };
 // Manufacturer quirk flags
 #define SAT_QUIRK_MIN_MOD_10     0x01  // Geminox: minimum modulation 10%
-#define SAT_QUIRK_IMMERGAS_TP    0x02  // Immergas: extra TP=11:12 command, cap 80%
+#define SAT_QUIRK_IMMERGAS_TP    0x02  // Immergas: TP=11:12=min(MM,80) right before every MM= (entry 233)
 #define SAT_QUIRK_NO_REL_MOD     0x04  // Ideal/Intergas/Geminox/Nefit: no relative modulation support
 #define SAT_QUIRK_MI_500_BOOT    0x08  // Ideal/Intergas/Nefit: send MI=500 on boot
 enum SATFlameStatus : uint8_t {

@@ -94,6 +94,7 @@ static void addCommandToQueue(const char* cmd, int, bool, int) { printf("%u %s\n
 static bool isPICEnabled() { return true; }
 static bool hasOTCommandInterface() { return true; }
 static float satEffectiveMaxSetpoint() { return 1000.0f; }   // TASK-1536: satCapRepeatCS() ceiling, no cap here
+static bool satImmergasTpActive() { return false; }   // TASK-1537: satSendMM Immergas TP
 static bool _sat_bootCS0sent = false;   // HEAD: the deferred boot CS=0 in the span stands in for initSAT()'s CS=0
 static bool _sat_prevFlameState = false;
 static bool satIsFlameOn() { return false; }
