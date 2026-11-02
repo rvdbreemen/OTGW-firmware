@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.9
+**  Version  : v2.0.0-beta.10
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -246,7 +246,7 @@ bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t
 {
   static const char rebootLogFile[] = "/reboot_log.txt";
   char pendingSummary[160] = {0};
-  char line[160] = {0};
+  char line[REBOOT_LOG_LINE_MAX] = {0};   // a 16-frame core-dump line (TASK-1538)
 
   if (summary == nullptr || summarySize == 0 || details == nullptr || detailsSize == 0) {
     return false;
@@ -302,7 +302,7 @@ static void copyOlderRebootLogLines(File &infh, File &outfh, int maxLines)
 {
   int copied = 0;
   while (infh.available() && copied < maxLines) {
-    char line[140] = {0};   // LOG_LINE_LENGTH; char buffer avoids heap allocation (ADR-004)
+    char line[REBOOT_LOG_LINE_MAX] = {0};   // keeps a 16-frame core-dump line whole (TASK-1538); no heap (ADR-004)
     int n = 0;
     while (infh.available() && n < (int)sizeof(line) - 1) {
       int c = infh.read();
@@ -329,7 +329,7 @@ bool updateRebootLog(String text)
   #define LOG_LINE_LENGTH 140
 
   char log_line[LOG_LINE_LENGTH] = {0};
-  char log_line_regs[120] = {0};  // "ESP register contents: epc1=0x12345678, ..." = 116 chars max
+  char log_line_regs[REBOOT_LOG_LINE_MAX] = {0};  // "Core dump: ..." with all 16 backtrace frames (TASK-1538)
   char log_line_excpt[64]  = {0}; // "- Access to invalid address (29)" = 32 chars max
   uint32_t errorCode = -1;
 

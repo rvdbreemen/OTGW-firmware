@@ -542,7 +542,8 @@ inline uint32_t platformResetCode() {
 // The ESP32 reset info has no register dump; the crash is in the ESP-IDF core dump
 // (coredump partition, ELF format, written by the panic handler, also on a task-watchdog
 // panic). When a dump is present that was not reported before, buf gets
-// "Core dump: <task> pc=0x.. bt=0x.. ..\r\n" (backtrace PCs capped to fit; a trailing '!'
+// "Core dump: <task> pc=0x.. bt=0x.. ..\r\n" (up to 16 backtrace PCs, as many as fit; the reboot log gives
+// it REBOOT_LOG_LINE_MAX, room for all 16, TASK-1538; a trailing '!'
 // marks a corrupted backtrace). Only the summary is read, not the whole dump. The dump
 // stays in flash for an offline esp-coredump decode; a fingerprint in NVS keeps the same
 // dump from being reported on every boot. The current reset reason is not checked, because

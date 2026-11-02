@@ -3,10 +3,11 @@ id: TASK-1538
 title: >-
   Field panic (Sergeant D, alpha.566): Exception/panic on ipc1 inside
   heap_caps_malloc, caller not in the dump
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-01T07:50:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-02T12:54:00Z'
 labels:
   - crash
   - field
@@ -27,8 +28,16 @@ Reported by Sergeant D in #alpha-testing 2026-11-01 (msg 1566327932199116884): '
 - [ ] #2 Cause identified with evidence (old-vs-fix reproduction) or, if not reproducible, the diagnostics gap closed so the next dump shows the caller
 <!-- AC:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+AC2 (diagnostics gap): REBOOT_LOG_LINE_MAX 240 (OTGW-firmware.h) sizes log_line_regs (updateRebootLog), readLatestCrashLog line, copyOlderRebootLogLines line and restAPI crashDetails, so the Core dump line keeps all 16 PCs of esp_core_dump_summary (max 236 chars). Test first: tests/test_crashlog_coredump.py reads the buffer sizes from the real sources; 16-frame writer, reader and copy cases. No OSS question (sizing only). Full dump download = TASK-1560 (new REST contract, ADR). AC1 (caller named) needs the next field dump: stays open.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: bt goes into log_line_regs[120] (helperStuff.ino:332, platform_esp32.h:578-588), ~6 frames, caller lost. AC2 diagnostics doable now; root cause needs a field dump.
+
+2026-11-02 evidence (wt-1552, base 6b0d0024d beta.9): tests/test_crashlog_coredump.py on HEAD copies (OTGW_PLATFORM_H/HELPER_INO/REST_INO/FW_H = git show HEAD): FAILED 3 = full16 6 frames (113 chars, as in Sergeant D's dump), parse16 reader cut the line, copy16 copy cut it. Fix: 10/10 OK, 16 frames, 223 chars. Side effect: the External Reason line was snprintf'd with LOG_LINE_LENGTH 140 into the 120 buffer (latent overflow), now 240. evaluate --quick 0 failed 100%; full tests/ 93/93. Review: risk-based, no agent review (buffer sizing only; stack: async_tcp readLatestCrashLog + REST +160 B on a 16 KB stack). Full core dump: still only over USB (esptool read_flash 0x3F0000 0x10000 + esp-coredump with the .elf); REST download filed as TASK-1560.
 <!-- SECTION:NOTES:END -->

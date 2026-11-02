@@ -18,6 +18,7 @@ old-vs-fix runs.
 Run: python tests/test_crashlog_coredump.py
 """
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -30,6 +31,8 @@ from test_sat_published_curve import compile_cpp  # noqa: E402
 REPO = Path(__file__).resolve().parent.parent
 PLATFORM_H = Path(os.environ.get("OTGW_PLATFORM_H", REPO / "src" / "libraries" / "Platform" / "src" / "platform_esp32.h"))
 HELPER_INO = Path(os.environ.get("OTGW_HELPER_INO", REPO / "src" / "OTGW-firmware" / "helperStuff.ino"))
+REST_INO = Path(os.environ.get("OTGW_REST_INO", REPO / "src" / "OTGW-firmware" / "restAPI.ino"))
+FW_H = Path(os.environ.get("OTGW_FW_H", REPO / "src" / "OTGW-firmware" / "OTGW-firmware.h"))
 
 STUBS = r"""
 #include <cstdio>
@@ -98,7 +101,7 @@ struct { File open(const char *, const char *) { File f; f.ok = true; f.data = g
 
 MAIN = r"""
 static void dumpLine(const char *tag) {
-  char buf[120];   // updateRebootLog(): char log_line_regs[120]
+  char buf[REGS_LEN];   // updateRebootLog(): char log_line_regs[...], size taken from helperStuff.ino
   memset(buf, 'X', sizeof(buf));
   platformResetRegisterDump(buf, sizeof(buf));
   std::string s(buf);
@@ -136,6 +139,34 @@ int main() {
   // Normal software reset, no dump: no detail line.
   g_reason = ESP_RST_SW;
   dumpLine("clean");
+  // TASK-1538: an ipc1 panic with all 16 backtrace frames the summary holds. The line must keep every frame,
+  // the reader must return it whole into the REST buffer, and the copy of older lines must not cut it.
+  g_reason = ESP_RST_PANIC;
+  fillDump(0x4038c7e4u, 16, false);
+  strcpy(g_sum.exc_task, "ipc1");
+  {
+    char buf[REGS_LEN];
+    platformResetRegisterDump(buf, sizeof(buf));
+    std::string line(buf);
+    int frames = 0;
+    for (size_t k = line.find("bt="); k != std::string::npos; k = line.find("0x420", k + 1)) frames += (line.compare(k, 5, "0x420") == 0);
+    printf("full16|%d|%zu\n", frames, line.size());
+    // The reader and the copy get a fixed 16-frame line (the field dump's task and pc), independent of the writer.
+    std::string full("Core dump: ipc1 pc=0x4038c7e4 elf=abcdef01 bt=");
+    for (int k = 0; k < 16; k++) { char h[16]; snprintf(h, sizeof(h), "%s0x%08x", k ? " " : "", 0x42000000u + k * 0x111u); full += h; }
+    full += "\r\n";
+    char summary16[160], details16[DETAILS_LEN];
+    g_file = std::string("2026-10-31 08:41:53 - reboot cause: Exception/panic (4) \r\n") + full;
+    bool ok16 = readLatestCrashLog(summary16, sizeof(summary16), details16, sizeof(details16));
+    printf("parse16|%d|%d\n", ok16 ? 1 : 0, strcmp(details16, std::string(full, 0, full.size() - 2).c_str()) == 0 ? 1 : 0);
+#ifndef NO_COPY_FN
+    File in16, out16;
+    in16.ok = out16.ok = true;
+    in16.data = full;
+    copyOlderRebootLogLines(in16, out16, 19);
+    printf("copy16|%d\n", out16.out == full ? 1 : 0);
+#endif
+  }
 
   // The crash-log reader on a reboot_log.txt whose newest entry has a core-dump detail line.
   char summary[160], details[160];
@@ -183,11 +214,20 @@ class CrashlogCoreDump(unittest.TestCase):
         helper = HELPER_INO.read_text(encoding="utf-8")
         shim = _slice(plat, "inline void platformResetRegisterDump", "// Exception cause", PLATFORM_H)
         parser = _slice(helper, "static bool isRebootLogSummaryLine", "bool updateRebootLog(", HELPER_INO)
+        # Buffer sizes from the real sources (TASK-1538): the writer's line, the REST details buffer, and the
+        # REBOOT_LOG_LINE_MAX define they may use.
+        fw = FW_H.read_text(encoding="utf-8")
+        define = re.search(r"^#define\s+REBOOT_LOG_LINE_MAX\s+(\d+)", fw, re.M)
+        defs = f"#define REBOOT_LOG_LINE_MAX {define.group(1)}\n" if define else ""
+        regs = re.search(r"char log_line_regs\[(\w+)\]", helper).group(1)
+        details = re.search(r"char crashDetails\[(\w+)\]", REST_INO.read_text(encoding="utf-8")).group(1)
+        defs += f"#define REGS_LEN {regs}\n#define DETAILS_LEN {details}\n"
+        cls.regs_len = int(define.group(1)) if regs == "REBOOT_LOG_LINE_MAX" else int(regs)
         cls.tmp = tempfile.TemporaryDirectory()
         cpp = Path(cls.tmp.name) / "t.cpp"
         cls.has_copy_fn = "copyOlderRebootLogLines" in parser
         guard = "" if cls.has_copy_fn else "#define NO_COPY_FN\n"
-        cpp.write_text(guard + STUBS + shim + "\n" + parser + "\n" + MAIN, encoding="utf-8")
+        cpp.write_text(guard + defs + STUBS + shim + "\n" + parser + "\n" + MAIN, encoding="utf-8")
         exe = compile_cpp(cpp, Path(cls.tmp.name) / "t.exe")
         if exe is None:
             raise unittest.SkipTest("no host C++ compiler")
@@ -206,7 +246,7 @@ class CrashlogCoreDump(unittest.TestCase):
         n, text = self.rows["first"]
         self.assertTrue(text.startswith("Core dump: loopTask pc=0x42012345 elf=abcdef01 bt=0x42000000 0x42000111"), text)
         self.assertTrue(text.endswith("\\r\\n"), text)
-        self.assertLess(int(n), 120)
+        self.assertLess(int(n), self.regs_len)
 
     def test_same_dump_is_reported_once(self):
         self.assertEqual(self.rows["again"], ["0", ""])
@@ -229,6 +269,19 @@ class CrashlogCoreDump(unittest.TestCase):
         crlf, lone, _ = self.rows["copy"]
         self.assertEqual(crlf, "19")   # 19 lines kept, each ends in \r\n
         self.assertEqual(lone, "0")    # no line joined by a bare \r any more
+
+    # TASK-1538: the field dump (ipc1, Exception/panic) showed 6 frames, the application caller was cut off.
+    def test_all_16_backtrace_frames_are_kept(self):
+        frames, length = self.rows["full16"]
+        self.assertEqual(frames, "16", f"only {frames} of 16 backtrace frames in the crash-log line ({length} chars)")
+
+    def test_reader_returns_the_whole_16_frame_line(self):
+        self.assertEqual(self.rows["parse16"], ["1", "1"], "readLatestCrashLog() / the REST buffer cut the line")
+
+    def test_older_16_frame_line_is_copied_whole(self):
+        if not self.has_copy_fn:
+            self.skipTest("copyOlderRebootLogLines() not in this source")
+        self.assertEqual(self.rows["copy16"], ["1"], "copyOlderRebootLogLines() split or cut a 16-frame line")
 
     def test_crashlog_reader_accepts_core_dump_line(self):
         ok, summary, details = self.rows["parse"]

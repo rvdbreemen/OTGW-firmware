@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.10] - 2026-11-02
+
+### Fixed
+
+- **The crash-log "Core dump:" line keeps all 16 backtrace frames** (TASK-1538). `updateRebootLog()` gave `platformResetRegisterDump()` a 120-char buffer, so only about 6 of the up to 16 PCs of the ESP-IDF core-dump summary fit (the ipc1 panic Sergeant D reported on alpha.566 lost its application caller). `REBOOT_LOG_LINE_MAX` (240, OTGW-firmware.h) now sizes the writer, `readLatestCrashLog()`, the copy of older reboot-log lines and the `/api/v2/device/crashlog` buffer, so a 16-frame line (236 chars max) stays whole. Also removes a latent overflow: the "External Reason:" line was written with length 140 into the 120-char buffer. Host test `tests/test_crashlog_coredump.py` (old code: 6 frames, reader and copy cut a 16-frame line). The full dump stays in the coredump partition (USB `esptool read_flash 0x3F0000 0x10000`); a REST download is TASK-1560.
+
 ## [2.0.0-beta.9] - 2026-11-02
 
 ### Fixed
@@ -557,7 +563,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.9...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.10...HEAD
+[2.0.0-beta.10]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.9...v2.0.0-beta.10
 [2.0.0-beta.9]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.8...v2.0.0-beta.9
 [2.0.0-beta.8]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.7...v2.0.0-beta.8
 [2.0.0-beta.7]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.1...v2.0.0-beta.7

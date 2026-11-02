@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.9
+**  Version  : v2.0.0-beta.10
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3467,7 +3467,7 @@ void sendHealth()
 void sendDeviceCrashLog()
 {
   char crashSummary[160] = {0};
-  char crashDetails[160] = {0};
+  char crashDetails[REBOOT_LOG_LINE_MAX] = {0};   // a 16-frame core-dump line (TASK-1538)
   bool hasCrashLog = readLatestCrashLog(crashSummary, sizeof(crashSummary), crashDetails, sizeof(crashDetails));
 
   AsyncResponseStream* strm = restBeginStream("application/json");
