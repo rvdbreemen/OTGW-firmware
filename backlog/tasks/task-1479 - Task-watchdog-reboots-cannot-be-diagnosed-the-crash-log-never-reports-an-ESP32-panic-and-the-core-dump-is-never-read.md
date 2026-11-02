@@ -3,11 +3,11 @@ id: TASK-1479
 title: >-
   Task-watchdog reboots cannot be diagnosed: the crash log never reports an
   ESP32 panic and the core dump is never read
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T14:37:00Z'
-updated_date: '2026-11-01T22:30:00Z'
+updated_date: '2026-11-02T01:24:00Z'
 labels:
   - bug
   - stability
@@ -26,7 +26,7 @@ Found in gruijter's field capture (TASK-1474, alpha.527): Task-watchdog reboot a
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 After a forced loop stall > 30 s on the bench, the web UI / REST can show which task tripped and its backtrace (core dump summary or download), and the same works after a real field TWDT
+- [x] #1 After a forced loop stall > 30 s on the bench, the web UI / REST can show which task tripped and its backtrace (core dump summary or download), and the same works after a real field TWDT
 - [x] #2 The crash-log endpoint reports an ESP32 panic/TWDT reboot instead of available:false
 - [x] #3 The OTGW-Core.ino TWDT comment names every task subscribed to the TWDT
 <!-- AC:END -->
@@ -64,4 +64,12 @@ Bench 2026-10-30 (coordinator otgw-firmware-b8, Classic-S3 .63, PIC 6.8): batch 
 Audit 2026-11-01: the earlier note '.61 offline' is stale: .61 (OTGW32) ran alpha.597 today and is available for the forced loop-task stall check (AC1).
 
 Lead triage 2026-11-01: field half of AC#1 split to TASK-1554. Remaining for this task: the loop-task stall run (local build with -DOTGW_TEST_TWDT_HANG, key-Z hang in loop(), on .61) when the build slot is free after beta.3/beta.4.
+
+Loop-task stall bench 2026-11-02 02:16 (lead): .63 Classic+S3 Mini, exploratory local build = 2.0.0-beta.5+d0efe73 plus a never-committed patch (telnet key Z sets a flag, loop() then spins without yield/feed). Flashed app-only via safeboot (ota_flash.py --no-fs, 175 settings unchanged), Z pressed after >60 s healthy: telnet ack 'TEST: loop() will spin without feeding the watchdog' 02:16:51; the REST API stayed reachable during the stall (async_tcp keeps running); TWDT reboot, bootcount 49 -> 50, device/info lastreset 'Task watchdog'; /api/v2/device/crashlog available:true, summary '2026-11-02 02:17:25 - reboot cause: Task watchdog (6)', details 'Core dump: loopTask pc=0x4203757f elf=ba693715 bt=0x4203757f 0x4207e864 0x40383841'. addr2line on the matching .elf: loop() <- loopTask(void*) main.cpp:82 <- vPortTaskWrapper port.c:139 = exactly the injected hang. Together with the async_tcp run of 2026-10-29 both TWDT subscribers are proven. Field half of AC#1 lives in TASK-1554. .63 restored to the published beta.5 app afterwards (sha256 equal to the posted build, 175 settings unchanged). Test artifacts: scratchpad twdt/ (TWDT-TEST-loophang.ino.bin/.elf, run.txt, addr2line.txt).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The crash log now reports ESP32 task-watchdog and panic reboots with the core-dump summary (task, pc, backtrace, elf hash) via /api/v2/device/crashlog (c0db93f72). Evidence: AC#2 host test tests/test_crashlog_coredump.py fix 7/7, old FAILED 4; bench .61 2026-10-29 async_tcp hang decoded to the injected site. AC#1: bench .63 2026-11-02 forced loop() stall: TWDT reboot, crashlog 'Core dump: loopTask ...', addr2line loop() <- loopTask <- vPortTaskWrapper; the field-TWDT half was split to TASK-1554 (waits for a tester capture). AC#3: OTGW-Core.ino TWDT comment names the loop task and async_tcp. Reboot log CRLF fix verified on .61 (21 lines, 21 CRLF).
+<!-- SECTION:FINAL_SUMMARY:END -->

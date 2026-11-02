@@ -3,11 +3,11 @@ id: TASK-1445
 title: >-
   feat-2.0.0: port TASK-1378 (1.x) — FSexplorer reboot redirect and helper forms
   relative, so they work behind a reverse proxy
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:15:00Z'
-updated_date: '2026-11-01T22:37:00Z'
+updated_date: '2026-11-02T01:24:00Z'
 labels:
   - port-from-1.x
   - webui
@@ -78,11 +78,11 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Behind the ingress rig (HA hass_ingress panel or nginx on /otgw/), pressing ReBoot on the FSexplorer page shows the countdown. After it, the browser lands on the gateway UI under the proxy prefix (e.g. /api/ingress/otgw/), not on the proxy root. Old firmware ("/") shows the wrong landing page on the same rig: record before/after screenshots or the request log on .63 (Classic+S3) or .61 (OTGW32).
-- [ ] #2 On direct access (http://<ip>/FSexplorer.html), ReBoot still redirects to http://<ip>/ after the countdown.
-- [ ] #3 The Helper page served when FSexplorer.html is absent posts its upload to <page directory>/upload and opens <page directory>/update. Check by grepping the served HTML for action="upload" and action='update', with no leading slash.
+- [x] #1 Behind the ingress rig (HA hass_ingress panel or nginx on /otgw/), pressing ReBoot on the FSexplorer page shows the countdown. After it, the browser lands on the gateway UI under the proxy prefix (e.g. /api/ingress/otgw/), not on the proxy root. Old firmware ("/") shows the wrong landing page on the same rig: record before/after screenshots or the request log on .63 (Classic+S3) or .61 (OTGW32).
+- [x] #2 On direct access (http://<ip>/FSexplorer.html), ReBoot still redirects to http://<ip>/ after the countdown.
+- [x] #3 The Helper page served when FSexplorer.html is absent posts its upload to <page directory>/upload and opens <page directory>/update. Check by grepping the served HTML for action="upload" and action='update', with no leading slash.
 - [x] #4 v2.js, FSexplorer.html, updateServerHtml.h and the CSRF checks are unchanged (git diff limited to src/OTGW-firmware/FSexplorer.ino plus the version bump files version.h and data/version.hash).
-- [ ] #5 The /ReBoot response carries the header 'Refresh: 120;url=./' and the body contains window.location.replace('./'); old firmware shows url=/. Captured with curl -i before and after the change (this check reboots the device).
+- [x] #5 The /ReBoot response carries the header 'Refresh: 120;url=./' and the body contains window.location.replace('./'); old firmware shows url=/. Captured with curl -i before and after the change (this check reboots the device).
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -95,4 +95,12 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 2026-11-01 Robert: drop the AC on porting the 1.x rig scripts (pic_flash_dryrun.py, pic_flash_ui_sim.py, pic_flash_via_proxy.py, polling text).
 
 Lead 2026-11-01 23:40: bench .61 offline (HTTP 000, ARP stale for 10:20:BA:21:B4:F8, no DHCP lease). Evidence collected without the unit: host test tests/test_fsexplorer_relative_urls.py fix 2/2 OK; same test with OTGW_FSEXPLORER_INO=39a3d9bf4~1 copy FAILED failures=2 (['/','/'] != ['./','./']; action="/upload"). Source: FSexplorer.ino:783/:792 doRedirect(...,120,"./",true) -> Refresh header + href + window.location.replace; :61 action="upload", :66 action='update'. RFC 3986 resolution: http://ip/ReBoot + ./ -> http://ip/ (AC#2); /api/hassio_ingress/TEST/ReBoot + ./ -> /api/hassio_ingress/TEST/ (old '/' -> proxy root). Remaining: curl -i /ReBoot capture (AC#5) and the ingress/proxy run (AC#1) on a live unit; planned on .63 after beta.3/beta.4.
+
+Bench 2026-11-02 02:22 (lead), .63 Classic+S3 Mini, published 2.0.0-beta.5+d0efe73 (contains 39a3d9bf4). AC#5/#2: GET /ReBoot -> HTTP 200, header 'Refresh: 120;url=./', body href='./' and window.location.replace('./'); unit back 6.3 s later, bootcount 51 -> 52; urljoin('http://192.168.88.63/ReBoot','./') = http://192.168.88.63/ (direct access lands on the root). Old half of AC#5: host test with the 39a3d9bf4~1 FSexplorer.ino FAILED (['/','/'] != ['./','./']); no old firmware flashed. AC#1: real reverse proxy (python stdlib on 127.0.0.1:18123, prefix /api/hassio_ingress/TEST/, not the HA ingress rig): GET <prefix>/ReBoot through the proxy -> Refresh: 120;url=./ -> browser target http://127.0.0.1:18123/api/hassio_ingress/TEST/ -> 200 'OTGW firmware' UI (54570 bytes) through the proxy after the reboot (bootcount 52 -> 53); old 'url=/' resolves to the proxy root, outside the prefix (404 on that proxy). AC#3: the Helper page is only served when FSexplorer.html is missing (FSexplorer.ino:294, :597) and no unit was stripped of that file; evidence = source FSexplorer.ino:61 action="upload", :66 action='update' + host test red on old (action="/upload") / green on fix. Lead decision (Robert: lead decides): AC#1 accepted with the stdlib proxy instead of the HA rig, AC#3 with source + host test instead of a served-HTML grep.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+FSexplorer ReBoot / ResetWireless redirect and the Helper page forms are relative (./, upload, update), so they work behind a reverse proxy prefix (39a3d9bf4, alpha.590). Evidence: host test tests/test_fsexplorer_relative_urls.py fix 2/2, old FAILED 2; bench .63 beta.5: Refresh: 120;url=./ + href/location.replace './', direct access resolves to http://<ip>/; through a real reverse proxy with an ingress-style prefix the redirect lands on <prefix>/ and serves the UI (200), old '/' would leave the prefix. AC#3 rests on source + host test (Helper page not reachable without deleting FSexplorer.html). AC#4 diff scope unchanged.
+<!-- SECTION:FINAL_SUMMARY:END -->
