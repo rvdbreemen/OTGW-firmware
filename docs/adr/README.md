@@ -674,6 +674,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-205: SAT heating curve self-tune: hourly evaluation, daily decision on the curve integral](ADR-205-sat-heating-curve-self-tune-hourly-evaluation-daily-decision-on-the-curve-integral.md)** 🆕 *(Accepted)*  
   An on/off self-tune, on by default, that logs every clean hour and changes the heating curve coefficient at most once a day by 0.1 when the mean curve integral (setpoint minus curve) of the last 3 counted days is outside +-1.0 C; PWM, minimum-output, hot-water, sunny and no-sun-elevation hours do not count, and a step leaves the PID alone (ADR-204). Revisits Sergeant D entry 72; design from entries 160-178, tested in the TASK-1519 simulations. Guideline-level, no CI gate.
 
+- **[ADR-206: REST API sets the telnet debug log flags by name from one shared table](ADR-206-rest-api-sets-the-telnet-debug-log-flags-by-name-from-one-shared-table.md)** 🆕 *(Proposed)*  
+  `GET`/`POST /api/v2/debug/flags` reads and sets the ten telnet debug log flags by name, idempotent, from the one table (`debugFlags.h`) the telnet keys also use; admin route (ADR-056), transient state; the simulation switches stay telnet-only (TASK-1561).
+
 - **[ADR-196: SAT behaviour ground truth: Sergeant D's recorded decisions, then pinned thermo-nova, then specs, then firmware](ADR-196-sat-behaviour-ground-truth-sergeant-d-s-recorded-decisions-then-pinned-thermo-nova-then-specs-then-firmware.md)** 🆕 *(Accepted)*  
   Source order for every SAT statement or change: `docs/sat/sergeant-d-corrections.md` entries, then thermo-nova at 7beaaf5 (`file:line`), then `thermo-nova-spec.md`, then the firmware and its docs, which are never the authority. Read the corrections file first, cite the entry or say none covers it, put conflicts to Sergeant D. Guideline-level, no CI gate.
 

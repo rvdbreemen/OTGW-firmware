@@ -378,11 +378,11 @@ class SatPwmAnchors(unittest.TestCase):
         self.assertEqual(tl.edges()[0], [60], tl.dump(120))
         self.assertEqual(n, 1)
 
-    def test_k3_without_overshoot_protection_there_is_no_hold(self):
-        # Entry 133 (Conf-107 A): the hold applies only with overshoot protection on. Entry 230 (the OFF phase stops the boiler without
-        # protection too) does not change that; whether it should is Q-1412.6a. The hot-water flame is lit at 1230 as in e4.
+    def test_k3_without_overshoot_protection_the_start_is_held_too(self):
+        # Entry 234 (Q-1412.6a B, TASK-1562; changes entry 133): since entry 230 every OFF phase stops the boiler without protection
+        # too, so the start is held while the hot-water flame burns, as with protection on (e4: start at 1350). beta.11/12: 1230.
         n, tl = self.starts(3, 0.5, "burning", [(1190, "dhw", 1), (1215, "dhw", 0), (1350, "flame", 0)], 1500, ("ovs 0",))
-        self.assertEqual(tl.edges()[0], [0, 1230], tl.dump(1300))
+        self.assertEqual(tl.edges()[0], [0, 1350], tl.dump(1400))
         self.assertEqual(n, 2)
 
     def test_k4_resume_with_the_flame_lit_clears_the_hot_water_mark(self):

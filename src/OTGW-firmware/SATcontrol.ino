@@ -1154,12 +1154,12 @@ static void satPwmNoteDhwFlameEdge(bool flame, bool dhwBit)
 }
 
 // OFF-to-ON start held back by a hot-water flame that still burns (entries 105, 106). Nothing else changes, so the start
-// comes on the first tick after the flame goes out. Only with overshoot protection on, no hot water and the requested setpoint
-// above the cold setpoint (Sergeant D entry 133, Conf-107 A). Entry 230 made the OFF phase stop the boiler also without protection;
-// whether the hold should follow is put to him (Q-1412.6a), so the protection gate stays explicit until he answers.
+// comes on the first tick after the flame goes out. Only with no hot water and the requested setpoint above the cold setpoint
+// (satPwmDrivesSetpoint), with or without overshoot protection: since entry 230 every OFF phase stops the boiler, so the
+// hot-water flame goes out and the held start follows (Sergeant D entry 234, Q-1412.6a B; changes entry 133).
 static bool satPwmHoldForDhwFlame(bool flame, float pidOutput)
 {
-  if (!(flame && _pwm_dhwFlameLit && settings.sat.bOvershootProtection && satPwmDrivesSetpoint(pidOutput))) {
+  if (!(flame && _pwm_dhwFlameLit && satPwmDrivesSetpoint(pidOutput))) {
     _pwm_dhwFlameHeldLogged = false;
     return false;
   }

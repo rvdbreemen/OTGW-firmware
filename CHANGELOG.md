@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **SAT PWM: the start hold while a hot-water flame still burns also applies without overshoot protection** (TASK-1562, 2.0.0-beta.13; Sergeant D entry 234, Q-1412.6a B, changes entry 133). `satPwmHoldForDhwFlame()` no longer checks the option itself: since beta.11 every OFF phase stops the boiler without protection too (entry 230), so the hot-water flame goes out and the start follows, as with protection on. Host test `tests/test_sat_pwm_anchors.py` k3 (beta.12: start at 1230 s, fix: 1350 s).
+
 ### Added
 
 - **REST API for the telnet debug log flags** (TASK-1561, 2.0.0-beta.12; ADR-206 Proposed). `GET /api/v2/debug/flags` lists the flags by name (otmsg, restapi, mqtt, sensors, sat, otdirect, satble, sattrace, mqttgate, ntp); `POST /api/v2/debug/flags` with `{"name":"sat","value":false}` (or `/api/v2/debug/flags/sat/off`) sets one to a value, so scripts no longer flip a flag by accident with a toggle key. One table (`debugFlags.h`) serves the telnet keys and the API; the telnet text is unchanged; the simulation switches (`d`, `s`) stay telnet-only. Admin route (ADR-056). Host test `tests/test_debug_flags_api.py` (set twice gives the same state, unknown name/value refused, drift guard against a flag outside the table).
