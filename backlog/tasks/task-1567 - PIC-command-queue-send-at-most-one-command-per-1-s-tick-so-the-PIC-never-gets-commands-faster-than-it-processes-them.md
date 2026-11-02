@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-02T20:37:00Z'
-updated_date: '2026-11-02T20:41:00Z'
+updated_date: '2026-11-02T21:29:00Z'
 labels:
   - pic
   - command-queue
@@ -25,9 +25,9 @@ Robert 2026-11-02: never send queue messages too fast; after one message always 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 handleCommandQueue sends at most one command per call; host test on the real queue code: three due commands are sent on three successive ticks (old code: all three in one tick, red)
-- [ ] #2 PM=/TP= ordering and TASK-1315/1555 behaviour kept: tests/test_pic_pm_chain.py and the queue tests green (adapted only where they assumed a same-tick burst)
-- [ ] #3 SAT keeps its 5 s CS/MM/CH resend and 30 s PIC keepalive within the slower drain: host check that a full SAT resend set (CS, MM, CH) drains within 5 s
+- [x] #1 handleCommandQueue sends at most one command per call; host test on the real queue code: three due commands are sent on three successive ticks (old code: all three in one tick, red)
+- [x] #2 PM=/TP= ordering and TASK-1315/1555 behaviour kept: tests/test_pic_pm_chain.py and the queue tests green (adapted only where they assumed a same-tick burst)
+- [x] #3 SAT keeps its 5 s CS/MM/CH resend and 30 s PIC keepalive within the slower drain: host check that a full SAT resend set (CS, MM, CH) drains within 5 s
 - [ ] #4 Bench .63 (PIC): telnet shows 'Sending to Serial' lines at least ~1 s apart under a burst of 5 REST commands; settings kept, no reboot
 <!-- AC:END -->
 
@@ -36,3 +36,9 @@ Robert 2026-11-02: never send queue messages too fast; after one message always 
 <!-- SECTION:PLAN:BEGIN -->
 1. handleCommandQueue(): after one sendPICSerial() return (one command per call; the loop calls it 1x/s). The PM=/TP= 1 s spacing is then implied and its static state removed. 2. Keep everything else (retry 5 x 5 s, dedup, eviction, ser2net quiet, pmChainTick). 3. Tests: extend tests/test_pic_pm_chain.py harness (real OTGW-Core.ino queue code) with a burst scenario: three different commands due in one tick -> sent on three successive ticks; red on origin/dev (all three in tick 1). Adapt existing scenarios only if they assumed a same-tick burst. 4. Full tests folder + evaluate --quick. 5. Commit without bump, hand to the lead for the next build tag; bench .63: 5 REST commands, telnet 'Sending to Serial' ~1 s apart.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-02 evidence (537fd5a63): tests/test_pic_pm_chain.py test_queue_drips_one_command_per_tick: origin/dev FAILED ([0,0,0] ms at 1000 and 250 ms loops), fix OK (CS/MM/CH sent 1 s apart, drained within 5 s); new test_cs_behind_a_full_queue_still_well_within_the_pic_minute: my first lowest-slot drip FAILED (CS never sent in 60 s: retrying slots took every tick), the oldest-due-first drain sends it after 19000 ms. tests/test_pic_pm_chain.py 13/13; full tests folder 95/95 OK; evaluate --quick 0 failed. Boot PR= readout is self-paced (3 s), PIC detection and version do not use the queue, so no boot timeout depends on the drip. AC4 (bench .63) by the lead after the 08:00 release, as beta.18.
+<!-- SECTION:NOTES:END -->
