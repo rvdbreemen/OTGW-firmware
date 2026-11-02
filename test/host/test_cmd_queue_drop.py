@@ -24,8 +24,9 @@ CORE = "src/OTGW-firmware/OTGW-Core.ino"
 PICTYPES = "src/OTGW-firmware/PICtypes.h"
 # Against a revision before TASK-1439, D1-D4 are the defect cases too; the
 # lists below are for the TASK-1457 comparison against a revision with TASK-1439.
-DEFECT = ["R1", "R2", "R3", "R4"]
-CONTROL = ["D1", "D2", "D3", "D4", "C1", "C2"]
+# TASK-1555 (compare against a revision with TASK-1457): Q1-Q3 and Q7 are the defect cases, Q4-Q6 controls.
+DEFECT = ["Q1", "Q2", "Q3", "Q7"]
+CONTROL = ["D1", "D2", "D3", "D4", "C1", "C2", "R1", "R2", "R3", "R4", "Q4", "Q5", "Q6"]
 
 
 def slice_queue(lines):

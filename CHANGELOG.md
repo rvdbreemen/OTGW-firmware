@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.8] - 2026-11-02
+
+### Fixed
+
+- **A write into a full PIC command queue takes the slot of an unsent read** (TASK-1555). `addCommandToQueue()` dropped every new command when the 20-slot queue was full, so a burst of reads (`PR=`, `PM=`, `TP=<id>:<entry>`) could make a write (`HW=`, `CS=`, `TT=`, `PS=`, ...) disappear. A write now replaces the newest queued read that was never sent (retrycnt 0), in its own slot (no shift, the call can run on async_tcp). A read into a full queue, or a write when no unsent read is queued, is still dropped. `TP=<id>:<entry>=<value>` counts as a write (OTGW-Commands.md). Host test `test/host/test_cmd_queue_drop.py --old-rev` (old code fails Q1-Q3 and Q7); bench: a `PS=0` after 25 `PM=` was dropped on beta.7 and sent and confirmed on beta.8.
+
 ## [2.0.0-beta.7] - 2026-11-02
 
 Same firmware code as the dev build 2.0.0-beta.6; it collects the dev builds 2.0.0-beta.2 to beta.6.
@@ -545,7 +551,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.7...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.8...HEAD
+[2.0.0-beta.8]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.7...v2.0.0-beta.8
 [2.0.0-beta.7]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.1...v2.0.0-beta.7
 [2.0.0-beta.1]: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.1
 [2.0.0-beta]: https://github.com/rvdbreemen/OTGW-firmware/compare/v1.3.5...HEAD

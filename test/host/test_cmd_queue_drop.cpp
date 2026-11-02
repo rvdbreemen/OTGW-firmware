@@ -214,6 +214,60 @@ int main() {
            "PM: NG reports PM=3 (NG) after one send", pubs());
   }
 
+  // ---- TASK-1555: a write is never dropped for a queued read when the queue is full ----
+  auto fillReads = [](int from) {            // PM= is unique per value: each PM=<n> takes its own slot
+    char c[8];
+    for (int n = from; cmdQueueSize < CMDQUEUE_MAX; n++) { std::snprintf(c, sizeof c, "PM=%d", n); add(c, false); }
+  };
+  auto inQueue = [](const char* c) {
+    for (int i = 0; i < cmdQueueSize; i++) if (std::strcmp(cmdqueue[i].cmd, c) == 0) return true;
+    return false;
+  };
+  // Q1: a full queue of reads plus one HW= write keeps the write; the newest unsent read makes room.
+  resetQueue(); fillReads(1);
+  add("HW=1", false);
+  report("Q1", cmdQueueSize == CMDQUEUE_MAX && inQueue("HW=1") && !inQueue("PM=20") && inQueue("PM=1"),
+         "full of reads + HW=1: HW=1 kept, newest read PM=20 evicted", std::to_string(cmdQueueSize) + " slot(s)");
+  // Q2: TP=<id>:<entry>=<value> writes a transparent slave parameter (OTGW-Commands.md TP); it keeps its place too.
+  resetQueue(); fillReads(1);
+  add("TP=11:12=40", false);
+  report("Q2", inQueue("TP=11:12=40") && cmdQueueSize == CMDQUEUE_MAX, "full of reads + TP=11:12=40 (write): kept",
+         std::to_string(cmdQueueSize) + " slot(s)");
+  // Q3: a read already sent to the PIC (awaiting its answer) is not the one evicted.
+  resetQueue(); add("PM=1", false); tick(); fillReads(2);
+  add("CS=40.0", false);
+  report("Q3", inQueue("CS=40.0") && inQueue("PM=1") && cmdqueue[0].retrycnt == 1,
+         "the in-flight read PM=1 stays, an unsent read is evicted", std::to_string(cmdQueueSize) + " slot(s)");
+  // Q7: a mixed queue (writes, one unsent read in the middle, writes): the write replaces that read, no write is lost.
+  resetQueue();
+  { char c[12]; for (int n = 0; n < 10; n++) { std::snprintf(c, sizeof c, "TT=%d", n); add(c, true); }
+    add("PM=7", false);
+    for (int n = 10; cmdQueueSize < CMDQUEUE_MAX; n++) { std::snprintf(c, sizeof c, "TT=%d", n); add(c, true); } }
+  add("HW=1", false);
+  {
+    int tt = 0; for (int i = 0; i < cmdQueueSize; i++) if (std::strncmp(cmdqueue[i].cmd, "TT=", 3) == 0) tt++;
+    report("Q7", inQueue("HW=1") && !inQueue("PM=7") && tt == CMDQUEUE_MAX - 1 && cmdQueueSize == CMDQUEUE_MAX
+           && std::strcmp(cmdqueue[10].cmd, "HW=1") == 0,
+           "writes + one unsent PM=7 + writes, then HW=1: PM=7's slot holds HW=1, all 19 TT= stay",
+           std::to_string(tt) + " TT=, slot10=" + cmdqueue[10].cmd);
+  }
+  // Q4 (control): a read (TP=<id>:<entry>, and a lower-case pr=a) into a full queue of reads is still dropped.
+  resetQueue(); fillReads(1);
+  add("TP=11:1", false); add("pr=a", false);
+  report("Q4", !inQueue("TP=11:1") && !inQueue("pr=a") && inQueue("PM=20") && cmdQueueSize == CMDQUEUE_MAX,
+         "full of reads + TP=11:1 / pr=a (reads): dropped, queue unchanged", std::to_string(cmdQueueSize) + " slot(s)");
+  // Q5 (control): a write into a full queue of writes is still dropped.
+  resetQueue();
+  { char c[12]; for (int n = 0; cmdQueueSize < CMDQUEUE_MAX; n++) { std::snprintf(c, sizeof c, "TT=%d", n); add(c, true); } }
+  add("HW=1", false);
+  report("Q5", !inQueue("HW=1") && cmdQueueSize == CMDQUEUE_MAX, "full of writes + HW=1: dropped (no read to evict)",
+         std::to_string(cmdQueueSize) + " slot(s)");
+  // Q6 (control): a queue that is not full is untouched: the write is appended, every read stays.
+  resetQueue(); add("PM=1", false); add("PM=2", false); add("PR=A", false);
+  add("HW=1", false);
+  report("Q6", cmdQueueSize == 4 && inQueue("PM=1") && inQueue("PM=2") && inQueue("PR=A") && inQueue("HW=1"),
+         "not full: HW=1 appended, no read evicted", std::to_string(cmdQueueSize) + " slot(s)");
+
   std::printf("%s (%d failed)\n", g_fail ? "FAIL" : "PASS", g_fail);
   return g_fail ? 1 : 0;
 }

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.7
+**  Version  : v2.0.0-beta.8
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3777,6 +3777,26 @@ static void removeFromCmdQueue(int index) {
   cmdqueue[cmdQueueSize].due = 0;
 }
 
+// TASK-1555: PIC commands that only read: PR= (report), PM= (priority message) and TP=<id>:<entry>
+// (read a transparent slave parameter; TP=<id>:<entry>=<value> writes it, OTGW-Commands.md "TP").
+// Everything else changes gateway or boiler state and counts as a write.
+static bool isQueueReadCmd(const char* cmd, int len) {
+  const char c0 = (char)toupper((unsigned char)cmd[0]);
+  const char c1 = (char)toupper((unsigned char)cmd[1]);
+  if ((c0 == 'P' && c1 == 'R') || (c0 == 'P' && c1 == 'M')) return true;
+  if (c0 == 'T' && c1 == 'P') return memchr(cmd + 3, '=', (size_t)(len - 3)) == nullptr;
+  return false;
+}
+
+// TASK-1555: the newest queued read that was never sent (retrycnt 0), or -1. A read already sent may
+// still get its PIC reply, which checkCommandResponse() matches by its two letters, so it is not evicted.
+static int findEvictableRead() {
+  for (int i = cmdQueueSize - 1; i >= 0; i--) {
+    if (cmdqueue[i].retrycnt == 0 && isQueueReadCmd(cmdqueue[i].cmd, cmdqueue[i].cmdlen)) return i;
+  }
+  return -1;
+}
+
 // Trigger PIC settings re-read only for commands that modify readable PIC settings (PR=).
 // GW→PR=M, SB→PR=S, VR→PR=V, TS→PR=D, IT/OH→PR=T, GA/GB→PR=G, LA-LF→PR=L
 // Used for commands from the queue and for commands typed on the ser2net port (25238).
@@ -3864,9 +3884,19 @@ void addCommandToQueue(const char* buf, const int len, const bool forceQueue, co
   else OTDebugTf(PSTR("CmdQueue: Adding cmd end of queue, slot [%d]\r\n"), insertptr);
 
   if (!foundcmd && cmdQueueSize >= CMDQUEUE_MAX) {
-    OTDebugTln(F("CmdQueue: Error: Reached max queue"));
-    OTDebugFlush();
-    return;
+    // TASK-1555: a write is never dropped for a queued read; the newest unsent read gives up its slot.
+    // The write takes that slot in place, as a same-prefix replace does: no shift and no size change,
+    // because this can run on async_tcp while the loop task walks the queue. Debug line only: the
+    // WebSocket log has one writer, the loop task (TASK-1321).
+    const int victim = isQueueReadCmd(buf, len) ? -1 : findEvictableRead();
+    if (victim < 0) {
+      OTDebugTln(F("CmdQueue: Error: Reached max queue"));
+      OTDebugFlush();
+      return;
+    }
+    OTDebugTf(PSTR("CmdQueue: Full, read [%s] in slot [%d] evicted for a write\r\n"), cmdqueue[victim].cmd, victim);
+    insertptr = (int8_t)victim;
+    foundcmd = true;          // reuse the slot: the size stays CMDQUEUE_MAX
   }
   if (insertptr < 0 || insertptr >= CMDQUEUE_MAX) {
     OTDebugTf(PSTR("CmdQueue: Error: Invalid insert slot [%d]\r\n"), insertptr);
