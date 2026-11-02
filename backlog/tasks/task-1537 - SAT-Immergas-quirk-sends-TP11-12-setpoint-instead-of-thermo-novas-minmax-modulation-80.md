@@ -3,11 +3,11 @@ id: TASK-1537
 title: >-
   SAT Immergas quirk sends TP=11:12=<setpoint> instead of thermo-nova's min(max
   modulation, 80)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-01T02:01:00Z'
-updated_date: '2026-11-02T19:18:00Z'
+updated_date: '2026-11-02T20:40:00Z'
 labels:
   - sat
   - bug
@@ -40,4 +40,12 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: SATcontrol.ino:680
 2026-11-02 evidence: tests/test_sat_immergas_tp.py 4/4 (HEAD copy: 3 fail). test_sat_pwm_override immergas case 100 (was 80). Five harnesses (cmd_cache, ot_loss, push_setpoint, restart_quiet, no_return_ignition) got a satImmergasTpActive stub, as for TASK-1536. Full tests/ 95/95 (run in parts: a background run was stopped for low PC memory, not a test failure). evaluate --quick 0 failed. Line-by-line thermo-nova check: value, format, order, call sites, MM uncap, PWM TP=0, ~5 s cadence match; TP only in thermo-nova's MQTT OTGW coordinator, not its serial one; MemberID 27 = Immergas and Sime -> beta.16 (entry 235).
 
 beta.16: TP only with explicit Immergas (entry 235, Robert). test_sat_immergas_tp 5/5; beta.15 copy fails the Auto/MemberID-27 case.
+
+2026-11-02 bench beta.17 (.63, 3e928d9): satmanufacturer Auto (0) 75 s telnet: 0 TP=11:12, 10 MM=100; Immergas (8) 60 s: 12x cmd[TP=11:12=80] queued 1 ms before cmd[MM=100], every 5 s; restored to 0. FINDING: the command queue updates an existing slot in place (MM in slot 1, TP in slot 3, dispatch order 0..3), so at the PIC MM= goes first and TP= after it (PM/TP spacing up to 1 s). Entry 233's implementation note asked for this check; my host test only checks the enqueue order. thermo-nova via OTGW-firmware has the same queue behaviour. Put to Sergeant D as Q-1537b (msg 1566908020888310011), advice A keep.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Immergas quirk aligned with thermo-nova (coordinator/mqtt/opentherm.py:216-220, entry 233) and limited to an explicit choice (entry 235). beta.15 9e123585b: satSendMM() queues TP=11:12=min(mm,80) right before every MM= (tick, 5 s resend, hot water, cutoff), MM no longer capped at 80, the tick-level TP=11:12=<flow setpoint> removed. beta.16 5a64db5d7: satImmergasTpActive() = settings.sat.iManufacturer == Immergas, so Auto (MemberID 27 = Immergas and Sime) sends no TP. Evidence: AC1 entries 21/233/235 checked, Q-1537a answered A. AC2 tests/test_sat_immergas_tp.py 5/5 (old code 3/4 fail; beta.15 fails the Auto/27 case), full tests/ 95/95, evaluate --quick 0 failed, build esp32-combo beta.17 (2x 'Successfully created ESP32S3 image', 'Build completed successfully'), bench .63 telnet: Auto 0 TP in 75 s, Immergas 12x cmd[TP=11:12=80] each 1 ms before cmd[MM=100] in 60 s. Finding: the queue updates slots in place, so at the PIC MM= goes before TP= (~1 s), same as thermo-nova on an OTGW; Q-1537b to Sergeant D (msg 1566908020888310011, advice A keep); if he picks B that becomes its own task. Not verified: a real Immergas boiler (none on the bench). Pushed 3e928d919, zip msg 1566914637587415100.
+<!-- SECTION:FINAL_SUMMARY:END -->
