@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-28T18:15:00Z'
-updated_date: '2026-10-28T19:15:00Z'
+updated_date: '2026-11-02T05:47:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -32,4 +32,6 @@ Found in TASK-1420 review. satGetFlowTemp() returns raw Tboiler (SATcontrol.ino 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-28 dependency reconciliation (Robert's go: reconcile the graph alongside the wave-3 work; scout+verifier report): depends on TASK-1412.5: 'what counts as no flow' is the LL-011 measurement-validity contract.
+
+2026-11-02 QD-6 answered A (entry 218): flow missing resets the sustain timers. Waits only on TASK-1412.5's validity contract now.
 <!-- SECTION:NOTES:END -->

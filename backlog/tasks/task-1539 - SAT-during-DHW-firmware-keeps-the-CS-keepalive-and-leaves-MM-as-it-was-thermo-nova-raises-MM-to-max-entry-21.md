@@ -6,11 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T07:53:00Z'
-updated_date: '2026-11-02T04:39:00Z'
+updated_date: '2026-11-02T05:47:00Z'
 labels:
   - sat
 dependencies: []
-priority: low
+priority: medium
 ordinal: 695000
 ---
 
@@ -30,4 +30,6 @@ Found by the TASK-1412.17 second read (docs/sat/sat-commissioning-profiles-2026-
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no. Waits on Sergeant D Q-1539a.
+
+2026-11-02 Q-1539a answered B (entry 220): MM to the maximum during a draw. The keepalive sub-question is unanswered; the keepalive stays until he answers. Q72 A (entry 221): no general resend during a draw.
 <!-- SECTION:NOTES:END -->

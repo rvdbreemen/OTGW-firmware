@@ -5516,6 +5516,126 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 
 **Settled (rationale, not a new decision):** the purpose of the slave SAT (entries 206-209) is the load band between the heat pump's maximum (Elga Ace about 4 kW) and the boiler's minimum (about 5.5 kW on older boilers), where the boiler on its own control cycles; the slave keeps it running at high efficiency (above 95 %) at low load. Compared with round 22 (docs/sat/sim-hp-lowload/round22.md): the cycling in that band is reproduced (Elga Ace, 1983-92 radiators: 2523 boiler starts per season, runs of 2.3 min) and the slave cuts it (935 starts, 15.9 min). Two model limits bear on his efficiency argument: the boiler minimum is 3.1 kW (Calenta 28c datasheet), smaller than his 5.5 kW, so the modelled gap is narrower; and the boiler efficiency is a fixed 0.97 (`BOILER_EFF`, scripts/sat_hp_library_study21.py:76) with no start losses, so the efficiency gain he expects from fewer starts is not in the model, while the extra gas in round 22 (577 -> 852 kWh) comes from the boiler taking heat over from the heat pump. thermo-nova has no hybrid concept. **Task:** TASK-1527 (round 22 follow-up: boiler minimum 5.5 kW, start losses and part-load efficiency). **Open:** whether the gas penalty survives a model with start losses and a 5.5 kW minimum.
 
+## 211. Q-1502b answered A: a CH flame after a draw gets the 180 s hold also when the first-flame wait had timed out (Sergeant D, 2026-11-02)
+
+**Source:** sergeantd, 2026-11-02 05:31 UTC, msg 1566686069796114443 (https://discord.com/channels/812969634638725140/1514720723980259460/1566686069796114443), one list answering the one-time overview Robert ordered (first msg 1566676694553858088, 04:53 UTC). Entries 211-225 and 227-229 come from that list. Q-1502b in msg 1566676696348754002.
+
+**Quoted** (excerpt of a list): "Q-1502b: A"
+
+**Settled:** option A as put to him: "Yes, as without a draw. The burner runs at least 180 s once lit." An ON phase whose 180 s first-flame wait has timed out, then a hot-water draw, then a CH flame: that flame gets the 180 s minimum burn hold. Compared: thermo-nova starts the hold at the first flame the ON phase sees after a timed-out wait (pwm.py:144-146, :201-203; it has no hot-water branch there); firmware today lets the phase end sooner (330 s example, TASK-1502, entry 156). Same idea as entry 158 (TASK-1518). **Task:** TASK-1558. **Open:** none.
+
+## 212. Q-1436j answered A: the reference stays thermo-nova 7beaaf5 (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; Q-1436j in msg 1566676696348754002 (first asked 2026-11-01, msg 1566267196571787296).
+
+**Quoted** (excerpt of a list): "Q-1436j: A"
+
+**Settled:** option A: "Stay on 7beaaf5. No change." The pin in CLAUDE.md stays; develop is not a candidate (entry 191). The conditional questions Q-1436a to Q-1436i (develop behaviour) fall away. Our advice to move once Alex names a newer commit was part of the question text, not of option A; a move needs a new question. **Task:** TASK-1436 (Done, no new work). **Open:** none.
+
+## 213. QD-1 answered A: slave MsgID 3 bit 4 = 1 blocks every PWM entry path (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; QD-1 in msg 1566676697917562952.
+
+**Quoted** (excerpt of a list): "QD-1: A"
+
+**Settled:** option A: "All: the 60 s overshoot switch, PWM restored after a restart, the manual pwm mode command, and the future end-of-cycle switch. SAT stays continuous." The question also asked for his OK to build the bit-4 rule at all; answering A is read as that OK (**interpretation, ours**). Compared: thermo-nova only shows the bit (coordinator/serial/binary_sensor.py:54) and never acts on it; the OT spec forbids master low-off and pump control when the slave sets it. Robert wanted it honoured after his OK (entry 179). **Task:** TASK-1412.4 (QD-1 to QD-3 now answered). **Open:** none.
+
+## 214. QD-2 answered A: bit 4 turning 1 while PWM runs leaves PWM in that tick (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; QD-2 in msg 1566676697917562952.
+
+**Quoted** (excerpt of a list): "QD-2: A"
+
+**Settled:** option A: "Leave PWM in that tick and send the continuous setpoint, as the underheat exit does. One ON phase may end early." No phase-end allowance. **Task:** TASK-1412.4. **Open:** none.
+
+## 215. QD-3 answered B: no PWM until a valid MsgID 3 reply (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; QD-3 in msg 1566676697917562952.
+
+**Quoted** (excerpt of a list): "QD-3: B"
+
+**Settled:** option B: "No PWM until a valid reply. A gateway that never gets one never uses PWM." Our fallback C (B with a timeout, then A with a warning) is not chosen. **Task:** TASK-1412.4. **Open:** none; a gateway that never gets a valid MsgID 3 reply runs without PWM, as he chose.
+
+## 216. QD-4: Sergeant D asks for more explanation (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; QD-4 in msg 1566676699368788009.
+
+**Quoted** (excerpt of a list): "QD-4: please explain further"
+
+**Settled:** nothing yet. QD-4 (PWM OFF phase with overshoot protection switched off: keep thermo-nova's previous CS with CH=1, always CS=10/CH=0, or no PWM) needs a clearer explanation; we owe him one, as a separate message. **Task:** TASK-1412.6. **Open:** QD-4 itself.
+
+## 217. QD-5 answered A: a return temperature invalid or absent for 5 minutes counts as no return temperature (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; QD-5 in msg 1566676700585140325.
+
+**Quoted** (excerpt of a list): "QD-5: A"
+
+**Settled:** option A: "After 5 minutes without a valid value, treat it as 'no return temperature' (the flow + 18 start of entries 45 and 149). A broken sensor gets the no-return start-up." The 5 minutes were our proposal (the board-sensor timeout) and he accepted it with A. Compared: thermo-nova only knows "missing" and then skips the flame-off hold (heating_control.py:393-395). Settles entry 84 Open #3 and entry 135 Open. **Task:** TASK-1412.5. **Open:** none.
+
+## 218. QD-6 answered A: a flow temperature invalid or stale for 30 s counts as missing (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; QD-6 in msg 1566676700585140325.
+
+**Quoted** (excerpt of a list): "QD-6: A"
+
+**Settled:** option A: "Treat it as missing: PWM goes idle, SAT sends the continuous setpoint, and the 60 / 180 / 300 s timers reset." The advice under the question named N = 30 s (three polls, to be measured on the bench); read as accepted with A (**interpretation, ours**; the bench measurement can still move N, and a change goes back to him). Compared: thermo-nova sets PWM idle when the flow is missing (pwm.py:122-128). **Task:** TASK-1412.5, TASK-1428. **Open:** the bench check of N.
+
+## 219. QD-7 answered A: entry 60's "CH=1 in the OFF phase" was the boiler's CH-mode status bit (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; QD-7 in msg 1566676699368788009. He wrote "QD7".
+
+**Quoted** (excerpt of a list): "QD7: A"
+
+**Settled:** option A: "You meant that boiler bit. No control change, we fix the graph label." Entry 60's open point is closed: SAT's CH enable is 0 in the PWM OFF phase (CS=10, heating_control.py:388-389, const.py:35; CH=0 because CS is not above 22, :238); the 1 he saw is MsgID 0 slave bit 1 (pump overrun). Changes entry 60 (reading confirmed, no rewrite of entry 60). **Task:** TASK-1412.6 (graph label). **Open:** none.
+
+## 220. Q-1539a answered B: MM to the maximum during a hot-water draw (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; Q-1539a in msg 1566676702099410985. He wrote "Q1539a".
+
+**Quoted** (excerpt of a list): "Q1539a: B"
+
+**Settled:** option B: "Follow thermo-nova and entry 21: MM to max during the draw." Compared: thermo-nova raises MM to the maximum while hot water is active (heating_control.py:136-137, :517-520); firmware today sends no MM during a draw, so an MM=0 from PWM lasts the whole draw. **Open:** the sub-question "stop the CS keepalive during a draw, yes or no?" got no answer. Until he answers, the keepalive stays (no change; our advice was to keep it, because a PIC drops SAT's CS after about 1-2 minutes without it). **Task:** TASK-1539.
+
+## 221. Q72 answered A: no resend during hot water and a boiler fault (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; Q72 in msg 1566676702099410985.
+
+**Quoted** (excerpt of a list): "Q72: A"
+
+**Settled:** option A: "No resend during hot water and fault (today, ADR-203)." The firmware keeps its deviation from thermo-nova, whose update ends with the CS, MM and CH sends in every branch (heating_control.py:236-238; caller climate.py:544-547 has no hot-water or fault guard). Interaction with entry 220: MM to max during a draw needs at least the MM send in the draw; that is the TASK-1539 change, not a general resend. **Task:** none (ADR-203 stands); TASK-1539 for the MM send. **Open:** none.
+
+## 222. Q-1412.17a answered B: entry 21's generic heat-pump MM rule is enough (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; Q-1412.17a in msg 1566676702099410985. He wrote "A-1412.17a", read as Q-1412.17a (no other id matches).
+
+**Quoted** (excerpt of a list): "A-1412.17a:B"
+
+**Settled:** option B: "Your generic rule of entry 21 (MM never 0 for heat pumps) is enough." No per-model bench test before a heat-pump claim. thermo-nova has no heat-pump MM rule. **Task:** TASK-1412.17 (OD-6, Done; no new work). **Open:** none.
+
+## 223. Q71 answered A: a preset chosen while the window is open wins (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; Q71 in msg 1566676721376169995.
+
+**Quoted** (excerpt of a list): "Q71: A"
+
+**Settled:** option A: "As now: the user's last choice wins. Heating runs at that preset while the window is still open." This matches thermo-nova (climate.py:816, :819, :830-832) and the firmware since alpha.537. **Task:** TASK-1487 (Done, no change). **Open:** none.
+
+## 224. Q-1414a answered A: keep the firmware's zone PID reset rule (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; Q-1414a in msg 1566676721376169995.
+
+**Quoted** (excerpt of a list): "Q-1414a: A"
+
+**Settled:** option A: "Keep the firmware rule. The zone integral survives repeated state events." The firmware resets a zone integral only on a real zone setpoint change; thermo-nova compares the room target with the stored HOME preset value (climate.py:788-795) and so resets often outside HOME. A deliberate deviation. **Task:** TASK-1414 (Done, no change). **Open:** none.
+
+## 225. Q-1525a answered A: a self-tune hour without a room temperature is not counted (Sergeant D, 2026-11-02)
+
+**Source:** as entry 211; Q-1525a in msg 1566676722768941168.
+
+**Quoted** (excerpt of a list): "Q-1525a: A"
+
+**Settled:** option A: "Skip such hours as 'no room temperature'." TASK-1525 counted them (B) until this answer. thermo-nova has no curve self-tune (ADR-205, accepted by him in entry 180). **Task:** TASK-1559. **Open:** none.
+
 ## 227. Q-1527a answered A: no "heat pump controls itself" setting; entries 194-198 and 202 are the answer (Sergeant D, 2026-11-02)
 
 **Source:** sergeantd, 2026-11-02 05:31 UTC, #alpha-testing, msg 1566686069796114443 (https://discord.com/channels/812969634638725140/1514720723980259460/1566686069796114443), answer to the overview (Q-1527a in msg 1566676696348754002).
