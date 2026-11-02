@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-31T13:48:00Z'
-updated_date: '2026-11-02T04:23:00Z'
+updated_date: '2026-11-02T05:39:00Z'
 labels:
   - sat
   - design
@@ -24,7 +24,7 @@ Robert 2026-10-31: 'de warmtepomp moet minimaal schakelen. Dus goal voor warmtep
 <!-- AC:BEGIN -->
 - [ ] #1 A heat-pump capture (>= 24 h, TASK-1523 tool: flame/compressor, modulation, flow, return, SAT log) is used to validate the model's start count within 25 %
 - [x] #2 Simulation of candidate settings (PWM period, minimum on/off time, flow cap, MM in PWM, hysteresis) scored on compressor starts per day first and comfort second, paired against current settings, over at least 5 winters; data and scripts in docs/sat/sim-hp-lowload/
-- [ ] #3 Options with numbers posted to Sergeant D one question at a time; his answers recorded in docs/sat/sergeant-d-corrections.md
+- [x] #3 Options with numbers posted to Sergeant D one question at a time; his answers recorded in docs/sat/sergeant-d-corrections.md
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -59,4 +59,6 @@ Audit 2026-11-01: moved To Do -> In Progress. Simulation rounds 12-17 are commit
 2026-11-02 AC#2 unchecked again (self-review): round 23b swept the heat pump's own band, not a SAT setting. The SAT-side hysteresis is the overshoot switch into PWM (entry 87, fOvershootMargin 2.0, 60 s). Round 23c runs it (margin 3.0 = thermo-nova cycles/const.py:10, margin 4.0, 300 s dwell) plus period 2400 s, the selectable middle value (beta.4 setter snaps to 1800/2400/10800). Found while doing so: rounds 21-23 switch on the first qualifying minute, the firmware one tick later (satCycleCheckOvershootSwitch, 60 s from the first qualifying tick); 23c includes the firmware-faithful variant.
 
 2026-11-02 AC#2 checked again, now with SAT's own hysteresis: round 23c (600 runs, ten seasons, paired against current; docs/sat/sim-hp-lowload/round23.md findings 6-9, round23c_switch_runs.json). Period 2400 s (selectable) -19 % starts (17.0 -> 13.8/day) at +0.0007 C, 120/120 runs fewer starts. Switch as the firmware (one tick later than the model) -0.5 starts/day: rounds 21-23 conclusions stand. Dwell 300 s -0.9. Margin 3.0/4.0: SAT never enters PWM in the model, an artefact of the assumed heat-pump stop band (stops at CS+3 K, study21.py:206); with a 5 K band margin 3.0 gives 12.4 starts/day, 4.0 gives 9.0 (NIBE, 2015 house, 2024-25). Rule: the switch fires only when the unit's own stop overshoot exceeds SAT's margin; needs a capture (AC#1). Data added to Q-1527c (advice default 2400 s), new queued Q-1527f (margin). Port proof 4/4 OK on beta.5 (0ab3edd99).
+
+2026-11-02 AC#3: options with numbers put to Sergeant D (Q-1527c with round 23 data, Q-1527f with round 23c, Q-1527a confirm) in the one-time overview of 04:53 (#alpha-testing msg 1566676722768941168; one overview instead of one question at a time, maintainer exception). Answers 05:31 (msg 1566686069796114443) recorded as entries 227 (Q-1527a A), 228 (Q-1527c C: 60 min as a new choice, default unchanged = our interpretation, TASK-1557), 229 (Q-1527f C: margin after a heat-pump capture). Entry 210 (slave SAT rationale) recorded; round 22b (5.5 kW boiler minimum, return-temperature efficiency, start losses) running. Remaining: AC#1 (heat-pump capture).
 <!-- SECTION:NOTES:END -->
