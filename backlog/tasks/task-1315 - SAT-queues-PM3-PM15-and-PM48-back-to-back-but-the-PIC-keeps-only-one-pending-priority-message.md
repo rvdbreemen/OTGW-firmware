@@ -3,11 +3,11 @@ id: TASK-1315
 title: >-
   SAT queues PM=3, PM=15 and PM=48 back to back but the PIC keeps only one
   pending priority message
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-23T09:37:00Z'
-updated_date: '2026-11-01T22:38:00Z'
+updated_date: '2026-11-02T01:02:00Z'
 labels:
   - pic
   - sat
@@ -49,10 +49,12 @@ Side finding of the TASK-1314 research (2026-10-23): src/OTGW-firmware/SATcontro
 2026-11-01 fix (Robert: PM= unique in the queue, and TP= the same way): addCommandToQueue treats PM= and TP= as unique per value (exact repeat refreshes; TP= no longer append-only). tests/test_pic_pm_chain.py new cases user_three (3x PM= from REST/MQTT) and user_tp; old OTGW-Core.ino FAILED 2 ('1' != '3' queued; TP repeat '4' != '3'), fix 11/11 OK; queue-related tests (otd_ch_override, sat_cmd_cache, dhw_sw_sync, max_tset, no_return_ignition, ot_loss, push_setpoint, restart_quiet, pwm_override, hp_pwm) OK; evaluate --quick 80/0. Version 2.0.0-beta.3. Bench (.63 PIC 6.8): three PM= via REST in quick succession, expect three PIC echoes; boiler answers cannot be shown (no boiler on the bench).
 
 2026-11-01 bench .63 on 2.0.0-beta.4+2905bd1 (SAT simulation off): three PM= via REST POST /api/v2/otgw/commands at 23:34:52 (HTTP 202 each, 26-65 ms) -> queue slots [0] PM=3, [1] PM=15, [2] PM=48 (no overwrite); 23:34:54.68 sent to the PIC PM=3, PM=15, PM=48 within 4 ms and echoed 'PM: 3', 'PM: 15', 'PM: 48'. Follow-up as 2.0.0-beta.5 (Robert: one second apart): handleCommandQueue sends at most one PM=/TP= per PRIO_MSG_SPACING_MS 1000 ms; tests/test_pic_pm_chain.py user_three now checks send times: beta.4 code FAILED ('sent less than 1 s apart: [0, 0, 0]'), fix 11/11; queue tests and evaluate 80/0 green.
+
+2026-11-02 bench .63 on 2.0.0-beta.5+d0efe73 (SAT simulation off): three PM= via REST POST /api/v2/otgw/commands (202 each) queued in slots [0] PM=3, [1] PM=15, [2] PM=48 and sent to the PIC at 02:02:01.745, 02:02:02.747, 02:02:03.747 (1.0 s apart), each echoed 'PM: 3', 'PM: 15', 'PM: 48'. Posted (Discord msg 1566618474996961435).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-SAT's boot priority messages PM=3, PM=15 and PM=48 are sent to the PIC one at a time (pmChainStart/pmChainTick, OTGW-Core.ino), advancing on the boiler's answer or after 60 s, with one retry of unanswered ids, instead of three back-to-back PM= of which the ESP queue kept only the last. Fix e344fa1f1. Evidence: bench .63 PIC 6.8 telnet 2026-11-01 21:04-21:10: PM=15, PM=48, then retry PM=3, 15, 48, each echoed by the PIC, chain stops. Not verified: boiler responses (no boiler on the bench); old-firmware bench run (AC#1 waived by Robert).
+PM= and TP= are unique per value in the PIC command queue (three different PM= in a row are three entries; an exact repeat refreshes its entry; TP= no longer append-only), and the queue sends at most one PM=/TP= per second, since both load the PIC's single priority-message slot (otgw-6.6 gateway.asm SetPrioMessage/SlaveParameter). SAT's boot chain (e344fa1f1) still waits for the boiler answer per id. Shipped as 2.0.0-beta.3 (efaa0a128) and beta.5 (0ab3edd99). Evidence: tests/test_pic_pm_chain.py red on old code (3 PM= -> 1 entry; TP repeat queued twice; sends at [0,0,0] ms), green 11/11 on the fix; bench .63 PIC 6.8: three PM= via REST reach the PIC 1.0 s apart, each echoed. Not verified: boiler answers to MsgID 3/15/48 (no boiler on the bench); AC#1 'old' bench evidence waived by Robert (old behaviour shown by the host test).
 <!-- SECTION:FINAL_SUMMARY:END -->
