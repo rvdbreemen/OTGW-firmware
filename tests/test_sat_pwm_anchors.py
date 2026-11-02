@@ -67,6 +67,7 @@ int main() {
     else if (cmd == "run") std::cin >> dur;
     else if (cmd == "ovs") std::cin >> ovs;                 // overshoot protection on/off
     else if (cmd == "entry") std::cin >> entryArm;          // PWM just entered: the first step skips the off wait (entry 43)
+    else if (cmd == "src") std::cin >> g_source;           // heating source (2 = heat pump: minimum burn 600 s, entry 197)
   }
   settings.sat.bOvershootProtection = ovs != 0;
   settings.sat.iCyclesPerHour = (uint8_t)cph;
@@ -488,15 +489,24 @@ class SatPwmAnchors(unittest.TestCase):
         self.assertTrue(offs, f"ON never ended: {tl.dump()}")
         self.assertLessEqual(abs(offs[0] - 810), TICK, f"ON ended at {offs[0]} s, expected 810 s; {tl.dump(1000)}")
 
-    # Open with Sergeant D (entry 132 does not settle them); the tests below only record today's behaviour so a change is noticed:
-    #  P3  a draw that begins after the 180 s wait timed out, before any CH flame: no anchor, so no hold in that phase.
-    #  P4  the hold clock is frozen through the post-draw wait (it resumes with the part that had run).
-    def test_m4_open_p3_draw_after_the_wait_timed_out_keeps_today_s_behaviour(self):
-        # Wait times out at 180, draw 190..250, CH flame 280, out 310, range 1 (ON time 0). Today: no hold anchor (resumed phase), ends at 330.
+    # Entry 211 (Q-1502b A, TASK-1558): a draw that begins after the 180 s wait timed out, before any CH flame. The CH flame after the
+    # draw gets the 180 s hold, as without a draw (thermo-nova pwm.py:144-146, :201-203).
+    def test_m4_ch_flame_after_a_draw_after_the_timed_out_wait_gets_the_180_s_hold(self):
+        # Wait times out at 180, draw 190..250 (end tick 270, Wait), CH flame 280 (seen at 300), out 310, range 1 (ON time 0).
+        # Fix: hold from 300, ON ends at 480. HEAD: no hold anchor in a resumed phase, ends at 330.
         tl = self._cold([(190, "dhw", 1), (250, "dhw", 0), (280, "flame", 1), (310, "flame", 0), (310, "ratio", 5)], 900)
         _ons, offs = tl.edges()
         self.assertTrue(offs, f"ON never ended: {tl.dump()}")
-        self.assertLessEqual(abs(offs[0] - 330), TICK, f"P3 (open with Sergeant D): ON ended at {offs[0]} s, today 330 s; {tl.dump(600)}")
+        self.assertLessEqual(abs(offs[0] - 480), TICK, f"ON ended at {offs[0]} s, expected 480 s (300 + 180 hold); {tl.dump(600)}")
+        self.assertTrue(all(q == 1 for s, q, _c, _f, _b in tl.rows if s < 470), tl.dump(600))
+
+    def test_m6_ch_flame_after_the_fallback_of_a_draw_after_the_timed_out_wait_gets_the_180_s_hold(self):
+        # Entry 211, late flame: wait times out at 180, draw 190..250 (end tick 270), no flame: the clock resumes at 450. CH flame at
+        # 460 (seen at 480), out 490, range 1: hold from 480, ON ends at 660. HEAD: no anchor, ends at 510.
+        tl = self._cold([(190, "dhw", 1), (250, "dhw", 0), (460, "flame", 1), (490, "flame", 0), (490, "ratio", 5)], 1000)
+        _ons, offs = tl.edges()
+        self.assertTrue(offs, f"ON never ended: {tl.dump()}")
+        self.assertLessEqual(abs(offs[0] - 660), TICK, f"ON ended at {offs[0]} s, expected 660 s (480 + 180 hold); {tl.dump(800)}")
 
     # TASK-1502 AC2: no CH flame
     def test_m2_no_ch_flame_within_180_s_of_the_draw_end_starts_the_timer_anyway(self):
@@ -520,13 +530,57 @@ class SatPwmAnchors(unittest.TestCase):
         self.assertTrue(all(q == 1 for s, q, _c, _f, _b in tl.rows if s < 410), tl.dump(600))
         self.assertEqual({bt for s, _q, _c, _f, bt in tl.rows if s >= 300}, {50.0}, tl.rows)
 
-    def test_m5_open_p4_hold_clock_is_frozen_through_the_post_draw_wait(self):
-        # Burning start at 0, draw 50..90 with the flame out for good, range 1 at 95. The hold (60 s of 180 s used at the draw) resumes at the
-        # 180 s fallback after the draw end (tick 120 + 180 = 300) with 120 s left: ON ends at 390 (open with Sergeant D, today's behaviour).
+    # Entry 158 (Q-1502a B, TASK-1518): the hold protects a burning flame only. No CH flame after the draw: the hold lapses and the
+    # ON phase ends on its normal ON time.
+    def test_m5_no_ch_flame_after_the_draw_lets_the_hold_lapse(self):
+        # Burning start at 0, draw 50..90 with the flame out for good, range 1 at 95 (ON time 0). Draw seen at 60 (60 s used), end tick
+        # 90, the 180 s wait runs to 270: ON ends at 270. HEAD resumed the frozen hold (120 s left) and ended at 390.
         tl = self.sim(3, 0.22, "burning", [(50, "dhw", 1), (55, "flame", 0), (90, "dhw", 0), (95, "ratio", 5)], 900)
         _ons, offs = tl.edges()
         self.assertTrue(offs, f"ON never ended: {tl.dump()}")
-        self.assertLessEqual(abs(offs[0] - 390), TICK, f"P4 (open with Sergeant D): ON ended at {offs[0]} s, today 390 s; {tl.dump(600)}")
+        self.assertLessEqual(abs(offs[0] - 270), TICK, f"ON ended at {offs[0]} s, expected 270 s (hold lapsed); {tl.dump(600)}")
+
+    def test_m5b_ch_flame_in_the_post_draw_wait_keeps_the_rest_of_the_hold(self):
+        # Control for entry 158: same draw, CH flame back at 100 (seen at 120) and out at 130, range 1. The hold had run 60 s at the draw:
+        # it continues from the resume, 120 s left, ON ends at 240. Unchanged by the fix.
+        tl = self.sim(3, 0.22, "burning", [(50, "dhw", 1), (55, "flame", 0), (90, "dhw", 0), (95, "ratio", 5), (100, "flame", 1), (130, "flame", 0)], 900)
+        _ons, offs = tl.edges()
+        self.assertTrue(offs, f"ON never ended: {tl.dump()}")
+        self.assertLessEqual(abs(offs[0] - 240), TICK, f"ON ended at {offs[0]} s, expected 240 s (120 + 120 hold left); {tl.dump(600)}")
+
+    def test_m5c_second_draw_after_a_lapsed_hold_gives_no_fresh_hold(self):
+        # Review finding (entries 103 B, 158): draw 1 50..90 with the flame out, the hold lapses at 270; CH relight at 300 (no new hold,
+        # thermo-nova keeps its first anchor, pwm.py:144-146). Draw 2 330..360 with the flame lit, range 1 at 365 (ON time 180 with a flame).
+        # Draw 2 seen at 330 (120 s used), resume at 360: ON ends at 360 - 120 + 180 = 420. A fresh hold after draw 2 would end at 540.
+        tl = self.sim(3, 0.22, "burning", [(50, "dhw", 1), (55, "flame", 0), (90, "dhw", 0), (300, "flame", 1),
+                                            (330, "dhw", 1), (360, "dhw", 0), (365, "ratio", 5)], 900)
+        _ons, offs = tl.edges()
+        self.assertTrue(offs, f"ON never ended: {tl.dump()}")
+        self.assertLessEqual(abs(offs[0] - 420), TICK, f"ON ended at {offs[0]} s, expected 420 s (no fresh hold); {tl.dump(700)}")
+
+    # The same three draw cases for a heat pump (satsource 2): the minimum burn is 600 s (entry 197), the post-draw wait stays 180 s.
+    def test_m7_heat_pump_no_ch_flame_after_the_draw_lets_the_600_s_hold_lapse(self):
+        # As m5: ON ends at the fallback, 270 s. HEAD resumed the frozen 600 s hold (540 s left) and ended at 810.
+        tl = self.sim(3, 0.22, "burning", [(50, "dhw", 1), (55, "flame", 0), (90, "dhw", 0), (95, "ratio", 5)], 1200, extra=["src 2"])
+        _ons, offs = tl.edges()
+        self.assertTrue(offs, f"ON never ended: {tl.dump()}")
+        self.assertLessEqual(abs(offs[0] - 270), TICK, f"ON ended at {offs[0]} s, expected 270 s (hold lapsed); {tl.dump(900)}")
+
+    def test_m7b_heat_pump_ch_flame_in_the_post_draw_wait_keeps_the_rest_of_the_600_s_hold(self):
+        # As m5b: 60 s of the 600 s used at the draw, resume at 120 with 540 s left: ON ends at 660.
+        tl = self.sim(3, 0.22, "burning", [(50, "dhw", 1), (55, "flame", 0), (90, "dhw", 0), (95, "ratio", 5), (100, "flame", 1), (130, "flame", 0)],
+                      1200, extra=["src 2"])
+        _ons, offs = tl.edges()
+        self.assertTrue(offs, f"ON never ended: {tl.dump()}")
+        self.assertLessEqual(abs(offs[0] - 660), TICK, f"ON ended at {offs[0]} s, expected 660 s (120 + 540); {tl.dump(900)}")
+
+    def test_m7c_heat_pump_ch_flame_after_a_draw_after_the_timed_out_wait_gets_the_600_s_hold(self):
+        # As m4: CH flame seen at 300, the 600 s hold keeps ON until 900. HEAD: no anchor, ends at 330.
+        tl = self.sim(3, 0.22, "cold", [(190, "dhw", 1), (250, "dhw", 0), (280, "flame", 1), (310, "flame", 0), (310, "ratio", 5)], 1200,
+                      extra=["src 2"])
+        _ons, offs = tl.edges()
+        self.assertTrue(offs, f"ON never ended: {tl.dump()}")
+        self.assertLessEqual(abs(offs[0] - 900), TICK, f"ON ended at {offs[0]} s, expected 900 s (300 + 600 hold); {tl.dump(1100)}")
 
     def test_g3_short_draw_inside_the_start_up_window_leaves_bt_alone(self):
         # Burning start at 0 (window 0..180, BT 50). Draw 50..85 with the flow at 62 C afterwards (first tick with the bit 60, resume at

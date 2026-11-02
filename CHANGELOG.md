@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.9] - 2026-11-02
+
+### Fixed
+
+- **SAT PWM: the 180 s minimum burn after a hot-water draw protects a burning CH flame only, and a CH flame after a draw always gets it** (TASK-1518, TASK-1558; Sergeant D entries 158, 211). `satPwmDhwResume()`: without a CH flame after the draw the hold anchor is cleared, so the ON phase ends on its normal ON time (before, the frozen rest of the hold kept it on without a flame: 390 s instead of 270 s in the test case). A later draw in the same phase does not give a relit flame a fresh hold (`_pwm_dhwHoldLapsed`, entry 103 B). When the first-flame wait had timed out before the draw (no anchor yet), the CH flame after the draw starts the 180 s hold, at the resume or after the 180 s fallback (before, no hold: the phase ended at 330 s instead of 480 s). thermo-nova anchors the hold at the first flame of the ON phase (pwm.py:144-146, :201-203). Host test `tests/test_sat_pwm_anchors.py` (old code fails m4, m5, m6; controls m5b, m5c and the TASK-1502 cases stay green).
+
 ## [2.0.0-beta.8] - 2026-11-02
 
 ### Fixed
@@ -551,7 +557,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.8...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.9...HEAD
+[2.0.0-beta.9]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.8...v2.0.0-beta.9
 [2.0.0-beta.8]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.7...v2.0.0-beta.8
 [2.0.0-beta.7]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.1...v2.0.0-beta.7
 [2.0.0-beta.1]: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.1
