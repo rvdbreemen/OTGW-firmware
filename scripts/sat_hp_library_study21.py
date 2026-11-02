@@ -107,7 +107,19 @@ BACKUP_END = "hp_spare"
 # TASK-1563: BOILER_MOD = True lets the hybrid's boiler modulate on its own loop flow behind the separator; False = the
 # boiler fires the system's need (rounds 22/22b), which overruns its small loop and short-cycles even above its minimum
 BOILER_MOD = False
+# TASK-1563: hot-water priority of a combi heat pump: list of (start minute of the day, duration in minutes) during
+# which the compressor makes hot water and gives no space heat (A: RVO packages 2/3 use a combi heat pump, brochure p.18;
+# the timing and length are assumptions). Empty = rounds 21-23.
+DHW_BLOCKS = []
 BOILER_GAIN = 250.0
+# TASK-1563: a list here collects one tuple per simulated minute (see the end of run()); None = no trace
+TRACE = None
+# TASK-1566 (comfort band): ANTICIPATE = {"hours": H, "solar": k, "error_k": sd} feeds the curve with the mean outdoor
+# temperature of the coming H hours plus the expected solar gain as degrees (k x gain / Heff), from the season's own
+# weather (a perfect forecast) or with a drifting error; ROOM_CUT = (hi, lo) in K stops heating above target + hi until
+# the room is below target + lo. Both None = rounds 21-23 behaviour.
+ANTICIPATE = None
+ROOM_CUT = None
 # Candidate sweep for TASK-1527 AC#2 (round 23): the SAT flow cap for a heat pump (entry 155: 40 C) and the
 # maximum relative modulation SAT sends while it runs PWM (heat pumps get MM = 100 today, satComputeMM).
 FLOW_CAP = h12.SP_MAX
@@ -184,19 +196,36 @@ def run(args):
     on = False; on_for = 0; off_for = 999; starts = 0; run_lens = []
     P = 0.0; boiler = False; deficit = 0; b_starts = 0; b_starts_t = []; b_el = 99; b_last_stop = None
     Tb = None; Pb_prev = 0.0
-    end_spare = end_spare_bon = end_ch = 0
+    end_spare = end_spare_bon = end_ch = 0; dhw_starts = 0
     spare = 0; b_req = False; s_pwm = False; s_on = False; s_el = 0; s_ov = 0; s_sat = s_uh = 0; s_eff = 0.0
     pwm = False; ov = 0; sat_s = 0; ph_on = False; ph_el = 0; eff_on = None
     sq = n = out = absum = 0.0; elec = gas = heat_hp = 0.0; gas_ret = 0.0; run_min = at_min = pwm_min = heat_min = boiler_min = 0
+    if ANTICIPATE:   # TASK-1566: prefix sums for the mean of the coming hours (the season's own weather = a perfect forecast)
+        pt = [0.0]; ps = [0.0]
+        for k in range(minutes): pt.append(pt[-1] + tm[k]); ps.append(ps[-1] + (sm[k] or 0.0))
+        fc_rnd = random.Random(7); fc_err = 0.0
+    room_cut = False
     for m in range(minutes):
         tout, sw = tm[m], sm[m]; heating = tout < 15
         room_meas = round(Ta / SENSOR_RES) * SENSOR_RES
-        cv = float(port.curve(c, TARGET, tout, base_off))
+        t_curve = tout
+        if ANTICIPATE:
+            hz = int(ANTICIPATE["hours"] * 60); e = min(minutes, m + hz); nwin = max(1, e - m)
+            t_f = (pt[e] - pt[m]) / nwin; s_f = (ps[e] - ps[m]) / nwin
+            if ANTICIPATE.get("error_k"):   # a forecast with a slowly drifting error (AR(1), hourly steps, sd error_k K)
+                if m % 60 == 0: fc_err = 0.97 * fc_err + fc_rnd.gauss(0.0, ANTICIPATE["error_k"] * (1 - 0.97 ** 2) ** 0.5)
+                t_f += fc_err
+            t_curve = t_f + ANTICIPATE.get("solar", 1.0) * 1.5 * s_f * solar_k / Heff
+        cv = float(port.curve(c, TARGET, t_curve, base_off))
         now = 1000000 + m * 60000
         pid.service(now, room_meas, TARGET, cv); pid.note_room(room_meas, now)
         sp = min(spmax, max(10.0, float(pid.output(cv)))) if heating else 10.0
         flow_now = Ts + P / (2 * MCP); ret_now = Ts - P / (2 * MCP)
         cs, ch = sp, heating and sp > cold_sp
+        if ROOM_CUT:   # TASK-1566: stop heating above TARGET + hi, resume below TARGET + lo (room thermostat limit)
+            if room_meas > TARGET + ROOM_CUT[0]: room_cut = True
+            elif room_meas < TARGET + ROOM_CUT[1]: room_cut = False
+            if room_cut: cs, ch = 10.0, False
         if heating: heat_min += 1
         if variant == "sat" and heating and sp > cold_sp:
             if not pwm:
@@ -231,6 +260,11 @@ def run(args):
         else: want = flow_now < cs - HP_START_K
         if on and not want and on_for < minrun: want = ch and heating
         if not on and want and off_for < standstill: want = False
+        if DHW_BLOCKS and u["type"] == "electric":   # TASK-1563: hot-water priority of a combi heat pump (A)
+            md = m % 1440
+            if any(s0 <= md < s0 + dur for s0, dur in DHW_BLOCKS):
+                if any(md == s0 for s0, dur in DHW_BLOCKS) and not on: dhw_starts += 1   # compressor starts for hot water
+                want = False                                                              # no space heating meanwhile
         if want and not on: starts += 1; on_for = 0
         if on and not want: run_lens.append(on_for)
         on = want
@@ -331,12 +365,14 @@ def run(args):
         qaw = G_AW * (Ta - Tw); solar = 1.5 * sw * solar_k
         Ta += (qfloor + gains[m] + 0.5 * solar - qaw - Gao * (Ta - tout)) * DT / Ca
         Tw += (qaw + 0.5 * solar - Gwo * (Tw - tout)) * DT / Cw
+        if TRACE is not None:   # TASK-1563 dashboard: one tuple per minute (outdoor, room, CS, flow, heat-pump W, on, pwm, boiler W)
+            TRACE.append((tout, Ta, cs if heating else None, flow_now, P, int(on), int(pwm), Pb))
         if heating and m >= 14 * 1440:
             e = Ta - TARGET; sq += e * e; n += 1; absum += abs(e)
             if abs(e) > 0.3: out += 1
     days = minutes / 1440
     return {"unit": unit_name, "variant": variant, "coeff": c, "era": era, "screed": screed,
-            "starts_per_day": starts / days, "run_median_min": statistics.median(run_lens) if run_lens else 0,
+            "starts_per_day": (starts + dhw_starts) / days, "dhw_starts_per_day": dhw_starts / days, "run_median_min": statistics.median(run_lens) if run_lens else 0,
             "mean_abs_err": absum / n if n else 0, "out_band_min_d": out / (n / 1440) if n else 0,
             "elec_kwh": elec / 3.6e6, "gas_kwh": gas / 3.6e6, "gas_ret_kwh": gas_ret / 3.6e6, "boiler_min_w": BOILER_MIN, "scop": heat_hp / elec if elec else 0,
             "share_at_pmin": at_min / run_min if run_min else 0, "pwm_share": pwm_min / max(1, heat_min),

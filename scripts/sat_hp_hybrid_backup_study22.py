@@ -26,6 +26,7 @@ def job(a):
     mode, un, v, plant, era, scr = a
     lib.HYBRID_MODE = mode; lib.PLANT = plant; lib.SEPARATOR = True   # entry 208: hydraulic separator (A: all four hybrids)
     if "--b" in sys.argv: lib.BOILER_MIN = 5500.0   # round 22b: older boiler minimum, entry 210
+    if "--mod" in sys.argv: lib.BOILER_MOD = True   # round 22c (TASK-1563): the boiler modulates on its own loop flow
     return lib.run((un, v, 1.6, era, scr))
 
 if __name__ == "__main__":
@@ -35,10 +36,10 @@ if __name__ == "__main__":
     J = [(mode, un, "cont", pl, e, s) for mode in ("own", "slave") for un in HYBRIDS
          for pl, e, s in HOUSES if not (pl == "ufh" and e == "4_1992-2012")]
     res = {}
-    part = os.path.join(arg("--outdir"), "round22b_parts" if "--b" in sys.argv else "round22_parts"); os.makedirs(part, exist_ok=True)
+    part = os.path.join(arg("--outdir"), ("round22c_parts" if "--mod" in sys.argv else "round22b_parts") if "--b" in sys.argv else "round22_parts"); os.makedirs(part, exist_ok=True)
     for w in sorted(glob.glob(os.path.join(arg("--seasondir"), "season_*.json"))):
         label = os.path.basename(w)[7:-5]; dest = os.path.join(part, label + ".json")
         if os.path.exists(dest): res[label] = json.load(open(dest)); continue
         with Pool(workers, initializer=_init, initargs=(w,)) as p: res[label] = p.map(job, J, chunksize=1)
         json.dump(res[label], open(dest, "w")); print(label, "done", flush=True)
-    json.dump(res, open(os.path.join(arg("--outdir"), "round22b_boiler55_runs.json" if "--b" in sys.argv else "round22_hybrid_backup_runs.json"), "w")); print("done")
+    json.dump(res, open(os.path.join(arg("--outdir"), ("round22c_boilermod_runs.json" if "--mod" in sys.argv else "round22b_boiler55_runs.json") if "--b" in sys.argv else "round22_hybrid_backup_runs.json"), "w")); print("done")
