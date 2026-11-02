@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.16
+**  Version  : v2.0.0-beta.17
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -219,6 +219,13 @@ bool updateLittleFSStatus(const __FlashStringHelper *probePath)
   return updateLittleFSStatus(pathBuffer);
 }
 
+// A wall-clock time the reboot log may print: 2020-01-01 .. 2100-01-01 UTC (TASK-1452). Before NTP the clock
+// counts seconds since boot, far below this range.
+static bool rebootLogClockValid(int64_t now)
+{
+  return now >= 1577836800LL && now < 4102444800LL;
+}
+
 static bool isRebootLogSummaryLine(const char* line)
 {
   return (line != nullptr && strstr(line, " - reboot cause: ") != nullptr);
@@ -353,9 +360,17 @@ bool updateRebootLog(String text)
     Debugf(PSTR("Fatal exception: %s\r\n"), log_line_excpt);
   }
 
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
-  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
-  snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n"), myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, log_line_excpt);
+  // Before NTP has synced, time() holds seconds since boot, which printed as a 1970 or 2106 date (TASK-1452,
+  // port of 1.x TASK-1253). Say so instead. The reader still finds " - reboot cause: " in the line.
+  const int64_t now = (int64_t)time(nullptr);
+  if (rebootLogClockValid(now)) {
+    TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
+    ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
+    snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n"), myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, log_line_excpt);
+  } else {
+    DebugTf(PSTR("reboot log: clock not set (time=%lld)\r\n"), (long long)now);
+    snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("time not set - reboot cause: %s (%x) %s\r\n"), CSTR(text), errorCode, log_line_excpt);
+  }
 
   if (LittleFS.begin()) {
     //start with opening the file

@@ -3,10 +3,11 @@ id: TASK-1452
 title: >-
   feat-2.0.0: port TASK-1253 (1.x) — reboot_log.txt keeps CRLF line endings and
   marks pre-NTP entries 'time not set'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T06:23:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-02T18:46:00Z'
 labels:
   - port-from-1.x
   - diagnostics
@@ -79,4 +80,6 @@ Audit 2026-11-01: moved To Do -> In Progress. The CRLF half is already in code u
 Lead triage 2026-11-01: CRLF half is on dev via TASK-1479 (c0db93f72), bench .61: reboot_log 21 lines / 21 CR / 21 LF. Pre-NTP 'time not set' guard is NOT done (helperStuff.ino:357 still formats time(nullptr) unconditionally). AC#6 (three targets) is outdated: dev builds esp32-combo only (maintainer 2026-10-29); read it as one combo build. Back to To Do (unassigned): needs a firmware change + bench red/green with NTP blocked via the MikroTik.
 
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: CRLF done (c0db93f72); helperStuff.ino:357-358 still formats time(nullptr) before NTP. Agent-doable.
+
+2026-11-02 (Robert: force to a close): pre-NTP guard implemented. helperStuff.ino: new rebootLogClockValid(now) (2020-01-01..2100-01-01 UTC); updateRebootLog() writes 'time not set - reboot cause: ...' when the clock is outside that range, else the dated line as before; the reader still matches ' - reboot cause: '. tests/test_reboot_log_time_not_set.py (cuts the real functions out of helperStuff.ino): fix 3/3 OK; origin/dev copy ERROR (no guard). test_crashlog_coredump.py 10/10 OK; evaluate --quick 0 failed. Committed without a bump; the lead takes it as beta.17 in one build with beta.15/16. Bench note: a software reboot keeps the ESP32 RTC time, so with NTP blocked a /ReBoot still logs a real date. AC#3 red/green needs NTP blocked plus a hardware (EN/USB or power) reset.
 <!-- SECTION:NOTES:END -->
