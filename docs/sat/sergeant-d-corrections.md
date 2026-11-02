@@ -5669,3 +5669,11 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted** (excerpt of a list): "A-1527f: C"
 
 **Settled:** option C: no change now; fOvershootMargin stays 2.0 for heat pumps (firmware satCycleCheckOvershootSwitch; thermo-nova OVERSHOOT_MARGIN_CELSIUS 3.0, cycles/const.py:10, heating_control.py:288-296). The margin is decided after a capture of a real heat pump shows how far it overshoots before it stops by itself (round 23c finding 9). **Task:** TASK-1527 AC#1 (heat-pump capture). **Open:** the margin decision itself, after the capture.
+
+## 230. QD-4 answered B: the PWM OFF phase always stops the boiler (CS=10, CH=0), whatever overshoot protection is (Sergeant D, 2026-11-02)
+
+**Source:** sergeantd, 2026-11-02 06:08 UTC, msg 1566695435488465019 (https://discord.com/channels/812969634638725140/1514720723980259460/1566695435488465019), answer to the re-ask msg 1566693634407927859 (entries 216, 226).
+
+**Quoted (whole message):** "QD-4: B"
+
+**Settled:** option B as put to him: "always stop the boiler, whatever that setting is". In every PWM OFF phase SAT sends CS=10 and CH=0, also with overshoot protection off; protection off then only drops the ON-phase ignition hold and suppression. Compared: thermo-nova stops the boiler in the OFF phase only with the user option on (heating_control.py:385 returns early when it is off; :388-389 set CS=10; default off, const.py:122); a deliberate deviation. Firmware today: satPwmDrivesSetpoint() requires bOvershootProtection (SATcontrol.ino ~1389, TASK-1412.6 triage), default true (SATtypes.h:508). Closes entries 216 and 226. **Task:** TASK-1412.6. **Open:** none.
