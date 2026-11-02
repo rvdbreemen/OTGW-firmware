@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.19
+**  Version  : v2.0.0-beta.20
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -434,6 +434,22 @@ int cmdQueueSize = 0;  // fill-pointer: entries are 0..cmdQueueSize-1, left-shif
 // degrade gracefully (enqueue drops, lock is a no-op).
 PlatformQueue otFrameQueue = nullptr;   // OTFrameMsg producer->consumer queue
 PlatformMutex otStateMutex = nullptr;   // guards the decoded OTGWState snapshot
+PlatformMutex cmdQueueMutex = nullptr;  // guards cmdqueue[]/cmdQueueSize (TASK-1569), recursive; see CmdQueueLock
+
+// TASK-1569: one recursive lock guards every read and write of cmdqueue[]/cmdQueueSize. Producers run on several
+// tasks (REST on async_tcp, MQTT, SAT and the drain on the loop task), and a slot move shifts entries. Recursive,
+// because the queue functions call each other in one chain (handleCommandQueue -> pmChainTick -> addCommandToQueue).
+// Bounded wait (TASK-879 rule): a holder never blocks long, and a request task must not wedge on it.
+// Lock order: OTStateLock first, then this one (processOT -> checkCommandResponse); never take OTStateLock while
+// holding this lock.
+#define CMD_QUEUE_LOCK_MS 100
+struct CmdQueueLock {
+  bool locked = false;
+  CmdQueueLock() { locked = platformRecursiveMutexLock(cmdQueueMutex, CMD_QUEUE_LOCK_MS); }
+  ~CmdQueueLock() { if (locked) platformRecursiveMutexUnlock(cmdQueueMutex); }
+  CmdQueueLock(const CmdQueueLock&) = delete;
+  CmdQueueLock& operator=(const CmdQueueLock&) = delete;
+};
 
 // Diagnostic counter: OTFrameMsg producers that hit a full queue. Should stay 0
 // in Phase 1 (producer+consumer co-resident per loop iteration). A non-zero
@@ -445,6 +461,7 @@ static uint32_t otFrameQueueDrops = 0;
 // Safe to call before WiFi/MQTT are up; pure FreeRTOS object allocation.
 void setupOTConcurrency() {
   if (otStateMutex == nullptr) otStateMutex = platformMutexCreate();
+  if (cmdQueueMutex == nullptr) cmdQueueMutex = platformRecursiveMutexCreate();
   if (otFrameQueue == nullptr) {
     otFrameQueue = platformQueueCreate(OT_FRAME_QUEUE_DEPTH, sizeof(OTFrameMsg));
   }
@@ -1159,6 +1176,8 @@ bool picBoardTretAbsent()
 // True when a PR=<reg> command is already waiting in the command queue.
 static bool cmdQueueHasPR(char reg)
 {
+  CmdQueueLock qlock;
+  if (!qlock.locked) return true;   // busy: report present, so no duplicate is queued
   for (int i = 0; i < cmdQueueSize; i++) {
     if (cmdqueue[i].cmdlen >= 4 && cmdqueue[i].cmd[0] == 'P' && cmdqueue[i].cmd[1] == 'R' &&
         cmdqueue[i].cmd[3] == reg) return true;
@@ -3715,6 +3734,7 @@ static uint32_t lastSer2netCmdMs = 0 - SER2NET_QUIET_MS;  // expired at boot
 #define OTGW_DELAY_SEND_MS 1000
 #define MAX_QUEUE_MSGSIZE 127
 
+
 // Dropped-command feedback (TASK-1439, same contract as 1.x TASK-1431). A drop
 // publishes the command once (not retained, nothing to clear) and latches
 // command_retry_exceeded ON (retained) until the next confirmed command. A drop
@@ -3814,25 +3834,27 @@ static void triggerReadoutForSettingsCmd(const char* buf) {
   Otherwise it's simply added to the queue, unless there are no free queue slots.
 */
 
-//void addCommandToQueue(const char* buf, const int len, const bool forceQueue = false, const int16_t delay = OTGW_DELAY_SEND_MS);
-void addCommandToQueue(const char* buf, const int len, const bool forceQueue, const int16_t delay){
+// TASK-1569: returns Queued (new entry at the back), Replaced (an entry for the same command was updated and moved to
+// the back), Sent (OT-Direct board: handled on the spot) or Dropped (refused, invalid, queue full, or the queue lock not
+// acquired within CMD_QUEUE_LOCK_MS). A caller that must not lose a value (SAT) can retry on Dropped.
+CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forceQueue, const int16_t delay){
   if (!isPICEnabled()) {
 #if HAS_DIRECT_OT
     // On OTGW32, route commands directly to OT-direct handler
     if (isOTDirectEnabled()) {
       handleOTDirectCommand(buf, len);
-      return;
+      return CmdQueueResult::Sent;
     }
 #endif
     OTDebugTln(F("CmdQueue: No PIC or OT-direct detected - command ignored"));
-    return;
+    return CmdQueueResult::Dropped;
   }
 
   constexpr int kMaxCmdLen = (int)(sizeof(cmdqueue[0].cmd) - 1);
 
   if (buf == nullptr) {
     OTDebugTln(F("CmdQueue: Error: null command"));
-    return;
+    return CmdQueueResult::Dropped;
   }
   if ((len < 3) || (buf[2] != '=')){ 
     // Not a valid command
@@ -3841,12 +3863,12 @@ void addCommandToQueue(const char* buf, const int len, const bool forceQueue, co
       OTDebug((char)buf[i]);
     }
     OTDebugf(PSTR("] (%d)\r\n"), len);
-    return;
+    return CmdQueueResult::Dropped;
   }
   if (len > kMaxCmdLen) {
     OTDebugTf(PSTR("CmdQueue: Error: command too long (%d > %d)\r\n"), len, kMaxCmdLen);
     OTDebugFlush();
-    return;
+    return CmdQueueResult::Dropped;
   }
   // TASK-1236 / ADR-179: same rule as the OT-Direct CS= handler. While SAT owns the
   // control setpoint an external CS= is refused; SAT's own CS= carries the in-flight
@@ -3855,56 +3877,53 @@ void addCommandToQueue(const char* buf, const int len, const bool forceQueue, co
   if (toupper((unsigned char)buf[0]) == 'C' && toupper((unsigned char)buf[1]) == 'S' &&
       satOwnsControlSetpoint() && !satCommandInFlight()) {
     DebugTln(F("CmdQueue: CS= refused, SAT owns the control setpoint (disable SAT to override)"));
-    return;
+    return CmdQueueResult::Dropped;
   }
 
-  //check to see if the cmd is in queue
-  bool foundcmd = false;
-  int8_t insertptr = cmdQueueSize; //set insertptr to next empty slot
-  const bool appendOnly = forceQueue;
-  // PM= and TP= are unique per value (TASK-1315, Robert 2026-11-01; TP= was append-only since TASK-1439): both
-  // load the PIC's single priority-message slot, so PM=3, PM=15, PM=48 (or two different TP=) in a row are
-  // separate entries, each sent to the PIC; only an exact repeat of a queued command refreshes that entry.
+  CmdQueueLock lock;
+  if (!lock.locked) {
+    OTDebugTln(F("CmdQueue: Error: queue busy, command dropped"));
+    return CmdQueueResult::Dropped;
+  }
+
+  // Look for an entry for the same command. PM= and TP= are unique per value (TASK-1315, Robert 2026-11-01; TP= was
+  // append-only since TASK-1439): both load the PIC's single priority-message slot, so PM=3, PM=15, PM=48 (or two
+  // different TP=) in a row are separate entries; only an exact repeat matches.
+  int found = -1;
   const bool uniquePerValue = (buf[0] == 'P' && buf[1] == 'M') || (buf[0] == 'T' && buf[1] == 'P');
-  if (!appendOnly){
-    char cmd[3];
-    memset(cmd, 0, sizeof(cmd));
-    memcpy(cmd, buf, 2);
+  if (!forceQueue){
     for (int i=0; i<cmdQueueSize; i++){
-      if (cmdqueue[i].cmd[0] == cmd[0] && cmdqueue[i].cmd[1] == cmd[1] &&
+      if (cmdqueue[i].cmd[0] == buf[0] && cmdqueue[i].cmd[1] == buf[1] &&
           (!uniquePerValue || (cmdqueue[i].cmdlen == len && memcmp(cmdqueue[i].cmd, buf, len) == 0))) {
-        //found cmd exists, set the inertptr to found slot
-        foundcmd = true;
-        insertptr = i;
+        found = i;
         break;
       }
-    } 
-  } 
-  if (foundcmd) OTDebugTf(PSTR("CmdQueue: Found cmd exists in slot [%d]\r\n"), insertptr);
-  else OTDebugTf(PSTR("CmdQueue: Adding cmd end of queue, slot [%d]\r\n"), insertptr);
+    }
+  }
 
-  if (!foundcmd && cmdQueueSize >= CMDQUEUE_MAX) {
+  // Rule 5b (TASK-1569, Robert 2026-11-02): an updated command moves to the back, so the order of offering is the
+  // order of sending (e.g. Immergas TP=11:12 offered before MM= also goes out first). The old entry is removed and the
+  // command is appended; the lock makes the shift safe against the drain on the loop task.
+  CmdQueueResult result = CmdQueueResult::Queued;
+  if (found >= 0) {
+    OTDebugTf(PSTR("CmdQueue: [%s] in slot [%d] updated, moved to the back\r\n"), cmdqueue[found].cmd, found);
+    removeFromCmdQueue(found);
+    result = CmdQueueResult::Replaced;
+  } else if (cmdQueueSize >= CMDQUEUE_MAX) {
     // TASK-1555: a write is never dropped for a queued read; the newest unsent read gives up its slot.
-    // The write takes that slot in place, as a same-prefix replace does: no shift and no size change,
-    // because this can run on async_tcp while the loop task walks the queue. Debug line only: the
-    // WebSocket log has one writer, the loop task (TASK-1321).
+    // Debug line only: the WebSocket log has one writer, the loop task (TASK-1321).
     const int victim = isQueueReadCmd(buf, len) ? -1 : findEvictableRead();
     if (victim < 0) {
       OTDebugTln(F("CmdQueue: Error: Reached max queue"));
       OTDebugFlush();
-      return;
+      return CmdQueueResult::Dropped;
     }
     OTDebugTf(PSTR("CmdQueue: Full, read [%s] in slot [%d] evicted for a write\r\n"), cmdqueue[victim].cmd, victim);
-    insertptr = (int8_t)victim;
-    foundcmd = true;          // reuse the slot: the size stays CMDQUEUE_MAX
-  }
-  if (insertptr < 0 || insertptr >= CMDQUEUE_MAX) {
-    OTDebugTf(PSTR("CmdQueue: Error: Invalid insert slot [%d]\r\n"), insertptr);
-    OTDebugFlush();
-    return;
+    removeFromCmdQueue(victim);
   }
 
-  //insert to the queue
+  //append at the back
+  const int insertptr = cmdQueueSize;
   OTDebugTf(PSTR("CmdQueue: Insert queue in slot[%d]:"), insertptr);
   OTDebug(F("cmd["));
   for (int i = 0; i < len; i++) {
@@ -3912,7 +3931,6 @@ void addCommandToQueue(const char* buf, const int len, const bool forceQueue, co
   }
   OTDebugf(PSTR("] (%d)\r\n"), len); 
 
-  //copy the command into the queue
   int cmdlen = min((int)len , (int)(sizeof(cmdqueue[insertptr].cmd)-1));
   memset(cmdqueue[insertptr].cmd, 0, cmdlen+1);
   memcpy(cmdqueue[insertptr].cmd, buf, cmdlen);
@@ -3920,22 +3938,12 @@ void addCommandToQueue(const char* buf, const int len, const bool forceQueue, co
   cmdqueue[insertptr].retrycnt = 0;
   const uint32_t safeDelay = (delay <= 0) ? 0u : (uint32_t)delay;
   cmdqueue[insertptr].due = millis() + safeDelay;
-
-  //if not found
-  if (!foundcmd) {
-    //if not reached max of queue
-    if (cmdQueueSize < CMDQUEUE_MAX) {
-      cmdQueueSize++; //next free slot
-      OTDebugTf(PSTR("CmdQueue: Next free queue slot: [%d]\r\n"), cmdQueueSize);
-    } else {
-      // Should be prevented above; keep as defensive fallback.
-      OTDebugTln(F("CmdQueue: Error: Reached max queue"));
-    }
-  } else OTDebugTf(PSTR("CmdQueue: Found command at: [%d] - [%d]\r\n"), insertptr, cmdQueueSize);
+  cmdQueueSize++;
 
   if (len >= 2) triggerReadoutForSettingsCmd(buf);
 
   OTDebugFlush();
+  return result;
 }
 
 /*
@@ -3953,18 +3961,23 @@ static uint32_t s_lastQueueSendMs = 0;
 static bool     s_queueSent = false;
 
 void handleCommandQueue(){
+  if (!isPICEnabled()) return;   // OT-Direct answers each command at once; never drain into it under the lock
+  CmdQueueLock qlock;
+  if (!qlock.locked) return;   // queue busy: this tick is skipped, the next one drains
   pmChainTick();
   // Pause queue processing briefly after ser2net activity to avoid collisions
   if ((millis() - lastSer2netCmdMs) < SER2NET_QUIET_MS) return;
   const uint32_t now = millis();
   if (s_queueSent && (now - s_lastQueueSendMs) < QUEUE_SEND_GAP_MS) return;   // wait for the next tick
-  // Send the command that has waited longest (oldest due time), not the lowest slot: an unconfirmed command comes
-  // due again every 5 s, so with a lowest-slot pick a few retrying slots would take every tick and starve a CS= at
-  // the back of the queue past the PIC's one-minute CS limit (TASK-1567 review, 20-deep test).
+  // Strict FIFO (rule 5b, TASK-1569 review): send the first due entry in slot order. Slot order is offering order,
+  // because a new or updated command is appended at the back, and a sent entry that still waits for its
+  // confirmation is moved to the back as well; so a few retrying commands cannot take every tick and starve a CS=
+  // behind them (TASK-1567 20-deep test). The per-command delay (due) is still respected.
   int pick = -1;
   for (int k = 0; k < cmdQueueSize; k++) {
     if ((int32_t)(now - cmdqueue[k].due) < 0) continue;
-    if (pick < 0 || (int32_t)(cmdqueue[pick].due - cmdqueue[k].due) > 0) pick = k;
+    pick = k;
+    break;
   }
   if (pick >= 0) {   // one command per tick: the next due one waits for the next tick
     const int i = pick;
@@ -3980,6 +3993,10 @@ void handleCommandQueue(){
       sendEventToWebSocket('!', cMsg);
       reportCommandDropped(cmdqueue[i].cmd);
       removeFromCmdQueue(i);
+    } else if (i < cmdQueueSize - 1) {
+      const OT_cmd_t sent = cmdqueue[i];   // waits for its echo: to the back, behind the commands offered after it
+      removeFromCmdQueue(i);
+      cmdqueue[cmdQueueSize++] = sent;
     }
   }
   OTDebugFlush();
@@ -3993,6 +4010,8 @@ void handleCommandQueue(){
   Only then it's deleted from the queue.
 */
 void checkCommandResponse(const char *buf, unsigned int len){
+  CmdQueueLock qlock;   // an echo lost to a busy lock is harmless: the command is resent after 5 s
+  if (!qlock.locked) return;
   if ((len<3) || (buf[2]!=':')) {
     OTDebugT(F("CmdQueue: Error: Not a command response ["));
     for (unsigned int i = 0; i < len; i++) {
@@ -4009,7 +4028,7 @@ void checkCommandResponse(const char *buf, unsigned int len){
   OTDebugf(PSTR("] (len=%d)\r\n"), len);
 
   char cmd[3]; memset( cmd, 0, sizeof(cmd));
-  char value[11]; memset( value, 0, sizeof(value));
+  char value[16]; memset( value, 0, sizeof(value));   // room for the longest TP= echo, "108:255=255"
   memcpy(cmd, buf, 2);
   memcpy(value, buf+3, ((len-3)<(sizeof(value)-1))?(len-3):(sizeof(value)-1));
   const char* code = value;
@@ -4033,6 +4052,13 @@ void checkCommandResponse(const char *buf, unsigned int len){
         const char* reg = value;
         while (*reg == ' ') reg++;
         if (cmdqueue[i].cmd[3] != *reg) continue;
+      }
+      // TP= is unique per value (TASK-1315): "TP: 11:12=80" confirms only the queued "TP=11:12=80", not another TP=
+      if (cmd[0] == 'T' && cmd[1] == 'P' && cmdqueue[i].cmdlen >= 4) {
+        const char* tv = value;
+        while (*tv == ' ') tv++;
+        const size_t ql = (size_t)cmdqueue[i].cmdlen - 3;
+        if (strncmp(tv, cmdqueue[i].cmd + 3, ql) != 0 || (tv[ql] != '\0' && tv[ql] != '\r' && tv[ql] != '\n' && tv[ql] != ' ')) continue;
       }
       // PM= keeps one pending message in the PIC: "PM: 15" must not remove a queued "PM=3"
       if (cmd[0] == 'P' && cmd[1] == 'M' && cmdqueue[i].cmdlen >= 4) {
@@ -4092,8 +4118,9 @@ static void pmChainSend() {
     }
   }
   pmChainLastId = kPmChainIds[pmChainIdx];
-  addCommandToQueue(cmd, n, true, 0);   // forceQueue: no prefix dedup
-  pmChainDeadline = millis() + PM_CHAIN_TIMEOUT_MS;
+  const CmdQueueResult r = addCommandToQueue(cmd, n, true, 0);   // forceQueue: no prefix dedup
+  // A PM= that did not get into the queue counts as missed after 5 s (re-asked once at the end), not after 60 s.
+  pmChainDeadline = millis() + (r == CmdQueueResult::Dropped ? 5000UL : PM_CHAIN_TIMEOUT_MS);
 }
 
 static void pmChainAdvance() {
@@ -4110,7 +4137,7 @@ static void pmChainAdvance() {
 }
 
 void pmChainStart() {
-  if (!isPICEnabled()) {   // OT-Direct: no single-slot limit, ask all three directly
+  if (!isPICEnabled()) {   // OT-Direct: no single-slot limit, ask all three directly (no queue lock: see below)
     for (int i = 0; i < PM_CHAIN_COUNT; i++) {
       char cmd[8];
       const int n = snprintf_P(cmd, sizeof(cmd), PSTR("PM=%u"), (unsigned)kPmChainIds[i]);
@@ -4118,6 +4145,8 @@ void pmChainStart() {
     }
     return;
   }
+  CmdQueueLock qlock;
+  if (!qlock.locked) return;   // queue busy: initSAT calls this again on the next start
   pmChainTodo = (1u << PM_CHAIN_COUNT) - 1;
   pmChainMissed = 0;
   pmChainRetry = false;
@@ -4136,6 +4165,8 @@ void pmChainOnBoilerResponse(uint8_t id) {
 // priority message and addCommandToQueue() replaces a queued PM= with the next one, so SAT's PM=25 must not be added then.
 // OT-Direct answers each PM= on its own: nothing queues there and this stays false.
 bool pmChainBusy() {
+  CmdQueueLock qlock;
+  if (!qlock.locked) return true;
   if (pmChainIdx >= 0) return true;
   for (int i = 0; i < cmdQueueSize; i++) {
     if (cmdqueue[i].cmd[0] != 'P' || cmdqueue[i].cmd[1] != 'M') continue;
@@ -5843,11 +5874,14 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
     OTDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
     sendMQTTversioninfo();
     // Banner is the response to PR=A — remove it directly from the command queue
-    for (int qi = 0; qi < cmdQueueSize; qi++) {
-      if (cmdqueue[qi].cmd[0] == 'P' && cmdqueue[qi].cmd[1] == 'R' &&
-          cmdqueue[qi].cmdlen >= 4 && cmdqueue[qi].cmd[3] == 'A') {
-        removeFromCmdQueue(qi);
-        break;
+    {
+      CmdQueueLock qlock;
+      for (int qi = 0; qlock.locked && qi < cmdQueueSize; qi++) {
+        if (cmdqueue[qi].cmd[0] == 'P' && cmdqueue[qi].cmd[1] == 'R' &&
+            cmdqueue[qi].cmdlen >= 4 && cmdqueue[qi].cmd[3] == 'A') {
+          removeFromCmdQueue(qi);
+          break;
+        }
       }
     }
     { char evtBuf[60]; snprintf_P(evtBuf, sizeof(evtBuf), PSTR("OTGW PIC restarted [%s]"), state.pic.sFwversion); reportOTGWEvent(evtBuf, '*', true); }
@@ -5994,7 +6028,8 @@ void handlePICSerial()
             lastSer2netCmdMs = millis();
             triggerReadoutForSettingsCmd(sWrite);
             // Remove matching command from queue to prevent override
-            for (int qi = 0; qi < cmdQueueSize; qi++) {
+            CmdQueueLock qlock;
+            for (int qi = 0; qlock.locked && qi < cmdQueueSize; qi++) {
               if (cmdqueue[qi].cmd[0] == sWrite[0] && cmdqueue[qi].cmd[1] == sWrite[1]) {
                 // For PR commands, also match the register letter (e.g., ser2net PR=S must not remove PR=O)
                 if (sWrite[0] == 'P' && sWrite[1] == 'R' && bytes_write >= 4 && cmdqueue[qi].cmdlen >= 4) {

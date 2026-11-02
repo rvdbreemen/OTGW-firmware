@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.19
+**  Version  : v2.0.0-beta.20
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -242,7 +242,10 @@ void runTopicCleanupStep();
 void setMQTTConfigPending(const uint8_t MSGid);
 void markAllMQTTConfigPending();
 const char *messageIDToString(OTLibMessageID message_id);
-void addCommandToQueue(const char* ,  int , const bool = false, const int16_t = 1000);
+// Result of addCommandToQueue (TASK-1569): Queued = new entry, Replaced = same command updated and moved to the back,
+// Sent = OT-Direct board handled it at once, Dropped = not queued (refused, invalid, queue full or busy).
+enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };
+CmdQueueResult addCommandToQueue(const char* ,  int , const bool = false, const int16_t = 1000);
 void triggerPICsettingsReadout();
 void sendMQTTheapdiag();
 // TASK-692 / TASK-693 port (dev TASK-686 / TASK-688): OT-bus support-map

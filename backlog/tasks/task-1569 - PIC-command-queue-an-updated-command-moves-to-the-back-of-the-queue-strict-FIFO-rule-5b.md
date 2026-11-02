@@ -3,10 +3,11 @@ id: TASK-1569
 title: >-
   PIC command queue: an updated command moves to the back of the queue (strict
   FIFO, rule 5b)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-02T20:44:00Z'
-updated_date: '2026-11-02T21:14:00Z'
+updated_date: '2026-11-02T21:21:00Z'
 labels:
   - pic
   - command-queue

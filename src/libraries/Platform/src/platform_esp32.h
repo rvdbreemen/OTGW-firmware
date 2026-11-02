@@ -692,6 +692,24 @@ inline void platformMutexUnlock(PlatformMutex m) {
   xSemaphoreGive(m);
 }
 
+// Recursive mutex: the owning task may take it again inside the same call chain (the PIC command queue, TASK-1569:
+// handleCommandQueue -> pmChainTick -> addCommandToQueue). Same nullptr and timeout rules as the plain mutex above;
+// timeoutMs == 0 blocks forever.
+inline PlatformMutex platformRecursiveMutexCreate() {
+  return xSemaphoreCreateRecursiveMutex();
+}
+
+inline bool platformRecursiveMutexLock(PlatformMutex m, uint32_t timeoutMs = 0) {
+  if (m == nullptr) return true;
+  TickType_t ticks = (timeoutMs == 0) ? portMAX_DELAY : pdMS_TO_TICKS(timeoutMs);
+  return xSemaphoreTakeRecursive(m, ticks) == pdTRUE;
+}
+
+inline void platformRecursiveMutexUnlock(PlatformMutex m) {
+  if (m == nullptr) return;
+  xSemaphoreGiveRecursive(m);
+}
+
 // Create a value-copy queue of `length` items, each `itemSize` bytes. The queue
 // copies by value on send/receive (no shared pointers, no mutex needed for the
 // item flow). Returns nullptr on allocation failure.

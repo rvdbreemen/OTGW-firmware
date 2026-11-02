@@ -72,7 +72,23 @@ static char g_sent[512];
 static void sendPICSerial(const char* b, int n) { strncat(g_sent, b, n); strcat(g_sent, ";"); }
 #include <algorithm>
 using std::min;
+// TASK-1569: result enum (OTGW-firmware.h) and the queue lock (OTGW-Core.ino globals, outside the cut-out range):
+// the host lock is a real recursive timed mutex, so the threaded test below exercises real contention.
+#include <mutex>
+#include <thread>
+#include <atomic>
+enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };
+static std::recursive_timed_mutex g_qmutex;
+struct CmdQueueLock {
+  bool locked = false;
+  CmdQueueLock() { locked = g_qmutex.try_lock_for(std::chrono::milliseconds(100)); }
+  ~CmdQueueLock() { if (locked) g_qmutex.unlock(); }
+};
+#ifdef OLD_VOID_ADD   // code before TASK-1569: addCommandToQueue returns nothing
 void addCommandToQueue(const char* buf, const int len, const bool forceQueue = false, const int16_t delay = 1000);
+#else
+CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forceQueue = false, const int16_t delay = 1000);
+#endif
 void pmChainStart();   // prototypes as in OTGW-Core.h
 void pmChainOnBoilerResponse(uint8_t id);
 void pmChainTick();
@@ -146,6 +162,107 @@ int main(int argc, char** argv) {
       }
     }
     printf("sent=%s\nsent_ms=%s\nqueued=%d\n", all, times, cmdQueueSize);
+    return 0;
+  }
+  if (!strcmp(sc, "stale_echo")) {       // review finding 5: CS=50 on the wire, replaced by CS=55, then the CS=50 echo
+    addCommandToQueue("CS=50.0", 7, false, 0);
+    g_sent[0] = 0; loopAt(100000);
+    printf("first=%s\n", g_sent);
+    addCommandToQueue("CS=55.0", 7, false, 0);   // replaces the queued entry while CS=50.0 is outstanding
+    echo("CS: 50.00");
+    printf("queued=%d\nq0=%s\n", cmdQueueSize, cmdQueueSize ? cmdqueue[0].cmd : "");
+    return 0;
+  }
+  if (!strcmp(sc, "retry_back")) {       // review finding 3: an unconfirmed command retries behind newer commands
+    addCommandToQueue("AA=1", 4, false, 0);       // never echoed
+    g_sent[0] = 0; loopAt(100000);               // AA=1 sent, no echo
+    addCommandToQueue("BB=1", 4, false, 0);
+    addCommandToQueue("CC=1", 4, false, 0);
+    char all[128] = "";
+    for (uint32_t t = 101000; t <= 112000; t += 10) {
+      g_sent[0] = 0; loopAt(t); strcat(all, g_sent);
+      char line[32]; const char* p = g_sent;
+      while (sscanf(p, "%31[^;];", line) == 1) {
+        if (strcmp(line, "AA=1")) { char e[32]; snprintf(e, sizeof(e), "%c%c: %s", line[0], line[1], line + 3); echo(e); }
+        p = strchr(p, ';') + 1;
+      }
+    }
+    printf("sent=%s\n", all);
+    return 0;
+  }
+  if (!strcmp(sc, "fifo")) {             // TASK-1569 rule 5b: an updated command moves to the back
+    addCommandToQueue("MM=80", 5, false, 0);
+    addCommandToQueue("CS=45.0", 7, false, 0);
+    addCommandToQueue("MM=90", 5, false, 0);   // update of the queued MM=
+    char all[128] = "";
+    for (uint32_t t = 100000; t <= 104000; t += 1000) {
+      g_sent[0] = 0; loopAt(t); strcat(all, g_sent);
+      char line[32]; const char* p = g_sent;
+      while (sscanf(p, "%31[^;];", line) == 1) { char e[32]; snprintf(e, sizeof(e), "%c%c: %s", line[0], line[1], line + 3); echo(e); p = strchr(p, ';') + 1; }
+    }
+    printf("sent=%s\n", all);
+    return 0;
+  }
+  if (!strcmp(sc, "tp_mm")) {            // Q-1537b: TP=11:12 then MM= offered in that order, both already queued
+    addCommandToQueue("MM=80", 5, false, 0);
+    addCommandToQueue("TP=11:12=80", 11, false, 0);
+    addCommandToQueue("TP=11:12=70", 11, false, 0);   // SAT's next tick: new TP first ...
+    addCommandToQueue("MM=70", 5, false, 0);          // ... then the new MM
+    char all[160] = "";
+    for (uint32_t t = 100000; t <= 106000; t += 1000) {
+      g_sent[0] = 0; loopAt(t); strcat(all, g_sent);
+      char line[32]; const char* p = g_sent;
+      while (sscanf(p, "%31[^;];", line) == 1) { char e[32]; snprintf(e, sizeof(e), "%c%c: %s", line[0], line[1], line + 3); echo(e); p = strchr(p, ';') + 1; }
+    }
+    printf("sent=%s\n", all);
+    return 0;
+  }
+#ifndef OLD_VOID_ADD
+  if (!strcmp(sc, "result")) {           // TASK-1569: addCommandToQueue reports what it did
+    printf("new=%d\n", (int)addCommandToQueue("MM=80", 5));
+    printf("again=%d\n", (int)addCommandToQueue("MM=90", 5));
+    printf("invalid=%d\n", (int)addCommandToQueue("XX", 2));
+    char c[8];
+    for (int k = 0; k < 19; k++) { snprintf(c, sizeof(c), "%c%c=1", 'A' + k / 6, 'A' + k % 6); addCommandToQueue(c, 4); }
+    printf("full_read=%d\n", (int)addCommandToQueue("PR=Q", 4, true));   // read into a full queue of writes: dropped
+    g_pic = false;
+    printf("direct=%d\n", (int)addCommandToQueue("MM=50", 5));
+    return 0;
+  }
+#endif
+  if (!strcmp(sc, "threads")) {          // TASK-1569: a second task adds while the loop drains and echoes
+    std::atomic<bool> stop(false);
+    std::atomic<long> added(0);
+    std::thread producer([&]() {
+      char c[8];
+      for (int k = 0; k < 4000; k++) {
+        snprintf(c, sizeof(c), "%c%c=%d", 'A' + (k % 7), 'A' + (k / 7) % 5, k % 10);
+#ifdef OLD_VOID_ADD
+        addCommandToQueue(c, (int)strlen(c), false, 0); added++;
+#else
+        if (addCommandToQueue(c, (int)strlen(c), false, 0) != CmdQueueResult::Dropped) added++;
+#endif
+      }
+      stop = true;
+    });
+    long bad = 0, maxSize = 0, loops = 0;
+    while (!stop || cmdQueueSize > 0) {
+      { CmdQueueLock l; g_ms += 1000; g_sent[0] = 0; }
+      handleCommandQueue();
+      char line[32]; const char* p = g_sent;
+      while (sscanf(p, "%31[^;];", line) == 1) {
+        if (strlen(line) < 4 || line[2] != '=') bad++;
+        char e[32]; snprintf(e, sizeof(e), "%c%c: %s", line[0], line[1], line + 3); echo(e);
+        p = strchr(p, ';') + 1;
+      }
+      { CmdQueueLock l;
+        if (cmdQueueSize < 0 || cmdQueueSize > CMDQUEUE_MAX) bad++;
+        if (cmdQueueSize > maxSize) maxSize = cmdQueueSize;
+        for (int i = 0; i < cmdQueueSize; i++) if (cmdqueue[i].cmdlen != (int)strlen(cmdqueue[i].cmd) || cmdqueue[i].cmd[2] != '=') bad++; }
+      if (++loops > 200000) break;
+    }
+    producer.join();
+    printf("bad=%ld\nmax_size=%ld\nadded=%ld\nend_size=%d\n", bad, maxSize, (long)added, cmdQueueSize);
     return 0;
   }
   if (!strcmp(sc, "deep")) {             // TASK-1567 review: a CS= behind a full queue (20 slots), the PIC echoes nothing
@@ -251,7 +368,9 @@ class PmChain(unittest.TestCase):
         cls.dir = tempfile.TemporaryDirectory()
         d = Path(cls.dir.name)
         cpp = d / "t.cpp"
-        cpp.write_text(STUBS.replace("@BODY@", extract(CORE_INO.read_text(encoding="utf-8"))), encoding="utf-8")
+        body = extract(CORE_INO.read_text(encoding="utf-8"))
+        prefix = "#define OLD_VOID_ADD\n" if "\nvoid addCommandToQueue(" in body else ""
+        cpp.write_text(prefix + STUBS.replace("@BODY@", body), encoding="utf-8")
         cls.exe = compile_cpp(cpp, d / "t.exe")
 
     @classmethod
@@ -263,7 +382,7 @@ class PmChain(unittest.TestCase):
             self.skipTest("no host C++ compiler")
         r = subprocess.run([str(self.exe), name, *args], capture_output=True, text=True)
         if r.returncode == 2:
-            self.skipTest(f"scenario {name} needs the PM chain, not in this copy (HEAD)")
+            self.skipTest(f"scenario {name} not in this copy (older code)")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         return dict(line.split("=", 1) for line in r.stdout.splitlines())
 
@@ -277,7 +396,8 @@ class PmChain(unittest.TestCase):
         # to the PIC, not only the last. HEAD: the 2-letter prefix dedup keeps one PM= slot, so only PM=48 is sent.
         out = self.run_sc("user_three")
         self.assertEqual(out["queued_at_start"], "3")
-        self.assertEqual(out["sent"], "PM=3;PM=15;PM=48;")
+        # TASK-1569 rule 5b: the exact repeat of PM=15 (offered last) moves to the back, so PM=48 goes before it
+        self.assertEqual(out["sent"], "PM=3;PM=48;PM=15;")
         self.assertEqual(out["queued"], "0")
         # one second apart (Robert): the PIC keeps one pending priority message
         ms = [int(x) for x in out["sent_ms"].strip(";").split(";")]
@@ -295,6 +415,43 @@ class PmChain(unittest.TestCase):
                 self.assertLessEqual(ms[-1], 5000, f"SAT resend set not drained within its 5 s period: {ms}")
                 self.assertEqual(out["queued"], "0")
 
+    def test_unconfirmed_command_retries_behind_newer_ones(self):
+        # TASK-1569 review finding 3: AA=1 is never echoed; BB=1 and CC=1 offered after it go first, AA=1 retries after.
+        out = self.run_sc("retry_back")
+        sent = out["sent"].strip(";").split(";")
+        self.assertEqual(sent[:2], ["BB=1", "CC=1"], out["sent"])
+        self.assertIn("AA=1", sent[2:])
+
+    def test_updated_command_moves_to_the_back(self):
+        # TASK-1569 rule 5b (Robert 2026-11-02). HEAD: MM=90 kept MM=80's first slot and went out before CS=45.0.
+        out = self.run_sc("fifo")
+        self.assertEqual(out["sent"], "CS=45.0;MM=90;")
+
+    def test_tp_offered_before_mm_goes_first(self):
+        # Q-1537b / entry 233 (Immergas): TP=11:12 is offered right before MM=, so it must reach the PIC first.
+        # HEAD: MM= kept its older slot and went first.
+        out = self.run_sc("tp_mm")
+        sent = out["sent"].strip(";").split(";")
+        self.assertIn("TP=11:12=70", sent)
+        self.assertIn("MM=70", sent)
+        self.assertLess(sent.index("TP=11:12=70"), sent.index("MM=70"), out["sent"])
+        self.assertNotIn("MM=80", sent)
+
+    def test_add_reports_its_result(self):
+        # TASK-1569: Queued=0, Replaced=1, Sent=2, Dropped=3 (CmdQueueResult order)
+        out = self.run_sc("result")
+        self.assertEqual((out["new"], out["again"], out["invalid"], out["full_read"], out["direct"]),
+                         ("0", "1", "3", "3", "2"))
+
+    def test_concurrent_add_and_drain_keep_the_queue_consistent(self):
+        # TASK-1569: a producer thread adds 4000 commands while the loop drains and echoes, with a real recursive
+        # timed mutex on the host. The queue never holds a torn entry, never exceeds 20, and empties at the end.
+        out = self.run_sc("threads")
+        self.assertEqual(out["bad"], "0", out)
+        self.assertLessEqual(int(out["max_size"]), 20)
+        self.assertEqual(out["end_size"], "0")
+        self.assertGreater(int(out["added"]), 0)
+
     def test_cs_behind_a_full_queue_still_well_within_the_pic_minute(self):
         # TASK-1567 review (lead): worst case for a CS= at the back of a full queue (20 slots), no PIC echoes, so every
         # earlier command keeps retrying every 5 s. The PIC drops a CS= after about a minute without a new one
@@ -311,7 +468,8 @@ class PmChain(unittest.TestCase):
         # Before: TP= was append-only (TASK-1439), so the repeat of TP=11:12=40 was queued a second time.
         out = self.run_sc("user_tp")
         self.assertEqual(out["queued_at_start"], "3")
-        self.assertEqual([out["q0"], out["q1"], out["q2"]], ["TP=11:12=40", "TP=11:12=45", "TP=11:13"])
+        # TASK-1569 rule 5b: the exact repeat of TP=11:12=40 (offered third) moves behind TP=11:12=45
+        self.assertEqual([out["q0"], out["q1"], out["q2"]], ["TP=11:12=45", "TP=11:12=40", "TP=11:13"])
 
     def test_chain_in_order_on_responses(self):
         out = self.run_sc("chain")
