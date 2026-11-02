@@ -15,6 +15,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **SAT sends MM, the Immergas TP and CH only on change** (TASK-1570, 2.0.0-beta.18 or later; Sergeant D entry 237, replaces entry 44 for MM and CH). Before, every control tick sent CS, MM and CH (and the Immergas `TP=11:12`) with unchanged values included, and the 5 s resend repeated all three. Now MM (with the Immergas `TP=11:12=min(MM, 80)` right before it, only when the manufacturer is explicitly Immergas) and CH go out only when the value changed, for every boiler. An unchanged value is still sent after a command-cache reset (SAT takes control or hands back, the OpenTherm link comes back, boot, and a runtime PIC restart seen as the "OpenTherm Gateway" banner) and as a repair resend once the value is 60 s old (`SAT_MMCH_REPAIR_MS`; Sergeant D entries 238 and 239). CS is unchanged: it is sent on every control tick, repeated by the 5 s resend (which now repeats CS only) and kept alive by the 30 s PIC keepalive. Effect: far fewer PIC commands on a steady boiler. Covered by the host test `tests/test_sat_cmd_cache.py` (18 tests; the beta.17 code fails 9 of them plus 1 error).
+
 - **The REST debug-flag API also switches the two simulations** (TASK-1561, 2.0.0-beta.14; Robert's choice when reviewing ADR-206). `sensorsim` (telnet `d`) and `otgwsim` (telnet `s`/`S`) are in the shared table; their side effects (sensor re-init and poll, replay start/stop) run only when the value changes. The telnet keys go through the same table. Host test `tests/test_debug_flags_api.py` 8/8 (beta.13: 4 fail).
 
 ### Changed

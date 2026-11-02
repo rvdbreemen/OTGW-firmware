@@ -561,6 +561,15 @@ static bool    _sat_swSentValid       = false;  // false: SW= still has to go ou
 // SAT_CMD_REFRESH_MS is the staleness window of the one change-checked sender left, satEnqueueIfChangedCS(), which the
 // 3 s PWM suppression refresh uses (entry 23).
 static const uint32_t SAT_CMD_REFRESH_MS = 300000UL; // 5 min
+// TASK-1570, Sergeant D entry 237: MM= (with the Immergas TP=11:12) and CH= go out only when the value changes, for
+// every boiler. The PIC keeps both until a new command (gateway.asm:4752-4764; only SC, CS and C2 expire, :493-496),
+// OT-Direct expires only CS/C2/SC (OTDirect.ino:450-463). satResetCmdCache() clears these flags, so after a hand-back,
+// an OpenTherm link that comes back, a PIC restart (satNotifyPicRestart) or a reboot the next send goes out again.
+// Sergeant D entry 239 (with the maintainer): an unchanged MM=/TP=/CH= is resent once a minute, as a repair for a
+// dropped enqueue or an external MM=/CH=.
+static const uint32_t SAT_MMCH_REPAIR_MS = 60000UL;
+static bool _sat_mmSentValid = false;
+static bool _sat_chSentValid = false;
 static const uint32_t SAT_CMD_RESEND_MS  = 5000UL;   // thermo-nova climate.py:707-708
 
 // TASK-1536: a repeated CS (5 s resend, PIC keepalive) is capped by the same ceiling as the control tick,
@@ -590,6 +599,8 @@ static inline void satResetCmdCache() {
   state.sat.iLastSentMMMs  = stale;
   state.sat.iLastSentCHMs  = stale;
   state.sat.bTCAccountedValid = false;   // TC= is event-driven (TASK-1272): force the resend explicitly
+  _sat_mmSentValid = false;              // TASK-1570: MM= and CH= are on-change; force the next one
+  _sat_chSentValid = false;
 }
 
 // TASK-1150: true only while SAT itself is submitting a command through the shared
@@ -662,6 +673,10 @@ static void satPicCSKeepalive() {
 // and MM itself is not capped (Sergeant D entry 233, TASK-1537). The PIC queue spaces PM=/TP= by up to 1 s (TASK-1315) and
 // MM= is not held, so right after another PM=/TP= the MM= can reach the PIC up to 1 s before this TP=.
 static void satSendMM(uint8_t mm) {
+  // TASK-1570: on change only (entry 237), plus a repair resend once the value is SAT_MMCH_REPAIR_MS (60 s, entry 239)
+  // old, so a dropped enqueue (full queue, PIC reset in progress) or an external MM= is corrected within a minute.
+  if (_sat_mmSentValid && mm == state.sat.iLastSentMM &&
+      (uint32_t)(millis() - state.sat.iLastSentMMMs) < SAT_MMCH_REPAIR_MS) return;
   char buf[16];
   if (satImmergasTpActive()) {
     snprintf_P(buf, sizeof(buf), PSTR("TP=11:12=%u"), (unsigned)(mm > 80 ? 80 : mm));
@@ -672,18 +687,23 @@ static void satSendMM(uint8_t mm) {
   state.sat.iLastSentMM     = mm;
   state.sat.iLastSentMMMs   = millis();
   state.sat.bLastSentValid  = true;
+  _sat_mmSentValid          = true;
 }
 
 // ch is 0 or 1 (CH=0 / CH=1). Both string forms are 4 chars.
 static void satSendCH(uint8_t ch) {
+  if (_sat_chSentValid && ch == state.sat.iLastSentCH &&             // TASK-1570: on change, repair as satSendMM
+      (uint32_t)(millis() - state.sat.iLastSentCHMs) < SAT_MMCH_REPAIR_MS) return;
   addCommandToQueue(ch ? "CH=1" : "CH=0", 4, false, 0);
   state.sat.iLastSentCH     = ch;
   state.sat.iLastSentCHMs   = millis();
   state.sat.bLastSentValid  = true;
+  _sat_chSentValid          = true;
 }
 
 // Between control ticks, every SAT_CMD_RESEND_MS after the last CS= (a tick or the suppression refresh),
-// repeat the LAST SENT CS, MM and CH (not recomputed). Gates: the callers' (SAT enabled, not tripped, OpenTherm
+// repeat the LAST SENT CS (not recomputed). MM= and CH= are on-change since TASK-1570 (entry 237), so the resend no
+// longer repeats them. Gates: the callers' (SAT enabled, not tripped, OpenTherm
 // link alive, restart and outside-temperature gates passed) plus bLastSentValid, which satResetCmdCache()
 // clears on every hand-back, so nothing is repeated after SAT released the boiler. A tick that ends on hot
 // water or on the boiler fault flag sends nothing and disarms the resend until a later tick sends again, and
@@ -696,9 +716,11 @@ static void satCmdResend() {
   if (OTcurrentSystemState.SlaveStatus & 0x05) return;
   if ((uint32_t)(millis() - state.sat.iLastSentCSMs) < SAT_CMD_RESEND_MS) return;
   satSendCS(satCapRepeatCS(state.sat.fLastSentCS));
-  satSendMM(state.sat.iLastSentMM);
-  satSendCH(state.sat.iLastSentCH);
 }
+
+// TASK-1570: a PIC banner line means the PIC (re)started and forgot MM= and CH= (gateway.asm:1281 clears the max
+// modulation at start), so SAT sends them again on its next tick even if unchanged.
+void satNotifyPicRestart() { satResetCmdCache(); }
 
 // TASK-1272, Sergeant D entry 14 and the maintainer decision of 2026-10-24: TC= is pushed when the
 // target changes and not on a timer, exactly as thermo-nova (climate.py:641-657, command TC={value}

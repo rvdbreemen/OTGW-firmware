@@ -53,7 +53,8 @@ static uint32_t millis() { return g_ms; }
 static bool isPICEnabled() { return true; }
 static bool hasOTCommandInterface() { return true; }
 static float satEffectiveMaxSetpoint() { return 1000.0f; }   // TASK-1536: satCapRepeatCS() ceiling, no cap here
-static bool satImmergasTpActive() { return false; }   // TASK-1537: satSendMM Immergas TP
+static bool g_imm = false;
+static bool satImmergasTpActive() { return g_imm; }   // TASK-1537: satSendMM Immergas TP
 struct OTSys { uint8_t SlaveStatus=0; }; static OTSys OTcurrentSystemState;
 static char g_sent[256];
 static void addCommandToQueue(const char* c, size_t n, bool, int) { strncat(g_sent, c, n); strcat(g_sent, ";"); }
@@ -104,6 +105,22 @@ int main(int argc, char** argv) {
       g_sent[0] = 0; satCmdResend();      if (g_sent[0]) rs++;
     }
     printf("[keepalive=%d resend=%d]\n[]\n[]\n[]\n", ka, rs);
+  } else if (mode == 7) {                                  // TASK-1570 entry 237: MM and CH only on change
+    g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
+    g_sent[0] = 0; g_ms = start + 1000; tick(40.0f, 60, 1); printf("[%s]\n", g_sent);   // MM changed
+    g_sent[0] = 0; g_ms = start + 2000; tick(40.0f, 60, 0); printf("[%s]\n", g_sent);   // CH changed
+    g_sent[0] = 0; g_ms = start + 3000; satNotifyPicRestart(); tick(40.0f, 60, 0); printf("[%s]\n", g_sent);   // PIC restart
+    g_sent[0] = 0; g_ms = start + 4000; tick(40.0f, 60, 0); printf("[%s]\n", g_sent);   // nothing changed
+  } else if (mode == 8) {                                  // TASK-1570: the Immergas TP follows MM on change
+    g_imm = true; g_ms = start; satResetCmdCache(); tick(40.0f, 100, 1); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 1000; tick(40.0f, 100, 1); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 2000; tick(40.0f, 60, 1); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 7000; satCmdResend(); printf("[%s]\n", g_sent);
+  } else if (mode == 9) {                                  // TASK-1570 entry 239: repair resend of an unchanged MM/CH after 60 s
+    g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
+    g_sent[0] = 0; g_ms = start + 59999; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 60000; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 90000; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);
   }
   return 0;
 }
@@ -127,6 +144,8 @@ class CmdCacheReset(unittest.TestCase):
         tick = ("satSendCS(cs); satSendMM((uint8_t)mm); satSendCH((uint8_t)ch);" if new else
                 "satEnqueueIfChangedCS(cs); satEnqueueIfChangedMM((uint8_t)mm); satEnqueueIfChangedCH((uint8_t)ch);")
         stub = "" if "satCmdResend" in body else "static void satCmdResend() {}"
+        if "satNotifyPicRestart" not in body:
+            stub += "\nstatic void satNotifyPicRestart() {}"
         cpp.write_text(STUBS.replace("@BODY@", body).replace("@TICK@", tick).replace("@STUB_RESEND@", stub)
                        .replace("@DISARM@", "_sat_cmdResendArmed = false;" if "_sat_cmdResendArmed" in body else ""))
         cls.exe = compile_cpp(cpp, d / "t.exe")
@@ -147,7 +166,8 @@ class CmdCacheReset(unittest.TestCase):
         self.assertEqual(sent, "CS=40.0;MM=80;CH=1;")
         # TASK-1370, Sergeant D entry 44: rewritten on purpose. The old assertion was write-on-change ("[]");
         # a control tick now sends CS, MM and CH every time, unchanged values included (thermo-nova heating_control.py:236-238).
-        self.assertEqual(again, "[CS=40.0;MM=80;CH=1;]")
+        # TASK-1570, Sergeant D entry 237: MM and CH only on change; CS still on every tick.
+        self.assertEqual(again, "[CS=40.0;]")
 
     def test_reset_at_millis_zero(self):
         self.assertEqual(self.run_at(0)[0], "CS=40.0;MM=80;CH=1;")
@@ -162,21 +182,21 @@ class CmdCacheReset(unittest.TestCase):
     def test_resend_repeats_last_values_after_5s_not_before(self):
         a, b, c, d = self.run_at(10000, 1)
         self.assertEqual(a, "[]")                             # 4999 ms after the tick
-        self.assertEqual(b, "[CS=40.0;MM=80;CH=1;]")          # 5000 ms
+        self.assertEqual(b, "[CS=40.0;]")                     # 5000 ms; MM/CH on change only (entry 237)
         self.assertEqual(c, "[]")                             # 4999 ms after the resend
-        self.assertEqual(d, "[CS=40.0;MM=80;CH=1;]")
+        self.assertEqual(d, "[CS=40.0;]")
 
     def test_no_resend_before_first_send(self):
         self.assertEqual(self.run_at(10000, 2)[0], "[]")
 
     def test_resend_repeats_the_cs_the_suppression_refresh_sent(self):
-        self.assertEqual(self.run_at(10000, 3)[0], "[CS=37.0;MM=80;CH=1;]")
+        self.assertEqual(self.run_at(10000, 3)[0], "[CS=37.0;]")
 
 
     def test_dhw_ending_tick_disarms_the_resend(self):
         a, b, _, _ = self.run_at(10000, 4)
         self.assertEqual(a, "[]")
-        self.assertEqual(b, "[CS=41.0;MM=80;CH=1;]")
+        self.assertEqual(b, "[CS=41.0;]")
 
     def test_pic_keepalive_stays_silent_while_the_resend_runs(self):
         # ADR-203 Verification: every resend CS= restarts the keepalive window (iLastSentCSMs), so over 120 s the 30 s
@@ -186,7 +206,29 @@ class CmdCacheReset(unittest.TestCase):
     def test_live_fault_and_dhw_bits_pause_the_resend(self):
         a, b, c, _ = self.run_at(10000, 5)
         self.assertEqual((a, b), ("[]", "[]"))
-        self.assertEqual(c, "[CS=40.0;MM=80;CH=1;]")
+        self.assertEqual(c, "[CS=40.0;]")
+
+    def test_mm_and_ch_only_on_change_and_again_after_pic_restart(self):
+        # TASK-1570, Sergeant D entry 237 (msgs 1566917384483381390, 1566917834351575095)
+        a, b, c, d = self.run_at(10000, 7)
+        self.assertEqual(a, "[CS=40.0;MM=60;]")
+        self.assertEqual(b, "[CS=40.0;CH=0;]")
+        self.assertEqual(c, "[CS=40.0;MM=60;CH=0;]")     # a PIC restart forgets MM/CH: sent again
+        self.assertEqual(d, "[CS=40.0;]")
+
+    def test_immergas_tp_follows_mm_on_change(self):
+        a, b, c, d = self.run_at(10000, 8)
+        self.assertEqual(a, "[CS=40.0;TP=11:12=80;MM=100;CH=1;]")
+        self.assertEqual(b, "[CS=40.0;]")
+        self.assertEqual(c, "[CS=40.0;TP=11:12=60;MM=60;]")
+        self.assertEqual(d, "[CS=40.0;]")               # the 5 s resend repeats CS only
+
+    def test_unchanged_mm_and_ch_repaired_after_60_s(self):
+        # TASK-1570, entry 239: a dropped enqueue or an external MM=/CH= is corrected by one resend once the value is 60 s old
+        a, b, c, _ = self.run_at(10000, 9)
+        self.assertEqual(a, "[CS=40.0;]")
+        self.assertEqual(b, "[CS=40.0;MM=80;CH=1;]")
+        self.assertEqual(c, "[CS=40.0;]")
 
 
 def _code_lines(src):
@@ -204,11 +246,19 @@ class TickPaths(unittest.TestCase):
     def test_tick_paths_use_always_send_helpers(self):
         for name in ("satSendCS", "satSendMM", "satSendCH"):
             # one definition (+ the resend helper's own call) + four control-tick paths
-            self.assertEqual(len(re.findall(r"\b%s\(" % name, self.code)), 1 + 4 + 1 + (2 if name == "satSendCS" else 0), name)   # + the start-up flood CS and its hand-over to the suppression (TASK-1371)
+            # TASK-1570: the resend calls satSendCS only (MM/CH are on change, entry 237)
+            self.assertEqual(len(re.findall(r"\b%s\(" % name, self.code)), 1 + 4 + (3 if name == "satSendCS" else 0), name)   # + the start-up flood CS and its hand-over to the suppression (TASK-1371)
         for old in ("satEnqueueIfChangedMM", "satEnqueueIfChangedCH"):
             self.assertNotIn(old, self.code)
         # the only change-checked CS callers left: its definition and the suppression refresh
         self.assertEqual(len(re.findall(r"\bsatEnqueueIfChangedCS\(", self.code)), 2)
+
+    def test_pic_banner_calls_the_restart_hook(self):
+        # TASK-1570: the runtime PIC banner branch of processOT() tells SAT the PIC forgot MM=/CH=
+        core = (SAT_INO.parent / "OTGW-Core.ino").read_text(encoding="utf-8")
+        branch = core[core.index("} else if (strstr(buf, OTGW_BANNER)!=NULL){"):]
+        self.assertIn("satNotifyPicRestart();", branch[:branch.index("\n  } else")] if "\n  } else" in branch else branch[:1500])
+        self.assertIn("void satNotifyPicRestart() { satResetCmdCache(); }", self.src)
 
     def test_suppression_refresh_stays_change_checked(self):
         refresh = self.src[self.src.index("static void satPwmSuppressionRefresh()"):]

@@ -38,6 +38,9 @@ static std::vector<std::string> g_q;
 static void addCommandToQueue(const char* buf, int len, bool, int) { g_q.push_back(std::string(buf, len)); }
 static uint8_t g_quirks = 0;
 static uint8_t satGetManufacturerQuirks() { return g_quirks; }
+static bool _sat_mmSentValid = false;   // TASK-1570 on-change flag (cleared per scenario below)
+static const uint32_t SAT_MMCH_REPAIR_MS = 60000UL;   // TASK-1570 repair window (real value in SATcontrol.ino)
+#define SEND(v) do { _sat_mmSentValid = false; satSendMM(v); } while (0)
 enum { SAT_MFR_AUTO = 0, SAT_MFR_IMMERGAS = 8, SAT_MFR_SIME = 14 };
 struct { struct { uint8_t iManufacturer; } sat; } settings;
 static uint32_t millis() { return 1000; }
@@ -54,16 +57,16 @@ static void dump(const char* tag) {
 int main() {
   settings.sat.iManufacturer = SAT_MFR_IMMERGAS;   // chosen explicitly
   g_quirks = SAT_QUIRK_IMMERGAS_TP;
-  satSendMM(100); dump("immergas100");
-  satSendMM(55);  dump("immergas55");
-  satSendMM(0);   dump("immergas0");
+  SEND(100); dump("immergas100");
+  SEND(55);  dump("immergas55");
+  SEND(0);   dump("immergas0");
   // Auto with MemberID 27 detected as Immergas (the quirk flags say Immergas): no TP, it may be a Sime (entry 235)
   settings.sat.iManufacturer = SAT_MFR_AUTO; g_quirks = SAT_QUIRK_IMMERGAS_TP;
-  satSendMM(100); dump("auto27");
+  SEND(100); dump("auto27");
   settings.sat.iManufacturer = SAT_MFR_SIME; g_quirks = 0;
-  satSendMM(100); dump("sime");
+  SEND(100); dump("sime");
   g_quirks = 0;
-  satSendMM(100); dump("plain100");
+  SEND(100); dump("plain100");
   printf("mm|%u|%u\n", (unsigned)satComputeMM(false, false, false, 100, SAT_QUIRK_IMMERGAS_TP),
                        (unsigned)satComputeMM(true, false, false, 100, SAT_QUIRK_IMMERGAS_TP));
   return 0;

@@ -175,7 +175,8 @@ class PushSetpoint(unittest.TestCase):
 
     def test_r_cmd_resend_is_not_a_tc_repush(self):
         # only on the lane: HEAD has no resend
-        self.assertEqual(self.run_sc("r"), "100:TC=20.0; 105:CS=45.0;MM=100;CH=1; 110:CS=45.0;MM=100;CH=1; 115:CS=45.0;MM=100;CH=1;")
+        # TASK-1570 (entry 237): the resend repeats CS only; MM and CH are on change
+        self.assertEqual(self.run_sc("r"), "100:TC=20.0; 105:CS=45.0; 110:CS=45.0; 115:CS=45.0;")
 
     def test_f_cache_reset_forces_resend(self):
         self.assertEqual(self.run_sc("f"), "100:TC=20.0; 160:TC=20.0;")

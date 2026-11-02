@@ -90,13 +90,14 @@ class CsCeiling(unittest.TestCase):
         return subprocess.run([str(self.exe), str(mode)], capture_output=True, text=True, check=True).stdout.strip()
 
     def test_resend_caps_a_cs_above_a_lowered_limit(self):
-        self.assertEqual(self.run_mode(0), "CS=40.0;MM=100;CH=1;|40.0")
+        # TASK-1570 (entry 237): the 5 s resend repeats CS only; MM and CH are on change
+        self.assertEqual(self.run_mode(0), "CS=40.0;|40.0")
 
     def test_pic_keepalive_caps_a_cs_above_a_lowered_limit(self):
         self.assertEqual(self.run_mode(1), "CS=40.0;|40.0")
 
     def test_cs_below_the_limit_is_repeated_unchanged(self):
-        self.assertEqual(self.run_mode(2), "CS=35.0;MM=100;CH=1;|35.0")
+        self.assertEqual(self.run_mode(2), "CS=35.0;|35.0")
 
     def test_thermal_safe_fallback_respects_the_boiler_max(self):
         self.assertTrue(self.has_helper, "satThermalSafeSetpoint() missing: the fallback has no boiler-MaxTSet cap")

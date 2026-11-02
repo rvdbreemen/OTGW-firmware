@@ -212,3 +212,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-204 | Accepted | - | SAT resets exactly the integral and the raw derivative of the main PID, and the integral of every zone PID, on the tr... |
 | ADR-205 | Accepted | - | SAT gets an on/off self-tune, on by default, that evaluates every clean hour, logs it, and changes the heating curve... |
 | ADR-206 | Accepted | - | All twelve debug flags get one name table, src/OTGW-firmware/debugFlags.h (kDebugFlags: REST name, telnet key, DebugS... |
+| ADR-207 | Accepted | - | SAT sends MM=, the Immergas TP=11:12 and CH= to the PIC only when the value changes. |

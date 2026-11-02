@@ -280,7 +280,7 @@ At the first computed update, the restored values are used as follows:
 16. Auto-switch check between continuous and PWM, only when the PID output is above the cold setpoint, for every heating source and heat pumps too (Sergeant D entry 87; `SATcontrol.ino:5542-5546`).
 17. Compute the modulation value (`SATcontrol.ino:4960-4967`).
 18. **Cold cutoff:** if the requested setpoint is at or below the cold setpoint (`satColdCutoff()`, `<=` like the PWM gate in `satApplyPWM()` and thermo-nova `heating_control.py:72` / `:385`; TASK-1323) (28.2 °C radiators, 21 °C underfloor), the setpoint becomes 10 °C and the modulation the configured maximum (corrected 2026-10-24, TASK-1351) (`SATcontrol.ino:5206-5214`, `SATcontrol.ino:130-131`, `SATcontrol.ino:339-343`). The cutoff also disables PWM, as thermo-nova's heater-OFF branch does (`pwm.disable()`, `heating_control.py:230`, `pwm.py:106-109`; control setpoint reset to `MINIMUM_SETPOINT`, `heating_control.py:233`): `satPwmDisableOnHeaterOff()` (also called in the valves-closed early return, thermo-nova `heating_control.py:69-70`) always leaves PWM mode (TASK-1332, Sergeant D entry 13) (thermo-nova's `control_mode` is CONTINUOUS while PWM is not enabled, `heating_control.py:148-152`; PWM returns through the overshoot paths, `heating_control.py:304`, mirrored by `satCycleCheckOvershootSwitch()`; the `on_cycle_end()` re-enable of `pwm.py:219-223` is not ported; the firmware-only summer simmer path calls the helper too, TASK-1362), resets the PWM phase, ignition wait and hold (`satPwmReset()`), clears the sustained overshoot/underheat/saturation timers (`_reset_pwm_disable_guards`, `heating_control.py:231`, `:525-528`; `satCycleResetSustainGuards()`), sets the modulation to the maximum relative modulation (`heating_control.py:234`) and sets the held "previous CS" to 10, so a later PWM tick without an override cannot return the pre-cutoff value (TASK-1327; Sergeant D 2026-10-23, `docs/sat/sergeant-d-corrections.md` entry 12). thermo-nova never reads its `force_pulse_width_modulation` option (`entry_data.py:223` is its only use), so the firmware option had no counterpart there and was removed.
-19. **Send** CS, MM and CH through the always-send helpers `satSendCS/MM/CH()` (every tick, unchanged values included, TASK-1370, Sergeant D entry 44, ADR-203); CH follows `satChEnableDecide()` (`SATchEnable.h`, TASK-1323; Sergeant D 2026-10-23: "If the requested setpoint is lower than the thresholds then we send CH=0 CS=10"; thermo-nova uses COLD_SETPOINT 22): `CH=0` when the requested setpoint is at or below the cold setpoint (the cold cutoff, CS=10) or when PWM drives the CS and the PWM phase is OFF (CS=10); otherwise `CH=1`. That includes the PWM ON phase whatever low CS is sent, continuous mode, and a PWM tick that keeps the previous CS (overshoot protection off, DHW active, no flow temperature) while the requested setpoint is above the cold setpoint, for example a held CS of 24 on radiators with a requested 30 gives `CH=1`. The CH bit does not depend on the sent CS value. Immergas gets `TP=11:12=<min(MM, 80)>` right before every `MM=`, inside `satSendMM()` (entry 233, TASK-1537; before: the setpoint on every tick) (`SATcontrol.ino:4986-4990`). With "push setpoint" on, `TC=<target>` is sent (`SATcontrol.ino:4992-4994`). Without a command interface, count a PIC failure; after 5, set the safety trip and disable (`SATcontrol.ino:4996-5004`, `SATcontrol.ino:69`).
+19. **Send** CS, MM and CH through the send helpers `satSendCS/MM/CH()`: CS every tick, unchanged values included (TASK-1370, Sergeant D entry 44, ADR-203); MM, the Immergas TP and CH only when the value changed, for every boiler (TASK-1570, entry 237, which replaces entry 44 for MM and CH; exceptions in the command cadence paragraph below); CH follows `satChEnableDecide()` (`SATchEnable.h`, TASK-1323; Sergeant D 2026-10-23: "If the requested setpoint is lower than the thresholds then we send CH=0 CS=10"; thermo-nova uses COLD_SETPOINT 22): `CH=0` when the requested setpoint is at or below the cold setpoint (the cold cutoff, CS=10) or when PWM drives the CS and the PWM phase is OFF (CS=10); otherwise `CH=1`. That includes the PWM ON phase whatever low CS is sent, continuous mode, and a PWM tick that keeps the previous CS (overshoot protection off, DHW active, no flow temperature) while the requested setpoint is above the cold setpoint, for example a held CS of 24 on radiators with a requested 30 gives `CH=1`. The CH bit does not depend on the sent CS value. Immergas gets `TP=11:12=<min(MM, 80)>` right before every `MM=` that is sent, inside `satSendMM()`, so only when MM changes (entry 233, TASK-1537; entry 237, TASK-1570; before: the setpoint on every tick) (`SATcontrol.ino:4986-4990`). With "push setpoint" on, `TC=<target>` is sent (`SATcontrol.ino:4992-4994`). Without a command interface, count a PIC failure; after 5, set the safety trip and disable (`SATcontrol.ino:4996-5004`, `SATcontrol.ino:69`).
 20. Record the tick time; save the PID state when 300 s passed since the last save (`SATcontrol.ino:5007-5012`). The last-save time starts at 0 (`SATcontrol.ino:1989`), so the first save happens on the first full tick after 300 s of uptime.
 21. Publish the SAT MQTT topics (`SATcontrol.ino:5018`).
 
@@ -298,9 +298,9 @@ At the first computed update, the restored values are used as follows:
 
 All SAT commands go through the shared command queue (`addCommandToQueue`). SAT's own `CS=` is marked as SAT's own while it is queued (`SATcontrol.ino:370-379`). MM, CH and TC are queued unmarked (`SATcontrol.ino:422`, `SATcontrol.ino:434`, `SATcontrol.ino:449`).
 
-**Command cadence (TASK-1370, supersedes the write-on-change rule below for CS, MM and CH).** As thermo-nova (`climate.py:707-708`, `heating_control.py:236-238`), every control tick sends CS, MM and CH, unchanged values included. Between ticks `satCmdResend()` repeats the last sent values (the cache, not recomputed) every `SAT_CMD_RESEND_MS` = 5 s after the last CS, MM and CH send. It runs after the safety-trip, OpenTherm-link and restart/outside-temperature gates, needs `bLastSentValid`, is disarmed by a tick that ends on hot water or on the boiler fault flag until a later tick sends again, and pauses while the live `SlaveStatus & 0x05` bits are set. The 3 s PWM suppression refresh keeps the change-checked `satEnqueueIfChangedCS()` (entry 23). TC is unchanged (event-driven). PIC command queue: a pending command with the same prefix is replaced, so resends do not pile up.
+**Command cadence (TASK-1370 for CS; TASK-1570, Sergeant D entry 237, for MM, the Immergas TP and CH; entry 237 replaces entry 44 for MM and CH).** CS is sent on every control tick, unchanged values included, as thermo-nova does (`climate.py:707-708`, `heating_control.py:236-238`). MM (with the Immergas `TP=11:12=min(MM, 80)` right before it when the manufacturer is explicitly Immergas) and CH are sent only when the value changed, for every boiler. An unchanged MM or CH is still sent after a command-cache reset (SAT takes control or hands back, the OpenTherm link comes back, boot, and a runtime PIC restart seen as the "OpenTherm Gateway" banner, `satNotifyPicRestart()`), and as a repair resend once the last send is 60 s old (`SAT_MMCH_REPAIR_MS`; Sergeant D entries 238 and 239). Between ticks `satCmdResend()` repeats the last sent CS only, every `SAT_CMD_RESEND_MS` = 5 s after the last CS send. It runs after the safety-trip, OpenTherm-link and restart/outside-temperature gates, needs `bLastSentValid`, is disarmed by a tick that ends on hot water or on the boiler fault flag until a later tick sends again, and pauses while the live `SlaveStatus & 0x05` bits are set. The 3 s PWM suppression refresh keeps the change-checked `satEnqueueIfChangedCS()` (entry 23). TC is unchanged (event-driven). PIC command queue: a pending command with the same prefix is replaced, so resends do not pile up.
 
-**Write-on-change (TC, and CS in the suppression refresh).** CS, MM, CH and TC were queued only when the value changed (CS and TC compared at 0.1 °C resolution), when the cache is invalid, or when 300 s passed since that command was last sent (`SATcontrol.ino:351`, `SATcontrol.ino:383-454`). The cache is invalid at boot, after `satDisable()` and on an OT offline-to-online edge (`SATcontrol.ino:3700`, `SATcontrol.ino:2182`, `SATcontrol.ino:4532-4534`). The boot `CS=0` and the disable `CS=0` go directly to the queue and do not fill the cache (`SATcontrol.ino:3707`, `SATcontrol.ino:2179`).
+**Write-on-change (TC, CS in the suppression refresh, and MM and CH since TASK-1570).** The older rule: CS, MM, CH and TC were queued only when the value changed (CS and TC compared at 0.1 °C resolution), when the cache is invalid, or when 300 s passed since that command was last sent (`SATcontrol.ino:351`, `SATcontrol.ino:383-454`). The cache is invalid at boot, after `satDisable()` and on an OT offline-to-online edge (`SATcontrol.ino:3700`, `SATcontrol.ino:2182`, `SATcontrol.ino:4532-4534`). The boot `CS=0` and the disable `CS=0` go directly to the queue and do not fill the cache (`SATcontrol.ino:3707`, `SATcontrol.ino:2179`).
 
 **PIC CS keepalive.** On PIC boards only, once a CS of 8 °C or more is in the cache, the last CS is re-sent when 30 s passed since the last CS send (`SATcontrol.ino:403-414`). The comment states the reason: the PIC drops a CS of 8 °C or more after about 63 to 126 s without a new one (`SATcontrol.ino:398-402`). The first `CS=10.0` therefore starts a 30 s keepalive on PIC boards.
 
@@ -316,7 +316,7 @@ All SAT commands go through the shared command queue (`addCommandToQueue`). SAT'
 | Window statistics | 60 s | 4 h and 24 h stats | `SATcontrol.ino:478`, `SATcontrol.ino:4602-4605` |
 | PWM suppression refresh | 3 s | CS during the PWM ON phase after the hold | `SATcontrol.ino:480`, `SATcontrol.ino:894-918` |
 | PIC CS keepalive | checked every pass, sends after 30 s | re-send last CS | `SATcontrol.ino:403-414` |
-| Command resend | 5 s after the last CS/MM/CH send (TASK-1370) | repeat the last sent CS, MM and CH (`satCmdResend()`); every tick also sends all three | `SATcontrol.ino:428`, `SATcontrol.ino:538-546`, `SATcontrol.ino:5673` |
+| Command resend | 5 s after the last CS send (TASK-1370; CS only since TASK-1570, entry 237) | repeat the last sent CS (`satCmdResend()`); every tick sends CS, while MM and CH send only on change | `SATcontrol.ino:428`, `SATcontrol.ino:538-546`, `SATcontrol.ino:5673` |
 | PID save | first tick after 300 s since the last save | write `/sat_pid_state.json` | `SATcontrol.ino:5010-5012` |
 | Energy save | 3600 s; estimated energy at each 0.1 kWh step | write the energy files | `SATcontrol.ino:2053`, `SATcontrol.ino:3254-3265` |
 
@@ -385,7 +385,7 @@ POWER-ON
   I+90 s  tick 3: first computed PID output -> CS/MM/CH from the mode   SATpid.ino:288-319
   every 30 s after a CS >= 8 C (PIC boards only): CS keepalive   SATcontrol.ino:403-414
   every 30 s: tick (PID computes only when its own gates allow)  SATcontrol.ino:4614
-  every 300 s: unchanged CS/MM/CH re-sent; PID state saved   SATcontrol.ino:351, 5010-5012
+  every 60 s: unchanged MM/CH repair resend (CS goes every tick); PID state saved   SATcontrol.ino:351, 5010-5012
 
 RUNTIME ENABLE (SAT was disabled)
   next pass: timer due time is in the past -> tick at once,
@@ -565,7 +565,7 @@ else: min = Tboiler - fFlowOffset                            (fFlowOffset defaul
 | `initSAT()`, command interface present, SAT enabled or not | `CS=0` | `SATcontrol.ino:3706-3710` |
 | `initSAT()`, SAT enabled, interface present | `PM=3`, `PM=15`, `PM=48`, `MI=500` for Ideal, Intergas, Nefit | `SATcontrol.ino:3721-3734` |
 | First enabled pass with an interface, if boot `CS=0` was missed | `CS=0` | `SATcontrol.ino:4585-4589` |
-| Each tick on the main path | `CS=<setpoint>`, `MM=<value>`, `CH=0/1`, every tick (TASK-1370) | `SATcontrol.ino:4978-4983` |
+| Each tick on the main path | `CS=<setpoint>` every tick (TASK-1370); `MM=<value>` and `CH=0/1` only on change, plus after a cache reset and as a 60 s repair resend (TASK-1570, entries 237 and 239) | `SATcontrol.ino:4978-4983` |
 | Every MM= send, Immergas | `TP=11:12=<min(MM, 80)>`, right before the `MM=` (entry 233) | `SATcontrol.ino:4986-4990` |
 | Same tick, push setpoint on | `TC=<target>`, on target change only, no re-push (TASK-1272) | `SATcontrol.ino:5172-5176`, `SATcontrol.ino:540-553` |
 | Tick in summer simmer or with all valves closed | `CS=10.0`, `MM=<max>`, `CH=0` | `SATcontrol.ino:4766-4773`, `SATcontrol.ino:4779-4786` |
@@ -1383,10 +1383,10 @@ Derived from the curve formula and the cold setpoints (computed, not stated in t
 
 | What | Value | Command | Citation |
 |---|---|---|---|
-| Control setpoint | `finalSetpoint` | `CS=%.1f`. Sent only when the value rounded to 0.1 changed, or 5 min after the last send | SATcontrol.ino:4980, SATcontrol.ino:383-396, SATcontrol.ino:351 |
-| Max relative modulation | `state.sat.iCurrentModulation` | `MM=<n>`, same write-on-change rule | SATcontrol.ino:4981, SATcontrol.ino:416-427 |
-| CH enable | `satChEnableDecide`: 0 when the requested setpoint is at or below the cold setpoint or in the PWM OFF phase, else 1 (corrected 2026-10-24, TASK-1351) | `CH=1` / `CH=0`, same rule | SATchEnable.h:46-52, SATcontrol.ino:5223 |
-| Immergas extra | min(MM, 80) (since TASK-1537; before: the final setpoint) | `TP=11:12=<value>`, right before every `MM=` | SATcontrol.ino:4986-4990 |
+| Control setpoint | `finalSetpoint` | `CS=%.1f`. Sent on every tick, unchanged included, and repeated by the 5 s resend (TASK-1370) | SATcontrol.ino:4980, SATcontrol.ino:383-396, SATcontrol.ino:351 |
+| Max relative modulation | `state.sat.iCurrentModulation` | `MM=<n>`, only on change, after a cache reset, or 60 s after the last send (TASK-1570, entries 237 and 239) | SATcontrol.ino:4981, SATcontrol.ino:416-427 |
+| CH enable | `satChEnableDecide`: 0 when the requested setpoint is at or below the cold setpoint or in the PWM OFF phase, else 1 (corrected 2026-10-24, TASK-1351) | `CH=1` / `CH=0`, same rule as MM | SATchEnable.h:46-52, SATcontrol.ino:5223 |
+| Immergas extra | min(MM, 80) (since TASK-1537; before: the final setpoint) | `TP=11:12=<value>`, right before every `MM=` that is sent (so only when MM changes) | SATcontrol.ino:4986-4990 |
 | Thermostat display | `settings.sat.fTargetTemp` when `bPushSetpoint` is on | `TC=%.1f`, on target change; no 5-min refresh (TASK-1272) | SATcontrol.ino:5172-5176, SATcontrol.ino:540-553 |
 
 On PIC boards the last `CS=` (when ≥ 8 °C) is re-sent every 30 s (SATcontrol.ino:403-414). The command cache is cleared when the OpenTherm bus comes back online, so the next tick re-sends everything (SATcontrol.ino:4531-4535). A grep for `CS=` over `SAT*.ino` shows every SAT `CS=` send going through `satEnqueueOwnCS()` (SATcontrol.ino:375-379, SATcontrol.ino:391, SATcontrol.ino:412, SATcontrol.ino:2179, SATcontrol.ino:3707, SATcontrol.ino:4586). (Superseded: `PM=25` after `CS=` now exists for a boiler without a return temperature, TASK-1371, and `SH=` is sent by `satMaxTSetSendStep()`, TASK-1373.)
@@ -1891,7 +1891,7 @@ To the boiler, at the end of a normal tick in this order (SATcontrol.ino:4977-49
 | Control setpoint | `CS=<value with one decimal>`, through `satEnqueueOwnCS()` so the firmware's own CS ownership check accepts it | SATcontrol.ino:383-396, SATcontrol.ino:375-379 |
 | Max relative modulation | `MM=<integer>` | SATcontrol.ino:416-427 |
 | CH enable | `CH=1` or `CH=0` | SATcontrol.ino:430-439 |
-| Immergas only | `TP=11:12=<finalSetpoint, no decimals>`, queued on every tick | SATcontrol.ino:4984-4990 |
+| Immergas only | `TP=11:12=<min(MM, 80)>`, queued right before every `MM=` that is sent, so only when MM changes (entries 233 and 237) | SATcontrol.ino:4984-4990 |
 
 Between ticks: the refresh may queue `CS=` every 3 s (SATcontrol.ino:916-917); on PIC boards the keepalive re-queues the last CS every 30 s (SATcontrol.ino:403-414). When SAT is disabled or trips, `CS=0` is sent (SATcontrol.ino:2179). Without an OpenTherm command interface nothing is queued, and after 5 such ticks SAT trips (SATcontrol.ino:4996-5004, SATcontrol.ino:69).
 
@@ -2828,7 +2828,8 @@ switch when (millis() - iWindowOpenSinceMs) / 1000 >= iWindowMinOpenSec
 | Follow-thermostat minimum change | 0.095 | °C | SATcontrol.ino:1070 |
 | Follow-thermostat debounce match | 0.051, two consecutive frames | °C | SATcontrol.ino:1071 |
 | Follow-thermostat echo window | 0.25 | °C | SATcontrol.ino:1076-1077 |
-| `SAT_CMD_REFRESH_MS` (unchanged CS/MM/CH re-send; not TC= since TASK-1272) | 300000 (5 min) | ms | SATcontrol.ino:427 |
+| `SAT_CMD_REFRESH_MS` (staleness window of the change-checked CS helper `satEnqueueIfChangedCS()` and the stale timestamps in `satResetCmdCache()`; not TC= since TASK-1272) | 300000 (5 min) | ms | SATcontrol.ino:427 |
+| `SAT_MMCH_REPAIR_MS` (repair resend of an unchanged MM/TP/CH, Sergeant D entry 239) | 60000 (1 min) | ms | SATcontrol.ino:570 |
 | `bPresetSync` default | false | | SATtypes.h:485 |
 | `sPresetSyncTopic` | empty, max 64 characters | | SATtypes.h:486 |
 | `iHeatingMode` default / range | 0 (comfort) / 0 to 1, no effect on control | | SATtypes.h:524, settingStuff.ino:1104 |
@@ -3523,7 +3524,7 @@ The PID, heating curve, PWM schedule and cycle classification are only reference
 - **4-hour and 24-hour window statistics:** every 60 s (`SATcontrol.ino:478`, `SATcontrol.ino:4602-4605`).
 - **PID state save:** every 300 s inside the control tick (`SATcontrol.ino:5010-5012`).
 - **PIC command queue:** drained once per second; a queued command is re-sent every 5000 ms until the PIC answers with the same two letters, at most 5 sends (`OTGW-firmware.ino:756-758`, `OTGW-Core.ino:3588-3589`, `OTGW-Core.ino:3741-3755`, `OTGW-Core.ino:3790-3806`). The queue pauses 2000 ms after serial-bridge traffic (`OTGW-Core.ino:3590`, `OTGW-Core.ino:3739`).
-- Compare: thermo-nova ticks every 5 s and writes every tick. The firmware ticks every 30 s by default and writes only on change (see C.7).
+- Compare: thermo-nova ticks every 5 s and writes every tick. The firmware ticks every 30 s by default; it writes CS every tick and MM and CH only on change (see C.7).
 
 #### C. Per control pass: what gets written
 
@@ -3576,13 +3577,13 @@ Steps 1 to 9 run on every pass. Steps 10 onward run only when the control timer 
     1. `CS=<setpoint>` via `satEnqueueIfChangedCS()` (`SATcontrol.ino:4980`);
     2. `MM=<value>` via `satEnqueueIfChangedMM()` (`SATcontrol.ino:4981`);
     3. `CH=` from `satChEnableDecide()` via `satEnqueueIfChangedCH()` (`SATcontrol.ino:5223`, `SATchEnable.h:46-52`) (corrected 2026-10-24, TASK-1351);
-    4. Immergas only: `TP=11:12=<setpoint, 0 decimals>`, sent on every tick, not write-on-change (`SATcontrol.ino:4986-4990`);
+    4. Immergas only: `TP=11:12=<min(MM, 80)>`, sent right before every `MM=` that is sent, so only when MM changes (entries 233 and 237; `SATcontrol.ino:4986-4990`);
     5. `TC=<fTargetTemp>` via `satEnqueueIfChangedTC()` when `bPushSetpoint` is on (`SATcontrol.ino:4992-4994`).
     - Compare: thermo-nova sets CH from `control_setpoint > 22`; the firmware sets CH from the requested setpoint against 28.2 / 21 and the PWM phase (entries 7, 9, 11, 17) (corrected 2026-10-24, TASK-1351). Thermo-nova sends `TP=11:12=min(MM, 80)` for Immergas; the firmware sends the control setpoint in `TP=11:12`. Thermo-nova sends `PM=25` after every CS on the OTGW-MQTT path; no `PM=25` was found in the firmware (search of all `.ino`, `.h` and `.cpp` files).
 30. **No command interface.** The PIC-failure counter grows. At 5 the safety trips (`SATcontrol.ino:4996-5005`, `SATcontrol.ino:69`). See G.
 31. PID state save every 300 s, MQTT publish (`SATcontrol.ino:5007-5018`).
 
-**C.7 Write-on-change.** CS, MM, CH and TC are sent only when the value changed (CS and TC compared at 0.1 °C), or when 300 s have passed since that command was last sent, or when the cache is invalid (`SATcontrol.ino:383-454`, `SATcontrol.ino:351`). The cache is invalidated at `initSAT()`, on the OT-bus online edge and in `satDisable()` (`SATcontrol.ino:3700`, `SATcontrol.ino:4533`, `SATcontrol.ino:2182`).
+**C.7 Write-on-change.** Since TASK-1570 (Sergeant D entry 237, replacing entry 44 for MM and CH) MM, the Immergas TP and CH are sent only when the value changed, or when 60 s have passed since that command was last sent (repair resend, `SAT_MMCH_REPAIR_MS`, entry 239), or when the cache is invalid; CS is sent on every tick (TASK-1370) and TC on change (CS and TC compared at 0.1 °C). The older description follows: CS, MM, CH and TC are sent only when the value changed, or when 300 s have passed since that command was last sent, or when the cache is invalid (`SATcontrol.ino:383-454`, `SATcontrol.ino:351`). The cache is invalidated at `initSAT()`, on the OT-bus online edge and in `satDisable()` (`SATcontrol.ino:3700`, `SATcontrol.ino:4533`, `SATcontrol.ino:2182`).
 
 - Compare: thermo-nova re-sends CS, MM and CH on every 5 s tick with no change detection.
 
@@ -3821,7 +3822,7 @@ Compare (defaults that differ from thermo-nova): overshoot protection true here,
 - **CH follows `satChEnableDecide`.** CH=0 when the requested setpoint is at or below 28.2 / 21 or in the PWM OFF phase, otherwise CH=1, the PWM ON phase included whatever CS keeps the flame on (`SATchEnable.h:46-52`, `SATcontrol.ino:5223`). Compare: thermo-nova gives CH=0 for a control setpoint of 22 or less (entries 7, 9, 11, 17) (corrected 2026-10-24, TASK-1351).
 - **All off paths set MM=max.** Cold cutoff: `iMaxRelModulation` (`SATcontrol.ino:1108`). Summer simmer and valves closed: `iMaxRelModulation` (`SATcontrol.ino:5001`, `SATcontrol.ino:5015`) (corrected 2026-10-24, TASK-1351); TASK-1327. Raw value: the entry-21 guards (heat pump/hybrid never 0, Geminox at least 10) do not apply on these paths. Open, see not-found item 15.
 - **PWM with overshoot protection off** keeps the previous setpoint in the ON phase while MM is still 0 in PWM; the OFF phase sends CS=10/CH=0 as with protection on (entry 230, a deliberate deviation from thermo-nova, TASK-1412.6). The firmware default is on (`SATtypes.h:508`).
-- **Immergas `TP` is sent every tick**, outside the write-on-change cache (`SATcontrol.ino:4984-4990`).
+- **Immergas `TP` is sent right before every `MM=` that is sent** (only when MM changes, TASK-1570, entry 237) (`SATcontrol.ino:4984-4990`).
 - **Fallback re-enable does not send the boot `PM=` commands** (`SATcontrol.ino:4549-4552`; `PM=` only in `SATcontrol.ino:3725-3733`).
 - **Safety trip keeps ownership.** External `CS=` stays refused while tripped, because ownership follows `bEnabled` (`SATcontrol.ino:2150-2157`, `OTGW-Core.ino:3654-3658`).
 - **No CS keepalive while tripped or disabled.** The keepalive is after the enabled and trip returns (`SATcontrol.ino:4568-4581`, `SATcontrol.ino:4608`). After the `CS=0` release this is consistent.

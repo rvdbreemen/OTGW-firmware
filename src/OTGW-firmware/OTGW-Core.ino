@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.17
+**  Version  : v2.0.0-beta.18
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5811,6 +5811,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
 #if HAS_PIC
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
+    satNotifyPicRestart();   // TASK-1570: the PIC forgot MM=/CH=; SAT sends them again (entry 237)
     // Re-enable PIC functions if boot-time detection missed it (transient startup failure).
     // Not while OT-Direct runs: the PIC UART is closed then, so the line came from the
     // frame replay (a user log with a boot banner), not from a PIC (TASK-1181).

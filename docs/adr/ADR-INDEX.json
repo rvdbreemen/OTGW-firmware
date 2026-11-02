@@ -7357,7 +7357,7 @@
       "path": "ADR-203-sat-sends-cs-mm-and-ch-on-every-control-update-supersedes-adr-199-decision-4.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-30",
+      "date": "2026-11-02",
       "decision_summary": "While SAT is the active controller, a 5 s resend timer sends the latest CS=, MM= and CH= values again, unchanged valu...",
       "topics": [
         "ch-enable",
@@ -7616,6 +7616,73 @@
         "verification": [
           "python tests/testdebugflagsapi.py (stdlib unittest): compiles debugFlags.h against the real DebugSection and checks explicit and idempotent sets, rejection without a change, the simulation side effect only on a real change, the S key, un...",
           "On a bench unit: curl http:// /api/v2/debug/flags, then curl -X POST -d '{\"name\":\"sat\",\"value\":false}' http:// /api/v2/debug/flags twice (same answer both times), and the telnet key still switches the same flag."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-207",
+      "title": "SAT sends MM, the Immergas TP and CH on change, CS keeps the 5 s resend (partly supersedes ADR-203)",
+      "path": "ADR-207-sat-sends-mm-the-immergas-tp-and-ch-on-change-cs-keeps-the-5-s-resend-partly-supersedes-adr-203.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-02",
+      "decision_summary": "SAT sends MM=, the Immergas TP=11:12 and CH= to the PIC only when the value changes.",
+      "topics": [
+        "ch-enable",
+        "command-cadence",
+        "max-modulation",
+        "opentherm",
+        "sat"
+      ],
+      "aliases": [
+        "60 s repair resend",
+        "CH on change",
+        "Immergas TP on change",
+        "MM on change",
+        "Q-1537c",
+        "Q-1570a",
+        "SAT_CMD_REFRESH_MS",
+        "write-on-change"
+      ],
+      "components": [
+        "SAT MM and CH command cache"
+      ],
+      "symbols": [
+        "SAT_MMCH_REPAIR_MS",
+        "satCmdResend",
+        "satNotifyPicRestart",
+        "satResetCmdCache",
+        "satSendCH",
+        "satSendMM"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "MM=, the Immergas TP=11:12 and CH= are enqueued only on a changed value, after a cache reset, or when the last send is 60 s old or older (SATMMCHREPAIRMS). SATCMDREFRESHMS (300 s) stays the staleness window of the change-checked CS helpe...",
+          "The Immergas TP follows MM: it goes out in the same call as the MM it derives from.",
+          "satResetCmdCache() runs on hand-back, OT link back, SAT enabled and boot; satNotifyPicRestart() runs from the runtime PIC banner branch.",
+          "satCmdResend() repeats CS only."
+        ],
+        "must_not": [
+          "The 5 s resend must not repeat MM, TP or CH.",
+          "The CS resend (5 s) and the 30 s PIC CS keepalive must not be removed or slowed by this ADR."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatcmdcache.py (18 tests): send on change, resend after a PIC restart, Immergas TP follows MM, the 60 s repair resend, and a structural check that the banner branch calls satNotifyPicRestart. On the beta.17 code 9 tests fail an..."
         ]
       },
       "scope": {
@@ -13381,6 +13448,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-203",
+      "target": "ADR-207",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-204",
       "target": "ADR-196",
       "type": "related",
@@ -13449,6 +13522,30 @@
     {
       "source": "ADR-206",
       "target": "ADR-202",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-207",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-207",
+      "target": "ADR-179",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-207",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-207",
+      "target": "ADR-203",
       "type": "related",
       "resolved": true
     }
