@@ -5515,3 +5515,27 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "my hypothesis about the slave SAT, comes from the gap between Elga and gas boiler. Since Elga is able to deliver around 4 kW max capacity and most older boilers minimum capacity sits on 5.5kW, there is a gap between 4kW to 5.5 kW that the boiler will cycle, using the master-slave operation, we are closing this gap and introducing maximum efficiency for both systems since the gas boiler will be able to work at efficiency more than 95% even at low load control."
 
 **Settled (rationale, not a new decision):** the purpose of the slave SAT (entries 206-209) is the load band between the heat pump's maximum (Elga Ace about 4 kW) and the boiler's minimum (about 5.5 kW on older boilers), where the boiler on its own control cycles; the slave keeps it running at high efficiency (above 95 %) at low load. Compared with round 22 (docs/sat/sim-hp-lowload/round22.md): the cycling in that band is reproduced (Elga Ace, 1983-92 radiators: 2523 boiler starts per season, runs of 2.3 min) and the slave cuts it (935 starts, 15.9 min). Two model limits bear on his efficiency argument: the boiler minimum is 3.1 kW (Calenta 28c datasheet), smaller than his 5.5 kW, so the modelled gap is narrower; and the boiler efficiency is a fixed 0.97 (`BOILER_EFF`, scripts/sat_hp_library_study21.py:76) with no start losses, so the efficiency gain he expects from fewer starts is not in the model, while the extra gas in round 22 (577 -> 852 kWh) comes from the boiler taking heat over from the heat pump. thermo-nova has no hybrid concept. **Task:** TASK-1527 (round 22 follow-up: boiler minimum 5.5 kW, start losses and part-load efficiency). **Open:** whether the gas penalty survives a model with start losses and a 5.5 kW minimum.
+
+## 227. Q-1527a answered A: no "heat pump controls itself" setting; entries 194-198 and 202 are the answer (Sergeant D, 2026-11-02)
+
+**Source:** sergeantd, 2026-11-02 05:31 UTC, #alpha-testing, msg 1566686069796114443 (https://discord.com/channels/812969634638725140/1514720723980259460/1566686069796114443), answer to the overview (Q-1527a in msg 1566676696348754002).
+
+**Quoted** (excerpt of a list): "Q-1527a: A"
+
+**Settled:** option A as put to him: on/off heat pumps get the experimental 3 h type (entries 195, 202), every heat pump gets 600 s minimum ON and OFF (entries 197, 198), ordinary heat pumps keep SAT's heat-pump PWM, entered through the overshoot switch (entry 87). The proposed setting "heat pump controls itself, no SAT PWM" from Q-1527a (31 Oct) is dropped. Compared: thermo-nova has no heat-pump-specific PWM rule (period = 3600 / cycles per hour, pwm.py:54; heat pumps get 2 or 3 per hour, config_flow.py:688-691). Firmware: entries 197/198 and the experimental type are in 2.0.0-beta.4 (dc566f8c6, TASK-1542). **Task:** TASK-1527 (no new work). **Open:** none.
+
+## 228. Q-1527c answered C: add 60 min as a selectable heat-pump PWM period (Sergeant D, 2026-11-02)
+
+**Source:** as entry 227, msg 1566686069796114443 (https://discord.com/channels/812969634638725140/1514720723980259460/1566686069796114443); Q-1527c in msg 1566676722768941168.
+
+**Quoted** (excerpt of a list): "Q-1527c: C"
+
+**Settled:** option C as put to him: "Add 60 min as a new choice (9.9 starts/day)". The heat-pump PWM period gets 3600 s as a selectable value next to 1800 s, 2400 s and the experimental 10800 s (today the setter snaps to 1800/2400/10800, dc566f8c6). Round 23 (docs/sat/sim-hp-lowload/round23.md): 1800 s 17.0 starts/day 0.162 C, 3600 s 9.9 / 0.163, ten seasons, 3 units x 4 houses. **Interpretation (ours):** C adds the choice and does not change the default; the default stays 1800 s. His earlier proposal (entry 194) was 60 min as the default; the answer C, not A, is read as keeping the default. Compared: thermo-nova's period is 3600 / cycles per hour, so 60 min is its longest period (pwm.py:54). **Task:** new backlog task (setter accepts 3600 s for heat pumps; UI choice; hybrids keep their own period). **Open:** whether 3600 s should become the default (entry 194 vs this answer); to confirm with him when the task is planned.
+
+## 229. Q-1527f answered C: the overshoot-switch margin for heat pumps waits for a real heat-pump capture (Sergeant D, 2026-11-02)
+
+**Source:** as entry 227, msg 1566686069796114443 (https://discord.com/channels/812969634638725140/1514720723980259460/1566686069796114443); Q-1527f in msg 1566676722768941168. He wrote "A-1527f", read as Q-1527f (no other id matches).
+
+**Quoted** (excerpt of a list): "A-1527f: C"
+
+**Settled:** option C: no change now; fOvershootMargin stays 2.0 for heat pumps (firmware satCycleCheckOvershootSwitch; thermo-nova OVERSHOOT_MARGIN_CELSIUS 3.0, cycles/const.py:10, heating_control.py:288-296). The margin is decided after a capture of a real heat pump shows how far it overshoots before it stops by itself (round 23c finding 9). **Task:** TASK-1527 AC#1 (heat-pump capture). **Open:** the margin decision itself, after the capture.
