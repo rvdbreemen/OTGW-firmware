@@ -3,10 +3,10 @@ id: TASK-1542
 title: >-
   SAT heat pumps: 600 s minimum ON for every heat pump, plus an experimental
   on/off heat-pump type with a 3-hour cycle
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-01T09:38:00Z'
-updated_date: '2026-11-02T19:27:00Z'
+updated_date: '2026-11-02T19:47:00Z'
 labels:
   - sat
   - heat-pump
@@ -34,7 +34,7 @@ Evidence: docs/sat/sim-hp-lowload/round18b.md (rounds 18b/18c, PWM as the firmwa
 - [x] #3 Host test against the real PWM mapper at 10800 s / 600 s: on/off times correct in all 5 duty ranges, ON phase ends at the current ON time, 600 s minimum holds
 - [x] #4 Existing PWM, gas and hybrid tests stay green (tests/test_sat_hp_pwm.py and the other tests/test_sat_pwm_*.py)
 - [x] #5 v2 UI: the experimental type appears in the appliance list labelled experimental, shown in hours ('cycle 3 hours, minimum run 10 minutes'), availability as decided in Q-1527b
-- [ ] #6 Bench run with satsimulation on the experimental type shows a full ON/OFF period with the expected times
+- [x] #6 Bench run with satsimulation on the experimental type shows a full ON/OFF period with the expected times
 - [x] #7 Minimum PWM OFF time 600 s for heat pumps (entry 198), also when the duty asks for continuous ON (range 5 must not restart within 600 s of a stop); gas unchanged; host test red on HEAD, green after
 <!-- AC:END -->
 
@@ -54,4 +54,12 @@ Renumbered 2026-11-01 before the commit (199-201 were taken on origin/dev by the
 2026-11-01 23:36-23:41 bench .63 on 2.0.0-beta.4+2905bd1 (SAT simulation on): POST settings satsource 2 + sathpcycle 10800 accepted and stored (GET settings shows 10800: the device setter keeps the 3 h value); sat/status heating_source 2. The simulated heat pump stayed in continuous mode at its setpoint (boiler_status at_setpoint, flow 27.4 vs CS 28.9), so no PWM edge occurred and the 10800 s mapper / 600 s hold were not exercised on the bench in the 5 minutes available; stopped early because Robert asked for the TASK-1525 bench run with priority. AC#6 stays open (needs a sim scenario with overshoot, e.g. a low load, or a field heat pump).
 
 Bench 2026-11-02 19:53-20:26 (.63, 2.0.0-beta.14+4d94f13, SAT simulation, Robert: short run): satsource 2 + sathpcycle 10800, control mode forced to pwm. Device log (satPwmSchedu): pwm_on=9076 s pwm_off=1724 s duty=0.84; pwm_on=3126 pwm_off=7674 duty=0.29; pwm_on=4019 pwm_off=6781 duty=0.37; pwm_on=2630 pwm_off=8170 duty=0.24 (each pair sums to 10800 s: the 3 h period is live on the device); at duty 0.00: pwm_on=600 s pwm_off=21000 s (the 600 s heat-pump minimum ON applied on the device). ON phase started 19:57:09. At 20:00:10 the requested setpoint fell to the cold setpoint and the cold cutoff ended PWM ('Control mode: continuous (heating off, PWM ended)'), so a complete ON->OFF edge at the 10800-based times was not observed in the slot. Limit: with the 3 h period the 600 s minimum ON only applies below duty 0.056, which on this sim lies below the cold cutoff. Settings restored (diff: only the self-learned satthermalcoeff). Side finding: TASK-1565 (stale REST body).
+
+2026-11-02 Robert: AC#6 accepted on the bench evidence above (10800 s period and 600 s minimum ON live in the device mapper); the complete ON->OFF edge is covered by the host test (tests/test_sat_hp_pwm.py, ON phase ends at the current ON time). Field confirmation from a tester with an on/off heat pump stays welcome.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Heat pumps: 600 s minimum ON and 600 s minimum OFF in SAT PWM (entries 197/198), and an experimental appliance type 'On/off heat pump, 3 h cycle' (satsource 2 + sathpcycle 10800, entries 202-204: warning text, extra confirm on radiators, cycle field hidden); hybrids keep 180 s and 1800/2400. Shipped as 2.0.0-beta.4 (dc566f8c6). Evidence: tests/test_sat_hp_pwm.py old code 20 FAIL, fix 33/33 (AC1-4, AC7); tests/webui/v2-settings-sat-followups.test.mjs beta.2 UI 4 FAIL, new PASS (AC5); bench .63 beta.14 (AC6): satPwmSchedu on/off pairs 9076/1724, 3126/7674, 4019/6781, 2630/8170 s (all 10800 s) and pwm_on=600 s at duty 0. Not observed on the bench: a complete ON->OFF edge (the cold cutoff ended PWM after 3 min); with a 3 h period the 600 s minimum ON only applies below 5.6 % duty. No field run with a real heat pump yet.
+<!-- SECTION:FINAL_SUMMARY:END -->
