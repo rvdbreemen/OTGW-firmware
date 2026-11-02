@@ -3,11 +3,11 @@ id: TASK-1562
 title: >-
   SAT PWM: the hot-water-flame start hold also applies without overshoot
   protection (Q-1412.6a B, entry 234)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-02T16:39:00Z'
-updated_date: '2026-11-02T17:00:00Z'
+updated_date: '2026-11-02T17:53:00Z'
 labels:
   - sat
   - pwm
@@ -40,3 +40,9 @@ Drop the explicit settings.sat.bOvershootProtection gate in satPwmHoldForDhwFlam
 <!-- SECTION:NOTES:BEGIN -->
 Evidence: k3 red on beta.12 (start 1230 s), green on fix (1350 s); anchors 53/53, override/hp/start-limit/no-return OK; full tests/ 94/94 (test_adr_governance fixed: the ADR-206 bullet was missing in docs/adr/README.md, added in this commit); evaluate --quick 0 failed. Spec + CHANGELOG updated; entry 231 left as written (entry 234 supersedes its hold point).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in 2.0.0-beta.13 (1eb605952), zip covered by the beta.14 post (msg 1566872791351955649). satPwmHoldForDhwFlame no longer checks overshoot protection (Sergeant D entry 234, Q-1412.6a B, changes entry 133). AC1: tests/test_sat_pwm_anchors.py k3 red on beta.12 (start 1230 s), green on the fix (1350 s, as e4). AC2: protection-on hold tests (e4, h1-h4, k1, k2, k4) green; anchors 53/53, override 79/79, hp 33/33, start-limit, no-return green; full tests/ 94/94. AC3: firmware-sat-spec.md and CHANGELOG updated. Not verified on the bench: a hot-water draw exactly at the OFF->ON start cannot be triggered on .63; host test only (decided under Robert's autonomy rule).
+<!-- SECTION:FINAL_SUMMARY:END -->

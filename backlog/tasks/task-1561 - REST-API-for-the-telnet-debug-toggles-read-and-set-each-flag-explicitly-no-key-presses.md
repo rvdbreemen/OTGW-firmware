@@ -3,11 +3,11 @@ id: TASK-1561
 title: >-
   REST API for the telnet debug toggles: read and set each flag explicitly (no
   key presses)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-02T13:53:00Z'
-updated_date: '2026-11-02T17:34:00Z'
+updated_date: '2026-11-02T17:53:00Z'
 labels:
   - rest-api
   - debug
@@ -25,10 +25,10 @@ Robert 2026-11-02: 'Kan je niet een api call maken voor de debug toggles. Zodat 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Proposed ADR (adr-kit) for the endpoint: names, body shape, auth, not persisted
-- [ ] #2 GET /api/v2/debug/flags lists every telnet debug flag by name with its state; POST sets one flag explicitly and is idempotent; unknown name 400; host test on the real handler (red before, green after)
-- [ ] #3 One name->flag table shared by the telnet keys and the REST handler (a test fails when a telnet flag has no REST name)
-- [ ] #4 Bench: set SAT debug on/off via REST twice in a row, state as requested both times; docs/api/ updated
+- [x] #1 Proposed ADR (adr-kit) for the endpoint: names, body shape, auth, not persisted
+- [x] #2 GET /api/v2/debug/flags lists every telnet debug flag by name with its state; POST sets one flag explicitly and is idempotent; unknown name 400; host test on the real handler (red before, green after)
+- [x] #3 One name->flag table shared by the telnet keys and the REST handler (a test fails when a telnet flag has no REST name)
+- [x] #4 Bench: set SAT debug on/off via REST twice in a row, state as requested both times; docs/api/ updated
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -47,3 +47,9 @@ OSS: not applicable (project-specific glue, a few dozen lines).
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-02 Robert reviewed ADR-206: transient yes, simulation switches INCLUDED, no extra judge rule; ADR-206 rewritten and Accepted via adr-kit. sensorsim/otgwsim added with onChange (only on a real change). tests/test_debug_flags_api.py 8/8 (beta.13: 4 fail). test_sim_event_single_writer follows the 's' key into debugFlagOtgwSimChanged (same intent: post, never send). Full tests/ 94/94.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in 2.0.0-beta.12 (b2130dbde) and beta.14 (4d94f130f, simulations included per Robert's ADR-206 review). AC1: ADR-206 written via adr-kit, rewritten to Robert's three answers (transient; simulation switches included; no extra judge rule) and Accepted by him 2026-11-02. AC2: GET/POST /api/v2/debug/flags, idempotent, unknown name/value 400; tests/test_debug_flags_api.py 8/8 (HEAD before: no table; beta.13: 4 fail). AC3: one table debugFlags.h shared by telnet keys and REST; drift guard (every DebugSection bool in the table, no telnet toggle outside it). AC4: bench .63 on beta.14: 22/22 checks (sat false/false/true/true via POST + GET, path form, 400 on unknown name and bad value, sensorsim and otgwsim on/on/off/off, telnet key 5 still toggles, start state restored); docs/api/README.md updated. Full tests/ 94/94, evaluate --quick 0 failed. Zip msg 1566872791351955649 (covers beta.12-14). Not done: the capture tool (otgw_capture.py) still uses key presses; switching it to the API is a possible follow-up.
+<!-- SECTION:FINAL_SUMMARY:END -->
