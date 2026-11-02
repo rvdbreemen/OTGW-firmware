@@ -5636,6 +5636,14 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 
 **Settled:** option A: "Skip such hours as 'no room temperature'." TASK-1525 counted them (B) until this answer. thermo-nova has no curve self-tune (ADR-205, accepted by him in entry 180). **Task:** TASK-1559. **Open:** none.
 
+## 226. QD-4 follow-up: "thermo nova stops the boiler during PWM off (CH=0, CS=10)" (Sergeant D, 2026-11-02)
+
+**Source:** sergeantd, 2026-11-02 05:50 UTC, msg 1566691068110700646 (https://discord.com/channels/812969634638725140/1514720723980259460/1566691068110700646), reply to our QD-4 explanation (msg 1566690509680939029, entry 216).
+
+**Quoted (whole message):** "thermo nova stops the boiler during PWM off ( CH=0, CS=10 )"
+
+**Compared:** this matches thermo-nova with overshoot protection ON (heating_control.py:388-389 sets CS to MINIMUM_SETPOINT 10, const.py:35; CH=0 because CS is not above COLD_SETPOINT 22, :238). With overshoot protection OFF, `_compute_pwm_control_setpoint` returns at :385 before :389, so the OFF phase sends no CS=10 and CH stays 1 (opened in this session). His statement and the code differ for the protection-off case; reported back to him with both citations (msg 1566691351070773289), not decided by us. **Reading (interpretation, ours):** his intent is that a PWM OFF phase stops the boiler, which points to option B, but he has not chosen A/B/C for protection off. **Task:** TASK-1412.6. **Open:** QD-4 (protection-off case), asked again.
+
 ## 227. Q-1527a answered A: no "heat pump controls itself" setting; entries 194-198 and 202 are the answer (Sergeant D, 2026-11-02)
 
 **Source:** sergeantd, 2026-11-02 05:31 UTC, #alpha-testing, msg 1566686069796114443 (https://discord.com/channels/812969634638725140/1514720723980259460/1566686069796114443), answer to the overview (Q-1527a in msg 1566676696348754002).
