@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.7] - 2026-11-02
+
+Same firmware code as the dev build 2.0.0-beta.6; it collects the dev builds 2.0.0-beta.2 to beta.6.
+
 ### Added
 
 - **SAT heat pumps: at least 10 minutes on and 10 minutes off, and an experimental on/off heat-pump type with a 3-hour cycle** (TASK-1542, 2.0.0-beta.4; Sergeant D entries 195, 197, 198; entries 202-204). A heat pump in SAT PWM now runs at least 600 s per ON phase (was 180 s, the gas value) and stays off at least 600 s after a stop, also when the demand asks for continuous ON; gas boilers and hybrids keep 180 s and no minimum OFF. New appliance type "On/off heat pump, 3 h cycle (experimental)" in the SAT settings: stored as heat pump with a 10800 s PWM cycle (`sathpcycle` 10800; the setter now snaps to 1800, 2400 or 10800); it can be chosen with any heating system (Sergeant D entries 202, 203) and always shows Robert's warning (entry 204): "Experimental. Only for on/off heat pumps with a large thermal mass (underfloor heating or a buffer tank). Long runs of up to 3 hours."; on radiators a second warning must be confirmed: "Not recommended without a buffer tank: the room may overheat." A hybrid never gets the 3-hour cycle. Host tests: `tests/test_sat_hp_pwm.py` (old code: 20 failures, fix 33/33), browser test `tests/webui/v2-settings-sat-followups.test.mjs`.
@@ -13,6 +17,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **SAT's cold cutoff no longer flips every minute on mild days** (TASK-1547, Sergeant D entries 199, 200). With the room on target the requested setpoint sits near the heating curve, and on a mild day that is right on the cold setpoint (28.2 C radiators, 21 C underfloor). The cutoff was a bare "at or below" test every 30 s tick, so it switched heating off and on again every minute and lit the boiler for about 60 s each time (reported on alpha.597). The cutoff is now latched with a 0.5 C band: heating stops at or below the cold setpoint as before, and starts again only above the cold setpoint + 0.5 C. The CS override, the CH bit, the PWM gates, the overshoot switch, the PWM exits and the 3 s suppression refresh all read the same latched state. The thresholds stay as Sergeant D chose them; thermo-nova's 22 C was a mistaken request (entry 200). Host tests: `tests/test_sat_cold_hysteresis.cpp`, `tests/test_sat_cold_hysteresis_source.py`.
 - **SAT pressure health no longer resets on every PWM OFF phase** (TASK-1480, entry 201). The pressure drop rate pauses for 600 s and clears its samples when central heating starts or stops. "Central heating active" is now the boiler's CH-mode bit (MsgID 0 slave bit 1, pump including overrun), as thermo-nova's MQTT coordinator reads it, instead of the master CH enable bit that SAT itself clears in every PWM OFF phase. On a synthetic series shaped like gruijter's field capture the false `sat/pressure_alarm` episodes drop from 7 to 0; on the real capture the earlier replay counted 9 against 5 (TASK-1480 notes). Host test: `tests/test_sat_pressure_health.py` (4 of 7 fail on the old bit, 7/7 on the fix).
+
+### Fixed
+
+- **SAT: every repeated CS and the thermal-safe CS respect the effective max setpoint** (TASK-1536, 2.0.0-beta.6). The 5 s resend and the 30 s PIC keepalive repeated the last CS without the ceiling, so a maximum lowered after the control tick was exceeded until the next tick (up to the control interval); the thermal-safe fallback (CS 45 after 2 h without a room temperature) was capped by the user max flow setpoint only, not by the boiler's own MaxTSet. Both now use `satEffectiveMaxSetpoint()` (boiler MaxTSet, the user or default cap of Sergeant D entries 148/152, the hard ceiling). Host test `tests/test_sat_cs_ceiling_1536.py` (old code: 4 of 5 fail); bench: with the ceiling lowered 62 -> 50, beta.5 kept sending CS=62.0 every 5 s, beta.6 sent CS=50.0 one second later.
+- **S0 counter, relay output and Dallas sensors refuse a pin the board itself drives** (TASK-1552, 2.0.0-beta.2). The 1.x Wemos defaults (S0 GPIO 12, output GPIO 16) hit the PIC reset and LED1 on an S3 Mini and the I2C bus on an S3 Mini Pro. `boardPinReserved()` (OTGW-firmware.h) refuses such a pin for the active board map; the function stays off and one line is logged (the output logs once per pin, not every OT frame). Do: check the pin of S0, the relay output or Dallas under Settings if you use them. Web UI, REST and flash-tool texts are board-neutral. Host test `tests/test_board_pin_reserved.py`.
 
 ## [2.0.0-beta.1] - 2026-11-01
 
@@ -536,7 +545,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.1...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.7...HEAD
+[2.0.0-beta.7]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.1...v2.0.0-beta.7
 [2.0.0-beta.1]: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.1
 [2.0.0-beta]: https://github.com/rvdbreemen/OTGW-firmware/compare/v1.3.5...HEAD
 [1.3.5]: https://github.com/rvdbreemen/OTGW-firmware/compare/v1.3.4...v1.3.5
