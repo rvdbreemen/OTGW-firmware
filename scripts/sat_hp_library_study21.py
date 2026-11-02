@@ -97,6 +97,11 @@ SEPARATOR = False
 # maximum relative modulation SAT sends while it runs PWM (heat pumps get MM = 100 today, satComputeMM).
 FLOW_CAP = h12.SP_MAX
 MM_PWM = 100.0
+# Overshoot switch (entry 87; firmware satCycleCheckOvershootSwitch, fOvershootMargin default 2.0; thermo-nova
+# OVERSHOOT_MARGIN_CELSIUS 3.0, cycles/const.py:10, heating_control.py:288-296). OV_TICKS = 1 switches on the first
+# qualifying minute (rounds 21-23); the firmware switches on the first tick >= 60 s after it, i.e. OV_TICKS = 2.
+OV_MARGIN = 2.0
+OV_TICKS = 1
 SEP_C, SEP_G, SEP_G_OFF, MCP_BOILER = 30000.0, 930.0, 20.0, 930.0
 
 
@@ -171,8 +176,8 @@ def run(args):
         if heating: heat_min += 1
         if variant == "sat" and heating and sp > cold_sp:
             if not pwm:
-                ov = ov + 1 if (on and flow_now >= sp + 2.0) else 0
-                if ov >= 1: pwm = True; ov = 0; ph_on = True; ph_el = 0; sat_s = 0; eff_on = None
+                ov = ov + 1 if (on and flow_now >= sp + OV_MARGIN) else 0
+                if ov >= OV_TICKS: pwm = True; ov = 0; ph_on = True; ph_el = 0; sat_s = 0; eff_on = None
             if pwm:
                 pwm_min += 1
                 ref = eff_on if eff_on else max(flow_now, cold_sp)

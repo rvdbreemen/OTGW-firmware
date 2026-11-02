@@ -34,10 +34,11 @@ NIBE 17.3 / 0.172, 10.1 / 0.174, 4.1 / 0.186; Daikin 04 20.8 / 0.158, 11.8 / 0.1
 1. **A longer PWM period is the strongest lever inside today's mechanism**: 3600 s cuts starts by 42 % at +0.002 C,
    10800 s by 77 % at +0.008 C (the cost is larger on the NIBE, +0.014 C). With the ON time following the room
    (entry 196), a long period no longer costs much comfort.
-2. **Entries 197/198 (600 s minimum ON and OFF) beat the old 180 s rule in every run**: the old rule had more starts
-   in 100 % of the runs and worse comfort in 92 %.
-3. **Flow cap 35 / 40 / 45 C makes no difference on underfloor heating**: the flow stays far below 35 C. This setting
-   matters on radiators, which this round does not model.
+2. **Entries 197/198 (600 s minimum ON and OFF) beat the old 180 s rule in every run**: the old rule had strictly more
+   starts in 120 of 120 runs and worse comfort in 110 of 120 (92 %).
+3. **Flow cap 35 / 40 / 45 C makes almost no difference on underfloor heating**: the 40 C cap never binds (cap 45 gives
+   identical runs), cap 35 changes 8 of 120 runs by at most 0.12 starts/day (the coldest days). This setting matters on
+   radiators, which this round does not model.
 4. **MM 0 in PWM changes little** (-0.4 starts/day): the ON-phase suppression setpoint (flow - 1 C) already holds the
    heat pump near its minimum; MM only acts during the first minutes of an ON phase.
 5. **SAT continuous stays the best option on both scores**: fewer starts than even the 3 h period (3.4 vs 3.9) and the
@@ -58,6 +59,40 @@ The band is the classic trade-off between starts and comfort, and it moves both 
 runs in the same direction). Even the tight 1 K band (9.9 starts, 0.111 C) has fewer starts and better comfort than
 SAT with its PWM switch (17.0 starts, 0.162 C). This band belongs to the heat pump's own control, not to SAT; SAT only
 sets the CS it moves around.
+
+## Round 23c: the selectable middle period and SAT's own hysteresis (the overshoot switch into PWM)
+
+Data `round23c_switch_runs.json` (600 runs, same units, houses and seasons; paired against "current" from round 23).
+SAT's hysteresis is the switch into PWM: flow >= CS + margin for 60 s (entry 87; firmware satCycleCheckOvershootSwitch
+with fOvershootMargin 2.0; thermo-nova OVERSHOOT_MARGIN_CELSIUS 3.0, cycles/const.py:10, heating_control.py:288-296).
+The beta.4 setter snaps the heat-pump period to 1800 / 2400 / 10800 s, so 2400 s is the selectable middle value
+(3600 s in round 23 is not selectable).
+
+| Candidate | Starts/day | Room error (C) | Min/day outside +-0.3 C | Time in PWM | Starts vs current | Runs with fewer starts | Runs with equal or better comfort |
+|---|---|---|---|---|---|---|---|
+| current (round 23) | 17.0 | 0.162 | 219 | 41 % | | | |
+| PWM period 2400 s | 13.8 | 0.163 | 220 | 41 % | -3.2 | 120 / 120 | 53 / 120 |
+| switch 60 s as the firmware (one tick later) | 16.5 | 0.161 | 217 | 39 % | -0.5 | 118 / 120 | 62 / 120 |
+| switch 300 s, margin 2.0 | 16.2 | 0.161 | 216 | 38 % | -0.9 | 117 / 120 | 71 / 120 |
+| margin 3.0 (thermo-nova), 60 s | 3.3 | 0.151 | 178 | 0 % | -13.8 | 120 / 120 | 77 / 120 |
+| margin 4.0, 60 s | 3.2 | 0.151 | 178 | 0 % | -13.8 | 120 / 120 | 78 / 120 |
+
+Findings:
+
+6. **2400 s cuts starts by 19 % (17.0 -> 13.8) at +0.0007 C**, every run fewer starts; the selectable step between
+   today's 1800 s and the experimental 10800 s.
+7. **The one-tick difference between the model and the firmware is small** (-0.5 starts/day, comfort equal): rounds 21-23
+   switch on the first qualifying minute, the firmware one tick later; their conclusions stand.
+8. **A longer dwell (300 s) changes little** (-0.9 starts/day).
+9. **With margin 3.0 or 4.0 SAT never enters PWM in this model, and that is an artefact of the model's assumption, not a
+   result.** The modelled heat pump stops by itself at flow > CS + 3 K (`study21.py:206`, assumption A). The switch needs
+   flow >= CS + margin for 60 s while the heat pump runs; with a margin of 3 K or more the heat pump stops first, so the
+   switch never fires and SAT stays continuous (3.3 starts/day, the SAT-continuous result). Check with a 5 K stop band
+   (NIBE, 2015 house, 2024-25): margin 2.0 -> 15.9 starts/day, 40 % PWM; margin 3.0 -> 12.4, 32 %; margin 4.0 -> 9.0, 23 %.
+   **General rule from the model: SAT's switch only fires when the heat pump's own stop overshoot is larger than SAT's
+   margin.** Where a unit stops close to its setpoint, SAT behaves as continuous whatever the margin; where it overshoots
+   further, a larger margin lowers the PWM share and the starts. How far real units overshoot before they stop is not
+   published for any of the ten units; a capture (TASK-1527 AC#1) is needed to settle it.
 
 ## Limits
 

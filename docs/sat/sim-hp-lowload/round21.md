@@ -1,7 +1,7 @@
 # TASK-1527 round 21: ten heat pumps and hybrids under SAT, ten heating seasons
 
-Date 2026-11-02. Robert (2026-11-01, #dev-sat-mqtt): research ten popular heat pumps and hybrids, build a library of
-models with proofs, use the real SAT in the simulation, run at least the last ten winters. A design validation run:
+Date 2026-11-02. Goal: ten popular heat pumps and hybrids as a library of models with sources, the real SAT in the
+simulation, at least the last ten winters. A design validation run:
 nothing in the firmware changes.
 
 Script `scripts/sat_hp_library_study21.py`; SAT port `scripts/sat_sim_port.py`; proof
