@@ -129,6 +129,38 @@ int main(int argc, char** argv) {
     printf("sent=%s\nsent_ms=%s\nqueued=%d\n", all, times, cmdQueueSize);
     return 0;
   }
+  if (!strcmp(sc, "burst")) {            // TASK-1567: SAT's resend set due at once; the queue must drip, one per tick
+    const unsigned step = (unsigned)atoi(argv[2]);   // loop period in ms (1000 = the firmware tick; 250 = a faster caller)
+    addCommandToQueue("CS=45.0", 7, false, 0);
+    addCommandToQueue("MM=80", 5, false, 0);
+    addCommandToQueue("CH=1", 4, false, 0);
+    char all[256] = "", times[256] = "";
+    for (uint32_t t = 100000; t <= 106000; t += step) {
+      g_sent[0] = 0; loopAt(t);
+      char line[64]; const char* p = g_sent;
+      while (sscanf(p, "%63[^;];", line) == 1) {
+        strcat(all, line); strcat(all, ";");
+        char ts[24]; snprintf(ts, sizeof(ts), "%lu;", (unsigned long)(t - 100000)); strcat(times, ts);
+        char e[24]; snprintf(e, sizeof(e), "%c%c: %s", line[0], line[1], line + 3); echo(e);   // the PIC echoes it
+        p = strchr(p, ';') + 1;
+      }
+    }
+    printf("sent=%s\nsent_ms=%s\nqueued=%d\n", all, times, cmdQueueSize);
+    return 0;
+  }
+  if (!strcmp(sc, "deep")) {             // TASK-1567 review: a CS= behind a full queue (20 slots), the PIC echoes nothing
+    char c[8];
+    for (int k = 0; k < 19; k++) { snprintf(c, sizeof(c), "%c%c=1", 'A' + k / 6, 'A' + k % 6); addCommandToQueue(c, 4, false, 0); }
+    addCommandToQueue("CS=45.0", 7, false, 0);
+    printf("queued_at_start=%d\n", cmdQueueSize);
+    long csAt = -1;
+    for (uint32_t t = 100000; t <= 160000 && csAt < 0; t += 1000) {
+      g_sent[0] = 0; loopAt(t);
+      if (strstr(g_sent, "CS=45.0")) csAt = (long)(t - 100000);
+    }
+    printf("cs_sent_ms=%ld\n", csAt);
+    return 0;
+  }
   if (!strcmp(sc, "user_tp")) {          // TP= follows the same rule: unique per value, exact repeat not added twice
     addCommandToQueue("TP=11:12=40", 11);
     addCommandToQueue("TP=11:12=45", 11);
@@ -250,6 +282,29 @@ class PmChain(unittest.TestCase):
         # one second apart (Robert): the PIC keeps one pending priority message
         ms = [int(x) for x in out["sent_ms"].strip(";").split(";")]
         self.assertTrue(all(b - a >= 1000 for a, b in zip(ms, ms[1:])), f"PM= sent less than 1 s apart: {ms}")
+
+    def test_queue_drips_one_command_per_tick(self):
+        # TASK-1567 (Robert 2026-11-02): the queue never bursts. Three commands due at once go to the PIC on three
+        # successive ticks, also when the queue is polled faster than the 1 s firmware tick. HEAD: all three in tick 0.
+        for step in ("1000", "250"):
+            with self.subTest(loop_ms=step):
+                out = self.run_sc("burst", step)
+                self.assertEqual(out["sent"], "CS=45.0;MM=80;CH=1;")
+                ms = [int(x) for x in out["sent_ms"].strip(";").split(";")]
+                self.assertTrue(all(b - a >= 900 for a, b in zip(ms, ms[1:])), f"sent within one tick: {ms}")
+                self.assertLessEqual(ms[-1], 5000, f"SAT resend set not drained within its 5 s period: {ms}")
+                self.assertEqual(out["queued"], "0")
+
+    def test_cs_behind_a_full_queue_still_well_within_the_pic_minute(self):
+        # TASK-1567 review (lead): worst case for a CS= at the back of a full queue (20 slots), no PIC echoes, so every
+        # earlier command keeps retrying every 5 s. The PIC drops a CS= after about a minute without a new one
+        # (otgw.tclcode.com/firmware.html: 'must be repeated at least every minute'); the drip must stay well inside that.
+        out = self.run_sc("deep")
+        self.assertEqual(out["queued_at_start"], "20")
+        cs = int(out["cs_sent_ms"])
+        self.assertGreaterEqual(cs, 0, "CS= never sent")
+        self.assertLessEqual(cs, 30000, f"CS= waited {cs} ms behind a full queue")
+        print(f"\n  CS= behind 19 unconfirmed commands went out after {cs} ms")
 
     def test_user_tp_unique_per_value(self):
         # Robert 2026-11-01: TP= the same way as PM=. Different values each get an entry; an exact repeat does not.

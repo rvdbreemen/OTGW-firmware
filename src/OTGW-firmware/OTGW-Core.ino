@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.18
+**  Version  : v2.0.0-beta.19
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3943,39 +3943,43 @@ void addCommandToQueue(const char* buf, const int len, const bool forceQueue, co
   This checks the queue for message are due to be resent.
   If retry max is reached the cmd is delete from the queue
 */
-// PM= and TP= both load the PIC's single priority-message slot (otgw-6.6 gateway.asm SetPrioMessage, SlaveParameter):
-// send at most one of them per second, so three in a row go out one second apart (TASK-1315, Robert 2026-11-01).
-#define PRIO_MSG_SPACING_MS 1000UL
-static uint32_t s_lastPrioSendMs = 0;
-static bool     s_prioSent = false;
+// The queue drips: at most one command per 1 s tick, never a burst (TASK-1567, Robert 2026-11-02). The PIC holds one
+// command line at a time (otgw-6.6 gateway.asm: one 16-byte rxbuffer, bytes are dropped while a command waits) and
+// answers OE when it is too busy (otgw.tclcode.com/firmware.html). The gap is measured in time, not in calls, so a
+// faster caller cannot send more; 900 ms leaves room for the jitter of the 1 s timer (one command per tick).
+// This also keeps PM= and TP= (one shared priority-message slot in the PIC) at least a tick apart (TASK-1315).
+#define QUEUE_SEND_GAP_MS 900UL
+static uint32_t s_lastQueueSendMs = 0;
+static bool     s_queueSent = false;
 
 void handleCommandQueue(){
   pmChainTick();
   // Pause queue processing briefly after ser2net activity to avoid collisions
   if ((millis() - lastSer2netCmdMs) < SER2NET_QUIET_MS) return;
   const uint32_t now = millis();
-  for (int i = 0; i < cmdQueueSize; i++) {
-    // OTDebugTf(PSTR("CmdQueue: Checking due in queue slot[%d]:[%lu]=>[%lu]\r\n"), (int)i, (unsigned long)millis(), (unsigned long)cmdqueue[i].due);
-    if ((int32_t)(now - cmdqueue[i].due) >= 0) {
-      const bool prio = (cmdqueue[i].cmd[0] == 'P' && cmdqueue[i].cmd[1] == 'M') ||
-                        (cmdqueue[i].cmd[0] == 'T' && cmdqueue[i].cmd[1] == 'P');
-      if (prio && s_prioSent && (now - s_lastPrioSendMs) < PRIO_MSG_SPACING_MS) continue;   // stays due, next pass
-      if (prio) { s_lastPrioSendMs = now; s_prioSent = true; }
-      OTDebugTf(PSTR("CmdQueue: Queue slot [%d] due\r\n"), i);
-      sendPICSerial(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
-      cmdqueue[i].retrycnt++;
-      cmdqueue[i].due = now + OTGW_CMD_INTERVAL_MS;
-      if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
-        //max retry reached, so delete command from queue
-        OTDebugTf(PSTR("CmdQueue: Delete [%d] from queue\r\n"), i);
-        snprintf_P(cMsg, sizeof(cMsg), PSTR("%s [dropped]"), cmdqueue[i].cmd);
-        sendEventToWebSocket('!', cMsg);
-        reportCommandDropped(cmdqueue[i].cmd);
-        removeFromCmdQueue(i);
-        i--; // re-check current index after shift
-      }
-      // //exit queue handling, after 1 command
-      // return;
+  if (s_queueSent && (now - s_lastQueueSendMs) < QUEUE_SEND_GAP_MS) return;   // wait for the next tick
+  // Send the command that has waited longest (oldest due time), not the lowest slot: an unconfirmed command comes
+  // due again every 5 s, so with a lowest-slot pick a few retrying slots would take every tick and starve a CS= at
+  // the back of the queue past the PIC's one-minute CS limit (TASK-1567 review, 20-deep test).
+  int pick = -1;
+  for (int k = 0; k < cmdQueueSize; k++) {
+    if ((int32_t)(now - cmdqueue[k].due) < 0) continue;
+    if (pick < 0 || (int32_t)(cmdqueue[pick].due - cmdqueue[k].due) > 0) pick = k;
+  }
+  if (pick >= 0) {   // one command per tick: the next due one waits for the next tick
+    const int i = pick;
+    s_lastQueueSendMs = now; s_queueSent = true;
+    OTDebugTf(PSTR("CmdQueue: Queue slot [%d] due\r\n"), i);
+    sendPICSerial(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
+    cmdqueue[i].retrycnt++;
+    cmdqueue[i].due = now + OTGW_CMD_INTERVAL_MS;
+    if (cmdqueue[i].retrycnt >= OTGW_CMD_RETRY){
+      //max retry reached, so delete command from queue
+      OTDebugTf(PSTR("CmdQueue: Delete [%d] from queue\r\n"), i);
+      snprintf_P(cMsg, sizeof(cMsg), PSTR("%s [dropped]"), cmdqueue[i].cmd);
+      sendEventToWebSocket('!', cMsg);
+      reportCommandDropped(cmdqueue[i].cmd);
+      removeFromCmdQueue(i);
     }
   }
   OTDebugFlush();
