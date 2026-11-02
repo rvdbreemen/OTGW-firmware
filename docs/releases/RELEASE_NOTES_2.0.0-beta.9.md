@@ -25,6 +25,8 @@ These apply only when SAT is on and in PWM mode.
 - **The 180 s minimum burn after a hot-water draw now follows Sergeant D's two rules** (TASK-1518, TASK-1558). When you tap hot water during a PWM ON phase, SAT pauses that phase and waits up to 180 s after the draw for the central-heating flame to come back.
   - No CH flame comes back: the 180 s minimum burn no longer holds the phase on. It ends on its normal ON time. Before, SAT kept the phase on for the rest of the 180 s without a flame (in the test case 390 s instead of 270 s).
   - The boiler had not lit within the first 180 s of the phase, then a draw came, then the CH flame lit: that flame now gets the full 180 s minimum burn, as it would without a draw. Before, it got none, and the phase could end 30 s after ignition.
+  - The same rules hold for a heat pump, with its 600 s minimum burn.
+  - **How this was tested:** host tests on the real SAT code (5 cases fail on beta.8, all pass on beta.9, also for heat pumps). The bench unit has no boiler, so the draw itself was not reproduced on hardware; the bench check covered the update (settings kept) and 11 minutes of SAT simulation, including a PWM ON phase, without a restart. Field reports on hot-water draws during heating are welcome.
 
 ---
 
