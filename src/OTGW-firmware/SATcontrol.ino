@@ -1154,11 +1154,15 @@ static void satPwmNoteDhwFlameEdge(bool flame, bool dhwBit)
 }
 
 // OFF-to-ON start held back by a hot-water flame that still burns (entries 105, 106). Nothing else changes, so the start
-// comes on the first tick after the flame goes out. Only when PWM drives the setpoint (entry 107, our reading: without
-// overshoot protection SAT does not switch the burner, so holding the count would only stop counting while the flame runs on).
+// comes on the first tick after the flame goes out. Only with overshoot protection on, no hot water and the requested setpoint
+// above the cold setpoint (Sergeant D entry 133, Conf-107 A). Entry 230 made the OFF phase stop the boiler also without protection;
+// whether the hold should follow is put to him (Q-1412.6a), so the protection gate stays explicit until he answers.
 static bool satPwmHoldForDhwFlame(bool flame, float pidOutput)
 {
-  if (!(flame && _pwm_dhwFlameLit && satPwmDrivesSetpoint(pidOutput))) { _pwm_dhwFlameHeldLogged = false; return false; }
+  if (!(flame && _pwm_dhwFlameLit && settings.sat.bOvershootProtection && satPwmDrivesSetpoint(pidOutput))) {
+    _pwm_dhwFlameHeldLogged = false;
+    return false;
+  }
   if (!_pwm_dhwFlameHeldLogged) {
     _pwm_dhwFlameHeldLogged = true;
     satNarratef_P(PSTR("PWM ON held: hot-water flame still burning"));
@@ -1406,22 +1410,24 @@ static void satPwmSchedule(float pidOutput)
   }
 }
 
-// PWM control setpoint, gated like thermo-nova _compute_pwm_control_setpoint (heating_control.py:385):
-// the CS override runs only with overshoot protection on, no DHW and a requested setpoint above the
-// cold setpoint. Otherwise there is no override and CS keeps its previous control setpoint (the
-// requested setpoint, which already includes the solar offset, when there is no heating CS to keep,
-// so CH can still start).
-// Override on: OFF phase -> 10 (CH off). ON phase (also duty range 5, status ON in thermo-nova):
+// PWM control setpoint, gated like thermo-nova _compute_pwm_control_setpoint (heating_control.py:385), with one deliberate
+// deviation: the OFF phase (and IDLE, which is not ON) sends 10 whenever there is no DHW and the requested setpoint is above the
+// cold setpoint, also with overshoot protection off (Sergeant D entry 230, QD-4 B); thermo-nova does that only with the option on.
+// With DHW or a requested setpoint at or below the cold setpoint there is no override and CS keeps its previous control setpoint
+// (the requested setpoint, which already includes the solar offset, when there is no heating CS to keep, so CH can still start).
+// Without overshoot protection the ON phase has no override either: it keeps the previous control setpoint.
+// Override on (protection on), ON phase (also duty range 5, status ON in thermo-nova):
 //  - flame off -> return + offset (the hold, kept for fModSupDelay after ignition),
 //  - flame on, no hold recorded and fModSupDelay not yet passed since the real flame-on time ->
 //    pending, the previous control setpoint stays,
 //  - after fModSupDelay -> flow - fModSupOffset (refreshed every 3 s by satPwmSuppressionRefresh()).
 // True when satApplyPWM() returns its PWM ON/OFF setpoint, false when it returns prevCS or the
 // continuous setpoint. Mirrors the early returns of satApplyPWM() exactly (TASK-1316, CH rule).
+// The OFF phase drives it whatever overshoot protection is (Sergeant D entry 230, QD-4 B); the ON phase only with protection on.
 static bool satPwmDrivesSetpoint(float pidOutput)
 {
-  return satGetFlowTemp() > 0.0f && settings.sat.bOvershootProtection && !state.sat.bDhwActive
-         && pidOutput > satColdThreshold();
+  return satGetFlowTemp() > 0.0f && !state.sat.bDhwActive && pidOutput > satColdThreshold()
+         && (settings.sat.bOvershootProtection || !state.sat.bPwmFlameRequested);
 }
 
 // scheduleDone: the control tick runs satPwmSchedule() and the PWM exits itself, before this setpoint step (thermo-nova order,
@@ -1433,13 +1439,16 @@ static float satApplyPWM(float pidOutput, bool scheduleDone = false)
   if (satGetFlowTemp() <= 0.0f) {
     return satApplyContinuous(pidOutput, _sat_lastControlCS);   // PWM idle without a flow temperature (heating_control.py:149-150)
   }
-  if (!settings.sat.bOvershootProtection || state.sat.bDhwActive || pidOutput <= satColdThreshold()) {
+  if (state.sat.bDhwActive || pidOutput <= satColdThreshold()) {
     return prevCS;
   }
   if (!state.sat.bPwmFlameRequested) {
     _pwm_flameOffHoldSetpoint = 0.0f;
-    return SAT_MIN_SETPOINT;                                      // OFF phase: no relight
+    return SAT_MIN_SETPOINT;                                      // OFF phase: no relight, also without overshoot protection (entry 230)
   }
+  // Without overshoot protection the ON phase has no override (no ignition hold, no suppression): it keeps the previous CS, as
+  // thermo-nova does (heating_control.py:385). After an OFF phase prevCS is the requested setpoint (the 10 is not kept).
+  if (!settings.sat.bOvershootProtection) return prevCS;
   const float maxSetpoint = satGetMaxSetpoint();
   if (!satIsFlameOn()) {                                          // waiting for ignition (also the ON-start tick)
     _pwm_flameOffHoldSetpoint = satPwmFlameOffHold(maxSetpoint);

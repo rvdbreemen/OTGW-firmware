@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.11] - 2026-11-02
+
+### Changed
+
+- **SAT PWM: the OFF phase sends CS=10 and CH=0 also with overshoot protection off** (TASK-1412.6; Sergeant D entry 230, QD-4 B; readings in entry 231). `satApplyPWM()` returns 10 in the OFF phase whatever `bOvershootProtection` is, and `satPwmDrivesSetpoint()` is true in the OFF phase, so `satChEnableDecide()` gives CH=0. Without the option the ON phase keeps the previous CS (no ignition hold, no suppression, no no-return flood), as before. A deliberate deviation from thermo-nova, which actuates the OFF phase only with the option on (heating_control.py:385). The hot-water-flame start hold stays gated on the option (entry 133; Q-1412.6a asks whether it should follow). Graph lane "CH mode" renamed "boiler CH mode" (it is MsgID 0 slave bit 1; entry 219). LL-017 host tests in `tests/test_sat_pwm_anchors.py` (old code: 4 fail) and `tests/test_sat_pwm_override.py` (old code: 2 fail).
+
 ## [2.0.0-beta.10] - 2026-11-02
 
 ### Fixed
@@ -563,7 +569,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.10...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.11...HEAD
+[2.0.0-beta.11]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.10...v2.0.0-beta.11
 [2.0.0-beta.10]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.9...v2.0.0-beta.10
 [2.0.0-beta.9]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.8...v2.0.0-beta.9
 [2.0.0-beta.8]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.7...v2.0.0-beta.8

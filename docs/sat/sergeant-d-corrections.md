@@ -5677,3 +5677,20 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted (whole message):** "QD-4: B"
 
 **Settled:** option B as put to him: "always stop the boiler, whatever that setting is". In every PWM OFF phase SAT sends CS=10 and CH=0, also with overshoot protection off; protection off then only drops the ON-phase ignition hold and suppression. Compared: thermo-nova stops the boiler in the OFF phase only with the user option on (heating_control.py:385 returns early when it is off; :388-389 set CS=10; default off, const.py:122); a deliberate deviation. Firmware today: satPwmDrivesSetpoint() requires bOvershootProtection (SATcontrol.ino ~1389, TASK-1412.6 triage), default true (SATtypes.h:508). Closes entries 216 and 226. **Task:** TASK-1412.6. **Open:** none.
+
+## 231. Interpretation: what entry 230 means for the ON phase without overshoot protection, and a conflict with entry 133 put back to him (2026-11-02, our reading)
+
+**Source:** no new statement. Implementation of entry 230 (QD-4 B) in TASK-1412.6, 2026-11-02, and its review.
+
+**His words (entry 230):** "QD-4: B", option B as put to him: always stop the boiler in every PWM OFF phase (CS=10, CH=0), whatever overshoot protection is; protection off then only drops the ON-phase ignition hold and suppression.
+
+**Readings acted on (ours):**
+
+1. **ON phase with protection off: no override, the previous control setpoint, as today.** `satApplyPWM()` returns the previous CS (thermo-nova keeps its previous control setpoint without the option, heating_control.py:385). After an OFF phase the previous CS is 10, which is never kept, so the first ON tick takes the requested setpoint; the later ticks of that ON phase keep that value (the CS does not follow a changed request until the next ON phase; the firmware did this before too). Switching the option off in the middle of an ON phase keeps the protected CS (hold or suppression value) until that ON phase ends, also as before. The no-return flood (entry 45) and the 3 s suppression refresh stay off without the option.
+2. **IDLE counts as "not ON":** at PWM entry while the hour limit or the hot-water-flame hold blocks the first start, the firmware sends 10, now also without protection. thermo-nova tests `PWMStatus.OFF` only (heating_control.py:388). Our reading of "every PWM OFF phase".
+
+**Conflict not resolved by us (Q-1412.6a, queued):** entry 133 (Conf-107 A, his answer) settles that the hot-water-flame start hold of entries 105/106 applies "only with overshoot protection on, no hot water and the requested setpoint above the cold setpoint". Entry 107 gave the reason: without protection SAT kept CH on in the OFF phase, so the hold could last for ever. Entry 230 removes that reason (the OFF phase now stops the boiler without protection too). The firmware keeps entry 133 as it is (the hold stays gated on protection, `satPwmHoldForDhwFlame`) and asks him whether the hold should now also apply without protection.
+
+**Compared with thermo-nova:** thermo-nova has no OFF-phase actuation without the option (heating_control.py:385) and no hot-water-flame hold (entry 106).
+
+**Task:** TASK-1412.6. **Open:** Q-1412.6a; readings 1 and 2 are offered to him in the progress note.

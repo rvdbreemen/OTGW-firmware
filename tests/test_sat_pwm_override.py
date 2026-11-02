@@ -298,7 +298,9 @@ int main(int argc, char** argv) {
     setPrev(45.0f);
     auto tick = [&](float req, bool dirty) {   // tickRun + the lines of satControlLoopRun() after the cut segment
       SETREQ(req);
-      if (dirty) { state.sat.bPwmFlameRequested = true; _pwm_flameOffHoldSetpoint = 48.0f; }   // dirty PWM phase
+      // dirty PWM phase: an ON phase that has just begun (anchor now), so the schedule keeps it ON and, without overshoot protection,
+      // the apply step keeps the previous CS (an old anchor would end the phase first: the OFF phase sends 10, entry 230)
+      if (dirty) { state.sat.bPwmFlameRequested = true; _pwm_flameOffHoldSetpoint = 48.0f; _pwm_lastUpdateMs = g_ms; }
       float cs = tickRun(req);
       _sat_lastControlCS = cs;
       return cs;
@@ -714,8 +716,10 @@ class SatPwmOverride(unittest.TestCase):
     def test_off_phase_with_protection_sends_minimum_not_28(self):
         self.assertEqual(float(self.run_sc("off", 1)["cs"]), 10.0)
 
-    def test_protection_off_keeps_previous_cs_in_off_phase(self):
-        self.assertEqual(float(self.run_sc("off", 0)["cs"]), 28.0)
+    def test_protection_off_off_phase_sends_10(self):
+        # Sergeant D entry 230 (QD-4 B, TASK-1412.6): the OFF phase stops the boiler also without overshoot protection.
+        # Before: the previous CS (28) was kept.
+        self.assertEqual(float(self.run_sc("off", 0)["cs"]), 10.0)
 
     def test_start_tick_with_protection_holds_return_plus_offset(self):
         r = self.run_sc("start", 1)
@@ -786,10 +790,13 @@ class SatPwmOverride(unittest.TestCase):
         self.assertEqual(float(self.run_sc("tick", 1, 0, 45)["cs"]), 48.0)
 
     def test_solar_offset_lowers_the_requested_setpoint_before_the_mode_step(self):
-        # protection off: PWM keeps the previous CS (28); the continuous marker shows what the step received
+        # Protection off. Without solar the requested 35 starts the ON phase (no override: the previous CS 28 stays). With solar the
+        # requested setpoint drops to 33 before the PWM step, too low for an ON start: the phase stays OFF, which sends 10 (entry 230).
         if not self.has_reqsp:
             self.skipTest("HEAD has no requested-setpoint segment")
-        self.assertEqual(float(self.run_sc("tick", 0, 1, 35)["cs"]), 28.0)
+        no_solar, solar = self.run_sc("tick", 0, 0, 35), self.run_sc("tick", 0, 1, 35)
+        self.assertEqual((float(no_solar["cs"]), no_solar["req"]), (28.0, "1"))
+        self.assertEqual((float(solar["cs"]), solar["req"]), (10.0, "0"))
 
     def test_refresh_after_hold_has_no_solar_term(self):
         r = self.run_sc("refresh", 1, "solar")

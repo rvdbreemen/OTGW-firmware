@@ -87,6 +87,7 @@ int main() {
       if (e.kind == "dhw") state.sat.bDhwActive = e.val != 0;
       else if (e.kind == "flow") g_flow = (float)e.val;
       else if (e.kind == "ratio") pid = 27.2f + (float)e.val / 100.0f * (50.0f - 27.2f);
+      else if (e.kind == "ovs") settings.sat.bOvershootProtection = e.val != 0;   // LL-017: protection toggled mid-run
       else if (e.kind == "flame" && (e.val != 0) != g_flame) {   // flame edge: what satCycleOnFlameChange() records
         g_flame = e.val != 0;
         if (g_flame) g_flameOnStart = g_ms; else g_flameOffStart = g_ms;
@@ -104,6 +105,8 @@ int main() {
     const float cs = satApplyPWM(pid);
     _sat_lastControlCS = cs;
     printf("T %d %d %.1f %d %.1f\n", sec, (int)state.sat.bPwmFlameRequested, cs, (int)g_flame, _pwm_effectiveBoilerTemp);
+    // the CH bit the control tick sends for this CS (satControlLoopRun: satChEnableDecide with satPwmDrivesSetpoint)
+    fprintf(stderr, "H %d %d\n", sec, (int)satChEnableDecide(pid, satColdThreshold(), satPwmDrivesSetpoint(pid), state.sat.bPwmFlameRequested));
   }
   fprintf(stderr, "C %d\n", g_pwmStarts);          // satCycleRecordPwmStart() calls = PWM starts counted (TASK-1421)
   return 0;
@@ -158,6 +161,14 @@ class SatPwmAnchors(unittest.TestCase):
         r = subprocess.run([str(self.exe)], input="\n".join(lines) + "\n", capture_output=True, text=True, check=True)
         n = [int(ln.split()[1]) for ln in r.stderr.splitlines() if ln.startswith("C ")][0]
         return n, self.sim(cph, ratio, init, events, dur, extra)
+
+    def sim_ch(self, cph, ratio, init, events, dur, extra=()):
+        lines = [f"cfg {cph} {ratio}", f"init {init}", f"run {dur}", *extra]
+        lines += [f"ev {s} {k} {v}" for s, k, v in sorted(events)]
+        r = subprocess.run([str(self.exe)], input="\n".join(lines) + "\n", capture_output=True, text=True, check=True)
+        rows = [(int(p[1]), int(p[2]), float(p[3]), int(p[4]), float(p[5])) for p in (ln.split() for ln in r.stdout.splitlines())]
+        ch = {int(p[1]): int(p[2]) for p in (ln.split() for ln in r.stderr.splitlines() if ln.startswith("H "))}
+        return Timeline(rows), ch
 
     def sim(self, cph, ratio, init, events, dur, extra=()):
         lines = [f"cfg {cph} {ratio}", f"init {init}", f"run {dur}", *extra]
@@ -368,7 +379,8 @@ class SatPwmAnchors(unittest.TestCase):
         self.assertEqual(n, 1)
 
     def test_k3_without_overshoot_protection_there_is_no_hold(self):
-        # Entry 107 (our reading): SAT does not switch the burner then, so the start is not held; the hot-water flame is lit at 1230 as in e4.
+        # Entry 133 (Conf-107 A): the hold applies only with overshoot protection on. Entry 230 (the OFF phase stops the boiler without
+        # protection too) does not change that; whether it should is Q-1412.6a. The hot-water flame is lit at 1230 as in e4.
         n, tl = self.starts(3, 0.5, "burning", [(1190, "dhw", 1), (1215, "dhw", 0), (1350, "flame", 0)], 1500, ("ovs 0",))
         self.assertEqual(tl.edges()[0], [0, 1230], tl.dump(1300))
         self.assertEqual(n, 2)
@@ -581,6 +593,75 @@ class SatPwmAnchors(unittest.TestCase):
         _ons, offs = tl.edges()
         self.assertTrue(offs, f"ON never ended: {tl.dump()}")
         self.assertLessEqual(abs(offs[0] - 900), TICK, f"ON ended at {offs[0]} s, expected 900 s (300 + 600 hold); {tl.dump(1100)}")
+
+    # LL-017 (TASK-1412.6, Sergeant D entry 230, QD-4 B): every PWM OFF phase stops the boiler (CS=10, CH=0), whatever overshoot
+    # protection is. Protection off only drops the ON-phase ignition hold and suppression; the ON phase then keeps the previous CS.
+    # cycles/hour 3, duty 0.22 (requested 32.2): ON 0..270, OFF 270..1230 (the timing does not depend on protection).
+    def test_ll017_off_phase_stops_the_boiler_without_overshoot_protection(self):
+        # Red on HEAD: the OFF phase kept the previous CS (32.2) with CH=1.
+        tl, ch = self.sim_ch(3, 0.22, "burning", [], 1300, ("ovs 0",))
+        ons, offs = tl.edges()
+        self.assertEqual((ons[:2], offs[:1]), ([0, 1230], [270]), tl.dump(1300))
+        off = [(s, cs) for s, q, cs, _f, _b in tl.rows if 270 <= s < 1230]
+        self.assertTrue(off and all(cs == 10.0 for _s, cs in off), f"OFF-phase CS not 10: {off}")
+        self.assertTrue(all(ch[s] == 0 for s, _cs in off), f"OFF-phase CH not 0: {[(s, ch[s]) for s, _c in off]}")
+
+    def test_ll017_on_phase_without_protection_has_no_hold_or_suppression(self):
+        # ON ticks: CH=1 and the CS is the requested setpoint (32.2), never a flame-off hold (return + offset) or a suppression CS
+        # (flow - offset). The second ON phase starts from CS=10: it takes the requested setpoint again, not the 10.
+        tl, ch = self.sim_ch(3, 0.22, "burning", [(1240, "flame", 0)], 1500, ("ovs 0",))
+        on = [(s, cs) for s, q, cs, _f, _b in tl.rows if q]
+        self.assertTrue(on and all(abs(cs - 32.2) < 0.06 for _s, cs in on), f"ON-phase CS: {on}")
+        self.assertTrue(all(ch[s] == 1 for s, _cs in on), f"ON-phase CH not 1: {[(s, ch[s]) for s, _c in on]}")
+
+    def test_ll017_toggling_protection_keeps_the_phase_timing_and_the_off_phase_actuation(self):
+        # Protection on at the start, off at 400 (OFF phase), on again at 1300 (second ON phase): the edges are the ones of a run with
+        # protection on throughout, the OFF phase sends CS=10/CH=0 on both sides of the toggle, and the second ON phase (protection back
+        # on) gets the ON-phase override again (CH=1, CS above 10).
+        ref, _ = self.sim_ch(3, 0.22, "burning", [], 1600)
+        tl, ch = self.sim_ch(3, 0.22, "burning", [(400, "ovs", 0), (1300, "ovs", 1)], 1600)
+        self.assertEqual(tl.edges(), ref.edges(), tl.dump(1600))
+        off = [(s, cs) for s, q, cs, _f, _b in tl.rows if 270 <= s < 1230]
+        self.assertTrue(all(cs == 10.0 and ch[s] == 0 for s, cs in off), f"OFF phase across the toggle: {[(s, cs, ch[s]) for s, cs in off]}")
+        on2 = [(s, cs) for s, q, cs, _f, _b in tl.rows if q and s >= 1300]
+        self.assertTrue(on2 and all(cs > 10.0 and ch[s] == 1 for s, cs in on2), f"second ON phase: {[(s, cs, ch[s]) for s, cs in on2]}")
+
+    def test_ll017_protection_off_inside_an_on_phase_keeps_its_cs_until_the_off_phase(self):
+        # Characterization (same on HEAD, entry 231 reading 1): protection on, turned off at 150 s inside the ON phase 0..270. The ON phase
+        # keeps its last protected CS (no new override, no switch to the requested setpoint) until it ends; the OFF phase then sends 10/CH=0.
+        tl, ch = self.sim_ch(3, 0.22, "burning", [(150, "ovs", 0)], 1300)
+        before = [cs for s, q, cs, _f, _b in tl.rows if q and s == 120][0]
+        kept = [cs for s, q, cs, _f, _b in tl.rows if q and 150 <= s < 270]
+        self.assertTrue(kept and all(cs == before for cs in kept), f"CS after the toggle: {kept}, before {before}")
+        self.assertTrue(all(cs == 10.0 and ch[s] == 0 for s, q, cs, _f, _b in tl.rows if 270 <= s < 1230), tl.dump(1300))
+
+    def test_ll017_heat_pump_off_phase_holds_cs10_for_the_600_s_minimum_off_without_protection(self):
+        # Heat pump (src 2), protection off. Duty 0.5, period 1800 s: ON 0..900. At 905 the demand jumps to range 5 (continuous ON);
+        # the TASK-1542 minimum OFF time (600 s, entry 198) keeps the OFF phase until 1500, and every OFF tick sends CS=10/CH=0.
+        tl, ch = self.sim_ch(3, 0.5, "burning", [(905, "ratio", 95)], 1700, ("ovs 0", "src 2"))
+        ons, offs = tl.edges()
+        self.assertEqual(offs[:1], [900], tl.dump(1700))
+        self.assertTrue(len(ons) >= 2 and abs(ons[1] - 1500) <= TICK, f"second ON at {ons[1:2]}, expected 1500; {tl.dump(1700)}")
+        off = [(s, cs) for s, q, cs, _f, _b in tl.rows if 900 <= s < ons[1]]
+        self.assertTrue(off and all(cs == 10.0 and ch[s] == 0 for s, cs in off), f"OFF phase: {[(s, cs, ch[s]) for s, cs in off]}")
+
+    def test_ll017_continuous_path_does_not_read_overshoot_protection(self):
+        # Structural guard, not a behaviour test: the continuous step (satApplyContinuous) never reads the option, so toggling it in
+        # continuous mode cannot change the CS. A read added there later fails this test.
+        src = hp.SAT_INO.read_text(encoding="utf-8")
+        a = src.index("static float satApplyContinuous(")
+        b = src.index("\n}\n", a)
+        self.assertNotIn("bOvershootProtection", src[a:b])
+
+    def test_ll017_cold_start_without_protection_waits_with_the_requested_setpoint(self):
+        # Startup: cold start, protection off, the ON phase waits for ignition with CH=1 and the requested setpoint (no flame-off hold);
+        # after the ON phase the OFF phase sends CS=10/CH=0.
+        tl, ch = self.sim_ch(3, 0.22, "cold", [(100, "flame", 1)], 1300, ("ovs 0",))
+        wait = [(s, cs) for s, q, cs, f, _b in tl.rows if q and not f]
+        self.assertTrue(wait and all(abs(cs - 32.2) < 0.06 and ch[s] == 1 for s, cs in wait), f"waiting ON ticks: {wait}")
+        _ons, offs = tl.edges()
+        self.assertTrue(offs, tl.dump())
+        self.assertTrue(all(cs == 10.0 and ch[s] == 0 for s, q, cs, _f, _b in tl.rows if s >= offs[0] and not q), tl.dump(1300))
 
     def test_g3_short_draw_inside_the_start_up_window_leaves_bt_alone(self):
         # Burning start at 0 (window 0..180, BT 50). Draw 50..85 with the flow at 62 C afterwards (first tick with the bit 60, resume at

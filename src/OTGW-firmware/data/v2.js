@@ -1336,7 +1336,8 @@
   // [key, label, colour, kind]: t = temperature line (auto-scaled), m = modulation area, l = on/off lane
   var GSER = [['flow', 'boiler', '#f85149', 't'], ['ret', 'return', '#58a6ff', 't'], ['chSet', 'control setpoint', '#8b949e', 't'],
     ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'],
-    ['mod', 'modulation', '#00bffe', 'm'], ['flame', 'flame', '#ff7b00', 'l'], ['dhw_on', 'DHW mode', '#2f81f7', 'l'], ['ch', 'CH mode', '#e5534b', 'l']];
+    ['mod', 'modulation', '#00bffe', 'm'], ['flame', 'flame', '#ff7b00', 'l'], ['dhw_on', 'DHW mode', '#2f81f7', 'l'], ['ch', 'boiler CH mode', '#e5534b', 'l']];
+  // 'ch' is the boiler's own CH-mode status bit (MsgID 0 slave bit 1; pump overrun keeps it on), not SAT's CH enable (Sergeant D entry 219)
   var GDCOL = ['#56d4dd', '#db61a2', '#7ee787', '#f0883e', '#79c0ff', '#bc8cff'];
   var GLANE_Y = { flame: 196, dhw_on: 218, ch: 240 };
   var gOff = {};
