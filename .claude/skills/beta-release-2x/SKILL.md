@@ -50,7 +50,9 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
    `2.0.0-beta.N` bump and its #alpha-testing zip (alpha track); only the daily release gets a
    GitHub prerelease and a #beta-testing post. Candidate: the newest beta.N that ran at least
    8 h on the bench unit (.63) without a restart (bootcount unchanged, no new crashlog).
-   Skip the day when nothing user-visible changed or the candidate failed its soak or a bench
+   No soak waiver: a slot whose candidate has not finished its 8 h soak is skipped, and the release
+   goes out in the first slot after the soak ends (Robert 2026-11-02). Every flash of the bench unit restarts the
+   soak, so after ~20:00 nothing new is flashed on it until the 08:00 release. Skip also when nothing user-visible changed or the candidate failed its soak or a bench
    check. Hotfix exception: a public beta that breaks or crashes units may get its fix out at
    once. No per-release question within this rule; still ask (AskUserQuestion, one question
    each) for anything new to weigh: a new waiver, a failed gate, a breaking change. The
