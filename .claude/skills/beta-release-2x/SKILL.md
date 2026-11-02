@@ -45,10 +45,14 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
 
 ### Phase 0: Preconditions and coordination
 
-1. **CHECKPOINT 1: Robert's explicit go for this beta.** Record it in the beta's
-   tracking task before the tag (`backlog task edit <id> --append-notes "... go ..."`).
-   No go, no tag. Open waivers (soak, OS capture runs) are his decision: ask with
-   AskUserQuestion, one question per waiver.
+1. **CHECKPOINT 1: Robert's go.** Standing go since 2026-11-02 (Robert: "Vanaf nu mag
+   je elke beta release ook officieel maken. En publiceren in het beta kanaal."): every
+   `2.0.0-beta.N` on `dev` is published without a per-beta question. Name the standing go
+   in the commit or task that carries the beta. Still ask (AskUserQuestion, one question
+   each) for anything new to weigh: a new waiver, a failed gate, a breaking change. The
+   existing soak/macOS waiver (TASK-1544) carries over and is stated in every notes file.
+   Under the per-task cadence the notes, the CHANGELOG rollover and the README link go
+   into the same commit as the firmware change and the bump (Phase 1/2 merge into it).
 2. Run from the main dev tree, on `dev`: `git rev-parse --abbrev-ref HEAD` prints `dev`.
 3. `git fetch origin && git status -sb`: local `dev` equals `origin/dev`.
 4. **Freeze dev pushes.** Message every live peer session (`ListAgents`) to hold
@@ -187,7 +191,8 @@ from the file at create time.
    git worktree remove ../wt-beta-post && git worktree prune
    ```
    Add the row to `.claude/alpha-build-ledger.local.md`.
-2. **CHECKPOINT 2: show the #beta-testing announcement to Robert before sending.**
+2. **#beta-testing announcement** (since 2026-11-02 sent without showing it first,
+   standing go above; show it first only when it announces something new to weigh).
    Channel `914498730001072149`, via `mcp__discord-mcp__send_message` (the webhook
    only reaches #alpha-testing; if the MCP is down, ask Robert to `/mcp` reconnect).
    Under 2000 characters. Content, for testers coming from 1.x:
