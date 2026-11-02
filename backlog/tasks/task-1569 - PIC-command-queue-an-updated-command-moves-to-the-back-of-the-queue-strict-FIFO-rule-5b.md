@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-02T20:44:00Z'
-updated_date: '2026-11-02T21:21:00Z'
+updated_date: '2026-11-02T21:45:00Z'
 labels:
   - pic
   - command-queue
@@ -33,3 +33,9 @@ Robert 2026-11-02, queue design rule 5: choose b. Today addCommandToQueue() dedu
 - [ ] #5 TP=11:12=x then MM=y, both already queued, updated in that order: TP= is sent before MM= (settles Q-1537b ordering; host test, old code MM first)
 - [ ] #6 addCommandToQueue returns a result (queued / replaced / dropped) so a caller (SAT, TASK-1570) can see a dropped enqueue; existing callers compile unchanged
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-02 independent review (opus, read-only) of b20ffc6f4: no deadlock, every queue access locked. Fixed on lane-q3: (1) pmChainStart took the lock unchecked and held it on the OT-Direct path, where handleOTDirectCommand -> processOT takes OTStateLock (wrong order): lock now only on the PIC path, checked; a dropped chain PM= counts as missed after 5 s instead of 60 s; handleCommandQueue returns at once without a PIC. (3) rule 5b was by due time, not offering order: the drain now sends the first due entry in slot order and moves a sent, unconfirmed entry to the back (strict FIFO, retries queue behind newer commands, 20-deep CS still 19 s / 950 ms with echoes). (4) PR=A banner: lock scope ends before reportOTGWEvent. (5) a late echo of a replaced command no longer removes the replacement (test_stale_echo...: red before, green after). Handed to the lead (SATcontrol.ino, TASK-1570): (2) satEnqueueOwnCS ignores Dropped and caches the CS as sent; (6) pre-existing: _satCmdInFlight is read in addCommandToQueue before the lock.
+<!-- SECTION:NOTES:END -->

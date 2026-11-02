@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.20
+**  Version  : v2.0.0-beta.21
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -761,7 +761,6 @@ void delayms(unsigned long delay_ms)
 //===[ Do task every 1s ]===
 void doTaskEvery1s(){
   //== do tasks ==
-  handleCommandQueue(); //just check if there are commands to retry
   state.uptime.iSeconds = platformUptimeSeconds();   // TASK-1449 (1.x TASK-1289): from the boot clock, not counted per tick
   sampleHeapWatermark();   // TASK-934: 1 Hz maxBlock min-watermark + histogram
   graphHistoryTick();      // TASK-1296: Monitor graph history slot (30 s, or 120 s with PSRAM)
@@ -1149,6 +1148,7 @@ void loop()
     if (DUE(timer60s))                doTaskEvery60s();
     if (DUE(timer3s))                 doTaskEvery3s();
     if (DUE(timer1s))                 doTaskEvery1s();
+    handleCommandQueue();             // TASK-1571: PIC command queue, paced by the PIC's echo (not by a timer)
     if (DUE(timer500ms)) {
       // LED2 fast blink (2x/s) when WiFi is up but no OT traffic for >10s
       bool noOT = (WiFi.status() == WL_CONNECTED) &&

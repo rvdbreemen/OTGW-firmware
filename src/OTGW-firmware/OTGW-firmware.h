@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.20
+**  Version  : v2.0.0-beta.21
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -246,6 +246,9 @@ const char *messageIDToString(OTLibMessageID message_id);
 // Sent = OT-Direct board handled it at once, Dropped = not queued (refused, invalid, queue full or busy).
 enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };
 CmdQueueResult addCommandToQueue(const char* ,  int , const bool = false, const int16_t = 1000);
+// Echo latency of the PIC command queue (TASK-1571): hist buckets <10,<20,<50,<100,<200,<500,<1000 ms, timeout.
+struct CmdQueueEchoStats { uint32_t count, timeouts, minMs, maxMs, sumMs; uint32_t hist[8]; };
+extern CmdQueueEchoStats g_cmdQueueEcho;
 void triggerPICsettingsReadout();
 void sendMQTTheapdiag();
 // TASK-692 / TASK-693 port (dev TASK-686 / TASK-688): OT-bus support-map

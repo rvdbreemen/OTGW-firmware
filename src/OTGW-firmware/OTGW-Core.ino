@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.20
+**  Version  : v2.0.0-beta.21
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3951,38 +3951,97 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
   This checks the queue for message are due to be resent.
   If retry max is reached the cmd is delete from the queue
 */
-// The queue drips: at most one command per 1 s tick, never a burst (TASK-1567, Robert 2026-11-02). The PIC holds one
-// command line at a time (otgw-6.6 gateway.asm: one 16-byte rxbuffer, bytes are dropped while a command waits) and
-// answers OE when it is too busy (otgw.tclcode.com/firmware.html). The gap is measured in time, not in calls, so a
-// faster caller cannot send more; 900 ms leaves room for the jitter of the 1 s timer (one command per tick).
-// This also keeps PM= and TP= (one shared priority-message slot in the PIC) at least a tick apart (TASK-1315).
-#define QUEUE_SEND_GAP_MS 900UL
+// The queue drips, paced by the PIC itself (TASK-1571, Robert 2026-11-02; replaces the fixed 1 s tick of TASK-1567).
+// One command is outstanding at a time. The PIC answers every command with an echo or an error code after it has
+// processed it (otgw-6.6 gateway.asm: SerialCommand runs before PrintString, ~1424-1431); while it processes one it
+// drops new bytes (SerialReceive, ~1466), also during an EEPROM write (EepromWait, ~1679). So the next command goes
+// out QUEUE_ECHO_GUARD_MS after the echo of the outstanding one, or QUEUE_ECHO_TIMEOUT_MS after it was sent when no
+// echo comes (that send counts as one of the OTGW_CMD_RETRY attempts). Two sends are never closer than
+// QUEUE_MIN_GAP_MS. otmonitor (sercmd, 2000 ms) and pyotgw (issue_cmd under a lock) also wait for the answer.
+// The guard and the floor are calculated (9600 baud: ~10 ms command + ~11 ms echo, 4 MHz PIC), not yet measured:
+// the echo-latency histogram below is the measurement (TASK-1571 AC1).
+#define QUEUE_ECHO_GUARD_MS   50UL
+#define QUEUE_MIN_GAP_MS      50UL
+#define QUEUE_ECHO_TIMEOUT_MS 1000UL
+// PM= and TP= share the PIC's one priority-message slot: keep them at least 1 s apart (TASK-1315, Robert
+// 2026-11-01) until TASK-1572 holds them until the boiler answers.
+#define PRIO_MSG_SPACING_MS   1000UL
+static uint32_t s_lastPrioSendMs = 0;
+static bool     s_prioSent = false;
 static uint32_t s_lastQueueSendMs = 0;
 static bool     s_queueSent = false;
+static uint32_t s_lastEchoMs = 0;
+static bool     s_echoSeen = false;
+struct QueueInflight { bool active; char cmd[sizeof(cmdqueue[0].cmd)]; int len; uint32_t sentMs; };
+static QueueInflight s_inflight = { false, {0}, 0, 0 };
+
+// Echo latency of the outstanding command, for the measurement and for /api/v2/device/info (TASK-1571, TASK-1573).
+// Buckets in ms: <10, <20, <50, <100, <200, <500, <1000, timeout.
+static const uint16_t kEchoBucketMs[] = { 10, 20, 50, 100, 200, 500, 1000 };
+CmdQueueEchoStats g_cmdQueueEcho = {};
+
+static void noteEcho(uint32_t now) {
+  const uint32_t ms = now - s_inflight.sentMs;
+  g_cmdQueueEcho.count++;
+  g_cmdQueueEcho.sumMs += ms;
+  if (g_cmdQueueEcho.count == 1 || ms < g_cmdQueueEcho.minMs) g_cmdQueueEcho.minMs = ms;
+  if (ms > g_cmdQueueEcho.maxMs) g_cmdQueueEcho.maxMs = ms;
+  int b = 0;
+  while (b < (int)(sizeof(kEchoBucketMs) / sizeof(kEchoBucketMs[0])) && ms >= kEchoBucketMs[b]) b++;
+  g_cmdQueueEcho.hist[b]++;
+  s_inflight.active = false;
+  s_lastEchoMs = now; s_echoSeen = true;
+}
+
+// The queue slot that holds the outstanding command, or -1 (it may have been replaced or removed meanwhile).
+static int findInflightSlot() {
+  for (int i = 0; i < cmdQueueSize; i++)
+    if (cmdqueue[i].cmdlen == s_inflight.len && memcmp(cmdqueue[i].cmd, s_inflight.cmd, s_inflight.len) == 0) return i;
+  return -1;
+}
 
 void handleCommandQueue(){
   if (!isPICEnabled()) return;   // OT-Direct answers each command at once; never drain into it under the lock
   CmdQueueLock qlock;
-  if (!qlock.locked) return;   // queue busy: this tick is skipped, the next one drains
+  if (!qlock.locked) return;   // queue busy: this pass is skipped, the next one drains
   pmChainTick();
   // Pause queue processing briefly after ser2net activity to avoid collisions
   if ((millis() - lastSer2netCmdMs) < SER2NET_QUIET_MS) return;
   const uint32_t now = millis();
-  if (s_queueSent && (now - s_lastQueueSendMs) < QUEUE_SEND_GAP_MS) return;   // wait for the next tick
+  if (s_inflight.active) {
+    if ((now - s_inflight.sentMs) < QUEUE_ECHO_TIMEOUT_MS) return;   // still waiting for its echo
+    g_cmdQueueEcho.timeouts++;
+    g_cmdQueueEcho.hist[sizeof(kEchoBucketMs) / sizeof(kEchoBucketMs[0])]++;
+    OTDebugTf(PSTR("CmdQueue: no echo for [%s] within %lu ms\r\n"), s_inflight.cmd, (unsigned long)QUEUE_ECHO_TIMEOUT_MS);
+    s_inflight.active = false;   // the queue entry stays and is resent after OTGW_CMD_INTERVAL_MS
+  }
+  if (s_queueSent && (now - s_lastQueueSendMs) < QUEUE_MIN_GAP_MS) return;
+  if (s_echoSeen && (now - s_lastEchoMs) < QUEUE_ECHO_GUARD_MS) return;
   // Strict FIFO (rule 5b, TASK-1569 review): send the first due entry in slot order. Slot order is offering order,
   // because a new or updated command is appended at the back, and a sent entry that still waits for its
-  // confirmation is moved to the back as well; so a few retrying commands cannot take every tick and starve a CS=
+  // confirmation is moved to the back as well; so a few retrying commands cannot take every turn and starve a CS=
   // behind them (TASK-1567 20-deep test). The per-command delay (due) is still respected.
   int pick = -1;
+  const bool prioWait = s_prioSent && (now - s_lastPrioSendMs) < PRIO_MSG_SPACING_MS;
   for (int k = 0; k < cmdQueueSize; k++) {
     if ((int32_t)(now - cmdqueue[k].due) < 0) continue;
+    const bool prioCmd = (cmdqueue[k].cmd[0] == 'P' && cmdqueue[k].cmd[1] == 'M') ||
+                         (cmdqueue[k].cmd[0] == 'T' && cmdqueue[k].cmd[1] == 'P');
+    if (prioCmd && prioWait) continue;
     pick = k;
     break;
   }
-  if (pick >= 0) {   // one command per tick: the next due one waits for the next tick
+  if (pick >= 0) {
     const int i = pick;
     s_lastQueueSendMs = now; s_queueSent = true;
+    if ((cmdqueue[i].cmd[0] == 'P' && cmdqueue[i].cmd[1] == 'M') || (cmdqueue[i].cmd[0] == 'T' && cmdqueue[i].cmd[1] == 'P')) {
+      s_lastPrioSendMs = now; s_prioSent = true;
+    }
     OTDebugTf(PSTR("CmdQueue: Queue slot [%d] due\r\n"), i);
+    memcpy(s_inflight.cmd, cmdqueue[i].cmd, sizeof(s_inflight.cmd));
+    s_inflight.len = cmdqueue[i].cmdlen;
+    s_inflight.active = true;
+    s_inflight.sentMs = now;
     sendPICSerial(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
     cmdqueue[i].retrycnt++;
     cmdqueue[i].due = now + OTGW_CMD_INTERVAL_MS;
@@ -3993,6 +4052,7 @@ void handleCommandQueue(){
       sendEventToWebSocket('!', cMsg);
       reportCommandDropped(cmdqueue[i].cmd);
       removeFromCmdQueue(i);
+      // the last attempt is still on the wire: wait for its echo or the timeout before the next command
     } else if (i < cmdQueueSize - 1) {
       const OT_cmd_t sent = cmdqueue[i];   // waits for its echo: to the back, behind the commands offered after it
       removeFromCmdQueue(i);
@@ -4034,6 +4094,40 @@ void checkCommandResponse(const char *buf, unsigned int len){
   const char* code = value;
   while (*code == ' ') code++;
   const bool rejected = isPicErrorReply(code);
+  const bool overrun = rejected && code[0] == 'O' && code[1] == 'E';
+  // TASK-1571: with one command outstanding, an echo with its two letters is its echo. Match it to that exact queue
+  // entry (no 2-letter ambiguity between two TP= or PR=), and pace the next send on it.
+  // For PR= the register letter and for PM= the DataID must match too ('PM: 15' is not PM=3's echo).
+  bool ownEcho = s_inflight.active && cmd[0] == s_inflight.cmd[0] && cmd[1] == s_inflight.cmd[1];
+  if (ownEcho && !rejected && s_inflight.len >= 4) {
+    const char* v = value;
+    while (*v == ' ') v++;
+    if (cmd[0] == 'P' && cmd[1] == 'R') ownEcho = (*v == s_inflight.cmd[3]);
+    else if (cmd[0] == 'P' && cmd[1] == 'M') ownEcho = (atoi(v) == atoi(s_inflight.cmd + 3));
+  }
+  if (ownEcho) {
+    noteEcho(millis());
+    const int t = findInflightSlot();
+    if (t >= 0) {
+      if (overrun) {   // rule 4: OE means the PIC was busy, not that the command is wrong: send it again soon
+        OTDebugTf(PSTR("CmdQueue: PIC busy (OE) for [%s], resending\r\n"), cmdqueue[t].cmd);
+        cmdqueue[t].due = millis();
+        return;
+      }
+      if (rejected) {
+        OTDebugTf(PSTR("CmdQueue: PIC refused [%d]:[%s] with [%s]\r\n"), t, cmdqueue[t].cmd, code);
+        reportCommandRejected(cmdqueue[t].cmd, code);
+        removeFromCmdQueue(t);
+        return;
+      }
+      if (!(cmd[0] == 'P' && (cmd[1] == 'R' || cmd[1] == 'M'))) clearCommandDropped();
+      OTDebugTf(PSTR("CmdQueue: Confirmed [%d]:[%s]\r\n"), t, cmdqueue[t].cmd);
+      removeFromCmdQueue(t);
+      return;
+    }
+    return;   // the echoed command was replaced while it was on the wire: the newer one stays queued
+  }
+  if (overrun) return;   // OE for a command no longer outstanding: its entry is resent on its own schedule
   for (int i=0; i<cmdQueueSize; i++){
       OTDebugTf(PSTR("CmdQueue: Checking [%2s]==>[%d]:[%s] from queue\r\n"), cmd, i, cmdqueue[i].cmd);
     if (cmdqueue[i].cmd[0] == cmd[0] && cmdqueue[i].cmd[1] == cmd[1]){
@@ -5876,6 +5970,8 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
     // Banner is the response to PR=A — remove it directly from the command queue
     {
       CmdQueueLock qlock;
+      if (qlock.locked && s_inflight.active && s_inflight.cmd[0] == 'P' && s_inflight.cmd[1] == 'R' &&
+          s_inflight.cmd[3] == 'A') noteEcho(millis());   // TASK-1571: the banner is PR=A's answer
       for (int qi = 0; qlock.locked && qi < cmdQueueSize; qi++) {
         if (cmdqueue[qi].cmd[0] == 'P' && cmdqueue[qi].cmd[1] == 'R' &&
             cmdqueue[qi].cmdlen >= 4 && cmdqueue[qi].cmd[3] == 'A') {

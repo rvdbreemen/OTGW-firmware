@@ -78,6 +78,7 @@ using std::min;
 #include <thread>
 #include <atomic>
 enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };
+struct CmdQueueEchoStats { uint32_t count, timeouts, minMs, maxMs, sumMs; uint32_t hist[8]; };
 static std::recursive_timed_mutex g_qmutex;
 struct CmdQueueLock {
   bool locked = false;
@@ -162,6 +163,62 @@ int main(int argc, char** argv) {
       }
     }
     printf("sent=%s\nsent_ms=%s\nqueued=%d\n", all, times, cmdQueueSize);
+    return 0;
+  }
+  if (!strcmp(sc, "paced")) {            // TASK-1571: three commands, the PIC echoes each one at once; loop every 10 ms
+    addCommandToQueue("CS=45.0", 7, false, 0);
+    addCommandToQueue("MM=80", 5, false, 0);
+    addCommandToQueue("CH=1", 4, false, 0);
+    char all[128] = "", times[128] = "";
+    for (uint32_t t = 100000; t <= 103000; t += 10) {
+      g_sent[0] = 0; loopAt(t); strcat(all, g_sent);
+      char line[32]; const char* p = g_sent;
+      while (sscanf(p, "%31[^;];", line) == 1) {
+        char ts[16]; snprintf(ts, sizeof(ts), "%lu;", (unsigned long)(t - 100000)); strcat(times, ts);
+        char e[32]; snprintf(e, sizeof(e), "%c%c: %s", line[0], line[1], line + 3); echo(e);
+        p = strchr(p, ';') + 1;
+      }
+    }
+    printf("sent=%s\nsent_ms=%s\nqueued=%d\n", all, times, cmdQueueSize);
+    return 0;
+  }
+  if (!strcmp(sc, "noecho")) {           // TASK-1571: no echo for the first command: the second waits for the timeout
+    addCommandToQueue("CS=45.0", 7, false, 0);
+    addCommandToQueue("MM=80", 5, false, 0);
+    char times[128] = "", all[128] = "";
+    for (uint32_t t = 100000; t <= 102500; t += 10) {
+      g_sent[0] = 0; loopAt(t); strcat(all, g_sent);
+      if (g_sent[0]) { char ts[16]; snprintf(ts, sizeof(ts), "%lu;", (unsigned long)(t - 100000)); strcat(times, ts); }
+    }
+    printf("sent=%s\nsent_ms=%s\n", all, times);
+    return 0;
+  }
+  if (!strcmp(sc, "oe")) {               // TASK-1571 rule 4: OE (PIC busy) is resent, not dropped
+    addCommandToQueue("CS=45.0", 7, false, 0);
+    char all[128] = "";
+    int n = 0;
+    for (uint32_t t = 100000; t <= 101000; t += 10) {
+      g_sent[0] = 0; loopAt(t); strcat(all, g_sent);
+      if (g_sent[0]) { n++; echo(n == 1 ? "CS: OE" : "CS: 45.00"); }
+    }
+    printf("sent=%s\nqueued=%d\ndropped=%u\n", all, cmdQueueSize, (unsigned)state.pic.iCmdDropped);
+    return 0;
+  }
+  if (!strcmp(sc, "deep_echo")) {        // TASK-1571: a CS= behind 19 commands that the PIC does echo
+    char c[8];
+    for (int k = 0; k < 19; k++) { snprintf(c, sizeof(c), "%c%c=1", 'A' + k / 6, 'A' + k % 6); addCommandToQueue(c, 4, false, 0); }
+    addCommandToQueue("CS=45.0", 7, false, 0);
+    long csAt = -1;
+    for (uint32_t t = 100000; t <= 130000 && csAt < 0; t += 10) {
+      g_sent[0] = 0; loopAt(t);
+      char line[32]; const char* p = g_sent;
+      while (sscanf(p, "%31[^;];", line) == 1) {
+        if (!strcmp(line, "CS=45.0")) csAt = (long)(t - 100000);
+        char e[32]; snprintf(e, sizeof(e), "%c%c: %s", line[0], line[1], line + 3); echo(e);
+        p = strchr(p, ';') + 1;
+      }
+    }
+    printf("cs_sent_ms=%ld\n", csAt);
     return 0;
   }
   if (!strcmp(sc, "stale_echo")) {       // review finding 5: CS=50 on the wire, replaced by CS=55, then the CS=50 echo
@@ -411,9 +468,49 @@ class PmChain(unittest.TestCase):
                 out = self.run_sc("burst", step)
                 self.assertEqual(out["sent"], "CS=45.0;MM=80;CH=1;")
                 ms = [int(x) for x in out["sent_ms"].strip(";").split(";")]
-                self.assertTrue(all(b - a >= 900 for a, b in zip(ms, ms[1:])), f"sent within one tick: {ms}")
+                # TASK-1571 replaced the 1 s tick by echo pacing; the floor between two sends is 50 ms
+                self.assertTrue(all(b - a >= 50 for a, b in zip(ms, ms[1:])), f"sent within the 50 ms floor: {ms}")
                 self.assertLessEqual(ms[-1], 5000, f"SAT resend set not drained within its 5 s period: {ms}")
                 self.assertEqual(out["queued"], "0")
+
+    def test_echo_paced_drain(self):
+        # TASK-1571 (Robert 2026-11-02): the next command follows the echo of the outstanding one plus a 50 ms guard,
+        # not a fixed 1 s tick. HEAD (TASK-1567 tick): the third command leaves 2000 ms after the first.
+        out = self.run_sc("paced")
+        self.assertEqual(out["sent"], "CS=45.0;MM=80;CH=1;")
+        ms = [int(x) for x in out["sent_ms"].strip(";").split(";")]
+        self.assertTrue(all(b - a >= 50 for a, b in zip(ms, ms[1:])), f"two sends within the 50 ms floor: {ms}")
+        self.assertLess(ms[-1] - ms[0], 500, f"not paced by the echo: {ms}")
+        self.assertEqual(out["queued"], "0")
+
+    def test_no_echo_waits_for_the_timeout(self):
+        # TASK-1571: one command outstanding; without an echo the next one waits 1000 ms.
+        out = self.run_sc("noecho")
+        ms = [int(x) for x in out["sent_ms"].strip(";").split(";")]
+        self.assertGreaterEqual(len(ms), 2, out)
+        self.assertGreaterEqual(ms[1] - ms[0], 1000, f"second command sent while the first was outstanding: {ms}")
+
+    def test_overrun_is_resent_not_dropped(self):
+        # TASK-1571 rule 4: OE = the PIC was busy; the command is sent again and confirmed, not reported as refused.
+        out = self.run_sc("oe")
+        self.assertEqual(out["sent"], "CS=45.0;CS=45.0;")
+        self.assertEqual(out["queued"], "0")
+        self.assertEqual(out["dropped"], "0")
+
+    def test_cs_behind_a_full_echoing_queue_within_two_seconds(self):
+        # TASK-1571 AC3: with echoes the 20-deep queue drains in about a second; the CS= at the back goes out < 2 s.
+        out = self.run_sc("deep_echo")
+        cs = int(out["cs_sent_ms"])
+        self.assertGreaterEqual(cs, 0, "CS= never sent")
+        self.assertLess(cs, 2000, f"CS= behind 19 echoed commands waited {cs} ms")
+        print(f"\n  CS= behind 19 echoed commands went out after {cs} ms")
+
+    def test_stale_echo_does_not_remove_the_replacement(self):
+        # TASK-1569 review finding 5: the echo of CS=50.0 arrives after CS=55.0 replaced it; CS=55.0 must stay queued.
+        out = self.run_sc("stale_echo")
+        self.assertEqual(out["first"], "CS=50.0;")
+        self.assertEqual(out["queued"], "1")
+        self.assertEqual(out["q0"], "CS=55.0")
 
     def test_unconfirmed_command_retries_behind_newer_ones(self):
         # TASK-1569 review finding 3: AA=1 is never echoed; BB=1 and CC=1 offered after it go first, AA=1 retries after.

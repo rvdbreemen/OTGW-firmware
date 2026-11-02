@@ -3,9 +3,11 @@ id: TASK-1571
 title: >-
   PIC command queue: echo-paced drain (stop-and-wait, rule 2), measured echo
   latency first
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-02T21:06:00Z'
+updated_date: '2026-11-02T21:38:00Z'
 labels:
   - pic
   - command-queue
