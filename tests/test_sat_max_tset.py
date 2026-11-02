@@ -119,7 +119,9 @@ def cut(src: str, start: str, end: str) -> str:
 def build(workdir: Path):
     src = SAT_INO.read_text(encoding="utf-8")
     consts = "\n".join(re.search(r"^static const float\s+" + n + r"\b.*$", src, re.M).group(0)
-                       for n in ("SAT_HARD_MAX_FLOOR", "SAT_HARD_MAX_RAD", "SAT_GLOBAL_MAX_SETPOINT", "SAT_MAX_SETPOINT_DEFAULT"))
+                       for n in ("SAT_HARD_MAX_FLOOR", "SAT_HARD_MAX_RAD", "SAT_GLOBAL_MAX_SETPOINT", "SAT_MAX_SETPOINT_DEFAULT",
+                                 "SAT_THERMAL_SAFE_FLOW")
+                       if re.search(r"^static const float\s+" + n + r"\b", src, re.M))
     block = cut(src, "// --- User Max flow setpoint", "// Returns heating curve base offset")   # block + satEffectiveMaxSetpoint()
     types = SATTYPES_H.read_text(encoding="utf-8")
     ok = re.search(r"^static inline bool satMaxTSetInputOk\(float v\).*$", types, re.M).group(0)

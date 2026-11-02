@@ -52,6 +52,7 @@ struct State { SatState sat; };
 static State state;
 struct OTSys { uint8_t SlaveStatus = 0; }; static OTSys OTcurrentSystemState;   // read by satCmdResend() (TASK-1370)
 static bool hasOTCommandInterface() { return true; }
+static float satEffectiveMaxSetpoint() { return 1000.0f; }   // TASK-1536: satCapRepeatCS() ceiling, no cap here
 static uint32_t g_ms = 0;
 static uint32_t millis() { return g_ms; }
 static bool isPICEnabled() { return true; }

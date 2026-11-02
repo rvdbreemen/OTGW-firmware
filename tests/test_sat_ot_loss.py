@@ -75,6 +75,7 @@ static bool g_pic = true;
 static bool isPICEnabled() { return g_pic; }
 static bool g_iface = true;
 static bool hasOTCommandInterface() { return g_iface; }
+static float satEffectiveMaxSetpoint() { return 1000.0f; }   // TASK-1536: satCapRepeatCS() ceiling, no cap here
 static bool _sat_bootCS0sent = true;
 static bool _sat_prevFlameState = false;
 static bool satIsFlameOn() { return false; }

@@ -415,6 +415,12 @@ static float satEffectiveMaxSetpoint()
   return maxSetpoint;
 }
 
+// TASK-1536: the thermal-safe fallback CS (SAT_THERMAL_SAFE_FLOW), capped like every other CS.
+static float satThermalSafeSetpoint() {
+  const float maxSp = satEffectiveMaxSetpoint();
+  return (SAT_THERMAL_SAFE_FLOW > maxSp) ? maxSp : SAT_THERMAL_SAFE_FLOW;
+}
+
 // Returns heating curve base offset for the current heating system
 static float satGetBaseOffset()
 {
@@ -548,6 +554,18 @@ static bool    _sat_swSentValid       = false;  // false: SW= still has to go ou
 static const uint32_t SAT_CMD_REFRESH_MS = 300000UL; // 5 min
 static const uint32_t SAT_CMD_RESEND_MS  = 5000UL;   // thermo-nova climate.py:707-708
 
+// TASK-1536: a repeated CS (5 s resend, PIC keepalive) is capped by the same ceiling as the control tick,
+// satEffectiveMaxSetpoint() (boiler MaxTSet, user or default cap of entries 148/152, hard ceiling), so a limit
+// lowered after the last tick holds from the next repeat on. The cache takes the capped value.
+static float satCapRepeatCS(float cs) {
+  const float maxSp = satEffectiveMaxSetpoint();
+  if (cs > maxSp) {
+    cs = maxSp;
+    state.sat.fLastSentCS = (float)(int16_t)lroundf(cs * 10.0f) / 10.0f;
+  }
+  return cs;
+}
+
 // Reset the SAT last-sent OT command cache so the next call to
 // satEnqueueIfChangedCS() always enqueues and satCmdResend() stays quiet until the next control tick sends. Used on offline->online edges,
 // safety/disable paths, and at boot.
@@ -625,7 +643,7 @@ static void satPicCSKeepalive() {
   uint32_t now = millis();
   if ((now - state.sat.iLastSentCSMs) < SAT_PIC_CS_KEEPALIVE_MS) return;
   char buf[16];
-  snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), state.sat.fLastSentCS);
+  snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), satCapRepeatCS(state.sat.fLastSentCS));
   satEnqueueOwnCS(buf);
   state.sat.iLastSentCSMs = now;
 }
@@ -660,7 +678,7 @@ static void satCmdResend() {
   if (!_sat_cmdResendArmed || !state.sat.bLastSentValid || !state.sat.bActive || !hasOTCommandInterface()) return;
   if (OTcurrentSystemState.SlaveStatus & 0x05) return;
   if ((uint32_t)(millis() - state.sat.iLastSentCSMs) < SAT_CMD_RESEND_MS) return;
-  satSendCS(state.sat.fLastSentCS);
+  satSendCS(satCapRepeatCS(state.sat.fLastSentCS));
   satSendMM(state.sat.iLastSentMM);
   satSendCH(state.sat.iLastSentCH);
 }
@@ -6545,9 +6563,7 @@ static void satControlLoopRun()
     if (estElapsed >= SAT_THERMAL_MAX_EST_MS) {
       _sat_thermalSafeActive = true;     // the 3 s PWM refresh must not overwrite this safe CS
       // Too long without real data -- use fixed safe flow setpoint
-      state.sat.fFinalSetpoint = SAT_THERMAL_SAFE_FLOW;
-      float sysMax = satGetMaxSetpoint();
-      if (state.sat.fFinalSetpoint > sysMax) state.sat.fFinalSetpoint = sysMax;
+      state.sat.fFinalSetpoint = satThermalSafeSetpoint();   // TASK-1536: boiler MaxTSet included
       _sat_lastControlCS = (float)(int)state.sat.fFinalSetpoint;   // the CS sent below is the previous CS (entry 112, TASK-1381)
       satCurveTuneNoteNotControlling();   // TASK-1525
       if (hasOTCommandInterface()) {
