@@ -5694,3 +5694,12 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Compared with thermo-nova:** thermo-nova has no OFF-phase actuation without the option (heating_control.py:385) and no hot-water-flame hold (entry 106).
 
 **Task:** TASK-1412.6. **Open:** Q-1412.6a; readings 1 and 2 are offered to him in the progress note.
+
+## 232. Q-1539a keepalive sub-question answered A: the CS keepalive keeps running during a hot-water draw (Sergeant D, 2026-11-02)
+
+**Source:** sergeantd, 2026-11-02 15:35 UTC, msg 1566838288340226199 (https://discord.com/channels/812969634638725140/1514720723980259460/1566838288340226199), answer to the re-ask msg 1566837157493088257 (the sub-question entry 220 left open).
+
+**Quoted:** "Q-1539a: A"
+
+**Settled:** option A as put to him: keep sending SAT's CS keepalive every 30 s during a hot-water draw (today's firmware, `satPicCSKeepalive`; a PIC drops SAT's CS after about 1-2 minutes without a new one). Compared: thermo-nova sends nothing extra during hot water (its update is not called with a draw guard; entry 221, ADR-203 keep the firmware's no-resend rule for the regular CS/MM/CH resend). No firmware change. Closes entry 220's open point. **Task:** TASK-1539 (MM to max during the draw; the keepalive stays as it is). **Open:** none.
+

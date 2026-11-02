@@ -22,7 +22,7 @@ Read "Before you flash" and "Known issues" first.
 
 - **SAT PWM: every OFF phase stops the boiler, also with "PWM overshoot protection" switched off** (TASK-1412.6, Sergeant D). In each PWM OFF phase SAT now sends control setpoint 10 C and central heating off, whatever that setting is. Before, with the setting off, the OFF phase kept the previous setpoint with central heating on, so the boiler could keep burning through the OFF phase. With the setting on (the default) nothing changes. With it off, the ON phase still gets no ignition hold and no suppression, as before. This applies only with SAT on, in PWM mode.
 - **Graph: the lane "CH mode" is now called "boiler CH mode"** (TASK-1412.6). It shows the boiler's own status bit (it stays on during pump overrun), not the central-heating command SAT sends.
-  - **How this was tested:** host tests on the real SAT code with the setting switched off and on in the ON phase, the OFF phase and at a cold start (6 cases fail on beta.10, all pass on beta.11), plus a bench run on the update.
+  - **How this was tested:** host tests on the real SAT code with the setting switched off and on in the ON phase, the OFF phase and at a cold start (6 cases fail on beta.10, all pass on beta.11). On the bench unit (SAT simulation, setting off) beta.10 sent setpoint 49.9 C with central heating on in the OFF phase, which reproduces the old behaviour. On beta.11 no OFF phase above the cold setpoint came up in two 20-minute runs (the one OFF phase seen fell together with the cold cutoff, which sends 10 C on both versions), so the new OFF phase itself is proven by the host tests only. The update kept all settings and the unit ran without a restart.
 
 ---
 
