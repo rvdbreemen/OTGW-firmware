@@ -176,8 +176,10 @@ class PortEquivalence(unittest.TestCase):
     def test_pwm_mapper_matches_the_firmware(self):
         if not self.pwm_exe: self.skipTest("no host C++ compiler")
         worst = 0.0; n = 0; boundary = []
+        # Source 2 = heat pump: minimum ON 600 s since 2.0.0-beta.4 (entry 197, TASK-1542); before that 180 s.
+        min_on = 600.0
         for hp in (1800, 2400):
-            dl = 180.0 / hp; edges = (dl / 2, dl, 1 - dl, 1 - dl / 2)
+            dl = min_on / hp; edges = (dl / 2, dl, 1 - dl, 1 - dl / 2)
             for i in range(1, 100):
                 ratio = i / 100.0
                 for flame in (0, 1):
@@ -187,11 +189,11 @@ class PortEquivalence(unittest.TestCase):
                     if any(abs(duty - e) < 1e-4 for e in edges):
                         # the harness prints the duty to 4 decimals; on a range edge the float32 duty can fall either side.
                         # Accept the firmware result if the port gives it for a duty just below or just above the edge.
-                        cands = [port.pwm_times(duty + s, hp, 180, bool(flame)) for s in (-2e-4, 2e-4)]
+                        cands = [port.pwm_times(duty + s, hp, min_on, bool(flame)) for s in (-2e-4, 2e-4)]
                         ok = any(abs(fon - (2 * hp if c else a)) <= 1 and abs(foff - (0.0 if c else b)) <= 1 for a, b, c in cands)
                         boundary.append((hp, duty, flame, ok)); self.assertTrue(ok, f"edge case hp={hp} duty={duty} flame={flame}")
                         continue
-                    on_s, off_s, cont = port.pwm_times(duty, hp, 180, bool(flame))
+                    on_s, off_s, cont = port.pwm_times(duty, hp, min_on, bool(flame))
                     fon_exp, foff_exp = (2 * hp, 0.0) if cont else (on_s, off_s)
                     worst = max(worst, abs(fon - fon_exp), abs(foff - foff_exp)); n += 1
         print(f"\nPWM mapper: {n} cases off the range edges, worst difference {worst:.3f} s; {len(boundary)} edge cases, all on one side of the edge")

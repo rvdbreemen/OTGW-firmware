@@ -93,6 +93,10 @@ RAD_EXP = 1.3
 # a small standing loss to the system when it does not. The boiler controls on its own loop flow; the system receives
 # the separator transfer, not the burner power.
 SEPARATOR = False
+# Candidate sweep for TASK-1527 AC#2 (round 23): the SAT flow cap for a heat pump (entry 155: 40 C) and the
+# maximum relative modulation SAT sends while it runs PWM (heat pumps get MM = 100 today, satComputeMM).
+FLOW_CAP = h12.SP_MAX
+MM_PWM = 100.0
 SEP_C, SEP_G, SEP_G_OFF, MCP_BOILER = 30000.0, 930.0, 20.0, 930.0
 
 
@@ -132,7 +136,7 @@ def run(args):
     season = statistics.fmean(t for t in tm if t < 15)
     ufh = PLANT == "ufh"; hybrid = u["type"] == "hybrid"
     base_off = 20.0 if ufh else 27.2; cold_sp = 21.0 if ufh else 28.2
-    spmax = h12.SP_MAX if (ufh or not hybrid) else 62.0; exp_e = h12.EXP_UFH if ufh else RAD_EXP
+    spmax = FLOW_CAP if (ufh or not hybrid) else 62.0; exp_e = h12.EXP_UFH if ufh else RAD_EXP
     if ufh: K = h12.k_for(Heff, season)
     else:
         Qs = max(Heff * (TARGET - season) - 135.0, 50.0); fs = float(port.curve(1.6, TARGET, season, 27.2))
@@ -205,7 +209,8 @@ def run(args):
         else: off_for += 1
         qfloor = K * max(Ts - Ta, 0.0) ** exp_e
         pm = interp([(t, v * 1000.0) for t, v in u["pmax"]], tout)
-        P = min(pm, max(pmin, qfloor + HP_GAIN * (cs - flow_now))) if on else 0.0
+        pm_eff = pmin + MM_PWM / 100.0 * (pm - pmin) if (pwm and variant == "sat") else pm   # MM limits the output while SAT runs PWM
+        P = min(pm_eff, max(pmin, qfloor + HP_GAIN * (cs - flow_now))) if on else 0.0
         Pb = 0.0
         if Tb is None: Tb = Ts
         fb_now = (Tb + Pb_prev / (2 * MCP_BOILER)) if SEPARATOR else flow_now

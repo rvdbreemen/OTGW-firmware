@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-31T13:48:00Z'
-updated_date: '2026-11-01T09:41:00Z'
+updated_date: '2026-11-02T03:11:00Z'
 labels:
   - sat
   - design
@@ -23,7 +23,7 @@ Robert 2026-10-31: 'de warmtepomp moet minimaal schakelen. Dus goal voor warmtep
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 A heat-pump capture (>= 24 h, TASK-1523 tool: flame/compressor, modulation, flow, return, SAT log) is used to validate the model's start count within 25 %
-- [ ] #2 Simulation of candidate settings (PWM period, minimum on/off time, flow cap, MM in PWM, hysteresis) scored on compressor starts per day first and comfort second, paired against current settings, over at least 5 winters; data and scripts in docs/sat/sim-hp-lowload/
+- [x] #2 Simulation of candidate settings (PWM period, minimum on/off time, flow cap, MM in PWM, hysteresis) scored on compressor starts per day first and comfort second, paired against current settings, over at least 5 winters; data and scripts in docs/sat/sim-hp-lowload/
 - [ ] #3 Options with numbers posted to Sergeant D one question at a time; his answers recorded in docs/sat/sergeant-d-corrections.md
 <!-- AC:END -->
 
@@ -51,4 +51,8 @@ Robert 2026-10-31: 'de warmtepomp moet minimaal schakelen. Dus goal voor warmtep
 2026-11-01 Robert: field test without a new control mechanism, only longer heat-pump PWM periods 1.5/2/3 h (entry 193) -> TASK-1542; round 18 deferred -> TASK-1543 (label simulatie); testers may be asked. field-test-plan.md updated to arms 1800 s vs 10800 s (underfloor) / 5400 s (radiators).
 
 Audit 2026-11-01: moved To Do -> In Progress. Simulation rounds 12-17 are committed (9 commits, e.g. 7c718324d, 71a8b78f1, a38973b14, 9a6815991). Still open: AC1 (24 h heat-pump capture validating the start count within 25 %) and Sergeant D's answer to Q-1527a.
+
+2026-11-01 AC#2 check (lead asked): NOT met yet, evidence per item. Done, paired against current settings, starts first then comfort: PWM period 30-240 min (rounds 14, 17, 18b), minimum ON 3/10/60 min and OFF 10 min (18b/18c/18d), room hysteresis (13), degree minutes and own control (13, 15, 16, 19c), curve (19b/19c), setback and room feedback (19). Gaps: (1) winters: rounds 12-19 ran 3 heating seasons x 2 seeds (round 13 = 576 runs over 3 winters, not 576 winters); the >= 5 winters requirement is only met by round 21 (10 seasons 2015-16..2024-25, SAT through the proven port, current vs continuous), which is still running; (2) flow cap and MM in PWM were not simulated as candidate settings. Plan to close AC#2: after round 21, rerun the candidate sweep (period, min ON/OFF, flow cap 35/40/45, MM in PWM 100 vs minimum) over the ten seasons with scripts/sat_hp_library_study21.py.
+
+2026-11-02 AC#2 checked with evidence: docs/sat/sim-hp-lowload/round23.md (round 23, 840 runs; round 23b, 360 runs), ten heating seasons 2015-16..2024-25, 3 units (min 1.8/2.4/3.2 kW) x 4 houses, SAT through the port proven against the firmware (tests/test_sat_sim_port_equivalence.py 4/4 OK on beta.2). Every candidate paired against current (period 1800 s, 600/600 s, cap 40 C, MM 100): period 3600 s -42 % starts at +0.002 C, 10800 s -77 % at +0.008 C; old 180 s rule worse in every run (+1.1 starts, worse comfort in 92 %); flow cap 35/45 C no effect on underfloor (limit: radiators not tested); MM 0 in PWM -0.4 starts; hysteresis (heat pump's own band, SAT continuous) 1/1 K 9.9 starts 0.111 C, 3/1 K 3.4 / 0.136, 5/3 K 1.7 / 0.181. Best overall on both scores: SAT continuous. Scripts in scripts/ (sat_hp_candidate_sweep_study23.py, sat_hp_library_study21.py, sat_sim_port.py), data and reports in docs/sat/sim-hp-lowload/. Rounds 21/22 reports: round21.md, round22.md.
 <!-- SECTION:NOTES:END -->
