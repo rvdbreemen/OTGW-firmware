@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T02:01:00Z'
-updated_date: '2026-11-02T19:15:00Z'
+updated_date: '2026-11-02T19:18:00Z'
 labels:
   - sat
   - bug
@@ -38,4 +38,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: SATcontrol.ino:680
 2026-11-02 entry 233: Sergeant D answered Q-1537a A (msg 1566847427238035578): TP=11:12=min(MM,80) right before every MM=, MM uncapped. Implementation heads-up from the TASK-1315 session: the PIC queue spaces PM=/TP= (writes too) by up to 1 s (PRIO_MSG_SPACING_MS, OTGW-Core.ino handleCommandQueue) and MM= is not held, so MM= can overtake the TP=; TP= is unique per value, so a changing MM leaves several TP=11:12=x entries. Options: enqueue MM= only after the TP= went out, or prove the order with tests/test_pic_pm_chain.py's send-time harness.
 
 2026-11-02 evidence: tests/test_sat_immergas_tp.py 4/4 (HEAD copy: 3 fail). test_sat_pwm_override immergas case 100 (was 80). Five harnesses (cmd_cache, ot_loss, push_setpoint, restart_quiet, no_return_ignition) got a satImmergasTpActive stub, as for TASK-1536. Full tests/ 95/95 (run in parts: a background run was stopped for low PC memory, not a test failure). evaluate --quick 0 failed. Line-by-line thermo-nova check: value, format, order, call sites, MM uncap, PWM TP=0, ~5 s cadence match; TP only in thermo-nova's MQTT OTGW coordinator, not its serial one; MemberID 27 = Immergas and Sime -> beta.16 (entry 235).
+
+beta.16: TP only with explicit Immergas (entry 235, Robert). test_sat_immergas_tp 5/5; beta.15 copy fails the Auto/MemberID-27 case.
 <!-- SECTION:NOTES:END -->

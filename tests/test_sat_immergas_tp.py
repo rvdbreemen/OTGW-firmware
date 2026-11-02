@@ -38,6 +38,8 @@ static std::vector<std::string> g_q;
 static void addCommandToQueue(const char* buf, int len, bool, int) { g_q.push_back(std::string(buf, len)); }
 static uint8_t g_quirks = 0;
 static uint8_t satGetManufacturerQuirks() { return g_quirks; }
+enum { SAT_MFR_AUTO = 0, SAT_MFR_IMMERGAS = 8, SAT_MFR_SIME = 14 };
+struct { struct { uint8_t iManufacturer; } sat; } settings;
 static uint32_t millis() { return 1000; }
 struct { struct { uint8_t iLastSentMM; uint32_t iLastSentMMMs; bool bLastSentValid; } sat; } state;
 """
@@ -50,10 +52,16 @@ static void dump(const char* tag) {
   g_q.clear();
 }
 int main() {
+  settings.sat.iManufacturer = SAT_MFR_IMMERGAS;   // chosen explicitly
   g_quirks = SAT_QUIRK_IMMERGAS_TP;
   satSendMM(100); dump("immergas100");
   satSendMM(55);  dump("immergas55");
   satSendMM(0);   dump("immergas0");
+  // Auto with MemberID 27 detected as Immergas (the quirk flags say Immergas): no TP, it may be a Sime (entry 235)
+  settings.sat.iManufacturer = SAT_MFR_AUTO; g_quirks = SAT_QUIRK_IMMERGAS_TP;
+  satSendMM(100); dump("auto27");
+  settings.sat.iManufacturer = SAT_MFR_SIME; g_quirks = 0;
+  satSendMM(100); dump("sime");
   g_quirks = 0;
   satSendMM(100); dump("plain100");
   printf("mm|%u|%u\n", (unsigned)satComputeMM(false, false, false, 100, SAT_QUIRK_IMMERGAS_TP),
@@ -99,6 +107,11 @@ class ImmergasTp(unittest.TestCase):
         self.assertEqual(self.rows["immergas100"], ["TP=11:12=80", "MM=100"])
         self.assertEqual(self.rows["immergas55"], ["TP=11:12=55", "MM=55"])
         self.assertEqual(self.rows["immergas0"], ["TP=11:12=0", "MM=0"])   # PWM: MM=0, TP follows (as thermo-nova)
+
+    def test_auto_detected_member_id_27_sends_no_tp(self):
+        # Robert 2026-11-02 (entry 235): MemberID 27 is Immergas and Sime; only an explicit choice sends the TP.
+        self.assertEqual(self.rows["auto27"], ["MM=100"])
+        self.assertEqual(self.rows["sime"], ["MM=100"])
 
     def test_other_boilers_get_no_tp(self):
         self.assertEqual(self.rows["plain100"], ["MM=100"])

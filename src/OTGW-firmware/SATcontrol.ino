@@ -259,9 +259,12 @@ static uint8_t satGetManufacturerQuirks()
 }
 
 // Immergas quirk active: TP=11:12=<min(MM, 80)> goes before every MM= (satSendMM, Sergeant D entry 233, TASK-1537).
+// Only when the user chose "Immergas" explicitly: OT MemberID 27 is Immergas and Sime, so an Auto detection must not write a
+// boiler parameter on a Sime (Robert 2026-11-02, entry 235). thermo-nova asks the user to confirm the manufacturer
+// (config_flow.py:508-531); Auto here has no such step.
 static bool satImmergasTpActive()
 {
-  return (satGetManufacturerQuirks() & SAT_QUIRK_IMMERGAS_TP) != 0;
+  return settings.sat.iManufacturer == SAT_MFR_IMMERGAS;
 }
 
 // Auto-detect manufacturer from OT MsgID 3 slave MemberID

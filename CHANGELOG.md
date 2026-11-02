@@ -7,6 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **SAT Immergas TP=11:12 only when "Immergas" is chosen explicitly** (TASK-1537, 2.0.0-beta.16; Robert's decision, entry 235). OpenTherm MemberID 27 is shared by Immergas and Sime, so the Auto manufacturer detection sent the Immergas TP=11:12 boiler-parameter write to Sime boilers too (up to beta.14 with the flow setpoint as value). Now `satImmergasTpActive()` reads only the explicit manufacturer setting; Auto still shows the detected name. thermo-nova makes the user confirm the manufacturer in its config step. Immergas owners on Auto: select Immergas under SAT settings (new hint). Host test `tests/test_sat_immergas_tp.py` (Auto/MemberID 27 and Sime send no TP).
+
+### Fixed
+
 - **SAT Immergas quirk: TP=11:12 carries min(MM, 80) right before every MM=, MM itself uncapped** (TASK-1537, 2.0.0-beta.15; Sergeant D entry 233, Q-1537a A). Before, the control tick sent `TP=11:12=<flow setpoint>` after CS/MM/CH, writing a flow temperature into the boiler's max-modulation parameter, and capped MM itself at 80. Now `satSendMM()` sends `TP=11:12=<min(mm, 80)>` before every `MM=` (tick, 5 s resend, hot-water and cutoff paths), as thermo-nova (coordinator/mqtt/opentherm.py:216-219). Known limit: the PIC queue spaces PM=/TP= by up to 1 s (TASK-1315) and MM= is not held, so right after another PM=/TP= the MM= can reach the PIC up to 1 s before the TP=. Host test `tests/test_sat_immergas_tp.py` (old code: 3 of 4 fail).
 
 ### Changed

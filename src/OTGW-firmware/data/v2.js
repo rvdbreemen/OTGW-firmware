@@ -2046,7 +2046,7 @@
     sattempstep:     { cat: 'sat', label: 'Setpoint step', hint: '°C' },
     satcoefficient:  { cat: 'sat', label: 'Heating curve slope' },
     satheatingmode:  { cat: 'sat', label: 'Heating mode' },
-    satmanufacturer: { cat: 'sat', label: 'Manufacturer' },
+    satmanufacturer: { cat: 'sat', label: 'Manufacturer', hint: 'Auto detects from the boiler; choose Immergas explicitly to enable its TP=11:12 modulation command' },
     satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' },
     sathpcycle:      { cat: 'sat', label: 'Heat-pump PWM cycle', hint: 'Cycle length; a heat pump runs at least 10 minutes and stays off at least 10 minutes' },
     otdmode:         { cat: 'otd', label: 'OT-Direct mode' },
