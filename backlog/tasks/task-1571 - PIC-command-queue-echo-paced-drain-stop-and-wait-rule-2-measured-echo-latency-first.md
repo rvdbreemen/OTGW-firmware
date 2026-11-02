@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-02T21:06:00Z'
-updated_date: '2026-11-02T21:38:00Z'
+updated_date: '2026-11-02T22:15:00Z'
 labels:
   - pic
   - command-queue
@@ -27,8 +27,14 @@ Robert 2026-11-02 (queue design rule 2 + timing analysis). Today (TASK-1567) the
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Bench measurement first: 100+ commands on .63, micros() at send and at the matching echo, distribution (min/p50/p99/max) recorded; the guard is set to p99 plus margin (expected ~50 ms) and the value with its evidence goes in the notes
-- [ ] #2 One command outstanding: host test on the real queue code shows the next command is sent only after the echo (+guard) or after the 1000 ms timeout; old code (1 s tick) red on the latency check
-- [ ] #3 A 20-deep queue drains in a few seconds instead of ~20 s and a CS= behind it goes out within 2 s (host test)
-- [ ] #4 Echo matched to the outstanding command, error codes too (NG/SE/BV/OR/NS/NF/OE); OE retried, not dropped (rule 4)
+- [x] #2 One command outstanding: host test on the real queue code shows the next command is sent only after the echo (+guard) or after the 1000 ms timeout; old code (1 s tick) red on the latency check
+- [x] #3 A 20-deep queue drains in a few seconds instead of ~20 s and a CS= behind it goes out within 2 s (host test)
+- [x] #4 Echo matched to the outstanding command, error codes too (NG/SE/BV/OR/NS/NF/OE); OE retried, not dropped (rule 4)
 - [ ] #5 Bench .63: burst of 20 REST commands, no OE, every command echoed once, no reboot, settings kept
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-02 handover to the lead (lane-q2 ../wt-q2, no bump, series 537fd5a63..HEAD, one commit per task). Host: tests/test_pic_pm_chain.py 28/28 at the top; each task's new tests red on the code before it (see commit/test names), green at its own commit; evaluate --quick 0 failed. Open: bench on .63 after the 08:00 release (lead tags, builds, benches each task), firmware compile check of the top running at handover.
+<!-- SECTION:NOTES:END -->
