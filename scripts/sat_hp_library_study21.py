@@ -120,6 +120,7 @@ TRACE = None
 # the room is below target + lo. Both None = rounds 21-23 behaviour.
 ANTICIPATE = None
 ROOM_CUT = None
+SOLAR_AIR = 0.5   # TASK-1566 sensitivity: share of the solar gain that lands on the air node (rest on the walls)
 # Candidate sweep for TASK-1527 AC#2 (round 23): the SAT flow cap for a heat pump (entry 155: 40 C) and the
 # maximum relative modulation SAT sends while it runs PWM (heat pumps get MM = 100 today, satComputeMM).
 FLOW_CAP = h12.SP_MAX
@@ -363,8 +364,8 @@ def run(args):
             gas_ret += Pb * DT / eta_r
         Ts += (P + q_sys - qfloor) * DT / screed
         qaw = G_AW * (Ta - Tw); solar = 1.5 * sw * solar_k
-        Ta += (qfloor + gains[m] + 0.5 * solar - qaw - Gao * (Ta - tout)) * DT / Ca
-        Tw += (qaw + 0.5 * solar - Gwo * (Tw - tout)) * DT / Cw
+        Ta += (qfloor + gains[m] + SOLAR_AIR * solar - qaw - Gao * (Ta - tout)) * DT / Ca
+        Tw += (qaw + (1.0 - SOLAR_AIR) * solar - Gwo * (Tw - tout)) * DT / Cw
         if TRACE is not None:   # TASK-1563 dashboard: one tuple per minute (outdoor, room, CS, flow, heat-pump W, on, pwm, boiler W)
             TRACE.append((tout, Ta, cs if heating else None, flow_now, P, int(on), int(pwm), Pb))
         if heating and m >= 14 * 1440:
