@@ -45,8 +45,8 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
 
 ### Phase 0: Preconditions and coordination
 
-1. **CHECKPOINT 1: the daily slot** (Robert 2026-11-02, replaces the same morning's "every beta public"):
-   at most ONE public beta per day, at 08:00 local time. Every firmware task keeps its own
+1. **CHECKPOINT 1: the 12-hour slots** (Robert 2026-11-02 evening; replaces that day's daily 08:00 rule and its
+   "every beta public" morning rule): at most one public beta per 12 hours, at 08:00 or 20:00 local time. Every firmware task keeps its own
    `2.0.0-beta.N` bump and its #alpha-testing zip (alpha track); only the daily release gets a
    GitHub prerelease and a #beta-testing post. Candidate: the newest beta.N that ran at least
    8 h on the bench unit (.63) without a restart (bootcount unchanged, no new crashlog).
@@ -196,7 +196,7 @@ from the file at create time.
    git worktree remove ../wt-beta-post && git worktree prune
    ```
    Add the row to `.claude/alpha-build-ledger.local.md`.
-2. **#beta-testing announcement** (sent without showing it first under the daily-slot rule
+2. **#beta-testing announcement** (sent without showing it first under the 12-hour slot rule
    above; show it first only when it announces something new to weigh).
    Channel `914498730001072149`, via `mcp__discord-mcp__send_message` (the webhook
    only reaches #alpha-testing; if the MCP is down, ask Robert to `/mcp` reconnect).
