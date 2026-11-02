@@ -5703,3 +5703,19 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 
 **Settled:** option A as put to him: keep sending SAT's CS keepalive every 30 s during a hot-water draw (today's firmware, `satPicCSKeepalive`; a PIC drops SAT's CS after about 1-2 minutes without a new one). Compared: thermo-nova sends nothing extra during hot water (its update is not called with a draw guard; entry 221, ADR-203 keep the firmware's no-resend rule for the regular CS/MM/CH resend). No firmware change. Closes entry 220's open point. **Task:** TASK-1539 (MM to max during the draw; the keepalive stays as it is). **Open:** none.
 
+## 233. Q-1537a answered A: Immergas gets TP=11:12=min(MM, 80) right before every MM=, MM itself not capped (Sergeant D, 2026-11-02)
+
+**Source:** sergeantd, 2026-11-02 16:12 UTC, msg 1566847427238035578 (https://discord.com/channels/812969634638725140/1514720723980259460/1566847427238035578), answer to Q-1537a (msg 1566846478226300929).
+
+**Quoted:** "A, because we intervene to boiler settings directly, it is not OpenTherm related"
+
+**Settled:** option A as put to him: follow thermo-nova. For an Immergas boiler SAT sends `TP=11:12=<min(MM, 80)>` right before every `MM=<value>`, with the max relative modulation as the value, and MM itself is not capped at 80. His reason: the TP command writes a boiler setting directly (a transparent slave parameter), it is not an OpenTherm value, so the cap belongs there. Compared: thermo-nova coordinator/mqtt/opentherm.py:216-219 (opened at the pin 2026-11-02); firmware today sends `TP=11:12=<flow setpoint>` after CS/MM/CH every tick (SATcontrol.ino ~6840-6846) and caps MM at 80 for Immergas (satComputeMM, SATcontrol.ino:506). Also for A: in PWM MM is 0, so an Immergas then gets TP=11:12=0, as in thermo-nova. **Task:** TASK-1537. **Open:** none on the rule. Implementation note (not his decision): the PIC command queue spaces PM=/TP= by up to 1 s (TASK-1315) while MM= is not held, so "right before" needs the queue order checked in the implementation.
+
+## 234. Q-1412.6a answered B: the hot-water-flame start hold also applies without overshoot protection (Sergeant D, 2026-11-02; changes entry 133)
+
+**Source:** sergeantd, 2026-11-02 16:24 UTC, msg 1566850532537274412 (https://discord.com/channels/812969634638725140/1514720723980259460/1566850532537274412), answer to Q-1412.6a (msg 1566850181322768496).
+
+**Quoted (whole message):** "B"
+
+**Settled:** option B as put to him: the PWM ON start is held while a flame lit during hot water still burns (entries 105, 106) also with overshoot protection off, because entry 230 makes every OFF phase stop the boiler (CS=10, CH=0) without protection too, so the hot-water flame goes out and the start follows, as with protection on. **Changes entry 133** (Conf-107 A: "only with overshoot protection on"); entry 133 is not rewritten. The other conditions stay: no hot water and the requested setpoint above the cold setpoint (`satPwmDrivesSetpoint`, which since entry 230 is true in the OFF phase whatever the option is). Compared: thermo-nova has no such hold (entry 106); firmware beta.11 gates the hold on the option explicitly (`satPwmHoldForDhwFlame`, TASK-1412.6). **Task:** TASK-1562. **Open:** none.
+

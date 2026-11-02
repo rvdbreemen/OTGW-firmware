@@ -45,14 +45,19 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
 
 ### Phase 0: Preconditions and coordination
 
-1. **CHECKPOINT 1: Robert's go.** Standing go since 2026-11-02 (Robert: "Vanaf nu mag
-   je elke beta release ook officieel maken. En publiceren in het beta kanaal."): every
-   `2.0.0-beta.N` on `dev` is published without a per-beta question. Name the standing go
-   in the commit or task that carries the beta. Still ask (AskUserQuestion, one question
+1. **CHECKPOINT 1: the daily slot** (Robert 2026-11-02, replaces the same morning's "every beta public"):
+   at most ONE public beta per day, at 08:00 local time. Every firmware task keeps its own
+   `2.0.0-beta.N` bump and its #alpha-testing zip (alpha track); only the daily release gets a
+   GitHub prerelease and a #beta-testing post. Candidate: the newest beta.N that ran at least
+   8 h on the bench unit (.63) without a restart (bootcount unchanged, no new crashlog).
+   Skip the day when nothing user-visible changed or the candidate failed its soak or a bench
+   check. Hotfix exception: a public beta that breaks or crashes units may get its fix out at
+   once. No per-release question within this rule; still ask (AskUserQuestion, one question
    each) for anything new to weigh: a new waiver, a failed gate, a breaking change. The
-   existing soak/macOS waiver (TASK-1544) carries over and is stated in every notes file.
-   Under the per-task cadence the notes, the CHANGELOG rollover and the README link go
-   into the same commit as the firmware change and the bump (Phase 1/2 merge into it).
+   soak/macOS waiver (TASK-1544) carries over and is stated in every notes file.
+   The release is a docs-only commit on top of the candidate (notes bundling every beta.N
+   since the previous public beta, CHANGELOG rollover, README link), tagged and built from
+   that commit (the beta.7 model); Phase 1/2 go into that commit.
 2. Run from the main dev tree, on `dev`: `git rev-parse --abbrev-ref HEAD` prints `dev`.
 3. `git fetch origin && git status -sb`: local `dev` equals `origin/dev`.
 4. **Freeze dev pushes.** Message every live peer session (`ListAgents`) to hold
@@ -191,8 +196,8 @@ from the file at create time.
    git worktree remove ../wt-beta-post && git worktree prune
    ```
    Add the row to `.claude/alpha-build-ledger.local.md`.
-2. **#beta-testing announcement** (since 2026-11-02 sent without showing it first,
-   standing go above; show it first only when it announces something new to weigh).
+2. **#beta-testing announcement** (sent without showing it first under the daily-slot rule
+   above; show it first only when it announces something new to weigh).
    Channel `914498730001072149`, via `mcp__discord-mcp__send_message` (the webhook
    only reaches #alpha-testing; if the MCP is down, ask Robert to `/mcp` reconnect).
    Under 2000 characters. Content, for testers coming from 1.x:
