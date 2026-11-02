@@ -70,7 +70,8 @@ static uint32_t g_ms = 1000;
 static uint32_t millis() { return g_ms; }
 static void DebugTln(const char*) {}
 static void satNarrate_P(const char*) {}
-static void addCommandToQueue(const char* cmd, int, bool, int) { printf("%u %s\n", (unsigned)(g_ms / 1000), cmd); }
+enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };   // TASK-1574
+static CmdQueueResult addCommandToQueue(const char* cmd, int, bool, int) { printf("%u %s\n", (unsigned)(g_ms / 1000), cmd); return CmdQueueResult::Queued; }
 static bool g_pic = true;
 static bool isPICEnabled() { return g_pic; }
 static bool g_iface = true;

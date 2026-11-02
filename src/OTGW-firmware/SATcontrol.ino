@@ -614,10 +614,13 @@ bool satCommandInFlight() { return _satCmdInFlight; }
 // control setpoint, and SAT uses the same generic command queue as everyone else, so
 // an unmarked SAT CS= is refused as if it were external. handleOTDirectCommand() runs
 // synchronously from addCommandToQueue(), so the flag is set for exactly this call.
-static void satEnqueueOwnCS(const char* cmd) {
+// TASK-1574 (commit-on-success): returns false when the PIC queue dropped the command, so the callers record it in the
+// last-sent cache only when it was accepted and a dropped one is sent again.
+static bool satEnqueueOwnCS(const char* cmd) {
   _satCmdInFlight = true;
-  addCommandToQueue(cmd, strlen(cmd), false, 0);
+  const CmdQueueResult r = addCommandToQueue(cmd, strlen(cmd), false, 0);
   _satCmdInFlight = false;
+  return r != CmdQueueResult::Dropped;
 }
 
 // Enqueue CS=<setpoint> only if value changed (rounded to 0.1) or refresh
@@ -630,7 +633,7 @@ static bool satEnqueueIfChangedCS(float setpoint) {
   if (state.sat.bLastSentValid && newQ == oldQ && !stale) return false;
   char buf[16];
   snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), setpoint);
-  satEnqueueOwnCS(buf);
+  if (!satEnqueueOwnCS(buf)) return false;   // TASK-1574 (commit-on-success): a dropped CS= stays out of the cache
   state.sat.fLastSentCS     = (float)newQ / 10.0f;
   state.sat.iLastSentCSMs   = now;
   state.sat.bLastSentValid  = true;
@@ -644,7 +647,7 @@ static void satSendCS(float setpoint) {
   _sat_cmdResendArmed = true;
   char buf[16];
   snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), setpoint);
-  satEnqueueOwnCS(buf);
+  if (!satEnqueueOwnCS(buf)) return;   // TASK-1574 (commit-on-success): iLastSentCSMs stays old, so satCmdResend() retries in 5 s
   state.sat.fLastSentCS     = (float)(int16_t)lroundf(setpoint * 10.0f) / 10.0f;
   state.sat.iLastSentCSMs   = millis();
   state.sat.bLastSentValid  = true;
@@ -664,8 +667,7 @@ static void satPicCSKeepalive() {
   if ((now - state.sat.iLastSentCSMs) < SAT_PIC_CS_KEEPALIVE_MS) return;
   char buf[16];
   snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), satCapRepeatCS(state.sat.fLastSentCS));
-  satEnqueueOwnCS(buf);
-  state.sat.iLastSentCSMs = now;
+  if (satEnqueueOwnCS(buf)) state.sat.iLastSentCSMs = now;   // TASK-1574 (commit-on-success): a dropped keepalive is tried again on the next pass
 }
 
 // Immergas (SAT_QUIRK_IMMERGAS_TP): TP=11:12=<min(mm, 80)> goes right before every MM=, as thermo-nova does
@@ -678,12 +680,14 @@ static void satSendMM(uint8_t mm) {
   if (_sat_mmSentValid && mm == state.sat.iLastSentMM &&
       (uint32_t)(millis() - state.sat.iLastSentMMMs) < SAT_MMCH_REPAIR_MS) return;
   char buf[16];
+  bool accepted = true;   // TASK-1574 (commit-on-success): the flag is set only when the TP (Immergas) and the MM were both accepted
   if (satImmergasTpActive()) {
     snprintf_P(buf, sizeof(buf), PSTR("TP=11:12=%u"), (unsigned)(mm > 80 ? 80 : mm));
-    addCommandToQueue(buf, strlen(buf), false, 0);
+    if (addCommandToQueue(buf, strlen(buf), false, 0) == CmdQueueResult::Dropped) accepted = false;
   }
   snprintf_P(buf, sizeof(buf), PSTR("MM=%u"), mm);
-  addCommandToQueue(buf, strlen(buf), false, 0);
+  if (addCommandToQueue(buf, strlen(buf), false, 0) == CmdQueueResult::Dropped) accepted = false;
+  if (!accepted) return;   // the next tick sends the TP and the MM again
   state.sat.iLastSentMM     = mm;
   state.sat.iLastSentMMMs   = millis();
   state.sat.bLastSentValid  = true;
@@ -694,7 +698,7 @@ static void satSendMM(uint8_t mm) {
 static void satSendCH(uint8_t ch) {
   if (_sat_chSentValid && ch == state.sat.iLastSentCH &&             // TASK-1570: on change, repair as satSendMM
       (uint32_t)(millis() - state.sat.iLastSentCHMs) < SAT_MMCH_REPAIR_MS) return;
-  addCommandToQueue(ch ? "CH=1" : "CH=0", 4, false, 0);
+  if (addCommandToQueue(ch ? "CH=1" : "CH=0", 4, false, 0) == CmdQueueResult::Dropped) return;   // TASK-1574 (commit-on-success)
   state.sat.iLastSentCH     = ch;
   state.sat.iLastSentCHMs   = millis();
   state.sat.bLastSentValid  = true;
@@ -721,6 +725,22 @@ static void satCmdResend() {
 // TASK-1570: a PIC banner line means the PIC (re)started and forgot MM= and CH= (gateway.asm:1281 clears the max
 // modulation at start), so SAT sends them again on its next tick even if unchanged.
 void satNotifyPicRestart() { satResetCmdCache(); }
+
+// TASK-1574 (commit-on-success): the hand-back (CS=0, CH=1, MM=T) of satDisable() and of the restart hand-back. When the
+// PIC queue drops one of the three, _sat_releasePending is set and satRetryRelease() sends all three again, once per loop
+// pass, until the queue accepts them. volatile: satDisable() also runs on the async_tcp task, the loop task consumes it.
+static volatile bool _sat_releasePending = false;
+static bool satSendRelease() {
+  bool ok = satEnqueueOwnCS("CS=0");
+  if (addCommandToQueue("CH=1", 4, false, 0) == CmdQueueResult::Dropped) ok = false;   // CH override back to the default (TASK-1346)
+  if (addCommandToQueue("MM=T", 4, false, 0) == CmdQueueResult::Dropped) ok = false;   // MM override cleared (TASK-1344)
+  return ok;
+}
+static void satRetryRelease() {
+  if (!_sat_releasePending) return;
+  if (state.sat.bActive) { _sat_releasePending = false; return; }   // SAT controls again: its own CS=/MM=/CH= replace the release
+  if (satSendRelease()) _sat_releasePending = false;
+}
 
 // TASK-1272, Sergeant D entry 14 and the maintainer decision of 2026-10-24: TC= is pushed when the
 // target changes and not on a timer, exactly as thermo-nova (climate.py:641-657, command TC={value}
@@ -3506,17 +3526,15 @@ void satDisable(bool persistPid)
     SATDebugTln(F("SAT: disabled during an OpenTherm loss, hand-back already sent"));
     return;
   }
-  satEnqueueOwnCS("CS=0");
-  // TASK-1346: also hand back the CH override. CH= only counts while a CS override is
+  // TASK-1346: CH=1 also hands back the CH override. CH= only counts while a CS override is
   // active (gateway.asm:53, pyotgw.py:602-603), but the flag itself stays: when the
   // OTDirect heating curve or a later CS= sets a new override, SAT's last CH=0 would
   // switch central heating off again. CH=1 restores the default state of that flag.
-  addCommandToQueue("CH=1", 4, false, 0);
-  // TASK-1344: release SAT's MM override (MM=0 in PWM). A non-numeric value clears it on
+  // TASK-1344: MM=T releases SAT's MM override (MM=0 in PWM). A non-numeric value clears it on
   // the PIC (gateway.asm:4752 SetMaxModLevel -> ClrMaxModLevel; pyotgw.py:542-543) and on
   // OT-Direct (MM= handler, clearWriteOverride(14)); otherwise the thermostat gets the
   // boiler back with maximum modulation 0 %.
-  addCommandToQueue("MM=T", 4, false, 0);
+  if (!satSendRelease()) _sat_releasePending = true;   // TASK-1574 (commit-on-success): satRetryRelease() repeats it
   // TASK-565: clear the last-sent cache so the next satControlLoop
   // (re-enable, fallback, or recommissioning) re-emits all four SAT commands.
   satResetCmdCache();
@@ -3650,9 +3668,7 @@ static bool satRestartStep()
       DebugTln(F("SAT: restored state valid, SAT takes over on its first tick (nothing sent at boot)"));
       satNarrate_P(PSTR("Restart: restored state valid, SAT resumes"));
     } else {
-      satEnqueueOwnCS("CS=0");
-      addCommandToQueue("CH=1", 4, false, 0);
-      addCommandToQueue("MM=T", 4, false, 0);
+      if (!satSendRelease()) _sat_releasePending = true;   // TASK-1574 (commit-on-success): satRetryRelease() repeats it
       satResetCmdCache();
       _sat_quietHandedBack = true;
       DebugTln(F("SAT: no valid restored state, boiler handed back (CS=0, CH=1, MM=T) until a boiler reply and an outside temperature"));
@@ -6394,6 +6410,9 @@ static void satControlLoopRun()
 {
   satApplyControlStateReset();    // TASK-1414: a reset requested from any task (REST, MQTT, SAT itself) is applied here, once
   satCurveTuneService(millis());  // TASK-1525: starts, stops and rolls the self-tune clock; before every early return
+  // TASK-1574 (commit-on-success): before the enabled gate and every other early return, so a dropped hand-back is repeated
+  // also while SAT is switched off (satDisable() then has no later pass of its own).
+  satRetryRelease();
   // Deferred PID state restore (Task #222): satLoadPidState() is called at initSAT()
   // but NTP may not yet be synced at that point, so the restore is skipped there.
   // Retry here once after NTP becomes available so freshness can be verified.

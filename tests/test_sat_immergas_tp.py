@@ -35,7 +35,8 @@ STUBS = r"""
 #define SAT_QUIRK_MIN_MOD_10   0x01
 #define SAT_QUIRK_IMMERGAS_TP  0x02
 static std::vector<std::string> g_q;
-static void addCommandToQueue(const char* buf, int len, bool, int) { g_q.push_back(std::string(buf, len)); }
+enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };   // TASK-1574
+static CmdQueueResult addCommandToQueue(const char* buf, int len, bool, int) { g_q.push_back(std::string(buf, len)); return CmdQueueResult::Queued; }
 static uint8_t g_quirks = 0;
 static uint8_t satGetManufacturerQuirks() { return g_quirks; }
 static bool _sat_mmSentValid = false;   // TASK-1570 on-change flag (cleared per scenario below)

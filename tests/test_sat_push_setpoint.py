@@ -58,7 +58,8 @@ static uint32_t g_ms = 0;
 static uint32_t millis() { return g_ms; }
 static bool isPICEnabled() { return true; }
 static char g_sent[512];
-static void addCommandToQueue(const char* c, size_t n, bool, int) { strncat(g_sent, c, n); strcat(g_sent, ";"); }
+enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };   // TASK-1574
+static CmdQueueResult addCommandToQueue(const char* c, size_t n, bool, int) { strncat(g_sent, c, n); strcat(g_sent, ";"); return CmdQueueResult::Queued; }
 @BODY@
 static float g_target = 20.0f;
 static void tick() { satEnqueueIfChangedTC(g_target); }

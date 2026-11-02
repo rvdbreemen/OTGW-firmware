@@ -57,7 +57,11 @@ static bool g_imm = false;
 static bool satImmergasTpActive() { return g_imm; }   // TASK-1537: satSendMM Immergas TP
 struct OTSys { uint8_t SlaveStatus=0; }; static OTSys OTcurrentSystemState;
 static char g_sent[256];
-static void addCommandToQueue(const char* c, size_t n, bool, int) { strncat(g_sent, c, n); strcat(g_sent, ";"); }
+enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };   // TASK-1574
+static int g_drop = 0;   // TASK-1574: 1 = the PIC queue refuses everything (nothing recorded), 2 = refuses only TP=
+static CmdQueueResult addCommandToQueue(const char* c, size_t n, bool, int) {
+  if (g_drop == 1 || (g_drop == 2 && !strncmp(c, "TP=", 3))) return CmdQueueResult::Dropped;
+  strncat(g_sent, c, n); strcat(g_sent, ";"); return CmdQueueResult::Queued; }
 @BODY@
 @STUB_RESEND@
 // scenario: tick = CS, MM, CH like satControlLoopRun
@@ -121,6 +125,24 @@ int main(int argc, char** argv) {
     g_sent[0] = 0; g_ms = start + 59999; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);
     g_sent[0] = 0; g_ms = start + 60000; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);
     g_sent[0] = 0; g_ms = start + 90000; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);
+  } else if (mode == 10) {                                 // TASK-1574: a dropped tick is not recorded, the next one sends again
+    g_ms = start; satResetCmdCache(); g_drop = 1; tick(40.0f, 80, 1);
+    printf("[%s]\n", g_sent);                                // nothing was accepted
+    g_drop = 0; g_ms = start + 1000; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);   // same values: CS, MM and CH go out
+    g_sent[0] = 0; g_ms = start + 2000; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);    // accepted now: MM/CH on change only
+  } else if (mode == 11) {                                 // Immergas: a dropped TP keeps the MM flag open
+    g_imm = true; g_ms = start; satResetCmdCache(); g_drop = 2; tick(40.0f, 100, 1);   // only the TP is refused, the MM is accepted
+    g_sent[0] = 0; g_drop = 0; g_ms = start + 1000; tick(40.0f, 100, 1); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 2000; tick(40.0f, 100, 1); printf("[%s]\n", g_sent);
+  } else if (mode == 12) {                                 // a dropped satSendCS is repeated by the 5 s resend
+    g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
+    g_ms = start + 1000; g_drop = 1; satSendCS(42.0f); g_drop = 0;   // iLastSentCSMs stays at start
+    g_sent[0] = 0; g_ms = start + 4999; satCmdResend(); printf("[%s]\n", g_sent);
+    g_ms = start + 5000; satCmdResend(); printf("[%s]\n", g_sent);   // 5 s after the last ACCEPTED CS
+  } else if (mode == 13) {                                 // a dropped PIC keepalive is tried again on the next pass
+    g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
+    g_sent[0] = 0; g_ms = start + 30000; g_drop = 1; satPicCSKeepalive(); g_drop = 0; printf("[%s]\n", g_sent);
+    g_ms = start + 30001; satPicCSKeepalive(); printf("[%s]\n", g_sent);
   }
   return 0;
 }
@@ -229,6 +251,28 @@ class CmdCacheReset(unittest.TestCase):
         self.assertEqual(a, "[CS=40.0;]")
         self.assertEqual(b, "[CS=40.0;MM=80;CH=1;]")
         self.assertEqual(c, "[CS=40.0;]")
+
+    def test_dropped_enqueue_is_not_cached_and_sent_again(self):
+        # TASK-1574 (commit-on-success): a Dropped CS/MM/CH never reaches the cache, so the next tick repeats all three
+        a, b, c, _ = self.run_at(10000, 10)
+        self.assertEqual(a, "[]")
+        self.assertEqual(b, "[CS=40.0;MM=80;CH=1;]")
+        self.assertEqual(c, "[CS=40.0;]")  # accepted now: CS every tick, MM/CH on change only
+
+    def test_immergas_dropped_tp_sends_tp_and_mm_again(self):
+        a, b, _, _ = self.run_at(10000, 11)
+        self.assertEqual(a, "[CS=40.0;TP=11:12=80;MM=100;]")   # TP is min(mm, 80); CH was accepted on the first tick
+        self.assertEqual(b, "[CS=40.0;]")
+
+    def test_dropped_satsendcs_is_retried_by_the_5s_resend(self):
+        a, b, _, _ = self.run_at(10000, 12)
+        self.assertEqual(a, "[]")
+        self.assertEqual(b, "[CS=40.0;]")
+
+    def test_dropped_keepalive_is_tried_again_on_the_next_pass(self):
+        a, b, _, _ = self.run_at(10000, 13)
+        self.assertEqual(a, "[]")
+        self.assertEqual(b, "[CS=40.0;]")
 
 
 def _code_lines(src):
