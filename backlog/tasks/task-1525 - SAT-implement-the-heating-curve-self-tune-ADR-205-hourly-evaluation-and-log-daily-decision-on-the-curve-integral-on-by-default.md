@@ -3,11 +3,11 @@ id: TASK-1525
 title: >-
   SAT: implement the heating curve self-tune (ADR-205): hourly evaluation and
   log, daily decision on the curve integral, on by default
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-31T13:45:00Z'
-updated_date: '2026-11-01T19:46:00Z'
+updated_date: '2026-11-02T00:48:00Z'
 labels:
   - sat
 dependencies:
@@ -30,7 +30,7 @@ Implements ADR-205 (Accepted 2026-10-31) from TASK-1519. Design source: Sergeant
 - [x] #4 Host test: settings.ini is written only when the coefficient changes
 - [x] #5 Setting exposed in settings/REST/MQTT/web UI like the other SAT settings, default on; switching it off keeps the coefficient and stops evaluation
 - [x] #6 Log records: hourly (mean, counted or first reason), daily (clean-hour count, 3-day mean, raise/lower/hold and reason) and a change line with old value, new value and mean; documented in docs/sat/sat-log-format.md; parsed by scripts/sat_log_to_csv.py
-- [ ] #7 Bench: SAT simulation on a bench unit over at least 4 simulated days shows hourly and daily records and one logged change; telnet and SAT log captured as evidence
+- [x] #7 Bench: SAT simulation on a bench unit over at least 4 simulated days shows hourly and daily records and one logged change; telnet and SAT log captured as evidence
 - [x] #8 python evaluate.py --quick green; combo build green
 <!-- AC:END -->
 
@@ -44,4 +44,12 @@ Robert 2026-10-31 13:47 UTC #dev-sat-mqtt (msg 1566086252254601217): 'we have a 
 Correction 2026-10-31 (alpha session, after Robert questioned it): the earlier note that the built-in simulation 'toggles the flame every tick' was wrong. Measured in the bench logs: SATTICK flame=0 on every 30 s tick and SATTUNEH reason=flame_off every (60 s sim) hour. Cause from the model equations: the synthetic boiler short-cycles, 37-54 starts/h with 5-12 s burns, because its minimum output (1.2 kW) always exceeds its emitter loss (0.1-0.6 kW) and its water mass is ~170x too small. Filed as TASK-1532; AC7 waits on it.
 
 2026-11-01 Robert: AC7 bench run deferred while 2.0.1 development is ongoing; do not tie up a bench unit for it now. Field logs meanwhile show the hourly records and exclusions working (gruijter alpha.597 capture: SATTUNEH hour=0 not_sat, hour=1/2 sun). Note: with the simulation at 60 s per hour the 4 simulated days take ~1.5-2 h wall time, not 4 days.
+
+AC#7 bench run 2026-11-02 00:01-01:46 (lead session, Robert: 'met spoed', bench frozen for it): .63 Classic+S3 Mini, 2.0.0-beta.4+2905bd1 (contains the 1525 code and the TASK-1532 sim boiler), satsimulation on, gas, target 19.8. Tuner hour 60 s via POST /api/v2/sat/sim/event {event:tune_hour,value:60}, SATinterval 10 s (docs/sat/sat-log-format.md), SAT telnet debug captured. Scenario: the stock sim (24 kW, min 20 % = 4.8 kW) cannot modulate above its minimum against the sim radiators, so every hour was excluded as min_mod (attempts 1 and 2, logs kept); run 3 used boilercapacity 10 kW, simcoolrate 0.2 (house needs ~6.6 kW) and coefficient 1.0 (curve too low on purpose). Result over 104 tuner hours = 4.3 simulated days: 104 SATTUNEH records, 86 counted (hours 0-1 min_mod while the house cooled down); SATTUNED day=0 clean=19 hold few_days; day=1 clean=19 hold few_days; day=2 clean=20 days_in_window=3 mean3=10.08 decision=raise reason=outside_band; 'SATTUNE old=1.0 new=1.1 mean3=10.08' (01:13:29); day=3 clean=21 days_in_window=1 hold few_days (window emptied by the change, as designed). bootcount 46 before and after, freeheap ~57-58.5 KB, maxblock 31732. Settings restored afterwards (SATinterval 30, boilercapacity 24, coefficient 1.5, simcoolrate 0.1). Finding: the stock simulation scenario never produces a counted tuner hour (sim house load < sim boiler minimum); a bench run needs the scenario above. Logs: scratchpad run1525/ (telnet.log, status.log, summary.txt).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Heating curve self-tune (ADR-205): hourly evaluation and log, daily decision on the 3-day mean of the curve signal, fixed 0.1 step, on by default. Code on dev (0fd940bf7, fb02f8431, 081ee4d9f, 9398cec94). AC1-AC6, AC8: host tests (tests/test_sat_curve_selftune.py 55/55, exclusion mutants red), REST/MQTT/doc checks, bench .61 hourly records, evaluate 80/0 (notes). AC7: bench .63 2026-11-02, 4.3 simulated days with 60 s tuner hours: 104 hourly records (86 counted), 4 daily records, one logged change on day 2 (mean3 10.08 C outside the 1 C band -> raise, SATTUNE old=1.0 new=1.1), window emptied after the change as designed, no reboot. The run needed a heavier sim scenario (10 kW boiler, simcoolrate 0.2, coefficient 1.0): the stock sim never yields a counted hour (house load below the sim boiler minimum), recorded in the notes.
+<!-- SECTION:FINAL_SUMMARY:END -->
