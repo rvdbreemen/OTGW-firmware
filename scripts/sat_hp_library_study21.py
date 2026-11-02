@@ -64,6 +64,13 @@ UNITS = {
         "cop35": [(-7, 2.77), (2, 4.35), (7, 4.60)],
         "src": "Daikin data book ERGA04-08EV p.5-7: EHBH08+ERGA08 7.50 kW COP 4.60 at A7/W35; 35 C ErP: Pdh +7 C 3.3, +12 C 3.9 kW "
                "(column mapping of merged cells read as 04/06 | 08, reading ours), -7 C 7.0 kW COPd 2.77"},
+    # TASK-1563: gas boilers on their own (no heat pump). Modulation 3.5 or 5.5 kW minimum to 24 kW (A; entry 210 names
+    # 5.5 kW for older boilers, the other value is a modern minimum, not from a datasheet); own anti-cycling 3 min (A);
+    # efficiency BOILER_EFF. SAT runs its gas rules: period GAS_PERIOD_S, minimum ON 180 s, at most 3 starts/h.
+    "gas_boiler_min35": {"type": "gas", "pmin": 3.5, "pmax": [(7, 24.0)], "cop35": [(7, 1.0)], "standstill": 3,
+        "src": "assumption (A), TASK-1563"},
+    "gas_boiler_min55": {"type": "gas", "pmin": 5.5, "pmax": [(7, 24.0)], "cop35": [(7, 1.0)], "standstill": 3,
+        "src": "assumption (A), entry 210 (older boilers about 5.5 kW minimum), TASK-1563"},
     "panasonic_aquarea_j_7": {"type": "electric", "pmin": 3.4, "pmax": [(-7, 6.8), (2, 7.0), (7, 7.0)],
         "cop35": [(-7, 2.81), (2, 3.40), (7, 4.76)],
         "src": "Panasonic EU model page WH-MDC07J3E5: A7/W35 7.00 kW COP 4.76, A2/W35 7.00 kW COP 3.40, A-7/W35 6.80 kW COP 2.81; "
@@ -93,6 +100,14 @@ RAD_EXP = 1.3
 # a small standing loss to the system when it does not. The boiler controls on its own loop flow; the system receives
 # the separator transfer, not the burner power.
 SEPARATOR = False
+# TASK-1563: HOUSE = a dict from sat_stock_houses.house() replaces the reference house (None = rounds 21-23 behaviour)
+HOUSE = None
+# TASK-1563: how a hybrid's backup request ends (see the hybrid branch of run()); "hp_spare" = rounds 22/22b
+BACKUP_END = "hp_spare"
+# TASK-1563: BOILER_MOD = True lets the hybrid's boiler modulate on its own loop flow behind the separator; False = the
+# boiler fires the system's need (rounds 22/22b), which overruns its small loop and short-cycles even above its minimum
+BOILER_MOD = False
+BOILER_GAIN = 250.0
 # Candidate sweep for TASK-1527 AC#2 (round 23): the SAT flow cap for a heat pump (entry 155: 40 C) and the
 # maximum relative modulation SAT sends while it runs PWM (heat pumps get MM = 100 today, satComputeMM).
 FLOW_CAP = h12.SP_MAX
@@ -137,16 +152,23 @@ def run(args):
     unit_name, variant, c, era, screed = args
     u = UNITS[unit_name]; pmin = u["pmin"] * 1000.0; standstill = u.get("standstill", 10); minrun = 10
     tm, sm = base.WEATHER["w"]; minutes = len(tm)
-    Ca, Cw, Gao, Gwo, Heff, _ = s3.house(era, "heavy", 1.0)
+    Ca, Cw, Gao, Gwo, Heff, _ = s3.house(era if not HOUSE else "5_2015", "heavy", 1.0)
+    G_AW, MCP, gain_k, solar_k = s3.G_AW, h12.MCP_UFH, 1.0, 1.0
+    if HOUSE:   # TASK-1563: an RVO stock dwelling (scripts/sat_stock_houses.py) instead of the reference house
+        Ca, Cw, Gao, Gwo, Heff, G_AW = HOUSE["Ca"], HOUSE["Cw"], HOUSE["Gao"], HOUSE["Gwo"], HOUSE["Heff"], HOUSE["G_aw"]
+        MCP, gain_k, solar_k = h12.MCP_UFH * HOUSE["gain_scale"], HOUSE["gain_scale"], HOUSE["solar_scale"]
     season = statistics.fmean(t for t in tm if t < 15)
-    ufh = PLANT == "ufh"; hybrid = u["type"] == "hybrid"
+    ufh = (HOUSE["emitter"] == "ufh") if HOUSE else PLANT == "ufh"; hybrid = u["type"] == "hybrid"; isgas = u["type"] == "gas"
+    if isgas: minrun = 1
     base_off = 20.0 if ufh else 27.2; cold_sp = 21.0 if ufh else 28.2
-    spmax = FLOW_CAP if (ufh or not hybrid) else 62.0; exp_e = h12.EXP_UFH if ufh else RAD_EXP
+    spmax = (50.0 if ufh else 62.0) if isgas else FLOW_CAP if (ufh or not hybrid) else 62.0; exp_e = h12.EXP_UFH if ufh else RAD_EXP
     if ufh: K = h12.k_for(Heff, season)
     else:
         Qs = max(Heff * (TARGET - season) - 135.0, 50.0); fs = float(port.curve(1.6, TARGET, season, 27.2))
         K = Qs / max(fs - Qs / (2 * h12.MCP_UFH) - TARGET, 0.5) ** RAD_EXP
-    pwm_minon = 180 if hybrid else PWM_MINON_S; pwm_minoff = 0 if hybrid else PWM_MINOFF_S; pwm_starts = []
+    if HOUSE: K, exp_e = HOUSE["K"], HOUSE["exp"]
+    pwm_minon = 180 if (hybrid or isgas) else PWM_MINON_S; pwm_minoff = 0 if (hybrid or isgas) else PWM_MINOFF_S; pwm_starts = []
+    pwm_period = GAS_PERIOD_S if isgas else PWM_PERIOD_S
     rnd = random.Random(1); gains = [0.0] * minutes
     for d in range(minutes // 1440):
         for m in range(d * 1440 + 1050, d * 1440 + 1110): gains[m] += 1200.0
@@ -155,12 +177,14 @@ def run(args):
             for m in range(st, min(minutes, st + int(rnd.uniform(30, 120)))): gains[m] += w
         if d % 14 == 9:
             for m in range(d * 1440 + 1140, d * 1440 + 1440): gains[m] += 1500.0
-    Ta = TARGET; Tw = (s3.G_AW * TARGET + Gwo * season) / (s3.G_AW + Gwo)
+    gains = [g * gain_k for g in gains]
+    Ta = TARGET; Tw = (G_AW * TARGET + Gwo * season) / (G_AW + Gwo)
     Ts = float(port.curve(c, TARGET, season, base_off)) - 2.0
     pid = port.Pid(c, ufh)
     on = False; on_for = 0; off_for = 999; starts = 0; run_lens = []
     P = 0.0; boiler = False; deficit = 0; b_starts = 0; b_starts_t = []; b_el = 99; b_last_stop = None
     Tb = None; Pb_prev = 0.0
+    end_spare = end_spare_bon = end_ch = 0
     spare = 0; b_req = False; s_pwm = False; s_on = False; s_el = 0; s_ov = 0; s_sat = s_uh = 0; s_eff = 0.0
     pwm = False; ov = 0; sat_s = 0; ph_on = False; ph_el = 0; eff_on = None
     sq = n = out = absum = 0.0; elec = gas = heat_hp = 0.0; gas_ret = 0.0; run_min = at_min = pwm_min = heat_min = boiler_min = 0
@@ -171,7 +195,7 @@ def run(args):
         now = 1000000 + m * 60000
         pid.service(now, room_meas, TARGET, cv); pid.note_room(room_meas, now)
         sp = min(spmax, max(10.0, float(pid.output(cv)))) if heating else 10.0
-        flow_now = Ts + P / (2 * h12.MCP_UFH); ret_now = Ts - P / (2 * h12.MCP_UFH)
+        flow_now = Ts + P / (2 * MCP); ret_now = Ts - P / (2 * MCP)
         cs, ch = sp, heating and sp > cold_sp
         if heating: heat_min += 1
         if variant == "sat" and heating and sp > cold_sp:
@@ -182,12 +206,12 @@ def run(args):
                 pwm_min += 1
                 ref = eff_on if eff_on else max(flow_now, cold_sp)
                 duty = min(max((sp - base_off) / max(ref - base_off, 1.0), 0.0), 1.0)
-                on_t, off_t, cont = port.pwm_times(duty, PWM_PERIOD_S, pwm_minon, on)
+                on_t, off_t, cont = port.pwm_times(duty, pwm_period, pwm_minon, on)
                 on_t /= 60.0; off_t /= 60.0
                 if ph_on:
                     if not cont and ph_el >= on_t: ph_on = False; ph_el = 0
                 elif (ph_el >= pwm_minoff / 60 and (cont or (on_t >= 3 and ph_el >= off_t))
-                        and (not hybrid or len([t for t in pwm_starts if m - t < 60]) < 3)):
+                        and (not (hybrid or isgas) or len([t for t in pwm_starts if m - t < 60]) < 3)):
                     ph_on = True; ph_el = 0; pwm_starts.append(m)
                 ph_el += 1
                 sat_s = sat_s + 1 if cont else 0
@@ -236,10 +260,19 @@ def run(args):
                 # after the HP047-050 delay with the heat pump at full output and the flow 2 K short of CS; ends when the
                 # heat pump has had spare capacity for 15 min or CH ends (A).
                 deficit = deficit + 1 if (on and P >= pm - 1 and flow_now < cs - 2.0) else 0
-                spare = spare + 1 if (P < pm - 1) else 0
+                # BACKUP_END "hp_spare" (rounds 22/22b): spare = the heat pump's own output below its maximum. "emitter":
+                # spare = the heat the emitters draw is below the heat pump's maximum (TASK-1563 diagnosis)
+                spare = spare + 1 if ((qfloor < pm - 1) if BACKUP_END == "emitter" else (P < pm - 1)) else 0
                 if not b_req and ch and deficit >= backup_delay(tout): b_req = True
-                if b_req and (not ch or spare >= 15): b_req = False
+                if b_req and (not ch or spare >= 15):
+                    if not ch: end_ch += 1
+                    else: end_spare += 1; end_spare_bon += int(boiler)
+                    b_req = False
                 need = qfloor + HP_GAIN * (cs - flow_now) - P
+                if BOILER_MOD and SEPARATOR and Tb is not None:
+                    # TASK-1563: a modulating boiler holds its own loop flow at CS: it fires what the separator passes
+                    # on plus a correction on its own flow error (instead of the system's need), between min and max
+                    need = SEP_G * (Tb - Ts) + BOILER_GAIN * (cs - fb_now)   # BOILER_GAIN x 60 s / SEP_C < 1: stable
                 if HYBRID_MODE == "own":
                     # the boiler's own control on the heat pump's CS (A): on below CS - 2 K after 3 min off, off above CS + 2 K
                     b_el += 1
@@ -282,9 +315,11 @@ def run(args):
         else:
             q_sys = Pb
         Pb_prev = Pb
-        flow = Ts + (P + q_sys) / (2 * h12.MCP_UFH)
+        flow = Ts + (P + q_sys) / (2 * MCP)
         if P > 0:
-            elec += P * DT / cop(u, flow, tout); heat_hp += P * DT; run_min += 1
+            if isgas: gas += P * DT / BOILER_EFF; gas_ret += P * DT / (0.97 - 0.10 * min(max((Ts - 30.0) / 30.0, 0.0), 1.0))
+            else: elec += P * DT / cop(u, flow, tout)
+            heat_hp += P * DT; run_min += 1
             if P <= pmin + 1: at_min += 1
         if Pb > 0:
             gas += Pb * DT / BOILER_EFF; boiler_min += 1
@@ -293,7 +328,7 @@ def run(args):
             eta_r = 0.97 - 0.10 * min(max((Ts - 30.0) / 30.0, 0.0), 1.0)
             gas_ret += Pb * DT / eta_r
         Ts += (P + q_sys - qfloor) * DT / screed
-        qaw = s3.G_AW * (Ta - Tw); solar = 1.5 * sw
+        qaw = G_AW * (Ta - Tw); solar = 1.5 * sw * solar_k
         Ta += (qfloor + gains[m] + 0.5 * solar - qaw - Gao * (Ta - tout)) * DT / Ca
         Tw += (qaw + 0.5 * solar - Gwo * (Tw - tout)) * DT / Cw
         if heating and m >= 14 * 1440:
@@ -306,7 +341,8 @@ def run(args):
             "elec_kwh": elec / 3.6e6, "gas_kwh": gas / 3.6e6, "gas_ret_kwh": gas_ret / 3.6e6, "boiler_min_w": BOILER_MIN, "scop": heat_hp / elec if elec else 0,
             "share_at_pmin": at_min / run_min if run_min else 0, "pwm_share": pwm_min / max(1, heat_min),
             "boiler_hours": boiler_min / 60, "boiler_starts": b_starts,
-            "boiler_run_mean_min": (boiler_min / b_starts) if b_starts else 0, "hybrid_mode": HYBRID_MODE, "plant": PLANT, "separator": SEPARATOR}
+            "boiler_run_mean_min": (boiler_min / b_starts) if b_starts else 0, "hybrid_mode": HYBRID_MODE, "plant": PLANT, "separator": SEPARATOR,
+            "backup_end": BACKUP_END, "req_end_spare": end_spare, "req_end_spare_boiler_on": end_spare_bon, "req_end_ch": end_ch}
 
 
 def _init(w): s15._init(w, {})

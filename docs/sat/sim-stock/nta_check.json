@@ -1,0 +1,1058 @@
+{
+ "oorspronkelijk": {
+  "median_ratio": 1.0860579805886657,
+  "p10": 0.929640305841003,
+  "p90": 1.2131050447050746,
+  "model_kwh_m2_weighted": 188.0904364952362,
+  "nta_kwh_m2_weighted": 164.48662581905876,
+  "per_dwelling": [
+   [
+    "vrij|tot65|oorspronkelijk",
+    331.2,
+    293.1
+   ],
+   [
+    "vrij|65-74|oorspronkelijk",
+    284.0,
+    234.0
+   ],
+   [
+    "vrij|75-91|oorspronkelijk",
+    185.0,
+    168.3
+   ],
+   [
+    "vrij|92-05|oorspronkelijk",
+    113.8,
+    121.0
+   ],
+   [
+    "vrij|06-14|oorspronkelijk",
+    100.4,
+    105.9
+   ],
+   [
+    "vrij|15-18|oorspronkelijk",
+    76.4,
+    87.4
+   ],
+   [
+    "2-1 kap|tot65|oorspronkelijk",
+    303.2,
+    260.4
+   ],
+   [
+    "2-1 kap|65-74|oorspronkelijk",
+    256.3,
+    207.7
+   ],
+   [
+    "2-1 kap|75-91|oorspronkelijk",
+    169.2,
+    151.4
+   ],
+   [
+    "2-1 kap|92-05|oorspronkelijk",
+    106.5,
+    110.2
+   ],
+   [
+    "2-1 kap|06-14|oorspronkelijk",
+    95.2,
+    97.7
+   ],
+   [
+    "2-1 kap|15-18|oorspronkelijk",
+    72.8,
+    80.6
+   ],
+   [
+    "rij tuss|tot46|oorspronkelijk",
+    293.4,
+    245.2
+   ],
+   [
+    "rij tuss|46-64|oorspronkelijk",
+    254.0,
+    202.9
+   ],
+   [
+    "rij tuss|65-74|oorspronkelijk",
+    214.1,
+    167.7
+   ],
+   [
+    "rij tuss|75-91|oorspronkelijk",
+    142.3,
+    124.7
+   ],
+   [
+    "rij tuss|92-05|oorspronkelijk",
+    95.5,
+    94.4
+   ],
+   [
+    "rij tuss|06-14|oorspronkelijk",
+    75.2,
+    73.7
+   ],
+   [
+    "rij tuss|15-18|oorspronkelijk",
+    67.6,
+    72.3
+   ],
+   [
+    "rij hoek|tot46|oorspronkelijk",
+    343.9,
+    299.7
+   ],
+   [
+    "rij hoek|46-64|oorspronkelijk",
+    308.7,
+    258.9
+   ],
+   [
+    "rij hoek|65-74|oorspronkelijk",
+    257.6,
+    207.4
+   ],
+   [
+    "rij hoek|75-91|oorspronkelijk",
+    164.5,
+    147.6
+   ],
+   [
+    "rij hoek|92-05|oorspronkelijk",
+    109.2,
+    112.5
+   ],
+   [
+    "rij hoek|06-14|oorspronkelijk",
+    91.3,
+    93.8
+   ],
+   [
+    "rij hoek|15-18|oorspronkelijk",
+    74.9,
+    80.6
+   ],
+   [
+    "mais|tot65|oorspronkelijk",
+    214.9,
+    184.7
+   ],
+   [
+    "mais|65-74|oorspronkelijk",
+    213.8,
+    187.9
+   ],
+   [
+    "mais|75-91|oorspronkelijk",
+    127.6,
+    112.2
+   ],
+   [
+    "mais|92-05|oorspronkelijk",
+    81.5,
+    78.2
+   ],
+   [
+    "mais|06-14|oorspronkelijk",
+    74.7,
+    80.6
+   ],
+   [
+    "mais|15-18|oorspronkelijk",
+    65.5,
+    72.5
+   ],
+   [
+    "gal|tot65|oorspronkelijk",
+    188.9,
+    181.7
+   ],
+   [
+    "gal|65-74|oorspronkelijk",
+    156.3,
+    148.4
+   ],
+   [
+    "gal|75-91|oorspronkelijk",
+    122.1,
+    106.2
+   ],
+   [
+    "gal|92-05|oorspronkelijk",
+    81.0,
+    75.9
+   ],
+   [
+    "gal|06-14|oorspronkelijk",
+    70.0,
+    68.4
+   ],
+   [
+    "gal|15-18|oorspronkelijk",
+    58.1,
+    59.9
+   ],
+   [
+    "port|tot46|oorspronkelijk",
+    250.5,
+    217.3
+   ],
+   [
+    "port|46-64|oorspronkelijk",
+    232.7,
+    194.4
+   ],
+   [
+    "port|65-74|oorspronkelijk",
+    182.5,
+    150.4
+   ],
+   [
+    "port|75-91|oorspronkelijk",
+    133.9,
+    117.7
+   ],
+   [
+    "port|92-05|oorspronkelijk",
+    83.6,
+    79.1
+   ],
+   [
+    "port|06-14|oorspronkelijk",
+    77.0,
+    74.3
+   ],
+   [
+    "port|15-18|oorspronkelijk",
+    84.7,
+    126.4
+   ],
+   [
+    "overig|tot65|oorspronkelijk",
+    172.6,
+    150.6
+   ],
+   [
+    "overig|65-74|oorspronkelijk",
+    151.5,
+    139.5
+   ],
+   [
+    "overig|75-91|oorspronkelijk",
+    109.4,
+    98.4
+   ],
+   [
+    "overig|92-05|oorspronkelijk",
+    78.4,
+    76.1
+   ],
+   [
+    "overig|06-14|oorspronkelijk",
+    66.8,
+    66.0
+   ],
+   [
+    "overig|15-18|oorspronkelijk",
+    58.8,
+    54.1
+   ]
+  ]
+ },
+ "huidig": {
+  "median_ratio": 1.0146839647039834,
+  "p10": 0.9056048856469003,
+  "p90": 1.1389232723935783,
+  "model_kwh_m2_weighted": 141.93863739971786,
+  "nta_kwh_m2_weighted": 134.1293788857828,
+  "per_dwelling": [
+   [
+    "vrij|tot65|huidig",
+    210.5,
+    209.5
+   ],
+   [
+    "vrij|65-74|huidig",
+    205.2,
+    181.9
+   ],
+   [
+    "vrij|75-91|huidig",
+    152.4,
+    152.0
+   ],
+   [
+    "vrij|92-05|huidig",
+    107.2,
+    117.2
+   ],
+   [
+    "vrij|06-14|huidig",
+    97.9,
+    104.7
+   ],
+   [
+    "vrij|15-18|huidig",
+    74.2,
+    87.4
+   ],
+   [
+    "2-1 kap|tot65|huidig",
+    202.7,
+    192.4
+   ],
+   [
+    "2-1 kap|65-74|huidig",
+    183.0,
+    160.7
+   ],
+   [
+    "2-1 kap|75-91|huidig",
+    143.0,
+    138.2
+   ],
+   [
+    "2-1 kap|92-05|huidig",
+    101.5,
+    107.4
+   ],
+   [
+    "2-1 kap|06-14|huidig",
+    92.4,
+    96.0
+   ],
+   [
+    "2-1 kap|15-18|huidig",
+    69.9,
+    78.4
+   ],
+   [
+    "rij tuss|tot46|huidig",
+    189.0,
+    170.7
+   ],
+   [
+    "rij tuss|46-64|huidig",
+    186.1,
+    159.2
+   ],
+   [
+    "rij tuss|65-74|huidig",
+    162.8,
+    136.0
+   ],
+   [
+    "rij tuss|75-91|huidig",
+    111.1,
+    110.5
+   ],
+   [
+    "rij tuss|92-05|huidig",
+    88.5,
+    91.4
+   ],
+   [
+    "rij tuss|06-14|huidig",
+    74.9,
+    73.8
+   ],
+   [
+    "rij tuss|15-18|huidig",
+    66.9,
+    72.9
+   ],
+   [
+    "rij hoek|tot46|huidig",
+    226.2,
+    211.8
+   ],
+   [
+    "rij hoek|46-64|huidig",
+    211.9,
+    191.4
+   ],
+   [
+    "rij hoek|65-74|huidig",
+    188.6,
+    162.4
+   ],
+   [
+    "rij hoek|75-91|huidig",
+    128.1,
+    130.7
+   ],
+   [
+    "rij hoek|92-05|huidig",
+    104.0,
+    109.7
+   ],
+   [
+    "rij hoek|06-14|huidig",
+    90.4,
+    93.7
+   ],
+   [
+    "rij hoek|15-18|huidig",
+    73.2,
+    80.8
+   ],
+   [
+    "mais|tot65|huidig",
+    166.8,
+    150.2
+   ],
+   [
+    "mais|65-74|huidig",
+    180.5,
+    171.3
+   ],
+   [
+    "mais|75-91|huidig",
+    100.9,
+    99.2
+   ],
+   [
+    "mais|92-05|huidig",
+    76.8,
+    75.5
+   ],
+   [
+    "mais|06-14|huidig",
+    53.8,
+    61.1
+   ],
+   [
+    "mais|15-18|huidig",
+    44.4,
+    52.9
+   ],
+   [
+    "gal|tot65|huidig",
+    134.7,
+    134.6
+   ],
+   [
+    "gal|65-74|huidig",
+    109.7,
+    114.1
+   ],
+   [
+    "gal|75-91|huidig",
+    96.1,
+    92.8
+   ],
+   [
+    "gal|92-05|huidig",
+    75.5,
+    72.2
+   ],
+   [
+    "gal|06-14|huidig",
+    68.0,
+    66.8
+   ],
+   [
+    "gal|15-18|huidig",
+    37.4,
+    38.2
+   ],
+   [
+    "port|tot46|huidig",
+    199.7,
+    175.9
+   ],
+   [
+    "port|46-64|huidig",
+    185.1,
+    160.0
+   ],
+   [
+    "port|65-74|huidig",
+    133.3,
+    114.7
+   ],
+   [
+    "port|75-91|huidig",
+    106.6,
+    102.9
+   ],
+   [
+    "port|92-05|huidig",
+    81.0,
+    77.9
+   ],
+   [
+    "port|06-14|huidig",
+    74.1,
+    72.7
+   ],
+   [
+    "port|15-18|huidig",
+    84.7,
+    129.9
+   ],
+   [
+    "overig|tot65|huidig",
+    130.3,
+    122.9
+   ],
+   [
+    "overig|65-74|huidig",
+    114.8,
+    115.9
+   ],
+   [
+    "overig|75-91|huidig",
+    83.4,
+    84.7
+   ],
+   [
+    "overig|92-05|huidig",
+    72.6,
+    73.4
+   ],
+   [
+    "overig|06-14|huidig",
+    67.1,
+    66.5
+   ],
+   [
+    "overig|15-18|huidig",
+    58.2,
+    53.7
+   ]
+  ]
+ },
+ "pakket2": {
+  "median_ratio": 1.067960042813174,
+  "p10": 0.9666974997607831,
+  "p90": 1.1403551374016951,
+  "model_kwh_m2_weighted": 62.318451358368854,
+  "nta_kwh_m2_weighted": 58.01017637950014,
+  "per_dwelling": [
+   [
+    "vrij|tot65|pakket2",
+    82.0,
+    80.8
+   ],
+   [
+    "vrij|65-74|pakket2",
+    81.7,
+    76.1
+   ],
+   [
+    "vrij|75-91|pakket2",
+    79.0,
+    75.8
+   ],
+   [
+    "vrij|92-05|pakket2",
+    72.1,
+    70.3
+   ],
+   [
+    "vrij|06-14|pakket2",
+    70.6,
+    69.0
+   ],
+   [
+    "vrij|15-18|pakket2",
+    56.0,
+    60.8
+   ],
+   [
+    "2-1 kap|tot65|pakket2",
+    75.3,
+    72.3
+   ],
+   [
+    "2-1 kap|65-74|pakket2",
+    74.2,
+    66.8
+   ],
+   [
+    "2-1 kap|75-91|pakket2",
+    72.7,
+    68.6
+   ],
+   [
+    "2-1 kap|92-05|pakket2",
+    67.4,
+    64.4
+   ],
+   [
+    "2-1 kap|06-14|pakket2",
+    64.8,
+    62.4
+   ],
+   [
+    "2-1 kap|15-18|pakket2",
+    51.6,
+    55.0
+   ],
+   [
+    "rij tuss|tot46|pakket2",
+    62.5,
+    58.5
+   ],
+   [
+    "rij tuss|46-64|pakket2",
+    62.4,
+    54.8
+   ],
+   [
+    "rij tuss|65-74|pakket2",
+    60.3,
+    53.2
+   ],
+   [
+    "rij tuss|75-91|pakket2",
+    56.8,
+    53.4
+   ],
+   [
+    "rij tuss|92-05|pakket2",
+    57.3,
+    52.9
+   ],
+   [
+    "rij tuss|06-14|pakket2",
+    51.6,
+    49.4
+   ],
+   [
+    "rij tuss|15-18|pakket2",
+    47.9,
+    49.5
+   ],
+   [
+    "rij hoek|tot46|pakket2",
+    74.3,
+    71.1
+   ],
+   [
+    "rij hoek|46-64|pakket2",
+    78.4,
+    70.8
+   ],
+   [
+    "rij hoek|65-74|pakket2",
+    74.8,
+    65.8
+   ],
+   [
+    "rij hoek|75-91|pakket2",
+    72.1,
+    67.1
+   ],
+   [
+    "rij hoek|92-05|pakket2",
+    69.8,
+    66.6
+   ],
+   [
+    "rij hoek|06-14|pakket2",
+    65.4,
+    62.2
+   ],
+   [
+    "rij hoek|15-18|pakket2",
+    55.3,
+    56.5
+   ],
+   [
+    "mais|tot65|pakket2",
+    52.6,
+    48.1
+   ],
+   [
+    "mais|65-74|pakket2",
+    60.0,
+    57.2
+   ],
+   [
+    "mais|75-91|pakket2",
+    53.1,
+    50.3
+   ],
+   [
+    "mais|92-05|pakket2",
+    47.4,
+    43.0
+   ],
+   [
+    "mais|06-14|pakket2",
+    50.3,
+    54.3
+   ],
+   [
+    "mais|15-18|pakket2",
+    44.5,
+    50.7
+   ],
+   [
+    "gal|tot65|pakket2",
+    50.6,
+    43.5
+   ],
+   [
+    "gal|65-74|pakket2",
+    46.7,
+    40.7
+   ],
+   [
+    "gal|75-91|pakket2",
+    49.1,
+    44.7
+   ],
+   [
+    "gal|92-05|pakket2",
+    46.0,
+    39.9
+   ],
+   [
+    "gal|06-14|pakket2",
+    44.8,
+    41.1
+   ],
+   [
+    "gal|15-18|pakket2",
+    37.9,
+    37.6
+   ],
+   [
+    "port|tot46|pakket2",
+    57.8,
+    53.5
+   ],
+   [
+    "port|46-64|pakket2",
+    60.7,
+    54.0
+   ],
+   [
+    "port|65-74|pakket2",
+    53.0,
+    45.4
+   ],
+   [
+    "port|75-91|pakket2",
+    53.5,
+    50.6
+   ],
+   [
+    "port|92-05|pakket2",
+    48.3,
+    43.3
+   ],
+   [
+    "port|06-14|pakket2",
+    49.0,
+    46.1
+   ],
+   [
+    "port|15-18|pakket2",
+    52.6,
+    78.1
+   ],
+   [
+    "overig|tot65|pakket2",
+    46.8,
+    42.1
+   ],
+   [
+    "overig|65-74|pakket2",
+    43.9,
+    40.0
+   ],
+   [
+    "overig|75-91|pakket2",
+    43.9,
+    40.7
+   ],
+   [
+    "overig|92-05|pakket2",
+    45.0,
+    40.7
+   ],
+   [
+    "overig|06-14|pakket2",
+    43.0,
+    39.2
+   ],
+   [
+    "overig|15-18|pakket2",
+    39.1,
+    33.6
+   ]
+  ]
+ },
+ "pakket3": {
+  "median_ratio": 1.2003631326634803,
+  "p10": 1.0306719402593925,
+  "p90": 1.3668940005423513,
+  "model_kwh_m2_weighted": 48.97521964966846,
+  "nta_kwh_m2_weighted": 41.021924887732276,
+  "per_dwelling": [
+   [
+    "vrij|tot65|pakket3",
+    68.6,
+    63.6
+   ],
+   [
+    "vrij|65-74|pakket3",
+    68.3,
+    59.4
+   ],
+   [
+    "vrij|75-91|pakket3",
+    65.6,
+    58.9
+   ],
+   [
+    "vrij|92-05|pakket3",
+    58.8,
+    54.4
+   ],
+   [
+    "vrij|06-14|pakket3",
+    57.2,
+    53.2
+   ],
+   [
+    "vrij|15-18|pakket3",
+    42.8,
+    44.9
+   ],
+   [
+    "2-1 kap|tot65|pakket3",
+    61.9,
+    55.0
+   ],
+   [
+    "2-1 kap|65-74|pakket3",
+    60.9,
+    50.4
+   ],
+   [
+    "2-1 kap|75-91|pakket3",
+    59.2,
+    51.8
+   ],
+   [
+    "2-1 kap|92-05|pakket3",
+    54.0,
+    48.5
+   ],
+   [
+    "2-1 kap|06-14|pakket3",
+    51.4,
+    46.5
+   ],
+   [
+    "2-1 kap|15-18|pakket3",
+    38.3,
+    38.8
+   ],
+   [
+    "rij tuss|tot46|pakket3",
+    49.1,
+    41.7
+   ],
+   [
+    "rij tuss|46-64|pakket3",
+    49.1,
+    38.4
+   ],
+   [
+    "rij tuss|65-74|pakket3",
+    46.9,
+    36.8
+   ],
+   [
+    "rij tuss|75-91|pakket3",
+    43.5,
+    36.5
+   ],
+   [
+    "rij tuss|92-05|pakket3",
+    44.0,
+    37.0
+   ],
+   [
+    "rij tuss|06-14|pakket3",
+    38.3,
+    33.1
+   ],
+   [
+    "rij tuss|15-18|pakket3",
+    34.6,
+    33.2
+   ],
+   [
+    "rij hoek|tot46|pakket3",
+    60.9,
+    53.9
+   ],
+   [
+    "rij hoek|46-64|pakket3",
+    65.0,
+    54.2
+   ],
+   [
+    "rij hoek|65-74|pakket3",
+    61.4,
+    49.5
+   ],
+   [
+    "rij hoek|75-91|pakket3",
+    58.7,
+    50.3
+   ],
+   [
+    "rij hoek|92-05|pakket3",
+    56.4,
+    50.7
+   ],
+   [
+    "rij hoek|06-14|pakket3",
+    52.1,
+    46.4
+   ],
+   [
+    "rij hoek|15-18|pakket3",
+    42.0,
+    40.8
+   ],
+   [
+    "mais|tot65|pakket3",
+    39.3,
+    30.1
+   ],
+   [
+    "mais|65-74|pakket3",
+    46.7,
+    40.0
+   ],
+   [
+    "mais|75-91|pakket3",
+    39.7,
+    32.1
+   ],
+   [
+    "mais|92-05|pakket3",
+    34.2,
+    26.1
+   ],
+   [
+    "mais|06-14|pakket3",
+    37.0,
+    36.1
+   ],
+   [
+    "mais|15-18|pakket3",
+    31.2,
+    32.5
+   ],
+   [
+    "gal|tot65|pakket3",
+    37.4,
+    27.6
+   ],
+   [
+    "gal|65-74|pakket3",
+    33.6,
+    24.4
+   ],
+   [
+    "gal|75-91|pakket3",
+    35.7,
+    26.5
+   ],
+   [
+    "gal|92-05|pakket3",
+    32.7,
+    23.2
+   ],
+   [
+    "gal|06-14|pakket3",
+    31.7,
+    24.7
+   ],
+   [
+    "gal|15-18|pakket3",
+    24.6,
+    19.7
+   ],
+   [
+    "port|tot46|pakket3",
+    44.5,
+    34.4
+   ],
+   [
+    "port|46-64|pakket3",
+    47.4,
+    35.6
+   ],
+   [
+    "port|65-74|pakket3",
+    39.8,
+    28.1
+   ],
+   [
+    "port|75-91|pakket3",
+    40.2,
+    31.5
+   ],
+   [
+    "port|92-05|pakket3",
+    35.0,
+    26.7
+   ],
+   [
+    "port|06-14|pakket3",
+    35.7,
+    28.4
+   ],
+   [
+    "port|15-18|pakket3",
+    39.2,
+    41.7
+   ],
+   [
+    "overig|tot65|pakket3",
+    33.6,
+    23.4
+   ],
+   [
+    "overig|65-74|pakket3",
+    30.6,
+    23.2
+   ],
+   [
+    "overig|75-91|pakket3",
+    30.6,
+    22.4
+   ],
+   [
+    "overig|92-05|pakket3",
+    31.7,
+    23.6
+   ],
+   [
+    "overig|06-14|pakket3",
+    29.9,
+    22.6
+   ],
+   [
+    "overig|15-18|pakket3",
+    26.0,
+    17.5
+   ]
+  ]
+ }
+}
