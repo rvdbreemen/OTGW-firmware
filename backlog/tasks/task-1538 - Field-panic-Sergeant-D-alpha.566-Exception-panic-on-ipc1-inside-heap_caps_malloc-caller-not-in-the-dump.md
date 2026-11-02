@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T07:50:00Z'
-updated_date: '2026-11-02T12:54:00Z'
+updated_date: '2026-11-02T13:12:00Z'
 labels:
   - crash
   - field
@@ -25,7 +25,7 @@ Reported by Sergeant D in #alpha-testing 2026-11-01 (msg 1566327932199116884): '
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Full core dump (or a longer backtrace) obtained from the unit or a reproduction, and the application caller named with file:line
-- [ ] #2 Cause identified with evidence (old-vs-fix reproduction) or, if not reproducible, the diagnostics gap closed so the next dump shows the caller
+- [x] #2 Cause identified with evidence (old-vs-fix reproduction) or, if not reproducible, the diagnostics gap closed so the next dump shows the caller
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -40,4 +40,6 @@ AC2 (diagnostics gap): REBOOT_LOG_LINE_MAX 240 (OTGW-firmware.h) sizes log_line_
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: bt goes into log_line_regs[120] (helperStuff.ino:332, platform_esp32.h:578-588), ~6 frames, caller lost. AC2 diagnostics doable now; root cause needs a field dump.
 
 2026-11-02 evidence (wt-1552, base 6b0d0024d beta.9): tests/test_crashlog_coredump.py on HEAD copies (OTGW_PLATFORM_H/HELPER_INO/REST_INO/FW_H = git show HEAD): FAILED 3 = full16 6 frames (113 chars, as in Sergeant D's dump), parse16 reader cut the line, copy16 copy cut it. Fix: 10/10 OK, 16 frames, 223 chars. Side effect: the External Reason line was snprintf'd with LOG_LINE_LENGTH 140 into the 120 buffer (latent overflow), now 240. evaluate --quick 0 failed 100%; full tests/ 93/93. Review: risk-based, no agent review (buffer sizing only; stack: async_tcp readLatestCrashLog + REST +160 B on a 16 KB stack). Full core dump: still only over USB (esptool read_flash 0x3F0000 0x10000 + esp-coredump with the .elf); REST download filed as TASK-1560.
+
+Shipped in 2.0.0-beta.10+118fb7e (tag v2.0.0-beta.10, GitHub prerelease, Latest stays v1.7.8, download sha256 c4e367e5... matches SHA256SUMS). Build: 2x Successfully created ESP32S3 image, Build completed successfully. Bench .63: OTA app+fs, settings 175 keys changed none, /api/v2/device/crashlog still returns the existing 02:17 entry, bootcount 62 unchanged after 5 min, reboot_log.txt one entry per line. A new 16-frame line was not produced on hardware (no crash trigger); Robert approved publishing with that stated (AskUserQuestion 2026-11-02). Posts: #alpha-testing zip 1566801902027407492 + report, #beta-testing announcement. AC2 checked (diagnostics gap closed for the summary backtrace). AC1 stays open: needs the next field dump (or TASK-1560 to fetch the full dump). Task stays In Progress.
 <!-- SECTION:NOTES:END -->
