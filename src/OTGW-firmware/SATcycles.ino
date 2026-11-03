@@ -1342,7 +1342,9 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
     return false;
   }
   const float flowTemp = satGetFlowTemp();
-  if (!(flowTemp >= requestedSetpoint + settings.sat.fOvershootMargin)) {
+  // satGetFlowTemp() is 0.0 for a flow temperature that is missing: never received, Data-Invalid, Unknown-DataID or older than
+  // 60 s (SATboilerFeed.h classes; entries 218, 241). Missing clears the start, as thermo-nova (heating_control.py:284-286).
+  if (flowTemp <= 0.0f || !(flowTemp >= requestedSetpoint + settings.sat.fOvershootMargin)) {
     _sustain_overshootRunning = false;
     return false;
   }
@@ -1383,7 +1385,11 @@ bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
   }
   const float flowTemp = satGetFlowTemp();
 
-  if (flowTemp <= requestedSetpoint - SAT_UNDERSHOOT_MARGIN_C) {
+  // A missing flow temperature (0.0, see satCycleCheckOvershootSwitch) clears the underheat start instead of counting as a very
+  // low flow (heating_control.py:333-335, entry 218). The saturation timer does not look at the flow (:353-367).
+  if (flowTemp <= 0.0f) {
+    _sustain_underheatRunning = false;
+  } else if (flowTemp <= requestedSetpoint - SAT_UNDERSHOOT_MARGIN_C) {
     if (satSustainedFor(_sustain_underheatRunning, _sustain_underheatStartMs, tickMs, SAT_UNDERHEAT_SUSTAIN_MS)) {
       SATDebugTln(F("SAT: sustained underheat detected, switching to continuous mode"));
       satSetControlMode(SAT_MODE_CONTINUOUS);

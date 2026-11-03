@@ -26,6 +26,7 @@ then the tick runs:
   u  PWM ON phase, flow 40 (underheat: 40 <= 50 - 3)         U  PWM ON phase, flow 47 exactly requested - 3
   z  PWM ON phase, flow 50, PWM off time 0 (saturation)      b  the tick bypasses the switches (fault, ...)
   w  PWM ON phase, flow 50, PWM off time 1 (neither)
+  m  PWM ON phase, flow missing (satGetFlowTemp() = 0.0, TASK-1428)   y  continuous, flow missing (TASK-1428)
   d  a hot-water tick (satCycleNoteDhwTick), the DHW bit is set from here on (satCycleNoteDhwBit(true))
   x  the loop pass at this time sees the DHW bit drop (satCycleNoteDhwBit(false)); no control tick runs
   s  a draw that began 5 s earlier and ends at this time, between two control ticks: no tick sees it, only the
@@ -152,6 +153,8 @@ int main(int argc, char** argv) {
     if (k == 'p') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = false; g_flow = 55.0f; g_offTime = 1; }
     if (k == 'u') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 40.0f; g_offTime = 1; }
     if (k == 'U') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 47.0f; g_offTime = 1; }
+    if (k == 'm') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 0.0f; g_offTime = 1; }
+    if (k == 'y') { state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false; g_flow = 0.0f; g_offTime = 1; }
     if (k == 'w') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 50.0f; g_offTime = 1; }
     if (k == 'z') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 50.0f; g_offTime = 0; }
     const int before = g_switches;
@@ -378,6 +381,27 @@ class SustainedSwitches(unittest.TestCase):
     def test_dhw_resets_saturation_and_blocks_it_for_300s(self):
         toks = ticks(30000, "zzz") + ["30000:d"] + ticks(30000, "z" * 24)
         self.assertEqual(self.switch_at(toks), 420000 + 300000)
+
+    # --- TASK-1428 (entries 218, 241; thermo-nova heating_control.py:284-286, :333-335): a missing flow resets the starts ---
+
+    # u@30 u@60 m@90 (flow missing: the underheat start is cleared) u@120 restarts, fires at 120 + 180. Old code: the
+    # missing flow (0.0) counts as underheat, fires at 30 + 180.
+    def test_missing_flow_resets_the_underheat_start(self):
+        self.assertEqual(self.switch_at(ticks(30000, "uumuuuuuuuu")), 30000 * 4 + 180000)
+
+    # Missing flow for the whole stint never fires underheat. Old code: fires 180 s after the first tick.
+    def test_missing_flow_alone_never_counts_as_underheat(self):
+        self.assertEqual(self.run_ticks(ticks(30000, "m" * 20))["t"], "-1")
+
+    # The missing flow also clears the start on a long (> 60 s) tick.
+    def test_missing_flow_resets_the_underheat_start_at_a_90s_tick(self):
+        self.assertEqual(self.switch_at(ticks(90000, "uumuuu")), 90000 * 4 + 180000)
+
+    # Overshoot: o@30 o@60 y@90 (flow missing) o@120 restarts, switch at 120 + 60 + ... Old code also resets here (0.0 is
+    # below requested + margin), so this case is green on both; it pins the behaviour.
+    def test_missing_flow_resets_the_overshoot_start(self):
+        self.assertEqual(self.switch_at(ticks(30000, "ooyoooo")), 30000 * 4 + 60000)
+        self.assertEqual(self.run_ticks(ticks(30000, "y" * 12))["t"], "-1")
 
     # --- bypass and skip (AC#4) ---
 
