@@ -46,6 +46,9 @@ enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };   // TA
 static CmdQueueResult addCommandToQueue(const char* cmd, int, bool, int) { printf("%d %s\n", g_pass, cmd); return CmdQueueResult::Queued; }
 static int _sat_lastSentSW = 0;
 static bool _sat_swSentValid = false;
+struct OTSys { float TdhwSet = 0; }; static OTSys OTcurrentSystemState;
+static bool satSwCurrent() { return true; }   // TASK-1541: the hand-back restore is tested in test_sat_disable_handback.py
+static void satSwNoteBeforeSend(float) {}
 @FUNC@
 int main(int argc, char** argv) {
   // argv: scenario

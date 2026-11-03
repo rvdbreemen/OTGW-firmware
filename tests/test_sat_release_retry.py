@@ -124,7 +124,9 @@ class CallSite(unittest.TestCase):
 
     def test_both_hand_backs_use_the_checked_release(self):
         src = SAT_INO.read_text(encoding="utf-8")
-        self.assertEqual(src.count("if (!satSendRelease()) _sat_releasePending = true;"), 2)
+        self.assertEqual(src.count("_sat_releasePending = true;   // TASK-1574"), 2)
+        self.assertIn("satSendRelease(restore)) _sat_releasePending", src)     # TASK-1541: satDisable() restores, the restart hand-back does not
+        self.assertIn("satSendRelease(false)) _sat_releasePending", src)
 
 
 if __name__ == "__main__":

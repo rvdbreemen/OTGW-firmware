@@ -51,6 +51,8 @@ struct SatState { bool bLastSentValid=false; float fLastSentCS=0; uint8_t iLastS
 struct State { SatState sat; };
 static State state;
 struct OTSys { uint8_t SlaveStatus = 0; }; static OTSys OTcurrentSystemState;   // read by satCmdResend() (TASK-1370)
+static int16_t satPreSatPersisted(bool) { return 0; }   // TASK-1541
+static void satPreSatPersist(int16_t, int16_t) {}
 static bool hasOTCommandInterface() { return true; }
 static float satEffectiveMaxSetpoint() { return 1000.0f; }   // TASK-1536: satCapRepeatCS() ceiling, no cap here
 static bool satImmergasTpActive() { return false; }   // TASK-1537: satSendMM Immergas TP

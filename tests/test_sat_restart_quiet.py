@@ -124,6 +124,9 @@ static void satPwmReset() {}
 static void satCycleSkipAutoSwitch() {}
 static float _sat_lastControlCS = 0, _sat_requestedSetpoint = 0;
 static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false, _sat_fireplaceActive = false;   // TASK-1374: satDisable() resets it
+static int16_t satPreSatPersisted(bool) { return 0; }   // TASK-1541
+static void satPreSatPersist(int16_t, int16_t) {}
+static bool satIsEnabled() { return true; }   // TASK-1541: satDisable() restores only when SAT is off or tripped
 static bool g_roomSeen = false;
 static bool satPidRoomSeen() { return g_roomSeen; }
 static void satPidReset() { g_roomSeen = false; }

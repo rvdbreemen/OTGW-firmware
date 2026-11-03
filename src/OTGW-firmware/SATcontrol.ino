@@ -389,6 +389,8 @@ static float satGetMaxSetpoint()
 // tick: only the first pass and a change send. A queued SH= the PIC drops is not retried until the next
 // change or restart. The value is the boiler value (no heat pump cap), the same cap a boiler's CS gets.
 static int16_t _sat_lastSentSH = -1;                        // -1 = nothing sent since boot
+static bool satShCurrent();                                 // TASK-1541: SAT's SH= is on the boiler (defined with the hand-back)
+static void satShNoteBeforeSend(float boilerValue);
 static void satMaxTSetSendStep()
 {
   if (!satIsEnabled() || !hasOTCommandInterface()) return;
@@ -398,9 +400,10 @@ static void satMaxTSetSendStep()
                                         OTcurrentSystemState.MaxTSetUBMaxTSetLB, satGlobalMaxSetpoint(), &chosen);
   if (!chosen) return;
   const int16_t iv = (int16_t)lroundf(v);
-  if (iv == _sat_lastSentSH) return;
+  if (iv == _sat_lastSentSH && satShCurrent()) return;     // after a hand-back (TASK-1541) the value goes out again
   char cmd[12];
   snprintf_P(cmd, sizeof(cmd), PSTR("SH=%d"), (int)iv);
+  satShNoteBeforeSend(OTcurrentSystemState.MaxTSet);       // TASK-1541: remember the boiler value before SAT's first SH=
   addCommandToQueue(cmd, strlen(cmd), false, 0);
   _sat_lastSentSH = iv;
   SATDebugTf(PSTR("SAT: user MaxTSet, sent %s\r\n"), cmd);
@@ -727,16 +730,70 @@ void satNotifyPicRestart() { satResetCmdCache(); }
 // PIC queue drops one of the three, _sat_releasePending is set and satRetryRelease() sends all three again, once per loop
 // pass, until the queue accepts them. volatile: satDisable() also runs on the async_tcp task, the loop task consumes it.
 static volatile bool _sat_releasePending = false;
-static bool satSendRelease() {
+
+// TASK-1541, Sergeant D entry 240: when SAT is switched off, the hand-back also puts back what SAT changed on the boiler and
+// the thermostat, after CS=0, CH=1, MM=T and in this order: SH= and SW= with the values read before SAT's first SH= / SW=
+// (OTcurrentSystemState.MaxTSet = MsgID 57, .TdhwSet = MsgID 56; 0 means never read, then nothing is sent for that item),
+// then TC=0 when SAT pushed a TC=. TP= (Immergas) and MI= stay as SAT left them (the old TP value is unknown). The flags say
+// what SAT changed since the last restore; the pre-SAT values are kept for the next time SAT takes over. They live in RAM:
+// a reboot with SAT enabled is not a switch-off and forgets them.
+static int16_t _sat_preSH = -1;          // MsgID 57 value before SAT's first SH=; -1 = never read
+static int16_t _sat_preSW = -1;          // MsgID 56 value before SAT's first SW=; -1 = never read
+static bool    _sat_shChanged = false;   // SAT sent SH= since the last restore
+static bool    _sat_swChanged = false;
+static bool    _sat_tcPushed  = false;   // SAT pushed a TC= since the last restore
+// The pending restore values also live in settings.sat.iPreSatMaxTSet / iPreSatDhwSet (settings.ini, 0 = nothing pending), so a
+// reboot with SAT enabled does not lose them: they are written when SAT first changes the boiler, cleared by a successful restore,
+// and loaded in initSAT(). The write is the deferred settings flush (settingsMarkDirty), never per tick.
+static int16_t satPreSatPersisted(bool dhw);               // accessors of the two settings, defined after the hand-back code
+static void satPreSatPersist(int16_t sh, int16_t sw);      // stores them, marks the settings dirty when they changed
+static void satPreSatStore() {
+  satPreSatPersist((_sat_shChanged && _sat_preSH > 0) ? _sat_preSH : 0, (_sat_swChanged && _sat_preSW > 0) ? _sat_preSW : 0);
+}
+static void satPreSatLoad() {
+  const int16_t sh = satPreSatPersisted(false), sw = satPreSatPersisted(true);
+  if (sh > 0) { _sat_preSH = sh; _sat_shChanged = true; }   // a stored value means SAT changed it and it is not restored yet
+  if (sw > 0) { _sat_preSW = sw; _sat_swChanged = true; }
+}
+static volatile bool _sat_releaseRestore = false;   // the pending release must also restore (retry)
+static bool satShCurrent() { return _sat_shChanged; }
+static bool satSwCurrent() { return _sat_swChanged; }
+static void satShNoteBeforeSend(float boilerValue) {   // boilerValue: OTcurrentSystemState.MaxTSet at the moment of the send
+  const bool first = !_sat_shChanged;
+  if (first && _sat_preSH < 0 && boilerValue >= 1.0f) _sat_preSH = (int16_t)lroundf(boilerValue);
+  _sat_shChanged = true;
+  if (first) satPreSatStore();
+}
+static void satSwNoteBeforeSend(float boilerValue) {   // boilerValue: OTcurrentSystemState.TdhwSet at the moment of the send
+  const bool first = !_sat_swChanged;
+  if (first && _sat_preSW < 0 && boilerValue >= 1.0f) _sat_preSW = (int16_t)lroundf(boilerValue);
+  _sat_swChanged = true;
+  if (first) satPreSatStore();
+}
+static bool satEnqueueRestoreValue(const char* name, int16_t value) {   // "SH" / "SW": one format, the senders keep their own
+  char cmd[12];
+  snprintf_P(cmd, sizeof(cmd), PSTR("%s=%d"), name, (int)value);
+  return addCommandToQueue(cmd, strlen(cmd), false, 0) != CmdQueueResult::Dropped;
+}
+static bool satSendRestore() {
+  bool ok = true;
+  if (_sat_shChanged && _sat_preSH >= 0 && !satEnqueueRestoreValue("SH", _sat_preSH)) ok = false;
+  if (_sat_swChanged && _sat_preSW >= 0 && !satEnqueueRestoreValue("SW", _sat_preSW)) ok = false;
+  if (_sat_tcPushed && addCommandToQueue("TC=0", 4, false, 0) == CmdQueueResult::Dropped) ok = false;
+  if (ok) { _sat_shChanged = false; _sat_swChanged = false; _sat_tcPushed = false; satPreSatStore(); }   // a Dropped one keeps the flags: the retry sends all again; the stored values go back to 0
+  return ok;
+}
+static bool satSendRelease(bool restore) {
   bool ok = satEnqueueOwnCS("CS=0");
   if (addCommandToQueue("CH=1", 4, false, 0) == CmdQueueResult::Dropped) ok = false;   // CH override back to the default (TASK-1346)
   if (addCommandToQueue("MM=T", 4, false, 0) == CmdQueueResult::Dropped) ok = false;   // MM override cleared (TASK-1344)
+  if (restore && !satSendRestore()) ok = false;
   return ok;
 }
 static void satRetryRelease() {
   if (!_sat_releasePending) return;
   if (state.sat.bActive) { _sat_releasePending = false; return; }   // SAT controls again: its own CS=/MM=/CH= replace the release
-  if (satSendRelease()) _sat_releasePending = false;
+  if (satSendRelease(_sat_releaseRestore)) _sat_releasePending = false;
 }
 
 // TASK-1272, Sergeant D entry 14 and the maintainer decision of 2026-10-24: TC= is pushed when the
@@ -764,6 +821,7 @@ static bool satEnqueueIfChangedTC(float tc) {
   char buf[16];
   snprintf_P(buf, sizeof(buf), PSTR("TC=%.1f"), tc);
   addCommandToQueue(buf, strlen(buf), false, 0);
+  _sat_tcPushed               = true;                      // TASK-1541: satDisable() clears it with TC=0
   state.sat.fLastSentTC       = (float)newQ / 10.0f;
   state.sat.bTCAccountedValid = true;
   state.sat.iTCPushMs         = millis() ? millis() : 1;   // 0 means "no push"
@@ -3598,6 +3656,26 @@ void satPersistAllToFs()
 // from freezing.
 // satIsEnabled(): does SAT control the boiler right now? The user's setting, or the MQTT-loss
 // takeover (state.sat.bFallbackActive, TASK-1345), which never touches the setting.
+static int16_t satPreSatPersisted(bool dhw) { return dhw ? settings.sat.iPreSatDhwSet : settings.sat.iPreSatMaxTSet; }
+static void satPreSatPersist(int16_t sh, int16_t sw)
+{
+  if (settings.sat.iPreSatMaxTSet == sh && settings.sat.iPreSatDhwSet == sw) return;
+  settings.sat.iPreSatMaxTSet = sh;
+  settings.sat.iPreSatDhwSet  = sw;
+  settingsMarkDirty();   // TASK-1541: the deferred flush (loop task) writes settings.ini; this only sets a flag, so any task may call it
+}
+
+// TASK-1541: SAT was switched off (or the unit rebooted with SAT off) while a restore was still pending: send it now,
+// retried every 5 s until the queue accepts it. Runs on the loop task while SAT is disabled.
+static void satRestoreLeftover()
+{
+  static uint32_t lastMs = 0;
+  if (!(_sat_shChanged || _sat_swChanged || _sat_tcPushed) || !hasOTCommandInterface()) return;
+  if (lastMs != 0 && (uint32_t)(millis() - lastMs) < 5000UL) return;
+  lastMs = millis() ? millis() : 1;
+  satSendRestore();
+}
+
 bool satIsEnabled()
 {
 #if defined(HAS_SAT) && HAS_SAT
@@ -3632,6 +3710,9 @@ void satDisable(bool persistPid)
   // satDisable() call, made with the flag still false). A user switch-off or the MQTT-takeover lift during
   // the loss only ends the loss state; the commands are not sent a second time.
   const bool handedBack = state.sat.bOtLinkLost || state.sat.bOutsideTempMissing;   // TASK-1390: the outside-missing hand-back counts too
+  // TASK-1541 (entry 240): SAT stops for good (switched off, MQTT takeover lifted, safety trip): SH=, SW= and TC=0 go back too.
+  // Not for a pause with SAT still enabled (OpenTherm loss, outside temperature missing, flash): SAT resumes by itself.
+  const bool restore = !satIsEnabled() || state.sat.bSafetyTripped;
   state.sat.bOutsideTempMissing = false;   // the outside-temperature gate sets it again after this call (TASK-1390)
   state.sat.bOtLinkLost = false;       // a switch-off ends the OpenTherm-loss state; the loss path sets it again after this call (TASK-1365)
   satSetControlMode(SAT_MODE_OFF);
@@ -3655,6 +3736,10 @@ void satDisable(bool persistPid)
   if (handedBack) {
     satResetCmdCache();
     SATDebugTln(F("SAT: disabled during an OpenTherm loss, hand-back already sent"));
+    if (restore) {                         // TASK-1541: the loss hand-back did not restore SH=, SW=, TC=
+      _sat_releaseRestore = true;
+      if (!satSendRestore()) _sat_releasePending = true;
+    }
     return;
   }
   // TASK-1346: CH=1 also hands back the CH override. CH= only counts while a CS override is
@@ -3665,7 +3750,8 @@ void satDisable(bool persistPid)
   // the PIC (gateway.asm:4752 SetMaxModLevel -> ClrMaxModLevel; pyotgw.py:542-543) and on
   // OT-Direct (MM= handler, clearWriteOverride(14)); otherwise the thermostat gets the
   // boiler back with maximum modulation 0 %.
-  if (!satSendRelease()) _sat_releasePending = true;   // TASK-1574 (commit-on-success): satRetryRelease() repeats it
+  _sat_releaseRestore = restore;
+  if (!satSendRelease(restore)) _sat_releasePending = true;   // TASK-1574 (commit-on-success): satRetryRelease() repeats it
   // TASK-565: clear the last-sent cache so the next satControlLoop
   // (re-enable, fallback, or recommissioning) re-emits all four SAT commands.
   satResetCmdCache();
@@ -3799,7 +3885,8 @@ static bool satRestartStep()
       DebugTln(F("SAT: restored state valid, SAT takes over on its first tick (nothing sent at boot)"));
       satNarrate_P(PSTR("Restart: restored state valid, SAT resumes"));
     } else {
-      if (!satSendRelease()) _sat_releasePending = true;   // TASK-1574 (commit-on-success): satRetryRelease() repeats it
+      _sat_releaseRestore = false;         // TASK-1541: a restart hand-back is not a switch-off, SAT takes over after it
+      if (!satSendRelease(false)) _sat_releasePending = true;   // TASK-1574 (commit-on-success): satRetryRelease() repeats it
       satResetCmdCache();
       _sat_quietHandedBack = true;
       DebugTln(F("SAT: no valid restored state, boiler handed back (CS=0, CH=1, MM=T) until a boiler reply and an outside temperature"));
@@ -5328,6 +5415,7 @@ static void satUpdateFlameStatus()
 void initSAT()
 {
   satPidReset();
+  satPreSatLoad();          // TASK-1541: a restore still pending from before the reboot (settings are read before initSAT())
   satRestartNotePidLoad(satLoadPidState());   // Restore PID state (and the outside temperature, entry 126) after reset (Task #222)
   satLoadEnergyState();     // Restore energy total from LittleFS after reset (Task #196)
   satLoadEstimatedEnergy();  // Restore estimated gas energy from LittleFS (Task #232)
@@ -6522,6 +6610,8 @@ bool satPidGatherInputs(float* room, float* target, float* curve)
 // enabled and DHW control is on with a valid setpoint, SW=<int> goes out at once when the DHW setpoint changes (REST,
 // MQTT or the web UI) and once after a restart, after satRestartStep() has let SAT act. It runs every pass, not on the
 // control tick, and not at the start of a hot-water draw.
+static bool satSwCurrent();               // TASK-1541: SAT's SW= is on the boiler (defined with the hand-back)
+static void satSwNoteBeforeSend(float boilerValue);
 static void satDhwSetpointSync()
 {
   const float sp = settings.sat.fDhwSetpoint;
@@ -6530,9 +6620,10 @@ static void satDhwSetpointSync()
     return;
   }
   if (!hasOTCommandInterface()) return;
-  if (_sat_swSentValid && (int)sp == _sat_lastSentSW) return;
+  if (_sat_swSentValid && satSwCurrent() && (int)sp == _sat_lastSentSW) return;   // after a hand-back (TASK-1541) it goes out again
   char swCmd[16];
   snprintf_P(swCmd, sizeof(swCmd), PSTR("SW=%d"), (int)sp);
+  satSwNoteBeforeSend(OTcurrentSystemState.TdhwSet);      // TASK-1541: remember the boiler value before SAT's first SW=
   addCommandToQueue(swCmd, strlen(swCmd), false, 0);
   _sat_lastSentSW = (int)sp;
   _sat_swSentValid = true;
@@ -6604,6 +6695,8 @@ static void satControlLoopRun()
   if (!satIsEnabled() || isFlashing()) {
     if (state.sat.bActive) {
       satDisable();
+    } else if (!satIsEnabled() && !isFlashing()) {
+      satRestoreLeftover();                // TASK-1541: a restore still pending from before a reboot with SAT off
     }
     _sat_otLinkBaseMs = millis();          // TASK-1365: a flash or a switch-off is not OpenTherm silence
     _sat_swSentValid = false;              // TASK-1376: SAT sends the DHW setpoint again when it is back

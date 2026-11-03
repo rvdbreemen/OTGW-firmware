@@ -63,6 +63,11 @@ struct SatState { bool bLastSentValid=false, bTCAccountedValid=false, bActive=fa
                   uint32_t iLastSentCSMs=0, iLastSentMMMs=0, iLastSentCHMs=0, iTCPushMs=0;
                   float fLastSentCS=0, fFinalSetpoint=0; uint8_t iLastSentMM=0, iLastSentCH=0; int eControlMode=0; uint32_t iSimDhwExpiryMs=0; };
 struct OTSys { uint8_t SlaveStatus = 0; }; static OTSys OTcurrentSystemState;
+// TASK-1541: settings.sat.iPreSatMaxTSet / iPreSatDhwSet behind the two accessors; g_persistDirty counts settingsMarkDirty() calls
+static int16_t g_persistSH = 0, g_persistSW = 0; static int g_persistDirty = 0;
+static int16_t satPreSatPersisted(bool dhw) { return dhw ? g_persistSW : g_persistSH; }
+static void satPreSatPersist(int16_t sh, int16_t sw) { if (sh == g_persistSH && sw == g_persistSW) return; g_persistSH = sh; g_persistSW = sw; g_persistDirty++; }
+static bool g_satEnabled = true; static bool satIsEnabled() { return g_satEnabled; }   // TASK-1541: satDisable() restores only when SAT is off or tripped
 struct OtBusState { uint32_t iBoilerLastSeenMs = 0; bool bPSmode = false; };
 struct State { SatState sat; OtBusState otBus; };
 static Settings settings; static State state;

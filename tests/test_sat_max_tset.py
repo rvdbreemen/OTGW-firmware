@@ -62,6 +62,8 @@ struct Settings { SatSettings sat; };
 struct OTSys { float MaxTSet = 0.0f; uint16_t MaxTSetUBMaxTSetLB = 0; };
 static Settings settings; static OTSys OTcurrentSystemState;
 static bool satIsEnabled() { return settings.sat.bEnabled; }
+static bool satShCurrent() { return true; }   // TASK-1541: the hand-back restore is tested in test_sat_disable_handback.py
+static void satShNoteBeforeSend(float) {}
 static bool g_hasOT = true;
 static bool hasOTCommandInterface() { return g_hasOT; }
 static uint8_t satGetEffectiveHeatingSystem() { return (uint8_t)settings.sat.iHeatingSystem; }

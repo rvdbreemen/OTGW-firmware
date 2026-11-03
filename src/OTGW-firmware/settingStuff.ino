@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.39
+**  Version  : v2.0.0-beta.40
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -339,6 +339,8 @@ bool writeSettings(bool show)
   writeJsonFloatKV(file, F("SATpresetactivity"), settings.sat.fPresetActivity);
   writeJsonFloatKV(file, F("SATpresethome"), settings.sat.fPresetHome);
   writeJsonIntKV(file, F("SATmaxmodulation"), settings.sat.iMaxRelModulation);
+  writeJsonIntKV(file, F("SATpresatmaxtset"), settings.sat.iPreSatMaxTSet);   // TASK-1541: internal, not in the settings listing
+  writeJsonIntKV(file, F("SATpresatdhwset"), settings.sat.iPreSatDhwSet);
   writeJsonFloatKV(file, F("SATovershootmargin"), settings.sat.fOvershootMargin);
   writeJsonFloatKV(file, F("SATmodsupdelay"), settings.sat.fModSupDelay);
   writeJsonFloatKV(file, F("SATmodsupoffset"), settings.sat.fModSupOffset);
@@ -1077,6 +1079,8 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATpresetactivity")) == 0)  settings.sat.fPresetActivity = clampSettingFloat(newValue, settings.sat.fPresetActivity, 5.0f, 20.0f);
   else if (strcasecmp_P(field, PSTR("SATpresethome")) == 0)      settings.sat.fPresetHome = clampSettingFloat(newValue, settings.sat.fPresetHome, 10.0f, 25.0f);
   else if (strcasecmp_P(field, PSTR("SATmaxmodulation")) == 0)   settings.sat.iMaxRelModulation = constrain(atoi(newValue), 0, 100);
+  else if (strcasecmp_P(field, PSTR("SATpresatmaxtset")) == 0)   settings.sat.iPreSatMaxTSet = constrain(atoi(newValue), 0, 100);   // TASK-1541
+  else if (strcasecmp_P(field, PSTR("SATpresatdhwset")) == 0)    settings.sat.iPreSatDhwSet = constrain(atoi(newValue), 0, 100);
   else if (strcasecmp_P(field, PSTR("SATovershootmargin")) == 0) settings.sat.fOvershootMargin = clampSettingFloat(newValue, settings.sat.fOvershootMargin, 0.5f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATmodsupdelay")) == 0)    settings.sat.fModSupDelay = clampSettingFloat(newValue, settings.sat.fModSupDelay, 0.0f, 120.0f);
   else if (strcasecmp_P(field, PSTR("SATmodsupoffset")) == 0)   settings.sat.fModSupOffset = clampSettingFloat(newValue, settings.sat.fModSupOffset, 0.0f, 5.0f);

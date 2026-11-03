@@ -56,6 +56,9 @@ static float satEffectiveMaxSetpoint() { return 1000.0f; }   // TASK-1536: satCa
 static bool g_imm = false;
 static bool satImmergasTpActive() { return g_imm; }   // TASK-1537: satSendMM Immergas TP
 struct OTSys { uint8_t SlaveStatus=0; }; static OTSys OTcurrentSystemState;
+static int16_t satPreSatPersisted(bool) { return 0; }   // TASK-1541: the stored restore values are tested in test_sat_disable_handback.py
+static void satPreSatPersist(int16_t, int16_t) {}
+static bool satIsEnabled() { return false; }   // TASK-1541: satDisable() restores only when SAT is off or tripped
 static char g_sent[256];
 enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };   // TASK-1574
 static int g_drop = 0;   // TASK-1574: 1 = the PIC queue refuses everything (nothing recorded), 2 = refuses only TP=

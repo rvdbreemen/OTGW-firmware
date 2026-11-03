@@ -67,6 +67,8 @@ struct State { SatState sat; };
 struct OTSys { int SlaveStatus = 0; };
 static Settings settings; static State state; static OTSys OTcurrentSystemState;
 static bool satIsEnabled() { return settings.sat.bEnabled; }
+static int16_t satPreSatPersisted(bool) { return 0; }   // TASK-1541
+static void satPreSatPersist(int16_t, int16_t) {}
 static uint32_t g_ms = 1000000; static bool g_flame = false; static float g_flow = 40, g_ret = 0;
 static uint32_t g_flameOnStart = 0, g_flameOffStart = 0; static bool g_due = false; static bool g_hourLimit = false;
 static float g_cold = 28.2f, g_effMax = 62.0f, g_userMax = 62.0f;

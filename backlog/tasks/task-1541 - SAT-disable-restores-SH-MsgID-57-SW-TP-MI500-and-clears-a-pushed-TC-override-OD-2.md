@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T08:16:00Z'
-updated_date: '2026-11-03T04:21:00Z'
+updated_date: '2026-11-03T06:07:00Z'
 labels:
   - sat
 dependencies: []
@@ -23,9 +23,9 @@ Decision Robert 2026-11-01 on OD-2 (docs/sat/sat-commissioning-profiles-2026-11-
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Plan with the hand-back order posted to Sergeant D and his answer recorded as a numbered entry
-- [ ] #2 Host test on the real satDisable: after enable + disable, SH=/SW=/TP=/MI= are restored to the pre-SAT values and TC= is cleared (red on HEAD, green on the fix)
-- [ ] #3 Every disable path listed in the description covered or explicitly excluded with a reason
+- [x] #1 Plan with the hand-back order posted to Sergeant D and his answer recorded as a numbered entry
+- [x] #2 Host test on the real satDisable: after enable + disable, SH=/SW=/TP=/MI= are restored to the pre-SAT values and TC= is cleared (red on HEAD, green on the fix)
+- [x] #3 Every disable path listed in the description covered or explicitly excluded with a reason
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -36,4 +36,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: satDisable (SATcon
 2026-11-03: thermo-nova restores nothing on HVAC off (climate.py:571-583, coordinator/mqtt/__init__.py:66-69); SH=/SW=/MI= sent at coordinator/mqtt/opentherm.py:225/202/172. Plan put to Sergeant D as Q-1541a (A: restore SH/SW from pre-SAT values + TC=0, order CS=0, CH=1, MM=T, SH, SW, TC=0; advice A). Implementation waits for his answer.
 
 2026-11-03: Sergeant D answered Q-1541a: A (entry 240, msg 1567028643157381263): on disable CS=0, CH=1, MM=T, then SH=/SW= back to the pre-SAT read values, then TC=0; TP and MI stay. Unblocked.
+
+2026-11-03 (agent, verified by lead in wt-next): AC1 = entry 240 (Q-1541a A). AC2 reading per entry 240 (overrides the AC text): SH=/SW= restored and TC=0 when SAT pushed a TC; TP and MI are NOT restored (test asserts they are never sent). On switch-off: CS=0, CH=1, MM=T, SH=<pre>, SW=<pre>, TC=0; a never-read value sends nothing; Dropped -> whole release retried (TASK-1574 path). Maintainer decision 2026-11-03: pre-SAT values persisted in settings.ini (SATpresatmaxtset/SATpresatdhwset, internal, not in the REST listing), written once on first capture and cleared after a successful restore; a leftover restore is sent after a reboot with SAT off. AC3 disable-path table: user switch-off, MQTT-fallback lift, safety trip = restore; OT-loss hand-back, outside-temp-missing, boot hand-back, flash, reboot = no restore (SAT resumes). tests/test_sat_disable_handback.py 20 tests: old 14 FAIL + 3 errors, fix 20 OK; 8 neighbouring SAT harnesses green. Bench: a PIC accepting SH/SW/TC=0 not yet tried.
 <!-- SECTION:NOTES:END -->

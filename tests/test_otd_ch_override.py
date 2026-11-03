@@ -122,7 +122,7 @@ class SourcePatterns(unittest.TestCase):
         # curve, the ESP curve on a PIC board) would apply SAT's last CH=0 again.
         sat = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino")).read_text(encoding="utf-8", errors="replace")
         # TASK-1574: satDisable() sends the hand-back through satSendRelease() (commit-on-success), which holds the commands
-        body = func_body(sat, "void satDisable(bool persistPid)") + func_body(sat, "static bool satSendRelease()")
+        body = func_body(sat, "void satDisable(bool persistPid)") + func_body(sat, "static bool satSendRelease(bool restore)")
         self.assertIn('"CS=0"', body)
         self.assertIn('"CH=1"', body, "satDisable must restore the CH override flag (CH=1)")
 
@@ -130,7 +130,7 @@ class SourcePatterns(unittest.TestCase):
         # TASK-1344: MM=0 from PWM must not outlive SAT (disable, trip, fallback end all
         # go through satDisable()). A non-numeric MM= clears the override on both boards.
         sat = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino")).read_text(encoding="utf-8", errors="replace")
-        body = func_body(sat, "void satDisable(bool persistPid)") + func_body(sat, "static bool satSendRelease()")   # TASK-1574
+        body = func_body(sat, "void satDisable(bool persistPid)") + func_body(sat, "static bool satSendRelease(bool restore)")   # TASK-1574
         self.assertRegex(body, r'addCommandToQueue\("MM=[^0-9"-][^"]*"', "satDisable must clear the MM override with a non-numeric MM=")
 
 
