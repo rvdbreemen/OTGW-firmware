@@ -3,9 +3,11 @@ id: TASK-1589
 title: >-
   SAT PWM: boiler stops and relights inside one ON phase when the ON setpoint
   sits at the flow temperature at minimum modulation (gruijter beta.49 capture)
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-11-03T13:40:00Z'
+updated_date: '2026-11-03T13:51:00Z'
 labels:
   - sat
 dependencies: []
@@ -21,6 +23,18 @@ From the peer analysis of gruijter's capture 20261103-101925 (beta.49, Classic P
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 thermo-nova ON-phase setpoint traced with file:line and compared with the firmware on the capture's frames (timeline)
-- [ ] #2 Second reader confirmed the difference (or refuted it); if real, Q queued for Sergeant D with A/B/C and advice
+- [x] #1 thermo-nova ON-phase setpoint traced with file:line and compared with the firmware on the capture's frames (timeline)
+- [x] #2 Second reader confirmed the difference (or refuted it); if real, Q queued for Sergeant D with A/B/C and advice
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-03 investigation (opus agent, read-only; findings scratchpad task1589-findings.md, timeline from the capture's otframes.log): no deviation. Every CS in 13:13-13:18 equals thermo-nova heating_control.py:385-448 for the same inputs (flame-off hold return+18 :392-401, 20 s hold after flame-on :410-426 with flame_on_since re-anchored per edge device/__init__.py:208-211, then flow-1 :435-448) and entries 20, 23, 135, 230. Corrections to the observation: the boiler raised its own modulation 7 -> 74 % at 13:15:10 with no DHW bit; MsgID 14 is Unknown-DataID on all 377 B frames (MM never reaches this Intergas); flame off at 13:15:28.5 after 122 s with last CS 36.4 (4.9 K under the flow, refresh lags the ~5 s MsgID 25 poll); 44.3 = board return 26.3 + 18 is the normal flame-off hold (entry 135: the board sensor counts as return), entries 45/149 (no-return rule) do not apply. A stop with CS under the flow is the known risk of the OT 2.1.1.2.5 suppression workaround, used on purpose by thermo-nova. On_cycle_end (TASK-1331) would not fire (class SHORT). AC2: no difference claimed, so nothing to confirm or publish; no Sergeant D question. Optional maintainer design idea (not parity, not filed): react to a boiler's own modulation rise on boilers that reject MsgID 14.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The relight inside a PWM ON phase in gruijter's beta.49 capture is thermo-nova behaviour, not a firmware deviation: all setpoints match heating_control.py:385-448 and entries 20/23/135/230; the trigger was the boiler's own modulation rise (MsgID 14 unsupported on this Intergas). No question for Sergeant D.
+<!-- SECTION:FINAL_SUMMARY:END -->
