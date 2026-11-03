@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-03T04:03:00Z'
+updated_date: '2026-11-03T12:09:00Z'
 labels:
   - sat
 dependencies: []
@@ -24,3 +25,9 @@ Follow-up of TASK-1511 (maintainer decision 2026-11-03: close 1511 on thermo-nov
 - [ ] #1 Sergeant D's answer to Q-1511a is recorded in sergeant-d-corrections.md
 - [ ] #2 If he chooses a filter: the capture replay (OTGW_PRESSURE_CAPTURE) gives 0 episodes and the slow-leak test still alarms
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-03 maintainer: Q-1511a not asked (entry 201), task parked at low priority.
+<!-- SECTION:NOTES:END -->

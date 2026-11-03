@@ -220,3 +220,7 @@ None open. Every question that was listed here has been answered by Sergeant D a
 - Tests: `tests/test_sat_pwm_override.py` (real `_pidUpdateIntegral()`, freeze path only; not in CI).
 
 The decision has no declarative rule a regex could check, and its only host test is not in CI, so it has no Enforcement block: it is guideline-level per ADR-080.
+
+## Correction 2026-11-03 (TASK-1577, maintainer)
+
+Decision 7 is unchanged; its status text is outdated. "Persistence (decided, pending in TASK-1415)" and the description of today's code are superseded by the implementation: since 2.0.0-beta.29 (TASK-1415, commit 7c6973587) the five PID values are restored at any age, with no age limit (the former 30 min limit is removed) and no NTP gate, exactly as decided (Sergeant D entry 74, Q24 "follow thermo-nova"; entry 140 covers the earlier NTP-gated deferred load). Evidence: tests/test_sat_pid_persist.py and tests/test_sat_pid_semantics.py (TASK-1412.10: a 3 h old derivative stamp still computes a slope). Correction note by maintainer decision (2026-11-03, "Correction note"); no superseding ADR.

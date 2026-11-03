@@ -5849,3 +5849,19 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 - Q-PARITY-6: the fallback setpoint when no requested setpoint exists (thermo-nova device_state.setpoint, the port the control setpoint at flame-on); unreachable, the requested setpoint is missing only before SAT's first control step on both sides.
 - Q-PARITY-11: the port reads a control setpoint <= 0 as missing; unreachable, thermo-nova's control setpoint is always a float (heating_control.py:89, 233).
 With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.14 parity catalogue is decided, so the parity gate (TASK-1412.14 AC, TASK-1331 resume signal) may pass. **Task:** TASK-1412.14, TASK-1331. **Open:** none.
+
+## 251. Cycle class label "underheat_pwm" stays (Q-PARITY-10) (maintainer, 2026-11-03)
+
+**Source:** Robert (maintainer), 2026-11-03, in the session (AskUserQuestion "Keep it").
+
+**Quoted:** "Keep it (Recommended)"
+
+**Settled:** the firmware keeps publishing "underheat_pwm" for an underheat cycle in PWM (MQTT sat/cycle_class, REST, Web UI), where thermo-nova uses "underheat" for both modes (cycles/classifier.py:54). Label only: every consumer treats both labels the same; a rename would break Home Assistant automations. A recorded deliberate label deviation. **Task:** TASK-1412.14 (catalogue). **Open:** none.
+
+## 252. QR-1: a rejected SH= (MaxTSet) write is observed and published, SAT keeps sending it by the normal rules (maintainer, 2026-11-03)
+
+**Source:** Robert (maintainer), 2026-11-03, in the session (AskUserQuestion "Observe and publish").
+
+**Quoted:** "Observe and publish (Recommended)"
+
+**Settled:** when a boiler answers SAT's SH= write (MsgID 57) with Data-Invalid or Unknown-DataID, the firmware records the write verdict (accepted / rejected) and publishes it as a diagnostic MQTT and REST value; SAT keeps sending SH= by its normal rules (no stop after a rejection). The OpenTherm protocol has no rule against the write. **Task:** TASK-1412.13. **Open:** none.
