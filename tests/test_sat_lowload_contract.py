@@ -177,7 +177,18 @@ DELEGATED = {
     "LL-013": [("test_sat_cmd_cache", "CmdCacheReset", ["test_dropped_enqueue_is_not_cached_and_sent_again", "test_dropped_satsendcs_is_retried_by_the_5s_resend",
                 "test_dropped_keepalive_is_tried_again_on_the_next_pass", "test_resend_repeats_last_values_after_5s_not_before",
                 "test_mm_and_ch_only_on_change_and_again_after_pic_restart", "test_unchanged_mm_and_ch_repaired_after_60_s",
-                "test_reset_across_uint32_wrap"])],
+                "test_reset_across_uint32_wrap", "test_resend_repeats_the_cs_the_suppression_refresh_sent",
+                "test_pic_keepalive_stays_silent_while_the_resend_runs"]),
+               # TASK-1412.11 AC1/AC2/AC3: intent, enqueue result, transmission and echo/boiler answer as separate events on the REAL
+               # SAT senders and the REAL PIC queue (and the OT-Direct enqueue path); full queue, interrupted exchange, PIC reset,
+               # superseded commands, recovery; measured queue latency at echo pacing
+               ("test_sat_command_delivery", "CommandDelivery", None),
+               ("test_pic_pm_chain", "PmChain", ["test_add_reports_its_result", "test_echo_paced_drain", "test_no_echo_waits_for_the_timeout",
+                "test_overrun_is_resent_not_dropped", "test_stale_echo_does_not_remove_the_replacement", "test_unconfirmed_command_retries_behind_newer_ones",
+                "test_updated_command_moves_to_the_back", "test_priority_slot_waits_for_the_boiler", "test_external_cs_refused_while_sat_enqueues_its_own",
+                "test_cs_behind_a_full_echoing_queue_within_two_seconds", "test_cs_behind_a_full_queue_still_well_within_the_pic_minute",
+                "test_simulation_held_back_command_is_consumed_not_dropped", "test_concurrent_add_and_drain_keep_the_queue_consistent"]),
+               ("test_sat_release_retry", "ReleaseRetry", None)],
     "LL-014": [("test_sat_max_tset", "SatMaxTSet", ["test_not_chosen_boiler_maxtset_below_default_still_caps_cs", "test_bounds_clamp_upper", "test_bounds_clamp_lower",
                 "test_bounds_arriving_later_resend_the_clamped_value", "test_invalid_bounds_fall_back_to_20_80", "test_change_sends_again_once",
                 "test_heat_pump_chosen_55_is_the_cap_and_sh", "test_underfloor_never_above_50",
@@ -409,9 +420,17 @@ class LowLoadContract(unittest.TestCase):
         self.assertRegex(sat, r"(?i)post[- ]?(dhw|hot[- ]?water)[^\n]*hold[^\n]*(60|one minute)", "no post-DHW setpoint hold; QD-8 not asked yet")
 
     @ll("LL-013", "contract", "satEnqueueOwnCS/satSendCS/satCmdResend/satEnqueueIfChanged* (SATcontrol.ino, via test_sat_cmd_cache)",
-        task="TASK-1574 (commit-on-success); wire ordering and PIC/boiler acks stay TASK-1412.11")
+        task="TASK-1574 (commit-on-success) and TASK-1412.11 (separate intent / enqueue / transmission / echo events, full queue, interrupted exchange, "
+             "PIC reset, superseded commands, measured budgets; tests/test_sat_command_delivery.py)")
     def test_ll013_dropped_enqueue_is_not_cached_and_is_retried(self):
         self.delegated("LL-013")
+
+    @ll("LL-013", "open_decision", "addCommandToQueue OT-Direct branch / handleOTDirectCommand (OTGW-Core.ino, OTDirect.ino; read from the source)",
+        task="TASK-1412.11 AC2: on OT-Direct a write that the handler refused (otCmdEnqueue ring full, 12 slots coalesced per MsgID) is still answered Sent, "
+             "so SAT would record it as delivered; the fix changes the handler's return type: not decided", question="Q-1412.11a (Robert)")
+    def test_ll013b_ot_direct_refusal_is_visible_to_the_caller(self):
+        import test_sat_command_delivery as cd
+        self.assertTrue(cd.ot_direct_refusal_reaches_the_caller(), "handleOTDirectCommand() returns void; addCommandToQueue() answers Sent")
 
     @ll("LL-014", "contract", "satEffective MaxTSet / CS ceiling and SH negotiation (SATcontrol.ino, via test_sat_max_tset)",
         task="TASK-1412.13 (entries 100, 252): ID49 bounds with 20/80 fallback, SH= without an MsgID 6 gate, the SH= write verdict observed, every CS path under the ceiling")
