@@ -5820,3 +5820,11 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot Q-1566a: B for now"
 
 **Settled:** option B for now: the heating curve keeps using the current outdoor temperature; no 6 h forecast term is added (round 25, docs/sat/sim-hp-lowload/round25.md). **Interpretation (ours):** "for now" parks the forecast idea rather than rejecting it; TASK-1566 (with TASK-1510 merged into it by the maintainer on 2026-11-03) stays open and parked, not closed as rejected. **Task:** TASK-1566. **Open:** when to revisit the forecast term.
+
+## 248. Q-PARITY-1 answered A: the classifier interpolates its percentiles, as thermo-nova (Sergeant D, 2026-11-03)
+
+**Source:** sergeantd, 2026-11-03 07:44 UTC, msg 1567082044964610131 (https://discord.com/channels/812969634638725140/1514720723980259460/1567082044964610131), answer to Q-PARITY-1 (msg 1567072815528542209).
+
+**Quoted:** "@BlueFlame Bot TASK-1412.14: A"
+
+**Settled:** option A of Q-PARITY-1: the tail percentiles interpolate between the two neighbouring sorted values, as thermo-nova helpers.py:185-202 (percentile_interpolated); the port today takes the lower neighbour (SATcycles.ino:610, 640). **Interpretation (ours):** he named only the task; the one open question under TASK-1412.14 was Q-PARITY-1, so "A" is read as its option A. **Task:** TASK-1586. **Open:** none.
