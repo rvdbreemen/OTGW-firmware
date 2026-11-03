@@ -32,7 +32,7 @@ The v2 UI is the device's web interface. It uses the same firmware REST and WebS
 
 The Home page offers several layouts through a **View** picker dropdown at the top:
 
-- **System view**: a live schematic of the heating system (boiler or heat pump, flow and return pipes, radiators, room, DHW, pressure and modulation readouts).
+- **System view**: a live schematic of the heating system (boiler or heat pump, flow and return pipes, the space heating emitters, room, DHW, pressure and modulation readouts). With a heat pump, or a boiler that reports a DHW storage tank, the status line reads "Hot water demand · charging the tank" while hot water is heated; a gas boiler without a tank reads "Hot water running · tap open".
 - **At a glance**: a phone-first layout built around a single large room-temperature dial with step buttons.
 - **Mission control**: a live strip chart (flow / return / setpoint / modulation) plus a raw OpenTherm frame ticker.
 

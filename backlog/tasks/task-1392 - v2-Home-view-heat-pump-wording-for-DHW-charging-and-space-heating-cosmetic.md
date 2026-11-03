@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-25T14:34:00Z'
-updated_date: '2026-11-03T05:43:00Z'
+updated_date: '2026-11-03T06:14:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -21,8 +21,8 @@ maarten_41762 2026-10-25 (#alpha-testing 1563922208718463147, heat pump, screens
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With heating source heat pump (or a storage tank) the DHW state and the flow label use the tank-charging wording; gas boilers keep today's text (screenshot both)
-- [ ] #2 'Radiators' label replaced by a neutral 'space heating' where it names the CH circuit
+- [x] #1 With heating source heat pump (or a storage tank) the DHW state and the flow label use the tank-charging wording; gas boilers keep today's text (screenshot both)
+- [x] #2 'Radiators' label replaced by a neutral 'space heating' where it names the CH circuit
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -35,4 +35,6 @@ maarten_41762 2026-10-25 (#alpha-testing 1563922208718463147, heat pump, screens
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: v2.js:1083 one wording for all sources. UI text, doable.
 
 Released by Robert 2026-11-03 (interactive, maintainer): low priority.
+
+2026-11-03 (agent, verified by lead incl. screenshots in scratchpad shots/1392-old|new): browser test tests/webui/home-heatpump-wording.test.mjs on the real page, red on the old v2 files, green on the fix; integrated in wt-next.
 <!-- SECTION:NOTES:END -->

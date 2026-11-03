@@ -28,7 +28,7 @@ De v2 UI is de webinterface van het apparaat. Ze gebruikt dezelfde REST- en WebS
 
 De Home-pagina biedt meerdere weergaven via een **View**-keuzemenu bovenaan:
 
-- **System view**: een live schema van het verwarmingssysteem (ketel of warmtepomp, aanvoer- en retourleidingen, radiatoren, kamer, DHW, druk- en modulatiewaarden).
+- **System view**: een live schema van het verwarmingssysteem (ketel of warmtepomp, aanvoer- en retourleidingen, de ruimteverwarming, kamer, DHW, druk- en modulatiewaarden). Bij een warmtepomp, of een ketel die een warmwatervoorraadvat meldt, staat in de statusregel "Hot water demand · charging the tank" zolang warm water wordt gemaakt; een gasketel zonder vat toont "Hot water running · tap open".
 - **At a glance**: een telefoon-eerst weergave rond een enkele grote kamertemperatuur-dial met stapknoppen.
 - **Mission control**: een live strip-grafiek (flow / return / setpoint / modulatie) plus een ruwe OpenTherm-frame-ticker.
 

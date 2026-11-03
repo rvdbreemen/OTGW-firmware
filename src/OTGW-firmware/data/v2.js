@@ -1080,7 +1080,9 @@
   function statusSentence(isHP) {
     var burn = isHP ? 'compressor' : 'flame';
     if (model.fault) return 'Fault reported — check the appliance display.';
-    if (model.dhw_on) return 'Hot water running · tap open';
+    // TASK-1392: a heat pump (or any appliance with a DHW storage tank) sends the flow to the tank
+    // through a 3-way valve; "tap open" would be wrong there.
+    if (model.dhw_on) return (isHP || sat.tank) ? 'Hot water demand · charging the tank' : 'Hot water running · tap open';
     if (model.flame) return 'Heating · ' + burn + ' on' + (model.mod !== null ? ' · ' + Math.round(model.mod) + '% modulation' : '');
     if (model.ch) return 'Heating idle · pump running, ' + burn + ' off';
     return 'Standby · everything quiet';
@@ -1211,7 +1213,7 @@
     txt('bPress', fmt(model.pressure, 2, ' bar'));
     txt('bMod', model.mod === null ? '—' : Math.round(model.mod) + '%');
     txt('bDhw', model.dhw === null ? '—' : Math.round(model.dhw) + '°');
-    txt('bDhwState', model.dhw_on ? 'running' : 'standby');
+    txt('bDhwState', model.dhw_on ? ((effectiveSource() === 2 || sat.tank) ? 'charging' : 'running') : 'standby');
     txt('bOut', 'Outside ' + fmt(model.outside, 1, '°') + ' · OTGW firmware');
     var fill = document.getElementById('bModFill');
     if (fill) fill.style.height = (model.mod === null ? 0 : Math.max(0, Math.min(100, model.mod))) + '%';
@@ -3077,7 +3079,7 @@
   // P9: heat-source control, REST seed, target steppers, conn detail,
   // support hover, graph window/export, settings enum options.
   // ============================================================
-  var sat = { source: 0, detected: 1, target: null, active: false, roomLost: false };  // roomLost: SAT is on and has no valid room temperature (TASK-1546); source: 0=auto,1=gas,2=hp,3=hybrid
+  var sat = { source: 0, detected: 1, target: null, active: false, roomLost: false, tank: false };  // tank: boiler reports a DHW storage tank (MsgID 3 HB bit 3, TASK-1392); roomLost: SAT is on and has no valid room temperature (TASK-1546); source: 0=auto,1=gas,2=hp,3=hybrid
   function effectiveSource() { return sat.source === 0 ? sat.detected : sat.source; }
   var statsSort = { col: 'id', asc: true };
   function sortStatsCmp(a, b) {
@@ -3450,6 +3452,7 @@
       if (st.heating_source !== undefined) sat.source = st.heating_source | 0;
       if (st.heating_source_detected !== undefined) sat.detected = st.heating_source_detected | 0;
       if (st.target_temp !== undefined) sat.target = parseFloat(st.target_temp);
+      if (st.dhw_config_tank !== undefined) sat.tank = !!st.dhw_config_tank;   // TASK-1392
       sat.active = !!st.active;   // TASK-1342: room tile shows SAT's target while SAT controls
       sat.roomLost = !!(st.enabled && st.room_temp_lost);   // TASK-1546
       applyApplianceToggle();
