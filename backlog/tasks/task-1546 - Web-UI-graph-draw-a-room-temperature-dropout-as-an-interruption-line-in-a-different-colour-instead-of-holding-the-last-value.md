@@ -3,10 +3,11 @@ id: TASK-1546
 title: >-
   Web UI graph: draw a room-temperature dropout as an interruption line in a
   different colour instead of holding the last value
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-01T15:56:00Z'
-updated_date: '2026-11-02T04:37:00Z'
+updated_date: '2026-11-03T02:30:00Z'
 labels:
   - web-ui
   - sat

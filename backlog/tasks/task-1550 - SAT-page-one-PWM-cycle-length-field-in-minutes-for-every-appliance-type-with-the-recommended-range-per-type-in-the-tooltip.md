@@ -3,10 +3,11 @@ id: TASK-1550
 title: >-
   SAT page: one 'PWM cycle length' field in minutes for every appliance type,
   with the recommended range per type in the tooltip
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-01T18:56:00Z'
-updated_date: '2026-11-02T04:37:00Z'
+updated_date: '2026-11-03T02:30:00Z'
 labels:
   - web-ui
   - sat
