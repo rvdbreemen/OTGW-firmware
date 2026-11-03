@@ -194,7 +194,7 @@ int main(int argc, char** argv) {
     g_flow = 45.0f; setPrev(40.0f);        // 45 >= 35 + 2: a sustained overshoot
     float cs = 0; int ticks = 0; int contBefore = 0;
     for (; ticks < 400; ticks++) {
-      g_ms += 1000; _sat_tickMs = g_ms;
+      g_ms += (argc > 4) ? (uint32_t)strtoul(argv[4], 0, 10) : 1000UL; _sat_tickMs = g_ms;   // argv[4]: tick interval in ms (TASK-1412.8)
       const int before = state.sat.eControlMode;
       cs = tickRunSw(pid);
       if (before == SAT_MODE_CONTINUOUS && state.sat.eControlMode == SAT_MODE_CONTINUOUS && cs >= 61.9f) contBefore++;
@@ -210,17 +210,18 @@ int main(int argc, char** argv) {
   }
   if (!strcmp(sc, "exittick")) {           // TASK-1468 loop level: schedule, exits and apply step of ONE tick. argv[3]=uh|sat
 #ifdef HAS_SWITCH_TICK
-    const bool uh = !strcmp(argv[3], "uh");
+    const bool nf = !strcmp(argv[3], "nf");   // TASK-1428: the underheat scenario with a missing flow temperature
+    const bool uh = !strcmp(argv[3], "uh") || nf;
     const float p = uh ? 35.0f : 46.0f;    // uh: duty 0.39, ON time 351 s; sat: duty 0.94 = range 5 (off_time 0)
     SETREQ(p); state.sat.fPidOutput = p;
     state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flame = true;
     _pwm_effectiveBoilerTemp = 47.2f; _pwm_waitingForFlame = false; _pwm_lastUpdateMs = g_ms;
     _pwm_flameOnMs = g_ms - 200000UL; g_flameOnStart = g_ms - 200000UL;   // the 180 s start-up hold is over
-    g_flow = uh ? 20.0f : 46.0f;           // uh: flow <= request - 3; sat: on target
+    g_flow = nf ? 0.0f : uh ? 20.0f : 46.0f;           // nf: missing (satGetFlowTemp() = 0.0); uh: flow <= request - 3; sat: on target
     _pwm_lastOffTimeMs = 1; setPrev(40.0f);
     float cs = 0, prev = 0; int ticks = 0;
     for (; ticks < 60; ticks++) {
-      g_ms += 30000UL; _sat_tickMs = g_ms; prev = cs;
+      g_ms += (argc > 4) ? (uint32_t)strtoul(argv[4], 0, 10) : 30000UL; _sat_tickMs = g_ms; prev = cs;   // argv[4]: tick interval in ms (TASK-1412.8)
       cs = tickRunSw(p);
       if (state.sat.eControlMode != SAT_MODE_PWM) break;
     }
@@ -876,6 +877,38 @@ class SatPwmOverride(unittest.TestCase):
 
     def test_saturation_exit_tick_sends_the_continuous_setpoint(self):
         self._exit_tick("sat", "11", "45.0")      # 300 s; the off time 0 of the tick's own schedule step counts from tick 1
+
+    # TASK-1428 (entry 218, heating_control.py:333-335) LOOP LEVEL: PWM ON phase with a missing flow temperature for 60 ticks of 30 s: the real
+    # schedule step sees the 0.0 flow, resets PWM, and the exits never fire. Green on the old code too: the schedule-first order already
+    # clears the ON phase flag; the function-level cases in test_sat_overshoot_sustain.py are the ones that fail on the old exits.
+    def test_missing_flow_never_exits_pwm_at_loop_level(self):
+        r = self.run_sc("exittick", 1, "nf")
+        self.assertNotEqual(r["mode"], "-1", "no switch tick segment in this SATcontrol.ino")
+        self.assertEqual((r["mode"], r["ticks"]), ("2", "61"), r)  # 60 ticks ran, none left PWM
+
+    # TASK-1412.8 AC2/AC3 (entries 88, 134): the same-update transition holds at other control ticks, 10 s (the shortest the
+    # setting allows), 60 s and > 60 s. The tick count is 1 (the first qualifying tick starts the timer) plus the number of
+    # ticks needed to span the limit (ceil(limit / interval)); the transition tick itself carries the new mode's CS.
+    def test_same_tick_exits_at_10s_60s_and_90s_ticks(self):
+        for step_s in (10, 60, 90):
+            for kind, limit_s, prev in (("uh", 180, "19.0"), ("sat", 300, "45.0")):
+                with self.subTest(tick_s=step_s, exit=kind):
+                    r = self.run_sc("exittick", 1, kind, step_s * 1000)
+                    self.assertEqual(r["mode"], "1", r)
+                    self.assertEqual(r["ticks"], str(1 + -(-limit_s // step_s)), r)
+                    self.assertEqual(r["prev"], prev, r)
+                    self.assertEqual(r["cont_marker"], "1", r)
+                    self.assertEqual(r["ch"], "1", r)
+
+    def test_same_tick_overshoot_switch_at_10s_30s_60s_and_120s_ticks(self):
+        for step_s in (10, 30, 60, 120):
+            with self.subTest(tick_s=step_s):
+                r = self.run_sc("swtick", 1, "x", step_s * 1000)
+                self.assertEqual(r["mode"], "2", r)
+                self.assertEqual(r["ticks"], str(1 + -(-60 // step_s)), r)
+                self.assertEqual(r["cont_marker"], "0", "the switch tick sent the continuous setpoint: %r" % r)
+                self.assertEqual(r["final"], r["cs"], r)
+                self.assertEqual(r["ch"], "1", r)
 
     def test_mode_switch_resets_pwm_state(self):
         r = self.run_sc("reset", 1, "mode")

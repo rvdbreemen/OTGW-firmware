@@ -88,6 +88,20 @@ LL-003's 0.0001°C integral comparison is a proposed numerical test tolerance, n
 
 **Correction 2026-10-29 (TASK-1412.1, R36):** the LL-004 row describes the firmware before TASK-1420. Since alpha.521 (TASK-1420, entries 86, 95, 109) the underheat and saturation exits count from the first qualifying tick through satSustainedFor (SATcycles.ino:152, :1085, :1097) and fire on the first control tick at least 180 s / 300 s after it, so up to one tick later. Replayed-boiler bench on .63 (30 s tick only): 180.02 s and 300.03 s. The control timer runs SKIP_MISSED_TICKS (entry 109), so there is no catch-up grid. Still uncovered: jitter, delayed calls and millis rollover (TASK-1412.8 AC#2), and the exit-versus-CS order (open, Q47b in open-questions.md). This is not a physical-performance result.
 
+**Update 2026-11-03 (TASK-1412.8, R36):** the "about half" probability of Q46 is gone from the guidance (entry 109); the claims are replaced by executed traces. The elapsed-time contract (entries 86 Q44 A and Q46 B, 95 Q46b, 109, 134 Q47b A; flow-missing reset entries 218 and 241): a sustained switch fires on the first control tick whose tick time is at least its limit (60 / 180 / 300 s) after the first qualifying tick; ticks are never closer than one interval and there is no catch-up burst; a transition takes effect on the same tick. Coverage of that contract on the real functions (host tests; no device, no boiler):
+
+| Cell | Test |
+|---|---|
+| Overshoot 60 s at 10, 30, 60, 90, 120, 300 s ticks | LL-004 (`test_ll004_*`), exact against `expected_exit_s`; before that `test_2_*` (10 s), `test_1_*` (30 s), `test_4_*` (120 s) in test_sat_overshoot_sustain.py |
+| Underheat 180 s and saturation 300 s at 10, 30, 60, 90, 120, 300 s ticks | LL-004 (10 s is new); `test_underheat_fires_180s_*`, `test_saturation_fires_300s_*` (30, 60 s), `test_underheat_61s_*`, `test_saturation_61s_*` (> 60 s, no bail-out) |
+| Delayed calls and jitter, all three switches, 10, 30, 60, 120 s ticks | LL-020b (jitter sets (0,7,3,5 s), (0,25 s), (12 s)), exact against the model; `test_switch_at_first_tick_at_least_60s_after_the_start_when_ticks_run_late` (30 s) |
+| millis() rollover inside the timer | LL-020b (start 100 s before the wrap, and 1.5 intervals before it); `test_dhw_guard_inactive_without_a_draw_near_the_millis_wrap` |
+| Equality and boundary (59 999 / 60 000 ms, `>=` at margin, `<=` at requested - 3) | `test_7_boundary_60000_ms`, `test_equality_counts_*`, `test_underheat_counts_at_exactly_requested_minus_3` |
+| Same-update transition: the switch or exit tick sends the new mode's CS (entries 88, 134) | `test_overshoot_switch_tick_sends_the_pwm_setpoint_*` (1 s ticks), `test_same_tick_overshoot_switch_at_10s_30s_60s_and_120s_ticks`, `test_underheat_exit_tick_*` and `test_saturation_exit_tick_*` (30 s), `test_same_tick_exits_at_10s_60s_and_90s_ticks` in test_sat_pwm_override.py (real loop gates and apply step, stubbed CS enqueue); order of the calls in the loop: `test_overshoot_switch_precedes_apply_control_mode` (text) |
+| Skipped ticks, DHW, missing flow | `test_bypass_*`, `test_dhw_*`, `test_sub_tick_draw_arms_the_guard`, `test_missing_flow_*` (TASK-1428) |
+
+Not covered by an executing test: loop-level same-tick cases at 120 s and 300 s exits and at 300 s ticks (not run; the exit scenarios use 10 to 90 s), and the real `DUE()` skip-missed-ticks timer (`safeTimers.h`; entry 109 measured it once on the host, the test only checks that no CATCH_UP type is passed). The bench check on .63 is a 30 s tick only.
+
 ## 4. Required deterministic integration matrix
 
 The following checks are **planned and unavailable in the runner**. Existing helper tests provide partial coverage; they must not be represented as these whole-loop tests. Build adapters that call the real loop with an injectable monotonic clock, protocol input and observable command sink. Reuse a captured source trace against old and fixed commits. Do not reimplement the controller in the oracle.
