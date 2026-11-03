@@ -3,11 +3,11 @@ id: TASK-1559
 title: >-
   SAT self-tune: an hour without a room temperature is not counted (Q-1525a A,
   entry 225)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-02T05:45:00Z'
-updated_date: '2026-11-02T23:43:00Z'
+updated_date: '2026-11-03T01:00:00Z'
 labels:
   - sat
 dependencies: []
@@ -32,3 +32,9 @@ Sergeant D 2026-11-02 answered Q-1525a with A (entry 225): when the room tempera
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-03: removed the SAT_CT_EXCLUDE_ROOM_LOST build switch (pending flag for Q-1525a, now entry 225 A): a room-lost hour returns SATT_NO_ROOM unconditionally. tests/test_sat_curve_selftune.py 55/55; on the old SATcontrol.ino the two no_room tests fail (+1 source check that mixes old .ino and new header, not behaviour). docs/sat/sat-log-format.md updated; CHANGELOG. evaluate --quick 0 failed. Bench: SATTUNEH needs a full hour without room temperature, host test is the evidence.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+beta.26 ddb9d6bfa: a self-tune hour without a room temperature is not counted (reason no_room), Sergeant D entry 225; the SAT_CT_EXCLUDE_ROOM_LOST build switch is removed. Evidence: tests/test_sat_curve_selftune.py 59/59 at beta.31 (the no_room tests fail on the old code); full tests 100/100; build beta.31 green. Not verified on hardware (needs a full hour without room temperature).
+<!-- SECTION:FINAL_SUMMARY:END -->

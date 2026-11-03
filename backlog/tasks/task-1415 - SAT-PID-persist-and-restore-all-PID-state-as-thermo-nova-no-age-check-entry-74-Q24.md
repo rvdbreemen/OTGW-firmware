@@ -3,11 +3,11 @@ id: TASK-1415
 title: >-
   SAT PID: persist and restore all PID state as thermo-nova, no age check (entry
   74, Q24)
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-28T06:45:00Z'
-updated_date: '2026-11-03T00:18:00Z'
+updated_date: '2026-11-03T01:00:00Z'
 labels:
   - sat
   - sergeant-d
@@ -37,7 +37,7 @@ Sergeant D 2026-10-27 (entry 74, Q24: follow thermo-nova). Save integral, last e
 - [x] #1 Host test: save then restore round-trips all five fields; a file older than 30 min is still restored
 - [x] #2 NAN last error is saved and restored without corrupting the file
 - [x] #3 Write cadence decided by Robert and recorded in the task
-- [ ] #4 build + evaluate green
+- [x] #4 build + evaluate green
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -57,3 +57,9 @@ Execution-graph update requested by Robert: serialize pending SATpid.ino writers
 
 2026-11-03 (agent + lead integration): 30-min discard (SAT_PID_STALE_SEC) removed, only a missing ts skips; satPidStateBuild writes err:null for a NAN last error plus lt and dts (derivative time as wall clock); restore of last error/temperature/time via new satPidRestoreLast, skipped once a live room reading was seen. thermo-nova pid.py:141-157 (restore), :243-249 (save). AC1 test_round_trip_of_all_five_fields + test_file_older_than_30_minutes_is_still_restored (1801 s, 2 h, 90 days); AC2 test_nan_last_error_is_saved_and_restored_without_corrupting_the_file; tests/test_sat_pid_persist.py 8/8, old code 6 fail. restart_quiet 20, pid_cadence 31, integral_cap 5, ot_loss 24, fs_update_keep 37 green. KEPT: the NTP-gated deferred load (a wall-clock derivative time needs a clock; entry 140's 60 s wait). FOLLOW-UP: ADR-197 decision 7 still says 'no NTP gate' and describes the 30-min limit (text was already stale before this change) -> needs a correction note by Robert. NOT DONE: re-measure the ~100 B record against docs/design/pid-checkpoint-ten-year-spec.md section 10. AC4 build follows with the batch.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+beta.29 7c6973587: the saved PID state is restored at any age (30 min discard removed), with last error (null for NAN), last temperature and derivative time (wall clock), as thermo-nova pid.py:141-157/:243-249 (Sergeant D entry 74). Evidence: tests/test_sat_pid_persist.py 8/8 (6 fail on old code), PID/restart/fs-keep suites green, full tests 100/100, build beta.31 green, evaluate 0 failed. Kept: the NTP-gated deferred load (entry 140). Follow-ups: ADR-197 decision 7 text ('no NTP gate', 30 min limit) is stale and needs a correction note by Robert; the ~100 B record not yet re-measured against docs/design/pid-checkpoint-ten-year-spec.md section 10. Not verified on hardware.
+<!-- SECTION:FINAL_SUMMARY:END -->

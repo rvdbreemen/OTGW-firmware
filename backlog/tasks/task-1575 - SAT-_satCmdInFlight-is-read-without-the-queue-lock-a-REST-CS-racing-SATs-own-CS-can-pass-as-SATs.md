@@ -3,11 +3,11 @@ id: TASK-1575
 title: >-
   SAT: _satCmdInFlight is read without the queue lock, a REST CS= racing SAT's
   own CS= can pass as SAT's
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-02T21:47:00Z'
-updated_date: '2026-11-03T00:17:00Z'
+updated_date: '2026-11-03T01:00:00Z'
 labels:
   - sat
 dependencies: []
@@ -33,3 +33,9 @@ Peer review finding 6 (queue lane, 2026-11-02, pre-existing): addCommandToQueue 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-03: the SAT origin of a CS= is now an argument (addCommandToQueue(..., satOwn), handleOTDirectCommand(..., satOwn)); the global _satCmdInFlight and satCommandInFlight() are removed. AC1 tests/test_pic_pm_chain.py test_external_cs_refused_while_sat_enqueues_its_own: old Core lets the external CS= through (ext=1), fix refuses it (ext=0) and SAT's own is queued (sat=1); 29/29. AC2 OTDirect handler: same rule, now on the argument (OTDirect.ino:2771); SAT harnesses green. AC3 full tests folder: first run showed 7 SAT harnesses with a 4-arg addCommandToQueue stub not compiling; stubs got a 5th default param; all 98 files green after. evaluate 0 failed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+beta.28 210ab9e7c: SAT's own CS= is marked by a satOwn argument of addCommandToQueue()/handleOTDirectCommand(); the global _satCmdInFlight is gone, so a REST CS= on async_tcp can no longer pass as SAT's while SAT owns MsgID 1 (ADR-179). Evidence: tests/test_pic_pm_chain.py test_external_cs_refused_while_sat_enqueues_its_own (old Core: external let through), 29/29; SAT harness stubs updated; full tests 100/100; build beta.31 green.
+<!-- SECTION:FINAL_SUMMARY:END -->

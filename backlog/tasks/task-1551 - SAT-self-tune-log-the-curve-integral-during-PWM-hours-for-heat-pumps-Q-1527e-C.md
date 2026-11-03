@@ -3,11 +3,11 @@ id: TASK-1551
 title: >-
   SAT self-tune: log the curve integral during PWM hours for heat pumps (Q-1527e
   C)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-01T18:57:00Z'
-updated_date: '2026-11-02T23:49:00Z'
+updated_date: '2026-11-03T01:00:00Z'
 labels:
   - sat
   - heat-pump
@@ -38,3 +38,9 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: PWM-tick signa
 
 2026-11-03: the curve signal is already accumulated in PWM hours (satTuneAddTick: satActive && !dhw); added a per-hour pwmTicks counter and, for satsource heat pump only, a pwm=<ticks> field in SATTUNEH (reason shows only the first exclusion, so it is the reliable PWM mark). Tuner unchanged. tests/test_sat_curve_selftune.py 59/59; old code: the 2 heat-pump tests fail (+ the mixed-version source check); gas/hybrid-unchanged and decision-unchanged tests pass on both. AC3: SATTUNEH is published only in the telnet SAT log (no MQTT/REST), documented in docs/sat/sat-log-format.md; nothing in docs/api to change. evaluate 0 failed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+beta.27 e10575e69: for satsource heat pump the SATTUNEH record carries pwm=<ticks in SAT PWM> (Sergeant D entry 205, log only); gas and hybrid records and the tuner decision unchanged. Evidence: tests/test_sat_curve_selftune.py (heat-pump tests red on old code; gas/hybrid and decision-unchanged tests green on both); docs/sat/sat-log-format.md. AC3: SATTUNEH is published only in the telnet SAT log, nothing in docs/api. Build beta.31 green; not verified on a heat pump.
+<!-- SECTION:FINAL_SUMMARY:END -->
