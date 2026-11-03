@@ -119,6 +119,28 @@ inline void platformWifiDisableSleep() {
   WiFi.setSleep(false);
 }
 
+// Join the strongest access point of the configured SSID (TASK-1397).
+// Arduino-ESP32 3.3.5 defaults to WIFI_FAST_SCAN, which joins the first AP the
+// scan finds on the SSID (STA.cpp:231), so a unit can sit at -84 dBm while a
+// stronger AP of the same SSID is in range. WIFI_ALL_CHANNEL_SCAN scans every
+// channel and WIFI_CONNECT_AP_BY_SIGNAL picks the best RSSI of the results.
+// The Arduino setters only reach connect(ssid, ...) (STA.cpp:389-390). A bare
+// WiFi.begin() and the SDK auto-reconnect reuse the stored driver config, so the
+// same two fields are patched in it as well. Call after WiFi.mode(WIFI_STA) and
+// before every WiFi.begin(); safe to repeat. Costs about 1-2 s per (re)connect.
+inline void platformWifiPreferStrongestAp() {
+  WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+  WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
+  wifi_config_t cfg;
+  if (esp_wifi_get_config(WIFI_IF_STA, &cfg) == ESP_OK &&
+      (cfg.sta.scan_method != WIFI_ALL_CHANNEL_SCAN ||
+       cfg.sta.sort_method != WIFI_CONNECT_AP_BY_SIGNAL)) {
+    cfg.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+    cfg.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+    esp_wifi_set_config(WIFI_IF_STA, &cfg);
+  }
+}
+
 // LittleFS info (ESP32: construct from totalBytes/usedBytes)
 inline bool platformFSInfo(FSInfo &info) {
   info.totalBytes    = LittleFS.totalBytes();

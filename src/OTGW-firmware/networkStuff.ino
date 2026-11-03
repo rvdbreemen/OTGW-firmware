@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.41
+**  Version  : v2.0.0-beta.42
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -89,6 +89,10 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   // call pins that default (TASK-1052). It sits under WiFi.mode() because that
   // call brings the TCP/IP stack up. See platformIgnoreDhcpNtp().
   platformIgnoreDhcpNtp();
+
+  // TASK-1397: scan all channels and join the strongest AP of the SSID. Set here,
+  // before the WiFiManager portal can call WiFi.begin(ssid, ...) itself.
+  platformWifiPreferStrongestAp();
 
   // TASK-725 (port of TASK-548): apply static IP before any connect attempt.
   // Empty sStaticIp = DHCP (default) → leave OS DHCP mode unchanged.
@@ -184,6 +188,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     if (directConnectTimeout < 5) directConnectTimeout = 5;
     DebugTf(PSTR("Direct connect timeout: %d sec\r\n"), directConnectTimeout);
     platformSetHostname(hostname);  // set before begin() so DHCP sends the correct hostname
+    platformWifiPreferStrongestAp();
     WiFi.begin(); // use stored credentials
     DECLARE_TIMER_SEC(timeoutWifiConnectInitial, directConnectTimeout, CATCH_UP_MISSED_TICKS);
     while (WiFi.status() != WL_CONNECTED)
@@ -354,6 +359,7 @@ void loopWifi() {
               wifiRetryCount + 1,
               CSTR(settings.sHostname));
       platformSetHostname(CSTR(settings.sHostname));
+      platformWifiPreferStrongestAp();
       WiFi.begin();  // uses stored credentials
       RESTART_TIMER(timerWifiRetry);
       wifiState = WIFI_CONNECTING;
@@ -417,6 +423,7 @@ void loopWifi() {
       if (DUE(timerAPRetry)) {
         DebugTln(F("BETA AP: 5-min timer — attempting WiFi reconnect"));
         platformSetHostname(CSTR(settings.sHostname));
+        platformWifiPreferStrongestAp();
         WiFi.begin();  // uses stored credentials
         RESTART_TIMER(timerAPConnWait);
         wifiState = WIFI_AP_RETRY;

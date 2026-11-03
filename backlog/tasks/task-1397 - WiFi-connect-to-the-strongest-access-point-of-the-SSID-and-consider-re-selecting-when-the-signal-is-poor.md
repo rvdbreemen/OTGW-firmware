@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-25T19:48:00Z'
-updated_date: '2026-11-03T05:45:00Z'
+updated_date: '2026-11-03T06:12:00Z'
 labels:
   - wifi
 milestone: 2.0.0
@@ -35,4 +35,6 @@ maarten_41762 2026-10-25 (#alpha-testing 1563987220115890257, alpha.500): the un
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: no setSortMethod/setScanMethod in src. Code doable, proof needs a two-AP bench.
 
 Released by Robert 2026-11-03 (interactive, maintainer): low priority. Bench proof needs two APs on one SSID; any MikroTik write needs Robert's explicit OK first. Expect (re)connect about 1-2 s slower with a full scan.
+
+2026-11-03 (agent, verified by lead in wt-next): Arduino-ESP32 3.3.5 defaults are WIFI_FAST_SCAN + BY_SIGNAL (STA.cpp:231); fast scan stops at the first matching AP. The setters only reach the driver in connect(ssid,...) (STA.cpp:389-390); a bare WiFi.begin() reuses the stored config, so the new shim platformWifiPreferStrongestAp() (platform_esp32.h) sets both and patches scan_method/sort_method in the stored STA config via esp_wifi_get/set_config. Called before all 5 WiFi.begin sites (networkStuff.ino x4 incl. startWiFi top before WiFiManager, Ethernet.ino switchToWiFi). SDK auto-reconnect uses the same stored config. tests/test_wifi_strongest_ap.py 3 tests: old 3 FAIL, fix OK; evaluate 0 failed (abstraction gate clean). AC1 (bench, two APs same SSID, before/after RSSI) open; any MikroTik change needs Robert's OK.
 <!-- SECTION:NOTES:END -->

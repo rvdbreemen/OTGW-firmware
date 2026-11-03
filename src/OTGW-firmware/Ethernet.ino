@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Ethernet.ino
-**  Version  : v2.0.0-beta.41
+**  Version  : v2.0.0-beta.42
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -129,6 +129,7 @@ static void switchToWiFi() {
   // does nothing while the radio is still off.
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
+  platformWifiPreferStrongestAp();
   WiFi.begin();
   // Note: MQTT/WebSocket restart happens in loopWifi()/WIFI_RECONNECTED once
   // the WiFi association is confirmed. Publishing "wifi" here would race with
