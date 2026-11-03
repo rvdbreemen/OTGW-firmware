@@ -27,6 +27,7 @@
 
 // --- Cycle Constants ---
 static const uint8_t  SAT_CYCLE_HISTORY_SIZE       = 16;
+static const uint32_t SAT_CYCLE_MIN_SAMPLES        = 3;       // a cycle with fewer 1 Hz samples is not recorded (tracker.py:98-100, minimum_samples_per_cycle, TASK-1588)
 // Overshoot margin now read from settings.sat.fOvershootMargin (default 2.0C; Python OVERSHOOT_MARGIN_CELSIUS is 3.0)
 static const float    SAT_OVERSHOOT_SUSTAIN_SEC     = 60.0f;   // Sustained overshoot (cycle classifier streak)
 static const uint32_t SAT_OVERSHOOT_SUSTAIN_MS      = 60000UL;  // Sustained overshoot before PWM switch (satCycleCheckOvershootSwitch)
@@ -660,17 +661,17 @@ static float _tailPercentile(uint8_t pct)
 // thermo-nova's tail starts at max(start + min(60, 0.25 * duration), end - 180) (tracker.py:113-116,
 // :237-241): the first effective warm-up seconds of a burn are never in the tail. The ring already
 // holds only the last SAT_TAIL_SAMPLE_SIZE s, so only a burn short enough to still have its warm-up in
-// the ring needs trimming. The ring is filled at 1 Hz (>= 1000 ms apart, so sample k lies at about
-// k * duration / total_samples s after flame-on), the burn start is known, and the oldest samples are
-// the ones to drop: no per-sample timestamp (360 B) and no new buffer, the ring's count is lowered
-// before the percentiles read it. Samples with t < warm-up are dropped, t >= warm-up stays (">=").
+// the ring needs trimming. The ring is filled at 1 Hz (>= 1000 ms apart; the flame-on sample is k = 0, so
+// sample k lies at about k * duration / total_samples s after flame-on), the burn start is known, and the
+// oldest samples are the ones to drop: no per-sample timestamp (360 B) and no new buffer, the ring's count
+// is lowered before the percentiles read it. Samples with t < warm-up are dropped, t >= warm-up stays (">=").
 static void _tailTrimWarmup(float durationSec)
 {
   if (durationSec <= 0.0f || _cycle_totalSamples == 0) return;
   const float warmupSec = fminf(60.0f, 0.25f * durationSec);
   const float x = warmupSec * (float)_cycle_totalSamples / durationSec;   // warm-up in sample periods
   if (x <= 0.001f) return;
-  const uint32_t drop = (uint32_t)ceilf(x - 0.001f) - 1;                  // samples with k < x
+  const uint32_t drop = (uint32_t)ceilf(x - 0.001f);                      // samples k = 0 .. with k < x
   if (drop >= _cycle_totalSamples) { _tail_sampleCount = 0; return; }
   const uint32_t keep = _cycle_totalSamples - drop;                       // samples at or after the warm-up
   if (keep < _tail_sampleCount) _tail_sampleCount = (uint8_t)keep;
@@ -847,7 +848,8 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
 //     both from _tailReqMetrics(). controlSp (state.sat.fFinalSetpoint at flame-on) is only the
 //     continuous underheat fallback when no tail second has a requested setpoint (cls:81-83);
 //     thermo-nova's own fallback, device_state.setpoint at flame-off, is not ported (Q-PARITY-6, refuted);
-//   - fewer than 3 samples is recorded as INSUFFICIENT; tracker.py:98-100 drops such a cycle;
+//   - a cycle with fewer than 3 samples never gets here: satCycleOnFlameChange() drops it as tracker.py:98-100
+//     does (TASK-1588, entry 249), so INSUFFICIENT is only the duration <= 0 rule (cls:19-20);
 //   - pwmIdle comes from satPwmIsIdle(), an approximation of pwm.py's IDLE status;
 //   - the tail percentiles come from the last 180 s ring with tracker.py's warm-up exclusion
 //     (tail_start = max(start + min(60, 0.25 * duration), end - 180), tracker.py:113-116, :237-241;
@@ -855,15 +857,15 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
 //     first min(60, 0.25 * duration) s in tailP50/tailP90.
 // The kind is _cycleDetectKind(); dhwInTail is "a DHW sample in the tail" (tail_metrics.
 // hot_water_active_fraction > 0, tracker.py:294-296), with the warm-up exclusion applied.
-static SATCycleClass _cycleClassify(float durationSec, uint32_t sampleCount, SATCycleKind kind,
+static SATCycleClass _cycleClassify(float durationSec, SATCycleKind kind,
                                     bool dhwInTail, bool pwmEnabled, bool pwmIdle, bool pwmOn,
                                     float onTimeSec, float tailP90, float tailP50,
                                     bool ctrlErrKnown, float ctrlErrP50, float ctrlErrP90,
                                     float controlSp, bool reqSpKnown, float reqSpP50,
                                     bool reqErrKnown, float reqErrP90)
 {
-  // cls:19-20 (and the firmware's < 3 samples, see above)
-  if (durationSec <= 0.0f || sampleCount < 3) return SAT_CYCLE_INSUFFICIENT;
+  // cls:19-20
+  if (durationSec <= 0.0f) return SAT_CYCLE_INSUFFICIENT;
 
   // cls:22-23
   if (kind == SAT_CK_UNKNOWN) return SAT_CYCLE_UNCERTAIN;
@@ -909,6 +911,58 @@ static SATCycleClass _cycleClassify(float durationSec, uint32_t sampleCount, SAT
     return SAT_CYCLE_UNDERHEAT;                       // cls:88
   }
   return SAT_CYCLE_GOOD;                              // cls:90 returns None -> cls:37 GOOD
+}
+
+//=== One 1 Hz tail sample (TASK-1588) ===
+// The tail ring slot (flow, control-setpoint error, requested setpoint) and the cycle kind / DHW-in-tail counters
+// (TASK-1387; tracker.py:103-104 counts per sample). Taken by satCycleSample() in its 1 Hz gate and by the flame-on edge:
+// thermo-nova appends the flame-on sample too (tracker.py:71-72, entry 249), so it is sample k = 0 of the burn.
+static void _cycleTailSample(uint32_t nowMs, float flowTemp)
+{
+  _tail_samples[_tail_sampleHead] = flowTemp;
+  {
+    // Per-sample control setpoint error (TASK-1405); fFinalSetpoint <= 0 = no control setpoint, and a
+    // non-finite flow is left out too (thermo-nova skips a sample without flow, tracker.py:268).
+    // Percentiles interpolate as thermo-nova (helpers.py:185-202, TASK-1586).
+    const float sp = state.sat.fFinalSetpoint;
+    _tail_ctrlErr[_tail_sampleHead] = (sp > 0.0f && isfinite(flowTemp))
+        ? (int16_t)lroundf(fmaxf(-300.0f, fminf(300.0f, flowTemp - sp)) * 100.0f)
+        : SAT_TAIL_CTRL_ERR_NONE;
+  }
+  {
+    // Per-sample requested setpoint (TASK-1585); <= 0 or non-finite = no requested setpoint (thermo-nova None).
+    const float rq = _sat_requestedSetpoint;
+    _tail_reqSp[_tail_sampleHead] = (rq > 0.0f && isfinite(rq))
+        ? (int16_t)lroundf(fminf(rq, 300.0f) * 100.0f)
+        : SAT_TAIL_CTRL_ERR_NONE;
+  }
+  _tail_sampleHead = (_tail_sampleHead + 1) % SAT_TAIL_SAMPLE_SIZE;
+  if (_tail_sampleCount < SAT_TAIL_SAMPLE_SIZE) _tail_sampleCount++;
+  _tail_lastSampleMs = nowMs;
+
+  // Cycle kind and DHW-in-tail inputs, counted in the same 1 Hz gate as the tail ring
+  // (TASK-1387; tracker.py:103-104 counts per sample):
+  // DHW = Statusflags bit 2 (slave DHW mode), CH = Statusflags bit 8 (master CH enable) without DHW.
+  // SAT simulation has no OT status: the simulated DHW draw (bDhwActive, forced by the simulation)
+  // stands in for bit 2, and the CH enable SAT commands stands in for bit 8 (CS above the minimum
+  // setpoint: the CH rule sends CH=0 exactly with CS=10, satChEnableDecide; the simulated boiler
+  // also only fires CH above it).
+  bool dhwSample, chSample;
+  if (settings.sat.bSimulation) {
+    dhwSample = state.sat.bDhwActive;
+    chSample  = state.sat.fFinalSetpoint > SAT_MIN_SETPOINT;
+  } else {
+    const uint16_t sf = OTcurrentSystemState.Statusflags;
+    dhwSample = (sf & 0x0004) != 0;
+    chSample  = (sf & 0x0100) != 0;
+  }
+  _cycle_totalSamples++;
+  if (dhwSample) {
+    _cycle_dhwSamples++;
+    _cycle_lastDhwMs = nowMs - _cycle_flameOnStartMs;
+  } else if (chSample) {
+    _cycle_chSamples++;
+  }
 }
 
 //=== Called on each flame status change ===
@@ -975,6 +1029,9 @@ void satCycleOnFlameChange(bool flameOn)
     _cycle_overshootStreakSec          = 0.0f;
     _cycle_timeToFirstOvershootSec     = -1.0f;
     _cycle_timeToSustainedOvershootSec = -1.0f;
+    // The flame-on sample counts, as thermo-nova (tracker.py:71-72, TASK-1588, entry 249): it is the first tail
+    // sample and the first kind / DHW count. It also sets _tail_lastSampleMs, so the next sample is >= 1 s later.
+    _cycleTailSample(now, satGetFlowTemp());
   }
   else if (!flameOn && _cycle_flameOn) {
     // Flame just turned OFF — complete the cycle
@@ -994,6 +1051,16 @@ void satCycleOnFlameChange(bool flameOn)
         snprintf_P(_wsMsg, sizeof(_wsMsg), PSTR("{\"type\":\"status\",\"msg\":\"Heating off, room %.1f deg C\"}"), OTcurrentSystemState.Tr);
       }
       sendWebSocketJSON(_wsMsg);
+    }
+    // tracker.py:98-100 (TASK-1588, entry 249): a flame with fewer than SAT_CYCLE_MIN_SAMPLES 1 Hz samples is not a
+    // cycle. Nothing is recorded: no history entry, count, class, kind, fractions, EMAs, duty, 4 h or daily window
+    // entry and no last-cycle value; only this flame-off edge is remembered (tracker.py:106, _last_flame_off_timestamp
+    // is set before the build), as the off gap of the next cycle.
+    if (_cycle_totalSamples < SAT_CYCLE_MIN_SAMPLES) {
+      SATDebugTf(PSTR("SAT cycle dropped: %lu samples (< %lu), dur=%.0fs\r\n"),
+                 (unsigned long)_cycle_totalSamples, (unsigned long)SAT_CYCLE_MIN_SAMPLES, durationSec);
+      _cycle_lastFlameOffMs = now;
+      return;
     }
     // Compute p90/p10 from collected flow samples (Task #225)
     float p90 = (_flow_sampleCount >= 10) ? _flowPercentile(90) : _cycle_maxFlowTemp;
@@ -1025,7 +1092,7 @@ void satCycleOnFlameChange(bool flameOn)
                         ((float)_cycle_lastDhwMs / 1000.0f >= tailStartSec);
     float ctrlErrP50 = 0.0f, ctrlErrP90 = 0.0f;
     const bool ctrlErrKnown = _tailCtrlErrPercentiles(ctrlErrP50, ctrlErrP90);   // per-sample setpoints (TASK-1405)
-    SATCycleClass cls = _cycleClassify(durationSec, _cycle_totalSamples, _cycleDetectKind(),
+    SATCycleClass cls = _cycleClassify(durationSec, _cycleDetectKind(),
                                        dhwInTail, pwmEnabled, satPwmIsIdle(),
                                        state.sat.bPwmFlameRequested, onTimeSec,
                                        tailP90, tailP50, ctrlErrKnown, ctrlErrP50, ctrlErrP90,
@@ -1109,50 +1176,7 @@ void satCycleSample()
     _flow_sampleHead = (_flow_sampleHead + 1) % SAT_FLOW_SAMPLE_SIZE;
     if (_flow_sampleCount < SAT_FLOW_SAMPLE_SIZE) _flow_sampleCount++;
 
-    _tail_samples[_tail_sampleHead] = flowTemp;
-    {
-      // Per-sample control setpoint error (TASK-1405); fFinalSetpoint <= 0 = no control setpoint, and a
-      // non-finite flow is left out too (thermo-nova skips a sample without flow, tracker.py:268).
-      // Percentiles interpolate as thermo-nova (helpers.py:185-202, TASK-1586).
-      const float sp = state.sat.fFinalSetpoint;
-      _tail_ctrlErr[_tail_sampleHead] = (sp > 0.0f && isfinite(flowTemp))
-          ? (int16_t)lroundf(fmaxf(-300.0f, fminf(300.0f, flowTemp - sp)) * 100.0f)
-          : SAT_TAIL_CTRL_ERR_NONE;
-    }
-    {
-      // Per-sample requested setpoint (TASK-1585); <= 0 or non-finite = no requested setpoint (thermo-nova None).
-      const float rq = _sat_requestedSetpoint;
-      _tail_reqSp[_tail_sampleHead] = (rq > 0.0f && isfinite(rq))
-          ? (int16_t)lroundf(fminf(rq, 300.0f) * 100.0f)
-          : SAT_TAIL_CTRL_ERR_NONE;
-    }
-    _tail_sampleHead = (_tail_sampleHead + 1) % SAT_TAIL_SAMPLE_SIZE;
-    if (_tail_sampleCount < SAT_TAIL_SAMPLE_SIZE) _tail_sampleCount++;
-    _tail_lastSampleMs = nowMs;
-
-    // Cycle kind and DHW-in-tail inputs, counted in the same 1 Hz gate as the tail ring
-    // (TASK-1387; tracker.py:103-104 counts per sample):
-    // DHW = Statusflags bit 2 (slave DHW mode), CH = Statusflags bit 8 (master CH enable) without DHW.
-    // SAT simulation has no OT status: the simulated DHW draw (bDhwActive, forced by the simulation)
-    // stands in for bit 2, and the CH enable SAT commands stands in for bit 8 (CS above the minimum
-    // setpoint: the CH rule sends CH=0 exactly with CS=10, satChEnableDecide; the simulated boiler
-    // also only fires CH above it).
-    bool dhwSample, chSample;
-    if (settings.sat.bSimulation) {
-      dhwSample = state.sat.bDhwActive;
-      chSample  = state.sat.fFinalSetpoint > SAT_MIN_SETPOINT;
-    } else {
-      const uint16_t sf = OTcurrentSystemState.Statusflags;
-      dhwSample = (sf & 0x0004) != 0;
-      chSample  = (sf & 0x0100) != 0;
-    }
-    _cycle_totalSamples++;
-    if (dhwSample) {
-      _cycle_dhwSamples++;
-      _cycle_lastDhwMs = nowMs - _cycle_flameOnStartMs;
-    } else if (chSample) {
-      _cycle_chSamples++;
-    }
+    _cycleTailSample(nowMs, flowTemp);
 
     if (++_flow_logTick >= 30) {   // one debug line per 30 samples (30 s)
       _flow_logTick = 0;

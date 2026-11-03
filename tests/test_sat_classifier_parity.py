@@ -15,8 +15,8 @@ Both sides run the REAL code on the SAME timestamped samples:
             does (satCycleOnFlameChange, satCycleSample, _cycleClassify, the tail rings, the kind counters).
 
 Driver order per tick equals the production loop (SATcontrol.ino:6592 then :6599): the flame edge is processed first, then
-satCycleSample(), so the flame-on tick and the flame-off tick take no tail sample in the port, while thermo-nova's
-CycleTracker.update appends the flame-on sample and not the flame-off one (tracker.py:71-72). A scenario is a list of
+satCycleSample(). Both sides take the flame-on sample and not the flame-off one (tracker.py:71-72; the port since TASK-1588,
+entry 249: satCycleOnFlameChange(true) records it itself) and both drop a cycle with fewer than 3 samples (tracker.py:98-100). A scenario is a list of
 timestamped ticks t = 0 .. N (flame on for t < N, the tick at t = N is the flame-off edge). Seconds in `gaps` have no tick on
 either side (missing samples).
 
@@ -26,7 +26,8 @@ Two configurations, because the port has decided deviations built in:
             OVERSHOOT_MARGIN_CELSIUS and COLD_SETPOINT of classifier.py are set to those values for the run and restored
             (the only change to the loaded code; no file is modified)
 
-Q-PARITY-1 (entry 248, TASK-1586), Q-PARITY-3 (entry 244, TASK-1584) and Q-PARITY-5 (entry 245, TASK-1585) are implemented and have no difference left.
+Q-PARITY-1 (entry 248, TASK-1586), Q-PARITY-3 (entry 244, TASK-1584), Q-PARITY-5 (entry 245, TASK-1585) and Q-PARITY-7/8 (entry 249,
+TASK-1588) are implemented and have no difference left.
 Every verdict difference between the two sides must appear in DIFFERENCES with its classification:
   (a) already a RECORDED deviation: a decision of Sergeant D in docs/sat/sergeant-d-corrections.md (entry number given);
   (b) UNRECORDED: not decided by him; listed as an open question (Q-PARITY-n); behaviour is not changed here.
@@ -250,13 +251,13 @@ def build_scenarios():
     add("dhw_just_before_tail_start", "N=500: DHW flag at t=319 (one second before the tail)", 500, window(319, 320, flags=CHDHW))
     add("dhw_only_cycle", "300 s on hot water", 300, lambda t: dict(flags=DHW))
     add("kind_unknown", "300 s flame with neither CH enable nor DHW", 300, lambda t: dict(flags=NONE_FLAGS))
-    add("kind_ch_exactly_80pct", "N=10: samples t=0 and t=9 neither, t=1..8 CH (upstream 8 of 10 = 0.8, not > 0.8; port sees 8 of 9)", 10,
+    add("kind_ch_exactly_80pct", "N=10: samples t=0 and t=9 neither, t=1..8 CH (8 of 10 = 0.8, not > 0.8: kind UNKNOWN on both sides)", 10,
         lambda t: dict(flags=NONE_FLAGS) if t in (0, 9) else {})
     add("pwm_idle_at_end", "PWM mode, status IDLE at flame-off", 300, lambda t: dict(mode=PWM, on=0), on_time=300, idle=True)
 
     # sample count
-    add("three_second_cycle", "N=3: thermo-nova has samples t=0,1,2 (3, minimum 3); the port takes t=1,2", 3)
-    add("two_second_cycle", "N=2: thermo-nova has 2 samples (< 3, cycle dropped); the port records INSUFFICIENT", 2)
+    add("three_second_cycle", "N=3: samples t=0,1,2 (3 = the minimum): recorded on both sides", 3)
+    add("two_second_cycle", "N=2: 2 samples (< 3): the cycle is dropped on both sides", 2)
 
     # percentile interpolation (180-sample tail, N=240: tail t=60..239, warm-up 60 s)
     def p90_case(low, high):
@@ -401,7 +402,7 @@ int main(int argc, char** argv) {
     satCycleSample();     // production order: SATcontrol.ino:6592 flame edge, :6599 sample
   }
   fclose(fp);
-  printf("cls=%d kind=%d\n", (int)state.sat.eLastCycleClass, (int)state.sat.eLastCycleKind);
+  printf("cls=%d kind=%d count=%lu\n", (int)state.sat.eLastCycleClass, (int)state.sat.eLastCycleKind, (unsigned long)state.sat.iCycleCount);
   return 0;
 }
 """
@@ -447,10 +448,12 @@ def run_port(sc, cfg):
     r = subprocess.run([str(exe), repr(CONFIGS[cfg]["margin"]), repr(CONFIGS[cfg]["cold"]), str(path)], capture_output=True, text=True, timeout=30)
     if r.returncode != 0:
         raise AssertionError("port harness exit %d: %s%s" % (r.returncode, r.stdout, r.stderr[-300:]))
-    m = re.search(r"cls=(\d+) kind=(\d+)", r.stdout)
+    m = re.search(r"cls=(\d+) kind=(\d+) count=(\d+)", r.stdout)
     if not m:
         raise AssertionError(r.stdout)
     d = re.search(r"diag (.*)", r.stdout)
+    if int(m.group(3)) == 0:      # no cycle recorded (the port's counterpart of "no Cycle emitted")
+        return dict(verdict="DROPPED", kind="-", detail="no cycle recorded (cycle count 0)")
     return dict(verdict=base.CLS_NAME[int(m.group(1))], kind=base.KIND_NAME[int(m.group(2))], detail=d.group(1) if d else "")
 
 
@@ -459,7 +462,6 @@ def run_port(sc, cfg):
 # Citations: upstream relative to custom_components/sat at 7beaaf5; port in src/OTGW-firmware/SATcycles.ino at this revision.
 W = "tracker.py:113-116 (warm-up min(60, 0.25 x duration), tail_start = max(.., end - 180)), :235-241 (tail = samples with timestamp >= tail_start)"
 QUANT_PORT = "SATcycles.ino:1019-1022 (error stored as int16 hundredths, lroundf), :662"
-MIN3_UP = "tracker.py:96-100 (fewer than 3 samples: no Cycle is built or emitted)"
 
 DIFFERENCES = {}
 
@@ -486,13 +488,7 @@ diff("sample_gap_in_tail", BOTH, "b", "GOOD", "OVERSHOOT", "after a 100 s gap th
 # Q-PARITY-6 fallback setpoint
 diff("device_setpoint_fallback_cold", BOTH, "b", "UNCERTAIN", "UNDERHEAT", "requested missing: thermo-nova falls back to device_state.setpoint at the end (20); the port to the control setpoint at flame-on (30)",
      "classifier.py:81-85 (device_state.setpoint of the flame-off sample)", "SATcycles.ino:814 (controlSp = _cycle_setpointAtStart, set at flame-on :842)", "Q-PARITY-6")
-# Q-PARITY-7 / 8 sample count
-diff("kind_ch_exactly_80pct", BOTH, "b", "UNCERTAIN", "GOOD", "the flame-on sample is a kind sample upstream (8 CH of 10 = 0.8, not > 0.8: kind UNKNOWN); the port counts 8 of 9",
-     "tracker.py:71-72 (the sample of the OFF->ON transition is appended), :314-324", "SATcycles.ino:1009 (the flame-on pass takes no sample: _tail_lastSampleMs = now at :869), :1044-1049", "Q-PARITY-7")
-diff("three_second_cycle", BOTH, "b", "GOOD", "INSUFFICIENT", "3 seconds of flame is 3 samples upstream (t=0,1,2, minimum 3), 2 in the port (the flame-on pass takes none)",
-     MIN3_UP + "; tracker.py:71-72", "SATcycles.ino:774 (sampleCount < 3), :869, :1009", "Q-PARITY-7")
-diff("two_second_cycle", BOTH, "b", "DROPPED", "INSUFFICIENT", "thermo-nova emits no Cycle (not counted in any window); the port records an INSUFFICIENT cycle",
-     MIN3_UP, "SATcycles.ino:774 (INSUFFICIENT), :687-710 (_cycleRecord stores it)", "Q-PARITY-8")
+# Q-PARITY-7 / 8 sample count: decided (entry 249, A), implemented in satCycleOnFlameChange() (TASK-1588): no difference left.
 # Q-PARITY-9 non-finite flow in the tail ring: its one observed scenario (flow_missing_pwm_underheat) agrees since TASK-1585,
 # because the PWM requested-setpoint error percentile skips a non-finite flow (_tailReqMetrics()). Not decided by Sergeant D.
 # Q-PARITY-11 stand-ins
@@ -597,6 +593,7 @@ class TestParity(Base):
                      "kind_unknown", "pwm_idle_at_end", "warmup_high_flow_short_cycle",
                      "requested_raised_inside_tail_pwm", "requested_missing_last_third_pwm",
                      "requested_lowered_below_cold_continuous", "requested_missing_all_pwm", "flow_missing_pwm_underheat",
+                     "kind_ch_exactly_80pct", "three_second_cycle", "two_second_cycle",
                      "interp_p90_over_margin3", "interp_p90_over_margin2", "interp_p50_underheat"):
             for cfg in ("parity", "firmware"):
                 u, p = obs[(name, cfg)]

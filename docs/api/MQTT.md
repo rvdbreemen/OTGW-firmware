@@ -677,7 +677,7 @@ silently dropped (TASK-489 + TASK-493).
 
 **Boiler status names** (`sat/boiler_status`): `off`, `idle`, `preheating`, `at_setpoint`, `modulating_up`, `modulating_down`, `ignition_surge`, `stalled_ignition`, `anti_cycling`, `pump_starting`, `waiting_flame`, `overshoot_cooling`, `post_cycle`, `heating`, `cooling`, `heating_hot_water`
 
-**Cycle class** (`sat/cycle_class`): `none`, `good`, `overshoot`, `underheat`, `short`, `uncertain`, `underheat_pwm`, `insufficient`
+**Cycle class** (`sat/cycle_class`): `none`, `good`, `overshoot`, `underheat`, `short`, `uncertain`, `underheat_pwm`, `insufficient`. Since TASK-1588 a flame with fewer than 3 one-second samples is not recorded as a cycle (thermo-nova `tracker.py:98-100`): it no longer produces `insufficient`, and does not change `sat/cycle_class`, the cycle count or the 4 h / 24 h values. `insufficient` stays in the list for the duration <= 0 rule, which a running firmware does not reach
 
 **Flame status** (`sat/flame_status`): `INSUFFICIENT_DATA`, `HEALTHY`, `IDLE_OK`, `STUCK_ON`, `STUCK_OFF`, `PWM_SHORT`, `SHORT_CYCLING`
 

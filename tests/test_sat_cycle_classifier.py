@@ -124,7 +124,8 @@ static void sendWebSocketJSON(const char*) {}
 static size_t strlcpy_P(char* d, const char* s, size_t n) { snprintf(d, n, "%s", s); return strlen(s); }
 static void _hourCountRecord(uint32_t) {}
 static uint8_t _hourCountGet(uint32_t) { return 1; }
-static void _dailyRecord(uint32_t, uint32_t, uint32_t, SATCycleClass, float) {}
+static int g_dailyCalls = 0;
+static void _dailyRecord(uint32_t, uint32_t, uint32_t, SATCycleClass, float) { g_dailyCalls++; }
 #define SATDebugTln(x) ((void)0)
 #define SATDebugTf(...) ((void)0)
 #define SATDebugf(...) ((void)0)
@@ -172,8 +173,34 @@ static int twoCycle() {
 // argv: ctrlSp reqSp onTimeSec idle sim seg...   seg = count:flow:flags:mode:pwmOn[:ctrl[:req]]
 // ctrl (TASK-1405) = the control setpoint (fFinalSetpoint) from this segment on; ctrlSp is the one at flame-on.
 // req (TASK-1585) = the PID requested setpoint (_sat_requestedSetpoint) from this segment on (0 = none); reqSp is the one at flame-on.
+// TASK-1588: a 300 s CH cycle, then a 0 s and a 1 s flame (flickers of 1 and 2 samples, 60 s apart). Prints every observable of the cycle record
+// after the first cycle (a) and after the flickers (b); the real satCycleOnFlameChange()/satCycleSample() drive it.
+static void snap(const char* tag) {
+  satGetWindow4hStats();
+  printf("%s count=%lu hist=%d win4h=%d daily=%d cls=%d dur=%.9g end=%lu ema_os=%.9g ema_uh=%.9g duty=%.9g n4h=%d avgon=%.9g\n", tag,
+         (unsigned long)state.sat.iCycleCount, (int)_cycleHistoryCount, (int)_win4hCount, g_dailyCalls, (int)state.sat.eLastCycleClass,
+         (double)state.sat.fLastCycleDuration, (unsigned long)state.sat.iLastCycleEndMs, (double)state.sat.fOvershootFraction,
+         (double)state.sat.fUnderheatFraction, (double)state.sat.fDutyRatio, (int)state.sat.i4hCycles, (double)state.sat.f4hAvgOnSec);
+}
+static int flicker() {
+  settings.sat.fOvershootMargin = 2.0f;
+  state.sat.fFinalSetpoint = 50.0f; _sat_requestedSetpoint = 50.0f; state.sat.fPidOutput = 50.0f;
+  apply(50.0f, CHFLAGS, 1, 0); satCycleOnFlameChange(true);
+  for (int k = 0; k < 300; k++) { g_ms += 1000; apply(50.0f, CHFLAGS, 1, 0); satCycleSample(); }
+  satCycleOnFlameChange(false);
+  snap("a");
+  for (int secs = 0; secs <= 1; secs++) {
+    g_ms += 60000;
+    apply(50.0f, CHFLAGS, 1, 0); satCycleOnFlameChange(true);
+    for (int k = 0; k < secs; k++) { g_ms += 1000; apply(50.0f, CHFLAGS, 1, 0); satCycleSample(); }
+    satCycleOnFlameChange(false);
+  }
+  snap("b");
+  return 0;
+}
 int main(int argc, char** argv) {
   if (argc > 1 && strcmp(argv[1], "twocycle") == 0) return twoCycle();
+  if (argc > 1 && strcmp(argv[1], "flicker") == 0) return flicker();
   if (argc < 6) return 2;
   settings.sat.fOvershootMargin = 2.0f;
   const float ctrlSp = (float)atof(argv[1]), reqSp = (float)atof(argv[2]);
@@ -199,7 +226,7 @@ int main(int argc, char** argv) {
   }
   if (first) { apply(50.0f, 0x010A, 1, 0); satCycleOnFlameChange(true); }   // no samples: zero-length cycle
   satCycleOnFlameChange(false);
-  printf("cls=%d kind=%d\n", (int)state.sat.eLastCycleClass, (int)state.sat.eLastCycleKind);
+  printf("cls=%d kind=%d count=%lu\n", (int)state.sat.eLastCycleClass, (int)state.sat.eLastCycleKind, (unsigned long)state.sat.iCycleCount);
   return 0;
 }
 """
@@ -275,8 +302,18 @@ class Case:
 
 
 CASES = {
-    # R1 cls:19-20 duration <= 0 -> INSUFFICIENT_DATA
-    "R1": Case([], "INSUFFICIENT"),
+    # R1 tracker.py:98-100 (TASK-1588, entry 249): fewer than 3 samples (here the flame-on sample only) -> no cycle is recorded
+    # at all ("NONE" = the class register stays untouched, count 0). cls:19-20 (duration <= 0 with >= 3 samples) is not reachable
+    # in a running firmware, so no case reaches INSUFFICIENT any more. Oracle off: the drop happens in tracker.py, not in classifier.py.
+    "R1": Case([], "NONE", oracle=False),
+    # F1/F2 (TASK-1588): this harness takes a sample at the flame-off time too, so seg(1) = samples t=0,1 (2: dropped) and
+    # seg(2) = t=0,1,2 (3 = the minimum: recorded, GOOD). The flame-on sample counts (tracker.py:71-72).
+    "F1_two_samples_dropped": Case([seg(1, 50.0)], "NONE", oracle=False),
+    "F2_three_samples_recorded": Case([seg(2, 50.0)], "GOOD", oracle=False),
+    # K80 (TASK-1588): 10 samples t=0..9, t=0 and t=9 without CH enable, t=1..8 CH: 8 of 10 = 0.8 is not > 0.8 -> kind UNKNOWN ->
+    # UNCERTAIN (without the flame-on sample it was 8 of 9 -> CH -> GOOD). seg(0) lights the flame with NONE flags and takes no
+    # further sample.
+    "K80_flame_on_sample_counts": Case([seg(0, 50.0, NONE), seg(8, 50.0), seg(1, 50.0, NONE)], "UNCERTAIN"),
     # R2 cls:22-23 kind UNKNOWN -> UNCERTAIN (no CH-enable, no DHW: both fractions 0, tracker.py:314-324)
     "R2": Case([seg(300, 50.0, NONE)], "UNCERTAIN"),
     # R3 cls:25-26 hot water in the tail -> UNCERTAIN (DHW in the last 10 s only: kind stays CH)
@@ -422,8 +459,9 @@ class CycleClassifier(unittest.TestCase):
                  for s in c.segs]
         r = subprocess.run(args, capture_output=True, text=True, timeout=20)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr[-300:])
-        m = re.match(r"cls=(\d+) kind=(\d+)", r.stdout)
+        m = re.match(r"cls=(\d+) kind=(\d+) count=(\d+)", r.stdout)
         self.assertTrue(m, r.stdout)
+        self.last_count = int(m.group(3))
         return int(m.group(1)), int(m.group(2))
 
     def check(self, name):
@@ -431,8 +469,28 @@ class CycleClassifier(unittest.TestCase):
         exp = CASES[name].expect
         self.assertEqual(CLS_NAME.get(cls_, cls_), exp, "%s: expected %s, firmware gave %s" % (name, exp, CLS_NAME.get(cls_, cls_)))
 
-    def test_R1_zero_duration_is_insufficient(self):
+    def test_R1_fewer_than_3_samples_is_not_recorded(self):
         self.check("R1")
+        self.assertEqual(self.last_count, 0)
+
+    def test_task1588_three_samples_is_the_minimum_and_the_flame_on_sample_counts(self):
+        self.check("F1_two_samples_dropped")
+        self.assertEqual(self.last_count, 0)
+        self.check("F2_three_samples_recorded")
+        self.assertEqual(self.last_count, 1)
+        self.check("K80_flame_on_sample_counts")
+
+    def test_task1588_flickers_leave_the_cycle_record_untouched(self):
+        """A 300 s cycle (a), then a flame that is lit and out again at once (1 sample) and a 1 s flame (2 samples), 60 s apart (b).
+        Count, history, the 4 h window, the daily window, the EMAs, the duty ratio and every last-cycle value stay as after (a)."""
+        if self.exe is None:
+            self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
+        r = subprocess.run([str(self.exe), "flicker"], capture_output=True, text=True, timeout=20)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr[-300:])
+        lines = {ln.split()[0]: dict(tok.split("=") for tok in ln.split()[1:]) for ln in r.stdout.splitlines() if ln[:2] in ("a ", "b ")}
+        self.assertEqual(lines["a"]["count"], "1")
+        self.assertEqual(lines["a"]["daily"], "1")
+        self.assertEqual(lines["b"], lines["a"], "a flicker changed the cycle record")
 
     def test_R2_kind_unknown_is_uncertain(self):
         self.check("R2")
@@ -655,19 +713,23 @@ def _kind(samples, tntypes):
 def oracle(c: Case):
     clf, T = _load_classifier()
     samples = [(flow, flags) for (n, flow, flags, _m, _o, *_c) in c.segs for _ in range(n)]
+    # the flame-on sample (t = 0) counts (tracker.py:71-72): it has the first segment's flow and flags and the initial setpoint
+    # (the harness applies a segment's own control setpoint only after the flame-on call)
+    if c.segs:
+        samples.insert(0, (c.segs[0][1], c.segs[0][2]))
     # per-sample control setpoint (tracker.py:267-271, a None setpoint leaves the sample out)
-    ctrls, cur = [], c.ctrl
+    ctrls, cur = [c.ctrl], c.ctrl
     for sg in c.segs:
         if len(sg) > 5:
             cur = sg[5]
         ctrls += [cur] * sg[0]
-    # tracker.py:113-116, :237-241: sample k (1-based) at start + k s, the cycle ends at the last sample;
+    # tracker.py:113-116, :237-241: sample k (0-based, the flame-on sample is k = 0) at start + k s, the cycle ends at the last sample;
     # the tail is every sample at or after max(start + min(60, 0.25 * duration), end - 180). The firmware's
     # flow percentiles skip the warm-up exclusion (a recorded deviation); no case has a non-uniform flow in it.
-    dur = float(len(samples))
+    dur = float(len(samples) - 1)
     tail_start = max(min(60.0, 0.25 * dur), dur - 180.0)
-    tail = [s_ for k, s_ in enumerate(samples, start=1) if k >= tail_start]
-    tail_ctrl = [x for k, x in enumerate(ctrls, start=1) if k >= tail_start]
+    tail = [s_ for k, s_ in enumerate(samples) if k >= tail_start]
+    tail_ctrl = [x for k, x in enumerate(ctrls) if k >= tail_start]
     flows = [f for f, _ in tail]
     errs = [f - sp for f, sp in zip(flows, tail_ctrl) if sp > 0]
     P = T.Percentiles
@@ -681,7 +743,7 @@ def oracle(c: Case):
     status = T.PWMStatus.IDLE if c.idle else (T.PWMStatus.ON if last[4] else T.PWMStatus.OFF)
     pwm = pytypes.SimpleNamespace(enabled=enabled, status=status, on_time_seconds=float(c.on_time))
     dev = pytypes.SimpleNamespace(setpoint=c.ctrl)   # device-setpoint fallback (cls:81-83)
-    res = clf.CycleClassifier.classify(device_state=dev, duration_seconds=float(len(samples)), kind=_kind(samples, T),
+    res = clf.CycleClassifier.classify(device_state=dev, duration_seconds=dur, kind=_kind(samples, T),
                                        pwm_state=pwm, tail_metrics=tm)
     name = {"insufficient_data": "INSUFFICIENT", "short_cycling": "SHORT"}.get(res.value.lower(), res.name)
     if name == "UNDERHEAT" and enabled:

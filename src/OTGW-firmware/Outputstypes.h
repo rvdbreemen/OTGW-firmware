@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Outputstypes.h
-**  Version  : v2.0.0-beta.50
+**  Version  : v2.0.0-beta.51
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
