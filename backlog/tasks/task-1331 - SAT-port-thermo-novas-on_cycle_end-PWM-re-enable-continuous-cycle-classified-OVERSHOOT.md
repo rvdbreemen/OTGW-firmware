@@ -3,11 +3,11 @@ id: TASK-1331
 title: >-
   SAT: port thermo-nova's on_cycle_end PWM re-enable (continuous cycle
   classified OVERSHOOT)
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T19:43:00Z'
-updated_date: '2026-11-03T10:33:00Z'
+updated_date: '2026-11-03T11:09:00Z'
 labels:
   - blocked
   - sat
@@ -66,4 +66,6 @@ Audit 2026-11-01: moved To Do -> In Progress: AC1 research is checked and the ch
 Lead triage 2026-11-01 23:30 (Robert: lead decides): back to To Do + blocked, as Robert set on 10-29. Blocked on TASK-1412.14, .4 and .7 (all To Do); the parked stash predates TASK-1345/1341/1344/1387 and must be re-applied by hand when those land. Owner of the SAT chain: session otgw-firmware-67.
 
 2026-11-03: unblocked by TASK-1412.14: the classifier parity gate passes (entries 244/245/248/249/250). Next: a plan quoting thermo-nova on_cycle_end (pwm.py:219-227) for Sergeant D's OK before implementation (SAT behaviour change).
+
+2026-11-03 lead: decision already complete: entry 15 (port both on_cycle_end branches, margin 2.0), entry 18 (not gated on bPwmAutoSwitch), the Q2 prerequisite (per-sample control setpoint in the tail, entry 36 / TASK-1405, done) and the parity proof TASK-1412.14 (Done, entries 244/245/248/249/250). Implementation starts; the enable path goes through the existing PWM entry gate (1412.4 low-load permission, entries 213-215).
 <!-- SECTION:NOTES:END -->
