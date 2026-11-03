@@ -5881,3 +5881,11 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Quoted:** "@BlueFlame Bot Don't change anything. SAT behaved properly. The flame off detected properly and then the start up sequence worked as designed"
 
 **Settled:** no change. **Interpretation (ours):** (1) Q-1589b is answered B: hot water stays detected from the DHW status bit only, as thermo-nova (coordinator/mqtt/opentherm.py:22, :68-69); no MsgID 19 flow-rate or MsgID 26 Tdhw detection is added. (2) "Don't change anything ... the start up sequence worked as designed" also answers the parked Q-1589a: the flame-off hold keeps being applied on the control tick (SATcontrol.ino:1608), no 5 s alignment. If he meant otherwise for either, a correcting entry follows. Entry 253 stays as the record that the event was a hot-water draw without the bit. **Task:** TASK-1589. **Open:** none.
+
+## 255. The 10:28 CH interruption in gruijter's capture: SAT worked as designed, no change (Sergeant D, 2026-11-03)
+
+**Source:** sergeantd, 2026-11-03 15:24 UTC, msg 1567197910205210768 (https://discord.com/channels/812969634638725140/1514720723980259460/1567197910205210768), after our 10:28 timeline (continuous mode; flow below CS from 10:29:34, no flame until 10:37:20, 7 min 46 s of unserved demand on the boiler side; MsgID 19 0.00 l/min on all 16 reads 10:29:23-10:37:49).
+
+**Quoted:** "If a DHW expansion vessel is installed in this house probably absorbed some sudden rise of pressure from a tap. My verdict is that SAT worked as designed. Thanks for analysis"
+
+**Settled:** no change to SAT for this event: SAT sent the continuous requested setpoint with the flame off (as thermo-nova heating_control.py:476-482) and the boiler waited on its own. His explanation (a DHW expansion vessel absorbing a tap pressure rise) is a hypothesis: gruijter answered at 15:28 UTC (msg 1567198695773184072) "I have no DHW expansion vessel installed". The verdict "SAT worked as designed" does not depend on that hypothesis. **Task:** none. **Open:** why the boiler waited (boiler side; non-binding questions to gruijter about comfort/preheat and a short tap are with him).
