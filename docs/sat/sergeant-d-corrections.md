@@ -5804,3 +5804,11 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot TASK-1412.14: A"
 
 **Settled:** option A of Q-PARITY-5: the requested setpoint is recorded per classifier sample, and the tail median (p50) is the effective setpoint for the underheat cold check, as thermo-nova cycles/tracker.py:273-277 and classifier.py:81-86; the port today uses one snapshot at flame-off (SATcycles.ino:918). About 360 bytes more RAM. **Interpretation (ours):** he named only the task; the one open question under TASK-1412.14 was Q-PARITY-5, so "A" is read as its option A. **Task:** TASK-1585. **Open:** none.
+
+## 246. Q-1581a answered A: on an Immergas, TP=11:12=80 goes right before MM=T at the maximum duty (Sergeant D, 2026-11-03)
+
+**Source:** sergeantd, 2026-11-03 06:45 UTC, msg 1567067079675224145 (https://discord.com/channels/812969634638725140/1514720723980259460/1567067079675224145), answer to Q-1581a (msg 1567066646059688018).
+
+**Quoted:** "@BlueFlame Bot Q1581a: A"
+
+**Settled:** option A, completing entries 233, 242 and 243 for an Immergas: when SAT sends MM=T at the maximum duty it sends TP=11:12=80 right before it (MM=T is the 100 % default and min(100, 80) = 80, as entry 233 would give for MM=100). When the duty drops below the maximum, TP=11:12=min(MM, 80) and the numeric MM go back to the normal low-load values (entries 233, 243). Other boilers: MM=T only. **Task:** TASK-1581. **Open:** none.
