@@ -437,6 +437,18 @@ class SatPressureHealth(unittest.TestCase):
         self.assertEqual(suspended, [], f"drop rate suspended on a PWM OFF phase at t(s)={suspended[:5]}")
         self.assert_matches_oracle(rows)
 
+    def test_real_slow_leak_still_alarms_with_cycling_pwm_and_flame(self):
+        # TASK-1511 AC2: a steady leak of 0.4 bar/h (above fMaxPressureDrop 0.3) with the boiler's CH mode on
+        # throughout and the master CH enable cycling like PWM must still alarm, and must do so as in thermo-nova.
+        rows = []
+        for i in range(240):                                   # 2 h, one sample per 30 s
+            ms = 1000 + i * 30000
+            master = MASTER_CH if (ms // 600000) % 2 == 0 else 0
+            rows.append((ms, round(2.4 - 0.4 * ms / 3.6e6, 4), master | SLAVE_CH, 1))
+        fw, ref = self.assert_matches_oracle(rows)
+        self.assertGreaterEqual(episodes([a for _, a in fw]), 1, "a 0.4 bar/h leak must raise the pressure alarm")
+        print(f"  slow leak: alarm episodes firmware {episodes([a for _, a in fw])}, thermo-nova {episodes([o[0] for o in ref])}")
+
     def test_samples_up_to_one_hour_old_count(self):
         # 40 min at 2.0 bar, then 1.9 bar flat. thermo-nova still sees the step 15 min later
         # (window 3600 s); a 10-minute window sees a flat line.
