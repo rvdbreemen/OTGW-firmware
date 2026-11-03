@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-beta.57
+**  Version  : v2.0.0-beta.58
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -101,9 +101,26 @@ struct WebRequestBody {
 extern WebRequestBody g_requestBody;
 
 // Append a body chunk (called from the onRequestBody hook). index==0 resets.
-inline void webCaptureBody(void* req, const uint8_t* data, size_t len, size_t index, size_t total) {
+//
+// TASK-1565: the capture is released when its request is destroyed. The async
+// server delivers a form-urlencoded body (curl -d default) as POST params and
+// never calls this hook for it, so the previous request's body stayed in the
+// buffer with owner==<freed address>, and the next request allocated at that same
+// address passed the owner match and read the old body. The server runs the
+// request's onDisconnect handler in AsyncWebServerRequest::_onDisconnect() just
+// before it deletes the request (one request per connection), so releasing there
+// closes the hole for every request type. Not covered: a request destroyed while
+// its client is still connected (the destructor clears the callback instead).
+inline void webCaptureBody(AsyncWebServerRequest* req, const uint8_t* data, size_t len, size_t index, size_t total) {
   (void)total;
-  if (index == 0) { g_requestBody.len = 0; g_requestBody.owner = req; }
+  if (index == 0) {
+    g_requestBody.len = 0;
+    g_requestBody.owner = req;
+    g_requestBody.data[0] = '\0';
+    req->onDisconnect([req]() {
+      if (g_requestBody.owner == req) { g_requestBody.owner = nullptr; g_requestBody.len = 0; g_requestBody.data[0] = '\0'; }
+    });
+  }
   size_t room = (sizeof(g_requestBody.data) - 1) - g_requestBody.len;
   size_t take = (len < room) ? len : room;
   memcpy(g_requestBody.data + g_requestBody.len, data, take);

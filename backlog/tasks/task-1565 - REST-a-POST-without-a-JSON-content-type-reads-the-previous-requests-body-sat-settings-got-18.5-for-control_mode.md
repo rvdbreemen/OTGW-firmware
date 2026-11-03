@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-02T18:59:00Z'
-updated_date: '2026-11-03T18:22:00Z'
+updated_date: '2026-11-03T18:46:00Z'
 labels:
   - rest-api
   - bug
@@ -25,7 +25,13 @@ Seen on bench .63, 2.0.0-beta.14+4d94f13, 2026-11-02 19:54 (TASK-1542 bench). Re
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduction on the bench or a host harness: a form-encoded POST right after a JSON POST gets the previous body on the old code
-- [ ] #2 Fix: each request sees only its own body; a missing body gives 400 Missing value; host test red on the old code, green on the fix
+- [x] #1 Reproduction on the bench or a host harness: a form-encoded POST right after a JSON POST gets the previous body on the old code
+- [x] #2 Fix: each request sees only its own body; a missing body gives 400 Missing value; host test red on the old code, green on the fix
 - [ ] #3 Bench re-run of the same two curl calls on the fix returns value pwm or 400, never the previous value
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-03 fix (sonnet agent; lead checked the vendored ESPAsyncWebServer: one request per connection, _onDisconnectfn runs in AsyncWebServerRequest::_onDisconnect() just before delete in AsyncWebServer::_handleDisconnect, WebServer.cpp:131; form-urlencoded and key=value text/plain bodies are parsed as params and never reach the body hook, WebRequest.cpp:202-216). Root cause webServerCompat.h webCaptureBody/hasBodyCompat: g_requestBody never released, next request at the freed address passed the owner match. Fix: release on the request's onDisconnect (owner-guarded). test/host/test_rest_body_stale.py --old-rev HEAD: OLD S2 FAIL, FIX all pass, RESULT PASS (lead rerun in the integration tree). Contract unchanged: a form-encoded call now gets 400 Missing value; JSON as documented. Residual: a request destroyed while its client is still connected (destructor nulls the callback) is not covered. Tag beta.58; AC3 bench curl pending in the shared build.
+<!-- SECTION:NOTES:END -->
