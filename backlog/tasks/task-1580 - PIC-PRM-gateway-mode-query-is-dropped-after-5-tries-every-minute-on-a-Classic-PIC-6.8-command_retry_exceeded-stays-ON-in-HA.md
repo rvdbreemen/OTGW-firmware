@@ -3,9 +3,11 @@ id: TASK-1580
 title: >-
   PIC: PR=M (gateway-mode query) is dropped after 5 tries every minute on a
   Classic PIC 6.8; command_retry_exceeded stays ON in HA
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-03T05:02:00Z'
+updated_date: '2026-11-03T05:10:00Z'
 labels:
   - pic
   - bug
@@ -26,3 +28,9 @@ Found 2026-11-03 06:00 on the beta.17 soak unit .63 (Classic + S3 Mini, PIC 6.8,
 - [ ] #2 Fix: a host test on the real checkCommandResponse/queue code red on the old code, green on the fix
 - [ ] #3 Bench: a Classic PIC unit runs 1 h with cmd_dropped not increasing and command_retry_exceeded OFF
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-03 06:15 root cause (lead, read-only telnet + code): .63 runs with satsimulation=true. sendPICSerial() returns early when satSimulationBlocksBusTx() refuses the command (OTGW-Core.ino beta.17 sendPICSerial, ~line 28 of the function), but handleCommandQueue() still does retrycnt++ and after OTGW_CMD_RETRY=5 calls reportCommandDropped(). Telnet: PR=M inserted slot[3] 06:08:09, 'Queue slot [3] due' at 10.8/15.8/20.8/25.8/30.8 s, sat/sim/last_cmd = PR=M (blocked), command_dropped at 06:08:30. SAT's CS/MM/CH are also blocked but SAT replaces them every 5 s, resetting retrycnt, so only PR=M drops. Normal operation (simulation off) is not affected. Release notes known issue corrected accordingly. Fix direction: a command refused by the simulation is removed from the queue without a drop report (sendPICSerial reports blocked).
+<!-- SECTION:NOTES:END -->
