@@ -3,9 +3,11 @@ id: TASK-1585
 title: >-
   SAT cycle classifier: requested setpoint per sample, tail median for the cold
   check, as thermo-nova (entry 245)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-03T06:42:00Z'
+updated_date: '2026-11-03T06:52:00Z'
 labels:
   - sat
 dependencies: []
