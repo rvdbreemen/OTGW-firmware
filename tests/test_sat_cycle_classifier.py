@@ -169,8 +169,9 @@ static int twoCycle() {
   }
   return 0;
 }
-// argv: ctrlSp reqSp onTimeSec idle sim seg...   seg = count:flow:flags:mode:pwmOn[:ctrl]
+// argv: ctrlSp reqSp onTimeSec idle sim seg...   seg = count:flow:flags:mode:pwmOn[:ctrl[:req]]
 // ctrl (TASK-1405) = the control setpoint (fFinalSetpoint) from this segment on; ctrlSp is the one at flame-on.
+// req (TASK-1585) = the PID requested setpoint (_sat_requestedSetpoint) from this segment on (0 = none); reqSp is the one at flame-on.
 int main(int argc, char** argv) {
   if (argc > 1 && strcmp(argv[1], "twocycle") == 0) return twoCycle();
   if (argc < 6) return 2;
@@ -184,11 +185,12 @@ int main(int argc, char** argv) {
   state.sat.fPidOutput = reqSp;
   int first = 1;
   for (int i = 6; i < argc; i++) {
-    unsigned cnt = 0, flags = 0; float flow = 0, segCtrl = 0; int mode = 1, pwmOn = 0;
-    int nf = sscanf(argv[i], "%u:%f:%i:%d:%d:%f", &cnt, &flow, &flags, &mode, &pwmOn, &segCtrl);
-    if (nf != 5 && nf != 6) return 3;
+    unsigned cnt = 0, flags = 0; float flow = 0, segCtrl = 0, segReq = 0; int mode = 1, pwmOn = 0;
+    int nf = sscanf(argv[i], "%u:%f:%i:%d:%d:%f:%f", &cnt, &flow, &flags, &mode, &pwmOn, &segCtrl, &segReq);
+    if (nf != 5 && nf != 6 && nf != 7) return 3;
     if (first) { apply(flow, flags, mode, pwmOn); satCycleOnFlameChange(true); first = 0; }
-    if (nf == 6) state.sat.fFinalSetpoint = segCtrl;
+    if (nf >= 6) state.sat.fFinalSetpoint = segCtrl;
+    if (nf == 7) { _sat_requestedSetpoint = segReq; state.sat.fPidOutput = segReq; }
     for (unsigned k = 0; k < cnt; k++) {
       g_ms += 1000;
       apply(flow, flags, mode, pwmOn);
@@ -259,7 +261,10 @@ def build(wd: Path):
 
 # --- scenarios ------------------------------------------------------------------------------------------
 # seg(count, flow, flags=CH, mode=CONT, pwmOn=0)
-def seg(n, flow, flags=CH, mode=CONT, on=0, ctrl=None):
+def seg(n, flow, flags=CH, mode=CONT, on=0, ctrl=None, req=None):
+    if req is not None:
+        assert ctrl is not None, "a segment with a requested setpoint also states the control setpoint"
+        return (n, flow, flags, mode, on, ctrl, req)
     return (n, flow, flags, mode, on) if ctrl is None else (n, flow, flags, mode, on, ctrl)
 
 
@@ -358,6 +363,35 @@ CASES = {
     # Burn 600 s: warm-up capped at 60 s, the tail is the last 180 s, the warm-up is long gone from the ring.
     "W600_warmup_out": Case([seg(59, 62.0), seg(541, 50.0)], "GOOD"),
     "W600_tail_in": Case([seg(420, 50.0), seg(60, 62.0), seg(120, 50.0)], "OVERSHOOT"),
+    # TASK-1585 (entry 245, Q-PARITY-5 A): the requested setpoint is recorded per tail sample (tracker.py:273-277).
+    # The PWM underheat test uses the p90 of flow - requested per sample (classifier.py:45), the cold check the tail p50
+    # of the requested setpoint (classifier.py:48-49, :81-86). Port-only (oracle=False): the parity test
+    # (test_sat_classifier_parity.py) runs the same shapes against the real tracker.py + classifier.py.
+    # RQ1: requested raised from 50 to 60 for the last 100 s, flow 50: tail errors 0 x80, -10 x100, p90 = 0 -> GOOD
+    # (a snapshot at flame-off gave 50 - 60 = -10 -> UNDERHEAT_PWM).
+    "RQ1_pwm_requested_raised_in_tail": Case([seg(200, 50.0, CH, PWM, 1, 50.0, 50.0), seg(100, 50.0, CH, PWM, 1, 50.0, 60.0)],
+                                             "GOOD", on_time=300, oracle=False),
+    # RQ2: requested missing (0) for the last 100 s: those seconds are left out, the rest has error 0 -> GOOD
+    # (a snapshot at flame-off read 0 and called the percentiles missing -> UNCERTAIN).
+    "RQ2_pwm_requested_missing_last_third": Case([seg(200, 50.0, CH, PWM, 1, 50.0, 50.0), seg(100, 50.0, CH, PWM, 1, 50.0, 0.0)],
+                                                 "GOOD", on_time=300, oracle=False),
+    # RQ3: continuous underheat (flow 45 under control 50), requested 50 until the last 50 s then 20: tail p50 = 50 >= cold
+    # -> UNDERHEAT (a snapshot gave 20 < 28.2 -> UNCERTAIN).
+    "RQ3_cold_check_uses_tail_p50_not_last": Case([seg(250, 45.0, CH, CONT, 0, 50.0, 50.0), seg(50, 45.0, CH, CONT, 0, 50.0, 20.0)],
+                                                  "UNDERHEAT", oracle=False),
+    # RQ4: the mirror: requested 20 for 100 of the 180 tail seconds, 50 at the end: tail p50 = 20 < cold -> UNCERTAIN
+    # (a snapshot gave 50 -> UNDERHEAT).
+    "RQ4_cold_check_low_p50_high_last": Case([seg(120, 45.0, CH, CONT, 0, 50.0, 50.0), seg(100, 45.0, CH, CONT, 0, 50.0, 20.0),
+                                              seg(80, 45.0, CH, CONT, 0, 50.0, 50.0)], "UNCERTAIN", oracle=False),
+    # RQ5: no tail second has a requested setpoint: the cold check falls back to the control setpoint at flame-on
+    # (the port's fallback; thermo-nova's device_state.setpoint is the refuted Q-PARITY-6). 40 >= cold -> UNDERHEAT, 20 -> UNCERTAIN.
+    "RQ5_fallback_control_sp_warm": Case([seg(300, 30.0)], "UNDERHEAT", ctrl=40.0, req=0.0, oracle=False),
+    "RQ5_fallback_control_sp_cold": Case([seg(300, 10.0)], "UNCERTAIN", ctrl=20.0, req=0.0, oracle=False),
+    # RQ6: warm-up alignment (TASK-1584 trim): 120 s burn, the first 29 samples (warm-up 30 s) have requested 10 (error +40),
+    # the 91 tail samples requested 50 with flow 46 (error -4). Trimmed tail: p90 = -4 -> UNDERHEAT_PWM; with the warm-up in,
+    # p90 would be +40 -> GOOD.
+    "RQ6_warmup_excluded_from_requested_error": Case([seg(29, 50.0, CH, PWM, 1, 50.0, 10.0), seg(91, 46.0, CH, PWM, 1, 50.0, 50.0)],
+                                                     "UNDERHEAT_PWM", on_time=300, oracle=False),
     "kind_mixed": Case([seg(45, 50.0, DHW), seg(45, 50.0, CH), seg(210, 50.0, NONE)], None, kind="MIXED", oracle=False),
 }
 
@@ -377,7 +411,8 @@ class CycleClassifier(unittest.TestCase):
             self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
         c = CASES[name]
         args = [str(self.exe), repr(c.ctrl), repr(c.req), repr(float(c.on_time)), "1" if c.idle else "0", "1" if c.sim else "0"]
-        args += [("%d:%r:0x%X:%d:%d" % s[:5]) + ("" if len(s) < 6 else ":%r" % s[5]) for s in c.segs]
+        args += [("%d:%r:0x%X:%d:%d" % s[:5]) + ("" if len(s) < 6 else ":%r" % s[5]) + ("" if len(s) < 7 else ":%r" % s[6])
+                 for s in c.segs]
         r = subprocess.run(args, capture_output=True, text=True, timeout=20)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr[-300:])
         m = re.match(r"cls=(\d+) kind=(\d+)", r.stdout)
@@ -489,6 +524,20 @@ class CycleClassifier(unittest.TestCase):
                      "W240_warmup_out", "W240_from_warmup_in", "W600_warmup_out", "W600_tail_in"):
             with self.subTest(name):
                 self.check(name)
+
+    def test_task1585_requested_setpoint_is_recorded_per_tail_sample(self):
+        for name in ("RQ1_pwm_requested_raised_in_tail", "RQ2_pwm_requested_missing_last_third",
+                     "RQ3_cold_check_uses_tail_p50_not_last", "RQ4_cold_check_low_p50_high_last",
+                     "RQ5_fallback_control_sp_warm", "RQ5_fallback_control_sp_cold",
+                     "RQ6_warmup_excluded_from_requested_error"):
+            with self.subTest(name):
+                self.check(name)
+
+    def test_task1585_requested_setpoint_ring_costs_two_bytes_per_sample(self):
+        src = CYCLES_INO.read_text(encoding="utf-8")
+        if "_tail_reqSp" not in src:
+            self.skipTest("no per-sample requested setpoint ring in this copy")
+        self.assertRegex(src, r"static int16_t\s+_tail_reqSp\[SAT_TAIL_SAMPLE_SIZE\];")
 
     def test_task1405_tail_buffer_costs_two_bytes_per_sample(self):
         # static RAM of the per-sample control error ring: SAT_TAIL_SAMPLE_SIZE x int16

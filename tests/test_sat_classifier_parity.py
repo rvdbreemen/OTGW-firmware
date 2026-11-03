@@ -26,6 +26,7 @@ Two configurations, because the port has decided deviations built in:
             OVERSHOOT_MARGIN_CELSIUS and COLD_SETPOINT of classifier.py are set to those values for the run and restored
             (the only change to the loaded code; no file is modified)
 
+Q-PARITY-3 (entry 244, TASK-1584) and Q-PARITY-5 (entry 245, TASK-1585) are implemented and have no difference left.
 Every verdict difference between the two sides must appear in DIFFERENCES with its classification:
   (a) already a RECORDED deviation: a decision of Sergeant D in docs/sat/sergeant-d-corrections.md (entry number given);
   (b) UNRECORDED: not decided by him; listed as an open question (Q-PARITY-n); behaviour is not changed here.
@@ -367,8 +368,8 @@ static void applyTick(float flow, unsigned flags, int mode, int on) {
 // argv: sizes | margin cold scenario-file ; scenario line: t flame flow|nan flags mode on ctrl req idle onTimeSec
 int main(int argc, char** argv) {
   if (argc > 1 && strcmp(argv[1], "sizes") == 0) {
-    printf("SAT_TAIL_SAMPLE_SIZE=%d tail_samples=%zu tail_ctrlErr=%zu flow_samples=%zu\n", (int)SAT_TAIL_SAMPLE_SIZE,
-           sizeof(_tail_samples), sizeof(_tail_ctrlErr), sizeof(_flow_samples));
+    printf("SAT_TAIL_SAMPLE_SIZE=%d tail_samples=%zu tail_ctrlErr=%zu tail_reqSp=%zu flow_samples=%zu\n", (int)SAT_TAIL_SAMPLE_SIZE,
+           sizeof(_tail_samples), sizeof(_tail_ctrlErr), sizeof(_tail_reqSp), sizeof(_flow_samples));
     return 0;
   }
   if (argc < 4) return 2;
@@ -459,8 +460,6 @@ def run_port(sc, cfg):
 W = "tracker.py:113-116 (warm-up min(60, 0.25 x duration), tail_start = max(.., end - 180)), :235-241 (tail = samples with timestamp >= tail_start)"
 INTERP_UP = "helpers.py:187-203 percentile_interpolated, used by tracker.py:252-254"
 INTERP_PORT = "SATcycles.ino:633 and :662 (index = pct x (n-1) / 100, integer floor, no interpolation)"
-REQ_UP = "tracker.py:273-277, :249-250 (flow - requested_setpoint per sample; samples without one are left out)"
-REQ_PORT = "SATcycles.ino:918 (requestedSp = _sat_requestedSetpoint at flame-off), :790, :798 (tailP90 - requestedSp)"
 QUANT_PORT = "SATcycles.ino:1019-1022 (error stored as int16 hundredths, lroundf), :662"
 MIN3_UP = "tracker.py:96-100 (fewer than 3 samples: no Cycle is built or emitted)"
 
@@ -490,13 +489,8 @@ diff("underheat_boundary_cont_above_0004", BOTH, "b", "GOOD", "UNDERHEAT", "erro
 # Q-PARITY-4 count-based tail
 diff("sample_gap_in_tail", BOTH, "b", "GOOD", "OVERSHOOT", "after a 100 s gap the port's ring still holds the 130 samples before it; thermo-nova's tail is the last 180 s only",
      W, "SATcycles.ino:104-115, :1009-1030 (ring of the last 180 samples, not the last 180 s)", "Q-PARITY-4")
-# Q-PARITY-5 requested setpoint per sample
-diff("requested_raised_inside_tail_pwm", BOTH, "b", "GOOD", "UNDERHEAT_PWM", "requested 50 for 80 tail samples, 60 for 100: per sample p90 error 0; the port subtracts the last value 60",
-     REQ_UP, REQ_PORT, "Q-PARITY-5")
-diff("requested_missing_last_third_pwm", BOTH, "b", "GOOD", "UNCERTAIN", "requested missing for the last 100 s: thermo-nova leaves those samples out; the port reads 0 at flame-off and calls the percentiles missing",
-     REQ_UP, "SATcycles.ino:918, :790 (requestedSp <= 0 = missing)", "Q-PARITY-5")
-diff("requested_lowered_below_cold_continuous", BOTH, "b", "UNDERHEAT", "UNCERTAIN", "effective setpoint is the p50 of the per-sample requested setpoints (50); the port uses the value at flame-off (20, below cold)",
-     "classifier.py:81-86 (tail_metrics.requested_setpoint.p50 against COLD_SETPOINT), tracker.py:279-283", "SATcycles.ino:813-816 (effSp = requestedSp at flame-off)", "Q-PARITY-5")
+# Q-PARITY-5 requested setpoint per sample: decided (entry 245, A), implemented by _tail_reqSp / _tailReqMetrics()
+# (TASK-1585): no difference left.
 # Q-PARITY-6 fallback setpoint
 diff("device_setpoint_fallback_cold", BOTH, "b", "UNCERTAIN", "UNDERHEAT", "requested missing: thermo-nova falls back to device_state.setpoint at the end (20); the port to the control setpoint at flame-on (30)",
      "classifier.py:81-85 (device_state.setpoint of the flame-off sample)", "SATcycles.ino:814 (controlSp = _cycle_setpointAtStart, set at flame-on :842)", "Q-PARITY-6")
@@ -507,9 +501,8 @@ diff("three_second_cycle", BOTH, "b", "GOOD", "INSUFFICIENT", "3 seconds of flam
      MIN3_UP + "; tracker.py:71-72", "SATcycles.ino:774 (sampleCount < 3), :869, :1009", "Q-PARITY-7")
 diff("two_second_cycle", BOTH, "b", "DROPPED", "INSUFFICIENT", "thermo-nova emits no Cycle (not counted in any window); the port records an INSUFFICIENT cycle",
      MIN3_UP, "SATcycles.ino:774 (INSUFFICIENT), :687-710 (_cycleRecord stores it)", "Q-PARITY-8")
-# Q-PARITY-9 non-finite flow in the tail ring
-diff("flow_missing_pwm_underheat", BOTH, "b", "UNDERHEAT_PWM", "GOOD", "50 of 180 tail flows missing: thermo-nova leaves them out (p90 error -4); the port sorts NaN into the float tail ring and tailP90 becomes NaN",
-     "tracker.py:243-250 (None values skipped), :273-277", "SATcycles.ino:1017 (NaN stored in _tail_samples), :612-636 (_tailPercentile sorts it), :1019-1022 (only the control error ring skips it)", "Q-PARITY-9")
+# Q-PARITY-9 non-finite flow in the tail ring: its one observed scenario (flow_missing_pwm_underheat) agrees since TASK-1585,
+# because the PWM requested-setpoint error percentile skips a non-finite flow (_tailReqMetrics()). Not decided by Sergeant D.
 # Q-PARITY-11 stand-ins
 diff("control_zero_value", BOTH, "b", "OVERSHOOT", "UNCERTAIN", "a control setpoint of 0.0 is a value upstream (error +50); the port reads fFinalSetpoint <= 0 as missing",
      "tracker.py:267-271 (None only), heating_control.py:89, :233 (the control setpoint is a float, MINIMUM_SETPOINT when idle)", "SATcycles.ino:1019-1022 (sp > 0 required)", "Q-PARITY-11")
@@ -609,7 +602,9 @@ class TestParity(Base):
                      "underheat_cold_setpoint", "cs_change_before_tail", "cs_change_inside_tail", "cs_lowered_inside_tail",
                      "mode_cont_to_pwm_good", "mode_cont_to_pwm_underheat", "mode_pwm_to_cont_overshoot", "control_missing_all",
                      "warmup_dhw_out", "warmup_dhw_in", "dhw_exactly_at_tail_start", "dhw_just_before_tail_start", "dhw_only_cycle",
-                     "kind_unknown", "pwm_idle_at_end", "warmup_high_flow_short_cycle"):
+                     "kind_unknown", "pwm_idle_at_end", "warmup_high_flow_short_cycle",
+                     "requested_raised_inside_tail_pwm", "requested_missing_last_third_pwm",
+                     "requested_lowered_below_cold_continuous", "requested_missing_all_pwm", "flow_missing_pwm_underheat"):
             for cfg in ("parity", "firmware"):
                 u, p = obs[(name, cfg)]
                 with self.subTest(name=name, cfg=cfg):
@@ -643,16 +638,16 @@ AC2 = [
     ("per-sample control setpoint (entry 36, TASK-1405)", "recorded and implemented: no difference",
      ["cs_change_before_tail", "cs_change_inside_tail", "cs_lowered_inside_tail", "mode_and_cs_change"], None,
      "tracker.py:267-271", "SATcycles.ino:1019-1022"),
-    ("per-sample requested setpoint", "difference, Q-PARITY-5",
-     ["requested_raised_inside_tail_pwm", "requested_missing_last_third_pwm", "requested_lowered_below_cold_continuous"], "Q-PARITY-5",
-     "tracker.py:273-277", "SATcycles.ino:918, :790"),
+    ("per-sample requested setpoint", "recorded and implemented: no difference (entry 245, TASK-1585)",
+     ["requested_raised_inside_tail_pwm", "requested_missing_last_third_pwm", "requested_lowered_below_cold_continuous"], None,
+     "tracker.py:273-277, classifier.py:45, :81-86", "SATcycles.ino _tail_reqSp, _tailReqMetrics()"),
     ("warm-up exclusion", "recorded and implemented: no difference (entry 244, TASK-1584; the DHW-in-tail test had it before)",
      ["warmup_high_flow_short_cycle", "warmup_dhw_out", "warmup_dhw_in"], None, "tracker.py:113-116, :237-241", "SATcycles.ino _tailTrimWarmup(), :925-927 (DHW)"),
     ("percentile interpolation", "difference, Q-PARITY-1",
      ["interp_p90_over_margin3", "interp_p90_over_margin2", "interp_p50_underheat"], "Q-PARITY-1", "helpers.py:187-203", "SATcycles.ino:633, :662"),
-    ("missing-data treatment", "differences, Q-PARITY-5 / 6 / 9 / 11; control missing for the whole burn: no difference",
+    ("missing-data treatment", "differences, Q-PARITY-6 / 11; the requested-setpoint and flow cases agree since TASK-1585",
      ["control_missing_all", "control_missing_part_of_tail", "flow_missing_continuous", "flow_missing_pwm_underheat", "control_zero_value",
-      "device_setpoint_fallback_cold"], "Q-PARITY-9", "tracker.py:243-250, classifier.py:42-43, :71-72", "SATcycles.ino:790, :1017-1022"),
+      "device_setpoint_fallback_cold"], "Q-PARITY-11", "tracker.py:243-250, classifier.py:42-43, :71-72", "SATcycles.ino _tailReqMetrics(), :1017-1022"),
     ("boundary margin", "exact margin agrees (>=, entry 37); 0.004 either side differs, Q-PARITY-2",
      ["overshoot_boundary_parity_exact", "overshoot_boundary_firmware_exact", "overshoot_boundary_parity_below_0004",
       "overshoot_boundary_firmware_below_0004", "underheat_boundary_cont_exact", "underheat_boundary_cont_above_0004",
@@ -685,7 +680,7 @@ class TestAc2Inventory(Base):
 class TestRam(Base):
     def test_tail_sample_buffer_cost_is_counted_from_the_real_declarations(self):
         """AC3 (static part): bytes of the port's tail buffers, compiled from the real declarations (float tail ring 4 B,
-        int16 control-error ring 2 B, 180 slots); the on-device measurement is the bench part."""
+        int16 control-error ring 2 B, int16 requested-setpoint ring 2 B, 180 slots); the on-device measurement is the bench part."""
         exe = port_exe()
         out = subprocess.run([str(exe), "sizes"], capture_output=True, text=True).stdout
         v = dict(tok.split("=") for tok in out.split())
@@ -695,11 +690,11 @@ class TestRam(Base):
         self.assertEqual(int(v["SAT_TAIL_SAMPLE_SIZE"]), 180)
         self.assertEqual(int(v["tail_samples"]), 180 * 4)       # float
         self.assertEqual(int(v["tail_ctrlErr"]), 180 * 2)       # int16_t hundredths
+        self.assertEqual(int(v["tail_reqSp"]), 180 * 2)         # int16_t hundredths (TASK-1585, entry 245)
         self.assertEqual(int(v["flow_samples"]), 256 * 4)       # per-cycle flow ring (SAT_FLOW_SAMPLE_SIZE = 256), not a tail buffer
-        tail_total = int(v["tail_samples"]) + int(v["tail_ctrlErr"])
-        self.assertEqual(tail_total, 1080)
+        tail_total = int(v["tail_samples"]) + int(v["tail_ctrlErr"]) + int(v["tail_reqSp"])
+        self.assertEqual(tail_total, 1440)
         # Estimates for closing deviations (arithmetic from the same element sizes, not measurements):
-        #   per-sample requested setpoint as int16 hundredths: + 180 x 2 B = 360 B (tail would be 1440 B);
         #   per-sample timestamp so the tail is time based (gaps): + 180 x 4 B = 720 B (uint32) or 360 B (uint16 seconds).
         self.assertEqual(180 * 2, 360)
 

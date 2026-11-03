@@ -113,6 +113,12 @@ static uint32_t _tail_lastSampleMs = 0;
 // of the percentile, tracker.py:243-250).
 static const int16_t SAT_TAIL_CTRL_ERR_NONE = INT16_MIN;
 static int16_t  _tail_ctrlErr[SAT_TAIL_SAMPLE_SIZE];
+// PID requested setpoint per tail sample (TASK-1585, entry 245, Q-PARITY-5 A), same index as _tail_samples[]:
+// _sat_requestedSetpoint at that second, as thermo-nova's sample.requested_setpoint (cycles/tracker.py:
+// 273-277, :279-283). int16 hundredths of a degree, 2 bytes per sample (180 slots = 360 B, static);
+// SAT_TAIL_CTRL_ERR_NONE marks a second without a requested setpoint (value <= 0; thermo-nova: None,
+// left out of the percentile, tracker.py:243-250).
+static int16_t  _tail_reqSp[SAT_TAIL_SAMPLE_SIZE];
 
 // --- Current Cycle State ---
 static bool     _cycle_flameOn          = false;
@@ -298,6 +304,7 @@ void satCycleInit()
   // Tail ring buffer (180s window)
   memset(_tail_samples, 0, sizeof(_tail_samples));
   memset(_tail_ctrlErr, 0, sizeof(_tail_ctrlErr));
+  memset(_tail_reqSp, 0, sizeof(_tail_reqSp));
   _tail_sampleHead  = 0;
   _tail_sampleCount = 0;
   _tail_lastSampleMs = 0;
@@ -684,6 +691,47 @@ static bool _tailCtrlErrPercentiles(float &p50, float &p90)
   return true;
 }
 
+//=== Requested-setpoint metrics over the tail (TASK-1585, entry 245, Q-PARITY-5 A) ===
+// thermo-nova builds both from the per-sample requested setpoint (tracker.py:273-277, :279-283):
+//   spP50  = p50 of the requested setpoints (classifier.py:81-86, the effective setpoint of the cold check);
+//   errP90 = p90 of flow - requested setpoint (classifier.py:45, the PWM underheat test).
+// Seconds without a requested setpoint are left out of both; a non-finite flow is left out of errP90 only
+// (the setpoint percentile does not need the flow). Percentiles use the lower neighbour, as
+// _tailCtrlErrPercentiles(). spKnown / errKnown are false for "p50 / p90 missing" (thermo-nova: None).
+static void _tailReqMetrics(bool &spKnown, float &spP50, bool &errKnown, float &errP90)
+{
+  spKnown = false; errKnown = false; spP50 = 0.0f; errP90 = 0.0f;
+  float errs[SAT_TAIL_SAMPLE_SIZE];
+  int16_t sps[SAT_TAIL_SAMPLE_SIZE];
+  uint16_t ns = 0, ne = 0;
+  for (uint16_t i = 0; i < _tail_sampleCount; i++) {
+    uint16_t src = (_tail_sampleHead + SAT_TAIL_SAMPLE_SIZE - _tail_sampleCount + i) % SAT_TAIL_SAMPLE_SIZE;
+    if (_tail_reqSp[src] == SAT_TAIL_CTRL_ERR_NONE) continue;
+    sps[ns++] = _tail_reqSp[src];
+    if (isfinite(_tail_samples[src])) errs[ne++] = _tail_samples[src] - (float)_tail_reqSp[src] / 100.0f;
+  }
+  if (ns == 0) return;
+
+  for (uint16_t i = 1; i < ns; i++) {
+    int16_t key = sps[i];
+    int16_t j = (int16_t)i - 1;
+    while (j >= 0 && sps[j] > key) { sps[j + 1] = sps[j]; j--; }
+    sps[j + 1] = key;
+  }
+  spP50 = (float)sps[(uint32_t)50 * (ns - 1) / 100] / 100.0f;
+  spKnown = true;
+  if (ne == 0) return;
+
+  for (uint16_t i = 1; i < ne; i++) {
+    float key = errs[i];
+    int16_t j = (int16_t)i - 1;
+    while (j >= 0 && errs[j] > key) { errs[j + 1] = errs[j]; j--; }
+    errs[j + 1] = key;
+  }
+  errP90 = errs[(uint32_t)90 * (ne - 1) / 100];
+  errKnown = true;
+}
+
 //=== Cycle kind (TASK-1387): thermo-nova cycles/tracker.py:101-108 and _determine_cycle_kind :314-324 ===
 // Inputs are counted at 1 Hz in satCycleSample():
 //   DHW = slave DHW-mode bit, Statusflags bit 2 (device_state.hot_water_active,
@@ -768,15 +816,17 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
 //   - overshoot margin settings.sat.fOvershootMargin (2.0, `>=`, entries 15 and 37), not
 //     OVERSHOOT_MARGIN_CELSIUS 3.0 (cycles/const.py:10);
 //   - PWM underheat is labelled SAT_CYCLE_UNDERHEAT_PWM, continuous underheat SAT_CYCLE_UNDERHEAT;
-//   - a missing percentile (thermo-nova: p50/p90 None) has this stand-in for the requested-setpoint
-//     error: requestedSp <= 0 (cls:42-43); the control-setpoint error is missing when no tail second
-//     has a control setpoint (cls:71-72);
+//   - a missing percentile (thermo-nova: p50/p90 None): the requested-setpoint metrics are missing when no
+//     tail second has a requested setpoint (value <= 0, cls:42-43); the control-setpoint error is missing
+//     when no tail second has a control setpoint (cls:71-72);
 //   - the control-setpoint error comes per sample from the tail ring (_tail_ctrlErr, TASK-1405,
 //     entry 36; tracker.py:267-271), as ctrlErrP50/ctrlErrP90 with ctrlErrKnown = false for "p50/p90
-//     missing". The requested setpoint is still one value per cycle (requestedSp = _sat_requestedSetpoint
-//     at flame-off, so percentile(flow - sp) = tailPxx - sp); the per-sample requested setpoint is
-//     not ported. controlSp (state.sat.fFinalSetpoint at flame-on) is only the continuous
-//     underheat fallback when no requested setpoint exists (cls:81-83);
+//     missing". The requested setpoint is per sample too (_tail_reqSp, TASK-1585, entry 245,
+//     Q-PARITY-5 A; tracker.py:273-277): errP90 = p90 of flow - requested setpoint (cls:45) and the
+//     effective setpoint of the cold check is the p50 of the requested setpoints (cls:48-49, :81-86),
+//     both from _tailReqMetrics(). controlSp (state.sat.fFinalSetpoint at flame-on) is only the
+//     continuous underheat fallback when no tail second has a requested setpoint (cls:81-83);
+//     thermo-nova's own fallback, device_state.setpoint at flame-off, is not ported (Q-PARITY-6, refuted);
 //   - fewer than 3 samples is recorded as INSUFFICIENT; tracker.py:98-100 drops such a cycle;
 //   - pwmIdle comes from satPwmIsIdle(), an approximation of pwm.py's IDLE status;
 //   - the tail percentiles come from the last 180 s ring with tracker.py's warm-up exclusion
@@ -789,7 +839,8 @@ static SATCycleClass _cycleClassify(float durationSec, uint32_t sampleCount, SAT
                                     bool dhwInTail, bool pwmEnabled, bool pwmIdle, bool pwmOn,
                                     float onTimeSec, float tailP90, float tailP50,
                                     bool ctrlErrKnown, float ctrlErrP50, float ctrlErrP90,
-                                    float controlSp, float requestedSp)
+                                    float controlSp, bool reqSpKnown, float reqSpP50,
+                                    bool reqErrKnown, float reqErrP90)
 {
   // cls:19-20 (and the firmware's < 3 samples, see above)
   if (durationSec <= 0.0f || sampleCount < 3) return SAT_CYCLE_INSUFFICIENT;
@@ -807,13 +858,14 @@ static SATCycleClass _cycleClassify(float durationSec, uint32_t sampleCount, SAT
 
   // cls:31-32 -> _classify_pwm, cls:40-66
   if (pwmEnabled) {
-    // cls:42-43: flow_requested_setpoint_error p50/p90 missing
-    if (requestedSp <= 0.0f) return SAT_CYCLE_UNCERTAIN;
+    // cls:42-43: flow_requested_setpoint_error p50/p90 missing (a tail with no requested setpoint, or no
+    // finite flow beside one)
+    if (!reqErrKnown) return SAT_CYCLE_UNCERTAIN;
     // cls:45: p90 of the requested-setpoint error <= UNDERSHOOT_MARGIN_CELSIUS (-3.0)
-    const float reqErrP90 = tailP90 - requestedSp;
     if (reqErrP90 <= -SAT_UNDERSHOOT_MARGIN_C) {
-      // cls:48-49: the effective setpoint is the requested setpoint (never missing past cls:42-43 here)
-      if (requestedSp < coldSp) return SAT_CYCLE_UNCERTAIN;  // cls:51-52
+      // cls:48-49: the effective setpoint is the tail p50 of the requested setpoint (known whenever
+      // reqErrKnown is: an error sample needs a requested setpoint)
+      if (reqSpP50 < coldSp) return SAT_CYCLE_UNCERTAIN;     // cls:51-52
       return SAT_CYCLE_UNDERHEAT_PWM;                        // cls:54
     }
     // cls:56-64: the short-cycle test only while the PWM ON phase runs at cycle end
@@ -831,8 +883,8 @@ static SATCycleClass _cycleClassify(float durationSec, uint32_t sampleCount, SAT
   if (ctrlErrP90 >= settings.sat.fOvershootMargin) return SAT_CYCLE_OVERSHOOT;
   // cls:75, 80-88
   if (ctrlErrP50 <= -SAT_UNDERSHOOT_MARGIN_C) {
-    // cls:81-83: requested setpoint, else the device setpoint (the control setpoint)
-    const float effSp = (requestedSp > 0.0f) ? requestedSp : controlSp;
+    // cls:81-83: tail p50 of the requested setpoint, else the device setpoint (the control setpoint at flame-on)
+    const float effSp = reqSpKnown ? reqSpP50 : controlSp;
     if (effSp < coldSp) return SAT_CYCLE_UNCERTAIN;   // cls:85-86
     return SAT_CYCLE_UNDERHEAT;                       // cls:88
   }
@@ -885,6 +937,7 @@ void satCycleOnFlameChange(bool flameOn)
     // Reset tail ring buffer (Task #590: 180s end-of-cycle window)
     memset(_tail_samples, 0, sizeof(_tail_samples));
     memset(_tail_ctrlErr, 0, sizeof(_tail_ctrlErr));
+    memset(_tail_reqSp, 0, sizeof(_tail_reqSp));
     _tail_sampleHead  = 0;
     _tail_sampleCount = 0;
     _tail_lastSampleMs = now;
@@ -933,11 +986,14 @@ void satCycleOnFlameChange(bool flameOn)
     float tailP50 = (_tail_sampleCount >= 10) ? _tailPercentile(50) : (p90 + p10) * 0.5f;
     SATTraceTf(PSTR("SAT cycle classify: fullP90=%.1f tailP90=%.1f tailP50=%.1f tailP10=%.1f tailN=%u\r\n"),
                p90, tailP90, tailP50, tailP10, (unsigned)_tail_sampleCount);
-    // Classifier inputs (TASK-1387, cycles/classifier.py). Snapshot the PID requested setpoint at
-    // flame-off (it drifts across a multi-minute cycle). pwm_state at cycle end: enabled = PWM mode,
+    // Classifier inputs (TASK-1387, cycles/classifier.py). The PID requested setpoint comes from the tail
+    // ring per sample (TASK-1585; it drifts across a multi-minute cycle). pwm_state at cycle end: enabled = PWM mode,
     // status IDLE = satPwmIsIdle(), ON = the PWM ON phase (bPwmFlameRequested), on_time_seconds =
     // the last PWM on-time.
-    float requestedSp = _sat_requestedSetpoint;   // includes the solar offset, as thermo-nova requested_setpoint (TASK-1323)
+    // _sat_requestedSetpoint includes the solar offset, as thermo-nova requested_setpoint (TASK-1323)
+    bool  reqSpKnown = false, reqErrKnown = false;
+    float reqSpP50 = 0.0f, reqErrP90 = 0.0f;
+    _tailReqMetrics(reqSpKnown, reqSpP50, reqErrKnown, reqErrP90);
     bool  pwmEnabled  = (state.sat.eControlMode == SAT_MODE_PWM);
     float onTimeSec   = (float)satPwmLastOnTimeMs() / 1000.0f;
     // hot_water_active_fraction > 0 over the tail (tracker.py:294-296). The tail is every sample at or
@@ -953,11 +1009,11 @@ void satCycleOnFlameChange(bool flameOn)
                                        dhwInTail, pwmEnabled, satPwmIsIdle(),
                                        state.sat.bPwmFlameRequested, onTimeSec,
                                        tailP90, tailP50, ctrlErrKnown, ctrlErrP50, ctrlErrP90,
-                                       _cycle_setpointAtStart, requestedSp);
+                                       _cycle_setpointAtStart, reqSpKnown, reqSpP50, reqErrKnown, reqErrP90);
     _cycleRecord(cls, durationSec, _cycle_maxFlowTemp, _cycle_overshootSec);
 
     // Expose the 2nd error metric (AC#1) + shape metrics (AC#4) for state/JSON.
-    state.sat.fCycleReqSetpointError         = tailP90 - requestedSp;
+    state.sat.fCycleReqSetpointError         = reqErrKnown ? reqErrP90 : 0.0f;
     state.sat.fCycleTimeInBandSec            = _cycle_timeInBandSec;
     state.sat.fCycleTotalOvershootSec        = _cycle_totalOvershootSec;
     state.sat.fCycleTimeToFirstOvershoot     = _cycle_timeToFirstOvershootSec;
@@ -1041,6 +1097,13 @@ void satCycleSample()
       const float sp = state.sat.fFinalSetpoint;
       _tail_ctrlErr[_tail_sampleHead] = (sp > 0.0f && isfinite(flowTemp))
           ? (int16_t)lroundf(fmaxf(-300.0f, fminf(300.0f, flowTemp - sp)) * 100.0f)
+          : SAT_TAIL_CTRL_ERR_NONE;
+    }
+    {
+      // Per-sample requested setpoint (TASK-1585); <= 0 or non-finite = no requested setpoint (thermo-nova None).
+      const float rq = _sat_requestedSetpoint;
+      _tail_reqSp[_tail_sampleHead] = (rq > 0.0f && isfinite(rq))
+          ? (int16_t)lroundf(fminf(rq, 300.0f) * 100.0f)
           : SAT_TAIL_CTRL_ERR_NONE;
     }
     _tail_sampleHead = (_tail_sampleHead + 1) % SAT_TAIL_SAMPLE_SIZE;

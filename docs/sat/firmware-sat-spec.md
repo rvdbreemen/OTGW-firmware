@@ -2278,10 +2278,11 @@ The fractions shown are `dhw/n` and `ch/n` (SATcycles.ino:607-609); they need no
 ```
 ctrlErrP90 = tailP90 - controlSp          # controlSp = fFinalSetpoint at flame-on
 ctrlErrP50 = tailP50 - controlSp
-reqErrP90  = tailP90 - requestedSp        # requestedSp = _sat_requestedSetpoint at flame-off
-fCycleReqSetpointError = tailP90 - requestedSp
+reqErrP90  = p90 over the tail seconds of (flow - requested setpoint)   # per sample, _tail_reqSp
+reqSpP50   = p50 over the tail seconds of the requested setpoint         # effective setpoint of the cold check
+fCycleReqSetpointError = reqErrP90 (0 when missing)
 ```
-The error percentiles are flow percentiles shifted by a setpoint that is constant for the cycle.
+The control-setpoint errors are flow percentiles shifted by a setpoint that is constant for the cycle (`controlSp`, plus the per-sample control-setpoint ring). The requested setpoint is recorded per tail sample (TASK-1585, Sergeant D entry 245, Q-PARITY-5 A), as thermo-nova does (`cycles/tracker.py:273-277`, `:279-283`; `classifier.py:45`, `:48-49`, `:81-86`): `_tail_reqSp` is an `int16` ring of hundredths of a degree beside the tail flow ring, 180 slots = 360 B static, same indices, so the warm-up trim (TASK-1584) applies to it. A second with `_sat_requestedSetpoint <= 0` has no requested setpoint and is left out of both percentiles; a non-finite flow is left out of `reqErrP90` only. Percentiles use the lower neighbour, as the control-error ring does. PWM underheat uses `reqErrP90 <= -3` and then the cold check against `reqSpP50`; `reqErrP90` missing (no second with a requested setpoint and a finite flow) gives `UNCERTAIN`. The continuous underheat cold check uses `reqSpP50` too; when no tail second has a requested setpoint it falls back to `controlSp`, the control setpoint at flame-on (thermo-nova's fallback `device_state.setpoint` is the refuted Q-PARITY-6 and is not ported).
 
 **Percentiles** (SATcycles.ino:481-508, SATcycles.ino:514-538), no interpolation:
 ```
