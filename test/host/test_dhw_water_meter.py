@@ -153,7 +153,7 @@ DISC_MUTANTS = [
     ("M27", "MQTT-enabled check removed from publishDHWWaterMeter()", "gen_disc_mqtt.inc",
      [(PUBLISH_GATES, "  if (!dhwWaterMeterHasData()) return;\n")], "D9", ["D7"]),
     ("M6", "MQTT_HA_SENSOR_COUNT left at 389", "gen_disc_table.inc",
-     [("const uint16_t MQTT_HA_SENSOR_COUNT = 400;", "const uint16_t MQTT_HA_SENSOR_COUNT = 399;")], "D1", []),   # 400 since TASK-1490
+     [("const uint16_t MQTT_HA_SENSOR_COUNT = 399;", "const uint16_t MQTT_HA_SENSOR_COUNT = 398;")], "D1", []),   # 399 since TASK-1462
     ("M11", "publisher formats with dtostrf into msg[24] (the pre-fixup code)", "gen_disc_mqtt.inc",
      [('snprintf_P(msg, sizeof(msg), PSTR("%.1f"), dhwWaterTotalL);', "dtostrf(dhwWaterTotalL, 0, 1, msg);")],
      "D11", ["D7", "D10"], True),

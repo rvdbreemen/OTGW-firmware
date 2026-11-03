@@ -153,6 +153,7 @@ enum class HaDeviceClass : uint8_t {
     volume_flow_rate,   // "volume_flow_rate" (a rate, e.g. l/min — not "water",
                         // which HA reserves for a cumulative volume in L/m3/gal)
     water,              // "water": a cumulative volume, e.g. dhw_water_total in L (TASK-1123)
+    signal_strength,    // "signal_strength": BLE sensor RSSI in dBm (TASK-1462)
     _count
 };
 
@@ -183,6 +184,7 @@ enum class HaUnit : uint8_t {
     m3_h,               // "m³/h" (gas consumption rate, sat/consumption; TASK-1506)
     cm,                 // "cm" (snowfall: Open-Meteo reports it in centimetres; TASK-1464)
     bar_h,              // "bar/h" (sat/pressure_drop_rate; TASK-1490)
+    dBm,                // "dBm" (sat/ble_sensor_rssi; TASK-1462)
     _count
 };
 

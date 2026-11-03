@@ -1326,10 +1326,9 @@ Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-aud
 
 | State topic | Unit | Notes |
 |-------------|------|-------|
-| `sat/ble_sensor_rssi` | - | BLE RSSI (dBm value, no unit in discovery) |
+| `sat/ble_sensor_rssi` | dBm | BLE RSSI; device_class `signal_strength`, state_class `measurement` (TASK-1462) |
 | `sat/ble_battery` | % | BLE battery |
 | `sat/ble_sensor_count` | - | BLE sensors seen |
-| `sat/ble_temp_valid` | - | Announced as a sensor, not a binary sensor |
 | `sat/ch_pressure_status` | - | `ok` / `low` / `high` |
 
 **Sensor entities, flame status and state (ID 254):**
@@ -1358,6 +1357,7 @@ Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-aud
 | `sat/setpoint_sync`, `sat/modulation_sync`, `sat/ch_sync` | problem, diagnostic | `ON` / `OFF` | ON = the boiler does not follow the commanded value (TASK-1490) |
 | `sat/window_open` | window | `true` / `false` | Window detection state (TASK-1490) |
 | `sat/fallback_active`, `sat/room_temp_lost`, `sat/ot_link_lost`, `sat/push_refused`, `sat/sh_rejected` | problem, diagnostic | `true` / `false` | SAT handed control back, and its causes (TASK-1490, audit section 2) |
+| `sat/ble_temp_valid` | none, diagnostic (ID 251) | `true` / `false` | The BLE temperature reading is valid and not stale. Announced as a sensor before TASK-1462; the old `sensor/<node>/sat_sat_ble_temp_valid` config is emptied (retained) by every SAT discovery pass |
 | `sat/weather/is_day` | - | `1` / `0` | Daylight (ID 253) |
 
 **Multi-zone entities (ID 255):** for each configured zone n, and for a zone that still has fresh data: `sat_zone_<n>_active` (binary sensor, `sat/zone/<n>/active`, `true` / `false`), `sat_zone_<n>_output` and `sat_zone_<n>_error` (sensors, °C, `sat/zone/<n>/output` and `sat/zone/<n>/error`).

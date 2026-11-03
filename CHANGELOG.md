@@ -9,6 +9,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **reboot_log.txt names why the gateway restarted itself** (TASK-1447, port of 1.x TASK-1247, GH #682). Every planned restart was logged as the same `reboot cause: Software reset (3)`, because `doRestart()` threw its reason away. The reason is now kept in RTC memory (`RTC_NOINIT_ATTR`, no flash write) and the next boot appends it: `reboot cause: Software reset (3) - [nightly] scheduled restart`. The record is taken and cleared at the top of `setup()`, so a reason is reported once; it counts only when the reset was a software restart, so a power-on, panic or watchdog reset shows none. A config-portal timeout passes on the reason of the restart that started the chain instead of overwriting it. Line format unchanged. After an OTA handover through the safeboot app the reason may be absent (never wrong). Host test `tests/test_reboot_reason.py` (old code: the reason store does not exist, the test errors).
 
+### Changed
+
+- **BLE discovery: RSSI has a unit and `sat/ble_temp_valid` is a binary sensor** (TASK-1462). `sat/ble_sensor_rssi` is announced with unit `dBm` and device_class `signal_strength`. `sat/ble_temp_valid` (published `true`/`false`) is announced as a `binary_sensor` instead of a sensor, and the retained config of the old sensor entity (`sensor/<node>/sat_sat_ble_temp_valid`) is emptied. In Home Assistant the old `sensor` entity disappears and a new `binary_sensor` appears (new entity id and history; automations on the old sensor need the new entity). The MQTT state topics are unchanged. Host test `tests/test_ble_discovery_1462.py` (old code: 4 failures, new: 0).
+
 ## [2.0.0-beta.60] - 2026-11-03
 
 ### Changed

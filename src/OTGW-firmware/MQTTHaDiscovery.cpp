@@ -854,7 +854,7 @@ const char ha_name_alias_ventilation_system_type[]                           PRO
 const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
 const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
 // ========== Sensor array (400 entries) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 400;  // +4 SAT requested_setpoint/curve recommendation/manufacturer/pressure_drop_rate (id 254, TASK-1490), +2 SAT CH/DHW gas consumption (id 252, TASK-1506), +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276), +1 command_dropped (faux id 240, TASK-1439)
+const uint16_t MQTT_HA_SENSOR_COUNT = 399;  // +4 SAT requested_setpoint/curve recommendation/manufacturer/pressure_drop_rate (id 254, TASK-1490), +2 SAT CH/DHW gas consumption (id 252, TASK-1506), +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276), +1 command_dropped (faux id 240, TASK-1439)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1332,10 +1332,9 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     // SAT measurement primaries (ble_temp/humidity, ch_pressure) and the wider SAT
     // control/PID/cycle/weather/zone surface live in TASK-543 — a dedicated discovery
     // task because those are user-facing primaries, not diagnostics.
-    {251, 0x00, ha_lbl_sat_ble_sensor_rssi,           ha_name_sat_ble_sensor_rssi,           HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {251, 0x00, ha_lbl_sat_ble_sensor_rssi,           ha_name_sat_ble_sensor_rssi,           HaDeviceClass::signal_strength, HaUnit::dBm, HaStateClass::measurement, HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {251, 0x00, ha_lbl_sat_ble_battery,               ha_name_sat_ble_battery,               HaDeviceClass::none, HaUnit::percent, HaStateClass::measurement, HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {251, 0x00, ha_lbl_sat_ble_sensor_count,          ha_name_sat_ble_sensor_count,          HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement, HaIcon::counter,             HaEntityCat::diagnostic, true},
-    {251, 0x00, ha_lbl_sat_ble_temp_valid,            ha_name_sat_ble_temp_valid,            HaDeviceClass::none, HaUnit::none,    HaStateClass::none,        HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {251, 0x00, ha_lbl_sat_ch_pressure_status,        ha_name_sat_ch_pressure_status,        HaDeviceClass::none, HaUnit::none,    HaStateClass::none,        HaIcon::information_outline, HaEntityCat::diagnostic, true},
     // --- Pseudo-ID 252: TASK-543 SAT control + PID + cycle + rolling statistics ---
     {252, 0x00, ha_lbl_sat_target,                 ha_name_sat_target,                 HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
@@ -1415,12 +1414,12 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 };
 
 // ========== Binary sensor array (73 indexed entries) ==========
-// ADR-105: first 73 rows are indexed via mqttHaBinSensorIndex[] (per-id contiguous).
-// Rows 73..109 are HA-core aliases, NOT contiguous by OT id and NOT covered by
+// ADR-105: first 74 rows are indexed via mqttHaBinSensorIndex[] (per-id contiguous).
+// Rows 74..110 are HA-core aliases, NOT contiguous by OT id and NOT covered by
 // the index. The discovery dispatcher walks the alias tail separately when
 // settings.mqtt.bPublishHaCoreAliases is on (see MQTTstuff.ino).
-const uint16_t MQTT_HA_BINSENSOR_COUNT         = 110;
-const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 73;
+const uint16_t MQTT_HA_BINSENSOR_COUNT         = 111;
+const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 74;
 
 const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
 //  {id, flags, label, friendlyName, icon, entityCat, enabledByDefault}
@@ -1522,6 +1521,10 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     // --- Pseudo-ID 240: a command was dropped after 5 unanswered tries (TASK-1439) ---
     // ON on a drop, OFF on the next confirmed command; ON/OFF via CCONOFF.
     {240, 0x00, ha_lbl_cmd_retry_exceeded, ha_name_cmd_retry_exceeded, HaIcon::alert_circle, HaEntityCat::diagnostic, true},
+    // --- Pseudo-ID 251: SAT BLE temperature validity (TASK-1462) ---
+    // Was a sensor; publishes "true"/"false" (publishIfChangedB), so the payload is true_false.
+    // Last indexed row (index 73): the rows behind it are the HA-core alias tail.
+    SAT_BIN(251, sat_ble_temp_valid, HaIcon::information_outline, HaEntityCat::diagnostic, true, nullptr, HaBinaryPayload::true_false),
 
     // ---------------------------------------------------------------------------
     // ADR-105: HA-core aliases (37 rows) — gated by settings.mqtt.bPublishHaCoreAliases
@@ -1814,9 +1817,9 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 237
     0xFFFF, // id 238
     0xFFFF, // id 239
-    399, // id 240, 1 entry (TASK-1439: OTGWcmddropid command_dropped)
-    398, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
-    396, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
+    398, // id 240, 1 entry (TASK-1439: OTGWcmddropid command_dropped)
+    397, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
+    395, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
     332, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
     0xFFFF, // id 244
     284, // id 245, 4 entries
@@ -1825,10 +1828,10 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     306, // id 248, 7 entries (TASK-541 firmware diagnostics + ADR-113 hardware_type + uptime/unsupported_msgids)
     313, // id 249, 4 entries (TASK-541 PIC info; ADR-113 stage 2 removed picavailable)
     317, // id 250, 15 entries (TASK-541 PIC settings)
-    334, // id 251, 5 entries (TASK-541 SAT diagnostics; flame metrics moved to 243 per ADR-124)
-    339, // id 252, 37 entries (TASK-543 SAT control/PID/cycle/stats; TASK-1276 power/energy; TASK-1506 CH/DHW gas consumption)
-    376, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
-    391, // id 254, 5 entries (TASK-543 SAT flame status; TASK-1490 requested_setpoint, curve recommendation, manufacturer, pressure_drop_rate)
+    334, // id 251, 4 entries (TASK-541 SAT diagnostics; flame metrics moved to 243 per ADR-124)
+    338, // id 252, 37 entries (TASK-543 SAT control/PID/cycle/stats; TASK-1276 power/energy; TASK-1506 CH/DHW gas consumption)
+    375, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
+    390, // id 254, 5 entries (TASK-543 SAT flame status; TASK-1490 requested_setpoint, curve recommendation, manufacturer, pressure_drop_rate)
     0xFFFF // id 255
 };
 
@@ -2084,7 +2087,7 @@ const uint16_t PROGMEM mqttHaBinSensorIndex[256] = {
     0xFFFF, // id 248
     0xFFFF, // id 249
     0xFFFF, // id 250
-    0xFFFF, // id 251
+    73,     // id 251, 1 entry (TASK-1462: ble_temp_valid, was a sensor)
     0xFFFF, // id 252
     53, // id 253, 1 entry  (TASK-543 weather is_day)
     54, // id 254, 16 entries (TASK-543 SAT binary primaries; TASK-1490 health, sync, window and fault flags; TASK-1412.13 sh_rejected)
@@ -2107,6 +2110,7 @@ PGM_P haDeviceClassStr(HaDeviceClass dc) {
         case HaDeviceClass::carbon_dioxide: { static const char s[] PROGMEM = "carbon_dioxide"; return s; }
         case HaDeviceClass::volume_flow_rate: { static const char s[] PROGMEM = "volume_flow_rate"; return s; }
         case HaDeviceClass::water: { static const char s[] PROGMEM = "water"; return s; }
+        case HaDeviceClass::signal_strength: { static const char s[] PROGMEM = "signal_strength"; return s; }
         default: return nullptr;
     }
 }
@@ -2137,6 +2141,7 @@ PGM_P haUnitStr(HaUnit u) {
         case HaUnit::m3_h: { static const char s[] PROGMEM = "m³/h"; return s; }
         case HaUnit::cm: { static const char s[] PROGMEM = "cm"; return s; }
         case HaUnit::bar_h: { static const char s[] PROGMEM = "bar/h"; return s; }
+        case HaUnit::dBm: { static const char s[] PROGMEM = "dBm"; return s; }
         default: return nullptr;
     }
 }
@@ -3897,6 +3902,7 @@ static const RetiredSatEntity kRetiredSatEntities[] PROGMEM = {
   { nullptr, nullptr, "/sat/auto_tune" },   // RETIRED-SAT-ENTITY TASK-1413: retained state topic, no entity
   { nullptr, nullptr, "/sat/auto_tune_rate" },   // RETIRED-SAT-ENTITY TASK-1413: retained value topic, no entity
   { nullptr, nullptr, "/sat/deadband" },   // RETIRED-SAT-ENTITY TASK-1417: retained value topic, no entity (entry 76)
+  { "sensor", "sat_sat_ble_temp_valid", nullptr },   // RETIRED-SAT-ENTITY TASK-1462: now a binary_sensor; the state topic sat/ble_temp_valid stays
 };
 
 void clearRetiredSatEntities(const HaDiscoveryContext &ctx) {
