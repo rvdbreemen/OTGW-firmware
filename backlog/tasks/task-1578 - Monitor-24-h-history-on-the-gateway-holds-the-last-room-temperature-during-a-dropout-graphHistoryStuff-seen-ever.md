@@ -3,9 +3,11 @@ id: TASK-1578
 title: >-
   Monitor 24 h history on the gateway holds the last room temperature during a
   dropout (graphHistoryStuff 'seen ever')
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-03T02:54:00Z'
+updated_date: '2026-11-03T13:37:00Z'
 labels:
   - web-ui
   - sat

@@ -4,9 +4,11 @@ title: >-
   Repair the stale test/host harnesses that no longer compile
   (boiler_unsupported_origin, local_frame_consumers) and run test/host in the
   full test sweep
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-03T06:11:00Z'
+updated_date: '2026-11-03T13:37:00Z'
 labels:
   - test
 dependencies: []
