@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.60] - 2026-11-03
+
 ### Changed
 
 - **SAT: PWM ends and goes continuous when the request reaches the maximum it is clamped to** (TASK-1591, Sergeant D entry 256). The rule compared with the user ceiling, so an installer MaxTSet below it (for example 55 against a default 62) never ended PWM at the maximum. It now compares with `satEffectiveMaxSetpoint()`. The curve-tune clamp is unchanged (entry 256, open). Host test `test_1591_*` in `tests/test_sat_max_tset.py`.
@@ -25,7 +27,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
-- **REST: a POST without a raw body no longer reads the previous request's body** (TASK-1565). A form-encoded POST (curl `-d` default) right after a JSON POST got the earlier body (`POST /api/v2/sat/settings/control_mode` with `pwm` returned value `18.5`): the async server parses a form-encoded body as parameters and never captures it, and the next request allocated at the freed address of the previous one passed the owner check. The captured body is now released when its request ends. Such a call gets `400 Missing value`; send `Content-Type: application/json` as documented.
+- **REST: a POST without a raw body no longer reads the previous request's body** (TASK-1565). A form-encoded POST (curl `-d` default) right after a JSON POST got the earlier body (`POST /api/v2/sat/settings/control_mode` with `pwm` returned value `18.5`): the async server parses a form-encoded body as parameters and never captures it, and the next request allocated at the freed address of the previous one passed the owner check. The captured body is now released when its request ends. Such a form-encoded call gets `400 Missing value`; raw `application/json` and plain `text/plain` bodies work as before. beta.60: the body is released from the same disconnect callback as the REST/file gate slots (the gate replaced the beta.58 callback on the device).
 - **OT-Direct: a write the command ring refused is no longer reported as delivered** (TASK-1593, Robert 2026-11-03). `handleOTDirectCommand()` now returns whether it accepted the command and `addCommandToQueue()` answers `Dropped` instead of an unconditional `Sent`. With the 12-slot ring full, SAT's `CS=` or `MM=` was cached as delivered and only recovered by the 5 s CS resend or the 60 s MM repair; now SAT keeps its cache uncommitted and retries on the next tick. A pending frame for the same MsgID is still replaced in place and accepted. Host tests `tests/test_sat_command_delivery.py` `OtDirectRefusal` on the real ring, CS=/MM= branches and queue code (old code: 2 failures, `Sent` with the cache committed; new: 0); the LL-013b contract test passes.
 - **MQTT `MaxRelModLevelSetting/override` shows the active `MM=` value, as a percentage in Home Assistant** (TASK-1389). The topic published `0.00` every minute, also after `MM=100`: the Write-Ack data byte of MsgID 14 (undefined by the spec) was stored over the real value, and the substituted write was never read. It now carries the value the PIC applies (e.g. `100.00`), and its discovery declares unit `%` instead of device class temperature and `°C`. The Home Assistant entity changes unit, so its long-term statistics history may reset.
 - **Web UI Monitor > Connection: node text stays inside its box** (TASK-1427). The Thermostat and Boiler boxes are wider, so "master · seen 125s ago" no longer runs past them, and the "Broker → HA" and "This browser" labels are right-aligned inside the diagram instead of being cut off at its edge. The MQTT and live link labels move clear of their links. Browser test `tests/webui/connection-map-text-fits.test.mjs` (1343, 1280 and 375 px).
@@ -637,7 +639,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.38...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.60...HEAD
+[2.0.0-beta.60]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.38...v2.0.0-beta.60
 [2.0.0-beta.38]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.11...v2.0.0-beta.38
 [2.0.0-beta.11]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.10...v2.0.0-beta.11
 [2.0.0-beta.10]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.9...v2.0.0-beta.10
