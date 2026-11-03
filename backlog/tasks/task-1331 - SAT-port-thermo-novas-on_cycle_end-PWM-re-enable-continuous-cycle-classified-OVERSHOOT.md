@@ -3,11 +3,11 @@ id: TASK-1331
 title: >-
   SAT: port thermo-nova's on_cycle_end PWM re-enable (continuous cycle
   classified OVERSHOOT)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-23T19:43:00Z'
-updated_date: '2026-11-03T11:45:00Z'
+updated_date: '2026-11-03T11:58:00Z'
 labels:
   - blocked
   - sat
@@ -71,3 +71,9 @@ Lead triage 2026-11-01 23:30 (Robert: lead decides): back to To Do + blocked, as
 
 2026-11-03 (agent, verified by lead): satCycleApplyEndOfCycle(cls, pwmEnabled) in SATcycles.ino, last step of the flame-off branch (after record/windows; <3-sample flames never reach it): continuous OVERSHOOT -> satPwmEntryAllowed(5) -> satSetControlMode(PWM) (pwm.py:221-223); PWM UNDERHEAT_PWM -> continuous (pwm.py:225-227), not gated, as thermo-nova. Gate refusal logs pwm_veto_path 5, stays continuous. Entry 18: bPwmAutoSwitch no longer exists in src, so the switch is ungated by construction. Tests: test_sat_cycle_classifier 43 OK (9 new; old code 3 FAIL); mutant measuring against the flame-on setpoint ping-pongs back into PWM -> red, real code GOOD/no switch (the entry 36 prerequisite proven); test_sat_slave_lowload entry-gate caller count 3 -> 4. Full tests 107/107, evaluate 0 failed. Not verified: the real PWM schedule after the switch on a device.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT now switches mode at the end of a cycle exactly as thermo-nova on_cycle_end (pwm.py:219-227): a continuous cycle classified OVERSHOOT enables PWM, but only through the low-load permission gate (entries 213-215); a PWM cycle classified UNDERHEAT returns to continuous (entries 15, 18, 36). Evidence: 9 host tests on the real SATcycles.ino red on the old code, a feedback-loop mutant that ping-pongs (proves the entry 36 prerequisite), full tests 107/107, build beta.52 on .63 clean. Not yet observed: a real cycle-end switch on a boiler.
+<!-- SECTION:FINAL_SUMMARY:END -->
