@@ -212,6 +212,28 @@ DELEGATED = {
                 "test_tick_inside_the_flood_sends_the_live_hold", "test_relight_after_hot_water_repeats_the_flood_and_a_dhw_flame_does_not",
                 "test_normal_boiler_is_unchanged", "test_mi500_once_on_pic_after_no_return_detection", "test_mi500_never_on_ot_direct",
                 "test_a_break_in_the_no_return_fact_restarts_the_5_minutes"])],
+    # TASK-1412.12 (LL-018): the same ignition on the REAL measurement validity (tests/test_sat_no_return_startup.py), split by what it proves
+    "LL-018c": [("test_sat_no_return_startup", "NoReturnStartup", ["test_unsupported_return_floods_from_the_first_ignition",
+                "test_data_invalid_return_waits_5_minutes_then_counts_as_no_return", "test_stale_return_is_the_same_as_an_invalid_one_and_recovers",
+                "test_fresh_zero_return_is_a_measurement_not_a_missing_return", "test_board_sensor_return_is_a_return_even_when_the_boiler_says_unknown",
+                "test_unsupported_verdict_restored_from_file_is_not_enough_alone", "test_missing_flow_sends_no_flood_and_no_flow_based_hold"])],
+    "LL-018d": [("test_sat_no_return_startup", "NoReturnStartup", ["test_runtime_enable_with_a_running_boiler_sends_no_flood_and_defers_mi500_5_minutes_on_pic",
+                "test_runtime_enable_on_ot_direct_never_sends_mi500", "test_runtime_enable_then_pwm_ignition_floods"])],
+    "LL-018e": [("test_sat_no_return_startup", "NoReturnStartup", ["test_hot_boiler_in_lockout_holds_the_clamped_flow_hold_and_floods_from_the_flame_not_from_the_on_phase",
+                "test_cold_boiler_after_lockout_does_not_flood_before_the_flame"])],
+    "LL-018f": [("test_sat_no_return_startup", "NoReturnStartup", ["test_flood_cs_uses_a_flow_sample_at_most_one_second_old_when_the_boiler_answers_pm25",
+                "test_without_an_answer_to_pm25_the_flood_uses_the_thermostat_poll_age"])],
+    # PIC transport: the SAT side (MI=500 only on a PIC, PM=25 only when no other PM= holds the single priority slot) and the PIC queue side
+    "LL-018g": [("test_sat_no_return_ignition", "NoReturnIgnition", ["test_pm25_is_skipped_while_another_pm_is_pending", "test_mi500_once_on_pic_after_no_return_detection",
+                "test_no_return_mi500_waits_5_minutes_the_quirk_does_not", "test_mi500_for_the_manufacturer_quirk_on_pic_only"]),
+                ("test_pic_pm_chain", "PmChain", ["test_priority_slot_waits_for_the_boiler", "test_tp_and_pm_do_not_cancel_each_other", "test_priority_slot_frees_after_60_s",
+                "test_user_pm_is_not_purged"])],
+    # OT-Direct transport: no MI=500 from SAT, and the PM= branch plus the schedule that serves PM=25, on their own code (OTDirect.ino)
+    "LL-018h": [("test_sat_no_return_ignition", "NoReturnIgnition", ["test_mi500_never_on_ot_direct"]),
+                ("test_pic_pm_chain", "PmChain", ["test_not_armed_on_ot_direct"]),
+                ("test_sat_no_return_startup", "OtDirectPm", ["test_pm25_goes_out_within_a_communication_interval_when_the_slow_poll_tier_is_idle",
+                "test_pm25_latency_in_the_slow_poll_burst_is_bounded_but_not_one_interval", "test_without_pm25_the_msgid25_read_is_only_every_10_s_on_ot_direct",
+                "test_pm_for_an_unscheduled_id_is_a_one_shot_read", "test_pm_out_of_range_is_refused_with_bv"])],
     # LL-019 (TASK-1412.9): the whole phase-anchor and start-count suites run, not a subset: every test of test_sat_pwm_anchors (anchors,
     # ignition wait, relight, DHW interruptions, per-source start counting, millis rollover) and test_sat_pwm_start_limit (limit windows,
     # PWM entry, range 5, flame lag, ring rollover), plus the P / 2P mapper, minimum ON / OFF and range-5 cells of test_sat_hp_pwm.
@@ -452,6 +474,57 @@ class LowLoadContract(unittest.TestCase):
     def test_ll018_missing_return_ignition(self):
         self.delegated("LL-018")
 
+    @ll("LL-018", "contract", "satNoReturnTemp, satReturnFresh, satReturnMissingLong, satGetFlowTemp on real frames (SATboilerFeed.h, the processOT feed hook), satNoReturnFlood*, satMiStep "
+        "(via test_sat_no_return_startup)",
+        task="TASK-1412.12 AC1 (entries 84, 135, 149, 151, 217, 241): unsupported, Data-Invalid, stale and restored return; fresh zero; missing flow")
+    def test_ll018c_unsupported_invalid_and_stale_return_through_the_real_validity(self):
+        self.delegated("LL-018c")
+
+    @ll("LL-018", "contract", "SAT switched on while the boiler runs: satMiStep, satNoReturnFloodOnFlameEdge, control mode gate (via test_sat_no_return_startup)",
+        task="TASK-1412.12 AC1: runtime enable. The PM chain is NOT part of it (TASK-1384, LL-018 open decision below)")
+    def test_ll018d_runtime_enable_with_a_running_boiler(self):
+        self.delegated("LL-018d")
+
+    @ll("LL-018", "contract", "hot boiler that does not light for 180 s: satPwmFlameOffHold clamp, flood armed by the flame edge only (via test_sat_no_return_startup)",
+        task="TASK-1412.12 AC1: the boiler's own anti-cycle delay; the delay itself is a bench fact (TASK-1412.21)")
+    def test_ll018e_hot_boiler_in_its_own_anti_cycle_lockout(self):
+        self.delegated("LL-018e")
+
+    @ll("LL-018", "contract", "age of the MsgID 25 sample behind each flood CS, with and without an answer to PM=25 (via test_sat_no_return_startup)",
+        task="TASK-1412.12 AC2 (R39): modelled ages, OpenTherm v4.2 section 4.3.1 answer time; real ages are a bench measurement")
+    def test_ll018f_flow_sample_age_behind_the_flood_cs(self):
+        self.delegated("LL-018f")
+
+    @ll("LL-018", "contract", "PIC path: addCommandToQueue PM=/MI=, pmChainBusy, the single priority slot (via test_sat_no_return_ignition, test_pic_pm_chain)",
+        task="TASK-1412.12 AC3: PIC MI/PM, proven on its own; a command echo is not ignition")
+    def test_ll018g_pic_transport_mi_and_pm(self):
+        self.delegated("LL-018g")
+
+    @ll("LL-018", "contract", "OT-Direct path: the PM= branch and scheduleMasterRequest() of OTDirect.ino, no SAT MI=500 (via test_sat_no_return_startup, test_pic_pm_chain)",
+        task="TASK-1412.12 AC3: OT-Direct equivalents, proven on its own code; a replay is not ignition")
+    def test_ll018h_ot_direct_transport_mi_and_pm(self):
+        self.delegated("LL-018h")
+
+    @ll("LL-018", "open_decision", "none: enabling SAT at runtime does not start the boot PM chain (initSAT() is the only pmChainStart() caller); Sergeant D's OK for TASK-1384 AC2 is not recorded",
+        task="TASK-1384", question="audit #44 (runtime-enable PM chain)")
+    def test_ll018i_runtime_enable_sends_the_boot_pm_chain(self):
+        callers = sum(len(re.findall(r"\bpmChainStart\s*\(\s*\)\s*;", (FW / n).read_text(encoding="utf-8"))) for n in ("SATcontrol.ino", "settingStuff.ino", "restAPI.ino", "MQTTstuff.ino"))
+        self.assertGreaterEqual(callers, 2, "pmChainStart() is called only at boot (initSAT)")
+
+    @ll("LL-018", "open_decision", "none: a PM=25 on OT-Direct waits behind the entries already due in the schedule (a minute-aligned slow-poll burst delays it by seconds, not by one communication interval); no decision records what OT-Direct must do for PM=",
+        task="TASK-1412.12 finding", question="OTD-PM25 (new, to be asked)")
+    def test_ll018j_ot_direct_pm25_goes_out_within_one_communication_interval_in_the_full_schedule(self):
+        import test_sat_no_return_startup as nrs
+        cls = nrs.OtDirectPm
+        cls.setUpClass()
+        try:
+            if not cls.exe:
+                raise InfrastructureError("no host C++ compiler")
+            lat = cls("test_pm_out_of_range_is_refused_with_bv").pm25_latencies(True)
+        finally:
+            cls.tearDownClass()
+        self.assertLessEqual(max(lat), 1150, lat)
+
     @ll("LL-018", "open_decision", "none: the stale/Data-Invalid return rule (entry 217, TASK-1412.5) is host-tested; Conf-1371 (this-boot Unknown-DataID, 5 min board reading) is not answered and both transports are not benched (document check)",
         task="TASK-1412.12", question="Conf-1371")
     def test_ll018b_stale_or_invalid_return_is_treated_as_missing(self):
@@ -587,7 +660,7 @@ def main():
         "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started)),
         "git_head": git("rev-parse", "HEAD"), "git_dirty_src": git("status", "--porcelain", "--", "src").splitlines(),
         "release_mode": RELEASE, "override_env": {k: v for k, v in os.environ.items() if k.startswith("OTGW_SAT")},
-        "production_sources_sha256": {n: file_sha(FW / n) for n in ("SATcontrol.ino", "SATcycles.ino", "SATpid.ino", "SATchEnable.h", "SATboilerFeed.h", "SATtypes.h", "safeTimers.h")},
+        "production_sources_sha256": {n: file_sha(FW / n) for n in ("SATcontrol.ino", "SATcycles.ino", "SATpid.ino", "SATchEnable.h", "SATboilerFeed.h", "SATtypes.h", "safeTimers.h", "OTDirect.ino", "OTGW-Core.ino")},
         "harness_program_sha256": HARNESS_HASH,
         "test_modules_sha256": {m: file_sha(TESTS / (m + ".py")) for m in modules},
         "missing_ll_ids": missing, "tests": per_test,

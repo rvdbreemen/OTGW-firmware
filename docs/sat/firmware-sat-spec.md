@@ -3867,3 +3867,49 @@ Compare (defaults that differ from thermo-nova): overshoot protection true here,
 8. **`iHeatingSource` has no MQTT command** in `kSatMqttCmds` (`MQTTstuff.ino:655-747`). Whether REST exposes it was not checked.
 9. **Boot `PM=` collapse and the first-MM/CH skip** (Edge cases) are derived from reading the code. Neither was reproduced on a bench.
 10. **Effect of OT-Direct local state changes during simulation** (Behaviour E) was not traced.
+
+
+## Missing-return start-up: verification record and comparison with the OpenTherm specification (TASK-1412.12, LL-018)
+
+**Status:** host-verified on the real code; the physical ignition on both transports is NOT verified (bench item, TASK-1412.21). The specification of the behaviour is not repeated here: it is in the Sergeant D entries below and in the code they are cited against.
+
+### Recorded interpretation of entry 45 and Q40 (read before the tests were written)
+
+| What | Where it is recorded | Code |
+|---|---|---|
+| "No return temperature" = the boiler answered Unknown-DataID to MsgID 28, provisionally ("for now", Q40 B) | `sergeant-d-corrections.md` entry 84 | `satNoReturnTemp()` SATcontrol.ino:2552 |
+| A valid board sensor ('R') counts as a return: no flood, thermo-nova hold | entry 135 | `satReturnFresh()` + `picBoardTretValid()` |
+| Start-up hold for such a boiler = flow + 18 (not return + 18) for 20 s, then suppression flow - 1; replaces entry 45's "flow-based suppression from the start" | entry 149 | `satPwmFlameOffHold()` :1143 |
+| The CS / PM=25 flood (CS at t = 0, 2, 4 ..., PM=25 at t = 1, 3, 5 ...) runs inside those 20 s, from every CH flame off-to-on | entries 45, 142, 151 | `satNoReturnFloodOnFlameEdge/Step()` :1743, :1753 |
+| MI=500 on PIC boards only, once, when the firmware knows there is no return temperature (or the Ideal/Intergas/Nefit quirk) | entry 141 | `satMiStep()` :1796 |
+| Return invalid or absent for 5 minutes counts as no return | entry 217 (QD-5 A) | `satReturnMissingLong()` :2504 |
+| Flow older than 60 s, Data-Invalid or Unknown-DataID counts as missing | entries 218, 241 | `satFlowFeedClass()`, `SAT_FLOW_VALID_MS` :2472 |
+
+Our implementation choices that are NOT recorded decisions (Conf-1371, `open-questions.md` row, still "queued, not asked"): (a) the Unknown-DataID verdict counts only when a boiler frame of THIS boot confirmed it (entry 84 says the persisted verdict survives a restart); (b) a board-sensor reading is valid for 5 minutes; (c) MI=500 waits 300 s of uninterrupted no-return (entry 141 says "once the firmware knows"). In the boot window before a boiler answer the hold is the cold-setpoint floor (28.2 C in the test), not return + 18 and not flow + 18; the tests pin that as current behaviour, not as an approved one.
+
+### What the host tests execute (tests/test_sat_no_return_startup.py, LL-018c..LL-018j)
+
+The measurement validity (SATboilerFeed.h, the processOT feed hook), the PWM hold, the flood and `satMiStep()` run as one program fed by modelled boiler frames. Mutating `satNoReturnTemp()` (no 5-minute path), `satMiStep()` (no PIC check), the flood arming (no no-return check) or the return window (30 s instead of 300 s) turns it red.
+
+### Sample age and ignition sequence against the OpenTherm v4.2 specification
+
+| Specification (docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.md) | What it says | What the model and the code show |
+|---|---|---|
+| section 4.3.1, lines 1088-1116 | slave answers in 20..400 ms; the master waits MWT = 100 ms between conversations and communicates at least every MCI = 1 s (1.15 s max) | The model answers a PM=25 300 ms after the command. With the answer, the flow sample behind each flood CS is 100-700 ms old (the first CS of the flood: up to the thermostat poll interval, 4.0 s in the run, entry 241 field data: median 5.0 s, p95 6.9 s). Without an answer inside the flood the sample behind a CS is 0.1-4.1 s old. |
+| section 4.4.1, lines 1201-1225 | Read-Data is answered by Read-Ack, Data-Invalid (known, value not available) or Unknown-DataID (not implemented) | Matches the three feed events of `SatFeedEvent`; Data-Invalid keeps the last valid sample until the window ends (entry 217), Unknown-DataID is `Unsupported` at once. |
+| IDs 25 and 28, lines 1880, 1883 | both read-only f8.8 (-40..127 C); the specification does not make them mandatory | A boiler need not implement 28, which is the premise of entries 45 and 84. |
+| section 5.3.1, lines 1583-1588 and bit 3 "Flame status", line 1446 | MsgID 0 is mandatory and carries the flame bit | The flame edge that arms the flood comes from this bit (`satIsFlameOn()`). |
+| (not in the specification) | nothing about ignition timing, a boiler's anti-cycle delay, how fresh a read must be, or a priority read | The 2-3 s guidance (entry 23) and the anti-cycle lockout are not specified by OpenTherm; they cannot be checked against it. In the lockout case the tests only prove that SAT waits (hold clamped to the effective maximum, no PM=25 and no flood before the flame, flood armed by the flame edge, 20 s counted from it). |
+
+### Transports, proven separately
+
+- **PIC:** `PM=25` and `MI=500` are commands in the PIC queue (`addCommandToQueue()`); the PIC keeps ONE priority message, so SAT skips PM=25 while another PM= is pending (`pmChainBusy()`, OTGW-Core.ino:4342; tests LL-018g, incl. the TASK-1572 priority-slot tests of tests/test_pic_pm_chain.py). MI=500 is sent once, after 5 minutes of no-return, never on OT-Direct.
+- **OT-Direct:** there is no PIC; `PM=n` is the `PM` branch of the command handler (OTDirect.ino:3389) which sets `lastSentMs = 0` on the schedule entry (or enqueues a one-shot read), and `scheduleMasterRequest()` (OTDirect.ino:1545) serves it round-robin, one request per call, at least MWT apart. Host result (LL-018h, model, not a measurement): with the slow-poll tier idle the MsgID 25 read goes out 16-166 ms after the PM=25; with every one of the roughly 80 entries due together (the slow-poll tier) (they all start at boot with `lastSentMs = 0` and so stay in step, every minute) it goes out up to 8.3 s late. That is not "one communication interval". LL-018j records it as an open decision (OTD-PM25): no recorded decision says what PM=25 must do on OT-Direct.
+- **Not provable on the host:** whether MI=500 changes anything in gateway mode (the OTGW documentation describes MI for stand-alone mode, entry 45), the real age of the MsgID 25 sample, the boiler's real anti-cycle delay, and physical ignition. A replay or a command echo ("CS: 58.0") shows that SAT asked, not that the burner lit. These stay bench items for TASK-1412.21 on a PIC board and on an OT-Direct board.
+
+### Open items found by this verification
+
+1. Conf-1371 (above) is still not asked of Sergeant D.
+2. TASK-1384: enabling SAT at runtime does not start the boot PM chain (`pmChainStart()` is called only from `initSAT()`); MI=500 is covered because `satMiStep()` runs every pass. TASK-1384 AC2 (Sergeant D's OK) is not recorded. LL-018i.
+3. OTD-PM25 (above). LL-018j.
+4. The "Not found in the code" item 6 above ("No `PM=25` ... in the firmware") is stale since TASK-1371.
