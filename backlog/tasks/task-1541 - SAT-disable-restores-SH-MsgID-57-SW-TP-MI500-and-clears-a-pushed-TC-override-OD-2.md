@@ -3,11 +3,11 @@ id: TASK-1541
 title: >-
   SAT disable restores SH= (MsgID 57), SW=, TP=, MI=500 and clears a pushed TC=
   override (OD-2)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-01T08:16:00Z'
-updated_date: '2026-11-03T06:07:00Z'
+updated_date: '2026-11-03T23:02:00Z'
 labels:
   - sat
 dependencies: []
@@ -39,3 +39,9 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: satDisable (SATcon
 
 2026-11-03 (agent, verified by lead in wt-next): AC1 = entry 240 (Q-1541a A). AC2 reading per entry 240 (overrides the AC text): SH=/SW= restored and TC=0 when SAT pushed a TC; TP and MI are NOT restored (test asserts they are never sent). On switch-off: CS=0, CH=1, MM=T, SH=<pre>, SW=<pre>, TC=0; a never-read value sends nothing; Dropped -> whole release retried (TASK-1574 path). Maintainer decision 2026-11-03: pre-SAT values persisted in settings.ini (SATpresatmaxtset/SATpresatdhwset, internal, not in the REST listing), written once on first capture and cleared after a successful restore; a leftover restore is sent after a reboot with SAT off. AC3 disable-path table: user switch-off, MQTT-fallback lift, safety trip = restore; OT-loss hand-back, outside-temp-missing, boot hand-back, flash, reboot = no restore (SAT resumes). tests/test_sat_disable_handback.py 20 tests: old 14 FAIL + 3 errors, fix 20 OK; 8 neighbouring SAT harnesses green. Bench: a PIC accepting SH/SW/TC=0 not yet tried.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Switching SAT off restores SH= and SW= to the pre-SAT values (persisted as SATpresatmaxtset/SATpresatdhwset) and sends TC=0 when SAT pushed one (entry 240). Evidence per the notes: tests/test_sat_disable_handback.py on the real satDisable (old code: 11 failures), every disable path listed; beta.40, public in v2.0.0-beta.60. Not bench-verified with a boiler (none on the bench).
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,11 +1,11 @@
 ---
 id: TASK-1398
 title: 'v2 Settings: explain the orange REBOOT badge (looks clickable, no explanation)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T19:49:00Z'
-updated_date: '2026-11-03T06:13:00Z'
+updated_date: '2026-11-03T23:02:00Z'
 labels:
   - webui
 milestone: 2.0.0
@@ -36,3 +36,9 @@ Released by Robert 2026-11-03 (interactive, maintainer): low priority. Only the 
 
 2026-11-03 (agent, verified by lead incl. screenshots in scratchpad shots/1398-old|new): browser test tests/webui/settings-reboot-badge.test.mjs on the real page, red on the old v2 files, green on the fix; integrated in wt-next.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The orange REBOOT badge has a tooltip and no longer looks clickable. Evidence per the task notes: browser test settings-reboot-badge and screenshots; shipped in beta.43, public in v2.0.0-beta.60.
+<!-- SECTION:FINAL_SUMMARY:END -->

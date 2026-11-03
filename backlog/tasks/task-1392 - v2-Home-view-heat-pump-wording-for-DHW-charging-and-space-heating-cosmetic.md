@@ -1,11 +1,11 @@
 ---
 id: TASK-1392
 title: 'v2 Home view: heat-pump wording for DHW charging and space heating (cosmetic)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T14:34:00Z'
-updated_date: '2026-11-03T06:14:00Z'
+updated_date: '2026-11-03T23:02:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -38,3 +38,9 @@ Released by Robert 2026-11-03 (interactive, maintainer): low priority.
 
 2026-11-03 (agent, verified by lead incl. screenshots in scratchpad shots/1392-old|new): browser test tests/webui/home-heatpump-wording.test.mjs on the real page, red on the old v2 files, green on the fix; integrated in wt-next.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Home view uses tank-charging wording for heat pumps / storage tanks and 'space heating' instead of 'radiators'; gas boilers unchanged. Evidence per the task notes: browser test home-heatpump-wording on the real v2 page (red on the old page) and screenshots; shipped in beta.44, public in v2.0.0-beta.60.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -3,11 +3,11 @@ id: TASK-1578
 title: >-
   Monitor 24 h history on the gateway holds the last room temperature during a
   dropout (graphHistoryStuff 'seen ever')
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-03T02:54:00Z'
-updated_date: '2026-11-03T13:50:00Z'
+updated_date: '2026-11-03T23:02:00Z'
 labels:
   - web-ui
   - sat
@@ -34,3 +34,9 @@ Found with TASK-1546 (2026-11-03): the live graph now breaks the room line on a 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-03 (agent, verified by lead): graphHistEncRoom()/graphHistRoomLost() in graphHistoryStuff.h: a slot stores GRAPH_HIST_NO_TEMP (INT16_MIN, JSON null) for Tr when SAT reports room_temp_lost or MsgID 24 was seen but is silent > 270 s (the TASK-1546 live rule); 14-byte slot unchanged, GET history output unchanged. v2.js mergeGraphHistory flags a null room slot as roomX when the window has room readings. tests/test_graph_history.cpp 7 new checks PASS (old header does not compile: helper missing); graph-history-merge 20/20 (old v2.js 1 FAIL); graph-room-dropout scenarios 5-6 (old v2.js 2 FAIL); all 6 graph tests green; evaluate 0 failed. Build (static helper visibility across .ino) and device not yet verified.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The 24 h device history stores no room value during a dropout, so a reloaded graph shows the same interruption. Evidence per the notes: host test on the real graphHistoryStuff code (red on old), browser test graph-room-dropout (old page: 2 failures in scenario 5), ADR-193 slot size unchanged; beta.55, public in v2.0.0-beta.60.
+<!-- SECTION:FINAL_SUMMARY:END -->
