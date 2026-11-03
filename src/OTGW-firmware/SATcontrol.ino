@@ -1686,7 +1686,7 @@ static void satSetControlMode(SATControlMode m)
 // mirrors that by always leaving PWM mode here (the Force PWM option was removed, Sergeant D 2026-10-23,
 // entry 13). PWM comes back through the overshoot auto-switch: the sustained-overshoot re-enable
 // (heating_control.py:280-304) is mirrored by satCycleCheckOvershootSwitch(); the second re-enable, on_cycle_end() after
-// a continuous cycle classified OVERSHOOT (pwm.py:219-223), is not ported. The summer simmer path is a firmware
+// a continuous cycle classified OVERSHOOT (pwm.py:219-223), by satCycleApplyEndOfCycle() at flame off (TASK-1331). The summer simmer path is a firmware
 // feature without a thermo-nova counterpart and calls this too, as its heater state is OFF (TASK-1362).
 // Sergeant D 2026-10-23, docs/sat/sergeant-d-corrections.md entry 12.
 static void satPwmDisableOnHeaterOff()

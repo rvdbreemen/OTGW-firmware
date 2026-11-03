@@ -965,6 +965,35 @@ static void _cycleTailSample(uint32_t nowMs, float flowTemp)
   }
 }
 
+//=== End of cycle: the verdict switches PWM on or off (TASK-1331, Sergeant D entries 15, 18, 36, 37) ===
+// thermo-nova PWM.on_cycle_end() (pwm.py:219-227), called for every completed cycle (heating_control.py:167, EVENT_SAT_CYCLE_ENDED).
+// control_mode is the mode at the flame-off sample (tracker.py:129): PWM if PWM is enabled, else CONTINUOUS.
+//   CONTINUOUS cycle classified OVERSHOOT   -> pwm.enable()  (pwm.py:221-223): continuous -> PWM
+//   PWM cycle classified UNDERHEAT          -> pwm.disable() (pwm.py:225-227): PWM -> continuous; the firmware label
+//                                              of the PWM UNDERHEAT is SAT_CYCLE_UNDERHEAT_PWM
+// Not gated on a user setting (entry 18; the PWM auto switch setting no longer exists) and without a minimum length, cooldown or cold check, as in thermo-nova;
+// the margin of the OVERSHOOT verdict is 2.0 with >= (entries 15, 37, in the classifier). The enable goes through the same
+// PWM entry gate as every other entry (satPwmEntryAllowed(5), entries 213-215): when the boiler refuses low-off, nothing happens
+// and the mode stays continuous. The cold cutoff, the hot-water pause and the start limits act in the PWM schedule and the
+// heater-off branch of the next control tick, as they do after the 60 s switch. A mode that is neither PWM nor continuous
+// (OFF) is left alone. The classifier saw the per-sample control setpoint (entry 36), so a switch out of PWM in the middle of
+// a burn does not make that burn an OVERSHOOT verdict that sends SAT straight back.
+static void satCycleApplyEndOfCycle(SATCycleClass cls, bool pwmEnabled)
+{
+  if (!pwmEnabled && state.sat.eControlMode == SAT_MODE_CONTINUOUS) {
+    if (cls != SAT_CYCLE_OVERSHOOT) return;
+    if (!satPwmEntryAllowed(5)) return;
+    SATDebugTln(F("SAT: continuous cycle classified overshoot, switching to PWM mode"));
+    satSetControlMode(SAT_MODE_PWM);   // also clears the sustained-condition timers (satCycleSkipAutoSwitch)
+    satNarrate_P(PSTR("Control mode: PWM (the last cycle overshot)"));
+  } else if (pwmEnabled && state.sat.eControlMode == SAT_MODE_PWM) {
+    if (cls != SAT_CYCLE_UNDERHEAT_PWM) return;
+    SATDebugTln(F("SAT: PWM cycle classified underheat, switching to continuous mode"));
+    satSetControlMode(SAT_MODE_CONTINUOUS);
+    satNarrate_P(PSTR("Control mode: continuous (the last PWM cycle stayed under the setpoint, PWM ended)"));
+  }
+}
+
 //=== Called on each flame status change ===
 void satCycleOnFlameChange(bool flameOn)
 {
@@ -1145,6 +1174,8 @@ void satCycleOnFlameChange(bool flameOn)
     SATDebugTf(PSTR("SAT cycle #%d: class=%d dur=%.0fs maxFlow=%.1f p90=%.1f p10=%.1f overshoot=%.0fs totOvershoot=%.0fs inBand=%.0fs\r\n"),
             state.sat.iCycleCount, (int)cls, durationSec,
             _cycle_maxFlowTemp, p90, p10, _cycle_overshootSec, _cycle_totalOvershootSec, _cycle_timeInBandSec);
+
+    satCycleApplyEndOfCycle(cls, pwmEnabled);   // last: the cycle is fully recorded (EVENT_SAT_CYCLE_ENDED, TASK-1331)
   }
 }
 

@@ -360,9 +360,10 @@ class SlaveLowLoad(unittest.TestCase):
     def test_every_pwm_mode_entry_asks_the_permission(self):
         sat = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
         calls = re.findall(r"satSetControlMode\(SAT_MODE_PWM\)", sat + self.cyc)
-        # direct callers: the restore (at init and deferred) and the overshoot switch (the command passes the mode through a ternary, checked below); each asks satPwmEntryAllowed(), and satSetControlMode() checks again
-        self.assertEqual(len(calls), 3, calls)
-        for text in (sustain._fn(sat, "static void satRestoreControlMode()"), sustain._fn(self.cyc, "bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)")):
+        # direct callers: the restore (at init and deferred), the overshoot switch and the end-of-cycle switch (TASK-1331) (the command passes the mode through a ternary, checked below); each asks satPwmEntryAllowed(), and satSetControlMode() checks again
+        self.assertEqual(len(calls), 4, calls)
+        for text in (sustain._fn(sat, "static void satRestoreControlMode()"), sustain._fn(self.cyc, "bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)"),
+                     sustain._fn(self.cyc, "static void satCycleApplyEndOfCycle(SATCycleClass cls, bool pwmEnabled)")):
             self.assertIn("satPwmEntryAllowed(", text)
         self.assertIn("satPwmEntryAllowed(3) ? SAT_MODE_PWM", sat)
 

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T19:43:00Z'
-updated_date: '2026-11-03T11:09:00Z'
+updated_date: '2026-11-03T11:45:00Z'
 labels:
   - blocked
   - sat
@@ -33,7 +33,7 @@ From the TASK-1327 review: thermo-nova re-enables PWM in two ways after a disabl
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 thermo-nova on_cycle_end path traced with citations and the difference with the firmware recorded
-- [ ] #2 Sergeant D's decision recorded in docs/sat/sergeant-d-corrections.md; implemented with a host test (red/green) if he agrees
+- [x] #2 Sergeant D's decision recorded in docs/sat/sergeant-d-corrections.md; implemented with a host test (red/green) if he agrees
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -68,4 +68,6 @@ Lead triage 2026-11-01 23:30 (Robert: lead decides): back to To Do + blocked, as
 2026-11-03: unblocked by TASK-1412.14: the classifier parity gate passes (entries 244/245/248/249/250). Next: a plan quoting thermo-nova on_cycle_end (pwm.py:219-227) for Sergeant D's OK before implementation (SAT behaviour change).
 
 2026-11-03 lead: decision already complete: entry 15 (port both on_cycle_end branches, margin 2.0), entry 18 (not gated on bPwmAutoSwitch), the Q2 prerequisite (per-sample control setpoint in the tail, entry 36 / TASK-1405, done) and the parity proof TASK-1412.14 (Done, entries 244/245/248/249/250). Implementation starts; the enable path goes through the existing PWM entry gate (1412.4 low-load permission, entries 213-215).
+
+2026-11-03 (agent, verified by lead): satCycleApplyEndOfCycle(cls, pwmEnabled) in SATcycles.ino, last step of the flame-off branch (after record/windows; <3-sample flames never reach it): continuous OVERSHOOT -> satPwmEntryAllowed(5) -> satSetControlMode(PWM) (pwm.py:221-223); PWM UNDERHEAT_PWM -> continuous (pwm.py:225-227), not gated, as thermo-nova. Gate refusal logs pwm_veto_path 5, stays continuous. Entry 18: bPwmAutoSwitch no longer exists in src, so the switch is ungated by construction. Tests: test_sat_cycle_classifier 43 OK (9 new; old code 3 FAIL); mutant measuring against the flame-on setpoint ping-pongs back into PWM -> red, real code GOOD/no switch (the entry 36 prerequisite proven); test_sat_slave_lowload entry-gate caller count 3 -> 4. Full tests 107/107, evaluate 0 failed. Not verified: the real PWM schedule after the switch on a device.
 <!-- SECTION:NOTES:END -->

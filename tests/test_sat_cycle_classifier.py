@@ -120,6 +120,11 @@ static uint32_t satPwmLastOffTimeMs() { return 0; }
 static @IDLE_RET@ satPwmIsIdle() { return g_idle; }
 static void sendWebSocketJSON(const char*) {}
 #define satNarratef_P(...) ((void)0)
+#define satNarrate_P(x) ((void)0)
+// TASK-1331: the end-of-cycle switch (satCycleApplyEndOfCycle) reaches the PWM entry gate and the mode setter.
+static bool g_permit = true; static int g_switches = 0;
+static bool satPwmEntryAllowed(uint8_t) { return g_permit; }
+static void satSetControlMode(SATControlMode m) { if (m != state.sat.eControlMode) g_switches++; state.sat.eControlMode = m; }
 #define snprintf_P snprintf
 static size_t strlcpy_P(char* d, const char* s, size_t n) { snprintf(d, n, "%s", s); return strlen(s); }
 static void _hourCountRecord(uint32_t) {}
@@ -203,6 +208,7 @@ int main(int argc, char** argv) {
   if (argc > 1 && strcmp(argv[1], "flicker") == 0) return flicker();
   if (argc < 6) return 2;
   settings.sat.fOvershootMargin = 2.0f;
+  if (getenv("OTGW_TEST_PWM_DENIED")) g_permit = false;       // TASK-1331: the boiler refuses low-off (MsgID 3 HB bit 4 = 1)
   const float ctrlSp = (float)atof(argv[1]), reqSp = (float)atof(argv[2]);
   g_onTimeMs = (uint32_t)(atof(argv[3]) * 1000.0 + 0.5);
   g_idle = atoi(argv[4]) != 0;
@@ -226,7 +232,8 @@ int main(int argc, char** argv) {
   }
   if (first) { apply(50.0f, 0x010A, 1, 0); satCycleOnFlameChange(true); }   // no samples: zero-length cycle
   satCycleOnFlameChange(false);
-  printf("cls=%d kind=%d count=%lu\n", (int)state.sat.eLastCycleClass, (int)state.sat.eLastCycleKind, (unsigned long)state.sat.iCycleCount);
+  printf("cls=%d kind=%d count=%lu mode=%d switches=%d\n", (int)state.sat.eLastCycleClass, (int)state.sat.eLastCycleKind,
+         (unsigned long)state.sat.iCycleCount, (int)state.sat.eControlMode, g_switches);
   return 0;
 }
 """
@@ -440,6 +447,20 @@ CASES = {
 }
 
 
+# TASK-1331: end-of-cycle switch scenarios. The tests assert the control mode and the switch count after the cycle.
+END_CASES = {
+    "E1_continuous_overshoot": Case([seg(300, 54.0)], "OVERSHOOT", oracle=False),
+    "E2_continuous_good": Case([seg(300, 50.0)], "GOOD", oracle=False),
+    "E3_pwm_underheat": Case([seg(300, 45.0, CH, PWM, 1)], "UNDERHEAT_PWM", on_time=300, oracle=False),
+    "E4_pwm_good": Case([seg(20, 50.0, CH, PWM, 0)], "GOOD", on_time=300, oracle=False),
+    "E5_continuous_underheat": Case([seg(300, 45.0)], "UNDERHEAT", oracle=False),
+    "E6_continuous_uncertain": Case([seg(300, 54.0, NONE)], "UNCERTAIN", oracle=False),
+    "E7_mode_off_overshoot": Case([seg(300, 54.0, CH, 0, 0)], "OVERSHOOT", oracle=False),
+    "E8_switch_out_of_pwm_mid_burn": Case([seg(100, 60.0, CH, PWM, 1, 30.0), seg(200, 60.0, CH, CONT, 0, 60.0)],
+                                          "GOOD", ctrl=30.0, req=60.0, on_time=300, oracle=False),
+}
+
+
 class CycleClassifier(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -450,18 +471,23 @@ class CycleClassifier(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def run_case(self, name):
+    def run_case(self, name, deny=False, cases=None):
         if self.exe is None:
             self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
-        c = CASES[name]
+        c = (cases or CASES)[name]
         args = [str(self.exe), repr(c.ctrl), repr(c.req), repr(float(c.on_time)), "1" if c.idle else "0", "1" if c.sim else "0"]
         args += [("%d:%r:0x%X:%d:%d" % s[:5]) + ("" if len(s) < 6 else ":%r" % s[5]) + ("" if len(s) < 7 else ":%r" % s[6])
                  for s in c.segs]
-        r = subprocess.run(args, capture_output=True, text=True, timeout=20)
+        env = dict(os.environ)
+        if deny:
+            env["OTGW_TEST_PWM_DENIED"] = "1"
+        r = subprocess.run(args, capture_output=True, text=True, timeout=20, env=env)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr[-300:])
-        m = re.match(r"cls=(\d+) kind=(\d+) count=(\d+)", r.stdout)
+        m = re.match(r"cls=(\d+) kind=(\d+) count=(\d+)(?: mode=(\d+) switches=(\d+))?", r.stdout)
         self.assertTrue(m, r.stdout)
         self.last_count = int(m.group(3))
+        self.last_mode = int(m.group(4)) if m.group(4) is not None else None
+        self.last_switches = int(m.group(5)) if m.group(5) is not None else None
         return int(m.group(1)), int(m.group(2))
 
     def check(self, name):
@@ -646,6 +672,70 @@ class CycleClassifier(unittest.TestCase):
             self.assertAlmostEqual(float(v["c2_4h_avg_off_s"]), (0 + 600) / 2.0, places=3, msg="4h avg off time")
         with self.subTest("4h duty ratio"):
             self.assertAlmostEqual(float(v["c2_4h_duty"]), 600.0 / (600.0 + 600.0), places=5, msg="4h duty ratio")
+
+    # --- TASK-1331: the verdict switches PWM on or off at flame off (thermo-nova pwm.py:219-227, entries 15, 18, 36, 37) ---
+    def end_of_cycle(self, name, expect_mode, expect_switches, deny=False):
+        self.run_case(name, deny=deny, cases=END_CASES)
+        self.assertEqual((self.last_mode, self.last_switches), (expect_mode, expect_switches),
+                         "%s: mode/switches after the cycle (0 off, 1 continuous, 2 PWM)" % name)
+
+    def test_task1331_continuous_overshoot_cycle_enables_pwm(self):
+        self.end_of_cycle("E1_continuous_overshoot", PWM, 1)
+
+    def test_task1331_continuous_good_cycle_changes_nothing(self):
+        self.end_of_cycle("E2_continuous_good", CONT, 0)
+
+    def test_task1331_pwm_underheat_cycle_disables_pwm(self):
+        self.end_of_cycle("E3_pwm_underheat", CONT, 1)
+
+    def test_task1331_pwm_good_cycle_changes_nothing(self):
+        self.end_of_cycle("E4_pwm_good", PWM, 0)
+
+    def test_task1331_other_continuous_verdicts_change_nothing(self):
+        # continuous UNDERHEAT is not the PWM branch; UNCERTAIN (no CH enable) is neutral too
+        self.end_of_cycle("E5_continuous_underheat", CONT, 0)
+        self.end_of_cycle("E6_continuous_uncertain", CONT, 0)
+
+    def test_task1331_pwm_gate_refusal_keeps_continuous(self):
+        # MsgID 3 HB bit 4 = 1 (or no valid reply): satPwmEntryAllowed(5) says no, the OVERSHOOT verdict changes nothing
+        self.end_of_cycle("E1_continuous_overshoot", CONT, 0, deny=True)
+        # the gate guards the entry only: a PWM UNDERHEAT_PWM cycle still leaves PWM
+        self.end_of_cycle("E3_pwm_underheat", CONT, 1, deny=True)
+
+    def test_task1331_mode_off_is_left_alone(self):
+        self.end_of_cycle("E7_mode_off_overshoot", 0, 0)
+
+    def test_task1331_a_switch_out_of_pwm_mid_burn_does_not_come_back_as_overshoot(self):
+        """Entry 36: PWM holds a low control setpoint (30) for 100 s, the underheat exit then returns to continuous (setpoint 60,
+        flow 60). Per-sample setpoints give a tail error 0: GOOD, the mode stays continuous. A classifier that measures against the
+        setpoint at flame-on (30) would see +30, call it OVERSHOOT and enable PWM again at flame off (the ping-pong)."""
+        self.end_of_cycle("E8_switch_out_of_pwm_mid_burn", CONT, 0)
+
+    def test_task1331_the_ping_pong_test_goes_red_on_a_per_cycle_setpoint(self):
+        """Mutant: the tail error against the flame-on setpoint (what entry 36 retired). The ping-pong case must go red."""
+        global CYCLES_INO
+        src = CYCLES_INO.read_text(encoding="utf-8")   # universal newlines: CRLF arrives as LF
+        needle = "const float sp = state.sat.fFinalSetpoint;"
+        self.assertIn(needle, src)
+        if "satCycleApplyEndOfCycle" not in src:
+            self.skipTest("no end-of-cycle hook in this copy")
+        saved = CYCLES_INO
+        with tempfile.TemporaryDirectory() as td:
+            mutant = Path(td) / "SATcycles_mutant.ino"
+            mutant.write_text(src.replace(needle, "const float sp = _cycle_setpointAtStart;"), encoding="utf-8")
+            CYCLES_INO = mutant
+            try:
+                exe, _ = build(Path(td))
+            finally:
+                CYCLES_INO = saved
+            c = END_CASES["E8_switch_out_of_pwm_mid_burn"]
+            args = [str(exe), repr(c.ctrl), repr(c.req), "0.0", "0", "0"]
+            args += [("%d:%r:0x%X:%d:%d" % s[:5]) + ("" if len(s) < 6 else ":%r" % s[5]) for s in c.segs]
+            r = subprocess.run(args, capture_output=True, text=True, timeout=20)
+            m = re.match(r"cls=(\d+) kind=\d+ count=\d+ mode=(\d+) switches=(\d+)", r.stdout)
+            self.assertTrue(m, r.stdout)
+            self.assertEqual(CLS_NAME[int(m.group(1))], "OVERSHOOT")
+            self.assertEqual((int(m.group(2)), int(m.group(3))), (PWM, 1), "the mutant must ping-pong back into PWM")
 
     def test_kind_mixed(self):
         _, kind = self.run_case("kind_mixed")
