@@ -1,9 +1,11 @@
 ---
 id: TASK-1586
 title: 'SAT cycle classifier: interpolated percentiles, as thermo-nova (entry 248)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-03T07:52:00Z'
+updated_date: '2026-11-03T08:42:00Z'
 labels:
   - sat
 dependencies: []

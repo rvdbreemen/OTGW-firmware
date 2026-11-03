@@ -3,9 +3,11 @@ id: TASK-1588
 title: >-
   SAT cycle classifier: drop cycles with fewer than 3 samples and count the
   flame-on sample, as thermo-nova (entry 249)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-03T08:41:00Z'
+updated_date: '2026-11-03T08:42:00Z'
 labels:
   - sat
 dependencies: []
