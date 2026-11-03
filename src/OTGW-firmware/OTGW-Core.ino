@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.40
+**  Version  : v2.0.0-beta.41
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2835,9 +2835,17 @@ void print_f88(float& value)
   // ADR-118: capture gateway-injected override (additive; does NOT affect canonical).
   // Gated on the explicit suppression flags only, NOT !validForMaster (which is also
   // false for non-override reasons). Pure RAM write — no MQTT publish, no yield.
+  // TASK-1389: a Write-Ack whose data byte the slave does not echo (bSlaveEchoesValue false,
+  // e.g. MsgID 14 MaxRelModLevelSetting) carries no value, so the A frame of such a write is
+  // no override value (it stored 0.00 over the real one). The value the gateway applies to
+  // such an id is the write it substituted for the boiler: the R frame.
+  const bool ackWithoutValue = (OTdata.type == OT_WRITE_ACK) && !OTlookupitem.bSlaveEchoesValue;
   if ((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && OTdata.bAnswerOverride) {
-    recordOTOverride(OTdata.id, OT_OVERRIDE_ANSWER, _value);
+    if (!ackWithoutValue) recordOTOverride(OTdata.id, OT_OVERRIDE_ANSWER, _value);
   } else if ((OTdata.rsptype == OTGW_THERMOSTAT) && OTdata.bGatewaySubstituted) {
+    recordOTOverride(OTdata.id, OT_OVERRIDE_SUBSTITUTED, _value);
+  } else if ((OTdata.rsptype == OTGW_REQUEST_BOILER) && (OTdata.type == OT_WRITE_DATA)
+             && !OTlookupitem.bSlaveEchoesValue) {
     recordOTOverride(OTdata.id, OT_OVERRIDE_SUBSTITUTED, _value);
   }
 

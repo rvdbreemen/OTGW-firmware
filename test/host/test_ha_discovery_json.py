@@ -554,6 +554,19 @@ def dup_clear_topics(run):
     return {p["topic"] for p in run[2] if p["tag"] == DUP_CLEAR}
 
 
+def override_sensor_units(run):
+    """{msg id: (device_class, unit)} of the override sensors streamOverrideSensorDiscovery() announces."""
+    out = {}
+    for p in run[2]:
+        if p["tag"] != "streamOverrideSensorDiscovery" or not p["raw"]:
+            continue
+        m = re.search(r"id=(\d+)", p["args"])
+        obj = strict_json(p["raw"])[0] or {}
+        if m:
+            out.setdefault(int(m.group(1)), set()).add((obj.get("device_class"), obj.get("unit_of_measurement")))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--old-rev", help="also build the code under test from this git revision (OLD)")
@@ -576,6 +589,12 @@ def main():
     got = rf_batt_stat_t(fix)
     checks.append((f"TASK-1203 FIX: the RF battery-code sensor's stat_t is the topic its value is "
                    f"published on (got {sorted(got)})", got == want))
+    ov = override_sensor_units(fix)
+    checks.append((f"TASK-1389 FIX: the MaxRelModLevelSetting override sensor (id 14) is a percentage, no temperature class "
+                   f"(got {sorted(ov.get(14, []), key=str)})", ov.get(14) == {(None, "%")}))
+    others = {i: v for i, v in ov.items() if i != 14}
+    checks.append((f"TASK-1389 FIX: the other override sensors stay temperature in degrees C (got {len(others)} ids)",
+                   bool(others) and all(v == {("temperature", "\u00b0C")} for v in others.values())))
     e = dispatch244(fix)
     checks.append((f"TASK-1206 FIX: ID 244 reports done only when every config published (got {e})",
                    e == {"none": 1, "/resetgateway/": 0, "/select/": 0}))

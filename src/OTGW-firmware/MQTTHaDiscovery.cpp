@@ -3281,9 +3281,12 @@ bool streamOverrideSensorDiscovery(HaDiscoveryContext &ctx,
     if (!w.writeProgmem(PSTR("_override\""))) return false;
     if (!writeJsonComma(w)) return false;
 
-    // device_class temperature + name "<label> Override"
-    if (!writeJsonKV_P(w, kDevCls, PSTR("temperature"))) return false;
-    if (!writeJsonComma(w)) return false;
+    // device_class temperature + name "<label> Override". TASK-1389: MsgID 14 is a
+    // percentage (max relative modulation), so it gets no temperature class.
+    if (otid != 14) {
+      if (!writeJsonKV_P(w, kDevCls, PSTR("temperature"))) return false;
+      if (!writeJsonComma(w)) return false;
+    }
     if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
     if (!w.writeRam(label)) return false;
     if (!w.writeProgmem(PSTR(" Override\""))) return false;
@@ -3298,9 +3301,15 @@ bool streamOverrideSensorDiscovery(HaDiscoveryContext &ctx,
     if (!writeJsonComma(w)) return false;
 
     // unit + icon
-    if (!w.writeProgmem(PSTR("\"unit_of_measurement\":\"\xC2\xB0""C\""))) return false;
-    if (!writeJsonComma(w)) return false;
-    if (!writeJsonKV_P(w, kIcon, PSTR("mdi:thermometer-alert"))) return false;
+    if (otid == 14) {
+      if (!w.writeProgmem(PSTR("\"unit_of_measurement\":\"%\""))) return false;
+      if (!writeJsonComma(w)) return false;
+      if (!writeJsonKV_P(w, kIcon, PSTR("mdi:percent-outline"))) return false;
+    } else {
+      if (!w.writeProgmem(PSTR("\"unit_of_measurement\":\"\xC2\xB0""C\""))) return false;
+      if (!writeJsonComma(w)) return false;
+      if (!writeJsonKV_P(w, kIcon, PSTR("mdi:thermometer-alert"))) return false;
+    }
 
     // origin
     if (!writeJsonComma(w)) return false;

@@ -819,6 +819,10 @@ For MsgIDs where the slave does store and echo the value (most R/W parameters, C
 
 See `docs/api/MQTT-message-id-echo-audit.md` for the full per-MsgID classification with spec-citation rationale.
 
+#### Gateway override topics `{TopTopic}/<label>/override` (ADR-118, TASK-1389)
+
+Retained, republished every 60 s while an override is active (not refreshed for 10 minutes = stale). Home Assistant gets one sensor per override-capable MsgID (Gateway device). For `MaxRelModLevelSetting/override` (MsgID 14) the value is the percentage the PIC applies after `MM=`: the substituted write (`R` frame, e.g. `100.00` after `MM=100`), unit `%`, no `device_class` (the other override sensors stay `temperature`, `°C`). The Write-Ack of that write is not used: its data byte is per spec undefined for MsgID 14 (`bSlaveEchoesValue` false). Before TASK-1389 this topic showed `0.00` and was declared as a temperature.
+
 #### Migration note (2.0.0 topic-shape transition)
 
 Two changes shipped in successive 2.0.0 alpha builds. Migration guidance:

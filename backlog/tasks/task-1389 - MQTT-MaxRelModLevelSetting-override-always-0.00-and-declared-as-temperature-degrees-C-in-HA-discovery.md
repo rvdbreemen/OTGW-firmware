@@ -3,11 +3,11 @@ id: TASK-1389
 title: >-
   MQTT MaxRelModLevelSetting/override always 0.00 and declared as temperature
   (degrees C) in HA discovery
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T12:53:00Z'
-updated_date: '2026-11-03T05:43:00Z'
+updated_date: '2026-11-03T06:11:00Z'
 labels: []
 milestone: 2.0.0
 dependencies:
@@ -26,8 +26,8 @@ Seen in gruijter's alpha.504 capture 2026-10-25 (verifier of wf_4831cf35): the t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Root cause traced with file:line
-- [ ] #2 Topic reflects the active MM override (or is documented otherwise) and discovery declares a percentage (host test or capture, red on HEAD)
+- [x] #1 Root cause traced with file:line
+- [x] #2 Topic reflects the active MM override (or is documented otherwise) and discovery declares a percentage (host test or capture, red on HEAD)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -40,4 +40,12 @@ Seen in gruijter's alpha.504 capture 2026-10-25 (verifier of wf_4831cf35): the t
 2026-10-30 maintainer decision (Robert, in session otgw-firmware-ea): released for pickup ('vrijgeven'); label needs-maintainer-ok removed. Priority after beta-1 blockers unless it is one.
 
 Released by Robert 2026-11-03 (interactive, maintainer): high priority. Note for the fix: an HA entity whose unit changes from degrees C to % can lose its statistics history; mention it in the release notes.
+
+2026-11-03 (agent, verified by lead in wt-next): root cause print_f88() stored the PIC's Write-Ack A frame for MsgID 14 (data undefined, bSlaveEchoesValue=false, OTGW-Core.h:388) as 0.00; the substituted R frame (100) was never captured. Fix: skip such A Write-Acks, record the R Write-Data frame (ids with bSlaveEchoesValue=false: 1, 8, 14, 16). Discovery id 14: unit %, no device_class, mdi:percent-outline. test/host/test_override_modlevel.py: old O1+O2 FAIL, fix 4/4 PASS; test_ha_discovery_json.py two new checks red before, PASS after; sat energy/health discovery OK. Two other test/host harnesses fail to compile on clean dev already (TASK-1582), unrelated. Not verified: real processOT() pairing on a capture; HA statistics history of the entity may reset (unit change, CHANGELOG notes it).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+MaxRelModLevelSetting/override now shows the applied MM override (the PIC's substituted R frame) instead of 0.00 from the Write-Ack, and its HA discovery declares %. Evidence: new host harness on the real print_f88 (old 2 FAIL, fix 4/4) and two discovery checks red-then-green. Not verified on a capture or bench; ids 1/8/16 overrides now also take the R frame.
+<!-- SECTION:FINAL_SUMMARY:END -->
