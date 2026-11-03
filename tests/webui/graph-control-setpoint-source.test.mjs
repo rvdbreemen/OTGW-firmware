@@ -52,9 +52,10 @@ function load() {
     'var model = { flow: null, ret: null, dhw: null, outside: null, room: null, roomSet: null, chSet: null,' +
     ' mod: null, pressure: null, flame: false, ch: false, dhw_on: false, fault: false, fresh: false, wxValid: false };\n' +
     'var samples = [], SAMPLES_MAX = 1800, GSLOT = 5000, GHIST_MAX = 86400000 / GSLOT, gHist = [], gDallas = null, gLastRender = 0;\n' +
+    'var sat = { roomLost: false }, GROOM_STALE_MS = 270000;\n' +
     'function scheduleRender() {}\nfunction isMonitorVisible() { return false; }\nfunction renderGraph() {}\n' +
     [extractFunction(SRC, 'f88'), extractFunction(SRC, 'applyFrame'), extractFunction(SRC, 'rawFromLine'),
-     extractFunction(SRC, 'pushSample'), extractFunction(SRC, 'pushGraphSlot'), extractFunction(SRC, 'applyOtmonToModel')]
+     extractFunction(SRC, 'pushSample'), extractFunction(SRC, 'graphRoomLost'), extractFunction(SRC, 'pushGraphSlot'), extractFunction(SRC, 'applyOtmonToModel')]
       .join('\n').replace(/\bDate\.now\b/g, 'fakeDate.now') + '\n' +
     'return { model: model, gHist: function () { return gHist; }, setClock: function (t) { clock = t; },' +
     ' feed: function (line) { var raw = rawFromLine(line); if (raw) applyFrame(raw); return raw; },' +

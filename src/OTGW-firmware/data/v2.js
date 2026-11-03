@@ -511,7 +511,7 @@
       case 16: if (type === 1) { model.roomSet = f88(u16); changed = true; } break;  // TrSet (thermostat setpoint); Write-Ack data is undefined too
       case 17: if (isAck) { model.mod = f88(u16); changed = true; } break;        // RelModLevel
       case 18: if (isAck) { model.pressure = f88(u16); changed = true; } break;   // CH water pressure
-      case 24: if (isAck || isWrite) { model.room = f88(u16); changed = true; } break; // Troom
+      case 24: if (isAck || isWrite) { model.room = f88(u16); model.roomAt = Date.now(); changed = true; } break; // Troom (TASK-1546: roomAt = when it was last reported)
       case 25: if (isAck) { model.flow = f88(u16); changed = true; } break;       // Tboiler (flow)
       case 26: if (isAck) { model.dhw = f88(u16); changed = true; } break;        // Tdhw
       case 27: if (isAck && !model.wxValid) { model.outside = f88(u16); changed = true; } break;    // Toutside (yields to weather API when valid, TASK-954)
@@ -1342,6 +1342,14 @@
   var GLANE_Y = { flame: 196, dhw_on: 218, ch: 240 };
   var gOff = {};
   try { gOff = JSON.parse(localStorage.getItem('otgw-v2-goff') || '{}') || {}; } catch (e) { gOff = {}; }
+  // TASK-1546: no valid room temperature. With SAT on, SAT's own verdict (sat/status room_temp_lost);
+  // otherwise (and as a cross-check) the thermostat has not reported MsgID 24 for GROOM_STALE_MS, the same window
+  // as SAT's room timeout (about 4.5 min). A unit that never reported a room temperature has no dropout to show.
+  var GROOM_STALE_MS = 270000, GROOM_X = '#ff6b9d';
+  function graphRoomLost(now) {
+    if (sat.roomLost) return true;
+    return model.room !== null && !!model.roomAt && now - model.roomAt > GROOM_STALE_MS;
+  }
   function pushGraphSlot() {
     var now = Date.now(), t = now - now % GSLOT, r = gHist[gHist.length - 1];
     if (!r || r.t !== t) {
@@ -1349,6 +1357,8 @@
       if (gHist.length > GHIST_MAX + 256) gHist = gHist.slice(-GHIST_MAX);   // trim in batches
     }
     ['flow', 'ret', 'chSet', 'roomSet', 'room', 'outside', 'mod'].forEach(function (k) { r[k] = model[k]; });
+    r.roomX = graphRoomLost(now) ? 1 : 0;   // TASK-1546: a dropout is no reading: the room value is empty (CSV, line break)
+    if (r.roomX) r.room = null;
     ['flame', 'dhw_on', 'ch'].forEach(function (k) { if (model[k]) r[k] = 1; });
     r.d = gDallas;   // shared object, replaced (never mutated) on each sensors poll
     if (now - gLastRender > 2000 && isMonitorVisible('mgraph')) renderGraph();
@@ -1499,8 +1509,10 @@
     var win = graphWindowMs || 3600000, t0 = gLastRender - win, span = C_X1 - C_X0;
     var arr = windowedSamples(), keys = graphKeys(arr), metas = keys.map(gMeta), cols = {}, lo = Infinity, hi = -Infinity;
     // One value per pixel column (last value; max for lanes) keeps each polyline ~740 points.
+    var xcol = [];   // TASK-1546: [x, 1, t, span] of the records where the room temperature is lost
     arr.forEach(function (r) {
       var x = Math.round(C_X0 + (r.t - t0) / win * span);
+      if (r.roomX) { var px = xcol[xcol.length - 1]; if (px && px[0] === x) { px[2] = r.t; px[3] = r.span || 0; } else xcol.push([x, 1, r.t, r.span || 0]); }
       keys.forEach(function (k, i) {
         var v = gVal(r, k); if (v === null || v === undefined || isNaN(v)) return;
         var c = cols[k] || (cols[k] = []), p = c[c.length - 1], kind = metas[i][3];
@@ -1527,6 +1539,18 @@
       if (!gOff[k] && c.length) d = graphPath(c, kind, y, GLANE_Y[k]);
       el.setAttribute('d', d);
     });
+    // TASK-1546: the room dropout is its own line in a different colour along the bottom of the plot; it follows the room legend toggle
+    var ex = g.querySelector('[data-k="roomX"]');
+    if (!ex) {
+      ex = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      ex.setAttribute('data-k', 'roomX'); ex.setAttribute('stroke', GROOM_X); ex.setAttribute('stroke-width', '2.6'); ex.setAttribute('fill', 'none');
+      ex.setAttribute('stroke-dasharray', '2 3');
+      var title = document.createElementNS('http://www.w3.org/2000/svg', 'title'); title.textContent = 'Room temperature: no reading';
+      ex.appendChild(title);
+      g.appendChild(ex);
+    }
+    var xd = (!gOff.room && xcol.length) ? graphPath(xcol, 't', function () { return 167; }) : '';
+    ex.setAttribute('d', xd.replace(/M([\d.]+),([\d.]+)(?![\d.]| L)/g, function (m, a, c) { return 'M' + a + ',' + c + ' L' + (+a + 3) + ',' + c; }));
     renderGraphTime(t0, win);
     renderGraphLegend(keys, metas);
     gRArr = arr; gRKeys = keys; gRMetas = metas;   // the readout reads what was drawn
@@ -3046,7 +3070,7 @@
   // P9: heat-source control, REST seed, target steppers, conn detail,
   // support hover, graph window/export, settings enum options.
   // ============================================================
-  var sat = { source: 0, detected: 1, target: null, active: false };  // source: 0=auto,1=gas,2=hp,3=hybrid
+  var sat = { source: 0, detected: 1, target: null, active: false, roomLost: false };  // roomLost: SAT is on and has no valid room temperature (TASK-1546); source: 0=auto,1=gas,2=hp,3=hybrid
   function effectiveSource() { return sat.source === 0 ? sat.detected : sat.source; }
   var statsSort = { col: 'id', asc: true };
   function sortStatsCmp(a, b) {
@@ -3172,6 +3196,9 @@
     var map = { flow: 'boilertemperature', ret: 'returnwatertemperature', dhw: 'dhwtemperature', outside: 'outsidetemperature', room: 'roomtemperature', roomSet: 'roomsetpoint', chSet: 'controlsetpoint', mod: 'relmodlvl', pressure: 'chwaterpressure' };
     var changed = false;
     Object.keys(map).forEach(function (f) { if (f === 'outside' && model.wxValid) return; var v = num(map[f]); if (v !== null) { model[f] = v; changed = true; } });
+    // TASK-1546: the otmonitor epoch of the room temperature is a rolling counter; a new value means the thermostat reported again
+    var re = o.roomtemperature && o.roomtemperature.epoch;
+    if (re && re !== model.roomEp) { model.roomEp = re; model.roomAt = Date.now(); }
     var fl = on('flamestatus'); if (fl !== null) { model.flame = fl; changed = true; }
     var ch = on('chmodus'); if (ch !== null) { model.ch = ch; changed = true; }
     var dh = on('dhwmode'); if (dh !== null) { model.dhw_on = dh; changed = true; }
@@ -3417,6 +3444,7 @@
       if (st.heating_source_detected !== undefined) sat.detected = st.heating_source_detected | 0;
       if (st.target_temp !== undefined) sat.target = parseFloat(st.target_temp);
       sat.active = !!st.active;   // TASK-1342: room tile shows SAT's target while SAT controls
+      sat.roomLost = !!(st.enabled && st.room_temp_lost);   // TASK-1546
       applyApplianceToggle();
       if (activeDesign() === 'a') renderA();
     }).catch(function () { });
@@ -4796,6 +4824,7 @@
     txt('satStatusBig', big);
     var pr = document.getElementById('satPushRefused'); if (pr) pr.hidden = !(enabled && d.push_refused);
     var rl = document.getElementById('satRoomLost'); if (rl) rl.hidden = !(enabled && d.room_temp_lost);
+    sat.roomLost = !!(userEnabled && d.room_temp_lost);   // TASK-1546: the graph reads it
     var ol = document.getElementById('satOtLost'); if (ol) ol.hidden = !(enabled && d.ot_link_lost);
     var om = document.getElementById('satOutsideMissing'); if (om) om.hidden = !(enabled && d.outside_temp_missing);
     satRenderPresets(d);
