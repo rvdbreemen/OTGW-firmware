@@ -3,10 +3,11 @@ id: TASK-1397
 title: >-
   WiFi: connect to the strongest access point of the SSID (and consider
   re-selecting when the signal is poor)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T19:48:00Z'
-updated_date: '2026-11-03T05:37:00Z'
+updated_date: '2026-11-03T05:45:00Z'
 labels:
   - wifi
 milestone: 2.0.0
