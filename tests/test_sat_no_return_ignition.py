@@ -108,6 +108,10 @@ static bool isBoilerMsgIdUnsupportedRead(uint8_t id) { return id == 28 && g_noRe
 static bool boilerMsgId28UnknownConfirmed() { return g_confirmed; }   // a boiler frame of this boot said Unknown-DataID
 static bool picBoardTretAbsent() { return !g_boardTret; }
 static bool picBoardTretValid() { return g_boardTret; }                // only the version before the review fixes calls it            // settled: no board sensor reading
+// TASK-1412.5: satNoReturnTemp() now asks the feed validity. The feed itself is tested in tests/test_sat_flow_return_validity.py; here a return
+// temperature is fresh for a boiler that answers MsgID 28 or while the board sensor reads, and the 5 minute "missing" path stays closed.
+static bool satReturnFresh() { return g_boardTret || !g_noReturn; }
+static bool satReturnMissingLong() { return false; }
 static bool pmChainBusy() { return g_pmBusy; }
 static uint8_t satGetManufacturerQuirks() { return g_quirks; }
 #define DUE(t) (g_due)

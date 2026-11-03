@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.38
+**  Version  : v2.0.0-beta.39
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5926,6 +5926,16 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
           !OTdata.skipthis && !OTdata.bGatewaySubstituted) {
         state.otBus.iToutsideBoilerMs = millis();
         if (state.otBus.iToutsideBoilerMs == 0) state.otBus.iToutsideBoilerMs = 1;
+      }
+      // TASK-1412.5: the boiler's own reply to a read of the flow (25) or return (28) temperature, for SAT's validity and age
+      // check (entries 217, 218). Only a boiler reply counts: not a frame the gateway made (OT-Direct answer, loopback, the
+      // master-mode cache replay), not a replayed line, not a parity error. A B frame flagged bGatewaySubstituted still counts:
+      // it is the boiler's reply and print_f88() stores its value.
+      if ((OTdata.id == OT_Tboiler || OTdata.id == OT_Tret) && OTdata.masterslave == 1 && !OTdata.skipthis) {
+        const SatFeedEvent feedEvent = satFeedEventForFrame(OTdata.rsptype == OTGW_BOILER, OTdata.bLocalAnswer || OTdata.bReplayed,
+                                                            OTdata.type == OT_READ_ACK, OTdata.type == OT_DATA_INVALID,
+                                                            OTdata.type == OT_UNKNOWN_DATA_ID);
+        satFeedNote(OTdata.id == OT_Tboiler ? state.otBus.feedTboiler : state.otBus.feedTret, feedEvent, millis());
       }
 
       if (OTdata.skipthis || OTdata.bGatewaySubstituted) AddLog(" <ignored> ");

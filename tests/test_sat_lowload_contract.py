@@ -152,6 +152,7 @@ DELEGATED = {
     "LL-011": [("test_sat_pwm_override", "SatPwmOverride", ["test_no_flow_temperature_idles_pwm_and_sends_the_continuous_setpoint"]),
                ("test_sat_no_return_ignition", "NoReturnIgnition", ["test_a_restored_unknown_dataid_verdict_alone_is_no_return_nothing",
                                                                     "test_valid_board_sensor_counts_as_a_return_temperature"])],
+    "LL-011b": [("test_sat_flow_return_validity", "FlowReturnValidity", None)],   # TASK-1412.5: every validity class, 60 s flow, 5 min return
     "LL-012": [("test_sat_overshoot_sustain", "SustainedSwitches", ["test_dhw_guard_blocks_overshoot_for_300s_after_the_draw",
                 "test_dhw_guard_overshoot_exact_window", "test_dhw_guard_inactive_without_a_draw_near_the_millis_wrap",
                 "test_dhw_resets_underheat_and_blocks_it_for_300s", "test_dhw_resets_saturation_and_blocks_it_for_300s"]),
@@ -358,11 +359,10 @@ class LowLoadContract(unittest.TestCase):
     def test_ll011_flow_sentinel_unknown_dataid_and_board_sensor_return(self):
         self.delegated("LL-011")
 
-    @ll("LL-011", "known_defect", "none: SAT keeps no per-ID age or Data-Invalid state for IDs 25/28 (structural check)",
-        task="TASK-1412.5", question="QD-5, QD-6")
+    @ll("LL-011", "contract", "satFlowFeedClass, satReturnFeedClass, satGetFlowTemp, satGetReturnTemp, satNoReturnTemp, the processOT frame hook (via test_sat_flow_return_validity)",
+        task="TASK-1412.5 (fixed; entries 217, 218, 241): unsupported, never received, Data-Invalid, stale, fresh zero, valid; flow 60 s, return 5 min")
     def test_ll011b_per_id_age_and_invalid_state_exist(self):
-        sat = (FW / "SATcontrol.ino").read_text(encoding="utf-8") + (FW / "SATtypes.h").read_text(encoding="utf-8")
-        self.assertRegex(sat, r"(?i)(flow|return)\w*(Age|Fresh|Invalid|SeenMs|LastMs)\w*", "no per-ID age/validity for the flow and return temperature")
+        self.delegated("LL-011b")
 
     # LL-012 .. LL-015, LL-017 .. LL-021, LL-023 -------------------------------------------------------------------------
     @ll("LL-012", "contract", "satCycleCheck* DHW guard, satApplyPWM DHW pause/resume (SATcycles.ino, SATcontrol.ino)",
@@ -400,11 +400,12 @@ class LowLoadContract(unittest.TestCase):
     def test_ll018_missing_return_ignition(self):
         self.delegated("LL-018")
 
-    @ll("LL-018", "open_decision", "none: a return temperature that stops arriving (Data-Invalid/stale) is not detected (structural)",
-        task="TASK-1412.12", question="Conf-1371, QD-5")
+    @ll("LL-018", "open_decision", "none: the stale/Data-Invalid return rule (entry 217, TASK-1412.5) is host-tested; Conf-1371 (this-boot Unknown-DataID, 5 min board reading) is not answered and both transports are not benched (document check)",
+        task="TASK-1412.12", question="Conf-1371")
     def test_ll018b_stale_or_invalid_return_is_treated_as_missing(self):
-        sat = (FW / "SATcontrol.ino").read_text(encoding="utf-8")
-        self.assertRegex(sat, r"(?i)return\w*(Stale|Invalid|Age|SeenMs|LastMs)\w*", "no per-ID stale/invalid return handling (BoilerLastSeenMs is whole-link liveness and does not count)")
+        rows = [l for l in (REPO / "docs" / "sat" / "open-questions.md").read_text(encoding="utf-8").splitlines() if l.startswith("| Conf-1371 ")]
+        self.assertEqual(len(rows), 1, "Conf-1371 row not found in docs/sat/open-questions.md")
+        self.assertNotRegex(rows[0], r"(?i)queued|not asked|asked, ?waiting", "Conf-1371 is still open with Sergeant D")
 
     @ll("LL-019", "contract", "satApplyPWM phase anchors, ignition wait, start counting (via test_sat_pwm_anchors, test_sat_hp_pwm)",
         task="TASK-1380/1382/1383/1421 (fixed); TASK-1412.9 revalidation (matrix per source, limit windows, rollover)")
@@ -531,7 +532,7 @@ def main():
         "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started)),
         "git_head": git("rev-parse", "HEAD"), "git_dirty_src": git("status", "--porcelain", "--", "src").splitlines(),
         "release_mode": RELEASE, "override_env": {k: v for k, v in os.environ.items() if k.startswith("OTGW_SAT")},
-        "production_sources_sha256": {n: file_sha(FW / n) for n in ("SATcontrol.ino", "SATcycles.ino", "SATpid.ino", "SATchEnable.h", "SATtypes.h", "safeTimers.h")},
+        "production_sources_sha256": {n: file_sha(FW / n) for n in ("SATcontrol.ino", "SATcycles.ino", "SATpid.ino", "SATchEnable.h", "SATboilerFeed.h", "SATtypes.h", "safeTimers.h")},
         "harness_program_sha256": HARNESS_HASH,
         "test_modules_sha256": {m: file_sha(TESTS / (m + ".py")) for m in modules},
         "missing_ll_ids": missing, "tests": per_test,

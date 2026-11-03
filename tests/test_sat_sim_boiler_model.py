@@ -186,7 +186,7 @@ class SatTickSource(unittest.TestCase):
         text = SAT_INO.read_text(encoding="utf-8")
         ticks = [l for l in text.splitlines() if 'PSTR("SATTICK' in l]
         self.assertEqual(len(ticks), 2, ticks)
-        tail = text[text.index(ticks[1]):text.index(ticks[1]) + 900]
+        tail = text[text.index(ticks[1]):text.index(ticks[1]) + 1500]
         self.assertIn("satGetFlowTemp()", tail)
         self.assertIn("satGetReturnTemp()", tail)
         self.assertNotIn("OTcurrentSystemState.Tboiler", tail)

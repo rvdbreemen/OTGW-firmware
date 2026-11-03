@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTBustypes.h
-**  Version  : v2.0.0-beta.38
+**  Version  : v2.0.0-beta.39
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -20,6 +20,7 @@
 
 #include <Arduino.h>
 #include <time.h>
+#include "SATboilerFeed.h"
 
 struct OTBusState {          // state.otBus — OpenTherm protocol & bus state (semantic name: OT bus traffic, not the gateway as a whole)
   bool bOnline           = false;  // was bOTGWonline — serial link alive
@@ -51,4 +52,10 @@ struct OTBusState {          // state.otBus — OpenTherm protocol & bus state (
   // summary does not stamp it: it repeats stored values with no age (ADR-181). SAT counts MsgID 27 as a
   // valid outside temperature only while this is younger than 1 hour (TASK-1390, entries 57, 126).
   uint32_t iToutsideBoilerMs = 0;
+  // Validity and age of the boiler flow (MsgID 25) and return (MsgID 28) temperature, from boiler replies only (a live
+  // Read-Ack, Data-Invalid, Unknown-DataID; PIC and OT-Direct alike). The PS=1 summary and the board return sensor do not
+  // stamp them: a summary repeats stored values with no age (ADR-181). SAT reads them through satGetFlowTemp() and
+  // satGetReturnTemp() (TASK-1412.5, entries 217, 218).
+  SatBoilerFeed feedTboiler;
+  SatBoilerFeed feedTret;
 };

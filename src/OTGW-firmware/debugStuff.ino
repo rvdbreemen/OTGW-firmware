@@ -13,8 +13,8 @@
 **  and removes the prior multi-definition fragility of Debug.h):
 **
 **    - _debugPrintf_P(fmt, ...)
-**        PROGMEM-format-string helper. vsnprintf_P into a 256-byte stack
-**        buffer, then debugTelnet.print(buf). Strings longer than 255
+**        PROGMEM-format-string helper. vsnprintf_P into a 320-byte stack
+**        buffer, then debugTelnet.print(buf). Strings longer than 319
 **        chars are silently truncated -- acceptable for debug output.
 **
 **    - _debugBOL(fn, line)
@@ -29,10 +29,10 @@
 
 // SimpleTelnet inherits from Stream/Print but printf_P() is used here as a
 // standalone helper for PROGMEM format strings via vsnprintf_P into a
-// 256-byte stack buffer, then sent via debugTelnet.print().
-// Debug strings that exceed 255 chars are silently truncated -- acceptable.
+// 320-byte stack buffer, then sent via debugTelnet.print().
+// Debug strings that exceed 319 chars are silently truncated -- acceptable.
 void _debugPrintf_P(PGM_P fmt, ...) {
-    char buf[256];
+    char buf[320];   // TASK-1412.5: the SATTICK line (with fc/fage/rc/rage) is up to 284 chars in the worst case
     va_list args;
     va_start(args, fmt);
     vsnprintf_P(buf, sizeof(buf), fmt, args);

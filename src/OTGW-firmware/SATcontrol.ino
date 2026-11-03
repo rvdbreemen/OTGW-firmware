@@ -2388,23 +2388,82 @@ static float satSimNoiseOffset()
   return u * state.sat.fSimNoiseAmplitudeC;
 }
 
+// Flow (MsgID 25) and return (MsgID 28) feed validity (TASK-1412.5). The boiler replies stamp state.otBus.feedTboiler / feedTret in
+// processOT() (SATboilerFeed.h); these windows decide how old a valid sample may be.
+//  - flow: a flow temperature invalid or stale for 60 s counts as missing (Sergeant D entry 218, QD-6 A, with N set to 60 s by entry 241,
+//    QD-6b A: a field capture shows MsgID 25 gaps up to 40.8 s). Missing is the 0.0 sentinel the PWM and control code already
+//    reads as "no flow temperature": PWM idle, the continuous setpoint (thermo-nova pwm.py:122-128, heating_control.py:149-150).
+//  - return: a return temperature invalid or absent for 5 minutes counts as no return temperature (entry 217, QD-5 A), so the
+//    flow + 18 start-up of entries 45 and 149 applies (thermo-nova only knows "missing": no flame-off hold, heating_control.py:393-395).
+//    A valid board return sensor reading ('R', PR=E) counts as a return temperature for the same 5 minutes.
+// A live link does not make a feed fresh: iBoilerLastSeenMs is whole-link liveness and plays no part here.
+static const uint32_t SAT_FLOW_VALID_MS   = 60000UL;
+static const uint32_t SAT_RETURN_VALID_MS = 300000UL;
+
+static SatFeedClass satFlowFeedClass()
+{
+  if (settings.sat.bSimulation) return SatFeedClass::Valid;   // the simulation models both temperatures
+  return satFeedClassify(state.otBus.feedTboiler, millis(), SAT_FLOW_VALID_MS, isBoilerMsgIdUnsupportedRead(25),
+                         OTcurrentSystemState.Tboiler);
+}
+
+static SatFeedClass satReturnFeedClass()
+{
+  if (settings.sat.bSimulation) return SatFeedClass::Valid;
+  return satFeedClassify(state.otBus.feedTret, millis(), SAT_RETURN_VALID_MS, isBoilerMsgIdUnsupportedRead(28),
+                         OTcurrentSystemState.Tret);
+}
+
+// The OpenTherm MsgID 28 feed is fresh or the board sensor gave a reading in the last 5 minutes.
+static bool satReturnFresh()
+{
+  return satFeedClassIsFresh(satReturnFeedClass()) || picBoardTretValid();
+}
+
+// Not fresh, and for long enough: 5 minutes since the last valid sample, or since boot when there never was one.
+static bool satReturnMissingLong()
+{
+  if (satReturnFresh()) return false;
+  const SatBoilerFeed &f = state.otBus.feedTret;
+  return satFeedAgeMs(f, millis()) >= SAT_RETURN_VALID_MS;
+}
+
+// Age (ms) of the last valid sample for the SAT log; 0xFFFFFFFF = none since boot.
+static uint32_t satFlowSampleAgeMs()
+{
+  if (settings.sat.bSimulation) return 0;
+  return state.otBus.feedTboiler.sampleMs ? satFeedAgeMs(state.otBus.feedTboiler, millis()) : 0xFFFFFFFFUL;
+}
+
+static uint32_t satReturnSampleAgeMs()
+{
+  if (settings.sat.bSimulation) return 0;
+  return state.otBus.feedTret.sampleMs ? satFeedAgeMs(state.otBus.feedTret, millis()) : 0xFFFFFFFFUL;
+}
+
+// 0.0 when the flow temperature is missing (never received, Data-Invalid, Unknown-DataID or older than SAT_FLOW_VALID_MS).
 static float satGetFlowTemp()
 {
   if (settings.sat.bSimulation) return state.sat.fSimFlowTemp + satSimNoiseOffset();
-  return OTcurrentSystemState.Tboiler;     // OT MsgID 25 (flow water temp)
+  return satFeedClassIsFresh(satFlowFeedClass()) ? OTcurrentSystemState.Tboiler : 0.0f;     // OT MsgID 25 (flow water temp)
 }
 
+// 0.0 when there is no return temperature to use (see satReturnFresh()); the stored Tret may hold a value from either source.
 static float satGetReturnTemp()
 {
   if (settings.sat.bSimulation) return state.sat.fSimReturnTemp + satSimNoiseOffset();
-  return OTcurrentSystemState.Tret;        // OT MsgID 28 (return water temp)
+  return satReturnFresh() ? OTcurrentSystemState.Tret : 0.0f;        // OT MsgID 28 (return water temp) or the board sensor
 }
 
-// A boiler without a return temperature (TASK-1371, Sergeant D entries 84, 135): MsgID 28 was answered Unknown-DataID
-// (provisional, "for now") AND no valid board sensor 'R' reading in the last 5 minutes. Only this boiler type gets the flow-based
-// start-up hold, the CS/PM=25 flood and MI=500; every other boiler keeps thermo-nova's hold from the return temperature.
-// The simulation models a return temperature, so it never counts.
-// Both facts need evidence from THIS boot (our implementation choice; entry 84 open points 1 and 3 are open with Sergeant D):
+// A boiler without a return temperature (TASK-1371, Sergeant D entries 84, 135, 217): no return temperature to use, from either
+// source (satReturnFresh()), AND one of
+//  (1) MsgID 28 was answered Unknown-DataID (provisional, "for now") and it is settled that no board sensor gives a reading, at
+//      once, or
+//  (2) the return temperature has been invalid or absent for 5 minutes (entry 217, QD-5 A): Data-Invalid, no reply, or the last
+//      valid sample or board reading older than 5 minutes (satReturnMissingLong()).
+// Only this boiler type gets the flow-based start-up hold, the CS/PM=25 flood and MI=500; every other boiler keeps thermo-nova's
+// hold from the return temperature. The simulation models a return temperature, so it never counts.
+// Path (1) needs evidence from THIS boot (our implementation choice; entry 84 open points 1 and 3 are open with Sergeant D):
 // the Unknown-DataID verdict is restored from /ot-boiler.json at boot, but the sensor readout (PR=D, PR=E every 60 s) is not,
 // so a restored verdict alone would wrongly count a board with an 'R' sensor for its first minutes.
 //  (a) a boiler frame of this boot confirmed Unknown-DataID for MsgID 28 (boilerMsgId28UnknownConfirmed()),
@@ -2413,7 +2472,9 @@ static float satGetReturnTemp()
 static bool satNoReturnTemp()
 {
   if (settings.sat.bSimulation) return false;
-  return isBoilerMsgIdUnsupportedRead(28) && boilerMsgId28UnknownConfirmed() && picBoardTretAbsent();
+  if (satReturnFresh()) return false;
+  if (isBoilerMsgIdUnsupportedRead(28) && boilerMsgId28UnknownConfirmed() && picBoardTretAbsent()) return true;
+  return satReturnMissingLong();
 }
 
 static bool satIsFlameOn()
@@ -6669,9 +6730,11 @@ static void satControlLoopRun()
       satCurveTuneNoteTick(ti);
     }
     _sat_prevDhwActive = true;
-    SATDebugTf(PSTR("SATTICK target=%.1f mode=%d flame=%d flow=%.1f ret=%.1f dhw=1\r\n"),   // TASK-1521
+    SATDebugTf(PSTR("SATTICK target=%.1f mode=%d flame=%d flow=%.1f ret=%.1f fc=%c fage=%lu rc=%c rage=%lu dhw=1\r\n"),   // TASK-1521
                settings.sat.fTargetTemp, (int)state.sat.eControlMode, (int)satIsFlameOn(),
-               satGetFlowTemp(), satGetReturnTemp());   // TASK-1532: the simulated values in SAT simulation
+               satGetFlowTemp(), satGetReturnTemp(),   // TASK-1532: the simulated values in SAT simulation
+               satFeedClassLetter(satFlowFeedClass()), (unsigned long)satFlowSampleAgeMs(),     // TASK-1412.5
+               satFeedClassLetter(satReturnFeedClass()), (unsigned long)satReturnSampleAgeMs());
     // Hot water: refreshes the end of the draw (the 300 s guards, heating_control.py:272-274, :313-315) and
     // clears the overshoot, underheat and saturation starts (:268-270, :313-315; entry 108).
     satCycleNoteDhwTick(_sat_tickMs);
@@ -7058,14 +7121,16 @@ static void satControlLoopRun()
   // zones, solar offset and clamps; osrc see _sat_outsideSrc. Hot-water ticks log a short SATTICK with dhw=1.
   // PWM, three separate outputs (TASK-1412.9): commanded = pwm (phase asked for), duty, pon / poff (mapped ON / OFF seconds, 0 outside PWM);
   // counted = starts (PWM ON-phase starts in the rolling hour); observed = flame (boiler flame bit).
-  SATDebugTf(PSTR("SATTICK room=%.2f raw=%.2f rv=%d target=%.1f out=%.1f osrc=%c curve=%.2f p=%.2f i=%.2f d=%.2f praw=%.2f pid=%.2f cs=%.1f mm=%u ch=%u mode=%d pwm=%d duty=%.2f pon=%lu poff=%lu starts=%u flame=%d flow=%.1f ret=%.1f dhw=0\r\n"),
+  SATDebugTf(PSTR("SATTICK room=%.2f raw=%.2f rv=%d target=%.1f out=%.1f osrc=%c curve=%.2f p=%.2f i=%.2f d=%.2f praw=%.2f pid=%.2f cs=%.1f mm=%u ch=%u mode=%d pwm=%d duty=%.2f pon=%lu poff=%lu starts=%u flame=%d flow=%.1f ret=%.1f fc=%c fage=%lu rc=%c rage=%lu dhw=0\r\n"),
           roomTemp, rawRoom, (int)roomValid, targetTemp, outsideTemp, _sat_outsideSrc, curveValue,
           state.sat.fPidP, state.sat.fPidI, state.sat.fPidD, pidRaw,
           pidOutput, finalSetpoint, (unsigned)state.sat.iCurrentModulation, (unsigned)state.sat.iLastSentCH,
           (int)state.sat.eControlMode, (int)pwmOn, state.sat.fPwmDutyCycle,
           pwmMode ? (unsigned long)((satPwmLastOnTimeMs() + 500UL) / 1000UL) : 0UL, pwmMode ? (unsigned long)((satPwmLastOffTimeMs() + 500UL) / 1000UL) : 0UL,
           (unsigned)satCycleGetCyclesThisHour(), (int)satIsFlameOn(),
-          satGetFlowTemp(), satGetReturnTemp());   // TASK-1532: the simulated values in SAT simulation
+          satGetFlowTemp(), satGetReturnTemp(),   // TASK-1532: the simulated values in SAT simulation
+          satFeedClassLetter(satFlowFeedClass()), (unsigned long)satFlowSampleAgeMs(),     // TASK-1412.5: class V/Z/S/I/N/U and sample age in ms (4294967295 = none)
+          satFeedClassLetter(satReturnFeedClass()), (unsigned long)satReturnSampleAgeMs());
 
   // --- Publish to MQTT ---
   satPublishMQTT();
