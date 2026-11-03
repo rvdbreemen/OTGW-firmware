@@ -3,10 +3,11 @@ id: TASK-1447
 title: >-
   feat-2.0.0: port TASK-1247 (1.x) — reboot_log.txt names why the gateway
   restarted itself
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T06:17:00Z'
-updated_date: '2026-11-02T04:37:00Z'
+updated_date: '2026-11-03T19:40:00Z'
 labels:
   - port-from-1.x
   - diagnostics

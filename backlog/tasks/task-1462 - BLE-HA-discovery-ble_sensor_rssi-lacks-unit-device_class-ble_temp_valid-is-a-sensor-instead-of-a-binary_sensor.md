@@ -3,10 +3,11 @@ id: TASK-1462
 title: >-
   BLE HA discovery: ble_sensor_rssi lacks unit/device_class, ble_temp_valid is a
   sensor instead of a binary_sensor
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T07:21:00Z'
-updated_date: '2026-11-02T04:37:00Z'
+updated_date: '2026-11-03T19:40:00Z'
 labels:
   - ble
   - mqtt
