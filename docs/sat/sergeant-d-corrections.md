@@ -5788,3 +5788,11 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot Q-1412.9c, TASK-1581: When the duty cycle drops back below the maximum then we send again the appropriate MM command for low load control."
 
 **Settled:** option A, completing entry 242: MM=T is sent only while the PWM duty is at its maximum (range 5); as soon as the duty drops below the maximum SAT sends its own MM= value for low-load control again, by the on-change rule of entry 237 (and the once-a-minute repeat of entry 239). **Task:** TASK-1581. **Open:** none.
+
+## 244. Q-PARITY-3 answered A: the cycle classifier skips the warm-up of a burn, as thermo-nova (Sergeant D, 2026-11-03)
+
+**Source:** sergeantd, 2026-11-03 06:32 UTC, msg 1567063957036998667 (https://discord.com/channels/812969634638725140/1514720723980259460/1567063957036998667), answer to Q-PARITY-3 (msg 1567062769780391968).
+
+**Quoted:** "@BlueFlame Bot TASK-1412.14: A"
+
+**Settled:** option A of Q-PARITY-3: before the 180 s tail the classifier judges, it skips an effective warm-up of min(60 s, 25 % of the burn), as thermo-nova cycles/tracker.py:113-116; the port today counts the warm-up (SATcycles.ino:1009-1025). **Interpretation (ours):** he named only the task; the one open question under TASK-1412.14 was Q-PARITY-3, so "A" is read as its option A. **Task:** TASK-1584. **Open:** none.
