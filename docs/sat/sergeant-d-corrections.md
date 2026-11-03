@@ -5836,3 +5836,16 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot Q-PARITY-8, TASK-1412.14: A"
 
 **Settled:** option A of Q-PARITY-8 (Q-PARITY-7 merged in): a cycle with fewer than 3 samples is not recorded (thermo-nova cycles/tracker.py:98-100) instead of an INSUFFICIENT cycle (SATcycles.ino:846), and the flame-on sample is counted (tracker.py:71-72). With entries 244, 245, 248 and this one, every confirmed classifier parity question (Q-PARITY-1, 3, 5, 8) is decided; the others were withdrawn by the second reader. **Task:** TASK-1588. **Open:** none.
+
+## 250. Classifier parity: four internal deviations accepted by the maintainer (Q-PARITY-2, 4, 6, 11) (maintainer, 2026-11-03)
+
+**Source:** Robert (maintainer), 2026-11-03, in the session (AskUserQuestion "Accept as deviation"), after the second-reader check of the TASK-1412.14 parity catalogue (docs/sat/open-questions.md rows Q-PARITY-2, 4, 6, 11, withdrawn there as not worth Sergeant D's time).
+
+**Quoted:** "Accept as deviation (Recommended)"
+
+**Settled:** the four remaining differences between the firmware classifier and thermo-nova are accepted as recorded internal deviations; they are not put to Sergeant D:
+- Q-PARITY-2: the tail control error is kept in int16 hundredths of a degree (SATcycles.ino) where thermo-nova uses an unrounded float (classifier.py:74-75); it only matters within +-0.005 C of a margin, about the OpenTherm f8.8 resolution.
+- Q-PARITY-4: the tail is the last 180 samples, thermo-nova uses the last 180 s (tracker.py:116, 237-241); they differ only when the 1 Hz sampler stalls, which does not happen in normal operation.
+- Q-PARITY-6: the fallback setpoint when no requested setpoint exists (thermo-nova device_state.setpoint, the port the control setpoint at flame-on); unreachable, the requested setpoint is missing only before SAT's first control step on both sides.
+- Q-PARITY-11: the port reads a control setpoint <= 0 as missing; unreachable, thermo-nova's control setpoint is always a float (heating_control.py:89, 233).
+With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.14 parity catalogue is decided, so the parity gate (TASK-1412.14 AC, TASK-1331 resume signal) may pass. **Task:** TASK-1412.14, TASK-1331. **Open:** none.
