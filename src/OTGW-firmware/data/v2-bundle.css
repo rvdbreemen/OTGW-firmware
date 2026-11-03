@@ -768,7 +768,8 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .set-group h3{margin:0 0 4px;font-size:.95rem;display:flex;align-items:center;gap:8px}
   .set-group .gdesc{font-size:.76rem;color:var(--muted);margin:0 0 10px}
   .badge-reboot{font-size:.62rem;font-weight:700;color:var(--zone-warn);
-    border:1px solid var(--zone-warn);border-radius:8px;padding:2px 7px;letter-spacing:.04em}
+    border:1px solid var(--zone-warn);border-radius:8px;padding:2px 7px;letter-spacing:.04em;
+    cursor:default;user-select:none}
   .srow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border)}
   .srow:first-of-type{border-top:0}
   .srow .slbl{flex:1;font-size:.84rem}

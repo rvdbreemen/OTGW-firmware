@@ -2416,6 +2416,13 @@
     lbl.appendChild(b);
   }
   function catById(id) { for (var i = 0; i < SET_CATS.length; i++) if (SET_CATS[i].id === id) return SET_CATS[i]; return null; }
+  // TASK-1398: the REBOOT badge is a label, not a control. The title and aria-label say what it means.
+  function rebootBadge() {
+    var b = document.createElement('span'); b.className = 'badge-reboot'; b.textContent = 'REBOOT';
+    b.title = 'Changes in this category take effect after a reboot.';
+    b.setAttribute('aria-label', 'Changes in this category take effect after a reboot');
+    return b;
+  }
 
   var setData = {};   // key -> {value,type,...} as fetched
   var setDirty = {};  // key -> new value (string)
@@ -2518,7 +2525,7 @@
       if (!firstNonEmpty) firstNonEmpty = c.id;
       var ri = document.createElement('div'); ri.className = 'rail-item';
       ri.appendChild(document.createTextNode(c.icon + ' ' + c.title + ' '));
-      if (c.reboot) { var rb = document.createElement('span'); rb.className = 'badge-reboot'; rb.textContent = 'REBOOT'; ri.appendChild(rb); }
+      if (c.reboot) ri.appendChild(rebootBadge());
       var cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = n; ri.appendChild(cnt);
       ri.addEventListener('click', function () { setActiveCat = c.id; renderSettings(); });
       ri.dataset.cat = c.id;
@@ -2541,7 +2548,7 @@
       var head = document.createElement('div');
       var title = document.createElement('div'); title.className = 'set-cat-title';
       title.appendChild(document.createTextNode(c.icon + ' ' + c.title + ' '));
-      if (c.reboot) { var rb2 = document.createElement('span'); rb2.className = 'badge-reboot'; rb2.textContent = 'REBOOT'; title.appendChild(rb2); }
+      if (c.reboot) title.appendChild(rebootBadge());
       head.appendChild(title);
       if (c.desc) { var d = document.createElement('div'); d.className = 'cat-desc'; d.textContent = c.desc; head.appendChild(d); }
       cols.appendChild(head);

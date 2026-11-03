@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-25T19:49:00Z'
-updated_date: '2026-11-03T05:44:00Z'
+updated_date: '2026-11-03T06:13:00Z'
 labels:
   - webui
 milestone: 2.0.0
@@ -22,7 +22,7 @@ maarten_41762 2026-10-25 (#alpha-testing 1563987220115890257): on Settings > Net
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Badge has a tooltip and does not look clickable (screenshot)
+- [x] #1 Badge has a tooltip and does not look clickable (screenshot)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -33,4 +33,6 @@ maarten_41762 2026-10-25 (#alpha-testing 1563987220115890257): on Settings > Net
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: badge without title/aria (v2.js:2486/2509). Doable.
 
 Released by Robert 2026-11-03 (interactive, maintainer): low priority. Only the badge changes (tooltip/aria-label + non-button style); Settings rail and card panels stay as designed.
+
+2026-11-03 (agent, verified by lead incl. screenshots in scratchpad shots/1398-old|new): browser test tests/webui/settings-reboot-badge.test.mjs on the real page, red on the old v2 files, green on the fix; integrated in wt-next.
 <!-- SECTION:NOTES:END -->
