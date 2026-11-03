@@ -59,7 +59,7 @@ struct OTSys { uint8_t SlaveStatus=0; }; static OTSys OTcurrentSystemState;
 static char g_sent[256];
 enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };   // TASK-1574
 static int g_drop = 0;   // TASK-1574: 1 = the PIC queue refuses everything (nothing recorded), 2 = refuses only TP=
-static CmdQueueResult addCommandToQueue(const char* c, size_t n, bool, int) {
+static CmdQueueResult addCommandToQueue(const char* c, size_t n, bool, int, bool = false) {
   if (g_drop == 1 || (g_drop == 2 && !strncmp(c, "TP=", 3))) return CmdQueueResult::Dropped;
   strncat(g_sent, c, n); strcat(g_sent, ";"); return CmdQueueResult::Queued; }
 @BODY@

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.27
+**  Version  : v2.0.0-beta.28
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3839,12 +3839,12 @@ static void triggerReadoutForSettingsCmd(const char* buf) {
 // TASK-1569: returns Queued (new entry at the back), Replaced (an entry for the same command was updated and moved to
 // the back), Sent (OT-Direct board: handled on the spot) or Dropped (refused, invalid, queue full, or the queue lock not
 // acquired within CMD_QUEUE_LOCK_MS). A caller that must not lose a value (SAT) can retry on Dropped.
-CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forceQueue, const int16_t delay){
+CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forceQueue, const int16_t delay, const bool satOwn){
   if (!isPICEnabled()) {
 #if HAS_DIRECT_OT
     // On OTGW32, route commands directly to OT-direct handler
     if (isOTDirectEnabled()) {
-      handleOTDirectCommand(buf, len);
+      handleOTDirectCommand(buf, len, satOwn);
       return CmdQueueResult::Sent;
     }
 #endif
@@ -3873,11 +3873,11 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
     return CmdQueueResult::Dropped;
   }
   // TASK-1236 / ADR-179: same rule as the OT-Direct CS= handler. While SAT owns the
-  // control setpoint an external CS= is refused; SAT's own CS= carries the in-flight
-  // marker. Bytes written straight to the PIC over the serial bridge (port 25238)
+  // control setpoint an external CS= is refused; SAT's own CS= comes with satOwn = true (TASK-1575: an argument, not a
+  // global flag, so a CS= from another task cannot pass as SAT's). Bytes written straight to the PIC over the serial bridge (port 25238)
   // do not pass this queue and stay unfiltered (ADR-177).
   if (toupper((unsigned char)buf[0]) == 'C' && toupper((unsigned char)buf[1]) == 'S' &&
-      satOwnsControlSetpoint() && !satCommandInFlight()) {
+      satOwnsControlSetpoint() && !satOwn) {
     DebugTln(F("CmdQueue: CS= refused, SAT owns the control setpoint (disable SAT to override)"));
     return CmdQueueResult::Dropped;
   }

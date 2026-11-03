@@ -27,11 +27,11 @@ import test_sat_ot_loss as ol  # noqa: E402
 SRC = REPO / "src" / "OTGW-firmware"
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", SRC / "SATcontrol.ino"))
 
-OLD_STUB = ('static CmdQueueResult addCommandToQueue(const char* cmd, int, bool, int) '
+OLD_STUB = ('static CmdQueueResult addCommandToQueue(const char* cmd, int, bool, int, bool = false) '
             '{ printf("%u %s\\n", (unsigned)(g_ms / 1000), cmd); return CmdQueueResult::Queued; }')
 NEW_STUB = ('static int g_drop = 0;   // 0 = accept, 1 = drop everything, 2 = drop only MM=\n'
             'static int g_attempts = 0;\n'
-            'static CmdQueueResult addCommandToQueue(const char* cmd, int, bool, int) {\n'
+            'static CmdQueueResult addCommandToQueue(const char* cmd, int, bool, int, bool = false) {\n'
             '  g_attempts++;\n'
             '  if (g_drop == 1 || (g_drop == 2 && !strncmp(cmd, "MM=", 3))) return CmdQueueResult::Dropped;\n'
             '  printf("%u %s\\n", (unsigned)(g_ms / 1000), cmd); return CmdQueueResult::Queued; }')

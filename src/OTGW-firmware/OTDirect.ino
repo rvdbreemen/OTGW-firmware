@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.27
+**  Version  : v2.0.0-beta.28
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2746,7 +2746,7 @@ static unsigned long applyResponseModifiers(unsigned long response) {
 // are handled here — either translated to OpenTherm frames, applied to
 // local state, or acknowledged with a valid response.
 // ---------------------------------------------------------------------------
-void handleOTDirectCommand(const char* buf, int len) {
+void handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   if (len < 4) return;  // minimum "XX=Y"
 
   OTDDebugTf(PSTR("OTD: cmd \"%s\" (len=%d)\r\n"), buf, len);
@@ -2766,9 +2766,9 @@ void handleOTDirectCommand(const char* buf, int len) {
     // TASK-1150 / ADR-179: while SAT owns the control setpoint, an EXTERNAL CS= is
     // refused rather than silently winning by being the last writer. Maintainer
     // decision 2026-09-22: a visible refusal beats a race whose outcome depends on
-    // timing. SAT's own CS= arrives through the same queue, so it is let through on
-    // the in-flight marker; disable SAT to steer TSet by hand.
-    if (satOwnsControlSetpoint() && !satCommandInFlight()) {
+    // timing. SAT's own CS= arrives through the same queue with satOwn = true (TASK-1575); disable SAT to steer TSet
+    // by hand.
+    if (satOwnsControlSetpoint() && !satOwn) {
       OTDDebugTln(F("OT-direct: CS= refused, SAT owns the control setpoint (disable SAT to override)"));
       otDirectBridgeProcessStatus("NG");
       return;

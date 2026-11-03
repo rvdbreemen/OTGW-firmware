@@ -56,9 +56,11 @@ static bool g_pic = true;
 static bool isPICEnabled() { return g_pic; }
 static bool isOTDirectEnabled() { return true; }
 static char g_direct[256];
-static void handleOTDirectCommand(const char* b, int n) { strncat(g_direct, b, n); strcat(g_direct, ";"); }
-static bool satOwnsControlSetpoint() { return false; }
-static bool satCommandInFlight() { return false; }
+static void handleOTDirectCommand(const char* b, int n, bool = false) { strncat(g_direct, b, n); strcat(g_direct, ";"); }
+static bool g_satOwns = false;      // TASK-1575: SAT owns the control setpoint
+static bool satOwnsControlSetpoint() { return g_satOwns; }
+static bool g_inflight = false;     // the old global in-flight flag (read only by the code before TASK-1575)
+static bool satCommandInFlight() { return g_inflight; }
 static void triggerPICsettingsReadout() {}
 static char cMsg[128];
 static void sendEventToWebSocket(char, const char*) {}
@@ -88,6 +90,9 @@ struct CmdQueueLock {
 };
 #ifdef OLD_VOID_ADD   // code before TASK-1569: addCommandToQueue returns nothing
 void addCommandToQueue(const char* buf, const int len, const bool forceQueue = false, const int16_t delay = 1000);
+#elif defined(HAS_SAT_OWN_PARAM)   // TASK-1575: the origin of a CS= travels with the call
+CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forceQueue = false, const int16_t delay = 1000,
+                                 const bool satOwn = false);
 #else
 CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forceQueue = false, const int16_t delay = 1000);
 #endif
@@ -102,6 +107,19 @@ static void show(const char* tag) { printf("%s=%s\n", tag, g_sent); g_sent[0] = 
 int main(int argc, char** argv) {
   const char* sc = argv[1];
   g_ms = 100000;
+  if (!strcmp(sc, "own")) {              // TASK-1575: SAT owns MsgID 1 and is enqueueing its own CS= on the loop task
+    g_pic = true; g_satOwns = true; g_inflight = true;
+    CmdQueueResult r = addCommandToQueue("CS=40.0", 7, false, 0);          // an external CS= (REST) at that moment
+    printf("ext=%d\n", r == CmdQueueResult::Dropped ? 0 : 1);
+#ifdef HAS_SAT_OWN_PARAM
+    g_inflight = false;
+    r = addCommandToQueue("CS=41.0", 7, false, 0, true);                    // SAT's own CS=
+    printf("sat=%d\n", r == CmdQueueResult::Dropped ? 0 : 1);
+#else
+    printf("sat=1\n");
+#endif
+    return 0;
+  }
   if (!strcmp(sc, "init")) {             // initSAT, then a boiler that answers every PM= it is asked
 #ifdef PM_CHAIN_TIMEOUT_MS
     pmChainStart();                      // fix: what initSAT calls now
@@ -512,6 +530,8 @@ class PmChain(unittest.TestCase):
         cpp = d / "t.cpp"
         body = extract(CORE_INO.read_text(encoding="utf-8"))
         prefix = "#define OLD_VOID_ADD\n" if "\nvoid addCommandToQueue(" in body else ""
+        if "const bool satOwn" in body:
+            prefix += "#define HAS_SAT_OWN_PARAM\n"   # TASK-1575
         hdr = (REPO / "src" / "OTGW-firmware" / "OTGW-firmware.h").read_text(encoding="utf-8")
         a = hdr.index("struct CmdQueueEchoStats")
         b = hdr.index("void cmdQueueSnapshot(CmdQueueSnap* out);")
@@ -588,6 +608,12 @@ class PmChain(unittest.TestCase):
         self.assertEqual(out["sent"], "CS=45.0;CS=45.0;")
         self.assertEqual(out["queued"], "0")
         self.assertEqual(out["dropped"], "0")
+
+    def test_external_cs_refused_while_sat_enqueues_its_own(self):
+        # TASK-1575: with the old global in-flight flag set by SAT on the loop task, a CS= from REST at the same moment
+        # passed as SAT's own. The origin is now an argument: the external one is refused, SAT's own still goes in.
+        out = self.run_sc("own")
+        self.assertEqual((out["ext"], out["sat"]), ("0", "1"))
 
     def test_cs_behind_a_full_echoing_queue_within_two_seconds(self):
         # TASK-1571 AC3: with echoes the 20-deep queue drains in about a second; the CS= at the back goes out < 2 s.

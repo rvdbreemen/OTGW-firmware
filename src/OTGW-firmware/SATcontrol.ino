@@ -603,11 +603,6 @@ static inline void satResetCmdCache() {
   _sat_chSentValid = false;
 }
 
-// TASK-1150: true only while SAT itself is submitting a command through the shared
-// command queue. Set around SAT's own enqueue and read by the OTDirect CS= handler, so
-// it can tell SAT's own setpoint from an external one without a second command path.
-static bool _satCmdInFlight = false;
-bool satCommandInFlight() { return _satCmdInFlight; }
 
 // Every CS= that SAT itself sends goes through here, including the CS=0 releases in
 // satDisable() and the boot-safety path. External CS= is refused while SAT owns the
@@ -617,9 +612,9 @@ bool satCommandInFlight() { return _satCmdInFlight; }
 // TASK-1574 (commit-on-success): returns false when the PIC queue dropped the command, so the callers record it in the
 // last-sent cache only when it was accepted and a dropped one is sent again.
 static bool satEnqueueOwnCS(const char* cmd) {
-  _satCmdInFlight = true;
-  const CmdQueueResult r = addCommandToQueue(cmd, strlen(cmd), false, 0);
-  _satCmdInFlight = false;
+  // TASK-1575: SAT's own CS= is marked by the satOwn argument of addCommandToQueue(); before, a global flag set around
+  // this call let a CS= from another task (REST on async_tcp) that arrived at the same moment pass as SAT's.
+  const CmdQueueResult r = addCommandToQueue(cmd, strlen(cmd), false, 0, true);
   return r != CmdQueueResult::Dropped;
 }
 

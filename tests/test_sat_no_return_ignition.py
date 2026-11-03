@@ -107,7 +107,7 @@ static uint8_t satGetManufacturerQuirks() { return g_quirks; }
 #define DUE(t) (g_due)
 #define timerSATSuppress 0
 enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };   // TASK-1574
-static CmdQueueResult addCommandToQueue(const char* c, size_t n, bool, int) { printf("%lu %.*s\n", (unsigned long)(g_ms - 1000000UL), (int)n, c); return CmdQueueResult::Queued; }
+static CmdQueueResult addCommandToQueue(const char* c, size_t n, bool, int, bool = false) { printf("%lu %.*s\n", (unsigned long)(g_ms - 1000000UL), (int)n, c); return CmdQueueResult::Queued; }
 """
 
 MAIN = r"""

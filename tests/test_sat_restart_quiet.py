@@ -91,7 +91,7 @@ static bool isNTPtimeSet() { return g_now != 0; }
 static void DebugTln(const char*) {}
 static void satNarrate_P(const char*) {}
 enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };   // TASK-1574
-static CmdQueueResult addCommandToQueue(const char* cmd, int, bool, int) { printf("%u %s\n", (unsigned)(g_ms / 1000), cmd); return CmdQueueResult::Queued; }
+static CmdQueueResult addCommandToQueue(const char* cmd, int, bool, int, bool = false) { printf("%u %s\n", (unsigned)(g_ms / 1000), cmd); return CmdQueueResult::Queued; }
 static bool isPICEnabled() { return true; }
 static bool hasOTCommandInterface() { return true; }
 static float satEffectiveMaxSetpoint() { return 1000.0f; }   // TASK-1536: satCapRepeatCS() ceiling, no cap here

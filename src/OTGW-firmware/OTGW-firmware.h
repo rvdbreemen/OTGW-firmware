@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.27
+**  Version  : v2.0.0-beta.28
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -103,7 +103,7 @@ enum class OpenThermResponseStatus : byte;
 void initOTDirect();
 void loopOTDirect();
 void handleOTDirectBridgeStream();
-void handleOTDirectCommand(const char* buf, int len);
+void handleOTDirectCommand(const char* buf, int len, bool satOwn = false);   // satOwn: TASK-1575, see addCommandToQueue
 void sendOTDirectOverridesJSON();
 void sendPICSerial(const char* buf, int len);
 bool otDirectBoilerPresent();  // TASK-795 §4.2: real boiler answered MsgID 3 (excludes loopback)
@@ -245,7 +245,9 @@ const char *messageIDToString(OTLibMessageID message_id);
 // Result of addCommandToQueue (TASK-1569): Queued = new entry, Replaced = same command updated and moved to the back,
 // Sent = OT-Direct board handled it at once, Dropped = not queued (refused, invalid, queue full or busy).
 enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };
-CmdQueueResult addCommandToQueue(const char* ,  int , const bool = false, const int16_t = 1000);
+// satOwn (TASK-1575): true only for SAT's own CS= (satEnqueueOwnCS). While SAT owns the control setpoint every other CS=
+// is refused (ADR-179); the origin travels with the call, so a CS= from another task (REST, MQTT) cannot pass as SAT's.
+CmdQueueResult addCommandToQueue(const char* ,  int , const bool = false, const int16_t = 1000, const bool satOwn = false);
 // Echo latency of the PIC command queue (TASK-1571): hist buckets <10,<20,<50,<100,<200,<500,<1000 ms, timeout.
 struct CmdQueueEchoStats { uint32_t count, timeouts, minMs, maxMs, sumMs; uint32_t hist[8]; };
 extern CmdQueueEchoStats g_cmdQueueEcho;
@@ -389,7 +391,6 @@ bool satOwnsControlSetpoint();
 // TASK-1150: true only while SAT is itself submitting a command through the shared
 // command queue, so the CS= handler can refuse an EXTERNAL setpoint without refusing
 // SAT's own.
-bool satCommandInFlight();
 void satCurveTuneNoteManualChange();      // TASK-1525: a coefficient change that is not the self-tune's own empties its window
 void satCurveTuneSetHourS(uint32_t s);    // TASK-1525: simulation-only bench hook, tuner hour length in seconds
 void satOnThermostatSetpoint(float tr);  // TASK-1259: thermostat MsgID 16 Write-Data (T frame), edge detector for follow-thermostat
