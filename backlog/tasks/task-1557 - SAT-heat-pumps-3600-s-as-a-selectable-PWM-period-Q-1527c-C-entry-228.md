@@ -1,9 +1,11 @@
 ---
 id: TASK-1557
 title: 'SAT heat pumps: 3600 s as a selectable PWM period (Q-1527c C, entry 228)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-02T05:38:00Z'
+updated_date: '2026-11-03T00:58:00Z'
 labels:
   - sat
 dependencies: []

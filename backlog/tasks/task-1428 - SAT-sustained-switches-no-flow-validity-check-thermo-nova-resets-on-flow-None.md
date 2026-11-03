@@ -3,10 +3,11 @@ id: TASK-1428
 title: >-
   SAT sustained switches: no flow-validity check (thermo-nova resets on flow
   None)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-28T18:15:00Z'
-updated_date: '2026-11-02T05:47:00Z'
+updated_date: '2026-11-02T22:47:00Z'
 labels:
   - sat
 milestone: 2.0.0

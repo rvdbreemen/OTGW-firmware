@@ -3,10 +3,11 @@ id: TASK-1541
 title: >-
   SAT disable restores SH= (MsgID 57), SW=, TP=, MI=500 and clears a pushed TC=
   override (OD-2)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-01T08:16:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-02T23:38:00Z'
 labels:
   - sat
 dependencies: []
@@ -31,4 +32,6 @@ Decision Robert 2026-11-01 on OD-2 (docs/sat/sat-commissioning-profiles-2026-11-
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: satDisable (SATcontrol.ino:3388+) sends only CS=0, CH=1, MM=T; plan with Sergeant D (no Q queued).
+
+2026-11-03: thermo-nova restores nothing on HVAC off (climate.py:571-583, coordinator/mqtt/__init__.py:66-69); SH=/SW=/MI= sent at coordinator/mqtt/opentherm.py:225/202/172. Plan put to Sergeant D as Q-1541a (A: restore SH/SW from pre-SAT values + TC=0, order CS=0, CH=1, MM=T, SH, SW, TC=0; advice A). Implementation waits for his answer.
 <!-- SECTION:NOTES:END -->

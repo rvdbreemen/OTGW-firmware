@@ -3,10 +3,11 @@ id: TASK-1427
 title: >-
   Web UI Connection page: node text overflows its box and the right-hand nodes
   clip at the page edge (Edge/Chrome)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-28T15:19:00Z'
-updated_date: '2026-11-02T04:39:00Z'
+updated_date: '2026-11-02T22:46:00Z'
 labels:
   - web-ui
   - tester-feedback
