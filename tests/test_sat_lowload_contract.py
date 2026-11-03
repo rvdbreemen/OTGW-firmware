@@ -190,6 +190,9 @@ DELEGATED = {
     "LL-020": [("test_sat_pid_cadence", "Cadence", ["test_a_integral_and_step_count_independent_of_the_control_tick", "test_b_millis_wrap_gives_the_same_steps_and_integral",
                 "test_c_loop_stall_gives_one_step", "test_d_startup_step_at_the_first_pass", "test_f_no_room_gives_curve_only_never_nan",
                 "test_j_room_back_gives_curve_only_until_the_next_step"]),
+               ("test_sat_pid_semantics", "StartUp", None), ("test_sat_pid_semantics", "HeldDerivative", None),
+               ("test_sat_pid_semantics", "Saturation", None), ("test_sat_pid_semantics", "Deadband", None),
+               ("test_sat_pid_semantics", "KiZero", None), ("test_sat_pid_semantics", "Persistence", None),
                ("test_sat_previous_cs_clamp", "PreviousCsClamp", ["test_a_falling_request_holds_previous_cs", "test_b_rising_request_follows_min_allowed",
                 "test_c2_equal_request_takes_the_falling_branch"]),
                ("test_sat_overshoot_sustain", "TickClockAndLoopOrder", None)],
@@ -282,6 +285,25 @@ class LowLoadContract(unittest.TestCase):
         for tick, value in got.items():
             self.assertAlmostEqual(value, ref, delta=1e-4, msg="I at a %d s control tick differs from the 60 s reference %.6f: %s" % (tick, ref, got))
         self.rec()["observed"] = {"reference_I_60s": ref, "I_by_tick_s": got}
+
+    @ll("LL-003", "contract", "whole SATpid.ino via test_sat_pid_cadence.build_cpp; the oracle is pid.py _update_integral (pid.py:185-192) fed the logged step times",
+        task="TASK-1412.10 AC1 (absolute oracle, not only tick-independence)")
+    def test_ll003_integral_equals_pid_py_for_the_logged_steps(self):
+        import math
+        import test_sat_pid_semantics as sem
+        exe = self.need(pid_exe())
+        for tick in (10, 30, 60, 120):
+            lines = run([exe, "cad", tick, 1000000]).strip().split("\n")
+            last = pidc.parse(lines[-1])
+            steps = [int(x) for x in last["log"].split(",") if x]
+            self.assertEqual(len(steps), int(last["steps"]), "tick %d" % tick)
+            self.assertEqual(steps[0], 0, "the start-up step is the first pass")
+            self.assertTrue(all(b - a == 60 for a, b in zip(steps[1:], steps[2:])), "60 s between steps at tick %d: %s" % (tick, steps))
+            pid = sem.PidPy()
+            for t in steps:   # scripted room (test_sat_pid_cadence.roomAt, trace 0): inside the deadband, target 21, curve 40
+                room = sem.f32(21.0 - (0.05 + 0.04 * math.sin(t / 97.0)))
+                pid.update(room, sem.r3(21.0 - room), 1000000 / 1000.0 + t, 40.0)
+            self.assertAlmostEqual(float(last["I"]), pid.integral, delta=2e-3, msg="I at tick %d against pid.py" % tick)
 
     # LL-004 -------------------------------------------------------------------------------------------------------------
     def exit_after(self, interval_ms, kind, jitter=(0,), start=None):
