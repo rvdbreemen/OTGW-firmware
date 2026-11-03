@@ -7089,12 +7089,11 @@ static void satControlLoopRun()
   // Cold cutoff latch, once per tick before any user reads satColdThreshold() (TASK-1547, entry 199).
   _sat_coldCut = satColdCutoffLatched(pidOutput, satGetColdSetpoint(), _sat_coldCut, SAT_COLD_HYSTERESIS_C);
 
-  // AC#2: When PID output reaches the system maximum setpoint, use continuous mode
-  // instead of PWM — matches Python behavior where requested_setpoint >= maximum_setpoint
-  // disables PWM (full power needed, no duty cycling required).
-  if (pidOutput >= sysMax && state.sat.eControlMode == SAT_MODE_PWM) {
+  // AC#2: the request reaches the maximum it is clamped to (satEffectiveMaxSetpoint(), TASK-1591, entry 256):
+  // use continuous mode instead of PWM, as thermo-nova requested_setpoint >= maximum_setpoint (heating_control.py:203-204).
+  if (pidOutput >= maxSetpoint && state.sat.eControlMode == SAT_MODE_PWM) {
     satSetControlMode(SAT_MODE_CONTINUOUS);
-    SATDebugTln(F("SAT: PID at system max, switching to continuous mode"));
+    SATDebugTln(F("SAT: PID at the effective max, switching to continuous mode"));
     satNarrate_P(PSTR("Control mode: continuous (demand at the maximum setpoint)"));   // TASK-1521
   }
 

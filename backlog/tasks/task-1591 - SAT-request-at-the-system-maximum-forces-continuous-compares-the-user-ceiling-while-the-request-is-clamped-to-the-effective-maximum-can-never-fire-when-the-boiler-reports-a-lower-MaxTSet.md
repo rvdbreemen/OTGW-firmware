@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-03T14:02:00Z'
-updated_date: '2026-11-03T18:13:00Z'
+updated_date: '2026-11-03T18:45:00Z'
 labels:
   - sat
 dependencies: []
@@ -25,7 +25,7 @@ Found by TASK-1412.7 (2026-11-03): the rule that ends PWM when the request reach
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Both sides traced with citations and a second reader confirmed or refuted the difference
-- [ ] #2 If real: decision recorded (Sergeant D) and implemented with a host test red on the old code
+- [x] #2 If real: decision recorded (Sergeant D) and implemented with a host test red on the old code
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -34,4 +34,6 @@ Found by TASK-1412.7 (2026-11-03): the rule that ends PWM when the request reach
 2026-11-03 investigation (opus, read-only) + second reader (lead): CORRECTED and confirmed. effective <= sysMax always (MsgID 49 bounds are inside sysMax, so not a cause); they differ only through the boiler MsgID 57 term or the 75 fallback in satEffectiveMaxSetpoint() (SATcontrol.ino:417-429); clamp at ~:7089 feeds the compare pidOutput >= sysMax at ~:7095, so the at-max rule can never fire when the boiler/installer MaxTSet is below the user/default ceiling (most common: installer 55 vs default 62, no SH= involved). thermo-nova uses one configured value for clamp and compare (climate.py:394; coordinator/__init__.py:275-283; heating_control.py:203-204); MsgID 57 there only feeds the number entity (number.py:103-113). No entry decides which value the rule compares against. Asked as Q-1591a.
 
 2026-11-03 Q-1591a decided A by Robert (entry 256): compare with the clamped value satEffectiveMaxSetpoint(). Curve-tune clamp unchanged (not asked).
+
+2026-11-03 implemented (sonnet agent) + opus adversarial review (code SHIP; docs fixed per review: 8 spec places, sat-comparison rows ported; harness argc fix; debug text). SATcontrol.ino:7095 compares pidOutput >= maxSetpoint (satEffectiveMaxSetpoint). test_sat_max_tset: OLD 1 failure (mode 1 at clamped 55 vs default 62), FIX 37 OK; ceiling_paths 9 OK, ground_truth_block 6 OK, classifier_parity OK, evaluate 0 failed. Known effect (review, matches thermo-nova heating_control.py:203-208): at the boiler's own limit PWM and continuous can alternate. Tag beta.57; bench check pending in the shared build.
 <!-- SECTION:NOTES:END -->

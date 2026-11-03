@@ -78,6 +78,19 @@ static CmdQueueResult addCommandToQueue(const char* cmd, size_t len, bool, int) 
 @TYPES@
 """
 
+AT_MAX_STUBS = r"""
+enum { SAT_MODE_CONTINUOUS = 0, SAT_MODE_PWM = 1 };
+#define SATDebugTln(x) ((void)0)
+#define satNarrate_P(x) ((void)0)
+#define satNarratef_P(...) ((void)0)
+static const float SAT_MIN_SETPOINT = 10.0f; static const float SAT_COLD_HYSTERESIS_C = 1.0f;
+static bool _sat_narrAtMax = false, _sat_coldCut = false; static float _sat_requestedSetpoint = 0.0f;
+static bool satColdCutoffLatched(float, float, bool l, float) { return l; }
+static float satGetColdSetpoint() { return 0.0f; }
+static uint8_t g_mode = SAT_MODE_PWM;
+static void satSetControlMode(uint8_t m) { g_mode = m; }
+"""
+
 MAIN = r"""
 static void dump() {
   bool chosen = false;
@@ -87,8 +100,24 @@ static void dump() {
   for (size_t i = 0; i < g_queue.size(); i++) printf("%s%s", i ? "," : "", g_queue[i].c_str());
   printf("\n");
 }
+// TASK-1591: the real clamp + at-max block of the SAT tick (cut from SATcontrol.ino), mode PWM in, mode out
+static void atMaxStep(float pidOutput) {
+@ATMAX@
+  printf("mode=%d clamped=%.1f effCS=%.1f\n", (int)g_mode, pidOutput, maxSetpoint);
+}
 int main(int argc, char** argv) {
   if (argc < 2) return 2;
+  if (!strcmp(argv[1], "atmax") && argc >= 8) {   // atmax user system source rawBounds boilerMaxTSet pid
+    settings = Settings(); OTcurrentSystemState = OTSys();
+    settings.sat.fMaxTSetUser = (float)atof(argv[2]);
+    settings.sat.iHeatingSystem = atoi(argv[3]);
+    settings.sat.iHeatingSource = atoi(argv[4]);
+    OTcurrentSystemState.MaxTSetUBMaxTSetLB = (uint16_t)atoi(argv[5]);
+    OTcurrentSystemState.MaxTSet = (float)atof(argv[6]);
+    g_mode = SAT_MODE_PWM;
+    atMaxStep((float)atof(argv[7]));
+    return 0;
+  }
   if (!strcmp(argv[1], "setter") && argc >= 4) {   // setter value current
     printf("stored=%.1f ok=%d\n", parseMaxTSetUser(argv[2], (float)atof(argv[3])), (int)satMaxTSetInputOk((float)strtof(argv[2], nullptr)));
     return 0;
@@ -141,9 +170,10 @@ def build(workdir: Path):
     for fn in ("static float clampSettingFloat(", "static float parseMaxTSetUser("):   # the real helper and the real setter
         a = setter.index(fn)
         parse += setter[a:setter.index("\n}", a) + 2] + "\n"
+    atmax = cut(src[src.index("// --- Clamp to valid range ---"):], "  float maxSetpoint = satEffectiveMaxSetpoint();", "  // Entry 214:").replace("state.sat.eControlMode", "g_mode")
     cpp = workdir / "maxtset.cpp"
     feed = FEED_H.read_text(encoding="utf-8").replace("#pragma once", "")
-    cpp.write_text(STUBS.replace("@CONSTS@", consts).replace("@TYPES@", ok) + feed + block + parse + MAIN, encoding="utf-8")
+    cpp.write_text(STUBS.replace("@CONSTS@", consts).replace("@TYPES@", ok) + feed + block + parse + AT_MAX_STUBS + MAIN.replace("@ATMAX@", atmax), encoding="utf-8")
     return base.compile_cpp(cpp, workdir / "maxtset.exe")
 
 
@@ -175,6 +205,29 @@ class SatMaxTSet(unittest.TestCase):
         d = dict(kv.split("=", 1) for kv in out.split())
         d["queue"] = [c for c in d.get("queue", "").split(",") if c]
         return d
+
+    def atmax(self, user, pid, bounds=0, boiler=0, system=RAD, source=GAS):
+        out = subprocess.run([str(self.exe), "atmax", *map(str, (user, system, source, bounds, boiler, pid))],
+                             capture_output=True, text=True, check=True).stdout
+        return dict(kv.split("=", 1) for kv in out.split())
+
+    def test_1591_boiler_max_55_user_not_chosen_pid_above_goes_continuous(self):
+        # installer MaxTSet 55 (MsgID 57 read), user ceiling not chosen (default 62 radiators): the request is clamped to 55
+        # and PWM must end (entry 256). Old code compared with the user ceiling 62 and stayed in PWM at 55.
+        r = self.atmax(0, 60.0, boiler=55)
+        self.assertEqual(float(r["effCS"]), 55.0)
+        self.assertEqual(float(r["clamped"]), 55.0)
+        self.assertEqual(int(r["mode"]), 0, r)
+
+    def test_1591_boiler_70_user_70_still_goes_continuous(self):
+        r = self.atmax(70, 75.0, boiler=70)
+        self.assertEqual(float(r["effCS"]), 70.0)
+        self.assertEqual(int(r["mode"]), 0, r)
+
+    def test_1591_below_the_maximum_stays_pwm(self):
+        r = self.atmax(0, 50.0, boiler=55)
+        self.assertEqual(float(r["clamped"]), 50.0)
+        self.assertEqual(int(r["mode"]), 1, r)
 
     def setter(self, value, current):
         out = subprocess.run([str(self.exe), "setter", value, current], capture_output=True, text=True, check=True).stdout
