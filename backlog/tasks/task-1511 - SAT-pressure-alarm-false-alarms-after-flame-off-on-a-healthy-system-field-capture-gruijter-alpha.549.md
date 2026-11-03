@@ -3,10 +3,11 @@ id: TASK-1511
 title: >-
   SAT pressure alarm: false alarms after flame-off on a healthy system (field
   capture gruijter, alpha.549)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-30T14:12:00Z'
-updated_date: '2026-11-02T04:37:00Z'
+updated_date: '2026-11-03T03:35:00Z'
 labels:
   - sat
 milestone: 2.0.0

@@ -3,10 +3,11 @@ id: TASK-1490
 title: >-
   HA entities for SAT health, sync, window and setpoint topics (TASK-1486 audit
   sections 1 and 2)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T22:35:00Z'
-updated_date: '2026-11-02T04:37:00Z'
+updated_date: '2026-11-03T03:35:00Z'
 labels:
   - sat
   - mqtt
