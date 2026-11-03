@@ -3,10 +3,11 @@ id: TASK-1402
 title: >-
   Combo: forced OT-Direct (mode 2) on an S3 Mini Pro pulses GPIO 12 instead of
   the Pro's PIC reset GPIO 40
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T20:37:00Z'
-updated_date: '2026-11-02T04:37:00Z'
+updated_date: '2026-11-03T23:06:00Z'
 labels:
   - combo
   - pic

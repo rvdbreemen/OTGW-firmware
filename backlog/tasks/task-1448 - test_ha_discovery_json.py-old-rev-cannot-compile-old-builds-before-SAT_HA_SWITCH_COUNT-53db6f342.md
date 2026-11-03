@@ -3,10 +3,11 @@ id: TASK-1448
 title: >-
   test_ha_discovery_json.py --old-rev cannot compile old builds before
   SAT_HA_SWITCH_COUNT (53db6f342)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T06:18:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-03T23:06:00Z'
 labels:
   - test
 milestone: 2.0.0

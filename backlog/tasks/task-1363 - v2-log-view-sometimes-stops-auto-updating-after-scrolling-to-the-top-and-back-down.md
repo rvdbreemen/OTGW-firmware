@@ -3,10 +3,11 @@ id: TASK-1363
 title: >-
   v2 log view sometimes stops auto-updating after scrolling to the top and back
   down
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-24T21:32:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-03T23:06:00Z'
 labels:
   - webui
 milestone: 2.0.0
