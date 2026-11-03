@@ -133,7 +133,7 @@ De integraalterm gebruikt een **symmetrische clamp** `[-curveValue, +curveValue]
 | `satmodsupdelay` | `20.0` | 0-60 s | Modulatie-onderdrukkingsvertraging |
 | `satmodsupoffset` | `1.0` | 0-5 C | Modulatie-onderdrukkingsoffset onder setpoint |
 | `satflowoffset` | `2.0` | 0-10 C | Continue modus: maximale setpoint-daling t.o.v. keteltemperatuur |
-| `satcyclesperhour` | `3` | 2-6 | Doelcycli per uur |
+| `satcyclesperhour` | `3` | 3-4 | PWM-cyclusduur voor gasketels en Auto, opgeslagen als cycli per uur: 3 = 20 min, 4 = 15 min. De webinterface toont voor elk apparaattype het veld "PWM-cyclusduur" in minuten; warmtepompen en hybrides slaan het op in `sathpcycle` (seconden: 1800 = 30 min, 2400 = 40 min, 3600 = 60 min alleen voor een warmtepomp) |
 | `satpushsetpoint` | `false` | bool | SAT-doel naar thermostaatdisplay sturen (TC= commando). SAT pusht het kamersetpoint naar de thermostaat bij een doelwijziging (zoals thermo-nova); een thermostaat die de override op afstand weigert houdt zijn eigen setpoint en SAT blijft niet opnieuw pushen |
 | `satfollowthermostat` | aan als `satpushsetpoint` aan staat, anders uit | bool | Een setpointwijziging op de thermostaat wordt het SAT-doel (zie 5.21). Een unit zonder opgeslagen waarde krijgt eenmalig de waarde van `satpushsetpoint`; een opgeslagen waarde wint altijd |
 | `satfireplace` | uit | bool | Openhaardmodus: SAT stookt alleen op de stooklijn, zoals zonder kamertemperatuur (zie 5.21). MQTT `sat/fireplace_mode` |

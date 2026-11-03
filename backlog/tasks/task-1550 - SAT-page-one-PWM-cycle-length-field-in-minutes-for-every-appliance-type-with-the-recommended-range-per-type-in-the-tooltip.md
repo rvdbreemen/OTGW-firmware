@@ -3,11 +3,11 @@ id: TASK-1550
 title: >-
   SAT page: one 'PWM cycle length' field in minutes for every appliance type,
   with the recommended range per type in the tooltip
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-01T18:56:00Z'
-updated_date: '2026-11-03T02:30:00Z'
+updated_date: '2026-11-03T02:51:00Z'
 labels:
   - web-ui
   - sat
@@ -24,14 +24,22 @@ Robert 2026-11-01 adopts maarten's proposal (#alpha-testing msg 1566524283092603
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The PWM card shows exactly one field 'PWM cycle length' in minutes for every appliance type; switching the type swaps its choices without a reload
-- [ ] #2 Saving writes the existing setting for that type (satcyclesperhour for gas/Auto, sathpcycle for heat pump/hybrid) with the same values as today; REST and settings.ini unchanged
-- [ ] #3 Tooltip states the recommended range per type; the misleading 'minimum on time' hint is gone from the cycle field
-- [ ] #4 Browser test on the real page: red on the old page, green on the new one, screenshots before/after with synthetic data
+- [x] #1 The PWM card shows exactly one field 'PWM cycle length' in minutes for every appliance type; switching the type swaps its choices without a reload
+- [x] #2 Saving writes the existing setting for that type (satcyclesperhour for gas/Auto, sathpcycle for heat pump/hybrid) with the same values as today; REST and settings.ini unchanged
+- [x] #3 Tooltip states the recommended range per type; the misleading 'minimum on time' hint is gone from the cycle field
+- [x] #4 Browser test on the real page: red on the old page, green on the new one, screenshots before/after with synthetic data
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: v2.js:2050/:2117 still two fields (seconds, cycles per hour). UI only, no Sergeant D gate.
+
+2026-11-03 (agent, verified by lead incl. screenshots): one 'PWM cycle length' field in minutes (satcyclesperhour gas/Auto 20/15 min; sathpcycle heat pump 30/40/60 min; hybrid 30/40 min, entry 188), tooltip satPwmHelp() with the per-type range; REST/settings.ini unchanged. tests/webui/v2-settings-sat-followups.test.mjs: old v2.js 5 FAIL, fix 0 failures of 50 (saves POST sathpcycle=3600 and satcyclesperhour=4); peak in flight 2. Screenshots scratchpad/shots/1550-old and 1550-new (pwm-card-gas/heatpump/onoff-heatpump-3h). Manuals ch05/h05 updated.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+One 'PWM cycle length' field in minutes on the SAT page for every appliance type (gas 20/15 min, heat pump 30/40/60 min, hybrid 30/40 min), tooltip with the range per type, same settings and values saved as before (REST/settings.ini unchanged). Evidence: browser test on the real v2.js, old page 5 FAIL, new 0 of 50; screenshots before/after in the scratchpad shots/1550-*. Not verified on a device.
+<!-- SECTION:FINAL_SUMMARY:END -->

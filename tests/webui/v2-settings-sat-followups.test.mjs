@@ -304,13 +304,33 @@ const pwmCard = `(function(){ var hs = document.querySelectorAll('#satSetL3 .set
   var has = function (el, k) { return !!(el && el.querySelector('.srow[data-key="' + k + '"]')); };
   return { titles: titles, cph: has(c, 'satcyclesperhour'), hp: has(c, 'sathpcycle'), interval: has(c, 'satinterval'),
            otherCycle: has(other, 'satcyclesperhour') || has(other, 'sathpcycle') }; })()`;
+// TASK-1550: one field "PWM cycle length" in minutes for every appliance type; the tooltip names the range of the type.
+// The stored setting and its values stay as they were (satcyclesperhour 3/4, sathpcycle seconds).
+const pwmField = `(function(){ var c = null; document.querySelectorAll('#satSetL3 .set-group h3').forEach(function (h) { if (h.textContent === 'PWM') c = h.parentNode; });
+  if (!c) return null; var rows = c.querySelectorAll('.srow[data-key="satcyclesperhour"], .srow[data-key="sathpcycle"]');
+  if (rows.length !== 1) return { rows: rows.length };
+  var r = rows[0], s = r.querySelector('select'), i = r.querySelector('.sinfo'), pop = null;
+  if (i) { i.dispatchEvent(new Event('mouseenter')); pop = document.getElementById('shelp'); }
+  return { rows: 1, key: r.dataset.key, label: r.querySelector('.slbl').firstChild.textContent, text: r.querySelector('.slbl').textContent,
+    vals: s ? Array.prototype.map.call(s.options, function (o) { return o.value; }).join() : null,
+    texts: s ? Array.prototype.map.call(s.options, function (o) { return o.textContent; }).join('|') : null, help: pop ? pop.textContent : null }; })()`;
 const gas = await until(`(function(){ var r = ${pwmCard}; return r.cph !== undefined ? r : null; })()`);
 check(!!gas && gas.titles.indexOf('PWM') >= 0 && gas.titles.indexOf('PID / PWM') < 0, `card is titled "PWM", not "PID / PWM" (${gas && gas.titles.join('|')})`);
 await shotPwm('pwm-card-gas.png');
+const gasF = await evalJs(pwmField);
+check(!!gasF && gasF.rows === 1 && gasF.key === 'satcyclesperhour' && gasF.label === 'PWM cycle length' && gasF.vals === '3,4' && gasF.texts === '20 min (default)|15 min',
+  `gas / Auto: one field "PWM cycle length" with 20 min (3) and 15 min (4) (${JSON.stringify(gasF)})`);
+check(!!gasF && /20 minutes/.test(gasF.help || '') && /15 minutes/.test(gasF.help || '') && /Appliance type/.test(gasF.help || '') && !/minimum on time/i.test(gasF.text + gasF.help) && !/Cycles per hour/.test(gasF.text),
+  `gas tooltip names the range and the appliance type, no minimum-on-time hint (${JSON.stringify(gasF && gasF.help)})`);
 check(!!gas && gas.cph && !gas.hp && gas.interval && !gas.otherCycle, `gas boiler: cycles per hour shown, heat-pump cycle hidden, not moved to Other (${JSON.stringify(gas)})`);
 await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); sel.value = '2'; sel.dispatchEvent(new Event('change', { bubbles: true })); })()`);
 const hp = await until(`(function(){ var r = ${pwmCard}; return r.hp ? r : null; })()`);
 await shotPwm('pwm-card-heatpump.png');
+const hpF = await evalJs(pwmField);
+check(!!hpF && hpF.rows === 1 && hpF.key === 'sathpcycle' && hpF.label === 'PWM cycle length' && hpF.vals === '1800,2400,3600' && hpF.texts === '30 min (default)|40 min|60 min (heat pump only)',
+  `heat pump: one field "PWM cycle length" with 30, 40 and 60 min (${JSON.stringify(hpF)})`);
+check(!!hpF && /30 minutes/.test(hpF.help || '') && /60 minutes/.test(hpF.help || '') && /3 hour/.test(hpF.help || '') && !/minimum on time/i.test(hpF.text + hpF.help),
+  `heat pump tooltip names 30/40/60 min and the 3 h type (${JSON.stringify(hpF && hpF.help)})`);
 check(!!hp && hp.hp && !hp.cph && hp.interval && !hp.otherCycle, `heat pump selected: heat-pump cycle shown, cycles per hour hidden at once (${JSON.stringify(hp)})`);
 const dirtySrc = await evalJs(`(function(){ var r = document.querySelector('#satSetL2 .srow[data-key="satsource"]'); return !!r && r.classList.contains('dirty') && r.querySelector('select').value === '2'; })()`);
 check(dirtySrc === true, 'the re-render keeps the unsaved appliance type (dirty, still Heat Pump)');
@@ -319,6 +339,9 @@ await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[dat
 const hyb = await until(`(function(){ var r = ${pwmCard}; var s = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); return s && s.value === '3' && r.cph !== undefined ? r : null; })()`);
 check(!!hyb && hyb.hp && !hyb.cph && !hyb.otherCycle, `hybrid selected: heat-pump cycle shown, cycles per hour hidden (${JSON.stringify(hyb)})`);
 // TASK-1557 (entry 228): 60 min is offered for a heat pump, not for a hybrid (entry 188 names 1800 or 2400 s)
+const hybF = await evalJs(pwmField);
+check(!!hybF && hybF.rows === 1 && hybF.key === 'sathpcycle' && hybF.label === 'PWM cycle length' && hybF.texts === '30 min (default)|40 min' && /Hybrid: 30 minutes/.test(hybF.help || '') && !/60/.test(hybF.help || ''),
+  `hybrid: one field with 30 and 40 min only, tooltip says so (${JSON.stringify(hybF)})`);
 const hybOpts = await evalJs(`(function(){ var r = document.querySelector('#satSetL3 .srow[data-key="sathpcycle"]'); var s = r && r.querySelector('select');
   return s ? Array.prototype.map.call(s.options, function (o) { return o.value; }) : null; })()`);
 check(!!hybOpts && hybOpts.join() === '1800,2400', `hybrid: cycle options are 1800 and 2400 only (${JSON.stringify(hybOpts)})`);
@@ -326,6 +349,28 @@ await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[dat
 const hpOpts = await until(`(function(){ var r = document.querySelector('#satSetL3 .srow[data-key="sathpcycle"]'); var s = r && r.querySelector('select');
   return s ? Array.prototype.map.call(s.options, function (o) { return o.value; }) : null; })()`);
 check(!!hpOpts && hpOpts.join() === '1800,2400,3600', `heat pump: cycle options include 3600 s (${JSON.stringify(hpOpts)})`);
+await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); sel.value = '3'; sel.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+// TASK-1550: saving the minute choice writes the existing setting with the same values as before
+await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); sel.value = '2'; sel.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+await until(`(function(){ return document.querySelector('#satSetL3 .srow[data-key="sathpcycle"] select') ? 1 : null; })()`);
+await evalJs(`(function(){ var s = document.querySelector('#satSetL3 .srow[data-key="sathpcycle"] select'); s.value = '3600'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+const nSave1550 = log.length;
+await evalJs(`document.getElementById('satBtnSave').click()`);
+for (let i = 0; i < 40 && !log.slice(nSave1550).some((l) => l.startsWith('POST /api/v2/settings') && /sathpcycle/.test(l)); i++) await sleep(150);
+await sleep(300);
+const p1550 = Object.fromEntries(log.slice(nSave1550).filter((l) => l.startsWith('POST /api/v2/settings'))
+  .map((l) => { try { const j = JSON.parse(l.slice(l.indexOf('{'))); return [j.name, '' + j.value]; } catch { return ['', '']; } }));
+check(p1550.sathpcycle === '3600' && p1550.satsource === '2' && !('satcyclesperhour' in p1550), `heat pump 60 min saves sathpcycle 3600 (${JSON.stringify(p1550)})`);
+await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); sel.value = '1'; sel.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+await until(`(function(){ return document.querySelector('#satSetL3 .srow[data-key="satcyclesperhour"] select') ? 1 : null; })()`);
+await evalJs(`(function(){ var s = document.querySelector('#satSetL3 .srow[data-key="satcyclesperhour"] select'); s.value = '4'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+const nSave1550b = log.length;
+await evalJs(`document.getElementById('satBtnSave').click()`);
+for (let i = 0; i < 40 && !log.slice(nSave1550b).some((l) => l.startsWith('POST /api/v2/settings') && /satcyclesperhour/.test(l)); i++) await sleep(150);
+await sleep(300);
+const p1550b = Object.fromEntries(log.slice(nSave1550b).filter((l) => l.startsWith('POST /api/v2/settings'))
+  .map((l) => { try { const j = JSON.parse(l.slice(l.indexOf('{'))); return [j.name, '' + j.value]; } catch { return ['', '']; } }));
+check(p1550b.satcyclesperhour === '4' && !('sathpcycle' in p1550b), `gas 15 min saves satcyclesperhour 4 (${JSON.stringify(p1550b)})`);
 await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); sel.value = '3'; sel.dispatchEvent(new Event('change', { bubbles: true })); })()`);
 // TASK-1542 (entries 195, 202-204): the experimental on/off heat-pump type in the appliance list, on any heating system,
 // with Robert's warning text; on radiators a second warning must be confirmed; stored as satsource 2 + sathpcycle 10800,
@@ -345,7 +390,8 @@ await shotPwm('pwm-card-onoff-heatpump-3h.png');
 check(!!hpl && !hpl.hp && !hpl.cph, `experimental type selected: it stays selected after the re-render and no cycle field is shown (${JSON.stringify(hpl)})`);
 const nSave = log.length;
 await evalJs(`document.getElementById('satBtnSave').click()`);
-await until(`(document.getElementById('toast') || {}).textContent === 'Settings saved'`, 5000);
+for (let i = 0; i < 40 && !log.slice(nSave).some((l) => l.startsWith('POST /api/v2/settings') && /sathpcycle/.test(l)); i++) await sleep(150);
+await sleep(300);
 const hpPosts = Object.fromEntries(log.slice(nSave).filter((l) => l.startsWith('POST /api/v2/settings'))
   .map((l) => { try { const b = JSON.parse(l.slice(l.indexOf('{'))); return [b.name, '' + b.value]; } catch { return ['', '']; } }));
 check(hpPosts.satsource === '2' && hpPosts.sathpcycle === '10800', `saving the experimental type posts satsource 2 and sathpcycle 10800 (${JSON.stringify(hpPosts)})`);

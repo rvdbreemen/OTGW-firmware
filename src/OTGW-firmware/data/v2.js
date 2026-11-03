@@ -2048,7 +2048,7 @@
     satheatingmode:  { cat: 'sat', label: 'Heating mode' },
     satmanufacturer: { cat: 'sat', label: 'Manufacturer', hint: 'Auto detects from the boiler; choose Immergas explicitly to enable its TP=11:12 modulation command' },
     satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' },
-    sathpcycle:      { cat: 'sat', label: 'Heat-pump PWM cycle', hint: 'Cycle length; a heat pump runs at least 10 minutes and stays off at least 10 minutes' },
+    sathpcycle:      { cat: 'sat', label: 'PWM cycle length', hint: 'Minutes' },   // TASK-1550: one field for every appliance type, see helpFor()
     otdmode:         { cat: 'otd', label: 'OT-Direct mode' },
     // OT-Direct heating-curve / PI room-comp + ventilation (TASK-933 Phase 2)
     otdchmode:           { cat: 'otd', label: 'CH mode' },
@@ -2115,7 +2115,7 @@
     satmaxconsumption:   { cat: 'sat', label: 'Gas use at max modulation', hint: 'm³/h (0 = off)' },
     // TASK-933 P2: keys that already had GET + dispatch but lacked a whitelist token
     // (now POST-able).
-    satcyclesperhour:    { cat: 'sat', label: 'Cycles per hour', hint: 'Gas boilers; heat pumps and hybrids use the heat-pump PWM cycle' },
+    satcyclesperhour:    { cat: 'sat', label: 'PWM cycle length', hint: 'Minutes' },   // TASK-1550: gas / Auto; stored as cycles per hour
     satvalveoffset:      { cat: 'sat', label: 'Valve offset', hint: '°C' },
     satsensormaxage:     { cat: 'sat', label: 'Sensor max age', hint: 'Seconds' },
     saterrormon:         { cat: 'sat', label: 'Error monitoring' },
@@ -2218,6 +2218,15 @@
     var hp = !!setData.satsource && (curVal('satsource') === '2' || curVal('satsource') === '3');
     return (k === 'sathpcycle') === hp;
   }
+  // TASK-1550: the tooltip of the one 'PWM cycle length' field names the range of the chosen appliance type.
+  function satPwmHelp() {
+    var src = setData.satsource ? curVal('satsource') : '0';
+    var t = 'Length of one PWM cycle in minutes. The field follows the Appliance type. ';
+    if (src === '2') t += 'Heat pump: 30 minutes (default), 40 or 60 minutes. The experimental on/off heat pump type uses a fixed 3 hour cycle and has no choice here.';
+    else if (src === '3') t += 'Hybrid: 30 minutes (default) or 40 minutes.';
+    else t += 'Gas boiler (also Auto): 20 minutes (3 cycles per hour, default) or 15 minutes (4 cycles per hour).';
+    return t;
+  }
   // TASK-1542: the experimental on/off heat-pump type = heat pump (satsource 2) with the 10800 s cycle.
   function satHpLongCycle() {
     return !!setData.satsource && !!setData.sathpcycle && curVal('satsource') === '2' && curVal('sathpcycle') === '10800';
@@ -2255,6 +2264,7 @@
   var SETTINGS_HELP = null, helpPromise = null;
   function helpFor(k) {
     var m = SET_META[k];
+    if (k === 'sathpcycle' || k === 'satcyclesperhour') return satPwmHelp();   // TASK-1550
     if (m && m.help) return m.help;
     return (SETTINGS_HELP && typeof SETTINGS_HELP[k] === 'string') ? SETTINGS_HELP[k] : '';
   }
@@ -3104,8 +3114,8 @@
   var ENUM_OPTS = {
     satsource: [[0, 'Auto'], [1, 'Gas Boiler'], [2, 'Heat Pump'], [3, 'Hybrid'], [4, 'On/off heat pump, 3 h cycle (experimental)']],
     satsystem: [[0, 'Auto'], [1, 'Radiators'], [2, 'Underfloor']],
-    sathpcycle: [[1800, '1800 s (2 per hour, default)'], [2400, '2400 s (1.5 per hour)'], [3600, '3600 s (1 per hour, heat pump only)']],
-    satcyclesperhour: [[3, '3 per hour (default)'], [4, '4 per hour']],
+    sathpcycle: [[1800, '30 min (default)'], [2400, '40 min'], [3600, '60 min (heat pump only)']],   // TASK-1550: minutes, stored in seconds
+    satcyclesperhour: [[3, '20 min (default)'], [4, '15 min']],   // TASK-1550: minutes, stored as cycles per hour (3 or 4)
     // boardmode is the real 3-value hardware override (ADR-127); the mockup's
     // 4-option ESP8266/OTGW32/LOLIN list was semantically wrong.
     boardmode: [[0, 'Auto-detect'], [1, 'PIC (Classic)'], [2, 'OT-Direct (no PIC)']],

@@ -127,7 +127,7 @@ The integral term uses a **symmetric clamp** `[-curveValue, +curveValue]` with a
 | `satmodsupdelay` | 20.0 | 0-60 s | Modulation suppression delay |
 | `satmodsupoffset` | 1.0 | 0-5 C | Modulation suppression offset below setpoint |
 | `satflowoffset` | 2.0 | 0-10 C | Continuous mode: max setpoint drop from boiler temp |
-| `satcyclesperhour` | 3 | 2-6 | Target cycles per hour |
+| `satcyclesperhour` | 3 | 3-4 | PWM cycle length for gas boilers and Auto, stored as cycles per hour: 3 = 20 min, 4 = 15 min. The Web UI shows the field "PWM cycle length" in minutes for every appliance type; heat pumps and hybrids store it in `sathpcycle` (seconds: 1800 = 30 min, 2400 = 40 min, 3600 = 60 min for a heat pump only) |
 | `satpushsetpoint` | false | bool | Push SAT target to thermostat display (TC= command). SAT pushes the room setpoint to the thermostat when the target changes (as thermo-nova); a thermostat that rejects the remote override keeps its own setpoint, and SAT does not keep re-pushing |
 | `satfollowthermostat` | on when `satpushsetpoint` is on, else off | bool | A setpoint change on the thermostat becomes the SAT target (see 5.21). A unit with no stored value gets the `satpushsetpoint` value once; a stored value always wins |
 | `satfireplace` | off | bool | Fireplace mode: SAT heats on the heating curve only, as with no room temperature (see 5.21). MQTT `sat/fireplace_mode` |
