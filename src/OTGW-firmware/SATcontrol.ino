@@ -1438,7 +1438,7 @@ static void satPwmSchedule(float pidOutput)
     // The ON time must also reach HEATER_STARTUP_TIMEFRAME 180 s (pwm.py:155; Q38, TASK-1383).
     if (onTimeMs >= minOnMs && (entryOn || elapsedMs >= offTimeMs)) {
       // Per-hour start limit (Task #203, entry 59): suppress a new ON phase once the rolling hour holds
-      // cycles-per-hour PWM starts. Maintainer decision 2026-10-26 (provisional, Q48): the ON phase at PWM
+      // cycles-per-hour PWM starts. Sergeant D entry 89 (Q48 A): the ON phase at PWM
       // entry with the burner already burning counts but is never blocked, so the burner is not cut.
       static bool _hourLimitLogged = false;
       if (!(entryOn && flame) && satCycleIsHourLimitReached()) {
@@ -7056,11 +7056,15 @@ static void satControlLoopRun()
   // TASK-1521: one key=value line per control tick (low volume), parsed by scripts/sat_log_to_csv.py.
   // praw = curve + p + i + d when rv=1 (p/i/d come from the last 60 s PID step); pid = requested setpoint after
   // zones, solar offset and clamps; osrc see _sat_outsideSrc. Hot-water ticks log a short SATTICK with dhw=1.
-  SATDebugTf(PSTR("SATTICK room=%.2f raw=%.2f rv=%d target=%.1f out=%.1f osrc=%c curve=%.2f p=%.2f i=%.2f d=%.2f praw=%.2f pid=%.2f cs=%.1f mm=%u ch=%u mode=%d pwm=%d duty=%.2f flame=%d flow=%.1f ret=%.1f dhw=0\r\n"),
+  // PWM, three separate outputs (TASK-1412.9): commanded = pwm (phase asked for), duty, pon / poff (mapped ON / OFF seconds, 0 outside PWM);
+  // counted = starts (PWM ON-phase starts in the rolling hour); observed = flame (boiler flame bit).
+  SATDebugTf(PSTR("SATTICK room=%.2f raw=%.2f rv=%d target=%.1f out=%.1f osrc=%c curve=%.2f p=%.2f i=%.2f d=%.2f praw=%.2f pid=%.2f cs=%.1f mm=%u ch=%u mode=%d pwm=%d duty=%.2f pon=%lu poff=%lu starts=%u flame=%d flow=%.1f ret=%.1f dhw=0\r\n"),
           roomTemp, rawRoom, (int)roomValid, targetTemp, outsideTemp, _sat_outsideSrc, curveValue,
           state.sat.fPidP, state.sat.fPidI, state.sat.fPidD, pidRaw,
           pidOutput, finalSetpoint, (unsigned)state.sat.iCurrentModulation, (unsigned)state.sat.iLastSentCH,
-          (int)state.sat.eControlMode, (int)pwmOn, state.sat.fPwmDutyCycle, (int)satIsFlameOn(),
+          (int)state.sat.eControlMode, (int)pwmOn, state.sat.fPwmDutyCycle,
+          pwmMode ? (unsigned long)((satPwmLastOnTimeMs() + 500UL) / 1000UL) : 0UL, pwmMode ? (unsigned long)((satPwmLastOffTimeMs() + 500UL) / 1000UL) : 0UL,
+          (unsigned)satCycleGetCyclesThisHour(), (int)satIsFlameOn(),
           satGetFlowTemp(), satGetReturnTemp());   // TASK-1532: the simulated values in SAT simulation
 
   // --- Publish to MQTT ---

@@ -27,7 +27,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 import sat_log_to_csv as p  # noqa: E402
 
 TICK_KEYS = ["room", "raw", "rv", "target", "out", "osrc", "curve", "p", "i", "d", "praw", "pid", "cs", "mm", "ch",
-             "mode", "pwm", "duty", "flame", "flow", "ret", "dhw"]
+             "mode", "pwm", "duty", "pon", "poff", "starts", "flame", "flow", "ret", "dhw"]
 
 
 def tick_format(src):
@@ -43,6 +43,29 @@ class SourceHasRecords(unittest.TestCase):
         fmt = tick_format(self.src)
         self.assertIsNotNone(fmt, "no SATTICK line in SATcontrol.ino")
         self.assertEqual(re.findall(r"(\w+)=", fmt), TICK_KEYS)
+
+    def test_tick_separates_commanded_counted_and_observed_pwm(self):
+        """TASK-1412.9 AC#3: what SAT asked for, what it counted as a start, what the boiler did, as three separate SATTICK groups.
+
+        commanded: pwm (phase asked for), duty, pon / poff (the mapped ON / OFF phase seconds of the tick, 0 outside PWM);
+        counted:   starts (PWM ON-phase starts in the rolling hour, from the start recorder satCycleRecordPwmStart());
+        observed:  flame (the boiler's flame bit). No 180 s flame guarantee is implied: pon is a commanded duration."""
+        fmt = tick_format(self.src)
+        keys = re.findall(r"(\w+)=", fmt)
+        self.assertEqual(keys[keys.index("pwm"):keys.index("flame") + 1], ["pwm", "duty", "pon", "poff", "starts", "flame"])
+        a = self.src.index(fmt)
+        args = self.src[a:self.src.index(");", a)]
+        self.assertIn("satPwmLastOnTimeMs()", args)
+        self.assertIn("satPwmLastOffTimeMs()", args)
+        self.assertIn("satCycleGetCyclesThisHour()", args)
+        self.assertIn("pwmMode", args, "pon / poff must read 0 outside PWM, not the last PWM tick's stale value")
+
+    def test_tick_line_fits_the_debug_buffer(self):
+        """debugStuff.ino formats into a 256-byte buffer: the worst-case SATTICK (every number at its widest) must still end in 'dhw=0'."""
+        fmt = tick_format(self.src)
+        vals = [-99.99, -99.99, 1, -99.9, -99.9, "W", -99.99, -99.99, -999.99, -99.99, -199.99, -199.99, -99.9, 100, 1, 2, 1, 1.0,
+                43200, 43200, 7, 1, -99.9, -99.9]
+        self.assertLessEqual(len(fmt % tuple(vals)) + 2, 255)
 
     def test_event_records_present(self):
         for kind in ("SATBOOT phase=decide", "SATBOOT phase=boiler", "SATBOOT phase=outside", "SATBOOT phase=takeover",
@@ -65,7 +88,7 @@ class Parser(unittest.TestCase):
         fmt = tick_format(SAT_INO.read_text(encoding="utf-8"))
         if fmt is None:
             self.fail("no SATTICK line in SATcontrol.ino")
-        vals = [19.25, 19.31, 1, 20.0, 7.5, "W", 29.31, 0.5, 1.25, -0.03, 31.03, 31.06, 37.8, 100, 1, 2, 1, 0.54, 1,
+        vals = [19.25, 19.31, 1, 20.0, 7.5, "W", 29.31, 0.5, 1.25, -0.03, 31.03, 31.06, 37.8, 100, 1, 2, 1, 0.54, 900, 780, 2, 1,
                 38.8, 30.1]
         line = "10:04:38.127074 (  55700| 31732) satControlLo(6192): " + (fmt % tuple(vals))
         rows = p.parse([line])["SATTICK"]

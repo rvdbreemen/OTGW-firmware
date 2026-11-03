@@ -8,7 +8,7 @@ satCycleOnFlameChange), so a shower blocked heating (gruijter, Q12 evidence).
 
 TASK-1369 (entry 43, Q11): when PWM is entered the first phase is ON at once (thermo-nova starts ON from IDLE
 without the off wait, pwm.py:154-155), when the ON time is at least HEATER_STARTUP_TIMEFRAME 180 s
-(pwm.py:155, const.py:18). Maintainer decision (Robert 2026-10-26, provisional until Q48): the ON phase that
+(pwm.py:155, const.py:18). Maintainer decision (Robert 2026-10-26, confirmed by Sergeant D entry 89, Q48 A): the ON phase that
 starts when PWM is entered with the burner already running counts as a PWM ON start but the hourly limit
 never blocks or cuts it. That phase lasts its ON time from the entry (pwm.py:162-165, :205-209), so the
 burner is not cut on the next tick.
@@ -347,6 +347,21 @@ int main(int argc, char** argv) {
     printf("pwm=%d r0=%d dhw=%d onAtClear=%d\n", s, r0, dhw, onAtClear);
     return 0;
   }
+  if (!strcmp(sc, "limitwin")) {             // TASK-1412.9: cycles-per-hour starts in the rolling hour, then the sliding hour (entry 127). argv: cycles-per-hour source
+    g_cph = (uint8_t)atoi(argv[2]); g_source = atoi(argv[3]);
+    const uint32_t t0 = g_ms;
+    for (int i = 0; i < g_cph; i++) { satCycleRecordPwmStart(); g_ms += 60000UL; }
+    const unsigned before = cnt();
+    g_pid = 40.0f;                            // duty 0.561: range 3, the OFF wait is long over
+    int startedAt = -1, blocked = 0;
+    for (int i = 0; i < 400 && startedAt < 0; i++) {
+      step();
+      if (req()) startedAt = (int)((g_ms - t0) / 1000UL); else blocked++;
+      g_ms += 30000UL;
+    }
+    printf("before=%u startedAt=%d blocked=%d after=%u limit=%d\n", before, startedAt, blocked, cnt(), (int)satCycleIsHourLimitReached());
+    return 0;
+  }
   if (!strcmp(sc, "wrap")) {                 // 3 PWM starts, an hour without starts, then millis() wraps around
     const int s = pwmCycles(3);
     const uint32_t newest = _hourCycleTs[(_hourCycleHead + SAT_RING_N - 1) % SAT_RING_N];
@@ -528,7 +543,7 @@ class SatPwmStartLimit(unittest.TestCase):
         self.assertEntryKeepsBurning(r)
         self.assertEqual(r["count"], "1", r)
 
-    # (e) the entry as the 4th start of the hour: still ON, not cut (maintainer decision, Q48 pending)
+    # (e) the entry as the 4th start of the hour: still ON, not cut (Sergeant D entry 89, Q48 A)
     def test_e_entry_at_the_limit_is_not_blocked(self):
         r = self.run_sc("entry4")
         self.assertEqual((r["pwm"], r["before"]), ("3", "3"), r)
@@ -586,6 +601,28 @@ class SatPwmStartLimit(unittest.TestCase):
         r = self.run_sc("entrylimit")
         self.assertEqual((r["pwm"], r["r0"], r["dhw"]), ("3", "0", "1"), r)
         self.assertEqual(r["onAtClear"], "1", "entry ON did not start when the limit cleared (off wait applied): %r" % r)
+
+    # TASK-1412.9, LL-019 limit windows: the hourly start limit is cycles per hour (3 or 4, entry 52) for gas and hybrid, none for a heat
+    # pump (entry 81). The hour slides (entry 127): the 4th (5th) start waits until the OLDEST counted start is 3600 s old, then goes
+    # ahead although the others are still inside the hour. The real satCycleIsHourLimitReached() and ring decide; the starts are recorded by the
+    # real satCycleRecordPwmStart(), called directly so the timestamps sit exactly 60 s apart (test_b_fourth_pwm_start_in_the_hour_is_blocked
+    # reaches the same limit through PWM phases).
+    def test_limit_window_slides_for_gas_and_hybrid_at_3_and_4_per_hour(self):
+        for src in (1, 3):
+            for cph in (3, 4):
+                with self.subTest(source=src, cph=cph):
+                    r = self.run_sc("limitwin", cph, src)
+                    self.assertEqual(r["before"], str(cph), r)
+                    self.assertGreaterEqual(int(r["startedAt"]), 3600, "start before the oldest counted start was an hour old: %r" % r)
+                    self.assertLess(int(r["startedAt"]), 3630, "start later than the first tick after the oldest start aged out: %r" % r)
+                    self.assertEqual(r["after"], str(cph), "the other starts are still inside the hour: %r" % r)
+
+    def test_limit_window_does_not_exist_for_a_heat_pump(self):
+        for cph in (3, 4):
+            with self.subTest(cph=cph):
+                r = self.run_sc("limitwin", cph, 2)
+                self.assertEqual(r["blocked"], "0", r)
+                self.assertEqual(r["after"], str(cph + 1), "the start is still recorded (entry 81): %r" % r)
 
     # R1 review: after a millis() wrap old starts must not come back into the rolling hour
     def test_millis_wrap_does_not_revive_old_starts(self):

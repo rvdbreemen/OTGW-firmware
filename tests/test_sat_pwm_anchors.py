@@ -59,7 +59,7 @@ int main() {
   _sat_lastControlCS = 0; _sat_thermalSafeActive = false;
   state.sat.eControlMode = SAT_MODE_PWM; state.sat.bDhwActive = false;
   std::string cmd; int cph = 3; double ratio = 0.22, dur = 0; std::string init = "burning"; std::vector<Ev> evs;
-  int ovs = 1, entryArm = 0;
+  int ovs = 1, entryArm = 0; unsigned long long baseMs = 100000000ULL;
   while (std::cin >> cmd) {
     if (cmd == "cfg") std::cin >> cph >> ratio;
     else if (cmd == "init") std::cin >> init;
@@ -68,11 +68,12 @@ int main() {
     else if (cmd == "ovs") std::cin >> ovs;                 // overshoot protection on/off
     else if (cmd == "entry") std::cin >> entryArm;          // PWM just entered: the first step skips the off wait (entry 43)
     else if (cmd == "src") std::cin >> g_source;           // heating source (2 = heat pump: minimum burn 600 s, entry 197)
+    else if (cmd == "base") std::cin >> baseMs;            // millis() at second 0 (LL-019 rollover: a base just below 2^32 wraps inside the run)
   }
   settings.sat.bOvershootProtection = ovs != 0;
   settings.sat.iCyclesPerHour = (uint8_t)cph;
   float pid = 27.2f + (float)ratio * (50.0f - 27.2f);
-  g_ms = 100000000UL; const uint32_t base = g_ms;
+  g_ms = (uint32_t)baseMs; const uint32_t base = g_ms;
   if (init == "burning") {                          // flame lit, last burn long ago, OFF phase: the first tick starts ON with the flame
     g_flame = true;  g_flameOnStart = base - 4000000UL; g_flameOffStart = base - 5000000UL;
   } else {                                          // "cold": flame off; the last flame-on is an old hot-water ignition (1500 s ago)
@@ -688,6 +689,108 @@ class SatPwmAnchors(unittest.TestCase):
         self.assertEqual(narr, ["PWM ON paused for hot water (used 120 s of 264 s)",
                                 "PWM ON resumed after hot water (144 s left)"], narr)
         self.assertLess(max(len(x) for x in narr), 96)
+
+    # TASK-1412.9, LL-019 matrix per source. Gas cells are the tests above; these are the heat pump (src 2: 1800 s period, minimum ON
+    # and OFF 600 s, no hourly limit, entries 40, 50, 81, 197, 198) and hybrid (src 3: heat-pump period, gas minimums 180 s / 0 s,
+    # hourly limit kept, entries 188, 197, 198) cells. Every run is the real satApplyPWM() through the harness above.
+    SRC_HP, SRC_HYB = 2, 3
+
+    def test_n1_unlit_on_start_counts_once_for_heat_pump_and_hybrid(self):
+        # Entry 90 (pwm.py:160): the count is taken at the ON start, lit or not. Duty 0.5, period 1800 s: ON 900 s, the flame never lights.
+        for src in (self.SRC_HP, self.SRC_HYB):
+            with self.subTest(src=src):
+                n, tl = self.starts(3, 0.5, "cold", [], 1000, (f"src {src}",))
+                ons, offs = tl.edges()
+                self.assertEqual((ons, n), ([0], 1), tl.dump(60))
+                self.assertLessEqual(abs(offs[0] - 900), TICK, f"ON ended at {offs}, expected 900 s from the start (no abort at 180 s)")
+
+    def test_n2_ch_ignition_and_relight_add_no_count_for_heat_pump_and_hybrid(self):
+        for src in (self.SRC_HP, self.SRC_HYB):
+            with self.subTest(src=src):
+                n, tl = self.starts(3, 0.5, "cold", [(60, "flame", 1), (200, "flame", 0), (300, "flame", 1)], 1000, (f"src {src}",))
+                self.assertEqual((tl.edges()[0], n), ([0], 1), tl.dump(60))
+
+    def test_n3_range_5_start_counts_once_for_heat_pump_and_hybrid(self):
+        # Duty 0.97 is over the maximum for both: continuous ON, one counted start, the ignition and a relight add none (entry 90).
+        for src in (self.SRC_HP, self.SRC_HYB):
+            with self.subTest(src=src):
+                n, tl = self.starts(3, 0.97, "cold", [(60, "flame", 1), (200, "flame", 0), (300, "flame", 1)], 600, (f"src {src}",))
+                self.assertEqual((tl.edges()[0], n), ([0], 1), tl.dump(60))
+
+    def test_n4_zero_on_time_never_starts_for_heat_pump_and_hybrid(self):
+        # Entry 80 (Q38 A, pwm.py:155): the mapped ON time must reach the minimum. Duty 0.02 is below the minimum duty of both, no flame: ON 0.
+        for src in (self.SRC_HP, self.SRC_HYB):
+            with self.subTest(src=src):
+                n, tl = self.starts(3, 0.02, "cold", [], 6000, (f"src {src}",))
+                self.assertEqual((tl.edges()[0], n), ([], 0), tl.dump(300))
+
+    def test_n5_minimum_on_is_600_s_for_a_heat_pump_and_180_s_for_a_hybrid(self):
+        # Duty 0.07 with the flame burning from the start. Hybrid: range 2, ON 180 s (entries 143, 197 "Hybrid: not stated, keeps 180 s").
+        # Heat pump: below its minimum duty 0.1667, range 1 with a flame: ON = the 600 s minimum (entry 197). Gas is test_gas_on_phase_min_on_180.
+        # The hybrid 180 s pins the recorded reading of entry 197 ("Hybrid: not stated ... keeps 180 s until asked"), not a decision of Sergeant D.
+        for src, expected in ((self.SRC_HYB, 180), (self.SRC_HP, 600)):
+            with self.subTest(src=src):
+                tl = self.sim(3, 0.07, "burning", [], 900, (f"src {src}",))
+                offs = tl.edges()[1]
+                self.assertTrue(offs, tl.dump(700))
+                self.assertLessEqual(abs(offs[0] - expected), TICK, f"ON ended at {offs[0]} s, expected {expected} s; {tl.dump(700)}")
+                self.assertTrue(all(q == 1 for s, q, _c, _f, _b in tl.rows if s < expected - TICK), tl.dump(700))
+
+    def test_n6_heat_pump_entry_starts_on_at_once_and_holds_600_s(self):
+        # Entry 43 with a heat pump: the first phase after PWM is entered is ON at once, no 900 s off wait; with the burner lit and the demand
+        # in range 1 the ON phase lasts the 600 s minimum (entry 197), not 180 s. Entry with ON time 0 (flame off, range 1) does not start.
+        tl = self.sim(3, 0.5, "cold", [], 300, ("entry 1", f"src {self.SRC_HP}"))
+        self.assertEqual(tl.edges()[0][:1], [0], tl.dump(60))
+        tl = self.sim(3, 0.07, "burning", [], 900, ("entry 1", f"src {self.SRC_HP}"))
+        ons, offs = tl.edges()
+        self.assertEqual(ons[:1], [0], tl.dump(60))
+        self.assertLessEqual(abs(offs[0] - 600), TICK, tl.dump(700))
+        tl = self.sim(3, 0.02, "cold", [], 300, ("entry 1", f"src {self.SRC_HP}"))
+        self.assertEqual(tl.edges()[0], [], tl.dump(300))
+
+    def test_n7_heat_pump_failed_and_delayed_ignition_keep_the_phase_timing(self):
+        # No flame at all: no abort at 180 s, the ON time (900 s) runs from the phase start (pwm.py:197-199, entry 80).
+        tl = self.sim(3, 0.5, "cold", [], 1000, (f"src {self.SRC_HP}",))
+        offs = tl.edges()[1]
+        self.assertLessEqual(abs(offs[0] - 900), TICK, tl.dump(1000))
+        # Ignition at 120 s: the ON time counts from the ignition (pwm.py:186-188): ON ends at 120 + 900.
+        tl = self.sim(3, 0.5, "cold", [(120, "flame", 1)], 1200, (f"src {self.SRC_HP}",))
+        offs = tl.edges()[1]
+        self.assertLessEqual(abs(offs[0] - 1020), TICK, tl.dump(1200))
+
+    def test_n8_hybrid_range_5_restarts_without_the_600_s_minimum_off(self):
+        # Entry 198: heat pumps only ("Hybrid: not stated, keeps gas rules": the recorded reading, not a decision of Sergeant D about hybrids).
+        # Duty 0.5, ON 0..900, then range 5 at 905: a hybrid restarts at the next tick, a heat pump after 600 s
+        # (the heat-pump half is test_ll017_heat_pump_off_phase_holds_cs10_for_the_600_s_minimum_off_without_protection).
+        tl = self.sim(3, 0.5, "burning", [(905, "ratio", 95)], 1700, (f"src {self.SRC_HYB}",))
+        ons, offs = tl.edges()
+        self.assertEqual(offs[:1], [900], tl.dump(1000))
+        self.assertTrue(len(ons) >= 2 and ons[1] <= 960, f"second ON at {ons[1:2]}, expected about 930; {tl.dump(1000)}")
+
+    def test_n9_hot_water_in_the_off_phase_does_not_move_the_heat_pump_off_wait(self):
+        # Entry 97 (Q51b) for a heat pump: ON 0..900, OFF wait 900 s from the switch. A draw with a flame in the OFF phase changes nothing.
+        ev = [(1000, "dhw", 1), (1005, "flame", 1), (1090, "flame", 0), (1090, "dhw", 0)]
+        tl = self.sim(3, 0.5, "burning", [(905, "flame", 0)] + ev, 2200, (f"src {self.SRC_HP}",))
+        ons, offs = tl.edges()
+        self.assertEqual(offs[:1], [900], tl.dump(1000))
+        self.assertTrue(len(ons) >= 2 and abs(ons[1] - 1800) <= TICK, f"second ON at {ons[1:2]}, expected 1800; {tl.dump(2000)}")
+
+    def test_n10_phase_edges_survive_the_millis_rollover(self):
+        # LL-019 timestamp rollover: the same runs with millis() just below 2^32 (the wrap falls inside the run, at second 400) give the
+        # same edges and the same counted starts as with a base far from the wrap. Phase anchors, ignition wait, hold and OFF wait are all
+        # elapsed = millis() - anchor in uint32 arithmetic.
+        wrap = f"base {2**32 - 400000}"
+        cases = (("gas", 3, 0.22, "burning", [], 3000, ()),
+                 ("gas cold", 3, 0.5, "cold", [(120, "flame", 1)], 3000, ()),
+                 ("heat pump", 3, 0.5, "burning", [], 4000, (f"src {self.SRC_HP}",)),
+                 ("hybrid draw", 3, 0.22, "burning", [(100, "dhw", 1), (400, "dhw", 0)], 3000, (f"src {self.SRC_HYB}",)))
+        for name, cph, ratio, init, ev, dur, extra in cases:
+            with self.subTest(case=name):
+                n0, ref = self.starts(cph, ratio, init, ev, dur, extra)
+                n1, wrapped = self.starts(cph, ratio, init, ev, dur, (*extra, wrap))
+                self.assertGreaterEqual(len(ref.edges()[0]), 2, ref.dump(dur))
+                self.assertEqual(wrapped.edges(), ref.edges(), f"{wrapped.dump(dur)}\nvs\n{ref.dump(dur)}")
+                self.assertEqual(n1, n0)
 
 
 if __name__ == "__main__":

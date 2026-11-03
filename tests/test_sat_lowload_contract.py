@@ -182,11 +182,18 @@ DELEGATED = {
                 "test_tick_inside_the_flood_sends_the_live_hold", "test_relight_after_hot_water_repeats_the_flood_and_a_dhw_flame_does_not",
                 "test_normal_boiler_is_unchanged", "test_mi500_once_on_pic_after_no_return_detection", "test_mi500_never_on_ot_direct",
                 "test_a_break_in_the_no_return_fact_restarts_the_5_minutes"])],
-    "LL-019": [("test_sat_pwm_anchors", "SatPwmAnchors", ["test_d1_off_wait_ignores_hot_water_flame_offs", "test_d2_on_phase_without_flame_does_not_end_on_its_first_tick",
-                "test_d4_no_flame_within_180_s_does_not_abort_on", "test_d5_on_time_below_180_s_never_starts_on", "test_d6_relight_inside_on_does_not_restart_the_timer",
-                "test_d7_first_flame_after_the_wait_timed_out_does_not_resync_but_holds_180_s", "test_d8_late_ignition_keeps_on_until_180_s_after_flame_on",
-                "test_e1_unlit_on_start_counts_once", "test_e2_ch_ignition_and_relight_inside_on_add_no_count", "test_h3_range_5_is_held_the_same_way"]),
-               ("test_sat_hp_pwm", "SatHeatPumpPwm", ["test_r3_on_phase_waits_for_flame", "test_gas_range5_restarts_without_min_off"])],
+    # LL-019 (TASK-1412.9): the whole phase-anchor and start-count suites run, not a subset: every test of test_sat_pwm_anchors (anchors,
+    # ignition wait, relight, DHW interruptions, per-source start counting, millis rollover) and test_sat_pwm_start_limit (limit windows,
+    # PWM entry, range 5, flame lag, ring rollover), plus the P / 2P mapper, minimum ON / OFF and range-5 cells of test_sat_hp_pwm.
+    "LL-019": [("test_sat_pwm_anchors", "SatPwmAnchors", None),
+               ("test_sat_pwm_start_limit", "SatPwmStartLimit", None),
+               ("test_sat_hp_pwm", "SatHeatPumpPwm", ["test_hp1800_mid_range_duty_060", "test_hp1800_low_range_duty_030", "test_hp1800_ultra_low_without_flame_008",
+                "test_hp1800_over_max_092", "test_hp1800_ultra_low_with_flame", "test_hp1800_ultra_low_without_flame", "test_hp1800_over_max",
+                "test_hp2400_ultra_low_with_flame_007", "test_hp2400_over_max", "test_hp10800_all_five_ranges", "test_hp10800_on_phase_ends_at_the_current_on_time",
+                "test_hp3600_ranges", "test_hybrid_never_gets_3600", "test_hybrid_never_gets_10800", "test_hp1800_on_phase_ends_after_on_time",
+                "test_hp1800_on_phase_holds_before_on_time", "test_hp_minimum_burn_600_holds", "test_hp_min_off_600_in_range5",
+                "test_gas_range5_restarts_without_min_off", "test_gas_oracle_4ph", "test_gas_3ph_default", "test_gas_on_phase_min_on_180",
+                "test_r3_on_start_without_flame_starts", "test_r3_on_phase_waits_for_flame", "test_hybrid_uses_the_heat_pump_cycle"])],
     "LL-020": [("test_sat_pid_cadence", "Cadence", ["test_a_integral_and_step_count_independent_of_the_control_tick", "test_b_millis_wrap_gives_the_same_steps_and_integral",
                 "test_c_loop_stall_gives_one_step", "test_d_startup_step_at_the_first_pass", "test_f_no_room_gives_curve_only_never_nan",
                 "test_j_room_back_gives_curve_only_until_the_next_step"]),
@@ -199,11 +206,13 @@ DELEGATED = {
     "LL-021": [("test_sat_cycle_classifier", "CycleClassifier", None)],
     "LL-023": [("test_sat_ground_truth_block", "SatGroundTruthBlock", None)],
 }
-_delegated = {}   # (module, class) -> {test name: (ok, detail)}
+_delegated = {}   # (module, class, requested names) -> {test name: (ok, detail)}; the names are part of the key (TASK-1412.9)
 
 
 def delegated_results(module, cls, names):
-    key = (module, cls)
+    # TASK-1412.9: the requested names belong to the key. With (module, class) alone the first LL id to ask for a class fixed the subset that
+    # ran, so a later id asking for other tests of the same class (LL-019 after LL-015 / LL-017) was reported green without running them.
+    key = (module, cls, None if names is None else tuple(names))
     if key not in _delegated:
         hp.MAIN = HP_MAIN_ORIG
         mod = __import__(module)
@@ -396,7 +405,7 @@ class LowLoadContract(unittest.TestCase):
         self.assertRegex(sat, r"(?i)return\w*(Stale|Invalid|Age|SeenMs|LastMs)\w*", "no per-ID stale/invalid return handling (BoilerLastSeenMs is whole-link liveness and does not count)")
 
     @ll("LL-019", "contract", "satApplyPWM phase anchors, ignition wait, start counting (via test_sat_pwm_anchors, test_sat_hp_pwm)",
-        task="TASK-1380/1382/1383/1421 (fixed); fourth start/wrap/range changes are TASK-1412.9")
+        task="TASK-1380/1382/1383/1421 (fixed); TASK-1412.9 revalidation (matrix per source, limit windows, rollover)")
     def test_ll019_phase_clocks_and_start_counts(self):
         self.delegated("LL-019")
 
