@@ -3,9 +3,11 @@ id: TASK-1590
 title: >-
   SATTICK: show the return source (OT MsgID 28 vs PIC board sensor) next to
   rc/rage
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-03T13:40:00Z'
+updated_date: '2026-11-03T13:52:00Z'
 labels:
   - sat
   - logging
