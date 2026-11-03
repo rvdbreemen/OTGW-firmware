@@ -3,9 +3,11 @@ id: TASK-1597
 title: >-
   WiFi mode setting: force 802.11g for routers where the ESP8266 associates in
   11n but gets no traffic (dev TASK-1596)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-03T22:19:00Z'
+updated_date: '2026-11-03T22:30:00Z'
 labels:
   - wifi
   - esp8266
