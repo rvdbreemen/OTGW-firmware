@@ -5796,3 +5796,11 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot TASK-1412.14: A"
 
 **Settled:** option A of Q-PARITY-3: before the 180 s tail the classifier judges, it skips an effective warm-up of min(60 s, 25 % of the burn), as thermo-nova cycles/tracker.py:113-116; the port today counts the warm-up (SATcycles.ino:1009-1025). **Interpretation (ours):** he named only the task; the one open question under TASK-1412.14 was Q-PARITY-3, so "A" is read as its option A. **Task:** TASK-1584. **Open:** none.
+
+## 245. Q-PARITY-5 answered A: the classifier records the requested setpoint per sample and uses its tail median, as thermo-nova (Sergeant D, 2026-11-03)
+
+**Source:** sergeantd, 2026-11-03 06:40 UTC, msg 1567065983208661013 (https://discord.com/channels/812969634638725140/1514720723980259460/1567065983208661013), answer to Q-PARITY-5 (msg 1567065408190685227).
+
+**Quoted:** "@BlueFlame Bot TASK-1412.14: A"
+
+**Settled:** option A of Q-PARITY-5: the requested setpoint is recorded per classifier sample, and the tail median (p50) is the effective setpoint for the underheat cold check, as thermo-nova cycles/tracker.py:273-277 and classifier.py:81-86; the port today uses one snapshot at flame-off (SATcycles.ino:918). About 360 bytes more RAM. **Interpretation (ours):** he named only the task; the one open question under TASK-1412.14 was Q-PARITY-5, so "A" is read as its option A. **Task:** TASK-1585. **Open:** none.
