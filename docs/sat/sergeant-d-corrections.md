@@ -5756,3 +5756,11 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** Sergeant D: "TASK-1570: Resend them every one minute if it hasn't change, let's keep a smaller interval between these commands. Especially During start- up it is invaluable to have free PIC queue so we can refresh the CS fast". Robert: "Don't worry to much about the queue, I am redesigning the queue methods, so it's faster." / "That resend of messages should not really be needed, but we can do it once per minute." / "When nothing on the values changes."
 
 **Settled:** neither A (5 min) nor B (none): an unchanged MM=, the Immergas TP=11:12 and CH= are resent once every 60 s; a changed value goes out at once (entry 237); after a reset or PIC restart they go out at once (entry 238). CS is unchanged (every tick, 5 s resend). His start-up concern (a free PIC queue so CS refreshes fast) is met by the queue redesign (TASK-1567/1569/1571: one command at a time, echo-paced), per Robert. **Task:** TASK-1570 (constant SAT_MMCH_REPAIR_MS = 60 s instead of the 300 s SAT_CMD_REFRESH_MS). **Open:** none.
+
+## 240. Q-1541a answered: on SAT disable, restore SH= and SW= and clear TC=; TP and MI stay (Sergeant D, 2026-11-03)
+
+**Source:** sergeantd, 2026-11-03 04:12 UTC, msg 1567028643157381263 (https://discord.com/channels/812969634638725140/1514720723980259460/1567028643157381263), answer to Q-1541a (msg 1566959662073643069).
+
+**Quoted:** "@BlueFlame Bot Q-1541-a: A"
+
+**Settled:** option A of Q-1541a. When SAT is switched off it sends, in this order, CS=0, CH=1, MM=T (as today), then SH= and SW= back to the values read before SAT took over, then TC=0 to clear a thermostat setpoint SAT pushed. The Immergas TP=11:12 and MI=500 stay as SAT left them (the old TP value is unknown; MI=500 is harmless). This deviates from thermo-nova, which restores nothing on HVAC off (climate.py:571-583) and never sets SH/SW/MI back (coordinator/mqtt/opentherm.py:225, 202, 172). **Interpretation (ours):** "the values read before SAT took over" are the boiler's MsgID 57 / 56 values last read before satEnable; when no value was read, nothing is sent for that item. **Task:** TASK-1541 (OD-2). **Open:** none.
