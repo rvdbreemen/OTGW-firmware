@@ -3,10 +3,11 @@ id: TASK-1581
 title: >-
   SAT: send MM=T at the maximum PWM duty (range 5) as the threshold to
   continuous mode (entry 242)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-03T06:08:00Z'
-updated_date: '2026-11-03T06:27:00Z'
+updated_date: '2026-11-03T06:35:00Z'
 labels:
   - sat
 dependencies: []
