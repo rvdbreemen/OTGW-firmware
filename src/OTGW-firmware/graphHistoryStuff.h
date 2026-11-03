@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : graphHistoryStuff.h
-**  Version  : v2.0.0-beta.54
+**  Version  : v2.0.0-beta.55
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -121,6 +121,21 @@ inline uint8_t graphHistEncMod(float v, bool present) {
   if (v <= 0.0f)   return 0;
   if (v >= 100.0f) return 100;
   return (uint8_t)(v + 0.5f);
+}
+
+// Room temperature dropout (TASK-1578). Same rule as the live graph (v2.js graphRoomLost, TASK-1546):
+// the room is lost when SAT is on and reports room_temp_lost, or when MsgID 24 has been silent for
+// more than GRAPH_HIST_ROOM_STALE_S (SAT's own room timeout, about 4.5 min). A unit that never
+// reported MsgID 24 has no dropout: its room stays "no value" as before.
+#define GRAPH_HIST_ROOM_STALE_S 270
+
+inline bool graphHistRoomLost(bool satRoomLost, bool seen, uint32_t ageS) {
+  return satRoomLost || (seen && ageS > GRAPH_HIST_ROOM_STALE_S);
+}
+
+// Room column of a slot: the reading while it is current, the no-value sentinel during a dropout.
+inline int16_t graphHistEncRoom(float v, bool seen, bool satRoomLost, uint32_t ageS) {
+  return graphHistEncTemp(v, seen && !graphHistRoomLost(satRoomLost, seen, ageS));
 }
 
 // ---- ring ------------------------------------------------------------------

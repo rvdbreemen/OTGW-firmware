@@ -1384,6 +1384,10 @@
     if (!(n > 0) || !(iv > 0) || !(sc > 0) || !(age >= 0)) return hist;
     for (var c = 0; c < ALL.length; c++) if (!Array.isArray(j[ALL[c]]) || j[ALL[c]].length !== n) return hist;
     var live = hist.filter(function (r) { return !r.h; }), ivMs = iv * 1000, out = [], li = 0;
+    // TASK-1578: the device stores a room dropout as a null room. When the window has room readings at all,
+    // a null room in a slot that has other data is a dropout (the TASK-1546 interruption); a unit that never
+    // reported a room temperature has no dropout to show.
+    var hasRoom = j.room.some(function (v) { return typeof v === 'number'; });
     for (var i = 0; i < n; i++) {
       var x = nowMs - age - (n - i) * ivMs, t = x - x % GSLOT;
       while (li < live.length && live[li].t < t) li++;
@@ -1398,6 +1402,7 @@
       r.mod = (typeof m === 'number') ? m : null;
       r.flame = j.flame[i] ? 1 : 0; r.dhw_on = j.dhw_on[i] ? 1 : 0; r.ch = j.ch[i] ? 1 : 0;
       if (!any && r.mod === null && !r.flame && !r.dhw_on && !r.ch) continue;   // pure gap slot
+      if (hasRoom && r.room === null) r.roomX = 1;
       if (out.length && out[out.length - 1].t === t) out[out.length - 1] = r; else out.push(r);
     }
     var merged = [], a = 0, b = 0;

@@ -32,12 +32,23 @@ if (!CHROME) { console.log('SKIP: no Chrome/Edge binary found; cannot run the br
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.png': 'image/png' };
 
 let satBody = { enabled: false };
+// TASK-1578: the device's own history (GET /api/v2/graph/history). null = not served (404, as on an old firmware).
+// 25 slots of 120 s ending 60 s ago; the room column is null for the newest 10 slots (a dropout the device stored as no value).
+let deviceHistory = null;
+function makeHistory(roomNullFrom) {
+  const n = 25, col = (f) => Array.from({ length: n }, (_, i) => f(i));
+  return { interval_s: 120, newest_age_ms: 60000, count: n, scale: 10,
+    flow: col(() => 450), ret: col(() => 300), chSet: col(() => 500), roomSet: col(() => 200),
+    room: col((i) => (i >= roomNullFrom ? null : 193)), outside: col(() => 50), mod: col(() => 30),
+    flame: col(() => 1), dhw_on: col(() => 0), ch: col(() => 1) };
+}
 let epoch = 1700000000, rolling = true;
 const srv = http.createServer((q, s) => {
   const url = new URL(q.url, `http://127.0.0.1:${PORT}`);
   let p = decodeURIComponent(url.pathname);
   const js = (o) => { s.writeHead(200, { 'content-type': 'application/json' }); s.end(JSON.stringify(o)); };
   if (p.endsWith('/v2/sat/status')) return js(satBody);
+  if (p.endsWith('/v2/graph/history')) { if (!deviceHistory) { s.writeHead(404); return s.end('nf'); } return js(deviceHistory); }
   if (p.endsWith('/v2/otgw/otmonitor')) {
     if (rolling) epoch++;
     return js({ otmonitor: { roomtemperature: { value: '19.34', epoch }, boilertemperature: { value: '45.0', epoch: epoch + 1 }, roomsetpoint: { value: '20.0', epoch: 1700000000 } } });
@@ -98,8 +109,8 @@ const GRAPH = `(function(){
 
 // phase 1 = 8 s of polling at the real time, then the page clock runs 60 times faster for `fastSec` real seconds
 // (a poll every 2 s is then a sample every 2 minutes, which the graph still draws as one line)
-async function scenario(sat, rollingEpoch, fastSec, shot) {
-  satBody = sat; rolling = rollingEpoch; epoch += 1000;
+async function scenario(sat, rollingEpoch, fastSec, shot, hist) {
+  satBody = sat; deviceHistory = hist || null; rolling = rollingEpoch; epoch += 1000;
   await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/v2.html` });
   await sleep(3800);   // startup: otmonitor seed at 2 s, sat/status at 2.8 s
   await evalJs(`document.querySelector('.seg[data-page="monitor"]').click()`);
@@ -150,6 +161,15 @@ check(!!c.rows && c.rows.length > 1 && c.rows.slice(1).every((v) => v === ''), `
 // 4. SAT on, room valid: no interruption line
 const d = await scenario({ enabled: true, active: true, room_temp_lost: false }, true, 0, null);
 check(!!d.g && d.g.roomN > 0 && d.g.xN === 0, `SAT on, room valid: room line, no interruption line (${JSON.stringify(d.g && { roomN: d.g.roomN, xN: d.g.xN })})`);
+
+// 5. TASK-1578: after a reload the part of the graph that comes from the device history shows the same interruption.
+// The live thermostat reports fine (rolling epoch, SAT off); only the history has a null room stretch.
+const e = await scenario({ enabled: false }, true, 0, 'dropout-5-history.png', makeHistory(15));
+check(!!e.g && e.g.xN > 0 && !!e.g.xColour && e.g.xColour !== e.g.roomColour,
+  `device history with a room dropout: interruption line drawn from history (${JSON.stringify(e.g && { xN: e.g.xN, x: e.g.xColour, room: e.g.roomColour })})`);
+check(!!e.g && e.g.roomN > 0 && e.g.xMin !== null, `device history with a room dropout: the room line is drawn too (before the dropout and live) (${JSON.stringify(e.g && { roomN: e.g.roomN, xMin: e.g.xMin })})`);
+const f = await scenario({ enabled: false }, true, 0, null, makeHistory(0));
+check(!!f.g && f.g.xN === 0, `device history where the room never reported: no interruption line (${JSON.stringify(f.g && { xN: f.g.xN })})`);
 
 check(exceptions.length === 0, `no uncaught page exceptions (${exceptions.join(' ; ')})`);
 console.log(ok ? '\n0 failures' : '\nsome failures');

@@ -177,6 +177,24 @@ static void runCommon() {
   check((GRAPH_HIST_SMALL_SLOTS - GRAPH_HIST_MARGIN) * GRAPH_HIST_SMALL_INTERVAL_S == 3600, "small ring emits exactly 1 h");
   check((GRAPH_HIST_LARGE_SLOTS - GRAPH_HIST_MARGIN) * GRAPH_HIST_LARGE_INTERVAL_S == 24 * 3600, "large ring emits exactly 24 h");
 
+  // TASK-1578: a slot taken during a room dropout stores no value for the room (live-graph rule, TASK-1546).
+  check(graphHistEncRoom(19.3f, true, false, 10) == 193, "room: current reading is stored");
+  check(graphHistEncRoom(19.3f, true, false, 270) == 193, "room: 270 s silent is still a reading (limit is above 270 s)");
+  check(graphHistEncRoom(19.3f, true, false, 271) == GRAPH_HIST_NO_TEMP, "room: MsgID 24 silent 271 s -> no value");
+  check(graphHistEncRoom(19.3f, true, true, 5) == GRAPH_HIST_NO_TEMP, "room: SAT room_temp_lost -> no value even with a fresh MsgID 24");
+  check(graphHistEncRoom(0.0f, false, false, 0) == GRAPH_HIST_NO_TEMP, "room: never reported -> no value");
+  check(graphHistEncRoom(0.0f, true, false, 5) == 0, "room: a real 0.0 reading is not a dropout");
+  {
+    RingBox rb(8, 30); graphHistIntervalsDue(rb.r, rb.c, 0);
+    GraphHistSlot ok = graphHistEmptySlot(); ok.room = graphHistEncRoom(20.0f, true, false, 5);
+    GraphHistSlot lost = graphHistEmptySlot(); lost.room = graphHistEncRoom(20.0f, true, false, 600);
+    graphHistCommit(rb.r, rb.c, graphHistIntervalsDue(rb.r, rb.c, 30000), ok);
+    graphHistCommit(rb.r, rb.c, graphHistIntervalsDue(rb.r, rb.c, 60000), lost);
+    GraphHistSnapshot sn = graphHistMakeSnapshot(rb.r, rb.c, rb.c.lastCommitMs);
+    std::vector<std::string> col;
+    check(column(emit(rb.r, sn), "room", col) && col.size() == 2 && col[0] == "200" && col[1] == "null", "GET history: room 200 then null for the dropout slot");
+  }
+
   check(graphHistEncTemp(21.54f, true) == 215, "21.54 -> 215");
   check(graphHistEncTemp(21.56f, true) == 216, "21.56 -> 216");
   check(graphHistEncTemp(-3.26f, true) == -33, "-3.26 -> -33 (round half away from zero)");

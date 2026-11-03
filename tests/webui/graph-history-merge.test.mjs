@@ -262,3 +262,17 @@ test('interval_s 30: the covered-by-live window is 30 s wide', () => {
   assertSortedUnique(inside);
   assertSortedUnique(outside);
 });
+
+// TASK-1578: the device stores a room dropout as a null room; the merge marks it as the TASK-1546 interruption.
+test('a null room in a window that has room readings is a dropout (roomX)', () => {
+  const r = merge([], body(6, { room: [190, 191, null, null, 192, null] }), NOW);
+  assert.deepEqual(r.map(x => x.roomX || 0), [0, 0, 1, 1, 0, 1]);
+  assert.equal(r[2].room, null);
+  assert.equal(r[0].room, 19);
+});
+
+test('a window where the room never reported has no dropout (no roomX)', () => {
+  const r = merge([], body(4, { room: [null, null, null, null] }), NOW);
+  assert.equal(r.length, 4);
+  assert.ok(r.every(x => !x.roomX));
+});

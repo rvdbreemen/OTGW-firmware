@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : graphHistoryStuff.ino
-**  Version  : v2.0.0-beta.54
+**  Version  : v2.0.0-beta.55
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -59,7 +59,10 @@ void graphHistoryTick()
   s.ret     = graphHistEncTemp(OTcurrentSystemState.Tret,    graphHistSeen(28));
   s.chSet   = graphHistEncTemp(OTcurrentSystemState.TSet,    graphHistSeen(1));
   s.roomSet = graphHistEncTemp(OTcurrentSystemState.TrSet,   graphHistSeen(16));
-  s.room    = graphHistEncTemp(OTcurrentSystemState.Tr,      graphHistSeen(24));
+  // TASK-1578: a slot taken during a room dropout stores no value (same rule as the live graph).
+  const uint16_t trAt = getMsgLastUpdated(24);   // 0 = never reported
+  s.room    = graphHistEncRoom(OTcurrentSystemState.Tr, trAt != 0, satIsEnabled() && state.sat.bRoomTempLost,
+                               elapsedTrackedSeconds(currentTrackedSeconds(), trAt));
   s.mod     = graphHistEncMod (OTcurrentSystemState.RelModLevel, graphHistSeen(17));
   // Outside follows the browser rule (v2.js): weather API when valid, else MsgID 27.
   if (state.sat.weather.bValid) s.outside = graphHistEncTemp(state.sat.weather.fTemperature, true);
