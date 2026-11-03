@@ -138,7 +138,7 @@
 #### Command Queue
 
 ##### `void addCommandToQueue(const char* buf, const int len, const bool forceQueue, const int16_t delay)`
-- **Purpose**: Queue a command for the PIC (for example `GW=1`, `TT=20.0`). With no PIC it hands the command to `handleOTDirectCommand()` when OT-Direct is active (the combo OT-Direct path), otherwise it ignores it.
+- **Purpose**: Queue a command for the PIC (for example `GW=1`, `TT=20.0`). With no PIC it hands the command to `handleOTDirectCommand()` when OT-Direct is active (the combo OT-Direct path) and answers `Sent` when the handler accepted it, `Dropped` when it refused it (TASK-1593: error reply, unknown command, command ring full); with neither it ignores the command (`Dropped`).
 - **Parameters**:
   - `buf`, `len`: command text, at least `XX=`, shorter than the entry size
   - `forceQueue`: when false, a queued command with the same two-letter prefix is overwritten instead of appended; when true it always takes a new slot (the `PR=` queries use this)

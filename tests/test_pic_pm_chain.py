@@ -56,7 +56,7 @@ static bool g_pic = true;
 static bool isPICEnabled() { return g_pic; }
 static bool isOTDirectEnabled() { return true; }
 static char g_direct[256];
-static void handleOTDirectCommand(const char* b, int n, bool = false) { strncat(g_direct, b, n); strcat(g_direct, ";"); }
+static bool handleOTDirectCommand(const char* b, int n, bool = false) { strncat(g_direct, b, n); strcat(g_direct, ";"); return true; }
 static bool g_satOwns = false;      // TASK-1575: SAT owns the control setpoint
 static bool satOwnsControlSetpoint() { return g_satOwns; }
 static bool g_inflight = false;     // the old global in-flight flag (read only by the code before TASK-1575)

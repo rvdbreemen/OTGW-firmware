@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.58
+**  Version  : v2.0.0-beta.59
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -103,7 +103,7 @@ enum class OpenThermResponseStatus : byte;
 void initOTDirect();
 void loopOTDirect();
 void handleOTDirectBridgeStream();
-void handleOTDirectCommand(const char* buf, int len, bool satOwn = false);   // satOwn: TASK-1575, see addCommandToQueue
+bool handleOTDirectCommand(const char* buf, int len, bool satOwn = false);   // satOwn: TASK-1575, see addCommandToQueue; false = refused (TASK-1593)
 void sendOTDirectOverridesJSON();
 bool sendPICSerial(const char* buf, int len);
 bool otDirectBoilerPresent();  // TASK-795 §4.2: real boiler answered MsgID 3 (excludes loopback)

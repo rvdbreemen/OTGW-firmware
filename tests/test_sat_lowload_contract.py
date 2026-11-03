@@ -174,6 +174,7 @@ DELEGATED = {
                ("test_sat_cycle_classifier", "CycleClassifier", ["test_R2_master_ch_enable_decides_the_kind"]),
                ("test_sat_pressure_health", "SatPressureHealth", ["test_ch_enable_transition_suspends_and_clears", "test_sat_on_off_alone_does_not_suspend",
                 "test_pwm_off_phase_does_not_suspend"])],
+    "LL-013b": [("test_sat_command_delivery", "OtDirectRefusal", None)],
     "LL-013": [("test_sat_cmd_cache", "CmdCacheReset", ["test_dropped_enqueue_is_not_cached_and_sent_again", "test_dropped_satsendcs_is_retried_by_the_5s_resend",
                 "test_dropped_keepalive_is_tried_again_on_the_next_pass", "test_resend_repeats_last_values_after_5s_not_before",
                 "test_mm_and_ch_only_on_change_and_again_after_pic_restart", "test_unchanged_mm_and_ch_repaired_after_60_s",
@@ -447,12 +448,10 @@ class LowLoadContract(unittest.TestCase):
     def test_ll013_dropped_enqueue_is_not_cached_and_is_retried(self):
         self.delegated("LL-013")
 
-    @ll("LL-013", "open_decision", "addCommandToQueue OT-Direct branch / handleOTDirectCommand (OTGW-Core.ino, OTDirect.ino; read from the source)",
-        task="TASK-1412.11 AC2: on OT-Direct a write that the handler refused (otCmdEnqueue ring full, 12 slots coalesced per MsgID) is still answered Sent, "
-             "so SAT would record it as delivered; the fix changes the handler's return type: not decided", question="Q-1412.11a (Robert)")
+    @ll("LL-013", "contract", "addCommandToQueue OT-Direct branch, handleOTDirectCommand CS=/MM= branches, otCmdEnqueue ring, SAT senders (via test_sat_command_delivery.OtDirectRefusal)",
+        task="TASK-1593 (Q-1412.11a, Robert 2026-11-03): an OT-Direct write that the handler refused (command ring full) is answered Dropped and SAT does not cache it as delivered")
     def test_ll013b_ot_direct_refusal_is_visible_to_the_caller(self):
-        import test_sat_command_delivery as cd
-        self.assertTrue(cd.ot_direct_refusal_reaches_the_caller(), "handleOTDirectCommand() returns void; addCommandToQueue() answers Sent")
+        self.delegated("LL-013b")
 
     @ll("LL-014", "contract", "satEffective MaxTSet / CS ceiling and SH negotiation (SATcontrol.ino, via test_sat_max_tset)",
         task="TASK-1412.13 (entries 100, 252): ID49 bounds with 20/80 fallback, SH= without an MsgID 6 gate, the SH= write verdict observed, every CS path under the ceiling")

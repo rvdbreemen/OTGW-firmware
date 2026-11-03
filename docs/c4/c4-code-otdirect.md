@@ -190,8 +190,9 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 
 ### Command Handler
 
-#### `void handleOTDirectCommand(const char* buf, int len)`
+#### `bool handleOTDirectCommand(const char* buf, int len, bool satOwn = false)`
 - **Purpose**: Process PIC-style text commands (XX=value) and translate to OT frames/state changes
+- **Return value (TASK-1593)**: `true` = accepted, `false` = refused: too short or malformed, an error reply (`NG`, `BV`, `OR`, `SE`, `NF`, `NS`), an unknown command, or a write that `enqueueWriteCommand()` could not put in the 12-slot command ring (ring full, no pending frame for that MsgID to replace). The replies to the sender are unchanged. `addCommandToQueue()` maps `false` to `CmdQueueResult::Dropped`, so SAT does not cache a refused `CS=`/`MM=` as delivered. Callers that ignore the result (`sendPICSerial()`) behave as before.
 - **Behavior**:
   - Parses buf[0-1] as command code, buf[2] must be '=', buf[3+] is value
   - Implements full PIC command set across 9 categories:

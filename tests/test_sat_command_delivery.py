@@ -35,6 +35,58 @@ import test_pic_pm_chain as pm  # noqa: E402
 
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino"))   # OTGW_CORE_INO: see test_pic_pm_chain
 
+OTD_INO = Path(os.environ.get("OTGW_OTD_INO", REPO / "src" / "OTGW-firmware" / "OTDirect.ino"))
+
+# TASK-1593: the OT-Direct side is the REAL code too: the command ring (otCmdEnqueue), enqueueWriteCommand() and the prologue, the CS= and the
+# MM= branches and the epilogue of handleOTDirectCommand() are cut out of OTDirect.ino. Every other command goes to a recording stub branch.
+OTD_STUBS = r"""
+#define OTDDebugTf(...) ((void)0)
+#define OTDDebugTln(...) ((void)0)
+#define DebugTf(...) ((void)0)
+#include <cctype>
+#include <cstdlib>
+enum class OpenThermMessageType : uint8_t { WRITE_DATA = 1 };
+enum class OpenThermMessageID : uint8_t {};
+struct OpenTherm { static unsigned long buildRequest(OpenThermMessageType t, OpenThermMessageID id, uint16_t d) {
+  return ((unsigned long)t << 28) | ((unsigned long)(uint8_t)id << 16) | d; } };
+static bool satOwnsControlSetpoint();
+static unsigned long otCSLastCommandMs = 0;
+static uint16_t floatToF88(float f) { return (uint16_t)(int16_t)(f * 256.0f); }
+static void updateWriteCache(uint8_t, uint16_t) {}
+static void setOverride(uint8_t, uint16_t) {}
+static void clearWriteOverride(uint8_t) {}
+static void synthesizeResponse(const char*, const char*) {}
+static void otDirectBridgeProcessStatus(const char*) {}
+static char* dtostrf(float v, int, int, char* b) { snprintf(b, 16, "%.2f", v); return b; }
+"""
+
+
+def build_otd_handler() -> str:
+    """The OT-Direct blocks, cut from OTDirect.ino. Against a copy from before TASK-1593 (no otdWriteRefused) the handler is void and the
+    wrapper answers true, which is what the old addCommandToQueue() did with it (it ignored the handler)."""
+    nl = chr(10)
+    o = OTD_INO.read_text(encoding="utf-8").replace(chr(13) + nl, nl)
+    end_fn = nl + "}" + nl
+    new = "otdWriteRefused" in o
+    ring = o[o.index("static constexpr uint8_t OT_CMD_QUEUE_SIZE"):]
+    ring = ring[:ring.index(end_fn, ring.index("static bool otCmdEnqueue(")) + len(end_fn)]
+    a = o.index("// TASK-1593: set when") if new else o.index("static bool enqueueWriteCommand(")
+    enq = o[a:o.index(end_fn, o.index("static bool enqueueWriteCommand(")) + len(end_fn)]
+    h0 = o.index("bool handleOTDirectCommand(" if new else "void handleOTDirectCommand(")
+    prologue = o[h0:o.index("  // CS=xx.x")]
+    cs = o[o.index("  // CS=xx.x"):o.index("  // TC=xx.x")]
+    mm = o[o.index("  // MM=xx"):o.index("  // OT=xx.x")]
+    assert cs.rstrip().endswith("}") and "else if (cmd0 == 'M' && cmd1 == 'M')" in mm
+    epilogue = "  return !otdWriteRefused;" + end_fn
+    assert not new or epilogue in o[h0:]
+    other = '  else {' + nl + '    strncat(g_direct, buf, len); strcat(g_direct, ";");   // any other command: recorded, not run' + nl + '  }' + nl
+    handler = prologue + cs + mm + other + (epilogue if new else "}" + nl)
+    if not new:
+        handler = handler.replace("void handleOTDirectCommand(", "void handleOTDirectCommand_old(", 1)
+        handler += "static bool handleOTDirectCommand(const char* b, int n, bool s = false) { handleOTDirectCommand_old(b, n, s); return true; }" + nl
+    return OTD_STUBS + nl + ring + nl + enq + nl + handler
+
+
 SAT_STUBS = r"""
 #define SATTraceTf(...) ((void)0)
 #define SATTraceTln(x) ((void)0)
@@ -74,10 +126,9 @@ static void evf(const char* kind, const char* fmt, ...) {
 // the wrapper the cut-out SAT source calls instead of addCommandToQueue() (text replacement), so the result is its own event
 static CmdQueueResult addCmdLogged(const char* c, size_t n, bool force, int delay, bool own = false) {
   char t[40]; size_t k = n < 39 ? n : 39; memcpy(t, c, k); t[k] = 0;
-  const size_t before = strlen(g_direct);
   const CmdQueueResult r = addCommandToQueue(c, (int)n, force, (int16_t)delay, own);
   ev("ENQ", (std::string(t) + " " + rname(r)).c_str());
-  if (!g_pic && strlen(g_direct) > before) ev("HANDLER", t);
+  if (!g_pic) ev("HANDLER", t);   // the real OT-Direct handler runs on every OT-Direct call
   return r;
 }
 // ordinary traffic (REST/MQTT/UI): logged the same way, not SAT's
@@ -151,6 +202,14 @@ int main(int argc, char** argv) {
     g_ms = 104000; tick(45.0f, 60, 1);                   // the latest approved state is now different: 45.0 / 60
     run(104010, 106000);
     qdump();
+  } else if (sc == "ringfull" || sc == "ringfull_coalesce" || sc == "ringpartial") {   // TASK-1593: OT-Direct, the handler's 12-slot ring (11 usable)
+    const int fill = sc == "ringpartial" ? 5 : 11;
+    for (int id = 2; id < 2 + fill; id++) otCmdEnqueue(((uint32_t)id << 16) | 1);   // frames for other MsgIDs sit in the ring
+    if (sc == "ringfull_coalesce") otCmdQueue[otCmdTail] = (1UL << 16) | 7;         // a pending MsgID 1 frame: a new CS= replaces it in place
+    printf("STATE ring_depth_before=%u cs_ms_before=%lu\n", (unsigned)otCmdQueueDepth(), (unsigned long)state.sat.iLastSentCSMs);
+    tick(40.0f, 80, 1);
+    printf("STATE ring_depth=%u valid=%d last_cs_ms=%lu mm_valid=%d last_mm=%u\n", (unsigned)otCmdQueueDepth(), (int)state.sat.bLastSentValid,
+           (unsigned long)state.sat.iLastSentCSMs, (int)_sat_mmSentValid, (unsigned)state.sat.iLastSentMM);
   } else if (sc == "superseded") { // an ON decision waits in the queue, a newer OFF decision replaces it: the ON never reaches the wire
     muteAll = true; userCmd("AA=1");                     // the PIC is busy with an earlier command, nothing is echoed yet
     run(100000, 100100);
@@ -234,6 +293,11 @@ int main(int argc, char** argv) {
 def build_source() -> str:
     pre = pm.STUBS.split("@BODY@")[0]
     pre = pre.replace("struct State { PicState pic; };", SAT_STATE + "struct State { PicState pic; SatState sat; };")
+    stub_void = "static void handleOTDirectCommand(const char* b, int n, bool = false) { strncat(g_direct, b, n); strcat(g_direct, \";\"); }"
+    stub_bool = "static bool handleOTDirectCommand(const char* b, int n, bool = false) { strncat(g_direct, b, n); strcat(g_direct, \";\"); return true; }"
+    stub = stub_bool if stub_bool in pre else stub_void
+    assert stub in pre, "the handler stub of tests/test_pic_pm_chain.py changed"
+    pre = pre.replace(stub, build_otd_handler())
     pre = "#include <string>\n#include <cstdarg>\n" + pre
     core = pm.extract(pm.CORE_INO.read_text(encoding="utf-8"))
     hdr = (REPO / "src" / "OTGW-firmware" / "OTGW-firmware.h").read_text(encoding="utf-8")
@@ -453,24 +517,66 @@ class CommandDelivery(unittest.TestCase):
         self.assertEqual(hnd, enq, "OT-Direct hands the command to the handler within the enqueue call")
 
 
-def ot_direct_refusal_reaches_the_caller() -> bool:
-    """True when addCommandToQueue() can answer Dropped for an OT-Direct write that the handler refused (ring full, NG, BV).
-    Read from the source (structural): OTDirect.ino's handleOTDirectCommand() is a 700-line function that is not cut out on the host."""
-    core = (REPO / "src" / "OTGW-firmware" / "OTGW-Core.ino").read_text(encoding="utf-8")
-    otd = (REPO / "src" / "OTGW-firmware" / "OTDirect.ino").read_text(encoding="utf-8")
-    branch = core[core.index("CmdQueueResult addCommandToQueue("):]
-    branch = branch[:branch.index("constexpr int kMaxCmdLen")]
-    handler_status = re.search(r"^(bool|int|CmdQueueResult)\s+handleOTDirectCommand\(", otd, re.M) is not None
-    return handler_status and "Dropped" in branch.split("handleOTDirectCommand")[1]
+class OtDirectRefusal(unittest.TestCase):
+    """TASK-1593 (LL-013b): on OT-Direct a write that the handler refused (the 12-slot command ring is full) is answered Dropped, so SAT does not
+    cache it as delivered. The real ring, enqueueWriteCommand(), the CS= and MM= branches and addCommandToQueue() run; the PIC is not involved.
+    Against the code from before the fix (OTGW_OTD_INO / OTGW_CORE_INO = the old files) the full-ring tests fail: Sent, cache committed."""
 
+    @classmethod
+    def setUpClass(cls):
+        cls.dir = tempfile.TemporaryDirectory()
+        d = Path(cls.dir.name)
+        cpp = d / "t.cpp"
+        cpp.write_text(build_source(), encoding="utf-8")
+        cls.exe = compile_cpp(cpp, d / "t.exe")
 
-class OtDirectKnownGap(unittest.TestCase):
-    """OT-Direct: addCommandToQueue() answers Sent although the handler may have refused the write (ring full). Open: see the report."""
+    @classmethod
+    def tearDownClass(cls):
+        cls.dir.cleanup()
 
-    @unittest.expectedFailure
-    def test_handler_refusal_is_visible_to_the_caller(self):
-        self.assertTrue(ot_direct_refusal_reaches_the_caller(),
-                        "handleOTDirectCommand() returns void and addCommandToQueue() returns Sent, so a write the OT-Direct ring refused is reported as delivered")
+    def sc(self, name):
+        if not self.exe:
+            self.skipTest("no host C++ compiler")
+        r = subprocess.run([str(self.exe), name, "direct"], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        ev, other = parse(r.stdout)
+        return ev, {k: v for line in other if line.startswith("STATE ") for k, v in [kv.split("=") for kv in line[6:].split() if "=" in kv]}, other
+
+    def test_full_ring_cs_and_mm_are_dropped_and_not_cached(self):
+        ev, st, other = self.sc("ringfull")
+        print("\n  ring full, SAT tick CS=40.0 MM=80 CH=1: " + "; ".join(f"{x[2]}" for x in ev if x[1] == "ENQ") + " | " + " | ".join(other))
+        for cmd in ("CS=40.0", "MM=80"):
+            enq = kinds(ev, cmd, "ENQ")
+            self.assertTrue(enq and enq[0][2].endswith("Dropped"), (cmd, enq))
+            self.assertTrue(kinds(ev, cmd, "HANDLER"), cmd + ": the handler was called")
+        self.assertEqual((st["last_cs_ms"], st["mm_valid"]), (st["cs_ms_before"], "0"), "SAT must not record a refused CS= or MM= as delivered")
+        self.assertEqual(st["ring_depth"], st["ring_depth_before"], "the refused frames did not enter the ring")
+
+    def test_ring_with_room_is_still_sent_and_cached(self):
+        ev, st, other = self.sc("ringpartial")
+        for cmd in ("CS=40.0", "MM=80"):
+            enq = kinds(ev, cmd, "ENQ")
+            self.assertTrue(enq and enq[0][2].endswith("Sent"), (cmd, enq))
+        self.assertEqual((st["last_cs_ms"], st["mm_valid"], st["last_mm"]), ("100000", "1", "80"), other)
+        self.assertEqual(int(st["ring_depth"]), int(st["ring_depth_before"]) + 2, "CS and MM each took a slot")
+
+    def test_full_ring_with_a_pending_frame_for_the_same_msgid_is_coalesced_and_sent(self):
+        ev, st, other = self.sc("ringfull_coalesce")
+        cs = kinds(ev, "CS=40.0", "ENQ")
+        mm = kinds(ev, "MM=80", "ENQ")
+        self.assertTrue(cs and cs[0][2].endswith("Sent"), cs)       # MsgID 1 is pending: replaced in place, accepted
+        self.assertTrue(mm and mm[0][2].endswith("Dropped"), mm)    # MsgID 14 has no pending frame and the ring is full
+        self.assertEqual((st["last_cs_ms"], st["mm_valid"]), ("100000", "0"), other)
+
+    def test_source_shape(self):
+        core = (REPO / "src" / "OTGW-firmware" / "OTGW-Core.ino").read_text(encoding="utf-8")
+        otd = (REPO / "src" / "OTGW-firmware" / "OTDirect.ino").read_text(encoding="utf-8")
+        hdr = (REPO / "src" / "OTGW-firmware" / "OTGW-firmware.h").read_text(encoding="utf-8")
+        self.assertRegex(otd, r"(?m)^bool handleOTDirectCommand\(")
+        self.assertRegex(hdr, r"(?m)^bool handleOTDirectCommand\(")
+        branch = core[core.index("CmdQueueResult addCommandToQueue("):]
+        branch = branch[:branch.index("constexpr int kMaxCmdLen")]
+        self.assertIn("handleOTDirectCommand(buf, len, satOwn) ? CmdQueueResult::Sent : CmdQueueResult::Dropped", branch)
 
 
 if __name__ == "__main__":

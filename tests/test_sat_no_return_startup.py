@@ -459,7 +459,7 @@ def build_otd_source():
     pm = o.index("else if (cmd0 == 'P' && cmd1 == 'M') {")
     pm_end = o.index("\n  }\n", pm) + len("\n  }\n")
     branch = o[pm:pm_end]
-    handler = "static void handlePM(const char* value, char* buf) {\n  const char cmd0 = 'P', cmd1 = 'M'; char rspBuf[16];\n  if (false) {}\n  " + branch + "}\n"
+    handler = "static bool handlePM(const char* value, char* buf) {\n  const char cmd0 = 'P', cmd1 = 'M'; char rspBuf[16];\n  if (false) {}\n  " + branch + "  return true;\n}\n"
     return (OTD_STUBS + "\n".join(wanted) + "\n" + sched + "\n" + sched_fn + "\n" + handler + OTD_MAIN)
 
 
