@@ -28,6 +28,7 @@
 #include <esp_heap_caps.h>      // heap_caps_malloc (platformPsramAllocOnce)
 #include <esp_mac.h>
 #include <esp_netif.h>
+#include <esp_wifi.h>            // esp_wifi_get_config/set_config (platformWifiPreferStrongestAp, TASK-1397)
 #include <esp_flash.h>
 #include <esp_core_dump.h>       // core-dump summary for the reboot log (platformResetRegisterDump, TASK-1479)
 #include <hal/usb_serial_jtag_ll.h>  // platformUsbJtagPutc (TASK-1217)
