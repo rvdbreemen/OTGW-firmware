@@ -53,6 +53,14 @@ import traceback
 import urllib.request
 import zipfile
 from pathlib import Path
+# The embedded Python's python312._pth names one fixed tree and makes Python skip
+# the script's own folder on sys.path, so "import config" loaded the main tree's
+# config.py from any worktree: artifacts went to the main tree's build/ while the
+# merged images and the flash zip in this tree picked up stale firmware.
+_THIS_DIR = str(Path(__file__).resolve().parent)
+if _THIS_DIR in sys.path:
+    sys.path.remove(_THIS_DIR)
+sys.path.insert(0, _THIS_DIR)
 import config
 
 # =============================================================================
