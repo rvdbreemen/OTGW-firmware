@@ -3,11 +3,11 @@ id: TASK-1589
 title: >-
   SAT PWM: boiler stops and relights inside one ON phase when the ON setpoint
   sits at the flow temperature at minimum modulation (gruijter beta.49 capture)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-03T13:40:00Z'
-updated_date: '2026-11-03T14:24:00Z'
+updated_date: '2026-11-03T14:37:00Z'
 labels:
   - sat
 dependencies: []
@@ -35,10 +35,12 @@ From the peer analysis of gruijter's capture 20261103-101925 (beta.49, Classic P
 2026-11-03 follow-up: in-depth timeline posted to Sergeant D by the peer session (his request), second reader (lead) confirmed one unrecorded timing difference: the flame-off hold waits for the 30 s control tick (SATcontrol.ino:1608) vs thermo-nova's 5 s loop (climate.py:707-709). Asked as Q-1589a.
 
 2026-11-03 CORRECTION (lead): the earlier verdict 'no DHW bit, the boiler raised its own modulation' was wrong in part. Sergeant D (entry 253): 'It behaved like DHW enabled'. The frames show a hot-water event without the DHW status bit: MsgID 26 Tdhw 29.17 -> 37.01 -> 41.20 (13:14:35-13:15:23), MsgID 19 flow rate 0.38 at 13:15:21 (0.00 on every other read), thermostat DHW enable on. We checked only the status bit. Still no firmware vs thermo-nova deviation (both use the bit only), but a detection gap: Q-1589b asked; Q-1589a parked. Reopened until Q-1589b is decided.
+
+2026-11-03 Sergeant D entry 254: 'Don't change anything. SAT behaved properly...'. Q-1589b read as B (DHW bit only), Q-1589a covered (hold on the control tick stays). No firmware change.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-The relight inside a PWM ON phase in gruijter's beta.49 capture is thermo-nova behaviour, not a firmware deviation: all setpoints match heating_control.py:385-448 and entries 20/23/135/230; the trigger was the boiler's own modulation rise (MsgID 14 unsupported on this Intergas). No question for Sergeant D.
+gruijter's 13:15 double flame was a hot-water draw without the DHW status bit (entry 253, our first reading missed it). Sergeant D decided no change (entry 254): SAT behaved as designed, hot water stays detected from the bit only, and the flame-off hold timing stays. Investigation evidence in the task notes.
 <!-- SECTION:FINAL_SUMMARY:END -->
