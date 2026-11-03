@@ -3,11 +3,11 @@ id: TASK-1511
 title: >-
   SAT pressure alarm: false alarms after flame-off on a healthy system (field
   capture gruijter, alpha.549)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-30T14:12:00Z'
-updated_date: '2026-11-03T03:43:00Z'
+updated_date: '2026-11-03T04:04:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -34,4 +34,12 @@ Field evidence: gruijter's capture 20261030-092718 (alpha.549, Classic PIC, Inte
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: fix landed 6f44f9da9 (TASK-1480, entry 201, SATcontrol.ino:4767); alpha.549 capture replay missing. Replay then likely close.
 
 2026-11-03 (lead): the fix for entry 201 already landed in TASK-1480 (6f44f9da9, SATcontrol.ino:4943-4956, slave CH-mode bit 0x0002). Real capture 20261030-092718 (gruijter, alpha.549, from Discord msg 1565703062507495454, kept out of the repo) replayed via OTGW_PRESSURE_CAPTURE on the real satUpdatePressure(): field published 7 alarm episodes over 3.91 h; old code (6f44f9da9^) 7 = reproduces the field; current code 2; thermo-nova oracle with the CH-mode bit 2, with the master CH enable 7. AC1 proven. AC2 NOT met: 2 episodes remain on this healthy system, same as thermo-nova itself. New test test_real_slow_leak_still_alarms_with_cycling_pwm_and_flame (0.4 bar/h leak, CH mode on, PWM cycling): fix 1 episode = thermo-nova, old code fails. Open: accept parity (2 residual) or add pump-head step handling -> maintainer decision (entry 201 was his).
+
+2026-11-03 maintainer decision (AskUserQuestion): close on thermo-nova parity; residual moved to TASK-1579, question Q-1511a queued for Sergeant D.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Pressure false alarms after flame-off: the cause (master CH enable instead of the boiler CH-mode bit) was fixed in TASK-1480 per entry 201. Evidence on gruijter's real capture via the replay test: field 7 episodes, old code 7, current code 2, thermo-nova 2; a new slow-leak test still alarms (fix 1 = thermo-nova, old code fails). AC2 not met: 2 residual episodes remain, same as thermo-nova; closed on parity by maintainer decision, residual in TASK-1579.
+<!-- SECTION:FINAL_SUMMARY:END -->
