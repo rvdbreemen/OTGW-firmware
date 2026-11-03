@@ -72,7 +72,11 @@ static State state;
 static void sendMQTTData(const char*, const char*, bool) {}
 static size_t strlcpy(char* d, const char* s, size_t n) { size_t l = strlen(s); if (n) { size_t c = l < n - 1 ? l : n - 1; memcpy(d, s, c); d[c] = 0; } return l; }
 static char g_sent[512];
-static void sendPICSerial(const char* b, int n) { strncat(g_sent, b, n); strcat(g_sent, ";"); }
+static bool g_simBlock = false;   // TASK-1580: the bench simulation refuses PR= (satSimulationBlocksBusTx)
+static bool sendPICSerial(const char* b, int n) {
+  if (g_simBlock && b[0] == 'P' && b[1] == 'R') return false;   // held back: nothing reaches the PIC
+  strncat(g_sent, b, n); strcat(g_sent, ";"); return true;
+}
 #include <algorithm>
 using std::min;
 // TASK-1569: result enum (OTGW-firmware.h) and the queue lock (OTGW-Core.ino globals, outside the cut-out range):
@@ -211,6 +215,25 @@ int main(int argc, char** argv) {
       if (g_sent[0]) { char ts[16]; snprintf(ts, sizeof(ts), "%lu;", (unsigned long)(t - 100000)); strcat(times, ts); }
     }
     printf("sent=%s\nsent_ms=%s\n", all, times);
+    return 0;
+  }
+  if (!strcmp(sc, "sim_block") || !strcmp(sc, "sim_off_silent")) {   // TASK-1580
+    g_simBlock = !strcmp(sc, "sim_block");
+    addCommandToQueue("PR=M", 4, false, 0);
+    char all[256] = "";
+    for (uint32_t t = 100000; t <= 160000; t += 100) {   // 60 s: well over 5 retry intervals and echo timeouts
+      g_sent[0] = 0; loopAt(t); strcat(all, g_sent);
+    }
+    printf("sent=%s\nqueued=%d\ndropped=%u\nflag=%d\n", all, cmdQueueSize, (unsigned)state.pic.iCmdDropped, (int)state.pic.bCmdRetryExceeded);
+    return 0;
+  }
+  if (!strcmp(sc, "sim_order")) {        // TASK-1580: a held-back PR=M must not delay the command behind it
+    g_simBlock = true;                   // the stub refuses PR=... only here (see sendPICSerial)
+    addCommandToQueue("PR=M", 4, false, 0);
+    addCommandToQueue("CS=45.0", 7, false, 0);
+    long csAt = -1;
+    for (uint32_t t = 100000; t <= 110000 && csAt < 0; t += 10) { g_sent[0] = 0; loopAt(t); if (strstr(g_sent, "CS=45.0")) csAt = t - 100000; }
+    printf("cs_at=%ld\nqueued=%d\ndropped=%u\n", csAt, cmdQueueSize, (unsigned)state.pic.iCmdDropped);
     return 0;
   }
   if (!strcmp(sc, "oe")) {               // TASK-1571 rule 4: OE (PIC busy) is resent, not dropped
@@ -608,6 +631,27 @@ class PmChain(unittest.TestCase):
         self.assertEqual(out["sent"], "CS=45.0;CS=45.0;")
         self.assertEqual(out["queued"], "0")
         self.assertEqual(out["dropped"], "0")
+
+    def test_simulation_held_back_command_is_consumed_not_dropped(self):
+        # TASK-1580: sendPICSerial() refuses while the bench simulation is on. The queue must consume the entry,
+        # not retry it five times and report PR=M as dropped every minute (command_retry_exceeded latched ON).
+        out = self.run_sc("sim_block")
+        self.assertEqual(out["dropped"], "0", out)
+        self.assertEqual(out["flag"], "0", out)
+        self.assertEqual(out["queued"], "0", out)
+
+    def test_simulation_off_silent_pic_still_drops_after_five_tries(self):
+        # Same command, simulation off, PIC never echoes: unchanged behaviour, dropped once after 5 tries.
+        out = self.run_sc("sim_off_silent")
+        self.assertEqual(out["sent"], "PR=M;" * 5, out)
+        self.assertEqual(out["dropped"], "1", out)
+        self.assertEqual(out["flag"], "1", out)
+        self.assertEqual(out["queued"], "0", out)
+
+    def test_simulation_held_back_command_does_not_delay_the_next(self):
+        out = self.run_sc("sim_order")
+        self.assertEqual(out["dropped"], "0", out)
+        self.assertTrue(0 <= int(out["cs_at"]) < 1000, out)
 
     def test_external_cs_refused_while_sat_enqueues_its_own(self):
         # TASK-1575: with the old global in-flight flag set by SAT on the loop task, a CS= from REST at the same moment

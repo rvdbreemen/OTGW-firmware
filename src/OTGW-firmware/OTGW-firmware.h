@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.37
+**  Version  : v2.0.0-beta.38
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -105,7 +105,7 @@ void loopOTDirect();
 void handleOTDirectBridgeStream();
 void handleOTDirectCommand(const char* buf, int len, bool satOwn = false);   // satOwn: TASK-1575, see addCommandToQueue
 void sendOTDirectOverridesJSON();
-void sendPICSerial(const char* buf, int len);
+bool sendPICSerial(const char* buf, int len);
 bool otDirectBoilerPresent();  // TASK-795 §4.2: real boiler answered MsgID 3 (excludes loopback)
 // TASK-183: PI room compensation
 float getFlowTemp();

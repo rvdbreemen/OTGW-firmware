@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.37
+**  Version  : v2.0.0-beta.38
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4080,7 +4080,15 @@ void handleCommandQueue(){
     s_inflight.len = cmdqueue[i].cmdlen;
     s_inflight.active = true;
     s_inflight.sentMs = now;
-    sendPICSerial(cmdqueue[i].cmd, cmdqueue[i].cmdlen);
+    if (!sendPICSerial(cmdqueue[i].cmd, cmdqueue[i].cmdlen)) {
+      // TASK-1580: the bench simulation kept the command off the bus. Nothing was sent, so there is no echo to wait
+      // for and no failure to report: consume the entry, free the slots, leave the dropped flag as it is.
+      s_inflight.active = false;
+      if (isPrioCmd(cmdqueue[i].cmd)) prioSlotRelease();
+      removeFromCmdQueue(i);
+      OTDebugFlush();
+      return;
+    }
     g_cmdQueueSent++;
     if (cmdqueue[i].retrycnt > 0) g_cmdQueueRetried++;
     cmdqueue[i].retrycnt++;
@@ -4349,8 +4357,9 @@ void pmChainTick() {
 /*
   sendPICSerial(const char* buf, int len) sends a string to the serial OTGW device.
   The buffer is send out to OTGW on the serial device instantly, as long as there is space in the buffer.
+  Returns false only when the bench simulation held the command back (TASK-1580); true otherwise.
 */
-void sendPICSerial(const char* buf, int len)
+bool sendPICSerial(const char* buf, int len)
 {
   if (!isPICEnabled()) {
 #if HAS_DIRECT_OT
@@ -4359,7 +4368,7 @@ void sendPICSerial(const char* buf, int len)
 #else
     OTDebugTln(F("sendPICSerial: No PIC detected - command ignored"));
 #endif
-    return;
+    return true;
   }
 #if HAS_PIC
   // TASK-795 §4.1 path (a): block PIC serial when EITHER the legacy OTGW
@@ -4374,7 +4383,7 @@ void sendPICSerial(const char* buf, int len)
     picCmd[n] = '\0';
     // strip a trailing CR/LF so the trace line stays single-line
     while (n > 0 && (picCmd[n - 1] == '\r' || picCmd[n - 1] == '\n')) picCmd[--n] = '\0';
-    if (satSimulationBlocksBusTx(picCmd, F("pic-serial"))) return;
+    if (satSimulationBlocksBusTx(picCmd, F("pic-serial"))) return false;   // TASK-1580: held back, the queue consumes it
   }
 
   // TASK-865.6: the dedicated PIC task is the sole UART writer. Build the full
@@ -4403,6 +4412,7 @@ void sendPICSerial(const char* buf, int len)
     }
   }
 #endif
+  return true;
 }
 
 // dispatchOTGWInputLine — loop-side enqueue helper for the OTGW replay simulation
