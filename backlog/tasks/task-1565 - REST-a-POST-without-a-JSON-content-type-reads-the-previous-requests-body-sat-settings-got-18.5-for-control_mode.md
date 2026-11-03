@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-02T18:59:00Z'
-updated_date: '2026-11-03T18:46:00Z'
+updated_date: '2026-11-03T19:23:00Z'
 labels:
   - rest-api
   - bug
@@ -34,4 +34,6 @@ Seen on bench .63, 2.0.0-beta.14+4d94f13, 2026-11-02 19:54 (TASK-1542 bench). Re
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-03 fix (sonnet agent; lead checked the vendored ESPAsyncWebServer: one request per connection, _onDisconnectfn runs in AsyncWebServerRequest::_onDisconnect() just before delete in AsyncWebServer::_handleDisconnect, WebServer.cpp:131; form-urlencoded and key=value text/plain bodies are parsed as params and never reach the body hook, WebRequest.cpp:202-216). Root cause webServerCompat.h webCaptureBody/hasBodyCompat: g_requestBody never released, next request at the freed address passed the owner match. Fix: release on the request's onDisconnect (owner-guarded). test/host/test_rest_body_stale.py --old-rev HEAD: OLD S2 FAIL, FIX all pass, RESULT PASS (lead rerun in the integration tree). Contract unchanged: a form-encoded call now gets 400 Missing value; JSON as documented. Residual: a request destroyed while its client is still connected (destructor nulls the callback) is not covered. Tag beta.58; AC3 bench curl pending in the shared build.
+
+2026-11-03 BENCH beta.59+c2983e1 on both units: first fix does NOT work on the device. JSON POST heating_mode 'comfort' then form-encoded 'zzz' returned value 'comfort' (the echoed input = stale body) 3/3 on .63 and .61. Cause: ESPAsyncWebServer keeps ONE onDisconnect per request; REST routes call webArmSlotRelease() (REST/file gate, TASK-1172) after the body capture, which replaced the body-release callback. The host mock did not model the single slot nor the gate. Second fix (beta.60): webArmDisconnect(req, restHeld, fileHeld) is the one callback that releases gate slots AND the body, used by webCaptureBody() and webArmSlotRelease(); capture keeps a gate already held by the same request. Harness extension (single-slot mock + gate) in progress.
 <!-- SECTION:NOTES:END -->

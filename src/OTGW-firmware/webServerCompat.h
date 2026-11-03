@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-beta.59
+**  Version  : v2.0.0-beta.60
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -109,17 +109,34 @@ extern WebRequestBody g_requestBody;
 // address passed the owner match and read the old body. The server runs the
 // request's onDisconnect handler in AsyncWebServerRequest::_onDisconnect() just
 // before it deletes the request (one request per connection), so releasing there
-// closes the hole for every request type. Not covered: a request destroyed while
-// its client is still connected (the destructor clears the callback instead).
+// closes the hole for every request type. The server keeps ONE disconnect
+// callback per request, so the body release and the gate-slot releases are armed
+// together by webArmDisconnect() (below), never separately. Not covered: a
+// request destroyed while its client is still connected (the destructor clears
+// the callback instead).
+inline void webBodyReleaseFor(const void* req) {
+  if (g_requestBody.owner == req) { g_requestBody.owner = nullptr; g_requestBody.len = 0; g_requestBody.data[0] = '\0'; }
+}
+void restSlotRelease();       // REST gate (restAPI.ino)
+void webFileGateRelease();    // static-file gate (restAPI.ino)
+// The one disconnect callback of a request: releases the gate slots it holds and its body.
+inline void webArmDisconnect(AsyncWebServerRequest* req, bool restHeld, bool fileHeld) {
+  req->onDisconnect([req, restHeld, fileHeld]() {
+    if (restHeld) restSlotRelease();
+    if (fileHeld) webFileGateRelease();
+    webBodyReleaseFor(req);
+  });
+}
 inline void webCaptureBody(AsyncWebServerRequest* req, const uint8_t* data, size_t len, size_t index, size_t total) {
   (void)total;
   if (index == 0) {
     g_requestBody.len = 0;
     g_requestBody.owner = req;
     g_requestBody.data[0] = '\0';
-    req->onDisconnect([req]() {
-      if (g_requestBody.owner == req) { g_requestBody.owner = nullptr; g_requestBody.len = 0; g_requestBody.data[0] = '\0'; }
-    });
+    // The body normally arrives before the route handler takes a gate. If this request
+    // already holds one, keep its release in the same callback.
+    const bool mine = (currentRequest == req);
+    webArmDisconnect(req, mine && g_restSlotHeld, mine && g_fileSlotHeld);
   }
   size_t room = (sizeof(g_requestBody.data) - 1) - g_requestBody.len;
   size_t take = (len < room) ? len : room;
@@ -365,14 +382,11 @@ void restSlotRelease();       // REST gate counterpart (restAPI.ino), same armin
 // each time a gate is taken. Application code does not call ->onDisconnect() for
 // gate bookkeeping itself; a REST route that streams a file otherwise leaked its
 // REST slot until reboot (TASK-1172).
+// TASK-1565: the same callback also releases the request's captured body.
 inline void webArmSlotRelease() {
   if (!currentRequest) return;
-  if (g_restSlotHeld && g_fileSlotHeld) {
-    currentRequest->onDisconnect([]() { restSlotRelease(); webFileGateRelease(); });
-  } else if (g_restSlotHeld) {
-    currentRequest->onDisconnect([]() { restSlotRelease(); });
-  } else if (g_fileSlotHeld) {
-    currentRequest->onDisconnect([]() { webFileGateRelease(); });
+  if (g_restSlotHeld || g_fileSlotHeld) {
+    webArmDisconnect(currentRequest, g_restSlotHeld, g_fileSlotHeld);
   }
 }
 
