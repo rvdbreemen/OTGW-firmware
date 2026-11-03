@@ -1,10 +1,11 @@
 ---
 id: TASK-1392
 title: 'v2 Home view: heat-pump wording for DHW charging and space heating (cosmetic)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T14:34:00Z'
-updated_date: '2026-11-03T05:37:00Z'
+updated_date: '2026-11-03T05:43:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []

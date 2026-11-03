@@ -3,10 +3,11 @@ id: TASK-1389
 title: >-
   MQTT MaxRelModLevelSetting/override always 0.00 and declared as temperature
   (degrees C) in HA discovery
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T12:53:00Z'
-updated_date: '2026-11-03T05:37:00Z'
+updated_date: '2026-11-03T05:43:00Z'
 labels: []
 milestone: 2.0.0
 dependencies:

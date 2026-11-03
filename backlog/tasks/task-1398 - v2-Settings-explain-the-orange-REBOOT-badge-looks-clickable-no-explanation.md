@@ -1,10 +1,11 @@
 ---
 id: TASK-1398
 title: 'v2 Settings: explain the orange REBOOT badge (looks clickable, no explanation)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T19:49:00Z'
-updated_date: '2026-11-03T05:37:00Z'
+updated_date: '2026-11-03T05:44:00Z'
 labels:
   - webui
 milestone: 2.0.0
