@@ -108,6 +108,7 @@ int main() {
     printf("T %d %d %.1f %d %.1f\n", sec, (int)state.sat.bPwmFlameRequested, cs, (int)g_flame, _pwm_effectiveBoilerTemp);
     // the CH bit the control tick sends for this CS (satControlLoopRun: satChEnableDecide with satPwmDrivesSetpoint)
     fprintf(stderr, "H %d %d\n", sec, (int)satChEnableDecide(pid, satColdThreshold(), satPwmDrivesSetpoint(pid), state.sat.bPwmFlameRequested));
+    fprintf(stderr, "M %d %d\n", sec, @ATMAX@);   // TASK-1581: duty range 5 (SAT sends MM=T); 0 on a source without the flag
   }
   fprintf(stderr, "C %d\n", g_pwmStarts);          // satCycleRecordPwmStart() calls = PWM starts counted (TASK-1421)
   return 0;
@@ -140,7 +141,8 @@ class SatPwmAnchors(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         hooks = "satPwmOnDhwStart" in hp.SAT_INO.read_text(encoding="utf-8")
-        hp.MAIN = (MAIN.replace("@DHWSTART@", "satPwmOnDhwStart();" if hooks else "")
+        hp.MAIN = (MAIN.replace("@ATMAX@", "(int)satPwmAtMaxDuty()" if "satPwmAtMaxDuty" in hp.SAT_INO.read_text(encoding="utf-8") else "0")
+                       .replace("@DHWSTART@", "satPwmOnDhwStart();" if hooks else "")
                        .replace("@DHWEND@", "satPwmOnDhwEnd(g_flame);" if hooks else "")
                        .replace("@FLAMEEDGE@", "satPwmNoteDhwFlameEdge(g_flame, state.sat.bDhwActive);" if "satPwmNoteDhwFlameEdge" in hp.SAT_INO.read_text(encoding="utf-8") else "")
                        .replace("@DHWFLAME@", "satPwmNoteDhwFlame(g_flame);" if "satPwmNoteDhwFlame" in hp.SAT_INO.read_text(encoding="utf-8") else ""))
@@ -774,6 +776,24 @@ class SatPwmAnchors(unittest.TestCase):
         ons, offs = tl.edges()
         self.assertEqual(offs[:1], [900], tl.dump(1000))
         self.assertTrue(len(ons) >= 2 and abs(ons[1] - 1800) <= TICK, f"second ON at {ons[1:2]}, expected 1800; {tl.dump(2000)}")
+
+    def at_max_duty(self, cph, ratio, init, events, dur, extra=()):
+        """{tick second: 1 when the real schedule left the duty in range 5 (SAT sends MM=T)}."""
+        lines = [f"cfg {cph} {ratio}", f"init {init}", f"run {dur}", *extra]
+        lines += [f"ev {s} {k} {v}" for s, k, v in sorted(events)]
+        r = subprocess.run([str(self.exe)], input=NL.join(lines) + NL, capture_output=True, text=True, check=True)
+        return {int(p[1]): int(p[2]) for p in (ln.split() for ln in r.stderr.splitlines() if ln.startswith("M "))}
+
+    def test_n11_mm_t_flag_is_up_exactly_while_the_duty_is_in_range_5(self):
+        # TASK-1581, entries 242 and 243: duty 0.5 (range 3), then 0.95 (range 5) from 905, then 0.5 again from 1805.
+        # Any phase counts (a heat pump restart wait is OFF): the flag follows the duty only.
+        for src in (None, self.SRC_HP, self.SRC_HYB):
+            with self.subTest(src=src):
+                extra = (f"src {src}",) if src else ()
+                m = self.at_max_duty(3, 0.5, "burning", [(905, "ratio", 95), (1805, "ratio", 50)], 2400, extra)
+                self.assertTrue(all(m[s] == 0 for s in m if s < 905), m)
+                self.assertTrue(all(m[s] == 1 for s in range(930, 1800, 30)), m)
+                self.assertTrue(all(m[s] == 0 for s in range(1830, 2400, 30)), m)
 
     def test_n10_phase_edges_survive_the_millis_rollover(self):
         # LL-019 timestamp rollover: the same runs with millis() just below 2^32 (the wrap falls inside the run, at second 400) give the

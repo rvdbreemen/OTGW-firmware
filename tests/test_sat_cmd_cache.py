@@ -163,6 +163,19 @@ int main(int argc, char** argv) {
     settings.sat.iMaxRelModulation = 0;  satResetCmdCache(); g_sent[0] = 0; g_src = SAT_SRC_HEAT_PUMP; satSendMMDuringDhw(); printf("[%s]\n", g_sent);   // heat pump never 0
     satResetCmdCache(); g_sent[0] = 0; g_src = SAT_SRC_GAS_BOILER; g_quirks = SAT_QUIRK_MIN_MOD_10; satSendMMDuringDhw(); printf("[%s]\n", g_sent);   // Geminox floor 10
     g_quirks = 0; settings.sat.iMaxRelModulation = 100; g_imm = true; satResetCmdCache(); g_sent[0] = 0; satSendMMDuringDhw(); printf("[%s]\n", g_sent);   // Immergas: TP follows
+  } else if (mode == 16) {                                 // TASK-1581: MM=T at the maximum PWM duty (entries 242, 243, 246); 255 = SAT_MM_T
+    g_ms = start; satResetCmdCache(); tick(40.0f, 0, 1);                                  // low-load MM=0
+    g_sent[0] = 0; g_ms = start + 30000; tick(40.0f, 255, 1); printf("[%s]\n", g_sent);   // into range 5: MM=T once
+    g_sent[0] = 0; g_ms = start + 59000; tick(40.0f, 255, 1); printf("[%s]\n", g_sent);   // staying: nothing yet
+    g_sent[0] = 0; g_ms = start + 90000; tick(40.0f, 255, 1); printf("[%s]\n", g_sent);   // 60 s after the MM=T: repeated
+    g_sent[0] = 0; g_ms = start + 120000; tick(40.0f, 0, 1); printf("[%s]\n", g_sent);    // below range 5: own MM= at once
+  } else if (mode == 17) {                                 // TASK-1581: a dropped MM=T is retried; Immergas TP=80 goes before it
+    g_ms = start; satResetCmdCache(); tick(40.0f, 0, 1);
+    g_drop = 1; g_ms = start + 30000; tick(40.0f, 255, 1);                                // refused: not recorded
+    g_drop = 0; g_sent[0] = 0; g_ms = start + 31000; tick(40.0f, 255, 1); printf("[%s]\n", g_sent);   // sent again
+    g_imm = true; satResetCmdCache(); g_sent[0] = 0; g_ms = start + 32000; tick(40.0f, 255, 1); printf("[%s]\n", g_sent);   // Immergas
+    g_sent[0] = 0; g_ms = start + 33000; tick(40.0f, 0, 1); printf("[%s]\n", g_sent);   // back below: TP=min(0,80) and MM=0
+    g_sent[0] = 0; g_ms = start + 34000; tick(40.0f, 255, 1); printf("[%s]\n", g_sent);  // and up again
   } else if (mode == 13) {                                 // a dropped PIC keepalive is tried again on the next pass
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
     g_sent[0] = 0; g_ms = start + 30000; g_drop = 1; satPicCSKeepalive(); g_drop = 0; printf("[%s]\n", g_sent);
@@ -284,6 +297,22 @@ class CmdCacheReset(unittest.TestCase):
         self.assertEqual(b, "[CS=40.0;]")
         self.assertEqual(c, "[CS=40.0;TP=11:12=60;MM=60;]")
         self.assertEqual(d, "[CS=40.0;]")               # the 5 s resend repeats CS only
+
+    def test_mm_t_at_the_maximum_duty_on_change_repeat_and_back(self):
+        # TASK-1581, entries 242 (MM=T at range 5), 243 (own MM= below it), 237 (on change), 239 (60 s repeat)
+        a, b, c, d = self.run_at(10000, 16)
+        self.assertEqual(a, "[CS=40.0;MM=T;]")
+        self.assertEqual(b, "[CS=40.0;]")
+        self.assertEqual(c, "[CS=40.0;MM=T;CH=1;]")   # CH=1 is its own 60 s repair
+        self.assertEqual(d, "[CS=40.0;MM=0;]")
+
+    def test_mm_t_is_retried_after_a_drop_and_the_immergas_tp_is_80(self):
+        # TASK-1581 commit-on-success (TASK-1574); entry 246 (Q-1581a A): Immergas TP=11:12=80 right before MM=T
+        a, b, c, d = self.run_at(10000, 17)
+        self.assertEqual(a, "[CS=40.0;MM=T;]")
+        self.assertEqual(b, "[CS=40.0;TP=11:12=80;MM=T;CH=1;]")
+        self.assertEqual(c, "[CS=40.0;TP=11:12=0;MM=0;]")
+        self.assertEqual(d, "[CS=40.0;TP=11:12=80;MM=T;]")
 
     def test_unchanged_mm_and_ch_repaired_after_60_s(self):
         # TASK-1570, entry 239: a dropped enqueue or an external MM=/CH= is corrected by one resend once the value is 60 s old

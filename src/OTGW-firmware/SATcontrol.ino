@@ -674,6 +674,11 @@ static void satPicCSKeepalive() {
 // (coordinator/mqtt/opentherm.py:216-219); the TP writes the boiler's own max-modulation parameter, so the 80 cap is there
 // and MM itself is not capped (Sergeant D entry 233, TASK-1537). The PIC queue spaces PM=/TP= by up to 1 s (TASK-1315) and
 // MM= is not held, so right after another PM=/TP= the MM= can reach the PIC up to 1 s before this TP=.
+// TASK-1581 (entries 242, 243, 246): at the maximum PWM duty (range 5) SAT sends MM=T, the step into continuous mode; below it
+// its own MM= again. satSendMM() takes either a percentage (0-100) or this marker; the marker is kept in iLastSentMM, so the
+// on-change rule, the 60 s repeat, the cache reset and commit-on-success treat MM=T as one more value.
+static const uint8_t SAT_MM_T = 255;
+
 static void satSendMM(uint8_t mm) {
   // TASK-1570: on change only (entry 237), plus a repair resend once the value is SAT_MMCH_REPAIR_MS (60 s, entry 239)
   // old, so a dropped enqueue (full queue, PIC reset in progress) or an external MM= is corrected within a minute.
@@ -682,10 +687,12 @@ static void satSendMM(uint8_t mm) {
   char buf[16];
   bool accepted = true;   // TASK-1574 (commit-on-success): the flag is set only when the TP (Immergas) and the MM were both accepted
   if (satImmergasTpActive()) {
-    snprintf_P(buf, sizeof(buf), PSTR("TP=11:12=%u"), (unsigned)(mm > 80 ? 80 : mm));
+    // MM=T gives back the 100 % default, so the TP carries min(100, 80) = 80 (entry 246, Q-1581a A).
+    snprintf_P(buf, sizeof(buf), PSTR("TP=11:12=%u"), (unsigned)((mm > 80) ? 80 : mm));   // 255 (SAT_MM_T) also gives 80
     if (addCommandToQueue(buf, strlen(buf), false, 0) == CmdQueueResult::Dropped) accepted = false;
   }
-  snprintf_P(buf, sizeof(buf), PSTR("MM=%u"), mm);
+  if (mm == SAT_MM_T) snprintf_P(buf, sizeof(buf), PSTR("MM=T"));
+  else                snprintf_P(buf, sizeof(buf), PSTR("MM=%u"), mm);
   if (addCommandToQueue(buf, strlen(buf), false, 0) == CmdQueueResult::Dropped) accepted = false;
   if (!accepted) return;   // the next tick sends the TP and the MM again
   state.sat.iLastSentMM     = mm;
@@ -1083,7 +1090,10 @@ static uint32_t _pwm_flameOnMs             = 0;
 static bool     _pwm_waitingForFlame       = false;
 static float    _pwm_flameOffHoldSetpoint  = 0.0f;
 static uint32_t _pwm_lastOffTimeMs         = 1;    // Last PWM off-phase duration (ms); 0 = saturation (duty wants continuous ON). Read by the off_time==0 saturation guard.
+static bool     _pwm_atMaxDuty             = false; // TASK-1581: the last schedule pass was duty range 5 (the maximum duty); read by satPwmAtMaxDuty()
 static bool     _pwm_idle                  = true; // thermo-nova PWMStatus.IDLE: no ON/OFF phase since the last reset (pwm.py:92, :122-128, :179-180). Read by the cycle classifier (classifier.py:28-29, TASK-1387).
+// TASK-1581: PWM mode with the duty in range 5 (the maximum): SAT sends MM=T instead of its own MM= (entries 242, 243).
+static bool satPwmAtMaxDuty() { return state.sat.eControlMode == SAT_MODE_PWM && _pwm_atMaxDuty; }
 static uint32_t _pwm_lastOnTimeMs          = 0;    // Last PWM on-phase duration (ms) = Python pwm_state.on_time_seconds. Read by the cycle classifier's SHORT_CYCLING threshold (TASK-891.4 AC#3).
 static bool     _pwm_entryPending          = false; // PWM was just entered (satSetControlMode): the first schedule step starts ON without the off wait, as thermo-nova from IDLE (pwm.py:154-155; entry 43, TASK-1369)
 static uint32_t _pwm_lastUpdateMs          = 0;    // thermo-nova _last_update: the one anchor of both phases. Set at reset (pwm.py:91), at OFF/IDLE->ON (:162), at the first ignition while waiting (:188) and at ON->OFF (:208); the ON time and the off wait count from it (:155, :205; entries 43, 80, 91, 92)
@@ -1353,6 +1363,7 @@ static void satPwmSchedule(float pidOutput)
   // (pwm.py:154-180). The one exception, the hour-limit return below, restores the old value.
   const bool wasIdle = _pwm_idle;
   _pwm_idle = false;
+  _pwm_atMaxDuty = false;   // TASK-1581: set again in the range 5 branch below
   // First step after PWM was entered (thermo-nova IDLE): it may start ON without the off wait (pwm.py:155).
   // Consumed here; only the hour-limit return below gives it back, as that return keeps IDLE (pwm.py:156-158).
   const bool entry = _pwm_entryPending;
@@ -1412,6 +1423,7 @@ static void satPwmSchedule(float pidOutput)
   uint32_t onTimeMs, offTimeMs;
 
   if (duty >= dutyMax) {
+    _pwm_atMaxDuty = true;   // TASK-1581: MM=T while the duty stays here, whatever the phase (entry 242)
     // Range 5: Over-max - continuous ON (no CS startup sequence needed). Its OFF->ON start is a normal ON
     // start (pwm.py:160-167 with off_time 0, pwm.py:296-301): counted (entry 59) and anchored, so a later
     // drop into ranges 1-4 times the ON phase from this start, not from an older flame-on. It is not held
@@ -1620,6 +1632,7 @@ void satPwmReset()
   _pwm_lastOffTimeMs          = 1;
   _pwm_effectiveBoilerTemp    = 0.0f;   // thermo-nova pwm.reset(): _effective_on_temperature = None (pwm.py:100)
   _pwm_idle                   = true;   // pwm.reset(): _status = PWMStatus.IDLE (pwm.py:92)
+  _pwm_atMaxDuty              = false;  // TASK-1581
   _pwm_dhwFlameLit            = false;
   _pwm_dhwFlameHeldLogged     = false;
   _pwm_dhwPhase               = PwmDhwPhase::None;   // a hot-water pause belongs to the ON phase it interrupted (entries 95, 103)
@@ -7159,10 +7172,14 @@ static void satControlLoopRun()
   }
 
   // --- Send CS= and MM= commands to boiler when an OT command interface is available ---
+  const uint8_t mmTarget = (!coldCutoff && satPwmAtMaxDuty()) ? SAT_MM_T : state.sat.iCurrentModulation;   // TASK-1581
+  char mmTxt[4];
+  if (mmTarget == SAT_MM_T) strlcpy(mmTxt, "T", sizeof(mmTxt));
+  else                      snprintf_P(mmTxt, sizeof(mmTxt), PSTR("%u"), (unsigned)mmTarget);
   if (hasOTCommandInterface()) {
     // TASK-1370: sent every tick. Main control block.
     satSendCS(finalSetpoint);
-    satSendMM(state.sat.iCurrentModulation);
+    satSendMM(mmTarget);   // TASK-1581: SAT_MM_T at the maximum PWM duty, else the value above
     // CH rule of Sergeant D 2026-10-23 (see satChEnableDecide in SATchEnable.h): CH=0 with CS=10 when the
     // requested setpoint is at or below the cold setpoint or the PWM OFF phase drives the CS, else CH=1.
     satSendCH(satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn));
@@ -7214,10 +7231,10 @@ static void satControlLoopRun()
   // zones, solar offset and clamps; osrc see _sat_outsideSrc. Hot-water ticks log a short SATTICK with dhw=1.
   // PWM, three separate outputs (TASK-1412.9): commanded = pwm (phase asked for), duty, pon / poff (mapped ON / OFF seconds, 0 outside PWM);
   // counted = starts (PWM ON-phase starts in the rolling hour); observed = flame (boiler flame bit).
-  SATDebugTf(PSTR("SATTICK room=%.2f raw=%.2f rv=%d target=%.1f out=%.1f osrc=%c curve=%.2f p=%.2f i=%.2f d=%.2f praw=%.2f pid=%.2f cs=%.1f mm=%u ch=%u mode=%d pwm=%d duty=%.2f pon=%lu poff=%lu starts=%u flame=%d flow=%.1f ret=%.1f fc=%c fage=%lu rc=%c rage=%lu dhw=0\r\n"),
+  SATDebugTf(PSTR("SATTICK room=%.2f raw=%.2f rv=%d target=%.1f out=%.1f osrc=%c curve=%.2f p=%.2f i=%.2f d=%.2f praw=%.2f pid=%.2f cs=%.1f mm=%s ch=%u mode=%d pwm=%d duty=%.2f pon=%lu poff=%lu starts=%u flame=%d flow=%.1f ret=%.1f fc=%c fage=%lu rc=%c rage=%lu dhw=0\r\n"),
           roomTemp, rawRoom, (int)roomValid, targetTemp, outsideTemp, _sat_outsideSrc, curveValue,
           state.sat.fPidP, state.sat.fPidI, state.sat.fPidD, pidRaw,
-          pidOutput, finalSetpoint, (unsigned)state.sat.iCurrentModulation, (unsigned)state.sat.iLastSentCH,
+          pidOutput, finalSetpoint, mmTxt, (unsigned)state.sat.iLastSentCH,
           (int)state.sat.eControlMode, (int)pwmOn, state.sat.fPwmDutyCycle,
           pwmMode ? (unsigned long)((satPwmLastOnTimeMs() + 500UL) / 1000UL) : 0UL, pwmMode ? (unsigned long)((satPwmLastOffTimeMs() + 500UL) / 1000UL) : 0UL,
           (unsigned)satCycleGetCyclesThisHour(), (int)satIsFlameOn(),

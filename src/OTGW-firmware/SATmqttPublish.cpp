@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.cpp
-**  Version  : v2.0.0-beta.47
+**  Version  : v2.0.0-beta.48
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
