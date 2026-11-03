@@ -5828,3 +5828,11 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot TASK-1412.14: A"
 
 **Settled:** option A of Q-PARITY-1: the tail percentiles interpolate between the two neighbouring sorted values, as thermo-nova helpers.py:185-202 (percentile_interpolated); the port today takes the lower neighbour (SATcycles.ino:610, 640). **Interpretation (ours):** he named only the task; the one open question under TASK-1412.14 was Q-PARITY-1, so "A" is read as its option A. **Task:** TASK-1586. **Open:** none.
+
+## 249. Q-PARITY-8 answered A: a cycle with fewer than 3 samples is dropped and the flame-on sample counts, as thermo-nova (Sergeant D, 2026-11-03)
+
+**Source:** sergeantd, 2026-11-03 08:16 UTC, msg 1567090031389179947 (https://discord.com/channels/812969634638725140/1514720723980259460/1567090031389179947), answer to Q-PARITY-8 (msg 1567084255681454111).
+
+**Quoted:** "@BlueFlame Bot Q-PARITY-8, TASK-1412.14: A"
+
+**Settled:** option A of Q-PARITY-8 (Q-PARITY-7 merged in): a cycle with fewer than 3 samples is not recorded (thermo-nova cycles/tracker.py:98-100) instead of an INSUFFICIENT cycle (SATcycles.ino:846), and the flame-on sample is counted (tracker.py:71-72). With entries 244, 245, 248 and this one, every confirmed classifier parity question (Q-PARITY-1, 3, 5, 8) is decided; the others were withdrawn by the second reader. **Task:** TASK-1588. **Open:** none.
