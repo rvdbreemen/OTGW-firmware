@@ -5812,3 +5812,11 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot Q1581a: A"
 
 **Settled:** option A, completing entries 233, 242 and 243 for an Immergas: when SAT sends MM=T at the maximum duty it sends TP=11:12=80 right before it (MM=T is the 100 % default and min(100, 80) = 80, as entry 233 would give for MM=100). When the duty drops below the maximum, TP=11:12=min(MM, 80) and the numeric MM go back to the normal low-load values (entries 233, 243). Other boilers: MM=T only. **Task:** TASK-1581. **Open:** none.
+
+## 247. Q-1566a answered B for now: no forecast term in the heating curve yet (Sergeant D, 2026-11-03)
+
+**Source:** sergeantd, 2026-11-03 06:55 UTC, msg 1567069605912911913 (https://discord.com/channels/812969634638725140/1514720723980259460/1567069605912911913), answer to Q-1566a (msg 1567069177263558667).
+
+**Quoted:** "@BlueFlame Bot Q-1566a: B for now"
+
+**Settled:** option B for now: the heating curve keeps using the current outdoor temperature; no 6 h forecast term is added (round 25, docs/sat/sim-hp-lowload/round25.md). **Interpretation (ours):** "for now" parks the forecast idea rather than rejecting it; TASK-1566 (with TASK-1510 merged into it by the maintainer on 2026-11-03) stays open and parked, not closed as rejected. **Task:** TASK-1566. **Open:** when to revisit the forecast term.
