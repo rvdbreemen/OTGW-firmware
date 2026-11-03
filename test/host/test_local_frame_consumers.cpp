@@ -111,6 +111,12 @@ using PlatformQueue = void*;
 using PlatformMutex = void*;
 static bool platformMutexLock(PlatformMutex, uint32_t = 0) { return true; }
 static void platformMutexUnlock(PlatformMutex) {}
+static bool platformRecursiveMutexLock(PlatformMutex, uint32_t = 0) { return true; }   // the command-queue lock (CmdQueueLock)
+static void platformRecursiveMutexUnlock(PlatformMutex) {}
+#define CoreMQTTDebugTf(...) ((void)0)
+// Consumers of the frame that sit outside the chain under test (SAT follow-thermostat, the PM chain).
+static void satOnThermostatSetpoint(float) {}
+static void pmChainOnBoilerResponse(uint8_t) {}
 
 // ---- OTGW-Core.h and Hardwaretypes.h, sliced ----------------------------------------
 #include "types.inc"
@@ -137,15 +143,13 @@ static bool platformQueueReceive(PlatformQueue, void* item, uint32_t = 0) {
 }
 
 // state / settings: only the fields the slices touch.
+#include "SATboilerFeed.h"                         // the real header: SatBoilerFeed, SatFeedEvent, SatShVerdict (no firmware state in it)
+#include "otbus.inc"                               // the real OTBusState
 static struct {
-  struct {
-    bool bPSmode; time_t tBoilerLastSeen; time_t tThermostatLastSeen;
-    bool bBoilerState; bool bThermostatState; bool bOnline;
-    time_t tRealBoilerLastSeen;                    // only revisions that have it read it
-  } otBus;
+  OTBusState otBus;
   struct { bool bAvailable; } pic;                 // isPICEnabled()
   struct { OTGWHardwareMode eMode; } hw;           // isOTDirectEnabled()
-  struct { bool bBoilerDetectedFlag; } sat;        // satNotifyBoilerFrameSeen()
+  struct { bool bBoilerDetectedFlag; uint8_t iShVerdict; } sat;   // satNotifyBoilerFrameSeen(); the MsgID 57 verdict (TASK-1412.13)
 } state;
 static struct {
   struct { bool bOTmessage; bool bEnable; } mqtt;

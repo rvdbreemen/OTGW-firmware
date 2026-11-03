@@ -51,6 +51,12 @@ void sendMQTTDataPic(const __FlashStringHelper*, const char*) {}
 static bool hasWebSocketClients() { return false; }
 static void sendEventToWebSocket(char, const char*) {}
 static void applyFramelessTret(float) {}
+// Board return-sensor bookkeeping the PR=E branch writes (OTGW-Core.ino, TASK-1371): storage only, no case reads it.
+static uint32_t g_millis = 0;
+static uint32_t millis() { return g_millis; }
+static uint32_t picBoardTretMs = 0;
+static bool     picBoardTretSeen = false;
+static uint16_t picTretPollResults = 0;
 
 #include "../../src/OTGW-firmware/PICreturnSensor.h"
 #include "../../src/OTGW-firmware/picSettingValue.h"

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Parallel host test runner (stdlib only).
 
-Runs every tests/test_*.py as its own subprocess (each file runs standalone),
+Runs every tests/test_*.py and every test/host/test_*.py (the MSVC harnesses that compile
+sliced firmware sources; Windows only) as its own subprocess (each file runs standalone),
 N at a time, with a per-file timeout. See docs/guides/test-runner.md.
 
     python scripts/run_tests.py                 # full suite, 4 parallel
+    python scripts/run_tests.py --no-host       # tests/ only, without the test/host harnesses
     python scripts/run_tests.py -j 8 --timeout 900
     python scripts/run_tests.py --changed       # only tests affected vs origin/dev
     python scripts/run_tests.py --changed HEAD~3 --list
@@ -24,6 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TESTS = ROOT / "tests"
 WEBUI = TESTS / "webui"
+HOST = ROOT / "test" / "host"   # compiled with MSVC through vswhere: Windows only
 
 # Files that must not run inside the parallel pool; they run serially after it.
 # Fill in with a reason when a file proves to collide in parallel (see the doc).
@@ -158,11 +161,17 @@ def main():
     ap.add_argument("--changed", nargs="?", const="origin/dev", metavar="REF",
                     help="only tests affected by git diff REF (default origin/dev) + untracked")
     ap.add_argument("--webui", action="store_true", help="also run node --test tests/webui/*.test.mjs")
+    ap.add_argument("--no-host", action="store_true", help="leave out the test/host/test_*.py harnesses")
     ap.add_argument("--list", action="store_true", help="print the selection, do not run")
     ap.add_argument("pattern", nargs="*", help="optional substrings to restrict test file names")
     a = ap.parse_args()
 
     py_tests = sorted(TESTS.glob("test_*.py"))
+    if not a.no_host:
+        if os.name == "nt":
+            py_tests += sorted(HOST.glob("test_*.py"))
+        else:
+            print("note: test/host harnesses need MSVC (Windows); left out", file=sys.stderr)
     mjs_tests = sorted(WEBUI.glob("*.test.mjs")) if a.webui else []
     if a.pattern:
         py_tests = [t for t in py_tests if any(p in t.name for p in a.pattern)]

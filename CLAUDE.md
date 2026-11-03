@@ -372,6 +372,11 @@ heap-frag soak, TASK-934):
 - **Static gates:** `python evaluate.py` (full) / `--quick`. Exit 0 = pass, 1 =
   FAIL, 2 = WARN>5. NOT run by build.py — run it separately. Gate unit tests:
   `python tests/test_evaluate.py` (stdlib unittest, no pytest).
+- **Full test sweep:** `python scripts/run_tests.py` runs every `tests/test_*.py` AND every
+  `test/host/test_*.py` (the MSVC harnesses that compile sliced firmware sources; Windows only,
+  `--no-host` leaves them out). Run it before a lane commit; a `test/host` harness that stops
+  compiling after a firmware change is a stale stub, fix it in the same lane
+  (`docs/guides/test-runner.md`).
 - **Flash over WiFi OTA first** (maintainer directive, 2026-10-24): the app through
   `POST /safeboot` and the safeboot updater's `/update` upload, the filesystem through
   `POST /update?cmd=100&size=<n>` on the main firmware. The filesystem OTA keeps

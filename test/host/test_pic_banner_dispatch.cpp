@@ -71,6 +71,7 @@ static char* utoa(unsigned v, char* buf, int) { std::snprintf(buf, 12, "%u", v);
 static int  g_publishes = 0;
 static bool g_enabledAtPublish = false;
 void sendMQTTversioninfo();                               // recording double, defined below
+static void triggerPICsettingsReadout() {}                    // PIC settings read-out cycle: outside the banner chain
 void fwreportinfo(OTGWFirmware fw, const char* version);  // the firmware gets this from the .ino preprocessor
 
 // ---- code under test from the firmware, sliced ------------------------------------

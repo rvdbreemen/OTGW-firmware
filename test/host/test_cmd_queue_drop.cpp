@@ -72,7 +72,7 @@ bool sendMQTTData(const __FlashStringHelper* topic, const char* value, const boo
   return true;
 }
 static std::vector<std::string> g_serial;
-static void sendPICSerial(const char* cmd, int len) { g_serial.emplace_back(cmd, (size_t)len); }
+static bool sendPICSerial(const char* cmd, int len) { g_serial.emplace_back(cmd, (size_t)len); return true; }   // true: on the bus (TASK-1580)
 static void sendEventToWebSocket(char, const char*) {}
 static void pmChainTick() {}
 static void triggerPICsettingsReadout() {}
@@ -88,11 +88,18 @@ struct DebugDouble { bool bOTmsg = false; };
 struct StateDouble { PICSection pic; DebugDouble debug; };
 static StateDouble state;
 
-struct OT_cmd_t { char cmd[15]; int cmdlen; int retrycnt; unsigned long due; };
-#define CMDQUEUE_MAX 20
+// The command-queue lock is the firmware's own CmdQueueLock; only the FreeRTOS mutex under it is doubled
+// (one task, never contended). CmdQueueEchoStats, CmdQueueResult, OT_cmd_t and CMDQUEUE_MAX are the
+// firmware's declarations too (cmdq_support.inc).
+using PlatformMutex = void*;
+static PlatformMutex cmdQueueMutex = nullptr;
+static bool platformRecursiveMutexLock(PlatformMutex, uint32_t = 0) { return true; }
+static void platformRecursiveMutexUnlock(PlatformMutex) {}
+#include "cmdq_support.inc"
+extern CmdQueueEchoStats g_cmdQueueEcho;
 struct OT_cmd_t cmdqueue[CMDQUEUE_MAX];
 int cmdQueueSize = 0;
-void addCommandToQueue(const char* buf, const int len, const bool forceQueue = false, const int16_t delay = 1000);
+#include "cmdq_decl.inc"                           // addCommandToQueue() with the header's default arguments
 
 #include "cmdq_queue.inc"
 
@@ -118,9 +125,11 @@ static const Pub* last(const char* topic) {
 static std::string pubs() {
   std::string s;
   for (auto& p : g_pubs) s += p.topic + "=" + p.payload + (p.retain ? "(r) " : " ");
-  return s.empty() ? "no publish" : s;
+  s = s.empty() ? "no publish" : s;
+  return s + " (queue " + std::to_string(cmdQueueSize) + ", sent " + std::to_string(g_serial.size()) + ")";
 }
-static void resetQueue() { cmdQueueSize = 0; g_pubs.clear(); g_serial.clear(); }
+// A new case starts 10 s after the last one: the queue paces sends on the last send and echo (TASK-1571).
+static void resetQueue() { cmdQueueSize = 0; g_pubs.clear(); g_serial.clear(); g_millis += 10000; }
 
 int main() {
   const char* kDropped = "otgw-firmware/command_dropped";
@@ -247,9 +256,9 @@ int main() {
   {
     int tt = 0; for (int i = 0; i < cmdQueueSize; i++) if (std::strncmp(cmdqueue[i].cmd, "TT=", 3) == 0) tt++;
     report("Q7", inQueue("HW=1") && !inQueue("PM=7") && tt == CMDQUEUE_MAX - 1 && cmdQueueSize == CMDQUEUE_MAX
-           && std::strcmp(cmdqueue[10].cmd, "HW=1") == 0,
-           "writes + one unsent PM=7 + writes, then HW=1: PM=7's slot holds HW=1, all 19 TT= stay",
-           std::to_string(tt) + " TT=, slot10=" + cmdqueue[10].cmd);
+           && std::strcmp(cmdqueue[10].cmd, "TT=10") == 0 && std::strcmp(cmdqueue[CMDQUEUE_MAX - 1].cmd, "HW=1") == 0,
+           "writes + one unsent PM=7 + writes, then HW=1: PM=7 leaves, HW=1 joins at the back (strict FIFO, TASK-1569), all 19 TT= stay in order",
+           std::to_string(tt) + " TT=, slot10=" + cmdqueue[10].cmd + ", last=" + cmdqueue[CMDQUEUE_MAX - 1].cmd);
   }
   // Q4 (control): a read (TP=<id>:<entry>, and a lower-case pr=a) into a full queue of reads is still dropped.
   resetQueue(); fillReads(1);

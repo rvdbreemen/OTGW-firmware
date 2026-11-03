@@ -56,7 +56,9 @@ EMA_ANCHOR = r"^static float satRoomFiltered\("   # the TASK-894 room EMA, share
 
 KEEP = ["C1", "C2", "C2b", "C3", "C5a", "C6", "C7", "H1"]   # pid.py rules + self-check: pass on both sides
 # The TASK-1195 defects: fail on OLD, pass on FIX.
-DEFECT = ["A2_reach", "A2_dt", "A2_oracle", "E1", "R1", "B1", "B1d", "B2"]
+# E1 and R1 (the derivative reference on a fast sensor and through the room EMA) are reported as NOTE lines, not
+# judged: TASK-1418 undid TASK-1195's separate reference on purpose (Sergeant D entry 77, Q27).
+DEFECT = ["A2_reach", "A2_dt", "A2_oracle", "B1", "B1d", "B2"]
 
 ROUNDED = "return roundf((target - room) * 1000.0f) / 1000.0f;"
 
@@ -67,8 +69,6 @@ MUTANTS = [
     ("MC", "raw cap removed", "pid", [("if (fabsf(rawDeriv) >= SAT_PID_DERIVATIVE_CAP) {", "if (false) {")], "C2"),
     ("MA", "alpha fixed at 0.5", "pid", [("float alpha = deltaTime / (SAT_PID_UPDATE_INTERVAL + deltaTime);",
                                           "float alpha = 0.5f;")], "C3"),
-    ("MB", "derivative reference is the last temperature seen (pid.py's literal last_temperature)", "pid",
-     [("float tempDelta = roomTemp - _pid_derivRefTemp;", "float tempDelta = roomTemp - _pid_lastRoomTemp;")], "E1"),
     ("MR", "error rounding removed (primary PID)", "pid", [(ROUNDED, "return target - room;")], "B1"),
     ("MRz", "error rounding removed (zone PID)", "pid", [(ROUNDED, "return target - room;")], "B2"),
     ("MZ", "zone Kp divisor keyed on iHeatingSystem == 1 again", "ctl",
@@ -117,7 +117,11 @@ def prepare(side, rev, mutations=(), target="pid"):
     (d / "sat_hsys_slice.inc").write_text(head.format(CONTROL_INO) + hsys + "\n", encoding="utf-8")
     (d / "sat_zone_slice.inc").write_text(head.format(CONTROL_INO) + zone + "\n", encoding="utf-8")
     (d / "sat_ema_slice.inc").write_text(head.format(CONTROL_INO) + ema + "\n", encoding="utf-8")
-    (d / "SATtypes.h").write_text(read(rev, TYPES_H), encoding="utf-8")
+    types_h = read(rev, TYPES_H)
+    (d / "SATtypes.h").write_text(types_h, encoding="utf-8")
+    # The local headers SATtypes.h pulls in (SATcurveTune.h since TASK-1525), from the same revision.
+    for inc in re.findall(r'^#include "([^"]+)"', types_h, re.M):
+        (d / inc).write_text(read(rev, FW + inc), encoding="utf-8")
     (d / "safeTimers.h").write_text(read(rev, FW + "safeTimers.h"), encoding="utf-8")
     return d
 

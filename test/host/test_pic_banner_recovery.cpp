@@ -41,6 +41,7 @@ struct OTGWSerialStub {
 } OTGWSerial;
 
 void sendMQTTversioninfo();                    // recording double, defined below
+static void triggerPICsettingsReadout() {}                    // PIC settings read-out cycle: outside the banner chain
 #include "generated/pic_banner_recovery.inc"   // isPICEnabled() + applyPICBannerInfo()
 
 static int g_publishes = 0;

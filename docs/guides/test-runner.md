@@ -1,9 +1,16 @@
 # Host test runner
 
 `scripts/run_tests.py` (Python stdlib only) runs the host test suite in parallel.
-Every `tests/test_*.py` file is started as its own subprocess (each file already
-runs standalone with `python tests/test_x.py`), so coverage is the same as running
-them one by one, only faster.
+Every `tests/test_*.py` file and every `test/host/test_*.py` file is started as its own
+subprocess (each file already runs standalone with `python tests/test_x.py`), so coverage is
+the same as running them one by one, only faster.
+
+The `test/host` files are the MSVC harnesses: each slices real firmware code by anchor into a
+`generated/` directory and compiles it with `cl` found through vswhere, so they run on Windows
+only (the runner prints a note and leaves them out elsewhere). They sit outside `tests/` for
+historical reasons; before TASK-1582 the sweep never ran them and two of them stopped compiling
+unnoticed. `--no-host` runs `tests/` alone. `test_dhw_water_meter.py` builds about 40 mutants and
+takes several minutes: keep `--timeout` at 600 or more.
 
 ```bash
 python scripts/run_tests.py                  # all files, 4 in parallel, 600 s timeout each

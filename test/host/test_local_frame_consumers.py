@@ -40,8 +40,9 @@ import re
 import subprocess
 import sys
 
-from test_boiler_unsupported_origin import CORE, CORE_SLICES, OTD, OTD_SLICES, TYPES, cut
-from test_ot_reserved_range import GEN, HERE, find_vcvars
+from test_boiler_unsupported_origin import (CORE, CORE_SLICES, OTBUS_SLICES, OTD, OTD_SLICES, TYPES,
+                                            WORKTREE_ONLY, cut)
+from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars
 from test_pic_banner_dispatch import read
 
 FW_H = "src/OTGW-firmware/OTGW-firmware.h"
@@ -61,7 +62,7 @@ GATE_SLICES = [
     (SAT, r"^bool satBoilerHardwarePresent\(\)", None),
     (SAT, r"^void satNotifyBoilerFrameSeen\(\)", None),
 ]
-OUTPUTS = [("types.inc", TYPES), ("hw.inc", HW_SLICES), ("core.inc", CORE_SLICES),
+OUTPUTS = [("otbus.inc", OTBUS_SLICES), ("types.inc", TYPES),("hw.inc", HW_SLICES), ("core.inc", CORE_SLICES),
            ("otd.inc", OTD_SLICES + OTD_EXTRA), ("gate.inc", GATE_SLICES)]
 
 MODELS = {"combo": 1, "classic": 2, "otgw32": 3}
@@ -124,7 +125,7 @@ def export(rev, out_dir):
             path, start_rx, end_rx = entry[:3]
             optional = len(entry) > 3 and entry[3]
             if path not in sources:
-                sources[path] = read(path, rev).splitlines()
+                sources[path] = read(path, None if name in WORKTREE_ONLY else rev).splitlines()
             if optional and not any(re.search(start_rx, l) for l in sources[path]):
                 parts.append(f"// ---- {path}: not in this revision ({start_rx}) ----")
                 continue
@@ -143,7 +144,7 @@ def build_and_run(label, out_dir, model):
                    f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
                    f"cl /nologo /EHsc /W3 /std:c++17 /Od /utf-8 /D_CRT_SECURE_NO_WARNINGS /DMODEL={MODELS[model]} "
                    f"/Fo:\"{fwd}/\" /Fe:\"{exe}\" \"{HERE / 'test_local_frame_consumers.cpp'}\" "
-                   f"/I\"{out_dir}\"\r\n", encoding="ascii")
+                   f"/I\"{out_dir}\" /I\"{REPO / 'src' / 'OTGW-firmware'}\"\r\n", encoding="ascii")
     c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
     if c.returncode != 0 or not exe.exists():
         print(c.stdout[-4000:], c.stderr[-2000:])

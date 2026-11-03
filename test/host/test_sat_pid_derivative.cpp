@@ -56,6 +56,7 @@ static uint32_t g_millis = 0;
 static inline uint32_t millis() { return g_millis; }
 #define DebugTln(...)   ((void)0)
 #define SATDebugTf(...) ((void)0)
+#define SATDebugTln(...) ((void)0)
 
 struct HostSettings { SATSection        sat; } settings;   // settings.sat with the real defaults
 struct HostState    { SATRuntimeSection sat; } state;      // state.sat with the real defaults
@@ -75,9 +76,11 @@ typedef uint8_t byte;
 // Scripted inputs of one PID step: satPidService() reads them through satPidGatherInputs().
 static float g_inRoom = 0.0f, g_inTarget = 0.0f;
 static int   g_steps  = 0;                             // one per satPidGatherInputs() call = one per PID step
-bool satPidGatherInputs(float* room, float* target, float* curve, float* deadbandExtra) {
+// deadbandExtra: revisions before TASK-1417 (fixed deadband 0.1) pass a fourth argument.
+bool satPidGatherInputs(float* room, float* target, float* curve, float* deadbandExtra = nullptr) {
   g_steps++;
-  *room = g_inRoom; *target = g_inTarget; *curve = CURVE; *deadbandExtra = 0.0f;
+  *room = g_inRoom; *target = g_inTarget; *curve = CURVE;
+  if (deadbandExtra) *deadbandExtra = 0.0f;
   return true;
 }
 void satZonePidAdvanceAll();
@@ -143,6 +146,18 @@ static void check(const char* id, bool ok, const char* fmt, ...) {
   va_end(ap);
   printf("CHECK %s %s %s\n", id, ok ? "PASS" : "FAIL", buf);
   if (!ok) g_fail++;
+}
+
+// A reported measurement that is not judged. R1 and E1 were checks of TASK-1195's separate derivative reference;
+// TASK-1418 undid that reference on purpose (Sergeant D entry 77, Q27 "match thermo-nova"), so on a fast sensor and
+// through the room EMA the firmware now drops the same changes pid.py drops and no longer tracks the true slope.
+static void note(const char* id, bool matches, const char* fmt, ...) {
+  char buf[512];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(buf, sizeof(buf), fmt, ap);
+  va_end(ap);
+  printf("NOTE %s %s %s\n", id, matches ? "within the old tolerance" : "outside the old tolerance (not judged, TASK-1418)", buf);
 }
 
 // ---- one firmware call, observed ------------------------------------------------
@@ -357,8 +372,8 @@ static void acThreeCases() {
 // 0.1 and inside the deadband: the integral keeps growing and the derivative freezes.
 // Unrounded, 21.0f - 20.9f is 0.1000004: outside, the integral resets to 0.
 static void boundaryCases() {
-  printf("\n== deadband boundary: 21.0f - 20.9f = %.7f, deadband %.7f\n",
-         (double)(21.0f - 20.9f), (double)settings.sat.fDeadband);
+  printf("\n== deadband boundary: 21.0f - 20.9f = %.7f, deadband 0.1 (fixed since TASK-1417)\n",
+         (double)(21.0f - 20.9f));
 
   // B1: primary PID integral.
   satPidReset();
@@ -430,8 +445,8 @@ static void zoneGainCases() {
 
 int main() {
   printf("== TASK-1195 SAT PID derivative harness\n");
-  printf("   settings.sat: fDeadband=%.3f iControlInterval=%u s fHeatingCurveCoeff=%.2f\n",
-         settings.sat.fDeadband, (unsigned)settings.sat.iControlInterval,
+  printf("   settings.sat: iControlInterval=%u s fHeatingCurveCoeff=%.2f\n",
+         (unsigned)settings.sat.iControlInterval,
          settings.sat.fHeatingCurveCoeff);
   printf("   SATpid.ino: SAT_PID_UPDATE_INTERVAL=%.0f s SAT_PID_DERIVATIVE_CAP=%.1f\n",
          (double)SAT_PID_UPDATE_INTERVAL, (double)SAT_PID_DERIVATIVE_CAP);
@@ -518,7 +533,7 @@ int main() {
     RunCfg c; c.offsetS = 5; c.jitter = true; c.nSteps = 240; c.stepPeriodS = 30.0; c.stepC = 0.01;
     RunRes r = runScenario(c);
     const double slope = -0.01 / 30.0;
-    check("R1", std::fabs(r.rawFinal - slope) <= 0.10 * std::fabs(slope),
+    note("R1", std::fabs(r.rawFinal - slope) <= 0.10 * std::fabs(slope),
           "fast sensor, +0.01 C every 30 s: final rawDerivative %+.6f, true slope %+.6f (pid.py %+.6f)",
           r.rawFinal, slope, r.rawPyFinal);
   }
@@ -552,7 +567,7 @@ int main() {
     // (dt 60) or waits for the next one (dt 120) depends on those milliseconds: 80..135 filter runs per heat-up
     // of about 200 steps instead of one per step, and the mean derivative scatters from -9%% to +25%% of the
     // true slope. The mean stays unbiased within 30%%; the knife-edge is reported to the maintainer (entry 77 bench).
-    check("E1", allE1, "mean rawDerivative over steps 21-40 within 30%% of pid.py on the raw sensor in all runs"
+    note("E1", allE1, "mean rawDerivative over steps 21-40 within 30%% of pid.py on the raw sensor in all runs"
           " (firmware %+.6f .. %+.6f, pid.py %+.6f)", fwMin, fwMax, pyMean);
 
     // The same through the EMA with steps every 150 s, as the bench run feeds them
