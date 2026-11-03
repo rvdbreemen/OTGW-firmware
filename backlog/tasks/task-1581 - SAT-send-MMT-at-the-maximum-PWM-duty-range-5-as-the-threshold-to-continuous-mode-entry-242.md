@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-03T06:08:00Z'
-updated_date: '2026-11-03T06:35:00Z'
+updated_date: '2026-11-03T06:40:00Z'
 labels:
   - sat
 dependencies: []
@@ -32,4 +32,6 @@ Sergeant D entry 242 (2026-11-03, msg 1567055574548353047): when PWM is at the m
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-03: Q-1412.9c answered A (entry 243): below the maximum duty SAT sends its own MM= again (on change, entry 237). Unblocked.
+
+2026-11-03: agent stopped before editing on an uncovered interaction: Immergas TP=11:12=min(MM,80) precedes every MM= (entry 233, SATcontrol.ino:678-694) but MM=T has no number. Queued Q-1581a for Sergeant D (A: TP=11:12=80 before MM=T, advice). HP/hybrid: MM=T applies to every source at range 5, independent of the PWM phase (plain reading of entry 242). Design ready: range-5 flag in satPwmSchedule (duty >= dutyMax branch), satSendMM target T|number, SATTICK shows mm=T.
 <!-- SECTION:NOTES:END -->
