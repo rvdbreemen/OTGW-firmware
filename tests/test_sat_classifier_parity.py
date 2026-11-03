@@ -28,12 +28,13 @@ Two configurations, because the port has decided deviations built in:
 
 Q-PARITY-1 (entry 248, TASK-1586), Q-PARITY-3 (entry 244, TASK-1584), Q-PARITY-5 (entry 245, TASK-1585) and Q-PARITY-7/8 (entry 249,
 TASK-1588) are implemented and have no difference left.
+Q-PARITY-2, -4, -6 and -11 are RECORDED deviations since entry 250 (maintainer, 2026-11-03): they stay in the catalogue as class (a).
 Every verdict difference between the two sides must appear in DIFFERENCES with its classification:
-  (a) already a RECORDED deviation: a decision of Sergeant D in docs/sat/sergeant-d-corrections.md (entry number given);
-  (b) UNRECORDED: not decided by him; listed as an open question (Q-PARITY-n); behaviour is not changed here.
+  (a) already a RECORDED deviation: a decision of Sergeant D or the maintainer in docs/sat/sergeant-d-corrections.md (entry number given);
+  (b) UNRECORDED: not decided; listed as an open question (Q-PARITY-n); behaviour is not changed here. None is left.
 A difference that is not listed fails the run, and a listed difference that no longer occurs fails too (remove it when fixed).
-The last test, TestParityGate.test_no_unrecorded_difference_remains, is an expectedFailure: it turns into an unexpected success
-(a failure) the day class (b) is empty, which is the signal that TASK-1331 may resume.
+The last test, TestParityGate.test_no_unrecorded_difference_remains, is a normal test: it fails as soon as a class (b) difference
+appears. It passes now that class (b) is empty, which is the signal that TASK-1331 may resume.
 
 Run: python tests/test_sat_classifier_parity.py   (skips with a reason when the upstream cannot be imported, or no host compiler)
 """
@@ -475,25 +476,25 @@ BOTH = ("parity", "firmware")
 # Q-PARITY-1 percentile interpolation: decided (entry 248, A), implemented by _percentilePos() (TASK-1586): no difference left.
 # Q-PARITY-2 hundredth-degree quantisation of the control error
 for _c, _s in (("parity", "overshoot_boundary_parity_below_0004"), ("firmware", "overshoot_boundary_firmware_below_0004")):
-    diff(_s, (_c,), "b", "GOOD", "OVERSHOOT", "error 0.004 under the margin is stored as int16 hundredths and rounds up to the margin",
-         "classifier.py:77 (p90 >= OVERSHOOT_MARGIN_CELSIUS on the unrounded float)", QUANT_PORT, "Q-PARITY-2")
-diff("underheat_boundary_cont_above_0004", BOTH, "b", "GOOD", "UNDERHEAT", "error -2.996 is stored as -300 hundredths and reaches -3.0",
-     "classifier.py:78 (p50 <= UNDERSHOOT_MARGIN_CELSIUS on the unrounded float)", QUANT_PORT, "Q-PARITY-2")
+    diff(_s, (_c,), "a", "GOOD", "OVERSHOOT", "error 0.004 under the margin is stored as int16 hundredths and rounds up to the margin",
+         "classifier.py:77 (p90 >= OVERSHOOT_MARGIN_CELSIUS on the unrounded float)", QUANT_PORT, "entry 250")
+diff("underheat_boundary_cont_above_0004", BOTH, "a", "GOOD", "UNDERHEAT", "error -2.996 is stored as -300 hundredths and reaches -3.0",
+     "classifier.py:78 (p50 <= UNDERSHOOT_MARGIN_CELSIUS on the unrounded float)", QUANT_PORT, "entry 250")
 # Q-PARITY-3 tail warm-up: decided (entry 244, A), implemented by _tailTrimWarmup() (TASK-1584): no difference left.
 # Q-PARITY-4 count-based tail
-diff("sample_gap_in_tail", BOTH, "b", "GOOD", "OVERSHOOT", "after a 100 s gap the port's ring still holds the 130 samples before it; thermo-nova's tail is the last 180 s only",
-     W, "SATcycles.ino:104-115, :1009-1030 (ring of the last 180 samples, not the last 180 s)", "Q-PARITY-4")
+diff("sample_gap_in_tail", BOTH, "a", "GOOD", "OVERSHOOT", "after a 100 s gap the port's ring still holds the 130 samples before it; thermo-nova's tail is the last 180 s only",
+     W, "SATcycles.ino:104-115, :1009-1030 (ring of the last 180 samples, not the last 180 s)", "entry 250")
 # Q-PARITY-5 requested setpoint per sample: decided (entry 245, A), implemented by _tail_reqSp / _tailReqMetrics()
 # (TASK-1585): no difference left.
 # Q-PARITY-6 fallback setpoint
-diff("device_setpoint_fallback_cold", BOTH, "b", "UNCERTAIN", "UNDERHEAT", "requested missing: thermo-nova falls back to device_state.setpoint at the end (20); the port to the control setpoint at flame-on (30)",
-     "classifier.py:81-85 (device_state.setpoint of the flame-off sample)", "SATcycles.ino:814 (controlSp = _cycle_setpointAtStart, set at flame-on :842)", "Q-PARITY-6")
+diff("device_setpoint_fallback_cold", BOTH, "a", "UNCERTAIN", "UNDERHEAT", "requested missing: thermo-nova falls back to device_state.setpoint at the end (20); the port to the control setpoint at flame-on (30)",
+     "classifier.py:81-85 (device_state.setpoint of the flame-off sample)", "SATcycles.ino:814 (controlSp = _cycle_setpointAtStart, set at flame-on :842)", "entry 250")
 # Q-PARITY-7 / 8 sample count: decided (entry 249, A), implemented in satCycleOnFlameChange() (TASK-1588): no difference left.
 # Q-PARITY-9 non-finite flow in the tail ring: its one observed scenario (flow_missing_pwm_underheat) agrees since TASK-1585,
 # because the PWM requested-setpoint error percentile skips a non-finite flow (_tailReqMetrics()). Not decided by Sergeant D.
 # Q-PARITY-11 stand-ins
-diff("control_zero_value", BOTH, "b", "OVERSHOOT", "UNCERTAIN", "a control setpoint of 0.0 is a value upstream (error +50); the port reads fFinalSetpoint <= 0 as missing",
-     "tracker.py:267-271 (None only), heating_control.py:89, :233 (the control setpoint is a float, MINIMUM_SETPOINT when idle)", "SATcycles.ino:1019-1022 (sp > 0 required)", "Q-PARITY-11")
+diff("control_zero_value", BOTH, "a", "OVERSHOOT", "UNCERTAIN", "a control setpoint of 0.0 is a value upstream (error +50); the port reads fFinalSetpoint <= 0 as missing",
+     "tracker.py:267-271 (None only), heating_control.py:89, :233 (the control setpoint is a float, MINIMUM_SETPOINT when idle)", "SATcycles.ino:1019-1022 (sp > 0 required)", "entry 250")
 
 
 def observe():
@@ -635,13 +636,13 @@ AC2 = [
      ["warmup_high_flow_short_cycle", "warmup_dhw_out", "warmup_dhw_in"], None, "tracker.py:113-116, :237-241", "SATcycles.ino _tailTrimWarmup(), :925-927 (DHW)"),
     ("percentile interpolation", "recorded and implemented: no difference (entry 248, TASK-1586)",
      ["interp_p90_over_margin3", "interp_p90_over_margin2", "interp_p50_underheat"], None, "helpers.py:185-202", "SATcycles.ino _percentilePos()"),
-    ("missing-data treatment", "differences, Q-PARITY-6 / 11; the requested-setpoint and flow cases agree since TASK-1585",
+    ("missing-data treatment", "recorded deviations (entry 250: Q-PARITY-6 / 11); the requested-setpoint and flow cases agree since TASK-1585",
      ["control_missing_all", "control_missing_part_of_tail", "flow_missing_continuous", "flow_missing_pwm_underheat", "control_zero_value",
-      "device_setpoint_fallback_cold"], "Q-PARITY-11", "tracker.py:243-250, classifier.py:42-43, :71-72", "SATcycles.ino _tailReqMetrics(), :1017-1022"),
-    ("boundary margin", "exact margin agrees (>=, entry 37); 0.004 either side differs, Q-PARITY-2",
+      "device_setpoint_fallback_cold"], "entry 250", "tracker.py:243-250, classifier.py:42-43, :71-72", "SATcycles.ino _tailReqMetrics(), :1017-1022"),
+    ("boundary margin", "exact margin agrees (>=, entry 37); 0.004 either side differs, recorded deviation (entry 250, Q-PARITY-2)",
      ["overshoot_boundary_parity_exact", "overshoot_boundary_firmware_exact", "overshoot_boundary_parity_below_0004",
       "overshoot_boundary_firmware_below_0004", "underheat_boundary_cont_exact", "underheat_boundary_cont_above_0004",
-      "underheat_boundary_pwm_exact", "underheat_boundary_pwm_above_0004"], "Q-PARITY-2", "classifier.py:77-78, :45", "SATcycles.ino:809, :817-818, :798"),
+      "underheat_boundary_pwm_exact", "underheat_boundary_pwm_above_0004"], "entry 250", "classifier.py:77-78, :45", "SATcycles.ino:809, :817-818, :798"),
 ]
 
 
@@ -690,10 +691,9 @@ class TestRam(Base):
 
 
 class TestParityGate(Base):
-    @unittest.expectedFailure
     def test_no_unrecorded_difference_remains(self):
-        """TASK-1331 may resume only when every difference is class (a): this expected failure turns into an unexpected
-        success then, and the marker comes off together with an updated catalogue."""
+        """Every difference is class (a), a recorded deviation (entry 250 closed the last four): this is the TASK-1331 resume
+        signal. A new unrecorded difference makes it fail."""
         open_ = sorted(k for k, e in DIFFERENCES.items() if e["klass"] == "b")
         self.assertEqual(open_, [])
 

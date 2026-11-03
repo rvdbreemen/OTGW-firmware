@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-23T19:43:00Z'
-updated_date: '2026-11-01T22:28:00Z'
+updated_date: '2026-11-03T10:33:00Z'
 labels:
   - blocked
   - sat
@@ -64,4 +64,6 @@ From the TASK-1327 review: thermo-nova re-enables PWM in two ways after a disabl
 Audit 2026-11-01: moved To Do -> In Progress: AC1 research is checked and the change is parked in stash@{1} ('TASK-1331 blocked by review'). Blocked on TASK-1412.14, 1412.4 and 1412.7. The stash predates later SAT changes: re-apply it by hand, do not pop it.
 
 Lead triage 2026-11-01 23:30 (Robert: lead decides): back to To Do + blocked, as Robert set on 10-29. Blocked on TASK-1412.14, .4 and .7 (all To Do); the parked stash predates TASK-1345/1341/1344/1387 and must be re-applied by hand when those land. Owner of the SAT chain: session otgw-firmware-67.
+
+2026-11-03: unblocked by TASK-1412.14: the classifier parity gate passes (entries 244/245/248/249/250). Next: a plan quoting thermo-nova on_cycle_end (pwm.py:219-227) for Sergeant D's OK before implementation (SAT behaviour change).
 <!-- SECTION:NOTES:END -->

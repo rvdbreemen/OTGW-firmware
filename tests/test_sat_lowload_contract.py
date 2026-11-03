@@ -434,7 +434,7 @@ class LowLoadContract(unittest.TestCase):
         self.rec()["observed"] = results
 
     @ll("LL-021", "contract", "real pinned thermo-nova tracker/classifier and the real SATcycles.ino classifier on identical samples (via test_sat_cycle_classifier and test_sat_classifier_parity)",
-        task="TASK-1412.14: verdict differences are catalogued, class (b) ones are open (Q-PARITY-n); the gate test_sat_classifier_parity.TestParityGate stays an expected failure until none is left")
+        task="TASK-1412.14: verdict differences are catalogued, all are recorded deviations (entry 250); the gate test_sat_classifier_parity.TestParityGate fails when an unrecorded (class b) difference appears")
     def test_ll021_classifier_rules_and_window_inputs(self):
         self.delegated("LL-021")
 
