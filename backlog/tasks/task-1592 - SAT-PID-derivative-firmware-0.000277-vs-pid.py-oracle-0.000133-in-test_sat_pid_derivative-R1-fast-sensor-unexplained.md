@@ -3,11 +3,11 @@ id: TASK-1592
 title: >-
   SAT PID derivative: firmware -0.000277 vs pid.py oracle -0.000133 in
   test_sat_pid_derivative R1 (fast sensor), unexplained
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-03T14:26:00Z'
-updated_date: '2026-11-03T17:57:00Z'
+updated_date: '2026-11-03T18:06:00Z'
 labels:
   - sat
   - test
@@ -25,11 +25,19 @@ Found by TASK-1582 (2026-11-03): after the harness repair, check R1 (fast sensor
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Cause identified with file:line (harness oracle, input path such as the room EMA, or firmware); if firmware: a host test red on the old code and a recorded decision before any change
-- [ ] #2 R1/E1 either judged again with the correct oracle or documented why not
+- [x] #2 R1/E1 either judged again with the correct oracle or documented why not
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-03 investigation (opus): INPUT PATH DIFFERS, firmware follows pid.py. The R1 oracle feeds pid.py the sensor's exact change times on a 30 s grid, so dt sits exactly on pid.py's delta_time <= 60 boundary (pid.py:217; SATpid.ino:303 identical) and steps are skipped; the firmware stamps when it first sees a value (loop jitter 60.004-60.99 s), so every step passes. pid.py fed the firmware's own stamps equals the firmware within 1e-6 in 185/185 harness runs. Fix in the test only: judge R1/E1 against pid.py fed the firmware's (room, stamp) per step, compare steady-state means, keep the raw-time comparison as a NOTE.
+
+2026-11-03 fix (agent + lead): R1/E1 judged again against pid.py fed the firmware's own (room, stamp) per PID step, steady-state means, mean limit 1e-6, per-step limit 1e-5 (lead widened from 1e-6: E1 float rounding reaches 9.34e-7). Raw-sensor-time comparison kept as NOTE with the 60 s boundary explanation. New mutants MD (tempDelta halved) -> R1 red, MDe (sign flip) -> E1 red. test_sat_pid_derivative: PASS, all 8 mutants red; test_sat_pid_semantics 23 OK; evaluate 0 failed. No firmware change.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The R1/E1 PID derivative checks are judged again: the firmware equals pid.py fed its own timestamps (step difference 3.6e-11 / 9.3e-7); the earlier gap was the test oracle sitting on pid.py's 60 s boundary, not a firmware deviation. Two new derivative mutants are caught. Test-only change.
+<!-- SECTION:FINAL_SUMMARY:END -->

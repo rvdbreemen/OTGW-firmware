@@ -26,8 +26,7 @@ FIX side (working tree or --rev): every check must pass.
 OLD side (--old-rev; it must be a revision that already has satPidService(): the slices and
 the driver use the service API, and an older revision stops on the anchor check): the pid.py rules the fix keeps (C1, C2, C2b, C3, C5a, C6, C7) and
 the harness self-check H1 must pass; the defect checks must fail: the derivative timer
-(A2_reach, A2_dt, A2_oracle), the derivative on the device path through the TASK-894
-room EMA and on a fast sensor (E1, R1), and the deadband boundary at an error of 0.1
+(A2_reach, A2_dt, A2_oracle), and the deadband boundary at an error of 0.1
 (B1, B1d, B2). C4, C5b and C6b are reported for OLD, not judged. --defects names the
 checks OLD must fail when the old side is another fix's "before": Z1 (the zone PID Kp
 divisor per heating system) for TASK-1197, with --old-rev edb5c5cfe.
@@ -56,8 +55,11 @@ EMA_ANCHOR = r"^static float satRoomFiltered\("   # the TASK-894 room EMA, share
 
 KEEP = ["C1", "C2", "C2b", "C3", "C5a", "C6", "C7", "H1"]   # pid.py rules + self-check: pass on both sides
 # The TASK-1195 defects: fail on OLD, pass on FIX.
-# E1 and R1 (the derivative reference on a fast sensor and through the room EMA) are reported as NOTE lines, not
-# judged: TASK-1418 undid TASK-1195's separate reference on purpose (Sergeant D entry 77, Q27).
+# E1 and R1 (a fast sensor, and the room EMA) are judged against pid.py fed the firmware's own (room, room-changed
+# stamp) per PID step (TASK-1592), not against pid.py on the sensor's exact change times: TASK-1418 undid TASK-1195's
+# separate reference on purpose (Sergeant D entry 77, Q27), and that raw-time oracle sits exactly on pid.py's
+# `delta_time <= 60` boundary, so it skips steps the firmware passes. They are not in DEFECT: they no longer measure
+# the TASK-1195 defect, they check the firmware follows pid.py on a fast or smoothed sensor.
 DEFECT = ["A2_reach", "A2_dt", "A2_oracle", "B1", "B1d", "B2"]
 
 ROUNDED = "return roundf((target - room) * 1000.0f) / 1000.0f;"
@@ -69,6 +71,10 @@ MUTANTS = [
     ("MC", "raw cap removed", "pid", [("if (fabsf(rawDeriv) >= SAT_PID_DERIVATIVE_CAP) {", "if (false) {")], "C2"),
     ("MA", "alpha fixed at 0.5", "pid", [("float alpha = deltaTime / (SAT_PID_UPDATE_INTERVAL + deltaTime);",
                                           "float alpha = 0.5f;")], "C3"),
+    ("MD", "temperature change scaled by 0.5 in the derivative", "pid",
+     [("float tempDelta = roomTemp - _pid_lastRoomTemp;", "float tempDelta = 0.5f * (roomTemp - _pid_lastRoomTemp);")], "R1"),
+    ("MDe", "derivative sign flipped (EMA/device path)", "pid",
+     [("float rawDeriv = -tempDelta / deltaTime;", "float rawDeriv = tempDelta / deltaTime;")], "E1"),
     ("MR", "error rounding removed (primary PID)", "pid", [(ROUNDED, "return target - room;")], "B1"),
     ("MRz", "error rounding removed (zone PID)", "pid", [(ROUNDED, "return target - room;")], "B2"),
     ("MZ", "zone Kp divisor keyed on iHeatingSystem == 1 again", "ctl",

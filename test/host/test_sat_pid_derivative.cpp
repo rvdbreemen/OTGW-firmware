@@ -148,9 +148,12 @@ static void check(const char* id, bool ok, const char* fmt, ...) {
   if (!ok) g_fail++;
 }
 
-// A reported measurement that is not judged. R1 and E1 were checks of TASK-1195's separate derivative reference;
-// TASK-1418 undid that reference on purpose (Sergeant D entry 77, Q27 "match thermo-nova"), so on a fast sensor and
-// through the room EMA the firmware now drops the same changes pid.py drops and no longer tracks the true slope.
+// A reported measurement that is not judged: the raw-sensor-time comparison of R1 and E1. TASK-1418 undid TASK-1195's
+// separate derivative reference on purpose (Sergeant D entry 77, Q27 "match thermo-nova"), so the firmware follows pid.py
+// and no longer tracks the true slope. The firmware and a pid.py fed the sensor's exact change times still differ here:
+// that oracle sees dt on a perfect 30 s grid, exactly on pid.py's `delta_time <= 60` boundary (pid.py:217, SATpid.ino:303),
+// and skips steps, while the firmware stamps when it first sees a value (loop jitter 60.004..60.99 s) and passes the gate
+// every time. TASK-1592: the judged checks R1 and E1 feed pid.py the firmware's own (room, stamp) per PID step.
 static void note(const char* id, bool matches, const char* fmt, ...) {
   char buf[512];
   va_list ap;
@@ -162,6 +165,8 @@ static void note(const char* id, bool matches, const char* fmt, ...) {
 
 // ---- one firmware call, observed ------------------------------------------------
 struct FwObs {
+  bool   stepped  = false;  // a PID step ran in this call
+  uint32_t stampAtStep = 0; // _pid_roomTempChangedMs as the PID step left it (before the tick's own stamp)
   bool   consumed = false;  // the call took a new room temperature into _pid_lastRoomTemp
   bool   reached  = false;  // ...and the derivative filter, or the cap, ran on it
   bool   capped   = false;
@@ -181,9 +186,11 @@ static FwObs fwPass(uint32_t t, float room, float target, bool tick) {
   const int   steps0   = g_steps;
   o.r0 = _pid_rawDerivative;
   satPidService(t);
+  o.stampAtStep = _pid_roomTempChangedMs;
   if (tick) satPidNoteRoom(room, t);
   const bool stepped = g_steps != steps0;
   o.r1 = _pid_rawDerivative;
+  o.stepped = stepped;
   o.delta = room - lastRoom;
   o.consumed = stepped && wasInit && fabsf(o.delta) >= 0.001f && _pid_lastRoomTemp == room;
   o.reached  = o.consumed && o.r1 != o.r0;
@@ -233,6 +240,10 @@ struct RunRes {
   int    callsReached = 0;        // calls that ran the filter, over the whole run
   double callDtMin = 1e9, callDtMax = -1e9;
   double rawMeanFw = 0.0, rawMeanPy = 0.0;   // mean over the ticks of the second half of the steps
+  // pid.py fed what the firmware saw (its room value and room-changed stamp at each PID step), see runScenario().
+  double rawMeanFed = 0.0;       // mean over the ticks of the second half of the steps
+  double fedMaxDiff = 0.0;       // largest |firmware - pid.py fed| rawDerivative over all PID steps
+  int    fedSteps = 0;
 };
 
 static uint32_t stepMs(const RunCfg& c, int j) {
@@ -242,6 +253,7 @@ static uint32_t stepMs(const RunCfg& c, int j) {
 static RunRes runScenario(const RunCfg& c) {
   satPidReset();
   PyPid py;
+  PyPid fed;   // pid.py fed the firmware's own (room, room-changed stamp) at each PID step
   RunRes r;
   r.steps.resize(c.nSteps + 1);
   const uint32_t tickS  = settings.sat.iControlInterval;
@@ -249,7 +261,7 @@ static RunRes runScenario(const RunCfg& c) {
   const uint32_t endMs  = stepMs(c, c.nSteps) + (uint32_t)(2.0 * c.stepPeriodS * 1000.0);
   uint32_t lcg = 2463534242u ^ ((uint32_t)c.offsetS * 2654435761u) ^ (c.jitter ? 0x9E3779B9u : 0u);
   bool resetDone = false;
-  double meanFw = 0.0, meanPy = 0.0;
+  double meanFw = 0.0, meanPy = 0.0, meanFed = 0.0;
   int    meanN = 0;
 
   // One loop pass at time t (a tick pass also runs the tick's room stamp and the pid.py oracle).
@@ -267,11 +279,16 @@ static RunRes runScenario(const RunCfg& c) {
 
     const float roomIn = c.ema ? roomEma((float)roomD) : (float)roomD;
     FwObs o = fwPass(t, roomIn, (float)targetD, tick);
+    if (o.stepped) {
+      fed.update((double)roomIn, (double)(float)targetD, (double)o.stampAtStep / 1000.0);
+      r.fedMaxDiff = std::max(r.fedMaxDiff, std::fabs((double)o.r1 - fed.raw));
+      r.fedSteps++;
+    }
     if (o.reached) {
       r.callsReached++;
       if (!std::isnan(o.dt)) { r.callDtMin = std::min(r.callDtMin, o.dt); r.callDtMax = std::max(r.callDtMax, o.dt); }
     }
-    if (tick && n > c.nSteps / 2 && n <= c.nSteps) { meanFw += o.r1; meanPy += py.raw; meanN++; }
+    if (tick && n > c.nSteps / 2 && n <= c.nSteps) { meanFw += o.r1; meanPy += py.raw; meanFed += fed.raw; meanN++; }
     if (o.consumed && n >= 1 && !r.steps[n].seen) {
       StepRec& s = r.steps[n];
       s.seen = true; s.reached = o.reached; s.dtFw = o.dt; s.rawFw = o.r1;
@@ -314,7 +331,7 @@ static RunRes runScenario(const RunCfg& c) {
   r.rawFinal   = _pid_rawDerivative;
   r.rawPyFinal = py.raw;
   r.kdFinal    = state.sat.fKd;
-  if (meanN > 0) { r.rawMeanFw = meanFw / meanN; r.rawMeanPy = meanPy / meanN; }
+  if (meanN > 0) { r.rawMeanFw = meanFw / meanN; r.rawMeanPy = meanPy / meanN; r.rawMeanFed = meanFed / meanN; }
   return r;
 }
 
@@ -534,8 +551,14 @@ int main() {
     RunRes r = runScenario(c);
     const double slope = -0.01 / 30.0;
     note("R1", std::fabs(r.rawFinal - slope) <= 0.10 * std::fabs(slope),
-          "fast sensor, +0.01 C every 30 s: final rawDerivative %+.6f, true slope %+.6f (pid.py %+.6f)",
+          "fast sensor, +0.01 C every 30 s: final rawDerivative %+.6f, true slope %+.6f (pid.py on the sensor's exact times %+.6f;"
+          " the 60 s boundary makes that oracle skip steps the firmware passes)",
           r.rawFinal, slope, r.rawPyFinal);
+    // Judged: pid.py fed what the firmware saw. Steady state = mean over the ticks of the second half of the steps.
+    check("R1", r.fedSteps > 0 && std::fabs(r.rawMeanFw - r.rawMeanFed) <= 1e-6 && r.fedMaxDiff <= 1e-6,
+          "fast sensor vs pid.py fed the firmware's (room, stamp): steady-state mean fw %+.7f, pid.py %+.7f;"
+          " largest per-step difference %.2e over %d PID steps",
+          r.rawMeanFw, r.rawMeanFed, r.fedMaxDiff, r.fedSteps);
   }
 
   // E1: the device path. satControlLoop() smooths the raw sensor with the TASK-894 EMA
@@ -546,6 +569,8 @@ int main() {
     double fwMin = 1e9, fwMax = -1e9, pyMean = 0.0;
     int    callsMin = 1 << 30, callsMax = -1;
     bool   allE1 = true;
+    bool   allE1Fed = true;
+    double fedDiffMax = 0.0, meanDiffMax = 0.0;
     for (int jit = 0; jit <= 1; jit++) {
       for (int off = 0; off < 30; off++) {
         RunCfg c; c.offsetS = off; c.jitter = jit != 0; c.ema = true;
@@ -554,6 +579,11 @@ int main() {
         pyMean = r.rawMeanPy;
         callsMin = std::min(callsMin, r.callsReached); callsMax = std::max(callsMax, r.callsReached);
         if (std::fabs(r.rawMeanFw - r.rawMeanPy) > 0.30 * std::fabs(r.rawMeanPy)) allE1 = false;
+        meanDiffMax = std::max(meanDiffMax, std::fabs(r.rawMeanFw - r.rawMeanFed));
+        fedDiffMax  = std::max(fedDiffMax, r.fedMaxDiff);
+        // Mean limit 1e-6; per-step limit 1e-5 (float rounding reaches ~9e-7 per step through the EMA, too close
+        // to 1e-6 to survive a toolchain change; the derivative mutants differ by orders of magnitude more).
+        if (r.fedSteps == 0 || std::fabs(r.rawMeanFw - r.rawMeanFed) > 1e-6 || r.fedMaxDiff > 1e-5) allE1Fed = false;
       }
     }
     // No dt range here: the dt recovery takes _pid_lastRoomTemp as the reference, which
@@ -567,7 +597,9 @@ int main() {
     // (dt 60) or waits for the next one (dt 120) depends on those milliseconds: 80..135 filter runs per heat-up
     // of about 200 steps instead of one per step, and the mean derivative scatters from -9%% to +25%% of the
     // true slope. The mean stays unbiased within 30%%; the knife-edge is reported to the maintainer (entry 77 bench).
-    note("E1", allE1, "mean rawDerivative over steps 21-40 within 30%% of pid.py on the raw sensor in all runs"
+    check("E1", allE1Fed, "device path vs pid.py fed the firmware's (room, stamp): steady-state mean difference <= %.2e,"
+          " per-step difference <= %.2e over all 60 runs (limits: mean 1e-6, per step 1e-5)", meanDiffMax, fedDiffMax);
+    note("E1", allE1, "raw-sensor-time oracle: mean rawDerivative over steps 21-40 within 30%% of pid.py on the raw sensor in all runs"
           " (firmware %+.6f .. %+.6f, pid.py %+.6f)", fwMin, fwMax, pyMean);
 
     // The same through the EMA with steps every 150 s, as the bench run feeds them
