@@ -6,13 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T12:53:00Z'
-updated_date: '2026-10-30T21:56:00Z'
+updated_date: '2026-11-03T05:37:00Z'
 labels: []
 milestone: 2.0.0
 dependencies:
   - TASK-1412.3
 references:
   - TASK-1412
+priority: high
 ordinal: 528000
 ---
 
@@ -36,4 +37,6 @@ Seen in gruijter's alpha.504 capture 2026-10-25 (verifier of wf_4831cf35): the t
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
 
 2026-10-30 maintainer decision (Robert, in session otgw-firmware-ea): released for pickup ('vrijgeven'); label needs-maintainer-ok removed. Priority after beta-1 blockers unless it is one.
+
+Released by Robert 2026-11-03 (interactive, maintainer): high priority. Note for the fix: an HA entity whose unit changes from degrees C to % can lose its statistics history; mention it in the release notes.
 <!-- SECTION:NOTES:END -->

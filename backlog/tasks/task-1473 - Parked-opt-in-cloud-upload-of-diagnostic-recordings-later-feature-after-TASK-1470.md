@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T12:45:00Z'
-updated_date: '2026-11-02T04:39:00Z'
+updated_date: '2026-11-03T05:37:00Z'
 labels:
   - parked
   - on-hold
@@ -94,4 +94,6 @@ Firmware facts found (code survey, spot-checked):
 Open / unverified: EU jurisdiction on the R2/DO free plan; whether R2 asks for a payment method; mbedTLS allocation in PSRAM with the prebuilt Arduino libs; real data volume (estimates: OT ~9 MB/day, full debug up to ~260 MB/day). Task stays parked until Robert removes the parked label (AC #1).
 
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: parked on purpose.
+
+Robert 2026-11-03 (interactive): keep ON HOLD; not the moment yet.
 <!-- SECTION:NOTES:END -->

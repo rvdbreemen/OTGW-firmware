@@ -3,10 +3,10 @@ id: TASK-1510
 title: >-
   SAT: weather-forecast pre-emptive CH control (stop heating earlier when a
   sunny afternoon is forecast), only at high confidence
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30T13:58:00Z'
-updated_date: '2026-11-02T04:39:00Z'
+updated_date: '2026-11-03T05:37:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -27,4 +27,12 @@ Feature request from tester gruijter in #alpha-testing (msg 1565717631510646795,
 2026-10-30 maintainer decision (Robert, in session otgw-firmware-ea): released for pickup ('vrijgeven'); label needs-maintainer-ok removed. Priority after beta-1 blockers unless it is one.
 
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no forecast use in control. New feature, not beta.
+
+Decided by Robert 2026-11-03 (interactive, maintainer): merged into TASK-1566 (feasibility study, sun/mild-day overshoot). A weather forecast is one possible input there; no separate design. Closed as merged.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Merged into TASK-1566 by Robert 2026-11-03; no code. The forecast idea is evaluated inside the TASK-1566 feasibility study.
+<!-- SECTION:FINAL_SUMMARY:END -->

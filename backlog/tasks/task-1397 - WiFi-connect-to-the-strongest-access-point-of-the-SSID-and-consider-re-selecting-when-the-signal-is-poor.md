@@ -6,12 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T19:48:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-03T05:37:00Z'
 labels:
   - wifi
 milestone: 2.0.0
 dependencies: []
-priority: medium
+priority: low
 ordinal: 536000
 ---
 
@@ -32,4 +32,6 @@ maarten_41762 2026-10-25 (#alpha-testing 1563987220115890257, alpha.500): the un
 2026-10-30 maintainer decision (Robert, in session otgw-firmware-ea): released for pickup ('vrijgeven'); label needs-maintainer-ok removed. Priority after beta-1 blockers unless it is one.
 
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: no setSortMethod/setScanMethod in src. Code doable, proof needs a two-AP bench.
+
+Released by Robert 2026-11-03 (interactive, maintainer): low priority. Bench proof needs two APs on one SSID; any MikroTik write needs Robert's explicit OK first. Expect (re)connect about 1-2 s slower with a full scan.
 <!-- SECTION:NOTES:END -->
