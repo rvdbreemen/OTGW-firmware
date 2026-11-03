@@ -6435,6 +6435,18 @@ void satControlLoop()
   if (!_sat_tuneGatesPassed) satCurveTuneNoteNotControlling();   // TASK-1525: a gate held SAT back this pass: the tuner hour does not count
 }
 
+// Hot-water tick: MM= to the maximum for the whole draw (Sergeant D entry 220, Q-1539a B; entry 21; thermo-nova
+// relative_modulation_state is HOT_WATER, so _compute_relative_modulation_value() takes the maximum, heating_control.py:
+// 136-137, :517-524). It is the value of a tick that does not regulate: satComputeMM() with pwmMode false, so the heat pump
+// and Geminox rules of entry 21 apply as outside PWM. It goes through satSendMM(): on change, repaired every 60 s, Immergas TP
+// included. Nothing else is sent in the draw: no CS/CH tick values and no 5 s resend (entry 221), while the 30 s PIC CS keepalive
+// keeps running (entry 232). After the draw the next tick sends its own MM= (0 in PWM), which differs from the maximum.
+static void satSendMMDuringDhw() {
+  const uint8_t src = satGetEffectiveHeatingSource();
+  satSendMM(satComputeMM(false, src == SAT_SRC_HEAT_PUMP, src == SAT_SRC_HEAT_PUMP || src == SAT_SRC_HYBRID,
+                         settings.sat.iMaxRelModulation, satGetManufacturerQuirks()));
+}
+
 static void satControlLoopRun()
 {
   satApplyControlStateReset();    // TASK-1414: a reset requested from any task (REST, MQTT, SAT itself) is applied here, once
@@ -6606,6 +6618,7 @@ static void satControlLoopRun()
     // Hot water: refreshes the end of the draw (the 300 s guards, heating_control.py:272-274, :313-315) and
     // clears the overshoot, underheat and saturation starts (:268-270, :313-315; entry 108).
     satCycleNoteDhwTick(_sat_tickMs);
+    if (hasOTCommandInterface()) satSendMMDuringDhw();   // MM to the maximum for the draw (entry 220, TASK-1539); CS/CH stay as they were, no resend (entry 221)
     satPublishMQTT();   // sat/power carries the DHW-capacity value while DHW runs (TASK-1258)
     return;
   }

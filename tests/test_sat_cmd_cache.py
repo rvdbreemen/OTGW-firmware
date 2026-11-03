@@ -139,6 +139,27 @@ int main(int argc, char** argv) {
     g_ms = start + 1000; g_drop = 1; satSendCS(42.0f); g_drop = 0;   // iLastSentCSMs stays at start
     g_sent[0] = 0; g_ms = start + 4999; satCmdResend(); printf("[%s]\n", g_sent);
     g_ms = start + 5000; satCmdResend(); printf("[%s]\n", g_sent);   // 5 s after the last ACCEPTED CS
+  } else if (mode == 14) {                                 // TASK-1539: MM to the maximum for a draw; keepalive on, no 5 s resend
+    g_ms = start; satResetCmdCache(); tick(40.0f, 0, 1);   // PWM tick: MM=0
+    printf("[%s]\n", g_sent); g_sent[0] = 0;
+    char line[512]; line[0] = 0;
+    OTcurrentSystemState.SlaveStatus = 0x04;               // the draw
+    for (uint32_t s = 1; s <= 119; s++) {                  // satControlLoopRun() order: keepalive, resend, then the control tick
+      g_ms = start + s * 1000UL;
+      g_sent[0] = 0;
+      satPicCSKeepalive(); satCmdResend();
+      if (s % 30 == 0) { _sat_cmdResendArmed = false; satSendMMDuringDhw(); }   // the DHW branch of the tick
+      if (g_sent[0]) { char b[96]; snprintf(b, sizeof b, "s%lu:%s ", (unsigned long)s, g_sent); strcat(line, b); }
+    }
+    printf("[%s]\n", line);
+    OTcurrentSystemState.SlaveStatus = 0x00;               // the draw ends; the next tick regulates again
+    g_ms = start + 120000UL; g_sent[0] = 0; tick(40.0f, 0, 1); printf("[%s]\n", g_sent);
+  } else if (mode == 15) {                                 // TASK-1539: which MM the draw sends (satComputeMM, pwmMode false)
+    g_ms = start;
+    settings.sat.iMaxRelModulation = 80; satResetCmdCache(); g_sent[0] = 0; satSendMMDuringDhw(); printf("[%s]\n", g_sent);   // gas boiler
+    settings.sat.iMaxRelModulation = 0;  satResetCmdCache(); g_sent[0] = 0; g_src = SAT_SRC_HEAT_PUMP; satSendMMDuringDhw(); printf("[%s]\n", g_sent);   // heat pump never 0
+    satResetCmdCache(); g_sent[0] = 0; g_src = SAT_SRC_GAS_BOILER; g_quirks = SAT_QUIRK_MIN_MOD_10; satSendMMDuringDhw(); printf("[%s]\n", g_sent);   // Geminox floor 10
+    g_quirks = 0; settings.sat.iMaxRelModulation = 100; g_imm = true; satResetCmdCache(); g_sent[0] = 0; satSendMMDuringDhw(); printf("[%s]\n", g_sent);   // Immergas: TP follows
   } else if (mode == 13) {                                 // a dropped PIC keepalive is tried again on the next pass
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
     g_sent[0] = 0; g_ms = start + 30000; g_drop = 1; satPicCSKeepalive(); g_drop = 0; printf("[%s]\n", g_sent);
@@ -168,7 +189,23 @@ class CmdCacheReset(unittest.TestCase):
         stub = "" if "satCmdResend" in body else "static void satCmdResend() {}"
         if "satNotifyPicRestart" not in body:
             stub += "\nstatic void satNotifyPicRestart() {}"
-        cpp.write_text(STUBS.replace("@BODY@", body).replace("@TICK@", tick).replace("@STUB_RESEND@", stub)
+        # TASK-1539: satSendMMDuringDhw() (outside the cut block, just above satControlLoopRun) = satSendMM(satComputeMM(false, ...));
+        # both are cut from the real file. These stubs live here, not in STUBS, which other harnesses reuse as their prelude.
+        full = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+        extra = ("#define SAT_QUIRK_MIN_MOD_10 0x01\n"
+                 "enum SATHeatingSource : uint8_t { SAT_SRC_AUTO = 0, SAT_SRC_GAS_BOILER = 1, SAT_SRC_HEAT_PUMP = 2, SAT_SRC_HYBRID = 3 };\n"
+                 "struct { struct { uint8_t iMaxRelModulation = 80; } sat; } settings;\n"
+                 "static uint8_t g_src = SAT_SRC_GAS_BOILER, g_quirks = 0;\n"
+                 "static uint8_t satGetEffectiveHeatingSource() { return g_src; }\n"
+                 "static uint8_t satGetManufacturerQuirks() { return g_quirks; }\n")
+        compute = full[full.index("static uint8_t satComputeMM("):]
+        extra += compute[:compute.index("\n}\n") + 3] + "\n"   # the real satComputeMM()
+        if "static void satSendMMDuringDhw()" in full:
+            dhw = full[full.index("static void satSendMMDuringDhw()"):]
+            body += "\n" + dhw[:dhw.index("\n}\n") + 3]       # the real helper, after satSendMM
+        else:                                       # old-vs-fix: HEAD sends no MM during a draw
+            stub += "\nstatic void satSendMMDuringDhw() {}"
+        cpp.write_text(STUBS.replace("@BODY@", extra + body).replace("@TICK@", tick).replace("@STUB_RESEND@", stub)
                        .replace("@DISARM@", "_sat_cmdResendArmed = false;" if "_sat_cmdResendArmed" in body else ""))
         cls.exe = compile_cpp(cpp, d / "t.exe")
 
@@ -269,6 +306,25 @@ class CmdCacheReset(unittest.TestCase):
         self.assertEqual(a, "[]")
         self.assertEqual(b, "[CS=40.0;]")
 
+    def test_dhw_draw_sends_mm_max_keeps_the_keepalive_and_drops_the_resend(self):
+        # TASK-1539, Sergeant D entries 220 (MM to max during the draw), 221 (no 5 s resend in hot water), 232 (the 30 s PIC CS
+        # keepalive keeps running). Timeline: PWM tick MM=0 at t0; DHW ticks at 30/60/90 s; the draw ends; the next tick regulates.
+        a, b, c, _ = self.run_at(10000, 14)
+        self.assertEqual(a, "[CS=40.0;MM=0;CH=1;]")
+        # keepalive every 30 s after the last CS (s30, s60, s90, s119 not yet); MM=80 on the first draw tick, not again on the
+        # next (30 s old), once more at 60 s old (repair, entry 239); no resend CS in between (it would show at s5, s10 ...)
+        self.assertEqual(b, "[s30:CS=40.0;MM=80; s60:CS=40.0; s90:CS=40.0;MM=80; ]")
+        # after the draw MM=0 differs from the maximum: sent; CH=1 is 120 s old by now, so its repair resend (entry 239) goes too
+        self.assertEqual(c, "[CS=40.0;MM=0;CH=1;]")
+
+    def test_dhw_mm_value_follows_the_non_pwm_rules(self):
+        # satComputeMM(pwmMode false): the configured maximum; a heat pump never gets 0; Geminox at least 10; Immergas TP follows
+        a, b, c, d = self.run_at(10000, 15)
+        self.assertEqual(a, "[MM=80;]")
+        self.assertEqual(b, "[MM=100;]")
+        self.assertEqual(c, "[MM=10;]")
+        self.assertEqual(d, "[TP=11:12=80;MM=100;]")
+
     def test_dropped_keepalive_is_tried_again_on_the_next_pass(self):
         a, b, _, _ = self.run_at(10000, 13)
         self.assertEqual(a, "[]")
@@ -291,7 +347,8 @@ class TickPaths(unittest.TestCase):
         for name in ("satSendCS", "satSendMM", "satSendCH"):
             # one definition (+ the resend helper's own call) + four control-tick paths
             # TASK-1570: the resend calls satSendCS only (MM/CH are on change, entry 237)
-            self.assertEqual(len(re.findall(r"\b%s\(" % name, self.code)), 1 + 4 + (3 if name == "satSendCS" else 0), name)   # + the start-up flood CS and its hand-over to the suppression (TASK-1371)
+            # TASK-1539: satSendMM also has the call in satSendMMDuringDhw()
+            self.assertEqual(len(re.findall(r"\b%s\(" % name, self.code)), 1 + 4 + (3 if name == "satSendCS" else 0) + (1 if name == "satSendMM" else 0), name)   # + the start-up flood CS and its hand-over to the suppression (TASK-1371)
         for old in ("satEnqueueIfChangedMM", "satEnqueueIfChangedCH"):
             self.assertNotIn(old, self.code)
         # the only change-checked CS callers left: its definition and the suppression refresh
@@ -316,6 +373,15 @@ class TickPaths(unittest.TestCase):
         self.assertIn("_sat_cmdResendArmed = false;", dhw[:dhw.index("return;")])
         fault = src[src.index("if (OTcurrentSystemState.SlaveStatus & 0x01) {"):]
         self.assertIn("_sat_cmdResendArmed = false;", fault[:fault.index("return;")])
+
+    def test_dhw_tick_sends_the_dhw_mm_before_it_returns(self):
+        # TASK-1539: the DHW branch of the tick sends MM through satSendMMDuringDhw() (OT command interface only) and still returns
+        src = self.src
+        dhw = src[src.index("    // DHW has priority"):]
+        dhw = dhw[:dhw.index("    return;")]
+        self.assertIn("if (hasOTCommandInterface()) satSendMMDuringDhw();", dhw)
+        self.assertNotIn("satSendCS", dhw)
+        self.assertNotIn("satSendCH", dhw)
 
     def test_resend_runs_after_the_gates_and_before_the_tick(self):
         src = self.src

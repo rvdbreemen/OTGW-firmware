@@ -16,6 +16,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **SAT hot-water guard: a draw between two control ticks arms the 300 s guard, counted from the real end of the draw** (TASK-1429; Sergeant D entries 108, 131, thermo-nova `device/__init__.py:223-224`). Before, only a control tick that saw the boiler DHW-active bit armed the guard, so a short draw never did, and the guard counted from the last such tick, up to one control interval before the draw really ended. Every loop pass now reads the bit, and the pass that sees it drop sets the end of the draw.
 
+- **SAT sets MM to the maximum during a hot-water draw** (TASK-1539; Sergeant D entry 220, Q-1539a B; the 30 s PIC CS keepalive keeps running, entry 232; no 5 s resend, entry 221). Before, the hot-water tick sent no MM, so an MM=0 from PWM stayed for the whole draw. Now each hot-water tick sends the maximum relative modulation (a heat pump never 0, Geminox at least 10, Immergas TP first) through the on-change sender; the next regulating tick sends its own value.
+
 - **SAT Immergas TP=11:12 only when "Immergas" is chosen explicitly** (TASK-1537, 2.0.0-beta.16; Robert's decision, entry 235). OpenTherm MemberID 27 is shared by Immergas and Sime, so the Auto manufacturer detection sent the Immergas TP=11:12 boiler-parameter write to Sime boilers too (up to beta.14 with the flow setpoint as value). Now `satImmergasTpActive()` reads only the explicit manufacturer setting; Auto still shows the detected name. thermo-nova makes the user confirm the manufacturer in its config step. Immergas owners on Auto: select Immergas under SAT settings (new hint). Host test `tests/test_sat_immergas_tp.py` (Auto/MemberID 27 and Sime send no TP).
 
 ### Fixed
