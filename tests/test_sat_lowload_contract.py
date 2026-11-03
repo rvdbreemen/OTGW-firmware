@@ -203,7 +203,9 @@ DELEGATED = {
                ("test_sat_previous_cs_clamp", "PreviousCsClamp", ["test_a_falling_request_holds_previous_cs", "test_b_rising_request_follows_min_allowed",
                 "test_c2_equal_request_takes_the_falling_branch"]),
                ("test_sat_overshoot_sustain", "TickClockAndLoopOrder", None)],
-    "LL-021": [("test_sat_cycle_classifier", "CycleClassifier", None)],
+    "LL-021": [("test_sat_cycle_classifier", "CycleClassifier", None),
+               ("test_sat_classifier_parity", "TestUpstreamIdentity", None), ("test_sat_classifier_parity", "TestParity", None),
+               ("test_sat_classifier_parity", "TestAc2Inventory", None), ("test_sat_classifier_parity", "TestRam", None)],
     "LL-023": [("test_sat_ground_truth_block", "SatGroundTruthBlock", None)],
 }
 _delegated = {}   # (module, class, requested names) -> {test name: (ok, detail)}; the names are part of the key (TASK-1412.9)
@@ -430,8 +432,8 @@ class LowLoadContract(unittest.TestCase):
                         self.assertLessEqual(elapsed, threshold + 30 + max(jitter) / 1000.0, "late exit")
         self.rec()["observed"] = results
 
-    @ll("LL-021", "contract", "satCycleClassify* C++ classifier (via test_sat_cycle_classifier)",
-        task="partial: C++ side only; the Python side of the shared trace is TASK-1412.14 (no Python SAT here)")
+    @ll("LL-021", "contract", "real pinned thermo-nova tracker/classifier and the real SATcycles.ino classifier on identical samples (via test_sat_cycle_classifier and test_sat_classifier_parity)",
+        task="TASK-1412.14: verdict differences are catalogued, class (b) ones are open (Q-PARITY-n); the gate test_sat_classifier_parity.TestParityGate stays an expected failure until none is left")
     def test_ll021_classifier_rules_and_window_inputs(self):
         self.delegated("LL-021")
 
