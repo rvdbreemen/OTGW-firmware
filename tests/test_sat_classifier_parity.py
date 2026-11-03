@@ -457,7 +457,6 @@ def run_port(sc, cfg):
 # key (scenario, config) -> (class, upstream verdict, port verdict, why, upstream citation, port citation, entry or open question)
 # Citations: upstream relative to custom_components/sat at 7beaaf5; port in src/OTGW-firmware/SATcycles.ino at this revision.
 W = "tracker.py:113-116 (warm-up min(60, 0.25 x duration), tail_start = max(.., end - 180)), :235-241 (tail = samples with timestamp >= tail_start)"
-PW = "SATcycles.ino:1009-1024 (tail ring: the last 180 1 Hz samples, no warm-up), :909-911 (percentiles from that ring)"
 INTERP_UP = "helpers.py:187-203 percentile_interpolated, used by tracker.py:252-254"
 INTERP_PORT = "SATcycles.ino:633 and :662 (index = pct x (n-1) / 100, integer floor, no interpolation)"
 REQ_UP = "tracker.py:273-277, :249-250 (flow - requested_setpoint per sample; samples without one are left out)"
@@ -487,9 +486,7 @@ for _c, _s in (("parity", "overshoot_boundary_parity_below_0004"), ("firmware", 
          "classifier.py:77 (p90 >= OVERSHOOT_MARGIN_CELSIUS on the unrounded float)", QUANT_PORT, "Q-PARITY-2")
 diff("underheat_boundary_cont_above_0004", BOTH, "b", "GOOD", "UNDERHEAT", "error -2.996 is stored as -300 hundredths and reaches -3.0",
      "classifier.py:78 (p50 <= UNDERSHOOT_MARGIN_CELSIUS on the unrounded float)", QUANT_PORT, "Q-PARITY-2")
-# Q-PARITY-3 tail warm-up
-diff("warmup_high_flow_short_cycle", BOTH, "b", "GOOD", "OVERSHOOT", "the first 25 s (warm-up of a 100 s cycle) are outside thermo-nova's tail, inside the port's ring",
-     W, PW, "Q-PARITY-3")
+# Q-PARITY-3 tail warm-up: decided (entry 244, A), implemented by _tailTrimWarmup() (TASK-1584): no difference left.
 # Q-PARITY-4 count-based tail
 diff("sample_gap_in_tail", BOTH, "b", "GOOD", "OVERSHOOT", "after a 100 s gap the port's ring still holds the 130 samples before it; thermo-nova's tail is the last 180 s only",
      W, "SATcycles.ino:104-115, :1009-1030 (ring of the last 180 samples, not the last 180 s)", "Q-PARITY-4")
@@ -612,7 +609,7 @@ class TestParity(Base):
                      "underheat_cold_setpoint", "cs_change_before_tail", "cs_change_inside_tail", "cs_lowered_inside_tail",
                      "mode_cont_to_pwm_good", "mode_cont_to_pwm_underheat", "mode_pwm_to_cont_overshoot", "control_missing_all",
                      "warmup_dhw_out", "warmup_dhw_in", "dhw_exactly_at_tail_start", "dhw_just_before_tail_start", "dhw_only_cycle",
-                     "kind_unknown", "pwm_idle_at_end"):
+                     "kind_unknown", "pwm_idle_at_end", "warmup_high_flow_short_cycle"):
             for cfg in ("parity", "firmware"):
                 u, p = obs[(name, cfg)]
                 with self.subTest(name=name, cfg=cfg):
@@ -649,8 +646,8 @@ AC2 = [
     ("per-sample requested setpoint", "difference, Q-PARITY-5",
      ["requested_raised_inside_tail_pwm", "requested_missing_last_third_pwm", "requested_lowered_below_cold_continuous"], "Q-PARITY-5",
      "tracker.py:273-277", "SATcycles.ino:918, :790"),
-    ("warm-up exclusion", "difference, Q-PARITY-3 (the DHW-in-tail test already has it: no difference)",
-     ["warmup_high_flow_short_cycle", "warmup_dhw_out", "warmup_dhw_in"], "Q-PARITY-3", "tracker.py:113-116", "SATcycles.ino:925-927 (DHW only), :1009-1024"),
+    ("warm-up exclusion", "recorded and implemented: no difference (entry 244, TASK-1584; the DHW-in-tail test had it before)",
+     ["warmup_high_flow_short_cycle", "warmup_dhw_out", "warmup_dhw_in"], None, "tracker.py:113-116, :237-241", "SATcycles.ino _tailTrimWarmup(), :925-927 (DHW)"),
     ("percentile interpolation", "difference, Q-PARITY-1",
      ["interp_p90_over_margin3", "interp_p90_over_margin2", "interp_p50_underheat"], "Q-PARITY-1", "helpers.py:187-203", "SATcycles.ino:633, :662"),
     ("missing-data treatment", "differences, Q-PARITY-5 / 6 / 9 / 11; control missing for the whole burn: no difference",

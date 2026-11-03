@@ -635,6 +635,26 @@ static float _tailPercentile(uint8_t pct)
   return sorted[idx];
 }
 
+//=== Tail warm-up exclusion (TASK-1584, entry 244, Q-PARITY-3 A) ===
+// thermo-nova's tail starts at max(start + min(60, 0.25 * duration), end - 180) (tracker.py:113-116,
+// :237-241): the first effective warm-up seconds of a burn are never in the tail. The ring already
+// holds only the last SAT_TAIL_SAMPLE_SIZE s, so only a burn short enough to still have its warm-up in
+// the ring needs trimming. The ring is filled at 1 Hz (>= 1000 ms apart, so sample k lies at about
+// k * duration / total_samples s after flame-on), the burn start is known, and the oldest samples are
+// the ones to drop: no per-sample timestamp (360 B) and no new buffer, the ring's count is lowered
+// before the percentiles read it. Samples with t < warm-up are dropped, t >= warm-up stays (">=").
+static void _tailTrimWarmup(float durationSec)
+{
+  if (durationSec <= 0.0f || _cycle_totalSamples == 0) return;
+  const float warmupSec = fminf(60.0f, 0.25f * durationSec);
+  const float x = warmupSec * (float)_cycle_totalSamples / durationSec;   // warm-up in sample periods
+  if (x <= 0.001f) return;
+  const uint32_t drop = (uint32_t)ceilf(x - 0.001f) - 1;                  // samples with k < x
+  if (drop >= _cycle_totalSamples) { _tail_sampleCount = 0; return; }
+  const uint32_t keep = _cycle_totalSamples - drop;                       // samples at or after the warm-up
+  if (keep < _tail_sampleCount) _tail_sampleCount = (uint8_t)keep;
+}
+
 //=== Control-setpoint error percentile over the tail (TASK-1405) ===
 // Percentile (same floor-index rule as _tailPercentile) of the per-sample flow-minus-control-setpoint
 // errors of the tail ring; seconds without a control setpoint are left out. Returns false when no
@@ -759,9 +779,10 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
 //     underheat fallback when no requested setpoint exists (cls:81-83);
 //   - fewer than 3 samples is recorded as INSUFFICIENT; tracker.py:98-100 drops such a cycle;
 //   - pwmIdle comes from satPwmIsIdle(), an approximation of pwm.py's IDLE status;
-//   - the tail percentiles come from the last 180 s ring without tracker.py's warm-up exclusion
-//     (tail_start = max(start + min(60, 0.25 * duration), end - 180), tracker.py:113-116), so a cycle
-//     shorter than 240 s still has its first seconds in tailP50/tailP90.
+//   - the tail percentiles come from the last 180 s ring with tracker.py's warm-up exclusion
+//     (tail_start = max(start + min(60, 0.25 * duration), end - 180), tracker.py:113-116, :237-241;
+//     _tailTrimWarmup(), TASK-1584, entry 244), so a cycle shorter than 240 s does not have its
+//     first min(60, 0.25 * duration) s in tailP50/tailP90.
 // The kind is _cycleDetectKind(); dhwInTail is "a DHW sample in the tail" (tail_metrics.
 // hot_water_active_fraction > 0, tracker.py:294-296), with the warm-up exclusion applied.
 static SATCycleClass _cycleClassify(float durationSec, uint32_t sampleCount, SATCycleKind kind,
@@ -904,6 +925,7 @@ void satCycleOnFlameChange(bool flameOn)
     // Compute p90/p10 from collected flow samples (Task #225)
     float p90 = (_flow_sampleCount >= 10) ? _flowPercentile(90) : _cycle_maxFlowTemp;
     float p10 = (_flow_sampleCount >= 10) ? _flowPercentile(10) : _cycle_minFlowTemp;
+    _tailTrimWarmup(durationSec);   // TASK-1584: tail starts after the effective warm-up (tracker.py:113-116)
     // Task #590: tail-window percentiles (last 180s at 1Hz, or full buffer if shorter).
     // A cycle that self-corrected should not be classified OVERSHOOT from its early peak.
     float tailP90 = (_tail_sampleCount >= 10) ? _tailPercentile(90) : p90;

@@ -343,6 +343,21 @@ CASES = {
     "T4_missing_samples_left_out": Case([seg(120, 54.0), seg(90, 58.0, ctrl=0.0), seg(90, 54.0, ctrl=54.0)], "GOOD", ctrl=54.0),
     # T5: no sample in the tail has a control setpoint -> p50/p90 missing -> UNCERTAIN (cls:71-72)
     "T5_all_missing": Case([seg(300, 50.0, ctrl=0.0)], "UNCERTAIN", ctrl=50.0),
+    # TASK-1584 (entry 244, Q-PARITY-3 A): the tail starts after the effective warm-up min(60, 0.25 * duration)
+    # (tracker.py:113-116, :237-241). Samples are at t = 1..N s, so those with t < warm-up are out, t >= warm-up in.
+    # Burn 120 s: warm-up 30 s. 29 samples at +12 K (t < 30) are out -> GOOD (the 180 s ring alone gave OVERSHOOT).
+    "W120_warmup_out": Case([seg(29, 62.0), seg(91, 50.0)], "GOOD"),
+    # ... and the same 60 samples at +12 K from t = 30 on are in the tail -> OVERSHOOT.
+    "W120_from_warmup_in": Case([seg(29, 50.0), seg(60, 62.0), seg(31, 50.0)], "OVERSHOOT"),
+    # Burn 239 s: warm-up 59.75 s, ring of 180 holds t = 60..239; high samples t <= 59 are out.
+    "W239_warmup_out": Case([seg(59, 62.0), seg(180, 50.0)], "GOOD"),
+    "W239_from_warmup_in": Case([seg(59, 50.0), seg(60, 62.0), seg(120, 50.0)], "OVERSHOOT"),
+    # Burn 240 s: warm-up 60 s = end - 180, so both rules start the tail at t = 60.
+    "W240_warmup_out": Case([seg(59, 62.0), seg(181, 50.0)], "GOOD"),
+    "W240_from_warmup_in": Case([seg(59, 50.0), seg(61, 62.0), seg(120, 50.0)], "OVERSHOOT"),
+    # Burn 600 s: warm-up capped at 60 s, the tail is the last 180 s, the warm-up is long gone from the ring.
+    "W600_warmup_out": Case([seg(59, 62.0), seg(541, 50.0)], "GOOD"),
+    "W600_tail_in": Case([seg(420, 50.0), seg(60, 62.0), seg(120, 50.0)], "OVERSHOOT"),
     "kind_mixed": Case([seg(45, 50.0, DHW), seg(45, 50.0, CH), seg(210, 50.0, NONE)], None, kind="MIXED", oracle=False),
 }
 
@@ -464,6 +479,14 @@ class CycleClassifier(unittest.TestCase):
     def test_task1405_tail_error_uses_the_per_sample_control_setpoint(self):
         for name in ("T1_raised_setpoint", "T2_raised_setpoint_underheat", "T3_change_before_tail",
                      "T4_missing_samples_left_out", "T5_all_missing"):
+            with self.subTest(name):
+                self.check(name)
+
+    def test_task1584_tail_excludes_the_effective_warm_up(self):
+        # warm-up 30 / 59.75 / 60 / 60 s for burns of 120 / 239 / 240 / 600 s; each case also agrees with
+        # thermo-nova's classifier.py through ThermoNovaOracle.test_expected_classes_match_classifier_py
+        for name in ("W120_warmup_out", "W120_from_warmup_in", "W239_warmup_out", "W239_from_warmup_in",
+                     "W240_warmup_out", "W240_from_warmup_in", "W600_warmup_out", "W600_tail_in"):
             with self.subTest(name):
                 self.check(name)
 
