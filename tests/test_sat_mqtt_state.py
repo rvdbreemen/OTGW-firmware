@@ -148,14 +148,14 @@ class ExternalTempSetting(unittest.TestCase):
         self.assertIn('PSTR("external_temp")', read("restAPI.ino"))
         ha = read("MQTTHaDiscovery.cpp")
         self.assertIn("case 2:", ha)   # moved into the slot of the removed comfort adjust switch (TASK-1282)
-        self.assertNotIn("case 14:", ha)   # 14 switches (cases 0..13): TASK-1525 self-tune 12, TASK-1374 fireplace 13
-        self.assertIn("case 13:", ha)   # Fireplace mode, appended last (TASK-1374)
+        self.assertNotIn("case 15:", ha)   # 15 switches (cases 0..14): TASK-1525 self-tune 12, TASK-1374 fireplace 13, TASK-1490 SAT enabled 14
+        self.assertIn("case 14:", ha)   # SAT enabled, appended last (TASK-1490); fireplace mode is case 13 (TASK-1374)
         self.assertIn('PSTR("/sat/external_temp"),           PSTR("/sat/external_temp_enable")', ha)
         # The discovery loop must reach the last switch (TASK-1287: the bound is SAT_HA_SWITCH_COUNT).
         self.assertRegex(read("MQTTstuff.ino"), r"swIdx < SAT_HA_SWITCH_COUNT")
         count = re.search(r"constexpr uint8_t SAT_HA_SWITCH_COUNT = (\d+);", read("MQTTstuff.h"))
         self.assertIsNotNone(count)
-        self.assertEqual(int(count.group(1)), 14)
+        self.assertEqual(int(count.group(1)), 15)
 
 
 class PvBoostDiscoveryMatchesFirmware(unittest.TestCase):

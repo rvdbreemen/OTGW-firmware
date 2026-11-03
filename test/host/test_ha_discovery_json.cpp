@@ -210,9 +210,13 @@ static void partA(OTGWHardwareMode engine, bool first) {
     call("streamSatSwitchDiscovery", argsf("engine=%s,first=%d,switch=%u", eng, f, s),
          s < SAT_HA_SWITCH_COUNT, s < SAT_HA_SWITCH_COUNT,
          [&] { return streamSatSwitchDiscovery(s, ctx); });
-  for (uint8_t s = 0; s <= 1; s++)          // 1 is out of range
-    call("streamSatSelectDiscovery", argsf("engine=%s,first=%d,select=%u", eng, f, s), s == 0, s == 0,
+  for (uint8_t s = 0; s <= 2; s++)          // 2 is out of range (0 heating system, 1 preset: TASK-1490)
+    call("streamSatSelectDiscovery", argsf("engine=%s,first=%d,select=%u", eng, f, s), s < 2, s < 2,
          [&] { return streamSatSelectDiscovery(s, ctx); });
+
+  for (uint8_t s = 0; s <= 2; s++)          // 2 is out of range (0 max setpoint, 1 max modulation)
+    call("streamSatNumberDiscovery", argsf("engine=%s,first=%d,number=%u", eng, f, s), s < 2, s < 2,
+         [&] { return streamSatNumberDiscovery(s, ctx); });
 
   ctx.device = HaDevice::Gateway;
   call("streamButtonDiscovery", argsf("engine=%s,first=%d", eng, f), 1, 1, [&] { return streamButtonDiscovery(ctx); });

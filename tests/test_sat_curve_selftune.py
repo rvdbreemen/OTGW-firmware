@@ -721,7 +721,7 @@ class SourceChecks(unittest.TestCase):
             self.assertIn(frag, rest)
         self.assertIn('{ "curve_self_tune",        "SATcurveselftune"', (SRC / "MQTTstuff.ino").read_text(encoding="utf-8"))
         self.assertIn("-sat-curve-self-tune-enable", (SRC / "MQTTHaDiscovery.cpp").read_text(encoding="utf-8"))
-        self.assertIn("SAT_HA_SWITCH_COUNT = 14", (SRC / "MQTTstuff.h").read_text(encoding="utf-8"))
+        self.assertIn("SAT_HA_SWITCH_COUNT = 15", (SRC / "MQTTstuff.h").read_text(encoding="utf-8"))
         self.assertIn("sat/curve_self_tune_enable", self.src)
         self.assertIn("satcurveselftune:", (SRC / "data" / "v2.js").read_text(encoding="utf-8"))
 

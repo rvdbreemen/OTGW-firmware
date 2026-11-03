@@ -352,6 +352,23 @@ DECLARE_SAT_DISCOVERY_STRINGS(sat_safety_tripped,        "sat/safety_tripped",  
 DECLARE_SAT_DISCOVERY_STRINGS(sat_flame_health,          "sat/flame_health",                 "SAT_Flame_Health")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_valves_open,           "sat/valves_open",                  "SAT_Valves_Open")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_is_day,        "sat/weather/is_day",               "SAT_Weather_Is_Day")
+// TASK-1490 (TASK-1486 audit sections 1 and 2): health, sync, window and fault flags, and four state sensors.
+// Health, sync and fault binary sensors follow ON = problem (TASK-1466 decision 4).
+DECLARE_SAT_DISCOVERY_STRINGS(sat_device_health,         "sat/device_health",                "SAT_Device_Health")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_cycle_health,          "sat/cycle_health",                 "SAT_Cycle_Health")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_pressure_health,       "sat/pressure_health",              "SAT_Pressure_Health")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_setpoint_sync,         "sat/setpoint_sync",                "SAT_Setpoint_Sync")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_modulation_sync,       "sat/modulation_sync",              "SAT_Modulation_Sync")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_ch_sync,               "sat/ch_sync",                      "SAT_CH_Sync")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_window_open,           "sat/window_open",                  "SAT_Window_Open")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_fallback_active,       "sat/fallback_active",              "SAT_Fallback_Active")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_room_temp_lost,        "sat/room_temp_lost",               "SAT_Room_Temp_Lost")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_ot_link_lost,          "sat/ot_link_lost",                 "SAT_OT_Link_Lost")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_push_refused,          "sat/push_refused",                 "SAT_Push_Refused")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_requested_setpoint,    "sat/requested_setpoint",           "SAT_Requested_Setpoint")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_heating_curve_recommendation, "sat/heating_curve_recommendation", "SAT_Heating_Curve_Recommendation")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_manufacturer,          "sat/manufacturer",                 "SAT_Manufacturer")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_pressure_drop_rate,    "sat/pressure_drop_rate",           "SAT_Pressure_Drop_Rate")
 // TASK-942 (GH #665): standalone HA sensors mirroring the unified climate entity's
 // hvac_mode/hvac_action topics (published by OTGW-Core.ino). Plain string topics, so the
 // default "{{ value }}" template applies. Faux dataid OTGWhvacid (242) -> OT-Core device.
@@ -366,6 +383,7 @@ static const char ha_tpl_sat_kmh_to_ms[]          PROGMEM = "{{ (value | float /
 static const char ha_json_sat_pid_attributes[]    PROGMEM = "sat/pid_attributes";
 static const char ha_json_sat_cycle_attributes[]  PROGMEM = "sat/cycle_attributes";
 static const char ha_bincls_problem[]             PROGMEM = "problem";
+static const char ha_bincls_window[]              PROGMEM = "window";
 const char ha_lbl_centralheating[] PROGMEM = "centralheating";
 const char ha_lbl_centralheating2[] PROGMEM = "centralheating2";
 const char ha_lbl_ch2_enable[] PROGMEM = "ch2_enable";
@@ -834,8 +852,8 @@ const char ha_name_alias_ventilation_diagnostic[]                            PRO
 const char ha_name_alias_ventilation_system_type[]                           PROGMEM = "Ventilation_system_type";
 const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
 const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
-// ========== Sensor array (394 entries) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 396;  // +2 SAT CH/DHW gas consumption (id 252, TASK-1506), +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276), +1 command_dropped (faux id 240, TASK-1439)
+// ========== Sensor array (400 entries) ==========
+const uint16_t MQTT_HA_SENSOR_COUNT = 400;  // +4 SAT requested_setpoint/curve recommendation/manufacturer/pressure_drop_rate (id 254, TASK-1490), +2 SAT CH/DHW gas consumption (id 252, TASK-1506), +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276), +1 command_dropped (faux id 240, TASK-1439)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1378,6 +1396,11 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {253, 0x00, ha_lbl_sat_weather_weather_code,   ha_name_sat_weather_weather_code,   HaDeviceClass::none,        HaUnit::none,    HaStateClass::measurement, HaIcon::information,   HaEntityCat::none, true, nullptr,              nullptr},
     // --- Pseudo-ID 254: TASK-543 SAT flame status string ---
     {254, 0x00, ha_lbl_sat_flame_status,           ha_name_sat_flame_status,           HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::fire,          HaEntityCat::none, true, nullptr,              nullptr},
+    // TASK-1490: requested setpoint (thermo-nova sensor.py:71), curve recommendation (:299), manufacturer (:402), pressure drop rate (input of pressure_health)
+    {254, 0x00, ha_lbl_sat_requested_setpoint,     ha_name_sat_requested_setpoint,     HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement, HaIcon::thermometer,   HaEntityCat::none,       true, nullptr,              nullptr},
+    {254, 0x00, ha_lbl_sat_heating_curve_recommendation, ha_name_sat_heating_curve_recommendation, HaDeviceClass::none, HaUnit::none, HaStateClass::none,   HaIcon::tune_variant,  HaEntityCat::none,       true, nullptr,              nullptr},
+    {254, 0x00, ha_lbl_sat_manufacturer,           ha_name_sat_manufacturer,           HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::tag,           HaEntityCat::diagnostic, true, nullptr,              nullptr},
+    {254, 0x00, ha_lbl_sat_pressure_drop_rate,     ha_name_sat_pressure_drop_rate,     HaDeviceClass::none,        HaUnit::bar_h,   HaStateClass::measurement, HaIcon::gauge,         HaEntityCat::diagnostic, true, nullptr,              nullptr},
     // --- Faux ID 242 (OTGWhvacid): unified-climate companion sensors, TASK-942 / GH #665 ---
     {242, 0x00, ha_lbl_hvac_mode,                  ha_name_hvac_mode,                  HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::thermostat_icon, HaEntityCat::none, true, nullptr,            nullptr},
     {242, 0x00, ha_lbl_hvac_action,                ha_name_hvac_action,                HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::radiator,      HaEntityCat::none, true, nullptr,              nullptr},
@@ -1390,13 +1413,13 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {240, 0x00, ha_lbl_cmd_dropped,                ha_name_cmd_dropped,                HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::alert_circle,  HaEntityCat::diagnostic, true},
 };
 
-// ========== Binary sensor array (61 indexed entries) ==========
-// ADR-105: first 61 rows are indexed via mqttHaBinSensorIndex[] (per-id contiguous).
-// Rows 61..97 are HA-core aliases, NOT contiguous by OT id and NOT covered by
+// ========== Binary sensor array (72 indexed entries) ==========
+// ADR-105: first 72 rows are indexed via mqttHaBinSensorIndex[] (per-id contiguous).
+// Rows 72..108 are HA-core aliases, NOT contiguous by OT id and NOT covered by
 // the index. The discovery dispatcher walks the alias tail separately when
 // settings.mqtt.bPublishHaCoreAliases is on (see MQTTstuff.ino).
-const uint16_t MQTT_HA_BINSENSOR_COUNT         = 98;
-const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 61;
+const uint16_t MQTT_HA_BINSENSOR_COUNT         = 109;
+const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 72;
 
 const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
 //  {id, flags, label, friendlyName, icon, entityCat, enabledByDefault}
@@ -1476,6 +1499,18 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     SAT_BIN(254, sat_safety_tripped, HaIcon::alert_circle,    HaEntityCat::none, true, ha_bincls_problem, HaBinaryPayload::true_false),
     SAT_BIN(254, sat_flame_health,   HaIcon::fire,            HaEntityCat::none, true, ha_bincls_problem, HaBinaryPayload::on_off),
     SAT_BIN(254, sat_valves_open,    HaIcon::radiator,        HaEntityCat::none, true, nullptr,           HaBinaryPayload::true_false),
+    // TASK-1490: health and sync flags (ON = problem, ON/OFF), window (true/false), fallback causes (problem, true/false); TASK-1486 audit sections 1 and 2
+    SAT_BIN(254, sat_device_health,   HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off),
+    SAT_BIN(254, sat_cycle_health,    HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off),
+    SAT_BIN(254, sat_pressure_health, HaIcon::gauge,        HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off),
+    SAT_BIN(254, sat_setpoint_sync,   HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off),
+    SAT_BIN(254, sat_modulation_sync, HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off),
+    SAT_BIN(254, sat_ch_sync,         HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off),
+    SAT_BIN(254, sat_window_open,     HaIcon::information,  HaEntityCat::none,       true, ha_bincls_window,  HaBinaryPayload::true_false),
+    SAT_BIN(254, sat_fallback_active, HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),
+    SAT_BIN(254, sat_room_temp_lost,  HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),
+    SAT_BIN(254, sat_ot_link_lost,    HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),
+    SAT_BIN(254, sat_push_refused,    HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),
 
     // --- Pseudo-ID 244: gateway/OTGW connection status (HaDevice::Gateway) ---
     // Values publish "ON"/"OFF" via CCONOFF; the on_off payload writes no
@@ -1777,9 +1812,9 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 237
     0xFFFF, // id 238
     0xFFFF, // id 239
-    395, // id 240, 1 entry (TASK-1439: OTGWcmddropid command_dropped)
-    394, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
-    392, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
+    399, // id 240, 1 entry (TASK-1439: OTGWcmddropid command_dropped)
+    398, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
+    396, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
     332, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
     0xFFFF, // id 244
     284, // id 245, 4 entries
@@ -1791,7 +1826,7 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     334, // id 251, 5 entries (TASK-541 SAT diagnostics; flame metrics moved to 243 per ADR-124)
     339, // id 252, 37 entries (TASK-543 SAT control/PID/cycle/stats; TASK-1276 power/energy; TASK-1506 CH/DHW gas consumption)
     376, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
-    391, // id 254, 1 entry  (TASK-543 SAT flame status)
+    391, // id 254, 5 entries (TASK-543 SAT flame status; TASK-1490 requested_setpoint, curve recommendation, manufacturer, pressure_drop_rate)
     0xFFFF // id 255
 };
 
@@ -2036,11 +2071,11 @@ const uint16_t PROGMEM mqttHaBinSensorIndex[256] = {
     0xFFFF, // id 237
     0xFFFF, // id 238
     0xFFFF, // id 239
-    60,     // id 240, 1 entry (TASK-1439: command_retry_exceeded; last of indexed region)
+    71,     // id 240, 1 entry (TASK-1439: command_retry_exceeded; last of indexed region)
     0xFFFF, // id 241
     0xFFFF, // id 242
     0xFFFF, // id 243
-    58,     // id 244, 2 entries (gateway_mode, otgw_connected)
+    69,     // id 244, 2 entries (gateway_mode, otgw_connected)
     0xFFFF, // id 245
     0xFFFF, // id 246
     0xFFFF, // id 247
@@ -2050,7 +2085,7 @@ const uint16_t PROGMEM mqttHaBinSensorIndex[256] = {
     0xFFFF, // id 251
     0xFFFF, // id 252
     53, // id 253, 1 entry  (TASK-543 weather is_day)
-    54, // id 254, 4 entries (TASK-543 SAT binary primaries)
+    54, // id 254, 15 entries (TASK-543 SAT binary primaries; TASK-1490 health, sync, window and fault flags)
     0xFFFF // id 255
 };
 
@@ -2099,6 +2134,7 @@ PGM_P haUnitStr(HaUnit u) {
         case HaUnit::L: { static const char s[] PROGMEM = "L"; return s; }
         case HaUnit::m3_h: { static const char s[] PROGMEM = "m³/h"; return s; }
         case HaUnit::cm: { static const char s[] PROGMEM = "cm"; return s; }
+        case HaUnit::bar_h: { static const char s[] PROGMEM = "bar/h"; return s; }
         default: return nullptr;
     }
 }
@@ -3465,11 +3501,18 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
         PSTR("-sat-curve-self-tune-enable"),  PSTR("_SAT_Curve_Self_Tune"),
         PSTR("/sat/curve_self_tune"),         PSTR("/sat/curve_self_tune_enable"),
         PSTR("mdi:auto-fix"));
+      break;
     case 13:   // TASK-1374 (entry 49): appended last so the existing indices and ids stay where they are
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-fireplace-mode"),          PSTR("_SAT_Fireplace_Mode"),
         PSTR("/sat/fireplace_mode"),          PSTR("/sat/fireplace_mode"),
         PSTR("mdi:fireplace"));
+      break;
+    case 14:   // TASK-1490 (TASK-1486 section 2): SAT on/off. Command and state share the topic sat/enabled.
+      published = streamSatBoolSwitch(ctx,
+        PSTR("-sat-enabled"),                 PSTR("_SAT_Enabled"),
+        PSTR("/sat/enabled"),                 PSTR("/sat/enabled"),
+        PSTR("mdi:power"));
       break;
     default:
       return false;
@@ -3481,13 +3524,16 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
 bool streamSatSelectDiscovery(uint8_t selectIdx,
                               HaDiscoveryContext &ctx)
 {
-  if (selectIdx != 0) return false;
+  if (selectIdx >= SAT_HA_SELECT_COUNT) return false;
+  const bool isPreset = (selectIdx == 1);   // TASK-1490: sat/preset, else sat/heating_system
   if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
   if (platformFreeHeap() < STREAM_HEAP_MIN) return false;
 
   char topic[STREAM_TOPIC_MAX];
-  snprintf_P(topic, sizeof(topic), PSTR("%s/select/%s/sat_heating_system/config"),
+  snprintf_P(topic, sizeof(topic),
+             isPreset ? PSTR("%s/select/%s/sat_preset/config")
+                      : PSTR("%s/select/%s/sat_heating_system/config"),
              ctx.haPrefix, ctx.nodeId);
 
   auto compose = [&](MqttJsonWriter &w) -> bool {
@@ -3504,28 +3550,29 @@ bool streamSatSelectDiscovery(uint8_t selectIdx,
     if (!w.writeRam(ctx.nodeId)) return false;
     if (!w.writeChar('-')) return false;
     if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
-    if (!w.writeProgmem(PSTR("sat-heating-system\""))) return false;
+    if (!w.writeProgmem(isPreset ? PSTR("sat-preset\"") : PSTR("sat-heating-system\""))) return false;
     if (!writeJsonComma(w)) return false;
 
     // ADR-140: clean name (no source prefix in display name)
     if (!w.writeProgmem(PSTR("\"name\":\""))) return false;
-    if (!w.writeProgmem(PSTR("SAT Heating System\""))) return false;
+    if (!w.writeProgmem(isPreset ? PSTR("SAT Preset\"") : PSTR("SAT Heating System\""))) return false;
     if (!writeJsonComma(w)) return false;
 
     if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttSubTopic)) return false;
-    if (!w.writeProgmem(PSTR("/sat/heating_system\""))) return false;
+    if (!w.writeProgmem(isPreset ? PSTR("/sat/preset\"") : PSTR("/sat/heating_system\""))) return false;
     if (!writeJsonComma(w)) return false;
 
     if (!w.writeProgmem(PSTR("\"stat_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttPubTopic)) return false;
-    if (!w.writeProgmem(PSTR("/sat/heating_system\""))) return false;
+    if (!w.writeProgmem(isPreset ? PSTR("/sat/preset\"") : PSTR("/sat/heating_system\""))) return false;
     if (!writeJsonComma(w)) return false;
 
-    if (!w.writeProgmem(PSTR("\"options\":[\"0\",\"1\",\"2\",\"3\"]"))) return false;
+    if (!w.writeProgmem(isPreset ? PSTR("\"options\":[\"none\",\"away\",\"eco\",\"comfort\",\"sleep\",\"activity\",\"home\"]")
+                                 : PSTR("\"options\":[\"0\",\"1\",\"2\",\"3\"]"))) return false;
     if (!writeJsonComma(w)) return false;
 
-    if (!writeJsonKV_P(w, kIcon, PSTR("mdi:radiator"))) return false;
+    if (!writeJsonKV_P(w, kIcon, isPreset ? PSTR("mdi:tune") : PSTR("mdi:radiator"))) return false;
     if (!writeJsonComma(w)) return false;
 
     if (!writeOriginBlock(w, ctx)) return false;

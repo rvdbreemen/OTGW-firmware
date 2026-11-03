@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.36
+**  Version  : v2.0.0-beta.37
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2960,7 +2960,10 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
       if (streamSatSwitchDiscovery(swIdx, ctx)) result = true;
     }
     feedWatchDog();
-    if (streamSatSelectDiscovery(0, ctx)) result = true;
+    for (uint8_t selIdx = 0; selIdx < SAT_HA_SELECT_COUNT; selIdx++) {
+      if (streamSatSelectDiscovery(selIdx, ctx)) result = true;
+      feedWatchDog();
+    }
     feedWatchDog();
     if (streamSatNumberDiscovery(0, ctx)) result = true;   // TASK-1373: Max flow setpoint
     feedWatchDog();

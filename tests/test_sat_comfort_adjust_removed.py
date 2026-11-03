@@ -81,7 +81,7 @@ class ComfortAdjustRemoved(unittest.TestCase):
         body = body[:body.index("default:")]
         cases = [int(c) for c in re.findall(r"^\s*case (\d+):", body, re.M)]
         self.assertEqual(cases, list(range(count)))
-        self.assertEqual(count, 14)   # TASK-1525 self-tune case 12, TASK-1374 fireplace case 13
+        self.assertEqual(count, 15)   # TASK-1525 self-tune case 12, TASK-1374 fireplace case 13, TASK-1490 SAT enabled case 14
         # the dhw_enable gate in the discovery loop still points at its case
         self.assertIn("if (swIdx == 10 && !dhwEnableSwitchAllowed) continue;", read("MQTTstuff.ino"))
         case10 = body[body.index("case 10:"):]

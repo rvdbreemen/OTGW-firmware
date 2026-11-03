@@ -1209,12 +1209,12 @@ The firmware emits the following entity categories (`MQTTHaDiscovery.cpp` and th
 
 | Component | Count | Source | Notes |
 |-----------|-------|--------|-------|
-| `sensor` | 394 (`MQTT_HA_SENSOR_COUNT`) | PROGMEM table `mqttHaSensors[]` (indexed via `mqttHaSensorIndex[256]`) | Covers all OT numeric fields, status decoding, RBP, VH, solar, SAT sensor fan-out |
-| `binary_sensor` | 98 (`MQTT_HA_BINSENSOR_COUNT`) | PROGMEM table `mqttHaBinSensors[]` (first 61 rows indexed via `mqttHaBinSensorIndex[256]`) | Master/slave status bits, ASF flags, SAT health binaries. 37 of these rows have HA-core-style alias siblings (ADR-106); the discovery streamer publishes exactly one of the two name sets depending on `settings.mqtt.bUseLegacyOtTopics`. |
+| `sensor` | 400 (`MQTT_HA_SENSOR_COUNT`) | PROGMEM table `mqttHaSensors[]` (indexed via `mqttHaSensorIndex[256]`) | Covers all OT numeric fields, status decoding, RBP, VH, solar, SAT sensor fan-out |
+| `binary_sensor` | 109 (`MQTT_HA_BINSENSOR_COUNT`) | PROGMEM table `mqttHaBinSensors[]` (first 72 rows indexed via `mqttHaBinSensorIndex[256]`) | Master/slave status bits, ASF flags, SAT health binaries. 37 of these rows have HA-core-style alias siblings (ADR-106); the discovery streamer publishes exactly one of the two name sets depending on `settings.mqtt.bUseLegacyOtTopics`. |
 | `climate` | 2 | `streamClimateDiscovery(idx=0/1)` | 0 = Thermostat, 1 = DHW Control |
 | `number` | 1 | `streamNumberDiscovery()` | `Toutside_override` slider |
-| `switch` (SAT, TASK-284) | 13 (`SAT_HA_SWITCH_COUNT`) | `streamSatSwitchDiscovery(idx=0..12)` | See list below; idx 10 (`dhw_enable`) only when the boiler reports a storage tank (MsgID 3 HB3) |
-| `select` (SAT, TASK-284) | 1 | `streamSatSelectDiscovery(idx=0)` | `sat_heating_system` (options `"0"`..`"3"`) |
+| `switch` (SAT, TASK-284) | 15 (`SAT_HA_SWITCH_COUNT`) | `streamSatSwitchDiscovery(idx=0..14)` | See list below; idx 10 (`dhw_enable`) only when the boiler reports a storage tank (MsgID 3 HB3) |
+| `select` (SAT, TASK-284) | 2 (`SAT_HA_SELECT_COUNT`) | `streamSatSelectDiscovery(idx=0..1)` | `sat_heating_system` (options `"0"`..`"3"`), `sat_preset` (TASK-1490) |
 | `button` (PIC control) | 1 | `streamButtonDiscovery()` | `resetgateway` — pseudo-ID 244 |
 | `select` (PIC control) | 8 | `streamSelectDiscovery(idx=0..7)` | `gpioa`/`gpiob` + `leda`–`ledf` — pseudo-ID 244 |
 | `sensor` (Dallas) | runtime | `streamDallasSensorDiscovery()` via `configSensors()` | Published per detected 1-Wire address |
@@ -1327,7 +1327,17 @@ Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-aud
 | `sat/ble_temp_valid` | - | Announced as a sensor, not a binary sensor |
 | `sat/ch_pressure_status` | - | `ok` / `low` / `high` |
 
-**Sensor entity, flame status (ID 254):** `sat/flame_status`, no unit.
+**Sensor entities, flame status and state (ID 254):**
+
+| State topic | Device class | Unit | Category | Notes |
+|-------------|--------------|------|----------|-------|
+| `sat/flame_status` | - | - | - | Flame status string |
+| `sat/requested_setpoint` | temperature | °C | - | `state_class` `measurement` (TASK-1490; thermo-nova `sensor.py:71`) |
+| `sat/heating_curve_recommendation` | - | - | - | Lower-case recommendation string (TASK-1490; thermo-nova `sensor.py:299`) |
+| `sat/manufacturer` | - | - | diagnostic | Detected boiler manufacturer name (TASK-1490; thermo-nova `sensor.py:402`) |
+| `sat/pressure_drop_rate` | - | bar/h | diagnostic | `state_class` `measurement`; the input of `pressure_health` (TASK-1490) |
+
+`sat/consumption` (m³/h, ID 252) was already announced by TASK-1506. `sat/max_setpoint` is the number entity `sat_max_setpoint` (TASK-1373), so it gets no extra sensor.
 
 **Binary sensor entities:**
 
@@ -1337,6 +1347,12 @@ Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-aud
 | `sat/safety_tripped` | problem | `true` / `false` | Safety shutdown |
 | `sat/flame_health` | problem | `ON` / `OFF` | ON = flame problem |
 | `sat/valves_open` | - | `true` / `false` | TRV valves reported open |
+| `sat/device_health` | problem, diagnostic | `ON` / `OFF` | ON = insufficient boiler data (TASK-1490, after TASK-1485) |
+| `sat/cycle_health` | problem, diagnostic | `ON` / `OFF` | ON = cycle problem (TASK-1490) |
+| `sat/pressure_health` | problem, diagnostic | `ON` / `OFF` | ON = pressure problem (TASK-1490, after TASK-1485) |
+| `sat/setpoint_sync`, `sat/modulation_sync`, `sat/ch_sync` | problem, diagnostic | `ON` / `OFF` | ON = the boiler does not follow the commanded value (TASK-1490) |
+| `sat/window_open` | window | `true` / `false` | Window detection state (TASK-1490) |
+| `sat/fallback_active`, `sat/room_temp_lost`, `sat/ot_link_lost`, `sat/push_refused` | problem, diagnostic | `true` / `false` | SAT handed control back, and its causes (TASK-1490, audit section 2) |
 | `sat/weather/is_day` | - | `1` / `0` | Daylight (ID 253) |
 
 **Multi-zone entities (ID 255):** for each configured zone n, and for a zone that still has fresh data: `sat_zone_<n>_active` (binary sensor, `sat/zone/<n>/active`, `true` / `false`), `sat_zone_<n>_output` and `sat_zone_<n>_error` (sensors, °C, `sat/zone/<n>/output` and `sat/zone/<n>/error`).
@@ -1345,7 +1361,7 @@ Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-aud
 
 **BLE per-MAC entities:** see "Home Assistant auto-discovery" under BLE Temperature Sensor.
 
-The topics `sat/estimated_room`, `sat/humidity`, `sat/current_modulation`, `sat/pressure`, `sat/pressure_drop_rate`, `sat/manufacturer`, `sat/error_mean`, `sat/error_stddev`, `sat/thermal_*`, `sat/indoor_rise_rate`, `sat/curve_recommendation`, `sat/summer_*`, `sat/window_open`, `sat/pressure_alarm`, `sat/pressure_health`, `sat/modulation_reliable`, `sat/setpoint_mismatch`, `sat/solar_gain`, `sat/humidity_valid`, `sat/*_sync`, `sat/device_health` and `sat/cycle_health` are published but have no discovery entity. There is no SAT DHW-setpoint number entity.
+The topics `sat/estimated_room`, `sat/humidity`, `sat/current_modulation`, `sat/pressure`, `sat/error_mean`, `sat/error_stddev`, `sat/thermal_*`, `sat/indoor_rise_rate`, `sat/curve_recommendation`, `sat/summer_*`, `sat/pressure_alarm`, `sat/modulation_reliable`, `sat/setpoint_mismatch`, `sat/solar_gain` and `sat/humidity_valid` are published but have no discovery entity. There is no SAT DHW-setpoint number entity.
 
 **Switch entities (TASK-284):**
 
@@ -1367,12 +1383,14 @@ Each switch publishes its state to `%mqtt_pub_topic%/<state topic>` and takes co
 | `-sat-follow-thermostat-enable` | `sat/follow_thermostat` | `sat/follow_thermostat_enable` | `mdi:thermostat` |
 | `-sat-curve-self-tune-enable` | `sat/curve_self_tune` | `sat/curve_self_tune_enable` | `mdi:auto-fix` |
 | `-sat-fireplace-mode` | `sat/fireplace_mode` | `sat/fireplace_mode` | `mdi:fireplace` |
+| `-sat-enabled` | `sat/enabled` | `sat/enabled` | `mdi:power`; SAT on/off (TASK-1490) |
 
 **Select entity (TASK-284):**
 
 | Object id | Command topic suffix | State topic suffix | Options |
 |-----------|----------------------|--------------------|---------|
 | `sat_heating_system` | `sat/heating_system` | `sat/heating_system` | `"0"`, `"1"`, `"2"`, `"3"` |
+| `sat_preset` | `sat/preset` | `sat/preset` | `"none"`, `"away"`, `"eco"`, `"comfort"`, `"sleep"`, `"activity"`, `"home"` (TASK-1490) |
 
 **Retired SAT entities (`kRetiredSatEntities`):** on every SAT discovery pass the firmware empties the retained discovery config and the retained state topic of these removed switches, so Home Assistant drops them:
 
