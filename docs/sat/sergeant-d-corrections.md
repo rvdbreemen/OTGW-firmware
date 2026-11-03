@@ -5764,3 +5764,11 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot Q-1541-a: A"
 
 **Settled:** option A of Q-1541a. When SAT is switched off it sends, in this order, CS=0, CH=1, MM=T (as today), then SH= and SW= back to the values read before SAT took over, then TC=0 to clear a thermostat setpoint SAT pushed. The Immergas TP=11:12 and MI=500 stay as SAT left them (the old TP value is unknown; MI=500 is harmless). This deviates from thermo-nova, which restores nothing on HVAC off (climate.py:571-583) and never sets SH/SW/MI back (coordinator/mqtt/opentherm.py:225, 202, 172). **Interpretation (ours):** "the values read before SAT took over" are the boiler's MsgID 57 / 56 values last read before satEnable; when no value was read, nothing is sent for that item. **Task:** TASK-1541 (OD-2). **Open:** none.
+
+## 241. QD-6b answered: a flow temperature older than 60 s counts as missing (Sergeant D, 2026-11-03)
+
+**Source:** sergeantd, 2026-11-03 04:33 UTC, msg 1567034047237070869 (https://discord.com/channels/812969634638725140/1514720723980259460/1567034047237070869), answer to QD-6b (msg 1567031094145056769).
+
+**Quoted:** "@BlueFlame Bot QD-6b, TASK-1512.5: A"
+
+**Settled:** option A of QD-6b: the flow-temperature staleness limit N of entry 218 becomes 60 s instead of 30 s (field capture gruijter 2026-10-31: MsgID 25 gap median 5.0 s, p95 6.9 s, max 40.8 s). Changes entry 218 on N only. **Interpretation (ours):** "TASK-1512.5" is a typo for TASK-1412.5, the task the question named (there is no TASK-1512.5). **Task:** TASK-1412.5. **Open:** none.
