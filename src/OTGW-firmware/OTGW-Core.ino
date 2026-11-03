@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.53
+**  Version  : v2.0.0-beta.54
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5944,6 +5944,15 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
                                                             OTdata.type == OT_READ_ACK, OTdata.type == OT_DATA_INVALID,
                                                             OTdata.type == OT_UNKNOWN_DATA_ID);
         satFeedNote(OTdata.id == OT_Tboiler ? state.otBus.feedTboiler : state.otBus.feedTret, feedEvent, millis());
+      }
+
+      // TASK-1412.13 (entry 252): the boiler's answer to a MsgID 57 write (SAT's SH=), observed for the status only. Write-Ack =
+      // accepted; Data-Invalid / Unknown-DataID = rejected. Same boiler-reply filter as the feeds above; PIC and OT-Direct alike.
+      if (OTdata.id == OT_MaxTSet && OTdata.masterslave == 1 && !OTdata.skipthis) {
+        const SatShVerdict shVerdict = satShVerdictForFrame(OTdata.rsptype == OTGW_BOILER, OTdata.bLocalAnswer || OTdata.bReplayed,
+                                                            OTdata.type == OT_WRITE_ACK, OTdata.type == OT_DATA_INVALID,
+                                                            OTdata.type == OT_UNKNOWN_DATA_ID);
+        if (shVerdict != SatShVerdict::Unknown) state.sat.iShVerdict = (uint8_t)shVerdict;
       }
 
       if (OTdata.skipthis || OTdata.bGatewaySubstituted) AddLog(" <ignored> ");

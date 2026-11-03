@@ -73,7 +73,7 @@ struct SatSettings { bool bSimulation = false; bool bEnabled = true; bool bPushS
 struct Settings { SatSettings sat; };
 struct SatState { bool bSlaveCfgValid=false, bSlaveLowOffDenied=false;   // TASK-1412.4: read by the cut satRestoreDeferredStep()
                   bool bLastSentValid=false, bTCAccountedValid=false, bActive=false, bSafetyTripped=false, bFallbackActive=false,
-                  bPushRefused=false, bRoomTempLost=false, bOtLinkLost=false, bOutsideTempMissing=false;
+                  bPushRefused=false, bRoomTempLost=false, bOtLinkLost=false, bOutsideTempMissing=false; uint8_t iShVerdict=0;   /* TASK-1412.13 */
                   uint32_t iLastSentCSMs=0, iLastSentMMMs=0, iLastSentCHMs=0, iTCPushMs=0;
                   float fLastSentCS=0, fFinalSetpoint=0; uint8_t iLastSentMM=0, iLastSentCH=0; int eControlMode=0; uint32_t iSimDhwExpiryMs=0;
                   float fSimOutdoorTemp = 0, fExternalOutdoor = 0; bool bExternalOutdoorValid = false; uint32_t iExternalOutdoorLastMs = 0;

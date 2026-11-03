@@ -38,6 +38,8 @@ FW = REPO / "src" / "OTGW-firmware"
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", FW / "SATcontrol.ino"))
 SETTINGS_INO = Path(os.environ.get("OTGW_SETTINGS_INO", FW / "settingStuff.ino"))
 SATTYPES_H = Path(os.environ.get("OTGW_SATTYPES_H", FW / "SATtypes.h"))
+FEED_H = Path(os.environ.get("OTGW_SATFEED_H", FW / "SATboilerFeed.h"))   # TASK-1412.13: the real SH= verdict classifier
+CORE_INO = Path(os.environ.get("OTGW_CORE_INO", FW / "OTGW-Core.ino"))
 
 STUBS = r"""
 #include <cstdint>
@@ -61,6 +63,7 @@ struct SatSettings { float fMaxTSetUser = 0.0f; float fMaxSetpoint = 65.0f; bool
 struct Settings { SatSettings sat; };
 struct OTSys { float MaxTSet = 0.0f; uint16_t MaxTSetUBMaxTSetLB = 0; };
 static Settings settings; static OTSys OTcurrentSystemState;
+struct SatState { uint8_t iShVerdict = 0; }; struct State { SatState sat; }; static State state;   // TASK-1412.13
 static bool satIsEnabled() { return settings.sat.bEnabled; }
 static bool satShCurrent() { return true; }   // TASK-1541: the hand-back restore is tested in test_sat_disable_handback.py
 static void satShNoteBeforeSend(float) {}
@@ -80,7 +83,7 @@ static void dump() {
   bool chosen = false;
   const bool ug = satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR;
   const float boilerVal = satMaxTSetBoilerValue(settings.sat.fMaxTSetUser, ug, OTcurrentSystemState.MaxTSetUBMaxTSetLB, satGlobalMaxSetpoint(), &chosen);
-  printf("chosen=%d boiler=%.1f sysMax=%.1f effCS=%.1f queue=", (int)chosen, boilerVal, satGetMaxSetpoint(), satEffectiveMaxSetpoint());
+  printf("verdict=%d chosen=%d boiler=%.1f sysMax=%.1f effCS=%.1f queue=", (int)state.sat.iShVerdict, (int)chosen, boilerVal, satGetMaxSetpoint(), satEffectiveMaxSetpoint());
   for (size_t i = 0; i < g_queue.size(); i++) printf("%s%s", i ? "," : "", g_queue[i].c_str());
   printf("\n");
 }
@@ -105,6 +108,11 @@ int main(int argc, char** argv) {
       else if (!strncmp(argv[i], "src=", 4)) settings.sat.iHeatingSource = atoi(argv[i] + 4);
       else if (!strncmp(argv[i], "glob=", 5)) settings.sat.fMaxSetpoint = (float)atof(argv[i] + 5);
       else if (!strncmp(argv[i], "sat=", 4)) settings.sat.bEnabled = atoi(argv[i] + 4) != 0;
+      else if (!strncmp(argv[i], "ans=", 4)) {   // the boiler's answer to a MsgID 57 write, through the real classifier: w | i | u | r (read-ack) | l (local answer)
+        const char c = argv[i][4];
+        const SatShVerdict v = satShVerdictForFrame(true, c == 'l', c == 'w', c == 'i', c == 'u');
+        if (v != SatShVerdict::Unknown) state.sat.iShVerdict = (uint8_t)v;   // the exact assignment of processOT()
+      }
     }
     dump();
     return 0;
@@ -134,7 +142,8 @@ def build(workdir: Path):
         a = setter.index(fn)
         parse += setter[a:setter.index("\n}", a) + 2] + "\n"
     cpp = workdir / "maxtset.cpp"
-    cpp.write_text(STUBS.replace("@CONSTS@", consts).replace("@TYPES@", ok) + block + parse + MAIN, encoding="utf-8")
+    feed = FEED_H.read_text(encoding="utf-8").replace("#pragma once", "")
+    cpp.write_text(STUBS.replace("@CONSTS@", consts).replace("@TYPES@", ok) + feed + block + parse + MAIN, encoding="utf-8")
     return base.compile_cpp(cpp, workdir / "maxtset.exe")
 
 
@@ -306,6 +315,54 @@ class SatMaxTSet(unittest.TestCase):
         r = self.boot(55, source=HP, steps=["tick", "set=0", "tick"])
         self.assertEqual(r["queue"], ["SH=55"])
         self.assertEqual(float(r["effCS"]), 40.0)
+
+    # --- LL-014 / TASK-1412.13: MsgID 57 is always sent without an ID6 gate, and the boiler's answer is observed (entries 100, 252) ---
+    def test_sh_is_sent_without_any_msgid_6_check_and_with_no_bounds_reported(self):
+        # no MsgID 49 (raw 0) and no MsgID 6 data at all: the value goes out, clamped to the 20..80 fallback
+        r = self.boot(75, bounds=0, boiler=0, steps=["tick"])
+        self.assertEqual(r["queue"], ["SH=75"])
+        r = self.boot(90, bounds=0, boiler=0, steps=["tick"])
+        self.assertEqual(r["queue"], ["SH=80"])          # radiator hard ceiling and the 20..80 fallback
+        src = SAT_INO.read_text(encoding="utf-8")
+        fn = src[src.index("static void satMaxTSetSendStep()"):]
+        fn = fn[:fn.index("\n}\n")]
+        self.assertNotRegex(fn, r"(?i)msgid ?6\b|MsgID6|SlaveConfig|RemoteParam|bSupports", "satMaxTSetSendStep gates SH= on MsgID 6 data")
+
+    def test_boiler_answers_are_classified_write_ack_accepted_rejects_rejected(self):
+        for ans, want in (("w", "1"), ("i", "2"), ("u", "2")):
+            r = self.boot(60, steps=["tick", "ans=" + ans])
+            self.assertEqual(r["verdict"], want, ans)
+            self.assertEqual(r["queue"], ["SH=60"], "an answer never changes what SAT sends")
+
+    def test_a_read_ack_or_a_gateway_answer_says_nothing(self):
+        for ans in ("r", "l"):
+            r = self.boot(60, steps=["tick", "ans=" + ans])
+            self.assertEqual(r["verdict"], "0", ans)
+
+    def test_rejected_sh_keeps_being_sent_by_the_normal_rules_and_reset_on_a_new_send(self):
+        r = self.boot(60, steps=["tick", "ans=u", "tick", "tick"])
+        self.assertEqual((r["verdict"], r["queue"]), ("2", ["SH=60"]))     # no stop, no per-tick resend either
+        r = self.boot(60, steps=["tick", "ans=i", "set=55", "tick"])
+        self.assertEqual((r["verdict"], r["queue"]), ("0", ["SH=60", "SH=55"]))   # a new SH= waits for its own answer
+        r = self.boot(60, steps=["tick", "ans=i", "set=55", "tick", "ans=w"])
+        self.assertEqual(r["verdict"], "1")
+
+    def test_no_sh_sent_means_no_verdict_is_claimed_by_the_step(self):
+        r = self.boot(0, steps=["tick"])
+        self.assertEqual((r["verdict"], r["queue"]), ("0", []))
+
+    def test_core_hook_records_only_boiler_write_replies_of_msgid_57(self):
+        core = CORE_INO.read_text(encoding="utf-8")
+        i = core.index("satShVerdictForFrame(")
+        hook = core[i - 400:i + 500]
+        self.assertIn("OTdata.id == OT_MaxTSet", hook)
+        self.assertIn("OTdata.masterslave == 1", hook)
+        self.assertIn("OTdata.rsptype == OTGW_BOILER", hook)
+        self.assertIn("OTdata.bLocalAnswer || OTdata.bReplayed", hook)
+        self.assertIn("OTdata.type == OT_WRITE_ACK", hook)
+        self.assertIn("OTdata.type == OT_DATA_INVALID", hook)
+        self.assertIn("OTdata.type == OT_UNKNOWN_DATA_ID", hook)
+        self.assertIn("state.sat.iShVerdict = (uint8_t)shVerdict", hook)
 
     # --- setter: 0 = not chosen, 1..19 is a typo ---
     def test_setter_rejects_typo_1_to_19_keeps_old(self):

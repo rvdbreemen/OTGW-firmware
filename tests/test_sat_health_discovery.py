@@ -44,6 +44,7 @@ BIN = {
     "room_temp_lost":  dict(device_class="problem", entity_category="diagnostic", pl_on="true", pl_off="false"),
     "ot_link_lost":    dict(device_class="problem", entity_category="diagnostic", pl_on="true", pl_off="false"),
     "push_refused":    dict(device_class="problem", entity_category="diagnostic", pl_on="true", pl_off="false"),
+    "sh_rejected":     dict(device_class="problem", entity_category="diagnostic", pl_on="true", pl_off="false"),   # TASK-1412.13, entry 252
 }
 SENSOR = {
     "requested_setpoint": dict(device_class="temperature", unit_of_measurement="°C",

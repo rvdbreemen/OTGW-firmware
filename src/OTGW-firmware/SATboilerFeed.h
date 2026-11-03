@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATboilerFeed.h
-**  Version  : v2.0.0-beta.53
+**  Version  : v2.0.0-beta.54
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -72,6 +72,25 @@ static inline SatFeedEvent satFeedEventForFrame(bool boilerReply, bool madeByGat
   if (dataInvalid)   return SatFeedEvent::DataInvalid;
   if (unknownDataId) return SatFeedEvent::UnknownDataId;
   return SatFeedEvent::None;
+}
+
+// What the boiler answered to SAT's MsgID 57 write (SH=), TASK-1412.13 (entry 252, QR-1). SAT keeps sending SH= by its normal rules
+// whatever the answer; the verdict is only observed and published.
+enum class SatShVerdict : uint8_t {
+  Unknown = 0,     // no boiler answer to a MsgID 57 write since SAT's last SH= (or since SAT was switched off)
+  Accepted,        // Write-Ack: the boiler took the value
+  Rejected         // Data-Invalid or Unknown-DataID: the boiler refused or does not implement the write
+};
+
+// The boiler reply to a MsgID 57 write as a verdict; Unknown = this frame says nothing (keep the old verdict). A frame the gateway
+// made itself or a replayed log line says nothing about the boiler, as for the feeds above.
+static inline SatShVerdict satShVerdictForFrame(bool boilerReply, bool madeByGatewayOrReplayed, bool writeAck,
+                                                bool dataInvalid, bool unknownDataId)
+{
+  if (!boilerReply || madeByGatewayOrReplayed) return SatShVerdict::Unknown;
+  if (writeAck)                     return SatShVerdict::Accepted;
+  if (dataInvalid || unknownDataId) return SatShVerdict::Rejected;
+  return SatShVerdict::Unknown;
 }
 
 // Age of the last valid sample. No sample since boot counts as the time since boot (millis() starts at 0).

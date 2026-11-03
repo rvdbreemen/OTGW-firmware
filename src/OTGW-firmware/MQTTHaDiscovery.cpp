@@ -365,6 +365,7 @@ DECLARE_SAT_DISCOVERY_STRINGS(sat_fallback_active,       "sat/fallback_active", 
 DECLARE_SAT_DISCOVERY_STRINGS(sat_room_temp_lost,        "sat/room_temp_lost",               "SAT_Room_Temp_Lost")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_ot_link_lost,          "sat/ot_link_lost",                 "SAT_OT_Link_Lost")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_push_refused,          "sat/push_refused",                 "SAT_Push_Refused")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_sh_rejected,           "sat/sh_rejected",                  "SAT_SH_Rejected")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_requested_setpoint,    "sat/requested_setpoint",           "SAT_Requested_Setpoint")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_heating_curve_recommendation, "sat/heating_curve_recommendation", "SAT_Heating_Curve_Recommendation")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_manufacturer,          "sat/manufacturer",                 "SAT_Manufacturer")
@@ -1413,13 +1414,13 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {240, 0x00, ha_lbl_cmd_dropped,                ha_name_cmd_dropped,                HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::alert_circle,  HaEntityCat::diagnostic, true},
 };
 
-// ========== Binary sensor array (72 indexed entries) ==========
-// ADR-105: first 72 rows are indexed via mqttHaBinSensorIndex[] (per-id contiguous).
-// Rows 72..108 are HA-core aliases, NOT contiguous by OT id and NOT covered by
+// ========== Binary sensor array (73 indexed entries) ==========
+// ADR-105: first 73 rows are indexed via mqttHaBinSensorIndex[] (per-id contiguous).
+// Rows 73..109 are HA-core aliases, NOT contiguous by OT id and NOT covered by
 // the index. The discovery dispatcher walks the alias tail separately when
 // settings.mqtt.bPublishHaCoreAliases is on (see MQTTstuff.ino).
-const uint16_t MQTT_HA_BINSENSOR_COUNT         = 109;
-const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 72;
+const uint16_t MQTT_HA_BINSENSOR_COUNT         = 110;
+const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 73;
 
 const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
 //  {id, flags, label, friendlyName, icon, entityCat, enabledByDefault}
@@ -1511,6 +1512,7 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     SAT_BIN(254, sat_room_temp_lost,  HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),
     SAT_BIN(254, sat_ot_link_lost,    HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),
     SAT_BIN(254, sat_push_refused,    HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),
+    SAT_BIN(254, sat_sh_rejected,     HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),   // TASK-1412.13, entry 252
 
     // --- Pseudo-ID 244: gateway/OTGW connection status (HaDevice::Gateway) ---
     // Values publish "ON"/"OFF" via CCONOFF; the on_off payload writes no
@@ -2071,11 +2073,11 @@ const uint16_t PROGMEM mqttHaBinSensorIndex[256] = {
     0xFFFF, // id 237
     0xFFFF, // id 238
     0xFFFF, // id 239
-    71,     // id 240, 1 entry (TASK-1439: command_retry_exceeded; last of indexed region)
+    72,     // id 240, 1 entry (TASK-1439: command_retry_exceeded; last of indexed region)
     0xFFFF, // id 241
     0xFFFF, // id 242
     0xFFFF, // id 243
-    69,     // id 244, 2 entries (gateway_mode, otgw_connected)
+    70,     // id 244, 2 entries (gateway_mode, otgw_connected)
     0xFFFF, // id 245
     0xFFFF, // id 246
     0xFFFF, // id 247
@@ -2085,7 +2087,7 @@ const uint16_t PROGMEM mqttHaBinSensorIndex[256] = {
     0xFFFF, // id 251
     0xFFFF, // id 252
     53, // id 253, 1 entry  (TASK-543 weather is_day)
-    54, // id 254, 15 entries (TASK-543 SAT binary primaries; TASK-1490 health, sync, window and fault flags)
+    54, // id 254, 16 entries (TASK-543 SAT binary primaries; TASK-1490 health, sync, window and fault flags; TASK-1412.13 sh_rejected)
     0xFFFF // id 255
 };
 

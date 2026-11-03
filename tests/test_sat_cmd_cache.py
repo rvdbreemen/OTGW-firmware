@@ -45,7 +45,7 @@ static bool _sat_bootOutsideLogged = false;
 #define snprintf_P snprintf
 struct SatState { bool bActive=true; bool bLastSentValid=false; float fLastSentCS=0; uint8_t iLastSentMM=0, iLastSentCH=0; float fLastSentTC=0; bool bTCAccountedValid=false;
                   uint32_t iLastSentCSMs=0, iLastSentMMMs=0, iLastSentCHMs=0;
-                  uint32_t iTCPushMs=0; bool bPushRefused=false; };   // TASK-1343
+                  uint32_t iTCPushMs=0; bool bPushRefused=false; uint8_t iShVerdict=0; };   // TASK-1343; TASK-1412.13 (satDisable() and satMaxTSetSendStep() reset the SH= verdict)
 struct State { SatState sat; };
 static State state;
 static uint32_t g_ms = 0;

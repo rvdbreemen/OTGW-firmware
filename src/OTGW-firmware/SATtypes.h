@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.53
+**  Version  : v2.0.0-beta.54
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -415,6 +415,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fRestoredOutdoor       = 0.0f;
   uint32_t iRestoredOutdoorMs     = 0;      // millis()-based measurement time of fRestoredOutdoor (may lie before boot, unsigned age maths)
   bool     bPushRefused           = false;  // the thermostat keeps its own setpoint >= 5 min after a TC= push (status only, TASK-1343)
+  uint8_t  iShVerdict             = 0;      // the boiler's answer to SAT's MsgID 57 write (SH=): 0 unknown, 1 accepted (Write-Ack), 2 rejected (Data-Invalid / Unknown-DataID); transient, never persisted (TASK-1412.13, entry 252)
   bool     bTCAccountedValid      = false;  // fLastSentTC is the value the thermostat push has dealt with; false after boot, a cache reset or push off: the next tick sends TC= (TASK-1272)
   float    fThermostatTrSet       = 0.0f;   // last thermostat room setpoint seen for follow-thermostat (TASK-1259)
   float    fThermostatTrSetCand   = 0.0f;   // debounce: new thermostat setpoint seen once, waiting for its second frame

@@ -59,7 +59,7 @@ enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 struct SatSettings { bool bSimulation = false; float fTargetTemp = 20.0f; };   // fTargetTemp: TASK-1521 follow narration
 struct Settings { SatSettings sat; };
 struct SatState { bool bLastSentValid=false, bTCAccountedValid=false, bActive=false, bSafetyTripped=false, bFallbackActive=false,
-                  bPushRefused=false, bRoomTempLost=false, bOtLinkLost=false, bOutsideTempMissing=false;
+                  bPushRefused=false, bRoomTempLost=false, bOtLinkLost=false, bOutsideTempMissing=false; uint8_t iShVerdict=0;   /* TASK-1412.13 */
                   uint32_t iLastSentCSMs=0, iLastSentMMMs=0, iLastSentCHMs=0, iTCPushMs=0;
                   float fLastSentCS=0, fFinalSetpoint=0; uint8_t iLastSentMM=0, iLastSentCH=0; int eControlMode=0; uint32_t iSimDhwExpiryMs=0; };
 struct OTSys { uint8_t SlaveStatus = 0; }; static OTSys OTcurrentSystemState;

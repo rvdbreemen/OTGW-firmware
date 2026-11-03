@@ -167,8 +167,13 @@ DELEGATED = {
                 "test_reset_across_uint32_wrap"])],
     "LL-014": [("test_sat_max_tset", "SatMaxTSet", ["test_not_chosen_boiler_maxtset_below_default_still_caps_cs", "test_bounds_clamp_upper", "test_bounds_clamp_lower",
                 "test_bounds_arriving_later_resend_the_clamped_value", "test_invalid_bounds_fall_back_to_20_80", "test_change_sends_again_once",
-                "test_heat_pump_chosen_55_is_the_cap_and_sh", "test_underfloor_never_above_50"]),
-               ("test_sat_no_return_ignition", "NoReturnIgnition", ["test_hold_is_clamped_to_the_user_max"])],
+                "test_heat_pump_chosen_55_is_the_cap_and_sh", "test_underfloor_never_above_50",
+                "test_sh_is_sent_without_any_msgid_6_check_and_with_no_bounds_reported", "test_boiler_answers_are_classified_write_ack_accepted_rejects_rejected",
+                "test_a_read_ack_or_a_gateway_answer_says_nothing", "test_rejected_sh_keeps_being_sent_by_the_normal_rules_and_reset_on_a_new_send",
+                "test_no_sh_sent_means_no_verdict_is_claimed_by_the_step", "test_core_hook_records_only_boiler_write_replies_of_msgid_57"]),
+               ("test_sat_no_return_ignition", "NoReturnIgnition", ["test_hold_is_clamped_to_the_user_max"]),
+               ("test_sat_ceiling_paths", "CeilingPaths", None), ("test_sat_ceiling_paths", "PersistedLimits", None),   # TASK-1412.13: every CS path, AC3
+               ("test_sat_cs_ceiling_1536", "CsCeiling", None)],
     "LL-015": [("test_sat_hp_pwm", "SatHeatPumpPwm", ["test_hp1800_mid_range_duty_060", "test_hp2400_mid_range_duty_050", "test_hp_minimum_burn_600_holds",
                 "test_hp_min_off_600_in_range5", "test_gas_oracle_4ph", "test_gas_3ph_default", "test_gas_on_phase_min_on_180",
                 "test_hybrid_uses_the_heat_pump_cycle", "test_cph_getter_heat_pump_period_ignores_cph"]),
@@ -395,7 +400,7 @@ class LowLoadContract(unittest.TestCase):
         self.delegated("LL-013")
 
     @ll("LL-014", "contract", "satEffective MaxTSet / CS ceiling and SH negotiation (SATcontrol.ino, via test_sat_max_tset)",
-        task="partial: static limits; lowering the limit during ON and a rejected write are TASK-1412.13")
+        task="TASK-1412.13 (entries 100, 252): ID49 bounds with 20/80 fallback, SH= without an MsgID 6 gate, the SH= write verdict observed, every CS path under the ceiling")
     def test_ll014_every_cs_obeys_the_effective_ceiling(self):
         self.delegated("LL-014")
 

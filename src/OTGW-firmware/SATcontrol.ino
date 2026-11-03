@@ -406,6 +406,7 @@ static void satMaxTSetSendStep()
   satShNoteBeforeSend(OTcurrentSystemState.MaxTSet);       // TASK-1541: remember the boiler value before SAT's first SH=
   addCommandToQueue(cmd, strlen(cmd), false, 0);
   _sat_lastSentSH = iv;
+  state.sat.iShVerdict = 0;                                // TASK-1412.13 (entry 252): a new SH= waits for the boiler's answer
   SATDebugTf(PSTR("SAT: user MaxTSet, sent %s\r\n"), cmd);
 }
 
@@ -3716,6 +3717,7 @@ void satDisable(bool persistPid)
              (int)state.sat.bSafetyTripped, (int)state.sat.bFallbackActive);
   state.sat.iTCPushMs    = 0;
   state.sat.bPushRefused = false;
+  state.sat.iShVerdict   = 0;          // TASK-1412.13: a switched-off SAT has no SH= verdict
   state.sat.bRoomTempLost = false;     // narration and status start clean after a re-enable (TASK-1364)
   _sat_roomLostActive = false;
   _sat_fireplaceActive = false;
@@ -4177,6 +4179,7 @@ void satSendStatusJSON()
     je.field(F("control_interval_sec"), (int32_t)settings.sat.iControlInterval);
     je.field(F("fallback_active"),      snap->st.sat.bFallbackActive);
     je.field(F("push_refused"),         snap->st.sat.bPushRefused);
+    je.field(F("sh_write"),             snap->st.sat.iShVerdict == 1 ? "accepted" : (snap->st.sat.iShVerdict == 2 ? "rejected" : "unknown"));   // TASK-1412.13, entry 252
     je.field(F("room_temp_lost"),       snap->st.sat.bRoomTempLost);
     je.field(F("ot_link_lost"),         snap->st.sat.bOtLinkLost);
     je.field(F("outside_temp_missing"), snap->st.sat.bOutsideTempMissing);   // TASK-1390
@@ -4367,7 +4370,7 @@ static const char* satSimmerPerception(float indexC) {
 // the ADR-111 heartbeat keeps the retained values fresh. A REST or settings disable therefore
 // reaches the broker on the next loop pass. Shadows are file-scope so satRepublishCoreState()
 // can reset them.
-static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_room_temp_lost, s_core_ot_link_lost, s_core_outside_temp_missing, s_core_external_temp_enable;
+static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_sh_rejected, s_core_room_temp_lost, s_core_ot_link_lost, s_core_outside_temp_missing, s_core_external_temp_enable;
 static SATShadowS s_core_mode, s_core_preset, s_core_control_mode;
 
 static void satPublishCoreState()
@@ -4379,6 +4382,7 @@ static void satPublishCoreState()
   publishIfChangedB(F("sat/safety_tripped"),   state.sat.bSafetyTripped,    s_core_safety_tripped,   true);
   publishIfChangedB(F("sat/fallback_active"),  state.sat.bFallbackActive,   s_core_fallback_active,  true);
   publishIfChangedB(F("sat/push_refused"),     state.sat.bPushRefused,      s_core_push_refused,     true);
+  publishIfChangedB(F("sat/sh_rejected"),      state.sat.iShVerdict == 2,   s_core_sh_rejected,      true);   // TASK-1412.13, entry 252
   publishIfChangedB(F("sat/room_temp_lost"),   state.sat.bRoomTempLost,     s_core_room_temp_lost,   true);
   publishIfChangedB(F("sat/ot_link_lost"),     state.sat.bOtLinkLost,       s_core_ot_link_lost,     true);
   publishIfChangedB(F("sat/outside_temp_missing"), state.sat.bOutsideTempMissing, s_core_outside_temp_missing, true);   // TASK-1390
@@ -4406,6 +4410,7 @@ void satRepublishCoreState()
   memset(&s_core_safety_tripped, 0, sizeof(s_core_safety_tripped));
   memset(&s_core_fallback_active, 0, sizeof(s_core_fallback_active));
   memset(&s_core_push_refused, 0, sizeof(s_core_push_refused));
+  memset(&s_core_sh_rejected, 0, sizeof(s_core_sh_rejected));
   memset(&s_core_room_temp_lost, 0, sizeof(s_core_room_temp_lost));
   memset(&s_core_ot_link_lost, 0, sizeof(s_core_ot_link_lost));
   memset(&s_core_outside_temp_missing, 0, sizeof(s_core_outside_temp_missing));
