@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.38] - 2026-11-03
+
 ### Changed
 
 - **PIC command queue: a command the bench simulation holds back is no longer reported as dropped** (TASK-1580). With `satsimulation` or the OTGW serial replay on, `sendPICSerial()` keeps every command off the PIC, but the queue still retried the once-a-minute `PR=M` five times and published `command_dropped` every minute, which latched `command_retry_exceeded` ON; the held-back command also blocked the echo-paced queue until the echo timeout. `sendPICSerial()` now returns false when it held a command back and the queue consumes the entry without retry, drop report or flag change. Host test `tests/test_pic_pm_chain.py` (old code: 2 failures, new: 0 of 32). Simulation off is unchanged.
@@ -608,7 +610,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.11...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.38...HEAD
+[2.0.0-beta.38]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.11...v2.0.0-beta.38
 [2.0.0-beta.11]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.10...v2.0.0-beta.11
 [2.0.0-beta.10]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.9...v2.0.0-beta.10
 [2.0.0-beta.9]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.8...v2.0.0-beta.9
