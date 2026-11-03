@@ -152,10 +152,12 @@ static bool     _sustain_underheatRunning = false;
 static uint32_t _sustain_underheatStartMs = 0;
 static bool     _sustain_saturationRunning = false;
 static uint32_t _sustain_saturationStartMs = 0;
-// Tick time of the last control tick with the boiler DHW-active bit set; only meaningful once a draw has been
-// seen (_sustain_dhwSeen), so the guard is inactive from boot until the first draw.
+// End of the last draw: the loop pass that saw the boiler DHW-active bit drop, or the tick time of the last control
+// tick with the bit set; only meaningful once a draw has been seen (_sustain_dhwSeen), so the guard is inactive from
+// boot until the first draw.
 static uint32_t _sustain_dhwEndMs       = 0;
 static bool     _sustain_dhwSeen        = false;
+static bool     _sustain_dhwBitPrev     = false;  // the DHW-active bit at the previous loop pass (satCycleNoteDhwBit)
 
 // thermo-nova sustained_runtime() (helpers.py:51-56): a timer that is not running, or whose start lies after the
 // tick (clock went back), starts at tickMs with elapsed 0 and never fires on that sample. Otherwise the elapsed
@@ -214,6 +216,19 @@ void satCycleNoteDhwTick(uint32_t tickMs)
   _sustain_dhwEndMs = tickMs;
   _sustain_dhwSeen = true;
   satCycleResetSustainGuards();
+}
+
+// The live boiler DHW-active bit, read on every loop pass before the control tick. When it drops, the end of the draw
+// is that moment: thermo-nova stamps hot_water_off_since at the update that sees the transition (device/__init__.py:
+// 223-224), so the 300 s guards count from the real end of the draw, also for a draw that began and ended between two
+// control ticks (entry 108, TASK-1429). The control tick only refreshes the end while the bit is still set.
+void satCycleNoteDhwBit(bool dhwBit, uint32_t nowMs)
+{
+  if (_sustain_dhwBitPrev && !dhwBit) {
+    _sustain_dhwEndMs = nowMs;
+    _sustain_dhwSeen = true;
+  }
+  _sustain_dhwBitPrev = dhwBit;
 }
 
 // --- Cycle History ---

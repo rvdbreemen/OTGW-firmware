@@ -6512,12 +6512,15 @@ static void satControlLoopRun()
   satMiStep();            // TASK-1371: MI=500 once, PIC boards only
   if (state.sat.eControlMode != SAT_MODE_OFF) satSavePwmEnabled(state.sat.eControlMode == SAT_MODE_PWM);   // TASK-1482, entry 121
 
+  // Live boiler DHW-active bit (the control tick reads it later), read on every pass: a draw shorter than one tick still marks its
+  // flame (entries 105, 106) and still arms the 300 s guard, counted from the pass that sees the bit drop (entry 108, TASK-1429).
+  const bool dhwBitNow = (settings.sat.bSimulation && state.sat.iSimDhwExpiryMs != 0) || (OTcurrentSystemState.SlaveStatus & 0x04) != 0;
+  satCycleNoteDhwBit(dhwBitNow, millis());
+
   // Flame edge detection — always process, independent of timer
   bool currentFlame = satIsFlameOn();
   if (currentFlame != _sat_prevFlameState) {
     satCycleOnFlameChange(currentFlame);
-    // live boiler DHW-active bit (the control tick reads it later): a draw shorter than one tick still marks its flame (entries 105, 106)
-    const bool dhwBitNow = (settings.sat.bSimulation && state.sat.iSimDhwExpiryMs != 0) || (OTcurrentSystemState.SlaveStatus & 0x04) != 0;
     satPwmNoteDhwFlameEdge(currentFlame, dhwBitNow);
     satNoReturnFloodOnFlameEdge(currentFlame, dhwBitNow);   // TASK-1371: CH ignition of a boiler without a return temperature
     _sat_prevFlameState = currentFlame;

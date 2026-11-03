@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-28T18:16:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-03T00:19:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -23,7 +23,7 @@ Found in TASK-1420 review. satCycleNoteDhwTick() arms the guard only on control 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test: a draw between two ticks arms the guard; the guard ends 300 s after the DHW bit dropped; red on HEAD, green on fix
+- [x] #1 Host test: a draw between two ticks arms the guard; the guard ends 300 s after the DHW bit dropped; red on HEAD, green on fix
 - [ ] #2 build + evaluate green
 <!-- AC:END -->
 
@@ -31,4 +31,6 @@ Found in TASK-1420 review. satCycleNoteDhwTick() arms the guard only on control 
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: guard only armed by satCycleNoteDhwTick (SATcycles.ino:212), flame-edge path (SATcontrol.ino:1117) does not. Entry 108 decided. Agent-doable.
+
+2026-11-03 (agent + lead integration): new satCycleNoteDhwBit(bool, ms) in SATcycles.ino, called every loop pass from satControlLoopRun before the timer gate; the pass that sees the DHW bit drop stamps the real end of the draw, so a draw between two ticks arms the guard and the 300 s counts from its end. Entries 108/131; thermo-nova device/__init__.py:223-224, :99-100, heating_control.py:272-274, :313-315, const.py:19. tests/test_sat_overshoot_sustain.py 46/46: test_sub_tick_draw_arms_the_guard (HEAD switches at 120000, fix 390000), test_guard_counts_from_the_real_end_of_the_draw (HEAD 400000, fix 430000), structural check. ot_loss/restart_quiet stubs added. AC2 build with the batch.
 <!-- SECTION:NOTES:END -->

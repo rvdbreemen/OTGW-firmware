@@ -83,6 +83,7 @@ static bool _sat_prevFlameState = false;
 static bool satIsFlameOn() { return false; }
 static void satCycleOnFlameChange(bool) {}
 static void satPwmNoteDhwFlameEdge(bool, bool) {}
+static void satCycleNoteDhwBit(bool, uint32_t) {}   // TASK-1429: the loop pass hands the DHW bit to the guard
 static void satCycleSample() {}
 static void satGetWindow4hStats() {}
 static void satGetWindow24hStats() {}

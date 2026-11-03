@@ -26,7 +26,10 @@ then the tick runs:
   u  PWM ON phase, flow 40 (underheat: 40 <= 50 - 3)         U  PWM ON phase, flow 47 exactly requested - 3
   z  PWM ON phase, flow 50, PWM off time 0 (saturation)      b  the tick bypasses the switches (fault, ...)
   w  PWM ON phase, flow 50, PWM off time 1 (neither)
-  d  a hot-water tick (satCycleNoteDhwTick)
+  d  a hot-water tick (satCycleNoteDhwTick), the DHW bit is set from here on (satCycleNoteDhwBit(true))
+  x  the loop pass at this time sees the DHW bit drop (satCycleNoteDhwBit(false)); no control tick runs
+  s  a draw that began 5 s earlier and ends at this time, between two control ticks: no tick sees it, only the
+     loop pass does (satCycleNoteDhwBit true then false). TASK-1429
 Prints the tick time since the start of the first mode change ("t=<ms>"), or t=-1.
 
 Run: python tests/test_sat_overshoot_sustain.py
@@ -112,8 +115,24 @@ int main(int argc, char** argv) {
 #endif
       continue;
     }
+    if (k == 'x') {                        // the loop pass sees the DHW bit drop
+#ifdef HAS_BIT
+      satCycleNoteDhwBit(false, tick);
+#endif
+      continue;
+    }
+    if (k == 's') {                        // a draw between two ticks: rises 5 s before, drops now
+#ifdef HAS_BIT
+      satCycleNoteDhwBit(true, tick - 5000);
+      satCycleNoteDhwBit(false, tick);
+#endif
+      continue;
+    }
     if (k == 'd') {
       state.sat.bDhwActive = true;
+#ifdef HAS_BIT
+      satCycleNoteDhwBit(true, tick);
+#endif
 #if defined(HAS_NOTE)
       satCycleNoteDhwTick(tick);
 #elif defined(HAS_SKIP)
@@ -167,7 +186,8 @@ def extract(src: str):
             raise AssertionError("satCycleCheckOvershootSwitch / satCycleCheckPwmExits not found in %s" % CYCLES_INO)
         if "void satCycleNoteDhwTick(uint32_t tickMs)" not in src or "void satCycleSkipAutoSwitch()" not in src:
             raise AssertionError("satCycleNoteDhwTick / satCycleSkipAutoSwitch not found in %s" % CYCLES_INO)
-        return "#define HAS_SKIP 1\n#define HAS_NOTE 1\n", "\n".join(consts) + "\n" + src[a:b] + "\n" + ovs + "\n" + ext + "\n"
+        has_bit = "#define HAS_BIT 1\n" if "void satCycleNoteDhwBit(bool dhwBit, uint32_t nowMs)" in src else ""
+        return "#define HAS_SKIP 1\n#define HAS_NOTE 1\n" + has_bit, "\n".join(consts) + "\n" + src[a:b] + "\n" + ovs + "\n" + ext + "\n"
     b = src.index("// --- EMA Fractions", a)
     check = _fn(src, "bool satCycleCheckAutoSwitch(float requestedSetpoint)")
     if not check:
@@ -326,6 +346,22 @@ class SustainedSwitches(unittest.TestCase):
                              capture_output=True, text=True, check=True).stdout
         r = dict(kv.split("=") for kv in out.split())
         self.assertEqual((int(r["t"]), r["mode"]), (90000, "2"), "overshoot near the wrap switched late or never: %r" % r)
+
+    # TASK-1429 (entry 108, thermo-nova device/__init__.py:223-224): a draw that began and ended between two ticks
+    # (no tick sees the bit) arms the guard from the moment the bit dropped. s@30: o@60..o@330-30: guarded (tick - 30 <
+    # 300 until o@300); o@330 is the first unguarded tick and starts the timer; o@390 fires. Old code: no guard,
+    # o@60 starts, o@120 fires.
+    def test_sub_tick_draw_arms_the_guard(self):
+        r = self.run_ticks(["30000:s"] + ticks(30000, "o" * 9))                     # o@60 .. o@300: guarded
+        self.assertEqual(r["t"], "-1", "a draw between two ticks must arm the 300 s guard: %r" % r)
+        self.assertEqual(self.switch_at(["30000:s"] + ticks(30000, "o" * 12)), 390000)
+
+    # The guard counts 300 s from the moment the DHW bit dropped, not from the last tick that saw it set: d@30 (bit
+    # set), the bit drops at 70 (no tick), ticks at 100, 130 ...: the guard ends at 370, o@370 starts, o@430 fires.
+    # Counting from the tick (30) the guard would end at 330 and the switch would come at 400 (o@340 starts).
+    def test_guard_counts_from_the_real_end_of_the_draw(self):
+        toks = ["30000:d", "40000:x"] + ticks(30000, "o" * 12)
+        self.assertEqual(self.switch_at(toks), 430000)
 
     # A draw also resets running exit timers, and they count only 300 s after it.
     def test_dhw_resets_underheat_and_blocks_it_for_300s(self):
@@ -532,6 +568,11 @@ class TickClockAndLoopOrder(unittest.TestCase):
                                     r"[ \t]*_sat_tickMs = millis\(\);")
         self.assertEqual(len(re.findall(r"_sat_tickMs = ", self.loop)), 1, "_sat_tickMs must be assigned once per tick")
         self.assertRegex(self.src, r"static uint32_t _sat_tickMs = 0;")
+
+    # STRUCTURAL (TASK-1429): every loop pass hands the live DHW bit to satCycleNoteDhwBit(), before the timer gate.
+    def test_loop_pass_notes_the_dhw_bit_before_the_timer_gate(self):
+        self.assertEqual(len(re.findall(r"satCycleNoteDhwBit\(dhwBitNow, millis\(\)\);", self.loop)), 1)
+        self.assertLess(self.loop.index("satCycleNoteDhwBit("), self.loop.index("if (!DUE(timerSATControl)) return;"))
 
     # STRUCTURAL: both places that set the control interval pass no CATCH_UP type, so the timer keeps the
     # SKIP_MISSED_TICKS type (safeTimers.h) and two ticks are never closer than one interval (entry 109).
