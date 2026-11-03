@@ -2,7 +2,9 @@
 // The body-capture code (webServerCompat.h: WebRequestBody, webCaptureBody,
 // hasBodyCompat, bodyCompat) is included from the generated slice, never copied.
 // The mock below stands in for ESPAsyncWebServer only: a request object whose
-// destructor runs its onDisconnect handler, as AsyncWebServerRequest does.
+// destructor runs its onDisconnect handler, as AsyncWebServerRequest does, and
+// whose onDisconnect keeps ONE callback: a second call REPLACES the first
+// (ESPAsyncWebServer WebRequest.cpp: _onDisconnectfn = fn).
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
@@ -20,6 +22,11 @@ struct AsyncWebServerRequest {
   void onDisconnect(ArDisconnectHandler fn) { _fn = fn; }
 };
 static AsyncWebServerRequest* currentRequest = nullptr;
+static bool g_restSlotHeld = false;
+static bool g_fileSlotHeld = false;
+static int restReleases = 0, fileReleases = 0;
+void restSlotRelease() { restReleases++; }
+void webFileGateRelease() { fileReleases++; }
 
 #include "body_slice.inc"
 WebRequestBody g_requestBody{};
@@ -66,6 +73,46 @@ int main() {
   check("S4", hasBodyCompat() && strcmp(bodyCompat(), "newer") == 0, "late end of another request keeps the current body");
 
   b->~AsyncWebServerRequest();
+  currentRequest = nullptr;
+
+  // S5 defect (bench): body captured, then the REST gate is taken and
+  // webArmSlotRelease() runs. Its callback must still release the body, and the
+  // gate slot exactly once.
+  restReleases = fileReleases = 0;
+  a = new (slot) AsyncWebServerRequest(40);
+  capture(a, "{\"name\":\"sattargettemp\",\"value\":18.5}");
+  currentRequest = a; g_restSlotHeld = true; g_fileSlotHeld = false;
+  webArmSlotRelease();
+  a->~AsyncWebServerRequest();
+  check("S5", restReleases == 1 && fileReleases == 0 && g_requestBody.owner == nullptr,
+        "capture then gate arm: gate released once and body released");
+  b = new (slot) AsyncWebServerRequest(3);
+  currentRequest = b; g_restSlotHeld = false;
+  check("S5b", !hasBodyCompat() && bodyCompat()[0] == '\0', "next request at the same address sees no body");
+  b->~AsyncWebServerRequest();
+
+  // S6: both gates held -> each released exactly once, body released.
+  restReleases = fileReleases = 0;
+  a = new (slot) AsyncWebServerRequest(40);
+  capture(a, "body6");
+  currentRequest = a; g_restSlotHeld = true; g_fileSlotHeld = true;
+  webArmSlotRelease();
+  a->~AsyncWebServerRequest();
+  check("S6", restReleases == 1 && fileReleases == 1 && g_requestBody.owner == nullptr,
+        "both gates held: each released once and body released");
+
+  // S7: the gate is taken (and armed) BEFORE the body capture; the capture must
+  // not lose the gate release.
+  restReleases = fileReleases = 0;
+  a = new (slot) AsyncWebServerRequest(40);
+  currentRequest = a; g_restSlotHeld = true; g_fileSlotHeld = false;
+  webArmSlotRelease();
+  capture(a, "body7");
+  a->~AsyncWebServerRequest();
+  check("S7", restReleases == 1 && g_requestBody.owner == nullptr,
+        "gate armed before capture: gate still released once and body released");
+  currentRequest = nullptr; g_restSlotHeld = g_fileSlotHeld = false;
+
   printf(failures ? "FAILED %d\n" : "ALL PASS\n", failures);
   return failures ? 1 : 0;
 }

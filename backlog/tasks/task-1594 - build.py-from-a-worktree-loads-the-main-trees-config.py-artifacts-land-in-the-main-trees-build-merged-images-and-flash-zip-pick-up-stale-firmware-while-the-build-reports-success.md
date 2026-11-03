@@ -4,11 +4,11 @@ title: >-
   build.py from a worktree loads the main tree's config.py: artifacts land in
   the main tree's build/, merged images and flash zip pick up stale firmware
   while the build reports success
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-03T19:07:00Z'
-updated_date: '2026-11-03T19:08:00Z'
+updated_date: '2026-11-03T19:35:00Z'
 labels:
   - tooling
   - build
@@ -27,7 +27,7 @@ Found 2026-11-03 building beta.58/59 in wt-1552 with the main tree's embedded Py
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 build.py imports the config.py next to itself, also when another tree is first on sys.path; host test red on the old build.py, green on the fix
-- [ ] #2 A worktree build with the main tree's embedded Python puts every artifact (ino.bin, littlefs.bin, elf, merged, flash zip) in that worktree's build/ with the HEAD githash
+- [x] #2 A worktree build with the main tree's embedded Python puts every artifact (ino.bin, littlefs.bin, elf, merged, flash zip) in that worktree's build/ with the HEAD githash
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -35,3 +35,9 @@ Found 2026-11-03 building beta.58/59 in wt-1552 with the main tree's embedded Py
 <!-- SECTION:NOTES:BEGIN -->
 Fix: build.py inserts its own folder at sys.path[0] before 'import config'. tests/test_build_config_path.py: OLD build.py loads decoy/config.py (AssertionError), FIX OK. test_build 13, safeboot 11, staging 16, jobs, lock OK. Follow-up risk noted, not changed: create_merged_binary falls back to sorted(matches)[0] of any version when the semver pattern finds nothing.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+build.py loads the config.py next to itself, so a worktree build with the main tree's embedded Python packs its own artifacts. Evidence: tests/test_build_config_path.py old build.py loads the decoy config (AssertionError), fix OK; build tests OK; beta.59/60 builds in wt-1552: merge_bin uses the HEAD githash .ino.bin, flash zip present (before: stale beta.18 merged, no zip). Side effect found: the bad builds wiped the main tree's build/ (incl. elf-archive); all ELFs remain in OTGW-build-archive/<semver>.zip. Open risk, unchanged: create_merged_binary still falls back to sorted()[0] of any version when the semver pattern finds nothing.
+<!-- SECTION:FINAL_SUMMARY:END -->

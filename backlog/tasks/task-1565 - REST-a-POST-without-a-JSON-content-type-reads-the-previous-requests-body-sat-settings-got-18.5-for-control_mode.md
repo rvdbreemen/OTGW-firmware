@@ -3,11 +3,11 @@ id: TASK-1565
 title: >-
   REST: a POST without a JSON content type reads the previous request's body
   (sat/settings got 18.5 for control_mode)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-02T18:59:00Z'
-updated_date: '2026-11-03T19:23:00Z'
+updated_date: '2026-11-03T19:35:00Z'
 labels:
   - rest-api
   - bug
@@ -27,7 +27,7 @@ Seen on bench .63, 2.0.0-beta.14+4d94f13, 2026-11-02 19:54 (TASK-1542 bench). Re
 <!-- AC:BEGIN -->
 - [x] #1 Reproduction on the bench or a host harness: a form-encoded POST right after a JSON POST gets the previous body on the old code
 - [x] #2 Fix: each request sees only its own body; a missing body gives 400 Missing value; host test red on the old code, green on the fix
-- [ ] #3 Bench re-run of the same two curl calls on the fix returns value pwm or 400, never the previous value
+- [x] #3 Bench re-run of the same two curl calls on the fix returns value pwm or 400, never the previous value
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -37,3 +37,9 @@ Seen on bench .63, 2.0.0-beta.14+4d94f13, 2026-11-02 19:54 (TASK-1542 bench). Re
 
 2026-11-03 BENCH beta.59+c2983e1 on both units: first fix does NOT work on the device. JSON POST heating_mode 'comfort' then form-encoded 'zzz' returned value 'comfort' (the echoed input = stale body) 3/3 on .63 and .61. Cause: ESPAsyncWebServer keeps ONE onDisconnect per request; REST routes call webArmSlotRelease() (REST/file gate, TASK-1172) after the body capture, which replaced the body-release callback. The host mock did not model the single slot nor the gate. Second fix (beta.60): webArmDisconnect(req, restHeld, fileHeld) is the one callback that releases gate slots AND the body, used by webCaptureBody() and webArmSlotRelease(); capture keeps a gate already held by the same request. Harness extension (single-slot mock + gate) in progress.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A POST whose body the async server parses as form parameters (curl -d default) no longer reads the previous request's body. Two fixes: beta.58 released the captured body on the request's disconnect; the bench showed the REST gate's own onDisconnect replaced that callback (ESPAsyncWebServer keeps one), so beta.60 arms ONE callback (webArmDisconnect) that releases the gate slots and the body. Evidence: host test test/host/test_rest_body_stale.py (single-slot mock + gate) old d74eb9593 fails S5/S5b/S6/S7, fix passes all; device: JSON 'comfort' then form 'zzz' returned stale 'comfort' 3/3 on beta.59 (both units), 400 Missing value 5/5 on beta.60 (both units); original repro 400; 60/60 REST + 10/10 file serves 200 (no gate leak), no crashlog. Contract: form-encoded calls get 400, JSON as documented. Not covered: a request destroyed while its client is still connected.
+<!-- SECTION:FINAL_SUMMARY:END -->
