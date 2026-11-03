@@ -5780,3 +5780,11 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156566015851
 **Quoted:** "@BlueFlame Bot Q-1412.9a, TASK-1412.9: B, no dip keep the boiler ON. Moreover when we are in max cycle length send the command MM=T. It will work as the threshold to continuous mode"
 
 **Settled:** (1) option B: in duty range 5 the PWM ON phase is not ended every 2 periods, the boiler keeps burning (deviates from thermo-nova pwm.py:204-214, 296-298; the firmware already behaves this way). (2) New, beyond the question: when PWM is at the maximum cycle length (duty range 5), SAT sends MM=T, releasing its own max-modulation override, as the step into continuous mode. **Interpretation (ours):** MM=T replaces SAT's own MM= value while the duty stays in range 5, and it follows the sending rules of entries 237 and 239 (sent on the change into range 5, repeated once a minute while unchanged). What SAT sends when the duty drops back below range 5 is not stated: asked as Q-1412.9c. Relates to entries 44, 237, 239 and ADR-207. **Task:** TASK-1581. **Open:** Q-1412.9c.
+
+## 243. Q-1412.9c answered A: below the maximum duty SAT sends its own MM= again (Sergeant D, 2026-11-03)
+
+**Source:** sergeantd, 2026-11-03 06:25 UTC, msg 1567062027648639099 (https://discord.com/channels/812969634638725140/1514720723980259460/1567062027648639099), answer to Q-1412.9c (msg 1567057993588019303).
+
+**Quoted:** "@BlueFlame Bot Q-1412.9c, TASK-1581: When the duty cycle drops back below the maximum then we send again the appropriate MM command for low load control."
+
+**Settled:** option A, completing entry 242: MM=T is sent only while the PWM duty is at its maximum (range 5); as soon as the duty drops below the maximum SAT sends its own MM= value for low-load control again, by the on-change rule of entry 237 (and the once-a-minute repeat of entry 239). **Task:** TASK-1581. **Open:** none.

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-03T06:08:00Z'
+updated_date: '2026-11-03T06:27:00Z'
 labels:
   - sat
 dependencies: []
@@ -21,7 +22,13 @@ Sergeant D entry 242 (2026-11-03, msg 1567055574548353047): when PWM is at the m
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Q-1412.9c answer recorded in sergeant-d-corrections.md
+- [x] #1 Q-1412.9c answer recorded in sergeant-d-corrections.md
 - [ ] #2 Host test on the real SATcontrol.ino: entering range 5 sends MM=T once (on change), unchanged it repeats once a minute, leaving range 5 sends what Q-1412.9c decided; red on the old code
 - [ ] #3 SATTICK/log shows the MM value sent; docs/sat/firmware-sat-spec.md updated
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-03: Q-1412.9c answered A (entry 243): below the maximum duty SAT sends its own MM= again (on change, entry 237). Unblocked.
+<!-- SECTION:NOTES:END -->
