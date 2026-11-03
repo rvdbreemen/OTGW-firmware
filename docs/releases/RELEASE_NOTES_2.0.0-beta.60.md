@@ -7,7 +7,7 @@
 
 > **Disclaimer: this is a beta of 2.0.0.** It is not a stable release. It has had alpha and beta testing on a small group of units, but not the long field runs a release needs. What was and was not tested for this build:
 >
-> - beta.60 ran a 1 hour bench soak with MQTT connected, on one OTGW Classic with an S3 Mini (PIC attached). One hour is the agreed minimum for a beta (maintainer decision 2026-11-03): slow problems are for the field testers to find. That is not a 24-hour soak test, and no macOS capture run was done (see Known issues).
+> - beta.60 ran a bench soak of about 35 minutes with MQTT connected on one OTGW Classic with an S3 Mini (PIC attached), within 2.5 hours of uptime: no restart, no crash log, a flat heap. The agreed minimum is one hour with MQTT; the maintainer cut it short to publish (the bench broker was stopped twice by a memory shortage on the bench PC). That is not a 24-hour soak test, and no macOS capture run was done (see Known issues).
 > - The per-task changes from beta.39 to beta.60 were host-tested and built. They were bench-checked only as part of that one soak, not one by one.
 > - **No real Immergas boiler was tested.** The Immergas changes (TASK-1537, TASK-1570, TASK-1581) are covered by host tests and by watching the commands on the bench, not by an Immergas boiler.
 >
@@ -66,7 +66,7 @@ Firmware commits from beta.39 to beta.60, grouped by theme. If you come from an 
 
 - **WiFi: every connect and reconnect joins the strongest access point of the SSID** (TASK-1397). The default fast scan joined the first access point it found, so a unit could stay at -84 dBm next to a stronger access point of the same SSID. A (re)connect takes about 1 to 2 s longer. There is no roaming while connected.
 
-**How this was tested.** Host tests on the real code, each failing on the code before the change. Examples: `tests/test_sat_flow_return_validity.py`, `tests/test_sat_overshoot_sustain.py` (old code: 3 failures), `tests/test_sat_disable_handback.py` (old code: 11 failures), `tests/test_sat_cycle_classifier.py` and `tests/test_sat_classifier_parity.py` (old code: 1 and 3 failures), `tests/test_sat_command_delivery.py` (old code: 2 failures), `tests/test_wifi_strongest_ap.py` (old code: 3 failures), `tests/test_graph_history.cpp` and the browser tests `tests/webui/graph-room-dropout.test.mjs` (old page: 2 failures in scenario 5), `connection-map-text-fits`, `home-heatpump-wording` and `settings-reboot-badge`. The bench part is described in the disclaimer: one 1 hour soak of beta.60.
+**How this was tested.** Host tests on the real code, each failing on the code before the change. Examples: `tests/test_sat_flow_return_validity.py`, `tests/test_sat_overshoot_sustain.py` (old code: 3 failures), `tests/test_sat_disable_handback.py` (old code: 11 failures), `tests/test_sat_cycle_classifier.py` and `tests/test_sat_classifier_parity.py` (old code: 1 and 3 failures), `tests/test_sat_command_delivery.py` (old code: 2 failures), `tests/test_wifi_strongest_ap.py` (old code: 3 failures), `tests/test_graph_history.cpp` and the browser tests `tests/webui/graph-room-dropout.test.mjs` (old page: 2 failures in scenario 5), `connection-map-text-fits`, `home-heatpump-wording` and `settings-reboot-badge`. The bench part is described in the disclaimer: one shortened soak of beta.60.
 
 ---
 
