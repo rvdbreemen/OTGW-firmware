@@ -725,9 +725,9 @@ class SatPwmAnchors(unittest.TestCase):
                 self.assertEqual((tl.edges()[0], n), ([], 0), tl.dump(300))
 
     def test_n5_minimum_on_is_600_s_for_a_heat_pump_and_180_s_for_a_hybrid(self):
-        # Duty 0.07 with the flame burning from the start. Hybrid: range 2, ON 180 s (entries 143, 197 "Hybrid: not stated, keeps 180 s").
+        # Duty 0.07 with the flame burning from the start. Hybrid: range 2, ON 180 s (decided: entry 82 Q37 A gas timing with minimum ON 180 s, entry 188 only the PWM cycle comes from the heat pump).
         # Heat pump: below its minimum duty 0.1667, range 1 with a flame: ON = the 600 s minimum (entry 197). Gas is test_gas_on_phase_min_on_180.
-        # The hybrid 180 s pins the recorded reading of entry 197 ("Hybrid: not stated ... keeps 180 s until asked"), not a decision of Sergeant D.
+        # The hybrid 180 s pins Sergeant D's decision: entry 82 (Q37 A), entry 188 ("everything else stays as for a gas boiler"), entry 198 (600 s only for heat pumps).
         for src, expected in ((self.SRC_HYB, 180), (self.SRC_HP, 600)):
             with self.subTest(src=src):
                 tl = self.sim(3, 0.07, "burning", [], 900, (f"src {src}",))
@@ -759,7 +759,7 @@ class SatPwmAnchors(unittest.TestCase):
         self.assertLessEqual(abs(offs[0] - 1020), TICK, tl.dump(1200))
 
     def test_n8_hybrid_range_5_restarts_without_the_600_s_minimum_off(self):
-        # Entry 198: heat pumps only ("Hybrid: not stated, keeps gas rules": the recorded reading, not a decision of Sergeant D about hybrids).
+        # Entry 198: 600 s minimum OFF for heat pumps only ("Only heat pump. Gas boilers are not so sensitive"); a hybrid keeps the gas rules, OFF 0 s (decided: entries 82 and 188).
         # Duty 0.5, ON 0..900, then range 5 at 905: a hybrid restarts at the next tick, a heat pump after 600 s
         # (the heat-pump half is test_ll017_heat_pump_off_phase_holds_cs10_for_the_600_s_minimum_off_without_protection).
         tl = self.sim(3, 0.5, "burning", [(905, "ratio", 95)], 1700, (f"src {self.SRC_HYB}",))
