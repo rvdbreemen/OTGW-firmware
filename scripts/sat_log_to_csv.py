@@ -2,7 +2,7 @@
 """TASK-1521: turn the SAT telnet lines of a capture into CSV for analysis and simulation.
 
 The firmware logs (telnet debug key '5', on by default):
-  SATTICK room=.. target=.. out=.. curve=.. p=.. i=.. d=.. pid=.. cs=.. mm=.. ch=.. mode=.. pwm=.. duty=.. pon=.. poff=.. starts=.. flame=.. flow=.. ret=.. fc=.. fage=.. rc=.. rage=..
+  SATTICK room=.. target=.. out=.. curve=.. p=.. i=.. d=.. pid=.. cs=.. mm=.. ch=.. mode=.. pwm=.. duty=.. pon=.. poff=.. starts=.. flame=.. flow=.. ret=.. fc=.. fage=.. rc=.. rage=.. rsrc=..
   SATBOOT phase=decide|takeover ms=.. ...; SATMODE from= to=; SATTC push= | refused=; SATFOLLOW recorded=;
   SATDHW start|end (event column)
   SATTUNEH hour= mean= ticks= counted= reason=; SATTUNED day= clean= counted= days_in_window= mean3= decision= reason=;

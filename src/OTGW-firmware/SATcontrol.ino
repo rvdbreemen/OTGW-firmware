@@ -2492,6 +2492,14 @@ static bool satReturnFresh()
   return satFeedClassIsFresh(satReturnFeedClass()) || picBoardTretValid();
 }
 
+// TASK-1590: where the return temperature of satGetReturnTemp() comes from, for the SATTICK rsrc field. The same two
+// tests as satReturnFresh(), in the same order: OT = a fresh MsgID 28 feed, BRD = only the PIC board sensor (PR=E), - = none.
+static const char *satReturnSourceText()
+{
+  if (satFeedClassIsFresh(satReturnFeedClass())) return "OT";
+  return picBoardTretValid() ? "BRD" : "-";
+}
+
 // Not fresh, and for long enough: 5 minutes since the last valid sample, or since boot when there never was one.
 static bool satReturnMissingLong()
 {
@@ -6841,11 +6849,11 @@ static void satControlLoopRun()
       satCurveTuneNoteTick(ti);
     }
     _sat_prevDhwActive = true;
-    SATDebugTf(PSTR("SATTICK target=%.1f mode=%d flame=%d flow=%.1f ret=%.1f fc=%c fage=%lu rc=%c rage=%lu dhw=1\r\n"),   // TASK-1521
+    SATDebugTf(PSTR("SATTICK target=%.1f mode=%d flame=%d flow=%.1f ret=%.1f fc=%c fage=%lu rc=%c rage=%lu rsrc=%s dhw=1\r\n"),   // TASK-1521
                settings.sat.fTargetTemp, (int)state.sat.eControlMode, (int)satIsFlameOn(),
                satGetFlowTemp(), satGetReturnTemp(),   // TASK-1532: the simulated values in SAT simulation
                satFeedClassLetter(satFlowFeedClass()), (unsigned long)satFlowSampleAgeMs(),     // TASK-1412.5
-               satFeedClassLetter(satReturnFeedClass()), (unsigned long)satReturnSampleAgeMs());
+               satFeedClassLetter(satReturnFeedClass()), (unsigned long)satReturnSampleAgeMs(), satReturnSourceText());   // TASK-1590
     // Hot water: refreshes the end of the draw (the 300 s guards, heating_control.py:272-274, :313-315) and
     // clears the overshoot, underheat and saturation starts (:268-270, :313-315; entry 108).
     satCycleNoteDhwTick(_sat_tickMs);
@@ -7236,7 +7244,7 @@ static void satControlLoopRun()
   // zones, solar offset and clamps; osrc see _sat_outsideSrc. Hot-water ticks log a short SATTICK with dhw=1.
   // PWM, three separate outputs (TASK-1412.9): commanded = pwm (phase asked for), duty, pon / poff (mapped ON / OFF seconds, 0 outside PWM);
   // counted = starts (PWM ON-phase starts in the rolling hour); observed = flame (boiler flame bit).
-  SATDebugTf(PSTR("SATTICK room=%.2f raw=%.2f rv=%d target=%.1f out=%.1f osrc=%c curve=%.2f p=%.2f i=%.2f d=%.2f praw=%.2f pid=%.2f cs=%.1f mm=%s ch=%u mode=%d pwm=%d duty=%.2f pon=%lu poff=%lu starts=%u flame=%d flow=%.1f ret=%.1f fc=%c fage=%lu rc=%c rage=%lu dhw=0\r\n"),
+  SATDebugTf(PSTR("SATTICK room=%.2f raw=%.2f rv=%d target=%.1f out=%.1f osrc=%c curve=%.2f p=%.2f i=%.2f d=%.2f praw=%.2f pid=%.2f cs=%.1f mm=%s ch=%u mode=%d pwm=%d duty=%.2f pon=%lu poff=%lu starts=%u flame=%d flow=%.1f ret=%.1f fc=%c fage=%lu rc=%c rage=%lu rsrc=%s dhw=0\r\n"),
           roomTemp, rawRoom, (int)roomValid, targetTemp, outsideTemp, _sat_outsideSrc, curveValue,
           state.sat.fPidP, state.sat.fPidI, state.sat.fPidD, pidRaw,
           pidOutput, finalSetpoint, mmTxt, (unsigned)state.sat.iLastSentCH,
@@ -7245,7 +7253,8 @@ static void satControlLoopRun()
           (unsigned)satCycleGetCyclesThisHour(), (int)satIsFlameOn(),
           satGetFlowTemp(), satGetReturnTemp(),   // TASK-1532: the simulated values in SAT simulation
           satFeedClassLetter(satFlowFeedClass()), (unsigned long)satFlowSampleAgeMs(),     // TASK-1412.5: class V/Z/S/I/N/U and sample age in ms (4294967295 = none)
-          satFeedClassLetter(satReturnFeedClass()), (unsigned long)satReturnSampleAgeMs());
+          satFeedClassLetter(satReturnFeedClass()), (unsigned long)satReturnSampleAgeMs(),
+          satReturnSourceText());   // TASK-1590: OT / BRD / - (rc/rage describe the MsgID 28 feed only)
 
   // --- Publish to MQTT ---
   satPublishMQTT();

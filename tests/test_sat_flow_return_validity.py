@@ -106,7 +106,11 @@ int main() {
       fc = satFeedClassLetter(satFlowFeedClass()); rc = satFeedClassLetter(satReturnFeedClass());
       fage = (unsigned long)satFlowSampleAgeMs(); rage = (unsigned long)satReturnSampleAgeMs();
 #endif
-      printf("flow=%.2f fc=%c fage=%lu ret=%.2f rc=%c rage=%lu nr=%d\n", satGetFlowTemp(), fc, fage, satGetReturnTemp(), rc, rage, (int)satNoReturnTemp());
+      const char* rsrc = "?";
+#ifdef HAVE_RSRC
+      rsrc = satReturnSourceText();
+#endif
+      printf("flow=%.2f fc=%c fage=%lu ret=%.2f rc=%c rage=%lu rsrc=%s nr=%d\n", satGetFlowTemp(), fc, fage, satGetReturnTemp(), rc, rage, rsrc, (int)satNoReturnTemp());
     }
   }
   return 0;
@@ -122,6 +126,8 @@ def build_source():
     if marker in sat:
         a = sat.index(marker)
         defs = "#define HAVE_FEED 1\n"
+        if "satReturnSourceText" in sat:
+            defs += "#define HAVE_RSRC 1\n"
     else:   # old code: the wrappers read the stored value
         a = sat.index("static float satGetFlowTemp()")
         defs = ""
@@ -248,6 +254,22 @@ class FlowReturnValidity(unittest.TestCase):
                       "t 300000", "q"])
         self.assertEqual([x["nr"] for x in r], ["1", "0", "1"])
         self.assertEqual(r[0]["rc"], "U")
+
+    def test_return_source_ot_board_only_and_none(self):   # TASK-1590: SATTICK rsrc
+        r = self.sim(["t 1000", "f 28 ack 38.5", "q",                       # fresh MsgID 28 feed
+                      "board 1", "q",                                       # both valid: OT wins
+                      "t 400000", "q",                                      # OT stale, board still counted
+                      "board 0", "q"])                                      # neither
+        self.assertEqual([x["rsrc"] for x in r], ["OT", "OT", "BRD", "-"])
+        self.assertEqual([x["ret"] for x in r], ["38.50", "31.00", "31.00", "0.00"])
+
+    def test_return_source_board_when_the_boiler_answers_unknown_dataid(self):   # gruijter beta.49: rc=U rage=4294967295, ret from PR=E
+        r, = self.sim(["unsup28 1", "confirmed 1", "board 1", "t 2000", "f 28 unk 0", "q"])
+        self.assertEqual((r["rc"], r["rage"], r["rsrc"], r["ret"]), ("U", "4294967295", "BRD", "31.00"))
+
+    def test_return_source_in_the_simulation_is_the_modelled_feed(self):
+        r, = self.sim(["sim 1", "t 1000", "q"])
+        self.assertEqual(r["rsrc"], "OT")
 
     def test_unknown_dataid_with_a_board_sensor_reading_is_not_no_return(self):
         r, = self.sim(["unsup28 1", "confirmed 1", "board 1", "t 2000", "q"])

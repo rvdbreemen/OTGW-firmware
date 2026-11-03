@@ -27,7 +27,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 import sat_log_to_csv as p  # noqa: E402
 
 TICK_KEYS = ["room", "raw", "rv", "target", "out", "osrc", "curve", "p", "i", "d", "praw", "pid", "cs", "mm", "ch",
-             "mode", "pwm", "duty", "pon", "poff", "starts", "flame", "flow", "ret", "fc", "fage", "rc", "rage", "dhw"]   # fc/fage/rc/rage: TASK-1412.5
+             "mode", "pwm", "duty", "pon", "poff", "starts", "flame", "flow", "ret", "fc", "fage", "rc", "rage", "rsrc", "dhw"]   # fc/fage/rc/rage: TASK-1412.5; rsrc: TASK-1590
 
 
 def tick_format(src):
@@ -64,7 +64,7 @@ class SourceHasRecords(unittest.TestCase):
         """debugStuff.ino formats into a 320-byte buffer: the worst-case SATTICK (every number at its widest) must still end in 'dhw=0'."""
         fmt = tick_format(self.src)
         vals = [-99.99, -99.99, 1, -99.9, -99.9, "W", -99.99, -99.99, -999.99, -99.99, -199.99, -199.99, -99.9, 100, 1, 2, 1, 1.0,
-                43200, 43200, 7, 1, -99.9, -99.9, "V", 4294967295, "S", 4294967295]
+                43200, 43200, 7, 1, -99.9, -99.9, "V", 4294967295, "S", 4294967295, "BRD"]
         self.assertLessEqual(len(fmt % tuple(vals)) + 2, 319)
 
     def test_event_records_present(self):
@@ -89,7 +89,7 @@ class Parser(unittest.TestCase):
         if fmt is None:
             self.fail("no SATTICK line in SATcontrol.ino")
         vals = [19.25, 19.31, 1, 20.0, 7.5, "W", 29.31, 0.5, 1.25, -0.03, 31.03, 31.06, 37.8, 100, 1, 2, 1, 0.54, 900, 780, 2, 1,
-                38.8, 30.1, "V", 1200, "S", 301000]
+                38.8, 30.1, "V", 1200, "S", 301000, "BRD"]
         line = "10:04:38.127074 (  55700| 31732) satControlLo(6192): " + (fmt % tuple(vals))
         rows = p.parse([line])["SATTICK"]
         self.assertEqual(len(rows), 1)

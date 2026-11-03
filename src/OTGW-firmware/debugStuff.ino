@@ -32,7 +32,7 @@
 // 320-byte stack buffer, then sent via debugTelnet.print().
 // Debug strings that exceed 319 chars are silently truncated -- acceptable.
 void _debugPrintf_P(PGM_P fmt, ...) {
-    char buf[320];   // TASK-1412.5: the SATTICK line (with fc/fage/rc/rage) is up to 284 chars in the worst case
+    char buf[320];   // TASK-1412.5: the SATTICK line (with fc/fage/rc/rage) is up to 284 chars in the worst case, 293 with rsrc (TASK-1590)
     va_list args;
     va_start(args, fmt);
     vsnprintf_P(buf, sizeof(buf), fmt, args);
