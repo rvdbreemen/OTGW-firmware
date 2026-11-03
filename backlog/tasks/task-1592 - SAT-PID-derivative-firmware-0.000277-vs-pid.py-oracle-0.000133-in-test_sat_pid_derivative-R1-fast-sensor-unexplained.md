@@ -3,9 +3,11 @@ id: TASK-1592
 title: >-
   SAT PID derivative: firmware -0.000277 vs pid.py oracle -0.000133 in
   test_sat_pid_derivative R1 (fast sensor), unexplained
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-03T14:26:00Z'
+updated_date: '2026-11-03T17:46:00Z'
 labels:
   - sat
   - test

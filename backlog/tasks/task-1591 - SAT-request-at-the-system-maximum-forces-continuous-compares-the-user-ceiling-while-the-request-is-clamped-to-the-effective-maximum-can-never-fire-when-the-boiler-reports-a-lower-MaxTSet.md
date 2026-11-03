@@ -4,9 +4,11 @@ title: >-
   SAT: 'request at the system maximum forces continuous' compares the user
   ceiling while the request is clamped to the effective maximum (can never fire
   when the boiler reports a lower MaxTSet)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-03T14:02:00Z'
+updated_date: '2026-11-03T17:46:00Z'
 labels:
   - sat
 dependencies: []
