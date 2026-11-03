@@ -5865,3 +5865,11 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Quoted:** "Observe and publish (Recommended)"
 
 **Settled:** when a boiler answers SAT's SH= write (MsgID 57) with Data-Invalid or Unknown-DataID, the firmware records the write verdict (accepted / rejected) and publishes it as a diagnostic MQTT and REST value; SAT keeps sending SH= by its normal rules (no stop after a rejection). The OpenTherm protocol has no rule against the write. **Task:** TASK-1412.13. **Open:** none.
+
+## 253. Correction: the 13:15 double flame in gruijter's capture behaved like a hot-water draw without the DHW bit (Sergeant D, 2026-11-03)
+
+**Source:** sergeantd, 2026-11-03 14:19 UTC, msg 1567181431686434969 (https://discord.com/channels/812969634638725140/1514720723980259460/1567181431686434969), reply to our in-depth 13:15 analysis (msgs 1567178966807093362, 1567178968673689793, 1567178970376445993).
+
+**Quoted:** "something is missing here. It behaved like DHW enabled"
+
+**Settled (corrects our TASK-1589 reading):** our analysis said the boiler raised its modulation 7 -> 74 % on its own, with no hot-water signal. That is wrong in part: the frames show a hot-water event without the DHW status bit (MsgID 0 slave bit 2 off): MsgID 26 Tdhw 29.17 (13:14:35) -> 37.01 (13:15:15) -> 41.20 (13:15:23), MsgID 19 DHW flow rate 0.38 at 13:15:21 and 0.07 at 13:16:39 (0.00 on every other read), and the thermostat had DHW enable on for the whole run. The firmware and thermo-nova both detect hot water only from the status bit (thermo-nova coordinator/mqtt/opentherm.py:22, :68-69), so this is no deviation between them, but a gap in what SAT recognises as a draw. How to detect it is asked as Q-1589b; Q-1589a (flame-off hold timing) is parked until then. **Task:** TASK-1589. **Open:** Q-1589b, Q-1589a.
