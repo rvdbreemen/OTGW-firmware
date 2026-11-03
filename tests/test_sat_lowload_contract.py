@@ -160,7 +160,20 @@ DELEGATED = {
                ("test_sat_pwm_anchors", "SatPwmAnchors", ["test_e3_hot_water_flame_inside_on_adds_no_count", "test_f1_draw_in_on_phase_resumes_with_the_remaining_on_time_after_the_ch_relight",
                 "test_f2_no_ch_flame_after_the_draw_resumes_180_s_after_the_draw_end", "test_f4_draw_in_off_phase_keeps_the_off_wait_from_the_switch",
                 "test_h1_no_on_start_while_the_hot_water_flame_burns", "test_k1_a_draw_shorter_than_one_tick_still_marks_its_flame",
-                "test_m3_short_draw_inside_the_hold_keeps_the_rest_of_the_hold"])],
+                "test_m3_short_draw_inside_the_hold_keeps_the_rest_of_the_hold",
+                # TASK-1412.7 AC3: hot-water flame edges and draws never move a phase-owned timer (OFF anchor, ON clock, heat-pump OFF wait)
+                "test_d1_off_wait_ignores_hot_water_flame_offs", "test_n9_hot_water_in_the_off_phase_does_not_move_the_heat_pump_off_wait",
+                "test_f3_flame_still_lit_after_the_draw_resumes_at_once", "test_g4_second_draw_in_the_post_draw_wait_counts_the_180_s_from_the_last_draw_end",
+                "test_d6_relight_inside_on_does_not_restart_the_timer"]),
+               # TASK-1412.7 AC1/AC2: the entry cells (startup ramp, setpoint fall, valve/pump step, maximum limit, post-draw heat, real
+               # saturation path, no flame/modulation input) and the QD-8 comparison traces on the real continuous clamp
+               ("test_sat_overshoot_sustain", "LowLoadEntryCells", None),
+               ("test_sat_post_dhw_traces", "PostDhwTraces", None),
+               # TASK-1412.7 AC3: master CH enable and the boiler's CH-mode bit are different signals
+               ("test_sat_ch_signals", "ChSignals", None),
+               ("test_sat_cycle_classifier", "CycleClassifier", ["test_R2_master_ch_enable_decides_the_kind"]),
+               ("test_sat_pressure_health", "SatPressureHealth", ["test_ch_enable_transition_suspends_and_clears", "test_sat_on_off_alone_does_not_suspend",
+                "test_pwm_off_phase_does_not_suspend"])],
     "LL-013": [("test_sat_cmd_cache", "CmdCacheReset", ["test_dropped_enqueue_is_not_cached_and_sent_again", "test_dropped_satsendcs_is_retried_by_the_5s_resend",
                 "test_dropped_keepalive_is_tried_again_on_the_next_pass", "test_resend_repeats_last_values_after_5s_not_before",
                 "test_mm_and_ch_only_on_change_and_again_after_pic_restart", "test_unchanged_mm_and_ch_repaired_after_60_s",
@@ -385,7 +398,8 @@ class LowLoadContract(unittest.TestCase):
 
     # LL-012 .. LL-015, LL-017 .. LL-021, LL-023 -------------------------------------------------------------------------
     @ll("LL-012", "contract", "satCycleCheck* DHW guard, satApplyPWM DHW pause/resume (SATcycles.ino, SATcontrol.ino)",
-        task="partial: existing DHW cases; setpoint fall, max limiting, pump step, flow None are TASK-1412.7")
+        task="TASK-1412.7: DHW tails and phase-owned timers; entry cells (startup, setpoint fall, valve/pump step, maximum limit, real saturation); "
+             "CH enable vs CH mode; QD-8 comparison traces. Flow None: TASK-1412.5/1428 (LL-011b)")
     def test_ll012_dhw_transitions(self):
         self.delegated("LL-012")
 

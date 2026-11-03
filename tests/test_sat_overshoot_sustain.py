@@ -31,6 +31,8 @@ then the tick runs:
   x  the loop pass at this time sees the DHW bit drop (satCycleNoteDhwBit(false)); no control tick runs
   s  a draw that began 5 s earlier and ends at this time, between two control ticks: no tick sees it, only the
      loop pass does (satCycleNoteDhwBit true then false). TASK-1429
+  g<req>,<flow>  continuous, any requested setpoint and flow, e.g. "g45,62" (TASK-1412.7: setpoint fall, valve step, start-up,
+     maximum limiting; the request is what the control loop passes in, after the caller's clamp to the effective maximum)
 Prints the tick time since the start of the first mode change ("t=<ms>"), or t=-1.
 
 Run: python tests/test_sat_overshoot_sustain.py
@@ -105,6 +107,7 @@ int main(int argc, char** argv) {
   if (argc > 1 && !strncmp(argv[1], "start=", 6)) { g_ms = (uint32_t)strtoul(argv[1] + 6, 0, 10); argv++; argc--; }
   uint32_t tick = g_ms;
   const uint32_t t0 = tick;
+  float g_req = 50.0f;
 #ifdef HEAD_API
   _sustain_lastCheckMs = g_ms;              // old code: the previous control tick ran at t=0
 #endif
@@ -116,6 +119,13 @@ int main(int argc, char** argv) {
     tick += (uint32_t)strtoul(tok, 0, 10) + (at ? (uint32_t)strtoul(at + 1, 0, 10) : 0UL);
     g_ms = tick;
     const char k = colon[1];
+    g_req = 50.0f;
+    if (k == 'g') {                        // continuous, the request and the flow from the token
+      float rq = 50.0f, fl = 49.0f;
+      sscanf(colon + 2, "%f,%f", &rq, &fl);
+      g_req = rq; g_flow = fl; g_offTime = 1;
+      state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false;
+    }
     if (k == 'b') {
 #ifdef HAS_SKIP
       satCycleSkipAutoSwitch();
@@ -158,7 +168,7 @@ int main(int argc, char** argv) {
     if (k == 'w') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 50.0f; g_offTime = 1; }
     if (k == 'z') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 50.0f; g_offTime = 0; }
     const int before = g_switches;
-    run_checks(50.0f, tick);
+    run_checks(g_req, tick);
     if (g_switches != before) {
 #ifdef HEAD_API
       const int satrun = _sustain_saturationSec > 0.0f;
@@ -483,6 +493,115 @@ def extract_gate(sat_src: str) -> str:
     thr = _fn(sat_src, "static float satColdThreshold()")   # empty before TASK-1547
     return ("\n".join(consts) + "\n" + cold + "\n" + latch + "\n" + thr + "\n" + always
             + "\nstatic void gate(float pidOutput) {\n" + blocks + "\n}\n")
+
+
+class LowLoadEntryCells(unittest.TestCase):
+    """TASK-1412.7, LL-012 / R06: the continuous -> PWM entry is a TEMPERATURE PROXY, not proof of minimum-power saturation.
+
+    The real satCycleCheckOvershootSwitch() decides from three numbers only: the requested setpoint, the flow temperature and the
+    MsgID 3 permission. Whatever moved the flow above request + 2.0 K, the verdict is the same: 60 s from the first qualifying tick
+    (entries 22, 41, 86, 109; thermo-nova heating_control.py:262-305). The cells below pin that for the situations the OT application
+    note (AFS 2.1.1.2.1) says are NOT real low load: start-up, a setpoint fall, a pump or valve step, the maximum-temperature
+    limit and the heat left after a hot-water draw. They are characterization tests of the recorded rule, not fixes: the
+    conditions of OT-R1 that SAT does not use (flame off with demand, ID17 <= 5 %, shortly after start-up, a fast setpoint
+    change) are differences to the OpenTherm recommendation, listed in docs/sat/sat-low-load-verification-plan-2026-10-28.md.
+    Tick 30 s. A token "g<req>,<flow>" is one control tick in continuous mode.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        src = CYCLES_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+        cls.src = src
+        cls.dir = tempfile.TemporaryDirectory()
+        d = Path(cls.dir.name)
+        cpp = d / "t.cpp"
+        flag, body = extract(src)
+        cpp.write_text(flag + STUBS + body + MAIN, encoding="utf-8")
+        cls.exe = compile_cpp(cpp, d / "t.exe")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.dir.cleanup()
+
+    def run_ticks(self, toks):
+        if self.exe is None:
+            self.skipTest("no host C++ compiler")
+        out = subprocess.run([str(self.exe), *toks], capture_output=True, text=True, check=True).stdout
+        return dict(kv.split("=") for kv in out.split())
+
+    def switch_at(self, toks):
+        return int(self.run_ticks(toks)["t"])
+
+    @staticmethod
+    def g(*pairs, dt=30000):
+        return ["%d:g%g,%g" % (dt, rq, fl) for rq, fl in pairs]
+
+    def test_setpoint_fall_is_a_proxy_hit(self):
+        # Request 60 -> 50 with the flow at 58: no overshoot at 60 (58 < 62), overshoot at 50 (58 >= 52) although the boiler is
+        # modulating normally and only cools towards the new request. First qualifying tick 90 s, switch 60 s later.
+        toks = self.g((60, 58), (60, 58), (50, 58), (50, 58), (50, 58))
+        self.assertEqual(self.switch_at(toks), 150000)
+
+    def test_setpoint_fall_that_is_reversed_inside_60s_restarts_the_timer(self):
+        toks = self.g((60, 58), (50, 58), (60, 58), (50, 58), (50, 58), (50, 58))
+        self.assertEqual(self.switch_at(toks), 180000)
+
+    def test_startup_ramp_through_the_margin_counts_from_the_first_tick_above_it(self):
+        # Cold start at high fire: the flow runs 20, 35, 50, 58, 64, 66 at request 50. 58 >= 52 is the first qualifying tick (120 s).
+        # The burner is at high power and the flow is still rising, yet the proxy fires 60 s later. OT-R1 excludes
+        # "shortly after boiler start-up"; SAT does not (entry 22 only runs the cold start in continuous first).
+        toks = self.g((50, 20), (50, 35), (50, 50), (50, 58), (50, 64), (50, 66))
+        self.assertEqual(self.switch_at(toks), 180000)
+
+    def test_startup_59s_does_not_switch_60s_does(self):
+        self.assertEqual(self.switch_at(self.g((50, 58)) + self.g((50, 58), dt=59000)), -1)
+        self.assertEqual(self.switch_at(self.g((50, 58)) + self.g((50, 58), dt=60000)), 90000)
+
+    def test_valve_or_pump_step_shorter_than_60s_never_switches(self):
+        # A flow step of +9 K that lasts one tick (zone valve, pump start) and returns: no switch.
+        toks = self.g((50, 45), (50, 54), (50, 45), (50, 45), (50, 54), (50, 45))
+        self.assertEqual(self.switch_at(toks), -1)
+
+    def test_valve_or_pump_step_held_for_60s_switches_although_nothing_is_saturated(self):
+        toks = self.g((50, 45), (50, 54), (50, 54), (50, 54))
+        self.assertEqual(self.switch_at(toks), 120000)
+
+    def test_a_flow_dip_inside_the_window_restarts_the_timer(self):
+        toks = self.g((50, 54), (50, 54), (50, 48), (50, 54), (50, 54), (50, 54))
+        self.assertEqual(self.switch_at(toks), 180000)
+
+    def test_maximum_temperature_limit_counts_like_any_other_request(self):
+        # The caller clamps the request to the effective maximum (here 55) before the check. A boiler held at its limit with the
+        # flow 2.0 K above it is an overshoot verdict, one 0.1 K lower is not.
+        self.assertEqual(self.switch_at(self.g((55, 57), (55, 57), (55, 57))), 90000)
+        self.assertEqual(self.switch_at(self.g(*[(55, 56.9)] * 8)), -1)
+
+    def test_heat_left_after_a_hot_water_draw_is_blocked_for_300s_then_counts_60s(self):
+        # AFS 2.2.3 situation: at the end of a draw the supply is far above the request (here 62 against 41). The 300 s guard keeps
+        # the entry closed (the guard is not the AFS recovery: nothing is held, it only forbids the switch), and the proxy then
+        # needs 60 s of qualifying ticks: the switch comes 360 s after the draw tick.
+        toks = ["30000:d"] + self.g(*[(41, 62)] * 14)
+        self.assertEqual(self.switch_at(toks), 30000 + 360000)
+
+    def test_true_minimum_capacity_saturation_is_a_different_path_and_takes_300s(self):
+        # PWM -> continuous after 300 s of "the PWM off time is 0" (the duty asks for no OFF phase at all): it is the one
+        # place where the controller itself knows the boiler cannot be throttled further. 12 ticks of 30 s after the first.
+        self.assertEqual(self.switch_at(ticks(30000, "z" * 14)), 30000 + 300000)
+
+    def test_entry_reads_no_flame_modulation_or_status_signal(self):
+        body = _fn(self.src, "bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)")
+        self.assertTrue(body, "satCycleCheckOvershootSwitch not found")
+        for token in ("Modulation", "RelMod", "satIsFlameOn", "Statusflags", "MasterStatus", "SlaveStatus", "OTcurrentSystemState"):
+            self.assertNotIn(token, body, "the entry now reads %s: it is no longer a pure temperature proxy; update LL-012 and the "
+                                          "evidence section of docs/sat/sat-low-load-verification-plan-2026-10-28.md" % token)
+
+    def test_request_at_the_system_maximum_ends_pwm_before_the_entry_check(self):
+        # The loop cannot be sliced (static, hardware-bound), so this is a source assertion. thermo-nova update():
+        # `if requested >= maximum_setpoint: pwm.disable()` precedes `_maybe_enable_pwm_on_sustained_overshoot` (heating_control.py:203-210).
+        s = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+        a = s.index("if (pidOutput >= sysMax && state.sat.eControlMode == SAT_MODE_PWM) {")
+        b = s.index("satCycleCheckOvershootSwitch(pidOutput, _sat_tickMs);")
+        self.assertLess(a, b)
 
 
 class GateHeatPumpSwitch(unittest.TestCase):

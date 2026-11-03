@@ -169,3 +169,66 @@ Gross observed duty is `physical CH flame-on seconds / CH-demand wall interval`.
 An independent reviewer checks the raw frame/measurement locations and tries to refute each conclusion, including a current-versus-upstream difference. LL-023 and PH-PROFILE record the chosen pending design answers, accepted targets, exclusions, source/firmware hashes, missing cases and review findings. A test changing boiler control cannot supply its own missing design approval.
 
 Acceptance requires all applicable deterministic contracts, protocol/capability checks, both claimed transport paths and the physical/field checks. If no heat pump was tested, explicitly scope the result to the tested gas-boiler configuration. No boiler measurement means **host/replay verified, physical low-load performance unverified**. The runner's current blocked verdict is the correct starting point for this programme, not a reason to weaken its checks.
+
+## 7. Low-load entry evidence and post-DHW recovery (TASK-1412.7)
+
+Added 2026-11-03. Covers LL-012, R06, R19, R25 and R31 of the remediation plan. Everything below is host-executed on the real firmware code (the test names are in section 7.6); nothing here is a boiler measurement.
+
+### 7.1 The entry is a temperature proxy, not confirmed low-load operation
+
+SAT leaves continuous mode for PWM when the flow temperature stays at or above the requested setpoint plus 2.0 K for 60 s, counted from the first qualifying control tick (`SATcycles.ino` `satCycleCheckOvershootSwitch`; Sergeant D entries 22, 41, 86, 109; thermo-nova `heating_control.py:262-305`, margin 3.0 there). Compared with the OpenTherm application note AFS 2.1.1.2.1 (OT-R1, a recommendation, not a requirement):
+
+| OT-R1 condition for "low load" | SAT entry today |
+|---|---|
+| flame off while heat is requested | not used |
+| last modulation (ID17) not above 5 % | not used |
+| boiler temperature (ID25) above the control setpoint (ID1) | used, as flow >= request + 2.0 K for 60 s |
+| not when ID25 is at the maximum (ID57) | a request at or above the system maximum ends PWM before the entry check, every tick (source assertion; thermo-nova `heating_control.py:203-204` does the same) |
+| not shortly after DHW | used: 300 s guard (entries 108, 131; `const.py:19`, `heating_control.py:313-315` for the exits) |
+| not when ID3 high byte bit 4 is set | used (entries 213-215, TASK-1412.4) |
+| not shortly after boiler start-up | not used; a cold start runs continuous first (entry 22) |
+| a fast setpoint change "may not be real low load" | not used |
+
+So the same verdict follows from a start-up ramp, a setpoint fall, a valve or pump step held for 60 s, a boiler held at its maximum, or heat left after a draw. The cells are pinned in `LowLoadEntryCells`. Only one path knows the boiler is at its floor: the PWM-to-continuous saturation exit, which fires after 300 s of "the duty asks for an OFF time of 0" (`satCycleCheckPwmExits`). That is controller knowledge, not boiler evidence either. Confirmed low-load operation needs flame and modulation readings that the entry does not read (asserted by `test_entry_reads_no_flame_modulation_or_status_signal`). Adding any of them is a change of the recorded rule and needs Sergeant D plus field evidence; none is proposed.
+
+### 7.2 AFS 2.2.3 against the current inhibit timing
+
+AFS 2.2.3 (OT Application Functional Specification v1.1f, section 2.2.3, md lines 470-478, printed page 17), master side: with CH demand, keep the boiler on after a DHW interruption by setting the control setpoint equal to the boiler temperature; if after 1 minute the boiler temperature is not decreasing, restore the original setpoint; if the boiler switches off, stay in modulating mode.
+
+| Step | AFS 2.2.3 | SAT today |
+|---|---|---|
+| during the draw | (boiler handles DHW) | no CS change; MM to the maximum (entry 220); the CS keepalive keeps the old value (entry 232) |
+| first CH tick after the draw | CS = boiler temperature | CS = `max(request, min(flow - 2, previous CS))`, previous CS = the CS sent before the draw (entry 112; `heating_control.py:485-489`): about the request, not the boiler temperature, unless the request rose |
+| after 1 minute | restore the setpoint | no hold, nothing to restore |
+| PWM entry after a draw | "stay modulating" | blocked for 300 s after the bit drops, then 60 s of overshoot: earliest switch 360 s after the draw tick (30 s tick) |
+| PWM exits after a draw | | timers cleared and blocked for 300 s; an interrupted ON phase resumes with its remaining ON time, or 180 s after the draw if the CH flame does not return (entries 95, 103, 132, 158) |
+
+The 300 s guard keeps PWM from starting or stopping on the transient; it does not keep the boiler burning. The timing comparison: AFS acts for 60 s from the first tick; SAT inhibits mode changes for 300 s (plus 60 s for entry) and sends nothing special.
+
+### 7.3 QD-8 comparison traces (synthetic inputs, real clamp)
+
+`tests/test_sat_post_dhw_traces.py` runs the real continuous clamp. Scenario inputs are made up: the draw ends with the supply at 62, a pump cools it 4 K per 30 s tick, request 41, previous CS 41, flame lit.
+
+| t after draw | supply | CS today | CS minus supply today | CS with a 60 s hold (model) | minus supply |
+|---|---|---|---|---|---|
+| +0 s | 62 | 41 | -21 | 62 | 0 |
+| +30 s | 58 | 41 | -17 | 58 | 0 |
+| +60 s | 54 | 41 | -13 | 52 | -2 |
+| +90 s | 50 | 41 | -9 | 48 | -2 |
+| +120 s | 46 | 41 | -5 | 44 | -2 |
+| +150 s | 43 | 41 | -2 | 41 | -2 |
+
+If the request rose during the draw (41 to 48), today's CS follows the supply: 60, 56, 52, 48 (supply minus 2). With the flame out at the draw end, the CS is the request. A hold would not snap back: entry 112 turns it into a ramp that follows supply minus 2. Whether the boiler actually stops at CS 41 with a 62 supply depends on the boiler; this section does not show it. The crosswalk wording "CS >= flow - 2 with the flame on" is only true when the request rose above the previous CS.
+
+### 7.4 Master CH enable and the boiler's CH-mode bit
+
+They are different signals: master CH enable (MsgID 0 master bit 0, `Statusflags & 0x0100`) is SAT's own request and is 0 in every PWM OFF phase; the boiler's CH-mode bit (slave bit 1) stays 1 through the pump overrun (entries 201, 219). The low-load entry, the exits and the CH-enable rule read neither. `tests/test_sat_ch_signals.py` inventories every reader of the two bits. Known and documented, not changed: the off-with-demand duration reads the slave bit while thermo-nova's serial coordinator uses the master bit (`coordinator/serial/__init__.py:53-55`); it is telemetry only (`fOffWithDemandSec`) and no recorded decision covers it.
+
+### 7.5 Observations left open
+
+- "At the system maximum" compares the request with the user ceiling (`sysMax`), while the request is clamped to the effective maximum, which also includes the boiler's reported MaxTSet. They are equal unless the boiler reports a lower MaxTSet than the user ceiling (for example a rejected SH=); then the forced-continuous rule cannot fire. No recorded decision covers this; not changed.
+- A field check of boiler stops after real draws (the gruijter capture of entry 92 shows draws and PWM timing, not supply temperature after a draw) has not been made.
+
+### 7.6 Tests
+
+`tests/test_sat_lowload_contract.py` LL-012 (`test_ll012_dhw_transitions`) runs: `test_sat_overshoot_sustain.py` (`SustainedSwitches` DHW cases, `LowLoadEntryCells`), `test_sat_pwm_anchors.py` (DHW and flame edges against the phase timers), `test_sat_post_dhw_traces.py`, `test_sat_ch_signals.py`, and the CH-mode cases of `test_sat_cycle_classifier.py` and `test_sat_pressure_health.py`. `test_ll012b` stays an open decision (QD-8).
