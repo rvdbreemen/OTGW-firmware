@@ -3,9 +3,11 @@ id: TASK-1584
 title: >-
   SAT cycle classifier: skip the warm-up (min 60 s, 25 % of the burn) before the
   180 s tail, as thermo-nova (entry 244)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-03T06:37:00Z'
+updated_date: '2026-11-03T06:39:00Z'
 labels:
   - sat
 dependencies: []
