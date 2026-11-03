@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.7.9-beta.1
+**  Version  : v1.7.9-beta.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -5710,6 +5710,7 @@ var translateFields = [
   , ["uptime", "Uptime Since Boot"]
   , ["bootcount", "Number of Reboots"]
   , ["ledblink", "Heartbeat LED"]
+  , ["wififorce11g", "Force WiFi 802.11g"]
   , ["darktheme", "Dark Theme"]
   , ["nightlyrestart", "Scheduled Nightly Restart"]
   , ["nightlyrestarthour", "Nightly Restart Hour (0-23)"]
@@ -5781,6 +5782,7 @@ var translateTooltips = [
   , ["ntphostname", "Hostname of the NTP server. The default pool server is usually fine."]
   , ["ntpsendtime", "Send the current time from this gateway to the thermostat when supported."]
   , ["ledblink", "Blink the onboard LED as a heartbeat to show the firmware is running."]
+  , ["wififorce11g", "Connect in 802.11g instead of 802.11n. Only turn this on if the gateway joins your WiFi but gets no network (seen on some new routers). Takes effect after a restart."]
   , ["darktheme", "Use the dark color theme in the web interface."]
   , ["nightlyrestart", "Restart the device once a day at the configured hour to recover heap memory. Causes a brief (~30 second) service interruption."]
   , ["nightlyrestarthour", "Local hour (0-23) when the nightly restart runs. Default is 4 (04:00). Only active when NTP is enabled and synced."]

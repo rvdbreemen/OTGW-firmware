@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v1.7.9-beta.1
+**  Version  : v1.7.9-beta.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -285,11 +285,44 @@ static bool wifiTakeSkipPortal()
   return marked;
 }
 
+// PHY mode (TASK-1596). Some routers (seen: a Bouygues Bbox Wi-Fi 7) let the
+// ESP8266 associate in 802.11n but pass no traffic (no DHCP, no ARP), while
+// the same unit works in 802.11g. The mode is set explicitly on every start,
+// 11g when the user opted in and 11n otherwise, so switching back to auto
+// always takes effect.
+static void wifiApplyPhyMode()
+{
+  const WiFiPhyMode_t want = settings.wifi.bForce11g ? WIFI_PHY_MODE_11G : WIFI_PHY_MODE_11N;
+  if (WiFi.getPhyMode() != want) WiFi.setPhyMode(want);
+  const WiFiPhyMode_t now = WiFi.getPhyMode();
+  DebugTf(PSTR("WiFi: PHY mode %s (setting: %s)\r\n"),
+          now == WIFI_PHY_MODE_11G ? "11g" : (now == WIFI_PHY_MODE_11N ? "11n" : "11b"),
+          settings.wifi.bForce11g ? "force 11g" : "auto");
+}
+
+// Config-portal field for the PHY mode (TASK-1596). A text field is always
+// submitted, so "auto" really clears the setting; an unchecked checkbox would
+// submit nothing. WiFiManager runs the save-params callback inside
+// handleWifiSave(), before it connects to the new network, so the chosen mode
+// also applies to that first connect.
+static WiFiManagerParameter *s_wmPhyParam = nullptr;
+static void wifiPortalSaveParams()
+{
+  if (s_wmPhyParam == nullptr) return;
+  const bool force = (strcasecmp_P(s_wmPhyParam->getValue(), PSTR("11g")) == 0);
+  if (force != settings.wifi.bForce11g) {
+    settings.wifi.bForce11g = force;
+    writeSettings(false);
+  }
+  wifiApplyPhyMode();
+}
+
 //===========================================================================================
 void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 {
   const bool skipPortal = wifiTakeSkipPortal();
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  wifiApplyPhyMode();  // before any connect attempt (TASK-1596)
   wifiLinkEventsBegin();
 
   // TASK-548: apply static IP before any connect attempt.
@@ -331,6 +364,13 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   manageWiFi.setShowInfoErase(false);
   manageWiFi.setMenu(wm_menu);
   manageWiFi.setHostname(hostname);
+
+  //--- WiFi mode field (TASK-1596): "auto" (802.11n, the default) or "11g"
+  WiFiManagerParameter phyParam("wifimode", "WiFi mode: auto or 11g (use 11g if the gateway connects but gets no network)",
+                                settings.wifi.bForce11g ? "11g" : "auto", 4);
+  s_wmPhyParam = &phyParam;
+  manageWiFi.addParameter(&phyParam);
+  manageWiFi.setSaveParamsCallback(wifiPortalSaveParams);
 
   bool wifiSaved     = manageWiFi.getWiFiIsSaved();
   bool wifiConnected = (WiFi.status() == WL_CONNECTED);
@@ -417,6 +457,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
       delay(5000);  // Enough time to ensure we don't return.
     }
   }
+  s_wmPhyParam = nullptr;  // phyParam lives on this stack frame (TASK-1596)
   DebugTf(PSTR("Wifi status: %s\r\n"), WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
   DebugTf(PSTR("Connected to: %s\r\n"), WiFi.localIP().toString().c_str());
   // SDK auto-reconnect handles brief WiFi glitches (channel hops, momentary

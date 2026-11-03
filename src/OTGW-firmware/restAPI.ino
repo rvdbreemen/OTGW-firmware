@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.7.9-beta.1
+**  Version  : v1.7.9-beta.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1633,6 +1633,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("wifigateway"), CSTR(settings.wifi.sGateway), "s", 15);
   sendJsonSettingObj(F("wifidns1"), CSTR(settings.wifi.sDns1), "s", 15);
   sendJsonSettingObj(F("wifidns2"), CSTR(settings.wifi.sDns2), "s", 15);
+  sendJsonSettingObj(F("wififorce11g"), settings.wifi.bForce11g, "b");
   sendJsonSettingObj(F("mqttenable"), settings.mqtt.bEnable, "b");
   sendJsonSettingObj(F("mqttbroker"), CSTR(settings.mqtt.sBroker), "s", 32);
   sendJsonSettingObj(F("mqttbrokerport"), settings.mqtt.iBrokerPort, "i", 0, 65535);
@@ -1717,7 +1718,7 @@ static const char* const PROGMEM knownSettings[] = {
   "ui_capture", "ui_graphtimewindow", "ui_timestamps",
   "webhookcontenttype", "webhookenable", "webhookenabled",
   "webhookpayload", "webhooktriggerbit", "webhookurloff", "webhookurlon",
-  "wifidns1", "wifidns2", "wifigateway", "wifistaticip", "wifisubnet",
+  "wifidns1", "wifidns2", "wififorce11g", "wifigateway", "wifistaticip", "wifisubnet",
 };
 
 static bool isKnownSetting(const char* field) {

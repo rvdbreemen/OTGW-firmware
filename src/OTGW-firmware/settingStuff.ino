@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v1.7.9-beta.1
+**  Version  : v1.7.9-beta.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -235,6 +235,7 @@ bool writeSettings(bool show)
   ok = writeJsonStringKV(file, F("WifiGateway"), settings.wifi.sGateway, true) && ok;
   ok = writeJsonStringKV(file, F("WifiDns1"), settings.wifi.sDns1, true) && ok;
   ok = writeJsonStringKV(file, F("WifiDns2"), settings.wifi.sDns2, true) && ok;
+  ok = writeJsonBoolKV(file, F("WifiForce11g"), settings.wifi.bForce11g, true) && ok;
   ok = writeJsonBoolKV(file, F("MQTTenable"), settings.mqtt.bEnable, true) && ok;
   ok = writeJsonStringKV(file, F("MQTTbroker"), settings.mqtt.sBroker, true) && ok;
   ok = writeJsonIntKV(file, F("MQTTbrokerPort"), settings.mqtt.iBrokerPort, true) && ok;
@@ -412,6 +413,7 @@ void readSettings(bool show)
     Debugf(PSTR("WiFi static IP        : %s\r\n"), settings.wifi.sStaticIp[0] ? settings.wifi.sStaticIp : "(DHCP)");
     Debugf(PSTR("WiFi subnet           : %s\r\n"), CSTR(settings.wifi.sSubnet));
     Debugf(PSTR("WiFi gateway          : %s\r\n"), CSTR(settings.wifi.sGateway));
+    Debugf(PSTR("WiFi force 802.11g    : %s\r\n"), CBOOLEAN(settings.wifi.bForce11g));
     Debugf(PSTR("WiFi DNS1             : %s\r\n"), CSTR(settings.wifi.sDns1));
     Debugf(PSTR("WiFi DNS2             : %s\r\n"), CSTR(settings.wifi.sDns2));
     Debugf(PSTR("MQTT enabled          : %s\r\n"), CBOOLEAN(settings.mqtt.bEnable));
@@ -503,6 +505,9 @@ void updateSetting(const char *field, const char *newValue)
   }
   else if (strcasecmp_P(field, PSTR("WifiDns2")) == 0) {
     strlcpy(settings.wifi.sDns2, newValue, sizeof(settings.wifi.sDns2));
+  }
+  else if (strcasecmp_P(field, PSTR("WifiForce11g")) == 0) {
+    settings.wifi.bForce11g = EVALBOOLEAN(newValue);   // applied at the next WiFi start (restart)
   }
   else if (strcasecmp_P(field, PSTR("httppasswd")) == 0) {
     // Only update if not the placeholder value.

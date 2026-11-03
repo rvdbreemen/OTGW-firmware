@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.9-beta.1
+**  Version  : v1.7.9-beta.2
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -516,6 +516,7 @@ struct WifiSection {              // settings.wifi — static IP (all empty = DH
   char sGateway[16]  = "";       // e.g. "192.168.1.1"
   char sDns1[16]     = "";       // e.g. "8.8.8.8"
   char sDns2[16]     = "";       // e.g. "8.8.4.4"
+  bool bForce11g     = false;    // force 802.11g PHY instead of 11n (TASK-1596: routers where 11n associates but passes no traffic)
 };
 
 struct OTGWSettings {
