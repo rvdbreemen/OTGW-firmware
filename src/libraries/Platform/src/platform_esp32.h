@@ -561,6 +561,12 @@ inline uint32_t platformResetCode() {
   return (uint32_t)esp_reset_reason();
 }
 
+// TASK-1447: true when the chip restarted through esp_restart() (ESP_RST_SW), as doRestart() and the
+// config-portal timeout do. False after power-on, panic, watchdog, brownout or an external reset.
+inline bool platformResetWasSoftware() {
+  return esp_reset_reason() == ESP_RST_SW;
+}
+
 // Reboot-log detail line for the reset that just happened (TASK-1479).
 // The ESP32 reset info has no register dump; the crash is in the ESP-IDF core dump
 // (coredump partition, ELF format, written by the panic handler, also on a task-watchdog

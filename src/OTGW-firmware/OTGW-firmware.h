@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.60
+**  Version  : v2.0.0-beta.61
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -284,6 +284,8 @@ void doMqttDisconnect();                 // graceful disconnect for reboot path 
 void doWebSocketClose();                 // close all WS clients before reboot (otLogWs not extern'd in any header)
 uint16_t webSocketClientCount();         // connected /ws clients (port 80); used by the web connection cap (ADR-188)
 void doRestart(const char* reason);      // canonical reboot path: flushSettings + prepareForReboot + ESP.restart
+void captureRebootReason();                        // TASK-1447: take the stored restart reason; first call in setup()
+void storeRebootReasonUnlessPending(const char *reason); // TASK-1447: keep a taken but unlogged reason instead
 // MQTT discovery verification (ADR-062, TASK-349): state machine lives in
 // mqtt_discovery_verify.cpp as of TASK-363; public API in that file's header.
 // startDiscoveryVerification() / isDiscoveryVerificationActive() are

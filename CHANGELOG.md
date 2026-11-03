@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **reboot_log.txt names why the gateway restarted itself** (TASK-1447, port of 1.x TASK-1247, GH #682). Every planned restart was logged as the same `reboot cause: Software reset (3)`, because `doRestart()` threw its reason away. The reason is now kept in RTC memory (`RTC_NOINIT_ATTR`, no flash write) and the next boot appends it: `reboot cause: Software reset (3) - [nightly] scheduled restart`. The record is taken and cleared at the top of `setup()`, so a reason is reported once; it counts only when the reset was a software restart, so a power-on, panic or watchdog reset shows none. A config-portal timeout passes on the reason of the restart that started the chain instead of overwriting it. Line format unchanged. After an OTA handover through the safeboot app the reason may be absent (never wrong). Host test `tests/test_reboot_reason.py` (old code: the reason store does not exist, the test errors).
+
 ## [2.0.0-beta.60] - 2026-11-03
 
 ### Changed

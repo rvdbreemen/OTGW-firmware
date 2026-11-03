@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:17:00Z'
-updated_date: '2026-11-03T19:40:00Z'
+updated_date: '2026-11-03T20:00:00Z'
 labels:
   - port-from-1.x
   - diagnostics
@@ -99,4 +99,6 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: no RTC_NOINIT/storeRebootReason; doRestart (helperStuff.ino:644) does not save the reason. Agent-doable.
+
+2026-11-03 implemented (sonnet agent): RTC_NOINIT_ATTR record (magic OTRR, reason[48]) in helperStuff.ino, stored by doRestart(), taken and cleared at the top of setup() (captureRebootReason), counted only when platformResetWasSoftware() (new shim, esp_reset_reason()==ESP_RST_SW); portal-timeout chain keeps the first reason (storeRebootReasonUnlessPending). tests/test_reboot_reason.py 7 OK on the fix (restart once, no repeat, power-on/crash none, chain, portal-only, truncation); old helperStuff.ino: reason store absent (error). evaluate 0 failed incl. abstraction gate. Before-evidence marvin .61 beta.60: every line 'Software reset (3)' with no reason. Tag beta.61 (local, after the beta.60 public release).
 <!-- SECTION:NOTES:END -->

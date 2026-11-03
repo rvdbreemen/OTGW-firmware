@@ -65,6 +65,7 @@
 - **Purpose**: Crash/reboot log persistence in `/reboot_log.txt`.
 - **Details**:
   - `updateRebootLog()` calls `loopNTP()` first, then writes a new entry at the top of a temp file `/reboot_log.t.txt` (timestamp, "reboot cause", platform reset code, exception info, register dump from `platformResetRegisterDump()`, and the external watchdog reason when `platformIsExternalReset()`), appends older lines up to `LOG_LINES` (20) and renames the temp file over the log
+  - Restart reason (TASK-1447): `doRestart(reason)` calls `storeRebootReason()`, which writes a magic word and the reason (48 B) into an `RTC_NOINIT_ATTR` record; `captureRebootReason()` (first call in `setup()`) takes and clears it, and keeps it only when `platformResetWasSoftware()` (ESP_RST_SW) holds. `updateRebootLog()` then appends `- <reason>` to the `reboot cause: Software reset (3)` line, once. The config-portal timeout calls `storeRebootReasonUnlessPending()` so a reason taken but not yet logged is passed on. Power-on, panic and watchdog resets log no reason; after an OTA handover through the safeboot app the reason may be absent
   - `readLatestCrashLog()` returns the newest summary line that is directly followed by a register-dump or external-reason line; it uses the `LittleFSmounted` flag instead of calling `LittleFS.begin()` again
   - Uses static or stack char buffers for line formatting (ADR-004)
 

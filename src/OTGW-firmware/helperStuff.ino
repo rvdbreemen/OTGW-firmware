@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.60
+**  Version  : v2.0.0-beta.61
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -219,6 +219,65 @@ bool updateLittleFSStatus(const __FlashStringHelper *probePath)
   return updateLittleFSStatus(pathBuffer);
 }
 
+// TASK-1447 begin (port of 1.x TASK-1247): the doRestart() reason survives the restart in RTC memory, so the
+// next boot can write it into reboot_log.txt. Without it every planned restart reads "Software reset (3)".
+// RTC_NOINIT_ATTR keeps its content over a software, panic and watchdog reset and is garbage after power-on,
+// so the magic word is mandatory. No NVS or LittleFS write: a reboot loop would wear the flash and the
+// write would sit in the shutdown path.
+#define REBOOT_REASON_MAGIC     0x4F545252UL  // "OTRR"
+
+struct RebootReasonRtc {
+  uint32_t magic;
+  char     reason[48];
+};
+
+static RTC_NOINIT_ATTR RebootReasonRtc g_rtcRebootReason;
+
+void storeRebootReason(const char *reason)
+{
+  g_rtcRebootReason.magic = REBOOT_REASON_MAGIC;
+  strlcpy(g_rtcRebootReason.reason, reason ? reason : "?", sizeof(g_rtcRebootReason.reason));
+}
+
+// Copies the stored reason into out and clears the record. Returns false when no valid record is present
+// (power-on, or a reset that did not pass through a store). Called once per boot, so a reason is never
+// reported twice.
+static bool takeRebootReason(char *out, size_t outSize)
+{
+  const bool valid = (g_rtcRebootReason.magic == REBOOT_REASON_MAGIC);
+  if (valid) {
+    g_rtcRebootReason.reason[sizeof(g_rtcRebootReason.reason) - 1] = '\0';
+    strlcpy(out, g_rtcRebootReason.reason, outSize);
+  }
+  g_rtcRebootReason.magic = 0;
+  return valid;
+}
+
+// Taken at the top of setup(), before startWiFi() can restart the board (the config-portal timeout), so each
+// record belongs to the restart that wrote it.
+static char g_bootRestartReason[48] = {0};
+static bool g_bootRestartReasonValid = false;
+
+void captureRebootReason()
+{
+  // Always take (and so clear) the record; it applies only to a software restart, not to a crash or
+  // watchdog reset during doRestart()'s shutdown, nor to a power-on.
+  g_bootRestartReason[0] = '\0';
+  const bool taken = takeRebootReason(g_bootRestartReason, sizeof(g_bootRestartReason));
+  g_bootRestartReasonValid = taken && platformResetWasSoftware();
+}
+
+// For a restart that can happen before updateRebootLog() has run (the config-portal timeout in startWiFi()).
+// If this boot took over a reason it has not logged yet, pass that one on: the restart that started the chain
+// is the one worth knowing, and overwriting it would lose it. The intermediate restart itself is not logged,
+// because its boot never reaches the log.
+void storeRebootReasonUnlessPending(const char *reason)
+{
+  storeRebootReason(g_bootRestartReasonValid ? g_bootRestartReason : reason);
+  g_bootRestartReasonValid = false;   // handed on: the next boot reports it, this boot must not
+}
+// TASK-1447 end
+
 // A wall-clock time the reboot log may print: 2020-01-01 .. 2100-01-01 UTC (TASK-1452). Before NTP the clock
 // counts seconds since boot, far below this range.
 static bool rebootLogClockValid(int64_t now)
@@ -359,6 +418,13 @@ bool updateRebootLog(String text)
   if (log_line_excpt[0] != '\0') {
     Debugf(PSTR("Fatal exception: %s\r\n"), log_line_excpt);
   }
+
+  // TASK-1447: the reason doRestart() stored. log_line_excpt is empty after a software reset on ESP32.
+  if (g_bootRestartReasonValid && platformResetWasSoftware()) {
+    snprintf_P(log_line_excpt, sizeof(log_line_excpt), PSTR("- %s"), g_bootRestartReason);
+    DebugTf(PSTR("restart reason: %s\r\n"), g_bootRestartReason);
+  }
+  g_bootRestartReasonValid = false;   // logged (or not applicable): never pass it on again
 
   // Before NTP has synced, time() holds seconds since boot, which printed as a 1970 or 2106 date (TASK-1452,
   // port of 1.x TASK-1253). Say so instead. The reader still finds " - reboot cause: " in the line.
@@ -664,6 +730,7 @@ void doRestart(const char* str) {
           (unsigned)platformMinFreeHeap(),
           (unsigned)platformMaxFreeBlock(),
           (unsigned)platformHeapFragmentation());
+  storeRebootReason(str);  // TASK-1447: reported in reboot_log.txt after the restart
 
   // ADR-191: a planned restart means this image ran; confirm it so the
   // bootloader does not roll it back to safeboot at the reset below.

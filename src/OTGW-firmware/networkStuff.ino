@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.60
+**  Version  : v2.0.0-beta.61
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -229,6 +229,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     {
       DebugTln(F("failed to connect and hit timeout"));
       delay(2000);  // Enough time for messages to be sent.
+      storeRebootReasonUnlessPending("WiFi: config portal timeout");   // TASK-1447
       platformRestart();
       delay(5000);  // Enough time to ensure we don't return.
     }
