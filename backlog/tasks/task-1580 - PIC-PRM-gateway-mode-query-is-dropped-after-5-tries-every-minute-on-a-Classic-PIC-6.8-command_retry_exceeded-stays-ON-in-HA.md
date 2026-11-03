@@ -3,11 +3,11 @@ id: TASK-1580
 title: >-
   PIC: PR=M (gateway-mode query) is dropped after 5 tries every minute on a
   Classic PIC 6.8; command_retry_exceeded stays ON in HA
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-03T05:02:00Z'
-updated_date: '2026-11-03T05:46:00Z'
+updated_date: '2026-11-03T23:13:00Z'
 labels:
   - pic
   - bug
@@ -26,7 +26,7 @@ Found 2026-11-03 06:00 on the beta.17 soak unit .63 (Classic + S3 Mini, PIC 6.8,
 <!-- AC:BEGIN -->
 - [x] #1 Reproduced: cmd_dropped rate and a raw PIC serial/telnet capture show whether the PIC answers PR=M and why the queue does not match it
 - [x] #2 Fix: a host test on the real checkCommandResponse/queue code red on the old code, green on the fix
-- [ ] #3 Bench: a Classic PIC unit runs 1 h with cmd_dropped not increasing and command_retry_exceeded OFF
+- [x] #3 Bench: a Classic PIC unit runs 1 h with cmd_dropped not increasing and command_retry_exceeded OFF
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -36,3 +36,9 @@ Found 2026-11-03 06:00 on the beta.17 soak unit .63 (Classic + S3 Mini, PIC 6.8,
 
 2026-11-03 (agent, verified by lead): sendPICSerial() returns bool (false only where satSimulationBlocksBusTx refuses); handleCommandQueue() treats a held-back command as consumed: clears s_inflight, releases the prio slot, removes it, no retry/drop/flag. Also found: a held-back command occupied the in-flight slot, delaying every other command by the 1000 ms echo timeout per try. tests/test_pic_pm_chain.py: 3 new tests; old code 2 FAIL (dropped 1 instead of 0; next CS at 1000 ms), fix 32 OK; simulation-off silent PIC still drops after 5 tries (passes old and new). Full tests 104/104, evaluate 0 failed. AC3 bench: 1 h on .63 with satsimulation on, cmd_dropped flat (beta.38 soak).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A command the SAT bench simulation holds back is consumed instead of counted as dropped (sendPICSerial returns bool, TASK-1580). Evidence: host tests in the task notes; bench .63 (Classic+PIC, beta.60+1c34c39 with satsimulation ON): 3 h 08 min uptime, cmd_dropped=0 in all 14 soak samples 22:01-23:06 UTC, MQTT command_retry_exceeded = OFF (read 2026-11-04 ~00:20). A later deliberate ZZ=1 (TASK-1573 check, simulation off) raised cmd_dropped to 1 as designed.
+<!-- SECTION:FINAL_SUMMARY:END -->
