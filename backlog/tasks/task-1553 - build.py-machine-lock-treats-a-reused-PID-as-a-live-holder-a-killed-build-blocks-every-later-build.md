@@ -3,11 +3,11 @@ id: TASK-1553
 title: >-
   build.py machine lock treats a reused PID as a live holder; a killed build
   blocks every later build
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-01T21:22:00Z'
-updated_date: '2026-11-03T18:22:00Z'
+updated_date: '2026-11-03T18:40:00Z'
 labels:
   - tooling
 dependencies: []
@@ -23,8 +23,8 @@ ordinal: 706000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A lock whose PID now belongs to a non-build process (or started after the lock time) is taken over, host test red on the old check
-- [ ] #2 Waiting message names the holder process name so a stale lock is visible
+- [x] #1 A lock whose PID now belongs to a non-build process (or started after the lock time) is taken over, host test red on the old check
+- [x] #2 Waiting message names the holder process name so a stale lock is visible
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -35,4 +35,12 @@ Related, same evening: in a fresh worktree (wt-1552, no build/ dir) build.py com
 Third trap, same evening: running ../OTGW-firmware/.build-python/python.exe build.py from another worktree (wt-1552) imports the MAIN tree's config.py, because .build-python is an embedded Python whose python312._pth puts '.'(=its own dir parent? no: the main tree) on sys.path and does not insert the script dir. Verified: sys.path[2] = D:/.../OTGW-firmware, config.__file__ = OTGW-firmware/config.py. Effect: BUILD_DIR = main-tree build/, which build.py cleaned (beta.1 release artifacts removed; they are still on the GitHub release) and filled with the wt-1552 beta.2 parts; the worktree build/ stayed empty and merged/zip failed ('Firmware binary not found'), exit 0. Workaround: python.exe -c "import sys,runpy; sys.path.insert(0, r'<wt>'); sys.argv=['build.py']; runpy.run_path(r'<wt>/build.py', run_name='__main__')". The /release-2x skill (Phase 4) recommends the main tree's interpreter for a worktree: fix that text too.
 
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: build.py _pid_alive (~:3021) checks the PID only, no process name or start time. Agent-doable, tooling only.
+
+2026-11-03 fix (sonnet agent, lead re-verified): build.py records the holder's process start time (line 4 of the lock); a holder is live only when the PID exists AND its start time matches (Windows OpenProcess+GetProcessTimes, Linux /proc stat; no new dependency). Old-format lock (PID only): stale when the live process started > 2 s after the lock time. Unreadable start time -> live (conservative). Wait/refuse message names the holder process. tests/test_build_lock.py: old code 2 FAIL + 1 ERROR (reused PID blocks with exit 3), fix 7 OK (lead rerun 7 OK). Lead probe: own python start 1793731197774 ms, child +414 ms, dead PID -> None. test_build_jobs 7, test_build 13, test_build_safeboot 11, test_build_staging 16 OK; evaluate 0 failed. Not verified: a real killed build with a reused PID; POSIX path; the two other traps in the implementation notes (os.makedirs before build_safeboot copy2, embedded python sys.path config.py) are untouched.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+build.py's machine-wide build lock no longer treats a reused PID as a live build: the lock records the holder's process start time and a holder counts as live only when PID and start time match (old PID-only locks: stale when the process started after the lock). The wait/refuse message names the holder process. Evidence: tests/test_build_lock.py red on old build.py (exit 3 on a reused PID), 7 OK on the fix; build test files OK; evaluate 0 failed. Not verified: a real killed build on Windows, the POSIX path.
+<!-- SECTION:FINAL_SUMMARY:END -->

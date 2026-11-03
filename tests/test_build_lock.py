@@ -82,6 +82,46 @@ class BuildLock(unittest.TestCase):
         self.assertIn("stale build lock", ob)
         self.assertIn("START", ob)
 
+    # TASK-1553: a pid that Windows (or any OS) reused for another process is not a live holder.
+    def _write_lock(self, pid, start_ms, stamp="2026-01-01 00:00:00"):
+        extra = "" if start_ms is None else f"{start_ms}\n"
+        self.lock.write_text(f"{pid}\nold-tree\n{stamp}\n{extra}", encoding="utf-8")
+
+    def test_reused_pid_with_other_start_time_is_taken_over(self):
+        # The test process itself is live but is not the process that wrote the lock.
+        self._write_lock(os.getpid(), 1000)
+        b = run_child(self.lock, 0, 0.1)
+        ob, _ = b.communicate(timeout=30)
+        self.assertEqual(b.returncode, 0, ob)
+        self.assertIn("stale build lock", ob)
+        self.assertIn("START", ob)
+
+    def test_live_holder_with_matching_start_time_is_respected(self):
+        sys.path.insert(0, str(BUILD_PY_DIR))
+        import build
+        started = build._pid_start_ms(os.getpid())
+        self.assertIsNotNone(started)
+        self._write_lock(os.getpid(), started)
+        b = run_child(self.lock, 0, 0.1)
+        ob, _ = b.communicate(timeout=30)
+        self.assertEqual(b.returncode, 3, ob)
+        self.assertIn("Another build is running", ob)
+        self.assertIn("process ", ob)           # wait message names the holder process
+        self.assertNotIn("START", ob)
+
+    def test_old_format_lock_written_before_the_process_started_is_taken_over(self):
+        self._write_lock(os.getpid(), None, "2000-01-01 00:00:00")   # no start-time line, lock older than this process
+        b = run_child(self.lock, 0, 0.1)
+        ob, _ = b.communicate(timeout=30)
+        self.assertEqual(b.returncode, 0, ob)
+        self.assertIn("stale build lock", ob)
+
+    def test_old_format_lock_of_a_running_holder_is_respected(self):
+        self._write_lock(os.getpid(), None, time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time() + 3600)))
+        b = run_child(self.lock, 0, 0.1)
+        ob, _ = b.communicate(timeout=30)
+        self.assertEqual(b.returncode, 3, ob)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

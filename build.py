@@ -3041,6 +3041,98 @@ def _pid_alive(pid):
     return True
 
 
+def _pid_start_ms(pid):
+    """Start time of the process in epoch milliseconds, or None when it cannot be read.
+
+    Together with the pid it identifies one process: Windows reuses a pid for an unrelated
+    process soon after the old one ends (TASK-1553).
+    """
+    if pid <= 0:
+        return None
+    try:
+        if platform.system() == "Windows":
+            import ctypes
+            from ctypes import wintypes
+            kernel32 = ctypes.windll.kernel32
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not handle:
+                return None
+            try:
+                created, _exit, _kernel, _user = (wintypes.FILETIME() for _ in range(4))
+                if not kernel32.GetProcessTimes(wintypes.HANDLE(handle), ctypes.byref(created), ctypes.byref(_exit),
+                                                ctypes.byref(_kernel), ctypes.byref(_user)):
+                    return None
+                ticks = (created.dwHighDateTime << 32) | created.dwLowDateTime  # 100 ns since 1601-01-01
+                return (ticks - 116444736000000000) // 10000
+            finally:
+                kernel32.CloseHandle(handle)
+        if os.path.exists("/proc/self/stat"):
+            with open(f"/proc/{pid}/stat", encoding="utf-8") as f:
+                stat = f.read()
+            ticks = int(stat.rsplit(")", 1)[1].split()[19])  # field 22: start time in clock ticks since boot
+            with open("/proc/stat", encoding="utf-8") as f:
+                boot = next(int(line.split()[1]) for line in f if line.startswith("btime "))
+            return boot * 1000 + ticks * 1000 // os.sysconf("SC_CLK_TCK")
+    except (OSError, ValueError, IndexError, StopIteration):
+        return None
+    return None
+
+
+def _pid_name(pid):
+    """Executable name of the process, or '?' when it cannot be read (shown in the wait message)."""
+    try:
+        if platform.system() == "Windows":
+            import ctypes
+            from ctypes import wintypes
+            kernel32 = ctypes.windll.kernel32
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            handle = kernel32.OpenProcess(0x1000, False, pid)
+            if not handle:
+                return "?"
+            try:
+                buf = ctypes.create_unicode_buffer(1024)
+                size = wintypes.DWORD(len(buf))
+                if kernel32.QueryFullProcessImageNameW(wintypes.HANDLE(handle), 0, buf, ctypes.byref(size)):
+                    return os.path.basename(buf.value)
+            finally:
+                kernel32.CloseHandle(handle)
+            return "?"
+        with open(f"/proc/{pid}/comm", encoding="utf-8") as f:
+            return f.read().strip() or "?"
+    except OSError:
+        return "?"
+
+
+def _holder_is_live(lines):
+    """True when the process that wrote this lock file still runs (TASK-1553).
+
+    New format: line 4 holds the holder's start time in epoch ms; a live pid with another start
+    time is a reused pid, so the lock is stale. Old format (no line 4): a live pid whose process
+    started more than 2 s after the lock was written is a reused pid; when the start time cannot
+    be read the holder counts as live (the conservative answer).
+    """
+    try:
+        pid = int(lines[0]) if lines else 0
+    except ValueError:
+        return False
+    if not _pid_alive(pid):
+        return False
+    started = _pid_start_ms(pid)
+    if started is None:
+        return True
+    if len(lines) >= 4:
+        try:
+            return started == int(lines[3])
+        except ValueError:
+            return True
+    try:
+        written = time.mktime(time.strptime(lines[2].strip(), "%Y-%m-%d %H:%M:%S"))
+    except (IndexError, ValueError):
+        return True
+    return started / 1000.0 <= written + 2.0
+
+
 def acquire_build_lock(project_dir, wait_minutes=None, poll_seconds=10, lock_path=None):
     """Machine-wide build lock (maintainer 2026-10-29: never more than one build at a time).
 
@@ -3049,7 +3141,6 @@ def acquire_build_lock(project_dir, wait_minutes=None, poll_seconds=10, lock_pat
     wait (0 = refuse at once). Returns the lock path; the caller releases it with
     release_build_lock().
     """
-    import time
     lock = Path(lock_path) if lock_path else build_lock_path()
     lock.parent.mkdir(parents=True, exist_ok=True)
     if wait_minutes is None:
@@ -3069,14 +3160,14 @@ def acquire_build_lock(project_dir, wait_minutes=None, poll_seconds=10, lock_pat
                 holder_pid = int(lines[0]) if lines else 0
             except (OSError, ValueError):
                 lines, holder_pid = [], 0
-            if not _pid_alive(holder_pid):
-                print_warning(f"Removing stale build lock (pid {holder_pid} is not running): {lock}")
+            if not _holder_is_live(lines):
+                print_warning(f"Removing stale build lock (pid {holder_pid} is not running or was reused by another process): {lock}")
                 try:
                     lock.unlink()
                 except FileNotFoundError:
                     pass
                 continue
-            holder = " | ".join(lines) if lines else "unknown"
+            holder = (" | ".join(lines[:3]) if lines else "unknown") + f" | process {_pid_name(holder_pid)}"
             if time.time() >= deadline:
                 print_error(f"Another build is running ({holder}); not starting a second one. Lock: {lock}")
                 sys.exit(3)
