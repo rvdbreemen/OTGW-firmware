@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-28T15:19:00Z'
-updated_date: '2026-11-03T05:37:00Z'
+updated_date: '2026-11-03T06:14:00Z'
 labels:
   - web-ui
   - tester-feedback
@@ -25,8 +25,8 @@ Tester report, maarten_41762 (<@1544684325847703602>), #alpha-testing 2026-10-28
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Screenshot before/after at the reporter's width and at 1280 px: node text stays inside its box and the right-hand nodes are fully visible
-- [ ] #2 Phone width (375 px) still works, no horizontal page scroll
+- [x] #1 Screenshot before/after at the reporter's width and at 1280 px: node text stays inside its box and the right-hand nodes are fully visible
+- [x] #2 Phone width (375 px) still works, no horizontal page scroll
 - [ ] #3 build (filesystem) green; no new FAIL in evaluate
 <!-- AC:END -->
 
@@ -38,4 +38,6 @@ Tester report, maarten_41762 (<@1544684325847703602>), #alpha-testing 2026-10-28
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: connRecency layout v2.js:1844 unchanged. Doable.
 
 Released by Robert 2026-11-03 (interactive, maintainer) (was already In Progress).
+
+2026-11-03 (agent, verified by lead incl. screenshots in scratchpad shots/1427-old|new): browser test tests/webui/connection-map-text-fits.test.mjs on the real page, red on the old v2 files, green on the fix; integrated in wt-next.
 <!-- SECTION:NOTES:END -->

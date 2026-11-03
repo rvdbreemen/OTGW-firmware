@@ -691,36 +691,36 @@
       <svg viewBox="0 0 820 360" id="connMap" role="img" aria-label="Connectivity map">
         <!-- links (drawn first, under the nodes) -->
         <g id="cnLinks">
-          <path id="lk-therm"  class="cn-link" d="M150,86 H264 V180 H300"/>
-          <path id="fl-therm"  class="cn-flow" d="M150,86 H264 V180 H300"/>
-          <path id="lk-boiler" class="cn-link" d="M150,274 H264 V180 H300"/>
-          <path id="fl-boiler" class="cn-flow" d="M150,274 H264 V180 H300"/>
+          <path id="lk-therm"  class="cn-link" d="M210,86 H264 V180 H300"/>
+          <path id="fl-therm"  class="cn-flow" d="M210,86 H264 V180 H300"/>
+          <path id="lk-boiler" class="cn-link" d="M210,274 H264 V180 H300"/>
+          <path id="fl-boiler" class="cn-flow" d="M210,274 H264 V180 H300"/>
           <path id="lk-wifi"   class="cn-link" d="M470,180 H560"/>
           <path id="fl-wifi"   class="cn-flow" d="M470,180 H560"/>
           <path id="lk-mqtt"   class="cn-link" d="M700,150 V104 H760"/>
           <path id="fl-mqtt"   class="cn-flow" d="M700,150 V104 H760"/>
           <path id="lk-ws"     class="cn-link" d="M700,210 V300 H760"/>
           <path id="fl-ws"     class="cn-flow" d="M700,210 V300 H760"/>
-          <text class="cn-linklbl" x="225" y="74">OT bus</text>
-          <text class="cn-linklbl" x="225" y="262">OT bus</text>
+          <text class="cn-linklbl" x="240" y="74">OT bus</text>
+          <text class="cn-linklbl" x="240" y="262">OT bus</text>
           <text class="cn-linklbl" x="515" y="170">Wi-Fi</text>
-          <text class="cn-linklbl" x="690" y="120">MQTT</text>
-          <text class="cn-linklbl" x="690" y="250">live</text>
+          <text class="cn-linklbl" x="676" y="120">MQTT</text>
+          <text class="cn-linklbl" x="676" y="250">live</text>
         </g>
         <!-- nodes -->
         <g id="n-therm">
-          <rect class="cn-box" x="20" y="56" width="130" height="60" rx="12"/>
+          <rect class="cn-box" x="20" y="56" width="190" height="60" rx="12"/>
           <text class="cn-ic" x="36" y="96">🌡️</text>
           <text class="cn-title" x="64" y="84">Thermostat</text>
           <text class="cn-sub" x="64" y="102" id="cnThermSub">master</text>
-          <circle class="cn-statedot" id="dot-therm" cx="142" cy="64" r="7"/>
+          <circle class="cn-statedot" id="dot-therm" cx="202" cy="64" r="7"/>
         </g>
         <g id="n-boiler">
-          <rect class="cn-box" x="20" y="244" width="130" height="60" rx="12"/>
+          <rect class="cn-box" x="20" y="244" width="190" height="60" rx="12"/>
           <text class="cn-ic" x="36" y="284">🔥</text>
           <text class="cn-title" x="64" y="272">Boiler</text>
           <text class="cn-sub" x="64" y="290" id="cnBoilerSub">slave</text>
-          <circle class="cn-statedot" id="dot-boiler" cx="142" cy="252" r="7"/>
+          <circle class="cn-statedot" id="dot-boiler" cx="202" cy="252" r="7"/>
         </g>
         <!-- gateway: PIC + ESP, carries the mode chip -->
         <g id="n-gw">
@@ -745,13 +745,13 @@
           <text class="cn-ic" x="772" y="110">🗄️</text>
           <circle class="cn-statedot" id="dot-mqtt" cx="808" cy="82" r="7"/>
         </g>
-        <text class="cn-sub" x="760" y="148">Broker → HA</text>
+        <text class="cn-sub" x="812" y="148" text-anchor="end">Broker → HA</text>
         <g id="n-browser">
           <rect class="cn-box" x="760" y="270" width="56" height="60" rx="12"/>
           <text class="cn-ic" x="772" y="306">📱</text>
           <circle class="cn-statedot" id="dot-ws" cx="808" cy="278" r="7"/>
         </g>
-        <text class="cn-sub" x="760" y="344">This browser</text>
+        <text class="cn-sub" x="812" y="344" text-anchor="end">This browser</text>
         <!-- TASK-984: override signal on the OT bus (elbows converge at y=180). Hidden when zero. -->
         <g id="cnOvr" style="cursor:pointer;display:none" role="button" aria-label="Active gateway overrides — click for detail">
           <rect x="200" y="167" width="96" height="26" rx="13" fill="color-mix(in srgb,var(--zone-warn) 16%,var(--panel))" stroke="var(--zone-warn)" stroke-width="1.5"/>
