@@ -3,9 +3,11 @@ id: TASK-1565
 title: >-
   REST: a POST without a JSON content type reads the previous request's body
   (sat/settings got 18.5 for control_mode)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-02T18:59:00Z'
+updated_date: '2026-11-03T18:22:00Z'
 labels:
   - rest-api
   - bug

@@ -3,10 +3,11 @@ id: TASK-1553
 title: >-
   build.py machine lock treats a reused PID as a live holder; a killed build
   blocks every later build
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-01T21:22:00Z'
-updated_date: '2026-11-02T04:37:00Z'
+updated_date: '2026-11-03T18:22:00Z'
 labels:
   - tooling
 dependencies: []
