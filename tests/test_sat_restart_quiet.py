@@ -71,7 +71,8 @@ enum SATControlMode { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 
 struct Weather { bool bValid = false; uint32_t iLastUpdateMs = 0; float fTemperature = 0.0f; };
 struct SatSettings { bool bSimulation = false; bool bEnabled = true; bool bPushSetpoint = false; float fTargetTemp = 15.0f; };
 struct Settings { SatSettings sat; };
-struct SatState { bool bLastSentValid=false, bTCAccountedValid=false, bActive=false, bSafetyTripped=false, bFallbackActive=false,
+struct SatState { bool bSlaveCfgValid=false, bSlaveLowOffDenied=false;   // TASK-1412.4: read by the cut satRestoreDeferredStep()
+                  bool bLastSentValid=false, bTCAccountedValid=false, bActive=false, bSafetyTripped=false, bFallbackActive=false,
                   bPushRefused=false, bRoomTempLost=false, bOtLinkLost=false, bOutsideTempMissing=false;
                   uint32_t iLastSentCSMs=0, iLastSentMMMs=0, iLastSentCHMs=0, iTCPushMs=0;
                   float fLastSentCS=0, fFinalSetpoint=0; uint8_t iLastSentMM=0, iLastSentCH=0; int eControlMode=0; uint32_t iSimDhwExpiryMs=0;
@@ -113,6 +114,12 @@ static void satMiStep() {}   // TASK-1371: MI=500 is tested in test_sat_no_retur
 static void satNoReturnFloodOnFlameEdge(bool, bool) {}
 static void satNoReturnFloodStep() {}
 static void satSetControlMode(SATControlMode m) { state.sat.eControlMode = m; }
+// TASK-1412.4: the slave low-load permission is not under test here (tests/test_sat_slave_lowload.py): PWM is permitted
+static bool satPwmPermitted() { return true; }
+static void satPwmNoteRefused(uint8_t) {}
+static bool satPwmEntryAllowed(uint8_t) { return true; }
+static bool satCycleCheckLowLoadVeto() { return false; }
+
 static void satPwmReset() {}
 static void satCycleSkipAutoSwitch() {}
 static float _sat_lastControlCS = 0, _sat_requestedSetpoint = 0;

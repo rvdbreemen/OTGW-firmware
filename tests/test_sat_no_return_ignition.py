@@ -94,6 +94,12 @@ static bool satCycleIsHourLimitReached() { return g_hourLimit; }
 static void satCycleRecordPwmStart() {}
 void satCycleResetSustainGuards() {}
 void satCycleSkipAutoSwitch() {}
+// TASK-1412.4: the slave low-load permission is not under test here (tests/test_sat_slave_lowload.py): PWM is permitted
+static bool satPwmPermitted() { return true; }
+static void satPwmNoteRefused(uint8_t) {}
+static bool satPwmEntryAllowed(uint8_t) { return true; }
+static bool satCycleCheckLowLoadVeto() { return false; }
+
 void satPwmReset();
 static bool g_pic = true, g_hasOT = true, g_noReturn = true, g_boardTret = false, g_confirmed = true, g_pmBusy = false; static uint8_t g_quirks = 0;
 static bool isPICEnabled() { return g_pic; }

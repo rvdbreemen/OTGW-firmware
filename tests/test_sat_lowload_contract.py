@@ -148,6 +148,7 @@ def run(argv, **kw):
 # ---- delegation to the existing suites ------------------------------------------------------------------------------------
 # module -> class -> test names. One group runs once per module/class (one compile), the LL test then asserts its names.
 DELEGATED = {
+    "LL-010": [("test_sat_slave_lowload", "SlaveLowLoad", None)],
     "LL-011": [("test_sat_pwm_override", "SatPwmOverride", ["test_no_flow_temperature_idles_pwm_and_sends_the_continuous_setpoint"]),
                ("test_sat_no_return_ignition", "NoReturnIgnition", ["test_a_restored_unknown_dataid_verdict_alone_is_no_return_nothing",
                                                                     "test_valid_board_sensor_counts_as_a_return_temperature"])],
@@ -311,13 +312,12 @@ class LowLoadContract(unittest.TestCase):
         self.rec()["observed"] = rows
 
     # LL-010 -------------------------------------------------------------------------------------------------------------
-    @ll("LL-010", "open_decision", "none: no SAT function reads the MsgID 3 HB4 low-off/pump-control permission (structural check)",
-        task="TASK-1412.4", question="QD-1, QD-2, QD-3 (Sergeant D entry 179, ADR-196)")
+    @ll("LL-010", "contract", "satNoteSlaveConfig, satPwmPermitted, satPwmEntryAllowed, satSetControlMode, satRestoreControlMode, satHandleControlMode, "
+        "satCycleCheckOvershootSwitch, satCycleCheckLowLoadVeto (test_sat_slave_lowload; entries 213-215, ADR-157)",
+        task="TASK-1412.4: HB4 = 1 and no valid reply block the overshoot switch, the restart restore, the pwm command and any other entry; "
+             "HB4 turning 1 leaves PWM in that tick")
     def test_ll010_hb4_permission_is_consulted_before_low_load_cycling(self):
-        sat = (FW / "SATcontrol.ino").read_text(encoding="utf-8") + (FW / "SATcycles.ino").read_text(encoding="utf-8")
-        self.assertRegex(sat, r"(?i)\bHB4\b[^\n]*(low[- ]?off|pump)|(low[- ]?off|pump)[^\n]*\bHB4\b",
-                         "no SAT code consults MsgID 3 HB4 (master low-off & pump control permission); oracle for the "
-                         "Unknown-DataID/timeout answer is QD-1..3, the veto itself is TASK-1412.4")
+        self.delegated("LL-010")
 
     # LL-011 -------------------------------------------------------------------------------------------------------------
     @ll("LL-011", "contract", "satApplyPWM flow-sentinel path; no-return verdict and board-sensor return (test_sat_pwm_override, test_sat_no_return_ignition)",

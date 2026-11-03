@@ -1106,6 +1106,65 @@ void satCycleSample()
   _cycle_lastSampleMs = now;
 }
 
+//=== Slave low-load permission: OpenTherm MsgID 3 HB bit 4 (TASK-1412.4, Sergeant D entries 213-215) ===
+// OT spec v4.2 (slave configuration flags, ID 3): bit 4 "Master low-off & pump control function" [allowed, not allowed],
+// 1 = not allowed. PWM is the master switching the boiler off between phases, so it is a permission, not a source
+// detector: the manual heating source (ADR-157) is never read here. thermo-nova only shows the bit
+// (coordinator/serial/binary_sensor.py:54) and does not act on it.
+// Entry 215: no PWM until a valid reply; a gateway that never gets one never uses PWM.
+// Called from the OpenTherm frame decoder for a valid MsgID 3 READ-ACK from the boiler.
+void satNoteSlaveConfig(uint8_t hb)
+{
+  const bool denied = (hb & 0x10) != 0;
+  if (!state.sat.bSlaveCfgValid || denied != state.sat.bSlaveLowOffDenied) state.sat.iSlaveCfgChangeMs = millis();
+  state.sat.bSlaveLowOffDenied = denied;   // before the valid flag: a reader on the other task never sees a valid reply with the old bit
+  state.sat.bSlaveCfgValid     = true;
+}
+
+bool satPwmPermitted()
+{
+  return state.sat.bSlaveCfgValid && !state.sat.bSlaveLowOffDenied;
+}
+
+// Records why and on which path PWM was refused (the REST status and the log show it) and writes one log line when the
+// reason or path changes or 10 minutes have passed since the last line (the overshoot switch asks every 60 s).
+void satPwmNoteRefused(uint8_t path)
+{
+  const uint8_t reason = state.sat.bSlaveCfgValid ? 2 : 1;
+  const uint32_t now = millis();
+  const bool fresh = state.sat.iPwmVetoMs == 0 || reason != state.sat.iPwmVetoReason || path != state.sat.iPwmVetoPath ||
+                     (uint32_t)(now - state.sat.iPwmVetoMs) >= 600000UL;
+  state.sat.iPwmVetoReason = reason;
+  state.sat.iPwmVetoPath   = path;
+  if (fresh) {
+    state.sat.iPwmVetoMs = (now != 0) ? now : 1;
+    satNarratef_P(PSTR("PWM refused (path %u): %s"), (unsigned)path,
+                  (reason == 2) ? "the boiler does not allow master low-off (MsgID 3 HB bit 4 = 1)"
+                                : "no valid MsgID 3 reply from the boiler yet");
+  }
+}
+
+// The entry paths ask here: true = PWM may start, false = refused and recorded under that path.
+bool satPwmEntryAllowed(uint8_t path)
+{
+  if (satPwmPermitted()) return true;
+  satPwmNoteRefused(path);
+  return false;
+}
+
+// PWM -> continuous when the permission is gone while PWM runs (entry 214: bit 4 turning 1 leaves PWM in that tick and the
+// continuous setpoint goes out, as the underheat exit does; one ON phase may end early). Called once per control tick, before
+// the PWM schedule. Returns true if the mode was switched.
+bool satCycleCheckLowLoadVeto()
+{
+  if (state.sat.eControlMode != SAT_MODE_PWM || satPwmPermitted()) return false;
+  satPwmNoteRefused(4);
+  satSetControlMode(SAT_MODE_CONTINUOUS);
+  satNarrate_P(PSTR("Control mode: continuous (the boiler does not allow PWM, PWM ended)"));
+  satCycleResetSustainGuards();
+  return true;
+}
+
 //=== Sustained overshoot: continuous -> PWM (thermo-nova _maybe_enable_pwm_on_sustained_overshoot, heating_control.py:262-305) ===
 // Called from the control loop once per tick, before the control mode is applied (Q47 A, entry 88), with the
 // tick time. Returns true if the mode was switched. Heat pumps use it too (entry 87).
@@ -1128,6 +1187,13 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
     return false;
   }
   if (!satSustainedFor(_sustain_overshootRunning, _sustain_overshootStartMs, tickMs, SAT_OVERSHOOT_SUSTAIN_MS)) return false;
+
+  // The boiler's MsgID 3 permission comes first (entry 213): without it the switch stays in continuous and the start
+  // is cleared, so a permission that returns later starts a fresh 60 s.
+  if (!satPwmEntryAllowed(1)) {
+    _sustain_overshootRunning = false;
+    return false;
+  }
 
   SATDebugTf(PSTR("SAT: sustained overshoot for %lus (flow=%.1f >= sp=%.1f + %.1f), switching to PWM mode\r\n"),
              (unsigned long)((uint32_t)(tickMs - _sustain_overshootStartMs) / 1000UL), flowTemp, requestedSetpoint,

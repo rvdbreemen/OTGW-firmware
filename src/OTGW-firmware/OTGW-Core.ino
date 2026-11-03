@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.32
+**  Version  : v2.0.0-beta.33
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3170,6 +3170,9 @@ void print_slavememberid(uint16_t& value)
 {
   AddLogf("%s = Slave Config[%s] MemberID code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   if (is_value_valid(OTdata, OTlookupitem)){
+    // SAT PWM permission (TASK-1412.4): only the boiler's own READ-ACK counts, on the PIC path and on OT-Direct alike
+    // (OT-Direct feeds its replies through bridgeFrameToParser('B', ...)). HB bit 4 = 1: master low-off not allowed.
+    if (OTdata.rsptype == OTGW_BOILER) satNoteSlaveConfig(OTdata.valueHB);
     //Build string for SendMQTT
     sendMQTTData(F("slave_configuration"), byte_to_binary(OTdata.valueHB));
     char _msg[15] {0};

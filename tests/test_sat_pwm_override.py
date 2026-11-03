@@ -108,6 +108,12 @@ static bool hasOTCommandInterface() { return g_hasOT; }
 static bool satEnqueueIfChangedCS(float cs) { g_csSent++; g_csLast = cs; return true; }
 void satCycleResetSustainGuards();                                    // defined in the cut SATcycles block
 void satCycleSkipAutoSwitch();                                        // idem (TASK-1367; a no-op stub on HEAD)
+// TASK-1412.4: the slave low-load permission is not under test here (tests/test_sat_slave_lowload.py): PWM is permitted
+static bool satPwmPermitted() { return true; }
+static void satPwmNoteRefused(uint8_t) {}
+static bool satPwmEntryAllowed(uint8_t) { return true; }
+static bool satCycleCheckLowLoadVeto() { return false; }
+
 #define DUE(t) (g_due)
 #define timerSATSuppress 0
 #include "@CHENABLE@"

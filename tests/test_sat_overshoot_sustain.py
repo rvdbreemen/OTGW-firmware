@@ -81,6 +81,12 @@ static uint32_t g_offTime = 1;
 static uint32_t satPwmLastOffTimeMs() { return g_offTime; }
 static int g_switches = 0;
 static void satSetControlMode(SATControlMode m) { if (m != state.sat.eControlMode) g_switches++; state.sat.eControlMode = m; }
+// TASK-1412.4: the slave low-load permission is not under test here (tests/test_sat_slave_lowload.py): PWM is permitted
+static bool satPwmPermitted() { return true; }
+static void satPwmNoteRefused(uint8_t) {}
+static bool satPwmEntryAllowed(uint8_t) { return true; }
+static bool satCycleCheckLowLoadVeto() { return false; }
+
 """
 
 MAIN = r"""

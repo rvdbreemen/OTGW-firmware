@@ -97,6 +97,8 @@ static bool satRestartStep() { return false; }   // TASK-1482: the restart and o
 static void satSavePwmEnabled(bool) {}
 static void satPidService(uint32_t) {}   // TASK-1368: the 60 s PID service is not under test here
 static void satSetControlMode(int m) { state.sat.eControlMode = m; }
+static void satRestoreDeferredStep() {}   // TASK-1412.4: tested in test_sat_slave_lowload.py
+static void satPwmSaveStep() {}
 static void satPwmReset() {}
 static void satCycleSkipAutoSwitch() {}   // TASK-1367: called by satDisable(); the overshoot timer is not under test here
 static float _sat_lastControlCS = 0, _sat_requestedSetpoint = 0;

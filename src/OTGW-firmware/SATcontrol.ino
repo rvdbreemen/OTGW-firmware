@@ -1579,9 +1579,15 @@ void satPwmReset()
 // sustained-overshoot start, so no path (the control_mode command included) can carry a start from one
 // continuous stint into the next. Firmware choice: thermo-nova has no mode command; it clears the start on
 // the next update while PWM is enabled (heating_control.py:264-266).
+// PWM is entered only with the boiler's MsgID 3 permission (satPwmPermitted(), entries 213-215). The callers check it first
+// to log their own path; this check is the last line, so no entry path can bypass the veto.
 
 static void satSetControlMode(SATControlMode m)
 {
+  if (m == SAT_MODE_PWM && !satPwmPermitted()) {
+    satPwmNoteRefused(0);
+    m = SAT_MODE_CONTINUOUS;
+  }
   if (m != state.sat.eControlMode) {
     // TASK-1521: every mode change in one place; the callers narrate their own reason
     SATDebugTf(PSTR("SATMODE from=%d to=%d\r\n"), (int)state.sat.eControlMode, (int)m);
@@ -3385,6 +3391,46 @@ static void satSavePwmEnabled(bool enabled)
 }
 // --- satPwmFlag end
 
+// The control mode SAT starts in. Entry 121: PWM enabled before the restart comes back as PWM, from a fresh phase
+// (pwm.py:111-114). Entries 213 and 215: only with the boiler's MsgID 3 permission, which a restart has not seen yet.
+// Our reading of 121 + 213 + 215 together: the restore is deferred. SAT starts in continuous and keeps the saved flag
+// (satPwmSaveStep() does not overwrite it); the FIRST valid MsgID 3 reply after the boot decides: bit 4 clear restores PWM
+// once, bit 4 set keeps continuous and the saved flag. Later changes of bit 4 follow the normal entry rules.
+// SAT's boot PM chain sends PM=3, so the PIC asks the boiler for MsgID 3 shortly after the boot (in a field capture the
+// thermostat itself read MsgID 3 only once in 46 minutes, so without PM=3 the permission could stay unknown for long).
+// 0 nothing to restore, 1 waiting for the first valid reply, 2 the reply denied it: continuous, saved flag kept
+static uint8_t _sat_pwmRestore = 0;
+
+static void satRestoreControlMode()
+{
+  _sat_pwmRestore = 0;
+  const bool saved = satLoadPwmEnabled();
+  if (saved && satPwmEntryAllowed(2)) { satSetControlMode(SAT_MODE_PWM); return; }
+  if (saved) _sat_pwmRestore = 1;
+  state.sat.eControlMode = SAT_MODE_CONTINUOUS;
+}
+
+// Control loop, once per pass: the deferred restore (see above).
+static void satRestoreDeferredStep()
+{
+  if (_sat_pwmRestore == 0) return;
+  if (state.sat.eControlMode != SAT_MODE_CONTINUOUS) { _sat_pwmRestore = 0; return; }   // the mode moved on its own (PWM entered, SAT off)
+  if (_sat_pwmRestore != 1 || !state.sat.bSlaveCfgValid) return;
+  if (satPwmEntryAllowed(2)) {
+    satSetControlMode(SAT_MODE_PWM);
+    _sat_pwmRestore = 0;
+    satNarrate_P(PSTR("Control mode: PWM (restored after the restart)"));
+  } else {
+    _sat_pwmRestore = 2;
+  }
+}
+
+// Control loop, once per pass: the PWM-enabled flag follows the mode (entry 121), except while a restore is still open.
+static void satPwmSaveStep()
+{
+  if (state.sat.eControlMode != SAT_MODE_OFF && _sat_pwmRestore == 0) satSavePwmEnabled(state.sat.eControlMode == SAT_MODE_PWM);
+}
+
 //=== Energy State Persistence (Task #196) ===
 static const char* SAT_ENERGY_FILE PROGMEM = "/sat_energy.json";
 static uint32_t _energyLastSaveMs = 0;
@@ -3794,12 +3840,15 @@ void satHandleControlMode(const char* value)
   // While SAT is disabled or tripped the actual mode stays off (sat/mode): the command only
   // records what was requested (sat/control_mode). The control loop starts continuous on enable.
   const bool live = satIsEnabled() && !state.sat.bSafetyTripped;
+  if (live) _sat_pwmRestore = 0;   // an explicit mode command ends an open restart restore
   if (strcasecmp_P(value, PSTR("continuous")) == 0 || numericVal == 1) {
     state.sat.iRequestedControlMode = 1;
     if (live) satSetControlMode(SAT_MODE_CONTINUOUS);
   } else if (strcasecmp_P(value, PSTR("pwm")) == 0 || numericVal == 2) {
     state.sat.iRequestedControlMode = 2;
-    if (live) satSetControlMode(SAT_MODE_PWM);
+    // Entry 213: the veto covers the manual command too. The request stays 2 (sat/control_mode) while the actual mode
+    // (sat/mode) stays continuous; nothing re-enters PWM later, the command has to be sent again.
+    if (live) satSetControlMode(satPwmEntryAllowed(3) ? SAT_MODE_PWM : SAT_MODE_CONTINUOUS);
   } else if (strcasecmp_P(value, PSTR("auto")) == 0 || numericVal == 0) {
     state.sat.iRequestedControlMode = 0;
     if (live) satSetControlMode(SAT_MODE_CONTINUOUS); // Start in continuous, auto-switch
@@ -3892,7 +3941,13 @@ void satSendStatusJSON()
     je.field(F("enabled"),              settings.sat.bEnabled);
     je.field(F("active"),               snap->st.sat.bActive);
     je.field(F("control_mode"),         (int32_t)snap->st.sat.eControlMode);
-    je.field(F("boiler_status"),        snap->boilerStatus);
+    // MsgID 3 HB bit 4 permission and the last PWM refusal (TASK-1412.4): reason 0 none, 1 no valid reply yet, 2 bit 4 = 1;
+    // path 0 other, 1 overshoot switch, 2 restart restore, 3 control_mode command, 4 PWM left while running
+    je.field(F("slave_cfg_valid"),      snap->st.sat.bSlaveCfgValid);
+    je.field(F("slave_low_off_denied"), snap->st.sat.bSlaveLowOffDenied);
+    je.field(F("pwm_veto_reason"),      (int32_t)snap->st.sat.iPwmVetoReason);
+    je.field(F("pwm_veto_path"),        (int32_t)snap->st.sat.iPwmVetoPath);
+    je.field(F("boiler_status"),       snap->boilerStatus);
     je.field(F("target_temp"),          settings.sat.fTargetTemp);
     je.field(F("room_temp"),            snap->roomTemp);
     // TASK-886 review M1: distinguish "no reading" from a real 0 °C. room_temp
@@ -5244,8 +5299,7 @@ void initSAT()
 
   if (settings.sat.bEnabled) {
     // Entry 121: PWM enabled before the restart comes back as PWM, from a fresh phase (pwm.py:111-114).
-    if (satLoadPwmEnabled()) satSetControlMode(SAT_MODE_PWM);
-    else state.sat.eControlMode = SAT_MODE_CONTINUOUS;
+    satRestoreControlMode();
     DebugTf(PSTR("SAT: initialized and enabled (%s mode)\r\n"),
             state.sat.eControlMode == SAT_MODE_PWM ? "PWM" : "continuous");
     // Boot sequence: send priority messages PM=3,15,48 per SAT Python
@@ -6524,7 +6578,8 @@ static void satControlLoopRun()
   _sat_tuneGatesPassed = true;   // TASK-1525: every gate above (disabled, flashing, MQTT fallback, safety, OT link, restart) let SAT control this pass
   satMaxTSetSendStep();   // TASK-1373: SH= on a change of the user MaxTSet and once after a restart
   satMiStep();            // TASK-1371: MI=500 once, PIC boards only
-  if (state.sat.eControlMode != SAT_MODE_OFF) satSavePwmEnabled(state.sat.eControlMode == SAT_MODE_PWM);   // TASK-1482, entry 121
+  satRestoreDeferredStep();   // entries 121, 213, 215: PWM comes back on the first valid MsgID 3 reply with bit 4 clear
+  satPwmSaveStep();       // TASK-1482, entry 121
 
   // Live boiler DHW-active bit (the control tick reads it later), read on every pass: a draw shorter than one tick still marks its
   // flame (entries 105, 106) and still arms the 300 s guard, counted from the pass that sees the bit drop (entry 108, TASK-1429).
@@ -6860,6 +6915,10 @@ static void satControlLoopRun()
     SATDebugTln(F("SAT: PID at system max, switching to continuous mode"));
     satNarrate_P(PSTR("Control mode: continuous (demand at the maximum setpoint)"));   // TASK-1521
   }
+
+  // Entry 214: the boiler withdrew the low-off permission (MsgID 3 HB bit 4 = 1) while PWM runs: PWM ends in this tick and
+  // the continuous setpoint below goes out in it, as with the underheat exit. Before the overshoot check, which refuses too.
+  satCycleCheckLowLoadVeto();
 
   // --- Sustained overshoot: continuous -> PWM (Tasks #42/#43) ---
   // Before the mode is applied, as thermo-nova (heating_control.py:206-215, Sergeant D entry 88, Q47 A): on the

@@ -395,6 +395,12 @@ uint32_t satCycleGetFlameOnStartMs();
 uint32_t satCycleGetFlameOffStartMs();
 void satCycleSkipAutoSwitch();
 void satCycleResetSustainGuards();
+// TASK-1412.4: the slave low-load permission is not under test here (tests/test_sat_slave_lowload.py): PWM is permitted
+static bool satPwmPermitted() { return true; }
+static void satPwmNoteRefused(uint8_t) {}
+static bool satPwmEntryAllowed(uint8_t) { return true; }
+static bool satCycleCheckLowLoadVeto() { return false; }
+
 """
 
 
