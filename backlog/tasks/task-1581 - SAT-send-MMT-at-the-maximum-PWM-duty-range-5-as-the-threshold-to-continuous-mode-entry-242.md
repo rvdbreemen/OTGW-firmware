@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-03T06:08:00Z'
-updated_date: '2026-11-03T07:06:00Z'
+updated_date: '2026-11-03T08:17:00Z'
 labels:
   - sat
 dependencies: []
@@ -38,6 +38,8 @@ Sergeant D entry 242 (2026-11-03, msg 1567055574548353047): when PWM is at the m
 2026-11-03: Q-1581a answered A (entry 246): on an Immergas TP=11:12=80 right before MM=T at the maximum duty; below it TP and MM back to the low-load values. Unblocked.
 
 2026-11-03 (agent, verified by lead in wt-next): range-5 flag _pwm_atMaxDuty set in satPwmSchedule (duty >= dutyMax), cleared each pass and in satPwmReset; satSendMM takes SAT_MM_T=255 and sends MM=T (on change, 60 s repeat, cache reset, commit-on-success unchanged); Immergas gets TP=11:12=80 before MM=T via the existing min(mm,80) (entry 246); below range 5 the numeric MM and TP=min(MM,80) again (entry 243). DHW draw keeps its numeric maximum (overrides on change), hand-back MM=T unchanged, cold cutoff and non-PWM unchanged; HP/hybrid same rule. SATTICK prints mm=T. Tests: test_sat_cmd_cache modes 16/17 + test_n11 (gas/HP/hybrid): old 2 FAIL + 3 subtests, fix cmd_cache 27 OK, anchors 64 OK, hp_pwm 35, pic_pm_chain 32, log_to_csv 8, lowload contract OK, evaluate 0 failed. Not verified: the control-tick line itself on a host; bench.
+
+2026-11-03 lead: full sweep found tests/test_sat_immergas_tp.py failing to compile (harness cuts satSendMM without the new SAT_MM_T constant); the harness now reads the real SAT_MM_T declaration from the source. 5 OK on the fix and on the pre-1581 code; full tests 107/107 on the rebased integration HEAD.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

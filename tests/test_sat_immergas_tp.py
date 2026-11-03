@@ -92,7 +92,10 @@ class ImmergasTp(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.src = SAT_INO.read_text(encoding="utf-8")
-        body = (cut(cls.src, "static uint8_t satComputeMM(") + "\n" + cut(cls.src, "static bool satImmergasTpActive(")
+        # TASK-1581: satSendMM() uses the MM=T marker; take its real declaration from the source (absent on older code).
+        mmt = re.search(r"^static const uint8_t SAT_MM_T = \d+;", cls.src, re.M)
+        body = ((mmt.group(0) + "\n" if mmt else "")
+                + cut(cls.src, "static uint8_t satComputeMM(") + "\n" + cut(cls.src, "static bool satImmergasTpActive(")
                 + "\n" + cut(cls.src, "static void satSendMM(uint8_t mm)"))
         cls.tmp = tempfile.TemporaryDirectory()
         cpp = Path(cls.tmp.name) / "t.cpp"
