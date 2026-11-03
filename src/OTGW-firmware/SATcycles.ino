@@ -612,10 +612,24 @@ static float _flowPercentile(uint8_t pct)
   return sorted[idx];
 }
 
+//=== Interpolated percentile position (TASK-1586, entry 248, Q-PARITY-1 A) ===
+// thermo-nova percentile_interpolated (helpers.py:185-202): position = (n - 1) * p, lower = int(position),
+// upper = min(lower + 1, n - 1), the value is the lerp between the two sorted neighbours by the fraction
+// (n == 1: the value itself). Every tail percentile below uses this one helper; the caller lerps in its own
+// sample type (float, or int16 hundredths), so no buffer is added. Integer arithmetic: (n - 1) * pct is
+// exact, position = that / 100.
+static void _percentilePos(uint16_t n, uint8_t pct, uint16_t &lower, uint16_t &upper, float &frac)
+{
+  const uint32_t pos100 = (uint32_t)(n - 1) * pct;
+  lower = (uint16_t)(pos100 / 100);
+  upper = (lower + 1 < n) ? (uint16_t)(lower + 1) : (uint16_t)(n - 1);
+  frac  = (float)(pos100 % 100) / 100.0f;
+}
+
 //=== Tail-window percentile (Task #590) ===
 // Same insertion-sort approach as _flowPercentile(), but uses the 1Hz-gated
 // tail ring buffer so only the final SAT_TAIL_SAMPLE_SIZE seconds of the
-// cycle are considered.
+// cycle are considered. Interpolated between the two neighbours (TASK-1586).
 static float _tailPercentile(uint8_t pct)
 {
   if (_tail_sampleCount == 0) return 0.0f;
@@ -637,9 +651,9 @@ static float _tailPercentile(uint8_t pct)
     sorted[j + 1] = key;
   }
 
-  uint16_t idx = (uint16_t)((uint32_t)pct * (n - 1) / 100);
-  if (idx >= n) idx = n - 1;
-  return sorted[idx];
+  uint16_t lo, hi; float frac;
+  _percentilePos(n, pct, lo, hi, frac);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * frac;
 }
 
 //=== Tail warm-up exclusion (TASK-1584, entry 244, Q-PARITY-3 A) ===
@@ -663,7 +677,7 @@ static void _tailTrimWarmup(float durationSec)
 }
 
 //=== Control-setpoint error percentile over the tail (TASK-1405) ===
-// Percentile (same floor-index rule as _tailPercentile) of the per-sample flow-minus-control-setpoint
+// Percentile (interpolated as _tailPercentile, TASK-1586) of the per-sample flow-minus-control-setpoint
 // errors of the tail ring; seconds without a control setpoint are left out. Returns false when no
 // sample has one (thermo-nova: p50/p90 None, classifier.py:71-72).
 static bool _tailCtrlErrPercentiles(float &p50, float &p90)
@@ -686,8 +700,11 @@ static bool _tailCtrlErrPercentiles(float &p50, float &p90)
     }
     sorted[j + 1] = key;
   }
-  p50 = (float)sorted[(uint32_t)50 * (n - 1) / 100] / 100.0f;
-  p90 = (float)sorted[(uint32_t)90 * (n - 1) / 100] / 100.0f;
+  uint16_t lo, hi; float frac;
+  _percentilePos(n, 50, lo, hi, frac);
+  p50 = ((float)sorted[lo] + ((float)sorted[hi] - (float)sorted[lo]) * frac) / 100.0f;   // hundredths in, degrees out
+  _percentilePos(n, 90, lo, hi, frac);
+  p90 = ((float)sorted[lo] + ((float)sorted[hi] - (float)sorted[lo]) * frac) / 100.0f;
   return true;
 }
 
@@ -696,8 +713,8 @@ static bool _tailCtrlErrPercentiles(float &p50, float &p90)
 //   spP50  = p50 of the requested setpoints (classifier.py:81-86, the effective setpoint of the cold check);
 //   errP90 = p90 of flow - requested setpoint (classifier.py:45, the PWM underheat test).
 // Seconds without a requested setpoint are left out of both; a non-finite flow is left out of errP90 only
-// (the setpoint percentile does not need the flow). Percentiles use the lower neighbour, as
-// _tailCtrlErrPercentiles(). spKnown / errKnown are false for "p50 / p90 missing" (thermo-nova: None).
+// (the setpoint percentile does not need the flow). Percentiles are interpolated, as
+// _tailCtrlErrPercentiles() (TASK-1586). spKnown / errKnown are false for "p50 / p90 missing" (thermo-nova: None).
 static void _tailReqMetrics(bool &spKnown, float &spP50, bool &errKnown, float &errP90)
 {
   spKnown = false; errKnown = false; spP50 = 0.0f; errP90 = 0.0f;
@@ -718,7 +735,9 @@ static void _tailReqMetrics(bool &spKnown, float &spP50, bool &errKnown, float &
     while (j >= 0 && sps[j] > key) { sps[j + 1] = sps[j]; j--; }
     sps[j + 1] = key;
   }
-  spP50 = (float)sps[(uint32_t)50 * (ns - 1) / 100] / 100.0f;
+  uint16_t lo, hi; float frac;
+  _percentilePos(ns, 50, lo, hi, frac);
+  spP50 = ((float)sps[lo] + ((float)sps[hi] - (float)sps[lo]) * frac) / 100.0f;
   spKnown = true;
   if (ne == 0) return;
 
@@ -728,7 +747,8 @@ static void _tailReqMetrics(bool &spKnown, float &spP50, bool &errKnown, float &
     while (j >= 0 && errs[j] > key) { errs[j + 1] = errs[j]; j--; }
     errs[j + 1] = key;
   }
-  errP90 = errs[(uint32_t)90 * (ne - 1) / 100];
+  _percentilePos(ne, 90, lo, hi, frac);
+  errP90 = errs[lo] + (errs[hi] - errs[lo]) * frac;
   errKnown = true;
 }
 
@@ -1093,7 +1113,7 @@ void satCycleSample()
     {
       // Per-sample control setpoint error (TASK-1405); fFinalSetpoint <= 0 = no control setpoint, and a
       // non-finite flow is left out too (thermo-nova skips a sample without flow, tracker.py:268).
-      // Percentiles use the lower neighbour, not thermo-nova's interpolation (helpers.py:187-203).
+      // Percentiles interpolate as thermo-nova (helpers.py:185-202, TASK-1586).
       const float sp = state.sat.fFinalSetpoint;
       _tail_ctrlErr[_tail_sampleHead] = (sp > 0.0f && isfinite(flowTemp))
           ? (int16_t)lroundf(fmaxf(-300.0f, fminf(300.0f, flowTemp - sp)) * 100.0f)

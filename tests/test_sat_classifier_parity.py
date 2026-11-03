@@ -26,7 +26,7 @@ Two configurations, because the port has decided deviations built in:
             OVERSHOOT_MARGIN_CELSIUS and COLD_SETPOINT of classifier.py are set to those values for the run and restored
             (the only change to the loaded code; no file is modified)
 
-Q-PARITY-3 (entry 244, TASK-1584) and Q-PARITY-5 (entry 245, TASK-1585) are implemented and have no difference left.
+Q-PARITY-1 (entry 248, TASK-1586), Q-PARITY-3 (entry 244, TASK-1584) and Q-PARITY-5 (entry 245, TASK-1585) are implemented and have no difference left.
 Every verdict difference between the two sides must appear in DIFFERENCES with its classification:
   (a) already a RECORDED deviation: a decision of Sergeant D in docs/sat/sergeant-d-corrections.md (entry number given);
   (b) UNRECORDED: not decided by him; listed as an open question (Q-PARITY-n); behaviour is not changed here.
@@ -458,8 +458,6 @@ def run_port(sc, cfg):
 # key (scenario, config) -> (class, upstream verdict, port verdict, why, upstream citation, port citation, entry or open question)
 # Citations: upstream relative to custom_components/sat at 7beaaf5; port in src/OTGW-firmware/SATcycles.ino at this revision.
 W = "tracker.py:113-116 (warm-up min(60, 0.25 x duration), tail_start = max(.., end - 180)), :235-241 (tail = samples with timestamp >= tail_start)"
-INTERP_UP = "helpers.py:187-203 percentile_interpolated, used by tracker.py:252-254"
-INTERP_PORT = "SATcycles.ino:633 and :662 (index = pct x (n-1) / 100, integer floor, no interpolation)"
 QUANT_PORT = "SATcycles.ino:1019-1022 (error stored as int16 hundredths, lroundf), :662"
 MIN3_UP = "tracker.py:96-100 (fewer than 3 samples: no Cycle is built or emitted)"
 
@@ -472,13 +470,7 @@ def diff(scenario, cfgs, klass, up, port, why, up_cite, port_cite, ref):
 
 
 BOTH = ("parity", "firmware")
-# Q-PARITY-1 percentile rule
-diff("interp_p90_over_margin3", ("parity",), "b", "OVERSHOOT", "GOOD", "p90 of 180 samples sits between two sorted values: interpolated 3.05, floor 2.5",
-     INTERP_UP, INTERP_PORT, "Q-PARITY-1")
-diff("interp_p90_over_margin2", ("firmware",), "b", "OVERSHOOT", "GOOD", "same at the 2.0 margin: interpolated 2.15, floor 1.5",
-     INTERP_UP, INTERP_PORT, "Q-PARITY-1")
-diff("interp_p50_underheat", BOTH, "b", "GOOD", "UNDERHEAT", "p50 of 180 samples: interpolated -2.5, floor -5.0",
-     INTERP_UP, INTERP_PORT, "Q-PARITY-1")
+# Q-PARITY-1 percentile interpolation: decided (entry 248, A), implemented by _percentilePos() (TASK-1586): no difference left.
 # Q-PARITY-2 hundredth-degree quantisation of the control error
 for _c, _s in (("parity", "overshoot_boundary_parity_below_0004"), ("firmware", "overshoot_boundary_firmware_below_0004")):
     diff(_s, (_c,), "b", "GOOD", "OVERSHOOT", "error 0.004 under the margin is stored as int16 hundredths and rounds up to the margin",
@@ -604,7 +596,8 @@ class TestParity(Base):
                      "warmup_dhw_out", "warmup_dhw_in", "dhw_exactly_at_tail_start", "dhw_just_before_tail_start", "dhw_only_cycle",
                      "kind_unknown", "pwm_idle_at_end", "warmup_high_flow_short_cycle",
                      "requested_raised_inside_tail_pwm", "requested_missing_last_third_pwm",
-                     "requested_lowered_below_cold_continuous", "requested_missing_all_pwm", "flow_missing_pwm_underheat"):
+                     "requested_lowered_below_cold_continuous", "requested_missing_all_pwm", "flow_missing_pwm_underheat",
+                     "interp_p90_over_margin3", "interp_p90_over_margin2", "interp_p50_underheat"):
             for cfg in ("parity", "firmware"):
                 u, p = obs[(name, cfg)]
                 with self.subTest(name=name, cfg=cfg):
@@ -643,8 +636,8 @@ AC2 = [
      "tracker.py:273-277, classifier.py:45, :81-86", "SATcycles.ino _tail_reqSp, _tailReqMetrics()"),
     ("warm-up exclusion", "recorded and implemented: no difference (entry 244, TASK-1584; the DHW-in-tail test had it before)",
      ["warmup_high_flow_short_cycle", "warmup_dhw_out", "warmup_dhw_in"], None, "tracker.py:113-116, :237-241", "SATcycles.ino _tailTrimWarmup(), :925-927 (DHW)"),
-    ("percentile interpolation", "difference, Q-PARITY-1",
-     ["interp_p90_over_margin3", "interp_p90_over_margin2", "interp_p50_underheat"], "Q-PARITY-1", "helpers.py:187-203", "SATcycles.ino:633, :662"),
+    ("percentile interpolation", "recorded and implemented: no difference (entry 248, TASK-1586)",
+     ["interp_p90_over_margin3", "interp_p90_over_margin2", "interp_p50_underheat"], None, "helpers.py:185-202", "SATcycles.ino _percentilePos()"),
     ("missing-data treatment", "differences, Q-PARITY-6 / 11; the requested-setpoint and flow cases agree since TASK-1585",
      ["control_missing_all", "control_missing_part_of_tail", "flow_missing_continuous", "flow_missing_pwm_underheat", "control_zero_value",
       "device_setpoint_fallback_cold"], "Q-PARITY-11", "tracker.py:243-250, classifier.py:42-43, :71-72", "SATcycles.ino _tailReqMetrics(), :1017-1022"),

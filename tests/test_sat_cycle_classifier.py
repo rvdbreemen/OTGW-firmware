@@ -392,6 +392,13 @@ CASES = {
     # p90 would be +40 -> GOOD.
     "RQ6_warmup_excluded_from_requested_error": Case([seg(29, 50.0, CH, PWM, 1, 50.0, 10.0), seg(91, 46.0, CH, PWM, 1, 50.0, 50.0)],
                                                      "UNDERHEAT_PWM", on_time=300, oracle=False),
+    # TASK-1586 (entry 248, Q-PARITY-1 A): the tail percentiles interpolate between the two neighbouring sorted values
+    # (helpers.py:185-202). Burn 239 s, so the 180-sample ring is exactly the tail (warm-up 59.75 s: t = 60..239).
+    # IP1: tail errors +1.5 x162, +8 x18 (control 50): p90 position 161.1 -> 1.5 + 6.5 * 0.1 = 2.15 >= margin 2.0 -> OVERSHOOT
+    # (the lower neighbour gave 1.5 -> GOOD).
+    "IP1_p90_between_neighbours_overshoot": Case([seg(221, 51.5), seg(18, 58.0)], "OVERSHOOT"),
+    # IP2: tail errors -5 x90 (t = 60..149), 0 x90: p50 position 89.5 -> -2.5 > -3 -> GOOD (the lower neighbour gave -5 -> UNDERHEAT).
+    "IP2_p50_between_neighbours_good": Case([seg(149, 45.0), seg(90, 50.0)], "GOOD"),
     "kind_mixed": Case([seg(45, 50.0, DHW), seg(45, 50.0, CH), seg(210, 50.0, NONE)], None, kind="MIXED", oracle=False),
 }
 
@@ -514,6 +521,12 @@ class CycleClassifier(unittest.TestCase):
     def test_task1405_tail_error_uses_the_per_sample_control_setpoint(self):
         for name in ("T1_raised_setpoint", "T2_raised_setpoint_underheat", "T3_change_before_tail",
                      "T4_missing_samples_left_out", "T5_all_missing"):
+            with self.subTest(name):
+                self.check(name)
+
+    def test_task1586_tail_percentiles_interpolate_between_the_neighbours(self):
+        # each case also agrees with the real classifier.py + helpers.percentile_interpolated through ThermoNovaOracle
+        for name in ("IP1_p90_between_neighbours_overshoot", "IP2_p50_between_neighbours_good"):
             with self.subTest(name):
                 self.check(name)
 

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """TASK-1338: host test for SATcycles.ino _tailPercentile() with more than 127 samples.
+TASK-1586 (entry 248): the percentile is interpolated between the two neighbouring sorted values; the expected
+values come from the REAL thermo-nova helpers.percentile_interpolated (other-projects, pinned 7beaaf5, loaded through
+test_sat_classifier_parity.load_upstream()), not from a re-implementation.
 
 The real function and the real tail ring globals are cut out of SATcycles.ino with a regex
 and compiled with a host compiler (g++, clang++ or MSVC cl via vswhere). Nothing is
@@ -56,10 +59,12 @@ int main(int argc, char** argv) {   // argv: head count v0 v1 ... (count values,
 def extract(src: str) -> str:
     g = re.search(r"^static float\s+_tail_samples\[[^\n]*\n^static uint8_t\s+_tail_sampleHead[^\n]*\n^static uint8_t\s+_tail_sampleCount[^\n]*\n",
                   src, re.M)
+    h = re.search(r"^static void _percentilePos\(.*?^\}\s*$", src, re.S | re.M)
     f = re.search(r"^static float _tailPercentile\(uint8_t pct\)\s*\{.*?^\}\s*$", src, re.S | re.M)
     if not g or not f:
         raise AssertionError("tail ring globals or _tailPercentile() not found in SATcycles.ino")
-    return g.group(0) + "\n" + f.group(0) + "\n"
+    # _percentilePos() (TASK-1586) is part of the unit under test when the copy has it; the old copy has none
+    return g.group(0) + "\n" + (h.group(0) + "\n" if h else "") + f.group(0) + "\n"
 
 
 def compile_cpp(cpp: Path, exe: Path, asan: bool):
@@ -78,9 +83,9 @@ def compile_cpp(cpp: Path, exe: Path, asan: bool):
 
 
 def reference(vals, pct):
-    n = len(vals)
-    s = sorted(vals)
-    return s[min(pct * (n - 1) // 100, n - 1)]
+    """The real thermo-nova percentile_interpolated (helpers.py:185-202) on the same samples."""
+    import test_sat_classifier_parity as par
+    return par.load_upstream().helpers.percentile_interpolated(vals, pct / 100.0)
 
 
 class TailPercentile(unittest.TestCase):
@@ -112,11 +117,18 @@ class TailPercentile(unittest.TestCase):
     def check(self, vals, head=0, exe=None):
         got = self.run_exe(exe or self.exe, head, vals)
         want = [float(reference(vals, p)) for p in (10, 50, 90)]
-        self.assertEqual(got, want, f"n={len(vals)} head={head}")
+        self.assertEqual(len(got), 3)
+        for g_, w_, p in zip(got, want, (10, 50, 90)):
+            self.assertAlmostEqual(g_, w_, places=2, msg=f"p{p} n={len(vals)} head={head}")   # printed with %.3f; float32 lerp
 
     def setUp(self):
         if self.exe is None:
             self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
+        import test_sat_classifier_parity as par
+        try:
+            par.load_upstream()
+        except par.UpstreamUnavailable as e:
+            self.skipTest("thermo-nova upstream not runnable: %s" % e)
 
     def test_descending_full_ring(self):          # worst case for insertion sort
         self.check([float(SIZE - i) for i in range(SIZE)])
@@ -131,7 +143,20 @@ class TailPercentile(unittest.TestCase):
         vals = [float((i * 37) % 101) + 0.5 for i in range(SIZE)]
         self.check(vals, head=77)
 
-    def test_small_counts_unchanged(self):
+    def test_interpolates_between_the_two_neighbours(self):
+        # 180 values 0..179: p10 position 17.9 -> 17.9, p50 89.5, p90 161.1 (floor would give 17, 89, 161)
+        got = self.run_exe(self.exe, 0, [float(i) for i in range(SIZE)])
+        self.assertEqual([round(x, 2) for x in got], [17.9, 89.5, 161.1])
+
+    def test_single_and_two_samples(self):
+        self.assertEqual(self.run_exe(self.exe, 1, [7.5]), [7.5, 7.5, 7.5])          # n == 1 returns the value
+        got = self.run_exe(self.exe, 2, [10.0, 20.0])                                 # n == 2: lerp over the pair
+        self.assertEqual([round(x, 3) for x in got], [11.0, 15.0, 19.0])
+
+    def test_equal_samples_stay_exact(self):
+        self.assertEqual(self.run_exe(self.exe, 0, [3.25] * 50), [3.25, 3.25, 3.25])
+
+    def test_small_counts_match_the_reference(self):
         for n in (10, 64, 127):
             self.check([float(n - i) for i in range(n)], head=5)
 
