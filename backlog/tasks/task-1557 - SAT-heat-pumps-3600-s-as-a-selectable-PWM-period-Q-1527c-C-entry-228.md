@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-02T05:38:00Z'
-updated_date: '2026-11-03T00:58:00Z'
+updated_date: '2026-11-03T01:36:00Z'
 labels:
   - sat
 dependencies: []
@@ -21,8 +21,14 @@ Sergeant D answered Q-1527c with C (entry 228, 2026-11-02): add 60 min as a new 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The heat-pump period setter accepts 3600 s and stores it; 1800/2400/10800 unchanged; a hybrid never gets 3600 s unless entry 188 allows it (check first)
-- [ ] #2 The UI offers 60 min for heat pumps; host test red on the old setter, green on the fix
+- [x] #1 The heat-pump period setter accepts 3600 s and stores it; 1800/2400/10800 unchanged; a hybrid never gets 3600 s unless entry 188 allows it (check first)
+- [x] #2 The UI offers 60 min for heat pumps; host test red on the old setter, green on the fix
 - [ ] #3 Bench: a heat pump set to 3600 s runs PWM periods of 60 min (log or capture)
-- [ ] #4 Default stays 1800 s unless Sergeant D confirms otherwise; his confirmation recorded in sergeant-d-corrections.md
+- [x] #4 Default stays 1800 s unless Sergeant D confirms otherwise; his confirmation recorded in sergeant-d-corrections.md
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-03 (agent + lead): SAThpcycle setter snaps to 1800/2400/3600/10800 (boundaries 2100/3000/7200; the old 6600 boundary sent 3600 to 2400); a heat pump with 3600 runs a 3600 s period; hybrid keeps 1800/2400 (entry 188; a stored 3600 still runs 1800 on a hybrid); v2.js offers 3600 for heat pumps only. AC1/AC2: tests/test_sat_hp_pwm.py 35/35, old code 7 fail; UI tests/webui/v2-settings-sat-followups.test.mjs: old v2.js FAIL 'heat pump: cycle options include 3600 s ([1800,2400])', new v2.js PASS ([1800,2400,3600]), 0 failures of 43. AC4: default unchanged at 1800 s (no change needs no confirmation; Q-1527c notes the default as our interpretation). AC3 bench pending. Rough edge left: a heat pump with 3600 switched to Hybrid shows '3600 (current)' while it runs 1800.
+<!-- SECTION:NOTES:END -->

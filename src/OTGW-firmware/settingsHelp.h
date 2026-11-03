@@ -74,7 +74,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satheatingmode":"Comfort or Eco. Stored and published, but the control loop does not use it today.",
 "satmanufacturer":"Boiler brand, for known quirks. Auto detects it; set it only if detection is wrong.",
 "satinterval":"Seconds between SAT control cycles, 10 to 300. Default 30.",
-"sathpcycle":"Heat pump and hybrid PWM cycle length in seconds: 1800 (2 per hour, default) or 2400 (1.5 per hour). The minimum on time is 180 s.",
+"sathpcycle":"Heat pump and hybrid PWM cycle length in seconds: 1800 (2 per hour, default) or 2400 (1.5 per hour); a heat pump (not a hybrid) can also use 3600 (1 per hour). The minimum on time is 180 s.",
 "otdmode":"OT-Direct mode: Bypass, Gateway (default), Monitor, Master or Loopback test. A change asks for confirmation.",
 "otdchmode":"How the flow temperature is chosen: Off, Fixed flow, or Heating curve (auto) from the outside temperature. Master mode only.",
 "otdflowtemp":"Flow temperature in Fixed flow mode. Default 45 °C. Master mode only.",

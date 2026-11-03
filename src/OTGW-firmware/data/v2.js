@@ -2604,6 +2604,8 @@
       var cvInt = '' + parseInt(cv, 10);
       var hasInt = !hasRaw && cv !== '' && ENUM_OPTS[k].some(function (o) { return ('' + o[0]) === cvInt; });
       ENUM_OPTS[k].forEach(function (o) {
+        // TASK-1557 (entry 228): 60 min is for a heat pump only; a hybrid keeps 1800 or 2400 s (entry 188)
+        if (k === 'sathpcycle' && o[0] === 3600 && setData.satsource && curVal('satsource') === '3') return;
         var opt = document.createElement('option'); opt.value = '' + o[0]; opt.textContent = o[1]; input.appendChild(opt);
       });
       // Preserve an out-of-list current value as its own option so a custom setting
@@ -3102,7 +3104,7 @@
   var ENUM_OPTS = {
     satsource: [[0, 'Auto'], [1, 'Gas Boiler'], [2, 'Heat Pump'], [3, 'Hybrid'], [4, 'On/off heat pump, 3 h cycle (experimental)']],
     satsystem: [[0, 'Auto'], [1, 'Radiators'], [2, 'Underfloor']],
-    sathpcycle: [[1800, '1800 s (2 per hour, default)'], [2400, '2400 s (1.5 per hour)']],
+    sathpcycle: [[1800, '1800 s (2 per hour, default)'], [2400, '2400 s (1.5 per hour)'], [3600, '3600 s (1 per hour, heat pump only)']],
     satcyclesperhour: [[3, '3 per hour (default)'], [4, '4 per hour']],
     // boardmode is the real 3-value hardware override (ADR-127); the mockup's
     // 4-option ESP8266/OTGW32/LOLIN list was semantically wrong.

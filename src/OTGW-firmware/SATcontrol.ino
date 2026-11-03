@@ -487,12 +487,14 @@ static uint32_t satGetMinOffTimeSec()
 // Returns the PWM cycle length (period) in seconds, thermo-nova's _on_time_upper_threshold
 // (pwm.py:54). Heat pump and hybrid: iHpCycleSeconds, 1800 s (2 per hour, default) or 2400 s
 // (1.5 per hour), Sergeant D entries 40, 50 and 188 (TASK-1531). A heat pump may also have 10800 s, the
-// experimental on/off heat-pump cycle of 3 hours (entry 195, TASK-1542); a hybrid never gets it.
+// experimental on/off heat-pump cycle of 3 hours (entry 195, TASK-1542) or 3600 s (1 per hour, entry 228,
+// TASK-1557); a hybrid never gets either (entry 188 names only 1800 or 2400 s), it falls back to 1800 s.
 // Otherwise 3600 / cycles per hour.
 static uint32_t satGetPwmPeriodSec()
 {
   const uint8_t src = satGetEffectiveHeatingSource();
   if (src == SAT_SRC_HEAT_PUMP && settings.sat.iHpCycleSeconds == 10800) return 10800UL;
+  if (src == SAT_SRC_HEAT_PUMP && settings.sat.iHpCycleSeconds == 3600) return 3600UL;
   if (src == SAT_SRC_HEAT_PUMP || src == SAT_SRC_HYBRID) {
     return (settings.sat.iHpCycleSeconds == 2400) ? 2400UL : 1800UL;
   }

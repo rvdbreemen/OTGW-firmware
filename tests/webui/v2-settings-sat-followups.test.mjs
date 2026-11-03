@@ -52,7 +52,7 @@ const SETTINGS = {
   // TASK-1529: appliance type and the two PWM cycle settings
   satsource: { value: 1, type: 'i', min: 0, max: 3 },
   satsystem: { value: 1, type: 'i', min: 0, max: 2 },   // TASK-1542: radiators, so the experimental type asks the second warning
-  satcyclesperhour: { value: 3, type: 'i', min: 3, max: 4 }, sathpcycle: { value: 1800, type: 'i', min: 1800, max: 2400 },
+  satcyclesperhour: { value: 3, type: 'i', min: 3, max: 4 }, sathpcycle: { value: 1800, type: 'i', min: 1800, max: 10800 },
   satinterval: { value: 30, type: 'i', min: 10, max: 300 },
   // TASK-1530: a stale form copy (100) next to the live status value (80), as Sergeant D saw it
   satmaxmodulation: { value: 100, type: 'i', min: 0, max: 100 },
@@ -318,6 +318,15 @@ check(dirtySrc === true, 'the re-render keeps the unsaved appliance type (dirty,
 await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); sel.value = '3'; sel.dispatchEvent(new Event('change', { bubbles: true })); })()`);
 const hyb = await until(`(function(){ var r = ${pwmCard}; var s = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); return s && s.value === '3' && r.cph !== undefined ? r : null; })()`);
 check(!!hyb && hyb.hp && !hyb.cph && !hyb.otherCycle, `hybrid selected: heat-pump cycle shown, cycles per hour hidden (${JSON.stringify(hyb)})`);
+// TASK-1557 (entry 228): 60 min is offered for a heat pump, not for a hybrid (entry 188 names 1800 or 2400 s)
+const hybOpts = await evalJs(`(function(){ var r = document.querySelector('#satSetL3 .srow[data-key="sathpcycle"]'); var s = r && r.querySelector('select');
+  return s ? Array.prototype.map.call(s.options, function (o) { return o.value; }) : null; })()`);
+check(!!hybOpts && hybOpts.join() === '1800,2400', `hybrid: cycle options are 1800 and 2400 only (${JSON.stringify(hybOpts)})`);
+await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); sel.value = '2'; sel.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+const hpOpts = await until(`(function(){ var r = document.querySelector('#satSetL3 .srow[data-key="sathpcycle"]'); var s = r && r.querySelector('select');
+  return s ? Array.prototype.map.call(s.options, function (o) { return o.value; }) : null; })()`);
+check(!!hpOpts && hpOpts.join() === '1800,2400,3600', `heat pump: cycle options include 3600 s (${JSON.stringify(hpOpts)})`);
+await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); sel.value = '3'; sel.dispatchEvent(new Event('change', { bubbles: true })); })()`);
 // TASK-1542 (entries 195, 202-204): the experimental on/off heat-pump type in the appliance list, on any heating system,
 // with Robert's warning text; on radiators a second warning must be confirmed; stored as satsource 2 + sathpcycle 10800,
 // the 3-hour cycle is fixed (no cycle field)

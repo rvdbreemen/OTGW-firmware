@@ -257,6 +257,17 @@ class SatHeatPumpPwm(unittest.TestCase):
         r = self.run_sc("map", SRC_HP, 10800, 3, 0.50, 1, 5000)        # ON 5400 s: still ON
         self.assertEqual(r["req"], "1")
 
+    # --- TASK-1557, entry 228 (Q-1527c C): 3600 s period for a heat pump, minimum ON 600 s ---
+    # lower 600/3600 = 1/6, upper 5/6, min 1/12, max 11/12
+    def test_hp3600_ranges(self):
+        for ratio, flame, exp in ((0.50, False, (1800, 1800)), (0.60, True, (2160, 1440)), (0.30, False, (1080, 2520)),
+                                  (0.98, False, (7200, 0))):
+            with self.subTest(ratio=ratio, flame=flame):
+                self.assertMap(SRC_HP, 3600, 3, ratio, flame, exp)
+
+    def test_hybrid_never_gets_3600(self):
+        self.assertMap(SRC_HYB, 3600, 3, 0.50, False, (900, 900))      # 3600 stored, a hybrid runs 1800 s (entry 188)
+
     def test_hybrid_never_gets_10800(self):
         self.assertMap(SRC_HYB, 10800, 3, 0.50, False, (900, 900))     # 10800 stored, a hybrid runs 1800 s
 
@@ -320,10 +331,11 @@ class SatHeatPumpPwm(unittest.TestCase):
             with self.subTest(hp_sec=hp_sec, ratio=ratio):
                 self.assertMap(SRC_HYB, hp_sec, 3, ratio, flame, exp)
 
-    # --- Setter: 1800 / 2400 (entries 30, 40, 50) and 10800 (entry 195); other values snap to the nearest ---
-    def test_setter_snaps_to_three_options(self):
+    # --- Setter: 1800 / 2400 (entries 30, 40, 50), 3600 (entry 228) and 10800 (entry 195); other values snap to the nearest ---
+    def test_setter_snaps_to_four_options(self):
         for given, stored in (("1800", 1800), ("2400", 2400), ("2100", 2400), ("2099", 1800), ("0", 1800),
-                              ("6599", 2400), ("6600", 10800), ("9999", 10800), ("10800", 10800), ("20000", 10800)):
+                              ("2999", 2400), ("3000", 3600), ("3600", 3600), ("7199", 3600), ("7200", 10800), ("9999", 10800),
+                              ("10800", 10800), ("20000", 10800)):
             with self.subTest(given=given):
                 self.assertEqual(int(self.run_sc("setter", given)["stored"]), stored)
 
