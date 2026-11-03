@@ -112,6 +112,34 @@ void satPidGetPersistState(float* integral, float* d, float* rawDerivative, floa
   *lastError     = isnan(_pid_lastError) ? 0.0f : _pid_lastError;
 }
 
+//=== The rest of the persisted controller state (TASK-1415, entry 74) ===
+// thermo-nova persists five values (pid.py:243-249): integral, last error, raw derivative, last temperature and the
+// derivative time. satPidGetPersistState() gives the first three (the last error as 0 while none is held); this gives
+// the other two and whether the last error is held. The derivative time is an uptime stamp (millis()); the caller
+// stores it as wall-clock time.
+void satPidGetPersistLast(bool* errorHeld, bool* tempHeld, float* lastTemp, uint32_t* derivativeMs)
+{
+  *errorHeld    = !isnan(_pid_lastError);
+  *tempHeld     = _pid_initialized;
+  *lastTemp     = _pid_lastRoomTemp;
+  *derivativeMs = _pid_lastDerivativeMs;
+}
+
+// Restore of the last error, the last temperature and the derivative time (pid.py:150-152). The derivative time
+// arrives as an uptime stamp, already converted from the saved wall-clock time. Setting _pid_initialized lets the
+// first live step compute its derivative from the restored temperature and time, as thermo-nova does after a
+// restart. Once a live step has run (a restore that lands late, after NTP) the live values are newer and stay.
+void satPidRestoreLast(bool errorHeld, float lastError, bool tempHeld, float lastTemp, uint32_t derivativeMs)
+{
+  if (_pid_roomSeen) return;
+  _pid_lastError     = errorHeld ? lastError : NAN;
+  _pid_previousError = errorHeld ? lastError : 0.0f;
+  if (!tempHeld) return;
+  _pid_lastRoomTemp     = lastTemp;
+  _pid_lastDerivativeMs = derivativeMs;
+  _pid_initialized      = true;
+}
+
 //=== Reset of the integral and the raw derivative (thermo-nova PID.reset(), pid.py:134-137) ====
 // Zeroes exactly what thermo-nova zeroes and nothing else: the last error, the last room temperature, the
 // timers, _pid_initialized and the start-up flags stay, so the next PID step is a normal step and the

@@ -123,6 +123,8 @@ static void satResetControlState() {}   // TASK-1414: zone integrals, tested in 
 static int g_pidRestored = 0;
 static void satPidRestoreState(float, float) { g_pidRestored = 1; }
 static void satPidGetPersistState(float* i, float* d, float* rd, float* e) { *i = 1.5f; *d = 0; *rd = 0; *e = 0.2f; }
+static void satPidGetPersistLast(bool* eh, bool* th, float* lt, uint32_t* dm) { *eh = true; *th = false; *lt = 0; *dm = 0; }   // TASK-1415: tested in test_sat_pid_persist.py
+static void satPidRestoreLast(bool, float, bool, float, uint32_t) {}
 static void satSaveEnergyState() {}
 static void satSaveEstimatedEnergy() {} static void satHCRReset() {}
 // LittleFS over real files in the working directory (a "reboot" is a second process on the same files)

@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-28T06:45:00Z'
-updated_date: '2026-10-30T18:40:00Z'
+updated_date: '2026-11-03T00:18:00Z'
 labels:
   - sat
   - sergeant-d
@@ -34,8 +34,8 @@ Sergeant D 2026-10-27 (entry 74, Q24: follow thermo-nova). Save integral, last e
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test: save then restore round-trips all five fields; a file older than 30 min is still restored
-- [ ] #2 NAN last error is saved and restored without corrupting the file
+- [x] #1 Host test: save then restore round-trips all five fields; a file older than 30 min is still restored
+- [x] #2 NAN last error is saved and restored without corrupting the file
 - [x] #3 Write cadence decided by Robert and recorded in the task
 - [ ] #4 build + evaluate green
 <!-- AC:END -->
@@ -54,4 +54,6 @@ Execution-graph update requested by Robert: serialize pending SATpid.ino writers
 2026-10-28 maintainer decision (Robert, in session), replaces the earlier 'only on change' note: write the PID checkpoint at most once every 15 minutes, and only when a stored value changed (the spec proposed 5 minutes). Planned restarts and SAT disable still flush immediately (spec section 10 exceptional events). Wear estimate from docs/design/pid-checkpoint-ten-year-spec.md (LittleFS simulation, 62-byte record, dedicated dir + tmp/rename: max 1538 erases on one sector per 100k updates; not a hardware test, the final 180-byte record must be re-measured): worst case every interval writes = 35,040 writes/yr -> ~539 erases/yr on the hottest sector -> ~5,400 in 10 years (+~560 for 36,525 flushes) = ~12% of the spec's 50,000 ten-year budget, ~6% of the 100,000 rated cycles. 5 min would be ~16,200 (+560) in 10 years; 60 s ~80,800 (over budget). Cost: up to 15 min of learned PID state lost on an unplanned reset (power cut, crash).
 
 2026-10-30 coordinator: picked up and put back: Robert's SATpid.ino writer order is 1416 -> 1417 -> 1418 -> 1414 -> 1423 -> 1415; TASK-1414 is not Done yet.
+
+2026-11-03 (agent + lead integration): 30-min discard (SAT_PID_STALE_SEC) removed, only a missing ts skips; satPidStateBuild writes err:null for a NAN last error plus lt and dts (derivative time as wall clock); restore of last error/temperature/time via new satPidRestoreLast, skipped once a live room reading was seen. thermo-nova pid.py:141-157 (restore), :243-249 (save). AC1 test_round_trip_of_all_five_fields + test_file_older_than_30_minutes_is_still_restored (1801 s, 2 h, 90 days); AC2 test_nan_last_error_is_saved_and_restored_without_corrupting_the_file; tests/test_sat_pid_persist.py 8/8, old code 6 fail. restart_quiet 20, pid_cadence 31, integral_cap 5, ot_loss 24, fs_update_keep 37 green. KEPT: the NTP-gated deferred load (a wall-clock derivative time needs a clock; entry 140's 60 s wait). FOLLOW-UP: ADR-197 decision 7 still says 'no NTP gate' and describes the 30-min limit (text was already stale before this change) -> needs a correction note by Robert. NOT DONE: re-measure the ~100 B record against docs/design/pid-checkpoint-ten-year-spec.md section 10. AC4 build follows with the batch.
 <!-- SECTION:NOTES:END -->

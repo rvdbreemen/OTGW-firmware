@@ -3233,20 +3233,39 @@ static void satMigrateFile(PGM_P oldPath, PGM_P newPath)
 static const char* SAT_PID_STATE_FILE PROGMEM = "/sat_pid_state.json";
 static uint32_t _pidLastSaveMs = 0;
 
-// Max age (seconds) before a saved PID state is considered stale and discarded on restore.
-// 30 minutes: covers brief power cuts and OTA updates; rejects summer/long-downtime state.
-static const uint32_t SAT_PID_STALE_SEC = 1800UL;
+// The saved PID state has no age limit (entry 74, Q24: thermo-nova restores whatever is stored, pid.py:141-157, and
+// only "no stored data" skips the restore, pid.py:147-148). A long gap shows as a large derivative delta time on the
+// first live step, as in thermo-nova.
+
+// The five values of thermo-nova (pid.py:243-249) as the opening of the JSON object, without the closing brace.
+// TASK-1415 (entry 74): the last error is null while none is held (it is NAN, which is not valid JSON); the last
+// temperature and the derivative time are stored as wall-clock time (uptime does not survive a restart). Without a set
+// clock the derivative time cannot be stored, so the last temperature goes with it. Returns the length written.
+static int satPidStateBuild(char* buf, size_t size, time_t ts)
+{
+  float i, d, rd, err;
+  satPidGetPersistState(&i, &d, &rd, &err);   // the held controller state, not the published copies (round 3)
+  bool errHeld, tempHeld; float lastTemp; uint32_t derivMs;
+  satPidGetPersistLast(&errHeld, &tempHeld, &lastTemp, &derivMs);
+  char errTxt[16];
+  if (errHeld) snprintf_P(errTxt, sizeof(errTxt), PSTR("%.3f"), err); else snprintf_P(errTxt, sizeof(errTxt), PSTR("null"));
+  int n = snprintf_P(buf, size, PSTR("{\"i\":%.4f,\"d\":%.4f,\"rd\":%.4f,\"err\":%s,\"ts\":%lu"),
+                     i, d, rd, errTxt, (unsigned long)ts);
+  if (n > 0 && (size_t)n < size - 2 && tempHeld && ts >= 1000000L) {
+    const unsigned long derivTs = (unsigned long)ts - (unsigned long)((uint32_t)(millis() - derivMs) / 1000UL);
+    int m = snprintf_P(buf + n, size - n - 1, PSTR(",\"lt\":%.3f,\"dts\":%lu"), lastTemp, derivTs);
+    if (m > 0 && (size_t)(n + m) < size - 2) n += m; else buf[n] = '\0';
+  }
+  return n;
+}
 
 void satSavePidState()
 {
   File f = LittleFS.open(FPSTR(SAT_PID_STATE_FILE), "w");
   if (!f) return;
-  char buf[192];
+  char buf[256];
   time_t ts = time(nullptr);
-  float i, d, rd, err;
-  satPidGetPersistState(&i, &d, &rd, &err);   // the held controller state, not the published copies (round 3)
-  int n = snprintf_P(buf, sizeof(buf), PSTR("{\"i\":%.4f,\"d\":%.4f,\"rd\":%.4f,\"err\":%.2f,\"ts\":%lu"),
-                     i, d, rd, err, (unsigned long)ts);
+  int n = satPidStateBuild(buf, sizeof(buf), ts);
   // A clamp, not a guard: the file is always written (the forced write of satPersistAllToFs() relies on it).
   n = (n > 0 && (size_t)n < sizeof(buf) - 2) ? n : 0;
   n = satPidStateAppendOutside(buf, n, sizeof(buf), ts);   // entry 126 (TASK-1482)
@@ -3259,7 +3278,7 @@ void satSavePidState()
 
 // Restore the PID state, and the outside temperature saved with it (entry 126). Returns SAT_PIDLOAD_RESTORED when
 // the PID state was restored, SAT_PIDLOAD_WAIT_NTP when a file exists but the clock is not set yet (the control
-// loop retries after NTP), else SAT_PIDLOAD_NONE (no file, stale, or no time stamp).
+// loop retries after NTP), else SAT_PIDLOAD_NONE (no file or no time stamp). There is no age check (entry 74).
 static const uint8_t SAT_PIDLOAD_NONE     = 0;
 static const uint8_t SAT_PIDLOAD_RESTORED = 1;
 static const uint8_t SAT_PIDLOAD_WAIT_NTP = 2;
@@ -3267,18 +3286,22 @@ uint8_t satLoadPidState()
 {
   File f = LittleFS.open(FPSTR(SAT_PID_STATE_FILE), "r");
   if (!f) return SAT_PIDLOAD_NONE;
-  char buf[192];
+  char buf[256];
   size_t len = f.readBytes(buf, sizeof(buf) - 1);
   buf[len] = 0;
   f.close();
-  // Simple parse: extract values from {"i":X,"d":Y,"rd":Z,"err":W,"ts":N}
-  float i = 0, d = 0, rd = 0, err = 0;
-  unsigned long savedTs = 0;
+  // Simple parse: extract values from {"i":X,"d":Y,"rd":Z,"err":W|null,"ts":N[,"lt":T,"dts":N][,"ot":..,"ots":..]}
+  float i = 0, d = 0, rd = 0, err = 0, lastTemp = 0;
+  unsigned long savedTs = 0, derivTs = 0;
+  bool errHeld = false;
   char* p;
   if ((p = strstr(buf, "\"i\":"))   != nullptr) i      = atof(p + 4);
   if ((p = strstr(buf, "\"d\":"))   != nullptr) d      = atof(p + 4);
   if ((p = strstr(buf, "\"rd\":"))  != nullptr) rd     = atof(p + 5);
-  if ((p = strstr(buf, "\"err\":")) != nullptr) err    = atof(p + 6);
+  if ((p = strstr(buf, "\"err\":")) != nullptr && p[6] != 'n') { err = atof(p + 6); errHeld = true; }   // null: none held
+  const bool hasLast = (p = strstr(buf, "\"lt\":")) != nullptr;   // a file from before TASK-1415 has no last temperature
+  if (hasLast) lastTemp = atof(p + 5);
+  if ((p = strstr(buf, "\"dts\":")) != nullptr) derivTs = strtoul(p + 6, nullptr, 10);
   if ((p = strstr(buf, "\"ts\":"))  != nullptr) savedTs = strtoul(p + 5, nullptr, 10);
   float outside = 0.0f;
   unsigned long outsideTs = 0;
@@ -3286,7 +3309,7 @@ uint8_t satLoadPidState()
   if (hasOutside) outside = atof(p + 5);
   if ((p = strstr(buf, "\"ots\":")) != nullptr) outsideTs = strtoul(p + 6, nullptr, 10);
 
-  // Staleness guard (Task #222): discard if NTP not yet synced or saved > 30 min ago.
+  // NTP guard (Task #222): the saved wall-clock times need a set clock.
   time_t nowTs = time(nullptr);
   if (nowTs < 1000000L) {
     // NTP not yet synced at boot — skip restore; PID starts from zero.
@@ -3304,18 +3327,22 @@ uint8_t satLoadPidState()
     state.sat.bRestoredOutdoorValid = true;
     SATDebugTf(PSTR("SAT: outside temperature restored (%.1f C, age=%lus)\r\n"), outside, (unsigned long)ageS);
   }
-  if (savedTs == 0 || (uint32_t)(nowTs - (time_t)savedTs) > SAT_PID_STALE_SEC) {
-    SATDebugTf(PSTR("SAT: PID state discarded (stale, age=%lus)\r\n"),
-            (unsigned long)(nowTs - (time_t)savedTs));
+  if (savedTs == 0) {
+    SATDebugTln(F("SAT: PID state discarded (no time stamp)"));
     return SAT_PIDLOAD_NONE;
   }
+  const uint32_t ageS = (time_t)savedTs <= nowTs ? (uint32_t)(nowTs - (time_t)savedTs) : 0;
   state.sat.fPidD  = d;
   state.sat.fError = err;
   // satPidRestoreState() sets _pid_integral and _pid_rawDerivative directly
   // so the next satPidStep() warm-starts instead of cold-starting at zero.
   satPidRestoreState(i, rd);
-  SATDebugTf(PSTR("SAT: PID state restored (I=%.4f D=%.4f rd=%.4f err=%.2f age=%lus)\r\n"),
-          i, d, rd, err, (unsigned long)(nowTs - (time_t)savedTs));
+  // The derivative time back from wall-clock to uptime; the age is capped so the uptime stamp cannot wrap past itself.
+  uint32_t derivAgeS = (derivTs != 0 && (time_t)derivTs <= nowTs) ? (uint32_t)(nowTs - (time_t)derivTs) : 0;
+  if (derivAgeS > 4000000UL) derivAgeS = 4000000UL;
+  satPidRestoreLast(errHeld, err, hasLast && derivTs != 0, lastTemp, millis() - derivAgeS * 1000UL);
+  SATDebugTf(PSTR("SAT: PID state restored (I=%.4f D=%.4f rd=%.4f err=%.3f age=%lus)\r\n"),
+          i, d, rd, err, (unsigned long)ageS);
   return SAT_PIDLOAD_RESTORED;
 }
 

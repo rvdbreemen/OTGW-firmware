@@ -288,7 +288,9 @@ def real_gather_source(sat: str) -> str:
 
 
 def save_source(sat: str) -> str:
-    return SAVE_STUBS + _fn(sat, r"void satSavePidState\(")
+    # TASK-1415: the file content is built by satPidStateBuild(); the old code builds it inside satSavePidState()
+    build = _fn(sat, r"static int satPidStateBuild\(") if "static int satPidStateBuild(" in sat else ""
+    return SAVE_STUBS + build + "\n" + _fn(sat, r"void satSavePidState\(")
 
 
 def adapt(sat: str, text: str) -> str:
