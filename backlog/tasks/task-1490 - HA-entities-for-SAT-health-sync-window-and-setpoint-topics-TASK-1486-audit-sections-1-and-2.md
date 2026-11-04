@@ -3,11 +3,11 @@ id: TASK-1490
 title: >-
   HA entities for SAT health, sync, window and setpoint topics (TASK-1486 audit
   sections 1 and 2)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T22:35:00Z'
-updated_date: '2026-11-04T13:03:00Z'
+updated_date: '2026-11-04T14:14:00Z'
 labels:
   - sat
   - mqtt
@@ -29,7 +29,7 @@ TASK-1486 audited the 91 published sat/* state topics without a Home Assistant e
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 A host test streams the discovery for each new row with the class, unit, category and payload from the audit; red on HEAD, green after
-- [ ] #2 Bench: mosquitto_sub on homeassistant/# shows each new config, and HA shows each entity with a state (gated topics excepted)
+- [x] #2 Bench: mosquitto_sub on homeassistant/# shows each new config, and HA shows each entity with a state (gated topics excepted)
 - [x] #3 At least one health and one sync entity read OFF on a healthy bench and ON with the fault forced (simulation)
 - [x] #4 Flash and static-RAM delta measured from a before/after esp32-combo build (estimate ~0.9 KB flash for section 1, ~1.5 KB with all recommended section-2 adds, 0 B static RAM)
 - [x] #5 MQTT.md entity counts and CHANGELOG updated
@@ -47,4 +47,12 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: none of the sat/* 
 2026-11-03 AC4 measured (xtensa size -A, beta.36 369a2e1 vs beta.37 33fb8ec, both esp32-combo): .flash.rodata +1152 B, .flash.text +196 B, app .ino.bin +1344 B (2137472 -> 2138816); .dram0.data/.dram0.bss unchanged = 0 B static RAM. Estimate was ~1.2-1.3 KB flash, 0 B RAM. AC2/AC3 (bench mosquitto_sub + HA, fault forced) after the 08:00 beta.
 
 2026-11-04 bench .61 beta.70 (sonnet agent, lead checked mon.txt + settings cmp): replay of a custom /otgw_simulation.log (MsgID 0/1/14/18) via /api/v2/simulate. setpoint_sync, modulation_sync, ch_sync ON (no boiler) -> OFF at 11:50:49 when TSet matched final_setpoint; setpoint_sync + ch_sync ON at 11:52:49 (66 s after the mismatch: 60 s debounce + 10 s pass), modulation_sync stayed OFF as control; ch_sync OFF 11:59:29, setpoint_sync OFF 12:00:39 after re-agreeing. pressure_health OFF -> ON at 11:59:09 (EMA below 0.8 bar + 120 s) -> OFF 11:59:49 after 2.0 bar. Settings identical before/after (cmp, 9644 B). AC2 broker part: all 17 TASK-1490 configs retained (426 configs total), each stat_t has a value; window_open, requested_setpoint, pressure_drop_rate are not retained (heartbeat ~5 min, function-static shadows, not in satRepublishCoreState). AC2 HA part not verified (HA MCP 401, ingress rig not started).
+
+2026-11-04 Robert (interactive): waive the HA part of AC2; broker evidence (17 retained configs, each with a state) suffices.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT health, sync, window, fallback and setpoint topics are HA entities (11 binary_sensor, 4 sensor, switch sat/enabled, select sat/preset). Evidence: broker on .61 beta.70 shows all 17 configs retained with states; replay bench forced setpoint_sync/ch_sync and pressure_health OFF->ON->OFF (60 s / 120 s debounces), settings unchanged; AC4 size measured earlier (+1344 B flash, 0 B RAM). Waived by Robert: the HA UI check of AC2. Follow-up TASK-1603: three non-retained states read unknown after an HA restart for up to ~5 min.
+<!-- SECTION:FINAL_SUMMARY:END -->
