@@ -141,6 +141,9 @@ struct HTTPClient {
   void end() {}
   bool connected() { return true; }
 };
+// TASK-1605: the worker pre-connects by IP (networkStuff.ino); the connect order itself is
+// tested in test_no_hostbyname.py. Here the connection always succeeds.
+static bool netConnectUrl(WiFiClient&, const char*, uint32_t, uint32_t) { return true; }
 
 struct WeatherState {
   float fTemperature = 0, fApparentTemp = 0, fHumidity = 0, fWindSpeed = 0, fCloudCover = 0;

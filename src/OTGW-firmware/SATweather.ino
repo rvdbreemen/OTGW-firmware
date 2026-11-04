@@ -379,6 +379,7 @@ static uint32_t _wxLastFirstTryMs = 0;
 static uint32_t _wxFirstRetryMs   = 0;
 
 static const uint32_t WEATHER_CONNECT_TIMEOUT_MS = 2000UL;  // TCP connect bound; DNS is bounded only by running off the loop task
+static const uint32_t WEATHER_READ_TIMEOUT_MS    = 5000UL;  // HTTP header wait and stream read bound
 static const uint32_t WEATHER_WORKER_STACK_BYTES = 8192;    // as the webhook sender task, which runs the same HTTPClient GET chain
 
 // Worker body: HTTP GET + stream parse into _wxWork. Runs on the worker task, never on the loop.
@@ -395,10 +396,18 @@ static void weatherFetchWork()
   WiFiClient client;
   HTTPClient http;
   http.setConnectTimeout(WEATHER_CONNECT_TIMEOUT_MS);
-  http.setTimeout(5000);  // read bound: header wait and every body byte (wstreamGet)
+  http.setTimeout(WEATHER_READ_TIMEOUT_MS);  // read bound: header wait and every body byte (wstreamGet)
 
   if (!http.begin(client, url)) {
     DebugTln(F("Weather: http.begin() failed"));
+    return;
+  }
+
+  // TASK-1605: connect by IP after begin() and before GET(), so HTTPClient reuses this
+  // connection and never resolves the hostname through hostByName() (see netConnectUrl()).
+  if (!netConnectUrl(client, url, WEATHER_CONNECT_TIMEOUT_MS, WEATHER_READ_TIMEOUT_MS)) {
+    DebugTln(F("Weather: no connection to the weather server"));
+    http.end();
     return;
   }
 

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.75
+**  Version  : v2.0.0-beta.76
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -852,6 +852,74 @@ const char* getUniqueId()
   static char uniqueId[32];
   snprintf_P(uniqueId, sizeof(uniqueId), PSTR("otgw-%s"), getMacAddress());
   return uniqueId;
+}
+
+//=====[ Outbound HTTP by IP (TASK-1605) ]=====================================
+// Application code never resolves through Network/WiFi.hostByName() and never lets
+// HTTPClient or NetworkClient connect by hostname, because that path clears the lwIP DNS
+// cache without the core lock (see platformResolveHost() in platform_esp32.h).
+// tests/test_no_hostbyname.py enforces this.
+
+static const size_t NET_HOST_MAX = 64;
+
+// Host and port of an "http://host[:port]/..." URL, host resolved with platformResolveHost().
+// Port 80 when the URL has none. False on a malformed URL or a failed lookup (ip is 0.0.0.0).
+bool netResolveUrlHost(const char* url, IPAddress& ip, uint16_t& port)
+{
+  ip = IPAddress(static_cast<uint32_t>(0));
+  port = 80;
+  if (url == nullptr || strncasecmp_P(url, PSTR("http://"), 7) != 0) return false;
+  const char* host = url + 7;
+  size_t len = 0;
+  while (host[len] && host[len] != '/' && host[len] != ':' && host[len] != '?') len++;
+  if (len == 0 || len >= NET_HOST_MAX) return false;
+  char hostBuf[NET_HOST_MAX];
+  memcpy(hostBuf, host, len);
+  hostBuf[len] = '\0';
+  if (host[len] == ':') {
+    const char* s = host + len + 1;
+    uint32_t p = 0;
+    size_t digits = 0;
+    while (*s >= '0' && *s <= '9' && digits < 6) { p = p * 10 + (uint32_t)(*s - '0'); s++; digits++; }
+    if (digits == 0 || p == 0 || p > 65535) return false;
+    port = (uint16_t)p;
+  }
+  return platformResolveHost(hostBuf, ip);
+}
+
+// Connect client by IP and set its read timeout. HTTPClient only sets the read timeout on
+// its own connect path (HTTPClient.cpp:1115, arduino-esp32 3.3.5), which a pre-connected
+// client skips.
+bool netConnectIp(WiFiClient& client, const IPAddress& ip, uint16_t port,
+                  uint32_t connectTimeoutMs, uint32_t readTimeoutMs)
+{
+  if (!client.connect(ip, port, (int32_t)connectTimeoutMs)) return false;
+  client.setTimeout(readTimeoutMs);
+  return true;
+}
+
+// Resolve the host of url and connect client to it by IP, for an HTTPClient that then reuses
+// the connection. The order at the call site matters (HTTPClient.cpp, arduino-esp32 3.3.5):
+//   1. http.begin(client, url): begin() on a client that is already connected stops it when
+//      the host differs from the previous one, and a fresh HTTPClient has none (:283-287).
+//   2. netConnectUrl(client, url, ...): resolve with platformResolveHost(), connect(ip, port).
+//   3. http.GET() / sendRequest(): connect() finds the client connected and reuses it without
+//      DNS (:1075-1085). The Host header still carries the hostname from the URL (:288, :1145).
+// If this returns false the caller must not send the request: HTTPClient would then connect by
+// hostname itself.
+bool netConnectUrl(WiFiClient& client, const char* url, uint32_t connectTimeoutMs, uint32_t readTimeoutMs)
+{
+  IPAddress ip;
+  uint16_t port = 80;
+  if (!netResolveUrlHost(url, ip, port)) {
+    DebugTf(PSTR("Net: DNS lookup failed for %s\r\n"), url);
+    return false;
+  }
+  if (!netConnectIp(client, ip, port, connectTimeoutMs, readTimeoutMs)) {
+    DebugTf(PSTR("Net: connect to %u.%u.%u.%u:%u failed\r\n"), ip[0], ip[1], ip[2], ip[3], port);
+    return false;
+  }
+  return true;
 }
 
 /***************************************************************************

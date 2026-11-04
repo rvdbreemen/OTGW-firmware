@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.75
+**  Version  : v2.0.0-beta.76
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -6579,6 +6579,9 @@ void applyLegacyPort25238Setting()
 // while still leaving generous TWDT headroom.
 static const uint16_t PIC_HTTP_TIMEOUT_MS          = 5000;
 static const uint16_t PIC_HTTP_DOWNLOAD_TIMEOUT_MS = 15000;
+// Update-check and download URL: device id and hex file name.
+static const char kPicUpdateUrlFmt[] PROGMEM = "http://otgw.tclcode.com/download/%s/%s";
+static const size_t PIC_UPDATE_URL_LEN = 128;
 
 void upgradepicnow(const char *filename) {
   if (!isPICEnabled()) {
@@ -6907,7 +6910,9 @@ String checkforupdatepic(String filename){
 
   // Security note: download is over unencrypted HTTP; ensure device is on a
   // trusted local network and is not reachable from untrusted networks.
-  http.begin(client, "http://otgw.tclcode.com/download/" + String(state.pic.sDeviceid) + "/" + filename);
+  char url[PIC_UPDATE_URL_LEN];
+  snprintf_P(url, sizeof(url), kPicUpdateUrlFmt, state.pic.sDeviceid, filename.c_str());
+  http.begin(client, url);
   // TASK-865.14: this runs in loop() context (deferred off the AsyncTCP task) and
   // loop() is subscribed to the 30s ESP32 TWDT (ADR-135). Bound the connect+read
   // timeouts so an unreachable host (the AC#5 worst case) costs ~5s, not a full
@@ -6918,6 +6923,14 @@ String checkforupdatepic(String filename){
   strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
   http.setUserAgent(useragent);
   http.collectHeaders(hexheaders, 2);
+  feedWatchDog();              // before the blocking DNS lookup + connect
+  // TASK-1605: connect by IP after begin() and before the request, so HTTPClient reuses this
+  // connection and never resolves the hostname through hostByName() (see netConnectUrl()).
+  if (!netConnectUrl(client, url, PIC_HTTP_TIMEOUT_MS, PIC_HTTP_TIMEOUT_MS)) {
+    OTDebugln(F("Failed to fetch version from Schelte Bron website"));
+    http.end();
+    return latest;
+  }
   feedWatchDog();              // before the blocking call
   code = http.sendRequest("HEAD");
   feedWatchDog();              // and after, before header iteration
@@ -6953,7 +6966,9 @@ void refreshpic(String filename, String version) {
   if (latest != version) {
     OTDebugTf(PSTR("Update (%s)%s: %s -> %s\r\n"), state.pic.sDeviceid, filename.c_str(), version.c_str(), latest.c_str());
     OTDebugTln(F("NOTE: PIC firmware is downloaded over plain HTTP (no TLS); ensure device is on a trusted local network."));
-    http.begin(client, "http://otgw.tclcode.com/download/" + String(state.pic.sDeviceid) + "/" + filename);
+    char url[PIC_UPDATE_URL_LEN];
+    snprintf_P(url, sizeof(url), kPicUpdateUrlFmt, state.pic.sDeviceid, filename.c_str());
+    http.begin(client, url);
     // TASK-865.14: bounded timeouts — deferred to loop() context, under the 30s TWDT.
     // The connect bound stays at the 5s HEAD value, but the read bound is larger
     // here: this GET streams a full Intel-HEX (~30-60 KB) to LittleFS, so a tight
@@ -6965,6 +6980,14 @@ void refreshpic(String filename, String version) {
     char useragent[40] = "esp8266-otgw-firmware/";
     strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
     http.setUserAgent(useragent);
+    feedWatchDog();            // before the blocking DNS lookup + connect
+    // TASK-1605: connect by IP first, as in checkforupdatepic(). The read bound is the
+    // download bound, not the connect bound (netConnectIp sets it on the client).
+    if (!netConnectUrl(client, url, PIC_HTTP_TIMEOUT_MS, PIC_HTTP_DOWNLOAD_TIMEOUT_MS)) {
+      OTDebugTln(F("PIC refresh: no connection to the download server"));
+      http.end();
+      return;
+    }
     feedWatchDog();            // before the blocking GET
     code = http.GET();
     feedWatchDog();            // and after, before the stream write

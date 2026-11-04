@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-04T16:24:00Z'
-updated_date: '2026-11-04T16:24:00Z'
+updated_date: '2026-11-04T17:04:00Z'
 labels:
   - network
   - crash
@@ -26,7 +26,13 @@ Bench .63 beta.74, 2026-11-04 16:56-17:21 (TASK-1471 T1: MikroTik forward drop f
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A Platform shim (platform_esp32.h) resolves a hostname with lwip_getaddrinfo (thread-safe, no dns_clear_cache) with a bounded wait; no application code calls Network/WiFi.hostByName or connects by hostname any more (source gate test)
-- [ ] #2 Weather, PIC update check/download and MQTT hostname broker connect by the resolved IP while the HTTP Host header keeps the hostname (HTTPClient reuses the pre-connected client)
+- [x] #1 A Platform shim (platform_esp32.h) resolves a hostname with lwip_getaddrinfo (thread-safe, no dns_clear_cache) with a bounded wait; no application code calls Network/WiFi.hostByName or connects by hostname any more (source gate test)
+- [x] #2 Weather, PIC update check/download and MQTT hostname broker connect by the resolved IP while the HTTP Host header keeps the hostname (HTTPClient reuses the pre-connected client)
 - [ ] #3 Bench .63 with the TASK-1471 T1 drop rule for 25 min: no panic, bootcount unchanged, no loop stall from these paths (red: beta.74 five panics in 25 min)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-04 (opus agent; lead reran in wt-int4): platformResolveHost() (platform_esp32.h:406-447, lwip_getaddrinfo AF_INET, never dns_clear_cache; DNS bound derived 7 s per server, 21 s worst case with 3 servers); networkStuff.ino netResolveUrlHost/netConnectIp/netConnectUrl; weather, PIC HEAD/GET, webhook (also fixes its double lookup) do http.begin() THEN connect by IP so HTTPClient reuses the client and the Host header stays the hostname (HTTPClient.cpp:283-288, 1075-1085, 1145); MQTT broker lookup via the shim (setServer(IPAddress) path, ClientSync connect(host) unreachable). tests/test_no_hostbyname.py 12 OK (HEAD: 4 FAIL incl. connect-order C2), weather handoff 10, stream_tail 4 OK, evaluate 0 failed. Known: test_sim_fixture_builtin ser2net case already fails on HEAD (not touched). Tag beta.76.
+<!-- SECTION:NOTES:END -->

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.75
+**  Version  : v2.0.0-beta.76
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1316,7 +1316,9 @@ void handleMQTT()
   {
     case MQTT_STATE_INIT:
       MQTTDebugTln(F("MQTT State: MQTT Initializing"));
-      WiFi.hostByName(CSTR(settings.mqtt.sBroker), MQTTbrokerIP);  // lookup the MQTTbroker convert to IP
+      // Resolve the broker to an IP (TASK-1605: the platform shim, never hostByName(), which
+      // clears the lwIP DNS cache without the core lock). On failure MQTTbrokerIP is 0.0.0.0.
+      platformResolveHost(CSTR(settings.mqtt.sBroker), MQTTbrokerIP);
       snprintf_P(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), PSTR("%d.%d.%d.%d"), MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
       if (isValidIP(MQTTbrokerIP))
       {
@@ -1453,7 +1455,7 @@ void handleMQTT()
         //remember when you tried last time to reconnect
         RESTART_TIMER(timerMQTTwaitforretry);
         reconnectAttempts = 0;
-        // F2 (TASK-873): re-enter INIT (not TRY_TO_CONNECT) so WiFi.hostByName()+
+        // F2 (TASK-873): re-enter INIT (not TRY_TO_CONNECT) so platformResolveHost()+
         // setServer() re-run every reconnect cycle. Recovers a boot-time DNS miss
         // (resolver/mDNS not yet up), a broker that changed IP via DHCP, and a
         // first INIT pass that landed in MQTT_STATE_ERROR with no server ever set.

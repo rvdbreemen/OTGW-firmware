@@ -1,6 +1,6 @@
 /*********
 **  Program  : webhook.ino
-**  Version  : v2.0.0-beta.75
+**  Version  : v2.0.0-beta.76
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -27,60 +27,23 @@ static bool webhookInitialized = false;
 //    and public IPs are rejected
 //  - Hostnames (letters/digits/dashes/dots) are allowed — local DNS
 //    is trusted on a private network (ADR-032 trust model)
+//  - TASK-1605: the host is resolved once (platformResolveHost, via
+//    netResolveUrlHost) and the caller connects to exactly that IP, so the
+//    address that passed this check is the one that gets the request.
 //=======================================================================
-static bool isLocalUrl(const char* url) {
+static bool isLocalUrl(const char* url, IPAddress& ip, uint16_t& port) {
   // Scheme must be http://
   if (strncasecmp_P(url, PSTR("http://"), 7) != 0) {
     DebugTln(F("Webhook: URL rejected (scheme must be http://)"));
     return false;
   }
 
-  // Extract host: scan from after "http://" to first '/', ':' or NUL
-  const char* host = url + 7;
-  size_t hostLen = 0;
-  while (host[hostLen] && host[hostLen] != '/' && host[hostLen] != ':') {
-    hostLen++;
-  }
-  if (hostLen == 0 || hostLen >= 64) {
-    DebugTln(F("Webhook: URL rejected (invalid host)"));
+  if (!netResolveUrlHost(url, ip, port)) {
+    DebugTf(PSTR("Webhook: URL rejected (invalid host or port, or DNS lookup failed): %s\r\n"), url);
     return false;
   }
-
-  // Copy into a small stack buffer for analysis
-  char hostBuf[64];
-  memcpy(hostBuf, host, hostLen);
-  hostBuf[hostLen] = '\0';
-
-  // Determine whether the host is a bare IPv4 dotted-decimal address
-  bool isIp = true;
-  int dotCount = 0;
-  for (size_t i = 0; i < hostLen; i++) {
-    char c = hostBuf[i];
-    if (c == '.') { dotCount++; }
-    else if (c < '0' || c > '9') { isIp = false; break; }
-  }
-  // Must have exactly 3 dots to be a valid IPv4 (rejects "1.2.3.4.5", "...")
-  if (isIp && dotCount != 3) isIp = false;
-
-  unsigned int o1 = 0, o2 = 0, o3 = 0, o4 = 0;
-
-  if (!isIp) {
-    // Hostname — resolve to IP and validate it's local (prevents SSRF via DNS rebinding)
-    IPAddress resolved;
-    if (!WiFi.hostByName(hostBuf, resolved)) {
-      DebugTf(PSTR("Webhook: URL rejected (DNS lookup failed for %s)\r\n"), hostBuf);
-      return false;
-    }
-    o1 = resolved[0]; o2 = resolved[1]; o3 = resolved[2]; o4 = resolved[3];
-    DebugTf(PSTR("Webhook: hostname %s resolved to %u.%u.%u.%u\r\n"), hostBuf, o1, o2, o3, o4);
-  } else {
-    // Parse the four octets and validate range
-    if (sscanf(hostBuf, "%u.%u.%u.%u", &o1, &o2, &o3, &o4) != 4 ||
-        o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255) {
-      DebugTln(F("Webhook: URL rejected (malformed IP)"));
-      return false;
-    }
-  }
+  unsigned int o1 = ip[0], o2 = ip[1], o3 = ip[2], o4 = ip[3];
+  DebugTf(PSTR("Webhook: host resolved to %u.%u.%u.%u:%u\r\n"), o1, o2, o3, o4, port);
 
   if (o1 == 10)                            return true;  // 10.0.0.0/8
   if (o1 == 172 && o2 >= 16 && o2 <= 31)  return true;  // 172.16.0.0/12
@@ -245,7 +208,9 @@ static bool buildWebhookJob(bool stateOn, WebhookJob& job) {
 //=======================================================================
 static bool sendWebhookJob(const WebhookJob& job) {
   // Enforce local-network-only policy on every send (ADR-003/ADR-032, ADR-057 §3)
-  if (!isLocalUrl(job.sURL)) {
+  IPAddress ip;
+  uint16_t port = 80;
+  if (!isLocalUrl(job.sURL, ip, port)) {
     DebugTln(F("Webhook: blocked (must target local subnet; see ADR-032)"));
     return true; // policy block is not a retryable error
   }
@@ -256,6 +221,15 @@ static bool sendWebhookJob(const WebhookJob& job) {
 
   if (!http.begin(client, job.sURL)) {
     DebugTln(F("Webhook: http.begin() failed (invalid URL?)"));
+    return false;
+  }
+
+  // TASK-1605: connect to the IP isLocalUrl() checked, after begin() and before the request,
+  // so HTTPClient reuses this connection and never resolves the host through hostByName()
+  // (see netConnectUrl()). Connect bound = the HTTPClient default the old path used.
+  if (!netConnectIp(client, ip, port, HTTPCLIENT_DEFAULT_TCP_TIMEOUT, 1000)) {
+    DebugTf(PSTR("Webhook: connect to %u.%u.%u.%u:%u failed\r\n"), ip[0], ip[1], ip[2], ip[3], port);
+    http.end();
     return false;
   }
 

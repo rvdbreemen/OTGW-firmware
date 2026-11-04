@@ -36,6 +36,7 @@
 #include <esp_sntp.h>            // esp_sntp_servermode_dhcp() (platformIgnoreDhcpNtp)
 #include <lwip/priv/tcp_priv.h>  // tcp_active_pcbs (platformTcpActivePcbCount)
 #include <lwip/tcpip.h>          // LOCK_TCPIP_CORE/UNLOCK_TCPIP_CORE (platformTcpActivePcbCount)
+#include <lwip/netdb.h>          // lwip_getaddrinfo (platformResolveHost, TASK-1605)
 
 // ---- ADR-123 async/FreeRTOS stack (TASK-865.4) ---------------------------
 // Foundation headers for the 2.0.0 ESP32-S3 event-driven migration. Included
@@ -400,6 +401,48 @@ inline uint16_t platformTcpTxHoldingOnPort(uint16_t localPort) {
   }
   UNLOCK_TCPIP_CORE();
   return count;
+}
+
+// TASK-1605: resolve a hostname to an IPv4 address without Network/WiFi.hostByName().
+// arduino-esp32 3.3.5 NetworkManager::hostByName() (NetworkManager.cpp:78-82) calls
+// dns_clear_cache() without the lwIP core lock whenever its static "have IPv4/IPv6" flags
+// change, which is always the first call after boot. dns_clear_cache() runs the found-callback
+// of every pending DNS entry (dns.c:414), so a pending SNTP lookup of the NTP server then runs
+// sntp_dns_found() -> sys_untimeout() on the caller's task and trips the core-lock assert
+// (bench .63, beta.74, internet blocked: a panic every 5 min). NetworkClient::connect(host, ..)
+// and HTTPClient's connect go through that same hostByName() (NetworkClient.cpp:310-315).
+//
+// lwip_getaddrinfo() is safe from any task: netconn_gethostbyname() runs the lookup through
+// tcpip_send_msg_wait_sem(), which takes LOCK_TCPIP_CORE() (tcpip.c:446-448, this build has
+// CONFIG_LWIP_TCPIP_CORE_LOCKING=y), and it never clears the cache. Never call this with the
+// core lock held: the lock is not recursive.
+//
+// IPv4 only (AF_INET): every outbound target of this firmware is IPv4. A literal address
+// (IPAddress::fromString) returns at once without DNS.
+//
+// Wait bound: lwip_getaddrinfo() has no timeout parameter and blocks the caller until the lwIP
+// DNS timer gives up. Per configured DNS server that is DNS_MAX_RETRIES (4, lwIP opt.h default,
+// not overridden) tries with waits of 1+1+2+3 DNS_TMR_INTERVAL (1000 ms) = 7 s (dns.c
+// dns_check_entry), then the next non-zero server. CONFIG_LWIP_DNS_MAX_SERVERS=3 and no fallback
+// server (CONFIG_LWIP_FALLBACK_DNS_SERVER_SUPPORT unset), so at most 3 x 7 s = 21 s, 7 s with
+// one DHCP DNS server. A DNS server that answers (also NXDOMAIN) returns at once. A tighter hard
+// bound would need a separate resolver task, which this shim does not have; callers that must
+// not block run it on their own task.
+inline bool platformResolveHost(const char *name, IPAddress &out) {
+  out = IPAddress(static_cast<uint32_t>(0));
+  if (name == nullptr || name[0] == '\0') return false;
+  if (out.fromString(name)) return true;
+  struct addrinfo hints;
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  struct addrinfo *res = nullptr;
+  int err = lwip_getaddrinfo(name, nullptr, &hints, &res);
+  if (err != 0 || res == nullptr) return false;
+  const struct sockaddr_in *sin = reinterpret_cast<const struct sockaddr_in *>(res->ai_addr);
+  out = IPAddress(sin->sin_addr.s_addr);
+  lwip_freeaddrinfo(res);
+  return static_cast<uint32_t>(out) != 0;
 }
 
 // Exception cause from the last reset. ESP32 does not expose a direct
