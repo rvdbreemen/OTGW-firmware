@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-04T05:48:00Z'
+updated_date: '2026-11-04T05:57:00Z'
 labels:
   - otdirect
   - sat
@@ -28,3 +29,9 @@ Implements ADR-208 (Proposed, TASK-1238 option B): bit 0 of a relayed thermostat
 - [ ] #2 ADR-208 accepted by Robert before merge (open question: any CS override vs SAT-only answered)
 - [ ] #3 esp32-combo build, OTA on the OT-Direct bench unit, no regression in gateway-mode polling
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-04 Robert: ADR-208 accepted (any CS override, entry 264); implementation may start.
+<!-- SECTION:NOTES:END -->

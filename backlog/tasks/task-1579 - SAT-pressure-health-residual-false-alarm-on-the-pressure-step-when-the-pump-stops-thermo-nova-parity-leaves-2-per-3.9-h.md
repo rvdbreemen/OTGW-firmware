@@ -3,10 +3,11 @@ id: TASK-1579
 title: >-
   SAT pressure health: residual false alarm on the pressure step when the pump
   stops (thermo-nova parity leaves 2 per 3.9 h)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-03T04:03:00Z'
-updated_date: '2026-11-03T12:09:00Z'
+updated_date: '2026-11-04T05:57:00Z'
 labels:
   - sat
 dependencies: []
@@ -30,4 +31,6 @@ Follow-up of TASK-1511 (maintainer decision 2026-11-03: close 1511 on thermo-nov
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-03 maintainer: Q-1511a not asked (entry 201), task parked at low priority.
+
+2026-11-04 Robert decided (maintainer decision, entries 257-262; Sergeant D informed msg 1567417361798144021, may object). See docs/sat/sergeant-d-corrections.md.
 <!-- SECTION:NOTES:END -->

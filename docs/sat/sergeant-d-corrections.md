@@ -5897,3 +5897,74 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Quoted:** "A"
 
 **Settled:** the rule that ends PWM and goes continuous when the requested setpoint reaches the maximum compares with the value the request is clamped to (satEffectiveMaxSetpoint(): the lowest of the user/default ceiling, the boiler MaxTSet MsgID 57 or its 75 fallback, and the hard ceiling), not with the user ceiling alone. At the boiler's own limit SAT therefore goes continuous. One value for clamp and compare, as thermo-nova (heating_control.py:203-204 compares requested_setpoint with the same configured maximum it clamps to, climate.py:394, coordinator/__init__.py:275-283). Before: SATcontrol.ino clamped to satEffectiveMaxSetpoint() but compared pidOutput >= sysMax, so the rule could never fire when the boiler or installer MaxTSet sat below the ceiling (most common: installer 55 vs default 62). The boiler MaxTSet stays in the clamp (option C not chosen; firmware-only rule TASK-1373). **Task:** TASK-1591. **Open:** whether the curve-tune signal clamp at sysMax (SATcontrol.ino, near the at-max rule) follows the same value; not part of the question as posted, so it stays unchanged until asked.
+
+## 257. Heating curve rounded to 0.1 C as thermo-nova (TASK-1360) (maintainer decision, 2026-11-04)
+
+**Source:** Robert (maintainer), 2026-11-04 ~07:00 local, interactive in the session (AskUserQuestion), from the decision briefs drafted with thermo-nova and firmware citations. Maintainer decision as with entry 256; Sergeant D informed in #alpha-testing and may object, his comments are processed afterwards.
+
+**Quoted:** "Implement now, FYI to Sergeant D"
+
+**Settled:** The heating curve value is rounded to 0.1 C as thermo-nova heating_curve.py:39 (round(base_offset + coeff/4*curve, 1)); zones use the same (area.py:49, :200). Firmware satCalcHeatingCurve (SATcontrol.ino ~886-901) and the UI copy v2.js (~5057) get the same rounding. Effect at most 0.05 C. Implements ADR-198 Q3 (Robert). Entries 78/95 (round PID values to 3 decimals) do not cover the curve; this is our reading. **Task:** TASK-1360. **Open:** Sergeant D's comment, if any.
+
+
+## 258. Boiler status 'stalled' forgets the last cycle after 6 h and uses >= (TASK-1356) (maintainer decision, 2026-11-04)
+
+**Source:** Robert (maintainer), 2026-11-04 ~07:00 local, interactive in the session (AskUserQuestion), from the decision briefs drafted with thermo-nova and firmware citations. Maintainer decision as with entry 256; Sergeant D informed in #alpha-testing and may object, his comments are processed afterwards.
+
+**Quoted:** "Port 6 h expiry and >="
+
+**Settled:** The stall threshold max(600 s, 3 x last cycle duration) uses the last cycle only while it is younger than 6 h and compares with >=, as thermo-nova device/status.py:157-168 and cycles/history.py:48-57 (LAST_CYCLE_MAX_AGE_SECONDS 6*3600, cycles/const.py:14). Firmware before: no age limit and > (SATcontrol.ino ~973-981). Display only (boiler status), no control effect. **Task:** TASK-1356. **Open:** Sergeant D's comment, if any.
+
+
+## 259. Boiler status 'overshoot_cooling' follows thermo-nova's flame-off latch (TASK-1361) (maintainer decision, 2026-11-04)
+
+**Source:** Robert (maintainer), 2026-11-04 ~07:00 local, interactive in the session (AskUserQuestion), from the decision briefs drafted with thermo-nova and firmware citations. Maintainer decision as with entry 256; Sergeant D informed in #alpha-testing and may object, his comments are processed afterwards.
+
+**Quoted:** "Port thermo-nova structure"
+
+**Settled:** As thermo-nova device/__init__.py:204-207 and device/status.py:121, :201-209: an overshoot is latched at the flame-off edge when flow >= setpoint + 3.0 (device/const.py:8), skipped when the setpoint is below the cold setpoint (28.2 radiators / 21 underfloor, entries 7/11, strict <), and the status shows overshoot_cooling while flow > setpoint. Before: a live test flow > CS + 2.0 every tick, which with CS 10 in PWM OFF / cold cutoff masked post_cycle, anti_cycling and stalled. Display only. Entry 37's 2.0 margin stays for the classifier. **Task:** TASK-1361. **Open:** Sergeant D's comment, if any.
+
+
+## 260. PWM schedule does not run while the cold cutoff holds (TASK-1515) (maintainer decision, 2026-11-04)
+
+**Source:** Robert (maintainer), 2026-11-04 ~07:00 local, interactive in the session (AskUserQuestion), from the decision briefs drafted with thermo-nova and firmware citations. Maintainer decision as with entry 256; Sergeant D informed in #alpha-testing and may object, his comments are processed afterwards.
+
+**Quoted:** "Skip the schedule while cold-cut"
+
+**Settled:** satPwmSchedule is skipped while _sat_coldCut is latched, so a cold-cutoff tick can no longer begin an ON phase and count a phantom start in the sliding-hour window (which satPwmReset does not clear, entry 127). As thermo-nova heating_control.py:202-234 (heater OFF: no pwm.update, PWM disabled/reset). Our reading: completes entry 12 ('keep the thermo-nova solution'); entries 59, 98, 199 agree. **Task:** TASK-1515. **Open:** Sergeant D's comment, if any.
+
+
+## 261. The boot PM chain runs on PIC boards whatever SAT is (TASK-1384) (maintainer decision, 2026-11-04)
+
+**Source:** Robert (maintainer), 2026-11-04 ~07:00 local, interactive in the session (AskUserQuestion), from the decision briefs drafted with thermo-nova and firmware citations. Maintainer decision as with entry 256; Sergeant D informed in #alpha-testing and may object, his comments are processed afterwards.
+
+**Quoted:** "PM at boot whatever SAT is"
+
+**Settled:** The boot PM chain (PM=3/15/48) runs at every boot on PIC boards, also when SAT is disabled, so MsgID 3 (low-load permission, entry 215) is known before a later runtime SAT enable or MQTT takeover. As thermo-nova coordinator/mqtt/opentherm.py:166-172 (boot() at coordinator load, any HVAC mode). Before: only from initSAT when settings.sat.bEnabled (SATcontrol.ino ~5473-5483). OT-Direct unchanged (polls these every 60 s). Entry 129 concerns CS/CH/MM, not PM reads (our reading). **Task:** TASK-1384. **Open:** Sergeant D's comment, if any.
+
+
+## 262. Pressure drop-rate check suspended 600 s after flame-off, only if proven (TASK-1579) (maintainer decision, 2026-11-04)
+
+**Source:** Robert (maintainer), 2026-11-04 ~07:00 local, interactive in the session (AskUserQuestion), from the decision briefs drafted with thermo-nova and firmware citations. Maintainer decision as with entry 256; Sergeant D informed in #alpha-testing and may object, his comments are processed afterwards.
+
+**Quoted:** "Suspend 600 s after flame-off, if proven"
+
+**Settled:** Besides thermo-nova's 600 s suspension after coordinator.active changes (binary_sensor.py:335-355), the pressure drop-rate check is also suspended for 600 s after flame-off, to remove the pump-stop false alarms (gruijter capture: 2 episodes in 3.9 h, thermo-nova gives the same 2). Condition: kept only if the replay of gruijter's capture gives 0 episodes AND the slow-leak test still alarms; otherwise parity (no change). Q-1511a withdrawn by Robert (entry 201). **Task:** TASK-1579. **Open:** Sergeant D's comment, if any.
+
+
+## 263. No-return start-up window keeps the previous CS (TASK-1412.12, Conf-1371) (maintainer decision, 2026-11-04)
+
+**Source:** Robert (maintainer), 2026-11-04 ~07:00 local, interactive in the session (AskUserQuestion), from the decision briefs drafted with thermo-nova and firmware citations. Maintainer decision as with entry 256; Sergeant D informed in #alpha-testing and may object, his comments are processed afterwards.
+
+**Quoted:** "Keep previous CS in the window"
+
+**Settled:** In the window before the return validity is known (first ~5 minutes after boot, before any MsgID 28 answer), the flame-off hold keeps the previous CS as thermo-nova heating_control.py:392-395, instead of return 0 + 18 floored to the cold setpoint 28.2/21 (SATcontrol.ino ~1143-1150), which hit every boiler. Unchanged: the board-sensor 5 min validity (entry 217) and the MI=500 300 s debounce (entry 141; guards a normal boiler against a permanent EEPROM MI=500). Entries 84, 135, 149, 151 agree. **Task:** TASK-1412.12 (Conf-1371). **Open:** Sergeant D's comment, if any.
+
+
+## 264. OT-Direct gateway mode applies the CH override to the relayed thermostat MsgID 0 on any CS override (ADR-208, TASK-1238) (maintainer decision, 2026-11-04)
+
+**Source:** Robert (maintainer), 2026-11-04 ~07:00 local, interactive in the session (AskUserQuestion), from the decision briefs drafted with thermo-nova and firmware citations. Maintainer decision as with entry 256; Sergeant D informed in #alpha-testing and may object, his comments are processed afterwards.
+
+**Quoted:** "Any CS override, accept now"
+
+**Settled:** ADR-208 Accepted: in OT-Direct gateway mode bit 0 of a relayed thermostat MsgID 0 gets the same rule as the gateway's own frame while any CS override is held (SAT or manual CS=), as the PIC does (gateway.asm:2700-2750); the thermostat gets the boiler's slave status back with its own high byte. SAT-only was rejected (the two frames could disagree). Entries 5, 17, 39, 60 agree; no entry decides OT-Direct transport. **Task:** TASK-1600 (implementation), TASK-1601 (field capture). **Open:** Sergeant D's comment, if any.

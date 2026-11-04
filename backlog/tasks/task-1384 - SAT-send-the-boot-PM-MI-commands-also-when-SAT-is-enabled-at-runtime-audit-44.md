@@ -3,10 +3,11 @@ id: TASK-1384
 title: >-
   SAT: send the boot PM/MI commands also when SAT is enabled at runtime (audit
   #44)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T10:39:00Z'
-updated_date: '2026-10-30T18:56:00Z'
+updated_date: '2026-11-04T05:57:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -36,4 +37,6 @@ From TASK-1273 and sat-port-audit-2026-10-24.md #44: the PM/MI commands sent at 
 2026-10-28 execution sequencing: reused by TASK-1412. Required prerequisites are encoded as dependencies; existing status, queue ordinal, decisions and approval requirements are preserved. Do not resume affected control changes before the scoped approved contract and red tests. Later integration, simulation, bench acceptance and field evidence are tracked by the epic; this metadata update is not implementation or validation.
 
 2026-10-30 coordinator: skipped in this cycle: AC2 needs Sergeant D's OK first (not recorded). Note TASK-1371 already moved MI=500 to satMiStep() after satRestartStep(), which also runs when SAT is enabled at runtime; the PM chain is still boot-only. Question to queue.
+
+2026-11-04 Robert decided (maintainer decision, entries 257-262; Sergeant D informed msg 1567417361798144021, may object). See docs/sat/sergeant-d-corrections.md.
 <!-- SECTION:NOTES:END -->

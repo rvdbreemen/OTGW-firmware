@@ -3,10 +3,11 @@ id: TASK-1356
 title: >-
   SAT: ignition-stall threshold uses a last cycle duration that never expires
   (thermo-nova falls back to 600 s after 6 h)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-24T16:44:00Z'
-updated_date: '2026-11-02T04:39:00Z'
+updated_date: '2026-11-04T05:57:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -30,4 +31,6 @@ Found during TASK-1352: SATcontrol.ino:678 bases the stalled-ignition threshold 
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: SATcontrol.ino:833-836 fLastCycleDuration no 6 h expiry. Plan to Sergeant D.
+
+2026-11-04 Robert decided (maintainer decision, entries 257-262; Sergeant D informed msg 1567417361798144021, may object). See docs/sat/sergeant-d-corrections.md.
 <!-- SECTION:NOTES:END -->

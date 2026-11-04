@@ -3,10 +3,11 @@ id: TASK-1361
 title: >-
   SAT: apply the per-system cold setpoint (28.2/21) to the
   overshoot-at-flame-off check, as thermo-nova device/status.py:121
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-24T20:26:00Z'
-updated_date: '2026-11-02T04:39:00Z'
+updated_date: '2026-11-04T05:57:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -30,4 +31,6 @@ Robert 2026-10-24 (ADR-199 open question 1): port thermo-nova's COLD_SETPOINT us
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no cold-setpoint gate at SATcontrol.ino:818. Decided (ADR-199), plan to Sergeant D.
+
+2026-11-04 Robert decided (maintainer decision, entries 257-262; Sergeant D informed msg 1567417361798144021, may object). See docs/sat/sergeant-d-corrections.md.
 <!-- SECTION:NOTES:END -->

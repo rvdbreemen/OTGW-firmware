@@ -4,10 +4,11 @@ title: >-
   SAT PWM: on a cold-cutoff tick the PWM schedule still runs and can count a
   start in the hourly limit (thermo-nova skips pwm.update when the heater is
   off)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-30T18:16:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-04T05:57:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -32,4 +33,6 @@ Found in the TASK-1468 review (2026-10-30). In satControlLoopRun the PWM schedul
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: satPwmSchedule (SATcontrol.ino:6734) runs before the cold-cutoff disable (:6796). AC1 + red test doable; behaviour change needs Sergeant D OK.
+
+2026-11-04 Robert decided (maintainer decision, entries 257-262; Sergeant D informed msg 1567417361798144021, may object). See docs/sat/sergeant-d-corrections.md.
 <!-- SECTION:NOTES:END -->
