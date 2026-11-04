@@ -98,6 +98,13 @@ int main() {
   storeRebootReasonUnlessPending("WiFi: config portal timeout");
   bootCapture(true);   logLine("portal_only");
 
+  // 5b. stale record, then a crash reset (not software), then a portal timeout in that boot: the stale
+  //     reason must not be handed on; the portal timeout names itself.
+  storeRebootReason("Reboot after upgrade");
+  bootCapture(false);
+  storeRebootReasonUnlessPending("WiFi: config portal timeout");
+  bootCapture(true);   logLine("stale_then_portal");
+
   // 6. a reason longer than the record is cut and terminated, never overruns.
   storeRebootReason("0123456789012345678901234567890123456789012345678901234567890123456789");
   bootCapture(true);   logLine("long");
@@ -157,6 +164,23 @@ class RebootReason(unittest.TestCase):
 
     def test_portal_timeout_alone_stores_its_own_reason(self):
         self.assertEqual(self.rows["portal_only"], "reboot cause: Software reset (3) - WiFi: config portal timeout")
+
+    def test_stale_record_is_not_handed_on_by_portal_timeout(self):
+        self.assertEqual(self.rows["stale_then_portal"],
+                         "reboot cause: Software reset (3) - WiFi: config portal timeout")
+
+    def test_call_sites_are_wired(self):
+        # Textual wiring check (the host harness cannot run setup()/startWiFi()).
+        net = (HELPER_INO.parent / "networkStuff.ino").read_text(encoding="utf-8")
+        i = net.find('storeRebootReasonUnlessPending("WiFi: config portal timeout")')
+        self.assertGreater(i, 0, "portal timeout does not store its reason")
+        self.assertIn("platformRestart();", net[i:i + 200])
+        self.assertGreater(i, net.rfind("startConfigPortal", 0, i))
+        ino = (HELPER_INO.parent / "OTGW-firmware.ino").read_text(encoding="utf-8")
+        s = ino.find("void setup() {")
+        self.assertGreater(s, 0)
+        first = ino[s:].replace("\r", "").split("\n")[1].strip()
+        self.assertTrue(first.startswith("captureRebootReason();"), first)
 
     def test_long_and_null_reasons_are_safe(self):
         self.assertEqual(self.rows["longlen"], "47")
