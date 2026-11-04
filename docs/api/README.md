@@ -269,6 +269,21 @@ Returns the latest stored abnormal reboot/crash diagnostics, if available.
 
 When no crash log is available, `available` is `false` and `summary`/`details` are empty strings.
 
+#### `GET /api/v2/device/coredump`
+
+Downloads the ESP32 core dump stored in the `coredump` partition after a panic or watchdog reset (ADR-210). The dump is an ELF image; decode it offline with `esp-coredump` against the `.elf` of the same githash.
+
+**Authentication**: Required when an admin password is set (HTTP Basic Auth plus the same-origin check, ADR-056).
+
+**Response** `200 OK`: `application/octet-stream`, the dump image (its real length, not the 64 KB partition), `Content-Disposition: attachment; filename="otgw-coredump-<githash>.bin"`, streamed from flash.
+
+**Response** `404`: no valid core dump is stored.
+
+```bash
+curl -u admin:<password> -o otgw-coredump.bin http://<ip>/api/v2/device/coredump
+esp-coredump info_corefile --core otgw-coredump.bin --core-format raw <matching>.elf
+```
+
 ---
 
 ### Settings

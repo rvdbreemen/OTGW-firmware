@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.72
+**  Version  : v2.0.0-beta.73
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -484,6 +484,8 @@ static void handleDevice(const char words[][API_WORD_LEN], uint8_t wc, HTTPMetho
     sendDeviceTimeV2();
   } else if (wc > 4 && strcmp_P(words[4], PSTR("crashlog")) == 0) {
     sendDeviceCrashLog();
+  } else if (wc > 4 && strcmp_P(words[4], PSTR("coredump")) == 0) {
+    sendDeviceCoreDump();   // TASK-1560, admin route (ADR-210)
   } else {
     sendApiNotFound(originalURI);
   }
@@ -3547,6 +3549,36 @@ void sendDeviceCrashLog()
     je.endObject();                   // close root
   }
   restFinalize();
+}
+
+//=======================================================================
+// GET /api/v2/device/coredump (TASK-1560, ADR-210). Admin route (ADR-056): the dump holds task
+// stacks and heap fragments, so it sits behind the same checkHttpAuth() as the other admin routes.
+// Streams the stored ESP32 core dump (ELF; decode offline with esp-coredump against the matching
+// .elf) as an attachment. The body is read from flash by the response filler in the chunk sizes the
+// server asks for, never buffered: no copy of the 64 KB partition exists in RAM.
+// 404 when no valid dump is stored.
+void sendDeviceCoreDump()
+{
+  if (!checkHttpAuth()) return;
+  const size_t dumpSize = platformCoreDumpSize();
+  if (dumpSize == 0) { sendApiError(404, F("No core dump stored")); return; }
+  if (!currentRequest || g_responseSent) return;
+
+  char disp[WEB_HEADER_VALUE_LEN];
+  snprintf_P(disp, sizeof(disp), PSTR("attachment; filename=\"otgw-coredump-%s.bin\""), _VERSION_GITHASH);
+  webPushHeader(F("Content-Disposition"), disp);
+  webPushHeader(F("Cache-Control"), F("no-store"));
+
+  AsyncWebServerResponse* resp = currentRequest->beginResponse(
+      String(F("application/octet-stream")), dumpSize,
+      [](uint8_t* buf, size_t maxLen, size_t index) -> size_t {
+        return platformCoreDumpRead(index, buf, maxLen);   // 0 at the end of the image ends the body
+      });
+  if (!resp) { sendApiBusy(F("low heap")); return; }
+  webApplyHeaders(resp);
+  currentRequest->send(resp);
+  g_responseSent = true;
 }
 
 

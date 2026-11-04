@@ -910,6 +910,39 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
+  /v2/device/coredump:
+    get:
+      tags:
+        - Device Info
+      summary: Download the stored ESP32 core dump
+      description: |
+        Streams the ELF core dump kept in the coredump partition after a panic or
+        watchdog reset (ADR-210), for an offline decode with esp-coredump against
+        the matching .elf. Admin route (ADR-056): Basic Auth plus same-origin
+        check when an admin password is set.
+      operationId: getDeviceCoreDump
+      responses:
+        '200':
+          description: Core dump image
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="otgw-coredump-68b6668.bin"'
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Admin authentication required
+        '403':
+          description: Cross-origin request rejected
+        '404':
+          description: No valid core dump stored
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
   /v2/flash/status:
     get:
       tags:

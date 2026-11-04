@@ -31,6 +31,7 @@
 #include <esp_wifi.h>            // esp_wifi_get_config/set_config (platformWifiPreferStrongestAp, TASK-1397)
 #include <esp_flash.h>
 #include <esp_core_dump.h>       // core-dump summary for the reboot log (platformResetRegisterDump, TASK-1479)
+#include <esp_partition.h>       // coredump partition read (platformCoreDumpRead, TASK-1560)
 #include <hal/usb_serial_jtag_ll.h>  // platformUsbJtagPutc (TASK-1217)
 #include <esp_sntp.h>            // esp_sntp_servermode_dhcp() (platformIgnoreDhcpNtp)
 #include <lwip/priv/tcp_priv.h>  // tcp_active_pcbs (platformTcpActivePcbCount)
@@ -631,6 +632,34 @@ inline void platformResetRegisterDump(char *buf, size_t bufLen) {
 // Exception cause — not available on ESP32 via esp_reset_reason() API
 inline void platformResetExceptionInfo(char *buf, size_t bufLen) {
   buf[0] = '\0';
+}
+
+// TASK-1560: the stored core dump as a byte range, for GET /api/v2/device/coredump.
+// platformCoreDumpSize() returns the length of the valid dump image (esp_core_dump_image_check()
+// verifies its checksum, esp_core_dump_image_get() reports the length actually written, which is
+// less than the 64 KB partition), or 0 when no valid dump is stored.
+inline size_t platformCoreDumpSize() {
+  size_t addr = 0, size = 0;
+  if (esp_core_dump_image_check() != ESP_OK) return 0;
+  if (esp_core_dump_image_get(&addr, &size) != ESP_OK) return 0;
+  return size;
+}
+
+// Copy up to len bytes of the dump image, starting at byte offset, into dst. Returns the number of
+// bytes copied (0 at or past the end of the image, or on a flash read error). The partition is found
+// by type and subtype, no offset is hard-coded; every call is a bounded flash read, nothing is cached.
+inline size_t platformCoreDumpRead(size_t offset, uint8_t* dst, size_t len) {
+  size_t addr = 0, size = 0;
+  if (dst == nullptr || esp_core_dump_image_get(&addr, &size) != ESP_OK) return 0;
+  if (offset >= size) return 0;
+  const esp_partition_t* part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
+                                                         ESP_PARTITION_SUBTYPE_DATA_COREDUMP, nullptr);
+  if (part == nullptr || addr < part->address) return 0;
+  size_t base = addr - part->address;
+  if (base >= part->size || size > part->size - base) return 0;
+  if (len > size - offset) len = size - offset;
+  if (esp_partition_read(part, base + offset, dst, len) != ESP_OK) return 0;
+  return len;
 }
 
 // platformRestartDHCP() removed in TASK-432 port. Although the ESP32
