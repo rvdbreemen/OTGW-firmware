@@ -4,7 +4,7 @@ title: 'beta.1 follow-up: 24 h soak and macOS capture run (waived for v2.0.0-bet
 status: To Do
 assignee: []
 created_date: '2026-11-01T15:47:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-04T05:34:00Z'
 labels:
   - beta
   - release
@@ -32,4 +32,6 @@ TASK-1504 AC2 (macOS capture run by a tester) and AC3 (24 h soak on Classic + S3
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: verification only (24 h soak + macOS capture). Release gate for the next beta.
+
+2026-11-04 Robert: keep as the 2.0.0 stable-release gate (24 h soak + macOS/Linux capture runs); no bench soak now.
 <!-- SECTION:NOTES:END -->

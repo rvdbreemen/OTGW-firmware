@@ -1,10 +1,10 @@
 ---
 id: TASK-1498
 title: 'Unknown IRAM crash on bench .63: core dump elf 063543e5, not decodable'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30T04:19:00Z'
-updated_date: '2026-11-02T04:39:00Z'
+updated_date: '2026-11-04T05:33:00Z'
 labels:
   - bug
   - esp32
@@ -46,4 +46,12 @@ Low priority: there is one occurrence and no build to match it. Reopen if a late
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: ELF 063543e5 still missing. Close if no ELF turns up.
+
+2026-11-04 Robert (interactive): closed as waiting-for-field; reopen when the field evidence arrives (tester capture / dump).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed by Robert 2026-11-04 as waiting-for-field: the remaining AC needs field evidence that cannot be produced on the bench (see notes). Reopen when that evidence arrives.
+<!-- SECTION:FINAL_SUMMARY:END -->

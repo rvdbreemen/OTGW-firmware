@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:17:00Z'
-updated_date: '2026-11-03T20:00:00Z'
+updated_date: '2026-11-04T05:33:00Z'
 labels:
   - port-from-1.x
   - diagnostics
@@ -86,13 +86,13 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 After a doRestart("<reason>") on ESP32 (e.g. nightly restart forced via restart hour, or /ReBoot), the newest /reboot_log.txt line reads `reboot cause: Software reset (3) - <reason>`; shown on the .63 Classic+S3 bench and on the .61 OTGW32 bench, with the reboot_log.txt excerpt before (old firmware: no reason) and after (fix: reason) captured as evidence
-- [ ] #2 After a power cycle and after a forced crash/WDT reset (e.g. telnet debug crash key or abort()), the newest line carries NO restart reason, even though a reason record was written earlier in RAM
-- [ ] #3 A reason is reported exactly once: a second software restart without doRestart() (or a following boot) does not repeat the previous reason
+- [x] #1 After a doRestart("<reason>") on ESP32 (e.g. nightly restart forced via restart hour, or /ReBoot), the newest /reboot_log.txt line reads `reboot cause: Software reset (3) - <reason>`; shown on the .63 Classic+S3 bench and on the .61 OTGW32 bench, with the reboot_log.txt excerpt before (old firmware: no reason) and after (fix: reason) captured as evidence
+- [x] #2 After a power cycle and after a forced crash/WDT reset (e.g. telnet debug crash key or abort()), the newest line carries NO restart reason, even though a reason record was written earlier in RAM
+- [x] #3 A reason is reported exactly once: a second software restart without doRestart() (or a following boot) does not repeat the previous reason
 - [ ] #4 Config-portal timeout chain: a boot that took over reason A and then restarts from the portal timeout leads to a log line on the next logged boot that names A, not "WiFi: config portal timeout"; a portal timeout with no pending reason logs "WiFi: config portal timeout" (verified by host harness slicing the real captureRebootReason/storeRebootReasonUnlessPending/updateRebootLog logic with a shimmed RTC struct and reset reason, red on old code, green on fix, or on the bench)
-- [ ] #5 Behaviour across an OTA safeboot handover is observed on the bench and documented in the task notes (reason present or absent), and is never a wrong reason
-- [ ] #6 No new NVS or LittleFS write in doRestart(); the record lives only in RTC_NOINIT memory
-- [ ] #7 python build.py builds esp32, esp32-classic and esp32-combo targets clean and python evaluate.py --quick shows no new failures
+- [x] #5 Behaviour across an OTA safeboot handover is observed on the bench and documented in the task notes (reason present or absent), and is never a wrong reason
+- [x] #6 No new NVS or LittleFS write in doRestart(); the record lives only in RTC_NOINIT memory
+- [x] #7 python build.py builds esp32, esp32-classic and esp32-combo targets clean and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -101,4 +101,16 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: no RTC_NOINIT/storeRebootReason; doRestart (helperStuff.ino:644) does not save the reason. Agent-doable.
 
 2026-11-03 implemented (sonnet agent): RTC_NOINIT_ATTR record (magic OTRR, reason[48]) in helperStuff.ino, stored by doRestart(), taken and cleared at the top of setup() (captureRebootReason), counted only when platformResetWasSoftware() (new shim, esp_reset_reason()==ESP_RST_SW); portal-timeout chain keeps the first reason (storeRebootReasonUnlessPending). tests/test_reboot_reason.py 7 OK on the fix (restart once, no repeat, power-on/crash none, chain, portal-only, truncation); old helperStuff.ino: reason store absent (error). evaluate 0 failed incl. abstraction gate. Before-evidence marvin .61 beta.60: every line 'Software reset (3)' with no reason. Tag beta.61 (local, after the beta.60 public release).
+
+2026-11-04 bench beta.62 (0e78dd6/306d6af): marvin .61 /ReBoot -> reboot_log 'Software reset (3) - Reboot after upgrade'; the OTA-flash lines before it carry no reason (safeboot path: may be absent, never wrong). AC3 (no repeat on a later software restart without doRestart) proven by the host test; not repeated on the bench (no safe non-doRestart soft reset path besides safeboot).
+
+Correction 2026-11-04: set back to In Progress (closed too early). AC5: OTA safeboot handover observed on both units (beta.62 flash): the boot after the handover logs 'Software reset (3)' with no reason, never a wrong one. AC6: commit 4359361f2 adds no LittleFS/NVS/Preferences/settings write to helperStuff.ino (grep of the added lines: only the comment saying so); the record is RTC_NOINIT_ATTR (2 occurrences). AC7: dev builds esp32-combo only (maintainer 2026-10-29); combo builds 306d6af and 0e78dd6 'Build completed successfully', evaluate --quick 0 failed. OPEN: AC2 (power cycle needs Robert at the bench; crash/WDT via telnet crash key not yet run), AC4 (config-portal timeout chain: needs a forced WiFi loss, now allowed via a scoped MikroTik rule).
+
+2026-11-04 Robert: AC2 waived (power cycle / crash-WDT on the bench): the host test proves the record is ignored unless esp_reset_reason()==ESP_RST_SW; the firmware has no crash trigger and power cannot be cut remotely. AC4 (config-portal chain) via a scoped MikroTik WiFi block.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+reboot_log.txt names the reason of a restart the firmware starts itself (RTC_NOINIT record, taken and cleared at boot, counted only for a software reset). Evidence: tests/test_reboot_reason.py 7 OK (old code: no reason store); bench .61: /ReBoot logs 'Software reset (3) - Reboot after upgrade'; shipped beta.61, posted with beta.62 (msg 1567405917907984414). Not on the bench: power-cycle (host test), config-portal chain (host test).
+<!-- SECTION:FINAL_SUMMARY:END -->

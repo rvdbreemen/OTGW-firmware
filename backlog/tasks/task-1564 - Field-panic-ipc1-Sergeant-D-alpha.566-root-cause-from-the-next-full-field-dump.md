@@ -3,10 +3,10 @@ id: TASK-1564
 title: >-
   Field panic ipc1 (Sergeant D, alpha.566): root cause from the next full field
   dump
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-02T18:11:00Z'
-updated_date: '2026-11-02T18:12:00Z'
+updated_date: '2026-11-04T05:33:00Z'
 labels:
   - crash
   - field
@@ -27,3 +27,15 @@ Split from TASK-1538 AC#1 (Robert, 2026-11-02). Since 2.0.0-beta.10 (TASK-1538) 
 - [ ] #1 A field crash log or core dump of the ipc1 panic on 2.0.0-beta.10 or later is obtained and the application caller is named with file:line
 - [ ] #2 Cause fixed with an old-vs-fix reproduction, or documented as not reproducible with the evidence
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-04 Robert (interactive): closed as waiting-for-field; reopen when the field evidence arrives (tester capture / dump).
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed by Robert 2026-11-04 as waiting-for-field: the remaining AC needs field evidence that cannot be produced on the bench (see notes). Reopen when that evidence arrives.
+<!-- SECTION:FINAL_SUMMARY:END -->
