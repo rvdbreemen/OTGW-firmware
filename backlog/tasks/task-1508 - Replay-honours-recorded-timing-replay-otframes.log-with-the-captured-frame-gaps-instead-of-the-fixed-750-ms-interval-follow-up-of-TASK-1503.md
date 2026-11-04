@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:53:00Z'
-updated_date: '2026-11-04T14:52:00Z'
+updated_date: '2026-11-04T19:05:00Z'
 labels:
   - replay capture tooling
 milestone: 2.0.0
@@ -43,6 +43,8 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: OTGW-Core.ino:4327
 2026-11-04 (sonnet agent; lead reran in wt-int4): firmware reads times (Robert). otframes.log lines (host TAB device_time TAB source TAB frame, or the last 3 columns) dispatch after the recorded device-time gap (clamped 0..60 s, midnight-wrap, drift-free anchor); bare lines keep 750 ms; '#' lines skipped. GET /api/v2/simulate shows timing timed|fixed. ADR-209 Proposed. tests/test_replay_timing.py 4 OK (old: 2 FAIL on the timed cases, bare-frame cases pass = regression), pm_chain 40, capture_otframes 6, adr_governance 15 OK, evaluate 0 failed. Also removed a duplicate ADR-208 row in docs/adr/README.md. AC2 bench pending. Tag beta.72.
 
 2026-11-04 bench beta.73 (.61): uploaded a 20-line otframes.log-format file (gaps 0.2/1.0/3.5/0.9995/2.0/0.5/1.5/4.0/0.3/1.0 s), /api/v2/simulate showed timing timed; telnet processOT timestamps of 29 replayed frames: gaps 3.501, 0.995, 2.001, 0.499, 1.504, 3.995, 0.303, 1.001, 0.196, 1.002, ... 4.007, 0.291: every gap within 10 ms of the recording (old firmware: fixed 750 ms). File deleted afterwards, settings unchanged.
+
+2026-11-04 follow-up: tests/test_sim_fixture_builtin.py test_ser2net_mirror_is_unchanged anchored on the old inline write in replayNextOTGWSimulationLine; TASK-1508 moved the identical gated write + dispatch into emitReplayLine(). Test re-anchored (gate, write, dispatch, call site), 18 OK. Behaviour unchanged.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

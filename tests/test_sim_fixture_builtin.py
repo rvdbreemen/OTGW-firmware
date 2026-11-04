@@ -148,9 +148,13 @@ class ReplaySourceInCore(unittest.TestCase):
         self.assertIn("otgwReplayBuiltinPos = 0", body)
 
     def test_ser2net_mirror_is_unchanged(self):
-        body = function_body(self.src, "replayNextOTGWSimulationLine")
-        self.assertIn("OTGWstream.write(reinterpret_cast<const uint8_t*>(sReplay), replayLen)", body)
-        self.assertIn("dispatchOTGWInputLine(sReplay, replayLen)", body)
+        # TASK-1508 moved the ser2net mirror and the dispatch into emitReplayLine(); the replay
+        # reader calls it for every line it releases.
+        body = function_body(self.src, "emitReplayLine")
+        self.assertIn("settings.mqtt.bLegacyPort25238Enabled", body)
+        self.assertIn("OTGWstream.write(reinterpret_cast<const uint8_t*>(line), len)", body)
+        self.assertIn("dispatchOTGWInputLine(line, len)", body)
+        self.assertIn("emitReplayLine(", function_body(self.src, "replayNextOTGWSimulationLine"))
 
 
 class SimulateRestApi(unittest.TestCase):
