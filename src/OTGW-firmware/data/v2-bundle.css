@@ -899,7 +899,9 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .cn-ic{font-size:21px}
   .cn-link{fill:none;stroke-width:7;stroke-linecap:round}
   .cn-flow{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-dasharray:2 11;
-    animation:dashMove 1s linear infinite;animation-play-state:paused;opacity:0}
+    animation:cnFlowMove 1s linear infinite;animation-play-state:paused;opacity:0}
+  /* shift = one dash period (2+11) so each loop ends where it started; dashMove's -19 fits .dash only */
+  @keyframes cnFlowMove{to{stroke-dashoffset:-13}}
   .cn-link.lk-ok{stroke:var(--zone-ok)} .cn-link.lk-warn{stroke:var(--zone-warn)}
   .cn-link.lk-down{stroke:var(--zone-alert)} .cn-link.lk-off{stroke:var(--gauge-track)}
   .cn-link.lk-unknown{stroke:var(--gauge-track);stroke-dasharray:6 7}
