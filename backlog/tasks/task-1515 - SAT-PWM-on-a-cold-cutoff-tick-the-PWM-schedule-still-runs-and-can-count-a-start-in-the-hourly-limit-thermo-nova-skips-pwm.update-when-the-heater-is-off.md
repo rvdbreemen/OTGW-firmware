@@ -4,11 +4,11 @@ title: >-
   SAT PWM: on a cold-cutoff tick the PWM schedule still runs and can count a
   start in the hourly limit (thermo-nova skips pwm.update when the heater is
   off)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-30T18:16:00Z'
-updated_date: '2026-11-04T06:39:00Z'
+updated_date: '2026-11-04T07:08:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -25,8 +25,8 @@ Found in the TASK-1468 review (2026-10-30). In satControlLoopRun the PWM schedul
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 thermo-nova behaviour on a heater-OFF tick cited (file:line, second reader)
-- [ ] #2 Host test: cold-cutoff tick in PWM does not count a start (red on HEAD, green on fix), after Sergeant D's OK if it changes behaviour
+- [x] #1 thermo-nova behaviour on a heater-OFF tick cited (file:line, second reader)
+- [x] #2 Host test: cold-cutoff tick in PWM does not count a start (red on HEAD, green on fix), after Sergeant D's OK if it changes behaviour
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -38,3 +38,9 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: satPwmSchedule (SA
 
 2026-11-04 implemented (sonnet agent; lead reran on the integration tree): see CHANGELOG [Unreleased] and docs/sat/firmware-sat-spec.md. Host tests red on old, green on fix: test_sat_pwm_start_limit 26 OK (1515), test_pic_pm_chain 40 OK (1384), test_sat_no_return_startup 20 OK (1412.12), overshoot_sustain 62 OK, no_return_ignition 19 OK, evaluate 0 failed. Shipped together as beta.66 (one SATcontrol.ino commit for TASK-1515, TASK-1384, TASK-1412.12). Bench pending.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+While the cold cutoff holds, the PWM schedule does not run, so no phantom start is counted (Robert's decision, entry 260; thermo-nova heating_control.py:202-234 opened by the brief agent and the implementing agent). Evidence: tests/test_sat_pwm_start_limit.py old everOn=1 count=2, fix none; 26 OK; beta.66 on both units. Not bench-tested with a boiler.
+<!-- SECTION:FINAL_SUMMARY:END -->

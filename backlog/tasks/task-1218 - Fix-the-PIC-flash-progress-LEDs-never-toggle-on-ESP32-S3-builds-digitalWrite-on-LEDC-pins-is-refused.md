@@ -3,11 +3,10 @@ id: TASK-1218
 title: >-
   Fix: the PIC-flash progress LEDs never toggle on ESP32-S3 builds (digitalWrite
   on LEDC pins is refused)
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-10-11 23:22
-updated_date: '2026-11-04T05:10:00Z'
-updated_date: '2026-11-04T05:43:00Z'
+updated_date: '2026-11-04T07:08:00Z'
 labels:
   - bug
   - esp32
@@ -39,3 +38,9 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: OTGW-Core.ino:6395
 2026-11-04 Robert: AC2 (LED toggles during a real PIC flash) waived; prove the fix without flashing the PIC (drive the same LED code path).
 2026-11-04 (sonnet agent, lead reran in the integration tree): picProgressLedWrite() -> setLed() (ledcWrite on LEDC boards) for LED1 at flash start; OTGWSerial gets registerLedCallback() (same pattern as registerFirmwareCallback) so SetLED() uses the app's LEDC-aware write; without a callback the old digitalWrite path is unchanged. test/host/test_pic_led_ledc.py --old-rev HEAD: OLD L1 refused=1, L2 refused=3 (FAIL); FIX L1/L2/P1 pass; RESULT PASS. evaluate 0 failed. AC2 waived by Robert (no PIC flash). Tag beta.64.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PIC-flash progress LEDs use the LEDC-aware LED write on the ESP32-S3 (OTGWSerial LED callback -> setLed()). Evidence: test/host/test_pic_led_ledc.py old L1/L2 refused (FAIL), fix pass; beta.64 runs on both bench units without regression (no crashlog). AC2 (LED toggles during a real PIC flash) waived by Robert 2026-11-04: no PIC flash.
+<!-- SECTION:FINAL_SUMMARY:END -->

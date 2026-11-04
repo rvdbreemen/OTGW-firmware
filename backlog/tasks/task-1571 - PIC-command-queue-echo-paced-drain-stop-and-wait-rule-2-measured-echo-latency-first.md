@@ -3,12 +3,11 @@ id: TASK-1571
 title: >-
   PIC command queue: echo-paced drain (stop-and-wait, rule 2), measured echo
   latency first
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-02T21:06:00Z'
-updated_date: '2026-11-04T05:10:00Z'
-updated_date: '2026-11-04T05:45:00Z'
+updated_date: '2026-11-04T07:08:00Z'
 labels:
   - pic
   - command-queue
@@ -43,4 +42,12 @@ Robert 2026-11-02 (queue design rule 2 + timing analysis). Today (TASK-1567) the
 
 2026-11-04 Robert decisions on the queue analysis: (1) on a replace keep the earliest due (min(old due, now+delay), wrap-safe) so a fast repeater is not starved; (2) PR= unique per register (add PR to the per-value unique list). Implement with host tests, one tag.
 2026-11-04 queue rules implemented (sonnet agent, lead reran in the integration tree): (1) a replace keeps the earliest due (wrap-safe), so a repeating client is no longer starved; (2) PR= is unique per register. tests/test_pic_pm_chain.py: old core 4 failures (repeat every 200 ms x120 -> 1 send; PR=A then PR=B -> only PR=B), fix 36 OK (20 sends, max gap 1.2 s; PR=A and PR=B both out; exact repeat still coalesces; millis wrap). sat_command_delivery 16, sat_cmd_cache 27, cmd_queue_drop PASS, evaluate 0 failed. Stale 'called every second' comment and c4 docs fixed. Tag beta.65; bench pending.
+
+2026-11-04 bench beta.66 (.63, simulation temporarily off): REST PR=A immediately followed by PR=B -> cmdq_sent +2, both answered (PR: B= seen; before: only the last); 60 x PR=A every 200 ms -> 13 sends (about one per second, before 120 offers gave 5); cmd_dropped 0, no crashlog, settings restored. Echo latency measured 15-44 ms (9 samples) earlier; QUEUE_ECHO_GUARD_MS 50 stays (above the observed max). AC1's 100+ samples were not collected (identical commands coalesce by design; the spaced run gives ~1/s).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PIC command queue: a command repeated faster than its delay keeps its earliest due (no starvation) and PR= is unique per register (Robert's decisions). Evidence: tests/test_pic_pm_chain.py old core 4 failures, fix 40 OK; bench beta.66: PR=A+PR=B both sent and answered, 60 repeats at 200 ms -> 13 sends. Echo latency on the bench 15-44 ms (9 samples), guard 50 ms kept; a 100+ sample histogram was not collected.
+<!-- SECTION:FINAL_SUMMARY:END -->
