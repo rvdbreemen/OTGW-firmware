@@ -3,10 +3,11 @@ id: TASK-1372
 title: >-
   Filesystem OTA from alpha.495 left the unit in safeboot (main firmware did not
   come back)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T05:14:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-04T20:23:00Z'
 labels:
   - ota
 milestone: 2.0.0
@@ -30,4 +31,6 @@ ordinal: 507000
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no repro or fix; ota_flash.py still filesystem first. Needs bench repro; overlaps TASK-1524.
+
+2026-11-04 status: not seen again. scripts/ota_flash.py still flashes filesystem first, then the app via safeboot; since this report it gained TASK-1494 (survives a dropped response after the fs write) and TASK-1497 (checks the image arrived whole). Today about 25 filesystem-first OTAs across beta.60-beta.79 on .61 (OT-Direct) and .63 (Classic+PIC) plus 3 filesystem-only OTAs under a full capture on .63: no safeboot rollback. Not explained: the AC asks for a capture of a real occurrence; keep open until one is seen (watch for 'timeout waiting for main firmware after filesystem update').
 <!-- SECTION:NOTES:END -->
