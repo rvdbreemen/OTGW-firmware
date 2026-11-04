@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-25T23:09:38.215Z
-> Files: 23 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-04T21:53:52.824Z
+> Files: 25 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -391,6 +391,12 @@
 
 ## docs/manuals/nl/
 
+
+## docs/process/
+
+- `agentic-improvements-handoff-2026-11-04.md` — Handoff: agentic setup improvements (TASK-1612 .. TASK-1623) (~2435 tok)
+- `agentic-setup.md` — OTGW agentic werkplaats: functionele architectuur van de ontwikkelomgeving (~7247 tok)
+- `agentic-setup.html` — Visual version of agentic-setup.md (layer diagram, cycle, findings, proposals) (~12000 tok)
 
 ## docs/research/
 

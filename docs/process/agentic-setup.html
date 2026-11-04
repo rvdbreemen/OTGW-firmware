@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OTGW agentic werkplaats</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: één leeskolom (≈70ch) met brede diagrammen die eruit mogen breken; secties als hoofdstukken van een technisch dossier. */
+:root{
+  --bg:#f4f6f7; --surface:#ffffff; --fg:#151a1f; --muted:#56616c; --line:#d5dce2;
+  --flame:#c2410c; --flame-soft:#fde7d9; --cool:#0e7490; --cool-soft:#d9eff4;
+  --ok:#2f7d32; --warn:#a15c00; --crit:#b42318;
+  --f-display:"Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body:"Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101417; --surface:#171d21; --fg:#e6eaed; --muted:#9aa6b0; --line:#2b343b;
+  --flame:#ff8a4c; --flame-soft:#3a2216; --cool:#4fc3d6; --cool-soft:#12313a;
+  --ok:#7bc47f; --warn:#f0b04a; --crit:#ff7b6b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101417; --surface:#171d21; --fg:#e6eaed; --muted:#9aa6b0; --line:#2b343b;
+  --flame:#ff8a4c; --flame-soft:#3a2216; --cool:#4fc3d6; --cool-soft:#12313a;
+  --ok:#7bc47f; --warn:#f0b04a; --crit:#ff7b6b; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:17px/1.6 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:56px}
+.col{max-width:72ch}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(30px,5vw,46px);font-weight:800;letter-spacing:-.01em}
+h2{font-size:clamp(23px,3vw,30px);font-weight:700}
+h3{font-size:18px;font-weight:700}
+p{margin:0}
+section{display:flex;flex-direction:column;gap:18px}
+.eyebrow{font:600 12px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--flame)}
+.lede{font-size:19px;color:var(--muted);max-width:68ch}
+code,.mono{font-family:var(--f-mono);font-size:.86em}
+code{background:var(--cool-soft);color:var(--fg);padding:1px 5px;border-radius:3px}
+a{color:var(--cool)}
+header{display:flex;flex-direction:column;gap:14px;border-bottom:2px solid var(--fg);padding-bottom:24px}
+.meta{font:13px/1.5 var(--f-mono);color:var(--muted)}
+
+/* Kernpunten */
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.key{background:var(--surface);border:1px solid var(--line);padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.key b{font-family:var(--f-display);font-size:16px}
+.key p{color:var(--muted);font-size:15.5px}
+
+/* Diagram */
+.fig{background:var(--surface);border:1px solid var(--line);overflow-x:auto}
+.fig svg{display:block;min-width:900px;width:100%;height:auto}
+.fig figcaption{padding:10px 16px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
+figure{margin:0}
+svg text{font-family:var(--f-body);fill:var(--fg)}
+svg .t{font-size:14px;font-weight:600}
+svg .s{font-size:12px;fill:var(--muted)}
+svg .m{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+svg .lbl{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;fill:var(--flame);font-weight:600}
+svg .box{fill:var(--surface);stroke:var(--line);stroke-width:1.2}
+svg .person{fill:var(--flame-soft);stroke:var(--flame);stroke-width:1.2}
+svg .chan{fill:var(--bg);stroke:var(--muted);stroke-width:1;stroke-dasharray:4 3}
+svg .core{fill:var(--cool-soft);stroke:var(--cool);stroke-width:1.6}
+svg .band{fill:none;stroke:var(--line);stroke-dasharray:2 4}
+svg .chip{fill:var(--bg);stroke:var(--cool);stroke-width:1}
+svg .gate{fill:var(--flame-soft);stroke:var(--flame);stroke-width:1}
+svg .ln{stroke:var(--muted);stroke-width:1.3;fill:none}
+svg .ln-hot{stroke:var(--flame);stroke-width:1.8;fill:none}
+svg .ln-cool{stroke:var(--cool);stroke-width:1.6;fill:none}
+svg .ah{fill:var(--muted)} svg .ah-hot{fill:var(--flame)} svg .ah-cool{fill:var(--cool)}
+
+/* Definities */
+dl.defs{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:0;margin:0;border-top:1px solid var(--line)}
+dl.defs dt,dl.defs dd{padding:11px 0;border-bottom:1px solid var(--line);margin:0}
+dl.defs dt{font-family:var(--f-display);font-weight:700;font-size:15.5px;padding-right:18px}
+dl.defs dd{font-size:16px}
+dl.defs .cat{grid-column:1/-1;font:600 12px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--cool);padding:22px 0 8px;border-bottom:1px solid var(--line)}
+@media (max-width:620px){dl.defs{grid-template-columns:1fr} dl.defs dt{border-bottom:0;padding-bottom:0}}
+
+/* Cyclus */
+ol.cycle{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px;counter-reset:st}
+ol.cycle li{counter-increment:st;background:var(--surface);border:1px solid var(--line);padding:14px 16px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+ol.cycle li::before{content:"Stap " counter(st, decimal);font:600 11px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--flame)}
+ol.cycle.from0 li::before{content:"Stap " counter(st, decimal)}
+ol.cycle li b{font-family:var(--f-display);font-size:16px}
+ol.cycle li span{font-size:15px;color:var(--muted)}
+ol.cycle li.stop{border-color:var(--flame);background:var(--flame-soft)}
+
+/* Tabellen */
+.tbl{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:15px;min-width:640px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 12px/1.3 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
+td.c{text-align:center;font-family:var(--f-mono)}
+.y{color:var(--ok);font-weight:600}.n{color:var(--muted)}.p{color:var(--warn);font-weight:600}
+tr:last-child td{border-bottom:0}
+
+/* Cijfers */
+.nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.num{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.num b{font:700 28px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.num span{font-size:14px;color:var(--muted)}
+
+/* Bevindingen */
+.finds{display:flex;flex-direction:column;gap:10px}
+.find{display:grid;grid-template-columns:92px minmax(0,1fr);gap:14px;background:var(--surface);border:1px solid var(--line);padding:14px 16px}
+.sev{font:600 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;padding:6px 8px;border:1px solid;align-self:start;text-align:center}
+.sev.hi{color:var(--crit);border-color:var(--crit)}.sev.md{color:var(--warn);border-color:var(--warn)}.sev.lo{color:var(--muted);border-color:var(--line)}
+.find h3{font-size:16.5px;margin-bottom:4px}
+.find p{font-size:15.5px}
+.find .ev{font-size:14px;color:var(--muted);margin-top:6px}
+@media (max-width:560px){.find{grid-template-columns:1fr}}
+
+/* Voorstellen */
+.props{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px}
+.prop{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--cool);padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.prop .tag{font:600 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--cool)}
+.prop p{font-size:15.5px}
+.prop .why{color:var(--muted);font-size:14.5px}
+.scen{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:14px}
+.sc{border:1px solid var(--line);padding:16px 18px;background:var(--bg);display:flex;flex-direction:column;gap:6px}
+.sc b{font-family:var(--f-display)}
+.sc p{font-size:15px;color:var(--muted)}
+.note{border-left:3px solid var(--warn);padding:10px 16px;background:var(--surface);font-size:15.5px}
+ul.tight{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+</head><body>
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">OTGW-firmware · ontwikkelorganisatie</span>
+  <h1>Hoe het OTGW-project zich ontwikkelt met agents, testers en de SAT-ontwerper</h1>
+  <p class="lede">Een functionele beschrijving van de agentic werkplaats rond de OTGW-firmware 2.x: wie er beslist, welke agents wat doen, langs welke kanalen informatie binnenkomt en welke poorten een wijziging moet passeren voordat een tester hem krijgt.</p>
+  <p class="meta">Bron: lokale repo, branch <code>claude/amazing-babbage-j1mdcm</code> @ 19e318b, stand 2026-11-04 · huidige firmware-tag 2.0.0-beta.79 · uitgebreide rapportage: <code>docs/process/agentic-setup.md</code> · taken TASK-1611..1623</p>
+</header>
+
+<section>
+  <span class="eyebrow">Kernpunten</span>
+  <h2>In vijf zinnen</h2>
+  <div class="keys">
+    <div class="key"><b>Eén coördinerende AI-sessie draait een continue cyclus</b><p>De skill <code>/implement-next-task</code> kiest de volgende taak, ontwerpt, laat zichzelf reviewen, delegeert code naar subagents en zet een taak alleen op Done met bewijs uit dezelfde sessie.</p></div>
+    <div class="key"><b>Robert is de enige met beslismacht over scope en vrijgave</b><p>Testers leveren input en bewijs maar kunnen niets prioriteren. Wat zij vragen krijgt het label <code>needs-maintainer-ok</code>.</p></div>
+    <div class="key"><b>Sergeant D is de enige bron van waarheid voor SAT-gedrag</b><p>Daarna komt de vastgepinde thermo-nova-code. De firmware zelf telt nooit als bron. Elke uitspraak van hem wordt eerst vastgelegd (269 entries) en pas daarna uitgevoerd.</p></div>
+    <div class="key"><b>Kwaliteit is ingebed in de werkwijze, niet in CI</b><p>Git-hooks, <code>evaluate.py</code>, een build-lock, een benchtest per taak en een post-script dat weigert bij twijfel. De GitHub-CI draait alleen op pull requests, en die worden op <code>dev</code> niet gebruikt.</p></div>
+    <div class="key"><b>De grootste risico's zijn drift en concentratie</b><p>Instructies per agent lopen uiteen, regels groeien als lagen bij, en kritieke state staat op één Windows-machine.</p></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Overzicht</span>
+  <h2>De architectuur in één beeld</h2>
+  <p class="col">Lees van boven naar beneden: mensen en hun kanalen, de agentlaag die alles verwerkt, de kennis waar die laag zich aan houdt, de uitvoeringsstraat met poorten, en wat er uiteindelijk naar buiten gaat. De oranje lijn is Roberts directe stuurlijn via de Claude Code-sessie.</p>
+  <figure class="fig">
+  <svg viewBox="0 0 1040 830" role="img" aria-label="Lagendiagram van de OTGW agentic ontwikkelomgeving">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-hot"/></marker>
+      <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-cool"/></marker>
+    </defs>
+
+    <!-- Band 1: Mensen -->
+    <text x="40" y="28" class="lbl">MENSEN (ROLLEN)</text>
+    <rect x="40" y="38" width="210" height="74" class="person"/>
+    <text x="54" y="62" class="t">Eindgebruikers</text>
+    <text x="54" y="82" class="s">support-vragen, issues,</text>
+    <text x="54" y="98" class="s">bugmeldingen</text>
+    <rect x="290" y="38" width="210" height="74" class="person"/>
+    <text x="304" y="62" class="t">Alpha-testers</text>
+    <text x="304" y="82" class="s">flashen elke alpha, leveren</text>
+    <text x="304" y="98" class="s">captures · geen beslismacht</text>
+    <rect x="540" y="38" width="210" height="74" class="person"/>
+    <text x="554" y="62" class="t">Sergeant D</text>
+    <text x="554" y="82" class="s">ontwerper van SAT · bron van</text>
+    <text x="554" y="98" class="s">waarheid voor SAT-gedrag</text>
+    <rect x="790" y="38" width="210" height="74" class="person"/>
+    <text x="804" y="62" class="t">Robert (maintainer)</text>
+    <text x="804" y="82" class="s">scope, prioriteit, vrijgave,</text>
+    <text x="804" y="98" class="s">push naar main, releases</text>
+
+    <!-- Band 2: Kanalen -->
+    <text x="40" y="160" class="lbl">KANALEN</text>
+    <rect x="40" y="170" width="176" height="66" class="chan"/>
+    <text x="52" y="194" class="t">Tweakers-topic</text>
+    <text x="52" y="214" class="s">RSS, alleen lezen</text>
+    <rect x="236" y="170" width="176" height="66" class="chan"/>
+    <text x="248" y="194" class="t">GitHub issues</text>
+    <text x="248" y="214" class="s">via gh, triage</text>
+    <rect x="432" y="170" width="176" height="66" class="chan"/>
+    <text x="444" y="194" class="t">Discord support</text>
+    <text x="444" y="214" class="s">NL/EN, #beta-testing</text>
+    <rect x="628" y="170" width="176" height="66" class="chan"/>
+    <text x="640" y="194" class="t">#alpha-testing</text>
+    <text x="640" y="214" class="s">builds, SAT-vragen, verslag</text>
+    <rect x="824" y="170" width="176" height="66" class="chan"/>
+    <text x="836" y="194" class="t">#dev-sat-mqtt</text>
+    <text x="836" y="214" class="s">backlog-bot, SAT-rondes</text>
+
+    <path d="M145 112 L128 168" class="ln" marker-end="url(#a)"/>
+    <path d="M145 112 L322 168" class="ln" marker-end="url(#a)"/>
+    <path d="M145 112 L512 168" class="ln" marker-end="url(#a)"/>
+    <path d="M395 112 L660 168" class="ln" marker-end="url(#a)"/>
+    <path d="M645 112 L700 168" class="ln" marker-end="url(#a)"/>
+    <path d="M645 112 L890 168" class="ln" marker-end="url(#a)"/>
+
+    <!-- Robert direct line -->
+    <path d="M1000 75 L1026 75 L1026 350 L1004 350" class="ln-hot" marker-end="url(#ah)"/>
+    <text x="1018" y="215" class="m" transform="rotate(-90 1018 215)" text-anchor="middle">Claude Code-sessie · AskUserQuestion</text>
+
+    <!-- Channels down to core -->
+    <text x="40" y="270" class="m">gelezen en beantwoord via discord-mcp (lokaal, Java) · zip-post via webhook · gh · RSS</text>
+    <path d="M128 236 L128 298" class="ln-cool" marker-end="url(#ac)"/>
+    <path d="M324 236 L324 298" class="ln-cool" marker-end="url(#ac)"/>
+    <path d="M520 236 L520 298" class="ln-cool" marker-end="url(#ac)"/>
+    <path d="M716 298 L716 238" class="ln-cool" marker-end="url(#ac)" marker-start="url(#ac)"/>
+    <path d="M912 298 L912 238" class="ln-cool" marker-end="url(#ac)" marker-start="url(#ac)"/>
+
+    <!-- Band 3: Agentlaag -->
+    <text x="40" y="290" class="lbl">AGENTLAAG</text>
+    <rect x="30" y="296" width="980" height="190" class="band"/>
+    <rect x="40" y="304" width="960" height="102" class="core"/>
+    <text x="56" y="330" class="t" style="font-size:16px">Coördinerende hoofdsessie (Claude Code, door Robert gekozen model)</text>
+    <text x="56" y="350" class="s">kiest en plant taken · beslist binnen de regels · enige die post op Discord, bumpt, commit en pusht · beoordeelt zelf het bewijs</text>
+    <rect x="56" y="364" width="150" height="28" class="chip"/><text x="66" y="383" class="m">/implement-next-task</text>
+    <rect x="214" y="364" width="136" height="28" class="chip"/><text x="224" y="383" class="m">/backlog_discord</text>
+    <rect x="358" y="364" width="150" height="28" class="chip"/><text x="368" y="383" class="m">/check_otgw_issues</text>
+    <rect x="516" y="364" width="136" height="28" class="chip"/><text x="526" y="383" class="m">/beta-release-2x</text>
+    <rect x="660" y="364" width="108" height="28" class="chip"/><text x="670" y="383" class="m">/release-2x</text>
+    <rect x="776" y="364" width="128" height="28" class="chip"/><text x="786" y="383" class="m">/update-docs-2x</text>
+    <rect x="912" y="364" width="76" height="28" class="chip"/><text x="922" y="383" class="m">/flash</text>
+
+    <rect x="40" y="420" width="176" height="56" class="box"/>
+    <text x="52" y="442" class="t">Implementatie</text>
+    <text x="52" y="461" class="s">subagent, Sonnet</text>
+    <rect x="236" y="420" width="176" height="56" class="box"/>
+    <text x="248" y="442" class="t">Runners</text>
+    <text x="248" y="461" class="s">build, tests · Haiku</text>
+    <rect x="432" y="420" width="176" height="56" class="box"/>
+    <text x="444" y="442" class="t">Reviewteam</text>
+    <text x="444" y="461" class="s">Opus correctheid + lenzen</text>
+    <rect x="628" y="420" width="176" height="56" class="box"/>
+    <text x="640" y="442" class="t">otgw-device-verify</text>
+    <text x="640" y="461" class="s">flash + UI-check op bench</text>
+    <rect x="824" y="420" width="176" height="56" class="box"/>
+    <text x="836" y="442" class="t">Andere agents</text>
+    <text x="836" y="461" class="s">Codex · Copilot · CI-Claude</text>
+
+    <!-- Band 3 → 4 -->
+    <path d="M226 488 L226 532" class="ln" marker-end="url(#a)" marker-start="url(#a)"/>
+    <text x="236" y="514" class="m">leest regels en ADR's · schrijft register, notes, cerebrum</text>
+    <path d="M814 488 L814 532" class="ln" marker-end="url(#a)"/>
+    <text x="804" y="514" class="m" text-anchor="end">stuurt de uitvoeringsstraat</text>
+
+    <!-- Band 4 -->
+    <text x="40" y="528" class="lbl" dy="0"> </text>
+    <rect x="40" y="536" width="470" height="170" class="box"/>
+    <text x="56" y="560" class="lbl">KENNIS EN REGELS</text>
+    <text x="56" y="586" class="t">CLAUDE.md · AGENTS.md</text><text x="56" y="603" class="s">673 + 918 regels projectregels</text>
+    <text x="56" y="630" class="t">ADR's</text><text x="56" y="647" class="s">±210 besluiten, 7 binding met CI-poort</text>
+    <text x="56" y="674" class="t">C4-documentatie</text><text x="56" y="691" class="s">welk component bezit welke code</text>
+    <text x="290" y="586" class="t">SAT-beslisregister</text><text x="290" y="603" class="s">269 entries, append-only</text>
+    <text x="290" y="630" class="t">Open-vragenwachtrij</text><text x="290" y="647" class="s">thermo-nova pin 7beaaf5</text>
+    <text x="290" y="674" class="t">OpenWolf · graphify</text><text x="290" y="691" class="s">geheugen, buglog, codegraaf</text>
+
+    <rect x="530" y="536" width="470" height="170" class="box"/>
+    <text x="546" y="560" class="lbl">UITVOERING EN POORTEN</text>
+    <rect x="546" y="572" width="134" height="30" class="chip"/><text x="556" y="592" class="m">backlog-taak</text>
+    <rect x="696" y="572" width="134" height="30" class="chip"/><text x="706" y="592" class="m">plan + zelfreview</text>
+    <rect x="846" y="572" width="140" height="30" class="chip"/><text x="856" y="592" class="m">code + test rood→groen</text>
+    <rect x="546" y="618" width="134" height="30" class="gate"/><text x="556" y="638" class="m">evaluate · tests</text>
+    <rect x="696" y="618" width="134" height="30" class="gate"/><text x="706" y="638" class="m">bump + commit-hooks</text>
+    <rect x="846" y="618" width="140" height="30" class="gate"/><text x="856" y="638" class="m">build combo (lock)</text>
+    <rect x="546" y="664" width="134" height="30" class="gate"/><text x="556" y="684" class="m">OTA-benchtest</text>
+    <rect x="696" y="664" width="134" height="30" class="chip"/><text x="706" y="684" class="m">push origin/dev</text>
+    <rect x="846" y="664" width="140" height="30" class="gate"/><text x="856" y="684" class="m">discord-post-build</text>
+    <path d="M680 587 L694 587" class="ln" marker-end="url(#a)"/>
+    <path d="M830 587 L844 587" class="ln" marker-end="url(#a)"/>
+    <path d="M916 602 L916 610 L613 610 L613 616" class="ln" marker-end="url(#a)"/>
+    <path d="M680 633 L694 633" class="ln" marker-end="url(#a)"/>
+    <path d="M830 633 L844 633" class="ln" marker-end="url(#a)"/>
+    <path d="M916 648 L916 656 L613 656 L613 662" class="ln" marker-end="url(#a)"/>
+    <path d="M680 679 L694 679" class="ln" marker-end="url(#a)"/>
+    <path d="M830 679 L844 679" class="ln" marker-end="url(#a)"/>
+
+    <!-- Band 5 -->
+    <path d="M916 706 L916 748" class="ln-hot" marker-end="url(#ah)"/>
+    <text x="40" y="740" class="lbl">WAT NAAR BUITEN GAAT</text>
+    <rect x="40" y="750" width="210" height="66" class="box"/>
+    <text x="54" y="774" class="t">1.x LTS</text><text x="54" y="794" class="s">otgw-1.x.x → main, via CI</text>
+    <rect x="290" y="750" width="210" height="66" class="box"/>
+    <text x="304" y="774" class="t">Stabiel 2.x</text><text x="304" y="794" class="s">release/2.x · alleen na Roberts go</text>
+    <rect x="540" y="750" width="210" height="66" class="box"/>
+    <text x="554" y="774" class="t">Beta 2.x</text><text x="554" y="794" class="s">GitHub-prerelease, lokaal gebouwd</text>
+    <rect x="790" y="750" width="210" height="66" class="person"/>
+    <text x="804" y="774" class="t">Alpha-zip per taak</text><text x="804" y="794" class="s">→ #alpha-testing → testers</text>
+  </svg>
+  <figcaption>Pijlen tussen kanalen en agentlaag in twee richtingen betekenen dat de sessie daar zowel leest als post. Codex, Copilot en de CI-Claude werken met eigen instructiebestanden. Zie bevinding 1.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <span class="eyebrow">Begrippen</span>
+  <h2>Definities</h2>
+  <p class="col">Deze termen gebruik ik in de rest van het stuk. Waar het project zelf een term vastlegt, volg ik die definitie.</p>
+  <dl class="defs">
+    <div class="cat">Rollen</div>
+    <dt>Maintainer</dt><dd>Robert. Bezit scope, prioriteit, uitzonderingen (waivers) en elke actie die niet terug te draaien is: PIC flashen, release, push naar <code>main</code>, force-push. Agents leggen open beslissingen aan hem voor als één vraag per beslissing, met opties en een gewogen advies.</dd>
+    <dt>SAT-ontwerper</dt><dd>Sergeant D (George). Ontwierp SAT op papier. Zijn vastgelegde uitspraken staan boven de code. Hij krijgt vragen in het Engels, één per bericht, in een tempo dat afhangt van zijn aanwezigheid.</dd>
+    <dt>Tester</dt><dd>Deelnemer in #alpha-testing die alpha-builds draait en captures levert. Bewijs van een tester mag een bestaande taak sluiten. Een verzoek van een tester wordt een taak met <code>needs-maintainer-ok</code> en blijft liggen tot Robert hem vrijgeeft.</dd>
+    <dt>Read-only lid</dt><dd>Discord-lid van wie niets tot actie leidt. Krijgt één keer het antwoord "Changes go through Robert."</dd>
+    <dt>Hoofdsessie</dt><dd>De Claude Code-sessie die de cyclus draait. Ontwerpt, roept de advisor of reviewers aan, beoordeelt het ruwe bewijs, en doet als enige de Discord-posts, bumps, commits en pushes.</dd>
+    <dt>Coördinerende 2.0.0-sessie</dt><dd>Bij meerdere gelijktijdige sessies: de sessie die builds aankondigt, het verslag in #alpha-testing schrijft en het alpha-ledger bijhoudt.</dd>
+    <dt>Subagent</dt><dd>Een door de hoofdsessie gestarte agent met een smalle opdracht: implementeren (Sonnet), mechanisch uitvoeren en output citeren (Haiku), of reviewen (Opus plus lenzen). Bumpt, commit en pusht nooit.</dd>
+
+    <div class="cat">Werkeenheden en bewijs</div>
+    <dt>Backlog-taak</dt><dd>De eenheid van werk in Backlog.md (<code>TASK-NNN</code>). Elke wijziging begint met een taak. Agents gebruiken altijd de CLI, nooit de MCP-server en nooit een directe bestandsbewerking. Hooks dwingen dat af.</dd>
+    <dt>AC / DoD</dt><dd>Acceptatiecriteria en Definition of Done per taak. Een AC mag alleen worden afgevinkt met bewijs uit dezelfde sessie, zoals build-output, een capture, een curl-respons of een screenshot.</dd>
+    <dt>Oud-tegen-fix-bewijs</dt><dd>Dezelfde reproductie gefaald op de oude code en geslaagd op de fix. Een groene run op alleen de fix telt niet als bewijs.</dd>
+    <dt>Poort (gate)</dt><dd>Een geautomatiseerde controle die een stap kan weigeren: <code>evaluate.py</code> (42 checks), de pre-commit- en commit-msg-hooks, de build-lock en de weigerregels van <code>discord-post-build.sh</code>.</dd>
+    <dt>Bench</dt><dd>Fysieke testunits (OTGW32 en S3 Classic) op Roberts werkplek. Ze worden over WiFi-OTA geflasht via safeboot. USB alleen als OTA niet lukt.</dd>
+
+    <div class="cat">Versies en distributie</div>
+    <dt>Alpha-tag</dt><dd>Een unieke <code>_VERSION_PRERELEASE</code> per firmwarecommit, zodat een tester twee builds kan vergelijken (A/B). De pre-commit-hook dwingt dat af.</dd>
+    <dt>Alpha-ledger</dt><dd>Lokaal, gitignored bestand van de coördinator dat bijhoudt welke tags zijn gepost. Voor elke post wordt het vergeleken met de git-log.</dd>
+    <dt>Lijnen</dt><dd><code>dev</code> is 2.x (ESP32-S3, async) en de werklijn. <code>release/2.x</code> is stabiel 2.x. <code>otgw-1.x.x</code> is 1.x LTS. <code>main</code> is de laatste publieke 1.x-release.</dd>
+
+    <div class="cat">Kennis</div>
+    <dt>ADR, binding</dt><dd>Een architectuurbesluit dat een patroon vastlegt en een CI- of testpoort heeft (ADR-080). Er zijn er nu 7. Structurele ADR's worden alleen bij review gecontroleerd.</dd>
+    <dt>Ground truth (SAT)</dt><dd>De rangorde voor SAT-gedrag: (1) register van Sergeant D, (2) thermo-nova-code op commit <code>7beaaf5</code>, (3) de spec die uit die code is afgeleid, (4) de firmware. Elke uitspraak citeert <code>file:line</code>.</dd>
+    <dt>Beslisregister</dt><dd><code>docs/sat/sergeant-d-corrections.md</code>: genummerde, onveranderlijke entries met citaat, Discord-link, vergelijking met thermo-nova en de firmware, de taak die eruit volgt en wat nog open staat.</dd>
+    <dt>Open-vragenwachtrij</dt><dd><code>docs/sat/open-questions.md</code>: de SAT-vragen die het port-team niet zelf mag beantwoorden, elk met de status queued, asked, answered of dropped.</dd>
+    <dt>OpenWolf</dt><dd>Een contextlaag in <code>.wolf/</code>: anatomy (bestandsindex), cerebrum (lessen en Do-Not-Repeat), buglog en memory. Hooks rond Read en Write houden die bij.</dd>
+  </dl>
+</section>
+
+<section>
+  <span class="eyebrow">Werkwijze</span>
+  <h2>De ontwikkelcyclus</h2>
+  <p class="col">De skill <code>implement-next-task</code> ordent de regels uit CLAUDE.md tot een lus die blijft draaien tot er niets meer uitvoerbaar is. Sinds 2026-10-20 vervangt een kritische zelfreview plus een melding in #alpha-testing het wachten op Roberts goedkeuring van het plan. Gemarkeerde stappen zijn stoppunten.</p>
+  <ol class="cycle">
+    <li><b>Testervragen eerst</b><span><code>/backlog_discord</code> zoekt onbeantwoorde berichten van Sergeant D, testers of Robert en beantwoordt die vóór nieuw werk.</span></li>
+    <li><b>Selecteren en aankondigen</b><span>Eerst lopende taken die nu af te ronden zijn, daarna To Do op prioriteit. Taken die op hardware, Sergeant D of <code>needs-maintainer-ok</code> wachten worden overgeslagen. De keuze wordt in #alpha-testing gemeld.</span></li>
+    <li><b>Ontwerpen</b><span>C4 en ADR-context lezen, bij SAT het register doornemen, eerst open source zoeken, de reproductie vastleggen. Het plan gaat de taak in.</span></li>
+    <li><b>Kritische zelfreview</b><span>Een advisor of een Opus-reviewer toetst het plan. Bevindingen worden overgenomen of met reden afgewezen. Bij een architectuurwijziging komt er een Proposed ADR bij.</span></li>
+    <li class="stop"><b>Plan melden, of wachten bij SAT</b><span>Gewoonlijk alleen een melding. Verandert de taak hoe SAT de ketel regelt, dan gaat het plan met thermo-nova-citaten naar Sergeant D en wordt er niets gebouwd tot hij akkoord is.</span></li>
+    <li><b>Implementeren met bewijs</b><span>Een Sonnet-subagent schrijft de code. De bug eerst rood reproduceren, dan groen. Daarna build, evaluate en tests. De hoofdsessie leest het ruwe bewijs zelf.</span></li>
+    <li><b>Reviewteam</b><span>Parallelle reviewers, gevraagd om te weerleggen en niet om goed te keuren: correctheid, projectregels, de echtheid van tests en bij SAT het register. Elke bevinding wordt zelf gecontroleerd.</span></li>
+    <li><b>Done met bewijs</b><span>Een final summary met bewijs per AC, de prerelease-bump, één commit per taak met expliciete paden, en graphify, buglog en cerebrum bijwerken.</span></li>
+    <li class="stop"><b>Build, bench, publiceren</b><span>Een esp32-combo-build (machinebreed één tegelijk), OTA naar een benchunit en een benchtest. Alleen als die slaagt: push, de zip in #alpha-testing en een verslag in gewone taal.</span></li>
+  </ol>
+  <p class="col">De cyclus stopt als er niets uitvoerbaar is, als Robert stop zegt, na twee mislukte reviewrondes op dezelfde taak, of bij een rate limit. Een gate die niet groen wordt houdt het werk tegen. De regels laten geen omweg toe.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Interactie</span>
+  <h2>Zo werkt het samenspel op Discord</h2>
+  <p class="col">Discord is tegelijk distributiekanaal, feedbackkanaal en ontwerpoverleg. De bot leest en post via een lokale Discord-MCP (Java, op Roberts machine) en post zips via een webhook. Wie wat mag, staat vast:</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Actor</th><th>Taak laten aanmaken</th><th>Prioriteit en selectie</th><th>SAT-gedrag bepalen</th><th>Code laten wijzigen</th><th>Push naar dev</th><th>Release en main</th></tr></thead>
+    <tbody>
+      <tr><td>Robert</td><td class="c y">ja</td><td class="c y">ja</td><td class="c p">beslist mee*</td><td class="c y">ja</td><td class="c y">staand mandaat</td><td class="c y">per keer</td></tr>
+      <tr><td>Sergeant D</td><td class="c y">ja</td><td class="c n">nee</td><td class="c y">ja, eerste bron</td><td class="c p">via register → taak</td><td class="c n">nee</td><td class="c n">nee</td></tr>
+      <tr><td>Alpha-tester</td><td class="c p">met label</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td></tr>
+      <tr><td>Read-only lid</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td></tr>
+      <tr><td>Hoofdsessie</td><td class="c y">ja</td><td class="c p">binnen de regels</td><td class="c n">nee, vraagt</td><td class="c y">ja</td><td class="c y">na de poorten</td><td class="c n">nee</td></tr>
+      <tr><td>Subagent</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td><td class="c y">bewerkt alleen</td><td class="c n">nee</td><td class="c n">nee</td></tr>
+    </tbody>
+  </table></div>
+  <p class="col" style="font-size:15px;color:var(--muted)">* Robert neemt ook SAT-besluiten. Ze staan als "maintainer decision" in hetzelfde register (minstens 18 entries), soms achteraf door Sergeant D bevestigd (entry 265). Zie bevinding 5.</p>
+
+  <h3 style="margin-top:12px">De SAT-beslisketen</h3>
+  <ol class="cycle">
+    <li><b>Gat ontdekt</b><span>De code of de spec laat het gedrag niet zien. De regel is dan: schrijf "not found in the code" en vul het niet zelf in.</span></li>
+    <li><b>Vraag opstellen</b><span>Eén vraag in eenvoudig Engels, met opties A/B/C, de gevolgen, het thermo-nova-citaat en een advies. Volgorde van het advies: beste regelresultaat, dan zijn eerdere antwoorden, dan thermo-nova.</span></li>
+    <li><b>Wachtrij en tempo</b><span>Is hij actief, dan meteen de volgende vraag. Elk uur kijken. Reageert hij niet, dan stil wachten. Is hij terug, dan de openstaande vraag kort opnieuw stellen met een link.</span></li>
+    <li class="stop"><b>Vastleggen vóór uitvoeren</b><span>Een nieuwe genummerde entry: zijn letterlijke woorden, de Discord-link, wat het besluit vastlegt ten opzichte van thermo-nova en de firmware, en wat open blijft. Een korte reactie wordt expliciet als interpretatie vastgelegd.</span></li>
+    <li><b>Taak en implementatie</b><span>Elk besluit wordt een backlog-taak. Het plan noemt de entries waarop het steunt, en een reviewer controleert de diff tegen het hele register.</span></li>
+    <li><b>Terug naar het veld</b><span>De alpha-zip gaat naar testers. Hun captures leveren bewijs of nieuwe vragen op. Simulatierondes worden ook in #dev-sat-mqtt besproken.</span></li>
+  </ol>
+
+  <h3 style="margin-top:12px">Instroom van gebruikers</h3>
+  <p class="col"><code>/check_otgw_issues</code> loopt Discord-support, GitHub-issues en het Tweakers-topic af. Ingebouwde zuinigheidsregels: stoppen als alles korter dan 2 uur geleden is bekeken, lazy loading van bijlagen, Tweakers eerst alleen op omschrijving. Daarna triage naar bug, feature of vraag en een backlog-taak na akkoord van de ontwikkelaar.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Omvang</span>
+  <h2>De werkplaats in cijfers</h2>
+  <div class="nums">
+    <div class="num"><b>269</b><span>entries in het SAT-beslisregister (6.013 regels)</span></div>
+    <div class="num"><b>±86</b><span>vragen in de SAT-wachtrij, waarvan het grootste deel beantwoord</span></div>
+    <div class="num"><b>115</b><span>actieve taken: 36 To Do, 14 In Progress, 65 Done</span></div>
+    <div class="num"><b>1.321</b><span>gearchiveerde taken, de hoogste nu TASK-1610</span></div>
+    <div class="num"><b>±210</b><span>ADR's, waarvan 7 binding</span></div>
+    <div class="num"><b>42</b><span>checks in evaluate.py</span></div>
+    <div class="num"><b>125 + 43</b><span>Python-tests en host-harnassen (MSVC)</span></div>
+    <div class="num"><b>9 · 2 · 1</b><span>skills, commands en eigen subagents</span></div>
+  </div>
+  <p class="col" style="font-size:15px;color:var(--muted)">Deze checkout is een shallow clone van 50 commits, allemaal van 2026-11-04. Een betrouwbare commitfrequentie of doorlooptijd valt hier daarom niet uit af te leiden. Alle 50 dragen een Claude co-author-trailer: 47 op naam van Robert en 3 van Andre Brait.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Analyse</span>
+  <h2>Bevindingen</h2>
+  <p class="col">Wat goed werkt, eerst kort. Het bewijsregime (oud tegen fix, Done alleen met bewijs, reviewers die moeten weerleggen) is streng en goed uitgewerkt. De SAT-rangorde met verplichte <code>file:line</code>-citaten is een sterke maatregel tegen hallucinatie. Dat elke firmwarecommit een eigen tag krijgt, maakt testerfeedback goed toe te wijzen. De risico's hieronder gaan over beheersbaarheid op termijn.</p>
+  <div class="finds">
+    <div class="find"><span class="sev hi">Hoog</span><div><h3>1. Instructies lopen uiteen tussen agents</h3><p>CLAUDE.md verbiedt de backlog-MCP en schrijft de CLI voor. AGENTS.md (Codex) noemt de MCP juist het primaire kanaal. <code>.github/copilot-instructions.md</code> beschrijft nog ESP8266 en ArduinoJson, terwijl ADR-146 ArduinoJson verbiedt. <code>.claude/docs/discord-backlog-bridge.md</code> beschrijft een npx-<code>mcp-discord</code>, een bot "OTGW bot#0128" en alleen #dev-sat-mqtt. De werkelijkheid is een Java-saseq-server, de bot "BlueFlame Bot" en ook #alpha-testing.</p><p class="ev">Gevolg: een andere agent of een nieuwe sessie handelt aantoonbaar tegen de regels. Alleen het blok met binding ADR's wordt al op gelijkheid getest (<code>tests/test_adr_governance.py</code>).</p></div></div>
+    <div class="find"><span class="sev hi">Hoog</span><div><h3>2. CI ziet de hoofdlijn niet</h3><p><code>build.yml</code>, <code>evaluate.yml</code> en <code>adr-governance.yml</code> reageren alleen op <code>pull_request</code>. Op <code>dev</code> wordt rechtstreeks gecommit en gepusht. De git-hooks zijn opt-in per clone (<code>core.hooksPath</code>) en kunnen met env-vars worden omzeild.</p><p class="ev">Gevolg: de enige objectieve poort is lokaal. Een sessie zonder hooks, of in een andere omgeving, pusht ongecontroleerd.</p></div></div>
+    <div class="find"><span class="sev md">Middel</span><div><h3>3. De omgeving zit vast aan één Windows-machine</h3><p>De PostToolUse-hook in <code>.claude/settings.json</code> heeft een hardcoded <code>cd 'D:/Users/Robert/...'</code> en eindigt op <code>|| true</code>. In deze cloudsessie of op een Mac draait de evaluator dus stil niet. Daarnaast staan de bench-IP en COM4, de webhook in <code>%LOCALAPPDATA%</code>, de Discord-MCP, de people-file en het ledger allemaal lokaal en gitignored. Alles draait op <code>bypassPermissions</code> met <code>Bash(*)</code>.</p><p class="ev">Gevolg: een hoge bus-factor. Zonder die machine valt het hele publicatie- en Discord-pad weg en is het ledger niet te reconstrueren.</p></div></div>
+    <div class="find"><span class="sev md">Middel</span><div><h3>4. De regels groeien als lagen bij</h3><p>CLAUDE.md telt 673 regels met 14 gedateerde "maintainer directive/decision"-amendementen, en wordt elke sessie volledig geladen. Samen met AGENTS.md is dat ±120 KB. Sommige regels vervangen eerdere maar laten die staan, zoals de cadans 2026-10-29 → 10-30 en het SAT-vraagritme 10-24 → 10-25. Bekende bugs, zoals een lege <code>backlog task list</code>, worden op meerdere plekken omzeild in plaats van opgelost.</p><p class="ev">Gevolg: hoge contextkosten per sessie, een groter risico op tegenstrijdige lezingen, en een nieuwe deelnemer kan het systeem moeilijk overzien.</p></div></div>
+    <div class="find"><span class="sev md">Middel</span><div><h3>5. Het SAT-register en de wachtrij zijn ongestructureerd</h3><p>Het register is één markdownbestand van 6.013 regels zonder machineleesbare metadata. Besluiten van de maintainer staan tussen die van Sergeant D. In <code>open-questions.md</code> is de geschiedenis in "Update"-alinea's opgestapeld, en in de statuskolom staan rijen nog op "asked" terwijl de kolom "Answered" al een entry noemt (bijvoorbeeld Q-1519b → 163).</p><p class="ev">Gevolg: de herkomst ("wie besliste dit?") en de actuele status zijn alleen te achterhalen door het bestand volledig te lezen. Daar zitten precies de hallucinatie- en driftrisico's die de regels willen voorkomen.</p></div></div>
+    <div class="find"><span class="sev lo">Laag</span><div><h3>6. Doorvoer is bewust geserialiseerd</h3><p>Machinebreed één build tegelijk, maximaal 4 jobs, een benchtest per taak en maximaal 3 uur tussen builds. Dat is een verdedigbare keuze voor betrouwbaarheid, maar het plafond ligt bij één bench en één machine.</p></div></div>
+    <div class="find"><span class="sev lo">Laag</span><div><h3>7. Onderzoek staat tussen gereedschap</h3><p>45 van de 84 scripts in <code>scripts/</code> zijn <code>sat_*</code>-studies en simulaties (study 2 tot en met 25). Ze staan naast operationeel gereedschap zoals <code>discord-post-build.sh</code> en <code>ota_flash.py</code>.</p></div></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Vervolg</span>
+  <h2>Verbetervoorstellen</h2>
+  <div class="props">
+    <div class="prop"><span class="tag">Eén bron · klein</span><h3>Genereer de agentinstructies uit één kern</h3><p class="mono" style="color:var(--flame)">TASK-1612</p><p>Maak een gedeelde kern (rollen, poorten, backlog via de CLI, Discord-regels) en genereer daaruit CLAUDE.md, AGENTS.md en copilot-instructions.md. Breid <code>test_adr_governance.py</code> uit tot een driftcheck over alle drie. Werk de bridge-doc bij of verwijder hem.</p><p class="why">Lost bevinding 1 structureel op. Dezelfde aanpak als het blok met binding ADR's, dat al wordt getest.</p></div>
+    <div class="prop"><span class="tag">Vangnet · klein</span><h3>CI op push naar dev</h3><p class="mono" style="color:var(--flame)">TASK-1613</p><p>Voeg <code>push: branches: [dev]</code> toe aan evaluate en adr-governance. Voeg aan de SessionStart-hook <code>git config core.hooksPath .githooks</code> toe, zodat elke sessie de hooks heeft.</p><p class="why">Geen blokkade op de werkstroom, wel een signaal achteraf. De build kan op een runner blijven als die kosten te hoog zijn.</p></div>
+    <div class="prop"><span class="tag">Draagbaarheid · klein</span><h3>Haal machinepaden uit de hooks</h3><p class="mono" style="color:var(--flame)">TASK-1614 · TASK-1615</p><p>Vervang het D:-pad door <code>$CLAUDE_PROJECT_DIR</code> en laat een FAIL zichtbaar worden in plaats van <code>|| true</code>. Zet bench-IP en poort in een lokaal env-bestand met een geversioneerd voorbeeld.</p><p class="why">Dan werkt de evaluator ook in cloud- en Mac-sessies, zoals deze.</p></div>
+    <div class="prop"><span class="tag">Structuur · middel</span><h3>Maak het SAT-register machineleesbaar</h3><p class="mono" style="color:var(--flame)">TASK-1616 · TASK-1617</p><p>Geef elke entry een korte YAML-kop: id, datum, bron (SergeantD of maintainer), soort (correctie, antwoord of interpretatie), supersedes, taken, link en bevestigd-door. Genereer de statuskolom van de wachtrij daaruit en laat een test falen als een beantwoorde vraag nog op "asked" staat.</p><p class="why">Herkomst en status zijn dan op te vragen zonder 6.000 regels te lezen. Dat is tegelijk een maatregel tegen hallucinatie.</p></div>
+    <div class="prop"><span class="tag">Context · middel</span><h3>Maak CLAUDE.md slanker</h3><p class="mono" style="color:var(--flame)">TASK-1618 · TASK-1622</p><p>Houd een kern van ±150 regels: rollen, harde verboden en poorten. Verplaats domeinregels (SAT, builds, releases, Discord) naar skills of <code>.claude/rules/</code> die alleen laden als ze relevant zijn. Leg vervangen directives vast in een changelog en niet in de lopende tekst.</p><p class="why">Lagere tokenkosten per sessie en minder ruimte voor tegenstrijdige lezingen.</p></div>
+    <div class="prop"><span class="tag">Continuïteit · middel</span><h3>Maak lokale state reconstrueerbaar</h3><p class="mono" style="color:var(--flame)">TASK-1619</p><p>Leid het alpha-ledger af uit de git-log en de Discord-berichten met een script, in plaats van het met de hand bij te houden. Versioneer een geanonimiseerd sjabloon van de people-file. Leg vast hoe Discord-MCP en webhook op een tweede machine worden opgezet.</p><p class="why">Verlaagt de bus-factor zonder secrets of persoonsregels in de publieke repo te zetten.</p></div>
+    <div class="prop"><span class="tag">Inzicht · klein</span><h3>Meet de doorstroom</h3><p class="mono" style="color:var(--flame)">TASK-1620 → TASK-1623</p><p>Een klein rapport met doorlooptijd per taak, tijd tot antwoord per SAT-vraag, de leeftijd van open vragen en het aantal taken met <code>needs-maintainer-ok</code>. Dat laat zien waar de echte bottleneck zit: bij Robert, Sergeant D of de bench.</p><p class="why">Maakt bevinding 6 van een vermoeden tot een getal.</p></div>
+    <div class="prop"><span class="tag">Opruimen · klein</span><h3>Scheid onderzoek van gereedschap</h3><p class="mono" style="color:var(--flame)">TASK-1621</p><p>Verplaats de <code>sat_*study*</code>-scripts naar <code>tools/research/sat/</code> of naast de bijbehorende <code>docs/sat/sim-*</code>-map.</p></div>
+  </div>
+
+  <h3 style="margin-top:8px">Drie scenario's</h3>
+  <div class="scen">
+    <div class="sc"><b>A. Consolideren (dagen)</b><p>Drift weghalen, de CI-trigger op dev, de hook-paden, hooksPath bij de start van een sessie. Weinig risico en direct minder kans op fouten. Mijn advies voor nu.</p></div>
+    <div class="sc"><b>B. Herstructureren (weken)</b><p>A plus een slanke CLAUDE.md met regels op aanvraag, een register met metadata en een gegenereerde wachtrij. Raakt de werkwijze van de lopende SAT-campagne (TASK-1412), dus pas na een rustig moment in die campagne.</p></div>
+    <div class="sc"><b>C. Opschalen (maanden)</b><p>B plus een tweede bench of een self-hosted build-runner, zodat de build-lock niet meer aan één machine hangt, en de Discord-MCP op een kleine always-on host. Alleen zinvol als de metingen uit het voorstel "Meet de doorstroom" laten zien dat de bench of de machine echt de bottleneck is.</p></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Beperkingen</span>
+  <h2>Wat ik niet heb kunnen zien</h2>
+  <div class="note">
+    <ul class="tight">
+      <li>Discord zelf. Deze cloudsessie heeft geen Discord-MCP. De beschrijving van de interactie komt uit de regels, commands en het register, niet uit de gesprekken zelf.</li>
+      <li>Lokale, gitignored bestanden: <code>discord-people.local.md</code>, het alpha-ledger, <code>.mcp.json</code> en de webhook.</li>
+      <li>Geschiedenis. De shallow clone van 50 commits laat geen trend in tempo of doorlooptijd zien.</li>
+      <li>Aantallen zoals "±86 vragen" en "±210 ADR's" zijn telling op bestandsniveau. Varianten en meta-bestanden kunnen ze een paar procent laten afwijken.</li>
+    </ul>
+  </div>
+</section>
+
+</div>
+
+</body></html>

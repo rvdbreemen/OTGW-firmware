@@ -54,6 +54,8 @@
 - Git Bash `ps` cannot see native Windows processes; use `tasklist //FI "PID eq <pid>"`.
 
 ### Git / backlog / ADR
+- Cloud sessions have no backlog CLI: `npm install -g backlog.md@1.46.1` (version from docs/guides/backlog-cli.md). There `backlog task list --plain` works (115 tasks, status filter OK); the 'returns empty' bug is not universal (TASK-1622). The 'Failed to fetch remote tasks' stack dump on create is noise; the task is still written.
+- The SessionStart toolchain build leaves build-stamp churn in version.h / data/version.hash; the Stop hook then asks for a commit. Restore it with `git checkout --`, never commit it (TASK-1615).
 - **Fetch before any cross-branch gap analysis.** `git fetch` + `git rev-list --left-right --count HEAD...origin/<branch>` FIRST; a 6-commit-stale tree produced 3 dead tasks.
 - `backlog task edit` AUTO-COMMITS in the dev worktree (wipes your index); not in the 2.0.0 tree. Never leave staged work during CLI calls, and don't re-commit ADR/task files afterwards — check `git log` first. Dev commit-msg hook demands a task file for EVERY `TASK-NNN` token — don't cite 2.0.0 ids in dev commits. Exemptions: `chore(meta|release|housekeeping|daily-report):`; version-banner housekeeping needs `OTGW_BUMP_HOOK_DISABLE=1`.
 - `other-projects/` is a submodule of private `rvdbreemen/OTGW-other-projects`. Commit inside it, then the gitlink.
@@ -97,6 +99,7 @@
 - **NimBLE TU include order (TASK-1199, 2026-10-03)**: IDF component includes arrive via `-iprefix`/`-iwithprefix`, which are searched after every `-I`. A NimBLE-Arduino TU gets only four `-I` dirs: the lib's src, the sdkconfig dir (`esp32s3/qio_qspi/include`), cores, variants. Every sdkconfig.h includer seen uses quotes, and the framework sdkconfig.h is `#pragma once`.
 
 ## Do-Not-Repeat
+- 2026-11-04: when scripting `backlog task create` and capturing the new id as `T=TASK-NNNN`, do not write `TASK-$T` in later descriptions/ACs (gives TASK-TASK-NNNN). Use `$T` alone.
 - 2026-10-26: build artefact names use a 7-char githash, but `git rev-parse --short` now returns 9 chars in this repo (7 is ambiguous). A script that builds the .ino.bin path from `--short` gets FileNotFoundError, and ota_flash.py printed only 'running: <old>' (it failed twice: alpha.512 OTGW32, alpha.513 Classic). Always use `git rev-parse --short=7 HEAD` for artefact paths, and check for 'Update OK' + 'running: <new>' after every OTA.
 - [2026-10-25] Called the bench unit 'the OTGW32' in task evidence because memory tied MAC 10:20:BA:21:B4:F8 to it; Robert: the OTGW32 was not connected for 48 h. The combo image shows OT-Direct on ANY S3 without PIC and boiler (ADR-160), so neither 'OT-Direct' nor a remembered MAC identifies the board. Name the unit by what was observed (MAC, board string, PIC yes/no) and ask Robert which board it is.
 - [2026-10-25] Prerelease tag collision: another session (TASK-1377) pushed alpha.506/.507 while my unpushed TASK-1367 commit also carried alpha.506. Before bin/bump-prerelease.sh, git fetch and check origin/dev's _VERSION_PRERELEASE; when the remote moved, rebase first. Recovery that worked: rebase, take upstream for version-only conflict hunks (49 banner files + version.h/hash), re-run the bump (alpha.508), continue.
