@@ -39,11 +39,12 @@ def main() -> None:
         # Fail-open: a malformed hook payload should never block real work.
         sys.exit(0)
 
-    tool_name = payload.get("tool_name", "")
+    # Case-insensitive name and `path` key also cover non-Claude harnesses (OMP etc.).
+    tool_name = str(payload.get("tool_name", "")).lower()
     tool_input = payload.get("tool_input") or {}
 
-    if tool_name in ("Edit", "Write", "MultiEdit"):
-        file_path = (tool_input.get("file_path") or "").replace("\\", "/")
+    if tool_name in ("edit", "write", "multiedit"):
+        file_path = (tool_input.get("file_path") or tool_input.get("path") or "").replace("\\", "/")
         if re.search(r"(?:^|/)backlog/tasks/[^/]+\.md$", file_path, re.IGNORECASE):
             _block(
                 "Blocked: never edit backlog/tasks/*.md directly "
