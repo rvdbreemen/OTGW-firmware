@@ -64,6 +64,21 @@ class OpenQuestionsStatus(unittest.TestCase):
                 offenders.append(f"{qid}: Answered entry {m.group(1)} not named in Status '{status[:60]}'")
         self.assertEqual(offenders, [], "\n".join(offenders))
 
+    def test_live_queue_matches_the_table(self):
+        # The Live queue is derived from the table: every asked/queued row without an
+        # answering entry, and nothing else. A row closed in the table but left in the list
+        # (or the reverse) is the staleness this test exists for.
+        open_ids = {
+            qid for qid, ans, status in self.rows
+            if re.match(r"(asked|queued)\b", status, re.I) and not ans.startswith("✓")
+        }
+        start = self.text.find("## Live queue")
+        end = self.text.find("| # | Answered | Status |")
+        listed = set(re.findall(r"^- \*\*([^*]+)\*\*", self.text[start:end], re.M))
+        self.assertEqual(sorted(listed), sorted(open_ids),
+                         "Live queue differs from the open rows of the table: "
+                         "run python scripts/sat_open_questions.py --update")
+
     def test_history_is_below_the_live_queue(self):
         live = self.text.find("## Live queue")
         history = self.text.find("## History")
