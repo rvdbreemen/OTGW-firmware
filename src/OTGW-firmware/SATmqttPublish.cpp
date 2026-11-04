@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.cpp
-**  Version  : v2.0.0-beta.70
+**  Version  : v2.0.0-beta.71
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -41,6 +41,9 @@ static inline uint32_t satNextDeadline(bool wasFirstSeen);
 // publish due, so the outbox walk in mqttOutboxDepth() is not paid on quiet passes.
 static bool s_satPublishDeferred = false;
 
+// TASK-1603 (ADR-174): see SATmqttPublish.h.
+uint8_t g_satShadowEpoch = 0;
+
 bool satPublishDeferred()      { return s_satPublishDeferred; }
 void satPublishDeferredClear() { s_satPublishDeferred = false; }
 
@@ -64,10 +67,12 @@ bool publishIfChangedF(const char* topic, float current,
   const bool firstSeen    = !shadow.valid;
   const bool valueDiff    = !firstSeen && (fabsf(current - shadow.last) >= tolerance);
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
-  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  const bool stale = (shadow.epoch != g_satShadowEpoch);   // TASK-1603: HA came back online
+  if (!firstSeen && !valueDiff && !heartbeatDue && !stale) return false;
   if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
   shadow.last            = current;
   shadow.valid           = true;
+  shadow.epoch           = g_satShadowEpoch;
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
   char buf[16];
   dtostrf(current, 1, decimals, buf);
@@ -81,10 +86,12 @@ bool publishIfChangedI(const char* topic, int32_t current,
   const bool firstSeen    = !shadow.valid;
   const bool valueDiff    = !firstSeen && (current != shadow.last);
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
-  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  const bool stale = (shadow.epoch != g_satShadowEpoch);   // TASK-1603: HA came back online
+  if (!firstSeen && !valueDiff && !heartbeatDue && !stale) return false;
   if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
   shadow.last            = current;
   shadow.valid           = true;
+  shadow.epoch           = g_satShadowEpoch;
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
   char buf[16];
   snprintf_P(buf, sizeof(buf), PSTR("%ld"), (long)current);
@@ -98,9 +105,11 @@ bool publishIfChangedB(const char* topic, bool current,
   const bool firstSeen    = (shadow.nextRepublishMs == 0);
   const bool valueDiff    = !firstSeen && (shadow.last != (int8_t)(current ? 1 : 0));
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
-  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  const bool stale = (shadow.epoch != g_satShadowEpoch);   // TASK-1603: HA came back online
+  if (!firstSeen && !valueDiff && !heartbeatDue && !stale) return false;
   if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
   shadow.last            = (int8_t)(current ? 1 : 0);
+  shadow.epoch           = g_satShadowEpoch;
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
   sendMQTTData(topic, current ? "true" : "false", retained);
   return true;
@@ -112,10 +121,12 @@ bool publishIfChangedS(const char* topic, const char* current,
   const bool firstSeen    = !shadow.valid;
   const bool valueDiff    = !firstSeen && (strncmp(current, shadow.last, sizeof(shadow.last)) != 0);
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
-  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  const bool stale = (shadow.epoch != g_satShadowEpoch);   // TASK-1603: HA came back online
+  if (!firstSeen && !valueDiff && !heartbeatDue && !stale) return false;
   if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
   strlcpy(shadow.last, current, sizeof(shadow.last));
   shadow.valid           = true;
+  shadow.epoch           = g_satShadowEpoch;
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
   sendMQTTData(topic, current, retained);
   return true;
@@ -151,12 +162,14 @@ bool publishIfChangedF(const __FlashStringHelper* topic, float current,
   const bool valueDiff   = !firstSeen && (fabsf(current - shadow.last) >= tolerance);
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
 
-  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  const bool stale = (shadow.epoch != g_satShadowEpoch);   // TASK-1603: HA came back online
+  if (!firstSeen && !valueDiff && !heartbeatDue && !stale) return false;
   if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
 
   // Update shadow FIRST (re-entrancy safety — sendMQTTData may feedWatchDog/yield).
   shadow.last            = current;
   shadow.valid           = true;
+  shadow.epoch           = g_satShadowEpoch;
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
 
   // dtostrf matches the formatting convention used throughout satPublishMQTT().
@@ -177,11 +190,13 @@ bool publishIfChangedI(const __FlashStringHelper* topic, int32_t current,
   const bool valueDiff    = !firstSeen && (current != shadow.last);
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
 
-  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  const bool stale = (shadow.epoch != g_satShadowEpoch);   // TASK-1603: HA came back online
+  if (!firstSeen && !valueDiff && !heartbeatDue && !stale) return false;
   if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
 
   shadow.last            = current;
   shadow.valid           = true;
+  shadow.epoch           = g_satShadowEpoch;
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
 
   char buf[16];
@@ -213,10 +228,12 @@ bool publishIfChangedB(const __FlashStringHelper* topic, bool current,
   const bool valueDiff    = !firstSeen && (shadow.last != (int8_t)(current ? 1 : 0));
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
 
-  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  const bool stale = (shadow.epoch != g_satShadowEpoch);   // TASK-1603: HA came back online
+  if (!firstSeen && !valueDiff && !heartbeatDue && !stale) return false;
   if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
 
   shadow.last            = (int8_t)(current ? 1 : 0);
+  shadow.epoch           = g_satShadowEpoch;
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
 
   sendMQTTData(topic, current ? "true" : "false", retained);
@@ -234,11 +251,13 @@ bool publishIfChangedS(const __FlashStringHelper* topic, const char* current,
   const bool valueDiff    = !firstSeen && (strncmp(current, shadow.last, sizeof(shadow.last)) != 0);
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
 
-  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  const bool stale = (shadow.epoch != g_satShadowEpoch);   // TASK-1603: HA came back online
+  if (!firstSeen && !valueDiff && !heartbeatDue && !stale) return false;
   if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
 
   strlcpy(shadow.last, current, sizeof(shadow.last));
   shadow.valid           = true;
+  shadow.epoch           = g_satShadowEpoch;
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
 
   sendMQTTData(topic, current, retained);
@@ -258,9 +277,11 @@ bool publishIfChangedBStr(const __FlashStringHelper* topic, bool current,
   const bool firstSeen    = (shadow.nextRepublishMs == 0);
   const bool valueDiff    = !firstSeen && (shadow.last != (int8_t)(current ? 1 : 0));
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
-  if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  const bool stale = (shadow.epoch != g_satShadowEpoch);   // TASK-1603: HA came back online
+  if (!firstSeen && !valueDiff && !heartbeatDue && !stale) return false;
   if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
   shadow.last            = (int8_t)(current ? 1 : 0);
+  shadow.epoch           = g_satShadowEpoch;
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
   sendMQTTData(topic, current ? onLabel : offLabel, retained);
   return true;

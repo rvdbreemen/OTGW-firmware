@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-beta.70
+**  Version  : v2.0.0-beta.71
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -124,16 +124,19 @@ struct SATShadowF {
   float    last;
   uint32_t nextRepublishMs;
   bool     valid;
+  uint8_t  epoch;             // TASK-1603: g_satShadowEpoch when last published
 };
 
 struct SATShadowI {
   int32_t  last;
   uint32_t nextRepublishMs;
   bool     valid;
+  uint8_t  epoch;
 };
 
 struct SATShadowB {
   int8_t   last;              // -1 = invalid, 0/1 = boolean value
+  uint8_t  epoch;
   uint32_t nextRepublishMs;
 };
 
@@ -144,10 +147,17 @@ struct SATShadowS {
   char     last[24];
   uint32_t nextRepublishMs;
   bool     valid;
+  uint8_t  epoch;
 };
 
 static_assert(sizeof(SATShadowS::last) >= 20,
               "SATShadowS::last must hold the longest published SAT string (19+null)");
+
+// TASK-1603 (ADR-174): a shadow whose epoch differs from g_satShadowEpoch counts as unseen: its
+// helper publishes once, whatever the value, then stores the epoch. satRepublishCoreState()
+// increments it when Home Assistant comes back online, so every SAT state topic (retained or
+// not) is sent again on the next pass. BSS zero-init (shadow.epoch 0 == 0) leaves boot unchanged.
+extern uint8_t g_satShadowEpoch;
 
 // ---------------------------------------------------------------------------
 // Helper API (ADR-111 sub-rule 1).

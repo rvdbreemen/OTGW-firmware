@@ -229,6 +229,7 @@ bool sendMQTTData(const __FlashStringHelper* topic, const char* json, const bool
 
 GATE_MAIN = r"""
 #include <string>
+#define PASS6(NAME) { g_outbox = 0; g_sent = 0; int q = 0;   q += publishIfChangedF(F("t/f"), 1.5f, ef, 0.05f, 1, false); q += publishIfChangedI(F("t/i"), 7, ei, false);   q += publishIfChangedB(F("t/b"), true, eb, false); q += publishIfChangedBStr(F("t/bs"), true, ebs, "ON", "OFF", false);   q += publishIfChangedS(F("t/s"), "idle", es, false); q += publishIfChangedF("t/c", 2.5f, ec, 0.05f, 1, false);   printf(#NAME " r=%d sent=%d\n", q, g_sent); }
 int main() {
   // 1. float, first-seen, outbox above the limit, then drained
   SATShadowF f{};
@@ -274,6 +275,26 @@ int main() {
   g_now += 500; g_outbox = 0; g_sent = 0;
   r = publishJsonAttrIfChanged(F("sat/pid_attributes"), "{\"a\":1}", hb, false, false);   // source shadows already updated
   printf("blob_next r=%d sent=%d\n", (int)r, g_sent);
+  // 8. TASK-1603: HA-online epoch. Unchanged value -> quiet; after a bump -> one publish, then quiet.
+  g_outbox = 0; g_sent = 0; g_now = 1000;
+  SATShadowF ef{}; SATShadowI ei{}; SATShadowB eb{}, ebs{}; SATShadowS es{}; SATShadowF ec{};
+  publishIfChangedF(F("t/f"), 1.5f, ef, 0.05f, 1, false);  publishIfChangedI(F("t/i"), 7, ei, false);
+  publishIfChangedB(F("t/b"), true, eb, false);            publishIfChangedBStr(F("t/bs"), true, ebs, "ON", "OFF", false);
+  publishIfChangedS(F("t/s"), "idle", es, false);          publishIfChangedF("t/c", 2.5f, ec, 0.05f, 1, false);
+  PASS6(epoch_quiet)
+  EPOCH_BUMP();
+  PASS6(epoch_bumped)
+  PASS6(epoch_again)
+  // 9. a bump while the outbox is full defers (shadow untouched) and retries
+  EPOCH_BUMP();
+  g_outbox = 1000; g_sent = 0; DEFERRED_CLEAR();
+  r = publishIfChangedF(F("t/f"), 1.5f, ef, 0.05f, 1, false);
+  printf("epoch_full r=%d sent=%d deferred=%d\n", (int)r, g_sent, DEFERRED());
+  g_outbox = 0; g_sent = 0;
+  r = publishIfChangedF(F("t/f"), 1.5f, ef, 0.05f, 1, false);
+  bool r2 = publishIfChangedF(F("t/f"), 1.5f, ef, 0.05f, 1, false);
+  printf("epoch_retry r=%d sent=%d again=%d\n", (int)r, g_sent, (int)r2);
+  printf("sizes F=%d I=%d B=%d S=%d\n", (int)sizeof(SATShadowF), (int)sizeof(SATShadowI), (int)sizeof(SATShadowB), (int)sizeof(SATShadowS));
   return 0;
 }
 """
@@ -296,6 +317,8 @@ class OutboxGate(unittest.TestCase):
         has_flag = "satPublishDeferred" in h
         flag = ("#define DEFERRED() ((int)satPublishDeferred())\n#define DEFERRED_CLEAR() satPublishDeferredClear()\n"
                 if has_flag else "#define DEFERRED() (-1)\n#define DEFERRED_CLEAR() ((void)0)\n")
+        flag += ("#define EPOCH_BUMP() (g_satShadowEpoch++)\n" if "g_satShadowEpoch" in h
+                 else "#define EPOCH_BUMP() ((void)0)\n")
         cls.tmp = tempfile.TemporaryDirectory()
         src = Path(cls.tmp.name) / "gate.cpp"
         src.write_text(GATE_PRELUDE + strip_includes(h) + "\n" + strip_includes(cpp) + "\n" + flag + GATE_MAIN,
@@ -350,6 +373,23 @@ class OutboxGate(unittest.TestCase):
     def test_blob_change_signal_survives_a_skip(self):
         self.assertEqual(self.r("blob_full"), {"r": "0", "sent": "0", "due": "1"})
         self.assertEqual(self.r("blob_next"), {"r": "1", "sent": "1"})
+
+    # --- TASK-1603: HA-online epoch ------------------------------------------------------------
+    def test_epoch_bump_republishes_every_helper_once(self):
+        # 6 helper calls: F, I, B, BStr, S (F() topics) and F (char* topic)
+        self.assertEqual(self.r("epoch_quiet"), {"r": "0", "sent": "0"})
+        self.assertEqual(self.r("epoch_bumped"), {"r": "6", "sent": "6"})
+        self.assertEqual(self.r("epoch_again"), {"r": "0", "sent": "0"})
+
+    def test_epoch_bump_respects_the_outbox_gate(self):
+        self.assertEqual(self.r("epoch_full"), {"r": "0", "sent": "0", "deferred": "1"})
+        self.assertEqual(self.r("epoch_retry"), {"r": "1", "sent": "1", "again": "0"})
+
+    def test_epoch_field_does_not_grow_the_shadows(self):
+        self.assertEqual(self.r("sizes"), {"F": "12", "I": "12", "B": "8", "S": "32"})
+
+    def test_ha_online_reset_bumps_the_epoch(self):
+        self.assertIn("g_satShadowEpoch++;", body(read("SATcontrol.ino"), "void satRepublishCoreState()"))
 
     # --- source wiring -----------------------------------------------------------------------
     def test_every_helper_is_gated_before_its_shadow_write(self):

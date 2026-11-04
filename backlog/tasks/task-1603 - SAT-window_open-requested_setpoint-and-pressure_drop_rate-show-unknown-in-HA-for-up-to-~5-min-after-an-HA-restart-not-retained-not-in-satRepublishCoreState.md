@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-04T13:03:00Z'
-updated_date: '2026-11-04T14:25:00Z'
+updated_date: '2026-11-04T14:31:00Z'
 labels:
   - sat
   - mqtt
@@ -27,7 +27,7 @@ Found in the TASK-1490 bench (2026-11-04, .61 beta.70): these three SAT states p
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 After homeassistant/status offline->online the three topics publish within one SAT publish pass (bench: mosquitto_sub timestamps)
-- [ ] #2 Host or source test shows the three shadows are reset by the HA-online path
+- [x] #2 Host or source test shows the three shadows are reset by the HA-online path
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -40,4 +40,6 @@ Reset the function-static shadows of window_open, requested_setpoint and pressur
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-04 lead: the first agent pass (3 shadows to file scope) showed ~55 more function-static, non-retained SAT shadows with the same gap (publish calls SATcontrol.ino ~4561-4907). Decision (lead, KISS for the whole class): a uint8 epoch per shadow + g_satShadowEpoch, bumped in satRepublishCoreState(); the helpers treat an old epoch as first-seen. One change in SATmqttPublish covers every SAT state topic; RAM cost absorbed by struct padding (sizeof to be reported).
+
+2026-11-04 (sonnet agent; lead reran in wt-int4): uint8 epoch per SATShadow (sizeof F/I/B/S unchanged 12/12/8/32), g_satShadowEpoch bumped in satRepublishCoreState(); all 9 helpers treat an old epoch as first-seen, outbox deferral still retries. tests/test_sat_mqtt_state.py 30 OK (old: 3 FAIL, epoch_bumped 0 instead of 6), mqtt_contract 15, fallback 8, restart_quiet 20, ot_loss 24 OK; evaluate 0 failed. Known gap: sat/cycle_attributes and sat/climate_attributes JSON blobs refresh only on their heartbeat (<=11 min). Tag beta.71.
 <!-- SECTION:NOTES:END -->

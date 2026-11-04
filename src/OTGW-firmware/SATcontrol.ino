@@ -4463,6 +4463,10 @@ void satRepublishCoreState()
   memset(&s_core_mode, 0, sizeof(s_core_mode));
   memset(&s_core_control_mode, 0, sizeof(s_core_control_mode));
   memset(&s_core_preset, 0, sizeof(s_core_preset));
+  // TASK-1603: every other SAT shadow (function-static ones too) re-publishes on its next pass.
+  // A uint8_t wrap is harmless: shadows compare with !=, and only a shadow that missed exactly 256 bumps
+  // would skip one redundant resend; its normal change and heartbeat publishing is unaffected.
+  g_satShadowEpoch++;
 }
 
 void satPublishMQTT()
