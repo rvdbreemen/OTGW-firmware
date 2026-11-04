@@ -12,7 +12,7 @@ Every fixture has exactly one of four kinds (reported per LL id at the end and w
   known_defect      reproduced against the current code and marked unittest.expectedFailure; the task named in the decorator
                     fixes it. When the fix lands the test turns into an UNEXPECTED SUCCESS (a failure), which is the signal to
                     remove the marker: red-then-green without disabling any unrelated assertion.
-  open_decision     expectedFailure because the approved oracle depends on an open SAT question (QD-8, Conf-1371, QD-1..3, ...)
+  open_decision     expectedFailure because the approved oracle depends on an open SAT question (QD-8, OTD-PM25, ...)
   unavailable       cannot run on the host (needs PH-FIELD data or a bench); skipped in normal mode
 Source hashes: sha256 of the production files, of the generated host program (cut code + harness) per compiled fixture, and of the
 delegated test modules; the git HEAD and the OTGW_SAT* override variables are recorded too.
@@ -220,6 +220,10 @@ DELEGATED = {
                 "test_fresh_zero_return_is_a_measurement_not_a_missing_return", "test_board_sensor_return_is_a_return_even_when_the_boiler_says_unknown",
                 "test_unsupported_verdict_restored_from_file_is_not_enough_alone", "test_missing_flow_sends_no_flood_and_no_flow_based_hold",
                 "test_start_up_window_keeps_the_previous_cs_until_5_minutes_without_a_return"])],
+    # TASK-1412.12 (LL-018b, entries 217, 263): the stale / Data-Invalid return rule and the start-up window that keeps the previous CS
+    "LL-018b": [("test_sat_no_return_startup", "NoReturnStartup", ["test_start_up_window_keeps_the_previous_cs_until_5_minutes_without_a_return",
+                "test_unsupported_verdict_restored_from_file_is_not_enough_alone", "test_data_invalid_return_waits_5_minutes_then_counts_as_no_return",
+                "test_stale_return_is_the_same_as_an_invalid_one_and_recovers"])],
     # TASK-1384 (entry 261): the boot PM chain on a PIC board whatever SAT is; OT-Direct unchanged
     "LL-018i": [("test_pic_pm_chain", "PmChain", ["test_boot_chain_on_pic_with_sat_disabled", "test_boot_chain_on_pic_with_sat_enabled_unchanged",
                 "test_boot_chain_ot_direct_unchanged", "test_init_sat_starts_the_chain_outside_the_sat_enabled_block"])],
@@ -468,7 +472,7 @@ class LowLoadContract(unittest.TestCase):
         self.delegated("LL-014")
 
     @ll("LL-015", "contract", "satGetPwmPeriodSec, satGetMaxCyclesPerHour, satApplyPWM per source (via test_sat_hp_pwm, test_sat_pwm_start_limit)",
-        task="partial: mapper and phase arithmetic; full-loop automatic entry per source is TASK-1412.7/9", question="Q-1527a (heat pumps)")
+        task="partial: mapper and phase arithmetic; full-loop automatic entry per source is TASK-1412.7/9 (Q-1527a answered A, entry 227)")
     def test_ll015_source_profiles_period_and_minimums(self):
         self.delegated("LL-015")
 
@@ -532,12 +536,11 @@ class LowLoadContract(unittest.TestCase):
             cls.tearDownClass()
         self.assertLessEqual(max(lat), 1150, lat)
 
-    @ll("LL-018", "open_decision", "none: the stale/Data-Invalid return rule (entry 217, TASK-1412.5) is host-tested; Conf-1371 (this-boot Unknown-DataID, 5 min board reading) is not answered and both transports are not benched (document check)",
-        task="TASK-1412.12", question="Conf-1371")
+    @ll("LL-018", "contract", "satNoReturnTemp, satReturnFresh, satApplyPWM no-return start-up window (SATcontrol.ino, via test_sat_no_return_startup)",
+        task="TASK-1412.12 (entries 217, 263; Conf-1371 answered by entry 263, confirmed by Sergeant D in entry 265): Data-Invalid / stale return counts as missing after 5 minutes; "
+             "before any MsgID 28 answer of this boot the flame-off hold keeps the previous CS; a restored Unknown-DataID verdict alone does not count")
     def test_ll018b_stale_or_invalid_return_is_treated_as_missing(self):
-        rows = [l for l in (REPO / "docs" / "sat" / "open-questions.md").read_text(encoding="utf-8").splitlines() if l.startswith("| Conf-1371 ")]
-        self.assertEqual(len(rows), 1, "Conf-1371 row not found in docs/sat/open-questions.md")
-        self.assertNotRegex(rows[0], r"(?i)queued|not asked|asked, ?waiting", "Conf-1371 is still open with Sergeant D")
+        self.delegated("LL-018b")
 
     @ll("LL-019", "contract", "satApplyPWM phase anchors, ignition wait, start counting (via test_sat_pwm_anchors, test_sat_hp_pwm)",
         task="TASK-1380/1382/1383/1421 (fixed); TASK-1412.9 revalidation (matrix per source, limit windows, rollover)")
