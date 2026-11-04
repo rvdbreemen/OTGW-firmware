@@ -3,11 +3,11 @@ id: TASK-1427
 title: >-
   Web UI Connection page: node text overflows its box and the right-hand nodes
   clip at the page edge (Edge/Chrome)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-28T15:19:00Z'
-updated_date: '2026-11-03T06:14:00Z'
+updated_date: '2026-11-04T10:15:00Z'
 labels:
   - web-ui
   - tester-feedback
@@ -27,7 +27,7 @@ Tester report, maarten_41762 (<@1544684325847703602>), #alpha-testing 2026-10-28
 <!-- AC:BEGIN -->
 - [x] #1 Screenshot before/after at the reporter's width and at 1280 px: node text stays inside its box and the right-hand nodes are fully visible
 - [x] #2 Phone width (375 px) still works, no horizontal page scroll
-- [ ] #3 build (filesystem) green; no new FAIL in evaluate
+- [x] #3 build (filesystem) green; no new FAIL in evaluate
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -40,4 +40,12 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: connRecency layout
 Released by Robert 2026-11-03 (interactive, maintainer) (was already In Progress).
 
 2026-11-03 (agent, verified by lead incl. screenshots in scratchpad shots/1427-old|new): browser test tests/webui/connection-map-text-fits.test.mjs on the real page, red on the old v2 files, green on the fix; integrated in wt-next.
+
+2026-11-04: beta.69 build (842512519) built firmware + filesystem: 4x 'Successfully created ESP32S3 image', littlefs.bin 0.75 MB, 'Build completed successfully'; evaluate --quick 0 failed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Connection map node text stays inside its boxes and the right-hand nodes are fully visible at the reporter's width, 1280 px and 375 px (270b490c4). Evidence: tests/webui/connection-map-text-fits.test.mjs on the real page, red on the old v2 files, green on the fix; before/after screenshots; beta.69 filesystem build green, evaluate 0 failed.
+<!-- SECTION:FINAL_SUMMARY:END -->
