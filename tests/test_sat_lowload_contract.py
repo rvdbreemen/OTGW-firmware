@@ -148,7 +148,8 @@ def run(argv, **kw):
 # ---- delegation to the existing suites ------------------------------------------------------------------------------------
 # module -> class -> test names. One group runs once per module/class (one compile), the LL test then asserts its names.
 DELEGATED = {
-    "LL-010": [("test_sat_slave_lowload", "SlaveLowLoad", None)],
+    "LL-010": [("test_sat_slave_lowload", "SlaveLowLoad", None),
+               ("test_sat_requested_vs_transmitted", "RequestedVsTransmitted", None)],   # TASK-1412.4 AC3: requested vs transmitted master bits
     "LL-011": [("test_sat_pwm_override", "SatPwmOverride", ["test_no_flow_temperature_idles_pwm_and_sends_the_continuous_setpoint"]),
                ("test_sat_no_return_ignition", "NoReturnIgnition", ["test_a_restored_unknown_dataid_verdict_alone_is_no_return_nothing",
                                                                     "test_valid_board_sensor_counts_as_a_return_temperature"])],
@@ -264,6 +265,10 @@ DELEGATED = {
                ("test_sat_classifier_parity", "TestUpstreamIdentity", None), ("test_sat_classifier_parity", "TestParity", None),
                ("test_sat_classifier_parity", "TestAc2Inventory", None), ("test_sat_classifier_parity", "TestRam", None)],
     "LL-023": [("test_sat_ground_truth_block", "SatGroundTruthBlock", None)],
+    # TASK-1412.15: telemetry against independent timestamped frames. The OpenDecisions class of that module is not delegated
+    # (its expectedFailure tests are registered below as open_decision fixtures, one per question).
+    "LL-022": [("test_sat_telemetry_wire", "CycleMetricsVsFrames", None), ("test_sat_telemetry_wire", "BootGap", None),
+               ("test_sat_telemetry_wire", "PwmSecondsVsWire", None), ("test_sat_telemetry_wire", "MmValue", None)],
 }
 _delegated = {}   # (module, class, requested names) -> {test name: (ok, detail)}; the names are part of the key (TASK-1412.9)
 
@@ -582,9 +587,30 @@ class LowLoadContract(unittest.TestCase):
     def test_ll016_room_comfort_and_delivered_heat_under_ph_field(self):
         self.skipTest("unavailable: needs calibrated delivered heat/energy and PH-FIELD data (comfort noninferiority), not a host function")
 
-    @ll("LL-022", "unavailable", "none", task="TASK-1412.15 (and TASK-1389 for the percentage unit)")
-    def test_ll022_telemetry_separates_requested_queued_acknowledged_measured(self):
-        self.skipTest("unavailable: needs queue-rejection/ack events on a device or the wire; no host adapter yet (TASK-1412.15)")
+    @ll("LL-022", "contract", "satCycleOnFlameChange/satCycleSample/satGetWindow4hStats/satGetWindow24hStats/_cycleRecord/_hourCount*/_dailyRecord (SATcycles.ino), "
+        "satApplyPWM + satChEnableDecide, satComputeMM and the published MM units, all against frame-derived timestamps (via test_sat_telemetry_wire)",
+        task="TASK-1412.15: on/off seconds, off gaps, 4 h and 24 h duty, zero gap, DHW overlap, flicker, missing frame, window expiry; "
+             "the PIC/OT-Direct frame decode (OTGW-Core.ino) and the control loop around the flame edge are not run")
+    def test_ll022_telemetry_matches_independent_frames(self):
+        self.delegated("LL-022")
+
+    @ll("LL-022", "open_decision", "satCycleInit (SATcycles.ino): _cycle_lastFlameOffMs = millis() at start gives a flame that already burns at boot an off gap equal to the time since start",
+        task="TASK-1412.15", question="Q-TW-1 (TASK-1412.15 hand-off report)")
+    def test_ll022_first_cycle_off_gap_of_a_flame_burning_at_boot_is_not_a_measurement(self):
+        import test_sat_telemetry_wire as tw
+        tw.check_first_cycle_gap_is_not_fabricated_when_the_flame_burns_at_boot()
+
+    @ll("LL-022", "open_decision", "state.sat.bModSuppressed (SATtypes.h:226) published as mod_suppressed (SATcontrol.ino:4203, restAPI.ino:2431, handleDebug.ino:235), only ever assigned false (SATcontrol.ino:7193)",
+        task="TASK-1412.15", question="Q-TW-2 (TASK-1412.15 hand-off report)")
+    def test_ll022_mod_suppressed_follows_the_real_suppression_state(self):
+        import test_sat_telemetry_wire as tw
+        tw.check_mod_suppressed_follows_the_suppression_state()
+
+    @ll("LL-022", "open_decision", "state.sat.iCurrentModulation published as current_modulation (SATcontrol.ino:4223, :4706) while the wire carries MM=T at the maximum PWM duty (mmTarget, SATcontrol.ino:7224)",
+        task="TASK-1412.15", question="Q-TW-4 (TASK-1412.15 hand-off report)")
+    def test_ll022_published_modulation_equals_the_mm_on_the_wire(self):
+        import test_sat_telemetry_wire as tw
+        tw.check_published_modulation_equals_the_mm_on_the_wire()
 
 
 class InfrastructureError(Exception):
