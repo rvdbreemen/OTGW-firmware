@@ -682,6 +682,9 @@ static void satPicCSKeepalive() {
 // its own MM= again. satSendMM() takes either a percentage (0-100) or this marker; the marker is kept in iLastSentMM, so the
 // on-change rule, the 60 s repeat, the cache reset and commit-on-success treat MM=T as one more value.
 static const uint8_t SAT_MM_T = 255;
+// The percentage published as current_modulation (MQTT sat/current_modulation, REST, debug): 100 while the last MM sent is MM=T
+// (maximum PWM duty, entry 269), else the value satComputeMM() gave.
+static uint8_t satReportedModulation(bool sendingMmT, uint8_t computed) { return sendingMmT ? 100 : computed; }
 
 static void satSendMM(uint8_t mm) {
   // TASK-1570: on change only (entry 237), plus a repair resend once the value is SAT_MMCH_REPAIR_MS (60 s, entry 239)
@@ -1584,6 +1587,7 @@ static bool satPwmDrivesSetpoint(float pidOutput)
 // entry 134), and passes true. The default runs the schedule here, for callers that want both steps in one call.
 static float satApplyPWM(float pidOutput, bool scheduleDone = false)
 {
+  state.sat.bModSuppressed = false;   // true only on the last return below: the PWM ON phase that suppresses modulation (entry 267, Q-TW-2)
   const float prevCS = (_sat_lastControlCS > SAT_MIN_SETPOINT) ? _sat_lastControlCS : pidOutput;
   if (!scheduleDone) satPwmSchedule(pidOutput);
   if (satGetFlowTemp() <= 0.0f) {
@@ -1615,6 +1619,7 @@ static float satApplyPWM(float pidOutput, bool scheduleDone = false)
     return satNoReturnTemp() ? satPwmFlameOffHold(maxSetpoint) : _pwm_flameOffHoldSetpoint;
   }
   _pwm_flameOffHoldSetpoint = 0.0f;
+  state.sat.bModSuppressed = true;    // ON phase, protection on, flame lit, hold elapsed: CS = flow - fModSupOffset (refreshed every 3 s)
   return satPwmSuppressionSetpoint(maxSetpoint);
 }
 
@@ -1661,6 +1666,8 @@ void satPwmReset()
   _pwm_effectiveBoilerTemp    = 0.0f;   // thermo-nova pwm.reset(): _effective_on_temperature = None (pwm.py:100)
   _pwm_idle                   = true;   // pwm.reset(): _status = PWMStatus.IDLE (pwm.py:92)
   _pwm_atMaxDuty              = false;  // TASK-1581
+  state.sat.bModSuppressed    = false;  // no PWM stint, no suppression (entry 267)
+  state.sat.iModSuppressionSinceMs = 0;
   _pwm_dhwFlameLit            = false;
   _pwm_dhwFlameHeldLogged     = false;
   _pwm_dhwPhase               = PwmDhwPhase::None;   // a hot-water pause belongs to the ON phase it interrupted (entries 95, 103)
@@ -6807,6 +6814,7 @@ static void satControlLoopRun()
   // Flame edge detection — always process, independent of timer
   bool currentFlame = satIsFlameOn();
   if (currentFlame != _sat_prevFlameState) {
+    if (!currentFlame) state.sat.bModSuppressed = false;   // the suppression is a flame-on phase; the next tick sets it again (entry 267)
     satCycleOnFlameChange(currentFlame);
     satPwmNoteDhwFlameEdge(currentFlame, dhwBitNow);
     satNoReturnFloodOnFlameEdge(currentFlame, dhwBitNow);   // TASK-1371: CH ignition of a boiler without a return temperature
@@ -7192,9 +7200,9 @@ static void satControlLoopRun()
   _sat_lastControlCS = finalSetpoint;   // the "previous CS" a PWM tick without override keeps
   state.sat.fFinalSetpoint = finalSetpoint;
 
-  // Modulation suppression is handled via CS sequence in satApplyPWM() (PWM ON only)
-  state.sat.bModSuppressed = false;
-  state.sat.iModSuppressionSinceMs = 0;
+  // Modulation suppression is the CS sequence of satApplyPWM() (PWM ON phase only): it sets state.sat.bModSuppressed on that path
+  // (entry 267, Q-TW-2). Continuous mode never suppresses.
+  if (!pwmMode) state.sat.bModSuppressed = false;
 
   // --- Compute modulation value based on mode, heating system, suppression, and quirks ---
   {
@@ -7204,6 +7212,10 @@ static void satControlLoopRun()
                                                 src == SAT_SRC_HEAT_PUMP || src == SAT_SRC_HYBRID,
                                                 settings.sat.iMaxRelModulation,
                                                 satGetManufacturerQuirks());
+    // Entry 269 (Q-TW-4): while MM=T goes out (below), the published current_modulation is 100 %, not the 0 satComputeMM() gives a
+    // gas boiler in PWM. Same condition as mmTarget below; satPwmAtMaxDuty() and _sat_coldCut do not change in between.
+    state.sat.iCurrentModulation = satReportedModulation(!_sat_coldCut && satPwmAtMaxDuty() && hasOTCommandInterface(),
+                                                         state.sat.iCurrentModulation);
   }
 
   // --- COLD_SETPOINT cutoff (TASK-891.2, George): requested setpoint below the per-heating-system
@@ -7221,7 +7233,10 @@ static void satControlLoopRun()
     finalSetpoint = SAT_MIN_SETPOINT;
     state.sat.fFinalSetpoint = finalSetpoint;
     satPwmDisableOnHeaterOff();   // thermo-nova pwm.disable(), guards, MINIMUM_SETPOINT, max modulation (Sergeant D 2026-10-23, entry 12)
+    state.sat.bModSuppressed = false;   // the cutoff overrides the CS of the suppression
   }
+  if (state.sat.bModSuppressed) { if (state.sat.iModSuppressionSinceMs == 0) state.sat.iModSuppressionSinceMs = millis(); }
+  else                          state.sat.iModSuppressionSinceMs = 0;
 
   // --- Send CS= and MM= commands to boiler when an OT command interface is available ---
   const uint8_t mmTarget = (!coldCutoff && satPwmAtMaxDuty()) ? SAT_MM_T : state.sat.iCurrentModulation;   // TASK-1581

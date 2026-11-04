@@ -71,7 +71,7 @@ enum SATControlMode { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 
 struct Weather { bool bValid = false; uint32_t iLastUpdateMs = 0; float fTemperature = 0.0f; };
 struct SatSettings { bool bSimulation = false; bool bEnabled = true; bool bPushSetpoint = false; float fTargetTemp = 15.0f; };
 struct Settings { SatSettings sat; };
-struct SatState { bool bSlaveCfgValid=false, bSlaveLowOffDenied=false;   // TASK-1412.4: read by the cut satRestoreDeferredStep()
+struct SatState { bool bModSuppressed=false; unsigned iModSuppressionSinceMs=0; bool bSlaveCfgValid=false, bSlaveLowOffDenied=false;   // TASK-1412.4: read by the cut satRestoreDeferredStep()
                   bool bLastSentValid=false, bTCAccountedValid=false, bActive=false, bSafetyTripped=false, bFallbackActive=false,
                   bPushRefused=false, bRoomTempLost=false, bOtLinkLost=false, bOutsideTempMissing=false; uint8_t iShVerdict=0;   /* TASK-1412.13 */
                   uint32_t iLastSentCSMs=0, iLastSentMMMs=0, iLastSentCHMs=0, iTCPushMs=0;

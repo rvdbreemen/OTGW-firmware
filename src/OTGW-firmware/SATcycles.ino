@@ -147,6 +147,10 @@ static float    _cycle_overshootStreakSec = 0.0f; // current contiguous overshoo
 static float    _cycle_timeToFirstOvershootSec = -1.0f;     // -1 = none yet
 static float    _cycle_timeToSustainedOvershootSec = -1.0f; // -1 = none yet
 static uint32_t _cycle_lastFlameOffMs   = 0;      // millis() of the previous flame-off edge (for off-with-demand gating)
+// false from satCycleInit() until a flame-off sample or a flame-off edge is seen: a flame already burning when SAT starts has an
+// unknown first off gap, as thermo-nova's None (tracker.py:144-145); that gap is left out of the 4 h average and the duty EMA.
+static bool     _cycle_offGapKnown      = false;
+static const uint32_t SAT_OFF_GAP_UNKNOWN = 0xFFFFFFFFUL;   // offDurationMs of a cycle whose preceding off gap is unknown
 
 // --- Sustained State Detection ---
 // The three sustained timers (overshoot -> PWM, underheat and saturation -> continuous) each hold a running flag
@@ -340,6 +344,7 @@ void satCycleInit()
   _cycle_timeToFirstOvershootSec     = -1.0f;
   _cycle_timeToSustainedOvershootSec = -1.0f;
   _cycle_lastFlameOffMs              = millis();
+  _cycle_offGapKnown                 = false;
   state.sat.fCycleReqSetpointError        = 0.0f;
   state.sat.fCycleTimeInBandSec           = 0.0f;
   state.sat.fCycleTotalOvershootSec       = 0.0f;
@@ -417,6 +422,7 @@ void satGetWindow4hStats()
 
   uint32_t sumOnMs      = 0;
   uint32_t sumOffMs     = 0;
+  uint16_t nGaps        = 0;      // cycles with a known off gap: the n of the average off gap (entry 266)
   float    sumP90Flow   = 0.0f;
   uint16_t nOvershoot   = 0;
   uint16_t nUnderheat   = 0;
@@ -433,7 +439,7 @@ void satGetWindow4hStats()
     uint16_t idx = (_win4hHead + SAT_WIN4H_SIZE - 1 - i) % SAT_WIN4H_SIZE;
     if ((nowMs - _win4h[idx].endMs) > SAT_WIN4H_SPAN_MS) continue; // outside 4h window
     sumOnMs    += _win4h[idx].onDurationMs;
-    sumOffMs   += _win4h[idx].offDurationMs;
+    if (_win4h[idx].offDurationMs != SAT_OFF_GAP_UNKNOWN) { sumOffMs += _win4h[idx].offDurationMs; nGaps++; }
     sumP90Flow += _win4h[idx].p90FlowTemp;
     if (_win4h[idx].eClass == (uint8_t)SAT_CYCLE_OVERSHOOT) nOvershoot++;
     // Both continuous and PWM underheat count toward the underheat fraction (TASK-891.4).
@@ -461,14 +467,16 @@ void satGetWindow4hStats()
 
   float n = (float)nValid;
   state.sat.f4hAvgOnSec          = (float)sumOnMs  / (n * 1000.0f);
-  state.sat.f4hAvgOffSec         = (float)sumOffMs / (n * 1000.0f);
+  state.sat.f4hAvgOffSec         = (nGaps > 0) ? ((float)sumOffMs / ((float)nGaps * 1000.0f)) : 0.0f;
   state.sat.f4hAvgFlow           = sumP90Flow / n;
   state.sat.f4hOvershootFraction = (float)nOvershoot / n;
   state.sat.f4hUnderheatFraction = (float)nUnderheat / n;
 
-  // Duty ratio: on / (on + off) per cycle, averaged
-  float totalMs = (float)(sumOnMs + sumOffMs);
-  state.sat.f4hDutyRatio = (totalMs > 0.0f) ? ((float)sumOnMs / totalMs) : 0.0f;
+  // Duty: flame-on seconds of the cycles ending in the window / the window length, as thermo-nova _duty_ratio_since
+  // (history.py:209-216, clamp 0..1); every flame counts, hot water too, and a history shorter than the window still
+  // divides by the full window (entry 268, Q-TW-3).
+  float duty4 = (float)sumOnMs / (float)SAT_WIN4H_SPAN_MS;
+  state.sat.f4hDutyRatio = (duty4 > 1.0f) ? 1.0f : duty4;
 
   // Percentiles for flow-return delta: insertion-sort the collected deltas
   if (nDeltas == 0) {
@@ -547,7 +555,7 @@ void satGetWindow24hStats()
   uint32_t cutoff = (bidx >= (uint32_t)SAT_DAILY_BUCKETS) ? (bidx - SAT_DAILY_BUCKETS + 1) : 0;
 
   uint32_t nC = 0, nO = 0, nU = 0, nL = 0;
-  uint64_t sOn = 0, sOff = 0;
+  uint64_t sOn = 0;
   for (uint8_t i = 0; i < _dailyCount; i++) {
     if (_daily[i].nCycles == 0) continue;
     if (_daily[i].bucketIdx < cutoff || _daily[i].bucketIdx > bidx) continue; // outside 24h
@@ -556,7 +564,6 @@ void satGetWindow24hStats()
     nU  += _daily[i].nUnderheat;
     nL  += _daily[i].nLong;
     sOn += _daily[i].sumOnMs;
-    sOff += _daily[i].sumOffMs;
   }
 
   state.sat.i24hCycles = (uint16_t)((nC > 0xFFFFu) ? 0xFFFFu : nC);
@@ -568,8 +575,9 @@ void satGetWindow24hStats()
     return;
   }
   float fn = (float)nC;
-  float totalMs = (float)(sOn + sOff);
-  state.sat.f24hDutyRatio         = (totalMs > 0.0f) ? ((float)sOn / totalMs) : 0.0f;
+  // Duty: flame-on time of the cycles in the window / the 24 h window length (history.py:209-216, entry 268, Q-TW-3)
+  float duty24 = (float)sOn / ((float)SAT_DAILY_BUCKETS * (float)SAT_DAILY_BUCKET_MS);
+  state.sat.f24hDutyRatio         = (duty24 > 1.0f) ? 1.0f : duty24;
   state.sat.f24hOvershootFraction = (float)nO / fn;
   state.sat.f24hUnderheatFraction = (float)nU / fn;
   state.sat.f24hLongCycleFraction = (float)nL / fn;
@@ -815,13 +823,15 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
   // Duty ratio: flame-on time / total time since the previous flame-off edge. _cycle_flameOffStartMs is
   // already this cycle's own flame-off here, so the previous edge comes from _cycle_lastFlameOffMs
   // (updated only after the cycle is recorded, TASK-1409).
-  float totalTime = durationSec;
-  if (_cycle_lastFlameOffMs > 0 && (int32_t)(_cycle_flameOnStartMs - _cycle_lastFlameOffMs) >= 0) {
-    totalTime = (float)(millis() - _cycle_lastFlameOffMs) / 1000.0f;
+  // A cycle whose off gap is unknown (flame already burning when SAT started, entry 266) is left out of the EMA.
+  const bool gapKnown = _cycle_offGapKnown && _cycle_lastFlameOffMs > 0 &&
+                        (int32_t)(_cycle_flameOnStartMs - _cycle_lastFlameOffMs) >= 0;
+  if (gapKnown) {
+    const float totalTime = (float)(millis() - _cycle_lastFlameOffMs) / 1000.0f;
+    float dutyThis = (totalTime > 0.0f) ? (durationSec / totalTime) : 0.0f;
+    if (dutyThis > 1.0f) dutyThis = 1.0f;
+    _ema_dutyRatio = EMA_ALPHA * dutyThis + (1.0f - EMA_ALPHA) * _ema_dutyRatio;
   }
-  float dutyThis = (totalTime > 0.0f) ? (durationSec / totalTime) : 0.0f;
-  if (dutyThis > 1.0f) dutyThis = 1.0f;
-  _ema_dutyRatio = EMA_ALPHA * dutyThis + (1.0f - EMA_ALPHA) * _ema_dutyRatio;
 
   // Expose to state
   state.sat.fDutyRatio = _ema_dutyRatio;
@@ -1005,7 +1015,7 @@ void satCycleOnFlameChange(bool flameOn)
     // just ended only counts if heat demand was present (CH on, not DHW, setpoint above
     // flow temp), mirroring Python CycleTracker._compute_off_with_demand_duration.
     {
-      float offSec = (_cycle_lastFlameOffMs > 0) ? (float)(now - _cycle_lastFlameOffMs) / 1000.0f : 0.0f;
+      float offSec = (_cycle_offGapKnown && _cycle_lastFlameOffMs > 0) ? (float)(now - _cycle_lastFlameOffMs) / 1000.0f : 0.0f;
       bool demandPresent = (!state.sat.bDhwActive)
                         && ((OTcurrentSystemState.Statusflags & 0x02) != 0)  // Bit 1 = CH active
                         && (state.sat.fFinalSetpoint > satGetFlowTemp());
@@ -1089,6 +1099,7 @@ void satCycleOnFlameChange(bool flameOn)
       SATDebugTf(PSTR("SAT cycle dropped: %lu samples (< %lu), dur=%.0fs\r\n"),
                  (unsigned long)_cycle_totalSamples, (unsigned long)SAT_CYCLE_MIN_SAMPLES, durationSec);
       _cycle_lastFlameOffMs = now;
+      _cycle_offGapKnown = true;
       return;
     }
     // Compute p90/p10 from collected flow samples (Task #225)
@@ -1148,16 +1159,17 @@ void satCycleOnFlameChange(bool flameOn)
     // Record completed cycle into the rolling 4-hour window (Task #227)
     {
       uint32_t onMs  = now - _cycle_flameOnStartMs;
-      // The off gap before this cycle: previous flame-off edge to this flame-on (TASK-1409).
-      uint32_t offMs = (_cycle_lastFlameOffMs > 0 && (int32_t)(_cycle_flameOnStartMs - _cycle_lastFlameOffMs) >= 0)
-                       ? (_cycle_flameOnStartMs - _cycle_lastFlameOffMs)
-                       : 0;
+      // The off gap before this cycle: previous flame-off edge to this flame-on (TASK-1409). Unknown when the flame already burned
+      // at the first observation (entry 266, Q-TW-1): SAT_OFF_GAP_UNKNOWN, left out of the averages and the duty EMA.
+      const bool offKnown = _cycle_offGapKnown && _cycle_lastFlameOffMs > 0 &&
+                            (int32_t)(_cycle_flameOnStartMs - _cycle_lastFlameOffMs) >= 0;
+      uint32_t offMs = offKnown ? (_cycle_flameOnStartMs - _cycle_lastFlameOffMs) : SAT_OFF_GAP_UNKNOWN;
       float avgDelta = (_cycle_deltasamples > 0)
                        ? (_cycle_sumFlowRetDelta / (float)_cycle_deltasamples)
                        : -1.0f;  // sentinel: no valid data
       _win4h[_win4hHead].endMs          = now;
       _win4h[_win4hHead].onDurationMs   = onMs;
-      _win4h[_win4hHead].offDurationMs  = offMs;
+      _win4h[_win4hHead].offDurationMs  = offMs;   // SAT_OFF_GAP_UNKNOWN when not known
       _win4h[_win4hHead].p90FlowTemp    = p90;
       _win4h[_win4hHead].avgFlowRetDelta = avgDelta;
       _win4h[_win4hHead].eClass         = (uint8_t)cls;
@@ -1165,11 +1177,12 @@ void satCycleOnFlameChange(bool flameOn)
       if (_win4hCount < SAT_WIN4H_SIZE) _win4hCount++;
 
       // Mirror into the reduced-resolution 24h daily window (TASK-891.4 AC#5)
-      _dailyRecord(now, onMs, offMs, cls, durationSec);
+      _dailyRecord(now, onMs, offKnown ? offMs : 0, cls, durationSec);
     }
 
     // Remember this flame-off edge for the next cycle's off-with-demand gating (AC#5)
     _cycle_lastFlameOffMs = now;
+    _cycle_offGapKnown = true;
 
     SATDebugTf(PSTR("SAT cycle #%d: class=%d dur=%.0fs maxFlow=%.1f p90=%.1f p10=%.1f overshoot=%.0fs totOvershoot=%.0fs inBand=%.0fs\r\n"),
             state.sat.iCycleCount, (int)cls, durationSec,
@@ -1182,7 +1195,12 @@ void satCycleOnFlameChange(bool flameOn)
 //=== Called periodically to sample flow temp during active cycle ===
 void satCycleSample()
 {
-  if (!_cycle_flameOn) return;
+  if (!_cycle_flameOn) {
+    // A status frame with the flame off: from here the off gap runs from a seen moment (a lower bound at the first sample).
+    // Statusflags is 0 until the first MsgID 0 frame arrives, so a pass before the boiler status is known proves nothing.
+    if (OTcurrentSystemState.Statusflags != 0 || settings.sat.bSimulation) _cycle_offGapKnown = true;
+    return;
+  }
 
   uint32_t now = millis();
   float flowTemp = satGetFlowTemp();

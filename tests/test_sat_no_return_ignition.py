@@ -58,7 +58,7 @@ struct SatSettings { float fOvershootMargin=2.0f; bool bEnabled=true, bOvershoot
                      int iMaxRelModulation=80; float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2;
                      int iHeatingMode=0; };
 struct Settings { SatSettings sat; };
-struct SatState { int iCurrentModulation=0; float fFinalSetpoint=0, fPwmDutyCycle=0, fPidOutput=0; bool bPwmFlameRequested=false, bDhwActive=false,
+struct SatState { int iCurrentModulation=0; unsigned iModSuppressionSinceMs=0; bool bModSuppressed=false; float fFinalSetpoint=0, fPwmDutyCycle=0, fPidOutput=0; bool bPwmFlameRequested=false, bDhwActive=false,
                   bActive=true, bSafetyTripped=false, bValvesOpen=true, bSummerActive=false, bSolarGainActive=false;
                   int eControlMode=SAT_MODE_PWM;
                   bool bLastSentValid=false; float fLastSentCS=0; uint8_t iLastSentMM=0, iLastSentCH=0; float fLastSentTC=0; bool bTCAccountedValid=false;

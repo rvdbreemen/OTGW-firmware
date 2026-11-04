@@ -12,11 +12,14 @@ stores and publishes when it is fed the same frames. Nothing of the code under t
 The thin adapter in the cycle harness feeds one status frame per second and calls satCycleOnFlameChange on a flame-bit edge, the
 way SATcontrol.ino:6803-6814 does. OTGW-Core.ino's frame decode and the control loop around that call are NOT run here.
 
+Decisions applied here (docs/sat/sergeant-d-corrections.md): entry 266 (Q-TW-1) an unknown first off gap is excluded from the averages
+and the duty EMA, entry 267 (Q-TW-2) mod_suppressed follows the PWM suppression, entry 268 (Q-TW-3) the 4 h / 24 h duty is flame-on
+seconds / window length, entry 269 (Q-TW-4) current_modulation is 100 while MM=T goes out.
+
 Scenarios: clean cycles with a known first gap (S1), a boiler already burning at boot (S2), hot-water overlap with and without a
 flame edge (S3), a flicker and a missing frame (S4), window expiry at 4 h and 24 h (S5), PWM seconds and duty against the CH-enable
-and flame bits of the frame stream (P1), the MM value and its unit (M1), and the two telemetry values that do not follow the wire
-(O1 mod_suppressed, O2 current_modulation at the maximum PWM duty, O3 the first-cycle off gap): those three are expectedFailure
-because the correct value is not a recorded decision; see Q-TW-1, Q-TW-2 and Q-TW-4 in the TASK-1412.15 hand-off report.
+and flame bits of the frame stream (P1), the MM value and its unit (M1), and the three telemetry values that used to differ from the wire
+(O1 mod_suppressed, O2 current_modulation at the maximum PWM duty, O3 the first-cycle off gap), now contract tests.
 
 Run: python tests/test_sat_telemetry_wire.py
 """
@@ -118,14 +121,14 @@ def recorded(cycles, min_samples=3):
 
 def oracle_window(cycles, now_ms, span_ms):
     """Cycles in the window and the figures a reader can derive from the frames: average on, average known gap, duty =
-    sum(on) / (sum(on) + sum(known gap)) over cycles with a known gap. Unknown gaps are not a number of seconds."""
+    sum(on of every cycle ending in the window) / window length, clamped to 1 (thermo-nova cycles/history.py:209-216, entry 268).
+    Unknown gaps are not a number of seconds: they stay out of the average gap (entry 266) but their flame counts in the duty."""
     inwin = [c for c in cycles if now_ms - c["end"] <= span_ms]
     known = [c for c in inwin if c["gap"] is not None]
     r = {"n": len(inwin), "n_known_gap": len(known)}
     r["avg_on_s"] = (sum(c["on"] for c in inwin) / len(inwin) / 1000.0) if inwin else 0.0
     r["avg_off_s"] = (sum(c["gap"] for c in known) / len(known) / 1000.0) if known else None
-    so, sg = sum(c["on"] for c in known), sum(c["gap"] for c in known)
-    r["duty"] = (so / float(so + sg)) if known and (so + sg) > 0 else None
+    r["duty"] = min(1.0, sum(c["on"] for c in inwin) / float(span_ms))
     return r
 
 
@@ -288,9 +291,9 @@ class CycleMetricsVsFrames(unittest.TestCase):
         r = res[q]
         self.assertEqual(int(r["n4"]), o["n"], name + ": cycles in the 4 h window")
         self.assertAlmostEqual(r["on4"], o["avg_on_s"], places=2, msg=name + ": average on-time (s)")
-        if o["avg_off_s"] is not None:
-            self.assertAlmostEqual(r["off4"], o["avg_off_s"], places=2, msg=name + ": average off-gap (s)")
-            self.assertAlmostEqual(r["duty4"], o["duty"], places=4, msg=name + ": 4 h duty")
+        self.assertAlmostEqual(r["off4"], o["avg_off_s"] if o["avg_off_s"] is not None else 0.0, places=2,
+                               msg=name + ": average off-gap (s), the n is the known gaps only")
+        self.assertAlmostEqual(r["duty4"], o["duty"], places=6, msg=name + ": 4 h duty = flame-on seconds / 4 h")
         return o
 
     def test_s1_clean_cycles_match_the_frames(self):
@@ -305,7 +308,9 @@ class CycleMetricsVsFrames(unittest.TestCase):
         recs = res[end]["records"]
         self.assertEqual([(r["on"], r["off"]) for r in recs], [(c["on"], c["gap"]) for c in cyc], "per-cycle on/off in the window ring")
         self.assertAlmostEqual(res[end]["ema"], oracle_ema(cyc), places=5, msg="S1: duty EMA (per cycle on / (on + gap))")
-        self.assertAlmostEqual(res[end]["duty24"], o["duty"], places=4, msg="S1: 24 h duty (hour buckets, exact sums)")
+        o24 = oracle_window(cyc, end, 24 * 3600 * 1000)
+        self.assertAlmostEqual(res[end]["duty24"], o24["duty"], places=6, msg="S1: 24 h duty = flame-on seconds / 24 h")
+        self.assertAlmostEqual(res[end]["duty4"], 1000.0 / 14400.0, places=6, msg="S1: 1000 s of flame in 4 h, history shorter than the window")
         self.assertEqual(int(res[end]["n24"]), 3)
 
     def test_s3_hot_water_overlap_without_a_flame_edge_is_one_cycle_with_the_real_duration(self):
@@ -325,8 +330,7 @@ class CycleMetricsVsFrames(unittest.TestCase):
         self.assertEqual([(r["on"], r["off"]) for r in res[t]["records"]], [(620000, 30000), (250000, 600000)])
 
     def test_s3b_a_hot_water_only_burn_is_a_cycle_of_its_own_and_counts_in_the_window(self):
-        # Reading only: the 4 h and 24 h figures count every flame cycle, hot water ones included. Whether that is the intended
-        # reading is not recorded (Q-TW-3 in the TASK-1412.15 hand-off report); the frames decide the numbers.
+        # The 4 h and 24 h figures count every flame cycle, hot water ones included (entry 268, as thermo-nova); the frames decide the numbers.
         fr, t = [], 3_000_000
         fr += one_hz(t, 30, False); t += 30000
         fr += one_hz(t, 150, True, ch_enable=False, dhw=True); t += 150000
@@ -409,11 +413,14 @@ class CycleMetricsVsFrames(unittest.TestCase):
         self.assertRegex(src, r"SAT_WIN4H_SPAN_MS\s*=\s*4UL \* 3600UL \* 1000UL")
 
 
-# ---- open decisions: the telemetry does not follow the wire, the correct value is not recorded ---------------------------
+# ---- decisions 266-269: the telemetry follows the wire ---------------------------------------------------------------------------
+UNKNOWN_GAP = 0xFFFFFFFF   # SAT_OFF_GAP_UNKNOWN (SATcycles.ino)
+
+
 def check_first_cycle_gap_is_not_fabricated_when_the_flame_burns_at_boot():
-    """O3. The boiler already burns at the first observation, 20 s after SAT started. The frames show no flame-off edge, so no
-    off gap is known. SATcycles.ino:satCycleInit() sets _cycle_lastFlameOffMs = millis(), so the first cycle stores a 20 s gap
-    that never happened, and the 4 h average off-gap and duty are published from it."""
+    """O3 / entry 266 (Q-TW-1). The boiler already burns at the first observation, 20 s after SAT started. The frames show no
+    flame-off edge, so no off gap is known (thermo-nova None, tracker.py:144-145): the first cycle is stored with an unknown gap and
+    the 4 h average off gap and the duty EMA are built from the real gaps only (n counts them)."""
     fr, t = [], 7_000_000 + 20000
     fr += one_hz(t, 300, True); t += 300000
     fr += one_hz(t, 600, False); t += 600000
@@ -421,39 +428,90 @@ def check_first_cycle_gap_is_not_fabricated_when_the_flame_burns_at_boot():
     fr += one_hz(t, 5, False); t += 5000
     res = run_script(fr, 7_000_000, [t])
     cyc = recorded(flame_cycles(fr))
-    assert cyc[0]["gap"] is None
-    first = res[t]["records"][0]
-    assert first["off"] == 0, "first cycle stores an off gap of %d ms for a flame that was already burning" % first["off"]
+    assert cyc[0]["gap"] is None and cyc[1]["gap"] == 600000
+    r = res[t]
+    assert [x["off"] for x in r["records"]] == [UNKNOWN_GAP, 600000], \
+        "first cycle stores an off gap of %d ms for a flame that was already burning" % r["records"][0]["off"]
+    o = oracle_window(cyc, t, H4)
+    assert int(r["n4"]) == 2 and abs(r["off4"] - 600.0) < 0.01, "average off gap %.2f s over the real gaps only" % r["off4"]
+    assert abs(r["on4"] - o["avg_on_s"]) < 0.01
+    assert abs(r["duty4"] - 600.0 / 14400.0) < 1e-6, "both flames count in the duty: %.6f" % r["duty4"]
+    assert abs(r["ema"] - oracle_ema(cyc)) < 1e-5, "the unknown gap is out of the duty EMA: %.6f vs %.6f" % (r["ema"], oracle_ema(cyc))
 
 
 def check_mod_suppressed_follows_the_suppression_state():
-    """O1. state.sat.bModSuppressed is published (mod_suppressed in the SAT JSON, REST and debug) but never set true."""
-    src = SAT_INO.read_text(encoding="utf-8")
-    assigned_true = [v for v in re.findall(r"bModSuppressed\s*=\s*([^;=]+);", src) if v.strip() != "false"]
-    assert assigned_true, "bModSuppressed is only ever assigned false (SATcontrol.ino), yet published as mod_suppressed"
+    """O1 / entry 267 (Q-TW-2). state.sat.bModSuppressed (published as mod_suppressed) is true while satApplyPWM() returns the
+    suppression CS (PWM ON phase, protection on, flame lit, hold elapsed) and false in every other phase; the real satApplyPWM
+    runs in the PWM harness (PwmSecondsVsWire.rows)."""
+    PwmSecondsVsWire.setUpClass()
+    rows = PwmSecondsVsWire.rows
+    try:
+        assert rows, "no host C++ compiler"
+        assert any(r["sup"] == 1 for r in rows), "bModSuppressed never true during the PWM ON phase after the hold"
+        for r in rows:
+            if r["sup"] == 1:
+                assert r["flame"] == 1 and r["ch"] == 1, "suppressed while the flame is out or CH is off: %r" % r
+            if r["ch"] == 0:
+                assert r["sup"] == 0, "suppressed in the PWM OFF phase: %r" % r
+    finally:
+        PwmSecondsVsWire.tearDownClass()
 
 
 def check_published_modulation_equals_the_mm_on_the_wire():
-    """O2. At the maximum PWM duty SAT sends MM=T (entries 242, 243, 246) but publishes state.sat.iCurrentModulation, the value
-    satComputeMM() gave (0 for a gas boiler in PWM). iLastSentMM, which holds 255 for MM=T, is not published anywhere."""
-    src = SAT_INO.read_text(encoding="utf-8")
-    published_last_sent = re.search(r"(je\.field|publishIfChanged\w*)\([^)]*iLastSentMM", src)
-    follows_target = re.search(r"iCurrentModulation\s*=\s*mmTarget", src)
-    assert published_last_sent or follows_target, "the published current_modulation never shows the MM=T that went out"
+    """O2 / entry 269 (Q-TW-4). At the maximum PWM duty SAT sends MM=T (entries 242, 243, 246); the published current_modulation
+    is 100 then, with the predicate of mmTarget, and satComputeMM()'s value otherwise."""
+    src = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+    fn = re.search(r"^static uint8_t satReportedModulation\([^\n]*\}$", src, re.M)
+    assert fn, "no satReportedModulation(): the published current_modulation never shows the MM=T that went out"
+    assert re.search(r"iCurrentModulation\s*=\s*satReportedModulation\(\s*!_sat_coldCut && satPwmAtMaxDuty\(\)", src), \
+        "the control tick does not publish satReportedModulation() with the mmTarget predicate"
+    assert re.search(r"mmTarget = \(!coldCutoff && satPwmAtMaxDuty\(\)\) \? SAT_MM_T", src)
+    with tempfile.TemporaryDirectory() as d:
+        cpp = Path(d) / "rm.cpp"
+        cpp.write_text("#include <cstdint>\n#include <cstdio>\n#include <cstdlib>\n" + fn.group(0) + r"""
+int main(int, char** a) { printf("%u\n", (unsigned)satReportedModulation(atoi(a[1]) != 0, (uint8_t)atoi(a[2]))); }
+""", encoding="utf-8")
+        exe = compile_cpp(cpp, Path(d) / "rm.exe")
+        if not exe:
+            raise unittest.SkipTest("no host C++ compiler")
+
+        def out(m, v):
+            return int(subprocess.run([str(exe), str(m), str(v)], capture_output=True, text=True).stdout)
+        assert out(1, 0) == 100 and out(1, 37) == 100, "MM=T goes out: 100"
+        assert out(0, 0) == 0 and out(0, 37) == 37 and out(0, 100) == 100, "otherwise the satComputeMM() value"
 
 
-class OpenDecisions(unittest.TestCase):
-    @unittest.expectedFailure
+class TelemetryDecisions(unittest.TestCase):
     def test_o3_first_cycle_gap_of_a_flame_that_burned_at_boot(self):
         check_first_cycle_gap_is_not_fabricated_when_the_flame_burns_at_boot()
 
-    @unittest.expectedFailure
+    def test_o3b_status_word_zero_before_the_first_frame_is_no_observation_of_the_flame(self):
+        """Statusflags is 0 until the first MsgID 0 frame arrives: samples taken then must not make the gap 'known'."""
+        fr, t = [], 7_500_000 + 40000
+        fr += [(7_500_000 + i * 1000, status_frame(0, False, ch_mode=False)) for i in range(30)]   # an all-zero status word
+        fr += one_hz(t, 300, True); t += 300000
+        fr += one_hz(t, 5, False); t += 5000
+        res = run_script(fr, 7_500_000, [t])
+        self.assertEqual([x["off"] for x in res[t]["records"]], [UNKNOWN_GAP])
+        self.assertEqual(res[t]["off4"], 0.0, "no real gap: the average is 0 with n = 0")
+
     def test_o1_mod_suppressed_follows_the_suppression_state(self):
         check_mod_suppressed_follows_the_suppression_state()
 
-    @unittest.expectedFailure
     def test_o2_current_modulation_equals_the_mm_on_the_wire(self):
         check_published_modulation_equals_the_mm_on_the_wire()
+
+    def test_q3_duty_is_flame_seconds_over_the_window_and_counts_every_flame(self):
+        """Entry 268: 2 cycles of 300 s in 4 h, one of them hot water only: duty = 600 / 14400, whatever the gaps are."""
+        fr, t = [], 3_100_000
+        fr += one_hz(t, 30, False); t += 30000
+        fr += one_hz(t, 300, True, ch_enable=False, dhw=True); t += 300000
+        fr += one_hz(t, 3000, False); t += 3000000
+        fr += one_hz(t, 300, True); t += 300000
+        fr += one_hz(t, 5, False); t += 5000
+        res = run_script(fr, 3_100_000, [t])
+        self.assertAlmostEqual(res[t]["duty4"], 600.0 / 14400.0, places=6)
+        self.assertAlmostEqual(res[t]["duty24"], 600.0 / 86400.0, places=6)
 
 
 # ---- the boot-time off gap that IS a measurement ----------------------------------------------------------------------
@@ -478,8 +536,8 @@ int main(int argc, char** argv) {
   for(int i=0;i<200;i++) {
     const float cs=satApplyPWM(request);
     const unsigned ch=satChEnableDecide(request,g_cold,satPwmDrivesSetpoint(request),state.sat.bPwmFlameRequested);
-    printf("t=%d flame=%d ch=%u cs=%.1f on_ms=%lu off_ms=%lu duty=%.4f\n", i*30, (int)g_flame, ch, cs,
-           (unsigned long)_pwm_lastOnTimeMs, (unsigned long)_pwm_lastOffTimeMs, state.sat.fPwmDutyCycle);
+    printf("t=%d flame=%d ch=%u cs=%.1f on_ms=%lu off_ms=%lu duty=%.4f sup=%d\n", i*30, (int)g_flame, ch, cs,
+           (unsigned long)_pwm_lastOnTimeMs, (unsigned long)_pwm_lastOffTimeMs, state.sat.fPwmDutyCycle, (int)state.sat.bModSuppressed);
     g_ms+=30000UL;
     const bool want = state.sat.bPwmFlameRequested;   // the boiler lights / goes out on the tick after the request
     if (want && !g_flame) { g_flame=true; g_flameOnStart=g_ms; }

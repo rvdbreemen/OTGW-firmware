@@ -1536,7 +1536,7 @@ On a tick, in this fixed order:
 13. Clamp `finalSetpoint` to [10, effective maximum] and store it as `_sat_lastControlCS` (SATcontrol.ino:4935-4939).
 14. Solar gain: no longer here. The offset is subtracted from `pidOutput` before the clamp of item 9 (SATcontrol.ino:5137-5143) (corrected 2026-10-24, TASK-1351); TASK-1323.
 15. Exits check, before item 12's setpoint step since TASK-1468: only if `pidOutput > cold setpoint`, for every source, `satCycleCheckPwmExits()`; otherwise the sustain guards reset (details in step 3). The overshoot switch (continuous to PWM) runs before the schedule (entry 88).
-16. `bModSuppressed = false` (SATcontrol.ino:4955-4957).
+16. `bModSuppressed` (entry 267, Q-TW-2, TASK-1412.15): `satApplyPWM()` sets it to false at its start and to true only on its last return, the PWM ON phase with overshoot protection on, the flame lit and the `fModSupDelay` hold elapsed (CS = flow - `fModSupOffset`, the suppression). The tick leaves it alone in PWM mode, clears it in continuous mode and under the cold cutoff; `satPwmReset()` and a flame-off edge clear it. `iModSuppressionSinceMs` is the `millis()` of the tick that first saw it true, 0 otherwise.
 17. Compute MM with `satComputeMM()`, using the mode **after** the exits of item 15 (details in step 6).
 18. Cold cutoff: if `pidOutput <= cold setpoint`, `finalSetpoint = 10`, MM = `iMaxRelModulation`, and `satPwmDisableOnHeaterOff()` leaves PWM (SATcontrol.ino:5206-5214, SATcontrol.ino:1100-1109) (corrected 2026-10-24, TASK-1351).
 19. Send, in this order: CS, MM, CH from `satChEnableDecide` (SATchEnable.h:46-52, SATcontrol.ino:5223) (corrected 2026-10-24, TASK-1351); for Immergas `TP=11:12=<min(MM, 80)>` goes inside `satSendMM()`, right before the `MM=` (entry 233); optionally `TC=` (SATcontrol.ino:5216-5236). Each of CS, MM, CH is only queued when it changed (CS at 0.1 °C resolution) or when 300 s passed since the last send (`SAT_CMD_REFRESH_MS`, SATcontrol.ino:427, and the `satEnqueueIfChanged*` helpers) [lines refreshed 2026-10-24, TASK-1351].
@@ -1941,7 +1941,7 @@ To entities (MQTT, published only when changed): `sat/mode` (actual mode, "off" 
 1. **Resolved by TASK-1273: whether the effective-temperature filter ever runs with the default 30 s interval.** The question was whether a tick lands inside a 30 000 ms window after the sync tick. The window is now 180 000 ms (Sergeant D, 2026-10-22, `docs/sat/sergeant-d-corrections.md` entry 1), so the default 30 s tick gives about five samples per ON phase (SATcontrol.ino:768, SATtypes.h:444; derived from the interval, not run). Exactly how many land still depends on timer jitter at the window edge, which was not traced. Only a control interval of 180 s or more gets no sample, and BT then stays at the seed of the ON phase.
 2. **DHW post-overshoot guard**: as written it cannot become active (see step 3). Whether that is intended is not stated in the code.
 3. **The `iRequestedControlMode` "pwm" request** is not enforced after the auto-switch moves the mode away (see step 3). Whether that is intended is not stated.
-4. **`bModSuppressed` and `iModSuppressionSinceMs`** are declared, reset every tick and published, but never set (SATcontrol.ino:4956-4957, SATtypes.h:213-215). Their purpose is not visible in the code.
+4. **`bModSuppressed` and `iModSuppressionSinceMs`** (answered, entry 267, Q-TW-2, TASK-1412.15): `bModSuppressed` is true while `satApplyPWM()` returns the suppression CS (PWM ON phase after the hold) and false otherwise; before, it was only ever assigned false.
 5. **`SAT_PWM_MIN_ON_SEC` and `SAT_FLOW_OFFSET_CONTINUOUS`** are defined but unused (SATcontrol.ino:58-59).
 6. **Comment versus code**: the `fModSupOffset` comment says "below setpoint" (SATtypes.h:456); the code uses "below the flow temperature" (SATcontrol.ino:713). The `fOvershootMargin` comment says the default was lowered from 3.0 (SATtypes.h:454); the reason is not in the code.
 7. **What the boiler does with CS = flow - 1 °C and MM = 0** is boiler behaviour and not in the firmware.
@@ -2197,7 +2197,7 @@ Host test: `tests/test_sat_cycle_classifier.py` (cases T1 to T5: setpoint raised
 6. 24 h window: add to the current hourly bucket (SATcycles.ino:834, SATcycles.ino:402-434).
 7. Remember this flame-off for the next cycle's off-with-demand (SATcycles.ino:838).
 
-**Off-time and duty are always zero / one (derived from the order of the code).** The flame-off branch sets `_cycle_flameOffStartMs` = now (SATcycles.ino:760) before `_cycleRecord` runs (SATcycles.ino:796) and before the 4 h block (SATcycles.ino:816-820). Both blocks test `_cycle_flameOnStartMs > _cycle_flameOffStartMs` (SATcycles.ino:591, SATcycles.ino:818), which is then false. So:
+**Off-time and duty are always zero / one (derived from the order of the code).** *Superseded: TASK-1409 fixed the off gap, entries 266 and 268 (TASK-1412.15) changed the figures, see "4 h window statistics" and "24 h window statistics" below; the paragraph is kept as history.* The flame-off branch sets `_cycle_flameOffStartMs` = now (SATcycles.ino:760) before `_cycleRecord` runs (SATcycles.ino:796) and before the 4 h block (SATcycles.ino:816-820). Both blocks test `_cycle_flameOnStartMs > _cycle_flameOffStartMs` (SATcycles.ino:591, SATcycles.ino:818), which is then false. So:
 - the per-cycle duty used for the EMA is `durationSec / durationSec` = 1.0 for every cycle with a positive duration (SATcycles.ino:590-596), and `fDutyRatio` moves towards 1.0;
 - every window record gets `offDurationMs` = 0 (SATcycles.ino:818-820, SATcycles.ino:826), so `f4hAvgOffSec` = 0 and `f4hDutyRatio` = 1.0 whenever the window holds a cycle with on-time (SATcycles.ino:357-365);
 - every daily bucket gets `sumOffMs` += 0 (SATcycles.ino:433), so `f24hDutyRatio` = 1.0 (SATcycles.ino:465-466).
@@ -2334,18 +2334,18 @@ duty sample      = durationSec / totalTime, capped at 1  (see section 8: always 
 ```
 i4hCycles            = number of such records (all classes)
 f4hAvgOnSec          = sum(onDurationMs) / n / 1000
-f4hAvgOffSec         = sum(offDurationMs) / n / 1000
+f4hAvgOffSec         = sum(offDurationMs of the records with a known gap) / nGaps / 1000   # entry 266: nGaps counts the real gaps only; a cycle whose flame already burned when SAT started stores SAT_OFF_GAP_UNKNOWN (0xFFFFFFFF) and is left out; 0 when nGaps = 0
 f4hAvgFlow           = mean of the per-cycle full p90 flow
 f4hOvershootFraction = count(OVERSHOOT) / n
 f4hUnderheatFraction = count(UNDERHEAT or UNDERHEAT_PWM) / n
-f4hDutyRatio         = sum(on) / (sum(on) + sum(off))
+f4hDutyRatio         = min(1, sum(onDurationMs of every record in the window) / 14 400 000 ms)   # entry 268, thermo-nova cycles/history.py:209-216: flame-on seconds / window length, hot-water flames included, also when the history is shorter than the window (the boot hours read low)
 f4hFlowRetDeltaP50/P90 = percentile (index method above) of per-cycle mean deltas >= 0
 ```
 
 **24 h window statistics** (SATcycles.ino:402-475): one bucket per `millis() / 3600000` (uptime hour); a cycle goes into the newest bucket when it has the same index, else a new bucket opens. Every 60 s the last 24 bucket indices are summed:
 ```
 i24hCycles            = sum(nCycles)
-f24hDutyRatio         = sum(onMs) / (sum(onMs) + sum(offMs))
+f24hDutyRatio         = min(1, sum(onMs) / 86 400 000 ms)     # entry 268: flame-on seconds / 24 h, as the 4 h figure
 f24hOvershootFraction = sum(nOvershoot) / sum(nCycles)
 f24hUnderheatFraction = sum(nUnderheat) / sum(nCycles)
 f24hLongCycleFraction = sum(nLong) / sum(nCycles)     # nLong: durationSec >= 600
@@ -2465,7 +2465,7 @@ The buffer sizes are the same for the OTGW32, Classic-S3 and combo builds: the c
 - **Short cycles.** Below 10 tail samples (about 10 s) the tail values fall back to the flow ring, and below 10 flow samples to the cycle maximum and minimum (SATcycles.ino:777-783). The flow ring is seeded with the flame-on flow, the tail ring is not (SATcycles.ino:739-746).
 - **Tail percentile sort (derived from reading the code, not run).** `_tailPercentile` uses `uint8_t n` and `int8_t j = (int8_t)i - 1` in the insertion sort (SATcycles.ino:519, SATcycles.ino:525-533). For a ring index `i` of 129 or more, `(int8_t)i` is negative, so `j` is negative, the shift loop does not run, and `sorted[j + 1] = key` writes to a negative index outside `sorted`. The tail ring holds up to 180 samples (src/libraries/Platform/src/boards.h:122), so this applies to any cycle whose tail ring holds more than 129 samples, that is a cycle of more than about 130 s. Then only the first 129 (oldest) samples of the copy are sorted; with a full ring the p90 index is 161 (SATcycles.ino:535), which picks an unsorted sample from about 18 s before flame-off rather than the 90th percentile. `tailP50` (index 89) comes from the sorted oldest 129 samples. The flow ring version uses `int16_t j` and is not affected (SATcycles.ino:494-502). This was not verified with a compiler run or on a device.
 - **PWM ON phase and a stale flame-on time (fixed by TASK-1382).** The ON phase used to be timed from `satCycleGetFlameOnStartMs()`, which changes only at a flame OFF->ON edge, so an ON phase that started before the ignition ended on its first tick. It is now timed from `_pwm_lastUpdateMs`, set at the ON start and at the first ignition (SATcontrol.ino:870, SATcontrol.ino:963, SATcontrol.ino:1019-1035; pwm.py:162, :188, :205). The PWM mechanism itself is described in the PWM section.
-- **Off-time zero.** See section 8: window off-times are always 0 and the duty ratios are 1.0 (derived from the order of the code).
+- **Off-time zero.** Superseded (see section 8): the window off gaps are the real gaps since TASK-1409, an unknown first gap is left out of the average (entry 266), and the 4 h / 24 h duty is flame-on seconds / window length (entry 268, TASK-1412.15).
 - **Hot water.** Since TASK-1387 a cycle with a hot water sample in its tail (after the warm-up, tracker.py:113-116), or of kind UNKNOWN, is UNCERTAIN (SATcycles.ino:667-670, cls:22-26). A DHW or MIXED cycle without hot water in the tail is classified by the PWM or continuous rules, as in thermo-nova.
 - **Hot water and CH sources.** On the real bus the cycle kind and the DHW-in-tail test read `Statusflags` bit 2 and bit 8 per sample; under SAT simulation they read `bDhwActive` (forced true by a simulated draw, SATcontrol.ino:4998-5002) and a commanded CS above `SAT_MIN_SETPOINT` (SATcycles.ino:907-920) [lines refreshed 2026-10-25, TASK-1387 review]. The off-with-demand test still reads the real bus slave CH-mode bit (SATcycles.ino:726), also under simulation.
 - **Setpoint used for the cycle.** The control error uses `fFinalSetpoint` captured at flame-on (SATcycles.ino:717). In PWM, `fFinalSetpoint` at the ignition tick is the flame-off hold value (return + offset, SATcontrol.ino:701-707, SATcontrol.ino:880-882) and changes later in the cycle (SATcontrol.ino:884-888), so the captured value is the setpoint of one moment (derived from the order of the code).
@@ -3592,7 +3592,7 @@ Steps 1 to 9 run on every pass. Steps 10 onward run only when the control timer 
     - Compare: thermo-nova's continuous branch holds a falling request at the previous setpoint; the firmware does not compare with the previous setpoint.
 25. **Final clamp** of the setpoint to [10, effective maximum] (`SATcontrol.ino:5178-5183`). The solar offset is no longer applied here; it lowers `pidOutput` before step 22 (`SATcontrol.ino:5137-5143`) (corrected 2026-10-24, TASK-1351); TASK-1323.
 26. Auto-switch check, only when `pidOutput` is above the cold setpoint, for every source (`SATcontrol.ino:5542-5546`). PWM section.
-27. **Modulation value** `iCurrentModulation = satComputeMM(...)` (`SATcontrol.ino:4960-4967`):
+27. **Modulation value** `iCurrentModulation = satComputeMM(...)` (`SATcontrol.ino:4960-4967`), then (entry 269, Q-TW-4, TASK-1412.15) `satReportedModulation()`: 100 while the tick sends MM=T (`!_sat_coldCut && satPwmAtMaxDuty()` with a command interface, the `mmTarget` condition), else the value below, so the published `current_modulation` (MQTT, REST, debug) shows the 100 % of MM=T instead of the 0 of a gas boiler in PWM:
     - heat pump outside PWM: 100;
     - PWM: 0, or the configured maximum for heat pump and hybrid;
     - otherwise the configured maximum `iMaxRelModulation`;

@@ -265,8 +265,8 @@ DELEGATED = {
                ("test_sat_classifier_parity", "TestUpstreamIdentity", None), ("test_sat_classifier_parity", "TestParity", None),
                ("test_sat_classifier_parity", "TestAc2Inventory", None), ("test_sat_classifier_parity", "TestRam", None)],
     "LL-023": [("test_sat_ground_truth_block", "SatGroundTruthBlock", None)],
-    # TASK-1412.15: telemetry against independent timestamped frames. The OpenDecisions class of that module is not delegated
-    # (its expectedFailure tests are registered below as open_decision fixtures, one per question).
+    # TASK-1412.15: telemetry against independent timestamped frames. The TelemetryDecisions class of that module is not delegated
+    # (its three decision checks are registered below as contract fixtures, one per decision, entries 266, 267 and 269).
     "LL-022": [("test_sat_telemetry_wire", "CycleMetricsVsFrames", None), ("test_sat_telemetry_wire", "BootGap", None),
                ("test_sat_telemetry_wire", "PwmSecondsVsWire", None), ("test_sat_telemetry_wire", "MmValue", None)],
 }
@@ -594,20 +594,20 @@ class LowLoadContract(unittest.TestCase):
     def test_ll022_telemetry_matches_independent_frames(self):
         self.delegated("LL-022")
 
-    @ll("LL-022", "open_decision", "satCycleInit (SATcycles.ino): _cycle_lastFlameOffMs = millis() at start gives a flame that already burns at boot an off gap equal to the time since start",
-        task="TASK-1412.15", question="Q-TW-1 (TASK-1412.15 hand-off report)")
+    @ll("LL-022", "contract", "satCycleSample/satCycleOnFlameChange/satGetWindow4hStats (SATcycles.ino): a flame that already burns when SAT starts has an unknown first off gap (SAT_OFF_GAP_UNKNOWN), left out of the average off gap and the duty EMA (entry 266, thermo-nova tracker.py:144-145)",
+        task="TASK-1412.15: Q-TW-1")
     def test_ll022_first_cycle_off_gap_of_a_flame_burning_at_boot_is_not_a_measurement(self):
         import test_sat_telemetry_wire as tw
         tw.check_first_cycle_gap_is_not_fabricated_when_the_flame_burns_at_boot()
 
-    @ll("LL-022", "open_decision", "state.sat.bModSuppressed (SATtypes.h:226) published as mod_suppressed (SATcontrol.ino:4203, restAPI.ino:2431, handleDebug.ino:235), only ever assigned false (SATcontrol.ino:7193)",
-        task="TASK-1412.15", question="Q-TW-2 (TASK-1412.15 hand-off report)")
+    @ll("LL-022", "contract", "satApplyPWM (SATcontrol.ino): state.sat.bModSuppressed, published as mod_suppressed (SATcontrol.ino, restAPI.ino, handleDebug.ino), is true on the PWM ON-phase suppression path and false elsewhere (entry 267)",
+        task="TASK-1412.15: Q-TW-2")
     def test_ll022_mod_suppressed_follows_the_real_suppression_state(self):
         import test_sat_telemetry_wire as tw
         tw.check_mod_suppressed_follows_the_suppression_state()
 
-    @ll("LL-022", "open_decision", "state.sat.iCurrentModulation published as current_modulation (SATcontrol.ino:4223, :4706) while the wire carries MM=T at the maximum PWM duty (mmTarget, SATcontrol.ino:7224)",
-        task="TASK-1412.15", question="Q-TW-4 (TASK-1412.15 hand-off report)")
+    @ll("LL-022", "contract", "satReportedModulation + the control tick (SATcontrol.ino): the published current_modulation is 100 while MM=T goes out at the maximum PWM duty (entry 269)",
+        task="TASK-1412.15: Q-TW-4")
     def test_ll022_published_modulation_equals_the_mm_on_the_wire(self):
         import test_sat_telemetry_wire as tw
         tw.check_published_modulation_equals_the_mm_on_the_wire()

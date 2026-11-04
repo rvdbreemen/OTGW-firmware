@@ -652,26 +652,25 @@ class CycleClassifier(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr[-300:])
         v = dict(tok.split("=") for tok in r.stdout.split())
         alpha, duty0 = float(v["init_ema_alpha"]), float(v["init_duty"])
-        # Cycle 1 is the first one after init: no previous flame-off edge exists, so the stored gap is 0
-        # (not "time since init") and the duty is on/on = 1.0.
-        self.assertEqual(int(v["c1_off_ms"]), 0, "cycle 1 (first after init) off gap")
-        self.assertAlmostEqual(float(v["c1_duty"]), alpha * 1.0 + (1.0 - alpha) * duty0, places=5,
-                               msg="cycle 1 EMA duty (no previous edge: duty 1.0)")
+        # Cycle 1 is the first one after init and the flame was never seen off: its off gap is unknown (entry 266, thermo-nova
+        # None, tracker.py:144-145), stored as SAT_OFF_GAP_UNKNOWN and left out of the duty EMA, which keeps its start value.
+        self.assertEqual(int(v["c1_off_ms"]), 0xFFFFFFFF, "cycle 1 (first after init) off gap is unknown")
+        self.assertAlmostEqual(float(v["c1_duty"]), duty0, places=5, msg="cycle 1 is not in the duty EMA (unknown gap)")
         # Cycle 2
         self.assertEqual(int(v["c2_on_ms"]), 300000, "cycle 2 on time")
         with self.subTest("stored off gap"):
             self.assertEqual(int(v["c2_off_ms"]), 600000, "cycle 2 stored off gap (ms)")
         with self.subTest("per-cycle duty (EMA)"):
-            want = alpha * (300.0 / 900.0) + (1.0 - alpha) * float(v["c1_duty"])
+            want = alpha * (300.0 / 900.0) + (1.0 - alpha) * float(v["c1_duty"])   # c1_duty = the start value
             self.assertAlmostEqual(float(v["c2_duty"]), want, places=5,
                                    msg="cycle 2 EMA duty must use 300 s on / 900 s since the previous flame-off")
-        # Rolling 4 h window over both cycles: off 0 + 600 s, on 300 + 300 s.
+        # Rolling 4 h window over both cycles: on 300 + 300 s, one known gap of 600 s.
         self.assertEqual(int(v["c2_4h_n"]), 2)
         self.assertAlmostEqual(float(v["c2_4h_avg_on_s"]), 300.0, places=3)
         with self.subTest("4h average off time"):
-            self.assertAlmostEqual(float(v["c2_4h_avg_off_s"]), (0 + 600) / 2.0, places=3, msg="4h avg off time")
+            self.assertAlmostEqual(float(v["c2_4h_avg_off_s"]), 600.0, places=3, msg="4h avg off time: the n is the known gaps")
         with self.subTest("4h duty ratio"):
-            self.assertAlmostEqual(float(v["c2_4h_duty"]), 600.0 / (600.0 + 600.0), places=5, msg="4h duty ratio")
+            self.assertAlmostEqual(float(v["c2_4h_duty"]), 600.0 / 14400.0, places=5, msg="4h duty = flame-on seconds / 4 h (entry 268)")
 
     # --- TASK-1331: the verdict switches PWM on or off at flame off (thermo-nova pwm.py:219-227, entries 15, 18, 36, 37) ---
     def end_of_cycle(self, name, expect_mode, expect_switches, deny=False):

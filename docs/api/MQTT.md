@@ -360,7 +360,7 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/max_setpoint` | `"62.0"` | yes | Maximum flow setpoint SAT works with (°C) (TASK-1373): the user's Max flow setpoint (`set/<node>/sat/max_setpoint`) cut into the boiler's MsgID 49 bounds (20 to 80 without them), at most 50 for underfloor, 40 for a heat pump and 65 (the old global ceiling). While the user has not chosen a value: 62 for radiators, 50 for underfloor, 40 for a heat pump. Before TASK-1373 this was the fixed 62 / 45 / 40 table |
 | `sat/modulation_state` | `"OFF"` / `"HOT_WATER"` / `"PWM_OFF"` / `"COLD"` / `"ACTIVE"` | no | Modulation state. `"OFF"` while SAT is not active; `"COLD"` = flow temperature below 22 °C |
 | `sat/pwm_state` | `"IDLE"` / `"ON"` / `"OFF"` | no | PWM phase; `"IDLE"` when the control mode is not PWM |
-| `sat/current_modulation` | `"45"` | no | Current boiler modulation (%) |
+| `sat/current_modulation` | `"45"` | no | Modulation SAT sends (%), 100 while the last MM sent is `MM=T` (maximum PWM duty, TASK-1412.15) |
 | `sat/sim/last_cmd` | command string | no | Last PIC / OT-Direct command that simulation mode kept off the bus. Published only while simulation is on |
 
 #### PID Components
@@ -407,7 +407,7 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 | `sat/cycle_phase` | `"startup"` / `"steady"` / `"cooldown"` / `"idle"` | no | Current cycle phase |
 | `sat/cycles_this_hour` | `"3"` | no | PWM ON-phase starts in the last 3600 s (rolling window; falls as starts leave it) |
 | `sat/pwm_duty` | `"0.65"` | no | PWM duty cycle (0.00-1.00) |
-| `sat/duty_ratio` | `"0.70"` | no | EMA duty ratio (flame-on fraction) |
+| `sat/duty_ratio` | `"0.70"` | no | EMA duty ratio (flame-on fraction); a cycle whose off gap is unknown (flame already burning when SAT started) is not in the EMA |
 | `sat/overshoot_fraction` | `"0.12"` | no | EMA fraction of cycles with overshoot |
 | `sat/device_health` | `"ON"` / `"OFF"` | yes | Binary, ON = problem: ON while the boiler status has not been evaluated yet since boot (thermo-nova `INSUFFICIENT_DATA`). Before TASK-1485 the description said "ON when the boiler status is `off`" |
 
@@ -417,9 +417,9 @@ Removed in TASK-1282 (Sergeant D entry 114): the comfort adjust feature is gone,
 | ----- | ----- | -------- | ----------- |
 | `sat/4h_cycles` | `"12"` | no | Cycles in the window |
 | `sat/4h_avg_on_sec` | `"540.0"` | no | Average flame-on time per cycle (s) |
-| `sat/4h_avg_off_sec` | `"900.0"` | no | Average off time between cycles (s) |
+| `sat/4h_avg_off_sec` | `"900.0"` | no | Average off time between cycles (s), over the known gaps only: a flame already burning when SAT started has an unknown first gap and is left out (0 when there is none) |
 | `sat/4h_avg_flow_temp` | `"45.2"` | no | Average flow temperature (°C) |
-| `sat/4h_duty_ratio` | `"0.375"` | no | Flame-on fraction (0-1) |
+| `sat/4h_duty_ratio` | `"0.375"` | no | Flame-on seconds of the cycles ending in the last 4 h / 14 400 s (0-1), every flame counted, also when SAT has run for less than 4 h (thermo-nova `_duty_ratio_since`; TASK-1412.15, before: on / (on + off) over the cycles) |
 | `sat/4h_overshoot_fraction` | `"0.083"` | no | Fraction of cycles classed overshoot (0-1) |
 | `sat/4h_underheat_fraction` | `"0.000"` | no | Fraction of cycles classed underheat (0-1) |
 | `sat/4h_flow_ret_delta_p50` | `"8.5"` | no | Median flow-return temperature difference (°C) |
