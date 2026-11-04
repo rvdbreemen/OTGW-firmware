@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Home Assistant: the SAT zone and PV-boost entities get readable names** (TASK-1608, PR #693 by Andre Brait). Names are spaced and no longer carry the hostname, for example `SAT Zone 1 Active`; entity ids, unique ids and topics are unchanged, only the display name in HA changes.
+
+### Fixed
+
+- **Web UI: the flow dots on the Connection map loop without a jump** (TASK-1609, PR #695 by Andre Brait). They use their own keyframes matched to their dash pattern.
+
 ## [2.0.0-beta.77] - 2026-11-04
 
 ### Added

@@ -1,10 +1,10 @@
 ---
 id: TASK-1607
 title: 'Resolve Claude hook paths without CLAUDE_PROJECT_DIR (PR #691, Andre Brait)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-04T17:55:00Z'
-updated_date: '2026-11-04T18:02:00Z'
+updated_date: '2026-11-04T19:18:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -29,3 +29,9 @@ Contributor PR #691 by Andre Brait: .claude/settings.json hook commands fall bac
 <!-- SECTION:NOTES:BEGIN -->
 Host evidence (2026-11-04, lane-prs b9fc4bc1a): guard with CLAUDE_PROJECT_DIR unset: Edit file_path backlog/tasks/*.md -> exit 2, edit path backlog/tasks/*.md -> exit 2, Write src/a.ino -> 0, Bash -> 0. Same lowercase edit+path case on the origin/dev guard -> exit 0 (passes through): red on old, green on new. evaluate --quick 0 failed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Hook commands resolve their paths without CLAUDE_PROJECT_DIR (PR #691, Andre Brait); the backlog-file guard blocks Edit/edit on backlog/tasks/*.md and allows other paths, with and without the variable. Evidence in the notes (guard red/green on the old lowercase bypass).
+<!-- SECTION:FINAL_SUMMARY:END -->
