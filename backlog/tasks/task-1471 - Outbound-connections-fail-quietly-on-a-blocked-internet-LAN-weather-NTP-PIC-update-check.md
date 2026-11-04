@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T10:49:00Z'
-updated_date: '2026-11-04T15:45:00Z'
+updated_date: '2026-11-04T15:53:00Z'
 labels:
   - sat
   - network
@@ -25,9 +25,9 @@ Tester martreides (#alpha-testing msg 1565312598595993792, 2026-10-29) runs the 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Inventory of every outbound connection on dev with file:line, timeout and the task/context it runs in
+- [x] #1 Inventory of every outbound connection on dev with file:line, timeout and the task/context it runs in
 - [ ] #2 Bench test with outbound internet blocked (router firewall drop rule, MikroTik): no loop gap above the normal maximum, no reboot, SAT keeps running on its fallbacks; evidence = capture transcript
-- [ ] #3 Each failure path logs at most once per retry interval and backs off; any path that fails this gets a fix or its own task
+- [x] #3 Each failure path logs at most once per retry interval and backs off; any path that fails this gets a fix or its own task
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -40,4 +40,6 @@ Robert 2026-10-29 (interactive): released, priority medium. TASK-1478 (alpha.534
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: weather backoff SATweather.ino:438-455; outbound inventory (AC1) doable, rest needs a blocked-WAN bench.
 
 2026-11-04 Robert: MikroTik fault injection allowed: one rule per test, scoped to the bench boards' MAC/IP (.61/.63), comment-tagged, scheduler auto-removal within 30 min, removed right after; config export before and after recorded in the notes.
+
+2026-11-04 (sonnet agent, lead verified R2 in code): inventory in docs/audits/2026-11-04-outbound-connections.md (weather, NTP, PIC HEAD/GET, MQTT DNS/connect, webhook LAN-only, mDNS, DHCP/DNS; no GitHub/OTA/Discord calls). AC3: every path backs off and logs at most once per interval except two that block the loop task: R1 weather GET (5 s+ per attempt), R2 refreshpic GET after a failed HEAD (lead: a feedWatchDog sits between HEAD and GET, so each block stays under the 30 s TWDT, but the GET is useless); both go to TASK-1604. Low: R4 MQTT hostname lookup, R5 two ungated [HEAP] lines. AC2 bench plan in the audit.
 <!-- SECTION:NOTES:END -->
