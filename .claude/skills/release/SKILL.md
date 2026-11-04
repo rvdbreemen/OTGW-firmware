@@ -98,7 +98,9 @@ Check whether architectural changes since the previous release require new or up
 ### Phase 2: Stabilize the release branch
 
 1. Commit all open/uncommitted changes on `otgw-1.x.x` and push to remote.
-2. Run the build and filter output (R2):
+2. Run the build and filter output (R2). First check the machine-wide build lock
+   (one build at a time, see Important rules). On Windows run the wrapper by its
+   full path (`cmd //c "<worktree>\build.bat"`); a bare `build.bat` is not found:
    ```bash
    mkdir -p .tmp
    python build.py 2>&1 | tee .tmp/build_release.log | tail -10
@@ -295,7 +297,7 @@ Proceed directly after Phase 4 approval.
    gh release view v<version> --json assets --jq '.assets[].name'
    ```
    A missing `SHA256SUMS` breaks `flash_otgw.sh` / `flash_otgw.bat` auto-download with `EXIT_SHA_MISMATCH`. Fix the draft now; after publishing it is unfixable.
-9. **Publish**: `gh release edit v<version> --draft=false --latest`
+9. **Publish**: `gh release edit v<version> --draft=false --latest` (use `--latest=false` once a 2.x stable release is "Latest"; see Important rules)
 10. **Verify the live download path**: `curl -sSI https://github.com/rvdbreemen/OTGW-firmware/releases/latest/download/SHA256SUMS | head -1` must not be a 404. This is the URL the flash scripts use.
 
 ### Phase 6: Post-release, Discord announcement & reopen the next beta cycle
@@ -372,6 +374,10 @@ Skipping step 3 leaves the repo and GitHub release page out of sync. Skipping st
 - **Never use em dashes** in any generated text
 - **Always push to remote after every commit**
 - **Stage the WHOLE build sweep, not just `version.h`**: every `python build.py` runs `autoinc-semver --update-all`, which rewrites `version.h`, `data/version.hash`, and the `Version :` banner comments across ~24 source/data files. After any build-output commit (Phase 2, Phase 5, Phase 6 bump) run `git status --short` and confirm a clean tree before proceeding. Leftover banner changes committed late, or on `main` before tagging, mean the published tag carries stale `-beta` source comments (the binary version stays correct via `version.h`).
+- **Verify every commit landed before you push or tag.** The 1.x `commit-msg` hook refuses a message that names a `TASK-NNN` whose file is not tracked in THIS tree (a dev-backlog task id, for example), and a refused commit leaves the change staged while `HEAD` stays where it was. Check `git log -1 --format=%s` shows YOUR subject and `git status --short` shows nothing staged. Reference another tree's task as plain text ("dev task 1596"), never as `TASK-1596`. On 2026-11-03 a refused commit went unnoticed and `v1.7.9-beta.1` was tagged and published (immutable) from a commit without the change; it had to roll forward to beta.2.
+- **No backlog CLI edits while release changes are staged.** The 1.x backlog has `auto_commit: true`: every `backlog task create/edit` commits the whole index, so it swallows staged release work into an "Update task" commit. Do task edits before staging or after the release commit.
+- **One build at a time on the machine.** The 1.x `build.py` takes no machine-wide lock, but the dev line does (`%LOCALAPPDATA%/OTGW-build/build.lock`). Before each build, check that lock: if its PID is alive, wait; tell the 2.0.0 lead session when your build starts and ends.
+- **`--latest` only while 1.x is the newest stable.** Once a 2.x stable release is GitHub "Latest", publish 1.x releases with `--latest=false`, or the flash scripts' `releases/latest` path flips to the wrong line.
 - **Run git mutations SERIALLY, never in parallel tool calls**: `git checkout`, `git stash`, `git merge`, and `git commit` issued concurrently race on the index and working tree and produce corrupt or misleading state. Chain them with `&&` in one command or run them one at a time. Only read-only `git` queries may overlap.
 - **Always create releases as draft first**: attach every asset, verify the count is 10, then publish
 - **Releases are immutable, and this has two hard consequences**:
