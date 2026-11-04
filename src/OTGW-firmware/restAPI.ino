@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.71
+**  Version  : v2.0.0-beta.72
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -373,11 +373,12 @@ static void sendSimulationStatus() {
   const bool haveFile = LittleFSmounted && LittleFS.exists(F("/otgw_simulation.log"));
   char jsonBuf[240];
   snprintf_P(jsonBuf, sizeof(jsonBuf),
-             PSTR("{\"simulation\":{\"active\":%s,\"available\":true,\"source\":\"%s\",\"file\":\"%S\",\"interval_ms\":%lu}}"),
+             PSTR("{\"simulation\":{\"active\":%s,\"available\":true,\"source\":\"%s\",\"file\":\"%S\",\"interval_ms\":%lu,\"timing\":\"%s\"}}"),
              state.debug.bOTGWSimulation ? "true" : "false",
              haveFile ? "file" : "builtin",
              reinterpret_cast<PGM_P>(kOTGWSimulationFile),
-             static_cast<unsigned long>(state.debug.iOTGWSimulationIntervalMs));
+             static_cast<unsigned long>(state.debug.iOTGWSimulationIntervalMs),
+             otgwReplayTimingMode());
   sendCorsOriginHeader();
   webSend(200, F("application/json"), jsonBuf);
 }

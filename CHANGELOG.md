@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Replay honours the recorded frame gaps of `otframes.log`** (TASK-1508, ADR-209). A line of `/otgw_simulation.log` in the `otframes.log` layout (host time, device time, source letter, frame; tab separated) is dispatched once the recorded device-time gap to the previous line has elapsed (clamped to 0..60 s) instead of every 750 ms. Bare-frame files and the built-in fixture keep the 750 ms interval; `#` note lines are skipped; `GET /api/v2/simulate` reports `timing` (`timed` or `fixed`). Host test `tests/test_replay_timing.py` (old code: timed cases fail with 750 ms and an unparsed tab line; new: all pass).
+
 ### Fixed
 
 - **SAT: all state topics reach Home Assistant again right after its restart** (TASK-1603). The non-retained SAT topics (`window_open`, `pressure_drop_rate`, `requested_setpoint` and about 55 more) showed `unknown` in HA for up to the ~5 minute heartbeat, because the ADR-174 republish on `homeassistant/status` online only reset the retained core shadows. Every SAT change-shadow now carries an epoch; `satRepublishCoreState()` increments it and each helper sends its topic once on the next pass (the outbox gate still applies). Topics stay `retain=false`; the shadows do not grow.

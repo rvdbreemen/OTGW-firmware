@@ -779,6 +779,13 @@ The OT frame replay feeds `/otgw_simulation.log` from LittleFS when that file ex
 otherwise the fixture built into the firmware (TASK-1294), to the OpenTherm
 decoder, one line every 750 ms, and starts again at the top when the source ends.
 Each line is one frame in the PIC's text format, for example `T10010A00`.
+A line may instead be a line of `otframes.log` (capture tool): tab separated
+`host_time`, `device_time` (`HH:MM:SS.uuuuuu`), source letter and frame; only the
+last three columns are read. The replay then dispatches that line once the
+difference between its device time and the previous timed line's has elapsed
+(wraps at midnight, clamped to 0..60 s; the first line after a start goes out at
+once). Lines without these columns keep the 750 ms interval, and lines starting
+with `#` are skipped (ADR-209).
 Replayed frames take the same decode, state and MQTT publish path as live
 frames. This works on every board: PIC (OTGW Classic) and OT-Direct (OTGW32).
 A replayed frame is no evidence about the boiler on the bus, though: it sets no
@@ -816,7 +823,8 @@ Returns the replay status.
     "available": true,
     "source": "builtin",
     "file": "/otgw_simulation.log",
-    "interval_ms": 750
+    "interval_ms": 750,
+    "timing": "fixed"
   }
 }
 ```
@@ -824,10 +832,11 @@ Returns the replay status.
 | Field | Description |
 |---|---|
 | `active` | `true` while the replay is on. |
+| `timing` | `"timed"` while the last replayed line carried a device time (recorded gaps), otherwise `"fixed"` (the `interval_ms` spacing). |
 | `available` | Always `true`. Without a `/otgw_simulation.log` on LittleFS the replay reads the fixture built into the firmware. |
 | `source` | Where the next replay reads from: `"file"` when `/otgw_simulation.log` exists on LittleFS (it takes precedence), otherwise `"builtin"`. |
 | `file` | The optional replay file on LittleFS. Fixed. |
-| `interval_ms` | Time between replayed lines. Fixed at 750. |
+| `interval_ms` | Time between replayed bare lines. Fixed at 750. Timed lines use their recorded gap instead. |
 
 #### `POST /api/v2/simulate/start` | `PUT /api/v2/simulate/start`
 

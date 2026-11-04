@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-30T06:53:00Z'
-updated_date: '2026-11-04T14:15:00Z'
+updated_date: '2026-11-04T14:33:00Z'
 labels:
   - replay capture tooling
 milestone: 2.0.0
@@ -24,9 +24,9 @@ TASK-1503 records otframes.log (host time, device timestamp, source letter, fram
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Plan with the option chosen and why (firmware vs host), Proposed ADR via adr-kit if it changes a contract
+- [x] #1 Plan with the option chosen and why (firmware vs host), Proposed ADR via adr-kit if it changes a contract
 - [ ] #2 A capture with mixed gaps replays with each frame within 50 ms of its recorded gap (measured, old fixed-interval run shown as the red case)
-- [ ] #3 Bare-frame files keep replaying as today (regression test)
+- [x] #3 Bare-frame files keep replaying as today (regression test)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -39,4 +39,6 @@ Robert 2026-11-04 (interactive): firmware reads times. otgw_simulation.log may c
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: OTGW-Core.ino:4327/4342 next frame = millis()+fixed 750 ms. Agent-doable, host testable.
+
+2026-11-04 (sonnet agent; lead reran in wt-int4): firmware reads times (Robert). otframes.log lines (host TAB device_time TAB source TAB frame, or the last 3 columns) dispatch after the recorded device-time gap (clamped 0..60 s, midnight-wrap, drift-free anchor); bare lines keep 750 ms; '#' lines skipped. GET /api/v2/simulate shows timing timed|fixed. ADR-209 Proposed. tests/test_replay_timing.py 4 OK (old: 2 FAIL on the timed cases, bare-frame cases pass = regression), pm_chain 40, capture_otframes 6, adr_governance 15 OK, evaluate 0 failed. Also removed a duplicate ADR-208 row in docs/adr/README.md. AC2 bench pending. Tag beta.72.
 <!-- SECTION:NOTES:END -->

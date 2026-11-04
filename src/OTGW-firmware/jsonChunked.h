@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : jsonChunked.h
-**  Version  : v2.0.0-beta.71
+**  Version  : v2.0.0-beta.72
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

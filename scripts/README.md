@@ -205,7 +205,7 @@ Not on a live heating system (see "Simulation" in `docs/api/README.md`). The fir
 2. Start it with `POST /api/v2/simulate/start`, check it with `GET /api/v2/simulate`, stop it with `POST /api/v2/simulate/stop`. `source` is `file` while the uploaded file is used.
 3. Delete the file from LittleFS afterwards to return to the built-in fixture.
 
-A replay that honours the timing in `otframes.log` is a separate follow-up.
+To replay at the recorded pace, upload lines of `otframes.log` instead of the bare frames (ADR-209): the firmware waits the device-time gap between lines (0..60 s) and skips `#` notes.
 
 Tests: `python tests/test_capture_tool.py` runs the tool against fake telnet,
 HTTP and MQTT servers, and the long-run segment store with an injected clock.
