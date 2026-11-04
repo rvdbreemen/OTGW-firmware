@@ -3,10 +3,11 @@ id: TASK-1455
 title: >-
   feat-2.0.0: port TASK-1262 (1.x) — skip the WiFi config portal on the boot
   after a WiFi supervisor restart and finish setup() offline
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T06:28:00Z'
-updated_date: '2026-11-04T05:10:00Z'
+updated_date: '2026-11-04T20:49:00Z'
 labels:
   - port-from-1.x
   - wifi

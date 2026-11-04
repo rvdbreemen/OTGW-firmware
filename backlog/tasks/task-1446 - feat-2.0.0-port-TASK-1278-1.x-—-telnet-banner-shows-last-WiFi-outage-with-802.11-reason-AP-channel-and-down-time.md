@@ -3,10 +3,11 @@ id: TASK-1446
 title: >-
   feat-2.0.0: port TASK-1278 (1.x) — telnet banner shows last WiFi outage with
   802.11 reason, AP, channel and down time
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T06:16:00Z'
-updated_date: '2026-11-04T05:10:00Z'
+updated_date: '2026-11-04T20:49:00Z'
 labels:
   - port-from-1.x
   - wifi
