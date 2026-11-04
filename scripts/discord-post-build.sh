@@ -91,9 +91,12 @@ size=$(wc -c < "$zip" | tr -d ' ')
 
 content="Build ready: \`$version+$hash\` (esp32-combo, flash package attached)."
 [ -n "$extra" ] && content="$content $extra"
-# JSON string: drop control characters (newlines, tabs), escape backslash and quote
-esc=$(printf '%s' "$content" | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
-payload="{\"content\":\"$esc\",\"allowed_mentions\":{\"parse\":[]}}"
+# JSON payload, ASCII-only (TASK-1610): non-ASCII characters become \uXXXX escapes, because the payload
+# reaches the Windows-native curl.exe as a command-line argument, which Windows converts through the
+# ANSI code page ("Andre" with an accent arrived as "Andr?"). The text goes to Python on stdin as raw
+# UTF-8 bytes, so no argv conversion touches it. Control characters (newlines, tabs) are dropped.
+payload=$(printf '%s' "$content" | python -I -c 'import json,sys; t=sys.stdin.buffer.read().decode("utf-8","replace"); t="".join(c for c in t if ord(c)>=32); print(json.dumps({"content":t,"allowed_mentions":{"parse":[]}},ensure_ascii=True))')
+[ -n "$payload" ] || refuse "could not build the JSON payload (python missing?)"
 
 # Discord drops '+' from attachment names (alpha.465+5cf2758 showed as alpha.4655cf2758),
 # so upload under a name with '_'; the local zip keeps its name.
