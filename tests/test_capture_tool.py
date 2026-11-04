@@ -29,6 +29,7 @@ New:
   o  MQTT via the vendored paho wheel: messages land as 'topic payload' lines
   p  PowerShell-style arguments (-DeviceHost ...) are accepted
   q  browser child dies with the tool (fake browser process; Windows job object / Linux PDEATHSIG)
+  r  TASK-1560: the stored core dump is fetched once at the end (200 kept, 404 / 401 one line, no credentials)
 
 Run: python tests/test_capture_tool.py
 """
@@ -1037,6 +1038,103 @@ class SatTraceToggleCase(unittest.TestCase):
         sent, result = self.run_toggles(True)
         self.assertEqual(sent, [b"1", b"5", b"8"])
         self.assertIn("SATtrace=on", result)
+
+
+# ---- TASK-1560: core dump fetch at the end of a capture --------------------
+
+class CoreDumpFetchCase(unittest.TestCase):
+    DUMP = bytes(range(256)) * 20
+
+    def serve(self, status, sha="a1b2c3d4e", body=None):
+        seen = []
+        dump = self.DUMP if body is None else body
+
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                seen.append((self.path, self.headers.get("Authorization")))
+                self.send_response(status)
+                if status == 200:
+                    self.send_header("Content-Type", "application/octet-stream")
+                    if sha:
+                        self.send_header("X-Coredump-App-Sha256", sha)
+                    self.send_header("Content-Length", str(len(dump)))
+                    self.end_headers()
+                    self.wfile.write(dump)
+                else:
+                    msg = b"{}"
+                    self.send_header("Content-Length", str(len(msg)))
+                    self.end_headers()
+                    self.wfile.write(msg)
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        self.addCleanup(httpd.server_close)   # cleanups run last-in first-out: shutdown, then close
+        self.addCleanup(httpd.shutdown)
+        return "http://127.0.0.1:%d" % httpd.server_address[1], seen
+
+    def fetch(self, status, **kw):
+        base, seen = self.serve(status, **kw)
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        run = Path(tmp.name) / "20261104-120000"
+        run.mkdir()
+        cap = oc.Capture(run, echo=False)
+        line = oc.fetch_coredump(cap, base, 5)
+        cap.store.close()
+        return cap, line, seen
+
+    def test_200_is_kept_with_the_app_sha(self):
+        cap, line, seen = self.fetch(200)
+        target = cap.run_path / "coredump-20261104-120000.bin"
+        self.assertEqual(target.read_bytes(), self.DUMP)
+        self.assertIn("a1b2c3d4e", line)
+        self.assertEqual(seen, [("/api/v2/device/coredump", None)])   # once, and no credentials sent
+        self.assertIn(line, (cap.run_path / "summary.txt").read_text(encoding="utf-8"))
+
+    def test_200_without_sha_header_still_kept(self):
+        cap, line, _ = self.fetch(200, sha="")
+        self.assertEqual((cap.run_path / "coredump-20261104-120000.bin").read_bytes(), self.DUMP)
+        self.assertNotIn("sha256", line)
+
+    def test_404_logs_one_line_and_keeps_nothing(self):
+        cap, line, _ = self.fetch(404)
+        self.assertIn("none stored", line)
+        self.assertEqual(list(cap.run_path.glob("coredump-*.bin")), [])
+
+    def test_401_and_403_say_the_password_is_needed(self):
+        for code in (401, 403):
+            cap, line, seen = self.fetch(code)
+            self.assertIn("admin password needed", line)
+            self.assertEqual(list(cap.run_path.glob("coredump-*.bin")), [])
+            self.assertEqual(len(seen), 1)
+
+    def test_unreachable_device_is_one_line(self):
+        s = socket.socket()
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+        s.close()
+        with tempfile.TemporaryDirectory() as tmp:
+            cap = oc.Capture(tmp, echo=False)
+            line = oc.fetch_coredump(cap, "http://127.0.0.1:%d" % port, 2)
+            cap.store.close()
+        self.assertIn("request failed", line)
+
+    def test_dump_goes_into_the_upload_zip(self):
+        cap, _, _ = self.fetch(200)
+        transcript = cap.run_path / "transcript.txt"
+        transcript.write_text("t", encoding="utf-8")
+        target = oc.build_upload_zip(cap, transcript, False)
+        with zipfile.ZipFile(target) as z:
+            self.assertIn("coredump-20261104-120000.bin", z.namelist())
+            self.assertEqual(z.read("coredump-20261104-120000.bin"), self.DUMP)
+        target.unlink()
+
+    def test_skip_flag_and_call_site(self):
+        self.assertTrue(oc.build_parser().parse_args(["--skip-coredump"]).skip_coredump)
+        self.assertFalse(oc.build_parser().parse_args([]).skip_coredump)
 
 
 def pid_alive(pid):

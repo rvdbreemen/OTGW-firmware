@@ -64,9 +64,9 @@ The dump holds task stacks and heap fragments, so it can contain credentials tha
 2. **Access.** `sendDeviceCoreDump()` calls `checkHttpAuth()` first: HTTP Basic Auth plus the same-origin (CSRF) check of ADR-056, exactly like `/api/v2/debug/flags`. Like every admin route it is open while no admin password is set (the ADR-056 default).
 3. **Streaming.** The body is an `application/octet-stream` response with a known length and a filler callback (`beginResponse(contentType, len, filler)`). The filler reads the flash range the server asks for. No copy of the dump is held in RAM, and no 64 KB buffer is allocated, so the heap gates of ADR-165 and ADR-188 stay valid. The REST in-flight slot is held until the connection closes, like every other streamed response.
 4. **Length.** The response is as long as the dump image the IDF reports (`esp_core_dump_image_get()`), not the whole partition.
-5. **Format.** Headers `Content-Disposition: attachment; filename="otgw-coredump-<githash>.bin"` (the githash names the matching `.elf`) and `Cache-Control: no-store`. The bytes are the raw IDF image, decoded with `esp-coredump info_corefile --core-format raw` or `--core <file>` against the `.elf` of that githash.
+5. **Format.** Headers `Content-Disposition: attachment; filename="otgw-coredump-app-<first 9 hex>.bin"`, `X-Coredump-App-Sha256: <hex>` and `Cache-Control: no-store`. Both names come from the dump's own summary (`esp_core_dump_get_summary()`, `app_elf_sha256`, read by `platformCoreDumpAppSha()`), not from the running githash: the stored dump is usually from an older build, and the bench showed that a running-githash name points at the wrong `.elf`. The ESP-IDF stores `CONFIG_APP_RETRIEVE_LEN_ELF_SHA` characters of the hash (9 by default), so the header usually holds that prefix. The matching ELF is the one whose `sha256sum` starts with it (esp-coredump compares exactly this string); the build archive (`../OTGW-build-archive/<semver>.zip`) or the release `.elf` asset holds it. Without a readable summary the name is `otgw-coredump.bin` and the header is absent. The bytes are the raw IDF image, decoded with `esp-coredump info_corefile --core-format raw` or `--core <file>` against that `.elf`.
 6. **No dump.** `404` through `sendApiError()` when `esp_core_dump_image_check()` finds no valid dump.
-7. **Platform shims.** All `esp_core_dump` and `esp_partition` calls live in `platformCoreDumpSize()` and `platformCoreDumpRead()` in `src/libraries/Platform/src/platform_esp32.h`. The partition is found by type and subtype, no offset is hard-coded. The application code has no raw platform symbol.
+7. **Platform shims.** All `esp_core_dump` and `esp_partition` calls live in `platformCoreDumpSize()`, `platformCoreDumpRead()` and `platformCoreDumpAppSha()` in `src/libraries/Platform/src/platform_esp32.h`. The partition is found by type and subtype, no offset is hard-coded. The application code has no raw platform symbol.
 8. **Read-only.** The route never erases or marks the dump as read. The existing NVS fingerprint (TASK-1479) still decides whether the reboot log reports a dump.
 
 ## Decision Contract
@@ -91,7 +91,7 @@ The dump holds task stacks and heap fragments, so it can contain credentials tha
 ### Verification
 
 - `python tests/test_device_coredump_api.py`.
-- On a bench unit with a stored dump: `curl -u admin:<pw> -o dump.bin -D - http://<ip>/api/v2/device/coredump`, check `Content-Length` equals the file size, then `esp-coredump info_corefile --core dump.bin --core-format raw <matching>.elf`. Without a dump: HTTP 404.
+- On a bench unit with a stored dump: `curl -u admin:<pw> -o dump.bin -D - http://<ip>/api/v2/device/coredump`, check `Content-Length` equals the file size, then check that `X-Coredump-App-Sha256` is a prefix of `sha256sum` of the `.elf` you decode with, and run `esp-coredump info_corefile --core dump.bin --core-format raw <matching>.elf`. Without a dump: HTTP 404.
 
 ## Alternatives Considered
 
@@ -125,7 +125,7 @@ The dump holds task stacks and heap fragments, so it can contain credentials tha
 ## References
 
 - Tasks: TASK-1560, TASK-1538 (16-frame summary), TASK-1479 (core dump in the reboot log).
-- Source: `src/OTGW-firmware/restAPI.ino` (`sendDeviceCoreDump`), `src/libraries/Platform/src/platform_esp32.h` (`platformCoreDumpSize`, `platformCoreDumpRead`).
+- Source: `src/OTGW-firmware/restAPI.ino` (`sendDeviceCoreDump`), `src/libraries/Platform/src/platform_esp32.h` (`platformCoreDumpSize`, `platformCoreDumpRead`, `platformCoreDumpAppSha`).
 - Test: `tests/test_device_coredump_api.py`.
 - API docs: `docs/api/README.md`, `docs/api/openapi.yaml`.
 

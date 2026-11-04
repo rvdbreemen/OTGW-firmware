@@ -2071,6 +2071,45 @@ def run_http_probes(cap, http_base, timeout):
         log.write(f"\nFinished: {now_iso()}\n")
 
 
+COREDUMP_PATH = "/api/v2/device/coredump"
+COREDUMP_MAX_BYTES = 1024 * 1024   # the partition is 64 KB; anything larger is not a core dump
+
+
+def fetch_coredump(cap, http_base, timeout):
+    """One GET of the stored core dump at the end of a capture (TASK-1560, ADR-210). 200: the body is kept as
+    coredump-<run>.bin in the run folder (and goes into the upload zip) and the dump's app ELF SHA256 is logged;
+    404: no dump stored, one line; 401/403: the admin password is set, one line, and no credentials are asked for
+    or sent. Returns the summary line it logged."""
+    url = http_base + COREDUMP_PATH
+    request = urllib.request.Request(url, headers={"User-Agent": "OTGW-capture/2"})
+    status, body, sha, err = None, b"", "", None
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            status = response.status
+            sha = response.headers.get("X-Coredump-App-Sha256", "") or ""
+            body = response.read(COREDUMP_MAX_BYTES + 1)
+    except urllib.error.HTTPError as exc:
+        status = exc.code
+    except Exception as exc:
+        err = f"{type(exc).__name__}: {exc}"
+    if status == 200 and 0 < len(body) <= COREDUMP_MAX_BYTES:
+        target = cap.path(f"coredump-{cap.run_path.name}.bin")
+        target.write_bytes(body)
+        line = f"Core dump: {len(body)} bytes -> {target.name}" + (f" (app ELF sha256 {sha}: decode with the .elf whose sha256sum starts with it)" if sha else "")
+    elif status == 200:
+        line = f"Core dump: answer of {len(body)} bytes is empty or too large, not kept"
+    elif status == 404:
+        line = "Core dump: none stored on the device (404)"
+    elif status in (401, 403):
+        line = f"Core dump: admin password needed (HTTP {status}), not fetched"
+    elif status is None:
+        line = f"Core dump: request failed ({err})"
+    else:
+        line = f"Core dump: HTTP {status}, not fetched"
+    cap.summary(line)
+    return line
+
+
 def resolve_metadata(cap, device_host, http_base, run_name):
     metadata = {"hostname": "", "firmware_version": "", "unique_id": "", "pic_device_id": ""}
     sources = []
@@ -2240,6 +2279,8 @@ def build_upload_zip(cap, transcript, hourly):
             items.append((path, arcname))
 
     add(transcript, Path(transcript).name)
+    for path in sorted(cap.run_path.glob("coredump-*.bin")):
+        add(path, path.name)
     csv_dir = cap.run_path / "csv-run.tmp"
     try:
         if hourly:
@@ -2412,6 +2453,8 @@ def build_parser():
     p.add_argument("--browser-debug-port", type=ranged(1, 65535), default=9222)
     p.add_argument("--browser-path")
     p.add_argument("--skip-http-probes", action="store_true")
+    p.add_argument("--skip-coredump", action="store_true",
+                   help="do not fetch the stored core dump (GET /api/v2/device/coredump) at the end of the capture")
     p.add_argument("--http-probe-timeout-seconds", type=ranged(1, 60), default=10)
     p.add_argument("--skip-frame-capture", action="store_true",
                    help="do not record otframes.log / otgw_simulation.log (raw OpenTherm frames)")
@@ -2547,6 +2590,7 @@ def main(argv=None):
     s(f"SkipCrashlogCapture: {args.skip_crashlog_capture}", echo=False)
     s(f"SkipFrameCapture: {args.skip_frame_capture}", echo=False)
     s(f"SkipHttpProbes: {args.skip_http_probes}", echo=False)
+    s(f"SkipCoredump: {args.skip_coredump}", echo=False)
     s(f"HttpProbeTimeoutSeconds: {args.http_probe_timeout_seconds}", echo=False)
     s(f"CrashlogPollSeconds: {args.crashlog_poll_seconds}", echo=False)
     snapshot_seconds = args.snapshot_seconds if args.snapshot_seconds is not None else (SNAPSHOT_SECONDS_DEFAULT if long_run else 0)
@@ -2690,6 +2734,15 @@ def main(argv=None):
         except Exception as exc:
             s("HTTP probes: failed (see error.txt)", echo=False)
             cap.script_error(f"HTTP probes failed: {type(exc).__name__}: {exc}")
+
+    if args.skip_coredump:
+        s("Core dump: not fetched (--skip-coredump).", echo=False)
+    else:
+        try:
+            fetch_coredump(cap, http_base, args.http_probe_timeout_seconds)
+        except Exception as exc:
+            s("Core dump: failed (see error.txt)", echo=False)
+            cap.script_error(f"Core dump fetch failed: {type(exc).__name__}: {exc}")
 
     try:
         filename = resolve_metadata(cap, args.device, http_base, run_name)

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-02T12:52:00Z'
-updated_date: '2026-11-04T14:52:00Z'
+updated_date: '2026-11-04T15:04:00Z'
 labels:
   - crash
   - diagnostics
@@ -41,4 +41,6 @@ Robert 2026-11-04 (interactive): admin-protected. GET /api/v2/device/coredump un
 2026-11-04 (sonnet agent; lead reran in wt-int4): GET /api/v2/device/coredump behind checkHttpAuth() (ADR-056, Robert's choice), streamed by a beginResponse filler from platformCoreDumpRead() (Platform shim, partition by type/subtype), only the image length, Content-Disposition otgw-coredump-<githash>.bin, 404 when no dump. ADR-210 Proposed. tests/test_device_coredump_api.py 12 OK (old platform_esp32.h: errors=1), test_crashlog_coredump 10 OK, adr_governance 15 OK, evaluate 0 failed. Not done yet: capture-tool download step (AC3 part), bench download + esp-coredump decode (AC2). Tag beta.73.
 
 2026-11-04 bench beta.73: GET /api/v2/device/coredump on .61: 200, 29796 B, on .63: 200, 31908 B, Content-Type application/octet-stream, Content-Length = body. The .63 dump matches the archived beta.5+d0efe73 ELF (dump SHA ba693715a) and esp-coredump 1.16.0 decodes it: Panic reason 'Task watchdog got triggered ... loopTask (CPU 1)', registers; the thread listing then fails inside esp-coredump (KeyError current-thread-id, gdb quirk). The .61 dump (SHA 12206dc4f) matches no archived ELF. FINDING: the attachment name uses the RUNNING githash (otgw-coredump-1f6a124.bin) while the dump is from an older build: misleading. Open: filename fix, capture-tool download step (AC3), 401/403 paths with an admin password set (not exercised: no password on the bench).
+
+2026-11-04 follow-up (sonnet agent; lead reran in wt-int4): attachment named after the dump's own app ELF SHA (otgw-coredump-app-<9 hex>.bin, header X-Coredump-App-Sha256) via shim platformCoreDumpAppSha (platform_esp32.h:671); capture tool scripts/otgw_capture.py fetch_coredump() once per capture (200 keeps coredump-<run>.bin + adds it to the upload zip, 404 one line, 401/403 'admin password needed', --skip-coredump). tests/test_device_coredump_api.py 16 OK (old red), test_capture_tool CoreDumpFetchCase 7 OK (old: no fetch_coredump), crashlog_coredump 10, adr_governance 15, launcher 7 OK; evaluate 0 failed. Tag beta.74.
 <!-- SECTION:NOTES:END -->

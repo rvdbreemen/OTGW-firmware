@@ -138,6 +138,7 @@ empty broker skips the MQTT stream and writes one summary line saying so
 - `--skip-crashlog-capture`, `--crashlog-url`, `--crashlog-poll-seconds`: crash log and `reboot_log.txt` polling
 - `--skip-frame-capture`: do not record the raw OpenTherm frames (`otframes.log`, `otgw_simulation.log`)
 - `--skip-http-probes`, `--http-probe-timeout-seconds`: post-capture HTTP probes
+- `--skip-coredump`: do not fetch the stored core dump at the end of the capture. Without it the tool does one `GET /api/v2/device/coredump` (TASK-1560, ADR-210) and keeps a 200 answer as `coredump-<run>.bin` in the run folder and in the upload zip; the summary names the dump's app ELF SHA256 (decode with the `.elf` whose `sha256sum` starts with it). 404 logs "none stored", 401/403 logs "admin password needed" (the tool never asks for or sends admin credentials; fetch it with `curl -u admin:<password>` instead)
 
 `-MosquittoSubPath` and `-SkipToolInstall` are still accepted and ignored.
 

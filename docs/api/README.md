@@ -271,16 +271,17 @@ When no crash log is available, `available` is `false` and `summary`/`details` a
 
 #### `GET /api/v2/device/coredump`
 
-Downloads the ESP32 core dump stored in the `coredump` partition after a panic or watchdog reset (ADR-210). The dump is an ELF image; decode it offline with `esp-coredump` against the `.elf` of the same githash.
+Downloads the ESP32 core dump stored in the `coredump` partition after a panic or watchdog reset (ADR-210). The dump is an ELF image; decode it offline with `esp-coredump` against the `.elf` of the app that wrote the dump. That is usually an older build than the one running now, so the file is named after the dump itself, not after the running githash.
 
 **Authentication**: Required when an admin password is set (HTTP Basic Auth plus the same-origin check, ADR-056).
 
-**Response** `200 OK`: `application/octet-stream`, the dump image (its real length, not the 64 KB partition), `Content-Disposition: attachment; filename="otgw-coredump-<githash>.bin"`, streamed from flash.
+**Response** `200 OK`: `application/octet-stream`, the dump image (its real length, not the 64 KB partition), `Content-Disposition: attachment; filename="otgw-coredump-app-<first 9 hex>.bin"` (plain `otgw-coredump.bin` when the dump has no readable summary), `X-Coredump-App-Sha256: <hex>` (omitted in that case), streamed from flash. Both come from the dump's own summary (`app_elf_sha256`): the ESP-IDF stores 9 hex characters by default, so the header usually holds that prefix. The matching ELF is the one whose `sha256sum` starts with that prefix (esp-coredump compares exactly this string); it is in the build archive (`../OTGW-build-archive/<semver>.zip`, written by `build.py`) or in the release `.elf` asset of that build.
 
 **Response** `404`: no valid core dump is stored.
 
 ```bash
 curl -u admin:<password> -o otgw-coredump.bin http://<ip>/api/v2/device/coredump
+sha256sum *.elf | grep ^<hex from the header>     # the .elf files of the build archive or release
 esp-coredump info_corefile --core otgw-coredump.bin --core-format raw <matching>.elf
 ```
 

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.73
+**  Version  : v2.0.0-beta.74
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3557,6 +3557,10 @@ void sendDeviceCrashLog()
 // Streams the stored ESP32 core dump (ELF; decode offline with esp-coredump against the matching
 // .elf) as an attachment. The body is read from flash by the response filler in the chunk sizes the
 // server asks for, never buffered: no copy of the 64 KB partition exists in RAM.
+// The attachment is named after the dump's own app ELF SHA256 (otgw-coredump-app-<first 9 hex>.bin) and
+// the full string the dump carries goes in X-Coredump-App-Sha256: the stored dump is usually from an
+// older build than the running one, so the running githash would name the wrong .elf. Without a
+// readable summary the name is plain otgw-coredump.bin.
 // 404 when no valid dump is stored.
 void sendDeviceCoreDump()
 {
@@ -3565,10 +3569,14 @@ void sendDeviceCoreDump()
   if (dumpSize == 0) { sendApiError(404, F("No core dump stored")); return; }
   if (!currentRequest || g_responseSent) return;
 
+  char appSha[65];   // 64 hex digits + NUL: the longest SHA-256 the summary could hold
+  const bool haveSha = platformCoreDumpAppSha(appSha, sizeof(appSha));
   char disp[WEB_HEADER_VALUE_LEN];
-  snprintf_P(disp, sizeof(disp), PSTR("attachment; filename=\"otgw-coredump-%s.bin\""), _VERSION_GITHASH);
+  if (haveSha) snprintf_P(disp, sizeof(disp), PSTR("attachment; filename=\"otgw-coredump-app-%.9s.bin\""), appSha);
+  else         strlcpy_P(disp, PSTR("attachment; filename=\"otgw-coredump.bin\""), sizeof(disp));
   webPushHeader(F("Content-Disposition"), disp);
   webPushHeader(F("Cache-Control"), F("no-store"));
+  if (haveSha) webPushHeader(F("X-Coredump-App-Sha256"), appSha);
 
   AsyncWebServerResponse* resp = currentRequest->beginResponse(
       String(F("application/octet-stream")), dumpSize,

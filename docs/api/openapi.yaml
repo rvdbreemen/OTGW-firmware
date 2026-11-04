@@ -919,7 +919,11 @@ paths:
         Streams the ELF core dump kept in the coredump partition after a panic or
         watchdog reset (ADR-210), for an offline decode with esp-coredump against
         the matching .elf. Admin route (ADR-056): Basic Auth plus same-origin
-        check when an admin password is set.
+        check when an admin password is set. The file is named after the dump's
+        own app ELF SHA256, not the running build (the stored dump is usually
+        from an older build). The matching ELF is the one whose sha256sum starts
+        with that prefix (esp-coredump compares exactly this); the build's
+        build archive (OTGW-build-archive/<semver>.zip) or the release .elf asset holds it.
       operationId: getDeviceCoreDump
       responses:
         '200':
@@ -928,7 +932,16 @@ paths:
             Content-Disposition:
               schema:
                 type: string
-                example: 'attachment; filename="otgw-coredump-68b6668.bin"'
+                example: 'attachment; filename="otgw-coredump-app-0123456ab.bin"'
+            X-Coredump-App-Sha256:
+              description: >-
+                SHA256 (hex) of the ELF of the app that wrote the dump, as the dump
+                stores it (the ESP-IDF default keeps the first 9 characters). Omitted
+                when the dump has no readable summary; the file is then named
+                otgw-coredump.bin.
+              schema:
+                type: string
+                example: '0123456ab'
           content:
             application/octet-stream:
               schema:

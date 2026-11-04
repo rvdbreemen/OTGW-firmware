@@ -662,6 +662,29 @@ inline size_t platformCoreDumpRead(size_t offset, uint8_t* dst, size_t len) {
   return len;
 }
 
+// TASK-1560: SHA-256 (lowercase hex) of the ELF of the app that wrote the stored dump, from the dump's
+// own summary, not from the running build (the stored dump is usually from an older build). esp-coredump
+// compares exactly this string with the sha256 of the .elf it is given. The IDF keeps only
+// CONFIG_APP_RETRIEVE_LEN_ELF_SHA characters (9 by default), so dst may hold a prefix. Returns true and
+// fills dst (NUL-terminated, at most len-1 characters) when the summary has hex digits; otherwise false
+// and dst is empty.
+inline bool platformCoreDumpAppSha(char* dst, size_t len) {
+  if (dst == nullptr || len == 0) return false;
+  dst[0] = '\0';
+  if (len < 2) return false;
+  esp_core_dump_summary_t sum;
+  if (esp_core_dump_image_check() != ESP_OK || esp_core_dump_get_summary(&sum) != ESP_OK) return false;
+  size_t n = 0;
+  for (; n < sizeof(sum.app_elf_sha256) && n + 1 < len; n++) {
+    char c = (char)sum.app_elf_sha256[n];
+    if (c >= 'A' && c <= 'F') c = (char)(c + ('a' - 'A'));
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) break;
+    dst[n] = c;
+  }
+  dst[n] = '\0';
+  return n > 0;
+}
+
 // platformRestartDHCP() removed in TASK-432 port. Although the ESP32
 // esp_netif_dhcpc_stop/start API differs from ESP8266's SDK calls, the
 // underlying ownership-takeover concern still applies: once user code
