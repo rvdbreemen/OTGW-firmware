@@ -27,11 +27,31 @@ if [ -f "$MARKER" ]; then
 fi
 
 echo "Provisioning OTGW ESP build toolchain via build.py (first web session may take several minutes)..."
+
+# build.py stamps _VERSION_BUILD / _VERSION_GITHASH into version.h and data/version.hash.
+# That build stamp is not a version bump (CLAUDE.md), so restore it afterwards, but only
+# when both files were clean before this build and no _VERSION_PRERELEASE line changed:
+# an earlier edit or a real bump in the session's tree is never touched (TASK-1628).
+VERSION_FILES=("src/OTGW-firmware/version.h" "src/OTGW-firmware/data/version.hash")
+stamp_was_clean=0
+if git -C "$PROJECT_DIR" diff --quiet -- "${VERSION_FILES[@]}" 2>/dev/null; then
+  stamp_was_clean=1
+fi
+restore_build_stamp() {
+  [ "$stamp_was_clean" = 1 ] || return 0
+  if git -C "$PROJECT_DIR" diff -U0 -- "${VERSION_FILES[@]}" 2>/dev/null | grep -q '^[-+]#define _VERSION_PRERELEASE'; then
+    return 0
+  fi
+  git -C "$PROJECT_DIR" checkout -- "${VERSION_FILES[@]}" 2>/dev/null || true
+}
+
 if python3 "${PROJECT_DIR}/build.py" --firmware >"$LOG" 2>&1; then
+  restore_build_stamp
   mkdir -p "$(dirname "$MARKER")"
   : >"$MARKER"
   echo "OTGW build toolchain provisioned; firmware build succeeded."
 else
+  restore_build_stamp
   {
     echo "WARNING: build.py could not provision the toolchain in this session."
     echo "Most likely the environment network policy blocks the toolchain download"
