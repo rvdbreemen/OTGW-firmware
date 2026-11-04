@@ -7,6 +7,7 @@ status: To Do
 assignee: []
 created_date: 2026-10-11 23:22
 updated_date: '2026-11-04T05:10:00Z'
+updated_date: '2026-11-04T05:43:00Z'
 labels:
   - bug
   - esp32
@@ -25,9 +26,9 @@ Seen on the Classic + LOLIN S3 Mini bench, 2026-10-12, while verifying TASK-1129
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 LED writes during a PIC flash use the LEDC API (ledcWrite) or detach and reattach the pin, through a platform shim, so the LED visibly toggles
+- [x] #1 LED writes during a PIC flash use the LEDC API (ledcWrite) or detach and reattach the pin, through a platform shim, so the LED visibly toggles
 - [ ] #2 Bench: during a PIC flash on the Classic + S3 Mini the LED toggles (photo or observation noted), and no 'is not set as GPIO' line appears (checked on a build without the console mute or via a debug counter)
-- [ ] #3 Build green for the three targets; evaluate.py --quick shows no new failures
+- [x] #3 Build green for the three targets; evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -36,4 +37,5 @@ Seen on the Classic + LOLIN S3 Mini bench, 2026-10-12, while verifying TASK-1129
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: OTGW-Core.ino:6395 and OTGWSerial.cpp:1022 digitalWrite on LEDC-attached LED pins (OTGW-firmware.ino:664-669). TASK-1552 did not touch it. Agent-doable, AC2 bench on .63.
 
 2026-11-04 Robert: AC2 (LED toggles during a real PIC flash) waived; prove the fix without flashing the PIC (drive the same LED code path).
+2026-11-04 (sonnet agent, lead reran in the integration tree): picProgressLedWrite() -> setLed() (ledcWrite on LEDC boards) for LED1 at flash start; OTGWSerial gets registerLedCallback() (same pattern as registerFirmwareCallback) so SetLED() uses the app's LEDC-aware write; without a callback the old digitalWrite path is unchanged. test/host/test_pic_led_ledc.py --old-rev HEAD: OLD L1 refused=1, L2 refused=3 (FAIL); FIX L1/L2/P1 pass; RESULT PASS. evaluate 0 failed. AC2 waived by Robert (no PIC flash). Tag beta.64.
 <!-- SECTION:NOTES:END -->

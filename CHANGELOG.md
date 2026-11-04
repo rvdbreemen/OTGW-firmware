@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **The PIC-flash progress LEDs now light during a PIC flash on the ESP32-S3 boards** (TASK-1218). The firmware drove the LEDs with `digitalWrite`, but their pins are attached to LEDC, and arduino-esp32 3.x refuses `digitalWrite` on such a pin (`IO n is not set as GPIO`), so the LEDs never changed. LED1 at flash start now goes through `setLed()` (`ledcWrite` on LEDC boards, `digitalWrite` elsewhere), and `OTGWSerial` has a new optional `registerLedCallback()` that routes its progress-LED writes to the same `setLed()`; without a callback it still uses `digitalWrite`. Host test `test/host/test_pic_led_ledc.py` (old code: LEDC cases L1 and L2 fail with refused writes, plain-GPIO control passes; new: all pass).
 - **Combo: forced OT-Direct on an S3 Mini Pro resets the PIC on GPIO 40, not GPIO 12** (TASK-1402). Mode 2 resolved the OTGW32 pin map, so the TASK-1031 recovery probe pulsed GPIO 12 (the Pro's I2C SDA). It now uses the Pro reset pin when the IMU probe found a Pro. Other modes unchanged. Host test `tests/test_pic_rst_pin.py`.
 
 ## [2.0.0-beta.62] - 2026-11-04

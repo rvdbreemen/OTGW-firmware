@@ -1017,9 +1017,17 @@ void OTGWSerial::registerFirmwareCallback(OTGWFirmwareReport *func) {
     _firmwareFunc = func;
 }
 
+void OTGWSerial::registerLedCallback(OTGWLedWrite *func) {
+    _ledFunc = func;
+}
+
 void OTGWSerial::SetLED(int state) {
     if (_led >= 0) {
-        digitalWrite(_led, state ? LOW : HIGH);
+        if (_ledFunc) {
+            _ledFunc(_led, state != 0);
+        } else {
+            digitalWrite(_led, state ? LOW : HIGH);
+        }
     }
 }
 

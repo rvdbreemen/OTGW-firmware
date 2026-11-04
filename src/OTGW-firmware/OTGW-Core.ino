@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.63
+**  Version  : v2.0.0-beta.64
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -6627,6 +6627,12 @@ static void picUpgradeDebug(const char *fmt, ...) {
 }
 #endif
 
+// PIC-flash progress LED: setLed() goes through ledcWrite on the LEDC-attached
+// ESP32-S3 pins; digitalWrite on them is refused (TASK-1218).
+static void picProgressLedWrite(int pin, bool on) {
+  setLed((uint8_t)pin, on ? ON : OFF);
+}
+
 void fwupgradestart(const char *hexfile) {
   DebugTln(F("--- fwupgradestart() ---"));
 #ifdef OTGWSERIAL_DEBUG
@@ -6661,7 +6667,8 @@ void fwupgradestart(const char *hexfile) {
 
 
   // Turn on LED to indicate flashing
-  digitalWrite(LED1, LOW);
+  setLed(LED1, ON);
+  OTGWSerial.registerLedCallback(picProgressLedWrite);
   DebugTln(F("LED1 activated (LOW=ON)"));
   DebugTln(F("Calling OTGWSerial.startUpgrade()..."));
   result = OTGWSerial.startUpgrade(hexfile);

@@ -86,6 +86,7 @@ typedef struct {
 typedef void OTGWUpgradeFinished(OTGWError result, short errors, short retries);
 typedef void OTGWUpgradeProgress(int pct);
 typedef void OTGWFirmwareReport(OTGWFirmware fw, const char *version);
+typedef void OTGWLedWrite(int pin, bool on);
 typedef void OTGWDebugFunction(const char *fmt, ...);
 
 class OTGWSerial;
@@ -187,6 +188,8 @@ public:
    void registerFinishedCallback(OTGWUpgradeFinished *func);
    void registerProgressCallback(OTGWUpgradeProgress *func);
    void registerFirmwareCallback(OTGWFirmwareReport *func);
+   // Optional: the host drives the progress LED (pins attached to LEDC refuse digitalWrite).
+   void registerLedCallback(OTGWLedWrite *func);
 #ifdef OTGWSERIAL_DEBUG
    void registerDebugFunc(OTGWDebugFunction *func);
 #endif
@@ -196,6 +199,7 @@ protected:
    OTGWUpgradeFinished *_finishedFunc = nullptr;
    OTGWUpgradeProgress *_progressFunc = nullptr;
    OTGWFirmwareReport *_firmwareFunc = nullptr;
+   OTGWLedWrite *_ledFunc = nullptr;
    OTGWProcessor model = PIC16F88;
    int _reset, _led;
    byte _banner_matched[FIRMWARE_COUNT], _version_pos;
