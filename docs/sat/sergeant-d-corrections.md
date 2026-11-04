@@ -5976,3 +5976,38 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Quoted:** "They look good to me."
 
 **Settled:** no correction to entries 257 (curve rounding), 258 (stall threshold 6 h expiry and >=), 259 (overshoot_cooling flame-off latch), 260 (no PWM schedule while cold-cut), 261 (boot PM chain whatever SAT is), 262 (pressure 600 s after flame-off, only if proven), 263 (start-up window keeps the previous CS) and 264 (ADR-208, CH override on the relayed thermostat MsgID 0 for any CS override). They stand as decided. **Task:** TASK-1360, 1356, 1361, 1515, 1384, 1579, 1412.12, 1600. **Open:** none from him.
+
+## 266. An unknown off gap at boot is excluded from the averages and duty (Q-TW-1) (maintainer decision, 2026-11-04)
+
+**Source:** Robert (maintainer), 2026-11-04 ~08:50 local, interactive in the session, after the TASK-1412.15 telemetry-vs-wire test (tests/test_sat_telemetry_wire.py) exposed four open points. Maintainer decision as entries 256-264; Sergeant D informed and may object.
+
+**Quoted:** "Unknown, excluded"
+
+**Settled:** When SAT starts while the flame already burns, the first off gap is unknown: it is left out of the 4 h / 24 h averages and the duty (n counts only real gaps), as thermo-nova uses None for an unknown gap (cycles/tracker.py:144-145). Before: satCycleInit stored time-since-boot (SATcycles.ino ~395). **Task:** TASK-1412.15 follow-up. **Open:** Sergeant D's comment, if any.
+
+
+## 267. mod_suppressed follows the real suppression state (Q-TW-2) (maintainer decision, 2026-11-04)
+
+**Source:** Robert (maintainer), 2026-11-04 ~08:50 local, interactive in the session, after the TASK-1412.15 telemetry-vs-wire test (tests/test_sat_telemetry_wire.py) exposed four open points. Maintainer decision as entries 256-264; Sergeant D informed and may object.
+
+**Quoted:** "Wire it to the real state"
+
+**Settled:** The published mod_suppressed (MQTT, REST, telnet) is true while SAT suppresses modulation and false otherwise. Before: it was only ever assigned false (SATcontrol.ino ~7193). **Task:** TASK-1412.15 follow-up. **Open:** Sergeant D's comment, if any.
+
+
+## 268. Duty is flame-on seconds per window, as thermo-nova (Q-TW-3) (maintainer decision, 2026-11-04)
+
+**Source:** Robert (maintainer), 2026-11-04 ~08:50 local, interactive in the session, after the TASK-1412.15 telemetry-vs-wire test (tests/test_sat_telemetry_wire.py) exposed four open points. Maintainer decision as entries 256-264; Sergeant D informed and may object.
+
+**Quoted:** "thermo-nova: on / window"
+
+**Settled:** The 4 h and 24 h duty is flame-on seconds in the window divided by the window length, as thermo-nova cycles/history.py:209-216; every flame counts (hot-water burns included, as thermo-nova). Before: on/(on+gap) over the cycles. **Task:** TASK-1412.15 follow-up. **Open:** Sergeant D's comment, if any.
+
+
+## 269. current_modulation shows 100 while SAT has sent MM=T (Q-TW-4) (maintainer decision, 2026-11-04)
+
+**Source:** Robert (maintainer), 2026-11-04 ~08:50 local, interactive in the session, after the TASK-1412.15 telemetry-vs-wire test (tests/test_sat_telemetry_wire.py) exposed four open points. Maintainer decision as entries 256-264; Sergeant D informed and may object.
+
+**Quoted:** "Show 100 while MM=T"
+
+**Settled:** While the last MM sent is MM=T (maximum PWM duty, entries 242/243/246), the published current_modulation reports 100 %. Before: satComputeMM() gave 0 for a gas boiler in PWM. No new topic. **Task:** TASK-1412.15 follow-up. **Open:** Sergeant D's comment, if any.
