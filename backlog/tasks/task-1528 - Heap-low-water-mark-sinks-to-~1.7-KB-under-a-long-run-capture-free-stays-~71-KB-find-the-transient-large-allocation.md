@@ -3,11 +3,11 @@ id: TASK-1528
 title: >-
   Heap low-water mark sinks to ~1.7 KB under a long-run capture (free stays ~71
   KB): find the transient large allocation
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-31T13:54:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-04T19:50:00Z'
 labels:
   - alpha
   - bug
@@ -41,4 +41,6 @@ Response sizes measured 15:07 (one at a time): sat?detail=full 413 B, device/inf
 Lead triage 2026-11-01: not actively worked; back to To Do, priority stays high (known issue in the beta.1 notes). Needs a dedicated multi-hour bench slot (windowed heap minimum per stream + network-drop fault); possibly linked to TASK-1450.
 
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: cause not found. Multi-hour bench run.
+
+2026-11-04 20:49 overnight bench run started on .61 (beta.79, SAT simulation + built-in OT replay, MQTT on): device/info every 10 s (freeheap, hd_min_free_heap watermark, maxfreeblock, hd_min_max_block), continuous telnet log, 180 s network drop every 30 min (MikroTik bridge filter on the unit MAC, router-side :delay 200s auto-removal). Output: scratchpad t1528-night/ (samples.log, events.log, telnet.txt). Goal AC1: time each watermark step against the drop/reconnect events and the telnet context.
 <!-- SECTION:NOTES:END -->
