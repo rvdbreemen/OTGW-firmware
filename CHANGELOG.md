@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.77] - 2026-11-04
+
 ### Added
 
 - **Replay honours the recorded frame gaps of `otframes.log`** (TASK-1508, ADR-209). A line of `/otgw_simulation.log` in the `otframes.log` layout (host time, device time, source letter, frame; tab separated) is dispatched once the recorded device-time gap to the previous line has elapsed (clamped to 0..60 s) instead of every 750 ms. Bare-frame files and the built-in fixture keep the 750 ms interval; `#` note lines are skipped; `GET /api/v2/simulate` reports `timing` (`timed` or `fixed`). Host test `tests/test_replay_timing.py` (old code: timed cases fail with 750 ms and an unparsed tab line; new: all pass).
@@ -678,7 +680,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.62...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.77...HEAD
+[2.0.0-beta.77]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.62...v2.0.0-beta.77
 [2.0.0-beta.62]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.60...v2.0.0-beta.62
 [2.0.0-beta.60]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.38...v2.0.0-beta.60
 [2.0.0-beta.38]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.11...v2.0.0-beta.38
