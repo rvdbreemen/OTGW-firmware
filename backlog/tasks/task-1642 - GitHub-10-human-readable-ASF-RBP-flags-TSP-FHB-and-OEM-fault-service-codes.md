@@ -6,10 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-04T23:53:00Z'
+updated_date: '2026-11-04T23:57:00Z'
 labels:
   - github
   - needs-maintainer-ok
-milestone: 2.0.0
+milestone: 2.1.0
 dependencies: []
 priority: low
 ordinal: 768000
@@ -20,3 +21,9 @@ ordinal: 768000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 https://github.com/rvdbreemen/OTGW-firmware/issues/10 by STemplar (2022). Feature request: decode fault/flag MsgIDs into readable text. Needs Robert's go.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-05 Robert (session): parked for 2.1.0.
+<!-- SECTION:NOTES:END -->
