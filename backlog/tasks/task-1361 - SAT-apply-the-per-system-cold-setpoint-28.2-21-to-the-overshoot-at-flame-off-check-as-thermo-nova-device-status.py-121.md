@@ -3,11 +3,11 @@ id: TASK-1361
 title: >-
   SAT: apply the per-system cold setpoint (28.2/21) to the
   overshoot-at-flame-off check, as thermo-nova device/status.py:121
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-24T20:26:00Z'
-updated_date: '2026-11-04T07:13:00Z'
+updated_date: '2026-11-04T07:30:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,7 +24,7 @@ Robert 2026-10-24 (ADR-199 open question 1): port thermo-nova's COLD_SETPOINT us
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The firmware's overshoot-at-flame-off check ignores setpoints below the per-system cold setpoint (host test red on HEAD, green); plan posted to Sergeant D first
+- [x] #1 The firmware's overshoot-at-flame-off check ignores setpoints below the per-system cold setpoint (host test red on HEAD, green); plan posted to Sergeant D first
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -36,3 +36,9 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no cold-setpoint gate 
 
 2026-11-04 implemented (sonnet agent; lead reran on the integration tree): tests/test_sat_status_display.py 8 OK (old code 7 failures), mqtt_contract_1485 15, sim_port_equivalence 4, last_cycle_expiry 10, overshoot_sustain 62 OK, evaluate 0 failed. Tag beta.67 (one commit for TASK-1360, TASK-1356, TASK-1361).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Boiler status overshoot_cooling uses thermo-nova's flame-off latch (flow >= setpoint + 3.0, skipped below the cold setpoint 28.2/21, strict <), so it no longer shows in every PWM OFF phase. Entry 259 (Robert), confirmed by Sergeant D (entry 265). Evidence: tests/test_sat_status_display.py old 3 failures, fix OK; beta.67 on both bench units. Display only.
+<!-- SECTION:FINAL_SUMMARY:END -->
