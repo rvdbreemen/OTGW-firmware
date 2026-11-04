@@ -3,11 +3,11 @@ id: TASK-1444
 title: >-
   feat-2.0.0: port TASK-1434 (1.x) — WiFi outage record (reason, AP, duration)
   in /api/v2/device/info
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:14:00Z'
-updated_date: '2026-11-04T21:41:00Z'
+updated_date: '2026-11-04T21:56:00Z'
 labels:
   - port-from-1.x
   - wifi
