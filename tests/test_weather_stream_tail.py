@@ -94,16 +94,6 @@ struct WiFiClient {
 };
 struct HTTPClient { bool connected() { return true; } };   // keep-alive: socket never closes
 
-struct WeatherState {
-  float fTemperature = -999, fApparentTemp = -999, fHumidity = -999, fWindSpeed = -999, fCloudCover = -999;
-  float fWindDirection = -999, fWindGusts = -999, fPressureMsl = -999, fPrecipitation = -999;
-  float fRain = -999, fSnowfall = -999;
-  uint16_t iWeatherCode = 0; bool bIsDay = false;
-};
-struct SatState { WeatherState weather; };
-struct OtgwState { SatState sat; };
-static OtgwState state;
-
 #include "weather_cut.inc"
 
 int main(int argc, char** argv) {
@@ -114,14 +104,14 @@ int main(int argc, char** argv) {
   uint32_t t0 = g_ms;
   weatherParseStream(&c, &h);
   uint32_t tail = g_ms - g_msAtLastByte;
-  const WeatherState& w = state.sat.weather;
+  const WeatherResult& w = _wxWork;
   printf("temp=%.2f apparent=%.2f hum=%.0f wind=%.1f cloud=%.0f dir=%.0f gusts=%.1f msl=%.1f precip=%.1f rain=%.1f snow=%.1f code=%u isday=%d\n",
          w.fTemperature, w.fApparentTemp, w.fHumidity, w.fWindSpeed, w.fCloudCover, w.fWindDirection,
          w.fWindGusts, w.fPressureMsl, w.fPrecipitation, w.fRain, w.fSnowfall, (unsigned)w.iWeatherCode, (int)w.bIsDay);
   printf("count=%u t0=%.2f t23=%.2f dew4=%.2f dew5=%.2f dew6=%.2f cloud3=%u cloud4=%u prec10=%u\n",
-         (unsigned)_weather_forecastCount, _weather_forecastTemp[0], _weather_forecastTemp[23],
-         _weather_forecastDewPt[4], _weather_forecastDewPt[5], _weather_forecastDewPt[6],
-         (unsigned)_weather_forecastCloud[3], (unsigned)_weather_forecastCloud[4], (unsigned)_weather_forecastPrecipProb[10]);
+         (unsigned)w.fcCount, w.fcTemp[0], w.fcTemp[23],
+         w.fcDewPt[4], w.fcDewPt[5], w.fcDewPt[6],
+         (unsigned)w.fcCloud[3], (unsigned)w.fcCloud[4], (unsigned)w.fcPrecipProb[10]);
   printf("tail_ms=%u total_ms=%u consumed=%zu of %zu\n", tail, g_ms - t0, g_pos, g_data.size());
   return 0;
 }
@@ -132,8 +122,11 @@ def cut(src: str) -> str:
     a = src.index("static const uint8_t  WEATHER_FORECAST_HOURS")
     b = src.index("#endif  // HAS_WEATHER_FORECAST", a)
     arrays = src[a:b]
+    sa = src.index("struct WeatherResult")
+    sb = src.index("static WeatherResult _wxWork;") + len("static WeatherResult _wxWork;")
+    arrays = arrays + "\n" + src[sa:sb]   # TASK-1604: the parser fills the worker scratch _wxWork
     p = src.index("// Read one byte from stream")
-    q = src.index("//=== HTTP Fetch ===")
+    q = src.index("//=== HTTP Fetch (worker task)")
     q = src.rindex("//====", 0, q)
     return arrays + "\n" + src[p:q]
 
@@ -206,10 +199,10 @@ class WeatherStreamTail(unittest.TestCase):
 class FetchSource(unittest.TestCase):
     def test_http10_before_get(self):
         src = WEATHER_INO.read_text(encoding="utf-8")
-        fn = src[src.index("static void weatherFetchOpenMeteo()\n{"):]
+        fn = src[src.index("static void weatherFetchWork()\n{"):]
         a = fn.find("http.useHTTP10(true)")
         b = fn.find("http.GET()")
-        self.assertGreater(a, 0, "weatherFetchOpenMeteo() does not call http.useHTTP10(true)")
+        self.assertGreater(a, 0, "weatherFetchWork() does not call http.useHTTP10(true)")
         self.assertLess(a, b, "http.useHTTP10(true) must come before http.GET()")
 
 

@@ -43,6 +43,38 @@ static uint8_t  _weather_forecastPrecipProb[WEATHER_FORECAST_HOURS];
 static uint8_t  _weather_forecastCount = 0;
 #endif  // HAS_WEATHER_FORECAST
 
+// TASK-1604: the HTTP fetch runs on a one-shot worker task. The worker parses into this scratch
+// copy only and never touches state.sat.weather or the live forecast arrays; the loop task
+// copies it over in weatherConsumeResult() once the worker has published it (see "HTTP Fetch"
+// below). The fields mirror state.sat.weather; the loop task seeds the scratch from the live
+// values before it starts the worker, so a field missing from a response keeps its old value.
+struct WeatherResult {
+  float    fTemperature   = 0.0f;
+  float    fApparentTemp  = 0.0f;
+  float    fHumidity      = 0.0f;
+  float    fWindSpeed     = 0.0f;
+  float    fWindDirection = 0.0f;
+  float    fWindGusts     = 0.0f;
+  float    fCloudCover    = 0.0f;
+  float    fPressureMsl   = 0.0f;
+  float    fPrecipitation = 0.0f;
+  float    fRain          = 0.0f;
+  float    fSnowfall      = 0.0f;
+  uint16_t iWeatherCode   = 0;
+  bool     bIsDay         = true;
+#if HAS_WEATHER_FORECAST
+  float    fcTemp[WEATHER_FORECAST_HOURS];
+  float    fcDewPt[WEATHER_FORECAST_HOURS];
+  uint8_t  fcCloud[WEATHER_FORECAST_HOURS];
+  uint8_t  fcPrecipProb[WEATHER_FORECAST_HOURS];
+  uint8_t  fcCount        = 0;
+#endif
+  bool     bOk            = false;   // worker verdict: HTTP 200 and the stream was parsed
+  float    fReqLat        = 0.0f;    // request coordinates, copied by the loop task at start
+  float    fReqLon        = 0.0f;
+};
+static WeatherResult _wxWork;
+
 // Timer — fires every 15 min.  SKIP_MISSED_TICKS: if the loop was busy and a
 // tick was missed, fire once then restart the full 15-min window.  Never
 // fire multiple times in a row to "catch up" — that would hammer the
@@ -221,10 +253,10 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
 #if HAS_WEATHER_FORECAST
       if (inHourly) {
         arrFloat = nullptr; arrU8 = nullptr; arrMax = 0; arrPos = 0;
-        if      (strcmp_P(keyBuf, PSTR("temperature_2m"))            == 0) { arrFloat = _weather_forecastTemp;        arrMax = WEATHER_FORECAST_HOURS; }
-        else if (strcmp_P(keyBuf, PSTR("dew_point_2m"))              == 0) { arrFloat = _weather_forecastDewPt;       arrMax = WEATHER_FORECAST_HOURS; }
-        else if (strcmp_P(keyBuf, PSTR("cloud_cover"))               == 0) { arrU8    = _weather_forecastCloud;       arrMax = WEATHER_FORECAST_HOURS; }
-        else if (strcmp_P(keyBuf, PSTR("precipitation_probability")) == 0) { arrU8    = _weather_forecastPrecipProb;  arrMax = WEATHER_FORECAST_HOURS; }
+        if      (strcmp_P(keyBuf, PSTR("temperature_2m"))            == 0) { arrFloat = _wxWork.fcTemp;        arrMax = WEATHER_FORECAST_HOURS; }
+        else if (strcmp_P(keyBuf, PSTR("dew_point_2m"))              == 0) { arrFloat = _wxWork.fcDewPt;       arrMax = WEATHER_FORECAST_HOURS; }
+        else if (strcmp_P(keyBuf, PSTR("cloud_cover"))               == 0) { arrU8    = _wxWork.fcCloud;       arrMax = WEATHER_FORECAST_HOURS; }
+        else if (strcmp_P(keyBuf, PSTR("precipitation_probability")) == 0) { arrU8    = _wxWork.fcPrecipProb;  arrMax = WEATHER_FORECAST_HOURS; }
 
         if (arrFloat || arrU8) {
           while ((ci = wstreamGet(stream, http)) >= 0) {
@@ -244,7 +276,7 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
               }
             }
           }
-          if (arrFloat == _weather_forecastTemp) _weather_forecastCount = arrPos;
+          if (arrFloat == _wxWork.fcTemp) _wxWork.fcCount = arrPos;
         } else {
           wstreamSkipArray(stream, http);
         }
@@ -260,21 +292,21 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
       float val = wstreamReadNumber(stream, http, c);
       if (inCurrent) {
         // Core SAT fields — both platforms
-        if      (strcmp_P(keyBuf, PSTR("temperature_2m"))       == 0) state.sat.weather.fTemperature  = val;
-        else if (strcmp_P(keyBuf, PSTR("apparent_temperature")) == 0) state.sat.weather.fApparentTemp  = val;
-        else if (strcmp_P(keyBuf, PSTR("relative_humidity_2m")) == 0) state.sat.weather.fHumidity      = val;
-        else if (strcmp_P(keyBuf, PSTR("wind_speed_10m"))       == 0) state.sat.weather.fWindSpeed     = val;
-        else if (strcmp_P(keyBuf, PSTR("cloud_cover"))          == 0) state.sat.weather.fCloudCover    = val;
+        if      (strcmp_P(keyBuf, PSTR("temperature_2m"))       == 0) _wxWork.fTemperature  = val;
+        else if (strcmp_P(keyBuf, PSTR("apparent_temperature")) == 0) _wxWork.fApparentTemp  = val;
+        else if (strcmp_P(keyBuf, PSTR("relative_humidity_2m")) == 0) _wxWork.fHumidity      = val;
+        else if (strcmp_P(keyBuf, PSTR("wind_speed_10m"))       == 0) _wxWork.fWindSpeed     = val;
+        else if (strcmp_P(keyBuf, PSTR("cloud_cover"))          == 0) _wxWork.fCloudCover    = val;
 #if HAS_WEATHER_FORECAST
         // Extended fields — ESP32 only (not requested in ESP8266 URL)
-        else if (strcmp_P(keyBuf, PSTR("wind_direction_10m"))   == 0) state.sat.weather.fWindDirection = val;
-        else if (strcmp_P(keyBuf, PSTR("wind_gusts_10m"))       == 0) state.sat.weather.fWindGusts     = val;
-        else if (strcmp_P(keyBuf, PSTR("pressure_msl"))         == 0) state.sat.weather.fPressureMsl   = val;
-        else if (strcmp_P(keyBuf, PSTR("precipitation"))        == 0) state.sat.weather.fPrecipitation = val;
-        else if (strcmp_P(keyBuf, PSTR("rain"))                 == 0) state.sat.weather.fRain          = val;
-        else if (strcmp_P(keyBuf, PSTR("snowfall"))             == 0) state.sat.weather.fSnowfall      = val;
-        else if (strcmp_P(keyBuf, PSTR("weather_code"))         == 0) state.sat.weather.iWeatherCode   = (uint16_t)val;
-        else if (strcmp_P(keyBuf, PSTR("is_day"))               == 0) state.sat.weather.bIsDay         = (val > 0.0f);
+        else if (strcmp_P(keyBuf, PSTR("wind_direction_10m"))   == 0) _wxWork.fWindDirection = val;
+        else if (strcmp_P(keyBuf, PSTR("wind_gusts_10m"))       == 0) _wxWork.fWindGusts     = val;
+        else if (strcmp_P(keyBuf, PSTR("pressure_msl"))         == 0) _wxWork.fPressureMsl   = val;
+        else if (strcmp_P(keyBuf, PSTR("precipitation"))        == 0) _wxWork.fPrecipitation = val;
+        else if (strcmp_P(keyBuf, PSTR("rain"))                 == 0) _wxWork.fRain          = val;
+        else if (strcmp_P(keyBuf, PSTR("snowfall"))             == 0) _wxWork.fSnowfall      = val;
+        else if (strcmp_P(keyBuf, PSTR("weather_code"))         == 0) _wxWork.iWeatherCode   = (uint16_t)val;
+        else if (strcmp_P(keyBuf, PSTR("is_day"))               == 0) _wxWork.bIsDay         = (val > 0.0f);
 #endif  // HAS_WEATHER_FORECAST
       }
     }
@@ -285,11 +317,8 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
 }
 
 //=====================================================================
-//=== HTTP Fetch ===
+//=== HTTP Fetch (worker task) and handoff to the loop task ===
 //=====================================================================
-// Forward declaration so the public debug wrapper below can call the
-// file-static implementation that is defined further down.
-static void weatherFetchOpenMeteo();
 
 // Structured dump of the cached weather state to the telnet debug
 // console. Called after the manual fetch triggered by the 'w' shortcut.
@@ -329,42 +358,47 @@ static void weatherDumpStateToTelnet()
   Debugln(F("---"));
 }
 
-// Public entry point for the telnet debug 'w' shortcut. Bypasses the
-// 3600-second scheduler interval but still honours the bWeatherEnable
-// flag and coordinate-configured guard inside weatherFetchOpenMeteo().
-// Dumps the resulting cached state in a structured block.
-void weatherFetchOpenMeteoNow()
-{
-  DebugTln(F("Weather: manual Open-Meteo fetch triggered via debug telnet"));
-  weatherFetchOpenMeteo();
-  weatherDumpStateToTelnet();
-}
+// TASK-1604 (TASK-1471 R1). The GET used to run on the loop task: with the internet blocked it
+// stalled the loop for the DNS lookup (not bounded by any HTTPClient timeout) plus the connect
+// timeout, at +300/360/480/720/1200 s after boot. Now a one-shot worker task does DNS, connect,
+// GET and parse. Ownership rules:
+//   - _wxState IDLE:    nobody touches _wxWork except the loop task (seed / consume).
+//   - _wxState RUNNING: only the worker touches _wxWork. The loop task starts no second worker.
+//   - _wxState READY:   the worker has published the result (release store) and does nothing but
+//                       delete itself; the loop task (acquire load) copies it to state.sat.weather
+//                       in weatherConsumeResult() and sets IDLE.
+// _wxState is only accessed through __atomic builtins. No SAT state is written from the worker.
+static const uint8_t WX_IDLE    = 0;
+static const uint8_t WX_RUNNING = 1;
+static const uint8_t WX_READY   = 2;
+static uint8_t  _wxState        = WX_IDLE;
+static bool     _wxManual       = false;      // loop task only: the telnet 'w' key asked for this fetch
+static uint32_t _wxLastBlockMs  = 0;          // loop task only: rate limit for the heap-critical log
+// First-fetch backoff (TASK-1319), loop task only. 0 in _wxFirstRetryMs = no try yet.
+static uint32_t _wxLastFirstTryMs = 0;
+static uint32_t _wxFirstRetryMs   = 0;
 
-static void weatherFetchOpenMeteo()
-{
-  if (!settings.sat.bWeatherEnable) return;
-  if (settings.sat.fWeatherLat == 0.0f && settings.sat.fWeatherLon == 0.0f) {
-    DebugTln(F("Weather: skipping fetch, no coordinates configured"));
-    return;
-  }
+static const uint32_t WEATHER_CONNECT_TIMEOUT_MS = 2000UL;  // TCP connect bound; DNS is bounded only by running off the loop task
+static const uint32_t WEATHER_WORKER_STACK_BYTES = 8192;    // as the webhook sender task, which runs the same HTTPClient GET chain
 
-  // WiFiClient and HTTPClient are resolved via the platform include chain:
-  //   ESP8266: platform_esp8266.h → <ESP8266HTTPClient.h>
-  //   ESP32:   platform_esp32.h   → <HTTPClient.h>
-  // Both expose the same http.begin(WiFiClient&, url) API.
+// Worker body: HTTP GET + stream parse into _wxWork. Runs on the worker task, never on the loop.
+static void weatherFetchWork()
+{
+  _wxWork.bOk = false;
+
+  // WiFiClient and HTTPClient come from the platform include chain (<HTTPClient.h>).
   char url[512];
-  snprintf_P(url, sizeof(url), kWeatherUrlFmt,
-             settings.sat.fWeatherLat, settings.sat.fWeatherLon);
+  snprintf_P(url, sizeof(url), kWeatherUrlFmt, _wxWork.fReqLat, _wxWork.fReqLon);
 
   DebugTf(PSTR("Weather: fetching %s\r\n"), url);
 
   WiFiClient client;
   HTTPClient http;
-  http.setTimeout(5000);  // 5s — ESP8266 HW WDT fires at ~8s; stay within margin
+  http.setConnectTimeout(WEATHER_CONNECT_TIMEOUT_MS);
+  http.setTimeout(5000);  // read bound: header wait and every body byte (wstreamGet)
 
   if (!http.begin(client, url)) {
     DebugTln(F("Weather: http.begin() failed"));
-    state.sat.weather.iFetchErrors++;
     return;
   }
 
@@ -376,43 +410,180 @@ static void weatherFetchOpenMeteo()
   yield();
 
   if (httpCode == 200) {
-    // Stream-parse directly — no heap allocation needed.
+    // Stream-parse directly: no heap allocation needed.
     WiFiClient* stream = http.getStreamPtr();
     weatherParseStream(stream, &http);
-
-    state.sat.weather.bValid       = true;
-    state.sat.weather.iLastUpdateMs = millis();
-
-#if !HAS_WEATHER_FORECAST
-    DebugTf(PSTR("Weather: %.1fC (feels %.1fC), %d%% RH, %.1f km/h wind, %d%% cloud\r\n"),
-      state.sat.weather.fTemperature,
-      state.sat.weather.fApparentTemp,
-      (int)state.sat.weather.fHumidity,
-      state.sat.weather.fWindSpeed,
-      (int)state.sat.weather.fCloudCover);
-#else
-    DebugTf(PSTR("Weather: %.1fC (feels %.1fC), %d%% RH, %.1f km/h wind, %d%% cloud, WMO %d, %d h forecast\r\n"),
-      state.sat.weather.fTemperature,
-      state.sat.weather.fApparentTemp,
-      (int)state.sat.weather.fHumidity,
-      state.sat.weather.fWindSpeed,
-      (int)state.sat.weather.fCloudCover,
-      (int)state.sat.weather.iWeatherCode,
-      _weather_forecastCount);
-#endif  // !HAS_WEATHER_FORECAST
-
+    _wxWork.bOk = true;
   } else {
     DebugTf(PSTR("Weather: HTTP %d\r\n"), httpCode);
-    state.sat.weather.iFetchErrors++;
   }
 
   http.end();
-  feedWatchDog();
+}
+
+static void weatherWorkerBody(void* arg)
+{
+  (void)arg;
+  weatherFetchWork();
+  __atomic_store_n(&_wxState, WX_READY, __ATOMIC_RELEASE);   // publish: from here the loop task owns _wxWork
+  platformTaskExit();
+}
+
+// Loop task, worker not running: copy the live values into the scratch.
+static void weatherSeedWork()
+{
+  _wxWork.fTemperature   = state.sat.weather.fTemperature;
+  _wxWork.fApparentTemp  = state.sat.weather.fApparentTemp;
+  _wxWork.fHumidity      = state.sat.weather.fHumidity;
+  _wxWork.fWindSpeed     = state.sat.weather.fWindSpeed;
+  _wxWork.fWindDirection = state.sat.weather.fWindDirection;
+  _wxWork.fWindGusts     = state.sat.weather.fWindGusts;
+  _wxWork.fCloudCover    = state.sat.weather.fCloudCover;
+  _wxWork.fPressureMsl   = state.sat.weather.fPressureMsl;
+  _wxWork.fPrecipitation = state.sat.weather.fPrecipitation;
+  _wxWork.fRain          = state.sat.weather.fRain;
+  _wxWork.fSnowfall      = state.sat.weather.fSnowfall;
+  _wxWork.iWeatherCode   = state.sat.weather.iWeatherCode;
+  _wxWork.bIsDay         = state.sat.weather.bIsDay;
+#if HAS_WEATHER_FORECAST
+  memcpy(_wxWork.fcTemp,       _weather_forecastTemp,       sizeof(_wxWork.fcTemp));
+  memcpy(_wxWork.fcDewPt,      _weather_forecastDewPt,      sizeof(_wxWork.fcDewPt));
+  memcpy(_wxWork.fcCloud,      _weather_forecastCloud,      sizeof(_wxWork.fcCloud));
+  memcpy(_wxWork.fcPrecipProb, _weather_forecastPrecipProb, sizeof(_wxWork.fcPrecipProb));
+  _wxWork.fcCount        = _weather_forecastCount;
+#endif
+  _wxWork.bOk            = false;
+  _wxWork.fReqLat        = settings.sat.fWeatherLat;
+  _wxWork.fReqLon        = settings.sat.fWeatherLon;
+}
+
+// Start the worker unless one is running or its result is not consumed yet.
+// Returns 1 = worker started, 0 = not attempted (disabled, no coordinates, busy, heap critical),
+// -1 = attempted and failed (task creation failed; already counted as a fetch error).
+static int weatherRequestFetch()
+{
+  if (!settings.sat.bWeatherEnable) return 0;
+  if (settings.sat.fWeatherLat == 0.0f && settings.sat.fWeatherLon == 0.0f) {
+    DebugTln(F("Weather: skipping fetch, no coordinates configured"));
+    return 0;
+  }
+  if (__atomic_load_n(&_wxState, __ATOMIC_ACQUIRE) != WX_IDLE) return 0;   // one worker at a time
+  if (getHeapHealth() == HEAP_CRITICAL) {
+    if (_wxLastBlockMs == 0 || (uint32_t)(millis() - _wxLastBlockMs) >= 60000UL) {
+      _wxLastBlockMs = millis() | 1UL;
+      DebugTln(F("Weather: heap critical, fetch not started"));
+    }
+    return 0;
+  }
+  weatherSeedWork();
+  __atomic_store_n(&_wxState, WX_RUNNING, __ATOMIC_RELEASE);
+  PlatformTask task = platformTaskCreatePinned(weatherWorkerBody, "weather", WEATHER_WORKER_STACK_BYTES, nullptr, 1);
+  if (task == nullptr) {
+    __atomic_store_n(&_wxState, WX_IDLE, __ATOMIC_RELEASE);
+    DebugTln(F("Weather: failed to create the fetch task"));
+    state.sat.weather.iFetchErrors++;
+    return -1;
+  }
+  return 1;
+}
+
+// Loop task: apply a published result to state.sat.weather. Returns the worker verdict.
+static bool weatherApplyResult()
+{
+  if (!_wxWork.bOk) {
+    state.sat.weather.iFetchErrors++;
+    return false;
+  }
+  state.sat.weather.fTemperature   = _wxWork.fTemperature;
+  state.sat.weather.fApparentTemp  = _wxWork.fApparentTemp;
+  state.sat.weather.fHumidity      = _wxWork.fHumidity;
+  state.sat.weather.fWindSpeed     = _wxWork.fWindSpeed;
+  state.sat.weather.fWindDirection = _wxWork.fWindDirection;
+  state.sat.weather.fWindGusts     = _wxWork.fWindGusts;
+  state.sat.weather.fCloudCover    = _wxWork.fCloudCover;
+  state.sat.weather.fPressureMsl   = _wxWork.fPressureMsl;
+  state.sat.weather.fPrecipitation = _wxWork.fPrecipitation;
+  state.sat.weather.fRain          = _wxWork.fRain;
+  state.sat.weather.fSnowfall      = _wxWork.fSnowfall;
+  state.sat.weather.iWeatherCode   = _wxWork.iWeatherCode;
+  state.sat.weather.bIsDay         = _wxWork.bIsDay;
+#if HAS_WEATHER_FORECAST
+  memcpy(_weather_forecastTemp,       _wxWork.fcTemp,       sizeof(_wxWork.fcTemp));
+  memcpy(_weather_forecastDewPt,      _wxWork.fcDewPt,      sizeof(_wxWork.fcDewPt));
+  memcpy(_weather_forecastCloud,      _wxWork.fcCloud,      sizeof(_wxWork.fcCloud));
+  memcpy(_weather_forecastPrecipProb, _wxWork.fcPrecipProb, sizeof(_wxWork.fcPrecipProb));
+  _weather_forecastCount = _wxWork.fcCount;
+#endif
+  state.sat.weather.bValid        = true;
+  state.sat.weather.iLastUpdateMs = millis();
+
+#if !HAS_WEATHER_FORECAST
+  DebugTf(PSTR("Weather: %.1fC (feels %.1fC), %d%% RH, %.1f km/h wind, %d%% cloud\r\n"),
+    state.sat.weather.fTemperature,
+    state.sat.weather.fApparentTemp,
+    (int)state.sat.weather.fHumidity,
+    state.sat.weather.fWindSpeed,
+    (int)state.sat.weather.fCloudCover);
+#else
+  DebugTf(PSTR("Weather: %.1fC (feels %.1fC), %d%% RH, %.1f km/h wind, %d%% cloud, WMO %d, %d h forecast\r\n"),
+    state.sat.weather.fTemperature,
+    state.sat.weather.fApparentTemp,
+    (int)state.sat.weather.fHumidity,
+    state.sat.weather.fWindSpeed,
+    (int)state.sat.weather.fCloudCover,
+    (int)state.sat.weather.iWeatherCode,
+    _weather_forecastCount);
+#endif  // !HAS_WEATHER_FORECAST
+  return true;
+}
+
+// First-fetch backoff (TASK-1319): a failed try waits 60 s, then doubles, capped at the poll
+// interval; a success ends the backoff and restarts the poll timer. Loop task only.
+static void weatherNoteFirstFetchOutcome(bool ok)
+{
+  if (ok) {
+    _wxFirstRetryMs = 0;
+    RESTART_TIMER(timerWeatherPoll);
+  } else {
+    const uint32_t capMs = (uint32_t)settings.sat.iWeatherInterval * 1000UL;
+    _wxFirstRetryMs = (_wxFirstRetryMs == 0) ? WEATHER_FIRST_RETRY_MS : _wxFirstRetryMs * 2;
+    if (capMs >= WEATHER_FIRST_RETRY_MS && _wxFirstRetryMs > capMs) _wxFirstRetryMs = capMs;
+  }
+}
+
+// Loop task, every pass: consume a published result. Idempotent: a second call finds IDLE.
+static void weatherConsumeResult()
+{
+  if (__atomic_load_n(&_wxState, __ATOMIC_ACQUIRE) != WX_READY) return;
+  const bool wasValid = state.sat.weather.bValid;
+  const bool ok       = weatherApplyResult();
+  const bool manual   = _wxManual;
+  _wxManual = false;
+  __atomic_store_n(&_wxState, WX_IDLE, __ATOMIC_RELEASE);
+  if (manual) {
+    weatherDumpStateToTelnet();
+  } else if (!wasValid) {
+    weatherNoteFirstFetchOutcome(ok);
+  }
 }
 
 void weatherFetch()
 {
-  weatherFetchOpenMeteo();
+  (void)weatherRequestFetch();
+}
+
+// Public entry point for the telnet debug 'w' shortcut. Bypasses the scheduler interval but
+// still honours the bWeatherEnable flag and the coordinate guard inside weatherRequestFetch().
+// TASK-1604: the fetch runs on the worker task; the cached state is dumped to telnet when the
+// loop task consumes the result, a few seconds later.
+void weatherFetchOpenMeteoNow()
+{
+  DebugTln(F("Weather: manual Open-Meteo fetch triggered via debug telnet"));
+  if (weatherRequestFetch() > 0) {
+    _wxManual = true;
+  } else {
+    DebugTln(F("Weather: fetch not started (disabled, no coordinates, busy or heap critical)"));
+  }
 }
 
 //=====================================================================
@@ -420,6 +591,7 @@ void weatherFetch()
 //=====================================================================
 void weatherLoop()
 {
+  weatherConsumeResult();   // apply a result the worker published, also when the feature was switched off meanwhile
   if (!settings.sat.bWeatherEnable) return;
   // 5-minute startup gate: give the OT bus time to report Toutside before
   // making the first weather API call.
@@ -434,26 +606,19 @@ void weatherLoop()
   // TASK-1319: until the first fetch succeeds, try right after the start-up gate
   // instead of waiting for the first poll tick (the poll timer runs from boot, so
   // that tick comes ~15 min after boot). A failed try waits 60 s, then doubles,
-  // capped at the poll interval: a fetch blocks the loop for its DNS, connect and
-  // read timeouts, so a unit without internet must not retry every minute forever.
+  // capped at the poll interval, so a unit without internet does not retry every
+  // minute forever. TASK-1604: the fetch runs on a worker task, so the outcome
+  // reaches the backoff in weatherConsumeResult() on a later pass.
   // Without coordinates there is nothing to fetch and no try is counted, so the
   // first fetch follows right after the coordinates are entered.
   // Once valid, the normal interval takes over, counted from that fetch.
   if (!state.sat.weather.bValid) {
     if (settings.sat.fWeatherLat == 0.0f && settings.sat.fWeatherLon == 0.0f) return;
-    static uint32_t s_lastFirstTryMs = 0;
-    static uint32_t s_firstRetryMs   = 0;   // 0 = no try yet
-    if (s_firstRetryMs != 0 && (millis() - s_lastFirstTryMs) < s_firstRetryMs) return;
-    s_lastFirstTryMs = millis();
-    weatherFetch();
-    if (state.sat.weather.bValid) {
-      s_firstRetryMs = 0;
-      RESTART_TIMER(timerWeatherPoll);
-    } else {
-      const uint32_t capMs = (uint32_t)settings.sat.iWeatherInterval * 1000UL;
-      s_firstRetryMs = (s_firstRetryMs == 0) ? WEATHER_FIRST_RETRY_MS : s_firstRetryMs * 2;
-      if (capMs >= WEATHER_FIRST_RETRY_MS && s_firstRetryMs > capMs) s_firstRetryMs = capMs;
-    }
+    if (_wxFirstRetryMs != 0 && (millis() - _wxLastFirstTryMs) < _wxFirstRetryMs) return;
+    const int started = weatherRequestFetch();
+    if (started == 0) return;                 // busy or heap critical: ask again on the next pass
+    _wxLastFirstTryMs = millis();
+    if (started < 0) weatherNoteFirstFetchOutcome(false);
     return;
   }
   if (!DUE(timerWeatherPoll)) return;

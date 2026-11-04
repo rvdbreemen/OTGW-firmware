@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.74
+**  Version  : v2.0.0-beta.75
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -6942,6 +6942,13 @@ void refreshpic(String filename, String version) {
   int code;
 
   latest = checkforupdatepic(filename);
+
+  // TASK-1604 (R2): an empty answer means the HEAD failed (host unreachable). A GET to the same
+  // host would only stall the loop task a second time, so stop here.
+  if (latest.length() == 0) {
+    OTDebugTln(F("PIC refresh: update check gave no version, skipping the download"));
+    return;
+  }
 
   if (latest != version) {
     OTDebugTf(PSTR("Update (%s)%s: %s -> %s\r\n"), state.pic.sDeviceid, filename.c_str(), version.c_str(), latest.c_str());

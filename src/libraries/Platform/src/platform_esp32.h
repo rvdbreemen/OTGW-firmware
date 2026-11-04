@@ -875,6 +875,12 @@ inline void platformTaskDelay(uint32_t ms) {
   vTaskDelay(ticks);
 }
 
+// End the calling task and free its stack (TASK-1604: one-shot worker tasks such as the
+// weather fetch). Must be the last statement of the task body; it does not return.
+inline void platformTaskExit() {
+  vTaskDelete(nullptr);
+}
+
 /***************************************************************************
 *
 * This program is free software: you can redistribute it and/or modify
