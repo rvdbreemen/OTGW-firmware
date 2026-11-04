@@ -1,12 +1,14 @@
 ---
 id: TASK-1151
 title: OLED status rows keep the tail of the previous, longer text
-status: In Review
+status: To Do
 assignee:
   - '@claude'
 created_date: 2026-09-22 06:37
-updated_date: '2026-10-22T07:00:00Z'
-labels: []
+updated_date: '2026-11-04T20:45:00Z'
+labels:
+  - oled
+  - waiting-for-field
 dependencies: []
 ordinal: 286000
 ---
@@ -58,4 +60,6 @@ AC7 correction: the 'manual-padding workaround' the verification pass flagged at
 AC2, AC3, AC6 and AC10 need an OLED on a 2.0.0 board. None was reachable this session: the OTGW32 (192.168.88.61) is in ARP but does not answer, the S3 Mini Pro is not on the network, and 192.168.88.68 is the 1.x ESP8266 unit.
 
 2026-10-22 cycle: skipped, AC2/3/6/10 need an Ethernet cable plugged into and pulled from the bench OTGW32, a physical action the session cannot do.
+
+2026-11-04 Robert (interactive): parked. The code is in the firmware (AC1, 4, 5, 7, 8, 9 met); AC2, 3, 6, 10 (Ethernet plug/unplug on an OTGW32, visual OLED check, no flicker) are validated once the first OTGW32 runs in the field. Robert will not bench-test it himself.
 <!-- SECTION:NOTES:END -->
