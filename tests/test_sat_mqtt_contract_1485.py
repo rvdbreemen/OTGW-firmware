@@ -193,6 +193,7 @@ static const float SAT_EPS_PRESSURE = 0.01f, SAT_EPS_FRACTION = 0.001f, SAT_EPS_
 static uint32_t g_now = 1000; static uint32_t millis() { return g_now; }
 static bool g_flame = false; static bool satIsFlameOn() { return g_flame; }
 static float satGetFlowTemp() { return 30.0f; }
+static float satGetColdSetpoint() { return 28.2f; }   // read by satUpdateBoilerStatus since TASK-1361
 static float satGetRoomTemp() { return 26.0f; }
 static bool satHumidityFresh(uint32_t) { return true; }
 static float satCalcSimmerIndex(float t, float) { return t; }

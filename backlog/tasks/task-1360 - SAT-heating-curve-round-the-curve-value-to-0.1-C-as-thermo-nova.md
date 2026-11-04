@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T20:21:00Z'
-updated_date: '2026-11-04T05:57:00Z'
+updated_date: '2026-11-04T07:13:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -31,4 +31,6 @@ Robert 2026-10-24 (ADR-198 open question 3): round like thermo-nova heating_curv
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no rounding in satCalcHeatingCurve (SATcontrol.ino:746-761). Decided (ADR-198), notice only.
 
 2026-11-04 Robert decided (maintainer decision, entries 257-262; Sergeant D informed msg 1567417361798144021, may object). See docs/sat/sergeant-d-corrections.md.
+
+2026-11-04 implemented (sonnet agent; lead reran on the integration tree): tests/test_sat_status_display.py 8 OK (old code 7 failures), mqtt_contract_1485 15, sim_port_equivalence 4, last_cycle_expiry 10, overshoot_sustain 62 OK, evaluate 0 failed. Tag beta.67 (one commit for TASK-1360, TASK-1356, TASK-1361).
 <!-- SECTION:NOTES:END -->

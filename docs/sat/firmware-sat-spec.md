@@ -410,7 +410,7 @@ Variable names are as in the code.
 effectiveTarget = fTargetTemp (+ fPvBoostAppliedC when the PV boost is active)
 ```
 
-**Heating curve** (`SATcontrol.ino:489-496`), not rounded:
+**Heating curve** (`satCalcHeatingCurve()` in `SATcontrol.ino`), rounded to 0.1 °C as thermo-nova `heating_curve.py:39` (entry 257, TASK-1360; zones use the same, `area.py:49`, `:200`; the v2 UI copy `satCalcCurve()` in `v2.js` rounds too):
 
 ```
 diff = outsideTemp - 20
@@ -794,7 +794,7 @@ Variable names as in the code.
 
 **Heating curve** (SATcontrol.ino:485-500, SATcontrol.ino:255-260):
 `curveValue = 4 * (targetTemp - 20) + 0.03 * (outsideTemp - 20)^2 - 0.4 * (outsideTemp - 20)`
-`setpoint = baseOffset + (coeff / 4) * curveValue`, not rounded.
+`setpoint = roundf((baseOffset + (coeff / 4) * curveValue) * 10) / 10`, rounded to 0.1 °C (entry 257, TASK-1360; before: not rounded). The rounding is half away from zero in float32; thermo-nova rounds a Python float64, so an exact .x5 tie can differ by 0.1 °C.
 `baseOffset = 20.0` for underfloor, `27.2` otherwise (SATcontrol.ino:49-50, SATcontrol.ino:258-259).
 `coeff` is `settings.sat.fHeatingCurveCoeff` (SATcontrol.ino:488).
 
@@ -2078,10 +2078,10 @@ The branches are tested in this order:
 | # | Condition | Status | Citation |
 |---|---|---|---|
 | 1 | flame on and `bDhwActive` | `HEATING_HOT_WATER` | SATcontrol.ino:548-551 |
-| 2 | flame off, previous call flame off, flow > setpoint + `fOvershootMargin` | `OVERSHOOT_COOLING` | SATcontrol.ino:552-558 |
+| 2 | flame off, the overshoot latch is set and flow > setpoint (checked right after the hot-water rule, so also on the first flame-off tick) | `OVERSHOOT_COOLING` | `satUpdateBoilerStatus()`, entry 259, TASK-1361 |
 | 3 | (same branch) flame-off time known, less than 60 s since `_bs_flameOffMs`, and previous status was HEATING, AT_SETPOINT, COOLING or POST_CYCLE | `POST_CYCLE` | SATcontrol.ino:559-563 |
 | 4 | (same branch) demand, flame-off time known, less than 180 s since flame-off | `ANTI_CYCLING` | SATcontrol.ino:564-566 |
-| 5 | (same branch) demand, flame-off time known, time since off > threshold | `STALLED_IGNITION` | SATcontrol.ino:567-577 |
+| 5 | (same branch) demand, flame-off time known, time since off >= threshold (`>=` and the 6 h age limit of the last cycle: entry 258, TASK-1356) | `STALLED_IGNITION` | `satUpdateBoilerStatus()` |
 | 6 | (same branch) demand, flame-off time known, otherwise | `WAITING_FLAME` | SATcontrol.ino:578-580 |
 | 7 | (same branch) otherwise | `IDLE` | SATcontrol.ino:582-584 |
 | 8 | flame on, previous call flame off, flow < setpoint - 6 | `PUMP_STARTING` | SATcontrol.ino:586-589 |
@@ -2100,7 +2100,8 @@ Notes on the status rules:
 - **`OFF` is never assigned by the evaluator.** Every branch above assigns another value (SATcontrol.ino:546-637), and the only other writer of `eBoilerStatus` is its initial default (SATtypes.h:152; search for `eBoilerStatus\s*=` found only SATcontrol.ino:643). So `OFF` holds only until the first evaluation (derived from the order of the code). There is no rule on the central-heating bit.
 - **`HEATING_HOT_WATER` is unreachable through the control tick.** The only caller is SATcontrol.ino:4814. It runs after the DHW early return at SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351], so `bDhwActive` is always false when the evaluator runs (derived from the order of the code; the only writers of `bDhwActive` are SATcontrol.ino:4626 and SATcontrol.ino:4628).
 - **"Setpoint" is SAT's own command** (`fFinalSetpoint`, SATcontrol.ino:521) from the previous tick, because the current tick only writes it later (SATcontrol.ino:4946). In the PWM OFF phase with overshoot protection that value is 10 °C (SATcontrol.ino:875-878), so `hasDemand` is false then (derived from the order of the code).
-- **Overshoot cooling** uses the live margin test only; there is no "last flame-off was an overshoot" memory and no cold-setpoint guard (SATcontrol.ino:556-558).
+- **Overshoot cooling** follows thermo-nova's flame-off latch (entry 259, TASK-1361; `device/__init__.py:204-212`, `device/status.py:119-124`, `:201-209`). At the flame ON->OFF edge the latch is set when the previous tick's flow >= the previous tick's setpoint + 3.0 (`device/const.py:8`) and that setpoint is not below the cold setpoint (28.2 radiators, 21 underfloor, strict `<`). The status is `OVERSHOOT_COOLING` while the latch is set, the flame is off and flow > setpoint; a flame OFF->ON edge clears the latch. Before: a live test flow > setpoint + `fOvershootMargin` on every tick, which in a PWM OFF phase or the cold cutoff (setpoint 10) masked `POST_CYCLE`, `ANTI_CYCLING` and `STALLED_IGNITION`. The margin 2.0 of entry 37 stays for the cycle classifier. Display only: nothing in control reads `eBoilerStatus`.
+- **Stall threshold** (entry 258, TASK-1356): `max(600 s, 3 x last cycle duration)`; the last cycle counts only while it ended less than 6 h ago (`satLastCycleExpired()`, thermo-nova `cycles/history.py:48-57`, `cycles/const.py:14`), otherwise the 600 s floor applies. The comparison is `>=` as `device/status.py:168`.
 - **Timing is per tick.** `_bs_flameOffMs` and `_bs_flameOnMs` are the times of the tick that first saw the change (SATcontrol.ino:526-531). With a 30 s tick, rule 3 can hold on the tick after `COOLING` (about 30 s since the observed flame-off) and no longer one tick later (derived from the order of the code).
 - **Modulation direction** (SATcontrol.ino:615-622): when `bModulationReliable`, +1 if modulation rose more than 1.0, -1 if it fell more than 1.0, else 0, with no fall-through to the flow gradient. When not reliable: +1 if the flow change > 0.1, -1 if < -0.1, else 0.
 - **Flame status tracker (firmware only)**, every control tick after 6 warm-up calls (SATcontrol.ino:3622-3676), first match wins:

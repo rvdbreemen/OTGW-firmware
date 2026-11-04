@@ -858,6 +858,8 @@ static uint32_t _thermal_totalLearnMs = 0;       // Accumulated learning time
 static bool     _bs_prevFlame          = false;
 static float    _bs_prevModulation     = 0.0f;
 static float    _bs_prevBoilerTemp     = 0.0f;
+static float    _bs_prevSetpoint       = 0.0f;   // setpoint of the previous tick: the overshoot test at flame-off uses the previous state (thermo-nova device/__init__.py:204-207)
+static bool     _bs_overshootLatched   = false;  // flame went off with flow >= setpoint + BS_OVERSHOOT_DELTA (TASK-1361, entry 259)
 static uint32_t _bs_stateEntryMs       = 0;
 static uint32_t _bs_flameOnMs          = 0;
 static uint32_t _bs_flameOffMs         = 0;
@@ -896,6 +898,10 @@ static float satCalcHeatingCurve(float targetTemp, float outsideTemp)
 
   float setpoint = baseOffset + (coeff / 4.0f) * curveValue;
 
+  // Rounded to 0.1 C as thermo-nova heating_curve.py:39 round(..., 1); zones use the same (area.py:49, :200)
+  // (entry 257, TASK-1360).
+  setpoint = roundf(setpoint * 10.0f) / 10.0f;
+
   // No state write here: the zone steps call this too, and the published curve is the
   // main curve, stored by the control loop (TASK-1353).
   return setpoint;
@@ -914,6 +920,7 @@ static const float    BS_AT_SETPOINT_BAND         = 1.5f;      // +/- 1.5C at se
 static const float    BS_PUMP_START_DELTA         = 6.0f;      // pump starting: temp drop > 6C
 static const float    BS_PREHEAT_DELTA            = 6.0f;      // preheating: flow > 6C below setpoint (Python BOILER_PREHEAT_DELTA)
 static const float    BS_IGNITION_SURGE_RATE      = 0.5f;      // 0.5C/s temp rise rate
+static const float    BS_OVERSHOOT_DELTA          = 3.0f;      // overshoot at flame-off: flow >= setpoint + 3.0 (Python BOILER_OVERSHOOT_DELTA, device/const.py:8)
 
 static void satUpdateBoilerStatus()
 {
@@ -930,6 +937,14 @@ static void satUpdateBoilerStatus()
   }
   if (!flame && _bs_prevFlame) {
     _bs_flameOffMs = now;
+    // Latch the overshoot at the flame-off edge from the previous tick's flow and setpoint, skipped when that
+    // setpoint is below the cold setpoint (strict <): thermo-nova device/__init__.py:204-207, device/status.py:121-124
+    // (entry 259, TASK-1361). Display only: nothing in the control path reads eBoilerStatus.
+    _bs_overshootLatched = !(_bs_prevSetpoint < satGetColdSetpoint()) &&
+                           (_bs_prevBoilerTemp >= _bs_prevSetpoint + BS_OVERSHOOT_DELTA);
+  }
+  if (flame && !_bs_prevFlame) {
+    _bs_overshootLatched = false;   // flame OFF -> ON clears the latch (device/__init__.py:212)
   }
 
   // Demand detection with hysteresis (SAT Python)
@@ -951,14 +966,16 @@ static void satUpdateBoilerStatus()
     // DHW takes priority while the flame is on (Python device/status.py: hot_water_active).
     newStatus = SAT_BS_HEATING_HOT_WATER;
   }
+  else if (!flame && _bs_overshootLatched && boilerTemp > setpoint) {
+    // Overshoot cooling: the flame went off on an overshoot and the flow is still above the setpoint
+    // (device/status.py:201-209, checked first when the flame is off, status.py:40-48).
+    newStatus = SAT_BS_OVERSHOOT_COOLING;
+  }
   else if (!flame && !_bs_prevFlame) {
     // --- No flame, was already off ---
     uint32_t offDuration = (now - _bs_flameOffMs);
 
-    if (boilerTemp > setpoint + settings.sat.fOvershootMargin) {
-      newStatus = SAT_BS_OVERSHOOT_COOLING;
-    }
-    else if (_bs_flameOffMs > 0 && offDuration < BS_POST_CYCLE_SETTLE_MS &&
+    if (_bs_flameOffMs > 0 && offDuration < BS_POST_CYCLE_SETTLE_MS &&
              (prev == SAT_BS_HEATING || prev == SAT_BS_AT_SETPOINT ||
               prev == SAT_BS_COOLING || prev == SAT_BS_POST_CYCLE)) {
       newStatus = SAT_BS_POST_CYCLE;
@@ -969,13 +986,15 @@ static void satUpdateBoilerStatus()
     else if (hasDemand && _bs_flameOffMs > 0) {
       // Stall threshold = max(600s, last_cycle_duration * 3.0) per Python
       // (BOILER_STALL_IGNITION_MIN_OFF_SECONDS=600, BOILER_STALL_IGNITION_OFF_RATIO=3.0).
-      // Falls back to the 600s floor when no prior cycle duration is available (cold start).
+      // Falls back to the 600s floor when no prior cycle duration is available (cold start) or the last cycle
+      // ended more than 6 h ago (cycles/history.py:48-57, entry 258, TASK-1356).
       uint32_t stalledThreshold = BS_STALLED_IGNITION_MIN_MS; // 600s floor
-      if (state.sat.fLastCycleDuration > 0.0f) {
+      bool lastCycleFresh = satReportedLastCycleClass(state.sat, now) != SAT_CYCLE_NONE;
+      if (lastCycleFresh && state.sat.fLastCycleDuration > 0.0f) {
         uint32_t adaptive = (uint32_t)(state.sat.fLastCycleDuration * 3000.0f); // * 1000 ms/s * 3.0
         if (adaptive > stalledThreshold) stalledThreshold = adaptive;          // max(600s, dur * 3.0)
       }
-      if (offDuration > stalledThreshold) {
+      if (offDuration >= stalledThreshold) {   // >= as device/status.py:168
         newStatus = SAT_BS_STALLED_IGNITION;
       } else {
         newStatus = SAT_BS_WAITING_FLAME;
@@ -1047,6 +1066,7 @@ static void satUpdateBoilerStatus()
   _bs_prevFlame = flame;
   _bs_prevModulation = mod;
   _bs_prevBoilerTemp = boilerTemp;
+  _bs_prevSetpoint = setpoint;
 }
 
 // String labels for boiler status (PROGMEM)

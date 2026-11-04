@@ -40,10 +40,12 @@ def pid_error(target, room):
 
 
 def curve(coeff, target, outside, base_offset):
-    """satCalcHeatingCurve: base + coeff/4 * (4*(target-20) + 0.03*(out-20)^2 - 0.4*(out-20)), not rounded."""
+    """satCalcHeatingCurve: base + coeff/4 * (4*(target-20) + 0.03*(out-20)^2 - 0.4*(out-20)), rounded to 0.1 (entry 257)."""
     diff = f32(outside) - HC_REF
     cv = f32(4.0) * (f32(target) - HC_REF) + f32(0.03) * diff * diff - f32(0.4) * diff
-    return f32(base_offset) + (f32(coeff) / f32(4.0)) * cv
+    v = f32(base_offset) + (f32(coeff) / f32(4.0)) * cv
+    x = float(v * f32(10.0))   # roundf(v * 10) / 10, half away from zero (entry 257, TASK-1360)
+    return f32(math.copysign(math.floor(abs(x) + 0.5), x)) / f32(10.0)
 
 
 class Pid:

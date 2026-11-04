@@ -5058,7 +5058,8 @@
   function satCalcCurve(outside, target, coeff, system) {
     var base = (system === 2) ? SAT_HC_FLOOR : SAT_HC_RAD;   // 2 = underfloor
     var diff = outside - SAT_HC_REF;
-    return base + (coeff / 4.0) * (4.0 * (target - SAT_HC_REF) + 0.03 * diff * diff - 0.4 * diff);
+    // Rounded to 0.1 C as the firmware and thermo-nova heating_curve.py:39 (entry 257).
+    return Math.round((base + (coeff / 4.0) * (4.0 * (target - SAT_HC_REF) + 0.03 * diff * diff - 0.4 * diff)) * 10) / 10;
   }
 
   function satDrawCurve(d) {
