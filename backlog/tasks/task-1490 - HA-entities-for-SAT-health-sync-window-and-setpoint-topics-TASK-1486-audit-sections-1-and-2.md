@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T22:35:00Z'
-updated_date: '2026-11-03T04:52:00Z'
+updated_date: '2026-11-04T13:03:00Z'
 labels:
   - sat
   - mqtt
@@ -30,7 +30,7 @@ TASK-1486 audited the 91 published sat/* state topics without a Home Assistant e
 <!-- AC:BEGIN -->
 - [x] #1 A host test streams the discovery for each new row with the class, unit, category and payload from the audit; red on HEAD, green after
 - [ ] #2 Bench: mosquitto_sub on homeassistant/# shows each new config, and HA shows each entity with a state (gated topics excepted)
-- [ ] #3 At least one health and one sync entity read OFF on a healthy bench and ON with the fault forced (simulation)
+- [x] #3 At least one health and one sync entity read OFF on a healthy bench and ON with the fault forced (simulation)
 - [x] #4 Flash and static-RAM delta measured from a before/after esp32-combo build (estimate ~0.9 KB flash for section 1, ~1.5 KB with all recommended section-2 adds, 0 B static RAM)
 - [x] #5 MQTT.md entity counts and CHANGELOG updated
 <!-- AC:END -->
@@ -45,4 +45,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: none of the sat/* 
 2026-11-03 (agent, verified by lead): 11 binary_sensor rows (device/cycle/pressure health, setpoint/modulation/ch sync, window_open, fallback_active, room_temp_lost, ot_link_lost, push_refused), 4 sensors (requested_setpoint, heating_curve_recommendation, manufacturer, pressure_drop_rate bar/h, new HaUnit::bar_h), switch sat_enabled (case 14), select sat_preset; skipped sat/consumption (exists since TASK-1506) and sat/max_setpoint (number entity, TASK-1373). Fixed a missing break in streamSatSwitchDiscovery case 12 (self-tune also announced the fireplace switch). tests/test_sat_health_discovery.py on the real MQTTHaDiscovery.cpp: old 18 FAIL, new 6 OK; test/host/test_ha_discovery_json.py FAIL on HEAD -> PASS. Full tests 104/104. MQTT.md counts 400/109/15/2. AC2/AC3 bench, AC4 build delta pending.
 
 2026-11-03 AC4 measured (xtensa size -A, beta.36 369a2e1 vs beta.37 33fb8ec, both esp32-combo): .flash.rodata +1152 B, .flash.text +196 B, app .ino.bin +1344 B (2137472 -> 2138816); .dram0.data/.dram0.bss unchanged = 0 B static RAM. Estimate was ~1.2-1.3 KB flash, 0 B RAM. AC2/AC3 (bench mosquitto_sub + HA, fault forced) after the 08:00 beta.
+
+2026-11-04 bench .61 beta.70 (sonnet agent, lead checked mon.txt + settings cmp): replay of a custom /otgw_simulation.log (MsgID 0/1/14/18) via /api/v2/simulate. setpoint_sync, modulation_sync, ch_sync ON (no boiler) -> OFF at 11:50:49 when TSet matched final_setpoint; setpoint_sync + ch_sync ON at 11:52:49 (66 s after the mismatch: 60 s debounce + 10 s pass), modulation_sync stayed OFF as control; ch_sync OFF 11:59:29, setpoint_sync OFF 12:00:39 after re-agreeing. pressure_health OFF -> ON at 11:59:09 (EMA below 0.8 bar + 120 s) -> OFF 11:59:49 after 2.0 bar. Settings identical before/after (cmp, 9644 B). AC2 broker part: all 17 TASK-1490 configs retained (426 configs total), each stat_t has a value; window_open, requested_setpoint, pressure_drop_rate are not retained (heartbeat ~5 min, function-static shadows, not in satRepublishCoreState). AC2 HA part not verified (HA MCP 401, ingress rig not started).
 <!-- SECTION:NOTES:END -->
