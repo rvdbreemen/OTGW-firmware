@@ -125,8 +125,8 @@ int main(int argc, char** argv) {
     g_sent[0] = 0; g_ms = start + 7000; satCmdResend(); printf("[%s]\n", g_sent);
   } else if (mode == 9) {                                  // TASK-1570 entry 239: repair resend of an unchanged MM/CH after 60 s
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
-    g_sent[0] = 0; g_ms = start + 59999; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);
-    g_sent[0] = 0; g_ms = start + 60000; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 58999; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);   // TASK-1602: due from 60 s minus the 1 s slack
+    g_sent[0] = 0; g_ms = start + 59000; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);
     g_sent[0] = 0; g_ms = start + 90000; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);
   } else if (mode == 10) {                                 // TASK-1574: a dropped tick is not recorded, the next one sends again
     g_ms = start; satResetCmdCache(); g_drop = 1; tick(40.0f, 80, 1);
@@ -166,7 +166,7 @@ int main(int argc, char** argv) {
   } else if (mode == 16) {                                 // TASK-1581: MM=T at the maximum PWM duty (entries 242, 243, 246); 255 = SAT_MM_T
     g_ms = start; satResetCmdCache(); tick(40.0f, 0, 1);                                  // low-load MM=0
     g_sent[0] = 0; g_ms = start + 30000; tick(40.0f, 255, 1); printf("[%s]\n", g_sent);   // into range 5: MM=T once
-    g_sent[0] = 0; g_ms = start + 59000; tick(40.0f, 255, 1); printf("[%s]\n", g_sent);   // staying: nothing yet
+    g_sent[0] = 0; g_ms = start + 58000; tick(40.0f, 255, 1); printf("[%s]\n", g_sent);   // staying: nothing yet
     g_sent[0] = 0; g_ms = start + 90000; tick(40.0f, 255, 1); printf("[%s]\n", g_sent);   // 60 s after the MM=T: repeated
     g_sent[0] = 0; g_ms = start + 120000; tick(40.0f, 0, 1); printf("[%s]\n", g_sent);    // below range 5: own MM= at once
   } else if (mode == 17) {                                 // TASK-1581: a dropped MM=T is retried; Immergas TP=80 goes before it
@@ -176,6 +176,16 @@ int main(int argc, char** argv) {
     g_imm = true; satResetCmdCache(); g_sent[0] = 0; g_ms = start + 32000; tick(40.0f, 255, 1); printf("[%s]\n", g_sent);   // Immergas
     g_sent[0] = 0; g_ms = start + 33000; tick(40.0f, 0, 1); printf("[%s]\n", g_sent);   // back below: TP=min(0,80) and MM=0
     g_sent[0] = 0; g_ms = start + 34000; tick(40.0f, 255, 1); printf("[%s]\n", g_sent);  // and up again
+  } else if (mode == 18) {                                 // TASK-1602, entry 239: every send is stamped 3 ms after its tick
+    g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);  // first emit; the next tick comes 29997 ms after the stamp
+    char line[512]; line[0] = 0;
+    for (int k = 1; k <= 10; k++) {                        // 5 min of 30 s ticks, MM and CH unchanged
+      g_ms += 29997; g_sent[0] = 0; tick(40.0f, 80, 1);
+      if (strstr(g_sent, "MM=")) { char b[32]; snprintf(b, sizeof b, "MM@%ds ", k * 30); strcat(line, b); }
+      if (strstr(g_sent, "CH=")) { char b[32]; snprintf(b, sizeof b, "CH@%ds ", k * 30); strcat(line, b); }
+    }
+    printf("[%s]\n", line);
+    g_ms += 29997; g_sent[0] = 0; tick(40.0f, 70, 1); printf("[%s]\n", g_sent);   // a changed MM still goes out at once
   } else if (mode == 13) {                                 // a dropped PIC keepalive is tried again on the next pass
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
     g_sent[0] = 0; g_ms = start + 30000; g_drop = 1; satPicCSKeepalive(); g_drop = 0; printf("[%s]\n", g_sent);
@@ -320,6 +330,12 @@ class CmdCacheReset(unittest.TestCase):
         self.assertEqual(a, "[CS=40.0;]")
         self.assertEqual(b, "[CS=40.0;MM=80;CH=1;]")
         self.assertEqual(c, "[CS=40.0;]")
+
+    def test_repair_is_due_at_the_first_tick_at_or_after_60_s_despite_the_stamp_lag(self):
+        # TASK-1602, entry 239: bench saw MM/CH repair every 90 s; the stamp is a few ms after the tick, so the 60 s tick saw 59 99x ms
+        a, b, _, _ = self.run_at(10000, 18)
+        self.assertEqual(a, "[MM@60s CH@60s MM@120s CH@120s MM@180s CH@180s MM@240s CH@240s MM@300s CH@300s ]")
+        self.assertEqual(b, "[CS=40.0;MM=70;]")
 
     def test_dropped_enqueue_is_not_cached_and_sent_again(self):
         # TASK-1574 (commit-on-success): a Dropped CS/MM/CH never reaches the cache, so the next tick repeats all three

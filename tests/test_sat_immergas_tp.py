@@ -41,6 +41,7 @@ static uint8_t g_quirks = 0;
 static uint8_t satGetManufacturerQuirks() { return g_quirks; }
 static bool _sat_mmSentValid = false;   // TASK-1570 on-change flag (cleared per scenario below)
 static const uint32_t SAT_MMCH_REPAIR_MS = 60000UL;   // TASK-1570 repair window (real value in SATcontrol.ino)
+static const uint32_t SAT_MMCH_REPAIR_SLACK_MS = 1000UL;   // TASK-1602 (real value in SATcontrol.ino)
 #define SEND(v) do { _sat_mmSentValid = false; satSendMM(v); } while (0)
 enum { SAT_MFR_AUTO = 0, SAT_MFR_IMMERGAS = 8, SAT_MFR_SIME = 14 };
 struct { struct { uint8_t iManufacturer; } sat; } settings;

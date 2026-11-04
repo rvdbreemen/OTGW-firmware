@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-04T07:45:00Z'
-updated_date: '2026-11-04T07:46:00Z'
+updated_date: '2026-11-04T09:48:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,7 +24,13 @@ Bench .63 beta.68 (2026-11-04, simulation on, 5.5 min telnet): MM and CH enqueue
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test on the real satSendMM/satSendCH with a 30 s control tick and a few ms of send latency: repair every 60 s (red on old code: 90 s)
-- [ ] #2 Fix keeps the on-change rule and the 60 s intent (e.g. compare with SAT_MMCH_REPAIR_MS minus a tick tolerance), same for CH and the Immergas TP
+- [x] #1 Host test on the real satSendMM/satSendCH with a 30 s control tick and a few ms of send latency: repair every 60 s (red on old code: 90 s)
+- [x] #2 Fix keeps the on-change rule and the 60 s intent (e.g. compare with SAT_MMCH_REPAIR_MS minus a tick tolerance), same for CH and the Immergas TP
 - [ ] #3 Bench .63 telnet: MM and CH repair gaps about 60 s, CS still 5 s
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-04 (sonnet agent; lead reran in wt-int4): SAT_MMCH_REPAIR_SLACK_MS 1000; repair due from 59 s. tests/test_sat_cmd_cache.py old: repairs at 90/180/270 s (red), fix: 60/120/180/240/300 s, changed MM still immediate; 28 OK; command_delivery 16, immergas_tp 5 OK; evaluate 0 failed. Tag beta.69; bench pending.
+<!-- SECTION:NOTES:END -->

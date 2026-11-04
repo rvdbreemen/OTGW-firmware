@@ -574,6 +574,9 @@ static const uint32_t SAT_CMD_REFRESH_MS = 300000UL; // 5 min
 // Sergeant D entry 239 (with the maintainer): an unchanged MM=/TP=/CH= is resent once a minute, as a repair for a
 // dropped enqueue or an external MM=/CH=.
 static const uint32_t SAT_MMCH_REPAIR_MS = 60000UL;
+// TASK-1602, entry 239: the send stamp is taken a few ms after the 30 s tick, so the 60 s tick sees 59 99x ms and the repair
+// slipped to the 90 s tick. The repair is due from SAT_MMCH_REPAIR_MS - SAT_MMCH_REPAIR_SLACK_MS (slack well below the tick).
+static const uint32_t SAT_MMCH_REPAIR_SLACK_MS = 1000UL;
 static bool _sat_mmSentValid = false;
 static bool _sat_chSentValid = false;
 static const uint32_t SAT_CMD_RESEND_MS  = 5000UL;   // thermo-nova climate.py:707-708
@@ -684,7 +687,7 @@ static void satSendMM(uint8_t mm) {
   // TASK-1570: on change only (entry 237), plus a repair resend once the value is SAT_MMCH_REPAIR_MS (60 s, entry 239)
   // old, so a dropped enqueue (full queue, PIC reset in progress) or an external MM= is corrected within a minute.
   if (_sat_mmSentValid && mm == state.sat.iLastSentMM &&
-      (uint32_t)(millis() - state.sat.iLastSentMMMs) < SAT_MMCH_REPAIR_MS) return;
+      (uint32_t)(millis() - state.sat.iLastSentMMMs) < SAT_MMCH_REPAIR_MS - SAT_MMCH_REPAIR_SLACK_MS) return;
   char buf[16];
   bool accepted = true;   // TASK-1574 (commit-on-success): the flag is set only when the TP (Immergas) and the MM were both accepted
   if (satImmergasTpActive()) {
@@ -705,7 +708,7 @@ static void satSendMM(uint8_t mm) {
 // ch is 0 or 1 (CH=0 / CH=1). Both string forms are 4 chars.
 static void satSendCH(uint8_t ch) {
   if (_sat_chSentValid && ch == state.sat.iLastSentCH &&             // TASK-1570: on change, repair as satSendMM
-      (uint32_t)(millis() - state.sat.iLastSentCHMs) < SAT_MMCH_REPAIR_MS) return;
+      (uint32_t)(millis() - state.sat.iLastSentCHMs) < SAT_MMCH_REPAIR_MS - SAT_MMCH_REPAIR_SLACK_MS) return;
   if (addCommandToQueue(ch ? "CH=1" : "CH=0", 4, false, 0) == CmdQueueResult::Dropped) return;   // TASK-1574 (commit-on-success)
   state.sat.iLastSentCH     = ch;
   state.sat.iLastSentCHMs   = millis();
