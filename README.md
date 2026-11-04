@@ -4,9 +4,20 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.8](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.8): the gateway recovers by itself from silent WiFi links, failed broker lookups and access point outages, and says why it went down. If your gateway has an admin password set and still runs v1.7.4 or earlier, upgrade: those versions served `settings.ini`, which holds that password in cleartext, without authentication.
+> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.9](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.9): a new option to force WiFi 802.11g, for routers where the gateway joins but gets no network. If your gateway has an admin password set and still runs v1.7.4 or earlier, upgrade: those versions served `settings.ini`, which holds that password in cleartext, without authentication.
 
-## What's New in v1.7.8
+## What's New in v1.7.9
+
+v1.7.9 is a small release for the 1.x (ESP8266) line. No breaking changes versus v1.7.8.
+
+- **Force WiFi 802.11g.** On some new routers (seen on a Bouygues Bbox Wi-Fi 7) the gateway joins in 802.11n but never gets an address. Turn on "Force WiFi 802.11g" in the settings page and restart, or type `11g` in the new "WiFi mode" field of the WiFi setup portal. Off by default. (TASK-1597)
+
+Flash **both** firmware and filesystem. Settings are preserved.
+
+Full release notes: [RELEASE_NOTES_1.7.9.md](RELEASE_NOTES_1.7.9.md)
+Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
+
+## What was new in v1.7.8
 
 v1.7.8 is a network reliability release for the 1.x (ESP8266) line, driven by long field captures on GH #681 and GH #682. No breaking changes versus v1.7.7.
 
@@ -197,14 +208,21 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-## Latest stable release: v1.7.8
+## Latest stable release: v1.7.9
 
-`v1.7.8` is the current stable release on `main`. It recovers by itself from a WiFi link without traffic, a failed broker name lookup and an access point outage, keeps the radio awake and the router's ARP entry fresh, reports dropped and refused PIC commands, records why the gateway went down, and works behind a reverse proxy. No breaking changes.
+`v1.7.9` is the current stable release on `main`. It adds an option to force WiFi 802.11g, for routers where the gateway joins in 802.11n but gets no network. No breaking changes.
+
+Full release notes: [RELEASE_NOTES_1.7.9.md](RELEASE_NOTES_1.7.9.md)
+Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.9)
+
+## Previous stable release: v1.7.8
+
+`v1.7.8` recovers by itself from a WiFi link without traffic, a failed broker name lookup and an access point outage, keeps the radio awake and the router's ARP entry fresh, reports dropped and refused PIC commands, records why the gateway went down, and works behind a reverse proxy. No breaking changes.
 
 Full release notes: [RELEASE_NOTES_1.7.8.md](RELEASE_NOTES_1.7.8.md)
 Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.8)
 
-## Previous stable release: v1.7.7
+## Older stable release: v1.7.7
 
 `v1.7.7` let the temperature sensor wired to the PIC reach MQTT and Home Assistant, stopped two tools on one computer from evicting each other on port 25238, and stopped a web interface tab from starving a Telegraf scrape. No breaking changes.
 

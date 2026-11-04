@@ -8,10 +8,12 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
+## [1.7.9] - 2026-11-04
+
 ### Added
 
-- **New setting to force WiFi 802.11g, for routers where the gateway joins but gets no network.** On some new routers (reported on a Bouygues Bbox Wi-Fi 7) the ESP8266 associates in 802.11n, the router shows it as connected, but it never gets an address and the setup portal comes back after a few minutes. In 802.11g the same unit works. The setting "Force WiFi 802.11g" (`wififorce11g`, off by default) is in the settings page, and the WiFi setup portal now has a "WiFi mode" field: type `11g` there to connect in 802.11g from the start, or leave `auto`. With the setting off nothing changes: the gateway connects in 802.11n as before. A change on the settings page takes effect after a restart. Tasmota (`Wifi 3`) and ESPHome (`phy_mode: 11G`) offer the same manual option. Not bench-tested on hardware before this beta (host tests and build only); please report. Reported by robou1337 in #english-support. (TASK-1597)
-- **Note on 1.7.9-beta.1:** that tag was published by mistake from a commit without this change (it is 1.7.8 code with a new version number). Use beta.2 or later.
+- **New setting to force WiFi 802.11g, for routers where the gateway joins but gets no network.** On some new routers (reported on a Bouygues Bbox Wi-Fi 7) the ESP8266 associates in 802.11n, the router shows it as connected, but it never gets an address and the setup portal comes back after a few minutes. In 802.11g the same unit works. The setting "Force WiFi 802.11g" (`wififorce11g`, off by default) is in the settings page, and the WiFi setup portal now has a "WiFi mode" field: type `11g` there to connect in 802.11g from the start, or leave `auto`. With the setting off nothing changes: the gateway connects in 802.11n as before. A change on the settings page takes effect after a restart. Tasmota (`Wifi 3`) and ESPHome (`phy_mode: 11G`) offer the same manual option. Confirmed in the field on the reporter's Bbox with v1.7.9-beta.2; not bench-tested before release. Reported by robou1337 in #english-support. (TASK-1597)
+- **Note on 1.7.9-beta.1:** that tag was published by mistake from a commit without this change (it is 1.7.8 code with a new version number). Use v1.7.9 or v1.7.9-beta.2.
 
 ## [1.7.8] - 2026-11-01
 

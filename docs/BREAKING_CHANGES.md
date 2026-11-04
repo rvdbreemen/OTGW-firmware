@@ -4,6 +4,12 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## v1.7.9
+
+**No breaking changes versus v1.7.8.** One new setting (`wififorce11g`, force WiFi 802.11g) with a default that keeps today's behaviour; no MQTT topic renames, no REST API removals, and no migration on upgrade.
+
+---
+
 ## v1.7.8
 
 **No breaking changes versus v1.7.7.** No MQTT topic renames, no REST API removals, no settings-format changes, and no migration on upgrade.
