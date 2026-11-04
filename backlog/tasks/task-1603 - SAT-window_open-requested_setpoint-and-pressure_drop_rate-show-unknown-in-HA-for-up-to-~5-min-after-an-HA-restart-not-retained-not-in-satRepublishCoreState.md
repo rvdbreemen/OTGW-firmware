@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-04T13:03:00Z'
-updated_date: '2026-11-04T14:15:00Z'
+updated_date: '2026-11-04T14:25:00Z'
 labels:
   - sat
   - mqtt
@@ -35,3 +35,9 @@ Found in the TASK-1490 bench (2026-11-04, .61 beta.70): these three SAT states p
 <!-- SECTION:PLAN:BEGIN -->
 Reset the function-static shadows of window_open, requested_setpoint and pressure_drop_rate from the HA-online path (move them to file scope next to s_core_* and memset in satRepublishCoreState, or a flag consulted by satPublishMQTT). Source/host test + bench offline->online.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-04 lead: the first agent pass (3 shadows to file scope) showed ~55 more function-static, non-retained SAT shadows with the same gap (publish calls SATcontrol.ino ~4561-4907). Decision (lead, KISS for the whole class): a uint8 epoch per shadow + g_satShadowEpoch, bumped in satRepublishCoreState(); the helpers treat an old epoch as first-seen. One change in SATmqttPublish covers every SAT state topic; RAM cost absorbed by struct padding (sizeof to be reported).
+<!-- SECTION:NOTES:END -->
