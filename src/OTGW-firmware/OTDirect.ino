@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.67
+**  Version  : v2.0.0-beta.68
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -43,6 +43,8 @@ static void IRAM_ATTR slaveISR()  { otSlave.handleInterrupt(); }
 // ctags does not evaluate #if guards, so it may not generate these
 // declarations when scanning a single-TU build (PlatformIO Arduino builder).
 static unsigned long buildOTResponse(uint8_t type, uint8_t msgId, uint16_t data);
+static unsigned long otdRelayedStatusFrame(unsigned long frame);
+static uint16_t otdStatusReplyData(uint16_t thermostatData, uint16_t boilerData);
 static unsigned long applyResponseModifiers(unsigned long response);
 // TASK-466: TT=/TC= remote-override state machine helpers
 static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius);
@@ -566,8 +568,10 @@ static void clearUnknownCount(uint8_t msgId) {
 // Only a WRITE-DATA is substituted, and only when the override value differs
 // from the thermostat's own (the PIC's setbyte3/setbyte4 rule, gateway.asm:2680-2697).
 // A READ-DATA passes unchanged, so the thermostat gets the boiler's own answer
-// to its read. Returns the frame to send; modified is true when the data was
-// replaced.
+// to its read. The one exception is the thermostat's MsgID 0 in gateway mode
+// (ADR-208): bit 0 (CH enable) of its master status follows the CS-override
+// rule, as the PIC does (gateway.asm:2700-2743). Returns the frame to send;
+// modified is true when the data was replaced.
 static unsigned long applyOverrides(unsigned long frame, bool &modified) {
   modified = false;
   uint8_t msgType = (frame >> 28) & 0x07;
@@ -580,6 +584,16 @@ static unsigned long applyOverrides(unsigned long frame, bool &modified) {
   // Bounded work: a couple of compares + one 8-bit increment, no I/O.
   if (msgId == 16) {
     onThermostatMsgID16(msgType, origData);
+  }
+
+  if (msgType == 0 /* READ_DATA */ && msgId == 0 && otCurrentMode == OTD_MODE_GATEWAY) {
+    unsigned long rewritten = otdRelayedStatusFrame(frame);
+    if (rewritten != frame) {
+      modified = true;
+      OTDDebugTf(PSTR("OTD: CH override MsgID=0 orig=0x%04X new=0x%04X\r\n"),
+                 origData, (unsigned)(rewritten & 0xFFFF));
+    }
+    return rewritten;
   }
 
   if (msgType != 1 /* WRITE_DATA */) return frame;
@@ -774,6 +788,26 @@ static uint8_t otdEffectiveMasterFlags(uint8_t boardFlags, bool chModeOff, bool 
   return chModeOff ? (uint8_t)(boardFlags & ~0x01) : (uint8_t)(boardFlags | 0x01);
 }
 // --- otdEffectiveMasterFlags end
+
+// ADR-208: the thermostat's relayed MsgID 0 READ_DATA gets the same bit 0 rule as the
+// gateway's own frame (high byte = master status). Other bits and the low byte pass
+// unchanged; parity is recomputed only when bit 0 changed. No CS override: unchanged.
+// --- otdRelayedStatus begin
+static unsigned long otdRelayedStatusFrame(unsigned long frame) {
+  const uint8_t hb = (uint8_t)((frame >> 8) & 0xFF);
+  const uint8_t eff = otdEffectiveMasterFlags(hb, otChModeOff, otdCsOverrideActive());
+  if (eff == hb) return frame;
+  frame = (frame & 0xFFFF00FFUL) | ((unsigned long)eff << 8);
+  setOTParityBit(frame);
+  return frame;
+}
+
+// Reply data for a rewritten MsgID 0: the boiler's slave status (low byte) with the
+// thermostat's original master status (high byte), as the PIC statusreturn (gateway.asm:2745-2750).
+static uint16_t otdStatusReplyData(uint16_t thermostatData, uint16_t boilerData) {
+  return (uint16_t)((thermostatData & 0xFF00) | (boilerData & 0x00FF));
+}
+// --- otdRelayedStatus end
 
 static unsigned long buildStatusRequest() {
   // Build a complete READ_DATA request so message type, data-id and parity are correct.
@@ -1291,6 +1325,12 @@ static unsigned long buildOverriddenReply(unsigned long thermostatReq, unsigned 
   const uint8_t msgId = (thermostatReq >> 16) & 0xFF;
   const uint8_t type  = ((thermostatReq >> 28) & 0x07) | 0x04;   // request type + response bit: WRITE_DATA -> WRITE_ACK
   uint16_t data = thermostatReq & 0xFFFF;
+  if (msgId == 0) {
+    // ADR-208: a rewritten MsgID 0 READ_DATA. A boiler READ_ACK gives the slave status;
+    // any other boiler answer goes back to the thermostat as it came.
+    if (((boilerResp >> 28) & 0x07) != 4) return boilerResp;
+    return buildOTResponse(type, msgId, otdStatusReplyData(data, (uint16_t)(boilerResp & 0xFFFF)));
+  }
   if (msgId == 56 || msgId == 57) {
     const uint8_t boilerType = (boilerResp >> 28) & 0x07;
     if (boilerType == 5) data = boilerResp & 0xFFFF;         // WRITE_ACK: the value the boiler took

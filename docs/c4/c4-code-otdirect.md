@@ -316,7 +316,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - **Purpose**: Intercept thermostat frame and replace data value if override active for that MsgID
 - **Behavior**:
   - Passes MsgID 16 frames to the TT/TC observer `onThermostatMsgID16()` first
-  - Leaves a READ-DATA unchanged; only a WRITE-DATA is substituted
+  - Leaves a READ-DATA unchanged; only a WRITE-DATA is substituted. The one exception is the thermostat's READ-DATA MsgID 0 in gateway mode (ADR-208, TASK-1600): while a CS override is held, `otdRelayedStatusFrame()` sets bit 0 (CH enable) of the master status from `otdEffectiveMasterFlags()` (the same rule as the gateway's own MsgID 0), recomputes parity, leaves other bits and the low byte, and marks the frame modified. `buildOverriddenReply()` then answers the thermostat with the boiler's slave status (low byte) and the thermostat's original master status (high byte), as the PIC `statusreturn` (gateway.asm:2745-2750); a non-READ-ACK boiler answer goes back unchanged
   - Searches `otOverrides[]` table for active entry matching msgId
   - Replaces lower 16 bits (data value) while keeping message type and msgId, when the override value differs from the thermostat's
   - Recalculates parity
