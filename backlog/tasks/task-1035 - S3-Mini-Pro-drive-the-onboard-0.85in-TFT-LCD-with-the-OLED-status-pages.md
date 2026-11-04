@@ -5,9 +5,10 @@ status: To Do
 assignee:
   - '@claude'
 created_date: 2026-07-09 18:37
-updated_date: '2026-11-02T04:39:00Z'
+updated_date: '2026-11-04T05:08:00Z'
 labels:
   - parked
+milestone: 2.1.0
 dependencies: []
 priority: low
 ordinal: 244000
@@ -46,4 +47,6 @@ BLOCKED, 2026-07-31 (backlog-drain triage). Needs the S3 Mini Pro physically on 
 Audit 2026-11-01: stays To Do, labelled parked: no TFT code in src; investigation done; Robert parked it (2026-07-09, confirmed 2026-10-06) pending the hardware decision on D5/GPIO40 (PIC reset conflict). Commit 683789e3b '(TASK-1035)' belongs to an older task with the same id, not to this one.
 
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no TFT driver; parked: GPIO40 TFT SCK is the PIC MCLR net.
+
+2026-11-04 Robert (interactive): moved to milestone 2.1.0, out of the 2.0.0 scope.
 <!-- SECTION:NOTES:END -->

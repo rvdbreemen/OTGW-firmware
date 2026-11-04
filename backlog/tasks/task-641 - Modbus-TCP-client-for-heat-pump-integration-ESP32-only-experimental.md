@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: 2026-05-20 18:31
-updated_date: '2026-11-02T04:39:00Z'
+updated_date: '2026-11-04T05:08:00Z'
 labels:
   - feature
   - esp32-only
@@ -105,4 +105,6 @@ BLOCKED ON SCOPING, 2026-07-31 (backlog-drain triage). A Modbus TCP client is ne
 2026-10-22 cycle: skipped. AC14 (new Modbus web page) cannot fit the LittleFS image until TASK-1294 restores headroom (664 of 768 KiB used after TASK-1281); AC5/AC18 add a new library and an ADR (~50 KB flash, FreeRTOS task) for an experimental feature no tester has asked for, which is a maintainer scope decision; verification needs a Modbus TCP heat pump or a simulator on the bench. Resume after TASK-1294 and an explicit go.
 
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no Modbus code; deferred to 2.1.0.
+
+2026-11-04 Robert (interactive): moved to milestone 2.1.0, out of the 2.0.0 scope.
 <!-- SECTION:NOTES:END -->

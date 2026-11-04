@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-11 23:22
-updated_date: '2026-11-02T04:37:00Z'
+updated_date: '2026-11-04T05:10:00Z'
 labels:
   - bug
   - esp32
@@ -34,4 +34,6 @@ Seen on the Classic + LOLIN S3 Mini bench, 2026-10-12, while verifying TASK-1129
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: OTGW-Core.ino:6395 and OTGWSerial.cpp:1022 digitalWrite on LEDC-attached LED pins (OTGW-firmware.ino:664-669). TASK-1552 did not touch it. Agent-doable, AC2 bench on .63.
+
+2026-11-04 Robert: AC2 (LED toggles during a real PIC flash) waived; prove the fix without flashing the PIC (drive the same LED code path).
 <!-- SECTION:NOTES:END -->

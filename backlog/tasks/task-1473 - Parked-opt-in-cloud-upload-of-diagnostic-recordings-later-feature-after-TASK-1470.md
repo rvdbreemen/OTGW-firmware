@@ -6,13 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T12:45:00Z'
-updated_date: '2026-11-03T05:37:00Z'
+updated_date: '2026-11-04T05:08:00Z'
 labels:
   - parked
   - on-hold
   - needs-maintainer-ok
   - diagnostics
   - tooling
+milestone: 2.1.0
 dependencies: []
 priority: low
 ordinal: 633000
@@ -96,4 +97,6 @@ Open / unverified: EU jurisdiction on the R2/DO free plan; whether R2 asks for a
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: parked on purpose.
 
 Robert 2026-11-03 (interactive): keep ON HOLD; not the moment yet.
+
+2026-11-04 Robert (interactive): moved to milestone 2.1.0, out of the 2.0.0 scope.
 <!-- SECTION:NOTES:END -->

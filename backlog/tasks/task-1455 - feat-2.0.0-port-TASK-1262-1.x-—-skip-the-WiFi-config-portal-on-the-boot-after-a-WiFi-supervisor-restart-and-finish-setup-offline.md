@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T06:28:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-04T05:10:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -124,4 +124,6 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 Do together with TASK-1450 (both touch the WiFi supervisor), per the port evaluation.
 
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no. Do with TASK-1450; needs ADR and bench.
+
+2026-11-04 Robert: MikroTik fault injection allowed: one rule per test, scoped to the bench boards' MAC/IP (.61/.63), comment-tagged, scheduler auto-removal within 30 min, removed right after; config export before and after recorded in the notes.
 <!-- SECTION:NOTES:END -->

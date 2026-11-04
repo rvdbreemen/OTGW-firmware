@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T10:49:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-04T05:10:00Z'
 labels:
   - sat
   - network
@@ -37,4 +37,6 @@ Related: TASK-1478 (found in gruijter's capture, TASK-1474): even with working i
 Robert 2026-10-29 (interactive): released, priority medium. TASK-1478 (alpha.534) already fixed the 5 s tail of a successful weather fetch; this task covers blocked (dropped/rejected) outbound traffic.
 
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: weather backoff SATweather.ino:438-455; outbound inventory (AC1) doable, rest needs a blocked-WAN bench.
+
+2026-11-04 Robert: MikroTik fault injection allowed: one rule per test, scoped to the bench boards' MAC/IP (.61/.63), comment-tagged, scheduler auto-removal within 30 min, removed right after; config export before and after recorded in the notes.
 <!-- SECTION:NOTES:END -->

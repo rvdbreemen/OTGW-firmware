@@ -6,12 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T09:03:00Z'
-updated_date: '2026-11-02T04:39:00Z'
+updated_date: '2026-11-04T05:08:00Z'
 labels:
   - sat
   - diagnostics
   - replay
-milestone: 2.0.0
+milestone: 2.1.0
 dependencies: []
 priority: low
 ordinal: 630000
@@ -38,4 +38,6 @@ Constraint from martreides (#alpha-testing msg 1565312598595993792, 2026-10-29):
 Robert 2026-10-29: local first; cloud upload parked as a later feature (task-1473). Captures and recordings stay on the user's own network.
 
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no on-device recorder; host capture exists. Needs ADR + budget decision.
+
+2026-11-04 Robert (interactive): moved to milestone 2.1.0, out of the 2.0.0 scope.
 <!-- SECTION:NOTES:END -->

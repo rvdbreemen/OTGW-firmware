@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-15 15:47
-updated_date: '2026-11-03T17:42:00Z'
+updated_date: '2026-11-04T05:10:00Z'
 labels:
   - sat
   - otdirect
@@ -42,4 +42,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: OTDirect.ino:585 a
 2026-11-03: bench capture (AC1) blocked: the OTGW32 bench unit (.88.61) does not answer on the network. Decision A/B waits for that capture; not put to the maintainer without evidence.
 
 2026-11-03 Robert: no thermostat is connected to either bench board (zaphod .63, marvin .61). AC1 (capture with a live thermostat in OT-Direct gateway mode) cannot run on the bench; it needs a thermostat on marvin or a field capture from an OT-Direct user. Decision A/B stays open until then.
+
+2026-11-04 Robert: write the option-B ADR now via adr-kit (Proposed, Robert accepts), close with AC1 waived, follow-up task for a field capture from an OT-Direct user with a thermostat.
 <!-- SECTION:NOTES:END -->
