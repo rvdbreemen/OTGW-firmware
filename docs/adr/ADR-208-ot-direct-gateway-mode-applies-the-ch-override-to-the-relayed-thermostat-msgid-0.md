@@ -1,7 +1,7 @@
 ---
 id: "ADR-208"
 title: "OT-Direct gateway mode applies the CH= override to the relayed thermostat MsgID 0"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-04"
 binding: false
 gate: null
@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "otdirect"
   - "opentherm"
@@ -32,6 +31,7 @@ symbols:
   - "buildStatusRequest"
   - "otChModeOff"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -40,7 +40,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-04.
+Accepted, 2026-11-04.
 
 Guideline-level per ADR-080 (Binding ADR rules must have a CI (continuous integration) gate): no gate exists yet, because the behaviour is not implemented. The implementation task adds the host test named under Verification; with that test in place the maintainer may reclassify this ADR as pattern-level at acceptance.
 
@@ -55,6 +55,11 @@ status_history:
     changed_by: Claude
     reason: Initial proposal from TASK-1238 (maintainer chose option B on 2026-10-30; AC1 waived 2026-11-04)
     changed_via: adr-kit
+  - date: 2026-11-04
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: "Maintainer decision 2026-11-04 (interactive): any CS override, accept now; entry 264"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -144,7 +149,7 @@ This is a deliberate exception to the contract in the comment above `applyOverri
 
 ## Open Questions
 
-- [ ] Scope of the trigger: is the CS-override predicate (manual `CS=` with `CH=` included, PIC parity) accepted, or does the maintainer want the rewrite limited to SAT? Recommendation: the CS-override predicate, for the reason under Alternatives Considered.
+- [x] Scope of the trigger: is the CS-override predicate (manual `CS=` with `CH=` included, PIC parity) accepted, or does the maintainer want the rewrite limited to SAT? **Resolved 2026-11-04 by Robert (maintainer): the CS-override predicate (any held CS override), as recommended; recorded as entry 264 in docs/sat/sergeant-d-corrections.md.**
 
 ## Related Decisions
 

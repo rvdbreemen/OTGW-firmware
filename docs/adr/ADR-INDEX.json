@@ -7702,7 +7702,7 @@
       "title": "OT-Direct gateway mode applies the CH= override to the relayed thermostat MsgID 0",
       "path": "ADR-208-ot-direct-gateway-mode-applies-the-ch-override-to-the-relayed-thermostat-msgid-0.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-04",
       "decision_summary": "In OT-Direct gateway mode, bit 0 of the master status in a relayed thermostat READDATA MsgID 0 frame is set by the sa...",
       "topics": [
