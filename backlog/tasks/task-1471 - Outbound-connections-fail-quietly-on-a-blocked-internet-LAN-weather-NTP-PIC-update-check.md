@@ -3,10 +3,11 @@ id: TASK-1471
 title: >-
   Outbound connections fail quietly on a blocked-internet LAN (weather, NTP, PIC
   update check)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T10:49:00Z'
-updated_date: '2026-11-04T05:10:00Z'
+updated_date: '2026-11-04T15:45:00Z'
 labels:
   - sat
   - network
