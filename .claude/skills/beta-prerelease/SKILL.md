@@ -518,6 +518,8 @@ fresh suffix per dry-run.
 
 ## Important rules
 
+- **Verify the release commit landed before you push or tag.** The 1.x `commit-msg` hook refuses a message that names a `TASK-NNN` whose file is not tracked in THIS tree (a dev-backlog task id, for example). A refused commit leaves the change staged and `HEAD` unchanged, and the 1.x backlog's `auto_commit` may have added an "Update task" commit on top that looks like progress. Before `git push` and `git tag`: `git log -1 --format=%s` must show `chore(release): <NEW_PRERELEASE>`, `git status --short` must show nothing staged, and `git show HEAD --stat` must list the firmware files you meant to ship. Name another tree's task as plain text ("dev task 1596"). On 2026-11-03 this went wrong: `v1.7.9-beta.1` was tagged and published (immutable) from a commit without the change and had to roll forward to beta.2.
+- **No backlog CLI edits while release changes are staged** (`auto_commit: true` commits the whole index).
 - **A beta needs demand, not just readiness.** Name the person waiting for the
   build before Phase 0. Closing a task, emptying a board or satisfying an
   acceptance criterion is not demand. See "The demand gate".
