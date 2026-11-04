@@ -3,11 +3,11 @@ id: TASK-1455
 title: >-
   feat-2.0.0: port TASK-1262 (1.x) — skip the WiFi config portal on the boot
   after a WiFi supervisor restart and finish setup() offline
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:28:00Z'
-updated_date: '2026-11-04T20:49:00Z'
+updated_date: '2026-11-04T21:41:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -127,4 +127,6 @@ Do together with TASK-1450 (both touch the WiFi supervisor), per the port evalua
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no. Do with TASK-1450; needs ADR and bench.
 
 2026-11-04 Robert: MikroTik fault injection allowed: one rule per test, scoped to the bench boards' MAC/IP (.61/.63), comment-tagged, scheduler auto-removal within 30 min, removed right after; config export before and after recorded in the notes.
+
+2026-11-04 status check (workflow, two readers): no code, notes or ACs yet; the In Progress came from a status-only commit. Back to To Do until work starts. TASK-1450 (dead-link restart) adds a second WIFI_FAILED restart path; the skip-portal mark should cover both doRestart calls (1450 agent).
 <!-- SECTION:NOTES:END -->

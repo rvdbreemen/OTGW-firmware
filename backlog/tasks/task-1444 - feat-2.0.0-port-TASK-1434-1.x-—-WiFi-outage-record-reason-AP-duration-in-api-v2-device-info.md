@@ -3,11 +3,11 @@ id: TASK-1444
 title: >-
   feat-2.0.0: port TASK-1434 (1.x) — WiFi outage record (reason, AP, duration)
   in /api/v2/device/info
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:14:00Z'
-updated_date: '2026-11-02T22:49:00Z'
+updated_date: '2026-11-04T21:41:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -93,4 +93,6 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no. Waits on TASK-1446.
+
+2026-11-04 status check (workflow, two readers): no code, notes or ACs yet; the In Progress came from a status-only commit. Back to To Do until work starts. Depends on TASK-1446.
 <!-- SECTION:NOTES:END -->
