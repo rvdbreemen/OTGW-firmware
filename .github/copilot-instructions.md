@@ -1,15 +1,32 @@
 # GitHub Copilot Instructions for OTGW-firmware
 
+<!-- AGENT-CORE START (TASK-1625: identical in CLAUDE.md, AGENTS.md and .github/copilot-instructions.md; guarded by tests/test_agent_core_block.py) -->
+## Core rules for every agent
+
+This block is shared word for word by CLAUDE.md, AGENTS.md (Codex) and .github/copilot-instructions.md (Copilot). CLAUDE.md holds the full rule set; where another instruction file disagrees with it, CLAUDE.md wins. Change this block in all three files at once.
+
+- **Lines.** `dev` is the 2.x line: ESP32-S3 only (OTGW32, and the OTGW Classic with an ESP32-S3 module), async and FreeRTOS. `otgw-1.x.x` is the 1.x ESP8266 maintenance line. `main` is the latest public release and is only pushed in the release flow, after Robert's go.
+- **Roles.** Robert (maintainer) decides scope, priority, waivers and releases; put an open decision to him as one question with the options, their consequences and your recommendation. Sergeant D decides SAT behaviour (see the SAT ground truth block). Testers give input and evidence, never decisions: their requests become tasks labelled `needs-maintainer-ok`.
+- **Tasks.** Every change starts from a Backlog.md task. Use the `backlog` CLI for every task read and write. Never use the backlog MCP server and never edit `backlog/tasks/*.md` directly.
+- **Done needs evidence.** Tick an acceptance criterion only with evidence from the session that did the work: build output, a test run, a capture, a screenshot. For a bug fix, the same reproduction fails on the old code and passes on the fix.
+- **Firmware rules.** No ArduinoJson (ADR-146). No HTTPS or WSS. Never write to `Serial` after init (it is the PIC link); debug output goes to telnet. PIC commands only through `addCommandToQueue()`. String literals stay in flash (`F()`, `PSTR()`, the `_P` functions). No `String` class in hot paths (ADR-180). No raw `#ifdef ESP32`/`ESP8266` outside the Platform library: use the `platformXxx()` shims and `HAS_*` flags. The web UI keeps at most 2 API calls in flight.
+- **Versions and commits.** A commit that touches `src/OTGW-firmware/**` or `src/libraries/**` bumps `_VERSION_PRERELEASE` with `bin/bump-prerelease.sh`. Every `TASK-NNN` in a commit message needs its task file staged. The git hooks in `.githooks/` enforce both (`git config core.hooksPath .githooks`).
+- **Gates.** `python evaluate.py --quick` shows no new FAIL. Build only through `build.bat` / `./build.sh`, never `python build.py` directly. Run the tests with `python scripts/run_tests.py`.
+- **Discord.** Answer in English, answer first, with the real `<@ID>` mention. Never name the OTGW32 board in public. Every SAT correction or decision by Sergeant D goes into `docs/sat/sergeant-d-corrections.md` before it is implemented.
+<!-- AGENT-CORE END -->
+
+---
+
 ## Project Overview
 
-This is the ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW). It provides network connectivity (Web UI, MQTT, REST API, and TCP serial socket) for the OpenTherm Gateway hardware, with a focus on reliable Home Assistant integration.
+This is the firmware for the NodoShop OpenTherm Gateway (OTGW). It provides network connectivity (Web UI, MQTT, REST API, and TCP serial socket) for the OpenTherm Gateway hardware, with a focus on reliable Home Assistant integration. The `dev` branch is the 2.x line for the ESP32-S3 only (async and FreeRTOS); the 1.x ESP8266 firmware lives on `otgw-1.x.x`. Parts of this file below the core block were written for 1.x: where they disagree with CLAUDE.md, CLAUDE.md wins.
 
 ## ADR Workflow Reminder
 
 **IMPORTANT:** This project maintains Architecture Decision Records (ADRs) as docs-as-code that document key architectural choices. Before making changes that affect architecture, consult the relevant ADRs:
 
 - **Platform & Architecture:** See `docs/adr/` directory for complete ADR index
-- **Key decisions documented:** ESP8266 platform, modular .ino files, HTTP-only (no HTTPS), static buffers, PROGMEM strings, WebSocket streaming (OpenTherm messages only), MQTT integration, timer-based scheduling, LittleFS persistence, hardware watchdog, PIC firmware upgrade, Arduino framework, build system, NTP/timezone, command queue, WiFiManager, ArduinoJson, simplified OTA flash (XHR-based, see ADR-029)
+- **Key decisions documented:** ESP32-S3 platform with the Platform abstraction library, modular .ino files, HTTP-only (no HTTPS), static buffers, PROGMEM strings, WebSocket streaming (OpenTherm messages only), MQTT integration, timer-based scheduling, LittleFS persistence, hardware watchdog, PIC firmware upgrade, Arduino framework, build system, NTP/timezone, command queue, no ArduinoJson (hand-rolled JSON, ADR-146), safeboot OTA updater (ADR-191)
 - **ADR Index:** `docs/adr/README.md` provides navigation and decision summaries
 - **ADR Skill:** `.github/skills/adr/SKILL.md` provides comprehensive ADR creation guidance
 
@@ -46,18 +63,12 @@ If the answer is unclear, stop and inspect `docs/adr/README.md` before proceedin
 
 ## Technology Stack
 
-- **Platform**: ESP8266 (NodeMCU / Wemos D1 mini)
-- **Language**: Arduino C/C++ (.ino files)
-- **Core Library**: ESP8266 Arduino Core 2.7.4
-- **Filesystem**: LittleFS
-- **Build System**: Makefile with arduino-cli
-- **Key Libraries**:
-  - WiFiManager - WiFi configuration and connection management
-  - ArduinoJson - JSON parsing and serialization
-  - PubSubClient - MQTT client
-  - TelnetStream - Debug telnet server
-  - AceTime - Time and timezone handling
-  - OneWire/DallasTemperature - Dallas temperature sensors
+- **Platform**: ESP32-S3 only on `dev` (OTGW32, and the OTGW Classic with an ESP32-S3 module); one `esp32-combo` image picks PIC or OT-Direct at boot (ADR-127). The 1.x ESP8266 line is `otgw-1.x.x`.
+- **Language**: Arduino C/C++ (.ino files, single translation unit), async and FreeRTOS
+- **Platform layer**: `src/libraries/Platform/src/` (`platform.h`, `platform_esp32.h`, `boards.h` with the `HAS_*` flags)
+- **Filesystem**: LittleFS, built from a minified staging copy of `src/OTGW-firmware/data/` (ADR-190)
+- **Build System**: PlatformIO (ADR-083), always through `build.bat` / `./build.sh`
+- **Libraries**: see `platformio.ini` and `src/libraries/`. JSON is written by hand (JsonEmit / `snprintf_P`); ArduinoJson is not allowed (ADR-146).
 
 ## Architecture
 
@@ -75,7 +86,7 @@ When making decisions for refactors, feature additions, or bug fixes, always rev
 - **Target Environment**: Local network use only (not internet-exposed)
 - **HTTP Only**: This codebase uses HTTP only, never HTTPS
 - **WebSocket Protocol**: Always uses `ws://` protocol, never `wss://`
-- **No TLS/SSL**: The ESP8266 firmware does not implement TLS/SSL encryption
+- **No TLS/SSL**: The firmware does not implement TLS/SSL encryption
 - **Reverse Proxy**: While the REST API and basic Web UI can work behind a reverse proxy with HTTPS, WebSocket-based features (live OT message log) assume plain HTTP and may not function correctly via HTTPS reverse proxy
 - **Security Model**: Device should be accessed only on trusted local networks; use VPN for remote access if needed
 
@@ -85,13 +96,13 @@ When making decisions for refactors, feature additions, or bug fixes, always rev
 
 ### General Guidelines
 
-- Use Arduino/ESP8266 conventions and patterns
+- Use Arduino conventions and the project's Platform shims (`platformXxx()`, `HAS_*` flags); no raw `#ifdef ESP32`/`ESP8266` outside the Platform library
 - Follow existing code style in the repository
 - Prefer bounded buffers over `String` class to reduce heap fragmentation
 - Always feed the watchdog in long-running operations
 - Use telnet (port 23) for debug output, NOT Serial (Serial is reserved for OTGW PIC communication)
 - **Use typed internal control flow**: If a parameter selects one of a small set of internal behaviors, use an `enum class`, numeric ID, or dedicated flag instead of string tokens.
-- **Do not use text as internal branch selection** unless the text is actual user/domain data. Internal discriminator strings are fragile on ESP8266 and can hide RAM-vs-flash pointer bugs.
+- **Do not use text as internal branch selection** unless the text is actual user/domain data. Internal discriminator strings are fragile and can hide RAM-vs-flash pointer bugs.
 - **Fix layout/spacing structurally**: For Web UI rendering issues, prefer HTML/CSS structure or spacing styles over inserting ad hoc spaces into runtime-generated strings.
 
 ### Naming Conventions
@@ -105,10 +116,10 @@ When making decisions for refactors, feature additions, or bug fixes, always rev
 
 - **Critical**: Avoid `String` class in performance-critical or frequently-called code
 - Use `char` buffers with bounds checking for string operations
-- Be mindful of heap fragmentation - this is an ESP8266 with limited RAM
+- Be mindful of heap fragmentation: the device runs for months, and the async web, MQTT and BLE stacks share one heap
 - Prefer stack allocation for small, temporary buffers
 
-#### PROGMEM Usage (CRITICAL - ESP8266 Has Limited RAM)
+#### PROGMEM Usage (CRITICAL)
 
 **MANDATORY**: All string literals MUST use `PROGMEM` to keep them in flash memory instead of RAM.
 
@@ -186,7 +197,7 @@ When making decisions for refactors, feature additions, or bug fixes, always rev
   ```
 
 - **Refactor existing code** to use PROGMEM when you encounter RAM-based string literals
-- The ESP8266 has only ~80KB of RAM total, with ~40KB typically available after core libraries
+- RAM is shared by the async web server, MQTT, BLE and the FreeRTOS task stacks; heap pressure is a recurring field issue
 - Every byte of string literal in RAM is a byte unavailable for runtime operations
 - This is **non-negotiable** - PROGMEM usage is critical for firmware stability
 - **Post-mortem rule**: If a bug involves `_P` helpers, `PGM_P`, or `__FlashStringHelper`, assume a storage-domain mismatch until proven otherwise.
@@ -312,7 +323,7 @@ When making decisions for refactors, feature additions, or bug fixes, always rev
    ```
 
 **Why This Matters**:
-- ESP8266 has ~40KB available RAM after core libraries
+- Free heap is limited and shared by concurrent async requests
 - Loading 11KB file + modifications = >22KB peak memory usage (>50% of available RAM)
 - Multiple concurrent requests can easily exhaust memory
 - String operations cause heap fragmentation
@@ -563,22 +574,20 @@ Before implementing or modifying frontend features, verify browser support:
 
 ### Build and Test
 
-- **Build locally**: `python build.py` or `make -j$(nproc)`
-  - Build firmware only: `python build.py --firmware`
-  - Build filesystem only: `python build.py --filesystem`
-  - Clean build: `python build.py --clean`
-  - Build script auto-installs arduino-cli if missing
+- **Build locally**: `build.bat` (Windows) or `./build.sh` (macOS/Linux); they bootstrap the Python venv and the PlatformIO toolchain and build `esp32-combo` firmware plus LittleFS
+  - Firmware only: `build.bat --firmware` / `./build.sh --firmware`
+  - Clean build: `build.bat --clean` / `./build.sh --clean`
+  - Never call `python build.py` directly: on an unsupported host Python it can exit 0 without building
 - **Resolve merge-conflict markers before build/test**: Files containing `<<<<<<<`, `=======`, or `>>>>>>>` must be fixed before compilation. Treat merge markers as build blockers, not as downstream compiler issues.
-- **Flash firmware**: `python flash_esp.py` (downloads and flashes latest release)
-  - Flash from local build: `python flash_esp.py --build`
-  - See [FLASH_GUIDE.md](../docs/FLASH_GUIDE.md) for detailed instructions
+- **Flash firmware**: `flash_otgw.bat` / `flash_otgw.sh`; prefer WiFi OTA through the safeboot updater, USB only when OTA cannot work
+  - See [docs/guides/FLASH_GUIDE.md](../docs/guides/FLASH_GUIDE.md) for detailed instructions
 - **Evaluate code quality**: `python evaluate.py`
   - Quick check: `python evaluate.py --quick`
   - Generate report: `python evaluate.py --report`
   - See [EVALUATION.md](../docs/EVALUATION.md) for evaluation framework details
 - **Build artifacts**: Located in `build/` directory with versioned filenames
 - **CI/CD**: Uses GitHub Actions with the same Makefile
-- **Always test on actual hardware when possible** (ESP8266 behavior can differ from simulation)
+- **Always test on actual hardware when possible** (device behavior can differ from simulation)
 - **Regression focus for filesystem/OTA work**: Validate both firmware and filesystem upload flows, and confirm telnet output is sufficient to distinguish upload progress, flash finalization, and reboot.
 
 ## Common Patterns
@@ -762,7 +771,7 @@ docs/reviews/
 - **Never** flash PIC firmware over WiFi using OTmonitor (can brick the PIC)
 - **Always** use the command queue for OTGW commands
 - **Always** validate buffer sizes before string operations
-- **Always** use `PROGMEM` (`F()` or `PSTR()`) for string literals - ESP8266 RAM is severely limited
+- **Always** use `PROGMEM` (`F()` or `PSTR()`) for string literals
 - **Always** test MQTT and Home Assistant integration for relevant changes
 - **Always** consider backwards compatibility with existing configurations
 - Target audience: Local network use only (not internet-exposed)
@@ -777,7 +786,7 @@ docs/reviews/
 
 ## Testing Guidance
 
-- Test on both NodeMCU and Wemos D1 mini if possible
+- Run `python scripts/run_tests.py` and `python evaluate.py --quick`; test on a bench unit (OTGW32 and OTGW Classic with ESP32-S3) when the change needs hardware
 - Verify MQTT publish/subscribe functionality
 - Test Web UI on multiple browsers
 - Verify serial communication with actual OTGW hardware
@@ -787,37 +796,33 @@ docs/reviews/
 ## Dependencies and Security
 
 - Avoid adding new dependencies unless absolutely necessary
-- Check library compatibility with ESP8266 Arduino Core 2.7.4
+- Check library compatibility with the pinned espressif32 platform in `platformio.ini`
 - Review security implications of any network-facing changes
-- Consider impact on limited ESP8266 resources (RAM, flash)
+- Consider impact on limited resources (RAM, flash, 4 MB partition layout, ADR-191)
 
 ## Contribution Workflow
 
 - Follow existing code organization (modular .ino files)
-- Add version bumps to `version.h` for releases
+- Bump `_VERSION_PRERELEASE` with `bin/bump-prerelease.sh` in every commit that touches `src/OTGW-firmware/**` or `src/libraries/**` (enforced by `.githooks/pre-commit`)
 - Update release notes in README.md for user-facing changes
 - **Run evaluation before submitting**: `python evaluate.py` to check code quality
-- **Test builds**: `python build.py` before submitting
+- **Test builds**: `build.bat` / `./build.sh` before submitting (never `python build.py` directly)
 - Ensure changes work with the NodoShop OTGW hardware
 
 ## Development Tools
 
 ### Build System (`build.py`)
 
-The Python build script automates the entire build process:
-- Auto-installs arduino-cli if not present
+The Python build script automates the build. Always start it through the `build.bat` / `./build.sh` wrapper, which provides a working Python venv and the PlatformIO toolchain:
+- Builds the `esp32-combo` firmware and the LittleFS image (the only target built on `dev`)
 - Updates version information from git
-- Builds firmware and filesystem
 - Creates versioned artifacts in `build/` directory
-- Options: `--firmware`, `--filesystem`, `--clean`, `--no-rename`
+- Takes a machine-wide build lock, so only one build runs at a time
+- Options: `--firmware`, `--clean`
 
 ### Flash Tool (`flash_esp.py`)
 
-Automated firmware flashing for ESP8266:
-- Default: Downloads and flashes latest GitHub release
-- `--build`: Builds from source and flashes
-- Handles both firmware and filesystem images
-- Platform-independent (Windows, Mac, Linux)
+Flashing goes through `flash_otgw.bat` / `flash_otgw.sh`, not `flash_esp.py` directly. Prefer WiFi OTA through the safeboot updater (ADR-191); use USB only when OTA cannot work, and then with `--migrate --host <ip>` so `settings.ini` survives.
 
 ### Evaluation Framework (`evaluate.py`)
 

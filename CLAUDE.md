@@ -9,6 +9,23 @@ This project uses OpenWolf for context management. Read and follow .wolf/OPENWOL
 
 ---
 
+<!-- AGENT-CORE START (TASK-1625: identical in CLAUDE.md, AGENTS.md and .github/copilot-instructions.md; guarded by tests/test_agent_core_block.py) -->
+## Core rules for every agent
+
+This block is shared word for word by CLAUDE.md, AGENTS.md (Codex) and .github/copilot-instructions.md (Copilot). CLAUDE.md holds the full rule set; where another instruction file disagrees with it, CLAUDE.md wins. Change this block in all three files at once.
+
+- **Lines.** `dev` is the 2.x line: ESP32-S3 only (OTGW32, and the OTGW Classic with an ESP32-S3 module), async and FreeRTOS. `otgw-1.x.x` is the 1.x ESP8266 maintenance line. `main` is the latest public release and is only pushed in the release flow, after Robert's go.
+- **Roles.** Robert (maintainer) decides scope, priority, waivers and releases; put an open decision to him as one question with the options, their consequences and your recommendation. Sergeant D decides SAT behaviour (see the SAT ground truth block). Testers give input and evidence, never decisions: their requests become tasks labelled `needs-maintainer-ok`.
+- **Tasks.** Every change starts from a Backlog.md task. Use the `backlog` CLI for every task read and write. Never use the backlog MCP server and never edit `backlog/tasks/*.md` directly.
+- **Done needs evidence.** Tick an acceptance criterion only with evidence from the session that did the work: build output, a test run, a capture, a screenshot. For a bug fix, the same reproduction fails on the old code and passes on the fix.
+- **Firmware rules.** No ArduinoJson (ADR-146). No HTTPS or WSS. Never write to `Serial` after init (it is the PIC link); debug output goes to telnet. PIC commands only through `addCommandToQueue()`. String literals stay in flash (`F()`, `PSTR()`, the `_P` functions). No `String` class in hot paths (ADR-180). No raw `#ifdef ESP32`/`ESP8266` outside the Platform library: use the `platformXxx()` shims and `HAS_*` flags. The web UI keeps at most 2 API calls in flight.
+- **Versions and commits.** A commit that touches `src/OTGW-firmware/**` or `src/libraries/**` bumps `_VERSION_PRERELEASE` with `bin/bump-prerelease.sh`. Every `TASK-NNN` in a commit message needs its task file staged. The git hooks in `.githooks/` enforce both (`git config core.hooksPath .githooks`).
+- **Gates.** `python evaluate.py --quick` shows no new FAIL. Build only through `build.bat` / `./build.sh`, never `python build.py` directly. Run the tests with `python scripts/run_tests.py`.
+- **Discord.** Answer in English, answer first, with the real `<@ID>` mention. Never name the OTGW32 board in public. Every SAT correction or decision by Sergeant D goes into `docs/sat/sergeant-d-corrections.md` before it is implemented.
+<!-- AGENT-CORE END -->
+
+---
+
 ## Task Management (MANDATORY)
 
 For SAT work under TASK-1412, read `docs/sat/sat-low-load-agent-handoff-2026-10-28.md` before selecting the next task. It links the current execution graph, PID writer order, open decision gates and bench-to-field validation sequence. Live Backlog dependencies take precedence over an older graph snapshot.
