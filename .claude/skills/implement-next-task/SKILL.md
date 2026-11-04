@@ -49,6 +49,56 @@ early exit). A direct question or bug report from a tester in #alpha-testing is
 answered before new work starts. A new bug report becomes a task and goes through
 the normal selection below.
 
+### Step 0b: GitHub issues and pull requests (maintainer directive, 2026-11-05, TASK-1637)
+
+Before each new task, also sweep GitHub. A new issue or PR becomes a backlog task and is
+picked up through step 1.
+
+1. List what is open (`gh` is logged in as the maintainer):
+   ```bash
+   gh issue list --repo rvdbreemen/OTGW-firmware --state open --limit 50 \
+     --json number,title,author,createdAt,updatedAt,labels,url
+   gh pr list --repo rvdbreemen/OTGW-firmware --state open --limit 30 \
+     --json number,title,author,baseRefName,headRefName,isDraft,updatedAt,url
+   ```
+   Leave out items by `rvdbreemen` and by `[bot]` accounts.
+2. **Dedupe on the URL**, not on `#N` (short numbers such as `#10` match unrelated text):
+   ```bash
+   grep -rlF "github.com/rvdbreemen/OTGW-firmware/issues/<N>" backlog/   # or /pull/<N>
+   ```
+   A hit in `backlog/tasks`, `backlog/completed` or `backlog/archive` means it is known:
+   if the item changed since (new comment, new commits on the PR), append a note to that
+   task instead of filing a new one. Older tasks may name only `#N`; when the URL grep is
+   empty, also check `grep -rlF "#<N>"` by hand before filing.
+3. **File each new item** with the URL in the description, so step 2 finds it next time:
+   - Issue: `backlog task create "GitHub #<N>: <title>" -d "<url> by <author>. <one-line
+     summary from the body>" --milestone 2.0.0 -l github` plus the ACs the issue needs. Use
+     `--milestone` of the 1.x line and label `1.x` when it is about ESP8266/1.x only; step 1
+     does not select those, report them in the cycle summary.
+   - PR: `backlog task create "Review PR #<N>: <title>" -d "<url> by <author>, base <base>"
+     -l github,pr` with ACs: reviewed (reviewer team of step 6), tests and build green on
+     the PR head, bench-tested when it changes firmware behaviour.
+4. **Classify** from the body (fetch at most 5 comments with `gh issue view --json
+   comments --jq '.comments[:5]'`, only for bugs):
+   - **Bug report or PR**: priority `high`. These go first among new tasks in step 1
+     (after the resumable `In Progress` tasks of step 1.1).
+   - **Feature request, proposal, discussion or question**: file it with the label
+     `needs-maintainer-ok` (same rule as tester feedback) and ask Robert once in the
+     session, interactively, whether to release it, with a recommendation. Answer a plain
+     question on the issue directly.
+5. **Working a GitHub task**:
+   - Bug: follow "Bug fixing: reproduce, then prove". When the issue has no captures, ask
+     the reporter for them in an issue comment (English, answer first, never name the
+     OTGW32 board). Reference the issue in the commit body (`Fixes #<N>` / `Refs #<N>`).
+   - PR: check it out in its own worktree (`git worktree add ../wt-pr<N>` then
+     `gh pr checkout <N>` there), run the tests, `evaluate.py --quick` and the combo build,
+     and bench-test firmware changes. Post the review findings as a PR review comment.
+     **Merging stays Robert's call**: ask him per PR (merging another person's work always
+     needs explicit permission), then merge, credit the author in the #alpha-testing report,
+     and remove the worktree.
+6. End the sweep with one line in the session: `github: open issues N, PRs N, new tasks N
+   (ids), notes added N`.
+
 ## Step 1: select and announce
 
 1. First look at tasks already `In Progress` with assignee `@claude` (any milestone).
@@ -59,7 +109,8 @@ the normal selection below.
    re-announce it.
 2. Otherwise pick the next new task with this rule:
    - milestone 2.0.0, status `To Do`;
-   - highest priority first (high, medium, low), then the lowest task number;
+   - tasks labelled `github` from step 0b (bug reports and PRs) first, oldest first;
+   - then highest priority first (high, medium, low), then the lowest task number;
    - **skip** a task whose ACs need hardware that is not available now, a design
      decision that is not recorded in the task notes, input from a tester, or an
      action that needs explicit maintainer permission (PIC flash, release, push to
