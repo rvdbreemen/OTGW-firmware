@@ -1,9 +1,11 @@
 ---
 id: TASK-1626
 title: Run evaluate and ADR-governance CI on pushes to dev
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-04T22:39:00Z'
+updated_date: '2026-11-04T23:32:00Z'
 labels:
   - process
   - agentic
@@ -27,3 +29,9 @@ Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/
 - [ ] #3 Decision on build.yml on push recorded in the notes with its measured run time
 - [ ] #4 docs/process/agentic-setup.md finding F2 updated to the new state
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-05. No workflow assumes a PR context (no github.event.pull_request.* or base-ref diff): evaluate.yml, adr-governance.yml and build.yml only check out and run. Added push triggers on dev: evaluate.yml (all paths), adr-governance.yml (same paths as the PR trigger), build.yml with paths-ignore docs/**, backlog/**, .claude/**, **/*.md. Decision on build.yml (AC3), Robert 2026-11-05 via AskUserQuestion: build on push to dev except docs-only pushes. Measured run time (PR #696, head b00cfaf50): pio run esp32 2m17s, esp32-classic 2m56s, esp32-combo 2m35s, in parallel; evaluate 10s. YAML parsed with PyYAML: all three have pull_request and push keys.
+<!-- SECTION:NOTES:END -->

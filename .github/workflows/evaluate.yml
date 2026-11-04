@@ -9,6 +9,10 @@ on:
       - "1.5.*"
       - "feature-dev-*"
       - "release/**"
+  # TASK-1626: work lands on dev by direct push, not through a PR, so check the line itself too.
+  push:
+    branches:
+      - dev
 
 jobs:
   evaluate:
