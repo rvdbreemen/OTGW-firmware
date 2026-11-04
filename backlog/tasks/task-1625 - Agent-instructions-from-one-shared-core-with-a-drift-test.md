@@ -1,9 +1,9 @@
 ---
-id: TASK-1612
-title: 'Agent instructions from one shared core, with a drift test'
+id: TASK-1625
+title: Agent instructions from one shared core, with a drift test
 status: To Do
 assignee: []
-created_date: '2026-11-04 21:50'
+created_date: '2026-11-04T22:39:00Z'
 labels:
   - process
   - agentic
@@ -20,7 +20,7 @@ Finding F1. The instruction files for the different agents contradict each other
 - .github/copilot-instructions.md still describes ESP8266 firmware and lists ArduinoJson as a key decision, while dev is ESP32-S3-only and ADR-146 forbids ArduinoJson.
 - .claude/docs/discord-backlog-bridge.md describes an npx mcp-discord server, a bot named 'OTGW bot#0128', the backlog MCP server and #dev-sat-mqtt as the only channel. Reality (CLAUDE.md, .claude/commands/backlog_discord.md): native Java saseq discord-mcp, bot 'BlueFlame Bot', #alpha-testing read as well, backlog CLI only.
 Only the binding-ADR block is drift-tested today (tests/test_adr_governance.py).
-Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/agentic-improvements-handoff-2026-11-04.md. Parent: TASK-1611.
+Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/agentic-improvements-handoff-2026-11-04.md. Parent: TASK-1624.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

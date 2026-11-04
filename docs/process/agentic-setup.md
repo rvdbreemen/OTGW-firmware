@@ -4,7 +4,7 @@
 |---|---|
 | Status | Vastgelegde momentopname, bedoeld om op voort te bouwen |
 | Peildatum | 2026-11-04, `dev` @ 19e318b, firmware 2.0.0-beta.79 |
-| Taak | TASK-1611 (verbetertaken TASK-1612 t/m TASK-1623) |
+| Taak | TASK-1624 (verbetertaken TASK-1625 t/m TASK-1636) |
 | Visuele versie | [`agentic-setup.html`](agentic-setup.html): open lokaal in een browser |
 | Uitvoering | [`agentic-improvements-handoff-2026-11-04.md`](agentic-improvements-handoff-2026-11-04.md) |
 | Opgesteld door | Claude Code (cloudsessie) in opdracht van Robert |
@@ -322,7 +322,7 @@ Let op: de git-hooks zijn alleen actief als `git config core.hooksPath .githooks
 | Entries in het SAT-register | 269 (6.013 regels) | `grep -c '^## [0-9]'` |
 | Waarvan maintainer decisions | ≥ 18 | `grep -c 'maintainer decision'` |
 | Rijen in de SAT-wachtrij | ±86 | rijen die beginnen met `\| Q` |
-| Actieve taken (vóór TASK-1611) | 115: 36 To Do, 14 In Progress, 65 Done | frontmatter-status |
+| Actieve taken (vóór TASK-1624) | 115: 36 To Do, 14 In Progress, 65 Done | frontmatter-status |
 | Gearchiveerde taken | 1.321 | `backlog/archive/tasks` |
 | ADR-bestanden | ±210 (217 bestanden inclusief index en rapporten) | `ls docs/adr` |
 | Checks in evaluate.py | 42 | `def check` |
@@ -330,7 +330,7 @@ Let op: de git-hooks zijn alleen actief als `git config core.hooksPath .githooks
 | Skills / commands / eigen subagents | 9 / 2 / 1 | `.claude/` |
 | Scripts | 84, waarvan 45 `sat_*` | `scripts/` |
 
-Deze checkout was een shallow clone van 50 commits (allemaal van 2026-11-04). Doorlooptijden en commitfrequentie zijn daarom niet gemeten. Daar is TASK-1620 voor.
+Deze checkout was een shallow clone van 50 commits (allemaal van 2026-11-04). Doorlooptijden en commitfrequentie zijn daarom niet gemeten. Daar is TASK-1633 voor.
 
 ---
 
@@ -340,15 +340,15 @@ Wat goed werkt: het bewijsregime (oud tegen fix, Done alleen met bewijs, reviewe
 
 | # | Ernst | Bevinding | Bewijs | Taak |
 |---|---|---|---|---|
-| F1 | Hoog | **Instructies lopen uiteen tussen agents.** CLAUDE.md: backlog alleen via de CLI. AGENTS.md: de MCP is primair. Copilot-instructies: ESP8266 en ArduinoJson (in strijd met ADR-146). De bridge-doc beschrijft een npx-`mcp-discord`, "OTGW bot#0128" en alleen #dev-sat-mqtt. Alleen het blok met binding ADR's wordt op drift getest. | `AGENTS.md:11`, `.github/copilot-instructions.md:5-12`, `.claude/docs/discord-backlog-bridge.md:18-82` | TASK-1612 |
-| F2 | Hoog | **CI ziet de hoofdlijn niet.** build, evaluate en adr-governance draaien alleen op `pull_request`, terwijl `dev` directe pushes krijgt. De hooks zijn opt-in per clone. | `.github/workflows/*.yml` `on:` | TASK-1613, TASK-1614 |
-| F3 | Middel | **De omgeving zit vast aan één werkplek.** De evaluate-hook heeft `cd 'D:/...'` en `|| true`. Bench-IP en COM4, webhook, Discord-MCP, people-file en ledger zijn lokaal. Alles draait met `bypassPermissions` en `Bash(*)`. | `.claude/settings.json` | TASK-1614, TASK-1619 |
-| F3b | Middel | **Builds door hooks laten een build-stempel achter**, waardoor de stop-hook om een commit vraagt. | waargenomen 2026-11-04 | TASK-1615 |
-| F4 | Middel | **Regels groeien als lagen bij.** 673 regels, 14 directives, vervangen regels blijven staan, workarounds voor bugs op meerdere plekken. | `CLAUDE.md` | TASK-1618, TASK-1622 |
-| F5 | Middel | **Het SAT-register en de wachtrij zijn ongestructureerd.** Er is geen machineleesbare herkomst, maintainer-besluiten staan tussen die van Sergeant D, de statuskolom loopt achter (Q-1519b, -d, -e, Q-1531a, Q-1537a) en de geschiedenis is in "Update"-alinea's opgestapeld. | `docs/sat/open-questions.md` | TASK-1616, TASK-1617 |
-| F6 | Laag | **Doorvoer is bewust geserialiseerd**: één build tegelijk, een benchtest per taak, maximaal 3 uur tussen builds. Waar de bottleneck zit is niet gemeten. | CLAUDE.md, Build Commands | TASK-1620, TASK-1623 |
-| F7 | Laag | **Onderzoek staat tussen gereedschap.** 45 `sat_*`-studies in `scripts/` worden veel vanuit `docs/sat/` aangeroepen. | `scripts/` | TASK-1621 |
-| F8 | Laag | **"`backlog task list` is leeg" lijkt niet (meer) universeel.** Op Linux met v1.46.1 werkt het. De workaround staat wel op meerdere plekken. | cloudsessie 2026-11-04 | TASK-1622 |
+| F1 | Hoog | **Instructies lopen uiteen tussen agents.** CLAUDE.md: backlog alleen via de CLI. AGENTS.md: de MCP is primair. Copilot-instructies: ESP8266 en ArduinoJson (in strijd met ADR-146). De bridge-doc beschrijft een npx-`mcp-discord`, "OTGW bot#0128" en alleen #dev-sat-mqtt. Alleen het blok met binding ADR's wordt op drift getest. | `AGENTS.md:11`, `.github/copilot-instructions.md:5-12`, `.claude/docs/discord-backlog-bridge.md:18-82` | TASK-1625 |
+| F2 | Hoog | **CI ziet de hoofdlijn niet.** build, evaluate en adr-governance draaien alleen op `pull_request`, terwijl `dev` directe pushes krijgt. De hooks zijn opt-in per clone. | `.github/workflows/*.yml` `on:` | TASK-1626, TASK-1627 |
+| F3 | Middel | **De omgeving zit vast aan één werkplek.** De evaluate-hook heeft `cd 'D:/...'` en `|| true`. Bench-IP en COM4, webhook, Discord-MCP, people-file en ledger zijn lokaal. Alles draait met `bypassPermissions` en `Bash(*)`. | `.claude/settings.json` | TASK-1627, TASK-1632 |
+| F3b | Middel | **Builds door hooks laten een build-stempel achter**, waardoor de stop-hook om een commit vraagt. | waargenomen 2026-11-04 | TASK-1628 |
+| F4 | Middel | **Regels groeien als lagen bij.** 673 regels, 14 directives, vervangen regels blijven staan, workarounds voor bugs op meerdere plekken. | `CLAUDE.md` | TASK-1631, TASK-1635 |
+| F5 | Middel | **Het SAT-register en de wachtrij zijn ongestructureerd.** Er is geen machineleesbare herkomst, maintainer-besluiten staan tussen die van Sergeant D, de statuskolom loopt achter (Q-1519b, -d, -e, Q-1531a, Q-1537a) en de geschiedenis is in "Update"-alinea's opgestapeld. | `docs/sat/open-questions.md` | TASK-1629, TASK-1630 |
+| F6 | Laag | **Doorvoer is bewust geserialiseerd**: één build tegelijk, een benchtest per taak, maximaal 3 uur tussen builds. Waar de bottleneck zit is niet gemeten. | CLAUDE.md, Build Commands | TASK-1633, TASK-1636 |
+| F7 | Laag | **Onderzoek staat tussen gereedschap.** 45 `sat_*`-studies in `scripts/` worden veel vanuit `docs/sat/` aangeroepen. | `scripts/` | TASK-1634 |
+| F8 | Laag | **"`backlog task list` is leeg" lijkt niet (meer) universeel.** Op Linux met v1.46.1 werkt het. De workaround staat wel op meerdere plekken. | cloudsessie 2026-11-04 | TASK-1635 |
 
 ---
 
@@ -358,26 +358,26 @@ Wat goed werkt: het bewijsregime (oud tegen fix, Done alleen met bewijs, reviewe
 
 | Taak | Voorstel | Prioriteit | Hangt af van |
 |---|---|---|---|
-| TASK-1612 | Agentinstructies uit één gedeelde kern, met een driftcheck. Bridge-doc bijwerken. | hoog | |
-| TASK-1613 | CI (evaluate, adr-governance) op push naar `dev` | hoog | |
-| TASK-1614 | Hooks draagbaar maken (`$CLAUDE_PROJECT_DIR`, zichtbare FAIL, `core.hooksPath` bij sessiestart) | hoog | |
-| TASK-1615 | Geen build-stempel na builds door hooks | middel | |
-| TASK-1616 | Statuskolom van de wachtrij corrigeren, plus test | middel | |
-| TASK-1617 | Machineleesbare index naast het SAT-register (entries blijven onveranderd) | middel | 1616 |
-| TASK-1618 | CLAUDE.md slanker: kern plus regels die alleen laden als ze relevant zijn, en een changelog van directives | middel | 1612 |
-| TASK-1619 | Lokale state reconstrueerbaar maken (ledger-generator, sjabloon voor de people-file, runbook voor een tweede machine) | middel | |
-| TASK-1620 | Doorvoer meten | laag | (1617 helpt) |
-| TASK-1621 | Onderzoeksscripts verplaatsen, met alle verwijzingen | laag | |
-| TASK-1622 | De workaround voor `task list` oplossen of verwijderen | laag | |
-| TASK-1623 | Besluit over opschalen (bench, build-runner, Discord-host) | laag | 1620 |
+| TASK-1625 | Agentinstructies uit één gedeelde kern, met een driftcheck. Bridge-doc bijwerken. | hoog | |
+| TASK-1626 | CI (evaluate, adr-governance) op push naar `dev` | hoog | |
+| TASK-1627 | Hooks draagbaar maken (`$CLAUDE_PROJECT_DIR`, zichtbare FAIL, `core.hooksPath` bij sessiestart) | hoog | |
+| TASK-1628 | Geen build-stempel na builds door hooks | middel | |
+| TASK-1629 | Statuskolom van de wachtrij corrigeren, plus test | middel | |
+| TASK-1630 | Machineleesbare index naast het SAT-register (entries blijven onveranderd) | middel | 1629 |
+| TASK-1631 | CLAUDE.md slanker: kern plus regels die alleen laden als ze relevant zijn, en een changelog van directives | middel | 1625 |
+| TASK-1632 | Lokale state reconstrueerbaar maken (ledger-generator, sjabloon voor de people-file, runbook voor een tweede machine) | middel | |
+| TASK-1633 | Doorvoer meten | laag | (1630 helpt) |
+| TASK-1634 | Onderzoeksscripts verplaatsen, met alle verwijzingen | laag | |
+| TASK-1635 | De workaround voor `task list` oplossen of verwijderen | laag | |
+| TASK-1636 | Besluit over opschalen (bench, build-runner, Discord-host) | laag | 1633 |
 
 ### 9.2 Scenario's
 
 | Scenario | Inhoud | Doorlooptijd | Advies |
 |---|---|---|---|
-| **A. Consolideren** | TASK-1612 t/m 1616 en 1622 | dagen | Nu. Weinig risico, direct minder kans op fouten. |
-| **B. Herstructureren** | A plus TASK-1617, 1618 en 1619 | weken | Na een rustig moment in de SAT-campagne (TASK-1412). 1617 en 1618 hebben Roberts goedkeuring nodig. |
-| **C. Opschalen** | B plus TASK-1620 en een besluit via 1623 | maanden | Alleen als de metingen het rechtvaardigen. |
+| **A. Consolideren** | TASK-1625 t/m 1629 en 1635 | dagen | Nu. Weinig risico, direct minder kans op fouten. |
+| **B. Herstructureren** | A plus TASK-1630, 1631 en 1632 | weken | Na een rustig moment in de SAT-campagne (TASK-1412). 1630 en 1631 hebben Roberts goedkeuring nodig. |
+| **C. Opschalen** | B plus TASK-1633 en een besluit via 1636 | maanden | Alleen als de metingen het rechtvaardigen. |
 
 ---
 
@@ -390,7 +390,7 @@ Wat goed werkt: het bewijsregime (oud tegen fix, Done alleen met bewijs, reviewe
 
 ## 11. Dit document bijwerken
 
-- Werk de peildatum en de cijfers in hoofdstuk 7 bij met de genoemde meetwijzen. Na TASK-1620 doet het script dat.
+- Werk de peildatum en de cijfers in hoofdstuk 7 bij met de genoemde meetwijzen. Na TASK-1633 doet het script dat.
 - Bevinding afgerond: zet de status bij de bevinding ("opgelost in TASK-NNN, datum") in plaats van de rij te verwijderen. Zo blijft de redenering herleidbaar.
 - Nieuwe rol, kanaal, skill of poort: voeg hem toe aan de tabellen in hoofdstuk 2, 3 en 6.
 - Werk de visuele versie (`agentic-setup.html`) bij als de architectuur in hoofdstuk 3 verandert.

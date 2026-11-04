@@ -394,7 +394,7 @@
 
 ## docs/process/
 
-- `agentic-improvements-handoff-2026-11-04.md` — Handoff: agentic setup improvements (TASK-1612 .. TASK-1623) (~2435 tok)
+- `agentic-improvements-handoff-2026-11-04.md` — Handoff: agentic setup improvements (TASK-1625 .. TASK-1636) (~2435 tok)
 - `agentic-setup.md` — OTGW agentic werkplaats: functionele architectuur van de ontwikkelomgeving (~7247 tok)
 - `agentic-setup.html` — Visual version of agentic-setup.md (layer diagram, cycle, findings, proposals) (~12000 tok)
 

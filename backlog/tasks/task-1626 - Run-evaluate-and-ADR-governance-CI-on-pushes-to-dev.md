@@ -1,9 +1,9 @@
 ---
-id: TASK-1613
+id: TASK-1626
 title: Run evaluate and ADR-governance CI on pushes to dev
 status: To Do
 assignee: []
-created_date: '2026-11-04 21:50'
+created_date: '2026-11-04T22:39:00Z'
 labels:
   - process
   - agentic
@@ -17,7 +17,7 @@ ordinal: 753000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Finding F2. .github/workflows/build.yml, evaluate.yml and adr-governance.yml trigger only on pull_request, but all work is committed and pushed directly to dev. The main line is therefore never checked by CI; the only objective gate is local (git hooks that are opt-in per clone and can be bypassed with env vars).
 Keep the scope cheap: evaluate + ADR governance on push; the firmware build on push only if the run time is acceptable (measure it).
-Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/agentic-improvements-handoff-2026-11-04.md. Parent: TASK-1611.
+Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/agentic-improvements-handoff-2026-11-04.md. Parent: TASK-1624.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

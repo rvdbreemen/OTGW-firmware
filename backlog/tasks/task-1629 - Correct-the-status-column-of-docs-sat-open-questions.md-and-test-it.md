@@ -1,9 +1,9 @@
 ---
-id: TASK-1616
+id: TASK-1629
 title: Correct the status column of docs/sat/open-questions.md and test it
 status: To Do
 assignee: []
-created_date: '2026-11-04 21:50'
+created_date: '2026-11-04T22:41:00Z'
 labels:
   - process
   - agentic
@@ -18,7 +18,7 @@ ordinal: 756000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Finding F5 (part). Rows in the question table still say 'asked' or 'queued' while the Answered column already names an entry (examples: Q-1519b -> 163, Q-1519d -> 172, Q-1519e -> 173, Q-1531a -> 188, Q-1537a -> 233). The 'Update' paragraphs at the top have piled up as history.
 Documentation hygiene only: no SAT behaviour, no question to Sergeant D. Do not rewrite entries in sergeant-d-corrections.md (they are immutable).
-Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/agentic-improvements-handoff-2026-11-04.md. Parent: TASK-1611.
+Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/agentic-improvements-handoff-2026-11-04.md. Parent: TASK-1624.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

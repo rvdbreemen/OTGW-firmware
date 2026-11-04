@@ -1,9 +1,9 @@
 ---
-id: TASK-1614
+id: TASK-1627
 title: Make the Claude Code hooks portable and their failures visible
 status: To Do
 assignee: []
-created_date: '2026-11-04 21:50'
+created_date: '2026-11-04T22:40:00Z'
 labels:
   - process
   - agentic
@@ -16,7 +16,7 @@ ordinal: 754000
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Finding F3. The PostToolUse evaluate hook in .claude/settings.json runs: cd 'D:/Users/Robert/Documents/GitHub/RvdB/OTGW-firmware' && python evaluate.py --quick 2>/dev/null || true. In a cloud or macOS session, or another worktree, it silently checks nothing (or the wrong tree). The git hooks only run when core.hooksPath is set per clone, which a fresh cloud session does not do.
-Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/agentic-improvements-handoff-2026-11-04.md. Parent: TASK-1611.
+Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/agentic-improvements-handoff-2026-11-04.md. Parent: TASK-1624.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

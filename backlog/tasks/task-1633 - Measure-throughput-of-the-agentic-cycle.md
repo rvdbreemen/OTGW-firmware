@@ -1,10 +1,9 @@
 ---
-id: TASK-1620
+id: TASK-1633
 title: Measure throughput of the agentic cycle
 status: To Do
 assignee: []
-created_date: '2026-11-04 21:50'
-updated_date: '2026-11-04 21:51'
+created_date: '2026-11-04T22:44:00Z'
 labels:
   - process
   - agentic
@@ -17,8 +16,8 @@ ordinal: 760000
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Finding F6. The cycle is deliberately serialised (one build machine-wide, bench test per task, at most 3 h between builds). Whether the bottleneck is Robert, Sergeant D or the bench is not measured.
-Report from repo data only: task lead time (created -> Done) from backlog frontmatter, time from question asked to entry recorded from open-questions.md / the TASK-1617 index, age of open questions, number of tasks labelled needs-maintainer-ok, alpha tags per day from git log.
-Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/agentic-improvements-handoff-2026-11-04.md. Parent: TASK-1611.
+Report from repo data only: task lead time (created -> Done) from backlog frontmatter, time from question asked to entry recorded from open-questions.md / the TASK-1630 index, age of open questions, number of tasks labelled needs-maintainer-ok, alpha tags per day from git log.
+Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/agentic-improvements-handoff-2026-11-04.md. Parent: TASK-1624.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

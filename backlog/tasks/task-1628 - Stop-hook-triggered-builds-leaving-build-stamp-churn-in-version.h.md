@@ -1,9 +1,9 @@
 ---
-id: TASK-1615
+id: TASK-1628
 title: Stop hook-triggered builds leaving build-stamp churn in version.h
 status: To Do
 assignee: []
-created_date: '2026-11-04 21:50'
+created_date: '2026-11-04T22:41:00Z'
 labels:
   - process
   - agentic
@@ -16,7 +16,7 @@ ordinal: 755000
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Observed 2026-11-04 in a cloud session: the SessionStart toolchain hook (.claude/hooks/session-start-build-toolchain.sh -> build.py) rewrites _VERSION_BUILD and _VERSION_GITHASH in src/OTGW-firmware/version.h and data/version.hash. The Stop hook then reports uncommitted changes and asks to commit them. CLAUDE.md says build-stamp churn must be restored, not committed, so the agent reverts it every turn.
-Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/agentic-improvements-handoff-2026-11-04.md. Parent: TASK-1611.
+Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/agentic-improvements-handoff-2026-11-04.md. Parent: TASK-1624.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
