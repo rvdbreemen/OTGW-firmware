@@ -118,6 +118,10 @@ static void edge(bool on) { g_flame = on; satCycleOnFlameChange(on); }
 static float step() {
   g_cs = satApplyPWM(g_pid); _sat_lastControlCS = g_cs; state.sat.fFinalSetpoint = g_cs; return g_cs;
 }
+// TASK-1515 (entry 260): the real "PWM schedule" gate cut out of satControlLoopRun() (the tick itself is not host-compilable)
+static void tickSchedule(float pidOutput) {
+@@TICK@@
+}
 static int req() { return (int)state.sat.bPwmFlameRequested; }
 // OFF phase: a step every 30 s until the ON phase starts or maxSec passes. 1 = started.
 static int waitStart(int maxSec) {
@@ -362,7 +366,16 @@ int main(int argc, char** argv) {
     printf("before=%u startedAt=%d blocked=%d after=%u limit=%d\n", before, startedAt, blocked, cnt(), (int)satCycleIsHourLimitReached());
     return 0;
   }
-  if (!strcmp(sc, "wrap")) {                 // 3 PWM starts, an hour without starts, then millis() wraps around
+  if (!strcmp(sc, "coldcut")) {              // TASK-1515: argv[2] = 1 cold cutoff latched, 0 not. Ticks every 30 s for 2 h with a PID that would start an ON phase
+    _sat_coldCut = atoi(argv[2]) != 0;
+    g_flow = _sat_coldCut ? 30.0f : 50.0f;   // a cool boiler: duty (28.0-27.2)/(30-27.2) = 0.29, range 3, so the old code starts an ON phase
+    g_pid = _sat_coldCut ? 28.0f : 40.0f;    // cold: at or below the 28.2 cold setpoint; normal: duty 0.561, range 3
+    int everOn = 0;
+    for (int i = 0; i < 60; i++) { tickSchedule(g_pid); if (req()) everOn = 1; g_ms += 30000UL; }   // 30 min, no flame
+    printf("everOn=%d count=%u\n", everOn, cnt());
+    return 0;
+  }
+  if (!strcmp(sc, "wrap")) {               // 3 PWM starts, an hour without starts, then millis() wraps around
     const int s = pwmCycles(3);
     const uint32_t newest = _hourCycleTs[(_hourCycleHead + SAT_RING_N - 1) % SAT_RING_N];
     g_ms += 3700000UL;
@@ -428,8 +441,16 @@ def build(wd: Path):
     # order: the PWM block first (it defines _sat_requestedSetpoint, read by satCycleOnFlameChange), then the ring
     # (called by satCycleOnFlameChange on HEAD), then the cycles cut
     cpp.write_text(cls_harness.PRELUDE + cls_harness.extract_types(types_src, True) + STUBS + FWD
-                   + extract_pwm(sat) + ring + cls_harness.extract_cycles(cycles) + tail + MAIN, encoding="utf-8")
+                   + extract_pwm(sat) + ring + cls_harness.extract_cycles(cycles) + tail + MAIN.replace("@@TICK@@", extract_tick_gate(sat)), encoding="utf-8")
     return compile_cpp(cpp, wd / "t.exe")
+
+
+def extract_tick_gate(src: str) -> str:
+    """The real `if (... SAT_MODE_PWM ...) { satPwmSchedule(pidOutput); }` statement of satControlLoopRun()."""
+    src = src.replace("\r\n", "\n")
+    m = re.search(r"^  if \(state\.sat\.eControlMode == SAT_MODE_PWM[^\n]*\) \{\n    satPwmSchedule\(pidOutput\);\n  \}", src, re.M)
+    assert m, "PWM schedule gate not found in satControlLoopRun()"
+    return m.group(0)
 
 
 class SatPwmStartLimit(unittest.TestCase):
@@ -623,6 +644,17 @@ class SatPwmStartLimit(unittest.TestCase):
                 r = self.run_sc("limitwin", cph, 2)
                 self.assertEqual(r["blocked"], "0", r)
                 self.assertEqual(r["after"], str(cph + 1), "the start is still recorded (entry 81): %r" % r)
+
+    # TASK-1515 (entry 260; heating_control.py:202-234): a cold-cutoff tick runs no PWM schedule, so no ON phase begins and no start
+    # enters the sliding-hour ring. Red on the code before the fix (everOn=1 count=1 at PID 28.0), green after.
+    def test_cold_cutoff_tick_records_no_pwm_start(self):
+        r = self.run_sc("coldcut", 1)
+        self.assertEqual((r["everOn"], r["count"]), ("0", "0"), "a cold-cutoff tick began an ON phase / counted a start: %r" % r)
+
+    def test_normal_pwm_tick_still_starts_and_counts(self):
+        r = self.run_sc("coldcut", 0)
+        self.assertEqual(r["everOn"], "1", r)
+        self.assertGreaterEqual(int(r["count"]), 1, r)
 
     # R1 review: after a millis() wrap old starts must not come back into the rolling hour
     def test_millis_wrap_does_not_revive_old_starts(self):

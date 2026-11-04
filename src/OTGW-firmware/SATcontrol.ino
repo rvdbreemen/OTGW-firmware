@@ -1578,6 +1578,10 @@ static float satApplyPWM(float pidOutput, bool scheduleDone = false)
   if (!settings.sat.bOvershootProtection) return prevCS;
   const float maxSetpoint = satGetMaxSetpoint();
   if (!satIsFlameOn()) {                                          // waiting for ignition (also the ON-start tick)
+    // No-return start-up window (TASK-1412.12, entry 263): the return temperature is not known yet (no MsgID 28 answer this boot, no
+    // board reading) and the boiler does not count as a no-return boiler yet (satNoReturnTemp(): 5 minutes, or a confirmed
+    // Unknown-DataID). The hold keeps the previous CS, as thermo-nova (heating_control.py:392-395: no return temperature, return).
+    if (satGetReturnTemp() <= 0.0f && !satNoReturnTemp()) return prevCS;
     _pwm_flameOffHoldSetpoint = satPwmFlameOffHold(maxSetpoint);
     return _pwm_flameOffHoldSetpoint;
   }
@@ -2543,9 +2547,12 @@ static float satGetReturnTemp()
 //      valid sample or board reading older than 5 minutes (satReturnMissingLong()).
 // Only this boiler type gets the flow-based start-up hold, the CS/PM=25 flood and MI=500; every other boiler keeps thermo-nova's
 // hold from the return temperature. The simulation models a return temperature, so it never counts.
-// Path (1) needs evidence from THIS boot (our implementation choice; entry 84 open points 1 and 3 are open with Sergeant D):
+// Path (1) needs evidence from THIS boot (our implementation choice: entry 84 open point 1, whether the PIC or OT-Direct reads
+// MsgID 28 at all, is not settled; points 2 and 3 are settled by entries 135 and 217):
 // the Unknown-DataID verdict is restored from /ot-boiler.json at boot, but the sensor readout (PR=D, PR=E every 60 s) is not,
 // so a restored verdict alone would wrongly count a board with an 'R' sensor for its first minutes.
+// Until path (1) or (2) holds, and while there is no return temperature at all (the first 5 minutes after boot, before a MsgID 28
+// answer), the flame-off hold keeps the previous CS (entry 263, satApplyPWM(); thermo-nova heating_control.py:392-395).
 //  (a) a boiler frame of this boot confirmed Unknown-DataID for MsgID 28 (boilerMsgId28UnknownConfirmed()),
 //  (b) it is settled that no board sensor gives a reading: no valid reading in the last 5 minutes and, when the PR=E poll runs,
 //      at least one poll result of this boot (picBoardTretAbsent()).
@@ -5438,6 +5445,13 @@ static void satUpdateFlameStatus()
 //=====================================================================
 //=== Initialize SAT ===
 //=====================================================================
+// TASK-1384 (entry 261): whether initSAT() starts the boot PM chain. A PIC board always; an OT-Direct board only with SAT enabled
+// (nothing else on OT-Direct needs the chain, and the SAT-off boot stays as it was).
+static bool satBootPmChainWanted()
+{
+  return hasOTCommandInterface() && (isPICEnabled() || settings.sat.bEnabled);
+}
+
 void initSAT()
 {
   satPidReset();
@@ -5477,14 +5491,15 @@ void initSAT()
     satRestoreControlMode();
     DebugTf(PSTR("SAT: initialized and enabled (%s mode)\r\n"),
             state.sat.eControlMode == SAT_MODE_PWM ? "PWM" : "continuous");
-    // Boot sequence: send priority messages PM=3,15,48 per SAT Python
-    if (hasOTCommandInterface()) {
-      pmChainStart();   // PIC: PM=3, then 15 and 48 as the boiler answers; OT-Direct: all three directly (TASK-1315)
-      // MI=500 is sent by satMiStep() once the manufacturer or the missing return temperature is known (TASK-1371, entry 141)
-    }
   } else {
     DebugTln(F("SAT: initialized but disabled"));
   }
+  // Boot sequence: priority messages PM=3,15,48 (thermo-nova coordinator boot(), opentherm.py:166-172). On a PIC board at every
+  // boot, SAT enabled or not (TASK-1384, entry 261), so MsgID 3 (low-load permission, entry 215) is known before a later runtime
+  // SAT enable or MQTT takeover. PIC: PM=3, then 15 and 48 as the boiler answers; OT-Direct (SAT enabled only; it polls these
+  // IDs itself): all three directly (TASK-1315). MI=500 is sent by satMiStep() once the manufacturer or the missing return
+  // temperature is known (TASK-1371, entry 141).
+  if (satBootPmChainWanted()) pmChainStart();
 }
 
 //=====================================================================
@@ -7118,7 +7133,9 @@ static void satControlLoopRun()
   // thermo-nova order (heating_control.py:211-228, Sergeant D entry 134, Q47b A): pwm.update, the underheat and saturation exits
   // (_maybe_disable_pwm_runtime), then the control setpoint of whichever mode is left. So on the tick an exit fires, the continuous
   // setpoint (and CH=1) goes out in that same tick, not one tick later. The schedule runs first: saturation reads this tick's off time.
-  if (state.sat.eControlMode == SAT_MODE_PWM) {
+  // Not while the cold cutoff holds (TASK-1515, entry 260): thermo-nova's heater-OFF branch skips pwm.update (heating_control.py:202-234),
+  // so a cold-cutoff tick begins no ON phase and records no start in the sliding-hour ring (satPwmBeginOn; the ring stays, entry 127).
+  if (state.sat.eControlMode == SAT_MODE_PWM && !_sat_coldCut) {
     satPwmSchedule(pidOutput);
   }
 

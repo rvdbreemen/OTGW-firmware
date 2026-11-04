@@ -217,7 +217,11 @@ DELEGATED = {
     "LL-018c": [("test_sat_no_return_startup", "NoReturnStartup", ["test_unsupported_return_floods_from_the_first_ignition",
                 "test_data_invalid_return_waits_5_minutes_then_counts_as_no_return", "test_stale_return_is_the_same_as_an_invalid_one_and_recovers",
                 "test_fresh_zero_return_is_a_measurement_not_a_missing_return", "test_board_sensor_return_is_a_return_even_when_the_boiler_says_unknown",
-                "test_unsupported_verdict_restored_from_file_is_not_enough_alone", "test_missing_flow_sends_no_flood_and_no_flow_based_hold"])],
+                "test_unsupported_verdict_restored_from_file_is_not_enough_alone", "test_missing_flow_sends_no_flood_and_no_flow_based_hold",
+                "test_start_up_window_keeps_the_previous_cs_until_5_minutes_without_a_return"])],
+    # TASK-1384 (entry 261): the boot PM chain on a PIC board whatever SAT is; OT-Direct unchanged
+    "LL-018i": [("test_pic_pm_chain", "PmChain", ["test_boot_chain_on_pic_with_sat_disabled", "test_boot_chain_on_pic_with_sat_enabled_unchanged",
+                "test_boot_chain_ot_direct_unchanged", "test_init_sat_starts_the_chain_outside_the_sat_enabled_block"])],
     "LL-018d": [("test_sat_no_return_startup", "NoReturnStartup", ["test_runtime_enable_with_a_running_boiler_sends_no_flood_and_defers_mi500_5_minutes_on_pic",
                 "test_runtime_enable_on_ot_direct_never_sends_mi500", "test_runtime_enable_then_pwm_ignition_floods"])],
     "LL-018e": [("test_sat_no_return_startup", "NoReturnStartup", ["test_hot_boiler_in_lockout_holds_the_clamped_flow_hold_and_floods_from_the_flame_not_from_the_on_phase",
@@ -475,7 +479,7 @@ class LowLoadContract(unittest.TestCase):
 
     @ll("LL-018", "contract", "satNoReturnTemp, satReturnFresh, satReturnMissingLong, satGetFlowTemp on real frames (SATboilerFeed.h, the processOT feed hook), satNoReturnFlood*, satMiStep "
         "(via test_sat_no_return_startup)",
-        task="TASK-1412.12 AC1 (entries 84, 135, 149, 151, 217, 241): unsupported, Data-Invalid, stale and restored return; fresh zero; missing flow")
+        task="TASK-1412.12 AC1 (entries 84, 135, 149, 151, 217, 241, 263): unsupported, Data-Invalid, stale and restored return; fresh zero; missing flow; the start-up window keeps the previous CS")
     def test_ll018c_unsupported_invalid_and_stale_return_through_the_real_validity(self):
         self.delegated("LL-018c")
 
@@ -504,11 +508,10 @@ class LowLoadContract(unittest.TestCase):
     def test_ll018h_ot_direct_transport_mi_and_pm(self):
         self.delegated("LL-018h")
 
-    @ll("LL-018", "open_decision", "none: enabling SAT at runtime does not start the boot PM chain (initSAT() is the only pmChainStart() caller); Sergeant D's OK for TASK-1384 AC2 is not recorded",
-        task="TASK-1384", question="audit #44 (runtime-enable PM chain)")
+    @ll("LL-018", "contract", "initSAT -> satBootPmChainWanted -> pmChainStart: the boot PM chain runs on a PIC board whatever SAT is, so MsgID 3 is known before a runtime SAT enable (via test_pic_pm_chain)",
+        task="TASK-1384 (entry 261)")
     def test_ll018i_runtime_enable_sends_the_boot_pm_chain(self):
-        callers = sum(len(re.findall(r"\bpmChainStart\s*\(\s*\)\s*;", (FW / n).read_text(encoding="utf-8"))) for n in ("SATcontrol.ino", "settingStuff.ino", "restAPI.ino", "MQTTstuff.ino"))
-        self.assertGreaterEqual(callers, 2, "pmChainStart() is called only at boot (initSAT)")
+        self.delegated("LL-018i")
 
     @ll("LL-018", "open_decision", "none: a PM=25 on OT-Direct waits behind the entries already due in the schedule (a minute-aligned slow-poll burst delays it by seconds, not by one communication interval); no decision records what OT-Direct must do for PM=",
         task="TASK-1412.12 finding", question="OTD-PM25 (new, to be asked)")

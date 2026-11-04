@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-25T10:39:00Z'
-updated_date: '2026-11-04T05:57:00Z'
+updated_date: '2026-11-04T06:39:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -39,4 +39,6 @@ From TASK-1273 and sat-port-audit-2026-10-24.md #44: the PM/MI commands sent at 
 2026-10-30 coordinator: skipped in this cycle: AC2 needs Sergeant D's OK first (not recorded). Note TASK-1371 already moved MI=500 to satMiStep() after satRestartStep(), which also runs when SAT is enabled at runtime; the PM chain is still boot-only. Question to queue.
 
 2026-11-04 Robert decided (maintainer decision, entries 257-262; Sergeant D informed msg 1567417361798144021, may object). See docs/sat/sergeant-d-corrections.md.
+
+2026-11-04 implemented (sonnet agent; lead reran on the integration tree): see CHANGELOG [Unreleased] and docs/sat/firmware-sat-spec.md. Host tests red on old, green on fix: test_sat_pwm_start_limit 26 OK (1515), test_pic_pm_chain 40 OK (1384), test_sat_no_return_startup 20 OK (1412.12), overshoot_sustain 62 OK, no_return_ignition 19 OK, evaluate 0 failed. Shipped together as beta.66 (one SATcontrol.ino commit for TASK-1515, TASK-1384, TASK-1412.12). Bench pending.
 <!-- SECTION:NOTES:END -->

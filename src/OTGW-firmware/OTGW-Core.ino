@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.65
+**  Version  : v2.0.0-beta.66
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4243,7 +4243,7 @@ void checkCommandResponse(const char *buf, unsigned int len){
 
 
 /*
-  SAT priority-message chain (TASK-1315), PIC boards only.
+  Boot priority-message chain (TASK-1315), PIC boards only. initSAT() starts it at every boot, SAT enabled or not (TASK-1384, entry 261).
   The PIC keeps ONE pending priority message: every PM= overwrites the previous one until the
   matching boiler response arrives, and the PIC only sends it in a slot the thermostat gives up
   (it never times out). SAT wants MsgID 3, 15 and 48 (thermo-nova boot() asks all three), so they
@@ -4308,7 +4308,7 @@ void pmChainStart() {
     return;
   }
   CmdQueueLock qlock;
-  if (!qlock.locked) return;   // queue busy: initSAT calls this again on the next start
+  if (!qlock.locked) return;   // queue busy: no chain this boot; initSAT() calls pmChainStart() once per boot, so the next try is the next boot
   pmChainTodo = (1u << PM_CHAIN_COUNT) - 1;
   pmChainMissed = 0;
   pmChainRetry = false;

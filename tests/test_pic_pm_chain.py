@@ -26,6 +26,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_sat_pwm_override import compile_cpp  # noqa: E402
 
+SAT_INO = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino"))
 CORE_INO = Path(os.environ.get("OTGW_CORE_INO", REPO / "src" / "OTGW-firmware" / "OTGW-Core.ino"))
 
 STUBS = r"""
@@ -106,6 +107,12 @@ void pmChainTick();
 @BODY@
 // one second of the main loop at time t, then print what went to the PIC
 static void loopAt(uint32_t t) { g_ms = t; handleCommandQueue(); }
+// TASK-1384 (entry 261): the real satBootPmChainWanted() cut out of SATcontrol.ino (empty on the code before the fix)
+struct SatSettingsStub { bool bEnabled = false; };
+struct SettingsStub { SatSettingsStub sat; };
+static SettingsStub settings;
+static bool hasOTCommandInterface() { return true; }
+@BOOTPM@
 static void echo(const char* l) { checkCommandResponse(l, (unsigned)strlen(l)); }
 static void show(const char* tag) { printf("%s=%s\n", tag, g_sent); g_sent[0] = 0; }
 int main(int argc, char** argv) {
@@ -585,6 +592,17 @@ int main(int argc, char** argv) {
     for (int i = 0; i < cmdQueueSize; i++) printf("q%d=%s\n", i, cmdqueue[i].cmd);
     return 0;
   }
+  if (!strcmp(sc, "boot")) {             // TASK-1384: what initSAT() does at boot. argv: pic(0/1) satEnabled(0/1)
+    g_pic = atoi(argv[2]) != 0; settings.sat.bEnabled = atoi(argv[3]) != 0;
+#ifdef HAS_BOOT_PM_GATE
+    if (satBootPmChainWanted()) pmChainStart();
+#else
+    if (settings.sat.bEnabled) pmChainStart();   // code before the fix: only with SAT enabled
+#endif
+    loopAt(100000);
+    printf("sent=%s\nqueued=%d\ndirect=%s\n", g_sent, cmdQueueSize, g_direct);
+    return 0;
+  }
   if (!strcmp(sc, "direct")) {           // OT-Direct board: no PIC, three direct PM=, chain not armed
     g_pic = false;
     pmChainStart();
@@ -623,7 +641,12 @@ class PmChain(unittest.TestCase):
         core_h = (REPO / "src" / "OTGW-firmware" / "OTGW-Core.h").read_text(encoding="utf-8")
         m = re.search(r"^#define\s+PIC_CMD_MAX_LEN\s+(\d+)", core_h, re.M)
         picmax = m.group(1) if m else "14"   # before TASK-1576: char cmd[15]
-        cpp.write_text(prefix + STUBS.replace("@QUEUE_TYPES@", types).replace("@PICMAX@", picmax).replace("@BODY@", body), encoding="utf-8")
+        sat_src = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+        mg = re.search(r"^static bool satBootPmChainWanted\(\)\n\{.*?^\}\n", sat_src, re.S | re.M)
+        if mg:
+            prefix += "#define HAS_BOOT_PM_GATE\n"
+        boot_pm = mg.group(0) if mg else ""
+        cpp.write_text(prefix + STUBS.replace("@BOOTPM@", boot_pm).replace("@QUEUE_TYPES@", types).replace("@PICMAX@", picmax).replace("@BODY@", body), encoding="utf-8")
         cls.exe = compile_cpp(cpp, d / "t.exe")
 
     @classmethod
@@ -905,6 +928,30 @@ class PmChain(unittest.TestCase):
         self.assertEqual(out["t1"], "PM=15;")
         self.assertEqual(out["q0"], "PM=7")
         self.assertEqual(out["q1"], "PM=15")
+
+    # TASK-1384 (entry 261): the boot PM chain runs on a PIC board whatever SAT is; OT-Direct stays as it was (SAT enabled only).
+    # Red on the code before the fix: PIC with SAT disabled sends nothing.
+    def test_boot_chain_on_pic_with_sat_disabled(self):
+        out = self.run_sc("boot", "1", "0")
+        self.assertEqual(out["sent"], "PM=3;", out)
+
+    def test_boot_chain_on_pic_with_sat_enabled_unchanged(self):
+        out = self.run_sc("boot", "1", "1")
+        self.assertEqual(out["sent"], "PM=3;", out)
+
+    def test_boot_chain_ot_direct_unchanged(self):
+        off = self.run_sc("boot", "0", "0")
+        self.assertEqual((off["direct"], off["sent"]), ("", ""), off)          # SAT disabled: nothing (the board polls itself)
+        on = self.run_sc("boot", "0", "1")
+        self.assertEqual(on["direct"], "PM=3;PM=15;PM=48;", on)                # SAT enabled: three direct PM=
+
+    def test_init_sat_starts_the_chain_outside_the_sat_enabled_block(self):
+        src = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+        body = re.search(r"^void initSAT\(\)\n\{\n(.*?)^\}\n", src, re.S | re.M).group(1)
+        self.assertIn("if (satBootPmChainWanted()) pmChainStart();", body)
+        enabled = re.search(r"  if \(settings\.sat\.bEnabled\) \{\n(.*?)\n  \} else \{", body, re.S)
+        self.assertIsNotNone(enabled)
+        self.assertNotIn("pmChainStart", enabled.group(1), "the chain must not sit inside the SAT-enabled block")
 
     def test_not_armed_on_ot_direct(self):
         out = self.run_sc("direct")

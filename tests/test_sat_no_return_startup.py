@@ -282,6 +282,18 @@ class NoReturnStartup(unittest.TestCase):
         self.assertEqual(ticks[0][1], 58.0)
         self.assertEqual(len(self.pms(cmds, 306100, 326100)), 10)
 
+    def test_start_up_window_keeps_the_previous_cs_until_5_minutes_without_a_return(self):
+        # Entry 263 (thermo-nova heating_control.py:392-395): no MsgID 28 answer of any kind this boot. Inside the first 5 minutes the
+        # flame-off hold keeps the previous CS (50.0 in the harness); from 5 minutes on the boiler counts as a no-return boiler
+        # (entry 217) and the flow-based hold flow + 18 applies again. Red on the old code: 28.2 (0 + 18 floored to the cold setpoint).
+        pre = ["base 1000", "pic 1", "flowper 5000", "flow 40"]   # base 1000: millis() since boot is 0..300 s, no sample ever
+        cmds, _, qs, ticks = self.sim(pre + ["run 100000", "tick 55", "q"])
+        self.assertEqual(qs[-1]["nr"], "0")
+        self.assertEqual(ticks[0][1], 50.0)
+        cmds, _, qs, ticks = self.sim(pre + ["run 302000", "tick 55", "q"])
+        self.assertEqual(qs[-1]["nr"], "1")
+        self.assertEqual(ticks[0][1], 58.0)
+
     def test_stale_return_is_the_same_as_an_invalid_one_and_recovers(self):
         # no MsgID 28 frame at all after t=1 s (a thermostat that stopped asking): stale after 5 minutes (entry 217)
         pre = ["retper 5000 30", "run 1000", "retper 0 0", "pic 1", "flowper 5000", "flow 40"]
@@ -307,11 +319,13 @@ class NoReturnStartup(unittest.TestCase):
         self.assertEqual([c for _, c in cmds if c.startswith("MI=")], [])
 
     def test_unsupported_verdict_restored_from_file_is_not_enough_alone(self):
-        # Conf-1371 is open with Sergeant D: this is OUR current choice (a boiler frame of this boot must confirm the verdict), not a
-        # recorded decision. In that boot window nothing floods and the hold has no return temperature to use: the cold-setpoint floor.
+        # A boiler frame of this boot must confirm the verdict (our choice). In that boot window nothing floods and the hold has no
+        # return temperature to use. Entry 263 (maintainer, 2026-11-04; thermo-nova heating_control.py:392-395): the hold keeps the
+        # previous CS (50.0 in the harness) instead of the old 0 + 18 floored to the cold setpoint 28.2, which hit every boiler.
+        # Red on the code before the fix (28.2), green after.
         cmds, _, qs, ticks = self.sim(self.ignite(["base 1000", "unsup28 1", "confirmed 0", "boardunknown 1"]))
         self.assertEqual(qs[-1]["nr"], "0")
-        self.assertEqual(ticks[0][1], 28.2)
+        self.assertEqual(ticks[0][1], 50.0)
         self.assertEqual(self.pms(cmds), [])
 
     # ---- MsgID 25 missing: no flood on a flow that is not there ----------------------------------------------------------
