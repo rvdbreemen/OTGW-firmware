@@ -6,7 +6,9 @@
 #    a TASK-NNN identifier OR an explicit exemption tag.
 #
 # 2. If any TASK-NNN is referenced in the message, require the corresponding
-#    backlog/tasks/task-NNN-*.md file to be tracked or staged.
+#    backlog/tasks/task-NNN-*.md file to be tracked or staged. An archived
+#    task (backlog/archive/tasks/ or backlog/completed/) counts too: Done
+#    tasks are archived to keep the backlog board's reloads small (TASK-1599).
 #
 # Why: CLAUDE.md policy is "every piece of work must have a backlog task before
 # any code is written. No exceptions." Audit on 2026-05-21 (TASK-653) showed
@@ -86,7 +88,11 @@ if [ -n "$ids" ]; then
     missing=""
     for id in $ids; do
         num=$(printf '%s' "$id" | sed 's/TASK-//')
-        matches=$(git ls-files "backlog/tasks/task-${num}.md" "backlog/tasks/task-${num} *.md" "backlog/tasks/task-${num}-*.md" 2>/dev/null)
+        matches=""
+        for dir in backlog/tasks backlog/archive/tasks backlog/completed; do
+            found=$(git ls-files "$dir/task-${num}.md" "$dir/task-${num} *.md" "$dir/task-${num}-*.md" 2>/dev/null)
+            matches="$matches$found"
+        done
         if [ -z "$matches" ]; then
             missing="$missing $id"
         fi
