@@ -752,7 +752,7 @@ class TickClockAndLoopOrder(unittest.TestCase):
     # then the control setpoint, so the continuous CS goes out on the tick an exit fires.
     def test_overshoot_switch_precedes_apply_control_mode(self):
         loop = self.loop
-        i_max = loop.index("satSetControlMode(SAT_MODE_CONTINUOUS);\n    SATDebugTln(F(\"SAT: PID at system max")
+        i_max = loop.index("satSetControlMode(SAT_MODE_CONTINUOUS);\n    SATDebugTln(F(\"SAT: PID at the effective max")
         i_os = loop.index("satCycleCheckOvershootSwitch(pidOutput, _sat_tickMs);")
         i_apply = loop.index("// --- Apply control mode ---")
         i_mode = loop.index("const bool pwmMode = (state.sat.eControlMode == SAT_MODE_PWM);")
