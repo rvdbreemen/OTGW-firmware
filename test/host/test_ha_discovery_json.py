@@ -567,10 +567,30 @@ def override_sensor_units(run):
     return out
 
 
+# The harness needs two symbols an older OLD build lacks, so it cannot compile there: SAT_HA_SWITCH_COUNT (introduced in
+# 53db6f342) and streamSatNumberDiscovery (introduced in c39b8e9f7, a descendant of 53db6f342). --old-rev must be
+# c39b8e9f7 or a descendant (TASK-1448).
+OLD_REV_LOWER_BOUND = "c39b8e9f7"
+
+
+def require_old_rev_in_range(rev):
+    repo = str(HERE.parent.parent)
+    if subprocess.run(["git", "-C", repo, "rev-parse", "--verify", "--quiet", rev + "^{commit}"],
+                      capture_output=True).returncode != 0:
+        sys.exit(f"--old-rev {rev}: not a commit in this repository")
+    if subprocess.run(["git", "-C", repo, "merge-base", "--is-ancestor", OLD_REV_LOWER_BOUND, rev],
+                      capture_output=True).returncode != 0:
+        sys.exit(f"--old-rev {rev} is older than {OLD_REV_LOWER_BOUND}: this harness needs symbols that older "
+                 f"revisions lack (SAT_HA_SWITCH_COUNT from 53db6f342, streamSatNumberDiscovery from c39b8e9f7), so the "
+                 f"OLD build would not compile. Use {OLD_REV_LOWER_BOUND} or a later revision.")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--old-rev", help="also build the code under test from this git revision (OLD)")
     args = ap.parse_args()
+    if args.old_rev:
+        require_old_rev_in_range(args.old_rev)
     root = GEN / "ha_discovery_json"
     checks = []
 
