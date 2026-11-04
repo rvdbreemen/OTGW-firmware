@@ -99,6 +99,11 @@
 - **NimBLE TU include order (TASK-1199, 2026-10-03)**: IDF component includes arrive via `-iprefix`/`-iwithprefix`, which are searched after every `-I`. A NimBLE-Arduino TU gets only four `-I` dirs: the lib's src, the sdkconfig dir (`esp32s3/qio_qspi/include`), cores, variants. Every sdkconfig.h includer seen uses quotes, and the framework sdkconfig.h is `#pragma once`.
 
 ## Do-Not-Repeat
+- [2026-11-04] Accepting an ADR also means adding its row to docs/adr/README.md (entry list + table); tests/test_adr_governance.py test_live_index_complete fails otherwise (ADR-208 was missed).
+- [2026-11-04] Run scripts/run_tests.py from Git Bash, not via PowerShell Start-Process: the .sh tests then get a backslash-stripped path (rc 127).
+- [2026-11-04] arduino-esp32 NetworkManager::hostByName() calls dns_clear_cache() without the lwIP core lock on the first call after an IP-state change; with a pending SNTP lookup that panics. Resolve hostnames with platformResolveHost() (lwip_getaddrinfo), never hostByName/connect(host) in app code (TASK-1605, tests/test_no_hostbyname.py).
+- [2026-11-05] git stash pop / pull --autostash can leave .wolf files at an OLDER version than HEAD when a peer committed them meanwhile: compare before restoring a stash copy, re-add own lines on top of HEAD instead.
+- [2026-11-05] A git stash push <path> of an UNTRACKED file stashes nothing, and the following stash pop applies an unrelated old stash (happened with stash@{0} WIP 1412.4 -> conflict markers in v2.js, build started on it). Use cp to scratch for untracked files.
 - 2026-11-05: in PowerShell 7 chain test-then-push with `&&`, never `;`: with `;` a failing post-rebase test still let `git push` run (TASK-1629 follow-up).
 - 2026-11-05: concurrent sessions edit docs/sat/open-questions.md within minutes; never hand-maintain a list derived from its table. Refresh the Live queue with `python scripts/sat_open_questions.py --update` (TASK-1629).
 - 2026-11-05: under WSL, evaluate.py on /mnt/d (9P) takes more than 25 s; test Linux behaviour on a native-fs copy (git archive into /tmp), not on /mnt/d (TASK-1627).

@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-04T21:53:52.824Z
-> Files: 25 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-04T23:56:39.543Z
+> Files: 2 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -11,6 +11,10 @@
 
 ## ../../../Claude/Projects/Kluis/02-wiki/
 
+
+## ../wt-agentic/.claude/hooks/
+
+- `session-start-build-toolchain.sh` — SessionStart hook: pre-provision the ESP firmware build toolchain so Claude (~754 tok)
 
 ## ./
 
@@ -272,8 +276,6 @@
 
 ## C:/Users/rvdbr/.claude/projects/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/memory/
 
-- `reference_bench_simulation_without_boiler.md` — Merged from reference_otgw32_sim_pic_path_only (~956 tok)
-- `reference_otgw32_test_device.md` — Declares board (~2282 tok)
 
 ## C:/Users/rvdbr/AppData/Local/Temp/
 
@@ -319,19 +321,6 @@
 
 ## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/5c40272c-4417-42f4-924c-666810f09dc1/scratchpad/
 
-- `block.cpp` — === Cycle kind (TASK-1387): thermo-nova cycles/tracker.py:101-108 and _determine_cycle_kind :314-324 (~2084 tok)
-- `boot_heap_capture.py` — TASK-1339: reboot the unit N times and capture the [HEAP] boot lines over telnet. (~678 tok)
-- `capture.py` — Telnet capture (port 23) with host timestamps + 5 s sat/status poller (one request at a time). (~688 tok)
-- `cmp_doc.py` — row (~1812 tok)
-- `ed2.py` — Declares char (~2061 tok)
-- `edit_cls_test.py` — rep, test_R4_pwm_idle_is_uncertain, test_R3_dhw_in_the_warm_up_is_not_in_the_tail, test_R2_master_ch (~1462 tok)
-- `edit_cmp.py` — sub (~2088 tok)
-- `edit_fix2.py` — load, save (~1285 tok)
-- `edit_misc.py` — load, save (~541 tok)
-- `edit_spec.py` — is: repl_line (~5240 tok)
-- `gen_overshoot_replay.py` — TASK-1367 bench replay: flame on, constant high flow, fixed outside temperature, no room temp. (~440 tok)
-- `spec_doc.py` — changes: rep, block (~2940 tok)
-- `spec_doc2.py` — rep (~800 tok)
 
 ## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/5c40272c-4417-42f4-924c-666810f09dc1/scratchpad/t1339/
 
@@ -341,6 +330,10 @@
 
 ## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/c70b1e97-db42-4038-96aa-f497de4e2278/scratchpad/
 
+
+## C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/74b8fc81-f282-4eda-bcab-6276a4a766f4/scratchpad/
+
+- `stamptest.sh` — TASK-1628 emulation: run a session-start hook script against a throwaway repo whose (~406 tok)
 
 ## C:/Users/rvdbr/AppData/Local/Temp/fakedev/
 
@@ -368,11 +361,9 @@
 
 ## docs/adr/
 
-- `ADR-201-combo-board-detection-persists-only-a-positive-pic-verdict-and-re-probes-every-boot-supersedes-adr-164.md` — ADR-201 Combo board detection persists only a positive PIC verdict and re-probes every boot (superse (~4310 tok)
 
 ## docs/api/
 
-- `openapi.yaml` (~54230 tok)
 
 ## docs/c4/
 
@@ -394,9 +385,6 @@
 
 ## docs/process/
 
-- `agentic-improvements-handoff-2026-11-04.md` — Handoff: agentic setup improvements (TASK-1625 .. TASK-1636) (~2435 tok)
-- `agentic-setup.md` — OTGW agentic werkplaats: functionele architectuur van de ontwikkelomgeving (~7247 tok)
-- `agentic-setup.html` — Visual version of agentic-setup.md (layer diagram, cycle, findings, proposals) (~12000 tok)
 
 ## docs/research/
 
@@ -412,10 +400,6 @@
 
 ## src/OTGW-firmware/
 
-- `MQTTstuff.ino` — include <espMqttClient.h>          // bertmelis async MQTT client (ADR-123 Phase 2, TASK-865.7) (~51749 tok)
-- `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~13682 tok)
-- `SATcontrol.ino` — Declares char (~72827 tok)
-- `SATcycles.ino` — Declares uint8_t (~16734 tok)
 
 ## src/OTGW-firmware/data/
 
@@ -434,8 +418,6 @@
 
 ## tests/
 
-- `test_sat_cycle_classifier.py` — TASK-1387: host test for the end-of-cycle classifier against thermo-nova cycles/classifier.py. (~7598 tok)
-- `test_sat_pwm_override.py` — TASK-1268: host test for the SAT PWM control-setpoint override and the MM selection. (~14670 tok)
 
 ## tests/stubs/
 
