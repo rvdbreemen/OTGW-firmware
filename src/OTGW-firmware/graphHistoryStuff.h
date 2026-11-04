@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : graphHistoryStuff.h
-**  Version  : v2.0.0-beta.62
+**  Version  : v2.0.0-beta.63
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

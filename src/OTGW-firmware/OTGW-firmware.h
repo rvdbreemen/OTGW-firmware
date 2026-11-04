@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.62
+**  Version  : v2.0.0-beta.63
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -866,8 +866,17 @@ inline int activeLed2() {
 // PIC reset differs between the two Classic modules (S3 Mini 12, Pro 40). The
 // OTGWSerial ctor binds the S3 Mini pin at global-init; it is re-pinned after
 // detection via OTGWSerial.setResetPin(activePicRst()). OTGW32 has no PIC.
+// [pic-rst-pin:begin] TASK-1402
+// Forced OT-Direct (iBoardMode 2) resolves the OTGW32 map, whose PIC reset (12)
+// is the I2C SDA on a Pro. The TASK-1031 recovery probe in that mode still
+// resets a PIC, so it uses the Pro's reset (40) when the IMU probe found a Pro.
+inline int picRstPinFor(ComboPinMap map, uint8_t boardMode, bool classicPro) {
+  const bool pro = (map == COMBO_MAP_CLASSIC_PRO) || (boardMode == 2 && classicPro);
+  return pro ? PIN_CLASSIC_PRO_PIC_RST : PIN_PIC_RST;
+}
+// [pic-rst-pin:end]
 inline int activePicRst() {
-  return (comboActivePinMap() == COMBO_MAP_CLASSIC_PRO) ? PIN_CLASSIC_PRO_PIC_RST : PIN_PIC_RST;
+  return picRstPinFor(comboActivePinMap(), settings.iBoardMode, state.hw.bClassicPro);
 }
 #endif
 

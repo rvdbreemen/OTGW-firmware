@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Combo: forced OT-Direct on an S3 Mini Pro resets the PIC on GPIO 40, not GPIO 12** (TASK-1402). Mode 2 resolved the OTGW32 pin map, so the TASK-1031 recovery probe pulsed GPIO 12 (the Pro's I2C SDA). It now uses the Pro reset pin when the IMU probe found a Pro. Other modes unchanged. Host test `tests/test_pic_rst_pin.py`.
+
 ## [2.0.0-beta.62] - 2026-11-04
 
 ### Added

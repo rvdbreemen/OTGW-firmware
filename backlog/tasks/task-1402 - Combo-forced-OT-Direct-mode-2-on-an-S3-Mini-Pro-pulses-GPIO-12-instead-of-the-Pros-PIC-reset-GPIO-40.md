@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-25T20:37:00Z'
-updated_date: '2026-11-03T23:06:00Z'
+updated_date: '2026-11-04T05:41:00Z'
 labels:
   - combo
   - pic
@@ -25,7 +25,7 @@ ADR-201 Open Question 1, Robert 2026-10-25: yes, fix. comboActivePinMap() return
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Forced mode 2 recovery probe on a Pro pulses GPIO 40, not GPIO 12 (code + host or bench evidence)
+- [x] #1 Forced mode 2 recovery probe on a Pro pulses GPIO 40, not GPIO 12 (code + host or bench evidence)
 - [ ] #2 Plain S3 Mini and OTGW32 behaviour unchanged
 <!-- AC:END -->
 
@@ -33,4 +33,6 @@ ADR-201 Open Question 1, Robert 2026-10-25: yes, fix. comboActivePinMap() return
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: mode 2 resolves the OTGW32 map, activePicRst() = GPIO 12 (OTGW-firmware.h:781/845); TASK-1552 boardPinReserved only guards user pins. Code doable, bench needs a Mini Pro.
+
+2026-11-04 (sonnet agent, lead reran on the integration tree): picRstPinFor() in OTGW-firmware.h; activePicRst() returns 40 for mode 2 + Pro (IMU), 12 otherwise; comboActivePinMap untouched. tests/test_pic_rst_pin.py 3 OK (9 cases), mutant without the mode-2 clause red; old header lacks the helper. board_detect_persist_gate 7 OK, board_pin_reserved 5 OK, evaluate 0 failed. Tag beta.63. Bench needs an S3 Mini Pro on a Classic carrier with boardmode=2 (neither bench board is one).
 <!-- SECTION:NOTES:END -->
