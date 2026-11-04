@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-02T20:56:00Z'
-updated_date: '2026-11-02T22:20:00Z'
+updated_date: '2026-11-04T07:46:00Z'
 labels:
   - sat
 dependencies: []
@@ -26,7 +26,7 @@ Sergeant D entry 237 (2026-11-02, answers to Q-1537c): MM= (and for an explicit 
 - [x] #1 Host test on the real satSendMM/satSendCH/satCmdResend: an unchanged MM or CH is not enqueued again by the tick or the 5 s resend; a changed value is enqueued once; Immergas TP=11:12 follows MM; CS is still resent every 5 s (red on beta.17, green)
 - [ ] #2 After a command-cache reset (SAT takes control, OT link back, PIC reset detected, reboot) the next send enqueues MM, CH (and the Immergas TP) once even if unchanged; the PIC reset path is identified in the code and covered by the test
 - [x] #3 A Proposed ADR superseding ADR-203 for MM and CH (CS unchanged), citing entry 237; the maintainer accepts it
-- [ ] #4 Bench .63 telnet: MM/CH/TP enqueue counts per minute before (beta.17) and after; CS still every 5 s; settings kept, stable 5 min
+- [x] #4 Bench .63 telnet: MM/CH/TP enqueue counts per minute before (beta.17) and after; CS still every 5 s; settings kept, stable 5 min
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -45,4 +45,6 @@ Robert 2026-11-02 evening: (1) 'akkoord' on the ADR partly superseding ADR-203 (
 Full tests/ 97 files: 96 green, test_sat_cs_ceiling_1536 failed on 2 assertions that expected the 5 s resend to repeat MM=100;CH=1 (replaced by entry 237; the CS ceiling values stay checked); expectations updated, now green. ADR-207 Proposed (adr-kit, governance 15/15, quality 0.92); docs + CHANGELOG updated by agent. Entry 238 recorded (Sergeant D confirms the resend after a reset). Waiting: Q-1570a (5-min repair), asked again msg 1566924494524911667.
 
 2026-11-02: AC1 tests/test_sat_cmd_cache.py 18/18 (beta.17: 9 failures + 1 error). AC3 ADR-207 Accepted (maintainer akkoord, adr-kit gates passed), related to ADR-203 both sides. AC2 code path identified and covered by the host test (banner branch -> satNotifyPicRestart, structural test); bench part (GW=R on .63) pending after 08:00. AC4 bench pending. Repair window 60 s per entry 239.
+
+2026-11-04 bench .63 beta.68 (simulation on, 5.5 min telnet): CS enqueued every 5.0 s (25 in 125 s), SATTICK every 30 s, MM and CH on change and as repair every 90.0 s (expected 60 s per entry 239: defect filed as TASK-1602). With simulation off and no boiler SAT hands back after 30 s without a boiler reply (CS=0, CH=1, MM=T), as designed.
 <!-- SECTION:NOTES:END -->
