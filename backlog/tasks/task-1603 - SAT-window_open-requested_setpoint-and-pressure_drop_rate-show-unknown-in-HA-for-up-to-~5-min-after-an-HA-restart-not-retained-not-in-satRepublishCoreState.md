@@ -4,9 +4,11 @@ title: >-
   SAT: window_open, requested_setpoint and pressure_drop_rate show unknown in HA
   for up to ~5 min after an HA restart (not retained, not in
   satRepublishCoreState)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-04T13:03:00Z'
+updated_date: '2026-11-04T14:15:00Z'
 labels:
   - sat
   - mqtt
@@ -27,3 +29,9 @@ Found in the TASK-1490 bench (2026-11-04, .61 beta.70): these three SAT states p
 - [ ] #1 After homeassistant/status offline->online the three topics publish within one SAT publish pass (bench: mosquitto_sub timestamps)
 - [ ] #2 Host or source test shows the three shadows are reset by the HA-online path
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Reset the function-static shadows of window_open, requested_setpoint and pressure_drop_rate from the HA-online path (move them to file scope next to s_core_* and memset in satRepublishCoreState, or a flag consulted by satPublishMQTT). Source/host test + bench offline->online.
+<!-- SECTION:PLAN:END -->
