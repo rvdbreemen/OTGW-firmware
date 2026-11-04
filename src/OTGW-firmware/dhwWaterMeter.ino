@@ -1,7 +1,7 @@
 /*
  ***************************************************************************
  **  Program  : dhwWaterMeter
- **  Version  : v1.7.9
+ **  Version  : v1.8.0-beta.1
  **
  **  Copyright (c) 2026 Robert van Breemen
  **
