@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-04T17:56:00Z'
+updated_date: '2026-11-04T18:02:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -25,3 +26,9 @@ Contributor PR #693 by Andre Brait: streamSatZoneDiscovery() and streamSatPvBoos
 - [ ] #2 unique_id and topics unchanged (diff check)
 - [ ] #3 Release notes mention the display-name change in Home Assistant
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Host evidence (2026-11-04, lane-prs 038773cf1): format/argument count of every snprintf_P in streamSatZoneDiscovery and streamSatPvBoostDiscovery matches (12 calls, each exactly one %s and one ctx.hostname argument removed vs origin/dev); uniq_id, stat_t/cmd_t and discovery topics unchanged in the diff. Comment reference corrected from TASK-1603 to TASK-1608. Contributor bench: OTGW32 combo with boiler, HA showed the new names on the existing entities, entity_id unchanged. Not yet: our build/bench (after beta.77).
+<!-- SECTION:NOTES:END -->

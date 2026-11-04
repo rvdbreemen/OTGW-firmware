@@ -4,6 +4,7 @@ title: 'Resolve Claude hook paths without CLAUDE_PROJECT_DIR (PR #691, Andre Bra
 status: To Do
 assignee: []
 created_date: '2026-11-04T17:55:00Z'
+updated_date: '2026-11-04T18:02:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -19,6 +20,12 @@ Contributor PR #691 by Andre Brait: .claude/settings.json hook commands fall bac
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Hook commands work with CLAUDE_PROJECT_DIR unset (guard blocks Edit/edit on backlog/tasks/*.md, allows other paths)
-- [ ] #2 Claude Code behaviour unchanged when CLAUDE_PROJECT_DIR is set
+- [x] #1 Hook commands work with CLAUDE_PROJECT_DIR unset (guard blocks Edit/edit on backlog/tasks/*.md, allows other paths)
+- [x] #2 Claude Code behaviour unchanged when CLAUDE_PROJECT_DIR is set
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Host evidence (2026-11-04, lane-prs b9fc4bc1a): guard with CLAUDE_PROJECT_DIR unset: Edit file_path backlog/tasks/*.md -> exit 2, edit path backlog/tasks/*.md -> exit 2, Write src/a.ino -> 0, Bash -> 0. Same lowercase edit+path case on the origin/dev guard -> exit 0 (passes through): red on old, green on new. evaluate --quick 0 failed.
+<!-- SECTION:NOTES:END -->
