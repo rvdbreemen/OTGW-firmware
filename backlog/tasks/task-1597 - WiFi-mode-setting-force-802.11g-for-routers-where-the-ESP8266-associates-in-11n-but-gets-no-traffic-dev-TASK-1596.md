@@ -3,11 +3,11 @@ id: TASK-1597
 title: >-
   WiFi mode setting: force 802.11g for routers where the ESP8266 associates in
   11n but gets no traffic (dev TASK-1596)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-03T22:19:00Z'
-updated_date: '2026-11-04T04:56:00Z'
+updated_date: '2026-11-04T05:07:00Z'
 labels:
   - wifi
   - esp8266
@@ -28,7 +28,7 @@ Port/1.x implementation of dev TASK-1596. Field report robou1337 (#english-suppo
 - [x] #1 settings.wifi.bForce11g (JSON WifiForce11g, REST wififorce11g, default false) read/write/REST/whitelist/debug dump; web UI label + help
 - [x] #2 PHY mode set explicitly (11G when forced, 11N otherwise) right after WiFi.mode(WIFI_STA) in startWiFi(), read back via getPhyMode() and logged
 - [x] #3 Config portal field 'WiFi mode' (auto/11g, always submitted) applied and saved before WiFiManager connects
-- [ ] #4 Bench .68: default logs phy 11n and connects; forced logs phy 11g and stays reachable; back to auto logs 11n
+- [x] #4 Bench .68: default logs phy 11n and connects; forced logs phy 11g and stays reachable; back to auto logs 11n
 - [x] #5 Full tests/ + evaluate.py green, build green, released as a 1.7.9 beta prerelease
 <!-- AC:END -->
 
@@ -36,4 +36,12 @@ Port/1.x implementation of dev TASK-1596. Field report robou1337 (#english-suppo
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-04: shipped in v1.7.9-beta.2 (622bbbe6c, release https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.9-beta.2). Evidence: test/run_tests.bat green, evaluate.py --quick 38 passed 0 failed, build.bat firmware+fs exit 0 (777128 B sketch, 74%). AC4 (bench .68) NOT done: .68 unreachable (ping ok, HTTP/telnet dead) and off USB (no COM3); Robert chose to release without the bench test. Field confirmation asked from robou1337 (#english-support msg 1567401891200245933). v1.7.9-beta.1 was tagged by mistake from eeeae1e21 (the code commit had been refused by the commit-msg hook over a dev TASK id); release notes of beta.1 now say so, tag skipped. Research: Tasmota (Wifi 2/3/4, support_command.ino:2993-3029) and ESPHome (phy_mode, PR #16055) offer a manual PHY option only, no automatic 11n->11g fallback.
+
+2026-11-04 field confirmation (replaces the bench test of AC4, Robert's call): robou1337, #english-support msg 1567330104563081218, 00:10 UTC: 'can confirm it works'. Screenshot: Firmware 1.7.9-beta.2+622bbbe (compiled Nov 3 2026 23:21:38), SSID Bbox-806ABA80, IP 192.168.1.95, gw 192.168.1.254, RSSI -63, web UI reachable. Also on it: PIC Available false (likely D1 mini off the OTGW board) and a stored 'time not set - reboot cause: External System (6)' entry; not related to this change, not investigated.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Opt-in setting to force WiFi 802.11g (settings.wifi.bForce11g, JSON WifiForce11g, REST wififorce11g, default off) plus a 'WiFi mode' field (auto/11g) in the WiFiManager setup portal, applied via WiFi.setPhyMode() right after WiFi.mode(WIFI_STA) in startWiFi() and in the portal save-params callback before WiFiManager connects. Default path unchanged (explicit 11n). Released in v1.7.9-beta.2 (622bbbe6c); v1.7.9-beta.1 was tagged by mistake without the change (release notes say so). Evidence: test/run_tests.bat green, evaluate.py --quick 38/0, build green; field confirmation by robou1337 on his Bouygues Bbox Wi-Fi 7 (msg 1567330104563081218). Not verified: bench test on .68 (unreachable; waived by Robert), the portal field path on hardware by us (robou's result implies it works but he may have used the settings page).
+<!-- SECTION:FINAL_SUMMARY:END -->
