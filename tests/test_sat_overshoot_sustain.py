@@ -599,7 +599,7 @@ class LowLoadEntryCells(unittest.TestCase):
         # The loop cannot be sliced (static, hardware-bound), so this is a source assertion. thermo-nova update():
         # `if requested >= maximum_setpoint: pwm.disable()` precedes `_maybe_enable_pwm_on_sustained_overshoot` (heating_control.py:203-210).
         s = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
-        a = s.index("if (pidOutput >= sysMax && state.sat.eControlMode == SAT_MODE_PWM) {")
+        a = s.index("if (pidOutput >= maxSetpoint && state.sat.eControlMode == SAT_MODE_PWM) {")
         b = s.index("satCycleCheckOvershootSwitch(pidOutput, _sat_tickMs);")
         self.assertLess(a, b)
 
