@@ -3,11 +3,11 @@ id: TASK-1599
 title: >-
   Tooling: 'backlog board' grows to 5-9 GB RAM and starves builds and commit
   hooks
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-04T05:35:00Z'
-updated_date: '2026-11-04T07:59:00Z'
+updated_date: '2026-11-04T17:49:00Z'
 labels:
   - tooling
   - backlog
@@ -25,7 +25,7 @@ Observed three times on 2026-11-02/04 on the maintainer's PC: the backlog.md TUI
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Reproduce: board memory over time with the repo idle vs with backlog CLI edits in other worktrees; record version and numbers
-- [ ] #2 Check backlog.md upstream (GitHub issues/releases) for a known leak or fix; upgrade or file an issue with the numbers
+- [x] #2 Check backlog.md upstream (GitHub issues/releases) for a known leak or fix; upgrade or file an issue with the numbers
 - [x] #3 Interim rule recorded (e.g. close the board after use, or a watchdog) if no fix exists
 <!-- AC:END -->
 
@@ -37,4 +37,12 @@ Observed three times on 2026-11-02/04 on the maintainer's PC: the backlog.md TUI
 2026-11-04 test 3: same storm test with check_active_branches=false and remote_operations=false (local wt-stock config only, reverted after): peaks 1882, 2084, 2156 MB, each back to ~224 MB. So cross-branch loading is not the main driver (with it on: 0/1611/3456 MB; one run each, noisy). The driver is the full corpus reload itself: ~9.7 MB of task text becomes ~2 GB transient per reload. Code (upstream 3a296c0, src/core/content-store.ts:1086-1186): a 'rename' event (how git and editors write files) can call loadTasksWithLoader() (full corpus) inside reconcileRenamedItem; any change in an archived-task dir calls refreshTasksFromDisk() (full corpus). Upstream comment posted: https://github.com/MrLesk/Backlog.md/issues/1038#issuecomment-6623857412
 
 2026-11-04 local fix shipped: 1250 Done tasks archived with 'backlog task archive' (origin/dev 3dd6efdbf, 1250 pure renames, 107 tasks left in backlog/tasks; 29 duplicate-ID groups left, the CLI blocks ID commands on those). commit-msg hook accepts archived task records (04a071a5c; red/green: archived-only task old exit 1 / new exit 0, unknown id stays blocked). Measured on a copy: board burst peak 2526 -> 684 MB. Interim rule recorded in memory (feedback_backlog_board_short_open): board only briefly open; sessions may stop it under memory pressure and report. Upstream: comment on MrLesk/Backlog.md#1038 posted; coalescing fix being prepared locally (not opened yet). AC2 (upstream fix/upgrade) open.
+
+2026-11-04 upstream PR opened: MrLesk/Backlog.md#1173 (BACK-799, head 65e2dcf, refs #1038). Watcher harness peak >6.9 GB -> ~640 MB on a 1353-task backlog; new tests red on old, green on fix. Full bun run test on Windows: old 3178 pass/418 fail, fix 3204/393; 380 shared failures are Windows environment. Only fix-side suspect tui-task-composer: 10 s timeout flake, old 6/10 fail, fix 4/10, 0/5 both at 60 s; changed code not on its path. Evidence: session scratchpad probe/ (full-old/full-fix logs, flake.csv). Until a release with the fix: archive Done tasks, keep the board briefly open.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Backlog board memory: root cause is watchTasks calling loadTask per file event, each a full corpus read, about 2N reads on a burst of N events (AC1, measured 1.6-3.5 GB peaks, up to >6.9 GB in the harness). Local fix: 1250 Done tasks archived (3dd6efdbf) plus a commit-msg hook that accepts archived task records (04a071a5c), board burst peak 2526 -> 684 MB. Interim rule: board only briefly open (AC3, memory feedback_backlog_board_short_open). Upstream: comment on #1038 and PR MrLesk/Backlog.md#1173 coalescing the corpus reads, ~640 MB in the harness, full Windows test run 25 fewer failures, flake ruled out (AC2). Not verified: Linux CI of the PR, which runs upstream.
+<!-- SECTION:FINAL_SUMMARY:END -->
