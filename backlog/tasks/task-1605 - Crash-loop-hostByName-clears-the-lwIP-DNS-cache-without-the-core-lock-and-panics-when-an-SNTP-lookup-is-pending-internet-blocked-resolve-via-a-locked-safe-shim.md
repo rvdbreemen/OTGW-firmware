@@ -4,11 +4,11 @@ title: >-
   Crash loop: hostByName() clears the lwIP DNS cache without the core lock and
   panics when an SNTP lookup is pending (internet blocked): resolve via a
   locked-safe shim
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-04T16:24:00Z'
-updated_date: '2026-11-04T18:10:00Z'
+updated_date: '2026-11-04T19:46:00Z'
 labels:
   - network
   - crash
@@ -28,7 +28,7 @@ Bench .63 beta.74, 2026-11-04 16:56-17:21 (TASK-1471 T1: MikroTik forward drop f
 <!-- AC:BEGIN -->
 - [x] #1 A Platform shim (platform_esp32.h) resolves a hostname with lwip_getaddrinfo (thread-safe, no dns_clear_cache) with a bounded wait; no application code calls Network/WiFi.hostByName or connects by hostname any more (source gate test)
 - [x] #2 Weather, PIC update check/download and MQTT hostname broker connect by the resolved IP while the HTTP Host header keeps the hostname (HTTPClient reuses the pre-connected client)
-- [ ] #3 Bench .63 with the TASK-1471 T1 drop rule for 25 min: no panic, bootcount unchanged, no loop stall from these paths (red: beta.74 five panics in 25 min)
+- [x] #3 Bench .63 with the TASK-1471 T1 drop rule for 25 min: no panic, bootcount unchanged, no loop stall from these paths (red: beta.74 five panics in 25 min)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -37,4 +37,12 @@ Bench .63 beta.74, 2026-11-04 16:56-17:21 (TASK-1471 T1: MikroTik forward drop f
 2026-11-04 (opus agent; lead reran in wt-int4): platformResolveHost() (platform_esp32.h:406-447, lwip_getaddrinfo AF_INET, never dns_clear_cache; DNS bound derived 7 s per server, 21 s worst case with 3 servers); networkStuff.ino netResolveUrlHost/netConnectIp/netConnectUrl; weather, PIC HEAD/GET, webhook (also fixes its double lookup) do http.begin() THEN connect by IP so HTTPClient reuses the client and the Host header stays the hostname (HTTPClient.cpp:283-288, 1075-1085, 1145); MQTT broker lookup via the shim (setServer(IPAddress) path, ClientSync connect(host) unreachable). tests/test_no_hostbyname.py 12 OK (HEAD: 4 FAIL incl. connect-order C2), weather handoff 10, stream_tail 4 OK, evaluate 0 failed. Known: test_sim_fixture_builtin ser2net case already fails on HEAD (not touched). Tag beta.76.
 
 2026-11-04 bench beta.76 on .61 (T1: MikroTik forward drop .61 -> internet, 18:14-18:39, rule auto-removed, 'left: 0'): 5 weather attempts (18:19, 18:20, 18:22, 18:26, 18:34), each 'Net: DNS lookup failed' after ~14 s inside the worker task (stack 31732 vs loop 32756); bootcount 42 the whole run (no restart), hd_max_loop_gap_ms 456 constant; reboot_log only the flash lines. Same rule on .63 with beta.74 (16:56-17:21): 5 Exception/panic restarts. Same-board (.63) green run with beta.77 follows after the 20:00 publish.
+
+2026-11-04 same-board green run .63 beta.79 (T1 forward drop .63 -> internet 20:19-20:44, rule auto-removed 'left: 0'): bootcount 128 in all 26 samples (no restart; beta.74 on the same board and rule: 5 Exception/panic restarts), hd_max_loop_gap_ms 472 (baseline 456-493), 4 'Net: DNS lookup failed' in the weather worker, reboot_log only the flash lines.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Hostnames are resolved through platformResolveHost() (lwip_getaddrinfo, never dns_clear_cache) instead of NetworkManager::hostByName(), which cleared the lwIP DNS cache without the core lock and panicked when SNTP retried. Weather, PIC update check, webhook and MQTT broker name connect by IP after http.begin(). Evidence: tests/test_no_hostbyname.py 12 OK (HEAD 4 FAIL); bench with internet blocked 25 min: beta.74 5 panics on .63, fixed builds 0 restarts on .61 (beta.76) and .63 (beta.79). Shipped in public v2.0.0-beta.77.
+<!-- SECTION:FINAL_SUMMARY:END -->

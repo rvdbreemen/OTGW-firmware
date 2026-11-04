@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-27T23:40:00Z'
-updated_date: '2026-10-31T14:02:00Z'
+updated_date: '2026-11-04T19:46:00Z'
 labels:
   - epic
   - sat
@@ -86,6 +86,8 @@ stays; the order inside it changes so that this defect is fixed first, with old-
 2026-10-28 Codex execution-graph update completed at Robert's request: preserved reconciliation 6dda1e15a, linked 1422/1424 into 1412.7 and 1413 into 1412.16, encoded the serial PID writer chain without Q53 blocking independent fixes, refreshed markdown/JSON and audit. Audit: 63 nodes, zero cycles, 42 issue owners, all relevant SAT follow-ups in the epic closure, bench required for formal field stages; injected cycle and bench-bypass controls rejected. Builder handoff published in comments on 1368/1409/1270 and this epic, linked from AGENTS.md and CLAUDE.md. No direct active builder endpoint was available and no acknowledgement is claimed. Active builders retain ownership of 1368/1409 and all firmware edits. No control change or task completion claimed.
 
 Robert 2026-10-30 (session, coordinator otgw-firmware-b8): WAIVER of the field-validation order for the first 2.0.0 beta (target Sun 2026-11-01). SAT ships experimental / opt-in (default off); SAT field data may come from named testers who enable it knowingly, before 1412.21/.22 bench and equipment acceptance. The epic stays the route to 'SAT stable'; this waiver covers field-data collection only, not a stable claim.
+
+2026-11-04 Robert (interactive): the official 2.0.0 stable release waits until SAT low-load is field-validated (epic TASK-1412 closed: 1412.16-26), not 'SAT experimental'. Estimate 4-6+ weeks, gated by testers and heating-season data.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

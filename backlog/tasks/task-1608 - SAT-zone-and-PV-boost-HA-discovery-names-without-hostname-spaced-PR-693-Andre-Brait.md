@@ -3,10 +3,11 @@ id: TASK-1608
 title: >-
   SAT zone and PV-boost HA discovery names without hostname, spaced (PR #693,
   Andre Brait)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-04T17:56:00Z'
-updated_date: '2026-11-04T19:18:00Z'
+updated_date: '2026-11-04T19:47:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []

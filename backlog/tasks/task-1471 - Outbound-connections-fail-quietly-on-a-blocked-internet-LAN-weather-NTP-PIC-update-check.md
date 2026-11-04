@@ -3,11 +3,11 @@ id: TASK-1471
 title: >-
   Outbound connections fail quietly on a blocked-internet LAN (weather, NTP, PIC
   update check)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T10:49:00Z'
-updated_date: '2026-11-04T16:24:00Z'
+updated_date: '2026-11-04T19:46:00Z'
 labels:
   - sat
   - network
@@ -26,7 +26,7 @@ Tester martreides (#alpha-testing msg 1565312598595993792, 2026-10-29) runs the 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Inventory of every outbound connection on dev with file:line, timeout and the task/context it runs in
-- [ ] #2 Bench test with outbound internet blocked (router firewall drop rule, MikroTik): no loop gap above the normal maximum, no reboot, SAT keeps running on its fallbacks; evidence = capture transcript
+- [x] #2 Bench test with outbound internet blocked (router firewall drop rule, MikroTik): no loop gap above the normal maximum, no reboot, SAT keeps running on its fallbacks; evidence = capture transcript
 - [x] #3 Each failure path logs at most once per retry interval and backs off; any path that fails this gets a fix or its own task
 <!-- AC:END -->
 
@@ -44,4 +44,12 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: weather backof
 2026-11-04 (sonnet agent, lead verified R2 in code): inventory in docs/audits/2026-11-04-outbound-connections.md (weather, NTP, PIC HEAD/GET, MQTT DNS/connect, webhook LAN-only, mDNS, DHCP/DNS; no GitHub/OTA/Discord calls). AC3: every path backs off and logs at most once per interval except two that block the loop task: R1 weather GET (5 s+ per attempt), R2 refreshpic GET after a failed HEAD (lead: a feedWatchDog sits between HEAD and GET, so each block stays under the 30 s TWDT, but the GET is useless); both go to TASK-1604. Low: R4 MQTT hostname lookup, R5 two ungated [HEAP] lines. AC2 bench plan in the audit.
 
 2026-11-04 AC2 red run beta.74 (.63, T1 forward drop, 16:56-17:21): five Exception/panic reboots, one every 5 min, backtrace into NetworkManager::hostByName -> dns_clear_cache -> sntp_dns_found (lwIP core-lock assert); filed TASK-1605 (high). Router: rule auto-removed, 'left: 0', export before/after saved on the router (t1471-red-before/after).
+
+2026-11-04 same-board green run .63 beta.79 (T1 forward drop .63 -> internet 20:19-20:44, rule auto-removed 'left: 0'): bootcount 128 in all 26 samples (no restart; beta.74 on the same board and rule: 5 Exception/panic restarts), hd_max_loop_gap_ms 472 (baseline 456-493), 4 'Net: DNS lookup failed' in the weather worker, reboot_log only the flash lines. AC2 met: with outbound internet blocked no reboot and no loop gap above normal on the fixed build; the red run on beta.74 found TASK-1605.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Outbound connections inventoried (docs/audits/2026-11-04-outbound-connections.md); blocked-internet bench found and drove two fixes (TASK-1604 loop stall, TASK-1605 crash loop). Evidence: red beta.74 5 panics / green beta.76 and beta.79 0 restarts, loop gap at baseline. Low items R4/R5 left as noted.
+<!-- SECTION:FINAL_SUMMARY:END -->

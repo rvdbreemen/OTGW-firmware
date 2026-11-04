@@ -3,11 +3,11 @@ id: TASK-1604
 title: >-
   Outbound fetches off the loop task: weather fetch in a one-shot task, and the
   PIC refresh stops after a failed update check (TASK-1471 R1, R2)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-04T15:53:00Z'
-updated_date: '2026-11-04T18:10:00Z'
+updated_date: '2026-11-04T19:46:00Z'
 labels:
   - network
 milestone: 2.0.0
@@ -26,7 +26,7 @@ From the TASK-1471 audit (docs/audits/2026-11-04-outbound-connections.md). R1: t
 <!-- AC:BEGIN -->
 - [x] #1 R1: the weather fetch runs outside the loop task (one-shot FreeRTOS task like webhook.ino:336, or the async HTTP pattern) with a connect timeout <= 2 s; the loop never blocks on it (host/source test + bench max_loop_gap_ms with internet blocked equal to baseline)
 - [x] #2 R2: refreshpic() returns without a GET when the update check gave no version (host or source test red on old code)
-- [ ] #3 Bench .63 with a scoped MikroTik drop rule for outbound internet: no loop-stall line from weather or PIC paths, no reboot, settings unchanged
+- [x] #3 Bench .63 with a scoped MikroTik drop rule for outbound internet: no loop-stall line from weather or PIC paths, no reboot, settings unchanged
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -35,4 +35,12 @@ From the TASK-1471 audit (docs/audits/2026-11-04-outbound-connections.md). R1: t
 2026-11-04 (sonnet agent; lead reran in wt-int4): R1 weather fetch on a one-shot worker (8192 B stack, prio 1, app core, via platformTaskCreatePinned + new platformTaskExit shim), IDLE/RUNNING/READY atomic handoff, the loop task applies the result (no SAT state written by the worker), setConnectTimeout(2000), no start at HEAP_CRITICAL; telnet 'w' prints when the result is consumed. R2 refreshpic returns on an empty version. tests/test_weather_worker_handoff.py 10 OK (old: 10 FAIL), stream_tail 4, snowfall 3, settings_float 2 OK, evaluate 0 failed. Tag beta.75; bench pending (TASK-1471 T1 red run on beta.74 running).
 
 2026-11-04 bench beta.76 on .61 (T1: MikroTik forward drop .61 -> internet, 18:14-18:39, rule auto-removed, 'left: 0'): 5 weather attempts (18:19, 18:20, 18:22, 18:26, 18:34), each 'Net: DNS lookup failed' after ~14 s inside the worker task (stack 31732 vs loop 32756); bootcount 42 the whole run (no restart), hd_max_loop_gap_ms 456 constant; reboot_log only the flash lines. Same rule on .63 with beta.74 (16:56-17:21): 5 Exception/panic restarts. Same-board (.63) green run with beta.77 follows after the 20:00 publish. AC1 bench half: max loop gap with internet blocked equal to baseline (456 ms).
+
+2026-11-04 same-board green run .63 beta.79 (T1 forward drop .63 -> internet 20:19-20:44, rule auto-removed 'left: 0'): bootcount 128 in all 26 samples (no restart; beta.74 on the same board and rule: 5 Exception/panic restarts), hd_max_loop_gap_ms 472 (baseline 456-493), 4 'Net: DNS lookup failed' in the weather worker, reboot_log only the flash lines.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The weather fetch runs in a one-shot worker task (atomic IDLE/RUNNING/READY handoff, the loop applies the result) and refreshpic() stops after a failed update check. Evidence: tests/test_weather_worker_handoff.py 10 OK (old 10 FAIL); bench with internet blocked: loop gap unchanged (456/472 ms), no restart.
+<!-- SECTION:FINAL_SUMMARY:END -->
