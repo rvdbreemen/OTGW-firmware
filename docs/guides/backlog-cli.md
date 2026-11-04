@@ -2,7 +2,7 @@
 
 Full CLI reference for task management in this project. Read this when you need command details.
 
-> CLI version: **backlog.md v1.46.1** — updated from v1.40.0; notable additions: task comments, modified-file tracking, label management, milestone filter on task list, enhanced search filters.
+> CLI version: **backlog.md v1.46.1** — updated from v1.40.0; notable additions: task comments, modified-file tracking, label management, milestone filter on task list, enhanced search filters. Robert's workstation runs v1.55.3 (checked 2026-11-04); the commands below work on both.
 
 ---
 
@@ -236,7 +236,9 @@ backlog search --modified-file platform.h --plain
 | Limit results | `backlog search "heap" --limit 10 --plain` |
 | Archive | `backlog task archive 42` |
 
-**Known bug:** `backlog task list` sometimes returns empty. Use `backlog task <id> --plain` or read `backlog/tasks/` directly as a fallback.
+**`backlog task list` works.** The old "returns empty" note did not reproduce on 2026-11-04 (TASK-1635): v1.55.3 on Windows listed 115 of 115 task files, and 35 with `-s "To Do"`; v1.46.1 on Linux listed all 115 too.
+
+**Windows: no multi-line arguments through `backlog.cmd`.** cmd.exe cuts the argument list at the first newline inside an argument. A multi-line `-d`, `--notes` or `--plan` keeps only its first paragraph and every later flag is silently dropped. For multi-line text call `node <npm-prefix>/node_modules/backlog.md/cli.js ...` directly (on this machine `C:\nvm4w\nodejs\node_modules\backlog.md\cli.js`), or add paragraphs one by one with `--append-notes`.
 
 ---
 

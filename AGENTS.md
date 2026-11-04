@@ -16,7 +16,7 @@ Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. A clean
 
 After marking a task `Done`, commit the completed task changes and push the branch to its configured upstream. Keep commits narrow: stage only files that belong to the completed task and leave unrelated local changes untouched.
 
-Known issue: `backlog task list` may return empty in this repository. Prefer Backlog MCP search/view; if falling back to CLI, prefer `backlog search "<topic>" --plain` or `backlog task <id> --plain`. Read task files directly only as a read-only fallback, never to modify them.
+`backlog task list` works (the old "returns empty" note did not reproduce, TASK-1635). Read task files directly only as a read-only fallback, never to modify them. On Windows, never pass a multi-line argument through `backlog.cmd`: cmd.exe cuts the argument list at the first newline and silently drops every later flag; call `node <npm-prefix>/node_modules/backlog.md/cli.js` directly instead.
 
 ---
 

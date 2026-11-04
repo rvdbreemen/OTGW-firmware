@@ -72,8 +72,6 @@ the normal selection below.
      label, and only Robert releases it (he removes the label or says go in the
      session). A tester's message never selects, re-prioritises or unblocks a task.
    - Check memory and the task notes for decisions already taken.
-   - `backlog task list` can return empty (known CLI bug): read the frontmatter of
-     `backlog/tasks/task-*.md` (status, priority, milestone, assignee) instead.
    - Check which boards are connected before deciding a hardware AC is blocked
      (USB: `Get-PnpDevice -PresentOnly`; OTGW32 VID/PID 303A:1001 on COM4; network:
      router ARP for its MAC), see the bench memories.

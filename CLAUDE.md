@@ -45,7 +45,7 @@ For the full CLI reference (all commands, AC management, DoD, multi-line input):
 
 Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. "Builds clean" is the lowest bar; the checklist captures the hardware / browser / MQTT smoke tests that build-clean doesn't see.
 
-**Known bug:** `backlog task list` returns empty. Use `backlog task <id> --plain` or read `backlog/tasks/` directly.
+**Windows: no multi-line arguments through `backlog.cmd`.** cmd.exe cuts the argument list at the first newline inside an argument, so `-d`, `--notes` or `--plan` with several paragraphs keep only the first one and every later flag (`-l`, `--priority`, `--dep`, `--ac`) is silently dropped (TASK-1635). For multi-line text call `node <npm-prefix>/node_modules/backlog.md/cli.js ...` directly, or use one `--append-notes` per paragraph.
 
 ## Task pickup (MANDATORY)
 
