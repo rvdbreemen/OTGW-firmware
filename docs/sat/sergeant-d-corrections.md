@@ -5968,3 +5968,11 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Quoted:** "Any CS override, accept now"
 
 **Settled:** ADR-208 Accepted: in OT-Direct gateway mode bit 0 of a relayed thermostat MsgID 0 gets the same rule as the gateway's own frame while any CS override is held (SAT or manual CS=), as the PIC does (gateway.asm:2700-2750); the thermostat gets the boiler's slave status back with its own high byte. SAT-only was rejected (the two frames could disagree). Entries 5, 17, 39, 60 agree; no entry decides OT-Direct transport. **Task:** TASK-1600 (implementation), TASK-1601 (field capture). **Open:** Sergeant D's comment, if any.
+
+## 265. Sergeant D confirms the eight maintainer decisions of 2026-11-04 (entries 257-264) (Sergeant D, 2026-11-04)
+
+**Source:** sergeantd, 2026-11-04 07:16 UTC, msg 1567437260549263433 (https://discord.com/channels/812969634638725140/1514720723980259460/1567437260549263433), in reply to Robert's "please check my decisions. Any correction needed?" (msg 1567422816540823717) after our summary of the eight decisions (msg 1567417361798144021).
+
+**Quoted:** "They look good to me."
+
+**Settled:** no correction to entries 257 (curve rounding), 258 (stall threshold 6 h expiry and >=), 259 (overshoot_cooling flame-off latch), 260 (no PWM schedule while cold-cut), 261 (boot PM chain whatever SAT is), 262 (pressure 600 s after flame-off, only if proven), 263 (start-up window keeps the previous CS) and 264 (ADR-208, CH override on the relayed thermostat MsgID 0 for any CS override). They stand as decided. **Task:** TASK-1360, 1356, 1361, 1515, 1384, 1579, 1412.12, 1600. **Open:** none from him.
