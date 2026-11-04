@@ -85,7 +85,7 @@ def parse_adr(path):
     supersedes = _fm_list(fm, "supersedes")
     # fall back to prose if frontmatter is absent/empty
     scope = (status_line + " " + prose_status + " " + inline_status)
-    if not superseded_by:
+    if not superseded_by and not re.search(r"^superseded_by:", fm, re.M):
         superseded_by = sorted({int(x) for x in re.findall(r"[Ss]upersed\w*\s+by\s+\[?ADR-(\d+)", scope)})
 
     # ADR-080: a binding ADR that names a check_* gate must have that gate. The
