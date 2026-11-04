@@ -386,6 +386,67 @@ int main(int argc, char** argv) {
     printf("sent=%s\n", all);
     return 0;
   }
+  if (!strcmp(sc, "rate")) {             // TASK-1571 rule 1: a client repeats one prefix faster than the delay (1000 ms)
+    // argv: mode ("tt" = TT=<changing value>, "pr" = PR=A exact repeat), period_ms, count. The PIC echoes after 25 ms.
+    const char* mode = argv[2]; const int period = atoi(argv[3]); const int count = atoi(argv[4]);
+    const uint32_t t0 = 100000, end = t0 + (uint32_t)period * count + 8000;
+    int offered = 0, sends = 0; uint32_t echoAt = 0, lastSend = 0, maxGap = 0; char pend[32] = "";
+    for (uint32_t t = t0; t <= end; t += 5) {
+      g_ms = t;
+      if (offered < count && t >= t0 + (uint32_t)period * offered) {
+        char c[16];
+        if (!strcmp(mode, "pr")) strcpy(c, "PR=A"); else snprintf(c, sizeof(c), "TT=%d.0", 10 + offered % 20);
+        addCommandToQueue(c, (int)strlen(c), false, 1000);
+        offered++;
+      }
+      if (echoAt && t >= echoAt) {
+        char e[32];
+        if (pend[0] == 'P') snprintf(e, sizeof(e), "PR: %c=1", pend[3]); else snprintf(e, sizeof(e), "%c%c: %s", pend[0], pend[1], pend + 3);
+        echo(e); echoAt = 0;
+      }
+      g_sent[0] = 0; handleCommandQueue();
+      if (g_sent[0]) {
+        sends++; if (lastSend && t - lastSend > maxGap) maxGap = t - lastSend; lastSend = t;
+        strncpy(pend, g_sent, sizeof(pend) - 1); char* s = strchr(pend, ';'); if (s) *s = 0;
+        echoAt = t + 25;
+      }
+    }
+    printf("offered=%d\nsends=%d\nmax_gap_ms=%lu\nleft=%d\n", offered, sends, (unsigned long)maxGap, cmdQueueSize);
+    return 0;
+  }
+  if (!strcmp(sc, "pr_ab")) {            // TASK-1571 rule 2: PR=A then PR=B within the delay; each is confirmed by its own echo
+    addCommandToQueue("PR=A", 4, false, 1000);
+    addCommandToQueue("PR=B", 4, false, 1000);
+    char all[64] = "";
+    for (uint32_t t = 100000; t <= 106000; t += 5) {
+      g_sent[0] = 0; loopAt(t); strcat(all, g_sent);
+      char line[32]; const char* p = g_sent;
+      while (sscanf(p, "%31[^;];", line) == 1) { char e[32]; snprintf(e, sizeof(e), "PR: %c=1", line[3]); echo(e); p = strchr(p, ';') + 1; }
+    }
+    printf("sent=%s\nqueued=%d\n", all, cmdQueueSize);
+    return 0;
+  }
+  if (!strcmp(sc, "pr_repeat")) {        // TASK-1571 rule 2: an exact repeat of PR=A still coalesces
+    addCommandToQueue("PR=A", 4, false, 1000);
+    addCommandToQueue("PR=A", 4, false, 1000);
+    const int queued = cmdQueueSize;
+    char all[64] = "";
+    for (uint32_t t = 100000; t <= 103000; t += 5) {
+      g_sent[0] = 0; loopAt(t); strcat(all, g_sent);
+      if (g_sent[0]) echo("PR: A=1");
+    }
+    printf("queued=%d\nsent=%s\n", queued, all);
+    return 0;
+  }
+  if (!strcmp(sc, "due_wrap")) {         // TASK-1571 rule 1 across the millis() wrap: the earliest due is kept
+    const uint32_t start = 0xFFFFFE00u;   // 512 ms before the wrap
+    g_ms = start; addCommandToQueue("TT=20.0", 7, false, 1000);        // due start+1000 (after the wrap)
+    g_ms = start + 300; addCommandToQueue("TT=21.0", 7, false, 1000);   // newer text, later due: keeps start+1000
+    long at = -1; char got[32] = "";
+    for (uint32_t d = 0; d <= 3000 && at < 0; d += 5) { g_sent[0] = 0; loopAt(start + d); if (g_sent[0]) { at = (long)d; strcpy(got, g_sent); } }
+    printf("sent=%s\nsent_at_ms=%ld\n", got, at);
+    return 0;
+  }
   if (!strcmp(sc, "tp_mm")) {            // Q-1537b: TP=11:12 then MM= offered in that order, both already queued
     addCommandToQueue("MM=80", 5, false, 0);
     addCommandToQueue("TP=11:12=80", 11, false, 0);
@@ -737,6 +798,32 @@ class PmChain(unittest.TestCase):
         # TASK-1569 rule 5b (Robert 2026-11-02). HEAD: MM=90 kept MM=80's first slot and went out before CS=45.0.
         out = self.run_sc("fifo")
         self.assertEqual(out["sent"], "CS=45.0;MM=90;")
+
+    def test_repeating_client_is_not_starved(self):
+        # TASK-1571 rule 1 (Robert 2026-11-04): the same prefix every 200 ms for 24 s (delay 1000 ms) must still
+        # reach the PIC about once per second. HEAD: every repeat re-armed due = now + 1000, so only 1 send in total.
+        for mode in ("tt", "pr"):
+            with self.subTest(mode=mode):
+                out = self.run_sc("rate", mode, "200", "120")
+                self.assertGreaterEqual(int(out["sends"]), 18, out)
+                self.assertLessEqual(int(out["max_gap_ms"]), 1300, out)
+                print(f"\n  {mode}: 120 offers / 24 s -> {out['sends']} sends, max gap {out['max_gap_ms']} ms")
+
+    def test_earliest_due_survives_the_millis_wrap(self):
+        out = self.run_sc("due_wrap")
+        self.assertEqual(out["sent"], "TT=21.0;")   # newest text wins
+        self.assertLessEqual(abs(int(out["sent_at_ms"]) - 1000), 10, out)   # not 1300 (re-armed)
+
+    def test_pr_different_registers_both_go_out(self):
+        # TASK-1571 rule 2: only an exact repeat of PR= coalesces. HEAD: PR=B replaced PR=A, only PR=B was sent.
+        out = self.run_sc("pr_ab")
+        self.assertEqual(out["sent"], "PR=A;PR=B;")
+        self.assertEqual(out["queued"], "0")
+
+    def test_pr_exact_repeat_still_coalesces(self):
+        out = self.run_sc("pr_repeat")
+        self.assertEqual(out["queued"], "1")
+        self.assertEqual(out["sent"], "PR=A;")
 
     def test_tp_offered_before_mm_goes_first(self):
         # Q-1537b / entry 233 (Immergas): TP=11:12 is offered right before MM=, so it must reach the PIC first.

@@ -141,7 +141,7 @@
 - **Purpose**: Queue a command for the PIC (for example `GW=1`, `TT=20.0`). With no PIC it hands the command to `handleOTDirectCommand()` when OT-Direct is active (the combo OT-Direct path) and answers `Sent` when the handler accepted it, `Dropped` when it refused it (TASK-1593: error reply, unknown command, command ring full); with neither it ignores the command (`Dropped`).
 - **Parameters**:
   - `buf`, `len`: command text, at least `XX=`, shorter than the entry size
-  - `forceQueue`: when false, a queued command with the same two-letter prefix is overwritten instead of appended; when true it always takes a new slot (the `PR=` queries use this)
+  - `forceQueue`: when false, a queued command with the same two-letter prefix is overwritten instead of appended (the newest text wins, the entry moves to the back and keeps the earlier of its old and new due time, so a client that repeats faster than `delay` is not starved); `PM=`, `TP=` and `PR=` are unique per value: only an exact repeat overwrites. When true it always takes a new slot
   - `delay`: ms until first send (default `OTGW_DELAY_SEND_MS` 1000)
 - **CS= refusal (TASK-1236, ADR-179)**: a `CS=` is refused while `satOwnsControlSetpoint()` is true unless `satCommandInFlight()` marks it as SAT's own. SAT sends its own through `satEnqueueOwnCS()`. Bytes written straight to the PIC over port 25238 do not pass this queue and stay unfiltered (ADR-177).
 - **Settings re-read**: commands that change a readable PIC setting (`GW`, `GA`, `GB`, `SB`, `VR`, `TS`, `IT`, `OH`, `LA`-`LF`) call `triggerPICsettingsReadout()`
@@ -149,7 +149,7 @@
 - **Related**: `handleCommandQueue()`, `checkCommandResponse()`, `removeFromCmdQueue()`, `OT_cmd_t`
 
 ##### `void handleCommandQueue()`
-- **Purpose**: Send due commands and drop exhausted ones (called every second from `doTaskEvery1s()`)
+- **Purpose**: Send due commands, one at a time and paced by the PIC's echo, and drop exhausted ones (called on every main-loop pass)
 - **Flow**:
   1. Skip while a port 25238 client command is recent (`SER2NET_QUIET_MS` 2000)
   2. For each due entry: `sendPICSerial()`, count a retry, reschedule `OTGW_CMD_INTERVAL_MS` (5000) ahead
@@ -353,7 +353,7 @@ The PIC byte stream reaches every consumer verbatim: the line assembler, port 25
 
 ### Command Queue with Retry
 
-Commands queued via `addCommandToQueue()` are sent when due, re-sent every 5 s until the PIC answers (`checkCommandResponse()` removes the entry), and dropped after 5 tries. A command with the same two-letter prefix overwrites its queue slot unless `forceQueue` is set.
+Commands queued via `addCommandToQueue()` are sent when due, re-sent every 5 s until the PIC answers (`checkCommandResponse()` removes the entry), and dropped after 5 tries. A command with the same two-letter prefix overwrites its queue slot unless `forceQueue` is set; `PM=`, `TP=` and `PR=` overwrite only on an exact repeat. An overwrite keeps the earliest due time, so repeating a command faster than its delay does not postpone it.
 
 ### Message Spec Compatibility
 

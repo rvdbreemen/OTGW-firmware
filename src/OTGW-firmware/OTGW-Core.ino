@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.64
+**  Version  : v2.0.0-beta.65
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3902,9 +3902,10 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
 
   // Look for an entry for the same command. PM= and TP= are unique per value (TASK-1315, Robert 2026-11-01; TP= was
   // append-only since TASK-1439): both load the PIC's single priority-message slot, so PM=3, PM=15, PM=48 (or two
-  // different TP=) in a row are separate entries; only an exact repeat matches.
+  // different TP=) in a row are separate entries; only an exact repeat matches. PR= is unique per value as well
+  // (TASK-1571, Robert 2026-11-04): PR=A and PR=B are different reports and both go out.
   int found = -1;
-  const bool uniquePerValue = (buf[0] == 'P' && buf[1] == 'M') || (buf[0] == 'T' && buf[1] == 'P');
+  const bool uniquePerValue = (buf[0] == 'P' && (buf[1] == 'M' || buf[1] == 'R')) || (buf[0] == 'T' && buf[1] == 'P');
   if (!forceQueue){
     for (int i=0; i<cmdQueueSize; i++){
       if (cmdqueue[i].cmd[0] == buf[0] && cmdqueue[i].cmd[1] == buf[1] &&
@@ -3918,9 +3919,15 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
   // Rule 5b (TASK-1569, Robert 2026-11-02): an updated command moves to the back, so the order of offering is the
   // order of sending (e.g. Immergas TP=11:12 offered before MM= also goes out first). The old entry is removed and the
   // command is appended; the lock makes the shift safe against the drain on the loop task.
+  // The updated entry keeps the earliest due (TASK-1571, Robert 2026-11-04): the newest text wins, but a client that
+  // repeats a command faster than its delay must not push the send back for ever.
   CmdQueueResult result = CmdQueueResult::Queued;
+  bool keepDue = false;
+  uint32_t keptDue = 0;
   if (found >= 0) {
     OTDebugTf(PSTR("CmdQueue: [%s] in slot [%d] updated, moved to the back\r\n"), cmdqueue[found].cmd, found);
+    keepDue = true;
+    keptDue = cmdqueue[found].due;
     removeFromCmdQueue(found);
     result = CmdQueueResult::Replaced;
   } else if (cmdQueueSize >= CMDQUEUE_MAX) {
@@ -3951,7 +3958,8 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
   cmdqueue[insertptr].cmdlen = cmdlen;
   cmdqueue[insertptr].retrycnt = 0;
   const uint32_t safeDelay = (delay <= 0) ? 0u : (uint32_t)delay;
-  cmdqueue[insertptr].due = millis() + safeDelay;
+  const uint32_t newDue = millis() + safeDelay;
+  cmdqueue[insertptr].due = (keepDue && (int32_t)(keptDue - newDue) < 0) ? keptDue : newDue;
   cmdQueueSize++;
 
   if (len >= 2) triggerReadoutForSettingsCmd(buf);
@@ -3961,9 +3969,8 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
 }
 
 /*
-  handleCommandQueue should be called every second from main loop. 
-  This checks the queue for message are due to be resent.
-  If retry max is reached the cmd is delete from the queue
+  handleCommandQueue is called from the main loop on every pass and sends at most one due command, paced by the
+  PIC's echo (see below). An entry whose retry limit is reached is deleted from the queue.
 */
 // The queue drips, paced by the PIC itself (TASK-1571, Robert 2026-11-02; replaces the fixed 1 s tick of TASK-1567).
 // One command is outstanding at a time. The PIC answers every command with an echo or an error code after it has

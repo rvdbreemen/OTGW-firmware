@@ -8,6 +8,7 @@ assignee:
   - '@claude'
 created_date: '2026-11-02T21:06:00Z'
 updated_date: '2026-11-04T05:10:00Z'
+updated_date: '2026-11-04T05:45:00Z'
 labels:
   - pic
   - command-queue
@@ -41,4 +42,5 @@ Robert 2026-11-02 (queue design rule 2 + timing analysis). Today (TASK-1567) the
 2026-11-04 ~00:15 bench .63 (beta.60+1c34c39, satsimulation temporarily OFF, restored ON after): with simulation ON every command is consumed without sending (TASK-1580 path: sendPICSerial false), so cmdq_* stay 0; measurements need simulation off. Echo latency 9 samples: min 15, avg 25, max 44 ms, hist [0,6,3,0,0,0,0,0], 0 echo timeouts (QUEUE_ECHO_GUARD_MS 50 is above the observed max). FINDING: throughput far below the echo pacing: 110 x PR=A back-to-back -> 3 sends; 120 x PR=A at 200 ms spacing -> 5 sends; burst of 20 PR=x -> 1 send; no reboot (boot 96), settings kept, cmd_dropped only the ZZ=1 NG. Coalescing of identical pending commands explains part; ~1 send per 3-4 s does not follow from the 50 ms gaps alone. AC1 (100+ samples) not reached yet; analysis lane started.
 
 2026-11-04 Robert decisions on the queue analysis: (1) on a replace keep the earliest due (min(old due, now+delay), wrap-safe) so a fast repeater is not starved; (2) PR= unique per register (add PR to the per-value unique list). Implement with host tests, one tag.
+2026-11-04 queue rules implemented (sonnet agent, lead reran in the integration tree): (1) a replace keeps the earliest due (wrap-safe), so a repeating client is no longer starved; (2) PR= is unique per register. tests/test_pic_pm_chain.py: old core 4 failures (repeat every 200 ms x120 -> 1 send; PR=A then PR=B -> only PR=B), fix 36 OK (20 sends, max gap 1.2 s; PR=A and PR=B both out; exact repeat still coalesces; millis wrap). sat_command_delivery 16, sat_cmd_cache 27, cmd_queue_drop PASS, evaluate 0 failed. Stale 'called every second' comment and c4 docs fixed. Tag beta.65; bench pending.
 <!-- SECTION:NOTES:END -->
