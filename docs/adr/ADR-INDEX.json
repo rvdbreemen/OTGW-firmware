@@ -7696,6 +7696,73 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-208",
+      "title": "OT-Direct gateway mode applies the CH= override to the relayed thermostat MsgID 0",
+      "path": "ADR-208-ot-direct-gateway-mode-applies-the-ch-override-to-the-relayed-thermostat-msgid-0.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-04",
+      "decision_summary": "In OT-Direct gateway mode, bit 0 of the master status in a relayed thermostat READDATA MsgID 0 frame is set by the sa...",
+      "topics": [
+        "ch-enable",
+        "gateway-mode",
+        "master-status",
+        "opentherm",
+        "otdirect",
+        "sat"
+      ],
+      "aliases": [
+        "CH enable on the relayed status frame",
+        "MsgID 0 relay rewrite",
+        "TASK-1238 option B",
+        "two masters on MsgID 0"
+      ],
+      "components": [
+        "OT-Direct relayed MsgID 0 CH-enable rewrite"
+      ],
+      "symbols": [
+        "applyOverrides",
+        "buildOverriddenReply",
+        "buildStatusRequest",
+        "otChModeOff",
+        "otdCsOverrideActive",
+        "otdEffectiveMasterFlags"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "In gateway mode, a relayed thermostat READDATA MsgID 0 frame gets bit 0 of its high byte from otdEffectiveMasterFlags(), with the same otChModeOff and otdCsOverrideActive() inputs that buildStatusRequest() uses, and its parity recomputed.",
+          "The reply to the thermostat for a rewritten MsgID 0 carries the boiler's low byte and the thermostat's original high byte.",
+          "The gateway's own MsgID 0 schedule and the MsgID-0-based offline detection stay in place."
+        ],
+        "must_not": [
+          "Must not rewrite any MsgID 0 bit other than bit 0 (CH enable).",
+          "Must not rewrite the frame without an active CS override, or in monitor mode.",
+          "Must not suppress the gateway's own MsgID 0 while a thermostat is connected (option A)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "To be added by the implementation task: a host test that compiles the real rewrite and reply code cut from src/OTGW-firmware/OTDirect.ino (the cut-between-markers pattern of tests/testotdchoverride.py, which already covers otdEffectiveMa...",
+          "Field validation, open: a capture from an OT-Direct user with a live thermostat in gateway mode, showing which MsgID 0 frames reach the boiler and that the boiler follows SAT's CH=0 (TASK-1238 AC1, waived for this decision)."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/OTDirect.ino"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -13546,6 +13613,54 @@
     {
       "source": "ADR-207",
       "target": "ADR-203",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-208",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-208",
+      "target": "ADR-096",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-208",
+      "target": "ADR-103",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-208",
+      "target": "ADR-179",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-208",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-208",
+      "target": "ADR-199",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-208",
+      "target": "ADR-203",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-208",
+      "target": "ADR-207",
       "type": "related",
       "resolved": true
     }

@@ -3,10 +3,10 @@ id: TASK-1238
 title: >-
   Decide how SAT's CH-enable reaches the boiler in OT-Direct gateway mode (MsgID
   0)
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-10-15 15:47
-updated_date: '2026-11-04T05:10:00Z'
+updated_date: '2026-11-04T05:50:00Z'
 labels:
   - sat
   - otdirect
@@ -25,7 +25,7 @@ Moved out of ADR-179's open questions (TASK-1237). In gateway mode the gateway s
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Bench capture in OT-Direct gateway mode with a live thermostat shows which CH-enable bit the boiler acts on
-- [ ] #2 Maintainer decision A or B (or neither) recorded in an ADR
+- [x] #2 Maintainer decision A or B (or neither) recorded in an ADR
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -44,4 +44,12 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: OTDirect.ino:585 a
 2026-11-03 Robert: no thermostat is connected to either bench board (zaphod .63, marvin .61). AC1 (capture with a live thermostat in OT-Direct gateway mode) cannot run on the bench; it needs a thermostat on marvin or a field capture from an OT-Direct user. Decision A/B stays open until then.
 
 2026-11-04 Robert: write the option-B ADR now via adr-kit (Proposed, Robert accepts), close with AC1 waived, follow-up task for a field capture from an OT-Direct user with a thermostat.
+
+2026-11-04: ADR-208 written (Proposed, docs/adr/ADR-208-ot-direct-gateway-mode-applies-the-ch-override-to-the-relayed-thermostat-msgid-0.md, quality 0.96). AC1 waived by Robert (no thermostat on the bench), follow-up field capture task created; implementation task created.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Decision (option B, Robert 2026-10-30) recorded in ADR-208 (Proposed; Robert accepts): in OT-Direct gateway mode the CH override is applied to the relayed thermostat MsgID 0, as the PIC does (gateway.asm:2700-2750). AC1 (bench capture with a live thermostat) waived by Robert 2026-11-04; follow-up field-capture and implementation tasks created.
+<!-- SECTION:FINAL_SUMMARY:END -->
