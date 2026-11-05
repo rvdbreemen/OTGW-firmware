@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T09:03:00Z'
-updated_date: '2026-11-05T16:57:00Z'
+updated_date: '2026-11-05T18:08:00Z'
 labels:
   - sat
   - diagnostics
@@ -41,4 +41,6 @@ Robert 2026-10-29: local first; cloud upload parked as a later feature (task-147
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no on-device recorder; host capture exists. Needs ADR + budget decision.
 
 2026-11-04 Robert (interactive): moved to milestone 2.1.0, out of the 2.0.0 scope.
+
+2026-11-05 Robert's decisions on the ADR-213 open questions (AskUserQuestion in the lead session): (1) no-PSRAM boards: a 4 KB ring, allocated only while a recording runs (against the recommendation of no ring); (2) PSRAM ring 1.5 MB (~13.5 h; against the 1 MB recommendation); (3) download OPEN, not admin-protected (against the recommendation); (4) keep repeat records (~2.8 MB/day); (5) after a reboot a running recording resumes as a new recording starting with the reboot/crash record; (6) port 25238 bridge bytes not recorded in version 1. Measurements: docs/diagnostics/recording-budget-1470.md (wt-1470). AC2 still lacks the .61 heap read with UI open + BLE on.
 <!-- SECTION:NOTES:END -->

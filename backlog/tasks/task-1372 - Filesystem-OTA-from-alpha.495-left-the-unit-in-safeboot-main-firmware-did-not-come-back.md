@@ -3,11 +3,11 @@ id: TASK-1372
 title: >-
   Filesystem OTA from alpha.495 left the unit in safeboot (main firmware did not
   come back)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T05:14:00Z'
-updated_date: '2026-11-05T17:09:00Z'
+updated_date: '2026-11-05T18:08:00Z'
 labels:
   - ota
 milestone: 2.0.0
@@ -24,7 +24,7 @@ ordinal: 507000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduced or explained with a capture (crashlog / serial / rollback state); if a defect, fixed so a filesystem OTA never sends a unit to safeboot, or ota_flash.py orders app/fs so it cannot happen (red/green evidence)
+- [x] #1 Reproduced or explained with a capture (crashlog / serial / rollback state); if a defect, fixed so a filesystem OTA never sends a unit to safeboot, or ota_flash.py orders app/fs so it cannot happen (red/green evidence)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -37,4 +37,12 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no repro or fix; ota_f
 Robert 2026-11-05 (session): close by changing scripts/ota_flash.py to flash the app first, then the filesystem (the AC's own alternative), with red/green evidence.
 
 2026-11-05 (sonnet agent, lead verified): scripts/ota_flash.py flashes the app first (safeboot handover, upload, wait for the main firmware) and then the filesystem; --no-fs / --no-app unchanged. A newer fs can no longer land on an older app (the reported alpha.499-on-alpha.495 case). Window new app + old fs: only checklittlefshash()'s LittleFSMismatch warning (helperStuff.ino:831-857), the fs OTA handler checks size and /version.hash only (OTGW-ModUpdateServer-esp32.h:368, 458). The fs OTA reboot inside the app's 30 s pending-verify window is safe: requestDeferredReboot -> performDeferredReboot -> doRestart (helperStuff.ino:595) -> safebootMarkAppValid() (:737). tests/test_ota_flash.py 12 OK; on HEAD's script test_app_is_flashed_before_the_filesystem FAILS (['fs','safeboot','app'] != ['safeboot','app','fs']). evaluate 0 failed. Bench next: beta.99 OTA to .61 with the new order.
+
+2026-11-05 19:05 bench (.61, OT-Direct): scripts/ota_flash.py (app-first, 5c4644a85) flashed beta.95+1fbd5cf -> beta.99+3a63cae: handover to safeboot; app OTA HTTP 200, app running beta.99; THEN filesystem OTA, 'filesystem confirmed: /version.hash 1fbd5cf -> 3a63cae', /v2.js complete 266410 B; 'settings: 177 keys, changed: none'; exit 0; bootcount 71 -> 73 (two main-app boots; safeboot does not count), lastreset Software reset, mqtt connected, no rollback (fwversion beta.99 after the fs reboot). Log: scratchpad/ota99-61.log.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: explained and fixed in the tooling (Robert's decision: app first, then fs). Cause: ota_flash.py flashed the filesystem before the app, so a newer filesystem landed on an older app (the reported alpha.499-on-alpha.495 case). Fix 5c4644a85: app first (safeboot handover, upload, wait for the main firmware), then the filesystem. Red/green: tests/test_ota_flash.py 12 OK; on the old script test_app_is_flashed_before_the_filesystem FAILS (['fs','safeboot','app'] != ['safeboot','app','fs']). Code-read: the fs OTA reboot inside the new app's 30 s pending-verify window goes requestDeferredReboot -> performDeferredReboot -> doRestart (helperStuff.ino:595) -> safebootMarkAppValid() (:737), so no rollback. Bench 2026-11-05 19:05 on .61: beta.95 -> beta.99 with the new order, app running beta.99, filesystem confirmed 1fbd5cf -> 3a63cae, settings 177 keys changed none, bootcount +2, no rollback. Not verified: the original alpha.495 safeboot hang itself was not re-reproduced on hardware.
+<!-- SECTION:FINAL_SUMMARY:END -->
