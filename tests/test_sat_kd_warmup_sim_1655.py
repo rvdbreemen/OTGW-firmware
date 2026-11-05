@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """TASK-1655: the KD warm-up study's loop is a faithful copy of the TASK-1412.19 closed loop, and the KD factor lands in
 the gain exactly as pre-registered (docs/sat/sim-1655/thresholds.md).
-
+1. With KD x0.9 (= the port's 0.063 since TASK-1656, entry 279) and no start offset, tools/research/sat/sat_kd_warmup_sim_1655.run gives the same scored numbers as
 1. With KD x1.0 and no start offset, tools/research/sat/sat_kd_warmup_sim_1655.run gives the same scored numbers as
    tools/research/sat/sat_closedloop_sim_1412_19.run for a fault-free 1412.19 class (very_low_load, seed 2 = steady 12 C).
 2. kd = round3(factor * 0.07 * 8400 * kp) for factor 1.0 / 0.9 / 0.8, and the original port gain code is restored after.
@@ -20,7 +20,7 @@ class KdWarmup(unittest.TestCase):
     def test_copy_matches_1412_19_run(self):
         ref = c19.run("very_low_load", "3_1983-92", "rad", "variable", 5.5, True, 2)
         self.assertEqual(ref["outdoor"], "steady_12")
-        mine = k.run("3_1983-92", ref["mass"], "rad", "variable", 5.5, True, 12.0, 0.0, factor=1.0,
+        mine = k.run("3_1983-92", ref["mass"], "rad", "variable", 5.5, True, 12.0, 0.0, factor=0.9,
                      hours=c19.HOURS, skip_h=c19.SETTLE_H)
         self.assertEqual(mine["share_in_0_3_scored"], ref["S1_share_in_0_3"])
         self.assertEqual(mine["max_over_scored"], ref["S2_max_over"])

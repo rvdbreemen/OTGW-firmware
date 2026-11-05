@@ -59,11 +59,13 @@ def _gains_with(factor):
 
 
 class kd_factor:
-    """Context manager: run the port PID with kd = round3(factor * 0.07 * 8400 * kp); restores the original after."""
+    """Context manager: run the port PID with kd = round3(factor * 0.07 * 8400 * kp); restores the original after.
+    Every factor, 1.0 included, uses the explicit 0.07 base of the pre-registration (docs/sat/sim-1655/thresholds.md):
+    since TASK-1656 the port itself uses 0.063 (entry 279), which equals factor 0.9 here."""
     def __init__(self, factor): self.factor = factor
 
     def __enter__(self):
-        port.Pid._gains = _ORIG_GAINS if self.factor == 1.0 else _gains_with(self.factor)
+        port.Pid._gains = _gains_with(self.factor)
         return self
 
     def __exit__(self, *a):
