@@ -720,6 +720,48 @@ paths:
                         type: integer
                       wifiquality_text:
                         type: string
+                      wifi_ap_bssid:
+                        type: string
+                        description: WiFi station link record (GH #682), always present, also while Ethernet or the AP fallback is active. Access point (BSSID, AA:BB:CC:DD:EE:FF) of the last WiFi connect; all zeros before the first connect.
+                      wifi_ap_channel:
+                        type: integer
+                        description: Channel of the last WiFi connect.
+                      wifi_outages:
+                        type: integer
+                        description: WiFi outages since boot. One outage runs from the first disconnect event after a connect to the next connect. Drops the firmware causes itself (Ethernet takeover, dead-link reconnect, AP fallback retry timeout) are not counted; see wifi_drop_self.
+                      wifi_disconnect_events:
+                        type: integer
+                        description: Every WiFi disconnect event since boot, self-caused ones included (the driver repeats the event while it retries).
+                      wifi_drop_bssid:
+                        type: string
+                        description: Access point that was left in the last drop; empty before the first drop. The wifi_drop_* fields describe the last drop, a field outage or a self-caused one; they are 0, empty or false before the first drop.
+                      wifi_drop_channel:
+                        type: integer
+                        description: Channel that was left in the last drop.
+                      wifi_drop_reason:
+                        type: integer
+                        description: ESP-IDF reason code (wifi_err_reason_t, 802.11 codes plus 200+) of the first disconnect event of the last drop; 0 before the first drop.
+                      wifi_drop_reason_name:
+                        type: string
+                        description: Name of wifi_drop_reason, e.g. BEACON_TIMEOUT; "?" for a code the framework does not name.
+                      wifi_drop_last_reason:
+                        type: integer
+                        description: Reason code of the last disconnect event of the last drop.
+                      wifi_drop_last_reason_name:
+                        type: string
+                        description: Name of wifi_drop_last_reason.
+                      wifi_drop_events:
+                        type: integer
+                        description: Disconnect events in the last drop.
+                      wifi_drop_down_sec:
+                        type: integer
+                        description: How long the last drop lasted, in seconds; 0 while it lasts.
+                      wifi_drop_ago_sec:
+                        type: integer
+                        description: Seconds since the last drop started.
+                      wifi_drop_self:
+                        type: boolean
+                        description: True when the firmware caused the last drop itself (Ethernet takeover, dead-link reconnect, AP fallback retry timeout); such a drop is not counted in wifi_outages.
                       ntpenable:
                         type: boolean
                       ntptimezone:

@@ -117,6 +117,10 @@ static void startMQTT() {}
 static void startWebSocket() {}
 static void startAPFallback() { g_apFallback++; state.net.bAPFallback = true; ev("ap_fallback"); }
 static void stopAPFallback() { state.net.bAPFallback = false; }
+// TASK-1446 link record hooks called from the state machine (tested in test_wifi_link_record.py)
+enum WifiSelfCause : uint8_t { WIFI_SELF_NONE, WIFI_SELF_ETHERNET, WIFI_SELF_AP_RETRY, WIFI_SELF_DEAD_LINK };
+static void wifiLinkMarkSelf(WifiSelfCause) {}
+static void wifiLinkEventsLog() {}
 
 // ---- fake probe shims -------------------------------------------------------------------------
 static bool     g_pcbFail = false, g_pbufFail = false;

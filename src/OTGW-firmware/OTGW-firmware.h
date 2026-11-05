@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.84
+**  Version  : v2.0.0-beta.85
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -290,6 +290,10 @@ void captureWifiDeadRestarts();          // TASK-1450: take the dead-link restar
 bool restRequestWithin(uint32_t ms);     // TASK-1450: a REST request arrived within ms (dead-link witness)
 void otgwStreamRxNote();                 // TASK-1450: a port 25238 client sent a byte
 bool otgwStreamRxWithin(uint32_t ms);    // TASK-1450: a port 25238 byte arrived within ms (dead-link witness)
+void wifiLinkMarkSelf(WifiSelfCause cause);    // TASK-1446: call right before the firmware's own WiFi disconnect
+void wifiLinkSnapshot(WifiLinkRecord *out);    // TASK-1444: copy the WiFi link record under its lock
+const char *wifiReasonName(uint8_t reason);    // TASK-1446: wifi_err_reason_t name, "?" when unknown
+void wifiFormatBssid(char *buf, size_t size, const uint8_t *b);  // TASK-1446: "AA:BB:CC:DD:EE:FF"
 // MQTT discovery verification (ADR-062, TASK-349): state machine lives in
 // mqtt_discovery_verify.cpp as of TASK-363; public API in that file's header.
 // startDiscoveryVerification() / isDiscoveryVerificationActive() are

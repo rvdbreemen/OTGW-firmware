@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.84
+**  Version  : v2.0.0-beta.85
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -55,6 +55,204 @@ bool   LittleFSmounted = false;
 
 //=====[ WiFi ]================================================================
 
+// TASK-1446 record begin
+// WiFi station link record (TASK-1446 telnet banner, TASK-1444 device/info; GH #682;
+// port of the 1.x outage record). The driver raises STA_CONNECTED/STA_DISCONNECTED on
+// the Arduino network event task, concurrently with the loop task (log drain) and the
+// async_tcp task (telnet banner, device/info). The callbacks only write the record
+// under g_wifiLinkMux: no logging, no allocation, no String. wifiLinkEventsLog() logs
+// from loopWifi(); readers take a copy under the lock and format outside it.
+//
+// One outage runs from the first disconnect event after a connect until the next
+// connect; the driver repeats the event (e.g. 201 NO_AP_FOUND) while it retries, so
+// those count as events of the same outage. A disconnect that the firmware causes
+// itself (Ethernet takeover, BETA AP retry timeout, dead-link forced reconnect) is
+// marked through wifiLinkMarkSelf() right before the call: the drop is recorded with
+// its cause but not counted in iOutages. The mark only applies to a drop that starts
+// while the link is up, and every disconnect or connect event clears it, so it can
+// never land on a later field outage.
+static portMUX_TYPE   g_wifiLinkMux            = portMUX_INITIALIZER_UNLOCKED;
+static WifiLinkRecord g_wifiLink;                               // guarded by g_wifiLinkMux
+static WifiSelfCause  g_wifiSelfPending        = WIFI_SELF_NONE;  // guarded
+static bool           g_wifiDropLogPending     = false;           // guarded
+static bool           g_wifiJoinLogPending     = false;           // guarded
+static bool           g_wifiLinkEventsBegun    = false;           // loop task only
+
+void wifiFormatBssid(char *buf, size_t size, const uint8_t *b)
+{
+  snprintf_P(buf, size, PSTR("%02X:%02X:%02X:%02X:%02X:%02X"), b[0], b[1], b[2], b[3], b[4], b[5]);
+}
+
+// arduino-esp32 3.3.5 names the wifi_err_reason_t codes itself (STA.cpp); it returns ""
+// for a code it does not know (e.g. 209..212).
+const char *wifiReasonName(uint8_t reason)
+{
+  const char *name = WiFi.disconnectReasonName((wifi_err_reason_t)reason);
+  return (name && name[0]) ? name : "?";
+}
+
+static const char *wifiSelfCauseName(WifiSelfCause cause)
+{
+  switch (cause) {
+    case WIFI_SELF_ETHERNET:  return "Ethernet takeover";
+    case WIFI_SELF_AP_RETRY:  return "AP retry timeout";
+    case WIFI_SELF_DEAD_LINK: return "dead-link check";
+    case WIFI_SELF_NONE:      break;
+  }
+  return "";
+}
+
+static void wifiLinkOnConnected(const uint8_t *bssid, uint8_t channel, uint32_t now)
+{
+  portENTER_CRITICAL(&g_wifiLinkMux);
+  memcpy(g_wifiLink.joinedBssid, bssid, sizeof(g_wifiLink.joinedBssid));
+  g_wifiLink.iJoinedChannel = channel;
+  g_wifiLink.bJoinSeen      = true;
+  if (!g_wifiLink.bLinkUp && g_wifiLink.bDropValid) g_wifiLink.iDropDurationMs = now - g_wifiLink.iDropStartMs;
+  g_wifiLink.bLinkUp        = true;
+  g_wifiSelfPending         = WIFI_SELF_NONE;
+  g_wifiJoinLogPending      = true;
+  portEXIT_CRITICAL(&g_wifiLinkMux);
+}
+
+static void wifiLinkOnDisconnected(const uint8_t *bssid, uint8_t reason, uint32_t now)
+{
+  portENTER_CRITICAL(&g_wifiLinkMux);
+  const WifiSelfCause self = g_wifiSelfPending;
+  g_wifiSelfPending = WIFI_SELF_NONE;
+  g_wifiLink.iDisconnectEvents++;
+  if (g_wifiLink.bLinkUp) {   // first event after a connect: a new drop starts
+    g_wifiLink.bLinkUp          = false;
+    if (self == WIFI_SELF_NONE) g_wifiLink.iOutages++;
+    g_wifiLink.bDropValid       = true;
+    g_wifiLink.iDropFirstReason = reason;
+    memcpy(g_wifiLink.dropBssid, bssid, sizeof(g_wifiLink.dropBssid));
+    g_wifiLink.iDropChannel     = g_wifiLink.iJoinedChannel;
+    g_wifiLink.iDropEvents      = 0;
+    g_wifiLink.iDropStartMs     = now;
+    g_wifiLink.iDropDurationMs  = 0;
+    g_wifiLink.eDropSelf        = self;
+    g_wifiDropLogPending        = true;
+  }
+  if (g_wifiLink.bDropValid) {
+    g_wifiLink.iDropEvents++;
+    g_wifiLink.iDropLastReason = reason;
+  }
+  portEXIT_CRITICAL(&g_wifiLinkMux);
+}
+
+// Network event task. Plain function pointer (WiFiEventSysCb): no std::function.
+static void onWifiLinkEvent(arduino_event_t *ev)
+{
+  if (!ev) return;
+  const uint32_t now = millis();
+  if (ev->event_id == ARDUINO_EVENT_WIFI_STA_CONNECTED) {
+    wifiLinkOnConnected(ev->event_info.wifi_sta_connected.bssid, ev->event_info.wifi_sta_connected.channel, now);
+  } else if (ev->event_id == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+    wifiLinkOnDisconnected(ev->event_info.wifi_sta_disconnected.bssid, ev->event_info.wifi_sta_disconnected.reason, now);
+  }
+}
+
+// Called from startWiFi() right after WiFi.mode(WIFI_STA); registers once.
+static void wifiLinkEventsBegin()
+{
+  if (g_wifiLinkEventsBegun) return;
+  g_wifiLinkEventsBegun = true;
+  WiFi.onEvent(onWifiLinkEvent, ARDUINO_EVENT_WIFI_STA_CONNECTED);
+  WiFi.onEvent(onWifiLinkEvent, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+}
+
+void wifiLinkMarkSelf(WifiSelfCause cause)
+{
+  portENTER_CRITICAL(&g_wifiLinkMux);
+  if (g_wifiLink.bLinkUp) g_wifiSelfPending = cause;   // a running outage is never relabelled
+  portEXIT_CRITICAL(&g_wifiLinkMux);
+}
+
+void wifiLinkSnapshot(WifiLinkRecord *out)
+{
+  if (!out) return;
+  portENTER_CRITICAL(&g_wifiLinkMux);
+  *out = g_wifiLink;
+  portEXIT_CRITICAL(&g_wifiLinkMux);
+}
+
+// Called from loopWifi() on every pass, before the Ethernet early return, so a drop
+// recorded before or during an Ethernet takeover is still logged.
+static void wifiLinkEventsLog()
+{
+  WifiLinkRecord r;
+  portENTER_CRITICAL(&g_wifiLinkMux);
+  r = g_wifiLink;
+  const bool dropLog = g_wifiDropLogPending;
+  const bool joinLog = g_wifiJoinLogPending;
+  g_wifiDropLogPending = false;
+  g_wifiJoinLogPending = false;
+  portEXIT_CRITICAL(&g_wifiLinkMux);
+
+  char bssid[18];
+  if (dropLog) {
+    wifiFormatBssid(bssid, sizeof(bssid), r.dropBssid);
+    DebugTf(PSTR("WiFi: link lost, reason %u %s, AP %s ch %u%s%s%s\r\n"),
+            (unsigned)r.iDropFirstReason, wifiReasonName(r.iDropFirstReason), bssid, (unsigned)r.iDropChannel,
+            r.eDropSelf != WIFI_SELF_NONE ? " (self: " : "", wifiSelfCauseName(r.eDropSelf),
+            r.eDropSelf != WIFI_SELF_NONE ? ")" : "");
+  }
+  if (joinLog) {
+    wifiFormatBssid(bssid, sizeof(bssid), r.joinedBssid);
+    if (!r.bDropValid) {
+      DebugTf(PSTR("WiFi: joined AP %s ch %u\r\n"), bssid, (unsigned)r.iJoinedChannel);
+    } else {
+      DebugTf(PSTR("WiFi: joined AP %s ch %u after %lu s, %lu disconnect event(s), last reason %u %s\r\n"),
+              bssid, (unsigned)r.iJoinedChannel, (unsigned long)(r.iDropDurationMs / 1000),
+              (unsigned long)r.iDropEvents, (unsigned)r.iDropLastReason, wifiReasonName(r.iDropLastReason));
+    }
+  }
+  // The boot association can complete before wifiLinkEventsBegin() registers the
+  // callbacks; take the joined AP from the driver then.
+  if (!r.bJoinSeen && WiFi.status() == WL_CONNECTED) {
+    uint8_t b[6];
+    const bool haveBssid = (WiFi.BSSID(b) != nullptr);
+    const uint8_t ch = (uint8_t)WiFi.channel();
+    portENTER_CRITICAL(&g_wifiLinkMux);
+    if (!g_wifiLink.bJoinSeen) {
+      if (haveBssid) memcpy(g_wifiLink.joinedBssid, b, sizeof(g_wifiLink.joinedBssid));
+      g_wifiLink.iJoinedChannel = ch;
+      g_wifiLink.bJoinSeen      = true;
+      g_wifiLink.bLinkUp        = true;
+    }
+    portEXIT_CRITICAL(&g_wifiLinkMux);
+  }
+}
+
+// Two telnet banner lines, each its own _debugPrintf_P (256-byte buffer).
+static void printWifiLinkBanner()
+{
+  WifiLinkRecord r;
+  wifiLinkSnapshot(&r);
+  const uint32_t now = millis();
+  char bssid[18];
+  wifiFormatBssid(bssid, sizeof(bssid), r.joinedBssid);
+  _debugPrintf_P(PSTR("  Link : AP %s ch %u%s   outages %lu   disconnect events %lu\r\n"),
+    bssid, (unsigned)r.iJoinedChannel, r.bLinkUp ? "" : " (down)",
+    (unsigned long)r.iOutages, (unsigned long)r.iDisconnectEvents);
+  if (!r.bDropValid) {
+    debugTelnet.println(F("  Drop : none since boot"));
+    return;
+  }
+  char down[16];
+  if (r.bLinkUp) snprintf_P(down, sizeof(down), PSTR("%lu s"), (unsigned long)(r.iDropDurationMs / 1000));
+  else           strlcpy(down, "ongoing", sizeof(down));
+  wifiFormatBssid(bssid, sizeof(bssid), r.dropBssid);
+  _debugPrintf_P(PSTR("  Drop : %lu s ago, down %s, reason %u %s (last %u %s, %lu events), AP %s ch %u%s%s\r\n"),
+    (unsigned long)((now - r.iDropStartMs) / 1000), down,
+    (unsigned)r.iDropFirstReason, wifiReasonName(r.iDropFirstReason),
+    (unsigned)r.iDropLastReason, wifiReasonName(r.iDropLastReason),
+    (unsigned long)r.iDropEvents, bssid, (unsigned)r.iDropChannel,
+    r.eDropSelf != WIFI_SELF_NONE ? ", self: " : "", wifiSelfCauseName(r.eDropSelf));
+}
+// TASK-1446 record end
+
 //gets called when WiFiManager enters configuration mode
 static void configModeCallback(WiFiManager *myWiFiManager)
 {
@@ -83,6 +281,7 @@ void resetWiFiSettings(void)
 void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 {
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  wifiLinkEventsBegin();   // TASK-1446: WiFi link record (reason, AP, outages)
 
   // Keep DHCP-supplied NTP servers (option 42) out of SNTP: we run our own NTP
   // in startNTP(). lwIP already rejects them by default on this framework; the
@@ -466,6 +665,7 @@ static void wifiLinkProbeReset()
 static void wifiDeadLinkReconnect()
 {
   wifiDeadReconnectDone = true;
+  wifiLinkMarkSelf(WIFI_SELF_DEAD_LINK);   // TASK-1446: not a field outage
   platformWifiForceReconnect();   // loopWifi() sees the drop and reconnects
 }
 
@@ -628,6 +828,7 @@ static bool wifiDeadLinkFailedRetry()
 // TASK-1450 end
 
 void loopWifi() {
+  wifiLinkEventsLog();   // TASK-1446: every pass, before the Ethernet early return
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // When wired Ethernet is the active transport, the WiFi radio is powered down
   // by switchToEthernet() (WIFI_OFF). Do not run the reconnect state machine —
@@ -748,6 +949,7 @@ void loopWifi() {
         wifiRetryCount = 0;
       } else if (DUE(timerAPConnWait)) {
         DebugTln(F("BETA AP: WiFi reconnect timed out, staying in AP fallback"));
+        wifiLinkMarkSelf(WIFI_SELF_AP_RETRY);   // TASK-1446: only applies if the link came up (connect without IP)
         WiFi.disconnect();
         RESTART_TIMER(timerAPRetry);
         wifiState = WIFI_AP_FALLBACK;
@@ -846,6 +1048,7 @@ static void sendTelnetBanner(const char* ip)
     _debugPrintf_P(PSTR("         AP-Fallback active: %s\r\n"), state.net.sAPSSID);
   }
 #endif
+  printWifiLinkBanner();   // TASK-1446: Link + Drop lines (WiFi station record, also while wired)
   _debugPrintf_P(PSTR("  Heap : free %u  frag %u%%  minFree %u  maxBlk %u  sketchFree %u\r\n"),
     (unsigned)platformFreeHeap(),
     (unsigned)platformHeapFragmentation(),

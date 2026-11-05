@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.84
+**  Version  : v2.0.0-beta.85
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3164,6 +3164,12 @@ struct DeviceInfoSnap {
   char      gateway[16];
   char      dns1[16];
   char      dns2[16];
+  WifiLinkRecord wifiLink;            // TASK-1444: WiFi link record, copied once under its lock
+  uint32_t  wifiDropAgoSec;           // now - wifiLink.iDropStartMs, frozen here (no millis() in the closure)
+  char      wifiApBssid[18];
+  char      wifiDropBssid[18];
+  const char* wifiDropReasonName;     // rodata names from wifiReasonName(), "" before the first drop
+  const char* wifiDropLastReasonName;
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   char      ethSubnet[16];
   char      ethGateway[16];
@@ -3211,6 +3217,23 @@ void sendDeviceInfoV2()
   strlcpy(snap->gateway,   WiFi.gatewayIP().toString().c_str(),   sizeof(snap->gateway));
   strlcpy(snap->dns1,      WiFi.dnsIP(0).toString().c_str(),      sizeof(snap->dns1));
   strlcpy(snap->dns2,      WiFi.dnsIP(1).toString().c_str(),      sizeof(snap->dns2));
+  // TASK-1444: one consistent copy of the WiFi link record (event task writes it).
+  wifiLinkSnapshot(&snap->wifiLink);
+  {
+    const WifiLinkRecord& wl = snap->wifiLink;
+    wifiFormatBssid(snap->wifiApBssid, sizeof(snap->wifiApBssid), wl.joinedBssid);
+    if (wl.bDropValid) {
+      wifiFormatBssid(snap->wifiDropBssid, sizeof(snap->wifiDropBssid), wl.dropBssid);
+      snap->wifiDropAgoSec         = (millis() - wl.iDropStartMs) / 1000;
+      snap->wifiDropReasonName     = wifiReasonName(wl.iDropFirstReason);
+      snap->wifiDropLastReasonName = wifiReasonName(wl.iDropLastReason);
+    } else {
+      snap->wifiDropBssid[0]       = '\0';
+      snap->wifiDropAgoSec         = 0;
+      snap->wifiDropReasonName     = "";
+      snap->wifiDropLastReasonName = "";
+    }
+  }
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   strlcpy(snap->ethSubnet,  Ethernet.subnetMask().toString().c_str(),    sizeof(snap->ethSubnet));
   strlcpy(snap->ethGateway, Ethernet.gatewayIP().toString().c_str(),     sizeof(snap->ethGateway));
@@ -3313,6 +3336,28 @@ void sendDeviceInfoV2()
       je.field(F("wifirssi"), snap->rssi);
       je.field(F("wifiquality"), signal_quality_perc_quad(snap->rssi));
       je.field(F("wifiquality_text"), dBmtoQuality(snap->rssi));
+    }
+    // WiFi link record (TASK-1444, GH #682): always present, also while wired or in AP
+    // fallback. The drop fields describe the last drop, field or self-caused
+    // (wifi_drop_self); they stay 0, "" or false until the first drop. wifi_outages
+    // counts field outages only.
+    {
+      const WifiLinkRecord& wl = snap->wifiLink;
+      const bool dropped = wl.bDropValid;
+      je.field(F("wifi_ap_bssid"),              snap->wifiApBssid);
+      je.field(F("wifi_ap_channel"),            (uint32_t)wl.iJoinedChannel);
+      je.field(F("wifi_outages"),               (uint32_t)wl.iOutages);
+      je.field(F("wifi_disconnect_events"),     (uint32_t)wl.iDisconnectEvents);
+      je.field(F("wifi_drop_bssid"),            snap->wifiDropBssid);
+      je.field(F("wifi_drop_channel"),          (uint32_t)(dropped ? wl.iDropChannel : 0));
+      je.field(F("wifi_drop_reason"),           (uint32_t)(dropped ? wl.iDropFirstReason : 0));
+      je.field(F("wifi_drop_reason_name"),      snap->wifiDropReasonName);
+      je.field(F("wifi_drop_last_reason"),      (uint32_t)(dropped ? wl.iDropLastReason : 0));
+      je.field(F("wifi_drop_last_reason_name"), snap->wifiDropLastReasonName);
+      je.field(F("wifi_drop_events"),           (uint32_t)(dropped ? wl.iDropEvents : 0));
+      je.field(F("wifi_drop_down_sec"),         (uint32_t)(dropped ? wl.iDropDurationMs / 1000 : 0));
+      je.field(F("wifi_drop_ago_sec"),          snap->wifiDropAgoSec);
+      je.field(F("wifi_drop_self"),             dropped && wl.eDropSelf != WIFI_SELF_NONE);
     }
 
     // --- Time, NTP & uptime ---
