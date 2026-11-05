@@ -127,7 +127,7 @@ the firmware form of entry 279.
     - `D = round(kd * raw_derivative, 3)` (`pid.py:109-114`).
     - The raw derivative is frozen inside the deadband (`pid.py:205-207`).
 - **Entry 279** (KD factor 0.063, deadband in 8400 s):
-  - The simulation shows no harm from 0.063.
+  - The simulation shows almost no harm from 0.063: one own guard failure (G4, 2015 heavy rad, +0.8 min) and one run with more starts (77 -> 84).
   - It does not show a warm-up gain that would make the 8400 s target reachable in more runs, except in 1983-92 light
     rad (6 -> 12 of 48).
   - **Conflict to put to Sergeant D:** his stated reason (a faster warm-up) is not borne out by the model. That is for
