@@ -163,3 +163,19 @@ the firmware form of entry 279.
 - The mechanism in section 4 rests on two traces, not on the whole grid.
 - The faithfulness test covers d0 = 0 with no gain input. The cold starts (d0 != 0) and the guard scenario with a gain input
   (gain_step_8) are not compared with a committed 1412.16 or 1412.19 row.
+
+## 9. What was posted (2026-11-05, after this report)
+
+6b (lead session) posted the numbers verbatim in #dev-sat-mqtt (msg 1567864588442009651), with one change: the
+recommendation is **C, defined as keep his 0.063 and study the minimum-power / PWM phase of the warm-up**, not B.
+
+- **Departure from the pre-registered rule.** The posted recommendation is not what the rule gives: the rule's outcome
+  is "keep KD". The departure is deliberate, for two reasons.
+  - Robert's standing rule is "best result, not parity": thermo-nova is a reference, not a mandate. The reason given
+    for B in section 7 ("no deviation from thermo-nova") is a parity argument and does not count under that rule.
+  - 0.063 is Sergeant D's design choice (entry 279), and this run shows almost no harm from it: the two effects of its
+    own are in section 2.
+- **What the departure does not change.** The study's finding stands: KD is not the lever for the warm-up in this
+  model, and the time is lost in the minimum-power / PWM phase.
+- **Option C changed meaning.** Section 7's draft defined C as "keep 0.07 and study". The posted C keeps 0.063 instead.
+- **Firmware task.** The firmware task for entry 279 is TASK-1656 (lead lane).
