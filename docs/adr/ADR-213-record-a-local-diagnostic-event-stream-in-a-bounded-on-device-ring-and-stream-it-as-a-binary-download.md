@@ -1,7 +1,7 @@
 ---
 id: "ADR-213"
 title: "Record a local diagnostic event stream in a bounded on-device ring and stream it as a binary download"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-05"
 binding: false
 gate: null
@@ -42,9 +42,9 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-05.
+Accepted, 2026-11-05.
 
-Guideline-level per ADR-080 (Binding ADR rules must have a CI gate): no gate exists yet. The
+Guideline-level per ADR-080 (Binding ADR rules must have a CI (continuous integration) gate): no gate exists yet. The
 implementation task adds a host test that encodes and decodes the record format and checks the
 no-PSRAM allocation and refusal rule (see Verification). Robert answered the six open questions on
 2026-11-05; the Decision below states those answers. The ADR stays Proposed until it passes the
@@ -59,33 +59,38 @@ status_history:
     changed_by: "Agent: Claude"
     reason: Initial proposal (TASK-1470 AC1, from the AC2 measurements)
     changed_via: adr-kit
+  - date: 2026-11-05
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Accepted by Robert in the session 2026-11-05 after his six answers; the design TASK-1470 builds
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
 A tester proposed an opt-in 24 h diagnostic recording uploaded to a cloud store (TASK-1469).
 The maintainer decided on 2026-10-29: local first, cloud later (TASK-1473). The recording must work
-without any outbound traffic, because some units run in a VLAN with all internet blocked
-(TASK-1469 notes). It must cover the same events as the proposal: OT frames, PIC commands and
-responses, MQTT publishes, external inputs (REST and MQTT commands, weather, BLE readings, setting
+without any outbound traffic, because some units run in a VLAN (virtual LAN) with all internet blocked
+(TASK-1469 notes). It must cover the same events as the proposal: OT (OpenTherm) frames, PIC (the gateway microcontroller) commands and
+responses, MQTT (Message Queuing Telemetry Transport) publishes, external inputs (REST (Representational State Transfer) and MQTT commands, weather, BLE (Bluetooth Low Energy) readings, setting
 changes) and reboots or crashes. A host replay plus a diff tool must then show the PIC-command and
 MQTT-publish differences between two firmware builds (TASK-1470 AC3).
 
 Measurements, 2026-11-05 (`docs/diagnostics/recording-budget-1470.md`):
 
-- **Event rate.** A real boiler with a PIC gateway and SAT on (12.8 h field run) produces about
+- **Event rate.** A real boiler with a PIC gateway and SAT (Smart Autotune Thermostat) on (12.8 h field run) produces about
   17,000 events per hour: 9,155 OT frames, 5,779 MQTT publishes, 1,047 PIC commands and 1,047
   responses. The other types add fewer than 10 per hour. Cross-checked against the WebSocket frame
   log (0.01 % apart) and the broker (1.2 % apart).
 - **Repeats.** 87 % of OT frames repeat the previous value for their source and MsgID; 63 to 84 %
   of MQTT publishes repeat the last value on their topic.
-- **Size.** Encoding the real streams: 6.65 MB per day with a plain 6-byte header and topic text,
+- **Size.** Encoding the real streams: 6.65 MB (megabytes) per day with a plain 6-byte header and topic text,
   4.85 MB with topic ids, **2.79 MB in the compact layout below** (32.2 B/s, 113 KiB/h, 4 KiB blocks that each decode
   on their own), about 2.05 MB without repeat records. A stream whose repeat cache is never reset
   would be 2.46 MB, but it cannot be decoded after the ring wraps.
-- **RAM.** No-PSRAM unit (.61, beta.95, BLE off): 64 to 67 KB free, largest block 31.7 KB,
+- **RAM.** No-PSRAM unit (.61, beta.95, BLE off): 64 to 67 KB (kilobytes) free, largest block 31.7 KB,
   low-water mark 11,588 B after 58 min. The night run on the same unit reached a low-water mark of
-  536 B (TASK-1528, open). BLE costs about 46 KB more (ADR-193). PSRAM boards: 2,057,884 of
+  536 B (TASK-1528, open). BLE costs about 46 KB more (ADR-193). PSRAM (pseudo-static random-access memory) boards: 2,057,884 of
   2,097,152 B free after boot.
 - **Flash.** App headroom 143,328 B (beta.99: 2,150,432 of 2,293,760 B). LittleFS: 768 KiB
   partition, the shipped image fills 161 of 192 blocks, 124 KiB free before runtime files.
@@ -94,15 +99,15 @@ Measurements, 2026-11-05 (`docs/diagnostics/recording-budget-1470.md`):
 So 24 h of everything fits on no board. A no-PSRAM board has room for minutes at most.
 
 Other constraints: the REST path runs on the async_tcp task and must not block or allocate a large
-buffer (ADR-132, ADR-137); at most two API requests in flight and at most four send-holding
+buffer (ADR-132, ADR-137); at most two API (application programming interface) requests in flight and at most four send-holding
 connections (ADR-165, ADR-188, ADR-147); the PIC byte stream reaches every consumer verbatim
 (ADR-177); large feature buffers are static or allocated once (ADR-053, ADR-193's PSRAM exception);
 no ArduinoJson (ADR-146); admin routes follow ADR-056.
 
 ## Decision
 
-1. **Opt-in, local, RAM only.** Recording is off by default. The user starts and stops it in the
-   web UI or through REST. Records live in RAM and are lost on a reboot. A recording that was running
+1. **Opt-in, local, RAM (random-access memory) only.** Recording is off by default. The user starts and stops it in the
+   web UI (user interface) or through REST. Records live in RAM and are lost on a reboot. A recording that was running
    resumes after a reboot as a new recording whose first record is the Reboot record (reset reason,
    crash summary of the previous boot); the "recording on" flag survives the reboot as a setting.
    On a no-PSRAM board the resume obeys the same start rule as a manual start (decision 3). The firmware never sends a recording
@@ -114,8 +119,8 @@ no ArduinoJson (ADR-146); admin routes follow ADR-056.
    starts mid-stream never leaves a later block undecodable. A 4 KiB block costs 13 % more than a
    never-reset stream; 1 KiB blocks would cost 25 % more, 16 KiB blocks 6 % (field run).
    - Block header, 16 bytes: `block_seq u32` (counts up from the start of a recording),
-     `uptime_ms u32` of the first record, `epoch u32` (0 before NTP), `first_record_seq u32`.
-   - Record: `type u8`, `dt` (ms since the previous record, LEB128, 1 to 3 bytes), payload.
+     `uptime_ms u32` of the first record, `epoch u32` (0 before NTP (Network Time Protocol)), `first_record_seq u32`.
+   - Record: `type u8`, `dt` (ms since the previous record, LEB128 (little-endian base-128 varint), 1 to 3 bytes), payload.
      Records never cross a block boundary.
    - A download starts with a file header: magic `OTGWREC`, format version, board
      (`HAS_*` flags, PSRAM present), firmware version and githash, boot count, reset reason,
@@ -126,15 +131,15 @@ no ArduinoJson (ADR-146); admin routes follow ADR-056.
    |---|---|---|
    | OT frame T, B, R, A, E (one type per source) | 4 bytes | `processOT()`, after the frame is decoded, for every source |
    | OT repeat | MsgID u8 (same frame as the last for that source and MsgID in this block) | same |
-   | PIC command | len u8 + text | `sendPICSerial()`, which feeds `enqueuePICTx()`. The TCP serial bridge (port 25238) also writes through `enqueuePICTx()`, byte by byte; its bytes are not recorded as commands (decided: version 1 does not record port 25238 bridge bytes) |
+   | PIC command | len u8 + text | `sendPICSerial()`, which feeds `enqueuePICTx()`. The TCP (Transmission Control Protocol) serial bridge (port 25238) also writes through `enqueuePICTx()`, byte by byte; its bytes are not recorded as commands (decided: version 1 does not record port 25238 bridge bytes) |
    | OT-Direct command | len u8 + text | the OT-Direct command handler (the `handleOTDirectCommand()` path) |
    | PIC / OT-Direct response | len u8 + text | the response line handler |
-   | MQTT publish | topic id u16, len u8, value (max 255, flag when cut) | `sendMQTTData()`, the value-publish path. HA discovery, the online/LWT message and discovery clears go straight to `mqttPublishRaw()` and are not recorded |
+   | MQTT publish | topic id u16, len u8, value (max 255, flag when cut) | `sendMQTTData()`, the value-publish path. HA (Home Assistant) discovery, the online/LWT message and discovery clears go straight to `mqttPublishRaw()` and are not recorded |
    | MQTT repeat | topic id u16 (same value as the last on that topic in this block) | same |
    | MQTT command in | len u8 + topic suffix, len u8 + value | the MQTT message callback |
    | REST command in | route id u8, method u8, len u8 + body (truncated) | REST dispatch, non-GET only |
    | Weather | outdoor temperature, humidity, wind, as int16 x100 | after a successful weather fetch |
-   | BLE reading | sensor slot u8, temperature and humidity int16 x100, battery u8, RSSI int8 | the loop-task side of the BLE reader (not the BLE callback) |
+   | BLE reading | sensor slot u8, temperature and humidity int16 x100, battery u8, RSSI (received signal strength) int8 | the loop-task side of the BLE reader (not the BLE callback) |
    | Setting change | setting id u16, len u8 + new value (secrets replaced, decision 6) | `updateSetting()` when a value changes |
    | Reboot | reset reason, boot count, crash summary of the previous boot | first record after boot |
    | Gap | count of records the writer had to drop | when an append fails (decision 4) |
@@ -177,9 +182,9 @@ no ArduinoJson (ADR-146); admin routes follow ADR-056.
 
 6. **Privacy.** The header and the setting records never carry passwords, tokens, MQTT
    credentials, the WiFi key or the admin password; they say "set" or "empty". Latitude and
-   longitude are rounded to 0.1 degree. BLE MAC addresses become slot numbers. Recording and
+   longitude are rounded to 0.1 degree. BLE MAC (hardware address) addresses become slot numbers. Recording and
    download are local only and need no account. The download and status routes are open (not
-   admin-protected), like the crash log: anyone on the LAN can fetch a recording. That is why this
+   admin-protected), like the crash log: anyone on the LAN (local area network) can fetch a recording. That is why this
    redaction (secrets, rounded location, BLE MAC slots) is mandatory and not best effort.
 
 7. **Replay and diff (host side).** A host script decodes a recording. It writes the OT frames as
@@ -256,11 +261,11 @@ no ArduinoJson (ADR-146); admin routes follow ADR-056.
   github.com/nanopb/nanopb) and TinyCBOR v7.1 (MIT, active, github.com/intel/tinycbor) give a
   standard container, but a per-record tag and length costs as much as the whole compact record
   (4 to 7 bytes for an OT frame), and the host decoder is a few dozen lines either way. heatshrink
-  (ISC, github.com/atomicobject/heatshrink, last push 2024-05) could compress blocks further, but
+  (ISC (ISC licence), github.com/atomicobject/heatshrink, last push 2024-05) could compress blocks further, but
   it adds a dependency and work on the writer path for data that is already delta-coded. Not
   adopted; the format version leaves room for a compressed block type later.
 - **Status quo: host capture only (`scripts/otgw_capture.py`).** Works on every board but needs a
-  PC for 24 h, and does not see PIC commands, setting changes or internal timing in a structured
+  PC (personal computer) for 24 h, and does not see PIC commands, setting changes or internal timing in a structured
   form. Kept as the fallback.
 - **Cloud upload (the tester's proposal).** Parked by the maintainer (TASK-1473).
 

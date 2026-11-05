@@ -7953,7 +7953,7 @@
       "title": "Record a local diagnostic event stream in a bounded on-device ring and stream it as a binary download",
       "path": "ADR-213-record-a-local-diagnostic-event-stream-in-a-bounded-on-device-ring-and-stream-it-as-a-binary-download.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-05",
       "decision_summary": "Opt-in, local, RAM only.",
       "topics": [
