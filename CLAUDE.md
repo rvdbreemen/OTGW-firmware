@@ -111,7 +111,7 @@ Exceptions — do NOT auto-advance:
 
 Two MCP servers are wired into Claude Code for this project:
 
-- **`mcp__backlog__*`** — task management. Started locally by Claude Code itself (stdio).
+- **`mcp__backlog__*`** — the Backlog.md MCP server, started locally by Claude Code (stdio). It stays wired, but agents do not use it: every task read and write goes through the `backlog` CLI (see Task Management and the AGENT-CORE block).
 - **`mcp__discord-mcp__*`** — Discord I/O for `#dev-sat-mqtt` and the support channels. Runs as a **native Java process** (`saseq/discord-mcp`, Temurin JDK 17) on `http://localhost:8085/mcp` — no Docker. Launcher: `D:\Users\Robert\Documents\GitHub\RvdB\discord-mcp-saseq\run-discord-mcp.ps1`, which reads `DISCORD_TOKEN` + `DISCORD_GUILD_ID` from the Windows user environment (`SPRING_PROFILES_ACTIVE=http`). It auto-starts at logon via a Startup-folder shortcut (`discord-mcp-saseq.lnk`). Most-used tools: `read_messages` (params `channelId`, `count`), `send_message` (params `channelId`, `message`), `get_server_info`, `read_private_messages`, `send_private_message`. There is no separate login tool — JDA handshakes with Discord at startup. For attachment contents (logs, screenshots), see `.claude/commands/backlog_discord.md` (Phase 1b) and `.claude/commands/check_otgw_issues.md` (Phase 1d). (Migrated off the Docker container 2026-07-04 to eliminate the idle `vmmemWSL`/WSL2 CPU+RAM cost; the redundant `gustycube` Node server was retired in the same change.)
 
 If Discord calls start failing with "Expected token to be set" or 401, the native process has dropped its gateway session; restart it (`schtasks`-free: run `run-discord-mcp.ps1`, or kill the stale `java -jar discord-mcp-1.0.0.jar` PID and re-run the launcher) plus an MCP reconnect (`/mcp` in Claude Code). Only ONE instance may hold the bot token at a time — never run this alongside another discord bot process on the same token (gateway conflict). Full operational reference, restart procedure, channel discipline, and bot-side intent requirements: read `docs/guides/discord-mcp-server.md`.
@@ -134,9 +134,9 @@ If Discord calls start failing with "Expected token to be set" or 401, the nativ
 
 ## Project Overview
 
-ESP8266/ESP32 firmware for the NodoShop OpenTherm Gateway. Web UI, MQTT, REST API, TCP serial bridge, Home Assistant integration.
+Firmware for the NodoShop OpenTherm Gateway. Web UI, MQTT, REST API, TCP serial bridge, Home Assistant integration.
 
-- **Platform**: ESP8266 (NodeMCU/Wemos D1 mini), ~40KB usable RAM; ESP32-S3 (OTGW32)
+- **Platform**: on `dev` (2.x) ESP32-S3 only: the OTGW32 (OT-Direct) and the OTGW Classic with an ESP32-S3 module (PIC), one esp32-combo image. The ESP8266 (NodeMCU/Wemos D1 mini, ~40KB usable RAM) is the 1.x line on `otgw-1.x.x`
 - **Language**: Arduino C/C++ (.ino files), single translation unit
 - **Serial**: Reserved exclusively for PIC — never write to `Serial` after init
 - **Debug**: `DebugTln()`, `DebugTf()` → Telnet port 23, never `Serial.print()`

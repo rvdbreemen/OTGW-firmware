@@ -52,7 +52,7 @@ After marking a task `Done`, commit the completed task changes and push the bran
 
 This repository contains ESP8266 and ESP32 firmware for the NodoShop OpenTherm Gateway, including Web UI, MQTT, REST API, TCP serial bridge, Home Assistant integration, OTGW32 support, and SAT-related work.
 
-- Platform: ESP8266 (NodeMCU/Wemos D1 mini, tight RAM budget) and ESP32/OTGW32.
+- Platform: on `dev` (2.x) ESP32-S3 only (OTGW32, and the OTGW Classic with an ESP32-S3 module); the ESP8266 (NodeMCU/Wemos D1 mini, tight RAM budget) is the 1.x line on `otgw-1.x.x`.
 - Language: Arduino C/C++ in `.ino` files, built as a single translation unit.
 - Serial: reserved for the PIC after initialization. Never write to `Serial` after OTGW init.
 - Debug: use `DebugTln()`, `DebugTf()`, and related debug helpers. They go to Telnet port 23; do not use `Serial.print()`.
