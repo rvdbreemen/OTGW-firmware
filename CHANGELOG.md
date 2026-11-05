@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.80] - 2026-11-05
+
 ### Changed
 
 - **Home Assistant: the SAT zone and PV-boost entities get readable names** (TASK-1608, PR #693 by Andre Brait). Names are spaced and no longer carry the hostname, for example `SAT Zone 1 Active`; entity ids, unique ids and topics are unchanged, only the display name in HA changes.
@@ -688,7 +690,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.77...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.80...HEAD
+[2.0.0-beta.80]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.77...v2.0.0-beta.80
 [2.0.0-beta.77]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.62...v2.0.0-beta.77
 [2.0.0-beta.62]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.60...v2.0.0-beta.62
 [2.0.0-beta.60]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.38...v2.0.0-beta.60
