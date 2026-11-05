@@ -314,6 +314,13 @@ void handleDebugChar(char c){
             debugFlagWrite(state.debug, f, on);
             return;
         }
+        // This callback runs on async_tcp. Until setup() is done, an action key would run next to setup() on
+        // another task ('q' reloaded the settings while setup() still used them, TASK-1395). Toggles and the
+        // menu stay available; the actions wait for "Setup finished!".
+        if (!state.bSetupComplete && c != 'h') {
+            DebugTf(PSTR("\r\nKey '%c' ignored: setup still running, retry after 'Setup finished!'\r\n"), c);
+            return;
+        }
         switch (c){
             case 'h':
                 Debugln();
