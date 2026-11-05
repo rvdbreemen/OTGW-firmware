@@ -28,7 +28,9 @@
 // Emits one plain-language line to BOTH sinks so Telnet and the Web UI live-log
 // never drift. Always-on (NOT gated by state.debug.bSAT) but transition-only at
 // the call sites, so volume stays low. Web UI lines carry prefix 'S'.
-#define SAT_NARRATE_BUF 96
+// 128: the longest line, the self-tune report with two 11-character coefficients, needs 103 characters
+// (TASK-1663; tests/test_sat_narrate_fits.py checks every satNarrate*_P format against SAT_NARRATE_BUF - 1).
+#define SAT_NARRATE_BUF 128
 
 // TASK-1337: ot_log_buffer has one writer, the loop task. satNarrate*() is also reached from
 // REST handlers and the settings POST (async_tcp task), so it never sends: it posts the line to
