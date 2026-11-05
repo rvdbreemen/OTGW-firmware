@@ -217,4 +217,5 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-209 | Accepted | - | Format. |
 | ADR-210 | Accepted | - | Route. |
 | ADR-211 | Proposed | - | A WiFi supervisor restart marks the next boot. |
-| ADR-213 | Accepted | - | Opt-in, local, RAM only. |
+| ADR-213 | Accepted | - | Opt-in, local, RAM (random-access memory) only. |
+| ADR-214 | Accepted | - | Ids are a hash, not a table. |

@@ -7955,7 +7955,7 @@
       "format": "canonical",
       "status": "Accepted",
       "date": "2026-11-05",
-      "decision_summary": "Opt-in, local, RAM only.",
+      "decision_summary": "Opt-in, local, RAM (random-access memory) only.",
       "topics": [
         "diagnostics",
         "privacy",
@@ -8012,6 +8012,64 @@
           "Host test: a recording that was on before a reboot resumes with the Reboot record first.",
           "Bench: start a recording on a PSRAM unit, download it twice with since=, check the gap after an overwrite and that hdmaxloopgapms and the REST 503 counters do not rise.",
           "TASK-1470 AC3: a recorded day replays on the host and the diff shows PIC-command and MQTT-publish differences between two builds."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-214",
+      "title": "Diagnostic recording identifies topics and settings by a 16-bit FNV-1a hash of the lowercased name (amends ADR-213 decision on the fixed id table)",
+      "path": "ADR-214-diagnostic-recording-identifies-topics-and-settings-by-a-16-bit-fnv-1a-hash-of-the-lowercased-name-amends-adr-213-decision-on-the-fixed-id-table.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-05",
+      "decision_summary": "Ids are a hash, not a table.",
+      "topics": [
+        "diagnostics",
+        "record format",
+        "recording",
+        "topic ids"
+      ],
+      "aliases": [
+        "diagnostic recording id hash",
+        "recording topic id"
+      ],
+      "components": [
+        "recording id hash",
+        "recording record format amendments"
+      ],
+      "symbols": [
+        "diagNameId"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Compute record ids with diagNameId() and nothing else.",
+          "Write the names and ids the firmware knows into the download header.",
+          "Fail a host check when two different names of the real topic or settings list share an id.",
+          "Count the repeat caches in the allocation the no-PSRAM start rule checks."
+        ],
+        "must_not": [
+          "Add dictionary records to the ring.",
+          "Share one id between two names on purpose.",
+          "Change diagNameId() or the type numbers without a new format version."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "test/host/testdiagrecorder.py includes the real diagRecorderStuff.h and covers the id function, repeat types, the 255 cut marker and the 9984 B start boundary (cases F1, F7, F9, F11).",
+          "The collision check over the real name lists is owned by TASK-1666 and TASK-1667. Until it exists this ADR is guideline-level per ADR-080."
         ]
       },
       "scope": {
@@ -14061,6 +14119,24 @@
     {
       "source": "ADR-213",
       "target": "ADR-210",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-214",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-214",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-214",
+      "target": "ADR-213",
       "type": "related",
       "resolved": true
     }
