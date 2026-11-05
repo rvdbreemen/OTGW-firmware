@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<!-- TASK-1643: render-blocking stylesheet, so the first paint is styled (a script-inserted
+     <link> does not block rendering: the page flashed unstyled). The handlers only record the
+     outcome; the loader below owns the retry-on-503 and starts v2.js. -->
+<link rel="stylesheet" href="v2-bundle.css" id="v2css" onload="this.setAttribute('data-s','ok');window.v2CssDone&&window.v2CssDone(this,1)" onerror="this.setAttribute('data-s','err');window.v2CssDone&&window.v2CssDone(this,0)">
 <title>OTGW firmware</title>
 <script>
   // Pre-paint theme (localStorage key otgw-theme) to avoid flash-of-wrong-theme.
@@ -17,7 +21,7 @@
   })();
 </script>
 <script>
-  // TASK-978: load the stylesheets + v2.js with retry-on-503. A 503'd/reset
+  // TASK-978: load the stylesheet + v2.js with retry-on-503. A 503'd/reset
   // <link>/<script> has no native retry, so the UI would render unstyled (CSS
   // dropped) or dead (v2.js dropped) with nothing surfaced. Retry with linear
   // backoff, as the former classic UI loader did (TASK-960).
@@ -30,19 +34,30 @@
   // generate_v2_css_bundle) -- one request instead of two on first paint.
   (function(){
     var MAX = 8;
-    function loadCss(href, then){
-      var attempt = 0;
-      (function go(){
-        var l = document.createElement('link');
-        l.rel = 'stylesheet'; l.href = href;
-        l.onload = function(){ if (then) then(); };
-        l.onerror = function(){
-          if (l.parentNode) l.parentNode.removeChild(l);
-          if (++attempt <= MAX) setTimeout(go, 200 * attempt);
-          else { console.error('[loader] gave up on ' + href); if (then) then(); }
-        };
-        document.head.appendChild(l);
-      })();
+    // TASK-1643: v2-bundle.css is the static, render-blocking <link id="v2css"> in the head.
+    // This only handles its outcome: on load start the chain, on error (503 / reset) re-add
+    // the link with the same linear backoff as before (200 ms * attempt, MAX retries).
+    function watchCss(then){
+      var attempt = 0, fired = false;
+      function ok(){ if (fired) return; fired = true; if (then) then(); }
+      function fail(l){
+        if (l && l.parentNode) l.parentNode.removeChild(l);
+        if (++attempt <= MAX) setTimeout(retry, 200 * attempt);
+        else { console.error('[loader] gave up on v2-bundle.css'); ok(); }
+      }
+      function retry(){
+        var r = document.createElement('link');
+        r.rel = 'stylesheet'; r.href = 'v2-bundle.css'; r.id = 'v2css';
+        r.onload = function(){ ok(); };
+        r.onerror = function(){ fail(r); };
+        document.head.appendChild(r);
+      }
+      window.v2CssDone = function(l, good){ if (good) ok(); else fail(l); };
+      // The static link may have finished before this script ran.
+      var first = document.getElementById('v2css');
+      var st = first && first.getAttribute('data-s');
+      if (st === 'ok') ok(); else if (st === 'err') fail(first);
+      else if (first && first.sheet) ok();
     }
     function loadJs(then){
       var jsAttempt = 0;
@@ -59,13 +74,13 @@
       })();
     }
     // v2-bundle.css -> v2.js -> fonts, STRICTLY chained (each step's "then" only
-    // fires after the previous one lands). loadCss()/loadJs() return immediately
+    // fires after the previous one lands). watchCss()/loadJs() return immediately
     // (they fire-and-continue via callback, not a blocking call) -- starting the
-    // font loader right after calling loadCss(), rather than inside its "then",
+    // font loader right after calling watchCss(), rather than inside its "then",
     // was the bug that let font1 race the still-in-flight v2-bundle.css fetch
     // (plus the browser's own automatic favicon.ico fetch) for the same
     // WEB_FILE_MAX_INFLIGHT=2 slots, 503ing repeatedly even one-font-at-a-time.
-    loadCss('v2-bundle.css', function(){
+    watchCss(function(){
       loadJs(function(){ loadFontsSequentially(); });
     });
 
@@ -79,7 +94,7 @@
     // Fix: v2-bundle.css no longer carries @font-face (build.py,
     // generate_v2_css_bundle strips it); load the 3 fonts here instead via the
     // FontFace() API, deliberately ONE AT A TIME with retry, same backoff
-    // pattern as loadCss above. Peak concurrent font requests: 1.
+    // pattern as watchCss above. Peak concurrent font requests: 1.
     function loadFontsSequentially(){
       if (!window.FontFace) return;   // very old browser: page still works, system-font fallback
       var fonts = [

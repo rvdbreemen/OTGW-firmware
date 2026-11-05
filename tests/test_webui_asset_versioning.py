@@ -1,8 +1,8 @@
 """Web UI asset caching contract (ADR-139, amended by TASK-958).
 
-v2.html, the only Web UI shell since TASK-1223.12, loads its stylesheet and
-script through a sequential loader (TASK-978/989): loadCss('x.css', ...) calls
-and a script element whose src is set in loadJs(). Every asset that
+v2.html, the only Web UI shell since TASK-1223.12, loads its stylesheet through a
+render-blocking <link> in the head (TASK-1643) and its script through a sequential
+loader (TASK-978/989): a script element whose src is set in loadJs(). Every asset that
 loader requests must be served by serveVersionedAsset() in FSexplorer.ino (ETag
 = filesystem hash, Cache-Control: no-cache, so a reflash shows on the next
 load) under a stable URL: no ?v= query versioning.
@@ -22,7 +22,7 @@ MIME = {".css": "text/css", ".js": "application/javascript"}
 
 def loader_assets(html):
     """Assets the v2.html loader requests, in load order, without a leading './'."""
-    css = re.findall(r"loadCss\('([^']+)'", html)
+    css = re.findall(r'<link rel="stylesheet" href="([^"]+)"', html)
     scripts = re.findall(r"\bs\.src\s*=\s*'([^']+)'", html)
     return [a[2:] if a.startswith("./") else a for a in css + scripts]
 
