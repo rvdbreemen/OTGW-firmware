@@ -95,7 +95,7 @@ def main():
         else:
             state = "no"
             cover = next((p for p in posts if r["tag"] in expand(p["text"]) and p["key"] != key), None)
-            # CLAUDE.md alpha-tag protocol: a tag that was not posted itself is covered by the next
+            # Alpha-tag protocol (.claude/rules/discord.md): a tag that was not posted itself is covered by the next
             # posted zip of the same core. rows is newest first, so look at the newer rows.
             later = next((keys[j] for j in range(i - 1, -1, -1)
                           if keys[j] in tags and rows[j]["core"] == r["core"]), None)

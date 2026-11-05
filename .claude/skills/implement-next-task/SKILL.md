@@ -18,7 +18,7 @@ reviewing. Maintainer decisions behind this skill (2026-10-20, TASK-1275):
 
 CLAUDE.md stays authoritative. This skill only orders its rules into a cycle; where
 they disagree, CLAUDE.md wins, with one deliberate exception: inside this cycle the
-CLAUDE.md "share the plan and WAIT for approval" step (Task Management step 4, and the
+CLAUDE.md "share the plan and WAIT for approval" step (Tasks step 4, and the
 plan-approval exception under Auto-advance) is replaced by the self-review of step 3
 plus the #alpha-testing notice of step 4. Do not stop to wait for approval of the plan.
 Stopping is still required for the actions that always need explicit permission (PIC
@@ -135,11 +135,11 @@ picked up through step 1.
 
 ## Step 2: design
 
-1. Read the task, its notes and the code it touches (follow the CLAUDE.md "what to
-   read" table and the C4 docs for the owning component).
+1. Read the task, its notes and the code it touches (follow the "what to
+   read" table in `.claude/rules/navigation.md` and the C4 docs for the owning component).
 2. Run `/adr-kit:context <topic>` and honour the Accepted ADRs it returns. For anything that
    touches SAT, also read `docs/sat/sergeant-d-corrections.md` and list in the plan the entries
-   the change relies on or conflicts with (CLAUDE.md SAT ground truth block).
+   the change relies on or conflicts with (SAT ground truth block, `.claude/rules/sat-ground-truth.md`).
 3. Non-trivial new functionality: look for an open-source solution first and record
    what was considered (project rule).
 4. For a bug: decide how you will **reproduce** it (host test, frame replay,
@@ -169,12 +169,12 @@ changes how SAT controls the boiler (setpoint, PWM, PID, cutoffs, modulation, de
 of SAT control settings), post the plan to Sergeant D (`<@821036882946424852>`) asking
 for his advice and his OK, name the open points, and do **not** implement until he
 agrees. The plan quotes the thermo-nova code for that area with `file:line` citations at the
-pinned commit, as the "SAT ground truth" block in CLAUDE.md requires; a plan without them is
+pinned commit, as the "SAT ground truth" block (`.claude/rules/sat-ground-truth.md`) requires; a plan without them is
 not ready to post. Record the wait in the task notes, leave the task `In Progress`, and continue
 the cycle with the next task that does not change SAT behaviour. When his answer
 arrives (via `/backlog_discord`), record it as a numbered entry in
 `docs/sat/sergeant-d-corrections.md` (quote, Discord link, thermo-nova and firmware
-comparison, task id; CLAUDE.md SAT ground truth block) and in the task notes, then resume
+comparison, task id; SAT ground truth block in `.claude/rules/sat-ground-truth.md`) and in the task notes, then resume
 the task. The same applies to any correction he makes outside a pending question. SAT changes without a
 behaviour choice (logging, UI, graphs, docs) do not wait.
 
@@ -248,11 +248,11 @@ plainly what is not verified yet.
 ## Step 9: leave the build ready
 
 Every alpha tag that reaches `dev` is published, also one another session built: follow the
-"Every alpha tag on `dev` is published" protocol in CLAUDE.md (build from the pushed HEAD, post
+"Every alpha tag on `dev` is published" protocol in `.claude/rules/discord.md` (build from the pushed HEAD, post
 the zip, report to the coordinating session, ledger check before each post).
 
-Per-task cadence (maintainer directive, 2026-10-30, CLAUDE.md "Per-task cadence", replaces the
-2026-10-29 batch of 4 tasks): after the commit of step 7, build esp32-combo, OTA-flash a bench unit
+Per-task cadence (maintainer directive, 2026-10-30, `docs/guides/agent-build-and-bench.md`
+"Per-task cadence"): after the commit of step 7, build esp32-combo, OTA-flash a bench unit
 and bench-test this task's behaviour. Only after a passing bench test: push, post the zip and the
 step 8 report. A failed bench test publishes nothing: fix it, then build and bench-test again.
 Tasks that are ready at the same moment may share one build, but each task's behaviour is

@@ -43,7 +43,7 @@ it on the first.
 
 The bench units, their addresses and serial ports are described in the session memory of the
 main workstation, not in the repository. On a second machine, find the units by MAC address in
-the router's ARP table and flash over WiFi OTA first (CLAUDE.md, "Test automation").
+the router's ARP table and flash over WiFi OTA first (`docs/guides/agent-build-and-bench.md`, "Test automation").
 
 ## Check
 

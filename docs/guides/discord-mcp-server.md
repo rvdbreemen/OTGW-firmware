@@ -1,7 +1,7 @@
 # Discord MCP server and the Discord bot: operations guide
 
-How Claude Code sessions read and post on the OTGW Discord server. CLAUDE.md (section "MCP
-Servers") points here. Replaces `.claude/docs/discord-backlog-bridge.md`, which described an
+How Claude Code sessions read and post on the OTGW Discord server. `.claude/rules/discord.md` (section "MCP
+servers") points here. Replaces `.claude/docs/discord-backlog-bridge.md`, which described an
 earlier setup (npx `mcp-discord`, the backlog MCP server, one channel) and was removed in
 TASK-1625.
 

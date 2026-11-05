@@ -1,7 +1,7 @@
 """TASK-1292: the 'SAT ground truth' rules must not drift.
 
-CLAUDE.md and AGENTS.md both carry the block between the SAT-GROUND-TRUTH markers, word for
-word, and it pins the thermo-nova commit that the local copy and docs/sat/ are written against.
+.claude/rules/sat-ground-truth.md (split out of CLAUDE.md by TASK-1631, loaded in every session) and
+AGENTS.md both carry the block between the SAT-GROUND-TRUTH markers, word for word, and it pins the thermo-nova commit that the local copy and docs/sat/ are written against.
 Mirrors tests/test_adr_governance.py, which guards the binding-ADR block the same way.
 
 Run: python tests/test_sat_ground_truth_block.py
@@ -13,6 +13,7 @@ import unittest
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 START = "<!-- SAT-GROUND-TRUTH START"
 END = "<!-- SAT-GROUND-TRUTH END -->"
+RULE = ".claude/rules/sat-ground-truth.md"
 PINNED = "7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb"
 
 
@@ -27,15 +28,15 @@ def block(name):
 
 class SatGroundTruthBlock(unittest.TestCase):
     def test_both_files_carry_the_block(self):
-        for name in ("CLAUDE.md", "AGENTS.md"):
+        for name in (RULE, "AGENTS.md"):
             self.assertIsNotNone(block(name), name + " has no SAT-GROUND-TRUTH block")
 
     def test_blocks_are_identical(self):
-        self.assertEqual(block("CLAUDE.md"), block("AGENTS.md"),
-                         "the SAT ground truth block differs between CLAUDE.md and AGENTS.md")
+        self.assertEqual(block(RULE), block("AGENTS.md"),
+                         "the SAT ground truth block differs between " + RULE + " and AGENTS.md")
 
     def test_block_pins_the_thermo_nova_commit_and_the_rules(self):
-        b = block("CLAUDE.md")
+        b = block(RULE)
         self.assertIn(PINNED, b, "pinned thermo-nova commit missing")
         self.assertIn("releases/thermo-nova", b)
         self.assertIn("other-projects/SAT-releases-thermo-nova/", b)
@@ -47,7 +48,7 @@ class SatGroundTruthBlock(unittest.TestCase):
     def test_block_requires_recording_sergeant_d_decisions(self):
         # Maintainer directive 2026-10-23 (TASK-1329): every correction or decision by
         # Sergeant D goes into one named file, in the same session, before implementing.
-        b = block("CLAUDE.md")
+        b = block(RULE)
         self.assertIn("docs/sat/sergeant-d-corrections.md", b)
         self.assertIn("in the same session and before the change it leads to is implemented", b)
         # TASK-1330: decisions are checked against the recorded entries, conflicts go to him.
@@ -66,7 +67,8 @@ class SatGroundTruthBlock(unittest.TestCase):
             self.assertEqual(f.read().strip().split()[0], PINNED)
 
     def test_navigation_rows_point_at_the_spec(self):
-        for name in ("CLAUDE.md", "AGENTS.md"):
+        # TASK-1631: the navigation table moved from CLAUDE.md to a path-scoped rule.
+        for name in (".claude/rules/navigation.md", "AGENTS.md"):
             with open(os.path.join(REPO, name), encoding="utf-8") as f:
                 text = f.read()
             row = re.search(r"^\| SAT/BLE feature \|.*$", text, re.M)

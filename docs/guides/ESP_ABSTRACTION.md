@@ -99,4 +99,4 @@ So the number only ever goes down. To see the current live count:
 - ADR-061 (primary), ADR-072/113/114/115, ADR-063, ADR-082, ADR-080 (gate meta-rule).
 - `evaluate.py::check_esp_abstraction_boundary()` + `ESP_ABSTRACTION_BASELINE`.
 - `docs/audits/2026-05-28-esp-abstraction-leak-audit.md` + TASK-739..746.
-- The CLAUDE.md "ESP Platform Abstraction" section (the operational quick-rules).
+- The "ESP Platform Abstraction" section of `.claude/rules/firmware-coding.md` (the operational quick-rules).
