@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-04T23:53:00Z'
-updated_date: '2026-11-04T23:57:00Z'
+updated_date: '2026-11-05T17:27:00Z'
 labels:
   - github
   - needs-maintainer-ok
@@ -26,4 +26,6 @@ https://github.com/rvdbreemen/OTGW-firmware/issues/10 by STemplar (2022). Featur
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-05 Robert (session): parked for 2.1.0.
+
+Robert 2026-11-05 (session, AskUserQuestion): keep waiting (label needs-maintainer-ok stays).
 <!-- SECTION:NOTES:END -->

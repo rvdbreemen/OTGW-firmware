@@ -5,16 +5,9 @@ status: To Do
 assignee:
   - '@claude'
 created_date: 2026-05-20 18:31
-updated_date: '2026-11-04T05:08:00Z'
+updated_date: '2026-11-05T17:28:00Z'
 labels:
-  - feature
-  - esp32-only
-  - experimental
-  - modbus
-  - heatpump
-  - energy
-  - milestone-v2.1.0
-  - deferred-from-v2.0.0
+  - parked
 milestone: 2.1.0
 dependencies:
   - TASK-640
@@ -107,4 +100,6 @@ BLOCKED ON SCOPING, 2026-07-31 (backlog-drain triage). A Modbus TCP client is ne
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no Modbus code; deferred to 2.1.0.
 
 2026-11-04 Robert (interactive): moved to milestone 2.1.0, out of the 2.0.0 scope.
+
+Robert 2026-11-05 (session, AskUserQuestion): parked; nobody works on it until Robert releases it (HTTPS epic: the no-HTTPS rule, ADR-003, stays).
 <!-- SECTION:NOTES:END -->

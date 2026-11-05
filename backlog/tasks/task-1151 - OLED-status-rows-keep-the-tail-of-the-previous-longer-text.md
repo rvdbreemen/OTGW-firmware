@@ -5,10 +5,9 @@ status: To Do
 assignee:
   - '@claude'
 created_date: 2026-09-22 06:37
-updated_date: '2026-11-04T20:45:00Z'
+updated_date: '2026-11-05T17:28:00Z'
 labels:
-  - oled
-  - waiting-for-field
+  - parked
 dependencies: []
 ordinal: 286000
 ---
@@ -62,4 +61,6 @@ AC2, AC3, AC6 and AC10 need an OLED on a 2.0.0 board. None was reachable this se
 2026-10-22 cycle: skipped, AC2/3/6/10 need an Ethernet cable plugged into and pulled from the bench OTGW32, a physical action the session cannot do.
 
 2026-11-04 Robert (interactive): parked. The code is in the firmware (AC1, 4, 5, 7, 8, 9 met); AC2, 3, 6, 10 (Ethernet plug/unplug on an OTGW32, visual OLED check, no flicker) are validated once the first OTGW32 runs in the field. Robert will not bench-test it himself.
+
+Robert 2026-11-05 (session, AskUserQuestion): parked; nobody works on it until Robert releases it (HTTPS epic: the no-HTTPS rule, ADR-003, stays).
 <!-- SECTION:NOTES:END -->
