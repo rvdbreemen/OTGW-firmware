@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.99
+**  Version  : v2.0.0-beta.100
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -15,6 +15,7 @@
 #include <pgmspace.h>
 #include "OTGW-Core.h"              // Core OpenTherm data structures and functions
 #include "MQTTstuff.h"              // Structured discovery data layer (enums, structs, streaming API)
+#include "mqttBrokerAddress.h"      // decideMqttBrokerLookup() (TASK-1451)
 #include "mqtt_discovery_verify.h"  // Discovery-verify state machine (TASK-363: separate TU)
 
 // MQTT publish model (TASK-865.7 / ADR-123): espMqttClient frames every publish
@@ -51,6 +52,8 @@ static void runThermostatDupCleanupStep();
 
 static IPAddress  MQTTbrokerIP;
 static char       MQTTbrokerIPchar[20];
+// The broker name MQTTbrokerIP was resolved for (TASK-1451): a held address is only reused for that name.
+static char       MQTTbrokerResolvedFor[sizeof(settings.mqtt.sBroker)];
 constexpr size_t  MQTT_ID_MAX_LEN = 96;
 constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
@@ -1316,11 +1319,25 @@ void handleMQTT()
   {
     case MQTT_STATE_INIT:
       MQTTDebugTln(F("MQTT State: MQTT Initializing"));
+      { // own scope: the locals below must not cross the following case labels
       // Resolve the broker to an IP (TASK-1605: the platform shim, never hostByName(), which
-      // clears the lwIP DNS cache without the core lock). On failure MQTTbrokerIP is 0.0.0.0.
-      platformResolveHost(CSTR(settings.mqtt.sBroker), MQTTbrokerIP);
-      snprintf_P(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), PSTR("%d.%d.%d.%d"), MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
-      if (isValidIP(MQTTbrokerIP))
+      // clears the lwIP DNS cache without the core lock). The shim zeroes its target on failure, so
+      // it resolves into a local: a failed lookup must not destroy the last good address (TASK-1451).
+      IPAddress lookedUp;
+      platformResolveHost(CSTR(settings.mqtt.sBroker), lookedUp);
+      const MqttBrokerLookup lookup = decideMqttBrokerLookup(isValidIP(lookedUp), isValidIP(MQTTbrokerIP),
+                                                             MQTTbrokerResolvedFor, CSTR(settings.mqtt.sBroker));
+      if (lookup.bUseResult)
+      {
+        MQTTbrokerIP = lookedUp;
+        strlcpy(MQTTbrokerResolvedFor, CSTR(settings.mqtt.sBroker), sizeof(MQTTbrokerResolvedFor));
+        snprintf_P(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), PSTR("%d.%d.%d.%d"), MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
+      }
+      else if (lookup.bUsable)
+      {
+        MQTTDebugTf(PSTR("MQTT: lookup of [%s] failed, using the last known address %s\r\n"), CSTR(settings.mqtt.sBroker), MQTTbrokerIPchar);
+      }
+      if (lookup.bUsable)
       {
         MQTTDebugTf(PSTR("[%s] => setServer(%s, %d)\r\n"), CSTR(settings.mqtt.sBroker), MQTTbrokerIPchar, settings.mqtt.iBrokerPort);
         MQTTclient.disconnect();
@@ -1357,12 +1374,21 @@ void handleMQTT()
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
       }
       else
-      { // invalid IP, then goto error state
+      { // no usable address for this name, then goto error state
+        // A rename whose lookup fails must not leave the previous broker's session open, nor a CONNECT
+        // still in flight to it, whose late CONNACK would set IS_CONNECTED on the old broker (TASK-1451).
+        // disconnect(false) only acts on an established session, so a pending CONNECT is aborted with disconnect(true).
+        if (MQTTclient.connected()) MQTTclient.disconnect();               // graceful close of an open session
+        else if (!MQTTclient.disconnected()) MQTTclient.disconnect(true);  // abort a CONNECT still in flight
+        MQTTbrokerIP = IPAddress();           // keeps the publish guards (isValidIP) closed
+        MQTTbrokerResolvedFor[0] = '\0';
+        snprintf_P(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), PSTR("0.0.0.0"));
         MQTTDebugTf(PSTR("ERROR: [%s] => is not a valid URL\r\n"), CSTR(settings.mqtt.sBroker));
         stateMQTT = MQTT_STATE_ERROR;
         //DebugTln(F("Next State: MQTT_STATE_ERROR"));
       }
       RESTART_TIMER(timerMQTTwaitforconnect);
+      }
     break;
 
     case MQTT_STATE_TRY_TO_CONNECT:

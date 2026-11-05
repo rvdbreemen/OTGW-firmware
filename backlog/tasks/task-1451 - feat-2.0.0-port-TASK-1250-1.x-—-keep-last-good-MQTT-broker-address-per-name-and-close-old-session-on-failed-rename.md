@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:22:00Z'
-updated_date: '2026-11-05T16:35:00Z'
+updated_date: '2026-11-05T16:52:00Z'
 labels:
   - port-from-1.x
   - mqtt
@@ -103,10 +103,10 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A failed broker-name lookup in MQTT_STATE_INIT no longer overwrites MQTTbrokerIP: when an address for the SAME broker name is held, the state machine goes to TRY_TO_CONNECT with that address and logs that the lookup failed.
-- [ ] #2 A held address is never used for a different broker name: after a rename whose lookup fails, the client does not connect or publish to the previous broker's address.
-- [ ] #3 When the INIT step has no usable address, the existing MQTT session is closed (doMqttDisconnect) before entering MQTT_STATE_ERROR; after a failed rename /api/v2 device info and the Web UI no longer report MQTT connected to the old broker.
-- [ ] #4 The decision logic lives in a header-only pure function on origin/dev (port of mqttBrokerAddress.h) and is covered by a host test under test/host/ that #includes the real header. The test runs red against the old dev semantics (lookup result written straight over the held address, name ignored) and green on the fix, with the old-vs-fix run counts recorded in the task notes.
+- [x] #1 A failed broker-name lookup in MQTT_STATE_INIT no longer overwrites MQTTbrokerIP: when an address for the SAME broker name is held, the state machine goes to TRY_TO_CONNECT with that address and logs that the lookup failed.
+- [x] #2 A held address is never used for a different broker name: after a rename whose lookup fails, the client does not connect or publish to the previous broker's address.
+- [x] #3 When the INIT step has no usable address, the existing MQTT session is closed (doMqttDisconnect) before entering MQTT_STATE_ERROR; after a failed rename /api/v2 device info and the Web UI no longer report MQTT connected to the old broker.
+- [x] #4 The decision logic lives in a header-only pure function on origin/dev (port of mqttBrokerAddress.h) and is covered by a host test under test/host/ that #includes the real header. The test runs red against the old dev semantics (lookup result written straight over the held address, name ignored) and green on the fix, with the old-vs-fix run counts recorded in the task notes.
 - [ ] #5 Bench check on .61 OTGW32 or .63 Classic+S3 with the broker set by hostname: (a) with MQTT connected, make the name unresolvable (for example a MikroTik static DNS override or blocking mDNS), drop the broker connection, and confirm MQTT reconnects to the last known address within one 42 s cycle; (b) rename the broker to an unresolvable name and confirm the old session closes and MQTT shows disconnected. Telnet/MQTT debug transcript attached.
 - [ ] #6 Re-resolve after every reconnect wait (dev TASK-873, MQTTstuff.ino:1449-1463) still works: once the name resolves again, MQTT connects without a reboot.
 - [ ] #7 Build for esp32, esp32-classic and esp32-combo succeeds and python evaluate.py --quick shows no new failures.
@@ -116,4 +116,6 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: MQTTstuff.ino:1319 hostByName overwrites MQTTbrokerIP. Code + host test doable.
+
+2026-11-05 (sonnet agent + opus refute review, lead verified): new header-only mqttBrokerAddress.h decideMqttBrokerLookup(); MQTT_STATE_INIT resolves via platformResolveHost into a local (the shim zeroes its target on failure, platform_esp32.h:449), adopts only a valid result and records MQTTbrokerResolvedFor; a failed lookup for the SAME name keeps the held address (log 'MQTT: lookup of [%s] failed, using the last known address %s'); no usable address -> graceful close of an open session, FORCED abort of a CONNECT still in flight (review finding: disconnect(false) is a no-op unless connected, MqttClient.cpp:140-150), MQTTbrokerIP zeroed so the publish guards stay closed, ERROR. Host test test/host/test_mqtt_broker_address.py (real header + the real INIT block sliced from MQTTstuff.ino): fix D1-D6 + H1-H7 pass; origin/dev H2/H3/H5/H7 FAIL, controls pass, RESULT: PASS. test_no_hostbyname OK, evaluate 0 failed. Bench AC5/AC6 next (MikroTik DNS override).
 <!-- SECTION:NOTES:END -->
