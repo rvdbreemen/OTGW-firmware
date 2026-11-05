@@ -3,11 +3,11 @@ id: TASK-1653
 title: >-
   SAT on PIC: request MsgID 25 itself when the thermostat never reads it
   (maintainer decision)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-05T07:00:00Z'
-updated_date: '2026-11-05T13:22:00Z'
+updated_date: '2026-11-05T17:03:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -37,4 +37,6 @@ Robert 2026-11-05: on a PIC installation whose thermostat never reads MsgID 25, 
 2026-11-05 implementation (opus agent, wt-1653; integrated on wt-1645b): new SATpm25Poll.h (no state; constants 300 s quiet / 20 s age / 120 s slot window / 10 s fault hold-off / 500 ms pairing), hook in processOT (OTGW-Core.ino ~5868, skips localAnswer/replayed), picPrioSlotBusy() reuses the 60 s priority-slot gate, satPm25PollStep() in SATcontrol.ino after satMiStep(); at most one PM=25 outstanding, at least 20 s apart; REST /api/v2/sat/status pm25_no_slot/sent/answered/unanswered, MQTT sat/pm25_no_slot (docs/api/MQTT.md). Robert 2026-11-05 (session): slot rule B, widened: besides 'T X then R Y', also 'T X then B X Unknown-DataID within 500 ms' counts as a slot (PIC prints R/A only when it substitutes; with an empty AA list the bus shows only T X / B X Unknown-DataID, gateway.asm 3447-3462, 2401, 2446; it blacklists after 3 rejections, 2429-2446). Tests: tests/test_sat_pm25_poll.py 16/16 (old: 11 FAIL, 2 skipped); mutants (spacing, hold-off) red; pic_pm_chain 40, ot_loss 24, restart_quiet 20 OK; evaluate 0 failed. Not verified: PIC 6.8 behaviour, bench on a PIC with a thermostat that skips 25 (needs such a thermostat or the TASK-1654 simulator).
 
 2026-11-05: published as beta.97 in the beta.98 zip (#alpha-testing msg 1567891122137604228). Bench .61 (OT-Direct) shows the new pm25_* fields (0, gated off on OT-Direct as designed). AC3 bench half open: needs a PIC with a thermostat that skips MsgID 25 (or the TASK-1654 boiler simulator).
+
+2026-11-05: In Review (Robert's rule): all self-verifiable ACs evidenced (host test 16/16, old 11 FAIL; published in alpha beta.98); the open AC3 bench half needs a PIC with a thermostat that skips MsgID 25 (field / hardware we lack). Not yet in a public beta: the 2-week clock starts at the first public beta that contains beta.97.
 <!-- SECTION:NOTES:END -->

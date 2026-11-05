@@ -1,10 +1,11 @@
 ---
 id: TASK-1544
 title: 'beta.1 follow-up: 24 h soak and macOS capture run (waived for v2.0.0-beta.1)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-01T15:47:00Z'
-updated_date: '2026-11-04T05:34:00Z'
+updated_date: '2026-11-05T16:57:00Z'
 labels:
   - beta
   - release

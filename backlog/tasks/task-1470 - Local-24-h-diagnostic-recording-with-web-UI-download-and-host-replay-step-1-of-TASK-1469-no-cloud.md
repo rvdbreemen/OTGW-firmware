@@ -3,10 +3,11 @@ id: TASK-1470
 title: >-
   Local 24 h diagnostic recording with web UI download and host replay (step 1
   of TASK-1469, no cloud)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T09:03:00Z'
-updated_date: '2026-11-04T05:08:00Z'
+updated_date: '2026-11-05T16:57:00Z'
 labels:
   - sat
   - diagnostics
