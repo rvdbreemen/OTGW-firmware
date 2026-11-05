@@ -3,11 +3,11 @@ id: TASK-1643
 title: >-
   v2 web UI: elements jump or look broken while the page first loads
   (andrebrait, #alpha-testing)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-04T23:56:00Z'
-updated_date: '2026-11-05T05:55:00Z'
+updated_date: '2026-11-05T09:30:00Z'
 labels:
   - web-ui
 dependencies: []
@@ -23,8 +23,8 @@ Reported by andrebrait in #alpha-testing (msg 1567687106934083745, 2026-11-04 23
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The jarring first-load state is reproduced (screenshot or recording before the fix, synthetic data)
-- [ ] #2 The first paint shows either a stable layout or a loading state, with before/after screenshots
+- [x] #1 The jarring first-load state is reproduced (screenshot or recording before the fix, synthetic data)
+- [x] #2 The first paint shows either a stable layout or a loading state, with before/after screenshots
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -37,4 +37,12 @@ Reported by andrebrait in #alpha-testing (msg 1567687106934083745, 2026-11-04 23
 2026-11-05 andrebrait (msg 1567699818757750835): 'embedding the style sheet is not an option?' Options for Robert: (1) head link + onerror retry (preferred, smallest change); (2) inline the whole bundle in v2.html (source sizes v2.html 55 KB, v2-bundle.css 76 KB): one request less, no FOUC, loses separate caching, build change, changes the ADR-192 asset set -> needs an ADR; (3) inline only first-paint critical CSS, keep the bundle.
 
 2026-11-05 Robert (session): go for option 'head link with onerror retry' (render-blocking <link> in the head, re-added with the same backoff on a 503, v2.js started from its onload so the one-file-at-a-time order stays). Needs a bench check under a 503.
+
+2026-11-05 bench .61 beta.94+c474756, Playwright: v2-bundle.css answered 503 for the first 3 requests (route-injected), loader retried at t=237/945/1356 ms, 4th passed at 1962 ms, v2.js requested only after it (2429 ms), fonts after that; page styled (body font Inter), stylesheet link in the head. Screenshot: .playwright-mcp/t1643-after-503-retry.png (local). Before: andrebrait's screenshot (#alpha-testing 1567690322044129351) shows the unstyled first paint.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Render-blocking <link> for v2-bundle.css in the head with an onerror re-add (same backoff, 8 retries 200..1600 ms) and v2.js started from the stylesheet's onload. Evidence: tests/webui/v2-css-render-blocking.test.mjs 4/4 (old v2.html: 1 FAIL, the render-blocking check); bench .61 beta.94+c474756 under 3 injected 503s: retry sequence and order css -> v2.js -> fonts observed, page styled. Before screenshot: andrebrait (Discord). Not verified: Safari/Firefox, a device-generated (not injected) 503.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -3,11 +3,11 @@ id: TASK-1391
 title: >-
   OT support bitmap: PIC-built A frames can count as boiler evidence (unpaired
   A, blacklist/UI= Unknown)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T13:44:00Z'
-updated_date: '2026-11-04T23:06:00Z'
+updated_date: '2026-11-05T09:30:00Z'
 labels:
   - opentherm
   - pic
@@ -42,3 +42,9 @@ Full suite 2026-11-04 in wt-6c-batch (b1fe73d2e + 1b7a9db21, 500796bc3, 40effe0e
 
 2026-11-05 rerun of tests/test_sat_lowload_contract.py in wt-6c-batch, in four OTGW_LL_ONLY chunks (one full run hit the 590 s tool limit while a lead build ran): LL-021+023 pass (43 s); LL-001..011 pass (119 s, incl. LL-011 Unknown-DataID verdict + board-sensor return); LL-012..017 pass (220 s; LL-012b expectedFailure QD-8, LL-016 skip PH-FIELD); LL-018..022 pass (249 s; LL-018b/018j expectedFailure open decisions). All 18 LL ids pass, 0 FAIL/ERROR. The earlier single FAIL in the overnight full-suite run is not reproducible here; it ran under memory pressure (commit charge 88-90%) and its log was not kept, so the cause stays unknown.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Only boiler B frames feed the OT support bitmaps. Evidence: host tests red/green (see notes); bench .61 beta.87 under the builtin replay: map refilled with 14 ids; real-traffic relearn not shown (idle OT-Direct bench).
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:21:00Z'
-updated_date: '2026-11-04T21:27:00Z'
+updated_date: '2026-11-05T09:30:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -107,4 +107,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no dead-link probe in 
 2026-11-04 Robert: MikroTik fault injection allowed: one rule per test, scoped to the bench boards' MAC/IP (.61/.63), comment-tagged, scheduler auto-removal within 30 min, removed right after; config export before and after recorded in the notes.
 
 2026-11-04 (opus agent; lead reran in wt-int4): dead-link check ported from 1.x: ICMP echo to the gateway via a raw lwIP pcb in platform_esp32.h (every lwIP call under LOCK_TCPIP_CORE; recv callback on tcpip only sets a mask, never eats the packet), every 60 s 3 echoes, 8 dead probes -> forced reconnect, then restart via WIFI_FAILED; arming after the gateway answered once, gateway change disarms, Ethernet resets; witnesses MQTT connected, REST request <60 s, port-25238 byte <60 s; cap 3 restarts then 1 reconnect per 15 min (RTC_NOINIT, captureWifiDeadRestarts second in setup). Raw pcb chosen over esp ping_sock (no extra task/stack). tests/test_wifi_deadlink.py 28 OK (old: 21 FAIL + 1 ERROR; 10 mutants each red); reboot_reason 9, no_hostbyname 12, strongest_ap 3 OK; evaluate 0 failed. Tag beta.81. Bench plan in the agent report (AC1-AC8 on a MikroTik bridge filter that keeps association): pending, boards busy tonight (.61 TASK-1528 night run, .63 TASK-1306 ring fill until 06:30).
+
+2026-11-05 beta.94+c474756: ACs stay open per wording (multi-board build list, witness tests, cap, ping, Ethernet); the bench run of beta.87 (notes above) covers #1/#2 in spirit (forced reconnect then 'WiFi: connected but no traffic' restart).
 <!-- SECTION:NOTES:END -->

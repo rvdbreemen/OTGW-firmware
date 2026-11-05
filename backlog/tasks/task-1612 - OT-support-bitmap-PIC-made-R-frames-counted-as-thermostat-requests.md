@@ -1,11 +1,11 @@
 ---
 id: TASK-1612
 title: 'OT support bitmap: PIC-made R frames counted as thermostat requests'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-04T21:28:00Z'
-updated_date: '2026-11-05T05:51:00Z'
+updated_date: '2026-11-05T09:30:00Z'
 labels:
   - opentherm
   - pic
@@ -33,3 +33,9 @@ Found while fixing TASK-1391. The master branch of the bitmap block (OTGW-Core.i
 
 Bench .61 beta.87+2a9201f 2026-11-05: PASS (file evidence; the telnet line prints before port 23 listens and was not captured). After the flash /ot-thermo.json was v1 with 52 ids and /api/v2/otgw/ot-support {"msgids":[]} (format 1 not loaded); at 06:40 /ot-thermo.json {"v":2,"sr":[],"sw":[]} and /ot-boiler.json v3: the migration in loadOtSupportFiles.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Only thermostat T frames feed the thermostat bitmaps (PIC R frames no longer counted). Evidence: tests/test_boiler_support_bitmap_b_only.py 8/8 (2 red on old); bench .61 beta.87: ot-thermo.json v1 dropped and rewritten as v2 (file evidence; the telnet line prints before port 23 listens).
+<!-- SECTION:FINAL_SUMMARY:END -->
