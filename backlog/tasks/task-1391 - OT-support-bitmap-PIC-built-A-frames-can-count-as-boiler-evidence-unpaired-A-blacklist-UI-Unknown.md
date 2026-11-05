@@ -3,10 +3,11 @@ id: TASK-1391
 title: >-
   OT support bitmap: PIC-built A frames can count as boiler evidence (unpaired
   A, blacklist/UI= Unknown)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-25T13:44:00Z'
-updated_date: '2026-11-05T05:51:00Z'
+updated_date: '2026-11-04T21:24:00Z'
 labels:
   - opentherm
   - pic
@@ -24,8 +25,8 @@ From the boiler-capability research 2026-10-25 (docs/research/2026-10-25-boiler-
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Bench or field capture shows (or refutes) a PIC-built A frame setting the boiler bitmap
-- [ ] #2 If confirmed: only B frames set/retract boiler support bits (host test red on HEAD)
+- [x] #1 Bench or field capture shows (or refutes) a PIC-built A frame setting the boiler bitmap
+- [x] #2 If confirmed: only B frames set/retract boiler support bits (host test red on HEAD)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -33,5 +34,5 @@ From the boiler-capability research 2026-10-25 (docs/research/2026-10-25-boiler-
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: only a genuine B retracts (OTGW-Core.ino:5564/5576); unpaired PIC A can still set (:5530/5545). Needs a capture.
 
-Bench .61 beta.87+2a9201f 2026-11-05 05:50-06:43 (sonnet agent, evidence scratchpad/bench-b87/, router exports b87-before/after, rules left 0): idle OT-Direct bench has no OT traffic: ot-support {"msgids":[]} at 05:55 and 06:40 (nothing to relearn). Under /api/v2/simulate/start builtin replay 06:40:53-06:42:40 the map filled with 14 ids (0,1,3,5,6,14,17,18,25,26,28,48,56,57; e.g. 0 tsR true, 1 tsW true). Real-traffic relearn not shown.
+2026-11-04 (otgw-firmware-6c). AC1 confirmed in a field capture (bench .63 has no boiler/thermostat, OTbus offline, so no A frames there): gruijter transcript 20261030-092718 (alpha.549, 350042 lines, local %LOCALAPPDATA%/OTGW-capture/field/gruijter-20261030-092718). Per MsgID: 9 = 349 T + 348 A Read-Ack, 0 B; 16 = 347 T + 347 A Write-Ack, 0 B; 24 = 347 T + 347 A Unknown-Data-Id, 0 B; 57 = 347 T + 347 A Read-Ack, 0 B; 115 = 49 T + 49 A Unknown-Data-Id, 0 B; 28 = 49 T, 1 B Unknown, 48 A Read-Ack. Every one of those A frames follows a B of another id (T57 R26 B26 A57 pattern: the PIC replaced the request). The published otgw-firmware/boiler/unsupported_msgids (transcript line 149167) reads 15R,28R,49R,57R,99R,115R,117R,118R,119R,121R,122R,14W,24W,57W: 24W and 115R come from PIC answers only (caveat: retained value, could partly date from earlier runs; the mechanism matches). Primary sources: otgw-6.6 gateway.asm:2490-2496 prints 'A' for a response the PIC transmits itself (nothing in monitor mode); OTGW-documentation/OTGW-Protocol.md:92 'A = modified response being sent to the thermostat'. AC2: OTGW-Core.ino bitmap block now only enters the slave branch for rsptype OTGW_BOILER (was: every slave frame except an answer-override A). /ot-boiler.json goes to format 3; format 1/2 files are not loaded (start fresh once, same pattern as TASK-1185) so the wrong 24W/115R bits do not stay forever (retraction needs a B that never comes). C4 doc c4-code-otgw-core.md updated. ADR-103 is unaffected (it routes values on MQTT, not support evidence). Side effect for SAT (no design change): a PIC A(28 Unknown) no longer sets boilerUnknown28ThisBoot, matching the SAT rule's own text 'a boiler frame of this boot confirmed Unknown-DataID' (SATcontrol.ino:2586). Host test tests/test_boiler_support_bitmap_b_only.py compiles the real block: against origin/dev b1fe73d2e 3 of 5 FAIL (57/16/9 acked, 24W/115R unsupported, u28 set from an A), on the fix 5 of 5 OK. Related tests OK: test_sat_no_return_startup, test_sat_flow_return_validity, test_pic_pm_chain (40), test_sat_max_tset, test_fs_update_keep. evaluate --quick 82/0/0. NOT host-tested: the format-3 load/save (LittleFS); bench check after build: telnet shows 'ot-support: /ot-boiler.json is format 1/2 ... starting fresh' once, /ot-boiler.json then starts with {"v":3 after the 15-min save.
 <!-- SECTION:NOTES:END -->

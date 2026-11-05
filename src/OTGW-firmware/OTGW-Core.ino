@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.83
+**  Version  : v2.0.0-beta.84
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5915,15 +5915,18 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
               thermostatFileDirty = true;
             }
           }
-        } else if (!(OTdata.rsptype == OTGW_ANSWER_THERMOSTAT && OTdata.bAnswerOverride)) {
-          // Slave frame — track boiler-side response classification.
+        } else if (OTdata.rsptype == OTGW_BOILER) {
+          // Slave frame from the boiler — track boiler-side response classification.
           //
-          // The masterslave bit alone is not enough to call a frame boiler
-          // evidence: a gateway-generated override answer to the thermostat is
-          // a type-7 with masterslave==1, and counting it marked msgids the
-          // boiler had just Write-Acked as "not implemented" (GH #677). A
-          // proxy A with no preceding B still counts, per ADR-103 — the same
-          // distinction is_value_valid_for_master_topic() already makes. A
+          // Only a B frame is boiler evidence. The PIC prints 'A' for every
+          // response it transmits to the thermostat itself (otgw-6.6
+          // gateway.asm:2490-2496), paired with a B (answer override, GH #677)
+          // or not: for a request it replaced by one of its own (T57 R26 B26
+          // A57) the boiler never saw the id. Counting such an A branded
+          // msgids the boiler never received (gruijter capture 2026-10-30:
+          // 24W and 115R unsupported, 9/16/57 acked, no B for any of them;
+          // TASK-1391). ADR-103 still publishes such an A as the boiler-side
+          // value; that is MQTT routing, not support evidence. A
           // frame the gateway made itself (bLocalAnswer: SR= answer, master-mode
           // WRITE-ACK echo, loopback B; TASK-1086) or a replayed line
           // (bReplayed) counts for none of these bitmaps: it is no evidence of
@@ -5938,15 +5941,9 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
             // this the bitmap is a one-way latch that is persisted and reloaded
             // at boot, so one bad observation brands the msgid forever.
             //
-            // Retraction deliberately demands stricter evidence than the set:
-            // only a genuine B frame from the boiler. bAnswerOverride alone is
-            // not enough, because it is set only when a B preceded the A. A
-            // gateway that answers the thermostat itself emits (T,A) with no B
-            // (OTDirect does so from its SR= table and in master mode), so the
-            // flag stays false and such a frame would otherwise clear a verdict
-            // the boiler really gave. Setting stays permissive so a PIC proxy A
-            // still counts as boiler evidence (ADR-103). A B is not enough
-            // either when the gateway made it itself: OTDirect loopback mode
+            // Retraction, like the set, needs a genuine B frame from the boiler
+            // (this branch only sees B frames). A B is not enough
+            // when the gateway made it itself: OTDirect loopback mode
             // answers every request with a B of its own (bLocalAnswer), and a
             // replayed B comes from a recording (bReplayed): boilerEvidence.
             if (OTdata.rsptype == OTGW_BOILER && boilerEvidence && (boilerUnsupportedRead[idx] & mask) != 0) {
@@ -7214,8 +7211,14 @@ void upgradepic(AsyncWebServerRequest *request) {
 //
 // Files (LittleFS):
 //   /ot-thermo.json — {"v":1,"device":"thermostat","sent_read":[...],"sent_write":[...]}
-//   /ot-boiler.json — {"v":2,"device":"boiler","acked_read":[...],"acked_write":[...],
+//   /ot-boiler.json — {"v":3,"device":"boiler","acked_read":[...],"acked_write":[...],
 //                     "unsupported_read":[...],"unsupported_write":[...]}
+//
+// Boiler format 3 (TASK-1391): format 2 was written by builds that counted a
+// PIC-built A frame (an answer the PIC sent the thermostat for a request the
+// boiler never saw) as boiler evidence, so it can hold unsupported bits no B
+// frame will ever retract. A format-1 or format-2 file is not loaded, the same
+// way as below.
 //
 // Boiler format 2 (TASK-1185): format 1 was written by builds that counted
 // answers the gateway made itself (OT-Direct SR=, master mode, loopback) and
@@ -7335,22 +7338,22 @@ void loadOtSupportFiles() {
     char header[16] = {0};
     int n = f.read((uint8_t*)header, sizeof(header) - 1);
     header[n > 0 ? n : 0] = '\0';
-    if (strstr_P(header, PSTR("\"v\":2")) != nullptr) {
+    if (strstr_P(header, PSTR("\"v\":3")) != nullptr) {
       readBitmapArrayFromJson(f, F("\"ar\":["), boilerAckedRead);
       readBitmapArrayFromJson(f, F("\"aw\":["), boilerAckedWrite);
       readBitmapArrayFromJson(f, F("\"ur\":["), boilerUnsupportedRead);
       readBitmapArrayFromJson(f, F("\"uw\":["), boilerUnsupportedWrite);
       DebugTln(F("ot-support: boiler profile loaded from /ot-boiler.json"));
-    } else if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
-      boilerMigrated = true;              // format 1: see the header comment above
-      DebugTln(F("ot-support: /ot-boiler.json is format 1 (it counted gateway answers as boiler evidence), starting fresh"));
+    } else if (strstr_P(header, PSTR("\"v\":1")) != nullptr || strstr_P(header, PSTR("\"v\":2")) != nullptr) {
+      boilerMigrated = true;              // format 1 or 2: see the header comment above
+      DebugTln(F("ot-support: /ot-boiler.json is format 1/2 (it counted gateway answers as boiler evidence), starting fresh"));
     } else {
       DebugTln(F("ot-support: /ot-boiler.json header missing/invalid — starting fresh"));
     }
     f.close();
   }
   // We loaded what's on disk, so the on-disk copy matches RAM: not dirty. A
-  // migrated format-1 file does not match, so it is rewritten as format 2.
+  // migrated format-1/2 file does not match, so it is rewritten as format 3.
   thermostatFileDirty = false;
   boilerFileDirty     = boilerMigrated;
 }
@@ -7377,7 +7380,7 @@ static bool writeOtBoilerFile(const char* canonicalPath, const char* tmpPath) {
   if (!f) return false;
   // TASK-696: short keys (ar/aw/ur/uw) match the reader; saves ~100 B per write.
   // Format 2 since TASK-1185 (see the header comment above).
-  f.print(F("{\"v\":2,\"device\":\"boiler\",\"ar\":["));
+  f.print(F("{\"v\":3,\"device\":\"boiler\",\"ar\":["));
   writeBitmapArrayToJson(f, boilerAckedRead);
   f.print(F("],\"aw\":["));
   writeBitmapArrayToJson(f, boilerAckedWrite);
