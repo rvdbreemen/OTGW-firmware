@@ -32,6 +32,7 @@ TARGET = 20.0
 GAS_PERIOD_S, GAS_MINON_S, GAS_MAX_STARTS_H = 1200, 180, 3   # gas PWM, entries 30/52/80
 OV_MARGIN = 2.0                # entries 22/37/41
 COLD_HYST = 0.5                # SAT_COLD_HYSTERESIS_C, entry 199
+COLD_CUT_MIN_BURN = False      # TASK-1652 (entry 275): a lit PWM ON phase burns 180 s before the cold cutoff ends it; False = today
 PMAX = 24000.0
 BOILER_STOP_K = 5.0          # A: the boiler stops at CS + 5 K at minimum output (sensitivity 3 K)
 BOILER_START_K = 2.0
@@ -104,7 +105,9 @@ class SatCtl:
         self.pid.service(ms, room, TARGET, cv); self.pid.note_room(room, ms)
         sp = min(e["spmax"], max(10.0, float(self.pid.output(cv))))
         self.cut = (sp <= e["cold"] + COLD_HYST) if self.cut else (sp <= e["cold"])
-        if self.cut:
+        # TASK-1652: a lit ON phase (flame_at None = it lit since the last tick) is not cut before 180 s since its ignition
+        if self.cut and not (COLD_CUT_MIN_BURN and self.pwm and self.ph_on and flame
+                             and (self.flame_at is None or now_s - self.flame_at < 180.0)):
             self.pwm = False; self.cs, self.ch = 10.0, False; self.duty = None; return sp
         if not self.pwm:
             self.ov_s = self.ov_s + 30.0 if (flame and flow >= sp + OV_MARGIN) else 0.0

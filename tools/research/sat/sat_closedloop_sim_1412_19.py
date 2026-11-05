@@ -139,7 +139,7 @@ def run(cls, era, em, fl, pmin, mm, seed, outdoor="steady_5", mass="heavy", coef
     fault_windows = [v for k, v in ev.items() if isinstance(v, tuple)]
     P = 0.0; cmd_q = []; delivered = (10.0, False); handed = False; handback_s = None; cmds_after_handback = 0
     out_lost_since = None; viol = {"H1": 0, "H2": 0, "H3": 0, "H4": 0}; max_cs = 0.0
-    room_err = []; scored = []; tr = []; pwm_phase = None; short_on = 0; dhw_hit = False
+    room_err = []; scored = []; tr = []; pwm_phase = None; short_on = 0; dhw_hit = False; short_cause = {}
     last_out_ok = 0.0
     for k in range(steps):
         t = k * DT; th = t / 3600.0; tout = f_out(th)
@@ -199,11 +199,13 @@ def run(cls, era, em, fl, pmin, mm, seed, outdoor="steady_5", mass="heavy", coef
         if pwm_active and ctl.ph_on:
             if pwm_phase is None: pwm_phase = {"flame": 0.0, "dhw": False}
             pwm_phase["flame"] += DT if (boiler.flame and not dhw) else 0.0; pwm_phase["dhw"] |= dhw
+            pwm_phase["lit"] = boiler.flame
         elif pwm_phase is not None:
             if pwm_phase["flame"] < 180.0 and not pwm_phase["dhw"] and pwm_phase["flame"] > 0:
                 short_on += 1
-                S6_DIAG.append(("cold_cutoff" if ctl.cut else "pwm_exit" if not ctl.pwm else "on_timer",
-                                pwm_phase["flame"]))
+                cause = "cold_cutoff" if ctl.cut else "pwm_exit" if not ctl.pwm else "on_timer"
+                if cause == "cold_cutoff" and not pwm_phase["lit"]: cause = "cold_cutoff_flame_out"   # TASK-1652 diagnostics
+                S6_DIAG.append((cause, pwm_phase["flame"])); short_cause[cause] = short_cause.get(cause, 0) + 1
             pwm_phase = None
         Tr += (P - draw) * DT / e["C"]
         Ta += (draw - Gao * (Ta - tout) - s3.G_AW * (Ta - Tw)) * DT / Ca
@@ -231,7 +233,7 @@ def run(cls, era, em, fl, pmin, mm, seed, outdoor="steady_5", mass="heavy", coef
            "S1_share_in_0_3": round(sum(1 for x in scored if abs(x) <= 0.3) / max(len(scored), 1), 4),
            "S2_max_over": round(max(scored), 3), "S3_max_under": round(min(scored), 3),
            "S4_starts_per_day": round(boiler.starts * 24.0 / HOURS, 2), "S5_recovery_min": rec, "S6_short_on": short_on,
-           "pwm_starts_max_per_hour": h1}
+           "pwm_starts_max_per_hour": h1, "S6_short_cause": short_cause}
     res["pass"] = {"H1": viol["H1"] == 0, "H2": viol["H2"] == 0, "H3": viol["H3"] == 0, "H4": viol["H4"] == 0,
                    "S1": res["S1_share_in_0_3"] >= 0.80, "S2": res["S2_max_over"] <= 0.6, "S3": res["S3_max_under"] >= -0.6,
                    "S4": res["S4_starts_per_day"] <= 72, "S5": None if not ends else (rec is not None and rec <= 240),
@@ -273,7 +275,10 @@ def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--out", required=True); ap.add_argument("--quick", action="store_true")
     ap.add_argument("--classes", default=",".join(CLASSES), help="comma list; runs only these classes")
     ap.add_argument("--merge", action="store_true", help="merge the per-class part files into runs.json")
+    ap.add_argument("--cold-cut-min-burn", action="store_true",
+                    help="TASK-1652 rule: the cold cutoff waits until a lit PWM ON phase has burnt 180 s (default: today)")
     a = ap.parse_args(); os.makedirs(a.out, exist_ok=True)
+    s16.COLD_CUT_MIN_BURN = a.cold_cut_min_burn
     parts = os.path.join(a.out, "parts"); os.makedirs(parts, exist_ok=True)
     if not a.merge:
         for cls in a.classes.split(","):
@@ -289,7 +294,8 @@ def main():
     sha = lambda f: hashlib.sha256(open(f, "rb").read()).hexdigest()
     meta = {"script_sha256": sha(me), "study16_sha256": sha(os.path.join(os.path.dirname(me), "sat_lowload_study_1412_16.py")),
             "port_sha256": sha(os.path.join(os.path.dirname(me), "sat_sim_port.py")), "thresholds_commit": "b3b096a1a",
-            "hours": HOURS, "settle_h": SETTLE_H, "dt_s": DT, "quick": a.quick}
+            "hours": HOURS, "settle_h": SETTLE_H, "dt_s": DT, "quick": a.quick,
+            "cold_cut_min_burn": a.cold_cut_min_burn}
     with open(os.path.join(a.out, "runs.json"), "w", encoding="utf-8") as f:
         json.dump({"meta": meta, "summary": summ, "runs": runs}, f, indent=0, sort_keys=True)
     for cls, s in summ.items(): print(cls, s)

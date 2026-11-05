@@ -463,7 +463,7 @@ def check_published_modulation_equals_the_mm_on_the_wire():
     src = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
     fn = re.search(r"^static uint8_t satReportedModulation\([^\n]*\}$", src, re.M)
     assert fn, "no satReportedModulation(): the published current_modulation never shows the MM=T that went out"
-    assert re.search(r"iCurrentModulation\s*=\s*satReportedModulation\(\s*!_sat_coldCut && satPwmAtMaxDuty\(\)", src), \
+    assert re.search(r"iCurrentModulation\s*=\s*satReportedModulation\(\s*!(?:_sat_coldCut|satColdCutActive\(\)) && satPwmAtMaxDuty\(\)", src), \
         "the control tick does not publish satReportedModulation() with the mmTarget predicate"
     assert re.search(r"mmTarget = \(!coldCutoff && satPwmAtMaxDuty\(\)\) \? SAT_MM_T", src)
     with tempfile.TemporaryDirectory() as d:

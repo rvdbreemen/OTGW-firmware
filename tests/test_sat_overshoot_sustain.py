@@ -487,10 +487,13 @@ def extract_gate(sat_src: str) -> str:
     cold = _fn(sat_src, "static float satGetColdSetpoint()")
     if len(consts) != 2 or not cold:
         raise AssertionError("satGetColdSetpoint() or its constants not found in %s" % SAT_INO)
+    # TASK-1652: satColdThreshold() reads SAT_MIN_SETPOINT while the cutoff waits for the minimum burn
+    consts += re.findall(r"^static const float SAT_MIN_SETPOINT\s*=[^;]*;", sat_src, re.M)
     always = _fn(sat_src, "static bool satAlwaysMaxModulation()")   # empty when the source does not define it
     # TASK-1547: the gate compares against the latched threshold; take the real latch, band and helper when the source has them
-    latch = "\n".join(re.findall(r"^static (?:bool _sat_coldCut|const float SAT_COLD_HYSTERESIS_C)\s*=[^;]*;", sat_src, re.M))
-    thr = _fn(sat_src, "static float satColdThreshold()")   # empty before TASK-1547
+    latch = "\n".join(re.findall(r"^static (?:bool _sat_coldCut(?:Deferred)?|const float SAT_COLD_HYSTERESIS_C)\s*=[^;]*;", sat_src, re.M))
+    # TASK-1652: satColdCutActive() sits next to the latch (empty before); then the threshold (empty before TASK-1547)
+    thr = _fn(sat_src, "static bool satColdCutActive()") + "\n" + _fn(sat_src, "static float satColdThreshold()")
     return ("\n".join(consts) + "\n" + cold + "\n" + latch + "\n" + thr + "\n" + always
             + "\nstatic void gate(float pidOutput) {\n" + blocks + "\n}\n")
 

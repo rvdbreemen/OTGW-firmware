@@ -43,7 +43,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_sat_cycle_classifier as cls_harness  # noqa: E402  (types + cycles cut)
-from test_sat_pwm_override import compile_cpp  # noqa: E402
+from test_sat_pwm_override import compile_cpp, extract_cold_cut  # noqa: E402
 
 FW = cls_harness.FW
 CYCLES_INO = cls_harness.CYCLES_INO
@@ -69,9 +69,8 @@ static bool satIsFlameOn() { return g_flame; }
 static bool satIsEnabled() { return true; }
 static float satGetColdSetpoint() { return 28.2f; }
 // TASK-1547: latched cold cutoff (SATcontrol.ino satColdThreshold/_sat_coldCut, outside the cut block); never cut here.
-static bool _sat_coldCut = false;
 static const float SAT_COLD_HYSTERESIS_C = 0.5f;
-static float satColdThreshold() { return satGetColdSetpoint() + (_sat_coldCut ? SAT_COLD_HYSTERESIS_C : 0.0f); }
+@COLDCUT@
 static float satGetBaseOffset() { return 27.2f; }
 static float satGetMaxSetpoint() { return 62.0f; }
 static float satEffectiveMaxSetpoint() { return 62.0f; }
@@ -440,7 +439,7 @@ def build(wd: Path):
     cpp = wd / "t.cpp"
     # order: the PWM block first (it defines _sat_requestedSetpoint, read by satCycleOnFlameChange), then the ring
     # (called by satCycleOnFlameChange on HEAD), then the cycles cut
-    cpp.write_text(cls_harness.PRELUDE + cls_harness.extract_types(types_src, True) + STUBS + FWD
+    cpp.write_text(cls_harness.PRELUDE + cls_harness.extract_types(types_src, True) + STUBS.replace("@COLDCUT@", extract_cold_cut(sat)) + FWD
                    + extract_pwm(sat) + ring + cls_harness.extract_cycles(cycles) + tail + MAIN.replace("@@TICK@@", extract_tick_gate(sat)), encoding="utf-8")
     return compile_cpp(cpp, wd / "t.exe")
 

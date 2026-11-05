@@ -452,13 +452,24 @@ static float satGetColdSetpoint()
 
 // Cold cutoff state, latched once per control tick by satColdCutoffLatched (TASK-1547, entry 199).
 static bool _sat_coldCut = false;
+// TASK-1652 (maintainer decision, entry 275): the latched cutoff waits while a lit PWM ON phase burns its first 180 s
+// (satPwmColdCutWaitsForMinBurn()). Set once per tick right after the latch; the latch itself keeps its hysteresis.
+static bool _sat_coldCutDeferred = false;
+
+// The cold cutoff in force: latched and not waiting for the minimum burn of a lit ON phase.
+static bool satColdCutActive()
+{
+  return _sat_coldCut && !_sat_coldCutDeferred;
+}
 
 // Threshold every "requested setpoint at or below the cold setpoint" test compares against: the cold
-// setpoint while heating, cold + SAT_COLD_HYSTERESIS_C while cut off. After the tick's latch update,
-// "requested <= satColdThreshold()" equals _sat_coldCut, so the CS override, the CH bit, the PWM gates,
-// the overshoot switch, the PWM exits and the 3 s refresh all see the same state between ticks.
+// setpoint while heating, cold + SAT_COLD_HYSTERESIS_C while cut off, and below every requested setpoint
+// (clamped to at least SAT_MIN_SETPOINT) while the cutoff waits for the minimum burn. After the tick's
+// latch update, "requested <= satColdThreshold()" equals satColdCutActive(), so the CS override, the CH bit,
+// the PWM gates, the overshoot switch, the PWM exits and the 3 s refresh all see the same state between ticks.
 static float satColdThreshold()
 {
+  if (_sat_coldCutDeferred) return SAT_MIN_SETPOINT - 1.0f;
   return satGetColdSetpoint() + (_sat_coldCut ? SAT_COLD_HYSTERESIS_C : 0.0f);
 }
 
@@ -1226,6 +1237,19 @@ static void satPwmBeginOn(bool flame, float boilerTemp, uint32_t onTimeMs, uint3
     _pwm_waitingForFlame = true;
     _pwm_flameOnMs = 0;                   // no ignition yet in this ON phase (pwm.py:164)
   }
+}
+
+// TASK-1652 (maintainer decision 2026-11-05, entry 275; entries 31, 80): once an ON phase has lit, the cold cutoff does not end it
+// before 180 s of flame since its ignition. True while PWM runs an ON phase whose flame burns, without hot water, and the ignition
+// anchor _pwm_flameOnMs is younger than 180 s, or is not set yet but the schedule sets it on this tick (first ignition, or a first
+// flame after the ignition wait timed out; satPwmSchedule()). A dark flame, hot water, an unlit phase or a hold that lapsed after a
+// draw give false, so the cutoff acts at once. The other stop paths (fault, DHW, SAT off, safety, valves, summer) never read this.
+static bool satPwmColdCutWaitsForMinBurn()
+{
+  if (state.sat.eControlMode != SAT_MODE_PWM || !state.sat.bPwmFlameRequested) return false;
+  if (!satIsFlameOn() || state.sat.bDhwActive || _pwm_dhwPhase != PwmDhwPhase::None || _pwm_dhwFlameLit) return false;
+  if (_pwm_flameOnMs == 0) return _pwm_waitingForFlame || !_pwm_dhwResumed || _pwm_dhwAnchorLate;
+  return (millis() - _pwm_flameOnMs) < PWM_IGNITION_TIMEOUT_MS;
 }
 
 // ON->OFF (pwm.py:205-209): the ignition anchor goes with the phase and the off wait is timed from this edge
@@ -7210,6 +7234,10 @@ static void satControlLoopRun()
   // the continuous setpoint below goes out in it, as with the underheat exit. Before the overshoot check, which refuses too.
   satCycleCheckLowLoadVeto();
 
+  // TASK-1652 (maintainer decision, entry 275): a lit PWM ON phase burns 180 s before the cold cutoff acts. Decided after the
+  // maximum-setpoint switch and the low-load veto, which end PWM themselves, and before the first reader of satColdThreshold().
+  _sat_coldCutDeferred = _sat_coldCut && satPwmColdCutWaitsForMinBurn();
+
   // --- Sustained overshoot: continuous -> PWM (Tasks #42/#43) ---
   // Before the mode is applied, as thermo-nova (heating_control.py:206-215, Sergeant D entry 88, Q47 A): on the
   // switch tick satApplyPWM() below sends the first PWM CS. Delegated to satCycleCheckOvershootSwitch() in
@@ -7229,7 +7257,7 @@ static void satControlLoopRun()
   // setpoint (and CH=1) goes out in that same tick, not one tick later. The schedule runs first: saturation reads this tick's off time.
   // Not while the cold cutoff holds (TASK-1515, entry 260): thermo-nova's heater-OFF branch skips pwm.update (heating_control.py:202-234),
   // so a cold-cutoff tick begins no ON phase and records no start in the sliding-hour ring (satPwmBeginOn; the ring stays, entry 127).
-  if (state.sat.eControlMode == SAT_MODE_PWM && !_sat_coldCut) {
+  if (state.sat.eControlMode == SAT_MODE_PWM && !satColdCutActive()) {
     satPwmSchedule(pidOutput);
   }
 
@@ -7262,6 +7290,8 @@ static void satControlLoopRun()
 
   _sat_lastControlCS = finalSetpoint;   // the "previous CS" a PWM tick without override keeps
   state.sat.fFinalSetpoint = finalSetpoint;
+  // TASK-1652: the schedule or an exit ended the ON phase in this tick (its 180 s are burnt): the cutoff acts in this tick.
+  if (_sat_coldCutDeferred && !satPwmColdCutWaitsForMinBurn()) _sat_coldCutDeferred = false;
 
   // Modulation suppression is the CS sequence of satApplyPWM() (PWM ON phase only): it sets state.sat.bModSuppressed on that path
   // (entry 267, Q-TW-2). Continuous mode never suppresses.
@@ -7276,15 +7306,22 @@ static void satControlLoopRun()
                                                 settings.sat.iMaxRelModulation,
                                                 satGetManufacturerQuirks());
     // Entry 269 (Q-TW-4): while MM=T goes out (below), the published current_modulation is 100 %, not the 0 satComputeMM() gives a
-    // gas boiler in PWM. Same condition as mmTarget below; satPwmAtMaxDuty() and _sat_coldCut do not change in between.
-    state.sat.iCurrentModulation = satReportedModulation(!_sat_coldCut && satPwmAtMaxDuty() && hasOTCommandInterface(),
+    // gas boiler in PWM. Same condition as mmTarget below; satPwmAtMaxDuty() and satColdCutActive() do not change in between.
+    state.sat.iCurrentModulation = satReportedModulation(!satColdCutActive() && satPwmAtMaxDuty() && hasOTCommandInterface(),
                                                          state.sat.iCurrentModulation);
   }
 
   // --- COLD_SETPOINT cutoff (TASK-891.2, George): requested setpoint below the per-heating-system
   // cold setpoint => no heating needed; command the boiler OFF (CS=MINIMUM => CH=0, MM=100 restore).
   // At or below, like thermo-nova (heating_control.py:72, :385) and the satApplyPWM gate.
-  const bool coldCutoff = _sat_coldCut;   // latched above; equals satColdCutoff(pidOutput, satColdThreshold())
+  // TASK-1652: while a lit ON phase burns its first 180 s the latched cutoff waits (entry 275); it acts on the first tick after.
+  const bool coldCutoff = satColdCutActive();   // latched above; equals satColdCutoff(pidOutput, satColdThreshold())
+  static bool narrColdWait = false;
+  if (_sat_coldCutDeferred && !narrColdWait) {
+    satNarratef_P(PSTR("Heating off waits for the 180 s minimum burn: requested %.1f is at or below the cold setpoint %.1f"),
+                  pidOutput, satGetColdSetpoint());
+  }
+  narrColdWait = _sat_coldCutDeferred;
   if (coldCutoff != _sat_narrCold) {   // TASK-1521: narrate the edge, with the numbers that decided it
     _sat_narrCold = coldCutoff;
     if (coldCutoff) satNarratef_P(PSTR("Heating off: requested %.1f is at or below the cold setpoint %.1f"),

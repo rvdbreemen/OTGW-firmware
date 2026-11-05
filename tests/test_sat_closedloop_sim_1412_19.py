@@ -63,6 +63,19 @@ class ClosedLoop(unittest.TestCase):
             c.ROOM_LOST_CURVE_ONLY = True
         self.assertFalse(r["pass"]["H4"])
 
+    def test_task1652_rule_removes_cold_cut_short_burns(self):
+        # TASK-1652 (entry 275): today the cold cutoff ends lit ON phases under 180 s of flame in this run; with the rule it waits.
+        # MODEL only (s16.SatCtl), not the firmware: tests/test_sat_cold_cut_min_burn.py covers the firmware.
+        args = ("very_low_load", "3_1983-92", "ufh", "fixed", 5.5, True, 1)
+        self.assertFalse(s16.COLD_CUT_MIN_BURN)        # the default stays today's behaviour
+        self.assertGreater(c.run(*args)["S6_short_cause"].get("cold_cutoff", 0), 0)
+        s16.COLD_CUT_MIN_BURN = True
+        try:
+            r = c.run(*args)
+        finally:
+            s16.COLD_CUT_MIN_BURN = False
+        self.assertEqual(r["S6_short_cause"].get("cold_cutoff", 0), 0, r["S6_short_cause"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

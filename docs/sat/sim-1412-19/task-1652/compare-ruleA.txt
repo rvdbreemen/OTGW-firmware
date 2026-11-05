@@ -1,0 +1,21 @@
+baseline runs 1440 differ from committed runs.json: 0
+short phases cause cold_cutoff base 309 rule 40
+short phases cause cold_cutoff_flame_out base 0 rule 0
+short phases cause on_timer base 1338 rule 1341
+short phases cause pwm_exit base 179 rule 179
+S6 short total base 1826 rule 1560
+runs newly failing a hard check: 0
+runs newly failing S2: 0
+runs with any metric change: 180
+
+| class | runs | changed | cold-cut short base/rule | flame-out at cut base/rule | S6 short base/rule | S6 pass base/rule | starts/day med base/rule (worst) | S2 max-over med base/rule (worst d) | S1 med base/rule | S3 worst base/rule | S2 pass base/rule | S4 pass base/rule | hard fails base/rule |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| very_low_load | 160 | 30 | 162/28 | 0/0 | 162/28 | 76%/88% | 37.5/37.5 (d max +2.00, min -1.00) | 0.073/0.073 (d max +0.008) | 1.000/1.000 | -0.17/-0.17 | 100%/100% | 100%/100% | 0/0 |
+| thermal_lag | 160 | 8 | 8/0 | 0/0 | 11/3 | 93%/98% | 46.8/46.8 (d max +0.50, min -0.50) | 0.073/0.073 (d max +0.001) | 1.000/1.000 | -0.36/-0.36 | 100%/100% | 100%/100% | 0/0 |
+| minimum_power | 160 | 30 | 30/0 | 0/0 | 40/10 | 81%/94% | 62.8/62.8 (d max +1.00, min -1.00) | 0.065/0.065 (d max +0.000) | 1.000/1.000 | -0.26/-0.26 | 100%/100% | 100%/100% | 0/0 |
+| trv_pump | 160 | 19 | 12/1 | 0/0 | 1214/1205 | 46%/49% | 72.8/72.8 (d max +0.50, min -7.50) | 0.064/0.064 (d max +0.002) | 0.977/0.977 | -2.96/-2.96 | 100%/100% | 49%/49% | 0/0 |
+| dhw | 160 | 21 | 21/1 | 0/0 | 41/21 | 82%/93% | 51.0/51.0 (d max +9.00, min -5.00) | 0.073/0.073 (d max +0.013) | 1.000/1.000 | -0.41/-0.41 | 100%/100% | 100%/100% | 0/0 |
+| ignition | 160 | 8 | 8/0 | 0/0 | 43/35 | 80%/84% | 51.5/51.5 (d max +5.00, min -1.00) | 0.060/0.060 (d max +0.000) | 1.000/1.000 | -0.26/-0.26 | 100%/100% | 100%/100% | 0/0 |
+| room_fault | 160 | 32 | 34/7 | 0/0 | 73/46 | 74%/88% | 53.5/53.5 (d max +9.50, min -5.50) | 0.175/0.175 (d max +0.007) | 1.000/1.000 | -0.22/-0.22 | 93%/94% | 100%/100% | 0/0 |
+| outside_fault | 160 | 19 | 12/1 | 0/0 | 55/45 | 79%/84% | 54.2/54.2 (d max +1.50, min -0.50) | 0.139/0.139 (d max +0.099) | 1.000/1.000 | -0.28/-0.28 | 100%/100% | 86%/86% | 0/0 |
+| transport | 160 | 13 | 22/2 | 0/0 | 187/167 | 79%/87% | 49.5/49.5 (d max +10.00, min -0.50) | 0.097/0.097 (d max +0.092) | 1.000/1.000 | -0.22/-0.22 | 100%/100% | 99%/99% | 0/0 |
