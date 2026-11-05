@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.85
+**  Version  : v2.0.0-beta.86
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -277,6 +277,9 @@ void resetWiFiSettings(void)
   manageWiFi.resetSettings();
 }
 
+// TASK-1455: skip-portal mark, defined with the WiFi state machine below.
+static bool wifiSkipPortalDecide(bool wifiConnected, bool wifiSaved, bool forcePortal);
+
 //===========================================================================================
 void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 {
@@ -404,7 +407,15 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     DebugTln(F("No saved WiFi, starting config portal."));
   }
 
-  if (!wifiConnected)
+  // TASK-1455 (ADR-211): the boot after a WiFi supervisor restart opens neither the config
+  // portal nor the prerelease AP fallback while the saved network is away. setup() goes on
+  // without WiFi and loopWifi() retries the saved network every 30 s.
+  const bool portalSkipped = wifiSkipPortalDecide(wifiConnected, wifiSaved, forcePortal);
+  if (portalSkipped)
+  {
+    DebugTln(F("WiFi: not connected after a WiFi supervisor restart, skipping the config portal; loopWifi keeps retrying"));
+  }
+  else if (!wifiConnected)
   {
 #if defined(_VERSION_PRERELEASE)
     if (wifiSaved && !forcePortal) {
@@ -443,7 +454,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   platformWifiDisableSleep();  // keep radio always-on for a responsive web UI (TASK-817)
 
   DebugTf(PSTR("Wifi status: %s\r\n"), WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
-  if (WiFi.status() != WL_CONNECTED)
+  if (WiFi.status() != WL_CONNECTED && !portalSkipped)   // a skipped boot goes on without WiFi
   {
     DECLARE_TIMER_SEC(timeoutWifiConnectFinal, timeOut, CATCH_UP_MISSED_TICKS);
     while ((WiFi.status() != WL_CONNECTED))
@@ -527,6 +538,59 @@ enum WifiState_t {
 };
 static WifiState_t wifiState = WIFI_IDLE;
 static int wifiRetryCount = 0;
+
+//===========================================================================================
+// TASK-1455 begin (1.x skip-portal port, ADR-211): a WiFi supervisor restart marks the next
+// boot. On that boot startWiFi() opens neither the WiFiManager config portal nor the
+// prerelease AP fallback when the saved network is still away after the direct-connect
+// window: setup() finishes without WiFi and loopWifi() keeps retrying. WiFiManager 2.0.17
+// switches the station off while the portal runs, so a gateway in the portal could not
+// rejoin an access point that came back.
+// The mark lives in RTC_NOINIT memory: it survives esp_restart() and is garbage after a
+// power-on, so it needs the magic word and a software reset reason. setup() clears it, so it
+// applies to one boot. No NVS or flash write. A power cycle, a boot without saved
+// credentials, the triple reset and every other restart still get the portal.
+#define WIFI_SKIP_PORTAL_MAGIC  0x4F545350UL   // "OTSP"
+
+struct WifiSkipPortalRtc {
+  uint32_t magic;
+  uint32_t marked;   // 1: the previous run ended in a WiFi supervisor restart
+};
+static RTC_NOINIT_ATTR WifiSkipPortalRtc g_rtcWifiSkipPortal;
+static bool wifiSkipPortalBoot = false;   // this boot follows a WiFi supervisor restart
+
+// Called right before a WiFi supervisor doRestart(). Not while Ethernet is the active link:
+// loopWifi() returns before both restart sites then, and this keeps it that way.
+static void wifiMarkSkipPortal()
+{
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  if (state.net.eMode == NET_ETHERNET) return;
+#endif
+  g_rtcWifiSkipPortal.magic  = WIFI_SKIP_PORTAL_MAGIC;
+  g_rtcWifiSkipPortal.marked = 1;
+}
+
+// Called once near the top of setup(). Always clears the record. It counts only after a
+// software restart: a panic or watchdog reset in doRestart()'s shutdown, or a power-on with
+// garbage that happens to match, gets the portal as before.
+void captureWifiSkipPortal()
+{
+  wifiSkipPortalBoot = platformResetWasSoftware()
+                       && g_rtcWifiSkipPortal.magic == WIFI_SKIP_PORTAL_MAGIC
+                       && g_rtcWifiSkipPortal.marked == 1;
+  g_rtcWifiSkipPortal.magic  = 0;
+  g_rtcWifiSkipPortal.marked = 0;
+}
+
+// startWiFi(): true when this boot must not open the portal (or the AP fallback). Takes the
+// flag, so a later startWiFi() in the same boot (telnet debug menu) behaves as before.
+static bool wifiSkipPortalDecide(bool wifiConnected, bool wifiSaved, bool forcePortal)
+{
+  const bool marked = wifiSkipPortalBoot;
+  wifiSkipPortalBoot = false;
+  return marked && !wifiConnected && wifiSaved && !forcePortal;
+}
+// TASK-1455 end
 
 //===========================================================================================
 // TASK-1450 begin (port of 1.x TASK-1248, GH #682): detect a WiFi link that stays
@@ -732,6 +796,7 @@ static void handleWifiProbeVerdict(bool gatewayAnswered)
   }
   wifiDeadRestarts++;
   writeWifiDeadRestarts(wifiDeadRestarts);
+  wifiMarkSkipPortal();   // TASK-1455
   doRestart("WiFi: connected but no traffic");
 }
 
@@ -926,6 +991,7 @@ void loopWifi() {
         wifiState = WIFI_DISCONNECTED;
         break;
       }
+      wifiMarkSkipPortal();   // TASK-1455
       doRestart("WiFi: too many reconnect failures");
       break;
 
