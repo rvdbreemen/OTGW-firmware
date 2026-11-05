@@ -426,7 +426,7 @@ baseOffset = 20 underfloor, 27.2 otherwise                (SATcontrol.ino:49-50,
 ```
 kp = round3(fHeatingCurveCoeff * curveValue / divisor)   (divisor 4 underfloor, 3 otherwise)
 ki = round3(kp / 8400)                                   (the rounded kp, as pid.py:82)
-kd = round3(0.07 * 8400 * kp)                            (the rounded kp, as pid.py:93)
+kd = round3(0.063 * 8400 * kp)                           (the rounded kp; factor 0.063, SAT_PID_KD_FACTOR, entry 279; pid.py:93 has 0.07)
 (round3 = rounded to 3 decimals, satPidRound3(); entry 95 Q28a, TASK-1423. pid.py rounds the gains to 6.)
 (automatic gains only; the manual-gain switch and its fields were removed, TASK-1357)
 ```
@@ -802,7 +802,7 @@ Variable names as in the code.
 - `divisor = 4` for underfloor, otherwise `3` (SATpid.ino:133, SATpid.ino:28-29).
 - `kp = (coeff * curveValue) / divisor` (SATpid.ino:135).
 - `ki = kp / 8400` (SATpid.ino:136, SATpid.ino:25).
-- `kd = 0.07 * 8400 * kp`, that is `588 * kp` (SATpid.ino:137).
+- `kd = 0.063 * 8400 * kp`, that is `529.2 * kp` (`SAT_PID_KD_FACTOR`, SATpid.ino). Sergeant D decided the factor 0.063 instead of the 0.07 of thermo-nova pid.py:93 (entry 279, TASK-1656): Kd is 10% lower, for the morning warm-up.
 - No rounding.
 
 **Manual gains.** Removed (TASK-1357). The switch `bAutoGains` and the fields `fKpManual`, `fKiManual`, `fKdManual` were never reachable (no setting, REST or MQTT path wrote them); the settings key `SATautogains` and its REST, MQTT and Web UI surface (`auto_gains_value`, `kp_manual`, `ki_manual`, `kd_manual`) went with them. An old `settings.ini` that still has `SATautogains` is ignored on load.
@@ -867,7 +867,7 @@ With the firmware default coefficient of 1.5 (SATtypes.h:442) and the same input
 | Kp divisor, underfloor | 4 | none | SATpid.ino:28 |
 | Kp divisor, radiators (and AUTO) | 3 | none | SATpid.ino:29, SATcontrol.ino:198-199 |
 | `SAT_PID_AGGRESSION_V3` (Ki divisor) | 8400 | not stated in the code | SATpid.ino:25 |
-| Kd factor | 0.07 * 8400 = 588 | not stated in the code | SATpid.ino:137 |
+| Kd factor (`SAT_PID_KD_FACTOR`) | 0.063 * 8400 = 529.2 (thermo-nova pid.py:93: 0.07 * 8400 = 588) | not stated in the code | SATpid.ino, entry 279 |
 | Integral absolute cap | 20.0 | degrees | SATpid.ino:176 |
 | Ki minimum for accumulation | none (the 1e-9 guard was removed, TASK-1423, entry 95 Q28b) | none | |
 | PID value rounding | 3 decimals for gains, P, I, D, raw derivative and output (entry 95 Q28a; pid.py: 6 for the gains, 3 for P, I, D and raw derivative, 1 for the output) | decimals | SATpid.ino:79 |
@@ -1022,7 +1022,7 @@ Computed from the code: `satCalcHeatingCurve` returns the curve and writes no st
 9. **Outside temperature `NaN`.** The range check at SATcontrol.ino:4721 does not catch `NaN`, because comparisons with `NaN` are false. Whether `OTcurrentSystemState.Toutside` or the other outside sources can be `NaN` was not checked for this section (SATcontrol.ino:1283-1303).
 10. **Zone overshoot cap.** Ported from thermo-nova area.py:303-333 (TASK-1440): every counted zone more than 0.3 °C above its target gives `cold + 10 - 4 * degrees over`, the lowest wins, floored at the cold setpoint, and the requested setpoint is `min(requested, cap)` (SATcontrol.ino:2335-2337, SATcontrol.ino:2342-2350, SATcontrol.ino:2368-2372). The old rule (subtract the largest overshoot 1:1, no margin, floor 10.0) is gone. The cold setpoint is the per-system one (ADR-199), not thermo-nova's 22.
 11. **Integral rate at control intervals other than 60 s.** The fixed 60 s step (SATpid.ino:166), combined with the 10 s and 60 s gates (SATpid.ino:276-285), means the integral gain per minute depends on the control interval and on how often the error changes. The code does not state whether this is intended.
-12. **Units of Ki and Kd.** The code does not name units. The origin of 8400 and 0.07 is not explained (SATpid.ino:25, SATpid.ino:137).
+12. **Units of Ki and Kd.** The code does not name units. The origin of 8400 and of the thermo-nova factor 0.07 is not explained; the firmware factor 0.063 is Sergeant D's decision (entry 279; SATpid.ino:25, `SAT_PID_KD_FACTOR`).
 13. **Integral reset on a target change.** Thermo-nova resets the PID on a target change. No such reset was found in the firmware target paths (SATcontrol.ino:1903-1934, SATcontrol.ino:1034-1045, settingStuff.ino:997). The window paths are the exception: they clear the integral when they change the target (SATcontrol.ino:1119, SATcontrol.ino:1139).
 
 ---
@@ -1136,7 +1136,7 @@ The PID steps on its 60 s timer with a valid room temperature. There is no stale
 6. The integral and the derivative are updated (SATpid.ino:291-294). The integral update is skipped entirely, reset included, while solar gain is active and `bSolarFreezeIntegral` is on (SATpid.ino:157) (corrected 2026-10-24, TASK-1351); TASK-1323.
 7. Output (`satPidOutput()`) = curve + P + I + D, not rounded; D is 0 on the first output after a reset.
 
-PID internals belong to the PID section. In short: with automatic gains (default on, SATtypes.h:518), `kp = fHeatingCurveCoeff * curveValue / 4` for underfloor and `/ 3` otherwise (SATpid.ino:130-135), `ki = kp / 8400` (SATpid.ino:136), `kd = 0.07 * 8400 * kp` (SATpid.ino:137). The integral is reset to 0 whenever |error| > `fDeadband` (default 0.1, SATtypes.h:443, SATpid.ino:154-156). Inside the deadband it adds `ki * error * 60` per update (SATpid.ino:166), clamped to plus or minus the curve value and to plus or minus 20 (SATpid.ino:172-178).
+PID internals belong to the PID section. In short: with automatic gains (default on, SATtypes.h:518), `kp = fHeatingCurveCoeff * curveValue / 4` for underfloor and `/ 3` otherwise (SATpid.ino:130-135), `ki = kp / 8400` (SATpid.ino:136), `kd = 0.063 * 8400 * kp` (`SAT_PID_KD_FACTOR`, entry 279; thermo-nova has 0.07). The integral is reset to 0 whenever |error| > `fDeadband` (default 0.1, SATtypes.h:443, SATpid.ino:154-156). Inside the deadband it adds `ki * error * 60` per update (SATpid.ino:166), clamped to plus or minus the curve value and to plus or minus 20 (SATpid.ino:172-178).
 
 **Zone PID** (SATcontrol.ino:1806-1867). A zone is excluded (output 10, integral cleared) when it is off, has no valid room or setpoint, is older than `iZoneTimeoutS`, or has a room outside -10 to 50 °C or a setpoint outside 5 to 30 °C (SATcontrol.ino:1790-1796, SATcontrol.ino:1814-1825). Otherwise it computes its own curve (SATcontrol.ino:1828), `kp` with the same divisor rule and `ki = kp / 8400` (SATcontrol.ino:1834-1837), an integral with the same deadband, clamp and 20 °C cap (SATcontrol.ino:1845-1853), and output `curve + P + I` (no D term) clamped to [10, system cap] (SATcontrol.ino:1855-1861). It runs on every tick for every configured zone, also at `iZoneCount` 1 (SATcontrol.ino:5540-5561). Derived from line 1846 and the 30 s default tick: the zone integral step is sized for 60 s but is applied every 30 s.
 

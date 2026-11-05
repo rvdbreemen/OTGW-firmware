@@ -83,7 +83,7 @@ class PidPy:
     # gains: pid.py:61-93 rounds to 6; the firmware rounds to 3 (entry 95, Q28a), so the oracle takes 3
     def kp(self, curve): return r3(self.coeff * curve / self.divisor)
     def ki(self, curve): return r3(self.kp(curve) / 8400)
-    def kd(self, curve): return r3(0.07 * 8400 * self.kp(curve))
+    def kd(self, curve): return r3(cad.KD_FACTOR * 8400 * self.kp(curve))   # 0.063: entry 279, deliberate deviation from pid.py:93 (0.07)
 
     def update(self, current, error, last_changed, curve, freeze_integral=False):      # pid.py:159-171
         self._update_derivative(current, error, last_changed)

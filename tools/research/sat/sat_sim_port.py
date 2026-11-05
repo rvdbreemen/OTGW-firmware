@@ -66,7 +66,7 @@ class Pid:
     def _gains(self, cv):
         self.kp = round3(self.coeff * f32(cv) / self.divisor)
         self.ki = round3(self.kp / AGGRESSION)
-        self.kd = round3(f32(0.07) * AGGRESSION * self.kp)
+        self.kd = round3(f32(0.063) * AGGRESSION * self.kp)   # SAT_PID_KD_FACTOR, entry 279 (pid.py:93 has 0.07)
 
     def note_room(self, room, now_ms):
         room = f32(room)
