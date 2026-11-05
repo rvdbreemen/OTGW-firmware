@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.93
+**  Version  : v2.0.0-beta.94
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
