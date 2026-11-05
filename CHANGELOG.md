@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.99] - 2026-11-05
+
+### Added
+- **SAT asks the PIC for the boiler flow temperature when the thermostat never reads it** (TASK-1653). On a PIC board whose thermostat never reads MsgID 25, SAT sends `PM=25` itself: only after 300 s without a thermostat read of 25, when the flow value is at least 20 s old, when the PIC has a free slot, with at most one request outstanding and at least 20 s between requests. New MQTT topic `sat/pm25_no_slot` and new `pm25_*` fields in `GET /api/v2/sat/status` report a request the PIC did not answer. Host test `tests/test_sat_pm25_poll.py` (old code: 11 failures). Not verified with a thermostat that skips MsgID 25.
+
+### Changed
+- **SAT: derivative gain factor 0.063 instead of 0.07** (TASK-1656, decided by Sergeant D). `kd` is about 10 % lower at the same `kp`, so the derivative pull during a warm-up is about 10 % smaller. Deliberate deviation from the SAT reference code (0.07). Bench: `kd` 11854.08 at `kp` 22.4.
+
+### Fixed
+- **"No setup portal when Wi-Fi is down" also keeps the beta fallback access point closed** (TASK-1645). With `wifinoportal` on, the prerelease rule in `loopWifi()` that starts the fallback access point after 2 failed retries is skipped. Host test `tests/test_wifi_skip_portal.py` (old code: the access point opened with the setting on). Bench: no OTGW SSID for 5 minutes with the setting on; with it off the fallback access point appeared after about 2 minutes.
+
 ## [2.0.0-beta.95] - 2026-11-05
 
 ### Added
@@ -709,7 +720,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.95...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.99...HEAD
+[2.0.0-beta.99]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.95...v2.0.0-beta.99
 [2.0.0-beta.95]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.77...v2.0.0-beta.95
 [2.0.0-beta.77]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.62...v2.0.0-beta.77
 [2.0.0-beta.62]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.60...v2.0.0-beta.62
