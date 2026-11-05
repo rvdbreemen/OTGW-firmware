@@ -3693,6 +3693,35 @@
     "TASK-1412.5"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 277,
+   "title": "Q-1412.16a: the integral stays exactly as thermo-nova; reduce KD instead (Sergeant D, 2026-11-05; overrules maintainer entry 271)",
+   "date": "2026-11-05",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567811527984283732",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.16",
+    "TASK-1412.19",
+    "TASK-1651"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 278,
+   "title": "Sergeant D asks how KD is calculated and proposes reducing it by 10% (question and proposal, not yet a decision) (Sergeant D, 2026-11-05)",
+   "date": "2026-11-05",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1567789991315120178",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.16",
+    "TASK-1412.19"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

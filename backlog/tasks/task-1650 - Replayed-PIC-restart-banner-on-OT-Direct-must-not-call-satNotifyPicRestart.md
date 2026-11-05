@@ -4,6 +4,7 @@ title: Replayed PIC restart banner on OT-Direct must not call satNotifyPicRestar
 status: To Do
 assignee: []
 created_date: '2026-11-05T06:58:00Z'
+updated_date: '2026-11-05T07:13:00Z'
 labels:
   - bug
   - sat
@@ -24,3 +25,9 @@ Found by TASK-1412.20 (R-4): OTGW-Core.ino:6188 calls satNotifyPicRestart() for 
 - [ ] #1 On OT-Direct a replayed PIC banner does not call satNotifyPicRestart(); on a PIC board a real banner still does
 - [ ] #2 Host test red on old / green on fix; evaluate --quick green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-05: fix (wt-1649): banner path OTGW-Core.ino ~6192 now 'if (!isOTDirectEnabled()) satNotifyPicRestart();' (guard reused from the PIC recovery lines below). A replayed banner on a PIC board still notifies (bench scenario SB15 relies on it). Test: same harness, OT-Direct banner case red on old (got 1 want 0), green on fix; PIC banner case green on both.
+<!-- SECTION:NOTES:END -->

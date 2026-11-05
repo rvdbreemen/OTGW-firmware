@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-05T06:59:00Z'
+updated_date: '2026-11-05T08:29:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -26,3 +27,9 @@ Robert 2026-11-05 chose option B for Q-1412.16a (see docs/sat/sergeant-d-correct
 - [ ] #2 TASK-1412.16/1412.19 simulation rerun: warm-up time to within 0.3 C improves and overshoot/starts do not regress versus today (pre-registered thresholds)
 - [ ] #3 Host test of the PID update red on old / green on fix; bench run and a field run named before Done
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-05: dropped. Sergeant D vetoed the integral change ('Do not change the integral behavior. It is very important to stay as is.', msgs 1567811527984283732 / 1567812516141203638 / 1567814060550918146, entry 277 overrules maintainer entry 271); Robert confirmed in the session to follow him. Replaced by the KD simulation study task.
+<!-- SECTION:NOTES:END -->
