@@ -2026,6 +2026,7 @@
     wifigateway:     { cat: 'network', sub: 'Wi-Fi', label: 'Gateway' },
     wifidns1:        { cat: 'network', sub: 'Wi-Fi', label: 'DNS 1' },
     wifidns2:        { cat: 'network', sub: 'Wi-Fi', label: 'DNS 2', hint: 'Optional' },
+    wifinoportal:    { cat: 'network', sub: 'Wi-Fi', label: 'No setup portal when Wi-Fi is down', hint: 'Keeps retrying; triple reset opens the portal' },
     ethstaticip:     { cat: 'network', sub: 'Ethernet', label: 'Use static IP' },
     ethipaddress:    { cat: 'network', sub: 'Ethernet', label: 'IP address' },
     ethsubnet:       { cat: 'network', sub: 'Ethernet', label: 'Subnet mask' },

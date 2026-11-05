@@ -218,6 +218,9 @@ marked boot, the prerelease branch in `startWiFi()` moves above the skip check;
 - ADR-017: WiFiManager for initial configuration. This narrows its "fall back to
   AP mode after max retries" for the boot after a supervisor restart.
 - ADR-043: triple reset recovery, which still forces the portal.
+- TASK-1645 (GitHub #154 point 1, #131): an opt-in setting `wifinoportal` (default off) gives the same skip on every
+  boot with saved credentials, not only the one after a supervisor restart. It reuses `wifiSkipPortalDecide()`;
+  no saved credentials and the triple reset still open the portal.
 - ADR-047: non-blocking WiFi reconnect, which takes over after an offline setup().
 
 ## References

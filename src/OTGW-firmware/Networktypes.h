@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Networktypes.h
-**  Version  : v2.0.0-beta.88
+**  Version  : v2.0.0-beta.89
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -67,6 +67,7 @@ struct WifiSection {
   char sGateway[16]  = "";   // e.g. "192.168.1.1"
   char sDns1[16]     = "";   // e.g. "8.8.8.8"
   char sDns2[16]     = "";   // e.g. "8.8.4.4"
+  bool bNoPortal     = false; // TASK-1645: saved WiFi unreachable at boot -> no portal/AP, keep retrying
 };
 
 // TASK-1446 types begin

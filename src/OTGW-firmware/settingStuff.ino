@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.88
+**  Version  : v2.0.0-beta.89
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -497,6 +497,7 @@ bool writeSettings(bool show)
   writeJsonStringKV(file, F("WifiGateway"),  settings.wifi.sGateway);
   writeJsonStringKV(file, F("WifiDns1"),     settings.wifi.sDns1);
   writeJsonStringKV(file, F("WifiDns2"),     settings.wifi.sDns2);
+  writeJsonBoolKV(file, F("WifiNoPortal"),   settings.wifi.bNoPortal);   // TASK-1645
   size_t tail = file.print(F("\n}\n"));
   bool tailWritten = (tail == 3);
   size_t intended = file.position();
@@ -1339,6 +1340,9 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("WifiDns1")) == 0) {
     if (newValue[0] == '\0') { settings.wifi.sDns1[0] = '\0'; }
     else { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.wifi.sDns1, newValue, sizeof(settings.wifi.sDns1)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
+  }
+  else if (strcasecmp_P(field, PSTR("WifiNoPortal")) == 0) {
+    settings.wifi.bNoPortal = EVALBOOLEAN(newValue);   // TASK-1645: read by the next startWiFi()
   }
   else if (strcasecmp_P(field, PSTR("WifiDns2")) == 0) {
     if (newValue[0] == '\0') { settings.wifi.sDns2[0] = '\0'; }

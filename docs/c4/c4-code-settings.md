@@ -52,7 +52,7 @@
   - SAT settings alone: ~100 fields (heating system and source, presets, weather, multi-area, PV boost, BLE roster with per-slot bindkeys, etc.)
   - OT-direct settings (`HAS_DIRECT_OT`): 27 `OTD*` keys (mode, bypass relay, heating curve, room compensation, CH hysteresis, ventilation)
   - Ethernet settings (`HAS_ETH_CAPABLE`): static IP configuration
-  - WiFi static IP (`WifiStaticIP`, `WifiSubnet`, `WifiGateway`, `WifiDns1`, `WifiDns2`; empty IP = DHCP)
+  - WiFi static IP (`WifiStaticIP`, `WifiSubnet`, `WifiGateway`, `WifiDns1`, `WifiDns2`; empty IP = DHCP) and `WifiNoPortal` (TASK-1645)
   - Ends with `safebootSyncNvs()` like `readSettings()`
 - **Dependencies**:
   - LittleFS filesystem
@@ -481,9 +481,12 @@ struct WifiSection {
   char sGateway[16]  = "";
   char sDns1[16]     = "";
   char sDns2[16]     = "";
+  bool bNoPortal     = false; // TASK-1645
 };
 ```
 Persisted as `WifiStaticIP`, `WifiSubnet`, `WifiGateway`, `WifiDns1`, `WifiDns2`; applied by `startWiFi()` in `networkStuff.ino` when `sStaticIp` is set and parses with the subnet and gateway.
+
+`bNoPortal` (file key `WifiNoPortal`, REST key `wifinoportal`, default off, TASK-1645): with saved credentials that cannot reach the router, `startWiFi()` opens neither the config portal nor the prerelease AP fallback and `loopWifi()` keeps retrying. It is a second reason in `wifiSkipPortalDecide()`, next to the one-boot TASK-1455 mark (ADR-211), and holds on every `startWiFi()`. No saved credentials and the triple reset still open the portal. The OLED network page shows "Triple reset to reconfigure WiFi" while offline.
 
 ## Dependencies
 

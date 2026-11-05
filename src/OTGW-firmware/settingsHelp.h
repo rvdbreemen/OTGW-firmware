@@ -18,6 +18,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "wifigateway":"Router address for the static Wi-Fi setup, for example 192.168.1.1.",
 "wifidns1":"Primary DNS server for the static Wi-Fi setup.",
 "wifidns2":"Optional second DNS server for the static Wi-Fi setup.",
+"wifinoportal":"When the saved Wi-Fi is down at boot, open no setup portal and keep retrying. Triple reset still opens it.",
 "ethstaticip":"Use a fixed address on Ethernet. Off means DHCP. Separate from the Wi-Fi setting.",
 "ethipaddress":"Fixed IP address on Ethernet, used when Use static IP is on.",
 "ethsubnet":"Subnet mask for the static Ethernet address.",

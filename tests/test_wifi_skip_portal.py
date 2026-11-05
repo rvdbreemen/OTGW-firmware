@@ -78,7 +78,7 @@ template <class... A> static void Debugln(A...) {}
 enum NetMode { NET_WIFI, NET_ETHERNET };
 struct NetState { NetMode eMode = NET_WIFI; bool bAPFallback = false; };
 struct State { NetState net; };
-struct WifiSettings { char sStaticIp[16] = ""; char sSubnet[16] = ""; char sGateway[16] = ""; char sDns1[16] = ""; char sDns2[16] = ""; };
+struct WifiSettings { char sStaticIp[16] = ""; char sSubnet[16] = ""; char sGateway[16] = ""; char sDns1[16] = ""; char sDns2[16] = ""; bool bNoPortal = false; };
 struct Settings { WifiSettings wifi; char sHTTPpasswd[16] = ""; };
 static State state; static Settings settings;
 
@@ -164,6 +164,7 @@ int main(int argc, char **argv) {
   const bool force = atoi(argv[6]) != 0;
   g_apUpAt = (uint32_t)strtoul(argv[7], nullptr, 10) * 1000UL;
   state.net.eMode = atoi(argv[8]) ? NET_ETHERNET : NET_WIFI;
+  if (argc > 9) settings.wifi.bNoPortal = atoi(argv[9]) != 0;   // TASK-1645 opt-in setting
 
   if (!strcmp(mode, "mark")) {   // the supervisor writes the mark before its doRestart()
     wifiMarkSkipPortal();
@@ -249,8 +250,9 @@ class SkipPortalBoot(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def boot(self, mode="boot", magic=0, marked=0, soft=1, saved=1, force=0, ap_up=NEVER, eth=0, build="rel"):
-        args = [str(self.exe[build]), mode, str(magic), str(marked), str(soft), str(saved), str(force), str(ap_up), str(eth)]
+    def boot(self, mode="boot", magic=0, marked=0, soft=1, saved=1, force=0, ap_up=NEVER, eth=0, build="rel", noportal=0):
+        args = [str(self.exe[build]), mode, str(magic), str(marked), str(soft), str(saved), str(force), str(ap_up), str(eth),
+                str(noportal)]
         out = subprocess.run(args, capture_output=True, text=True, check=True).stdout
         return parse(out), out
 
@@ -490,6 +492,74 @@ class SkipPortalSourceGates(unittest.TestCase):
         self.assertLess(d, body.find("startAPFallback();"))
         self.assertLess(d, body.find("startConfigPortal("))
         self.assertIn("if (WiFi.status() != WL_CONNECTED && !portalSkipped)", body, "final 240 s wait not skipped")
+
+
+# ---------------------------------------------------------------------------------- TASK-1645: opt-in wifinoportal
+# With settings.wifi.bNoPortal on, every boot with saved credentials that cannot reach the router skips the open
+# config portal and the prerelease AP fallback (no RTC mark needed), and loopWifi keeps retrying. No credentials and
+# the triple reset still open the portal. Red on the code before TASK-1645: the setting is ignored, the portal opens.
+class NoPortalSetting(unittest.TestCase):
+    # Same two host builds and helpers as SkipPortalBoot, without running its tests a second time.
+    setUpClass = classmethod(SkipPortalBoot.setUpClass.__func__)
+    tearDownClass = classmethod(SkipPortalBoot.tearDownClass.__func__)
+    boot = SkipPortalBoot.boot
+    assert_portal = SkipPortalBoot.assert_portal
+
+    def test_power_on_router_down_no_portal_no_ap(self):
+        for build in ("rel", "pre"):
+            r, _ = self.boot(soft=0, noportal=1, build=build)
+            self.assertNotIn("portal", r["EV"], build + ": portal opened with wifinoportal on")
+            self.assertNotIn("ap_fallback", r["EV"], build + ": AP fallback opened with wifinoportal on")
+            self.assertNotIn("RESTART", r)
+            self.assertEqual(r["DONE"]["conn"], 0)
+            self.assertEqual((r["DONE"]["auto"], r["DONE"]["pers"]), (1, 1), build + ": auto-reconnect not armed")
+            self.assertTrue(any("Triple reset to reconfigure" in x for x in r["LOG"]), build + ": no hint in the log")
+
+    def test_router_back_in_window_connects(self):
+        r, _ = self.boot(soft=0, noportal=1, ap_up=60)
+        self.assertNotIn("portal", r["EV"])
+        self.assertEqual(r["DONE"]["conn"], 1)
+
+    def test_every_startwifi_skips_not_only_the_first(self):
+        r, _ = self.boot(mode="again", soft=0, noportal=1)
+        self.assertEqual(r["EV"].count("portal"), 0, "the second startWiFi() opened the portal")
+        self.assertIn("DONE2", r)
+
+    def test_no_credentials_still_opens_portal(self):
+        for build in ("rel", "pre"):
+            r, _ = self.boot(soft=0, saved=0, noportal=1, build=build)
+            self.assert_portal(r)
+
+    def test_triple_reset_still_opens_portal(self):
+        for build in ("rel", "pre"):
+            r, out = self.boot(soft=0, force=1, noportal=1, build=build)
+            self.assert_portal(r)
+            self.assertIn("Triple-reset detected", out)
+
+    def test_setting_off_unchanged(self):
+        r, _ = self.boot(soft=0, noportal=0)
+        self.assert_portal(r)
+        r, _ = self.boot(soft=0, noportal=0, build="pre")
+        self.assertIn("ap_fallback", r["EV"])
+
+
+class NoPortalSettingWired(unittest.TestCase):
+    def src(self, name):
+        return (FW_DIR / name).read_text(encoding="utf-8")
+
+    def test_default_off(self):
+        self.assertRegex(self.src("Networktypes.h"), r"\bbool\s+bNoPortal\s*=\s*false\s*;")
+
+    def test_settings_file_rest_help_ui(self):
+        st = self.src("settingStuff.ino")
+        self.assertIn('writeJsonBoolKV(file, F("WifiNoPortal"),', st)
+        self.assertRegex(st, r'PSTR\("WifiNoPortal"\)\) == 0\) \{\s*settings\.wifi\.bNoPortal = EVALBOOLEAN\(newValue\);')
+        r = self.src("restAPI.ino")
+        self.assertIn('addBool(F("wifinoportal"), settings.wifi.bNoPortal, "b");', r)
+        known = r[r.find("knownSettings[] = {"):]
+        self.assertIn('"wifinoportal"', known[:known.find("};")])
+        self.assertRegex(self.src("settingsHelp.h"), r'(?m)^"wifinoportal":"')
+        self.assertRegex(self.src("data/v2.js"), r"wifinoportal:\s*\{ cat: 'network', sub: 'Wi-Fi'")
 
 
 if __name__ == "__main__":

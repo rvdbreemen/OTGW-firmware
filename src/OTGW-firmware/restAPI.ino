@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.88
+**  Version  : v2.0.0-beta.89
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4290,6 +4290,7 @@ void sendDeviceSettings()
   addStr(F("wifigateway"),  CSTR(settings.wifi.sGateway),  "s", 15);
   addStr(F("wifidns1"),     CSTR(settings.wifi.sDns1),     "s", 15);
   addStr(F("wifidns2"),     CSTR(settings.wifi.sDns2),     "s", 15);
+  addBool(F("wifinoportal"), settings.wifi.bNoPortal, "b");   // TASK-1645
   char httpPasswordPlaceholder[sizeof("password=40")];
   snprintf_P(httpPasswordPlaceholder,
              sizeof(httpPasswordPlaceholder),
@@ -4367,7 +4368,7 @@ static const char* const PROGMEM knownSettings[] = {
   "ui_onboarded",
   "webhookcontenttype", "webhookenable", "webhookenabled",
   "webhookpayload", "webhooktriggerbit", "webhookurloff", "webhookurlon",
-  "wifidns1", "wifidns2", "wifigateway", "wifistaticip", "wifisubnet",
+  "wifidns1", "wifidns2", "wifigateway", "wifinoportal", "wifistaticip", "wifisubnet",
 };
 
 static bool isKnownSetting(const char* field) {

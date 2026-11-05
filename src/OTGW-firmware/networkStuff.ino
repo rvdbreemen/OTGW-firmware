@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.88
+**  Version  : v2.0.0-beta.89
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -413,7 +413,10 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   const bool portalSkipped = wifiSkipPortalDecide(wifiConnected, wifiSaved, forcePortal);
   if (portalSkipped)
   {
-    DebugTln(F("WiFi: not connected after a WiFi supervisor restart, skipping the config portal; loopWifi keeps retrying"));
+    if (settings.wifi.bNoPortal)   // TASK-1645
+      DebugTln(F("WiFi: saved network not reachable, skipping the config portal (setting wifinoportal); loopWifi keeps retrying. Triple reset to reconfigure WiFi"));
+    else
+      DebugTln(F("WiFi: not connected after a WiFi supervisor restart, skipping the config portal; loopWifi keeps retrying"));
   }
   else if (!wifiConnected)
   {
@@ -588,7 +591,9 @@ static bool wifiSkipPortalDecide(bool wifiConnected, bool wifiSaved, bool forceP
 {
   const bool marked = wifiSkipPortalBoot;
   wifiSkipPortalBoot = false;
-  return marked && !wifiConnected && wifiSaved && !forcePortal;
+  // TASK-1645: with settings.wifi.bNoPortal every startWiFi() skips too, not only the one boot after a
+  // supervisor restart. No saved credentials and the triple reset (forcePortal) still open the portal.
+  return (marked || settings.wifi.bNoPortal) && !wifiConnected && wifiSaved && !forcePortal;
 }
 // TASK-1455 end
 

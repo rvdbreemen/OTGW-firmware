@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T04:09:00Z'
-updated_date: '2026-11-05T05:28:00Z'
+updated_date: '2026-11-05T04:50:00Z'
 labels:
   - github
   - security
@@ -35,6 +35,4 @@ https://github.com/rvdbreemen/OTGW-firmware/issues/154 point 1 (and closed #131)
 
 <!-- SECTION:NOTES:BEGIN -->
 6c 2026-11-05 05:50: implemented in wt-6c-1645 on wt-int4 2a9201f7d; patch at C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/9ad25eb8-1a77-4659-887b-f3c41994cc95/scratchpad/task-1645.patch. settings.wifi.bNoPortal (file WifiNoPortal, REST wifinoportal, default false): Networktypes.h, settings write/read, GET + knownSettings, settingsHelp.h, v2.js SET_META (network / Wi-Fi). wifiSkipPortalDecide() returns (marked || settings.wifi.bNoPortal) && !wifiConnected && wifiSaved && !forcePortal, so every startWiFi() with the setting on skips both the config portal and the prerelease AP fallback; no saved creds and the triple reset still open the portal. Telnet log line names the setting and 'Triple reset to reconfigure WiFi'; OLED network page shows 'Triple reset to / reconfigure WiFi' while offline with the setting on. Docs: docs/api/README.md, c4-code-settings.md, ADR-211 (Proposed) Related note. Evidence: tests/test_wifi_skip_portal.py extended (NoPortalSetting 6 tests on rel+pre builds, NoPortalSettingWired 2) - old sources 4 FAIL (the 4 behaviour/wiring tests that need the fix), fix 36/36 OK; tests/test_wifi_deadlink.py stub got settings.wifi, 28/28 OK; settings_whitelist OK, telnet_console_setting OK, adr_governance OK; evaluate --quick 89 checks 82 pass 0 fail 0 warn. settings-help 18 KB test still red (TASK-1646, pre-existing). Not verified: OLED text and the background retry on hardware; bench open: AP off at boot -> no OTGW SSID in a scan with the setting on, portal/AP fallback with it off (AC4).
-
-2026-11-05 lead: integrated as beta.88 87622e0aa (patch from the 6c session; skip_portal 36/36, deadlink 28, whitelist, telnet_setting, adr_governance OK). Bench .63 beta.89 AC4 INCONCLUSIVE: run 1 invalid (deny cut WiFi before the reboot request); run 2 (reboot 06:24:20, deny 06:24:21, setting on): 6 scans in 2.9 min with no OTGW/zaphod SSID on a PC adapter that sees 2.4 GHz, unit rejoined after the deny was removed (bootcount 141); cannot prove the boot happened before the deny, and the control (setting off -> portal/AP fallback SSID OTGW-CE45D8) was not run because .63 went to the 08:00 soak. Settings API takes {"name":"wifinoportal","value":true}. Redo: schedule the reboot from the unit side (or power-cycle) with the deny already active, and run the control. OLED not checked.
 <!-- SECTION:NOTES:END -->

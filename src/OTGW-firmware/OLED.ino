@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-beta.88
+**  Version  : v2.0.0-beta.89
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -275,6 +275,12 @@ static void drawPageNetwork() {
     // Rows 3 and 4 are not written while offline; blank the stale IP and RSSI.
     oledClearRow(3);
     oledClearRow(4);
+    if (settings.wifi.bNoPortal) {   // TASK-1645: no setup portal opens by itself, say how to get one
+      oledRow(3);
+      oledDisplay.print(F("Triple reset to"));
+      oledRow(4);
+      oledDisplay.print(F("reconfigure WiFi"));
+    }
   }
 
   // MQTT status + broker

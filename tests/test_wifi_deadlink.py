@@ -74,7 +74,8 @@ struct NetState { NetMode eMode = NET_WIFI; bool bAPFallback = false; };
 struct MqttState { bool bConnected = false; };
 struct State { NetState net; MqttState mqtt; };
 struct MqttSettings { bool bEnable = true; };
-struct Settings { MqttSettings mqtt; const char *sHostname = "otgw"; };
+struct WifiSettings { bool bNoPortal = false; };   // TASK-1645: read by wifiSkipPortalDecide()
+struct Settings { MqttSettings mqtt; WifiSettings wifi; const char *sHostname = "otgw"; };
 static State state; static Settings settings;
 
 enum HeapHealthLevel { HEAP_HEALTHY, HEAP_LOW, HEAP_WARNING, HEAP_CRITICAL };
