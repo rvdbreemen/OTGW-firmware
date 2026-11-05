@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-beta.95
+**  Version  : v2.0.0-beta.96
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

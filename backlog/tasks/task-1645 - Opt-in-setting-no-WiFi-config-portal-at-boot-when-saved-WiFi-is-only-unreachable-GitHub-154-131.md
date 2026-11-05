@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T04:09:00Z'
-updated_date: '2026-11-05T04:50:00Z'
+updated_date: '2026-11-05T10:01:00Z'
 labels:
   - github
   - security
@@ -35,4 +35,6 @@ https://github.com/rvdbreemen/OTGW-firmware/issues/154 point 1 (and closed #131)
 
 <!-- SECTION:NOTES:BEGIN -->
 6c 2026-11-05 05:50: implemented in wt-6c-1645 on wt-int4 2a9201f7d; patch at C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/9ad25eb8-1a77-4659-887b-f3c41994cc95/scratchpad/task-1645.patch. settings.wifi.bNoPortal (file WifiNoPortal, REST wifinoportal, default false): Networktypes.h, settings write/read, GET + knownSettings, settingsHelp.h, v2.js SET_META (network / Wi-Fi). wifiSkipPortalDecide() returns (marked || settings.wifi.bNoPortal) && !wifiConnected && wifiSaved && !forcePortal, so every startWiFi() with the setting on skips both the config portal and the prerelease AP fallback; no saved creds and the triple reset still open the portal. Telnet log line names the setting and 'Triple reset to reconfigure WiFi'; OLED network page shows 'Triple reset to / reconfigure WiFi' while offline with the setting on. Docs: docs/api/README.md, c4-code-settings.md, ADR-211 (Proposed) Related note. Evidence: tests/test_wifi_skip_portal.py extended (NoPortalSetting 6 tests on rel+pre builds, NoPortalSettingWired 2) - old sources 4 FAIL (the 4 behaviour/wiring tests that need the fix), fix 36/36 OK; tests/test_wifi_deadlink.py stub got settings.wifi, 28/28 OK; settings_whitelist OK, telnet_console_setting OK, adr_governance OK; evaluate --quick 89 checks 82 pass 0 fail 0 warn. settings-help 18 KB test still red (TASK-1646, pre-existing). Not verified: OLED text and the background retry on hardware; bench open: AP off at boot -> no OTGW SSID in a scan with the setting on, portal/AP fallback with it off (AC4).
+
+2026-11-05 bench .61 beta.94: (1) first two runs invalid: the CAPsMAN deny failed silently ('place-before=0' on an empty list -> 'no such item'), the unit roamed to a CAPsMAN AP within 6 s (router log DHCP 10:34:23). (2) With a working deny (router: 'rejected, forbidden by access-list' until removal, rejoin 10:55:03) and a forced WlanScan: setting ON -> the config portal was skipped, BUT device/info showed apfallback=true / 'AP Mode' and the scan saw SSID OTGW-21B4F8: the prerelease loopWifi rule (WIFI_CONNECTING, 2 retries -> startAPFallback) ignored wifinoportal. Fix: that rule now requires !settings.wifi.bNoPortal (networkStuff.ino WIFI_CONNECTING prerelease branch). Test: tests/test_wifi_skip_portal.py new test_prerelease_noportal_setting_never_opens_ap_fallback (control ap_gone pre -> ap=1; ap_gone_noportal pre -> ap=0, no restart): old FAIL ('ap=1' with the setting on), fix 37/37 OK. evaluate 0 failed.
 <!-- SECTION:NOTES:END -->

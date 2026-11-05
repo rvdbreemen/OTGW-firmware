@@ -369,6 +369,8 @@ static void printSkipMark() { printf("SKIP|0-0\n"); }
 DUMP_ANCHOR = 'static void dumpRtc(const char *tag) {\n  printf("%s|%lu|%lu\\n", tag,'
 EXTRA_SCENARIOS = r"""  } else if (!strcmp(sc, "ap_gone")) {     // TASK-1455: the access point disappears (no association)
     runFor(5 * 60); ev("ap_gone"); g_wifiStatus = WL_DISCONNECTED; g_dhcpWorks = false; runFor(15 * 60);
+  } else if (!strcmp(sc, "ap_gone_noportal")) {   // TASK-1645: the same with settings.wifi.bNoPortal on
+    settings.wifi.bNoPortal = true; runFor(5 * 60); ev("ap_gone"); g_wifiStatus = WL_DISCONNECTED; g_dhcpWorks = false; runFor(15 * 60);
   } else if (!strcmp(sc, "ap_gone_wired")) {   // the same while Ethernet is the active link
     runFor(5 * 60); state.net.eMode = NET_ETHERNET; g_wifiStatus = WL_DISCONNECTED; g_dhcpWorks = false; runFor(15 * 60);
   } else if (!strcmp(sc, "alive")) {"""
@@ -403,6 +405,7 @@ class SkipPortalRestartSites(unittest.TestCase):
     def run_sc(self, sc, build="rel", magic=0, count=0, soft=0):
         out = subprocess.run([str(self.exe[build]), sc, str(magic), str(count), str(soft), "1"],
                              capture_output=True, text=True, check=True).stdout
+        self.last_out = out
         skip = re.search(r"^SKIP\|(\d+)-(\d+)", out, re.M)
         restart = re.search(r"^RESTART\|\d+\|(.*)$", out, re.M)
         return (int(skip.group(1)), int(skip.group(2))), (restart.group(1).strip() if restart else None)
@@ -433,6 +436,14 @@ class SkipPortalRestartSites(unittest.TestCase):
         mark, reason = self.run_sc("ap_gone", build="pre")
         self.assertIsNone(reason)
         self.assertEqual(mark, (0, 0))
+
+    # TASK-1645 bench .61 2026-11-05: with wifinoportal on, loopWifi still opened the BETA AP fallback after 2 retries
+    def test_prerelease_noportal_setting_never_opens_ap_fallback(self):
+        self.run_sc("ap_gone", build="pre")
+        self.assertRegex(self.last_out, r"\|ap=[1-9]", "control: without the setting the BETA AP fallback must start")
+        mark, reason = self.run_sc("ap_gone_noportal", build="pre")
+        self.assertRegex(self.last_out, r"\|ap=0\|", "wifinoportal on: loopWifi started the AP fallback")
+        self.assertIsNone(reason, "wifinoportal on: the prerelease build must keep retrying, not restart")
 
     def test_wired_unit_neither_restarts_nor_marks(self):
         mark, reason = self.run_sc("ap_gone_wired")

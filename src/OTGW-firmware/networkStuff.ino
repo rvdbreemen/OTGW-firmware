@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.95
+**  Version  : v2.0.0-beta.96
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -947,8 +947,9 @@ void loopWifi() {
         wifiRetryCount++;
         DebugTf(PSTR("WiFi: connect attempt %d failed\r\n"), wifiRetryCount);
 #if defined(_VERSION_PRERELEASE)
-        // BETA: after 2 retries (≈60s) enter AP fallback instead of rebooting
-        if (wifiRetryCount >= 2) {
+        // BETA: after 2 retries (≈60s) enter AP fallback instead of rebooting. TASK-1645: not with
+        // settings.wifi.bNoPortal, which promises no portal and no AP; loopWifi then keeps retrying.
+        if (wifiRetryCount >= 2 && !settings.wifi.bNoPortal) {
           DebugTln(F("BETA: WiFi retries exhausted, entering AP fallback mode"));
           startAPFallback();
           RESTART_TIMER(timerAPRetry);
