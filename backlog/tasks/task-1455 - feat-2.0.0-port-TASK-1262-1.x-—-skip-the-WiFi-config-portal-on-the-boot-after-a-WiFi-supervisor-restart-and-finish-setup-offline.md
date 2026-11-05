@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:28:00Z'
-updated_date: '2026-11-04T23:10:00Z'
+updated_date: '2026-11-05T17:37:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -129,4 +129,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no. Do with TASK-1450;
 2026-11-04 Robert: MikroTik fault injection allowed: one rule per test, scoped to the bench boards' MAC/IP (.61/.63), comment-tagged, scheduler auto-removal within 30 min, removed right after; config export before and after recorded in the notes.
 
 2026-11-05 (opus agent; lead reran in wt-int4): RTC_NOINIT skip-portal mark ('OTSP', validated with platformResetWasSoftware, consumed at boot and again in startWiFi) written before both supervisor restarts (WIFI_FAILED 'too many reconnect failures' and the TASK-1450 dead-link restart), not on Ethernet; a marked boot that cannot connect skips the WiFiManager portal and the prerelease boot-time AP fallback, setup() finishes offline, loopWifi retries every 30 s (AP fallback after 2 retries still applies). Power-on, no credentials, triple reset, nightly/settings restarts unchanged. ADR-211 Proposed (mirrors 1.x ADR-099). tests/test_wifi_skip_portal.py 28 OK (old: 14 FAIL, the behaviour ones listed in the report), deadlink 28, link_record 15, reboot_reason 9, adr_governance 15 OK, evaluate 0 failed. Open for Robert: AC7 (mark also bypasses the prerelease AP fallback) and AC1 evidence (skip line is logged before telnet starts: proposed evidence = laptop SSID scan, rejoin time, reboot_log, boot count). Tag beta.85; release-configured A/B bench pending.
+
+2026-11-05: Robert's AC7 answer recorded in ADR-211 via adr answer (the skip mark also bypasses the prerelease boot-time AP fallback). ADR-211 stays Proposed until the release-config bench A/B (AC1/AC2) is green; then accept.
 <!-- SECTION:NOTES:END -->

@@ -1,8 +1,8 @@
 ---
 id: "ADR-209"
 title: "Replay file lines may carry the otframes.log device time and the replay waits the recorded gap"
-status: "Proposed"
-date: "2026-11-04"
+status: "Accepted"
+date: "2026-11-05"
 binding: false
 gate: null
 documents_shipped: false
@@ -33,7 +33,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-04.
+Accepted, 2026-11-05.
 
 Guideline-level per ADR-080 (Binding ADR rules must have a CI gate): the test gate is `tests/test_replay_timing.py`, which compiles the real parser and scheduler cut from `OTGW-Core.ino`. It is not enforced by `evaluate.py`.
 
@@ -46,6 +46,11 @@ status_history:
     changed_by: Claude
     reason: Initial proposal from TASK-1508 (maintainer chose "the firmware reads the times" on 2026-11-04)
     changed_via: adr-kit
+  - date: 2026-11-05
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Accepted by Robert in the session 2026-11-05; implemented and tested (TASK-1508 / TASK-1560 Done), shipped in v2.0.0-beta.95
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

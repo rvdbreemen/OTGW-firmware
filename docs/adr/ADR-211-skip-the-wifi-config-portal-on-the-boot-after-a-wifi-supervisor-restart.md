@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "wifi"
   - "config-portal"
@@ -33,6 +32,7 @@ symbols:
   - "wifiSkipPortalDecide"
   - "g_rtcWifiSkipPortal"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -209,8 +209,9 @@ marked boot, the prerelease branch in `startWiFi()` moves above the skip check;
 
 ## Open Questions
 
-- [ ] Robert: confirm that the skip mark also bypasses the prerelease boot-time
+- [x] Robert: confirm that the skip mark also bypasses the prerelease boot-time
   AP fallback (recommended above), or keep the fallback on the marked boot.
+  — **Answered 2026-11-05 by Robert van den Breemen:** Yes: the skip mark also bypasses the prerelease boot-time AP fallback (one behaviour on beta and release builds; the existing loopWifi rule still starts the AP fallback after 2 failed retries, about 60 s). Robert, session 2026-11-05.
 
 ## Related Decisions
 
