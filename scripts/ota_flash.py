@@ -1,29 +1,33 @@
 #!/usr/bin/env python3
 """Flash a 2.0.0 ESP32-S3 unit over WiFi OTA (ADR-191), keeping its settings.
 
-Order: filesystem first (main firmware, POST /update?cmd=100&size=<n>; the firmware keeps
-settings.ini and its other kept files across the new image), then the app through the
-safeboot updater (POST /safeboot, wait for the updater, POST /update), then wait until the
-main firmware answers again and report its version and whether the settings survived.
+Order: app first, then filesystem (TASK-1372). The app goes through the safeboot updater
+(POST /safeboot, wait for the updater, POST /update); once the new app answers, the
+filesystem follows on the main firmware (POST /update?cmd=100&size=<n>; the firmware keeps
+settings.ini and its other kept files across the new image). A newer filesystem therefore
+never lands on an older running app; the other way round (new app, old filesystem) only
+shows the "Flash your littleFS with matching version" warning. The script ends by waiting
+until the main firmware answers and reports its version and whether the settings survived.
+The filesystem restart is a planned restart, which also confirms the new app (ADR-191).
 
 The device can close the connection without an HTTP response after the filesystem write
 (during the remount). The script then does not abort: it polls GET /version.hash until it
 shows the new image's githash (the "+<githash>" in the .littlefs.bin name; without one, any
-hash other than the one before the write), and only then goes on to the app step. If the
-hash does not change within FS_VERIFY_TIMEOUT it stops with an error before the app step.
+hash other than the one before the write). If the hash does not change within
+FS_VERIFY_TIMEOUT it stops with an error.
 
 A new /version.hash does not prove the whole image arrived: it sits in the first blocks, and
 an interrupted upload leaves the later blocks of large files old, so they read back short
 (seen on .63: v2.js cut at 64 KB of 251 KB, the v2 UI does not start; a clean re-upload
-served it whole). After the hash the script therefore stops before the app step when
+served it whole). After the hash the script therefore stops with an error when
 device/info reports fsupdateincomplete (firmware with TASK-1495; an absent field is not
 checked) or when GET /v2.js returns fewer bytes than its Content-Length or none at all.
-Then upload the filesystem again. Stopping between the two steps leaves the old app on the
-new filesystem; rerun the script, or with --no-fs once the filesystem is complete.
+Then upload the filesystem again: rerun with --no-app.
 
 Usage:
   python scripts/ota_flash.py --host 192.168.88.61 [--app build/...ino.bin] [--fs build/...littlefs.bin]
                               [--password <admin pw>]
+--no-fs flashes the app only, --no-app the filesystem only.
 Without --app/--fs it picks the newest esp32-combo .ino.bin and .littlefs.bin in build/.
 Stdlib only.
 """
@@ -138,7 +142,7 @@ def flash_fs(host, password, fs):
         h = _wait(_new_fs, "the new filesystem", FS_VERIFY_TIMEOUT)
     except SystemExit:
         raise SystemExit(f"filesystem update not confirmed: /version.hash did not change to "
-                         f"{want or 'a new hash'} (was {old}); app step skipped")
+                         f"{want or 'a new hash'} (was {old})")
     print(f"  filesystem confirmed: /version.hash {old} -> {h}")
     _wait(lambda: _main_up(host), "main firmware after filesystem update", 120)
     _check_fs_complete(host)
@@ -152,7 +156,7 @@ def _check_fs_complete(host):
         dev = {}
     if dev.get("fsupdateincomplete") is True:
         raise SystemExit("device reports fsupdateincomplete: the filesystem update did not finish; "
-                         "upload the filesystem again (app step skipped)")
+                         "upload the filesystem again")
     for attempt in range(1, 4):
         try:
             with urllib.request.urlopen(f"http://{host}/v2.js", timeout=60) as r:
@@ -162,16 +166,46 @@ def _check_fs_complete(host):
         except http.client.IncompleteRead as e:
             got = len(e.partial)
             raise SystemExit(f"/v2.js served short ({got} of {got + (e.expected or 0)} bytes): the filesystem "
-                             "image is incomplete; upload the filesystem again (app step skipped)")
+                             "image is incomplete; upload the filesystem again")
         except urllib.error.HTTPError as e:
             # the file-serve gate (ADR-147) answers 503 under load: try again
             if attempt == 3:
-                raise SystemExit(f"/v2.js could not be checked (HTTP {e.code}); app step skipped")
+                raise SystemExit(f"/v2.js could not be checked (HTTP {e.code})")
             time.sleep(3)
     if n == 0:
         raise SystemExit("/v2.js is empty: the filesystem image is incomplete; upload the filesystem "
-                         "again (app step skipped)")
+                         "again")
     print(f"  /v2.js complete: {n} bytes" + (f" (Content-Length {length})" if length else ""))
+
+
+def flash_app(host, password, app):
+    """App OTA through the safeboot updater; returns once the main firmware answers again."""
+    print("handover to safeboot")
+    _post(host, "/safeboot", password)
+    _wait(lambda: _safeboot_up(host), "safeboot updater", 120)
+    # The safeboot updater runs the synchronous WebServer; a urllib upload of the
+    # whole body gets the connection closed without a response, curl's -F upload
+    # (as a browser form) goes through.
+    print(f"app OTA: {os.path.basename(app)} ({os.path.getsize(app)} bytes)")
+    cmd = ["curl", "-sS", "-m", "300", "-H", f"Origin: http://{host}",
+           "-F", f"update=@{os.path.abspath(app)};filename={os.path.basename(app)}",
+           "-w", " | HTTP %{http_code}", f"http://{host}/update"]
+    if password:
+        cmd[1:1] = ["-u", f"admin:{password}"]
+    # The updater can answer /info a moment before its upload handler accepts
+    # a body, so give the upload a few tries before giving up.
+    for attempt in range(1, 4):
+        time.sleep(3)
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        out = (r.stdout + " " + r.stderr).strip()
+        print(f"  -> try {attempt}: {out}")
+        if "HTTP 200" in out:
+            break
+    else:
+        raise SystemExit("app upload to safeboot failed; the unit stays in safeboot")
+    time.sleep(5)
+    ver = _wait(lambda: _main_up(host), "main firmware after app update", 180)
+    print("  app running:", ver)
 
 
 def newest(pattern):
@@ -196,34 +230,11 @@ def main(argv=None):
     before = _get_json(a.host, "/api/v2/settings")["settings"]
     print("running:", _main_up(a.host))
 
+    if app:
+        flash_app(a.host, a.password, app)
+
     if fs:
         flash_fs(a.host, a.password, fs)
-
-    if app:
-        print("handover to safeboot")
-        _post(a.host, "/safeboot", a.password)
-        _wait(lambda: _safeboot_up(a.host), "safeboot updater", 120)
-        # The safeboot updater runs the synchronous WebServer; a urllib upload of the
-        # whole body gets the connection closed without a response, curl's -F upload
-        # (as a browser form) goes through.
-        print(f"app OTA: {os.path.basename(app)} ({os.path.getsize(app)} bytes)")
-        cmd = ["curl", "-sS", "-m", "300", "-H", f"Origin: http://{a.host}",
-               "-F", f"update=@{os.path.abspath(app)};filename={os.path.basename(app)}",
-               "-w", " | HTTP %{http_code}", f"http://{a.host}/update"]
-        if a.password:
-            cmd[1:1] = ["-u", f"admin:{a.password}"]
-        # The updater can answer /info a moment before its upload handler accepts
-        # a body, so give the upload a few tries before giving up.
-        for attempt in range(1, 4):
-            time.sleep(3)
-            r = subprocess.run(cmd, capture_output=True, text=True)
-            out = (r.stdout + " " + r.stderr).strip()
-            print(f"  -> try {attempt}: {out}")
-            if "HTTP 200" in out:
-                break
-        else:
-            raise SystemExit("app upload to safeboot failed; the unit stays in safeboot")
-        time.sleep(5)
 
     ver = _wait(lambda: _main_up(a.host), "main firmware", 180)
     print("running:", ver)
