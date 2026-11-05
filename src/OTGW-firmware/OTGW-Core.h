@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-beta.96
+**  Version  : v2.0.0-beta.97
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -780,6 +780,7 @@ void pmChainStart();   // SAT: PM=3/15/48, one at a time on a PIC (TASK-1315)
 void pmChainOnBoilerResponse(uint8_t id);
 void pmChainTick();
 bool pmChainBusy();       // SAT: a PM= is pending or queued (another one would replace it on a PIC); PM=25 is no obstacle (TASK-1371)
+bool picPrioSlotBusy();   // SAT: the PIC priority slot waits for a boiler answer, or a PM=/TP= is queued (TASK-1653)
 bool picBoardTretValid(); // SAT: a valid PR=E reading of the board return sensor ('R') in the last 5 minutes (TASK-1371, entry 135)
 bool picBoardTretAbsent(); // SAT: it is settled in this boot that no board return sensor gives a reading (TASK-1371)
 bool boilerMsgId28UnknownConfirmed(); // SAT: a boiler frame in THIS boot said Unknown-DataID for MsgID 28 (not only restored from file)

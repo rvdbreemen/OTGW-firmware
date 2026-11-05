@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.96
+**  Version  : v2.0.0-beta.97
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4358,6 +4358,18 @@ bool pmChainBusy() {
   return false;
 }
 
+// TASK-1653: true while the PIC's priority-message slot is taken (a PM=/TP= sent and not yet answered by the boiler or freed by
+// the PRIO_SLOT_TIMEOUT_MS timeout) or a PM=/TP= waits in the queue. SAT's own PM=25 waits for that, so at most one is
+// outstanding and it never replaces another priority message. A busy lock counts as taken.
+bool picPrioSlotBusy() {
+  CmdQueueLock qlock;
+  if (!qlock.locked) return true;
+  if (s_prioSlotId != PRIO_SLOT_FREE) return true;
+  for (int i = 0; i < cmdQueueSize; i++)
+    if (isPrioCmd(cmdqueue[i].cmd)) return true;
+  return false;
+}
+
 // Called from handleCommandQueue().
 void pmChainTick() {
   if (pmChainIdx < 0) return;
@@ -5853,6 +5865,14 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
       //     → T did not reach the boiler; R replaces it on canonical and /boiler.
       //   if B (slave response) is followed within 500 ms by A (gateway-substituted answer)
       //     → A reaches the thermostat instead of B; B still represents boiler-side reality.
+      // TASK-1653: the incoming frame (OTdata) with the one before it (delayedOTdata), for SAT's own PM=25: a thermostat read of
+      // MsgID 25, an alternative slot (a thermostat request the PIC can replace, the two signatures in SATpm25Poll.h), a fault
+      // edge in MsgID 0. Frames the gateway made itself and replayed lines say nothing about this bus.
+      if (!localAnswer && !replayed) {
+        satPm25NoteFrame(state.otBus.pm25, buf[0], OTdata.type, OTdata.id, OTdata.valueLB,
+                         !delayedOTdata.bLocalAnswer && !delayedOTdata.bReplayed, delayedOTdata.buf[0], delayedOTdata.id,
+                         OTdata.time - delayedOTdata.time, OTdata.time);
+      }
       bool bGatewaySubstituted = (delayedOTdata.id == OTdata.id) && (OTdata.time - delayedOTdata.time < 500) &&
            (((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
             ((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_THERMOSTAT)));

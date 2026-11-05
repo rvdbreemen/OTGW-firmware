@@ -1842,6 +1842,56 @@ static void satMiStep()
   SATDebugTln(F("SAT: MI=500 sent (no return temperature or manufacturer quirk)"));
 }
 
+// TASK-1653 (maintainer decision, entry 276): on a PIC board the flow temperature only arrives when the thermostat reads MsgID 25.
+// When it does not (no thermostat read for 300 s) and the last valid sample is at least 20 s old, SAT asks for it with PM=25. The PIC
+// serves PM=25 only in an alternative slot (SATpm25Poll.h), so SAT asks only when one was seen in the last 120 s; without one it
+// sets bPm25NoSlot and sends nothing. At most one PM=25 is outstanding: SAT waits while the PIC's priority slot is taken
+// (picPrioSlotBusy(): until a boiler reply for that DataID, or the 60 s PRIO_SLOT_TIMEOUT_MS in handleCommandQueue()), and while
+// the boot PM chain runs (pmChainBusy()). No PM=25 for 10 s after a fault edge in MsgID 0: the PIC's own fault-code read uses
+// the same slot (gateway.asm statusreturn ~2751-2759). The entry 45 start-up flood (satNoReturnFloodStep) is separate and unchanged.
+// Two PM=25 are at least SAT_PM25_FLOW_AGE_MS apart, also when the boiler answers Data-Invalid (an answer that frees the slot but
+// leaves the flow sample old). Rate as built: at most one PM=25 per 20 s, one per ~60 s while unanswered, none without a slot.
+static uint32_t _sat_pm25SentMs = 0;          // millis() of the outstanding PM=25; 0 = none
+static uint32_t _sat_pm25LastSentMs = 0;      // millis() of the last PM=25 SAT queued; 0 = none since boot
+static bool     _sat_pm25Unanswered = false;  // the last PM=25 went unanswered and no valid flow sample came since
+static void satPm25PollStep()
+{
+  const uint32_t now = millis();
+  const SatBoilerFeed &feed = state.otBus.feedTboiler;
+  if (_sat_pm25SentMs != 0) {
+    if (feed.eventMs != 0 && (int32_t)(feed.eventMs - _sat_pm25SentMs) >= 0) {   // a boiler reply for MsgID 25 (Data-Invalid too)
+      state.sat.iPm25Answered++;
+      _sat_pm25SentMs = 0;
+      _sat_pm25Unanswered = false;
+    } else if (!picPrioSlotBusy()) {             // the slot came free without a reply: the 60 s timeout, or a newer PM=/TP=
+      const uint32_t fe = state.otBus.pm25.faultEdgeMs;
+      if (fe == 0 || (int32_t)(fe - _sat_pm25SentMs) < 0) {   // not when the PIC's own fault-code read took the slot meanwhile
+        state.sat.iPm25Unanswered++;
+        _sat_pm25Unanswered = true;
+      }
+      _sat_pm25SentMs = 0;
+    }
+  }
+  const bool gatesOk = isPICEnabled() && hasOTCommandInterface() && satIsEnabled() && state.sat.bActive && !settings.sat.bSimulation &&
+                       state.otBus.bGatewayModeKnown && state.otBus.bGatewayMode && !state.otBus.bPSmode &&
+                       !isBoilerMsgIdUnsupportedRead(25);
+  const SatPm25Verdict v = satPm25Decide(state.otBus.pm25, now, satFeedAgeMs(feed, now), gatesOk);
+  if (v == SatPm25Verdict::Idle) {
+    _sat_pm25Unanswered = false;
+    state.sat.bPm25NoSlot = false;
+    return;
+  }
+  state.sat.bPm25NoSlot = (v == SatPm25Verdict::NoSlot) || _sat_pm25Unanswered;
+  if (v != SatPm25Verdict::Send || _sat_pm25SentMs != 0) return;
+  if (_sat_pm25LastSentMs != 0 && (uint32_t)(now - _sat_pm25LastSentMs) < SAT_PM25_FLOW_AGE_MS) return;
+  if (picPrioSlotBusy() || pmChainBusy()) return;
+  if (addCommandToQueue("PM=25", 5, false, 0) == CmdQueueResult::Dropped) return;
+  _sat_pm25SentMs = satFeedStamp(now);
+  _sat_pm25LastSentMs = _sat_pm25SentMs;
+  state.sat.iPm25Sent++;
+  SATDebugTln(F("SAT: PM=25 (the thermostat does not read the flow temperature)"));
+}
+
 //=====================================================================
 //=== Preset Handling ===
 //=====================================================================
@@ -3763,6 +3813,8 @@ void satDisable(bool persistPid)
   state.sat.iTCPushMs    = 0;
   state.sat.bPushRefused = false;
   state.sat.iShVerdict   = 0;          // TASK-1412.13: a switched-off SAT has no SH= verdict
+  state.sat.bPm25NoSlot  = false;      // TASK-1653: a switched-off SAT asks for nothing
+  _sat_pm25Unanswered    = false;
   state.sat.bRoomTempLost = false;     // narration and status start clean after a re-enable (TASK-1364)
   _sat_roomLostActive = false;
   _sat_fireplaceActive = false;
@@ -4225,6 +4277,10 @@ void satSendStatusJSON()
     je.field(F("fallback_active"),      snap->st.sat.bFallbackActive);
     je.field(F("push_refused"),         snap->st.sat.bPushRefused);
     je.field(F("sh_write"),             snap->st.sat.iShVerdict == 1 ? "accepted" : (snap->st.sat.iShVerdict == 2 ? "rejected" : "unknown"));   // TASK-1412.13, entry 252
+    je.field(F("pm25_no_slot"),         snap->st.sat.bPm25NoSlot);       // TASK-1653
+    je.field(F("pm25_sent"),            snap->st.sat.iPm25Sent);
+    je.field(F("pm25_answered"),        snap->st.sat.iPm25Answered);
+    je.field(F("pm25_unanswered"),      snap->st.sat.iPm25Unanswered);
     je.field(F("room_temp_lost"),       snap->st.sat.bRoomTempLost);
     je.field(F("ot_link_lost"),         snap->st.sat.bOtLinkLost);
     je.field(F("outside_temp_missing"), snap->st.sat.bOutsideTempMissing);   // TASK-1390
@@ -4415,7 +4471,7 @@ static const char* satSimmerPerception(float indexC) {
 // the ADR-111 heartbeat keeps the retained values fresh. A REST or settings disable therefore
 // reaches the broker on the next loop pass. Shadows are file-scope so satRepublishCoreState()
 // can reset them.
-static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_sh_rejected, s_core_room_temp_lost, s_core_ot_link_lost, s_core_outside_temp_missing, s_core_external_temp_enable;
+static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_sh_rejected, s_core_pm25_no_slot, s_core_room_temp_lost, s_core_ot_link_lost, s_core_outside_temp_missing, s_core_external_temp_enable;
 static SATShadowS s_core_mode, s_core_preset, s_core_control_mode;
 
 static void satPublishCoreState()
@@ -4428,6 +4484,7 @@ static void satPublishCoreState()
   publishIfChangedB(F("sat/fallback_active"),  state.sat.bFallbackActive,   s_core_fallback_active,  true);
   publishIfChangedB(F("sat/push_refused"),     state.sat.bPushRefused,      s_core_push_refused,     true);
   publishIfChangedB(F("sat/sh_rejected"),      state.sat.iShVerdict == 2,   s_core_sh_rejected,      true);   // TASK-1412.13, entry 252
+  publishIfChangedB(F("sat/pm25_no_slot"),     state.sat.bPm25NoSlot,       s_core_pm25_no_slot,     true);   // TASK-1653
   publishIfChangedB(F("sat/room_temp_lost"),   state.sat.bRoomTempLost,     s_core_room_temp_lost,   true);
   publishIfChangedB(F("sat/ot_link_lost"),     state.sat.bOtLinkLost,       s_core_ot_link_lost,     true);
   publishIfChangedB(F("sat/outside_temp_missing"), state.sat.bOutsideTempMissing, s_core_outside_temp_missing, true);   // TASK-1390
@@ -4456,6 +4513,7 @@ void satRepublishCoreState()
   memset(&s_core_fallback_active, 0, sizeof(s_core_fallback_active));
   memset(&s_core_push_refused, 0, sizeof(s_core_push_refused));
   memset(&s_core_sh_rejected, 0, sizeof(s_core_sh_rejected));
+  memset(&s_core_pm25_no_slot, 0, sizeof(s_core_pm25_no_slot));
   memset(&s_core_room_temp_lost, 0, sizeof(s_core_room_temp_lost));
   memset(&s_core_ot_link_lost, 0, sizeof(s_core_ot_link_lost));
   memset(&s_core_outside_temp_missing, 0, sizeof(s_core_outside_temp_missing));
@@ -6807,6 +6865,7 @@ static void satControlLoopRun()
   _sat_tuneGatesPassed = true;   // TASK-1525: every gate above (disabled, flashing, MQTT fallback, safety, OT link, restart) let SAT control this pass
   satMaxTSetSendStep();   // TASK-1373: SH= on a change of the user MaxTSet and once after a restart
   satMiStep();            // TASK-1371: MI=500 once, PIC boards only
+  satPm25PollStep();      // TASK-1653: PM=25 when the thermostat does not read the flow temperature, PIC boards only
   satRestoreDeferredStep();   // entries 121, 213, 215: PWM comes back on the first valid MsgID 3 reply with bit 4 clear
   satPwmSaveStep();       // TASK-1482, entry 121
 

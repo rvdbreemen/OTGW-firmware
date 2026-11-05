@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTBustypes.h
-**  Version  : v2.0.0-beta.96
+**  Version  : v2.0.0-beta.97
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -21,6 +21,7 @@
 #include <Arduino.h>
 #include <time.h>
 #include "SATboilerFeed.h"
+#include "SATpm25Poll.h"
 
 struct OTBusState {          // state.otBus — OpenTherm protocol & bus state (semantic name: OT bus traffic, not the gateway as a whole)
   bool bOnline           = false;  // was bOTGWonline — serial link alive
@@ -58,4 +59,7 @@ struct OTBusState {          // state.otBus — OpenTherm protocol & bus state (
   // satGetReturnTemp() (TASK-1412.5, entries 217, 218).
   SatBoilerFeed feedTboiler;
   SatBoilerFeed feedTret;
+  // TASK-1653: what processOT() saw of the thermostat's MsgID 25 reads, the PIC's alternative slots and the MsgID 0 fault edges,
+  // for SAT's own PM=25 on a PIC board (SATpm25Poll.h). Written by processOT() only.
+  SatPm25Bus pm25;
 };
