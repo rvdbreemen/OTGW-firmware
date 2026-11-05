@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-02T12:52:00Z'
-updated_date: '2026-11-04T15:16:00Z'
+updated_date: '2026-11-05T18:11:00Z'
 labels:
   - crash
   - diagnostics
@@ -45,6 +45,8 @@ Robert 2026-11-04 (interactive): admin-protected. GET /api/v2/device/coredump un
 2026-11-04 follow-up (sonnet agent; lead reran in wt-int4): attachment named after the dump's own app ELF SHA (otgw-coredump-app-<9 hex>.bin, header X-Coredump-App-Sha256) via shim platformCoreDumpAppSha (platform_esp32.h:671); capture tool scripts/otgw_capture.py fetch_coredump() once per capture (200 keeps coredump-<run>.bin + adds it to the upload zip, 404 one line, 401/403 'admin password needed', --skip-coredump). tests/test_device_coredump_api.py 16 OK (old red), test_capture_tool CoreDumpFetchCase 7 OK (old: no fetch_coredump), crashlog_coredump 10, adr_governance 15, launcher 7 OK; evaluate 0 failed. Tag beta.74.
 
 2026-11-04 bench beta.74: .63 attachment otgw-coredump-app-ba693715a.bin, X-Coredump-App-Sha256 ba693715a = sha256sum prefix of the beta.5+d0efe73 .elf (ba693715a4decd32...) that esp-coredump decodes (TWDT loopTask CPU 1); .61 12206dc4f. Real capture (scripts/otgw_capture.py --device .63 --duration 20): 'Core dump: 31908 bytes -> coredump-20261104-161434.bin (app ELF sha256 ba693715a ...)', file in the upload zip. Auth on .61 with a temporary password: no creds 401, admin creds 200 (29796 B), foreign Origin 403; password cleared afterwards (password=0), settings identical (cmp). Posted msg 1567558144534642780.
+
+2026-11-05: ADR-210 Accepted by Robert (acronyms expanded at first use, unknown Enforcement keys forbid_call/require_call/allowed_in removed so the strict lint passes).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
