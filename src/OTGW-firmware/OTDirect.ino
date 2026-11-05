@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.81
+**  Version  : v2.0.0-beta.82
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -698,6 +698,7 @@ void handleOTDirectBridgeStream() {
   while (OTGWstream.available() && cmdsProcessed < kMaxLinesPerDrain) {
     int inByte = OTGWstream.read();
     if (inByte < 0) break;
+    otgwStreamRxNote();   // TASK-1450: LAN witness for the WiFi dead-link check
 
     char outByte = static_cast<char>(inByte);
     if (outByte == '\r') {

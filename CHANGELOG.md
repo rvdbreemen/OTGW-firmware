@@ -5,7 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-## [2.0.0-beta.80] - 2026-11-05
+### Added
+
+- **The gateway recovers from a WiFi link that stays connected but passes no traffic** (TASK-1450, port of 1.x TASK-1248, GH #682). The WiFi supervisor only acted when the link dropped, so a station that stayed associated with an IP while the access point or router dropped its traffic stayed off the network. The gateway now pings its default gateway (the router) three times every minute. When no ping is answered for 8 probes in a row (about 8 minutes), it forces a WiFi reconnect with the stored credentials, and if traffic still does not pass after another 8 probes, it restarts with the reason `WiFi: connected but no traffic` in `reboot_log.txt`. Guards: the check only arms once the router has answered a ping (a router that blocks ping never triggers it, a changed gateway address disarms it); no action while MQTT is connected, a REST request arrived within the last minute, or a port 25238 client sent data within the last minute; no probe while the heap is not healthy or a probe buffer cannot be allocated; off while Ethernet is the active link. After 3 such restarts it stops restarting and forces at most one reconnect every 15 minutes, until the link has stayed up for an hour; the count survives software restarts only. Prerelease builds that cannot reconnect go to their AP fallback as before. Host test `tests/test_wifi_deadlink.py` (drives the real `loopWifi()`; old code: no reconnect and no restart over 40 simulated minutes of a dead link).
 
 ### Changed
 

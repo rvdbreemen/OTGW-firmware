@@ -6,6 +6,14 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ## 2.0.0
 
+### Behaviour change: a WiFi link without traffic triggers a reconnect, then a restart (TASK-1450)
+
+The gateway pings its default gateway once a minute. After 8 unanswered probes in a row it forces a WiFi reconnect (stored credentials are kept), and after 8 more it restarts with `WiFi: connected but no traffic` in `reboot_log.txt`. This only happens after the router has answered a ping once, and never while MQTT is connected, a REST client or a port 25238 tool sent traffic in the last minute, or Ethernet is the active link. After 3 such restarts it only reconnects, at most once per 15 minutes.
+
+**Who is affected:** installations whose router answers ping and that have no MQTT, REST or port 25238 client. A reconnect closes every open web, WebSocket, telnet and port 25238 connection.
+
+**Migration:** none.
+
 ### Behaviour change: MQTT on-change publishing is the default (ADR-116)
 
 On-change publishing is now enabled by default. Fresh installs use `MQTTonChangePublishing=true` with `MQTTinterval=60`, so changed OpenTherm values still publish immediately while unchanged values refresh once per minute instead of on every repeated frame.

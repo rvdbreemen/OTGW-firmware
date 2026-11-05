@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.81
+**  Version  : v2.0.0-beta.82
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -255,6 +255,7 @@ static void applyResolvedComboPins()
 //=====================================================================
 void setup() {
   captureRebootReason();  // TASK-1447: before any path that can restart (config-portal timeout)
+  captureWifiDeadRestarts();  // TASK-1450: same rule, the dead-link restart count
   bootHeapPhase(PSTR("setup-early"));  // TASK-1339 diagnostics: windowed heap minimum over the boot path
 
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.

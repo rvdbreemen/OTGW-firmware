@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.81
+**  Version  : v2.0.0-beta.82
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -6321,6 +6321,21 @@ void handleOTReplay()
                             sizeof(sReplay));
 }
 
+// TASK-1450: bytes from a port 25238 client prove that the LAN carries traffic, so the WiFi
+// dead-link check takes no action while they arrive. Both readers (handlePICSerial() below,
+// the OTDirect bridge in OTDirect.ino) run on the loop task, as does the reader of the stamp.
+static uint32_t g_otgwStreamLastRxMs = 0;
+
+void otgwStreamRxNote()
+{
+  g_otgwStreamLastRxMs = millis();
+}
+
+bool otgwStreamRxWithin(uint32_t ms)
+{
+  return g_otgwStreamLastRxMs != 0 && (uint32_t)(millis() - g_otgwStreamLastRxMs) < ms;
+}
+
 void handlePICSerial()
 {
 #if HAS_PIC
@@ -6350,6 +6365,7 @@ void handlePICSerial()
       // ever sent. Same shape as the sibling reader in OTDirect.ino.
       int inByte = OTGWstream.read();  // read from port 25238
       if (inByte < 0) break;
+      otgwStreamRxNote();   // TASK-1450: LAN witness for the WiFi dead-link check
       outByte = static_cast<uint8_t>(inByte);
       if (!state.debug.bOTGWSimulation) {
         // TASK-865.6: enqueue for the PIC task to write (no direct UART write).

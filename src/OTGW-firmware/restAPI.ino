@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.81
+**  Version  : v2.0.0-beta.82
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2787,8 +2787,22 @@ static bool checkApiRateLimit(const char words[][API_WORD_LEN], uint8_t wc, HTTP
 }
 
 //=======================================================================
+// TASK-1450: a REST request proves that the LAN carries traffic, so the WiFi dead-link
+// check takes no action while requests arrive. Written on the async_tcp task, read on the
+// loop task: one aligned 32-bit store and load, which the Xtensa core does atomically.
+static volatile uint32_t g_lastRestRequestMs = 0;
+
+bool restRequestWithin(uint32_t ms)
+{
+  const uint32_t last = g_lastRestRequestMs;
+  return last != 0 && (uint32_t)(millis() - last) < ms;
+}
+
 void processAPI(AsyncWebServerRequest *request)
 {
+  // TASK-1450: first, before the 503 gates: a request that gets a busy reply still crossed the LAN.
+  g_lastRestRequestMs = millis();
+
   // Bind the per-request context. processAPI is reached from the /api route AND
   // the onNotFound catch-all (which already bound it); rebinding is idempotent.
   webBeginRequest(request);

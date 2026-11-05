@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.81
+**  Version  : v2.0.0-beta.82
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -286,6 +286,10 @@ uint16_t webSocketClientCount();         // connected /ws clients (port 80); use
 void doRestart(const char* reason);      // canonical reboot path: flushSettings + prepareForReboot + ESP.restart
 void captureRebootReason();                        // TASK-1447: take the stored restart reason; first call in setup()
 void storeRebootReasonUnlessPending(const char *reason); // TASK-1447: keep a taken but unlogged reason instead
+void captureWifiDeadRestarts();          // TASK-1450: take the dead-link restart count, once, near the top of setup()
+bool restRequestWithin(uint32_t ms);     // TASK-1450: a REST request arrived within ms (dead-link witness)
+void otgwStreamRxNote();                 // TASK-1450: a port 25238 client sent a byte
+bool otgwStreamRxWithin(uint32_t ms);    // TASK-1450: a port 25238 byte arrived within ms (dead-link witness)
 // MQTT discovery verification (ADR-062, TASK-349): state machine lives in
 // mqtt_discovery_verify.cpp as of TASK-363; public API in that file's header.
 // startDiscoveryVerification() / isDiscoveryVerificationActive() are
