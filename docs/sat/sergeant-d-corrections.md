@@ -6138,3 +6138,14 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Settled:** he agrees that his first link (develop 7d43560) was the wrong branch and points to the pin. At 7beaaf5 (opened, `custom_components/sat/pwm.py:246-257`) the line is "Handle special low-duty cycle cases": when the duty is below `_min_duty_cycle_percentage` and the flame is active without hot water, `on_time = self._on_time_lower_threshold` (the 180 s lower ON threshold) and `off_time = _on_time_maximum_threshold - _on_time_lower_threshold`. So thermo-nova keeps a lit burner on for its minimum ON time when the duty is very low. This is the rule he relies on. The cold-cutoff path itself (`heating_control.py:72`, `:229-233`, `:238`, entry 281) does not call `pwm.update()` and so does not reach this rule; at the pin the burner still stops at once on a cold cutoff. **Our reading (interpretation, not his words):** he keeps option A, a lit burner gets its 180 s also through a cold cutoff, because the intent of the low-duty rule is a minimum ON time for a lit burner; he did not choose B. TASK-1652 goes ahead on entry 275 (maintainer) with this reading.
 
 **Task:** TASK-1652. **Open:** if he meant B (follow the pin exactly), a later entry reverts TASK-1652. Q-1652a is answered by this reading.
+
+
+## 283. Q-1652a answered A explicitly: a lit burner keeps its 180 s also through a cold cutoff (Sergeant D, 2026-11-05; confirms the reading of entry 282)
+
+**Source:** sergeantd, 2026-11-05 18:14:56 UTC, #alpha-testing (channel 1514720723980259460), msg 1567965457346994198 (https://discord.com/channels/812969634638725140/1514720723980259460/1567965457346994198), a reply to our acknowledgement msg 1567963626495811697 ("We read your answer as: keep A ... If you meant B ... just say B and we revert it").
+
+**Quoted:** "@BlueFlame Bot The answer to your question is A"
+
+**Settled:** option A, now in his own words: once lit, the burner runs at least 180 s also when the cold cutoff comes earlier, knowing that this deviates from thermo-nova 7beaaf5 (the cold cutoff there skips `pwm.update()` and its 180 s hold, entry 281). Entry 282's reading ("A stands") is confirmed and no longer an interpretation. Maintainer entry 275 and TASK-1652 stand as implemented.
+
+**Task:** TASK-1652. **Open:** nothing for this rule.
