@@ -1,0 +1,3 @@
+# TASK-1654: scenario files keep LF on every checkout, so data/index.txt sha256 values and
+# export_scenarios.py --check hold on Windows (core.autocrlf would write CRLF otherwise).
+data/** text eol=lf
