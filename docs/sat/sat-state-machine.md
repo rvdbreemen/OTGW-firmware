@@ -219,7 +219,7 @@ stateDiagram-v2
 | PWM | CONTINUOUS | ON phase, not DHW guard, `flow > 0 && flow <= requested - 3.0` sustained | `SAT_UNDERHEAT_SUSTAIN_MS` 180000; `SAT_UNDERSHOOT_MARGIN_C` 3.0 | `SCT:7239-7243`; `SC:34-35`, `:1397-1420` | entries 86, 95, 108, 134; Q44 A |
 | PWM | CONTINUOUS | ON phase, `satPwmLastOffTimeMs() == 0` sustained | `SAT_SATURATION_SUSTAIN_MS` 300000 | `SC:36`, `:1422-1430` | entries 86, 95 |
 | PWM | CONTINUOUS | PWM burn ended classified `SAT_CYCLE_UNDERHEAT_PWM` | none | `SC:999-1003` | TASK-1331 |
-| PWM | CONTINUOUS | heater off (cold cutoff, summer simmer, valves closed), `satPwmDisableOnHeaterOff()` | none | `SCT:1727-1737`, `:7073`, `:7091`, `:7298` | entry 12, TASK-1362 |
+| PWM | CONTINUOUS | heater off (cold cutoff once it acts, after a lit ON phase's 180 s; summer simmer; valves closed), `satPwmDisableOnHeaterOff()` | none | `SCT:1751`, `:7097`, `:7115`, `:7335` | entry 12, TASK-1362, TASK-1652 |
 | any | OFF | `satDisable()` | none | `SCT:3830` | |
 
 Sustained timers: all three starts are cleared on every mode change, on DHW ticks, boiler fault, thermal safe, summer simmer, `satDisable()`, and when requested <= cold threshold (`SC:204-230`; `SCT:1701`, `:3831`, `:7028`, `:7052`, `:7082`, `:7223`, `:7242`). `satSustainedFor` fires on the first tick at least `limitMs` after the first qualifying tick (`SC:177-184`).
@@ -330,7 +330,10 @@ Purpose: decides heater off (CS = 10, CH = 0) when the requested setpoint is too
 ```mermaid
 stateDiagram-v2
     [*] --> Heating : _sat_coldCut false
-    Heating --> ColdCut : requested <= cold setpoint
+    Heating --> ColdCut : requested <= cold setpoint, no lit ON phase under 180 s
+    Heating --> CutWaitsForMinBurn : requested <= cold setpoint, lit PWM ON phase under 180 s since ignition
+    CutWaitsForMinBurn --> ColdCut : 180 s since ignition, flame dark, hot water, or the ON phase ended
+    CutWaitsForMinBurn --> Heating : requested > cold setpoint + 0.5
     ColdCut --> Heating : requested > cold setpoint + 0.5
 ```
 
@@ -339,21 +342,24 @@ stateDiagram-v2
 | State | Meaning | Stored |
 |---|---|---|
 | Heating (`_sat_coldCut` false) | heating allowed | `SCT:454` |
-| ColdCut (`_sat_coldCut` true) | heater off: CS = 10, PWM off, CH = 0 | `SCT:454`, latched `SCT:7199` |
+| CutWaitsForMinBurn (`_sat_coldCut` true, `_sat_coldCutDeferred` true) | latched, but a lit PWM ON phase (no hot water) is younger than 180 s since its first ignition: the phase keeps running, CS and CH as in the ON phase; telnet narrates "Heating off waits for the 180 s minimum burn" | `SCT:457`, set `SCT:7239`, cleared `SCT:7294`; wait test `satPwmColdCutWaitsForMinBurn()` `SCT:1247-1253`; narration `SCT:7321` |
+| ColdCut (`satColdCutActive()` true) | heater off: CS = 10, PWM off, CH = 0 | `SCT:454`, `SCT:460-463`, latched `SCT:7223` |
 
-Cold setpoint: radiators 28.2, underfloor 21.0 (`SCT:133-134`, `:447-451`). Threshold while cut = cold + 0.5 (`SCT:135`, `:460-463`).
+Cold setpoint: radiators 28.2, underfloor 21.0 (`SCT:133-134`, `:447-451`). Threshold (`satColdThreshold()`, `SCT:470-474`): cold + 0.5 while cut, the cold setpoint while heating, and below every requested setpoint while the cut waits for the minimum burn, so every reader (CS override, CH bit, PWM gates and exits) sees `satColdCutActive()`. The 180 s counts from the first ignition of the ON phase (`_pwm_flameOnMs`, `PWM_IGNITION_TIMEOUT_MS` 180000); a relight keeps that anchor. Deviation from thermo-nova 7beaaf5, where the cold cutoff skips `pwm.update()` and its 180 s hold (`heating_control.py:72`, `:229-233`, `:238`; `pwm.py:201-203`): maintainer entry 275, Sergeant D entries 281-283, TASK-1652.
 
 ### Transitions
 
 | From | To | Guard | Constant | Cite | Refs |
 |---|---|---|---|---|---|
-| Heating | ColdCut | `requested <= cold`, once per tick | 28.2 / 21.0 | `CHE:36-39`; `SCT:7199` | TASK-1547, entry 199 |
-| ColdCut | Heating | `requested > cold + band` | band 0.5 | `CHE:38`; `SCT:135` | entries 199, 200 |
-| ColdCut (action) | CS = 10, `satPwmDisableOnHeaterOff()`, `bModSuppressed` false | `coldCutoff` true | `SAT_MIN_SETPOINT` 10 | `SCT:7287-7300` | TASK-891.2, entry 12 |
+| Heating | ColdCut | `requested <= cold`, once per tick, no lit ON phase under 180 s | 28.2 / 21.0 | `CHE:36-39`; `SCT:7223`, `:7239` | TASK-1547, entry 199 |
+| Heating | CutWaitsForMinBurn | `requested <= cold` while `satPwmColdCutWaitsForMinBurn()` | 180 s | `SCT:7239`, `:1247-1253` | TASK-1652, entries 275, 281-283 |
+| CutWaitsForMinBurn | ColdCut | the wait test turns false (180 s since ignition, flame dark, hot water, PWM left); re-checked after the schedule in the same tick | `PWM_IGNITION_TIMEOUT_MS` 180000 | `SCT:7239`, `:7294` | TASK-1652 |
+| CutWaitsForMinBurn, ColdCut | Heating | `requested > cold + band` | band 0.5 | `CHE:38`; `SCT:135` | entries 199, 200 |
+| ColdCut (action) | CS = 10, `satPwmDisableOnHeaterOff()`, `bModSuppressed` false | `coldCutoff` (= `satColdCutActive()`) true | `SAT_MIN_SETPOINT` 10 | `SCT:7318`, `:7332-7337` | TASK-891.2, entry 12 |
 
-CH rule (`satChEnableDecide`, `CHE:56-62`, called at `SCT:7315`): CH = 0 if requested <= threshold; CH = 0 if PWM drives the CS and the phase is OFF; else CH = 1. `satPwmDrivesSetpoint` = flow > 0, no DHW, requested > threshold, and (protection on or not ON) (`SCT:1580-1584`). Refs: TASK-1316, TASK-1323, Sergeant D 2026-10-23.
+CH rule (`satChEnableDecide`, `CHE:56-62`, called at `SCT:7352`): CH = 0 if requested <= threshold; CH = 0 if PWM drives the CS and the phase is OFF; else CH = 1. `satPwmDrivesSetpoint` = flow > 0, no DHW, requested > threshold, and (protection on or not ON) (`SCT:1580-1584`). Refs: TASK-1316, TASK-1323, Sergeant D 2026-10-23.
 
-Other heater-off paths with the same CS = 10 and CH = 0: summer simmer (`SCT:7071-7085`) and valves closed (`SCT:7088-7101`).
+Other heater-off paths with the same CS = 10 and CH = 0: summer simmer (`SCT:7093-7109`) and valves closed (`SCT:7111-7125`). They act at once; only the cold cutoff waits for the minimum burn.
 
 ### Command cadence
 
