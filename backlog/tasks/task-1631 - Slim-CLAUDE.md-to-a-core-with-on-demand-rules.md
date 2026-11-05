@@ -4,6 +4,7 @@ title: Slim CLAUDE.md to a core with on-demand rules
 status: To Do
 assignee: []
 created_date: '2026-11-04T22:42:00Z'
+updated_date: '2026-11-05T04:49:00Z'
 labels:
   - process
   - agentic
@@ -29,3 +30,9 @@ Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/
 - [ ] #4 Superseded directives are removed from the running text and listed in a dated directive changelog
 - [ ] #5 The TASK-1625 drift test and tests/test_adr_governance.py still pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-05, Robert (AskUserQuestion): deferred until a quiet moment after the beta phase. Options offered: a light clean-up pass (superseded directives to a changelog, ~690 to ~550 lines) or a full split into path-scoped .claude/rules (~200-250 line core). Facts at the time: CLAUDE.md 690 lines, 70 KB; largest blocks test automation 61, navigation 47, versioning 41, build 39, ADR guidelines 37; the ADR list and SAT ground truth blocks must stay (drift tests), and the AGENT-CORE test (TASK-1625) already guards the shared rules. Before a split, verify that this Claude Code version loads .claude/rules/*.md with a paths: frontmatter only for matching files.
+<!-- SECTION:NOTES:END -->

@@ -4,6 +4,7 @@ title: Move SAT research scripts out of scripts/
 status: To Do
 assignee: []
 created_date: '2026-11-04T22:44:00Z'
+updated_date: '2026-11-05T04:49:00Z'
 labels:
   - process
   - agentic
@@ -26,3 +27,9 @@ Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/
 - [ ] #2 Every reference in docs/, tests/ and scripts/ is updated; grep for the old paths finds nothing
 - [ ] #3 python scripts/run_tests.py --no-host passes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-05, Robert (AskUserQuestion): deferred until the SAT campaign is quiet (after TASK-1566 / TASK-1412). Reason: other sessions use these scripts right now (9 commits touched scripts/sat_* in the two days before), and moving them mid-study breaks their paths. Do not pick up before then.
+<!-- SECTION:NOTES:END -->
