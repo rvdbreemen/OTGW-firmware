@@ -7947,6 +7947,84 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-213",
+      "title": "Record a local diagnostic event stream in a bounded on-device ring and stream it as a binary download",
+      "path": "ADR-213-record-a-local-diagnostic-event-stream-in-a-bounded-on-device-ring-and-stream-it-as-a-binary-download.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-05",
+      "decision_summary": "Opt-in, local, RAM only.",
+      "topics": [
+        "diagnostics",
+        "privacy",
+        "psram",
+        "recording",
+        "replay",
+        "rest api",
+        "streaming"
+      ],
+      "aliases": [
+        "/api/v2/diag/recording",
+        "24 h recording",
+        "diagnostic recording",
+        "event recorder",
+        "flight recorder"
+      ],
+      "components": [
+        "diagnostic recording ring",
+        "GET /api/v2/diag/recording",
+        "recording record format"
+      ],
+      "symbols": [
+        "platformPsramAllocOnce",
+        "processOT",
+        "sendMQTTData",
+        "sendPICSerial"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep recording off until the user starts it, and record nothing outbound.",
+          "Allocate the PSRAM ring once, through platformPsramAllocOnce(), on a board with PSRAM.",
+          "On a board without PSRAM, allocate the 4 KB ring only when a recording starts and free it when the recording stops.",
+          "Refuse to start (also on a resume after a reboot) and report a reason in the status when the allocation would drop free heap below the ADR-030 5120 B rung, or fails.",
+          "Resume a running recording after a reboot as a new recording that starts with the Reboot record.",
+          "Append without blocking: on contention or a full ring, drop and count (Gap record), never wait.",
+          "Stream the download block by block with a filler callback; fix the block range when the request starts.",
+          "Write a versioned file header so a decoder can refuse an unknown format.",
+          "Replace every secret setting value before it enters the ring, round latitude and longitude to 0.1 degree and replace BLE MAC addresses by slot numbers, because the download is open."
+        ],
+        "must_not": [
+          "Allocate a download buffer or copy the ring on the asynctcp task.",
+          "Keep a ring allocated on a no-PSRAM board while no recording runs.",
+          "Record the port 25238 bridge bytes in version 1.",
+          "Write the recording to LittleFS, or send it to any host the user did not ask.",
+          "Change the PIC byte stream or what other consumers see (ADR-177)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "Host test (implementation task): encode a fixture of events, decode them back, and check the block sequence, the gaps after an overwrite and the redaction of secret settings.",
+          "Host test: the PSRAM ring allocation path calls platformPsramAllocOnce(); the no-PSRAM ring is allocated on start and freed on stop; a start is refused with a status reason when the free heap after the allocation would be below 5120 B (r...",
+          "Host test: a recording that was on before a reboot resumes with the Reboot record first.",
+          "Bench: start a recording on a PSRAM unit, download it twice with since=, check the gap after an overwrite and that hdmaxloopgapms and the REST 503 counters do not rise.",
+          "TASK-1470 AC3: a recorded day replays on the host and the diff shows PIC-command and MQTT-publish differences between two builds."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -13911,6 +13989,78 @@
     {
       "source": "ADR-211",
       "target": "ADR-099",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-053",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-056",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-123",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-146",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-147",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-177",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-188",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-193",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-209",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-210",
       "type": "related",
       "resolved": true
     }
