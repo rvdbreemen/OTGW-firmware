@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-04T22:41:00Z'
-updated_date: '2026-11-05T11:21:00Z'
+updated_date: '2026-11-05T13:11:00Z'
 labels:
   - process
   - agentic
@@ -25,7 +25,6 @@ Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/
 <!-- AC:BEGIN -->
 - [x] #1 After a session start in a clean clone, git status is clean (the stamp is restored by the hook or not written), or the Stop hook ignores a stamp-only diff
 - [x] #2 A real _VERSION_PRERELEASE change is still reported by the Stop hook
-- [ ] #3 Behaviour shown before and after in a cloud session
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -36,10 +35,12 @@ Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/
 Open: AC3 needs a real cloud session start (CLAUDE_CODE_REMOTE=true with the real build.py and toolchain). Cannot be produced from the local Windows session. Check at the next cloud session on dev: git status right after start must be clean, and the Stop hook must not ask to commit version.h.
 
 2026-11-05 maintainer decision (AskUserQuestion): close TASK-1628 with AC3 deferred to the next real cloud session. AC3 stays unchecked on purpose: it has only the emulation evidence, no cloud-session evidence.
+
+2026-11-05 Robert (AskUserQuestion): AC3 (cloud-session evidence) moved to TASK-1658. This task keeps AC1 and AC2 with their emulation evidence.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Fix: the SessionStart toolchain hook restores version.h and data/version.hash after build.py when they were clean before the build and the diff carries no _VERSION_PRERELEASE line. AC1 and AC2 evidence: Git Bash emulation with the real hook script (CLAUDE_CODE_REMOTE=true, throwaway repo, real version.h, fake build.py that stamps like the real one). Old script leaves version.h and version.hash modified, new script leaves git status clean; a PRERELEASE change before or during the build is kept by both. AC3 (real cloud session) NOT verified: Robert waived it on 2026-11-05 as later evidence. Check at the next cloud session on dev: git status clean right after start, no Stop-hook request to commit version.h.
+Fix: the SessionStart toolchain hook restores version.h and data/version.hash after build.py when they were clean before the build and the diff carries no _VERSION_PRERELEASE line. AC1 and AC2 evidence: Git Bash emulation with the real hook script (CLAUDE_CODE_REMOTE=true, throwaway repo, real version.h, fake build.py that stamps like the real one). The old script leaves version.h and version.hash modified; the new script leaves git status clean. A PRERELEASE change before or during the build is kept by both. The check in a real cloud session (former AC3) moved to TASK-1658 by Robert's decision on 2026-11-05; it is not verified yet.
 <!-- SECTION:FINAL_SUMMARY:END -->
