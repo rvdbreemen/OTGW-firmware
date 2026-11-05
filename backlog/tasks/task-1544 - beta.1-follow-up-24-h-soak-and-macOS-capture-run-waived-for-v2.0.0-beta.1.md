@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T15:47:00Z'
-updated_date: '2026-11-05T16:57:00Z'
+updated_date: '2026-11-05T23:34:00Z'
 labels:
   - beta
   - release
@@ -35,4 +35,6 @@ TASK-1504 AC2 (macOS capture run by a tester) and AC3 (24 h soak on Classic + S3
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: verification only (24 h soak + macOS capture). Release gate for the next beta.
 
 2026-11-04 Robert: keep as the 2.0.0 stable-release gate (24 h soak + macOS/Linux capture runs); no bench soak now.
+
+2026-11-06 00:33: soak .63 at 9 h 31 min, boot 148 (no restart), freeheap drifting ~500 B/h (54,176 -> 51,572 B since 19:13); filed TASK-1669.
 <!-- SECTION:NOTES:END -->
