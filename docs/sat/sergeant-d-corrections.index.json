@@ -3735,6 +3735,21 @@
     "TASK-1655"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 280,
+   "title": "Q-1655a: KD factor 0.063 stays; no further KD simulation study, he wants real data (Sergeant D, 2026-11-05; answers our TASK-1655 question, agrees with entry 279)",
+   "date": "2026-11-05",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1567865321379991563",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412",
+    "TASK-1655",
+    "TASK-1656"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

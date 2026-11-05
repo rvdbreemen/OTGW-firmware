@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T14:37:00Z'
-updated_date: '2026-11-05T14:47:00Z'
+updated_date: '2026-11-05T16:33:00Z'
 labels:
   - github
   - pr
@@ -35,4 +35,6 @@ https://github.com/rvdbreemen/OTGW-firmware/pull/697 by andrebrait, base dev, +1
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-05 Robert (session): wait for andrebrait's gzip+ETag measurement, then choose the direction. PR comment posted (thanks, the ADR-192/139 implications, the two-tab 7668 B finding, the TASK-1657 number collision -> use TASK-1659, merge conflict with dev).
+
+2026-11-05 15:52: PR rebased onto dev, single commit 491c20b98 now uses TASK-1659, GitHub reports MERGEABLE. Direction still waits for the gzip+ETag measurement (Robert's decision).
 <!-- SECTION:NOTES:END -->

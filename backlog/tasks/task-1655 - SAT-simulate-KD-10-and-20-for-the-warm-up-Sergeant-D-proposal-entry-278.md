@@ -3,11 +3,11 @@ id: TASK-1655
 title: >-
   SAT: simulate KD -10% and -20% for the warm-up (Sergeant D proposal, entry
   278)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-05T08:29:00Z'
-updated_date: '2026-11-05T12:58:00Z'
+updated_date: '2026-11-05T16:34:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -25,7 +25,7 @@ Sergeant D 2026-11-05 (entry 277/278, #dev-sat-mqtt 1567789991315120178 and 1567
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Simulation baseline vs KD x0.9 vs x0.8 per plant class: time to within 0.1/0.3 C, overshoot, starts per day, comfort error; thresholds pre-registered before the run
-- [ ] #2 Report posted to Sergeant D with the numbers and a recommendation; his answer recorded as a numbered entry
+- [x] #2 Report posted to Sergeant D with the numbers and a recommendation; his answer recorded as a numbered entry
 - [ ] #3 Only if he agrees: firmware change + host test red/green + ADR or spec update
 <!-- AC:END -->
 
@@ -39,4 +39,12 @@ Sergeant D 2026-11-05 (entry 277/278, #dev-sat-mqtt 1567789991315120178 and 1567
 2026-11-05 6c: 6b posted the results in #dev-sat-mqtt (msg 1567864588442009651), numbers verbatim; recommendation C = keep 0.063 + study the minimum-power/PWM phase (not B), per Robert's 'best result, not parity' rule. This departs from the pre-registered outcome (keep KD) on purpose; recorded in report.md section 9 (local commit aa96eb53d). Firmware task for entry 279: TASK-1656 (6b lane). AC2 waits for Sergeant D's answer as a numbered entry. Commits stay local until 'beta.95 tag out'.
 
 2026-11-05 ~14:00: after beta.95 tag out (6b), rebased onto origin/dev and pushed c8481993f..2e757aaa9. New shas: pre-registration be3dd1726 -> f6e3a10d2 (thresholds.md identical, git diff empty), results 02b50ee28, report a4e293150/7b81bcec8/30ef35937, sha mapping note 2e757aaa9. Test 4/4 OK after rebase. AC2 waits for Sergeant D.
+
+2026-11-05: Sergeant D answered A ('The answer is A. We need real data no simulation at this point', #dev-sat-mqtt 1567865321379991563, entry 280): 0.063 stays (TASK-1656, beta.98), no further simulation study; warm-up evidence from field runs.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+KD x0.9/x0.8 warm-up simulation (1728 runs, pre-registered thresholds f6e3a10d2): x0.9 gives 0.3-2 % faster warm-up, close to harmless; posted to Sergeant D (msg 1567864588442009651); he chose A (entry 280): keep 0.063, real data next, no more simulation.
+<!-- SECTION:FINAL_SUMMARY:END -->
