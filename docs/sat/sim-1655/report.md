@@ -15,7 +15,7 @@ Sergeant D has already decided 0.063 (= x0.9, entry 279). This study is new evid
 Simulation only: no result is physical boiler proof. Pre-registration: `docs/sat/sim-1655/thresholds.md`, committed
 be3dd1726 before the first grid run (rebased onto dev after beta.95 as f6e3a10d2, same content and author date
 2026-11-05 10:57; `runs.json` keeps the pre-rebase sha it recorded at run time). Data: `docs/sat/sim-1655/runs.json` (1728 runs; meta holds the sha256 of every
-script and the thresholds commit). Script: `scripts/sat_kd_warmup_sim_1655.py`. Test:
+script and the thresholds commit). Script: `tools/research/sat/sat_kd_warmup_sim_1655.py`. Test:
 `tests/test_sat_kd_warmup_sim_1655.py` (4/4 OK; the loop with KD x1.0 and no start offset reproduces a committed
 1412.19 row exactly).
 

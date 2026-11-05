@@ -2,15 +2,15 @@
 """TASK-1655: the KD warm-up study's loop is a faithful copy of the TASK-1412.19 closed loop, and the KD factor lands in
 the gain exactly as pre-registered (docs/sat/sim-1655/thresholds.md).
 
-1. With KD x1.0 and no start offset, scripts/sat_kd_warmup_sim_1655.run gives the same scored numbers as
-   scripts/sat_closedloop_sim_1412_19.run for a fault-free 1412.19 class (very_low_load, seed 2 = steady 12 C).
+1. With KD x1.0 and no start offset, tools/research/sat/sat_kd_warmup_sim_1655.run gives the same scored numbers as
+   tools/research/sat/sat_closedloop_sim_1412_19.run for a fault-free 1412.19 class (very_low_load, seed 2 = steady 12 C).
 2. kd = round3(factor * 0.07 * 8400 * kp) for factor 1.0 / 0.9 / 0.8, and the original port gain code is restored after.
 3. Same inputs give the same output (determinism, as H5 of 1412.19).
 This proves the study uses the 1412.19 model; it proves nothing about the firmware beyond what that model reproduces.
 Run: python tests/test_sat_kd_warmup_sim_1655.py
 """
 import os, sys, unittest
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools", "research", "sat"))
 import sat_kd_warmup_sim_1655 as k
 import sat_closedloop_sim_1412_19 as c19
 import sat_sim_port as port

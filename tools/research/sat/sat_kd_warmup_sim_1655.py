@@ -13,13 +13,13 @@ which is how a firmware change would read: satPidRound3(KD_FACTOR * 0.07f * SAT_
 It is injected by replacing sat_sim_port.Pid._gains for the duration of a run; sat_sim_port.py itself is not edited
 (its sha256 is pinned in earlier runs.json files and by tests/test_sat_sim_port_equivalence.py).
 
-Controller: the TASK-1412.19 SAT (scripts/sat_closedloop_sim_1412_19.py class Sat: the 1412.16 SAT plus the hourly start
+Controller: the TASK-1412.19 SAT (tools/research/sat/sat_closedloop_sim_1412_19.py class Sat: the 1412.16 SAT plus the hourly start
 limit on the PWM entry and the CS clamp), driven by a fault-free copy of sat_closedloop_sim_1412_19.run with a room start
 offset d0 (the 1412.19 runs all start at the target). tests/test_sat_kd_warmup_sim_1655.py proves that the copy with
 KD x1.0 and d0 = 0 gives the same scored numbers as sat_closedloop_sim_1412_19.run.
 
 Simulation only: no result is physical boiler proof, and a pass says nothing about the firmware outside the modelled logic.
-Run: python scripts/sat_kd_warmup_sim_1655.py --out docs/sat/sim-1655 --classes <list> ; then --merge
+Run: python tools/research/sat/sat_kd_warmup_sim_1655.py --out docs/sat/sim-1655 --classes <list> ; then --merge
 """
 import argparse, hashlib, json, math, os, statistics, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

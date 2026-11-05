@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-04T22:44:00Z'
-updated_date: '2026-11-05T12:26:00Z'
+updated_date: '2026-11-05T13:05:00Z'
 labels:
   - process
   - agentic
@@ -37,6 +37,8 @@ Context: docs/process/agentic-setup.md (finding numbers F1-F7) and docs/process/
 2026-11-05 Robert (AskUserQuestion 'Beide uitvoeren'): do it now, despite the earlier deferral. Moved 42 research scripts with git mv to tools/research/sat/ (45 renames in git incl. siblings; operational tools stay in scripts/: sat_boiler_emulator, sat_log_to_csv, sat_corrections_index, sat_open_questions, sat_bench_scenarios_1412_20, sat_transport_delay_1412_5). Reference rewrite by script over docs/, tests/, scripts/, tools/, .claude/, .github/ and the agent files: 63 files. Path-depth fixes: sat_sim_plots ROOT, sat_stock_houses DATA, sys.path in three tests. Not rewritten on purpose (immutable records): docs/sat/sergeant-d-corrections.md and ADR-205 (Accepted); tools/research/sat/README.md says how to read the old paths there. Evidence: the six affected tests (closedloop_sim_1412_19, lowload_study_1412_16, sim_port_equivalence, bench_scenarios_1412_20, log_to_csv, corrections_index) exit 0 before and after the move; py_compile of all moved files OK; sat_stock_houses.DATA resolves to an existing file; grep for scripts/sat_<moved> outside backlog/.wolf finds only ADR-205 line 233.
 
 Correction to the note above: after reverting the two immutable records, grep for scripts/sat_<moved> outside backlog/ and .wolf/ finds 7 hits, all in immutable records: docs/sat/sergeant-d-corrections.md (5) and ADR-205 (2). Full suite (python scripts/run_tests.py --no-host, worktree lane-1631-1634 after the move): 138 files, 133 passed, 4 failed, 1 skipped. Failures checked: test_sat_lowload_contract LL-023 fails identically on a clean origin/dev worktree (d08cd47a6, pre-existing); test_static_integrity and test_refresh_storm pass when run alone (load in the -j 4 run); test_capture_tool is flaky on both trees (lane: 1 pass and 1 fail in two solo runs; clean origin/dev: 1 pass and 1 fail with 2 failures). None touches the moved scripts.
+
+Rebase onto origin/dev 2e757aaa9 (2026-11-05, after the beta.95 freeze). The new study scripts/sat_kd_warmup_sim_1655.py (TASK-1655, pushed meanwhile by another session) moved too. Its test now has tools/research/sat on sys.path, and its docstring paths were updated. docs/sat/sim-1655/thresholds.md is a pre-registration whose sha the report pins, so it keeps the old paths, like the other immutable records (README updated). After the rebase all 7 affected SAT tests exit 0, including test_sat_kd_warmup_sim_1655 (4 tests).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

@@ -11,7 +11,7 @@ Moved here from `scripts/` by TASK-1634 (2026-11-05). The operational SAT tools 
 Run a study from the repo root, for example `python tools/research/sat/sat_comfort_band_study25.py`. The scripts
 import each other from this folder (each one puts its own folder on `sys.path`), so keep them together.
 
-Records written before the move (`docs/sat/sergeant-d-corrections.md`, Accepted ADRs such as ADR-205, backlog
-task notes) still name the old `scripts/` paths. They are immutable history: read `scripts/sat_X.py` there as
+Records written before the move (`docs/sat/sergeant-d-corrections.md`, Accepted ADRs such as ADR-205,
+pre-registered thresholds such as `docs/sat/sim-1655/thresholds.md`, backlog task notes) still name the old `scripts/` paths. They are immutable history: read `scripts/sat_X.py` there as
 `tools/research/sat/sat_X.py`. Script hashes stored in a round's `meta` were taken from the file at its old path
 and content; the move changed only path strings in docstrings and comments.
