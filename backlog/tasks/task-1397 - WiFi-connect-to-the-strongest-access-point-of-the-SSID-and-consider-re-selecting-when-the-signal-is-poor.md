@@ -3,11 +3,11 @@ id: TASK-1397
 title: >-
   WiFi: connect to the strongest access point of the SSID (and consider
   re-selecting when the signal is poor)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-25T19:48:00Z'
-updated_date: '2026-11-04T05:10:00Z'
+updated_date: '2026-11-05T06:57:00Z'
 labels:
   - wifi
 milestone: 2.0.0
@@ -41,4 +41,12 @@ Released by Robert 2026-11-03 (interactive, maintainer): low priority. Bench pro
 2026-11-03 lead: the first esp32-combo build of the integration failed: platform_esp32.h:135/140 'esp_wifi_get_config/esp_wifi_set_config was not declared' (the agent's change was host-checked only). Fix: #include <esp_wifi.h> in platform_esp32.h. Firmware build then SUCCESS.
 
 2026-11-04 Robert: MikroTik fault injection allowed: one rule per test, scoped to the bench boards' MAC/IP (.61/.63), comment-tagged, scheduler auto-removal within 30 min, removed right after; config export before and after recorded in the notes.
+
+Robert 2026-11-05 (session, maintainer decision): AC1 (bench with two APs) waived; close on the host test (tests/test_wifi_strongest_ap.py old 3 FAIL / fix OK) and the code review; field feedback from maarten_41762 later is welcome but not a gate.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Strongest-AP join at (re)connect: all-channel scan + connect-by-signal via a platform shim (networkStuff.ino, Ethernet.ino switchToWiFi). Evidence: tests/test_wifi_strongest_ap.py red on old (3 FAIL) and green on fix; esp32-combo build green after the esp_wifi.h include fix; evaluate 0 failed. AC1 (bench with two APs, RSSI before/after) waived by Robert 2026-11-05: not verified on hardware.
+<!-- SECTION:FINAL_SUMMARY:END -->

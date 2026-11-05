@@ -3,13 +3,13 @@ id: TASK-1643
 title: >-
   v2 web UI: elements jump or look broken while the page first loads
   (andrebrait, #alpha-testing)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-04T23:56:00Z'
-updated_date: '2026-11-05T00:52:00Z'
+updated_date: '2026-11-05T05:55:00Z'
 labels:
   - web-ui
-  - needs-maintainer-ok
 dependencies: []
 priority: low
 ordinal: 764000
@@ -35,4 +35,6 @@ Reported by andrebrait in #alpha-testing (msg 1567687106934083745, 2026-11-04 23
 2026-11-05 andrebrait (msg 1567696952341172225): 'Why not just link the style sheet on the head of the page then?' Preferred option now: static <link rel=stylesheet href=v2-bundle.css> in <head> (render-blocking, no unstyled paint) with an onerror handler that re-inserts it with the existing backoff, and v2.js started from its onload to keep the one-file-at-a-time order (TASK-989, ADR-165). Needs a bench check that a 503 on the CSS still recovers.
 
 2026-11-05 andrebrait (msg 1567699818757750835): 'embedding the style sheet is not an option?' Options for Robert: (1) head link + onerror retry (preferred, smallest change); (2) inline the whole bundle in v2.html (source sizes v2.html 55 KB, v2-bundle.css 76 KB): one request less, no FOUC, loses separate caching, build change, changes the ADR-192 asset set -> needs an ADR; (3) inline only first-paint critical CSS, keep the bundle.
+
+2026-11-05 Robert (session): go for option 'head link with onerror retry' (render-blocking <link> in the head, re-added with the same backoff on a 503, v2.js started from its onload so the one-file-at-a-time order stays). Needs a bench check under a 503.
 <!-- SECTION:NOTES:END -->

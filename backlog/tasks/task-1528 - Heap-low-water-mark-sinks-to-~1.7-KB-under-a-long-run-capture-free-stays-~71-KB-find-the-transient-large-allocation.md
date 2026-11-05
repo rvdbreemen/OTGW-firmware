@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-31T13:54:00Z'
-updated_date: '2026-11-04T19:50:00Z'
+updated_date: '2026-11-05T04:50:00Z'
 labels:
   - alpha
   - bug
@@ -43,4 +43,6 @@ Lead triage 2026-11-01: not actively worked; back to To Do, priority stays high 
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: cause not found. Multi-hour bench run.
 
 2026-11-04 20:49 overnight bench run started on .61 (beta.79, SAT simulation + built-in OT replay, MQTT on): device/info every 10 s (freeheap, hd_min_free_heap watermark, maxfreeblock, hd_min_max_block), continuous telnet log, 180 s network drop every 30 min (MikroTik bridge filter on the unit MAC, router-side :delay 200s auto-removal). Output: scratchpad t1528-night/ (samples.log, events.log, telnet.txt). Goal AC1: time each watermark step against the drop/reconnect events and the telnet context.
+
+2026-11-05 night run .61 (beta.79 line? no: the unit ran the build flashed before 20:49; 9 h, replay running, 18 bridge-filter drops of 180 s every 30 min, sampler device/info every 10 s, telnet log): bootcount 46 for all 2830 samples (0 restarts, uptime 9:29 at the end), mqtt_drops 0, max loop gap 489 ms, router rules left 0. Watermark steps (hd_min_free_heap = native ESP minimum, not resettable): 15156 at start; 14896 at 21:03:04 (6 s after drop 1 ended); 548 at 21:21:49 (between drops, uptime 1:05; 10 s before it freeheap 71748, telnet prefixes in 21:21:39-21:21:49 never below 72 KB, max block stayed 31732, so a burst of many allocations, not one big block); 536 at 21:33:06 (6 s after drop 2 ended, reconnect). No further steps in the remaining 16 drops. Open: what allocated ~71 KB in one burst at 21:21:4x (candidate: an event about 1 h after boot, or a client request); next step: telnet heap trace around uptime 1:05 on a fresh boot, and check hourly jobs. Data local: scratchpad/t1528-night/.
 <!-- SECTION:NOTES:END -->

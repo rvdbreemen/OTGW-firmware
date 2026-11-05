@@ -4,9 +4,11 @@ title: Measure how long tasks wait for maintainer decisions and field evidence
 status: To Do
 assignee: []
 created_date: '2026-11-05T04:33:00Z'
+updated_date: '2026-11-05T06:57:00Z'
 labels:
   - process
   - agentic
+milestone: 2.1.0
 dependencies: []
 priority: low
 ordinal: 771000
@@ -24,3 +26,9 @@ Follow-up of TASK-1636 (Robert 2026-11-05: no scaling now). docs/process/agentic
 - [ ] #2 scripts/agentic_throughput.py reports both waits for a chosen window, with its limits stated
 - [ ] #3 One run stored in docs/process/ and the largest wait named in the task notes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Robert 2026-11-05 (session, maintainer decision): parked until after 2.0.0.
+<!-- SECTION:NOTES:END -->

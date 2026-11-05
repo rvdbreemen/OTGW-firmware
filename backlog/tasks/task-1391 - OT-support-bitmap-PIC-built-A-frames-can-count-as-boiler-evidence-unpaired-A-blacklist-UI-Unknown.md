@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T13:44:00Z'
-updated_date: '2026-11-02T04:39:00Z'
+updated_date: '2026-11-05T05:51:00Z'
 labels:
   - opentherm
   - pic
@@ -32,4 +32,6 @@ From the boiler-capability research 2026-10-25 (docs/research/2026-10-25-boiler-
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: only a genuine B retracts (OTGW-Core.ino:5564/5576); unpaired PIC A can still set (:5530/5545). Needs a capture.
+
+Bench .61 beta.87+2a9201f 2026-11-05 05:50-06:43 (sonnet agent, evidence scratchpad/bench-b87/, router exports b87-before/after, rules left 0): idle OT-Direct bench has no OT traffic: ot-support {"msgids":[]} at 05:55 and 06:40 (nothing to relearn). Under /api/v2/simulate/start builtin replay 06:40:53-06:42:40 the map filled with 14 ids (0,1,3,5,6,14,17,18,25,26,28,48,56,57; e.g. 0 tsR true, 1 tsW true). Real-traffic relearn not shown.
 <!-- SECTION:NOTES:END -->

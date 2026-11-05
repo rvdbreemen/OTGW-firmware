@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:28:00Z'
-updated_date: '2026-11-04T22:40:00Z'
+updated_date: '2026-11-05T06:57:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -129,4 +129,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no. Do with TASK-1450;
 2026-11-04 Robert: MikroTik fault injection allowed: one rule per test, scoped to the bench boards' MAC/IP (.61/.63), comment-tagged, scheduler auto-removal within 30 min, removed right after; config export before and after recorded in the notes.
 
 2026-11-04 status check (workflow, two readers): no code, notes or ACs yet; the In Progress came from a status-only commit. Back to To Do until work starts. TASK-1450 (dead-link restart) adds a second WIFI_FAILED restart path; the skip-portal mark should cover both doRestart calls (1450 agent).
+
+Robert 2026-11-05 (session, maintainer decision): AC7 accepted: the skip-portal mark also bypasses the prerelease boot-time AP fallback (one behaviour on beta and release; the existing loopWifi rule still starts the AP fallback after 2 failed retries, ~60 s).
 <!-- SECTION:NOTES:END -->

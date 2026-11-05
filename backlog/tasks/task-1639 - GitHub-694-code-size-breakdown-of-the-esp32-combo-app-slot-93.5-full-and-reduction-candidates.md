@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-04T23:51:00Z'
-updated_date: '2026-11-05T00:03:00Z'
+updated_date: '2026-11-05T05:28:00Z'
 labels:
   - github
 milestone: 2.0.0
@@ -26,4 +26,6 @@ https://github.com/rvdbreemen/OTGW-firmware/issues/694 by andrebrait. Measured b
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-05 Robert (session): released: implement the top-3 low-risk candidates, each measured before/after with the size tool and tested separately.
+
+2026-11-05 lead: Robert chose 'only siscanf' (the other andrebrait candidates are medium/high risk or ADR changes; /update minify not now). Patch (opus agent, wt-1639) integrated on wt-int4 as beta.89 051997cc1: 19 sscanf -> siscanf (10 firmware, 9 OTGWSerial), host shims, tests/test_no_float_sscanf.py (4 OK; red on base with 19 hits). Build: app 2,149,424 B vs beta.87 2,158,720 (-9,296 B incl. the small 1645 addition; 93.7% of 2,293,760); nm on the beta.89 ELF: no sscanf / __ssvfscanf_r. Bench .63 (PIC 6.8) beta.89: processOT decode OK (130 lines, MsgID 0 only: no boiler on the bench), picfwversion 6.8 / pic16f1847 unchanged, bootcount +1 over a planned /ReBoot, hardwaremode PIC. Not verified: other MsgIDs on a real boiler, OT-Direct command parsing (SR=27:...) on .61. Still to do: GitHub #694 reply after the push.
 <!-- SECTION:NOTES:END -->

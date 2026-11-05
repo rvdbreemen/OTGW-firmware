@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:21:00Z'
-updated_date: '2026-11-04T20:24:00Z'
+updated_date: '2026-11-05T05:51:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -105,4 +105,6 @@ Do together with TASK-1455 (both touch the WiFi supervisor), per the port evalua
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no dead-link probe in src. Needs MikroTik fault-injection bench.
 
 2026-11-04 Robert: MikroTik fault injection allowed: one rule per test, scoped to the bench boards' MAC/IP (.61/.63), comment-tagged, scheduler auto-removal within 30 min, removed right after; config export before and after recorded in the notes.
+
+Bench .61 beta.87+2a9201f 2026-11-05 05:50-06:43 (sonnet agent, evidence scratchpad/bench-b87/, router exports b87-before/after, rules left 0): PASS with caveat. Run B (bridge filter drop src/dst MAC forward+input+output, DHCP udp 67 allowed): forced reconnect 7m06s after the drop (router: disconnect 06:31:12, reassoc 06:31:16, DHCP 06:31:16); restart 8m09s later, reboot_log '2026-11-05 06:39:39 - reboot cause: Software reset (3) - WiFi: connected but no traffic', bootcount 49->50, HTTP back 1 s after rule removal, MQTT ~40 s, crashlog empty. Run A (DHCP also dropped): forced reconnect at 7m20s, then the normal AP-retry path (banner 'down 302 s, reason 8 ASSOC_LEAVE, self: AP retry timeout'), no restart, rejoin 4m49s after rule removal. Device telnet lines not captured (telnet session stalls while traffic is dropped).
 <!-- SECTION:NOTES:END -->

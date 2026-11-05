@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T18:39:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-05T05:51:00Z'
 labels:
   - telnet
   - debug
@@ -32,4 +32,6 @@ From Sergeant D's alpha.505 capture 2026-10-25 19:28 (TASK-1339 notes; analysis 
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: 'q' runs readSettings(true) from async_tcp (handleDebug.ino:364); no setup gate. Repro first.
+
+Bench .61 beta.87+2a9201f 2026-11-05 05:50-06:43 (sonnet agent, evidence scratchpad/bench-b87/, router exports b87-before/after, rules left 0): PASS. GET /ReBoot 05:54:24.8, telnet connected 15.2 s later, 'r' -> 'RX Key 'r' ignored: setup still running, retry after 'Setup finished!'' (device 05:54:38.624); after setup 'r' accepted ('Wifi is connected', 'MQTT is connected').
 <!-- SECTION:NOTES:END -->

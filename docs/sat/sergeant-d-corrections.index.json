@@ -3602,6 +3602,97 @@
     "TASK-1412.15"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 270,
+   "title": "QD-8 answered A: no post-hot-water setpoint hold, keep today's behaviour as thermo-nova (Sergeant D, 2026-11-05)",
+   "date": "2026-11-05",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567788885159714837",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.7",
+    "TASK-1412.18"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 271,
+   "title": "Q-1412.16a: let the integral build outside the 0.1 C deadband, with a clamp (maintainer decision, 2026-11-05)",
+   "date": "2026-11-05",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.16",
+    "TASK-1412.19"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 272,
+   "title": "Q-1412.20a: MsgID 3 answered validly, later invalid or missing: keep the last valid value (maintainer decision, 2026-11-05)",
+   "date": "2026-11-05",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.20"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 273,
+   "title": "Q-1436g: COLD_SETPOINT stays 28.2 / 21 in the firmware (maintainer decision, 2026-11-05)",
+   "date": "2026-11-05",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1436"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 274,
+   "title": "Q-1537b dropped: superseded by entry 236 and ADR-207 (maintainer decision, 2026-11-05)",
+   "date": "2026-11-05",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 275,
+   "title": "Minimum burn time beats the cold cutoff: once lit, the burner runs at least 180 s (maintainer decision, 2026-11-05)",
+   "date": "2026-11-05",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.19"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 276,
+   "title": "PIC installation whose thermostat never reads MsgID 25: SAT asks the PIC for it itself (maintainer decision, 2026-11-05)",
+   "date": "2026-11-05",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.5"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

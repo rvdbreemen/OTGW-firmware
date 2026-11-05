@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:14:00Z'
-updated_date: '2026-11-04T21:56:00Z'
+updated_date: '2026-11-05T05:51:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -95,4 +95,6 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no. Waits on TASK-1446.
 
 2026-11-04 status check (workflow, two readers): no code, notes or ACs yet; the In Progress came from a status-only commit. Back to To Do until work starts. Depends on TASK-1446.
+
+Bench .61 beta.87+2a9201f 2026-11-05 05:50-06:43 (sonnet agent, evidence scratchpad/bench-b87/, router exports b87-before/after, rules left 0): PASS with caveat. (a) station kick 06:18:30: wifi_outages 0->1, wifi_disconnect_events 2->3, wifi_drop_reason 2 AUTH_EXPIRE, wifi_drop_down_sec 2, wifi_drop_self false. Self-caused drops not counted (dead-link run: outages stayed 0, drop_self true, 'self: AP retry timeout'). (b) a full 90 s outage was not reproducible: the unit roams to a CAPsMAN AP or rejoins despite the deny; achieved 30 s outage: wifi_outages 3, disconnect_events 16 as one outage, last reason 203 ASSOC_FAIL, down 30 s, matching the router timeline 06:21:38-06:22:07. Banner lines Link/Drop printed with sane values.
 <!-- SECTION:NOTES:END -->

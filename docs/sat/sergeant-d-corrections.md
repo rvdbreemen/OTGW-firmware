@@ -6011,3 +6011,72 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Quoted:** "Show 100 while MM=T"
 
 **Settled:** While the last MM sent is MM=T (maximum PWM duty, entries 242/243/246), the published current_modulation reports 100 %. Before: satComputeMM() gave 0 for a gas boiler in PWM. No new topic. **Task:** TASK-1412.15 follow-up. **Open:** Sergeant D's comment, if any.
+
+
+## 270. QD-8 answered A: no post-hot-water setpoint hold, keep today's behaviour as thermo-nova (Sergeant D, 2026-11-05)
+
+**Source:** sergeantd, 2026-11-05 06:33 UTC, #alpha-testing, msg 1567788885159714837 (https://discord.com/channels/812969634638725140/1514720723980259460/1567788885159714837), answering QD-8 (msg 1567676030922260574, https://discord.com/channels/812969634638725140/1514720723980259460/1567676030922260574, asked 2026-11-05 ~00:20 local with options A no hold / B spec 60 s hold / C defer, recommendation A).
+
+**Quoted:** "@BlueFlame Bot QD-8: A"
+
+**Settled:** option A. After a hot-water draw SAT adds no setpoint hold; the one-minute hold of the OT spec (AFS 2.2.3) is not adopted. The firmware keeps today's behaviour, which matches thermo-nova. The thermo-nova lines used in the question, opened again in the local copy of 7beaaf5 (`other-projects/SAT-releases-thermo-nova/custom_components/sat`): `const.py:19` `DHW_OVERSHOOT_GUARD_SECONDS = 300.0`; `heating_control.py:268-274` (in `_maybe_enable_pwm_on_sustained_overshoot`, the PWM-enable overshoot timer) resets `_sustained_overshoot_started_at` while `hot_water_active` and within those 300 s after `hot_water_off_since`; `heating_control.py:385` is the guard of `_compute_pwm_control_setpoint` (def at `:380`, the PWM setpoint override and suppression path), which returns without an override when `device_state.hot_water_active or requested_setpoint <= COLD_SETPOINT or not config.overshoot_protection`, so that path is skipped during a draw. Neither holds the setpoint after a draw. Field basis of the question: the gruijter 2026-11-04 capture (4 CH-demand draws: flame off in the same 5 s poll as the DHW bit, first SAT CS 6-31 s later, relight 37-69 s). **Task:** TASK-1412.7, TASK-1412.18 (LL-012b becomes a contract: no post-DHW hold). **Open:** none.
+
+## 271. Q-1412.16a: let the integral build outside the 0.1 C deadband, with a clamp (maintainer decision, 2026-11-05)
+
+**Source:** Maintainer decision (Robert, session 2026-11-05), not Sergeant D; Sergeant D may revise in a later entry. Robert van den Breemen, 2026-11-05 ~07:00 local, interactive in the Claude session, taken without waiting for Sergeant D (Robert does not want to wait). Q-1412.16a was queued and never asked in Discord.
+
+**Question:** Slow last part of a warm-up (review item R13 / LL-020): outside the 0.1 C deadband the integral is reset to 0 on every update, so on the way up only P pushes and it weakens near the target. Options as asked: A) keep thermo-nova as it is (entry 212: stay on 7beaaf5); B) let the integral build outside the deadband with a clamp (differs from thermo-nova, needs its own task + ADR per AC3 of TASK-1412.16); C) accept it and only document the behaviour for users. Advice was A unless it is seen as a design flaw.
+
+**Quoted:** "B: integrator laten opbouwen, met clamp"
+
+**Settled:** option B, a deliberate deviation from thermo-nova. thermo-nova (opened at 7beaaf5): `pid.py:187-189` sets `self._integral = 0.0` and returns when `abs(state.error) > DEADBAND`, with `DEADBAND = 0.1` at `const.py:16`. Firmware today matches it: `SATpid.ino:244-246` (`_pidUpdateIntegral`, `fabsf(error) > deadband` sets `_pid_integral = 0.0f`), equivalence shown in `tests/test_sat_sim_port_equivalence.py`. This decision departs from entry 212 (reference stays 7beaaf5) for this one rule. Order of proof: its own task and an ADR first, then the TASK-1412.16 / TASK-1412.19 simulation must show no overshoot regression, then bench, then field. The clamp value and the exact build rule are not decided here. Checked against the recorded entries: entry 212 (reference stays thermo-nova 7beaaf5): **conflict**, this rule leaves the pin; entry 76 (fixed 0.1 deadband, no widening): agrees, the deadband stays 0.1; entry 73 (PID resets where thermo-nova resets, `pid.py:134-137`): agrees, the reset triggers do not change, only the reset outside the deadband inside `_update_integral`. **Task:** new task (to be created), TASK-1412.16, TASK-1412.19. **Open:** conflict with entry 212, to be put to Sergeant D; clamp size and rule.
+
+## 272. Q-1412.20a: MsgID 3 answered validly, later invalid or missing: keep the last valid value (maintainer decision, 2026-11-05)
+
+**Source:** Maintainer decision (Robert, session 2026-11-05), not Sergeant D; Sergeant D may revise in a later entry. Robert van den Breemen, 2026-11-05 ~07:00 local, interactive in the Claude session, taken without waiting for Sergeant D.
+
+**Question:** The boiler first answers MsgID 3 validly, later with Data-Invalid, Unknown-DataID or no answer at all. What happens to SAT's PWM permission (HB bit 4)? Entries 213-215 cover a valid reply and no valid reply yet, not a valid reply that later stops. Options as asked: only the chosen option was passed to this record (A, keep the last valid value); the other options are not recorded here.
+
+**Quoted:** "A: laatste geldige waarde houden"
+
+**Settled:** option A, which is the firmware's behaviour today. Firmware (opened): `OTGW-Core.ino:3183` calls `satNoteSlaveConfig()` only inside `is_value_valid()` and only for a boiler reply; `satNoteSlaveConfig()` (`SATcycles.ino:1294-1300`) sets `bSlaveLowOffDenied` and `bSlaveCfgValid = true` and no code clears them before a reboot (grep of `src/OTGW-firmware` for `bSlaveCfgValid`, `state.sat =` and `memset(&state.sat`: the only writes are `SATcycles.ino:1298-1299` and the initialiser `SATtypes.h:215`), so `satPwmPermitted()` (`SATcycles.ino:1302-1305`) keeps the last valid permission. thermo-nova only displays the bit (`coordinator/serial/binary_sensor.py:54`, `DATA_SLAVE_MASTER_LOW_OFF_PUMP`) and does not act on it, so there is no thermo-nova behaviour to follow. Consistent with entries 213-215. **Task:** TASK-1412.20 (bench scenario), no code change. **Open:** Sergeant D's comment, if any.
+
+## 273. Q-1436g: COLD_SETPOINT stays 28.2 / 21 in the firmware (maintainer decision, 2026-11-05)
+
+**Source:** Maintainer decision (Robert, session 2026-11-05), not Sergeant D; Sergeant D may revise in a later entry. Robert van den Breemen, 2026-11-05 ~07:00 local, interactive in the Claude session, taken without waiting for Sergeant D. Q-1436g was queued and never asked in Discord.
+
+**Question:** COLD_SETPOINT: 22 (pinned `const.py:34`) or 28.2 (develop `const.py:25`, as stated in the queue row; the develop branch was not opened in this session)? Options as asked: only the chosen option was passed to this record; the other options are not recorded here.
+
+**Quoted:** "Firmware houden: 28,2 / 21"
+
+**Settled:** the firmware keeps 28.2 C for radiators and 21 C for underfloor; entry 73 (Q20 "cold cutoff should be 28.2/21") stands, as do entries 199 and 200 (Sergeant D: 22 was a mistaken request, 28.2 is intended). thermo-nova at 7beaaf5 (opened): `const.py:34` `COLD_SETPOINT = 22`. Firmware (opened): `SATcontrol.ino:133-134` `SAT_COLD_SETPOINT_RAD = 28.2f`, `SAT_COLD_SETPOINT_FLOOR = 21.0f`. No change. **Task:** TASK-1436 (no code change). **Open:** none.
+
+## 274. Q-1537b dropped: superseded by entry 236 and ADR-207 (maintainer decision, 2026-11-05)
+
+**Source:** Maintainer decision (Robert, session 2026-11-05), not Sergeant D; Sergeant D may revise in a later entry. Robert van den Breemen, 2026-11-05 ~07:00 local, interactive in the Claude session.
+
+**Question:** Q-1537b (asked 2026-11-02, msg 1566908020888310011): the order of TP=11:12 and MM= at the PIC (A keep, B force TP first in the shared queue, C other). Options as asked: only the chosen option was passed to this record; the other options are not recorded here.
+
+**Quoted:** "Vervallen door entry 236 + ADR-207"
+
+**Settled:** Q-1537b is dropped. Entry 236 (Sergeant D: send TP and MM only when their value changes) and ADR-207 (`docs/adr/ADR-207-sat-sends-mm-the-immergas-tp-and-ch-on-change-cs-keeps-the-5-s-resend-partly-supersedes-adr-203.md`, on-change sending of MM, the Immergas TP and CH; CS keeps the 5 s resend) remove the repeated pair on which the order question rested. No change to entry 233 or 236. **Task:** none. **Open:** none.
+
+## 275. Minimum burn time beats the cold cutoff: once lit, the burner runs at least 180 s (maintainer decision, 2026-11-05)
+
+**Source:** Maintainer decision (Robert, session 2026-11-05), not Sergeant D; Sergeant D may revise in a later entry. Robert van den Breemen, 2026-11-05 ~07:00 local, interactive in the Claude session, taken without waiting for Sergeant D. Raised by the TASK-1412.19 simulation (`docs/sat/sim-1412-19/report.md:61-63`: 248 short PWM ON phases are cut by the cold cutoff within the first minutes, because the cold cutoff switches PWM off at once).
+
+**Question:** The cold cutoff (entries 12, 199) ends a PWM ON phase at once, which can leave less than 180 s of flame; entries 31 and 80 give a 180 s minimum flame time. Which rule wins? Options as asked: only the chosen option was passed to this record; the other options are not recorded here.
+
+**Quoted:** "Minimum 180 s wint"
+
+**Settled:** once the burner is lit, it runs at least 180 s, also when the cold cutoff comes earlier; the cutoff takes effect after the 180 s. This changes how entries 12 and 199 apply inside a running ON phase; it does not change their thresholds or the 0.5 C hysteresis. Firmware today (opened): `SAT_PWM_MIN_ON_SEC = 180.0f` (`SATcontrol.ino:138`) times the ON phase; the latched cutoff `_sat_coldCut = satColdCutoffLatched(...)` (`SATcontrol.ino:7140`, rule in `SATchEnable.h:36-39`) is applied on the same tick at `SATcontrol.ino:7236-7240`: `finalSetpoint = SAT_MIN_SETPOINT` and `satPwmDisableOnHeaterOff()`, with no check of the ON time already burnt. thermo-nova at 7beaaf5: `HEATER_STARTUP_TIMEFRAME = 180` (`const.py:18`); whether thermo-nova lets the cold cutoff end an ON phase early was not traced in this session. Order of proof: its own task, simulation first (S6 in `docs/sat/sim-1412-19/thresholds.md`), then bench. Checked against the recorded entries: entry 12 (cold cutoff switches PWM off and resets the setpoint, as thermo-nova): **conflict** inside a running ON phase; entry 199 (0.5 C hysteresis, keep 28.2): thresholds and band agree, the immediate switch-off inside an ON phase changes; entries 31 and 80 (180 s minimum flame time): agree. **Task:** new task (to be created), TASK-1412.19. **Open:** conflict with entries 12 and 199, to be put to Sergeant D; how hot water and a lost flame interact with the 180 s.
+
+## 276. PIC installation whose thermostat never reads MsgID 25: SAT asks the PIC for it itself (maintainer decision, 2026-11-05)
+
+**Source:** Maintainer decision (Robert, session 2026-11-05), not Sergeant D; Sergeant D may revise in a later entry. Robert van den Breemen, 2026-11-05 ~07:00 local, interactive in the Claude session, taken without waiting for Sergeant D. Raised by TASK-1412.5 (`docs/sat/transport-budgets-1412-5.md`: on PIC pass-through the MsgID 25 supply depends on the thermostat's polls).
+
+**Question:** On a PIC board in gateway mode the flow temperature (MsgID 25) only arrives when the room thermostat reads it. What does SAT do when the thermostat never reads MsgID 25? Options as asked: only the chosen option was passed to this record; the other options are not recorded here.
+
+**Quoted:** "PIC laten pollen via een eigen PR=/OT-request"
+
+**Settled:** SAT requests MsgID 25 itself through a PIC command, only when no valid MsgID 25 was seen for N s; while the thermostat reads it, SAT sends nothing extra. The PIC command that does this safely is to be confirmed in otgw-6.6 (`other-projects/otgw-6.6`) before any code; it is not named here. N is not decided. How thermo-nova handles a missing MsgID 25 on PIC pass-through was not traced in this session. Every PIC command goes through `addCommandToQueue()`. **Task:** new task (to be created), TASK-1412.5. **Open:** the PIC command (to be confirmed in otgw-6.6), the value of N; Sergeant D's comment, if any.
