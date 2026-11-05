@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TASK-1412.16: sanity and reproducibility checks of the simulation study (scripts/sat_lowload_study_1412_16.py).
+"""TASK-1412.16: sanity and reproducibility checks of the simulation study (tools/research/sat/sat_lowload_study_1412_16.py).
 
 What this proves: the study is deterministic, conserves energy in steady state, really enters SAT's PWM where the
 report says it does, and the 'MM honoured' plant variant runs the burner at its minimum in every PWM period. It does not
@@ -8,7 +8,7 @@ tests/test_sat_sim_port_equivalence.py); the report lists what is modelled and n
 Run: python tests/test_sat_lowload_study_1412_16.py
 """
 import os, sys, unittest
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools", "research", "sat"))
 import sat_lowload_study_1412_16 as st
 
 

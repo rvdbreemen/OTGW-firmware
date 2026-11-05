@@ -10,7 +10,7 @@ minutes, on every heat-pump type, over full heating seasons (1 Oct .. 30 Apr: 20
 On underfloor heating the time-proportional variant (ON time re-evaluated inside the period) runs alongside.
 Degree minutes come from rounds 15 (underfloor) and 16 (radiators), same seasons and houses.
 
-Script `scripts/sat_hp_period_sweep_study17.py`, data `round17_hp_period_sweep_runs.json` (1,134 seasons), chart
+Script `tools/research/sat/sat_hp_period_sweep_study17.py`, data `round17_hp_period_sweep_runs.json` (1,134 seasons), chart
 `round17_period_sweep.png`.
 
 ## Radiators (5 houses, calibrated radiators)

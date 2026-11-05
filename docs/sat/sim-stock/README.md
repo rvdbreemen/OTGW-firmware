@@ -14,7 +14,7 @@ semi-detached, terraced mid, terraced end, maisonnette, gallery flat, porch flat
 improvement packages (insulation to the national standard with: 1 gas boiler, 2 heat pump, 3 heat pump with balanced
 ventilation).
 
-Extraction: `scripts/sat_stock_extract_rvo2022.py` (run with `python -I`, paths as arguments) writes
+Extraction: `tools/research/sat/sat_stock_extract_rvo2022.py` (run with `python -I`, paths as arguments) writes
 `rvo_voorbeeldwoningen_2022.json`: per dwelling the floor area, the area and U-value of floor, facade, roof, windows
 and doors per level, ventilation, emitter and its temperature level, heater, NTA 8800 heat demand, and from the
 brochure text the number of dwellings and the stock share (51 entries, 7.47 million dwellings, 100.2 % by rounding).

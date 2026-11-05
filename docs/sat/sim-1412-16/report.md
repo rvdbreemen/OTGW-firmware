@@ -6,11 +6,11 @@ Any replacement of SAT's controller needs its own approved ADR and task; nothing
 | Item | Value |
 |---|---|
 | Firmware commit the study models | `a16184306` (origin/dev, 2026-11-05) |
-| Port proven equal to the firmware | `tests/test_sat_sim_port_equivalence.py` 4/4 OK on `b1fe73d2e`; `git diff b1fe73d2e a16184306` is empty for `SATpid.ino`, `SATcontrol.ino`, `SATchEnable.h`, `scripts/sat_sim_port.py`, so the proof holds for `a16184306` |
-| Script | `scripts/sat_lowload_study_1412_16.py`, sha256 `01031b894cd0...` (full value in `runs.json` `meta`) |
-| Port | `scripts/sat_sim_port.py`, sha256 in `runs.json` `meta` |
+| Port proven equal to the firmware | `tests/test_sat_sim_port_equivalence.py` 4/4 OK on `b1fe73d2e`; `git diff b1fe73d2e a16184306` is empty for `SATpid.ino`, `SATcontrol.ino`, `SATchEnable.h`, `tools/research/sat/sat_sim_port.py`, so the proof holds for `a16184306` |
+| Script | `tools/research/sat/sat_lowload_study_1412_16.py`, sha256 `01031b894cd0...` (full value in `runs.json` `meta`) |
+| Port | `tools/research/sat/sat_sim_port.py`, sha256 in `runs.json` `meta` |
 | Raw output | `runs.json` (864 runs + 54 sensitivity runs, per-period records), `traces.json` (three 24/12 h traces) |
-| Reproduce | `python scripts/sat_lowload_study_1412_16.py --out docs/sat/sim-1412-16` (no random numbers; same inputs give the same bytes) |
+| Reproduce | `python tools/research/sat/sat_lowload_study_1412_16.py --out docs/sat/sim-1412-16` (no random numbers; same inputs give the same bytes) |
 | Checks | `python tests/test_sat_lowload_study_1412_16.py`: 6/6 OK (determinism, steady energy balance, energy closure in transient scenarios, PWM entry at low load, MM-honoured burner at Pmin, a mutant boiler that ignores the PWM OFF phase is detected) |
 
 ## 1. What "SAT" is in this study

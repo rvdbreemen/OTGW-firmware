@@ -3,7 +3,7 @@
 Date 2026-10-31. Robert: research a new way of control that gives long runs instead of PWM with a 40-minute cycle,
 specifically for on/off heat pumps, only in the heat-pump mode and never in the general SAT control.
 
-Script `scripts/sat_hp_onoff_study13.py`, data `round13_hp_longrun_runs.json` (576 winters: 16 options x 3 heavy
+Script `tools/research/sat/sat_hp_onoff_study13.py`, data `round13_hp_longrun_runs.json` (576 winters: 16 options x 3 heavy
 houses (1992-2012, 2015, BENG) x 2 screeds (8 and 3 MJ/K) x 2 seeds x 3 winters (2010-11 cold, 2013-14 mild,
 2025-26)). Plant and SAT curve/PID as round 12 (on/off ground-source heat pump on underfloor heating; all
 assumptions in `round12.md`). Every new option has compressor protection of 20 min minimum on and 10 min minimum

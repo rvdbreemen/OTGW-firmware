@@ -11,9 +11,9 @@ electricity?
 
 ## Method
 
-- Round 21 library (`scripts/sat_hp_library_study21.py`) with SAT through the proven port
-  (`scripts/sat_sim_port.py`, `tests/test_sat_sim_port_equivalence.py`).
-- Script: `scripts/sat_comfort_band_study25.py`, one result file per run under `round25_parts/<season>/`,
+- Round 21 library (`tools/research/sat/sat_hp_library_study21.py`) with SAT through the proven port
+  (`tools/research/sat/sat_sim_port.py`, `tests/test_sat_sim_port_equivalence.py`).
+- Script: `tools/research/sat/sat_comfort_band_study25.py`, one result file per run under `round25_parts/<season>/`,
   merged in `round25_runs.json`.
 - Score: share of ALL minutes after the 14-day warm-up with the room above 20.3 C, below 19.7 C, and within
   the band. Heating and non-heating hours are both counted, because the complaint is about the room, not

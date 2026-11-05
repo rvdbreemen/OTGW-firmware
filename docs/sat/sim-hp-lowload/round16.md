@@ -20,8 +20,8 @@ Source: NIBE F1145 manual, menu 4.9.3, start compressor default -60, range -1000
 
 ## Setup
 
-Script `scripts/sat_hp_dm_study16.py`, data `round16_hp_dm_runs.json` (630 seasons), comparison script
-`scripts/sat_hp_compare_current.py`, charts `round16_tradeoff.png` and `round16_vs_current.png`.
+Script `tools/research/sat/sat_hp_dm_study16.py`, data `round16_hp_dm_runs.json` (630 seasons), comparison script
+`tools/research/sat/sat_hp_compare_current.py`, charts `round16_tradeoff.png` and `round16_vs_current.png`.
 Heat pumps on radiators (round 4/5b plant, radiators calibrated so the curve balances at 1.8): modulating down to
 30 %, modulating down to 60 %, on/off. Full heating seasons 1 Oct .. 30 Apr (2010-11, 2013-14, 2025-26), 5 houses,
 2 seeds. Modes: today's SAT PWM 1800 s (the current control) and 2400 s; "own" (SAT never switches to PWM, the heat
@@ -53,7 +53,7 @@ season and seed.
 | | DM -120 | 4.5 | -88 % | -0.143 | -362 | -1.9 % |
 | | own | 5.0 | -87 % | -0.161 | -417 | -2.6 % |
 
-(all rows: `python scripts/sat_hp_compare_current.py`)
+(all rows: `python tools/research/sat/sat_hp_compare_current.py`)
 
 ## Findings
 

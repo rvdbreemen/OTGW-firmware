@@ -4,7 +4,7 @@ Date 2026-11-02. Follow-up of round 22 after Sergeant D's rationale (entry 210):
 between the heat pump's maximum (Elga Ace about 4 kW) and an older boiler's minimum (about 5.5 kW), where the boiler on
 its own control cycles; running it longer keeps it above 95 % efficiency.
 
-Script `scripts/sat_hp_hybrid_backup_study22.py --b` (round 21 library, SAT through the proven port); results
+Script `tools/research/sat/sat_hp_hybrid_backup_study22.py --b` (round 21 library, SAT through the proven port); results
 `round22b_boiler55_runs.json` (240 runs: 4 hybrids x 3 houses x 2 modes x 10 seasons 2015-16 .. 2024-25). Regression:
 without `--b` the model reproduces round 22 exactly (Elga Ace, 1983-92 radiators, own, 2024-25: 2673 starts, 582 kWh).
 

@@ -4,8 +4,8 @@ Date 2026-11-02. Closes the simulation part of TASK-1527 AC#2 ("candidate settin
 flow cap, MM in PWM, hysteresis) scored on compressor starts per day first and comfort second, paired against current
 settings, over at least 5 winters").
 
-Script `scripts/sat_hp_candidate_sweep_study23.py` (round 21 library, SAT through the proven port
-`scripts/sat_sim_port.py`); data `round23_candidate_runs.json` (840 runs) and `round23b_hysteresis_runs.json`
+Script `tools/research/sat/sat_hp_candidate_sweep_study23.py` (round 21 library, SAT through the proven port
+`tools/research/sat/sat_sim_port.py`); data `round23_candidate_runs.json` (840 runs) and `round23b_hysteresis_runs.json`
 (360 runs, the hysteresis candidates). Units: Mitsubishi Ecodan WM50 (minimum 1.8 kW), NIBE S2125-8 (2.4 kW), Daikin Altherma 3 R 04 (3.2 kW);
 the four round 21 houses (underfloor heating); ten heating seasons 2015-16 .. 2024-25; each unit at its round 21 best
 curve. Port proof re-run on 2.0.0-beta.5 (0ab3edd99, the firmware with entries 197/198): 4/4 OK, mapper worst 0.003 s. Regression: "current" reproduces round 21 exactly (NIBE, 2015 house, 2024-25: 17.4 starts/day, 0.195 C).

@@ -6,11 +6,11 @@ boiler or compressor proof (AC3).** A pass or fail is about the model of SAT (se
 | Item | Value |
 |---|---|
 | Thresholds and classes | `thresholds.md`, committed and pushed as `b3b096a1a` (2026-11-05 00:19 +01:00) before any run; unchanged |
-| Script | `scripts/sat_closedloop_sim_1412_19.py`, sha256 `82f8aad5a992...` for the scored run (full value in `runs.json` `meta`); the committed version adds only the `S6_DIAG` diagnostic list used for section 3, which does not change any scored value |
-| Model base | `scripts/sat_lowload_study_1412_16.py` sha256 `01031b894cd0...`, port `scripts/sat_sim_port.py` sha256 `361b1ca6129d...` |
+| Script | `tools/research/sat/sat_closedloop_sim_1412_19.py`, sha256 `82f8aad5a992...` for the scored run (full value in `runs.json` `meta`); the committed version adds only the `S6_DIAG` diagnostic list used for section 3, which does not change any scored value |
+| Model base | `tools/research/sat/sat_lowload_study_1412_16.py` sha256 `01031b894cd0...`, port `tools/research/sat/sat_sim_port.py` sha256 `361b1ca6129d...` |
 | Firmware the model follows | origin/dev `a16184306`; port proven equal (curve, PID, PWM mapper) by `tests/test_sat_sim_port_equivalence.py` 4/4 |
 | Raw output | `runs.json` (1440 runs, every metric, event and seed per run) (the per-class `parts/` files the merge reads are not committed; they hold the same runs) |
-| Reproduce | `python scripts/sat_closedloop_sim_1412_19.py --out docs/sat/sim-1412-19 --classes <list>` then `--merge` |
+| Reproduce | `python tools/research/sat/sat_closedloop_sim_1412_19.py --out docs/sat/sim-1412-19 --classes <list>` then `--merge` |
 | Checks | `python tests/test_sat_closedloop_sim_1412_19.py` 5/5 OK: same seed gives identical output (H5), and each hard check H1-H4 goes red on a mutant that removes the behaviour it guards (hour limit, CS clamp, silence after hand-back, curve-only on a lost room) and green without it |
 
 ## 1. What was simulated

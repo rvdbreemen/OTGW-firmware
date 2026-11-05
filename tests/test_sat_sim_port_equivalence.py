@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TASK-1527 round 21: the simulation's SAT port (scripts/sat_sim_port.py) against the REAL firmware functions.
+"""TASK-1527 round 21: the simulation's SAT port (tools/research/sat/sat_sim_port.py) against the REAL firmware functions.
 
 The heat-pump simulation library runs SAT through a Python port. This test proves the port computes what the firmware
 computes, minute by minute, on the same input sequences:
@@ -30,7 +30,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
-sys.path.insert(0, str(HERE)); sys.path.insert(0, str(REPO / "scripts"))
+sys.path.insert(0, str(HERE)); sys.path.insert(0, str(REPO / "tools" / "research" / "sat"))
 import test_sat_pid_cadence as cad  # noqa: E402
 import test_sat_hp_pwm as hpw  # noqa: E402
 from test_sat_pwm_override import compile_cpp  # noqa: E402

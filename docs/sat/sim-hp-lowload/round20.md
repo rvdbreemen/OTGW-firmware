@@ -1,7 +1,7 @@
 # TASK-1527 round 20: a modulating hybrid heat pump (Remeha Elga Ace 4 kW) under SAT
 
 Date 2026-11-01. Robert: extend the model with a modulating heat pump based on the Remeha Elga Ace specifications, as a
-separate model. Script `scripts/sat_hp_modulating_elga_study20.py`; data `round20_elga_sweep_runs.json` (curve sweep,
+separate model. Script `tools/research/sat/sat_hp_modulating_elga_study20.py`; data `round20_elga_sweep_runs.json` (curve sweep,
 2025-26, seed 1, 126 runs) and `round20_elga_runs.json` (validation at the chosen curves, 3 seasons x 2 seeds,
 108 runs).
 

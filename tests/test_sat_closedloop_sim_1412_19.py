@@ -7,7 +7,7 @@ not prove anything about the firmware beyond what the model reproduces (see the 
 Run: python tests/test_sat_closedloop_sim_1412_19.py
 """
 import os, sys, unittest
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools", "research", "sat"))
 import sat_closedloop_sim_1412_19 as c
 import sat_lowload_study_1412_16 as s16
 

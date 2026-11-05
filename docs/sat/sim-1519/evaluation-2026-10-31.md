@@ -106,14 +106,14 @@ specification. Every change to how SAT controls the boiler needs Sergeant D's OK
 
 ## 7. Appendix: rounds 10 and 11 (run for this evaluation)
 
-**Round 10, PID left alone on a coefficient step** (`scripts/sat_curve_selftune_study10.py`, `data/round10_runs.json`).
+**Round 10, PID left alone on a coefficient step** (`tools/research/sat/sat_curve_selftune_study10.py`, `data/round10_runs.json`).
 ADR-204 forbids a PID reset on a coefficient change (Must Not: "Reset on a coefficient change"); rounds 1-9 zeroed
 the integral and derivative on every tuner step. The decided rule (3 days) was rerun with `STEP_KEEPS_PID = True` on
 2010-11, 2024-25 and 2025-26 and compared pair by pair with the reset runs: differences of -5 to +2 min/day, the
 same end coefficient in 443 of 450 runs, worst pairs unchanged within 2 min/day. The no-tuner runs are identical in
 both, as they must be. Conclusion: the firmware can follow ADR-204 and the study's conclusions stand.
 
-**Round 11, overshoot margin 2.0 vs 3.0 on the calibrated model** (`scripts/sat_curve_selftune_study11.py`,
+**Round 11, overshoot margin 2.0 vs 3.0 on the calibrated model** (`tools/research/sat/sat_curve_selftune_study11.py`,
 `data/round11_runs.json`): 2010-11 / 2024-25 / 2025-26, starts 1.0 / 1.4 / 1.8 / 2.4, 2 seeds, with and without the
 decided tuner, paired by house, start and seed.
 

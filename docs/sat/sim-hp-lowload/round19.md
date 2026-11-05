@@ -6,11 +6,11 @@ pin), **sim** (this round), **literature** (source given), **unverified** (needs
 
 Plant: rounds 15/18 (on/off heat pump, underfloor heating, 3 houses, heavy 8 MJ/K and light 3 MJ/K screed). Runs:
 - round 19: room-feedback and setback variants at curve 1.8, 3 seasons x 2 seeds, 864 runs
-  (`scripts/sat_hp_bestpractice_study19.py`, `round19_bestpractice_runs.json`);
-- round 19b: curve sweep 0.6-1.8 on 2025-26, seed 1, 378 runs (`scripts/sat_hp_curve_sweep_study19b.py`,
+  (`tools/research/sat/sat_hp_bestpractice_study19.py`, `round19_bestpractice_runs.json`);
+- round 19b: curve sweep 0.6-1.8 on 2025-26, seed 1, 378 runs (`tools/research/sat/sat_hp_curve_sweep_study19b.py`,
   `round19b_curve_sweep_runs.json`);
 - round 19c: out-of-sample check, the chosen curves fixed, 3 seasons x 2 seeds, 576 runs
-  (`scripts/sat_hp_tuned_curve_study19c.py`, `round19c_tuned_curve_runs.json`).
+  (`tools/research/sat/sat_hp_tuned_curve_study19c.py`, `round19c_tuned_curve_runs.json`).
 Regression: defaults reproduce round 17/18 exactly (pwm 30: 38.4 starts, 0.248 C). Hooks added to
 `sat_hp_onoff_study13.py`: `KP_MODE`, `SETBACK`, `COEFF` (defaults unchanged).
 

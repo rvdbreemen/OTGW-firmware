@@ -5,7 +5,7 @@ first run is allowed only as a new, dated section below the original, and the re
 both the original and the changed value. A run that fails a threshold is reported as a failure; it is never re-run with
 other inputs until it passes.
 
-Scope: the simulation tests SAT's control logic as modelled in `scripts/sat_lowload_study_1412_16.py` (curve, PID and PWM
+Scope: the simulation tests SAT's control logic as modelled in `tools/research/sat/sat_lowload_study_1412_16.py` (curve, PID and PWM
 mapper proven equal to the firmware by `tests/test_sat_sim_port_equivalence.py`; the rest modelled with citations,
 see `docs/sat/sim-1412-16/report.md` section 1) against documented plant models. **No result is physical boiler or
 compressor proof** (AC3), and a pass says nothing about the firmware outside the modelled logic.
