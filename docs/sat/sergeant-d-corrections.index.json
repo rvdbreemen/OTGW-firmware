@@ -1,0 +1,3607 @@
+{
+ "generated_by": "scripts/sat_corrections_index.py (TASK-1630)",
+ "register": "docs/sat/sergeant-d-corrections.md",
+ "entries": [
+  {
+   "id": 1,
+   "title": "PWM duty cycle: the boiler temperature (BT) in the formula (2026-10-22)",
+   "date": "2026-10-22",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1562827601834418319",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1273"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 2,
+   "title": "Follow thermostat and push setpoint (2026-10-22)",
+   "date": "2026-10-22",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1298"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 3,
+   "title": "Base temperature (2026-10-22)",
+   "date": "2026-10-22",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 4,
+   "title": "Validation of the three SAT documents (2026-10-22)",
+   "date": "2026-10-22",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 5,
+   "title": "PWM OFF: CH=0 together with CS=10 (2026-10-23)",
+   "date": "2026-10-23",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563135315991072789",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1316"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 6,
+   "title": "Return temperature (Tret): only needed in the PWM start-up phase (2026-10-23)",
+   "date": "2026-10-23",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563136971893772291",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1314"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 7,
+   "title": "CH threshold: the per-system cold setpoint instead of 22, and the cold-start hold (2026-10-23)",
+   "date": "2026-10-23",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563172561162862714",
+   "supersedes": [],
+   "tasks": [
+    "TASK-891.2",
+    "TASK-1316",
+    "TASK-1323",
+    "TASK-1324"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 8,
+   "title": "During PWM the CS only keeps the flame on; the duty cycle lives in pwm.py (2026-10-23)",
+   "date": "2026-10-23",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563203205633020027",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1316"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 9,
+   "title": "CH rule during PWM: read as confirmed (2026-10-23)",
+   "date": "2026-10-23",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563207530275152037",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1316",
+    "TASK-1323"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 10,
+   "title": "SAT dashboard: no Continuous/PWM buttons, the active mode stays visible (2026-10-23)",
+   "date": "2026-10-23",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563207530275152037",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1322",
+    "TASK-1323"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 11,
+   "title": "Solar offset on the requested setpoint, 28.2/21 everywhere, integral freeze (2026-10-23)",
+   "date": "2026-10-23",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563232315969249376",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1323"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 12,
+   "title": "Cold cutoff: switch PWM off and reset the setpoint, as thermo-nova does (2026-10-23)",
+   "date": "2026-10-23",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563254104346730600",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1327"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 13,
+   "title": "Force PWM: remove it completely (2026-10-23)",
+   "date": "2026-10-23",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563277074553376889",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1327",
+    "TASK-1332"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 14,
+   "title": "Push setpoint: push on a target change, re-push only when the override is gone (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563391276022366249",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1272"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 15,
+   "title": "PWM re-enable at the end of a cycle: port thermo-nova's on_cycle_end, margin 2 (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1268",
+    "TASK-1331",
+    "TASK-1338"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 16,
+   "title": "Push setpoint: exactly thermo-nova, no re-push on MsgID 9 (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1272"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 17,
+   "title": "CH during PWM confirmed on his installation (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1316"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 18,
+   "title": "The end-of-cycle PWM switch ignores the PWM auto switch setting (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563468667210170383",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1331"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 19,
+   "title": "Remove the \"PWM auto switch\" setting (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563474015409012747",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1341"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 20,
+   "title": "Overshoot protection (start-up + suppression): on by default for all heating systems (2026-10-20)",
+   "date": "2026-10-20",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1562170196897038447",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1268"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 21,
+   "title": "Maximum relative modulation (MM): 0 in PWM, never 0 for heat pumps and hybrids, Geminox at least 10 (2026-04-05 to 2026-10-20)",
+   "date": "2026-10-20",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1490446199092674793",
+   "supersedes": [],
+   "tasks": [
+    "TASK-85",
+    "TASK-1268"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 22,
+   "title": "Continuous to PWM on overshoot: cold start in continuous, margin 2.0 °C for 60 s (2026-10-20)",
+   "date": "2026-10-20",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1562200581961941054",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1268"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 23,
+   "title": "Ignition hold: a settable delay, then straight to flow minus 1, refreshed every few seconds (2026-10-20)",
+   "date": "2026-10-20",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1562185474288652301",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1268"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 24,
+   "title": "Heating curve coefficient default 2.0; stored values stay; the convex curve is deliberate (2026-10-20)",
+   "date": "2026-10-20",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1562170196897038447",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1268",
+    "TASK-1273"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 25,
+   "title": "The thermostat as user interface: two-way room setpoint, on change only (2026-10-19 and 2026-10-21)",
+   "date": "2026-10-21",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1561668633283928136",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1259",
+    "TASK-1298"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 26,
+   "title": "SAT owns the control setpoint while enabled; the thermostat is the fallback (2026-04-05 to 2026-10-23)",
+   "date": "2026-10-23",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1490310838181953598",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1150"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 27,
+   "title": "Room temperature input: stale timeout, a way to push it, redundancy, two decimals (2026-04-05 to 2026-09-24)",
+   "date": "2026-09-24",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1552681842749079614",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1157"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 28,
+   "title": "The SAT PID: integral only inside the deadband, derivative frozen there; filter the sensor, not the PID (2026-04-05 to 2026-10-03)",
+   "date": "2026-10-03",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1490318738774556785",
+   "supersedes": [],
+   "tasks": [
+    "TASK-8",
+    "TASK-894",
+    "TASK-1195"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 29,
+   "title": "\"Python always wins\", and the rulings of 2026-06-20 on saturation, DHW status and OPV calibration",
+   "date": "2026-06-20",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1517960092085911582",
+   "supersedes": [],
+   "tasks": [
+    "TASK-891"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 30,
+   "title": "Device type and heating system are separate settings; heat pump cycles (2026-04-05 to 2026-06-20)",
+   "date": "2026-06-20",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1490446199092674793",
+   "supersedes": [],
+   "tasks": [
+    "TASK-22",
+    "TASK-891",
+    "TASK-891.8"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 31,
+   "title": "PWM duty ranges come from the cycles per hour; 180 s minimum flame time; the low-duty special case (2026-04-05 and 2026-04-06)",
+   "date": "2026-04-06",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1490442317692407999",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 32,
+   "title": "Idle states: valves closed means CS=10; humidity only with the comfort option; Summer Simmer stays (2026-04-06 to 2026-04-09)",
+   "date": "2026-04-09",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1490819012899377444",
+   "supersedes": [],
+   "tasks": [
+    "TASK-29",
+    "TASK-1282"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 33,
+   "title": "DHW: one slider bounded by the boiler, a HW switch only for a storage tank (2023-05-10 to 2026-05-02)",
+   "date": "2026-05-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1105707977882734602",
+   "supersedes": [],
+   "tasks": [
+    "TASK-234",
+    "TASK-516",
+    "TASK-1232"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 34,
+   "title": "SAT onboarding asks the questions of the HA SAT config flow (2026-07-04)",
+   "date": "2026-07-04",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1522989168186232882",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 35,
+   "title": "Multiple areas: port upstream PR #172; any discovered sensor can be an area sensor (2026-05-08 and 2026-06-21)",
+   "date": "2026-06-21",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1502368354214871170",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 36,
+   "title": "The end-of-cycle switch waits for a per-sample control setpoint in the tail (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563657900973490277",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1331"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 37,
+   "title": "Overshoot margin 2.0, and a cycle at exactly 2.0 counts as an overshoot (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563658161821327361",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1331"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 38,
+   "title": "Room temperature lost or missing: keep heating on the heating curve, no P term (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563659520889331794",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 39,
+   "title": "No valid OpenTherm: SAT stops, sends CH=0 and CS=0 once, then sends nothing to the boiler (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563660179655098410",
+   "supersedes": [],
+   "tasks": [
+    "TASK-565",
+    "TASK-1344",
+    "TASK-1346"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 40,
+   "title": "Heat pumps in PWM: minimum on time 180 s; 1800 s and 2400 s are cycle lengths (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563661665155813528",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 41,
+   "title": "Continuous to PWM after 60 s of sustained overshoot, not 3 minutes (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563661990759633008",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1331"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 42,
+   "title": "PID cadence: a fixed 60 s PID update, as thermo-nova, not the control tick (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563662152831602801",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 43,
+   "title": "The first PWM phase is the ON phase (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563662623117938851",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1331"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 44,
+   "title": "CS, MM and CH go out on every control update, as thermo-nova (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563663056087556187",
+   "supersedes": [],
+   "tasks": [
+    "TASK-565",
+    "TASK-1236",
+    "TASK-1268",
+    "TASK-1272"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 45,
+   "title": "PWM ignition without a return temperature: skip the flame-off hold, flood CS and PM=25 for 20 s, MI=500 (2026-10-24)",
+   "date": "2026-10-24",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563667007692603523",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1371"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 46,
+   "title": "Room temperature lost or missing: reset P, I and D to 0 (2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563763199051038791",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1364"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 47,
+   "title": "Lost OpenTherm: hand the boiler back like a user switch-off (CS=0, CH=1, MM=T), then send nothing (2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563772498586378281",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1344",
+    "TASK-1346",
+    "TASK-1365"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 48,
+   "title": "A user MaxTSet slider, bounded by MsgID 57, sent to the boiler (2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563793351961223221",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1373"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 49,
+   "title": "Fireplace mode: a switch that makes SAT heat on the heating curve only (2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563799007157817405",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1364",
+    "TASK-1374"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 50,
+   "title": "Heat pumps in PWM: minimum ON 180 s, cycle length 1800 s (default) or 2400 s (2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563803408262234155",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1366"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 51,
+   "title": "SAT caps the CS it sends at the user's MaxTSet from the SAT settings (2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563791707135287388",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1373"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 52,
+   "title": "PWM cycles per hour default: 3 for gas boilers, 2 for heat pumps (2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563811907708649533",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1366"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 53,
+   "title": "Hot water setpoint: send SW= at once on every change (2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563816490799472681",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1365",
+    "TASK-1376"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 54,
+   "title": "SAT knows the user's MaxTSet and never sends a higher CS (2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563817156884430930",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1373"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 55,
+   "title": "End-of-cycle classifier: match thermo-nova's classifier.py exactly (2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563864684971696211",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1331",
+    "TASK-1387"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 56,
+   "title": "Outside temperature missing or old: stop SAT at once (2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563894284694982677",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1390"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 57,
+   "title": "Outside temperature counts as old after one hour (2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563904963237642251",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1390"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 58,
+   "title": "thermo-nova \"pauses PWM counting\" while hot water runs (statement, 2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1563987251912904705",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 59,
+   "title": "Hourly start limit counts only PWM's own ON phases (2026-10-25)",
+   "date": "2026-10-25",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564003846978670623",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1401"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 60,
+   "title": "\"CH=1 stays during the PWM OFF phase\" (report, 2026-10-26)",
+   "date": "2026-10-26",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564269695257935976",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 61,
+   "title": "Add PWM ON and OFF times in seconds to the SAT log (request, 2026-10-26)",
+   "date": "2026-10-26",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564271354390257867",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1407"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 62,
+   "title": "Coefficient 2.2 for gruijter, why, and the morning rise time (statements, 2026-10-26)",
+   "date": "2026-10-26",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564260826364248125",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1408"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 63,
+   "title": "\"Follow Alex's words\" (process statement, 2026-10-26)",
+   "date": "2026-10-26",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564358085181444097",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 64,
+   "title": "Alexw: \"SAT uses the flow temperature while the flame is off\" (technical statement, 2026-10-26)",
+   "date": "2026-10-26",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564357301341655121",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 65,
+   "title": "Alexw: \"when the flame is extinguished, we attempt to reignite it by increasing the flow by a factor of 10\" (technical statement, 2026-10-26)",
+   "date": "2026-10-26",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564360503793287252",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 66,
+   "title": "Alexw: \"updated in the newer version of SAT, in the branch you mentioned\" (technical statement, 2026-10-26)",
+   "date": "2026-10-26",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564359654958563339",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 67,
+   "title": "MaxTSet slider defaults: 62 °C radiators, 55 °C underfloor (2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564564109092192347",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1373"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 68,
+   "title": "Cycles per hour: \"please expand\" (request, 2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564564109092192347",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1375"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 69,
+   "title": "Hot water setpoint: SW= on change, slider bounded by MsgID 48, re-confirmed (2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564564109092192347",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1376"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 70,
+   "title": "Coefficients set by the old wizard (1.4 / 0.6 / 0.8) stay as they are (2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564564109092192347",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1347"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 71,
+   "title": "Cold cutoff: 28.2 / 21 restated, the boundary still open (2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564542304834945126",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1355"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 72,
+   "title": "Heating curve: the coefficient upper bound stays 5.0; the hourly auto-tune is removed (2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564542304834945126",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1355",
+    "TASK-1359"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 73,
+   "title": "PID resets: follow thermo-nova (2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564542304834945126",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1270",
+    "TASK-1412.10"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 74,
+   "title": "PID persistence: follow thermo-nova (2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564563332449435649",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1368"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 75,
+   "title": "Remove the firmware-only integral cap of plus/minus 20 and the 10 s minimum between PID updates (2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564563332449435649",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1368"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 76,
+   "title": "PID deadband: a fixed 0.1, no user setting, no widening (2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564563332449435649",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 77,
+   "title": "PID derivative details: match thermo-nova (2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564563332449435649",
+   "supersedes": [],
+   "tasks": [
+    "TASK-894",
+    "TASK-1195",
+    "TASK-1368"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 78,
+   "title": "PID rounding: \"Round PID values to 3 decimals\" (2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564563332449435649",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 79,
+   "title": "OpenTherm back after a loss: SAT resumes by itself on the first boiler reply (2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564581168630861865",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1365"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 80,
+   "title": "PWM ON phase: time it from the phase start and wait for ignition as thermo-nova; start ON only when the ON time is at least 180 s (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1371",
+    "TASK-1380",
+    "TASK-1382",
+    "TASK-1383",
+    "TASK-1412.3",
+    "TASK-1412.9"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 81,
+   "title": "Heat pumps: no hourly start limit in PWM, as thermo-nova (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1366",
+    "TASK-1401"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 82,
+   "title": "Hybrid in PWM: gas boiler timing (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1366"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 83,
+   "title": "First control tick after boot or SAT enable: send curve + P + restored I, not CS=10/CH=0 (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564869959920783400",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1270",
+    "TASK-1368"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 84,
+   "title": "\"No return temperature\" means Unknown-DataID on MsgID 28, for now (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1371",
+    "TASK-1412.5"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 85,
+   "title": "Q41 and Q42: he asked us to expand (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1373"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 86,
+   "title": "Sustained switches: overshoot counts at equality, underheat and saturation timed as thermo-nova, the 60 s switch timed on the tick's scheduled time (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1367",
+    "TASK-1412.8"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 87,
+   "title": "Heat pumps enter PWM through the 60 s overshoot switch, as thermo-nova (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564866308317773845",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1382",
+    "TASK-1412.3"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 88,
+   "title": "The 60 s overshoot switch runs before the CS of the same tick, as thermo-nova (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564868134287048788",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.8"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 89,
+   "title": "PWM-entry ON counts but is never cut; a hot-water flame is not counted (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564868134287048788",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1369",
+    "TASK-1380",
+    "TASK-1382",
+    "TASK-1401"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 90,
+   "title": "A PWM ON phase counts against cycles per hour at its ON start, as thermo-nova (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564868134287048788",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1382",
+    "TASK-1401",
+    "TASK-1412.9"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 91,
+   "title": "PWM phase anchors when the flame is already burning: ON counts from its start, OFF from the ON-to-OFF switch (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564868134287048788",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1380",
+    "TASK-1382",
+    "TASK-1401"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 92,
+   "title": "After hot water the next PWM ON comes a full off time late (report, 2026-10-27)",
+   "date": "2026-10-27",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564709639944151071",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1380",
+    "TASK-1382",
+    "TASK-1412.7"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 93,
+   "title": "PWM ON and OFF seconds in the SAT log (request repeated, 2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564861520494461061",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1407"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 94,
+   "title": "Mark answered questions in the open-questions table (process request, 2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564868134287048788",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1270",
+    "TASK-1413",
+    "TASK-1414",
+    "TASK-1415",
+    "TASK-1416",
+    "TASK-1417",
+    "TASK-1418",
+    "TASK-1419",
+    "TASK-1420",
+    "TASK-1421"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 95,
+   "title": "PID rounding, Ki clamp, first-tick D, tick timing scope, and hot water during a PWM ON phase (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564902129896792156",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1270",
+    "TASK-1382",
+    "TASK-1420",
+    "TASK-1421",
+    "TASK-1422",
+    "TASK-1423"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 96,
+   "title": "Cold cutoff boundary: SAT idles when the requested setpoint is below the cold setpoint (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564904039643357215",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1355"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 97,
+   "title": "Q51b: follow thermo-nova, the OFF wait always counts from the ON->OFF switch (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564904986037715015",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1380"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 98,
+   "title": "Cold cutoff boundary: at or below the cold setpoint (2026-10-28, corrects entry 96)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "correction",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564909937161805966",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1355"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 99,
+   "title": "Gas boiler cycles per hour: 3 or 4 only, default 3 (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564910294709571667",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1375"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 100,
+   "title": "MaxTSet slider: bounds from MsgID 49, always send the value, SAT caps CS itself (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564918647338700851",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1373"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 101,
+   "title": "Interpretation: an ON start right after a hot-water draw counts as a normal start (2026-10-28, our reading, asked as Q52 D)",
+   "date": "2026-10-28",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1421",
+    "TASK-1422"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 102,
+   "title": "The boiler's on/off-control bit (MsgID 3) does not force PWM (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564949482477457409",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 103,
+   "title": "Hot water during a PWM ON phase: resume details A, B and C confirmed; D to expand (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564953189969829993",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1421",
+    "TASK-1422"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 104,
+   "title": "Interpretation: the hot-water resume rules apply to every interrupted ON phase, also one still waiting for its first ignition (2026-10-28, our reading)",
+   "date": "2026-10-28",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1422"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 105,
+   "title": "Q52 D: an ON start right after a draw with the hot-water flame still lit does not count (2026-10-28, corrects entry 101)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "correction",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564954645489782858",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1421",
+    "TASK-1424"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 106,
+   "title": "Q52E: no PWM ON start while the hot-water flame still burns; start after it goes out, counted (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1564962902509752442",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1424"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 107,
+   "title": "Interpretation: the hot-water-flame hold applies only while PWM drives the setpoint (2026-10-28, our reading)",
+   "date": "2026-10-28",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1424"
+   ],
+   "confirmed_by_entry": 133
+  },
+  {
+   "id": 108,
+   "title": "Interpretation: the hot-water guard covers the PWM exits too, during the draw and for 300 s after it, as thermo-nova (2026-10-28, our reading)",
+   "date": "2026-10-28",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1420"
+   ],
+   "confirmed_by_entry": 131
+  },
+  {
+   "id": 109,
+   "title": "Correction of our own premise in Q46 and entry 86: the control timer skips missed ticks, it does not catch up (2026-10-28, our finding)",
+   "date": "2026-10-28",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1420"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 110,
+   "title": "Q15b B: keep the 50 °C underfloor ceiling; the underfloor default for max flow becomes 50 °C, as thermo-nova (2026-10-28, changes entry 67)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565079331175268423",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1373"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 111,
+   "title": "Q55: full thermo-nova for the 60 s PID timer: zones too, the PID keeps stepping when control is skipped; no room temperature keeps the heating curve (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565087366996037693",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1368"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 112,
+   "title": "Q53 A: continuous mode follows thermo-nova's previous-CS clamp (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565091338842669137",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1381"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 113,
+   "title": "Q54 B: a heat pump always gets the configured max modulation, in and outside PWM (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565098699074576566",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1426"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 114,
+   "title": "Q32 C: remove the firmware-only comfort adjust; humidity is used only through Thermal comfort, as thermo-nova (2026-10-28)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565103411240902818",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1282"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 115,
+   "title": "Q56 A: after a boot without a room reading yet, keep the restored PID state; a reading lost later still resets (2026-10-28, refines entry 46)",
+   "date": "2026-10-28",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565117854611939329",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1368"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 116,
+   "title": "Q18 A: zones follow thermo-nova's area.py aggregation as it is (2026-10-29, settles entry 35's open point)",
+   "date": "2026-10-29",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565225896418345072",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1340",
+    "TASK-1414",
+    "TASK-1423",
+    "TASK-1440"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 117,
+   "title": "Q57 A: Thermal comfort humidity comes from indoor sources only (MQTT/REST or the BLE room sensor), no weather fallback (2026-10-29)",
+   "date": "2026-10-29",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565232358192455792",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1441"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 118,
+   "title": "Q58 A: in ECO mode no solar gain offset either, as thermo-nova (2026-10-29)",
+   "date": "2026-10-29",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565255839856726017",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1423",
+    "TASK-1440"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 119,
+   "title": "Field assessment of gruijter's alpha.527 run: regulation works as intended (2026-10-29)",
+   "date": "2026-10-29",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565355195939033089",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1469",
+    "TASK-1474"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 120,
+   "title": "Restart: \"this is SAT's bug\", SAT stays quiet without valid OpenTherm; Q59 to be re-evaluated (2026-10-29)",
+   "date": "2026-10-29",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565385159803670560",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1390",
+    "TASK-1474"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 121,
+   "title": "Q59 A: after a restart SAT stays quiet until a valid boiler reply and a valid outside temperature, then takes over; \"PWM enabled\" is restored (2026-10-29, settles entry 120's open points)",
+   "date": "2026-10-29",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565390183174770699",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1390"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 122,
+   "title": "Correction of our own record in entry 31: the 180 s is SAT's commanded ON hold, not a physical burn minimum; P versus 2P is a policy difference, not wording (2026-10-29, our finding)",
+   "date": "2026-10-29",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [
+    31
+   ],
+   "tasks": [
+    "TASK-1382",
+    "TASK-1383",
+    "TASK-1407",
+    "TASK-1412.1",
+    "TASK-1412.9",
+    "TASK-1412.23"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 123,
+   "title": "Correction of our own description in entries 58 and 59: thermo-nova's hourly window is anchored, its cap does not bind at the default, and counting is not the ON-clock pause (2026-10-29, our finding)",
+   "date": "2026-10-29",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1401",
+    "TASK-1412.1",
+    "TASK-1412.9",
+    "TASK-1422"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 124,
+   "title": "Interpretation: entry 28's \"derivative frozen inside the deadband\" means the raw derivative; D = kd(curve) x held raw derivative still moves with the curve (2026-10-29, our reading)",
+   "date": "2026-10-29",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1368",
+    "TASK-1412.10",
+    "TASK-1423"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 125,
+   "title": "Correction of our own record in entries 63-66: branch ancestry, message order and quote/code attribution (2026-10-29, our finding)",
+   "date": "2026-10-29",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.1"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 126,
+   "title": "A valid outside temperature is younger than 1 hour and survives a restart, so SAT resumes in one tick (2026-10-29, refines entry 121 and the TASK-1482 plan)",
+   "date": "2026-10-29",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565459158591869019",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1390",
+    "TASK-1482"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 127,
+   "title": "Hourly PWM start limit: keep the sliding hour (2026-10-29, settles entry 123's open point)",
+   "date": "2026-10-29",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565460698874511522",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 128,
+   "title": "Correction of our entry 125: the develop flow+10 block is pwm.py:139-142 as entry 65 cites it (2026-10-29, our finding)",
+   "date": "2026-10-29",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.1"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 129,
+   "title": "Q62 A: with a valid restored state SAT sends nothing at boot until its first tick (2026-10-29, settles entry 126's open point)",
+   "date": "2026-10-29",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565464538709491954",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1390",
+    "TASK-1482"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 130,
+   "title": "Answers to the all-at-once round, 2026-10-30: shared source and reading (entries 130-140)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565582331387977849",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 131,
+   "title": "Conf-108 A: PWM exit timers restart during a draw and for 300 s after it, as thermo-nova (2026-10-30, confirms entry 108)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1420"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 132,
+   "title": "Conf-104: case 1 C (ignition sync after a draw), case 2 yes (rest of the original 180 s hold counts) (2026-10-30, changes entry 104)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1422"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 133,
+   "title": "Conf-107 A: the hot-water-flame hold of a PWM ON start applies only while PWM drives the setpoint (2026-10-30, confirms entry 107)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1424"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 134,
+   "title": "Q47b A: PWM exits to continuous send the continuous CS in the same tick, as thermo-nova (2026-10-30, settles entry 88 Open)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.8",
+    "TASK-1420"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 135,
+   "title": "Q61 A: a valid board return sensor ('R') counts as a return temperature; no entry 45 flood (2026-10-30, narrows entry 45 / Q40 B)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1371",
+    "TASK-1412.5"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 136,
+   "title": "Q63 A: inside the deadband the raw room slope is frozen, as pid.py (2026-10-30, settles entry 28's reading)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.10"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 137,
+   "title": "Q65 A: read as \"no flood on the CH relight after a hot-water draw\" - NEEDS CONFIRMATION (2026-10-30, entry 45 open point 4, first half)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1371"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 138,
+   "title": "Q65b A: the flood applies only to boilers without a return temperature (2026-10-30, entry 45 open point 4, second half)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1371"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 139,
+   "title": "Q66 A: an external outside temperature comes first for its whole valid hour (2026-10-30, refines entries 57 and 126)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1390",
+    "TASK-1482"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 140,
+   "title": "Q67 A and Q68 A: wait up to 60 s for NTP; the boot hand-back keeps the restored PID integral and PWM flag (2026-10-30, refines entries 121, 126, 129)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1390",
+    "TASK-1482"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 141,
+   "title": "Q64 B: MI=500 on PIC boards once the firmware knows there is no return temperature or the boiler is Ideal/Intergas/Nefit; no reset (2026-10-30, settles entry 45 open point 2)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565598981973868666",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1371"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 142,
+   "title": "Q65 B: the 20 s CS/PM=25 flood also runs on the CH relight after a hot-water draw (2026-10-30, replaces the reading of entry 137)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1371"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 143,
+   "title": "Q60 A: ultra-low duty keeps 180 s ON and extends OFF, up to twice the period; ultra-high duty is the mirror (2026-10-30, settles entry 122 / R30)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565605444062285845",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.9"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 144,
+   "title": "Q69: split gas consumption into a CH sensor and a DHW sensor (2026-10-30, answer to Q69; interpretation to confirm)",
+   "date": "2026-10-30",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565616780511154177",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1484"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 145,
+   "title": "Split gas consumption confirmed; CH consumption also requires the DHW bit to be clear (2026-10-30, refines entry 144)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565618631159717950",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1506"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 146,
+   "title": "Beta 1 must include TASK-1371, 1501, 1370, 1373, 1375 and 1376 (2026-10-30, answer to the Beta-OK question)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565620504503517256",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1370",
+    "TASK-1371",
+    "TASK-1373",
+    "TASK-1375",
+    "TASK-1376",
+    "TASK-1501",
+    "TASK-1502",
+    "TASK-1504"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 147,
+   "title": "OK for the TASK-1501 and TASK-1375 plans as posted (2026-10-30)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565658072079409193",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1375",
+    "TASK-1501"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 148,
+   "title": "TASK-1373 A: no default MaxTSet is sent to the boiler until the user moves the slider (2026-10-30)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565660158514696253",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1371",
+    "TASK-1373",
+    "TASK-1376"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 149,
+   "title": "TASK-1371: for a boiler without a return temperature the start-up hold is flow + 18 for the first 20 s, then suppression (2026-10-30, changes the plan of entries 45/142)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1371"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 150,
+   "title": "TASK-1376 A: no extra SW= at the start of a hot-water draw (2026-10-30, settles entry 53's open point)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1376"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 151,
+   "title": "TASK-1371 follow-up A: the CS/PM=25 flood runs inside the 20 s flow + 18 hold (2026-10-30, settles entry 149's open point)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565666884467298335",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1371"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 152,
+   "title": "Q-b A: no global 65 C cap once the user chose a max flow setpoint (2026-10-30, follow-up of entry 148)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565732208885633145",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1373",
+    "TASK-1513"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 153,
+   "title": "\"Central Heating Settings\" card with a max relative modulation slider (2026-10-30)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565737668627660861",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1370",
+    "TASK-1373",
+    "TASK-1514"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 154,
+   "title": "Entry 153 reading confirmed: the modulation slider edits the existing max relative modulation setting (2026-10-30)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565747152355991706",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1370",
+    "TASK-1514"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 155,
+   "title": "Q-c A: heat pumps default to a 40 C max flow setpoint; a chosen value replaces it (2026-10-30)",
+   "date": "2026-10-30",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565762899904041122",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1513"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 156,
+   "title": "TASK-1502: our readings of entry 132 in the implementation, two points put to him (2026-10-30, interpretation, not his words)",
+   "date": "2026-10-30",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1502"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 157,
+   "title": "TASK-1414: our readings of entry 73 in the implementation, one point put to him (2026-10-30, interpretation, not his words)",
+   "date": "2026-10-30",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1414"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 158,
+   "title": "Q-1502a B: with no CH flame after a draw, the minimum-burn hold lapses and the ON phase ends on its normal ON time (2026-10-31, settles entry 156 first open point)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1565946810353057936",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1502",
+    "TASK-1518"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 159,
+   "title": "TASK-1519 is developed in #dev-sat-mqtt (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1565971111873875971",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 160,
+   "title": "TASK-1519: the self-tune runs only with the sun elevation below 12 degrees (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1565972984202657914",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1410",
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 161,
+   "title": "TASK-1519: tune only while SAT is in charge; the integral is the signal; no sun during the calculation (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1565975696591953951",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 162,
+   "title": "TASK-1519: daily data sets, not hourly (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1565976214189908032",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 163,
+   "title": "Q-1519b A: the self-tune uses a separate curve integral (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1565976914605113448",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 164,
+   "title": "TASK-1519: change the coefficient in small daily increments and compare before and after (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1565977328410959936",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 165,
+   "title": "TASK-1519: a coefficient change is never more than +-0.2 from the previous curve (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1565978440094584853",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 166,
+   "title": "TASK-1519: most homes need a curve coefficient between 1.6 and 2.4 (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1565982872039325807",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 167,
+   "title": "Q-1519c: the 0.2 limit applies to each new curve, and the coefficient may carry 3 decimals (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1565985841287798876",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 168,
+   "title": "TASK-1519: the walls are a thermal battery that takes about 3 days to charge; the system response is 60-72 hours (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1565989617910681664",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 169,
+   "title": "Follow thermostat after a reboot: SAT pushes TC= at the boot decision (maintainer, 2026-10-31; amends entry 2)",
+   "date": "2026-10-31",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566018068998783016",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1520"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 170,
+   "title": "TASK-1519: the self-tune uses a curve derivative next to the curve integral, and the derivative never freezes in the deadband (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566022383356346479",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 171,
+   "title": "Q-1519f A: the autotuner uses only the curve integral, no derivative at all (2026-10-31; changes entry 170)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566035242035183787",
+   "supersedes": [
+    170
+   ],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 172,
+   "title": "Q-1519d B: the autotuner measures and logs every hour and decides once a day (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566042248171360347",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 173,
+   "title": "Q-1519e A: the autotuner uses a symmetric threshold of +-1 C of flow (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566043308629827587",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 174,
+   "title": "Q-1519g A: accept the low-load blind spot and log why the tuner holds (maintainer, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 175,
+   "title": "Q-1519h: the autotuner decides on the last 3 days of clean hours (maintainer, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 176,
+   "title": "TASK-1519: the self-tune setting is on by default (maintainer, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": 177
+  },
+  {
+   "id": 177,
+   "title": "Q-1519i A: the self-tune is on by default, also for existing units (2026-10-31; confirms entry 176)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566081440956026972",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 178,
+   "title": "TASK-1519: without a sun elevation source the self-tune holds; the local sun elevation (TASK-1410) comes first (maintainer, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1410",
+    "TASK-1519"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 179,
+   "title": "Honour OpenTherm MsgID 3 HB bit 4 in SAT: build it after Sergeant D's OK (maintainer, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412",
+    "TASK-1412.4"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 180,
+   "title": "Sergeant D accepts ADR-205 (SAT heating curve self-tune) (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566085956145123349",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1519",
+    "TASK-1525"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 181,
+   "title": "Heat pumps: minimum switching through two behaviours per setting, \"heat pump controls itself\" and a long time-proportional PWM (maintainer, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 182,
+   "title": "Heat pumps: the firmware may deviate from thermo-nova (maintainer, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 183,
+   "title": "Self-tune window survives a reboot: the counted days are kept on flash (maintainer, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1525"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 184,
+   "title": "Heat pumps: explore a third PWM option of 120 minutes (Sergeant D's request, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566100973019996253",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 185,
+   "title": "SAT page: the \"PID / PWM\" card becomes \"PWM\" and shows only the cycle setting of the selected appliance type (2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566110604618629279",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527",
+    "TASK-1529"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 186,
+   "title": "The Hybrid appliance type is treated as a heat pump (Sergeant D, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566111477927116892",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1529",
+    "TASK-1531"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 187,
+   "title": "SAT page: Max relative modulation is edited only in the Central Heating Settings card (Sergeant D, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566155941357944883",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1514",
+    "TASK-1530"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 188,
+   "title": "Q-1531a answered: Hybrid takes only the heat-pump PWM cycle (Sergeant D, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566167931191304233",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1529",
+    "TASK-1531"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 189,
+   "title": "Published Summer Simmer Index stays as thermo-nova computes it (maintainer, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1458"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 190,
+   "title": "Summer simmer cutoff leaves PWM like the cold cutoff (maintainer, 2026-10-31)",
+   "date": "2026-10-31",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1362"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 191,
+   "title": "Pin vs develop ancestry settled: develop is older than the pin; entry 66 had the direction reversed (2026-11-01, fact check, not his words)",
+   "date": "2026-11-01",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1436"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 192,
+   "title": "Degree minutes trade comfort for efficiency; the minimum capacity is the real lever (Sergeant D, 2026-11-01, position, not an answer to Q-1527a)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566320318547755021",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 193,
+   "title": "Field test: no new control mechanism, only longer heat-pump PWM periods of 1.5, 2 and 3 hours (maintainer, 2026-11-01)",
+   "date": "2026-11-01",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1542",
+    "TASK-1543"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 194,
+   "title": "Normal heat pumps: 1x/hour (default) and 1.5x/hour instead of 2x and 1.5x (Sergeant D, 2026-11-01, proposal)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566402415429820417",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 195,
+   "title": "A separate appliance type \"PWM ON/OFF Heat Pump\": period 10800 s, minimum ON 3600 s (Sergeant D, 2026-11-01, request)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566405746374090794",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527",
+    "TASK-1542"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 196,
+   "title": "Correction of our own model: SAT's PWM ON time is re-evaluated every step, not fixed per period (2026-11-01, fact check, not his words)",
+   "date": "2026-11-01",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1543"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 197,
+   "title": "Heat pumps: minimum ON time 600 s instead of 180 s (maintainer and Sergeant D, 2026-11-01)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566426065839071233",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 198,
+   "title": "Heat pumps: minimum PWM OFF time 600 s; heat pumps only (Sergeant D, 2026-11-01)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566428196449165364",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1542"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 199,
+   "title": "Q-1547a answered: hysteresis on the cold cutoff, 0.5 C, keep 28.2; 1 C if issues remain (Sergeant D, 2026-11-01)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566506101078495343",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1547"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 200,
+   "title": "thermo-nova's COLD_SETPOINT 22 was a mistaken request; 28.2 is intended and is to return upstream (Sergeant D, 2026-11-01)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566510907843023030",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1547"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 201,
+   "title": "Pressure health: \"CH active\" is the boiler's CH-mode bit; Q70 withdrawn (maintainer, 2026-11-01)",
+   "date": "2026-11-01",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1480"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 202,
+   "title": "Q-1527b: the experimental on/off heat-pump type follows the onboarding question, not the heating system (Sergeant D, 2026-11-01, interpretation)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566520805976711241",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1480",
+    "TASK-1542",
+    "TASK-1547"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 203,
+   "title": "Entry 202 stands; the warning texts for the experimental type are Robert's call (Sergeant D, 2026-11-01)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566521512742232217",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1542"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 204,
+   "title": "Warnings for the experimental on/off heat-pump type (maintainer, 2026-11-01)",
+   "date": "2026-11-01",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1542"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 205,
+   "title": "Q-1527e answered: C, no control change; log the curve integral in PWM hours too and decide on field data (Sergeant D, 2026-11-01)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566522996775194785",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1551"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 206,
+   "title": "Hybrids: a master SAT on the heat pump and a slave SAT on the boiler (Sergeant D, 2026-11-01, proposal)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566547198370517174",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 207,
+   "title": "Entry 206 clarified: the slave SAT takes the Elga's CS as its requested setpoint and chooses PWM or continuous itself (Sergeant D, 2026-11-01)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566551441219522634",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 208,
+   "title": "Entries 206/207 completed: CH=0 and CS=0 from the Elga stop the slave; the Elga Ace has a built-in hydraulic separator (Sergeant D, 2026-11-01)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566553372104986625",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 209,
+   "title": "Entry 208 corrected: the separator decouples the two primary circuits so they work as one source (Sergeant D, 2026-11-01)",
+   "date": "2026-11-01",
+   "source": "sergeant-d",
+   "kind": "correction",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566556968322334926",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 210,
+   "title": "Entry 206 rationale: the slave SAT closes the gap between the heat pump's maximum and the boiler's minimum (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1566673350195945543",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 211,
+   "title": "Q-1502b answered A: a CH flame after a draw gets the 180 s hold also when the first-flame wait had timed out (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566686069796114443",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1502",
+    "TASK-1518",
+    "TASK-1558"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 212,
+   "title": "Q-1436j answered A: the reference stays thermo-nova 7beaaf5 (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1436"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 213,
+   "title": "QD-1 answered A: slave MsgID 3 bit 4 = 1 blocks every PWM entry path (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.4"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 214,
+   "title": "QD-2 answered A: bit 4 turning 1 while PWM runs leaves PWM in that tick (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.4"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 215,
+   "title": "QD-3 answered B: no PWM until a valid MsgID 3 reply (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.4"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 216,
+   "title": "QD-4: Sergeant D asks for more explanation (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.6"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 217,
+   "title": "QD-5 answered A: a return temperature invalid or absent for 5 minutes counts as no return temperature (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.5"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 218,
+   "title": "QD-6 answered A: a flow temperature invalid or stale for 30 s counts as missing (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.5",
+    "TASK-1428"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 219,
+   "title": "QD-7 answered A: entry 60's \"CH=1 in the OFF phase\" was the boiler's CH-mode status bit (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [
+    60
+   ],
+   "tasks": [
+    "TASK-1412.6"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 220,
+   "title": "Q-1539a answered B: MM to the maximum during a hot-water draw (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1539"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 221,
+   "title": "Q72 answered A: no resend during hot water and a boiler fault (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1539"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 222,
+   "title": "Q-1412.17a answered B: entry 21's generic heat-pump MM rule is enough (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.17"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 223,
+   "title": "Q71 answered A: a preset chosen while the window is open wins (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1487"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 224,
+   "title": "Q-1414a answered A: keep the firmware's zone PID reset rule (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1414"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 225,
+   "title": "Q-1525a answered A: a self-tune hour without a room temperature is not counted (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1525",
+    "TASK-1559"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 226,
+   "title": "QD-4 follow-up: \"thermo nova stops the boiler during PWM off (CH=0, CS=10)\" (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566691068110700646",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.6"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 227,
+   "title": "Q-1527a answered A: no \"heat pump controls itself\" setting; entries 194-198 and 202 are the answer (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566686069796114443",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527",
+    "TASK-1542"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 228,
+   "title": "Q-1527c answered C: add 60 min as a selectable heat-pump PWM period (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566686069796114443",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 229,
+   "title": "Q-1527f answered C: the overshoot-switch margin for heat pumps waits for a real heat-pump capture (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566686069796114443",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1527"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 230,
+   "title": "QD-4 answered B: the PWM OFF phase always stops the boiler (CS=10, CH=0), whatever overshoot protection is (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566695435488465019",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.6"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 231,
+   "title": "Interpretation: what entry 230 means for the ON phase without overshoot protection, and a conflict with entry 133 put back to him (2026-11-02, our reading)",
+   "date": "2026-11-02",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.6"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 232,
+   "title": "Q-1539a keepalive sub-question answered A: the CS keepalive keeps running during a hot-water draw (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566838288340226199",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1539"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 233,
+   "title": "Q-1537a answered A: Immergas gets TP=11:12=min(MM, 80) right before every MM=, MM itself not capped (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566847427238035578",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1315",
+    "TASK-1537"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 234,
+   "title": "Q-1412.6a answered B: the hot-water-flame start hold also applies without overshoot protection (Sergeant D, 2026-11-02; changes entry 133)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566850532537274412",
+   "supersedes": [
+    133
+   ],
+   "tasks": [
+    "TASK-1412.6",
+    "TASK-1562"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 235,
+   "title": "Maintainer decision: the Immergas TP=11:12 is sent only when \"Immergas\" is chosen explicitly, not on an Auto detection (Robert, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1537"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 236,
+   "title": "Proposal on entry 233: send TP and MM only when their value changes, not every 5 s (Sergeant D, 2026-11-02; scope asked back, conflicts with entry 44 for MM)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566911737523867649",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1537"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 237,
+   "title": "Q-1537c answered B, plus CH: MM, TP and CH are sent on every change, for every boiler; CS stays on the 5 s resend (Sergeant D, 2026-11-02; changes entry 44 for MM and CH, settles entry 236)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566917384483381390",
+   "supersedes": [
+    44
+   ],
+   "tasks": [
+    "TASK-1537"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 238,
+   "title": "Confirmation of entry 237's implementation reading: MM, TP and CH are resent once after anything that can lose them, even if unchanged (Sergeant D, 2026-11-02)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566922137896493168",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1570"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 239,
+   "title": "Q-1570a answered: an unchanged MM, TP and CH are resent once a minute (Sergeant D, 2026-11-02; maintainer agrees)",
+   "date": "2026-11-02",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1566926416170455091",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1567",
+    "TASK-1570"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 240,
+   "title": "Q-1541a answered: on SAT disable, restore SH= and SW= and clear TC=; TP and MI stay (Sergeant D, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567028643157381263",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1541"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 241,
+   "title": "QD-6b answered: a flow temperature older than 60 s counts as missing (Sergeant D, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567034047237070869",
+   "supersedes": [
+    218
+   ],
+   "tasks": [
+    "TASK-1412.5",
+    "TASK-1512.5"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 242,
+   "title": "Q-1412.9a answered B: no dip at the maximum duty; and send MM=T at the maximum cycle length as the threshold to continuous mode (Sergeant D, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567055574548353047",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.9",
+    "TASK-1581"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 243,
+   "title": "Q-1412.9c answered A: below the maximum duty SAT sends its own MM= again (Sergeant D, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567062027648639099",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1581"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 244,
+   "title": "Q-PARITY-3 answered A: the cycle classifier skips the warm-up of a burn, as thermo-nova (Sergeant D, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567063957036998667",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.14",
+    "TASK-1584"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 245,
+   "title": "Q-PARITY-5 answered A: the classifier records the requested setpoint per sample and uses its tail median, as thermo-nova (Sergeant D, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567065983208661013",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.14",
+    "TASK-1585"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 246,
+   "title": "Q-1581a answered A: on an Immergas, TP=11:12=80 goes right before MM=T at the maximum duty (Sergeant D, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567067079675224145",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1581"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 247,
+   "title": "Q-1566a answered B for now: no forecast term in the heating curve yet (Sergeant D, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567069605912911913",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1510",
+    "TASK-1566"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 248,
+   "title": "Q-PARITY-1 answered A: the classifier interpolates its percentiles, as thermo-nova (Sergeant D, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567082044964610131",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.14",
+    "TASK-1586"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 249,
+   "title": "Q-PARITY-8 answered A: a cycle with fewer than 3 samples is dropped and the flame-on sample counts, as thermo-nova (Sergeant D, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567090031389179947",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.14",
+    "TASK-1588"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 250,
+   "title": "Classifier parity: four internal deviations accepted by the maintainer (Q-PARITY-2, 4, 6, 11) (maintainer, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1331",
+    "TASK-1412.14"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 251,
+   "title": "Cycle class label \"underheat_pwm\" stays (Q-PARITY-10) (maintainer, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.14"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 252,
+   "title": "QR-1: a rejected SH= (MaxTSet) write is observed and published, SAT keeps sending it by the normal rules (maintainer, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.13"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 253,
+   "title": "Correction: the 13:15 double flame in gruijter's capture behaved like a hot-water draw without the DHW bit (Sergeant D, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "sergeant-d",
+   "kind": "correction",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567181431686434969",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1589"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 254,
+   "title": "The 13:15 double flame: \"Don't change anything\", SAT behaved properly (Q-1589b, and covers Q-1589a) (Sergeant D, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567182900372185129",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1589"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 255,
+   "title": "The 10:28 CH interruption in gruijter's capture: SAT worked as designed, no change (Sergeant D, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567197910205210768",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 256,
+   "title": "The at-max rule compares with the value the request is clamped to (Q-1591a A, maintainer decision, 2026-11-03)",
+   "date": "2026-11-03",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567236360543146087",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1373",
+    "TASK-1591"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 257,
+   "title": "Heating curve rounded to 0.1 C as thermo-nova (TASK-1360) (maintainer decision, 2026-11-04)",
+   "date": "2026-11-04",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1360"
+   ],
+   "confirmed_by_entry": 265
+  },
+  {
+   "id": 258,
+   "title": "Boiler status 'stalled' forgets the last cycle after 6 h and uses >= (TASK-1356) (maintainer decision, 2026-11-04)",
+   "date": "2026-11-04",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1356"
+   ],
+   "confirmed_by_entry": 265
+  },
+  {
+   "id": 259,
+   "title": "Boiler status 'overshoot_cooling' follows thermo-nova's flame-off latch (TASK-1361) (maintainer decision, 2026-11-04)",
+   "date": "2026-11-04",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1361"
+   ],
+   "confirmed_by_entry": 265
+  },
+  {
+   "id": 260,
+   "title": "PWM schedule does not run while the cold cutoff holds (TASK-1515) (maintainer decision, 2026-11-04)",
+   "date": "2026-11-04",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1515"
+   ],
+   "confirmed_by_entry": 265
+  },
+  {
+   "id": 261,
+   "title": "The boot PM chain runs on PIC boards whatever SAT is (TASK-1384) (maintainer decision, 2026-11-04)",
+   "date": "2026-11-04",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1384"
+   ],
+   "confirmed_by_entry": 265
+  },
+  {
+   "id": 262,
+   "title": "Pressure drop-rate check suspended 600 s after flame-off, only if proven (TASK-1579) (maintainer decision, 2026-11-04)",
+   "date": "2026-11-04",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1579"
+   ],
+   "confirmed_by_entry": 265
+  },
+  {
+   "id": 263,
+   "title": "No-return start-up window keeps the previous CS (TASK-1412.12, Conf-1371) (maintainer decision, 2026-11-04)",
+   "date": "2026-11-04",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.12"
+   ],
+   "confirmed_by_entry": 265
+  },
+  {
+   "id": 264,
+   "title": "OT-Direct gateway mode applies the CH override to the relayed thermostat MsgID 0 on any CS override (ADR-208, TASK-1238) (maintainer decision, 2026-11-04)",
+   "date": "2026-11-04",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1238",
+    "TASK-1600",
+    "TASK-1601"
+   ],
+   "confirmed_by_entry": 265
+  },
+  {
+   "id": 265,
+   "title": "Sergeant D confirms the eight maintainer decisions of 2026-11-04 (entries 257-264) (Sergeant D, 2026-11-04)",
+   "date": "2026-11-04",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567437260549263433",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1360"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 266,
+   "title": "An unknown off gap at boot is excluded from the averages and duty (Q-TW-1) (maintainer decision, 2026-11-04)",
+   "date": "2026-11-04",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.15"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 267,
+   "title": "mod_suppressed follows the real suppression state (Q-TW-2) (maintainer decision, 2026-11-04)",
+   "date": "2026-11-04",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.15"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 268,
+   "title": "Duty is flame-on seconds per window, as thermo-nova (Q-TW-3) (maintainer decision, 2026-11-04)",
+   "date": "2026-11-04",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.15"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 269,
+   "title": "current_modulation shows 100 while SAT has sent MM=T (Q-TW-4) (maintainer decision, 2026-11-04)",
+   "date": "2026-11-04",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.15"
+   ],
+   "confirmed_by_entry": null
+  }
+ ]
+}
