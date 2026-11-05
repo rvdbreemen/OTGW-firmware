@@ -7,9 +7,12 @@
 //
 // The boiler reacts to the request, as a real boiler does:
 //   - MsgID 0: the answer echoes the master flags (high byte) and fills the slave flags (low byte).
-//     CH active follows the master's CH enable; the flame comes on ignition_delay seconds after CH
-//     enable was first seen (ignition_delay -1 = never lights, lockout-like). A DHW draw sets DHW
-//     active and the flame, and clears CH active.
+//     CH active follows the master's CH enable. Heat demand is CH active plus a written TSet
+//     (MsgID 1) >= demand_min; before any TSet write the boiler counts as demanding (its own
+//     setpoint). The flame comes on ignition_delay seconds after demand starts and goes out when it
+//     ends, so every PWM ON phase ignites again: SAT's OFF phase keeps CH=1 and sends CS=10
+//     (src/OTGW-firmware/SATcontrol.ino:1601, SAT_MIN_SETPOINT :132). ignition_delay -1 = never
+//     lights (lockout-like). A DHW draw sets DHW active and the flame, and clears CH active.
 //   - Write IDs are acknowledged with the written value echoed, and remembered for later reads.
 // Everything else comes from the scenario: values (flow, return, modulation, ...) and per-ID faults
 // (Data-Invalid, Unknown-DataID, no answer), phase by phase. See tools/bench/ot-boiler-sim/README.md.
@@ -32,7 +35,8 @@ struct Phase {
   uint8_t max_kw = 24, min_mod = 20;        // MsgID 15
   bool fault = false;           // MsgID 0 LB bit 0; a faulted boiler does not fire
   bool dhw_draw = false;        // tap open: DHW active + flame, CH active cleared
-  int32_t ignition_delay_s = 0; // flame this long after CH enable; -1 = never
+  int32_t ignition_delay_s = 0; // flame this long after heat demand starts; -1 = never
+  float demand_min = 20.0f;      // heat demand needs the written TSet (MsgID 1) >= this; SAT's OFF phase sends 10
   bool silent = false;          // no answer to any request
   uint16_t answer_ms = 100;     // answer delay; OT spec v4.2 slave window is 20..800 ms
   Reply reply[128];             // per-MsgID fault injection, default Ack
@@ -73,8 +77,8 @@ class Boiler {
  private:
   void updateStatus(uint8_t master_hb, uint32_t t_ms, const Phase &ph);
   const Scenario &sc_;
-  bool ch_enable_seen_ = false;
-  uint32_t ch_enable_since_ms_ = 0;
+  bool demand_seen_ = false;     // heat demand (CH active and TSet >= demand_min) since demand_since_ms_
+  uint32_t demand_since_ms_ = 0;
   bool ch_active_ = false, flame_ = false, dhw_active_ = false;
   bool stored_set_[128];
   uint16_t stored_[128];

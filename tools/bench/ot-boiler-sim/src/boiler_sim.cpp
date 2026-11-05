@@ -60,6 +60,7 @@ static bool setKey(Phase &ph, const char *key, const char *val, char *err, int e
   else if (!strcmp(key, "fault")) ph.fault = n != 0;
   else if (!strcmp(key, "dhw_draw")) ph.dhw_draw = n != 0;
   else if (!strcmp(key, "ignition_delay")) ph.ignition_delay_s = (int32_t)n;
+  else if (!strcmp(key, "demand_min")) ph.demand_min = f;
   else if (!strcmp(key, "silent")) ph.silent = n != 0;
   else if (!strcmp(key, "answer_ms")) {
     if (n < 20 || n > 800) { snprintf(err, err_len, "answer_ms outside 20..800: %s", val); return false; }
@@ -127,8 +128,8 @@ bool parseScenario(const char *text, Scenario &out, char *err, int err_len) {
 // ------------------------------------------------------------------ boiler
 
 void Boiler::reset() {
-  ch_enable_seen_ = false;
-  ch_enable_since_ms_ = 0;
+  demand_seen_ = false;
+  demand_since_ms_ = 0;
   ch_active_ = flame_ = dhw_active_ = false;
   for (int i = 0; i < 128; i++) { stored_set_[i] = false; stored_[i] = 0; }
   // Defaults for write IDs a master may read back before writing them.
@@ -151,12 +152,14 @@ int Boiler::phaseIndexAt(uint32_t t_ms) const {
 void Boiler::updateStatus(uint8_t master_hb, uint32_t t_ms, const Phase &ph) {
   bool ch_enable = master_hb & 0x01;
   bool dhw_enable = master_hb & 0x02;
-  if (ch_enable && !ch_enable_seen_) { ch_enable_seen_ = true; ch_enable_since_ms_ = t_ms; }
-  if (!ch_enable) ch_enable_seen_ = false;
   dhw_active_ = dhw_enable && ph.dhw_draw && !ph.fault;
   ch_active_ = ch_enable && !ph.fault && !dhw_active_;
-  bool lit_ch = ch_active_ && ph.ignition_delay_s >= 0 &&
-                (t_ms - ch_enable_since_ms_) >= (uint32_t)ph.ignition_delay_s * 1000u;
+  float tset = stored_set_[1] ? (float)(int16_t)stored_[1] / 256.0f : 1000.0f;   // no TSet yet: own setpoint
+  bool demand = ch_active_ && tset >= ph.demand_min;
+  if (demand && !demand_seen_) { demand_seen_ = true; demand_since_ms_ = t_ms; }
+  if (!demand) demand_seen_ = false;
+  bool lit_ch = demand && ph.ignition_delay_s >= 0 &&
+                (t_ms - demand_since_ms_) >= (uint32_t)ph.ignition_delay_s * 1000u;
   flame_ = dhw_active_ || lit_ch;
 }
 

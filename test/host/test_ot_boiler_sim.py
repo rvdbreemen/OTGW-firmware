@@ -148,6 +148,17 @@ def main():
             0x00, 0x02, 0x02, 0x0A]
     check("SB11_flame_120s_after_ch_enable_and_after_re_enable", lbs == want, "%s != %s" % (lbs, want))
 
+    # --- SB11 over PWM cycles: SAT's OFF phase keeps CH=1 and sends CS=10 (SATcontrol.ino:1601), so the
+    #     flame must go out on the low TSet and every ON phase must ignite 120 s after its TSet again
+    cs = lambda c: gen.frame(WRITE_DATA, 1, f88(c))
+    reqs = [(0, cs(50)), (1, status_req()), (120.9, status_req()), (121.0, status_req()),
+            (300, cs(10)), (301, status_req()),
+            (400, cs(50)), (401, status_req()), (520.9, status_req()), (521.0, status_req())]
+    ans = at("SB11-slow-ignition.scn", reqs)
+    lbs = [lb(a) for a, (_, f) in zip(ans, reqs) if f == status_req()]
+    want = [0x02, 0x02, 0x0A, 0x02, 0x02, 0x02, 0x0A]
+    check("SB11_every_pwm_on_phase_ignites_again_after_cs10_off", lbs == want, "%s != %s" % (lbs, want))
+
     # --- MsgID 0 echoes the master flags in the high byte
     ans = at("SB05-id25-data-invalid.scn", [(1, status_req(ch=True, dhw=True)), (2, status_req(ch=False, dhw=True))])
     check("ID0_echoes_master_high_byte", ans == [gen.frame(READ_ACK, 0, 0x030A), gen.frame(READ_ACK, 0, 0x0200)], str(ans))

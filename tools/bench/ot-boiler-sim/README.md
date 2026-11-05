@@ -11,7 +11,7 @@ It is not part of the OTGW firmware build. `build.bat`, `build.sh` and `build.py
 
 | AC | What | State |
 |---|---|---|
-| AC1 | Answers MsgID 0/1/3/17/25/28 with scripted values and faults from a scenario file | The engine is host-tested: `python test/host/test_ot_boiler_sim.py`, 16 cases, plus 4 mutants that each turn it red. The sketch glue (`src/main.cpp`) has **not been compiled** and has not run on a board. |
+| AC1 | Answers MsgID 0/1/3/17/25/28 with scripted values and faults from a scenario file | The engine is host-tested: `python test/host/test_ot_boiler_sim.py`, 17 cases, plus 5 mutants that each turn it red. The sketch glue (`src/main.cpp`) has **not been compiled** and has not run on a board. |
 | AC2 | The bench unit sees the simulator as a boiler on the wire | Not run: there is only one OTGW32. |
 | AC3 | SB05-SB09 and SB11 on the wire, with the SAT reactions recorded | Not run: there is only one OTGW32. |
 
@@ -34,10 +34,15 @@ The boiler reacts to each request, as a real boiler does:
   - bit 0: fault, from the scenario;
   - bit 1: CH active. It follows the master's CH enable, unless the boiler is faulted or a DHW draw runs;
   - bit 2: DHW active. It is set while the scenario has a DHW draw and the master enables DHW;
-  - bit 3: flame. It lights `ignition_delay` seconds after the master's CH enable was first seen. With `-1` it never
-    lights. It is also lit during a DHW draw.
+  - bit 3: flame. It needs heat demand: CH active and a written TSet (MsgID 1) of at least `demand_min` (default
+    20 °C). Before any TSet write, the boiler counts as demanding on its own setpoint. The flame lights
+    `ignition_delay` seconds after demand starts and goes out when demand ends; with `-1` it never lights. It is also
+    lit during a DHW draw.
 
-  When the master's CH enable drops, the ignition timer resets.
+  SAT's PWM OFF phase keeps CH=1 and sends CS=10 (`src/OTGW-firmware/SATcontrol.ino:1601`, `SAT_MIN_SETPOINT` at
+  `:132`). CH=0 is sent only on the summer and valves-closed paths (`:7080`, `:7096`). Because of the demand rule, every
+  PWM ON phase ignites again. Without it the flame would light once and burn through every OFF phase, and SB11 would
+  only test the first cycle. The host case `SB11_every_pwm_on_phase_ignites_again_after_cs10_off` checks this.
 - **MsgID 1.** Write-Ack echoes the TSet the master wrote. A later read returns that value.
 - **MsgID 3.** Read-Ack with `slave_hb` and `member_id`.
 - **MsgID 17.** Reports `mod` while the flame burns, otherwise 0.
@@ -48,8 +53,8 @@ The boiler reacts to each request, as a real boiler does:
   - reads of 15, 18, 26, 27, 125 and 127 get a default value;
   - reads of 1, 14, 56 and 57 return the stored value.
 
-  Every other ID gets Unknown-DataID. A real basic boiler does the same, and OTDirect then disables that schedule entry
-  (`OTDirect.ino:163`).
+  Every other ID gets Unknown-DataID. A real basic boiler does the same. OTDirect disables that schedule entry after
+  three Unknown-DataID answers (`OTDirect.ino:1496-1503`).
 - **Requests that get no answer:** a request with bad parity, and any frame type other than Read-Data or Write-Data.
 - **Answer delay.** The default is 100 ms. The parser accepts 20 to 800 ms (the OT spec v4.2 slave window). A slow
   ignition is modelled as a late flame bit, never as a late answer.
@@ -69,7 +74,7 @@ phase 0  # healthy hold after the scripted timeline
 - **Phases.** Each `phase <seconds> key=value ...` starts from the `default` line. The clock starts at the first valid
   request. The last phase holds forever.
 - **Keys:** `flow`, `ret`, `mod`, `pressure`, `outside`, `dhw_temp`, `slave_hb`, `member_id`, `max_kw`, `min_mod`,
-  `fault`, `dhw_draw`, `ignition_delay`, `silent`, `answer_ms` and `reply<ID>=ack|data_invalid|unknown|none`.
+  `fault`, `dhw_draw`, `ignition_delay`, `demand_min`, `silent`, `answer_ms` and `reply<ID>=ack|data_invalid|unknown|none`.
 - **Errors.** An unknown key is a parse error, so the simulator never runs a scenario it misread.
 
 ### What the export keeps from the 1412.20 generator
@@ -130,6 +135,11 @@ git submodule update --init ../../../src/libraries/OpenTherm
 1. Wire as above. Load `SB05-id25-data-invalid.scn`, then `restart` just before the capture.
 2. On the bench unit:
    - turn SAT off, and replay off (`GET /api/v2/simulate` must show no active replay);
+   - with no thermostat attached, the bench unit must originate its own requests:
+     - **OTDirect `.61`** does this in gateway mode, the default. Monitor mode sends nothing of its own
+       (`OTDirect.ino:2182-2186`). It probes with MsgID 0 until the simulator answers, then runs `otSchedule[]`.
+     - **Classic `.63`** has not been checked. Whether the PIC sends its own requests with no thermostat on its
+       thermostat side is not verified here. Check that before using `.63` as the bench unit;
    - start `scripts/capture-mqtt-debug.bat -DeviceHost <ip> -DurationSeconds 300`.
 3. Pass when:
    - the capture shows B frames for MsgID 0/3/25/28 with the values from the scenario (flow 40, return 30, member ID 4);
@@ -152,7 +162,7 @@ For each scenario:
    - SB07: `fage` grows from 60 s and recovers.
    - SB08: `rsrc=-` after 5 minutes of Data-Invalid.
    - SB09: `rc=U`, and no return temperature at once when the board has no sensor.
-   - SB11: the PWM ON phase re-anchors at the flame (120 s after SAT's CH=1) and lasts max(on_time, 180 s), with no
+   - SB11: the PWM ON phase re-anchors at the flame (120 s after the ON phase's CS) and lasts max(on_time, 180 s), with no
      ignition abort.
 5. The run report names:
    - the generator version and `data/index.txt` sha256 of the scenario;
@@ -162,7 +172,7 @@ For each scenario:
 ### Transports
 
 The 1412.20 scenarios list both transports. With one OTGW32 flashed as the simulator, the Classic `.63` can be the
-bench unit (PIC transport). The cost is that `.61` is then not available as the OT-Direct unit under test. A second
+bench unit (PIC transport), if the PIC sends its own requests (see AC2). The cost is that `.61` is then not available as the OT-Direct unit under test. A second
 OTGW32 removes that trade-off. The choice belongs to the lead session and Robert.
 
 ## What this does not prove
