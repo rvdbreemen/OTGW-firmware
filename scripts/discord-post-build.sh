@@ -138,3 +138,8 @@ grep -q "\"size\": *$size[,}]" "$resp" \
 msg_id=$(python -I -c 'import json,sys; print(json.load(open(sys.argv[1])).get("id",""))' "$resp" 2>/dev/null || true)
 echo "POSTED: $name ($size bytes), http $code, message ${msg_id:-unknown}"
 mkdir -p "$(dirname "$PUBLISHED")" && echo "$key" >> "$PUBLISHED"   # one tag per published build (core-prerelease)
+# Post log next to it (TASK-1632): lets scripts/alpha_ledger.py rebuild the alpha ledger.
+# Columns: UTC time, tag key, version+hash, Discord message id, the -m text (tabs and newlines removed).
+POSTLOG="${OTGW_POST_LOG:-$(dirname "$PUBLISHED")/published-posts.tsv}"
+printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%MZ)" "$key" "$version+$hash" "${msg_id:-unknown}" \
+  "$(printf '%s' "$extra" | tr '\t\r\n' '   ')" >> "$POSTLOG"
