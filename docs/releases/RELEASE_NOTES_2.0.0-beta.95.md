@@ -1,14 +1,15 @@
-# OTGW-firmware v2.0.0-beta.80 Release Notes
+# OTGW-firmware v2.0.0-beta.95 Release Notes
 
 **Release date:** 2026-11-05
 **Branch:** dev
-**Build:** 2.0.0-beta.80 (the githash is in the asset names)
-**Compare:** [v2.0.0-beta.77...v2.0.0-beta.80](https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.77...v2.0.0-beta.80). "What changed since beta.77" is new for a beta.77 user. Coming from an older beta: the [beta.77 notes](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/releases/RELEASE_NOTES_2.0.0-beta.77.md) hold beta.63 to beta.77 and the [beta.62 notes](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/releases/RELEASE_NOTES_2.0.0-beta.62.md) beta.1 to beta.62. Coming from 1.x: everything is new to you, read the whole document and the earlier notes.
+**Build:** 2.0.0-beta.95 (the githash is in the asset names)
+**Compare:** [v2.0.0-beta.77...v2.0.0-beta.95](https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.77...v2.0.0-beta.95). "What changed since beta.77" is new for a beta.77 user. Coming from an older beta: the [beta.77 notes](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/releases/RELEASE_NOTES_2.0.0-beta.77.md) hold beta.63 to beta.77 and the [beta.62 notes](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/releases/RELEASE_NOTES_2.0.0-beta.62.md) beta.1 to beta.62. Coming from 1.x: everything is new to you, read the whole document and the earlier notes.
 
 > **Disclaimer: this is a beta of 2.0.0.** It is not a stable release. It has had alpha and beta testing on a small group of units, but not the long field runs a release needs. What was and was not tested for this build:
 >
-> - beta.80 ran a 1 hour bench soak with MQTT connected, on one OTGW Classic with an S3 Mini (PIC attached). One hour is the agreed minimum for a beta (maintainer decision 2026-11-03): slow problems are for the field testers to find. That is not a 24-hour soak test, and no macOS capture run was done (see Known issues).
-> - The two changes since beta.77 were bench-tested on their own build (beta.78/79) before it was posted: the new Home Assistant names on the broker, and the stylesheet served by the device.
+> - beta.95 ran a 1 hour bench soak with MQTT connected, on one OTGW Classic with an S3 Mini (PIC attached). One hour is the agreed minimum for a beta (maintainer decision 2026-11-03): slow problems are for the field testers to find. That is not a 24-hour soak test, and no macOS capture run was done (see Known issues).
+> - Each change since beta.77 has host tests on the real code that fail on the old code and pass on the fix, except the Home Assistant names and the flow dots (checked on the bench). Bench-tested on a beta.79, beta.87 or beta.94 build: the new Home Assistant names on the broker, the stylesheet served by the device, the telnet switch (off within 4 s and on again without a reboot), the page load with 3 injected `503` answers, the PIC frame decode and PIC version after the size reduction, the support map files rewritten in their new format, and the WiFi dead-link recovery (a forced reconnect followed by the `WiFi: connected but no traffic` restart).
+> - **Not tested on a bench, or only partly:** the WiFi outage record (TASK-1446, TASK-1444) under a real WiFi drop; the skip-portal boot after a WiFi restart (TASK-1455); the new "No setup portal" setting with the access point off at boot, and its OLED text (TASK-1645); the dead-link recovery's guards, its restart cap and the Ethernet case (TASK-1450); keeping graph history across a device reboot in a browser (TASK-1306); a boot with the telnet console switched off (TASK-1644); the replay fixes on a device (TASK-1649, TASK-1650); the page load in Safari and Firefox (TASK-1643); the new integer parser (TASK-1639) on OT-Direct command parsing and on every message of a real boiler; the support maps relearning from a real boiler (TASK-1391).
 > - **No real Immergas boiler was tested**, and the OT-Direct change for a thermostat in gateway mode (TASK-1600, beta.68) has not been seen on a bench with a thermostat attached.
 >
 > Expect bugs, and keep a way back: save your settings, and keep the flash zip of the 2.0.0 build you run now, so you can flash it back over USB. A 1.x zip is ESP8266 firmware and does not run on an S3 Mini; going back to 1.x means putting the Wemos D1 mini back in. If you need a gateway that just works, stay on the [1.x releases](https://github.com/rvdbreemen/OTGW-firmware/releases) for now.
@@ -27,12 +28,46 @@ Read "Before you flash", "BREAKING changes" and "Known issues" first.
 
 ## What changed since beta.77
 
-Three builds (beta.78, beta.79 and the release commit beta.80). Both changes are contributions by Andre Brait (GitHub PRs #693 and #695), thank you.
+The builds beta.78 to beta.94, plus the release commit beta.95, which changes no code. beta.80 was prepared as a public beta but never published; its two changes are included here.
 
-- **Home Assistant: the SAT zone and PV-boost entities get readable names** (TASK-1608, PR #693). The display name was `<hostname>_SAT_Zone_1_<value>` and `<hostname>_SAT_PV_<value>`; it is now `SAT Zone 1 <value>` and `SAT PV <value>`, spaced and without the hostname, like the other entities. Unique ids and MQTT topics are unchanged, so existing entities keep their entity id and history; only the name shown in HA changes. **Do:** nothing, unless a dashboard or automation matches on the old display name.
-- **Web UI: the flow dots on the Connection map loop without a jump** (TASK-1609, PR #695). They now use their own animation, matched to their dash pattern.
+Several items come from André Brait (andrebrait): the pull requests #693 and #695, the code size breakdown in GitHub issue #694, and the report on Discord that the web UI looked broken while it loaded. Thank you. The telnet switch and the setup portal setting answer GitHub issue #154 (and #131).
 
-No change to SAT control, the OpenTherm handling, REST or settings since beta.77.
+### WiFi and network
+
+- **The gateway recovers from a WiFi link that stays connected but passes no traffic** (TASK-1450, port of the 1.x check, GitHub #682). Before, the gateway only acted when the link dropped. A unit that kept its connection and IP address while the router passed no traffic stayed offline. Now the gateway pings its router 3 times every minute. After 8 failed probes in a row (about 8 minutes) it reconnects WiFi; if traffic still does not pass after 8 more, it restarts with the reason `WiFi: connected but no traffic` in `reboot_log.txt`. It does nothing while MQTT is connected, while REST requests or port 25238 data arrived in the last minute, or while Ethernet is the active link. The check only starts once the router has answered a ping, so a router that blocks ping never triggers it. After 3 such restarts it stops restarting and reconnects at most once every 15 minutes.
+- **Telnet and `/api/v2/device/info` show why and when WiFi dropped** (TASK-1446, TASK-1444, GitHub #682). The gateway records the access point and channel it joined, the number of outages since boot, and for the last drop the reason (for example `200 BEACON_TIMEOUT`), the access point, how long it lasted and how long ago it started. Repeated disconnect events during one outage count as one. Drops the firmware causes itself (switching to Ethernet, the dead-link reconnect) are marked and not counted. The telnet banner gets a `Link :` and a `Drop :` line, and `device/info` gets 14 new `wifi_*` keys.
+- **After a WiFi restart the gateway no longer waits in the setup portal for an access point that is still away** (TASK-1455, ADR-211). When the WiFi supervisor restarted the gateway and the access point was still away, a release build opened the setup portal for 240 s, and the gateway could not rejoin the returning access point while it ran. On the boot after such a restart the gateway now skips the portal, finishes start-up without WiFi and retries the saved network every 30 s. A power cycle, a first install, the triple reset and every other restart still open the portal as before. **On this beta build** the gain is small: the boot itself skips the beta AP fallback too, but after 2 failed retries (about 1 minute) the gateway still starts that fallback access point, which retries the saved network only every 5 minutes; see Known issues.
+- **New setting: no setup portal when the saved WiFi is down at boot** (TASK-1645, GitHub #154, #131). Settings, Network, Wi-Fi: "No setup portal when Wi-Fi is down" (`wifinoportal`, off by default; it applies from the next boot). With it on, a boot that cannot reach the saved network keeps retrying every 30 s instead of opening the setup portal, and the OLED shows "Triple reset to reconfigure WiFi" while offline. Without saved WiFi, or after a triple reset, the portal still opens. **Note:** in this beta build the beta AP fallback can still start after 2 failed retries; see Known issues.
+
+### Telnet
+
+- **New setting: switch the telnet debug console (port 23) off** (TASK-1644, GitHub #154). Settings, System: "Telnet debug console" (`telnetenabled`, on by default). Port 23 has no login and its keys can switch the GPIO output, so switch it off if you do not use it. Off closes the port at once and drops a connected client, without a reboot. When you switch it on again, the gateway keeps trying to open port 23 for up to 3 minutes, because the network stack can hold the old port for about 2 minutes after it closed.
+- **Telnet action keys wait until start-up is done** (TASK-1395). A key such as `q` (reload settings) sent while the gateway was still starting ran next to the start-up code, and its output got mixed into the start-up log. Until `Setup finished!`, action keys are now refused with `Key 'q' ignored: setup still running, retry after 'Setup finished!'`. The debug toggles and `h` (help) still work.
+
+### OpenTherm
+
+- **The support maps learn only from frames the boiler and thermostat really sent** (TASK-1391, TASK-1612). The gateway keeps maps of which messages the boiler supports and which the thermostat asks for. Answers and requests the PIC made itself (`A` and `R` frames) were counted as if the boiler or thermostat had sent them, so a message could be marked unsupported by a boiler that never saw it. Now only `B` frames count for the boiler map and only `T` frames for the thermostat map. **Do:** nothing. After the update both maps start empty once and refill from live traffic; the MQTT value topic `otgw-firmware/boiler/unsupported_msgids` is published empty once.
+- **About 9 KB more free space in the firmware slot** (TASK-1639, GitHub #694). The firmware now uses an integer-only number parser; the floating point parser it pulled in is gone. On the bench the PIC frames, the PIC version and the boot counter read the same as before.
+
+### Web UI
+
+- **No unstyled first paint** (TASK-1643, reported by André Brait). The stylesheet now loads before the page is drawn, so elements no longer jump while the page loads. If the gateway answers `503` (busy), the page retries the stylesheet up to 8 times, as before.
+- **The graph keeps the history from before a device reboot** (TASK-1306). With the Graph page open, the next 10-minute reload after a device reboot dropped everything from before that reboot, because the gateway no longer holds it. It now stays on the page.
+- **The flow dots on the Connection map loop without a jump** (TASK-1609, PR #695 by André Brait).
+- **Settings help texts are a little shorter** (TASK-1646), to stay within the flash budget for them. Every setting keeps its help text.
+
+### Home Assistant
+
+- **The SAT zone and PV-boost entities get readable names** (TASK-1608, PR #693 by André Brait). The display name was `<hostname>_SAT_Zone_1_<value>` and `<hostname>_SAT_PV_<value>`; it is now `SAT Zone 1 <value>` and `SAT PV <value>`, spaced and without the hostname, like the other entities. Unique ids and MQTT topics are unchanged, so existing entities keep their entity id and history; only the name shown in HA changes. **Do:** nothing, unless a dashboard or automation matches on the old display name.
+
+### Replay (bench and diagnostics)
+
+- **A replayed outside temperature no longer counts as a fresh boiler reading** (TASK-1649). The value is still shown and published; only its age stamp, which SAT uses to judge whether the boiler's outside temperature is current, ignores replayed frames.
+- **On OT-Direct, a replayed PIC start-up line no longer makes SAT resend its commands** (TASK-1650). There is no PIC on OT-Direct, so the line can only come from the replay. On a PIC board it still does.
+
+### SAT
+
+No change to SAT control since beta.77. One report was checked and needs no change: hot-water flames count in the SAT 4 h and 24 h cycle windows, as in the SAT reference code and as decided by Sergeant D (TASK-1512).
 
 ---
 
@@ -119,9 +154,11 @@ The Windows launcher is tested on our bench. The Linux/macOS launcher has not ye
 
 ### New since beta.77
 
-No MQTT topic, REST route or setting is renamed or removed.
+No MQTT topic, REST route or setting is renamed or removed. Additive: two new settings, `telnetenabled` (on by default, TASK-1644) and `wifinoportal` (off by default, TASK-1645), and 14 new `wifi_*` keys in `GET /api/v2/device/info` (TASK-1444). Defaults keep the old behaviour.
 
 - **Home Assistant display names of the SAT zone and PV-boost entities change** (TASK-1608). Display only: unique ids, entity ids of existing entities and topics stay the same. **Do:** check dashboards or automations that match on the old `<hostname>_SAT_Zone_...` or `<hostname>_SAT_PV_...` names.
+- **The OpenTherm support maps start empty once after the update** (TASK-1391, TASK-1612). The map files written by older builds are not loaded, and the retained MQTT value topic `otgw-firmware/boiler/unsupported_msgids` is published empty until live traffic fills the maps again. **Do:** check automations that read that list right after the update.
+- **A WiFi link that passes no traffic can now restart the gateway** (TASK-1450). Only when MQTT is not connected and no REST or port 25238 traffic arrived in the last minute, after about 16 minutes without a ping answer from the router. The restart is logged as `WiFi: connected but no traffic` in `reboot_log.txt`.
 
 ### Carried over from earlier betas
 
@@ -205,7 +242,10 @@ The items below follow the CHANGELOG; quoted parts are in quotation marks. Check
 
 ## Known issues
 
-- **No 24-hour soak test and no macOS capture run for this build** (TASK-1544), by maintainer decision, as for beta.1. beta.80 ran 1 hour with MQTT connected on one bench unit, which is not a 24-hour test. The PIC command queue rework (beta.19 to beta.28) in particular has had no long run. Long-run stability is exactly what we need your field data for.
+- **No 24-hour soak test and no macOS capture run for this build** (TASK-1544), by maintainer decision, as for beta.1. beta.95 ran 1 hour with MQTT connected on one bench unit, which is not a 24-hour test. The PIC command queue rework (beta.19 to beta.28) in particular has had no long run. Long-run stability is exactly what we need your field data for.
+- **"No setup portal when Wi-Fi is down" and the skip-portal boot do not yet stop the beta AP fallback** (TASK-1645, TASK-1455). With the setting on, or on the boot after a WiFi restart, the boot itself skips the setup portal and the AP fallback. But this is a beta build: after 2 more failed retries (about 1 minute) it still starts its fallback access point, as all beta builds do when the saved WiFi stays away. A fix is ready for the next build (TASK-1645). Until then, expect the fallback access point while your WiFi is down, also with the setting on.
+- **The new WiFi features have not run in the field** (TASK-1450, TASK-1455, TASK-1446, TASK-1444). The dead-link recovery was seen once on the bench (forced reconnect, then the restart); its guards, the restart cap, the skip-portal boot and the outage record under a real WiFi drop are covered by host tests only. If your WiFi drops, the `Drop :` line in the telnet banner and the `wifi_drop_*` keys in `device/info` are what we would like to see.
+- **A boot with the telnet console switched off** was checked in the code only (TASK-1644); switching it off and on while running was bench-tested.
 - **Decoding a core dump:** the thread listing of `esp-coredump` may fail inside the tool. The decode still shows the panic reason. Send the downloaded file anyway.
 - **The OT-Direct thermostat relay change (TASK-1600)** has not been seen on a bench with a thermostat attached.
 - **No Immergas boiler has run this firmware.** The Immergas `TP=11:12` behaviour is proven by host tests and by the commands seen on the bench only. On the beta.17 bench the `MM=` could reach the PIC up to about 1 s before its `TP=11:12`; this is open with Sergeant D, and the queue has changed since (strict first-in, first-out, TASK-1569), so the order was not re-checked on this build. Since beta.48 (TASK-1581) SAT also sends `TP=11:12=80` before the `MM=T` at the maximum PWM duty; that is likewise untested on a real Immergas. If you own an Immergas, your capture is valuable.
@@ -227,4 +267,4 @@ The items below follow the CHANGELOG; quoted parts are in quotation marks. Check
 - Discord: #beta-testing or #alpha-testing, with the capture upload zip.
 - GitHub: [open an issue](https://github.com/rvdbreemen/OTGW-firmware/issues) and attach the capture files.
 
-Thank you to everyone who tested the alphas and betas, to gruijter and maarten_41762 for the detailed feedback, to Andre Brait for the pull requests, and to Sergeant D for the SAT design decisions.
+Thank you to everyone who tested the alphas and betas, to gruijter and maarten_41762 for the detailed feedback, to André Brait for the pull requests, the code size analysis and the page-load report, and to Sergeant D for the SAT design decisions.
