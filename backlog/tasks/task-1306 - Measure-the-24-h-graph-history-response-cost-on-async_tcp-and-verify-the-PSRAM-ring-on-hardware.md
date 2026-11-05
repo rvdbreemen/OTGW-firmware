@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T06:27:00Z'
-updated_date: '2026-11-04T21:15:00Z'
+updated_date: '2026-11-05T13:57:00Z'
 labels:
   - webui
   - graph
@@ -44,4 +44,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: measurement only, need
 2026-11-04 22:1x (otgw-firmware-6c) AC2 part 1 on .63 (Classic+S3 combo, ESP32-S3FH4R2, beta.79+a9dd048, uptime 6 min after the last TASK-1395 reboot at ~22:06): device/info psram_found 1, psram_size 2097152, psram_free 2057988 (39164 B in use after boot, ring included); GET /api/v2/graph/history: HTTP 200, interval_s 120, count 3, 277 B, 0.195 s. .63 left untouched (no reboot) so the ring fills; recheck around 06:15 (~8 h = ~240 slots; a full 24 h window needs 24 h uptime, not available tonight because the bench is needed at 06:30).
 
 2026-11-04 AC3 decided by Robert (interactive, this session): fix. mergeGraphHistory (data/v2.js) dropped every earlier history record on a reload (live = hist.filter(!r.h)); after a device reboot the ring only holds post-reboot slots, so history from before page load vanished on the next 10-minute reload. Fix: history records whose span ends before the oldest slot of the new response (tolerance one 5 s GSLOT for request timing) are kept; the overlap is still replaced by the response. tests/webui/graph-history-merge.test.mjs: new test 'history from before a device reboot survives the next reload' plus a stricter reload test; on HEAD b1fe73d2e both FAIL ('pre-reboot history slot 1799998770000 was dropped', 'history older than the new response is kept'); on the fix node --test tests/webui/graph-*.test.mjs: 58 pass, 0 fail. Needs a filesystem build + bump by the lead; bench: open Graph, reboot the unit, wait for the 10-min reload, earlier history still drawn.
+
+2026-11-05 lead: (a) 1 s image (GRAPH_HIST_LARGE_INTERVAL_S=1, beta.79 e8fb50b) app-only on .63 (Classic, PSRAM 2 MB) 14:24; ring full at count 720 after 30 min. 14:55: 5x GET /api/v2/graph/history: 28237 B in 0.249-0.358 s, HTTP 200 each; bootcount 146 before/after, uptime continuous, lastreset Software reset (the OTA), hd_max_loop_gap_ms 476 before/after (baseline 435-459), crashlog empty. This is PSRAM-board evidence; AC1 asks the no-PSRAM bench (.61, psram_found 0): to run there after the TASK-1450 bench frees .61. (b) AC2: .63 back on beta.95+1fbd5cf at ~14:58 (interval_s 120 reported); psram_free 2057884 of 2097152 after boot; the 24 h window needs the unit untouched until ~2026-11-06 15:00.
 <!-- SECTION:NOTES:END -->
