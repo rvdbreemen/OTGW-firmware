@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.106
+**  Version  : v2.0.0-beta.107
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -68,35 +68,26 @@ static inline uint8_t restEffectiveInflightCap() {
 // buffer + the AsyncWebServer file-response buffer from the heap per concurrent stream;
 // under fragmentation a small FD-struct alloc fails ("esp_littlefs: Unable to allocate
 // FD"), the invalid-source response then hangs, the leaked accept slot drains the 16-slot
-// lwIP PCB pool, and the webserver dies (TASK-879 silent hang). Refuse a new file serve
-// when too many are already building OR the largest free block is too low, returning a
-// cheap 503 instead of pushing another FD alloc into the fragmentation wall. SEPARATE
-// counter from the REST gate (restInFlight) keeps the proven REST path untouched; same
-// heap-tier clamp. Base cap 2 (was 6) per ADR-165's empirical parallelism study: nominal
-// (non-overload) load already produced visible 503s above N=2 on esp32-classic, so a
-// normal single-browser asset burst is deliberately gated below the browser's own
-// HTTP/1.1 per-origin parallel-connection ceiling. async_tcp-task-local (handlers
-// serialize on the one task) -> no atomic. Defined here, not in the header, because
-// platformMaxFreeBlock() is in scope at this point.
+// lwIP PCB pool, and the webserver dies (TASK-879 silent hang). Limit active file
+// streams before allocating their file/buffer state; webSendFile queues ordinary
+// contention in a bounded response-owned FIFO. SEPARATE counter from the REST gate
+// keeps the proven REST path untouched. Base cap 2 per ADR-165, clamped to 1 under
+// fragmentation. All admission, polling and destruction run on async_tcp.
 #ifndef WEB_FILE_MAX_INFLIGHT
 #define WEB_FILE_MAX_INFLIGHT 2
 #endif
 
-// ADR-188 (TASK-1162): web connection cap. Under a request storm the memory is held in
-// the lwIP send queues of connections already admitted, not in new ones, so the in-flight
-// gates above cannot stop it: the RX allocation then fails, no ACK comes in, and the
-// device goes deaf for minutes. Refuse a new request with the cheap 503 while more than
-// WEB_MAX_TX_CONNECTIONS port-80 connections hold or can queue send data. The /ws clients
-// share port 80 and are long-lived, so they are subtracted. The request being admitted is
-// one of the counted connections.
+// ADR-188: cap all possible senders, except identified idle file waiters.
+// A queued candidate reserves one sender before becoming eligible to transmit.
 #ifndef WEB_MAX_TX_CONNECTIONS
 #define WEB_MAX_TX_CONNECTIONS 4
 #endif
-static bool webConnCapExceeded() {
-  const uint16_t held = platformTcpTxHoldingOnPort(WEB_HTTP_PORT);
+static bool webConnCapExceeded(bool report = true, bool reserve = false) {
+  const uint16_t held = WebQueuedFileResponse::txHolding() + (reserve ? 1 : 0);
   const uint16_t ws   = webSocketClientCount();
   const uint16_t http = (held > ws) ? (uint16_t)(held - ws) : 0;
   if (http <= WEB_MAX_TX_CONNECTIONS) return false;
+  if (!report) return true;
   RESTDebugTf(PSTR("WEB CONN CAP: %u connections hold TX (%u ws, cap %u) => 503\r\n"),
               held, ws, (unsigned)WEB_MAX_TX_CONNECTIONS);
   state.heapdiag.iWebConn503Count++;
@@ -104,21 +95,22 @@ static bool webConnCapExceeded() {
 }
 
 static uint8_t webFileInFlight = 0;
+// Silent: a pending response may retry admission on every native response poll.
 bool webFileGateTryAdmit() {
-  if (webConnCapExceeded()) return false;
   uint8_t cap = WEB_FILE_MAX_INFLIGHT;
   const uint32_t mb = platformMaxFreeBlock();
   if (mb < 16000)      cap = 1;
   else if (mb < 24000) cap = 2;
-  if (webFileInFlight >= cap) {
-    RESTDebugTf(PSTR("WEBFILE BUSY: %u in-flight (cap %u) => 503 (freeheap=%u maxblock=%u)\r\n"),
-                webFileInFlight, cap, platformFreeHeap(), mb);
-    state.heapdiag.iWebfile503Count++;  // TASK-1017: load-test instrumentation
-    return false;
-  }
+  if (webFileInFlight >= cap) return false;
   webFileInFlight++;
   if (webFileInFlight > state.heapdiag.iWebfileInflightHwm) state.heapdiag.iWebfileInflightHwm = webFileInFlight;  // TASK-1017
   return true;
+}
+bool webFileGateCanSend(bool reserve) { return !webConnCapExceeded(false, reserve); }
+void webFileGateRejected() {
+  RESTDebugTf(PSTR("WEBFILE BUSY: pending queue full or wait expired => 503 (freeheap=%u maxblock=%u)\r\n"),
+              platformFreeHeap(), platformMaxFreeBlock());
+  state.heapdiag.iWebfile503Count++;
 }
 void webFileGateRelease() { if (webFileInFlight) webFileInFlight--; }
 void restSlotRelease()    { if (restInFlight) restInFlight--; }
@@ -2813,9 +2805,9 @@ void processAPI(AsyncWebServerRequest *request)
   // abusive concurrency (which otherwise aborts on bad_alloc in addHeader once the
   // chunked responses pile up). The server sends "Connection: close" and closes
   // after every response (no keep-alive), so the request's disconnect callback fires
-  // exactly once. The library keeps ONE such callback per request, so the slot is
-  // armed through webArmSlotRelease(), which also covers a file gate slot that
-  // webSendFile() takes later in the same request (TASK-1172). The diagnostic logs
+  // exactly once. The library keeps ONE such callback per request, so the REST
+  // slot and body cleanup are armed together through webArmSlotRelease().
+  // File responses independently own their file slot. The diagnostic logs
   // the heap at the cap so we can tell transient concurrency from a real leak.
   if (webConnCapExceeded()) {
     sendApiBusy(F("Server busy: too many connections, please retry"));
@@ -3428,6 +3420,13 @@ void sendDeviceInfoV2()
     je.field(F("hd_max_loop_gap_ms"),      snap->st.heapdiag.iMaxLoopGapMs);
     je.field(F("hd_rest_inflight_hwm"),    (uint32_t)snap->st.heapdiag.iRestInflightHwm);
     je.field(F("hd_webfile_inflight_hwm"), (uint32_t)snap->st.heapdiag.iWebfileInflightHwm);
+    je.field(F("hd_webfile_queued"),       snap->st.heapdiag.iWebfileQueued);
+    je.field(F("hd_webfile_admitted"),     snap->st.heapdiag.iWebfileAdmitted);
+    je.field(F("hd_webfile_cancelled"),    snap->st.heapdiag.iWebfileCancelled);
+    je.field(F("hd_webfile_timeout"),      snap->st.heapdiag.iWebfileTimeout);
+    je.field(F("hd_webfile_max_wait_ms"),  snap->st.heapdiag.iWebfileMaxWaitMs);
+    je.field(F("hd_webfile_pending"),      (uint32_t)snap->st.heapdiag.iWebfilePending);
+    je.field(F("hd_webfile_pending_hwm"),  (uint32_t)snap->st.heapdiag.iWebfilePendingHwm);
     je.field(F("hd_tcp_active_pcbs"),      (uint32_t)snap->st.heapdiag.iTcpActivePcbs);
     je.field(F("hd_rest_503"),             snap->st.heapdiag.iRest503Count);
     je.field(F("hd_webfile_503"),          snap->st.heapdiag.iWebfile503Count);

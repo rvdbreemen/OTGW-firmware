@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-beta.106
+**  Version  : v2.0.0-beta.107
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -40,6 +40,8 @@
 
 #include <Arduino.h>
 #include <ESPAsyncWebServer.h>
+#include <new>
+#include <utility>
 
 //=====[ Async HTTP server (port 80) ]=========================================
 // Single point of instantiation in networkStuff.ino (ADR-044). seq10 (WS) and
@@ -51,13 +53,12 @@ extern AsyncWebServer server;
 // currentRequest is set at the top of every route handler and read by the
 // compat accessors below. g_restStream is the lazily-allocated response stream
 // for the small-JSON path; g_responseSent guards the send-once invariant.
-// g_restSlotHeld / g_fileSlotHeld record which backpressure gate slots the
-// current request holds; webArmSlotRelease() releases them together (TASK-1172).
+// g_restSlotHeld records the current request's REST slot for webArmSlotRelease().
+// Static-file slots belong to their response, not the disconnect callback.
 extern AsyncWebServerRequest* currentRequest;
 extern AsyncResponseStream*   g_restStream;
 extern bool                   g_responseSent;
 extern bool                   g_restSlotHeld;
-extern bool                   g_fileSlotHeld;
 
 // Pending response headers. The sync WebServer let callers stage headers with
 // sendHeader() before send(); the async API attaches headers to the response
@@ -118,12 +119,10 @@ inline void webBodyReleaseFor(const void* req) {
   if (g_requestBody.owner == req) { g_requestBody.owner = nullptr; g_requestBody.len = 0; g_requestBody.data[0] = '\0'; }
 }
 void restSlotRelease();       // REST gate (restAPI.ino)
-void webFileGateRelease();    // static-file gate (restAPI.ino)
-// The one disconnect callback of a request: releases the gate slots it holds and its body.
-inline void webArmDisconnect(AsyncWebServerRequest* req, bool restHeld, bool fileHeld) {
-  req->onDisconnect([req, restHeld, fileHeld]() {
+// The one disconnect callback releases the REST slot and captured request body.
+inline void webArmDisconnect(AsyncWebServerRequest* req, bool restHeld) {
+  req->onDisconnect([req, restHeld]() {
     if (restHeld) restSlotRelease();
-    if (fileHeld) webFileGateRelease();
     webBodyReleaseFor(req);
   });
 }
@@ -136,7 +135,7 @@ inline void webCaptureBody(AsyncWebServerRequest* req, const uint8_t* data, size
     // The body normally arrives before the route handler takes a gate. If this request
     // already holds one, keep its release in the same callback.
     const bool mine = (currentRequest == req);
-    webArmDisconnect(req, mine && g_restSlotHeld, mine && g_fileSlotHeld);
+    webArmDisconnect(req, mine && g_restSlotHeld);
   }
   size_t room = (sizeof(g_requestBody.data) - 1) - g_requestBody.len;
   size_t take = (len < room) ? len : room;
@@ -165,7 +164,6 @@ inline void webBeginRequest(AsyncWebServerRequest* req) {
   g_restStream            = nullptr;
   g_responseSent          = false;
   g_restSlotHeld          = false;
-  g_fileSlotHeld          = false;
   g_pendingHeaders.count  = 0;
 }
 
@@ -369,67 +367,235 @@ inline void webSendPStream(int code, PGM_P contentType, PGM_P body) {
   g_responseSent = true;
 }
 
-// ADR-147 D4.1: static-file backpressure gate. Defined in restAPI.ino (next to the
-// sibling REST gate, where the platform heap shims are in scope); forward-declared here
-// so webSendFile can admit/reject before touching LittleFS. async_tcp-task-local.
-bool webFileGateTryAdmit();   // true => admitted (counter incremented); false => caller 503s
-void webFileGateRelease();    // decrement; armed by webArmSlotRelease()
-void restSlotRelease();       // REST gate counterpart (restAPI.ino), same arming
+// Active-file admission is silent; only actual safety/queue/deadline refusals
+// count as 503s. These helpers live beside the unchanged REST gate.
+bool webFileGateTryAdmit();
+void webFileGateRelease();
+bool webFileGateCanSend(bool reserve);
+void webFileGateRejected();
 
-// ESPAsyncWebServer keeps ONE disconnect callback per request: a second
-// onDisconnect() replaces the first (WebRequest.cpp, _onDisconnectfn = fn). So
-// every gate slot a request holds is released from one callback, re-armed here
-// each time a gate is taken. Application code does not call ->onDisconnect() for
-// gate bookkeeping itself; a REST route that streams a file otherwise leaked its
-// REST slot until reboot (TASK-1172).
-// TASK-1565: the same callback also releases the request's captured body.
+// ESPAsyncWebServer keeps ONE disconnect callback per request. Keep body cleanup
+// and REST release together; the response independently owns its file slot.
 inline void webArmSlotRelease() {
   if (!currentRequest) return;
-  if (g_restSlotHeld || g_fileSlotHeld) {
-    webArmDisconnect(currentRequest, g_restSlotHeld, g_fileSlotHeld);
+  if (g_restSlotHeld) {
+    webArmDisconnect(currentRequest, g_restSlotHeld);
   }
 }
 
-// Stream a file from LittleFS (or the .gz sibling — Content-Encoding handled by
-// the response). Drains pending headers, sends once.
+inline AsyncWebServerResponse* webFileErrorResponse(AsyncWebServerRequest* request, int code) {
+  AsyncWebServerResponse* response;
+  if (code == 404) {
+    response = request->beginResponse(404, String(F("text/plain")), String(F("File not found")));
+  } else if (code == 500) {
+    response = request->beginResponse(500, String(F("text/plain")), String(F("Invalid data in handler")));
+  } else {
+    response = request->beginResponse(code);
+  }
+  if (response) {
+    response->addHeader(F("Cache-Control"), F("no-store"));
+    if (code == 503) response->addHeader(F("Retry-After"), F("1"));
+  }
+  return response;
+}
+
+// A waiting response owns only bounded metadata, not an open file or send buffer.
+// ESPAsyncWebServer polls _ack on async_tcp and deletes this with its request.
+class WebQueuedFileResponse : public AsyncWebServerResponse {
+  struct Queue {
+    WebQueuedFileResponse* entries[4];
+    uint8_t count;
+    bool pumping;
+  };
+  static Queue& queue() { static Queue pending = {}; return pending; }
+  char _path[128];
+  char _mime[48];
+  uint32_t _queuedAt;
+  bool _held;
+  bool _gzip;
+  bool _deferred = false;
+  AsyncWebServerRequest* _request = nullptr; // Owned by the same live request; async_tcp only.
+  AsyncWebServerResponse* _inner = nullptr;
+
+  static void observeDepth() {
+    state.heapdiag.iWebfilePending = queue().count;
+    if (queue().count > state.heapdiag.iWebfilePendingHwm)
+      state.heapdiag.iWebfilePendingHwm = queue().count;
+  }
+  void observeWait() {
+    const uint32_t elapsed = uint32_t(millis() - _queuedAt);
+    if (elapsed > state.heapdiag.iWebfileMaxWaitMs) state.heapdiag.iWebfileMaxWaitMs = elapsed;
+  }
+  void dequeue() {
+    Queue& pending = queue();
+    for (uint8_t i = 0; i < pending.count; ++i) {
+      if (pending.entries[i] != this) continue;
+      for (uint8_t j = i + 1; j < pending.count; ++j) pending.entries[j - 1] = pending.entries[j];
+      pending.entries[--pending.count] = nullptr;
+      observeDepth();
+      break;
+    }
+  }
+  void release() {
+    if (_held) { webFileGateRelease(); _held = false; }
+  }
+  bool error(AsyncWebServerRequest* request, int code) {
+    dequeue();
+    delete _inner;
+    _inner = nullptr;
+    release();
+    _headers.clear();  // A refusal must not inherit a successful asset's validators.
+    _inner = webFileErrorResponse(request, code);
+    if (_inner) return true;
+    _state = RESPONSE_FAILED;
+    request->abort();
+    if (request->client()->pcb()) request->client()->abort(); // request.abort() is a no-op after _sent.
+    return false;
+  }
+  void start(AsyncWebServerRequest* request) {
+    if (!_held) {
+      if (uint32_t(millis() - _queuedAt) >= 10000U) {
+        observeWait();
+        state.heapdiag.iWebfileTimeout++;
+        _deferred = false;
+        webFileGateRejected();
+        if (!error(request, 503)) return;
+      } else if (queue().entries[0] != this || !webFileGateCanSend(true) || !webFileGateTryAdmit()) {
+        return;
+      } else {
+        observeWait();
+        if (_deferred) { state.heapdiag.iWebfileAdmitted++; _deferred = false; }
+        dequeue();
+        _held = true;
+      }
+    }
+    if (!_inner) {
+      // Check only after admission: even exists() can allocate filesystem state.
+      if (!LittleFS.exists(_path)) {
+        if (!error(request, 404)) return;
+      } else {
+        _inner = request->beginResponse(LittleFS, _path, _mime);
+        if (!_inner || !_inner->_sourceValid()) {
+          if (!error(request, 500)) return;
+        } else if (_gzip) {
+          _inner->addHeader(F("Content-Encoding"), F("gzip"));
+        }
+      }
+    }
+    for (auto& header : _headers) _inner->addHeader(std::move(header));
+    _headers.clear();
+    _code = _inner->code();
+    request->client()->setRxTimeout(0);
+    _inner->_respond(request);
+  }
+
+public:
+  static bool hasPending() { return queue().count != 0; }
+  static bool queueFull() { return queue().count == 4; }
+  static uint16_t txHolding() {
+    PlatformTcpIdleConnection idle[4];
+    uint8_t count = 0;
+    for (uint8_t i = 0; i < queue().count; ++i) {
+      AsyncWebServerRequest* request = queue().entries[i]->_request;
+      if (!request || !request->client()) continue;
+      idle[count++] = {request->client()->pcb(), request->client()};
+    }
+    return platformTcpTxHoldingOnPort(WEB_HTTP_PORT, idle, count);
+  }
+  static void pump() {
+    Queue& pending = queue();
+    if (pending.pumping) return;
+    pending.pumping = true;
+    for (uint8_t i = 0; i < 4 && pending.count; ++i) {
+      WebQueuedFileResponse* head = pending.entries[0];
+      if (!head->_request || !head->_request->client()->canSend()) break;
+      head->start(head->_request);
+      if (pending.count && pending.entries[0] == head) break;
+    }
+    pending.pumping = false;
+  }
+  WebQueuedFileResponse(const char* path, const char* mime, bool gzip, bool admitted)
+      : _queuedAt(millis()), _held(admitted), _gzip(gzip) {
+    strlcpy(_path, path, sizeof(_path));
+    strlcpy(_mime, mime, sizeof(_mime));
+    if (!admitted) { queue().entries[queue().count++] = this; observeDepth(); }
+  }
+  ~WebQueuedFileResponse() override {
+    if (_deferred && !_held && !_inner) {
+      observeWait();
+      state.heapdiag.iWebfileCancelled++;
+    }
+    dequeue();
+    delete _inner;  // Close the file before admitting another stream.
+    release();
+    pump();
+  }
+  bool _sourceValid() const override { return true; }
+  bool _started() const override { return _inner && _inner->_started(); }
+  bool _finished() const override { return _state == RESPONSE_FAILED || (_inner && _inner->_finished()); }
+  bool _failed() const override { return _state == RESPONSE_FAILED || (_inner && _inner->_failed()); }
+  void _respond(AsyncWebServerRequest* request) override {
+    // Native RX expiry precedes response polling: leave 1s to emit the 10s 503.
+    // shortcut: zero-window receive trickles can extend waits; use transport-level expiry if absolute socket lifetime must be bounded.
+    _request = request;
+    if (!_held) request->client()->setRxTimeout(11);
+    if (_held) start(request);
+    pump();
+    if (_state != RESPONSE_FAILED && !_held && !_inner && !_deferred) {
+      _deferred = true;
+      state.heapdiag.iWebfileQueued++;
+    }
+  }
+  size_t _ack(AsyncWebServerRequest* request, size_t len, uint32_t time) override {
+    if (_state == RESPONSE_FAILED) return 0;
+    if (_inner) return _inner->_ack(request, len, time);
+    observeWait();
+    if (uint32_t(millis() - _queuedAt) >= 10000U) start(request);
+    pump();
+    return 0;
+  }
+};
+
+inline void webSendFileError(int code) {
+  if (!currentRequest || g_responseSent) return;
+  g_pendingHeaders.count = 0;
+  AsyncWebServerResponse* response = webFileErrorResponse(currentRequest, code);
+  g_responseSent = true;
+  // Abort the request too, or the library tries to synthesize a 501 afterward.
+  if (response) currentRequest->send(response);
+  else currentRequest->abort();
+}
+
+// Stream with the standard file response after FIFO admission, preserving staged
+// headers and library content-type/gzip behavior. No main-loop HTTP ownership.
 inline void webSendFile(const char* path, const char* contentType, bool gzip) {
   if (!currentRequest || g_responseSent) return;
-  // ADR-147 D4.1: refuse a new file serve under heap pressure / too much concurrency,
-  // BEFORE any LittleFS work, so an esp_littlefs FD-struct alloc cannot fail into a hung
-  // connection that drains the lwIP PCB pool (TASK-879). A normal single-browser asset
-  // burst (<=6 parallel) is never throttled while the heap is healthy; under a flood the
-  // heap-tier clamp tightens the cap toward 1 and the excess gets a cheap 503.
-  if (!webFileGateTryAdmit()) {
-    // TASK-960: tell the client this is transient backpressure, not a hard error,
-    // so a cooperative loader retries promptly (the gate frees a slot within ~1s
-    // as in-flight serves finish). The cap itself stays allocation-bound (cap 1
-    // when maxBlock<16000): two concurrent LittleFS serves cannot be guaranteed to
-    // allocate at that point (the TASK-879 hung-PCB hazard), so the floor is held
-    // and the client-side retry — not a higher cap — is what makes a multi-asset
-    // page load reliably under heap pressure.
-    webPushHeader(F("Retry-After"), F("1"));
-    webSendStatus(503);
+  // Deferred metadata must never truncate into a different path or MIME type.
+  if (!path || strnlen(path, 128) >= 128) { webSendFileError(414); return; }
+  if (!contentType || strnlen(contentType, 48) >= 48) { webSendFileError(400); return; }
+  WebQueuedFileResponse::pump();
+  const bool admitted = !WebQueuedFileResponse::hasPending() &&
+                        webFileGateCanSend(false) && webFileGateTryAdmit();
+  if (!admitted && WebQueuedFileResponse::queueFull()) {
+    webFileGateRejected();
+    webSendFileError(503);
     return;
   }
-  g_fileSlotHeld = true;
-  webArmSlotRelease();  // also keeps a REST slot this request holds (TASK-1172)
-  // Missing-file guard (ADR-139): beginResponse(LittleFS, <missing>) yields an
-  // invalid-source response that send() turns into a 500 (or a hung connection on
-  // some ESPAsyncWebServer forks), never a clean 404. Check first.
-  if (!LittleFS.exists(path)) {
-    AsyncWebServerResponse* nf = currentRequest->beginResponse(404, String(F("text/plain")), String(F("File not found")));
-    webApplyHeaders(nf);
-    currentRequest->send(nf);
+  // File slot is response-owned, never also armed in the REST/body callback.
+  AsyncWebServerResponse* response = new (std::nothrow) WebQueuedFileResponse(path, contentType, gzip, admitted);
+  if (!response) {
+    if (admitted) webFileGateRelease();
+    g_pendingHeaders.count = 0;
     g_responseSent = true;
+    currentRequest->abort();
     return;
   }
-  AsyncWebServerResponse* resp = currentRequest->beginResponse(LittleFS, path, contentType);
-  if (gzip) resp->addHeader(F("Content-Encoding"), F("gzip"));
-  webApplyHeaders(resp);
-  currentRequest->send(resp);
+  webApplyHeaders(response);
+  currentRequest->send(response);
   g_responseSent = true;
 }
 inline void webSendFile(const char* path, const __FlashStringHelper* contentType, bool gzip) {
+  if (!contentType || strlen_P((PGM_P)contentType) >= 48) { webSendFileError(400); return; }
   char ctbuf[48];
   strlcpy_P(ctbuf, (PGM_P)contentType, sizeof(ctbuf));
   webSendFile(path, ctbuf, gzip);

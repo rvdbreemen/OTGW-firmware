@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+- **Web UI: the stylesheet, script and fonts load natively, and the server queues file requests instead of refusing them** (TASK-1659, ADR-212, PR #697 by André Brait). The page now uses a normal stylesheet link, a deferred script and font preloads; JavaScript retries only after a real load error. When both file-stream slots are busy, up to four file requests wait in arrival order for up to 10 s instead of getting 503. Limits are unchanged: two file streams, the REST gate and the connection cap. New counters in `/api/v2/device/info` and telnet: `hd_webfile_queued`, `hd_webfile_admitted`, `hd_webfile_cancelled`, `hd_webfile_timeout`, `hd_webfile_max_wait_ms`, `hd_webfile_pending`, `hd_webfile_pending_hwm`. Known caveat: two files streaming at once lower the largest free heap block to 7,668 bytes (13,812 on beta.94); measurements and the single gzipped file alternative are in PR #697.
+
 ## [2.0.0-beta.105] - 2026-11-06
 
 ### Changed

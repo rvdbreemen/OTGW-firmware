@@ -401,20 +401,26 @@ inline uint16_t platformTcpActivePcbCount() {
   return count;
 }
 
-// TASK-1162 / ADR-188: count the TCP connections on one local port that hold or can
-// still queue send data: ESTABLISHED, or any other active state with unsent/unacked
-// segments (a closing connection whose queue is still draining pins that memory; one
-// with empty queues pins nothing). Called per request from the web admission gates on
-// the async_tcp task, unlike platformTcpActivePcbCount() above: the walk is short (at
-// most CONFIG_LWIP_MAX_ACTIVE_TCP pcbs) and the per-request LOCK_TCPIP_CORE() was run
-// through 12 storm runs on the bench (TASK-1162) without a stall. The caller's own
-// connection is ESTABLISHED and is part of the count.
-inline uint16_t platformTcpTxHoldingOnPort(uint16_t localPort) {
+// Only response-owned waiters are excluded, matching both the live PCB and its
+// AsyncTCP owner under the core lock; address reuse cannot hide another sender.
+struct PlatformTcpIdleConnection {
+  const tcp_pcb* pcb;
+  const void* owner;
+};
+inline uint16_t platformTcpTxHoldingOnPort(uint16_t localPort,
+                                         const PlatformTcpIdleConnection* idle,
+                                         uint8_t idleCount) {
   uint16_t count = 0;
   LOCK_TCPIP_CORE();
   for (struct tcp_pcb *pcb = tcp_active_pcbs; pcb != nullptr; pcb = pcb->next) {
     if (pcb->local_port != localPort) continue;
-    if (pcb->state == ESTABLISHED || pcb->unsent != nullptr || pcb->unacked != nullptr) count++;
+    if (pcb->unsent != nullptr || pcb->unacked != nullptr) { count++; continue; }
+    if (pcb->state != ESTABLISHED) continue;
+    bool waiting = false;
+    for (uint8_t i = 0; i < idleCount; ++i) {
+      if (pcb == idle[i].pcb && pcb->callback_arg == idle[i].owner) { waiting = true; break; }
+    }
+    if (!waiting) count++;
   }
   UNLOCK_TCPIP_CORE();
   return count;

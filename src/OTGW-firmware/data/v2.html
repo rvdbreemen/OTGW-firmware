@@ -4,10 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<!-- TASK-1643: render-blocking stylesheet, so the first paint is styled (a script-inserted
-     <link> does not block rendering: the page flashed unstyled). The handlers only record the
-     outcome; the loader below owns the retry-on-503 and starts v2.js. -->
-<link rel="stylesheet" href="v2-bundle.css" id="v2css" onload="this.setAttribute('data-s','ok');window.v2CssDone&&window.v2CssDone(this,1)" onerror="this.setAttribute('data-s','err');window.v2CssDone&&window.v2CssDone(this,0)">
 <title>OTGW firmware</title>
 <script>
   // Pre-paint theme (localStorage key otgw-theme) to avoid flash-of-wrong-theme.
@@ -21,106 +17,135 @@
   })();
 </script>
 <script>
-  // TASK-978: load the stylesheet + v2.js with retry-on-503. A 503'd/reset
-  // <link>/<script> has no native retry, so the UI would render unstyled (CSS
-  // dropped) or dead (v2.js dropped) with nothing surfaced. Retry with linear
-  // backoff, as the former classic UI loader did (TASK-960).
-  // TASK-989: load SEQUENTIALLY (v2-bundle.css -> v2.js), one connection at a
-  // time. A parallel burst of asset connections is what collapses the S3 heap
-  // under concurrent serving (AsyncTCP accepts unconditionally; measured
-  // freeheap 22K->3.8K); serializing the assets removes the burst at the
-  // source instead of relying on the serve gates to shed it. v2-bundle.css is
-  // ds-tokens.css + v2.css concatenated at build time (build.py,
-  // generate_v2_css_bundle) -- one request instead of two on first paint.
+  // Observe parser-discovered requests before their events can fire. Recovery
+  // creates requests only after an error; normal startup is entirely native.
   (function(){
-    var MAX = 8;
-    // TASK-1643: v2-bundle.css is the static, render-blocking <link id="v2css"> in the head.
-    // This only handles its outcome: on load start the chain, on error (503 / reset) re-add
-    // the link with the same linear backoff as before (200 ms * attempt, MAX retries).
-    function watchCss(then){
-      var attempt = 0, fired = false;
-      function ok(){ if (fired) return; fired = true; if (then) then(); }
-      function fail(l){
-        if (l && l.parentNode) l.parentNode.removeChild(l);
-        if (++attempt <= MAX) setTimeout(retry, 200 * attempt);
-        else { console.error('[loader] gave up on v2-bundle.css'); ok(); }
-      }
-      function retry(){
-        var r = document.createElement('link');
-        r.rel = 'stylesheet'; r.href = 'v2-bundle.css'; r.id = 'v2css';
-        r.onload = function(){ ok(); };
-        r.onerror = function(){ fail(r); };
-        document.head.appendChild(r);
-      }
-      window.v2CssDone = function(l, good){ if (good) ok(); else fail(l); };
-      // The static link may have finished before this script ran.
-      var first = document.getElementById('v2css');
-      var st = first && first.getAttribute('data-s');
-      if (st === 'ok') ok(); else if (st === 'err') fail(first);
-      else if (first && first.sheet) ok();
-    }
-    function loadJs(then){
-      var jsAttempt = 0;
-      (function go(){
-        var s = document.createElement('script');
-        s.src = './v2.js'; s.defer = true;
-        s.onload = function(){ if (then) then(); };
-        s.onerror = function(){
-          if (s.parentNode) s.parentNode.removeChild(s);
-          if (++jsAttempt <= MAX) setTimeout(go, 200 * jsAttempt);
-          else { console.error('[loader] gave up on v2.js'); if (then) then(); }
-        };
-        document.head.appendChild(s);
-      })();
-    }
-    // v2-bundle.css -> v2.js -> fonts, STRICTLY chained (each step's "then" only
-    // fires after the previous one lands). watchCss()/loadJs() return immediately
-    // (they fire-and-continue via callback, not a blocking call) -- starting the
-    // font loader right after calling watchCss(), rather than inside its "then",
-    // was the bug that let font1 race the still-in-flight v2-bundle.css fetch
-    // (plus the browser's own automatic favicon.ico fetch) for the same
-    // WEB_FILE_MAX_INFLIGHT=2 slots, 503ing repeatedly even one-font-at-a-time.
-    watchCss(function(){
-      loadJs(function(){ loadFontsSequentially(); });
+    var MAX_RETRIES = 8;
+    var fonts = {
+      'fonts/inter-400.woff2': { family: 'Inter', weight: '400' },
+      'fonts/inter-700.woff2': { family: 'Inter', weight: '700' },
+      'fonts/jetbrains-mono-400.woff2': { family: 'JetBrains Mono', weight: '400' }
+    };
+    var paths = ['v2-bundle.css', 'v2.js', 'fonts/inter-400.woff2',
+      'fonts/inter-700.woff2', 'fonts/jetbrains-mono-400.woff2'];
+    var record = window.otgwAssetLoad = {
+      mode: 'native', pageId: performance.timeOrigin || Date.now(),
+      complete: false, cleanFirstAttempt: false, retryCount: 0, failureCount: 0, assets: {}
+    };
+    var started = {};
+    paths.forEach(function(path){
+      record.assets[path] = { attempts: 1, retries: 0, state: 'loading', lastElapsedMs: 0 };
+      started[path] = performance.now();
     });
-
-    // Field bug (esp32-otgw32, 2026-07-06): the 3 self-hosted fonts used to ship
-    // as @font-face rules inside v2-bundle.css. The browser fetches every
-    // @font-face src the instant that CSS parses, as an uncontrolled NATIVE
-    // parallel burst -- no JS ever sees it, so the retry-on-503 loader above
-    // cannot help. 3 simultaneous font fetches exceed WEB_FILE_MAX_INFLIGHT=2
-    // (ADR-165); the shed request 503s and, unlike CSS/JS, a browser-native
-    // font fetch never retries -- it fails permanently until a full reload.
-    // Fix: v2-bundle.css no longer carries @font-face (build.py,
-    // generate_v2_css_bundle strips it); load the 3 fonts here instead via the
-    // FontFace() API, deliberately ONE AT A TIME with retry, same backoff
-    // pattern as watchCss above. Peak concurrent font requests: 1.
-    function loadFontsSequentially(){
-      if (!window.FontFace) return;   // very old browser: page still works, system-font fallback
-      var fonts = [
-        { family: 'Inter',          url: 'fonts/inter-400.woff2',          weight: '400' },
-        { family: 'Inter',          url: 'fonts/inter-700.woff2',          weight: '700' },
-        { family: 'JetBrains Mono', url: 'fonts/jetbrains-mono-400.woff2', weight: '400' }
-      ];
-      function loadOne(i){
-        if (i >= fonts.length) return;
-        var f = fonts[i], attempt = 0;
-        (function go(){
-          var face = new FontFace(f.family, "url('" + f.url + "') format('woff2')",
-            { weight: f.weight, style: 'normal', display: 'swap' });
-          face.load().then(function (loaded) {
-            document.fonts.add(loaded);
-            loadOne(i + 1);
-          }).catch(function () {
-            if (++attempt <= MAX) setTimeout(go, 200 * attempt);
-            else { console.error('[loader] gave up on font ' + f.url); loadOne(i + 1); }
-          });
-        })();
-      }
-      loadOne(0);
+    function emit(name, path, cause, delay){
+      var a = record.assets[path];
+      var detail = { pageId: record.pageId, asset: path,
+        attempt: a.attempts + (name === 'asset_retry' ? 1 : 0),
+        retry: a.retries, elapsedMs: a.lastElapsedMs };
+      if (cause) detail.cause = cause;
+      if (delay !== undefined) detail.delayMs = delay;
+      if (name === 'asset_failed') console.error(name, detail);
+      else if (name === 'asset_retry') console.warn(name, detail);
+      else console.info(name, detail);
     }
+    function summarize(){
+      if (record.complete) return;
+      var allLoaded = true;
+      for (var i = 0; i < paths.length; i++){
+        var state = record.assets[paths[i]].state;
+        if (state === 'loading' || state === 'pending') return;
+        if (state !== 'loaded') allLoaded = false;
+      }
+      record.complete = true;
+      record.cleanFirstAttempt = allLoaded && record.retryCount === 0 && record.failureCount === 0;
+      // Emit a snapshot, not a mutable console reference to the public record.
+      var summary = { mode: record.mode, pageId: record.pageId, complete: record.complete,
+        cleanFirstAttempt: record.cleanFirstAttempt, retryCount: record.retryCount,
+        failureCount: record.failureCount, assets: {} };
+      paths.forEach(function(path){
+        var a = record.assets[path];
+        summary.assets[path] = { attempts: a.attempts, retries: a.retries,
+          state: a.state, lastElapsedMs: a.lastElapsedMs };
+      });
+      console.info('asset_load_summary', summary);
+    }
+    function showError(path){
+      function show(){
+        var error = document.createElement('p');
+        error.setAttribute('role', 'alert');
+        error.textContent = 'Unable to load ' + path + '. Reload this page to retry.';
+        document.body.insertBefore(error, document.body.firstChild);
+      }
+      if (document.body) show();
+      else document.addEventListener('DOMContentLoaded', show, { once: true });
+    }
+    function retry(path){
+      var a = record.assets[path];
+      a.attempts++;
+      a.state = 'loading';
+      started[path] = performance.now();
+      var attempt = a.attempts;
+      if (fonts[path]){
+        var font = fonts[path];
+        try {
+          var face = new FontFace(font.family, "url('" + path + "') format('woff2')",
+            { weight: font.weight, style: 'normal', display: 'swap' });
+          face.load().then(function(loaded){
+            if (a.state !== 'loading' || a.attempts !== attempt) return;
+            document.fonts.add(loaded);
+            settled(path, true, attempt);
+          }).catch(function(){ settled(path, false, attempt); });
+        } catch (e) { settled(path, false, attempt); }
+        return;
+      }
+      var node = document.createElement(path === 'v2.js' ? 'script' : 'link');
+      if (path === 'v2.js') { node.src = path; node.defer = true; }
+      else { node.rel = 'stylesheet'; node.href = path; }
+      node.onload = function(){ settled(path, true, attempt, node); };
+      node.onerror = function(){ settled(path, false, attempt, node); };
+      document.head.appendChild(node);
+    }
+    function settled(path, ok, attempt, node){
+      var a = record.assets[path];
+      // A stale/duplicate native or recovery event cannot settle another attempt.
+      if (!a || a.state !== 'loading' || a.attempts !== attempt) return;
+      a.lastElapsedMs = Math.round(performance.now() - started[path]);
+      if (fonts[path] && (!window.FontFace || !document.fonts)){
+        if (!ok) record.failureCount++;
+        a.state = 'skipped';
+        summarize();
+        return;
+      }
+      if (ok){
+        a.state = 'loaded';
+        if (a.retries) emit('asset_recovered', path);
+        summarize();
+        return;
+      }
+      record.failureCount++;
+      if (node && attempt > 1 && node.parentNode) node.parentNode.removeChild(node);
+      if (a.retries === MAX_RETRIES){
+        a.state = 'failed';
+        emit('asset_failed', path, 'load_error');
+        showError(path);
+        summarize();
+        return;
+      }
+      a.state = 'pending';
+      a.retries++;
+      record.retryCount++;
+      var delay = 200 * a.retries;
+      emit('asset_retry', path, 'load_error', delay);
+      setTimeout(function(){ retry(path); }, delay);
+    }
+    window.otgwAssetEvent = settled;
   })();
 </script>
+<link id="v2Stylesheet" rel="stylesheet" href="v2-bundle.css" onload="otgwAssetEvent('v2-bundle.css',true,1,this)" onerror="otgwAssetEvent('v2-bundle.css',false,1,this)">
+<link id="fontInter400" rel="preload" href="fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin="anonymous" onload="otgwAssetEvent('fonts/inter-400.woff2',true,1,this)" onerror="otgwAssetEvent('fonts/inter-400.woff2',false,1,this)">
+<link id="fontInter700" rel="preload" href="fonts/inter-700.woff2" as="font" type="font/woff2" crossorigin="anonymous" onload="otgwAssetEvent('fonts/inter-700.woff2',true,1,this)" onerror="otgwAssetEvent('fonts/inter-700.woff2',false,1,this)">
+<link id="fontMono400" rel="preload" href="fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin="anonymous" onload="otgwAssetEvent('fonts/jetbrains-mono-400.woff2',true,1,this)" onerror="otgwAssetEvent('fonts/jetbrains-mono-400.woff2',false,1,this)">
+<script id="v2Script" src="v2.js" defer onload="otgwAssetEvent('v2.js',true,1,this)" onerror="otgwAssetEvent('v2.js',false,1,this)"></script>
 </head>
 <body>
 

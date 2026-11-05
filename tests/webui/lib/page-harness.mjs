@@ -23,7 +23,7 @@ export const CHROME = [
 ].find((p) => fs.existsSync(p));
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export async function startPage({ api, width = 1400, height = 1000, page = '/v2.html' } = {}) {
+export async function startPage({ api, asset, beforeScript, width = 1400, height = 1000, page = '/v2.html' } = {}) {
   const log = [];
   let PORT = 0;
   const srv = http.createServer((q, s) => {
@@ -39,6 +39,7 @@ export async function startPage({ api, width = 1400, height = 1000, page = '/v2.
         s.end(JSON.stringify(r === undefined ? {} : r));
         return;
       }
+      if (asset && asset(p, q, s)) return;
       const f = path.join(DATA, p === '/' ? '/v2.html' : p);
       if (fs.existsSync(f) && fs.statSync(f).isFile()) {
         s.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' });
@@ -61,10 +62,11 @@ export async function startPage({ api, width = 1400, height = 1000, page = '/v2.
   if (!target) throw new Error('Chrome DevTools endpoint never came up');
   const ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
-  let msgId = 0; const pending = new Map(); const exceptions = [];
+  let msgId = 0; const pending = new Map(); const exceptions = []; const events = [];
   ws.addEventListener('message', (ev) => {
     const m = JSON.parse(ev.data);
     if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
+    if (m.method && (m.method.startsWith('Network.') || m.method === 'Runtime.consoleAPICalled')) events.push(m);
     if (m.method === 'Runtime.exceptionThrown') exceptions.push(JSON.stringify(m.params.exceptionDetails).slice(0, 300));
   });
   const send = (method, params = {}) => new Promise((res) => { const id = ++msgId; pending.set(id, res); ws.send(JSON.stringify({ id, method, params })); });
@@ -77,6 +79,9 @@ export async function startPage({ api, width = 1400, height = 1000, page = '/v2.
     return evalJs(expr).catch(() => null);
   };
   await send('Page.enable'); await send('Runtime.enable');
+  await send('Network.enable');
+  await send('Network.setCacheDisabled', { cacheDisabled: true });
+  if (beforeScript) await send('Page.addScriptToEvaluateOnNewDocument', { source: beforeScript });
   const resize = (w, h = height) => send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false });
   await resize(width);
   await send('Page.navigate', { url: `http://127.0.0.1:${PORT}${page}` });
@@ -93,5 +98,5 @@ export async function startPage({ api, width = 1400, height = 1000, page = '/v2.
     await sleep(300);
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* chrome may still hold files */ }
   };
-  return { PORT, log, exceptions, send, evalJs, until, sleep, shot, resize, close };
+  return { PORT, log, exceptions, events, send, evalJs, until, sleep, shot, resize, close };
 }
