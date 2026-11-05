@@ -34,15 +34,43 @@ SRC = Path(os.environ.get("OTGW_SRC_DIR", REPO / "src" / "OTGW-firmware"))
 PRELUDE = r"""
 #include <cstdio>
 #include <cstring>
+#include <cstdint>
+#include <cstdarg>
+#include <cstdlib>
+#include <string>
+#include <sstream>
+#include <iostream>
+typedef uint8_t byte;
 struct Settings { bool bTelnetEnabled = true; } settings;
+
+// Controllable fake clock; the real safeTimers.h (DECLARE_TIMER_SEC / DUE) runs against it.
+static uint32_t fakeNow = 0;
+static uint32_t millis() { return fakeNow; }
+static long random(long lo, long hi) { return lo; }
+
+// debugTelnet models the AsyncTCP listener: stop() with a client connected closes it from the server side,
+// which leaves local port 23 in TIME_WAIT for 120 s; begin() then fails tcp_bind (no SO_REUSEADDR).
 static int nBegin = 0, nStop = 0;
+static bool listening = false, clientConnected = false;
+static uint32_t busyUntil = 0;
 struct TelnetStub {
   void onConnect(void (*)()) {}
   void setLineMode(bool) {}
   void setNoDelay(bool) {}
   void onInputReceived(void (*)(const char*)) {}
-  bool begin(bool) { nBegin++; return true; }
-  void stop() { nStop++; }
+  bool begin(bool) {
+    nBegin++;
+    if (listening) return true;
+    if ((int32_t)(fakeNow - busyUntil) < 0) return false;
+    listening = true;
+    return true;
+  }
+  void stop() {
+    nStop++;
+    if (clientConnected) busyUntil = fakeNow + 120000UL;
+    clientConnected = false;
+    listening = false;
+  }
 } debugTelnet;
 static void sendTelnetBanner() {}
 static void onTelnetInput(const char*) {}
@@ -52,16 +80,29 @@ static const char* getActiveIP() { return "0.0.0.0"; }
 #define DebugT(...) do {} while (0)
 #define DebugTln(...) do {} while (0)
 #define DebugTf(...) do {} while (0)
+#include "@SAFETIMERS@"
 """
 
+# One command per stdin line; "print" emits "listening nBegin nStop".
 MAIN = r"""
-int main(int argc, char** argv) {
-  settings.bTelnetEnabled = argv[1][0] == '1';
-  startTelnet();
-  printf("%d %d\n", nBegin, nStop);
+int main() {
+  std::string line;
+  while (std::getline(std::cin, line)) {
+    std::istringstream is(line);
+    std::string c; long v = 0;
+    is >> c >> v;
+    if (c == "enable") settings.bTelnetEnabled = v != 0;
+    else if (c == "client") clientConnected = v != 0;
+    else if (c == "start") startTelnet();
+    else if (c == "adv") fakeNow += (uint32_t)v;
+    else if (c == "tick") telnetRelistenTick();
+    else if (c == "print") printf("%d %d %d\n", listening ? 1 : 0, nBegin, nStop);
+  }
   return 0;
 }
 """
+
+TICK_MARK = "// TASK-1644: stop() closes a connected client"
 
 
 def cut_function(src, signature):
@@ -84,15 +125,31 @@ def read(name):
     return (SRC / name).read_text(encoding="utf-8")
 
 
+def build_part1_source():
+    """Cut the real telnet code from networkStuff.ino: the TASK-1644 static block, startTelnet() and (when the
+    source has it) telnetRelistenTick(). Old sources lack the block and the tick; the second value reports that.
+    safeTimers.h is the real header, run against the fake millis()."""
+    src = read("networkStuff.ino")
+    at = src.find(TICK_MARK)
+    block = src[at:src.find("void startTelnet()")] if at >= 0 else ""
+    start_fn = cut_function(src, "void startTelnet()")
+    has_tick = "void telnetRelistenTick()" in src
+    tick = cut_function(src, "void telnetRelistenTick()") if has_tick else "void telnetRelistenTick() {}"
+    prelude = PRELUDE.replace("@SAFETIMERS@", (SRC / "safeTimers.h").as_posix())
+    return prelude + block + start_fn + "\n" + tick + "\n" + MAIN, has_tick
+
+
 class StartTelnetHonoursSetting(unittest.TestCase):
     exe = None
+    has_tick = False
 
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
         d = Path(cls.tmp.name)
         cpp = d / "telnet.cpp"
-        cpp.write_text(PRELUDE + cut_function(read("networkStuff.ino"), "void startTelnet()") + MAIN, encoding="utf-8")
+        code, cls.has_tick = build_part1_source()
+        cpp.write_text(code, encoding="utf-8")
         cls.exe = compile_cpp(cpp, d / ("telnet.exe" if os.name == "nt" else "telnet"))
         if cls.exe is None:
             raise unittest.SkipTest("no C++ compiler")
@@ -101,9 +158,26 @@ class StartTelnetHonoursSetting(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
+    def run_script(self, lines):
+        """Run commands, return one (listening, nBegin, nStop) tuple per 'print'."""
+        out = subprocess.run([str(self.exe)], input="\n".join(lines) + "\n", capture_output=True, text=True,
+                             check=True).stdout
+        return [tuple(int(x) for x in row.split()) for row in out.splitlines()]
+
+    def need_tick(self):
+        if not self.has_tick:
+            self.fail("networkStuff.ino has no telnetRelistenTick(): after telnetenabled off with a client, "
+                      "then on, begin() fails in the 120 s TIME_WAIT and nothing retries (port 23 stays closed)")
+
     def run_with(self, enabled):
-        out = subprocess.run([str(self.exe), "1" if enabled else "0"], capture_output=True, text=True, check=True).stdout
-        return tuple(int(x) for x in out.split())
+        return self.run_script(["enable %d" % (1 if enabled else 0), "start", "print"])[0][1:]
+
+    @staticmethod
+    def steps(seconds):
+        lines = []
+        for _ in range(seconds):
+            lines += ["adv 1000", "tick", "print"]
+        return lines
 
     def test_off_closes_port_23_and_never_listens(self):
         n_begin, n_stop = self.run_with(False)
@@ -113,6 +187,37 @@ class StartTelnetHonoursSetting(unittest.TestCase):
     def test_on_listens(self):
         n_begin, n_stop = self.run_with(True)
         self.assertEqual((n_begin, n_stop), (1, 0))
+
+    # --- TASK-1644 bench finding: re-enable inside the TIME_WAIT window of the closed client ---------------
+    OFF_ON = ["enable 1", "start", "client 1", "enable 0", "start", "enable 1", "start"]
+
+    def test_reenable_after_off_with_client_listens_within_130s(self):
+        self.need_tick()
+        rows = self.run_script(self.OFF_ON + ["print"] + self.steps(130))
+        self.assertEqual(rows[0][0], 0, "model check: the immediate begin() must fail inside TIME_WAIT")
+        t_listen = next((i for i, r in enumerate(rows[1:], 1) if r[0] == 1), None)
+        self.assertIsNotNone(t_listen, "port 23 never re-listened within 130 s of the re-enable")
+        self.assertLessEqual(t_listen, 130)
+
+    def test_normal_boot_never_calls_begin_from_tick(self):
+        self.need_tick()
+        rows = self.run_script(["enable 1", "start", "print"] + self.steps(200))
+        self.assertEqual(rows[-1][1], 1, "tick called begin() although telnet was never stopped")
+
+    def test_window_expires_after_180s(self):
+        self.need_tick()
+        at_190 = self.run_script(self.OFF_ON + self.steps(190))[-1]
+        at_400 = self.run_script(self.OFF_ON + self.steps(400))[-1]
+        self.assertGreater(at_190[1], 2, "tick never retried begin() inside the window")
+        self.assertEqual(at_190[1], at_400[1], "begin() still called after the 180 s retry window expired")
+
+    def test_off_again_during_window_stops_retries(self):
+        self.need_tick()
+        pre = self.OFF_ON + self.steps(25) + ["enable 0", "start", "print"]
+        before = self.run_script(pre)[-1]
+        after = self.run_script(pre + self.steps(200))[-1]
+        self.assertEqual(before[1], after[1], "tick retried begin() after telnetenabled went off again")
+        self.assertEqual(after[0], 0, "port 23 listening although telnetenabled is off")
 
 
 class SettingWiredEndToEnd(unittest.TestCase):

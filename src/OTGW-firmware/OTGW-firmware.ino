@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.90
+**  Version  : v2.0.0-beta.91
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1051,6 +1051,7 @@ void doBackgroundTasks()
   // startWebSocket()/startMQTT(), potentially tearing down the HTTP connection
   // carrying the OTA data and leaving the LittleFS partition partially written.
   if (!isFlashing()) loopWifi();
+  telnetRelistenTick();       // TASK-1644: re-listen on port 23 after a disable/enable (TIME_WAIT window)
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   if (!isFlashing()) loopEthernet();   // W5500 link-poll + WiFi↔Ethernet failover (every 5s)
 #endif

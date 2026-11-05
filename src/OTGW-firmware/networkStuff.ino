@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.90
+**  Version  : v2.0.0-beta.91
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1210,6 +1210,16 @@ static void onTelnetInput(const char* s) {
   if (s && s[0] != '\0') handleDebugChar(s[0]);
 }
 
+// TASK-1644: stop() closes a connected client from the server side, which leaves that connection in
+// TIME_WAIT on local port 23 for 2 x CONFIG_LWIP_TCP_MSL (120 s). AsyncTCP binds the listener without
+// SO_REUSEADDR, so a begin() inside that window fails its tcp_bind and port 23 stays closed (bench .61,
+// 2026-11-05: refused until the window passed). After a stop, startTelnet() opens a retry window in
+// which telnetRelistenTick() calls begin() again every 10 s; begin() returns at once while listening.
+static const uint32_t TELNET_RELISTEN_WINDOW_MS = 180000UL;   // TIME_WAIT 120 s plus margin
+static bool     telnetStoppedSinceBoot = false;
+static uint32_t telnetRelistenStartMs  = 0;
+static bool     telnetRelistenActive   = false;
+
 //===========================================================================================
 void startTelnet()
 {
@@ -1219,7 +1229,13 @@ void startTelnet()
   if (!settings.bTelnetEnabled) {
     DebugTln(F("Telnet debug console disabled (setting telnetenabled), closing port 23"));
     debugTelnet.stop();
+    telnetStoppedSinceBoot = true;
+    telnetRelistenActive = false;
     return;
+  }
+  if (telnetStoppedSinceBoot) {
+    telnetRelistenStartMs = millis();
+    telnetRelistenActive = true;
   }
   debugTelnet.onConnect(sendTelnetBanner);
   debugTelnet.setLineMode(false);
@@ -1234,6 +1250,20 @@ void startTelnet()
   DebugT(getActiveIP());
   DebugTln(F(":23"));
 } // startTelnet()
+
+//===========================================================================================
+// TASK-1644: called from doBackgroundTasks(). Only active for TELNET_RELISTEN_WINDOW_MS after a
+// re-enable that followed a stop(); does nothing otherwise.
+void telnetRelistenTick()
+{
+  if (!telnetRelistenActive) return;
+  if (!settings.bTelnetEnabled || (uint32_t)(millis() - telnetRelistenStartMs) > TELNET_RELISTEN_WINDOW_MS) {
+    telnetRelistenActive = false;
+    return;
+  }
+  DECLARE_TIMER_SEC(timerTelnetRelisten, 10, SKIP_MISSED_TICKS);
+  if (DUE(timerTelnetRelisten)) debugTelnet.begin(false);
+}
 
 //=======================================================================
 void startMDNS(const char *hostname)

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T04:09:00Z'
-updated_date: '2026-11-05T04:21:00Z'
+updated_date: '2026-11-05T05:53:00Z'
 labels:
   - github
   - security
@@ -35,4 +35,6 @@ https://github.com/rvdbreemen/OTGW-firmware/issues/154 point 4. Robert 2026-11-0
 
 <!-- SECTION:NOTES:BEGIN -->
 6c 2026-11-05 05:22: implemented in wt-6c-1644 on origin/dev 8111d17ad; patch at C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/9ad25eb8-1a77-4659-887b-f3c41994cc95/scratchpad/task-1644.patch (git apply --check OK on wt-int4 0ac39c9d7). Setting settings.bTelnetEnabled (key telnetenabled, default true): struct, settings file write/read, live apply via SIDE_EFFECT_TELNET -> startTelnet() in flushSettings() (same pattern as SIDE_EFFECT_OTGWSTREAM), GET + knownSettings + device/info settings.telnet_enabled, settingsHelp.h, v2.js SET_META (system). startTelnet() closes port 23 (debugTelnet.stop()) and returns when off; all callers (boot, WiFi reconnect, telnet r, deferred apply) go through it; grep shows no other debugTelnet.begin. Evidence: tests/test_telnet_console_setting.py on old sources (OTGW_SRC_DIR) 5 FAIL / 1 ok (on_listens), on the fix 6/6 OK; test_settings_whitelist OK; test_adr_governance OK; evaluate --quick 89 checks, 82 pass, 0 fail, 0 warn. Debug macros with no server: checked by reading code only (write() returns 0 with no client, flush() loops over inactive slots, AsyncServer::end() is a no-op without a pcb, so stop() at boot on a never-begun server is safe). Pre-existing: tests/webui/settings-help.test.mjs 18 KB limit already red on origin/dev (18682 B), 18814 B with this change. Open for the bench: port 23 refused after POST telnetenabled=false and accepted after true, no reboot (AC2/AC3).
+
+2026-11-05 fix for the re-enable FAIL: TIME_WAIT relisten window (networkStuff.ino static block + telnetRelistenTick(), called from doBackgroundTasks). tests/test_telnet_console_setting.py extended (TIME_WAIT model in the debugTelnet stub, real safeTimers.h with a fake clock): 10/10 OK on the fix, 4 FAIL on HEAD sources (the 4 new tests); lead mutant window 180->60 s: test (a) FAIL, restored: 10/10 OK. evaluate --quick 0 failed. Bench redo pending (off with a client, on -> port 23 accepted within ~130 s).
 <!-- SECTION:NOTES:END -->
