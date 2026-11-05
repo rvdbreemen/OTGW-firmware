@@ -1383,7 +1383,11 @@
     if (typeof n !== 'number' || typeof iv !== 'number' || typeof age !== 'number' || typeof sc !== 'number') return hist;
     if (!(n > 0) || !(iv > 0) || !(sc > 0) || !(age >= 0)) return hist;
     for (var c = 0; c < ALL.length; c++) if (!Array.isArray(j[ALL[c]]) || j[ALL[c]].length !== n) return hist;
-    var live = hist.filter(function (r) { return !r.h; }), ivMs = iv * 1000, out = [], li = 0;
+    // TASK-1306: earlier history that ends before the oldest slot of this response stays (after a device
+    // reboot the device no longer has it); history overlapping the response is replaced by it. One 5 s slot
+    // of tolerance absorbs the request timing. Those kept records act like live ones in the merge below.
+    var ivMs = iv * 1000, tFirst = nowMs - age - n * ivMs, out = [], li = 0;
+    var live = hist.filter(function (r) { return !r.h || r.t + r.span <= tFirst + GSLOT; });
     // TASK-1578: the device stores a room dropout as a null room. When the window has room readings at all,
     // a null room in a slot that has other data is a dropout (the TASK-1546 interruption); a unit that never
     // reported a room temperature has no dropout to show.

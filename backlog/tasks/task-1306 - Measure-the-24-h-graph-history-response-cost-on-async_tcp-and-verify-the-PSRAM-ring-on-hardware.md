@@ -3,10 +3,11 @@ id: TASK-1306
 title: >-
   Measure the 24 h graph history response cost on async_tcp and verify the PSRAM
   ring on hardware
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-23T06:27:00Z'
-updated_date: '2026-11-05T04:50:00Z'
+updated_date: '2026-11-04T21:15:00Z'
 labels:
   - webui
   - graph
@@ -28,7 +29,7 @@ Follow-up of TASK-1296. Boards with PSRAM keep a 726 x 120 s ring and serve ~24 
 <!-- AC:BEGIN -->
 - [ ] #1 Temporary uncommitted build with the 726-slot ring forced static and a 1 s interval on the no-PSRAM bench: full 24 KB body served, curl time_total recorded, hd_max_loop_gap_ms before/after 5 requests recorded, no TWDT reset
 - [ ] #2 On a PSRAM board (LOLIN S3 Mini/Pro): /api/v2/graph/history reports interval_s 120, PSRAM free size before/after boot recorded, 24 h window filled after the run time allows
-- [ ] #3 Decision on the reboot-while-page-open history drop recorded (accept or fix)
+- [x] #3 Decision on the reboot-while-page-open history drop recorded (accept or fix)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -40,5 +41,7 @@ Follow-up of TASK-1296. Boards with PSRAM keep a 726 x 120 s ring and serve ~24 
 
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: measurement only, needs a PSRAM board.
 
-6c 2026-11-05 bench window .63. AC2 reading on beta.79+a9dd048 at 05:37 (uptime 7:33, lastreset Software reset): GET /api/v2/graph/history interval_s 120, count 226 (ring not yet full, 726 slots = 24 h), 8977 B in 0.069 s and 0.098 s (2 runs, HTTP 200); device/info psram_free 2057516, hd_max_loop_gap_ms 435. AC1: temporary image beta.79+e8fb50b (GRAPH_HIST_LARGE_INTERVAL_S=1) OTA-flashed 05:38 via safeboot, app only, settings 175 keys unchanged; at 05:46 count 515, hd_max_loop_gap_ms 459, psram_free 2057512, no reset. The measurement script (wait for 726, then gap / 5 curls / gap) was stopped by Claude Code at about 05:49 because the PC was low on memory (commit charge 87 %); it recorded nothing and was not restarted (session rule). Last reading before restore: count 658. AC1 is therefore NOT measured; it needs a new window. .63 restored to beta.79+a9dd048 at 05:49:45 (ota_flash.py, settings unchanged).
+2026-11-04 22:1x (otgw-firmware-6c) AC2 part 1 on .63 (Classic+S3 combo, ESP32-S3FH4R2, beta.79+a9dd048, uptime 6 min after the last TASK-1395 reboot at ~22:06): device/info psram_found 1, psram_size 2097152, psram_free 2057988 (39164 B in use after boot, ring included); GET /api/v2/graph/history: HTTP 200, interval_s 120, count 3, 277 B, 0.195 s. .63 left untouched (no reboot) so the ring fills; recheck around 06:15 (~8 h = ~240 slots; a full 24 h window needs 24 h uptime, not available tonight because the bench is needed at 06:30).
+
+2026-11-04 AC3 decided by Robert (interactive, this session): fix. mergeGraphHistory (data/v2.js) dropped every earlier history record on a reload (live = hist.filter(!r.h)); after a device reboot the ring only holds post-reboot slots, so history from before page load vanished on the next 10-minute reload. Fix: history records whose span ends before the oldest slot of the new response (tolerance one 5 s GSLOT for request timing) are kept; the overlap is still replaced by the response. tests/webui/graph-history-merge.test.mjs: new test 'history from before a device reboot survives the next reload' plus a stricter reload test; on HEAD b1fe73d2e both FAIL ('pre-reboot history slot 1799998770000 was dropped', 'history older than the new response is kept'); on the fix node --test tests/webui/graph-*.test.mjs: 58 pass, 0 fail. Needs a filesystem build + bump by the lead; bench: open Graph, reboot the unit, wait for the 10-min reload, earlier history still drawn.
 <!-- SECTION:NOTES:END -->

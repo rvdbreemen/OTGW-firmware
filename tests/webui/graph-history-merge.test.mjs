@@ -202,7 +202,28 @@ test('a reload replaces the earlier history instead of duplicating it', () => {
   const again = merge(first, body(10, { newest_age_ms: 30000 }), NOW + 600000 + 25000 - 0);
   assertSortedUnique(again);
   assert.equal(again.filter(s => !s.h).length, 2);
-  assert.ok(again.filter(s => s.h).length <= 10);
+  // TASK-1306: earlier history older than the new response is kept, the overlap is replaced: no two history
+  // records overlap by more than one 5 s slot (request jitter).
+  const h = again.filter(s => s.h);
+  for (let i = 1; i < h.length; i++) assert.ok(h[i].t >= h[i - 1].t + h[i - 1].span - GSLOT, 'history records overlap at ' + i);
+  const tFirst = NOW + 625000 - 30000 - 10 * IV;
+  const fresh = h.filter(s => s.t >= floor5(tFirst));
+  assert.ok(fresh.length > 0);
+  for (const s of fresh) assert.equal((s.t - floor5(tFirst)) % IV, 0, 'the overlap comes from the new response only: ' + s.t);
+  assert.ok(h.length > fresh.length, 'history older than the new response is kept');
+});
+
+test('TASK-1306: history from before a device reboot survives the next reload', () => {
+  const live1 = [live(NOW - 20000), live(NOW - 15000)];
+  const first = merge(live1, body(10), NOW);
+  const before = first.filter(s => s.h).map(s => s.t);
+  // the device rebooted: 10 minutes later its ring holds only 3 slots, all after the first load
+  const again = merge(first, body(3), NOW + 600000);
+  assertSortedUnique(again);
+  const after = again.filter(s => s.h).map(s => s.t);
+  for (const t of before) assert.ok(after.includes(t), 'pre-reboot history slot ' + t + ' was dropped');
+  assert.equal(after.length, before.length + 3);
+  assert.equal(again.filter(s => !s.h).length, 2);
 });
 
 test('result is trimmed to GHIST_MAX, keeping the newest', () => {
