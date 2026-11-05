@@ -1,10 +1,11 @@
 ---
 id: TASK-1641
 title: 'GitHub #154: suggestions to improve security'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-04T23:52:00Z'
-updated_date: '2026-11-04T23:57:00Z'
+updated_date: '2026-11-05T00:03:00Z'
 labels:
   - github
 milestone: 2.0.0
