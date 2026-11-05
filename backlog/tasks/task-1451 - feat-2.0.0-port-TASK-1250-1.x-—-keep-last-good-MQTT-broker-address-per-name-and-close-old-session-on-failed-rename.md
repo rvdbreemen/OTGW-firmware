@@ -3,10 +3,11 @@ id: TASK-1451
 title: >-
   feat-2.0.0: port TASK-1250 (1.x) — keep last good MQTT broker address per name
   and close old session on failed rename
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T06:22:00Z'
-updated_date: '2026-11-02T04:38:00Z'
+updated_date: '2026-11-05T16:35:00Z'
 labels:
   - port-from-1.x
   - mqtt

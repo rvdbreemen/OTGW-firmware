@@ -1,10 +1,11 @@
 ---
 id: TASK-1647
 title: Measure how long tasks wait for maintainer decisions and field evidence
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-05T04:33:00Z'
-updated_date: '2026-11-05T06:57:00Z'
+updated_date: '2026-11-05T17:00:00Z'
 labels:
   - process
   - agentic
@@ -31,4 +32,6 @@ Follow-up of TASK-1636 (Robert 2026-11-05: no scaling now). docs/process/agentic
 
 <!-- SECTION:NOTES:BEGIN -->
 Robert 2026-11-05 (session, maintainer decision): parked until after 2.0.0.
+
+Robert 2026-11-05 (session, /goal): park lifted, implement now.
 <!-- SECTION:NOTES:END -->
