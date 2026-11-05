@@ -166,7 +166,10 @@ unsigned char OTGWUpgrade::hexChecksum(char *hex, int len) {
     strcpy_P(fmt, hexbytefmt);
 
     while (len-- > 0) {
-        sscanf(hex, fmt, &val);
+        // siscanf (newlib, integer-only) instead of sscanf: every format in this
+        // file is integer, and avoiding sscanf keeps the floating-point scanner
+        // out of the firmware image (TASK-1639).
+        siscanf(hex, fmt, &val);
         sum -= val;
         hex += 2;
     }
@@ -179,7 +182,7 @@ OTGWError OTGWUpgrade::readHexRecord() {
     strcpy_P(fmt, hexwordfmt);
     int len, addr, tag, data, offs, i;
     while (hexfd.readBytesUntil('\n', hexbuf, sizeof(hexbuf)) != 0) {
-        if (sscanf(hexbuf, ":%2x%4x%2x", &len, &addr, &tag) != 3) break;
+        if (siscanf(hexbuf, ":%2x%4x%2x", &len, &addr, &tag) != 3) break;
         if (len & 1) {
             // Invalid data size
             return OTGW_ERROR_HEX_DATASIZE;
@@ -195,7 +198,7 @@ OTGWError OTGWUpgrade::readHexRecord() {
             len >>= 1;
             hexlen = len;
             for (i = 0; i < len; i++) {
-                if (sscanf(hexbuf + offs, fmt, &data) != 1) {
+                if (siscanf(hexbuf + offs, fmt, &data) != 1) {
                     // Didn't find hex data
                     break;
                 }
@@ -210,11 +213,11 @@ OTGWError OTGWUpgrade::readHexRecord() {
             return OTGW_ERROR_NONE;
         } else if (tag == 2) {
             // Extended segment address record
-            if (sscanf(hexbuf + offs, fmt, &data) != 1) break;
+            if (siscanf(hexbuf + offs, fmt, &data) != 1) break;
             hexseg = data;
         } else if (tag == 4) {
             // Extended linear address record
-            if (sscanf(hexbuf + offs, fmt, &data) != 1) break;
+            if (siscanf(hexbuf + offs, fmt, &data) != 1) break;
             hexseg = data << 12;
         }
     }
@@ -333,9 +336,9 @@ int OTGWUpgrade::versionCompare(const char *version1, const char* version2) {
     int v1, v2, n;
 
     while (*s1 && *s2) {
-        if (!sscanf(s1, "%d%n", &v1, &n)) return 0;
+        if (!siscanf(s1, "%d%n", &v1, &n)) return 0;
         s1 += n;
-        if (!sscanf(s2, "%d%n", &v2, &n)) return 0;
+        if (!siscanf(s2, "%d%n", &v2, &n)) return 0;
         s2 += n;
         if (v1 < v2) return -1;
         if (v1 > v2) return 1;
@@ -366,7 +369,7 @@ int OTGWUpgrade::eepromSettings(const char *version, OTGWTransferData *xfer) {
     while (f.available()) {
         len = f.readBytesUntil('\n', buffer, sizeof(buffer) - 1);
         buffer[len] = '\0';
-        if ((n = sscanf(buffer, "%d %n%*s%n %x %d %x", &id, &p1, &p2, &addr, &size, &mask)) == 4) {
+        if ((n = siscanf(buffer, "%d %n%*s%n %x %d %x", &id, &p1, &p2, &addr, &size, &mask)) == 4) {
             if (id >= XFER_MAX_ID) break;
             buffer[p2] = '\0';
             if (versionCompare(version, buffer + p1) < 0) continue;
@@ -975,7 +978,7 @@ String OTGWSerial::firmwareToString() {
 
 OTGWProcessor OTGWSerial::processor() {
     int major;
-    if (sscanf(fwversion, "%d", &major) < 1) {
+    if (siscanf(fwversion, "%d", &major) < 1) {
         return PICUNKNOWN;
     } else if (major < newpic[firmware]) {
         return PIC16F88;

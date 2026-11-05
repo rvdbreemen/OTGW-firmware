@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.89
+**  Version  : v2.0.0-beta.90
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -166,8 +166,11 @@ static void appendBootDetectLog()
     first[n] = '\0';
     unsigned int prev = 0;
     // sscanf_P does not exist on ESP32 (this code is HAS_RUNTIME_HW_DETECT /
-    // combo only). PSTR() is a no-op on ESP32, so plain sscanf is correct here.
-    if (sscanf(first, PSTR("boot#%u"), &prev) == 1) bootNum = prev + 1;
+    // combo only). PSTR() is a no-op on ESP32, so a plain format is correct here.
+    // siscanf: newlib's integer-only sscanf. The firmware never calls sscanf, so
+    // the 8.8 KB floating-point scanner is not linked (TASK-1639,
+    // tests/test_no_float_sscanf.py).
+    if (siscanf(first, PSTR("boot#%u"), &prev) == 1) bootNum = prev + 1;
     infh.close();
   }
 

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.89
+**  Version  : v2.0.0-beta.90
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3011,7 +3011,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // SC=HH:MM/DOW — Time sync (MsgID 20 = day/time, ~61s expiry per PIC CommandExpiry)
   else if (cmd0 == 'S' && cmd1 == 'C') {
     int hh = 0, mm = 0, dow = 0;
-    if (sscanf(value, "%d:%d/%d", &hh, &mm, &dow) >= 2) {
+    if (siscanf(value, "%d:%d/%d", &hh, &mm, &dow) >= 2) {
       uint16_t data20 = (uint16_t)(((dow & 0x07) << 5 | (hh & 0x1F)) << 8) | (mm & 0x3F);
       enqueueWriteCommand(20, data20, "SC-time");
       otSCLastCommandMs = millis();
@@ -3477,7 +3477,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     if (comma) {
       // PIC byte-pair: SR=<msgId>:<highByte>,<lowByte> (decimal 0..255 each)
       unsigned int hiByte = 0, loByte = 0;
-      if (sscanf(value, "%u:%u,%u", &msgId, &hiByte, &loByte) != 3 ||
+      if (siscanf(value, "%u:%u,%u", &msgId, &hiByte, &loByte) != 3 ||
           msgId > 127 || hiByte > 255 || loByte > 255) {
         otDirectBridgeProcessStatus("BV"); return false;
       }
@@ -3492,10 +3492,10 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       for (const char* p = colon + 1; *p; ++p) {
         if ((*p >= 'a' && *p <= 'f') || (*p >= 'A' && *p <= 'F')) { hasHexDigit = true; break; }
       }
-      if (!hasHexDigit && sscanf(value, "%u:%u", &msgId, &oneVal) == 2 && oneVal <= 255) {
+      if (!hasHexDigit && siscanf(value, "%u:%u", &msgId, &oneVal) == 2 && oneVal <= 255) {
         if (msgId > 127) { otDirectBridgeProcessStatus("BV"); return false; }
         dataVal = oneVal & 0xFF;  // high byte = 0
-      } else if (sscanf(value, "%u:%x", &msgId, &dataVal) == 2 && msgId <= 127) {
+      } else if (siscanf(value, "%u:%x", &msgId, &dataVal) == 2 && msgId <= 127) {
         // legacy hex16 form
       } else {
         otDirectBridgeProcessStatus("BV"); return false;
@@ -3577,7 +3577,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   else if (cmd0 == 'R' && cmd1 == 'M') {
     unsigned int msgId = 0;
     unsigned int dataVal = 0;
-    if (sscanf(value, "%u:%x", &msgId, &dataVal) != 2 || msgId > 127) {
+    if (siscanf(value, "%u:%x", &msgId, &dataVal) != 2 || msgId > 127) {
       otDirectBridgeProcessStatus("BV"); return false;
     }
     setResponseModifier((uint8_t)msgId, (uint16_t)dataVal);

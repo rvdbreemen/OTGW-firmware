@@ -79,6 +79,7 @@ typedef uint8_t byte;
 typedef const char* PGM_P;
 #define PROGMEM
 #define PSTR(s) (s)
+#define siscanf sscanf   // newlib integer-only sscanf (TASK-1639); same parse for integer formats
 class __FlashStringHelper;                        // incomplete: pointer-only, as on Arduino
 #define F(s) ((const __FlashStringHelper*)(s))
 #define snprintf_P snprintf

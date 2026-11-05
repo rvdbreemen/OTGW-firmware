@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.89
+**  Version  : v2.0.0-beta.90
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5814,7 +5814,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
     memset(OTdata.buf, 0, sizeof(OTdata.buf));        // clear buffer
     memcpy(OTdata.buf, buf, len);                     // copy the raw message to the buffer
     OTdata.len = len;                                 // set the length of the message  
-    if (sscanf(bufval, "%8x", &value) != 1) return;    // extract the value, abort on parse failure
+    if (siscanf(bufval, "%8x", &value) != 1) return;    // extract the value, abort on parse failure
     OTdata.value = value;                             // store the value
     OTdata.type = (value >> 28) & 0x7;                // byte 1 = take 3 bits that define msg msgType
     OTdata.masterslave = (OTdata.type >> 2) & 0x1;    // MSB from type --> 0 = master and 1 = slave
