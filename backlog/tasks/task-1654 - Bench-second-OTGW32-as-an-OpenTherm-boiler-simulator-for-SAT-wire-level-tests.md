@@ -1,9 +1,11 @@
 ---
 id: TASK-1654
 title: 'Bench: second OTGW32 as an OpenTherm boiler simulator for SAT wire-level tests'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-05T07:00:00Z'
+updated_date: '2026-11-05T14:10:00Z'
 labels:
   - sat
   - bench
@@ -25,3 +27,13 @@ Robert 2026-11-05 (TASK-1412.20 R-1): a second OTGW32 runs the vendored OpenTher
 - [ ] #2 Bench unit sees the simulator as a boiler on the wire (B frames from the bus, not replay), shown in a capture
 - [ ] #3 TASK-1412.20 SB05-SB09 and SB11 run on the wire with the expected SAT reactions recorded
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-05 (6c, worktree wt-6c-1654 on origin/dev c0d471ebf): AC1 host side built under tools/bench/ot-boiler-sim/ (separate PlatformIO project, no src/ change). Engine src/boiler_sim.cpp is pure C++ and reacts to the master: ID0 echoes master flags; CH active follows CH enable; flame needs heat demand (CH + written TSet >= demand_min 20 C) and lights ignition_delay s later, because SAT's PWM OFF keeps CH=1 and sends CS=10 (SATcontrol.ino:1601). Per-ID Data-Invalid/Unknown/no-answer, silence, fault, DHW draw come from .scn files; export_scenarios.py writes SB05-SB09 and SB11 from scripts/sat_bench_scenarios_1412_20.py (generator unchanged, 1412.20-v1, sha256 per file in data/index.txt); SB11 wire variant ignition_delay=120. Other IDs the bench unit polls (OTDirect.ino otSchedule[]) are answered, so no unscripted Unknown-DataID confounds a run. Evidence: python test/host/test_ot_boiler_sim.py -> 17/17 PASS (MSVC; frames encoded by the generator's frame()); mutants red: Data-Invalid ignored, ID0 HB not echoed, ignition delay ignored, no-answer ignored, demand ignored. EOL bug found and fixed (.gitattributes eol=lf; --check stale -> up to date). evaluate.py --quick 83 passed / 0 failed. NOT verified: src/main.cpp sketch not compiled (pio run would bypass the build lock, TASK-1488; question to 6b), nothing ran on a board; AC1 left unchecked. Classic PIC: whether it originates requests without a thermostat is not checked. Commits 6b6f163bc, 19fae5d2a, 133b8072b (local, handed to 6b).
+
+Full sweep scripts/run_tests.py in wt-6c-1654: 153 passed / 7 failed. Fixed: tests/test_sat_kd_warmup_sim_1655.py (TASK-1656 moved the port to 0.063; commit 09d9ce606). Also failing on clean c0d471ebf: test_boiler_unsupported_origin, test_local_frame_consumers, test_ot_support_migration. Not re-run clean: test_capture_tool, test_refresh_storm, test_sat_lowload_contract (diff adds files only). test/host/test_ot_boiler_sim.py PASS in the sweep. Asked 6b about compiling via pio run (build lock).
+
+2026-11-05: pushed to origin/dev e5578aa52..29fbac698 (6b's go), 4 commits rebased (simulator, EOL attributes, heat-demand flame, TASK-1655 baseline fix). Push gate slip: my chained command piped the host test into tail, so a FAIL (committed_scn_files_match_export) did not stop the push. Cause checked: working copy only. git ls-files --eol shows i/lf w/crlf attr eol=lf; the rebase replayed commit 1 before .gitattributes existed. After deleting and re-checking out data/: --check 'up to date', test/host/test_ot_boiler_sim.py exit 0. The pushed blobs are correct. AC1 firmware-compile half stays open: compiling tools/bench/ot-boiler-sim needs a lock-aware build.py hook for tools/bench or Robert's OK (6b raises it with Robert; 6b declined a direct pio run, TASK-1488). AC2/AC3 need a second OTGW32, which does not exist yet.
+<!-- SECTION:NOTES:END -->

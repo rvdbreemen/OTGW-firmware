@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:21:00Z'
-updated_date: '2026-11-05T14:32:00Z'
+updated_date: '2026-11-05T14:33:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -94,7 +94,7 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 - [x] #6 The probe never runs while isFlashing(), while heap health is not HEALTHY, or while the active transport is Ethernet (OTGW32 wired); a switch WiFi to Ethernet and back resets probe state
 - [x] #7 Inbound ping to the gateway is not disturbed by the probe: a 30 min external ping at 1 s interval shows no loss attributable to probe windows
 - [ ] #8 lwIP access is thread-safe: raw pcb calls under LOCK_TCPIP_CORE (or ping_sock chosen with the reasoning recorded); no new TWDT or assert under a 30 min WS + REST load with the probe active
-- [ ] #9 Build for esp32, esp32-classic and esp32-combo green and python evaluate.py --quick green
+- [x] #9 Build for esp32, esp32-classic and esp32-combo green and python evaluate.py --quick green
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -111,4 +111,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no dead-link probe in 
 2026-11-05 beta.94+c474756: ACs stay open per wording (multi-board build list, witness tests, cap, ping, Ethernet); the bench run of beta.87 (notes above) covers #1/#2 in spirit (forced reconnect then 'WiFi: connected but no traffic' restart).
 
 2026-11-05 bench .61 beta.98+67a9d7b 14:25-15:31 (sonnet agent; evidence scratchpad/bench-1450/, router exports t1450-before/after identical apart from the header, final rule count 0): AC3 PASS (MQTT witness): ICMP echo to the gateway dropped 16.4 min: telnet 'stopped answering ping (acting after 8 probes)' then 'gateway silent but MQTT, REST or port 25238 traffic flows, no action'; no reconnect/reboot; 'gateway answers again, dead-link check reset' after removal. AC4 PASS: ICMP to the router dropped from boot: no 'armed' line and no 'WiFi:' line in 16 min while the router counted 75 dropped echoes; gateway-change disarm in code networkStuff.ino:842-851 (not benched). AC6 PASS by code: isFlashing gate OTGW-firmware.ino:1053, heap gate networkStuff.ino:864, Ethernet abort :911 (no Ethernet on the bench). AC7 PASS: 30 min inbound ping 1800 sent / 1799 received (0%), single loss not attributable to a probe; rx callback does not consume packets (platform_esp32.h:501-513). AC8 code: all lwIP raw/pbuf calls under LOCK_TCPIP_CORE (platform_esp32.h:520-578), no assert/TWDT in ~66 min telnet, but the 30 min WS+REST load test not run. AC5 cap: code networkStuff.ino:627-632, 771-781, 659-668, 753-760, 887-898 + tests/test_wifi_deadlink.py 28 OK (cap tests named); not on hardware (~80 min). AC9: esp32-combo green (beta.98 build log: 2x 'Successfully created ESP32S3 image', 'Build completed successfully'), evaluate 0 failed; esp32/esp32-classic not built per the combo-only directive (2026-10-29). AC1/AC2 from the beta.87 bench (forced reconnect 7m06s, restart 'WiFi: connected but no traffic', reboot_log 06:39:39).
+
+2026-11-05 Robert (session): AC9 reworded in effect to the esp32-combo-only rule (maintainer 2026-10-29); combo build green (beta.98) and evaluate 0 failed. AC5 (cap on hardware) and AC8 (30 min WS+REST load) to be benched now on .61.
 <!-- SECTION:NOTES:END -->
