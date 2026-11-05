@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-31T13:54:00Z'
-updated_date: '2026-11-05T21:14:00Z'
+updated_date: '2026-11-05T21:35:00Z'
 labels:
   - alpha
   - bug
@@ -72,4 +72,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: cause not found. M
 Bench 2026-11-05 21:29-22:05 on .61 (2.0.0-beta.101+5781def, satsimulation on), from /ReBoot each run, device/info every 5 s + telnet. Evidence: scratchpad t1528b/ (run1-*, run2-*, events.log). Run 1 (internet up): hd_min_free_heap 76868 -> 16824 within 5 s of boot, then flat 15 min. Run 2 (firewall forward drop src .61 out ether1, TASK-1528-2, scheduler removal, left 0): 75640 -> 4076 within 5 s of boot, then flat. Telnet places both dips in the boot MQTT connect window (outbox=56, discovery drip id=0 topics=39, free 42 KB at window end; burst minWin 16824 resp. 4076), before any weather fetch. 4076 B is 1 KB above the CRITICAL 3072 B tier.
 
 Not verified: the forced weather fetch. The telnet 'w' sent by the script (raw socket, char mode) produced no 'Weather: manual Open-Meteo fetch triggered' line in run 1 or run 2, so no fetch ran; cause of the lost keypress unknown (to test with 'h'). Run 3 (weather off, 180 s drop control) was cut at 22:00 after boot: the runner was killed by Claude Code's low-memory reaper before the drop; no drop rule was added. Cleanup checked: firewall/bridge/scheduler TASK-1528 count 0, router export t1528-runs-after, satweatherenable restored true, settings diff vs before = {}. AC1 still open: needs a working weather trigger and several boots to see whether the boot connect burst depth (16.8 KB vs 4.1 KB) is random.
+
+Robert 2026-11-05 ~22:30 (AskUserQuestion in session): option A chosen, outbox-depth gate on the discovery drip. Next: host test red/green on the gate decision, build, bench 5 boots old vs 5 boots fix on .61. Not started tonight: commit charge 83%, lead 6b asked for no long runs tonight.
 <!-- SECTION:NOTES:END -->
