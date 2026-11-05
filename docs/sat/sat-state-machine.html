@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SAT state machines</title>
+<style>
+:root {
+  --bg: #f7f6f2;
+  --surface: #ffffff;
+  --text: #1d2125;
+  --muted: #5b636b;
+  --border: #dcd9d0;
+  --accent: #b4461f;
+  --accent-soft: #f6e4da;
+  --feedback: #b4461f;
+  --report: #5b636b;
+  --code-bg: #efede7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181b;
+    --surface: #1d2125;
+    --text: #e6e3dc;
+    --muted: #9aa2aa;
+    --border: #343a40;
+    --accent: #f08a5d;
+    --accent-soft: #3a2a22;
+    --feedback: #f08a5d;
+    --report: #9aa2aa;
+    --code-bg: #262b30;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15181b;
+  --surface: #1d2125;
+  --text: #e6e3dc;
+  --muted: #9aa2aa;
+  --border: #343a40;
+  --accent: #f08a5d;
+  --accent-soft: #3a2a22;
+  --feedback: #f08a5d;
+  --report: #9aa2aa;
+  --code-bg: #262b30;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; overflow-x: hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+main { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 8px; }
+h2 { font-size: 1.35rem; margin: 40px 0 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+h3 { font-size: 1.05rem; margin: 20px 0 6px; }
+p, li { max-width: 72ch; }
+a { color: var(--accent); }
+code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.9em; background: var(--code-bg); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+.lede { color: var(--muted); margin: 0 0 16px; }
+.note { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 12px 14px; border-radius: 6px; margin: 16px 0; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin: 14px 0; }
+.diagram { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin: 14px 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.diagram pre.mermaid { margin: 0; min-width: 560px; background: transparent; }
+.diagram.wide pre.mermaid { min-width: 900px; }
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 16px; margin: 0; padding: 0; list-style: none; }
+.legend li { display: flex; gap: 8px; align-items: baseline; }
+.swatch { flex: 0 0 34px; height: 0; border-top: 3px solid var(--text); transform: translateY(-4px); }
+.swatch.thick { border-top-width: 6px; border-color: var(--feedback); }
+.swatch.dotted { border-top-style: dotted; border-color: var(--report); }
+.toc ol { columns: 2 220px; margin: 0; padding-left: 20px; }
+.states { margin: 8px 0; padding-left: 20px; }
+.states li { margin: 2px 0; }
+.timers { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; padding: 0; list-style: none; }
+.timers li { background: var(--code-bg); border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; font-size: 0.9rem; }
+ol.steps li { margin: 6px 0; }
+.dead { color: var(--muted); }
+footer { margin-top: 48px; color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<main>
+<h1>SAT state machines</h1>
+<p class="lede">How the 2.x firmware's SAT port runs today: firmware <code>dev</code> <code>acd5e6f7c</code> (2.0.0-beta.99), 2026-11-05, TASK-1661.</p>
+
+<div class="note">
+This page shows what the firmware does today, not what SAT should do. The source for SAT behaviour is Sergeant D's recorded decisions and the pinned thermo-nova code. Every fact here has a <code>file:line</code> citation in <a href="sat-state-machine.md">sat-state-machine.md</a>, along with the full transition tables. A second reader checked the citations. Control: about 52 claim groups confirmed, 12 imprecise and 1 wrong, all fixed. Cycles and boiler: 107 rows confirmed, 9 imprecise and 2 wrong, all fixed.
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">Legend</h3>
+<ul class="legend">
+  <li><span class="swatch thick"></span><span><b>Thick arrow</b>: a result that feeds back into control</span></li>
+  <li><span class="swatch"></span><span><b>Plain arrow</b>: a control signal or state change</span></li>
+  <li><span class="swatch dotted"></span><span><b>Dotted arrow</b>: reporting only</span></li>
+  <li><span><b>Tick</b>: the control tick, every 30 s by default (10 to 300 s)</span></li>
+  <li><span><b>CS / MM / CH</b>: control setpoint, max modulation, CH enable</span></li>
+  <li><span class="dead"><b>dead on loop path</b>: the code has the branch, but the main loop never reaches it</span></li>
+</ul>
+</div>
+
+<nav class="card toc" aria-label="Contents">
+<h3 style="margin-top:0">Contents</h3>
+<ol>
+  <li><a href="#overview">How the machines fit together</a></li>
+  <li><a href="#m1">M1 Activity and fallback</a></li>
+  <li><a href="#m2">M2 Control mode</a></li>
+  <li><a href="#m3">M3 PWM duty and phase</a></li>
+  <li><a href="#m4">M4 PWM ON-phase start-up</a></li>
+  <li><a href="#m5">M5 Cold cutoff, CH, cadence</a></li>
+  <li><a href="#m6">M6 Burn lifecycle and class</a></li>
+  <li><a href="#m7">M7 Cycle phase</a></li>
+  <li><a href="#m8">M8 Cycle kind</a></li>
+  <li><a href="#m9">M9 Flame status</a></li>
+  <li><a href="#m10">M10 Curve recommendations</a></li>
+  <li><a href="#m11">M11 Boiler status</a></li>
+  <li><a href="#timeline">Start-up timelines</a></li>
+</ol>
+</nav>
+
+<h2 id="overview">How the machines fit together</h2>
+<p>Only the class of a finished burn feeds back into control: OVERSHOOT moves continuous to PWM, UNDERHEAT_PWM moves PWM to continuous. Boiler status, flame status, cycle phase and the curve recommendations are reporting only. Cycle kind acts only indirectly: kind UNKNOWN makes the class UNCERTAIN, so no switch happens. The raw flame edge also reaches the PWM start-up: it times the suppression hold and clears suppression when the flame goes out.</p>
+<div class="diagram wide"><pre class="mermaid">flowchart TD
+    BOILER[(Boiler via OpenTherm)]
+    A["M1 Activity and fallback&lt;br/&gt;bActive, bFallbackActive,&lt;br/&gt;trip, OT loss, outside temp"]
+    M["M2 Control mode&lt;br/&gt;OFF / CONTINUOUS / PWM"]
+    P["M3 + M4 PWM duty, ON/OFF phase,&lt;br/&gt;ON-phase start-up"]
+    C["M5 Cold cutoff, CH rule,&lt;br/&gt;command cadence"]
+    Y["M6 + M7 + M8 Burn lifecycle,&lt;br/&gt;cycle class, phase, kind"]
+    F["M9 Flame status"]
+    B["M11 Boiler status"]
+    R["M10 Curve recommendations"]
+    PUB["M12 Publication&lt;br/&gt;MQTT, HA, REST, telnet, web UI"]
+
+    A --&gt;|"gates every loop pass"| M
+    M --&gt;|"PWM mode"| P
+    M --&gt;|"continuous CS"| C
+    P --&gt;|"PWM CS, flame request"| C
+    C --&gt;|"CS, MM, CH"| BOILER
+    BOILER --&gt;|"flame, flow, status bits"| Y
+    BOILER --&gt;|"flame edge: suppression hold,&lt;br/&gt;bModSuppressed cleared"| P
+    BOILER --&gt; F
+    BOILER --&gt; B
+    Y ==&gt;|"class OVERSHOOT: continuous to PWM"| M
+    Y ==&gt;|"class UNDERHEAT_PWM: PWM to continuous"| M
+    Y -.-&gt;|"last class SHORT"| F
+    Y -.-&gt;|"last cycle duration"| B
+    Y -.-&gt;|"reporting only"| PUB
+    F -.-&gt;|"reporting only"| PUB
+    B -.-&gt;|"reporting only"| PUB
+    R -.-&gt;|"reporting only"| PUB
+    M -.-&gt; PUB</pre></div>
+
+<h2 id="m1">M1 SAT activity and MQTT-loss fallback</h2>
+<p>Decides whether SAT controls the boiler on this pass. The MQTT-loss fallback is a second source of "enabled", not a separate mode.</p>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; Inactive : initSAT()
+    Inactive --&gt; Active : enabled, gates pass, control tick due
+    Active --&gt; Inactive : not enabled or flashing, satDisable()
+    Inactive --&gt; FallbackActive : opt-in, SAT off, MQTT lost over 300 s
+    FallbackActive --&gt; Active : gates pass, control tick due
+    FallbackActive --&gt; Inactive : MQTT back, opt-in off, user enabled, or suppressed
+    Active --&gt; SafetyTripped : no command interface 5 ticks
+    SafetyTripped --&gt; Inactive : satClearSafetyTrip() on enable
+    Active --&gt; OtLinkLost : no boiler B frame 30 s, hand-back once
+    Inactive --&gt; OtLinkLost : enabled, no boiler reply 30 s after first pass
+    OtLinkLost --&gt; Inactive : new boiler B frame, flag and cache cleared
+    Active --&gt; OutsideTempMissing : no fresh outside temp, hand-back once
+    Inactive --&gt; OutsideTempMissing : boot gates, no fresh outside temp
+    OutsideTempMissing --&gt; Inactive : outside temp fresh, flag and cache cleared</pre></div>
+<ul class="states">
+  <li><b>Inactive / Active</b>: <code>bActive</code>, true only after a control tick ran</li>
+  <li><b>FallbackActive</b>: MQTT lost for more than 300 s with the opt-in set; never writes the enabled setting</li>
+  <li><b>SafetyTripped</b>: no command interface for 5 ticks; cleared on re-enable</li>
+  <li><b>OtLinkLost / OutsideTempMissing</b>: boiler handed back once (CS=0, CH=1, MM=T), SAT stays enabled and resumes by itself</li>
+</ul>
+<ul class="timers"><li>MQTT loss 300 s</li><li>OT link loss 30 s</li><li>trip after 5 ticks</li><li>thermal safe after 2 h, flow 45</li></ul>
+
+<h2 id="m2">M2 Control mode</h2>
+<p>Selects how the CS is computed. A PWM request without MsgID 3 permission (HB bit 4 clear) becomes CONTINUOUS. There is no force-PWM option.</p>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; OFF : initSAT()
+    OFF --&gt; CONTINUOUS : first tick with SAT enabled
+    OFF --&gt; CONTINUOUS : initSAT, enabled, no saved PWM or not permitted
+    OFF --&gt; PWM : initSAT, enabled, saved PWM and permitted
+    CONTINUOUS --&gt; PWM : flow &gt;= req + margin for 60 s
+    CONTINUOUS --&gt; PWM : burn classified OVERSHOOT
+    CONTINUOUS --&gt; PWM : deferred restore, first MsgID 3 permits
+    CONTINUOUS --&gt; PWM : control_mode pwm, permitted
+    PWM --&gt; CONTINUOUS : req &gt;= effective max
+    PWM --&gt; CONTINUOUS : low-load permission withdrawn
+    PWM --&gt; CONTINUOUS : underheat 180 s
+    PWM --&gt; CONTINUOUS : off_time 0 for 300 s
+    PWM --&gt; CONTINUOUS : burn classified UNDERHEAT_PWM
+    PWM --&gt; CONTINUOUS : heater off
+    PWM --&gt; CONTINUOUS : control_mode continuous or auto
+    CONTINUOUS --&gt; OFF : satDisable()
+    PWM --&gt; OFF : satDisable()</pre></div>
+<ul class="states">
+  <li><b>OFF</b>: SAT not controlling</li>
+  <li><b>CONTINUOUS</b>: CS = PID output with an asymmetric clamp</li>
+  <li><b>PWM</b>: CS from the ON/OFF schedule</li>
+</ul>
+<ul class="timers"><li>overshoot 60 s, margin 2.0</li><li>underheat 180 s, margin 3.0</li><li>saturation 300 s</li><li>DHW guard 300 s</li></ul>
+
+<h2 id="m3">M3 PWM duty and ON/OFF phase</h2>
+<p>Inside PWM mode, decides whether the flame is requested. Runs once per tick, not during a cold cutoff. Duty = (PID output - base) / (boiler temp - base), split into five ranges.</p>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; IDLE : satPwmReset()
+    IDLE --&gt; ON : first step with flow, entry pending, onTime &gt;= minOn
+    IDLE --&gt; OFF : first step with flow that does not start ON
+    IDLE --&gt; IDLE : hour limit reached, or DHW flame held
+    OFF --&gt; ON : elapsed &gt;= offTime, onTime &gt;= minOn, hour limit ok
+    OFF --&gt; ON : range 5, duty &gt;= dutyMax
+    ON --&gt; OFF : ranges 1-4, min burn passed, elapsed &gt;= onTime
+    ON --&gt; IDLE : no flow temperature, or satPwmReset()
+    OFF --&gt; IDLE : no flow temperature, or satPwmReset()</pre></div>
+<ul class="states">
+  <li><b>IDLE</b>: after a reset or with no flow temperature</li>
+  <li><b>ON</b>: flame requested; OFF-phase CS is 10 and CH is 0</li>
+  <li><b>Range 5</b> (duty at the top): no OFF time, MM=T, none of the ON-phase wait or minimum burn logic</li>
+</ul>
+<ul class="timers"><li>min ON 180 s gas, 600 s heat pump</li><li>period 900 or 1200 s gas</li><li>hour limit 3 or 4 starts (gas)</li><li>min OFF 600 s heat pump, range 5</li></ul>
+
+<h2 id="m4">M4 PWM ON-phase start-up</h2>
+<p>One ON phase from its start until steady modulation suppression. Two flame-on anchors are in play: the real flame edge times the suppression hold; the tick that syncs to the flame times the minimum burn and the start-up average. They differ by up to one tick.</p>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; WaitFlame : satPwmBeginOn, flame off
+    [*] --&gt; FlameSynced : satPwmBeginOn, flame on
+    WaitFlame --&gt; FlameSynced : tick sees flame, ON clock restarts
+    WaitFlame --&gt; NoFlameTimer : tick, 180 s since phase start
+    NoFlameTimer --&gt; FlameSynced : later flame seen on a tick
+    NoFlameTimer --&gt; OffPhase : elapsed &gt;= onTime, no min burn, can be the same tick
+    FlameSynced --&gt; Suppressed : tick, fModSupDelay passed since flame edge
+    FlameSynced --&gt; OffPhase : min burn passed, elapsed &gt;= onTime
+    Suppressed --&gt; OffPhase : min burn passed, elapsed &gt;= onTime</pre></div>
+<ul class="states">
+  <li><b>WaitFlame</b>: CS = return + 18 (flame-off hold), resent every 5 s</li>
+  <li><b>FlameSynced</b>: ON clock restarts at the sync tick</li>
+  <li><b>Suppressed</b>: CS = flow - 1.0; the 3 s refresh keeps it current</li>
+  <li><b>NoFlameTimer</b>: no flame after 180 s; the ON timer runs from the phase start with no minimum burn</li>
+</ul>
+<ul class="timers"><li>ignition wait 180 s</li><li>suppression delay 20 s</li><li>refresh 3 s</li><li>start-up average 180 s</li><li>min burn 180 / 600 s</li></ul>
+
+<h2 id="m5">M5 Cold cutoff, CH rule and command cadence</h2>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; Heating : _sat_coldCut false
+    Heating --&gt; ColdCut : requested &lt;= cold setpoint
+    ColdCut --&gt; Heating : requested &gt; cold setpoint + 0.5</pre></div>
+<ul class="states">
+  <li><b>Cold setpoint</b>: 28.2 radiators, 21.0 underfloor, release at +0.5</li>
+  <li><b>CH</b>: 0 when requested is at or below the threshold, or in a PWM OFF phase; else 1</li>
+  <li><b>CS</b>: sent every tick and resent every 5 s</li>
+  <li><b>MM, CH</b>: on change, plus a repair after about 60 s</li>
+  <li><b>PIC boards</b>: a 30 s CS keepalive, which only acts while the 5 s resend is paused</li>
+</ul>
+
+<h2 id="m6">M6 Burn lifecycle and cycle class</h2>
+<p>At each flame-off a burn with 3 or more samples is classified. This is the only derived result that changes control.</p>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; FlameOff : satCycleInit()
+    FlameOff --&gt; Burning : flame-on edge
+    Burning --&gt; Burning : satCycleSample() each pass, 1 Hz rings
+    Burning --&gt; Dropped : flame-off edge, fewer than 3 samples
+    Burning --&gt; Classified : flame-off edge, 3 or more samples
+    Dropped --&gt; FlameOff : only lastFlameOffMs kept
+    Classified --&gt; FlameOff : recorded, windows updated, end-of-cycle switch</pre></div>
+<div class="diagram wide"><pre class="mermaid">flowchart TD
+    A["flame-off, 3 or more samples"] --&gt; B{"durationSec &lt;= 0"}
+    B -- yes --&gt; INS[INSUFFICIENT]
+    B -- no --&gt; C{"kind UNKNOWN"}
+    C -- yes --&gt; U1[UNCERTAIN]
+    C -- no --&gt; D{"dhwInTail"}
+    D -- yes --&gt; U2[UNCERTAIN]
+    D -- no --&gt; E{"pwmEnabled and pwmIdle"}
+    E -- yes --&gt; U3[UNCERTAIN]
+    E -- no --&gt; F{"pwmEnabled"}
+    F -- yes --&gt; P1{"reqErrKnown"}
+    P1 -- no --&gt; U4[UNCERTAIN]
+    P1 -- yes --&gt; P2{"reqErrP90 &lt;= -3.0"}
+    P2 -- yes --&gt; P3{"reqSpP50 &lt; coldSp"}
+    P3 -- yes --&gt; U5[UNCERTAIN]
+    P3 -- no --&gt; UHP[UNDERHEAT_PWM]
+    P2 -- no --&gt; P4{"pwmOn"}
+    P4 -- no --&gt; G1[GOOD]
+    P4 -- yes --&gt; P5{"onTimeSec &lt;= 0"}
+    P5 -- yes --&gt; S1[SHORT]
+    P5 -- no --&gt; P6{"durationSec &lt; 0.8 x onTimeSec"}
+    P6 -- yes --&gt; S2[SHORT]
+    P6 -- no --&gt; G2[GOOD]
+    F -- no --&gt; K1{"ctrlErrKnown"}
+    K1 -- no --&gt; U6[UNCERTAIN]
+    K1 -- yes --&gt; K2{"ctrlErrP90 &gt;= fOvershootMargin"}
+    K2 -- yes --&gt; OS[OVERSHOOT]
+    K2 -- no --&gt; K3{"ctrlErrP50 &lt;= -3.0"}
+    K3 -- no --&gt; G3[GOOD]
+    K3 -- yes --&gt; K4{"effSp &lt; coldSp"}
+    K4 -- yes --&gt; U7[UNCERTAIN]
+    K4 -- no --&gt; UH[UNDERHEAT]
+    UHP ==&gt; SW1(["PWM to continuous"])
+    OS ==&gt; SW2(["continuous to PWM if permitted"])</pre></div>
+<ul class="states">
+  <li><b>FlameOff / Burning</b>: burn tracked between flame edges</li>
+  <li><b>Dropped</b>: fewer than 3 samples, not classified</li>
+  <li><b>GOOD, OVERSHOOT, UNDERHEAT</b>: continuous burns</li>
+  <li><b>GOOD, UNDERHEAT_PWM, SHORT</b>: PWM burns (SHORT = ON phase still running at flame-off)</li>
+  <li><b>UNCERTAIN / INSUFFICIENT / NONE</b>: no verdict, zero duration, or no burn in the last 6 h</li>
+</ul>
+<ul class="timers"><li>tail ring 180 samples at 1 Hz</li><li>warm-up trim min(60 s, 25 %)</li><li>class expires after 6 h</li></ul>
+
+<h2 id="m7">M7 Cycle phase</h2>
+<p>A display label of where the burn is. It never returns to IDLE after the first flame-off.</p>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; IDLE : static init, boot only
+    IDLE --&gt; STARTUP : flame on, flow &lt; spStart - 1.5
+    IDLE --&gt; STEADY : flame on, flow within 1.5 of spStart
+    STARTUP --&gt; STEADY : flame on, flow within 1.5 of spStart
+    STEADY --&gt; STARTUP : flame on, flow &lt; spStart - 1.5
+    STARTUP --&gt; COOLDOWN : flame-off edge
+    STEADY --&gt; COOLDOWN : flame-off edge
+    IDLE --&gt; COOLDOWN : flame-off edge
+    COOLDOWN --&gt; STARTUP : flame on, flow &lt; spStart - 1.5
+    COOLDOWN --&gt; STEADY : flame on, flow within 1.5 of spStart</pre></div>
+
+<ul class="states">
+  <li><b>IDLE</b>: boot value only</li>
+  <li><b>STARTUP</b>: flow more than 1.5 below the setpoint at flame-on</li>
+  <li><b>STEADY</b>: flow within 1.5 of that setpoint</li>
+  <li><b>COOLDOWN</b>: set at every flame-off edge</li>
+</ul>
+<h2 id="m8">M8 Cycle kind</h2>
+<p>Labels a finished burn from 1 Hz status samples. UNKNOWN makes the class UNCERTAIN; otherwise reporting only.</p>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; evaluate : flame-off, burn kept
+    evaluate --&gt; UNKNOWN : n == 0
+    evaluate --&gt; DHW : dhw over 0.8 n and ch under 0.2 n
+    evaluate --&gt; CH : ch over 0.8 n and dhw under 0.2 n
+    evaluate --&gt; MIXED : dhw over 0.1 n and ch over 0.1 n
+    evaluate --&gt; UNKNOWN : otherwise</pre></div>
+
+<ul class="states">
+  <li><b>CH / DHW</b>: more than 80 % of samples one way, under 20 % the other</li>
+  <li><b>MIXED</b>: both above 10 %</li>
+  <li><b>UNKNOWN</b>: no samples or no rule matched</li>
+</ul>
+<h2 id="m9">M9 Flame status</h2>
+<p>A burner health label, recomputed from scratch on evaluated ticks (at most every 10 s). Reporting only.</p>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; INSUFFICIENT_DATA : boot
+    INSUFFICIENT_DATA --&gt; evaluate : 7th evaluation
+    evaluate --&gt; IDLE_OK : SAT not active, dead on loop path
+    evaluate --&gt; STUCK_OFF : safety tripped, dead on loop path
+    evaluate --&gt; SHORT_CYCLING : reported last class SHORT
+    evaluate --&gt; STUCK_ON : flame and final setpoint under 5
+    evaluate --&gt; STUCK_OFF : no flame, setpoint over 30, off over 300 s
+    evaluate --&gt; PWM_SHORT : PWM, duty under 0.05, flame
+    evaluate --&gt; HEALTHY : otherwise</pre></div>
+<ul class="states">
+  <li><b>INSUFFICIENT_DATA</b>: first 6 evaluations after boot</li>
+  <li><b>SHORT_CYCLING</b>: last class SHORT; <b>STUCK_ON</b>: flame with setpoint under 5</li>
+  <li><b>STUCK_OFF</b>: setpoint over 30, no flame for 5 min</li>
+  <li><b>PWM_SHORT</b>, <b>HEALTHY</b>; <span class="dead">IDLE_OK and STUCK_OFF-by-trip are dead on the loop path</span></li>
+</ul>
+<ul class="timers"><li>first 6 evaluations: insufficient data</li><li>stuck off after 300 s</li><li>PWM short below 5 % duty</li></ul>
+
+<h2 id="m10">M10 Curve recommendations</h2>
+<p>Two pieces of advice from the room error, never from cycles. Both are sampled only with a valid room temperature. The daily median version needs 3 days beyond 0.5 C.</p>
+<div class="diagram"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; INSUFFICIENT
+    INSUFFICIENT --&gt; evaluate : hourly sample, 6 or more samples
+    evaluate --&gt; INCREASE : mean over 0.2
+    evaluate --&gt; DECREASE : mean under -0.2
+    evaluate --&gt; HOLD : otherwise</pre></div>
+
+<ul class="states">
+  <li><b>Hourly</b>: INSUFFICIENT (under 6 samples), INCREASE (mean error over 0.2), DECREASE (under -0.2), HOLD</li>
+  <li><b>Daily median</b>: insufficient, increase, decrease, hold; saved to <code>/sat/sat_hcr.json</code></li>
+</ul>
+<h2 id="m11">M11 Boiler status</h2>
+<p>A display-only label, evaluated on the control tick and frozen on DHW, fault, thermal safe, summer and valves-closed ticks. HEATING_HOT_WATER is in the code but cannot be reached.</p>
+<div class="diagram wide"><pre class="mermaid">flowchart TD
+  S([control tick reaches satUpdateBoilerStatus&lt;br/&gt;SATcontrol.ino:7123]) --&gt; A{flame AND bDhwActive?&lt;br/&gt;:971}
+  A -- yes --&gt; HW[HEATING_HOT_WATER :973&lt;br/&gt;unreachable]
+  A -- no --&gt; B{!flame AND overshootLatched&lt;br/&gt;AND flow &gt; setpoint?&lt;br/&gt;:975}
+  B -- yes --&gt; OC[OVERSHOOT_COOLING :978]
+  B -- no --&gt; C{!flame AND !prevFlame?&lt;br/&gt;:980}
+  C -- yes --&gt; C1{flameOffMs&gt;0 AND offFor &lt; 60 s&lt;br/&gt;AND prev in HEATING, AT_SETPOINT,&lt;br/&gt;COOLING, POST_CYCLE?&lt;br/&gt;:984-986}
+  C1 -- yes --&gt; PC[POST_CYCLE :987]
+  C1 -- no --&gt; C2{hasDemand AND flameOffMs&gt;0&lt;br/&gt;AND offFor &lt; 180 s?&lt;br/&gt;:989}
+  C2 -- yes --&gt; AC[ANTI_CYCLING :990]
+  C2 -- no --&gt; C3{hasDemand AND flameOffMs&gt;0?&lt;br/&gt;:992}
+  C3 -- yes --&gt; C4{offFor &gt;= max 600 s, 3 x last cycle&lt;br/&gt;last cycle fresh only&lt;br/&gt;:997-1003}
+  C4 -- yes --&gt; ST[STALLED_IGNITION :1004]
+  C4 -- no --&gt; WF[WAITING_FLAME :1006]
+  C3 -- no --&gt; ID[IDLE :1010]
+  C -- no --&gt; D{flame AND !prevFlame?&lt;br/&gt;flame-on edge :1013}
+  D -- yes --&gt; D1{flow &lt; setpoint - 6.0?&lt;br/&gt;:1015}
+  D1 -- yes --&gt; PS1[PUMP_STARTING :1016]
+  D1 -- no --&gt; IS1[IGNITION_SURGE :1018]
+  D -- no --&gt; E{flame?&lt;br/&gt;:1021}
+  E -- yes --&gt; E1{flameOn &lt; 30 s AND tempRate &gt;= 0.5?&lt;br/&gt;:1026}
+  E1 -- yes --&gt; IS2[IGNITION_SURGE :1027]
+  E1 -- no --&gt; E2{flameOn &lt; 30 s AND tempRate &lt; 0&lt;br/&gt;AND setpoint - flow &gt; 6.0?&lt;br/&gt;:1030-1031}
+  E2 -- yes --&gt; PS2[PUMP_STARTING :1032]
+  E2 -- no --&gt; E3{abs flow - setpoint &lt;= 1.5?&lt;br/&gt;:1035}
+  E3 -- yes --&gt; AS[AT_SETPOINT :1036]
+  E3 -- no --&gt; E4{setpoint - flow &gt; 6.0?&lt;br/&gt;:1050}
+  E4 -- yes --&gt; PH[PREHEATING :1051]
+  E4 -- no --&gt; E5{modDir&lt;br/&gt;:1042-1049}
+  E5 -- "+1" --&gt; MU[MODULATING_UP :1053]
+  E5 -- "-1" --&gt; MD[MODULATING_DOWN :1055]
+  E5 -- "0" --&gt; HE[HEATING :1057]
+  E -- no --&gt; CO[COOLING :1063&lt;br/&gt;flame-off edge, no overshoot hit]</pre></div>
+<div class="diagram wide"><pre class="mermaid">stateDiagram-v2
+  [*] --&gt; OFF : boot
+  OFF --&gt; IDLE : first eval, flame off, no demand or flameOffMs 0
+  OFF --&gt; PUMP_STARTING : first eval, flame on edge, flow &lt; sp - 6
+  OFF --&gt; IGNITION_SURGE : first eval, flame on edge, flow &gt;= sp - 6
+
+  IDLE --&gt; PUMP_STARTING : flame on edge, flow &lt; sp - 6
+  IDLE --&gt; IGNITION_SURGE : flame on edge, flow &gt;= sp - 6
+  IDLE --&gt; ANTI_CYCLING : demand appears, off &lt; 180 s
+  IDLE --&gt; WAITING_FLAME : demand appears, 180 s &lt;= off &lt; stall threshold
+  IDLE --&gt; STALLED_IGNITION : demand appears, off &gt;= stall threshold
+
+  PUMP_STARTING --&gt; IGNITION_SURGE : flame on &lt; 30 s, tempRate &gt;= 0.5
+  IGNITION_SURGE --&gt; PUMP_STARTING : flame on &lt; 30 s, falling, sp - flow &gt; 6
+
+  state FlameOn {
+    AT_SETPOINT
+    PREHEATING
+    MODULATING_UP
+    MODULATING_DOWN
+    HEATING
+  }
+  IGNITION_SURGE --&gt; FlameOn : flame stays on
+  PUMP_STARTING --&gt; FlameOn : flame stays on
+  FlameOn --&gt; FlameOn : re-evaluated each tick
+
+  FlameOn --&gt; COOLING : flame off edge, no overshoot hit
+  FlameOn --&gt; OVERSHOOT_COOLING : flame off edge, latched, flow &gt; sp
+  PUMP_STARTING --&gt; COOLING : flame off edge
+  IGNITION_SURGE --&gt; COOLING : flame off edge
+  IGNITION_SURGE --&gt; OVERSHOOT_COOLING : flame off edge, latched, flow &gt; sp
+
+  COOLING --&gt; POST_CYCLE : off &lt; 60 s
+  COOLING --&gt; ANTI_CYCLING : off &gt;= 60 s, demand, off &lt; 180 s
+  COOLING --&gt; IDLE : off &gt;= 60 s, no demand
+  COOLING --&gt; WAITING_FLAME : off &gt;= 180 s, demand
+  COOLING --&gt; STALLED_IGNITION : off &gt;= stall threshold, demand
+  COOLING --&gt; PUMP_STARTING : flame on edge
+  COOLING --&gt; IGNITION_SURGE : flame on edge
+  POST_CYCLE --&gt; ANTI_CYCLING : off &gt;= 60 s, demand, off &lt; 180 s
+  POST_CYCLE --&gt; WAITING_FLAME : off &gt;= 180 s, demand
+  POST_CYCLE --&gt; IDLE : off &gt;= 60 s, no demand
+  POST_CYCLE --&gt; PUMP_STARTING : flame on edge
+  POST_CYCLE --&gt; IGNITION_SURGE : flame on edge
+
+  IDLE --&gt; OVERSHOOT_COOLING : latch kept, flow &gt; sp
+  ANTI_CYCLING --&gt; OVERSHOOT_COOLING : latch kept, flow &gt; sp
+  WAITING_FLAME --&gt; OVERSHOOT_COOLING : latch kept, flow &gt; sp
+  STALLED_IGNITION --&gt; OVERSHOOT_COOLING : latch kept, flow &gt; sp
+  POST_CYCLE --&gt; OVERSHOOT_COOLING : latch kept, flow &gt; sp
+  OVERSHOOT_COOLING --&gt; ANTI_CYCLING : flow &lt;= sp, demand, off &lt; 180 s
+  OVERSHOOT_COOLING --&gt; WAITING_FLAME : flow &lt;= sp, demand, off &gt;= 180 s
+  OVERSHOOT_COOLING --&gt; STALLED_IGNITION : flow &lt;= sp, demand, off &gt;= stall threshold
+  OVERSHOOT_COOLING --&gt; IDLE : flow &lt;= sp, no demand
+  OVERSHOOT_COOLING --&gt; PUMP_STARTING : flame on edge
+  OVERSHOOT_COOLING --&gt; IGNITION_SURGE : flame on edge
+
+  ANTI_CYCLING --&gt; WAITING_FLAME : off &gt;= 180 s, demand
+  ANTI_CYCLING --&gt; IDLE : demand gone
+  WAITING_FLAME --&gt; STALLED_IGNITION : off &gt;= stall threshold
+  WAITING_FLAME --&gt; IDLE : demand gone
+  STALLED_IGNITION --&gt; IDLE : demand gone
+  ANTI_CYCLING --&gt; PUMP_STARTING : flame on edge
+  ANTI_CYCLING --&gt; IGNITION_SURGE : flame on edge
+  WAITING_FLAME --&gt; PUMP_STARTING : flame on edge
+  WAITING_FLAME --&gt; IGNITION_SURGE : flame on edge
+  STALLED_IGNITION --&gt; PUMP_STARTING : flame on edge
+  STALLED_IGNITION --&gt; IGNITION_SURGE : flame on edge</pre></div>
+<ul class="states">
+  <li><b>Flame on</b>: PUMP_STARTING, IGNITION_SURGE, AT_SETPOINT, PREHEATING, MODULATING_UP/DOWN, HEATING</li>
+  <li><b>Flame off</b>: COOLING (one tick), POST_CYCLE, OVERSHOOT_COOLING, ANTI_CYCLING, WAITING_FLAME, STALLED_IGNITION, IDLE</li>
+  <li><b>OFF</b>: only before the first evaluation; <span class="dead">HEATING_HOT_WATER is unreachable</span></li>
+</ul>
+<ul class="timers"><li>post-cycle 60 s</li><li>anti-cycling 180 s</li><li>stall max(600 s, 3 x last burn)</li><li>surge window 30 s</li><li>demand +0.7 C</li><li>at setpoint 1.5 C</li></ul>
+
+<h2 id="timeline">Start-up timelines</h2>
+<h3>One PWM ON phase (duty ranges 1-4, flame off at the start)</h3>
+<ol class="steps">
+  <li><b>t0 tick</b>: ON starts, waiting for flame, start counted in the hour limit.</li>
+  <li><b>t0 tick</b>: CS = return + 18 (flame-off hold), CH = 1.</li>
+  <li><b>Every 5 s</b>: the hold CS is resent. The PIC keepalive does not fire.</li>
+  <li><b>tF</b>: flame edge. Boilers without a return temperature get a 20 s start-up flood.</li>
+  <li><b>tF to tF + 20 s</b>: only the 5 s resend of the hold.</li>
+  <li><b>Whichever comes first</b>: the 3 s refresh after tF + 20 s sends flow - 1.0 without setting the suppression flag; or the first tick with flame syncs, restarts the ON clock and, once 20 s have passed, sets the suppression flag.</li>
+  <li><b>180 s after the sync tick</b>: the start-up average of the boiler temperature stops.</li>
+  <li><b>Minimum burn</b>: no ON to OFF before 180 s (600 s heat pump) after the sync tick.</li>
+  <li><b>ON to OFF tick</b>: CS = 10, CH = 0, suppression flag cleared.</li>
+  <li><b>Flame-off edge</b>: suppression flag cleared again.</li>
+</ol>
+<p>With no flame after 180 s, the ON timer runs from t0 and the phase can end on that same tick.</p>
+
+<h3>Boot with SAT enabled</h3>
+<ol class="steps">
+  <li><b>initSAT</b>: mode restored, no CS/MM/CH; the boot PM chain (PM=3, 15, 48) starts.</li>
+  <li><b>Each pass</b>: fallback, enable, trip, OT link and restart gates, in that order.</li>
+  <li><b>OT link</b>: no boiler reply 30 s after the first pass means hand-back, even after a boot hand-back.</li>
+  <li><b>NTP wait</b>: at most 60 s for the PID file.</li>
+  <li><b>Decide once</b>: valid state sends nothing; otherwise one quiet hand-back once a command interface exists. TC= is pushed here if enabled.</li>
+  <li><b>Boiler reply gate</b>, then the <b>outside temperature gate</b> (no second hand-back).</li>
+  <li><b>Takeover</b>: the control tick is made due at once.</li>
+</ol>
+
+<footer>
+Source with every citation and full tables: <a href="sat-state-machine.md">sat-state-machine.md</a>. Differences from thermo-nova: <a href="sat-comparison.md">sat-comparison.md</a>.
+</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js" integrity="sha384-WmdflGW9aGfoBdHc4rRyWzYuAjEmDwMdGdiPNacbwfGKxBW/SO6guzuQ76qjnSlr" crossorigin="anonymous"></script>
+<script>
+(function () {
+  var dark = false;
+  try {
+    var t = document.documentElement.getAttribute('data-theme');
+    dark = t === 'dark' || (t !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  } catch (e) {}
+  if (window.mermaid) {
+    mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default', securityLevel: 'strict', fontSize: 15, flowchart: { htmlLabels: true, useMaxWidth: false }, state: { useMaxWidth: false } });
+  }
+})();
+</script>
+</body>
+</html>
