@@ -3,11 +3,11 @@ id: TASK-1450
 title: >-
   feat-2.0.0: port TASK-1248 (1.x) — recover from a WiFi link that stays
   associated but passes no traffic
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:21:00Z'
-updated_date: '2026-11-05T14:33:00Z'
+updated_date: '2026-11-05T20:25:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -90,10 +90,10 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 - [x] #2 Red/green bench proof on .63 (Classic+S3) or .61 (OTGW32 on WiFi): current origin/dev build stays unreachable for the full test window (at least 25 min), the fix recovers; commands, timestamps and telnet excerpts recorded in the task notes
 - [x] #3 No action while a witness shows LAN traffic: with MQTT connected, with the web UI polling REST, or with a port-25238 client sending, a silent gateway does not cause a reconnect or restart (bench check with ICMP to the gateway blocked but LAN traffic allowed)
 - [x] #4 A router that never answers ICMP never arms the check (no reconnect over at least 15 min), and a changed gateway address disarms it
-- [ ] #5 Restart cap holds: after 3 dead-link restarts the gateway stops restarting and forces at most one reconnect per 15 min; the count survives a software restart (RTC_NOINIT + esp_reset_reason()==ESP_RST_SW), clears on power-on or panic and after 60 min of answered probes; a forced reconnect that ends in WIFI_FAILED counts toward the cap
+- [x] #5 Restart cap holds: after 3 dead-link restarts the gateway stops restarting and forces at most one reconnect per 15 min; the count survives a software restart (RTC_NOINIT + esp_reset_reason()==ESP_RST_SW), clears on power-on or panic and after 60 min of answered probes; a forced reconnect that ends in WIFI_FAILED counts toward the cap
 - [x] #6 The probe never runs while isFlashing(), while heap health is not HEALTHY, or while the active transport is Ethernet (OTGW32 wired); a switch WiFi to Ethernet and back resets probe state
 - [x] #7 Inbound ping to the gateway is not disturbed by the probe: a 30 min external ping at 1 s interval shows no loss attributable to probe windows
-- [ ] #8 lwIP access is thread-safe: raw pcb calls under LOCK_TCPIP_CORE (or ping_sock chosen with the reasoning recorded); no new TWDT or assert under a 30 min WS + REST load with the probe active
+- [x] #8 lwIP access is thread-safe: raw pcb calls under LOCK_TCPIP_CORE (or ping_sock chosen with the reasoning recorded); no new TWDT or assert under a 30 min WS + REST load with the probe active
 - [x] #9 Build for esp32, esp32-classic and esp32-combo green and python evaluate.py --quick green
 <!-- AC:END -->
 
@@ -113,4 +113,12 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no dead-link probe in 
 2026-11-05 bench .61 beta.98+67a9d7b 14:25-15:31 (sonnet agent; evidence scratchpad/bench-1450/, router exports t1450-before/after identical apart from the header, final rule count 0): AC3 PASS (MQTT witness): ICMP echo to the gateway dropped 16.4 min: telnet 'stopped answering ping (acting after 8 probes)' then 'gateway silent but MQTT, REST or port 25238 traffic flows, no action'; no reconnect/reboot; 'gateway answers again, dead-link check reset' after removal. AC4 PASS: ICMP to the router dropped from boot: no 'armed' line and no 'WiFi:' line in 16 min while the router counted 75 dropped echoes; gateway-change disarm in code networkStuff.ino:842-851 (not benched). AC6 PASS by code: isFlashing gate OTGW-firmware.ino:1053, heap gate networkStuff.ino:864, Ethernet abort :911 (no Ethernet on the bench). AC7 PASS: 30 min inbound ping 1800 sent / 1799 received (0%), single loss not attributable to a probe; rx callback does not consume packets (platform_esp32.h:501-513). AC8 code: all lwIP raw/pbuf calls under LOCK_TCPIP_CORE (platform_esp32.h:520-578), no assert/TWDT in ~66 min telnet, but the 30 min WS+REST load test not run. AC5 cap: code networkStuff.ino:627-632, 771-781, 659-668, 753-760, 887-898 + tests/test_wifi_deadlink.py 28 OK (cap tests named); not on hardware (~80 min). AC9: esp32-combo green (beta.98 build log: 2x 'Successfully created ESP32S3 image', 'Build completed successfully'), evaluate 0 failed; esp32/esp32-classic not built per the combo-only directive (2026-10-29). AC1/AC2 from the beta.87 bench (forced reconnect 7m06s, restart 'WiFi: connected but no traffic', reboot_log 06:39:39).
 
 2026-11-05 Robert (session): AC9 reworded in effect to the esp32-combo-only rule (maintainer 2026-10-29); combo build green (beta.98) and evaluate 0 failed. AC5 (cap on hardware) and AC8 (30 min WS+REST load) to be benched now on .61.
+
+2026-11-05 bench .61 beta.95+1fbd5cf (evidence scratchpad/bench-1450b (lead session)): AC5 PASS: three dead-link restarts with the link dropped while associated ('WiFi: connected but no traffic' in reboot_log at 16:44:20, 17:01:53, 17:19:25; bootcount 68 -> 71, so the RTC count survived the software restarts); from the third boot the drop stayed on ~36 min: one forced reconnect at 17:28:34, the next verdict ~17:36:43 did nothing, the next reconnect at 17:44:43 (16.1 min later, >= 15 min), no restart (bootcount stayed 71). Not benched: count clears after 60 min of answered probes / on power-on or panic (tests/test_wifi_deadlink.py only). AC8 PASS: 30 min (17:58:27-18:28:29) one WS client + REST device/info and otmonitor every 2 s with MQTT connected and the probe active: 1779 REST OK, 3 single 5 s client timeouts (recovered), 470 WS frames, WS never dropped, bootcount 71 and uptime unbroken, no assert/TWDT/abort/panic/backtrace in telnet, no crashlog. Router count-only 0 (TASK-1450b), settings diff clean.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+All ACs evidenced. AC1-4, 6, 7, 9 per earlier notes (host tests, build, bench). AC5: restart cap on hardware (3 restarts, then reconnect-only at >= 15 min spacing, count survives software restarts). AC8: 30 min WS + REST load with the probe active, no TWDT/assert/reset. Not verified on hardware: the 60 min clear and the power-on/panic clear of the restart count (unit tests only); 3 unexplained single REST client timeouts under 2 s polling.
+<!-- SECTION:FINAL_SUMMARY:END -->
