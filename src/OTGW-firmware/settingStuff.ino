@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.87
+**  Version  : v2.0.0-beta.88
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -19,6 +19,7 @@
 #define SIDE_EFFECT_NTP    0x02
 #define SIDE_EFFECT_MDNS   0x04
 #define SIDE_EFFECT_OTGWSTREAM 0x08
+#define SIDE_EFFECT_TELNET 0x10
 static bool    settingsDirty = false;
 static uint8_t pendingSideEffects = 0;
 
@@ -91,6 +92,10 @@ void flushSettings()
   if (pendingSideEffects & SIDE_EFFECT_OTGWSTREAM) {
     DebugTln(F("[Settings] Applying legacy port 25238 setting (deferred)"));
     applyLegacyPort25238Setting();
+  }
+  if (pendingSideEffects & SIDE_EFFECT_TELNET) {
+    DebugTln(F("[Settings] Applying telnet debug console setting (deferred)"));
+    startTelnet();   // starts or stops port 23 per settings.bTelnetEnabled (TASK-1644)
   }
   pendingSideEffects = 0;
 }
@@ -298,6 +303,7 @@ bool writeSettings(bool show)
   writeJsonBoolKV(file, F("LEDblink"), settings.bLEDblink);
   writeJsonBoolKV(file, F("darktheme"), settings.bDarkTheme);
   writeJsonBoolKV(file, F("nightlyrestart"), settings.bNightlyRestart);
+  writeJsonBoolKV(file, F("telnetenabled"), settings.bTelnetEnabled);
   writeJsonIntKV(file, F("nightlyrestarthour"), settings.iRestartHour);
   writeJsonIntKV(file, F("boardmode"), settings.iBoardMode);  // ADR-127 combo board-mode cache/override
   writeJsonBoolKV(file, F("ui_onboarded"), settings.ui.bOnboarded);
@@ -699,6 +705,7 @@ void readSettings(bool show)
     Debugf(PSTR("NPT send time         : %s\r\n"), CBOOLEAN(settings.ntp.bSendtime));
     Debugf(PSTR("Led Blink             : %s\r\n"), CBOOLEAN(settings.bLEDblink));
     Debugf(PSTR("Nightly Restart       : %s (hour=%d)\r\n"), CBOOLEAN(settings.bNightlyRestart), settings.iRestartHour);
+    Debugf(PSTR("Telnet console (23)   : %s\r\n"), CBOOLEAN(settings.bTelnetEnabled));
     Debugf(PSTR("Board Mode (ADR-127)  : %d (0=auto,1=pic,2=otdirect,3=pic-pro)\r\n"), settings.iBoardMode);
     Debugf(PSTR("GPIO Sensors          : %s\r\n"), CBOOLEAN(settings.sensors.bEnabled));
     Debugf(PSTR("GPIO Sen. Legacy      : %s\r\n"), CBOOLEAN(settings.sensors.bLegacyFormat));
@@ -911,6 +918,10 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("LEDblink"))==0)      settings.bLEDblink = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("darktheme"))==0)     settings.bDarkTheme = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("nightlyrestart"))==0)     settings.bNightlyRestart = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("telnetenabled"))==0) {
+    settings.bTelnetEnabled = EVALBOOLEAN(newValue);
+    pendingSideEffects |= SIDE_EFFECT_TELNET;   // TASK-1644: applied live, no reboot
+  }
   else if (strcasecmp_P(field, PSTR("nightlyrestarthour"))==0) { int h = atoi(newValue); settings.iRestartHour = (h >= 0 && h <= 23) ? h : 4; }
   else if (strcasecmp_P(field, PSTR("boardmode"))==0)          { int m = atoi(newValue); settings.iBoardMode = (m >= 0 && m <= 3) ? (uint8_t)m : 0; }  // ADR-127/157
 

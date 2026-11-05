@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.87
+**  Version  : v2.0.0-beta.88
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1208,6 +1208,14 @@ static void onTelnetInput(const char* s) {
 //===========================================================================================
 void startTelnet()
 {
+  // TASK-1644: settings.bTelnetEnabled false closes port 23 and drops a connected client. Debug output
+  // then goes nowhere: AsyncSimpleTelnet::write() returns 0 with no client. Every caller (boot, WiFi
+  // reconnect, the deferred settings apply) comes through here, so the setting holds on every path.
+  if (!settings.bTelnetEnabled) {
+    DebugTln(F("Telnet debug console disabled (setting telnetenabled), closing port 23"));
+    debugTelnet.stop();
+    return;
+  }
   debugTelnet.onConnect(sendTelnetBanner);
   debugTelnet.setLineMode(false);
   // TASK-1333: Nagle on for the debug console only, so the TCP stack merges the

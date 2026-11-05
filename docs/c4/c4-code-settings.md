@@ -48,7 +48,7 @@
   - Uses helper functions: `writeJsonStringKV()`, `writeJsonBoolKV()`, `writeJsonIntKV()`, `writeJsonFloatKV()`
   - Reuses global `cMsg` buffer for JSON escaping (safe: no yield() between calls within writeSettings)
   - Closes file before optional echo read
-  - Covers every persisted sub-section (device, mqtt, ntp, ui, sensors, s0, picBoot, outputs, webhook, sat, wifi) plus the device-level fields (`hostname`, `httppasswd`, `LEDblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `boardmode`)
+  - Covers every persisted sub-section (device, mqtt, ntp, ui, sensors, s0, picBoot, outputs, webhook, sat, wifi) plus the device-level fields (`hostname`, `httppasswd`, `LEDblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `telnetenabled`, `boardmode`)
   - SAT settings alone: ~100 fields (heating system and source, presets, weather, multi-area, PV boost, BLE roster with per-slot bindkeys, etc.)
   - OT-direct settings (`HAS_DIRECT_OT`): 27 `OTD*` keys (mode, bypass relay, heating curve, room compensation, CH hysteresis, ventilation)
   - Ethernet settings (`HAS_ETH_CAPABLE`): static IP configuration

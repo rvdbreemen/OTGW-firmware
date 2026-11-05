@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.87
+**  Version  : v2.0.0-beta.88
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2269,6 +2269,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.dark_theme"), settings.bDarkTheme);
     je.field(F("settings.mydebug"), settings.bMyDEBUG);
     je.field(F("settings.nightly_restart"), settings.bNightlyRestart);
+    je.field(F("settings.telnet_enabled"), settings.bTelnetEnabled);
     je.field(F("settings.restart_hour"), (uint32_t)settings.iRestartHour);
 
     je.field(F("settings.mqtt.enabled"), settings.mqtt.bEnable);
@@ -4009,6 +4010,7 @@ void sendDeviceSettings()
   addBool(F("ledblink"), settings.bLEDblink, "b");
   addBool(F("darktheme"), settings.bDarkTheme, "b");
   addBool(F("nightlyrestart"), settings.bNightlyRestart, "b");
+  addBool(F("telnetenabled"), settings.bTelnetEnabled, "b");   // TASK-1644
   addInt(F("nightlyrestarthour"), (int)settings.iRestartHour, "i", 0, 23);
 #if HAS_RUNTIME_HW_DETECT
   // ADR-127/157 combo: persisted hardware-mode selector
@@ -4321,7 +4323,7 @@ static const char* const PROGMEM knownSettings[] = {
 #endif
   "gpiooutputsenabled", "gpiooutputspin", "gpiooutputstriggerbit",
   "gpiosensorsenabled", "gpiosensorsinterval", "gpiosensorslegacyformat", "gpiosensorspin",
-  "hostname", "httppasswd", "ledblink", "nightlyrestart", "nightlyrestarthour",
+  "hostname", "httppasswd", "ledblink", "nightlyrestart", "nightlyrestarthour", "telnetenabled",
   "mqttbroker", "mqttbrokerport", "mqttenable", "mqtthaprefix", "mqttharebootdetection",
   "mqttinterval", "mqttonchangepublishing", "mqttotmessage", "mqttpasswd", "mqttseparatesources", "legacyport25238enabled",
   "mqtttoptopic", "mqttuniqueid", "mqttuselegacyottopics", "mqttuser",  // TASK-1254: + mqttuselegacyottopics

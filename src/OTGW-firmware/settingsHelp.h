@@ -65,6 +65,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "darktheme":"Use the dark theme for the web UI.",
 "nightlyrestart":"Restart once a day to recover memory. Needs NTP sync. Interrupts service for about 30 s.",
 "nightlyrestarthour":"Local hour (0 to 23) of the nightly restart. Default 4.",
+"telnetenabled":"Telnet debug console on port 23. No login, and its keys can switch the GPIO output. Off closes the port at once.",
 "satenabled":"Master switch. On: SAT sets the boiler flow temperature itself. Off: the thermostat controls the boiler again.",
 "satsystem":"How heat is distributed: auto (treated as radiators), radiators or underfloor. Sets curve offset and flow limits.",
 "satsource":"Heat source: auto (gas boiler), gas boiler, heat pump or hybrid. Sets cycle timing; heat pumps never get modulation 0.",

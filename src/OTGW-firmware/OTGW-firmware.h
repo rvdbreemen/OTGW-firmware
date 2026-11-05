@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.87
+**  Version  : v2.0.0-beta.88
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -758,6 +758,7 @@ struct OTGWSettings {
   bool bDarkTheme    = false;
   bool bMyDEBUG      = false;
   bool bNightlyRestart = false;  // scheduled daily restart for heap recovery
+  bool bTelnetEnabled = true;    // TASK-1644: debug console on port 23 (no login; keys u/i drive the GPIO output)
   uint8_t iRestartHour = 4;     // hour (0-23) for nightly restart
   // Combo board (ADR-127 / ADR-158) persisted hardware-mode selector / override.
   // 0 = auto (boot-detect PIC vs OTDirect + S3 Mini vs S3 Mini Pro, then cache

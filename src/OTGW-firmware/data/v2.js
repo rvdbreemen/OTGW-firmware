@@ -2020,6 +2020,7 @@
     ssid:            { cat: 'system', label: 'Wi-Fi network', hint: 'Connected SSID (read-only)' },
     httppasswd:      { cat: 'system', label: 'Admin password', hint: 'Protects Settings / Advanced' },
     boardmode:       { cat: 'system', label: 'Board mode', hint: 'Hardware interface override' },
+    telnetenabled:   { cat: 'system', label: 'Telnet debug console', hint: 'TCP port 23, no login' },
     wifistaticip:    { cat: 'network', sub: 'Wi-Fi', label: 'Static IP', hint: 'Leave empty for DHCP' },
     wifisubnet:      { cat: 'network', sub: 'Wi-Fi', label: 'Subnet mask' },
     wifigateway:     { cat: 'network', sub: 'Wi-Fi', label: 'Gateway' },
