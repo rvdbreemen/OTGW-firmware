@@ -1,0 +1,7 @@
+# generator sat_bench_scenarios_1412_20 1412.20-v1; sha256 per scenario file
+629e24fcfda98541c22df112090e70e3f910d41ad1e7e1baee8ef0fea1a26856 SB05-id25-data-invalid.scn
+cef2b3c22f43e3fec56dfc51ced887697e8300f19489492a71940660d0e12e25 SB06-id25-unknown.scn
+65ab3d34ec4a48b0b3e7c63b668518d40d9249f7b06e615ceb0c2a2de9f70632 SB07-id25-no-answer.scn
+2a608259cfa40a3ee5fb0d50ec1d5f5afa69cf2ac702613092f7c97885db65c1 SB08-id28-data-invalid.scn
+430d029b5da96d00c144eb073244aa1914a00a83e971438299ffe309b6a52afe SB09-id28-unknown.scn
+86c1f37c291f69b0f95c525b0fb612ec0bf24b9a27b4155d7ff295896eca19c9 SB11-slow-ignition.scn
