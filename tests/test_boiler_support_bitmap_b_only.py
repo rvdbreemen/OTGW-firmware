@@ -64,6 +64,10 @@ int main(int argc, char** argv) {
     int ar = bit(boilerAckedRead, id), aw = bit(boilerAckedWrite, id), ur = bit(boilerUnsupportedRead, id), uw = bit(boilerUnsupportedWrite, id);
     if (ar || aw || ur || uw) printf("%d %d %d %d %d\n", id, ar, aw, ur, uw);
   }
+  for (int id = 0; id < 256; id++) {
+    int tr = bit(thermostatSentRead, id), tw = bit(thermostatSentWrite, id), lw = bit(boilerLastMasterWasWrite, id);
+    if (tr || tw || lw) printf("t %d %d %d %d\n", id, tr, tw, lw);
+  }
   printf("u28 %d\n", boilerUnknown28ThisBoot ? 1 : 0);
   return 0;
 }
@@ -109,13 +113,36 @@ class BoilerSupportBitmapBOnly(unittest.TestCase):
     def run_frames(self, frames):
         out = subprocess.run([str(self.exe), " ".join(frames)], capture_output=True, text=True, check=True).stdout
         bits, u28 = {}, None
+        self.tbits = {}
         for line in out.splitlines():
             p = line.split()
             if p[0] == "u28":
                 u28 = p[1] == "1"
+            elif p[0] == "t":
+                self.tbits[int(p[1])] = dict(zip(("sr", "sw", "lastw"), (x == "1" for x in p[2:])))
             else:
                 bits[int(p[0])] = dict(zip(("ar", "aw", "ur", "uw"), (x == "1" for x in p[1:])))
         return bits, u28
+
+    # ---- TASK-1612: the thermostat side. Only a T frame is what the thermostat sent; an R is the gateway's request to the
+    # boiler (the PIC's own write or its replacement of a T; OTDirect bridges its own requests as 'R', OTDirect.ino:1380).
+    # gruijter 20261030-092718: 2 x R56 Write-Data from the PIC, no T56 at all.
+
+    def test_pic_request_is_not_a_thermostat_request(self):
+        self.run_frames([f"R:{WR}:56", f"B:{WACK}:56"])
+        self.assertFalse(self.tbits.get(56, {}).get("sw"), "a PIC R56 write marked thermostatSentWrite[56]")
+        self.assertTrue(self.tbits[56]["lastw"], "the R is what the boiler answers: its direction still counts")
+
+    def test_replaced_request_counts_once_for_the_thermostat(self):
+        # T57 read replaced by R26 read: the thermostat asked 57, not 26
+        self.run_frames([f"T:{RD}:57", f"R:{RD}:26", f"B:{RACK}:26", f"A:{RACK}:57"])
+        self.assertTrue(self.tbits[57]["sr"])
+        self.assertFalse(self.tbits.get(26, {}).get("sr"), "the PIC's R26 marked thermostatSentRead[26]")
+
+    def test_thermostat_frames_still_count(self):
+        self.run_frames([f"T:{WR}:1", f"B:{WACK}:1", f"T:{RD}:25", f"B:{RACK}:25"])
+        self.assertTrue(self.tbits[1]["sw"] and self.tbits[1]["lastw"])
+        self.assertTrue(self.tbits[25]["sr"] and not self.tbits[25]["lastw"])
 
     def test_field_pattern_pic_answer_after_another_b_is_not_boiler_evidence(self):
         # gruijter 20261030-092718: T57 R26 B26 A57(Read-Ack), T16 R26 B26 A16(Write-Ack), T9 ... A9(Read-Ack)

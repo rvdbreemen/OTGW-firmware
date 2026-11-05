@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.86
+**  Version  : v2.0.0-beta.87
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5901,16 +5901,20 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
         const uint8_t idx  = OTdata.id >> 3;
         const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
         if (OTdata.masterslave == 0) {
-          // Master frame — track thermostat-side requests.
+          // Master frame. boilerLastMasterWasWrite follows every request the
+          // boiler gets (T, or the gateway's R); the thermostat bitmaps take
+          // only a T: an R is the gateway's own request or its replacement of
+          // a T, not something the thermostat sent (TASK-1612).
+          const bool fromThermostat = (OTdata.rsptype == OTGW_THERMOSTAT);
           if (OTdata.type == OT_WRITE_DATA) {
             boilerLastMasterWasWrite[idx] |= mask;
-            if ((thermostatSentWrite[idx] & mask) == 0) {
+            if (fromThermostat && (thermostatSentWrite[idx] & mask) == 0) {
               thermostatSentWrite[idx] |= mask;
               thermostatFileDirty = true;
             }
           } else if (OTdata.type == OT_READ_DATA) {
             boilerLastMasterWasWrite[idx] &= ~mask;
-            if ((thermostatSentRead[idx] & mask) == 0) {
+            if (fromThermostat && (thermostatSentRead[idx] & mask) == 0) {
               thermostatSentRead[idx] |= mask;
               thermostatFileDirty = true;
             }
@@ -7210,7 +7214,12 @@ void upgradepic(AsyncWebServerRequest *request) {
 // TASK-693 port (dev TASK-688): persist the OT-bus support map across reboots.
 //
 // Files (LittleFS):
-//   /ot-thermo.json — {"v":1,"device":"thermostat","sent_read":[...],"sent_write":[...]}
+//   /ot-thermo.json — {"v":2,"device":"thermostat","sent_read":[...],"sent_write":[...]}
+//
+// Thermostat format 2 (TASK-1612): format 1 was written by builds that counted
+// the gateway's own R requests (a PIC write such as R56, or the R that replaced
+// a T) as thermostat requests; those bits are never retracted, so a format-1
+// file is not loaded and the next save writes format 2.
 //   /ot-boiler.json — {"v":3,"device":"boiler","acked_read":[...],"acked_write":[...],
 //                     "unsupported_read":[...],"unsupported_write":[...]}
 //
@@ -7313,19 +7322,23 @@ static void writeBitmapArrayToJson(File &f, const uint8_t bitmap[32]) {
 
 void loadOtSupportFiles() {
   // Thermostat side.
+  bool thermostatMigrated = false;
   File f = LittleFS.open("/ot-thermo.json", "r");
   if (f) {
-    // Magic gate: read the start of the file and verify "v":1 is present.
+    // Magic gate: read the start of the file and verify the format.
     char header[16] = {0};
     int n = f.read((uint8_t*)header, sizeof(header) - 1);
     header[n > 0 ? n : 0] = '\0';
-    if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
+    if (strstr_P(header, PSTR("\"v\":2")) != nullptr) {
       // TASK-696: short keys (sr/sw/ar/aw/ur/uw) to trim flash on ESP32.
       // The file is firmware-internal; the WebUI / REST surfaces use the long
-      // names. Magic "v":1 unchanged so a future schema bump can still gate.
+      // names.
       readBitmapArrayFromJson(f, F("\"sr\":["), thermostatSentRead);
       readBitmapArrayFromJson(f, F("\"sw\":["), thermostatSentWrite);
       DebugTln(F("ot-support: thermostat profile loaded from /ot-thermo.json"));
+    } else if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
+      thermostatMigrated = true;          // format 1: see the header comment above
+      DebugTln(F("ot-support: /ot-thermo.json is format 1 (it counted gateway requests as thermostat requests), starting fresh"));
     } else {
       DebugTln(F("ot-support: /ot-thermo.json header missing/invalid — starting fresh"));
     }
@@ -7353,8 +7366,8 @@ void loadOtSupportFiles() {
     f.close();
   }
   // We loaded what's on disk, so the on-disk copy matches RAM: not dirty. A
-  // migrated format-1/2 file does not match, so it is rewritten as format 3.
-  thermostatFileDirty = false;
+  // migrated older file does not match, so it is rewritten in the current format.
+  thermostatFileDirty = thermostatMigrated;
   boilerFileDirty     = boilerMigrated;
 }
 
@@ -7365,7 +7378,7 @@ static bool writeOtThermoFile(const char* canonicalPath, const char* tmpPath) {
   File f = LittleFS.open(tmpPath, "w");
   if (!f) return false;
   // TASK-696: short keys (sr/sw) match the reader and save ~30 B per write.
-  f.print(F("{\"v\":1,\"device\":\"thermostat\",\"sr\":["));
+  f.print(F("{\"v\":2,\"device\":\"thermostat\",\"sr\":["));
   writeBitmapArrayToJson(f, thermostatSentRead);
   f.print(F("],\"sw\":["));
   writeBitmapArrayToJson(f, thermostatSentWrite);
