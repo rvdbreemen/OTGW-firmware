@@ -1,10 +1,16 @@
 # TASK-1655: KD x0.9 and x0.8 against today for the warm-up (simulation)
 
 **Result in one line.** The model shows the D term holding back the warm-up, as Sergeant D describes. But lowering KD by
-10 % or 20 % makes the warm-up only 0.3-4 % faster: a few minutes on 1.5-7 hours. By the pre-registered rule that is
-"keep KD: no 10 % warm-up gain in any class". KD x0.9 harms nothing: no guard fails that does not also fail at
-baseline. Sergeant D has already decided 0.063 (= x0.9, entry 279). This run therefore does not support his choice as
-a warm-up fix, and it does not count against it as a risk either.
+10 % or 20 % makes the warm-up only 0.3-4 % faster: a few minutes on 1.5-7 hours. By the pre-registered rule the
+recommendation is **keep KD at 0.07**: no 10 % warm-up gain in any class, so KD is not the lever for the warm-up in this
+model.
+
+On harm, x0.9 causes one guard failure of its own: G4 in 2015 heavy rad, where the deadband is reached 0.8 min later in
+the median. The other failing guards (G1, G2, G6) also fail at baseline on the same inputs. That "also at baseline"
+reading is our analysis after the run, not part of the pre-registered rule. In 1983-92 light rad the worst run's starts
+per day rose from 77 to 84; the median change there is 0.
+
+Sergeant D has already decided 0.063 (= x0.9, entry 279). This study is new evidence on that decision, not a ruling on it.
 
 Simulation only: no result is physical boiler proof. Pre-registration: `docs/sat/sim-1655/thresholds.md`, committed
 be3dd1726 before the first grid run. Data: `docs/sat/sim-1655/runs.json` (1728 runs; meta holds the sha256 of every
@@ -61,7 +67,7 @@ Paired deltas that matter for harm, x0.9 against baseline, as medians per class:
 - **Guard-run share within 0.3 K:** unchanged.
 - **Hard limits:** H1 (<= 3 PWM starts per hour) and H2 (CS clamp) hold in all 1728 runs.
 
-The single run-level change against x0.9 is G4 in 2015 heavy rad: the deadband is reached 0.8 min later in the median.
+Changes caused by x0.9 itself: G4 in 2015 heavy rad (median t01 +0.8 min) and, in 1983-92 light rad, the worst run's starts per day (77 -> 84, median delta 0).
 
 ## 3. Sergeant D's design intent: the deadband within 8400 s (entry 279)
 
@@ -131,20 +137,23 @@ the firmware form of entry 279.
 - **Entry 212** (reference stays 7beaaf5): deviated from for the kd factor only, on Sergeant D's authority (entry 279).
   Nothing in this study changes that.
 
-## 7. Draft message for Sergeant D (Q-1412.16b follow-up, one question)
+## 7. Draft message for Sergeant D (one question, new evidence on entry 279)
 
-> @sergeantd We ran your KD change in our simulator: 1728 runs, 8 house types, radiators and underfloor, cold starts
-> 2.5 K and 4 K below target. Your diagnosis holds: during warm-up the D term pulls the setpoint down by 1.2-2.9 C. But
-> lowering KD by 10 % (0.063) makes the warm-up only 1-2 % faster, about 1-3 minutes, and -20 % gives 2-4 %. The reason
-> in the model: after the first half hour the boiler runs at its minimum power or in PWM, so 0.25-0.5 C more setpoint
-> adds no heat. In heavy houses the cold walls set the pace. 0.063 does no harm: overshoot, starts per day and comfort
-> are unchanged. Our question: which do you prefer?
-> A) Keep 0.063 as you decided. Harmless, small effect. We implement it as planned.
-> B) Keep 0.07 (thermo-nova). No change, because the gain is too small to justify a deviation from thermo-nova.
-> C) Look at the PWM/minimum-power phase of the warm-up instead, where the model says the time is lost. That means a
->    new simulation first, and no firmware change yet.
-> Our recommendation: A. You already chose it, and it costs nothing. If the 8400 s warm-up target matters, C is where
-> the time can be won.
+> <@821036882946424852> We ran your KD change (entry 279, 0.07 -> 0.063) in our simulator: 1728 runs, 8 house types,
+> radiators and underfloor, cold starts 2.5 K and 4 K below target. Your diagnosis holds: during warm-up the D term
+> pulls the setpoint down by 1.2-2.9 C. But 0.063 makes the warm-up only 1-2 % faster, about 1-3 minutes, and -20 %
+> gives 2-4 %. The reason in the model: after the first half hour the boiler runs at its minimum power or in PWM, so
+> 0.25-0.5 C more setpoint adds no heat. In heavy houses the cold walls set the pace. 0.063 is close to harmless: no
+> change in overshoot or comfort, but in one house type the deadband comes 0.8 min later, and in another one run went
+> from 77 to 84 starts a day.
+> One question: which do you want?
+> A) Keep 0.063 as you decided in entry 279. Small effect, almost no harm. We implement it in the firmware as planned.
+> B) Back to 0.07, as thermo-nova (`pid.py:93` at 7beaaf5). No firmware change and no deviation from thermo-nova,
+>    because the warm-up gain is too small to justify one.
+> C) Keep 0.07 for now and look at the minimum-power / PWM phase of the warm-up, where the model says the time is lost.
+>    That means a new simulation first, and no firmware change yet.
+> Our recommendation is B, combined with the study in C: our pre-registered rule says keep KD, since no house type got
+> 10 % faster. A is your call and does almost no harm, if you prefer it.
 
 ## 8. Not verified
 
@@ -152,3 +161,5 @@ the firmware form of entry 279.
 - A night setback with a warm wall, a modulating boiler between Pmin and full power, and curve coefficients other than
   1.6 are not simulated.
 - The mechanism in section 4 rests on two traces, not on the whole grid.
+- The faithfulness test covers d0 = 0 with no gain input. The cold starts (d0 != 0) and the guard scenario with a gain input
+  (gain_step_8) are not compared with a committed 1412.16 or 1412.19 row.
