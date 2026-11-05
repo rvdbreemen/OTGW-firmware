@@ -132,6 +132,22 @@ Historic tasks (closed without Test Plan) should be retrofitted when reopened.
 
 ---
 
+## Marking a wait
+
+A task that cannot move until Robert decides, or until field evidence arrives, carries a marker. `scripts/agentic_throughput.py` dates each wait from the git history of the task file (TASK-1647), so set and clear the marker in its own edit, at the moment the wait starts and ends.
+
+| Wait | Start | Stop |
+|---|---|---|
+| Maintainer decision | `--add-label needs-maintainer-ok` (older tasks: `needs-decision`) | `--remove-label needs-maintainer-ok`, in the edit that records the decision in the notes |
+| Field evidence, whole task | `-s "In Review"` (only field validation is left) | `-s Done` when the evidence is in, or back to `To Do` / `In Progress` |
+| Field evidence, one AC while other work goes on | `--add-label needs-field-data` (older tasks: `waiting-for-field`, `field-verification`) | `--remove-label needs-field-data` when the evidence is in |
+
+- Setting a task to Done ends every wait, also when a stale marker stays behind.
+- `field` and `field-report` say where a report came from; they are not waits.
+- `auto_commit` is off: commit the task file soon after the edit. The script takes the time from `updated_date` in the commit, which is the last edit before that commit.
+
+---
+
 ## Acceptance Criteria
 
 | Action | Command |

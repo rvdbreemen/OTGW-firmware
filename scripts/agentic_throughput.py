@@ -12,7 +12,17 @@ Prints a Markdown report. Sources and their limits:
               docs/sat/sergeant-d-corrections.index.json (day resolution).
   labels      needs-maintainer-ok on tasks that are not Done.
   alpha tags  git log -G"_VERSION_PRERELEASE" -- src/OTGW-firmware/version.h on the current branch.
-Needs a full clone; a shallow clone undercounts the alpha tags.
+  waits       (TASK-1647) git history of the task files. A task waits for a maintainer decision
+              while it carries a MAINTAINER_LABELS label, and for field evidence while its status
+              is "In Review" or it carries a FIELD_LABELS label (convention:
+              docs/guides/backlog-cli.md, "Marking a wait"). Start and stop are the commits that add
+              and remove the marker, or the edit that sets the task to Done (a marker left on a
+              Done task is stale, not a wait); the clock is the updated_date written in that same
+              diff, else the commit time. Limits: auto_commit is off, so several edits can share one commit and
+              only the last edit time is known; a marker set and cleared between two commits is
+              invisible; a task that waits without a marker is not counted; history before
+              2026-11-05 used these markers unevenly, so older waits are undercounted.
+Needs a full clone; a shallow clone undercounts the alpha tags and the waits.
 """
 import argparse
 import datetime as dt
@@ -27,6 +37,94 @@ ROOT = Path(__file__).resolve().parent.parent
 TASK_DIRS = [ROOT / "backlog" / "tasks", ROOT / "backlog" / "archive" / "tasks"]
 QUESTIONS = ROOT / "docs" / "sat" / "open-questions.md"
 INDEX = ROOT / "docs" / "sat" / "sergeant-d-corrections.index.json"
+
+# Wait markers (TASK-1647). "field" and "field-report" mark where a report came from, not a wait.
+MAINTAINER_LABELS = {"needs-maintainer-ok", "needs-decision"}
+FIELD_LABELS = {"needs-field-data", "waiting-for-field", "field-verification"}
+FIELD_STATUS = "In Review"
+_LABEL_LINE = re.compile(r"^([+-])\s+-\s+['\"]?([\w.-]+)['\"]?\s*$")
+_STATUS_LINE = re.compile(r"^([+-])status:\s*['\"]?(.*?)['\"]?\s*$")
+_UPDATED_LINE = re.compile(r"^\+updated_date:\s*['\"]?(.*?)['\"]?\s*$")
+_TASK_ID = re.compile(r"task-(\d+(?:\.\d+)*)\b", re.I)
+
+
+def _kind(sign_line):
+    """Wait kind a diff line adds or removes, or None."""
+    m = _LABEL_LINE.match(sign_line)
+    if m:
+        if m.group(2) in MAINTAINER_LABELS:
+            return m.group(1), "maintainer"
+        if m.group(2) in FIELD_LABELS:
+            return m.group(1), "field"
+        return None
+    m = _STATUS_LINE.match(sign_line)
+    if m and m.group(2) == FIELD_STATUS:
+        return m.group(1), "field"
+    return None
+
+
+def parse_wait_events(log_text):
+    """Turn `git log --reverse -p -U0 --format='COMMIT %H %cI'` output into
+    (time, task_id, kind, 'start'|'stop') events, oldest first. Per commit and task the
+    added and removed markers are netted, so an archive move or rename is not a stop/start."""
+    events = []
+
+    def flush(commit_time, per_task):
+        for tid, rec in per_task.items():
+            when = rec["updated"] or commit_time
+            for kind in sorted(rec["+"] - rec["-"]):
+                events.append((when, tid, kind, "start"))
+            stops = {"maintainer", "field"} if rec["done"] else rec["-"] - rec["+"]
+            for kind in sorted(stops):
+                events.append((when, tid, kind, "stop"))
+
+    commit_time, per_task, cur = None, {}, None
+    for line in log_text.splitlines():
+        if line.startswith("COMMIT "):
+            if commit_time is not None:
+                flush(commit_time, per_task)
+            stamp = dt.datetime.fromisoformat(line.split()[2])
+            commit_time = stamp.astimezone(dt.timezone.utc).replace(tzinfo=None)
+            per_task, cur = {}, None
+        elif line.startswith("diff --git "):
+            m = _TASK_ID.search(line.rsplit(" b/", 1)[-1])
+            cur = per_task.setdefault(f"TASK-{m.group(1)}",
+                                      {"+": set(), "-": set(), "updated": None, "done": False}) if m else None
+        elif cur is not None and line[:1] in "+-" and not line.startswith(("+++", "---")):
+            u = _UPDATED_LINE.match(line)
+            if u:
+                cur["updated"] = parse_time(u.group(1)) or cur["updated"]
+                continue
+            s = _STATUS_LINE.match(line)
+            if s and s.group(1) == "+" and s.group(2) == "Done":
+                cur["done"] = True  # Done ends every wait, also when a stale marker stays behind
+            k = _kind(line)
+            if k:
+                cur[k[0]].add(k[1])
+    if commit_time is not None:
+        flush(commit_time, per_task)
+    return events
+
+
+def wait_intervals(events, now):
+    """(task_id, kind, start, stop_or_None) per wait; a second start while open is ignored."""
+    open_, out = {}, []
+    for when, tid, kind, what in events:
+        key = (tid, kind)
+        if what == "start" and key not in open_:
+            open_[key] = when
+        elif what == "stop" and key in open_:
+            out.append((tid, kind, open_.pop(key), when))
+    out += [(tid, kind, start, None) for (tid, kind), start in open_.items()]
+    return out
+
+
+def git_wait_log():
+    pattern = r"^(status: .?(" + FIELD_STATUS + r"|Done)|\s+- .?(" + "|".join(sorted(MAINTAINER_LABELS | FIELD_LABELS)) + r").?\s*$)"
+    return subprocess.run(["git", "-C", str(ROOT), "-c", "core.quotePath=false", "log", "--reverse", "-p", "-U0",
+                           "--format=COMMIT %H %cI", "-G" + pattern, "--",
+                           "backlog/tasks", "backlog/archive/tasks"],
+                          capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
 
 
 def parse_time(s):
@@ -140,6 +238,31 @@ def main():
             f"| Asked to answer, shortest / longest | {fmt_hours(min(waits) if waits else None)} / {fmt_hours(max(waits) if waits else None)} |",
             f"| Open now (asked or queued) | {len(open_ages)}: " + (", ".join(f"{q} {d} d" for q, d in open_ages) or "none") + " |",
             ""]
+
+    now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+    intervals = wait_intervals(parse_wait_events(git_wait_log()), now)
+    out += ["## Task waits for a maintainer decision or field evidence", "",
+            "A wait runs from the edit that sets the marker to the edit that clears it (TASK-1647; markers and limits in the script header).", "",
+            "| Figure | Maintainer decision | Field evidence |", "|---|---|---|"]
+    rows = {}
+    for kind in ("maintainer", "field"):
+        closed = [((stop - start).total_seconds() / 86400, tid) for tid, k, start, stop in intervals
+                  if k == kind and stop is not None and since <= stop < until]
+        opened = [((now - start).total_seconds() / 86400, tid) for tid, k, start, stop in intervals
+                  if k == kind and stop is None]
+        days = [d for d, _ in closed]
+        longest = max(closed) if closed else None
+        oldest = max(opened) if opened else None
+        rows[kind] = [str(len(closed)),
+                      fmt_days(statistics.median(days) if days else None),
+                      fmt_days(pct(days, 0.8)),
+                      f"{longest[0]:.1f} d ({longest[1]})" if longest else "n/a",
+                      str(len(opened)),
+                      f"{oldest[0]:.1f} d ({oldest[1]})" if oldest else "n/a"]
+    for i, label in enumerate(["Waits ended in the window", "Wait, median", "Wait, 80th percentile",
+                               "Longest ended wait", "Waiting now", "Oldest open wait"]):
+        out.append(f"| {label} | {rows['maintainer'][i]} | {rows['field'][i]} |")
+    out.append("")
 
     log = subprocess.run(["git", "-C", str(ROOT), "log", f"--since={a.since}", f"--until={until.date().isoformat()}",
                           "--format=%ad", "--date=short", "-G_VERSION_PRERELEASE", "--",
