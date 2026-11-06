@@ -101,6 +101,11 @@ void File::close() {
 }
 static FakeFS LittleFS;
 
+// TASK-1665: the diagnostic recorder is never started here, so the capture points in the slice are the idle one-read no-op.
+struct DiagRecStub { bool active = false; void recOtFrame(char, uint32_t) {} void recPicCommand(const char*, size_t) {}
+                     void recOtdCommand(const char*, size_t) {} void recResponse(const char*, size_t) {} };
+static DiagRecStub diagRec;
+
 // ---- code under test: OTGW-Core.ino, sliced ----------------------------------------
 #include "core.inc"
 

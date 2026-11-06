@@ -57,6 +57,10 @@ static bool g_pic = true;
 static bool isPICEnabled() { return g_pic; }
 static bool isOTDirectEnabled() { return true; }
 static char g_direct[256];
+// TASK-1665: the diagnostic recorder is never started here, so every capture point in the cut-out code is its one-read no-op.
+struct DiagRecStub { bool active = false; void recOtFrame(char, uint32_t) {} void recPicCommand(const char*, size_t) {}
+                     void recOtdCommand(const char*, size_t) {} void recResponse(const char*, size_t) {} };
+static DiagRecStub diagRec;
 static bool handleOTDirectCommand(const char* b, int n, bool = false) { strncat(g_direct, b, n); strcat(g_direct, ";"); return true; }
 static bool g_satOwns = false;      // TASK-1575: SAT owns the control setpoint
 static bool satOwnsControlSetpoint() { return g_satOwns; }

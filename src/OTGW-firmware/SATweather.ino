@@ -528,6 +528,7 @@ static bool weatherApplyResult()
 #endif
   state.sat.weather.bValid        = true;
   state.sat.weather.iLastUpdateMs = millis();
+  if (diagRec.active) diagRec.recWeather(diagX100(state.sat.weather.fTemperature), diagX100(state.sat.weather.fHumidity), diagX100(state.sat.weather.fWindSpeed));   // TASK-1665 (ADR-213)
 
 #if !HAS_WEATHER_FORECAST
   DebugTf(PSTR("Weather: %.1fC (feels %.1fC), %d%% RH, %.1f km/h wind, %d%% cloud\r\n"),

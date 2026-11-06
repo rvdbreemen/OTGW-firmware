@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.106
+**  Version  : v2.0.0-beta.107
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -713,7 +713,9 @@ void handleOTDirectBridgeStream() {
         OTDDebugTf(PSTR("OTDirect bridge: Sending [%s] (%d)\r\n"), sWrite, static_cast<int>(bytes_write));
         if (bytes_write > 0) {
           otDirectBridgeEvent('>', sWrite, bytes_write);
+          diagRec.bridgeLine = true;    // TASK-1665: ADR-213 does not record port 25238 bridge traffic
           sendPICSerial(sWrite, static_cast<int>(bytes_write));
+          diagRec.bridgeLine = false;
         }
       }
 
@@ -2794,6 +2796,7 @@ static unsigned long applyResponseModifiers(unsigned long response) {
 // ---------------------------------------------------------------------------
 bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   otdWriteRefused = false;
+  if (diagRec.active) diagRec.recOtdCommand(buf, (size_t)len);   // TASK-1665 (ADR-213)
   if (len < 4) return false;  // minimum "XX=Y"
 
   OTDDebugTf(PSTR("OTD: cmd \"%s\" (len=%d)\r\n"), buf, len);

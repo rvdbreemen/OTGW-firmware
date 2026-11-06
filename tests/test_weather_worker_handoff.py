@@ -129,6 +129,10 @@ template <class T> static T host_xchg(T* p, T v) { T o = *p; *p = v; return o; }
 static uint32_t g_ms = 0;
 static uint32_t millis() { return g_ms; }
 static void yield() {}
+// TASK-1665: the diagnostic recorder is never started here, so the capture point is its one-read no-op.
+struct DiagRecStub { bool active = false; void recWeather(int16_t, int16_t, int16_t) {} };
+static DiagRecStub diagRec;
+static int16_t diagX100(float) { return 0; }
 
 static std::string g_data;
 static size_t g_pos = 0;

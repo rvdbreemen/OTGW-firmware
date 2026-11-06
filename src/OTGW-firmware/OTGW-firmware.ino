@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.106
+**  Version  : v2.0.0-beta.107
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -313,6 +313,7 @@ void setup() {
   // queue/mutex must exist so the very first drain in loop() has its handles.
   setupOTConcurrency();
   graphHistoryInit();   // TASK-1296: Monitor graph history ring + mutex
+  diagRecorderInit();   // TASK-1665: diagnostic recorder lock + environment (no ring until a recording starts)
 
   //setup the status LED
   setLed(LED1, ON);
@@ -530,6 +531,7 @@ void setup() {
   SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
   state.uptime.iRebootCount = updateRebootCount();
   updateRebootLog(lastReset);
+  diagRecorderBootResume();   // TASK-1665: a recording that was on at the last reboot resumes with the Reboot record first
 
   // One-line boot signature for field diagnostics (TASK-394 Phase 2).
   // Captured AFTER full init so heap/fragmentation reflect steady-state setup.

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.106
+**  Version  : v2.0.0-beta.107
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -36,6 +36,13 @@ extern AsyncSimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 // OTDirecttypes.h must follow boards.h because its contents are gated on HAS_DIRECT_OT (ADR-079).
 #include "OTDirecttypes.h"
 #include "OTGWLogMacros.h"
+#include "diagRecorderStuff.h"  // TASK-1665 (ADR-213): diagnostic recorder format, ring and redaction; the glue is diagRecorderStuff.ino
+extern DiagRecorder diagRec;
+void diagRecorderInit();                    // once, from setup(): lock + environment
+DiagStartResult diagRecorderStart();        // manual start (REST, TASK-1666); sets the flag on success
+bool diagRecorderStop();                    // manual stop; clears the flag
+void diagRecorderBootResume();              // from setup(): resume a recording that was on at the last reboot
+void diagRecordRestIn(uint8_t routeIdx, const char* segment, const char* method, const char* body);
 #if HAS_PIC
 #include <OTGWSerial.h>         // Schelte Bron's Serial class - it upgrades and more
 #endif
@@ -786,6 +793,7 @@ struct OTGWSettings {
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   EthernetSection     eth;
 #endif
+  DiagSettingsSection diag;   // TASK-1665 (ADR-213): diagnostic recording flag
 };
 
 OTGWSettings settings;

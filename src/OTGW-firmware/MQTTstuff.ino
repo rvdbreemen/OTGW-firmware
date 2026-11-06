@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.106
+**  Version  : v2.0.0-beta.107
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -801,6 +801,8 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length, 
             length, (unsigned int)(sizeof(msgPayload) - 1));
     return;
   }
+
+  if (diagRec.active) diagRec.recMqttIn(topic, msgPayload, strlen(msgPayload));   // TASK-1665: inbound command or status (ADR-213); the topic as received
 
   if (strcasecmp_P(topic, PSTR("homeassistant/status")) == 0) {
     //incoming message on status, detect going down
@@ -1670,6 +1672,7 @@ bool sendMQTTData(const char* topic, const char *json, const bool retain)
   strlcat(full_topic, topic, sizeof(full_topic));
   MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settings.mqtt.sBroker, settings.mqtt.iBrokerPort, full_topic, json);
   const size_t payloadLen = strlen(json);
+  if (diagRec.active) diagRec.recMqttPublish(topic, json);   // TASK-1665: value publishes only (ADR-213); discovery uses mqttPublishRaw()
   // espMqttClient frames atomically (copies topic+payload into its Outbox); the
   // TASK-770 disconnect-on-truncated-write guard is obsolete.
   if (!mqttPublishRaw(full_topic, reinterpret_cast<const uint8_t*>(json), payloadLen, retain)) {
@@ -1726,6 +1729,7 @@ bool sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
   char payloadBuf[MQTT_TOPIC_MAX_LEN];
   strlcpy_P(payloadBuf, payload, sizeof(payloadBuf));
   const size_t payloadLen = strlen(payloadBuf);
+  if (diagRec.active) diagRec.recMqttPublish(topicBuf, payloadBuf);   // TASK-1665 (ADR-213)
   if (!mqttPublishRaw(full_topic, reinterpret_cast<const uint8_t*>(payloadBuf), payloadLen, retain)) {
     PrintMQTTError();
     return false;

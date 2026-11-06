@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.106
+**  Version  : v2.0.0-beta.107
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -317,6 +317,7 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
 static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleGraph(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);  // TASK-1296
+static void handleDiag(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);   // TASK-1666
 // TASK-585: WiFi network scan
 static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
@@ -2135,6 +2136,35 @@ static void handleGraph(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod
   sendApiError(404, F("Unknown graph resource"));
 }
 
+// TASK-1666 (ADR-213 decision 5): /api/v2/diag/recording[/status|/start|/stop]. The download and the
+// status are open (Robert 2026-11-05); start and stop are POST/PUT, so the central mutating-method
+// auth check above already covers them. The download is not in kApiRateLimitRoutes: it is pulled
+// by a host script every few minutes, one at a time, and holds one REST slot until it ends.
+void sendDiagRecordingDownload();
+void sendDiagRecordingStatus();
+void sendDiagRecordingControl(bool start);
+static void handleDiag(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
+{
+  if (wc > 4 && strcasecmp_P(words[4], PSTR("recording")) == 0) {
+    if (wc == 5) {
+      if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+      sendDiagRecordingDownload();
+      return;
+    }
+    if (wc == 6 && strcasecmp_P(words[5], PSTR("status")) == 0) {
+      if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+      sendDiagRecordingStatus();
+      return;
+    }
+    if (wc == 6 && (strcasecmp_P(words[5], PSTR("start")) == 0 || strcasecmp_P(words[5], PSTR("stop")) == 0)) {
+      if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+      sendDiagRecordingControl(strcasecmp_P(words[5], PSTR("start")) == 0);
+      return;
+    }
+  }
+  sendApiNotFound(originalURI);
+}
+
 static void debugFormatLocalIp(char* buf, size_t bufSize)
 {
   IPAddress ip = WiFi.localIP();
@@ -2601,6 +2631,7 @@ static const char kRouteDebugDump[]  PROGMEM = "debug";
 static const char kRouteGraph[]      PROGMEM = "graph";    // TASK-1296: Monitor graph history
 static const char kRouteNetwork[]    PROGMEM = "network";  // TASK-585
 static const char kRouteMqtt[]       PROGMEM = "mqtt";     // TASK-936: OT-value republish
+static const char kRouteDiag[]       PROGMEM = "diag";     // TASK-1666: diagnostic recording
 
 // Dispatch table placed in PROGMEM so the ~136 B of {segment, handler}
 // rows live in flash, not DRAM. Same pattern as kSatMqttCmds in
@@ -2628,6 +2659,7 @@ static const ApiRoute kV2Routes[] PROGMEM = {
   { kRouteGraph,      handleGraph },    // TASK-1296: GET /api/v2/graph/history
   { kRouteNetwork,    handleNetwork },  // TASK-585: WiFi scan
   { kRouteMqtt,       handleMqtt },     // TASK-936: POST /api/v2/mqtt/republish
+  { kRouteDiag,       handleDiag },     // TASK-1666: /api/v2/diag/recording (appended last: route ids in a recording stay stable)
   { nullptr,          nullptr }  // sentinel
 };
 
@@ -2799,6 +2831,15 @@ bool restRequestWithin(uint32_t ms)
   return last != 0 && (uint32_t)(millis() - last) < ms;
 }
 
+// TASK-1665 (ADR-213): the diagnostic recorder takes non-GET requests only, one record per request that reached
+// its handler. The body is redacted inside diagRecordRestIn().
+static void diagCaptureRest(uint8_t routeIdx, PGM_P segment, HTTPMethod method)
+{
+  if (!diagRec.active) return;
+  if (method != HTTP_POST && method != HTTP_PUT && method != HTTP_PATCH && method != HTTP_DELETE) return;
+  diagRecordRestIn(routeIdx, segment, httpMethodToStr(method), hasArgCompat(F("plain")) ? argCompat(F("plain")) : "");
+}
+
 void processAPI(AsyncWebServerRequest *request)
 {
   // TASK-1450: first, before the 503 gates: a request that gets a busy reply still crossed the LAN.
@@ -2904,6 +2945,7 @@ void processAPI(AsyncWebServerRequest *request)
                           httpMethodToStr(method), originalURI, millis() - startMs);
               return;
             }
+            diagCaptureRest((uint8_t)i, r.segment, method);
             r.handler(words, wc, method, originalURI);
             RESTDebugTf(PSTR("REST %s %s => %d v2/%S %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, r.segment, millis() - startMs);
             return;
@@ -3649,6 +3691,141 @@ void sendDeviceCoreDump()
   g_responseSent = true;
 }
 
+
+//=======================================================================
+// TASK-1666 (ADR-213 decision 5): diagnostic recording routes.
+//
+// {"recording":{"state":"recording|stopped|refused","enabled":b,"active":b,"reason":"","psram":b,
+//   "block_size":4096,"ring_blocks":n,"ring_bytes":n,"has_data":b,"oldest_seq":n,"newest_seq":n,
+//   "dropped":n,"exact":b}}
+// enabled = the persisted DiagRecordingOn flag (resumes at boot); active = a ring is being written;
+// reason is set when the last start was refused; oldest/newest_seq are 0 while has_data is false;
+// exact is false when the recorder lock was busy and the numbers were read without it.
+static void diagEmitStatus(JsonEmit& je)
+{
+  DiagStatus s;
+  diagStatusSnapshot(diagRec, s);
+  const bool refused = !s.active && s.lastStart != DIAG_START_OK && s.lastStart != DIAG_START_ALREADY;
+  je.beginObject(F("recording"));
+  je.field(F("state"),       s.active ? "recording" : (refused ? "refused" : "stopped"));
+  je.field(F("enabled"),     settings.diag.bRecordingOn);
+  je.field(F("active"),      s.active);
+  je.field(F("reason"),      refused ? diagStartReasonText(s.lastStart) : "");
+  je.field(F("psram"),       s.psram);
+  je.field(F("block_size"),  (uint32_t)DIAG_REC_BLOCK_SIZE);
+  je.field(F("ring_blocks"), s.ringBlocks);
+  je.field(F("ring_bytes"),  s.ringBytes);
+  je.field(F("has_data"),    s.hasData);
+  je.field(F("oldest_seq"),  s.oldest);
+  je.field(F("newest_seq"),  s.newest);
+  je.field(F("dropped"),     s.dropped);
+  je.field(F("exact"),       s.exact);
+  je.endObject();
+}
+
+void sendDiagRecordingStatus()
+{
+  sendCorsOriginHeader();
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();
+    diagEmitStatus(je);
+    je.endObject();
+  }
+  restFinalize();
+}
+
+// POST/PUT /api/v2/diag/recording/start|stop -> {"ok":b,"result":"started|already_running|refused|stopped|lock_busy",
+// "reason":"","recording":{...status...}}. A refused start is HTTP 200 with ok:false: the refusal is
+// a normal answer of the start rule (free heap below 5120 B), not a request error.
+void sendDiagRecordingControl(bool start)
+{
+  bool ok;
+  const char* result;
+  const char* reason = "";
+  if (start) {
+    const DiagStartResult r = diagRecorderStart();
+    ok = (r == DIAG_START_OK || r == DIAG_START_ALREADY);
+    result = (r == DIAG_START_OK) ? "started" : (r == DIAG_START_ALREADY) ? "already_running" : "refused";
+    if (!ok) reason = diagStartReasonText(r);
+  } else {
+    ok = diagRecorderStop();
+    result = ok ? "stopped" : "lock_busy";
+  }
+  sendCorsOriginHeader();
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();
+    je.field(F("ok"),     ok);
+    je.field(F("result"), result);
+    je.field(F("reason"), reason);
+    diagEmitStatus(je);
+    je.endObject();
+  }
+  restFinalize();
+}
+
+// GET /api/v2/diag/recording?since=<block_seq>: application/octet-stream, the file header
+// (diagRecorderStuff.h) then every block with block_seq > since (all of them without since).
+// The block range is fixed by diagDownloadRange() before the response starts; the filler copies one
+// chunk per call under the recorder try-lock and asks the server to retry when the lock is busy, so
+// async_tcp never waits. No ring-sized copy exists: only the 640 B header snapshot is on the heap.
+// A recorder that is stopped or empty gives a valid file with block count 0.
+void sendDiagRecordingDownload()
+{
+  if (!currentRequest || g_responseSent) return;
+  bool hasSince = false;
+  uint32_t since = 0;
+  if (hasArgCompat("since")) {
+    const char* sv = argCompat("since");
+    char* end = nullptr;
+    const unsigned long v = strtoul(sv, &end, 10);
+    if (sv[0] == '\0' || sv[0] == '-' || *end != '\0' || v > 0xFFFFFFFEul) {
+      sendApiError(400, F("since must be a block sequence number"));
+      return;
+    }
+    hasSince = true;
+    since = (uint32_t)v;
+  }
+  if (platformMaxFreeBlock() < 8192) { sendApiBusy(F("low heap")); return; }
+
+  auto dl = std::make_shared<DiagDownload>();
+  if (!diagDownloadRange(diagRec, *dl, hasSince, since)) { sendApiBusy(F("recorder busy")); return; }
+
+  DiagHdrWriter w(*dl);
+  diagDownloadHeaderBegin(w, *dl, diagRec, (uint32_t)state.uptime.iRebootCount, diagRec.memIsPsram,
+                          _SEMVER_FULL, _VERSION_GITHASH);
+  uint8_t nRoutes = 0;
+  for (;; nRoutes++) {
+    ApiRoute rt;
+    memcpy_P(&rt, &kV2Routes[nRoutes], sizeof(ApiRoute));
+    if (rt.segment == nullptr) break;
+  }
+  w.u8(nRoutes);
+  for (uint8_t i = 0; i < nRoutes; i++) {
+    ApiRoute rt;
+    memcpy_P(&rt, &kV2Routes[i], sizeof(ApiRoute));
+    char nm[API_WORD_LEN];
+    strlcpy_P(nm, rt.segment, sizeof(nm));
+    w.str(nm);
+  }
+  if (!diagDownloadHeaderEnd(w, *dl)) { sendApiError(500, F("recording header too large")); return; }
+
+  sendCorsOriginHeader();
+  webPushHeader(F("Content-Disposition"), F("attachment; filename=\"otgw-recording.bin\""));
+  webPushHeader(F("Cache-Control"), F("no-store"));
+  AsyncWebServerResponse* resp = currentRequest->beginResponse(
+      String(F("application/octet-stream")), dl->totalBytes(),
+      [dl](uint8_t* buf, size_t maxLen, size_t index) -> size_t {
+        return diagDownloadFill(diagRec, *dl, buf, maxLen, index);   // DIAG_FILL_TRY_AGAIN when the lock is busy
+      });
+  if (!resp) { sendApiBusy(F("low heap")); return; }
+  webApplyHeaders(resp);
+  currentRequest->send(resp);
+  g_responseSent = true;
+}
 
 //=======================================================================
 // GET /api/v2/pic/settings

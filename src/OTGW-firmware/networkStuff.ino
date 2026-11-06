@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.106
+**  Version  : v2.0.0-beta.107
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1395,6 +1395,7 @@ void loopNTP()
                   myTime.isError() ? "Y" : "N");
           if (!myTime.isError()) {
             NtpStatus = TIME_SYNC;
+            if (diagRec.active) diagRec.recTimeSync((uint32_t)now);   // TASK-1665 (ADR-213)
             DebugTln(F("[NTP] Time synced!"));
           } else {
             if (state.debug.bNTP) DebugTln(F("[NTP] ZonedDateTime error, staying in WAITFORSYNC"));

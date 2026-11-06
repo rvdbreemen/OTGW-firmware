@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.106
+**  Version  : v2.0.0-beta.107
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -498,6 +498,7 @@ bool writeSettings(bool show)
   writeJsonStringKV(file, F("WifiDns1"),     settings.wifi.sDns1);
   writeJsonStringKV(file, F("WifiDns2"),     settings.wifi.sDns2);
   writeJsonBoolKV(file, F("WifiNoPortal"),   settings.wifi.bNoPortal);   // TASK-1645
+  writeJsonBoolKV(file, F("DiagRecordingOn"), settings.diag.bRecordingOn); // TASK-1665: resume the diagnostic recording after a reboot
   size_t tail = file.print(F("\n}\n"));
   bool tailWritten = (tail == 3);
   size_t intended = file.position();
@@ -1344,6 +1345,9 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("WifiNoPortal")) == 0) {
     settings.wifi.bNoPortal = EVALBOOLEAN(newValue);   // TASK-1645: read by the next startWiFi()
   }
+  else if (strcasecmp_P(field, PSTR("DiagRecordingOn")) == 0) {
+    settings.diag.bRecordingOn = EVALBOOLEAN(newValue);   // TASK-1665: flag only; diagRecorderStart()/Stop() act on it
+  }
   else if (strcasecmp_P(field, PSTR("WifiDns2")) == 0) {
     if (newValue[0] == '\0') { settings.wifi.sDns2[0] = '\0'; }
     else { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.wifi.sDns2, newValue, sizeof(settings.wifi.sDns2)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
@@ -1369,6 +1373,8 @@ void updateSetting(const char *field, const char *newValue)
   // restarts are deferred to flushSettings() which runs from loop() timer.
   // This coalesces multiple field updates into a single flash write and at most
   // one restart per service (Finding #23: reduce flash wear + MQTT churn).
+  if (diagRec.active) diagRec.recSetting(field, newValue);   // TASK-1665: a changed value only; secrets are redacted inside
+
   settingsDirty = true;
   RESTART_TIMER(timerFlushSettings);
 

@@ -374,6 +374,11 @@ inline void* platformPsramAllocOnce(size_t bytes) {
   return heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 }
 
+// True when the board has PSRAM (TASK-1665: the diagnostic recorder picks its ring size by it).
+inline bool platformHasPsram() {
+  return psramFound();
+}
+
 // No-op on ESP32: the heap allocator tracks min-free internally.
 inline void platformUpdateMinFreeHeap() {
   // intentionally empty
@@ -944,6 +949,14 @@ inline bool platformMutexLock(PlatformMutex m, uint32_t timeoutMs = 0) {
   if (m == nullptr) return true;
   TickType_t ticks = (timeoutMs == 0) ? portMAX_DELAY : pdMS_TO_TICKS(timeoutMs);
   return xSemaphoreTake(m, ticks) == pdTRUE;
+}
+
+// Take the mutex without waiting (TASK-1665: the diagnostic recorder's capture points run on
+// several tasks and must never block). Returns false when another task holds it. A nullptr
+// handle returns true, as for platformMutexLock().
+inline bool platformMutexTryLock(PlatformMutex m) {
+  if (m == nullptr) return true;
+  return xSemaphoreTake(m, 0) == pdTRUE;
 }
 
 inline void platformMutexUnlock(PlatformMutex m) {

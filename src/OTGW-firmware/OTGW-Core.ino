@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.106
+**  Version  : v2.0.0-beta.107
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4433,6 +4433,7 @@ bool sendPICSerial(const char* buf, int len)
     }
     OTDebug(F("] (")); OTDebug(len); OTDebug(F(")")); OTDebugln();
 
+    if (diagRec.active) diagRec.recPicCommand(buf, (size_t)n);   // TASK-1665: the command as sent (ADR-213)
     if (enqueuePICTx(txbuf, n + 2)) {
       sendEventToWebSocket('>', buf, len);
     } else {
@@ -5828,7 +5829,8 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
     OTdata.len = len;                                 // set the length of the message  
     if (siscanf(bufval, "%8x", &value) != 1) return;    // extract the value, abort on parse failure
     OTdata.value = value;                             // store the value
-    OTdata.type = (value >> 28) & 0x7;                // byte 1 = take 3 bits that define msg msgType
+    if (diagRec.active) diagRec.recOtFrame(buf[0], value);   // TASK-1665: every decoded frame, arrival order (ADR-213)
+    OTdata.type = (value >> 28) & 0x7;               // byte 1 = take 3 bits that define msg msgType
     OTdata.masterslave = (OTdata.type >> 2) & 0x1;    // MSB from type --> 0 = master and 1 = slave
     OTdata.id = (value >> 16) & 0xFF;                 // byte 2 = message id 8 bits 
     OTdata.valueHB = (value >> 8) & 0xFF;             // byte 3 = high byte
@@ -6161,6 +6163,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
       ClrLog();
     } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
+    if (diagRec.active) diagRec.recResponse(buf, (size_t)len);   // TASK-1665: PIC and OT-Direct response lines (ADR-213)
     checkCommandResponse(buf, len);
     if (buf[0] == 'P' && buf[1] == 'R') {
       handlePRresponse(buf, len);  // process PR: responses (PIC settings, gateway mode; PR=A's register A is ignored)
