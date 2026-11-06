@@ -214,14 +214,14 @@
       </g>
       <g transform="translate(232,38)">
         <rect x="-46" y="-17" width="92" height="34" rx="11" class="chip-dhw"/>
-        <text class="chip-txt" y="3" font-size="17" id="aDhw">54°</text>
+        <text class="chip-txt" y="3" font-size="17" id="aDhw">—</text>
         <text class="chip-sub" y="14.5">DHW</text>
       </g>
 
       <!-- Outside chip -->
       <g transform="translate(660,34)">
         <path class="cloud" d="M14,22 a10,10 0 0 1 2,-19.8 a13,13 0 0 1 25,2 a8.5,8.5 0 0 1 -1,17.8 z"/>
-        <text class="label-big" x="52" y="18" id="aOut">8.4°</text>
+        <text class="label-big" x="52" y="18" id="aOut">—</text>
         <text class="label-tag" x="52" y="32">OUTSIDE</text>
       </g>
 
@@ -230,7 +230,7 @@
       <rect x="84" y="352" width="26" height="12" rx="3" fill="var(--gauge-track)"/>
       <rect x="190" y="352" width="26" height="12" rx="3" fill="var(--gauge-track)"/>
       <rect class="lcd" x="88" y="136" width="124" height="28" rx="8"/>
-      <text class="lcd-txt" x="150" y="155" id="aLcd">CH 62%</text>
+      <text class="lcd-txt" x="150" y="155" id="aLcd">—</text>
 
       <!-- burner window: gas flame OR electric lightning bolt; height = modulation -->
       <circle class="window" cx="150" cy="210" r="36"/>
@@ -253,7 +253,7 @@
       </g>
 
       <!-- prominent modulation readout -->
-      <text class="mod-big" x="150" y="286" id="aModBig">62%</text>
+      <text class="mod-big" x="150" y="286" id="aModBig">—</text>
       <text class="mod-tag" x="150" y="300" id="aModTag">MODULATION</text>
 
       <!-- pressure mini-gauge on boiler face (lower) -->
@@ -266,7 +266,7 @@
         <line id="aPressNeedle" class="press-needle" x1="150" y1="322" x2="132" y2="322"
               transform="rotate(0,150,322)"/>
         <circle cx="150" cy="322" r="3.5" fill="var(--needle)"/>
-        <text class="press-txt" x="150" y="344" id="aPress">1.75 bar</text>
+        <text class="press-txt" x="150" y="344" id="aPress">—</text>
       </g>
 
       <!-- FLOW pipe (red, out of the boiler) -->
@@ -275,7 +275,7 @@
       <polygon class="arrow ch arrowHot" points="388,158 414,170 388,182"/>
       <g transform="translate(310,128)">
         <rect x="-52" y="-22" width="104" height="44" rx="12" class="chip-hot"/>
-        <text class="chip-txt" y="0" id="aFlow">62.3°</text>
+        <text class="chip-txt" y="0" id="aFlow">—</text>
         <text class="chip-sub" y="15">FLOW →</text>
       </g>
 
@@ -285,14 +285,14 @@
       <polygon class="arrow ch arrowCold" points="372,328 346,340 372,352"/>
       <g transform="translate(310,392)">
         <rect x="-52" y="-22" width="104" height="44" rx="12" class="chip-cold"/>
-        <text class="chip-txt" y="0" id="aRet">48.1°</text>
+        <text class="chip-txt" y="0" id="aRet">—</text>
         <text class="chip-sub" y="15">← RETURN</text>
       </g>
 
       <!-- ΔT chip -->
       <g transform="translate(470,255)">
         <rect x="-44" y="-15" width="88" height="30" rx="15" class="soft-chip"/>
-        <text class="soft-txt" y="5" id="aDt">ΔT 14.2°</text>
+        <text class="soft-txt" y="5" id="aDt">ΔT —</text>
       </g>
 
       <!-- pump on the return -->
@@ -317,8 +317,8 @@
       </g>
       <g transform="translate(560,150)">
         <path class="house" d="M0,10 L13,-3 L26,10 V28 H0 Z"/>
-        <text class="label-big" x="36" y="13" id="aRoom">20.4°</text>
-        <text class="label-sub" x="36" y="28" id="aRoomSet">set 21.0°</text>
+        <text class="label-big" x="36" y="13" id="aRoom">—</text>
+        <text class="label-sub" x="36" y="28" id="aRoomSet"></text>
         <text class="label-tag" x="120" y="13">ROOM</text>
       </g>
 
@@ -348,8 +348,8 @@
         <path class="hero-track" id="bTrack" d=""/>
         <path class="hero-arc" id="bArc" d=""/>
         <line class="hero-tick" id="bTick" x1="0" y1="0" x2="0" y2="0"/>
-        <text class="hero-big" x="120" y="128" id="bRoom">20.4°</text>
-        <text class="hero-sub" x="120" y="152" id="bSet">target 21.0°</text>
+        <text class="hero-big" x="120" y="128" id="bRoom">—</text>
+        <text class="hero-sub" x="120" y="152" id="bSet">target —</text>
       </svg>
       <div>
         <button class="stepbtn" id="bDown" aria-label="Lower target">−</button>
@@ -361,30 +361,30 @@
     <div class="statgrid">
       <div class="stat">
         <div class="lbl">Boiler</div>
-        <div class="big"><span class="hotArrow">↑ <span id="bFlow">62.3°</span></span>
+        <div class="big"><span class="hotArrow">↑ <span id="bFlow">—</span></span>
           <span class="flamebadge" id="bFlame">🔥</span></div>
-        <div class="big" style="font-size:1.05rem"><span class="coldArrow">↓ <span id="bRet">48.1°</span></span>
-          <span style="color:var(--muted);font-size:.8rem" id="bDt">ΔT 14.2°</span></div>
+        <div class="big" style="font-size:1.05rem"><span class="coldArrow">↓ <span id="bRet">—</span></span>
+          <span style="color:var(--muted);font-size:.8rem" id="bDt">ΔT —</span></div>
       </div>
       <div class="stat">
         <div class="lbl">Pressure</div>
-        <div class="big" id="bPress">1.75 bar</div>
+        <div class="big" id="bPress">—</div>
         <div class="zonebar"><div class="zonedot" id="bPressDot" style="left:44%"></div></div>
       </div>
       <div class="stat">
         <div class="lbl">Modulation</div>
         <div class="modwrap">
           <div class="modbar"><div class="modfill" id="bModFill" style="height:45%"></div></div>
-          <div class="big" id="bMod">45%</div>
+          <div class="big" id="bMod">—</div>
         </div>
       </div>
       <div class="stat">
         <div class="lbl">Hot water</div>
-        <div class="big" id="bDhw">54°</div>
+        <div class="big" id="bDhw">—</div>
         <div style="font-size:.8rem;color:var(--muted)" id="bDhwState">standby</div>
       </div>
     </div>
-    <div class="foot" id="bOut">Outside 8.4° · OTGW firmware</div>
+    <div class="foot" id="bOut">Outside — · OTGW firmware</div>
   </div>
 </section>
 
@@ -752,7 +752,7 @@
           <rect class="cn-box" x="560" y="150" width="140" height="60" rx="12"/>
           <text class="cn-ic" x="578" y="190">📶</text>
           <text class="cn-title" x="610" y="178">Router</text>
-          <text class="cn-sub" x="610" y="196" id="cnWifiSub">-58 dBm</text>
+          <text class="cn-sub" x="610" y="196" id="cnWifiSub">—</text>
           <circle class="cn-statedot" id="dot-wifi" cx="692" cy="158" r="7"/>
         </g>
         <g id="n-broker">

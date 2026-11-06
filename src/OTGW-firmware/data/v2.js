@@ -1134,7 +1134,7 @@
             : (model.ch ? lead + ' idle' : 'STANDBY');
     txt('aLcd', lcd);
     txt('aPress', fmt(model.pressure, 2, ' bar'));
-    if (model.flow !== null && model.ret !== null) txt('aDt', 'ΔT ' + fmt(model.flow - model.ret, 1, '°'));
+    txt('aDt', 'ΔT ' + (model.flow !== null && model.ret !== null ? fmt(model.flow - model.ret, 1, '°') : '—'));
     // radiator bars tint from the flow temperature (cool track → hot), but only
     // while CH is actually heating — residual boiler heat must not paint them red.
     var rads = document.querySelectorAll('#schem .rad-bar');
