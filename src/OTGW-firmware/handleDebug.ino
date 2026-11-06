@@ -197,6 +197,13 @@ static void dumpDebugInfo() {
     // TASK-1017 load-test instrumentation (resettable via telnet 'z'):
     Debugf(PSTR("rest_inflight_hwm: %u\r\n"), (unsigned)state.heapdiag.iRestInflightHwm);
     Debugf(PSTR("webfile_inflight_hwm: %u\r\n"), (unsigned)state.heapdiag.iWebfileInflightHwm);
+    Debugf(PSTR("webfile_queued: %lu\r\n"), (unsigned long)state.heapdiag.iWebfileQueued);
+    Debugf(PSTR("webfile_admitted: %lu\r\n"), (unsigned long)state.heapdiag.iWebfileAdmitted);
+    Debugf(PSTR("webfile_cancelled: %lu\r\n"), (unsigned long)state.heapdiag.iWebfileCancelled);
+    Debugf(PSTR("webfile_timeout: %lu\r\n"), (unsigned long)state.heapdiag.iWebfileTimeout);
+    Debugf(PSTR("webfile_max_wait_ms: %lu\r\n"), (unsigned long)state.heapdiag.iWebfileMaxWaitMs);
+    Debugf(PSTR("webfile_pending: %u\r\n"), (unsigned)state.heapdiag.iWebfilePending);
+    Debugf(PSTR("webfile_pending_hwm: %u\r\n"), (unsigned)state.heapdiag.iWebfilePendingHwm);
     Debugf(PSTR("tcp_active_pcbs: %u\r\n"), (unsigned)state.heapdiag.iTcpActivePcbs);
     Debugf(PSTR("rest_503: %lu\r\n"), (unsigned long)state.heapdiag.iRest503Count);
     Debugf(PSTR("webfile_503: %lu\r\n"), (unsigned long)state.heapdiag.iWebfile503Count);

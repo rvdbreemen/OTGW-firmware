@@ -1,19 +1,14 @@
 ---
-id: ADR-147
+id: "ADR-147"
 title: "ESP32-S3 platform limits for concurrent webui static-file serving: keep LittleFS, guard the file-serve path, adopt the AsyncTCP config block (TASK-879)"
 status: "Accepted"
-date: 2026-06-19
-tags:
-  - "esp32s3"
-  - "littlefs"
-  - "asynctcp"
-  - "lwip"
-  - "webserver"
-  - "static-files"
-  - "heap"
-  - "concurrency"
-  - "task879"
-  - "platform-limits"
+date: "2026-06-19"
+binding: false
+gate: null
+documents_shipped: false
+verified_in:
+  - "platformio.ini:CONFIG_ASYNC_TCP_STACK_SIZE"
+  - "src/OTGW-firmware/webServerCompat.h:webFileGateTryAdmit"
 supersedes: []
 superseded_by: null
 related:
@@ -25,14 +20,20 @@ related:
   - "ADR-144"
   - "ADR-145"
   - "ADR-146"
+  - "ADR-212"
 deciders:
   - "Robert van den Breemen"
-binding: false
-gate: null
-documents_shipped: false
-verified_in:
-  - "platformio.ini:CONFIG_ASYNC_TCP_STACK_SIZE"
-  - "src/OTGW-firmware/webServerCompat.h:webFileGateTryAdmit"
+tags:
+  - "esp32s3"
+  - "littlefs"
+  - "asynctcp"
+  - "lwip"
+  - "webserver"
+  - "static-files"
+  - "heap"
+  - "concurrency"
+  - "task879"
+  - "platform-limits"
 ---
 
 # ADR-147: ESP32-S3 platform limits for concurrent webui static-file serving -- keep LittleFS, guard the file-serve path, adopt the AsyncTCP config block (TASK-879)
@@ -64,6 +65,11 @@ status_history:
     changed_by: maintainer (Robert van den Breemen)
     reason: Accepted by explicit maintainer instruction in-session, with the directive to adopt the AsyncTCP config block (QUEUE_SIZE=64, MAX_ACK_TIME=5000, PRIORITY=10, RUNNING_CORE=1, STACK_SIZE=4096) as part of the decision. Root cause + recommendation match the maintainer's KISS / minimal-change-surface stance and avoid the ADR-139 reversal that embedding would cost.
     changed_via: manual
+  - date: 2026-11-06
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-212
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

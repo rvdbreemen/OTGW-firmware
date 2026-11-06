@@ -53,6 +53,24 @@ def tree_hashes(root):
     }
 
 
+class TestV2BundleFonts(unittest.TestCase):
+    def test_generated_bundle_retains_native_font_faces(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = Path(tmp)
+            tokens = (DATA_DIR / "ds-tokens.css").read_text(encoding="utf-8")
+            (data / "ds-tokens.css").write_text(tokens, encoding="utf-8")
+            (data / "v2.css").write_text("body { color: var(--fg-1); }", encoding="utf-8")
+            with mock.patch.object(build.config, "DATA_DIR", data):
+                build.generate_v2_css_bundle(REPO_ROOT)
+            bundle = (data / "v2-bundle.css").read_text(encoding="utf-8")
+            faces = re.findall(r"@font-face\s*\{([^}]+)\}", bundle)
+            self.assertEqual(len(faces), 3)
+            for font in ("fonts/inter-400.woff2", "fonts/inter-700.woff2",
+                         "fonts/jetbrains-mono-400.woff2"):
+                self.assertTrue(any(font in face for face in faces), font)
+            self.assertEqual((data / "ds-tokens.css").read_text(encoding="utf-8"), tokens)
+
+
 @unittest.skipUnless(HAVE_MINIFIERS, "rjsmin/rcssmin not installed (requirements-build.txt)")
 class TestStagingOnRealData(unittest.TestCase):
     """Stage the real data/ directory into a temp dir."""

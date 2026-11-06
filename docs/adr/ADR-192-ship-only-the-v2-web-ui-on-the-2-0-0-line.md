@@ -16,6 +16,7 @@ related:
   - "ADR-173"
   - "ADR-190"
   - "ADR-191"
+  - "ADR-212"
 topics:
   - "web-ui"
   - "v2"
@@ -89,6 +90,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-173
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-06
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-212
     changed_via: adr-kit lifecycle
 ```
 

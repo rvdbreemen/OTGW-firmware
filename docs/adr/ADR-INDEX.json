@@ -4373,7 +4373,7 @@
       "path": "ADR-139-etag-cache-busting-standard-and-asynctcp-task-config.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-23",
+      "date": "2026-11-06",
       "decision_summary": "PRIMARY: ETag + bounded max-age is the project-wide cache-busting standard for ALL web UI static assets, served as pl...",
       "topics": [],
       "aliases": [],
@@ -4634,7 +4634,7 @@
       "path": "ADR-147-esp32s3-platform-limits-concurrent-webui-static-serving.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-06-19",
+      "date": "2026-11-06",
       "decision_summary": "D1 -- Root cause.",
       "topics": [],
       "aliases": [],
@@ -5206,7 +5206,7 @@
       "path": "ADR-165-optimal-request-parallelism-esp32s3-webui-rest.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-02",
+      "date": "2026-11-06",
       "decision_summary": "Adopt N=2 as the confirmed safe-and-robust parallelism ceiling for RESTMAXINFLIGHT and WEBFILEMAXINFLIGHT on the ESP3...",
       "topics": [],
       "aliases": [],
@@ -6361,7 +6361,7 @@
       "path": "ADR-188-cap-the-web-connections-that-hold-send-data-so-a-request-storm-cannot-starve-the-receive-path.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-06",
+      "date": "2026-11-06",
       "decision_summary": "Refuse a new web request with the existing cheap 503 while more than WEBMAXTXCONNECTIONS (4) connections on port 80 h...",
       "topics": [
         "backpressure",
@@ -6613,7 +6613,7 @@
       "path": "ADR-192-ship-only-the-v2-web-ui-on-the-2-0-0-line.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-15",
+      "date": "2026-11-06",
       "decision_summary": "The 2.0.0 line ships the v2 web UI as its only device web UI.",
       "topics": [
         "classic-ui",
@@ -7935,6 +7935,49 @@
           "tests/testwifiskipportal.py: compiles the real skip block and the real startWiFi() on the host (release and prerelease), and the real loopWifi() through the testwifideadlink.py harness. Red on the old code: the marked boot opens the port...",
           "Bench (TASK-1455 AC1, AC2): MikroTik access-list deny until the supervisor restarts, then allow, on a release-configured build. The old build opens the portal SSID and rejoins only after the portal timeout; the new build never shows the..."
         ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-212",
+      "title": "Load the Web UI assets natively behind a bounded server-side file queue",
+      "path": "ADR-212-load-web-ui-assets-natively-behind-a-bounded-server-side-file-queue.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-06",
+      "decision_summary": "Native loading.",
+      "topics": [
+        "backpressure",
+        "first-paint",
+        "web-server",
+        "webui"
+      ],
+      "aliases": [],
+      "components": [
+        "platformTcpTxHoldingOnPort (platform_esp32.h)",
+        "v2.html asset loader and window.otgwAssetLoad diagnostics",
+        "WebQueuedFileResponse (webServerCompat.h)"
+      ],
+      "symbols": [
+        "platformTcpTxHoldingOnPort",
+        "webSendFile"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
       },
       "scope": {
         "path_globs": []
@@ -11951,6 +11994,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-139",
+      "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-140",
       "target": "ADR-077",
       "type": "related",
@@ -12313,6 +12362,12 @@
     {
       "source": "ADR-147",
       "target": "ADR-146",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-147",
+      "target": "ADR-212",
       "type": "related",
       "resolved": true
     },
@@ -12791,6 +12846,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-165",
+      "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-166",
       "target": "ADR-126",
       "type": "related",
@@ -13241,6 +13302,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-188",
+      "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-189",
       "target": "ADR-184",
       "type": "related",
@@ -13369,6 +13436,12 @@
     {
       "source": "ADR-192",
       "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-192",
+      "target": "ADR-212",
       "type": "related",
       "resolved": true
     },
@@ -14047,6 +14120,36 @@
     {
       "source": "ADR-211",
       "target": "ADR-099",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-212",
+      "target": "ADR-139",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-212",
+      "target": "ADR-147",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-212",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-212",
+      "target": "ADR-188",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-212",
+      "target": "ADR-192",
       "type": "related",
       "resolved": true
     },

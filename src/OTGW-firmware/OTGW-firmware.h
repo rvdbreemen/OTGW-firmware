@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.108
+**  Version  : v2.0.0-beta.109
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -522,6 +522,13 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   // TASK-1017 load-test instrumentation (ADR-147 gate observability; reset by telnet 'z'):
   uint8_t  iRestInflightHwm        = 0; // high-watermark of concurrent REST in-flight requests (restAPI.ino restInFlight) since boot/reset
   uint8_t  iWebfileInflightHwm     = 0; // high-watermark of concurrent web-file-serve in-flight requests (restAPI.ino webFileInFlight) since boot/reset
+  uint32_t iWebfileQueued          = 0; // actual deferrals, once per response
+  uint32_t iWebfileAdmitted        = 0; // deferred responses admitted to stream
+  uint32_t iWebfileCancelled       = 0; // deferred responses destroyed before admission
+  uint32_t iWebfileTimeout         = 0; // pending deadline refusals
+  uint32_t iWebfileMaxWaitMs       = 0; // longest observed pending wait, rollover-safe
+  uint8_t  iWebfilePending         = 0; // observed queue depth, never used for admission
+  uint8_t  iWebfilePendingHwm      = 0;
   uint32_t iRest503Count           = 0; // lifetime REST 503s from the concurrency gate (processAPI)
   uint32_t iWebfile503Count        = 0; // lifetime web-file-serve 503s from the concurrency gate (webFileGateTryAdmit)
   uint32_t iWebConn503Count        = 0; // 503s from the web connection cap (restAPI.ino webConnCapExceeded, ADR-188)
