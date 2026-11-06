@@ -78,12 +78,14 @@ compare it with the first TCP flight: 3 x 1436 B = 4308 B. The MSS is 1436
 Arduino libs) and lwIP starts cwnd at 4380 B for that MSS (tcp_in.c:69 in the
 framework-espidf package).
 
-Default targets: /settings.ini, /fsexplorer.css (the control: its head plus
-3093 B fits in the first flight), /index.html, /v2-bundle.css and /v2.js,
-plus the REST controls /api/v2/device/info and /api/v2/settings.
-"/index.html" serves /v2.html, the only Web UI shell since TASK-1223.12
-(FSexplorer.ino sendIndex). Asset ETags read "<fshash>-<served path>"
-(FSexplorer.ino:109), so the expected size is looked up for the file actually
+Default targets: /settings.ini (the control: 384 B fits in the first flight),
+/FSexplorer.html (about 6 KB gzipped), /index.html (about 218 KB gzipped) and
+the REST controls /api/v2/device/info and /api/v2/settings. Each web page is
+one gzipped file (TASK-1640), so these two page targets replace the former
+stylesheet and script targets. "/index.html" serves /v2.html.gz and
+"/FSexplorer.html" serves /FSexplorer.html.gz (FSexplorer.ino sendIndex). The
+ETag reads "<fshash>-<served path>" (FSexplorer.ino:109) and the wire bytes are
+the gzipped bytes, so the expected size is the listed size of the file actually
 served.
 
 Assumes no admin password. With one set, /settings.ini, /index.html and
@@ -122,10 +124,8 @@ except Exception:
 
 DEFAULT_TARGETS = [
     "/settings.ini",
-    "/fsexplorer.css",
+    "/FSexplorer.html",
     "/index.html",
-    "/v2-bundle.css",
-    "/v2.js",
     "/api/v2/device/info",
     "/api/v2/settings",
 ]

@@ -108,6 +108,10 @@ Unlike phones and PCs, the unit has room for only one firmware, so there is no a
 
 On a unit that is still on the old layout, update the firmware first and the filesystem second. Older firmware looks for the classic `index.html` at `/`. A new filesystem on old firmware therefore shows the File Explorer there; the web UI is still at `/v2.html`.
 
+### Updating across the gzipped-page change (TASK-1640)
+
+From this release the filesystem holds each web page as one gzipped file (`v2.html.gz`, `FSexplorer.html.gz`). Until the filesystem is updated too, a newer firmware on an older filesystem serves the old `v2.html` and `FSexplorer.html` as before, so the web UI, the File Explorer and settings downloads keep working; this happens after a firmware-only update and between the two steps of the one-action update. An older firmware on a newer filesystem finds no page at `/` and shows a short upload prompt instead; its Flash Utility button still opens `/update`. Update the firmware first and the filesystem second, as the one-action page does.
+
 ## 5. Boards with 8 MB flash
 
 The release images use the 4 MB layout on every board, also on a module with 8 MB flash. Such a unit updates through safeboot like any other, and the extra flash stays unused.

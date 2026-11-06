@@ -14,7 +14,7 @@
 
 ### One UI bundle (v2)
 
-The 2.0.0 line ships one web UI: the v2 bundle (`v2.html`, `v2.js`, `v2-bundle.css`). The root path (`/`, plus `/index` and `/index.html` so old bookmarks keep working) always serves `v2.html`. If `/v2.html` is missing from the filesystem, those paths serve `FSexplorer.html` as a recovery page (`FSexplorer.ino`, `startWebserver`).
+The 2.0.0 line ships one web UI: the v2 page (sources `v2.html`, `v2.js`, `v2.css`, `ds-tokens.css`, fonts). Each page is served as ONE gzipped file (TASK-1640, ADR-215): `build.py` minifies the CSS and JavaScript, then `scripts/webui_pages.py` inlines the stylesheets, scripts and fonts (as `data:` URIs) into the page and gzips it, so the LittleFS image holds `v2.html.gz` (about 171 KB) and `FSexplorer.html.gz` (about 6 KB) instead of the separate files. The root path (`/`, plus `/index`, `/index.html` and `/v2.html`) serves `/v2.html.gz`. If that is missing, those paths serve the plain `/v2.html` of an older filesystem, else `FSexplorer.html` as a recovery page (`FSexplorer.ino`, `startWebserver`).
 
 **The classic UI was removed on 2026-10-15** (maintainer decision, TASK-1223.12, ADR-192). Only v2 fits the 768K LittleFS of the safeboot OTA layout (ADR-191). Removed with it: `index.html`, `index.js`, `graph.js`, `sat.js`, `sat-slider.js`, `theme-toggle.js`, `echarts-theme.js`, `components.css`, `design.html`, `update.png`, `system_update.png`, `download-to-storage-drive.png`, `refresh-page-option.png`, the device-wide UI switch (`settings.ui.bUseV2`, key `ui_usev2`) and the seven classic display preferences (`ui_autoscroll`, `ui_timestamps`, `ui_capture`, `ui_autoscreenshot`, `ui_autodownloadlog`, `ui_autoexport`, `ui_graphtimewindow`). An old `settings.ini` that still holds those keys loads without error; `updateSetting()` ignores unknown keys and the next settings write drops them. The 19 classic features v2 lacked are being ported (TASK-1223.14 to TASK-1223.18, plus follow-ups TASK-1226 to TASK-1232). The 12 features that were dropped, and how each was built, are documented in [`docs/history/2026-10-15-retired-classic-web-ui-features.md`](../history/2026-10-15-retired-classic-web-ui-features.md); the last commit with the classic UI is `3aa1ef927`. The full comparison is in [`docs/research/2026-10-15-classic-vs-v2-gap-audit.md`](../research/2026-10-15-classic-vs-v2-gap-audit.md).
 
@@ -24,12 +24,12 @@ Confirm the current asset list with `git ls-files src/OTGW-firmware/data`.
 
 | File | Purpose |
 |------|---------|
-| `v2.html` | SPA entry point. Pre-paints the theme, then loads `v2-bundle.css`, `v2.js` and the three fonts strictly one after another, each with retry on `503` (TASK-978/989), so a transient refusal from the file-serve gate does not leave the page half-initialised. |
-| `FSexplorer.html` | Standalone LittleFS file browser and recovery page (see below). |
+| `v2.html` | SPA entry point (source). Pre-paints the theme, links `ds-tokens.css` and `v2.css` and loads `<script src="v2.js">` at the end of the body. At build time everything is inlined and the page is gzipped to `v2.html.gz`; the old sequential loader with retries and `FontFace` loading is gone. |
+| `FSexplorer.html` | Standalone LittleFS file browser and recovery page (see below). Built into `FSexplorer.html.gz`. |
 
 ### V2 UI Bundle (tabbed SPA)
 
-`v2.html` / `v2.js` / `v2-bundle.css` form a self-contained single-page app. The top-level pages (`data-page` in `v2.html`) are **Home**, **Monitor**, **SAT**, **Settings**, **Advanced** and **Diagnose** (the last is shown only when the PIC runs the diagnose firmware). Monitor and Advanced have sub-tabs (Monitor: log, values, statistics, OT support, graph, connection; Advanced: PIC, debug, file system, system).
+`v2.html` / `v2.js` / `v2.css` form a self-contained single-page app. The top-level pages (`data-page` in `v2.html`) are **Home**, **Monitor**, **SAT**, **Settings**, **Advanced** and **Diagnose** (the last is shown only when the PIC runs the diagnose firmware). Monitor and Advanced have sub-tabs (Monitor: log, values, statistics, OT support, graph, connection; Advanced: PIC, debug, file system, system).
 
 The live OT stream comes from the `/ws` WebSocket; all reads and mutations go through the `/api/v2/*` REST API. v2 has no external script dependency: the graph is drawn as inline SVG, not with a chart library.
 
@@ -37,12 +37,11 @@ The live OT stream comes from the `/ws` WebSocket; all reads and mutations go th
 
 | File | Purpose |
 |------|---------|
-| `ds-tokens.css` | Design-system tokens: light/dark colour palettes, spacing scale, typography variables. **Build input only**: `build.py` (`generate_v2_css_bundle`) concatenates it with `v2.css` into `v2-bundle.css`. Not in the filesystem image (`STAGING_EXCLUDE`). |
+| `ds-tokens.css` | Design-system tokens: light/dark colour palettes, spacing scale, typography variables, plus the `@font-face` rules. **Build input only**: inlined into `v2.html.gz`, not served on its own. |
 | `v2.css` | Rules for the v2 SPA. **Build input only**, like `ds-tokens.css`. |
-| `v2-bundle.css` | Generated: `ds-tokens.css` (with its `@font-face` blocks stripped) + `v2.css`. The only stylesheet `v2.html` loads. |
-| `fsexplorer.css` | FSexplorer's own stylesheet; FSexplorer depends on no other sheet (TASK-1223.13). |
+| `fsexplorer.css` | FSexplorer's own stylesheet; FSexplorer depends on no other sheet (TASK-1223.13). **Build input only**: inlined into `FSexplorer.html.gz`. |
 
-Web fonts live under `data/fonts/` (`inter-400.woff2`, `inter-700.woff2`, `jetbrains-mono-400.woff2`). `v2.html` loads them one at a time through the `FontFace()` API, and the firmware serves them with an immutable cache header, so the UI renders without internet access.
+Web fonts live under `data/fonts/` (`inter-400.woff2`, `inter-700.woff2`, `jetbrains-mono-400.woff2`). They are source files only: the build inlines them into `v2.html.gz` as `data:` URIs, so the UI renders without internet access and no font is served separately.
 
 ### Configuration & Data Files
 
@@ -58,8 +57,7 @@ Note: `mqttha.cfg` and the file-based discovery template approach have been reti
 
 | File | Purpose |
 |------|---------|
-| `FSexplorer.html` | Standalone file browser for managing LittleFS files (upload, delete, download). Styled by `fsexplorer.css` only. Also served at `/` when `v2.html` is missing. v2 has its own in-page file browser (Advanced > File System). |
-| `FSexplorer.png` | Icon/graphic for file explorer UI |
+| `FSexplorer.html` | Standalone file browser for managing LittleFS files (upload, delete, download). Styled by `fsexplorer.css` only; built into `FSexplorer.html.gz`. Also served at `/` when the v2 page is missing. v2 has its own in-page file browser (Advanced > File System). |
 
 ### Assets & Media
 
@@ -202,7 +200,7 @@ Formatted display (example):
 
 1. **Storage**: `localStorage` key `otgw-theme` (`'dark'` or `'light'`).
 2. **Pre-paint**: an inline script at the top of `v2.html` reads the key (falling back to `prefers-color-scheme`) and sets `data-theme` on `<html>` before the first frame.
-3. **Token swap**: `v2-bundle.css` carries both palettes from `ds-tokens.css` as CSS variables, so a switch is a single attribute flip.
+3. **Token swap**: the inlined stylesheet carries both palettes from `ds-tokens.css` as CSS variables, so a switch is a single attribute flip.
 4. **Button**: the header toggle (`initTheme` in `v2.js`) flips the attribute, updates its own label and stores the choice.
 
 ---
@@ -291,11 +289,11 @@ This table predates the removal of the classic UI and has not been re-derived fr
 
 ### Token Layer (ds-tokens.css)
 
-Light and dark palettes are defined as CSS custom properties on `:root` and on `[data-theme="dark"]`. Tokens cover surface/background colours, text levels, accent (header / focus), borders, table rows, and graph palette. Themes are pure variable swaps: no separate stylesheet per theme. `ds-tokens.css` is a build input: it reaches the browser only inside `v2-bundle.css`.
+Light and dark palettes are defined as CSS custom properties on `:root` and on `[data-theme="dark"]`. Tokens cover surface/background colours, text levels, accent (header / focus), borders, table rows, and graph palette. Themes are pure variable swaps: no separate stylesheet per theme. `ds-tokens.css` is a build input: it reaches the browser only inlined in `v2.html.gz`.
 
 ### Component Layer (v2.css)
 
-All v2 widgets are styled in `v2.css`, which consumes the token variables. It too reaches the browser only inside `v2-bundle.css`.
+All v2 widgets are styled in `v2.css`, which consumes the token variables. It too reaches the browser only inlined in `v2.html.gz`.
 
 ---
 
@@ -304,11 +302,11 @@ All v2 widgets are styled in `v2.css`, which consumes the token variables. It to
 ### How Files Are Served
 
 1. The firmware mounts LittleFS at startup.
-2. `python build.py` packs `data/` into the LittleFS image from a staging copy in which `.js`/`.css` are minified and `ds-tokens.css` and `v2.css` are left out (ADR-190, `STAGING_EXCLUDE`). The device serves the minified files; the readable source stays in git.
+2. `python build.py` minifies `.js`/`.css` in a staging copy (ADR-190), then `scripts/webui_pages.py` inlines each page's stylesheets, scripts and fonts (as `data:` URIs) and gzips it (ADR-215). The LittleFS image holds `v2.html.gz` and `FSexplorer.html.gz` instead of the separate source files; the readable source stays in git. `favicon.ico` and `settings.png` stay as they are.
 3. HTTP server routes (`FSexplorer.ino`, `startWebserver`):
-   - `/`, `/index`, `/index.html` → `v2.html` (or `FSexplorer.html` when `v2.html` is missing)
-   - `/v2.html`, `/v2.js`, `/v2-bundle.css`, `/fsexplorer.css` → the UI assets, ETag-validated
-   - `/fonts/*.woff2` → immutable-cached fonts
+   - `/`, `/index`, `/index.html`, `/v2.html` → `/v2.html.gz` (`Content-Encoding: gzip`, `no-cache`, ETag `"<fsHash>-/v2.html.gz"`, 304 on match); else the plain `/v2.html` of an older filesystem, else FSexplorer
+   - `/FSexplorer.html`, `/FSexplorer` → `/FSexplorer.html.gz`, else plain `/FSexplorer.html`, else the PROGMEM upload prompt
+   - `/v2.js`, `/v2-bundle.css`, `/fsexplorer.css`, `/fonts/*` and `/FSexplorer.png` are no longer routes; an older filesystem's separate files stay reachable through the `onNotFound` catch-all
    - `/pic16f88/*`, `/pic16f1847/*` → PIC firmware binaries and version files
    - `/api/*` → REST endpoints (handled by firmware C++ code)
    - `/ws` → WebSocket endpoint (handled by firmware C++ code)
@@ -316,14 +314,14 @@ All v2 widgets are styled in `v2.css`, which consumes the token variables. It to
 
 ### Cache & Backpressure Policy
 
-- **`Cache-Control: no-cache` + ETag revalidation (ADR-163, amends ADR-139)**: static assets ship with stable URLs (no `?v=` query versioning) and a `Cache-Control: no-cache` header, so the browser may store an asset but must revalidate it every load via `If-None-Match`. The ETag is the filesystem hash combined with the served path, so each asset has its own validator; an unchanged filesystem returns `304`, an OTA/FS upgrade changes the hash and returns `200` with fresh content on the next load.
+- **`Cache-Control: no-cache` + ETag revalidation (ADR-163, amends ADR-139)**: pages ship with stable URLs (no `?v=` query versioning) and a `Cache-Control: no-cache` header, so the browser may store a page but must revalidate it every load via `If-None-Match`. The ETag is the filesystem hash combined with the served path (`"<fsHash>-/v2.html.gz"`); the `/update` page uses the firmware git hash (`"<githash>-/update"`). An unchanged filesystem returns `304`, an OTA/FS upgrade changes the hash and returns `200` with fresh content on the next load.
 - **Client-side request queue (ADR-184)**: the first lines of `v2.js` wrap `window.fetch`. Every same-origin `/api/` request waits in one first-in-first-out queue with at most 2 in flight, which matches the device's REST gate (`REST_MAX_INFLIGHT 2`, ADR-165).
-- **503 backpressure gate (ADR-147)**: the LittleFS file-serve path is allocation-bounded and refuses a new file serve under heap pressure or excessive concurrency with a cheap `503`, so abusive concurrency cannot drive the ESP32-S3 out of memory. `v2.html` loads its assets sequentially with retry to survive a transient `503`.
+- **503 backpressure gate (ADR-147)**: the LittleFS file-serve path is allocation-bounded and refuses a new file serve under heap pressure or excessive concurrency with a cheap `503`, so abusive concurrency cannot drive the ESP32-S3 out of memory. The server-side file queue (ADR-212, `WebQueuedFileResponse`) stays. Each page is one request, so the browser no longer needs a sequential loader with retries.
 
 ### File Size Constraints
 
 - **ESP32-S3 4MB boards**: LittleFS partition 768 KB in the safeboot OTA layout (ADR-191); the v2-only image is what makes it fit.
-- **UI assets**: `v2.html`, `v2.js`, `v2-bundle.css` (minified in the image) plus three fonts.
+- **UI assets**: `v2.html.gz` (about 171 KB) and `FSexplorer.html.gz` (about 6 KB), minified and gzipped, with the fonts inlined.
 - **PIC binaries**: about 140 KB on disk in `pic16f1847/` and `pic16f88/` (gateway, interface and diagnose images for both PIC types)
 
 ### Build Process

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile the real webSendFile path and file gate behind bounded platform fakes.
+"""Compile the real webSendFile path, file gate and page handlers behind bounded platform fakes.
 
 Run: python3 tests/test_web_file_scheduling.py
 --old-rev <revision> builds the same fixture against an older header/gate. Revisions
@@ -54,6 +54,11 @@ def main():
         start = helpers.index("void resetHeapWatermark() {")
         end = helpers.index("\n}", start) + 2
         (directory / "reset_heap.inc").write_text(helpers[start:end])
+        # TASK-1640: the real gzip page handlers (serveWebPage, serveWebPagePair, hasFSexplorerPage).
+        explorer = source("src/OTGW-firmware/FSexplorer.ino", args.old_rev)
+        start = explorer.index("static bool serveWebPage(")
+        end = explorer.index("// The recovery page:", start)
+        (directory / "web_pages.inc").write_text(explorer[start:end])
         (directory / "Arduino.h").write_text("")
         (directory / "ESPAsyncWebServer.h").write_text("")
         executable = directory / "file-scheduling"

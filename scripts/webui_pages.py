@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""Build the web pages as single gzipped files (TASK-1640, ADR-215).
+
+Each page in PAGES keeps its stylesheets, scripts and fonts as separate files
+in src/OTGW-firmware/data/ for editing. This module inlines them into the page
+(<link rel="stylesheet"> -> <style>, <script src> -> <script>, CSS url() ->
+data: URI) and gzips the result. build.py ships only the gzipped pages in the
+filesystem image; scripts/ota_flash.py --webui pushes the same files to a live
+board. progmem_header() turns the firmware update pages into gzipped PROGMEM
+arrays (scripts/platformio_webui.py runs it before every PlatformIO build).
+
+Standard library only, so every build and developer script can import it.
+"""
+import base64
+import gzip
+import re
+from pathlib import Path
+
+# LittleFS pages: source name in data/ -> gzipped file name in the image.
+PAGES = {"v2.html": "v2.html.gz", "FSexplorer.html": "FSexplorer.html.gz"}
+
+MIME = {".woff2": "font/woff2", ".png": "image/png", ".ico": "image/x-icon", ".svg": "image/svg+xml"}
+
+_STYLESHEET = re.compile(r'<link\b[^>]*\brel="stylesheet"[^>]*>', re.I)
+_SCRIPT = re.compile(r'<script\b[^>]*\bsrc="([^"]+)"[^>]*>\s*</script>', re.I)
+_HREF = re.compile(r'\bhref="([^"]+)"', re.I)
+_CSS_URL = re.compile(r"""url\(\s*(['"]?)([^'")]+)\1\s*\)""")
+
+
+def _local(ref):
+    """A relative reference to a file next to the page (not a URL, anchor or data: URI)."""
+    return not re.match(r"^([a-z][a-z0-9+.-]*:|//|/|#|\?)", ref, re.I)
+
+
+def _read(base, ref, used):
+    path = base / ref
+    if not path.is_file():
+        raise FileNotFoundError(f"{ref} is referenced but missing from {base}")
+    used.add(path.relative_to(base).as_posix())
+    return path
+
+
+def _inline_css(base, ref, used):
+    css = _read(base, ref, used).read_text(encoding="utf-8")
+    css_dir = (base / ref).parent
+
+    def data_uri(m):
+        target = m.group(2)
+        if not _local(target):
+            return m.group(0)
+        rel = (css_dir / target).relative_to(base).as_posix()
+        path = _read(base, rel, used)
+        mime = MIME.get(path.suffix.lower())
+        if mime is None:
+            raise ValueError(f"no MIME type for {rel} (referenced from {ref})")
+        return f"url(data:{mime};base64,{base64.b64encode(path.read_bytes()).decode()})"
+
+    css = _CSS_URL.sub(data_uri, css)
+    if re.search(r"</style", css, re.I):
+        raise ValueError(f"{ref} contains </style and cannot be inlined")
+    return css
+
+
+def inline_page(base, page):
+    """Return (html, used) for one page: html with every local stylesheet and
+    script inlined, used the set of inlined file names relative to base."""
+    base = Path(base)
+    used = set()
+    html = _read(base, page, used).read_text(encoding="utf-8")
+
+    def style(m):
+        href = _HREF.search(m.group(0))
+        if not href or not _local(href.group(1)):
+            return m.group(0)
+        return "<style>" + _inline_css(base, href.group(1), used) + "</style>"
+
+    def script(m):
+        if not _local(m.group(1)):
+            return m.group(0)
+        js = _read(base, m.group(1), used).read_text(encoding="utf-8")
+        if "<!--" in js:
+            raise ValueError(f"{m.group(1)} contains <!-- and cannot be inlined safely")
+        # "</script" would end the inline element early; "<\/script" is the same string in JS.
+        return "<script>" + re.sub(r"</(script)", r"<\\/\1", js, flags=re.I) + "</script>"
+
+    html = _STYLESHEET.sub(style, html)
+    html = _SCRIPT.sub(script, html)
+    return html, used
+
+
+def gzip_bytes(data):
+    """Reproducible gzip: fixed mtime, maximum compression."""
+    return gzip.compress(data, compresslevel=9, mtime=0)
+
+
+def build_pages(base):
+    """Return ({gzipped name: bytes}, used) for every page in PAGES found in base."""
+    out, used = {}, set()
+    for page, gz_name in PAGES.items():
+        if not (Path(base) / page).is_file():
+            continue
+        html, page_used = inline_page(base, page)
+        out[gz_name] = gzip_bytes(html.encode("utf-8"))
+        used |= page_used
+    return out, used
+
+
+def write_pages(staging_dir, keep=frozenset({"favicon.ico"})):
+    """Replace the pages in staging_dir by their gzipped single-file builds and
+    delete the inlined inputs. Returns {gzipped name: size}."""
+    staging_dir = Path(staging_dir)
+    pages, used = build_pages(staging_dir)
+    for name, data in pages.items():
+        (staging_dir / name).write_bytes(data)
+    for rel in used - keep:
+        (staging_dir / rel).unlink()
+    for folder in sorted({(staging_dir / rel).parent for rel in used}, reverse=True):
+        if folder != staging_dir and folder.is_dir() and not any(folder.iterdir()):
+            folder.rmdir()
+    return {name: len(data) for name, data in pages.items()}
+
+
+def progmem_header(pages, guard):
+    """C header with one gzipped PROGMEM array per page: pages maps a C symbol
+    to the HTML source path. Each array gets a <symbol>Len constant."""
+    lines = [
+        "// AUTO-GENERATED by scripts/webui_pages.py (TASK-1640). Do not edit:",
+        "// edit the HTML source and rebuild.",
+        f"#ifndef {guard}", f"#define {guard}", "", "#include <Arduino.h>", "",
+    ]
+    for symbol, path in pages.items():
+        # read_text() turns CRLF into LF, so the image does not depend on core.autocrlf.
+        data = gzip_bytes(Path(path).read_text(encoding="utf-8").encode("utf-8"))
+        lines.append(f"// {Path(path).as_posix()}: gzipped, {len(data)} bytes")
+        lines.append(f"static const uint8_t {symbol}[] PROGMEM = {{")
+        for i in range(0, len(data), 24):
+            lines.append("  " + ",".join(f"0x{b:02x}" for b in data[i:i + 24]) + ",")
+        lines.append("};")
+        lines.append(f"static const size_t {symbol}Len = sizeof({symbol});")
+        lines.append("")
+    lines.append(f"#endif // {guard}")
+    return "\n".join(lines) + "\n"
+
+
+def write_if_changed(path, text):
+    """Write text to path only when it differs, so unchanged builds stay incremental."""
+    path = Path(path)
+    if path.is_file() and path.read_text(encoding="utf-8") == text:
+        return False
+    path.write_text(text, encoding="utf-8")
+    return True
+
+
+# Firmware update pages: C symbol -> HTML source, gzipped into updateServerHtml.h.
+UPDATE_PAGES = {"UpdateServerIndex": "webui/update.html", "UpdateServerSuccess": "webui/update-success.html"}
+
+
+def write_update_header(project_dir):
+    """Regenerate src/OTGW-firmware/updateServerHtml.h from the update page sources."""
+    fw = Path(project_dir) / "src" / "OTGW-firmware"
+    text = progmem_header({sym: fw / rel for sym, rel in UPDATE_PAGES.items()}, "UPDATESERVERHTML_H")
+    return write_if_changed(fw / "updateServerHtml.h", text)

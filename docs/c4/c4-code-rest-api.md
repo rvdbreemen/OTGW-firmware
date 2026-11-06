@@ -53,10 +53,11 @@ Over budget gives `429` with `application/problem+json` (RFC 9457; `retry_after`
 
 ### File Serving & Caching Strategy (ADR-139)
 
-- **Stable URLs, ETag revalidation**: `serveVersionedAsset()` sends `ETag: "<fsHash>-<path>"` (filesystem hash plus served path) and `Cache-Control: no-cache`. A matching `If-None-Match` gets 304; a reflash or filesystem OTA changes the hash. Missing files return a no-cache 404 without validator. There is no `?v=` query versioning and no HTML rewriting.
-- **Immutable fonts**: `serveImmutableAsset()` serves the three `.woff2` fonts with `max-age=31536000, immutable`.
-- **Streaming**: `webSendFile()` serves from flash through `AsyncFileResponse`; files are never loaded into RAM.
-- **Shell**: only the v2 UI ships (`v2.html`, `v2.js`, `v2-bundle.css`, ADR-192). `sendIndex()` falls back to `/FSexplorer.html` when `/v2.html` is missing.
+- **One gzipped file per page (TASK-1640, ADR-215)**: `build.py` inlines each page's stylesheets, scripts and fonts (as `data:` URIs) and gzips it, so the filesystem holds `v2.html.gz` and `FSexplorer.html.gz`. `sendIndex()` serves `/v2.html.gz` through `serveWebPage()` / `serveWebPagePair()` with `Content-Encoding: gzip`, `Cache-Control: no-cache` and `ETag: "<fsHash>-/v2.html.gz"`. A matching `If-None-Match` gets 304; a reflash or filesystem OTA changes the hash.
+- **Older filesystems**: if `/v2.html.gz` is missing, `sendIndex()` serves the plain `/v2.html` of an older filesystem (no gzip, ETag `"<fsHash>-/v2.html"`), else the FSexplorer page.
+- **Firmware update pages**: `GET /update` is served by `webSendGzipPage()` from the generated PROGMEM arrays in `updateServerHtml.h`, with `Content-Encoding: gzip` and `ETag "<firmware githash>-/update"` (304 on match).
+- **Streaming**: `webSendFile()` serves from flash through `AsyncFileResponse`; files are never loaded into RAM. The server-side file queue (ADR-212, `WebQueuedFileResponse`) stays.
+- **Shell**: only the v2 UI ships (`v2.html.gz`, ADR-192).
 
 ## Code Elements
 
@@ -171,10 +172,10 @@ Over budget gives `429` with `application/problem+json` (RFC 9457; `retry_after`
 ### File Serving (FSexplorer.ino)
 
 #### `void startWebserver()`
-- Registers `/`, `/index`, `/index.html` (`sendIndex`, behind `checkHttpAuth()`), `/FSexplorer.png` (`serveStatic`), `/fsexplorer.css`, `/v2.html`, `/v2.js`, `/v2-bundle.css`, the three font routes, `/pic` (`upgradepic`, `HAS_PIC`), and the `/api` route (`processAPI` with body capture via `webCaptureBody`). Calls `server.begin()`. A failed port-80 bind is retried every 5 s by `handleWebserverListener()` (TASK-1130).
+- Registers `/`, `/index`, `/index.html`, `/v2.html` (`sendIndex`, behind `checkHttpAuth()`), `/pic` (`upgradepic`, `HAS_PIC`), and the `/api` route (`processAPI` with body capture via `webCaptureBody`). Calls `server.begin()`. A failed port-80 bind is retried every 5 s by `handleWebserverListener()` (TASK-1130).
 
 #### `void setupFSexplorer()`
-- Registers `/FSexplorer.html` and `/FSexplorer`, the deprecated unversioned `/api/firmwarefilelist` and `/api/listfiles`, `POST /upload`, `/ReBoot` and `/ResetWireless` (both `checkHttpAuth()`), the OTA handler (`httpUpdater.setup(&server)`, which also registers `POST /safeboot`), and the `onNotFound` catch-all (routes `/api/*` to `processAPI`, anything else to `handleFile()`, else 404).
+- Registers `/FSexplorer.html` and `/FSexplorer` (served from `/FSexplorer.html.gz`, else plain `/FSexplorer.html`, else the PROGMEM upload prompt), the deprecated unversioned `/api/firmwarefilelist` and `/api/listfiles`, `POST /upload`, `/ReBoot` and `/ResetWireless` (both `checkHttpAuth()`), the OTA handler (`httpUpdater.setup(&server)`, which also registers `POST /safeboot`), and the `onNotFound` catch-all (routes `/api/*` to `processAPI`, anything else to `handleFile()`, else 404).
 
 #### `apifirmwarefilelist()` / `apilistfiles()`
 - Streaming JSON listings (max `MAX_FILES_IN_LIST` = 40; hidden files skipped; `apilistfiles` adds a final storage entry and supports `?delete=<path>` behind auth). Both replicate the `platformFreeHeap() < 4096` guard because they bypass `processAPI()`.
@@ -239,11 +240,8 @@ Over budget gives `429` with `application/problem+json` (RFC 9457; `retry_after`
 
 | Method | Path | Handler | Purpose |
 |--------|------|---------|---------|
-| GET | `/`, `/index`, `/index.html` | sendIndex | v2 UI shell (auth, ETag); falls back to FSexplorer |
-| GET | `/v2.html`, `/v2.js`, `/v2-bundle.css`, `/fsexplorer.css` | serveVersionedAsset | ETag + `no-cache` assets |
-| GET | `/fonts/*.woff2` (inter-400, inter-700, jetbrains-mono-400) | serveImmutableAsset | One-year immutable cache |
-| GET | `/FSexplorer.png` | serveStatic | Icon |
-| GET | `/FSexplorer.html`, `/FSexplorer` | sendFSexplorerHtml | Recovery file explorer |
+| GET | `/`, `/index`, `/index.html`, `/v2.html` | sendIndex | v2 UI page: gzipped `/v2.html.gz` (auth, ETag, 304); falls back to plain `/v2.html` of an older filesystem, then FSexplorer |
+| GET | `/FSexplorer.html`, `/FSexplorer` | sendFSexplorerHtml | Recovery file explorer (`/FSexplorer.html.gz`, else plain file, else upload prompt) |
 | POST | `/upload` | handleFileUpload | Upload to LittleFS |
 | ANY | `/ReBoot`, `/ResetWireless` | reBootESP, resetWirelessButton | Reboot, reset WiFi (auth) |
 | ANY | `/pic` | upgradepic | PIC firmware flash (`HAS_PIC`) |

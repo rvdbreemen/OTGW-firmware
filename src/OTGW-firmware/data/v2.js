@@ -4204,11 +4204,7 @@
   var fsCurrentPath = '/';
   // Core UI assets: deleting any of these bricks the very page you are looking at, so
   // the Delete affordance is withheld (parity with the FSexplorer.html protectedFiles guard).
-  var FS_PROTECTED = [
-    'v2.html', 'v2.js', 'v2-bundle.css',
-    'FSexplorer.html', 'FSexplorer.png', 'fsexplorer.css', 'favicon.ico', 'settings.png',
-    'inter-400.woff2', 'inter-700.woff2', 'jetbrains-mono-400.woff2'
-  ];
+  var FS_PROTECTED = ['v2.html.gz', 'FSexplorer.html.gz', 'favicon.ico', 'settings.png'];
   function fsFmtBytes(n) {
     n = +n || 0;
     if (n < 1024) return n + ' B';

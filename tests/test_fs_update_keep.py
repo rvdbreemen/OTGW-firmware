@@ -451,7 +451,7 @@ class TestDocsMatch(unittest.TestCase):
             self.assertNotIn(name, lost, name + " is kept, it must not be listed as lost")
 
     def test_page_lines(self):
-        page = read(*FWDIR, "updateServerHtml.h")
+        page = read(*FWDIR, "webui", "update.html")
         kept = re.search(r"<li><b>Kept:</b>([^<]*)</li>", page).group(1).lower()
         fresh = re.search(r"<li><b>Starts fresh:</b>([^<]*)</li>", page).group(1).lower()
         for w in ("sat learned values", "opentherm profiles", "reboot log", "sensor names"):

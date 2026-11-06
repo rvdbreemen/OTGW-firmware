@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-beta.109
+**  Version  : v2.0.0-beta.110
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -42,6 +42,7 @@
 #include <ESPAsyncWebServer.h>
 #include <new>
 #include <utility>
+#include "version.h"   // _VERSION_GITHASH for webSendGzipPage's ETag
 
 //=====[ Async HTTP server (port 80) ]=========================================
 // Single point of instantiation in networkStuff.ino (ADR-044). seq10 (WS) and
@@ -362,6 +363,29 @@ inline void webSendPStream(int code, PGM_P contentType, PGM_P body) {
   AsyncWebServerResponse* resp =
       currentRequest->beginResponse(code, String(FPSTR(contentType)),
                                     reinterpret_cast<const uint8_t*>(body), strlen_P(body));
+  webApplyHeaders(resp);
+  currentRequest->send(resp);
+  g_responseSent = true;
+}
+
+// TASK-1640 (ADR-215): a gzipped page from app flash (scripts/webui_pages.py), streamed
+// without a heap copy and sent with Content-Encoding: gzip. With etagPath, the ETag is the
+// firmware hash plus that path (the page changes only with the firmware) and a matching
+// If-None-Match gets 304 with no body.
+inline void webSendGzipPage(PGM_P contentType, const uint8_t* gz, size_t len, const char* etagPath = nullptr) {
+  if (!currentRequest || g_responseSent) return;
+  webPushHeader(F("Cache-Control"), F("no-cache"));
+  if (etagPath) {
+    char etag[64];
+    snprintf_P(etag, sizeof(etag), PSTR("\"%s-%s\""), _VERSION_GITHASH, etagPath);
+    webPushHeader(F("ETag"), etag);
+    if (hasHeaderCompat(F("If-None-Match")) && strcmp(headerCompat(F("If-None-Match")), etag) == 0) {
+      webSendStatus(304);
+      return;
+    }
+  }
+  webPushHeader(F("Content-Encoding"), F("gzip"));
+  AsyncWebServerResponse* resp = currentRequest->beginResponse(200, String(FPSTR(contentType)), gz, len);
   webApplyHeaders(resp);
   currentRequest->send(resp);
   g_responseSent = true;

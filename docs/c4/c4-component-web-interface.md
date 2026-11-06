@@ -3,7 +3,7 @@
 ## Overview
 
 - **Name**: Web Interface
-- **Description**: The complete user-facing layer of the firmware. Combines a browser-delivered single-page application (the v2 bundle: `v2.html`, `v2.js`, `v2-bundle.css`, served from LittleFS) with the server-side infrastructure that supports it: an AsyncWebSocket live-log endpoint, heap health gates, the request gates that keep the web server alive under load, webhook HTTP callbacks to external systems, safe cooperative-scheduler timers, and the telnet debug server. Together these provide the operational surface for configuration, monitoring and control without a separate server.
+- **Description**: The complete user-facing layer of the firmware. Combines a browser-delivered single-page application (the v2 page, shipped as one gzipped file `v2.html.gz` served from LittleFS) with the server-side infrastructure that supports it: an AsyncWebSocket live-log endpoint, heap health gates, the request gates that keep the web server alive under load, webhook HTTP callbacks to external systems, safe cooperative-scheduler timers, and the telnet debug server. Together these provide the operational surface for configuration, monitoring and control without a separate server.
 - **Type**: Application Component
 - **Technology**: HTML5/CSS3/ES5+ JavaScript (no external scripts, no chart library), ESPAsyncWebServer + AsyncWebSocket, AsyncSimpleTelnet (SimpleTelnet library), LittleFS
 
@@ -11,7 +11,7 @@
 
 The Web Interface component has two coupled halves. The server side provides the real-time infrastructure the browser UI depends on: the `/ws` WebSocket that streams OT log lines to the live log viewer, the heap-health gates (`canSendWebSocket()`, `canPublishMQTT()`), the in-flight and connection gates that bound web-server concurrency (ADR-165, ADR-147, ADR-188), the poll rate limit (ADR-172), safe timer macros that handle `millis()` rollover, and the telnet debug server on port 23.
 
-The client side (Web Assets) is the v2 single-page app. It is the only UI on the 2.0.0 line (ADR-192): the classic UI (`index.html`, `index.js`, `graph.js`, `sat.js`, ...) was removed with TASK-1223.12. `v2.js` is one IIFE of about 5,200 lines that handles page navigation, WebSocket reconnection, REST polling, settings, the SAT dashboard, the file browser, firmware update and the inline-SVG graph. `FSexplorer.html` (with its own `fsexplorer.css`) is the recovery page, served at `/` when `v2.html` is missing. The webhook module delivers HTTP callbacks to external systems (for example Node-RED or Home Assistant) when a configured OpenTherm status bit changes. Asset-level detail is in [c4-code-web-assets.md](./c4-code-web-assets.md).
+The client side (Web Assets) is the v2 single-page app. It is the only UI on the 2.0.0 line (ADR-192): the classic UI (`index.html`, `index.js`, `graph.js`, `sat.js`, ...) was removed with TASK-1223.12. `v2.js` is one IIFE of about 5,200 lines that handles page navigation, WebSocket reconnection, REST polling, settings, the SAT dashboard, the file browser, firmware update and the inline-SVG graph. `FSexplorer.html` (with its own `fsexplorer.css`, both built into `FSexplorer.html.gz`) is the recovery page, served at `/` when the v2 page is missing. The webhook module delivers HTTP callbacks to external systems (for example Node-RED or Home Assistant) when a configured OpenTherm status bit changes. Asset-level detail is in [c4-code-web-assets.md](./c4-code-web-assets.md).
 
 ## Software Features
 
@@ -50,7 +50,7 @@ The client side (Web Assets) is the v2 single-page app. It is the only UI on the
 | Module | File | Description |
 |--------|------|-------------|
 | Utilities & WebSocket | [c4-code-utilities.md](./c4-code-utilities.md) | Telnet debug, WebSocket stream, heap health, safe timers, webhook, system utilities |
-| Web Assets | [c4-code-web-assets.md](./c4-code-web-assets.md) | v2 SPA bundle, FSexplorer recovery page, fonts, PIC firmware files |
+| Web Assets | [c4-code-web-assets.md](./c4-code-web-assets.md) | v2 SPA page, FSexplorer recovery page, fonts, PIC firmware files |
 
 ## Interfaces
 
@@ -106,17 +106,15 @@ The client side (Web Assets) is the v2 single-page app. It is the only UI on the
 
 ### Web UI Served Assets
 
-- **Protocol**: HTTP/1.1 (routes registered by `startWebserver()` in `FSexplorer.ino`; assets read from LittleFS)
-- **Description**: Static assets served to browser clients with ETag revalidation (ADR-163); fonts are immutable-cached.
+- **Protocol**: HTTP/1.1 (routes registered by `startWebserver()` in `FSexplorer.ino`; pages read from LittleFS)
+- **Description**: Each web page is ONE gzipped file (TASK-1640, ADR-215), served with `Content-Encoding: gzip`, `Cache-Control: no-cache` and ETag revalidation (ADR-163); stylesheets, script and fonts are inlined in it.
 - **Routes**:
-  - `/`, `/index`, `/index.html` - `v2.html`, or `FSexplorer.html` when `v2.html` is missing
-  - `/v2.html`, `/v2.js`, `/v2-bundle.css`, `/fsexplorer.css` - the UI assets
-  - `/fonts/inter-400.woff2`, `/fonts/inter-700.woff2`, `/fonts/jetbrains-mono-400.woff2`
-  - `/FSexplorer.html`, `/FSexplorer` - the recovery page; `/upload` (POST) stores a file, `/ReBoot`, `/ResetWireless`
-  - `/update` (firmware/filesystem OTA page) and `/safeboot` (POST, hand-over to the safeboot updater)
-  - `/pic16f88/*`, `/pic16f1847/*` - PIC firmware binaries, via the `onNotFound` file handler; `/api/*` goes to the REST dispatcher
-- **Build**: the LittleFS image is built from a minified staging copy of `data/` (ADR-190). `ds-tokens.css` and `v2.css` are build inputs of `v2-bundle.css` and are not in the image
-- **Not served any more**: `index.html`, `index.js`, `sat.js`, `sat-slider.js`, `graph.js`, `theme-toggle.js`, `echarts-theme.js`, `components.css`, `design.html`. HA MQTT discovery is published from PROGMEM tables, not a runtime `mqttha.cfg` (ADR-077)
+  - `/`, `/index`, `/index.html`, `/v2.html` - `/v2.html.gz` (ETag `"<fsHash>-/v2.html.gz"`, 304 on match); falls back to the plain `/v2.html` of an older filesystem, then to FSexplorer
+  - `/FSexplorer.html`, `/FSexplorer` - `/FSexplorer.html.gz`, else plain `/FSexplorer.html`, else the PROGMEM upload prompt (the recovery page); `/upload` (POST) stores a file, `/ReBoot`, `/ResetWireless`
+  - `/update` (firmware/filesystem OTA page, gzipped from PROGMEM `updateServerHtml.h`, ETag `"<firmware githash>-/update"`) and `/safeboot` (POST, hand-over to the safeboot updater)
+  - `/pic16f88/*`, `/pic16f1847/*` - PIC firmware binaries, via the `onNotFound` file handler (which also still reaches the separate files of an older filesystem); `/api/*` goes to the REST dispatcher
+- **Build**: `build.py` minifies the CSS and JavaScript in a staging copy of `data/` (ADR-190), then `scripts/webui_pages.py` inlines each page's stylesheets, scripts and fonts (as `data:` URIs) and gzips it. `ds-tokens.css`, `v2.css`, `v2.js` and the fonts are build inputs and are not in the image. The update pages (`webui/update.html`, `update-success.html`) are gzipped at build time into the generated, git-ignored `updateServerHtml.h`
+- **Not served any more**: `/v2.js`, `/v2-bundle.css`, `/fsexplorer.css`, `/fonts/*`, `/FSexplorer.png`, and the classic UI files `index.html`, `index.js`, `sat.js`, `sat-slider.js`, `graph.js`, `theme-toggle.js`, `echarts-theme.js`, `components.css`, `design.html`. HA MQTT discovery is published from PROGMEM tables, not a runtime `mqttha.cfg` (ADR-077)
 
 ## Dependencies
 
@@ -150,7 +148,7 @@ C4Component
     System_Ext(browser, "Web Browser", "Chrome / Firefox / Safari")
     System_Ext(telnetclient, "Telnet Client", "Developer debug terminal")
     System_Ext(webhooktarget, "Webhook Target", "Node-RED / Home Assistant HTTP endpoint")
-    SystemDb_Ext(lfs, "LittleFS", "v2.html, v2.js, v2-bundle.css, fonts, FSexplorer, PIC firmware")
+    SystemDb_Ext(lfs, "LittleFS", "v2.html.gz, FSexplorer.html.gz, PIC firmware")
 
     Rel(browser, webui, "WebSocket OT stream", "ws:// port 80 /ws")
     Rel(browser, integlayer, "HTTP SPA + REST API", "http:// port 80")
@@ -161,5 +159,5 @@ C4Component
     Rel(integlayer, webui, "Serve web assets", "LittleFS streaming")
     Rel(webui, cfgstate, "Read debug/uptime state", "state.debug.*, state.uptime.*")
     Rel(network, webui, "Start on reconnect", "startTelnet(), startWebSocket()")
-    Rel(integlayer, lfs, "Serves assets", "v2.html, v2.js, v2-bundle.css, fonts")
+    Rel(integlayer, lfs, "Serves gzipped pages", "v2.html.gz, FSexplorer.html.gz")
 ```

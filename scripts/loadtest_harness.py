@@ -22,7 +22,7 @@ WORKLOAD MIX (one "unit" of work, weighted by --mix)
   POST /api/v2/settings      - REST write, mirrors the frontend's postSetting() body shape
                                 {"name": "ui_onboarded", "value": true} - idempotent, safe
                                 to spam (does not disable/enable any subsystem).
-  GET  /v2.html, /v2.css, /ds-tokens.css, /v2.js - static LittleFS asset serve path
+  GET  /v2.html, /FSexplorer.html - gzipped page serve path (v2.html.gz, FSexplorer.html.gz)
 
 OUTPUT
 ------
@@ -54,10 +54,8 @@ DEFAULT_MIX = {
     "get_sat_status": 3,
     "get_health": 2,
     "post_settings": 1,
-    "get_v2html": 1,
-    "get_v2css": 1,
-    "get_dstokens": 1,
-    "get_v2js": 1,
+    "get_v2html": 2,
+    "get_fsexplorer": 1,
 }
 
 
@@ -68,9 +66,7 @@ def build_units(base_url):
         "get_health": ("GET", base_url + "/api/v2/health", None),
         "post_settings": ("POST", base_url + "/api/v2/settings", {"name": "ui_onboarded", "value": True}),
         "get_v2html": ("GET", base_url + "/v2.html", None),
-        "get_v2css": ("GET", base_url + "/v2.css", None),
-        "get_dstokens": ("GET", base_url + "/ds-tokens.css", None),
-        "get_v2js": ("GET", base_url + "/v2.js", None),
+        "get_fsexplorer": ("GET", base_url + "/FSexplorer.html", None),
     }
 
 

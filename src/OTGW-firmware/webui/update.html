@@ -1,21 +1,18 @@
-
-#ifndef UPDATESERVERHTML_H
-#define UPDATESERVERHTML_H
-
-// TASK-1283: the /update page. It lives in app flash (PROGMEM), so it is served
-// whatever the state of LittleFS. It carries two ways to update:
-//  1. The one-action block: the browser takes the release zip (or the two .bin
-//     files), recognises them by content, hands the unit over to the safeboot
-//     updater, uploads the firmware there, waits for the new firmware, uploads
-//     the filesystem to it and verifies. Safeboot and the OTA endpoints are not
-//     changed (ADR-191); the browser tab runs the sequence.
-//  2. The manual forms below it (advanced): one upload per form, as before.
-// The first <script> (id updLogic) holds the page logic without DOM access
-// (file recognition, zip reader, phase engine). tests/webui/update-orchestrator.test.mjs
-// extracts it and runs it under node, so keep it free of document/window use.
-// The raw string uses its own delimiter: the JS contains the sequence )" .
-static const char UpdateServerIndex[] PROGMEM =
-  R"UPD(<!DOCTYPE html>
+<!DOCTYPE html>
+<!--
+  TASK-1283: the /update page. scripts/webui_pages.py gzips it into app flash
+  (PROGMEM, updateServerHtml.h, TASK-1640), so it is served whatever the state of
+  LittleFS. It carries two ways to update:
+   1. The one-action block: the browser takes the release zip (or the two .bin
+      files), recognises them by content, hands the unit over to the safeboot
+      updater, uploads the firmware there, waits for the new firmware, uploads
+      the filesystem to it and verifies. Safeboot and the OTA endpoints are not
+      changed (ADR-191); the browser tab runs the sequence.
+   2. The manual forms below it (advanced): one upload per form, as before.
+  The first <script> (id updLogic) holds the page logic without DOM access
+  (file recognition, zip reader, phase engine). tests/webui/update-orchestrator.test.mjs
+  extracts it and runs it under node, so keep it free of document/window use.
+-->
 <html charset="UTF-8">
 <head>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
@@ -961,75 +958,4 @@ var OTGWUpd = (function () {
   preflight();
 })();
 </script>
-</html>)UPD";
-
-static const char UpdateServerSuccess[] PROGMEM =
-  // NOTE: This page is the HTTP response body for a traditional (non-XHR) form POST.
-  // In the normal XHR flow the main upload page handles polling and label restore itself;
-  // this page's script only runs when the browser navigates here via a legacy form submit.
-  R"SUCCESS(<html charset="UTF-8">
-      <head>
-      <script>
-        (function() {
-          try {
-            if (localStorage.getItem('theme') === 'dark') { document.documentElement.className = 'dark'; }
-          } catch (e) {}
-        })();
-      </script>
-      <style type='text/css'>body { font-family: sans-serif; }</style>
-      </head>
-      <body>
-      <h1>OTGW firmware Flash utility</h1>
-      <h2>Flashing successful!</h2>
-      <p>Wait for the OTGW firmware to reboot and start the HTTP server.</p>
-      <p><span id="s" style="font-weight:bold; color:#666;">Waiting for device... (60s)</span></p>
-      <p>If nothing happens: <b><a href="./">click here</a></b>.</p>
-      </body>
-      <script>
-        // Fallback path only — restore Dallas labels from localStorage then redirect.
-        // saveDallasLabelsToStorage() must have run on the upload page before the flash.
-        (function() {
-          function tryRestoreLabels() {
-            try {
-              var raw = localStorage.getItem('otgw_dallas_restore');
-              if (!raw) return;
-              var e = JSON.parse(raw);
-              if (!e || !e.data || !e.savedAt || (Date.now() - e.savedAt) > 86400000) {
-                localStorage.removeItem('otgw_dallas_restore'); return;
-              }
-              if (typeof e.data !== 'object' || Object.keys(e.data).length === 0) {
-                localStorage.removeItem('otgw_dallas_restore'); return;
-              }
-              fetch('api/v2/sensors/labels', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(e.data)
-              }).then(function(r) {
-                if (r.ok) { localStorage.removeItem('otgw_dallas_restore'); console.log('[OTA] Dallas labels restored (fallback path)'); }
-                else { console.error('[OTA] Label restore failed: HTTP ' + r.status); }
-              }).catch(function(err) { console.error('[OTA] Label restore error:', err); });
-            } catch(ex) { console.log('[OTA] Label restore skipped:', ex); }
-          }
-
-          var s = document.getElementById('s'), n = 60;
-          var t = setInterval(function() {
-            n--;
-            if (n <= 0) { clearInterval(t); window.location.href = './'; return; }
-            s.textContent = 'Waiting for device... (' + n + 's)';
-            fetch('api/v2/health?t=' + Date.now(), { cache: 'no-store' })
-              .then(function(r) { return r.ok ? r.json() : null; })
-              .then(function(d) {
-                if (d && d.health && d.health.status === 'UP') {
-                  clearInterval(t);
-                  s.textContent = 'Device is back online!';
-                  tryRestoreLabels();
-                  setTimeout(function() { window.location.href = './'; }, 1000);
-                }
-              }).catch(function() {});
-          }, 1000);
-        })();
-      </script>
-    </html>)SUCCESS";
-
-
-#endif // UPDATESERVERHTML_H
+</html>

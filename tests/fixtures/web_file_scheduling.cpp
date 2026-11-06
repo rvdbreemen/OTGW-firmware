@@ -23,6 +23,7 @@ using PGM_P = const char*;
 #define PROGMEM
 #define RESTDebugTf(...) do {} while (0)
 #define strcmp_P strcmp
+#define snprintf_P snprintf  // webSendGzipPage's ETag (TASK-1640)
 #define strlen_P strlen
 static size_t hostStrlcpy(char* dest, const char* src, size_t cap) {
   const size_t len = strlen(src);
@@ -129,6 +130,7 @@ struct Wire {
   int status = 0;
   std::string type, path;
   std::map<std::string, std::string> headers;
+  std::map<std::string, int> headerCount;  // a header sent twice (TASK-433) shows as 2
 };
 class BoundaryResponse : public AsyncWebServerResponse {
   bool valid, file;
@@ -157,6 +159,7 @@ class AsyncWebServerRequest {
 public:
   AsyncWebServerResponse* response = nullptr;
   Wire wire;
+  std::list<AsyncWebHeader> requestHeaders;  // what the client sent (If-None-Match)
   ~AsyncWebServerRequest() { delete response; }
   AsyncClient* client() { return &transport; }
   void onDisconnect(std::function<void()> fn) { disconnect = std::move(fn); }
@@ -200,8 +203,11 @@ public:
   AsyncResponseStream* beginResponseStream(const char*, size_t) { return new AsyncResponseStream; }
   const AsyncWebParameter* getParam(const char*, bool) const { return nullptr; }
   bool hasParam(const char*, bool) const { return false; }
-  const AsyncWebHeader* getHeader(const char*) const { return nullptr; }
-  bool hasHeader(const char*) const { return false; }
+  const AsyncWebHeader* getHeader(const char* name) const {
+    for (const auto& h : requestHeaders) if (h.name() == name) return &h;
+    return nullptr;
+  }
+  bool hasHeader(const char* name) const { return getHeader(name) != nullptr; }
   String host() const { return {}; }
   String url() const { return {}; }
   size_t contentLength() const { return 0; }
@@ -212,7 +218,7 @@ public:
 void BoundaryResponse::_respond(AsyncWebServerRequest* req) {
   req->wire.status = _code; req->wire.type = _contentType; req->wire.path = path;
   if (trackClients) req->client()->pcb()->unacked = req->client();
-  for (const auto& h : _headers) req->wire.headers[h.name()] = h.value();
+  for (const auto& h : _headers) { req->wire.headers[h.name()] = h.value(); ++req->wire.headerCount[h.name()]; }
   _state = RESPONSE_WAIT_ACK;
 }
 
@@ -450,12 +456,59 @@ static void measured_queue_lifecycle_and_reset() {
   EXPECT(state.heapdiag.iWebfileTimeout == 1); EXPECT(state.heapdiag.iWebfileCancelled == 0);
   admitted->cancel(); second->cancel();
 }
+
+// TASK-1640 (ADR-215): the real page handlers from FSexplorer.ino (serveWebPage and
+// serveWebPagePair), and webSendGzipPage from webServerCompat.h.
+static const char* fsHashValue = "fshash1";
+const char* getFilesystemHash() { return fsHashValue; }
+#include "web_pages.inc"
+static std::unique_ptr<AsyncWebServerRequest> pageRequest(const char* ifNoneMatch = nullptr) {
+  auto request = std::make_unique<AsyncWebServerRequest>();
+  if (ifNoneMatch) request->requestHeaders.emplace_back("If-None-Match", ifNoneMatch);
+  webBeginRequest(request.get());
+  return request;
+}
+static void gzip_pages_send_one_encoding_and_answer_304() {
+  reset(); LittleFS.files["/v2.html.gz"] = {}; LittleFS.files["/v2.html"] = {};
+  auto r = pageRequest(); EXPECT(serveWebPagePair("/v2.html.gz", "/v2.html")); r->start();
+  EXPECT(r->wire.status == 200); EXPECT(r->wire.path == "/v2.html.gz");
+  EXPECT(r->wire.headerCount["Content-Encoding"] == 1); EXPECT(r->wire.headers["Content-Encoding"] == "gzip");
+  EXPECT(r->wire.headers["ETag"] == "\"fshash1-/v2.html.gz\""); EXPECT(r->wire.headers["Cache-Control"] == "no-cache");
+  r->complete(); r->cancel();
+  const unsigned opens = LittleFS.opens;
+  auto again = pageRequest("\"fshash1-/v2.html.gz\""); EXPECT(serveWebPagePair("/v2.html.gz", "/v2.html")); again->start();
+  EXPECT(again->wire.status == 304); EXPECT(again->wire.headerCount.count("Content-Encoding") == 0);
+  EXPECT(again->wire.headers["ETag"] == "\"fshash1-/v2.html.gz\""); EXPECT(LittleFS.opens == opens);
+  again->cancel();
+  // A filesystem from before TASK-1640 has only the plain page: served plain, with its own ETag.
+  LittleFS.files.erase("/v2.html.gz");
+  auto plain = pageRequest("\"fshash1-/v2.html.gz\""); EXPECT(serveWebPagePair("/v2.html.gz", "/v2.html")); plain->start();
+  EXPECT(plain->wire.status == 200); EXPECT(plain->wire.path == "/v2.html");
+  EXPECT(plain->wire.headerCount.count("Content-Encoding") == 0); EXPECT(plain->wire.headers["ETag"] == "\"fshash1-/v2.html\"");
+  plain->complete(); plain->cancel();
+  LittleFS.files.erase("/v2.html");
+  auto none = pageRequest(); EXPECT(!serveWebPagePair("/v2.html.gz", "/v2.html")); EXPECT(!g_responseSent);
+  none.reset();
+  const uint8_t gz[] = {0x1f, 0x8b, 0x08};
+  char etag[64]; snprintf(etag, sizeof(etag), "\"%s-/update\"", _VERSION_GITHASH);
+  auto upd = pageRequest(); webSendGzipPage(PSTR("text/html; charset=UTF-8"), gz, sizeof(gz), "/update"); upd->start();
+  EXPECT(upd->wire.status == 200); EXPECT(upd->wire.headerCount["Content-Encoding"] == 1);
+  EXPECT(upd->wire.headers["ETag"] == etag); EXPECT(upd->wire.type == "text/html; charset=UTF-8");
+  upd->cancel();
+  auto upd304 = pageRequest(etag); webSendGzipPage(PSTR("text/html; charset=UTF-8"), gz, sizeof(gz), "/update"); upd304->start();
+  EXPECT(upd304->wire.status == 304); EXPECT(upd304->wire.headerCount.count("Content-Encoding") == 0);
+  upd304->cancel();
+  // handleFile's "no UI at all" gate: an older filesystem's plain FSexplorer.html still counts.
+  EXPECT(!hasFSexplorerPage()); LittleFS.files["/FSexplorer.html"] = {}; EXPECT(hasFSexplorerPage());
+  LittleFS.files.erase("/FSexplorer.html"); LittleFS.files["/FSexplorer.html.gz"] = {}; EXPECT(hasFSexplorerPage());
+}
 int main() {
   waits_then_streams_and_preserves_headers(); fifo_queue_cap_and_cancellation();
   low_memory_deadline_wrap_and_safety(); errors_bounds_and_response_ownership(); deferred_metadata_and_file_changes(); reset();
   unwritable_pending_and_null_responses(); reset();
   six_native_connections_progress_without_polling();
   pending_identity_never_hides_tx_or_unrelated_pcbs(); measured_queue_lifecycle_and_reset(); reset();
+  gzip_pages_send_one_encoding_and_answer_304(); reset();
   std::printf("%s: production webSendFile scheduling (%d failures)\n", failures ? "FAIL" : "PASS", failures);
   return failures ? 1 : 0;
 }

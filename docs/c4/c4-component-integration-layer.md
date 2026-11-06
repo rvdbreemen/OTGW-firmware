@@ -31,7 +31,7 @@ Both sub-systems avoid whole-document allocations on a heap-constrained device: 
 - **REST API v2 dispatch table**: single `processAPI()` entry point; URI tokenized and matched against `kV2Routes[]`; adding an endpoint takes one handler and one table row.
 - **Backpressure and rate limiting**: REST in-flight cap 2 (ADR-165, tightens to 1 when the largest free block is small), file-serve cap 2 (ADR-147), connection cap (ADR-188), 503 with `Retry-After: 1`; GCRA poll budgets on `GET /otgw/otmonitor` (and its `telegraf` alias) and `GET /device/time` answer 429 `application/problem+json` (ADR-172).
 - **Admin protection and CSRF** (ADR-056): `checkHttpAuth()` validates Basic Auth (user `admin`) and the Origin/Referer host for POST, PUT, PATCH and DELETE on `/api/v2/*`, and for the admin routes; it only engages when an admin password is set.
-- **ETag asset caching** (ADR-139): `v2.html`, `v2.js`, `v2-bundle.css` and `fsexplorer.css` are served from LittleFS with `ETag: "<fsHash>-<path>"` and `Cache-Control: no-cache` (304 when unchanged); fonts get a one-year immutable cache.
+- **ETag page caching** (ADR-139, ADR-215): each page is one gzipped file. `v2.html.gz` is served from LittleFS with `Content-Encoding: gzip`, `ETag: "<fsHash>-/v2.html.gz"` and `Cache-Control: no-cache` (304 when unchanged); stylesheets, script and fonts are inlined in it and are not served separately.
 - **Streaming JSON**: `JsonEmit` over an `AsyncResponseStream` (`restBeginStream()` / `restFinalize()`), or `restSendChunked()` with a frozen snapshot for the biggest responses.
 - **LittleFS file explorer**: upload (`POST /upload`), download, delete and listing in `FSexplorer.ino`; `FSexplorer.html` doubles as the recovery page.
 - **PIC firmware update orchestration**: `/pic` route and `/api/v2/pic/*` endpoints for PIC hex transfer (never over OTmonitor on WiFi).
@@ -120,10 +120,9 @@ Both sub-systems avoid whole-document allocations on a heap-constrained device: 
 - **Protocol**: HTTP/1.1
 - **Description**: Serves web UI assets from LittleFS with ETag validation, streamed from flash.
 - **Routes**:
-  - `GET /`, `/index`, `/index.html` - `v2.html` (auth guard, ETag); falls back to `FSexplorer.html` when `v2.html` is missing
-  - `GET /v2.html|/v2.js|/v2-bundle.css|/fsexplorer.css` - ETag + `no-cache`
-  - `GET /fonts/*.woff2` - one-year immutable cache
-  - `GET /FSexplorer.html`, `/FSexplorer` - LittleFS file explorer / recovery page
+  - `GET /`, `/index`, `/index.html`, `/v2.html` - gzipped `/v2.html.gz` (auth guard, ETag, 304); falls back to the plain `/v2.html` of an older filesystem, then to `FSexplorer.html`
+  - `GET /FSexplorer.html`, `/FSexplorer` - `/FSexplorer.html.gz` (else plain `/FSexplorer.html`, else the PROGMEM upload prompt): LittleFS file explorer / recovery page
+  - `GET /update` - gzipped firmware update page from PROGMEM (`updateServerHtml.h`, generated at build time), ETag `"<firmware githash>-/update"`
   - `POST /upload` - file upload; `ANY /ReBoot`, `/ResetWireless` - admin actions
   - `POST /update`, `POST /safeboot` - firmware / filesystem OTA (see the Network component)
 
@@ -142,7 +141,7 @@ Both sub-systems avoid whole-document allocations on a heap-constrained device: 
 
 - **espMqttClient** (bertmelis, vendored under `src/libraries/espMqttClient`, ADR-186 / ADR-187): async MQTT 3.1.1 client
 - **ESPAsyncWebServer / AsyncTCP**: HTTP transport for REST, files, WebSocket and OTA
-- **LittleFS**: `dallas_labels.ini`, `/sat_markers.json` (TASK-586), `/sat_pid_state.json`, `/topic_cleanup.bin`, `v2.html`, `v2.js`, `v2-bundle.css`, `fsexplorer.css`, `FSexplorer.html`, `fonts/`, PIC hex files. There is no runtime `mqttha.cfg`: discovery is published from PROGMEM tables in `MQTTHaDiscovery.cpp`.
+- **LittleFS**: `dallas_labels.ini`, `/sat_markers.json` (TASK-586), `/sat_pid_state.json`, `/topic_cleanup.bin`, `v2.html.gz`, `FSexplorer.html.gz`, PIC hex files. There is no runtime `mqttha.cfg`: discovery is published from PROGMEM tables in `MQTTHaDiscovery.cpp`.
 - **MQTT Broker**: external broker (Mosquitto, Home Assistant Mosquitto add-on, etc.)
 - **Home Assistant**: consumes MQTT discovery payloads and published OT telemetry
 
@@ -181,5 +180,5 @@ C4Component
     Rel(mqtt, utilities, "Heap backpressure", "canPublishMQTT(), feedWatchDog()")
     Rel(restapi, network, "Registers routes", "AsyncWebServer server")
     Rel(mqtt, lfs, "Reads sensor labels", "dallas_labels.ini")
-    Rel(restapi, lfs, "Serves web assets", "v2.html, v2.js, v2-bundle.css")
+    Rel(restapi, lfs, "Serves web pages", "v2.html.gz, FSexplorer.html.gz")
 ```

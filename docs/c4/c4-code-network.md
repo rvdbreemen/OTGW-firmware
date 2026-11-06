@@ -231,7 +231,7 @@ Feature flags in `platform_esp32.h`: `HAS_LLMNR` = 0, `MDNS_NEEDS_UPDATE` = 0, `
 - **`safeTimers.h`**: `DECLARE_TIMER_SEC`, `DUE`, `RESTART_TIMER`, `CATCH_UP_MISSED_TICKS`
 - **`OTGW-firmware.h`**: `settings.sHostname`, `settings.sHTTPpasswd`, `settings.ntp.*`, `settings.wifi.*`, `settings.eth.*`, `state.net.*`, `state.hw.bEthernetPresent`, `state.pic.*`, `state.otBus.*`; `networkModeName()` and `getActiveIP()` (inline)
 - **`webServerCompat.h`**: ESPAsyncWebServer bridge (`server`, `WEB_HTTP_PORT`)
-- **`OTGW-ModUpdateServer.h`** (dispatches to `-esp32.h`) and **`updateServerHtml.h`**: OTA server and its HTML
+- **`OTGW-ModUpdateServer.h`** (dispatches to `-esp32.h`) and **`updateServerHtml.h`**: OTA server and its HTML. `updateServerHtml.h` is generated at build time (git-ignored) from `webui/update.html` and `update-success.html` as gzipped PROGMEM arrays, served by `webSendGzipPage()`
 - **`OTGW-Core.ino`** / main loop: `feedWatchDog()`, `addCommandToQueue()`, `hasOTCommandInterface()`, `isGatewayFirmware()`
 - **`MQTTstuff.ino`** / **`webSocketStuff.ino`**: `startMQTT()`, `startWebSocket()` on reconnect or transport switch
 - **`OLED.ino`**: `oledShowConfigMode()`
@@ -365,7 +365,7 @@ graph TB
 - Static buffers: `baseMacChr[13]`, `uniqueId[32]`
 - Telnet callbacks receive `const char*`, never `String` (no heap churn)
 - WiFiManager debug output disabled via `WM_NODEBUG`
-- Files are streamed, never loaded whole (`v2.html` is about 50 KB)
+- Pages are streamed, never loaded whole (`v2.html.gz` is about 171 KB)
 
 ### Ethernet Failover (W5500)
 

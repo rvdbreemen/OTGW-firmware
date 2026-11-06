@@ -103,7 +103,8 @@ import time
 import urllib.error
 import urllib.request
 
-ASSET_PATHS = ["/v2.html", "/v2-bundle.css", "/v2.js"]
+# A page reload is one gzipped file per page (TASK-1640).
+ASSET_PATHS = ["/v2.html", "/FSexplorer.html"]
 API_PATHS = ["/api/v2/device/info", "/api/v2/sat/status", "/api/v2/health"]
 HTTP_TIMEOUT_SEC = 5.0
 # Pause before every JSON request. The REST gate frees a slot when the previous

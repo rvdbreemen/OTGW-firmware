@@ -1,7 +1,7 @@
 <!--
 ***************************************************************************  
 **  Program  : FSexplorer.html
-**  Version  : v2.0.0-beta.109
+**  Version  : v2.0.0-beta.110
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -15,7 +15,8 @@
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
       <!-- TASK-1223.13: FSexplorer is the recovery page when the main UI is
-           broken, so it loads only its own stylesheet (fsexplorer.css). Pre-paint
+           broken, so it uses only its own stylesheet (fsexplorer.css, inlined into
+           FSexplorer.html.gz at build time, TASK-1640). Pre-paint
            data-theme on <html> for the first frame; fsexplorer.css carries both
            the light baseline and the [data-theme="dark"] / body.dark overrides. -->
       <script>
@@ -219,13 +220,10 @@
                          deleteCell.width = '10%';
                          deleteCell.setAttribute('nowrap', '');
 
-                         // Footgun guard: no Delete link next to a load-bearing asset. Deleting
-                         // v2.js, for example, leaves a blank page at '/'.
-                         const protectedFiles = ['FSexplorer.html', 'FSexplorer.png', 'fsexplorer.css',
-                                                 'favicon.ico', 'settings.png',
-                                                 'v2.html', 'v2.js', 'v2-bundle.css',
-                                                 'inter-400.woff2', 'inter-700.woff2',
-                                                 'jetbrains-mono-400.woff2'];
+                         // Footgun guard: no Delete link next to a load-bearing file. Deleting
+                         // v2.html.gz, for example, leaves '/' on this recovery page.
+                         const protectedFiles = ['FSexplorer.html.gz', 'favicon.ico', 'settings.png',
+                                                 'v2.html.gz'];
                          if (!protectedFiles.includes(files[i].name)) {
                            const deleteLink = document.createElement('a');
                            deleteLink.href = '#';
