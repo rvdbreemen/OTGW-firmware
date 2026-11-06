@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.112
+**  Version  : v2.0.0-beta.113
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -530,6 +530,23 @@ void sampleHeapWatermark() {
   state.heapdiag.iTcpActivePcbs = platformTcpActivePcbCount();
 }
 
+// TASK-1673: called every loop() iteration. Reading free heap is cheap; the TCP walk (core
+// lock) runs only when a new minimum is seen, which settles after the first loads.
+void sampleHeapDip() {
+  const uint32_t fh = platformFreeHeap();
+  if (fh >= state.heapdiag.iDipFreeHeap) return;
+  const PlatformTcpHoldSnapshot t = platformTcpHoldSnapshot(80);
+  state.heapdiag.iDipFreeHeap     = fh;
+  state.heapdiag.iDipMaxBlock     = platformMaxFreeBlock();
+  state.heapdiag.iDipTxBytes      = t.txBytes;
+  state.heapdiag.iDipTxPcbs       = t.txPcbs;
+  state.heapdiag.iDipActivePcbs   = t.active;
+  state.heapdiag.iDipTimeWaitPcbs = t.timeWait;
+  state.heapdiag.iDipFiles        = webFileInFlightNow();
+  state.heapdiag.iDipRest         = restInFlightNow();
+  state.heapdiag.iDipWs           = (uint8_t)webSocketClientCount();
+}
+
 // Zero the soak window: watermark, histogram, and the cumulative pressure counters,
 // then re-seed the watermark so a publish/dump immediately after reset never shows
 // the 0xFFFFFFFF sentinel. Intended to be used from a HEALTHY heap at the start of a
@@ -566,6 +583,7 @@ void resetHeapWatermark() {
   state.heapdiag.iWebConn503Count          = 0;
   state.heapdiag.iWebAckAbortCount         = 0;
   state.heapdiag.iTcpActivePcbs            = 0;
+  state.heapdiag.iDipFreeHeap              = 0xFFFFFFFF;   // TASK-1673
   sampleHeapWatermark();   // re-seed iMinMaxBlock + first histogram tick (no 0xFFFFFFFF window) + tcp pcb count
 }
 

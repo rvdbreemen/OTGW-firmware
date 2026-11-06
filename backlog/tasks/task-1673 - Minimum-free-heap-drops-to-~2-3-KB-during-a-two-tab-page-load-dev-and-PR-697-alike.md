@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-06T10:57:00Z'
-updated_date: '2026-11-06T19:40:00Z'
+updated_date: '2026-11-06T19:44:00Z'
 labels:
   - heap
   - webui
@@ -41,4 +41,6 @@ Planned fixes, app side, no library change: (A) in webSendFile open the File wit
 2026-11-06 esp32-combo build of beta.111 failed: webServerCompat.h:505 'call of overloaded beginResponse(fs::File&, char[128], char[48]) is ambiguous' (fs::File's implicit operator bool reaches beginResponse(int, const char*, const char*)). The host mock had an explicit bool and no int overload, so it missed it. Mock made faithful (implicit bool + the int overload): host test then fails to compile with the same C2666; fix passes String(_path) explicitly, host test PASS.
 
 2026-11-06 bench .61 beta.112 (contains #698 too, so combined effect): two-tab load 4 x 25 rounds, minimum free heap 8136 B over the four runs (first run 21788 B) vs 3356 B on beta.109 under the same two-tab load with separate assets; no 503s; bootcount steady. AC2 target is >= 8 KB (8192 B): 8136 B is 56 B short, so AC2 stays open. AC1 asks for a heap trace or per-consumer counters; the cause analysis so far is code reading (workflow wf_6068a950-81e), so AC1 stays open too. Next: per-consumer counters (lwIP TX-holding pcbs, open files, WS clients) sampled at the minimum, then decide whether the remaining gap needs more.
+
+2026-11-06 instrumentation for AC1: loop() calls sampleHeapDip() every iteration; on a new free-heap minimum it snapshots port-80 TX pcbs and the bytes they hold (TCP_SND_BUF - snd_buf), active and TIME_WAIT pcbs, admitted file streams, REST in flight and WS clients (platformTcpHoldSnapshot under LOCK_TCPIP_CORE). Exposed as hd_dip_* in /api/v2/device/info.
 <!-- SECTION:NOTES:END -->

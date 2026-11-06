@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Hardwaretypes.h
-**  Version  : v2.0.0-beta.112
+**  Version  : v2.0.0-beta.113
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

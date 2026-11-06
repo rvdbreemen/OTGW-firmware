@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.112
+**  Version  : v2.0.0-beta.113
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1184,6 +1184,7 @@ void loop()
   }
 
   doBackgroundTasks();              // run background tasks
+  sampleHeapDip();                  // TASK-1673: who holds memory at the lowest free heap
 
   // TASK-865.5 (ADR-123 Phase-1): consume OT frames produced this iteration.
   // handlePICSerial()/loopOTDirect() ran inside doBackgroundTasks() and enqueued

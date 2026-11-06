@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.112
+**  Version  : v2.0.0-beta.113
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -347,7 +347,10 @@ void handleOTGWstream();
 void testWebhook(bool testOn);
 void evalWebhook();
 void startWebhookTask();  // ADR-123 Phase-4: create the webhook sender task once (webhook.ino)
-bool webhookTaskAvailable();  // TASK-1669: the sender task exists, so it can run the weather fetch (webhook.ino)
+bool webhookTaskAvailable();
+uint8_t webFileInFlightNow();
+uint8_t restInFlightNow();
+void sampleHeapDip();  // TASK-1669: the sender task exists, so it can run the weather fetch (webhook.ino)
 void weatherWorkerPoll();     // TASK-1669: run a requested weather fetch; webhook task only (SATweather.ino)
 bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-056; defined in restAPI.ino)
 extern bool picSettingsCycleActive;  // PIC settings readout cycle flag (OTGW-Core.ino)
@@ -533,6 +536,17 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint32_t iWebfile503Count        = 0; // lifetime web-file-serve 503s from the concurrency gate (webFileGateTryAdmit)
   uint32_t iWebConn503Count        = 0; // 503s from the web connection cap (restAPI.ino webConnCapExceeded, ADR-188)
   uint32_t iWebAckAbortCount       = 0; // web connections aborted on the ack timeout (webServerCompat.h webBeginRequest, ADR-189)
+  // TASK-1673: snapshot taken by the loop task at the lowest free heap it has seen (the native
+  // watermark hd_min_free_heap can be lower: the loop only sees what it samples).
+  uint32_t iDipFreeHeap            = 0xFFFFFFFF;
+  uint32_t iDipMaxBlock            = 0;
+  uint32_t iDipTxBytes             = 0;  // bytes port-80 pcbs hold in their send queue
+  uint16_t iDipTxPcbs              = 0;  // port-80 pcbs with unsent/unacked data
+  uint16_t iDipActivePcbs          = 0;
+  uint16_t iDipTimeWaitPcbs        = 0;
+  uint8_t  iDipFiles               = 0;  // file streams admitted by the file gate
+  uint8_t  iDipRest                = 0;  // REST requests in flight
+  uint8_t  iDipWs                  = 0;  // WebSocket clients
   uint16_t iTcpActivePcbs          = 0; // lwIP active TCP PCB count, sampled 1 Hz from the loop task (platformTcpActivePcbCount)
 };
 

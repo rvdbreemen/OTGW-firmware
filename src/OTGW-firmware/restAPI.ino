@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.112
+**  Version  : v2.0.0-beta.113
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -115,6 +115,8 @@ void webFileGateRejected() {
   state.heapdiag.iWebfile503Count++;
 }
 void webFileGateRelease() { if (webFileInFlight) webFileInFlight--; }
+uint8_t webFileInFlightNow() { return webFileInFlight; }  // TASK-1673 dip snapshot
+uint8_t restInFlightNow()    { return restInFlight; }
 void restSlotRelease()    { if (restInFlight) restInFlight--; }
 
 // Zero-allocation HTTP method to string (returns PROGMEM pointer).
@@ -3472,6 +3474,15 @@ void sendDeviceInfoV2()
     je.field(F("hd_webfile_pending"),      (uint32_t)snap->st.heapdiag.iWebfilePending);
     je.field(F("hd_webfile_pending_hwm"),  (uint32_t)snap->st.heapdiag.iWebfilePendingHwm);
     je.field(F("hd_tcp_active_pcbs"),      (uint32_t)snap->st.heapdiag.iTcpActivePcbs);
+    je.field(F("hd_dip_free_heap"),        snap->st.heapdiag.iDipFreeHeap == 0xFFFFFFFF ? 0u : snap->st.heapdiag.iDipFreeHeap);
+    je.field(F("hd_dip_max_block"),        snap->st.heapdiag.iDipMaxBlock);
+    je.field(F("hd_dip_tx_bytes"),         snap->st.heapdiag.iDipTxBytes);
+    je.field(F("hd_dip_tx_pcbs"),          (uint32_t)snap->st.heapdiag.iDipTxPcbs);
+    je.field(F("hd_dip_active_pcbs"),      (uint32_t)snap->st.heapdiag.iDipActivePcbs);
+    je.field(F("hd_dip_timewait_pcbs"),    (uint32_t)snap->st.heapdiag.iDipTimeWaitPcbs);
+    je.field(F("hd_dip_files"),            (uint32_t)snap->st.heapdiag.iDipFiles);
+    je.field(F("hd_dip_rest"),             (uint32_t)snap->st.heapdiag.iDipRest);
+    je.field(F("hd_dip_ws"),               (uint32_t)snap->st.heapdiag.iDipWs);
     je.field(F("hd_rest_503"),             snap->st.heapdiag.iRest503Count);
     je.field(F("hd_webfile_503"),          snap->st.heapdiag.iWebfile503Count);
     je.field(F("hd_webconn_503"),          snap->st.heapdiag.iWebConn503Count);
