@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-06T10:57:00Z'
-updated_date: '2026-11-06T19:44:00Z'
+updated_date: '2026-11-06T20:42:00Z'
 labels:
   - heap
   - webui
@@ -25,7 +25,7 @@ Bench .61 2026-11-06: hd_min_free_heap went to 2612 B (dev beta.106+069ae27, aft
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Find what holds the memory at the minimum (per-connection AsyncTCP/lwIP buffers, response objects, JSON writers, WebSocket) with a heap trace or per-consumer counters during a two-tab load
+- [x] #1 Find what holds the memory at the minimum (per-connection AsyncTCP/lwIP buffers, response objects, JSON writers, WebSocket) with a heap trace or per-consumer counters during a two-tab load
 - [ ] #2 Raise the minimum to a safe margin (target >= 8 KB, the HEAP_LOW level) under the same two-tab load, red/green on the bench
 <!-- AC:END -->
 
@@ -43,4 +43,8 @@ Planned fixes, app side, no library change: (A) in webSendFile open the File wit
 2026-11-06 bench .61 beta.112 (contains #698 too, so combined effect): two-tab load 4 x 25 rounds, minimum free heap 8136 B over the four runs (first run 21788 B) vs 3356 B on beta.109 under the same two-tab load with separate assets; no 503s; bootcount steady. AC2 target is >= 8 KB (8192 B): 8136 B is 56 B short, so AC2 stays open. AC1 asks for a heap trace or per-consumer counters; the cause analysis so far is code reading (workflow wf_6068a950-81e), so AC1 stays open too. Next: per-consumer counters (lwIP TX-holding pcbs, open files, WS clients) sampled at the minimum, then decide whether the remaining gap needs more.
 
 2026-11-06 instrumentation for AC1: loop() calls sampleHeapDip() every iteration; on a new free-heap minimum it snapshots port-80 TX pcbs and the bytes they hold (TCP_SND_BUF - snd_buf), active and TIME_WAIT pcbs, admitted file streams, REST in flight and WS clients (platformTcpHoldSnapshot under LOCK_TCPIP_CORE). Exposed as hd_dip_* in /api/v2/device/info.
+
+2026-11-06 AC1 evidence, .61 beta.113, two-tab load 2 x 25 rounds (page + favicon, gzip pages): loop-sampled dip 13592 B free with 2 port-80 pcbs holding 11488 B in their send queues (2 x TCP_SND_BUF 5744, both full), 2 admitted file streams, 13 TIME_WAIT pcbs (~3.2 KB), 3 active pcbs, REST 0, WS 0. The native watermark hd_min_free_heap was 3168 B in this run, about 10 KB below the loop-sampled dip: the extra is transient on the async_tcp task (the 2872 B response send buffer plus pbuf copies during tcp_write). CORRECTION: the 8136 B minimum reported for beta.112 was one favourable run; the minimum varies strongly run to run (3168 B here, same code path). It is not a stable improvement figure.
+
+2026-11-06 A/B on .61, reboot before every run (hd_min_free_heap is since boot), two-tab load 25 rounds: beta.113 cap 2: min free 20356 / 3328 / 3040 B (the low runs are the ones where both streams overlap, dip snapshot 2 TX pcbs 11488 B), p95 1.21-1.43 s. Experiment cap 1 (WEB_FILE_MAX_INFLIGHT 1, not committed): 21196 / 7596 / 12968 / 17528 B, p95 1.45-1.50 s but one run p50 5.91 s p95 11.55 s max 12.67 s. Cap 1 raises the worst case from ~3.0 to 7.6 KB, still below the 8 KB target, at a real latency cost. Found and fixed on the way: 'else if (mb < 24000) cap = 2' raised a base cap of 1 to 2; now it only lowers the cap (no effect with the production base of 2).
 <!-- SECTION:NOTES:END -->
