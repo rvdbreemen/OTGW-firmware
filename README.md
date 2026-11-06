@@ -4,7 +4,7 @@
 [![GitHub release](https://img.shields.io/github/v/release/rvdbreemen/OTGW-firmware?style=flat-square)](https://github.com/rvdbreemen/OTGW-firmware/releases)
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
 
-> **Disclaimer: v2.0.0-beta.99 is a beta of the 2.0.0 line.** It is not a stable release. It has had alpha and beta testing on a small group of units, but not yet the long field runs a stable release needs. Expect bugs, save your settings before you flash, and read the [beta.99 release notes](docs/releases/RELEASE_NOTES_2.0.0-beta.99.md) first, including the known issues.
+> **Disclaimer: v2.0.0-beta.105 is a beta of the 2.0.0 line.** It is not a stable release. It has had alpha and beta testing on a small group of units, but not yet the long field runs a stable release needs. Expect bugs, save your settings before you flash, and read the [beta.105 release notes](docs/releases/RELEASE_NOTES_2.0.0-beta.105.md) first, including the known issues.
 >
 > If you need a gateway that just works, stay on the 1.x line for now: the [`otgw-1.x.x` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/otgw-1.x.x) and the [published releases](https://github.com/rvdbreemen/OTGW-firmware/releases).
 
@@ -30,7 +30,7 @@ Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the tradit
 - **Diagnostics**: a capture tool (launchers for Windows and for Linux/macOS) that records telnet, MQTT, the crash log and raw OpenTherm frames in one upload file, and a crash log with core-dump details after a panic.
 - **Relicensed to GNU GPLv3** (was MIT).
 
-**Breaking changes**: 2.0.0 changes MQTT topics, REST fields and settings compared with 1.x. Check your Home Assistant automations, Node-RED flows and scripts against the [breaking changes in the release notes](docs/releases/RELEASE_NOTES_2.0.0-beta.99.md#since-the-1x-line) before you upgrade.
+**Breaking changes**: 2.0.0 changes MQTT topics, REST fields and settings compared with 1.x. Check your Home Assistant automations, Node-RED flows and scripts against the [breaking changes in the release notes](docs/releases/RELEASE_NOTES_2.0.0-beta.105.md#since-the-1x-line) before you upgrade.
 
 ---
 
@@ -89,7 +89,7 @@ This ESP32-S3 plus PIC combination is what the firmware supports.
 
 ## SAT: Smart Autotune Thermostat
 
-> **SAT is experimental and off by default.** When you switch it on, it takes over the control setpoint of your boiler. The setup wizard asks you to confirm that first. SAT behaviour can still change between builds; see the [release notes](docs/releases/RELEASE_NOTES_2.0.0-beta.99.md#sat-is-experimental-and-opt-in). Without SAT, the gateway is a transparent OpenTherm gateway, as in 1.x.
+> **SAT is experimental and off by default.** When you switch it on, it takes over the control setpoint of your boiler. The setup wizard asks you to confirm that first. SAT behaviour can still change between builds; see the [release notes](docs/releases/RELEASE_NOTES_2.0.0-beta.105.md#sat-is-experimental-and-opt-in). Without SAT, the gateway is a transparent OpenTherm gateway, as in 1.x.
 
 SAT is an embedded heating controller that runs entirely on the device, a port of the [SAT Home Assistant integration](https://github.com/Alexwijn/SAT). It replaces the room thermostat's role in controlling the boiler: it computes the boiler flow temperature from the outdoor temperature and the room temperature error, and keeps your home at the target temperature without needing Home Assistant or any external controller in the control loop.
 

@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.105] - 2026-11-06
+
+### Changed
+- **SAT: a lit burner runs at least 180 s before the cold cutoff stops it** (TASK-1652, Sergeant D's choice). The latched cold cutoff is deferred while a lit PWM ON phase is younger than 180 s since ignition; other stop reasons act at once. Host test `tests/test_sat_cold_cut_min_burn.py` (old code: 4 failures). Bench: cutoff 180.04 s after PWM ON. Not tested with a real boiler or a heat pump.
+
+### Fixed
+- **MQTT: keep the last good broker address per name when a lookup fails, and close the old session on a failed rename** (TASK-1451, port of 1.x TASK-1250). Host test `test/host/test_mqtt_broker_address.py` (old code fails H2/H3/H5/H7). Bench: fallback within one 42 s cycle; a rename leaves no publish to the old broker.
+- **MQTT: a publish refused while connected is logged as `packet not queued`, not as a false `TCP disconnected`** (TASK-1664). Host test `test/host/test_mqtt_print_error.py` (old code fails P1). Bench: an MQTT off/on cycle logs the real disconnect reason and no false `TCP disconnected`; the refused-publish line itself was not provoked on the bench.
+- **Web UI: live values show a dash instead of invented sample values when data is missing** (TASK-1670). `v2.html` no longer ships mockup numbers, and the system-view ΔT falls back to a dash when flow or return is unknown. Test `tests/webui/no-sample-values.test.mjs` (old code: 2 failures).
+- **SAT narration lines are no longer cut off** (TASK-1663). `SAT_NARRATE_BUF` 96 to 128; `tests/test_sat_narrate_fits.py` checks every narration format against the buffer (old code: two lines of 102 characters did not fit).
+
 ## [2.0.0-beta.99] - 2026-11-05
 
 ### Added
@@ -720,7 +731,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.99...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.105...HEAD
+[2.0.0-beta.105]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.99...v2.0.0-beta.105
 [2.0.0-beta.99]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.95...v2.0.0-beta.99
 [2.0.0-beta.95]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.77...v2.0.0-beta.95
 [2.0.0-beta.77]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.62...v2.0.0-beta.77
