@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Diagnostic recorder (opt-in, off by default)** (TASK-1665, TASK-1666, ADR-213, ADR-214). A bounded ring in RAM (PSRAM when present) records OpenTherm frames, PIC and OT-Direct commands, MQTT, REST, weather, BLE, NTP and boot events. `POST /api/v2/diag/recording/start` and `/stop` control it, `GET /api/v2/diag/recording/status` reports it, and `GET /api/v2/diag/recording[?since=N]` downloads it as a binary file whose block range is fixed when the request starts. Secrets never enter the ring: passwords, keys, tokens, MQTT credentials, webhook URLs and BLE MAC addresses are recorded as set or empty, location is rounded to 0.1 degree, and secret-looking keys inside free-text values such as a webhook payload are blanked.
+
 ### Changed
 - **Web UI: the stylesheet, script and fonts load natively, and the server queues file requests instead of refusing them** (TASK-1659, ADR-212, PR #697 by André Brait). The page now uses a normal stylesheet link, a deferred script and font preloads; JavaScript retries only after a real load error. When both file-stream slots are busy, up to four file requests wait in arrival order for up to 10 s instead of getting 503. Limits are unchanged: two file streams, the REST gate and the connection cap. New counters in `/api/v2/device/info` and telnet: `hd_webfile_queued`, `hd_webfile_admitted`, `hd_webfile_cancelled`, `hd_webfile_timeout`, `hd_webfile_max_wait_ms`, `hd_webfile_pending`, `hd_webfile_pending_hwm`. Known caveat: two files streaming at once lower the largest free heap block to 7,668 bytes (13,812 on beta.94); measurements and the single gzipped file alternative are in PR #697.
 

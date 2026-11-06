@@ -3,11 +3,11 @@ id: TASK-1659
 title: >-
   Review PR #697: native asset loading + bounded server-side file queue
   (andrebrait, ADR-212 Proposed)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-05T14:37:00Z'
-updated_date: '2026-11-06T15:29:00Z'
+updated_date: '2026-11-06T15:48:00Z'
 labels:
   - github
   - pr
@@ -28,7 +28,7 @@ https://github.com/rvdbreemen/OTGW-firmware/pull/697 by andrebrait, base dev, +1
 - [x] #1 Robert's architecture decision recorded (queue/ADR-212, single gzipped file, or neither)
 - [x] #2 Reviewer team on the PR head (correctness, project rules/ADRs incl. ADR-139/147/165/188/192, tests); findings posted as a PR review
 - [x] #3 Tests + evaluate + combo build green on the PR head in its own worktree; bench page-load under 2 tabs with heap numbers
-- [ ] #4 Merge only on Robert's go
+- [x] #4 Merge only on Robert's go
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -57,4 +57,12 @@ Third point: the test requires clang++/g++ only (shutil.which), while the repo's
 2026-11-06 12:xx part 2 on PR head 3d686f13c (Andre fixed finding 1), rebased locally in ../wt-pr697 onto dev f98f8eb0c (banner/CHANGELOG conflicts only; per-file non-banner diff identical to the PR), local test bump beta.107+742f969 (not pushed). Gates: evaluate --quick 84/0/0; test_web_file_scheduling PASS via MSVC shim (finding 3, no MSVC fallback, still open); esp32-combo build OK (RAM 122956, flash 2150803). Bench .61: two-tab load 350/350 x 200 on both builds, p50/p95/max dev 3.14/4.76/8.18 s vs PR 3.17/3.37/3.45 s; queue burst 8x /v2.js: 6 served (max wait 2257 ms, pending_hwm 4), 2 immediate 503 Retry-After 1, no hang; disconnect while queued: cancelled 4, heap recovered, no reboot, serves after. PR acceptance script 1/3 runs pass: favicon no answer 10 s once, v2.js ERR_CONNECTION_TIMED_OUT once (TCP level; not compared with dev, the script needs the PR diagnostics). Not seen: the 10 s deadline 503. Min free heap ~2.6-3.3 KB on both builds under these loads -> TASK-1673. Review part 2 posted: issuecomment-6683262801. Pending: native-asset-load.test.mjs result (re-running detached), ADR-212 decision and merge go from Robert.
 
 2026-11-06 landing: Robert chose 'Toch mergen en accepteren' (heap dip known, TASK-1673), with the condition of a green browser test. After stopping the stuck test process (pid 44384, Robert's approval) tests/webui/native-asset-load.test.mjs passed 9/9 in three runs in wt-pr697 and once more on the merged dev tree. ADR-212 Accepted 2026-11-06 via adr-kit (Status records the maintainer decision and the second bench run; related ADRs 139/147/165/188/192 linked both ways). Gates on the merged tree: tests/test_web_file_scheduling.py PASS (MSVC shim), test_build_staging, test_asset_loading_acceptance, test_adr_governance OK, test_rest_body_stale PASS, no-sample-values 2/2, evaluate --quick 85/0. Squash-merged as one commit with author André Brait and its own prerelease bump.
+
+2026-11-06 pushed 54b884319 (beta.109, author André Brait); GitHub closed #697 via 'Closes #697'. André's own latest head 3ee2cca28 (rebase onto 7108571cb) checked file by file against HEAD: identical apart from banners, the ADR-212 acceptance text and the recorder code that landed on dev in between. Bench .61 beta.109: two-tab 25 rounds 350/350 200, p50 2.92 s p95 3.32 s, bootcount steady; queue burst 6 served + 2 x 503 Retry-After 1; disconnect cancelled 4, heap back to 69.3 KB; min free heap 3356 B (TASK-1673). Zip posted to #alpha-testing (message 1568290326022725733).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: Robert decided queue + ADR-212 (AskUserQuestion 'Accepteren', then 'Toch mergen en accepteren'); ADR-212 Accepted 2026-11-06 via adr-kit with the heap dip as a recorded risk. AC2: reviewer findings posted as two PR review comments (2026-11-05/06). AC3: tests (web_file_scheduling PASS, native-asset-load 9/9 x4), evaluate 85/0, combo build OK, bench two-tab numbers above and in ADR-212. AC4: merged on Robert's go as 54b884319 (beta.109). Not verified: the 10 s deadline 503 on the bench. Open follow-up: heap dip, TASK-1673.
+<!-- SECTION:FINAL_SUMMARY:END -->
