@@ -1,11 +1,11 @@
 ---
 id: TASK-1664
 title: 'MQTT: 13 ''TCP disconnected'' error lines within 40 ms right after a reconnect'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-05T20:24:00Z'
-updated_date: '2026-11-06T04:12:00Z'
+updated_date: '2026-11-06T06:48:00Z'
 labels:
   - mqtt
 milestone: 2.0.0
@@ -23,7 +23,7 @@ Bench .61 beta.101 (TASK-1451 AC5a, 2026-11-05 20:38:25.061-.098): right after t
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Reproduced on old code (before TASK-1451) or shown to be new
-- [ ] #2 Explained from the code; fixed or documented as harmless
+- [x] #2 Explained from the code; fixed or documented as harmless
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -42,4 +42,12 @@ Proposed fix (not implemented yet, needs build + bench): publish-failure call si
 2026-11-06 host test test/host/test_mqtt_print_error.py --old-rev 29bfe386b^ (slices the real PrintMQTTError from MQTTstuff.ino, MSVC): FIX P1/C1/C2 pass; OLD P1 FAIL (connected + refused publish printed 'TCP disconnected'), C1/C2 pass; mutant (connected check removed) fails exactly P1; RESULT PASS exit 0. This reproduces the misleading line on the old code in a harness; the bench reconnect on .61 after the build is still open.
 
 AC1 ticked: the misleading line reproduces on the pre-fix PrintMQTTError in the host harness (P1 FAIL on 29bfe386b^), and git log -S lastMqttDisconnectReason shows that code since 5847521dc (2026-06-14, TASK-865.7), long before TASK-1451, so it is not new. AC2 stays open until the .61 bench reconnect shows the new line.
+
+2026-11-06 bench .61: esp32-combo build 2.0.0-beta.103+18e612a (2 images, Build completed successfully, artefacts 07:40), OTA app+fs exit 0, settings 177 keys changed none, v2.js 266410 B complete. MQTT reconnect via mqttenable false->true with telnet (scratchpad b103/telnet-reconnect2.log): disconnect printed 'Error: MQTT user disconnect' (real reason, client not connected), reconnect subscribed OK, post-subscribe free=74128 max_block=31732; 0 'TCP disconnected' lines and 0 'not queued' lines, mqttconnected true, bootcount 3. Not reproduced on the bench: a refused publish (max block stayed 31.7 KB, above the 16 KB EMC_MIN_FREE_MEMORY), so the new 'not queued' branch itself is proven by the host harness (test_mqtt_print_error.py P1), not on the device.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: old-vs-fix host harness test/host/test_mqtt_print_error.py --old-rev 29bfe386b^ PASS (OLD P1 FAIL, FIX all pass, mutant fails P1); stale-reason code dates from 5847521dc (2026-06-14), before TASK-1451. AC2: explained from code (stale lastMqttDisconnectReason printed on espMqttClient refusals below 16 KB max block) and fixed in 29bfe386b (beta.103): connected refusals log 'MQTT packet not queued (connected, maxblk=N)'. Bench .61 beta.103+18e612a: real disconnect still logs its real reason, reconnect burst logged no false 'TCP disconnected'. Not verified on device: the refused-publish branch (no heap pressure on the bench). evaluate.py --quick 91 checks 0 failed.
+<!-- SECTION:FINAL_SUMMARY:END -->
