@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T23:33:00Z'
-updated_date: '2026-11-06T10:23:00Z'
+updated_date: '2026-11-06T14:01:00Z'
 labels:
   - heap
   - soak
@@ -23,7 +23,7 @@ TASK-1544 soak on .63 (Classic + S3 Mini, PSRAM, MQTT connected, beta.95+1fbd5cf
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Full 24 h curve evaluated (linear vs levelling off) when the soak ends ~2026-11-06 15:00
+- [x] #1 Full 24 h curve evaluated (linear vs levelling off) when the soak ends ~2026-11-06 15:00
 - [x] #2 If linear: the growing allocation identified (heap tracing or per-consumer counters) and fixed, red/green
 <!-- AC:END -->
 
@@ -35,4 +35,6 @@ TASK-1544 soak on .63 (Classic + S3 Mini, PSRAM, MQTT connected, beta.95+1fbd5cf
 2026-11-06 fix (Robert chose: share the webhook task, 0 B extra RAM): SATweather.ino no longer creates/deletes a task per fetch; weatherRequestFetch() sets _wxRequested after webhookTaskAvailable(), the persistent webhook sender task waits at most 500 ms per queue receive and then calls weatherWorkerPoll() (webhook.ino); WebhookJob moved off the task stack to g_webhookJob (ADR-053) so the shared 8192 B stack keeps room for the fetch. Split test on .61 before the fix: 10 test webhooks (same HTTPClient chain, persistent task, no DNS) ~0 B (end 71164 -> 70984 -> 70984), so the per-fetch loss is the task create/delete (or DNS). Test tests/test_weather_worker_handoff.py: FIX 10/10 OK; OLD (HEAD SATweather.ino + webhook.ino) S3 FAIL (platformTaskCreatePinned found) and the compiled harness does not build. evaluate --quick 84 passed 0 failed.
 
 2026-11-06 bench .61 beta.106+069ae27 (build OK, RAM 122916 B = +632 B .bss for g_webhookJob, which left the task stack; OTA exit 0, settings unchanged). Weather works on the new path: valid true, fetch_errors 0, forecast filled. Slope run with satweatherinterval=300 (12 fetches/h), REST only, 40 x 60 s samples (scratchpad b103/slope-fix.log): after boot settling the line is flat: from t=6 min slope -9 B/h (70968 -> 70708), from t=10 min -246 B/h (70692 -> 70708), noise band ~580 B; the old code at 12 fetches/h would lose ~1.4-1.6 KB/h (12 x 118-132 B). The same-condition run on the old code was killed by Claude Code's memory reaper after 4 min, so the old-code reference is the .63 soak (25/29 samples -132 B) and the .61 telnet probe (~107 B/fetch). Full suite: 159/166, the 5 failures also fail on the 704cc1e baseline (ota_flash, sat_corrections_index, capture_tool, boiler_unsupported_origin, local_frame_consumers) and 2 (static_integrity, refresh_storm) pass when run alone. Pushed; zip posted #alpha-testing 1568209227644928033. AC1 (24 h curve of the beta.95 soak) stays for the 15:00 read; then put beta.106 on .63 for an overnight curve.
+
+2026-11-06 15:00 .63 (Classic + S3 Mini, beta.95+1fbd5cf): uptime 1(d)-00:03, bootcount 148 (unchanged since the soak start), mqttconnected true, crashlog available:false, reboot_log newest entries '2026-11-05 14:56:34 - reboot cause: Software reset (3)' and '2026-11-05 14:56:01 - ... [OTA] Rebooting...' (the beta.95 flash), nothing after: 24 h without a reboot. Heap: 54660 B at up 3:01 -> 44100 B at up 24:03 = -10560 B in 21.0 h (~503 B/h); minus the -676 B of the unauthorised research probe (TASK-1672) ~470 B/h; linear to the end, no levelling off; maxfreeblock 31732 flat, hd_min_free_heap 19736 unchanged, hd_min_max_block 17396. Matches ~4 x 118-132 B weather-fetch loss per hour (fixed in beta.106, AC2). Next: beta.106 on .63 for an overnight curve to confirm the slope goes to ~0 on the Classic.
 <!-- SECTION:NOTES:END -->
