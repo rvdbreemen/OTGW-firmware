@@ -72,7 +72,7 @@ HOURLY_SECTIONS = (
     ("HTTP PROBES (curl-probes.log)", "curl-probes.log"),
 )
 PROBE_PATHS = (
-    "/", "/index.html", "/v2.js", "/api/v2/health", "/api/v2/device/info",
+    "/", "/index.html", "/FSexplorer.html", "/api/v2/health", "/api/v2/device/info",
     "/api/v2/device/time", "/api/v2/flash/status", "/api/v2/sat/status",
 )
 # TASK-1396: these probe bodies are kept whole (up to the cap), so fields such as

@@ -2,28 +2,24 @@
 """TASK-1534: the /update flash utility page has a way back to the web UI.
 
 A tester on a phone found no way to cancel and return to the main menu from /update. The page
-(UpdateServerIndex in src/OTGW-firmware/updateServerHtml.h) now carries a "Back to the web UI"
+(src/OTGW-firmware/webui/update.html, gzipped into app flash at build time) now carries a "Back to the web UI"
 link at the top of the form page. It is hidden while an update runs (leaving the tab then would
 break the update) and shown again by the Back button after a failed run.
 
-Old-vs-fix: OTGW_UPDATE_H points at another copy, e.g. `git show HEAD~:src/OTGW-firmware/updateServerHtml.h`.
+Old-vs-fix: OTGW_UPDATE_HTML points at another copy of the page source.
 
 Run: python tests/test_update_page_back_link.py
 """
 import os
-import re
 import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-HDR = Path(os.environ.get("OTGW_UPDATE_H", REPO / "src" / "OTGW-firmware" / "updateServerHtml.h"))
+PAGE = Path(os.environ.get("OTGW_UPDATE_HTML", REPO / "src" / "OTGW-firmware" / "webui" / "update.html"))
 
 
 def page():
-    src = HDR.read_text(encoding="utf-8")
-    m = re.search(r'UpdateServerIndex\[\] PROGMEM =\s*R"UPD\((.*?)\)UPD"', src, re.S)
-    assert m, "UpdateServerIndex raw string not found"
-    return m.group(1)
+    return PAGE.read_text(encoding="utf-8")
 
 
 class UpdatePageBackLink(unittest.TestCase):

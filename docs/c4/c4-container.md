@@ -73,9 +73,9 @@ All containers live on a single physical device. There is no Docker, no Kubernet
 - **Type**: Web Application (single-page application, runs in the user's browser)
 - **Technology**: HTML5, CSS3, plain JavaScript (no external scripts or chart library), WebSocket API
 - **Platform**: Modern browser (Chrome, Firefox, Safari: latest + 2 versions back)
-- **Description**: The v2 UI is the only Web UI on the 2.0.0 line (ADR-192). The browser loads `v2.html` (about 51 KB source) from port 80, which pulls in `v2.js` (about 344 KB source, one IIFE) and `v2-bundle.css` (`ds-tokens.css` and `v2.css` concatenated at build time) plus three `.woff2` fonts, all served from LittleFS. The LittleFS image is built from a minified staging copy (ADR-190). The SPA is English-only. It communicates with the firmware through the REST API and the `/ws` WebSocket; a queue around `window.fetch` keeps at most 2 API calls in flight (ADR-184). There is no server-side rendering.
+- **Description**: The v2 UI is the only Web UI on the 2.0.0 line (ADR-192). The browser loads `v2.html.gz` from port 80: one gzipped file that holds `v2.html`, `v2.js` (one IIFE), the stylesheet (`ds-tokens.css` and `v2.css`) and three `.woff2` fonts inline (ADR-215), served from LittleFS. The LittleFS image is built from a minified staging copy (ADR-190). The SPA is English-only. It communicates with the firmware through the REST API and the `/ws` WebSocket; a queue around `window.fetch` keeps at most 2 API calls in flight (ADR-184). There is no server-side rendering.
 - **Components delivered**:
-  - Web Assets (`v2.js`, `v2-bundle.css`, `v2.html`): [c4-component-web-interface.md](./c4-component-web-interface.md)
+  - Web Assets (`v2.js`, `v2.css`, `v2.html`, built into `v2.html.gz`): [c4-component-web-interface.md](./c4-component-web-interface.md)
 - **Capabilities**:
   - Live OpenTherm log viewer (WebSocket feed, search/filter, export)
   - SAT thermostat dashboard (heating curve, PID, presets, BLE sensors)
@@ -97,9 +97,8 @@ All containers live on a single physical device. There is no Docker, no Kubernet
 | File / Path | Purpose |
 |---|---|
 | `/settings.ini` | Device configuration (all `OTGWSettings` fields as JSON); holds the admin and MQTT passwords in cleartext, so reads sit behind `checkHttpAuth()` |
-| `/v2.html`, `/v2.js`, `/v2-bundle.css` | The Web UI (ETag-validated assets) |
-| `/fonts/inter-400.woff2`, `inter-700.woff2`, `jetbrains-mono-400.woff2` | UI fonts (immutable cache) |
-| `/FSexplorer.html`, `/fsexplorer.css`, `/FSexplorer.png` | File explorer / recovery page |
+| `/`, `/v2.html` | The Web UI (`v2.html.gz`, gzip, ETag-validated) |
+| `/FSexplorer.html` | File explorer / recovery page (`FSexplorer.html.gz`) |
 | `/dallas_labels.ini` | DS18B20 sensor address-to-label mappings |
 | `/sat_markers.json`, `/sat_pid_state.json`, `/sat_energy.json`, `/sat_energy_estimate.json`, `/sat_hcr.json` | SAT calibration markers, PID state, energy and heating-curve data |
 | `/dhw_water.json` | Persisted DHW water total (ADR-176) |

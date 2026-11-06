@@ -188,8 +188,8 @@ MAX_RETRY_AFTER_S = 5.0         # cap on honoured Retry-After during readback/sn
 PATTERN_LINE = 64
 
 DEFAULT_PATHS = [
-    # the root (serves v2.html) and the v2 shell (the only Web UI since TASK-1223.12)
-    "/", "/v2.html", "/v2-bundle.css", "/v2.js",
+    # the root and /v2.html both serve v2.html.gz, the only Web UI page (TASK-1640)
+    "/", "/v2.html",
     # chunked REST routes
     "/api/v2/settings", "/api/v2/device/info", "/api/v2/sat/status",
 ]

@@ -13,6 +13,7 @@ superseded_by: null
 related:
   - "ADR-194"
   - "ADR-212"
+  - "ADR-215"
 ---
 # ADR-139 ETag + Bounded max-age as the Project-Wide Cache-Busting Standard for Web UI Static Assets (Retire ?v= Query Versioning and the Chunked Index Rewriter); Align AsyncTCP Task Config with the EMS-ESP32 Blueprint
 
@@ -81,6 +82,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-212
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-06
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-215
     changed_via: adr-kit lifecycle
 ```
 

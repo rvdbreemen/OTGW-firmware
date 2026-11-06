@@ -6,8 +6,8 @@ The filesystem image is built from a staging copy of src/OTGW-firmware/data/.
 These tests check the invariants that make that safe:
 - the source directory is never modified;
 - files that are not browser assets reach the image byte-for-byte;
-- browser assets (.js/.css) get smaller, and the v2-bundle.css inputs
-  (ds-tokens.css, v2.css) are left out;
+- browser assets (.js/.css) get smaller, and are inlined into v2.html.gz and
+  FSexplorer.html.gz (TASK-1640), which replace the page inputs in the image;
 - a minifier that returns nothing fails the step instead of shipping it.
 
 TASK-1225: a guard against CSS comments that close early. A comment text with
@@ -18,6 +18,7 @@ Run: python tests/test_build_staging.py (needs rjsmin + rcssmin from
 requirements-build.txt; the minify tests are skipped without them).
 """
 
+import gzip
 import hashlib
 import io
 import os
@@ -53,22 +54,12 @@ def tree_hashes(root):
     }
 
 
-class TestV2BundleFonts(unittest.TestCase):
-    def test_generated_bundle_retains_native_font_faces(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            data = Path(tmp)
-            tokens = (DATA_DIR / "ds-tokens.css").read_text(encoding="utf-8")
-            (data / "ds-tokens.css").write_text(tokens, encoding="utf-8")
-            (data / "v2.css").write_text("body { color: var(--fg-1); }", encoding="utf-8")
-            with mock.patch.object(build.config, "DATA_DIR", data):
-                build.generate_v2_css_bundle(REPO_ROOT)
-            bundle = (data / "v2-bundle.css").read_text(encoding="utf-8")
-            faces = re.findall(r"@font-face\s*\{([^}]+)\}", bundle)
-            self.assertEqual(len(faces), 3)
-            for font in ("fonts/inter-400.woff2", "fonts/inter-700.woff2",
-                         "fonts/jetbrains-mono-400.woff2"):
-                self.assertTrue(any(font in face for face in faces), font)
-            self.assertEqual((data / "ds-tokens.css").read_text(encoding="utf-8"), tokens)
+# TASK-1640: the pages are shipped as single gzipped files; their inputs are not.
+PAGE_INPUTS = {
+    "v2.html", "v2.js", "v2.css", "ds-tokens.css", "FSexplorer.html", "fsexplorer.css",
+    "fonts/inter-400.woff2", "fonts/inter-700.woff2", "fonts/jetbrains-mono-400.woff2",
+}
+PAGES = {"v2.html.gz", "FSexplorer.html.gz"}
 
 
 @unittest.skipUnless(HAVE_MINIFIERS, "rjsmin/rcssmin not installed (requirements-build.txt)")
@@ -80,7 +71,7 @@ class TestStagingOnRealData(unittest.TestCase):
         cls.tmp = tempfile.TemporaryDirectory()
         cls.staging = Path(cls.tmp.name) / "staging"
         cls.source_before = tree_hashes(DATA_DIR)
-        cls.report = build.stage_data_dir(DATA_DIR, cls.staging, minify=True)
+        cls.report, cls.pages = build.stage_data_dir(DATA_DIR, cls.staging, minify=True)
         cls.source_after = tree_hashes(DATA_DIR)
         cls.staged = tree_hashes(cls.staging)
 
@@ -91,52 +82,53 @@ class TestStagingOnRealData(unittest.TestCase):
     def test_source_untouched(self):
         self.assertEqual(self.source_before, self.source_after)
 
-    def test_excluded_files_not_staged(self):
-        for name in build.STAGING_EXCLUDE:
-            self.assertNotIn(name, self.staged)
+    def test_inputs_replaced_by_gzipped_pages(self):
+        self.assertEqual(set(self.staged), (set(self.source_before) - PAGE_INPUTS) | PAGES)
+        self.assertEqual(set(self.pages), PAGES)
+        for name, size in self.pages.items():
+            self.assertEqual(size, (self.staging / name).stat().st_size, name)
 
-    def test_bundle_inputs_excluded_but_bundle_shipped(self):
-        # TASK-1223.12: no page loads ds-tokens.css or v2.css on its own; v2.html
-        # loads v2-bundle.css, which build.py generates from both.
-        self.assertIn("ds-tokens.css", build.STAGING_EXCLUDE)
-        self.assertIn("v2.css", build.STAGING_EXCLUDE)
-        self.assertIn("ds-tokens.css", self.source_before)
-        self.assertIn("v2-bundle.css", self.staged)
+    def test_pages_are_inline_html(self):
+        for name in PAGES:
+            html = gzip.decompress((self.staging / name).read_bytes()).decode("utf-8")
+            self.assertIn("<style>", html, name)
+            self.assertIn("<script>", html, name)
+            self.assertNotRegex(html, r'<link[^>]*rel="stylesheet"', name)
+            self.assertNotRegex(html, r'<script[^>]*\ssrc=', name)
 
-    def test_nothing_else_dropped(self):
-        expected = set(self.source_before) - set(build.STAGING_EXCLUDE)
-        self.assertEqual(expected, set(self.staged))
+    def test_v2_page_carries_minified_assets(self):
+        html = gzip.decompress((self.staging / "v2.html.gz").read_bytes()).decode("utf-8")
+        # The inlined script is the minified v2.js, not the readable source.
+        self.assertLess(len(html), sum((DATA_DIR / n).stat().st_size for n in ("v2.html", "v2.js", "v2.css", "ds-tokens.css")))
 
-    def test_non_browser_files_byte_identical(self):
+    def test_other_files_byte_identical(self):
         for rel, digest in self.staged.items():
-            if Path(rel).suffix not in build.MINIFY_SUFFIXES:
+            if rel not in PAGES:
                 self.assertEqual(digest, self.source_before[rel], f"{rel} changed in staging")
 
     def test_browser_assets_minified_and_smaller(self):
         minified = {rel for rel, _, _ in self.report}
-        expected = {rel for rel in self.staged if Path(rel).suffix in build.MINIFY_SUFFIXES}
+        expected = {rel for rel in self.source_before if Path(rel).suffix in build.MINIFY_SUFFIXES}
         self.assertEqual(minified, expected)
         for rel, before, after in self.report:
             self.assertGreater(after, 0, rel)
             self.assertLess(after, before, f"{rel} did not shrink")
 
-    def test_minified_css_braces_balanced(self):
-        for rel, _, _ in self.report:
-            if rel.endswith(".css"):
-                text = (self.staging / rel).read_text(encoding="utf-8")
-                self.assertEqual(text.count("{"), text.count("}"), rel)
-
 
 class TestStagingWithoutMinify(unittest.TestCase):
-    def test_no_minify_copies_everything_but_excluded(self):
+    def test_no_minify_still_builds_pages_and_copies_the_rest(self):
         with tempfile.TemporaryDirectory() as tmp:
             staging = Path(tmp) / "staging"
-            report = build.stage_data_dir(DATA_DIR, staging, minify=False)
+            report, pages = build.stage_data_dir(DATA_DIR, staging, minify=False)
             self.assertEqual(report, [])
+            self.assertEqual(set(pages), PAGES)
             source = tree_hashes(DATA_DIR)
-            for name in build.STAGING_EXCLUDE:
-                source.pop(name, None)
-            self.assertEqual(source, tree_hashes(staging))
+            for name in PAGE_INPUTS:
+                source.pop(name)
+            staged = tree_hashes(staging)
+            for name in PAGES:
+                staged.pop(name)
+            self.assertEqual(source, staged)
 
 
 class TestStagingFailsLoud(unittest.TestCase):

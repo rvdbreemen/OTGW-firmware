@@ -11,6 +11,7 @@ supersedes: []
 superseded_by: null
 related:
   - "ADR-212"
+  - "ADR-215"
 topics:
   - "web-server"
   - "backpressure"
@@ -57,6 +58,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-212
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-06
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-215
     changed_via: adr-kit lifecycle
 ```
 

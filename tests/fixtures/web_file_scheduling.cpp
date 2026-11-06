@@ -23,6 +23,7 @@ using PGM_P = const char*;
 #define PROGMEM
 #define RESTDebugTf(...) do {} while (0)
 #define strcmp_P strcmp
+#define snprintf_P snprintf  // webSendGzipPage's ETag (TASK-1640)
 #define strlen_P strlen
 static size_t hostStrlcpy(char* dest, const char* src, size_t cap) {
   const size_t len = strlen(src);
@@ -80,6 +81,7 @@ struct AsyncWebHeader {
 };
 struct AsyncWebParameter { String value() const { return {}; } };
 class AsyncWebServerRequest;
+static unsigned contentEncodingCollisions = 0;  // TASK-1640: Content-Encoding added to one response twice
 enum WebResponseState { RESPONSE_SETUP, RESPONSE_HEADERS, RESPONSE_CONTENT, RESPONSE_WAIT_ACK, RESPONSE_END, RESPONSE_FAILED };
 class AsyncWebServerResponse {
 protected:
@@ -92,6 +94,9 @@ public:
   int code() const { return _code; }
   void setCode(int value) { _code = value; }
   bool addHeader(const String& name, const String& value, bool replace = true) {
+    if (name == "Content-Encoding") {
+      for (const auto& h : _headers) if (h.name() == name) ++contentEncodingCollisions;
+    }
     if (replace) _headers.remove_if([&](const AsyncWebHeader& h) { return h.name() == name; });
     _headers.emplace_back(name, value); return true;
   }
@@ -119,6 +124,7 @@ struct FakeFS {
   FakeFile open(const String& path, const char*) { FakeFile f; if (files.count(path)) { f.ok = true; f.path = path.c_str(); } return f; }
   mutable unsigned existsChecks = 0;
   bool exists(const String& path) const { ++existsChecks; return files.count(path) != 0; }
+  void remove(const String& path) { files.erase(path); }
 } LittleFS;
 struct AsyncClient {
   tcp_pcb control;
@@ -158,6 +164,7 @@ namespace AsyncWebRequestMethod { enum Method { HTTP_GET, HTTP_POST, HTTP_PUT, H
 enum HTTPMethod { HTTP_GET, HTTP_POST, HTTP_PUT, HTTP_DELETE, HTTP_PATCH, HTTP_HEAD, HTTP_OPTIONS, HTTP_ANY };
 struct AsyncWebServer {};
 static unsigned nullBasicResponses = 0, nullFileResponses = 0;
+static std::map<std::string, std::string> requestHeaders;  // request headers the fake client "sent"
 class AsyncWebServerRequest {
   AsyncClient transport;
   std::function<void()> disconnect;
@@ -213,8 +220,14 @@ public:
   AsyncResponseStream* beginResponseStream(const char*, size_t) { return new AsyncResponseStream; }
   const AsyncWebParameter* getParam(const char*, bool) const { return nullptr; }
   bool hasParam(const char*, bool) const { return false; }
-  const AsyncWebHeader* getHeader(const char*) const { return nullptr; }
-  bool hasHeader(const char*) const { return false; }
+  const AsyncWebHeader* getHeader(const char* name) const {
+    static AsyncWebHeader slot("", "");
+    auto it = requestHeaders.find(name);
+    if (it == requestHeaders.end()) return nullptr;
+    slot = AsyncWebHeader(String(it->first.c_str()), String(it->second.c_str()));
+    return &slot;
+  }
+  bool hasHeader(const char* name) const { return requestHeaders.count(name) != 0; }
   String host() const { return {}; }
   String url() const { return {}; }
   size_t contentLength() const { return 0; }
@@ -255,6 +268,22 @@ static std::unique_ptr<AsyncWebServerRequest> sendFile(const char* path = "/asse
   request->start();
   return request;
 }
+#if __has_include("gzip_pages.inc")
+// TASK-1640 (ADR-215): the gzipped-page serving code is sliced out of FSexplorer.ino by
+// tests/test_web_file_scheduling.py and compiled here; only these boundary fakes are ours.
+#define GZIP_PAGES_TEST 1
+#define SETTINGS_FILE "/settings.ini"
+#define DebugTf(...) do {} while (0)
+static const char* fsHashValue = "abc1234";
+const char* getFilesystemHash() { return fsHashValue; }
+bool checkHttpAuth() { return true; }
+static int strcasecmp_P(const char* a, const char* b) {
+  for (; *a && *b; ++a, ++b) if (std::tolower((unsigned char)*a) != std::tolower((unsigned char)*b)) break;
+  return std::tolower((unsigned char)*a) - std::tolower((unsigned char)*b);
+}
+const String& contentType(String& filename) { filename = "text/plain"; return filename; }
+#include "gzip_pages.inc"
+#endif
 static void reset() {
   EXPECT(webFileInFlight == 0); EXPECT(restInFlight == 0); EXPECT(LittleFS.openNow == 0);
   LittleFS = {}; LittleFS.files["/asset.css"] = {}; LittleFS.files["/other.css"] = {};
@@ -473,6 +502,109 @@ static void small_file_buffer_and_total_heap_cap() {
   freeHeap = 64000; a->cancel(); b->poll(); EXPECT(b->wire.status == 200); EXPECT(webFileInFlight == 1);
   b->cancel(); reset();
 }
+#ifdef GZIP_PAGES_TEST
+static std::unique_ptr<AsyncWebServerRequest> serve(const std::function<void()>& handler, const char* ifNoneMatch = nullptr) {
+  auto request = std::make_unique<AsyncWebServerRequest>();
+  requestHeaders.clear();
+  if (ifNoneMatch) requestHeaders["If-None-Match"] = ifNoneMatch;
+  contentEncodingCollisions = 0;
+  webBeginRequest(request.get());
+  handler();
+  request->start();
+  requestHeaders.clear();
+  return request;
+}
+static void files(std::initializer_list<const char*> names) {
+  reset(); LittleFS.files.clear();
+  for (const char* name : names) LittleFS.files[name] = {};
+}
+static void gzip_page_etag_and_304() {
+  files({"/v2.html.gz", "/v2.html", "/FSexplorer.html.gz"});
+  { auto r = serve([&] { sendIndex(currentRequest); });
+    EXPECT(r->wire.status == 200); EXPECT(r->wire.path == "/v2.html.gz");
+    EXPECT(r->wire.type == "text/html; charset=UTF-8");
+    EXPECT(r->wire.headers.count("Content-Encoding") == 1); EXPECT(r->wire.headers["Content-Encoding"] == "gzip");
+    EXPECT(contentEncodingCollisions == 0);
+    EXPECT(r->wire.headers["ETag"] == "\"abc1234-/v2.html.gz\""); EXPECT(r->wire.headers["Cache-Control"] == "no-cache"); }
+  const unsigned opens = LittleFS.opens;
+  { auto r = serve([&] { sendIndex(currentRequest); }, "\"abc1234-/v2.html.gz\"");
+    EXPECT(r->wire.status == 304); EXPECT(LittleFS.opens == opens);
+    EXPECT(r->wire.headers.count("Content-Encoding") == 0); EXPECT(r->wire.headers["ETag"] == "\"abc1234-/v2.html.gz\""); }
+  // A validator of another page or of another build must not give a 304.
+  { auto r = serve([&] { sendIndex(currentRequest); }, "\"abc1234-/FSexplorer.html.gz\"");
+    EXPECT(r->wire.status == 200); EXPECT(r->wire.path == "/v2.html.gz"); }
+  { auto r = serve([&] { sendIndex(currentRequest); }, "\"zzz9999-/v2.html.gz\"");
+    EXPECT(r->wire.status == 200); EXPECT(r->wire.path == "/v2.html.gz"); }
+}
+static void plain_page_fallback_from_an_older_filesystem() {
+  // New firmware on a filesystem from before ADR-215: plain pages, no .gz files.
+  files({"/v2.html", "/FSexplorer.html"});
+  { auto r = serve([&] { sendIndex(currentRequest); });
+    EXPECT(r->wire.status == 200); EXPECT(r->wire.path == "/v2.html");
+    EXPECT(r->wire.type == "text/html; charset=UTF-8");
+    EXPECT(r->wire.headers.count("Content-Encoding") == 0); EXPECT(contentEncodingCollisions == 0);
+    EXPECT(r->wire.headers["ETag"] == "\"abc1234-/v2.html\""); }
+  { auto r = serve([&] { sendFSexplorerPage(); });
+    EXPECT(r->wire.status == 200); EXPECT(r->wire.path == "/FSexplorer.html");
+    EXPECT(r->wire.headers.count("Content-Encoding") == 0); }
+  { auto r = serve([&] { sendIndex(currentRequest); }, "\"abc1234-/v2.html\"");
+    EXPECT(r->wire.status == 304); }
+  // The gzipped page wins when both exist.
+  files({"/v2.html", "/v2.html.gz"});
+  { auto r = serve([&] { sendIndex(currentRequest); });
+    EXPECT(r->wire.path == "/v2.html.gz"); EXPECT(r->wire.headers["Content-Encoding"] == "gzip"); }
+}
+static void recovery_page_then_upload_prompt() {
+  files({"/FSexplorer.html.gz"});
+  { auto r = serve([&] { sendIndex(currentRequest); });
+    EXPECT(r->wire.status == 200); EXPECT(r->wire.path == "/FSexplorer.html.gz");
+    EXPECT(r->wire.headers["Content-Encoding"] == "gzip"); EXPECT(contentEncodingCollisions == 0); }
+  files({"/settings.ini"});
+  { auto r = serve([&] { sendIndex(currentRequest); });
+    EXPECT(r->wire.status == 200); EXPECT(r->wire.path.empty());  // the PROGMEM upload prompt
+    EXPECT(r->wire.type == "text/html; charset=UTF-8"); EXPECT(r->wire.headers.count("Content-Encoding") == 0); }
+}
+static void handle_file_keeps_serving_on_an_older_filesystem() {
+  const char* names[] = {"/settings.ini", "/dallas_labels.ini", "/version.hash"};
+  // Older filesystem: plain /FSexplorer.html only. The files must come back, not the prompt.
+  files({"/FSexplorer.html", "/v2.html", "/settings.ini", "/dallas_labels.ini", "/version.hash"});
+  for (const char* name : names) {
+    bool handled = false;
+    auto r = serve([&] { handled = handleFile(String(name)); });
+    EXPECT(handled); EXPECT(r->wire.status == 200); EXPECT(r->wire.path == name);
+    EXPECT(r->wire.headers.count("Content-Encoding") == 0);
+  }
+  // Filesystem with the gzipped recovery page.
+  files({"/FSexplorer.html.gz", "/settings.ini"});
+  { bool handled = false; auto r = serve([&] { handled = handleFile(String("/settings.ini")); });
+    EXPECT(handled); EXPECT(r->wire.path == "/settings.ini"); }
+  // No recovery page at all: the upload prompt.
+  files({"/settings.ini"});
+  { bool handled = false; auto r = serve([&] { handled = handleFile(String("/settings.ini")); });
+    EXPECT(handled); EXPECT(r->wire.status == 200); EXPECT(r->wire.path.empty()); }
+  // A missing file is still a 404 for the caller.
+  files({"/FSexplorer.html"});
+  { bool handled = true; auto r = serve([&] { handled = handleFile(String("/nothing.ini")); });
+    EXPECT(!handled); }
+}
+static void progmem_gzip_page_etag_and_encoding() {
+  static const uint8_t gz[] = {0x1f, 0x8b, 0x08, 0x00};
+  reset();
+  const std::string etag = std::string("\"") + _VERSION_GITHASH + "-/update\"";
+  { auto r = serve([&] { webSendGzipPage(PSTR("text/html; charset=UTF-8"), gz, sizeof(gz), "/update"); });
+    EXPECT(r->wire.status == 200); EXPECT(r->wire.type == "text/html; charset=UTF-8");
+    EXPECT(r->wire.headers["Content-Encoding"] == "gzip"); EXPECT(contentEncodingCollisions == 0);
+    EXPECT(r->wire.headers["ETag"] == etag); EXPECT(r->wire.headers["Cache-Control"] == "no-cache"); }
+  { auto r = serve([&] { webSendGzipPage(PSTR("text/html; charset=UTF-8"), gz, sizeof(gz), "/update"); }, etag.c_str());
+    EXPECT(r->wire.status == 304); EXPECT(r->wire.headers.count("Content-Encoding") == 0);
+    EXPECT(r->wire.headers["ETag"] == etag); }
+  { auto r = serve([&] { webSendGzipPage(PSTR("text/html; charset=UTF-8"), gz, sizeof(gz), "/update"); }, "\"other-/update\"");
+    EXPECT(r->wire.status == 200); }
+  { auto r = serve([&] { webSendGzipPage(PSTR("text/html; charset=UTF-8"), gz, sizeof(gz)); }, etag.c_str());
+    EXPECT(r->wire.status == 200); EXPECT(r->wire.headers.count("ETag") == 0);
+    EXPECT(r->wire.headers["Content-Encoding"] == "gzip"); EXPECT(contentEncodingCollisions == 0); }
+}
+#endif
 int main() {
   waits_then_streams_and_preserves_headers(); fifo_queue_cap_and_cancellation();
   low_memory_deadline_wrap_and_safety(); errors_bounds_and_response_ownership(); deferred_metadata_and_file_changes(); reset();
@@ -480,6 +612,11 @@ int main() {
   six_native_connections_progress_without_polling();
   pending_identity_never_hides_tx_or_unrelated_pcbs(); measured_queue_lifecycle_and_reset(); reset();
   small_file_buffer_and_total_heap_cap();
+#ifdef GZIP_PAGES_TEST
+  gzip_page_etag_and_304(); plain_page_fallback_from_an_older_filesystem(); recovery_page_then_upload_prompt();
+  handle_file_keeps_serving_on_an_older_filesystem(); progmem_gzip_page_etag_and_encoding(); reset();
+  std::printf("gzip pages: production serveGzipPage, handleFile and webSendGzipPage compiled\n");
+#endif
   std::printf("%s: production webSendFile scheduling (%d failures)\n", failures ? "FAIL" : "PASS", failures);
   return failures ? 1 : 0;
 }

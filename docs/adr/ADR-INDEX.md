@@ -220,3 +220,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-212 | Accepted | - | Native loading. |
 | ADR-213 | Accepted | - | Opt-in, local, RAM (random-access memory) only. |
 | ADR-214 | Accepted | - | Ids are a hash, not a table. |
+| ADR-215 | Accepted | - | One file per page. |

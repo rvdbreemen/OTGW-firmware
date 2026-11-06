@@ -1474,9 +1474,7 @@ These routes are served directly by the web server (not under `/api`):
 
 | Route | Description |
 |-------|-------------|
-| `/` or `/index` or `/index.html` | Web UI (`v2.html`); `FSexplorer.html` when `v2.html` is missing |
-| `/v2.html`, `/v2.js`, `/v2-bundle.css` | Web UI shell, script and stylesheet |
-| `/fsexplorer.css` | FSexplorer stylesheet |
+| `/` or `/index` or `/index.html` or `/v2.html` | Web UI (`v2.html.gz`, gzipped, one file); FSexplorer when it is missing |
 | `/pic` | PIC firmware upload page |
 | `/upload` (POST) | File upload handler |
 | `/ReBoot` | Reboot the ESP8266 |

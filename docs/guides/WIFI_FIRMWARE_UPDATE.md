@@ -108,6 +108,15 @@ Unlike phones and PCs, the unit has room for only one firmware, so there is no a
 
 On a unit that is still on the old layout, update the firmware first and the filesystem second. Older firmware looks for the classic `index.html` at `/`. A new filesystem on old firmware therefore shows the File Explorer there; the web UI is still at `/v2.html`.
 
+### Firmware and web files from different releases (ADR-215)
+
+From the release that serves each page as one gzipped file (`v2.html.gz`, `FSexplorer.html.gz`), the firmware and the web files can be one step apart. What you see depends on the order:
+
+- **Firmware first, web files not yet** (the order the page and `ota_flash.py` use). The unit still holds the plain `v2.html` and `FSexplorer.html` from the older release. The new firmware serves them as they are, so the web UI opens as before and the settings, Dallas labels and `version.hash` files stay readable. Install the web files to get the faster single-file page.
+- **Web files first, firmware not yet.** The old firmware looks for the plain `v2.html` and `FSexplorer.html`, which the new image no longer holds. `/` answers "File not found" and `/FSexplorer.html` shows the upload prompt. `/update` still works, because it lives in the firmware: open it and install the firmware.
+
+In both cases finish with the other update; the unit is only fully on the new release when both are current.
+
 ## 5. Boards with 8 MB flash
 
 The release images use the 4 MB layout on every board, also on a module with 8 MB flash. Such a unit updates through safeboot like any other, and the extra flash stays unused.

@@ -53,10 +53,10 @@ Over budget gives `429` with `application/problem+json` (RFC 9457; `retry_after`
 
 ### File Serving & Caching Strategy (ADR-139)
 
-- **Stable URLs, ETag revalidation**: `serveVersionedAsset()` sends `ETag: "<fsHash>-<path>"` (filesystem hash plus served path) and `Cache-Control: no-cache`. A matching `If-None-Match` gets 304; a reflash or filesystem OTA changes the hash. Missing files return a no-cache 404 without validator. There is no `?v=` query versioning and no HTML rewriting.
-- **Immutable fonts**: `serveImmutableAsset()` serves the three `.woff2` fonts with `max-age=31536000, immutable`.
+- **Stable URLs, ETag revalidation**: `serveGzipPage()` sends `ETag: "<fsHash>-<path>"` (filesystem hash plus served path) and `Cache-Control: no-cache`. A matching `If-None-Match` gets 304; a reflash or filesystem OTA changes the hash. A page that is on neither form (gzipped or plain) is not answered by it: the caller falls back to the recovery page. There is no `?v=` query versioning and no HTML rewriting.
+- **One gzipped file per page (ADR-215)**: `v2.html.gz` and `FSexplorer.html.gz` carry their CSS, JavaScript and fonts inline and are served with `Content-Encoding: gzip`. A filesystem from before ADR-215 has the plain `/v2.html` and `/FSexplorer.html`; `serveGzipPage()` serves those as they are, without `Content-Encoding`. The firmware update pages (`/update`) are gzipped PROGMEM arrays sent by `webSendGzipPage()` with `ETag: "<firmware hash>-/update"`.
 - **Streaming**: `webSendFile()` serves from flash through `AsyncFileResponse`; files are never loaded into RAM.
-- **Shell**: only the v2 UI ships (`v2.html`, `v2.js`, `v2-bundle.css`, ADR-192). `sendIndex()` falls back to `/FSexplorer.html` when `/v2.html` is missing.
+- **Shell**: only the v2 UI ships (`v2.html.gz`, ADR-192, ADR-215). `sendIndex()` falls back to the recovery page (`sendFSexplorerPage()`) when neither `/v2.html.gz` nor `/v2.html` exists.
 
 ## Code Elements
 
@@ -171,7 +171,7 @@ Over budget gives `429` with `application/problem+json` (RFC 9457; `retry_after`
 ### File Serving (FSexplorer.ino)
 
 #### `void startWebserver()`
-- Registers `/`, `/index`, `/index.html` (`sendIndex`, behind `checkHttpAuth()`), `/FSexplorer.png` (`serveStatic`), `/fsexplorer.css`, `/v2.html`, `/v2.js`, `/v2-bundle.css`, the three font routes, `/pic` (`upgradepic`, `HAS_PIC`), and the `/api` route (`processAPI` with body capture via `webCaptureBody`). Calls `server.begin()`. A failed port-80 bind is retried every 5 s by `handleWebserverListener()` (TASK-1130).
+- Registers `/`, `/index`, `/index.html` (`sendIndex`, behind `checkHttpAuth()`), `/v2.html` (also `sendIndex`), `/settings-help.json` (from PROGMEM), `/pic` (`upgradepic`, `HAS_PIC`), and the `/api` route (`processAPI` with body capture via `webCaptureBody`). Calls `server.begin()`. A failed port-80 bind is retried every 5 s by `handleWebserverListener()` (TASK-1130).
 
 #### `void setupFSexplorer()`
 - Registers `/FSexplorer.html` and `/FSexplorer`, the deprecated unversioned `/api/firmwarefilelist` and `/api/listfiles`, `POST /upload`, `/ReBoot` and `/ResetWireless` (both `checkHttpAuth()`), the OTA handler (`httpUpdater.setup(&server)`, which also registers `POST /safeboot`), and the `onNotFound` catch-all (routes `/api/*` to `processAPI`, anything else to `handleFile()`, else 404).
@@ -239,10 +239,7 @@ Over budget gives `429` with `application/problem+json` (RFC 9457; `retry_after`
 
 | Method | Path | Handler | Purpose |
 |--------|------|---------|---------|
-| GET | `/`, `/index`, `/index.html` | sendIndex | v2 UI shell (auth, ETag); falls back to FSexplorer |
-| GET | `/v2.html`, `/v2.js`, `/v2-bundle.css`, `/fsexplorer.css` | serveVersionedAsset | ETag + `no-cache` assets |
-| GET | `/fonts/*.woff2` (inter-400, inter-700, jetbrains-mono-400) | serveImmutableAsset | One-year immutable cache |
-| GET | `/FSexplorer.png` | serveStatic | Icon |
+| GET | `/`, `/index`, `/index.html`, `/v2.html` | sendIndex | v2 UI page `v2.html.gz` (auth, ETag, gzip); plain `v2.html` on an older filesystem; falls back to FSexplorer |
 | GET | `/FSexplorer.html`, `/FSexplorer` | sendFSexplorerHtml | Recovery file explorer |
 | POST | `/upload` | handleFileUpload | Upload to LittleFS |
 | ANY | `/ReBoot`, `/ResetWireless` | reBootESP, resetWirelessButton | Reboot, reset WiFi (auth) |

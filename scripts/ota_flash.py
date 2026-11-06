@@ -21,12 +21,18 @@ an interrupted upload leaves the later blocks of large files old, so they read b
 (seen on .63: v2.js cut at 64 KB of 251 KB, the v2 UI does not start; a clean re-upload
 served it whole). After the hash the script therefore stops with an error when
 device/info reports fsupdateincomplete (firmware with TASK-1495; an absent field is not
-checked) or when GET /v2.js returns fewer bytes than its Content-Length or none at all.
-Then upload the filesystem again: rerun with --no-app.
+checked) or when GET / (the gzipped web UI, v2.html.gz) returns fewer bytes than its
+Content-Length or none at all. Then upload the filesystem again: rerun with --no-app.
+
+--webui (TASK-1640, debugging): build the gzipped web pages from src/OTGW-firmware/data/
+(scripts/webui_pages.py, the same inlining as the filesystem build, without minifying)
+and upload them to the running unit through /upload, without flashing an image. The
+filesystem hash, and so the page ETag, does not change: reload with the cache bypassed.
 
 Usage:
   python scripts/ota_flash.py --host 192.168.88.61 [--app build/...ino.bin] [--fs build/...littlefs.bin]
                               [--password <admin pw>]
+  python scripts/ota_flash.py --host 192.168.88.61 --webui [--password <admin pw>]
 --no-fs flashes the app only, --no-app the filesystem only.
 Without --app/--fs it picks the newest esp32-combo .ino.bin and .littlefs.bin in build/.
 Stdlib only.
@@ -34,6 +40,7 @@ Stdlib only.
 import argparse
 import base64
 import glob
+import gzip
 import http.client
 import json
 import os
@@ -43,6 +50,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import zlib
 
 BOUNDARY = "----otgwota7MA4YWxkTrZu0gW"
 FS_VERIFY_TIMEOUT = 120
@@ -70,11 +78,12 @@ def _post(host, path, password, body=b"", ctype=None, timeout=30):
         return r.status, r.read()
 
 
-def _multipart(path):
+def _multipart(path, field="update", data=None):
     name = os.path.basename(path)
-    with open(path, "rb") as f:
-        data = f.read()
-    head = (f"--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"update\"; filename=\"{name}\"\r\n"
+    if data is None:
+        with open(path, "rb") as f:
+            data = f.read()
+    head = (f"--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"{field}\"; filename=\"{name}\"\r\n"
             "Content-Type: application/octet-stream\r\n\r\n").encode()
     tail = f"\r\n--{BOUNDARY}--\r\n".encode()
     return head + data + tail, len(data)
@@ -126,7 +135,7 @@ def flash_fs(host, password, fs):
     try:
         st, out = _post(host, f"/update?cmd=100&size={n}", password, body,
                         f"multipart/form-data; boundary={BOUNDARY}", timeout=180)
-        print("  ->", st, out[:120].decode("latin-1", "replace").strip())
+        print("  ->", st, f"({len(out)} bytes)")  # the success page is gzipped (TASK-1640)
     except urllib.error.HTTPError:
         raise
     except (http.client.HTTPException, OSError) as e:
@@ -145,11 +154,18 @@ def flash_fs(host, password, fs):
                          f"{want or 'a new hash'} (was {old})")
     print(f"  filesystem confirmed: /version.hash {old} -> {h}")
     _wait(lambda: _main_up(host), "main firmware after filesystem update", 120)
-    _check_fs_complete(host)
+    _check_fs_complete(host, password)
 
 
-def _check_fs_complete(host):
-    """/version.hash is in the first blocks; a large file shows whether the rest arrived."""
+def _get_raw(host, path, password, timeout=60):
+    """GET path as sent (the gzipped pages stay gzipped); returns (body, Content-Length, Content-Encoding)."""
+    req = urllib.request.Request(f"http://{host}{path}", headers=_headers(host, password))
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read(), r.headers.get("Content-Length"), r.headers.get("Content-Encoding")
+
+
+def _check_fs_complete(host, password=""):
+    """/version.hash is in the first blocks; the largest file shows whether the rest arrived."""
     try:
         dev = _get_json(host, "/api/v2/device/info")["device"]
     except Exception:
@@ -159,23 +175,55 @@ def _check_fs_complete(host):
                          "upload the filesystem again")
     for attempt in range(1, 4):
         try:
-            with urllib.request.urlopen(f"http://{host}/v2.js", timeout=60) as r:
-                n = len(r.read())
-                length = r.headers.get("Content-Length")
+            body, length, encoding = _get_raw(host, "/", password)
+            n = len(body)
             break
         except http.client.IncompleteRead as e:
             got = len(e.partial)
-            raise SystemExit(f"/v2.js served short ({got} of {got + (e.expected or 0)} bytes): the filesystem "
-                             "image is incomplete; upload the filesystem again")
+            raise SystemExit(f"/ (v2.html.gz) served short ({got} of {got + (e.expected or 0)} bytes): the "
+                             "filesystem image is incomplete; upload the filesystem again")
         except urllib.error.HTTPError as e:
             # the file-serve gate (ADR-147) answers 503 under load: try again
             if attempt == 3:
-                raise SystemExit(f"/v2.js could not be checked (HTTP {e.code})")
+                raise SystemExit(f"/ (v2.html.gz) could not be checked (HTTP {e.code})")
             time.sleep(3)
     if n == 0:
-        raise SystemExit("/v2.js is empty: the filesystem image is incomplete; upload the filesystem "
-                         "again")
-    print(f"  /v2.js complete: {n} bytes" + (f" (Content-Length {length})" if length else ""))
+        raise SystemExit("/ (v2.html.gz) is empty: the filesystem image is incomplete; upload the "
+                         "filesystem again")
+    # A missing or stale v2.html.gz makes the firmware answer with a plain page (the old
+    # v2.html) or the recovery page: only a gzip body that decompresses proves the new image.
+    if (encoding or "").lower() != "gzip":
+        raise SystemExit("/ was not served as v2.html.gz (no Content-Encoding: gzip): the filesystem "
+                         "image is incomplete or stale; upload the filesystem again")
+    try:
+        html = gzip.decompress(body)
+    except (OSError, EOFError, zlib.error) as e:
+        raise SystemExit(f"/ (v2.html.gz) is not valid gzip ({e}): the filesystem image is incomplete; "
+                         "upload the filesystem again")
+    print(f"  / (v2.html.gz) complete: {n} bytes, {len(html)} bytes unpacked"
+          + (f" (Content-Length {length})" if length else ""))
+
+
+# Where each gzipped page is served, to read it back after a --webui push.
+WEBUI_ROUTES = {"v2.html.gz": "/", "FSexplorer.html.gz": "/FSexplorer.html"}
+
+
+def push_webui(host, password):
+    """Build the gzipped pages from data/ and upload them through /upload (TASK-1640)."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sys.path.insert(0, os.path.join(root, "scripts"))
+    import webui_pages
+    pages, _ = webui_pages.build_pages(os.path.join(root, "src", "OTGW-firmware", "data"))
+    for name, data in pages.items():
+        body, n = _multipart(name, field="upload", data=data)
+        st, _ = _post(host, "/upload?path=/", password, body, f"multipart/form-data; boundary={BOUNDARY}",
+                      timeout=120)
+        served, _, _ = _get_raw(host, WEBUI_ROUTES[name], password)
+        if served != data:
+            raise SystemExit(f"{name}: uploaded {n} bytes, but {WEBUI_ROUTES[name]} serves {len(served)} "
+                             "different bytes")
+        print(f"  {name}: {n} bytes uploaded, served at {WEBUI_ROUTES[name]}")
+    print("web pages pushed; reload with the cache bypassed (the ETag did not change)")
 
 
 def flash_app(host, password, app):
@@ -221,7 +269,12 @@ def main(argv=None):
     ap.add_argument("--password", default="")
     ap.add_argument("--no-app", action="store_true")
     ap.add_argument("--no-fs", action="store_true")
+    ap.add_argument("--webui", action="store_true", help="push the gzipped web pages only (debugging)")
     a = ap.parse_args(argv)
+    if a.webui:
+        print("running:", _main_up(a.host))
+        push_webui(a.host, a.password)
+        return 0
     app = None if a.no_app else (a.app or newest("build/*esp32-combo*.ino.bin"))
     fs = None if a.no_fs else (a.fs or newest("build/*esp32-combo*.littlefs.bin"))
     if not app and not fs:

@@ -6478,7 +6478,7 @@
       "path": "ADR-190-build-the-littlefs-image-from-a-minified-staging-copy-of-the-web-assets.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-23",
+      "date": "2026-11-06",
       "decision_summary": "build.py builds the LittleFS image from a staging copy of src/OTGW-firmware/data/ in which the .js and .css files are...",
       "topics": [
         "build-pipeline",
@@ -8113,6 +8113,73 @@
         "verification": [
           "test/host/testdiagrecorder.py includes the real diagRecorderStuff.h and covers the id function, repeat types, the 255 cut marker and the 9984 B start boundary (cases F1, F7, F9, F11).",
           "The collision check over the real name lists is owned by TASK-1666 and TASK-1667. Until it exists this ADR is guideline-level per ADR-080."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-215",
+      "title": "Serve each web page as one gzipped file with an ETag (partly supersedes ADR-139, ADR-190 and ADR-192)",
+      "path": "ADR-215-serve-each-web-page-as-one-gzipped-file-with-an-etag.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-06",
+      "decision_summary": "One file per page.",
+      "topics": [
+        "caching",
+        "gzip",
+        "littlefs",
+        "web-server",
+        "web-ui"
+      ],
+      "aliases": [
+        "gzip web ui",
+        "inline web assets",
+        "single gzipped page"
+      ],
+      "components": [
+        "build.py stage_data_dir (filesystem staging)",
+        "FSexplorer.ino serveGzipPage",
+        "scripts/platformio_webui.py (update page header)",
+        "scripts/webui_pages.py (page inlining and gzip)",
+        "webServerCompat.h webSendGzipPage"
+      ],
+      "symbols": [
+        "sendFSexplorerPage",
+        "sendIndex",
+        "serveGzipPage",
+        "webSendGzipPage"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Ship each page in webuipages.PAGES as one gzipped file, with no local stylesheet, script or font reference left in it.",
+          "Serve every page with Content-Encoding: gzip and an ETag, and answer a matching If-None-Match with 304 and no body.",
+          "Fail the build when a page references a local file that does not exist.",
+          "Keep FSexplorer self-contained: it must not depend on any v2 file."
+        ],
+        "must_not": [
+          "Serve a .gz file through a path where the library also adds Content-Encoding (a .gz sibling of a requested plain name).",
+          "Commit the generated updateServerHtml.h."
+        ],
+        "exceptions": [
+          "favicon.ico stays a separate file: browsers request it on their own."
+        ],
+        "verification": [
+          "tests/testwebuipages.py: inlining, missing-file failure, script-end escaping, the real pages without local references, the PROGMEM header round-trip.",
+          "tests/testbuildstaging.py: the staging copy holds the gzipped pages and no inlined inputs, and passes the LittleFS budget.",
+          "tests/testwebfilescheduling.py: compiles the real serveGzipPage, sendIndex, handleFile and webSendGzipPage: ETag - , 304 on a matching If-None-Match, Content-Encoding: gzip exactly once, the plain-page fallback and the upload-prompt gate...",
+          "Bench: first load 200 with the ETag, reload 304, stale ETag 200; no file 503s with two tabs."
         ]
       },
       "scope": {
@@ -12000,6 +12067,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-139",
+      "target": "ADR-215",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-140",
       "target": "ADR-077",
       "type": "related",
@@ -12368,6 +12441,12 @@
     {
       "source": "ADR-147",
       "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-147",
+      "target": "ADR-215",
       "type": "related",
       "resolved": true
     },
@@ -12852,6 +12931,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-165",
+      "target": "ADR-215",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-166",
       "target": "ADR-126",
       "type": "related",
@@ -13308,6 +13393,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-188",
+      "target": "ADR-215",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-189",
       "target": "ADR-184",
       "type": "related",
@@ -13352,6 +13443,12 @@
     {
       "source": "ADR-190",
       "target": "ADR-194",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-190",
+      "target": "ADR-215",
       "type": "related",
       "resolved": true
     },
@@ -13442,6 +13539,12 @@
     {
       "source": "ADR-192",
       "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-192",
+      "target": "ADR-215",
       "type": "related",
       "resolved": true
     },
@@ -14154,6 +14257,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-212",
+      "target": "ADR-215",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-213",
       "target": "ADR-030",
       "type": "related",
@@ -14240,6 +14349,54 @@
     {
       "source": "ADR-214",
       "target": "ADR-213",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-139",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-147",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-188",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-190",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-192",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-212",
       "type": "related",
       "resolved": true
     }

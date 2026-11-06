@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<!-- TASK-1640: build.py inlines these stylesheets (and their fonts) and v2.js into one
+     gzipped v2.html.gz (scripts/webui_pages.py), so the device serves the UI as one file. -->
+<link rel="stylesheet" href="ds-tokens.css">
+<link rel="stylesheet" href="v2.css">
 <title>OTGW firmware</title>
 <script>
   // Pre-paint theme (localStorage key otgw-theme) to avoid flash-of-wrong-theme.
@@ -16,136 +20,6 @@
     }catch(e){}
   })();
 </script>
-<script>
-  // Observe parser-discovered requests before their events can fire. Recovery
-  // creates requests only after an error; normal startup is entirely native.
-  (function(){
-    var MAX_RETRIES = 8;
-    var fonts = {
-      'fonts/inter-400.woff2': { family: 'Inter', weight: '400' },
-      'fonts/inter-700.woff2': { family: 'Inter', weight: '700' },
-      'fonts/jetbrains-mono-400.woff2': { family: 'JetBrains Mono', weight: '400' }
-    };
-    var paths = ['v2-bundle.css', 'v2.js', 'fonts/inter-400.woff2',
-      'fonts/inter-700.woff2', 'fonts/jetbrains-mono-400.woff2'];
-    var record = window.otgwAssetLoad = {
-      mode: 'native', pageId: performance.timeOrigin || Date.now(),
-      complete: false, cleanFirstAttempt: false, retryCount: 0, failureCount: 0, assets: {}
-    };
-    var started = {};
-    paths.forEach(function(path){
-      record.assets[path] = { attempts: 1, retries: 0, state: 'loading', lastElapsedMs: 0 };
-      started[path] = performance.now();
-    });
-    function emit(name, path, cause, delay){
-      var a = record.assets[path];
-      var detail = { pageId: record.pageId, asset: path,
-        attempt: a.attempts + (name === 'asset_retry' ? 1 : 0),
-        retry: a.retries, elapsedMs: a.lastElapsedMs };
-      if (cause) detail.cause = cause;
-      if (delay !== undefined) detail.delayMs = delay;
-      if (name === 'asset_failed') console.error(name, detail);
-      else if (name === 'asset_retry') console.warn(name, detail);
-      else console.info(name, detail);
-    }
-    function summarize(){
-      if (record.complete) return;
-      var allLoaded = true;
-      for (var i = 0; i < paths.length; i++){
-        var state = record.assets[paths[i]].state;
-        if (state === 'loading' || state === 'pending') return;
-        if (state !== 'loaded') allLoaded = false;
-      }
-      record.complete = true;
-      record.cleanFirstAttempt = allLoaded && record.retryCount === 0 && record.failureCount === 0;
-      // Emit a snapshot, not a mutable console reference to the public record.
-      var summary = { mode: record.mode, pageId: record.pageId, complete: record.complete,
-        cleanFirstAttempt: record.cleanFirstAttempt, retryCount: record.retryCount,
-        failureCount: record.failureCount, assets: {} };
-      paths.forEach(function(path){
-        var a = record.assets[path];
-        summary.assets[path] = { attempts: a.attempts, retries: a.retries,
-          state: a.state, lastElapsedMs: a.lastElapsedMs };
-      });
-      console.info('asset_load_summary', summary);
-    }
-    function showError(path){
-      function show(){
-        var error = document.createElement('p');
-        error.setAttribute('role', 'alert');
-        error.textContent = 'Unable to load ' + path + '. Reload this page to retry.';
-        document.body.insertBefore(error, document.body.firstChild);
-      }
-      if (document.body) show();
-      else document.addEventListener('DOMContentLoaded', show, { once: true });
-    }
-    function retry(path){
-      var a = record.assets[path];
-      a.attempts++;
-      a.state = 'loading';
-      started[path] = performance.now();
-      var attempt = a.attempts;
-      if (fonts[path]){
-        var font = fonts[path];
-        try {
-          var face = new FontFace(font.family, "url('" + path + "') format('woff2')",
-            { weight: font.weight, style: 'normal', display: 'swap' });
-          face.load().then(function(loaded){
-            if (a.state !== 'loading' || a.attempts !== attempt) return;
-            document.fonts.add(loaded);
-            settled(path, true, attempt);
-          }).catch(function(){ settled(path, false, attempt); });
-        } catch (e) { settled(path, false, attempt); }
-        return;
-      }
-      var node = document.createElement(path === 'v2.js' ? 'script' : 'link');
-      if (path === 'v2.js') { node.src = path; node.defer = true; }
-      else { node.rel = 'stylesheet'; node.href = path; }
-      node.onload = function(){ settled(path, true, attempt, node); };
-      node.onerror = function(){ settled(path, false, attempt, node); };
-      document.head.appendChild(node);
-    }
-    function settled(path, ok, attempt, node){
-      var a = record.assets[path];
-      // A stale/duplicate native or recovery event cannot settle another attempt.
-      if (!a || a.state !== 'loading' || a.attempts !== attempt) return;
-      a.lastElapsedMs = Math.round(performance.now() - started[path]);
-      if (fonts[path] && (!window.FontFace || !document.fonts)){
-        if (!ok) record.failureCount++;
-        a.state = 'skipped';
-        summarize();
-        return;
-      }
-      if (ok){
-        a.state = 'loaded';
-        if (a.retries) emit('asset_recovered', path);
-        summarize();
-        return;
-      }
-      record.failureCount++;
-      if (node && attempt > 1 && node.parentNode) node.parentNode.removeChild(node);
-      if (a.retries === MAX_RETRIES){
-        a.state = 'failed';
-        emit('asset_failed', path, 'load_error');
-        showError(path);
-        summarize();
-        return;
-      }
-      a.state = 'pending';
-      a.retries++;
-      record.retryCount++;
-      var delay = 200 * a.retries;
-      emit('asset_retry', path, 'load_error', delay);
-      setTimeout(function(){ retry(path); }, delay);
-    }
-    window.otgwAssetEvent = settled;
-  })();
-</script>
-<link id="v2Stylesheet" rel="stylesheet" href="v2-bundle.css" onload="otgwAssetEvent('v2-bundle.css',true,1,this)" onerror="otgwAssetEvent('v2-bundle.css',false,1,this)">
-<link id="fontInter400" rel="preload" href="fonts/inter-400.woff2" as="font" type="font/woff2" crossorigin="anonymous" onload="otgwAssetEvent('fonts/inter-400.woff2',true,1,this)" onerror="otgwAssetEvent('fonts/inter-400.woff2',false,1,this)">
-<link id="fontInter700" rel="preload" href="fonts/inter-700.woff2" as="font" type="font/woff2" crossorigin="anonymous" onload="otgwAssetEvent('fonts/inter-700.woff2',true,1,this)" onerror="otgwAssetEvent('fonts/inter-700.woff2',false,1,this)">
-<link id="fontMono400" rel="preload" href="fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin="anonymous" onload="otgwAssetEvent('fonts/jetbrains-mono-400.woff2',true,1,this)" onerror="otgwAssetEvent('fonts/jetbrains-mono-400.woff2',false,1,this)">
-<script id="v2Script" src="v2.js" defer onload="otgwAssetEvent('v2.js',true,1,this)" onerror="otgwAssetEvent('v2.js',false,1,this)"></script>
 </head>
 <body>
 
@@ -991,7 +865,6 @@
 <div class="toast" id="toast" role="status" aria-live="polite">Settings saved</div>
 <!-- TASK-984: floating override-detail panel (fixed position). Opened by #aOvrBadge (Home) and #cnOvr (Monitor map). -->
 <div class="ovr-panel" id="ovrPanel"></div>
-
-
+<script src="v2.js"></script>
 </body>
 </html>

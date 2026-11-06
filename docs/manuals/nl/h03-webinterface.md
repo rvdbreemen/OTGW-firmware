@@ -8,7 +8,7 @@ De interface werkt in de huidige plus twee voorgaande major-versies van Google C
 
 **Let op:** op de 2.0.0-lijn is de webinterface Engelstalig. De Nederlandse UI-teksten die er nog in zaten, zijn verwijderd (TASK-569). Deze handleiding blijft Nederlands; de schermteksten waarnaar verwezen wordt, zijn in het Engels.
 
-De SPA bestaat uit de bestanden `v2.html`, `v2.js` en `v2-bundle.css`, opgeslagen op het LittleFS-bestandssysteem van het apparaat. Communicatie met de firmware verloopt via de REST API (JSON over HTTP) voor instellingen en opdrachten, en via WebSocket voor de realtime OpenTherm-log.
+De SPA wordt als één gzip-bestand (`v2.html.gz`, met stijlen, JavaScript en lettertypen erin) opgeslagen op het LittleFS-bestandssysteem van het apparaat. Communicatie met de firmware verloopt via de REST API (JSON over HTTP) voor instellingen en opdrachten, en via WebSocket voor de realtime OpenTherm-log.
 
 Een persistent banner bovenaan elke pagina waarschuwt zodra de firmware-buildhash niet overeenkomt met de hash van het geflashte LittleFS-image, met een directe link naar de flash utility.
 

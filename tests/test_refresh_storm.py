@@ -65,7 +65,7 @@ except ImportError:
 
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 PIECE = 1460
-HELPER_HTML = b"<br>You first need to upload these two files:\n<ul><li>FSexplorer.html</li></ul>\n"
+HELPER_HTML = b"<br>You first need to upload this file (from the filesystem build, .pio/data-staging):\n<ul><li>FSexplorer.html.gz</li></ul>\n"
 SMALL_ASSET = b"a" * 3000
 
 
