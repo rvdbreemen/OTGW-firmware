@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T14:37:00Z'
-updated_date: '2026-11-06T01:03:00Z'
+updated_date: '2026-11-06T10:59:00Z'
 labels:
   - github
   - pr
@@ -53,4 +53,6 @@ With that slice end patched in a scratch copy only (scratchpad/gxxshim/sched_pat
 Third point: the test requires clang++/g++ only (shutil.which), while the repo's other host tests use MSVC via find_vcvars on Windows; on a Windows dev machine it raises 'A host C++ compiler is required'. Not run yet: tests/webui/native-asset-load.test.mjs (headless Chrome, skipped at 86% commit charge), full run_tests.py, esp32-combo build, bench. PR review comment not posted yet: waits until the gates are complete so it is one review.
 
 2026-11-06 03:00 first-part review posted on PR #697 (issuecomment-6673794452): gates green so far, findings 1-3 on tests/test_web_file_scheduling.py (slice end, compile-only old-rev red, MSVC fallback). Remaining: browser test, full run_tests, rebase, combo build, bench, ADR-212 to Robert, merge.
+
+2026-11-06 12:xx part 2 on PR head 3d686f13c (Andre fixed finding 1), rebased locally in ../wt-pr697 onto dev f98f8eb0c (banner/CHANGELOG conflicts only; per-file non-banner diff identical to the PR), local test bump beta.107+742f969 (not pushed). Gates: evaluate --quick 84/0/0; test_web_file_scheduling PASS via MSVC shim (finding 3, no MSVC fallback, still open); esp32-combo build OK (RAM 122956, flash 2150803). Bench .61: two-tab load 350/350 x 200 on both builds, p50/p95/max dev 3.14/4.76/8.18 s vs PR 3.17/3.37/3.45 s; queue burst 8x /v2.js: 6 served (max wait 2257 ms, pending_hwm 4), 2 immediate 503 Retry-After 1, no hang; disconnect while queued: cancelled 4, heap recovered, no reboot, serves after. PR acceptance script 1/3 runs pass: favicon no answer 10 s once, v2.js ERR_CONNECTION_TIMED_OUT once (TCP level; not compared with dev, the script needs the PR diagnostics). Not seen: the 10 s deadline 503. Min free heap ~2.6-3.3 KB on both builds under these loads -> TASK-1673. Review part 2 posted: issuecomment-6683262801. Pending: native-asset-load.test.mjs result (re-running detached), ADR-212 decision and merge go from Robert.
 <!-- SECTION:NOTES:END -->
