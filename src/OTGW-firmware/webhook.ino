@@ -1,6 +1,6 @@
 /*********
 **  Program  : webhook.ino
-**  Version  : v2.0.0-beta.105
+**  Version  : v2.0.0-beta.106
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -150,6 +150,11 @@ static bool expandPayload(const char* tmpl, char* out, size_t outLen, bool state
 static PlatformQueue webhookQueue   = nullptr;  // loop/AsyncTCP producer -> webhook task
 static PlatformTask  g_webhookTask  = nullptr;  // dedicated sender task handle
 static volatile bool webhookInFlight = false;   // ADR-057 §5: one pending transition at a time
+// TASK-1669: the job the sender task works on lives here, not on its stack, because the same
+// 8192-byte stack also runs the weather fetch (weatherWorkerPoll) between jobs (ADR-053).
+static WebhookJob    g_webhookJob;
+// How long the sender task waits for a job before it looks for a weather request.
+#define WEBHOOK_WEATHER_POLL_MS 500
 
 //=======================================================================
 // Build a WebhookJob for the given state. Reads settings + live OpenTherm
@@ -272,10 +277,13 @@ static bool sendWebhookJob(const WebhookJob& job) {
 //=======================================================================
 static void webhookTaskBody(void *arg) {
   (void)arg;
-  WebhookJob job;
+  WebhookJob& job = g_webhookJob;
   for (;;) {
-    // Block indefinitely until an edge is enqueued; zero CPU while idle.
-    if (!platformQueueReceive(webhookQueue, &job, PLATFORM_QUEUE_WAIT_FOREVER)) {
+    // TASK-1669: wait for an edge at most WEBHOOK_WEATHER_POLL_MS, then run a requested
+    // weather fetch, so the fetch needs no task of its own.
+    const bool gotJob = platformQueueReceive(webhookQueue, &job, WEBHOOK_WEATHER_POLL_MS);
+    weatherWorkerPoll();
+    if (!gotJob) {
       continue;
     }
     bool sent = false;
@@ -298,6 +306,10 @@ static void webhookTaskBody(void *arg) {
 // called once from setup(). Safe to call before settings load: the task simply
 // blocks on an empty queue until evalWebhook()/testWebhook() enqueue a job.
 //=======================================================================
+bool webhookTaskAvailable() {
+  return g_webhookTask != nullptr;
+}
+
 void startWebhookTask() {
   if (g_webhookTask != nullptr) return;                 // create exactly once
   if (webhookQueue == nullptr) {
@@ -308,9 +320,10 @@ void startWebhookTask() {
     return;
   }
   // 8192-byte stack: the HTTPClient GET/POST + TLS-free WiFiClient chain is
-  // deeper than the PIC task's shallow serial byte-I/O, and the task body also
-  // holds a ~644-byte WebhookJob local. This matches the Arduino loop task's
-  // default 8 KB stack the send previously ran on (pre-Phase-4).
+  // deeper than the PIC task's shallow serial byte-I/O. The same stack runs the
+  // weather fetch (TASK-1669, 512-byte URL buffer + HTTPClient GET + stream
+  // parse), which had its own 8192-byte task before; the WebhookJob is global
+  // (g_webhookJob) so the body frame stays small.
   g_webhookTask = platformTaskCreatePinned(
       webhookTaskBody, "webhook", 8192, nullptr, 1);
   if (g_webhookTask == nullptr) {

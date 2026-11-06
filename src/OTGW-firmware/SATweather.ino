@@ -43,7 +43,7 @@ static uint8_t  _weather_forecastPrecipProb[WEATHER_FORECAST_HOURS];
 static uint8_t  _weather_forecastCount = 0;
 #endif  // HAS_WEATHER_FORECAST
 
-// TASK-1604: the HTTP fetch runs on a one-shot worker task. The worker parses into this scratch
+// TASK-1604: the HTTP fetch runs on a worker task (the webhook sender task since TASK-1669). The worker parses into this scratch
 // copy only and never touches state.sat.weather or the live forecast arrays; the loop task
 // copies it over in weatherConsumeResult() once the worker has published it (see "HTTP Fetch"
 // below). The fields mirror state.sat.weather; the loop task seeds the scratch from the live
@@ -360,8 +360,8 @@ static void weatherDumpStateToTelnet()
 
 // TASK-1604 (TASK-1471 R1). The GET used to run on the loop task: with the internet blocked it
 // stalled the loop for the DNS lookup (not bounded by any HTTPClient timeout) plus the connect
-// timeout, at +300/360/480/720/1200 s after boot. Now a one-shot worker task does DNS, connect,
-// GET and parse. Ownership rules:
+// timeout, at +300/360/480/720/1200 s after boot. Now a worker task (the persistent webhook sender
+// task, TASK-1669) does DNS, connect, GET and parse. Ownership rules:
 //   - _wxState IDLE:    nobody touches _wxWork except the loop task (seed / consume).
 //   - _wxState RUNNING: only the worker touches _wxWork. The loop task starts no second worker.
 //   - _wxState READY:   the worker has published the result (release store) and does nothing but
@@ -380,7 +380,6 @@ static uint32_t _wxFirstRetryMs   = 0;
 
 static const uint32_t WEATHER_CONNECT_TIMEOUT_MS = 2000UL;  // TCP connect bound; DNS is bounded only by running off the loop task
 static const uint32_t WEATHER_READ_TIMEOUT_MS    = 5000UL;  // HTTP header wait and stream read bound
-static const uint32_t WEATHER_WORKER_STACK_BYTES = 8192;    // as the webhook sender task, which runs the same HTTPClient GET chain
 
 // Worker body: HTTP GET + stream parse into _wxWork. Runs on the worker task, never on the loop.
 static void weatherFetchWork()
@@ -430,12 +429,16 @@ static void weatherFetchWork()
   http.end();
 }
 
-static void weatherWorkerBody(void* arg)
+// TASK-1669: the fetch runs on the persistent webhook sender task, which calls this between its
+// jobs (webhookTaskBody). A one-shot task created and deleted per fetch lost about 132 B of
+// internal heap for good on every fetch (~12 KB a day at the 900 s default interval).
+static bool _wxRequested = false;   // set by the loop task (weatherRequestFetch), taken by the worker
+
+void weatherWorkerPoll()
 {
-  (void)arg;
+  if (!__atomic_exchange_n(&_wxRequested, false, __ATOMIC_ACQ_REL)) return;
   weatherFetchWork();
   __atomic_store_n(&_wxState, WX_READY, __ATOMIC_RELEASE);   // publish: from here the loop task owns _wxWork
-  platformTaskExit();
 }
 
 // Loop task, worker not running: copy the live values into the scratch.
@@ -486,13 +489,13 @@ static int weatherRequestFetch()
   }
   weatherSeedWork();
   __atomic_store_n(&_wxState, WX_RUNNING, __ATOMIC_RELEASE);
-  PlatformTask task = platformTaskCreatePinned(weatherWorkerBody, "weather", WEATHER_WORKER_STACK_BYTES, nullptr, 1);
-  if (task == nullptr) {
+  if (!webhookTaskAvailable()) {
     __atomic_store_n(&_wxState, WX_IDLE, __ATOMIC_RELEASE);
-    DebugTln(F("Weather: failed to create the fetch task"));
+    DebugTln(F("Weather: no worker task to run the fetch"));
     state.sat.weather.iFetchErrors++;
     return -1;
   }
+  __atomic_store_n(&_wxRequested, true, __ATOMIC_RELEASE);   // the webhook task picks it up within 500 ms
   return 1;
 }
 

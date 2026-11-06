@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.105
+**  Version  : v2.0.0-beta.106
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -340,6 +340,8 @@ void handleOTGWstream();
 void testWebhook(bool testOn);
 void evalWebhook();
 void startWebhookTask();  // ADR-123 Phase-4: create the webhook sender task once (webhook.ino)
+bool webhookTaskAvailable();  // TASK-1669: the sender task exists, so it can run the weather fetch (webhook.ino)
+void weatherWorkerPoll();     // TASK-1669: run a requested weather fetch; webhook task only (SATweather.ino)
 bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-056; defined in restAPI.ino)
 extern bool picSettingsCycleActive;  // PIC settings readout cycle flag (OTGW-Core.ino)
 
