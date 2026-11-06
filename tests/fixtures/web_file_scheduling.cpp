@@ -113,7 +113,7 @@ public:
 struct FileEntry { bool valid = true; bool compressed = false; };
 struct FakeFile {
   std::string path; bool ok = false; size_t buffer = 0;
-  explicit operator bool() const { return ok; }
+  operator bool() const { return ok; }  // implicit, like fs::File (FS.h:71): it competes with beginResponse(int, ...)
   bool setBufferSize(size_t size) { buffer = size; return true; }
 };
 using File = FakeFile;
@@ -198,6 +198,9 @@ public:
   }
   void complete() { response->_ack(this, 1, 0); if (response->_finished()) cancel(); }
   void send(AsyncWebServerResponse* value) { delete response; response = value; }
+  // Mirrors the library's (int, const char*, const char*) overload, which a File argument can reach through
+  // its implicit bool; a call that needs a user conversion for the path then becomes ambiguous (TASK-1673).
+  AsyncWebServerResponse* beginResponse(int code, const char* type, const char* body) { return beginResponse(code, String(type), String(body)); }
   AsyncWebServerResponse* beginResponse(int code, const String& type = {}, const String& = {}) {
     if (nullBasicResponses) { --nullBasicResponses; return nullptr; }
     return new BoundaryResponse(code, type);

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-06T10:57:00Z'
-updated_date: '2026-11-06T18:15:00Z'
+updated_date: '2026-11-06T19:19:00Z'
 labels:
   - heap
   - webui
@@ -37,4 +37,6 @@ Bench .61 2026-11-06: hd_min_free_heap went to 2612 B (dev beta.106+069ae27, aft
 Planned fixes, app side, no library change: (A) in webSendFile open the File with setBufferSize(512) and pass it to beginResponse (saves ~3.5 KB per stream, ~7 KB at the peak; also drops the duplicate exists()/open); (B) webFileGateTryAdmit also caps at 1 stream when platformFreeHeap() < ~24 KB and answers 503 Retry-After 1 below ~16 KB (today it only looks at maxblock). Library/sdkconfig options (snd_buf per pcb, ASYNC_RESPONCE_BUFF_SIZE, CONFIG_LWIP_TCP_SND_BUF) need Robert's approval and an ADR. Sequencing: both fixes touch webSendFile and the file gate that PR #697 (TASK-1659) rewrites, so implement them after the #697 merge decision, on top of whichever code lands. Bench A/B: twotab_load.py on .61, hd_min_free_heap and hd_min_max_block, old vs fix.
 
 2026-11-06 fix: (A) webServerCompat.h WebQueuedFileResponse opens the File itself with setBufferSize(512) and passes it to beginResponse(File, ...); (B) webFileGateTryAdmit caps at 1 stream when platformFreeHeap() < 24000 as well as maxblock < 16000. Host test tests/test_web_file_scheduling.py new case small_file_buffer_and_total_heap_cap: 3 FAIL on the old code (lastBuffer 0, two streams admitted at 20 KB free), PASS on the fix (0 failures).
+
+2026-11-06 esp32-combo build of beta.111 failed: webServerCompat.h:505 'call of overloaded beginResponse(fs::File&, char[128], char[48]) is ambiguous' (fs::File's implicit operator bool reaches beginResponse(int, const char*, const char*)). The host mock had an explicit bool and no int overload, so it missed it. Mock made faithful (implicit bool + the int overload): host test then fails to compile with the same C2666; fix passes String(_path) explicitly, host test PASS.
 <!-- SECTION:NOTES:END -->

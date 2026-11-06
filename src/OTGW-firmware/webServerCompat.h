@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-beta.111
+**  Version  : v2.0.0-beta.112
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -502,7 +502,7 @@ class WebQueuedFileResponse : public AsyncWebServerResponse {
         // littlefs block size, held per stream until the response ends.
         File content = LittleFS.open(_path, "r");
         if (content) content.setBufferSize(512);
-        _inner = content ? request->beginResponse(content, _path, _mime) : nullptr;
+        _inner = content ? request->beginResponse(content, String(_path), (const char*)_mime) : nullptr;
         if (!_inner || !_inner->_sourceValid()) {
           if (!error(request, 500)) return;
         } else if (_gzip) {
