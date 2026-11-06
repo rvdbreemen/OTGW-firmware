@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-06T10:57:00Z'
-updated_date: '2026-11-06T20:54:00Z'
+updated_date: '2026-11-06T21:11:00Z'
 labels:
   - heap
   - webui
@@ -49,4 +49,6 @@ Planned fixes, app side, no library change: (A) in webSendFile open the File wit
 2026-11-06 A/B on .61, reboot before every run (hd_min_free_heap is since boot), two-tab load 25 rounds: beta.113 cap 2: min free 20356 / 3328 / 3040 B (the low runs are the ones where both streams overlap, dip snapshot 2 TX pcbs 11488 B), p95 1.21-1.43 s. Experiment cap 1 (WEB_FILE_MAX_INFLIGHT 1, not committed): 21196 / 7596 / 12968 / 17528 B, p95 1.45-1.50 s but one run p50 5.91 s p95 11.55 s max 12.67 s. Cap 1 raises the worst case from ~3.0 to 7.6 KB, still below the 8 KB target, at a real latency cost. Found and fixed on the way: 'else if (mb < 24000) cap = 2' raised a base cap of 1 to 2; now it only lowers the cap (no effect with the production base of 2).
 
 2026-11-06 Robert chose the per-connection send-buffer experiment: webBeginRequest caps pcb->snd_buf at WEB_TCP_SEND_CAP 2872 (2 x MSS) through platformTcpCapSendBuffer (core lock, only while nothing is queued). Committed locally as beta.115 for the bench A/B; not pushed until the A/B is done.
+
+2026-11-06 beta.115 (send cap 2872) A/B: 1 of 5 rebooted runs completed before Claude Code stopped the background job for low system memory: min free 3252 B, p50 1.55 s p95 1.89 s (baseline cap2: 3040-3328 B in overlap runs, p50 1.05-1.26 s). Inconclusive with one run. hd_dip_tx_bytes showed 11488 B, which the cap makes meaningless: the metric was TCP_SND_BUF - snd_buf, which counts the lowered credit as held. Fixed to sum the unsent and unacked segment lengths (uncommitted until the next build). Next: rebuild, then the full 5-run A/B when memory allows; not restarted automatically.
 <!-- SECTION:NOTES:END -->

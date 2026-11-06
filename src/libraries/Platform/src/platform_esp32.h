@@ -408,7 +408,7 @@ inline void platformTcpCapSendBuffer(struct tcp_pcb* pcb, uint16_t cap) {
 }
 
 // TASK-1673: who holds TCP memory at a heap dip. Under the core lock: active pcbs, pcbs on
-// localPort with unsent or unacked data, the bytes they hold (TCP_SND_BUF minus snd_buf) and
+// localPort with unsent or unacked data, the bytes queued in their unsent and unacked segments and
 // the TIME_WAIT pcbs. Called only when the loop task sees a new free-heap minimum.
 struct PlatformTcpHoldSnapshot { uint16_t active, txPcbs, timeWait; uint32_t txBytes; };
 inline PlatformTcpHoldSnapshot platformTcpHoldSnapshot(uint16_t localPort) {
@@ -418,7 +418,9 @@ inline PlatformTcpHoldSnapshot platformTcpHoldSnapshot(uint16_t localPort) {
     s.active++;
     if (pcb->local_port == localPort && (pcb->unsent != nullptr || pcb->unacked != nullptr)) {
       s.txPcbs++;
-      if (pcb->snd_buf < TCP_SND_BUF) s.txBytes += (uint32_t)(TCP_SND_BUF - pcb->snd_buf);
+      // Sum the queued segments: TCP_SND_BUF - snd_buf overstates once snd_buf was capped.
+      for (struct tcp_seg *seg = pcb->unsent; seg != nullptr; seg = seg->next) s.txBytes += seg->len;
+      for (struct tcp_seg *seg = pcb->unacked; seg != nullptr; seg = seg->next) s.txBytes += seg->len;
     }
   }
   for (struct tcp_pcb *pcb = tcp_tw_pcbs; pcb != nullptr; pcb = pcb->next) s.timeWait++;
