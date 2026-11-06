@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-04T23:56:39.543Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-06T00:59:45.010Z
 > Files: 2 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
@@ -12,9 +12,50 @@
 ## ../../../Claude/Projects/Kluis/02-wiki/
 
 
+## ../wt-1412ll/src/OTGW-firmware/
+
+
+## ../wt-1412ll/tests/
+
+
+## ../wt-1451/test/host/
+
+
+## ../wt-1470/docs/adr/
+
+
+## ../wt-1470/docs/diagnostics/
+
+
+## ../wt-1665/src/OTGW-firmware/
+
+
+## ../wt-1665/src/libraries/Platform/src/
+
+
+## ../wt-1665/test/host/
+
+
+## ../wt-1665/tests/
+
+
+## ../wt-6c-1654/test/host/
+
+
+## ../wt-6c-1654/tools/bench/ot-boiler-sim/
+
+
+## ../wt-6c-1654/tools/bench/ot-boiler-sim/data/
+
+
+## ../wt-6c-1654/tools/bench/ot-boiler-sim/host/
+
+
+## ../wt-6c-1654/tools/bench/ot-boiler-sim/src/
+
+
 ## ../wt-agentic/.claude/hooks/
 
-- `session-start-build-toolchain.sh` — SessionStart hook: pre-provision the ESP firmware build toolchain so Claude (~754 tok)
 
 ## ./
 
@@ -271,6 +312,9 @@
 ## C:/Users/rvdbr/.claude/jobs/724775a1/tmp/satspec/
 
 
+## C:/Users/rvdbr/.claude/jobs/914dbd57/tmp/scripts/
+
+
 ## C:/Users/rvdbr/.claude/projects/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/2cc0fd9b-f0b0-419e-ad8b-bce8f67bdd24/workflows/scripts/
 
 
@@ -325,6 +369,18 @@
 ## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/5c40272c-4417-42f4-924c-666810f09dc1/scratchpad/t1339/
 
 
+## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/9604259c-3cd4-4397-a002-3ea5ca73cb77/scratchpad/
+
+
+## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/9604259c-3cd4-4397-a002-3ea5ca73cb77/scratchpad/bench-1450b/
+
+
+## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/9604259c-3cd4-4397-a002-3ea5ca73cb77/scratchpad/r1470/
+
+
+## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/9604259c-3cd4-4397-a002-3ea5ca73cb77/scratchpad/rel99/
+
+
 ## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/973c7813-75b7-4f1e-bab5-86d714ffc1db/scratchpad/
 
 
@@ -333,7 +389,9 @@
 
 ## C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/74b8fc81-f282-4eda-bcab-6276a4a766f4/scratchpad/
 
-- `stamptest.sh` — TASK-1628 emulation: run a session-start hook script against a throwaway repo whose (~406 tok)
+
+## C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/9ad25eb8-1a77-4659-887b-f3c41994cc95/scratchpad/
+
 
 ## C:/Users/rvdbr/AppData/Local/Temp/fakedev/
 
@@ -412,6 +470,8 @@
 
 ## test/host/
 
+- `test_ot_support_migration.cpp` — Declares char (~3622 tok)
+- `test_ot_support_migration.py` — TASK-1185 / TASK-1660 host harness: do older /ot-boiler.json (formats 1 and 2) and (~2267 tok)
 
 ## test/host/sat_pid_shim/
 
