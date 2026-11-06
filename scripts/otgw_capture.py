@@ -2425,7 +2425,8 @@ def build_parser():
         allow_abbrev=False)
     p.add_argument("--device", metavar="HOST", help="OTGW device host or IP (prompted when missing)")
     p.add_argument("--broker", metavar="HOST", help="MQTT broker host; empty = skip the MQTT stream")
-    p.add_argument("--broker-port", type=ranged(1, 65535), default=1883)
+    p.add_argument("--broker-port", type=ranged(1, 65535), default=None,
+                   help="MQTT broker port (default: the gateway's own setting, else 1883)")
     p.add_argument("--topic", default="#", help="MQTT topic filter (default '#')")
     p.add_argument("--username", help="MQTT username (blank = anonymous)")
     p.add_argument("--password", help="MQTT password (prompted when a username is given)")
@@ -2472,17 +2473,69 @@ def build_parser():
     return p
 
 
+def read_gateway_mqtt(device, http_port, timeout=5):
+    """Reads the MQTT settings the gateway itself uses from GET /api/v2/settings (TASK-1677), so the
+    capture listens on the same broker instead of a typed address. Returns (dict or None, reason).
+    The dict holds enable, broker, port and user; the password is never returned by the firmware."""
+    base = f"http://{device}" + ("" if http_port == 80 else f":{http_port}")
+    status, body, error, _ = http_get(base + "/api/v2/settings", timeout)
+    if status != 200:
+        if status == 401:
+            return None, "HTTP 401 (the gateway has an admin password)"
+        return None, f"HTTP {status}" if status else (error or "no answer")
+    try:
+        settings = json.loads(body.decode("utf-8", "replace")).get("settings", {})
+        value = lambda name: (settings.get(name) or {}).get("value")
+        found = {"enable": bool(value("mqttenable")), "broker": str(value("mqttbroker") or "").strip(),
+                 "port": value("mqttbrokerport"), "user": str(value("mqttuser") or "").strip()}
+    except Exception as exc:
+        return None, f"unreadable answer ({type(exc).__name__})"
+    if not isinstance(found["port"], int) or not 1 <= found["port"] <= 65535:
+        found["port"] = None
+    return found, None
+
+
 def resolve_inputs(args, parser):
     saved = load_settings()
     can_prompt = interactive() and not args.no_prompt
     broker_given = args.broker is not None
+    port_given = args.broker_port is not None
     if not args.device and can_prompt:
         args.device = ask("OTGW device host", str(saved.get("DeviceHost") or ""))
     if not args.device:
         parser.error("Device host is required (--device / -DeviceHost).")
-    if not broker_given and can_prompt:
+
+    # TASK-1677: take the broker from the gateway, so a typo cannot leave the MQTT stream empty.
+    gateway, reason = read_gateway_mqtt(args.device, getattr(args, "http_port", 80))
+    if gateway is not None and gateway["enable"] and gateway["broker"]:
+        gw_port = gateway["port"] or 1883
+        if broker_given and args.broker.strip() and (args.broker.strip(), args.broker_port or gw_port) != (gateway["broker"], gw_port):
+            print(f"WARNING: --broker {args.broker.strip()}:{args.broker_port or gw_port} differs from the gateway's "
+                  f"own MQTT broker {gateway['broker']}:{gw_port}. Using yours; leave --broker out to use the gateway's.")
+        elif not broker_given:
+            args.broker = gateway["broker"]
+            if not port_given:
+                args.broker_port = gw_port
+            if args.username is None:
+                args.username = gateway["user"]
+            print(f"MQTT broker read from the gateway: {args.broker}:{args.broker_port or gw_port}"
+                  + (f", user {args.username}" if args.username else ", anonymous"))
+    elif gateway is not None and not broker_given:
+        if not gateway["enable"]:
+            print("MQTT is off on the gateway: the MQTT stream is skipped (telnet, frames and probes still run).")
+        else:
+            print("The gateway has no MQTT broker set: the MQTT stream is skipped.")
+        args.broker = ""
+    elif gateway is None:
+        print(f"Note: could not read the MQTT settings from the gateway ({reason}); "
+              "enter the broker exactly as set in the gateway (Settings, MQTT).")
+
+    if not broker_given and args.broker is None and can_prompt:
         args.broker = ask("MQTT broker host (Enter = skip MQTT)", str(saved.get("BrokerHost") or ""))
     args.broker = (args.broker or "").strip()
+    if args.broker_port is None:
+        same_as_gateway = gateway is not None and args.broker == gateway["broker"]
+        args.broker_port = (gateway["port"] or 1883) if same_as_gateway else 1883
     if args.broker and args.username is None and can_prompt and not broker_given:
         args.username = ask("MQTT username (blank for anonymous)", str(saved.get("Username") or ""))
     if args.broker and args.username and not args.password:
