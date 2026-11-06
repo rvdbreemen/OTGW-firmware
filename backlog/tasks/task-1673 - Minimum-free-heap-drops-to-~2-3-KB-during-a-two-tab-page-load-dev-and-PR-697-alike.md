@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-06T10:57:00Z'
-updated_date: '2026-11-06T20:42:00Z'
+updated_date: '2026-11-06T20:54:00Z'
 labels:
   - heap
   - webui
@@ -47,4 +47,6 @@ Planned fixes, app side, no library change: (A) in webSendFile open the File wit
 2026-11-06 AC1 evidence, .61 beta.113, two-tab load 2 x 25 rounds (page + favicon, gzip pages): loop-sampled dip 13592 B free with 2 port-80 pcbs holding 11488 B in their send queues (2 x TCP_SND_BUF 5744, both full), 2 admitted file streams, 13 TIME_WAIT pcbs (~3.2 KB), 3 active pcbs, REST 0, WS 0. The native watermark hd_min_free_heap was 3168 B in this run, about 10 KB below the loop-sampled dip: the extra is transient on the async_tcp task (the 2872 B response send buffer plus pbuf copies during tcp_write). CORRECTION: the 8136 B minimum reported for beta.112 was one favourable run; the minimum varies strongly run to run (3168 B here, same code path). It is not a stable improvement figure.
 
 2026-11-06 A/B on .61, reboot before every run (hd_min_free_heap is since boot), two-tab load 25 rounds: beta.113 cap 2: min free 20356 / 3328 / 3040 B (the low runs are the ones where both streams overlap, dip snapshot 2 TX pcbs 11488 B), p95 1.21-1.43 s. Experiment cap 1 (WEB_FILE_MAX_INFLIGHT 1, not committed): 21196 / 7596 / 12968 / 17528 B, p95 1.45-1.50 s but one run p50 5.91 s p95 11.55 s max 12.67 s. Cap 1 raises the worst case from ~3.0 to 7.6 KB, still below the 8 KB target, at a real latency cost. Found and fixed on the way: 'else if (mb < 24000) cap = 2' raised a base cap of 1 to 2; now it only lowers the cap (no effect with the production base of 2).
+
+2026-11-06 Robert chose the per-connection send-buffer experiment: webBeginRequest caps pcb->snd_buf at WEB_TCP_SEND_CAP 2872 (2 x MSS) through platformTcpCapSendBuffer (core lock, only while nothing is queued). Committed locally as beta.115 for the bench A/B; not pushed until the A/B is done.
 <!-- SECTION:NOTES:END -->

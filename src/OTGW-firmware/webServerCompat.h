@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-beta.114
+**  Version  : v2.0.0-beta.115
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -149,6 +149,9 @@ inline void webCaptureBody(AsyncWebServerRequest* req, const uint8_t* data, size
 
 // Bind the per-request context at the top of a route handler and clear all
 // send-once / header state. ALWAYS call this first in a handler.
+#ifndef WEB_TCP_SEND_CAP
+#define WEB_TCP_SEND_CAP 2872
+#endif
 inline void webBeginRequest(AsyncWebServerRequest* req) {
   // ADR-189 (TASK-1162): when a response gets no ACK for the ack timeout (5 s), abort the
   // connection instead of the library's graceful close. tcp_close() queues the FIN behind
@@ -156,6 +159,9 @@ inline void webBeginRequest(AsyncWebServerRequest* req) {
   // that stops and waits for its own timeout. tcp_abort() frees the queue and sends a RST
   // the client sees at once.
   if (req && req->client()) {
+    // TASK-1673: each web connection queues at most 2 x MSS (2872 B) in lwIP instead of the
+    // full TCP_SND_BUF (5744 B); two streams overlapping held 11.5 KB at the two-tab heap dip.
+    platformTcpCapSendBuffer(req->client()->pcb(), WEB_TCP_SEND_CAP);
     req->client()->onTimeout([](void*, AsyncClient* c, uint32_t) {
       state.heapdiag.iWebAckAbortCount++;
       c->abort();

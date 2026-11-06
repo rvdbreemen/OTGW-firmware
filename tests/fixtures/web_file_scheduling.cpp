@@ -47,6 +47,7 @@ struct tcp_pcb {
   void* callback_arg = nullptr;
   void* unsent = nullptr;
   void* unacked = nullptr;
+  uint16_t snd_buf = 5744;
 };
 static tcp_pcb* tcp_active_pcbs = nullptr;
 static bool coreLocked = false, trackClients = false;
@@ -65,6 +66,8 @@ static void setSenders(unsigned count) {
     blockers[i] = {}; blockers[i].unsent = &blockers[i]; linkPcb(&blockers[i]);
   }
 }
+static unsigned sendCapCalls = 0;
+void platformTcpCapSendBuffer(tcp_pcb* pcb, uint16_t cap) { ++sendCapCalls; if (pcb && !pcb->unsent && !pcb->unacked && pcb->snd_buf > cap) pcb->snd_buf = cap; }
 uint32_t millis() { return clockMs; }
 uint32_t platformMaxFreeBlock() { return maxBlock; }
 uint32_t platformFreeHeap() { return freeHeap; }

@@ -396,6 +396,17 @@ inline void platformUpdateMinFreeHeap() {
 // hot path, since a live per-response walk would (a) break the REST chunked
 // emit's determinism contract (byte-identical JSON across re-run windows,
 // see DeviceInfoSnap) and (b) add lock contention to the async_tcp task.
+// TASK-1673: cap how much a web connection may queue in lwIP. snd_buf is a running credit:
+// lwIP adds back only the bytes the peer acknowledges, so lowering it once before anything is
+// queued caps that connection for its whole life. Never below the library's response copy
+// buffer (MSS x 2): its ack path defers while that buffer does not fit in the free credit.
+inline void platformTcpCapSendBuffer(struct tcp_pcb* pcb, uint16_t cap) {
+  if (pcb == nullptr) return;
+  LOCK_TCPIP_CORE();
+  if (pcb->unsent == nullptr && pcb->unacked == nullptr && pcb->snd_buf > cap) pcb->snd_buf = cap;
+  UNLOCK_TCPIP_CORE();
+}
+
 // TASK-1673: who holds TCP memory at a heap dip. Under the core lock: active pcbs, pcbs on
 // localPort with unsent or unacked data, the bytes they hold (TCP_SND_BUF minus snd_buf) and
 // the TIME_WAIT pcbs. Called only when the loop task sees a new free-heap minimum.
