@@ -5,9 +5,10 @@
 **  Host harness for TASK-1185 AC#2: /ot-boiler.json files written by builds
 **  that counted answers the gateway made itself as boiler evidence (format 1)
 **  must not bring those verdicts back. The maintainer chose a one-time
-**  migration: format 2 is the only boiler format that loads; a format-1 file is
-**  ignored once, the boiler bitmaps start empty, and the next save writes
-**  format 2. The thermostat file (/ot-thermo.json, format 1) is unaffected.
+**  migration: an older file is ignored once, its bitmaps start empty, and the
+**  next save writes the current format. TASK-1391 moved the boiler file to
+**  format 3 (format 2 is dropped too), TASK-1612 the thermostat file
+**  (/ot-thermo.json) to format 2 (format 1 is dropped).
 **
 **  The code under test is NOT copied here. test_ot_support_migration.py slices
 **  it by anchor, verbatim, from OTGW-Core.ino into
@@ -25,7 +26,7 @@
 **    /ot-boiler.json content after the case (F).
 **  Exit 0 when every case holds, 1 otherwise.
 **
-**  Run: python test/host/test_ot_support_migration.py --old-rev de6b13ebe
+**  Run: python test/host/test_ot_support_migration.py --old-rev 8442aaa1c^
 **
 **  TERMS OF USE: GNU GPLv3. See OTGW-firmware.h for the full notice.
 ***************************************************************************
@@ -110,6 +111,9 @@ static const char* kThermo = "/ot-thermo.json";
 // replay), 1 (a master-mode echo), unsupported 27 and 71.
 static const char* kBoilerV1 = "{\"v\":1,\"device\":\"boiler\",\"ar\":[3,26],\"aw\":[1],\"ur\":[27],\"uw\":[71]}\n";
 static const char* kThermoV1 = "{\"v\":1,\"device\":\"thermostat\",\"sr\":[0,25],\"sw\":[1]}\n";
+// The same verdicts in format 2 (boiler: TASK-1185 up to TASK-1391; thermostat: TASK-1612 on).
+static const char* kBoilerV2 = "{\"v\":2,\"device\":\"boiler\",\"ar\":[3,26],\"aw\":[1],\"ur\":[27],\"uw\":[71]}\n";
+static const char* kThermoV2 = "{\"v\":2,\"device\":\"thermostat\",\"sr\":[0,25],\"sw\":[1]}\n";
 
 static void resetRam() {
   memset(boilerLastMasterWasWrite, 0, sizeof(boilerLastMasterWasWrite));
@@ -180,20 +184,64 @@ int main(int argc, char** argv) {
   saveOtSupportFilesIfDirty();
   {
     const std::string f = LittleFS.files.count(kBoiler) ? LittleFS.files[kBoiler] : "";
-    const bool v2 = f.rfind("{\"v\":2,\"device\":\"boiler\"", 0) == 0;
+    const bool v3 = f.rfind("{\"v\":3,\"device\":\"boiler\"", 0) == 0;
     const bool empty = f.find("\"ar\":[]") != std::string::npos && f.find("\"aw\":[]") != std::string::npos &&
                        f.find("\"ur\":[]") != std::string::npos && f.find("\"uw\":[]") != std::string::npos;
     snprintf(got, sizeof got, "file after the save: %s", oneLine(f).c_str());
-    finish("M2", "the first save after that writes format 2 with empty boiler arrays", v2 && empty, got);
+    finish("M2", "the first save after that writes format 3 with empty boiler arrays", v3 && empty, got);
   }
 
   resetAll();
-  LittleFS.files[kBoiler] = "{\"v\":2,\"device\":\"boiler\",\"ar\":[3,26],\"aw\":[1],\"ur\":[27],\"uw\":[71]}\n";
+  LittleFS.files[kBoiler] = "{\"v\":3,\"device\":\"boiler\",\"ar\":[3,26],\"aw\":[1],\"ur\":[27],\"uw\":[71]}\n";
   loadOtSupportFiles();
   snprintf(got, sizeof got, "boiler bits loaded=%d (want 5), boilerFileDirty=%d", boilerBits(), (int)boilerFileDirty);
-  finish("M3", "a format-2 boiler file loads: acked 3, 26 and 1, unsupported 27 and 71",
+  finish("M3", "a format-3 boiler file loads: acked 3, 26 and 1, unsupported 27 and 71",
          boilerBits() == 5 && isBoilerMsgIdAckedRead(3) && isBoilerMsgIdAckedRead(26) && isBoilerMsgIdAckedWrite(1) &&
          isBoilerMsgIdUnsupportedRead(27) && isBoilerMsgIdUnsupportedWrite(71) && !boilerFileDirty, got);
+
+  // TASK-1391: format 2 still let gateway-made answers count as boiler evidence.
+  resetAll();
+  LittleFS.files[kBoiler] = kBoilerV2;
+  loadOtSupportFiles();
+  {
+    const int loaded = boilerBits();
+    const bool dirty = boilerFileDirty;
+    saveOtSupportFilesIfDirty();
+    const std::string f = LittleFS.files.count(kBoiler) ? LittleFS.files[kBoiler] : "";
+    const bool v3 = f.rfind("{\"v\":3,\"device\":\"boiler\"", 0) == 0;
+    const bool empty = f.find("\"ar\":[]") != std::string::npos && f.find("\"uw\":[]") != std::string::npos;
+    snprintf(got, sizeof got, "boiler bits loaded=%d, boilerFileDirty=%d, file after the save: %s", loaded, (int)dirty,
+             oneLine(f).c_str());
+    finish("M4", "a format-2 boiler file is not loaded and is rewritten as format 3 with empty arrays",
+           loaded == 0 && dirty && v3 && empty, got);
+  }
+
+  // TASK-1612: format 1 counted gateway-made requests as thermostat requests.
+  resetAll();
+  LittleFS.files[kThermo] = kThermoV1;
+  loadOtSupportFiles();
+  {
+    const int loaded = bits(thermostatSentRead) + bits(thermostatSentWrite);
+    const bool dirty = thermostatFileDirty;
+    saveOtSupportFilesIfDirty();
+    const std::string f = LittleFS.files.count(kThermo) ? LittleFS.files[kThermo] : "";
+    const bool v2 = f.rfind("{\"v\":2,\"device\":\"thermostat\"", 0) == 0;
+    const bool empty = f.find("\"sr\":[]") != std::string::npos && f.find("\"sw\":[]") != std::string::npos;
+    snprintf(got, sizeof got, "thermostat bits loaded=%d, thermostatFileDirty=%d, file after the save: %s", loaded,
+             (int)dirty, oneLine(f).c_str());
+    finish("M5", "a format-1 thermostat file is not loaded and is rewritten as format 2 with empty arrays",
+           loaded == 0 && dirty && v2 && empty, got);
+  }
+
+  resetAll();
+  LittleFS.files[kThermo] = kThermoV2;
+  loadOtSupportFiles();
+  snprintf(got, sizeof got, "thermostat sent read 0/25=%d/%d, write 1=%d, thermostatFileDirty=%d",
+           (int)isThermostatMsgIdSentRead(0), (int)isThermostatMsgIdSentRead(25), (int)isThermostatMsgIdSentWrite(1),
+           (int)thermostatFileDirty);
+  finish("M6", "a format-2 thermostat file loads: sent read 0 and 25, sent write 1",
+         isThermostatMsgIdSentRead(0) && isThermostatMsgIdSentRead(25) && isThermostatMsgIdSentWrite(1) &&
+         !thermostatFileDirty, got);
 
   std::printf("== controls ==\n");
   resetAll();
@@ -209,14 +257,18 @@ int main(int argc, char** argv) {
          isBoilerMsgIdAckedRead(25) && isBoilerMsgIdUnsupportedWrite(71) && boilerBits() == 2 && !boilerFileDirty, got);
 
   resetAll();
-  LittleFS.files[kThermo] = kThermoV1;
+  thermostatSentRead[25 >> 3] |= 1u << (25 & 7);
+  thermostatSentWrite[1 >> 3] |= 1u << (1 & 7);
+  thermostatFileDirty = true;
+  saveOtSupportFilesIfDirty();
+  resetRam();
   loadOtSupportFiles();
-  snprintf(got, sizeof got, "thermostat sent read 0/25=%d/%d, write 1=%d, thermostatFileDirty=%d",
-           (int)isThermostatMsgIdSentRead(0), (int)isThermostatMsgIdSentRead(25), (int)isThermostatMsgIdSentWrite(1),
-           (int)thermostatFileDirty);
-  finish("C2", "the thermostat file (format 1) still loads",
-         isThermostatMsgIdSentRead(0) && isThermostatMsgIdSentRead(25) && isThermostatMsgIdSentWrite(1) &&
-         !thermostatFileDirty, got);
+  snprintf(got, sizeof got, "after save and reload: sent read 25=%d, sent write 1=%d, bits=%d, thermostatFileDirty=%d",
+           (int)isThermostatMsgIdSentRead(25), (int)isThermostatMsgIdSentWrite(1),
+           bits(thermostatSentRead) + bits(thermostatSentWrite), (int)thermostatFileDirty);
+  finish("C2", "a thermostat file this build writes loads back unchanged on the next boot",
+         isThermostatMsgIdSentRead(25) && isThermostatMsgIdSentWrite(1) &&
+         bits(thermostatSentRead) + bits(thermostatSentWrite) == 2 && !thermostatFileDirty, got);
 
   resetAll();
   loadOtSupportFiles();
