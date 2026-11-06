@@ -3,9 +3,11 @@ id: TASK-1673
 title: >-
   Minimum free heap drops to ~2-3 KB during a two-tab page load (dev and PR #697
   alike)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-06T10:57:00Z'
+updated_date: '2026-11-06T14:26:00Z'
 labels:
   - heap
   - webui
@@ -26,3 +28,11 @@ Bench .61 2026-11-06: hd_min_free_heap went to 2612 B (dev beta.106+069ae27, aft
 - [ ] #1 Find what holds the memory at the minimum (per-connection AsyncTCP/lwIP buffers, response objects, JSON writers, WebSocket) with a heap trace or per-consumer counters during a two-tab load
 - [ ] #2 Raise the minimum to a safe margin (target >= 8 KB, the HEAP_LOW level) under the same two-tab load, red/green on the bench
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-06 research workflow wf_6068a950-81e (4 readers + verifiers, code only, no device access; full output session tasks/w5svbqjue.output). Confirmed: (1) lwIP send queue per TX-holding port-80 connection up to TCP_SND_BUF 5744 B (4 x MSS 1436) of copied pbufs, ~6.2 KB each; the server closes before the last ACK (WebRequest.cpp:255-264), so closing tails also hold it: 2 streams + 0-2 tails = ~12-25 KB; compiled into prebuilt liblwip (sdkconfig.h:1279/1283), not changeable by -D. (2) newlib stdio buffer 4096 B per open LittleFS File (vfs_api.cpp:223-251, st_blksize = littlefs block 4096) = ~8 KB for 2 streams. (3) AsyncAbstractResponse _send_buffer 2872 B (WebResponseImpl.h:27, no #ifndef) during an ack. (4) TIME_WAIT pcbs: server closes first, 2*MSL 120 s, pool 16 x ~250 B = ~3-3.5 KB. Plausible: per-connection request/header objects ~1-2.5 KB each, WiFi dynamic RX buffers, /ws clients ~2 KB fixed + queue per tab (real browser only).
+
+Planned fixes, app side, no library change: (A) in webSendFile open the File with setBufferSize(512) and pass it to beginResponse (saves ~3.5 KB per stream, ~7 KB at the peak; also drops the duplicate exists()/open); (B) webFileGateTryAdmit also caps at 1 stream when platformFreeHeap() < ~24 KB and answers 503 Retry-After 1 below ~16 KB (today it only looks at maxblock). Library/sdkconfig options (snd_buf per pcb, ASYNC_RESPONCE_BUFF_SIZE, CONFIG_LWIP_TCP_SND_BUF) need Robert's approval and an ADR. Sequencing: both fixes touch webSendFile and the file gate that PR #697 (TASK-1659) rewrites, so implement them after the #697 merge decision, on top of whichever code lands. Bench A/B: twotab_load.py on .61, hd_min_free_heap and hd_min_max_block, old vs fix.
+<!-- SECTION:NOTES:END -->
