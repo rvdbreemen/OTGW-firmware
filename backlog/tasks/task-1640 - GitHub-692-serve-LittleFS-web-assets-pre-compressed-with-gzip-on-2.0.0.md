@@ -1,10 +1,10 @@
 ---
 id: TASK-1640
 title: 'GitHub #692: serve LittleFS web assets pre-compressed with gzip on 2.0.0'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-04T23:51:00Z'
-updated_date: '2026-11-06T18:57:00Z'
+updated_date: '2026-11-06T19:41:00Z'
 labels:
   - github
   - needs-maintainer-ok
@@ -33,3 +33,9 @@ Robert 2026-11-06 ~00:00 (AskUserQuestion, lead session), after Andre's gzip+ETa
 
 2026-11-06 implemented by PR #698 (André Brait), landed via TASK-1674 with the review fixes; ADR-215 Accepted.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented by PR #698 (André Brait), landed as 14d304af9 (beta.111) with the TASK-1674 review fixes; ADR-215 Accepted 2026-11-06 by Robert. Bench evidence in TASK-1674. GitHub issue #692 still open (closing it was not in the approval).
+<!-- SECTION:FINAL_SUMMARY:END -->
