@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T20:24:00Z'
-updated_date: '2026-11-06T04:09:00Z'
+updated_date: '2026-11-06T04:12:00Z'
 labels:
   - mqtt
 milestone: 2.0.0
@@ -38,4 +38,6 @@ Assessment: the log text is misleading, the drops are real but bounded. The refu
 Proposed fix (not implemented yet, needs build + bench): publish-failure call sites log 'MQTT publish not queued (connected=%d, maxblk=%u)' instead of PrintMQTTError(), so a real TCP drop and an out-of-memory refusal read differently; optionally count refusals in device/info. Whether to also pace the onConnect burst is a separate question.
 
 2026-11-06 fix (local commit, not pushed): PrintMQTTError() prints 'Error: MQTT packet not queued (connected, maxblk=N)' when MQTTclient.connected() is true and returns; the stale disconnect reason is printed only while disconnected. Order checked in the library: _setState(State::disconnected) runs before _onDisconnectCallback (src/libraries/espMqttClient/src/MqttClient.cpp:309-311), so a real disconnect keeps its real reason. evaluate.py --quick: 91 checks, 0 failed, 0 warnings. Pending: esp32-combo build, OTA on .61, reconnect burst shows the new line (AC1/AC2 evidence).
+
+2026-11-06 host test test/host/test_mqtt_print_error.py --old-rev 29bfe386b^ (slices the real PrintMQTTError from MQTTstuff.ino, MSVC): FIX P1/C1/C2 pass; OLD P1 FAIL (connected + refused publish printed 'TCP disconnected'), C1/C2 pass; mutant (connected check removed) fails exactly P1; RESULT PASS exit 0. This reproduces the misleading line on the old code in a harness; the bench reconnect on .61 after the build is still open.
 <!-- SECTION:NOTES:END -->
