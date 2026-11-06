@@ -22,7 +22,7 @@ Bench .61 beta.101 (TASK-1451 AC5a, 2026-11-05 20:38:25.061-.098): right after t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduced on old code (before TASK-1451) or shown to be new
+- [x] #1 Reproduced on old code (before TASK-1451) or shown to be new
 - [ ] #2 Explained from the code; fixed or documented as harmless
 <!-- AC:END -->
 
@@ -40,4 +40,6 @@ Proposed fix (not implemented yet, needs build + bench): publish-failure call si
 2026-11-06 fix (local commit, not pushed): PrintMQTTError() prints 'Error: MQTT packet not queued (connected, maxblk=N)' when MQTTclient.connected() is true and returns; the stale disconnect reason is printed only while disconnected. Order checked in the library: _setState(State::disconnected) runs before _onDisconnectCallback (src/libraries/espMqttClient/src/MqttClient.cpp:309-311), so a real disconnect keeps its real reason. evaluate.py --quick: 91 checks, 0 failed, 0 warnings. Pending: esp32-combo build, OTA on .61, reconnect burst shows the new line (AC1/AC2 evidence).
 
 2026-11-06 host test test/host/test_mqtt_print_error.py --old-rev 29bfe386b^ (slices the real PrintMQTTError from MQTTstuff.ino, MSVC): FIX P1/C1/C2 pass; OLD P1 FAIL (connected + refused publish printed 'TCP disconnected'), C1/C2 pass; mutant (connected check removed) fails exactly P1; RESULT PASS exit 0. This reproduces the misleading line on the old code in a harness; the bench reconnect on .61 after the build is still open.
+
+AC1 ticked: the misleading line reproduces on the pre-fix PrintMQTTError in the host harness (P1 FAIL on 29bfe386b^), and git log -S lastMqttDisconnectReason shows that code since 5847521dc (2026-06-14, TASK-865.7), long before TASK-1451, so it is not new. AC2 stays open until the .61 bench reconnect shows the new line.
 <!-- SECTION:NOTES:END -->
