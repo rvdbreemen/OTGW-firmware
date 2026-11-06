@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-06T16:58:00Z'
-updated_date: '2026-11-06T16:59:00Z'
+updated_date: '2026-11-06T18:09:00Z'
 labels:
   - github
   - pr
@@ -30,3 +30,11 @@ https://github.com/rvdbreemen/OTGW-firmware/pull/698 by andrebrait, base dev. Ro
 - [ ] #3 ADR renumbered to a free number and lint-clean
 - [ ] #4 Merge only on Robert's go
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-06 review (workflow wf_eca4a750-bc8, 3 lenses + adversarial verify, no device): 12 confirmed findings posted on PR #698 (issuecomment-6690989204). Must fix: (1) new firmware on a pre-#698 filesystem shows only the Helper page, and handleFile answers /settings.ini with 200 Helper HTML, so flash_otgw --migrate backup/restore can overwrite settings with HTML; (2) ADR-215 Proposed reverses Accepted ADR-190/ADR-139 (gzip rejected by Robert); (3) ADR-215 lacks the relation to ADR-212 whose page-side half and test gate it removes. Should fix: Windows CRLF failure in tests/test_webui_pages.py, no host test of webSendGzipPage/serveGzipPage, weak ota_flash _check_fs_complete, stale docs-scope/c4 references.
+
+2026-11-06 Robert (AskUserQuestion): accept the ADR-215 direction (one gzipped file per page) once André fixes the must-fix items; then bench on .61 and ask Robert for the merge go. ADR-215 then partially supersedes ADR-139, ADR-190 and ADR-212 via adr-kit.
+<!-- SECTION:NOTES:END -->
