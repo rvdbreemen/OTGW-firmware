@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-06T00:59:45.010Z
-> Files: 2 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-06T04:11:27.872Z
+> Files: 5 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -458,6 +458,7 @@
 
 ## src/OTGW-firmware/
 
+- `MQTTstuff.ino` — include <espMqttClient.h>          // bertmelis async MQTT client (ADR-123 Phase 2, TASK-865.7) (~52646 tok)
 
 ## src/OTGW-firmware/data/
 
@@ -470,6 +471,8 @@
 
 ## test/host/
 
+- `test_mqtt_print_error.cpp` — TASK-1664 host harness: PrintMQTTError() from MQTTstuff.ino, compiled against stubs. (~618 tok)
+- `test_mqtt_print_error.py` — TASK-1664 host harness: does PrintMQTTError() stop calling a refused publish (~1165 tok)
 - `test_ot_support_migration.cpp` — Declares char (~3622 tok)
 - `test_ot_support_migration.py` — TASK-1185 / TASK-1660 host harness: do older /ot-boiler.json (formats 1 and 2) and (~2267 tok)
 
