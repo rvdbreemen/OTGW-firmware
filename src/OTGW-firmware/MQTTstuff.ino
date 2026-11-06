@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.102
+**  Version  : v2.0.0-beta.103
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1519,6 +1519,15 @@ static espMqttClientTypes::DisconnectReason lastMqttDisconnectReason =
 
 void PrintMQTTError(){
   MQTTDebugln();
+  // TASK-1664: a publish or subscribe that espMqttClient refuses while the link
+  // is up is not a disconnect. The library refuses a packet when the largest
+  // free block is below EMC_MIN_FREE_MEMORY (16 KB), as in the onConnect burst.
+  // Printing lastMqttDisconnectReason here would repeat a stale reason.
+  if (MQTTclient.connected()) {
+    MQTTDebugTf(PSTR("Error: MQTT packet not queued (connected, maxblk=%u)\r\n"),
+                (unsigned)platformMaxFreeBlock());
+    return;
+  }
   switch (lastMqttDisconnectReason)
   {
     case espMqttClientTypes::DisconnectReason::USER_OK:
