@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.109
+**  Version  : v2.0.0-beta.110
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -99,7 +99,9 @@ static uint8_t webFileInFlight = 0;
 bool webFileGateTryAdmit() {
   uint8_t cap = WEB_FILE_MAX_INFLIGHT;
   const uint32_t mb = platformMaxFreeBlock();
-  if (mb < 16000)      cap = 1;
+  // TASK-1673: the two-tab dip runs out of total heap (3.7 KB free) while the largest block
+  // is still 12.8 KB, so total free heap also caps the streams at one.
+  if (mb < 16000 || platformFreeHeap() < 24000) cap = 1;
   else if (mb < 24000) cap = 2;
   if (webFileInFlight >= cap) return false;
   webFileInFlight++;

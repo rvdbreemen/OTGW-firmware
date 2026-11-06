@@ -36,7 +36,7 @@ public:
   using std::string::string;
   String(const __FlashStringHelper* value) : std::string(reinterpret_cast<const char*>(value)) {}
 };
-static uint32_t clockMs = 0, maxBlock = 32000;
+static uint32_t clockMs = 0, maxBlock = 32000, freeHeap = 64000;
 static uint16_t wsClients = 0;
 enum { ESTABLISHED, FIN_WAIT_1 };
 struct tcp_pcb {
@@ -66,7 +66,7 @@ static void setSenders(unsigned count) {
 }
 uint32_t millis() { return clockMs; }
 uint32_t platformMaxFreeBlock() { return maxBlock; }
-uint32_t platformFreeHeap() { return 64000; }
+uint32_t platformFreeHeap() { return freeHeap; }
 #include "tcp_gate.inc"
 uint16_t webSocketClientCount() { return wsClients; }
 #include "heap_diag.inc"
@@ -106,9 +106,17 @@ public:
   const String& type() const { return _contentType; }
 };
 struct FileEntry { bool valid = true; bool compressed = false; };
+struct FakeFile {
+  std::string path; bool ok = false; size_t buffer = 0;
+  explicit operator bool() const { return ok; }
+  bool setBufferSize(size_t size) { buffer = size; return true; }
+};
+using File = FakeFile;
 struct FakeFS {
   std::map<std::string, FileEntry> files;
   unsigned opens = 0, openNow = 0, openHwm = 0;
+  size_t lastBuffer = 0;  // TASK-1673: stdio buffer size the served File carried
+  FakeFile open(const String& path, const char*) { FakeFile f; if (files.count(path)) { f.ok = true; f.path = path.c_str(); } return f; }
   mutable unsigned existsChecks = 0;
   bool exists(const String& path) const { ++existsChecks; return files.count(path) != 0; }
 } LittleFS;
@@ -197,6 +205,11 @@ public:
     if (fs.files.at(path).compressed) result->addHeader("Content-Encoding", "gzip");
     return result;
   }
+  AsyncWebServerResponse* beginResponse(FakeFile content, const String& path, const char* type) {
+    LittleFS.lastBuffer = content.buffer;
+    if (!content) return nullptr;
+    return beginResponse(LittleFS, path, type);
+  }
   AsyncResponseStream* beginResponseStream(const char*, size_t) { return new AsyncResponseStream; }
   const AsyncWebParameter* getParam(const char*, bool) const { return nullptr; }
   bool hasParam(const char*, bool) const { return false; }
@@ -245,7 +258,7 @@ static std::unique_ptr<AsyncWebServerRequest> sendFile(const char* path = "/asse
 static void reset() {
   EXPECT(webFileInFlight == 0); EXPECT(restInFlight == 0); EXPECT(LittleFS.openNow == 0);
   LittleFS = {}; LittleFS.files["/asset.css"] = {}; LittleFS.files["/other.css"] = {};
-  clockMs = 0; maxBlock = 32000; wsClients = 0; state.heapdiag = {};
+  clockMs = 0; maxBlock = 32000; freeHeap = 64000; wsClients = 0; state.heapdiag = {};
   setSenders(0); trackClients = false;
 }
 static void waits_then_streams_and_preserves_headers() {
@@ -450,12 +463,23 @@ static void measured_queue_lifecycle_and_reset() {
   EXPECT(state.heapdiag.iWebfileTimeout == 1); EXPECT(state.heapdiag.iWebfileCancelled == 0);
   admitted->cancel(); second->cancel();
 }
+// TASK-1673: a served file carries a 512-byte stdio buffer, and low total free heap admits one
+// stream even while the largest block is still large (two-tab dip: 3.7 KB free, 12.8 KB block).
+static void small_file_buffer_and_total_heap_cap() {
+  reset(); auto first = sendFile(); first->poll(); EXPECT(first->wire.status == 200); EXPECT(LittleFS.lastBuffer == 512);
+  first->cancel();
+  reset(); freeHeap = 20000; auto a = sendFile(); auto b = sendFile();
+  EXPECT(webFileInFlight == 1); EXPECT(b->wire.status == 0);
+  freeHeap = 64000; a->cancel(); b->poll(); EXPECT(b->wire.status == 200); EXPECT(webFileInFlight == 1);
+  b->cancel(); reset();
+}
 int main() {
   waits_then_streams_and_preserves_headers(); fifo_queue_cap_and_cancellation();
   low_memory_deadline_wrap_and_safety(); errors_bounds_and_response_ownership(); deferred_metadata_and_file_changes(); reset();
   unwritable_pending_and_null_responses(); reset();
   six_native_connections_progress_without_polling();
   pending_identity_never_hides_tx_or_unrelated_pcbs(); measured_queue_lifecycle_and_reset(); reset();
+  small_file_buffer_and_total_heap_cap();
   std::printf("%s: production webSendFile scheduling (%d failures)\n", failures ? "FAIL" : "PASS", failures);
   return failures ? 1 : 0;
 }
