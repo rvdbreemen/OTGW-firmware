@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : diagRecorderStuff.h
-**  Version  : v2.0.0-beta.107
+**  Version  : v2.0.0-beta.108
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -234,6 +234,8 @@ static inline bool diagRoundTenth(const char* s, char* out, size_t cap) {
   return true;
 }
 
+static inline void diagRedactBody(char* buf, size_t len);
+
 // The value a Setting record may carry. Secrets become "set" or "empty"; location becomes 0.1 degree.
 static inline void diagRedactSetting(const char* field, const char* value, char* out, size_t cap) {
   if (cap == 0) return;
@@ -255,6 +257,8 @@ static inline void diagRedactSetting(const char* field, const char* value, char*
   if (n + 1 > cap) n = cap - 1;
   if (n) memcpy(out, value, n);
   out[n] = '\0';
+  // A free-text value (a webhook payload template) can itself hold "token":"..." or key=...
+  diagRedactBody(out, n);
 }
 
 // Blank the value that follows a secret-looking key in a JSON or form body, in place.

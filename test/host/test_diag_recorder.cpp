@@ -366,6 +366,10 @@ int main() {
     diagRedactSetting("SATweatherlon", "abc", o, sizeof o); chk(!std::strcmp(o, "set"), "lon not a number");
     diagRedactSetting("SATtargettemp", "20.5", o, sizeof o); chk(!std::strcmp(o, "20.5"), "plain setting kept");
     diagRedactSetting("hostname", "OTGW", o, sizeof o); chk(!std::strcmp(o, "OTGW"), "hostname kept");
+    diagRedactSetting("WebhookPayload", "{\"state\":\"on\",\"token\":\"abc123\"}", o, sizeof o);
+    chk(!std::strstr(o, "abc123") && std::strstr(o, "\"state\":\"on\""), "payload template: embedded token blanked");
+    diagRedactSetting("WebhookPayload", "msg=on&key=s3cr3t", o, sizeof o);
+    chk(!std::strstr(o, "s3cr3t") && std::strstr(o, "msg=on"), "payload template: form key blanked");
     char b1[] = "{\"mqttpasswd\":\"hunter2\",\"x\":1}"; diagRedactBody(b1, std::strlen(b1)); chk(!std::strstr(b1, "hunter2") && std::strstr(b1, "\"x\":1"), "json body");
     char b2[] = "user=bob&password=hunter2&mode=1"; diagRedactBody(b2, std::strlen(b2)); chk(!std::strstr(b2, "hunter2") && !std::strstr(b2, "bob") && std::strstr(b2, "mode=1"), "form body");
     char b3[] = "TT=21.5"; diagRedactBody(b3, std::strlen(b3)); chk(!std::strcmp(b3, "TT=21.5"), "command kept");
