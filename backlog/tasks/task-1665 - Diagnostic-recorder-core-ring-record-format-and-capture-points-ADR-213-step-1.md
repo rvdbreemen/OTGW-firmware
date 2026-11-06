@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T20:34:00Z'
-updated_date: '2026-11-05T23:44:00Z'
+updated_date: '2026-11-06T07:48:00Z'
 labels:
   - diagnostics
 milestone: 2.0.0
@@ -37,4 +37,6 @@ Implement ADR-213 decisions 1-4: versioned 4 KiB-block format (16-byte block hea
 2026-11-05 23:40: lane commit 5344f039a on lane-1665 (wt-1665): recorder core + bridge-line suppression (F15) + ADR-214 Accepted. Next: esp32-combo build (wt-1665 has no .build-venv: create it first, see reference_fresh_worktree_build_venv), then bench AC2 on .61 (no PSRAM) and on a PSRAM board after the .63 soak (~2026-11-06 15:00). Build deferred tonight: commit charge 85.5 %.
 
 2026-11-06 00:45: ADR-214 (Accepted) brought onto dev docs-only ahead of the firmware, to reserve the number before PR #698 (whose ADR becomes 215). Robert confirmed both PR merges in order (#697 then #698) after green gates.
+
+2026-11-06 08:40: lane-1665 rebased on origin/dev (fe969a5ba, only conflict the task file, dev version kept), .build-venv created in wt-1665, esp32-combo build OK (BUILD_EXIT=0, Build completed successfully). Static cost vs dev beta.104 build: RAM 122284 -> 122412 B (+128 B), app flash 2150799 -> 2156955 B (+6156 B, 94.0 % of 2240 KiB). Not yet measured: ring heap and append cost on the device. A recording cannot be started in this lane: diagRecorderStart() is only called from the TASK-1666 REST route and DiagRecordingOn is not in isKnownSetting(), so the runtime part of AC2 needs TASK-1666 (or a bench-only hook). .61 not flashed: it carries the 1 h soak of public-beta candidate beta.104 (Robert 08:40).
 <!-- SECTION:NOTES:END -->
