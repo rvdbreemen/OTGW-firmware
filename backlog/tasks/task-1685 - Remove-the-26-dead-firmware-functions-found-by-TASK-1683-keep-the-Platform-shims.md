@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-07T09:28:00Z'
-updated_date: '2026-11-07T10:35:00Z'
+updated_date: '2026-11-07T10:50:00Z'
 labels:
   - cleanup
   - firmware
@@ -26,7 +26,7 @@ Robert 2026-11-07 chose: remove the dead firmware functions, keep platformWiFiCl
 <!-- AC:BEGIN -->
 - [x] #1 The 26 functions and their prototypes are removed; platformWiFiClientSetSync and platformTaskExit stay
 - [x] #2 The lifted bleMatchesConfiguredMAC copy in tests/test_ble_parsers.cpp is removed; python scripts/run_tests.py passes
-- [ ] #3 esp32-combo build succeeds with its own prerelease bump; the app image is the same size or smaller than beta.119's
+- [x] #3 esp32-combo build succeeds with its own prerelease bump; the app image is the same size or smaller than beta.119's
 - [ ] #4 evaluate.py --quick shows no new FAIL; an OTA bench flash boots and serves the web UI and MQTT
 <!-- AC:END -->
 
@@ -40,4 +40,6 @@ Removal-script bug caught in review: the first brace counter counted braces insi
 Evidence: evaluate.py --quick 84 passed, 0 warn, 0 fail. scripts/run_tests.py -j4: 170 files, 159 passed, 8 failed, 2 timeouts. The 5 genuine failures (test_adr_governance ADR-216 index, test_sat_corrections_index, test_static_integrity CLI, test_boiler_unsupported_origin, test_local_frame_consumers) fail identically on clean origin/dev (stash run: 0/5 passed); 3 more are environment (WinError 225 Defender on test_otd_status_relay / test_sat_requested_vs_transmitted, no host C++ compiler for test_web_file_scheduling). Timeouts rerun alone: test_dhw_water_meter PASS (670 s); test_sat_lowload_contract LL-021 error + LL-023 fail, baseline run on clean origin/dev in progress.
 
 test_sat_lowload_contract baseline on a clean origin/dev worktree: LL-010 fail, LL-021 error, LL-023 fail (624 s). Lane: LL-021 error, LL-023 fail, LL-010 pass. No new failure from the removal. Remaining: AC3 build + image size vs beta.119 and AC4 OTA bench, both after the coordinator's 'beta.118 tag out'; then rebase onto origin/dev and push via the lead.
+
+AC3: ./build.bat (esp32-combo, OTGW_BUILD_JOBS=4, commit charge 82%) succeeded: OTGW-firmware-esp32-combo-2.0.0-beta.120+8fad93a. App image 2,124,320 bytes vs beta.119+35f2cfd 2,124,352 bytes (-32 B; the removed code was already dropped by gc-sections, so only a tiny difference was expected). origin/dev was still 80b304f, no rebase needed.
 <!-- SECTION:NOTES:END -->
