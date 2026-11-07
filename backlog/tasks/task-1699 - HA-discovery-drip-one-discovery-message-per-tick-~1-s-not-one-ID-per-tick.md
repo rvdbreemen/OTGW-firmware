@@ -1,11 +1,11 @@
 ---
 id: TASK-1699
 title: 'HA discovery drip: one discovery message per tick (~1 s), not one ID per tick'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T16:56:00Z'
-updated_date: '2026-11-07T21:55:00Z'
+updated_date: '2026-11-07T22:36:00Z'
 labels:
   - mqtt
   - ha
@@ -24,9 +24,9 @@ Robert 2026-11-07: drip out the HA discovery on boot one MQTT discovery message 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Boot on .61: hd_mqtt_queue_hwm during the discovery drip <= a small bound (e.g. 3) instead of 48-49, and every entity still appears in HA (count before/after equal)
-- [ ] #2 Host test: a pending OTid 0 publishes one entity config per tick (red on old code: many per tick)
-- [ ] #3 ADR-088 gates in evaluate.py green; full discovery duration measured and documented
+- [x] #1 Boot on .61: hd_mqtt_queue_hwm during the discovery drip <= a small bound (e.g. 3) instead of 48-49, and every entity still appears in HA (count before/after equal)
+- [x] #2 Host test: a pending OTid 0 publishes one entity config per tick (red on old code: many per tick)
+- [x] #3 ADR-088 gates in evaluate.py green; full discovery duration measured and documented
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,4 +50,14 @@ Opus code review findings, all fixed: (1) id 255 now all-or-nothing like 244; (2
 Evidence so far. Host (real composers via test/host/test_ha_discovery_json part F): tests/test_discovery_drip_per_entity.py 7 OK: <=1 config per step for every id under 4 permutations; drip sends exactly the full pass's publishes (device block normalised: the full pass repeated the full block on every binary sensor of id 0 because streamBinarySensorDiscovery leaves ctx.isFirstEntity set; the drip sends it once, on step 0 of id 0, as ADR-140 states); verdicts equal; broker drop mid-id -> Retry x3 then complete; zone timeout / bSeparateSources off mid-drip -> no skip. Red on old (OTGW_DISC_REV=HEAD): one drip tick of id 0 = 39-40 configs. Mutants: zone/sources slot-after-check -> shift test FAILS; no retry on gate close -> drop test FAILS. Harness RESULT PASS, test_sat_health_discovery 6 OK, test_ble_discovery_1462 5 OK, evaluate --quick 85/0. Bench baseline .61 beta.128 after reboot: hd_mqtt_queue_hwm 49 (48 on a first reboot), 193 configs + 43 empty clears in 32 s, peak 39 configs in one second (mosquitto_sub on homeassistant/# from before the reboot, filtered on otgw-1020BA21B4F8; log scratchpad b103/drip-old128.log).
 
 Regression sweep 2026-11-07 (full run_tests.py was killed twice by low memory; suites rerun one by one). TASK-1699 broke two harness slices, both fixed: test_sat_pwm_override ForcePwmRemoved source assertion (now accepts clearRetiredSatEntityAt) -> 82 OK; test/host/test_dhw_water_meter (markAllMQTTConfigPending now resets sDripCursor; harness exports DiscoveryDripCursor + the static when present) -> RESULT PASS. Also green: test_sat_mqtt_contract_1485 15 OK, test_sat_health_discovery 6 OK, test_ble_discovery_1462 5 OK, harness test_ha_discovery_json PASS, drip test 7 OK, evaluate 85/0. Same commit fixes test/host/test_cmd_queue_drop (did not compile since TASK-1695: two stubs) -> PASS. Red before TASK-1684/1695 (verified at 834902ac8~1), not touched: test_boiler_unsupported_origin P1 (TASK-1713), test_local_frame_consumers AC5/AC6 (TASK-1714); env-only: test_board_detect_persist_gate (Defender WinError 225), test_web_file_scheduling (no host g++), test_diag_decode (fixture recording-v1.bin missing); test_sat_no_return_startup otCurrentMode fixed in 54's TASK-1707 (local).
+
+2026-11-07 beta.131 f0c99f6bb pushed, zip #alpha msg 1568754894930710650. Bench .61 OTA app+fs (settings 164 changed none), reboot, mosquitto_sub homeassistant/# from before the reboot filtered on otgw-1020BA21B4F8, 9 min: 193 configs (193 distinct) + 43 empty clears, first +20 s, last +226 s, span 206 s, max configs in one second 1; hd_mqtt_queue_hwm 17, hd_min_free_heap 26632, hd_min_max_block 31732, bootcount 116. Baseline beta.128 same procedure: 193 configs + 43 clears in 32 s, peak 39/s, hwm 49 (48 on another boot), min free 24884, max block 23540. Log scratchpad b103/drip-new131.log and drip-old128.log. AC1 open: entity count equal (193 = 193), but hwm 17 is above the example bound 3 in the AC; what fills the outbox to 17 (status bursts, connect-time telemetry) is not measured. Waiting for Robert: accept 17, or investigate.
+
+Robert 2026-11-07 (session, AskUserQuestion): hwm 17 accepted for AC1, task Done; the remaining outbox peak belongs to TASK-1697 (bound the outbox).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Done 2026-11-07, beta.131 f0c99f6bb (origin/dev), zip #alpha msg 1568754894930710650. AC1: bench .61 boot: hd_mqtt_queue_hwm 17 (beta.128: 49) and the same 193 config topics (193 distinct) + 43 empty clears as beta.128; Robert accepted 17 against the example bound 3 (remaining peak not from discovery, unmeasured, TASK-1697). AC2: tests/test_discovery_drip_per_entity.py on the real composers (harness part F): <=1 config per step for every id under 4 permutations; old code one drip tick of id 0 = 39-40 configs (red); fix 7 OK; mutants of the shift/retry fixes go red. AC3: evaluate --quick 85/0 (ADR-088 gates check_status_publishers_wrap_burst, check_status_burst_cooldown_bound, check_drip_consults_deferred green); duration measured 206 s (first config +20 s, last +226 s after reboot), peak 1/s. Regression: harness RESULT PASS, test_dhw_water_meter PASS, test_sat_pwm_override 82 OK, test_sat_mqtt_contract_1485 15 OK, test_cmd_queue_drop PASS. Not verified: the full run_tests.py (killed twice by low memory; affected suites rerun one by one); 1.x not ported (it has the same one-ID-per-tick drip; question for Robert).
+<!-- SECTION:FINAL_SUMMARY:END -->

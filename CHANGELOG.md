@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+- **Home Assistant discovery after boot goes out one config per second** (TASK-1699, Robert 2026-11-07). The discovery drip sent one whole OpenTherm ID per tick; ID 0 alone streamed about 40 configs at once. It now sends one config per second (`DISCOVERY_INTERVAL_NORMAL` 2 -> 1 s; 10 s under heap pressure, ADR-088 burst windows unchanged), through a per-entity cursor kept per ID. A config that cannot be sent because the broker, the publish gate or the heap is down is retried, not skipped; IDs 244 and 255 stay all-or-nothing. The full device block (ADR-140) rides only the first config. Bench after a reboot: beta.128 sent 193 configs in 32 s with a peak of 39 per second and an MQTT outbox high-water of 49; beta.131 sends the same 193 configs over 206 s with at most 1 per second and a high-water of 17. Test `tests/test_discovery_drip_per_entity.py` on the real composers (old code: 39-40 configs in one drip tick).
+
 ## [2.0.0-beta.130] - 2026-11-07
 
 ### Added
