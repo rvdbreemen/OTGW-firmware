@@ -769,6 +769,17 @@
   <div id="adv-debug" class="mpanel">
     <div id="dbgCrashOk" class="crashlog-ok" style="display:none">✓ No crash logs recorded since last boot.</div>
     <pre id="dbgCrash" class="console" style="display:none;max-height:320px;white-space:pre-wrap">—</pre>
+    <!-- Diagnostic recording (TASK-1700, ADR-213): local only, off by default -->
+    <div class="adv-card" id="diagRec" style="margin:12px 0">
+      <h4>Diagnostic recording <span style="font-weight:400;color:var(--muted);font-size:.8rem">· stays on this gateway until you download it</span></h4>
+      <div id="diagRecStatus" role="status" aria-live="polite" style="font-size:.85rem">Loading…</div>
+      <div class="fs-btnrow" style="margin-top:10px">
+        <button type="button" class="fs-btn primary" id="diagRecStart">Start</button>
+        <button type="button" class="fs-btn" id="diagRecStop" disabled>Stop</button>
+        <a class="fs-btn" id="diagRecDownload" href="#" download="otgw-recording.bin" aria-disabled="true">Download (.bin)</a>
+      </div>
+      <p style="font-size:.78rem;color:var(--muted);margin:8px 0 0">Records OpenTherm frames, commands, MQTT values and setting changes in RAM; passwords are never recorded. Decode on a PC with <code>scripts/diag_decode.py</code>.</p>
+    </div>
     <div id="dbgGroups"></div>
     <details class="grp">
       <summary>Raw debug dump (/api/v2/debug)</summary>

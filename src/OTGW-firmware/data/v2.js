@@ -3783,7 +3783,63 @@
       var d = (j && j.debug) || j || {};
       var keys = Object.keys(d);
       el.textContent = keys.length ? keys.map(function (k) { return k + '  =  ' + d[k]; }).join('\n') : 'No debug data';
-    }).catch(function () { var el = document.getElementById('dbgInfo'); if (el) el.textContent = 'Failed to load debug info'; });
+    }).catch(function () { var el = document.getElementById('dbgInfo'); if (el) el.textContent = 'Failed to load debug info'; })
+      // The recording status goes after the two reads above, so this panel keeps ADR-165's two calls in flight.
+      .then(function () { diagRecCall('GET', '/status'); });
+  }
+
+  // ---------- Advanced > Debug: diagnostic recording (TASK-1700, ADR-213) ----------
+  // Start/stop through POST /api/v2/diag/recording/start|stop, status from .../status, download as one
+  // GET of /api/v2/diag/recording through a download link (the browser streams it; no fetch, no burst).
+  // One diag call at a time: a click while a call runs is ignored.
+  var diagRecBusy = false, diagRecWired = false;
+  function diagRecSize(bytes) {
+    return bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.round(bytes / 1024) + ' KB';
+  }
+  function renderDiagRec(r, note) {
+    var st = document.getElementById('diagRecStatus'), start = document.getElementById('diagRecStart');
+    var stop = document.getElementById('diagRecStop'), dl = document.getElementById('diagRecDownload');
+    if (!st) return;
+    var text;
+    if (!r) text = 'Status unavailable';
+    else if (r.state === 'recording') {
+      text = 'Recording · ring ' + diagRecSize(r.ring_bytes || 0) + ' (' + (r.ring_blocks || 0) + ' blocks)' +
+        (r.psram ? ' in PSRAM' : '') + (r.dropped ? ' · ' + r.dropped + ' records dropped' : '') +
+        // ADR-213: without PSRAM the ring is a heap block that Stop frees, so the data goes with it
+        (r.psram ? '' : ' · no PSRAM: Stop clears the recording, download it first');
+    } else if (r.state === 'refused') text = 'Refused: ' + (r.reason || 'not enough memory');
+    else text = 'Stopped · ' + (r.has_data ? 'a recording is in memory, ready to download' : 'no recording in memory');
+    st.textContent = note ? text + ' — ' + note : text;
+    var active = !!(r && r.active);
+    if (start) start.disabled = diagRecBusy || active;
+    if (stop) stop.disabled = diagRecBusy || !active;
+    if (dl) {
+      var canDl = !diagRecBusy && !!(r && r.has_data);
+      dl.setAttribute('aria-disabled', canDl ? 'false' : 'true');
+      dl.style.opacity = canDl ? '' : '.5';
+      dl.style.pointerEvents = canDl ? '' : 'none';
+      dl.setAttribute('href', APIGW + 'v2/diag/recording');
+      dl.setAttribute('download', 'otgw-recording-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.bin');
+    }
+  }
+  function diagRecCall(method, path) {
+    wireDiagRec();
+    if (diagRecBusy) return;
+    diagRecBusy = true;
+    var opts = method === 'POST' ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' } : undefined;
+    fetch(APIGW + 'v2/diag/recording' + path, opts).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      diagRecBusy = false;
+      var note = (j && j.ok === false && j.result === 'refused') ? '' : (j && j.ok === false ? (j.result || 'not done') : '');
+      renderDiagRec((j && j.recording) || null, note);
+    }).catch(function () { diagRecBusy = false; renderDiagRec(null, 'request failed'); });
+  }
+  function wireDiagRec() {
+    if (diagRecWired) return;
+    var start = document.getElementById('diagRecStart'), stop = document.getElementById('diagRecStop');
+    if (!start || !stop) return;
+    diagRecWired = true;
+    start.addEventListener('click', function () { diagRecCall('POST', '/start'); });
+    stop.addEventListener('click', function () { diagRecCall('POST', '/stop'); });
   }
   function renderDebugGroups(d) {
     var host = document.getElementById('dbgGroups'); if (!host) return;
