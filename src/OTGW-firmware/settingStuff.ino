@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.124
+**  Version  : v2.0.0-beta.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -930,7 +930,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("GPIOSENSORSpin")) == 0)
   {
     int newPin = atoi(newValue);
-    if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: GPIOSENSORSpin %d out of range 0-16, ignored\r\n"), newPin); }
+    if (!settingGpioInRange(newPin)) { DebugTf(PSTR("WARNING: GPIOSENSORSpin %d is not a GPIO of the ESP32-S3 (0-21, 26-48), ignored\r\n"), newPin); }
     else {
       if (checkGPIOConflict(newPin, GPIOConflictCaller::Sensor)) {
         DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
@@ -954,7 +954,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("S0COUNTERpin")) == 0)
   {
     int newPin = atoi(newValue);
-    if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: S0COUNTERpin %d out of range 0-16, ignored\r\n"), newPin); }
+    if (!settingGpioInRange(newPin)) { DebugTf(PSTR("WARNING: S0COUNTERpin %d is not a GPIO of the ESP32-S3 (0-21, 26-48), ignored\r\n"), newPin); }
     else {
       if (checkGPIOConflict(newPin, GPIOConflictCaller::S0)) {
         DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
@@ -983,7 +983,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("GPIOOUTPUTSpin")) == 0)
   {
     int newPin = atoi(newValue);
-    if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: GPIOOUTPUTSpin %d out of range 0-16, ignored\r\n"), newPin); }
+    if (!settingGpioInRange(newPin)) { DebugTf(PSTR("WARNING: GPIOOUTPUTSpin %d is not a GPIO of the ESP32-S3 (0-21, 26-48), ignored\r\n"), newPin); }
     else {
       if (checkGPIOConflict(newPin, GPIOConflictCaller::Output)) {
         DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);

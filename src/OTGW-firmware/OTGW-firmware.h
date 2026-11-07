@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.124
+**  Version  : v2.0.0-beta.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -942,6 +942,15 @@ inline bool boardPinReserved(int pin, ComboPinMap map) {
 }
 // [board-pin-reserved:end]
 inline bool isBoardReservedPin(int pin) { return boardPinReserved(pin, comboActivePinMap()); }
+
+// [setting-gpio-range:begin] TASK-1686
+// The GPIO numbers the sensor, S0 and output pin settings accept: the ESP32-S3 has GPIO 0-21 and
+// 26-48 (22-25 do not exist). The 0-16 range came from the ESP8266 and kept the S3 Mini Pro's free
+// holes D6-D8 (GPIO 39/38/37) out of reach. Board pins inside the set stay refused where the pin is
+// used (isBoardReservedPin() in initSensors(), initS0Count() and validateGPIOOutputsConfig()).
+#define SETTING_GPIO_MAX 48
+inline bool settingGpioInRange(int pin) { return pin >= 0 && pin <= SETTING_GPIO_MAX && !(pin >= 22 && pin <= 25); }
+// [setting-gpio-range:end]
 
 //===================[ Global variables — not part of settings or state ]===================
 WiFiClient  wifiClient;

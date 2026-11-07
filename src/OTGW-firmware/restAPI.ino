@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.124
+**  Version  : v2.0.0-beta.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4182,15 +4182,15 @@ void sendDeviceSettings()
   addBool(F("sat_onboarded"), settings.ui.bSatOnboarded, "b");   // TASK-1012: SAT onboarding wizard persist flag
   addBool(F("gpiosensorsenabled"), settings.sensors.bEnabled, "b");
   addBool(F("gpiosensorslegacyformat"), settings.sensors.bLegacyFormat, "b");
-  addInt(F("gpiosensorspin"), settings.sensors.iPin, "i", 0, 16);
+  addInt(F("gpiosensorspin"), settings.sensors.iPin, "i", 0, SETTING_GPIO_MAX);   // TASK-1686
   addInt(F("gpiosensorsinterval"), settings.sensors.iInterval, "i", 5, 65535);
   addBool(F("s0counterenabled"), settings.s0.bEnabled, "b");
-  addInt(F("s0counterpin"), settings.s0.iPin, "i", 1, 16);
+  addInt(F("s0counterpin"), settings.s0.iPin, "i", 1, SETTING_GPIO_MAX);         // TASK-1686
   addInt(F("s0counterdebouncetime"), settings.s0.iDebounceTime, "i", 0, 1000);
   addInt(F("s0counterpulsekw"), settings.s0.iPulsekw, "i", 1, 5000);
   addInt(F("s0counterinterval"), settings.s0.iInterval, "i", 5, 65535);
   addBool(F("gpiooutputsenabled"), settings.outputs.bEnabled, "b");
-  addInt(F("gpiooutputspin"), settings.outputs.iPin, "i", 0, 16);
+  addInt(F("gpiooutputspin"), settings.outputs.iPin, "i", 0, SETTING_GPIO_MAX);  // TASK-1686
   addInt(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 15);
   addBool(F("otgwcommandenable"), settings.picBoot.bEnable, "b");
   addStr(F("otgwcommands"), CSTR(settings.picBoot.sCommands), "s", 128);
