@@ -3679,7 +3679,7 @@
    "tasks": [
     "TASK-1412.19"
    ],
-   "confirmed_by_entry": null
+   "confirmed_by_entry": 281
   },
   {
    "id": 276,
@@ -3749,6 +3749,56 @@
     "TASK-1655",
     "TASK-1656"
    ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 281,
+   "title": "Minimum 180 s burn through a cold cutoff: Sergeant D answers A (confirms maintainer entry 275); his citation is from `develop`, a different rule; follow-up asked (Sergeant D, 2026-11-05)",
+   "date": "2026-11-05",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567957804088823959",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1652"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 282,
+   "title": "Sergeant D corrects his link to the pin: pwm.py:246 at 7beaaf5, the low-duty rule; read as \"A stands\" (Sergeant D, 2026-11-05; follows entry 281)",
+   "date": "2026-11-05",
+   "source": "sergeant-d",
+   "kind": "correction",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567961327438139403",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1652"
+   ],
+   "confirmed_by_entry": 283
+  },
+  {
+   "id": 283,
+   "title": "Q-1652a answered A explicitly: a lit burner keeps its 180 s also through a cold cutoff (Sergeant D, 2026-11-05; confirms the reading of entry 282)",
+   "date": "2026-11-05",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1567965457346994198",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1652"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 284,
+   "title": "SAT characterised as \"a modified PID controller in series, autotuned by the heating curve value\" (statement, Sergeant D, 2026-11-07; follows our formula summary)",
+   "date": "2026-11-07",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1568595369716228117",
+   "supersedes": [],
+   "tasks": [],
    "confirmed_by_entry": null
   }
  ]

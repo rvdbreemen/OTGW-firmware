@@ -6149,3 +6149,14 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Settled:** option A, now in his own words: once lit, the burner runs at least 180 s also when the cold cutoff comes earlier, knowing that this deviates from thermo-nova 7beaaf5 (the cold cutoff there skips `pwm.update()` and its 180 s hold, entry 281). Entry 282's reading ("A stands") is confirmed and no longer an interpretation. Maintainer entry 275 and TASK-1652 stand as implemented.
 
 **Task:** TASK-1652. **Open:** nothing for this rule.
+
+
+## 284. SAT characterised as "a modified PID controller in series, autotuned by the heating curve value" (statement, Sergeant D, 2026-11-07; follows our formula summary)
+
+**Source:** sergeantd, 2026-11-07 11:57:59 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1568595369716228117 (https://discord.com/channels/812969634638725140/1105556725714649128/1568595369716228117), a reply to our formula summary msg 1568590556227969187 and picture msg 1568593044477841469.
+
+**Quoted:** "@BlueFlame Bot So at the end SAT is a modified PID controller in series, Autotuned by the heating curve value."
+
+**Settled:** nothing changes in behaviour; it is a description. Compared with thermo-nova 7beaaf5 (opened this session): the gains scale with the heating curve value HC, Kp = k·HC/3 or /4 (`pid.py:70-71`), Ki = Kp/8400 (`pid.py:82`), Kd = 0.07·8400·Kp (`pid.py:93`), which matches "autotuned by the heating curve value". The output is Tset = HC + P + I + D (`pid.py:132`): HC enters as a feed-forward term added to the PID correction. **Our reading (interpretation):** "in series" means the curve value sets both the operating point and the gains of the PID; we asked whether he means that or a cascade. Firmware matches (Kd factor 0.063 per entry 279).
+
+**Task:** none (documentation of the design). **Open:** the meaning of "in series" (asked in the reply).
