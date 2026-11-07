@@ -30,6 +30,7 @@ New:
   p  PowerShell-style arguments (-DeviceHost ...) are accepted
   q  browser child dies with the tool (fake browser process; Windows job object / Linux PDEATHSIG)
   r  TASK-1560: the stored core dump is fetched once at the end (200 kept, 404 / 401 one line, no credentials)
+  t  Safari browser capture through a fake safaridriver: hook, poll lines, session closed at stop
 
 Run: python tests/test_capture_tool.py
 """
@@ -568,6 +569,82 @@ class ToolCase(unittest.TestCase):
         proc.wait()
         self.assertTrue(wait_for(lambda: not pid_alive(bpid), 10), "browser child %d outlived the killed tool" % bpid)
 
+
+    def test_t_safari_capture_via_fake_safaridriver(self):
+        if os.name == "nt":
+            self.skipTest("the fake safaridriver is a POSIX shell launcher")
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        fake = Path(tmp.name) / "fake_safaridriver.py"
+        fake.write_text(FAKE_SAFARIDRIVER, encoding="utf-8")
+        driver = Path(tmp.name) / "safaridriver"
+        driver.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{fake}" "$@"\n', encoding="utf-8")
+        driver.chmod(0o755)
+        dev = FakeDevice()
+        self.addCleanup(dev.shutdown)
+        env = dict(os.environ, OTGW_CAPTURE_SETTINGS=str(Path(tmp.name) / "s.json"))
+        out = Path(tmp.name) / "out"
+        r = subprocess.run([sys.executable, str(TOOL), "--device", "127.0.0.1", "--broker", "", "--duration", "4",
+                            "--browser", "safari", "--safaridriver-path", str(driver), "--browser-debug-port", "9655",
+                            "--telnet-port", str(dev.telnet_port), "--http-port", str(dev.http_port),
+                            "--output-root", str(out), "--skip-crashlog-capture", "--skip-http-probes",
+                            "--telnet-idle-check-seconds", "0"],
+                           stdin=subprocess.DEVNULL, capture_output=True, env=env, timeout=90)
+        self.assertEqual(r.returncode, 0, r.stdout.decode(errors="replace") + r.stderr.decode(errors="replace"))
+        text = next(out.glob("*/transcript-*.txt")).read_text(encoding="utf-8", errors="replace")
+        browser = section(text, "BROWSER DEVTOOLS (browser.log)")
+        self.assertIn("webdriver session S1: safari 99.1", browser)
+        self.assertIn("hook: installed", browser)
+        self.assertIn("[console.error] boom", browser)
+        self.assertRegex(browser, r"\[net\]\s+12 ms\s+200\s+GET http://dev/api/v2/health")
+        self.assertIn("[net] FAILED      7 ms  TypeError  GET http://dev/api/v2/x", browser)
+        self.assertIn("[ws] open ws://dev/ws", browser)
+        self.assertIn("http://dev/api/v2/settings", browser)
+        self.assertIn("[nav] navigate status 200", browser)
+        self.assertIn("2 request(s) to other sites not logged", browser)
+        self.assertIn("Browser capture (Safari): completed normally.", text)
+        calls = Path(str(fake) + ".calls").read_text()
+        self.assertIn("DELETE /session/S1", calls)
+
+
+
+FAKE_SAFARIDRIVER = r"""
+import json, sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+port = int(sys.argv[sys.argv.index('--port') + 1])
+calls = open(sys.argv[0] + '.calls', 'a')
+polls = [0]
+class H(BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def reply(self, value, code=200):
+        body = json.dumps({'value': value}).encode()
+        self.send_response(code); self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
+    def do_GET(self):
+        self.reply({'ready': True, 'message': ''})
+    def do_DELETE(self):
+        calls.write('DELETE ' + self.path + '\n'); calls.flush(); self.reply(None)
+    def do_POST(self):
+        n = int(self.headers.get('Content-Length') or 0)
+        body = json.loads(self.rfile.read(n) or b'{}')
+        calls.write('POST ' + self.path + '\n'); calls.flush()
+        if self.path == '/session':
+            return self.reply({'sessionId': 'S1', 'capabilities': {'browserName': 'safari', 'browserVersion': '99.1', 'platformName': 'mac'}})
+        if self.path.endswith('/url'):
+            return self.reply(None)
+        script = body.get('script', '')
+        if '__otgwCap = ' in script:
+            return self.reply('installed')
+        polls[0] += 1
+        if polls[0] == 1:
+            t = 1700000000000
+            return self.reply({'q': [[t, 'console.error', 'boom'], [t, 'net', '12|200|GET http://dev/api/v2/health'],
+                                     [t, 'net-fail', '7|GET http://dev/api/v2/x|TypeError'], [t, 'ws', 'open ws://dev/ws']],
+                               'res': [[t, 33, 0, 'fetch', 'http://dev/api/v2/settings', 512]],
+                               'nav': [t, 900, 200, 'navigate', 800, 900], 'href': 'http://dev/', 'dropped': 0, 'other': 2})
+        return self.reply({'q': [], 'res': [], 'nav': None, 'href': 'http://dev/', 'dropped': 0, 'other': 0})
+HTTPServer(('127.0.0.1', port), H).serve_forever()
+"""
 
 # ---- TASK-1523: hourly segments, zips, index, disk floor -------------------
 
