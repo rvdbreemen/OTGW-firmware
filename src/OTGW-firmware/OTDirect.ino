@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.128
+**  Version  : v2.0.0-beta.129
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -74,6 +74,29 @@ static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
 #define IS_MONITOR_MODE()  (otCurrentMode == OTD_MODE_MONITOR)
 #define IS_MASTER_MODE()   (otCurrentMode == OTD_MODE_MASTER)
 #define IS_LOOPBACK_MODE() (otCurrentMode == OTD_MODE_LOOPBACK)
+
+// Set by the settings path when OTDmode is written (TASK-1702); loopOTDirect() applies it on
+// the loop task. The settings POST runs on the async_tcp task, so it only raises this flag.
+// The release store publishes settings.otd.iMode, written just before, to the acquiring loop.
+static bool otdModeSettingPending = false;
+
+void otdModeSettingChanged() { __atomic_store_n(&otdModeSettingPending, true, __ATOMIC_RELEASE); }
+void otdModeSettingCancel()  { __atomic_store_n(&otdModeSettingPending, false, __ATOMIC_RELEASE); }
+
+// otdModeFromSetting: the mode the bus runs for a stored OTDmode value. Bypass needs the
+// relay on the board and enabled in the settings; without it the gateway runs Gateway.
+static OTDirectMode otdModeFromSetting(int iMode) {
+  OTDirectMode mode = static_cast<OTDirectMode>(constrain(iMode, 0, 4));
+#if !HAS_BYPASS_RELAY
+  if (mode == OTD_MODE_BYPASS) mode = OTD_MODE_GATEWAY;
+#else
+  if (mode == OTD_MODE_BYPASS && !settings.otd.bHasBypassRelay) {
+    OTDDebugTln(F("OT-direct: Bypass relay not enabled in settings, using gateway mode"));
+    mode = OTD_MODE_GATEWAY;
+  }
+#endif
+  return mode;
+}
 
 // ---------------------------------------------------------------------------
 // Parity helper — sets bit 31 to make total number of 1-bits even
@@ -870,17 +893,7 @@ void initOTDirect() {
   DebugTln(F("OT-direct: Initializing direct GPIO OpenTherm..."));
 
   // 1. Restore operating mode from persistent settings
-  otCurrentMode = static_cast<OTDirectMode>(settings.otd.iMode);
-#if !HAS_BYPASS_RELAY
-  // Boards without relay can't do bypass mode — force gateway if saved as bypass
-  if (otCurrentMode == OTD_MODE_BYPASS) otCurrentMode = OTD_MODE_GATEWAY;
-#else
-  // Runtime check: even if board has relay, it must be enabled in settings
-  if (otCurrentMode == OTD_MODE_BYPASS && !settings.otd.bHasBypassRelay) {
-    OTDDebugTln(F("OT-direct: Bypass relay not enabled in settings — forcing gateway mode"));
-    otCurrentMode = OTD_MODE_GATEWAY;
-  }
-#endif
+  otCurrentMode = otdModeFromSetting(settings.otd.iMode);
   // Initialize bypass relay hardware
 #if HAS_BYPASS_RELAY
   pinMode(PIN_BYPASS_RELAY, OUTPUT);
@@ -1905,6 +1918,14 @@ void otdMqttSetRoomSetpoint(float tempC) {
 // Non-blocking: uses async requests, never blocks for OT response.
 // ---------------------------------------------------------------------------
 void loopOTDirect() {
+  // TASK-1702: a saved OTDmode takes effect at once. Compared with the running mode, not
+  // the stored one, so choosing Gateway after the boot auto-detect picked Master switches
+  // back. Waits while a master request is in flight.
+  if (!otMasterRequestActive && __atomic_exchange_n(&otdModeSettingPending, false, __ATOMIC_ACQ_REL)) {
+    OTDirectMode wanted = otdModeFromSetting(settings.otd.iMode);
+    if (wanted != otCurrentMode) applyOTDirectMode(wanted);
+  }
+
   // Process OpenTherm library state machines (drives ISR-based TX/RX)
   otMaster.process();
   otSlave.process();

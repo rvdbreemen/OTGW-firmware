@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.128
+**  Version  : v2.0.0-beta.129
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -584,6 +584,9 @@ void readSettings(bool show)
   // clear any dirty/side-effect state set by updateSetting() above.
   settingsDirty = false;
   pendingSideEffects = 0;
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  otdModeSettingCancel();   // TASK-1702: the boot path sets the mode in initOTDirect()
+#endif
 
   // Post-processing: apply defaults for any missing or empty values
   if (strlen(settings.sHostname) == 0) strlcpy(settings.sHostname, _HOSTNAME, sizeof(settings.sHostname));
@@ -1271,7 +1274,10 @@ void updateSetting(const char *field, const char *newValue)
   }
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings ---
-  else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 4);
+  else if (strcasecmp_P(field, PSTR("OTDmode")) == 0) {
+    settings.otd.iMode = constrain(atoi(newValue), 0, 4);
+    otdModeSettingChanged();   // TASK-1702: loopOTDirect() applies the mode live
+  }
   else if (strcasecmp_P(field, PSTR("OTDautodetect")) == 0)    settings.otd.bAutoDetect = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDsetbacktemp")) == 0)    settings.otd.fSetbackTemp = clampSettingFloat(newValue, settings.otd.fSetbackTemp, 1.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("OTDsetbacktimeout")) == 0) settings.otd.iSetbackTimeout = constrain(atoi(newValue), 5, 255);

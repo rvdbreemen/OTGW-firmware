@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.128
+**  Version  : v2.0.0-beta.129
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -109,6 +109,8 @@ enum class OpenThermResponseStatus : byte;
 // OT-direct forward declarations (defined in OTDirect.ino)
 void initOTDirect();
 void loopOTDirect();
+void otdModeSettingChanged();   // TASK-1702: settings path, applied by loopOTDirect()
+void otdModeSettingCancel();
 void handleOTDirectBridgeStream();
 bool handleOTDirectCommand(const char* buf, int len, bool satOwn = false);   // satOwn: TASK-1575, see addCommandToQueue; false = refused (TASK-1593)
 void sendOTDirectOverridesJSON();

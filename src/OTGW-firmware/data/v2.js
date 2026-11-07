@@ -1804,6 +1804,30 @@
       renderConnMap(); renderConnStrip();
     }
   }
+  // TASK-1702: the bus can run another mode than the stored one, because the boot auto-detect
+  // switches to Master in RAM only when it sees no thermostat (TASK-1694). The OT-Direct mode
+  // row then says what runs now, and saving the selected mode applies it (the firmware applies
+  // every OTDmode write live), also when the selection equals the stored value.
+  function otdModeName(v) {
+    var o = (ENUM_OPTS.otdmode || []).filter(function (p) { return ('' + p[0]) === ('' + v); })[0];
+    return o ? ('' + o[1]).toLowerCase() : '';
+  }
+  function otdRunningDiffers(v) {
+    var want = otdModeName(v);
+    return !!otdMode && want !== '' && want !== otdMode;
+  }
+  function otdRunningNote(lbl, row) {
+    var cv = '' + curVal('otdmode');
+    if (!otdRunningDiffers(cv)) return;
+    var hs = document.createElement('span'); hs.className = 'shint';
+    hs.textContent = 'Running now: ' + otdMode.charAt(0).toUpperCase() + otdMode.slice(1) +
+      (otdMode === 'master' ? ' (no thermostat seen at boot). ' : '. ');
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'tbtn';
+    b.textContent = 'Switch to ' + otdModeName(cv);
+    b.addEventListener('click', function () { markDirty('otdmode', cv, row); });
+    hs.appendChild(b);
+    lbl.appendChild(hs);
+  }
   function fetchOtdStatus() {
     return fetch(APIGW + 'v2/otdirect/status').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       var s = j && j.otdirect_status; if (!s) return;
@@ -2632,6 +2656,7 @@
     addHelpIcon(lbl, k);   // TASK-1281
     var hint = hintFor(k);
     if (hint) { var hs = document.createElement('span'); hs.className = 'shint'; hs.textContent = hint; lbl.appendChild(hs); }
+    if (k === 'otdmode') otdRunningNote(lbl, row);   // TASK-1702
     row.appendChild(lbl);
     var input;
     if (type === 'b') {
@@ -2809,7 +2834,8 @@
     }
     // Password fields show empty; an empty value means "leave unchanged", so it is
     // never dirty and never POSTed (the GET-side value is a mask, not the secret).
-    if ((isPwd(k) && val === '') || ('' + setData[k].value) === val) delete setDirty[k];
+    var same = ('' + setData[k].value) === val && !(k === 'otdmode' && otdRunningDiffers(val));   // TASK-1702
+    if ((isPwd(k) && val === '') || same) delete setDirty[k];
     else setDirty[k] = val;
     if (row) row.classList.toggle('dirty', fieldDirty(k));
     updateSaveBar();
