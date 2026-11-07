@@ -3,11 +3,11 @@ id: TASK-1701
 title: >-
   OT-Direct gateway and monitor mode behave like the PIC: no own MsgID 0 that
   overrides the thermostat's CH enable
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-07T17:04:00Z'
-updated_date: '2026-11-07T17:52:00Z'
+updated_date: '2026-11-07T18:40:00Z'
 labels:
   - otdirect
   - bug
@@ -42,4 +42,6 @@ Robert 2026-11-07: hotfix first (gateway mode with a connected thermostat sends 
 Fix: OTDirect.ino otdOwnStatusRequestAllowed(gatewayMode, thermostatConnected) between markers; scheduleMasterRequest() skips the MsgID 0 entry when it returns false. Monitor mode already skips the scheduler (loopOTDirect, DUE(timerOTSchedule) && !IS_MONITOR_MODE()) and forwards the thermostat frame unmodified: no code change, now covered by source-pattern tests.
 
 Evidence: tests/test_otd_gateway_own_status.py compiles the real scheduleMasterRequest/buildStatusRequest/schedule table, 6 min with a thermostat sending 0x02 each second. OLD (origin/dev c928bcaf7): G1 FAIL own_status=347 ch_changes=568 (tjfs pattern). FIX: 6/6 OK, G1 own_status=0 ch_changes=0, G2 (no thermostat) 347 own MsgID 0 kept, G3 master mode CH off kept. test_otd_ch_override 9/9 OK; test/host/test_override_reply.py 4 suites OK; evaluate --quick 84 passed 0 failed. test_otd_status_relay: 9 errors WinError 225 (Defender blocks the compiled exe) on OLD and FIX alike, environment, not the fix.
+
+Pushed origin/dev 91dead9cc (beta.126). Build at 91dead9: 2x ESP32S3 image, Build completed successfully. Bench .61 (OT-Direct, master mode, no thermostat, no boiler): OTA app+fs of ede9382 (same firmware, pre-rebase hash) OK, bootcount 103->105, no crashlog, 164 settings unchanged, SAT CS=30.2/MM/CH still sent. #alpha zip 1568696172582015118, tjfs reply 1568696366358859904. AC3 covers MsgID 0 only by Robert's hotfix choice; the rest of the PIC model is TASK-1707. AC5 needs a thermostat on an OT-Direct unit: field confirmation by tjfs, none on the bench.
 <!-- SECTION:NOTES:END -->
