@@ -1,9 +1,11 @@
 ---
 id: TASK-1667
 title: Host decoder and replay of a diagnostic recording (ADR-213 step 3)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-05T20:35:00Z'
+updated_date: '2026-11-07T11:34:00Z'
 labels:
   - diagnostics
 milestone: 2.0.0
