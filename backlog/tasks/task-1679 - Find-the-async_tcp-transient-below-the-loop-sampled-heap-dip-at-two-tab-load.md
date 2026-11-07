@@ -1,11 +1,11 @@
 ---
 id: TASK-1679
 title: Find the async_tcp transient below the loop-sampled heap dip at two-tab load
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T04:05:00Z'
-updated_date: '2026-11-07T12:16:00Z'
+updated_date: '2026-11-07T16:57:00Z'
 labels:
   - heap
 milestone: 2.0.0
@@ -40,4 +40,14 @@ Follow-up of TASK-1673 (ADR-216). With the per-connection send cap, the native m
 2026-11-07 root-cause research (read-only workflow, 5 lenses + synthesis; journal subagents/workflows/wf_74bfb91d-58f): heap budget of the two-tab peak explains ~21-31 KB of the observed ~52-58 KB drop (lwIP TX pbufs full-MSS copy ~6.3 KB, _send_buffer 2.9 KB per _ack, WiFi dynamic TX copies 0-6.4 KB, LittleFS chain ~1.45 KB per open file, request/response/client objects ~4 KB, 13 TIME_WAIT pcbs ~3.3 KB); ~22-37 KB unexplained, hypothesis: concurrent non-web consumers (MQTT/telnet pcbs uncapped, post-boot HA burst) and WiFi dynamic RX occupancy (runtime 32 dyn RX/32 dyn TX, WiFiGeneric.cpp:274-279). Bench .61 has psram_found=0. Five options put to Robert: 1 zero-copy gz from flash, 2 own file response with one shared static buffer, 3 size-aware admission + favicon from PROGMEM, 4 TIME_WAIT reaper, 5 send cap/burst pause for non-web pcbs; prerequisite measurement: extend sampleHeapDip (heap_caps_get_info internal, MQTT queue, TX bytes per port, heap just before the load) + A/B with MQTT off.
 
 2026-11-07 cause A/B on .61 (beta.120+8fad93a, no build; reboot per run, twotab_gz 25 rounds, 100/100 OK and 0 timeouts in every run; log scratchpad/b103/mqtt_ab.log). hd_min_free_heap per arm: A MQTT on, load 10 s after boot: 23580/14596/14308/15568/12748 (pre-load free 72.7-72.9 KB). B MQTT on, load 150 s after boot: 24876/19956/26284/20860/14364 (pre 72.8-73.3 KB). C MQTT off, load 10 s after boot: 44932/42068/45200/46544/46720 (pre 75.0-75.2 KB). Reading: with MQTT off the two-tab drop is about 30 KB (75 -> 45), which matches the web-path budget (21-31 KB); with MQTT on the minimum is 25-30 KB lower although MQTT costs only ~2.3 KB at rest. So the unexplained part is MQTT activity during the web load, and it is not only the post-boot burst (arm B still 14-26 KB). Settings identical before/after, MQTT reconnected. Side note: a capture-discovery test (TASK-1690) sent a few GETs to .61 during the run.
+
+2026-11-07 MQTT diag A/B on .61, beta.123+b73ed43 (MQTT on, SAT + satsimulation on, reboot per run, twotab_gz 25 rounds, 100/100 OK, 0 timeouts each; log scratchpad/b103/mqttdiag_b123.log). Per run: min_free / dip_free / files at dip / web TX at dip / MQTT outbox at dip / MQTT lwIP TX at dip / outbox HWM: r1 18784/25868/0/0/41/4886/49; r2 8080/14612/2/5744/0/828/48; r3 18680/24332/2/5744/10/3082/49; r4 12212/26120/2/5744/0/546/48; r5 15900/27320/0/0/40/286/48. Reading: the MQTT outbox reaches 48-49 messages every boot (HWM since boot, so the boot discovery/status burst is included), and at the loop-sampled dip it holds 0-41 messages plus up to 4.9 KB in lwIP on the broker pcb. The deepest dips (r2 8.1 KB, r4 12.2 KB) have 2 file streams and 5744 B web TX but an empty outbox, so they are the web path; dips with files 0 have 40-41 outbox messages. Outbox bytes are not measured (would need a library change); at about 100-200 B per queued publish (topic + payload + packet) 40-49 messages are an estimated 4-10 KB (INFERENCE).
+
+Correction to the final summary: the per-message discovery drip task is TASK-1699, not TASK-1698.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: transient measured inside async_tcp with hd_ack_low_* (beta.119, commit 35f2cfd18): the 5 KB dip of one run sat inside a file _ack that started at 22.6 KB. Cause A/B without a build (beta.120, 15 runs): MQTT off minimum 42-47 KB, MQTT on 13-26 KB, so MQTT adds 25-30 KB during web load. MQTT diag (beta.123, b73ed435a, 5 runs): outbox HWM 48-49 after boot, 0-41 at the dip, up to 4.9 KB lwIP TX on the broker pcb; the deepest dips (8-12 KB) are the web path with 2 file streams and an empty outbox. A 40 KB admission threshold was tried (beta.120+86f6716, local) and reverted: 3 timeouts of 12 s. AC2: decided with Robert (2026-11-07): close with two follow-ups TASK-1696 (favicon from PROGMEM + one large stream at a time) and TASK-1697 (MQTT pcb cap + outbox bound); Robert also asked for a per-message discovery drip, TASK-1698. Not verified: outbox byte size (needs a library change).
+<!-- SECTION:FINAL_SUMMARY:END -->

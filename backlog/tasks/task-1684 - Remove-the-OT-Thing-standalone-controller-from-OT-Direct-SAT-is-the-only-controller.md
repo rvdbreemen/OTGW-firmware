@@ -3,11 +3,11 @@ id: TASK-1684
 title: >-
   Remove the OT-Thing standalone controller from OT-Direct (SAT is the only
   controller)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T09:22:00Z'
-updated_date: '2026-11-07T14:14:00Z'
+updated_date: '2026-11-07T15:06:00Z'
 labels:
   - otdirect
   - breaking
@@ -76,3 +76,9 @@ Correction to the previous note: Robert answered the four open decisions; an exp
 
 2026-11-07 build + bench (beta.123+b73ed43 = 834902ac8 TASK-1684 + 038e60770 TASK-1694 + b73ed435a diag, rebased on 699b3616c). Build: 2x 'Successfully created ESP32S3 image', 'Build completed successfully', .ino.bin 2116944 B (beta.119+35f2cfd 2124352 B; TASK-1685 took 32 B in between) so about -7.4 KB app slot, the diag commit in the same image adds a little. evaluate --quick 85/0 on each commit. Bench .61 (no boiler, no thermostat), port 25238 raw frames for 90 s, SAT and satsimulation off, master mode: OLD image beta.120+8774771: MsgID 0 high byte 0x01 in 18/18 frames (CH on), 2 MsgID 1 writes 0x2D00, override table MsgID 1 = 11520. NEW beta.123: high byte 0x00 in 18/18 (CH off), 0 MsgID 1 writes, override table empty, crashlog empty. SAT on (no room temp, SAT inactive): high byte 0x01 in 23/23 (CH stays on while SAT is enabled, Robert's decision), 0 writes. SAT on with satsimulation: SAT active, preheating, heating curve 32.2, PID output 44.271, override MsgID 1 = 11340 (0x2C4C = 44.30 C) and MsgID 14 = 25600, last_blocked_cmd MID=1 VAL=11340: SAT computes and enqueues its CS as before. OTA settings check: 177 -> 164 keys, the only differences are the 13 removed keys; settings diff before/after the whole bench: removed = the 13 keys, added none, changed none. Logs/scripts in scratchpad/b103 (wire1684.py, set61.sh, settings-61-before/after-1684.json).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Removed the OT-Thing standalone controller from OT-Direct (commit 834902ac8, beta.121, pushed in b73ed435a / zip beta.123+b73ed43). AC1: code, 13 settings, REST keys (/settings, /otdirect/settings, /debug, ch_suspended), UI fields/help and the retained otgw32/ch_suspended topic removed; guard tests/test_otd_controller_removed.py red on HEAD (120 hits) and green; OTA settings check on .61: 177 -> 164 keys, only the 13 removed keys differ, old settings.ini loaded without error. AC2: master mode without SAT/CS is documented in BREAKING_CHANGES.md and CHANGELOG (CH off unless SAT enabled or a CS override is active; CS= must be repeated within 60 s; thermostat write enables CH). AC3: host harness suite 1684 OLD fails P1/P2 (12 MsgID 1 enqueues, CH on), FIX passes P1-P8, suites 1178/1177/1184 byte-identical; evaluate --quick 85/0; esp32-combo build OK; bench .61 wire test (port 25238, 90 s, master, SAT off): old image CH on 18/18 + 2x MsgID 1 = 0x2D00, new image CH off 18/18 + 0 writes; SAT on and inactive: CH on 23/23 (Robert's decision); SAT on in simulation: SAT active, setpoint 44.271 C, override MsgID 1 = 0x2C4C, so SAT still controls. AC4: .ino.bin 2124352 B (beta.119) -> 2116944 B (beta.123), about -7.4 KB including the small diag commit in the same image. Reviewed by an opus and a sonnet reviewer; findings fixed or documented. Robert: no ADR needed. Not verified: a real boiler and a real thermostat on the slave interface (bench has neither); the HA-sent CS= path in master mode was not run on the bench.
+<!-- SECTION:FINAL_SUMMARY:END -->

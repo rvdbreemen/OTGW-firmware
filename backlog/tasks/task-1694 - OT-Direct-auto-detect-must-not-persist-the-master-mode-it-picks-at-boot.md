@@ -1,11 +1,11 @@
 ---
 id: TASK-1694
 title: OT-Direct auto-detect must not persist the master mode it picks at boot
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T13:12:00Z'
-updated_date: '2026-11-07T14:14:00Z'
+updated_date: '2026-11-07T15:06:00Z'
 labels:
   - otdirect
   - bug
@@ -33,3 +33,9 @@ Robert 2026-11-07 (session, AskUserQuestion: 'Alleen het opslaan fixen'): auto-d
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-07 bench .61 beta.123+b73ed43: otdmode set to 1 (gateway) via REST, two reboots without a thermostat: boot 1 runtime master, saved otdmode 1; boot 2 runtime master, saved otdmode 1. Before the fix the unit had otdmode 3 saved by the auto-detect. A user mode change persists (REST otdmode=1 and later otdmode=3 both read back from /api/v2/settings). Source test tests/test_otd_autodetect_no_persist.py: old 2 failures + 1 error, fix OK. Release-note line is in BREAKING_CHANGES.md and CHANGELOG [Unreleased] Fixed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Boot auto-detect switches with applyOTDirectMode() (RAM only); setOTDirectMode() still persists user changes (commit 038e60770, beta.122). AC1: source test red on old (2 failures, 1 error), green on fix; bench .61 two boots without a thermostat with otdmode=1 saved: runtime master, saved 1 both times. AC2: REST otdmode=1 and otdmode=3 both persisted and read back. AC3: BREAKING_CHANGES + CHANGELOG note for units that already saved master. Not verified: a boot with a real thermostat connected (bench has none).
+<!-- SECTION:FINAL_SUMMARY:END -->
