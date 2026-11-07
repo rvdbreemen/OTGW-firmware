@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.122
+**  Version  : v2.0.0-beta.123
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -348,6 +348,7 @@ void startWebhookTask();  // ADR-123 Phase-4: create the webhook sender task onc
 bool webhookTaskAvailable();
 uint8_t webFileInFlightNow();
 uint8_t restInFlightNow();
+uint16_t mqttQueueNow();                 // TASK-1679: MQTT outbox entries (heap diagnostics)
 void sampleHeapDip();  // TASK-1669: the sender task exists, so it can run the weather fetch (webhook.ino)
 void weatherWorkerPoll();     // TASK-1669: run a requested weather fetch; webhook task only (SATweather.ino)
 bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-056; defined in restAPI.ino)
@@ -545,6 +546,9 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint8_t  iDipFiles               = 0;  // file streams admitted by the file gate
   uint8_t  iDipRest                = 0;  // REST requests in flight
   uint8_t  iDipWs                  = 0;  // WebSocket clients
+  uint16_t iDipMqttQueue           = 0;  // TASK-1679: MQTT outbox entries at the dip
+  uint32_t iDipMqttTxBytes         = 0;  // TASK-1679: bytes queued in lwIP on the broker connection at the dip
+  uint16_t iMqttQueueHwm           = 0;  // TASK-1679: largest MQTT outbox seen by the loop since the last reset
   // TASK-1679: lowest heap-window minimum that fell inside a file response's library ack,
   // the free heap just before that ack, and how many acks lowered the minimum.
   uint32_t iAckLowMin              = 0xFFFFFFFF;

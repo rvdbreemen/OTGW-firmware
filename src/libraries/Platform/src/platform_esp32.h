@@ -432,6 +432,20 @@ inline PlatformTcpHoldSnapshot platformTcpHoldSnapshot(uint16_t localPort) {
   return s;
 }
 
+// TASK-1679: bytes queued in unsent and unacked segments on the active pcbs whose remote port is
+// remotePort (the MQTT broker connection), under the core lock.
+inline uint32_t platformTcpTxBytesToRemotePort(uint16_t remotePort) {
+  uint32_t bytes = 0;
+  LOCK_TCPIP_CORE();
+  for (struct tcp_pcb *pcb = tcp_active_pcbs; pcb != nullptr; pcb = pcb->next) {
+    if (pcb->remote_port != remotePort) continue;
+    for (struct tcp_seg *seg = pcb->unsent; seg != nullptr; seg = seg->next) bytes += seg->len;
+    for (struct tcp_seg *seg = pcb->unacked; seg != nullptr; seg = seg->next) bytes += seg->len;
+  }
+  UNLOCK_TCPIP_CORE();
+  return bytes;
+}
+
 inline uint16_t platformTcpActivePcbCount() {
   uint16_t count = 0;
   LOCK_TCPIP_CORE();

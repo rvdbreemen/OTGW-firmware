@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.122
+**  Version  : v2.0.0-beta.123
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -209,6 +209,7 @@ static bool isDripDeferred() {
 // the re-entrancy contract must be re-evaluated there.
 // ClientSync owns its own TCP socket, so the old WiFiClient injection is gone.
 static espMqttClient MQTTclient(espMqttClientTypes::UseInternalTask::NO);
+uint16_t mqttQueueNow() { const size_t n = MQTTclient.queueSize(); return n > 0xFFFF ? 0xFFFF : (uint16_t)n; }
 
 // onConnect/onDisconnect handlers (defined below) need a forward declaration so
 // they can be wired with onConnect()/onDisconnect() in startMQTT().

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.122
+**  Version  : v2.0.0-beta.123
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3450,6 +3450,9 @@ void sendDeviceInfoV2()
     je.field(F("hd_dip_files"),            (uint32_t)snap->st.heapdiag.iDipFiles);
     je.field(F("hd_dip_rest"),             (uint32_t)snap->st.heapdiag.iDipRest);
     je.field(F("hd_dip_ws"),               (uint32_t)snap->st.heapdiag.iDipWs);
+    je.field(F("hd_dip_mqtt_queue"),       (uint32_t)snap->st.heapdiag.iDipMqttQueue);
+    je.field(F("hd_dip_mqtt_tx_bytes"),    (uint32_t)snap->st.heapdiag.iDipMqttTxBytes);
+    je.field(F("hd_mqtt_queue_hwm"),       (uint32_t)snap->st.heapdiag.iMqttQueueHwm);
     je.field(F("hd_ack_low_min"),          snap->st.heapdiag.iAckLowMin == 0xFFFFFFFF ? 0u : snap->st.heapdiag.iAckLowMin);
     je.field(F("hd_ack_low_free_before"),  snap->st.heapdiag.iAckLowFreeBefore);
     je.field(F("hd_ack_low_hits"),         snap->st.heapdiag.iAckLowHits);

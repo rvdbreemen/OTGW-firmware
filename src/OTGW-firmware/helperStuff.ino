@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.122
+**  Version  : v2.0.0-beta.123
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -533,6 +533,8 @@ void sampleHeapWatermark() {
 // TASK-1673: called every loop() iteration. Reading free heap is cheap; the TCP walk (core
 // lock) runs only when a new minimum is seen, which settles after the first loads.
 void sampleHeapDip() {
+  const uint16_t q = mqttQueueNow();
+  if (q > state.heapdiag.iMqttQueueHwm) state.heapdiag.iMqttQueueHwm = q;
   const uint32_t fh = platformFreeHeap();
   if (fh >= state.heapdiag.iDipFreeHeap) return;
   const PlatformTcpHoldSnapshot t = platformTcpHoldSnapshot(80);
@@ -545,6 +547,8 @@ void sampleHeapDip() {
   state.heapdiag.iDipFiles        = webFileInFlightNow();
   state.heapdiag.iDipRest         = restInFlightNow();
   state.heapdiag.iDipWs           = (uint8_t)webSocketClientCount();
+  state.heapdiag.iDipMqttQueue    = q;
+  state.heapdiag.iDipMqttTxBytes  = platformTcpTxBytesToRemotePort(settings.mqtt.iBrokerPort);
 }
 
 // Zero the soak window: watermark, histogram, and the cumulative pressure counters,
@@ -557,6 +561,7 @@ void sampleHeapDip() {
 // Note: min_free_heap is the native ESP32 allocator watermark (ESP.getMinFreeHeap)
 // and CANNOT be reset from user space — it stays since-boot.
 void resetHeapWatermark() {
+  state.heapdiag.iMqttQueueHwm = 0;
   state.heapdiag.iMinMaxBlock = 0xFFFFFFFF;
   for (uint8_t i = 0; i < 5; i++) state.heapdiag.aMaxBlockBucket[i] = 0;
   state.heapdiag.iWsDropsTotal             = 0;
