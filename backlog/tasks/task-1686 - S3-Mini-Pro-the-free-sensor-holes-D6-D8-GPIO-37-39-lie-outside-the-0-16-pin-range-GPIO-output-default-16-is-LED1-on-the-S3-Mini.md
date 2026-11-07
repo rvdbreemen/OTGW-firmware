@@ -3,11 +3,11 @@ id: TASK-1686
 title: >-
   S3 Mini Pro: the free sensor holes D6-D8 (GPIO 37-39) lie outside the 0-16 pin
   range; GPIO output default 16 is LED1 on the S3 Mini
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T09:40:00Z'
-updated_date: '2026-11-07T13:26:00Z'
+updated_date: '2026-11-07T16:55:00Z'
 labels:
   - sensors
 dependencies: []
@@ -35,4 +35,12 @@ Found under TASK-1662 (2026-11-07). The pin settings gpiosensorspin, s0counterpi
 Robert 2026-11-07 via 54: 'akkoord, je mag hoger instellen op een s3'. Defaults unchanged (sensor 10, S0 12, output 16) as instructed: changing them needs Robert. Implemented: settingGpioInRange() in OTGW-firmware.h ([setting-gpio-range] markers, SETTING_GPIO_MAX 48): GPIO 0-21 and 26-48 (22-25 do not exist on the ESP32-S3). The three setters (GPIOSENSORSpin, S0COUNTERpin, GPIOOUTPUTSpin) use it instead of 0-16; restAPI announces max SETTING_GPIO_MAX for gpiosensorspin/s0counterpin/gpiooutputspin, which the v2 settings page uses as the input max. Board pins inside the range stay refused where they are used (isBoardReservedPin in initSensors/initS0Count/validateGPIOOutputsConfig, TASK-1552).
 
 Evidence: tests/test_setting_gpio_range.py compiles the REAL setter branches, settingGpioInRange() and boardPinReserved() with the real boards.h (MSVC) and calls the setters like a REST POST. Fix: 5/5 OK (Pro free holes GPIO 39/38/37 stored for the 1-Wire bus and not reserved on COMBO_MAP_CLASSIC_PRO; 22, 25, 49, -1 refused; 10, 0, 16 still accepted; REST max is SETTING_GPIO_MAX; the three isBoardReservedPin guards are in place). On origin/dev settingStuff.ino + OTGW-firmware.h: the Pro case fails (GPIOSENSORSpin=38/37, S0COUNTERpin=38, GPIOOUTPUTSpin=37 refused, pin stays -1). test_board_pin_reserved, test_settings_whitelist, test_settings_float_roundtrip pass; evaluate --quick 0 FAIL. Build and OTA bench pending (one build with TASK-1692).
+
+Rebased onto TASK-1684 (banner conflicts only), re-bumped to beta.125. Rebased tree: gpio range 5/5, board pins 5/5, settings tests pass. Bench .61 with beta.125+95d4014: REST gpiosensorspin/s0counterpin/gpiooutputspin max 48; POST gpiosensorspin=38 stored (HTTP 200), POST 23 refused (value stays 38); value restored to 10; all 164 settings equal to before the flash. Pushed 95d4014, posted (#alpha-testing msg 1568670028713299998). Follow-up for the defaults: Robert chose per-board defaults (new task).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 (Robert: widen, defaults unchanged) and AC2 done. The pin settings accept the ESP32-S3 GPIO set 0-21/26-48 through settingGpioInRange(); REST announces max 48; board pins stay refused at use. Host test on the real setter branches: the Pro free holes 37-39 refused on the old code, stored on the fix; bench .61 confirms 38 stored and 23 refused; pushed as beta.125 (95d4014). Per-board defaults follow in a new task.
+<!-- SECTION:FINAL_SUMMARY:END -->
