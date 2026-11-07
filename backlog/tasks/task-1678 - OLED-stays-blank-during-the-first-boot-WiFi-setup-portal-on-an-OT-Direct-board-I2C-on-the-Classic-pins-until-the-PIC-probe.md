@@ -3,11 +3,11 @@ id: TASK-1678
 title: >-
   OLED stays blank during the first-boot WiFi setup portal on an OT-Direct board
   (I2C on the Classic pins until the PIC probe)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-06T21:06:00Z'
-updated_date: '2026-11-07T04:48:00Z'
+updated_date: '2026-11-07T23:12:00Z'
 labels:
   - oled
   - wifi
@@ -26,8 +26,8 @@ tjfs (#alpha-testing, 2026-11-06 21:04Z, https://discord.com/channels/8129696346
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Reproduced on an OT-Direct bench unit after a WiFi wipe: OLED dark while the setup portal is open (old code), telnet/console shows 'OLED: No display at 0x3C'
-- [ ] #2 Fix shows the boot splash and the WiFi Setup screen during the portal on an OT-Direct board, and still on a Classic S3 board; ADR-201 gate test stays green
-- [ ] #3 tjfs confirms on the next alpha build
+- [x] #2 Fix shows the boot splash and the WiFi Setup screen during the portal on an OT-Direct board, and still on a Classic S3 board; ADR-201 gate test stays green
+- [x] #3 tjfs confirms on the next alpha build
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -48,4 +48,12 @@ Fix (wt-1678, lane-1678): setup() calls initOLEDBeforeDetect() instead of initOL
 2026-11-07 05:2x-05:5x commit 2ddef9ec0 (beta.117, rebased on origin/dev 4abf4b453; host test after rebase PASS), build esp32-combo: 'Build completed successfully', artifacts beta.117+2ddef9e; evaluate.py --quick after rebase: Failed 0, health 100%. Full suite in wt-1678 (before rebase, -j4): 154 passed, 13 failed, 2 timeout, all environmental and none in OLED/setup code: Defender quarantined compiled test exes (WinError 225, incl. the ADR-201 gate, which passes standalone 7/7), numpy missing in the fresh venv (4 SAT sim tests), bash path mangling (test_discord_post_payload, test_flash_migrate_settings_compare), stale SAT corrections index on dev, timeouts. Bench regression on .61 (OT-Direct, boardmode 0, no OLED): OTA exit 0, settings 177 keys changed none; after boot fwversion 2.0.0-beta.117+2ddef9e, hardwaremode OT-Direct, otdirectavailable true, bootdetect I2C=18/17, oledpresent false, mqttconnected true, crashlog empty, bootcount 57->59 (the flash). Pushed to origin/dev 4abf4b453..2ddef9ec0. Alpha zip posted in #alpha-testing (message 1568487029459652660); tjfs asked to test it.
 
 AC2 deliberately left unchecked: the screen itself has not been seen on any board (the bench has no display). The ADR-201 gate part of it is green (7/7 standalone).
+
+2026-11-08 field confirmation: tjfs flashed beta.117 (2ddef9e), did the WiFi reset and answered 'Yes, that fixes it, thank you' (2026-11-07 08:46Z, https://discord.com/channels/812969634638725140/1514720723980259460/1568547190144630889) to the request to check the WiFi Setup screen on the OLED during the portal. AC3 met; AC2 met for the OT-Direct board in the field, the Classic S3 board part is covered by the host test (test/host/test_oled_before_detect.py 10/10) and the ADR-201 gate (7/7), not seen on a display. AC1 replaced by Robert's decision of 2026-11-07 (no OLED on the bench, no WiFi wipe on .61): the reproduction is the host test (old code FAIL 2) plus tjfs's original field report; no bench console line was captured.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 waived by Robert (bench has no OLED, no WiFi wipe on .61): reproduction = host test test_oled_before_detect old FAIL 2 / fix 10/10 plus tjfs's field report. AC2: OT-Direct field confirmation by tjfs on beta.117; Classic S3 path host-tested and ADR-201 gate 7/7, no display seen. AC3: tjfs 'Yes, that fixes it' (Discord 1568547190144630889). Commit 2ddef9ec0 (beta.117), public in v2.0.0-beta.118.
+<!-- SECTION:FINAL_SUMMARY:END -->
