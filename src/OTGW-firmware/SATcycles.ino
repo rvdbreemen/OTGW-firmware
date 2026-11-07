@@ -1434,18 +1434,6 @@ bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
   return false;
 }
 
-//=== Get cycle history count of a specific class (for diagnostics) ===
-uint8_t satCycleCountClass(SATCycleClass cls)
-{
-  uint8_t count = 0;
-  for (uint8_t i = 0; i < _cycleHistoryCount; i++) {
-    if (_cycleHistory[i].eClass == cls) count++;
-  }
-  SATDebugTf(PSTR("SAT countClass: class=%d count=%u total=%u\r\n"),
-             (int)cls, (unsigned)count, (unsigned)_cycleHistoryCount);
-  return count;
-}
-
 //=== Accessors for cycle timing (used by SATcontrol.ino PWM mode) ===
 uint32_t satCycleGetFlameOnStartMs()  { return _cycle_flameOnStartMs; }
 uint32_t satCycleGetFlameOffStartMs() { return _cycle_flameOffStartMs; }

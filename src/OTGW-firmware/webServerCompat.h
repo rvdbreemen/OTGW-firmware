@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-beta.119
+**  Version  : v2.0.0-beta.120
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -17,7 +17,7 @@
 **  heap state, no concurrency).
 **
 **  This header is the bridge between the existing imperative-push REST/
-**  FSexplorer code (sendStartJsonMap -> N x sendJsonMapEntry -> sendEndJsonMap,
+**  FSexplorer code (sendJsonMapEntry and the restSend* writers,
 **  serveVersionedAsset, doRedirect) and the pull/callback async server.
 **
 **  Split by hazard (TASK-865.9 design):

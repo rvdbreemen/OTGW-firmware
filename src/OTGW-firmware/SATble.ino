@@ -157,7 +157,6 @@ static bool satBleParseMacToOnAir(const char* macStr, uint8_t out6[6]);
 static bool mibeaconDecryptInPlace(uint8_t* raw, size_t len, const char* bindkeyHex, const uint8_t addr6[6], size_t* plaintextLen);
 bool        satBLERosterSetBindkey(const char* mac, const char* key);  // called from restAPI.ino
 static int  bleFindOrAllocSlot(const char* mac);
-static bool bleMatchesConfiguredMAC(const char* mac);
 static bool bleNameConfirmedMismatch(const char* name);  // TASK-895
 
 //=====================================================================
@@ -410,16 +409,6 @@ static bool parseBLEMiBeaconFormat(const uint8_t* data, size_t len, float* temp,
   }
 
   return gotTemp || gotHum || gotBatt;        // any decoded field registers the advert
-}
-
-//=====================================================================
-// Check if a MAC address matches the configured BLE MAC filter
-// Empty/unset MAC means accept all sensors
-//=====================================================================
-static bool bleMatchesConfiguredMAC(const char* mac)
-{
-  if (settings.sat.sBleMAC[0] == '\0') return true;  // No filter: accept all
-  return (strcasecmp(mac, settings.sat.sBleMAC) == 0);
 }
 
 //=====================================================================

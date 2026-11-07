@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.119
+**  Version  : v2.0.0-beta.120
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -732,14 +732,6 @@ void blinkLEDnow(uint8_t led){
 
 // Zero-argument wrapper — calls LED1 variant. Defined once for both boards.
 void blinkLEDnow() { blinkLEDnow(LED1); }
-
-void blinkLEDms(uint32_t delay){
-  //blink the statusled, when time passed
-  DECLARE_TIMER_MS(timerBlink, delay);
-  if (DUE(timerBlink)) {
-    blinkLEDnow();
-  }
-}
 
 void blinkLED(uint8_t led, int nr, uint32_t waittime_ms){
     for (int i = nr; i>0; i--){

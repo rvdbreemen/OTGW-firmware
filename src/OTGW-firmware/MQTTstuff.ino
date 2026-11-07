@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.119
+**  Version  : v2.0.0-beta.120
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -104,7 +104,6 @@ struct MQTTAutoConfigSessionLock {
   MQTTAutoConfigSessionLock& operator=(const MQTTAutoConfigSessionLock&) = delete;
 };
 
-// pgm_strncmp_PP() and pgm_read_char() are in MQTTstuff.h (inline, shared with MQTTHaDiscovery.cpp)
 
 // Status-burst quiesce (TASK-342) + post-burst cooldown (TASK-347).
 // A Status-frame fanout publishes status_master plus 7 bits, and/or status_slave
@@ -1080,7 +1079,6 @@ static void onMqttMessage(const espMqttClientTypes::MessageProperties& propertie
   handleMQTTcallback(topicBuf, const_cast<byte*>(payload), (unsigned int)len, properties.retain);
 }
 
-void sendMQTT(const char* topic, const char *json);
 void publishBirthOnline();  // F3 (TASK-874): gate-bypassing retained availability birth
 
 // ---------------------------------------------------------------------
@@ -2069,27 +2067,9 @@ void sendMQTTstateinformation(){
   publishOTGWConnectedState();
 }
 
-/*
-* topic:  <string> , topic will be used as is (no prefixing), retained = true
-* json:   <string> , payload to send
-*/
-//===========================================================================================
-// Publishes the topic verbatim (no namespace prefix), retained. Used for the
-// birth message and a few absolute-topic publishes. Funnels through the single
-// mqttPublishRaw chokepoint (espMqttClient buffers the publish atomically).
-void sendMQTT(const char* topic, const char *json) {
-  if (!settings.mqtt.bEnable) return;
-  if (!MQTTclient.connected()) return;
-  if (!isValidIP(MQTTbrokerIP)) return;
-  if (!canPublishMQTT()) return;
-
-  const size_t len = strlen(json);
-  if (!mqttPublishRaw(topic, reinterpret_cast<const uint8_t*>(json), len, true)) PrintMQTTError();
-}
-
 // F3 (TASK-874): publish the retained availability birth "online" to the base
 // namespace (== the LWT topic set in MQTT_STATE_INIT). Deliberately BYPASSES the
-// canPublishMQTT() heap gate that sendMQTT() applies: the birth is a 7-byte
+// canPublishMQTT() heap gate that sendMQTTData() applies: the birth is a 7-byte
 // control-plane message and dropping it strands every entity "unavailable" in HA
 // behind the retained LWT "offline". Called once from onMqttConnect() and then
 // periodically re-asserted while connected, so a transient outbox-full or a
@@ -2118,21 +2098,6 @@ bool publishMQTTOnOff(const char* topic, bool value) {
 
 bool publishMQTTOnOff(const __FlashStringHelper* topic, bool value) {
   return sendMQTTData(topic, value ? "ON" : "OFF");
-}
-
-/**
- * Publish integer value as string to MQTT topic
- */
-void publishMQTTInt(const char* topic, int value) {
-  static char buffer[12];
-  snprintf_P(buffer, sizeof(buffer), PSTR("%d"), value);
-  sendMQTTData(topic, buffer);
-}
-
-void publishMQTTInt(const __FlashStringHelper* topic, int value) {
-  static char buffer[12];
-  snprintf_P(buffer, sizeof(buffer), PSTR("%d"), value);
-  sendMQTTData(topic, buffer);
 }
 
 // ADR-096 worldview routing + ADR-097 sibling-suffix topic shape.

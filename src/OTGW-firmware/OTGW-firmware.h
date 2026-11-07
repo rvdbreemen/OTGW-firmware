@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.119
+**  Version  : v2.0.0-beta.120
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -625,20 +625,6 @@ inline bool isOTDirectEnabled() {
 #endif
 }
 
-// TASK-1073: can the serial frame-replay simulator actually run here?
-// The replay pump lives on the PIC serial path, so it is compiled out entirely
-// without HAS_PIC, and it returns early while the board is in OT-Direct mode.
-// The REST endpoints must consult this before reporting replay active: a PIC-less
-// or OT-Direct board otherwise answers active:true while not one fixture frame is
-// replayed, a silent failure that looks exactly like success.
-inline bool canReplayOTGWSimulation() {
-#if HAS_PIC
-  return !isOTDirectEnabled();
-#else
-  return false;
-#endif
-}
-
 inline bool hasOTCommandInterface() {
   return isPICEnabled() || isOTDirectEnabled();
 }
@@ -676,15 +662,6 @@ inline bool isNetworkUp() {
 #endif
 #if defined(_VERSION_PRERELEASE)
   if (state.net.bAPFallback) return true;  // BETA: SoftAP counts as network-up for web/telnet
-#endif
-  return (WiFi.status() == WL_CONNECTED);
-}
-
-// Returns true only when a real WiFi or Ethernet connection is available.
-// Use this (not isNetworkUp) to gate services that need internet/LAN: MQTT, NTP.
-inline bool isWiFiConnected() {
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  if (state.net.eMode == NET_ETHERNET) return true;
 #endif
   return (WiFi.status() == WL_CONNECTED);
 }
@@ -731,11 +708,6 @@ inline const __FlashStringHelper* hardwareTypeName() {
   return F(HW_TYPE_NAME);
 #endif
 }
-
-// Compile-time capability: does this board CLASS carry a PIC co-processor at all?
-// Static property of the hardware variant, NOT runtime PIC liveness (that is
-// isPICEnabled()). A PIC-class board with a dead PIC is still hardwareHasPIC()==true.
-inline constexpr bool hardwareHasPIC() { return HAS_PIC; }
 
 #if HAS_PIC
 inline bool isGatewayFirmware() { return strcmp_P(state.pic.sType, PSTR("gateway")) == 0; }
@@ -860,10 +832,6 @@ inline ComboPinMap comboActivePinMap() {
 #else
   return COMBO_MAP_OTGW32;  // fixed boards: single pin map, value unused
 #endif
-}
-// Retained convenience: is a Classic (PIC) pin map live, either module?
-inline bool comboClassicPinsActive() {
-  return comboActivePinMap() != COMBO_MAP_OTGW32;
 }
 inline int activeI2cSda() {
 #if HAS_RUNTIME_HW_DETECT

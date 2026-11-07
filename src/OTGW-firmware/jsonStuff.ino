@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v2.0.0-beta.119
+**  Version  : v2.0.0-beta.120
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -191,7 +191,7 @@ static void restPerfAccumulateSendTime(uint32_t deltaMs)
 // TASK-865.9: the restSend* layer is the imperative-push -> async-pull bridge.
 // Every restSendContent(P) write lands in the per-request AsyncResponseStream
 // (webServerCompat.h g_restStream), which is opened lazily on the first write
-// and flushed exactly once by restFlushContent() at the end of the response.
+// and sent exactly once by restFinalize() at the end of the response.
 // AsyncResponseStream buffers internally, so the old HAS_REST_TX_COALESCING
 // sTxBuf path (which existed to batch the sync WebServer's ~9 ms/sendContent
 // stalls) is no longer used on the write path.
@@ -211,24 +211,6 @@ static void restSendContentP(PGM_P content)
   // via normal pointers — FPSTR()/print handles them.
   if (s) s->print(FPSTR(content));
   restPerfAccumulateSendTime(millis() - startMs);
-}
-
-// Begin a fresh JSON response. The sync WebServer needed an explicit status +
-// content-type line here; the async stream carries the content type from
-// beginResponseStream() and the status defaults to 200, so this just opens the
-// stream and (defensively) discards any stale buffered bytes.
-static void restSendP(int code, PGM_P contentType, PGM_P content)
-{
-  (void)code; (void)content;
-  const uint32_t startMs = millis();
-  restBeginStream(contentType);
-  restPerfAccumulateSendTime(millis() - startMs);
-}
-
-// Flush the buffered JSON response to the client — sends the AsyncResponseStream
-// exactly once. Call at the end of each chunked response (sendEndJsonMap/Obj).
-void restFlushContent() {
-  restFinalize();
 }
 
 void restPerfBegin(RestPerfTarget target)
@@ -259,38 +241,7 @@ void restPerfCommit(RestPerfTarget target, uint32_t totalMs)
   state.restperf.iActiveChunkCount = 0;
 }
 
-//=======================================================================
-void sendStartJsonObj(const char *objName)
-{
-  char sBuff[50] = "";
 
-  if (strlen(objName)==0){
-    snprintf_P(sBuff, sizeof(sBuff), PSTR("{\r\n"));
-  }else {
-    snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"%s\":[\r\n"), objName);
-  }
-  // CORS header is queued before the stream opens so it lands on the response.
-  webPushHeader(F("Access-Control-Allow-Origin"), F("*"));
-  restSendP(200, PSTR("application/json"), PSTR(" "));
-  restSendContent(sBuff);
-  iIdentlevel++;
-  bFirst = true;
-
-} // sendStartJsonObj()
-
-
-//=======================================================================
-void sendEndJsonObj(const char *objName)
-{
-  iIdentlevel--;
-  if (strlen(objName)==0){
-    restSendContentP(PSTR("\r\n}\r\n"));
-  } else {
-    restSendContentP(PSTR("\r\n]}\r\n"));
-  }
-  restFlushContent();
-
-} // sendEndJsonObj()
 //=======================================================================
 void sendIdent(){
   for (int i = iIdentlevel; i >0; i--){
@@ -307,23 +258,6 @@ void sendBeforenext(){
 //=======================================================================
 // Map-based output functions for compact JSON
 //=======================================================================
-
-void sendStartJsonMap(const char *objName)
-{
-  char sBuff[50] = "";
-
-  if (strlen(objName)==0){
-    snprintf_P(sBuff, sizeof(sBuff), PSTR("{\r\n"));
-  }else {
-    snprintf_P(sBuff, sizeof(sBuff), PSTR("{\"%s\":{\r\n"), objName);
-  }
-  // CORS header is queued before the stream opens so it lands on the response.
-  webPushHeader(F("Access-Control-Allow-Origin"), F("*"));
-  restSendP(200, PSTR("application/json"), PSTR(" "));
-  restSendContent(sBuff);
-  iIdentlevel++;
-  bFirst = true;
-}
 
 //=======================================================================
 // Map entry helpers for compact JSON objects
@@ -413,17 +347,6 @@ void sendJsonMapEntry(const char *cName, String sValue)
   sendJsonMapEntry(cName, sValue.c_str());
 }
 
-void sendEndJsonMap(const char *objName)
-{
-  iIdentlevel--;
-  if (strlen(objName)==0){
-    restSendContentP(PSTR("\r\n}\r\n"));
-  } else {
-    restSendContentP(PSTR("\r\n}}\r\n"));
-  }
-  restFlushContent();
-}
-
 void sendJsonOTmonMapEntry(const char *cName, const char *cValue, const char *cUnit, time_t epoch)
 {
   char jsonBuff[JSON_ENTRY_BUF] = "";
@@ -503,33 +426,6 @@ void sendJsonOTmonMapEntry(const char *cName, bool bValue, const char *cUnit, ti
   sendIdent();
   restSendContent(jsonBuff);
 }
-
-//=======================================================================
-// Dallas temperature-specific helper for Map API (1 decimal precision)
-//=======================================================================
-void sendJsonOTmonMapEntryDallasTemp(const char *cName, float fValue, const char *cUnit, time_t epoch)
-{
-  char jsonBuff[200] = "";
-  
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.1f, \"unit\": \"%s\", \"type\": \"dallas\", \"epoch\": %d}")
-                                      , cName, fValue, cUnit, (uint32_t)epoch);
-
-  sendBeforenext();
-  sendIdent();
-  restSendContent(jsonBuff);
-} // sendJsonOTmonMapEntryDallasTemp(*char, float, *char, time_t)
-
-void sendJsonOTmonMapEntryDallasTemp(const char *cName, float fValue, const __FlashStringHelper *cUnit, time_t epoch)
-{
-  char jsonBuff[200] = "";
-
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": {\"value\": %.1f, \"unit\": \"%S\", \"type\": \"dallas\", \"epoch\": %d}")
-                                      , cName, fValue, reinterpret_cast<PGM_P>(cUnit), (uint32_t)epoch);
-
-  sendBeforenext();
-  sendIdent();
-  restSendContent(jsonBuff);
-} // sendJsonOTmonMapEntryDallasTemp(*char, float, *FlashStringHelper, time_t)
 
 //=======================================================================
 // ************ function to build Json Settings string ******************

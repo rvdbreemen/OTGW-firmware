@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.119
+**  Version  : v2.0.0-beta.120
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -964,25 +964,6 @@ String dBmtoQuality(int dBm)
 
   return (_ret);
 }//dBmtoQuality
-
-// Replace all occurrences of token with replacement, guarding buffer size
-bool replaceAll(char *buffer, const size_t bufSize, const char *token, const char *replacement) {
-  if (!buffer || !token || !replacement) return false;
-  const size_t tokenLen = strlen(token);
-  const size_t replLen = strlen(replacement);
-  if (tokenLen == 0) return true;
-
-  char *pos = strstr(buffer, token);
-  while (pos) {
-    const size_t tailLen = strlen(pos + tokenLen);
-    const size_t required = (pos - buffer) + replLen + tailLen + 1;
-    if (required > bufSize) return false;
-    memmove(pos + replLen, pos + tokenLen, tailLen + 1);
-    memcpy(pos, replacement, replLen);
-    pos = strstr(pos + replLen, token);
-  }
-  return true;
-}
 
 //===========================================================================================
 // Heap Monitoring and Backpressure Management

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-beta.119
+**  Version  : v2.0.0-beta.120
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -268,7 +268,6 @@ void setupFSexplorer(){
 
   server.on("/api/firmwarefilelist", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); apifirmwarefilelist(); });  // DEPRECATED: unversioned (ADR-035)
   server.on("/api/listfiles",        HTTP_ANY, [](AsyncWebServerRequest *r){ webBeginRequest(r); apilistfiles(); });         // DEPRECATED: unversioned (ADR-035)
-  // server.on("/LittleFSformat", HTTP_GET, formatLittleFS);
   // /upload: the body completion handler runs after the upload finished. If auth
   // or the same-origin check failed, handleFileUpload skipped the open and wrote
   // nothing; send the 401/403 here. This handler owns the whole response.
@@ -686,24 +685,6 @@ void handleFileUpload(AsyncWebServerRequest *request, const String &filename,
 
 
 //=====================================================================================
-void formatLittleFS(AsyncWebServerRequest *request)
-{       //Formatiert den Speicher
-  webBeginRequest(request);
-  if (!LittleFS.exists("/!format")) return;
-  DebugTln(F("Format LittleFS"));
-  LittleFS.format();
-  sendFSexplorerRedirect();
-
-} // formatLittleFS()
-
-//=====================================================================================
-const String formatBytes(size_t const& bytes) 
-{ 
-  return (bytes < 1024) ? String(bytes) + " Byte" : (bytes < (1024 * 1024)) ? String(bytes / 1024.0) + " KB" : String(bytes / 1024.0 / 1024.0) + " MB";
-
-} //formatBytes()
-
-//=====================================================================================
 const String &contentType(String& filename) 
 {       
   if (filename.endsWith(".htm") || filename.endsWith(".html")) filename = F("text/html; charset=UTF-8");
@@ -722,23 +703,6 @@ const String &contentType(String& filename)
   return filename;
   
 } // &contentType()
-
-//=====================================================================================
-bool freeSpace(uint16_t const& printsize)
-{
-  FSInfo fsInfo;
-  platformFSInfo(fsInfo);
-  unsigned long totalB = fsInfo.totalBytes;
-  unsigned long usedB  = (unsigned long)(fsInfo.usedBytes * 1.05);
-  // Same clamp as apilistfiles(): past 95.238% full the 5% margin pushes usedB over
-  // totalB and the 32-bit subtraction wraps to ~4 GB, so this would answer "yes,
-  // there is room" on a completely full filesystem.
-  if (usedB > totalB) usedB = totalB;
-  const unsigned long freeB = totalB - usedB;
-  Debugln(formatBytes(freeB) + " im LittleFS frei");
-  return (freeB > printsize);
-
-} // freeSpace()
 
 //=====================================================================================
 void reBootESP(AsyncWebServerRequest *request)

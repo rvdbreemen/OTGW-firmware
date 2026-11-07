@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-beta.119
+**  Version  : v2.0.0-beta.120
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -201,7 +201,6 @@ static OTdataStruct OTcurrentSystemState;
 
 // OT status bit helpers (prevent wrong-register bugs: flame is in slave byte, not master)
 inline bool isFlameOn()   { return (OTcurrentSystemState.Statusflags & 0x08) != 0; }  // Slave bit 3
-inline bool isDHWActive() { return (OTcurrentSystemState.SlaveStatus  & 0x04) != 0; }  // Slave bit 2
 
 // Value type enum for OTlogStruct
 enum OTValueType {
@@ -898,9 +897,6 @@ extern OTOverrideEntry_t otOverrideStore[OVERRIDE_STORE_MAX];
 
 // Capture hook: record (find-or-allocate) an override value for msg id. Pure RAM write.
 void recordOTOverride(uint8_t id, uint8_t kind, float value);
-// True if an entry for id exists and is within the active timeout.
-// PROGMEM-safe label for a kind ("answer" / "substituted").
-const __FlashStringHelper* overrideKindLabel(uint8_t kind);
 // Periodic publisher: emit retained <label>/override per active entry (MQTT path only).
 void publishActiveOverrides();
 

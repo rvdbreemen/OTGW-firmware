@@ -91,32 +91,6 @@ struct MQTTSettingsSection {
   bool    bThermostatDupsCleared = false;
 };
 
-// ---------------------------------------------------------------------------
-// PROGMEM-safe helpers -- shared between MQTTstuff.ino and the data layer.
-//
-// On ESP8266, standard strstr/strncmp may use word-aligned 32-bit reads.
-// Unaligned reads from flash (0x402xxxxx) cause Exception (3) on Arduino
-// Core 3.1.2+. These helpers use pgm_read_byte for safe byte access.
-// ---------------------------------------------------------------------------
-#ifndef MQTTHA_PGM_HELPERS_DEFINED
-#define MQTTHA_PGM_HELPERS_DEFINED
-inline int pgm_strncmp_PP(PGM_P s1, const char *s2, size_t n)
-{
-    for (size_t i = 0; i < n; i++) {
-        uint8_t c1 = pgm_read_byte(s1 + i);
-        uint8_t c2 = static_cast<uint8_t>(s2[i]);
-        if (c1 != c2) return (int)c1 - (int)c2;
-        if (c1 == 0) return 0;
-    }
-    return 0;
-}
-
-inline char pgm_read_char(PGM_P p)
-{
-    return static_cast<char>(pgm_read_byte(p));
-}
-#endif
-
 // strlcpy_P is not declared in ESP8266 Arduino Core 3.1.2. Provide a shared
 // fallback for every TU that #includes MQTTstuff.h so sendMQTTDataPic and
 // similar helpers compile on ESP8266 and ESP32 alike.

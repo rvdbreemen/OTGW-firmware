@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.119
+**  Version  : v2.0.0-beta.120
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2787,10 +2787,6 @@ void recordOTOverride(uint8_t id, uint8_t kind, float value) {
   otOverrideStore[slot].kind     = kind;
   otOverrideStore[slot].value    = value;
   otOverrideStore[slot].lastSeen = (now == 0) ? 1 : now;  // 0 reserved as "empty" sentinel
-}
-
-const __FlashStringHelper* overrideKindLabel(uint8_t kind) {
-  return (kind == OT_OVERRIDE_ANSWER) ? F("answer") : F("substituted");
 }
 
 // Periodic publisher (called from the MQTT periodic path, NOT from the decode hook).

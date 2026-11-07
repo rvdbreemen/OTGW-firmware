@@ -21,7 +21,7 @@
  *   echo $?   # 0 on pass, 1 on failure
  *
  * Pin: src/OTGW-firmware/SATble.ino (parseBLEAtcFormat,
- * parseBLEBTHomeFormat, bleMatchesConfiguredMAC). When SATble.ino
+ * parseBLEBTHomeFormat). When SATble.ino
  * changes any of these, this test must change too — that's the point.
  */
 
@@ -29,7 +29,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <cctype>
 
 // ---------------------------------------------------------------------------
 // Lifted constants — kept in sync with src/OTGW-firmware/SATble.ino
@@ -40,12 +39,6 @@ static constexpr uint8_t BTHOME_OBJ_PACKET_ID_U8    = 0x00;  // 1-byte counter (
 static constexpr uint8_t BTHOME_OBJ_BATTERY_U8      = 0x01;  // 1-byte uint8
 static constexpr uint8_t BTHOME_OBJ_TEMPERATURE_S16 = 0x02;  // 2-byte int16, factor 0.01
 static constexpr uint8_t BTHOME_OBJ_HUMIDITY_U16    = 0x03;  // 2-byte uint16, factor 0.01
-
-// ---------------------------------------------------------------------------
-// Mock for settings.sat.sBleMAC. Tests set this string before each filter
-// assertion. Empty string ("") = "accept any" (default-allow).
-// ---------------------------------------------------------------------------
-static char g_sBleMAC[18] = "";
 
 // ---------------------------------------------------------------------------
 // Lifted: parseBLEAtcFormat (SATble.ino:94)
@@ -124,27 +117,6 @@ static bool parseBLEBTHomeFormat(const uint8_t* data, size_t len,
   }
   (void)gotHum;
   return gotTemp;
-}
-
-// ---------------------------------------------------------------------------
-// Lifted: bleMatchesConfiguredMAC (SATble.ino:182)
-// strcasecmp is on most POSIX hosts; provide a portable inline shim.
-// ---------------------------------------------------------------------------
-static int test_strcasecmp(const char* a, const char* b)
-{
-  while (*a && *b) {
-    int ca = std::tolower((unsigned char)*a);
-    int cb = std::tolower((unsigned char)*b);
-    if (ca != cb) return ca - cb;
-    a++; b++;
-  }
-  return std::tolower((unsigned char)*a) - std::tolower((unsigned char)*b);
-}
-
-static bool bleMatchesConfiguredMAC(const char* mac)
-{
-  if (g_sBleMAC[0] == '\0') return true;  // accept all
-  return (test_strcasecmp(mac, g_sBleMAC) == 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -330,37 +302,6 @@ int main()
     float t = 0, h = 0; uint8_t b = 0;
     bool ok = parseBLEBTHomeFormat(adv, sizeof(adv), &t, &h, &b);
     checkBool("BTHome temp-out-of-range: not gotTemp", false, ok);
-  }
-
-  // -------------------------------------------------------------------
-  // 11. MAC filter — empty configured MAC accepts all (default-allow)
-  // -------------------------------------------------------------------
-  {
-    g_sBleMAC[0] = '\0';
-    checkBool("MAC filter empty: accepts well-formed MAC", true,
-              bleMatchesConfiguredMAC("AA:BB:CC:DD:EE:FF"));
-    checkBool("MAC filter empty: accepts lower-case MAC", true,
-              bleMatchesConfiguredMAC("aa:bb:cc:dd:ee:ff"));
-    // Even malformed MACs pass the empty filter — slot allocation later
-    // is the second line of defence. This documents current behaviour;
-    // do not "fix" it here without escalating to a UX decision.
-    checkBool("MAC filter empty: accepts garbage (current behaviour)", true,
-              bleMatchesConfiguredMAC("garbage"));
-  }
-
-  // 12. MAC filter — exact configured MAC accepts only that MAC
-  {
-    std::strcpy(g_sBleMAC, "AA:BB:CC:DD:EE:FF");
-    checkBool("MAC filter strict: accepts exact match",       true,
-              bleMatchesConfiguredMAC("AA:BB:CC:DD:EE:FF"));
-    checkBool("MAC filter strict: accepts case-insensitive",  true,
-              bleMatchesConfiguredMAC("aa:bb:cc:dd:ee:ff"));
-    checkBool("MAC filter strict: rejects different MAC",     false,
-              bleMatchesConfiguredMAC("11:22:33:44:55:66"));
-    checkBool("MAC filter strict: rejects empty input",       false,
-              bleMatchesConfiguredMAC(""));
-    checkBool("MAC filter strict: rejects malformed",         false,
-              bleMatchesConfiguredMAC("not-a-mac"));
   }
 
   std::printf("================================================\n");
