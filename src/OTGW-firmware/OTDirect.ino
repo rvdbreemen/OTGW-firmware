@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.125
+**  Version  : v2.0.0-beta.126
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -812,6 +812,18 @@ static uint16_t otdStatusReplyData(uint16_t thermostatData, uint16_t boilerData)
 }
 // --- otdRelayedStatus end
 
+// TASK-1701: whether the gateway may send a MsgID 0 of its own. In gateway mode with a
+// thermostat on the bus the boiler sees only the thermostat's MsgID 0 (with the ADR-208 bit 0
+// rule applied in applyOverrides), as on the PIC: it sends one boiler frame per thermostat frame
+// (gateway.asm:2384-2402, HandleRequest/CreateRequest) and generates frames of its own only
+// without a thermostat (gateway.asm:1770-1816, StandAloneMsg). A second MsgID 0 with the
+// gateway's own CH enable made the boiler follow whichever status came last (tjfs, 2026-11-07).
+// --- otdOwnStatusAllowed begin
+static bool otdOwnStatusRequestAllowed(bool gatewayMode, bool thermostatConnected) {
+  return !(gatewayMode && thermostatConnected);
+}
+// --- otdOwnStatusAllowed end
+
 static unsigned long buildStatusRequest() {
   // Build a complete READ_DATA request so message type, data-id and parity are correct.
   // MsgID 0: Master status flags in data-value HB (bits 15-8), LB = 0 (slave fills it)
@@ -1615,6 +1627,10 @@ static void scheduleMasterRequest() {
     otScheduleIdx = (otScheduleIdx + 1) % OT_SCHEDULE_SIZE;
 
     if (entry.disabled) continue;  // boiler doesn't support this MsgID
+
+    // TASK-1701: the thermostat's MsgID 0 is the only status the boiler gets in gateway mode
+    if (entry.msgId == 0 &&
+        !otdOwnStatusRequestAllowed(otCurrentMode == OTD_MODE_GATEWAY, state.otd.bThermostatConnected)) continue;
 
     // Offline: skip everything except MsgID 0 (the online/offline probe)
     if (busOffline && entry.msgId != 0) continue;
