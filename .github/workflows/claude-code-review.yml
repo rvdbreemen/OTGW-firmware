@@ -12,6 +12,12 @@ on:
 
 jobs:
   claude-review:
+    # A pull request from a fork gets no repository secrets and no OIDC token, so the
+    # action can only fail there ("Could not fetch an OIDC token", PR #699). Skip it for
+    # forks: the check then reads "skipped" instead of red, and fork PRs are reviewed by
+    # hand. pull_request_target is not used on purpose: it would run with the OAuth token
+    # on a job steered by an outside PR's text.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     # Optional: Filter by PR author
     # if: |
     #   github.event.pull_request.user.login == 'external-contributor' ||
