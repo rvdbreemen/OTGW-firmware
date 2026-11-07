@@ -8331,6 +8331,60 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-218",
+      "title": "Allow outbound TLS client requests on boards with PSRAM, inbound stays plain HTTP (amends ADR-003)",
+      "path": "ADR-218-allow-outbound-tls-client-requests-on-boards-with-psram-inbound-stays-plain-http-amends-adr-003.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-08",
+      "decision_summary": "User Decision (Robert, 2026-11-07), parked 2026-11-08: when a firmware feature needs an HTTPS request, the gateway ma...",
+      "topics": [
+        "ca-bundle",
+        "https-client",
+        "mbedtls",
+        "psram",
+        "tls"
+      ],
+      "aliases": [
+        "outbound https",
+        "TLS client"
+      ],
+      "components": [
+        "outbound TLS client capability"
+      ],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Run TLS client work off the asynctcp task (ADR-137), with its own task stack of at least 8 KB.",
+          "Detect PSRAM at runtime; install the PSRAM allocator redirect before the first handshake.",
+          "Trust only the mini CA bundle built by scripts/tls/ from the pinned IDF list."
+        ],
+        "must_not": [
+          "Serve HTTPS or WSS inbound.",
+          "Attempt a handshake on a board without PSRAM.",
+          "Disable certificate verification."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "A host test of the PSRAM capability gate and the fallback per feature; a bench fetch on a PSRAM board and a refusal on a no-PSRAM board, as in the PoC."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -14637,6 +14691,18 @@
     {
       "source": "ADR-217",
       "target": "ADR-207",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-218",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-218",
+      "target": "ADR-137",
       "type": "related",
       "resolved": true
     }

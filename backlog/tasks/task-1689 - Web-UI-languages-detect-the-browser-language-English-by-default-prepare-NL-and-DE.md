@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-07T11:06:00Z'
-updated_date: '2026-11-07T15:08:00Z'
+updated_date: '2026-11-07T23:29:00Z'
 labels:
   - webui
   - i18n
@@ -42,4 +42,6 @@ Robert 2026-11-07: detect which language the user uses; the default is always En
 2026-11-07 PoC run 2 (build 2.0.0-beta.120+8774771 = origin/dev 87747717f + src/OTGW-firmware/tlsPocStuff.ino + tlsPocRoots.h, branch poc-tls-1689 in ../wt-tlspoc, not pushed; driver scripts and raw logs in the session scratchpad tlspoc/). The allocator is switched at runtime with mbedtls_platform_set_calloc_free(): blocks >= 1 KB go to PSRAM, the rest stays internal (the prebuilt libs define MBEDTLS_PLATFORM_MEMORY with a function allocator). Results: .63 (Classic + S3 Mini, 2 MB PSRAM): psram=0 control failed -0x7F00 as in run 1; psram=1 pinned roots 3/3 HTTP 200 (raw.githubusercontent.com README, 22,217 B, connect+handshake 706-781 ms); full CA bundle 2/2 (715-756 ms); jsDelivr tag URL 2/2 (22,230 B, 728-823 ms). Internal low point during a run 23.5-27.6 KB (from 37.5 KB before), PSRAM peak use about 50-54 KB, task stack used about 4.4 KB of 12 KB. Leak check: 20/20 consecutive bundle+PSRAM fetches OK, free internal before each run constant at 37,524 B, PSRAM 2,059,152 -> 2,059,664, connect median 724 ms, max 818 ms. .61 (no PSRAM): 5/5 failed -0x7F00 (internal free 53 KB, largest block 31.7 KB): no TLS on this board, as Robert's capability rule expects. Both units: no crash, no reboot (.63 bootcount 159 = flashes x2, .61 92), MQTT connected, settings identical before and after (diffed). Flash: full bundle build 2,289,603 B (99.8% of app0, 4.2 KB free); bundle = 68,983 B, so a pinned-roots build is about 2,220,600 B (~73 KB free); TLS code ~96 KB. .63 restored to beta.118 afterwards; .61 left on the PoC image for 6b (agreed).
 
 2026-11-07 Robert's decision (AskUserQuestion): trust store = a mini CA bundle of about 15 roots built with ESP-IDF gen_crt_bundle.py (ISRG X1/X2, USERTrust RSA/ECC, DigiCert G2/G3, Google Trust R1-R4, Amazon Root CA 1-4 or similar), estimated 8-12 KB (to be measured), kept in the repo with a test that the target hosts validate through it. Rejected: 2 pinned roots (breaks on a CA change, GitHub moved to Let's Encrypt this year) and the full IDF bundle (+69 KB, 4.2 KB left in app0).
+
+2026-11-08: ADR-218 written as Proposed and parked (outbound TLS client only on PSRAM boards, mini CA bundle, fallback or disable per feature; inbound stays HTTP per ADR-003). Robert asked why outbound TLS is needed: nothing in src/ needs it today (PIC check/download and webhook use plain HTTP; language packs are fetched by the browser from jsDelivr). Stays Proposed until a concrete feature (likely HTTPS webhooks) asks for it. Mini bundle evidence from peer: commit 1dd2007 (lane-1689tls), 14 roots 5,427 B, tests/test_tls_mini_bundle.py 7/7.
 <!-- SECTION:NOTES:END -->

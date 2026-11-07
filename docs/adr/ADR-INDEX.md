@@ -223,3 +223,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-215 | Accepted | - | One file per page. |
 | ADR-216 | Accepted | - | webBeginRequest() (src/OTGW-firmware/webServerCompat.h) calls platformTcpCapSendBuffer(pcb, WEBTCPSENDCAP) for every... |
 | ADR-217 | Accepted | `src/OTGW-firmware/OTGW-Core.ino` | While SAT is enabled, the Classic port 25238 inbound bridge buffers each line up to CR, forwards an allowed text line... |
+| ADR-218 | Proposed | - | User Decision (Robert, 2026-11-07), parked 2026-11-08: when a firmware feature needs an HTTPS request, the gateway ma... |
