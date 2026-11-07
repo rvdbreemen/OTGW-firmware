@@ -406,7 +406,7 @@ static void satMaxTSetSendStep()
   char cmd[12];
   snprintf_P(cmd, sizeof(cmd), PSTR("SH=%d"), (int)iv);
   satShNoteBeforeSend(OTcurrentSystemState.MaxTSet);       // TASK-1541: remember the boiler value before SAT's first SH=
-  addCommandToQueue(cmd, strlen(cmd), false, 0);
+  addCommandToQueue(cmd, strlen(cmd), false, 0, true);
   _sat_lastSentSH = iv;
   state.sat.iShVerdict = 0;                                // TASK-1412.13 (entry 252): a new SH= waits for the boiler's answer
   SATDebugTf(PSTR("SAT: user MaxTSet, sent %s\r\n"), cmd);
@@ -709,11 +709,11 @@ static void satSendMM(uint8_t mm) {
   if (satImmergasTpActive()) {
     // MM=T gives back the 100 % default, so the TP carries min(100, 80) = 80 (entry 246, Q-1581a A).
     snprintf_P(buf, sizeof(buf), PSTR("TP=11:12=%u"), (unsigned)((mm > 80) ? 80 : mm));   // 255 (SAT_MM_T) also gives 80
-    if (addCommandToQueue(buf, strlen(buf), false, 0) == CmdQueueResult::Dropped) accepted = false;
+    if (addCommandToQueue(buf, strlen(buf), false, 0, true) == CmdQueueResult::Dropped) accepted = false;
   }
   if (mm == SAT_MM_T) snprintf_P(buf, sizeof(buf), PSTR("MM=T"));
   else                snprintf_P(buf, sizeof(buf), PSTR("MM=%u"), mm);
-  if (addCommandToQueue(buf, strlen(buf), false, 0) == CmdQueueResult::Dropped) accepted = false;
+  if (addCommandToQueue(buf, strlen(buf), false, 0, true) == CmdQueueResult::Dropped) accepted = false;
   if (!accepted) return;   // the next tick sends the TP and the MM again
   state.sat.iLastSentMM     = mm;
   state.sat.iLastSentMMMs   = millis();
@@ -725,7 +725,7 @@ static void satSendMM(uint8_t mm) {
 static void satSendCH(uint8_t ch) {
   if (_sat_chSentValid && ch == state.sat.iLastSentCH &&             // TASK-1570: on change, repair as satSendMM
       (uint32_t)(millis() - state.sat.iLastSentCHMs) < SAT_MMCH_REPAIR_MS - SAT_MMCH_REPAIR_SLACK_MS) return;
-  if (addCommandToQueue(ch ? "CH=1" : "CH=0", 4, false, 0) == CmdQueueResult::Dropped) return;   // TASK-1574 (commit-on-success)
+  if (addCommandToQueue(ch ? "CH=1" : "CH=0", 4, false, 0, true) == CmdQueueResult::Dropped) return;   // TASK-1574 (commit-on-success)
   state.sat.iLastSentCH     = ch;
   state.sat.iLastSentCHMs   = millis();
   state.sat.bLastSentValid  = true;
@@ -800,20 +800,20 @@ static void satSwNoteBeforeSend(float boilerValue) {   // boilerValue: OTcurrent
 static bool satEnqueueRestoreValue(const char* name, int16_t value) {   // "SH" / "SW": one format, the senders keep their own
   char cmd[12];
   snprintf_P(cmd, sizeof(cmd), PSTR("%s=%d"), name, (int)value);
-  return addCommandToQueue(cmd, strlen(cmd), false, 0) != CmdQueueResult::Dropped;
+  return addCommandToQueue(cmd, strlen(cmd), false, 0, true) != CmdQueueResult::Dropped;
 }
 static bool satSendRestore() {
   bool ok = true;
   if (_sat_shChanged && _sat_preSH >= 0 && !satEnqueueRestoreValue("SH", _sat_preSH)) ok = false;
   if (_sat_swChanged && _sat_preSW >= 0 && !satEnqueueRestoreValue("SW", _sat_preSW)) ok = false;
-  if (_sat_tcPushed && addCommandToQueue("TC=0", 4, false, 0) == CmdQueueResult::Dropped) ok = false;
+  if (_sat_tcPushed && addCommandToQueue("TC=0", 4, false, 0, true) == CmdQueueResult::Dropped) ok = false;
   if (ok) { _sat_shChanged = false; _sat_swChanged = false; _sat_tcPushed = false; satPreSatStore(); }   // a Dropped one keeps the flags: the retry sends all again; the stored values go back to 0
   return ok;
 }
 static bool satSendRelease(bool restore) {
   bool ok = satEnqueueOwnCS("CS=0");
-  if (addCommandToQueue("CH=1", 4, false, 0) == CmdQueueResult::Dropped) ok = false;   // CH override back to the default (TASK-1346)
-  if (addCommandToQueue("MM=T", 4, false, 0) == CmdQueueResult::Dropped) ok = false;   // MM override cleared (TASK-1344)
+  if (addCommandToQueue("CH=1", 4, false, 0, true) == CmdQueueResult::Dropped) ok = false;   // CH override back to the default (TASK-1346)
+  if (addCommandToQueue("MM=T", 4, false, 0, true) == CmdQueueResult::Dropped) ok = false;   // MM override cleared (TASK-1344)
   if (restore && !satSendRestore()) ok = false;
   return ok;
 }
@@ -847,7 +847,7 @@ static bool satEnqueueIfChangedTC(float tc) {
   if (state.sat.bTCAccountedValid && newQ == oldQ) return false;
   char buf[16];
   snprintf_P(buf, sizeof(buf), PSTR("TC=%.1f"), tc);
-  addCommandToQueue(buf, strlen(buf), false, 0);
+  addCommandToQueue(buf, strlen(buf), false, 0, true);
   _sat_tcPushed               = true;                      // TASK-1541: satDisable() clears it with TC=0
   state.sat.fLastSentTC       = (float)newQ / 10.0f;
   state.sat.bTCAccountedValid = true;
@@ -1842,7 +1842,7 @@ static void satNoReturnFloodStep()
     state.sat.fFinalSetpoint  = cs;
     satSendCS(cs);
   } else if (!pmChainBusy()) {
-    addCommandToQueue("PM=25", 5, false, 0);
+    addCommandToQueue("PM=25", 5, false, 0, true);
   }
 }
 
@@ -1863,7 +1863,7 @@ static void satMiStep()
   }
   const bool noReturnLong = _sat_noReturnSinceMs != 0 && (uint32_t)(millis() - _sat_noReturnSinceMs) >= SAT_NO_RETURN_MI_MS;
   if (!(satGetManufacturerQuirks() & SAT_QUIRK_MI_500_BOOT) && !noReturnLong) return;
-  addCommandToQueue("MI=500", 6, false, 0);
+  addCommandToQueue("MI=500", 6, false, 0, true);
   _sat_miSent = true;
   SATDebugTln(F("SAT: MI=500 sent (no return temperature or manufacturer quirk)"));
 }
@@ -1911,7 +1911,7 @@ static void satPm25PollStep()
   if (v != SatPm25Verdict::Send || _sat_pm25SentMs != 0) return;
   if (_sat_pm25LastSentMs != 0 && (uint32_t)(now - _sat_pm25LastSentMs) < SAT_PM25_FLOW_AGE_MS) return;
   if (picPrioSlotBusy() || pmChainBusy()) return;
-  if (addCommandToQueue("PM=25", 5, false, 0) == CmdQueueResult::Dropped) return;
+  if (addCommandToQueue("PM=25", 5, false, 0, true) == CmdQueueResult::Dropped) return;
   _sat_pm25SentMs = satFeedStamp(now);
   _sat_pm25LastSentMs = _sat_pm25SentMs;
   state.sat.iPm25Sent++;
@@ -4158,6 +4158,32 @@ void satHandleControlMode(const char* value)
 //=====================================================================
 //=== Send SAT Status as JSON (for REST API) ===
 //=====================================================================
+// TASK-1695: one refused external CV control command: counted, remembered (bounded) and logged to telnet.
+void satNoteExternalRefused(const char* buf, int len)
+{
+#if defined(HAS_SAT) && HAS_SAT
+  state.sat.iExtCmdRefused++;
+  const int cap = (int)sizeof(state.sat.sExtCmdLastRefused) - 1;
+  const int n = (buf == nullptr || len < 0) ? 0 : (len < cap ? len : cap);
+  if (n > 0) memcpy(state.sat.sExtCmdLastRefused, buf, n);
+  state.sat.sExtCmdLastRefused[n] = 0;
+  DebugTf(PSTR("CmdQueue: %s refused, SAT is enabled (disable SAT to control the boiler from outside)\r\n"), state.sat.sExtCmdLastRefused);
+#else
+  (void)buf; (void)len;
+#endif
+}
+
+// ADR-217: one line of the Classic port 25238 bridge dropped whole while SAT is enabled (non-text byte or longer than the line buffer).
+void satNoteBridgeDropped(const char* reasonP)
+{
+#if defined(HAS_SAT) && HAS_SAT
+  state.sat.iExtBridgeDropped++;
+  DebugTf(PSTR("Net2Ser: line dropped (%s), SAT is enabled (disable SAT for binary data such as a PIC upgrade)\r\n"), reasonP);
+#else
+  (void)reasonP;
+#endif
+}
+
 // TASK-883: per-response snapshot for the chunked /v2/sat/status stream. Same
 // DETERMINISM CONTRACT as DeviceInfoSnap (jsonChunked.h): the closure re-runs per
 // TCP window, so every AUTONOMOUS input is frozen ONCE here — the full state copy
@@ -4301,6 +4327,9 @@ void satSendStatusJSON()
     je.field(F("control_interval_sec"), (int32_t)settings.sat.iControlInterval);
     je.field(F("fallback_active"),      snap->st.sat.bFallbackActive);
     je.field(F("push_refused"),         snap->st.sat.bPushRefused);
+    je.field(F("ext_cmd_refused"),      snap->st.sat.iExtCmdRefused);          // TASK-1695
+    je.field(F("ext_cmd_last_refused"), snap->st.sat.sExtCmdLastRefused);
+    je.field(F("ext_bridge_dropped"),   snap->st.sat.iExtBridgeDropped);           // ADR-217
     je.field(F("sh_write"),             snap->st.sat.iShVerdict == 1 ? "accepted" : (snap->st.sat.iShVerdict == 2 ? "rejected" : "unknown"));   // TASK-1412.13, entry 252
     je.field(F("pm25_no_slot"),         snap->st.sat.bPm25NoSlot);       // TASK-1653
     je.field(F("pm25_sent"),            snap->st.sat.iPm25Sent);
@@ -6782,7 +6811,7 @@ static void satDhwSetpointSync()
   char swCmd[16];
   snprintf_P(swCmd, sizeof(swCmd), PSTR("SW=%d"), (int)sp);
   satSwNoteBeforeSend(OTcurrentSystemState.TdhwSet);      // TASK-1541: remember the boiler value before SAT's first SW=
-  addCommandToQueue(swCmd, strlen(swCmd), false, 0);
+  addCommandToQueue(swCmd, strlen(swCmd), false, 0, true);
   _sat_lastSentSW = (int)sp;
   _sat_swSentValid = true;
   SATDebugTf(PSTR("SAT: DHW setpoint, sent %s\r\n"), swCmd);

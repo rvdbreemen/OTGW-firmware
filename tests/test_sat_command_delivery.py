@@ -282,6 +282,15 @@ int main(int argc, char** argv) {
     for (int k = 0; k < 19; k++) { snprintf(c, sizeof c, "%c%c=1", 'A' + k / 6, 'A' + k % 6); userCmd(c); }
     intent("CS=45.0"); satSendCS(45.0f);
     run(100000, 110000);
+  } else if (sc == "ext") {        // TASK-1695: external CV control commands against SAT on/off; SAT's own senders (own = true) always pass
+    g_satOwns = argc > 3 && !strcmp(argv[3], "on");
+    static const char* kExternal[] = {"CS=40.0", "CH=0", "ch=0", "MM=50", "mm=50", "C2=40", "H2=1", "TT=20", "TC=20", "tc=20",
+                                      "HW=1", "SW=50", "SH=70", "GW=1", "PR=A"};
+    static const char* kOwn[] = {"CS=40.0", "CH=1", "MM=50", "TC=20", "SH=70", "SW=50", "TP=50", "TC=0", "MM=T"};
+    uint32_t t = 100000;
+    for (const char* c : kExternal) { const CmdQueueResult r = userCmd(c); printf("EXT %s %s\n", c, rname(r)); t += 1000; run(t, t + 100); }
+    for (const char* c : kOwn) { const CmdQueueResult r = addCmdLogged(c, strlen(c), false, 0, true); printf("OWN %s %s\n", c, rname(r)); t += 1000; run(t, t + 100); }
+    printf("STATE refused=%d last=%s\n", g_extRefused, g_extLast);
   } else {
     return 2;
   }
@@ -577,6 +586,91 @@ class OtDirectRefusal(unittest.TestCase):
         branch = core[core.index("CmdQueueResult addCommandToQueue("):]
         branch = branch[:branch.index("constexpr int kMaxCmdLen")]
         self.assertIn("handleOTDirectCommand(buf, len, satOwn) ? CmdQueueResult::Sent : CmdQueueResult::Dropped", branch)
+
+
+class ExternalCvCommandsRefused(unittest.TestCase):
+    """TASK-1695 part A: while SAT is enabled no other channel may send CV control commands (CS CH MM C2 H2 TT TC); SAT's own senders (satOwn)
+    and the free set (HW SW SH and everything else) pass; with SAT off everything passes. Both the PIC queue (addCommandToQueue) and the
+    OT-Direct handler run for real; against the old code (only CS= refused) the SAT-on tests fail."""
+
+    BLOCKED = ("CS=40.0", "CH=0", "ch=0", "MM=50", "mm=50", "C2=40", "H2=1", "TT=20", "TC=20", "tc=20")
+    FREE = ("HW=1", "SW=50", "SH=70", "GW=1", "PR=A")
+    OWN = ("CS=40.0", "CH=1", "MM=50", "TC=20", "SH=70", "SW=50", "TP=50", "TC=0", "MM=T")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.dir = tempfile.TemporaryDirectory()
+        d = Path(cls.dir.name)
+        cpp = d / "t.cpp"
+        cpp.write_text(build_source(), encoding="utf-8")
+        cls.exe = compile_cpp(cpp, d / "t.exe")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.dir.cleanup()
+
+    def run_ext(self, path, sat):
+        if not self.exe:
+            self.skipTest("no host C++ compiler")
+        r = subprocess.run([str(self.exe), "ext", path, sat], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        res = {"EXT": {}, "OWN": {}, "STATE": {}}
+        for line in r.stdout.splitlines():
+            p = line.split()
+            if p and p[0] in ("EXT", "OWN"):
+                res[p[0]][p[1]] = p[2]
+            elif p and p[0] == "STATE":
+                res["STATE"] = dict(kv.split("=", 1) for kv in p[1:])
+        return res
+
+    def test_sat_on_blocked_set_refused_on_both_paths(self):
+        for path in ("pic", "direct"):
+            res = self.run_ext(path, "on")
+            for c in self.BLOCKED:
+                self.assertEqual(res["EXT"][c], "Dropped", f"{path}: external {c} must be refused while SAT is enabled")
+            self.assertEqual(res["STATE"]["refused"], str(len(self.BLOCKED)), path)
+            self.assertEqual(res["STATE"]["last"], "tc=20", path)
+
+    def test_sat_on_free_set_passes(self):
+        for path in ("pic", "direct"):
+            res = self.run_ext(path, "on")
+            for c in self.FREE:
+                self.assertNotEqual(res["EXT"][c], "Dropped", f"{path}: external {c} is not a CV control command and must pass")
+
+    def test_sat_on_own_senders_pass(self):
+        for path in ("pic", "direct"):
+            res = self.run_ext(path, "on")
+            for c in self.OWN:
+                self.assertNotEqual(res["OWN"][c], "Dropped", f"{path}: SAT's own {c} must pass")
+
+    def test_sat_off_everything_passes(self):
+        for path in ("pic", "direct"):
+            res = self.run_ext(path, "off")
+            for c in self.BLOCKED + self.FREE:
+                self.assertNotEqual(res["EXT"][c], "Dropped", f"{path}: {c} must pass with SAT off")
+            self.assertEqual(res["STATE"]["refused"], "0", path)
+
+    def test_source_shape_every_sat_call_is_marked_and_no_other_caller_claims_satown(self):
+        src = REPO / "src" / "OTGW-firmware"
+        for f in sorted(src.glob("SAT*.ino")):
+            for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+                if "addCommandToQueue(" in line and not line.lstrip().startswith("//"):
+                    self.assertRegex(line, r"addCommandToQueue\([^;]*, false, 0, true\)", f"{f.name}:{n} SAT's own send must pass satOwn = true")
+        for f in sorted(src.glob("*.ino")):
+            if f.name.startswith("SAT"):
+                continue
+            for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+                m = re.search(r"addCommandToQueue\((.*)\)\s*;", line)
+                if m and not line.lstrip().startswith("//") and m.group(1).count(",") >= 4:
+                    self.assertNotRegex(m.group(1), r",\s*true\s*$", f"{f.name}:{n}: only SAT's own sends pass satOwn = true")
+
+    def test_source_shape_status_fields_and_both_gates_use_the_shared_predicate(self):
+        src = REPO / "src" / "OTGW-firmware"
+        sat = (src / "SATcontrol.ino").read_text(encoding="utf-8")
+        self.assertIn('je.field(F("ext_cmd_refused")', sat)
+        self.assertIn('je.field(F("ext_cmd_last_refused")', sat)
+        for name in ("OTGW-Core.ino", "OTDirect.ino"):
+            self.assertIn("satBlocksExternalCommand(buf, len)", (src / name).read_text(encoding="utf-8"), name)
 
 
 if __name__ == "__main__":

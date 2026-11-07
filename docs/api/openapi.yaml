@@ -4316,6 +4316,15 @@ components:
         fallback_active:
           type: boolean
           description: "Fallback control active (sensor/comms loss)"
+        ext_cmd_refused:
+          type: integer
+          description: "TASK-1695: external CV control commands (CS= CH= MM= C2= H2= TT= TC=) refused since boot while SAT was enabled"
+        ext_cmd_last_refused:
+          type: string
+          description: "TASK-1695: text of the last refused external command (first 12 characters, empty when none)"
+        ext_bridge_dropped:
+          type: integer
+          description: "ADR-217: lines the Classic port 25238 bridge dropped whole since boot while SAT was enabled because they held a non-text byte or were longer than 128 bytes (blocked commands count in ext_cmd_refused)"
         fallback_reason:
           type: integer
           description: "Fallback reason code"
@@ -4605,6 +4614,9 @@ components:
         dhw_enabled: false
         control_interval_sec: 30
         fallback_active: false
+        ext_cmd_refused: 0
+        ext_cmd_last_refused: ""
+        ext_bridge_dropped: 0
         fallback_reason: 0
         max_rel_modulation: 100
         current_modulation: 100

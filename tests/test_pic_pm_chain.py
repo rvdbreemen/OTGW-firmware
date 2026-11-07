@@ -61,6 +61,7 @@ static char g_direct[256];
 struct DiagRecStub { bool active = false; void recOtFrame(char, uint32_t) {} void recPicCommand(const char*, size_t) {}
                      void recOtdCommand(const char*, size_t) {} void recResponse(const char*, size_t) {} };
 static DiagRecStub diagRec;
+@EXTCMD@
 static bool handleOTDirectCommand(const char* b, int n, bool = false) { strncat(g_direct, b, n); strcat(g_direct, ";"); return true; }
 static bool g_satOwns = false;      // TASK-1575: SAT owns the control setpoint
 static bool satOwnsControlSetpoint() { return g_satOwns; }
@@ -620,6 +621,19 @@ int main(int argc, char** argv) {
   return 2;
 }
 """
+
+
+def _ext_support() -> str:
+    """TASK-1695: the REAL satBlocksExternalCommand() sliced from OTGW-firmware.h (empty against a header from before TASK-1695), plus a recording
+    stub for satNoteExternalRefused()."""
+    hdr = (REPO / "src" / "OTGW-firmware" / "OTGW-firmware.h").read_text(encoding="utf-8").replace(chr(13) + chr(10), chr(10))
+    marker = "inline bool satBlocksExternalCommand("
+    pred = hdr[hdr.index(marker):hdr.index(chr(10) + "}" + chr(10), hdr.index(marker)) + 3] + chr(10) if marker in hdr else ""
+    return ("static int g_extRefused = 0; static char g_extLast[16] = \"\";" + chr(10) +
+            "static void satNoteExternalRefused(const char* b, int n) { g_extRefused++; snprintf(g_extLast, sizeof g_extLast, \"%.*s\", n < 15 ? n : 15, b); }" + chr(10) + pred)
+
+
+STUBS = STUBS.replace("@EXTCMD@", _ext_support())
 
 
 def extract(src: str) -> str:

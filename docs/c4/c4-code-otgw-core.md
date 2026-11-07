@@ -352,6 +352,8 @@ Producers (PIC task, replay, OT-Direct) only enqueue copies of lines; `drainOTFr
 
 The PIC byte stream reaches every consumer verbatim: the line assembler, port 25238 (`drainOTRawQueue()`) and the diagnose WebSocket mirror. The only transformation is the printable filter on the WebSocket copy, named in ADR-177. Nothing on the raw path rewrites, drops or synthesises line terminators.
 
+Client-to-PIC direction (ADR-217): `handlePICSerial()` forwards each byte of port 25238 at once while SAT is disabled. While `satOwnsControlSetpoint()` is true it holds the line in `sRaw` until CR, drops it whole when `satBlocksExternalCommand()` is true, when it holds a byte outside 0x20-0x7E (CR and LF excepted) or when it is longer than `MAX_BUFFER_WRITE`, and otherwise forwards it byte-identical. The mode is sampled at a line start and when no client is connected. Drops are counted in `state.sat.iExtCmdRefused` (blocked) and `state.sat.iExtBridgeDropped` (binary, overlong).
+
 ### Command Queue with Retry
 
 Commands queued via `addCommandToQueue()` are sent when due, re-sent every 5 s until the PIC answers (`checkCommandResponse()` removes the entry), and dropped after 5 tries. A command with the same two-letter prefix overwrites its queue slot unless `forceQueue` is set; `PM=`, `TP=` and `PR=` overwrite only on an exact repeat. An overwrite keeps the earliest due time, so repeating a command faster than its delay does not postpone it.

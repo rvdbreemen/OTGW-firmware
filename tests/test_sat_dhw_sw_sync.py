@@ -43,7 +43,7 @@ static bool g_cmdif = true;
 static bool hasOTCommandInterface() { return g_cmdif; }
 static int g_pass = 0;
 enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };   // TASK-1574
-static CmdQueueResult addCommandToQueue(const char* cmd, int, bool, int) { printf("%d %s\n", g_pass, cmd); return CmdQueueResult::Queued; }
+static CmdQueueResult addCommandToQueue(const char* cmd, int, bool, int, bool = false) { printf("%d %s\n", g_pass, cmd); return CmdQueueResult::Queued; }
 static int _sat_lastSentSW = 0;
 static bool _sat_swSentValid = false;
 struct OTSys { float TdhwSet = 0; }; static OTSys OTcurrentSystemState;

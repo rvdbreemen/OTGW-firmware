@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.126
+**  Version  : v2.0.0-beta.127
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -414,6 +414,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool     bRestoredOutdoorValid  = false;  // fRestoredOutdoor came from the PID state file at boot (entry 126, TASK-1482)
   float    fRestoredOutdoor       = 0.0f;
   uint32_t iRestoredOutdoorMs     = 0;      // millis()-based measurement time of fRestoredOutdoor (may lie before boot, unsigned age maths)
+  uint32_t iExtCmdRefused         = 0;      // TASK-1695: external CV control commands refused while SAT is enabled (since boot)
+  char     sExtCmdLastRefused[13] = "";     // TASK-1695: text of the last refused command (first 12 characters)
+  uint32_t iExtBridgeDropped      = 0;      // ADR-217: Classic port 25238 lines dropped whole while SAT is enabled because they were binary or too long (since boot)
   bool     bPushRefused           = false;  // the thermostat keeps its own setpoint >= 5 min after a TC= push (status only, TASK-1343)
   uint8_t  iShVerdict             = 0;      // the boiler's answer to SAT's MsgID 57 write (SH=): 0 unknown, 1 accepted (Write-Ack), 2 rejected (Data-Invalid / Unknown-DataID); transient, never persisted (TASK-1412.13, entry 252)
   bool     bPm25NoSlot            = false;  // SAT needs MsgID 25 on a PIC board (the thermostat does not read it) but sees no alternative slot, or its last PM=25 went unanswered; status only, transient (TASK-1653)

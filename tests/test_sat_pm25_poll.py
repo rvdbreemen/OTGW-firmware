@@ -411,7 +411,7 @@ class SourceGuards(unittest.TestCase):
         self.assertIn("`sat/pm25_no_slot`", _read(REPO / "docs" / "api" / "MQTT.md"))
 
     def test_entry45_flood_unchanged(self):
-        self.assertIn('  } else if (!pmChainBusy()) {\n    addCommandToQueue("PM=25", 5, false, 0);\n  }', self.sat)
+        self.assertIn('  } else if (!pmChainBusy()) {\n    addCommandToQueue("PM=25", 5, false, 0, true);\n  }', self.sat)
 
 
 if __name__ == "__main__":

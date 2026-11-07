@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.126
+**  Version  : v2.0.0-beta.127
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -250,8 +250,9 @@ const char *messageIDToString(OTLibMessageID message_id);
 // Result of addCommandToQueue (TASK-1569): Queued = new entry, Replaced = same command updated and moved to the back,
 // Sent = OT-Direct board handled it at once, Dropped = not queued (refused, invalid, queue full or busy).
 enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };
-// satOwn (TASK-1575): true only for SAT's own CS= (satEnqueueOwnCS). While SAT owns the control setpoint every other CS=
-// is refused (ADR-179); the origin travels with the call, so a CS= from another task (REST, MQTT) cannot pass as SAT's.
+// satOwn (TASK-1575, TASK-1695): true only for SAT's own commands (every call in SAT*.ino). While SAT is enabled every other CV control
+// command (satBlocksExternalCommand: CS CH MM C2 H2 TT TC) is refused (ADR-179); the origin travels with the call, so a command from
+// another task (REST, MQTT, boot commands) cannot pass as SAT's.
 CmdQueueResult addCommandToQueue(const char* ,  int , const bool = false, const int16_t = 1000, const bool satOwn = false);
 // Echo latency of the PIC command queue (TASK-1571): hist buckets <10,<20,<50,<100,<200,<500,<1000 ms, timeout.
 struct CmdQueueEchoStats { uint32_t count, timeouts, minMs, maxMs, sumMs; uint32_t hist[8]; };
@@ -409,6 +410,24 @@ void satControlLoop();
 // safety-tripped SAT is still the owner, it just is not commanding, and handing
 // TSet back to the heating curve in that window is how the two used to fight.
 bool satOwnsControlSetpoint();
+// TASK-1695: while SAT is enabled no other channel may send CV control commands. True for CS=, CH=, MM=, C2=, H2=, TT= and TC= (case-insensitive);
+// HW=, SW=, SH= and every other command are free. Callers combine it with satOwnsControlSetpoint() and the satOwn argument of addCommandToQueue().
+inline bool satBlocksExternalCommand(const char* buf, int len) {
+  if (buf == nullptr || len < 3 || buf[2] != '=') return false;
+  const char a = (buf[0] >= 'a' && buf[0] <= 'z') ? (char)(buf[0] - 32) : buf[0];
+  const char b = (buf[1] >= 'a' && buf[1] <= 'z') ? (char)(buf[1] - 32) : buf[1];
+  switch (a) {
+    case 'C': return b == 'S' || b == 'H' || b == '2';
+    case 'M': return b == 'M';
+    case 'H': return b == '2';
+    case 'T': return b == 'T' || b == 'C';
+    default:  return false;
+  }
+}
+// Counts and logs one refused external command (state.sat.iExtCmdRefused / sExtCmdLastRefused, GET /api/v2/sat/status).
+void satNoteExternalRefused(const char* buf, int len);
+// ADR-217: counts and logs one line the Classic port 25238 bridge dropped while SAT is enabled (binary or overlong; state.sat.iExtBridgeDropped).
+void satNoteBridgeDropped(const char* reasonP);
 // TASK-1150: true only while SAT is itself submitting a command through the shared
 // command queue, so the CS= handler can refuse an EXTERNAL setpoint without refusing
 // SAT's own.

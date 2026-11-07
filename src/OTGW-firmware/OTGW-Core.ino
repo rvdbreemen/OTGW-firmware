@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.126
+**  Version  : v2.0.0-beta.127
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3880,13 +3880,12 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
     OTDebugFlush();
     return CmdQueueResult::Dropped;
   }
-  // TASK-1236 / ADR-179: same rule as the OT-Direct CS= handler. While SAT owns the
-  // control setpoint an external CS= is refused; SAT's own CS= comes with satOwn = true (TASK-1575: an argument, not a
-  // global flag, so a CS= from another task cannot pass as SAT's). Bytes written straight to the PIC over the serial bridge (port 25238)
+  // TASK-1236 / ADR-179 / TASK-1695: same rule as the OT-Direct handler. While SAT is enabled an external CV control command
+  // (CS= CH= MM= C2= H2= TT= TC=) is refused; SAT's own commands come with satOwn = true (TASK-1575: an argument, not a
+  // global flag, so a command from another task cannot pass as SAT's). Bytes written straight to the PIC over the serial bridge (port 25238)
   // do not pass this queue and stay unfiltered (ADR-177).
-  if (toupper((unsigned char)buf[0]) == 'C' && toupper((unsigned char)buf[1]) == 'S' &&
-      satOwnsControlSetpoint() && !satOwn) {
-    DebugTln(F("CmdQueue: CS= refused, SAT owns the control setpoint (disable SAT to override)"));
+  if (!satOwn && satOwnsControlSetpoint() && satBlocksExternalCommand(buf, len)) {
+    satNoteExternalRefused(buf, len);
     return CmdQueueResult::Dropped;
   }
 
@@ -6359,6 +6358,17 @@ bool otgwStreamRxWithin(uint32_t ms)
   return g_otgwStreamLastRxMs != 0 && (uint32_t)(millis() - g_otgwStreamLastRxMs) < ms;
 }
 
+// ADR-217: a counter that changes on every port 25238 connect, so a disconnect and a reconnect between two loop passes is seen as a new connection.
+// The telnet library calls the callback from the AsyncTCP task; it only bumps the counter that handlePICSerial() reads on the loop task.
+static volatile uint32_t g_bridgeConnectGen = 0;
+static void bridgeOnConnect(const char*) { g_bridgeConnectGen = g_bridgeConnectGen + 1; }
+
+// A byte a text command can contain: printable ASCII, CR and LF.
+static inline bool bridgeByteIsText(uint8_t b)
+{
+  return (b >= 0x20 && b <= 0x7E) || b == '\r' || b == '\n';
+}
+
 void handlePICSerial()
 {
 #if HAS_PIC
@@ -6377,8 +6387,25 @@ void handlePICSerial()
   static char sWrite[MAX_BUFFER_WRITE];
   static size_t bytes_write = 0;
   static uint8_t outByte;
+  // ADR-217: while SAT is enabled (satOwnsControlSetpoint()) a line is held in sRaw until its CR, then forwarded whole or dropped whole.
+  // While SAT is disabled every byte is forwarded at once. The mode is sampled at a line start (the first byte after a CR that is not an LF), never mid-line.
+  // Two latches hold per connection and end at the disconnect: a connection that sent a non-text byte while SAT was disabled stays transparent
+  // (a binary upgrade is not cut into pieces when SAT turns on), and a connection whose line was dropped as non-text drops everything after it.
+  static uint8_t sRaw[MAX_BUFFER_WRITE];
+  static size_t  rawLen = 0;
+  static bool    lineStart = true, lineFiltered = false, lineOverflow = false;
+  static bool    transparentLatched = false, binaryBlocked = false;
+  static uint32_t lastConnectGen = 0;
 
   if (isPICEnabled() && settings.mqtt.bLegacyPort25238Enabled) {
+    // no client, or a new connection since the last pass: forget every per-connection state
+    const uint32_t connectGen = g_bridgeConnectGen;
+    if (!OTGWstream.isConnected() || connectGen != lastConnectGen) {
+      lastConnectGen = connectGen;
+      bytes_write = 0; rawLen = 0;
+      lineStart = true; lineFiltered = false; lineOverflow = false;
+      transparentLatched = false; binaryBlocked = false;
+    }
     //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
     while (OTGWstream.available()){
       // available() and read() are separate critical sections in
@@ -6390,13 +6417,59 @@ void handlePICSerial()
       if (inByte < 0) break;
       otgwStreamRxNote();   // TASK-1450: LAN witness for the WiFi dead-link check
       outByte = static_cast<uint8_t>(inByte);
-      if (!state.debug.bOTGWSimulation) {
-        // TASK-865.6: enqueue for the PIC task to write (no direct UART write).
-        enqueuePICTx(&outByte, 1);
+      if (binaryBlocked) continue;   // after a dropped binary line: nothing more from this connection
+      if (lineStart) {
+        if (outByte == '\n') {   // the LF of a CR LF pair: the PIC ignores it, so it neither starts a line nor samples the mode
+          if (!state.debug.bOTGWSimulation) enqueuePICTx(&outByte, 1);
+          continue;
+        }
+        lineFiltered = satOwnsControlSetpoint() && !transparentLatched;
+        lineStart = false;
+        bytes_write = 0;
+      }
+      if (lineFiltered) {
+        if (rawLen < sizeof(sRaw)) sRaw[rawLen++] = outByte; else lineOverflow = true;
+      } else {
+        if (!bridgeByteIsText(outByte)) transparentLatched = true;
+        if (!state.debug.bOTGWSimulation) {
+          // TASK-865.6: enqueue for the PIC task to write (no direct UART write).
+          enqueuePICTx(&outByte, 1);
+        }
       }
       if (outByte == '\r')
       { //on CR, do something...
-        sWrite[bytes_write] = 0;
+        if (lineFiltered) {
+          // the command text is the held line without CR and LF
+          bytes_write = 0;
+          for (size_t ri = 0; ri < rawLen; ri++) {
+            if (sRaw[ri] != '\r' && sRaw[ri] != '\n' && bytes_write < (MAX_BUFFER_WRITE-1)) sWrite[bytes_write++] = (char)sRaw[ri];
+          }
+          sWrite[bytes_write] = 0;
+          const char* dropReason = nullptr;
+          if (lineOverflow) {
+            dropReason = PSTR("line too long");
+          } else {
+            for (size_t ri = 0; ri + 1 < rawLen; ri++) {
+              if (!bridgeByteIsText(sRaw[ri])) { dropReason = PSTR("non-text byte"); binaryBlocked = true; break; }
+            }
+          }
+          if (dropReason == nullptr && satBlocksExternalCommand(sWrite, (int)bytes_write)) {
+            satNoteExternalRefused(sWrite, (int)bytes_write);   // counts and logs the refusal
+            dropReason = PSTR("blocked command");
+          } else if (dropReason != nullptr) {
+            satNoteBridgeDropped(dropReason);
+          }
+          if (dropReason == nullptr && !state.debug.bOTGWSimulation && !enqueuePICTx(sRaw, rawLen)) {   // the whole line, CR included, byte-identical
+            satNoteBridgeDropped(PSTR("tx queue full"));
+            dropReason = PSTR("tx queue full");
+          }
+          if (dropReason != nullptr) {   // dropped whole: no echo, no ADR-059 override, no readout trigger, no GW=R or PS= handling
+            bytes_write = 0; rawLen = 0; lineOverflow = false; lineStart = true;
+            continue;
+          }
+        } else {
+          sWrite[bytes_write] = 0;
+        }
         if (state.debug.bOTGWSimulation) {
           OTDebugTf(PSTR("Net2Ser blocked by simulation mode: [%s] (%d)\r\n"), sWrite, bytes_write);
           if (bytes_write > 0) {
@@ -6439,14 +6512,11 @@ void handlePICSerial()
           }
         }
         bytes_write = 0; //start next line
-      } else if  (outByte == '\n')
-      {
-        // on LF, skip 
-      } 
-      else 
+        rawLen = 0; lineOverflow = false; lineStart = true;
+      } else if (outByte != '\n' && !lineFiltered)
       {
         if (bytes_write < (MAX_BUFFER_WRITE-1))
-          sWrite[bytes_write++] = outByte;
+          sWrite[bytes_write++] = outByte;   // an LF inside a line is skipped; a held line is rebuilt from sRaw at its CR
       }
     }
   }
@@ -6594,6 +6664,7 @@ void startPICStream()
   // Raw serial bridge for OTmonitor: disable telnet IAC handling so binary 0xFF
   // bytes pass through untouched (lib default NEG_REFUSE would strip them). TASK-866/879.
   OTGWstream.setTelnetNegotiation(AsyncSimpleTelnet<1>::NEG_OFF);
+  OTGWstream.onConnect(bridgeOnConnect);   // ADR-217: lets handlePICSerial() see a reconnect between two loop passes
   OTGWstream.begin(false);    // false = skip WiFi check; bind unconditionally
 }
 

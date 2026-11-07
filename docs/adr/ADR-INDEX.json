@@ -5698,7 +5698,7 @@
       "path": "ADR-177-keep-the-pic-byte-stream-verbatim-from-the-serial-task-to-every-consumer.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-09-05",
+      "date": "2026-11-07",
       "decision_summary": "Chosen option: Option A, because the damaging edits share a small, precise syntactic signature.",
       "topics": [
         "byte-transparency",
@@ -5823,7 +5823,7 @@
       "path": "ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-15",
+      "date": "2026-11-07",
       "decision_summary": "While SAT is enabled, SAT owns MsgID 1.",
       "topics": [
         "control setpoint ownership",
@@ -7357,7 +7357,7 @@
       "path": "ADR-203-sat-sends-cs-mm-and-ch-on-every-control-update-supersedes-adr-199-decision-4.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-02",
+      "date": "2026-11-07",
       "decision_summary": "While SAT is the active controller, a 5 s resend timer sends the latest CS=, MM= and CH= values again, unchanged valu...",
       "topics": [
         "ch-enable",
@@ -8243,6 +8243,89 @@
       "metadata": {
         "binding": false,
         "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-217",
+      "title": "While SAT is enabled, the Classic port 25238 bridge filters inbound lines and drops CV control commands and binary data",
+      "path": "ADR-217-while-sat-is-enabled-the-classic-port-25238-bridge-filters-inbound-lines-and-drops-cv-control-commands-and-binary-data.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-07",
+      "decision_summary": "While SAT is enabled, the Classic port 25238 inbound bridge buffers each line up to CR, forwards an allowed text line...",
+      "topics": [
+        "command-filter",
+        "otmonitor",
+        "pic",
+        "port-25238",
+        "sat",
+        "ser2net"
+      ],
+      "aliases": [
+        "25238 inbound filter",
+        "Net2Ser line filter",
+        "OTmonitor command blocking while SAT is enabled",
+        "serial bridge SAT filter"
+      ],
+      "components": [
+        "Classic port 25238 inbound bridge (Net2Ser, OTGW-Core.ino)"
+      ],
+      "symbols": [
+        "enqueuePICTx",
+        "satBlocksExternalCommand",
+        "satOwnsControlSetpoint"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "With satOwnsControlSetpoint() false, forward every inbound byte to enqueuePICTx() unchanged and without delay, CR bytes inside binary data included.",
+          "With satOwnsControlSetpoint() true, forward nothing until CR, then forward an allowed line byte-identical, including its CR.",
+          "Drop a whole line that contains a byte outside 0x20 to 0x7E, CR and LF while SAT is enabled.",
+          "Drop a line for which satBlocksExternalCommand() is true while SAT is enabled, and do not run the ser2net queue override of ADR-059 for it, so a dropped line cannot remove SAT's own queued command.",
+          "Drop a line longer than the bounded buffer whole, up to the next CR.",
+          "Log each dropped line with its reason and count drops.",
+          "Sample the mode only at a line boundary, and treat an LF at a line start as no boundary: forward it at once.",
+          "Keep a connection transparent from its first non-text byte sent while SAT is disabled until it disconnects.",
+          "Drop every byte of a connection after one of its lines was dropped as non-text, until it disconnects.",
+          "Forget all per-connection state at a disconnect and at a new connection, also one that falls between two loop passes.",
+          "Count a line as dropped, and skip its echo, override, trigger and GW=R/PS= handling, when enqueuePICTx() fails for it."
+        ],
+        "must_not": [
+          "Must not buffer, reframe or inspect byte values in the inbound path while SAT is disabled.",
+          "Must not forward part of a line while SAT is enabled.",
+          "Must not change the PIC to consumer direction (ADR-177).",
+          "Must not grow the line buffer without bound or allocate on the heap per line."
+        ],
+        "exceptions": [
+          "state.debug.bOTGWSimulation keeps its current behaviour (bytes are not sent to the PIC in simulation mode).",
+          "The OT-Direct bridge is out of scope: it is line based and its lines reach handleOTDirectCommand(), which already applies the rule."
+        ],
+        "verification": [
+          "Host test tests/testbridge25238satfilter.py on the real Classic bridge code (not a re-implementation, per the project's reproduce-then-prove rule):",
+          "With SAT enabled, the line CS=60\\r reaches the PIC transmit queue with zero bytes. The test is red on the current byte-forwarding code and green on the fix.",
+          "With SAT enabled, a line that contains a non-text byte (for example 0x00 or 0xFF) reaches the PIC with zero bytes.",
+          "With SAT enabled, an allowed line such as HW=1\\r reaches the PIC byte-identical.",
+          "With SAT disabled, a binary stream with CR bytes in the middle reaches the PIC byte-identical, in order and without waiting for a line end.",
+          "CR LF commands: with SAT enabled after HW=1\\r\\n, CH=0\\r\\n is refused; the mirror (SAT enabled for HW=1\\r\\n, then disabled) forwards the next CR LF command.",
+          "A binary blob with printable fragments between CR bytes reaches the PIC with zero bytes while SAT is enabled and triggers no GW=R; the latch ends at a new connection.",
+          "Binary data sent while SAT is disabled stays byte-identical across a SAT enable; a new connection filters again.",
+          "A reconnect between two loop passes drops the old partial line (X, reconnect, SAT on, CS=60\\r forwards no CS=60).",
+          "A failing enqueuePICTx() counts a drop and runs no echo, override, trigger or reset.",
+          "python evaluate.py --quick reports no new failing check."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/OTGW-Core.ino"
+        ]
+      },
+      "metadata": {
+        "binding": true,
+        "gate": "tests/test_bridge25238_sat_filter.py",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -13304,6 +13387,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-177",
+      "target": "ADR-217",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-178",
       "target": "ADR-051",
       "type": "related",
@@ -13324,6 +13413,12 @@
     {
       "source": "ADR-179",
       "target": "ADR-162",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-179",
+      "target": "ADR-217",
       "type": "related",
       "resolved": true
     },
@@ -14084,6 +14179,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-203",
+      "target": "ADR-217",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-204",
       "target": "ADR-196",
       "type": "related",
@@ -14500,6 +14601,42 @@
     {
       "source": "ADR-216",
       "target": "ADR-215",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-217",
+      "target": "ADR-059",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-217",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-217",
+      "target": "ADR-177",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-217",
+      "target": "ADR-179",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-217",
+      "target": "ADR-203",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-217",
+      "target": "ADR-207",
       "type": "related",
       "resolved": true
     }

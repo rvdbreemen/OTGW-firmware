@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.126
+**  Version  : v2.0.0-beta.127
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2578,22 +2578,22 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   const char* value = buf + 3;
   char rspBuf[16];  // scratch for formatting response values
 
+  // TASK-1150 / ADR-179 / TASK-1695: while SAT is enabled, an EXTERNAL CV control command (CS= CH= MM= C2= H2= TT= TC=) is refused
+  // rather than silently winning by being the last writer. Maintainer decision 2026-09-22: a visible refusal beats a race whose
+  // outcome depends on timing. SAT's own commands arrive through the same queue with satOwn = true (TASK-1575); disable SAT to
+  // control the boiler from outside.
+  if (!satOwn && satOwnsControlSetpoint() && satBlocksExternalCommand(buf, len)) {
+    satNoteExternalRefused(buf, len);
+    otDirectBridgeProcessStatus("NG");
+    return false;
+  }
+
   // =====================================================================
   // Setpoint write commands (enqueue + write cache + override)
   // =====================================================================
 
   // CS=xx.x — Control setpoint (MsgID 1 = TSet). Value 0 clears override.
   if (cmd0 == 'C' && cmd1 == 'S') {
-    // TASK-1150 / ADR-179: while SAT owns the control setpoint, an EXTERNAL CS= is
-    // refused rather than silently winning by being the last writer. Maintainer
-    // decision 2026-09-22: a visible refusal beats a race whose outcome depends on
-    // timing. SAT's own CS= arrives through the same queue with satOwn = true (TASK-1575); disable SAT to steer TSet
-    // by hand.
-    if (satOwnsControlSetpoint() && !satOwn) {
-      OTDDebugTln(F("OT-direct: CS= refused, SAT owns the control setpoint (disable SAT to override)"));
-      otDirectBridgeProcessStatus("NG");
-      return false;
-    }
     float temp = atof(value);
     bool enqueued = true;
     if (temp == 0.0f) {

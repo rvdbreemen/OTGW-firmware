@@ -73,7 +73,7 @@ static uint8_t satGetEffectiveHeatingSystem() { return (uint8_t)settings.sat.iHe
 static uint8_t satGetEffectiveHeatingSource() { return (uint8_t)settings.sat.iHeatingSource; }
 static std::vector<std::string> g_queue;
 enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };   // TASK-1574
-static CmdQueueResult addCommandToQueue(const char* cmd, size_t len, bool, int) { g_queue.push_back(std::string(cmd, len)); return CmdQueueResult::Queued; }
+static CmdQueueResult addCommandToQueue(const char* cmd, size_t len, bool, int, bool = false) { g_queue.push_back(std::string(cmd, len)); return CmdQueueResult::Queued; }
 @CONSTS@
 @TYPES@
 """

@@ -542,7 +542,7 @@ The WebSocket carries a stream from the firmware to the browser; each message is
 
 **Connection**: `tcp://<hostname>:25238` (when `LegacyPort25238Enabled` is on)
 
-Byte-transparent bridge between TCP clients and the PIC stream, in both directions, with no framing or negotiation.
+Byte-transparent bridge between TCP clients and the PIC stream, in both directions, with no framing or negotiation. Exception (ADR-217, Classic only): while SAT is enabled the client-to-PIC direction is read per line; lines with a blocked CV command (`CS= CH= MM= C2= H2= TT= TC=`), a non-text byte or more than 127 characters are dropped whole, other lines are forwarded unchanged. A PIC upgrade needs SAT off.
 
 **Line format** (same as the PIC UART):
 ```

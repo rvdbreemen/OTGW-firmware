@@ -9,6 +9,8 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-217"
 topics:
   - "pic-serial"
   - "byte-transparency"
@@ -49,6 +51,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-07
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Related to ADR-217
     changed_via: adr-kit lifecycle
 ```
 

@@ -9,6 +9,8 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-217"
 topics:
   - "control setpoint ownership"
   - "msgid 1 tset"
@@ -49,6 +51,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: Maintainer accepted 2026-10-15 after the code-vs-ADR verification; open questions answered in place (TASK-1237)
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-07
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Related to ADR-217
     changed_via: adr-kit lifecycle
 ```
 
