@@ -7,7 +7,9 @@
 **  (boilerUnsupportedRead / boilerUnsupportedWrite), in either direction. It
 **  may not set a verdict (an UNKNOWN-DATAID the gateway made) and may not
 **  retract one (a READ-ACK or WRITE-ACK the gateway made). A genuine boiler B
-**  on the OT-Direct path and a PIC-mode proxy A (ADR-103) keep counting.
+**  keeps counting. A PIC-mode proxy A without a B (ADR-103) neither sets nor
+**  retracts a verdict: the PIC sends an A for every answer it gives the
+**  thermostat itself, so only a B is boiler evidence (TASK-1391, 8442aaa1c).
 **
 **  The code under test is NOT copied here. test_boiler_unsupported_origin.py
 **  slices it by anchor, verbatim, into generated/boiler_unsupported_origin/<old|fix>/:
@@ -364,9 +366,10 @@ int main(int argc, char** argv) {
                 "(loopOTDirect SR table; override_reply C13b)",
           OTD_MODE_GATEWAY, { 26 }, {},
           { otd('T', otFrame(kReadData, 26, 0)), otd('A', otFrame(kReadAck, 26, c50)) }, 26, true, false);
-  runCase("P1", "PIC, proxy answer without a B (ADR-103), READ(70): T + A UNKNOWN-DATAID sets the read verdict",
+  runCase("P1", "PIC, proxy answer without a B (ADR-103), READ(70): T + A UNKNOWN-DATAID does not set the read "
+                "verdict, only a B is boiler evidence (TASK-1391)",
           OTD_MODE_GATEWAY, {}, {},
-          { pic('T', otFrame(kReadData, 70, 0)), pic('A', otFrame(kUnknownId, 70, 0)) }, 70, true, false);
+          { pic('T', otFrame(kReadData, 70, 0)), pic('A', otFrame(kUnknownId, 70, 0)) }, 70, false, false);
   runCase("P2", "PIC, boiler READ(40): T + B UNKNOWN-DATAID sets the read verdict",
           OTD_MODE_GATEWAY, {}, {},
           { pic('T', otFrame(kReadData, 40, 0)), pic('B', otFrame(kUnknownId, 40, 0)) }, 40, true, false);

@@ -16,8 +16,9 @@
 **       which counts loopback B frames on purpose (TASK-1138)
 **  and, per the maintainer's decision, the same consumers for a line the
 **  /otgw_simulation.log replay injects (the R cases): it is decoded and keeps
-**  boiler_connected, but it is no boiler evidence either. A genuine boiler B,
-**  and every live PIC frame (ADR-103 proxy A included), keep counting.
+**  boiler_connected, but it is no boiler evidence either. A genuine boiler B
+**  keeps counting; a live PIC proxy A without a B (ADR-103) does not, because
+**  only a B is boiler evidence (TASK-1391, 8442aaa1c).
 **
 **  The code under test is NOT copied here. test_local_frame_consumers.py slices
 **  it by anchor, verbatim, into generated/local_frame_consumers/<model>-<old|fix>/:
@@ -434,10 +435,12 @@ int main(int argc, char** argv) {
                            otd('A', otFrame(kReadAck, 26, c50)) }, false, 26, true);
   caseAcked("AC4", "control: PIC, boiler READ(25): T + B READ-ACK counts",
             kPic, { pic('T', otFrame(kReadData, 25, 0)), pic('B', otFrame(kReadAck, 25, 0x2A80)) }, false, 25, true);
-  caseAcked("AC5", "control: PIC proxy answer without a B (ADR-103), READ(57): T + A READ-ACK(80.0) counts",
-            kPic, { pic('T', otFrame(kReadData, 57, 0)), pic('A', otFrame(kReadAck, 57, c80)) }, false, 57, true);
-  caseAcked("AC6", "control: PIC proxy answer without a B (ADR-103), WRITE(24): T + A WRITE-ACK counts",
-            kPic, { pic('T', otFrame(kWriteData, 24, 0x1433)), pic('A', otFrame(kWriteAck, 24, 0x1433)) }, true, 24, true);
+  caseAcked("AC5", "control: PIC proxy answer without a B (ADR-103), READ(57): T + A READ-ACK(80.0) does not count, "
+                   "only a B is boiler evidence (TASK-1391)",
+            kPic, { pic('T', otFrame(kReadData, 57, 0)), pic('A', otFrame(kReadAck, 57, c80)) }, false, 57, false);
+  caseAcked("AC6", "control: PIC proxy answer without a B (ADR-103), WRITE(24): T + A WRITE-ACK does not count, "
+                   "only a B is boiler evidence (TASK-1391)",
+            kPic, { pic('T', otFrame(kWriteData, 24, 0x1433)), pic('A', otFrame(kWriteAck, 24, 0x1433)) }, true, 24, false);
 
   std::printf("== L: OT log suffix on a type-7 slave frame ==\n");
   caseLog("L1", "master mode, thermostat READ(27) with nothing cached: T + A UNKNOWN-DATAID "
