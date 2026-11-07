@@ -1,8 +1,8 @@
 // Settings help texts served at /settings-help.json (TASK-1294, from TASK-1281).
 //
-// This header is the source of truth. The JSON used to be a LittleFS file under
-// data/; it now lives in the firmware image so the 4 MB boards keep LittleFS headroom
-// (5 LittleFS blocks for 17.8 KB). FSexplorer.ino serves it with serveProgmemAsset().
+// This header is the source of truth. The JSON is a PROGMEM string in the app slot
+// (ADR-194), not a LittleFS file; FSexplorer.ino streams it from flash with
+// serveProgmemAsset(), without a RAM copy. Size limit 24 KB (TASK-1688).
 // The body below is exactly the JSON document: v2.js fetches it and tests/webui/
 // settings-help.test.mjs parses it out of this raw string. One key per line.
 // A key needs a matching entry in SET_META (v2.js); the test checks both ways.
@@ -49,10 +49,10 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "gpiosensorsinterval":"Seconds between sensor reads and MQTT updates. Default 20.",
 "gpiosensorslegacyformat":"Use the old v0.10.x sensor id format so existing Home Assistant entities keep working.",
 "gpiooutputsenabled":"Drive a GPIO pin from an OpenTherm status bit, for example to switch a relay.",
-"gpiooutputspin":"GPIO pin that carries the output. Default on an OTGW Classic: 11 (D7 hole) with an S3 Mini, 37 (D8 hole) with an S3 Mini Pro. On other boards choose a free GPIO.",
+"gpiooutputspin":"GPIO number that drives the output, not the hole: D6 is GPIO 13 on the S3 Mini.",
 "gpiooutputstriggerbit":"Status bit that switches the output: 0 = fault, 1 = CH active, 2 = DHW active, 3 = flame; 8-15 thermostat (8 = CH enable).",
 "s0counterenabled":"Count pulses from an S0 energy meter and publish power and totals.",
-"s0counterpin":"GPIO pin wired to the pulse output of the S0 meter. Default on an OTGW Classic: the D6 hole, 13 with an S3 Mini, 39 with an S3 Mini Pro. On other boards choose a free GPIO.",
+"s0counterpin":"GPIO number wired to the S0 meter pulse output, not the hole: D8 is GPIO 10 on the S3 Mini.",
 "s0counterpulsekw":"Pulses your meter gives per kWh. Default 1000. See the label on the meter.",
 "s0counterinterval":"Seconds between S0 reports. Default 60.",
 "s0counterdebouncetime":"Ignore pulses closer together than this many ms. Default 80; raise it for a bouncy meter.",

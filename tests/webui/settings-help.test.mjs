@@ -2,7 +2,7 @@
 // accessible info icon.
 //
 // Two parts:
-//  1. Content: the help JSON is valid JSON, at most 18 KB, has a text of
+//  1. Content: the help JSON is valid JSON, at most 24 KB, has a text of
 //     20..300 characters for EVERY key of SET_META and no key that SET_META does not know.
 //     SET_META is cut out of the real data/v2.js, so a new setting without help fails here.
 //     TASK-1294: the JSON lives in the firmware header src/OTGW-firmware/settingsHelp.h (a
@@ -19,7 +19,7 @@
 //                                               plain JSON, anything else as a header)
 //
 // Not covered: real hover/tap/focus behaviour, layout and the 390 px fit in a real browser
-// (needs the bench / Playwright), and the LittleFS image size (needs build.bat).
+// (needs the bench / Playwright), and the app image size (needs build.bat).
 //
 // Run: node --test tests/webui/settings-help.test.mjs
 import { test } from 'node:test';
@@ -35,7 +35,10 @@ const V2CSS = process.env.OTGW_V2_CSS || path.join(DATA, 'v2.css');
 const HELP_HEADER = process.env.OTGW_SETTINGS_HELP || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'settingsHelp.h');
 const HELP_DATA_FILE = path.join(DATA, 'settings-help.json');
 const SRC = fs.readFileSync(V2JS, 'utf8');
-const MAX_BYTES = 18 * 1024;
+// TASK-1688: 24 KB. The 18 KB limit dated from when the JSON was a LittleFS file. Since TASK-1294
+// (ADR-194) it is a PROGMEM string in the app slot (2,293,760 B; beta.118 used 2,123,984 B), streamed
+// from flash without a RAM copy, so the limit only guards flash growth, not RAM or LittleFS.
+const MAX_BYTES = 24 * 1024;
 
 // Cut "function <name>(...) { ... }" out of the source by brace matching, skipping string
 // literals and comments. optional: '' when the function does not exist (older v2.js).
@@ -84,12 +87,24 @@ test('the help texts ship in the firmware image: data/settings-help.json must no
   assert.ok(!fs.existsSync(HELP_DATA_FILE), HELP_DATA_FILE + ' must not exist; settingsHelp.h is the source of truth');
 });
 
-test('settings-help.json is valid JSON, an object of strings, and at most 18 KB', () => {
+test('settings-help.json is valid JSON, an object of strings, and at most 24 KB', () => {
   const { raw, obj } = readHelp();
   assert.ok(obj && typeof obj === 'object' && !Array.isArray(obj), 'top level must be an object');
   for (const [k, v] of Object.entries(obj)) assert.equal(typeof v, 'string', k + ' must be a string');
   assert.ok(raw.length <= MAX_BYTES, 'file is ' + raw.length + ' bytes, limit ' + MAX_BYTES);
   console.log('settings-help.json: ' + Object.keys(obj).length + ' keys, ' + raw.length + ' bytes (limit ' + MAX_BYTES + ')');
+});
+
+// TASK-1662/TASK-1688: the pin settings take a GPIO number, and the same socket hole has another GPIO
+// number on the Wemos (1.x) and the S3 Mini (2.x). Every pin help text says so and gives an example.
+test('the sensor, S0 and output pin help say GPIO number, not the hole', () => {
+  const { obj } = readHelp();
+  for (const k of ['gpiosensorspin', 's0counterpin', 'gpiooutputspin']) {
+    assert.ok(k in obj, k + ' has no help text');
+    assert.match(obj[k], /GPIO number/, k + ' must say it is a GPIO number');
+    assert.match(obj[k], /not the hole/, k + ' must say it is not the hole label');
+    assert.match(obj[k], /\bD\d is GPIO \d+ on the S3 Mini/, k + ' must give a hole-to-GPIO example');
+  }
 });
 
 test('every SET_META key has a help text of 20..300 characters', () => {
