@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-07T09:28:00Z'
-updated_date: '2026-11-07T10:24:00Z'
+updated_date: '2026-11-07T10:35:00Z'
 labels:
   - cleanup
   - firmware
@@ -38,4 +38,6 @@ Work in own lane wt-1685 (branch lane-1685 from origin/dev 80b304f; the main dev
 Removal-script bug caught in review: the first brace counter counted braces inside string literals and swallowed the live sendJsonMapEntry overloads with sendStartJsonMap; reverted, fixed (string/comment aware, prints every span), re-run, diff reviewed hunk by hunk (logged as bug in .wolf/buglog.json). No reference to any removed name is left in src/ or tests/ (git grep; only the separate JS formatBytes in HTML pages and a past-tense comment in restAPI.ino).
 
 Evidence: evaluate.py --quick 84 passed, 0 warn, 0 fail. scripts/run_tests.py -j4: 170 files, 159 passed, 8 failed, 2 timeouts. The 5 genuine failures (test_adr_governance ADR-216 index, test_sat_corrections_index, test_static_integrity CLI, test_boiler_unsupported_origin, test_local_frame_consumers) fail identically on clean origin/dev (stash run: 0/5 passed); 3 more are environment (WinError 225 Defender on test_otd_status_relay / test_sat_requested_vs_transmitted, no host C++ compiler for test_web_file_scheduling). Timeouts rerun alone: test_dhw_water_meter PASS (670 s); test_sat_lowload_contract LL-021 error + LL-023 fail, baseline run on clean origin/dev in progress.
+
+test_sat_lowload_contract baseline on a clean origin/dev worktree: LL-010 fail, LL-021 error, LL-023 fail (624 s). Lane: LL-021 error, LL-023 fail, LL-010 pass. No new failure from the removal. Remaining: AC3 build + image size vs beta.119 and AC4 OTA bench, both after the coordinator's 'beta.118 tag out'; then rebase onto origin/dev and push via the lead.
 <!-- SECTION:NOTES:END -->
