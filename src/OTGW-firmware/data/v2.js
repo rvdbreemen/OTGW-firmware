@@ -2087,20 +2087,7 @@
     satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' },
     sathpcycle:      { cat: 'sat', label: 'PWM cycle length', hint: 'Minutes' },   // TASK-1550: one field for every appliance type, see helpFor()
     otdmode:         { cat: 'otd', label: 'OT-Direct mode' },
-    // OT-Direct heating-curve / PI room-comp + ventilation (TASK-933 Phase 2)
-    otdchmode:           { cat: 'otd', label: 'CH mode' },
-    otdflowtemp:         { cat: 'otd', label: 'Flow setpoint', hint: '°C' },
-    otdflowmax:          { cat: 'otd', label: 'Max flow temperature', hint: '°C' },
-    otdroomsetpoint:     { cat: 'otd', label: 'Room setpoint', hint: '°C' },
-    otdgradient:         { cat: 'otd', label: 'Heat-curve gradient' },
-    otdexponent:         { cat: 'otd', label: 'Curve exponent' },
-    otdoffset:           { cat: 'otd', label: 'Curve offset', hint: '°C' },
-    otdroomcomp:         { cat: 'otd', label: 'Room compensation' },
-    otdkp:               { cat: 'otd', label: 'Kp (proportional)' },
-    otdki:               { cat: 'otd', label: 'Ki (integral)' },
-    otdkboost:           { cat: 'otd', label: 'K boost' },
-    otdhysteresisenable: { cat: 'otd', label: 'Hysteresis enabled' },
-    otdhysteresis:       { cat: 'otd', label: 'Hysteresis', hint: '°C' },
+    // OT-Direct ventilation (TASK-933 Phase 2)
     otdventenable:       { cat: 'otd', label: 'Ventilation enabled' },
     otdopenbypass:       { cat: 'otd', label: 'Open bypass now' },
     otdautobypass:       { cat: 'otd', label: 'Auto bypass' },
@@ -3171,8 +3158,6 @@
     // OT-Direct gateway mode — labels from OTDirecttypes.h (NOT the mockup's
     // Off/On-Off/PID list, which was a different, wrong concept).
     otdmode: [[0, 'Bypass'], [1, 'Gateway'], [2, 'Monitor'], [3, 'Master'], [4, 'Loopback']],
-    // OT-Direct CH mode (TASK-933 P2): 0=off, 1=fixed flow, 2=heating curve (auto)
-    otdchmode: [[0, 'Off'], [1, 'Fixed flow'], [2, 'Heating curve (auto)']],
     // SAT manufacturer presets — labels from the firmware satManufacturerTable[].
     satmanufacturer: [[0, 'Auto'], [1, 'Atag'], [2, 'Baxi'], [3, 'Brotje'], [4, 'De Dietrich'], [5, 'Ferroli'], [6, 'Geminox'], [7, 'Ideal'], [8, 'Immergas'], [9, 'Intergas'], [10, 'Itho'], [11, 'Nefit'], [12, 'Radiant'], [13, 'Remeha'], [14, 'Sime'], [15, 'Vaillant'], [16, 'Viessmann'], [17, 'Worcester'], [18, 'Other']],
     // Webhook POST content type — standard closed set (string-valued enum; the

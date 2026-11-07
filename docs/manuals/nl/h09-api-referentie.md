@@ -580,7 +580,7 @@ Opmerking (TASK-438): `monitor` is nu gekoppeld aan `GW=0` voor parity met PIC-f
 
 ##### GET /api/v2/otdirect/settings
 
-Retourneert de opgeslagen OT-direct-configuratie, inclusief verwarmingscurve en PI-kamercompensatieparameters.
+Retourneert de opgeslagen OT-direct-configuratie: modus, noodinstelling (setback) en ventilatie. SAT is de enige temperatuurregelaar op OT-Direct; de voormalige parameters voor verwarmingscurve en PI-kamercompensatie zijn verwijderd.
 
 **Antwoord:**
 ```json
@@ -589,24 +589,18 @@ Retourneert de opgeslagen OT-direct-configuratie, inclusief verwarmingscurve en 
     "mode": 1,
     "setback_temp": 15.0,
     "setback_timeout": 300,
-    "ch_mode": 0,
-    "flow_temp": 55.0,
-    "flow_max": 80.0,
-    "room_setpoint": 20.0,
-    "gradient": 1.5,
-    "exponent": 1.3,
-    "offset": 0.0,
-    "room_comp": false,
-    "kp": 1.0,
-    "ki": 0.01,
-    "kboost": 2.0
+    "vent_enable": false,
+    "open_bypass": false,
+    "auto_bypass": false,
+    "free_vent_enable": false,
+    "vent_setpoint": 0
   }
 }
 ```
 
 ##### POST /api/v2/otdirect/settings
 
-OT-direct-instellingen bijwerken. Alleen meegegeven parameters worden gewijzigd.
+OT-direct-instellingen bijwerken. Alleen meegegeven parameters worden gewijzigd. Parameters: `setbacktemp`, `setbacktimeout`, `ventenable`, `openbypass`, `autobypass`, `freeventenable`, `ventsetpoint`. Onbekende parameters worden genegeerd.
 
 ##### GET /api/v2/otdirect/overrides
 

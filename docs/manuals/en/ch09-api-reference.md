@@ -693,7 +693,7 @@ Note (TASK-438): `monitor` is now mapped to `GW=0` for parity with PIC firmware 
 
 ##### GET /api/v2/otdirect/settings
 
-Returns the persisted OT-direct configuration settings, including heating curve and PI room compensation parameters.
+Returns the persisted OT-direct configuration settings: mode, fail-safe setback and ventilation. SAT is the only temperature controller on OT-Direct; the former heating curve and PI room compensation parameters are removed.
 
 **Response:**
 
@@ -703,24 +703,18 @@ Returns the persisted OT-direct configuration settings, including heating curve 
     "mode": 1,
     "setback_temp": 15.0,
     "setback_timeout": 300,
-    "ch_mode": 0,
-    "flow_temp": 55.0,
-    "flow_max": 80.0,
-    "room_setpoint": 20.0,
-    "gradient": 1.5,
-    "exponent": 1.3,
-    "offset": 0.0,
-    "room_comp": false,
-    "kp": 1.0,
-    "ki": 0.01,
-    "kboost": 2.0
+    "vent_enable": false,
+    "open_bypass": false,
+    "auto_bypass": false,
+    "free_vent_enable": false,
+    "vent_setpoint": 0
   }
 }
 ```
 
 ##### POST /api/v2/otdirect/settings
 
-Update OT-direct settings. Only provided parameters are updated. Accepts form parameters: `setbacktemp`, `setbacktimeout`, `chmode`, `flowtemp`, `flowmax`, `roomsetpoint`, `gradient`, `exponent`, `offset`, `roomcomp`, `kp`, `ki`, `kboost`.
+Update OT-direct settings. Only provided parameters are updated. Accepts form parameters: `setbacktemp`, `setbacktimeout`, `ventenable`, `openbypass`, `autobypass`, `freeventenable`, `ventsetpoint`. Unknown parameters are ignored.
 
 ##### GET /api/v2/otdirect/overrides
 

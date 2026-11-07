@@ -44,6 +44,9 @@ AFTER_SAME = """{
   "SATcurveselftune": true
 }
 """
+# TASK-1684: the saved file comes from a firmware that still had the OT-Thing controller settings; the new
+# firmware does not write them back. A retired key may be missing, a real key may not.
+SAVED_RETIRED = SAVED.replace('  "SATenabled": true\n', '  "SATenabled": true,\n  "OTDchmode": 1,\n  "OTDflowtemp": 45.0,\n  "OTDhysteresisenable": false\n')
 AFTER_LOST = AFTER_SAME.replace('"MQTTbroker": "192.168.1.10",\n', "").replace('"httppasswd": "secret-old"', '"httppasswd": "secret-new"')
 
 
@@ -60,18 +63,20 @@ class SettingsCompare(unittest.TestCase):
         (self.tmp / "saved.ini").write_text(SAVED)
         (self.tmp / "same.ini").write_text(AFTER_SAME)
         (self.tmp / "lost.ini").write_text(AFTER_LOST)
+        (self.tmp / "saved_retired.ini").write_text(SAVED_RETIRED)
+        (self.tmp / "lost_retired.ini").write_text(AFTER_LOST)
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def run_bat(self, after):
+    def run_bat(self, after, saved="saved.ini"):
         r = subprocess.run(["cmd", "/c", str(DIR / "flash_otgw.bat"), "--compare-settings",
-                            str(self.tmp / "saved.ini"), str(self.tmp / after)], capture_output=True, text=True)
+                            str(self.tmp / saved), str(self.tmp / after)], capture_output=True, text=True)
         return r.returncode, r.stdout + r.stderr
 
-    def run_sh(self, after):
+    def run_sh(self, after, saved="saved.ini"):
         r = subprocess.run([bash(), str(DIR / "flash_otgw.sh"), "--compare-settings",
-                            (self.tmp / "saved.ini").as_posix(), (self.tmp / after).as_posix()],
+                            (self.tmp / saved).as_posix(), (self.tmp / after).as_posix()],
                            capture_output=True, text=True)
         return r.returncode, r.stdout + r.stderr
 
@@ -100,6 +105,26 @@ class SettingsCompare(unittest.TestCase):
     @unittest.skipUnless(bash(), "no bash")
     def test_sh_real_loss_names_the_keys(self):
         self.check_loss_named(*self.run_sh("lost.ini"))
+
+    @unittest.skipUnless(os.name == "nt", "cmd only on Windows")
+    def test_bat_retired_keys_may_be_missing(self):
+        self.check_same_ok(*self.run_bat("same.ini", "saved_retired.ini"))
+
+    @unittest.skipUnless(os.name == "nt", "cmd only on Windows")
+    def test_bat_retired_keys_do_not_hide_a_real_loss(self):
+        rc, out = self.run_bat("lost.ini", "saved_retired.ini")
+        self.check_loss_named(rc, out)
+        self.assertNotIn("OTDchmode", out)
+
+    @unittest.skipUnless(bash(), "no bash")
+    def test_sh_retired_keys_may_be_missing(self):
+        self.check_same_ok(*self.run_sh("same.ini", "saved_retired.ini"))
+
+    @unittest.skipUnless(bash(), "no bash")
+    def test_sh_retired_keys_do_not_hide_a_real_loss(self):
+        rc, out = self.run_sh("lost.ini", "saved_retired.ini")
+        self.check_loss_named(rc, out)
+        self.assertNotIn("OTDchmode", out)
 
     def test_old_byte_compare_would_have_reported_the_kept_settings(self):
         # the repro of the report: byte for byte the rewritten file differs although nothing was lost

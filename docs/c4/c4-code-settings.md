@@ -50,7 +50,7 @@
   - Closes file before optional echo read
   - Covers every persisted sub-section (device, mqtt, ntp, ui, sensors, s0, picBoot, outputs, webhook, sat, wifi) plus the device-level fields (`hostname`, `httppasswd`, `LEDblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `telnetenabled`, `boardmode`)
   - SAT settings alone: ~100 fields (heating system and source, presets, weather, multi-area, PV boost, BLE roster with per-slot bindkeys, etc.)
-  - OT-direct settings (`HAS_DIRECT_OT`): 27 `OTD*` keys (mode, bypass relay, heating curve, room compensation, CH hysteresis, ventilation)
+  - OT-direct settings (`HAS_DIRECT_OT`): 14 `OTD*` keys (mode, bypass relay, setback, ventilation)
   - Ethernet settings (`HAS_ETH_CAPABLE`): static IP configuration
   - WiFi static IP (`WifiStaticIP`, `WifiSubnet`, `WifiGateway`, `WifiDns1`, `WifiDns2`; empty IP = DHCP) and `WifiNoPortal` (TASK-1645)
   - Ends with `safebootSyncNvs()` like `readSettings()`
@@ -91,7 +91,7 @@
     - UI: first-time-setup and SAT onboarding flags (`ui_onboarded`, `sat_onboarded`)
     - PIC boot: command enable, command string
     - SAT: ~100 settings (enabled, heating system/source, PID, presets, weather, simulation, multi-area, PV boost, BLE roster, etc.)
-    - OT-direct (`HAS_DIRECT_OT`): mode, auto-detect, setback, fail-safe, bypass relay, heating curve, room compensation, CH hysteresis, ventilation
+    - OT-direct (`HAS_DIRECT_OT`): mode, auto-detect, setback, fail-safe, bypass relay, ventilation
     - Ethernet (`HAS_ETH_CAPABLE`) and WiFi: static IP, gateway, subnet, DNS (IP validation via `IPAddress::fromString()`; empty WiFi IP = DHCP)
 - **Dependencies**:
   - `checkGPIOConflict()` for GPIO conflict detection
@@ -439,22 +439,6 @@ struct OTDirectSettingsSection {
   uint16_t iMsgInterval       = 100;           // MI= inter-message gap (ms, 100-1275)
   bool     bHasBypassRelay    = false;         // Persisted: bypass relay fitted (user-declared)
   
-  // PI room compensation + heating curve (TASK-183)
-  uint8_t  iCHMode            = 1;             // CH mode (0=off, 1=fixed flow, 2=heating curve)
-  float    fFlowTemp          = 45.0f;         // Fixed flow temp (°C)
-  float    fFlowMax           = 75.0f;         // Maximum flow temp (°C)
-  float    fRoomSetpoint      = 20.0f;         // Room setpoint for curve (°C)
-  float    fGradient          = 1.5f;          // Heating curve gradient
-  float    fExponent          = 1.0f;          // Heating curve exponent (1.0=linear)
-  float    fOffset            = 0.0f;          // Heating curve offset (°C)
-  bool     bRoomCompEnabled   = false;         // PI room compensation enable
-  float    fKp                = 5.0f;          // Proportional gain (K/K)
-  float    fKi                = 0.5f;          // Integral gain (1/h)
-  float    fKboost            = 2.0f;          // Boost gain (K/K) for large error
-
-  // CH hysteresis deadband (TASK-582)
-  bool     bHysteresisEnable  = false;         // Enable CH suspension hysteresis
-  float    fHysteresis        = 0.5f;          // Total deadband width (degC, 0.0-2.0)
 
   // Ventilation override persistence (TASK-584)
   bool     bVentEnable, bOpenBypass, bAutoBypass, bFreeVentEnable;  // OT MsgID 70 bits

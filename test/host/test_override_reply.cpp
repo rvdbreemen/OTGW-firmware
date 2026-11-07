@@ -21,6 +21,7 @@
 **    otd_types.inc    OTDirectRequestOrigin, OTDirectMode   (OTDirecttypes.h)
 **    otd_slice.inc    OTDirect.ino: mode, override, response and UI tables,
 **                     setOTParityBit, applyOverrides, handleSlaveRequest,
+**                     otdCsOverrideActive .. buildStatusRequest (MsgID 0 master status),
 **                     everything from otLoopbackData[] through
 **                     handleMasterResponse(), loopOTDirect(), buildOTResponse()
 **                     and applyResponseModifiers()
@@ -37,7 +38,7 @@
 **    bridgeFrameToParser  records the T/R/B/A log.
 **    stubs                SAT, flame ratio, websocket, debug output, and the
 **                         functions loopOTDirect() calls only in master mode or
-**                         from its timer blocks. DUE() is false, so the
+**                         from its timer blocks; enqueueWriteCommand() records its calls. DUE() is false, so the
 **                         scheduler and the 1 s and 30 s blocks never run.
 **    stand-ins            otSchedule[] (read only after a third UNKNOWN_DATA_ID
 **                         for one MsgID, which no case reaches) and
@@ -64,6 +65,7 @@
 #include <string>
 #include <vector>
 #include <initializer_list>
+#include "rev_flags.inc"   // defines OTD_OLD_CONTROLLER when the sliced revision still has the OT-Thing controller
 
 // ---- platform surface the slices need ---------------------------------------
 typedef uint8_t byte;
@@ -163,17 +165,22 @@ static FakeOpenTherm otSlave;
 
 // state / settings: only the fields the slices touch.
 static struct { struct { bool bOnline; } otBus; struct { bool bThermostatConnected; } otd; } state;
+#ifdef OTD_OLD_CONTROLLER
 static struct {
   struct {
     uint8_t iCHMode; float fFlowTemp; float fFlowMax; float fRoomSetpoint;   // types as in OTDirecttypes.h
     float fGradient; float fExponent; float fOffset; bool bRoomCompEnabled;
   } otd;
 } settings;
+#else
+static struct { struct { bool bEnableSlave; } otd; } settings;
+#endif
 
 static void sendWebSocketJSON(const char*) {}
 static bool satSimulationBlocksBusTx(const char*, const __FlashStringHelper*) { return false; }
 static void satNotifyBoilerFrameSeen() {}
-static bool satOwnsControlSetpoint() { return false; }
+static bool g_satOwns = false;                    // TASK-1684 cases: SAT owns the control setpoint
+static bool satOwnsControlSetpoint() { return g_satOwns; }
 static std::string g_flame;                       // every flameRatioSet() call: '1' flame on, '0' off
 static void flameRatioSet(bool on) { g_flame += on ? '1' : '0'; }
 static void updateWriteCache(uint8_t, uint16_t) {}   // the scheduler's write cache, fed by master mode
@@ -194,9 +201,13 @@ static void updateOTDirectStatus() {}
 static void checkThermostatTimeout() {}
 static void loopFlameRatio() {}
 static void clearWriteOverride(uint8_t) {}
+#ifdef OTD_OLD_CONTROLLER
 static void loopPiCtrl() {}
-static bool enqueueWriteCommand(uint8_t, uint16_t, const char*) { return false; }
 static void loopCHHysteresis() {}
+#endif
+struct EnqueueCall { uint8_t msgId; uint16_t value; };
+static std::vector<EnqueueCall> g_enq;            // every enqueueWriteCommand() call (TASK-1684)
+static bool enqueueWriteCommand(uint8_t msgId, uint16_t value, const char*) { g_enq.push_back({ msgId, value }); return false; }
 static uint32_t otCSLastCommandMs = 0;
 static uint32_t otC2LastCommandMs = 0;
 static uint32_t otSCLastCommandMs = 0;
@@ -266,8 +277,8 @@ static std::string cacheText() {
 static const char* g_wantFlame   = nullptr;   // expected flameRatioSet() calls, "-" for none
 static int         g_wantPresent = -1;        // expected otDirectBoilerPresent(); -1: not checked
 static int         g_wantVent    = -1;        // expected otIsVentSlave(); -1: not checked
-static bool        g_checkFlow   = false;     // TASK-1184: check getFlowTemp() against g_wantFlow
-static float       g_wantFlow    = 0.0f;
+static int         g_wantEnq1    = -1;        // TASK-1684: expected number of MsgID 1 enqueueWriteCommand() calls; -1: not checked
+static int         g_wantStatusHB = -1;       // TASK-1684: expected master status byte of buildStatusRequest(); -1: not checked
 
 static void resetAll() {
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) otOverrides[i].active = false;
@@ -292,7 +303,8 @@ static void resetAll() {
   g_log.clear();
   g_m16Calls = 0; g_m16Type = 0; g_m16Data = 0;
   g_flame.clear();
-  g_wantFlame = nullptr; g_wantPresent = -1; g_wantVent = -1; g_checkFlow = false;
+  g_wantFlame = nullptr; g_wantPresent = -1; g_wantVent = -1; g_wantEnq1 = -1; g_wantStatusHB = -1;
+  g_enq.clear(); g_satOwns = false; otMasterStatusFlags = 0x01; otChModeOff = false;
   memset(&settings, 0, sizeof(settings));
 }
 
@@ -323,11 +335,14 @@ static void verdict(const char* id, const char* title,
   const std::string gotFlame = g_flame.empty() ? "-" : g_flame;
   const int  gotPresent = otDirectBoilerPresent() ? 1 : 0;
   const int  gotVent    = otIsVentSlave() ? 1 : 0;
-  const float gotFlow   = getFlowTemp();
+  int gotEnq1 = 0;
+  for (const EnqueueCall& c : g_enq) if (c.msgId == 1) gotEnq1++;
+  const int gotStatusHB = g_wantStatusHB < 0 ? -1 : (int)((buildStatusRequest() >> 8) & 0xFF);
   const bool extraOk   = (g_wantFlame == nullptr || gotFlame == g_wantFlame) &&
                          (g_wantPresent < 0 || gotPresent == g_wantPresent) &&
                          (g_wantVent < 0 || gotVent == g_wantVent) &&
-                         (!g_checkFlow || fabsf(gotFlow - g_wantFlow) < 0.01f);
+                         (g_wantEnq1 < 0 || gotEnq1 == g_wantEnq1) &&
+                         (g_wantStatusHB < 0 || gotStatusHB == g_wantStatusHB);
   const bool boilerOk  = gotBoiler  == framesText(wantBoiler);
   const bool repliesOk = gotReplies == framesText(wantReplies);
   const bool logOk     = gotLog     == wantLog;
@@ -346,19 +361,23 @@ static void verdict(const char* id, const char* title,
   printf("     state     : cache=%s online=%d%s\n", gotCache.c_str(), gotOnline ? 1 : 0,
          stateOk ? "" : ("   WANT cache=" + std::string(wantCache ? wantCache : "(not checked)") +
                          " online=" + (wantOnline ? "1" : "0")).c_str());
-  if (g_wantFlame || g_wantPresent >= 0 || g_wantVent >= 0 || g_checkFlow) {
-    char flowText[16];
-    snprintf(flowText, sizeof(flowText), "%.2f", g_wantFlow);
-    printf("     extra     : flame=%s present=%d vent=%d flow=%.2f%s\n", gotFlame.c_str(), gotPresent, gotVent, gotFlow,
+  if (g_wantFlame || g_wantPresent >= 0 || g_wantVent >= 0) {
+    printf("     extra     : flame=%s present=%d vent=%d%s\n", gotFlame.c_str(), gotPresent, gotVent,
            extraOk ? "" : ("   WANT flame=" + std::string(g_wantFlame ? g_wantFlame : "(any)") +
                            " present=" + (g_wantPresent < 0 ? "(any)" : std::to_string(g_wantPresent)) +
-                           " vent=" + (g_wantVent < 0 ? "(any)" : std::to_string(g_wantVent)) +
-                           " flow=" + (g_checkFlow ? std::string(flowText) : "(any)")).c_str());
+                           " vent=" + (g_wantVent < 0 ? "(any)" : std::to_string(g_wantVent))).c_str());
+  }
+  if (g_wantEnq1 >= 0 || g_wantStatusHB >= 0) {
+    printf("     controller: msgid1_enqueues=%d status_hb=%d%s\n", gotEnq1, gotStatusHB,
+           extraOk ? "" : ("   WANT msgid1_enqueues=" + (g_wantEnq1 < 0 ? std::string("(any)") : std::to_string(g_wantEnq1)) +
+                           " status_hb=" + (g_wantStatusHB < 0 ? std::string("(any)") : std::to_string(g_wantStatusHB))).c_str());
   }
   if (g_dump) {
-    fprintf(g_dump, "%s boiler=%s replies=%s log=%s cache=%s online=%d m16=%d:%u:%04X flame=%s present=%d vent=%d flow=%.2f\n",
+    fprintf(g_dump, "%s boiler=%s replies=%s log=%s cache=%s online=%d m16=%d:%u:%04X flame=%s present=%d vent=%d",
             id, gotBoiler.c_str(), gotReplies.c_str(), gotLog.c_str(), gotCache.c_str(), gotOnline ? 1 : 0,
-            g_m16Calls, (unsigned)g_m16Type, (unsigned)g_m16Data, gotFlame.c_str(), gotPresent, gotVent, gotFlow);
+            g_m16Calls, (unsigned)g_m16Type, (unsigned)g_m16Data, gotFlame.c_str(), gotPresent, gotVent);
+    if (g_wantEnq1 >= 0 || g_wantStatusHB >= 0) fprintf(g_dump, " enq1=%d status_hb=%d", gotEnq1, gotStatusHB);
+    fprintf(g_dump, "\n");
   }
 }
 
@@ -454,14 +473,10 @@ static void suite1177() {
 
 // ---- TASK-1184 suite: a boiler UNKNOWN-DATA-ID reply and the boiler cache --------
 // The library reports UNKNOWN-DATA-ID as SUCCESS, and the reply's data bytes
-// (0x0000) used to be cached as a valid value: the AUTO heating curve then ran
-// at 0.0 C outside and master mode answered READ-ACK(0). U1-U4 pin the fix;
-// U5 and U6 are controls that must behave the same with and without it.
-static void curveSettings() {                   // AUTO heating curve, the OTDirecttypes.h defaults
-  settings.otd.iCHMode = 2; settings.otd.fFlowTemp = 45.0f; settings.otd.fFlowMax = 75.0f;
-  settings.otd.fRoomSetpoint = 20.0f; settings.otd.fGradient = 1.5f; settings.otd.fExponent = 1.0f;
-  settings.otd.fOffset = 0.0f; settings.otd.bRoomCompEnabled = false;
-}
+// (0x0000) used to be cached as a valid value: a reader of MsgID 27 then saw
+// 0.0 C outside and master mode answered READ-ACK(0). U1-U4 pin the fix;
+// U5 and U6 are controls that must behave the same with and without it. The
+// cache is asserted directly (verdict's wantCache).
 static void gatewayExchange(unsigned long q, unsigned long b) {   // a scheduler request and its reply
   sendMasterRequestAsync(q, OT_DIRECT_ORIGIN_GATEWAY);
   otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
@@ -471,14 +486,13 @@ static void suite1184() {
   const unsigned long q27 = otFrame(kReadData, 27, 0), u27 = otFrame(kUnknownId, 27, 0);
   const unsigned long a27 = otFrame(kReadAck, 27, degC(5.0));
   {
-    resetAll(); curveSettings(); otCurrentMode = OTD_MODE_MASTER;
+    resetAll(); otCurrentMode = OTD_MODE_MASTER;
     gatewayExchange(q27, u27);
-    g_checkFlow = true; g_wantFlow = 45.0f;     // fixed flow: no outside temperature
-    verdict("U1", "master mode, AUTO curve, READ(27) answered UNKNOWN-DATAID: nothing cached, getFlowTemp() falls back to the fixed 45.0",
+    verdict("U1", "master mode, READ(27) answered UNKNOWN-DATAID: nothing cached in MsgID 27's slot",
             { q27 }, {}, logOf({ { 'R', q27 }, { 'B', u27 } }), "-");
   }
   {
-    resetAll(); curveSettings(); otCurrentMode = OTD_MODE_MASTER;
+    resetAll(); otCurrentMode = OTD_MODE_MASTER;
     gatewayExchange(q27, u27);
     clearTraffic();
     const unsigned long t = otFrame(kReadData, 27, 0), a = otFrame(kUnknownId, 27, 0);
@@ -487,11 +501,10 @@ static void suite1184() {
             {}, { a }, logOf({ { 'T', t }, { 'A', a } }), "-");
   }
   {
-    resetAll(); curveSettings(); otCurrentMode = OTD_MODE_MASTER;
+    resetAll(); otCurrentMode = OTD_MODE_MASTER;
     gatewayExchange(q27, a27);                  // 5.0 C cached
     gatewayExchange(q27, u27);                  // then the boiler stops supporting MsgID 27
-    g_checkFlow = true; g_wantFlow = 45.0f;
-    verdict("U3", "master mode, AUTO curve, READ-ACK(27, 5.0) then UNKNOWN-DATAID: the slot is cleared, getFlowTemp() uses the fixed 45.0",
+    verdict("U3", "master mode, READ-ACK(27, 5.0) then UNKNOWN-DATAID: the slot is cleared",
             { q27, q27 }, {}, logOf({ { 'R', q27 }, { 'B', a27 }, { 'R', q27 }, { 'B', u27 } }), "-");
   }
   {
@@ -503,10 +516,9 @@ static void suite1184() {
             { q }, {}, logOf({ { 'R', q }, { 'B', b } }), "-");
   }
   {
-    resetAll(); curveSettings(); otCurrentMode = OTD_MODE_MASTER;
+    resetAll(); otCurrentMode = OTD_MODE_MASTER;
     gatewayExchange(q27, a27);
-    g_checkFlow = true; g_wantFlow = 42.5f;     // 20 + 1.5 * (20 - 5)
-    verdict("U5", "control: READ-ACK(27, 5.0) is cached and drives the AUTO curve to 42.5",
+    verdict("U5", "control: READ-ACK(27, 5.0) is cached in MsgID 27's slot",
             { q27 }, {}, logOf({ { 'R', q27 }, { 'B', a27 } }), "1B:0500");
   }
   {
@@ -515,6 +527,80 @@ static void suite1184() {
     gatewayExchange(q, b);
     verdict("U6", "control: a WRITE-ACK(1, 40.0) reply is cached as before",
             { q }, {}, logOf({ { 'R', q }, { 'B', b } }), "01:2800");
+  }
+}
+
+// ---- TASK-1684 suite: SAT is the only temperature controller on OT-Direct ----------
+// Master mode has no thermostat. Without SAT and without a CS override nothing writes a
+// flow setpoint (MsgID 1) and the MsgID 0 master status the boiler gets has CH enable
+// (bit 0) off (with SAT enabled, g_satOwns, bit 0 stays on); the other bits are untouched. With a CS override (SAT or an external CS=)
+// bit 0 follows CH= (otChModeOff). Gateway mode is unchanged. The revision before the
+// removal wrote MsgID 1 = 45.0 C every 60 s from its OT-Thing controller (OTD_OLD_CONTROLLER):
+// P1 and P2 are the defect cases there.
+static void masterPasses(int n) {            // n loop passes, one simulated minute apart
+  for (int i = 0; i < n; i++) { g_millis += 60000UL; loopOTDirect(); }
+}
+static void controllerDefaults() {           // the OTDirecttypes.h defaults of the removed controller
+#ifdef OTD_OLD_CONTROLLER
+  settings.otd.iCHMode = 1; settings.otd.fFlowTemp = 45.0f; settings.otd.fFlowMax = 75.0f;
+  settings.otd.fRoomSetpoint = 20.0f; settings.otd.fGradient = 1.5f; settings.otd.fExponent = 1.0f;
+  settings.otd.fOffset = 0.0f; settings.otd.bRoomCompEnabled = false;
+#endif
+}
+
+static void suite1684() {
+  {
+    resetAll(); controllerDefaults(); otCurrentMode = OTD_MODE_MASTER;
+    masterPasses(12);
+    g_wantEnq1 = 0;
+    verdict("P1", "master mode, SAT off, defaults, 12 minutes of loop passes: no MsgID 1 write is enqueued",
+            {}, {}, "-", "-");
+  }
+  {
+    resetAll(); otCurrentMode = OTD_MODE_MASTER; otMasterStatusFlags = 0x03;   // CH enable + DHW enable
+    g_wantStatusHB = 0x02;
+    verdict("P2", "master mode, no CS override, board flags CH+DHW: MsgID 0 master status has CH enable off, DHW enable kept (0x02)",
+            {}, {}, "-", "-");
+  }
+  {
+    resetAll(); otCurrentMode = OTD_MODE_MASTER; otMasterStatusFlags = 0x03;
+    setOverride(1, degC(50.0));
+    g_wantStatusHB = 0x03;
+    verdict("P3", "control: master mode, CS override active, CH=1 state: MsgID 0 master status is CH+DHW (0x03)",
+            {}, {}, "-", "-");
+  }
+  {
+    resetAll(); otCurrentMode = OTD_MODE_MASTER; otMasterStatusFlags = 0x03;
+    setOverride(1, degC(50.0)); otChModeOff = true;
+    g_wantStatusHB = 0x02;
+    verdict("P4", "control: master mode, CS override active, CH=0 state: MsgID 0 master status has CH enable off, DHW kept (0x02)",
+            {}, {}, "-", "-");
+  }
+  {
+    resetAll(); otCurrentMode = OTD_MODE_GATEWAY; otMasterStatusFlags = 0x03;
+    g_wantStatusHB = 0x03;
+    verdict("P5", "control: gateway mode, no CS override: the gateway's own MsgID 0 master status keeps CH+DHW (0x03)",
+            {}, {}, "-", "-");
+  }
+  {
+    resetAll(); controllerDefaults(); otCurrentMode = OTD_MODE_MASTER; g_satOwns = true;
+    masterPasses(12);
+    g_wantEnq1 = 0;
+    verdict("P6", "control: master mode, SAT owns the setpoint, 12 minutes of loop passes: loopOTDirect enqueues no MsgID 1 write (SAT's CS= comes through the command path)",
+            {}, {}, "-", "-");
+  }
+  {
+    resetAll(); controllerDefaults(); otCurrentMode = OTD_MODE_GATEWAY;
+    masterPasses(12);
+    g_wantEnq1 = 0;
+    verdict("P7", "control: gateway mode, SAT off, 12 minutes of loop passes: no MsgID 1 write is enqueued",
+            {}, {}, "-", "-");
+  }
+  {
+    resetAll(); otCurrentMode = OTD_MODE_MASTER; otMasterStatusFlags = 0x03; g_satOwns = true;   // SAT enabled, no CS override yet
+    g_wantStatusHB = 0x03;
+    verdict("P8", "control: master mode, SAT owns the setpoint (enabled), no CS override, board flags CH+DHW: MsgID 0 master status keeps CH+DHW (0x03)",
+            {}, {}, "-", "-");
   }
 }
 
@@ -536,12 +622,13 @@ static int finish() {
   return ok ? 0 : 1;
 }
 
-// argv[1]: directory for the case dump (cases-<suite>.txt); argv[2]: suite, 1178 (default), 1177 or 1184.
+// argv[1]: directory for the case dump (cases-<suite>.txt); argv[2]: suite, 1178 (default), 1177, 1184 or 1684.
 int main(int argc, char** argv) {
   const std::string suite = argc > 2 ? argv[2] : "1178";
-  if (suite != "1178" && suite != "1177" && suite != "1184") { printf("unknown suite %s\n", suite.c_str()); return 3; }
+  if (suite != "1178" && suite != "1177" && suite != "1184" && suite != "1684") { printf("unknown suite %s\n", suite.c_str()); return 3; }
   printf("%s\n", suite == "1177" ? "== OT-Direct boiler cache and OEM data-ids 128-255 (TASK-1177) =="
                : suite == "1184" ? "== OT-Direct boiler cache and UNKNOWN-DATA-ID replies (TASK-1184) =="
+               : suite == "1684" ? "== OT-Direct master mode without the OT-Thing controller (TASK-1684) =="
                                  : "== OT-Direct reply to a forwarded thermostat frame (TASK-1178) ==");
   printf("slice origin: %s\n\n", OTD_SLICE_ORIGIN);
   if (argc > 1) {
@@ -551,6 +638,7 @@ int main(int argc, char** argv) {
   }
   if (suite == "1177") { suite1177(); return finish(); }
   if (suite == "1184") { suite1184(); return finish(); }
+  if (suite == "1684") { suite1684(); return finish(); }
 
   const uint16_t t30 = degC(30.0), t31 = degC(31.0), t40 = degC(40.0);
 

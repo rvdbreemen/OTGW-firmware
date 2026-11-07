@@ -24,8 +24,10 @@ set -o pipefail 2>/dev/null || true
 # TASK-1388: compare settings.ini per key, not byte for byte. A newer firmware rewrites the file in its
 # own format (new keys, defaults, number precision), so every saved key must come back with the same
 # value (numbers as numbers); new keys are fine. Only key names are printed, never values.
+# A retired key (a setting the firmware no longer has) may be missing after the restore.
+RETIRED_KEYS="OTDchmode OTDflowtemp OTDflowmax OTDroomsetpoint OTDgradient OTDexponent OTDoffset OTDroomcomp OTDkp OTDki OTDkboost OTDhysteresisenable OTDhysteresis"
 compare_settings() {
-    awk -v A="$1" -v B="$2" '
+    awk -v A="$1" -v B="$2" -v RK="$RETIRED_KEYS" '
     function load(f, m,   line, k, v, n) {
         n = 0
         while ((getline line < f) > 0) {
@@ -41,8 +43,9 @@ compare_settings() {
     BEGIN {
         if (load(A, a) == 0 || load(B, b) == 0) { print "[ERROR] Cannot read the settings files."; exit 2 }
         bad = ""
+        n = split(RK, rk, " "); for (i = 1; i <= n; i++) retired[rk[i]] = 1
         for (k in a) {
-            if (!(k in b)) { bad = bad (bad != "" ? ", " : "") k " (missing)"; continue }
+            if (!(k in b)) { if (k in retired) continue; bad = bad (bad != "" ? ", " : "") k " (missing)"; continue }
             if (isnum(a[k]) && isnum(b[k])) {
                 d = a[k] - b[k]; if (d < 0) d = -d
                 t = a[k] < 0 ? -a[k] : a[k]; if (t < 1) t = 1

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.120
+**  Version  : v2.0.0-beta.121
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -461,21 +461,6 @@ bool writeSettings(bool show)
   // a reboot (the POST dispatch + GET emit already existed; without this line the
   // flag reset to false every boot and the bypass-mode logic could never stay on).
   writeJsonBoolKV(file, F("OTDhasbypassrelay"), settings.otd.bHasBypassRelay);
-  // --- TASK-183: PI room compensation + heating curve ---
-  writeJsonIntKV(file, F("OTDchmode"), settings.otd.iCHMode);
-  writeJsonFloatKV(file, F("OTDflowtemp"), settings.otd.fFlowTemp);
-  writeJsonFloatKV(file, F("OTDflowmax"), settings.otd.fFlowMax);
-  writeJsonFloatKV(file, F("OTDroomsetpoint"), settings.otd.fRoomSetpoint);
-  writeJsonFloatKV(file, F("OTDgradient"), settings.otd.fGradient);
-  writeJsonFloatKV(file, F("OTDexponent"), settings.otd.fExponent);
-  writeJsonFloatKV(file, F("OTDoffset"), settings.otd.fOffset);
-  writeJsonBoolKV(file, F("OTDroomcomp"), settings.otd.bRoomCompEnabled);
-  writeJsonFloatKV(file, F("OTDkp"), settings.otd.fKp);
-  writeJsonFloatKV(file, F("OTDki"), settings.otd.fKi);
-  writeJsonFloatKV(file, F("OTDkboost"), settings.otd.fKboost);
-  // --- TASK-582: CH hysteresis deadband ---
-  writeJsonBoolKV(file, F("OTDhysteresisenable"), settings.otd.bHysteresisEnable);
-  writeJsonFloatKV(file, F("OTDhysteresis"), settings.otd.fHysteresis);
   // --- TASK-584: ventilation override persistence ---
   writeJsonBoolKV(file, F("OTDventenable"), settings.otd.bVentEnable);
   writeJsonBoolKV(file, F("OTDopenbypass"), settings.otd.bOpenBypass);
@@ -1295,21 +1280,6 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("OTDfailsafe")) == 0)      settings.otd.bFailSafe = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDmsginterval")) == 0)   settings.otd.iMsgInterval = constrain(atoi(newValue), 100, 1275);
   else if (strcasecmp_P(field, PSTR("OTDhasbypassrelay")) == 0) settings.otd.bHasBypassRelay = EVALBOOLEAN(newValue);
-  // --- TASK-183: PI room compensation + heating curve ---
-  else if (strcasecmp_P(field, PSTR("OTDchmode")) == 0)         settings.otd.iCHMode = constrain(atoi(newValue), 0, 2);
-  else if (strcasecmp_P(field, PSTR("OTDflowtemp")) == 0)       settings.otd.fFlowTemp = clampSettingFloat(newValue, settings.otd.fFlowTemp, 5.0f, 90.0f);
-  else if (strcasecmp_P(field, PSTR("OTDflowmax")) == 0)        settings.otd.fFlowMax = clampSettingFloat(newValue, settings.otd.fFlowMax, 20.0f, 90.0f);
-  else if (strcasecmp_P(field, PSTR("OTDroomsetpoint")) == 0)   settings.otd.fRoomSetpoint = clampSettingFloat(newValue, settings.otd.fRoomSetpoint, 5.0f, 30.0f);
-  else if (strcasecmp_P(field, PSTR("OTDgradient")) == 0)       settings.otd.fGradient = clampSettingFloat(newValue, settings.otd.fGradient, 0.1f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("OTDexponent")) == 0)       settings.otd.fExponent = clampSettingFloat(newValue, settings.otd.fExponent, 0.5f, 2.0f);
-  else if (strcasecmp_P(field, PSTR("OTDoffset")) == 0)         settings.otd.fOffset = clampSettingFloat(newValue, settings.otd.fOffset, -10.0f, 10.0f);
-  else if (strcasecmp_P(field, PSTR("OTDroomcomp")) == 0)       settings.otd.bRoomCompEnabled = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("OTDkp")) == 0)             settings.otd.fKp = clampSettingFloat(newValue, settings.otd.fKp, 0.0f, 20.0f);
-  else if (strcasecmp_P(field, PSTR("OTDki")) == 0)             settings.otd.fKi = clampSettingFloat(newValue, settings.otd.fKi, 0.0f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("OTDkboost")) == 0)         settings.otd.fKboost = clampSettingFloat(newValue, settings.otd.fKboost, 0.0f, 10.0f);
-  // --- TASK-582: CH hysteresis deadband ---
-  else if (strcasecmp_P(field, PSTR("OTDhysteresisenable")) == 0) settings.otd.bHysteresisEnable = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("OTDhysteresis")) == 0)       settings.otd.fHysteresis = clampSettingFloat(newValue, settings.otd.fHysteresis, 0.0f, 2.0f);
   // --- TASK-584: ventilation override persistence ---
   else if (strcasecmp_P(field, PSTR("OTDventenable")) == 0)      settings.otd.bVentEnable = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDopenbypass")) == 0)      settings.otd.bOpenBypass = EVALBOOLEAN(newValue);

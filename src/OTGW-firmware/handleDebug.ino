@@ -131,17 +131,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("fail_safe: %s\r\n"), settings.otd.bFailSafe ? "true" : "false");
     Debugf(PSTR("msg_interval: %u\r\n"), (unsigned)settings.otd.iMsgInterval);
     Debugf(PSTR("has_bypass_relay: %s\r\n"), settings.otd.bHasBypassRelay ? "true" : "false");
-    Debugf(PSTR("ch_mode: %u\r\n"), (unsigned)settings.otd.iCHMode);
-    Debugf(PSTR("flow_temp: %.1f\r\n"), settings.otd.fFlowTemp);
-    Debugf(PSTR("flow_max: %.1f\r\n"), settings.otd.fFlowMax);
-    Debugf(PSTR("room_setpoint: %.1f\r\n"), settings.otd.fRoomSetpoint);
-    Debugf(PSTR("gradient: %.2f\r\n"), settings.otd.fGradient);
-    Debugf(PSTR("exponent: %.2f\r\n"), settings.otd.fExponent);
-    Debugf(PSTR("offset: %.2f\r\n"), settings.otd.fOffset);
-    Debugf(PSTR("room_comp: %s\r\n"), settings.otd.bRoomCompEnabled ? "true" : "false");
-    Debugf(PSTR("kp: %.2f\r\n"), settings.otd.fKp);
-    Debugf(PSTR("ki: %.2f\r\n"), settings.otd.fKi);
-    Debugf(PSTR("kboost: %.2f\r\n"), settings.otd.fKboost);
 #endif
 
     Debugln(F("[state.mqtt]"));

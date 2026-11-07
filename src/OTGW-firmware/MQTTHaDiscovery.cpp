@@ -3902,6 +3902,7 @@ static const RetiredSatEntity kRetiredSatEntities[] PROGMEM = {
   { nullptr, nullptr, "/sat/auto_tune" },   // RETIRED-SAT-ENTITY TASK-1413: retained state topic, no entity
   { nullptr, nullptr, "/sat/auto_tune_rate" },   // RETIRED-SAT-ENTITY TASK-1413: retained value topic, no entity
   { nullptr, nullptr, "/sat/deadband" },   // RETIRED-SAT-ENTITY TASK-1417: retained value topic, no entity (entry 76)
+  { nullptr, nullptr, "/otgw32/ch_suspended" },   // RETIRED-SAT-ENTITY TASK-1684: retained OT-Direct state topic of the removed CH hysteresis, no entity
   { "sensor", "sat_sat_ble_temp_valid", nullptr },   // RETIRED-SAT-ENTITY TASK-1462: now a binary_sensor; the state topic sat/ble_temp_valid stays
 };
 

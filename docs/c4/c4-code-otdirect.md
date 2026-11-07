@@ -28,7 +28,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - **Repeater Overrides**: Thermostat frames can be intercepted and their data values replaced before forwarding to boiler (gateway mode)
 - **Response Modifiers**: Boiler responses can be intercepted and their data bytes modified before forwarding to thermostat
 - **Thermostat Timeout & Setback**: Fail-safe mechanism applies room setpoint override when thermostat offline for >N seconds
-- **PI Room Compensation (TASK-183)**: Weather-compensated heating curve with PI controller feedback loop from room temperature
+- **SAT is the only temperature controller**: OT-Direct has no heating curve, PI room compensation or CH hysteresis of its own (removed in TASK-1684). In master mode without SAT enabled and without a `CS=` override, no MsgID 1 is written and CH enable (bit 0) of the MsgID 0 master status is off (`buildStatusRequest()`: `IS_MASTER_MODE() && !otdCsOverrideActive() && !satOwnsControlSetpoint()`); an external `CS=` expires after 60 s (`OT_CSC2_EXPIRY_MS`) and must be repeated
 - **Flame Ratio Tracking (TASK-184)**: 3-hour rolling window of flame on/off duty cycle and transition frequency
 
 ## Code Elements
@@ -66,8 +66,6 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Schedules next periodic master request (every 100ms, skipped in monitor mode)
   - Emits PS=1 summary line if pending
   - Updates state.otd stats once per second and expires the CS= and C2= overrides after 60 s without a refresh and the SC= override after 61 s (PIC `CommandExpiry` parity; the CS= expiry is skipped while SAT owns the control setpoint)
-  - Runs PI room compensation every 60s, skipped while `satOwnsControlSetpoint()` (SAT owns MsgID 1, ADR-179)
-  - Runs CH hysteresis every 10s (`loopCHHysteresis()`)
   - Publishes flame ratio metrics every 60s
 
 #### `static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin origin)`
@@ -357,7 +355,6 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Clears repeater overrides
   - Clears response modifiers
   - Resets setback engagement
-  - Resets PI controller state (TASK-183)
   - Clears fake room setpoint (BS=)
 
 #### `static void checkThermostatTimeout()`
@@ -388,32 +385,6 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - **Purpose**: Simulated boiler data table for loopback mode, indexed by MsgID 0-127
 - **Values**: Realistic f8.8 temperatures, modulation levels, counters, etc.; 0xFFFF for unsupported MsgIDs
 
-### Room Temperature Compensation (TASK-183)
-
-#### `float getFlowTemp()`
-- **Purpose**: Compute target flow temperature from weather-compensated heating curve + PI correction
-- **Behavior**:
-  - Returns 0.0 if CH is off
-  - Fixed-flow mode: returns `settings.otd.fFlowTemp`
-  - Auto mode (heating curve):
-    - Reads outside temp from `otBoilerCache[27]` (MsgID 27, Toutside, f8.8) when that slot is valid; a boiler that answers MsgID 27 with UNKNOWN-DATA-ID leaves it invalid, and the curve falls back to the fixed flow temperature (TASK-1184)
-    - Applies OT-Thing curve formula: `flow = rsp + c1 * pow(rsp - outTmp, 1/exponent) + offset`
-    - Parameters from settings: `fFlowMax`, `fGradient`, `fExponent`, `fOffset`, `fRoomSetpoint`
-  - Adds PI correction term (`otPiDeltaT`) if room compensation enabled
-  - Clips result to [0, fFlowMax]
-
-#### `static void loopPiCtrl()`
-- **Purpose**: Run PI room temperature compensation loop (called every 60s)
-- **Behavior**:
-  - Reads room temp (MsgID 24) and room setpoint (MsgID 16) from boiler cache
-  - Applies low-pass filter (0.1x new + 0.9x previous) to room temperature
-  - Computes proportional term: `p = Kp * (rsp - rt)`
-  - Computes integral term: accumulates error weighted by heating active flag; clipped to [-5, +5] K
-  - Computes boost term: extra push when significantly cold (error > 1K)
-  - Clips total correction `otPiDeltaT` to [-5, +12] K
-  - Logs debug info if `state.debug.bOTmsg` enabled
-  - Forces immediate write of MsgID 1 (TSet) on next scheduler cycle
-
 ### Flame Ratio Tracking (TASK-184)
 
 #### `static void initFlameRatio()`
@@ -437,16 +408,6 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 
 #### `float getFlameRatioFreq()`
 - **Returns**: Flame cycle frequency (cycles/hour, one decimal place)
-
-### CH Hysteresis (TASK-582)
-
-#### `static void loopCHHysteresis()`
-- **Purpose**: Suspend and resume central heating around the room setpoint by toggling bit 0 (CH enable) of the master status byte
-- **Behavior** (every 10 s):
-  - Needs `settings.otd.bHysteresisEnable`, and room temperature (MsgID 24) and room setpoint (MsgID 16) in the boiler cache; otherwise any held suspension is released
-  - Suspends CH when room temperature reaches setpoint + `fHysteresis`/2; resumes when it falls to setpoint - `fHysteresis`/2
-  - Bypassed while SAT is active (`state.sat.bActive`); a held suspension is released first
-  - Publishes `otgw32/ch_suspended` (retained) on each change and mirrors it in `state.otd.bCHSuspended`
 
 ### MQTT-Sourced Input Routing (TASK-185)
 
@@ -687,9 +648,7 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 | OT_OFFLINE_RETRY_MS     | 5 s       | MsgID 0 probe interval while the bus is offline (everything else skipped) |
 | OT_VENT_FAST_INTERVAL_MS | 10 s     | MsgID 70/71 poll when the slave is a ventilation/HRV unit |
 | OT_CSC2_EXPIRY_MS / OT_SC_EXPIRY_MS | 60 s / 61 s | CS=/C2= and SC= overrides expire without a refresh |
-| CH hysteresis check     | 10 s      | `loopCHHysteresis()` |
 | OT_DHW_PUSH_TIMEOUT_MS  | 30 s      | DHW push state machine timeout |
-| OT_PI_INTERVAL_MS       | 60 s      | PI room compensation loop |
 | FLAME_BUF_SIZE          | 180 min   | 3-hour rolling window (flame ratio) |
 | Loop schedule check     | 100 ms    | Scheduler polling interval |
 | Status update           | 1 s       | `updateOTDirectStatus()` cadence |
@@ -701,7 +660,7 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 3. **3-Strike Auto-Blacklist**: MsgIDs returning UNKNOWN_DATA_ID ≥3 times are auto-disabled; manual `AA=MsgID` re-enables
 4. **Response vs Request Paths**: Response modifiers (RM=) applied only in gateway mode; repeater overrides (value injection) applied in both gateway and master modes
 5. **Loopback Mode**: Simulation is instant (no timing); useful for testing parser/MQTT without OT hardware
-6. **PI Integrator**: Clipped to [-5, +5] K; decays at 0.95× when CH inactive; includes boost term for rapid warm-up
+6. **Master mode CH enable**: `buildStatusRequest()` clears bit 0 of the MsgID 0 master status while master mode has no CS override (an external `CS=` or a thermostat MsgID 1 write) and SAT is not enabled (`satOwnsControlSetpoint()`); with an override, bit 0 follows `CH=` (`otChModeOff`). Gateway mode is unchanged
 7. **Flame Ratio**: Pre-filled to 60s on first transition; 0 if not yet initialized
 8. **Command Queue**: 12-frame limit; drops commands if full (logs error)
 9. **Write Cache**: Periodic writes inactive until `valueSet=true` (first command sets value)
@@ -711,12 +670,11 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 
 - **Loopback Mode**: `GW=L` enables full-stack testing with simulated boiler (parser, MQTT, WebSocket, HA discovery all functional)
 - **Summary Mode**: `PS=1` emits comma-separated values matching PIC format (useful for scripting/monitoring)
-- **Debug Output**: `state.debug.bOTmsg` enables telnet logging of OT frames and PI controller state
+- **Debug Output**: `state.debug.bOTmsg` enables telnet logging of OT frames
 - **REST API**: `/api/v2/otdirect/status` returns JSON with schedule/override counts, mode, connectivity
 - **MQTT Topics**:
   - `otgw32/flame_duty_pct` - Flame on-time % (under the configured MQTT top topic)
   - `otgw32/flame_cycles_per_hour` - Flame cycle frequency
-  - `otgw32/ch_suspended` - CH hysteresis suspension state (retained)
   - Standard OT topics populated by parser (temperature, modulation, etc.)
 
 ---
@@ -743,9 +701,6 @@ All 32-bit OT frames (request, response, gateway-generated) are formatted as 9-c
 
 ### Command Emulation Strategy
 The `handleOTDirectCommand()` function implements full PIC command compatibility by translating text commands to OpenTherm frames, state changes, or local overrides. Commands are processed immediately or queued (for boiler transmission) and synthesized responses are generated to maintain the illusion of a real PIC gateway.
-
-### PI Controller for Room Compensation
-The room temperature feedback loop (TASK-183) implements proportional-integral-boost control with low-pass filtering, setpoint change detection, and anti-windup clipping. The heating curve is weather-compensated (outside temperature dependent) and runs independently of the main OT schedule.
 
 ### Flame Ratio Tracking
 The flame on-time and cycle frequency (TASK-184) are tracked in a 180-minute rolling window (3 hours), matching OT-Thing behavior. A ring buffer structure with running sums provides O(1) updates and efficient duty-cycle/frequency calculations.

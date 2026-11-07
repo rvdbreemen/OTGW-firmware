@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.120
+**  Version  : v2.0.0-beta.121
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -114,8 +114,6 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn = false);   // 
 void sendOTDirectOverridesJSON();
 bool sendPICSerial(const char* buf, int len);
 bool otDirectBoilerPresent();  // TASK-795 §4.2: real boiler answered MsgID 3 (excludes loopback)
-// TASK-183: PI room compensation
-float getFlowTemp();
 // TASK-184: flame ratio metrics
 uint8_t getFlameRatioDuty();
 float   getFlameRatioFreq();

@@ -31,7 +31,7 @@ Central control loop, heating curve calculation, setpoint management, SAT-owned 
   - Room temperature source priority: simulation, then BLE (`bBleEnable` and fresh), then multi-area weighted average (`satGetWeightedRoomTemp()`), then MQTT/REST external temperature (`iSensorMaxAgeS` staleness), then OT MsgID 24 (`Tr`, stale after `SAT_STALE_TEMP_MS` of 5 min when it came from a thermostat, TASK-1157). Returns NAN when no source is valid; thermal comfort substitutes the Summer Simmer Index when humidity is fresh
 
 - `satOwnsControlSetpoint(): bool` (ADR-179, TASK-1150)
-  - True while `settings.sat.bEnabled`; deliberately not keyed on `bActive`, so a safety trip or the boot window does not hand TSet back to the OT-Direct heating curve. Used by OTDirect.ino (heating curve, thermostat MsgID 1 writes, CS heartbeat expiry) and by the CS= refusal in both command paths
+  - True while `settings.sat.bEnabled`; deliberately not keyed on `bActive`, so a safety trip or the boot window does not hand TSet to another MsgID 1 writer. Used by OTDirect.ino (thermostat MsgID 1 writes, CS heartbeat expiry) and by the CS= refusal in both command paths
 
 - `satEnqueueOwnCS(const char* cmd): void` (static) and `satCommandInFlight(): bool`
   - Every SAT-originated `CS=` (including the `CS=0` releases in `satDisable()`, boot safety and the keepalive) goes through `satEnqueueOwnCS()`, which sets `_satCmdInFlight` around `addCommandToQueue()`. `handleOTDirectCommand()` (OTDirect.ino) and `addCommandToQueue()` (OTGW-Core.ino, TASK-1236) refuse any `CS=` while `satOwnsControlSetpoint() && !satCommandInFlight()`, so an external CS= is rejected on both transports (OT-Direct answers `NG`). Bytes written straight to the PIC over TCP port 25238 bypass the queue and stay unfiltered (ADR-177)
@@ -252,7 +252,7 @@ Up to 4 weighted areas (`fAreaWeight[4]`, `iMultiAreaCount`). Each area is fed b
 - OTGW-firmware.h and SATtypes.h (type definitions, enums, settings/state structures)
 - MQTTstuff.ino (`kSatMqttCmds[]` dispatch table per ADR-078, `sendMQTTData`)
 - OTGW-Core.ino (`OTcurrentSystemState`, `addCommandToQueue()`, CS= refusal, `otRealBoilerSeenRecently()`)
-- OTDirect.ino (`otDirectBoilerPresent()`, CS= refusal, heating-curve gate on `satOwnsControlSetpoint()`)
+- OTDirect.ino (`otDirectBoilerPresent()`, CS= refusal and CS expiry gates on `satOwnsControlSetpoint()`)
 - restAPI.ino (`/api/v2/sat/*` handler)
 - sensors_ext.ino (Dallas to area routing via `satSetAreaTemp()`)
 - settingStuff.ino (settings persistence, `updateSetting()`)

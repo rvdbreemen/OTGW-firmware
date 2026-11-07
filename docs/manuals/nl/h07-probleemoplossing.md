@@ -345,7 +345,7 @@ Druk op elk moment op `h` om het helpmenu te tonen met de huidige apparaatstatus
 | 3 | MQTT-module |
 | 4 | Sensormodules |
 | 5 | SAT-regellus, cycles en HCR (standaard aan) |
-| 6 | OTDirect frame handling en PI-lus (standaard aan) |
+| 6 | OTDirect frame handling (standaard aan) |
 | g | MQTT interval gating (laat zien waarom een bericht wel of niet is gepubliceerd) |
 | n | NTP-tijdsynchronisatiedetails |
 | d | Dallas-sensor simulatiehelper |

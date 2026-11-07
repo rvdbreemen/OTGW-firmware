@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirecttypes.h
-**  Version  : v2.0.0-beta.120
+**  Version  : v2.0.0-beta.121
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -98,8 +98,6 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
   // TASK-466: PIC-style TT=/TC= remote-override mode (none/temporary/constant)
   OTRemoteOverrideMode eOverrideMode = OT_OVERRIDE_NONE;
   uint16_t iOverrideF88      = 0;        // f8.8 value of the active TT/TC override (0 when none)
-  // TASK-582: CH hysteresis suspension state
-  bool     bCHSuspended      = false;    // true = CH suspended by hysteresis deadband logic
 };
 
 //====================================================================
@@ -116,21 +114,6 @@ struct OTDirectSettingsSection {
   bool     bFailSafe          = true;  // FS= fail-safe setback on thermostat disconnect
   uint16_t iMsgInterval       = 100;   // MI= minimum inter-message gap (ms, 100-1275)
   bool     bHasBypassRelay    = false; // Persisted: bypass relay fitted on this board (user-declared, TASK-933 P2)
-  // --- TASK-183: PI room compensation + weather-compensated heating curve ---
-  uint8_t  iCHMode            = 1;     // 0=off, 1=fixed flow, 2=heating curve (AUTO)
-  float    fFlowTemp          = 45.0f; // Fixed flow temp for CH mode=fixed (°C)
-  float    fFlowMax           = 75.0f; // Maximum flow temperature (°C)
-  float    fRoomSetpoint      = 20.0f; // Default room setpoint for heating curve (°C)
-  float    fGradient          = 1.5f;  // Heating curve gradient
-  float    fExponent          = 1.0f;  // Heating curve exponent (1.0 = linear)
-  float    fOffset            = 0.0f;  // Heating curve offset (°C)
-  bool     bRoomCompEnabled   = false; // PI room compensation enabled
-  float    fKp                = 5.0f;  // Proportional gain (K/K)
-  float    fKi                = 0.5f;  // Integral gain (1/h)
-  float    fKboost            = 2.0f;  // Boost gain (K/K), applied when error > 1°C
-  // --- TASK-582: CH hysteresis deadband ---
-  bool     bHysteresisEnable  = false; // Enable CH suspension hysteresis (false = backward compat)
-  float    fHysteresis        = 0.5f;  // Total deadband width in °C (range 0.0-2.0); each side = fHysteresis/2
   // --- TASK-584: ventilation override persistence ---
   bool     bVentEnable        = false; // Ventilation control enabled (OT MsgID 70 HB bit0)
   bool     bOpenBypass        = false; // Open bypass valve (OT MsgID 70 HB bit2)

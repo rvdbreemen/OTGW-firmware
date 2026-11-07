@@ -3782,8 +3782,8 @@ void satPersistAllToFs()
 // Keyed on SAT being ENABLED, deliberately not on state.sat.bActive. A safety trip
 // clears bActive but leaves the user's intent (settings.sat.bEnabled) untouched, and
 // the boot window before the first control tick has the same shape. Keying on bActive
-// re-armed the OTDirect heating curve in exactly those windows, which is the conflict
-// sergeantd reported: SAT and the curve taking turns on TSet.
+// would release the setpoint to other MsgID 1 writers in exactly those windows: SAT and
+// another writer would take turns on TSet (the conflict sergeantd reported).
 //
 // One documented exception, decided by the maintainer 2026-09-22: the thermostat-timeout
 // setback (OTDirect.ino) is a fail-safe and deliberately outranks this ownership. If the
@@ -3881,9 +3881,8 @@ void satDisable(bool persistPid)
     return;
   }
   // TASK-1346: CH=1 also hands back the CH override. CH= only counts while a CS override is
-  // active (gateway.asm:53, pyotgw.py:602-603), but the flag itself stays: when the
-  // OTDirect heating curve or a later CS= sets a new override, SAT's last CH=0 would
-  // switch central heating off again. CH=1 restores the default state of that flag.
+  // active (gateway.asm:53, pyotgw.py:602-603), but the flag itself stays: when a
+  // later CS= sets an override, SAT's last CH=0 would switch central heating off again. CH=1 restores the default state of that flag.
   // TASK-1344: MM=T releases SAT's MM override (MM=0 in PWM). A non-numeric value clears it on
   // the PIC (gateway.asm:4752 SetMaxModLevel -> ClrMaxModLevel; pyotgw.py:542-543) and on
   // OT-Direct (MM= handler, clearWriteOverride(14)); otherwise the thermostat gets the

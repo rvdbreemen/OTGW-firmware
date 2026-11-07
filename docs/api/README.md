@@ -1359,17 +1359,11 @@ Returns the persisted OT-direct configuration settings.
     "mode": 1,
     "setback_temp": 15.0,
     "setback_timeout": 300,
-    "ch_mode": 0,
-    "flow_temp": 55.0,
-    "flow_max": 80.0,
-    "room_setpoint": 20.0,
-    "gradient": 1.5,
-    "exponent": 1.3,
-    "offset": 0.0,
-    "room_comp": false,
-    "kp": 2.0,
-    "ki": 0.001,
-    "kboost": 5.0
+    "vent_enable": false,
+    "open_bypass": false,
+    "auto_bypass": false,
+    "free_vent_enable": false,
+    "vent_setpoint": 0
   }
 }
 ```
@@ -1379,17 +1373,13 @@ Returns the persisted OT-direct configuration settings.
 | `mode` | integer | Persisted mode index: 0=bypass, 1=gateway, 2=monitor, 3=master, 4=loopback |
 | `setback_temp` | float | Setback temperature applied when thermostat disconnects (C, range 1-30) |
 | `setback_timeout` | integer | Seconds without a thermostat frame before setback activates |
-| `ch_mode` | integer | CH control mode (0=fixed setpoint, 1=heating curve, 2=PI room compensation) |
-| `flow_temp` | float | Fixed flow temperature setpoint (C, used when ch_mode=0) |
-| `flow_max` | float | Maximum flow temperature limit (C) |
-| `room_setpoint` | float | Room temperature setpoint for PI compensation (C) |
-| `gradient` | float | Heating curve gradient |
-| `exponent` | float | Heating curve exponent |
-| `offset` | float | Heating curve offset (C) |
-| `room_comp` | boolean | Whether PI room compensation is enabled |
-| `kp` | float | PI proportional gain |
-| `ki` | float | PI integral gain |
-| `kboost` | float | PI boost gain for large errors |
+| `vent_enable` | boolean | Ventilation control enabled (OT MsgID 70 HB bit 0) |
+| `open_bypass` | boolean | Open the ventilation bypass valve (OT MsgID 70 HB bit 2) |
+| `auto_bypass` | boolean | Automatic ventilation bypass valve mode (OT MsgID 70 HB bit 3) |
+| `free_vent_enable` | boolean | Free ventilation mode (OT MsgID 70 HB bit 4) |
+| `vent_setpoint` | integer | Ventilation setpoint 0-100 % (OT MsgID 71 HB) |
+
+SAT is the only temperature controller on OT-Direct. The former standalone controller fields (`ch_mode`, `flow_temp`, `flow_max`, `room_setpoint`, `gradient`, `exponent`, `offset`, `room_comp`, `kp`, `ki`, `kboost`, `hysteresis_enable`, `hysteresis`) are removed (see `docs/BREAKING_CHANGES.md`).
 
 #### `POST /api/v2/otdirect/settings`
 
@@ -1397,7 +1387,7 @@ Update OT-direct settings. Only provided parameters are updated.
 
 **Authentication**: Not required
 
-**Form parameters**: `setbacktemp` (float, 1.0-30.0), `setbacktimeout` (integer, seconds), `chmode` (int), `flowtemp` (float), `flowmax` (float), `roomsetpoint` (float), `gradient` (float), `exponent` (float), `offset` (float), `roomcomp` (bool), `kp` (float), `ki` (float), `kboost` (float)
+**Form parameters**: `setbacktemp` (float, 1.0-30.0), `setbacktimeout` (integer, seconds), `ventenable` (bool), `openbypass` (bool), `autobypass` (bool), `freeventenable` (bool), `ventsetpoint` (integer, 0-100). Unknown parameters, including the removed controller parameters, are ignored.
 
 **Response** `200 OK`: Full `otdirect_status` object.
 

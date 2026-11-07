@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.120
+**  Version  : v2.0.0-beta.121
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -554,21 +554,6 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
         je.field(F("mode"),            (int32_t)settings.otd.iMode);
         je.field(F("setback_temp"),    settings.otd.fSetbackTemp);
         je.field(F("setback_timeout"), (int32_t)settings.otd.iSetbackTimeout);
-        // TASK-183: PI room compensation + heating curve
-        je.field(F("ch_mode"),         (int32_t)settings.otd.iCHMode);
-        je.field(F("flow_temp"),       settings.otd.fFlowTemp);
-        je.field(F("flow_max"),        settings.otd.fFlowMax);
-        je.field(F("room_setpoint"),   settings.otd.fRoomSetpoint);
-        je.field(F("gradient"),        settings.otd.fGradient);
-        je.field(F("exponent"),        settings.otd.fExponent);
-        je.field(F("offset"),          settings.otd.fOffset);
-        je.field(F("room_comp"),       settings.otd.bRoomCompEnabled);
-        je.field(F("kp"),              settings.otd.fKp);
-        je.field(F("ki"),              settings.otd.fKi);
-        je.field(F("kboost"),          settings.otd.fKboost);
-        // TASK-582: CH hysteresis deadband
-        je.field(F("hysteresis_enable"), settings.otd.bHysteresisEnable);
-        je.field(F("hysteresis"),        settings.otd.fHysteresis);
         // TASK-584: ventilation override persistence
         je.field(F("vent_enable"),      settings.otd.bVentEnable);
         je.field(F("open_bypass"),      settings.otd.bOpenBypass);
@@ -582,21 +567,6 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
     } else if (method == HTTP_POST || method == HTTP_PUT) {
       if (hasArgCompat("setbacktemp"))    updateSetting("OTDsetbacktemp", argCompat("setbacktemp"));
       if (hasArgCompat("setbacktimeout")) updateSetting("OTDsetbacktimeout", argCompat("setbacktimeout"));
-      // TASK-183: PI room compensation + heating curve settings
-      if (hasArgCompat("chmode"))       updateSetting("OTDchmode", argCompat("chmode"));
-      if (hasArgCompat("flowtemp"))     updateSetting("OTDflowtemp", argCompat("flowtemp"));
-      if (hasArgCompat("flowmax"))      updateSetting("OTDflowmax", argCompat("flowmax"));
-      if (hasArgCompat("roomsetpoint")) updateSetting("OTDroomsetpoint", argCompat("roomsetpoint"));
-      if (hasArgCompat("gradient"))     updateSetting("OTDgradient", argCompat("gradient"));
-      if (hasArgCompat("exponent"))     updateSetting("OTDexponent", argCompat("exponent"));
-      if (hasArgCompat("offset"))       updateSetting("OTDoffset", argCompat("offset"));
-      if (hasArgCompat("roomcomp"))     updateSetting("OTDroomcomp", argCompat("roomcomp"));
-      if (hasArgCompat("kp"))           updateSetting("OTDkp", argCompat("kp"));
-      if (hasArgCompat("ki"))           updateSetting("OTDki", argCompat("ki"));
-      if (hasArgCompat("kboost"))       updateSetting("OTDkboost", argCompat("kboost"));
-      // TASK-582: CH hysteresis deadband settings
-      if (hasArgCompat("hysteresisenable")) updateSetting("OTDhysteresisenable", argCompat("hysteresisenable"));
-      if (hasArgCompat("hysteresis"))       updateSetting("OTDhysteresis", argCompat("hysteresis"));
       // TASK-584: ventilation override persistence settings
       if (hasArgCompat("ventenable"))    updateSetting("OTDventenable", argCompat("ventenable"));
       if (hasArgCompat("openbypass"))    updateSetting("OTDopenbypass", argCompat("openbypass"));
@@ -2392,17 +2362,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.otd.fail_safe"), settings.otd.bFailSafe);
     je.field(F("settings.otd.msg_interval"), (uint32_t)settings.otd.iMsgInterval);
     je.field(F("settings.otd.has_bypass_relay"), settings.otd.bHasBypassRelay);
-    je.field(F("settings.otd.ch_mode"), (uint32_t)settings.otd.iCHMode);
-    je.field(F("settings.otd.flow_temp"), settings.otd.fFlowTemp);
-    je.field(F("settings.otd.flow_max"), settings.otd.fFlowMax);
-    je.field(F("settings.otd.room_setpoint"), settings.otd.fRoomSetpoint);
-    je.field(F("settings.otd.gradient"), settings.otd.fGradient);
-    je.field(F("settings.otd.exponent"), settings.otd.fExponent);
-    je.field(F("settings.otd.offset"), settings.otd.fOffset);
-    je.field(F("settings.otd.room_comp"), settings.otd.bRoomCompEnabled);
-    je.field(F("settings.otd.kp"), settings.otd.fKp);
-    je.field(F("settings.otd.ki"), settings.otd.fKi);
-    je.field(F("settings.otd.kboost"), settings.otd.fKboost);
 #endif
 
     je.field(F("state.mqtt.connected"), snap->st.mqtt.bConnected);
@@ -3935,8 +3894,6 @@ void sendOTDirectStatus()
       dtostrf(getFlameRatioFreq(), 1, 1, freqBuf);
       je.field(F("flame_cycles_per_hour"), freqBuf);  // kept as a quoted string (dtostrf output)
     }
-    // TASK-582: CH hysteresis suspension state
-    je.field(F("ch_suspended"), state.otd.bCHSuspended);
     je.endObject();                       // close "otdirect_status"
     je.endObject();                       // close root
   }
@@ -4443,24 +4400,6 @@ void sendDeviceSettings()
   addBool(F("otdfailsafe"), settings.otd.bFailSafe, "b");
   addInt(F("otdmsginterval"), settings.otd.iMsgInterval, "i", 100, 1275);
   addBool(F("otdhasbypassrelay"), settings.otd.bHasBypassRelay, "b");
-  // --- OT-Direct PI room-comp + heating curve (TASK-183), newly exposed (TASK-933 P2) ---
-  addInt(F("otdchmode"), settings.otd.iCHMode, "i", 0, 2);   // 0=off,1=fixed,2=curve; ENUM_OPTS in v2.js
-  {
-    char tmpBuf[8];
-    dtostrf(settings.otd.fFlowTemp,     1, 1, tmpBuf); addNum(F("otdflowtemp"),     tmpBuf, "f", 5, 90);
-    dtostrf(settings.otd.fFlowMax,      1, 1, tmpBuf); addNum(F("otdflowmax"),      tmpBuf, "f", 20, 90);
-    dtostrf(settings.otd.fRoomSetpoint, 1, 1, tmpBuf); addNum(F("otdroomsetpoint"), tmpBuf, "f", 5, 30);
-    dtostrf(settings.otd.fGradient,     1, 2, tmpBuf); addNum(F("otdgradient"),     tmpBuf, "f", 0, 5);
-    dtostrf(settings.otd.fExponent,     1, 2, tmpBuf); addNum(F("otdexponent"),     tmpBuf, "f", 0, 2);
-    dtostrf(settings.otd.fOffset,       1, 1, tmpBuf); addNum(F("otdoffset"),       tmpBuf, "f", -10, 10);
-    dtostrf(settings.otd.fKp,           1, 2, tmpBuf); addNum(F("otdkp"),           tmpBuf, "f", 0, 20);
-    dtostrf(settings.otd.fKi,           1, 2, tmpBuf); addNum(F("otdki"),           tmpBuf, "f", 0, 5);
-    dtostrf(settings.otd.fKboost,       1, 2, tmpBuf); addNum(F("otdkboost"),       tmpBuf, "f", 0, 10);
-    dtostrf(settings.otd.fHysteresis,   1, 2, tmpBuf); addNum(F("otdhysteresis"),   tmpBuf, "f", 0, 2);
-  }
-  addBool(F("otdroomcomp"),         settings.otd.bRoomCompEnabled, "b");
-  // --- OT-Direct CH hysteresis (TASK-582) ---
-  addBool(F("otdhysteresisenable"), settings.otd.bHysteresisEnable, "b");
   // --- OT-Direct ventilation override (TASK-584) ---
   addBool(F("otdventenable"),       settings.otd.bVentEnable, "b");
   addBool(F("otdopenbypass"),       settings.otd.bOpenBypass, "b");
@@ -4530,11 +4469,9 @@ static const char* const PROGMEM knownSettings[] = {
   "mqttinterval", "mqttonchangepublishing", "mqttotmessage", "mqttpasswd", "mqttseparatesources", "legacyport25238enabled",
   "mqtttoptopic", "mqttuniqueid", "mqttuselegacyottopics", "mqttuser",  // TASK-1254: + mqttuselegacyottopics
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
-  "otdautobypass", "otdautodetect", "otdchmode", "otdenableslave", "otdexponent",
-  "otdfailsafe", "otdflowmax", "otdflowtemp", "otdfreeventenable", "otdgradient",
-  "otdhasbypassrelay", "otdhysteresis", "otdhysteresisenable", "otdkboost", "otdki",
-  "otdkp", "otdmode", "otdmsginterval", "otdoffset", "otdopenbypass", "otdroomcomp",
-  "otdroomsetpoint", "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
+  "otdautobypass", "otdautodetect", "otdenableslave", "otdfailsafe", "otdfreeventenable",
+  "otdhasbypassrelay", "otdmode", "otdmsginterval", "otdopenbypass",
+  "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
   "otdventenable", "otdventsetpoint",
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",

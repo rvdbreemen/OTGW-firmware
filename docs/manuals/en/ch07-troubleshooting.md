@@ -183,7 +183,7 @@ Press `h` at any time to print the help menu with the current device status and 
 | 3 | MQTT module |
 | 4 | Sensor modules |
 | 5 | SAT control loop, cycles and HCR (enabled by default) |
-| 6 | OTDirect frame handling and PI loop (enabled by default) |
+| 6 | OTDirect frame handling (enabled by default) |
 | g | MQTT interval gating (shows why a message was or was not published) |
 | n | NTP time sync details |
 | d | Dallas sensor simulation helper |
