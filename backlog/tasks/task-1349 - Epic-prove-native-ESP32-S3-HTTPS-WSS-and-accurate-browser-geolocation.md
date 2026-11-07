@@ -4,12 +4,9 @@ title: 'Epic: prove native ESP32-S3 HTTPS/WSS and accurate browser geolocation'
 status: To Do
 assignee: []
 created_date: '2026-10-24T10:55:00Z'
-updated_date: '2026-11-04T05:09:00Z'
+updated_date: '2026-11-05T17:27:00Z'
 labels:
-  - epic
-  - https
-  - esp32-s3
-  - paused
+  - parked
 milestone: 2.1.0
 dependencies: []
 references:
@@ -52,4 +49,6 @@ The ESP32-S3 migration makes encrypted local browser access feasible, but the cu
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no HTTPS code. Paused until after beta.1 (d0f8c5561); conflicts with ADR-003 and the HTTP-only rule unless superseded.
 
 2026-11-04 Robert (interactive): moved to milestone 2.1.0, out of the 2.0.0 scope.
+
+Robert 2026-11-05 (session, AskUserQuestion): parked; nobody works on it until Robert releases it (HTTPS epic: the no-HTTPS rule, ADR-003, stays).
 <!-- SECTION:NOTES:END -->

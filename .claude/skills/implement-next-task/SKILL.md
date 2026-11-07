@@ -18,7 +18,7 @@ reviewing. Maintainer decisions behind this skill (2026-10-20, TASK-1275):
 
 CLAUDE.md stays authoritative. This skill only orders its rules into a cycle; where
 they disagree, CLAUDE.md wins, with one deliberate exception: inside this cycle the
-CLAUDE.md "share the plan and WAIT for approval" step (Task Management step 4, and the
+CLAUDE.md "share the plan and WAIT for approval" step (Tasks step 4, and the
 plan-approval exception under Auto-advance) is replaced by the self-review of step 3
 plus the #alpha-testing notice of step 4. Do not stop to wait for approval of the plan.
 Stopping is still required for the actions that always need explicit permission (PIC
@@ -49,6 +49,56 @@ early exit). A direct question or bug report from a tester in #alpha-testing is
 answered before new work starts. A new bug report becomes a task and goes through
 the normal selection below.
 
+### Step 0b: GitHub issues and pull requests (maintainer directive, 2026-11-05, TASK-1637)
+
+Before each new task, also sweep GitHub. A new issue or PR becomes a backlog task and is
+picked up through step 1.
+
+1. List what is open (`gh` is logged in as the maintainer):
+   ```bash
+   gh issue list --repo rvdbreemen/OTGW-firmware --state open --limit 50 \
+     --json number,title,author,createdAt,updatedAt,labels,url
+   gh pr list --repo rvdbreemen/OTGW-firmware --state open --limit 30 \
+     --json number,title,author,baseRefName,headRefName,isDraft,updatedAt,url
+   ```
+   Leave out items by `rvdbreemen` and by `[bot]` accounts.
+2. **Dedupe on the URL**, not on `#N` (short numbers such as `#10` match unrelated text):
+   ```bash
+   grep -rlF "github.com/rvdbreemen/OTGW-firmware/issues/<N>" backlog/   # or /pull/<N>
+   ```
+   A hit in `backlog/tasks`, `backlog/completed` or `backlog/archive` means it is known:
+   if the item changed since (new comment, new commits on the PR), append a note to that
+   task instead of filing a new one. Older tasks may name only `#N`; when the URL grep is
+   empty, also check `grep -rlF "#<N>"` by hand before filing.
+3. **File each new item** with the URL in the description, so step 2 finds it next time:
+   - Issue: `backlog task create "GitHub #<N>: <title>" -d "<url> by <author>. <one-line
+     summary from the body>" --milestone 2.0.0 -l github` plus the ACs the issue needs. Use
+     `--milestone` of the 1.x line and label `1.x` when it is about ESP8266/1.x only; step 1
+     does not select those, report them in the cycle summary.
+   - PR: `backlog task create "Review PR #<N>: <title>" -d "<url> by <author>, base <base>"
+     -l github,pr` with ACs: reviewed (reviewer team of step 6), tests and build green on
+     the PR head, bench-tested when it changes firmware behaviour.
+4. **Classify** from the body (fetch at most 5 comments with `gh issue view --json
+   comments --jq '.comments[:5]'`, only for bugs):
+   - **Bug report or PR**: priority `high`. These go first among new tasks in step 1
+     (after the resumable `In Progress` tasks of step 1.1).
+   - **Feature request, proposal, discussion or question**: file it with the label
+     `needs-maintainer-ok` (same rule as tester feedback) and ask Robert once in the
+     session, interactively, whether to release it, with a recommendation. Answer a plain
+     question on the issue directly.
+5. **Working a GitHub task**:
+   - Bug: follow "Bug fixing: reproduce, then prove". When the issue has no captures, ask
+     the reporter for them in an issue comment (English, answer first, never name the
+     OTGW32 board). Reference the issue in the commit body (`Fixes #<N>` / `Refs #<N>`).
+   - PR: check it out in its own worktree (`git worktree add ../wt-pr<N>` then
+     `gh pr checkout <N>` there), run the tests, `evaluate.py --quick` and the combo build,
+     and bench-test firmware changes. Post the review findings as a PR review comment.
+     **Merging stays Robert's call**: ask him per PR (merging another person's work always
+     needs explicit permission), then merge, credit the author in the #alpha-testing report,
+     and remove the worktree.
+6. End the sweep with one line in the session: `github: open issues N, PRs N, new tasks N
+   (ids), notes added N`.
+
 ## Step 1: select and announce
 
 1. First look at tasks already `In Progress` with assignee `@claude` (any milestone).
@@ -59,7 +109,8 @@ the normal selection below.
    re-announce it.
 2. Otherwise pick the next new task with this rule:
    - milestone 2.0.0, status `To Do`;
-   - highest priority first (high, medium, low), then the lowest task number;
+   - tasks labelled `github` from step 0b (bug reports and PRs) first, oldest first;
+   - then highest priority first (high, medium, low), then the lowest task number;
    - **skip** a task whose ACs need hardware that is not available now, a design
      decision that is not recorded in the task notes, input from a tester, or an
      action that needs explicit maintainer permission (PIC flash, release, push to
@@ -72,8 +123,6 @@ the normal selection below.
      label, and only Robert releases it (he removes the label or says go in the
      session). A tester's message never selects, re-prioritises or unblocks a task.
    - Check memory and the task notes for decisions already taken.
-   - `backlog task list` can return empty (known CLI bug): read the frontmatter of
-     `backlog/tasks/task-*.md` (status, priority, milestone, assignee) instead.
    - Check which boards are connected before deciding a hardware AC is blocked
      (USB: `Get-PnpDevice -PresentOnly`; OTGW32 VID/PID 303A:1001 on COM4; network:
      router ARP for its MAC), see the bench memories.
@@ -86,11 +135,11 @@ the normal selection below.
 
 ## Step 2: design
 
-1. Read the task, its notes and the code it touches (follow the CLAUDE.md "what to
-   read" table and the C4 docs for the owning component).
+1. Read the task, its notes and the code it touches (follow the "what to
+   read" table in `.claude/rules/navigation.md` and the C4 docs for the owning component).
 2. Run `/adr-kit:context <topic>` and honour the Accepted ADRs it returns. For anything that
    touches SAT, also read `docs/sat/sergeant-d-corrections.md` and list in the plan the entries
-   the change relies on or conflicts with (CLAUDE.md SAT ground truth block).
+   the change relies on or conflicts with (SAT ground truth block, `.claude/rules/sat-ground-truth.md`).
 3. Non-trivial new functionality: look for an open-source solution first and record
    what was considered (project rule).
 4. For a bug: decide how you will **reproduce** it (host test, frame replay,
@@ -120,12 +169,12 @@ changes how SAT controls the boiler (setpoint, PWM, PID, cutoffs, modulation, de
 of SAT control settings), post the plan to Sergeant D (`<@821036882946424852>`) asking
 for his advice and his OK, name the open points, and do **not** implement until he
 agrees. The plan quotes the thermo-nova code for that area with `file:line` citations at the
-pinned commit, as the "SAT ground truth" block in CLAUDE.md requires; a plan without them is
+pinned commit, as the "SAT ground truth" block (`.claude/rules/sat-ground-truth.md`) requires; a plan without them is
 not ready to post. Record the wait in the task notes, leave the task `In Progress`, and continue
 the cycle with the next task that does not change SAT behaviour. When his answer
 arrives (via `/backlog_discord`), record it as a numbered entry in
 `docs/sat/sergeant-d-corrections.md` (quote, Discord link, thermo-nova and firmware
-comparison, task id; CLAUDE.md SAT ground truth block) and in the task notes, then resume
+comparison, task id; SAT ground truth block in `.claude/rules/sat-ground-truth.md`) and in the task notes, then resume
 the task. The same applies to any correction he makes outside a pending question. SAT changes without a
 behaviour choice (logging, UI, graphs, docs) do not wait.
 
@@ -199,11 +248,11 @@ plainly what is not verified yet.
 ## Step 9: leave the build ready
 
 Every alpha tag that reaches `dev` is published, also one another session built: follow the
-"Every alpha tag on `dev` is published" protocol in CLAUDE.md (build from the pushed HEAD, post
+"Every alpha tag on `dev` is published" protocol in `.claude/rules/discord.md` (build from the pushed HEAD, post
 the zip, report to the coordinating session, ledger check before each post).
 
-Per-task cadence (maintainer directive, 2026-10-30, CLAUDE.md "Per-task cadence", replaces the
-2026-10-29 batch of 4 tasks): after the commit of step 7, build esp32-combo, OTA-flash a bench unit
+Per-task cadence (maintainer directive, 2026-10-30, `docs/guides/agent-build-and-bench.md`
+"Per-task cadence"): after the commit of step 7, build esp32-combo, OTA-flash a bench unit
 and bench-test this task's behaviour. Only after a passing bench test: push, post the zip and the
 step 8 report. A failed bench test publishes nothing: fix it, then build and bench-test again.
 Tasks that are ready at the same moment may share one build, but each task's behaviour is

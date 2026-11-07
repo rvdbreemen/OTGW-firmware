@@ -1,0 +1,9 @@
+# OpenTherm boiler simulator scenario, TASK-1654. Exported from sat_bench_scenarios_1412_20.py by export_scenarios.py.
+# MsgID 25 answered Data-Invalid for 120 s after 60 s of valid answers (replay boundary calibration)
+scenario SB05-id25-data-invalid
+source sat_bench_scenarios_1412_20 1412.20-v1
+default flow=40 ret=30 pressure=1.5 outside=8 member_id=4 slave_hb=0 fault=0 ignition_delay=0 mod=30
+phase 60
+phase 120 reply25=data_invalid
+phase 60
+phase 0  # healthy hold after the scripted timeline

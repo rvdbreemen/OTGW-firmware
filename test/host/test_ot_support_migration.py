@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""TASK-1185 AC#2 host harness: does a format-1 /ot-boiler.json, written by builds
-that counted answers the gateway made itself as boiler evidence, stay out of RAM
-and get replaced by format 2?
+"""TASK-1185 / TASK-1660 host harness: do older /ot-boiler.json (formats 1 and 2) and
+/ot-thermo.json (format 1) files, written by builds that counted gateway-made frames as
+boiler or thermostat evidence, stay out of RAM and get replaced by the current formats
+(boiler 3 since TASK-1391, thermostat 2 since TASK-1612)?
 
-    python test/host/test_ot_support_migration.py                       # working tree only
-    python test/host/test_ot_support_migration.py --old-rev de6b13ebe   # OLD vs FIX, with mutants
+    python test/host/test_ot_support_migration.py                        # working tree only
+    python test/host/test_ot_support_migration.py --old-rev 8442aaa1c^   # OLD vs FIX, with mutants
 
 The six support bitmaps and the persistence functions (fileFindToken() through
 saveOtSupportFilesIfDirty()) are sliced by anchor from OTGW-Core.ino and compiled
@@ -28,19 +29,31 @@ SLICES = [
     (CORE, r"^static uint8_t boilerLastMasterWasWrite\[32\]", r"^void clearBoilerUnsupportedDirty\(\)"),
     (CORE, r"^static bool fileFindToken\(File &f, const char \*target\)", r"^void saveOtSupportFilesIfDirty\(\)"),
 ]
-DEFECT = {"M1": "RD", "M2": "RF", "M3": "R"}
-CONTROL = {"C1": "F", "C2": "", "C3": "", "C4": ""}   # C1: this build writes format 2, the old one format 1
+# OLD is the build before TASK-1391 (boiler format 2, thermostat format 1); FIX is the
+# working tree (boiler format 3, thermostat format 2). See the .cpp for each case.
+DEFECT = {"M2": "F", "M3": "R", "M4": "RF", "M5": "R", "M6": "R"}
+CONTROL = {"M1": "", "C1": "F", "C2": "", "C3": "", "C4": ""}   # C1: FIX writes format 3, OLD format 2
 PARTS = ["R", "D", "F"]
 
 MUTANTS = [
-    ("MX1", "the load does not mark a migrated file for rewrite",
-     [("boilerFileDirty     = boilerMigrated;", "boilerFileDirty     = false;")], ["M1", "M2"]),
-    ("MX2", "the writer still writes format 1",
-     [(r'{\"v\":2,\"device\":\"boiler\"', r'{\"v\":1,\"device\":\"boiler\"')], ["C1", "M2"]),
+    ("MX1", "the load does not mark a migrated boiler file for rewrite",
+     [("boilerFileDirty     = boilerMigrated;", "boilerFileDirty     = false;")], ["M1", "M2", "M4"]),
+    ("MX2", "the boiler writer still writes format 2",
+     [(r'{\"v\":3,\"device\":\"boiler\"', r'{\"v\":2,\"device\":\"boiler\"')], ["C1", "M2", "M4"]),
     ("MX3", "a format-1 boiler file loads again",
+     [(r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr) {',
+       r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr || strstr_P(header, PSTR("\"v\":1")) != nullptr) {')],
+     ["M1", "M2"]),
+    ("MX4", "a format-2 boiler file loads again",
+     [(r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr) {',
+       r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr || strstr_P(header, PSTR("\"v\":2")) != nullptr) {')],
+     ["M4"]),
+    ("MX5", "a format-1 thermostat file loads again",
      [(r'if (strstr_P(header, PSTR("\"v\":2")) != nullptr) {',
        r'if (strstr_P(header, PSTR("\"v\":2")) != nullptr || strstr_P(header, PSTR("\"v\":1")) != nullptr) {')],
-     ["M1", "M2"]),
+     ["M5"]),
+    ("MX6", "the thermostat writer still writes format 1",
+     [(r'{\"v\":2,\"device\":\"thermostat\"', r'{\"v\":1,\"device\":\"thermostat\"')], ["C2", "M5"]),
 ]
 
 

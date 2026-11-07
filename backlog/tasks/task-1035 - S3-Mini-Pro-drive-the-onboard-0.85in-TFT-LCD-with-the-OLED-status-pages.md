@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: 2026-07-09 18:37
-updated_date: '2026-11-04T05:08:00Z'
+updated_date: '2026-11-05T17:28:00Z'
 labels:
   - parked
 milestone: 2.1.0
@@ -49,4 +49,6 @@ Audit 2026-11-01: stays To Do, labelled parked: no TFT code in src; investigatio
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no TFT driver; parked: GPIO40 TFT SCK is the PIC MCLR net.
 
 2026-11-04 Robert (interactive): moved to milestone 2.1.0, out of the 2.0.0 scope.
+
+Robert 2026-11-05 (session, AskUserQuestion): parked; nobody works on it until Robert releases it (HTTPS epic: the no-HTTPS rule, ADR-003, stays).
 <!-- SECTION:NOTES:END -->

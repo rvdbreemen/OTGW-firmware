@@ -3,10 +3,11 @@ id: TASK-1391
 title: >-
   OT support bitmap: PIC-built A frames can count as boiler evidence (unpaired
   A, blacklist/UI= Unknown)
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-10-25T13:44:00Z'
-updated_date: '2026-11-02T04:39:00Z'
+updated_date: '2026-11-05T09:30:00Z'
 labels:
   - opentherm
   - pic
@@ -24,12 +25,26 @@ From the boiler-capability research 2026-10-25 (docs/research/2026-10-25-boiler-
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Bench or field capture shows (or refutes) a PIC-built A frame setting the boiler bitmap
-- [ ] #2 If confirmed: only B frames set/retract boiler support bits (host test red on HEAD)
+- [x] #1 Bench or field capture shows (or refutes) a PIC-built A frame setting the boiler bitmap
+- [x] #2 If confirmed: only B frames set/retract boiler support bits (host test red on HEAD)
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: partly: only a genuine B retracts (OTGW-Core.ino:5564/5576); unpaired PIC A can still set (:5530/5545). Needs a capture.
+
+2026-11-04 (otgw-firmware-6c). AC1 confirmed in a field capture (bench .63 has no boiler/thermostat, OTbus offline, so no A frames there): gruijter transcript 20261030-092718 (alpha.549, 350042 lines, local %LOCALAPPDATA%/OTGW-capture/field/gruijter-20261030-092718). Per MsgID: 9 = 349 T + 348 A Read-Ack, 0 B; 16 = 347 T + 347 A Write-Ack, 0 B; 24 = 347 T + 347 A Unknown-Data-Id, 0 B; 57 = 347 T + 347 A Read-Ack, 0 B; 115 = 49 T + 49 A Unknown-Data-Id, 0 B; 28 = 49 T, 1 B Unknown, 48 A Read-Ack. Every one of those A frames follows a B of another id (T57 R26 B26 A57 pattern: the PIC replaced the request). The published otgw-firmware/boiler/unsupported_msgids (transcript line 149167) reads 15R,28R,49R,57R,99R,115R,117R,118R,119R,121R,122R,14W,24W,57W: 24W and 115R come from PIC answers only (caveat: retained value, could partly date from earlier runs; the mechanism matches). Primary sources: otgw-6.6 gateway.asm:2490-2496 prints 'A' for a response the PIC transmits itself (nothing in monitor mode); OTGW-documentation/OTGW-Protocol.md:92 'A = modified response being sent to the thermostat'. AC2: OTGW-Core.ino bitmap block now only enters the slave branch for rsptype OTGW_BOILER (was: every slave frame except an answer-override A). /ot-boiler.json goes to format 3; format 1/2 files are not loaded (start fresh once, same pattern as TASK-1185) so the wrong 24W/115R bits do not stay forever (retraction needs a B that never comes). C4 doc c4-code-otgw-core.md updated. ADR-103 is unaffected (it routes values on MQTT, not support evidence). Side effect for SAT (no design change): a PIC A(28 Unknown) no longer sets boilerUnknown28ThisBoot, matching the SAT rule's own text 'a boiler frame of this boot confirmed Unknown-DataID' (SATcontrol.ino:2586). Host test tests/test_boiler_support_bitmap_b_only.py compiles the real block: against origin/dev b1fe73d2e 3 of 5 FAIL (57/16/9 acked, 24W/115R unsupported, u28 set from an A), on the fix 5 of 5 OK. Related tests OK: test_sat_no_return_startup, test_sat_flow_return_validity, test_pic_pm_chain (40), test_sat_max_tset, test_fs_update_keep. evaluate --quick 82/0/0. NOT host-tested: the format-3 load/save (LittleFS); bench check after build: telnet shows 'ot-support: /ot-boiler.json is format 1/2 ... starting fresh' once, /ot-boiler.json then starts with {"v":3 after the 15-min save.
+
+SAT entry check (CLAUDE.md SAT rules): entry 84 defines 'no return temperature' as 'the boiler answered Unknown-DataID to a read of MsgID 28'; a PIC-built A(28) is not the boiler, so the fix agrees with 84; entries 135, 141 and 217 build on 84 and agree for the same reason. No conflict, nothing to put to Sergeant D. 1.x sibling: TASK-1611 (same code at otgw-1.x.x OTGW-Core.ino:4489-4495). Thermostat-side analogue (PIC R frames): TASK-1612.
+
+Full suite 2026-11-04 in wt-6c-batch (b1fe73d2e + 1b7a9db21, 500796bc3, 40effe0ea): python tests/test_*.py 126/127 OK; the one FAIL, test_sat_lowload_contract.py, also fails on clean c469c5166 (ll021/ll023, lead 6b) and passes on the lead's beta.83 line that carries this commit (35 OK, 1 skipped, 3 expected failures, 474 s): tree age, not this change. Node webui suite not run here (killed for low memory); lead ran graph-history-merge 21/21.
+
+2026-11-05 rerun of tests/test_sat_lowload_contract.py in wt-6c-batch, in four OTGW_LL_ONLY chunks (one full run hit the 590 s tool limit while a lead build ran): LL-021+023 pass (43 s); LL-001..011 pass (119 s, incl. LL-011 Unknown-DataID verdict + board-sensor return); LL-012..017 pass (220 s; LL-012b expectedFailure QD-8, LL-016 skip PH-FIELD); LL-018..022 pass (249 s; LL-018b/018j expectedFailure open decisions). All 18 LL ids pass, 0 FAIL/ERROR. The earlier single FAIL in the overnight full-suite run is not reproducible here; it ran under memory pressure (commit charge 88-90%) and its log was not kept, so the cause stays unknown.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Only boiler B frames feed the OT support bitmaps. Evidence: host tests red/green (see notes); bench .61 beta.87 under the builtin replay: map refilled with 14 ids; real-traffic relearn not shown (idle OT-Direct bench).
+<!-- SECTION:FINAL_SUMMARY:END -->

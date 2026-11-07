@@ -58,7 +58,7 @@ otcore@^src/OTGW-firmware/(OTGW-Core\.(ino|h)|OTDirect(\.ino|types\.h)|OTBustype
 sat@^src/OTGW-firmware/SAT[A-Za-z]*\.(ino|h|cpp)$@ch05/h05, docs/c4/c4-code-sat.md, docs/c4/c4-component-smart-thermostat.md
 sensors@^src/OTGW-firmware/(sensors_ext\.ino|Sensorstypes\.h|s0PulseCount\.ino|S0types\.h|dhwWaterMeter\.ino|outputs_ext\.ino|Outputstypes\.h|OLED\.ino)$@ch02/h02, docs/api/DALLAS_SENSOR_LABELS_API.md, docs/c4/c4-code-sensors.md
 settings@^src/OTGW-firmware/(settingStuff\.ino|settingsHelp\.h|OTGW-firmware\.h|(Device|UI|Uptime|Hardware|Flash)types\.h)$@ch03/h03 (Settings page), docs/c4/c4-code-settings.md
-webui@^src/OTGW-firmware/(data/(v2\.(html|js|css)|v2-bundle\.css|ds-tokens\.css|FSexplorer\.html|fsexplorer\.css)|FSexplorer\.ino|updateServerHtml\.h|graphHistoryStuff\.(ino|h))$@ch03/h03, docs/c4/c4-code-web-assets.md
+webui@^src/OTGW-firmware/(data/(v2\.(html|js|css)|ds-tokens\.css|FSexplorer\.html|fsexplorer\.css)|webui/[A-Za-z-]+\.html|FSexplorer\.ino|graphHistoryStuff\.(ino|h))$@ch03/h03, docs/c4/c4-code-web-assets.md
 webhook@^src/OTGW-firmware/(webhook\.ino|Webhooktypes\.h)$@ch03/h03, ch09/h09
 ota@^(src/OTGW-firmware/OTGW-ModUpdateServer.*\.h|safeboot/.*|partitions_otgw_esp32\.csv|flash_otgw\.(bat|sh)|flash_esp\.py)$@ch02/h02, ch07/h07, docs/c4/c4-code-network.md
 platform@^src/libraries/Platform/.*$@ch02/h02 (boards), ch08/h08

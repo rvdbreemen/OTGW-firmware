@@ -52,7 +52,7 @@ param(
   [switch]$OldVsFix,
   [string]$OldRev = 'HEAD',
   [string]$OpenThermDir = '',
-  [ValidateSet('1178', '1177', '1184')][string]$Suite = '1178'
+  [ValidateSet('1178', '1177', '1184', '1684')][string]$Suite = '1178'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -71,8 +71,10 @@ $utf8     = New-Object System.Text.UTF8Encoding $false
 # EndKind is 'line' (a #define).
 $otdAnchors = @(
   @{ Name = 'decl buildOTResponse';         Kind = 'construct'; Regex = '^static unsigned long buildOTResponse\([^)]*\);' },
+  @{ Name = 'decl otdRelayedStatusFrame';   Kind = 'construct'; Regex = '^static unsigned long otdRelayedStatusFrame\([^)]*\);' },
   @{ Name = 'decl applyResponseModifiers';  Kind = 'construct'; Regex = '^static unsigned long applyResponseModifiers\([^)]*\);' },
   @{ Name = 'otMasterStatusFlags';          Kind = 'construct'; Regex = '^static uint8_t otMasterStatusFlags\b' },
+  @{ Name = 'otChModeOff';                  Kind = 'construct'; Regex = '^static bool otChModeOff\b' },
   @{ Name = 'otCurrentMode, IS_*_MODE()';   Kind = 'range';     Regex = '^static OTDirectMode otCurrentMode\b';
      EndRegex = '^#define IS_LOOPBACK_MODE\(\)'; EndKind = 'line' },
   @{ Name = 'setOTParityBit';               Kind = 'construct'; Regex = '^static inline void setOTParityBit\(unsigned long &frame\)\s*\{' },
@@ -98,10 +100,12 @@ $otdAnchors = @(
   @{ Name = 'applyOverrides';               Kind = 'construct'; Regex = '^static unsigned long applyOverrides\(unsigned long frame, bool &modified\)\s*\{' },
   @{ Name = 'request state, handleSlaveRequest'; Kind = 'range'; Regex = '^static bool\s+otMasterRequestActive\b';
      EndRegex = '^static void handleSlaveRequest\(unsigned long request, OpenThermResponseStatus status\)\s*\{'; EndKind = 'construct' },
+  @{ Name = 'otdCsOverrideActive .. buildStatusRequest'; Kind = 'range'; Regex = '^static bool otdCsOverrideActive\(\)\s*\{';
+     EndRegex = '^static unsigned long buildStatusRequest\(\)\s*\{'; EndKind = 'construct' },
   @{ Name = 'otLoopbackData[] .. handleMasterResponse'; Kind = 'range'; Regex = '^static const uint16_t PROGMEM otLoopbackData\[';
      EndRegex = '^static void handleMasterResponse\(\)\s*\{'; EndKind = 'construct' },
   @{ Name = 'PI state, getFlowTemp';        Kind = 'range';     Regex = '^static float\s+otPiIntegState\b';
-     EndRegex = '^float getFlowTemp\(\)\s*\{'; EndKind = 'construct' },
+     EndRegex = '^float getFlowTemp\(\)\s*\{'; EndKind = 'construct'; Optional = $true },   # only in the revisions before TASK-1684
   @{ Name = 'loopOTDirect';                 Kind = 'construct'; Regex = '^void loopOTDirect\(\)\s*\{' },
   @{ Name = 'buildOTResponse';              Kind = 'construct'; Regex = '^static unsigned long buildOTResponse\([^)]*\)\s*\{' },
   @{ Name = 'handleMasterModeSlaveFrame';   Kind = 'construct'; Regex = '^static void handleMasterModeSlaveFrame\(unsigned long frame\)\s*\{' },
@@ -136,11 +140,15 @@ $classes1178 = @{
 }
 $classes1177 = @{ Defect = @('K1','K2','K3','K4'); Unchanged = @('K5','K6','K7'); LogOnly = @() }
 $classes1184 = @{ Defect = @('U1','U2','U3','U4'); Unchanged = @('U5','U6'); LogOnly = @() }
+$classes1684 = @{ Defect = @('P1','P2'); Unchanged = @('P3','P4','P5','P6','P7','P8'); LogOnly = @() }
 $suiteSpec = @{
   '1178' = @{ Classes = $classes1178; Regression = @() }
   '1177' = @{ Classes = $classes1177; Regression = @(@{ Suite = '1178'; Classes = $classes1178; Changed = @() }) }
   '1184' = @{ Classes = $classes1184; Regression = @(@{ Suite = '1178'; Classes = $classes1178; Changed = @('C2','C7b','C7e','C8b') },
                                                      @{ Suite = '1177'; Classes = $classes1177; Changed = @() }) }
+  '1684' = @{ Classes = $classes1684; Regression = @(@{ Suite = '1178'; Classes = $classes1178; Changed = @() },
+                                                     @{ Suite = '1177'; Classes = $classes1177; Changed = @() },
+                                                     @{ Suite = '1184'; Classes = $classes1184; Changed = @() }) }
 }
 $defectCases    = $suiteSpec[$Suite].Classes.Defect
 $unchangedCases = $suiteSpec[$Suite].Classes.Unchanged
@@ -227,6 +235,10 @@ function Export-Slices([string[]]$Lines, [object[]]$Anchors, [string]$Origin, [s
   if ($OriginMacro) { $out.Add("#define $OriginMacro `"$Origin`"") }
   $prevLast = 0
   foreach ($a in $Anchors) {
+    if ($a.Optional -and (@($Lines | Where-Object { $_ -cmatch $a.Regex }).Count -eq 0)) {
+      Write-Host ("  {0,-40} not in this revision (optional)" -f $a.Name)
+      continue
+    }
     $s = Get-AnchoredSlice -Lines $Lines -A $a
     if ($s.First -le $prevLast) { throw "$($s.Name) : slices out of source order (line $($s.First) after $prevLast)" }
     $prevLast = $s.Last
@@ -281,6 +293,10 @@ function Export-Revision([string[]]$OtdLines, [string[]]$TypesLines, [string]$Ot
   Export-Slices -Lines $TypesLines -Anchors $typesAnchors -Origin $TypesOrigin -OutFile (Join-Path $Dir 'otd_types.inc') -OriginMacro ''
   Write-Host "  -- $OtdOrigin"
   Export-Slices -Lines $OtdLines -Anchors $otdAnchors -Origin $OtdOrigin -OutFile (Join-Path $Dir 'otd_slice.inc') -OriginMacro 'OTD_SLICE_ORIGIN'
+  # The harness stubs the OT-Thing controller only for a revision that still has it (TASK-1684).
+  $flags = @('// GENERATED by test/host/build_and_run_override_reply.ps1')
+  if (@($OtdLines | Where-Object { $_ -cmatch '^static float\s+otPiIntegState\b' }).Count -gt 0) { $flags += '#define OTD_OLD_CONTROLLER 1' }
+  [System.IO.File]::WriteAllLines((Join-Path $Dir 'rev_flags.inc'), $flags, $utf8)
 }
 
 function Build-Harness([string]$Dir, [string]$Label) {
@@ -373,6 +389,9 @@ if ($Suite -eq '1177' -and (@($oldOtd | Where-Object { $_ -match '\botBoilerCach
 }
 if ($Suite -eq '1184' -and (@($oldOtd | Where-Object { $_ -match '^\s*otBoilerCacheValid\[id\] = false;' })).Count -gt 0) {
   throw "OLD ($OldRev, $oldSha) already contains the TASK-1184 fix; pass -OldRev <the commit before the fix>"
+}
+if ($Suite -eq '1684' -and (@($oldOtd | Where-Object { $_ -match '^static void loopCHHysteresis' })).Count -eq 0) {
+  throw "OLD ($OldRev, $oldSha) no longer has the OT-Thing controller; pass -OldRev <a commit before TASK-1684>"
 }
 $oldOtdOrigin   = "git $OldRev ($oldSha):$otdRel"
 $oldTypesOrigin = "git $OldRev ($oldSha):$typesRel"

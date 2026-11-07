@@ -28,7 +28,9 @@
 // Emits one plain-language line to BOTH sinks so Telnet and the Web UI live-log
 // never drift. Always-on (NOT gated by state.debug.bSAT) but transition-only at
 // the call sites, so volume stays low. Web UI lines carry prefix 'S'.
-#define SAT_NARRATE_BUF 96
+// 128: the longest line, the self-tune report with two 11-character coefficients, needs 103 characters
+// (TASK-1663; tests/test_sat_narrate_fits.py checks every satNarrate*_P format against SAT_NARRATE_BUF - 1).
+#define SAT_NARRATE_BUF 128
 
 // TASK-1337: ot_log_buffer has one writer, the loop task. satNarrate*() is also reached from
 // REST handlers and the settings POST (async_tcp task), so it never sends: it posts the line to
@@ -452,13 +454,24 @@ static float satGetColdSetpoint()
 
 // Cold cutoff state, latched once per control tick by satColdCutoffLatched (TASK-1547, entry 199).
 static bool _sat_coldCut = false;
+// TASK-1652 (maintainer decision, entry 275): the latched cutoff waits while a lit PWM ON phase burns its first 180 s
+// (satPwmColdCutWaitsForMinBurn()). Set once per tick right after the latch; the latch itself keeps its hysteresis.
+static bool _sat_coldCutDeferred = false;
+
+// The cold cutoff in force: latched and not waiting for the minimum burn of a lit ON phase.
+static bool satColdCutActive()
+{
+  return _sat_coldCut && !_sat_coldCutDeferred;
+}
 
 // Threshold every "requested setpoint at or below the cold setpoint" test compares against: the cold
-// setpoint while heating, cold + SAT_COLD_HYSTERESIS_C while cut off. After the tick's latch update,
-// "requested <= satColdThreshold()" equals _sat_coldCut, so the CS override, the CH bit, the PWM gates,
-// the overshoot switch, the PWM exits and the 3 s refresh all see the same state between ticks.
+// setpoint while heating, cold + SAT_COLD_HYSTERESIS_C while cut off, and below every requested setpoint
+// (clamped to at least SAT_MIN_SETPOINT) while the cutoff waits for the minimum burn. After the tick's
+// latch update, "requested <= satColdThreshold()" equals satColdCutActive(), so the CS override, the CH bit,
+// the PWM gates, the overshoot switch, the PWM exits and the 3 s refresh all see the same state between ticks.
 static float satColdThreshold()
 {
+  if (_sat_coldCutDeferred) return SAT_MIN_SETPOINT - 1.0f;
   return satGetColdSetpoint() + (_sat_coldCut ? SAT_COLD_HYSTERESIS_C : 0.0f);
 }
 
@@ -1228,6 +1241,19 @@ static void satPwmBeginOn(bool flame, float boilerTemp, uint32_t onTimeMs, uint3
   }
 }
 
+// TASK-1652 (maintainer decision 2026-11-05, entry 275; entries 31, 80): once an ON phase has lit, the cold cutoff does not end it
+// before 180 s of flame since its ignition. True while PWM runs an ON phase whose flame burns, without hot water, and the ignition
+// anchor _pwm_flameOnMs is younger than 180 s, or is not set yet but the schedule sets it on this tick (first ignition, or a first
+// flame after the ignition wait timed out; satPwmSchedule()). A dark flame, hot water, an unlit phase or a hold that lapsed after a
+// draw give false, so the cutoff acts at once. The other stop paths (fault, DHW, SAT off, safety, valves, summer) never read this.
+static bool satPwmColdCutWaitsForMinBurn()
+{
+  if (state.sat.eControlMode != SAT_MODE_PWM || !state.sat.bPwmFlameRequested) return false;
+  if (!satIsFlameOn() || state.sat.bDhwActive || _pwm_dhwPhase != PwmDhwPhase::None || _pwm_dhwFlameLit) return false;
+  if (_pwm_flameOnMs == 0) return _pwm_waitingForFlame || !_pwm_dhwResumed || _pwm_dhwAnchorLate;
+  return (millis() - _pwm_flameOnMs) < PWM_IGNITION_TIMEOUT_MS;
+}
+
 // ON->OFF (pwm.py:205-209): the ignition anchor goes with the phase and the off wait is timed from this edge
 // (_last_update, pwm.py:208), whatever the boiler flame did before or since (entries 91, 92).
 static void satPwmEndOn(uint32_t onTimeMs, uint32_t offTimeMs)
@@ -1840,6 +1866,56 @@ static void satMiStep()
   addCommandToQueue("MI=500", 6, false, 0);
   _sat_miSent = true;
   SATDebugTln(F("SAT: MI=500 sent (no return temperature or manufacturer quirk)"));
+}
+
+// TASK-1653 (maintainer decision, entry 276): on a PIC board the flow temperature only arrives when the thermostat reads MsgID 25.
+// When it does not (no thermostat read for 300 s) and the last valid sample is at least 20 s old, SAT asks for it with PM=25. The PIC
+// serves PM=25 only in an alternative slot (SATpm25Poll.h), so SAT asks only when one was seen in the last 120 s; without one it
+// sets bPm25NoSlot and sends nothing. At most one PM=25 is outstanding: SAT waits while the PIC's priority slot is taken
+// (picPrioSlotBusy(): until a boiler reply for that DataID, or the 60 s PRIO_SLOT_TIMEOUT_MS in handleCommandQueue()), and while
+// the boot PM chain runs (pmChainBusy()). No PM=25 for 10 s after a fault edge in MsgID 0: the PIC's own fault-code read uses
+// the same slot (gateway.asm statusreturn ~2751-2759). The entry 45 start-up flood (satNoReturnFloodStep) is separate and unchanged.
+// Two PM=25 are at least SAT_PM25_FLOW_AGE_MS apart, also when the boiler answers Data-Invalid (an answer that frees the slot but
+// leaves the flow sample old). Rate as built: at most one PM=25 per 20 s, one per ~60 s while unanswered, none without a slot.
+static uint32_t _sat_pm25SentMs = 0;          // millis() of the outstanding PM=25; 0 = none
+static uint32_t _sat_pm25LastSentMs = 0;      // millis() of the last PM=25 SAT queued; 0 = none since boot
+static bool     _sat_pm25Unanswered = false;  // the last PM=25 went unanswered and no valid flow sample came since
+static void satPm25PollStep()
+{
+  const uint32_t now = millis();
+  const SatBoilerFeed &feed = state.otBus.feedTboiler;
+  if (_sat_pm25SentMs != 0) {
+    if (feed.eventMs != 0 && (int32_t)(feed.eventMs - _sat_pm25SentMs) >= 0) {   // a boiler reply for MsgID 25 (Data-Invalid too)
+      state.sat.iPm25Answered++;
+      _sat_pm25SentMs = 0;
+      _sat_pm25Unanswered = false;
+    } else if (!picPrioSlotBusy()) {             // the slot came free without a reply: the 60 s timeout, or a newer PM=/TP=
+      const uint32_t fe = state.otBus.pm25.faultEdgeMs;
+      if (fe == 0 || (int32_t)(fe - _sat_pm25SentMs) < 0) {   // not when the PIC's own fault-code read took the slot meanwhile
+        state.sat.iPm25Unanswered++;
+        _sat_pm25Unanswered = true;
+      }
+      _sat_pm25SentMs = 0;
+    }
+  }
+  const bool gatesOk = isPICEnabled() && hasOTCommandInterface() && satIsEnabled() && state.sat.bActive && !settings.sat.bSimulation &&
+                       state.otBus.bGatewayModeKnown && state.otBus.bGatewayMode && !state.otBus.bPSmode &&
+                       !isBoilerMsgIdUnsupportedRead(25);
+  const SatPm25Verdict v = satPm25Decide(state.otBus.pm25, now, satFeedAgeMs(feed, now), gatesOk);
+  if (v == SatPm25Verdict::Idle) {
+    _sat_pm25Unanswered = false;
+    state.sat.bPm25NoSlot = false;
+    return;
+  }
+  state.sat.bPm25NoSlot = (v == SatPm25Verdict::NoSlot) || _sat_pm25Unanswered;
+  if (v != SatPm25Verdict::Send || _sat_pm25SentMs != 0) return;
+  if (_sat_pm25LastSentMs != 0 && (uint32_t)(now - _sat_pm25LastSentMs) < SAT_PM25_FLOW_AGE_MS) return;
+  if (picPrioSlotBusy() || pmChainBusy()) return;
+  if (addCommandToQueue("PM=25", 5, false, 0) == CmdQueueResult::Dropped) return;
+  _sat_pm25SentMs = satFeedStamp(now);
+  _sat_pm25LastSentMs = _sat_pm25SentMs;
+  state.sat.iPm25Sent++;
+  SATDebugTln(F("SAT: PM=25 (the thermostat does not read the flow temperature)"));
 }
 
 //=====================================================================
@@ -3706,8 +3782,8 @@ void satPersistAllToFs()
 // Keyed on SAT being ENABLED, deliberately not on state.sat.bActive. A safety trip
 // clears bActive but leaves the user's intent (settings.sat.bEnabled) untouched, and
 // the boot window before the first control tick has the same shape. Keying on bActive
-// re-armed the OTDirect heating curve in exactly those windows, which is the conflict
-// sergeantd reported: SAT and the curve taking turns on TSet.
+// would release the setpoint to other MsgID 1 writers in exactly those windows: SAT and
+// another writer would take turns on TSet (the conflict sergeantd reported).
 //
 // One documented exception, decided by the maintainer 2026-09-22: the thermostat-timeout
 // setback (OTDirect.ino) is a fail-safe and deliberately outranks this ownership. If the
@@ -3763,6 +3839,8 @@ void satDisable(bool persistPid)
   state.sat.iTCPushMs    = 0;
   state.sat.bPushRefused = false;
   state.sat.iShVerdict   = 0;          // TASK-1412.13: a switched-off SAT has no SH= verdict
+  state.sat.bPm25NoSlot  = false;      // TASK-1653: a switched-off SAT asks for nothing
+  _sat_pm25Unanswered    = false;
   state.sat.bRoomTempLost = false;     // narration and status start clean after a re-enable (TASK-1364)
   _sat_roomLostActive = false;
   _sat_fireplaceActive = false;
@@ -3803,9 +3881,8 @@ void satDisable(bool persistPid)
     return;
   }
   // TASK-1346: CH=1 also hands back the CH override. CH= only counts while a CS override is
-  // active (gateway.asm:53, pyotgw.py:602-603), but the flag itself stays: when the
-  // OTDirect heating curve or a later CS= sets a new override, SAT's last CH=0 would
-  // switch central heating off again. CH=1 restores the default state of that flag.
+  // active (gateway.asm:53, pyotgw.py:602-603), but the flag itself stays: when a
+  // later CS= sets an override, SAT's last CH=0 would switch central heating off again. CH=1 restores the default state of that flag.
   // TASK-1344: MM=T releases SAT's MM override (MM=0 in PWM). A non-numeric value clears it on
   // the PIC (gateway.asm:4752 SetMaxModLevel -> ClrMaxModLevel; pyotgw.py:542-543) and on
   // OT-Direct (MM= handler, clearWriteOverride(14)); otherwise the thermostat gets the
@@ -4225,6 +4302,10 @@ void satSendStatusJSON()
     je.field(F("fallback_active"),      snap->st.sat.bFallbackActive);
     je.field(F("push_refused"),         snap->st.sat.bPushRefused);
     je.field(F("sh_write"),             snap->st.sat.iShVerdict == 1 ? "accepted" : (snap->st.sat.iShVerdict == 2 ? "rejected" : "unknown"));   // TASK-1412.13, entry 252
+    je.field(F("pm25_no_slot"),         snap->st.sat.bPm25NoSlot);       // TASK-1653
+    je.field(F("pm25_sent"),            snap->st.sat.iPm25Sent);
+    je.field(F("pm25_answered"),        snap->st.sat.iPm25Answered);
+    je.field(F("pm25_unanswered"),      snap->st.sat.iPm25Unanswered);
     je.field(F("room_temp_lost"),       snap->st.sat.bRoomTempLost);
     je.field(F("ot_link_lost"),         snap->st.sat.bOtLinkLost);
     je.field(F("outside_temp_missing"), snap->st.sat.bOutsideTempMissing);   // TASK-1390
@@ -4415,7 +4496,7 @@ static const char* satSimmerPerception(float indexC) {
 // the ADR-111 heartbeat keeps the retained values fresh. A REST or settings disable therefore
 // reaches the broker on the next loop pass. Shadows are file-scope so satRepublishCoreState()
 // can reset them.
-static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_sh_rejected, s_core_room_temp_lost, s_core_ot_link_lost, s_core_outside_temp_missing, s_core_external_temp_enable;
+static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_sh_rejected, s_core_pm25_no_slot, s_core_room_temp_lost, s_core_ot_link_lost, s_core_outside_temp_missing, s_core_external_temp_enable;
 static SATShadowS s_core_mode, s_core_preset, s_core_control_mode;
 
 static void satPublishCoreState()
@@ -4428,6 +4509,7 @@ static void satPublishCoreState()
   publishIfChangedB(F("sat/fallback_active"),  state.sat.bFallbackActive,   s_core_fallback_active,  true);
   publishIfChangedB(F("sat/push_refused"),     state.sat.bPushRefused,      s_core_push_refused,     true);
   publishIfChangedB(F("sat/sh_rejected"),      state.sat.iShVerdict == 2,   s_core_sh_rejected,      true);   // TASK-1412.13, entry 252
+  publishIfChangedB(F("sat/pm25_no_slot"),     state.sat.bPm25NoSlot,       s_core_pm25_no_slot,     true);   // TASK-1653
   publishIfChangedB(F("sat/room_temp_lost"),   state.sat.bRoomTempLost,     s_core_room_temp_lost,   true);
   publishIfChangedB(F("sat/ot_link_lost"),     state.sat.bOtLinkLost,       s_core_ot_link_lost,     true);
   publishIfChangedB(F("sat/outside_temp_missing"), state.sat.bOutsideTempMissing, s_core_outside_temp_missing, true);   // TASK-1390
@@ -4456,6 +4538,7 @@ void satRepublishCoreState()
   memset(&s_core_fallback_active, 0, sizeof(s_core_fallback_active));
   memset(&s_core_push_refused, 0, sizeof(s_core_push_refused));
   memset(&s_core_sh_rejected, 0, sizeof(s_core_sh_rejected));
+  memset(&s_core_pm25_no_slot, 0, sizeof(s_core_pm25_no_slot));
   memset(&s_core_room_temp_lost, 0, sizeof(s_core_room_temp_lost));
   memset(&s_core_ot_link_lost, 0, sizeof(s_core_ot_link_lost));
   memset(&s_core_outside_temp_missing, 0, sizeof(s_core_outside_temp_missing));
@@ -6807,6 +6890,7 @@ static void satControlLoopRun()
   _sat_tuneGatesPassed = true;   // TASK-1525: every gate above (disabled, flashing, MQTT fallback, safety, OT link, restart) let SAT control this pass
   satMaxTSetSendStep();   // TASK-1373: SH= on a change of the user MaxTSet and once after a restart
   satMiStep();            // TASK-1371: MI=500 once, PIC boards only
+  satPm25PollStep();      // TASK-1653: PM=25 when the thermostat does not read the flow temperature, PIC boards only
   satRestoreDeferredStep();   // entries 121, 213, 215: PWM comes back on the first valid MsgID 3 reply with bit 4 clear
   satPwmSaveStep();       // TASK-1482, entry 121
 
@@ -7151,6 +7235,10 @@ static void satControlLoopRun()
   // the continuous setpoint below goes out in it, as with the underheat exit. Before the overshoot check, which refuses too.
   satCycleCheckLowLoadVeto();
 
+  // TASK-1652 (maintainer decision, entry 275): a lit PWM ON phase burns 180 s before the cold cutoff acts. Decided after the
+  // maximum-setpoint switch and the low-load veto, which end PWM themselves, and before the first reader of satColdThreshold().
+  _sat_coldCutDeferred = _sat_coldCut && satPwmColdCutWaitsForMinBurn();
+
   // --- Sustained overshoot: continuous -> PWM (Tasks #42/#43) ---
   // Before the mode is applied, as thermo-nova (heating_control.py:206-215, Sergeant D entry 88, Q47 A): on the
   // switch tick satApplyPWM() below sends the first PWM CS. Delegated to satCycleCheckOvershootSwitch() in
@@ -7170,7 +7258,7 @@ static void satControlLoopRun()
   // setpoint (and CH=1) goes out in that same tick, not one tick later. The schedule runs first: saturation reads this tick's off time.
   // Not while the cold cutoff holds (TASK-1515, entry 260): thermo-nova's heater-OFF branch skips pwm.update (heating_control.py:202-234),
   // so a cold-cutoff tick begins no ON phase and records no start in the sliding-hour ring (satPwmBeginOn; the ring stays, entry 127).
-  if (state.sat.eControlMode == SAT_MODE_PWM && !_sat_coldCut) {
+  if (state.sat.eControlMode == SAT_MODE_PWM && !satColdCutActive()) {
     satPwmSchedule(pidOutput);
   }
 
@@ -7203,6 +7291,8 @@ static void satControlLoopRun()
 
   _sat_lastControlCS = finalSetpoint;   // the "previous CS" a PWM tick without override keeps
   state.sat.fFinalSetpoint = finalSetpoint;
+  // TASK-1652: the schedule or an exit ended the ON phase in this tick (its 180 s are burnt): the cutoff acts in this tick.
+  if (_sat_coldCutDeferred && !satPwmColdCutWaitsForMinBurn()) _sat_coldCutDeferred = false;
 
   // Modulation suppression is the CS sequence of satApplyPWM() (PWM ON phase only): it sets state.sat.bModSuppressed on that path
   // (entry 267, Q-TW-2). Continuous mode never suppresses.
@@ -7217,15 +7307,22 @@ static void satControlLoopRun()
                                                 settings.sat.iMaxRelModulation,
                                                 satGetManufacturerQuirks());
     // Entry 269 (Q-TW-4): while MM=T goes out (below), the published current_modulation is 100 %, not the 0 satComputeMM() gives a
-    // gas boiler in PWM. Same condition as mmTarget below; satPwmAtMaxDuty() and _sat_coldCut do not change in between.
-    state.sat.iCurrentModulation = satReportedModulation(!_sat_coldCut && satPwmAtMaxDuty() && hasOTCommandInterface(),
+    // gas boiler in PWM. Same condition as mmTarget below; satPwmAtMaxDuty() and satColdCutActive() do not change in between.
+    state.sat.iCurrentModulation = satReportedModulation(!satColdCutActive() && satPwmAtMaxDuty() && hasOTCommandInterface(),
                                                          state.sat.iCurrentModulation);
   }
 
   // --- COLD_SETPOINT cutoff (TASK-891.2, George): requested setpoint below the per-heating-system
   // cold setpoint => no heating needed; command the boiler OFF (CS=MINIMUM => CH=0, MM=100 restore).
   // At or below, like thermo-nova (heating_control.py:72, :385) and the satApplyPWM gate.
-  const bool coldCutoff = _sat_coldCut;   // latched above; equals satColdCutoff(pidOutput, satColdThreshold())
+  // TASK-1652: while a lit ON phase burns its first 180 s the latched cutoff waits (entry 275); it acts on the first tick after.
+  const bool coldCutoff = satColdCutActive();   // latched above; equals satColdCutoff(pidOutput, satColdThreshold())
+  static bool narrColdWait = false;
+  if (_sat_coldCutDeferred && !narrColdWait) {
+    satNarratef_P(PSTR("Heating off waits for the 180 s minimum burn: requested %.1f is at or below the cold setpoint %.1f"),
+                  pidOutput, satGetColdSetpoint());
+  }
+  narrColdWait = _sat_coldCutDeferred;
   if (coldCutoff != _sat_narrCold) {   // TASK-1521: narrate the edge, with the numbers that decided it
     _sat_narrCold = coldCutoff;
     if (coldCutoff) satNarratef_P(PSTR("Heating off: requested %.1f is at or below the cold setpoint %.1f"),

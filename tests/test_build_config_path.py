@@ -38,6 +38,8 @@ class BuildLoadsItsOwnConfig(unittest.TestCase):
             os.makedirs(decoy)
             shutil.copy2(BUILD_PY, os.path.join(tree, "build.py"))
             shutil.copy2(os.path.join(ROOT, "config.py"), os.path.join(tree, "config.py"))
+            os.makedirs(os.path.join(tree, "scripts"))  # build.py imports scripts/webui_pages.py (TASK-1640)
+            shutil.copy2(os.path.join(ROOT, "scripts", "webui_pages.py"), os.path.join(tree, "scripts", "webui_pages.py"))
             with open(os.path.join(decoy, "config.py"), "w", encoding="utf-8") as f:
                 f.write(open(os.path.join(ROOT, "config.py"), encoding="utf-8").read())
             r = subprocess.run([sys.executable, "-c", PROBE, os.path.join(tree, "build.py"), decoy],

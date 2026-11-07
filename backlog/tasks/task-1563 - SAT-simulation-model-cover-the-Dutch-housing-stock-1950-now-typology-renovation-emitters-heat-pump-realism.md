@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-02T16:51:00Z'
-updated_date: '2026-11-02T17:24:00Z'
+updated_date: '2026-11-06T19:52:00Z'
 labels:
   - sat
 dependencies: []
@@ -50,4 +50,10 @@ Source (read, primary): RVO Voorbeeldwoningen 2022 (51 dwellings = Dutch stock t
 2026-11-02 Robert (mid-turn): 'Doe ook typisch huizen doorrekenen van de NL woningmarkt overeenkomstig met de voorraad' (dictated; read as: compute typical houses of the Dutch housing market in line with the stock, i.e. weighted by stock shares). Reading reported back to Robert.
 
 2026-11-02 AC#1: typology from RVO Voorbeeldwoningen 2022 (primary, read): 51 dwellings, 9 types x 7-8 periods (1975-91 class covers 1975-83), levels oorspronkelijk/huidig/3 packages; extracted by scripts/sat_stock_extract_rvo2022.py to docs/sat/sim-stock/rvo_voorbeeldwoningen_2022.json; stock counts 7.47 M dwellings (100.2 %). Parameters cited or labelled A1-A6 in scripts/sat_stock_houses.py and docs/sat/sim-stock/README.md. Plausibility vs RVO NTA 8800 heat demand (scripts/sat_stock_nta_check.py): huidig model/NTA median 1.01 (p10 0.91, p90 1.14), pakket2 1.07 (0.97-1.14) after A2b (sealed ventilation 0.35/h; was 1.23 with 0.5/h), oorspronkelijk 1.09, pakket3 1.20 (not used). AC#4: HOUSE hook in sat_hp_library_study21.py; default path unchanged (NIBE 2015 2024-25 17.3525 starts/d, 0.1947 C; hybrid Elga rad own 2673 starts, 582 kWh) and the reference house fed through the hook gives identical results (r == r2 True). Gas boilers added as units gas_boiler_min35/min55 (A). Finding from RVO: pakket 2 (heat pump) uses radiators at 55/47 in 218 of 251 variants, while SAT caps heat pumps at 40 C (entry 155): round 24 runs both caps. Unit picks pakket 2 (smallest electric unit covering the design load at -7 C): Mitsubishi WM50 42 of 51 dwellings.
+
+Field reference 2026-11-06 (maarten_41762, #alpha-testing msg 1568336705600233763): 24.7 h capture 2026-11-05 18:48 to 2026-11-06 19:30 (CET), on/off heat pump about 9 kW (his figure), 2017 A-label house, 175 m2, heavy underfloor heating. Not SAT-driven: a Honeywell floor controller switches the heat pump by relay with a 180 min PWM; heating blocked 06-10 and 16-21. Gateway firmware 2.0.0-beta.8. The OT master is fixed: MsgID0 HB=3 always, CS 35, MaxTSet 35, room setpoint 20, MM 100.
+
+Compressor starts in 24.7 h: 5 (4 CH + 1 DHW). CH: each demand = 2:00 min CH mode without compressor, then 49:11-49:13 min compressor on, identical in all 4 runs (00:16, 03:16, 10:35, 13:36). Start-to-start within a pair 3h00m35s. No run in the allowed slot around 21:13 on 5 Nov. DHW: one run 04:32-05:11 (39.4 min), started 2 s after an MQTT HW=1 (HW=0 had been sent at 21:22). Shortest compressor off time 26.4 min (CH2 end 04:05:48 to DHW start 04:32:12). Modulation (MsgID17) only 0 or 100.
+
+CH run profile: supply 27 to 30.5-31.5 C within about 20 min, return 25-26.4 C at the end, dT 5.2-5.5 K steady; supply never reaches CS 35, so each run ends on time, not on temperature. DHW run: supply 27 to 62 C, tank (MsgID26) 46.1 to 55.7 C. Outdoor 2.0-12.9 C; run length did not change with outdoor temperature. Rooms (his CSVs, 5 min): north 20.7-21.1 C all day; south 20.0 C at 07:10 to 21.7 C at 12:30 (sun), still 21.6 C during the 13:34 run. Check against the heat-pump sim: about 2-4 starts per day predicted for this house type; observed 4 CH starts (3 per day on 1-2 Nov per his summary). The raw capture stays local.
 <!-- SECTION:NOTES:END -->

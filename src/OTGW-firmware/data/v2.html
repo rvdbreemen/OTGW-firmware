@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<!-- TASK-1640: build.py inlines these stylesheets (and their fonts) and v2.js into one
+     gzipped v2.html.gz (scripts/webui_pages.py), so the device serves the UI as one file. -->
+<link rel="stylesheet" href="ds-tokens.css">
+<link rel="stylesheet" href="v2.css">
 <title>OTGW firmware</title>
 <script>
   // Pre-paint theme (localStorage key otgw-theme) to avoid flash-of-wrong-theme.
@@ -14,96 +18,6 @@
       var isDark = (stored === 'dark') || (!stored && prefersDark);
       document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
     }catch(e){}
-  })();
-</script>
-<script>
-  // TASK-978: load the stylesheets + v2.js with retry-on-503. A 503'd/reset
-  // <link>/<script> has no native retry, so the UI would render unstyled (CSS
-  // dropped) or dead (v2.js dropped) with nothing surfaced. Retry with linear
-  // backoff, as the former classic UI loader did (TASK-960).
-  // TASK-989: load SEQUENTIALLY (v2-bundle.css -> v2.js), one connection at a
-  // time. A parallel burst of asset connections is what collapses the S3 heap
-  // under concurrent serving (AsyncTCP accepts unconditionally; measured
-  // freeheap 22K->3.8K); serializing the assets removes the burst at the
-  // source instead of relying on the serve gates to shed it. v2-bundle.css is
-  // ds-tokens.css + v2.css concatenated at build time (build.py,
-  // generate_v2_css_bundle) -- one request instead of two on first paint.
-  (function(){
-    var MAX = 8;
-    function loadCss(href, then){
-      var attempt = 0;
-      (function go(){
-        var l = document.createElement('link');
-        l.rel = 'stylesheet'; l.href = href;
-        l.onload = function(){ if (then) then(); };
-        l.onerror = function(){
-          if (l.parentNode) l.parentNode.removeChild(l);
-          if (++attempt <= MAX) setTimeout(go, 200 * attempt);
-          else { console.error('[loader] gave up on ' + href); if (then) then(); }
-        };
-        document.head.appendChild(l);
-      })();
-    }
-    function loadJs(then){
-      var jsAttempt = 0;
-      (function go(){
-        var s = document.createElement('script');
-        s.src = './v2.js'; s.defer = true;
-        s.onload = function(){ if (then) then(); };
-        s.onerror = function(){
-          if (s.parentNode) s.parentNode.removeChild(s);
-          if (++jsAttempt <= MAX) setTimeout(go, 200 * jsAttempt);
-          else { console.error('[loader] gave up on v2.js'); if (then) then(); }
-        };
-        document.head.appendChild(s);
-      })();
-    }
-    // v2-bundle.css -> v2.js -> fonts, STRICTLY chained (each step's "then" only
-    // fires after the previous one lands). loadCss()/loadJs() return immediately
-    // (they fire-and-continue via callback, not a blocking call) -- starting the
-    // font loader right after calling loadCss(), rather than inside its "then",
-    // was the bug that let font1 race the still-in-flight v2-bundle.css fetch
-    // (plus the browser's own automatic favicon.ico fetch) for the same
-    // WEB_FILE_MAX_INFLIGHT=2 slots, 503ing repeatedly even one-font-at-a-time.
-    loadCss('v2-bundle.css', function(){
-      loadJs(function(){ loadFontsSequentially(); });
-    });
-
-    // Field bug (esp32-otgw32, 2026-07-06): the 3 self-hosted fonts used to ship
-    // as @font-face rules inside v2-bundle.css. The browser fetches every
-    // @font-face src the instant that CSS parses, as an uncontrolled NATIVE
-    // parallel burst -- no JS ever sees it, so the retry-on-503 loader above
-    // cannot help. 3 simultaneous font fetches exceed WEB_FILE_MAX_INFLIGHT=2
-    // (ADR-165); the shed request 503s and, unlike CSS/JS, a browser-native
-    // font fetch never retries -- it fails permanently until a full reload.
-    // Fix: v2-bundle.css no longer carries @font-face (build.py,
-    // generate_v2_css_bundle strips it); load the 3 fonts here instead via the
-    // FontFace() API, deliberately ONE AT A TIME with retry, same backoff
-    // pattern as loadCss above. Peak concurrent font requests: 1.
-    function loadFontsSequentially(){
-      if (!window.FontFace) return;   // very old browser: page still works, system-font fallback
-      var fonts = [
-        { family: 'Inter',          url: 'fonts/inter-400.woff2',          weight: '400' },
-        { family: 'Inter',          url: 'fonts/inter-700.woff2',          weight: '700' },
-        { family: 'JetBrains Mono', url: 'fonts/jetbrains-mono-400.woff2', weight: '400' }
-      ];
-      function loadOne(i){
-        if (i >= fonts.length) return;
-        var f = fonts[i], attempt = 0;
-        (function go(){
-          var face = new FontFace(f.family, "url('" + f.url + "') format('woff2')",
-            { weight: f.weight, style: 'normal', display: 'swap' });
-          face.load().then(function (loaded) {
-            document.fonts.add(loaded);
-            loadOne(i + 1);
-          }).catch(function () {
-            if (++attempt <= MAX) setTimeout(go, 200 * attempt);
-            else { console.error('[loader] gave up on font ' + f.url); loadOne(i + 1); }
-          });
-        })();
-      }
-      loadOne(0);
-    }
   })();
 </script>
 </head>
@@ -128,7 +42,7 @@
   <!-- TASK-983: shown only while OT-replay simulation is active (polled via /api/v2/simulate). -->
   <span class="hdr-sim hidden" id="hdrSim" title="Simulation active — values may be replayed, not live from the boiler">SIMULATION</span>
   <span class="sub" id="clock">--:--:--</span>
-  <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" aria-pressed="false">🌙 Dark</button>
+  <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch to dark theme" title="Switch to dark theme">🌙 Dark</button>
 </div>
 <div class="fs-banner" id="fsMismatch" role="alert" hidden></div>
 <div class="switcher">
@@ -199,14 +113,14 @@
       </g>
       <g transform="translate(232,38)">
         <rect x="-46" y="-17" width="92" height="34" rx="11" class="chip-dhw"/>
-        <text class="chip-txt" y="3" font-size="17" id="aDhw">54°</text>
+        <text class="chip-txt" y="3" font-size="17" id="aDhw">—</text>
         <text class="chip-sub" y="14.5">DHW</text>
       </g>
 
       <!-- Outside chip -->
       <g transform="translate(660,34)">
         <path class="cloud" d="M14,22 a10,10 0 0 1 2,-19.8 a13,13 0 0 1 25,2 a8.5,8.5 0 0 1 -1,17.8 z"/>
-        <text class="label-big" x="52" y="18" id="aOut">8.4°</text>
+        <text class="label-big" x="52" y="18" id="aOut">—</text>
         <text class="label-tag" x="52" y="32">OUTSIDE</text>
       </g>
 
@@ -215,7 +129,7 @@
       <rect x="84" y="352" width="26" height="12" rx="3" fill="var(--gauge-track)"/>
       <rect x="190" y="352" width="26" height="12" rx="3" fill="var(--gauge-track)"/>
       <rect class="lcd" x="88" y="136" width="124" height="28" rx="8"/>
-      <text class="lcd-txt" x="150" y="155" id="aLcd">CH 62%</text>
+      <text class="lcd-txt" x="150" y="155" id="aLcd">—</text>
 
       <!-- burner window: gas flame OR electric lightning bolt; height = modulation -->
       <circle class="window" cx="150" cy="210" r="36"/>
@@ -238,7 +152,7 @@
       </g>
 
       <!-- prominent modulation readout -->
-      <text class="mod-big" x="150" y="286" id="aModBig">62%</text>
+      <text class="mod-big" x="150" y="286" id="aModBig">—</text>
       <text class="mod-tag" x="150" y="300" id="aModTag">MODULATION</text>
 
       <!-- pressure mini-gauge on boiler face (lower) -->
@@ -251,7 +165,7 @@
         <line id="aPressNeedle" class="press-needle" x1="150" y1="322" x2="132" y2="322"
               transform="rotate(0,150,322)"/>
         <circle cx="150" cy="322" r="3.5" fill="var(--needle)"/>
-        <text class="press-txt" x="150" y="344" id="aPress">1.75 bar</text>
+        <text class="press-txt" x="150" y="344" id="aPress">—</text>
       </g>
 
       <!-- FLOW pipe (red, out of the boiler) -->
@@ -260,7 +174,7 @@
       <polygon class="arrow ch arrowHot" points="388,158 414,170 388,182"/>
       <g transform="translate(310,128)">
         <rect x="-52" y="-22" width="104" height="44" rx="12" class="chip-hot"/>
-        <text class="chip-txt" y="0" id="aFlow">62.3°</text>
+        <text class="chip-txt" y="0" id="aFlow">—</text>
         <text class="chip-sub" y="15">FLOW →</text>
       </g>
 
@@ -270,14 +184,14 @@
       <polygon class="arrow ch arrowCold" points="372,328 346,340 372,352"/>
       <g transform="translate(310,392)">
         <rect x="-52" y="-22" width="104" height="44" rx="12" class="chip-cold"/>
-        <text class="chip-txt" y="0" id="aRet">48.1°</text>
+        <text class="chip-txt" y="0" id="aRet">—</text>
         <text class="chip-sub" y="15">← RETURN</text>
       </g>
 
       <!-- ΔT chip -->
       <g transform="translate(470,255)">
         <rect x="-44" y="-15" width="88" height="30" rx="15" class="soft-chip"/>
-        <text class="soft-txt" y="5" id="aDt">ΔT 14.2°</text>
+        <text class="soft-txt" y="5" id="aDt">ΔT —</text>
       </g>
 
       <!-- pump on the return -->
@@ -302,8 +216,8 @@
       </g>
       <g transform="translate(560,150)">
         <path class="house" d="M0,10 L13,-3 L26,10 V28 H0 Z"/>
-        <text class="label-big" x="36" y="13" id="aRoom">20.4°</text>
-        <text class="label-sub" x="36" y="28" id="aRoomSet">set 21.0°</text>
+        <text class="label-big" x="36" y="13" id="aRoom">—</text>
+        <text class="label-sub" x="36" y="28" id="aRoomSet"></text>
         <text class="label-tag" x="120" y="13">ROOM</text>
       </g>
 
@@ -333,8 +247,8 @@
         <path class="hero-track" id="bTrack" d=""/>
         <path class="hero-arc" id="bArc" d=""/>
         <line class="hero-tick" id="bTick" x1="0" y1="0" x2="0" y2="0"/>
-        <text class="hero-big" x="120" y="128" id="bRoom">20.4°</text>
-        <text class="hero-sub" x="120" y="152" id="bSet">target 21.0°</text>
+        <text class="hero-big" x="120" y="128" id="bRoom">—</text>
+        <text class="hero-sub" x="120" y="152" id="bSet">target —</text>
       </svg>
       <div>
         <button class="stepbtn" id="bDown" aria-label="Lower target">−</button>
@@ -346,30 +260,30 @@
     <div class="statgrid">
       <div class="stat">
         <div class="lbl">Boiler</div>
-        <div class="big"><span class="hotArrow">↑ <span id="bFlow">62.3°</span></span>
+        <div class="big"><span class="hotArrow">↑ <span id="bFlow">—</span></span>
           <span class="flamebadge" id="bFlame">🔥</span></div>
-        <div class="big" style="font-size:1.05rem"><span class="coldArrow">↓ <span id="bRet">48.1°</span></span>
-          <span style="color:var(--muted);font-size:.8rem" id="bDt">ΔT 14.2°</span></div>
+        <div class="big" style="font-size:1.05rem"><span class="coldArrow">↓ <span id="bRet">—</span></span>
+          <span style="color:var(--muted);font-size:.8rem" id="bDt">ΔT —</span></div>
       </div>
       <div class="stat">
         <div class="lbl">Pressure</div>
-        <div class="big" id="bPress">1.75 bar</div>
+        <div class="big" id="bPress">—</div>
         <div class="zonebar"><div class="zonedot" id="bPressDot" style="left:44%"></div></div>
       </div>
       <div class="stat">
         <div class="lbl">Modulation</div>
         <div class="modwrap">
           <div class="modbar"><div class="modfill" id="bModFill" style="height:45%"></div></div>
-          <div class="big" id="bMod">45%</div>
+          <div class="big" id="bMod">—</div>
         </div>
       </div>
       <div class="stat">
         <div class="lbl">Hot water</div>
-        <div class="big" id="bDhw">54°</div>
+        <div class="big" id="bDhw">—</div>
         <div style="font-size:.8rem;color:var(--muted)" id="bDhwState">standby</div>
       </div>
     </div>
-    <div class="foot" id="bOut">Outside 8.4° · OTGW firmware</div>
+    <div class="foot" id="bOut">Outside — · OTGW firmware</div>
   </div>
 </section>
 
@@ -737,7 +651,7 @@
           <rect class="cn-box" x="560" y="150" width="140" height="60" rx="12"/>
           <text class="cn-ic" x="578" y="190">📶</text>
           <text class="cn-title" x="610" y="178">Router</text>
-          <text class="cn-sub" x="610" y="196" id="cnWifiSub">-58 dBm</text>
+          <text class="cn-sub" x="610" y="196" id="cnWifiSub">—</text>
           <circle class="cn-statedot" id="dot-wifi" cx="692" cy="158" r="7"/>
         </g>
         <g id="n-broker">
@@ -951,7 +865,6 @@
 <div class="toast" id="toast" role="status" aria-live="polite">Settings saved</div>
 <!-- TASK-984: floating override-detail panel (fixed position). Opened by #aOvrBadge (Home) and #cnOvr (Monitor map). -->
 <div class="ovr-panel" id="ovrPanel"></div>
-
-
+<script src="v2.js"></script>
 </body>
 </html>

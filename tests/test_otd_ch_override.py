@@ -34,7 +34,7 @@ int main() {
       for (int cs = 0; cs < 2; cs++)
         printf("%d %d %d %d\n", board | 1, off, cs, otdEffectiveMasterFlags((uint8_t)(board | 1), off, cs));
   }
-  printf("%d %d %d %d\n", 0x20, 0, 0, otdEffectiveMasterFlags(0x20, false, false));  // hysteresis cleared bit0
+  printf("%d %d %d %d\n", 0x20, 0, 0, otdEffectiveMasterFlags(0x20, false, false));  // board flags with bit0 clear
   printf("%d %d %d %d\n", 0x20, 1, 0, otdEffectiveMasterFlags(0x20, true, false));
   printf("%d %d %d %d\n", 0x20, 0, 1, otdEffectiveMasterFlags(0x20, false, true));
   printf("%d %d %d %d\n", 0x21, 1, 1, otdEffectiveMasterFlags(0x21, true, true));
@@ -96,7 +96,7 @@ class Compiled(unittest.TestCase):
         for board, off, cs, res in self.rows:
             if not cs:
                 self.assertEqual(res, board)
-        self.assertIn((0x20, 1, 0, 0x20), self.rows)   # CH=0 without CS: hysteresis-cleared bit0 stays 0
+        self.assertIn((0x20, 1, 0, 0x20), self.rows)   # CH=0 without CS: a board bit0 that is clear stays 0
         self.assertIn((0x20, 0, 0, 0x20), self.rows)
 
     def test_other_bits_untouched(self):
@@ -109,6 +109,13 @@ class SourcePatterns(unittest.TestCase):
         body = func_body(SRC, "static unsigned long buildStatusRequest()")
         self.assertIn("otdEffectiveMasterFlags(", body, "buildStatusRequest must use the effective flags")
         self.assertNotRegex(body, r"\(unsigned int\)otMasterStatusFlags\s*<<")
+
+    def test_master_mode_without_cs_override_clears_ch_enable(self):
+        # TASK-1684: master mode has no thermostat; without SAT enabled and without a CS override nothing
+        # sets a flow setpoint, so bit 0 of the MsgID 0 master status is off. The behaviour itself is
+        # host-tested by test/host/test_override_reply.py (suite 1684, P1-P8).
+        body = func_body(SRC, "static unsigned long buildStatusRequest()")
+        self.assertRegex(body, r"IS_MASTER_MODE\(\)\s*&&\s*!otdCsOverrideActive\(\)\s*&&\s*!satOwnsControlSetpoint\(\)")
 
     def test_ch_handler_writes_only_the_mode_flag(self):
         i = SRC.find("cmd0 == 'C' && cmd1 == 'H'")

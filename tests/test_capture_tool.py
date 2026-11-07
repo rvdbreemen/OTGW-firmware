@@ -35,6 +35,7 @@ New:
 Run: python tests/test_capture_tool.py
 """
 
+import contextlib
 import io
 import json
 import os
@@ -1236,6 +1237,95 @@ def pid_alive(pid):
             return f.read().split()[2] != "Z"
     except OSError:
         return True
+
+
+# ---- TASK-1677: the MQTT broker comes from the gateway, not from typing ------
+
+class FakeSettingsGateway:
+    """Serves GET /api/v2/settings in the firmware's shape: {"settings":{"<name>":{"value":...}}}."""
+
+    def __init__(self, status=200, broker="192.168.2.101", port=1884, user="otgw", enable=True):
+        gw = self
+        self.hits = 0
+
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                if self.path != "/api/v2/settings":
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                gw.hits += 1
+                body = json.dumps({"settings": {
+                    "mqttenable": {"value": enable, "type": "b"},
+                    "mqttbroker": {"value": broker, "type": "s", "maxlen": 32},
+                    "mqttbrokerport": {"value": port, "type": "i", "min": 0, "max": 65535},
+                    "mqttuser": {"value": user, "type": "s", "maxlen": 32},
+                    "mqttpasswd": {"value": "password=8", "type": "p", "maxlen": 100},
+                }}).encode() if status == 200 else b'{"error":"unauthorized"}'
+                self.send_response(status)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(body)
+
+        self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.port = self.httpd.server_address[1]
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
+class GatewayBrokerCase(unittest.TestCase):
+    """A field capture had an empty MQTT stream: the broker was typed as 192.168.1.101 while the
+    gateway published to 192.168.2.101. The tool now takes host, port and user from the gateway."""
+
+    def resolve(self, gw, extra=(), saved=None):
+        parser = oc.build_parser()
+        args = parser.parse_args(oc.normalize_argv(["--device", "127.0.0.1", "--http-port", str(gw.port),
+                                                    "--no-prompt", *extra]))
+        out = io.StringIO()
+        with mock.patch.object(oc, "load_settings", return_value=dict(saved or {})), \
+                mock.patch.object(oc, "interactive", return_value=False), \
+                contextlib.redirect_stdout(out):
+            oc.resolve_inputs(args, parser)
+        return args, out.getvalue()
+
+    def test_gateway_broker_replaces_a_saved_typo(self):
+        gw = FakeSettingsGateway()
+        self.addCleanup(gw.close)
+        args, out = self.resolve(gw, saved={"BrokerHost": "192.168.1.101", "Username": "someone"})
+        self.assertEqual(args.broker, "192.168.2.101")
+        self.assertEqual(args.broker_port, 1884)
+        self.assertEqual(args.username, "otgw")
+        self.assertIn("192.168.2.101:1884", out)
+
+    def test_typed_broker_that_differs_is_reported(self):
+        gw = FakeSettingsGateway()
+        self.addCleanup(gw.close)
+        args, out = self.resolve(gw, extra=["--broker", "192.168.1.101"])
+        self.assertEqual(args.broker, "192.168.1.101")   # an explicit command-line value is kept
+        self.assertIn("differs from the gateway", out)
+        self.assertIn("192.168.2.101", out)
+
+    def test_mqtt_off_on_the_gateway_skips_the_stream(self):
+        gw = FakeSettingsGateway(enable=False)
+        self.addCleanup(gw.close)
+        args, out = self.resolve(gw, saved={"BrokerHost": "192.168.1.101"})
+        self.assertEqual(args.broker, "")
+        self.assertIn("MQTT is off on the gateway", out)
+
+    def test_unauthorized_falls_back_with_a_message(self):
+        gw = FakeSettingsGateway(status=401)
+        self.addCleanup(gw.close)
+        args, out = self.resolve(gw, extra=["--broker", "10.0.0.5"])
+        self.assertEqual(args.broker, "10.0.0.5")
+        self.assertIn("could not read the MQTT settings from the gateway", out)
+        self.assertIn("401", out)
 
 
 if __name__ == "__main__":

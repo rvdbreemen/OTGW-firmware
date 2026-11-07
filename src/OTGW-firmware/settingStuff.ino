@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.79
+**  Version  : v2.0.0-beta.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -19,6 +19,7 @@
 #define SIDE_EFFECT_NTP    0x02
 #define SIDE_EFFECT_MDNS   0x04
 #define SIDE_EFFECT_OTGWSTREAM 0x08
+#define SIDE_EFFECT_TELNET 0x10
 static bool    settingsDirty = false;
 static uint8_t pendingSideEffects = 0;
 
@@ -91,6 +92,10 @@ void flushSettings()
   if (pendingSideEffects & SIDE_EFFECT_OTGWSTREAM) {
     DebugTln(F("[Settings] Applying legacy port 25238 setting (deferred)"));
     applyLegacyPort25238Setting();
+  }
+  if (pendingSideEffects & SIDE_EFFECT_TELNET) {
+    DebugTln(F("[Settings] Applying telnet debug console setting (deferred)"));
+    startTelnet();   // starts or stops port 23 per settings.bTelnetEnabled (TASK-1644)
   }
   pendingSideEffects = 0;
 }
@@ -298,6 +303,7 @@ bool writeSettings(bool show)
   writeJsonBoolKV(file, F("LEDblink"), settings.bLEDblink);
   writeJsonBoolKV(file, F("darktheme"), settings.bDarkTheme);
   writeJsonBoolKV(file, F("nightlyrestart"), settings.bNightlyRestart);
+  writeJsonBoolKV(file, F("telnetenabled"), settings.bTelnetEnabled);
   writeJsonIntKV(file, F("nightlyrestarthour"), settings.iRestartHour);
   writeJsonIntKV(file, F("boardmode"), settings.iBoardMode);  // ADR-127 combo board-mode cache/override
   writeJsonBoolKV(file, F("ui_onboarded"), settings.ui.bOnboarded);
@@ -455,21 +461,6 @@ bool writeSettings(bool show)
   // a reboot (the POST dispatch + GET emit already existed; without this line the
   // flag reset to false every boot and the bypass-mode logic could never stay on).
   writeJsonBoolKV(file, F("OTDhasbypassrelay"), settings.otd.bHasBypassRelay);
-  // --- TASK-183: PI room compensation + heating curve ---
-  writeJsonIntKV(file, F("OTDchmode"), settings.otd.iCHMode);
-  writeJsonFloatKV(file, F("OTDflowtemp"), settings.otd.fFlowTemp);
-  writeJsonFloatKV(file, F("OTDflowmax"), settings.otd.fFlowMax);
-  writeJsonFloatKV(file, F("OTDroomsetpoint"), settings.otd.fRoomSetpoint);
-  writeJsonFloatKV(file, F("OTDgradient"), settings.otd.fGradient);
-  writeJsonFloatKV(file, F("OTDexponent"), settings.otd.fExponent);
-  writeJsonFloatKV(file, F("OTDoffset"), settings.otd.fOffset);
-  writeJsonBoolKV(file, F("OTDroomcomp"), settings.otd.bRoomCompEnabled);
-  writeJsonFloatKV(file, F("OTDkp"), settings.otd.fKp);
-  writeJsonFloatKV(file, F("OTDki"), settings.otd.fKi);
-  writeJsonFloatKV(file, F("OTDkboost"), settings.otd.fKboost);
-  // --- TASK-582: CH hysteresis deadband ---
-  writeJsonBoolKV(file, F("OTDhysteresisenable"), settings.otd.bHysteresisEnable);
-  writeJsonFloatKV(file, F("OTDhysteresis"), settings.otd.fHysteresis);
   // --- TASK-584: ventilation override persistence ---
   writeJsonBoolKV(file, F("OTDventenable"), settings.otd.bVentEnable);
   writeJsonBoolKV(file, F("OTDopenbypass"), settings.otd.bOpenBypass);
@@ -491,6 +482,8 @@ bool writeSettings(bool show)
   writeJsonStringKV(file, F("WifiGateway"),  settings.wifi.sGateway);
   writeJsonStringKV(file, F("WifiDns1"),     settings.wifi.sDns1);
   writeJsonStringKV(file, F("WifiDns2"),     settings.wifi.sDns2);
+  writeJsonBoolKV(file, F("WifiNoPortal"),   settings.wifi.bNoPortal);   // TASK-1645
+  writeJsonBoolKV(file, F("DiagRecordingOn"), settings.diag.bRecordingOn); // TASK-1665: resume the diagnostic recording after a reboot
   size_t tail = file.print(F("\n}\n"));
   bool tailWritten = (tail == 3);
   size_t intended = file.position();
@@ -699,6 +692,7 @@ void readSettings(bool show)
     Debugf(PSTR("NPT send time         : %s\r\n"), CBOOLEAN(settings.ntp.bSendtime));
     Debugf(PSTR("Led Blink             : %s\r\n"), CBOOLEAN(settings.bLEDblink));
     Debugf(PSTR("Nightly Restart       : %s (hour=%d)\r\n"), CBOOLEAN(settings.bNightlyRestart), settings.iRestartHour);
+    Debugf(PSTR("Telnet console (23)   : %s\r\n"), CBOOLEAN(settings.bTelnetEnabled));
     Debugf(PSTR("Board Mode (ADR-127)  : %d (0=auto,1=pic,2=otdirect,3=pic-pro)\r\n"), settings.iBoardMode);
     Debugf(PSTR("GPIO Sensors          : %s\r\n"), CBOOLEAN(settings.sensors.bEnabled));
     Debugf(PSTR("GPIO Sen. Legacy      : %s\r\n"), CBOOLEAN(settings.sensors.bLegacyFormat));
@@ -911,6 +905,10 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("LEDblink"))==0)      settings.bLEDblink = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("darktheme"))==0)     settings.bDarkTheme = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("nightlyrestart"))==0)     settings.bNightlyRestart = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("telnetenabled"))==0) {
+    settings.bTelnetEnabled = EVALBOOLEAN(newValue);
+    pendingSideEffects |= SIDE_EFFECT_TELNET;   // TASK-1644: applied live, no reboot
+  }
   else if (strcasecmp_P(field, PSTR("nightlyrestarthour"))==0) { int h = atoi(newValue); settings.iRestartHour = (h >= 0 && h <= 23) ? h : 4; }
   else if (strcasecmp_P(field, PSTR("boardmode"))==0)          { int m = atoi(newValue); settings.iBoardMode = (m >= 0 && m <= 3) ? (uint8_t)m : 0; }  // ADR-127/157
 
@@ -932,7 +930,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("GPIOSENSORSpin")) == 0)
   {
     int newPin = atoi(newValue);
-    if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: GPIOSENSORSpin %d out of range 0-16, ignored\r\n"), newPin); }
+    if (!settingGpioInRange(newPin)) { DebugTf(PSTR("WARNING: GPIOSENSORSpin %d is not a GPIO of the ESP32-S3 (0-21, 26-48), ignored\r\n"), newPin); }
     else {
       if (checkGPIOConflict(newPin, GPIOConflictCaller::Sensor)) {
         DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
@@ -956,7 +954,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("S0COUNTERpin")) == 0)
   {
     int newPin = atoi(newValue);
-    if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: S0COUNTERpin %d out of range 0-16, ignored\r\n"), newPin); }
+    if (!settingGpioInRange(newPin)) { DebugTf(PSTR("WARNING: S0COUNTERpin %d is not a GPIO of the ESP32-S3 (0-21, 26-48), ignored\r\n"), newPin); }
     else {
       if (checkGPIOConflict(newPin, GPIOConflictCaller::S0)) {
         DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
@@ -985,7 +983,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("GPIOOUTPUTSpin")) == 0)
   {
     int newPin = atoi(newValue);
-    if (newPin < 0 || newPin > 16) { DebugTf(PSTR("WARNING: GPIOOUTPUTSpin %d out of range 0-16, ignored\r\n"), newPin); }
+    if (!settingGpioInRange(newPin)) { DebugTf(PSTR("WARNING: GPIOOUTPUTSpin %d is not a GPIO of the ESP32-S3 (0-21, 26-48), ignored\r\n"), newPin); }
     else {
       if (checkGPIOConflict(newPin, GPIOConflictCaller::Output)) {
         DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
@@ -1282,21 +1280,6 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("OTDfailsafe")) == 0)      settings.otd.bFailSafe = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDmsginterval")) == 0)   settings.otd.iMsgInterval = constrain(atoi(newValue), 100, 1275);
   else if (strcasecmp_P(field, PSTR("OTDhasbypassrelay")) == 0) settings.otd.bHasBypassRelay = EVALBOOLEAN(newValue);
-  // --- TASK-183: PI room compensation + heating curve ---
-  else if (strcasecmp_P(field, PSTR("OTDchmode")) == 0)         settings.otd.iCHMode = constrain(atoi(newValue), 0, 2);
-  else if (strcasecmp_P(field, PSTR("OTDflowtemp")) == 0)       settings.otd.fFlowTemp = clampSettingFloat(newValue, settings.otd.fFlowTemp, 5.0f, 90.0f);
-  else if (strcasecmp_P(field, PSTR("OTDflowmax")) == 0)        settings.otd.fFlowMax = clampSettingFloat(newValue, settings.otd.fFlowMax, 20.0f, 90.0f);
-  else if (strcasecmp_P(field, PSTR("OTDroomsetpoint")) == 0)   settings.otd.fRoomSetpoint = clampSettingFloat(newValue, settings.otd.fRoomSetpoint, 5.0f, 30.0f);
-  else if (strcasecmp_P(field, PSTR("OTDgradient")) == 0)       settings.otd.fGradient = clampSettingFloat(newValue, settings.otd.fGradient, 0.1f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("OTDexponent")) == 0)       settings.otd.fExponent = clampSettingFloat(newValue, settings.otd.fExponent, 0.5f, 2.0f);
-  else if (strcasecmp_P(field, PSTR("OTDoffset")) == 0)         settings.otd.fOffset = clampSettingFloat(newValue, settings.otd.fOffset, -10.0f, 10.0f);
-  else if (strcasecmp_P(field, PSTR("OTDroomcomp")) == 0)       settings.otd.bRoomCompEnabled = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("OTDkp")) == 0)             settings.otd.fKp = clampSettingFloat(newValue, settings.otd.fKp, 0.0f, 20.0f);
-  else if (strcasecmp_P(field, PSTR("OTDki")) == 0)             settings.otd.fKi = clampSettingFloat(newValue, settings.otd.fKi, 0.0f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("OTDkboost")) == 0)         settings.otd.fKboost = clampSettingFloat(newValue, settings.otd.fKboost, 0.0f, 10.0f);
-  // --- TASK-582: CH hysteresis deadband ---
-  else if (strcasecmp_P(field, PSTR("OTDhysteresisenable")) == 0) settings.otd.bHysteresisEnable = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("OTDhysteresis")) == 0)       settings.otd.fHysteresis = clampSettingFloat(newValue, settings.otd.fHysteresis, 0.0f, 2.0f);
   // --- TASK-584: ventilation override persistence ---
   else if (strcasecmp_P(field, PSTR("OTDventenable")) == 0)      settings.otd.bVentEnable = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDopenbypass")) == 0)      settings.otd.bOpenBypass = EVALBOOLEAN(newValue);
@@ -1329,6 +1312,12 @@ void updateSetting(const char *field, const char *newValue)
     if (newValue[0] == '\0') { settings.wifi.sDns1[0] = '\0'; }
     else { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.wifi.sDns1, newValue, sizeof(settings.wifi.sDns1)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
   }
+  else if (strcasecmp_P(field, PSTR("WifiNoPortal")) == 0) {
+    settings.wifi.bNoPortal = EVALBOOLEAN(newValue);   // TASK-1645: read by the next startWiFi()
+  }
+  else if (strcasecmp_P(field, PSTR("DiagRecordingOn")) == 0) {
+    settings.diag.bRecordingOn = EVALBOOLEAN(newValue);   // TASK-1665: flag only; diagRecorderStart()/Stop() act on it
+  }
   else if (strcasecmp_P(field, PSTR("WifiDns2")) == 0) {
     if (newValue[0] == '\0') { settings.wifi.sDns2[0] = '\0'; }
     else { IPAddress t; if (t.fromString(newValue)) strlcpy(settings.wifi.sDns2, newValue, sizeof(settings.wifi.sDns2)); else DebugTf(PSTR("Invalid IP '%s', ignored\r\n"), newValue); }
@@ -1354,6 +1343,8 @@ void updateSetting(const char *field, const char *newValue)
   // restarts are deferred to flushSettings() which runs from loop() timer.
   // This coalesces multiple field updates into a single flash write and at most
   // one restart per service (Finding #23: reduce flash wear + MQTT churn).
+  if (diagRec.active) diagRec.recSetting(field, newValue);   // TASK-1665: a changed value only; secrets are redacted inside
+
   settingsDirty = true;
   RESTART_TIMER(timerFlushSettings);
 

@@ -24,7 +24,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_sat_pwm_override import compile_cpp  # noqa: E402
+from test_sat_pwm_override import compile_cpp, extract_cold_cut  # noqa: E402
 
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino"))
 
@@ -80,9 +80,8 @@ static float satApplyContinuous(float p, float) { return 1000.0f + p; }
 static float satGetBaseOffset() { return 27.2f; }
 static float satGetColdSetpoint() { return g_cold; }
 // TASK-1547: latched cold cutoff (SATcontrol.ino satColdThreshold/_sat_coldCut, outside the cut block); never cut here.
-static bool _sat_coldCut = false;
 static const float SAT_COLD_HYSTERESIS_C = 0.5f;
-static float satColdThreshold() { return satGetColdSetpoint() + (_sat_coldCut ? SAT_COLD_HYSTERESIS_C : 0.0f); }
+@COLDCUT@
 static float satGetMaxSetpoint() { return g_userMax; }
 static float satEffectiveMaxSetpoint() { return g_effMax; }
 static bool satImmergasTpActive() { return false; }   // TASK-1537: satSendMM Immergas TP
@@ -121,6 +120,8 @@ static uint8_t satGetManufacturerQuirks() { return g_quirks; }
 enum class CmdQueueResult : uint8_t { Queued, Replaced, Sent, Dropped };   // TASK-1574
 static CmdQueueResult addCommandToQueue(const char* c, size_t n, bool, int, bool = false) { printf("%lu %.*s\n", (unsigned long)(g_ms - 1000000UL), (int)n, c); return CmdQueueResult::Queued; }
 """
+# TASK-1652: the real cold-cutoff state and threshold, filled at import so importers of STUBS (test_sat_no_return_startup.py) get it too
+STUBS = STUBS.replace("@COLDCUT@", extract_cold_cut(SAT_INO.read_text(encoding="utf-8")))
 
 MAIN = r"""
 static bool g_prevFlame = false;

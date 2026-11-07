@@ -9,97 +9,43 @@ This project uses OpenWolf for context management. Read and follow .wolf/OPENWOL
 
 ---
 
-## Task Management (MANDATORY)
+<!-- AGENT-CORE START (TASK-1625: identical in CLAUDE.md, AGENTS.md and .github/copilot-instructions.md; guarded by tests/test_agent_core_block.py) -->
+## Core rules for every agent
 
-For SAT work under TASK-1412, read `docs/sat/sat-low-load-agent-handoff-2026-10-28.md` before selecting the next task. It links the current execution graph, PID writer order, open decision gates and bench-to-field validation sequence. Live Backlog dependencies take precedence over an older graph snapshot.
+This block is shared word for word by CLAUDE.md, AGENTS.md (Codex) and .github/copilot-instructions.md (Copilot). CLAUDE.md with its `.claude/rules/` files holds the full rule set; where another instruction file disagrees with it, CLAUDE.md wins. Change this block in all three files at once.
 
-**Every piece of work must have a backlog task before any code is written. No exceptions.**
+- **Lines.** `dev` is the 2.x line: ESP32-S3 only (OTGW32, and the OTGW Classic with an ESP32-S3 module), async and FreeRTOS. `otgw-1.x.x` is the 1.x ESP8266 maintenance line. `main` is the latest public release and is only pushed in the release flow, after Robert's go.
+- **Roles.** Robert (maintainer) decides scope, priority, waivers and releases; put an open decision to him as one question with the options, their consequences and your recommendation. Sergeant D decides SAT behaviour (see the SAT ground truth block). Testers give input and evidence, never decisions: their requests become tasks labelled `needs-maintainer-ok`.
+- **Tasks.** Every change starts from a Backlog.md task. Use the `backlog` CLI for every task read and write. Never use the backlog MCP server and never edit `backlog/tasks/*.md` directly.
+- **Done needs evidence.** Tick an acceptance criterion only with evidence from the session that did the work: build output, a test run, a capture, a screenshot. For a bug fix, the same reproduction fails on the old code and passes on the fix.
+- **Firmware rules.** No ArduinoJson (ADR-146). No HTTPS or WSS. Never write to `Serial` after init (it is the PIC link); debug output goes to telnet. PIC commands only through `addCommandToQueue()`. String literals stay in flash (`F()`, `PSTR()`, the `_P` functions). No `String` class in hot paths (ADR-180). No raw `#ifdef ESP32`/`ESP8266` outside the Platform library: use the `platformXxx()` shims and `HAS_*` flags. The web UI keeps at most 2 API calls in flight.
+- **Versions and commits.** A commit that touches `src/OTGW-firmware/**` or `src/libraries/**` bumps `_VERSION_PRERELEASE` with `bin/bump-prerelease.sh`. Every `TASK-NNN` in a commit message needs its task file staged. The git hooks in `.githooks/` enforce both (`git config core.hooksPath .githooks`).
+- **Gates.** `python evaluate.py --quick` shows no new FAIL. Build only through `build.bat` / `./build.sh`, never `python build.py` directly. Run the tests with `python scripts/run_tests.py`.
+- **Discord.** Answer in English, answer first, with the real `<@ID>` mention. Never name the OTGW32 board in public. Every SAT correction or decision by Sergeant D goes into `docs/sat/sergeant-d-corrections.md` before it is implemented.
+<!-- AGENT-CORE END -->
 
-**Always use the `backlog` CLI for task operations on this project. Do NOT use the `mcp__backlog__*` MCP server.** The MCP server indexes only one worktree at a time and serves stale cached state across worktrees (verified 2026-05-05: MCP returned a pre-edit "In Progress" snapshot of TASK-514 long after the CLI marked it Done on disk in another tree). The "Backlog.md: always use the CLI" section near the bottom of this file is the canonical statement; this paragraph is a reminder so the rule is the first thing seen.
+---
+
+## Tasks (MANDATORY)
+
+Every piece of work has a backlog task before any code is written. Use the `backlog` CLI for every read and write; never the `mcp__backlog__*` server (it indexes one worktree and serves stale state), never a direct edit of `backlog/tasks/*.md`. Full CLI reference: `docs/guides/backlog-cli.md`.
 
 ```bash
-# Before writing any code:
-backlog search "<topic>" --plain           # 1. Find existing task
-backlog task create "Title" -d "..." --ac "..."  # 2. Create if none
-backlog task edit <id> -s "In Progress" -a @claude  # 3. Start it
-backlog task edit <id> --plan "..."        # 4. Write plan, share with user, WAIT for approval
-                                           #    (in the /implement-next-task cycle: self-review + #alpha-testing notice instead, see Auto-advance)
-
-# During implementation:
-backlog task edit <id> --check-ac 1        # Mark ACs done as you go
-backlog task edit <id> --append-notes "..."  # Log progress
-
-# When done:
-backlog task edit <id> --final-summary "..." # PR description
+backlog search "<topic>" --plain                    # 1. find an existing task
+backlog task create "Title" -d "..." --ac "..."     # 2. create one if none
+backlog task edit <id> -s "In Progress" -a @claude  # 3. FIRST action on pickup, before any reading or code
+backlog task edit <id> --plan "..."                 # 4. plan; share with Robert and wait (not inside /implement-next-task)
+backlog task edit <id> --check-ac 1                 # tick ACs as their evidence comes in
+backlog task edit <id> --append-notes "..."         # log progress
+backlog task edit <id> --final-summary "..."        # evidence per AC
 backlog task edit <id> -s Done
 ```
 
-**CRITICAL: NEVER edit task files in `backlog/tasks/` directly. Always use the `backlog` CLI.**
+Enforced: `.claude/hooks/backlog-mcp-guard.py` blocks Edit/Write on task files; `.githooks/commit-msg` rejects a `TASK-NNN` without its task file staged. **Windows:** `backlog.cmd` cuts multi-line arguments at the first newline and silently drops later flags (TASK-1635); call `node <npm-prefix>/node_modules/backlog.md/cli.js` directly or use one `--append-notes` per paragraph. For SAT work under TASK-1412 read `docs/sat/sat-low-load-agent-handoff-2026-10-28.md` before selecting a task.
 
-Two hooks enforce this contract — they fail closed, you don't have to remember:
+**Done only with evidence.** Set Done as soon as every AC and DoD item holds with evidence from this session (fresh build/evaluator output, a capture, a curl response, a screenshot, a bench log) and the Final Summary names it per AC. Run `docs/guides/pr-checklist.md` first and invoke `superpowers:verification-before-completion` before claiming anything done. Leave a task In Progress only when an AC is genuinely not self-verifiable (name it), a DoD item is unmet, or a sibling task gates it; attempt a verification before calling it impossible.
 
-- `.claude/hooks/backlog-mcp-guard.py` — PreToolUse guard wired in `.claude/settings.json`. Blocks `Edit/Write/MultiEdit` on `backlog/tasks/*.md` (direct file edits are never allowed). Does NOT block `backlog` CLI invocations — CLI is the preferred interface.
-- `.githooks/commit-msg` — git hook that fails the commit if its message references `TASK-NNN` without a matching `backlog/tasks/task-NNN*.md` file in the index. Catches the failure mode where a code commit lands but its task record stays untracked. Install once per clone with `git config core.hooksPath .githooks`. Bypass with `git commit --no-verify` for emergencies (document why in the message).
-
-For the full CLI reference (all commands, AC management, DoD, multi-line input): read `docs/guides/backlog-cli.md`.
-
-Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. "Builds clean" is the lowest bar; the checklist captures the hardware / browser / MQTT smoke tests that build-clean doesn't see.
-
-**Known bug:** `backlog task list` returns empty. Use `backlog task <id> --plain` or read `backlog/tasks/` directly.
-
-## Task pickup (MANDATORY)
-
-**When picking up any task from the backlog — whether newly created or already existing — the first action before any code, research, or file reading is:**
-
-```bash
-backlog task edit <id> -s "In Progress" -a @claude
-```
-
-This makes the task visible in the correct board column immediately. Skipping this step leaves the task in "To Do" while it is actually being worked on, which creates false visibility for the user and breaks board accuracy.
-
-## Task completion: Done only with evidence (project policy)
-
-A task is **Done** only when every Definition-of-Done item is satisfied: every AC checked, every DoD item checked, Final Summary added, build passes, evaluator green, no regressions. When all of them hold, set the task **Done** right away; do not leave it "In Progress" waiting for the user to flip it.
-
-Every checked AC needs evidence collected in this session: the fresh output of the build/evaluator run, a capture transcript, a curl response, a browser screenshot, a bench log. A belief that it works is not evidence, and neither is a run from before the last change. For bug fixes, the evidence is the old-vs-fix reproduction (see "Bug fixing: reproduce, then prove" below). The Final Summary names the evidence per AC, so the user can audit after the fact via the Final Summary + git log.
-
-Rationale: a well-designed AC list means "all ACs checked with evidence" already means "task objectively done". A user review as gate doubles turnaround.
-
-**Exceptions** (leave "In Progress" only if):
-- An AC is genuinely not self-verifiable (hardware-specific tester feedback, explicit user sign-off as policy, third-party integration approval). Name the blocking AC in the Final Summary.
-- A DoD item is unmet (build failed, regression, missing test).
-- The task is part of a coordinated set whose status waits on a sibling.
-
-Unsure whether an AC is self-verifiable: **attempt** the verification rather than deferring pre-emptively. A truly unverifiable AC should not be an AC.
-
-Before claiming any work done (AC checked, task Done, fix shipped, push complete), invoke `superpowers:verification-before-completion`: it forces a fresh verification run in the current message and a read of its actual output, instead of relying on earlier runs or extrapolation.
-
-## Auto-advance to next task (project policy)
-
-After completing a task (or reaching a blocking state with no self-verifiable ACs remaining), **immediately analyse the backlog and pick up the highest-priority actionable task** without waiting for the user to prompt. Apply the following selection order:
-
-1. Highest-priority task with all non-field-validation ACs unblocked (can be started and verified without hardware).
-2. If all open tasks are blocked on field validation or external input, report that state and idle.
-
-Exceptions — do NOT auto-advance:
-- User has explicitly asked you to stop or wait.
-- The next task requires a plan approval checkpoint (per KISS principle: share choices so user decides on complexity).
-- The next task is a cross-worktree master-plan task (requires the one-plan-then-two-agents protocol).
-
-**Continuous cycle (`/implement-next-task`, maintainer decision 2026-10-20).** Inside the cycle defined by `.claude/skills/implement-next-task/SKILL.md`, the plan-approval wait (Task Management step 4 and the plan-approval exception above) is replaced by a critical self-review with the advisor plus a notice in #alpha-testing: implement directly after the self-review and keep advancing. Actions that always need explicit permission (PIC flash, release, push to `main`, force-push) still stop the cycle.
-
----
-
-## MCP Servers
-
-Two MCP servers are wired into Claude Code for this project:
-
-- **`mcp__backlog__*`** — task management. Started locally by Claude Code itself (stdio).
-- **`mcp__discord-mcp__*`** — Discord I/O for `#dev-sat-mqtt` and the support channels. Runs as a **native Java process** (`saseq/discord-mcp`, Temurin JDK 17) on `http://localhost:8085/mcp` — no Docker. Launcher: `D:\Users\Robert\Documents\GitHub\RvdB\discord-mcp-saseq\run-discord-mcp.ps1`, which reads `DISCORD_TOKEN` + `DISCORD_GUILD_ID` from the Windows user environment (`SPRING_PROFILES_ACTIVE=http`). It auto-starts at logon via a Startup-folder shortcut (`discord-mcp-saseq.lnk`). Most-used tools: `read_messages` (params `channelId`, `count`), `send_message` (params `channelId`, `message`), `get_server_info`, `read_private_messages`, `send_private_message`. There is no separate login tool — JDA handshakes with Discord at startup. For attachment contents (logs, screenshots), see `.claude/commands/backlog_discord.md` (Phase 1b) and `.claude/commands/check_otgw_issues.md` (Phase 1d). (Migrated off the Docker container 2026-07-04 to eliminate the idle `vmmemWSL`/WSL2 CPU+RAM cost; the redundant `gustycube` Node server was retired in the same change.)
-
-If Discord calls start failing with "Expected token to be set" or 401, the native process has dropped its gateway session; restart it (`schtasks`-free: run `run-discord-mcp.ps1`, or kill the stale `java -jar discord-mcp-1.0.0.jar` PID and re-run the launcher) plus an MCP reconnect (`/mcp` in Claude Code). Only ONE instance may hold the bot token at a time — never run this alongside another discord bot process on the same token (gateway conflict). Full operational reference, restart procedure, channel discipline, and bot-side intent requirements: read `docs/guides/discord-mcp-server.md`.
-
----
+**Auto-advance.** After a task, pick up the highest-priority task whose non-field ACs are unblocked, without waiting; report and idle when everything is blocked. Do not advance when Robert asked to stop, when the next task needs a plan checkpoint, or for a cross-worktree master-plan task. Inside `/implement-next-task` (`.claude/skills/implement-next-task/SKILL.md`) the plan wait is replaced by an advisor self-review plus an #alpha-testing notice; PIC flash, release, push to `main` and force-push still stop the cycle.
 
 ## Design Principles
 
@@ -109,152 +55,17 @@ If Discord calls start failing with "Expected token to be set" or 401, the nativ
 - **Comments about the present only**: Avoid defensive comments about hypothetical future scenarios ("if mode X is ever added, revisit this"). They confuse future readers by implying a plan that doesn't exist. Write only about what is true now. If the future concern is real, it belongs in a backlog task, not a code comment.
 - **Fix the doc, not the identifier**: When an existing identifier's name is semantically correct but its documentation is wrong (stale docstring, mismatched comment, outdated reference), prefer fixing the documentation over renaming. A rename touching N call sites is rarely a net win when the name itself isn't the bug.
 - **Surface assumptions, don't hide confusion**: If a request is ambiguous or a simpler path exists, say so before coding. Do not silently pick between interpretations; name them and ask.
-- **Open questions go to Robert, interactively, with a weighed recommendation** (maintainer directive, 2026-10-29): when a decision is open (scope, a trade-off, an AC that cannot be evidenced, a waiver, a priority, anything only the maintainer can weigh), ask Robert in the session with an interactive question (the AskUserQuestion tool where available): one question per decision, the concrete options with their consequences, and your recommendation, critically weighed (what you considered, the trade-off, why it wins, the main risk). Do not decide it silently, do not leave it only in task notes, and do not bundle several open decisions in one prose message. SAT design questions still go to Sergeant D under the SAT ground truth rules below.
+- **Open questions go to Robert, interactively, with a weighed recommendation** (maintainer directive, 2026-10-29): when a decision is open (scope, a trade-off, an AC that cannot be evidenced, a waiver, a priority, anything only the maintainer can weigh), ask Robert in the session with an interactive question (the AskUserQuestion tool where available): one question per decision, the concrete options with their consequences, and your recommendation, critically weighed (what you considered, the trade-off, why it wins, the main risk). Do not decide it silently, do not leave it only in task notes, and do not bundle several open decisions in one prose message. SAT design questions still go to Sergeant D under `.claude/rules/sat-ground-truth.md`.
 - **Verifiable goals over vague intent**: Translate the task into a check before writing code ("add validation" → "tests for invalid inputs pass"; "fix bug" → "a test reproduces it, then passes"). For backlog work the AC checkboxes are the verification: if an AC is too vague to verify, sharpen it before implementing.
 - **Reuse open source before building your own** (maintainer directive, 2026-10-14): before writing a library, tool or non-trivial helper, research existing open-source projects that already solve the problem (maintained, licence-compatible, fits our constraints: RAM/flash budget, no ArduinoJson per ADR-146, no HTTPS, ESP32-S3 + our pinned platform). Compare at least two candidates on primary sources (repo, release activity, licence, measured size/behaviour), and record what was checked and why it was chosen or rejected in the task notes. Build it yourself only when that research shows no candidate fits, and say why. Example: TASK-1224 uses the rjsmin/rcssmin minifiers instead of a hand-written one.
 
 ---
 
-## Project Overview
+## Project and firmware rules
 
-ESP8266/ESP32 firmware for the NodoShop OpenTherm Gateway. Web UI, MQTT, REST API, TCP serial bridge, Home Assistant integration.
+Firmware for the NodoShop OpenTherm Gateway: web UI, MQTT, REST API, TCP serial bridge, Home Assistant integration. Arduino C/C++, single translation unit. `dev` (2.x) is ESP32-S3 only, one esp32-combo image for the OTGW32 (OT-Direct) and the OTGW Classic with an S3 module (PIC); `otgw-1.x.x` is the ESP8266 1.x line; `main` is the latest public release. Port fixes between the lines deliberately, not reflexively.
 
-- **Platform**: ESP8266 (NodeMCU/Wemos D1 mini), ~40KB usable RAM; ESP32-S3 (OTGW32)
-- **Language**: Arduino C/C++ (.ino files), single translation unit
-- **Serial**: Reserved exclusively for PIC — never write to `Serial` after init
-- **Debug**: `DebugTln()`, `DebugTf()` → Telnet port 23, never `Serial.print()`
-- **Branches** (model changed 2026-06-20): **`dev` is now the DEFAULT working line and carries the 2.0.0 ESP32-S3-only async + FreeRTOS firmware** (epic TASK-865, ADR-123/128; ESP8266 dropped). It is the former `feature-2.0.0-esp32s3-async` line, promoted to `dev`. **`otgw-1.x.x` is the 1.5.x/1.6.x maintenance/LTS line** (the former `dev`, renamed). **`main` is ALWAYS the latest public release** (currently 1.6.1) and is never auto-pushed. The old `feature-2.0.0-esp32s3-async`, `feature-2.0.0-esp32s3-only` and `feature-dev-2.0.0-otgw32-esp32-sat-support` branches are historical/folded-in, not active. Default to the branch you are on; port fixes between `dev` (2.0.0) and `otgw-1.x.x` (1.x) deliberately, not reflexively.
-
----
-
-## Critical Coding Rules
-
-### PROGMEM — ALL string literals must stay in flash
-
-```cpp
-DebugTln(F("Message"));                        // F() macro
-DebugTf(PSTR("Value: %d\r\n"), value);         // PSTR() for printf
-snprintf_P(buf, size, PSTR("fmt: %s"), str);   // snprintf_P always
-```
-
-String comparisons: `strcmp_P()`, `strcasecmp_P()` with `PSTR()`.
-Binary data: `memcmp_P()` only — **never** `strncmp_P`/`strstr_P` on binary (causes Exception (2) crash).
-
-### No ArduinoJson — ever
-
-JSON built manually with `snprintf_P` / `sendJsonMapEntry`. Parsed with `parseJsonKVLine()`.
-
-### No String class in hot paths (ADR-180)
-
-Use `char[]` with `strlcpy`, `snprintf_P`. `String` only in setup/one-off contexts.
-
-### File serving — stream, never load into RAM
-
-Files >2 KB: `httpServer.streamFile()`. `v2.html` is ~50 KB — never `f.readString()`.
-
-### HTTP/WS only — never add HTTPS/WSS
-
-Trusted LAN only. REST API works behind HTTPS reverse proxy, but WebSocket assumes plain WS.
-
-### ESP Platform Abstraction — no raw `#ifdef ESP8266`/`ESP32` outside the abstraction layer
-
-The 2.0.0 branch carries an explicit platform abstraction so that
-application code is written against shims and capability flags, never
-against raw platform symbols. **No `#if(def) ESP8266`, `#if(def) ESP32`,
-`#if(def) ARDUINO_ARCH_ESP*`, or `#if(def) BOARD_NODOSHOP_ESP*` may appear
-outside the allowlisted abstraction files.**
-
-Allowlisted files (the only place these conditionals belong; the list in
-`evaluate.py::ESP_ABSTRACTION_ALLOWED_FILES` is authoritative). Since
-c880a0203 (2026-06-02) the abstraction is the project's own Platform
-library under `src/libraries/Platform/src/`, and dev has no ESP8266 header
-any more:
-
-- `src/libraries/Platform/src/platform.h` — dispatcher
-- `src/libraries/Platform/src/platform_esp32.h` — ESP32 includes, shims, type aliases
-- `src/libraries/Platform/src/boards.h` — pin maps, `HAS_*` capability flags and per-board tuning constants
-- `src/OTGW-firmware/OTGW-ModUpdateServer{.h,-esp32.h}` — parallel mini-abstraction for the firmware update server
-
-**The other libraries under `src/libraries/**` are vendored upstreams and OUT OF SCOPE entirely.**
-They are independent upstreams that manage their own platform support and are
-NOT firmware application code. Do NOT pull them into the abstraction: never add
-`platformXxx()` shims into them and never strip their internal
-`#if defined(ESP8266)/(ESP32)`. Examples: `src/libraries/SimpleTelnet`,
-`src/libraries/OTGWSerial` (PIC serial driver). They are listed in
-`evaluate.py::ESP_ABSTRACTION_EXCLUDED_LIB_DIRS` and excluded from the
-abstraction scan. (Maintainer directive, 2026-05-30.)
-
-Application code MUST instead:
-
-1. **Call `platformXxx()` shims** from `platform_esp32.h` for any divergent API
-   (heap, hostname, MAC, reset, NTP, LED, JSON tx, WiFi, BLE, …). If a
-   shim does not exist yet for a divergence you need, *add the shim first*
-   in `src/libraries/Platform/src/platform_esp32.h` — with an inline no-op
-   stub where a board lacks the feature — and then call it unguarded from
-   application code.
-2. **Gate optional features with `HAS_*` flags** from `boards.h`
-   (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`,
-   `HAS_SAT_BLE`, `HAS_WEATHER_FORECAST`, etc.). If your feature does not
-   yet have a flag, add one to `boards.h` first.
-3. **Never read raw board macros (`BOARD_NODOSHOP_ESP32`, …) outside
-   `boards.h`.** Those decide which `HAS_*` flags are set; the rest of
-   the firmware sees only the `HAS_*` flags.
-4. **Never call `ESP.getXxx()` directly** when a `platformXxx()` shim
-   already exists (`platformFreeHeap`, `platformMinFreeHeap`,
-   `platformMaxFreeBlock`, `platformHeapFragmentation`, `platformRestart`,
-   `platformChipId`, `platformFlashChip*`, etc.). Skipping the shim is a
-   quieter form of the same leak — it bypasses the platform's substitution
-   point.
-
-When adding a new feature that diverges per platform, the **first** thing
-to write is the shim or the `HAS_*` flag, not the application code that
-needs it. The platform headers are the public API of the abstraction; the
-.ino files are clients.
-
-`evaluate.py::check_esp_abstraction_boundary()` enforces this rule with a
-baseline-ratchet: it FAILs on any new violation above the recorded
-`ESP_ABSTRACTION_BASELINE` and WARNs while any pre-existing violation
-remains. The current baseline and remediation roadmap live in
-`docs/audits/2026-05-28-esp-abstraction-leak-audit.md` (TASK-739) and the
-tier tasks TASK-740..746. **Each tier task must lower
-`ESP_ABSTRACTION_BASELINE` in `evaluate.py` as part of its Definition of
-Done.**
-
-### Architecture rules
-
-- PIC commands: always `addCommandToQueue()`, never direct serial write
-- SAT's own `CS=` (the `CS=0` releases included) goes through `satEnqueueOwnCS()`. While SAT is enabled it owns MsgID 1, and both the OTDirect handler (ADR-179) and the PIC command queue (`addCommandToQueue()`, TASK-1236) refuse any unmarked `CS=` as external, SAT's own included. On PIC boards `satPicCSKeepalive()` re-sends SAT's CS every 30 s, because the PIC drops a CS= after ~63-126 s without a new one
-- Timers: `DECLARE_TIMER_SEC()` / `DECLARE_TIMER_MS()` + `DUE()` (see `safeTimers.h`)
-- `doBackgroundTasks()` can re-enter (called from inside `doAutoConfigure()`'s file-reading loop). Shared scratch state must declare an acquisition contract: see ADR-090 for the pattern (RAII or inUse-flag, both with fail-safe on contention)
-- Typed control flow: `enum class` or numeric IDs, never string tokens as discriminators
-- Frontend JS: Chrome/Firefox/Safari (latest + 2). Check element existence, try-catch JSON.parse, response.ok, .catch() on all async
-- **At most 2 concurrent API calls (hard cap, NEVER burst above it).** The device's REST backpressure gate (`restAPI.ino`, `REST_MAX_INFLIGHT`) and file-serve gate (`WEB_FILE_MAX_INFLIGHT`) are both capped at 2 — empirically confirmed as the highest offered concurrency with zero 503s under nominal load and zero incidents under combined-stress/overload (ADR-165, TASK-1015 two-phase load-test study; supersedes the flat single-flight rule from TASK-1014). Both gates tighten toward 1 under heap pressure regardless. No `Promise.all` / `.map()` over `fetch` for anything that can exceed 2 in flight — a burst above the cap gets a cheap 503, which surfaces as silent partial saves (the SAT onboarding "Could not save the settings, SAT was not enabled" bug, TASK-1014). This applies to GETs too, not just POSTs. Existing sequential-chain code (`kv.reduce((c,p)=>c.then(()=>post(...)), Promise.resolve())`, one request at a time) stays as-is — it's safely within the new N<=2 ceiling, and no client-side `MAX_INFLIGHT` knob has been built to actually raise it (ADR-165 deliberately left that undone). Note: `post()` fires the fetch eagerly when called, so if you ever do allow up to 2 in flight, serialize by deferring the *call* (build `[name,value]` pairs, dispatch up to 2 at a time), not by awaiting a pre-built array of already-launched promises. The v2 bundle enforces the cap centrally (ADR-184's queue, carried into `v2.js` by TASK-1210). The first lines of `v2.js` wrap `window.fetch`, so every same-origin `/api/` request waits in one first-in-first-out queue with at most 2 in flight. Bursts there no longer reach the device, but they still queue and delay each other, so keep writing calls one at a time. A 503 that still shows on page load comes from the connection and file-serve gates (ADR-188, ADR-147), not from more than 2 API calls.
-- Webui assets live in `src/OTGW-firmware/data/` and ship as a LittleFS image built from a minified staging copy (ADR-190); use `python build.py` (not `--firmware`) to rebuild them. The 2.0.0 line ships only the v2 UI (`v2.html`, `v2.js`, `v2-bundle.css`, ADR-192); `ds-tokens.css` and `v2.css` are build inputs of `v2-bundle.css` and are not shipped. FSexplorer (`FSexplorer.html` + `fsexplorer.css`) is the recovery page and must not depend on the v2 assets. The classic UI is gone; its dropped features are recorded in `docs/history/2026-10-15-retired-classic-web-ui-features.md`
-- Log container contract: `.ot-log-content` has `white-space: pre` (components.css); `\n` is the line separator. Prefer `textContent` over `innerHTML` for plain text (skips HTML parser and per-line escape)
-
-### Naming conventions
-
-- Variables/functions: camelCase (`settingHostname`, `startWiFi`)
-- Constants: UPPER_CASE (`CMSG_SIZE`)
-- Global settings: `setting` prefix (`settingMqttBroker`)
-
----
-
-## Settings & State Architecture (ADR-051)
-
-- `OTGWSettings settings` — persistent, serialized to LittleFS
-- `OTGWState state` — transient, never persisted
-- Two-level sub-sections, Hungarian prefixes: `b`=bool, `s`=char[], `i`=int, `f`=float
-- Access: `settings.mqtt.sBroker`, `state.otgw.bOnline`
-
----
-
-## REST API
-
-- `/api/v2/` — current. Dispatch table `kV2Routes[]` in `restAPI.ino`.
-- Errors: `sendApiError(httpCode, F("message"))`
-
----
+The firmware rules are in the AGENT-CORE block above. The full set (PROGMEM, platform abstraction and its baseline ratchet, architecture rules, settings/state, REST, constraints, debugging user reports against the OpenTherm spec first) is `.claude/rules/firmware-coding.md`, and the read-before-you-touch table is `.claude/rules/navigation.md`. Both load automatically when you read or edit a file under `src/`; read them yourself before you plan firmware work without opening a source file. If you cannot name the C4 component that owns the code you are about to change, read `docs/c4/c4-context.md` first.
 
 ## ADR Guidelines
 
@@ -291,46 +102,13 @@ Do NOT create for: refactors, bug fixes, minor features within existing patterns
 
 Per **ADR-080**, a new pattern-level ADR MUST either reference its CI gate (in `evaluate.py` or `tests/`) or be explicitly labeled guideline-level in its Status line. No more "binding on paper, unchecked in practice".
 
----
+## Build, flash and bench (hard rules)
 
-## Build Commands
-
-**Builds on this machine (maintainer directive, 2026-10-29): one build at a time across ALL agents and sessions, never two in parallel, also not in different worktrees; at most 4 compiler jobs (`build.py` caps `pio_jobs()` at 4, TASK-1456); on `dev` build `esp32-combo` only (the plain wrapper), no separate esp32 / esp32-classic builds, also not for `HAS_*`/platform changes.** A session announces its build to the coordinating 2.0.0 session before it starts and when it ends. **Enforced (TASK-1488):** `build.py` takes a machine-wide lock (`%LOCALAPPDATA%/OTGW-build/build.lock`, shared by every worktree and session); a second build waits until the first ends (it prints the holder), a dead holder's lock is taken over, and `OTGW_BUILD_LOCK_WAIT=<minutes>` bounds the wait (0 = refuse, exit 3). A worktree only gets the lock once its `build.py` contains it: rebase onto origin/dev before building. Direct `pio run` bypasses the lock and is not allowed for that reason.
-
-**Per-task cadence (maintainer directive, 2026-10-30, replaces the 2026-10-29 batch of 4 tasks): every finished firmware task is bench-tested before its zip is published.** Per task: host tests red on the old code and green on the fix, `python evaluate.py --quick`, its own prerelease bump (the pre-commit hook enforces one tag per firmware commit, so testers keep their A/B signal) and a commit. Then one esp32-combo build from that HEAD, an OTA flash of a bench unit, and a bench test of that task's behaviour. Only after a passing bench test: push, `discord-post-build.sh`, the #alpha-testing note and the ledger rows. A failed bench test publishes nothing: fix it, then build and bench-test again. Tasks that are ready at the same moment may share one build, but each task's behaviour is bench-tested before the zip is posted, and the post's `-m` names every covered tag. At most 3 hours between two builds while work lands. A rebase before the push means a rebuild from the rebased HEAD, because the post script refuses a zip whose githash is not HEAD. Docs-only commits may still push at any time, except while a build for a push is running. Independent tasks may be implemented in parallel in their own worktrees (agents edit and test, the lead merges, bumps and commits one at a time).
-
-**Every alpha tag on `dev` is published (maintainer directive, 2026-10-29), also when another session or agent built it.** Protocol:
-1. The session that pushes a firmware commit (new `_VERSION_PRERELEASE`) builds esp32-combo from its pushed HEAD (or from the committed HEAD it is about to push, after the final rebase) and runs `bash scripts/discord-post-build.sh -m "TASK-NNN: <one-line change>"` from that worktree. The script refuses unless the zip githash is HEAD and `src/` is clean, so a pre-rebase build cannot be posted: rebuild after the rebase.
-2. When the build slot or memory does not allow a separate build, the next posted zip covers the tag; its post and `-m` line name every covered tag.
-3. The pushing session messages the coordinating 2.0.0 session with tag, commit, tasks and evidence. The coordinator posts the plain-language report in #alpha-testing (several tags may share one message) and keeps the ledger `.claude/alpha-build-ledger.local.md` in the main dev tree (gitignored).
-4. Before every post the coordinator compares the ledger with `git log -G"_VERSION_PRERELEASE" origin/dev -- src/OTGW-firmware/version.h`; any tag that is neither posted nor named as covered is published with the next zip.
-
-**ALWAYS use the `.bat`/`.sh` wrappers — they are the only sanctioned CI/agent entrypoints.** On Windows use `build.bat`; on macOS/Linux use `./build.sh`. The wrapper bootstraps a correct Python venv **and downloads the full PlatformIO toolchain** if missing, so it works on any host. **NEVER invoke `python build.py` or `python flash_esp.py` directly** (maintainer directive, 2026-07-05): the host default Python is often 3.14, which the espressif32 platform rejects (needs 3.10–3.13), and `build.py` masks that failure with a lying exit 0 — leaving a stale `littlefs.bin` while claiming success. `build.bat`/`build.sh` are the entrypoints; `flash_otgw.bat` (not `flash_esp.py`) is the flash entrypoint. The `python build.py ...` forms below document what the wrapper runs underneath — invoke them directly only if the wrapper itself is genuinely unavailable, and then verify the output SUCCESS line + `firmware.bin`/`littlefs.bin` freshness by hand.
-
-```bash
-./build.sh                   # Preferred — firmware + filesystem (handles venv)
-python build.py              # Build firmware + filesystem, esp32-combo only (default)
-python build.py --target all             # Not used on dev: combo only (maintainer 2026-10-29)
-python build.py --firmware   # Firmware only (also the push-policy gate)
-python build.py --clean      # Clean build
-python evaluate.py           # Code quality check (PROGMEM, unsafe patterns)
-python evaluate.py --quick   # Fast check
-```
-
-Build targets on `dev` (`build.py --target` choices; ESP8266 exists only on `otgw-1.x.x`):
-
-| Target | Hardware | Asset name token |
-|---|---|---|
-| `esp32` | OTGW32 / OT-Thing PCB (OTDirect) | `esp32-otgw32` |
-| `esp32-classic` | OTGW Classic + LOLIN S3 Mini (PIC) | `esp32-classic` |
-| `esp32-combo` | One image for both boards, PIC or OTDirect picked at boot (ADR-127); the default for S3 builds and what the bench runs | `esp32-combo` |
-
-Asset naming: `OTGW-firmware-<token>-<semver>+<githash>-flash.zip` (plus
-`.ino.bin`, `.littlefs.bin`, merged bins and `.elf`). Never run two builds
-concurrently in one worktree — shared `.pio/build/` corrupts (bug-034 class);
-wipe the affected `.pio/build/<env>` dir and rebuild solo to recover.
-
----
+- Build only with `build.bat` / `./build.sh`; never `python build.py`, `python flash_esp.py` or a direct `pio run` (wrong host Python gives a lying exit 0, and pio bypasses the lock).
+- One build at a time on this machine across all sessions and worktrees (machine-wide lock in `build.py`, TASK-1488); at most 4 compiler jobs; on `dev` build `esp32-combo` only. Rebase onto origin/dev before building. Announce the build to the coordinating 2.0.0 session before it starts and when it ends, and respect a build or push freeze it announces.
+- Per firmware task: host tests red on the old code and green on the fix, `python evaluate.py --quick`, its own prerelease bump, a commit, an esp32-combo build, an OTA bench flash and a bench test of that behaviour; only then push and publish (`.claude/rules/discord.md`).
+- Flash over WiFi OTA first; USB only when OTA cannot work, and then `flash_otgw.bat --board esp32 --migrate --host <ip>`. A filesystem write resets the settings: save `/api/v2/settings` first. Never flash PIC firmware over WiFi using OTmonitor (bricks the PIC).
+- Details (commands, targets, asset names, safeboot partitions, test automation and soak recipes): `docs/guides/agent-build-and-bench.md`.
 
 ## Bug fixing: reproduce, then prove (maintainer rule, Robert)
 
@@ -352,166 +130,6 @@ close the gap on the bench.
 
 ---
 
-## Test automation (on-device / soak)
-
-End-to-end loop for firmware changes that need on-device validation (e.g. the
-heap-frag soak, TASK-934):
-
-- **Build (canonical):** `build.bat --target esp32` / `./build.sh --target esp32`
-  (a bare wrapper builds esp32-combo only) — builds firmware + filesystem and
-  bootstraps its own venv, so it is immune to the host Python version.
-- **Build (direct pio) gotcha:** `python -m platformio run -e esp32` fails if the
-  host Python is 3.14+ (the espressif32 platform requires 3.10–3.13: *"Python
-  version must be between 3.10 and 3.13"*). Invoke pio via its own penv instead:
-  `~/.platformio/penv/Scripts/python.exe -m platformio run -e esp32`
-  (firmware) and `... -e esp32 -t buildfs` (LittleFS).
-- **Fresh worktree:** run `git submodule update --init --recursive` before the
-  first build — git worktrees do NOT populate submodule working trees, so
-  `SimpleTelnet` (AsyncSimpleTelnet.h) and `OpenTherm` are missing otherwise and
-  the sketch fails with *"No such file or directory"*.
-- **Static gates:** `python evaluate.py` (full) / `--quick`. Exit 0 = pass, 1 =
-  FAIL, 2 = WARN>5. NOT run by build.py — run it separately. Gate unit tests:
-  `python tests/test_evaluate.py` (stdlib unittest, no pytest).
-- **Full test sweep:** `python scripts/run_tests.py` runs every `tests/test_*.py` AND every
-  `test/host/test_*.py` (the MSVC harnesses that compile sliced firmware sources; Windows only,
-  `--no-host` leaves them out). Run it before a lane commit; a `test/host` harness that stops
-  compiling after a firmware change is a stale stub, fix it in the same lane
-  (`docs/guides/test-runner.md`).
-- **Flash over WiFi OTA first** (maintainer directive, 2026-10-24): the app through
-  `POST /safeboot` and the safeboot updater's `/update` upload, the filesystem through
-  `POST /update?cmd=100&size=<n>` on the main firmware. The filesystem OTA keeps
-  `settings.ini` and the other kept files by itself, and it is the route users take.
-  Flash app and filesystem together when the web assets changed, so the hashes match.
-- **USB only when OTA cannot work** (unit does not boot, no network, no safeboot), and
-  then always `flash_otgw.bat --board esp32 --migrate --host <ip>`, which saves and
-  restores `settings.ini` (auto-detects the S3 over USB VID/PID 303A:1001; `--port COMx`
-  to force; esptool-only, works on any Python). Never `--update --fs` over USB.
-- **Settings live on LittleFS:** any flash that writes a filesystem image (`--fs`,
-  or bare `--update`, which auto-picks app + fs) resets every setting (mode reverts
-  to `gateway`). `--update --app <bin>` writes the app only and keeps them (before
-  TASK-1160 it silently added a littlefs image found in `build\`). Save
-  `curl http://<ip>/api/v2/settings` first when a filesystem write is involved.
-  Check the downloaded size of a static file such as `/settings.ini` before
-  trusting it: the device can serve it truncated.
-- **Never `sed -i` a `.bat`:** it strips the CRLF line endings and cmd then fails
-  with `'M' is not recognized`. Edit with the Edit tool and check the endings.
-- **Load (fragmenting):** `python scripts/sat_boiler_emulator.py --host <ip>` for
-  synthetic OT traffic; combine with concurrent Web UI polling + MQTT discovery
-  republish to exercise heap pressure.
-- **Capture / soak:** `scripts/capture-mqtt-debug.bat -DeviceHost <ip> -BrokerHost
-  <ip> -DurationSeconds <N> -Topic "otgw-firmware/stats/#"` → one merged
-  transcript (telnet debug + MQTT stream + browser devtools + crashlog + HTTP
-  probes).
-- **Heap soak (TASK-934):** watch `otgw-firmware/stats/min_max_block`,
-  `/maxblock_lt2k…ge16k`, `/max_loop_gap_ms` and the gating counters
-  (`/drip_slowmode`, `/mqtt_drops`, `/ws_drops`, `/enter_*`). Telnet `z` zeroes the
-  watermark/histogram/counters for a fresh window (`min_free_heap` is the native
-  ESP32 allocator watermark and is not resettable). Press `z` from a healthy heap:
-  if reset mid-pressure, the tier-entry counters (`enter_*`) only resume counting
-  after the heap recovers to HEALTHY and re-enters the tier (they share
-  `getHeapHealth()`'s internal state, which the reset deliberately does not touch).
-
----
-
-## Important Constraints
-
-- Never write to `Serial` after OTGW init (it's the PIC serial link)
-- Never flash PIC firmware over WiFi using OTmonitor (bricks the PIC)
-- **Firmware OTA on 4MB boards goes through the safeboot updater (ADR-191).** The 4MB table has a safeboot app/factory partition (0x10000, 960K), one app slot app0/ota_0 (0x100000, 2240K) and LittleFS (0x330000, 768K). The main firmware never writes ota_0 itself: `_handleUploadStart` (`OTGW-ModUpdateServer-esp32.h`) still refuses an app image (it would overwrite the running app, TASK-959). Instead POST /safeboot (admin-protected) erases otadata and restarts into safeboot (`safeboot/src/main.cpp`), which writes ota_0 and restarts into it. Bootloader app rollback is on: a new image stays pending until 30 s of healthy loop() or a planned restart (`safebootMarkAppValid()`), so an early crash returns to safeboot. Filesystem OTA works from the main firmware as before. Units on the old layout (app0 @0x10000) need one USB `flash_otgw --migrate`; `flash_otgw --update` reads the unit's partition table and refuses a layout mismatch. The offsets live in `partitions_otgw_esp32.csv` and are mirrored in build.py, flash_otgw.bat/.sh and flash_esp.py; `tests/test_build_safeboot.py` fails when they drift. Dual-slot app OTA on an 8MB module still works through `hasSpareAppOtaSlot()`.
-- Never add HTTPS/WSS
-- Always `addCommandToQueue()` for OTGW commands
-- Always validate buffer sizes before string operations
-- Always `feedWatchDog()` in long-running loops
-
----
-
-## Project Navigation: What to Read Before Touching Code
-
-**Always start with** `docs/c4/c4-context.md` (system overview) and `docs/c4/c4-component.md` (component index).
-
-| Scenario | Read before starting |
-|---|---|
-| Bug in MQTT publishing | `c4-component-integration-layer.md` + `docs/api/MQTT.md` + `c4-code-mqtt.md` |
-| Bug in OT message parsing | `c4-component-opentherm-core.md` + OT spec v4.2 + `c4-code-otgw-core.md` |
-| Bug in web UI | `c4-component-web-interface.md` + `c4-code-web-assets.md` |
-| New REST endpoint | `c4-component-integration-layer.md` + `c4-code-rest-api.md` |
-| New MQTT topic | `docs/api/MQTT.md` + `c4-code-mqtt.md` + relevant ADRs |
-| Settings/config change | `c4-component-configuration-state.md` + ADR-051 + `c4-code-settings.md` |
-| Network/WiFi/OTA change | `c4-component-network.md` + `c4-code-network.md` |
-| SAT/BLE feature | `c4-component-smart-thermostat.md` + `other-projects/SAT-releases-thermo-nova/` + `docs/sat/thermo-nova-spec.md` (see "SAT ground truth" below) |
-| ESP32 port/feature | `c4-container.md` + `other-projects/OT-Thing-OTGW32/` + relevant ADRs |
-| OpenTherm protocol/message IDs | `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.md` |
-| MQTT/REST/WebSocket API change | `docs/api/MQTT.md` + `docs/api/WEBSOCKET_FLOW.md` — breaking silently breaks HA integrations |
-| Architecture change | `c4-context.md` + `c4-component.md` + all relevant ADRs + create new ADR |
-| New dependency | Relevant ADRs + PROGMEM/RAM budget check + create ADR |
-
-**C4 component files** (all in `docs/c4/`):
-
-| File | Covers |
-|---|---|
-| `c4-component-opentherm-core.md` | OT protocol, OTGW-Core, OTDirect, PIC serial |
-| `c4-component-integration-layer.md` | MQTT, REST API, WebSocket, HA auto-config |
-| `c4-component-web-interface.md` | Web UI, FSexplorer, file serving |
-| `c4-component-network.md` | WiFi, Ethernet, OTA, mDNS, NTP |
-| `c4-component-smart-thermostat.md` | SAT, BLE, simulation mode |
-| `c4-component-sensors-hardware.md` | Dallas, S0 pulse counter, OLED |
-| `c4-component-configuration-state.md` | Settings persistence, OTGWSettings, OTGWState |
-
-**Code-level docs** (in `docs/c4/`, one per source area): `mqtt`, `network`, `otdirect`, `otgw-core`, `rest-api`, `sat`, `sensors`, `settings`, `utilities`, `web-assets`.
-
-**Reference implementations** in `other-projects/` — read-only, never copy verbatim:
-
-| Directory | When to read |
-|---|---|
-| `OT-Thing-OTGW32/` | ESP32 port, OTDirect, Ethernet, BLE |
-| `SAT-releases-thermo-nova/` | SAT subsystem, BLE protocol |
-| `otgw-6.6/` | PIC command set, response timing |
-| `otmonitor-6.6/` | How a well-tested client drives the PIC |
-
-**If you cannot name the C4 component that owns the code you are about to change, stop and read c4-context.md first.**
-
----
-
-## Debugging User-Reported Issues
-
-When investigating a user-reported bug, behavioural deviation, or "this should work" complaint, follow the reference precedence in this order:
-
-1. **Read the OpenTherm specification first.** `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.md` is the ground truth. The spec defines what the protocol *says* should happen. Anchor every investigation here before opening implementation code, regardless of how confident you feel about the topic.
-2. **Then consult `other-projects/`.** Read `other-projects/README.md` and `other-projects/CLAUDE.md` before quoting any reference implementation. Those files document the precedence ladder inside that directory: Schelte Bron's projects (otgw, otmonitor, otgwmcu) for PIC and otmonitor protocol authority; the HA `opentherm_gw` component for user-perceived behaviour; `pyotgw` for the engine under HA; OT-Thing and SAT for alternative implementations.
-3. **Never modify code under `other-projects/`.** It is upstream reference, read-only by convention. The full rule and rationale live in `other-projects/CLAUDE.md`.
-
-**Spec wins on design decisions.** When the spec is explicit and unambiguous, our firmware matches the spec, even if a downstream client behaves differently.
-
-**HA component behaviour matters for understanding the report.** Most user complaints in practice are "this differs from what Home Assistant shows me", not "this differs from the OpenTherm spec". Match the report against the HA component to triage; match the design against the spec to decide.
-
-**When spec-correct and HA-perceived behaviour conflict**, capture the trade-off as an ADR (`docs/adr/`). Do not silently align with one or the other; the next maintainer needs to know we made the call deliberately.
-
-<!-- SAT-GROUND-TRUTH START (identical in CLAUDE.md and AGENTS.md; tests/test_sat_ground_truth_block.py) -->
-## SAT ground truth and anti-drift rules (maintainer directive, 2026-10-22)
-
-SAT (Smart Autotune Thermostat) was designed on paper by Sergeant D and turned into code by Alex (Alexwijn). There is no written design document. The firmware's SAT is a port, so the firmware is never a source of truth for SAT behaviour. Earlier AI work described the start-up sequence and the PWM/modulation suppression from memory and got them wrong more than once; these rules exist so that cannot happen again.
-
-**Ground truth, in this order:**
-1. Sergeant D's recorded corrections and decisions in `docs/sat/sergeant-d-corrections.md` (one numbered entry each, with date and Discord link).
-2. The thermo-nova code: `https://github.com/Alexwijn/SAT/tree/releases/thermo-nova`, pinned at commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb` (2026-03-18). The local copy `other-projects/SAT-releases-thermo-nova/` is identical to that commit (verified 2026-10-22) and read-only.
-3. `docs/sat/thermo-nova-spec.md`, the cited specification written from that code (TASK-1292).
-4. Our firmware (`src/OTGW-firmware/SAT*.ino`, `SATtypes.h`), `docs/sat/firmware-sat-spec.md` and `docs/sat/sat-comparison.md`: they describe what the port does today, not what SAT should do.
-
-**Rules for every statement about SAT behaviour** (in a plan, task note, ADR, spec, Discord post or review):
-- Cite the thermo-nova source as `file:line` relative to `custom_components/sat` at the pinned commit, and open that location in the current session before citing it. No citation, no claim.
-- Never fill a gap with plausible behaviour. If the code does not show it, write "not found in the code" and ask Sergeant D.
-- Describe behaviour in time order from the code (what happens first, what triggers the next step, which timers run). The start-up sequence and the suppression mechanism are the known hallucination hot spots: for those, trace every path and write a timeline.
-- When Sergeant D's description and the code disagree, report both with the citation and let him decide. Do not pick one silently; record the outcome under item 1.
-- **Every correction or decision by Sergeant D is recorded in `docs/sat/sergeant-d-corrections.md`, in the same session and before the change it leads to is implemented** (maintainer directive, 2026-10-23). This covers corrections of our claims or code, answers to our questions, and choices between options, also when they arrive as a one-line reply on Discord. One numbered entry per item: date, his words quoted verbatim, the Discord message link, what it settles compared with the thermo-nova code (`file:line`) and the firmware, the task it drives, and what stays open. When a reply is short or ambiguous, record the reading you act on as an interpretation and say so. A later entry that changes an earlier one names the earlier entry; old entries are never rewritten.
-- **Every SAT decision is checked against Sergeant D's recorded decisions before it is taken** (maintainer directive, 2026-10-23). Read `docs/sat/sergeant-d-corrections.md` first. A plan, review, ADR, spec change or Discord answer about SAT names the entries it relies on and says, per relevant entry, whether it agrees. A conflict with an entry is never resolved silently: report it with the entry number and the citations, and put it to Sergeant D. A reviewer checks the same list and treats an unmentioned conflict as a finding.
-- **Unclear SAT behaviour is resolved by questioning Sergeant D step by step** (maintainer directive, 2026-10-24): the specification must be complete and correct, and asking him is how it gets there. Ask one question per Discord message, in plain English (he is a Greek native speaker), with the possible answers (A/B/C, each with its consequence and the thermo-nova citation) and our recommendation of the best one, and wait for his answer in the chat before the next question. Pace the questions to his presence (maintainer directive, 2026-10-25, replaces the 12-hour repeat rule): while he is active (he just answered a question), post the next queued question at once, however little time has passed. Check the chat every hour. If he does not react within the first hour after a question, wait quietly: no post while he is away. As soon as he is back (any new message from him in the channel), ask the first open question again, short, with a link to the original; he may simply have forgotten it. Keep the queue and each question's status in `docs/sat/open-questions.md`; record every answer in `docs/sat/sergeant-d-corrections.md` before acting on it, and turn each decided answer into a backlog task that implements it. Take the time: an open question blocks the implementation, never a guess.
-- Before changing how SAT controls the boiler, the plan quotes the thermo-nova implementation of that area, names the difference with both citations, and waits for Sergeant D's OK (see `.claude/skills/implement-next-task/SKILL.md`, step 4). Arguments from memory or from the firmware do not count.
-- A claimed difference between thermo-nova and the firmware is published only after a second reader has opened both citations and tried to refute it.
-- Move the pinned commit only on purpose: one commit that updates this block, re-diffs `docs/sat/thermo-nova-spec.md` against the new upstream and says what changed. Never update the local copy silently.
-<!-- SAT-GROUND-TRUTH END -->
-
----
-
 ## Git push policy
 
 The default Claude Code instruction is "do not push without explicit user permission". For this project, the maintainer (Robert) has granted standing permission to push to **`origin/dev`** (the 2.0.0 async default line) and **`origin/otgw-1.x.x`** (the 1.x maintenance line) when it is logical to do so. Logical means: a clean working state, recent commits that are self-contained, and no pending review checkpoints.
@@ -523,7 +141,7 @@ Concrete rules that override the default "ask first":
 - **`origin/main`** push: **`main` is ALWAYS the latest public release.** Never auto-pushed; every push requires explicit per-instance confirmation and is part of the release flow only.
 - **Force-push** to any branch: still requires explicit per-instance confirmation. Force-push to main is forbidden regardless.
 - **`origin/release/2.x`** push: the stable 2.x line (maintainer decision 2026-11-01, TASK-1545). Pushed only inside `/release-2x`, after Robert's go for that release; never force-pushed. It never merges back into `dev` as a whole (its production commit comments out `_VERSION_PRERELEASE`); release docs go to `dev` by cherry-pick. `main` stays the 1.x stable line until 1.x is end-of-life.
-- **Sub-branches / other remote branches** (`feature-*`, `fix-*`, ad-hoc lanes): require explicit per-instance confirmation. Create a parallel lane only for genuine parallel work and delete it immediately after merging back (one-line policy, see Worktree layout).
+- **Sub-branches / other remote branches** (`feature-*`, `fix-*`, ad-hoc lanes): require explicit per-instance confirmation. Create a parallel lane only for genuine parallel work and delete it immediately after merging back (one-line policy, see `docs/guides/worktrees.md`).
 
 When in doubt about whether a push is "logical", err toward asking. The cost of one extra prompt is small; the cost of an unwanted force-push is large.
 
@@ -538,136 +156,29 @@ Docs: `/update-docs-2x` (`.claude/skills/update-docs-2x/SKILL.md`, scope from `s
 
 `dev` has no release CI: 2.x builds are local (esp32-combo) and assets are uploaded with `gh`, draft first (immutable releases).
 
-## Versioning policy
+---
 
-Field-test users on Discord identify which build they are running by the prerelease tag in `_VERSION_PRERELEASE` (e.g. `alpha.6`, `beta.23`). Every commit that changes firmware behaviour must ship under its own prerelease tag so a tester can A/B two builds and report which one regressed. Implicit batching ("multiple fixes shipped under one tag") destroys that signal — so the policy is enforced mechanically.
+## Versions and worktrees
 
-**What requires a prerelease bump** — any staged path under:
+A commit that touches `src/OTGW-firmware/**` (except `version.h`) or `src/libraries/**` carries its own prerelease bump via `bin/bump-prerelease.sh`, which stages every banner it touched; never pass `--git`. Build-stamp churn in `version.h`/`version.hash` is not a bump: restore it. Full policy: `docs/guides/versioning-policy.md`.
 
-- `src/OTGW-firmware/**` (the `.ino`/`.h`/`.cpp` sources and the LittleFS data assets), **except** `src/OTGW-firmware/version.h` itself;
-- `src/libraries/**` (vendored libs that link into the firmware).
+Single-lane work commits straight on `dev`. A sub-branch or extra worktree only for a genuine parallel lane, deleted right after the merge. One worktree per live session; never `git add -A` in a shared tree; never cross lines inside one tree. Cross-line work (dev and otgw-1.x.x) gets one master plan approved by Robert, then one task and one agent per line. Details and recovery recipes: `docs/guides/worktrees.md`.
 
-**What does NOT require a bump** (commit can land with no version change):
+## ADR kit and graphify
 
-- `*.md`, `docs/**`, `backlog/**`, `.claude/**` — pure documentation / project metadata;
-- `scripts/**`, `bin/**`, `.githooks/**` — host-side tooling not flashed to the device;
-- top-level `.py` / `.sh` / `.bat` — build orchestration, not firmware.
+- Before a feature or architectural change run `/adr-kit:context <topic>` and honour the Accepted ADRs it returns. Author ADRs with `/adr-kit:adr` (or the `adr-generator` subagent). While coding follow the plugin's `instructions/adr.coding.md`; in a review apply the six named ADR checks of `instructions/adr.review.md`. An ADR goes Proposed to Accepted only through the four gates (Completeness, Evidence, Clarity, Consistency) and is then immutable: supersede, never edit.
+- For questions about firmware code structure run `graphify query|path|explain` first; the graph covers `src/` only. Read `graphify-out/GRAPH_REPORT.md` only for a broad architecture review. The graph complements the C4 reading rules, never replaces them. After changing `src/` run `graphify update src`, never `graphify update .`.
 
-**How to bump.** From the project root:
+## Where the rest lives
 
-```bash
-bin/bump-prerelease.sh        # bumps tag, syncs ALL version banners, stages everything it touched
-git commit -m "..."
-```
-
-The bump script updates `version.h`, `data/version.hash`, **and every
-source-file version banner** (via `autoinc-semver.py --update-all`), then
-stages all of them itself. Do NOT hand-stage only `version.h` + `version.hash`
-— that leaves the ~43 banner updates uncommitted and the headers drift out of
-sync with the version file (observed: banners at alpha.165 while version.h was
-at alpha.170). The whole bump lands in one commit, banner churn included.
-
-The helper requires the current tag to match `^[a-zA-Z]+\.[0-9]+$` (so `alpha.6` → `alpha.7`, `beta.23` → `beta.24`). If you need to change the alpha/beta word itself, edit `version.h` by hand and let `scripts/autoinc-semver.py` handle the rest.
-
-**Enforcement.** `.githooks/pre-commit` checks the staged diff. If any triggering path is staged but `_VERSION_PRERELEASE` is unchanged, the commit is rejected with a clear error. The hook is wired via `core.hooksPath = .githooks` (already set on this worktree).
-
-**Bypass for one commit.** Use sparingly — e.g. an emergency rollback, or a commit that only re-formats whitespace and genuinely does not need its own tag:
-
-```bash
-OTGW_BUMP_HOOK_DISABLE=1 git commit -m "..."
-```
-
-If you find yourself reaching for the bypass routinely, the rule is wrong, not the commit. Open a backlog task to revisit the policy.
-
-## Worktree layout
-
-Branch model changed 2026-06-20. The 2.0.0 async line was promoted to `dev` (it is now the default working line), the old 1.x `dev` was renamed `otgw-1.x.x`, and `main` is always the latest public release. The everyday state is a **single working tree on `dev`**; a second worktree is only needed when actively maintaining the 1.x line. **The paths below assume the Windows root `D:/Users/Robert/Documents/GitHub/RvdB/` (Mac-canonical equivalent: `~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/...`).**
-
-| Worktree dir | Branch | Purpose |
+| Topic | File | Loaded |
 |---|---|---|
-| `.../GitHub/RvdB/OTGW-firmware` | `dev` | **DEFAULT working tree.** 2.0.0 ESP32-S3-only async + FreeRTOS line (epic TASK-865, ADR-123/128; ESP8266 dropped). |
-| (add on demand) | `otgw-1.x.x` | 1.5.x/1.6.x maintenance/LTS line (the former `dev`). Spin up a worktree only when patching 1.x. |
-| (release only) | `main` | ALWAYS the latest public release. Never a working tree; touched only during the release flow. |
-
-The old `feature-2.0.0-esp32s3-async`, `feature-2.0.0-esp32s3-only` and `feature-dev-2.0.0-otgw32-esp32-sat-support` branches are historical (folded into `dev` / parked) and are not active work lines.
-
-**One line, no stray sub-branches (maintainer directive, 2026-06-19, still in force).** Single-lane work commits and pushes DIRECTLY on `dev`, NO sub-branch. Create a sub-branch/worktree ONLY for a genuine parallel lane, and DELETE it immediately after merging back: `git branch -d <sub>`, `git push origin --delete <sub>`, `git worktree remove <dir>`. Codified in `.claude/skills/implement-next-task/SKILL.md`.
-
-**Rule: don't cross lines inside one tree.** Work targeting `otgw-1.x.x` belongs in its own worktree. Never `git checkout otgw-1.x.x` inside the `dev` tree to do 1.x work: it defeats the split and risks losing in-flight changes.
-
-**Windows gotcha:** `git worktree remove` can fail with "Function not implemented" (ENOSYS) when a worktree holds internal symlinks (venv `lib64`, toolchain). Remove junction-safe with `cmd //c rmdir /s /q "<path>"` then `git worktree prune`, never a blind recursive delete that may follow a junction's target.
-
-Verify with `git worktree list`.
-
-**Backlog.md: always use the CLI, never the MCP server.** The `backlog` MCP server (`mcp__backlog__task_*` tools) inherits the launching session's working directory and indexes only that single worktree. Tasks living in a sibling worktree are invisible to `mcp__backlog__task_search`, and `mcp__backlog__task_view` returns cached/stale content for cross-tree tasks (verified 2026-05-05: MCP kept returning the pre-edit "In Progress" snapshot of TASK-514 long after a CLI edit had marked it Done on disk in the 2.0.0 tree). Mixing CLI and MCP on the same task is fragile because MCP caches and does not reflect CLI-side writes without a server restart. **Use `backlog task ...` CLI for every read, edit, create, complete, and archive in this project.**
-
-**CLI cross-tree behaviour.** The backlog now lives in the `dev` tree's `backlog/tasks/` — all 2.0.0 (TASK-865.x and friends) and legacy task files are here. If you spin up a second worktree for `otgw-1.x.x`, remember `backlog task edit` only writes to the worktree where the task file actually lives: if an edit returns `Task not found`, `find` for `task-<id>*` across both worktrees and run the edit from the worktree that holds the file.
-
-### One worktree per concurrent session — never share a working tree between two live sessions
-
-Two Claude (or Codex / Gemini) sessions doing git operations in the **same** worktree share one git index and one set of working-tree files. This is fragile and was observed to fail (2026-05-29):
-
-- **Shared-index corruption.** Concurrent `git add`/commit from two sessions corrupts the index: `error: invalid object <hash> for '.claude-plugin/marketplace.json'` / `.gemini/settings.json`, then `error: Error building trees` — every commit is blocked. Recovery: `git reset` (mixed, no args) rebuilds the index from HEAD without touching commits or the working tree, then re-stage only your files and commit. A targeted `git reset -- <path>` only fixes one entry at a time (whack-a-mole when several are corrupt).
-- **`.pio` build collisions.** Two `python build.py` runs in the same tree clobber `.pio/build/`, producing a spurious ESP32 LTO link failure (`undefined reference to setup()/loop()`) **even though `build.py` exits 0** (it does not propagate the per-env PlatformIO failure). Recovery: `rm -rf .pio/build/esp32` and rebuild solo. A background agent that backgrounds its own build and then ends leaves an orphaned build that collides with the next one — have agents NOT build, and let the main thread build once after they finish.
-- **EOL churn is normal, not work.** On Windows every git touch flags `LF will be replaced by CRLF` on ~90 files that show as modified with zero content change. `git diff --ignore-cr-at-eol` reveals the real set; after committing real work, `git checkout -- .` restores the EOL-only files to leave a clean tree.
-
-**Prevention.** Give each concurrent session its OWN worktree (`git worktree add ../wt-<topic> <branch-or-HEAD>`), OR run parallel work as **background sub-agents inside ONE session** (they serialise git through the single main thread, and the convention here is that sub-agents implement + report but do NOT commit/bump/build — the main thread does that once after reviewing). Do not run two top-level sessions in the same tree expecting clean commits.
-
-### Cross-worktree work — ask first, then plan once, then parallelise
-
-Whenever you take on a bug fix, feature change, or architectural decision, **explicitly ask yourself**: *does this also need to land on the other line?* For `dev` (2.0.0) ↔ `otgw-1.x.x` (1.x) the answer is **yes** when the change touches:
-
-- Any file under `src/OTGW-firmware/` whose name is the same on both lines (most `.ino`, `.h`, `.cpp` and the LittleFS data assets) — even when the line numbers or filenames differ between branches (e.g. 1.x's `mqtt_configuratie.cpp` is `MQTTHaDiscovery.cpp` on 2.0.0), the architectural fix usually applies to both.
-- ADRs that codify a cross-cutting decision (MQTT topic shape, heap policy, discovery semantics, settings schema). The `dev` ADR and the `otgw-1.x.x` ADR have separate numbering, but the *decision* must be coherent across both.
-- Anything driven by a HA-side, broker-side or PIC-side contract (HA discovery regex, MQTT retained behaviour, OpenTherm message ID semantics) — those are platform-independent and the firmware-side fix must apply on both lines.
-
-The answer is usually **no** when the change is genuinely scoped to a feature that only exists on one line (SAT dashboard, ESP32-S3 board pinning, OTGW32 hardware bring-up, async/FreeRTOS → `dev`/2.0.0 only; 1.x-specific patch backports → `otgw-1.x.x` only). Note: with 1.x now in maintenance/LTS, most active work is `dev`-only and cross-line porting is the exception, not the default.
-
-**If both: one master plan, two tasks, two agents.**
-
-1. **Write ONE master plan first**, before creating any task or spawning any agent. The plan covers *both* worktrees in a single document and must contain, for each change:
-   - The desired outcome in plain language (the "what" and "why").
-   - The exact file(s) and line number(s) on **both** branches — they often differ (dev refactor split files differently than 2.0.0). Read each branch's source to confirm; do not assume parity.
-   - Per-platform considerations explicitly called out for the 2.0.0 side (ESP8266 vs ESP32-S3 deadbands/thresholds, board-specific pin maps, conditional compilation flags `#if defined(ESP32)` etc.).
-   - The full AC list each per-worktree task will inherit (build commands per target, evaluator commands, field-validation gates, ADR-acceptance gates).
-   - Cross-tree dependencies and ordering — e.g. dev ADR-N must be Accepted before 2.0.0 ADR-M can be drafted; dev impl can be pushed before 2.0.0 impl is reviewed.
-   - The expected commit message prefix and the push gate per branch (`origin/dev` auto-push allowed under the dev worktree's policy; 2.0.0 feature branch push needs explicit confirmation).
-
-2. **Share the master plan with the user for approval** before any task creation. The user's "go" on the master plan replaces the per-task plan-review gate that would otherwise apply individually.
-
-3. **Then create two separate backlog tasks**, one per worktree. Use the convention `feat-2.0.0: port TASK-N — <title>` for the 2.0.0 sibling so cross-references stay legible. Each task carries its own AC list derived from the master plan; do not over-share ACs across tasks (each agent must be able to verify its own task in isolation).
-
-4. **Spawn two agents in parallel**, one per worktree. Each agent:
-   - Has its own self-contained prompt referencing the master plan (or restating its scope in full).
-   - Works exclusively in its own worktree and explicitly does not touch the other tree.
-   - Reports back independently with build/evaluator/commit/push receipts.
-
-5. **Verify both reports**, then report a consolidated summary to the user.
-
-Do **not** sequence (dev first, then 2.0.0 only after dev is fully done) unless there's a hard ordering dependency (e.g. 2.0.0 ADR cites a regex finding from the dev ADR — in that case dev ADR must be Accepted before the 2.0.0 ADR can be drafted, but the 2.0.0 *code* impl can still parallelise once both ADRs are Accepted).
-
-The benefit of writing the plan once is symmetry: agents see the same intent, the two ADRs cross-reference cleanly, the two commits land within minutes of each other, and the user reviews one design instead of two slightly-divergent designs.
-
-## ADR Kit Rules
-
-This project uses [adr-kit](https://github.com/rvdbreemen/adr-kit) for Architecture Decision Records. The skill, the `adr-generator` subagent, and the path-specific instructions are loaded via the plugin.
-
-- **Before implementing a feature or architectural change, run `/adr-kit:context <topic>` first** (e.g. "mqtt discovery", "heap allocation", "ble scanning") to surface the 3-5 most relevant Accepted ADRs before you write code. With 160+ ADRs this is the efficient way to honour existing decisions without reading the whole set; it is read-only and safe to call from parallel subagents. Feed the same topic you would use to describe the change.
-- Use `/adr-kit:adr` (or invoke the `adr-generator` subagent) when authoring a new ADR.
-- During coding work, follow the rules in the plugin's `instructions/adr.coding.md`.
-- During code review, apply the six named ADR checks in the plugin's `instructions/adr.review.md`.
-- An ADR cannot flip from `Proposed` to `Accepted` until it passes all four verification gates: Completeness, Evidence, Clarity, Consistency.
-
-ADR files live at `docs/adr/ADR-XXX-title.md`. Status flow: `Proposed` to `Accepted`, then immutable. To reverse a decision, write a superseding ADR rather than editing the original.
-
-## graphify
-
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-**Scope: the graph covers `src/` only** (firmware sources, vendored libs, web assets — 1628 nodes, 93 communities). It does NOT index docs/, backlog/, or scripts/; for those, use the C4 docs and `backlog` CLI as usual.
-
-Rules:
-- For questions about firmware code structure ("what calls X", "how does Y connect to Z", "trace flow through W"), first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output (~13x fewer tokens per query, measured).
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code under `src/`, run `graphify update src` to keep the graph current (AST-only, no API cost). Never `graphify update .` — the repo root has 1900+ files and would trigger a full re-scan.
-- The graph complements, never replaces, the docs/c4/ reading rules above: C4 answers "which component owns this"; the graph answers "what actually connects to what" at symbol level.
+| SAT ground truth and Sergeant D rules | `.claude/rules/sat-ground-truth.md` | every session |
+| Discord MCP, alpha-tag publishing | `.claude/rules/discord.md` | every session |
+| Firmware coding rules | `.claude/rules/firmware-coding.md` | on `src/`, `test/`, `safeboot/` files |
+| What to read before touching code | `.claude/rules/navigation.md` | on `src/`, `docs/c4/`, `other-projects/` files |
+| Build, flash, bench, soak | `docs/guides/agent-build-and-bench.md` | read before building |
+| Versioning policy | `docs/guides/versioning-policy.md` | read before a firmware commit |
+| Worktrees and cross-line work | `docs/guides/worktrees.md` | read before a parallel lane |
+| Dated maintainer directives and what replaced what | `docs/process/directive-changelog.md` | on demand |
+| Discord MCP operations | `docs/guides/discord-mcp-server.md` | on demand |

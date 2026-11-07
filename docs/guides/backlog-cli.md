@@ -2,7 +2,7 @@
 
 Full CLI reference for task management in this project. Read this when you need command details.
 
-> CLI version: **backlog.md v1.46.1** — updated from v1.40.0; notable additions: task comments, modified-file tracking, label management, milestone filter on task list, enhanced search filters.
+> CLI version: **backlog.md v1.46.1** — updated from v1.40.0; notable additions: task comments, modified-file tracking, label management, milestone filter on task list, enhanced search filters. Robert's workstation runs v1.55.3 (checked 2026-11-04); the commands below work on both.
 
 ---
 
@@ -132,6 +132,22 @@ Historic tasks (closed without Test Plan) should be retrofitted when reopened.
 
 ---
 
+## Marking a wait
+
+A task that cannot move until Robert decides, or until field evidence arrives, carries a marker. `scripts/agentic_throughput.py` dates each wait from the git history of the task file (TASK-1647), so set and clear the marker in its own edit, at the moment the wait starts and ends.
+
+| Wait | Start | Stop |
+|---|---|---|
+| Maintainer decision | `--add-label needs-maintainer-ok` (older tasks: `needs-decision`) | `--remove-label needs-maintainer-ok`, in the edit that records the decision in the notes |
+| Field evidence, whole task | `-s "In Review"` (only field validation is left) | `-s Done` when the evidence is in, or back to `To Do` / `In Progress` |
+| Field evidence, one AC while other work goes on | `--add-label needs-field-data` (older tasks: `waiting-for-field`, `field-verification`) | `--remove-label needs-field-data` when the evidence is in |
+
+- Setting a task to Done ends every wait, also when a stale marker stays behind.
+- `field` and `field-report` say where a report came from; they are not waits.
+- `auto_commit` is off: commit the task file soon after the edit. The script takes the time from `updated_date` in the commit, which is the last edit before that commit.
+
+---
+
 ## Acceptance Criteria
 
 | Action | Command |
@@ -236,7 +252,9 @@ backlog search --modified-file platform.h --plain
 | Limit results | `backlog search "heap" --limit 10 --plain` |
 | Archive | `backlog task archive 42` |
 
-**Known bug:** `backlog task list` sometimes returns empty. Use `backlog task <id> --plain` or read `backlog/tasks/` directly as a fallback.
+**`backlog task list` works.** The old "returns empty" note did not reproduce on 2026-11-04 (TASK-1635): v1.55.3 on Windows listed 115 of 115 task files, and 35 with `-s "To Do"`; v1.46.1 on Linux listed all 115 too.
+
+**Windows: no multi-line arguments through `backlog.cmd`.** cmd.exe cuts the argument list at the first newline inside an argument. A multi-line `-d`, `--notes` or `--plan` keeps only its first paragraph and every later flag is silently dropped. For multi-line text call `node <npm-prefix>/node_modules/backlog.md/cli.js ...` directly (on this machine `C:\nvm4w\nodejs\node_modules\backlog.md\cli.js`), or add paragraphs one by one with `--append-notes`.
 
 ---
 

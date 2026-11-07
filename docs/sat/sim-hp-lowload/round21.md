@@ -4,7 +4,7 @@ Date 2026-11-02. Goal: ten popular heat pumps and hybrids as a library of models
 simulation, at least the last ten winters. A design validation run:
 nothing in the firmware changes.
 
-Script `scripts/sat_hp_library_study21.py`; SAT port `scripts/sat_sim_port.py`; proof
+Script `tools/research/sat/sat_hp_library_study21.py`; SAT port `tools/research/sat/sat_sim_port.py`; proof
 `tests/test_sat_sim_port_equivalence.py`; weather `weather_season10/` (Open-Meteo archive, 52.13 N 6.13 E, 1 Oct -
 30 Apr, 2015-16 .. 2024-25; a spot check of 2013-14 against the older download differs by 0.08 K on average, 0.6 K at
 most, Open-Meteo reprocessing); curve sweep `round21_library_sweep_runs.json` (2024-25, coefficient 1.0 / 1.6), chosen

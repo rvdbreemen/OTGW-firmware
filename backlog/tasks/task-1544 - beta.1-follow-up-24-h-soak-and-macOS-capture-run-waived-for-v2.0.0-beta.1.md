@@ -1,10 +1,11 @@
 ---
 id: TASK-1544
 title: 'beta.1 follow-up: 24 h soak and macOS capture run (waived for v2.0.0-beta.1)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-01T15:47:00Z'
-updated_date: '2026-11-04T05:34:00Z'
+updated_date: '2026-11-06T14:01:00Z'
 labels:
   - beta
   - release
@@ -22,7 +23,7 @@ TASK-1504 AC2 (macOS capture run by a tester) and AC3 (24 h soak on Classic + S3
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 24 h soak of a beta build on the Classic + S3 Mini without an unexplained reboot; crashlog and reboot_log quoted
+- [x] #1 24 h soak of a beta build on the Classic + S3 Mini without an unexplained reboot; crashlog and reboot_log quoted
 - [ ] #2 Capture run from the release zip on macOS by a named tester, with transcript
 - [ ] #3 Capture runs from the beta zip on Windows and Linux, each with a transcript (TASK-1504 AC2 asked for all three OSes)
 - [ ] #4 Update over WiFi with the release zip through the /update page (the path the release notes give users), then device/info shows the new version and settings are kept
@@ -34,4 +35,8 @@ TASK-1504 AC2 (macOS capture run by a tester) and AC3 (24 h soak on Classic + S3
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: verification only (24 h soak + macOS capture). Release gate for the next beta.
 
 2026-11-04 Robert: keep as the 2.0.0 stable-release gate (24 h soak + macOS/Linux capture runs); no bench soak now.
+
+2026-11-06 00:33: soak .63 at 9 h 31 min, boot 148 (no restart), freeheap drifting ~500 B/h (54,176 -> 51,572 B since 19:13); filed TASK-1669.
+
+2026-11-06 15:00 .63 (Classic + S3 Mini, beta.95+1fbd5cf): uptime 1(d)-00:03, bootcount 148 (unchanged since the soak start), mqttconnected true, crashlog available:false, reboot_log newest entries '2026-11-05 14:56:34 - reboot cause: Software reset (3)' and '2026-11-05 14:56:01 - ... [OTA] Rebooting...' (the beta.95 flash), nothing after: 24 h without a reboot.
 <!-- SECTION:NOTES:END -->

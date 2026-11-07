@@ -9,6 +9,10 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-212"
+  - "ADR-215"
+  - "ADR-216"
 topics:
   - "web-server"
   - "backpressure"
@@ -50,6 +54,21 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: "Maintainer accepted 2026-10-06 after the interleaved bench runs on alpha.417 (TASK-1162): deaf in 1 of 5 runs with the cap (7.2 s) against 4 of 6 without (up to 292 s); nominal load hd_webconn_503 = 0"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-06
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-212
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-06
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-215
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-07
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-216
     changed_via: adr-kit lifecycle
 ```
 

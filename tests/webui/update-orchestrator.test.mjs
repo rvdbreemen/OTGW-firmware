@@ -1,8 +1,9 @@
 // TASK-1283 guard: the one-action WiFi update on the /update page.
 //
 // The page logic (file recognition, zip reader, phase engine) is the first <script>
-// of src/OTGW-firmware/updateServerHtml.h (id "updLogic"). This test cuts that script
-// out of the header and runs the REAL text under node; nothing is re-implemented.
+// of src/OTGW-firmware/webui/update.html (id "updLogic"; build time turns the page into
+// the gzipped PROGMEM array in updateServerHtml.h, TASK-1640). This test cuts that script
+// out of the page source and runs the REAL text under node; nothing is re-implemented.
 // Node's Blob, Response and DecompressionStream('deflate-raw') are the same API the
 // browser uses for the zip.
 //
@@ -30,10 +31,10 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', '..');
-const HEADER = process.env.OTGW_UPDATE_H || path.join(ROOT, 'src', 'OTGW-firmware', 'updateServerHtml.h');
+const PAGE = process.env.OTGW_UPDATE_HTML || path.join(ROOT, 'src', 'OTGW-firmware', 'webui', 'update.html');
 const BUILD = process.env.OTGW_BUILD_DIR || path.join(ROOT, 'build');
 
-const header = fs.readFileSync(HEADER, 'utf8');
+const header = fs.readFileSync(PAGE, 'utf8');
 
 function scriptByMarker(src, open) {
   const a = src.indexOf(open);
@@ -50,8 +51,7 @@ function load(text = LOGIC) {
 const U = load();
 
 // ---------- page structure ----------
-test('the raw string has one terminator and the page script parses', () => {
-  assert.equal(header.split(')UPD"').length - 1, 1, 'the raw-string delimiter must occur once');
+test('the page script parses', () => {
   const page = header.slice(header.indexOf("<script id='updLogic'>") + 1);
   const second = page.indexOf('<script>', page.indexOf('</script>'));
   const src = page.slice(second + '<script>'.length, page.indexOf('</script>', second));
@@ -667,7 +667,7 @@ test('contract: every endpoint and field the page depends on exists in the firmw
   const sb = read('safeboot', 'src', 'main.cpp');
   // main firmware: POST /safeboot, POST /update with cmd=100 and size=, 'Flash error' body
   assert.match(upd, /srv\.on\("\/safeboot", HTTP_POST/);
-  assert.match(upd, /webSendPStream\(200, PSTR\("text\/html"\), _serverIndex\)/, 'the large page streams from flash');
+  assert.match(upd, /webSendGzipPage\(PSTR\("text\/html; charset=UTF-8"\), _serverIndex, _serverIndexLen, "\/update"\)/, 'the page is sent gzipped from flash');
   assert.match(upd, /getParam\("cmd", false\)/);
   assert.match(upd, /getParam\("size", false\)/);
   assert.match(upd, /"Flash error: %s"/);

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.79
+**  Version  : v2.0.0-beta.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2789,10 +2789,6 @@ void recordOTOverride(uint8_t id, uint8_t kind, float value) {
   otOverrideStore[slot].lastSeen = (now == 0) ? 1 : now;  // 0 reserved as "empty" sentinel
 }
 
-const __FlashStringHelper* overrideKindLabel(uint8_t kind) {
-  return (kind == OT_OVERRIDE_ANSWER) ? F("answer") : F("substituted");
-}
-
 // Periodic publisher (called from the MQTT periodic path, NOT from the decode hook).
 // Publishes one retained `<label>/override` topic per active override entry so HA
 // and dashboards reflect the injected value. Canonical topics are untouched.
@@ -4358,6 +4354,18 @@ bool pmChainBusy() {
   return false;
 }
 
+// TASK-1653: true while the PIC's priority-message slot is taken (a PM=/TP= sent and not yet answered by the boiler or freed by
+// the PRIO_SLOT_TIMEOUT_MS timeout) or a PM=/TP= waits in the queue. SAT's own PM=25 waits for that, so at most one is
+// outstanding and it never replaces another priority message. A busy lock counts as taken.
+bool picPrioSlotBusy() {
+  CmdQueueLock qlock;
+  if (!qlock.locked) return true;
+  if (s_prioSlotId != PRIO_SLOT_FREE) return true;
+  for (int i = 0; i < cmdQueueSize; i++)
+    if (isPrioCmd(cmdqueue[i].cmd)) return true;
+  return false;
+}
+
 // Called from handleCommandQueue().
 void pmChainTick() {
   if (pmChainIdx < 0) return;
@@ -4421,6 +4429,7 @@ bool sendPICSerial(const char* buf, int len)
     }
     OTDebug(F("] (")); OTDebug(len); OTDebug(F(")")); OTDebugln();
 
+    if (diagRec.active) diagRec.recPicCommand(buf, (size_t)n);   // TASK-1665: the command as sent (ADR-213)
     if (enqueuePICTx(txbuf, n + 2)) {
       sendEventToWebSocket('>', buf, len);
     } else {
@@ -5814,9 +5823,10 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
     memset(OTdata.buf, 0, sizeof(OTdata.buf));        // clear buffer
     memcpy(OTdata.buf, buf, len);                     // copy the raw message to the buffer
     OTdata.len = len;                                 // set the length of the message  
-    if (sscanf(bufval, "%8x", &value) != 1) return;    // extract the value, abort on parse failure
+    if (siscanf(bufval, "%8x", &value) != 1) return;    // extract the value, abort on parse failure
     OTdata.value = value;                             // store the value
-    OTdata.type = (value >> 28) & 0x7;                // byte 1 = take 3 bits that define msg msgType
+    if (diagRec.active) diagRec.recOtFrame(buf[0], value);   // TASK-1665: every decoded frame, arrival order (ADR-213)
+    OTdata.type = (value >> 28) & 0x7;               // byte 1 = take 3 bits that define msg msgType
     OTdata.masterslave = (OTdata.type >> 2) & 0x1;    // MSB from type --> 0 = master and 1 = slave
     OTdata.id = (value >> 16) & 0xFF;                 // byte 2 = message id 8 bits 
     OTdata.valueHB = (value >> 8) & 0xFF;             // byte 3 = high byte
@@ -5853,6 +5863,14 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
       //     → T did not reach the boiler; R replaces it on canonical and /boiler.
       //   if B (slave response) is followed within 500 ms by A (gateway-substituted answer)
       //     → A reaches the thermostat instead of B; B still represents boiler-side reality.
+      // TASK-1653: the incoming frame (OTdata) with the one before it (delayedOTdata), for SAT's own PM=25: a thermostat read of
+      // MsgID 25, an alternative slot (a thermostat request the PIC can replace, the two signatures in SATpm25Poll.h), a fault
+      // edge in MsgID 0. Frames the gateway made itself and replayed lines say nothing about this bus.
+      if (!localAnswer && !replayed) {
+        satPm25NoteFrame(state.otBus.pm25, buf[0], OTdata.type, OTdata.id, OTdata.valueLB,
+                         !delayedOTdata.bLocalAnswer && !delayedOTdata.bReplayed, delayedOTdata.buf[0], delayedOTdata.id,
+                         OTdata.time - delayedOTdata.time, OTdata.time);
+      }
       bool bGatewaySubstituted = (delayedOTdata.id == OTdata.id) && (OTdata.time - delayedOTdata.time < 500) &&
            (((OTdata.rsptype == OTGW_ANSWER_THERMOSTAT) && (delayedOTdata.rsptype == OTGW_BOILER)) ||
             ((OTdata.rsptype == OTGW_REQUEST_BOILER) && (delayedOTdata.rsptype == OTGW_THERMOSTAT)));
@@ -5901,29 +5919,36 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
         const uint8_t idx  = OTdata.id >> 3;
         const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
         if (OTdata.masterslave == 0) {
-          // Master frame — track thermostat-side requests.
+          // Master frame. boilerLastMasterWasWrite follows every request the
+          // boiler gets (T, or the gateway's R); the thermostat bitmaps take
+          // only a T: an R is the gateway's own request or its replacement of
+          // a T, not something the thermostat sent (TASK-1612).
+          const bool fromThermostat = (OTdata.rsptype == OTGW_THERMOSTAT);
           if (OTdata.type == OT_WRITE_DATA) {
             boilerLastMasterWasWrite[idx] |= mask;
-            if ((thermostatSentWrite[idx] & mask) == 0) {
+            if (fromThermostat && (thermostatSentWrite[idx] & mask) == 0) {
               thermostatSentWrite[idx] |= mask;
               thermostatFileDirty = true;
             }
           } else if (OTdata.type == OT_READ_DATA) {
             boilerLastMasterWasWrite[idx] &= ~mask;
-            if ((thermostatSentRead[idx] & mask) == 0) {
+            if (fromThermostat && (thermostatSentRead[idx] & mask) == 0) {
               thermostatSentRead[idx] |= mask;
               thermostatFileDirty = true;
             }
           }
-        } else if (!(OTdata.rsptype == OTGW_ANSWER_THERMOSTAT && OTdata.bAnswerOverride)) {
-          // Slave frame — track boiler-side response classification.
+        } else if (OTdata.rsptype == OTGW_BOILER) {
+          // Slave frame from the boiler — track boiler-side response classification.
           //
-          // The masterslave bit alone is not enough to call a frame boiler
-          // evidence: a gateway-generated override answer to the thermostat is
-          // a type-7 with masterslave==1, and counting it marked msgids the
-          // boiler had just Write-Acked as "not implemented" (GH #677). A
-          // proxy A with no preceding B still counts, per ADR-103 — the same
-          // distinction is_value_valid_for_master_topic() already makes. A
+          // Only a B frame is boiler evidence. The PIC prints 'A' for every
+          // response it transmits to the thermostat itself (otgw-6.6
+          // gateway.asm:2490-2496), paired with a B (answer override, GH #677)
+          // or not: for a request it replaced by one of its own (T57 R26 B26
+          // A57) the boiler never saw the id. Counting such an A branded
+          // msgids the boiler never received (gruijter capture 2026-10-30:
+          // 24W and 115R unsupported, 9/16/57 acked, no B for any of them;
+          // TASK-1391). ADR-103 still publishes such an A as the boiler-side
+          // value; that is MQTT routing, not support evidence. A
           // frame the gateway made itself (bLocalAnswer: SR= answer, master-mode
           // WRITE-ACK echo, loopback B; TASK-1086) or a replayed line
           // (bReplayed) counts for none of these bitmaps: it is no evidence of
@@ -5938,15 +5963,9 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
             // this the bitmap is a one-way latch that is persisted and reloaded
             // at boot, so one bad observation brands the msgid forever.
             //
-            // Retraction deliberately demands stricter evidence than the set:
-            // only a genuine B frame from the boiler. bAnswerOverride alone is
-            // not enough, because it is set only when a B preceded the A. A
-            // gateway that answers the thermostat itself emits (T,A) with no B
-            // (OTDirect does so from its SR= table and in master mode), so the
-            // flag stays false and such a frame would otherwise clear a verdict
-            // the boiler really gave. Setting stays permissive so a PIC proxy A
-            // still counts as boiler evidence (ADR-103). A B is not enough
-            // either when the gateway made it itself: OTDirect loopback mode
+            // Retraction, like the set, needs a genuine B frame from the boiler
+            // (this branch only sees B frames). A B is not enough
+            // when the gateway made it itself: OTDirect loopback mode
             // answers every request with a B of its own (bLocalAnswer), and a
             // replayed B comes from a recording (bReplayed): boilerEvidence.
             if (OTdata.rsptype == OTGW_BOILER && boilerEvidence && (boilerUnsupportedRead[idx] & mask) != 0) {
@@ -6076,8 +6095,9 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
         stampThermostatRoomTemp();
       }
       // TASK-1390: the boiler's own outside temperature, from a live Read-Ack only (entries 57, 126).
+      // TASK-1649: a replayed line (OTdata.bReplayed) is no live Read-Ack and does not stamp it.
       if (OTdata.id == 27 && OTdata.rsptype == OTGW_BOILER && OTdata.type == OT_READ_ACK &&
-          !OTdata.skipthis && !OTdata.bGatewaySubstituted) {
+          !OTdata.skipthis && !OTdata.bGatewaySubstituted && !OTdata.bReplayed) {
         state.otBus.iToutsideBoilerMs = millis();
         if (state.otBus.iToutsideBoilerMs == 0) state.otBus.iToutsideBoilerMs = 1;
       }
@@ -6139,6 +6159,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
       ClrLog();
     } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
+    if (diagRec.active) diagRec.recResponse(buf, (size_t)len);   // TASK-1665: PIC and OT-Direct response lines (ADR-213)
     checkCommandResponse(buf, len);
     if (buf[0] == 'P' && buf[1] == 'R') {
       handlePRresponse(buf, len);  // process PR: responses (PIC settings, gateway mode; PR=A's register A is ignored)
@@ -6188,7 +6209,9 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
 #if HAS_PIC
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
-    satNotifyPicRestart();   // TASK-1570: the PIC forgot MM=/CH=; SAT sends them again (entry 237)
+    // TASK-1650: not while OT-Direct runs: there is no PIC then, so the banner came from the replay.
+    // A banner on a PIC board, replayed or real, still makes SAT resend (bench scenario SB15).
+    if (!isOTDirectEnabled()) satNotifyPicRestart();   // TASK-1570: the PIC forgot MM=/CH=; SAT sends them again (entry 237)
     // Re-enable PIC functions if boot-time detection missed it (transient startup failure).
     // Not while OT-Direct runs: the PIC UART is closed then, so the line came from the
     // frame replay (a user log with a boot banner), not from a PIC (TASK-1181).
@@ -6321,6 +6344,21 @@ void handleOTReplay()
                             sizeof(sReplay));
 }
 
+// TASK-1450: bytes from a port 25238 client prove that the LAN carries traffic, so the WiFi
+// dead-link check takes no action while they arrive. Both readers (handlePICSerial() below,
+// the OTDirect bridge in OTDirect.ino) run on the loop task, as does the reader of the stamp.
+static uint32_t g_otgwStreamLastRxMs = 0;
+
+void otgwStreamRxNote()
+{
+  g_otgwStreamLastRxMs = millis();
+}
+
+bool otgwStreamRxWithin(uint32_t ms)
+{
+  return g_otgwStreamLastRxMs != 0 && (uint32_t)(millis() - g_otgwStreamLastRxMs) < ms;
+}
+
 void handlePICSerial()
 {
 #if HAS_PIC
@@ -6350,6 +6388,7 @@ void handlePICSerial()
       // ever sent. Same shape as the sibling reader in OTDirect.ino.
       int inByte = OTGWstream.read();  // read from port 25238
       if (inByte < 0) break;
+      otgwStreamRxNote();   // TASK-1450: LAN witness for the WiFi dead-link check
       outByte = static_cast<uint8_t>(inByte);
       if (!state.debug.bOTGWSimulation) {
         // TASK-865.6: enqueue for the PIC task to write (no direct UART write).
@@ -7197,9 +7236,20 @@ void upgradepic(AsyncWebServerRequest *request) {
 // TASK-693 port (dev TASK-688): persist the OT-bus support map across reboots.
 //
 // Files (LittleFS):
-//   /ot-thermo.json — {"v":1,"device":"thermostat","sent_read":[...],"sent_write":[...]}
-//   /ot-boiler.json — {"v":2,"device":"boiler","acked_read":[...],"acked_write":[...],
+//   /ot-thermo.json — {"v":2,"device":"thermostat","sent_read":[...],"sent_write":[...]}
+//
+// Thermostat format 2 (TASK-1612): format 1 was written by builds that counted
+// the gateway's own R requests (a PIC write such as R56, or the R that replaced
+// a T) as thermostat requests; those bits are never retracted, so a format-1
+// file is not loaded and the next save writes format 2.
+//   /ot-boiler.json — {"v":3,"device":"boiler","acked_read":[...],"acked_write":[...],
 //                     "unsupported_read":[...],"unsupported_write":[...]}
+//
+// Boiler format 3 (TASK-1391): format 2 was written by builds that counted a
+// PIC-built A frame (an answer the PIC sent the thermostat for a request the
+// boiler never saw) as boiler evidence, so it can hold unsupported bits no B
+// frame will ever retract. A format-1 or format-2 file is not loaded, the same
+// way as below.
 //
 // Boiler format 2 (TASK-1185): format 1 was written by builds that counted
 // answers the gateway made itself (OT-Direct SR=, master mode, loopback) and
@@ -7294,19 +7344,23 @@ static void writeBitmapArrayToJson(File &f, const uint8_t bitmap[32]) {
 
 void loadOtSupportFiles() {
   // Thermostat side.
+  bool thermostatMigrated = false;
   File f = LittleFS.open("/ot-thermo.json", "r");
   if (f) {
-    // Magic gate: read the start of the file and verify "v":1 is present.
+    // Magic gate: read the start of the file and verify the format.
     char header[16] = {0};
     int n = f.read((uint8_t*)header, sizeof(header) - 1);
     header[n > 0 ? n : 0] = '\0';
-    if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
+    if (strstr_P(header, PSTR("\"v\":2")) != nullptr) {
       // TASK-696: short keys (sr/sw/ar/aw/ur/uw) to trim flash on ESP32.
       // The file is firmware-internal; the WebUI / REST surfaces use the long
-      // names. Magic "v":1 unchanged so a future schema bump can still gate.
+      // names.
       readBitmapArrayFromJson(f, F("\"sr\":["), thermostatSentRead);
       readBitmapArrayFromJson(f, F("\"sw\":["), thermostatSentWrite);
       DebugTln(F("ot-support: thermostat profile loaded from /ot-thermo.json"));
+    } else if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
+      thermostatMigrated = true;          // format 1: see the header comment above
+      DebugTln(F("ot-support: /ot-thermo.json is format 1 (it counted gateway requests as thermostat requests), starting fresh"));
     } else {
       DebugTln(F("ot-support: /ot-thermo.json header missing/invalid — starting fresh"));
     }
@@ -7319,23 +7373,23 @@ void loadOtSupportFiles() {
     char header[16] = {0};
     int n = f.read((uint8_t*)header, sizeof(header) - 1);
     header[n > 0 ? n : 0] = '\0';
-    if (strstr_P(header, PSTR("\"v\":2")) != nullptr) {
+    if (strstr_P(header, PSTR("\"v\":3")) != nullptr) {
       readBitmapArrayFromJson(f, F("\"ar\":["), boilerAckedRead);
       readBitmapArrayFromJson(f, F("\"aw\":["), boilerAckedWrite);
       readBitmapArrayFromJson(f, F("\"ur\":["), boilerUnsupportedRead);
       readBitmapArrayFromJson(f, F("\"uw\":["), boilerUnsupportedWrite);
       DebugTln(F("ot-support: boiler profile loaded from /ot-boiler.json"));
-    } else if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
-      boilerMigrated = true;              // format 1: see the header comment above
-      DebugTln(F("ot-support: /ot-boiler.json is format 1 (it counted gateway answers as boiler evidence), starting fresh"));
+    } else if (strstr_P(header, PSTR("\"v\":1")) != nullptr || strstr_P(header, PSTR("\"v\":2")) != nullptr) {
+      boilerMigrated = true;              // format 1 or 2: see the header comment above
+      DebugTln(F("ot-support: /ot-boiler.json is format 1/2 (it counted gateway answers as boiler evidence), starting fresh"));
     } else {
       DebugTln(F("ot-support: /ot-boiler.json header missing/invalid — starting fresh"));
     }
     f.close();
   }
   // We loaded what's on disk, so the on-disk copy matches RAM: not dirty. A
-  // migrated format-1 file does not match, so it is rewritten as format 2.
-  thermostatFileDirty = false;
+  // migrated older file does not match, so it is rewritten in the current format.
+  thermostatFileDirty = thermostatMigrated;
   boilerFileDirty     = boilerMigrated;
 }
 
@@ -7346,7 +7400,7 @@ static bool writeOtThermoFile(const char* canonicalPath, const char* tmpPath) {
   File f = LittleFS.open(tmpPath, "w");
   if (!f) return false;
   // TASK-696: short keys (sr/sw) match the reader and save ~30 B per write.
-  f.print(F("{\"v\":1,\"device\":\"thermostat\",\"sr\":["));
+  f.print(F("{\"v\":2,\"device\":\"thermostat\",\"sr\":["));
   writeBitmapArrayToJson(f, thermostatSentRead);
   f.print(F("],\"sw\":["));
   writeBitmapArrayToJson(f, thermostatSentWrite);
@@ -7361,7 +7415,7 @@ static bool writeOtBoilerFile(const char* canonicalPath, const char* tmpPath) {
   if (!f) return false;
   // TASK-696: short keys (ar/aw/ur/uw) match the reader; saves ~100 B per write.
   // Format 2 since TASK-1185 (see the header comment above).
-  f.print(F("{\"v\":2,\"device\":\"boiler\",\"ar\":["));
+  f.print(F("{\"v\":3,\"device\":\"boiler\",\"ar\":["));
   writeBitmapArrayToJson(f, boilerAckedRead);
   f.print(F("],\"aw\":["));
   writeBitmapArrayToJson(f, boilerAckedWrite);

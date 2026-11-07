@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.79
+**  Version  : v2.0.0-beta.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -36,6 +36,13 @@ extern AsyncSimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 // OTDirecttypes.h must follow boards.h because its contents are gated on HAS_DIRECT_OT (ADR-079).
 #include "OTDirecttypes.h"
 #include "OTGWLogMacros.h"
+#include "diagRecorderStuff.h"  // TASK-1665 (ADR-213): diagnostic recorder format, ring and redaction; the glue is diagRecorderStuff.ino
+extern DiagRecorder diagRec;
+void diagRecorderInit();                    // once, from setup(): lock + environment
+DiagStartResult diagRecorderStart();        // manual start (REST, TASK-1666); sets the flag on success
+bool diagRecorderStop();                    // manual stop; clears the flag
+void diagRecorderBootResume();              // from setup(): resume a recording that was on at the last reboot
+void diagRecordRestIn(uint8_t routeIdx, const char* segment, const char* method, const char* body);
 #if HAS_PIC
 #include <OTGWSerial.h>         // Schelte Bron's Serial class - it upgrades and more
 #endif
@@ -107,8 +114,6 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn = false);   // 
 void sendOTDirectOverridesJSON();
 bool sendPICSerial(const char* buf, int len);
 bool otDirectBoilerPresent();  // TASK-795 §4.2: real boiler answered MsgID 3 (excludes loopback)
-// TASK-183: PI room compensation
-float getFlowTemp();
 // TASK-184: flame ratio metrics
 uint8_t getFlameRatioDuty();
 float   getFlameRatioFreq();
@@ -286,6 +291,14 @@ uint16_t webSocketClientCount();         // connected /ws clients (port 80); use
 void doRestart(const char* reason);      // canonical reboot path: flushSettings + prepareForReboot + ESP.restart
 void captureRebootReason();                        // TASK-1447: take the stored restart reason; first call in setup()
 void storeRebootReasonUnlessPending(const char *reason); // TASK-1447: keep a taken but unlogged reason instead
+void captureWifiDeadRestarts();          // TASK-1450: take the dead-link restart count, once, near the top of setup()
+bool restRequestWithin(uint32_t ms);     // TASK-1450: a REST request arrived within ms (dead-link witness)
+void otgwStreamRxNote();                 // TASK-1450: a port 25238 client sent a byte
+bool otgwStreamRxWithin(uint32_t ms);    // TASK-1450: a port 25238 byte arrived within ms (dead-link witness)
+void wifiLinkMarkSelf(WifiSelfCause cause);    // TASK-1446: call right before the firmware's own WiFi disconnect
+void wifiLinkSnapshot(WifiLinkRecord *out);    // TASK-1444: copy the WiFi link record under its lock
+const char *wifiReasonName(uint8_t reason);    // TASK-1446: wifi_err_reason_t name, "?" when unknown
+void wifiFormatBssid(char *buf, size_t size, const uint8_t *b);  // TASK-1446: "AA:BB:CC:DD:EE:FF"
 // MQTT discovery verification (ADR-062, TASK-349): state machine lives in
 // mqtt_discovery_verify.cpp as of TASK-363; public API in that file's header.
 // startDiscoveryVerification() / isDiscoveryVerificationActive() are
@@ -332,6 +345,12 @@ void handleOTGWstream();
 void testWebhook(bool testOn);
 void evalWebhook();
 void startWebhookTask();  // ADR-123 Phase-4: create the webhook sender task once (webhook.ino)
+bool webhookTaskAvailable();
+uint8_t webFileInFlightNow();
+uint8_t restInFlightNow();
+uint16_t mqttQueueNow();                 // TASK-1679: MQTT outbox entries (heap diagnostics)
+void sampleHeapDip();  // TASK-1669: the sender task exists, so it can run the weather fetch (webhook.ino)
+void weatherWorkerPoll();     // TASK-1669: run a requested weather fetch; webhook task only (SATweather.ino)
 bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-056; defined in restAPI.ino)
 extern bool picSettingsCycleActive;  // PIC settings readout cycle flag (OTGW-Core.ino)
 
@@ -505,10 +524,37 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   // TASK-1017 load-test instrumentation (ADR-147 gate observability; reset by telnet 'z'):
   uint8_t  iRestInflightHwm        = 0; // high-watermark of concurrent REST in-flight requests (restAPI.ino restInFlight) since boot/reset
   uint8_t  iWebfileInflightHwm     = 0; // high-watermark of concurrent web-file-serve in-flight requests (restAPI.ino webFileInFlight) since boot/reset
+  uint32_t iWebfileQueued          = 0; // actual deferrals, once per response
+  uint32_t iWebfileAdmitted        = 0; // deferred responses admitted to stream
+  uint32_t iWebfileCancelled       = 0; // deferred responses destroyed before admission
+  uint32_t iWebfileTimeout         = 0; // pending deadline refusals
+  uint32_t iWebfileMaxWaitMs       = 0; // longest observed pending wait, rollover-safe
+  uint8_t  iWebfilePending         = 0; // observed queue depth, never used for admission
+  uint8_t  iWebfilePendingHwm      = 0;
   uint32_t iRest503Count           = 0; // lifetime REST 503s from the concurrency gate (processAPI)
   uint32_t iWebfile503Count        = 0; // lifetime web-file-serve 503s from the concurrency gate (webFileGateTryAdmit)
   uint32_t iWebConn503Count        = 0; // 503s from the web connection cap (restAPI.ino webConnCapExceeded, ADR-188)
   uint32_t iWebAckAbortCount       = 0; // web connections aborted on the ack timeout (webServerCompat.h webBeginRequest, ADR-189)
+  // TASK-1673: snapshot taken by the loop task at the lowest free heap it has seen (the native
+  // watermark hd_min_free_heap can be lower: the loop only sees what it samples).
+  uint32_t iDipFreeHeap            = 0xFFFFFFFF;
+  uint32_t iDipMaxBlock            = 0;
+  uint32_t iDipTxBytes             = 0;  // bytes port-80 pcbs hold in their send queue
+  uint16_t iDipTxPcbs              = 0;  // port-80 pcbs with unsent/unacked data
+  uint16_t iDipActivePcbs          = 0;
+  uint16_t iDipTimeWaitPcbs        = 0;
+  uint8_t  iDipFiles               = 0;  // file streams admitted by the file gate
+  uint8_t  iDipRest                = 0;  // REST requests in flight
+  uint8_t  iDipWs                  = 0;  // WebSocket clients
+  uint16_t iDipMqttQueue           = 0;  // TASK-1679: MQTT outbox entries at the dip
+  uint32_t iDipMqttTxBytes         = 0;  // TASK-1679: bytes queued in lwIP on the broker connection at the dip
+  uint16_t iMqttQueueHwm           = 0;  // TASK-1679: largest MQTT outbox seen by the loop since the last reset
+  // TASK-1679: lowest heap-window minimum that fell inside a file response's library ack,
+  // the free heap just before that ack, and how many acks lowered the minimum.
+  uint32_t iAckLowMin              = 0xFFFFFFFF;
+  uint32_t iAckLowFreeBefore       = 0;
+  uint32_t iAckLowHits             = 0;
+  uint8_t  iAckLowFiles            = 0;  // file streams admitted at that moment
   uint16_t iTcpActivePcbs          = 0; // lwIP active TCP PCB count, sampled 1 Hz from the loop task (platformTcpActivePcbCount)
 };
 
@@ -581,20 +627,6 @@ inline bool isOTDirectEnabled() {
 #endif
 }
 
-// TASK-1073: can the serial frame-replay simulator actually run here?
-// The replay pump lives on the PIC serial path, so it is compiled out entirely
-// without HAS_PIC, and it returns early while the board is in OT-Direct mode.
-// The REST endpoints must consult this before reporting replay active: a PIC-less
-// or OT-Direct board otherwise answers active:true while not one fixture frame is
-// replayed, a silent failure that looks exactly like success.
-inline bool canReplayOTGWSimulation() {
-#if HAS_PIC
-  return !isOTDirectEnabled();
-#else
-  return false;
-#endif
-}
-
 inline bool hasOTCommandInterface() {
   return isPICEnabled() || isOTDirectEnabled();
 }
@@ -632,15 +664,6 @@ inline bool isNetworkUp() {
 #endif
 #if defined(_VERSION_PRERELEASE)
   if (state.net.bAPFallback) return true;  // BETA: SoftAP counts as network-up for web/telnet
-#endif
-  return (WiFi.status() == WL_CONNECTED);
-}
-
-// Returns true only when a real WiFi or Ethernet connection is available.
-// Use this (not isNetworkUp) to gate services that need internet/LAN: MQTT, NTP.
-inline bool isWiFiConnected() {
-#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  if (state.net.eMode == NET_ETHERNET) return true;
 #endif
   return (WiFi.status() == WL_CONNECTED);
 }
@@ -687,11 +710,6 @@ inline const __FlashStringHelper* hardwareTypeName() {
   return F(HW_TYPE_NAME);
 #endif
 }
-
-// Compile-time capability: does this board CLASS carry a PIC co-processor at all?
-// Static property of the hardware variant, NOT runtime PIC liveness (that is
-// isPICEnabled()). A PIC-class board with a dead PIC is still hardwareHasPIC()==true.
-inline constexpr bool hardwareHasPIC() { return HAS_PIC; }
 
 #if HAS_PIC
 inline bool isGatewayFirmware() { return strcmp_P(state.pic.sType, PSTR("gateway")) == 0; }
@@ -750,6 +768,7 @@ struct OTGWSettings {
   bool bDarkTheme    = false;
   bool bMyDEBUG      = false;
   bool bNightlyRestart = false;  // scheduled daily restart for heap recovery
+  bool bTelnetEnabled = true;    // TASK-1644: debug console on port 23 (no login; keys u/i drive the GPIO output)
   uint8_t iRestartHour = 4;     // hour (0-23) for nightly restart
   // Combo board (ADR-127 / ADR-158) persisted hardware-mode selector / override.
   // 0 = auto (boot-detect PIC vs OTDirect + S3 Mini vs S3 Mini Pro, then cache
@@ -775,6 +794,7 @@ struct OTGWSettings {
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   EthernetSection     eth;
 #endif
+  DiagSettingsSection diag;   // TASK-1665 (ADR-213): diagnostic recording flag
 };
 
 OTGWSettings settings;
@@ -814,10 +834,6 @@ inline ComboPinMap comboActivePinMap() {
 #else
   return COMBO_MAP_OTGW32;  // fixed boards: single pin map, value unused
 #endif
-}
-// Retained convenience: is a Classic (PIC) pin map live, either module?
-inline bool comboClassicPinsActive() {
-  return comboActivePinMap() != COMBO_MAP_OTGW32;
 }
 inline int activeI2cSda() {
 #if HAS_RUNTIME_HW_DETECT
@@ -926,6 +942,15 @@ inline bool boardPinReserved(int pin, ComboPinMap map) {
 }
 // [board-pin-reserved:end]
 inline bool isBoardReservedPin(int pin) { return boardPinReserved(pin, comboActivePinMap()); }
+
+// [setting-gpio-range:begin] TASK-1686
+// The GPIO numbers the sensor, S0 and output pin settings accept: the ESP32-S3 has GPIO 0-21 and
+// 26-48 (22-25 do not exist). The 0-16 range came from the ESP8266 and kept the S3 Mini Pro's free
+// holes D6-D8 (GPIO 39/38/37) out of reach. Board pins inside the set stay refused where the pin is
+// used (isBoardReservedPin() in initSensors(), initS0Count() and validateGPIOOutputsConfig()).
+#define SETTING_GPIO_MAX 48
+inline bool settingGpioInRange(int pin) { return pin >= 0 && pin <= SETTING_GPIO_MAX && !(pin >= 22 && pin <= 25); }
+// [setting-gpio-range:end]
 
 //===================[ Global variables — not part of settings or state ]===================
 WiFiClient  wifiClient;

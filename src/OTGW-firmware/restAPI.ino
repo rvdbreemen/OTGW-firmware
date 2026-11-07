@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.79
+**  Version  : v2.0.0-beta.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -68,35 +68,26 @@ static inline uint8_t restEffectiveInflightCap() {
 // buffer + the AsyncWebServer file-response buffer from the heap per concurrent stream;
 // under fragmentation a small FD-struct alloc fails ("esp_littlefs: Unable to allocate
 // FD"), the invalid-source response then hangs, the leaked accept slot drains the 16-slot
-// lwIP PCB pool, and the webserver dies (TASK-879 silent hang). Refuse a new file serve
-// when too many are already building OR the largest free block is too low, returning a
-// cheap 503 instead of pushing another FD alloc into the fragmentation wall. SEPARATE
-// counter from the REST gate (restInFlight) keeps the proven REST path untouched; same
-// heap-tier clamp. Base cap 2 (was 6) per ADR-165's empirical parallelism study: nominal
-// (non-overload) load already produced visible 503s above N=2 on esp32-classic, so a
-// normal single-browser asset burst is deliberately gated below the browser's own
-// HTTP/1.1 per-origin parallel-connection ceiling. async_tcp-task-local (handlers
-// serialize on the one task) -> no atomic. Defined here, not in the header, because
-// platformMaxFreeBlock() is in scope at this point.
+// lwIP PCB pool, and the webserver dies (TASK-879 silent hang). Limit active file
+// streams before allocating their file/buffer state; webSendFile queues ordinary
+// contention in a bounded response-owned FIFO. SEPARATE counter from the REST gate
+// keeps the proven REST path untouched. Base cap 2 per ADR-165, clamped to 1 under
+// fragmentation. All admission, polling and destruction run on async_tcp.
 #ifndef WEB_FILE_MAX_INFLIGHT
 #define WEB_FILE_MAX_INFLIGHT 2
 #endif
 
-// ADR-188 (TASK-1162): web connection cap. Under a request storm the memory is held in
-// the lwIP send queues of connections already admitted, not in new ones, so the in-flight
-// gates above cannot stop it: the RX allocation then fails, no ACK comes in, and the
-// device goes deaf for minutes. Refuse a new request with the cheap 503 while more than
-// WEB_MAX_TX_CONNECTIONS port-80 connections hold or can queue send data. The /ws clients
-// share port 80 and are long-lived, so they are subtracted. The request being admitted is
-// one of the counted connections.
+// ADR-188: cap all possible senders, except identified idle file waiters.
+// A queued candidate reserves one sender before becoming eligible to transmit.
 #ifndef WEB_MAX_TX_CONNECTIONS
 #define WEB_MAX_TX_CONNECTIONS 4
 #endif
-static bool webConnCapExceeded() {
-  const uint16_t held = platformTcpTxHoldingOnPort(WEB_HTTP_PORT);
+static bool webConnCapExceeded(bool report = true, bool reserve = false) {
+  const uint16_t held = WebQueuedFileResponse::txHolding() + (reserve ? 1 : 0);
   const uint16_t ws   = webSocketClientCount();
   const uint16_t http = (held > ws) ? (uint16_t)(held - ws) : 0;
   if (http <= WEB_MAX_TX_CONNECTIONS) return false;
+  if (!report) return true;
   RESTDebugTf(PSTR("WEB CONN CAP: %u connections hold TX (%u ws, cap %u) => 503\r\n"),
               held, ws, (unsigned)WEB_MAX_TX_CONNECTIONS);
   state.heapdiag.iWebConn503Count++;
@@ -104,23 +95,36 @@ static bool webConnCapExceeded() {
 }
 
 static uint8_t webFileInFlight = 0;
+// Silent: a pending response may retry admission on every native response poll.
 bool webFileGateTryAdmit() {
-  if (webConnCapExceeded()) return false;
   uint8_t cap = WEB_FILE_MAX_INFLIGHT;
   const uint32_t mb = platformMaxFreeBlock();
-  if (mb < 16000)      cap = 1;
-  else if (mb < 24000) cap = 2;
-  if (webFileInFlight >= cap) {
-    RESTDebugTf(PSTR("WEBFILE BUSY: %u in-flight (cap %u) => 503 (freeheap=%u maxblock=%u)\r\n"),
-                webFileInFlight, cap, platformFreeHeap(), mb);
-    state.heapdiag.iWebfile503Count++;  // TASK-1017: load-test instrumentation
-    return false;
-  }
+  // TASK-1673: the two-tab dip runs out of total heap (3.7 KB free) while the largest block
+  // is still 12.8 KB, so total free heap also caps the streams at one.
+  if (mb < 16000 || platformFreeHeap() < 24000) cap = 1;
+  else if (mb < 24000 && cap > 2) cap = 2;   // only ever lowers the cap
+  if (webFileInFlight >= cap) return false;
   webFileInFlight++;
   if (webFileInFlight > state.heapdiag.iWebfileInflightHwm) state.heapdiag.iWebfileInflightHwm = webFileInFlight;  // TASK-1017
   return true;
 }
+bool webFileGateCanSend(bool reserve) { return !webConnCapExceeded(false, reserve); }
+void webFileGateRejected() {
+  RESTDebugTf(PSTR("WEBFILE BUSY: pending queue full or wait expired => 503 (freeheap=%u maxblock=%u)\r\n"),
+              platformFreeHeap(), platformMaxFreeBlock());
+  state.heapdiag.iWebfile503Count++;
+}
 void webFileGateRelease() { if (webFileInFlight) webFileInFlight--; }
+uint8_t webFileInFlightNow() { return webFileInFlight; }  // TASK-1673 dip snapshot
+// TASK-1679: runs on async_tcp inside the file response ack wrapper.
+void webAckLowObserve(uint32_t windowMin, uint32_t freeBefore) {
+  state.heapdiag.iAckLowHits++;
+  if (windowMin >= state.heapdiag.iAckLowMin) return;
+  state.heapdiag.iAckLowMin        = windowMin;
+  state.heapdiag.iAckLowFreeBefore = freeBefore;
+  state.heapdiag.iAckLowFiles      = webFileInFlight;
+}
+uint8_t restInFlightNow()    { return restInFlight; }
 void restSlotRelease()    { if (restInFlight) restInFlight--; }
 
 // Zero-allocation HTTP method to string (returns PROGMEM pointer).
@@ -317,6 +321,7 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
 static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleGraph(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);  // TASK-1296
+static void handleDiag(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);   // TASK-1666
 // TASK-585: WiFi network scan
 static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
@@ -549,21 +554,6 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
         je.field(F("mode"),            (int32_t)settings.otd.iMode);
         je.field(F("setback_temp"),    settings.otd.fSetbackTemp);
         je.field(F("setback_timeout"), (int32_t)settings.otd.iSetbackTimeout);
-        // TASK-183: PI room compensation + heating curve
-        je.field(F("ch_mode"),         (int32_t)settings.otd.iCHMode);
-        je.field(F("flow_temp"),       settings.otd.fFlowTemp);
-        je.field(F("flow_max"),        settings.otd.fFlowMax);
-        je.field(F("room_setpoint"),   settings.otd.fRoomSetpoint);
-        je.field(F("gradient"),        settings.otd.fGradient);
-        je.field(F("exponent"),        settings.otd.fExponent);
-        je.field(F("offset"),          settings.otd.fOffset);
-        je.field(F("room_comp"),       settings.otd.bRoomCompEnabled);
-        je.field(F("kp"),              settings.otd.fKp);
-        je.field(F("ki"),              settings.otd.fKi);
-        je.field(F("kboost"),          settings.otd.fKboost);
-        // TASK-582: CH hysteresis deadband
-        je.field(F("hysteresis_enable"), settings.otd.bHysteresisEnable);
-        je.field(F("hysteresis"),        settings.otd.fHysteresis);
         // TASK-584: ventilation override persistence
         je.field(F("vent_enable"),      settings.otd.bVentEnable);
         je.field(F("open_bypass"),      settings.otd.bOpenBypass);
@@ -577,21 +567,6 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
     } else if (method == HTTP_POST || method == HTTP_PUT) {
       if (hasArgCompat("setbacktemp"))    updateSetting("OTDsetbacktemp", argCompat("setbacktemp"));
       if (hasArgCompat("setbacktimeout")) updateSetting("OTDsetbacktimeout", argCompat("setbacktimeout"));
-      // TASK-183: PI room compensation + heating curve settings
-      if (hasArgCompat("chmode"))       updateSetting("OTDchmode", argCompat("chmode"));
-      if (hasArgCompat("flowtemp"))     updateSetting("OTDflowtemp", argCompat("flowtemp"));
-      if (hasArgCompat("flowmax"))      updateSetting("OTDflowmax", argCompat("flowmax"));
-      if (hasArgCompat("roomsetpoint")) updateSetting("OTDroomsetpoint", argCompat("roomsetpoint"));
-      if (hasArgCompat("gradient"))     updateSetting("OTDgradient", argCompat("gradient"));
-      if (hasArgCompat("exponent"))     updateSetting("OTDexponent", argCompat("exponent"));
-      if (hasArgCompat("offset"))       updateSetting("OTDoffset", argCompat("offset"));
-      if (hasArgCompat("roomcomp"))     updateSetting("OTDroomcomp", argCompat("roomcomp"));
-      if (hasArgCompat("kp"))           updateSetting("OTDkp", argCompat("kp"));
-      if (hasArgCompat("ki"))           updateSetting("OTDki", argCompat("ki"));
-      if (hasArgCompat("kboost"))       updateSetting("OTDkboost", argCompat("kboost"));
-      // TASK-582: CH hysteresis deadband settings
-      if (hasArgCompat("hysteresisenable")) updateSetting("OTDhysteresisenable", argCompat("hysteresisenable"));
-      if (hasArgCompat("hysteresis"))       updateSetting("OTDhysteresis", argCompat("hysteresis"));
       // TASK-584: ventilation override persistence settings
       if (hasArgCompat("ventenable"))    updateSetting("OTDventenable", argCompat("ventenable"));
       if (hasArgCompat("openbypass"))    updateSetting("OTDopenbypass", argCompat("openbypass"));
@@ -2135,6 +2110,35 @@ static void handleGraph(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod
   sendApiError(404, F("Unknown graph resource"));
 }
 
+// TASK-1666 (ADR-213 decision 5): /api/v2/diag/recording[/status|/start|/stop]. The download and the
+// status are open (Robert 2026-11-05); start and stop are POST/PUT, so the central mutating-method
+// auth check above already covers them. The download is not in kApiRateLimitRoutes: it is pulled
+// by a host script every few minutes, one at a time, and holds one REST slot until it ends.
+void sendDiagRecordingDownload();
+void sendDiagRecordingStatus();
+void sendDiagRecordingControl(bool start);
+static void handleDiag(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
+{
+  if (wc > 4 && strcasecmp_P(words[4], PSTR("recording")) == 0) {
+    if (wc == 5) {
+      if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+      sendDiagRecordingDownload();
+      return;
+    }
+    if (wc == 6 && strcasecmp_P(words[5], PSTR("status")) == 0) {
+      if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+      sendDiagRecordingStatus();
+      return;
+    }
+    if (wc == 6 && (strcasecmp_P(words[5], PSTR("start")) == 0 || strcasecmp_P(words[5], PSTR("stop")) == 0)) {
+      if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+      sendDiagRecordingControl(strcasecmp_P(words[5], PSTR("start")) == 0);
+      return;
+    }
+  }
+  sendApiNotFound(originalURI);
+}
+
 static void debugFormatLocalIp(char* buf, size_t bufSize)
 {
   IPAddress ip = WiFi.localIP();
@@ -2269,6 +2273,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.dark_theme"), settings.bDarkTheme);
     je.field(F("settings.mydebug"), settings.bMyDEBUG);
     je.field(F("settings.nightly_restart"), settings.bNightlyRestart);
+    je.field(F("settings.telnet_enabled"), settings.bTelnetEnabled);
     je.field(F("settings.restart_hour"), (uint32_t)settings.iRestartHour);
 
     je.field(F("settings.mqtt.enabled"), settings.mqtt.bEnable);
@@ -2357,17 +2362,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.otd.fail_safe"), settings.otd.bFailSafe);
     je.field(F("settings.otd.msg_interval"), (uint32_t)settings.otd.iMsgInterval);
     je.field(F("settings.otd.has_bypass_relay"), settings.otd.bHasBypassRelay);
-    je.field(F("settings.otd.ch_mode"), (uint32_t)settings.otd.iCHMode);
-    je.field(F("settings.otd.flow_temp"), settings.otd.fFlowTemp);
-    je.field(F("settings.otd.flow_max"), settings.otd.fFlowMax);
-    je.field(F("settings.otd.room_setpoint"), settings.otd.fRoomSetpoint);
-    je.field(F("settings.otd.gradient"), settings.otd.fGradient);
-    je.field(F("settings.otd.exponent"), settings.otd.fExponent);
-    je.field(F("settings.otd.offset"), settings.otd.fOffset);
-    je.field(F("settings.otd.room_comp"), settings.otd.bRoomCompEnabled);
-    je.field(F("settings.otd.kp"), settings.otd.fKp);
-    je.field(F("settings.otd.ki"), settings.otd.fKi);
-    je.field(F("settings.otd.kboost"), settings.otd.fKboost);
 #endif
 
     je.field(F("state.mqtt.connected"), snap->st.mqtt.bConnected);
@@ -2600,6 +2594,7 @@ static const char kRouteDebugDump[]  PROGMEM = "debug";
 static const char kRouteGraph[]      PROGMEM = "graph";    // TASK-1296: Monitor graph history
 static const char kRouteNetwork[]    PROGMEM = "network";  // TASK-585
 static const char kRouteMqtt[]       PROGMEM = "mqtt";     // TASK-936: OT-value republish
+static const char kRouteDiag[]       PROGMEM = "diag";     // TASK-1666: diagnostic recording
 
 // Dispatch table placed in PROGMEM so the ~136 B of {segment, handler}
 // rows live in flash, not DRAM. Same pattern as kSatMqttCmds in
@@ -2627,6 +2622,7 @@ static const ApiRoute kV2Routes[] PROGMEM = {
   { kRouteGraph,      handleGraph },    // TASK-1296: GET /api/v2/graph/history
   { kRouteNetwork,    handleNetwork },  // TASK-585: WiFi scan
   { kRouteMqtt,       handleMqtt },     // TASK-936: POST /api/v2/mqtt/republish
+  { kRouteDiag,       handleDiag },     // TASK-1666: /api/v2/diag/recording (appended last: route ids in a recording stay stable)
   { nullptr,          nullptr }  // sentinel
 };
 
@@ -2787,8 +2783,31 @@ static bool checkApiRateLimit(const char words[][API_WORD_LEN], uint8_t wc, HTTP
 }
 
 //=======================================================================
+// TASK-1450: a REST request proves that the LAN carries traffic, so the WiFi dead-link
+// check takes no action while requests arrive. Written on the async_tcp task, read on the
+// loop task: one aligned 32-bit store and load, which the Xtensa core does atomically.
+static volatile uint32_t g_lastRestRequestMs = 0;
+
+bool restRequestWithin(uint32_t ms)
+{
+  const uint32_t last = g_lastRestRequestMs;
+  return last != 0 && (uint32_t)(millis() - last) < ms;
+}
+
+// TASK-1665 (ADR-213): the diagnostic recorder takes non-GET requests only, one record per request that reached
+// its handler. The body is redacted inside diagRecordRestIn().
+static void diagCaptureRest(uint8_t routeIdx, PGM_P segment, HTTPMethod method)
+{
+  if (!diagRec.active) return;
+  if (method != HTTP_POST && method != HTTP_PUT && method != HTTP_PATCH && method != HTTP_DELETE) return;
+  diagRecordRestIn(routeIdx, segment, httpMethodToStr(method), hasArgCompat(F("plain")) ? argCompat(F("plain")) : "");
+}
+
 void processAPI(AsyncWebServerRequest *request)
 {
+  // TASK-1450: first, before the 503 gates: a request that gets a busy reply still crossed the LAN.
+  g_lastRestRequestMs = millis();
+
   // Bind the per-request context. processAPI is reached from the /api route AND
   // the onNotFound catch-all (which already bound it); rebinding is idempotent.
   webBeginRequest(request);
@@ -2798,9 +2817,9 @@ void processAPI(AsyncWebServerRequest *request)
   // abusive concurrency (which otherwise aborts on bad_alloc in addHeader once the
   // chunked responses pile up). The server sends "Connection: close" and closes
   // after every response (no keep-alive), so the request's disconnect callback fires
-  // exactly once. The library keeps ONE such callback per request, so the slot is
-  // armed through webArmSlotRelease(), which also covers a file gate slot that
-  // webSendFile() takes later in the same request (TASK-1172). The diagnostic logs
+  // exactly once. The library keeps ONE such callback per request, so the REST
+  // slot and body cleanup are armed together through webArmSlotRelease().
+  // File responses independently own their file slot. The diagnostic logs
   // the heap at the cap so we can tell transient concurrency from a real leak.
   if (webConnCapExceeded()) {
     sendApiBusy(F("Server busy: too many connections, please retry"));
@@ -2889,6 +2908,7 @@ void processAPI(AsyncWebServerRequest *request)
                           httpMethodToStr(method), originalURI, millis() - startMs);
               return;
             }
+            diagCaptureRest((uint8_t)i, r.segment, method);
             r.handler(words, wc, method, originalURI);
             RESTDebugTf(PSTR("REST %s %s => %d v2/%S %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, r.segment, millis() - startMs);
             return;
@@ -3150,6 +3170,12 @@ struct DeviceInfoSnap {
   char      gateway[16];
   char      dns1[16];
   char      dns2[16];
+  WifiLinkRecord wifiLink;            // TASK-1444: WiFi link record, copied once under its lock
+  uint32_t  wifiDropAgoSec;           // now - wifiLink.iDropStartMs, frozen here (no millis() in the closure)
+  char      wifiApBssid[18];
+  char      wifiDropBssid[18];
+  const char* wifiDropReasonName;     // rodata names from wifiReasonName(), "" before the first drop
+  const char* wifiDropLastReasonName;
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   char      ethSubnet[16];
   char      ethGateway[16];
@@ -3197,6 +3223,23 @@ void sendDeviceInfoV2()
   strlcpy(snap->gateway,   WiFi.gatewayIP().toString().c_str(),   sizeof(snap->gateway));
   strlcpy(snap->dns1,      WiFi.dnsIP(0).toString().c_str(),      sizeof(snap->dns1));
   strlcpy(snap->dns2,      WiFi.dnsIP(1).toString().c_str(),      sizeof(snap->dns2));
+  // TASK-1444: one consistent copy of the WiFi link record (event task writes it).
+  wifiLinkSnapshot(&snap->wifiLink);
+  {
+    const WifiLinkRecord& wl = snap->wifiLink;
+    wifiFormatBssid(snap->wifiApBssid, sizeof(snap->wifiApBssid), wl.joinedBssid);
+    if (wl.bDropValid) {
+      wifiFormatBssid(snap->wifiDropBssid, sizeof(snap->wifiDropBssid), wl.dropBssid);
+      snap->wifiDropAgoSec         = (millis() - wl.iDropStartMs) / 1000;
+      snap->wifiDropReasonName     = wifiReasonName(wl.iDropFirstReason);
+      snap->wifiDropLastReasonName = wifiReasonName(wl.iDropLastReason);
+    } else {
+      snap->wifiDropBssid[0]       = '\0';
+      snap->wifiDropAgoSec         = 0;
+      snap->wifiDropReasonName     = "";
+      snap->wifiDropLastReasonName = "";
+    }
+  }
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   strlcpy(snap->ethSubnet,  Ethernet.subnetMask().toString().c_str(),    sizeof(snap->ethSubnet));
   strlcpy(snap->ethGateway, Ethernet.gatewayIP().toString().c_str(),     sizeof(snap->ethGateway));
@@ -3300,6 +3343,28 @@ void sendDeviceInfoV2()
       je.field(F("wifiquality"), signal_quality_perc_quad(snap->rssi));
       je.field(F("wifiquality_text"), dBmtoQuality(snap->rssi));
     }
+    // WiFi link record (TASK-1444, GH #682): always present, also while wired or in AP
+    // fallback. The drop fields describe the last drop, field or self-caused
+    // (wifi_drop_self); they stay 0, "" or false until the first drop. wifi_outages
+    // counts field outages only.
+    {
+      const WifiLinkRecord& wl = snap->wifiLink;
+      const bool dropped = wl.bDropValid;
+      je.field(F("wifi_ap_bssid"),              snap->wifiApBssid);
+      je.field(F("wifi_ap_channel"),            (uint32_t)wl.iJoinedChannel);
+      je.field(F("wifi_outages"),               (uint32_t)wl.iOutages);
+      je.field(F("wifi_disconnect_events"),     (uint32_t)wl.iDisconnectEvents);
+      je.field(F("wifi_drop_bssid"),            snap->wifiDropBssid);
+      je.field(F("wifi_drop_channel"),          (uint32_t)(dropped ? wl.iDropChannel : 0));
+      je.field(F("wifi_drop_reason"),           (uint32_t)(dropped ? wl.iDropFirstReason : 0));
+      je.field(F("wifi_drop_reason_name"),      snap->wifiDropReasonName);
+      je.field(F("wifi_drop_last_reason"),      (uint32_t)(dropped ? wl.iDropLastReason : 0));
+      je.field(F("wifi_drop_last_reason_name"), snap->wifiDropLastReasonName);
+      je.field(F("wifi_drop_events"),           (uint32_t)(dropped ? wl.iDropEvents : 0));
+      je.field(F("wifi_drop_down_sec"),         (uint32_t)(dropped ? wl.iDropDurationMs / 1000 : 0));
+      je.field(F("wifi_drop_ago_sec"),          snap->wifiDropAgoSec);
+      je.field(F("wifi_drop_self"),             dropped && wl.eDropSelf != WIFI_SELF_NONE);
+    }
 
     // --- Time, NTP & uptime ---
     je.field(F("ntpenable"), settings.ntp.bEnable);
@@ -3368,7 +3433,30 @@ void sendDeviceInfoV2()
     je.field(F("hd_max_loop_gap_ms"),      snap->st.heapdiag.iMaxLoopGapMs);
     je.field(F("hd_rest_inflight_hwm"),    (uint32_t)snap->st.heapdiag.iRestInflightHwm);
     je.field(F("hd_webfile_inflight_hwm"), (uint32_t)snap->st.heapdiag.iWebfileInflightHwm);
+    je.field(F("hd_webfile_queued"),       snap->st.heapdiag.iWebfileQueued);
+    je.field(F("hd_webfile_admitted"),     snap->st.heapdiag.iWebfileAdmitted);
+    je.field(F("hd_webfile_cancelled"),    snap->st.heapdiag.iWebfileCancelled);
+    je.field(F("hd_webfile_timeout"),      snap->st.heapdiag.iWebfileTimeout);
+    je.field(F("hd_webfile_max_wait_ms"),  snap->st.heapdiag.iWebfileMaxWaitMs);
+    je.field(F("hd_webfile_pending"),      (uint32_t)snap->st.heapdiag.iWebfilePending);
+    je.field(F("hd_webfile_pending_hwm"),  (uint32_t)snap->st.heapdiag.iWebfilePendingHwm);
     je.field(F("hd_tcp_active_pcbs"),      (uint32_t)snap->st.heapdiag.iTcpActivePcbs);
+    je.field(F("hd_dip_free_heap"),        snap->st.heapdiag.iDipFreeHeap == 0xFFFFFFFF ? 0u : snap->st.heapdiag.iDipFreeHeap);
+    je.field(F("hd_dip_max_block"),        snap->st.heapdiag.iDipMaxBlock);
+    je.field(F("hd_dip_tx_bytes"),         snap->st.heapdiag.iDipTxBytes);
+    je.field(F("hd_dip_tx_pcbs"),          (uint32_t)snap->st.heapdiag.iDipTxPcbs);
+    je.field(F("hd_dip_active_pcbs"),      (uint32_t)snap->st.heapdiag.iDipActivePcbs);
+    je.field(F("hd_dip_timewait_pcbs"),    (uint32_t)snap->st.heapdiag.iDipTimeWaitPcbs);
+    je.field(F("hd_dip_files"),            (uint32_t)snap->st.heapdiag.iDipFiles);
+    je.field(F("hd_dip_rest"),             (uint32_t)snap->st.heapdiag.iDipRest);
+    je.field(F("hd_dip_ws"),               (uint32_t)snap->st.heapdiag.iDipWs);
+    je.field(F("hd_dip_mqtt_queue"),       (uint32_t)snap->st.heapdiag.iDipMqttQueue);
+    je.field(F("hd_dip_mqtt_tx_bytes"),    (uint32_t)snap->st.heapdiag.iDipMqttTxBytes);
+    je.field(F("hd_mqtt_queue_hwm"),       (uint32_t)snap->st.heapdiag.iMqttQueueHwm);
+    je.field(F("hd_ack_low_min"),          snap->st.heapdiag.iAckLowMin == 0xFFFFFFFF ? 0u : snap->st.heapdiag.iAckLowMin);
+    je.field(F("hd_ack_low_free_before"),  snap->st.heapdiag.iAckLowFreeBefore);
+    je.field(F("hd_ack_low_hits"),         snap->st.heapdiag.iAckLowHits);
+    je.field(F("hd_ack_low_files"),        (uint32_t)snap->st.heapdiag.iAckLowFiles);
     je.field(F("hd_rest_503"),             snap->st.heapdiag.iRest503Count);
     je.field(F("hd_webfile_503"),          snap->st.heapdiag.iWebfile503Count);
     je.field(F("hd_webconn_503"),          snap->st.heapdiag.iWebConn503Count);
@@ -3591,6 +3679,141 @@ void sendDeviceCoreDump()
 
 
 //=======================================================================
+// TASK-1666 (ADR-213 decision 5): diagnostic recording routes.
+//
+// {"recording":{"state":"recording|stopped|refused","enabled":b,"active":b,"reason":"","psram":b,
+//   "block_size":4096,"ring_blocks":n,"ring_bytes":n,"has_data":b,"oldest_seq":n,"newest_seq":n,
+//   "dropped":n,"exact":b}}
+// enabled = the persisted DiagRecordingOn flag (resumes at boot); active = a ring is being written;
+// reason is set when the last start was refused; oldest/newest_seq are 0 while has_data is false;
+// exact is false when the recorder lock was busy and the numbers were read without it.
+static void diagEmitStatus(JsonEmit& je)
+{
+  DiagStatus s;
+  diagStatusSnapshot(diagRec, s);
+  const bool refused = !s.active && s.lastStart != DIAG_START_OK && s.lastStart != DIAG_START_ALREADY;
+  je.beginObject(F("recording"));
+  je.field(F("state"),       s.active ? "recording" : (refused ? "refused" : "stopped"));
+  je.field(F("enabled"),     settings.diag.bRecordingOn);
+  je.field(F("active"),      s.active);
+  je.field(F("reason"),      refused ? diagStartReasonText(s.lastStart) : "");
+  je.field(F("psram"),       s.psram);
+  je.field(F("block_size"),  (uint32_t)DIAG_REC_BLOCK_SIZE);
+  je.field(F("ring_blocks"), s.ringBlocks);
+  je.field(F("ring_bytes"),  s.ringBytes);
+  je.field(F("has_data"),    s.hasData);
+  je.field(F("oldest_seq"),  s.oldest);
+  je.field(F("newest_seq"),  s.newest);
+  je.field(F("dropped"),     s.dropped);
+  je.field(F("exact"),       s.exact);
+  je.endObject();
+}
+
+void sendDiagRecordingStatus()
+{
+  sendCorsOriginHeader();
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();
+    diagEmitStatus(je);
+    je.endObject();
+  }
+  restFinalize();
+}
+
+// POST/PUT /api/v2/diag/recording/start|stop -> {"ok":b,"result":"started|already_running|refused|stopped|lock_busy",
+// "reason":"","recording":{...status...}}. A refused start is HTTP 200 with ok:false: the refusal is
+// a normal answer of the start rule (free heap below 5120 B), not a request error.
+void sendDiagRecordingControl(bool start)
+{
+  bool ok;
+  const char* result;
+  const char* reason = "";
+  if (start) {
+    const DiagStartResult r = diagRecorderStart();
+    ok = (r == DIAG_START_OK || r == DIAG_START_ALREADY);
+    result = (r == DIAG_START_OK) ? "started" : (r == DIAG_START_ALREADY) ? "already_running" : "refused";
+    if (!ok) reason = diagStartReasonText(r);
+  } else {
+    ok = diagRecorderStop();
+    result = ok ? "stopped" : "lock_busy";
+  }
+  sendCorsOriginHeader();
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();
+    je.field(F("ok"),     ok);
+    je.field(F("result"), result);
+    je.field(F("reason"), reason);
+    diagEmitStatus(je);
+    je.endObject();
+  }
+  restFinalize();
+}
+
+// GET /api/v2/diag/recording?since=<block_seq>: application/octet-stream, the file header
+// (diagRecorderStuff.h) then every block with block_seq > since (all of them without since).
+// The block range is fixed by diagDownloadRange() before the response starts; the filler copies one
+// chunk per call under the recorder try-lock and asks the server to retry when the lock is busy, so
+// async_tcp never waits. No ring-sized copy exists: only the 640 B header snapshot is on the heap.
+// A recorder that is stopped or empty gives a valid file with block count 0.
+void sendDiagRecordingDownload()
+{
+  if (!currentRequest || g_responseSent) return;
+  bool hasSince = false;
+  uint32_t since = 0;
+  if (hasArgCompat("since")) {
+    const char* sv = argCompat("since");
+    char* end = nullptr;
+    const unsigned long v = strtoul(sv, &end, 10);
+    if (sv[0] == '\0' || sv[0] == '-' || *end != '\0' || v > 0xFFFFFFFEul) {
+      sendApiError(400, F("since must be a block sequence number"));
+      return;
+    }
+    hasSince = true;
+    since = (uint32_t)v;
+  }
+  if (platformMaxFreeBlock() < 8192) { sendApiBusy(F("low heap")); return; }
+
+  auto dl = std::make_shared<DiagDownload>();
+  if (!diagDownloadRange(diagRec, *dl, hasSince, since)) { sendApiBusy(F("recorder busy")); return; }
+
+  DiagHdrWriter w(*dl);
+  diagDownloadHeaderBegin(w, *dl, diagRec, (uint32_t)state.uptime.iRebootCount, diagRec.memIsPsram,
+                          _SEMVER_FULL, _VERSION_GITHASH);
+  uint8_t nRoutes = 0;
+  for (;; nRoutes++) {
+    ApiRoute rt;
+    memcpy_P(&rt, &kV2Routes[nRoutes], sizeof(ApiRoute));
+    if (rt.segment == nullptr) break;
+  }
+  w.u8(nRoutes);
+  for (uint8_t i = 0; i < nRoutes; i++) {
+    ApiRoute rt;
+    memcpy_P(&rt, &kV2Routes[i], sizeof(ApiRoute));
+    char nm[API_WORD_LEN];
+    strlcpy_P(nm, rt.segment, sizeof(nm));
+    w.str(nm);
+  }
+  if (!diagDownloadHeaderEnd(w, *dl)) { sendApiError(500, F("recording header too large")); return; }
+
+  sendCorsOriginHeader();
+  webPushHeader(F("Content-Disposition"), F("attachment; filename=\"otgw-recording.bin\""));
+  webPushHeader(F("Cache-Control"), F("no-store"));
+  AsyncWebServerResponse* resp = currentRequest->beginResponse(
+      String(F("application/octet-stream")), dl->totalBytes(),
+      [dl](uint8_t* buf, size_t maxLen, size_t index) -> size_t {
+        return diagDownloadFill(diagRec, *dl, buf, maxLen, index);   // DIAG_FILL_TRY_AGAIN when the lock is busy
+      });
+  if (!resp) { sendApiBusy(F("low heap")); return; }
+  webApplyHeaders(resp);
+  currentRequest->send(resp);
+  g_responseSent = true;
+}
+
+//=======================================================================
 // GET /api/v2/pic/settings
 // Returns the cached PIC settings last queried via PR= commands.
 // Triggers a new readout cycle (one PR= every 3s, ~45s full cycle).
@@ -3674,8 +3897,6 @@ void sendOTDirectStatus()
       dtostrf(getFlameRatioFreq(), 1, 1, freqBuf);
       je.field(F("flame_cycles_per_hour"), freqBuf);  // kept as a quoted string (dtostrf output)
     }
-    // TASK-582: CH hysteresis suspension state
-    je.field(F("ch_suspended"), state.otd.bCHSuspended);
     je.endObject();                       // close "otdirect_status"
     je.endObject();                       // close root
   }
@@ -3950,6 +4171,7 @@ void sendDeviceSettings()
   addBool(F("ledblink"), settings.bLEDblink, "b");
   addBool(F("darktheme"), settings.bDarkTheme, "b");
   addBool(F("nightlyrestart"), settings.bNightlyRestart, "b");
+  addBool(F("telnetenabled"), settings.bTelnetEnabled, "b");   // TASK-1644
   addInt(F("nightlyrestarthour"), (int)settings.iRestartHour, "i", 0, 23);
 #if HAS_RUNTIME_HW_DETECT
   // ADR-127/157 combo: persisted hardware-mode selector
@@ -3960,15 +4182,15 @@ void sendDeviceSettings()
   addBool(F("sat_onboarded"), settings.ui.bSatOnboarded, "b");   // TASK-1012: SAT onboarding wizard persist flag
   addBool(F("gpiosensorsenabled"), settings.sensors.bEnabled, "b");
   addBool(F("gpiosensorslegacyformat"), settings.sensors.bLegacyFormat, "b");
-  addInt(F("gpiosensorspin"), settings.sensors.iPin, "i", 0, 16);
+  addInt(F("gpiosensorspin"), settings.sensors.iPin, "i", 0, SETTING_GPIO_MAX);   // TASK-1686
   addInt(F("gpiosensorsinterval"), settings.sensors.iInterval, "i", 5, 65535);
   addBool(F("s0counterenabled"), settings.s0.bEnabled, "b");
-  addInt(F("s0counterpin"), settings.s0.iPin, "i", 1, 16);
+  addInt(F("s0counterpin"), settings.s0.iPin, "i", 1, SETTING_GPIO_MAX);         // TASK-1686
   addInt(F("s0counterdebouncetime"), settings.s0.iDebounceTime, "i", 0, 1000);
   addInt(F("s0counterpulsekw"), settings.s0.iPulsekw, "i", 1, 5000);
   addInt(F("s0counterinterval"), settings.s0.iInterval, "i", 5, 65535);
   addBool(F("gpiooutputsenabled"), settings.outputs.bEnabled, "b");
-  addInt(F("gpiooutputspin"), settings.outputs.iPin, "i", 0, 16);
+  addInt(F("gpiooutputspin"), settings.outputs.iPin, "i", 0, SETTING_GPIO_MAX);  // TASK-1686
   addInt(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 15);
   addBool(F("otgwcommandenable"), settings.picBoot.bEnable, "b");
   addStr(F("otgwcommands"), CSTR(settings.picBoot.sCommands), "s", 128);
@@ -4181,24 +4403,6 @@ void sendDeviceSettings()
   addBool(F("otdfailsafe"), settings.otd.bFailSafe, "b");
   addInt(F("otdmsginterval"), settings.otd.iMsgInterval, "i", 100, 1275);
   addBool(F("otdhasbypassrelay"), settings.otd.bHasBypassRelay, "b");
-  // --- OT-Direct PI room-comp + heating curve (TASK-183), newly exposed (TASK-933 P2) ---
-  addInt(F("otdchmode"), settings.otd.iCHMode, "i", 0, 2);   // 0=off,1=fixed,2=curve; ENUM_OPTS in v2.js
-  {
-    char tmpBuf[8];
-    dtostrf(settings.otd.fFlowTemp,     1, 1, tmpBuf); addNum(F("otdflowtemp"),     tmpBuf, "f", 5, 90);
-    dtostrf(settings.otd.fFlowMax,      1, 1, tmpBuf); addNum(F("otdflowmax"),      tmpBuf, "f", 20, 90);
-    dtostrf(settings.otd.fRoomSetpoint, 1, 1, tmpBuf); addNum(F("otdroomsetpoint"), tmpBuf, "f", 5, 30);
-    dtostrf(settings.otd.fGradient,     1, 2, tmpBuf); addNum(F("otdgradient"),     tmpBuf, "f", 0, 5);
-    dtostrf(settings.otd.fExponent,     1, 2, tmpBuf); addNum(F("otdexponent"),     tmpBuf, "f", 0, 2);
-    dtostrf(settings.otd.fOffset,       1, 1, tmpBuf); addNum(F("otdoffset"),       tmpBuf, "f", -10, 10);
-    dtostrf(settings.otd.fKp,           1, 2, tmpBuf); addNum(F("otdkp"),           tmpBuf, "f", 0, 20);
-    dtostrf(settings.otd.fKi,           1, 2, tmpBuf); addNum(F("otdki"),           tmpBuf, "f", 0, 5);
-    dtostrf(settings.otd.fKboost,       1, 2, tmpBuf); addNum(F("otdkboost"),       tmpBuf, "f", 0, 10);
-    dtostrf(settings.otd.fHysteresis,   1, 2, tmpBuf); addNum(F("otdhysteresis"),   tmpBuf, "f", 0, 2);
-  }
-  addBool(F("otdroomcomp"),         settings.otd.bRoomCompEnabled, "b");
-  // --- OT-Direct CH hysteresis (TASK-582) ---
-  addBool(F("otdhysteresisenable"), settings.otd.bHysteresisEnable, "b");
   // --- OT-Direct ventilation override (TASK-584) ---
   addBool(F("otdventenable"),       settings.otd.bVentEnable, "b");
   addBool(F("otdopenbypass"),       settings.otd.bOpenBypass, "b");
@@ -4229,6 +4433,7 @@ void sendDeviceSettings()
   addStr(F("wifigateway"),  CSTR(settings.wifi.sGateway),  "s", 15);
   addStr(F("wifidns1"),     CSTR(settings.wifi.sDns1),     "s", 15);
   addStr(F("wifidns2"),     CSTR(settings.wifi.sDns2),     "s", 15);
+  addBool(F("wifinoportal"), settings.wifi.bNoPortal, "b");   // TASK-1645
   char httpPasswordPlaceholder[sizeof("password=40")];
   snprintf_P(httpPasswordPlaceholder,
              sizeof(httpPasswordPlaceholder),
@@ -4262,16 +4467,14 @@ static const char* const PROGMEM knownSettings[] = {
 #endif
   "gpiooutputsenabled", "gpiooutputspin", "gpiooutputstriggerbit",
   "gpiosensorsenabled", "gpiosensorsinterval", "gpiosensorslegacyformat", "gpiosensorspin",
-  "hostname", "httppasswd", "ledblink", "nightlyrestart", "nightlyrestarthour",
+  "hostname", "httppasswd", "ledblink", "nightlyrestart", "nightlyrestarthour", "telnetenabled",
   "mqttbroker", "mqttbrokerport", "mqttenable", "mqtthaprefix", "mqttharebootdetection",
   "mqttinterval", "mqttonchangepublishing", "mqttotmessage", "mqttpasswd", "mqttseparatesources", "legacyport25238enabled",
   "mqtttoptopic", "mqttuniqueid", "mqttuselegacyottopics", "mqttuser",  // TASK-1254: + mqttuselegacyottopics
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
-  "otdautobypass", "otdautodetect", "otdchmode", "otdenableslave", "otdexponent",
-  "otdfailsafe", "otdflowmax", "otdflowtemp", "otdfreeventenable", "otdgradient",
-  "otdhasbypassrelay", "otdhysteresis", "otdhysteresisenable", "otdkboost", "otdki",
-  "otdkp", "otdmode", "otdmsginterval", "otdoffset", "otdopenbypass", "otdroomcomp",
-  "otdroomsetpoint", "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
+  "otdautobypass", "otdautodetect", "otdenableslave", "otdfailsafe", "otdfreeventenable",
+  "otdhasbypassrelay", "otdmode", "otdmsginterval", "otdopenbypass",
+  "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
   "otdventenable", "otdventsetpoint",
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
@@ -4306,7 +4509,7 @@ static const char* const PROGMEM knownSettings[] = {
   "ui_onboarded",
   "webhookcontenttype", "webhookenable", "webhookenabled",
   "webhookpayload", "webhooktriggerbit", "webhookurloff", "webhookurlon",
-  "wifidns1", "wifidns2", "wifigateway", "wifistaticip", "wifisubnet",
+  "wifidns1", "wifidns2", "wifigateway", "wifinoportal", "wifistaticip", "wifisubnet",
 };
 
 static bool isKnownSetting(const char* field) {

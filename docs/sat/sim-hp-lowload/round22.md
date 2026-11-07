@@ -5,7 +5,7 @@ between the heat pump and the boiler takes the heat pump's CS as its requested s
 (continuous until the overshoot switch, then gas PWM), because "when Elga stops heating and instructs the gas boiler to
 run, gas boilers cycling like hell". This round models that backup.
 
-Script `scripts/sat_hp_hybrid_backup_study22.py` (uses the round 21 library and SAT port); results
+Script `tools/research/sat/sat_hp_hybrid_backup_study22.py` (uses the round 21 library and SAT port); results
 `round22_hybrid_backup_runs.json` (240 runs: 4 hybrids x 3 houses x 2 modes x 10 seasons 2015-16 .. 2024-25).
 
 ## Model

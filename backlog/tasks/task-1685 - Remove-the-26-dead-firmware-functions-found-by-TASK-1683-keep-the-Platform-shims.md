@@ -1,0 +1,55 @@
+---
+id: TASK-1685
+title: >-
+  Remove the 26 dead firmware functions found by TASK-1683 (keep the Platform
+  shims)
+status: Done
+assignee:
+  - '@claude'
+created_date: '2026-11-07T09:28:00Z'
+updated_date: '2026-11-07T11:20:00Z'
+labels:
+  - cleanup
+  - firmware
+dependencies: []
+priority: low
+ordinal: 806000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Robert 2026-11-07 chose: remove the dead firmware functions, keep platformWiFiClientSetSync and platformTaskExit (Platform API). List and evidence in TASK-1683 notes: 23 zero-use functions (all absent from the beta.119 elf) plus 3 transitive (formatBytes, restSendP, restFlushContent). Also drop the lifted bleMatchesConfiguredMAC copy and its cases from tests/test_ble_parsers.cpp. Start only after the coordinator's 'beta.118 tag out' (build freeze).
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [x] #1 The 26 functions and their prototypes are removed; platformWiFiClientSetSync and platformTaskExit stay
+- [x] #2 The lifted bleMatchesConfiguredMAC copy in tests/test_ble_parsers.cpp is removed; python scripts/run_tests.py passes
+- [x] #3 esp32-combo build succeeds with its own prerelease bump; the app image is the same size or smaller than beta.119's
+- [x] #4 evaluate.py --quick shows no new FAIL; an OTA bench flash boots and serves the web UI and MQTT
+<!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Work in own lane wt-1685 (branch lane-1685 from origin/dev 80b304f; the main dev tree had another session's build churn). Removed 23 zero-use + 3 transitive functions, their prototypes, the empty MQTTHA_PGM_HELPERS_DEFINED guard and five comments that named removed code (sendMQTTData now named as the heap-gate owner, restFinalize as the stream sender). Platform shims kept. tests/test_ble_parsers.cpp: lifted bleMatchesConfiguredMAC, its strcasecmp shim, the g_sBleMAC mock, cases 11-12 and the now-unused <cctype> removed. Net: 12 firmware files + 1 test, about 300 lines removed. Prerelease bump beta.119 -> beta.120.
+
+Removal-script bug caught in review: the first brace counter counted braces inside string literals and swallowed the live sendJsonMapEntry overloads with sendStartJsonMap; reverted, fixed (string/comment aware, prints every span), re-run, diff reviewed hunk by hunk (logged as bug in .wolf/buglog.json). No reference to any removed name is left in src/ or tests/ (git grep; only the separate JS formatBytes in HTML pages and a past-tense comment in restAPI.ino).
+
+Evidence: evaluate.py --quick 84 passed, 0 warn, 0 fail. scripts/run_tests.py -j4: 170 files, 159 passed, 8 failed, 2 timeouts. The 5 genuine failures (test_adr_governance ADR-216 index, test_sat_corrections_index, test_static_integrity CLI, test_boiler_unsupported_origin, test_local_frame_consumers) fail identically on clean origin/dev (stash run: 0/5 passed); 3 more are environment (WinError 225 Defender on test_otd_status_relay / test_sat_requested_vs_transmitted, no host C++ compiler for test_web_file_scheduling). Timeouts rerun alone: test_dhw_water_meter PASS (670 s); test_sat_lowload_contract LL-021 error + LL-023 fail, baseline run on clean origin/dev in progress.
+
+test_sat_lowload_contract baseline on a clean origin/dev worktree: LL-010 fail, LL-021 error, LL-023 fail (624 s). Lane: LL-021 error, LL-023 fail, LL-010 pass. No new failure from the removal. Remaining: AC3 build + image size vs beta.119 and AC4 OTA bench, both after the coordinator's 'beta.118 tag out'; then rebase onto origin/dev and push via the lead.
+
+AC3: ./build.bat (esp32-combo, OTGW_BUILD_JOBS=4, commit charge 82%) succeeded: OTGW-firmware-esp32-combo-2.0.0-beta.120+8fad93a. App image 2,124,320 bytes vs beta.119+35f2cfd 2,124,352 bytes (-32 B; the removed code was already dropped by gc-sections, so only a tiny difference was expected). origin/dev was still 80b304f, no rebase needed.
+
+AC4 bench (.61, slot from 6b): scripts/ota_flash.py --app beta.120+8fad93a --no-fs over safeboot: 'Update OK', running 2.0.0-beta.120+8fad93a, settings 177 keys changed: none. Checks: / 200 (170,522 B gzipped page), /api/v2/device/info 200, /api/v2/otgw/otmonitor 200, /api/v2/settings 200, /api/listfiles 200, /api/firmwarefilelist 200, /FSexplorer.html 200, /api/v2/health 200 (/v2.js 404 is expected since ADR-215), crashlog available:false. 5 min soak: uptime 1 -> 6 min without reboot, mqttconnected true every 30 s, freeheap 70,516-72,336 B, 339 MQTT messages from otgw-1020BA21B4F8 (.61) on the bench broker 192.168.88.32.
+
+Pushed to origin/dev 3d7590fa5 (fast-forward from 80b304f, OK from lead 6b). Post-build from that HEAD: OTGW-firmware-esp32-combo-2.0.0-beta.120+3d7590f-flash.zip, posted by discord-post-build.sh (#alpha-testing msg 1568585882246578217); tag details sent to coordinator 54 for the ledger.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1-AC4 done. 26 dead firmware functions removed (Platform shims kept) plus the self-testing lifted copy in tests/test_ble_parsers.cpp; no reference left. evaluate --quick 0 FAIL; host test failures identical to a clean origin/dev baseline (stash run and a baseline worktree for test_sat_lowload_contract). esp32-combo beta.120 image 2,124,320 B vs beta.119 2,124,352 B. Bench .61 OTA: settings unchanged, all checked routes 200, 5 min soak without reboot, MQTT connected with 339 messages. Pushed as 3d7590f and posted to #alpha-testing.
+<!-- SECTION:FINAL_SUMMARY:END -->

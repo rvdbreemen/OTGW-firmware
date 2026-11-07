@@ -4,7 +4,7 @@ Date 2026-10-31. Trigger: maarten_41762 (#alpha-testing msg 1566089657492705431)
 underfloor heating, well-insulated home with much internal mass; a 3-hour PWM period gives longer runs, few starts
 and a stable room. Robert: for heat pumps the goal is the fewest starts with maximum comfort.
 
-Script `scripts/sat_hp_onoff_study12.py`, data `round12_hp_onoff_runs.json` (540 winters: 30 variants x 3 houses
+Script `tools/research/sat/sat_hp_onoff_study12.py`, data `round12_hp_onoff_runs.json` (540 winters: 30 variants x 3 houses
 (1992-2012, 2015, BENG, all heavy) x 2 seeds x 3 winters (2010-11 cold, 2013-14 mild, 2025-26)). Model assumptions
 (not validated against any heat pump): on/off at full power sized for -10 C; screed 8 MJ/K as the emitter node,
 emission exponent 1.1, curve base 20 C (`SATcontrol.ino:127`), max flow 40 C (entry 155), COP 0.5 x Carnot from a

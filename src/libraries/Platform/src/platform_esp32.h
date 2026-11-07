@@ -37,6 +37,9 @@
 #include <lwip/priv/tcp_priv.h>  // tcp_active_pcbs (platformTcpActivePcbCount)
 #include <lwip/tcpip.h>          // LOCK_TCPIP_CORE/UNLOCK_TCPIP_CORE (platformTcpActivePcbCount)
 #include <lwip/netdb.h>          // lwip_getaddrinfo (platformResolveHost, TASK-1605)
+#include <lwip/raw.h>            // raw ICMP pcb (platformGatewayProbe*, TASK-1450)
+#include <lwip/prot/icmp.h>      // icmp_echo_hdr, ICMP_ECHO/ICMP_ER (platformGatewayProbe*)
+#include <lwip/inet_chksum.h>    // inet_chksum (platformGatewayProbeSend)
 
 // ---- ADR-123 async/FreeRTOS stack (TASK-865.4) ---------------------------
 // Foundation headers for the 2.0.0 ESP32-S3 event-driven migration. Included
@@ -142,6 +145,20 @@ inline void platformWifiPreferStrongestAp() {
     cfg.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
     esp_wifi_set_config(WIFI_IF_STA, &cfg);
   }
+}
+
+// TASK-1450: IPv4 default gateway of the WiFi station, in lwIP byte order (the order
+// ip4_addr_set_u32() takes); 0 when there is none (static IP without a gateway).
+inline uint32_t platformWifiGatewayV4() {
+  return static_cast<uint32_t>(WiFi.gatewayIP());
+}
+
+// TASK-1450: drop the WiFi association without touching the stored credentials (eraseap
+// false), and without the 100 ms wait of the default disconnect(). The driver reports
+// reason ASSOC_LEAVE, for which arduino-esp32 3.3.5 skips its own auto-reconnect
+// (STA.cpp:151), so loopWifi() sees the drop and reconnects through WiFi.begin().
+inline void platformWifiForceReconnect() {
+  WiFi.disconnect(false, false, 0);
 }
 
 // LittleFS info (ESP32: construct from totalBytes/usedBytes)
@@ -299,6 +316,9 @@ inline uint8_t platformHeapFragmentation() {
 inline uint32_t& platformHeapWinBootMin() { static uint32_t v = 0xFFFFFFFFu; return v; }
 inline volatile bool& platformHeapWinActiveRef() { static volatile bool a = false; return a; }
 inline bool platformHeapWindowActive() { return platformHeapWinActiveRef(); }
+// TASK-1679: bumped on every window (re)start, so a reader can tell a real drop of the
+// window minimum from a restart by another task between two reads.
+inline volatile uint32_t& platformHeapWinGen() { static volatile uint32_t g = 0; return g; }
 
 // Minimum free internal heap since the window started (0 when no window is open).
 inline uint32_t platformHeapWindowMin() {
@@ -328,6 +348,7 @@ inline bool platformHeapWindowStart() {
   // Mark active before the start, clear it after the stop: a reader on another
   // task then always sees min(bootMin, native), which is never too high.
   platformHeapWinActiveRef() = true;
+  platformHeapWinGen() = platformHeapWinGen() + 1;
   if (wasActive) heap_caps_monitor_local_minimum_free_size_stop();
   if (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) < 256 ||
       heap_caps_monitor_local_minimum_free_size_start() != ESP_OK) {
@@ -357,6 +378,11 @@ inline void* platformPsramAllocOnce(size_t bytes) {
   return heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 }
 
+// True when the board has PSRAM (TASK-1665: the diagnostic recorder picks its ring size by it).
+inline bool platformHasPsram() {
+  return psramFound();
+}
+
 // No-op on ESP32: the heap allocator tracks min-free internally.
 inline void platformUpdateMinFreeHeap() {
   // intentionally empty
@@ -374,6 +400,52 @@ inline void platformUpdateMinFreeHeap() {
 // hot path, since a live per-response walk would (a) break the REST chunked
 // emit's determinism contract (byte-identical JSON across re-run windows,
 // see DeviceInfoSnap) and (b) add lock contention to the async_tcp task.
+// TASK-1673: cap how much a web connection may queue in lwIP. snd_buf is a running credit:
+// lwIP adds back only the bytes the peer acknowledges, so lowering it once before anything is
+// queued caps that connection for its whole life. Never below the library's response copy
+// buffer (MSS x 2): its ack path defers while that buffer does not fit in the free credit.
+inline void platformTcpCapSendBuffer(struct tcp_pcb* pcb, uint16_t cap) {
+  if (pcb == nullptr) return;
+  LOCK_TCPIP_CORE();
+  if (pcb->unsent == nullptr && pcb->unacked == nullptr && pcb->snd_buf > cap) pcb->snd_buf = cap;
+  UNLOCK_TCPIP_CORE();
+}
+
+// TASK-1673: who holds TCP memory at a heap dip. Under the core lock: active pcbs, pcbs on
+// localPort with unsent or unacked data, the bytes queued in their unsent and unacked segments and
+// the TIME_WAIT pcbs. Called only when the loop task sees a new free-heap minimum.
+struct PlatformTcpHoldSnapshot { uint16_t active, txPcbs, timeWait; uint32_t txBytes; };
+inline PlatformTcpHoldSnapshot platformTcpHoldSnapshot(uint16_t localPort) {
+  PlatformTcpHoldSnapshot s = {0, 0, 0, 0};
+  LOCK_TCPIP_CORE();
+  for (struct tcp_pcb *pcb = tcp_active_pcbs; pcb != nullptr; pcb = pcb->next) {
+    s.active++;
+    if (pcb->local_port == localPort && (pcb->unsent != nullptr || pcb->unacked != nullptr)) {
+      s.txPcbs++;
+      // Sum the queued segments: TCP_SND_BUF - snd_buf overstates once snd_buf was capped.
+      for (struct tcp_seg *seg = pcb->unsent; seg != nullptr; seg = seg->next) s.txBytes += seg->len;
+      for (struct tcp_seg *seg = pcb->unacked; seg != nullptr; seg = seg->next) s.txBytes += seg->len;
+    }
+  }
+  for (struct tcp_pcb *pcb = tcp_tw_pcbs; pcb != nullptr; pcb = pcb->next) s.timeWait++;
+  UNLOCK_TCPIP_CORE();
+  return s;
+}
+
+// TASK-1679: bytes queued in unsent and unacked segments on the active pcbs whose remote port is
+// remotePort (the MQTT broker connection), under the core lock.
+inline uint32_t platformTcpTxBytesToRemotePort(uint16_t remotePort) {
+  uint32_t bytes = 0;
+  LOCK_TCPIP_CORE();
+  for (struct tcp_pcb *pcb = tcp_active_pcbs; pcb != nullptr; pcb = pcb->next) {
+    if (pcb->remote_port != remotePort) continue;
+    for (struct tcp_seg *seg = pcb->unsent; seg != nullptr; seg = seg->next) bytes += seg->len;
+    for (struct tcp_seg *seg = pcb->unacked; seg != nullptr; seg = seg->next) bytes += seg->len;
+  }
+  UNLOCK_TCPIP_CORE();
+  return bytes;
+}
+
 inline uint16_t platformTcpActivePcbCount() {
   uint16_t count = 0;
   LOCK_TCPIP_CORE();
@@ -384,20 +456,26 @@ inline uint16_t platformTcpActivePcbCount() {
   return count;
 }
 
-// TASK-1162 / ADR-188: count the TCP connections on one local port that hold or can
-// still queue send data: ESTABLISHED, or any other active state with unsent/unacked
-// segments (a closing connection whose queue is still draining pins that memory; one
-// with empty queues pins nothing). Called per request from the web admission gates on
-// the async_tcp task, unlike platformTcpActivePcbCount() above: the walk is short (at
-// most CONFIG_LWIP_MAX_ACTIVE_TCP pcbs) and the per-request LOCK_TCPIP_CORE() was run
-// through 12 storm runs on the bench (TASK-1162) without a stall. The caller's own
-// connection is ESTABLISHED and is part of the count.
-inline uint16_t platformTcpTxHoldingOnPort(uint16_t localPort) {
+// Only response-owned waiters are excluded, matching both the live PCB and its
+// AsyncTCP owner under the core lock; address reuse cannot hide another sender.
+struct PlatformTcpIdleConnection {
+  const tcp_pcb* pcb;
+  const void* owner;
+};
+inline uint16_t platformTcpTxHoldingOnPort(uint16_t localPort,
+                                         const PlatformTcpIdleConnection* idle,
+                                         uint8_t idleCount) {
   uint16_t count = 0;
   LOCK_TCPIP_CORE();
   for (struct tcp_pcb *pcb = tcp_active_pcbs; pcb != nullptr; pcb = pcb->next) {
     if (pcb->local_port != localPort) continue;
-    if (pcb->state == ESTABLISHED || pcb->unsent != nullptr || pcb->unacked != nullptr) count++;
+    if (pcb->unsent != nullptr || pcb->unacked != nullptr) { count++; continue; }
+    if (pcb->state != ESTABLISHED) continue;
+    bool waiting = false;
+    for (uint8_t i = 0; i < idleCount; ++i) {
+      if (pcb == idle[i].pcb && pcb->callback_arg == idle[i].owner) { waiting = true; break; }
+    }
+    if (!waiting) count++;
   }
   UNLOCK_TCPIP_CORE();
   return count;
@@ -444,6 +522,124 @@ inline bool platformResolveHost(const char *name, IPAddress &out) {
   lwip_freeaddrinfo(res);
   return static_cast<uint32_t>(out) != 0;
 }
+
+// TASK-1450 probe begin
+// ICMP echo probe of the WiFi default gateway (dead-link check in networkStuff.ino).
+// One raw ICMP pcb that exists only while a probe runs (Begin .. End, about 6 s).
+//
+// Thread safety: this build has CONFIG_LWIP_TCPIP_CORE_LOCKING=y and
+// CONFIG_LWIP_CHECK_THREAD_SAFETY=y, so raw_new/raw_recv/raw_sendto/raw_remove assert that
+// the caller holds the core lock (raw.c LWIP_ASSERT_CORE_LOCKED). Every lwIP call below runs
+// between LOCK_TCPIP_CORE() and UNLOCK_TCPIP_CORE(). The lock is not recursive: call these
+// only from the loop task, never with the lock held.
+//
+// The receive callback runs on the tcpip task, which holds the core lock while it processes
+// input (ip4_input asserts it, ip4.c:504). It only reads the packet and sets a bit in
+// replyMask: no logging, no allocation, no Arduino call. It never eats a packet (returns 0),
+// so every ICMP packet, our own echo replies included, still reaches lwIP's ICMP code
+// (icmp.c handles ICMP_ER as a no-op, and echo requests to the gateway keep being answered),
+// and it never moves p->payload (raw.c asserts that for packets that are not eaten).
+// target, seqBase and replyMask are written by Begin/End under the core lock and by the
+// callback under that same lock, so the mutex orders them.
+#define PLATFORM_GW_PROBE_ECHO_ID   0x4F54   // "OT"; other pingers use their own id
+#define PLATFORM_GW_PROBE_ECHO_DATA 16       // payload bytes per echo request
+#define PLATFORM_GW_PROBE_MAX_SEQ   8        // replies tracked per probe (bits in replyMask)
+
+struct PlatformGatewayProbe {
+  struct raw_pcb   *pcb;
+  uint32_t          target;      // gateway, lwIP byte order
+  uint16_t          seqBase;     // seq of the first echo of this probe
+  volatile uint8_t  replyMask;   // bit n: echo (seqBase + n) answered by target
+};
+
+// Function-local static: one instance across every translation unit that includes this header.
+inline PlatformGatewayProbe &platformGatewayProbeState() {
+  static PlatformGatewayProbe s = { nullptr, 0, 0, 0 };
+  return s;
+}
+
+// tcpip task, core lock held. Flags only.
+inline u8_t platformGatewayProbeRecv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *addr) {
+  (void)pcb;
+  PlatformGatewayProbe *s = static_cast<PlatformGatewayProbe *>(arg);
+  if (s == nullptr || p == nullptr || addr == nullptr) return 0;
+  if (ip_addr_get_ip4_u32(addr) != s->target) return 0;
+  const uint16_t hlen = static_cast<uint16_t>((pbuf_get_at(p, 0) & 0x0F) * 4);
+  struct icmp_echo_hdr hdr;
+  if (pbuf_copy_partial(p, &hdr, sizeof(hdr), hlen) != sizeof(hdr)) return 0;
+  if (ICMPH_TYPE(&hdr) != ICMP_ER || hdr.id != PP_HTONS(PLATFORM_GW_PROBE_ECHO_ID)) return 0;
+  const uint16_t n = static_cast<uint16_t>(lwip_ntohs(hdr.seqno) - s->seqBase);
+  if (n < PLATFORM_GW_PROBE_MAX_SEQ) s->replyMask = static_cast<uint8_t>(s->replyMask | (1u << n));
+  return 0;
+}
+
+// Opens the probe pcb for target (lwIP byte order). Echoes are numbered from seqBase.
+// False when a probe is already open or the pcb could not be allocated.
+inline bool platformGatewayProbeBegin(uint32_t target, uint16_t seqBase) {
+  PlatformGatewayProbe &s = platformGatewayProbeState();
+  bool ok = false;
+  LOCK_TCPIP_CORE();
+  if (s.pcb == nullptr) {
+    s.target    = target;
+    s.seqBase   = seqBase;
+    s.replyMask = 0;
+    s.pcb = raw_new(IP_PROTO_ICMP);
+    if (s.pcb != nullptr) {
+      raw_recv(s.pcb, platformGatewayProbeRecv, &s);
+      ok = true;
+    }
+  }
+  UNLOCK_TCPIP_CORE();
+  return ok;
+}
+
+// Sends echo request seq to the probe target. False only when the probe is not open or the
+// echo buffer could not be allocated. A send that the stack or the WiFi driver refuses
+// returns true: an unanswered echo is exactly what a dead link looks like.
+inline bool platformGatewayProbeSend(uint16_t seq) {
+  PlatformGatewayProbe &s = platformGatewayProbeState();
+  const uint16_t len = static_cast<uint16_t>(sizeof(struct icmp_echo_hdr) + PLATFORM_GW_PROBE_ECHO_DATA);
+  bool ok = false;
+  LOCK_TCPIP_CORE();
+  if (s.pcb != nullptr) {
+    struct pbuf *p = pbuf_alloc(PBUF_IP, len, PBUF_RAM);
+    if (p != nullptr) {
+      struct icmp_echo_hdr *echo = static_cast<struct icmp_echo_hdr *>(p->payload);
+      ICMPH_TYPE_SET(echo, ICMP_ECHO);
+      ICMPH_CODE_SET(echo, 0);
+      echo->id     = PP_HTONS(PLATFORM_GW_PROBE_ECHO_ID);
+      echo->seqno  = lwip_htons(seq);
+      echo->chksum = 0;
+      uint8_t *data = reinterpret_cast<uint8_t *>(echo) + sizeof(struct icmp_echo_hdr);
+      for (uint16_t i = 0; i < PLATFORM_GW_PROBE_ECHO_DATA; i++) data[i] = static_cast<uint8_t>(i);
+      echo->chksum = inet_chksum(echo, len);
+      ip_addr_t dst;
+      ip_addr_set_ip4_u32_val(dst, s.target);
+      (void)raw_sendto(s.pcb, p, &dst);
+      pbuf_free(p);
+      ok = true;
+    }
+  }
+  UNLOCK_TCPIP_CORE();
+  return ok;
+}
+
+// Closes the probe pcb and returns the reply mask (0 when nothing answered or no probe was
+// open). After raw_remove() under the lock the callback can no longer run for this probe.
+inline uint8_t platformGatewayProbeEnd() {
+  PlatformGatewayProbe &s = platformGatewayProbeState();
+  uint8_t mask = 0;
+  LOCK_TCPIP_CORE();
+  if (s.pcb != nullptr) {
+    raw_remove(s.pcb);
+    s.pcb = nullptr;
+    mask = s.replyMask;
+  }
+  s.replyMask = 0;
+  UNLOCK_TCPIP_CORE();
+  return mask;
+}
+// TASK-1450 probe end
 
 // Exception cause from the last reset. ESP32 does not expose a direct
 // numeric exccause via esp_reset_reason(); instead the reset_reason enum
@@ -809,6 +1005,14 @@ inline bool platformMutexLock(PlatformMutex m, uint32_t timeoutMs = 0) {
   if (m == nullptr) return true;
   TickType_t ticks = (timeoutMs == 0) ? portMAX_DELAY : pdMS_TO_TICKS(timeoutMs);
   return xSemaphoreTake(m, ticks) == pdTRUE;
+}
+
+// Take the mutex without waiting (TASK-1665: the diagnostic recorder's capture points run on
+// several tasks and must never block). Returns false when another task holds it. A nullptr
+// handle returns true, as for platformMutexLock().
+inline bool platformMutexTryLock(PlatformMutex m) {
+  if (m == nullptr) return true;
+  return xSemaphoreTake(m, 0) == pdTRUE;
 }
 
 inline void platformMutexUnlock(PlatformMutex m) {

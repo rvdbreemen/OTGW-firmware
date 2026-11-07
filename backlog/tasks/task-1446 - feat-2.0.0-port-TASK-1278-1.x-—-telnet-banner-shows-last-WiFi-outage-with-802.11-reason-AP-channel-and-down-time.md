@@ -3,10 +3,11 @@ id: TASK-1446
 title: >-
   feat-2.0.0: port TASK-1278 (1.x) — telnet banner shows last WiFi outage with
   802.11 reason, AP, channel and down time
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T06:16:00Z'
-updated_date: '2026-11-04T05:10:00Z'
+updated_date: '2026-11-04T22:23:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -93,4 +94,6 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no event handlers/wifiReasonName in src. Agent-doable; prerequisite of TASK-1444.
 
 2026-11-04 Robert: MikroTik fault injection allowed: one rule per test, scoped to the bench boards' MAC/IP (.61/.63), comment-tagged, scheduler auto-removal within 30 min, removed right after; config export before and after recorded in the notes.
+
+2026-11-04 (opus agent; lead reran in wt-int4): one WiFi link/outage record from WiFi.onEvent (STA_CONNECTED/DISCONNECTED; callbacks only write under portMUX g_wifiLinkMux, no log/alloc), retries in one outage = 1 outage with event count + first/last reason (WiFi.disconnectReasonName), self-caused drops (Ethernet takeover, AP-retry timeout, TASK-1450 dead-link reconnect) marked and not counted (mark only while the link is up, cleared by every event), boot catch-up of BSSID/channel; telnet banner Link/Drop lines; device/info 14 wifi_* keys (the AC's '15' lists 14 names; the 15th in the 1.x commit was cmd_dropped of another task); openapi documented. tests/test_wifi_link_record.py 15 OK (old: 15 FAIL; 2 mutants red each), deadlink 28, rest_contract 16 OK, evaluate 0 failed. Tag beta.84; firmware build + MikroTik deauth/access-list bench pending.
 <!-- SECTION:NOTES:END -->

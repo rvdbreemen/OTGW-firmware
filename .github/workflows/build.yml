@@ -13,6 +13,16 @@ on:
       - "1.5.*"
       - "feature-dev-*"
       - "release/**"
+  # TASK-1626 (Robert, 2026-11-05): also compile every push to dev, except docs-only pushes.
+  # A push whose changed files all match these patterns starts no build.
+  push:
+    branches:
+      - dev
+    paths-ignore:
+      - "docs/**"
+      - "backlog/**"
+      - ".claude/**"
+      - "**/*.md"
 
 jobs:
   build:

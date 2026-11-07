@@ -31,7 +31,7 @@ values follow from thermo-nova's duty formula (`pwm.py:247-301`, P = 7200: lower
 - Not covered by the harness: hours of repeated cycles, and the exits (underheat 180 s, saturation 300 s). Those
   timers do not depend on the period; their behaviour over hours is in the simulation below.
 
-## 3. Simulation (script `scripts/sat_hp_period_study14.py`, data `round14_hp_period_runs.json`, 360 winters)
+## 3. Simulation (script `tools/research/sat/sat_hp_period_study14.py`, data `round14_hp_period_runs.json`, 360 winters)
 
 SAT PWM as today (ON time fixed at the start of each period, minimum ON 180 s), three winters (2010-11, 2013-14,
 2025-26), 2 seeds. Indicative: plant assumptions as rounds 12-13 and 4-5b.

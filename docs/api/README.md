@@ -326,7 +326,7 @@ Update a single device setting.
 - `401` - Authentication required
 - `403` - CSRF protection: invalid origin
 
-**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttonchangepublishing`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `ui_onboarded`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, `satexternaltemp`, `satpresetcomfort`, `satpreseteco`, `satpresetaway`, `satbleriskack`
+**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttonchangepublishing`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `telnetenabled`, `wifinoportal`, `ui_onboarded`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, `satexternaltemp`, `satpresetcomfort`, `satpreseteco`, `satpresetaway`, `satbleriskack`
 
 **Nightly restart settings**:
 
@@ -334,6 +334,8 @@ Update a single device setting.
 |---------|------|-------|---------|-------------|
 | `nightlyrestart` | bool | - | `false` | Enable a scheduled daily restart to recover heap memory |
 | `nightlyrestarthour` | int | 0-23 | `4` | Local hour when the nightly restart runs (requires NTP to be enabled and synced) |
+| `wifinoportal` | bool | - | `false` | Saved WiFi unreachable at boot: open no config portal and no AP fallback, keep retrying in the background. No saved WiFi or a triple reset still opens the portal. Read at the next boot |
+| `telnetenabled` | bool | - | `true` | Telnet debug console on TCP port 23. `false` closes the port at once and drops a connected client; `true` opens it again. No reboot needed |
 
 **SAT setting details**:
 
@@ -1357,17 +1359,11 @@ Returns the persisted OT-direct configuration settings.
     "mode": 1,
     "setback_temp": 15.0,
     "setback_timeout": 300,
-    "ch_mode": 0,
-    "flow_temp": 55.0,
-    "flow_max": 80.0,
-    "room_setpoint": 20.0,
-    "gradient": 1.5,
-    "exponent": 1.3,
-    "offset": 0.0,
-    "room_comp": false,
-    "kp": 2.0,
-    "ki": 0.001,
-    "kboost": 5.0
+    "vent_enable": false,
+    "open_bypass": false,
+    "auto_bypass": false,
+    "free_vent_enable": false,
+    "vent_setpoint": 0
   }
 }
 ```
@@ -1377,17 +1373,13 @@ Returns the persisted OT-direct configuration settings.
 | `mode` | integer | Persisted mode index: 0=bypass, 1=gateway, 2=monitor, 3=master, 4=loopback |
 | `setback_temp` | float | Setback temperature applied when thermostat disconnects (C, range 1-30) |
 | `setback_timeout` | integer | Seconds without a thermostat frame before setback activates |
-| `ch_mode` | integer | CH control mode (0=fixed setpoint, 1=heating curve, 2=PI room compensation) |
-| `flow_temp` | float | Fixed flow temperature setpoint (C, used when ch_mode=0) |
-| `flow_max` | float | Maximum flow temperature limit (C) |
-| `room_setpoint` | float | Room temperature setpoint for PI compensation (C) |
-| `gradient` | float | Heating curve gradient |
-| `exponent` | float | Heating curve exponent |
-| `offset` | float | Heating curve offset (C) |
-| `room_comp` | boolean | Whether PI room compensation is enabled |
-| `kp` | float | PI proportional gain |
-| `ki` | float | PI integral gain |
-| `kboost` | float | PI boost gain for large errors |
+| `vent_enable` | boolean | Ventilation control enabled (OT MsgID 70 HB bit 0) |
+| `open_bypass` | boolean | Open the ventilation bypass valve (OT MsgID 70 HB bit 2) |
+| `auto_bypass` | boolean | Automatic ventilation bypass valve mode (OT MsgID 70 HB bit 3) |
+| `free_vent_enable` | boolean | Free ventilation mode (OT MsgID 70 HB bit 4) |
+| `vent_setpoint` | integer | Ventilation setpoint 0-100 % (OT MsgID 71 HB) |
+
+SAT is the only temperature controller on OT-Direct. The former standalone controller fields (`ch_mode`, `flow_temp`, `flow_max`, `room_setpoint`, `gradient`, `exponent`, `offset`, `room_comp`, `kp`, `ki`, `kboost`, `hysteresis_enable`, `hysteresis`) are removed (see `docs/BREAKING_CHANGES.md`).
 
 #### `POST /api/v2/otdirect/settings`
 
@@ -1395,7 +1387,7 @@ Update OT-direct settings. Only provided parameters are updated.
 
 **Authentication**: Not required
 
-**Form parameters**: `setbacktemp` (float, 1.0-30.0), `setbacktimeout` (integer, seconds), `chmode` (int), `flowtemp` (float), `flowmax` (float), `roomsetpoint` (float), `gradient` (float), `exponent` (float), `offset` (float), `roomcomp` (bool), `kp` (float), `ki` (float), `kboost` (float)
+**Form parameters**: `setbacktemp` (float, 1.0-30.0), `setbacktimeout` (integer, seconds), `ventenable` (bool), `openbypass` (bool), `autobypass` (bool), `freeventenable` (bool), `ventsetpoint` (integer, 0-100). Unknown parameters, including the removed controller parameters, are ignored.
 
 **Response** `200 OK`: Full `otdirect_status` object.
 
@@ -1472,9 +1464,7 @@ These routes are served directly by the web server (not under `/api`):
 
 | Route | Description |
 |-------|-------------|
-| `/` or `/index` or `/index.html` | Web UI (`v2.html`); `FSexplorer.html` when `v2.html` is missing |
-| `/v2.html`, `/v2.js`, `/v2-bundle.css` | Web UI shell, script and stylesheet |
-| `/fsexplorer.css` | FSexplorer stylesheet |
+| `/` or `/index` or `/index.html` or `/v2.html` | Web UI (`v2.html.gz`, gzipped, one file); FSexplorer when it is missing |
 | `/pic` | PIC firmware upload page |
 | `/upload` (POST) | File upload handler |
 | `/ReBoot` | Reboot the ESP8266 |

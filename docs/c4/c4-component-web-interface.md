@@ -3,7 +3,7 @@
 ## Overview
 
 - **Name**: Web Interface
-- **Description**: The complete user-facing layer of the firmware. Combines a browser-delivered single-page application (the v2 bundle: `v2.html`, `v2.js`, `v2-bundle.css`, served from LittleFS) with the server-side infrastructure that supports it: an AsyncWebSocket live-log endpoint, heap health gates, the request gates that keep the web server alive under load, webhook HTTP callbacks to external systems, safe cooperative-scheduler timers, and the telnet debug server. Together these provide the operational surface for configuration, monitoring and control without a separate server.
+- **Description**: The complete user-facing layer of the firmware. Combines a browser-delivered single-page application (the v2 page, one gzipped file `v2.html.gz` with its CSS, JavaScript and fonts inline, served from LittleFS, ADR-215) with the server-side infrastructure that supports it: an AsyncWebSocket live-log endpoint, heap health gates, the request gates that keep the web server alive under load, webhook HTTP callbacks to external systems, safe cooperative-scheduler timers, and the telnet debug server. Together these provide the operational surface for configuration, monitoring and control without a separate server.
 - **Type**: Application Component
 - **Technology**: HTML5/CSS3/ES5+ JavaScript (no external scripts, no chart library), ESPAsyncWebServer + AsyncWebSocket, AsyncSimpleTelnet (SimpleTelnet library), LittleFS
 
@@ -110,12 +110,11 @@ The client side (Web Assets) is the v2 single-page app. It is the only UI on the
 - **Description**: Static assets served to browser clients with ETag revalidation (ADR-163); fonts are immutable-cached.
 - **Routes**:
   - `/`, `/index`, `/index.html` - `v2.html`, or `FSexplorer.html` when `v2.html` is missing
-  - `/v2.html`, `/v2.js`, `/v2-bundle.css`, `/fsexplorer.css` - the UI assets
-  - `/fonts/inter-400.woff2`, `/fonts/inter-700.woff2`, `/fonts/jetbrains-mono-400.woff2`
+  - `/`, `/index`, `/index.html`, `/v2.html` - the UI page (`v2.html.gz`)
   - `/FSexplorer.html`, `/FSexplorer` - the recovery page; `/upload` (POST) stores a file, `/ReBoot`, `/ResetWireless`
   - `/update` (firmware/filesystem OTA page) and `/safeboot` (POST, hand-over to the safeboot updater)
   - `/pic16f88/*`, `/pic16f1847/*` - PIC firmware binaries, via the `onNotFound` file handler; `/api/*` goes to the REST dispatcher
-- **Build**: the LittleFS image is built from a minified staging copy of `data/` (ADR-190). `ds-tokens.css` and `v2.css` are build inputs of `v2-bundle.css` and are not in the image
+- **Build**: the LittleFS image is built from a minified staging copy of `data/` (ADR-190). `scripts/webui_pages.py` inlines the stylesheets, `v2.js` and the fonts into `v2.html.gz` and `FSexplorer.html.gz`; the inlined inputs are not in the image (ADR-215)
 - **Not served any more**: `index.html`, `index.js`, `sat.js`, `sat-slider.js`, `graph.js`, `theme-toggle.js`, `echarts-theme.js`, `components.css`, `design.html`. HA MQTT discovery is published from PROGMEM tables, not a runtime `mqttha.cfg` (ADR-077)
 
 ## Dependencies
@@ -150,7 +149,7 @@ C4Component
     System_Ext(browser, "Web Browser", "Chrome / Firefox / Safari")
     System_Ext(telnetclient, "Telnet Client", "Developer debug terminal")
     System_Ext(webhooktarget, "Webhook Target", "Node-RED / Home Assistant HTTP endpoint")
-    SystemDb_Ext(lfs, "LittleFS", "v2.html, v2.js, v2-bundle.css, fonts, FSexplorer, PIC firmware")
+    SystemDb_Ext(lfs, "LittleFS", "v2.html.gz, FSexplorer.html.gz, PIC firmware")
 
     Rel(browser, webui, "WebSocket OT stream", "ws:// port 80 /ws")
     Rel(browser, integlayer, "HTTP SPA + REST API", "http:// port 80")
@@ -161,5 +160,5 @@ C4Component
     Rel(integlayer, webui, "Serve web assets", "LittleFS streaming")
     Rel(webui, cfgstate, "Read debug/uptime state", "state.debug.*, state.uptime.*")
     Rel(network, webui, "Start on reconnect", "startTelnet(), startWebSocket()")
-    Rel(integlayer, lfs, "Serves assets", "v2.html, v2.js, v2-bundle.css, fonts")
+    Rel(integlayer, lfs, "Serves assets", "v2.html.gz")
 ```

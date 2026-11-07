@@ -28,6 +28,29 @@ def adr(num, status="Accepted", supersedes=None, superseded_by=None,
     }
 
 
+class SupersededByParseTests(unittest.TestCase):
+    """parse_adr: the frontmatter is the source of truth (TASK-1183, TASK-1638)."""
+
+    def _parse(self, frontmatter, status_prose):
+        body = f"---\n{frontmatter}---\n# ADR-62 Example\n\n## Status\n\n{status_prose}\n"
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "ADR-062-example.md")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(body)
+            return gov.parse_adr(path)
+
+    def test_explicit_null_superseded_by_beats_status_prose(self):
+        # ADR-062: only its automatic part is replaced by ADR-170, so the frontmatter says
+        # superseded_by: null while the status prose mentions "superseded by ADR-170".
+        a = self._parse('status: "Accepted"\nsuperseded_by: null\n',
+                        "Accepted. **Automatic mechanism superseded by ADR-170 (Proposed).**")
+        self.assertEqual(a["superseded_by"], [])
+
+    def test_prose_is_still_used_when_the_key_is_absent(self):
+        a = self._parse('status: "Superseded"\n', "Superseded by ADR-170")
+        self.assertEqual(a["superseded_by"], [170])
+
+
 class LintTests(unittest.TestCase):
     def test_clean_set_passes(self):
         adrs = {1: adr(1), 2: adr(2, "Superseded by ADR-3", superseded_by=[3]), 3: adr(3, supersedes=[2], superseded_by=[])}

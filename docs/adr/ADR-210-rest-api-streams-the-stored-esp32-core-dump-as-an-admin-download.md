@@ -1,8 +1,8 @@
 ---
 id: "ADR-210"
 title: "REST API streams the stored ESP32 core dump as an admin download"
-status: "Proposed"
-date: "2026-11-04"
+status: "Accepted"
+date: "2026-11-05"
 binding: false
 gate: null
 documents_shipped: false
@@ -35,11 +35,11 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-04.
+Accepted, 2026-11-05.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer) chose "admin-protected" for this endpoint on 2026-11-04 (interactive question, TASK-1560).
 
-Guideline-level per ADR-080: no automated gate checks the API shape; the host test `tests/test_device_coredump_api.py` checks the route wiring, the auth call, the shim use and that no partition-sized buffer exists. Review checks the rest.
+Guideline-level per ADR-080: no automated gate checks the API (application programming interface) shape; the host test `tests/test_device_coredump_api.py` checks the route wiring, the auth call, the shim use and that no partition-sized buffer exists. Review checks the rest.
 
 ## Status History
 
@@ -50,24 +50,29 @@ status_history:
     changed_by: "Agent: Claude"
     reason: Initial proposal (TASK-1560)
     changed_via: adr-kit
+  - date: 2026-11-05
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Accepted by Robert in the session 2026-11-05; implemented and tested (TASK-1560 Done), shipped in v2.0.0-beta.95
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-An ESP32 panic or task-watchdog reset leaves an ELF core dump in the `coredump` partition (64 KB at 0x3F0000, `partitions_otgw_esp32.csv`). The reboot log keeps only the summary (task, PC, up to 16 backtrace frames, TASK-1538). The application caller can sit deeper than 16 frames (the ipc1 panic of alpha.566 entered through `_frxt_int_enter` inside `heap_caps_malloc`). The full dump decodes with `esp-coredump` against the matching `.elf`, but today it can only be read over USB (`esptool read_flash`). A field tester without a cable cannot send it.
+An ESP32 panic or task-watchdog reset leaves an ELF (Executable and Linkable Format) core dump in the `coredump` partition (64 KB (kilobytes) at 0x3F0000, `partitions_otgw_esp32.csv`). The reboot log keeps only the summary (task, PC (personal computer), up to 16 backtrace frames, TASK-1538). The application caller can sit deeper than 16 frames (the ipc1 panic of alpha.566 entered through `_frxt_int_enter` inside `heap_caps_malloc`). The full dump decodes with `esp-coredump` against the matching `.elf`, but today it can only be read over USB (`esptool read_flash`). A field tester without a cable cannot send it.
 
-The dump holds task stacks and heap fragments, so it can contain credentials that were in RAM (WiFi, MQTT, HTTP password). It is more sensitive than the crash log summary.
+The dump holds task stacks and heap fragments, so it can contain credentials that were in RAM (WiFi, MQTT (Message Queuing Telemetry Transport), HTTP (Hypertext Transfer Protocol) password). It is more sensitive than the crash log summary.
 
 ## Decision
 
 1. **Route.** `GET /api/v2/device/coredump`, a new branch in `handleDevice()` (`restAPI.ino`). Other methods answer 405 through the existing `handleDevice()` check.
 2. **Access.** `sendDeviceCoreDump()` calls `checkHttpAuth()` first: HTTP Basic Auth plus the same-origin (CSRF) check of ADR-056, exactly like `/api/v2/debug/flags`. Like every admin route it is open while no admin password is set (the ADR-056 default).
-3. **Streaming.** The body is an `application/octet-stream` response with a known length and a filler callback (`beginResponse(contentType, len, filler)`). The filler reads the flash range the server asks for. No copy of the dump is held in RAM, and no 64 KB buffer is allocated, so the heap gates of ADR-165 and ADR-188 stay valid. The REST in-flight slot is held until the connection closes, like every other streamed response.
-4. **Length.** The response is as long as the dump image the IDF reports (`esp_core_dump_image_get()`), not the whole partition.
+3. **Streaming.** The body is an `application/octet-stream` response with a known length and a filler callback (`beginResponse(contentType, len, filler)`). The filler reads the flash range the server asks for. No copy of the dump is held in RAM (random-access memory), and no 64 KB buffer is allocated, so the heap gates of ADR-165 and ADR-188 stay valid. The REST (Representational State Transfer) in-flight slot is held until the connection closes, like every other streamed response.
+4. **Length.** The response is as long as the dump image the IDF (IoT Development Framework) reports (`esp_core_dump_image_get()`), not the whole partition.
 5. **Format.** Headers `Content-Disposition: attachment; filename="otgw-coredump-app-<first 9 hex>.bin"`, `X-Coredump-App-Sha256: <hex>` and `Cache-Control: no-store`. Both names come from the dump's own summary (`esp_core_dump_get_summary()`, `app_elf_sha256`, read by `platformCoreDumpAppSha()`), not from the running githash: the stored dump is usually from an older build, and the bench showed that a running-githash name points at the wrong `.elf`. The ESP-IDF stores `CONFIG_APP_RETRIEVE_LEN_ELF_SHA` characters of the hash (9 by default), so the header usually holds that prefix. The matching ELF is the one whose `sha256sum` starts with it (esp-coredump compares exactly this string); the build archive (`../OTGW-build-archive/<semver>.zip`) or the release `.elf` asset holds it. Without a readable summary the name is `otgw-coredump.bin` and the header is absent. The bytes are the raw IDF image, decoded with `esp-coredump info_corefile --core-format raw` or `--core <file>` against that `.elf`.
 6. **No dump.** `404` through `sendApiError()` when `esp_core_dump_image_check()` finds no valid dump.
 7. **Platform shims.** All `esp_core_dump` and `esp_partition` calls live in `platformCoreDumpSize()`, `platformCoreDumpRead()` and `platformCoreDumpAppSha()` in `src/libraries/Platform/src/platform_esp32.h`. The partition is found by type and subtype, no offset is hard-coded. The application code has no raw platform symbol.
-8. **Read-only.** The route never erases or marks the dump as read. The existing NVS fingerprint (TASK-1479) still decides whether the reboot log reports a dump.
+8. **Read-only.** The route never erases or marks the dump as read. The existing NVS (non-volatile storage) fingerprint (TASK-1479) still decides whether the reboot log reports a dump.
 
 ## Decision Contract
 
@@ -105,13 +110,13 @@ The dump holds task stacks and heap fragments, so it can contain credentials tha
 
 **Positive:**
 
-- A tester downloads a decodable dump with one `curl` or browser request; the capture of a field panic no longer needs USB.
+- A tester downloads a decodable dump with one `curl` or browser request; the capture of a field panic no longer needs USB (Universal Serial Bus).
 - No RAM cost beyond the response object; no new dependency; no persisted state.
 
 **Negative:**
 
 - One more admin route; a script that depends on the file name depends on the githash naming.
-- With no admin password set, anyone on the LAN can download the dump (ADR-056 default).
+- With no admin password set, anyone on the LAN (local area network) can download the dump (ADR-056 default).
 - Flash reads run in the async_tcp task for the length of a chunk (a few hundred bytes to a few KB per call).
 - Not verified on hardware at proposal time (see the task for bench evidence).
 
@@ -137,9 +142,6 @@ No declarative rule: the host test is the gate.
 {
   "forbid_pattern": [],
   "forbid_import": [],
-  "require_pattern": [],
-  "forbid_call": [],
-  "require_call": [],
-  "allowed_in": []
+  "require_pattern": []
 }
 ```

@@ -23,7 +23,6 @@ struct AsyncWebServerRequest {
 };
 static AsyncWebServerRequest* currentRequest = nullptr;
 static bool g_restSlotHeld = false;
-static bool g_fileSlotHeld = false;
 static int restReleases = 0, fileReleases = 0;
 void restSlotRelease() { restReleases++; }
 void webFileGateRelease() { fileReleases++; }
@@ -81,7 +80,7 @@ int main() {
   restReleases = fileReleases = 0;
   a = new (slot) AsyncWebServerRequest(40);
   capture(a, "{\"name\":\"sattargettemp\",\"value\":18.5}");
-  currentRequest = a; g_restSlotHeld = true; g_fileSlotHeld = false;
+  currentRequest = a; g_restSlotHeld = true;
   webArmSlotRelease();
   a->~AsyncWebServerRequest();
   check("S5", restReleases == 1 && fileReleases == 0 && g_requestBody.owner == nullptr,
@@ -91,27 +90,28 @@ int main() {
   check("S5b", !hasBodyCompat() && bodyCompat()[0] == '\0', "next request at the same address sees no body");
   b->~AsyncWebServerRequest();
 
-  // S6: both gates held -> each released exactly once, body released.
+  // S6: rearming replaces the callback, never duplicates REST/body cleanup.
   restReleases = fileReleases = 0;
   a = new (slot) AsyncWebServerRequest(40);
   capture(a, "body6");
-  currentRequest = a; g_restSlotHeld = true; g_fileSlotHeld = true;
+  currentRequest = a; g_restSlotHeld = true;
+  webArmSlotRelease();
   webArmSlotRelease();
   a->~AsyncWebServerRequest();
-  check("S6", restReleases == 1 && fileReleases == 1 && g_requestBody.owner == nullptr,
-        "both gates held: each released once and body released");
+  check("S6", restReleases == 1 && fileReleases == 0 && g_requestBody.owner == nullptr,
+        "rearmed REST/body callback runs once; file release stays response-owned");
 
   // S7: the gate is taken (and armed) BEFORE the body capture; the capture must
   // not lose the gate release.
   restReleases = fileReleases = 0;
   a = new (slot) AsyncWebServerRequest(40);
-  currentRequest = a; g_restSlotHeld = true; g_fileSlotHeld = false;
+  currentRequest = a; g_restSlotHeld = true;
   webArmSlotRelease();
   capture(a, "body7");
   a->~AsyncWebServerRequest();
   check("S7", restReleases == 1 && g_requestBody.owner == nullptr,
         "gate armed before capture: gate still released once and body released");
-  currentRequest = nullptr; g_restSlotHeld = g_fileSlotHeld = false;
+  currentRequest = nullptr; g_restSlotHeld = false;
 
   printf(failures ? "FAILED %d\n" : "ALL PASS\n", failures);
   return failures ? 1 : 0;

@@ -13,6 +13,9 @@ Each domain section lists:
 - **GAP** — feature in OT-Thing not yet in 2.0.0 (linked to backlog task)
 - **ADVANTAGE** — feature in 2.0.0 that OT-Thing does not have
 - **BOTH GAP** — absent in both projects
+- **REMOVED**: OT-Thing feature that 2.0.0 had and dropped on purpose (TASK-1684)
+
+**Update 2026-11-07 (TASK-1684):** the OT-Thing standalone controller (fixed flow, heating curve, PI room compensation, CH hysteresis; TASK-183 and TASK-582) is intentionally removed from OT-Direct. SAT is the only temperature controller. In OT-Direct master mode without SAT and without a `CS=` override (an external `CS=` must be repeated within 60 s), no flow setpoint is written and CH enable is off. The rows below that describe the controller are history.
 
 ---
 
@@ -54,8 +57,8 @@ Each domain section lists:
 | Flame ratio tracking (180-min window) | COVERED | Parity |
 | Thermostat disconnect + setback | COVERED | Parity (OTDirect adds more than OT-Thing) |
 | Ventilation polling interval | GAP — TASK-583 | OT-Thing: 10s when vent active; 2.0.0: 60s |
-| OTDirect hysteresis + CH suspension | GAP — TASK-582 | OT-Thing: per-channel deadband; 2.0.0: none in OTDirect |
-| Room temperature low-pass filtering in PI loop | GAP (minor) | OT-Thing: 0.1/0.9 filter; 2.0.0 OTDirect: none |
+| OTDirect hysteresis + CH suspension | REMOVED, TASK-1684 | Built in TASK-582, removed again: SAT is the only controller (SAT has its own cold-cutoff hysteresis) |
+| Room temperature low-pass filtering in PI loop | REMOVED, TASK-1684 | The OT-Direct PI loop is gone; SAT filters its own room temperature |
 | Ventilation override persistence | GAP — TASK-584 | OT-Thing persists; 2.0.0 runtime-only |
 
 ---
@@ -120,7 +123,7 @@ Each domain section lists:
 | OLED UI (5-page display, button pagination, 30s timeout) | GAP — TASK-580 | OT-Thing: full OLED UI; 2.0.0: detects but does not display |
 | Dynamic Ethernet↔WiFi failover (5s polling) | GAP — TASK-581 | OT-Thing: runtime; 2.0.0: boot-time only |
 | Auto firmware version check (GitHub API) | GAP (minor) | OT-Thing: built-in; 2.0.0: external checker required |
-| Heating curve config (exponent/gradient/offset — static) | DIFFERENT | OT-Thing: static curves; 2.0.0: SAT autotune replaces this intentionally |
+| Heating curve config (exponent/gradient/offset, static) | REMOVED, TASK-1684 | OT-Thing: static curves; 2.0.0: SAT is the only controller (the OT-Direct curve settings were removed) |
 
 ---
 
@@ -133,7 +136,7 @@ Each domain section lists:
 | TASK-579 | feat(ui): highlight active heating curve — mute reference curves | medium |
 | TASK-580 | feat(oled): implement OLED UI driver with multi-page display | medium |
 | TASK-581 | feat(network): dynamic Ethernet-to-WiFi failover at runtime | medium |
-| TASK-582 | feat(otdirect): add hysteresis and CH suspension logic to OTDirect | medium |
+| TASK-582 | feat(otdirect): add hysteresis and CH suspension logic to OTDirect (removed again by TASK-1684) | medium |
 | TASK-583 | feat(otdirect): increase ventilation MsgID polling frequency from 60s to 10s | low |
 | TASK-584 | feat(settings): persist ventilation overrides across reboots | low |
 | TASK-585 | feat(ui): WiFi network scan REST endpoint and UI selector | low |

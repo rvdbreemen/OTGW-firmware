@@ -38,7 +38,7 @@ class ColdHysteresisSource(unittest.TestCase):
         gate = src.find("if (pidOutput > satColdThreshold()) {\n    satCycleCheckOvershootSwitch")
         if gate < 0:
             gate = src.find("if (pidOutput > satColdThreshold()) {\r\n    satCycleCheckOvershootSwitch")
-        cut = src.find("const bool coldCutoff = _sat_coldCut;")
+        cut = src.find("const bool coldCutoff = satColdCutActive();")   # TASK-1652: the latch unless a lit ON phase burns its 180 s
         self.assertGreater(gate, upd[0])
         self.assertGreater(cut, upd[0])
 

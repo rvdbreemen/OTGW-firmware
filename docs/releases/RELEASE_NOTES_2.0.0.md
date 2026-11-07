@@ -58,7 +58,7 @@ The legacy otmonitor TCP bridge on port 25238 is now opt-in. Users of pyotgw, ot
 - SAT LittleFS reorganized to `/sat/` subdirectory with timestamps and stale detection.
 - ELF file included in build artifacts for crash debugging.
 - Multi-area room support uses TASK-25 weighted temperature algorithm.
-- OTGW32 OTDirect: PI room compensation and flame ratio tracking added.
+- OTGW32 OTDirect: flame ratio tracking added.
 - SAT cycle classifier uses per-hour PWM cycle limiter and p90 flow temperature.
 
 ---
@@ -262,7 +262,6 @@ OTGW32 (ESP32) can act as a direct OpenTherm bus master without the PIC microcon
 **Capabilities:**
 
 - Hardware timer-based Manchester encoding for timing-accurate OpenTherm frame generation.
-- PI room compensation: injects a room temperature correction to the boiler's flow setpoint calculation, independent of SAT.
 - Flame ratio tracking: monitors modulation level trends and publishes normalized flame ratio to MQTT.
 - Step-up converter control: 18V OT bus power via GPIO-controlled boost converter.
 - All mode transitions available via REST API (`/api/v2/otdirect/*`) and MQTT.

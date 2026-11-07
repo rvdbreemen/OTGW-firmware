@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T12:45:00Z'
-updated_date: '2026-11-04T05:08:00Z'
+updated_date: '2026-11-05T17:46:00Z'
 labels:
   - parked
   - on-hold
@@ -99,4 +99,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: parked on purpose.
 Robert 2026-11-03 (interactive): keep ON HOLD; not the moment yet.
 
 2026-11-04 Robert (interactive): moved to milestone 2.1.0, out of the 2.0.0 scope.
+
+Robert 2026-11-05 (session otgw-firmware-54, AskUserQuestion): stays parked until 2.1.0; labels parked/on-hold stay.
 <!-- SECTION:NOTES:END -->

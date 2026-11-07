@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.79
+**  Version  : v2.0.0-beta.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -15,6 +15,7 @@
 #include <pgmspace.h>
 #include "OTGW-Core.h"              // Core OpenTherm data structures and functions
 #include "MQTTstuff.h"              // Structured discovery data layer (enums, structs, streaming API)
+#include "mqttBrokerAddress.h"      // decideMqttBrokerLookup() (TASK-1451)
 #include "mqtt_discovery_verify.h"  // Discovery-verify state machine (TASK-363: separate TU)
 
 // MQTT publish model (TASK-865.7 / ADR-123): espMqttClient frames every publish
@@ -51,6 +52,8 @@ static void runThermostatDupCleanupStep();
 
 static IPAddress  MQTTbrokerIP;
 static char       MQTTbrokerIPchar[20];
+// The broker name MQTTbrokerIP was resolved for (TASK-1451): a held address is only reused for that name.
+static char       MQTTbrokerResolvedFor[sizeof(settings.mqtt.sBroker)];
 constexpr size_t  MQTT_ID_MAX_LEN = 96;
 constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 192;
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
@@ -101,7 +104,6 @@ struct MQTTAutoConfigSessionLock {
   MQTTAutoConfigSessionLock& operator=(const MQTTAutoConfigSessionLock&) = delete;
 };
 
-// pgm_strncmp_PP() and pgm_read_char() are in MQTTstuff.h (inline, shared with MQTTHaDiscovery.cpp)
 
 // Status-burst quiesce (TASK-342) + post-burst cooldown (TASK-347).
 // A Status-frame fanout publishes status_master plus 7 bits, and/or status_slave
@@ -207,6 +209,7 @@ static bool isDripDeferred() {
 // the re-entrancy contract must be re-evaluated there.
 // ClientSync owns its own TCP socket, so the old WiFiClient injection is gone.
 static espMqttClient MQTTclient(espMqttClientTypes::UseInternalTask::NO);
+uint16_t mqttQueueNow() { const size_t n = MQTTclient.queueSize(); return n > 0xFFFF ? 0xFFFF : (uint16_t)n; }
 
 // onConnect/onDisconnect handlers (defined below) need a forward declaration so
 // they can be wired with onConnect()/onDisconnect() in startMQTT().
@@ -799,6 +802,8 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length, 
     return;
   }
 
+  if (diagRec.active) diagRec.recMqttIn(topic, msgPayload, strlen(msgPayload));   // TASK-1665: inbound command or status (ADR-213); the topic as received
+
   if (strcasecmp_P(topic, PSTR("homeassistant/status")) == 0) {
     //incoming message on status, detect going down
     // ADR-174: bHAcycle is armed ONLY by an observed "offline". HA's birth message may be
@@ -1075,7 +1080,6 @@ static void onMqttMessage(const espMqttClientTypes::MessageProperties& propertie
   handleMQTTcallback(topicBuf, const_cast<byte*>(payload), (unsigned int)len, properties.retain);
 }
 
-void sendMQTT(const char* topic, const char *json);
 void publishBirthOnline();  // F3 (TASK-874): gate-bypassing retained availability birth
 
 // ---------------------------------------------------------------------
@@ -1316,11 +1320,25 @@ void handleMQTT()
   {
     case MQTT_STATE_INIT:
       MQTTDebugTln(F("MQTT State: MQTT Initializing"));
+      { // own scope: the locals below must not cross the following case labels
       // Resolve the broker to an IP (TASK-1605: the platform shim, never hostByName(), which
-      // clears the lwIP DNS cache without the core lock). On failure MQTTbrokerIP is 0.0.0.0.
-      platformResolveHost(CSTR(settings.mqtt.sBroker), MQTTbrokerIP);
-      snprintf_P(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), PSTR("%d.%d.%d.%d"), MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
-      if (isValidIP(MQTTbrokerIP))
+      // clears the lwIP DNS cache without the core lock). The shim zeroes its target on failure, so
+      // it resolves into a local: a failed lookup must not destroy the last good address (TASK-1451).
+      IPAddress lookedUp;
+      platformResolveHost(CSTR(settings.mqtt.sBroker), lookedUp);
+      const MqttBrokerLookup lookup = decideMqttBrokerLookup(isValidIP(lookedUp), isValidIP(MQTTbrokerIP),
+                                                             MQTTbrokerResolvedFor, CSTR(settings.mqtt.sBroker));
+      if (lookup.bUseResult)
+      {
+        MQTTbrokerIP = lookedUp;
+        strlcpy(MQTTbrokerResolvedFor, CSTR(settings.mqtt.sBroker), sizeof(MQTTbrokerResolvedFor));
+        snprintf_P(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), PSTR("%d.%d.%d.%d"), MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
+      }
+      else if (lookup.bUsable)
+      {
+        MQTTDebugTf(PSTR("MQTT: lookup of [%s] failed, using the last known address %s\r\n"), CSTR(settings.mqtt.sBroker), MQTTbrokerIPchar);
+      }
+      if (lookup.bUsable)
       {
         MQTTDebugTf(PSTR("[%s] => setServer(%s, %d)\r\n"), CSTR(settings.mqtt.sBroker), MQTTbrokerIPchar, settings.mqtt.iBrokerPort);
         MQTTclient.disconnect();
@@ -1357,12 +1375,21 @@ void handleMQTT()
         stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
       }
       else
-      { // invalid IP, then goto error state
+      { // no usable address for this name, then goto error state
+        // A rename whose lookup fails must not leave the previous broker's session open, nor a CONNECT
+        // still in flight to it, whose late CONNACK would set IS_CONNECTED on the old broker (TASK-1451).
+        // disconnect(false) only acts on an established session, so a pending CONNECT is aborted with disconnect(true).
+        if (MQTTclient.connected()) MQTTclient.disconnect();               // graceful close of an open session
+        else if (!MQTTclient.disconnected()) MQTTclient.disconnect(true);  // abort a CONNECT still in flight
+        MQTTbrokerIP = IPAddress();           // keeps the publish guards (isValidIP) closed
+        MQTTbrokerResolvedFor[0] = '\0';
+        snprintf_P(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), PSTR("0.0.0.0"));
         MQTTDebugTf(PSTR("ERROR: [%s] => is not a valid URL\r\n"), CSTR(settings.mqtt.sBroker));
         stateMQTT = MQTT_STATE_ERROR;
         //DebugTln(F("Next State: MQTT_STATE_ERROR"));
       }
       RESTART_TIMER(timerMQTTwaitforconnect);
+      }
     break;
 
     case MQTT_STATE_TRY_TO_CONNECT:
@@ -1493,6 +1520,15 @@ static espMqttClientTypes::DisconnectReason lastMqttDisconnectReason =
 
 void PrintMQTTError(){
   MQTTDebugln();
+  // TASK-1664: a publish or subscribe that espMqttClient refuses while the link
+  // is up is not a disconnect. The library refuses a packet when the largest
+  // free block is below EMC_MIN_FREE_MEMORY (16 KB), as in the onConnect burst.
+  // Printing lastMqttDisconnectReason here would repeat a stale reason.
+  if (MQTTclient.connected()) {
+    MQTTDebugTf(PSTR("Error: MQTT packet not queued (connected, maxblk=%u)\r\n"),
+                (unsigned)platformMaxFreeBlock());
+    return;
+  }
   switch (lastMqttDisconnectReason)
   {
     case espMqttClientTypes::DisconnectReason::USER_OK:
@@ -1635,6 +1671,7 @@ bool sendMQTTData(const char* topic, const char *json, const bool retain)
   strlcat(full_topic, topic, sizeof(full_topic));
   MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settings.mqtt.sBroker, settings.mqtt.iBrokerPort, full_topic, json);
   const size_t payloadLen = strlen(json);
+  if (diagRec.active) diagRec.recMqttPublish(topic, json);   // TASK-1665: value publishes only (ADR-213); discovery uses mqttPublishRaw()
   // espMqttClient frames atomically (copies topic+payload into its Outbox); the
   // TASK-770 disconnect-on-truncated-write guard is obsolete.
   if (!mqttPublishRaw(full_topic, reinterpret_cast<const uint8_t*>(json), payloadLen, retain)) {
@@ -1691,6 +1728,7 @@ bool sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
   char payloadBuf[MQTT_TOPIC_MAX_LEN];
   strlcpy_P(payloadBuf, payload, sizeof(payloadBuf));
   const size_t payloadLen = strlen(payloadBuf);
+  if (diagRec.active) diagRec.recMqttPublish(topicBuf, payloadBuf);   // TASK-1665 (ADR-213)
   if (!mqttPublishRaw(full_topic, reinterpret_cast<const uint8_t*>(payloadBuf), payloadLen, retain)) {
     PrintMQTTError();
     return false;
@@ -2030,27 +2068,9 @@ void sendMQTTstateinformation(){
   publishOTGWConnectedState();
 }
 
-/*
-* topic:  <string> , topic will be used as is (no prefixing), retained = true
-* json:   <string> , payload to send
-*/
-//===========================================================================================
-// Publishes the topic verbatim (no namespace prefix), retained. Used for the
-// birth message and a few absolute-topic publishes. Funnels through the single
-// mqttPublishRaw chokepoint (espMqttClient buffers the publish atomically).
-void sendMQTT(const char* topic, const char *json) {
-  if (!settings.mqtt.bEnable) return;
-  if (!MQTTclient.connected()) return;
-  if (!isValidIP(MQTTbrokerIP)) return;
-  if (!canPublishMQTT()) return;
-
-  const size_t len = strlen(json);
-  if (!mqttPublishRaw(topic, reinterpret_cast<const uint8_t*>(json), len, true)) PrintMQTTError();
-}
-
 // F3 (TASK-874): publish the retained availability birth "online" to the base
 // namespace (== the LWT topic set in MQTT_STATE_INIT). Deliberately BYPASSES the
-// canPublishMQTT() heap gate that sendMQTT() applies: the birth is a 7-byte
+// canPublishMQTT() heap gate that sendMQTTData() applies: the birth is a 7-byte
 // control-plane message and dropping it strands every entity "unavailable" in HA
 // behind the retained LWT "offline". Called once from onMqttConnect() and then
 // periodically re-asserted while connected, so a transient outbox-full or a
@@ -2079,21 +2099,6 @@ bool publishMQTTOnOff(const char* topic, bool value) {
 
 bool publishMQTTOnOff(const __FlashStringHelper* topic, bool value) {
   return sendMQTTData(topic, value ? "ON" : "OFF");
-}
-
-/**
- * Publish integer value as string to MQTT topic
- */
-void publishMQTTInt(const char* topic, int value) {
-  static char buffer[12];
-  snprintf_P(buffer, sizeof(buffer), PSTR("%d"), value);
-  sendMQTTData(topic, buffer);
-}
-
-void publishMQTTInt(const __FlashStringHelper* topic, int value) {
-  static char buffer[12];
-  snprintf_P(buffer, sizeof(buffer), PSTR("%d"), value);
-  sendMQTTData(topic, buffer);
 }
 
 // ADR-096 worldview routing + ADR-097 sibling-suffix topic shape.

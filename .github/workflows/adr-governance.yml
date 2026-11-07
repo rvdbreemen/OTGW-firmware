@@ -22,6 +22,15 @@ on:
       - "scripts/adr_governance.py"
       - "tests/test_adr_governance.py"
       - ".github/workflows/adr-governance.yml"
+  # TASK-1626: work lands on dev by direct push, not through a PR, so check the line itself too.
+  push:
+    branches:
+      - dev
+    paths:
+      - "docs/adr/**"
+      - "scripts/adr_governance.py"
+      - "tests/test_adr_governance.py"
+      - ".github/workflows/adr-governance.yml"
 
 # Least-privilege token: this workflow only reads the checkout and runs Python.
 permissions:

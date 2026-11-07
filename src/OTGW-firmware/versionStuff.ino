@@ -25,7 +25,7 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
     while (f.readBytesUntil('\n', hexbuf, sizeof(hexbuf)) != 0) {
       linecnt++;
       // DebugTf(PSTR("reading line %d %s\n"),linecnt,hexbuf);
-      if (sscanf(hexbuf, ":%2x%4x%2x", &len, &addr, &tag) != 3)
+      if (siscanf(hexbuf, ":%2x%4x%2x", &len, &addr, &tag) != 3)
       {
         DebugTf(PSTR("Parse error on line %d\n"),linecnt);// Parse error
         break;
@@ -48,7 +48,7 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
           while (len > 0)
           {
             if (addr >= (int)(sizeof(datamem))) break;  // Bounds check to prevent buffer overflow
-            if (sscanf(hexbuf + offs, "%04x", &data) != 1)
+            if (siscanf(hexbuf + offs, "%04x", &data) != 1)
               break;
             // if (!bitRead(datamap, addr / 64)) weight += WEIGHT_DATAPROG;
             // bitSet(datamap, addr / 64);
@@ -64,7 +64,7 @@ void GetVersion(const char* hexfile, char* version, size_t destSize){
           while (len > 0)
           {
             if (addr >= (int)(sizeof(datamem))) break;  // Bounds check to prevent buffer overflow
-            if (sscanf(hexbuf + offs, "%04x", &data) != 1)
+            if (siscanf(hexbuf + offs, "%04x", &data) != 1)
               break;
             // if (!bitRead(datamap, addr / 64)) weight += WEIGHT_DATAPROG;
             // bitSet(datamap, addr / 64);

@@ -12,12 +12,12 @@
 Date 2026-11-01. Rounds 12-17 modelled "SAT PWM as now" with the ON time fixed at the start of each period. The
 firmware re-evaluates the 5-range mapper on every step (SATcontrol.ino `satApplyPWM`; thermo-nova `pwm.py:135`,
 `:205`), so the ON phase follows the room (entry 196, checked on the real code with tests/test_sat_hp_pwm.py's
-harness). This round adds that behaviour as variant `fw` to `scripts/sat_hp_onoff_study13.py` and reruns the
+harness). This round adds that behaviour as variant `fw` to `tools/research/sat/sat_hp_onoff_study13.py` and reruns the
 underfloor on/off heat pump. It includes Sergeant D's proposed type (entry 195): period 180 min, minimum ON 60 min.
 
 Plant as round 15/17: on/off heat pump on underfloor heating, 3 houses (1992-2012, 2015, BENG 2021), heavy (8 MJ/K)
 and light (3 MJ/K) screed, full heating seasons 1 Oct .. 30 Apr (2010-11, 2013-14, 2025-26), 2 seeds: 12 runs per
-variant per season, 324 runs. Script `scripts/sat_hp_fw_pwm_study18b.py`, data `round18b_fw_pwm_runs.json`.
+variant per season, 324 runs. Script `tools/research/sat/sat_hp_fw_pwm_study18b.py`, data `round18b_fw_pwm_runs.json`.
 Check: the old `pwm 30` variant reproduces round 17 exactly (2025-26, 1992-2012, heavy, seed 1: 38.4 starts/day,
 0.248 C).
 

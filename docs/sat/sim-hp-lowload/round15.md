@@ -4,7 +4,7 @@ Date 2026-10-31. Robert asked whether the simulations used a whole winter data s
 of 1 November .. 28 February (120 days, real hourly weather). October, March and April were missing, and those carry
 the lowest loads, where heat pumps switch most. This round runs the heat-pump options of rounds 13-14 over three
 full heating seasons of 212 days each: 2010-11 (cold), 2013-14 (mild), 2025-26 (average), Open-Meteo archive, same
-grid cell (`weather_season/`, 5088 hours each, no gaps). Script `scripts/sat_hp_season_study15.py`, data
+grid cell (`weather_season/`, 5088 hours each, no gaps). Script `tools/research/sat/sat_hp_season_study15.py`, data
 `round15_hp_season_runs.json` (504 seasons).
 
 **Model fix against rounds 12-14:** the underfloor emitter constant K was calibrated on the season mean of the

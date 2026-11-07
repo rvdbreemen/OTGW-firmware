@@ -231,7 +231,7 @@ Feature flags in `platform_esp32.h`: `HAS_LLMNR` = 0, `MDNS_NEEDS_UPDATE` = 0, `
 - **`safeTimers.h`**: `DECLARE_TIMER_SEC`, `DUE`, `RESTART_TIMER`, `CATCH_UP_MISSED_TICKS`
 - **`OTGW-firmware.h`**: `settings.sHostname`, `settings.sHTTPpasswd`, `settings.ntp.*`, `settings.wifi.*`, `settings.eth.*`, `state.net.*`, `state.hw.bEthernetPresent`, `state.pic.*`, `state.otBus.*`; `networkModeName()` and `getActiveIP()` (inline)
 - **`webServerCompat.h`**: ESPAsyncWebServer bridge (`server`, `WEB_HTTP_PORT`)
-- **`OTGW-ModUpdateServer.h`** (dispatches to `-esp32.h`) and **`updateServerHtml.h`**: OTA server and its HTML
+- **`OTGW-ModUpdateServer.h`** (dispatches to `-esp32.h`) and **`updateServerHtml.h`** (generated, git-ignored, from `webui/update.html` and `webui/update-success.html` by `scripts/webui_pages.py`): OTA server and its gzipped HTML
 - **`OTGW-Core.ino`** / main loop: `feedWatchDog()`, `addCommandToQueue()`, `hasOTCommandInterface()`, `isGatewayFirmware()`
 - **`MQTTstuff.ino`** / **`webSocketStuff.ino`**: `startMQTT()`, `startWebSocket()` on reconnect or transport switch
 - **`OLED.ino`**: `oledShowConfigMode()`

@@ -88,11 +88,10 @@ static bool satNoReturnTemp() { return false; }   // TASK-1371: a boiler with a 
 static float satGetBaseOffset() { return 27.2f; }
 static float g_cold = 28.2f;
 static float satGetColdSetpoint() { return g_cold; }
-// TASK-1547: the latched cold cutoff (SATcontrol.ino satColdThreshold/_sat_coldCut sit outside the cut block). Same one-line
-// definitions as the .ino; the harness ticks never cut off, so the threshold stays g_cold as before.
-static bool _sat_coldCut = false;
+// TASK-1547: the latched cold cutoff (SATcontrol.ino satColdThreshold/_sat_coldCut sit outside the cut block). The real
+// definitions are cut in (extract_cold_cut(), TASK-1652); the harness ticks never cut off, so the threshold stays g_cold as before.
 static const float SAT_COLD_HYSTERESIS_C = 0.5f;
-static float satColdThreshold() { return satGetColdSetpoint() + (_sat_coldCut ? SAT_COLD_HYSTERESIS_C : 0.0f); }
+@COLDCUT@
 static float satGetMaxSetpoint() { return 62.0f; }
 static float satEffectiveMaxSetpoint() { return 62.0f; }
 static uint32_t satGetMinOnTimeSec() { return 180; }
@@ -118,6 +117,22 @@ static bool satCycleCheckLowLoadVeto() { return false; }
 #define timerSATSuppress 0
 #include "@CHENABLE@"
 """
+
+
+def extract_cold_cut(src: str) -> str:
+    """The real cold-cutoff state and threshold of SATcontrol.ino (outside the cut PWM block): from the latch declaration to the end
+    of satColdThreshold(), so the harnesses see what the firmware has (TASK-1652: the deferral flag and satColdCutActive()). A source
+    before TASK-1547 has neither: the old one-line stubs then."""
+    src = src.replace("\r\n", "\n")
+    a = src.find("static bool _sat_coldCut = false;")
+    m = re.compile(r"^static float satColdThreshold\(\)\s*\{.*?^\}", re.S | re.M).search(src, a) if a >= 0 else None
+    if not m:
+        return ("static bool _sat_coldCut = false;\n"
+                "static float satColdThreshold() { return satGetColdSetpoint() + (_sat_coldCut ? SAT_COLD_HYSTERESIS_C : 0.0f); }\n")
+    return src[a:m.end()] + "\n"
+
+
+STUBS = STUBS.replace("@COLDCUT@", extract_cold_cut(SAT_INO.read_text(encoding="utf-8")))
 
 MAIN = r"""
 static void reset() {
@@ -1048,7 +1063,7 @@ class SolarSource(unittest.TestCase):
         src = SAT_INO.read_text(encoding="utf-8")
         # TASK-1547: the cutoff is the latch, updated once per tick with satColdCutoffLatched; the PWM gate reads the same threshold
         self.assertIn("_sat_coldCut = satColdCutoffLatched(pidOutput, satGetColdSetpoint(), _sat_coldCut, SAT_COLD_HYSTERESIS_C)", src)
-        self.assertIn("const bool coldCutoff = _sat_coldCut;", src)
+        self.assertIn("const bool coldCutoff = satColdCutActive();", src)   # TASK-1652: the latch, unless a lit ON phase burns its 180 s
         self.assertIn("pidOutput <= satColdThreshold()", src[src.index("static float satApplyPWM"):])
         self.assertNotIn("(pidOutput < satGetColdSetpoint())", src)
 

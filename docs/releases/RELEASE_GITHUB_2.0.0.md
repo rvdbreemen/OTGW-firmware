@@ -34,7 +34,7 @@ On OTGW32 (ESP32), SAT can read room temperature from Bluetooth Low Energy senso
 
 ### OTDirect: Native OpenTherm on ESP32
 
-OTGW32 can drive the OpenTherm bus directly, without the PIC, using hardware timer Manchester encoding. Five modes: Gateway, Monitor, Bypass, Master, and Loopback. Includes PI room compensation and flame ratio tracking. Controlled via REST API (`/api/v2/otdirect/*`) and MQTT.
+OTGW32 can drive the OpenTherm bus directly, without the PIC, using hardware timer Manchester encoding. Five modes: Gateway, Monitor, Bypass, Master, and Loopback. Includes flame ratio tracking. SAT is the only temperature controller. Controlled via REST API (`/api/v2/otdirect/*`) and MQTT.
 
 ### Dual-Platform Build (ESP8266 and ESP32)
 

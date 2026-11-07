@@ -6,10 +6,11 @@ PURPOSE
 -------
 Drives a REAL browser page-load (not a synthetic HTTP client) against the OTGW-firmware
 v2 Web UI over the Chrome DevTools Protocol (CDP), so the load-test study (TASK-1015)
-can see what an actual user's browser experiences: per-asset parallel connection count,
+can see what an actual user's browser experiences: parallel connection count,
 DOMContentLoaded/load timing, and any 503s the ADR-147 backpressure gate hands back
-during a real multi-asset page load (v2.html + v2.css + ds-tokens.css + v2.js + API calls
-the page fires on load).
+during a real page load. Since TASK-1640 the page is one gzipped file (v2.html.gz, with
+its CSS, JS and fonts inlined), so the load is that file plus the API calls the page
+fires on load.
 
 Two runs per invocation:
   COLD  - fresh --user-data-dir, empty cache -> every asset is a full fetch

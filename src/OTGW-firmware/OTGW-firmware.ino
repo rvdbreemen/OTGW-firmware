@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.79
+**  Version  : v2.0.0-beta.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -166,8 +166,11 @@ static void appendBootDetectLog()
     first[n] = '\0';
     unsigned int prev = 0;
     // sscanf_P does not exist on ESP32 (this code is HAS_RUNTIME_HW_DETECT /
-    // combo only). PSTR() is a no-op on ESP32, so plain sscanf is correct here.
-    if (sscanf(first, PSTR("boot#%u"), &prev) == 1) bootNum = prev + 1;
+    // combo only). PSTR() is a no-op on ESP32, so a plain format is correct here.
+    // siscanf: newlib's integer-only sscanf. The firmware never calls sscanf, so
+    // the 8.8 KB floating-point scanner is not linked (TASK-1639,
+    // tests/test_no_float_sscanf.py).
+    if (siscanf(first, PSTR("boot#%u"), &prev) == 1) bootNum = prev + 1;
     infh.close();
   }
 
@@ -255,6 +258,8 @@ static void applyResolvedComboPins()
 //=====================================================================
 void setup() {
   captureRebootReason();  // TASK-1447: before any path that can restart (config-portal timeout)
+  captureWifiDeadRestarts();  // TASK-1450: same rule, the dead-link restart count
+  captureWifiSkipPortal();    // TASK-1455: one-boot skip-portal mark of a WiFi supervisor restart
   bootHeapPhase(PSTR("setup-early"));  // TASK-1339 diagnostics: windowed heap minimum over the boot path
 
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
@@ -308,6 +313,7 @@ void setup() {
   // queue/mutex must exist so the very first drain in loop() has its handles.
   setupOTConcurrency();
   graphHistoryInit();   // TASK-1296: Monitor graph history ring + mutex
+  diagRecorderInit();   // TASK-1665: diagnostic recorder lock + environment (no ring until a recording starts)
 
   //setup the status LED
   setLed(LED1, ON);
@@ -346,7 +352,7 @@ void setup() {
   // portal blocks inside startWiFi(), so the boot splash and the "how to
   // connect" config screen must already be on the display by the time the
   // portal opens. I2C is already up (top of setup, before the watchdog disarm).
-  initOLED();
+  initOLEDBeforeDetect();                         // TASK-1678: also finds the display on a board without a PIC
 
 #if HAS_STATUS_PIXEL
   startStatusPixel();  // before startWiFi(): the config portal blocks setup()
@@ -525,6 +531,7 @@ void setup() {
   SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
   state.uptime.iRebootCount = updateRebootCount();
   updateRebootLog(lastReset);
+  diagRecorderBootResume();   // TASK-1665: a recording that was on at the last reboot resumes with the Reboot record first
 
   // One-line boot signature for field diagnostics (TASK-394 Phase 2).
   // Captured AFTER full init so heap/fragmentation reflect steady-state setup.
@@ -725,14 +732,6 @@ void blinkLEDnow(uint8_t led){
 
 // Zero-argument wrapper — calls LED1 variant. Defined once for both boards.
 void blinkLEDnow() { blinkLEDnow(LED1); }
-
-void blinkLEDms(uint32_t delay){
-  //blink the statusled, when time passed
-  DECLARE_TIMER_MS(timerBlink, delay);
-  if (DUE(timerBlink)) {
-    blinkLEDnow();
-  }
-}
 
 void blinkLED(uint8_t led, int nr, uint32_t waittime_ms){
     for (int i = nr; i>0; i--){
@@ -1046,6 +1045,7 @@ void doBackgroundTasks()
   // startWebSocket()/startMQTT(), potentially tearing down the HTTP connection
   // carrying the OTA data and leaving the LittleFS partition partially written.
   if (!isFlashing()) loopWifi();
+  telnetRelistenTick();       // TASK-1644: re-listen on port 23 after a disable/enable (TIME_WAIT window)
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   if (!isFlashing()) loopEthernet();   // W5500 link-poll + WiFi↔Ethernet failover (every 5s)
 #endif
@@ -1176,6 +1176,7 @@ void loop()
   }
 
   doBackgroundTasks();              // run background tasks
+  sampleHeapDip();                  // TASK-1673: who holds memory at the lowest free heap
 
   // TASK-865.5 (ADR-123 Phase-1): consume OT frames produced this iteration.
   // handlePICSerial()/loopOTDirect() ran inside doBackgroundTasks() and enqueued

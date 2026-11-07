@@ -4373,7 +4373,7 @@
       "path": "ADR-139-etag-cache-busting-standard-and-asynctcp-task-config.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-23",
+      "date": "2026-11-06",
       "decision_summary": "PRIMARY: ETag + bounded max-age is the project-wide cache-busting standard for ALL web UI static assets, served as pl...",
       "topics": [],
       "aliases": [],
@@ -4634,7 +4634,7 @@
       "path": "ADR-147-esp32s3-platform-limits-concurrent-webui-static-serving.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-06-19",
+      "date": "2026-11-06",
       "decision_summary": "D1 -- Root cause.",
       "topics": [],
       "aliases": [],
@@ -5206,7 +5206,7 @@
       "path": "ADR-165-optimal-request-parallelism-esp32s3-webui-rest.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-02",
+      "date": "2026-11-07",
       "decision_summary": "Adopt N=2 as the confirmed safe-and-robust parallelism ceiling for RESTMAXINFLIGHT and WEBFILEMAXINFLIGHT on the ESP3...",
       "topics": [],
       "aliases": [],
@@ -6361,7 +6361,7 @@
       "path": "ADR-188-cap-the-web-connections-that-hold-send-data-so-a-request-storm-cannot-starve-the-receive-path.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-06",
+      "date": "2026-11-07",
       "decision_summary": "Refuse a new web request with the existing cheap 503 while more than WEBMAXTXCONNECTIONS (4) connections on port 80 h...",
       "topics": [
         "backpressure",
@@ -6478,7 +6478,7 @@
       "path": "ADR-190-build-the-littlefs-image-from-a-minified-staging-copy-of-the-web-assets.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-23",
+      "date": "2026-11-06",
       "decision_summary": "build.py builds the LittleFS image from a staging copy of src/OTGW-firmware/data/ in which the .js and .css files are...",
       "topics": [
         "build-pipeline",
@@ -6613,7 +6613,7 @@
       "path": "ADR-192-ship-only-the-v2-web-ui-on-the-2-0-0-line.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-15",
+      "date": "2026-11-06",
       "decision_summary": "The 2.0.0 line ships the v2 web UI as its only device web UI.",
       "topics": [
         "classic-ui",
@@ -7754,6 +7754,491 @@
         "path_globs": [
           "src/OTGW-firmware/OTDirect.ino"
         ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-209",
+      "title": "Replay file lines may carry the otframes.log device time and the replay waits the recorded gap",
+      "path": "ADR-209-replay-file-lines-may-carry-the-otframes-log-device-time-and-the-replay-waits-the-recorded-gap.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-05",
+      "decision_summary": "Format.",
+      "topics": [
+        "otframes",
+        "replay",
+        "simulation",
+        "timing"
+      ],
+      "aliases": [
+        "otgw_simulation.log format",
+        "timed replay"
+      ],
+      "components": [
+        "OTGW replay (/api/v2/simulate)"
+      ],
+      "symbols": [
+        "classifyReplayLine",
+        "parseReplayDeviceTime",
+        "replayNextOTGWSimulationLine"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "A timed line is dispatched within 50 ms of its recorded gap (the device time difference), for gaps up to 60 s.",
+          "A line without device time columns keeps the fixed intervalms spacing."
+        ],
+        "must_not": [
+          "Must not load the replay file into RAM.",
+          "Must not dispatch the tab separated line itself to the parser; the parser gets the bare form."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testreplaytiming.py (mixed gaps of 0.2 s, 1.0 s, 3.5 s and 0.9995 s within 50 ms; midnight wrap and the 60 s clamp; bare file and built-in fixture at 750 ms). Old code: the timed cases fail (fixed 750 ms, tab line dispatched unpars..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-210",
+      "title": "REST API streams the stored ESP32 core dump as an admin download",
+      "path": "ADR-210-rest-api-streams-the-stored-esp32-core-dump-as-an-admin-download.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-05",
+      "decision_summary": "Route.",
+      "topics": [
+        "admin endpoint",
+        "core dump",
+        "crash diagnostics",
+        "rest api",
+        "streaming"
+      ],
+      "aliases": [
+        "/api/v2/device/coredump",
+        "coredump partition download"
+      ],
+      "components": [
+        "Platform abstraction",
+        "REST API v2"
+      ],
+      "symbols": [
+        "platformCoreDumpRead",
+        "platformCoreDumpSize",
+        "sendDeviceCoreDump"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Call checkHttpAuth() before any dump byte or length is produced.",
+          "Stream the dump from flash in the filler's chunks.",
+          "Answer 404 when no valid dump is stored.",
+          "Reach flash only through platformCoreDump()."
+        ],
+        "must_not": [
+          "Allocate a buffer of the partition or image size.",
+          "Erase, rewrite or mark the dump as read from this route.",
+          "Add the dump to an unauthenticated route (crashlog, info)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "python tests/testdevicecoredumpapi.py.",
+          "On a bench unit with a stored dump: curl -u admin: -o dump.bin -D - http:// /api/v2/device/coredump, check Content-Length equals the file size, then check that X-Coredump-App-Sha256 is a prefix of sha256sum of the .elf you decode with, a..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-211",
+      "title": "Skip the WiFi config portal on the boot after a WiFi supervisor restart",
+      "path": "ADR-211-skip-the-wifi-config-portal-on-the-boot-after-a-wifi-supervisor-restart.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-04",
+      "decision_summary": "A WiFi supervisor restart marks the next boot.",
+      "topics": [
+        "ap-fallback",
+        "config-portal",
+        "restart",
+        "wifi",
+        "wifi-recovery",
+        "wifimanager"
+      ],
+      "aliases": [
+        "1.x ADR-099 port",
+        "access point outage recovery",
+        "portal after supervisor restart",
+        "skip portal"
+      ],
+      "components": [
+        "Boot-time WiFi connect policy in startWiFi() (portal, AP fallback or neither)",
+        "One-boot skip-portal mark in RTC_NOINIT memory, written before a WiFi supervisor restart"
+      ],
+      "symbols": [
+        "captureWifiSkipPortal",
+        "g_rtcWifiSkipPortal",
+        "loopWifi",
+        "startWiFi",
+        "wifiMarkSkipPortal",
+        "wifiSkipPortalDecide"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Write the mark only directly before the two WiFi supervisor doRestart() calls in networkStuff.ino (dead link, WIFIFAILED).",
+          "Keep the mark in RTCNOINITATTR memory with a magic word, accept it only after a software restart, and clear it at every boot.",
+          "Keep the portal for the triple reset (ADR-043), for a boot without saved credentials, after a power cycle and after any other restart.",
+          "Log one line when the portal is skipped.",
+          "Write no mark while Ethernet is the active link."
+        ],
+        "must_not": [
+          "Must not store the mark in NVS, LittleFS or settings (platformRtcWrite(), Preferences).",
+          "Must not keep the mark across more than one boot, or across a second startWiFi() call in the same boot.",
+          "Must not modify the vendored WiFiManager library."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testwifiskipportal.py: compiles the real skip block and the real startWiFi() on the host (release and prerelease), and the real loopWifi() through the testwifideadlink.py harness. Red on the old code: the marked boot opens the port...",
+          "Bench (TASK-1455 AC1, AC2): MikroTik access-list deny until the supervisor restarts, then allow, on a release-configured build. The old build opens the portal SSID and rejoins only after the portal timeout; the new build never shows the..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-212",
+      "title": "Load the Web UI assets natively behind a bounded server-side file queue",
+      "path": "ADR-212-load-web-ui-assets-natively-behind-a-bounded-server-side-file-queue.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-07",
+      "decision_summary": "Native loading.",
+      "topics": [
+        "backpressure",
+        "first-paint",
+        "web-server",
+        "webui"
+      ],
+      "aliases": [],
+      "components": [
+        "platformTcpTxHoldingOnPort (platform_esp32.h)",
+        "v2.html asset loader and window.otgwAssetLoad diagnostics",
+        "WebQueuedFileResponse (webServerCompat.h)"
+      ],
+      "symbols": [
+        "platformTcpTxHoldingOnPort",
+        "webSendFile"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-213",
+      "title": "Record a local diagnostic event stream in a bounded on-device ring and stream it as a binary download",
+      "path": "ADR-213-record-a-local-diagnostic-event-stream-in-a-bounded-on-device-ring-and-stream-it-as-a-binary-download.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-05",
+      "decision_summary": "Opt-in, local, RAM (random-access memory) only.",
+      "topics": [
+        "diagnostics",
+        "privacy",
+        "psram",
+        "recording",
+        "replay",
+        "rest api",
+        "streaming"
+      ],
+      "aliases": [
+        "/api/v2/diag/recording",
+        "24 h recording",
+        "diagnostic recording",
+        "event recorder",
+        "flight recorder"
+      ],
+      "components": [
+        "diagnostic recording ring",
+        "GET /api/v2/diag/recording",
+        "recording record format"
+      ],
+      "symbols": [
+        "platformPsramAllocOnce",
+        "processOT",
+        "sendMQTTData",
+        "sendPICSerial"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep recording off until the user starts it, and record nothing outbound.",
+          "Allocate the PSRAM ring once, through platformPsramAllocOnce(), on a board with PSRAM.",
+          "On a board without PSRAM, allocate the 4 KB ring only when a recording starts and free it when the recording stops.",
+          "Refuse to start (also on a resume after a reboot) and report a reason in the status when the allocation would drop free heap below the ADR-030 5120 B rung, or fails.",
+          "Resume a running recording after a reboot as a new recording that starts with the Reboot record.",
+          "Append without blocking: on contention or a full ring, drop and count (Gap record), never wait.",
+          "Stream the download block by block with a filler callback; fix the block range when the request starts.",
+          "Write a versioned file header so a decoder can refuse an unknown format.",
+          "Replace every secret setting value before it enters the ring, round latitude and longitude to 0.1 degree and replace BLE MAC addresses by slot numbers, because the download is open."
+        ],
+        "must_not": [
+          "Allocate a download buffer or copy the ring on the asynctcp task.",
+          "Keep a ring allocated on a no-PSRAM board while no recording runs.",
+          "Record the port 25238 bridge bytes in version 1.",
+          "Write the recording to LittleFS, or send it to any host the user did not ask.",
+          "Change the PIC byte stream or what other consumers see (ADR-177)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "Host test (implementation task): encode a fixture of events, decode them back, and check the block sequence, the gaps after an overwrite and the redaction of secret settings.",
+          "Host test: the PSRAM ring allocation path calls platformPsramAllocOnce(); the no-PSRAM ring is allocated on start and freed on stop; a start is refused with a status reason when the free heap after the allocation would be below 5120 B (r...",
+          "Host test: a recording that was on before a reboot resumes with the Reboot record first.",
+          "Bench: start a recording on a PSRAM unit, download it twice with since=, check the gap after an overwrite and that hdmaxloopgapms and the REST 503 counters do not rise.",
+          "TASK-1470 AC3: a recorded day replays on the host and the diff shows PIC-command and MQTT-publish differences between two builds."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-214",
+      "title": "Diagnostic recording identifies topics and settings by a 16-bit FNV-1a hash of the lowercased name (amends ADR-213 decision on the fixed id table)",
+      "path": "ADR-214-diagnostic-recording-identifies-topics-and-settings-by-a-16-bit-fnv-1a-hash-of-the-lowercased-name-amends-adr-213-decision-on-the-fixed-id-table.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-05",
+      "decision_summary": "Ids are a hash, not a table.",
+      "topics": [
+        "diagnostics",
+        "record format",
+        "recording",
+        "topic ids"
+      ],
+      "aliases": [
+        "diagnostic recording id hash",
+        "recording topic id"
+      ],
+      "components": [
+        "recording id hash",
+        "recording record format amendments"
+      ],
+      "symbols": [
+        "diagNameId"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Compute record ids with diagNameId() and nothing else.",
+          "Write the names and ids the firmware knows into the download header.",
+          "Fail a host check when two different names of the real topic or settings list share an id.",
+          "Count the repeat caches in the allocation the no-PSRAM start rule checks."
+        ],
+        "must_not": [
+          "Add dictionary records to the ring.",
+          "Share one id between two names on purpose.",
+          "Change diagNameId() or the type numbers without a new format version."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "test/host/testdiagrecorder.py includes the real diagRecorderStuff.h and covers the id function, repeat types, the 255 cut marker and the 9984 B start boundary (cases F1, F7, F9, F11).",
+          "The collision check over the real name lists is owned by TASK-1666 and TASK-1667. Until it exists this ADR is guideline-level per ADR-080."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-215",
+      "title": "Serve each web page as one gzipped file with an ETag (partly supersedes ADR-139, ADR-190 and ADR-192)",
+      "path": "ADR-215-serve-each-web-page-as-one-gzipped-file-with-an-etag.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-07",
+      "decision_summary": "One file per page.",
+      "topics": [
+        "caching",
+        "gzip",
+        "littlefs",
+        "web-server",
+        "web-ui"
+      ],
+      "aliases": [
+        "gzip web ui",
+        "inline web assets",
+        "single gzipped page"
+      ],
+      "components": [
+        "build.py stage_data_dir (filesystem staging)",
+        "FSexplorer.ino serveGzipPage",
+        "scripts/platformio_webui.py (update page header)",
+        "scripts/webui_pages.py (page inlining and gzip)",
+        "webServerCompat.h webSendGzipPage"
+      ],
+      "symbols": [
+        "sendFSexplorerPage",
+        "sendIndex",
+        "serveGzipPage",
+        "webSendGzipPage"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Ship each page in webuipages.PAGES as one gzipped file, with no local stylesheet, script or font reference left in it.",
+          "Serve every page with Content-Encoding: gzip and an ETag, and answer a matching If-None-Match with 304 and no body.",
+          "Fail the build when a page references a local file that does not exist.",
+          "Keep FSexplorer self-contained: it must not depend on any v2 file."
+        ],
+        "must_not": [
+          "Serve a .gz file through a path where the library also adds Content-Encoding (a .gz sibling of a requested plain name).",
+          "Commit the generated updateServerHtml.h."
+        ],
+        "exceptions": [
+          "favicon.ico stays a separate file: browsers request it on their own."
+        ],
+        "verification": [
+          "tests/testwebuipages.py: inlining, missing-file failure, script-end escaping, the real pages without local references, the PROGMEM header round-trip.",
+          "tests/testbuildstaging.py: the staging copy holds the gzipped pages and no inlined inputs, and passes the LittleFS budget.",
+          "tests/testwebfilescheduling.py: compiles the real serveGzipPage, sendIndex, handleFile and webSendGzipPage: ETag - , 304 on a matching If-None-Match, Content-Encoding: gzip exactly once, the plain-page fallback and the upload-prompt gate...",
+          "Bench: first load 200 with the ETag, reload 304, stale ETag 200; no file 503s with two tabs."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-216",
+      "title": "Cap each web connection's lwIP send queue at two segments",
+      "path": "ADR-216-cap-each-web-connection-s-lwip-send-queue-at-two-segments.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-07",
+      "decision_summary": "webBeginRequest() (src/OTGW-firmware/webServerCompat.h) calls platformTcpCapSendBuffer(pcb, WEBTCPSENDCAP) for every...",
+      "topics": [
+        "backpressure",
+        "heap",
+        "lwip",
+        "web-server"
+      ],
+      "aliases": [
+        "send buffer cap",
+        "snd_buf cap",
+        "two-tab heap dip"
+      ],
+      "components": [
+        "platformTcpCapSendBuffer (platform_esp32.h)",
+        "WEB_TCP_SEND_CAP (webServerCompat.h)"
+      ],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Apply the cap before the first byte of a response is queued, under LOCKTCPIPCORE.",
+          "Keep WEBTCPSENDCAP at or above 2 x CONFIGLWIPTCPMSS (2,872 bytes).",
+          "Keep the change in the Platform shim and the web compatibility layer; no edit of the vendored AsyncTCP, ESPAsyncWebServer or lwIP code."
+        ],
+        "must_not": [
+          "Raise sndbuf above the value lwIP gave the connection.",
+          "Change the cap on a connection that already has data queued."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testwebfilescheduling.py compiles the real webBeginRequest(); its fixture stubs the shim, so it shows the call compiles and runs, not that lwIP honours the cap. That is shown only on the bench.",
+          "Bench recipe (TASK-1673 notes): reboot before every run, two-tab load 25 rounds, read hdminfreeheap and hddiptxbytes / hddiptxpcbs. With the cap, two overlapping streams hold 5,744 bytes together instead of 11,488."
+        ]
+      },
+      "scope": {
+        "path_globs": []
       },
       "metadata": {
         "binding": false,
@@ -11631,6 +12116,18 @@
       "resolved": true
     },
     {
+      "source": "ADR-139",
+      "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-139",
+      "target": "ADR-215",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-140",
       "target": "ADR-077",
       "type": "related",
@@ -11993,6 +12490,18 @@
     {
       "source": "ADR-147",
       "target": "ADR-146",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-147",
+      "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-147",
+      "target": "ADR-215",
       "type": "related",
       "resolved": true
     },
@@ -12471,6 +12980,24 @@
       "resolved": true
     },
     {
+      "source": "ADR-165",
+      "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-165",
+      "target": "ADR-215",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-165",
+      "target": "ADR-216",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-166",
       "target": "ADR-126",
       "type": "related",
@@ -12921,6 +13448,24 @@
       "resolved": true
     },
     {
+      "source": "ADR-188",
+      "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-188",
+      "target": "ADR-215",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-188",
+      "target": "ADR-216",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-189",
       "target": "ADR-184",
       "type": "related",
@@ -12965,6 +13510,12 @@
     {
       "source": "ADR-190",
       "target": "ADR-194",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-190",
+      "target": "ADR-215",
       "type": "related",
       "resolved": true
     },
@@ -13049,6 +13600,18 @@
     {
       "source": "ADR-192",
       "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-192",
+      "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-192",
+      "target": "ADR-215",
       "type": "related",
       "resolved": true
     },
@@ -13661,6 +14224,282 @@
     {
       "source": "ADR-208",
       "target": "ADR-207",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-209",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-209",
+      "target": "ADR-177",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-210",
+      "target": "ADR-056",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-210",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-210",
+      "target": "ADR-146",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-210",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-210",
+      "target": "ADR-188",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-211",
+      "target": "ADR-017",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-211",
+      "target": "ADR-043",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-211",
+      "target": "ADR-047",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-211",
+      "target": "ADR-099",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-212",
+      "target": "ADR-139",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-212",
+      "target": "ADR-147",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-212",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-212",
+      "target": "ADR-188",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-212",
+      "target": "ADR-192",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-212",
+      "target": "ADR-215",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-212",
+      "target": "ADR-216",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-053",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-056",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-123",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-146",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-147",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-177",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-188",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-193",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-209",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-213",
+      "target": "ADR-210",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-214",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-214",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-214",
+      "target": "ADR-213",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-139",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-147",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-188",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-190",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-192",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-216",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-216",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-216",
+      "target": "ADR-188",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-216",
+      "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-216",
+      "target": "ADR-215",
       "type": "related",
       "resolved": true
     }

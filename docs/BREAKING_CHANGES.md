@@ -6,6 +6,30 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ## 2.0.0
 
+### Removed: the OT-Direct standalone controller (fixed flow, heating curve, PI room compensation, CH hysteresis) (TASK-1684)
+
+SAT is now the only temperature controller on OT-Direct. The OT-Thing controller (TASK-183, TASK-582) only acted in OT-Direct master mode with SAT off. With its defaults it wrote a constant flow setpoint of 45.0 C (MsgID 1 = `0x2D00`) every 60 s.
+
+**Master mode without SAT:** no MsgID 1 is written. CH enable (bit 0) in the MsgID 0 master status is cleared only when the unit is in master mode, no CS override is active and SAT is not enabled; while SAT is enabled it stays on, also during SAT's hand-back or before its first `CS=`. Without SAT, central heating stays off until an external `CS=` command (REST, MQTT, Home Assistant, port 25238) sets a setpoint. That `CS=` must be repeated within 60 s: in master mode the override expires after 60 s (`OT_CSC2_EXPIRY_MS` in OTDirect.ino), and then CH goes off again when SAT is off. A thermostat that writes MsgID 1 > 0 on the slave interface also sets the override and so enables CH; a later write of 0 is ignored. Gateway mode (the thermostat controls the boiler) is unchanged. A gateway-mode unit whose thermostat is silent at boot runs in master mode for that boot (auto-detect, `OTDautodetect`); the mode is not saved, so every boot detects again (TASK-1694). A unit on which an older build already saved master mode this way stays in master mode until you set the OT-Direct mode to gateway once. If a thermostat later writes MsgID 1 > 0 on the slave interface, CH is enabled.
+
+**Removed settings:** `OTDchmode`, `OTDflowtemp`, `OTDflowmax`, `OTDroomsetpoint`, `OTDgradient`, `OTDexponent`, `OTDoffset`, `OTDroomcomp`, `OTDkp`, `OTDki`, `OTDkboost`, `OTDhysteresisenable`, `OTDhysteresis`.
+
+**REST:** `GET /api/v2/settings` no longer lists `otdchmode`, `otdflowtemp`, `otdflowmax`, `otdroomsetpoint`, `otdgradient`, `otdexponent`, `otdoffset`, `otdkp`, `otdki`, `otdkboost`, `otdhysteresis`, `otdroomcomp` and `otdhysteresisenable`, and `POST /api/v2/settings` with one of these names answers 400. `GET /api/v2/otdirect/settings` loses `ch_mode`, `flow_temp`, `flow_max`, `room_setpoint`, `gradient`, `exponent`, `offset`, `room_comp`, `kp`, `ki`, `kboost`, `hysteresis_enable` and `hysteresis`; `POST /api/v2/otdirect/settings` ignores the matching arguments. `GET /api/v2/otdirect/status` loses `ch_suspended`. `GET /api/v2/debug` loses the `settings.otd.*` controller fields.
+
+**MQTT:** the retained topic `<prefix>/otgw32/ch_suspended` is gone. The device empties it on every discovery pass. `otgw32/room_temp` and `otgw32/room_setpoint` stay.
+
+**Who is affected:** OT-Direct units without a thermostat and without SAT (master mode, including units that auto-detect switched to master), and scripts or automations that read or write the removed keys.
+
+**Migration:** enable SAT, or send `CS=<temperature>` from your own automation. Old `settings.ini` files load without error. If you downgrade to an older 2.x build, it falls back to its defaults (fixed flow 45 C) because the keys are no longer in `settings.ini`.
+
+### Behaviour change: a WiFi link without traffic triggers a reconnect, then a restart (TASK-1450)
+
+The gateway pings its default gateway once a minute. After 8 unanswered probes in a row it forces a WiFi reconnect (stored credentials are kept), and after 8 more it restarts with `WiFi: connected but no traffic` in `reboot_log.txt`. This only happens after the router has answered a ping once, and never while MQTT is connected, a REST client or a port 25238 tool sent traffic in the last minute, or Ethernet is the active link. After 3 such restarts it only reconnects, at most once per 15 minutes.
+
+**Who is affected:** installations whose router answers ping and that have no MQTT, REST or port 25238 client. A reconnect closes every open web, WebSocket, telnet and port 25238 connection.
+
+**Migration:** none.
+
 ### Behaviour change: MQTT on-change publishing is the default (ADR-116)
 
 On-change publishing is now enabled by default. Fresh installs use `MQTTonChangePublishing=true` with `MQTTinterval=60`, so changed OpenTherm values still publish immediately while unchanged values refresh once per minute instead of on every repeated frame.

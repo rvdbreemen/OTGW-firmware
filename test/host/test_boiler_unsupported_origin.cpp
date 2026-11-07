@@ -82,6 +82,7 @@ typedef uint8_t byte;
 typedef const char* PGM_P;
 #define PROGMEM
 #define PSTR(s) (s)
+#define siscanf sscanf   // newlib integer-only sscanf (TASK-1639); same parse for integer formats
 class __FlashStringHelper;                        // incomplete: pointer-only, as on Arduino
 #define F(s) ((const __FlashStringHelper*)(s))
 #define snprintf_P snprintf
@@ -144,7 +145,10 @@ static bool platformQueueReceive(PlatformQueue, void* item, uint32_t = 0) {
 
 // state / settings: only the fields the slices touch.
 #include "SATboilerFeed.h"                         // the real header: SatBoilerFeed, SatFeedEvent, SatShVerdict (no firmware state in it)
-#include "otbus.inc"                               // the real OTBusState
+#include "SATpm25Poll.h"                           // the real header: SatPm25Bus, satPm25NoteFrame (TASK-1653, no firmware state in it)
+#include "diagRecorderStuff.h"                     // the real header (TASK-1665); the recorder is never started here, so its capture points are the idle no-op
+static DiagRecorder diagRec;
+#include "otbus.inc"                              // the real OTBusState
 static struct {
   OTBusState otBus;
   struct { uint8_t iShVerdict; } sat;              // processOT() stores the MsgID 57 verdict (TASK-1412.13)

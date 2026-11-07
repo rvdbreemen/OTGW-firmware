@@ -38,8 +38,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_sat_pwm_override import compile_cpp  # noqa: E402
 
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino"))
-# Automatic gains are the only mode (TASK-1357): kd = 0.07 * 8400 * kp, kp = coefficient * curve / 3 (radiators).
-KD_AT_CURVE_40 = round(0.07 * 8400.0 * round(1.6 * 40.0 / 3.0, 3), 3)   # the gains are rounded to 3 decimals since TASK-1423 (entry 95, Q28a)
+# Automatic gains are the only mode (TASK-1357): kd = 0.063 * 8400 * kp (entry 279, TASK-1656; pid.py:93 has 0.07), kp = coefficient * curve / 3 (radiators).
+KD_FACTOR = 0.063   # Sergeant D entry 279 (TASK-1656)
+KD_AT_CURVE_40 = round(KD_FACTOR * 8400.0 * round(1.6 * 40.0 / 3.0, 3), 3)   # the gains are rounded to 3 decimals since TASK-1423 (entry 95, Q28a)
 PID_INO = Path(os.environ.get("OTGW_SATPID_INO", REPO / "src" / "OTGW-firmware" / "SATpid.ino"))
 TIMERS = (REPO / "src" / "OTGW-firmware" / "safeTimers.h").as_posix()
 
@@ -554,7 +555,7 @@ class Cadence(unittest.TestCase):
 
     def test_m_first_output_with_pid_terms_has_d_zero_then_d(self):
         """Entry 95 Q39b (round 3): the first output that includes the PID terms has D = 0, also when it comes after a restore and
-        a stretch of curve-only outputs; the next output has D = kd * raw derivative (curve 40, coefficient 1.6: kd = 0.07 * 8400 * 1.6 * 40 / 3 = 12544, raw 0.02 -> 250.88)."""
+        a stretch of curve-only outputs; the next output has D = kd * raw derivative (curve 40, coefficient 1.6: kd = 0.063 * 8400 * 1.6 * 40 / 3 = 11289.6, raw 0.02 -> 225.792)."""
         if self.head:
             self.fail("HEAD has no restore hold")
         rows = {int(r["t"]): r for r in self.run_sc("holdsave", 10)}

@@ -237,6 +237,9 @@ Layer 4: Application Layer (OTGW-firmware)
    - **Mitigation:** Network segmentation recommended
    - **Mitigation:** WiFi encryption (WPA2/WPA3)
    - **Mitigation:** Router firewall rules
+   - **Mitigation (2.0.0, TASK-1644, 2026-11-05):** the telnet debug console on port 23 has no login and its keys can
+     switch the GPIO output. The setting `telnetenabled` (default on) closes that port at once, without a reboot
+     (GitHub #154 point 4). The other unauthenticated services are unchanged.
    - **Accepted:** Trust model assumes trusted local network
 
 2. **Vulnerable if Exposed to Internet** 🔴 CRITICAL

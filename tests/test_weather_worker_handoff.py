@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""TASK-1604 (TASK-1471 R1, R2): the weather GET runs on a one-shot worker task, and the PIC refresh
-stops after a failed update check.
+"""TASK-1604 (TASK-1471 R1, R2): the weather GET runs on a worker task, and the PIC refresh
+stops after a failed update check. TASK-1669: that worker is the persistent webhook sender task,
+not a task created and deleted per fetch (which lost ~132 B of heap per fetch).
 
 The code under test is NOT re-implemented here. The compiled tests cut the real weather parser, the
 WeatherResult scratch struct and the worker/handoff/scheduler block (weatherFetchWork ..
 weatherLoop) out of src/OTGW-firmware/SATweather.ino and compile them on the host with stubs: a fake
-HTTPClient/WiFiClient over a byte buffer, a platformTaskCreatePinned stub that only records the call
-(the test runs the worker body by hand, so "worker" and "loop" interleave deterministically), a
+HTTPClient/WiFiClient over a byte buffer, a webhookTaskAvailable() stub that records each worker request
+(the test runs weatherWorkerPoll() by hand, so "worker" and "loop" interleave deterministically), a
 controllable millis() and heap level.
 
 Source tests (no compiler needed):
   S1 http.GET() exists only in weatherFetchWork(); the loop-path functions never call it
   S2 weatherFetchWork() sets a connect timeout of at most 2000 ms
-  S3 the worker is created through the platform shim, not a raw FreeRTOS call
+  S3 the weather code creates and deletes no task per fetch (TASK-1669); the webhook sender task
+     calls weatherWorkerPoll() in its loop
   S4 R2: refreshpic() returns after an empty checkforupdatepic() answer, before any GET
 Compiled tests:
   C1 handoff: nothing is written to state.sat.weather before the loop task consumes the result;
@@ -20,7 +22,7 @@ Compiled tests:
   C2 busy guard: no second worker while one runs or while its result is unconsumed
   C3 heap CRITICAL: no worker is started
   C4 failure path and first-fetch backoff (60 s, 120 s) keep working through the handoff
-  C5 task creation failure counts one fetch error and leaves the state IDLE
+  C5 no worker task available: counts one fetch error and leaves the state IDLE
 
 OTGW_SATWEATHER_INO / OTGW_CORE_INO point at another copy (for example the output of
 `git show HEAD:src/OTGW-firmware/SATweather.ino`) for the old-vs-fix run.
@@ -42,6 +44,7 @@ from test_weather_stream_tail import make_json  # noqa: E402
 
 WEATHER_INO = Path(os.environ.get("OTGW_SATWEATHER_INO", REPO / "src" / "OTGW-firmware" / "SATweather.ino"))
 CORE_INO = Path(os.environ.get("OTGW_CORE_INO", REPO / "src" / "OTGW-firmware" / "OTGW-Core.ino"))
+WEBHOOK_INO = Path(os.environ.get("OTGW_WEBHOOK_INO", REPO / "src" / "OTGW-firmware" / "webhook.ino"))
 
 
 def read(p: Path) -> str:
@@ -76,12 +79,16 @@ class SourceChecks(unittest.TestCase):
         self.assertIsNotNone(m)
         self.assertLessEqual(int(m.group(1)), 2000)
 
-    def test_s3_shim_not_raw_freertos(self):
+    def test_s3_no_task_per_fetch(self):
+        # TASK-1669: a task created and deleted per fetch lost ~132 B of internal heap per fetch
         src = read(WEATHER_INO)
-        self.assertIn("platformTaskCreatePinned(weatherWorkerBody", src)
-        self.assertNotIn("xTaskCreate", src)
-        self.assertNotIn("vTaskDelete", src)
-        self.assertIn("platformTaskExit();", src)
+        for call in ("platformTaskCreatePinned(", "platformTaskExit(", "xTaskCreate", "vTaskDelete"):
+            self.assertNotIn(call, src, "SATweather.ino must not create or delete a task per fetch: " + call)
+        wh = read(WEBHOOK_INO)
+        a = wh.index("static void webhookTaskBody(")
+        body = wh[a:wh.index("\n}\n", a)]
+        self.assertIn("weatherWorkerPoll();", body, "the webhook sender task must run the weather fetch")
+        self.assertNotIn("PLATFORM_QUEUE_WAIT_FOREVER", body, "the sender task must wake up for a weather request")
 
     def test_s4_r2_refreshpic_stops_on_empty_version(self):
         src = read(CORE_INO)
@@ -114,11 +121,18 @@ STUB = r'''
 #define __ATOMIC_RELEASE 0
 #define __atomic_load_n(p, o) (*(p))
 #define __atomic_store_n(p, v, o) ((void)(*(p) = (v)))
+#define __ATOMIC_ACQ_REL 0
+template <class T> static T host_xchg(T* p, T v) { T o = *p; *p = v; return o; }
+#define __atomic_exchange_n(p, v, o) host_xchg((p), (v))
 #endif
 
 static uint32_t g_ms = 0;
 static uint32_t millis() { return g_ms; }
 static void yield() {}
+// TASK-1665: the diagnostic recorder is never started here, so the capture point is its one-read no-op.
+struct DiagRecStub { bool active = false; void recWeather(int16_t, int16_t, int16_t) {} };
+static DiagRecStub diagRec;
+static int16_t diagX100(float) { return 0; }
 
 static std::string g_data;
 static size_t g_pos = 0;
@@ -163,17 +177,14 @@ enum HeapHealthLevel { HEAP_HEALTHY, HEAP_LOW, HEAP_WARNING, HEAP_CRITICAL };
 static HeapHealthLevel g_heap = HEAP_HEALTHY;
 static HeapHealthLevel getHeapHealth() { return g_heap; }
 
-using PlatformTask = void*;
+// TASK-1669: a worker request goes to the persistent webhook sender task. g_createCalls counts the
+// requests (one per started fetch); g_createFails stands for "no sender task".
 static int g_createCalls = 0;
 static bool g_createFails = false;
-static void (*g_workerFn)(void*) = nullptr;
-static PlatformTask platformTaskCreatePinned(void (*fn)(void*), const char*, uint32_t, void*, unsigned) {
+static bool webhookTaskAvailable() {
   g_createCalls++;
-  if (g_createFails) return nullptr;
-  g_workerFn = fn;
-  return (PlatformTask)1;
+  return !g_createFails;
 }
-static void platformTaskExit() {}
 
 static int g_restartTimer = 0;
 static bool g_due = false;
@@ -190,7 +201,7 @@ static const uint32_t WEATHER_FIRST_RETRY_MS = 60000UL;
 
 static void runWorker(const std::string& body, int code) {
   g_data = body; g_pos = 0; g_httpCode = code;
-  g_workerFn(nullptr);
+  weatherWorkerPoll();
 }
 #define P(k, v) printf("%s=%g\n", k, (double)(v))
 

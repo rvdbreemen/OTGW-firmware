@@ -114,7 +114,14 @@
   function applyTheme(dark) {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     var b = document.getElementById('themeToggle');
-    if (b) { b.textContent = dark ? '☀ Light' : '🌙 Dark'; b.setAttribute('aria-pressed', dark ? 'true' : 'false'); }
+    // TASK-1692: the label shows what a click gives, so no aria-pressed (the WAI-ARIA toggle-button
+    // pattern keeps the label fixed); aria-label and title name that action.
+    if (b) {
+      var action = dark ? 'Switch to light theme' : 'Switch to dark theme';
+      b.textContent = dark ? '☀ Light' : '🌙 Dark';
+      b.setAttribute('aria-label', action);
+      b.setAttribute('title', action);
+    }
   }
   function initTheme() {
     applyTheme(document.documentElement.getAttribute('data-theme') === 'dark');
@@ -1134,7 +1141,7 @@
             : (model.ch ? lead + ' idle' : 'STANDBY');
     txt('aLcd', lcd);
     txt('aPress', fmt(model.pressure, 2, ' bar'));
-    if (model.flow !== null && model.ret !== null) txt('aDt', 'ΔT ' + fmt(model.flow - model.ret, 1, '°'));
+    txt('aDt', 'ΔT ' + (model.flow !== null && model.ret !== null ? fmt(model.flow - model.ret, 1, '°') : '—'));
     // radiator bars tint from the flow temperature (cool track → hot), but only
     // while CH is actually heating — residual boiler heat must not paint them red.
     var rads = document.querySelectorAll('#schem .rad-bar');
@@ -1383,7 +1390,11 @@
     if (typeof n !== 'number' || typeof iv !== 'number' || typeof age !== 'number' || typeof sc !== 'number') return hist;
     if (!(n > 0) || !(iv > 0) || !(sc > 0) || !(age >= 0)) return hist;
     for (var c = 0; c < ALL.length; c++) if (!Array.isArray(j[ALL[c]]) || j[ALL[c]].length !== n) return hist;
-    var live = hist.filter(function (r) { return !r.h; }), ivMs = iv * 1000, out = [], li = 0;
+    // TASK-1306: earlier history that ends before the oldest slot of this response stays (after a device
+    // reboot the device no longer has it); history overlapping the response is replaced by it. One 5 s slot
+    // of tolerance absorbs the request timing. Those kept records act like live ones in the merge below.
+    var ivMs = iv * 1000, tFirst = nowMs - age - n * ivMs, out = [], li = 0;
+    var live = hist.filter(function (r) { return !r.h || r.t + r.span <= tFirst + GSLOT; });
     // TASK-1578: the device stores a room dropout as a null room. When the window has room readings at all,
     // a null room in a slot that has other data is a dropout (the TASK-1546 interruption); a unit that never
     // reported a room temperature has no dropout to show.
@@ -2016,11 +2027,13 @@
     ssid:            { cat: 'system', label: 'Wi-Fi network', hint: 'Connected SSID (read-only)' },
     httppasswd:      { cat: 'system', label: 'Admin password', hint: 'Protects Settings / Advanced' },
     boardmode:       { cat: 'system', label: 'Board mode', hint: 'Hardware interface override' },
+    telnetenabled:   { cat: 'system', label: 'Telnet debug console', hint: 'TCP port 23, no login' },
     wifistaticip:    { cat: 'network', sub: 'Wi-Fi', label: 'Static IP', hint: 'Leave empty for DHCP' },
     wifisubnet:      { cat: 'network', sub: 'Wi-Fi', label: 'Subnet mask' },
     wifigateway:     { cat: 'network', sub: 'Wi-Fi', label: 'Gateway' },
     wifidns1:        { cat: 'network', sub: 'Wi-Fi', label: 'DNS 1' },
     wifidns2:        { cat: 'network', sub: 'Wi-Fi', label: 'DNS 2', hint: 'Optional' },
+    wifinoportal:    { cat: 'network', sub: 'Wi-Fi', label: 'No setup portal when Wi-Fi is down', hint: 'Keeps retrying; triple reset opens the portal' },
     ethstaticip:     { cat: 'network', sub: 'Ethernet', label: 'Use static IP' },
     ethipaddress:    { cat: 'network', sub: 'Ethernet', label: 'IP address' },
     ethsubnet:       { cat: 'network', sub: 'Ethernet', label: 'Subnet mask' },
@@ -2065,7 +2078,6 @@
     webhookcontenttype: { cat: 'webhook', label: 'Content type' },
     webhookpayload:  { cat: 'webhook', label: 'Payload template' },
     ledblink:        { cat: 'behavior', label: 'Blink LED on OT traffic' },
-    darktheme:       { cat: 'behavior', label: 'Dark theme by default' },
     nightlyrestart:  { cat: 'behavior', label: 'Nightly restart' },
     nightlyrestarthour: { cat: 'behavior', label: 'Restart hour', hint: '0–23' },
     // Most-used SAT fields get curated labels; the long tail falls back to the
@@ -2081,20 +2093,7 @@
     satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' },
     sathpcycle:      { cat: 'sat', label: 'PWM cycle length', hint: 'Minutes' },   // TASK-1550: one field for every appliance type, see helpFor()
     otdmode:         { cat: 'otd', label: 'OT-Direct mode' },
-    // OT-Direct heating-curve / PI room-comp + ventilation (TASK-933 Phase 2)
-    otdchmode:           { cat: 'otd', label: 'CH mode' },
-    otdflowtemp:         { cat: 'otd', label: 'Flow setpoint', hint: '°C' },
-    otdflowmax:          { cat: 'otd', label: 'Max flow temperature', hint: '°C' },
-    otdroomsetpoint:     { cat: 'otd', label: 'Room setpoint', hint: '°C' },
-    otdgradient:         { cat: 'otd', label: 'Heat-curve gradient' },
-    otdexponent:         { cat: 'otd', label: 'Curve exponent' },
-    otdoffset:           { cat: 'otd', label: 'Curve offset', hint: '°C' },
-    otdroomcomp:         { cat: 'otd', label: 'Room compensation' },
-    otdkp:               { cat: 'otd', label: 'Kp (proportional)' },
-    otdki:               { cat: 'otd', label: 'Ki (integral)' },
-    otdkboost:           { cat: 'otd', label: 'K boost' },
-    otdhysteresisenable: { cat: 'otd', label: 'Hysteresis enabled' },
-    otdhysteresis:       { cat: 'otd', label: 'Hysteresis', hint: '°C' },
+    // OT-Direct ventilation (TASK-933 Phase 2)
     otdventenable:       { cat: 'otd', label: 'Ventilation enabled' },
     otdopenbypass:       { cat: 'otd', label: 'Open bypass now' },
     otdautobypass:       { cat: 'otd', label: 'Auto bypass' },
@@ -2266,7 +2265,10 @@
   // (NOT from setData — satOnbNeeded()/the ui_onboarded logic read setData). Rendering them
   // as editable "Onboarded" checkboxes would let a user tick one and permanently bypass the
   // wizard + its enable-interception. Rows are hidden here, not dropped from setData.
-  var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1 };
+  // TASK-1692: darktheme is never read by this UI (the theme comes from the toggle in this
+  // browser, else the OS preference, see the v2.html pre-paint script); the key stays in REST
+  // and in the settings file.
+  var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1, darktheme: 1 };
   function humanizeKey(k) {
     var s = k.replace(/^(sat|otd|gpiosensors|gpiooutputs|s0counter|mqtt|wifi|eth|ntp|webhook|ui_|dallas)/, '');
     if (!s) s = k;
@@ -3165,8 +3167,6 @@
     // OT-Direct gateway mode — labels from OTDirecttypes.h (NOT the mockup's
     // Off/On-Off/PID list, which was a different, wrong concept).
     otdmode: [[0, 'Bypass'], [1, 'Gateway'], [2, 'Monitor'], [3, 'Master'], [4, 'Loopback']],
-    // OT-Direct CH mode (TASK-933 P2): 0=off, 1=fixed flow, 2=heating curve (auto)
-    otdchmode: [[0, 'Off'], [1, 'Fixed flow'], [2, 'Heating curve (auto)']],
     // SAT manufacturer presets — labels from the firmware satManufacturerTable[].
     satmanufacturer: [[0, 'Auto'], [1, 'Atag'], [2, 'Baxi'], [3, 'Brotje'], [4, 'De Dietrich'], [5, 'Ferroli'], [6, 'Geminox'], [7, 'Ideal'], [8, 'Immergas'], [9, 'Intergas'], [10, 'Itho'], [11, 'Nefit'], [12, 'Radiant'], [13, 'Remeha'], [14, 'Sime'], [15, 'Vaillant'], [16, 'Viessmann'], [17, 'Worcester'], [18, 'Other']],
     // Webhook POST content type — standard closed set (string-valued enum; the
@@ -4198,11 +4198,7 @@
   var fsCurrentPath = '/';
   // Core UI assets: deleting any of these bricks the very page you are looking at, so
   // the Delete affordance is withheld (parity with the FSexplorer.html protectedFiles guard).
-  var FS_PROTECTED = [
-    'v2.html', 'v2.js', 'v2-bundle.css',
-    'FSexplorer.html', 'FSexplorer.png', 'fsexplorer.css', 'favicon.ico', 'settings.png',
-    'inter-400.woff2', 'inter-700.woff2', 'jetbrains-mono-400.woff2'
-  ];
+  var FS_PROTECTED = ['v2.html.gz', 'FSexplorer.html.gz', 'favicon.ico', 'settings.png'];
   function fsFmtBytes(n) {
     n = +n || 0;
     if (n < 1024) return n + ' B';

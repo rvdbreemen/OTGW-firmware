@@ -214,3 +214,11 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-206 | Accepted | - | All twelve debug flags get one name table, src/OTGW-firmware/debugFlags.h (kDebugFlags: REST name, telnet key, DebugS... |
 | ADR-207 | Accepted | - | SAT sends MM=, the Immergas TP=11:12 and CH= to the PIC only when the value changes. |
 | ADR-208 | Accepted | `src/OTGW-firmware/OTDirect.ino` | In OT-Direct gateway mode, bit 0 of the master status in a relayed thermostat READDATA MsgID 0 frame is set by the sa... |
+| ADR-209 | Accepted | - | Format. |
+| ADR-210 | Accepted | - | Route. |
+| ADR-211 | Proposed | - | A WiFi supervisor restart marks the next boot. |
+| ADR-212 | Accepted | - | Native loading. |
+| ADR-213 | Accepted | - | Opt-in, local, RAM (random-access memory) only. |
+| ADR-214 | Accepted | - | Ids are a hash, not a table. |
+| ADR-215 | Accepted | - | One file per page. |
+| ADR-216 | Accepted | - | webBeginRequest() (src/OTGW-firmware/webServerCompat.h) calls platformTcpCapSendBuffer(pcb, WEBTCPSENDCAP) for every... |

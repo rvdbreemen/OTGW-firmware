@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-beta.79
+**  Version  : v2.0.0-beta.125
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -53,10 +53,9 @@ static bool s_uploadOk = false;
 #define MAX_FILES_IN_LIST   40
 
 const char Helper[] PROGMEM =
-  "<br>You first need to upload these two files:\n"
+  "<br>You first need to upload this file (from the filesystem build, .pio/data-staging):\n"
   "<ul>\n"
-  "  <li>FSexplorer.html</li>\n"
-  "  <li>FSexplorer.css</li>\n"
+  "  <li>FSexplorer.html.gz</li>\n"
   "</ul>\n"
   "<form method=\"POST\" action=\"upload\" enctype=\"multipart/form-data\">\n"
   "  <input type=\"file\" name=\"upload\">\n"
@@ -69,7 +68,7 @@ const char Helper[] PROGMEM =
 const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
 
 
-// Serve a static webui asset with ETag-based cache validation (ADR-139, amended
+// Serve a gzipped web page with ETag-based cache validation (ADR-139, amended
 // TASK-958). Stable URLs, no ?v= query versioning: the ETag is the filesystem
 // hash. Cache-Control: no-cache means the browser MAY store the asset but MUST
 // revalidate (conditional GET) before every use — it never serves from cache
@@ -79,22 +78,24 @@ const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCa
 // for up to 60s, so a filesystem OTA (which DOES replace the assets) still showed
 // the old UI on the immediate post-reboot reload (window.location.href='/' does
 // not bypass a fresh cache entry). no-cache costs one tiny 304 revalidation per
-// asset per load, negligible on the trusted LAN. Assets are
-// stored as plain readable files on LittleFS (no build-time gzip, maintainer
-// directive); streamed straight from flash via AsyncFileResponse, never buffered
-// whole on the fragmented S3 heap.
-static void serveVersionedAsset(const char* path, const __FlashStringHelper* mime) {
-  // Existence first, before any ETag / max-age is staged and before the 304
-  // short-circuit. A missing asset must NOT be cached: the ETag is the filesystem
-  // hash, which only changes on a reflash, so a 404 tagged with it (or answered
-  // 304 against it) would be reused for the whole firmware session and would even
-  // survive a manual FSexplorer re-upload of the file (an upload does not bump the
-  // hash). So a miss returns a no-cache 404 with no validator, matching the
-  // pre-ETag behaviour and refetching every time.
+// asset per load, negligible on the trusted LAN. TASK-1640 (ADR-215): each web
+// page is one gzipped file (scripts/webui_pages.py inlines its CSS, JavaScript
+// and fonts at build time), streamed straight from flash via AsyncFileResponse
+// with Content-Encoding: gzip, never buffered whole on the fragmented S3 heap.
+// Mixed state (ADR-215): new firmware on a filesystem from before the gzipped pages
+// still has the plain page (plainPath, e.g. /v2.html). It is served as-is, without
+// Content-Encoding, when the .gz file is absent. Returns false, without sending
+// anything, when neither exists, so the caller can fall back to the recovery page.
+static bool serveGzipPage(const char* gzPath, const char* plainPath) {
+  // Existence first, before any ETag is staged and before the 304 short-circuit:
+  // the ETag is the filesystem hash, which only changes on a reflash, so a miss
+  // must not be answered with it.
+  const char* path = gzPath;
+  bool gzip = true;
   if (!LittleFS.exists(path)) {
-    webPushHeader(F("Cache-Control"), F("no-cache"));
-    webSend(404, F("text/plain"), F("File not found"));
-    return;
+    if (!plainPath || !LittleFS.exists(plainPath)) return false;
+    path = plainPath;
+    gzip = false;
   }
   const char* fsHash = getFilesystemHash();
   if (fsHash && fsHash[0] != '\0') {
@@ -102,7 +103,7 @@ static void serveVersionedAsset(const char* path, const __FlashStringHelper* mim
     // filesystem build. A bare fsHash ETag would be identical for every file,
     // so a browser could get a false 304 for one path from the validator of
     // another (TASK-960 saw this when the root route still switched between two
-    // UI shells). Include the served path so each asset has a distinct validator.
+    // UI shells). Include the served path so each page has a distinct validator.
     char etag[64];
     snprintf_P(etag, sizeof(etag), PSTR("\"%s-%s\""), fsHash, path);
     if (hasHeaderCompat(F("If-None-Match")) &&
@@ -110,17 +111,25 @@ static void serveVersionedAsset(const char* path, const __FlashStringHelper* mim
       webPushHeader(F("Cache-Control"), F("no-cache"));
       webPushHeader(F("ETag"), etag);
       webSendStatus(304);
-      return;
+      return true;
     }
     webPushHeader(F("ETag"), etag);
   }
   webPushHeader(F("Cache-Control"), F("no-cache"));
-  webSendFile(path, mime, /*gzip=*/false);
+  webSendFile(path, F("text/html; charset=UTF-8"), gzip);
+  return true;
+}
+
+// The recovery page: FSexplorer, or the PROGMEM upload prompt when it is missing too.
+static void sendFSexplorerPage() {
+  if (!serveGzipPage("/FSexplorer.html.gz", "/FSexplorer.html")) {
+    webSendP(200, PSTR("text/html; charset=UTF-8"), Helper);  // prompt to upload FSexplorer.html.gz
+  }
 }
 
 // TASK-1294: static text that lives in the firmware image instead of on LittleFS, so
 // the 4 MB boards keep their LittleFS headroom. Same cache contract as
-// serveVersionedAsset(): Cache-Control no-cache plus an ETag, 304 on a matching
+// serveGzipPage(): Cache-Control no-cache plus an ETag, 304 on a matching
 // If-None-Match. The validator is the FIRMWARE git hash plus the path, because the
 // body changes only with the firmware image, not with the LittleFS image: a
 // filesystem-only update leaves it alone, a firmware update changes it. The body
@@ -140,27 +149,9 @@ static void serveProgmemAsset(const char* path, PGM_P mime, PGM_P body) {
   webSendPStream(200, mime, body);
 }
 
-// TASK-989: fonts are large immutable binaries that v2.html loads one at a time
-// through the FontFace() API. Unlike the HTML/CSS/JS shell they never change between releases,
-// so serve them with a long immutable max-age: after the first visit the browser
-// never asks again (not even a 304 probe), removing three parallel connections
-// from every page load. They previously fell through to the onNotFound catch-all
-// (no cache headers -> refetched per load, plus String churn on the async task).
-static void serveImmutableAsset(const char* path, const __FlashStringHelper* mime) {
-  if (!LittleFS.exists(path)) {
-    webPushHeader(F("Cache-Control"), F("no-cache"));
-    webSend(404, F("text/plain"), F("File not found"));
-    return;
-  }
-  webPushHeader(F("Cache-Control"), F("max-age=31536000, immutable"));
-  webSendFile(path, mime, /*gzip=*/false);
-}
-
-// Serve the web UI shell (v2.html). ADR-139: the bespoke chunked
+// Serve the web UI (v2.html.gz). ADR-139: the bespoke chunked
 // beginChunkedResponse emitter that rewrote ?v=<fsHash> into asset URLs line by
-// line is retired. The shell is now a plain static file served from flash via
-// AsyncFileResponse with ETag validation, identical to every other asset, so it
-// is never buffered whole on the fragmented S3 heap and shares one cache policy.
+// line is retired; the page is a plain static file with ETag validation.
 static void sendIndex(AsyncWebServerRequest *request) {
   webBeginRequest(request);
   // Auth guard: if a password is configured, require it upfront so the browser
@@ -168,13 +159,9 @@ static void sendIndex(AsyncWebServerRequest *request) {
   // mid-session popup. checkHttpAuth() sends the 401 challenge on failure.
   if (!checkHttpAuth()) return;
   // TASK-1223.12: v2 is the only Web UI; the classic shell (index.html) is gone.
-  // Checked per request, not at boot: when v2.html is deleted or lost at runtime
-  // the root still lands on FSexplorer, the page to upload a working copy with.
-  if (!LittleFS.exists("/v2.html")) {
-    webSendFile("/FSexplorer.html", F("text/html; charset=UTF-8"), /*gzip=*/false);
-    return;
-  }
-  serveVersionedAsset("/v2.html", F("text/html; charset=UTF-8"));
+  // Checked per request, not at boot: when the UI page is deleted or lost at runtime
+  // the root still lands on FSexplorer, the page to repair the filesystem with.
+  if (!serveGzipPage("/v2.html.gz", "/v2.html")) sendFSexplorerPage();
 }
 
 // TASK-989 NOTE: a server-level heap-guard middleware (shed/abort on low maxblock,
@@ -192,38 +179,20 @@ static void sendIndex(AsyncWebServerRequest *request) {
 
 //=====================================================================================
 void startWebserver(){
-  // Versioned-asset helpers register one handler per asset; the lambda binds the
-  // request context before delegating to serveVersionedAsset().
-  // The root paths keep /index and /index.html so old bookmarks still land on the UI.
-  // Serve v2.html with ETag-based caching (ADR-139, amended TASK-958):
+  // The root paths keep /index, /index.html and /v2.html so old bookmarks still land on
+  // the UI. ETag-based caching (ADR-139, amended TASK-958):
   //  - Cache-Control: no-cache — browser may store but MUST revalidate via If-None-Match (ETag = fsHash) every load.
   //  - Unchanged FS → server replies 304 Not Modified (headers only, no body re-download).
   //  - FS upgraded/OTA → ETag changes → server replies 200 with fresh content on the very next load (no stale window).
-  //  - JS/CSS assets share the same stable-path + ETag policy (no ?v= query versioning).
-  // sendIndex() falls back to FSexplorer when v2.html is missing.
+  // TASK-1640: the page carries its CSS, JavaScript and fonts, so there are no asset routes.
+  // sendIndex() falls back to FSexplorer when v2.html.gz is missing.
   server.on("/",           HTTP_GET, sendIndex);
   server.on("/index",      HTTP_GET, sendIndex);
   server.on("/index.html", HTTP_GET, sendIndex);
-  server.serveStatic("/FSexplorer.png", LittleFS, "/FSexplorer.png");
-
-  // ETag + bounded max-age caching for every static webui asset (ADR-139). Plain
-  // readable files served from flash via AsyncFileResponse; no gzip, no ?v= query.
-  // TASK-1223.13: FSexplorer's own stylesheet, so the recovery page needs no design-system file.
-  server.on("/fsexplorer.css",   HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/fsexplorer.css",   F("text/css")); });
-  // The v2 Web UI bundle (TASK-908; the only Web UI since TASK-1223.12).
-  server.on("/v2.html",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); if (!checkHttpAuth()) return; serveVersionedAsset("/v2.html", F("text/html; charset=UTF-8")); });
-  server.on("/v2.js",            HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2.js",            F("application/javascript")); });
-  // TASK-989: ds-tokens.css + v2.css concatenated at build time (build.py,
-  // generate_v2_css_bundle). v2.html loads this bundle; the two source files are
-  // not shipped in the filesystem image (build.py STAGING_EXCLUDE).
-  server.on("/v2-bundle.css",    HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2-bundle.css",    F("text/css")); });
+  server.on("/v2.html",    HTTP_GET, sendIndex);
   // TASK-1281: the settings help texts, fetched by v2.js the first time an info icon is used.
   // TASK-1294: served from the firmware image (settingsHelp.h), not from LittleFS.
   server.on("/settings-help.json", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveProgmemAsset("/settings-help.json", PSTR("application/json"), SETTINGS_HELP_JSON); });
-  // TASK-989: immutable-cached font routes (see serveImmutableAsset above).
-  server.on("/fonts/inter-400.woff2",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveImmutableAsset("/fonts/inter-400.woff2",          F("font/woff2")); });
-  server.on("/fonts/inter-700.woff2",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveImmutableAsset("/fonts/inter-700.woff2",          F("font/woff2")); });
-  server.on("/fonts/jetbrains-mono-400.woff2", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveImmutableAsset("/fonts/jetbrains-mono-400.woff2", F("font/woff2")); });
 #if HAS_PIC
   //otgw pic functions
   server.on("/pic", HTTP_ANY, upgradepic);
@@ -285,14 +254,10 @@ void handleWebserverListener(){
     retries = 0;
   }
 }
-// Serve /FSexplorer.html (static file).
+// Serve FSexplorer (FSexplorer.html.gz), the recovery page.
 static void sendFSexplorerHtml(AsyncWebServerRequest *request) {
   webBeginRequest(request);
-  if (LittleFS.exists("/FSexplorer.html")) {
-    webSendFile("/FSexplorer.html", F("text/html; charset=UTF-8"), /*gzip=*/false);
-  } else {
-    webSendP(200, PSTR("text/html; charset=UTF-8"), Helper);  // prompt to upload FSexplorer.html
-  }
+  sendFSexplorerPage();
 }
 
 //=====================================================================================
@@ -303,7 +268,6 @@ void setupFSexplorer(){
 
   server.on("/api/firmwarefilelist", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); apifirmwarefilelist(); });  // DEPRECATED: unversioned (ADR-035)
   server.on("/api/listfiles",        HTTP_ANY, [](AsyncWebServerRequest *r){ webBeginRequest(r); apilistfiles(); });         // DEPRECATED: unversioned (ADR-035)
-  // server.on("/LittleFSformat", HTTP_GET, formatLittleFS);
   // /upload: the body completion handler runs after the upload finished. If auth
   // or the same-origin check failed, handleFileUpload skipped the open and wrote
   // nothing; send the 401/403 here. This handler owns the whole response.
@@ -336,8 +300,8 @@ void setupFSexplorer(){
   // setup() is idempotent (guarded by _routesRegistered), so the per-connect
   // updateCredentials() calls in startWiFi() never re-register the route.
   httpUpdater.setup(&server);
-  httpUpdater.setIndexPage(UpdateServerIndex);
-  httpUpdater.setSuccessPage(UpdateServerSuccess);
+  httpUpdater.setIndexPage(UpdateServerIndex, UpdateServerIndexLen);
+  httpUpdater.setSuccessPage(UpdateServerSuccess, UpdateServerSuccessLen);
   if (settings.sHTTPpasswd[0] != '\0') {
     httpUpdater.updateCredentials("admin", settings.sHTTPpasswd);
   }
@@ -594,8 +558,9 @@ bool handleFile(String&& path)
     sendFSexplorerRedirect();
     return true;
   }
-  if (!LittleFS.exists("/FSexplorer.html")) { webSendP(200, PSTR("text/html; charset=UTF-8"), (PGM_P)Helper); return true; }
-  if (path.endsWith("/")) path += F("v2.html");
+  // The upload prompt only when no recovery page exists at all: a filesystem from before
+  // the gzipped pages has the plain /FSexplorer.html and keeps serving settings.ini etc.
+  if (!LittleFS.exists("/FSexplorer.html.gz") && !LittleFS.exists("/FSexplorer.html")) { webSendP(200, PSTR("text/html; charset=UTF-8"), (PGM_P)Helper); return true; }
   // ADR-056 §1: settings.ini stores httppasswd and MQTTpasswd in cleartext, so this
   // read path sits INSIDE the protected admin boundary — it is not one of the "read
   // paths that do not expose secret values" the open carve-out covers. Every sibling
@@ -720,24 +685,6 @@ void handleFileUpload(AsyncWebServerRequest *request, const String &filename,
 
 
 //=====================================================================================
-void formatLittleFS(AsyncWebServerRequest *request)
-{       //Formatiert den Speicher
-  webBeginRequest(request);
-  if (!LittleFS.exists("/!format")) return;
-  DebugTln(F("Format LittleFS"));
-  LittleFS.format();
-  sendFSexplorerRedirect();
-
-} // formatLittleFS()
-
-//=====================================================================================
-const String formatBytes(size_t const& bytes) 
-{ 
-  return (bytes < 1024) ? String(bytes) + " Byte" : (bytes < (1024 * 1024)) ? String(bytes / 1024.0) + " KB" : String(bytes / 1024.0 / 1024.0) + " MB";
-
-} //formatBytes()
-
-//=====================================================================================
 const String &contentType(String& filename) 
 {       
   if (filename.endsWith(".htm") || filename.endsWith(".html")) filename = F("text/html; charset=UTF-8");
@@ -756,23 +703,6 @@ const String &contentType(String& filename)
   return filename;
   
 } // &contentType()
-
-//=====================================================================================
-bool freeSpace(uint16_t const& printsize)
-{
-  FSInfo fsInfo;
-  platformFSInfo(fsInfo);
-  unsigned long totalB = fsInfo.totalBytes;
-  unsigned long usedB  = (unsigned long)(fsInfo.usedBytes * 1.05);
-  // Same clamp as apilistfiles(): past 95.238% full the 5% margin pushes usedB over
-  // totalB and the 32-bit subtraction wraps to ~4 GB, so this would answer "yes,
-  // there is room" on a completely full filesystem.
-  if (usedB > totalB) usedB = totalB;
-  const unsigned long freeB = totalB - usedB;
-  Debugln(formatBytes(freeB) + " im LittleFS frei");
-  return (freeB > printsize);
-
-} // freeSpace()
 
 //=====================================================================================
 void reBootESP(AsyncWebServerRequest *request)

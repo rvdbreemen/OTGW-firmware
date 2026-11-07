@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.79
+**  Version  : v2.0.0-beta.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -61,7 +61,7 @@ static constexpr uint32_t OT_SLOW_INTERVAL_MS     = 60000;  // Slow-poll items e
 static constexpr uint32_t OT_WRITE_INTERVAL_MS    = 15000;  // Periodic writes every 15s (keep boiler values alive)
 
 // Status flags to send in MsgID 0 (master status byte)
-static uint8_t otMasterStatusFlags = 0x01;  // bit0=CH enable (default on)
+static uint8_t otMasterStatusFlags = 0x01;  // bit0=CH enable: board default on; in master mode buildStatusRequest() decides what the boiler sees
 // CH= state, mirrors the PIC's CHModeOff: set by CH=0, cleared by CH=1, persists until the next CH=.
 // It only reaches bit0 of MsgID 0 while a CS override is active (otdEffectiveMasterFlags).
 static bool otChModeOff = false;
@@ -698,6 +698,7 @@ void handleOTDirectBridgeStream() {
   while (OTGWstream.available() && cmdsProcessed < kMaxLinesPerDrain) {
     int inByte = OTGWstream.read();
     if (inByte < 0) break;
+    otgwStreamRxNote();   // TASK-1450: LAN witness for the WiFi dead-link check
 
     char outByte = static_cast<char>(inByte);
     if (outByte == '\r') {
@@ -712,7 +713,9 @@ void handleOTDirectBridgeStream() {
         OTDDebugTf(PSTR("OTDirect bridge: Sending [%s] (%d)\r\n"), sWrite, static_cast<int>(bytes_write));
         if (bytes_write > 0) {
           otDirectBridgeEvent('>', sWrite, bytes_write);
+          diagRec.bridgeLine = true;    // TASK-1665: ADR-213 does not record port 25238 bridge traffic
           sendPICSerial(sWrite, static_cast<int>(bytes_write));
+          diagRec.bridgeLine = false;
         }
       }
 
@@ -812,10 +815,15 @@ static uint16_t otdStatusReplyData(uint16_t thermostatData, uint16_t boilerData)
 static unsigned long buildStatusRequest() {
   // Build a complete READ_DATA request so message type, data-id and parity are correct.
   // MsgID 0: Master status flags in data-value HB (bits 15-8), LB = 0 (slave fills it)
+  uint8_t flags = otdEffectiveMasterFlags(otMasterStatusFlags, otChModeOff, otdCsOverrideActive());
+  // Master mode: CH enable (bit 0) stays on while SAT is enabled, also during its hand-back or before
+  // its first CS. Without SAT and without a CS override (an external CS= or a thermostat write on the
+  // slave interface) nothing sets a flow setpoint, so bit 0 is off. DHW and the other bits are unchanged.
+  if (IS_MASTER_MODE() && !otdCsOverrideActive() && !satOwnsControlSetpoint()) flags &= (uint8_t)~0x01;
   return OpenTherm::buildRequest(
     OpenThermMessageType::READ_DATA,
     OpenThermMessageID::Status,
-    ((unsigned int)otdEffectiveMasterFlags(otMasterStatusFlags, otChModeOff, otdCsOverrideActive()) << 8)
+    ((unsigned int)flags << 8)
   );
 }
 
@@ -1038,8 +1046,8 @@ void initOTDirect() {
       delay(50);
     }
     if (!thermostatFound) {
-      OTDDebugTln(F("OT-direct: No thermostat detected — switching to master (standalone) mode"));
-      setOTDirectMode(OTD_MODE_MASTER);
+      OTDDebugTln(F("OT-direct: No thermostat detected — switching to master (standalone) mode for this boot"));
+      applyOTDirectMode(OTD_MODE_MASTER);   // not persisted: the next boot detects again
     } else {
       OTDDebugTln(F("OT-direct: Thermostat present — staying in gateway mode"));
     }
@@ -1386,8 +1394,8 @@ static void bridgeSentRequest(unsigned long request, OTDirectRequestOrigin origi
 // for an OEM data-id 128-255 is not stored: masking it with 0x7F would put it
 // in another id's slot (MsgID 131 would land on MsgID 3). An UNKNOWN-DATA-ID
 // reply carries no value, only "not supported", so it clears the id's slot
-// instead of filling it with the reply's data bytes (the AUTO heating curve
-// would read those as an outside temperature of 0.0 C).
+// instead of filling it with the reply's data bytes (a reader would take those
+// as an outside temperature of 0.0 C).
 // ---------------------------------------------------------------------------
 static void otBoilerCacheStore(unsigned long response) {
   const uint8_t id = (response >> 16) & 0xFF;
@@ -1753,223 +1761,6 @@ static void emitSummaryLine() {
 }
 
 // ===========================================================================
-// TASK-183: PI room compensation + weather-compensated heating curve
-// ===========================================================================
-
-// PI controller state (static locals — one heating circuit)
-static float  otPiIntegState   = 0.0f;   // integrator state (K)
-static float  otPiRoomFilt     = 0.0f;   // low-pass filtered room temp
-static float  otPiRspPrev      = 0.0f;   // previous room setpoint
-static bool   otPiInit         = false;  // first-run flag
-static float  otPiDeltaT       = 0.0f;  // current PI correction (K)
-static uint32_t otNextPiCtrl   = 0;      // next PI update (millis)
-
-static constexpr uint32_t OT_PI_INTERVAL_MS = 60000UL;  // 60s PI period (matches OT-Thing)
-
-// getFlowTemp — compute target flow temperature from settings + PI correction.
-// Returns 0 if CH is off; clipped to [0, fFlowMax].
-float getFlowTemp() {
-  float flow = settings.otd.fFlowTemp;  // fixed-flow default
-
-  if (settings.otd.iCHMode == 0) {
-    return 0.0f;  // off
-  }
-
-  if (settings.otd.iCHMode == 2) {
-    // AUTO mode: weather-compensated heating curve
-    // Need outside temperature from OT cache (MsgID 27 = Toutside, f8.8)
-    if (otBoilerCacheValid[27]) {
-      int16_t rawOT = (int16_t)otBoilerCache[27];
-      float outTmp = rawOT / 256.0f;
-
-      float rsp = settings.otd.fRoomSetpoint;
-      float flowMax = settings.otd.fFlowMax;
-      float gradient = settings.otd.fGradient;
-      float exponent = settings.otd.fExponent;
-      float offset = settings.otd.fOffset;
-
-      // Formula from OT-Thing getFlow() (CTRLMODE_AUTO):
-      // minOutside = rsp - (flowMax - rsp) / gradient
-      // c1 = (flowMax - rsp) / pow(rsp - minOutside, 1/exponent)
-      // flow = rsp + c1 * pow(rsp - outTmp, 1/exponent) + offset
-      float minOutside = rsp - (flowMax - rsp) / gradient;
-      float span = rsp - minOutside;
-      if (span > 0.0f) {
-        float c1 = (flowMax - rsp) / powf(span, 1.0f / exponent);
-        float diff = rsp - outTmp;
-        if (diff > 0.0f) {
-          flow = rsp + c1 * powf(diff, 1.0f / exponent) + offset;
-        } else {
-          flow = rsp + offset;  // outside >= room setpoint: minimal flow
-        }
-      }
-    }
-    // else: outside temp unknown, fall back to fixed flow
-  }
-
-  // Apply PI room compensation correction
-  if (settings.otd.bRoomCompEnabled) {
-    flow += otPiDeltaT;
-  }
-
-  // Clip to [0, flowMax]
-  if (flow < 0.0f) flow = 0.0f;
-  if (flow > settings.otd.fFlowMax) flow = settings.otd.fFlowMax;
-
-  return flow;
-}
-
-// loopPiCtrl — run PI room temperature compensation (called every 60s).
-// Reads room temperature from MsgID 24 cache and room setpoint from MsgID 16 cache.
-static void loopPiCtrl() {
-  // Force the boiler write for MsgID 1 on next scheduler cycle
-  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
-    if (otSchedule[i].msgId == 1 && otSchedule[i].isWrite) {
-      otSchedule[i].lastSentMs = 0;  // force immediate send
-      break;
-    }
-  }
-
-  if (!settings.otd.bRoomCompEnabled) {
-    otPiDeltaT = 0.0f;
-    return;
-  }
-
-  // Need room temp (MsgID 24 = Tr) and room setpoint (MsgID 16 = TrSet)
-  if (!otBoilerCacheValid[24] || !otBoilerCacheValid[16]) {
-    // Not enough data — decay integrator gently
-    otPiIntegState *= 0.95f;
-    otPiDeltaT = 0.0f;
-    return;
-  }
-
-  float rt  = (int16_t)otBoilerCache[24] / 256.0f;  // room temp (f8.8)
-  float rsp = (int16_t)otBoilerCache[16] / 256.0f;  // room setpoint (f8.8)
-
-  if (!otPiInit) {
-    otPiRoomFilt = rt;
-    otPiRspPrev  = rsp;
-    otPiInit     = true;
-  } else {
-    otPiRoomFilt = 0.1f * rt + 0.9f * otPiRoomFilt;
-  }
-
-  float e = rsp - rt;       // error
-  if (e > -0.2f && e < 0.2f) e = 0.0f;  // 0.2°C deadband
-
-  // Proportional part
-  float p = settings.otd.fKp * e;
-
-  // Integral part — track setpoint changes
-  otPiIntegState += rsp - otPiRspPrev;
-  otPiRspPrev = rsp;
-
-  // Integrate only when CH is active (infer from flame on, bit 3 of MsgID 0 slave byte)
-  bool chActive = false;
-  if (otBoilerCacheValid[0]) {
-    chActive = (otBoilerCache[0] & 0x02) != 0;  // bit 1 of slave status LB = CH active
-  }
-  if (chActive) {
-    if (e > 0.0f)
-      otPiIntegState += settings.otd.fKi * e * (OT_PI_INTERVAL_MS / 1000.0f) / 3600.0f;
-    else
-      otPiIntegState += settings.otd.fKi * e * 0.3f * (OT_PI_INTERVAL_MS / 1000.0f) / 3600.0f;
-  } else {
-    otPiIntegState *= 0.95f;  // decay when not heating
-  }
-
-  // Anti-windup: clip integral to [-5, +5] K
-  if (otPiIntegState < -5.0f) otPiIntegState = -5.0f;
-  if (otPiIntegState >  5.0f) otPiIntegState =  5.0f;
-
-  // Boost term: extra push when significantly cold
-  float boost = 0.0f;
-  if (e > 1.0f) boost = e * settings.otd.fKboost;
-
-  otPiDeltaT = p + otPiIntegState + boost;
-
-  // Clip total correction to [-5, +12] K
-  if (otPiDeltaT < -5.0f)  otPiDeltaT = -5.0f;
-  if (otPiDeltaT > 12.0f)  otPiDeltaT = 12.0f;
-
-  OTDDebugTf(PSTR("OTD: PI rt=%.1f rsp=%.1f e=%.2f p=%.2f I=%.2f boost=%.2f dT=%.2f clamp=%s\r\n"),
-             rt, rsp, e, p, otPiIntegState, boost, otPiDeltaT,
-             (otPiDeltaT <= -5.0f || otPiDeltaT >= 12.0f) ? "yes" : "no");
-}
-
-// ===========================================================================
-// TASK-582: CH hysteresis suspension logic
-// ===========================================================================
-// loopCHHysteresis — suspend/resume CH heating based on configurable deadband.
-//
-// When room temperature exceeds (setpoint + hysteresis/2), MsgID 0 CH-enable
-// bit (bit0) is cleared, suspending central heating.  When room temperature
-// falls back to (setpoint - hysteresis/2) or below, CH-enable is restored.
-//
-// Guards:
-//   - bHysteresisEnable must be true in settings.otd (false = backward compat)
-//   - Room temperature must be available in otBoilerCache[24] (MsgID 24 = Tr)
-//   - CH setpoint must be available in otBoilerCache[16] (MsgID 16 = TrSet)
-//   - SAT active: bypass entirely; SAT manages its own control (state.sat.bActive)
-//   - Publishes transition events to MQTT topic otgw32/ch_suspended (retained)
-//
-// Called every 10s from doOTDirectLoop() — matches the temperature read interval.
-static void loopCHHysteresis() {
-  // SAT active: SAT owns the control loop, skip hysteresis
-#if defined(HAS_SAT) && HAS_SAT
-  if (state.sat.bActive) {
-    // If we had suspended CH, restore it before handing back to SAT
-    if (state.otd.bCHSuspended) {
-      state.otd.bCHSuspended = false;
-      otMasterStatusFlags |= 0x01;  // re-enable CH
-      sendMQTTData(F("otgw32/ch_suspended"), "false", true);
-      OTDDebugTln(F("OTD: hysteresis: SAT active, CH-suspend released"));
-    }
-    return;
-  }
-#endif
-
-  if (!settings.otd.bHysteresisEnable) {
-    // Feature disabled — ensure we're not holding a stale suspension
-    if (state.otd.bCHSuspended) {
-      state.otd.bCHSuspended = false;
-      otMasterStatusFlags |= 0x01;
-      sendMQTTData(F("otgw32/ch_suspended"), "false", true);
-      OTDDebugTln(F("OTD: hysteresis: disabled, CH-suspend released"));
-    }
-    return;
-  }
-
-  // Room temperature and setpoint must both be in cache
-  if (!otBoilerCacheValid[24] || !otBoilerCacheValid[16]) {
-    OTDDebugTln(F("OTD: hysteresis: room temp or setpoint not available, skipping"));
-    return;
-  }
-
-  float rt  = (int16_t)otBoilerCache[24] / 256.0f;  // room temp (f8.8)
-  float rsp = (int16_t)otBoilerCache[16] / 256.0f;  // room setpoint (f8.8)
-  float half = settings.otd.fHysteresis / 2.0f;
-
-  bool wasSuspended = state.otd.bCHSuspended;
-
-  if (!wasSuspended && rt >= (rsp + half)) {
-    // Room temp exceeded upper threshold — suspend CH
-    state.otd.bCHSuspended = true;
-    otMasterStatusFlags &= ~0x01;  // clear CH enable bit
-    sendMQTTData(F("otgw32/ch_suspended"), "true", true);
-    OTDDebugTf(PSTR("OTD: hysteresis: CH suspended rt=%.1f rsp=%.1f (+%.2f)\r\n"),
-               rt, rsp, half);
-  } else if (wasSuspended && rt <= (rsp - half)) {
-    // Room temp fell back below lower threshold — resume CH
-    state.otd.bCHSuspended = false;
-    otMasterStatusFlags |= 0x01;   // set CH enable bit
-    sendMQTTData(F("otgw32/ch_suspended"), "false", true);
-    OTDDebugTf(PSTR("OTD: hysteresis: CH resumed rt=%.1f rsp=%.1f (-%.2f)\r\n"),
-               rt, rsp, half);
-  }
-}
-
-// ===========================================================================
 // TASK-184: Flame ratio tracking
 // ===========================================================================
 
@@ -2029,7 +1820,7 @@ static void flameRatioSet(bool flame) {
   if (otFlame.currentFlame != flame) {
     if (!otFlame.init) {
       // First transition: pre-fill on-time buffer with 60 so duty starts sensibly
-      // (matches OT-Thing behaviour for the first incomplete minute)
+      // (first incomplete minute)
       memset(otFlame.on.buf, 60, sizeof(otFlame.on.buf));
       otFlame.on.sum = (uint32_t)FLAME_BUF_SIZE * 60UL;
       otFlame.init = true;
@@ -2238,38 +2029,6 @@ void loopOTDirect() {
                (int)state.otBus.bOnline, modeStr, flowTemp,
                flameOn ? "on" : "off",
                (int)state.otd.bThermostatConnected);
-  }
-
-  // TASK-183: PI room compensation — run every 60s
-  if ((millis() - otNextPiCtrl) >= OT_PI_INTERVAL_MS || otNextPiCtrl == 0) {
-    // TASK-761: SAT owns the CH setpoint (MsgID 1), so OTDirect must not also drive
-    // MsgID 1 or the heating-curve writer and SAT fight over TSet (observed flip-flop
-    // 45<->10 every 60 s). TASK-1150 widened the gate from state.sat.bActive to
-    // satOwnsControlSetpoint(): bActive drops on a safety trip and during the boot
-    // window while the user still has SAT enabled, and re-arming the curve there is
-    // the same conflict in a narrower window. Keep otNextPiCtrl advancing so the
-    // PI/heating curve resumes cleanly once SAT is actually disabled.
-#if defined(HAS_SAT) && HAS_SAT
-    if (!satOwnsControlSetpoint()) {
-#endif
-      loopPiCtrl();
-      // Apply heating curve flow in master mode when CH mode is not fixed
-      if (IS_MASTER_MODE() && settings.otd.iCHMode != 0) {
-        float flow = getFlowTemp();
-        if (flow > 0.0f) {
-          enqueueWriteCommand(1, floatToF88(flow), "heating-curve");
-        }
-      }
-#if defined(HAS_SAT) && HAS_SAT
-    }
-#endif
-    otNextPiCtrl = millis();
-  }
-
-  // TASK-582: CH hysteresis suspension — run every 10s (matches temperature read interval)
-  DECLARE_TIMER_SEC(timerCHHysteresis, 10, SKIP_MISSED_TICKS);
-  if (DUE(timerCHHysteresis)) {
-    loopCHHysteresis();
   }
 }
 
@@ -2554,21 +2313,16 @@ static void resetTransientState() {
     otSetbackEngaged = false;
     state.otd.bSetbackActive = false;
   }
-  // TASK-183: reset PI controller state
-  otPiIntegState = 0.0f;
-  otPiRoomFilt   = 0.0f;
-  otPiRspPrev    = 0.0f;
-  otPiInit       = false;
-  otPiDeltaT     = 0.0f;
-  otNextPiCtrl   = 0;
   // BS= fake room setpoint — clear on reset
   otFakeRoomSetpoint = 0.0f;
 }
 
 // ---------------------------------------------------------------------------
-// setOTDirectMode — switch operating mode with hardware reconfiguration
+// applyOTDirectMode — switch operating mode with hardware reconfiguration, in RAM only.
+// The boot auto-detect uses it directly, so the mode it picks is decided again on every
+// boot (TASK-1694). setOTDirectMode() below also persists the mode for user changes.
 // ---------------------------------------------------------------------------
-static void setOTDirectMode(OTDirectMode newMode) {
+static void applyOTDirectMode(OTDirectMode newMode) {
   resetTransientState();  // Clear all transient state on mode change
   otCurrentMode  = newMode;
 
@@ -2625,9 +2379,12 @@ static void setOTDirectMode(OTDirectMode newMode) {
       break;
   }
 
-  // Persist mode to settings via the public updateSetting() API.
-  // This keeps all settings mutation through a single path and gets
-  // side-effect handling (dirty flag, debounce timer) for free.
+}
+
+// setOTDirectMode — a mode change chosen by the user (command, REST): apply it and persist it
+// via the public updateSetting() API, which handles the dirty flag and the debounce timer.
+static void setOTDirectMode(OTDirectMode newMode) {
+  applyOTDirectMode(newMode);
   char modeBuf[4];
   snprintf_P(modeBuf, sizeof(modeBuf), PSTR("%d"), (int)newMode);
   updateSetting("OTDmode", modeBuf);
@@ -2710,7 +2467,8 @@ static void handleMasterModeSlaveFrame(unsigned long frame) {
     // Apply thermostat's TSet as our write cache so scheduler sends it to boiler.
     // TASK-1150: not while SAT owns the control setpoint — a thermostat writing MsgID 1
     // in master mode would otherwise silently replace SAT's setpoint. The WRITE_ACK is
-    // still echoed above so the thermostat sees a well-formed exchange.
+    // still echoed above so the thermostat sees a well-formed exchange. A write of MsgID 1 > 0
+    // sets the CS override, which enables CH in buildStatusRequest(); a later write of 0 is ignored.
     if (msgId == 1 && dataVal != 0 && !satOwnsControlSetpoint()) {
       setOverride(1, dataVal);
       updateWriteCache(1, dataVal);
@@ -2793,6 +2551,7 @@ static unsigned long applyResponseModifiers(unsigned long response) {
 // ---------------------------------------------------------------------------
 bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   otdWriteRefused = false;
+  if (diagRec.active) diagRec.recOtdCommand(buf, (size_t)len);   // TASK-1665 (ADR-213)
   if (len < 4) return false;  // minimum "XX=Y"
 
   OTDDebugTf(PSTR("OTD: cmd \"%s\" (len=%d)\r\n"), buf, len);
@@ -3010,7 +2769,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // SC=HH:MM/DOW — Time sync (MsgID 20 = day/time, ~61s expiry per PIC CommandExpiry)
   else if (cmd0 == 'S' && cmd1 == 'C') {
     int hh = 0, mm = 0, dow = 0;
-    if (sscanf(value, "%d:%d/%d", &hh, &mm, &dow) >= 2) {
+    if (siscanf(value, "%d:%d/%d", &hh, &mm, &dow) >= 2) {
       uint16_t data20 = (uint16_t)(((dow & 0x07) << 5 | (hh & 0x1F)) << 8) | (mm & 0x3F);
       enqueueWriteCommand(20, data20, "SC-time");
       otSCLastCommandMs = millis();
@@ -3476,7 +3235,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     if (comma) {
       // PIC byte-pair: SR=<msgId>:<highByte>,<lowByte> (decimal 0..255 each)
       unsigned int hiByte = 0, loByte = 0;
-      if (sscanf(value, "%u:%u,%u", &msgId, &hiByte, &loByte) != 3 ||
+      if (siscanf(value, "%u:%u,%u", &msgId, &hiByte, &loByte) != 3 ||
           msgId > 127 || hiByte > 255 || loByte > 255) {
         otDirectBridgeProcessStatus("BV"); return false;
       }
@@ -3491,10 +3250,10 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       for (const char* p = colon + 1; *p; ++p) {
         if ((*p >= 'a' && *p <= 'f') || (*p >= 'A' && *p <= 'F')) { hasHexDigit = true; break; }
       }
-      if (!hasHexDigit && sscanf(value, "%u:%u", &msgId, &oneVal) == 2 && oneVal <= 255) {
+      if (!hasHexDigit && siscanf(value, "%u:%u", &msgId, &oneVal) == 2 && oneVal <= 255) {
         if (msgId > 127) { otDirectBridgeProcessStatus("BV"); return false; }
         dataVal = oneVal & 0xFF;  // high byte = 0
-      } else if (sscanf(value, "%u:%x", &msgId, &dataVal) == 2 && msgId <= 127) {
+      } else if (siscanf(value, "%u:%x", &msgId, &dataVal) == 2 && msgId <= 127) {
         // legacy hex16 form
       } else {
         otDirectBridgeProcessStatus("BV"); return false;
@@ -3576,7 +3335,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   else if (cmd0 == 'R' && cmd1 == 'M') {
     unsigned int msgId = 0;
     unsigned int dataVal = 0;
-    if (sscanf(value, "%u:%x", &msgId, &dataVal) != 2 || msgId > 127) {
+    if (siscanf(value, "%u:%x", &msgId, &dataVal) != 2 || msgId > 127) {
       otDirectBridgeProcessStatus("BV"); return false;
     }
     setResponseModifier((uint8_t)msgId, (uint16_t)dataVal);

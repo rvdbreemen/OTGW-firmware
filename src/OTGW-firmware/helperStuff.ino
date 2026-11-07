@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.79
+**  Version  : v2.0.0-beta.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -530,6 +530,27 @@ void sampleHeapWatermark() {
   state.heapdiag.iTcpActivePcbs = platformTcpActivePcbCount();
 }
 
+// TASK-1673: called every loop() iteration. Reading free heap is cheap; the TCP walk (core
+// lock) runs only when a new minimum is seen, which settles after the first loads.
+void sampleHeapDip() {
+  const uint16_t q = mqttQueueNow();
+  if (q > state.heapdiag.iMqttQueueHwm) state.heapdiag.iMqttQueueHwm = q;
+  const uint32_t fh = platformFreeHeap();
+  if (fh >= state.heapdiag.iDipFreeHeap) return;
+  const PlatformTcpHoldSnapshot t = platformTcpHoldSnapshot(80);
+  state.heapdiag.iDipFreeHeap     = fh;
+  state.heapdiag.iDipMaxBlock     = platformMaxFreeBlock();
+  state.heapdiag.iDipTxBytes      = t.txBytes;
+  state.heapdiag.iDipTxPcbs       = t.txPcbs;
+  state.heapdiag.iDipActivePcbs   = t.active;
+  state.heapdiag.iDipTimeWaitPcbs = t.timeWait;
+  state.heapdiag.iDipFiles        = webFileInFlightNow();
+  state.heapdiag.iDipRest         = restInFlightNow();
+  state.heapdiag.iDipWs           = (uint8_t)webSocketClientCount();
+  state.heapdiag.iDipMqttQueue    = q;
+  state.heapdiag.iDipMqttTxBytes  = platformTcpTxBytesToRemotePort(settings.mqtt.iBrokerPort);
+}
+
 // Zero the soak window: watermark, histogram, and the cumulative pressure counters,
 // then re-seed the watermark so a publish/dump immediately after reset never shows
 // the 0xFFFFFFFF sentinel. Intended to be used from a HEALTHY heap at the start of a
@@ -540,6 +561,7 @@ void sampleHeapWatermark() {
 // Note: min_free_heap is the native ESP32 allocator watermark (ESP.getMinFreeHeap)
 // and CANNOT be reset from user space — it stays since-boot.
 void resetHeapWatermark() {
+  state.heapdiag.iMqttQueueHwm = 0;
   state.heapdiag.iMinMaxBlock = 0xFFFFFFFF;
   for (uint8_t i = 0; i < 5; i++) state.heapdiag.aMaxBlockBucket[i] = 0;
   state.heapdiag.iWsDropsTotal             = 0;
@@ -555,11 +577,20 @@ void resetHeapWatermark() {
   // TASK-1017 load-test instrumentation:
   state.heapdiag.iRestInflightHwm          = 0;
   state.heapdiag.iWebfileInflightHwm       = 0;
+  state.heapdiag.iWebfileQueued            = 0;
+  state.heapdiag.iWebfileAdmitted          = 0;
+  state.heapdiag.iWebfileCancelled         = 0;
+  state.heapdiag.iWebfileTimeout           = 0;
+  state.heapdiag.iWebfileMaxWaitMs         = 0;
+  state.heapdiag.iWebfilePendingHwm        = state.heapdiag.iWebfilePending;
   state.heapdiag.iRest503Count             = 0;
   state.heapdiag.iWebfile503Count          = 0;
   state.heapdiag.iWebConn503Count          = 0;
   state.heapdiag.iWebAckAbortCount         = 0;
   state.heapdiag.iTcpActivePcbs            = 0;
+  state.heapdiag.iDipFreeHeap              = 0xFFFFFFFF;   // TASK-1673
+  state.heapdiag.iAckLowMin                = 0xFFFFFFFF;   // TASK-1679
+  state.heapdiag.iAckLowHits               = 0;
   sampleHeapWatermark();   // re-seed iMinMaxBlock + first histogram tick (no 0xFFFFFFFF window) + tcp pcb count
 }
 
@@ -938,25 +969,6 @@ String dBmtoQuality(int dBm)
 
   return (_ret);
 }//dBmtoQuality
-
-// Replace all occurrences of token with replacement, guarding buffer size
-bool replaceAll(char *buffer, const size_t bufSize, const char *token, const char *replacement) {
-  if (!buffer || !token || !replacement) return false;
-  const size_t tokenLen = strlen(token);
-  const size_t replLen = strlen(replacement);
-  if (tokenLen == 0) return true;
-
-  char *pos = strstr(buffer, token);
-  while (pos) {
-    const size_t tailLen = strlen(pos + tokenLen);
-    const size_t required = (pos - buffer) + replLen + tailLen + 1;
-    if (required > bufSize) return false;
-    memmove(pos + replLen, pos + tokenLen, tailLen + 1);
-    memcpy(pos, replacement, replLen);
-    pos = strstr(pos + replLen, token);
-  }
-  return true;
-}
 
 //===========================================================================================
 // Heap Monitoring and Backpressure Management

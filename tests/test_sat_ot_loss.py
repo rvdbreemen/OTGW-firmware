@@ -59,7 +59,7 @@ enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 struct SatSettings { bool bSimulation = false; float fTargetTemp = 20.0f; };   // fTargetTemp: TASK-1521 follow narration
 struct Settings { SatSettings sat; };
 struct SatState { bool bModSuppressed=false; unsigned iModSuppressionSinceMs=0; bool bLastSentValid=false, bTCAccountedValid=false, bActive=false, bSafetyTripped=false, bFallbackActive=false,
-                  bPushRefused=false, bRoomTempLost=false, bOtLinkLost=false, bOutsideTempMissing=false; uint8_t iShVerdict=0;   /* TASK-1412.13 */
+                  bPushRefused=false, bRoomTempLost=false, bOtLinkLost=false, bOutsideTempMissing=false, bPm25NoSlot=false; uint8_t iShVerdict=0;   /* TASK-1412.13, TASK-1653 */
                   uint32_t iLastSentCSMs=0, iLastSentMMMs=0, iLastSentCHMs=0, iTCPushMs=0;
                   float fLastSentCS=0, fFinalSetpoint=0; uint8_t iLastSentMM=0, iLastSentCH=0; int eControlMode=0; uint32_t iSimDhwExpiryMs=0; };
 struct OTSys { uint8_t SlaveStatus = 0; }; static OTSys OTcurrentSystemState;
@@ -96,6 +96,8 @@ static void satPwmSuppressionRefresh() {}
 static void satMaxTSetSendStep() {}   // TASK-1373: the user MaxTSet SH= step is tested in test_sat_max_tset.py
 static void satDhwSetpointSync() {}   // TASK-1376: the SW= sync is tested in test_sat_dhw_sw_sync.py
 static void satMiStep() {}   // TASK-1371: MI=500 is tested in test_sat_no_return_ignition.py
+static void satPm25PollStep() {}   // TASK-1653: own PM=25 is tested in test_sat_pm25_poll.py
+static bool _sat_pm25Unanswered = false;   // TASK-1653: satDisable() resets it
 static void satNoReturnFloodOnFlameEdge(bool, bool) {}
 static void satNoReturnFloodStep() {}
 static bool satRestartStep() { return false; }   // TASK-1482: the restart and outside gates are tested in test_sat_restart_quiet.py

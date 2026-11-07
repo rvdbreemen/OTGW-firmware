@@ -6011,3 +6011,163 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Quoted:** "Show 100 while MM=T"
 
 **Settled:** While the last MM sent is MM=T (maximum PWM duty, entries 242/243/246), the published current_modulation reports 100 %. Before: satComputeMM() gave 0 for a gas boiler in PWM. No new topic. **Task:** TASK-1412.15 follow-up. **Open:** Sergeant D's comment, if any.
+
+
+## 270. QD-8 answered A: no post-hot-water setpoint hold, keep today's behaviour as thermo-nova (Sergeant D, 2026-11-05)
+
+**Source:** sergeantd, 2026-11-05 06:33 UTC, #alpha-testing, msg 1567788885159714837 (https://discord.com/channels/812969634638725140/1514720723980259460/1567788885159714837), answering QD-8 (msg 1567676030922260574, https://discord.com/channels/812969634638725140/1514720723980259460/1567676030922260574, asked 2026-11-05 ~00:20 local with options A no hold / B spec 60 s hold / C defer, recommendation A).
+
+**Quoted:** "@BlueFlame Bot QD-8: A"
+
+**Settled:** option A. After a hot-water draw SAT adds no setpoint hold; the one-minute hold of the OT spec (AFS 2.2.3) is not adopted. The firmware keeps today's behaviour, which matches thermo-nova. The thermo-nova lines used in the question, opened again in the local copy of 7beaaf5 (`other-projects/SAT-releases-thermo-nova/custom_components/sat`): `const.py:19` `DHW_OVERSHOOT_GUARD_SECONDS = 300.0`; `heating_control.py:268-274` (in `_maybe_enable_pwm_on_sustained_overshoot`, the PWM-enable overshoot timer) resets `_sustained_overshoot_started_at` while `hot_water_active` and within those 300 s after `hot_water_off_since`; `heating_control.py:385` is the guard of `_compute_pwm_control_setpoint` (def at `:380`, the PWM setpoint override and suppression path), which returns without an override when `device_state.hot_water_active or requested_setpoint <= COLD_SETPOINT or not config.overshoot_protection`, so that path is skipped during a draw. Neither holds the setpoint after a draw. Field basis of the question: the gruijter 2026-11-04 capture (4 CH-demand draws: flame off in the same 5 s poll as the DHW bit, first SAT CS 6-31 s later, relight 37-69 s). **Task:** TASK-1412.7, TASK-1412.18 (LL-012b becomes a contract: no post-DHW hold). **Open:** none.
+
+## 271. Q-1412.16a: let the integral build outside the 0.1 C deadband, with a clamp (maintainer decision, 2026-11-05)
+
+**Source:** Maintainer decision (Robert, session 2026-11-05), not Sergeant D; Sergeant D may revise in a later entry. Robert van den Breemen, 2026-11-05 ~07:00 local, interactive in the Claude session, taken without waiting for Sergeant D (Robert does not want to wait). Q-1412.16a was queued and never asked in Discord.
+
+**Question:** Slow last part of a warm-up (review item R13 / LL-020): outside the 0.1 C deadband the integral is reset to 0 on every update, so on the way up only P pushes and it weakens near the target. Options as asked: A) keep thermo-nova as it is (entry 212: stay on 7beaaf5); B) let the integral build outside the deadband with a clamp (differs from thermo-nova, needs its own task + ADR per AC3 of TASK-1412.16); C) accept it and only document the behaviour for users. Advice was A unless it is seen as a design flaw.
+
+**Quoted:** "B: integrator laten opbouwen, met clamp"
+
+**Settled:** option B, a deliberate deviation from thermo-nova. thermo-nova (opened at 7beaaf5): `pid.py:187-189` sets `self._integral = 0.0` and returns when `abs(state.error) > DEADBAND`, with `DEADBAND = 0.1` at `const.py:16`. Firmware today matches it: `SATpid.ino:244-246` (`_pidUpdateIntegral`, `fabsf(error) > deadband` sets `_pid_integral = 0.0f`), equivalence shown in `tests/test_sat_sim_port_equivalence.py`. This decision departs from entry 212 (reference stays 7beaaf5) for this one rule. Order of proof: its own task and an ADR first, then the TASK-1412.16 / TASK-1412.19 simulation must show no overshoot regression, then bench, then field. The clamp value and the exact build rule are not decided here. Checked against the recorded entries: entry 212 (reference stays thermo-nova 7beaaf5): **conflict**, this rule leaves the pin; entry 76 (fixed 0.1 deadband, no widening): agrees, the deadband stays 0.1; entry 73 (PID resets where thermo-nova resets, `pid.py:134-137`): agrees, the reset triggers do not change, only the reset outside the deadband inside `_update_integral`. **Task:** new task (to be created), TASK-1412.16, TASK-1412.19. **Open:** conflict with entry 212, to be put to Sergeant D; clamp size and rule.
+
+## 272. Q-1412.20a: MsgID 3 answered validly, later invalid or missing: keep the last valid value (maintainer decision, 2026-11-05)
+
+**Source:** Maintainer decision (Robert, session 2026-11-05), not Sergeant D; Sergeant D may revise in a later entry. Robert van den Breemen, 2026-11-05 ~07:00 local, interactive in the Claude session, taken without waiting for Sergeant D.
+
+**Question:** The boiler first answers MsgID 3 validly, later with Data-Invalid, Unknown-DataID or no answer at all. What happens to SAT's PWM permission (HB bit 4)? Entries 213-215 cover a valid reply and no valid reply yet, not a valid reply that later stops. Options as asked: only the chosen option was passed to this record (A, keep the last valid value); the other options are not recorded here.
+
+**Quoted:** "A: laatste geldige waarde houden"
+
+**Settled:** option A, which is the firmware's behaviour today. Firmware (opened): `OTGW-Core.ino:3183` calls `satNoteSlaveConfig()` only inside `is_value_valid()` and only for a boiler reply; `satNoteSlaveConfig()` (`SATcycles.ino:1294-1300`) sets `bSlaveLowOffDenied` and `bSlaveCfgValid = true` and no code clears them before a reboot (grep of `src/OTGW-firmware` for `bSlaveCfgValid`, `state.sat =` and `memset(&state.sat`: the only writes are `SATcycles.ino:1298-1299` and the initialiser `SATtypes.h:215`), so `satPwmPermitted()` (`SATcycles.ino:1302-1305`) keeps the last valid permission. thermo-nova only displays the bit (`coordinator/serial/binary_sensor.py:54`, `DATA_SLAVE_MASTER_LOW_OFF_PUMP`) and does not act on it, so there is no thermo-nova behaviour to follow. Consistent with entries 213-215. **Task:** TASK-1412.20 (bench scenario), no code change. **Open:** Sergeant D's comment, if any.
+
+## 273. Q-1436g: COLD_SETPOINT stays 28.2 / 21 in the firmware (maintainer decision, 2026-11-05)
+
+**Source:** Maintainer decision (Robert, session 2026-11-05), not Sergeant D; Sergeant D may revise in a later entry. Robert van den Breemen, 2026-11-05 ~07:00 local, interactive in the Claude session, taken without waiting for Sergeant D. Q-1436g was queued and never asked in Discord.
+
+**Question:** COLD_SETPOINT: 22 (pinned `const.py:34`) or 28.2 (develop `const.py:25`, as stated in the queue row; the develop branch was not opened in this session)? Options as asked: only the chosen option was passed to this record; the other options are not recorded here.
+
+**Quoted:** "Firmware houden: 28,2 / 21"
+
+**Settled:** the firmware keeps 28.2 C for radiators and 21 C for underfloor; entry 73 (Q20 "cold cutoff should be 28.2/21") stands, as do entries 199 and 200 (Sergeant D: 22 was a mistaken request, 28.2 is intended). thermo-nova at 7beaaf5 (opened): `const.py:34` `COLD_SETPOINT = 22`. Firmware (opened): `SATcontrol.ino:133-134` `SAT_COLD_SETPOINT_RAD = 28.2f`, `SAT_COLD_SETPOINT_FLOOR = 21.0f`. No change. **Task:** TASK-1436 (no code change). **Open:** none.
+
+## 274. Q-1537b dropped: superseded by entry 236 and ADR-207 (maintainer decision, 2026-11-05)
+
+**Source:** Maintainer decision (Robert, session 2026-11-05), not Sergeant D; Sergeant D may revise in a later entry. Robert van den Breemen, 2026-11-05 ~07:00 local, interactive in the Claude session.
+
+**Question:** Q-1537b (asked 2026-11-02, msg 1566908020888310011): the order of TP=11:12 and MM= at the PIC (A keep, B force TP first in the shared queue, C other). Options as asked: only the chosen option was passed to this record; the other options are not recorded here.
+
+**Quoted:** "Vervallen door entry 236 + ADR-207"
+
+**Settled:** Q-1537b is dropped. Entry 236 (Sergeant D: send TP and MM only when their value changes) and ADR-207 (`docs/adr/ADR-207-sat-sends-mm-the-immergas-tp-and-ch-on-change-cs-keeps-the-5-s-resend-partly-supersedes-adr-203.md`, on-change sending of MM, the Immergas TP and CH; CS keeps the 5 s resend) remove the repeated pair on which the order question rested. No change to entry 233 or 236. **Task:** none. **Open:** none.
+
+## 275. Minimum burn time beats the cold cutoff: once lit, the burner runs at least 180 s (maintainer decision, 2026-11-05)
+
+**Source:** Maintainer decision (Robert, session 2026-11-05), not Sergeant D; Sergeant D may revise in a later entry. Robert van den Breemen, 2026-11-05 ~07:00 local, interactive in the Claude session, taken without waiting for Sergeant D. Raised by the TASK-1412.19 simulation (`docs/sat/sim-1412-19/report.md:61-63`: 248 short PWM ON phases are cut by the cold cutoff within the first minutes, because the cold cutoff switches PWM off at once).
+
+**Question:** The cold cutoff (entries 12, 199) ends a PWM ON phase at once, which can leave less than 180 s of flame; entries 31 and 80 give a 180 s minimum flame time. Which rule wins? Options as asked: only the chosen option was passed to this record; the other options are not recorded here.
+
+**Quoted:** "Minimum 180 s wint"
+
+**Settled:** once the burner is lit, it runs at least 180 s, also when the cold cutoff comes earlier; the cutoff takes effect after the 180 s. This changes how entries 12 and 199 apply inside a running ON phase; it does not change their thresholds or the 0.5 C hysteresis. Firmware today (opened): `SAT_PWM_MIN_ON_SEC = 180.0f` (`SATcontrol.ino:138`) times the ON phase; the latched cutoff `_sat_coldCut = satColdCutoffLatched(...)` (`SATcontrol.ino:7140`, rule in `SATchEnable.h:36-39`) is applied on the same tick at `SATcontrol.ino:7236-7240`: `finalSetpoint = SAT_MIN_SETPOINT` and `satPwmDisableOnHeaterOff()`, with no check of the ON time already burnt. thermo-nova at 7beaaf5: `HEATER_STARTUP_TIMEFRAME = 180` (`const.py:18`); whether thermo-nova lets the cold cutoff end an ON phase early was not traced in this session. Order of proof: its own task, simulation first (S6 in `docs/sat/sim-1412-19/thresholds.md`), then bench. Checked against the recorded entries: entry 12 (cold cutoff switches PWM off and resets the setpoint, as thermo-nova): **conflict** inside a running ON phase; entry 199 (0.5 C hysteresis, keep 28.2): thresholds and band agree, the immediate switch-off inside an ON phase changes; entries 31 and 80 (180 s minimum flame time): agree. **Task:** new task (to be created), TASK-1412.19. **Open:** conflict with entries 12 and 199, to be put to Sergeant D; how hot water and a lost flame interact with the 180 s.
+
+## 276. PIC installation whose thermostat never reads MsgID 25: SAT asks the PIC for it itself (maintainer decision, 2026-11-05)
+
+**Source:** Maintainer decision (Robert, session 2026-11-05), not Sergeant D; Sergeant D may revise in a later entry. Robert van den Breemen, 2026-11-05 ~07:00 local, interactive in the Claude session, taken without waiting for Sergeant D. Raised by TASK-1412.5 (`docs/sat/transport-budgets-1412-5.md`: on PIC pass-through the MsgID 25 supply depends on the thermostat's polls).
+
+**Question:** On a PIC board in gateway mode the flow temperature (MsgID 25) only arrives when the room thermostat reads it. What does SAT do when the thermostat never reads MsgID 25? Options as asked: only the chosen option was passed to this record; the other options are not recorded here.
+
+**Quoted:** "PIC laten pollen via een eigen PR=/OT-request"
+
+**Settled:** SAT requests MsgID 25 itself through a PIC command, only when no valid MsgID 25 was seen for N s; while the thermostat reads it, SAT sends nothing extra. The PIC command that does this safely is to be confirmed in otgw-6.6 (`other-projects/otgw-6.6`) before any code; it is not named here. N is not decided. How thermo-nova handles a missing MsgID 25 on PIC pass-through was not traced in this session. Every PIC command goes through `addCommandToQueue()`. **Task:** new task (to be created), TASK-1412.5. **Open:** the PIC command (to be confirmed in otgw-6.6), the value of N; Sergeant D's comment, if any.
+
+## 277. Q-1412.16a: the integral stays exactly as thermo-nova; reduce KD instead (Sergeant D, 2026-11-05; overrules maintainer entry 271)
+
+**Source:** sergeantd, 2026-11-05, three messages. (1) #alpha-testing 08:03:16 UTC, msg 1567811527984283732 (https://discord.com/channels/812969634638725140/1514720723980259460/1567811527984283732), a reply to our question msg 1567796885421564005 (https://discord.com/channels/812969634638725140/1514720723980259460/1567796885421564005, item 1 = may the integral build outside the deadband). (2) #alpha-testing 08:07:12 UTC, msg 1567812516141203638 (https://discord.com/channels/812969634638725140/1514720723980259460/1567812516141203638). (3) #dev-sat-mqtt (channel 1105556725714649128) 08:13:20 UTC, msg 1567814060550918146 (https://discord.com/channels/812969634638725140/1105556725714649128/1567814060550918146). Robert confirmed in the session on 2026-11-05 that we follow Sergeant D here.
+
+**Quoted:** (1) "@BlueFlame Bot 1: NO" (2) "@BlueFlame Bot Regarding 1. Do not change the integral behavior. It is very important to stay as is." (3) "@BlueFlame Bot regarding no 1. https://discord.com/channels/812969634638725140/1514720723980259460/1567796885421564005 I asked you the above question. The controller is unique and doesn't follow the classic PID controller, its uniqueness comes from the fact that keeps the heating curve value as the integral of the calculation. So the issue is to reduce KD in order to reach the deadband faster. Then the derivative freezes inside deadband and acts as an offset for the heating curve ( like a heating curve move move up/down ). Then integral comes into the equation and slowly rises until we reach the setpoint."
+
+**Settled:** the integral is not allowed to build outside the 0.1 C deadband. The reset to 0 outside the deadband stays exactly as in thermo-nova and in the firmware port. Maintainer decision entry 271 (option B, integral builds outside the deadband with a clamp) is overruled and is not implemented; entry 212 (reference stays 7beaaf5) holds again for this rule, so the conflict recorded in entry 271 is gone. Sergeant D's model, checked against thermo-nova at 7beaaf5 (opened in the local copy, `custom_components/sat`): the output is `heating_curve_value + P + I + D` (`pid.py:132`), so the heating curve value is the integral-like base of the output; outside the deadband `_update_integral` sets `self._integral = 0.0` and returns (`pid.py:187-189`, `DEADBAND = 0.1` at `const.py:16`); inside the deadband `_update_derivative` returns without touching the derivative (`pid.py:205-207`), so the last raw derivative stays and acts as a fixed offset on the curve; the integral then only builds inside the deadband (`pid.py:191-192`). His remedy for the slow warm-up is a lower KD, so the deadband is reached sooner. Firmware (opened earlier in entry 271): `SATpid.ino:244-246` matches the reset. **Task:** TASK-1651 (integral build outside the deadband) is dropped. A KD simulation study replaces it (see entry 278, Q-1412.16b), in the TASK-1412.16 / TASK-1412.19 harness. **Open:** the KD value, decided with Sergeant D after the simulation (entry 278).
+
+## 278. Sergeant D asks how KD is calculated and proposes reducing it by 10% (question and proposal, not yet a decision) (Sergeant D, 2026-11-05)
+
+**Source:** sergeantd, 2026-11-05 06:37:42 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1567789991315120178 (https://discord.com/channels/812969634638725140/1105556725714649128/1567789991315120178).
+
+**Quoted:** "@BlueFlame Bot can you show me how we calculate the KD gain? Maybe we need to reduce KD by 10% because the controller starves a bit during initial home warm-up"
+
+**Settled:** nothing is decided. This is a question and a proposal. The answer to his question, from thermo-nova at 7beaaf5 (opened, `custom_components/sat`): `kp = round(heating_curve_coefficient * curve / 3, 6)` for radiators, `/ 4` for underfloor (`pid.py:61-71`); `ki = round(kp / 8400, 6)` (`pid.py:73-82`); `kd = round(0.07 * 8400 * kp, 6)` (`pid.py:84-93`). The derivative term is `D = round(kd * raw_derivative, 3)` (`pid.py:109-114`). The raw derivative is `-dT_room/dt` in C/s (`pid.py:220`), low-pass filtered with `alpha = delta_time / (PID_UPDATE_INTERVAL + delta_time)` and clamped to `DERIVATIVE_RAW_CAP = 5.0` (`pid.py:228-230`, `const.py:19`), and frozen while `abs(error) <= DEADBAND` (`pid.py:205-207`). Firmware: `SATpid.ino:211-225` (`_pidCalculateGains`) rounds each gain to 3 decimals, Ki and Kd derived from the rounded Kp (entry 95, Q28a). Worked example (our calculation, not from a capture): coefficient 2.0, curve 45 C, radiators give kp = 2.0 * 45 / 3 = 30 and kd = 0.07 * 8400 * 30 = 17640. A room warming at 0.5 C/h is 0.000139 C/s, so D = 17640 * (-0.000139) = about -2.45 C on the setpoint; with KD reduced by 10% (kd 15876) D is about -2.2 C. Checked against the recorded entries: entry 277 (integral stays as thermo-nova, reduce KD instead) agrees with this direction; entry 95 (gain rounding) agrees. **Task:** TASK-1412.16, TASK-1412.19 (simulation). **Open:** whether to reduce KD and by how much. We simulate KD -10% and KD -20% against the baseline (time to within 0.3 C of the target, overshoot, number of starts) in the TASK-1412.16 / TASK-1412.19 harness and bring the result back to him before any change (queue row Q-1412.16b).
+
+## 279. Q-1412.16b: the KD factor becomes 0.063 instead of 0.07; SAT is designed to reach the deadband in 8400 s (Sergeant D, 2026-11-05; answers entry 278)
+
+**Source:** sergeantd, 2026-11-05, two messages in #dev-sat-mqtt (channel 1105556725714649128). (1) 09:07:42 UTC, msg 1567827743976980561 (https://discord.com/channels/812969634638725140/1105556725714649128/1567827743976980561). (2) 09:09:46 UTC, msg 1567828260404863027 (https://discord.com/channels/812969634638725140/1105556725714649128/1567828260404863027). They follow his question and proposal in entry 278 (msg 1567789991315120178).
+
+**Quoted:** (1) "@BlueFlame Bot change the value 0.07 to 0.063" (2) "@BlueFlame Bot SAT is designed to reach the deadband in 8400 seconds during morning warm-up"
+
+**Settled:** the derivative gain factor changes from 0.07 to 0.063, so `kd = 0.063 * 8400 * kp`. That is KD reduced by 10% (0.063 / 0.07 = 0.9), the value he proposed in entry 278. This is a deliberate deviation from thermo-nova, decided by Sergeant D: thermo-nova at 7beaaf5 (opened in the local copy, `custom_components/sat`) uses `return round(0.07 * 8400 * self.kp, 6)` at `pid.py:93` (the `kd` property, `pid.py:84-93`). Firmware: `SATpid.ino:221` reads `float kd = satPidRound3(0.07f * SAT_PID_AGGRESSION_V3 * kp);` and changes to 0.063f; the rounding to 3 decimals stays (entry 95, Q28a). With the worked example of entry 278 (kp 30) kd goes from 17640 to 15876. Design intent he states: SAT is designed to reach the deadband in 8400 seconds (2 h 20 min) during the morning warm-up. Interpretation (ours, not asked): 8400 is the same constant as `SAT_PID_AGGRESSION_V3`, used in `ki = kp / 8400` (`pid.py:82`) and in the kd factor `0.07 * 8400` (`pid.py:93`); we read his message as the design intent behind that constant. If the link between the 8400 s and the constant matters for a later change, ask him. Checked against the recorded entries: entry 277 (integral stays as thermo-nova, reduce KD instead) agrees; entry 278 (question and proposal) is answered by this entry; entry 95 (gain rounding) agrees; entry 212 (reference stays 7beaaf5) is deviated from here on purpose, on his authority for the kd factor only. **Task:** a firmware task implements the change (to be filed). TASK-1655's simulation (KD x0.9) is the evidence run. **Open:** whether the simulation confirms the shorter warm-up; the task number of the firmware task.
+
+## 280. Q-1655a: KD factor 0.063 stays; no further KD simulation study, he wants real data (Sergeant D, 2026-11-05; answers our TASK-1655 question, agrees with entry 279)
+
+**Source:** sergeantd, 2026-11-05 11:37:02 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1567865321379991563 (https://discord.com/channels/812969634638725140/1105556725714649128/1567865321379991563). It answers our question msg 1567864588442009651 (https://discord.com/channels/812969634638725140/1105556725714649128/1567864588442009651) with the TASK-1655 KD simulation results.
+
+**Quoted:** "@BlueFlame Bot The answer is A. We need real data no simulation at this point"
+
+**Settled:** of our options (A keep 0.063 as decided, B go back to 0.07, C keep 0.063 and study the minimum-power / PWM phase by simulation), he chose A. The KD factor stays at 0.063 (entry 279; implemented as TASK-1656 and published in beta.98). This is the same deviation from thermo-nova at 7beaaf5 as in entry 279 (`custom_components/sat/pid.py:93` uses 0.07; firmware `SATpid.ino:221` uses 0.063f); nothing changes in code. He declines our recommendation C: the proposed follow-up simulation study is not wanted now, because he wants real (field) data and no more simulation at this point. Consequence: warm-up evidence comes from field runs with beta.98 or later (TASK-1412 field validation), and no new simulation task is filed. Checked against the recorded entries: entry 279 (KD factor 0.063) agrees and is confirmed; entry 277 (integral stays as thermo-nova, reduce KD instead) agrees; entry 278 is answered by 279. **Task:** none new; TASK-1655 stays the record of the simulation run, TASK-1412 field validation collects the real data. **Open:** nothing for KD; the minimum-power / PWM phase is not studied by simulation until he asks.
+
+
+## 281. Minimum 180 s burn through a cold cutoff: Sergeant D answers A (confirms maintainer entry 275); his citation is from `develop`, a different rule; follow-up asked (Sergeant D, 2026-11-05)
+
+**Source:** sergeantd, 2026-11-05, #alpha-testing (channel 1514720723980259460). (1) 17:44:31 UTC, msg 1567957804088823959 (https://discord.com/channels/812969634638725140/1514720723980259460/1567957804088823959), a reply to our question msg 1567954422800187464 (https://discord.com/channels/812969634638725140/1514720723980259460/1567954422800187464: "When the cold cutoff comes in the first minutes of a PWM ON phase, should the burner still finish its 180 s minimum? A) once lit, at least 180 s; B) the cutoff stops the burner at once, as thermo-nova"). (2) 17:46:24 UTC, msg 1567958277147463681 (https://discord.com/channels/812969634638725140/1514720723980259460/1567958277147463681). Robert (number3nl) pointed out at 17:49:48 UTC, msg 1567959132047413271, that the link is to another branch. Our follow-up question: msg 1567960232125141034 (https://discord.com/channels/812969634638725140/1514720723980259460/1567960232125141034), 17:54:10 UTC.
+
+**Quoted:** (1) "@BlueFlame Bot A" (2) "@BlueFlame Bot It is in the thermo nova as special handling here <https://github.com/Alexwijn/SAT/blob/7d43560342ca9d854e92b8b5a91bdfbf9cbc2152/custom_components/sat/pwm.py#L206>"
+
+**Settled:** option A. Once the burner is lit in a PWM ON phase, it burns at least 180 s, also when the cold cutoff (entries 12, 199) comes earlier; the cutoff acts after the 180 s. This confirms the maintainer decision of entry 275 (Robert, same day), which stays the basis for TASK-1652; Robert also said on 2026-11-05 in the session not to wait for Sergeant D ("ik heb al gekozen voor 180S, vraag hooguit voor bevestiging, maar voer het alvast uit").
+
+**Compared with thermo-nova at 7beaaf5 (opened, `custom_components/sat`):** the pin has a 180 s minimum flame-on hold, `pwm.py:201-203` ("PWM ON minimum flame-on hold active", returns before the ON->OFF switch while `timestamp - self._flame_on_at < HEATER_STARTUP_TIMEFRAME`), with `HEATER_STARTUP_TIMEFRAME = 180` at `const.py:18`. That hold only delays the normal end of an ON phase. On the cold cutoff the pin bypasses it: `heating_control.py:72` gives `HeaterState.OFF` when `requested_setpoint <= COLD_SETPOINT`; `update()` then takes the else branch at `:229-233` (`self._pwm.disable()`, `MINIMUM_SETPOINT`) and `:238` sends the heater OFF; `pwm.update()` is not called on that path. So at the pin the burner stops at once on a cold cutoff, and option A is a deliberate deviation from the pin, not parity. His link points to `develop` commit 7d43560 (2026-03-01), not to the pin: there `pwm.py:206` is the low-duty-cycle rule ("Handle special low-duty cycle cases": duty below the minimum with the flame on and no hot water gives the lower ON threshold), a different rule, not a minimum flame time. We read his "A" as a choice of the option as asked; his reasoning in (2) does not support it from the pinned code. That reading is our interpretation until he answers the follow-up.
+
+**Firmware (TASK-1652):** `SATcontrol.ino` `satPwmColdCutWaitsForMinBurn()` and `_sat_coldCutDeferred`: the latched cutoff waits while a lit ON phase (no hot water) is younger than `PWM_IGNITION_TIMEOUT_MS` (180000) since ignition; every other stop path (fault, hot water, SAT off, safety, valves, summer) is unchanged. Simulation (`docs/sat/sim-1412-19/task-1652/compare-ruleB.txt`, 1440 runs): cold-cutoff short burns 309 -> 32, no run newly fails a hard check or S2.
+
+**Task:** TASK-1652. **Open:** the follow-up (msg 1567960232125141034): does he keep A knowing it deviates from the pin (A) or follow the pin (B)? A B answer reverts TASK-1652; it is recorded as a later entry naming this one.
+
+
+## 282. Sergeant D corrects his link to the pin: pwm.py:246 at 7beaaf5, the low-duty rule; read as "A stands" (Sergeant D, 2026-11-05; follows entry 281)
+
+**Source:** sergeantd, 2026-11-05 17:58:31 UTC, #alpha-testing (channel 1514720723980259460), msg 1567961327438139403 (https://discord.com/channels/812969634638725140/1514720723980259460/1567961327438139403), a reply to our follow-up msg 1567960232125141034 (entry 281).
+
+**Quoted:** "You are correct, my bad. @BlueFlame Bot this is the correct link <https://github.com/Alexwijn/SAT/blob/7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb/custom_components/sat/pwm.py#L246>"
+
+**Settled:** he agrees that his first link (develop 7d43560) was the wrong branch and points to the pin. At 7beaaf5 (opened, `custom_components/sat/pwm.py:246-257`) the line is "Handle special low-duty cycle cases": when the duty is below `_min_duty_cycle_percentage` and the flame is active without hot water, `on_time = self._on_time_lower_threshold` (the 180 s lower ON threshold) and `off_time = _on_time_maximum_threshold - _on_time_lower_threshold`. So thermo-nova keeps a lit burner on for its minimum ON time when the duty is very low. This is the rule he relies on. The cold-cutoff path itself (`heating_control.py:72`, `:229-233`, `:238`, entry 281) does not call `pwm.update()` and so does not reach this rule; at the pin the burner still stops at once on a cold cutoff. **Our reading (interpretation, not his words):** he keeps option A, a lit burner gets its 180 s also through a cold cutoff, because the intent of the low-duty rule is a minimum ON time for a lit burner; he did not choose B. TASK-1652 goes ahead on entry 275 (maintainer) with this reading.
+
+**Task:** TASK-1652. **Open:** if he meant B (follow the pin exactly), a later entry reverts TASK-1652. Q-1652a is answered by this reading.
+
+
+## 283. Q-1652a answered A explicitly: a lit burner keeps its 180 s also through a cold cutoff (Sergeant D, 2026-11-05; confirms the reading of entry 282)
+
+**Source:** sergeantd, 2026-11-05 18:14:56 UTC, #alpha-testing (channel 1514720723980259460), msg 1567965457346994198 (https://discord.com/channels/812969634638725140/1514720723980259460/1567965457346994198), a reply to our acknowledgement msg 1567963626495811697 ("We read your answer as: keep A ... If you meant B ... just say B and we revert it").
+
+**Quoted:** "@BlueFlame Bot The answer to your question is A"
+
+**Settled:** option A, now in his own words: once lit, the burner runs at least 180 s also when the cold cutoff comes earlier, knowing that this deviates from thermo-nova 7beaaf5 (the cold cutoff there skips `pwm.update()` and its 180 s hold, entry 281). Entry 282's reading ("A stands") is confirmed and no longer an interpretation. Maintainer entry 275 and TASK-1652 stand as implemented.
+
+**Task:** TASK-1652. **Open:** nothing for this rule.
+
+
+## 284. SAT characterised as "a modified PID controller in series, autotuned by the heating curve value" (statement, Sergeant D, 2026-11-07; follows our formula summary)
+
+**Source:** sergeantd, 2026-11-07 11:57:59 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1568595369716228117 (https://discord.com/channels/812969634638725140/1105556725714649128/1568595369716228117), a reply to our formula summary msg 1568590556227969187 and picture msg 1568593044477841469.
+
+**Quoted:** "@BlueFlame Bot So at the end SAT is a modified PID controller in series, Autotuned by the heating curve value."
+
+**Settled:** nothing changes in behaviour; it is a description. Compared with thermo-nova 7beaaf5 (opened this session): the gains scale with the heating curve value HC, Kp = k·HC/3 or /4 (`pid.py:70-71`), Ki = Kp/8400 (`pid.py:82`), Kd = 0.07·8400·Kp (`pid.py:93`), which matches "autotuned by the heating curve value". The output is Tset = HC + P + I + D (`pid.py:132`): HC enters as a feed-forward term added to the PID correction. **Our reading (interpretation):** "in series" means the curve value sets both the operating point and the gains of the PID; we asked whether he means that or a cascade. Firmware matches (Kd factor 0.063 per entry 279).
+
+**Task:** none (documentation of the design). **Open:** the meaning of "in series" (asked in the reply).
+
+
+## 285. "In series" means the curve sets the operating point and the gains (Sergeant D, 2026-11-07; answers the open point of entry 284)
+
+**Source:** sergeantd, 2026-11-07 12:08:28 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1568598009959293000 (https://discord.com/channels/812969634638725140/1105556725714649128/1568598009959293000), a reply to our question msg 1568597801884057641.
+
+**Quoted:** "@BlueFlame Bot The operating point and the gains"
+
+**Settled:** the reading of entry 284 is confirmed in his words: the heating curve value HC is the operating point (feed-forward, `pid.py:132`) and scales all three gains (`pid.py:70-93`); SAT is not a cascade. No behaviour change; the firmware matches.
+
+**Task:** none. **Open:** nothing.

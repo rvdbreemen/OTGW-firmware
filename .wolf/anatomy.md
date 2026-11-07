@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-25T23:09:38.215Z
-> Files: 23 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-06T04:11:27.872Z
+> Files: 5 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -10,6 +10,51 @@
 
 
 ## ../../../Claude/Projects/Kluis/02-wiki/
+
+
+## ../wt-1412ll/src/OTGW-firmware/
+
+
+## ../wt-1412ll/tests/
+
+
+## ../wt-1451/test/host/
+
+
+## ../wt-1470/docs/adr/
+
+
+## ../wt-1470/docs/diagnostics/
+
+
+## ../wt-1665/src/OTGW-firmware/
+
+
+## ../wt-1665/src/libraries/Platform/src/
+
+
+## ../wt-1665/test/host/
+
+
+## ../wt-1665/tests/
+
+
+## ../wt-6c-1654/test/host/
+
+
+## ../wt-6c-1654/tools/bench/ot-boiler-sim/
+
+
+## ../wt-6c-1654/tools/bench/ot-boiler-sim/data/
+
+
+## ../wt-6c-1654/tools/bench/ot-boiler-sim/host/
+
+
+## ../wt-6c-1654/tools/bench/ot-boiler-sim/src/
+
+
+## ../wt-agentic/.claude/hooks/
 
 
 ## ./
@@ -267,13 +312,14 @@
 ## C:/Users/rvdbr/.claude/jobs/724775a1/tmp/satspec/
 
 
+## C:/Users/rvdbr/.claude/jobs/914dbd57/tmp/scripts/
+
+
 ## C:/Users/rvdbr/.claude/projects/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/2cc0fd9b-f0b0-419e-ad8b-bce8f67bdd24/workflows/scripts/
 
 
 ## C:/Users/rvdbr/.claude/projects/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/memory/
 
-- `reference_bench_simulation_without_boiler.md` — Merged from reference_otgw32_sim_pic_path_only (~956 tok)
-- `reference_otgw32_test_device.md` — Declares board (~2282 tok)
 
 ## C:/Users/rvdbr/AppData/Local/Temp/
 
@@ -319,27 +365,32 @@
 
 ## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/5c40272c-4417-42f4-924c-666810f09dc1/scratchpad/
 
-- `block.cpp` — === Cycle kind (TASK-1387): thermo-nova cycles/tracker.py:101-108 and _determine_cycle_kind :314-324 (~2084 tok)
-- `boot_heap_capture.py` — TASK-1339: reboot the unit N times and capture the [HEAP] boot lines over telnet. (~678 tok)
-- `capture.py` — Telnet capture (port 23) with host timestamps + 5 s sat/status poller (one request at a time). (~688 tok)
-- `cmp_doc.py` — row (~1812 tok)
-- `ed2.py` — Declares char (~2061 tok)
-- `edit_cls_test.py` — rep, test_R4_pwm_idle_is_uncertain, test_R3_dhw_in_the_warm_up_is_not_in_the_tail, test_R2_master_ch (~1462 tok)
-- `edit_cmp.py` — sub (~2088 tok)
-- `edit_fix2.py` — load, save (~1285 tok)
-- `edit_misc.py` — load, save (~541 tok)
-- `edit_spec.py` — is: repl_line (~5240 tok)
-- `gen_overshoot_replay.py` — TASK-1367 bench replay: flame on, constant high flow, fixed outside temperature, no room temp. (~440 tok)
-- `spec_doc.py` — changes: rep, block (~2940 tok)
-- `spec_doc2.py` — rep (~800 tok)
 
 ## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/5c40272c-4417-42f4-924c-666810f09dc1/scratchpad/t1339/
+
+
+## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/9604259c-3cd4-4397-a002-3ea5ca73cb77/scratchpad/
+
+
+## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/9604259c-3cd4-4397-a002-3ea5ca73cb77/scratchpad/bench-1450b/
+
+
+## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/9604259c-3cd4-4397-a002-3ea5ca73cb77/scratchpad/r1470/
+
+
+## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/9604259c-3cd4-4397-a002-3ea5ca73cb77/scratchpad/rel99/
 
 
 ## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/973c7813-75b7-4f1e-bab5-86d714ffc1db/scratchpad/
 
 
 ## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/c70b1e97-db42-4038-96aa-f497de4e2278/scratchpad/
+
+
+## C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/74b8fc81-f282-4eda-bcab-6276a4a766f4/scratchpad/
+
+
+## C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/9ad25eb8-1a77-4659-887b-f3c41994cc95/scratchpad/
 
 
 ## C:/Users/rvdbr/AppData/Local/Temp/fakedev/
@@ -368,11 +419,9 @@
 
 ## docs/adr/
 
-- `ADR-201-combo-board-detection-persists-only-a-positive-pic-verdict-and-re-probes-every-boot-supersedes-adr-164.md` — ADR-201 Combo board detection persists only a positive PIC verdict and re-probes every boot (superse (~4310 tok)
 
 ## docs/api/
 
-- `openapi.yaml` (~54230 tok)
 
 ## docs/c4/
 
@@ -392,6 +441,9 @@
 ## docs/manuals/nl/
 
 
+## docs/process/
+
+
 ## docs/research/
 
 
@@ -406,10 +458,7 @@
 
 ## src/OTGW-firmware/
 
-- `MQTTstuff.ino` — include <espMqttClient.h>          // bertmelis async MQTT client (ADR-123 Phase 2, TASK-865.7) (~51749 tok)
-- `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~13682 tok)
-- `SATcontrol.ino` — Declares char (~72827 tok)
-- `SATcycles.ino` — Declares uint8_t (~16734 tok)
+- `MQTTstuff.ino` — include <espMqttClient.h>          // bertmelis async MQTT client (ADR-123 Phase 2, TASK-865.7) (~52646 tok)
 
 ## src/OTGW-firmware/data/
 
@@ -422,14 +471,16 @@
 
 ## test/host/
 
+- `test_mqtt_print_error.cpp` — TASK-1664 host harness: PrintMQTTError() from MQTTstuff.ino, compiled against stubs. (~618 tok)
+- `test_mqtt_print_error.py` — TASK-1664 host harness: does PrintMQTTError() stop calling a refused publish (~1165 tok)
+- `test_ot_support_migration.cpp` — Declares char (~3622 tok)
+- `test_ot_support_migration.py` — TASK-1185 / TASK-1660 host harness: do older /ot-boiler.json (formats 1 and 2) and (~2267 tok)
 
 ## test/host/sat_pid_shim/
 
 
 ## tests/
 
-- `test_sat_cycle_classifier.py` — TASK-1387: host test for the end-of-cycle classifier against thermo-nova cycles/classifier.py. (~7598 tok)
-- `test_sat_pwm_override.py` — TASK-1268: host test for the SAT PWM control-setpoint override and the MM selection. (~14670 tok)
 
 ## tests/stubs/
 

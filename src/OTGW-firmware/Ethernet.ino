@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Ethernet.ino
-**  Version  : v2.0.0-beta.79
+**  Version  : v2.0.0-beta.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -100,6 +100,7 @@ static void switchToEthernet() {
   // set in startWiFi(); a bare WiFi.disconnect() would let auto-reconnect resurrect
   // the station and fight the wired link.
   state.net.eMode = NET_ETHERNET;
+  wifiLinkMarkSelf(WIFI_SELF_ETHERNET);   // TASK-1446: this drop is ours, not a field outage
   WiFi.disconnect();
   WiFi.mode(WIFI_OFF);
   state.net.bEthernetLink = true;

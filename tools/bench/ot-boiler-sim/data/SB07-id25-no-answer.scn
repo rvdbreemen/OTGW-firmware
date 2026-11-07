@@ -1,0 +1,9 @@
+# OpenTherm boiler simulator scenario, TASK-1654. Exported from sat_bench_scenarios_1412_20.py by export_scenarios.py.
+# MsgID 25 not answered for 90 s while the other IDs are answered (stale flow)
+scenario SB07-id25-no-answer
+source sat_bench_scenarios_1412_20 1412.20-v1
+default flow=40 ret=30 pressure=1.5 outside=8 member_id=4 slave_hb=0 fault=0 ignition_delay=0 mod=30
+phase 60
+phase 90 reply25=none
+phase 60
+phase 0  # healthy hold after the scripted timeline

@@ -1,7 +1,7 @@
 # TASK-1519 rounds 5 analysis, 5b and 7
 
-Date: 2026-10-31. Scripts: `scripts/sat_curve_selftune_study4.py` (model, new flags), `scripts/sat_curve_selftune_study5b.py`,
-`scripts/sat_curve_selftune_study7.py`. Data: `docs/sat/sim-1519/data/round5b_*.json`, `round7_runs.json`, and
+Date: 2026-10-31. Scripts: `tools/research/sat/sat_curve_selftune_study4.py` (model, new flags), `tools/research/sat/sat_curve_selftune_study5b.py`,
+`tools/research/sat/sat_curve_selftune_study7.py`. Data: `docs/sat/sim-1519/data/round5b_*.json`, `round7_runs.json`, and
 `round5_results_raw.json` (round 5, 7,992 runs). Weather: Open-Meteo archive 52.1N 6.2E, 2025-11-01..2026-02-28.
 
 All numbers are model output. The model is a two-node house per building era with boiler / heat-pump minimum output
@@ -10,7 +10,7 @@ a field test has to confirm them.
 
 ## 1. Round 5 result, and why its reference was wrong
 
-Round 5 scored tuners against `best_coeff2()` (`scripts/sat_curve_selftune_study3.py:30-33`), which was 1.80 for every
+Round 5 scored tuners against `best_coeff2()` (`tools/research/sat/sat_curve_selftune_study3.py:30-33`), which was 1.80 for every
 house. With the tuner the end coefficient was further from 1.80 (0.44-0.57) than without (0.33), and hp30 with the
 band ended at start - 0.4 in almost every house. That looked like a biased tuner. It was a biased reference.
 
@@ -100,7 +100,7 @@ Findings:
 
 ## 6. Rounds 5c-5g: the clean-hour rule, option B, and the blind spot in low-load houses
 
-Scripts `scripts/sat_curve_selftune_study5c.py`, `study5d.py` (with `--cold` for 5e), `study5f.py` (with `--guard`
+Scripts `tools/research/sat/sat_curve_selftune_study5c.py`, `study5d.py` (with `--cold` for 5e), `study5f.py` (with `--guard`
 for 5g); data `round5c_runs.json` .. `round5g_runs.json`. All on the round 5b model, daily rule 2 days, step 0.1,
 paired against no tuner; starts 1.0 / 1.2 / 1.4 / 1.8 / 2.4 on houses balanced at 1.8. `clean_h` = clean hours the
 tuner saw per winter (scored days).
@@ -145,7 +145,7 @@ an open design question (Q-1519g, queued for Sergeant D), not a parameter to tun
 
 ## 8. Round 8: a second winter (2024-25), 2-day window (Robert 2026-10-31)
 
-Script `scripts/sat_curve_selftune_study8.py`; data `round8_runs.json`, weather `weather_2024_25.json` (Open-Meteo
+Script `tools/research/sat/sat_curve_selftune_study8.py`; data `round8_runs.json`, weather `weather_2024_25.json` (Open-Meteo
 archive, same grid cell 52.13N 6.13E, 2024-11-01..2025-02-28) next to `weather_2025_26.json`. Same houses and radiator
 sizes (calibrated on 2025-26, so 2024-25 is out of sample). Rule as decided (entries 163, 165, 167, 171-174): curve
 integral, clean hours without PWM and minimum output, daily on 2 days, symmetric 1 C, step 0.1. Check: the 2025-26
@@ -188,7 +188,7 @@ Findings:
 
 ## 9. Round 9: twenty winters (2005-06 .. 2024-25), 2-day and 3-day window (Robert 2026-10-31)
 
-Script `scripts/sat_curve_selftune_study9.py`; weather `data/weather20/` (Open-Meteo archive, same grid cell, Nov-Feb,
+Script `tools/research/sat/sat_curve_selftune_study9.py`; weather `data/weather20/` (Open-Meteo archive, same grid cell, Nov-Feb,
 120 days each); results per winter in `data/round9/<winter>.json`. Radiators as calibrated on 2025-26 (all 20 winters
 out of sample). Per winter: coarse sweep (c = 1.0-2.4, seed 1) and the decided rule with a 2-day and a 3-day window
 against no tuner, starts 1.0 / 1.2 / 1.4 / 1.8 / 2.4, 2 seeds, gas / hp30 / hp60: 11,100 winters in total. Check:

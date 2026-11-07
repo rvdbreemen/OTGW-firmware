@@ -131,17 +131,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("fail_safe: %s\r\n"), settings.otd.bFailSafe ? "true" : "false");
     Debugf(PSTR("msg_interval: %u\r\n"), (unsigned)settings.otd.iMsgInterval);
     Debugf(PSTR("has_bypass_relay: %s\r\n"), settings.otd.bHasBypassRelay ? "true" : "false");
-    Debugf(PSTR("ch_mode: %u\r\n"), (unsigned)settings.otd.iCHMode);
-    Debugf(PSTR("flow_temp: %.1f\r\n"), settings.otd.fFlowTemp);
-    Debugf(PSTR("flow_max: %.1f\r\n"), settings.otd.fFlowMax);
-    Debugf(PSTR("room_setpoint: %.1f\r\n"), settings.otd.fRoomSetpoint);
-    Debugf(PSTR("gradient: %.2f\r\n"), settings.otd.fGradient);
-    Debugf(PSTR("exponent: %.2f\r\n"), settings.otd.fExponent);
-    Debugf(PSTR("offset: %.2f\r\n"), settings.otd.fOffset);
-    Debugf(PSTR("room_comp: %s\r\n"), settings.otd.bRoomCompEnabled ? "true" : "false");
-    Debugf(PSTR("kp: %.2f\r\n"), settings.otd.fKp);
-    Debugf(PSTR("ki: %.2f\r\n"), settings.otd.fKi);
-    Debugf(PSTR("kboost: %.2f\r\n"), settings.otd.fKboost);
 #endif
 
     Debugln(F("[state.mqtt]"));
@@ -197,6 +186,13 @@ static void dumpDebugInfo() {
     // TASK-1017 load-test instrumentation (resettable via telnet 'z'):
     Debugf(PSTR("rest_inflight_hwm: %u\r\n"), (unsigned)state.heapdiag.iRestInflightHwm);
     Debugf(PSTR("webfile_inflight_hwm: %u\r\n"), (unsigned)state.heapdiag.iWebfileInflightHwm);
+    Debugf(PSTR("webfile_queued: %lu\r\n"), (unsigned long)state.heapdiag.iWebfileQueued);
+    Debugf(PSTR("webfile_admitted: %lu\r\n"), (unsigned long)state.heapdiag.iWebfileAdmitted);
+    Debugf(PSTR("webfile_cancelled: %lu\r\n"), (unsigned long)state.heapdiag.iWebfileCancelled);
+    Debugf(PSTR("webfile_timeout: %lu\r\n"), (unsigned long)state.heapdiag.iWebfileTimeout);
+    Debugf(PSTR("webfile_max_wait_ms: %lu\r\n"), (unsigned long)state.heapdiag.iWebfileMaxWaitMs);
+    Debugf(PSTR("webfile_pending: %u\r\n"), (unsigned)state.heapdiag.iWebfilePending);
+    Debugf(PSTR("webfile_pending_hwm: %u\r\n"), (unsigned)state.heapdiag.iWebfilePendingHwm);
     Debugf(PSTR("tcp_active_pcbs: %u\r\n"), (unsigned)state.heapdiag.iTcpActivePcbs);
     Debugf(PSTR("rest_503: %lu\r\n"), (unsigned long)state.heapdiag.iRest503Count);
     Debugf(PSTR("webfile_503: %lu\r\n"), (unsigned long)state.heapdiag.iWebfile503Count);
@@ -312,6 +308,13 @@ void handleDebugChar(char c){
             const bool on = !(state.debug.*(f->member));
             DebugTf(PSTR("\r\nDebug %s: %s\r\n"), f->label, CBOOLEAN(on));
             debugFlagWrite(state.debug, f, on);
+            return;
+        }
+        // This callback runs on async_tcp. Until setup() is done, an action key would run next to setup() on
+        // another task ('q' reloaded the settings while setup() still used them, TASK-1395). Toggles and the
+        // menu stay available; the actions wait for "Setup finished!".
+        if (!state.bSetupComplete && c != 'h') {
+            DebugTf(PSTR("\r\nKey '%c' ignored: setup still running, retry after 'Setup finished!'\r\n"), c);
             return;
         }
         switch (c){

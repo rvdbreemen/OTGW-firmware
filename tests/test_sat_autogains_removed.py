@@ -8,7 +8,7 @@ Two parts:
      ki_manual / kd_manual / auto_gains_value. This part fails on HEAD before the removal.
   2. Behaviour: the REAL _pidCalculateGains() is cut out of SATpid.ino and compiled with a host C++ compiler; the Kp/Ki/Kd it
      computes for a grid of heating-curve inputs are compared with the automatic formula as it stood on HEAD
-     (pid.py automatic_gains: kp = coeff * curve / divisor, ki = kp / 8400, kd = 0.07 * 8400 * kp; divisor 4 underfloor,
+     (pid.py automatic_gains: kp = coeff * curve / divisor, ki = kp / 8400, kd = 0.07 * 8400 * kp, the firmware uses 0.063 since TASK-1656 (entry 279); divisor 4 underfloor,
      3 radiators), each rounded to 3 decimals since TASK-1423 (entry 95, Q28a; Ki and Kd from the rounded Kp, pid.py:82, :93;
      pid.py itself rounds to 6). The stub settings carry the old fields at their old defaults (bAutoGains true), so the same
      harness also compiles the pre-removal SATpid.ino; it only matches while that file does not round.
@@ -64,18 +64,21 @@ int main(int argc, char** argv) {
 
 def extract_gain_code(src: str) -> str:
     """The gain constants and the real _pidCalculateGains() body, verbatim."""
-    consts = [m.group(0) for m in re.finditer(r"^static const float SAT_PID_(?:AGGRESSION_V3|KP_DIVISOR_FLOOR|KP_DIVISOR_RAD)\s*=.*;", src, re.M)]
-    assert len(consts) == 3, consts
+    consts = [m.group(0) for m in re.finditer(r"^static const float SAT_PID_(?:AGGRESSION_V3|KD_FACTOR|KP_DIVISOR_FLOOR|KP_DIVISOR_RAD)\s*=.*;", src, re.M)]
+    assert len(consts) in (3, 4), consts   # 3 on a pre-TASK-1656 copy, which writes 0.07f inline
     a = src.index("static void _pidCalculateGains(float curveValue)")
     b = src.index("\n}\n", a) + 3
     r = src.index("float satPidRound3(float v)")
     return "\n".join(consts) + "\n" + src[r:src.index("\n}\n", r) + 3] + "\n" + src[a:b]
 
 
+KD_FACTOR = 0.063   # Sergeant D entry 279 (TASK-1656): deliberate deviation from thermo-nova pid.py:93, which uses 0.07
+
+
 def expected_gains(coeff: float, curve: float, system: int):
     divisor = 4.0 if system == 2 else 3.0
     kp = round(coeff * curve / divisor, 3)   # TASK-1423: 3 decimals, Ki and Kd from the rounded Kp
-    return kp, round(kp / 8400.0, 3), round(0.07 * 8400.0 * kp, 3)
+    return kp, round(kp / 8400.0, 3), round(KD_FACTOR * 8400.0 * kp, 3)
 
 
 class AutoGainsNamesGone(unittest.TestCase):

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.79
+**  Version  : v2.0.0-beta.125
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -46,7 +46,6 @@ AsyncWebServerRequest*  currentRequest  = nullptr;
 AsyncResponseStream*    g_restStream    = nullptr;
 bool                    g_responseSent  = false;
 bool                    g_restSlotHeld  = false;
-bool                    g_fileSlotHeld  = false;
 WebPendingHeaders       g_pendingHeaders{};
 WebRequestBody          g_requestBody{};
 
@@ -54,6 +53,204 @@ FSInfo LittleFSinfo;
 bool   LittleFSmounted = false;
 
 //=====[ WiFi ]================================================================
+
+// TASK-1446 record begin
+// WiFi station link record (TASK-1446 telnet banner, TASK-1444 device/info; GH #682;
+// port of the 1.x outage record). The driver raises STA_CONNECTED/STA_DISCONNECTED on
+// the Arduino network event task, concurrently with the loop task (log drain) and the
+// async_tcp task (telnet banner, device/info). The callbacks only write the record
+// under g_wifiLinkMux: no logging, no allocation, no String. wifiLinkEventsLog() logs
+// from loopWifi(); readers take a copy under the lock and format outside it.
+//
+// One outage runs from the first disconnect event after a connect until the next
+// connect; the driver repeats the event (e.g. 201 NO_AP_FOUND) while it retries, so
+// those count as events of the same outage. A disconnect that the firmware causes
+// itself (Ethernet takeover, BETA AP retry timeout, dead-link forced reconnect) is
+// marked through wifiLinkMarkSelf() right before the call: the drop is recorded with
+// its cause but not counted in iOutages. The mark only applies to a drop that starts
+// while the link is up, and every disconnect or connect event clears it, so it can
+// never land on a later field outage.
+static portMUX_TYPE   g_wifiLinkMux            = portMUX_INITIALIZER_UNLOCKED;
+static WifiLinkRecord g_wifiLink;                               // guarded by g_wifiLinkMux
+static WifiSelfCause  g_wifiSelfPending        = WIFI_SELF_NONE;  // guarded
+static bool           g_wifiDropLogPending     = false;           // guarded
+static bool           g_wifiJoinLogPending     = false;           // guarded
+static bool           g_wifiLinkEventsBegun    = false;           // loop task only
+
+void wifiFormatBssid(char *buf, size_t size, const uint8_t *b)
+{
+  snprintf_P(buf, size, PSTR("%02X:%02X:%02X:%02X:%02X:%02X"), b[0], b[1], b[2], b[3], b[4], b[5]);
+}
+
+// arduino-esp32 3.3.5 names the wifi_err_reason_t codes itself (STA.cpp); it returns ""
+// for a code it does not know (e.g. 209..212).
+const char *wifiReasonName(uint8_t reason)
+{
+  const char *name = WiFi.disconnectReasonName((wifi_err_reason_t)reason);
+  return (name && name[0]) ? name : "?";
+}
+
+static const char *wifiSelfCauseName(WifiSelfCause cause)
+{
+  switch (cause) {
+    case WIFI_SELF_ETHERNET:  return "Ethernet takeover";
+    case WIFI_SELF_AP_RETRY:  return "AP retry timeout";
+    case WIFI_SELF_DEAD_LINK: return "dead-link check";
+    case WIFI_SELF_NONE:      break;
+  }
+  return "";
+}
+
+static void wifiLinkOnConnected(const uint8_t *bssid, uint8_t channel, uint32_t now)
+{
+  portENTER_CRITICAL(&g_wifiLinkMux);
+  memcpy(g_wifiLink.joinedBssid, bssid, sizeof(g_wifiLink.joinedBssid));
+  g_wifiLink.iJoinedChannel = channel;
+  g_wifiLink.bJoinSeen      = true;
+  if (!g_wifiLink.bLinkUp && g_wifiLink.bDropValid) g_wifiLink.iDropDurationMs = now - g_wifiLink.iDropStartMs;
+  g_wifiLink.bLinkUp        = true;
+  g_wifiSelfPending         = WIFI_SELF_NONE;
+  g_wifiJoinLogPending      = true;
+  portEXIT_CRITICAL(&g_wifiLinkMux);
+}
+
+static void wifiLinkOnDisconnected(const uint8_t *bssid, uint8_t reason, uint32_t now)
+{
+  portENTER_CRITICAL(&g_wifiLinkMux);
+  const WifiSelfCause self = g_wifiSelfPending;
+  g_wifiSelfPending = WIFI_SELF_NONE;
+  g_wifiLink.iDisconnectEvents++;
+  if (g_wifiLink.bLinkUp) {   // first event after a connect: a new drop starts
+    g_wifiLink.bLinkUp          = false;
+    if (self == WIFI_SELF_NONE) g_wifiLink.iOutages++;
+    g_wifiLink.bDropValid       = true;
+    g_wifiLink.iDropFirstReason = reason;
+    memcpy(g_wifiLink.dropBssid, bssid, sizeof(g_wifiLink.dropBssid));
+    g_wifiLink.iDropChannel     = g_wifiLink.iJoinedChannel;
+    g_wifiLink.iDropEvents      = 0;
+    g_wifiLink.iDropStartMs     = now;
+    g_wifiLink.iDropDurationMs  = 0;
+    g_wifiLink.eDropSelf        = self;
+    g_wifiDropLogPending        = true;
+  }
+  if (g_wifiLink.bDropValid) {
+    g_wifiLink.iDropEvents++;
+    g_wifiLink.iDropLastReason = reason;
+  }
+  portEXIT_CRITICAL(&g_wifiLinkMux);
+}
+
+// Network event task. Plain function pointer (WiFiEventSysCb): no std::function.
+static void onWifiLinkEvent(arduino_event_t *ev)
+{
+  if (!ev) return;
+  const uint32_t now = millis();
+  if (ev->event_id == ARDUINO_EVENT_WIFI_STA_CONNECTED) {
+    wifiLinkOnConnected(ev->event_info.wifi_sta_connected.bssid, ev->event_info.wifi_sta_connected.channel, now);
+  } else if (ev->event_id == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+    wifiLinkOnDisconnected(ev->event_info.wifi_sta_disconnected.bssid, ev->event_info.wifi_sta_disconnected.reason, now);
+  }
+}
+
+// Called from startWiFi() right after WiFi.mode(WIFI_STA); registers once.
+static void wifiLinkEventsBegin()
+{
+  if (g_wifiLinkEventsBegun) return;
+  g_wifiLinkEventsBegun = true;
+  WiFi.onEvent(onWifiLinkEvent, ARDUINO_EVENT_WIFI_STA_CONNECTED);
+  WiFi.onEvent(onWifiLinkEvent, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+}
+
+void wifiLinkMarkSelf(WifiSelfCause cause)
+{
+  portENTER_CRITICAL(&g_wifiLinkMux);
+  if (g_wifiLink.bLinkUp) g_wifiSelfPending = cause;   // a running outage is never relabelled
+  portEXIT_CRITICAL(&g_wifiLinkMux);
+}
+
+void wifiLinkSnapshot(WifiLinkRecord *out)
+{
+  if (!out) return;
+  portENTER_CRITICAL(&g_wifiLinkMux);
+  *out = g_wifiLink;
+  portEXIT_CRITICAL(&g_wifiLinkMux);
+}
+
+// Called from loopWifi() on every pass, before the Ethernet early return, so a drop
+// recorded before or during an Ethernet takeover is still logged.
+static void wifiLinkEventsLog()
+{
+  WifiLinkRecord r;
+  portENTER_CRITICAL(&g_wifiLinkMux);
+  r = g_wifiLink;
+  const bool dropLog = g_wifiDropLogPending;
+  const bool joinLog = g_wifiJoinLogPending;
+  g_wifiDropLogPending = false;
+  g_wifiJoinLogPending = false;
+  portEXIT_CRITICAL(&g_wifiLinkMux);
+
+  char bssid[18];
+  if (dropLog) {
+    wifiFormatBssid(bssid, sizeof(bssid), r.dropBssid);
+    DebugTf(PSTR("WiFi: link lost, reason %u %s, AP %s ch %u%s%s%s\r\n"),
+            (unsigned)r.iDropFirstReason, wifiReasonName(r.iDropFirstReason), bssid, (unsigned)r.iDropChannel,
+            r.eDropSelf != WIFI_SELF_NONE ? " (self: " : "", wifiSelfCauseName(r.eDropSelf),
+            r.eDropSelf != WIFI_SELF_NONE ? ")" : "");
+  }
+  if (joinLog) {
+    wifiFormatBssid(bssid, sizeof(bssid), r.joinedBssid);
+    if (!r.bDropValid) {
+      DebugTf(PSTR("WiFi: joined AP %s ch %u\r\n"), bssid, (unsigned)r.iJoinedChannel);
+    } else {
+      DebugTf(PSTR("WiFi: joined AP %s ch %u after %lu s, %lu disconnect event(s), last reason %u %s\r\n"),
+              bssid, (unsigned)r.iJoinedChannel, (unsigned long)(r.iDropDurationMs / 1000),
+              (unsigned long)r.iDropEvents, (unsigned)r.iDropLastReason, wifiReasonName(r.iDropLastReason));
+    }
+  }
+  // The boot association can complete before wifiLinkEventsBegin() registers the
+  // callbacks; take the joined AP from the driver then.
+  if (!r.bJoinSeen && WiFi.status() == WL_CONNECTED) {
+    uint8_t b[6];
+    const bool haveBssid = (WiFi.BSSID(b) != nullptr);
+    const uint8_t ch = (uint8_t)WiFi.channel();
+    portENTER_CRITICAL(&g_wifiLinkMux);
+    if (!g_wifiLink.bJoinSeen) {
+      if (haveBssid) memcpy(g_wifiLink.joinedBssid, b, sizeof(g_wifiLink.joinedBssid));
+      g_wifiLink.iJoinedChannel = ch;
+      g_wifiLink.bJoinSeen      = true;
+      g_wifiLink.bLinkUp        = true;
+    }
+    portEXIT_CRITICAL(&g_wifiLinkMux);
+  }
+}
+
+// Two telnet banner lines, each its own _debugPrintf_P (256-byte buffer).
+static void printWifiLinkBanner()
+{
+  WifiLinkRecord r;
+  wifiLinkSnapshot(&r);
+  const uint32_t now = millis();
+  char bssid[18];
+  wifiFormatBssid(bssid, sizeof(bssid), r.joinedBssid);
+  _debugPrintf_P(PSTR("  Link : AP %s ch %u%s   outages %lu   disconnect events %lu\r\n"),
+    bssid, (unsigned)r.iJoinedChannel, r.bLinkUp ? "" : " (down)",
+    (unsigned long)r.iOutages, (unsigned long)r.iDisconnectEvents);
+  if (!r.bDropValid) {
+    debugTelnet.println(F("  Drop : none since boot"));
+    return;
+  }
+  char down[16];
+  if (r.bLinkUp) snprintf_P(down, sizeof(down), PSTR("%lu s"), (unsigned long)(r.iDropDurationMs / 1000));
+  else           strlcpy(down, "ongoing", sizeof(down));
+  wifiFormatBssid(bssid, sizeof(bssid), r.dropBssid);
+  _debugPrintf_P(PSTR("  Drop : %lu s ago, down %s, reason %u %s (last %u %s, %lu events), AP %s ch %u%s%s\r\n"),
+    (unsigned long)((now - r.iDropStartMs) / 1000), down,
+    (unsigned)r.iDropFirstReason, wifiReasonName(r.iDropFirstReason),
+    (unsigned)r.iDropLastReason, wifiReasonName(r.iDropLastReason),
+    (unsigned long)r.iDropEvents, bssid, (unsigned)r.iDropChannel,
+    r.eDropSelf != WIFI_SELF_NONE ? ", self: " : "", wifiSelfCauseName(r.eDropSelf));
+}
+// TASK-1446 record end
 
 //gets called when WiFiManager enters configuration mode
 static void configModeCallback(WiFiManager *myWiFiManager)
@@ -79,10 +276,14 @@ void resetWiFiSettings(void)
   manageWiFi.resetSettings();
 }
 
+// TASK-1455: skip-portal mark, defined with the WiFi state machine below.
+static bool wifiSkipPortalDecide(bool wifiConnected, bool wifiSaved, bool forcePortal);
+
 //===========================================================================================
 void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 {
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  wifiLinkEventsBegin();   // TASK-1446: WiFi link record (reason, AP, outages)
 
   // Keep DHCP-supplied NTP servers (option 42) out of SNTP: we run our own NTP
   // in startNTP(). lwIP already rejects them by default on this framework; the
@@ -205,7 +406,18 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     DebugTln(F("No saved WiFi, starting config portal."));
   }
 
-  if (!wifiConnected)
+  // TASK-1455 (ADR-211): the boot after a WiFi supervisor restart opens neither the config
+  // portal nor the prerelease AP fallback while the saved network is away. setup() goes on
+  // without WiFi and loopWifi() retries the saved network every 30 s.
+  const bool portalSkipped = wifiSkipPortalDecide(wifiConnected, wifiSaved, forcePortal);
+  if (portalSkipped)
+  {
+    if (settings.wifi.bNoPortal)   // TASK-1645
+      DebugTln(F("WiFi: saved network not reachable, skipping the config portal (setting wifinoportal); loopWifi keeps retrying. Triple reset to reconfigure WiFi"));
+    else
+      DebugTln(F("WiFi: not connected after a WiFi supervisor restart, skipping the config portal; loopWifi keeps retrying"));
+  }
+  else if (!wifiConnected)
   {
 #if defined(_VERSION_PRERELEASE)
     if (wifiSaved && !forcePortal) {
@@ -244,7 +456,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   platformWifiDisableSleep();  // keep radio always-on for a responsive web UI (TASK-817)
 
   DebugTf(PSTR("Wifi status: %s\r\n"), WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
-  if (WiFi.status() != WL_CONNECTED)
+  if (WiFi.status() != WL_CONNECTED && !portalSkipped)   // a skipped boot goes on without WiFi
   {
     DECLARE_TIMER_SEC(timeoutWifiConnectFinal, timeOut, CATCH_UP_MISSED_TICKS);
     while ((WiFi.status() != WL_CONNECTED))
@@ -329,7 +541,363 @@ enum WifiState_t {
 static WifiState_t wifiState = WIFI_IDLE;
 static int wifiRetryCount = 0;
 
+//===========================================================================================
+// TASK-1455 begin (1.x skip-portal port, ADR-211): a WiFi supervisor restart marks the next
+// boot. On that boot startWiFi() opens neither the WiFiManager config portal nor the
+// prerelease AP fallback when the saved network is still away after the direct-connect
+// window: setup() finishes without WiFi and loopWifi() keeps retrying. WiFiManager 2.0.17
+// switches the station off while the portal runs, so a gateway in the portal could not
+// rejoin an access point that came back.
+// The mark lives in RTC_NOINIT memory: it survives esp_restart() and is garbage after a
+// power-on, so it needs the magic word and a software reset reason. setup() clears it, so it
+// applies to one boot. No NVS or flash write. A power cycle, a boot without saved
+// credentials, the triple reset and every other restart still get the portal.
+#define WIFI_SKIP_PORTAL_MAGIC  0x4F545350UL   // "OTSP"
+
+struct WifiSkipPortalRtc {
+  uint32_t magic;
+  uint32_t marked;   // 1: the previous run ended in a WiFi supervisor restart
+};
+static RTC_NOINIT_ATTR WifiSkipPortalRtc g_rtcWifiSkipPortal;
+static bool wifiSkipPortalBoot = false;   // this boot follows a WiFi supervisor restart
+
+// Called right before a WiFi supervisor doRestart(). Not while Ethernet is the active link:
+// loopWifi() returns before both restart sites then, and this keeps it that way.
+static void wifiMarkSkipPortal()
+{
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  if (state.net.eMode == NET_ETHERNET) return;
+#endif
+  g_rtcWifiSkipPortal.magic  = WIFI_SKIP_PORTAL_MAGIC;
+  g_rtcWifiSkipPortal.marked = 1;
+}
+
+// Called once near the top of setup(). Always clears the record. It counts only after a
+// software restart: a panic or watchdog reset in doRestart()'s shutdown, or a power-on with
+// garbage that happens to match, gets the portal as before.
+void captureWifiSkipPortal()
+{
+  wifiSkipPortalBoot = platformResetWasSoftware()
+                       && g_rtcWifiSkipPortal.magic == WIFI_SKIP_PORTAL_MAGIC
+                       && g_rtcWifiSkipPortal.marked == 1;
+  g_rtcWifiSkipPortal.magic  = 0;
+  g_rtcWifiSkipPortal.marked = 0;
+}
+
+// startWiFi(): true when this boot must not open the portal (or the AP fallback). Takes the
+// flag, so a later startWiFi() in the same boot (telnet debug menu) behaves as before.
+static bool wifiSkipPortalDecide(bool wifiConnected, bool wifiSaved, bool forcePortal)
+{
+  const bool marked = wifiSkipPortalBoot;
+  wifiSkipPortalBoot = false;
+  // TASK-1645: with settings.wifi.bNoPortal every startWiFi() skips too, not only the one boot after a
+  // supervisor restart. No saved credentials and the triple reset (forcePortal) still open the portal.
+  return (marked || settings.wifi.bNoPortal) && !wifiConnected && wifiSaved && !forcePortal;
+}
+// TASK-1455 end
+
+//===========================================================================================
+// TASK-1450 begin (port of 1.x TASK-1248, GH #682): detect a WiFi link that stays
+// associated with an IP while no traffic passes, and recover from it. loopWifi() only acts
+// on WiFi.status() != WL_CONNECTED, and WL_CONNECTED means "associated and got an IP", so
+// such a link was never acted on.
+//
+// Detection: while the link is up and loopWifi() is idle, the default gateway gets
+// WIFI_PROBE_PINGS ICMP echo requests every WIFI_PROBE_INTERVAL_SEC, WIFI_PROBE_SPACING_MS
+// apart, sent from the loop task through the platformGatewayProbe*() shims (one raw ICMP
+// pcb that exists only during the probe, every lwIP call under the core lock). A probe is
+// judged WIFI_PROBE_SPACING_MS after its last echo: any reply means the gateway answered.
+// - Armed per gateway: a gateway counts only after it has answered once. A router that
+//   drops ICMP never arms the check, a network that is dead from boot cannot trigger it,
+//   and a new gateway address disarms it again.
+// - Witnesses: a silent gateway alone does not prove a dead link. While MQTT is connected
+//   (espMqttClient drops a connection after 2 keepalives without server traffic,
+//   MqttClient.cpp:469, keepalive 60 s), a REST request arrived, or a port 25238 client
+//   sent a byte within WIFI_WITNESS_WINDOW_MS, no action is taken. A router reboot
+//   therefore leaves a gateway with any LAN client alone.
+// - No probe while the heap is not HEALTHY, and a probe whose pcb or echo buffers could
+//   not be allocated does not count (a TASK-1162-style overload is not a dead link). A
+//   probe that took far longer than planned (the loop stalled) is discarded too.
+//
+// Escalation after WIFI_PROBE_FAILS_TO_ACT dead probes in a row:
+// 1. a forced reconnect that keeps the stored credentials; loopWifi() then reconnects as
+//    for any other drop. The DHCP lease is released by it, which is why the witnesses
+//    come first. A prerelease build that cannot get the link back goes to its AP fallback;
+// 2. if the link is still dead after that reconnect, doRestart(). A forced reconnect that
+//    ends in WIFI_FAILED (release builds) restarts there and counts toward the same cap.
+//
+// Restart cap: a link that works for a few minutes after every boot and then dies would
+// otherwise restart the gateway endlessly. Dead-link restarts are counted in RTC_NOINIT
+// memory, kept only over a software restart (platformResetWasSoftware()). At
+// WIFI_DEAD_RESTART_CAP the gateway stops restarting and forces at most one reconnect per
+// WIFI_CAPPED_RECONNECT_MIN. The count clears after the link has stayed alive for
+// WIFI_DEAD_RESTART_CLEAR_MIN, and on a power-on, panic or watchdog reset.
+#define WIFI_PROBE_INTERVAL_SEC       60   // one probe per minute while connected
+#define WIFI_PROBE_PINGS               3   // echo requests per probe
+#define WIFI_PROBE_SPACING_MS       2000   // between echoes, and the wait after the last one
+#define WIFI_PROBE_MAX_SPAN_MS     15000   // a probe open longer than this (normal: 6 s) is discarded
+#define WIFI_PROBE_FAILS_TO_ACT        8   // dead probes in a row before acting: a typical router
+                                           // reboot (a few minutes) passes unharmed
+#define WIFI_WITNESS_WINDOW_MS     60000   // REST or port 25238 traffic this recent proves the LAN works
+#define WIFI_DEAD_RESTART_CAP          3
+#define WIFI_DEAD_RESTART_CLEAR_MIN   60
+#define WIFI_CAPPED_RECONNECT_MIN     15
+#define WIFI_DEAD_RESTART_MAGIC  0x4F544452UL   // "OTDR"
+#define WIFI_IP4_ARGS(a) (unsigned)((a) & 0xFF), (unsigned)(((a) >> 8) & 0xFF), \
+                         (unsigned)(((a) >> 16) & 0xFF), (unsigned)(((a) >> 24) & 0xFF)
+
+struct WifiDeadRestartRtc {
+  uint32_t magic;
+  uint32_t count;
+};
+static RTC_NOINIT_ATTR WifiDeadRestartRtc g_rtcWifiDeadRestarts;
+
+static bool     wifiProbeScheduled      = false;  // wifiProbeNextMs is valid
+static uint32_t wifiProbeNextMs         = 0;
+static bool     wifiProbeOpen           = false;  // a probe runs (shim pcb exists)
+static uint32_t wifiProbeStartMs        = 0;
+static uint32_t wifiProbeTarget         = 0;      // gateway of the running probe
+static uint16_t wifiEchoSeqBase         = 0;
+static uint8_t  wifiEchoSent            = 0;
+static bool     wifiEchoAllocFailed     = false;
+static uint32_t wifiEchoNextMs          = 0;
+static bool     wifiProbeSkipLogged     = false;  // "probe skipped" logged since the last judged probe
+static uint32_t wifiArmedGateway        = 0;      // gateway that answered; 0 = not armed
+static uint8_t  wifiDeadProbes          = 0;
+static bool     wifiDeadReconnectDone   = false;  // a forced reconnect ran in this dead streak
+static bool     wifiWitnessLogged       = false;  // "traffic flows, no action" logged; quiet until an answer
+static uint8_t  wifiDeadRestarts        = 0;      // dead-link restarts, mirrored in RTC
+static bool     wifiDeadRestartsLogged  = false;
+static uint32_t wifiLinkAliveSinceMs    = 0;
+static uint32_t wifiCappedReconnectMs   = 0;
+static bool     wifiCappedReconnectDone = false;
+
+static void writeWifiDeadRestarts(uint32_t count)
+{
+  g_rtcWifiDeadRestarts.magic = WIFI_DEAD_RESTART_MAGIC;
+  g_rtcWifiDeadRestarts.count = count;
+}
+
+// Called once near the top of setup(), before anything can restart. A software restart
+// keeps the count; any other reset reason starts from zero (RTC_NOINIT is garbage after
+// power-on, so the magic word is mandatory).
+void captureWifiDeadRestarts()
+{
+  if (platformResetWasSoftware() && g_rtcWifiDeadRestarts.magic == WIFI_DEAD_RESTART_MAGIC
+      && g_rtcWifiDeadRestarts.count <= WIFI_DEAD_RESTART_CAP) {
+    wifiDeadRestarts = (uint8_t)g_rtcWifiDeadRestarts.count;
+  } else {
+    wifiDeadRestarts = 0;
+    writeWifiDeadRestarts(0);
+  }
+}
+
+// Proof that the LAN still carries traffic while the gateway is silent.
+static bool wifiLanTrafficSeen()
+{
+  if (settings.mqtt.bEnable && state.mqtt.bConnected) return true;
+  if (restRequestWithin(WIFI_WITNESS_WINDOW_MS)) return true;
+  return otgwStreamRxWithin(WIFI_WITNESS_WINDOW_MS);
+}
+
+static void wifiProbeSkipped(PGM_P why)
+{
+  if (wifiProbeSkipLogged) return;
+  wifiProbeSkipLogged = true;
+  DebugTf(PSTR("WiFi: gateway probe skipped (%s), not counted\r\n"), why);
+}
+
+// Ends a running probe without a verdict (link dropped, transport switch, stalled probe).
+static void wifiLinkProbeAbort()
+{
+  if (!wifiProbeOpen) return;
+  (void)platformGatewayProbeEnd();
+  wifiProbeOpen = false;
+}
+
+// Back to the boot state of the check (WiFi -> Ethernet). The restart count stays.
+// Cheap when there is nothing to reset: loopWifi() calls it on every pass while wired.
+static void wifiLinkProbeReset()
+{
+  if (!wifiProbeOpen && !wifiProbeScheduled && wifiArmedGateway == 0 && wifiDeadProbes == 0
+      && !wifiDeadReconnectDone) return;
+  wifiLinkProbeAbort();
+  if (wifiArmedGateway != 0) DebugTln(F("WiFi: wired link active, dead-link check disarmed"));
+  wifiProbeScheduled    = false;
+  wifiArmedGateway      = 0;
+  wifiDeadProbes        = 0;
+  wifiDeadReconnectDone = false;
+  wifiWitnessLogged     = false;
+}
+
+static void wifiDeadLinkReconnect()
+{
+  wifiDeadReconnectDone = true;
+  wifiLinkMarkSelf(WIFI_SELF_DEAD_LINK);   // TASK-1446: not a field outage
+  platformWifiForceReconnect();   // loopWifi() sees the drop and reconnects
+}
+
+static void handleWifiProbeVerdict(bool gatewayAnswered)
+{
+  const uint32_t now = millis();
+  if (gatewayAnswered) {
+    if (wifiArmedGateway != wifiProbeTarget) {
+      wifiArmedGateway = wifiProbeTarget;
+      wifiLinkAliveSinceMs = now;
+      DebugTf(PSTR("WiFi: gateway %u.%u.%u.%u answers ping, dead-link check armed\r\n"),
+              WIFI_IP4_ARGS(wifiArmedGateway));
+    }
+    if (wifiDeadProbes > 0 || wifiDeadReconnectDone || wifiWitnessLogged) {
+      DebugTln(F("WiFi: gateway answers again, dead-link check reset"));
+      wifiLinkAliveSinceMs = now;
+    }
+    wifiDeadProbes        = 0;
+    wifiDeadReconnectDone = false;
+    wifiWitnessLogged     = false;
+    if (wifiDeadRestarts > 0
+        && (uint32_t)(now - wifiLinkAliveSinceMs) >= WIFI_DEAD_RESTART_CLEAR_MIN * 60000UL) {
+      DebugTln(F("WiFi: link alive for an hour, dead-link restart count cleared"));
+      wifiDeadRestarts        = 0;
+      wifiCappedReconnectDone = false;
+      writeWifiDeadRestarts(0);
+    }
+    return;
+  }
+  if (wifiArmedGateway == 0) return;   // no gateway answered yet: check stays off
+
+  if (wifiDeadProbes < 255) wifiDeadProbes++;
+  if (wifiDeadProbes == 1 && !wifiWitnessLogged) {
+    DebugTf(PSTR("WiFi: gateway %u.%u.%u.%u stopped answering ping (acting after %u probes)\r\n"),
+            WIFI_IP4_ARGS(wifiArmedGateway), (unsigned)WIFI_PROBE_FAILS_TO_ACT);
+  }
+  if (wifiDeadProbes < WIFI_PROBE_FAILS_TO_ACT) return;
+  wifiDeadProbes = 0;
+
+  if (wifiLanTrafficSeen()) {
+    if (!wifiWitnessLogged) {   // once, until the gateway answers again
+      wifiWitnessLogged = true;
+      DebugTln(F("WiFi: gateway silent but MQTT, REST or port 25238 traffic flows, no action"));
+    }
+    return;
+  }
+  wifiWitnessLogged = false;
+  if (wifiDeadRestarts >= WIFI_DEAD_RESTART_CAP) {
+    // Cap reached: no more restarts, and at most one forced reconnect per
+    // WIFI_CAPPED_RECONNECT_MIN so a false verdict cannot bounce every session.
+    if (wifiCappedReconnectDone
+        && (uint32_t)(now - wifiCappedReconnectMs) < WIFI_CAPPED_RECONNECT_MIN * 60000UL) return;
+    DebugTf(PSTR("WiFi: no traffic, restart cap (%u) reached, reconnecting only\r\n"),
+            (unsigned)WIFI_DEAD_RESTART_CAP);
+    wifiCappedReconnectDone = true;
+    wifiCappedReconnectMs   = now;
+    wifiDeadLinkReconnect();
+    return;
+  }
+  if (!wifiDeadReconnectDone) {
+    DebugTln(F("WiFi: connected but no traffic, forcing a reconnect"));
+    wifiDeadLinkReconnect();
+    return;
+  }
+  wifiDeadRestarts++;
+  writeWifiDeadRestarts(wifiDeadRestarts);
+  wifiMarkSkipPortal();   // TASK-1455
+  doRestart("WiFi: connected but no traffic");
+}
+
+// Called from loopWifi() while the link is up and the state machine is idle.
+static void wifiLinkProbeTick()
+{
+  const uint32_t now = millis();
+  if (!wifiDeadRestartsLogged) {
+    wifiDeadRestartsLogged = true;
+    if (wifiDeadRestarts > 0) {
+      DebugTf(PSTR("WiFi: %u dead-link restart(s) since the link was last alive for an hour (cap %u)\r\n"),
+              (unsigned)wifiDeadRestarts, (unsigned)WIFI_DEAD_RESTART_CAP);
+    }
+  }
+  if (!wifiProbeScheduled) {   // first idle pass after boot, a reconnect or a transport switch
+    wifiProbeScheduled = true;
+    wifiProbeNextMs = now + WIFI_PROBE_INTERVAL_SEC * 1000UL;
+    return;
+  }
+
+  if (wifiProbeOpen) {
+    if ((uint32_t)(now - wifiProbeStartMs) > WIFI_PROBE_MAX_SPAN_MS) {
+      wifiLinkProbeAbort();   // the loop stalled during the probe: its result says nothing
+      return;
+    }
+    if ((int32_t)(now - wifiEchoNextMs) < 0) return;
+    if (wifiEchoSent < WIFI_PROBE_PINGS) {
+      if (!platformGatewayProbeSend((uint16_t)(wifiEchoSeqBase + wifiEchoSent))) wifiEchoAllocFailed = true;
+      wifiEchoSent++;
+      wifiEchoNextMs = now + WIFI_PROBE_SPACING_MS;
+      return;
+    }
+    const uint8_t replies = platformGatewayProbeEnd();
+    wifiProbeOpen = false;
+    if (replies == 0 && wifiEchoAllocFailed) {   // heard nothing and could not send everything
+      wifiProbeSkipped(PSTR("no echo buffer"));
+      return;
+    }
+    wifiProbeSkipLogged = false;
+    handleWifiProbeVerdict(replies != 0);
+    return;
+  }
+
+  if ((int32_t)(now - wifiProbeNextMs) < 0) return;
+  wifiProbeNextMs = now + WIFI_PROBE_INTERVAL_SEC * 1000UL;
+
+  // Read once per probe, not per loop pass: it reads the station netif's address fields.
+  const uint32_t gateway = platformWifiGatewayV4();
+  if (gateway == 0) return;   // static IP without a gateway: nothing to probe
+  if (wifiArmedGateway != 0 && gateway != wifiArmedGateway) {
+    DebugTf(PSTR("WiFi: gateway address changed to %u.%u.%u.%u, dead-link check disarmed\r\n"),
+            WIFI_IP4_ARGS(gateway));
+    wifiArmedGateway      = 0;
+    wifiDeadProbes        = 0;
+    wifiDeadReconnectDone = false;
+    wifiWitnessLogged     = false;
+  }
+  if (getHeapHealth() != HEAP_HEALTHY) { wifiProbeSkipped(PSTR("heap not healthy")); return; }
+
+  wifiEchoSeqBase = (uint16_t)(wifiEchoSeqBase + WIFI_PROBE_PINGS);
+  if (!platformGatewayProbeBegin(gateway, wifiEchoSeqBase)) { wifiProbeSkipped(PSTR("no pcb")); return; }
+  wifiProbeOpen       = true;
+  wifiProbeStartMs    = now;
+  wifiProbeTarget     = gateway;
+  wifiEchoSent        = 0;
+  wifiEchoAllocFailed = false;
+  wifiEchoNextMs      = now;
+}
+
+// The link came back through loopWifi(): a fresh dead streak and alive window, first probe
+// one interval from now. Arming and wifiDeadReconnectDone stay: a reconnect that did not
+// bring traffic back leads to the restart.
+static void wifiLinkProbeOnReconnect()
+{
+  wifiDeadProbes       = 0;
+  wifiLinkAliveSinceMs = millis();
+  wifiProbeScheduled   = false;
+}
+
+// WIFI_FAILED: true when loopWifi() must keep retrying instead of restarting (a forced
+// dead-link reconnect failed while the restart cap is reached). Otherwise a restart that a
+// forced reconnect led to is counted toward the cap.
+static bool wifiDeadLinkFailedRetry()
+{
+  if (!wifiDeadReconnectDone) return false;
+  if (wifiDeadRestarts >= WIFI_DEAD_RESTART_CAP) {
+    DebugTln(F("WiFi: reconnect failed, dead-link restart cap reached, retrying"));
+    return true;
+  }
+  wifiDeadRestarts++;
+  writeWifiDeadRestarts(wifiDeadRestarts);
+  return false;
+}
+// TASK-1450 end
+
 void loopWifi() {
+  wifiLinkEventsLog();   // TASK-1446: every pass, before the Ethernet early return
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // When wired Ethernet is the active transport, the WiFi radio is powered down
   // by switchToEthernet() (WIFI_OFF). Do not run the reconnect state machine —
@@ -338,7 +906,8 @@ void loopWifi() {
   // A connected wired link also preempts the BETA AP fallback: WIFI_OFF in
   // switchToEthernet() tears down the softAP, and this early return keeps the
   // AP-retry states dormant while Ethernet is active.
-  if (state.net.eMode == NET_ETHERNET) return;
+  // The dead-link check is WiFi-only: reset it, so a later switch back starts unarmed.
+  if (state.net.eMode == NET_ETHERNET) { wifiLinkProbeReset(); return; }
 #endif
   DECLARE_TIMER_SEC(timerWifiRetry,  30, CATCH_UP_MISSED_TICKS);
 #if defined(_VERSION_PRERELEASE)
@@ -350,8 +919,11 @@ void loopWifi() {
     case WIFI_IDLE:
       if (WiFi.status() != WL_CONNECTED) {
         DebugTln(F("WiFi: connection lost, starting non-blocking reconnect"));
+        wifiLinkProbeAbort();   // TASK-1450: a probe across the drop says nothing
         wifiRetryCount = 0;
         wifiState = WIFI_DISCONNECTED;
+      } else {
+        wifiLinkProbeTick();   // TASK-1450
       }
       break;
 
@@ -374,8 +946,9 @@ void loopWifi() {
         wifiRetryCount++;
         DebugTf(PSTR("WiFi: connect attempt %d failed\r\n"), wifiRetryCount);
 #if defined(_VERSION_PRERELEASE)
-        // BETA: after 2 retries (≈60s) enter AP fallback instead of rebooting
-        if (wifiRetryCount >= 2) {
+        // BETA: after 2 retries (≈60s) enter AP fallback instead of rebooting. TASK-1645: not with
+        // settings.wifi.bNoPortal, which promises no portal and no AP; loopWifi then keeps retrying.
+        if (wifiRetryCount >= 2 && !settings.wifi.bNoPortal) {
           DebugTln(F("BETA: WiFi retries exhausted, entering AP fallback mode"));
           startAPFallback();
           RESTART_TIMER(timerAPRetry);
@@ -409,12 +982,21 @@ void loopWifi() {
       // OTGWstream is auto-started by handleOTGW() in the main loop
       startMQTT();
       startWebSocket();
+      wifiLinkProbeOnReconnect();   // TASK-1450
       wifiState = WIFI_IDLE;
       DebugTf(PSTR("WiFi: reconnected, services restarted; IP=%s\r\n"),
               WiFi.localIP().toString().c_str());
       break;
 
     case WIFI_FAILED:
+      // TASK-1450: when the dead-link check forced this reconnect, the restart counts toward
+      // its cap; at the cap keep retrying instead of restarting.
+      if (wifiDeadLinkFailedRetry()) {
+        wifiRetryCount = 0;
+        wifiState = WIFI_DISCONNECTED;
+        break;
+      }
+      wifiMarkSkipPortal();   // TASK-1455
       doRestart("WiFi: too many reconnect failures");
       break;
 
@@ -438,6 +1020,7 @@ void loopWifi() {
         wifiRetryCount = 0;
       } else if (DUE(timerAPConnWait)) {
         DebugTln(F("BETA AP: WiFi reconnect timed out, staying in AP fallback"));
+        wifiLinkMarkSelf(WIFI_SELF_AP_RETRY);   // TASK-1446: only applies if the link came up (connect without IP)
         WiFi.disconnect();
         RESTART_TIMER(timerAPRetry);
         wifiState = WIFI_AP_FALLBACK;
@@ -536,6 +1119,7 @@ static void sendTelnetBanner(const char* ip)
     _debugPrintf_P(PSTR("         AP-Fallback active: %s\r\n"), state.net.sAPSSID);
   }
 #endif
+  printWifiLinkBanner();   // TASK-1446: Link + Drop lines (WiFi station record, also while wired)
   _debugPrintf_P(PSTR("  Heap : free %u  frag %u%%  minFree %u  maxBlk %u  sketchFree %u\r\n"),
     (unsigned)platformFreeHeap(),
     (unsigned)platformHeapFragmentation(),
@@ -626,9 +1210,33 @@ static void onTelnetInput(const char* s) {
   if (s && s[0] != '\0') handleDebugChar(s[0]);
 }
 
+// TASK-1644: stop() closes a connected client from the server side, which leaves that connection in
+// TIME_WAIT on local port 23 for 2 x CONFIG_LWIP_TCP_MSL (120 s). AsyncTCP binds the listener without
+// SO_REUSEADDR, so a begin() inside that window fails its tcp_bind and port 23 stays closed (bench .61,
+// 2026-11-05: refused until the window passed). After a stop, startTelnet() opens a retry window in
+// which telnetRelistenTick() calls begin() again every 10 s; begin() returns at once while listening.
+static const uint32_t TELNET_RELISTEN_WINDOW_MS = 180000UL;   // TIME_WAIT 120 s plus margin
+static bool     telnetStoppedSinceBoot = false;
+static uint32_t telnetRelistenStartMs  = 0;
+static bool     telnetRelistenActive   = false;
+
 //===========================================================================================
 void startTelnet()
 {
+  // TASK-1644: settings.bTelnetEnabled false closes port 23 and drops a connected client. Debug output
+  // then goes nowhere: AsyncSimpleTelnet::write() returns 0 with no client. Every caller (boot, WiFi
+  // reconnect, the deferred settings apply) comes through here, so the setting holds on every path.
+  if (!settings.bTelnetEnabled) {
+    DebugTln(F("Telnet debug console disabled (setting telnetenabled), closing port 23"));
+    debugTelnet.stop();
+    telnetStoppedSinceBoot = true;
+    telnetRelistenActive = false;
+    return;
+  }
+  if (telnetStoppedSinceBoot) {
+    telnetRelistenStartMs = millis();
+    telnetRelistenActive = true;
+  }
   debugTelnet.onConnect(sendTelnetBanner);
   debugTelnet.setLineMode(false);
   // TASK-1333: Nagle on for the debug console only, so the TCP stack merges the
@@ -642,6 +1250,20 @@ void startTelnet()
   DebugT(getActiveIP());
   DebugTln(F(":23"));
 } // startTelnet()
+
+//===========================================================================================
+// TASK-1644: called from doBackgroundTasks(). Only active for TELNET_RELISTEN_WINDOW_MS after a
+// re-enable that followed a stop(); does nothing otherwise.
+void telnetRelistenTick()
+{
+  if (!telnetRelistenActive) return;
+  if (!settings.bTelnetEnabled || (uint32_t)(millis() - telnetRelistenStartMs) > TELNET_RELISTEN_WINDOW_MS) {
+    telnetRelistenActive = false;
+    return;
+  }
+  DECLARE_TIMER_SEC(timerTelnetRelisten, 10, SKIP_MISSED_TICKS);
+  if (DUE(timerTelnetRelisten)) debugTelnet.begin(false);
+}
 
 //=======================================================================
 void startMDNS(const char *hostname)
@@ -772,6 +1394,7 @@ void loopNTP()
                   myTime.isError() ? "Y" : "N");
           if (!myTime.isError()) {
             NtpStatus = TIME_SYNC;
+            if (diagRec.active) diagRec.recTimeSync((uint32_t)now);   // TASK-1665 (ADR-213)
             DebugTln(F("[NTP] Time synced!"));
           } else {
             if (state.debug.bNTP) DebugTln(F("[NTP] ZonedDateTime error, staying in WAITFORSYNC"));

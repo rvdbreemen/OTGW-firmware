@@ -4,19 +4,36 @@ These instructions adapt the repository's Claude guidance for Codex agents. They
 
 ---
 
+<!-- AGENT-CORE START (TASK-1625: identical in CLAUDE.md, AGENTS.md and .github/copilot-instructions.md; guarded by tests/test_agent_core_block.py) -->
+## Core rules for every agent
+
+This block is shared word for word by CLAUDE.md, AGENTS.md (Codex) and .github/copilot-instructions.md (Copilot). CLAUDE.md with its `.claude/rules/` files holds the full rule set; where another instruction file disagrees with it, CLAUDE.md wins. Change this block in all three files at once.
+
+- **Lines.** `dev` is the 2.x line: ESP32-S3 only (OTGW32, and the OTGW Classic with an ESP32-S3 module), async and FreeRTOS. `otgw-1.x.x` is the 1.x ESP8266 maintenance line. `main` is the latest public release and is only pushed in the release flow, after Robert's go.
+- **Roles.** Robert (maintainer) decides scope, priority, waivers and releases; put an open decision to him as one question with the options, their consequences and your recommendation. Sergeant D decides SAT behaviour (see the SAT ground truth block). Testers give input and evidence, never decisions: their requests become tasks labelled `needs-maintainer-ok`.
+- **Tasks.** Every change starts from a Backlog.md task. Use the `backlog` CLI for every task read and write. Never use the backlog MCP server and never edit `backlog/tasks/*.md` directly.
+- **Done needs evidence.** Tick an acceptance criterion only with evidence from the session that did the work: build output, a test run, a capture, a screenshot. For a bug fix, the same reproduction fails on the old code and passes on the fix.
+- **Firmware rules.** No ArduinoJson (ADR-146). No HTTPS or WSS. Never write to `Serial` after init (it is the PIC link); debug output goes to telnet. PIC commands only through `addCommandToQueue()`. String literals stay in flash (`F()`, `PSTR()`, the `_P` functions). No `String` class in hot paths (ADR-180). No raw `#ifdef ESP32`/`ESP8266` outside the Platform library: use the `platformXxx()` shims and `HAS_*` flags. The web UI keeps at most 2 API calls in flight.
+- **Versions and commits.** A commit that touches `src/OTGW-firmware/**` or `src/libraries/**` bumps `_VERSION_PRERELEASE` with `bin/bump-prerelease.sh`. Every `TASK-NNN` in a commit message needs its task file staged. The git hooks in `.githooks/` enforce both (`git config core.hooksPath .githooks`).
+- **Gates.** `python evaluate.py --quick` shows no new FAIL. Build only through `build.bat` / `./build.sh`, never `python build.py` directly. Run the tests with `python scripts/run_tests.py`.
+- **Discord.** Answer in English, answer first, with the real `<@ID>` mention. Never name the OTGW32 board in public. Every SAT correction or decision by Sergeant D goes into `docs/sat/sergeant-d-corrections.md` before it is implemented.
+<!-- AGENT-CORE END -->
+
+---
+
 ## Task Management
 
 For SAT work under TASK-1412, read `docs/sat/sat-low-load-agent-handoff-2026-10-28.md` before selecting the next task. It links the current execution graph, PID writer order, open decision gates and bench-to-field validation sequence. Live Backlog dependencies take precedence over an older graph snapshot.
 
-Every meaningful code or documentation change should be backed by a Backlog task before implementation work starts. Use Backlog MCP tools as the primary interface for reading, creating, updating, and completing tasks.
+Every meaningful code or documentation change should be backed by a Backlog task before implementation work starts. Use the `backlog` CLI for reading, creating, updating, and completing tasks.
 
-Codex agents must not edit files in `backlog/tasks/` directly. Use Backlog MCP tools such as task view/search/create/edit when available. Use the Backlog CLI commands in the reference below only when the MCP tools are unavailable, missing required capability, or fail for the current operation.
+Codex agents must not edit files in `backlog/tasks/` directly, and must not use the backlog MCP server: it indexes only one worktree and serves stale cached task state across worktrees (verified 2026-05-05, see CLAUDE.md). The CLI reference below is the interface.
 
 Before marking a task `Done`, run through `docs/guides/pr-checklist.md`. A clean build is the minimum bar; the checklist covers hardware, browser, MQTT, and smoke-test expectations that compile checks do not cover.
 
 After marking a task `Done`, commit the completed task changes and push the branch to its configured upstream. Keep commits narrow: stage only files that belong to the completed task and leave unrelated local changes untouched.
 
-Known issue: `backlog task list` may return empty in this repository. Prefer Backlog MCP search/view; if falling back to CLI, prefer `backlog search "<topic>" --plain` or `backlog task <id> --plain`. Read task files directly only as a read-only fallback, never to modify them.
+`backlog task list` works (the old "returns empty" note did not reproduce, TASK-1635). Read task files directly only as a read-only fallback, never to modify them. On Windows, never pass a multi-line argument through `backlog.cmd`: cmd.exe cuts the argument list at the first newline and silently drops every later flag; call `node <npm-prefix>/node_modules/backlog.md/cli.js` directly instead.
 
 ---
 
@@ -35,7 +52,7 @@ Known issue: `backlog task list` may return empty in this repository. Prefer Bac
 
 This repository contains ESP8266 and ESP32 firmware for the NodoShop OpenTherm Gateway, including Web UI, MQTT, REST API, TCP serial bridge, Home Assistant integration, OTGW32 support, and SAT-related work.
 
-- Platform: ESP8266 (NodeMCU/Wemos D1 mini, tight RAM budget) and ESP32/OTGW32.
+- Platform: on `dev` (2.x) ESP32-S3 only (OTGW32, and the OTGW Classic with an ESP32-S3 module); the ESP8266 (NodeMCU/Wemos D1 mini, tight RAM budget) is the 1.x line on `otgw-1.x.x`.
 - Language: Arduino C/C++ in `.ino` files, built as a single translation unit.
 - Serial: reserved for the PIC after initialization. Never write to `Serial` after OTGW init.
 - Debug: use `DebugTln()`, `DebugTf()`, and related debug helpers. They go to Telnet port 23; do not use `Serial.print()`.
@@ -264,9 +281,9 @@ SAT (Smart Autotune Thermostat) was designed on paper by Sergeant D and turned i
 - Never fill a gap with plausible behaviour. If the code does not show it, write "not found in the code" and ask Sergeant D.
 - Describe behaviour in time order from the code (what happens first, what triggers the next step, which timers run). The start-up sequence and the suppression mechanism are the known hallucination hot spots: for those, trace every path and write a timeline.
 - When Sergeant D's description and the code disagree, report both with the citation and let him decide. Do not pick one silently; record the outcome under item 1.
-- **Every correction or decision by Sergeant D is recorded in `docs/sat/sergeant-d-corrections.md`, in the same session and before the change it leads to is implemented** (maintainer directive, 2026-10-23). This covers corrections of our claims or code, answers to our questions, and choices between options, also when they arrive as a one-line reply on Discord. One numbered entry per item: date, his words quoted verbatim, the Discord message link, what it settles compared with the thermo-nova code (`file:line`) and the firmware, the task it drives, and what stays open. When a reply is short or ambiguous, record the reading you act on as an interpretation and say so. A later entry that changes an earlier one names the earlier entry; old entries are never rewritten.
+- **Every correction or decision by Sergeant D is recorded in `docs/sat/sergeant-d-corrections.md`, in the same session and before the change it leads to is implemented** (maintainer directive, 2026-10-23). This covers corrections of our claims or code, answers to our questions, and choices between options, also when they arrive as a one-line reply on Discord. One numbered entry per item: date, his words quoted verbatim, the Discord message link, what it settles compared with the thermo-nova code (`file:line`) and the firmware, the task it drives, and what stays open. When a reply is short or ambiguous, record the reading you act on as an interpretation and say so. A later entry that changes an earlier one names the earlier entry; old entries are never rewritten. After adding an entry, refresh the provenance index with `python scripts/sat_corrections_index.py --update` (TASK-1630).
 - **Every SAT decision is checked against Sergeant D's recorded decisions before it is taken** (maintainer directive, 2026-10-23). Read `docs/sat/sergeant-d-corrections.md` first. A plan, review, ADR, spec change or Discord answer about SAT names the entries it relies on and says, per relevant entry, whether it agrees. A conflict with an entry is never resolved silently: report it with the entry number and the citations, and put it to Sergeant D. A reviewer checks the same list and treats an unmentioned conflict as a finding.
-- **Unclear SAT behaviour is resolved by questioning Sergeant D step by step** (maintainer directive, 2026-10-24): the specification must be complete and correct, and asking him is how it gets there. Ask one question per Discord message, in plain English (he is a Greek native speaker), with the possible answers (A/B/C, each with its consequence and the thermo-nova citation) and our recommendation of the best one, and wait for his answer in the chat before the next question. Pace the questions to his presence (maintainer directive, 2026-10-25, replaces the 12-hour repeat rule): while he is active (he just answered a question), post the next queued question at once, however little time has passed. Check the chat every hour. If he does not react within the first hour after a question, wait quietly: no post while he is away. As soon as he is back (any new message from him in the channel), ask the first open question again, short, with a link to the original; he may simply have forgotten it. Keep the queue and each question's status in `docs/sat/open-questions.md`; record every answer in `docs/sat/sergeant-d-corrections.md` before acting on it, and turn each decided answer into a backlog task that implements it. Take the time: an open question blocks the implementation, never a guess.
+- **Unclear SAT behaviour is resolved by questioning Sergeant D step by step** (maintainer directive, 2026-10-24): the specification must be complete and correct, and asking him is how it gets there. Ask one question per Discord message, in plain English (he is a Greek native speaker), with the possible answers (A/B/C, each with its consequence and the thermo-nova citation) and our recommendation of the best one, and wait for his answer in the chat before the next question. Pace the questions to his presence (maintainer directive, 2026-10-25): while he is active (he just answered a question), post the next queued question at once, however little time has passed. Check the chat every hour. If he does not react within the first hour after a question, wait quietly: no post while he is away. As soon as he is back (any new message from him in the channel), ask the first open question again, short, with a link to the original; he may simply have forgotten it. Keep the queue and each question's status in `docs/sat/open-questions.md` (status words queued, asked, answered, dropped; refresh its Live queue with `python scripts/sat_open_questions.py --update`, TASK-1629); record every answer in `docs/sat/sergeant-d-corrections.md` before acting on it, and turn each decided answer into a backlog task that implements it. Take the time: an open question blocks the implementation, never a guess.
 - Before changing how SAT controls the boiler, the plan quotes the thermo-nova implementation of that area, names the difference with both citations, and waits for Sergeant D's OK (see `.claude/skills/implement-next-task/SKILL.md`, step 4). Arguments from memory or from the firmware do not count.
 - A claimed difference between thermo-nova and the firmware is published only after a second reader has opened both citations and tried to refute it.
 - Move the pinned commit only on purpose: one commit that updates this block, re-diffs `docs/sat/thermo-nova-spec.md` against the new upstream and says what changed. Never update the local copy silently.
@@ -275,14 +292,14 @@ SAT (Smart Autotune Thermostat) was designed on paper by Sergeant D and turned i
 ---
 
 <!-- BACKLOG.MD GUIDELINES START -->
-# Instructions for the usage of Backlog.md MCP / CLI Tooling
+# Instructions for the usage of Backlog.md CLI Tool
 
-## Backlog.md: Comprehensive Project Management Tool via MCP or CLI
+## Backlog.md: Comprehensive Project Management Tool via CLI
 
 ### Assistant Objective
 
-Efficiently manage all project tasks, status, and documentation using Backlog MCP tools when available, with the
-Backlog.md CLI as fallback, ensuring all project metadata remains fully synchronized and up-to-date.
+Efficiently manage all project tasks, status, and documentation using the Backlog.md CLI, ensuring all project metadata
+remains fully synchronized and up-to-date.
 
 ### Core Capabilities
 
@@ -300,30 +317,30 @@ Backlog.md CLI as fallback, ensuring all project metadata remains fully synchron
 ### Why This Matters to You (AI Agent)
 
 1. **Comprehensive system** - Full project management capabilities through CLI
-2. **MCP is the preferred interface** - Use Backlog MCP task tools first when they are available in the session
-3. **CLI is the fallback interface** - Use `backlog` commands only when MCP is unavailable or fails for the needed operation
-4. **Metadata stays synchronized** - MCP and CLI both preserve the complex relationships when used instead of direct file edits
+2. **The CLI is the interface** - All operations go through `backlog` commands
+3. **Unified interaction model** - You can use CLI for both reading (`backlog task 1 --plain`) and writing (
+   `backlog task edit 1`)
+4. **Metadata stays synchronized** - The CLI handles all the complex relationships
 
 ### Key Understanding
 
 - **Tasks** live in `backlog/tasks/` as `task-<id> - <title>.md` files
-- **You interact via Backlog MCP first**: view/search/create/edit tasks through the MCP tools when available
-- **Fallback to CLI only when needed**: `backlog task create`, `backlog task edit`, etc.
-- **Use `--plain` flag** for AI-friendly output when viewing/listing through the CLI fallback
-- **Never bypass MCP/CLI for writes** - They handle Git, metadata, file naming, and relationships
+- **You interact via CLI only**: `backlog task create`, `backlog task edit`, etc.
+- **Use `--plain` flag** for AI-friendly output when viewing/listing
+- **Never bypass the CLI** - It handles Git, metadata, file naming, and relationships
 
 ---
 
-# ⚠️ CRITICAL: NEVER EDIT TASK FILES DIRECTLY. Edit Only via MCP or CLI
+# ⚠️ CRITICAL: NEVER EDIT TASK FILES DIRECTLY. Edit Only via CLI
 
-**ALL task operations MUST use Backlog MCP tools first, or Backlog.md CLI commands as fallback**
+**ALL task operations MUST use the Backlog.md CLI commands**
 
-- ✅ **DO**: Use Backlog MCP task edit/create/view/search tools when available
-- ✅ **DO**: Use `backlog task edit` and other CLI commands when MCP is unavailable or fails
-- ✅ **DO**: Use MCP acceptance-criteria fields or `backlog task edit <id> --check-ac <index>` to mark acceptance criteria
+- ✅ **DO**: Use `backlog task edit` and other CLI commands
+- ✅ **DO**: Use `backlog task create` to create new tasks
+- ✅ **DO**: Use `backlog task edit <id> --check-ac <index>` to mark acceptance criteria
 - ❌ **DON'T**: Edit markdown files directly
 - ❌ **DON'T**: Manually change checkboxes in files
-- ❌ **DON'T**: Add or modify text in task files without using MCP or CLI
+- ❌ **DON'T**: Add or modify text in task files without using CLI
 
 **Why?** Direct file editing breaks metadata synchronization, Git tracking, and task relationships.
 
@@ -340,9 +357,9 @@ Backlog.md CLI as fallback, ensuring all project metadata remains fully synchron
 
 ### 🔧 **ACTING** (How to change things)
 
-- **All task operations MUST use Backlog MCP first, with Backlog.md CLI as fallback**
+- **All task operations MUST use the Backlog.md CLI tool**
 - This ensures metadata is correctly updated and the project stays in sync
-- **Always use `--plain` flag** when listing or viewing tasks through the CLI fallback for AI-friendly text output
+- **Always use `--plain` flag** when listing or viewing tasks for AI-friendly text output
 
 ---
 
@@ -702,12 +719,12 @@ backlog task edit 42 -s Done
 
 A task is **Done** only when **ALL** of the following are complete:
 
-### ✅ Via MCP or CLI Commands:
+### ✅ Via CLI Commands:
 
-1. **All acceptance criteria checked**: Use Backlog MCP `acceptanceCriteriaCheck` or CLI `backlog task edit <id> --check-ac <index>` for each
-2. **All Definition of Done items checked**: Use Backlog MCP `definitionOfDoneCheck` or CLI `backlog task edit <id> --check-dod <index>` for each
-3. **Final Summary added**: Use Backlog MCP `finalSummary` or CLI `backlog task edit <id> --final-summary "..."`
-4. **Status set to Done**: Use Backlog MCP `status: Done` or CLI `backlog task edit <id> -s Done`
+1. **All acceptance criteria checked**: Use `backlog task edit <id> --check-ac <index>` for each
+2. **All Definition of Done items checked**: Use `backlog task edit <id> --check-dod <index>` for each
+3. **Final Summary added**: Use `backlog task edit <id> --final-summary "..."`
+4. **Status set to Done**: Use `backlog task edit <id> -s Done`
 
 ### ✅ Via Code/Testing:
 
@@ -722,7 +739,7 @@ A task is **Done** only when **ALL** of the following are complete:
 
 ## 8. Finding Tasks and Content with Search
 
-When users ask you to find tasks related to a topic, use Backlog MCP search first. If MCP is unavailable or fails, use the `backlog search` command with `--plain` flag:
+When users ask you to find tasks related to a topic, use the `backlog search` command with `--plain` flag:
 
 ```bash
 # Search for tasks about authentication
@@ -750,26 +767,24 @@ backlog search "bug" --priority high --plain
 
 | Task         | ✅ DO                        | ❌ DON'T                         |
 |--------------|-----------------------------|---------------------------------|
-| View task    | MCP task view or `backlog task 42 --plain`   | Open and read .md file directly |
-| List tasks   | MCP task list/search or `backlog task list --plain` | Browse backlog/tasks folder     |
-| Check status | MCP task view or `backlog task 42 --plain`   | Look at file content            |
-| Find by topic| MCP task search or `backlog search "auth" --plain` | Manually grep through files |
+| View task    | `backlog task 42 --plain`   | Open and read .md file directly |
+| List tasks   | `backlog task list --plain` | Browse backlog/tasks folder     |
+| Check status | `backlog task 42 --plain`   | Look at file content            |
+| Find by topic| `backlog search "auth" --plain` | Manually grep through files |
 
 ### Modifying Tasks
 
 | Task          | ✅ DO                                 | ❌ DON'T                           |
 |---------------|--------------------------------------|-----------------------------------|
-| Check AC      | MCP task edit or `backlog task edit 42 --check-ac 1`  | Change `- [ ]` to `- [x]` in file |
-| Add notes     | MCP task edit or `backlog task edit 42 --notes "..."` | Type notes into .md file          |
-| Add final summary | MCP task edit or `backlog task edit 42 --final-summary "..."` | Type summary into .md file |
-| Change status | MCP task edit or `backlog task edit 42 -s Done`       | Edit status in frontmatter        |
-| Add AC        | MCP task edit or `backlog task edit 42 --ac "New"`    | Add `- [ ] New` to file           |
+| Check AC      | `backlog task edit 42 --check-ac 1`  | Change `- [ ]` to `- [x]` in file |
+| Add notes     | `backlog task edit 42 --notes "..."` | Type notes into .md file          |
+| Add final summary | `backlog task edit 42 --final-summary "..."` | Type summary into .md file |
+| Change status | `backlog task edit 42 -s Done`       | Edit status in frontmatter        |
+| Add AC        | `backlog task edit 42 --ac "New"`    | Add `- [ ] New` to file           |
 
 ---
 
-## 10. Fallback CLI Command Reference
-
-Use these commands when Backlog MCP tools are unavailable or fail for the current operation.
+## 10. Complete CLI Command Reference
 
 ### Task Creation
 
@@ -903,15 +918,15 @@ Tests:
 |----------------------|--------------------------------------------------------------------|
 | Task not found       | Check task ID with `backlog task list --plain`                     |
 | AC won't check       | Use correct index: `backlog task 42 --plain` to see AC numbers     |
-| Changes not saving   | Ensure you're using MCP/CLI, not editing files                     |
+| Changes not saving   | Ensure you're using CLI, not editing files                         |
 | Metadata out of sync | Re-edit via CLI to fix: `backlog task edit 42 -s <current-status>` |
 
 ---
 
 ## Remember: The Golden Rule
 
-**🎯 If you want to change ANYTHING in a task, use Backlog MCP task edit first or the `backlog task edit` CLI fallback.**
-**📖 Use MCP/CLI to read tasks, exceptionally READ task files directly, never WRITE to them.**
+**🎯 If you want to change ANYTHING in a task, use the `backlog task edit` command.**
+**📖 Use CLI to read tasks, exceptionally READ task files directly, never WRITE to them.**
 
 Full help available: `backlog --help`
 

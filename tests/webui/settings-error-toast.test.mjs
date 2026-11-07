@@ -5,7 +5,7 @@
 // data/v2.js by brace matching and evaluated against a stub #toast element and a
 // stub fetch. The helpers saveSettings() calls that are unrelated to the toast
 // (IP validation, SAT onboarding, re-render) are stubbed. The CSS check reads the
-// shipped v2-bundle.css. Point OTGW_V2_JS / OTGW_V2_CSS at older copies to show
+// shipped v2.css and ds-tokens.css (the page inlines both). Point OTGW_V2_JS / OTGW_V2_CSS at older copies to show
 // the gap.
 //
 // Run: node --test tests/webui/settings-error-toast.test.mjs
@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
 const V2JS = process.env.OTGW_V2_JS || path.join(DATA, 'v2.js');
-const V2CSS = process.env.OTGW_V2_CSS || path.join(DATA, 'v2-bundle.css');
+const V2CSS = process.env.OTGW_V2_CSS || path.join(DATA, 'v2.css');
 
 // Same brace-matching cutter as static-ip-validation.test.mjs.
 function extractFunction(src, name) {
@@ -115,7 +115,7 @@ test('a new toast cancels the previous toast\'s pending hide timer', () => {
   assert.ok(!toast.classList.contains('show'));
 });
 
-test('v2-bundle.css defines a red .toast.err variant from a design token', () => {
+test('v2.css defines a red .toast.err variant from a design token', () => {
   const css = fs.readFileSync(V2CSS, 'utf8');
   assert.match(css, /\.toast\.err\s*\{[^}]*background:\s*var\(--status-critical\)/);
 });

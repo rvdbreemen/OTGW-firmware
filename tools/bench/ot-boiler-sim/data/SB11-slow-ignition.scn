@@ -1,0 +1,9 @@
+# OpenTherm boiler simulator scenario, TASK-1654. Exported from sat_bench_scenarios_1412_20.py by export_scenarios.py.
+# CH request, flame appears 120 s later (slow ignition); replay variant feeds the flame edge only
+scenario SB11-slow-ignition
+source sat_bench_scenarios_1412_20 1412.20-v1
+default flow=40 ret=30 pressure=1.5 outside=8 member_id=4 slave_hb=0 fault=0 ignition_delay=120 mod=30
+phase 30
+phase 120
+phase 240
+phase 0  # healthy hold after the scripted timeline
