@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T17:05:00Z'
-updated_date: '2026-11-07T20:17:00Z'
+updated_date: '2026-11-07T21:24:00Z'
 labels:
   - otdirect
   - webui
@@ -48,6 +48,8 @@ AC2 left open on purpose: the host test proves the bus mode follows the saved se
 Robert 2026-11-07: (1) the UI shows the running mode when it differs from the stored one and lets the user apply the stored mode; (2) every OTDmode write applies live, also with the same value (accepted). Lead added: v2.js otdRunningNote()/otdRunningDiffers() and markDirty keeps otdmode dirty while the running mode differs; tests/webui/otd-mode-running-note.test.mjs (real v2.html/v2.js in headless Chrome, fake device running Master with Gateway stored): old 4 of 5 FAIL, fix 5 of 5 PASS, control (running = stored) 3 of 3 PASS. Verifier minors fixed: prototypes in OTGW-firmware.h under HAS_DIRECT_OT; the pending flag uses __atomic release/acq_rel (the project idiom, SATweather.ino), MSVC stand-ins in the host test. tests/test_otd_mode_live_apply.py after that: fix 7 OK, old 5 failures. evaluate --quick 0 failed.
 
 Pushed origin/dev 54757840a (beta.129). Build at 6d0307e (pre-rebase, rebase only added CI commit a3ff23645): Build completed successfully. Bench .61 (OT-Direct, stored and running Master): OTA app+fs OK, 164 settings unchanged; POST otdmode=1 -> device/info otdmode gateway within 3 s, POST otdmode=3 -> master within 3 s, bootcount 113 throughout (no reboot), no crashlog, settings identical to before afterwards. AC3 met. Zip post: covered by the next zip (beta.130 from otgw-firmware-6b), memory 86%.
+
+Regression found after the push: the TASK-1702 head of loopOTDirect() (otdModeSettingPending, __atomic, otdModeFromSetting, applyOTDirectMode) broke the compile of test/host/test_override_reply.py (all 4 suites FAILED on origin/dev 1d96ac6c1). Fixed with test stubs (MSVC __atomic stand-ins, a false flag, settings.otd.iMode): 4 suites OK again. Firmware unaffected (the esp32-combo build and bench passed).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

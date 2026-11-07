@@ -173,8 +173,21 @@ static struct {
   } otd;
 } settings;
 #else
-static struct { struct { bool bEnableSlave; } otd; } settings;
+static struct { struct { bool bEnableSlave; int iMode; } otd; } settings;
 #endif
+
+// TASK-1702: loopOTDirect() applies a saved OTDmode first. The flag is file state and the
+// mode switch is hardware reconfiguration, both outside the slices; the flag stays false here.
+// The firmware uses the GCC __atomic builtins; MSVC gets single-thread stand-ins.
+#ifdef _MSC_VER
+#define __ATOMIC_RELEASE 0
+#define __ATOMIC_ACQ_REL 0
+#define __atomic_store_n(p, v, o) (*(p) = (v))
+template <typename T> static T __atomic_exchange_n(T* p, T v, int) { T o = *p; *p = v; return o; }
+#endif
+static bool otdModeSettingPending = false;
+static OTDirectMode otdModeFromSetting(int iMode) { return static_cast<OTDirectMode>(iMode); }
+static void applyOTDirectMode(OTDirectMode) {}
 
 static void sendWebSocketJSON(const char*) {}
 static bool satSimulationBlocksBusTx(const char*, const __FlashStringHelper*) { return false; }
