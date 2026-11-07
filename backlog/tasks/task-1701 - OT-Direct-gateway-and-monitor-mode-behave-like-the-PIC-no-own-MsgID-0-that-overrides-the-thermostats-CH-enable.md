@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-07T17:04:00Z'
-updated_date: '2026-11-07T18:40:00Z'
+updated_date: '2026-11-07T20:57:00Z'
 labels:
   - otdirect
   - bug
@@ -44,4 +44,6 @@ Fix: OTDirect.ino otdOwnStatusRequestAllowed(gatewayMode, thermostatConnected) b
 Evidence: tests/test_otd_gateway_own_status.py compiles the real scheduleMasterRequest/buildStatusRequest/schedule table, 6 min with a thermostat sending 0x02 each second. OLD (origin/dev c928bcaf7): G1 FAIL own_status=347 ch_changes=568 (tjfs pattern). FIX: 6/6 OK, G1 own_status=0 ch_changes=0, G2 (no thermostat) 347 own MsgID 0 kept, G3 master mode CH off kept. test_otd_ch_override 9/9 OK; test/host/test_override_reply.py 4 suites OK; evaluate --quick 84 passed 0 failed. test_otd_status_relay: 9 errors WinError 225 (Defender blocks the compiled exe) on OLD and FIX alike, environment, not the fix.
 
 Pushed origin/dev 91dead9cc (beta.126). Build at 91dead9: 2x ESP32S3 image, Build completed successfully. Bench .61 (OT-Direct, master mode, no thermostat, no boiler): OTA app+fs of ede9382 (same firmware, pre-rebase hash) OK, bootcount 103->105, no crashlog, 164 settings unchanged, SAT CS=30.2/MM/CH still sent. #alpha zip 1568696172582015118, tjfs reply 1568696366358859904. AC3 covers MsgID 0 only by Robert's hotfix choice; the rest of the PIC model is TASK-1707. AC5 needs a thermostat on an OT-Direct unit: field confirmation by tjfs, none on the bench.
+
+2026-11-07 field evidence (analysis by session system32-25, relayed): tjfs capture 20261107-201007 (beta.127+d8186d7, OT-Direct gateway, thermostat connected, SAT off), 20:10:07-20:30:16, 3836 frames (T 1010, B 1910, R 916). MsgID 0: T 376, B 371, R 0 (gateway sent none of its own; old code ~1000 in 20 min). Master CH-enable changed 0 times (room 19.56-19.80 C vs setpoint 18.0); boiler CH mode/flame changed 0 times. No cycling over 20 min in standby; a heat demand / burner start is not in this capture. Side findings, unexplained, not TASK-1701: one 197 s gap 20:18:25-20:21:42 where telnet, /ws and browser ws dropped together (no reboot, wifi_outages 0, hd_max_loop_gap 794 ms, /ws WinError 10054 on reconnect); end probe hd_min_free_heap 16124, hd_min_max_block 17396 (TASK-1679/1696 area). Files: system32-25 scratchpad tjfs-2010.
 <!-- SECTION:NOTES:END -->
