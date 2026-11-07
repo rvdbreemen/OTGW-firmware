@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.127
+**  Version  : v2.0.0-beta.128
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -352,12 +352,10 @@ static void handleCommandSubmit(const char* cmdStr) {
   }
   constexpr size_t kMaxCmdLen = sizeof(cmdqueue[0].cmd) - 1;
   const size_t cmdLen = strlen(cmdStr);
-  // OTGW commands are two letters followed by '=' and a value.
-  // Reject non-alphabetic prefixes to prevent malformed bytes reaching the command queue (review I2).
-  if ((cmdLen < 3) || (cmdStr[2] != '=') ||
-      !isalpha(static_cast<unsigned char>(cmdStr[0])) ||
-      !isalpha(static_cast<unsigned char>(cmdStr[1]))) {
-    sendApiError(400, F("Invalid command format (expected LL=value)"));
+  // OTGW commands are a letter, a letter or digit (C2=, H2=), '=' and a value (otgwCommandFormatOk, TASK-1709).
+  // Other prefixes are rejected so malformed bytes cannot reach the command queue (review I2).
+  if (!otgwCommandFormatOk(cmdStr, cmdLen)) {
+    sendApiError(400, F("Invalid command format (expected XX=value)"));
     return;
   }
   if (cmdLen > kMaxCmdLen) {

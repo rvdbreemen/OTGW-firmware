@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.127
+**  Version  : v2.0.0-beta.128
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -410,6 +410,15 @@ void satControlLoop();
 // safety-tripped SAT is still the owner, it just is not commanding, and handing
 // TSet back to the heating curve in that window is how the two used to fight.
 bool satOwnsControlSetpoint();
+// TASK-1709: shape of an OTGW command as the REST API accepts it: a letter, then a letter or a digit (C2=, H2=), then '='.
+// The caller checks the length and the PIC checks the value. Digit-first and non-ASCII prefixes fail.
+inline bool otgwCommandFormatOk(const char* s, size_t len) {
+  if (s == nullptr || len < 3 || s[2] != '=') return false;
+  const unsigned char a = (unsigned char)s[0], b = (unsigned char)s[1];
+  const bool aLetter = (a >= 'A' && a <= 'Z') || (a >= 'a' && a <= 'z');
+  const bool bAlnum  = (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9');
+  return aLetter && bAlnum;
+}
 // TASK-1695: while SAT is enabled no other channel may send CV control commands. True for CS=, CH=, MM=, C2=, H2=, TT= and TC= (case-insensitive);
 // HW=, SW=, SH= and every other command are free. Callers combine it with satOwnsControlSetpoint() and the satOwn argument of addCommandToQueue().
 inline bool satBlocksExternalCommand(const char* buf, int len) {
