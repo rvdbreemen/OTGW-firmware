@@ -3,11 +3,11 @@ id: TASK-1702
 title: >-
   OT-Direct mode change in the settings takes effect at once or the UI says a
   restart is needed
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T17:05:00Z'
-updated_date: '2026-11-07T19:34:00Z'
+updated_date: '2026-11-07T20:17:00Z'
 labels:
   - otdirect
   - webui
@@ -27,7 +27,7 @@ tjfs 2026-11-07 14:01 UTC: after switching OT-Direct mode to Gateway the monitor
 <!-- AC:BEGIN -->
 - [x] #1 Code path for a live OT-Direct mode change verified and documented in the notes
 - [x] #2 After saving a new OT-Direct mode the monitor page shows the mode the bus actually runs in, or the settings page states that a restart is needed
-- [ ] #3 Bench evidence on an OT-Direct unit
+- [x] #3 Bench evidence on an OT-Direct unit
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -46,4 +46,12 @@ Not verified: no firmware build (forbidden this run, memory 86%), so the cross-f
 AC2 left open on purpose: the host test proves the bus mode follows the saved setting; that the monitor MODE chip then shows it (otdirect/status poll -> setOtdMode) is only checked by reading v2.js and needs the bench/browser check together with AC3.
 
 Robert 2026-11-07: (1) the UI shows the running mode when it differs from the stored one and lets the user apply the stored mode; (2) every OTDmode write applies live, also with the same value (accepted). Lead added: v2.js otdRunningNote()/otdRunningDiffers() and markDirty keeps otdmode dirty while the running mode differs; tests/webui/otd-mode-running-note.test.mjs (real v2.html/v2.js in headless Chrome, fake device running Master with Gateway stored): old 4 of 5 FAIL, fix 5 of 5 PASS, control (running = stored) 3 of 3 PASS. Verifier minors fixed: prototypes in OTGW-firmware.h under HAS_DIRECT_OT; the pending flag uses __atomic release/acq_rel (the project idiom, SATweather.ino), MSVC stand-ins in the host test. tests/test_otd_mode_live_apply.py after that: fix 7 OK, old 5 failures. evaluate --quick 0 failed.
+
+Pushed origin/dev 54757840a (beta.129). Build at 6d0307e (pre-rebase, rebase only added CI commit a3ff23645): Build completed successfully. Bench .61 (OT-Direct, stored and running Master): OTA app+fs OK, 164 settings unchanged; POST otdmode=1 -> device/info otdmode gateway within 3 s, POST otdmode=3 -> master within 3 s, bootcount 113 throughout (no reboot), no crashlog, settings identical to before afterwards. AC3 met. Zip post: covered by the next zip (beta.130 from otgw-firmware-6b), memory 86%.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: saved OTDmode applies live (loopOTDirect flag, applyOTDirectMode); tests/test_otd_mode_live_apply.py old 5/7 fail, fix 7/7. AC2: settings page shows the running mode and a Switch button when it differs; tests/webui/otd-mode-running-note.test.mjs old 4/5 fail, fix 5/5. AC3: bench .61 beta.129 live master->gateway->master within 3 s each, no reboot, settings unchanged. Commit 54757840a.
+<!-- SECTION:FINAL_SUMMARY:END -->
