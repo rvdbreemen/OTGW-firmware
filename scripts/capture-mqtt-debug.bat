@@ -7,7 +7,8 @@ rem  launcher only finds a Python 3.9+ interpreter and runs it:
 rem    1. py -3, python or python3 on PATH (the Microsoft Store alias fails the
 rem       version check and is skipped);
 rem    2. otherwise a portable Python 3.12.10 from python.org, unpacked once into
-rem       %LOCALAPPDATA%\OTGW-capture\ after its SHA-256 has been checked.
+rem       %LOCALAPPDATA%\OTGW-capture\ after its SHA-256 has been checked
+rem       (curl.exe, certutil and tar.exe from Windows; no PowerShell).
 rem
 rem  Usage:
 rem    capture-mqtt-debug.bat                 (interactive prompts)
@@ -60,23 +61,46 @@ if defined PY exit /b 0
 
 set "PY_ZIP=%TEMP%\otgw-capture-python-%PY_VER%-%ARCH%.zip"
 set "PY_URL=https://www.python.org/ftp/python/%PY_VER%/python-%PY_VER%-embed-%ARCH%.zip"
+set "SYS=%SystemRoot%\System32"
+if not exist "%SYS%\curl.exe" goto :no_tools
+if not exist "%SYS%\tar.exe" goto :no_tools
 echo Python 3.9 or newer was not found.
 echo Downloading portable Python %PY_VER% (%ARCH%, about 11 MB) from python.org into
 echo   %PY_DIR%
 echo This happens once; later runs reuse it. Installing Python 3.9+ yourself also works.
-rem Plain .NET calls only: started from a PowerShell 7 terminal, Windows
-rem PowerShell 5.1 inherits a PSModulePath it cannot load cmdlets such as
-rem Get-FileHash or Expand-Archive from. The empty PSModulePath does the rest.
-set "PSModulePath="
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object Net.WebClient).DownloadFile($env:PY_URL, $env:PY_ZIP); $sha = [Security.Cryptography.SHA256]::Create(); $fs = [IO.File]::OpenRead($env:PY_ZIP); $h = ([BitConverter]::ToString($sha.ComputeHash($fs))).Replace('-', '').ToLower(); $fs.Close(); if ($h -ne $env:PY_SHA) { [IO.File]::Delete($env:PY_ZIP); throw ('SHA-256 mismatch: ' + $h) }; if ([IO.Directory]::Exists($env:PY_DIR)) { [IO.Directory]::Delete($env:PY_DIR, $true) }; Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::ExtractToDirectory($env:PY_ZIP, $env:PY_DIR); [IO.File]::Delete($env:PY_ZIP)"
-if errorlevel 1 (
-    echo ERROR: could not download or verify portable Python from %PY_URL%>&2
-    echo Install Python 3.9 or newer from https://www.python.org/downloads/ and run this again.>&2
-    exit /b 1
+rem TASK-1711: no PowerShell here. An inline PowerShell download with
+rem -ExecutionPolicy Bypass and Net.WebClient was quarantined by a tester's
+rem Defender as a Trojan. curl.exe, certutil and tar.exe ship with Windows 10
+rem 1803 and later; the System32 paths keep Git's tar (no zip support) out.
+"%SYS%\curl.exe" -fsSL --retry 2 -o "%PY_ZIP%" "%PY_URL%"
+if errorlevel 1 goto :download_failed
+set "GOT="
+for /f "skip=1 delims=" %%H in ('""%SYS%\certutil.exe" -hashfile "%PY_ZIP%" SHA256"') do if not defined GOT set "GOT=%%H"
+if defined GOT set "GOT=%GOT: =%"
+if /I not "%GOT%"=="%PY_SHA%" (
+    del /f /q "%PY_ZIP%" >nul 2>nul
+    echo ERROR: SHA-256 mismatch for %PY_URL%: got "%GOT%">&2
+    goto :download_failed
 )
+if exist "%PY_DIR%" rmdir /s /q "%PY_DIR%"
+mkdir "%PY_DIR%"
+"%SYS%\tar.exe" -xf "%PY_ZIP%" -C "%PY_DIR%"
+if errorlevel 1 goto :download_failed
+del /f /q "%PY_ZIP%" >nul 2>nul
 call :try_python "%PY_DIR%\python.exe"
 if not defined PY (
     echo ERROR: the portable Python in %PY_DIR% does not start.>&2
     exit /b 1
 )
 exit /b 0
+
+:no_tools
+echo Python 3.9 or newer was not found, and this Windows has no curl.exe or tar.exe (Windows 10 1803 or later has both).>&2
+echo Install Python 3.9 or newer from https://www.python.org/downloads/ and run this again.>&2
+exit /b 1
+
+:download_failed
+if exist "%PY_ZIP%" del /f /q "%PY_ZIP%" >nul 2>nul
+echo ERROR: could not download or verify portable Python from %PY_URL%>&2
+echo Install Python 3.9 or newer from https://www.python.org/downloads/ and run this again.>&2
+exit /b 1
