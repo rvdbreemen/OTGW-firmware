@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.116
+**  Version  : v2.0.0-beta.117
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -352,7 +352,7 @@ void setup() {
   // portal blocks inside startWiFi(), so the boot splash and the "how to
   // connect" config screen must already be on the display by the time the
   // portal opens. I2C is already up (top of setup, before the watchdog disarm).
-  initOLED();
+  initOLEDBeforeDetect();                         // TASK-1678: also finds the display on a board without a PIC
 
 #if HAS_STATUS_PIXEL
   startStatusPixel();  // before startWiFi(): the config portal blocks setup()

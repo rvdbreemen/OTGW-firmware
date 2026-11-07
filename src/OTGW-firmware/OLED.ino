@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-beta.116
+**  Version  : v2.0.0-beta.117
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -77,6 +77,7 @@ static uint8_t  oledLastRenderedPage = 0xFF; // track page-change for selective 
 static char     oledCachedSSID[33] = "";   // cached WiFi SSID (avoid String in hot path)
 static uint8_t  oledLastBtnLevel  = HIGH;  // last sampled button level (active LOW)
 static uint32_t oledLastBtnEdge   = 0;     // millis of last accepted button edge
+static bool     oledButtonAttached = false; // button pin set up (not before board detection, TASK-1678)
 
 // Shared formatting buffer (small, on module level to avoid per-function stack cost)
 static char oledBuf[22];
@@ -467,15 +468,10 @@ static void drawPageHeating() {
 }
 
 // ---------------------------------------------------------------------------
-// initOLED - called from setup(), after Wire.begin()
+// oledStart - init the probed display and draw the boot splash. attachButton
+// false leaves the button pin alone (see initOLEDBeforeDetect).
 // ---------------------------------------------------------------------------
-void initOLED() {
-  if (!probeOLED()) {
-    DebugTln(F("OLED: No display at 0x3C - disabled"));
-    oledPresent = false;
-    return;
-  }
-
+static void oledStart(bool attachButton) {
   oledDisplay.begin(&Adafruit128x64, OLED_ADDR);
   oledDisplay.setFont(System5x7);
   oledDisplay.displayRemap(false);
@@ -522,9 +518,51 @@ void initOLED() {
   // Button for page cycling — polled in loopOLED() with a millis() debounce.
   // Portable Arduino API (no ISR / FreeRTOS queue), so it works identically on
   // ESP8266 and ESP32 (TASK-758). The boot button is active LOW with a pull-up.
+  oledButtonAttached = attachButton;
+  if (!attachButton) return;
   pinMode(OLED_BUTTON_PIN, INPUT_PULLUP);
   oledLastBtnLevel = digitalRead(OLED_BUTTON_PIN);
   DebugTf(PSTR("OLED: Button on GPIO %d (polled, debounced)\r\n"), OLED_BUTTON_PIN);
+}
+
+// ---------------------------------------------------------------------------
+// initOLED - called from setup(), after Wire.begin()
+// ---------------------------------------------------------------------------
+void initOLED() {
+  if (!probeOLED()) {
+    DebugTln(F("OLED: No display at 0x3C - disabled"));
+    oledPresent = false;
+    return;
+  }
+  oledStart(true);
+}
+
+// ---------------------------------------------------------------------------
+// initOLEDBeforeDetect - setup()'s OLED bring-up before startWiFi() (TASK-1678).
+// On the combo board in auto mode the pin map is the Classic one until the PIC
+// probe after startWiFi() settles it, so on a board without a PIC the 0x3C probe
+// above NACKs on the Classic pins and the blocking setup portal stays dark. When
+// that happens, look once on the OT-Direct I2C pins as well. A display found
+// there is driven without its button: the button alias still names the Classic
+// D3 pin, which is SDA on that bus. applyResolvedComboPins() re-inits the OLED
+// with the button once the mode is known. Nothing is persisted (ADR-201).
+// ---------------------------------------------------------------------------
+void initOLEDBeforeDetect() {
+  initOLED();
+#if HAS_RUNTIME_HW_DETECT
+  if (oledPresent) return;
+  if (settings.iBoardMode != 0 || comboActivePinMap() != COMBO_MAP_CLASSIC) return;
+  Wire.end();                                   // core 3.x: no silent re-pin
+  Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  if (probeOLED()) {
+    oledStart(false);
+    log_e("[oled] no display on the Classic I2C pins, found one on %d/%d before board detection",
+          PIN_I2C_SDA, PIN_I2C_SCL);
+    return;
+  }
+  Wire.end();                                   // none there either: back to the live map
+  Wire.begin(activeI2cSda(), activeI2cScl());
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -539,7 +577,7 @@ void loopOLED() {
   // Portable replacement for the former ESP32-only ISR+queue (TASK-758): poll
   // the pin at loop() cadence and accept a falling edge only once per debounce
   // window. The page cycle is not latency-critical, so polling is reliable.
-  uint8_t btnLevel = digitalRead(OLED_BUTTON_PIN);
+  uint8_t btnLevel = oledButtonAttached ? digitalRead(OLED_BUTTON_PIN) : HIGH;
   if (btnLevel == LOW && oledLastBtnLevel == HIGH &&
       (now - oledLastBtnEdge) >= OLED_DEBOUNCE_MS) {
     oledLastBtnEdge = now;
