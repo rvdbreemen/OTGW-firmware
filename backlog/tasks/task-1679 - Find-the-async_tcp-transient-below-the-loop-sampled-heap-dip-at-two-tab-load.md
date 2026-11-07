@@ -1,9 +1,11 @@
 ---
 id: TASK-1679
 title: Find the async_tcp transient below the loop-sampled heap dip at two-tab load
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-07T04:05:00Z'
+updated_date: '2026-11-07T04:45:00Z'
 labels:
   - heap
 milestone: 2.0.0
@@ -23,3 +25,9 @@ Follow-up of TASK-1673 (ADR-216). With the per-connection send cap, the native m
 - [ ] #1 Measure the transient on the async_tcp task (a heap low-water hook or sampling inside the response path) during the two-tab load
 - [ ] #2 Decide with Robert whether a reduction is worth its cost, with the numbers
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-07 instrumentation prepared (not committed: the public-beta freeze holds builds, and beta.117/118 belong to the release). Patch: scratchpad b103/task1679-ack-low.patch (127 lines). It attributes the heap-window minimum to the file response path: WebQueuedFileResponse::_ack reads platformHeapWindowMin() before and after _inner->_ack; a drop within one window generation (new platformHeapWinGen(), bumped on every window start, because MQTT restarts the window) is recorded by webAckLowObserve() as hd_ack_low_min / hd_ack_low_free_before / hd_ack_low_hits / hd_ack_low_files. If hd_ack_low_min is close to hd_min_free_heap after a two-tab load, the transient sits in the library ack (send-buffer copy + tcp_write pbufs); if hd_min_free_heap is much lower, it is elsewhere. Host fixture test_web_file_scheduling PASS and evaluate --quick 85/0 with the patch applied. Needs an MQTT heap window to be open (MQTT connected) during the run. Next: after 'beta.118 tag out', apply, bump, build, two-tab A/B on .61.
+<!-- SECTION:NOTES:END -->
