@@ -3,11 +3,11 @@ id: TASK-1685
 title: >-
   Remove the 26 dead firmware functions found by TASK-1683 (keep the Platform
   shims)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T09:28:00Z'
-updated_date: '2026-11-07T11:07:00Z'
+updated_date: '2026-11-07T11:20:00Z'
 labels:
   - cleanup
   - firmware
@@ -44,4 +44,12 @@ test_sat_lowload_contract baseline on a clean origin/dev worktree: LL-010 fail, 
 AC3: ./build.bat (esp32-combo, OTGW_BUILD_JOBS=4, commit charge 82%) succeeded: OTGW-firmware-esp32-combo-2.0.0-beta.120+8fad93a. App image 2,124,320 bytes vs beta.119+35f2cfd 2,124,352 bytes (-32 B; the removed code was already dropped by gc-sections, so only a tiny difference was expected). origin/dev was still 80b304f, no rebase needed.
 
 AC4 bench (.61, slot from 6b): scripts/ota_flash.py --app beta.120+8fad93a --no-fs over safeboot: 'Update OK', running 2.0.0-beta.120+8fad93a, settings 177 keys changed: none. Checks: / 200 (170,522 B gzipped page), /api/v2/device/info 200, /api/v2/otgw/otmonitor 200, /api/v2/settings 200, /api/listfiles 200, /api/firmwarefilelist 200, /FSexplorer.html 200, /api/v2/health 200 (/v2.js 404 is expected since ADR-215), crashlog available:false. 5 min soak: uptime 1 -> 6 min without reboot, mqttconnected true every 30 s, freeheap 70,516-72,336 B, 339 MQTT messages from otgw-1020BA21B4F8 (.61) on the bench broker 192.168.88.32.
+
+Pushed to origin/dev 3d7590fa5 (fast-forward from 80b304f, OK from lead 6b). Post-build from that HEAD: OTGW-firmware-esp32-combo-2.0.0-beta.120+3d7590f-flash.zip, posted by discord-post-build.sh (#alpha-testing msg 1568585882246578217); tag details sent to coordinator 54 for the ledger.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1-AC4 done. 26 dead firmware functions removed (Platform shims kept) plus the self-testing lifted copy in tests/test_ble_parsers.cpp; no reference left. evaluate --quick 0 FAIL; host test failures identical to a clean origin/dev baseline (stash run and a baseline worktree for test_sat_lowload_contract). esp32-combo beta.120 image 2,124,320 B vs beta.119 2,124,352 B. Bench .61 OTA: settings unchanged, all checked routes 200, 5 min soak without reboot, MQTT connected with 339 messages. Pushed as 3d7590f and posted to #alpha-testing.
+<!-- SECTION:FINAL_SUMMARY:END -->
