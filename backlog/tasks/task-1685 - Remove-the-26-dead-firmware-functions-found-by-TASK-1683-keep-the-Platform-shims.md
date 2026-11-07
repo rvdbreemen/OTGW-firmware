@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-07T09:28:00Z'
-updated_date: '2026-11-07T10:50:00Z'
+updated_date: '2026-11-07T11:07:00Z'
 labels:
   - cleanup
   - firmware
@@ -27,7 +27,7 @@ Robert 2026-11-07 chose: remove the dead firmware functions, keep platformWiFiCl
 - [x] #1 The 26 functions and their prototypes are removed; platformWiFiClientSetSync and platformTaskExit stay
 - [x] #2 The lifted bleMatchesConfiguredMAC copy in tests/test_ble_parsers.cpp is removed; python scripts/run_tests.py passes
 - [x] #3 esp32-combo build succeeds with its own prerelease bump; the app image is the same size or smaller than beta.119's
-- [ ] #4 evaluate.py --quick shows no new FAIL; an OTA bench flash boots and serves the web UI and MQTT
+- [x] #4 evaluate.py --quick shows no new FAIL; an OTA bench flash boots and serves the web UI and MQTT
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -42,4 +42,6 @@ Evidence: evaluate.py --quick 84 passed, 0 warn, 0 fail. scripts/run_tests.py -j
 test_sat_lowload_contract baseline on a clean origin/dev worktree: LL-010 fail, LL-021 error, LL-023 fail (624 s). Lane: LL-021 error, LL-023 fail, LL-010 pass. No new failure from the removal. Remaining: AC3 build + image size vs beta.119 and AC4 OTA bench, both after the coordinator's 'beta.118 tag out'; then rebase onto origin/dev and push via the lead.
 
 AC3: ./build.bat (esp32-combo, OTGW_BUILD_JOBS=4, commit charge 82%) succeeded: OTGW-firmware-esp32-combo-2.0.0-beta.120+8fad93a. App image 2,124,320 bytes vs beta.119+35f2cfd 2,124,352 bytes (-32 B; the removed code was already dropped by gc-sections, so only a tiny difference was expected). origin/dev was still 80b304f, no rebase needed.
+
+AC4 bench (.61, slot from 6b): scripts/ota_flash.py --app beta.120+8fad93a --no-fs over safeboot: 'Update OK', running 2.0.0-beta.120+8fad93a, settings 177 keys changed: none. Checks: / 200 (170,522 B gzipped page), /api/v2/device/info 200, /api/v2/otgw/otmonitor 200, /api/v2/settings 200, /api/listfiles 200, /api/firmwarefilelist 200, /FSexplorer.html 200, /api/v2/health 200 (/v2.js 404 is expected since ADR-215), crashlog available:false. 5 min soak: uptime 1 -> 6 min without reboot, mqttconnected true every 30 s, freeheap 70,516-72,336 B, 339 MQTT messages from otgw-1020BA21B4F8 (.61) on the bench broker 192.168.88.32.
 <!-- SECTION:NOTES:END -->
