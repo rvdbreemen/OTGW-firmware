@@ -1,7 +1,7 @@
 ---
 id: "ADR-216"
 title: "Cap each web connection's lwIP send queue at two segments"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-07"
 binding: false
 gate: null
@@ -37,7 +37,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-07.
+Accepted, 2026-11-07.
 
 ## Status History
 
@@ -68,11 +68,16 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-215
     changed_via: adr-kit lifecycle
+  - date: 2026-11-07
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted in session 2026-11-07 after the TASK-1673 bench A/B (median min heap 3.3 to 14.5 KB, +0.3 s load)
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-Two browser tabs loading the Web UI at the same moment drove the free heap of an ESP32-S3 (Espressif dual-core microcontroller) bench unit without PSRAM (pseudo-static RAM) to about 3 KB (TASK-1673). A dip snapshot taken by the loop task at the lowest free heap (`hd_dip_*` in `/api/v2/device/info`) showed two port-80 connections each holding a full lwIP (lightweight IP stack) send queue: 2 x 5,744 bytes (`CONFIG_LWIP_TCP_SND_BUF_DEFAULT`), plus 13 TIME_WAIT connections. The server streams at most two files at a time (ADR-165) and closes a connection before its last data is acknowledged, so both streams fill their queue.
+Two browser tabs loading the Web UI at the same moment drove the free heap of an ESP32-S3 (Espressif dual-core microcontroller) bench unit without PSRAM (pseudo-static random-access memory) to about 3 KB (TASK-1673). A dip snapshot taken by the loop task at the lowest free heap (`hd_dip_*` in `/api/v2/device/info`) showed two port-80 connections each holding a full lwIP (lightweight IP stack) send queue: 2 x 5,744 bytes (`CONFIG_LWIP_TCP_SND_BUF_DEFAULT`), plus 13 TIME_WAIT connections (TCP, Transmission Control Protocol). The server streams at most two files at a time (ADR-165) and closes a connection before its last data is acknowledged, so both streams fill their queue.
 
 `TCP_SND_BUF` is compiled into the prebuilt lwIP library; a build flag cannot change it, and a rebuilt framework is a tooling change. lwIP treats `snd_buf` as a running credit: each write subtracts from it and each acknowledgement adds back only the acknowledged bytes. Lowering the credit once, before anything is queued, therefore caps that connection for its whole life without touching the library.
 
@@ -105,8 +110,8 @@ Two browser tabs loading the Web UI at the same moment drove the free heap of an
 ## Alternatives Considered
 
 - **One file stream at a time (`WEB_FILE_MAX_INFLIGHT` 1).** Worst case rose from about 3.0 to 7.6 KB, but one of four runs had a p95 tab load of 11.6 s. It serialises every asset and reverses ADR-165.
-- **Rebuild the framework with a smaller `CONFIG_LWIP_TCP_SND_BUF_DEFAULT`.** Affects every TCP connection (MQTT, telnet, the PIC bridge) and is a build-tooling change.
-- **Accept the dip.** The unit never rebooted or answered 503 under the test load, but the margin for a concurrent allocation (MQTT burst, SAT) was about 3 KB.
+- **Rebuild the framework with a smaller `CONFIG_LWIP_TCP_SND_BUF_DEFAULT`.** Affects every TCP connection (MQTT (Message Queuing Telemetry Transport), telnet, the PIC (Microchip microcontroller) bridge) and is a build-tooling change.
+- **Accept the dip.** The unit never rebooted or answered 503 under the test load, but the margin for a concurrent allocation (MQTT burst, SAT, Smart Autotune Thermostat) was about 3 KB.
 
 ## Consequences
 
@@ -122,7 +127,7 @@ Two browser tabs loading the Web UI at the same moment drove the free heap of an
 
 ## Open Questions
 
-- [ ] Accept this decision (maintainer).
+- [x] Accept this decision (maintainer). — **Answered 2026-11-07 by Robert van den Breemen:** Accepted by Robert in the session on 2026-11-07 after the TASK-1673 bench A/B.
 
 ## Related Decisions
 

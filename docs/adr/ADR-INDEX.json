@@ -8199,7 +8199,7 @@
       "title": "Cap each web connection's lwIP send queue at two segments",
       "path": "ADR-216-cap-each-web-connection-s-lwip-send-queue-at-two-segments.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-07",
       "decision_summary": "webBeginRequest() (src/OTGW-firmware/webServerCompat.h) calls platformTcpCapSendBuffer(pcb, WEBTCPSENDCAP) for every...",
       "topics": [
@@ -8233,7 +8233,7 @@
           "None."
         ],
         "verification": [
-          "tests/testwebfilescheduling.py compiles the real webBeginRequest() with a tcppcb mock and the shim's contract.",
+          "tests/testwebfilescheduling.py compiles the real webBeginRequest(); its fixture stubs the shim, so it shows the call compiles and runs, not that lwIP honours the cap. That is shown only on the bench.",
           "Bench recipe (TASK-1673 notes): reboot before every run, two-tab load 25 rounds, read hdminfreeheap and hddiptxbytes / hddiptxpcbs. With the cap, two overlapping streams hold 5,744 bytes together instead of 11,488."
         ]
       },

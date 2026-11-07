@@ -221,4 +221,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-213 | Accepted | - | Opt-in, local, RAM (random-access memory) only. |
 | ADR-214 | Accepted | - | Ids are a hash, not a table. |
 | ADR-215 | Accepted | - | One file per page. |
-| ADR-216 | Proposed | - | webBeginRequest() (src/OTGW-firmware/webServerCompat.h) calls platformTcpCapSendBuffer(pcb, WEBTCPSENDCAP) for every... |
+| ADR-216 | Accepted | - | webBeginRequest() (src/OTGW-firmware/webServerCompat.h) calls platformTcpCapSendBuffer(pcb, WEBTCPSENDCAP) for every... |
