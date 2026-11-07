@@ -1767,6 +1767,288 @@ class BrowserCapture(threading.Thread):
 
 
 # --------------------------------------------------------------------------- #
+# Browser capture through Safari (macOS): safaridriver, W3C WebDriver
+# --------------------------------------------------------------------------- #
+
+SAFARIDRIVER = "/usr/bin/safaridriver"
+
+# Installed in the page with WebDriver execute/sync once the page has loaded,
+# and again after every reload (classic WebDriver has no script that runs
+# before the page's own scripts). It queues console output, uncaught errors,
+# fetch/XHR timings and WebSocket open/close/error events in window.__otgwCap.
+# Requests made before the hook (the page load itself, the first WebSocket)
+# show up through the Resource Timing entries that SAFARI_POLL_JS reports.
+SAFARI_HOOK_JS = r"""
+if (window.__otgwCap) { return 'present'; }
+var C = window.__otgwCap = {q: [], ri: 0, hookT: performance.now(), dropped: 0};
+try { performance.setResourceTimingBufferSize(2000); } catch (e) {}
+function push(k, m) { if (C.q.length < 5000) { C.q.push([Date.now(), k, String(m)]); } else { C.dropped++; } }
+function fmt(a) {
+  try {
+    return Array.prototype.map.call(a, function (x) {
+      if (x instanceof Error) { return x.stack || String(x); }
+      if (x !== null && typeof x === 'object') { try { return JSON.stringify(x); } catch (e) { return String(x); } }
+      return String(x);
+    }).join(' ');
+  } catch (e) { return '[unprintable]'; }
+}
+['log', 'info', 'warn', 'error', 'debug'].forEach(function (l) {
+  var o = console[l];
+  console[l] = function () { push('console.' + l, fmt(arguments)); return o.apply(console, arguments); };
+});
+window.addEventListener('error', function (e) {
+  var t = e.target;
+  if (t && t !== window && (t.src || t.href)) { push('resource-error', (t.tagName || '') + ' ' + (t.src || t.href)); }
+  else { push('exception', (e.error && e.error.stack ? e.error.stack : (e.message || 'error')) + ' at ' + (e.filename || '') + ':' + (e.lineno || '') + ':' + (e.colno || '')); }
+}, true);
+window.addEventListener('unhandledrejection', function (e) {
+  var r = e.reason; push('unhandledrejection', r && r.stack ? r.stack : String(r));
+});
+var of = window.fetch;
+if (of) {
+  window.fetch = function (input, init) {
+    var url = (typeof input === 'string') ? input : ((input && input.url) || String(input));
+    var m = (init && init.method) || (input && input.method) || 'GET';
+    var t = performance.now();
+    return of.apply(this, arguments).then(function (r) {
+      push('net', Math.round(performance.now() - t) + '|' + r.status + '|' + m + ' ' + url); return r;
+    }, function (err) {
+      push('net-fail', Math.round(performance.now() - t) + '|' + m + ' ' + url + '|' + err); throw err;
+    });
+  };
+}
+var XO = XMLHttpRequest.prototype.open, XS = XMLHttpRequest.prototype.send;
+XMLHttpRequest.prototype.open = function (m, u) { this.__otgw = [m, u]; return XO.apply(this, arguments); };
+XMLHttpRequest.prototype.send = function () {
+  var x = this, t = performance.now(), d = x.__otgw || ['?', '?'];
+  x.addEventListener('loadend', function () {
+    push(x.status ? 'net' : 'net-fail', Math.round(performance.now() - t) + '|' + x.status + '|' + d[0] + ' ' + d[1]);
+  });
+  return XS.apply(this, arguments);
+};
+var OW = window.WebSocket;
+if (OW) {
+  var W = function (u, p) {
+    var s = (p === undefined) ? new OW(u) : new OW(u, p);
+    push('ws', 'new ' + u);
+    s.addEventListener('open', function () { push('ws', 'open ' + u); });
+    s.addEventListener('close', function (e) { push('ws', 'close ' + u + ' code=' + e.code + ' clean=' + e.wasClean); });
+    s.addEventListener('error', function () { push('ws', 'error ' + u); });
+    return s;
+  };
+  W.prototype = OW.prototype;
+  ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'].forEach(function (k) { W[k] = OW[k]; });
+  window.WebSocket = W;
+}
+return 'installed';
+"""
+
+# Drains the queue and reports Resource Timing entries not reported yet. A
+# fetch/XHR entry that started after the hook is skipped: the hook logged it.
+SAFARI_POLL_JS = r"""
+var C = window.__otgwCap;
+if (!C) { return null; }
+var q = C.q.splice(0, C.q.length), res = [], nav = null;
+var e = performance.getEntriesByType('resource');
+for (var i = C.ri; i < e.length; i++) {
+  var x = e[i];
+  if ((x.initiatorType === 'fetch' || x.initiatorType === 'xmlhttprequest') && x.startTime >= C.hookT) { continue; }
+  res.push([Math.round(performance.timeOrigin + x.startTime), Math.round(x.duration), x.responseStatus || 0,
+            x.initiatorType || '', x.name, x.transferSize || 0]);
+}
+C.ri = e.length;
+if (!C.navDone) {
+  C.navDone = true;
+  var n = performance.getEntriesByType('navigation')[0];
+  if (n) { nav = [Math.round(performance.timeOrigin), Math.round(n.duration), n.responseStatus || 0, n.type || '',
+                  Math.round(n.domContentLoadedEventEnd), Math.round(n.loadEventEnd)]; }
+}
+var d = C.dropped; C.dropped = 0;
+return {q: q, res: res, nav: nav, href: location.href, dropped: d};
+"""
+
+
+def find_safaridriver():
+    if sys.platform == "darwin" and os.path.isfile(SAFARIDRIVER) and os.access(SAFARIDRIVER, os.X_OK):
+        return SAFARIDRIVER
+    return None
+
+
+def _ms_clock(epoch_ms):
+    try:
+        return datetime.fromtimestamp(epoch_ms / 1000.0).strftime("%H:%M:%S.%f")[:-3]
+    except Exception:
+        return clock()
+
+
+class SafariCapture(threading.Thread):
+    """Browser capture for macOS without Chromium: drives Safari through
+    safaridriver (W3C WebDriver, stdlib HTTP only). Safari has no headless
+    mode, so a separate automation window opens for the length of the capture.
+    Needs 'Allow Remote Automation' (Safari, Develop menu) or a one-time
+    `safaridriver --enable`."""
+
+    POLL_SECONDS = 1.0
+
+    def __init__(self, cap, driver_path, device_url, port):
+        super().__init__(name="browser", daemon=True)
+        self.cap = cap
+        self.driver_path = driver_path
+        self.device_url = device_url
+        self.port = port
+        self.proc = None
+        self.session = None
+        self.profile_dir = None   # main() removes it for the Chromium capture; nothing to remove here
+        self.result = "Browser capture (Safari): completed normally."
+
+    def log(self, line, stamp=None):
+        self.cap.store.write("browser.log", f"{stamp or clock()}  {line}\n")
+
+    def _wd(self, method, path, body=None, timeout=10):
+        data = None if body is None else json.dumps(body).encode("utf-8")
+        req = urllib.request.Request(f"http://127.0.0.1:{self.port}{path}", data=data, method=method,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                payload = json.loads(response.read().decode("utf-8") or "{}")
+        except urllib.error.HTTPError as exc:
+            try:
+                payload = json.loads(exc.read().decode("utf-8") or "{}")
+            except Exception:
+                payload = {}
+            value = payload.get("value") if isinstance(payload, dict) else None
+            if isinstance(value, dict) and value.get("message"):
+                raise RuntimeError(f"{value.get('error', 'webdriver error')}: {value['message']}") from None
+            raise RuntimeError(f"webdriver HTTP {exc.code} on {method} {path}") from None
+        return payload.get("value") if isinstance(payload, dict) else None
+
+    def _exec(self, script):
+        return self._wd("POST", f"/session/{self.session}/execute/sync", {"script": script, "args": []}, timeout=15)
+
+    def _emit(self, data):
+        if data.get("nav"):
+            t, dur, status, kind, dcl, load = data["nav"]
+            self.log(f"[nav] {kind or 'navigate'} status {status or '?'}  load {load} ms  DOMContentLoaded {dcl} ms  "
+                     f"total {dur} ms  {data.get('href', '')}", _ms_clock(t))
+        for t, dur, status, kind, url, size in data.get("res") or []:
+            self.log(f"[res] {dur:6d} ms  {status or '---':>3}  {kind:<14} {size:>7} B  {url}", _ms_clock(t))
+        for t, kind, msg in data.get("q") or []:
+            stamp = _ms_clock(t)
+            if kind == "net":
+                ms, status, what = (msg.split("|", 2) + ["", ""])[:3]
+                self.log(f"[net] {int(ms):6d} ms  {status:>3}  {what}", stamp)
+            elif kind == "net-fail":
+                ms, what, err = (msg.split("|", 2) + ["", ""])[:3]
+                self.log(f"[net] FAILED {int(ms):6d} ms  {err}  {what}", stamp)
+            elif kind.startswith("console."):
+                self.log(f"[{kind}] {msg}", stamp)
+            else:
+                self.log(f"[{kind}] {msg}", stamp)
+        if data.get("dropped"):
+            self.log(f"[capture] {data['dropped']} event(s) dropped: page queue full")
+
+    def run(self):
+        stderr_handle = None
+        try:
+            self.log(f"browser: Safari via {self.driver_path}")
+            self.log(f"device url: {self.device_url}   webdriver port: {self.port}")
+            stderr_handle = open(self.cap.path("browser.stderr.log"), "ab")
+            self.proc = subprocess.Popen([self.driver_path, "--port", str(self.port)], stdout=subprocess.DEVNULL,
+                                         stderr=stderr_handle, stdin=subprocess.DEVNULL)
+            deadline = time.monotonic() + 15
+            ready = False
+            while not self.cap.stopping() and time.monotonic() < deadline:
+                if self.proc.poll() is not None:
+                    raise RuntimeError(f"safaridriver exited with code {self.proc.returncode} (see browser.stderr.log)")
+                try:
+                    status = self._wd("GET", "/status", timeout=2) or {}
+                    if status.get("ready", True):
+                        ready = True
+                        break
+                except Exception:
+                    pass
+                self.cap.wait(0.3)
+            if not ready:
+                if self.cap.stopping():
+                    self.result = "Browser capture (Safari): stopped before safaridriver was ready."
+                    return
+                raise RuntimeError(f"safaridriver did not answer on port {self.port} within 15s")
+            try:
+                value = self._wd("POST", "/session", {"capabilities": {"alwaysMatch": {"browserName": "safari"}}},
+                                 timeout=60)
+            except RuntimeError as exc:
+                if "remote automation" in str(exc).lower():
+                    raise RuntimeError("Safari refused the session: switch on Safari > Settings > Advanced > "
+                                       "'Show features for web developers', then Develop > 'Allow Remote Automation' "
+                                       f"(or run `safaridriver --enable` once). Detail: {exc}") from None
+                raise
+            self.session = (value or {}).get("sessionId")
+            if not self.session:
+                raise RuntimeError(f"safaridriver returned no session id: {value}")
+            caps = (value or {}).get("capabilities", {})
+            self.log(f"webdriver session {self.session}: {caps.get('browserName', 'safari')} "
+                     f"{caps.get('browserVersion', '')} on {caps.get('platformName', '')}")
+            self._wd("POST", f"/session/{self.session}/url", {"url": self.device_url}, timeout=60)
+            self.log(f"navigated to {self.device_url}")
+            self.log(f"hook: {self._exec(SAFARI_HOOK_JS)} (console, errors, fetch/XHR, WebSocket; "
+                     "earlier requests come from Resource Timing as [res])")
+
+            while not self.cap.stopping():
+                try:
+                    data = self._exec(SAFARI_POLL_JS)
+                    if data is None:
+                        self.log("[nav] page reloaded or navigated; hook re-installed")
+                        self._exec(SAFARI_HOOK_JS)
+                        data = self._exec(SAFARI_POLL_JS)
+                    if data:
+                        self._emit(data)
+                except Exception as exc:
+                    self.log(f"[capture] poll failed: {exc}")
+                    if self.proc.poll() is not None:
+                        raise RuntimeError("safaridriver stopped during the capture") from None
+                    self.cap.wait(2)
+                self.cap.wait(self.POLL_SECONDS)
+            try:
+                data = self._exec(SAFARI_POLL_JS)
+                if data:
+                    self._emit(data)
+            except Exception:
+                pass
+            self.log("stop requested; closing capture")
+        except Exception as exc:
+            self.result = f"Browser capture (Safari): error - {exc}"
+            try:
+                self.log(f"[worker-error] {exc}")
+            except Exception:
+                pass
+        finally:
+            self.stop_browser()
+            if stderr_handle:
+                try:
+                    stderr_handle.close()
+                except Exception:
+                    pass
+            self.cap.summary(self.result)
+
+    def stop_browser(self):
+        if self.session:
+            session, self.session = self.session, None
+            try:
+                self._wd("DELETE", f"/session/{session}", timeout=10)
+            except Exception:
+                pass
+        if self.proc and self.proc.poll() is None:
+            try:
+                self.proc.terminate()
+                self.proc.wait(timeout=3)
+            except Exception:
+                try:
+                    self.proc.kill()
+                except Exception:
+                    pass
+
+
+# --------------------------------------------------------------------------- #
 # Crash log + reboot_log.txt polling
 # --------------------------------------------------------------------------- #
 
@@ -2374,7 +2656,7 @@ ALIASES = {
     "-TelnetPostDisconnectDelayMilliseconds": "--telnet-post-disconnect-delay-ms",
     "-TelnetIdleCheckSeconds": "--telnet-idle-check-seconds",
     "-SkipBrowserCapture": "--skip-browser-capture", "-BrowserUrl": "--browser-url",
-    "-BrowserDebugPort": "--browser-debug-port", "-BrowserPath": "--browser-path",
+    "-BrowserDebugPort": "--browser-debug-port", "-BrowserPath": "--browser-path", "-Browser": "--browser",
     "-SkipHttpProbes": "--skip-http-probes", "-HttpProbeTimeoutSeconds": "--http-probe-timeout-seconds",
     "-SkipCrashlogCapture": "--skip-crashlog-capture", "-CrashlogUrl": "--crashlog-url",
     "-CrashlogPollSeconds": "--crashlog-poll-seconds", "-NoPrompt": "--no-prompt",
@@ -2452,6 +2734,9 @@ def build_parser():
     p.add_argument("--browser-url")
     p.add_argument("--browser-debug-port", type=ranged(1, 65535), default=9222)
     p.add_argument("--browser-path")
+    p.add_argument("--browser", choices=("auto", "chromium", "safari"), default="auto",
+                   help="browser for the devtools capture: auto = Edge/Chrome/Chromium, else Safari on macOS; "
+                        "safari needs Develop > Allow Remote Automation (default auto)")
     p.add_argument("--skip-http-probes", action="store_true")
     p.add_argument("--skip-coredump", action="store_true",
                    help="do not fetch the stored core dump (GET /api/v2/device/coredump) at the end of the capture")
@@ -2620,8 +2905,21 @@ def main(argv=None):
     if args.skip_browser_capture:
         s("Browser capture: disabled (--skip-browser-capture).")
     else:
-        browser_path = find_browser(args.browser_path)
-        if browser_path:
+        browser_path = None if args.browser == "safari" else find_browser(args.browser_path)
+        safari_path = find_safaridriver() if args.browser == "safari" or (args.browser == "auto" and not browser_path) else None
+        if args.browser == "safari" and not safari_path:
+            s("Browser capture: skipped - --browser safari needs macOS with /usr/bin/safaridriver.")
+        elif safari_path:
+            port = select_debug_port(args.browser_debug_port)
+            url = args.browser_url or f"{http_base}/"
+            s(f"Browser capture: Safari ({safari_path})", echo=False)
+            s(f"Browser url: {url}", echo=False)
+            s(f"Browser WebDriver port: {port}", echo=False)
+            browser = SafariCapture(cap, safari_path, url, port)
+            browser.start()
+            workers.append((browser, 15))
+            s("Browser capture started (Safari automation window, writing browser.log; leave that window alone).")
+        elif browser_path:
             port = select_debug_port(args.browser_debug_port)
             profile = Path(os.environ.get("TEMP") or os.environ.get("TMPDIR") or "/tmp") / f"otgw-browser-{run_name}-{os.getpid()}"
             profile.mkdir(parents=True, exist_ok=True)
@@ -2634,7 +2932,8 @@ def main(argv=None):
             workers.append((browser, 12))
             s("Browser capture started (headless, writing browser.log; stderr in browser.stderr.log).")
         else:
-            s("Browser capture: skipped - no Edge/Chrome/Chromium found (pass --browser-path or --skip-browser-capture).")
+            s("Browser capture: skipped - no Edge/Chrome/Chromium found and no Safari driver "
+              "(pass --browser-path or --skip-browser-capture).")
 
     if args.skip_crashlog_capture:
         s("Crash-log capture: disabled (--skip-crashlog-capture).")
@@ -2775,7 +3074,7 @@ def main(argv=None):
             pass
         except OSError:
             pass
-    if browser is not None:
+    if browser is not None and browser.profile_dir:
         import shutil
         shutil.rmtree(browser.profile_dir, ignore_errors=True)
     for name in (FRAMES_LOG, SIM_LOG):
