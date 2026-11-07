@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-07T09:22:00Z'
-updated_date: '2026-11-07T13:15:00Z'
+updated_date: '2026-11-07T14:14:00Z'
 labels:
   - otdirect
   - breaking
@@ -26,10 +26,10 @@ Robert's decision 2026-11-07 (session, AskUserQuestion): remove, not keep as fal
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The controller code, its settings, REST keys, UI fields and MQTT/HA entities are removed; old settings files load without error (unknown keys ignored)
-- [ ] #2 Master mode without SAT behaviour is defined and documented (no TSet write unless CS= arrives), entry in docs/BREAKING_CHANGES.md and CHANGELOG
-- [ ] #3 Host tests and evaluate --quick green, combo build, bench .61 in master mode: no MsgID 1 write without SAT/CS, SAT still controls with SAT on
-- [ ] #4 App-slot size before/after recorded
+- [x] #1 The controller code, its settings, REST keys, UI fields and MQTT/HA entities are removed; old settings files load without error (unknown keys ignored)
+- [x] #2 Master mode without SAT behaviour is defined and documented (no TSet write unless CS= arrives), entry in docs/BREAKING_CHANGES.md and CHANGELOG
+- [x] #3 Host tests and evaluate --quick green, combo build, bench .61 in master mode: no MsgID 1 write without SAT/CS, SAT still controls with SAT on
+- [x] #4 App-slot size before/after recorded
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -73,4 +73,6 @@ Correction to the previous note: Robert answered the four open decisions; an exp
 2026-11-07 review (opus correctness + sonnet rules/tests/docs): no blocker; SAT's own on/off unchanged (SAT off states send CS=10 + CH=0, SATcontrol.ino:7104-7122). Major 1: SAT hand-back (CS=0) while SAT stays enabled (no outside temp > 1 h, OT loss, restart) gave CH off in master mode with nobody to heat. Robert decided (AskUserQuestion): keep CH enable on while SAT is enabled; the rule becomes CH off in master mode only when no CS override AND satOwnsControlSetpoint() is false. Major 2: external CS= expires after 60 s (OT_CSC2_EXPIRY_MS) and then CH goes off in master mode: document that CS= must be repeated within 60 s. Minor fixes queued: 2.0.0 release-note drafts still list PI room compensation, em dashes in OT_THING_FEATURE_PARITY.md, retired-topic wording (every discovery pass), OTDirect.ino:64 comment, BREAKING auto-detect wording (a later thermostat MsgID 1 write enables CH; auto-detect persists master mode), float threshold > 42, thermostat-write comment (TSet=0 is ignored, CH stays on once enabled).
 
 2026-11-07 review fixes applied (uncommitted, unbuilt): buildStatusRequest() clears CH enable only when IS_MASTER_MODE() && !otdCsOverrideActive() && !satOwnsControlSetpoint(); host case P8 (SAT owns, no CS override => 0x03) added, suite 1684 OLD fails P1,P2 only, FIX 8/8; docs state the 60 s CS= repeat, persisted auto-detect master mode, thermostat MsgID 1 > 0 enables CH, ch_suspended emptied every discovery pass; release drafts PI claims removed; float key threshold > 42 (43 keys); comments reworded. Tests green, evaluate --quick 85 pass 0 fail.
+
+2026-11-07 build + bench (beta.123+b73ed43 = 834902ac8 TASK-1684 + 038e60770 TASK-1694 + b73ed435a diag, rebased on 699b3616c). Build: 2x 'Successfully created ESP32S3 image', 'Build completed successfully', .ino.bin 2116944 B (beta.119+35f2cfd 2124352 B; TASK-1685 took 32 B in between) so about -7.4 KB app slot, the diag commit in the same image adds a little. evaluate --quick 85/0 on each commit. Bench .61 (no boiler, no thermostat), port 25238 raw frames for 90 s, SAT and satsimulation off, master mode: OLD image beta.120+8774771: MsgID 0 high byte 0x01 in 18/18 frames (CH on), 2 MsgID 1 writes 0x2D00, override table MsgID 1 = 11520. NEW beta.123: high byte 0x00 in 18/18 (CH off), 0 MsgID 1 writes, override table empty, crashlog empty. SAT on (no room temp, SAT inactive): high byte 0x01 in 23/23 (CH stays on while SAT is enabled, Robert's decision), 0 writes. SAT on with satsimulation: SAT active, preheating, heating curve 32.2, PID output 44.271, override MsgID 1 = 11340 (0x2C4C = 44.30 C) and MsgID 14 = 25600, last_blocked_cmd MID=1 VAL=11340: SAT computes and enqueues its CS as before. OTA settings check: 177 -> 164 keys, the only differences are the 13 removed keys; settings diff before/after the whole bench: removed = the 13 keys, added none, changed none. Logs/scripts in scratchpad/b103 (wire1684.py, set61.sh, settings-61-before/after-1684.json).
 <!-- SECTION:NOTES:END -->

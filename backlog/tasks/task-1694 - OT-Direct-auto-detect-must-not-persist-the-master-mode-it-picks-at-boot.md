@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-07T13:12:00Z'
-updated_date: '2026-11-07T13:19:00Z'
+updated_date: '2026-11-07T14:14:00Z'
 labels:
   - otdirect
   - bug
@@ -23,7 +23,13 @@ Robert 2026-11-07 (session, AskUserQuestion: 'Alleen het opslaan fixen'): auto-d
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A boot without a thermostat runs in master mode but settings.ini keeps OTDmode=1 (gateway); the next boot with a thermostat stays in gateway mode (host test red on old code, green on fix)
-- [ ] #2 A user mode change (REST/GW= command) still persists
-- [ ] #3 Release-note/BREAKING line for units that already saved OTDmode=2
+- [x] #1 A boot without a thermostat runs in master mode but settings.ini keeps OTDmode=1 (gateway); the next boot with a thermostat stays in gateway mode (host test red on old code, green on fix)
+- [x] #2 A user mode change (REST/GW= command) still persists
+- [x] #3 Release-note/BREAKING line for units that already saved OTDmode=2
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-07 bench .61 beta.123+b73ed43: otdmode set to 1 (gateway) via REST, two reboots without a thermostat: boot 1 runtime master, saved otdmode 1; boot 2 runtime master, saved otdmode 1. Before the fix the unit had otdmode 3 saved by the auto-detect. A user mode change persists (REST otdmode=1 and later otdmode=3 both read back from /api/v2/settings). Source test tests/test_otd_autodetect_no_persist.py: old 2 failures + 1 error, fix OK. Release-note line is in BREAKING_CHANGES.md and CHANGELOG [Unreleased] Fixed.
+<!-- SECTION:NOTES:END -->
