@@ -8254,7 +8254,7 @@
       "title": "While SAT is enabled, the Classic port 25238 bridge filters inbound lines and drops CV control commands and binary data",
       "path": "ADR-217-while-sat-is-enabled-the-classic-port-25238-bridge-filters-inbound-lines-and-drops-cv-control-commands-and-binary-data.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-07",
       "decision_summary": "While SAT is enabled, the Classic port 25238 inbound bridge buffers each line up to CR, forwards an allowed text line...",
       "topics": [

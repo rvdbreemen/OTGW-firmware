@@ -154,6 +154,7 @@ ADRs live in `docs/adr/`. Read relevant ADRs before architecture, NFR, API contr
 - **ADR-146**: No ArduinoJson: the hand-rolled streaming JSON writer (JsonEmit) on the ESP32-S3 REST path (gated by `check_no_arduinojson` in evaluate.py)
 - **ADR-177**: Keep the PIC byte stream verbatim from the serial task to every consumer (gated by the adr-judge declarative rules on the raw-path files)
 - **ADR-201**: Combo board detection persists only a positive PIC verdict and re-probes every boot (gated by `tests/test_board_detect_persist_gate.py`, which compiles the real detection blocks and fails on a mutant that persists a no-PIC verdict)
+- **ADR-217**: While SAT is enabled the Classic port 25238 bridge filters inbound lines and drops CV control commands and binary data; byte-transparent with SAT off (gated by `tests/test_bridge25238_sat_filter.py`, which compiles the real `handlePICSerial()` and fails on the code from before the ADR)
 
 **Structural / architectural ADRs** (reviewed at PR, no automated gate — see ADR-080):
 - **ADR-044**: Single-point-of-instantiation for globals

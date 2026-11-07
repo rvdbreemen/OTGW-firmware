@@ -1,7 +1,7 @@
 ---
 id: "ADR-217"
 title: "While SAT is enabled, the Classic port 25238 bridge filters inbound lines and drops CV control commands and binary data"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-07"
 binding: true
 gate: "tests/test_bridge25238_sat_filter.py"
@@ -41,11 +41,11 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-07.
+Accepted, 2026-11-07.
 
-This ADR (architecture decision record) is Proposed. It concerns SAT (Smart Autotune Thermostat, the firmware's own heating controller), the PIC (Peripheral Interface Controller, the Microchip microcontroller that runs Schelte Bron's gateway firmware) and the OTGW (OpenTherm Gateway) Classic board. The option it records (Option A below) was chosen by the maintainer, Robert van den Breemen, on 2026-11-07 (TASK-1695). Acceptance is a separate step and needs Robert's explicit go.
+This ADR (architecture decision record) concerns SAT (Smart Autotune Thermostat, the firmware's own heating controller), the PIC (Peripheral Interface Controller, the Microchip microcontroller that runs Schelte Bron's gateway firmware) and the OTGW (OpenTherm Gateway) Classic board. The option it records (Option A below) was chosen by the maintainer, Robert van den Breemen, on 2026-11-07 (TASK-1695). Robert accepted it on 2026-11-07 after the beta.127 build.
 
-Binding per ADR-080 once Accepted. The gate is the host test `tests/test_bridge25238_sat_filter.py` (named in the front matter `gate` field). The test exists (written with the implementation under TASK-1695): it compiles the real `handlePICSerial()` and fails on the code from before this ADR (12 of 15 cases) and passes on the implementation. It must pass before this ADR is accepted (see Decision Contract, Verification).
+Binding per ADR-080. The gate is the host test `tests/test_bridge25238_sat_filter.py` (named in the front matter `gate` field). The test exists (written with the implementation under TASK-1695): it compiles the real `handlePICSerial()` and fails on the code from before this ADR (12 of 15 cases) and passes on the implementation. It must pass before this ADR is accepted (see Decision Contract, Verification).
 
 Citations are to the working tree on 2026-11-07 on top of the `dev` branch commit `22fa148bc`, which carries uncommitted TASK-1695 changes in `OTGW-Core.ino`, `OTDirect.ino` and `OTGW-firmware.h`. Paths are relative to `src/OTGW-firmware/`. Line numbers can shift when that work is committed.
 
@@ -72,6 +72,11 @@ status_history:
     status: Proposed
     changed_by: Robert van den Breemen
     reason: Related to ADR-203
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-07
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: "Maintainer accepted in session 2026-11-07 after beta.127 build (d8186d789): content agreed earlier ('Inhoud goed, bouwen en dan accepteren'), host gate test 15/15 on the real handlePICSerial; live Classic bench run left to field testers."
     changed_via: adr-kit lifecycle
 ```
 

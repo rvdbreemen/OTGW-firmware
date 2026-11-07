@@ -3,11 +3,11 @@ id: TASK-1695
 title: >-
   While SAT is enabled, refuse external CV control commands on every channel
   (MQTT, REST, serial, port 25238)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T15:08:00Z'
-updated_date: '2026-11-07T18:05:00Z'
+updated_date: '2026-11-07T19:01:00Z'
 labels:
   - sat
   - otdirect
@@ -28,11 +28,11 @@ Robert 2026-11-07 (session): while SAT is enabled no other channel may send CS o
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With SAT enabled, CS=/CH=/MM=/C2=/H2=/TT=/TC= from MQTT, REST and the OT-Direct command path are refused and logged; SAT's own commands still pass (host test red on old, green on fix)
-- [ ] #2 With SAT disabled all of them are accepted again, also in OT-Direct master mode
-- [ ] #3 HW=, SW=, SH= are never blocked by this rule
-- [ ] #4 Port 25238 on the Classic: blocked text commands dropped while SAT is enabled, everything else byte-identical (host test on the real bridge code); ADR accepted by Robert first
-- [ ] #5 UI/MQTT feedback: a refused command is visible (log line, and a status field or MQTT reply)
+- [x] #1 With SAT enabled, CS=/CH=/MM=/C2=/H2=/TT=/TC= from MQTT, REST and the OT-Direct command path are refused and logged; SAT's own commands still pass (host test red on old, green on fix)
+- [x] #2 With SAT disabled all of them are accepted again, also in OT-Direct master mode
+- [x] #3 HW=, SW=, SH= are never blocked by this rule
+- [x] #4 Port 25238 on the Classic: blocked text commands dropped while SAT is enabled, everything else byte-identical (host test on the real bridge code); ADR accepted by Robert first
+- [x] #5 UI/MQTT feedback: a refused command is visible (log line, and a status field or MQTT reply)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -47,4 +47,12 @@ Part B implemented (agent, uncommitted): Classic port 25238 bridge in handlePICS
 2026-11-07 opus review of A+B (no blocker in part A: all 15 SAT addCommandToQueue calls pass satOwn=true, no non-SAT caller does; OT-Direct bridge correctly external). Part B findings, being fixed with new red-then-green gate cases: (1) CR LF clients (pyotgw sends CMD\r\n) - the LF started a new line and sampled the mode, so the first command after enabling SAT passed unfiltered and the ADR-059 override removed SAT's queued command; fix: LF at line start forwards at once and starts no line. (2) printable fragments between 0x0D bytes of a binary stream reached the PIC with SAT on; fix: binary latch drops everything until disconnect. (3) MQTT fallback enabling SAT during an OTmonitor upgrade would cut the upgrade; my choice: a connection that sent binary data with SAT off stays transparent until disconnect (a cut upgrade risks a bricked PIC; a bypass needs intent), documented in ADR-217. (4) disconnect reset incomplete, block check on sWrite; (5) enqueuePICTx failure ignored. Open for Robert at ADR-217 acceptance: GW=0/GW=P (monitor/bypass) and PS=1 stay free and can cancel SAT's control; user boot commands MM=/CH= are refused at every boot while SAT is enabled (BREAKING note). LL-010 failure in test_sat_lowload_contract was WinError 225 (Defender blocking a compiled exe); test_sat_requested_vs_transmitted alone: 10 OK.
 
 Part B review fixes (uncommitted): CR LF handled (LF at line start forwarded, never samples mode); binary-blocked latch and transparent latch per connection (ADR-217 documents the transparent exception); per-connection state reset on disconnect and on a new connection via OTGWstream.onConnect counter (no library change); blocked check rebuilt from sRaw; enqueuePICTx failure counts a drop and skips side effects; test takes MAX_BUFFER_WRITE from OTGW-Core.h. Gate test: HEAD 12 of 15 red, pre-fix tree 5 new cases red, fixed tree 15 of 15 green.
+
+2026-11-07 beta.127 (d8186d789, pushed origin/dev, zip posted #alpha msg 1568699984033874022). Bench .61 (OT-Direct, OTA app+fs, settings changed: none): SAT on: REST CH=0, MM=50, TT=19.5, CS=55 -> refused, ext_cmd_refused 1..4, ext_cmd_last_refused names each; HW=1 and HW=A accepted (counter unchanged). SAT off: CH=0 and CS=40 accepted (counter unchanged, /api/v2/otdirect/overrides write msgid 1 = 10240 = 40.0); cleared with CS=0/CH=1, SAT back on. Note: REST rejects C2=/H2= with 400 'Invalid command format' because handleCommandSubmit requires two letters (pre-existing, separate from this task); C2/H2 gate covered by host tests. Log: scratchpad b103/bench1695.log. AC4: host gate test 15/15 on the real handlePICSerial (old 12/15 fail); bench unit has no PIC; waits for Robert's acceptance of ADR-217.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Done 2026-11-07, beta.127 d8186d789 (origin/dev). AC1: host test_sat_command_delivery ExternalCvCommandsRefused on the real addCommandToQueue/handleOTDirectCommand, old code external CH=0 Queued, fix 22 OK; bench .61 SAT on: REST CH=0/MM=50/TT=19.5/CS=55 refused, ext_cmd_refused 1..4, telnet log line; SAT own commands pass (satOwn=true, test). AC2: bench .61 SAT off: CH=0, CS=40 accepted (override MsgID1=40.0), counter unchanged; OT-Direct master path in host tests. AC3: bench HW=1/HW=A accepted with SAT on; tests. AC4: tests/test_bridge25238_sat_filter.py on the real handlePICSerial, old 12/15 fail, fix 15/15; ADR-217 accepted by Robert in session 2026-11-07 (adr-kit accept --confirm, now binding; CLAUDE.md/AGENTS.md lists + README updated, test_adr_governance OK). AC5: GET /api/v2/sat/status ext_cmd_refused, ext_cmd_last_refused, ext_bridge_dropped (bench values above) + log line. Not verified: port 25238 filter on a live Classic with PIC (bench unit .61 has no PIC; left to field). Robert: GW=0/GW=P/PS=1 stay free by decision. Follow-up: REST rejects C2=/H2= (new task).
+<!-- SECTION:FINAL_SUMMARY:END -->

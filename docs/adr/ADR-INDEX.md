@@ -222,4 +222,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-214 | Accepted | - | Ids are a hash, not a table. |
 | ADR-215 | Accepted | - | One file per page. |
 | ADR-216 | Accepted | - | webBeginRequest() (src/OTGW-firmware/webServerCompat.h) calls platformTcpCapSendBuffer(pcb, WEBTCPSENDCAP) for every... |
-| ADR-217 | Proposed | `src/OTGW-firmware/OTGW-Core.ino` | While SAT is enabled, the Classic port 25238 inbound bridge buffers each line up to CR, forwards an allowed text line... |
+| ADR-217 | Accepted | `src/OTGW-firmware/OTGW-Core.ino` | While SAT is enabled, the Classic port 25238 inbound bridge buffers each line up to CR, forwards an allowed text line... |
