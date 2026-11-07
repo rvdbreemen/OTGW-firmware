@@ -5206,7 +5206,7 @@
       "path": "ADR-165-optimal-request-parallelism-esp32s3-webui-rest.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-06",
+      "date": "2026-11-07",
       "decision_summary": "Adopt N=2 as the confirmed safe-and-robust parallelism ceiling for RESTMAXINFLIGHT and WEBFILEMAXINFLIGHT on the ESP3...",
       "topics": [],
       "aliases": [],
@@ -6361,7 +6361,7 @@
       "path": "ADR-188-cap-the-web-connections-that-hold-send-data-so-a-request-storm-cannot-starve-the-receive-path.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-06",
+      "date": "2026-11-07",
       "decision_summary": "Refuse a new web request with the existing cheap 503 while more than WEBMAXTXCONNECTIONS (4) connections on port 80 h...",
       "topics": [
         "backpressure",
@@ -7954,7 +7954,7 @@
       "path": "ADR-212-load-web-ui-assets-natively-behind-a-bounded-server-side-file-queue.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-06",
+      "date": "2026-11-07",
       "decision_summary": "Native loading.",
       "topics": [
         "backpressure",
@@ -8133,7 +8133,7 @@
       "path": "ADR-215-serve-each-web-page-as-one-gzipped-file-with-an-etag.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-06",
+      "date": "2026-11-07",
       "decision_summary": "One file per page.",
       "topics": [
         "caching",
@@ -8180,6 +8180,61 @@
           "tests/testbuildstaging.py: the staging copy holds the gzipped pages and no inlined inputs, and passes the LittleFS budget.",
           "tests/testwebfilescheduling.py: compiles the real serveGzipPage, sendIndex, handleFile and webSendGzipPage: ETag - , 304 on a matching If-None-Match, Content-Encoding: gzip exactly once, the plain-page fallback and the upload-prompt gate...",
           "Bench: first load 200 with the ETag, reload 304, stale ETag 200; no file 503s with two tabs."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-216",
+      "title": "Cap each web connection's lwIP send queue at two segments",
+      "path": "ADR-216-cap-each-web-connection-s-lwip-send-queue-at-two-segments.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-07",
+      "decision_summary": "webBeginRequest() (src/OTGW-firmware/webServerCompat.h) calls platformTcpCapSendBuffer(pcb, WEBTCPSENDCAP) for every...",
+      "topics": [
+        "backpressure",
+        "heap",
+        "lwip",
+        "web-server"
+      ],
+      "aliases": [
+        "send buffer cap",
+        "snd_buf cap",
+        "two-tab heap dip"
+      ],
+      "components": [
+        "platformTcpCapSendBuffer (platform_esp32.h)",
+        "WEB_TCP_SEND_CAP (webServerCompat.h)"
+      ],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Apply the cap before the first byte of a response is queued, under LOCKTCPIPCORE.",
+          "Keep WEBTCPSENDCAP at or above 2 x CONFIGLWIPTCPMSS (2,872 bytes).",
+          "Keep the change in the Platform shim and the web compatibility layer; no edit of the vendored AsyncTCP, ESPAsyncWebServer or lwIP code."
+        ],
+        "must_not": [
+          "Raise sndbuf above the value lwIP gave the connection.",
+          "Change the cap on a connection that already has data queued."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testwebfilescheduling.py compiles the real webBeginRequest() with a tcppcb mock and the shim's contract.",
+          "Bench recipe (TASK-1673 notes): reboot before every run, two-tab load 25 rounds, read hdminfreeheap and hddiptxbytes / hddiptxpcbs. With the cap, two overlapping streams hold 5,744 bytes together instead of 11,488."
         ]
       },
       "scope": {
@@ -12937,6 +12992,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-165",
+      "target": "ADR-216",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-166",
       "target": "ADR-126",
       "type": "related",
@@ -13395,6 +13456,12 @@
     {
       "source": "ADR-188",
       "target": "ADR-215",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-188",
+      "target": "ADR-216",
       "type": "related",
       "resolved": true
     },
@@ -14263,6 +14330,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-212",
+      "target": "ADR-216",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-213",
       "target": "ADR-030",
       "type": "related",
@@ -14397,6 +14470,36 @@
     {
       "source": "ADR-215",
       "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-215",
+      "target": "ADR-216",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-216",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-216",
+      "target": "ADR-188",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-216",
+      "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-216",
+      "target": "ADR-215",
       "type": "related",
       "resolved": true
     }

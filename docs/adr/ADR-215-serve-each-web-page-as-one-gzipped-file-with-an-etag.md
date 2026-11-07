@@ -17,6 +17,7 @@ related:
   - "ADR-190"
   - "ADR-192"
   - "ADR-212"
+  - "ADR-216"
 topics:
   - "web-ui"
   - "web-server"
@@ -110,6 +111,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: Maintainer accepted the direction on 2026-11-06 (TASK-1674) on condition of the review must-fixes, which landed with this change
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-07
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-216
     changed_via: adr-kit lifecycle
 ```
 

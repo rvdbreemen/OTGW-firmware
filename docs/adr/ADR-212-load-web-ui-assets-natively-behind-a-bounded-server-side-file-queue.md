@@ -16,6 +16,7 @@ related:
   - "ADR-188"
   - "ADR-192"
   - "ADR-215"
+  - "ADR-216"
 topics:
   - "web-server"
   - "backpressure"
@@ -80,6 +81,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-215
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-07
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-216
     changed_via: adr-kit lifecycle
 ```
 

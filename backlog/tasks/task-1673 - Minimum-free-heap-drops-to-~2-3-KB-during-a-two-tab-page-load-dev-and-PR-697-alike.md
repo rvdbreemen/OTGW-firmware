@@ -3,11 +3,11 @@ id: TASK-1673
 title: >-
   Minimum free heap drops to ~2-3 KB during a two-tab page load (dev and PR #697
   alike)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-06T10:57:00Z'
-updated_date: '2026-11-06T21:11:00Z'
+updated_date: '2026-11-07T04:07:00Z'
 labels:
   - heap
   - webui
@@ -51,4 +51,12 @@ Planned fixes, app side, no library change: (A) in webSendFile open the File wit
 2026-11-06 Robert chose the per-connection send-buffer experiment: webBeginRequest caps pcb->snd_buf at WEB_TCP_SEND_CAP 2872 (2 x MSS) through platformTcpCapSendBuffer (core lock, only while nothing is queued). Committed locally as beta.115 for the bench A/B; not pushed until the A/B is done.
 
 2026-11-06 beta.115 (send cap 2872) A/B: 1 of 5 rebooted runs completed before Claude Code stopped the background job for low system memory: min free 3252 B, p50 1.55 s p95 1.89 s (baseline cap2: 3040-3328 B in overlap runs, p50 1.05-1.26 s). Inconclusive with one run. hd_dip_tx_bytes showed 11488 B, which the cap makes meaningless: the metric was TCP_SND_BUF - snd_buf, which counts the lowered credit as held. Fixed to sum the unsent and unacked segment lengths (uncommitted until the next build). Next: rebuild, then the full 5-run A/B when memory allows; not restarted automatically.
+
+2026-11-07 beta.116 A/B (send cap 2872, metric fixed), reboot per run, two-tab load 25 rounds: min free 19068 / 15608 / 13636 / 8060 / 15372 B; dip snapshot with overlap shows 2 pcbs holding 5744 B together (cap effective, was 11488). With beta.115 r1 (3252 B) six cap runs: 1 of 6 below 4 KB (baseline 2 of 3), median ~14.5 KB (baseline ~3.3 KB). p50 1.37-1.50 s vs 1.05-1.26 s. Robert (AskUserQuestion 2026-11-07): keep the cap, waive AC2 on these numbers; ADR-216 Proposed for his acceptance; remaining transient is TASK-1679.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: dip snapshot instrumentation (hd_dip_*, beta.113, segment-sum fix beta.116) shows what holds memory at the dip: two overlapping port-80 streams with full lwIP send queues (2 x 5744 B), 13 TIME_WAIT pcbs, 2 file streams, no REST/WS; native watermark ~10 KB below the loop-sampled dip. AC2 WAIVED by Robert 2026-11-07: target >= 8 KB not reached in every run. Fixes landed: 512 B per-file stdio buffer and total-heap file gate (beta.110, host test red/green), File overload build fix (beta.112), gate only lowers its cap (beta.114), per-connection send cap 2872 B (beta.115, ADR-216 Proposed). Bench A/B (reboot per run): runs below 4 KB 2/3 -> 1/6, median minimum ~3.3 -> ~14.5 KB, page load +0.3 s. Not achieved: a bounded worst case (one run 3252 B); follow-up TASK-1679.
+<!-- SECTION:FINAL_SUMMARY:END -->
