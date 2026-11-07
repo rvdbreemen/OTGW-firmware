@@ -525,7 +525,7 @@ bool streamSensorDiscovery(const MqttHaSensorCfg &cfg,
 bool streamBinarySensorDiscovery(const MqttHaBinSensorCfg &cfg,
                                  HaDiscoveryContext &ctx);
 
-bool streamSatZoneDiscovery(HaDiscoveryContext &ctx);
+bool streamSatZoneDiscovery(HaDiscoveryContext &ctx, struct DiscoveryEmitGate *gate = nullptr);   // TASK-1699: gate = one config per drip slot
 
 bool streamClimateDiscovery(uint8_t climateIdx,
                             HaDiscoveryContext &ctx);
@@ -547,6 +547,9 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
 
 // Empties the retained discovery configs and state topics of removed SAT entities
 // (TASK-1332), so Home Assistant drops them. Called once per SAT discovery pass.
+// TASK-1699: one entry at a time, so the drip can send them one tick apart.
+size_t retiredSatEntityCount();
+bool clearRetiredSatEntityAt(size_t index, const HaDiscoveryContext &ctx);   // true when it published something
 void clearRetiredSatEntities(const HaDiscoveryContext &ctx);
 
 // SAT select entities (dropdowns). selectIdx = 0 (sat_heating_system), 1 (sat_preset, TASK-1490).
@@ -561,8 +564,40 @@ bool streamSatNumberDiscovery(uint8_t numberIdx,
 bool streamDallasSensorDiscovery(const char *sensorAddress,
                                  HaDiscoveryContext &ctx);
 
+// TASK-1699: onlyVariant < 0 streams both source variants (_thermostat, _boiler); 0 or 1 streams that one.
+constexpr uint8_t HA_SENSOR_SOURCE_VARIANTS = 2;
 bool expandAndStreamSensorSources(const MqttHaSensorCfg &cfg,
-                                  HaDiscoveryContext &ctx);
+                                  HaDiscoveryContext &ctx,
+                                  int8_t onlyVariant = -1);
+
+// TASK-1699: the discovery drip sends one config per tick. A DiscoveryEmitGate passed to
+// doAutoConfigureMsgidImpl() lets the call run only the slots from index `skip` on, and stop after the
+// first slot that published (`published`); `more` says a later slot exists. nullptr = every slot (full pass).
+// The gate lives on the caller's stack, never in a static, so a re-entered call cannot change it (ADR-090).
+struct DiscoveryEmitGate {
+  uint16_t skip      = 0;      // slots finished in earlier ticks
+  uint16_t seen      = 0;      // slots passed in this call
+  uint16_t next      = 0;      // index after the last slot attempted in this call
+  bool     ran       = false;  // the call got past its guards (lock, broker, heap)
+  bool     published = false;  // a slot published in this call
+  bool     cfgSent   = false;  // that publish was a config (not an empty retained clear)
+  bool     failed    = false;  // a slot failed while discovery could not publish; it is retried next tick
+  bool     more      = false;  // a slot after the published one exists
+};
+// The drip's position inside one OT id. Reset when the drip moves to another id, on markAllMQTTConfigPending()
+// and when MQTT is down.
+struct DiscoveryDripCursor {
+  int16_t  otid = -1;          // id the cursor belongs to, -1 = none
+  uint16_t next = 0;           // first slot not done yet
+  bool     acc  = false;       // anyOk so far (id 244: allOk so far)
+};
+enum class DripStepResult : uint8_t { More, Done, Retry };
+// Free heap below which a discovery composer does not publish (MQTTHaDiscovery.cpp STREAM_HEAP_MIN); the drip waits
+// above it rather than letting a slot fail (TASK-1699).
+constexpr uint32_t HA_DISCOVERY_STREAM_HEAP_MIN = 4000;
+bool doAutoConfigureMsgidImpl(uint8_t OTid, bool isFirst, DiscoveryEmitGate *gate);
+DripStepResult doAutoConfigureMsgidStep(uint8_t OTid, bool isFirst, DiscoveryDripCursor &cursor, bool *success,
+                                        bool *configSent = nullptr);
 
 // Button discovery: one entity for resetgateway (pseudo-ID 244)
 bool streamButtonDiscovery(HaDiscoveryContext &ctx);

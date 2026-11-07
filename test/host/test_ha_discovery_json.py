@@ -99,7 +99,7 @@ CMD_KEY = {"button": "cmd_t", "select": "cmd_t", "switch": "cmd_t", "number": "c
 READ_ONLY = {"sensor", "binary_sensor"}
 REMOVAL = "clearTopologyDiscoveryForOTId"
 DUP_CLEAR = "clearThermostatDupDiscoveryForOTId"   # TASK-1201 one-time clear
-REMOVERS = {REMOVAL, "satBLEUnpublishDiscovery", DUP_CLEAR}
+REMOVERS = {REMOVAL, "satBLEUnpublishDiscovery", DUP_CLEAR, "clearRetiredSatEntityAt"}
 # The BLE composer formats with "%S" through snprintf_P (= snprintf); what that does is up to the
 # C library (MSVC here, newlib on the device), so its result is reported apart from the gate.
 BLE_PROBE = "satBLEPublishHaDiscovery"
@@ -120,9 +120,16 @@ def write(out_dir, name, origin, parts):
     (out_dir / name).write_text(head + "\n\n".join(parts) + "\n", encoding="utf-8")
 
 
+def has_drip_step(mino):
+    """TASK-1699: the per-entity drip (doAutoConfigureMsgidImpl + doAutoConfigureMsgidStep) exists in this revision."""
+    return any(l.startswith("DripStepResult doAutoConfigureMsgidStep(") for l in mino)
+
+
 def override_ids(mino):
     """The ids doAutoConfigureMsgid() gives an override sensor: its one 'case a: case b: ... {' line."""
-    body = construct(mino, r"^bool doAutoConfigureMsgid\(byte OTid, bool isFirst\)\s*$").splitlines()
+    anchor = (r"^bool doAutoConfigureMsgidImpl\(byte OTid, bool isFirst, DiscoveryEmitGate \*gate\)\s*$"
+              if has_drip_step(mino) else r"^bool doAutoConfigureMsgid\(byte OTid, bool isFirst\)\s*$")
+    body = construct(mino, anchor).splitlines()
     hits = [l for l in body if re.match(r"^\s*(case \d+:\s*)+\{\s*$", l)]
     if len(hits) != 1:
         raise SystemExit(f"the override case line must match once in doAutoConfigureMsgid(), got {len(hits)}")
@@ -186,10 +193,18 @@ def export(rev, out_dir):
         construct(mino, r"^bool satBLEPublishHaDiscovery\(const char\* macCompact, const char\* macWithColons,\s*$"),
         construct(mino, r"^void satBLEUnpublishDiscovery\(const char\* macCompact\)\s*$"),
         construct(mino, r"^static bool buildDiscoveryDeviceBlock\(char \*dest, size_t destSize, HaDiscoveryContext &ctx\)\s*$"),
-        construct(mino, r"^static bool streamSatPvBoostDiscovery\(HaDiscoveryContext &ctx\)\s*$"),
-        construct(mino, r"^bool streamSatZoneDiscovery\(HaDiscoveryContext &ctx\)\s*$"),
+        *([construct(mino, r"^static bool discoveryCanPublishNow\(\) \{"),
+           construct(mino, r"^static bool discSlot\(DiscoveryEmitGate \*g\) \{"),
+           construct(mino, r"^static bool discNote\(DiscoveryEmitGate \*g, bool ok, bool isConfig = true\) \{")]
+          if has_drip_step(mino) else []),
+        construct(mino, r"^static bool streamSatPvBoostDiscovery\(HaDiscoveryContext &ctx(, DiscoveryEmitGate \*gate)?\)\s*$"),
+        construct(mino, r"^bool streamSatZoneDiscovery\(HaDiscoveryContext &ctx(, DiscoveryEmitGate \*gate)?\)\s*$"),
         construct(mino, r"^static HaDevice deviceForOTId\(byte OTid\) \{"),
         construct(mino, r"^bool doAutoConfigureMsgid\(byte OTid, bool isFirst\)\s*$"),
+        *([construct(mino, r"^bool doAutoConfigureMsgidImpl\(byte OTid, bool isFirst, DiscoveryEmitGate \*gate\)\s*$"),
+           construct(mino, r"^DripStepResult doAutoConfigureMsgidStep\(byte OTid, bool isFirst, "
+                           r"DiscoveryDripCursor &cursor, bool \*success,\s*$")]
+          if has_drip_step(mino) else []),
         construct(mino, r"^void sensorAutoConfigure\(byte dataid, bool finishflag, const char \*cfgSensorId = nullptr\) \{"),
     ])
     write(out_dir, "gen_override_ids.inc", origin,
@@ -213,7 +228,8 @@ def build_and_run(label, out_dir, rev=None):
     bat.write_text("@echo off\r\n"
                    f'call "{find_vcvars()}" >nul 2>nul\r\n'
                    "cl /nologo /EHsc /W3 /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS /DBOARD_NODOSHOP_ESP32_COMBO "
-                   + ("/DHAS_THERMOSTAT_DUP_CLEAR " if DUP_CLEAR in entry_points(rev) else "") +
+                   + ("/DHAS_THERMOSTAT_DUP_CLEAR " if DUP_CLEAR in entry_points(rev) else "")
+                   + ("/DHAS_DRIP_STEP " if has_drip_step(read(MQTT_INO, rev).splitlines()) else "") +
                    f'/Fo:"{fwd}/" /Fe:"{exe}" "{HERE / CPP}" "{out_dir / "MQTTHaDiscovery.cpp"}" '
                    f'/I"{out_dir}" /I"{SHIM}"\r\n', encoding="ascii", newline="")
     c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
@@ -230,11 +246,17 @@ def build_and_run(label, out_dir, rev=None):
     return parse(lines)
 
 
+LAST_DRIP = []   # TASK-1699: the DRIP / DRIPINT lines of the last run (part F)
+
+
 def parse(lines):
     ctx, calls, pubs = {}, [], []
+    LAST_DRIP.clear()
     for l in lines:
         f = l.split(" ")
-        if f[0] == "CTX":
+        if f[0] in ("DRIP", "DRIPINT", "DRIPDROP", "DRIPSHIFT"):
+            LAST_DRIP.append(dict([("kind", f[0])] + [kv.split("=", 1) for kv in f[1:]]))
+        elif f[0] == "CTX":
             ctx = dict(kv.split("=", 1) for kv in f[1:])
         elif f[0] == "CALL":
             calls.append({"seq": int(f[1]), "tag": f[2], "args": f[3], "ret": int(f[4][4:]),

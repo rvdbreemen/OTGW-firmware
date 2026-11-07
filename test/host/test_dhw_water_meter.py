@@ -416,8 +416,12 @@ def export_disc(out_dir):
         construct(fwh, r"^inline bool isFlashing\(\)"),
     ])
     write(out_dir, "gen_meter.inc", origin, meter_slice())
+    # TASK-1699: markAllMQTTConfigPending() also resets the per-entity drip cursor (type in MQTTstuff.h).
+    drip_cursor = any(l.startswith("static DiscoveryDripCursor sDripCursor;") for l in mino)
     write(out_dir, "gen_disc_mqtt.inc", origin, [
         line(mino, r"^static bool\s+dripDeviceInfoPending\b"),
+        *([construct(mh, r"^struct DiscoveryDripCursor \{"),
+           line(mino, r"^static DiscoveryDripCursor sDripCursor;")] if drip_cursor else []),
         construct(mino, r"^static bool readMQTTTopicToken\(const char \*&cursor, char \*token, size_t tokenSize\) \{"),
         construct(mino, r"^bool getMQTTConfigDone\(const uint8_t MSGid\)\s*$"),
         construct(mino, r"^void setMQTTConfigDone\(const uint8_t MSGid\)\s*$"),

@@ -2764,7 +2764,7 @@ static bool buildBinSensorDiscoveryTopic(char *dest, size_t destSize,
 // ---------------------------------------------------------------------------
 // Minimum free heap for discovery publish (same as MQTTstuff.ino)
 // ---------------------------------------------------------------------------
-static constexpr uint32_t STREAM_HEAP_MIN = 4000;  // Streaming needs ~200 bytes, not 1200+
+static constexpr uint32_t STREAM_HEAP_MIN = HA_DISCOVERY_STREAM_HEAP_MIN;  // Streaming needs ~200 bytes, not 1200+ (MQTTstuff.h)
 static constexpr size_t   STREAM_TOPIC_MAX = 200;
 
 // ---------------------------------------------------------------------------
@@ -2947,7 +2947,8 @@ bool streamDallasSensorDiscovery(const char *sensorAddress,
 // mangling custom-type parameters.
 // ---------------------------------------------------------------------------
 bool expandAndStreamSensorSources(const MqttHaSensorCfg &cfg,
-                                  HaDiscoveryContext &ctx)
+                                  HaDiscoveryContext &ctx,
+                                  int8_t onlyVariant)
 {
   static const char src_suffix_thermostat[] PROGMEM = "_thermostat";
   static const char src_suffix_boiler[]     PROGMEM = "_boiler";
@@ -2970,7 +2971,9 @@ bool expandAndStreamSensorSources(const MqttHaSensorCfg &cfg,
   const char *origName = ctx.sourceName;
   const char *origSeg = ctx.sourceTopicSegment;
 
+  static_assert(kSourceVariantCount == HA_SENSOR_SOURCE_VARIANTS, "HA_SENSOR_SOURCE_VARIANTS must match sources[]");
   for (uint8_t i = 0; i < kSourceVariantCount; i++) {
+    if (onlyVariant >= 0 && i != static_cast<uint8_t>(onlyVariant)) continue;   // TASK-1699: one variant per drip slot
     strncpy_P(suffixBuf, sources[i].suffix, sizeof(suffixBuf) - 1); suffixBuf[sizeof(suffixBuf)-1] = '\0';
     strncpy_P(nameBuf, sources[i].name, sizeof(nameBuf) - 1); nameBuf[sizeof(nameBuf)-1] = '\0';
     strncpy_P(segBuf, sources[i].segment, sizeof(segBuf) - 1); segBuf[sizeof(segBuf)-1] = '\0';
@@ -3906,19 +3909,32 @@ static const RetiredSatEntity kRetiredSatEntities[] PROGMEM = {
   { "sensor", "sat_sat_ble_temp_valid", nullptr },   // RETIRED-SAT-ENTITY TASK-1462: now a binary_sensor; the state topic sat/ble_temp_valid stays
 };
 
-void clearRetiredSatEntities(const HaDiscoveryContext &ctx) {
+size_t retiredSatEntityCount() {
+  return sizeof(kRetiredSatEntities) / sizeof(kRetiredSatEntities[0]);
+}
+
+bool clearRetiredSatEntityAt(size_t index, const HaDiscoveryContext &ctx) {
+  if (index >= retiredSatEntityCount()) return false;
   char topic[STREAM_TOPIC_MAX];
-  for (size_t i = 0; i < sizeof(kRetiredSatEntities) / sizeof(kRetiredSatEntities[0]); i++) {
-    RetiredSatEntity e;
-    memcpy_P(&e, &kRetiredSatEntities[i], sizeof(e));
-    if (e.component && e.objectId) {
-      snprintf_P(topic, sizeof(topic), PSTR("%s/%s/%s/%s/config"), ctx.haPrefix, e.component, ctx.nodeId, e.objectId);
-      publishEmptyRetained(topic);
-    }
-    if (e.stateSub) {
-      snprintf_P(topic, sizeof(topic), PSTR("%s%s"), ctx.mqttPubTopic, e.stateSub);
-      publishEmptyRetained(topic);
-    }
+  RetiredSatEntity e;
+  memcpy_P(&e, &kRetiredSatEntities[index], sizeof(e));
+  bool sent = false;
+  if (e.component && e.objectId) {
+    snprintf_P(topic, sizeof(topic), PSTR("%s/%s/%s/%s/config"), ctx.haPrefix, e.component, ctx.nodeId, e.objectId);
+    publishEmptyRetained(topic);
+    sent = true;
+  }
+  if (e.stateSub) {
+    snprintf_P(topic, sizeof(topic), PSTR("%s%s"), ctx.mqttPubTopic, e.stateSub);
+    publishEmptyRetained(topic);
+    sent = true;
+  }
+  return sent;
+}
+
+void clearRetiredSatEntities(const HaDiscoveryContext &ctx) {
+  for (size_t i = 0; i < retiredSatEntityCount(); i++) {
+    clearRetiredSatEntityAt(i, ctx);
     feedWatchDog();
   }
 }

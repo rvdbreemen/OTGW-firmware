@@ -1143,7 +1143,9 @@ class ForcePwmRemoved(unittest.TestCase):
         rows = [l for l in src.splitlines() if "RETIRED-SAT-ENTITY" in l and "{" in l]
         # the table grows with every retired entity (TASK-1341, 1282, 1460): check this row, not the count
         self.assertTrue(any('"switch", "sat_force_pwm_enable", "/sat/force_pwm_enable"' in r for r in rows), rows)
-        self.assertIn("clearRetiredSatEntities(ctx);", (REPO / "src" / "OTGW-firmware" / "MQTTstuff.ino").read_text(encoding="utf-8"))
+        # The discovery pass clears every row: in one go, or one row per drip tick since TASK-1699.
+        mino = (REPO / "src" / "OTGW-firmware" / "MQTTstuff.ino").read_text(encoding="utf-8")
+        self.assertTrue("clearRetiredSatEntities(ctx);" in mino or "clearRetiredSatEntityAt(r, ctx)" in mino)
 
     def test_old_settings_key_is_ignored_silently(self):
         # updateSetting() has no catch-all: an unknown key (SATforcepwm in an old file) falls through the

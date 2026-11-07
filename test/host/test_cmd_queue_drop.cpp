@@ -78,6 +78,9 @@ static void pmChainTick() {}
 static void triggerPICsettingsReadout() {}
 static bool isPICEnabled() { return true; }
 static bool satOwnsControlSetpoint() { return false; }
+// TASK-1695 refuse gate in addCommandToQueue(): never reached here, SAT does not own the setpoint (above).
+static bool satBlocksExternalCommand(const char*, int) { return false; }
+static void satNoteExternalRefused(const char*, int) {}
 static bool satCommandInFlight() { return false; }
 static char cMsg[128];
 

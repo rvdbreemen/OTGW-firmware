@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.130
+**  Version  : v2.0.0-beta.131
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1161,7 +1161,7 @@ void loop()
       }
     }
     if (minuteChanged())              doTaskMinuteChanged(); //ADR-086: sole minuteChanged() caller; hour/day/year dispatch lives inside
-    loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, 2s normal / 10s slow)
+    loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, one config per 1 s normal / 10 s slow)
     runTopicCleanupStep();            // ADR-106: drain stale-mode discovery topics after bUseLegacyOtTopics toggle
     evalOutputs();                    // when the bits change, the output gpio bit will follow
     evalWebhook();                    // when the trigger bit changes, fire the webhook

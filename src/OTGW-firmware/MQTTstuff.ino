@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.130
+**  Version  : v2.0.0-beta.131
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -137,6 +137,7 @@ static uint16_t        statusBurstPublishCount = 0;
 static unsigned long   burstCooldownUntilMs  = 0;
 static uint32_t        sDripDueAtMs          = 0;   // updated by loopMQTTDiscovery(); read by dripDueWithinMs()
 static bool            dripDeviceInfoPending = false; // true after markAllMQTTConfigPending(); first drip entity carries full device block
+static DiscoveryDripCursor sDripCursor;             // TASK-1699: drip position inside one OT id (one config per tick)
 // ADR-140: single-device topology. The per-device identifier machinery from
 // TASK-648 (g_haDeviceIntroduced[], HaDeviceMetaBufs, g_haDeviceMeta[],
 // kHaDeviceSuffixes[]) is gone — there is one HA device (bare nodeId), the full
@@ -181,6 +182,10 @@ bool isStatusBurstActive() {
 // or is already overdue. Callers (e.g. queryNextPICsetting) use this to avoid
 // issuing MQTT publishes that would land on top of a drip allocation.
 bool dripDueWithinMs(uint32_t windowMs) {
+  // TASK-1699: the drip ticks every second; without pending discovery a tick publishes nothing, so it defers no one.
+  bool pending = false;
+  for (uint8_t g = 0; g < 8 && !pending; g++) pending = (MQTTautoCfgPendingMap[g] != 0);
+  if (!pending) return false;
   long timeLeft = (long)(sDripDueAtMs - millis());
   return timeLeft <= (long)windowMs;
 }
@@ -2263,6 +2268,7 @@ static void queueNonOTDiscoveryIds()
   setMQTTConfigPending(OTGWsatbinaryid);    // 254 TASK-543 SAT binaries + flame status
   setMQTTConfigPending(OTGWsatzoneid);      // 255 TASK-543 dynamic SAT zone discovery
   dripDeviceInfoPending = true;  // ADR-140: first drip entity carries the full single-device block
+  sDripCursor = DiscoveryDripCursor();  // TASK-1699: a new pass starts every id at its first slot
 }
 //===========================================================================================
 // publishNonOTDiscoveryConfigs() — queue only the non-OT discovery configs for drip publish.
@@ -2345,7 +2351,7 @@ void markAllMQTTConfigPending()
 // Three hysteresis layers gate normal<->slow mode transitions:
 //  1. Time hysteresis (TASK-370): a mode holds for at least one full
 //     timerDiscoveryDrip_interval before a switch is allowed in either
-//     direction. Normal (2s) -> Slow: requires >=2s in normal; Slow (10s)
+//     direction. Normal (1s) -> Slow: requires >=1s in normal; Slow (10s)
 //     -> Normal: requires >=10s in slow.
 //  2. Threshold hysteresis (TASK-553 / TASK-555): entry trigger uses the
 //     existing discoveryDripHasHeapPressure() predicate; restore trigger
@@ -2361,7 +2367,7 @@ void markAllMQTTConfigPending()
 //     Counter is updated once per timer tick (post-DUE) and resets to 0
 //     on any unhealthy read or on slow-mode entry.
 //===========================================================================================
-constexpr uint8_t DISCOVERY_INTERVAL_NORMAL = 2;   // seconds (heap recovery between bursts)
+constexpr uint8_t DISCOVERY_INTERVAL_NORMAL = 1;   // seconds between two discovery configs (TASK-1699: one config per tick)
 constexpr uint8_t DISCOVERY_INTERVAL_SLOW   = 10;  // seconds (heap pressure backoff)
 constexpr uint8_t DRIP_RESTORE_K_TICKS      = 2;   // TASK-555: consecutive healthy ticks required to restore
 
@@ -2433,7 +2439,7 @@ void loopMQTTDiscovery()
   }
 
   if (!settings.mqtt.bEnable) return;
-  if (!state.mqtt.bConnected) return;
+  if (!state.mqtt.bConnected) { sDripCursor = DiscoveryDripCursor(); return; }   // TASK-1699: restart the id after a drop
   if (platformFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return;
   // Defer drip during Status-frame fanout AND for STATUS_BURST_COOLDOWN_MS afterwards.
   // Timer keeps running; next tick picks up as soon as the deferred window clears.
@@ -2471,18 +2477,32 @@ void loopMQTTDiscovery()
         return;  // one per tick
       }
 
-      MQTTDebugTf(PSTR("[drip] publishing discovery for OT ID %d\r\n"), msgId);
+      // TASK-1699: one discovery config per tick; an id with N entities takes N ticks.
       const uint32_t heapTopics0 = heapDripTickBegin();  // TASK-1339 diagnostics
-      bool success = doAutoConfigureMsgid(msgId, dripDeviceInfoPending);
+      bool success = false;
+      const uint16_t slot0 = (sDripCursor.otid == (int16_t)msgId) ? sDripCursor.next : 0;
+      bool configSent = false;
+      const DripStepResult step = doAutoConfigureMsgidStep(msgId, dripDeviceInfoPending, sDripCursor, &success,
+                                                           &configSent);
+      if (configSent) dripDeviceInfoPending = false;   // a config went out, so the full device block did (ADR-140)
+      if (step == DripStepResult::Retry) {
+        heapDripTickEnd(msgId, false, heapTopics0);
+        return;  // discovery cannot publish now; same slot next tick
+      }
+      MQTTDebugTf(PSTR("[drip] OT ID %d slot %u%s\r\n"), msgId, (unsigned)slot0,
+                  step == DripStepResult::More ? "" : " (last)");
+      if (step == DripStepResult::More) {
+        heapDripTickEnd(msgId, true, heapTopics0);
+        return;  // one config per tick
+      }
       heapDripTickEnd(msgId, success, heapTopics0);
       if (success) {
-        dripDeviceInfoPending = false;
         setMQTTConfigDone(msgId);
         bitClear(MQTTautoCfgPendingMap[group], bit);
         MQTTDebugTf(PSTR("[drip] OT ID %d published OK\r\n"), msgId);
       } else {
         // Leave pending bit set — next drip tick retries automatically.
-        // Rate-limited by the drip timer itself (2s normal, 10s slow-mode under
+        // Rate-limited by the drip timer itself (1s normal, 10s slow-mode under
         // heap pressure), so no busy-loop risk. Fixes the limbo where a failed
         // publish used to drop the msgid until an external markAllMQTTConfigPending
         // call arrived (TASK-348).
@@ -2586,10 +2606,42 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
   return (n > 0 && static_cast<size_t>(n) < destSize);
 }
 
-// Forward declaration — defined just below streamSatZoneDiscovery (TASK-640).
-static bool streamSatPvBoostDiscovery(HaDiscoveryContext &ctx);
+// TASK-1699: slot gate helpers for the per-entity drip (DiscoveryEmitGate in MQTTstuff.h). With g == nullptr
+// every slot runs (full pass). In drip mode a slot runs when its index is at or past g->skip and nothing has
+// published yet in this call; the first slot that publishes ends the call (later slots only set g->more).
+// A slot that fails while discovery cannot publish right now (broker gone, publish gate closed, heap below the
+// composers' floor) ends the call and stays the next slot (g->failed), so a heap dip mid-id is retried instead of
+// marking the rest of the id done. A slot that fails while publishing is possible (an entity that does not apply)
+// is passed, as before.
+static bool discoveryCanPublishNow() {
+  return MQTTclient.connected() && canPublishMQTT() && platformFreeHeap() >= HA_DISCOVERY_STREAM_HEAP_MIN;
+}
+static bool discSlot(DiscoveryEmitGate *g) {
+  if (g == nullptr) return true;
+  const uint16_t idx = g->seen++;
+  if (idx < g->skip) return false;            // done in an earlier tick
+  if (g->published || g->failed) { g->more = true; return false; }
+  g->next = idx + 1;
+  return true;
+}
+// isConfig = false for the empty retained clears of retired entities: they end the tick but do not carry the
+// device block, so they do not count as the first config (ADR-140).
+static bool discNote(DiscoveryEmitGate *g, bool ok, bool isConfig = true) {
+  if (g == nullptr) return ok;
+  if (ok) {
+    g->published = true;
+    if (isConfig) g->cfgSent = true;
+  } else if (!discoveryCanPublishNow()) {
+    g->failed = true;
+    g->next = (uint16_t)(g->next - 1);        // retry this slot next tick
+  }
+  return ok;
+}
 
-bool streamSatZoneDiscovery(HaDiscoveryContext &ctx)
+// Forward declaration — defined just below streamSatZoneDiscovery (TASK-640).
+static bool streamSatPvBoostDiscovery(HaDiscoveryContext &ctx, DiscoveryEmitGate *gate = nullptr);
+
+bool streamSatZoneDiscovery(HaDiscoveryContext &ctx, DiscoveryEmitGate *gate)
 {
   if (!MQTTclient.connected()) return false;
   if (!canPublishMQTT()) return false;
@@ -2652,11 +2704,13 @@ bool streamSatZoneDiscovery(HaDiscoveryContext &ctx)
   // TASK-543 decision: publish zone discovery only for zones that are configured
   // now or still considered active from recent SAT runtime data.
   for (uint8_t i = 0; i < maxZones; i++) {
-    if (!satShouldDiscoverZone(i)) continue;
+    // Three slots per zone, taken also for a zone that is not discovered now, so slot numbers stay the same when a
+    // zone times out or appears during the drip (TASK-1699).
+    const bool zoneOn = satShouldDiscoverZone(i);
     const uint8_t zoneNumber = i + 1;
-    if (!publishZoneBinary(zoneNumber, "active", "Active", "thermostat")) return false;
-    if (!publishZoneSensor(zoneNumber, "output", "Output", "thermometer", "°C", "temperature", "measurement")) return false;
-    if (!publishZoneSensor(zoneNumber, "error", "Error", "thermometer", "°C", "temperature", "measurement")) return false;
+    if (discSlot(gate) && zoneOn && !discNote(gate, publishZoneBinary(zoneNumber, "active", "Active", "thermostat"))) return false;
+    if (discSlot(gate) && zoneOn && !discNote(gate, publishZoneSensor(zoneNumber, "output", "Output", "thermometer", "°C", "temperature", "measurement"))) return false;
+    if (discSlot(gate) && zoneOn && !discNote(gate, publishZoneSensor(zoneNumber, "error", "Error", "thermometer", "°C", "temperature", "measurement"))) return false;
   }
 
   // TASK-640: PV-surplus boost discovery. Chained into the zone discovery drip
@@ -2664,7 +2718,7 @@ bool streamSatZoneDiscovery(HaDiscoveryContext &ctx)
   // entities are emitted unconditionally (so users can enable the feature from
   // HA); the sensor / binary_sensor entities are emitted only when enabled to
   // keep the dashboard clean for users who don't use it.
-  if (!streamSatPvBoostDiscovery(ctx)) return false;
+  if (!streamSatPvBoostDiscovery(ctx, gate)) return false;
 
   return true;
 }
@@ -2674,7 +2728,7 @@ bool streamSatZoneDiscovery(HaDiscoveryContext &ctx)
 // stamp out sensor/binary_sensor/switch/number configs with the shared device
 // block + origin block. All entities live under the unique-id namespace
 // "<nodeId>-sat_pv_boost_*" so HA aggregates them under the OTGW device.
-static bool streamSatPvBoostDiscovery(HaDiscoveryContext &ctx)
+static bool streamSatPvBoostDiscovery(HaDiscoveryContext &ctx, DiscoveryEmitGate *gate)
 {
   if (!MQTTclient.connected()) return false;
   if (!canPublishMQTT()) return false;
@@ -2779,19 +2833,19 @@ static bool streamSatPvBoostDiscovery(HaDiscoveryContext &ctx)
   };
 
   // Always-on entities: switch + 5 numbers (so HA users can enable from UI).
-  if (!publishSwitch("boost_enabled", "Boost Enabled", "solar-power-variant")) return false;
-  if (!publishNumber("boost_threshold_w",      "Boost Threshold",     100, 10000, 100, "W",   "flash"))         return false;
-  if (!publishNumber("boost_hold_s",           "Boost Hold",           30,   600,  10, "s",   "timer-sand"))    return false;
-  if (!publishNumber("boost_delta_c",          "Boost Delta",         0.5,    5,  0.1, "°C",  "thermometer-plus")) return false;
-  if (!publishNumber("boost_max_indoor_c",     "Boost Max Indoor",     18,    28, 0.5, "°C",  "home-thermometer")) return false;
-  if (!publishNumber("boost_max_duration_min", "Boost Max Duration",   30,  1440,  10, "min", "timer"))         return false;
+  if (discSlot(gate) && !discNote(gate, publishSwitch("boost_enabled", "Boost Enabled", "solar-power-variant"))) return false;
+  if (discSlot(gate) && !discNote(gate, publishNumber("boost_threshold_w",      "Boost Threshold",     100, 10000, 100, "W",   "flash")))         return false;
+  if (discSlot(gate) && !discNote(gate, publishNumber("boost_hold_s",           "Boost Hold",           30,   600,  10, "s",   "timer-sand")))    return false;
+  if (discSlot(gate) && !discNote(gate, publishNumber("boost_delta_c",          "Boost Delta",         0.5,    5,  0.1, "°C",  "thermometer-plus"))) return false;
+  if (discSlot(gate) && !discNote(gate, publishNumber("boost_max_indoor_c",     "Boost Max Indoor",     18,    28, 0.5, "°C",  "home-thermometer"))) return false;
+  if (discSlot(gate) && !discNote(gate, publishNumber("boost_max_duration_min", "Boost Max Duration",   30,  1440,  10, "min", "timer")))         return false;
 
-  // Telemetry entities: only when feature is enabled, keeps dashboard clean.
-  if (settings.sat.bPvBoostEnabled) {
-    if (!publishSensor("surplus_w",     "Surplus",        "W",  "power",       "measurement", "solar-power")) return false;
-    if (!publishBinary("boost_active",  "Boost Active",                                       "fire")) return false;
-    if (!publishSensor("boost_applied_c","Boost Applied", "°C", "temperature", "measurement", "thermometer-chevron-up")) return false;
-  }
+  // Telemetry entities: only when feature is enabled, keeps dashboard clean. Their slots are taken either way so
+  // the slot numbers do not depend on the setting (TASK-1699).
+  const bool pvOn = settings.sat.bPvBoostEnabled;
+  if (discSlot(gate) && pvOn && !discNote(gate, publishSensor("surplus_w",     "Surplus",        "W",  "power",       "measurement", "solar-power"))) return false;
+  if (discSlot(gate) && pvOn && !discNote(gate, publishBinary("boost_active",  "Boost Active",                                       "fire"))) return false;
+  if (discSlot(gate) && pvOn && !discNote(gate, publishSensor("boost_applied_c","Boost Applied", "°C", "temperature", "measurement", "thermometer-chevron-up"))) return false;
 
   return true;
 }
@@ -2873,8 +2927,14 @@ static HaDevice deviceForOTId(byte OTid) {
 
 bool doAutoConfigureMsgid(byte OTid, bool isFirst)
 {
+  return doAutoConfigureMsgidImpl(OTid, isFirst, nullptr);
+}
+
+bool doAutoConfigureMsgidImpl(byte OTid, bool isFirst, DiscoveryEmitGate *gate)
+{
   // Dallas sensors have their own discovery path
   if (OTid == OTGWdallasdataid) {
+    if (gate != nullptr) gate->ran = true;
     configSensors();
     return true;
   }
@@ -2885,6 +2945,8 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   if (!MQTTclient.connected()) return false;
   if (!isValidIP(MQTTbrokerIP)) return false;
   if (platformFreeHeap() < MQTT_DISCOVERY_HEAP_MIN) return false;
+  if (gate != nullptr && !discoveryCanPublishNow()) return false;   // TASK-1699: drip waits, same slot next tick
+  if (gate != nullptr) gate->ran = true;
 
   bool result = false;
   HaDiscoveryContext ctx = buildDiscoveryContext(isFirst);
@@ -2910,12 +2972,14 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
       if (cfg.id != OTid) break;
       if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
         // Source variants (bSeparateSources): the _thermostat and _boiler entities.
-        if (settings.mqtt.bSeparateSources) {
-          if (expandAndStreamSensorSources(cfg, ctx)) result = true;
+        // Both variant slots are taken also with bSeparateSources off, so the slot numbers do not depend on it.
+        const bool sep = settings.mqtt.bSeparateSources;
+        for (int8_t v = 0; v < (int8_t)HA_SENSOR_SOURCE_VARIANTS; v++) {
+          if (discSlot(gate) && sep && discNote(gate, expandAndStreamSensorSources(cfg, ctx, v))) result = true;
         }
       } else {
         // ADR-097: base entity always emitted.
-        if (streamSensorDiscovery(cfg, ctx)) result = true;
+        if (discSlot(gate) && discNote(gate, streamSensorDiscovery(cfg, ctx))) result = true;
       }
       i++;
       feedWatchDog();
@@ -2933,7 +2997,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
         if (cfg.id != OTid) break;
         const bool skipReplaced = !topicLegacy && (cfg.flags & MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS);
         if (!skipReplaced) {
-          if (streamBinarySensorDiscovery(cfg, ctx)) result = true;
+          if (discSlot(gate) && discNote(gate, streamBinarySensorDiscovery(cfg, ctx))) result = true;
         }
         bIdx++;
         feedWatchDog();
@@ -2944,7 +3008,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
       for (uint16_t aIdx = MQTT_HA_BINSENSOR_INDEXED_COUNT; aIdx < MQTT_HA_BINSENSOR_COUNT; aIdx++) {
         MqttHaBinSensorCfg cfg = readBinSensorCfg(aIdx);
         if (cfg.id != OTid) continue;
-        if (streamBinarySensorDiscovery(cfg, ctx)) result = true;
+        if (discSlot(gate) && discNote(gate, streamBinarySensorDiscovery(cfg, ctx))) result = true;
         feedWatchDog();
       }
     }
@@ -2955,32 +3019,38 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   // SAT switches/select: Sat.
   if (OTid == 0) {
     ctx.device = HaDevice::Thermostat;
-    if (streamClimateDiscovery(0, ctx)) result = true;
-    if (streamClimateDiscovery(1, ctx)) result = true;
+    if (discSlot(gate) && discNote(gate, streamClimateDiscovery(0, ctx))) result = true;
+    if (discSlot(gate) && discNote(gate, streamClimateDiscovery(1, ctx))) result = true;
     ctx.device = HaDevice::Sat;
     // TASK-516: idx 10 (dhw_enable) gated on MsgID 3 HB3=1 (storage tank).
     const bool dhwEnableSwitchAllowed =
         (OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800) != 0;
     for (uint8_t swIdx = 0; swIdx < SAT_HA_SWITCH_COUNT; swIdx++) {
+      // The slot is taken before the dhw check so slot numbers stay the same when MsgID 3 arrives mid-drip.
+      if (!discSlot(gate)) continue;
       if (swIdx == 10 && !dhwEnableSwitchAllowed) continue;
       feedWatchDog();
-      if (streamSatSwitchDiscovery(swIdx, ctx)) result = true;
+      if (discNote(gate, streamSatSwitchDiscovery(swIdx, ctx))) result = true;
     }
     feedWatchDog();
     for (uint8_t selIdx = 0; selIdx < SAT_HA_SELECT_COUNT; selIdx++) {
-      if (streamSatSelectDiscovery(selIdx, ctx)) result = true;
+      if (discSlot(gate) && discNote(gate, streamSatSelectDiscovery(selIdx, ctx))) result = true;
       feedWatchDog();
     }
     feedWatchDog();
-    if (streamSatNumberDiscovery(0, ctx)) result = true;   // TASK-1373: Max flow setpoint
+    if (discSlot(gate) && discNote(gate, streamSatNumberDiscovery(0, ctx))) result = true;   // TASK-1373: Max flow setpoint
     feedWatchDog();
-    if (streamSatNumberDiscovery(1, ctx)) result = true;   // TASK-1514: Max relative modulation
-    clearRetiredSatEntities(ctx);
+    if (discSlot(gate) && discNote(gate, streamSatNumberDiscovery(1, ctx))) result = true;   // TASK-1514: Max relative modulation
+    // Retired SAT entities: one empty retained clear per slot (TASK-1699). Not part of result.
+    for (size_t r = 0; r < retiredSatEntityCount(); r++) {
+      if (discSlot(gate)) discNote(gate, clearRetiredSatEntityAt(r, ctx), false);
+      feedWatchDog();
+    }
   }
   // Number (OT ID 27): Thermostat (room temperature outside override is thermostat-side).
   if (OTid == 27) {
     ctx.device = HaDevice::Thermostat;
-    if (streamNumberDiscovery(ctx)) result = true;
+    if (discSlot(gate) && discNote(gate, streamNumberDiscovery(ctx))) result = true;
   }
 
   // ADR-118: active-gateway-override sensor for the override-capable numeric ids.
@@ -2990,7 +3060,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     case 1: case 8: case 9: case 14: case 16: case 39: case 56: case 57: {
       ctx.device = HaDevice::Gateway;
       const char* ovrLabel = messageIDToString(static_cast<OTLibMessageID>(OTid));
-      if (streamOverrideSensorDiscovery(ctx, OTid, ovrLabel)) result = true;
+      if (discSlot(gate) && discNote(gate, streamOverrideSensorDiscovery(ctx, OTid, ovrLabel))) result = true;
       break;
     }
     default: break;
@@ -2998,7 +3068,8 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
 
   if (OTid == OTGWsatzoneid) {
     ctx.device = HaDevice::Sat;
-    if (streamSatZoneDiscovery(ctx)) result = true;
+    // The zone composer takes the gate itself: one zone/PV config per slot (TASK-1699).
+    if (streamSatZoneDiscovery(ctx, gate)) result = true;
   }
 
   // PIC control entities (pseudo-ID 244): resetgateway button + GPIO/LED selects.
@@ -3016,10 +3087,12 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   // set it true, which used to hide a failed button or select publish (TASK-1206).
   if (OTid == OTGWpiccontrolsid) {
     ctx.device = HaDevice::Gateway;
-    bool allOk = streamButtonDiscovery(ctx);
+    // TASK-1699: in drip mode only the slots run this call are judged; the step accumulates allOk.
+    bool allOk = true;
+    if (discSlot(gate) && !discNote(gate, streamButtonDiscovery(ctx))) allOk = false;
     feedWatchDog();
     for (uint8_t i = 0; i <= 7; i++) {
-      if (!streamSelectDiscovery(i, ctx)) allOk = false;
+      if (discSlot(gate) && !discNote(gate, streamSelectDiscovery(i, ctx))) allOk = false;
       feedWatchDog();
     }
     result = allOk;
@@ -3028,6 +3101,44 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   return result;
 }
 
+
+
+// TASK-1699: one drip tick for one OT id. Runs the id's slots from cursor.next until one publishes, so each
+// tick sends one discovery config (Robert 2026-11-07: "one mqtt discovery message at a time ... 1 second apart").
+//   More  : a slot published and later slots remain; the cursor moved on.
+//   Done  : the id has no slots left; *success is the old whole-id verdict (any slot OK; id 244: all OK).
+//   Retry : the call stopped at a guard (session lock, broker, heap) before any slot; nothing changed.
+// The cursor belongs to one id: a different id, markAllMQTTConfigPending() or an MQTT drop resets it.
+DripStepResult doAutoConfigureMsgidStep(byte OTid, bool isFirst, DiscoveryDripCursor &cursor, bool *success,
+                                        bool *configSent)
+{
+  if (configSent != nullptr) *configSent = false;
+  // Ids 244 (PIC controls, TASK-1206) and 255 (SAT zones + PV boost) are all-or-nothing: one failed config
+  // retries the whole id. Every other id is done when any of its configs went out.
+  const bool allOrNothing = (OTid == OTGWpiccontrolsid) || (OTid == OTGWsatzoneid);
+  if (cursor.otid != (int16_t)OTid) {
+    cursor.otid = (int16_t)OTid;
+    cursor.next = 0;
+    cursor.acc  = allOrNothing;
+  }
+  DiscoveryEmitGate gate;
+  gate.skip = cursor.next;
+  gate.next = cursor.next;
+  const bool r = doAutoConfigureMsgidImpl(OTid, isFirst, &gate);
+  if (!gate.ran) return DripStepResult::Retry;
+  if (configSent != nullptr) *configSent = gate.cfgSent;
+  if (gate.failed) {                 // discovery could not publish: the failed slot is the next one, nothing judged
+    cursor.next = gate.next;
+    return DripStepResult::Retry;
+  }
+  cursor.acc = allOrNothing ? (cursor.acc && r) : (cursor.acc || r);
+  cursor.next = gate.next;
+  if (gate.more) return DripStepResult::More;
+  if (success != nullptr) *success = cursor.acc;
+  cursor.otid = -1;
+  cursor.next = 0;
+  return DripStepResult::Done;
+}
 
 void sensorAutoConfigure(byte dataid, bool finishflag, const char *cfgSensorId = nullptr) {
   // Dallas temperature sensor discovery via streaming API.
@@ -3706,7 +3817,7 @@ static void runTopologyCleanupStep() {
 //
 // The walk rides the discovery drip. loopMQTTDiscovery() calls this step only
 // on a tick with no discovery publish pending, after the drip's connection,
-// heap, burst and cooldown gates (ADR-088), so it runs at the drip's 2 s / 10 s
+// heap, burst and cooldown gates (ADR-088), so it runs at the drip's 1 s / 10 s
 // cadence. A step empties the topics of one OT ID; IDs without sensor or
 // binary-sensor rows are passed in the same step. A failed publish leaves the
 // walk on that ID, and the next step sends all of its topics again.
