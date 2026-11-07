@@ -726,9 +726,12 @@ var OTGWUpd = (function () {
       running = false;
       window.removeEventListener('beforeunload', guard);
       if (res.ok) {
-        setSteps('done'); ui.say('Done. The unit runs ' + r.E + ' with matching web files.');
+        // run() only reports ok after the final check saw the unit answer (health UP, matching
+        // web files, the new version), so the web UI can open without another poll (TASK-1703).
+        setSteps('done'); ui.say('Done. The unit runs ' + r.E + ' with matching web files. Opening the web UI...');
         $('oneBar').style.width = '100%'; setText('oneBarText', 'Done');
         $('oneOpen').href = PAGE_BASE + '?_ota=' + Date.now(); show('oneOpen', true);
+        redirectToHome(3000);
         return;
       }
       setText('oneErr', res.msg); setText('oneRec', res.rec);
