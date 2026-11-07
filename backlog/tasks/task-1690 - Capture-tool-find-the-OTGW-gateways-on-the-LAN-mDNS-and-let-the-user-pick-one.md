@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T11:35:00Z'
-updated_date: '2026-11-07T13:22:00Z'
+updated_date: '2026-11-07T16:57:00Z'
 labels:
   - capture
   - tooling
@@ -45,6 +45,8 @@ tests/test_capture_tool.py is timing-flaky on this machine at 100% CPU (Syncthin
 2026-11-07 follow-up (Robert): AC "one gateway as the prompt default" is replaced by "one gateway is used without a prompt". Firmware audit of the MQTT password: GET /api/v2/settings gives only "password=N" (restAPI.ino, snprintf password=%u of strnlen(settings.mqtt.sPasswd)); the debug endpoints print *** / (not set); the only clear-text read path is GET /settings.ini, served by handleFile() in FSexplorer.ino behind checkHttpAuth() (ADR-056 section 1), so open when no admin password is set. The tool reads it there only when N > 0 and the length matches.
 Evidence: tests/test_capture_discovery.py 30/30 green; on the previous script 6 failures + 1 error (test_f single gateway, five test_j password cases; test_i failed once under CPU load and passed 4 of 4 in isolation on old and new code). Live --no-prompt resolve: .16 (1.7.5-beta.6) broker homeassistant.local:1883, user set, a 10-character password read from /settings.ini and absent from the output; .61 and .63 anonymous, no settings.ini read. evaluate.py --quick: 0 failed. tests/test_capture_tool.py: 2 timing failures (test_m, test_t); the same set passed, then failed 1, in isolation; those runs use a fake telnet device and never reach the password path.
 Not verified: an MQTT login with the read password (only its length was compared), a gateway with an admin password on real hardware (the 401 path is a host test).
+
+Follow-up 2026-11-07 (Robert asked: does the script really work). Live: 45 s capture against .16 with --device --no-prompt: MQTT login with the password read from /settings.ini, 2099 messages in mqtt.log; the 10-char password found 0 times in console output, transcript, logs and zip; capture-settings.json holds no MqttPassword. Selection on the real LAN (4 found): input 3 -> .61 anonymous, input 1 -> .16 with password (stdin piped, interactive() patched; no real console). Gap found: 10 x --discover at 3 s gave 4,4,4,4,4,4,4,3 and once 1 (plus 4,4 at 6 s); with one hit used without a prompt that is a silent wrong pick. Fix: run_discovery() asks once more when 0 or 1 answered and merges by host. Red first: RetryCase 3 of 4 failed on the old code; then tests/test_capture_discovery.py 34/34 OK. After the fix 10 live rounds: nine 4, one 2 (two or more show the list, no retry; a typed host still works). The live retry branch itself did not fire in those runs; it is covered by the host tests only.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

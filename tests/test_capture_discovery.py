@@ -21,6 +21,8 @@ Every case drives the real functions of the tool:
   j  the MQTT password: the API gives only its length ("password=N"); N = 0 asks nothing,
      N > 0 reads it from the gateway's /settings.ini when the length matches, a 401 or a
      length mismatch falls back to a saved password of that length or the prompt
+  k  run_discovery(): one or no gateway after the first query -> a second query, results merged;
+     two or more -> no second query (on the bench 2 of 10 three-second rounds missed gateways)
 
 Run: python tests/test_capture_discovery.py
 """
@@ -362,6 +364,38 @@ class DiscoverFlagCase(unittest.TestCase):
             self.assertIn("2.0.0-beta.120", run.stdout)
             self.assertIn("otgw32 OT-Direct", run.stdout)
             self.assertFalse((Path(tmp) / "logs").exists(), "a capture was started")
+
+
+class RetryCase(unittest.TestCase):
+    """k: one mDNS round can miss a gateway; with "one found -> use it" that becomes a silent wrong pick."""
+    A = {"host": "192.168.88.63", "hostname": "zaphod-classic-s3", "firmware": "2.0.0", "kind": ""}
+    B = {"host": "192.168.88.61", "hostname": "marvin-otgw32", "firmware": "2.0.0", "kind": ""}
+
+    def run_discovery(self, rounds):
+        args = oc.build_parser().parse_args(["--discover-seconds", "1"])
+        with mock.patch.object(oc, "discover_gateways", side_effect=rounds) as d,                 contextlib.redirect_stdout(io.StringIO()):
+            found = oc.run_discovery(args)
+        return found, d.call_count
+
+    def test_k_single_hit_is_checked_by_a_second_query(self):
+        found, calls = self.run_discovery([[self.A], [self.A, self.B]])
+        self.assertEqual(calls, 2)
+        self.assertEqual([g["host"] for g in found], ["192.168.88.61", "192.168.88.63"])
+
+    def test_k_second_query_merges_without_duplicates(self):
+        found, calls = self.run_discovery([[self.A], [self.A]])
+        self.assertEqual(calls, 2)
+        self.assertEqual(found, [self.A])
+
+    def test_k_none_found_is_asked_twice(self):
+        found, calls = self.run_discovery([[], [self.B]])
+        self.assertEqual(calls, 2)
+        self.assertEqual(found, [self.B])
+
+    def test_k_two_or_more_need_no_second_query(self):
+        found, calls = self.run_discovery([[self.A, self.B]])
+        self.assertEqual(calls, 1)
+        self.assertEqual(len(found), 2)
 
 
 class FakeMqttGateway:

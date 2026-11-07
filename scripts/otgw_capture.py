@@ -2533,7 +2533,17 @@ def _mdns_target(args):
 def run_discovery(args):
     interfaces = [args.mdns_interface] if getattr(args, "mdns_interface", None) else None
     print(f"Looking for OTGW gateways on the network ({args.discover_seconds} s)...")
-    return discover_gateways(args.discover_seconds, getattr(args, "http_port", 80), interfaces, _mdns_target(args))
+    query = lambda: discover_gateways(args.discover_seconds, getattr(args, "http_port", 80), interfaces,
+                                      _mdns_target(args))
+    found = query()
+    if len(found) <= 1:
+        # One mDNS round can miss a responder (bench, 2026-11-07: 2 of 10 three-second rounds found
+        # 3 or 1 of the 4 gateways). One hit is used without a prompt, so a miss would silently pick
+        # the wrong gateway: ask once more and merge before trusting a single (or no) answer.
+        print("Asking once more to be sure no gateway was missed...")
+        known = {gw["host"] for gw in found}
+        found = sorted(found + [gw for gw in query() if gw["host"] not in known], key=_ip_sort_key)
+    return found
 
 
 # --------------------------------------------------------------------------- #
