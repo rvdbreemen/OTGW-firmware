@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-06T21:06:00Z'
-updated_date: '2026-11-07T04:02:00Z'
+updated_date: '2026-11-07T04:48:00Z'
 labels:
   - oled
   - wifi
@@ -44,4 +44,8 @@ Fix (wt-1678, lane-1678): setup() calls initOLEDBeforeDetect() instead of initOL
 2026-11-06 22:3x independent check of the diagnosis: tjfs answered 'yes' (21:17Z, https://discord.com/channels/812969634638725140/1514720723980259460/1568373801845133495) to 'once the gateway joins your WiFi, does the OLED come on?'. That matches the cause: applyResolvedComboPins() re-inits the OLED on the right pins only after startWiFi(). ADR-201 gate tests/test_board_detect_persist_gate.py: Ran 7, OK. GPIO 17 has no function on the Classic S3 Mini map in boards.h (only PIN_I2C_SCL of the OT-Direct map), and GPIO 18 there is the D3 config button (pull-up), so the extra look is a short I2C probe on a free pin and the button pin. Classic leg of AC2: .63 is busy until 08:00 (overnight heap sampler), so not tonight. AC1: the telnet line 'OLED: No display at 0x3C' cannot be captured before WiFi (telnet is not up yet), so the evidence for the old code is Robert's photo of the OLED while the portal is open.
 
 2026-11-07 Robert: .61 has no OLED mounted, so the bench cannot show the screen. Decision (Robert, interactive): prove it in the field (tjfs). No WiFi wipe on .61. The bench does a regression check only: OTA the fix on .61 (OT-Direct, boardmode 0, no OLED). That takes the new path (no display on the Classic pins, none on 18/17 either, Wire back to the live map): the boot must still end in OT-Direct mode with no crash or reboot loop, and oledpresent false. AC1 (bench reproduction) and the OLED part of AC2 are replaced by tjfs's field confirmation (AC3); state that in the final summary.
+
+2026-11-07 05:2x-05:5x commit 2ddef9ec0 (beta.117, rebased on origin/dev 4abf4b453; host test after rebase PASS), build esp32-combo: 'Build completed successfully', artifacts beta.117+2ddef9e; evaluate.py --quick after rebase: Failed 0, health 100%. Full suite in wt-1678 (before rebase, -j4): 154 passed, 13 failed, 2 timeout, all environmental and none in OLED/setup code: Defender quarantined compiled test exes (WinError 225, incl. the ADR-201 gate, which passes standalone 7/7), numpy missing in the fresh venv (4 SAT sim tests), bash path mangling (test_discord_post_payload, test_flash_migrate_settings_compare), stale SAT corrections index on dev, timeouts. Bench regression on .61 (OT-Direct, boardmode 0, no OLED): OTA exit 0, settings 177 keys changed none; after boot fwversion 2.0.0-beta.117+2ddef9e, hardwaremode OT-Direct, otdirectavailable true, bootdetect I2C=18/17, oledpresent false, mqttconnected true, crashlog empty, bootcount 57->59 (the flash). Pushed to origin/dev 4abf4b453..2ddef9ec0. Alpha zip posted in #alpha-testing (message 1568487029459652660); tjfs asked to test it.
+
+AC2 deliberately left unchecked: the screen itself has not been seen on any board (the bench has no display). The ADR-201 gate part of it is green (7/7 standalone).
 <!-- SECTION:NOTES:END -->
