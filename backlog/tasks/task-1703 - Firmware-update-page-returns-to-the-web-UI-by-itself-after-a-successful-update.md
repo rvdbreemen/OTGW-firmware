@@ -1,11 +1,11 @@
 ---
 id: TASK-1703
 title: Firmware update page returns to the web UI by itself after a successful update
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-07T17:06:00Z'
-updated_date: '2026-11-07T21:32:00Z'
+updated_date: '2026-11-07T22:51:00Z'
 labels:
   - webui
   - field-report
@@ -41,4 +41,6 @@ Not verified: a real browser and a real unit (navigation, beforeunload, timing t
 Full tests/webui per file (120 s cap each): 38 of 39 files green, 0 fail; v2-settings-sat-followups.test.mjs hangs past 120 s here. It does not read update.html and this lane changes nothing under data/, so it is unrelated to this change (not investigated further).
 
 Lead integration on lane-1707 (on origin/dev 1d96ac6c1 + TASK-1707): patch applied cleanly; update-auto-return 4/4 pass, old page (HEAD copy via OTGW_UPDATE_HTML) 2 fail; update-orchestrator 47 pass 0 fail 11 skipped. Verifier (sound, real code, red/green reproduced): minor findings only; the safeboot page's fixed 20 s reload stays for a follow-up.
+
+Pushed origin/dev 8cbdebc3f (TASK-1703 = 8cbdebc3f, beta.133). Bench .61: the served /update (gzip) contains the new 'Opening the web UI...' path; build green. A real browser update with the redirect was not run (it needs another flash of the shared bench unit): AC3 open, In Review until a user update on beta.133+ confirms it. Follow-up candidate: the safeboot page's fixed 20 s reload (safeboot/src/main.cpp:63).
 <!-- SECTION:NOTES:END -->

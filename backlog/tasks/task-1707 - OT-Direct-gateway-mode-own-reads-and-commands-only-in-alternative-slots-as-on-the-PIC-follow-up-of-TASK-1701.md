@@ -3,11 +3,11 @@ id: TASK-1707
 title: >-
   OT-Direct gateway mode: own reads and commands only in alternative slots, as
   on the PIC (follow-up of TASK-1701)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-07T17:50:00Z'
-updated_date: '2026-11-07T21:30:00Z'
+updated_date: '2026-11-07T22:51:00Z'
 labels:
   - otdirect
 dependencies: []
@@ -23,7 +23,7 @@ TASK-1701 stopped the gateway's own MsgID 0 while a thermostat is connected (hot
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 In gateway mode with a thermostat connected the boiler receives exactly one frame per thermostat frame (host test over a recorded thermostat stream)
+- [x] #1 In gateway mode with a thermostat connected the boiler receives exactly one frame per thermostat frame (host test over a recorded thermostat stream)
 - [x] #2 Gateway reads and queued commands go out only in slots of thermostat requests for IDs the boiler does not support, and the thermostat gets the PIC's reply for such a slot
 - [x] #3 Without a thermostat the gateway runs its own schedule as today
 - [ ] #4 Bench with a thermostat on an OT-Direct unit, and the MQTT values that depend on gateway reads checked
@@ -55,4 +55,6 @@ Full gate python scripts/run_tests.py on the final code: files 179, passed 168, 
 Robert 2026-11-07: PIC model, fix the review bug first. Lead fix of the verifier's major finding: otdThermostatWritesEntry[] marks schedule write entries whose Data-ID the thermostat writes (otdNoteThermostatFrame, also for a frame taken as slot); otdAltScheduleIndex skips them; cleared on thermostat disconnect (otdForgetThermostatWrites); setback release uses clearWriteOverride(1) so the cached setback TSet is dropped. New case W1 in tests/test_otd_gateway_alt_slots.py: old (origin/dev 1d96ac6c1) W1stale n=23 FAIL, fix n=0. Full test on the rebased lane: fix 9 OK (1 skip without REF), old 5 failures (A1 1109 vs 360, A30, Q1, unsupported slots, W1), with OTGW_OTD_REF=origin/dev 9 OK incl. S1 standalone byte-identical. One REF run gave errors=1 once and passed on rerun (likely Defender, not reproduced).
 
 tjfs's real log (scratchpad tjfs-1107/log.txt): 369 thermostat frames in 6 min, Data-IDs 0,1,15,16,17,24,25; only MsgID 24 (WRITE Tr) answered Unknown-DataID (12x), so about one slot per 30 s with his thermostat. AC1 measured on the stream composition, not replayed frame by frame. Related tests after rebase: test_otd_gateway_own_status, test_otd_mode_live_apply, test_sat_no_return_startup, test_otd_ch_override, test_sat_command_delivery, test_otd_autodetect_no_persist all OK; test/host/test_override_reply.py 4 suites OK (stub renamed to otdNoteThermostatFrame); evaluate --quick 0 failed.
+
+Pushed origin/dev 8cbdebc3f (TASK-1707 = 2ca74eae5, beta.132). Build of the same content (d6407b1, pre-rebase onto docs-only commits): Build completed successfully. Bench .61 (OT-Direct, master, no thermostat): OTA app+fs OK, bootcount 116->118, no crashlog, 164 settings unchanged, schedule_active 104 (master path unchanged). Gateway mode with a thermostat cannot be built on the bench: AC4 waits for field confirmation (tjfs). Zip covered by the next post (beta.134, memory).
 <!-- SECTION:NOTES:END -->
