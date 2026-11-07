@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.131
+**  Version  : v2.0.0-beta.132
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -835,14 +835,15 @@ static uint16_t otdStatusReplyData(uint16_t thermostatData, uint16_t boilerData)
 }
 // --- otdRelayedStatus end
 
-// TASK-1701: whether the gateway may send a MsgID 0 of its own. In gateway mode with a
-// thermostat on the bus the boiler sees only the thermostat's MsgID 0 (with the ADR-208 bit 0
-// rule applied in applyOverrides), as on the PIC: it sends one boiler frame per thermostat frame
-// (gateway.asm:2384-2402, HandleRequest/CreateRequest) and generates frames of its own only
+// TASK-1701, TASK-1707: whether the gateway may send frames of its own between the thermostat's.
+// In gateway mode with a thermostat on the bus the boiler gets one frame per thermostat frame, as
+// on the PIC (gateway.asm:2384-2414, HandleRequest/CreateRequest): the thermostat's own frame, with
+// the ADR-208 bit 0 rule applied to its MsgID 0 in applyOverrides, or a request of the gateway's own
+// in an alternative slot (otdAltSlotTaken). The PIC generates frames on its own timer only
 // without a thermostat (gateway.asm:1770-1816, StandAloneMsg). A second MsgID 0 with the
 // gateway's own CH enable made the boiler follow whichever status came last (tjfs, 2026-11-07).
 // --- otdOwnStatusAllowed begin
-static bool otdOwnStatusRequestAllowed(bool gatewayMode, bool thermostatConnected) {
+static bool otdOwnFramesAllowed(bool gatewayMode, bool thermostatConnected) {
   return !(gatewayMode && thermostatConnected);
 }
 // --- otdOwnStatusAllowed end
@@ -1614,6 +1615,10 @@ static void scheduleMasterRequest() {
   // Don't schedule if master is already busy (collision avoidance)
   if (otMasterRequestActive) return;
 
+  // TASK-1707: with a thermostat in gateway mode the queue and the schedule go out only in
+  // alternative slots (otdAltSlotTaken), never between the thermostat's frames.
+  if (!otdOwnFramesAllowed(otCurrentMode == OTD_MODE_GATEWAY, state.otd.bThermostatConnected)) return;
+
   uint32_t now = millis();
 
   // MI= global minimum inter-message gap
@@ -1640,10 +1645,6 @@ static void scheduleMasterRequest() {
     otScheduleIdx = (otScheduleIdx + 1) % OT_SCHEDULE_SIZE;
 
     if (entry.disabled) continue;  // boiler doesn't support this MsgID
-
-    // TASK-1701: the thermostat's MsgID 0 is the only status the boiler gets in gateway mode
-    if (entry.msgId == 0 &&
-        !otdOwnStatusRequestAllowed(otCurrentMode == OTD_MODE_GATEWAY, state.otd.bThermostatConnected)) continue;
 
     // Offline: skip everything except MsgID 0 (the online/offline probe)
     if (busOffline && entry.msgId != 0) continue;
@@ -1686,6 +1687,117 @@ static void scheduleMasterRequest() {
     }
   } while (otScheduleIdx != startIdx);
 }
+
+// ---------------------------------------------------------------------------
+// TASK-1707: alternative slots in gateway mode, as on the PIC. With a thermostat
+// on the bus the PIC sends the boiler one frame per thermostat frame. When the
+// thermostat asks a Data-ID the boiler does not support (three consecutive
+// Unknown-DataID answers, HandleResponse gateway.asm:2437-2449; UI= marks the same
+// map) the PIC sends a request of its own in that slot (CreateRequest/SendAltRequest
+// :2396-2414, Alternative :3390-3461) and answers the thermostat Unknown-DataID
+// (SendAltResponse :2464-2473, CreateMessage :3464-3471). Here the thermostat gets
+// that answer at once and the gateway's request goes to the boiler in the same slot. Data-IDs 128-255 are never marked
+// unsupported (UnknownMask :3491-3498; getUnknownCount() covers 0-127).
+// ---------------------------------------------------------------------------
+// --- otdAltSlot begin
+static bool otdResponseOverrideActive(uint8_t msgId) {
+  for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
+    if (otResponseOverrides[i].active && otResponseOverrides[i].msgId == msgId) return true;
+  }
+  return false;
+}
+
+// A thermostat Data-ID whose slot the gateway may use: one the UI= table marks
+// unknown, or one the boiler answered Unknown-DataID three times in a row and the
+// SR= table does not answer. MsgID 0 is never counted (handleMasterResponse).
+static bool otdIsAltSlot(uint8_t msgId) {
+  if (isUnknownId(msgId)) return true;
+  return getUnknownCount(msgId) >= 3 && !otdResponseOverrideActive(msgId);
+}
+
+// The schedule entry for an alternative slot: of the entries that may go out, the
+// one furthest past its interval (largest age / interval), so a slot is used while
+// any entry qualifies. MsgID 0 stays out: the boiler's status request is the
+// thermostat's. Returns its index, OT_SCHEDULE_SIZE when no entry qualifies.
+// Schedule write entries whose Data-ID the thermostat writes itself (TSet 1, 16, 24 ...).
+// Such an entry never goes out in a slot: the thermostat's own write reaches the boiler,
+// with an override applied in applyOverrides(), so a slot write would be a second master
+// writing the same value (the TASK-1701 defect for MsgID 1). Cleared when the thermostat drops.
+static bool otdThermostatWritesEntry[OT_SCHEDULE_SIZE];
+
+static uint8_t otdAltScheduleIndex(uint32_t now) {
+  uint8_t best = OT_SCHEDULE_SIZE;
+  uint64_t bestAge = 0, bestInterval = 1;
+  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+    const OTScheduleEntry &e = otSchedule[i];
+    if (e.msgId == 0 || e.disabled || (e.isWrite && (!e.valueSet || otdThermostatWritesEntry[i]))) continue;
+    uint32_t interval = e.intervalMs;
+    if ((e.msgId == 70 || e.msgId == 71) && otIsVentSlave()) interval = OT_VENT_FAST_INTERVAL_MS;
+    const uint64_t age = (uint32_t)(now - e.lastSentMs);
+    if (best == OT_SCHEDULE_SIZE || age * bestInterval > bestAge * interval) {
+      best = i; bestAge = age; bestInterval = interval;
+    }
+  }
+  return best;
+}
+
+// Uses the slot of a pending thermostat frame for the gateway's own request: the
+// oldest queued command first, as scheduleMasterRequest() sends them, then the
+// schedule. The thermostat gets Unknown-DataID; a sent command leaves the queue and
+// a sent schedule entry restarts its timer, a refused send leaves both for the next
+// slot. Returns false, with nothing answered or sent, when the frame is no slot,
+// nothing waits or the master bus is not ready: the caller then handles the frame
+// as before.
+static void otdNoteThermostatFrame(unsigned long frame, uint32_t now);
+static bool otdAltSlotTaken(unsigned long thermostatFrame) {
+  if (otCurrentMode != OTD_MODE_GATEWAY) return false;
+  if (!otdIsAltSlot((uint8_t)((thermostatFrame >> 16) & 0xFF))) return false;
+  if (!otMaster.isReady()) return false;
+  const uint32_t now = millis();
+  otdNoteThermostatFrame(thermostatFrame, now);
+  uint8_t idx = OT_SCHEDULE_SIZE;   // OT_SCHEDULE_SIZE: the queued command
+  unsigned long request;
+  if (!otCmdQueueEmpty()) {
+    request = otCmdQueue[otCmdTail];
+  } else {
+    idx = otdAltScheduleIndex(now);
+    if (idx == OT_SCHEDULE_SIZE) return false;
+    const OTScheduleEntry &e = otSchedule[idx];
+    request = OpenTherm::buildRequest(
+      e.isWrite ? OpenThermMessageType::WRITE_DATA : OpenThermMessageType::READ_DATA,
+      static_cast<OpenThermMessageID>(e.msgId),
+      e.isWrite ? e.cachedValue : 0);
+  }
+  // Unknown-DataID with the thermostat's own Data-ID and data bytes, as CreateMessage builds it
+  unsigned long unknownResp = buildOTResponse(7, (uint8_t)((thermostatFrame >> 16) & 0xFF),
+                                              (uint16_t)(thermostatFrame & 0xFFFF));
+  bridgeFrameToParser('T', thermostatFrame);
+  bridgeFrameToParser('A', unknownResp);
+  otSlave.sendResponse(unknownResp);
+  if (sendMasterRequestAsync(request, OT_DIRECT_ORIGIN_GATEWAY)) {
+    if (idx < OT_SCHEDULE_SIZE) otSchedule[idx].lastSentMs = now;
+    else otCmdTail = (otCmdTail + 1) % OT_CMD_QUEUE_SIZE;
+  }
+  return true;
+}
+
+// A thermostat READ-DATA refreshes that value as a gateway read does, so the
+// alternative slots go to values the thermostat does not read. A thermostat WRITE-DATA
+// marks the write entry of that Data-ID as the thermostat's (otdThermostatWritesEntry).
+static void otdNoteThermostatFrame(unsigned long frame, uint32_t now) {
+  const uint8_t type  = (frame >> 28) & 0x07;
+  const uint8_t msgId = (frame >> 16) & 0xFF;
+  if (type != 0 && type != 1) return;   // READ_DATA, WRITE_DATA
+  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+    if (otSchedule[i].msgId != msgId) continue;
+    if (type == 0 && !otSchedule[i].isWrite) otSchedule[i].lastSentMs = now;
+    if (type == 1 && otSchedule[i].isWrite) otdThermostatWritesEntry[i] = true;
+  }
+}
+static void otdForgetThermostatWrites() {
+  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) otdThermostatWritesEntry[i] = false;
+}
+// --- otdAltSlot end
 
 // ---------------------------------------------------------------------------
 // emitSummaryLine — PS=1 summary: 34 comma-separated values matching PIC format
@@ -1966,8 +2078,12 @@ void loopOTDirect() {
       // Gateway mode: full override processing
       uint8_t slaveMsgId = (otSlaveFrame >> 16) & 0xFF;
 
+      // TASK-1707: the slot of a Data-ID the boiler does not support carries the gateway's own request
+      if (otdAltSlotTaken(otSlaveFrame)) {
+        otSlaveFramePending = false;
+      }
       // UI table: respond UNKNOWN_DATAID directly, don't forward to boiler
-      if (isUnknownId(slaveMsgId)) {
+      else if (isUnknownId(slaveMsgId)) {
         unsigned long unknownResp = (otSlaveFrame & 0x00FF0000UL) | (7UL << 28);  // type=UNKNOWN_DATAID
         setOTParityBit(unknownResp);
         bridgeFrameToParser('T', otSlaveFrame);
@@ -2000,6 +2116,7 @@ void loopOTDirect() {
           if (sendMasterRequestAsync(frameToSend,
                 modified ? OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN : OT_DIRECT_ORIGIN_THERMOSTAT)) {
             otSlaveFramePending = false;
+            if (otCurrentMode == OTD_MODE_GATEWAY) otdNoteThermostatFrame(otSlaveFrame, millis());
           }
         }
       }
@@ -2441,6 +2558,7 @@ static void checkThermostatTimeout() {
     // Thermostat disconnected
     if (state.otd.bThermostatConnected) {
       state.otd.bThermostatConnected = false;
+      otdForgetThermostatWrites();   // TASK-1707: standalone writes its own values again
       OTDDebugTf(PSTR("OTD: thermostat disconnected (no frame for %lus)\r\n"),
               elapsed / 1000UL);
       sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: disconnected\"}");
@@ -2461,7 +2579,7 @@ static void checkThermostatTimeout() {
     if (otSetbackEngaged) {
       otSetbackEngaged = false;
       state.otd.bSetbackActive = false;
-      clearOverride(1);           // Release TSet override
+      clearWriteOverride(1);      // Release the TSet override and its cached write (TASK-1707)
       OTDDebugTln(F("OTD: thermostat reconnected, setback released"));
       sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: connected\"}");
     }

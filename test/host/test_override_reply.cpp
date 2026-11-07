@@ -207,6 +207,13 @@ static void onThermostatMsgID16(uint8_t msgType, uint16_t data) { g_m16Calls++; 
 // The firmware gets this prototype from the Arduino .ino preprocessor.
 static void handleMasterModeSlaveFrame(unsigned long frame);
 
+// TASK-1707: the alternative-slot helpers sit after scheduleMasterRequest() and use the
+// schedule table and command queue, which this harness does not slice. Here no slot is
+// ever taken, so every frame goes the way it went before (tests/test_otd_gateway_alt_slots.py
+// compiles the real helpers).
+static bool otdAltSlotTaken(unsigned long) { return false; }
+static void otdNoteThermostatFrame(unsigned long, uint32_t) {}
+
 // Called by loopOTDirect() only from its timer blocks.
 static void scheduleMasterRequest() {}
 static void emitSummaryLine() {}

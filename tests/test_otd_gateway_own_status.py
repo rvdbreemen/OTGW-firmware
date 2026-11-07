@@ -173,9 +173,10 @@ class Compiled(unittest.TestCase):
         self.assertEqual(r["ch_changes"], 0, "the boiler's CH demand toggled between the two masters")
         self.assertEqual(r["last_ch"], 0, "the boiler must follow the thermostat's CH off")
 
-    def test_G1_other_schedule_entries_still_run(self):
-        # Hotfix scope (Robert 2026-11-07): only MsgID 0 stops; the PIC slot model is a follow-up task.
-        self.assertGreater(self.rows["G1"]["own_other"], 0)
+    def test_G1_no_other_own_frames_either(self):
+        # TASK-1707: the rest of the schedule goes out only in alternative slots of thermostat frames
+        # (tests/test_otd_gateway_alt_slots.py); the scheduler itself sends nothing with a thermostat.
+        self.assertEqual(self.rows["G1"]["own_other"], 0)
 
     def test_G2_gateway_without_thermostat_keeps_own_status(self):
         r = self.rows["G2"]

@@ -422,7 +422,10 @@ static uint32_t millis() { return g_ms; }
 enum class OpenThermMessageType { READ_DATA = 0, WRITE_DATA = 1 };
 enum class OpenThermMessageID : int { };
 struct OpenTherm { static unsigned long buildRequest(OpenThermMessageType t, OpenThermMessageID id, unsigned int) { return ((unsigned long)t << 16) | (unsigned long)(int)id; } };
-struct OTBus { bool bOnline = true; }; struct State { OTBus otBus; }; static State state;
+struct OTBus { bool bOnline = true; }; struct OTD { bool bThermostatConnected = false; };
+struct State { OTBus otBus; OTD otd; }; static State state;
+// Gateway mode without a thermostat: the scheduler sends on its own timer (TASK-1701, TASK-1707).
+enum OTDirectMode { OTD_MODE_GATEWAY = 1 }; static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
 static unsigned long buildStatusRequest() { return 0xFFFF0000UL; }
 static bool otIsVentSlave() { return false; }
 static bool otCmdQueueEmpty() { return true; }
@@ -468,13 +471,15 @@ def build_otd_source():
     end = o.index("static constexpr uint8_t OT_SCHEDULE_SIZE")
     end = o.index("\n", end) + 1
     sched = o[start:end]
+    m = re.search(r"// --- otdOwnStatusAllowed begin\r?\n(.*?)// --- otdOwnStatusAllowed end", o, re.S)
+    own = m.group(1) if m else ""   # the scheduler's own-frames gate (TASK-1701, TASK-1707), real code
     sm = o.index("static void scheduleMasterRequest() {")
     sched_fn = o[sm:o.index("\n}\n", sm) + 3]
     pm = o.index("else if (cmd0 == 'P' && cmd1 == 'M') {")
     pm_end = o.index("\n  }\n", pm) + len("\n  }\n")
     branch = o[pm:pm_end]
     handler = "static bool handlePM(const char* value, char* buf) {\n  const char cmd0 = 'P', cmd1 = 'M'; char rspBuf[16];\n  if (false) {}\n  " + branch + "  return true;\n}\n"
-    return (OTD_STUBS + "\n".join(wanted) + "\n" + sched + "\n" + sched_fn + "\n" + handler + OTD_MAIN)
+    return (OTD_STUBS + "\n".join(wanted) + "\n" + sched + "\n" + own + "\n" + sched_fn + "\n" + handler + OTD_MAIN)
 
 
 class OtDirectPm(unittest.TestCase):
