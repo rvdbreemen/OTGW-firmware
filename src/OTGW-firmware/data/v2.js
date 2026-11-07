@@ -114,7 +114,14 @@
   function applyTheme(dark) {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     var b = document.getElementById('themeToggle');
-    if (b) { b.textContent = dark ? '☀ Light' : '🌙 Dark'; b.setAttribute('aria-pressed', dark ? 'true' : 'false'); }
+    // TASK-1692: the label shows what a click gives, so no aria-pressed (the WAI-ARIA toggle-button
+    // pattern keeps the label fixed); aria-label and title name that action.
+    if (b) {
+      var action = dark ? 'Switch to light theme' : 'Switch to dark theme';
+      b.textContent = dark ? '☀ Light' : '🌙 Dark';
+      b.setAttribute('aria-label', action);
+      b.setAttribute('title', action);
+    }
   }
   function initTheme() {
     applyTheme(document.documentElement.getAttribute('data-theme') === 'dark');
@@ -2071,7 +2078,6 @@
     webhookcontenttype: { cat: 'webhook', label: 'Content type' },
     webhookpayload:  { cat: 'webhook', label: 'Payload template' },
     ledblink:        { cat: 'behavior', label: 'Blink LED on OT traffic' },
-    darktheme:       { cat: 'behavior', label: 'Dark theme by default' },
     nightlyrestart:  { cat: 'behavior', label: 'Nightly restart' },
     nightlyrestarthour: { cat: 'behavior', label: 'Restart hour', hint: '0–23' },
     // Most-used SAT fields get curated labels; the long tail falls back to the
@@ -2259,7 +2265,10 @@
   // (NOT from setData — satOnbNeeded()/the ui_onboarded logic read setData). Rendering them
   // as editable "Onboarded" checkboxes would let a user tick one and permanently bypass the
   // wizard + its enable-interception. Rows are hidden here, not dropped from setData.
-  var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1 };
+  // TASK-1692: darktheme is never read by this UI (the theme comes from the toggle in this
+  // browser, else the OS preference, see the v2.html pre-paint script); the key stays in REST
+  // and in the settings file.
+  var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1, darktheme: 1 };
   function humanizeKey(k) {
     var s = k.replace(/^(sat|otd|gpiosensors|gpiooutputs|s0counter|mqtt|wifi|eth|ntp|webhook|ui_|dallas)/, '');
     if (!s) s = k;

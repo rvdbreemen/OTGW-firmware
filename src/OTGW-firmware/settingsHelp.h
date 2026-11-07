@@ -63,7 +63,6 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "webhookcontenttype":"Content-Type header of the request. Only used when a payload is set.",
 "webhookpayload":"Request body template. Empty sends a GET; filled sends a POST with this body.",
 "ledblink":"Blink the status LED with OpenTherm traffic.",
-"darktheme":"Use the dark theme for the web UI.",
 "nightlyrestart":"Restart once a day to recover memory. Needs NTP sync. Takes about 30 s.",
 "nightlyrestarthour":"Local hour (0 to 23) of the nightly restart. Default 4.",
 "telnetenabled":"Telnet debug console on port 23, without login; its keys can switch the GPIO output. Off closes the port at once.",
