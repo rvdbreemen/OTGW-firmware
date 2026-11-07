@@ -3800,6 +3800,17 @@
    "supersedes": [],
    "tasks": [],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 285,
+   "title": "\"In series\" means the curve sets the operating point and the gains (Sergeant D, 2026-11-07; answers the open point of entry 284)",
+   "date": "2026-11-07",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1568598009959293000",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
   }
  ]
 }

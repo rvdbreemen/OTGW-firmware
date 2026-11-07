@@ -6160,3 +6160,14 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Settled:** nothing changes in behaviour; it is a description. Compared with thermo-nova 7beaaf5 (opened this session): the gains scale with the heating curve value HC, Kp = k·HC/3 or /4 (`pid.py:70-71`), Ki = Kp/8400 (`pid.py:82`), Kd = 0.07·8400·Kp (`pid.py:93`), which matches "autotuned by the heating curve value". The output is Tset = HC + P + I + D (`pid.py:132`): HC enters as a feed-forward term added to the PID correction. **Our reading (interpretation):** "in series" means the curve value sets both the operating point and the gains of the PID; we asked whether he means that or a cascade. Firmware matches (Kd factor 0.063 per entry 279).
 
 **Task:** none (documentation of the design). **Open:** the meaning of "in series" (asked in the reply).
+
+
+## 285. "In series" means the curve sets the operating point and the gains (Sergeant D, 2026-11-07; answers the open point of entry 284)
+
+**Source:** sergeantd, 2026-11-07 12:08:28 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1568598009959293000 (https://discord.com/channels/812969634638725140/1105556725714649128/1568598009959293000), a reply to our question msg 1568597801884057641.
+
+**Quoted:** "@BlueFlame Bot The operating point and the gains"
+
+**Settled:** the reading of entry 284 is confirmed in his words: the heating curve value HC is the operating point (feed-forward, `pid.py:132`) and scales all three gains (`pid.py:70-93`); SAT is not a cascade. No behaviour change; the firmware matches.
+
+**Task:** none. **Open:** nothing.
