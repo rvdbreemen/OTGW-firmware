@@ -85,13 +85,21 @@ class FakeDevice(http.server.BaseHTTPRequestHandler):
                 type(self).page = "whole"
                 self.send_error(503)
                 return
+            # TASK-1687 (PR #698 head 7bcae1b97): "fsexplorer" is the gzipped recovery page the
+            # firmware serves at / when v2.html.gz is missing, "corrupt" a v2.html.gz whose gzip
+            # trailer (CRC and size) is damaged, "noetag" a valid v2.html.gz without its ETag.
             body = {"whole": PAGE_GZ, "short": PAGE_GZ, "empty": b"", "plain": b"<html>old v2.html</html>",
-                    "badgzip": b"x" * 5000}[mode]
+                    "badgzip": b"x" * 5000, "fsexplorer": gzip.compress(b"<html>FSexplorer</html>", mtime=0),
+                    "corrupt": PAGE_GZ[:-8] + bytes(8), "noetag": PAGE_GZ,
+                    "deflate": PAGE_GZ[:10] + b"\xff" * 40 + PAGE_GZ[50:]}[mode]
             sent = 16384 if mode == "short" else len(body)
+            name = "FSexplorer.html.gz" if mode == "fsexplorer" else "v2.html.gz"
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             if mode != "plain":  # "plain": the pre-gzip v2.html fallback, no Content-Encoding
                 self.send_header("Content-Encoding", "gzip")
+            if mode not in ("plain", "noetag"):  # as webSendGzipPage(): "<githash>-/<file>"
+                self.send_header("ETag", f'"{type(self).fs_hash}-/{name}"')
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body[:sent])
@@ -221,6 +229,41 @@ class OtaFlashDroppedResponse(unittest.TestCase):
         with self.assertRaises(SystemExit) as cm:
             self.run_main()
         self.assertIn("not valid gzip", str(cm.exception.code))
+
+    # TASK-1687 (PR #698 head 7bcae1b97): a gzipped, decodable answer on / is not enough.
+    # With v2.html.gz missing the firmware serves the gzipped FSexplorer recovery page at /
+    # (FSexplorer.ino sendIndex()); only the ETag names the file that was served.
+    def test_fsexplorer_fallback_stops_with_an_error(self):
+        FakeDevice.respond = True
+        FakeDevice.page = "fsexplorer"
+        with self.assertRaises(SystemExit) as cm:
+            self.run_main()
+        self.assertIn("does not serve the gzipped web UI", str(cm.exception.code))
+        self.assertIn("FSexplorer.html.gz", str(cm.exception.code))
+
+    def test_page_without_etag_stops_with_an_error(self):
+        FakeDevice.respond = True
+        FakeDevice.page = "noetag"
+        with self.assertRaises(SystemExit) as cm:
+            self.run_main()
+        self.assertIn("does not serve the gzipped web UI", str(cm.exception.code))
+
+    # PR #698's corrupt-page case: the gzip trailer (CRC32 and size) is damaged.
+    def test_corrupt_gzip_trailer_stops_with_an_error(self):
+        FakeDevice.respond = True
+        FakeDevice.page = "corrupt"
+        with self.assertRaises(SystemExit) as cm:
+            self.run_main()
+        self.assertIn("is not valid gzip", str(cm.exception.code))
+
+    # Kept from dev on purpose (Robert 2026-11-07): damaged deflate data raises zlib.error,
+    # which is not an OSError, so the check must catch it to stop with a clear message.
+    def test_damaged_deflate_data_stops_with_an_error(self):
+        FakeDevice.respond = True
+        FakeDevice.page = "deflate"
+        with self.assertRaises(SystemExit) as cm:
+            self.run_main()
+        self.assertIn("is not valid gzip", str(cm.exception.code))
 
     def test_device_flag_stops_with_an_error(self):
         FakeDevice.respond = True

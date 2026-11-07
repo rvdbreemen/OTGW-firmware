@@ -158,10 +158,10 @@ def flash_fs(host, password, fs):
 
 
 def _get_raw(host, path, password, timeout=60):
-    """GET path as sent (the gzipped pages stay gzipped); returns (body, Content-Length, Content-Encoding)."""
+    """GET path as sent (the gzipped pages stay gzipped); returns (body, response headers)."""
     req = urllib.request.Request(f"http://{host}{path}", headers=_headers(host, password))
     with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read(), r.headers.get("Content-Length"), r.headers.get("Content-Encoding")
+        return r.read(), r.headers
 
 
 def _check_fs_complete(host, password=""):
@@ -175,7 +175,7 @@ def _check_fs_complete(host, password=""):
                          "upload the filesystem again")
     for attempt in range(1, 4):
         try:
-            body, length, encoding = _get_raw(host, "/", password)
+            body, headers = _get_raw(host, "/", password)
             n = len(body)
             break
         except http.client.IncompleteRead as e:
@@ -191,16 +191,26 @@ def _check_fs_complete(host, password=""):
         raise SystemExit("/ (v2.html.gz) is empty: the filesystem image is incomplete; upload the "
                          "filesystem again")
     # A missing or stale v2.html.gz makes the firmware answer with a plain page (the old
-    # v2.html) or the recovery page: only a gzip body that decompresses proves the new image.
-    if (encoding or "").lower() != "gzip":
+    # v2.html) or with the gzipped FSexplorer recovery page (sendIndex() in FSexplorer.ino).
+    # Both can be non-empty and even valid gzip, so require the gzipped UI by its ETag
+    # ("<githash>-/v2.html.gz", webSendGzipPage/serveGzipPage) as PR #698 does (TASK-1687),
+    # then a gzip body that decompresses.
+    encoding = headers.get("Content-Encoding") or ""
+    etag = headers.get("ETag") or ""
+    if encoding.lower() != "gzip":
         raise SystemExit("/ was not served as v2.html.gz (no Content-Encoding: gzip): the filesystem "
                          "image is incomplete or stale; upload the filesystem again")
+    if "-/v2.html.gz" not in etag:
+        raise SystemExit(f"/ does not serve the gzipped web UI (ETag {etag or 'missing'}; v2.html.gz is "
+                         "missing from the filesystem image): upload the filesystem again")
     try:
         html = gzip.decompress(body)
+    # zlib.error is not an OSError: damaged deflate data needs its own catch (TASK-1687).
     except (OSError, EOFError, zlib.error) as e:
         raise SystemExit(f"/ (v2.html.gz) is not valid gzip ({e}): the filesystem image is incomplete; "
                          "upload the filesystem again")
-    print(f"  / (v2.html.gz) complete: {n} bytes, {len(html)} bytes unpacked"
+    length = headers.get("Content-Length")
+    print(f"  / (v2.html.gz) complete: {n} bytes, {len(html)} bytes unpacked, ETag {etag}"
           + (f" (Content-Length {length})" if length else ""))
 
 
@@ -218,7 +228,7 @@ def push_webui(host, password):
         body, n = _multipart(name, field="upload", data=data)
         st, _ = _post(host, "/upload?path=/", password, body, f"multipart/form-data; boundary={BOUNDARY}",
                       timeout=120)
-        served, _, _ = _get_raw(host, WEBUI_ROUTES[name], password)
+        served, _ = _get_raw(host, WEBUI_ROUTES[name], password)
         if served != data:
             raise SystemExit(f"{name}: uploaded {n} bytes, but {WEBUI_ROUTES[name]} serves {len(served)} "
                              "different bytes")
