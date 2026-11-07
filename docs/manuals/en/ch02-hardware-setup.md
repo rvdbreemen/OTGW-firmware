@@ -111,6 +111,22 @@ Up to 16 DS18B20 sensors can be connected on a single 1-Wire bus to a configurab
 
 > **Note for users upgrading from versions before v1.0.0**: The default Dallas GPIO pin changed from GPIO 13 (D7) to GPIO 10 (SD3) in v1.0.0. If your sensors stopped working after an upgrade, check the Dallas GPIO setting in Settings and change it back to 13 if needed.
 
+> **Moving from a Wemos D1 mini (1.x) to an S3 Mini (2.x): set the pin again.** The setting is a GPIO number, not a hole label, and the same hole has a different GPIO number on the S3. If you restore your 1.x settings or keep the old number, the 1-Wire bus moves to another hole and the sensors disappear. Example: a sensor on hole D7 is GPIO 13 on the Wemos but GPIO 11 on the S3 Mini. The same applies to the S0 counter pin and the GPIO output pin.
+
+| Socket hole | Wemos D1 mini GPIO (1.x) | S3 Mini GPIO (2.x) | S3 Mini Pro GPIO (2.x) | Free for a sensor on the Classic? |
+|---|---|---|---|---|
+| D6 | 12 | **13** | 39 | Yes |
+| D7 | 13 | **11** | 38 | Yes |
+| D8 | 15 | **10** | 37 | Yes |
+| D0 | 16 | 4 | 41 | No: LED2 |
+| D1 | 5 | 36 | 11 | No: I2C (watchdog, OLED) |
+| D2 | 4 | 35 | 12 | No: I2C (watchdog, OLED) |
+| D3 | 0 | 18 | 13 | No: button |
+| D4 | 2 | 16 | 14 | No: LED1 |
+| D5 | 14 | 12 | 40 | No: PIC reset |
+
+The firmware refuses a pin that the board uses: the sensors do not start and the telnet log says why. On the S3 Mini Pro the free holes D6, D7 and D8 are GPIO 39, 38 and 37; the setting accepts every S3 GPIO (0 to 21 and 26 to 48) since beta.125. The S3 Mini Pro numbers for D6 to D8 come from the SPI pins of its Arduino board definition (`lolin_s3_mini_pro`); the other rows are in [PINOUT.md](../../hardware/PINOUT.md) sections 3a and 4a.
+
 Wiring a DS18B20 sensor:
 
 - Connect VDD to 3.3 V (or use parasitic power mode with VDD tied to GND).

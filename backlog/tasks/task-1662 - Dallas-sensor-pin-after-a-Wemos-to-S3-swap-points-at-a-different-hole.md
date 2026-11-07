@@ -1,11 +1,11 @@
 ---
 id: TASK-1662
 title: Dallas sensor pin after a Wemos-to-S3 swap points at a different hole
-status: Done
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T19:30:00Z'
-updated_date: '2026-11-08T06:59:00Z'
+updated_date: '2026-11-07T09:42:00Z'
 labels:
   - docs
   - sensors
@@ -24,17 +24,13 @@ On the Classic the S3 Mini is footprint-compatible, but settings.sensors.iPin (g
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Decision by Robert: document only, or translate on import
-- [x] #2 The S3 migration docs list the D1-mini hole to S3 GPIO mapping for the sensor pin
+- [ ] #2 The S3 migration docs list the D1-mini hole to S3 GPIO mapping for the sensor pin
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-2026-11-08 decision (Robert, AskUserQuestion): document only. Translating on import cannot tell an ESP8266 GPIO number from an S3 one (13 is valid on both).
+2026-11-07 Robert's decision (AskUserQuestion in session 74b8fc81): document only. A table 'D1 mini hole to S3 GPIO' in the S3 migration docs plus a short hint in the help text of the setting; no translation on import (a 13 from a 2.x export is a valid GPIO13, which cannot be told from the number).
+
+2026-11-07: docs in docs/manuals/en/ch02-hardware-setup.md and docs/manuals/nl/h02-hardware-installatie.md (Dallas section): why the pin must be set again after the Wemos to S3 swap, plus a hole table D0-D8 with Wemos, S3 Mini and S3 Mini Pro GPIO and whether the hole is free on the Classic. Sources: docs/hardware/PINOUT.md 3a/4a, boards.h:270-271, OTGW-firmware.h:937 boardPinReserved, and the Arduino variants lolin_s3_mini and lolin_s3_mini_pro pins_arduino.h (Pro D6-D8 = MISO/MOSI/SS 39/38/37). Help text gpiosensorspin rewritten: 'GPIO number of the DS18B20 data line, not the hole: D7 is GPIO 11 on the S3 Mini.' (settings-help.test.mjs 28/28 pass, 18395 of 18432 bytes). Found: on the Pro the free holes are GPIO 37-39, outside the 0-16 setting range; filed as TASK-1686.
 <!-- SECTION:NOTES:END -->
-
-## Final Summary
-
-<!-- SECTION:FINAL_SUMMARY:BEGIN -->
-AC1: Robert chose 'document only' (2026-11-08, AskUserQuestion; import translation cannot tell an ESP8266 GPIO from an S3 one). AC2: docs/MANUAL.md 'Migrating from ESP8266 (1.x)' now explains that pin settings are GPIO numbers and lists the free Classic holes D6/D7/D8 -> Wemos D1 mini 12/13/15, S3 Mini 13/11/10, S3 Mini Pro 39/38/37 (sources: Arduino core variants lolin_s3_mini/lolin_s3_mini_pro pins_arduino.h, docs/hardware/combo-esp32-s3-pinout.md table 1), notes that D0-D5/TX/RX are board pins the firmware will not use (boardPinReserved(), TASK-1552; sensors_ext.ino logs 'sensors not started'), and that the Pro D7 (38) is the display data line. The Dallas section's stale 'setting range 0 to 16' is corrected to the TASK-1686 range and points Pro users to D6/D8. tests/test_manual_sat_commands.py 6/6, test_sat_mqtt_state.py 30/30. Not done (by decision): no firmware translation, no web UI help change.
-<!-- SECTION:FINAL_SUMMARY:END -->

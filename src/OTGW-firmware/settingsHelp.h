@@ -45,7 +45,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "otgwcommandenable":"Send the boot commands below to the gateway at startup.",
 "otgwcommands":"PIC commands sent at boot, separated by semicolons, for example PS=0;GW=1. Up to 128 characters.",
 "gpiosensorsenabled":"Read DS18B20 sensors on the 1-Wire pin and publish them. Up to 16.",
-"gpiosensorspin":"GPIO pin that carries the DS18B20 1-Wire data line.",
+"gpiosensorspin":"GPIO number of the DS18B20 data line, not the hole: D7 is GPIO 11 on the S3 Mini.",
 "gpiosensorsinterval":"Seconds between sensor reads and MQTT updates. Default 20.",
 "gpiosensorslegacyformat":"Use the old v0.10.x sensor id format so existing Home Assistant entities keep working.",
 "gpiooutputsenabled":"Drive a GPIO pin from an OpenTherm status bit, for example to switch a relay.",

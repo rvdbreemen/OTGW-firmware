@@ -130,6 +130,22 @@ De standaard GPIO-pin is GPIO 10. De pin is instelbaar via de webinterface (bere
 
 > **Opmerking voor gebruikers die upgraden van versies voor v1.0.0**: De standaard Dallas GPIO-pin is gewijzigd van GPIO 13 (D7) naar GPIO 10 (SD3) in v1.0.0. Als uw sensoren niet meer werken na een upgrade, controleer dan de Dallas GPIO-instelling in Instellingen en wijzig deze eventueel terug naar 13.
 
+> **Van een Wemos D1 mini (1.x) naar een S3 Mini (2.x): stel de pin opnieuw in.** De instelling is een GPIO-nummer, geen gaatje op de printplaat, en hetzelfde gaatje heeft op de S3 een ander GPIO-nummer. Zet u uw 1.x-instellingen terug of houdt u het oude nummer, dan komt de 1-Wire-bus op een ander gaatje uit en verdwijnen de sensoren. Voorbeeld: een sensor op gaatje D7 is GPIO 13 op de Wemos, maar GPIO 11 op de S3 Mini. Hetzelfde geldt voor de pin van de S0-teller en de GPIO-uitgang.
+
+| Gaatje | Wemos D1 mini GPIO (1.x) | S3 Mini GPIO (2.x) | S3 Mini Pro GPIO (2.x) | Vrij voor een sensor op de Classic? |
+|---|---|---|---|---|
+| D6 | 12 | **13** | 39 | Ja |
+| D7 | 13 | **11** | 38 | Ja |
+| D8 | 15 | **10** | 37 | Ja |
+| D0 | 16 | 4 | 41 | Nee: LED2 |
+| D1 | 5 | 36 | 11 | Nee: I2C (watchdog, OLED) |
+| D2 | 4 | 35 | 12 | Nee: I2C (watchdog, OLED) |
+| D3 | 0 | 18 | 13 | Nee: knop |
+| D4 | 2 | 16 | 14 | Nee: LED1 |
+| D5 | 14 | 12 | 40 | Nee: PIC-reset |
+
+De firmware weigert een pin die het bord zelf gebruikt: de sensoren starten dan niet en het telnet-log meldt waarom. Op de S3 Mini Pro zijn de vrije gaatjes D6, D7 en D8 GPIO 39, 38 en 37; sinds beta.125 accepteert de instelling elke S3-GPIO (0 tot 21 en 26 tot 48). De S3 Mini Pro-nummers voor D6 tot D8 komen uit de SPI-pinnen van de Arduino-borddefinitie (`lolin_s3_mini_pro`); de andere rijen staan in [PINOUT.md](../../hardware/PINOUT.md), paragraaf 3a en 4a.
+
 Bedrading van een DS18B20 sensor:
 
 - Verbind VDD met 3,3 V (of gebruik parasitaire voedingsmodus met VDD aan GND).

@@ -1,10 +1,11 @@
 ---
 id: TASK-1668
 title: 'Serve the v2 web UI as one gzipped page with an ETag (follow-up of PR #697)'
-status: Done
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-05T23:31:00Z'
-updated_date: '2026-11-07T23:06:00Z'
+updated_date: '2026-11-07T09:33:00Z'
 labels:
   - webui
 milestone: 2.0.0
@@ -29,5 +30,11 @@ Robert 2026-11-06: after the PR #697 request queue lands, serve / as one /v2.htm
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-2026-11-08: covered by PR #698 (André Brait), landed as 14d304af9 in 2.0.0-beta.111 (TASK-1640/TASK-1674), and ADR-215 (Accepted 2026-11-06, partly supersedes ADR-139, ADR-190 and ADR-192). / is served as one v2.html.gz with CSS, JS and fonts inlined, Content-Encoding gzip and ETag "<githash>-/v2.html.gz" (seen on .63 beta.130 OTA: 170631 bytes, ETag af8ebb5-/v2.html.gz). AC1/AC3 measurements are André's from PR #697 on one ESP32-S3 Combo unit (ADR-215 table): beta.94 loader cold load 2.9-4.2 s vs one gzipped file 1.1-1.4 s, 304 reload about 0.25-0.35 s; our bench added the two-tab test (beta.118 notes: median tab load 1.4-1.5 s with the send cap). Not re-measured by us as a single-tab before/after on our own bench: the multi-file baseline build no longer exists on dev.
+2026-11-07: duplicate of TASK-1640 (PR #698 by André Brait, landed as 14d304af9 in beta.111 with the TASK-1674 review fixes). Every AC here is the scope of TASK-1640/TASK-1674: ADR-215 (Accepted 2026-11-06 by Robert, partly supersedes ADR-139, ADR-190 and ADR-192); its measurements are first load 1.1-1.4 s against 2.9-4.2 s for the separate assets, and a 304 reload in about 0.25-0.35 s. Today's beta.118 OTA on .63 served / as v2.html.gz, 170522 bytes, 466751 unpacked. ACs left unticked here because the evidence belongs to TASK-1640/TASK-1674, not to this task.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as a duplicate of TASK-1640 (Done, PR #698, ADR-215 Accepted). No work in this task.
+<!-- SECTION:FINAL_SUMMARY:END -->
