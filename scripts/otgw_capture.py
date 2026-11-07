@@ -1845,14 +1845,18 @@ return 'installed';
 
 # Drains the queue and reports Resource Timing entries not reported yet. A
 # fetch/XHR entry that started after the hook is skipped: the hook logged it.
+# Only requests to the gateway itself are listed; requests to other sites (the
+# user's Safari extensions run in this session) are only counted.
 SAFARI_POLL_JS = r"""
 var C = window.__otgwCap;
 if (!C) { return null; }
 var q = C.q.splice(0, C.q.length), res = [], nav = null;
 var e = performance.getEntriesByType('resource');
+var other = 0;
 for (var i = C.ri; i < e.length; i++) {
   var x = e[i];
   if ((x.initiatorType === 'fetch' || x.initiatorType === 'xmlhttprequest') && x.startTime >= C.hookT) { continue; }
+  if (x.name.indexOf(location.origin + '/') !== 0) { other++; continue; }
   res.push([Math.round(performance.timeOrigin + x.startTime), Math.round(x.duration), x.responseStatus || 0,
             x.initiatorType || '', x.name, x.transferSize || 0]);
 }
@@ -1864,11 +1868,13 @@ if (!C.navDone) {
                   Math.round(n.domContentLoadedEventEnd), Math.round(n.loadEventEnd)]; }
 }
 var d = C.dropped; C.dropped = 0;
-return {q: q, res: res, nav: nav, href: location.href, dropped: d};
+return {q: q, res: res, nav: nav, href: location.href, dropped: d, other: other};
 """
 
 
-def find_safaridriver():
+def find_safaridriver(explicit=None):
+    if explicit:
+        return explicit if os.path.isfile(explicit) else None
     if sys.platform == "darwin" and os.path.isfile(SAFARIDRIVER) and os.access(SAFARIDRIVER, os.X_OK):
         return SAFARIDRIVER
     return None
@@ -1944,6 +1950,8 @@ class SafariCapture(threading.Thread):
                 self.log(f"[{kind}] {msg}", stamp)
             else:
                 self.log(f"[{kind}] {msg}", stamp)
+        if data.get("other"):
+            self.log(f"[res] {data['other']} request(s) to other sites not logged (browser extensions, CDNs)")
         if data.get("dropped"):
             self.log(f"[capture] {data['dropped']} event(s) dropped: page queue full")
 
@@ -2751,6 +2759,7 @@ def build_parser():
     # Test and bench hooks; not needed for a normal capture.
     p.add_argument("--telnet-port", type=ranged(1, 65535), default=23, help=argparse.SUPPRESS)
     p.add_argument("--http-port", type=ranged(1, 65535), default=80, help=argparse.SUPPRESS)
+    p.add_argument("--safaridriver-path", help=argparse.SUPPRESS)
     p.add_argument("--idle-check-floor", type=int, default=15, help=argparse.SUPPRESS)
     p.add_argument("--mosquitto-sub-path", help=argparse.SUPPRESS)
     p.add_argument("--skip-tool-install", action="store_true", help=argparse.SUPPRESS)
@@ -2906,7 +2915,7 @@ def main(argv=None):
         s("Browser capture: disabled (--skip-browser-capture).")
     else:
         browser_path = None if args.browser == "safari" else find_browser(args.browser_path)
-        safari_path = find_safaridriver() if args.browser == "safari" or (args.browser == "auto" and not browser_path) else None
+        safari_path = find_safaridriver(args.safaridriver_path) if args.browser == "safari" or (args.browser == "auto" and not browser_path) else None
         if args.browser == "safari" and not safari_path:
             s("Browser capture: skipped - --browser safari needs macOS with /usr/bin/safaridriver.")
         elif safari_path:
