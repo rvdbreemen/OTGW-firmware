@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.121
+**  Version  : v2.0.0-beta.122
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1046,8 +1046,8 @@ void initOTDirect() {
       delay(50);
     }
     if (!thermostatFound) {
-      OTDDebugTln(F("OT-direct: No thermostat detected — switching to master (standalone) mode"));
-      setOTDirectMode(OTD_MODE_MASTER);
+      OTDDebugTln(F("OT-direct: No thermostat detected — switching to master (standalone) mode for this boot"));
+      applyOTDirectMode(OTD_MODE_MASTER);   // not persisted: the next boot detects again
     } else {
       OTDDebugTln(F("OT-direct: Thermostat present — staying in gateway mode"));
     }
@@ -2318,9 +2318,11 @@ static void resetTransientState() {
 }
 
 // ---------------------------------------------------------------------------
-// setOTDirectMode — switch operating mode with hardware reconfiguration
+// applyOTDirectMode — switch operating mode with hardware reconfiguration, in RAM only.
+// The boot auto-detect uses it directly, so the mode it picks is decided again on every
+// boot (TASK-1694). setOTDirectMode() below also persists the mode for user changes.
 // ---------------------------------------------------------------------------
-static void setOTDirectMode(OTDirectMode newMode) {
+static void applyOTDirectMode(OTDirectMode newMode) {
   resetTransientState();  // Clear all transient state on mode change
   otCurrentMode  = newMode;
 
@@ -2377,9 +2379,12 @@ static void setOTDirectMode(OTDirectMode newMode) {
       break;
   }
 
-  // Persist mode to settings via the public updateSetting() API.
-  // This keeps all settings mutation through a single path and gets
-  // side-effect handling (dirty flag, debounce timer) for free.
+}
+
+// setOTDirectMode — a mode change chosen by the user (command, REST): apply it and persist it
+// via the public updateSetting() API, which handles the dirty flag and the debounce timer.
+static void setOTDirectMode(OTDirectMode newMode) {
+  applyOTDirectMode(newMode);
   char modeBuf[4];
   snprintf_P(modeBuf, sizeof(modeBuf), PSTR("%d"), (int)newMode);
   updateSetting("OTDmode", modeBuf);
