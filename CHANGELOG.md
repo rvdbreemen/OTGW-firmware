@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Capture tool: it finds the gateways on the network and lets you pick one** (TASK-1690). Started without `--device`, `otgw_capture.py` sends one mDNS query for `_http._tcp` on every IPv4 interface (the firmware announces it in `startMDNS()`; WSL, Hyper-V and VPN adapters no longer hide the LAN), keeps the responders whose `GET /api/v2/device/info` answers like an OTGW and drops printers and smart plugs. Several gateways give a numbered list with hostname, IP, firmware and the hardware (`otgw32 OT-Direct`, `otgw-classic PIC`, or the PIC type on 1.x); the last-used host is the default and a typed host still works. One gateway is used without a prompt. None found: the message `No OTGW answered on the network (mDNS)` and the manual host prompt with the saved host. `--discover` (`-Discover`) prints the list and exits without a capture (exit 1 when none answered); `--discover-seconds` sets the wait (default 3). `--device` and `--no-prompt` never search. The MQTT password: the REST API reports only its length (`password=N`), so with `N = 0` nothing is asked, and with `N > 0` the tool reads it from the gateway's own `/settings.ini` (the firmware serves it behind the admin password, ADR-056) when the length matches; a 401 or a length mismatch falls back to a saved password of that length or the prompt. The password is never printed or written into a capture. Standard library only: python-zeroconf 0.154.0 needs Python 3.11 and has no pure-Python wheel. Live on the bench LAN: 4 of 4 gateways (two 1.x, two 2.x) out of 10 `_http._tcp` responders. Dev only; the 1.x capture scripts are unchanged (Robert, 2026-11-07).
+
 ## [2.0.0-beta.118] - 2026-11-07
 
 ### Added

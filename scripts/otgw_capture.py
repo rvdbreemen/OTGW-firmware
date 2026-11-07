@@ -36,6 +36,7 @@ import urllib.error
 import urllib.request
 import zipfile
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -2301,6 +2302,241 @@ def build_upload_zip(cap, transcript, hourly):
 
 
 # --------------------------------------------------------------------------- #
+# Gateway discovery (TASK-1690)
+# --------------------------------------------------------------------------- #
+# The firmware announces _http._tcp on port 80 over mDNS (startMDNS() in
+# networkStuff.ino, 1.x and 2.x alike) under its hostname, which users rename,
+# and printers and smart plugs announce the same service. So the tool asks for
+# every _http._tcp responder and keeps those whose /api/v2/device/info answers
+# like an OTGW. The query goes out from an ephemeral port with the
+# unicast-response bit set, so responders answer straight to that port
+# (RFC 6762 section 6.7) and the tool never has to bind 5353, which the
+# operating system's own mDNS service usually holds. It is sent once per IPv4
+# interface: with WSL, Hyper-V or a VPN adapter present, the default multicast
+# route is often not the LAN.
+
+MDNS_GROUP = ("224.0.0.251", 5353)
+MDNS_SERVICE = "_http._tcp.local"
+DISCOVER_SECONDS_DEFAULT = 3
+
+
+def _dns_name(name):
+    return b"".join(bytes([len(part)]) + part.encode("ascii", "replace") for part in name.split(".") if part) + b"\0"
+
+
+def mdns_query(service=MDNS_SERVICE):
+    """One DNS-SD question: PTR <service>, class IN with the unicast-response (QU) bit."""
+    return struct.pack("!6H", 0, 0, 1, 0, 0, 0) + _dns_name(service) + struct.pack("!HH", 12, 0x8001)
+
+
+def _read_dns_name(buf, offset):
+    labels, end, hops = [], None, 0
+    while True:
+        if offset >= len(buf):
+            raise ValueError("name runs past the packet")
+        length = buf[offset]
+        if length & 0xC0 == 0xC0:
+            if offset + 1 >= len(buf) or hops > 32:
+                raise ValueError("bad compression pointer")
+            if end is None:
+                end = offset + 2
+            offset = ((length & 0x3F) << 8) | buf[offset + 1]
+            hops += 1
+            continue
+        offset += 1
+        if length == 0:
+            return ".".join(labels), (end if end is not None else offset)
+        labels.append(buf[offset:offset + length].decode("utf-8", "replace"))
+        offset += length
+
+
+def parse_mdns_records(buf):
+    """Returns [(name, type, value)] of every record in a DNS message; value is the target
+    name for PTR, the address for A and None otherwise. Raises ValueError on a broken packet."""
+    if len(buf) < 12:
+        raise ValueError("shorter than a DNS header")
+    _, _, qdcount, ancount, nscount, arcount = struct.unpack("!6H", buf[:12])
+    offset = 12
+    for _ in range(qdcount):
+        _, offset = _read_dns_name(buf, offset)
+        offset += 4
+    records = []
+    for _ in range(ancount + nscount + arcount):
+        name, offset = _read_dns_name(buf, offset)
+        if offset + 10 > len(buf):
+            raise ValueError("record header runs past the packet")
+        rtype, _, _, rdlength = struct.unpack("!HHIH", buf[offset:offset + 10])
+        offset += 10
+        if offset + rdlength > len(buf):
+            raise ValueError("record data runs past the packet")
+        if rtype == 12:
+            value = _read_dns_name(buf, offset)[0]
+        elif rtype == 1 and rdlength == 4:
+            value = socket.inet_ntoa(buf[offset:offset + 4])
+        else:
+            value = None
+        records.append((name, rtype, value))
+        offset += rdlength
+    return records
+
+
+def local_ipv4_addresses():
+    """The IPv4 addresses of this computer, without loopback and link-local ones."""
+    found = []
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            found.append(info[4][0])
+    except OSError:
+        pass
+    try:  # the address of the default route; no packet is sent by a UDP connect
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("192.0.2.1", 9))
+            found.append(probe.getsockname()[0])
+    except OSError:
+        pass
+    usable = []
+    for address in found:
+        if address not in usable and not address.startswith(("127.", "169.254.", "0.")):
+            usable.append(address)
+    return usable
+
+
+def mdns_browse(interfaces, wait=DISCOVER_SECONDS_DEFAULT, target=MDNS_GROUP, service=MDNS_SERVICE):
+    """Sends the query on every interface and collects the answers for `wait` seconds.
+    Returns [{"host": source address, "instance": instance label}] in arrival order."""
+    query = mdns_query(service)
+    sockets = []
+    for address in interfaces:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+            sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
+            sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(address))
+            sock.bind((address, 0))
+            sock.sendto(query, target)
+            sockets.append(sock)
+        except OSError:
+            continue
+    found = {}
+    suffix = "." + service.lower()
+    deadline = time.monotonic() + wait
+    try:
+        while sockets:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            ready, _, _ = select.select(sockets, [], [], min(remaining, 0.25))
+            for sock in ready:
+                try:
+                    data, (source, _) = sock.recvfrom(9000)
+                except OSError:
+                    continue
+                if len(data) < 12 or not data[2] & 0x80:   # a query, not an answer
+                    continue
+                try:
+                    records = parse_mdns_records(data)
+                except ValueError:
+                    continue
+                for name, rtype, value in records:
+                    if rtype == 12 and name.lower() == service.lower() and value:
+                        instance = value[:-len(suffix)] if value.lower().endswith(suffix) else value
+                        found.setdefault(source, instance)
+    finally:
+        for sock in sockets:
+            sock.close()
+    return [{"host": host, "instance": instance} for host, instance in found.items()]
+
+
+def probe_gateway(host, http_port=80, timeout=3):
+    """Returns {"host", "hostname", "firmware", "kind"} when host answers like an OTGW,
+    else None. Only /api/v2/device/info is read, which 1.x and 2.x both serve. "kind" tells
+    gateways apart in the list: the 2.x combo image reports one board name for the OTGW32 and
+    the Classic S3, so it is hardware_type plus hardwaremode; 1.x has neither and shows its PIC."""
+    base = f"http://{host}" + ("" if http_port == 80 else f":{http_port}")
+    status, body, _, _ = http_get(base + "/api/v2/device/info", timeout, max_bytes=65536)
+    if status != 200:
+        return None
+    try:
+        device = json.loads(body.decode("utf-8", "replace")).get("device")
+    except (ValueError, AttributeError):
+        return None
+    if not isinstance(device, dict):
+        return None
+    firmware, hostname = device.get("fwversion"), device.get("hostname")
+    if not isinstance(firmware, str) or not firmware or not isinstance(hostname, str):
+        return None
+    kind = " ".join(str(device[k]) for k in ("hardware_type", "hardwaremode") if device.get(k))
+    if not kind and device.get("picdeviceid"):
+        kind = f"PIC {device['picdeviceid']}"
+    return {"host": host, "hostname": hostname, "firmware": firmware, "kind": kind}
+
+
+def _ip_sort_key(gateway):
+    try:
+        return (0, socket.inet_aton(gateway["host"]))
+    except OSError:
+        return (1, gateway["host"].encode())
+
+
+def discover_gateways(wait=DISCOVER_SECONDS_DEFAULT, http_port=80, interfaces=None, target=MDNS_GROUP):
+    """The OTGW gateways that answer mDNS on this network, sorted by address."""
+    candidates = mdns_browse(local_ipv4_addresses() if interfaces is None else interfaces, wait, target)
+    if not candidates:
+        return []
+    with ThreadPoolExecutor(max_workers=min(16, len(candidates))) as pool:
+        probed = list(pool.map(lambda c: probe_gateway(c["host"], http_port), candidates))
+    return sorted((gw for gw in probed if gw), key=_ip_sort_key)
+
+
+def format_gateway(gateway):
+    kind = f"  {gateway['kind']}" if gateway.get("kind") else ""
+    return f"{gateway['hostname']:<22} {gateway['host']:<15} {gateway['firmware']:<26}{kind}"
+
+
+def _same_host(gateway, saved):
+    saved = (saved or "").strip().lower()
+    if saved.endswith(".local"):
+        saved = saved[:-6]
+    return bool(saved) and saved in (gateway["host"].lower(), gateway["hostname"].lower())
+
+
+def choose_gateway(gateways, saved_host, ask_fn):
+    """Lets the user pick one of the discovered gateways. Returns the host to capture, or
+    None when nothing was found (the caller then asks for a host as before)."""
+    if not gateways:
+        return None
+    if len(gateways) == 1:
+        # Robert 2026-11-07: the only gateway on the LAN is the one to capture; --device picks another.
+        print(f"Using the only OTGW found on the network: {format_gateway(gateways[0])}")
+        return gateways[0]["host"]
+    print(f"Found {len(gateways)} OTGW gateways on the network:")
+    for number, gateway in enumerate(gateways, 1):
+        print(f"  {number}) {format_gateway(gateway)}")
+    default = next((n for n, gw in enumerate(gateways, 1) if _same_host(gw, saved_host)), 1)
+    while True:
+        answer = ask_fn(f"Capture which gateway (1..{len(gateways)}, or type a host)", str(default)).strip()
+        if answer.isdigit():
+            if 1 <= int(answer) <= len(gateways):
+                return gateways[int(answer) - 1]["host"]
+            print(f"Choose a number 1..{len(gateways)}, or type a host or IP address.")
+            continue
+        return answer
+
+
+def _mdns_target(args):
+    text = getattr(args, "mdns_target", None)
+    if not text:
+        return MDNS_GROUP
+    host, _, port = text.rpartition(":")
+    return (host, int(port))
+
+
+def run_discovery(args):
+    interfaces = [args.mdns_interface] if getattr(args, "mdns_interface", None) else None
+    print(f"Looking for OTGW gateways on the network ({args.discover_seconds} s)...")
+    return discover_gateways(args.discover_seconds, getattr(args, "http_port", 80), interfaces, _mdns_target(args))
+
+
+# --------------------------------------------------------------------------- #
 # Settings, prompts, command line
 # --------------------------------------------------------------------------- #
 
@@ -2379,7 +2615,7 @@ ALIASES = {
     "-SkipCrashlogCapture": "--skip-crashlog-capture", "-CrashlogUrl": "--crashlog-url",
     "-CrashlogPollSeconds": "--crashlog-poll-seconds", "-NoPrompt": "--no-prompt",
     "-LongRun": "--long-run", "-Hourly": "--long-run", "-SnapshotSeconds": "--snapshot-seconds",
-    "-MinFreeGb": "--min-free-gb",
+    "-MinFreeGb": "--min-free-gb", "-Discover": "--discover", "-DiscoverSeconds": "--discover-seconds",
     "-Help": "--help", "-?": "--help", "/?": "--help",
     "--user": "--username", "--duration-seconds": "--duration",
     "--telnet-reconnect-delay-milliseconds": "--telnet-reconnect-delay-ms",
@@ -2423,7 +2659,12 @@ def build_parser():
                "--min-free-gb. "
                "PowerShell-style names work too: -DeviceHost, -BrokerHost, -DurationSeconds, -SaveSecrets, -LongRun, ...",
         allow_abbrev=False)
-    p.add_argument("--device", metavar="HOST", help="OTGW device host or IP (prompted when missing)")
+    p.add_argument("--device", metavar="HOST",
+                   help="OTGW device host or IP; when missing, the gateways on the network are listed to pick from")
+    p.add_argument("--discover", action="store_true",
+                   help="list the OTGW gateways found on the network (mDNS) and exit without a capture")
+    p.add_argument("--discover-seconds", type=ranged(1, 30), default=DISCOVER_SECONDS_DEFAULT,
+                   help=f"how long to wait for mDNS answers (default {DISCOVER_SECONDS_DEFAULT})")
     p.add_argument("--broker", metavar="HOST", help="MQTT broker host; empty = skip the MQTT stream")
     p.add_argument("--broker-port", type=ranged(1, 65535), default=None,
                    help="MQTT broker port (default: the gateway's own setting, else 1883)")
@@ -2467,6 +2708,8 @@ def build_parser():
     # Test and bench hooks; not needed for a normal capture.
     p.add_argument("--telnet-port", type=ranged(1, 65535), default=23, help=argparse.SUPPRESS)
     p.add_argument("--http-port", type=ranged(1, 65535), default=80, help=argparse.SUPPRESS)
+    p.add_argument("--mdns-target", help=argparse.SUPPRESS)      # HOST:PORT instead of 224.0.0.251:5353
+    p.add_argument("--mdns-interface", help=argparse.SUPPRESS)   # one interface address instead of all
     p.add_argument("--idle-check-floor", type=int, default=15, help=argparse.SUPPRESS)
     p.add_argument("--mosquitto-sub-path", help=argparse.SUPPRESS)
     p.add_argument("--skip-tool-install", action="store_true", help=argparse.SUPPRESS)
@@ -2476,7 +2719,8 @@ def build_parser():
 def read_gateway_mqtt(device, http_port, timeout=5):
     """Reads the MQTT settings the gateway itself uses from GET /api/v2/settings (TASK-1677), so the
     capture listens on the same broker instead of a typed address. Returns (dict or None, reason).
-    The dict holds enable, broker, port and user; the password is never returned by the firmware."""
+    The dict holds enable, broker, port, user and password_length: the firmware never returns the
+    password itself, only its length as "password=N" (restAPI.ino), or None when that is missing."""
     base = f"http://{device}" + ("" if http_port == 80 else f":{http_port}")
     status, body, error, _ = http_get(base + "/api/v2/settings", timeout)
     if status != 200:
@@ -2488,11 +2732,34 @@ def read_gateway_mqtt(device, http_port, timeout=5):
         value = lambda name: (settings.get(name) or {}).get("value")
         found = {"enable": bool(value("mqttenable")), "broker": str(value("mqttbroker") or "").strip(),
                  "port": value("mqttbrokerport"), "user": str(value("mqttuser") or "").strip()}
+        length = re.fullmatch(r"password=(\d+)", str(value("mqttpasswd") or ""))
+        found["password_length"] = int(length.group(1)) if length else None
     except Exception as exc:
         return None, f"unreadable answer ({type(exc).__name__})"
     if not isinstance(found["port"], int) or not 1 <= found["port"] <= 65535:
         found["port"] = None
     return found, None
+
+
+def read_gateway_mqtt_password(device, http_port, timeout=5):
+    """Reads the MQTT password from the gateway's own /settings.ini (TASK-1690). The REST API only
+    reports its length, but the settings file holds it in clear text and the firmware serves it
+    behind the admin password (ADR-056, FSexplorer.ino). Returns (password or None, reason). The
+    value is kept in memory only: it is never printed, logged or written to the capture."""
+    base = f"http://{device}" + ("" if http_port == 80 else f":{http_port}")
+    status, body, error, _ = http_get(base + "/settings.ini", timeout)
+    if status != 200:
+        if status in (401, 403):
+            return None, f"HTTP {status} (the gateway has an admin password)"
+        return None, f"HTTP {status}" if status else (error or "no answer")
+    try:
+        data = json.loads(body.decode("utf-8", "replace"))
+        value = next((v for k, v in data.items() if k.lower() == "mqttpasswd"), None)
+    except Exception as exc:
+        return None, f"unreadable settings file ({type(exc).__name__})"
+    if not isinstance(value, str):
+        return None, "no MQTT password in the settings file"
+    return value, None
 
 
 def resolve_inputs(args, parser):
@@ -2501,7 +2768,12 @@ def resolve_inputs(args, parser):
     broker_given = args.broker is not None
     port_given = args.broker_port is not None
     if not args.device and can_prompt:
-        args.device = ask("OTGW device host", str(saved.get("DeviceHost") or ""))
+        # TASK-1690: offer the gateways that answer on the network before asking for a host.
+        saved_host = str(saved.get("DeviceHost") or "")
+        args.device = choose_gateway(run_discovery(args), saved_host, ask)
+        if args.device is None:
+            print("No OTGW answered on the network (mDNS); enter its host or IP address.")
+            args.device = ask("OTGW device host", saved_host)
     if not args.device:
         parser.error("Device host is required (--device / -DeviceHost).")
 
@@ -2539,10 +2811,29 @@ def resolve_inputs(args, parser):
     if args.broker and args.username is None and can_prompt and not broker_given:
         args.username = ask("MQTT username (blank for anonymous)", str(saved.get("Username") or ""))
     if args.broker and args.username and not args.password:
+        # TASK-1690: the REST API reports only the length of the gateway's MQTT password. 0 means the
+        # gateway logs in without one, so the capture does too. N > 0: read it from the gateway's
+        # /settings.ini (length must match), else a saved password of that length, else ask.
+        gw_length = None
+        if gateway is not None and args.broker == gateway["broker"] and args.username == gateway["user"]:
+            gw_length = gateway.get("password_length")
         stored = saved.get("MqttPassword")
-        if stored and args.username == saved.get("Username"):
-            args.password = str(stored)
+        stored = str(stored) if stored and args.username == saved.get("Username") else None
+        fetched, reason = None, None
+        if gw_length:
+            fetched, reason = read_gateway_mqtt_password(args.device, getattr(args, "http_port", 80))
+            if fetched is not None and len(fetched) != gw_length:
+                fetched, reason = None, "the settings file and the API disagree on its length"
+        if gw_length == 0:
+            print("The gateway logs in to the broker without a password: none is asked.")
+        elif fetched:
+            args.password = fetched
+            print("MQTT password read from the gateway (/settings.ini).")
+        elif stored is not None and (gw_length is None or len(stored) == gw_length):
+            args.password = stored
         elif can_prompt:
+            if gw_length:
+                print(f"Could not read the gateway's {gw_length}-character MQTT password ({reason}).")
             import getpass
             args.password = getpass.getpass(f"MQTT password for {args.username}: ")
     if args.password and not args.username:
@@ -2594,6 +2885,15 @@ def main(argv=None):
     args = parser.parse_args(normalize_argv(sys.argv[1:] if argv is None else argv))
     if 0 < args.telnet_idle_check_seconds < args.idle_check_floor:
         parser.error(f"--telnet-idle-check-seconds must be 0 or >= {args.idle_check_floor}")
+    if args.discover:
+        gateways = run_discovery(args)
+        if not gateways:
+            print("No OTGW answered on the network (mDNS).")
+            return 1
+        print(f"Found {len(gateways)} OTGW gateway(s):")
+        for number, gateway in enumerate(gateways, 1):
+            print(f"  {number}) {format_gateway(gateway)}")
+        return 0
     resolve_inputs(args, parser)
     saved_path = save_settings(args, args.save_secrets)
 
