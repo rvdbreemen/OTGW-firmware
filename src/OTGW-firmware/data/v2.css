@@ -175,10 +175,9 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .rad-bar{stroke:var(--border);stroke-width:1.5;transition:fill .8s}
   .rad-mani{fill:var(--gauge-track);stroke:var(--border)}
   .pump-body{fill:var(--panel-2);stroke:var(--border);stroke-width:2.5}
-  #pumpBlades{transform-box:fill-box;transform-origin:center;
-    animation:spin 1.1s linear infinite;animation-play-state:paused;fill:var(--accent)}
-  svg.ch-on #pumpBlades{animation-play-state:running}
-  @keyframes spin{to{transform:rotate(360deg)}}
+  .pump-dir{fill:var(--muted);stroke:var(--muted);stroke-width:1.5;stroke-linejoin:round;transition:fill .4s,stroke .4s}
+  svg.ch-on .pump-dir{fill:var(--accent);stroke:var(--accent);animation:pumpPulse 1.1s ease-in-out infinite}
+  @keyframes pumpPulse{50%{opacity:.55}}
   .drop{fill:var(--cold);opacity:0}
   svg.dhw-on .drop{animation:dropFall 1.1s ease-in infinite}
   .drop.d2{animation-delay:.35s} .drop.d3{animation-delay:.7s}
