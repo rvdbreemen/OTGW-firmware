@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-beta.118
+**  Version  : v2.0.0-beta.119
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -400,6 +400,7 @@ inline void webSendGzipPage(PGM_P contentType, const uint8_t* gz, size_t len, co
 // Active-file admission is silent; only actual safety/queue/deadline refusals
 // count as 503s. These helpers live beside the unchanged REST gate.
 bool webFileGateTryAdmit();
+void webAckLowObserve(uint32_t windowMin, uint32_t freeBefore);
 void webFileGateRelease();
 bool webFileGateCanSend(bool reserve);
 void webFileGateRejected();
@@ -582,7 +583,17 @@ public:
   }
   size_t _ack(AsyncWebServerRequest* request, size_t len, uint32_t time) override {
     if (_state == RESPONSE_FAILED) return 0;
-    if (_inner) return _inner->_ack(request, len, time);
+    if (_inner) {
+      // TASK-1679: did the heap window minimum drop inside the library's ack (send-buffer
+      // copy, tcp_write pbufs)? Only a drop within one window generation counts.
+      const uint32_t gen = platformHeapWinGen();
+      const uint32_t before = platformHeapWindowMin();
+      const uint32_t freeBefore = platformFreeHeap();
+      const size_t sent = _inner->_ack(request, len, time);
+      const uint32_t after = platformHeapWindowMin();
+      if (before && after && after < before && gen == platformHeapWinGen()) webAckLowObserve(after, freeBefore);
+      return sent;
+    }
     observeWait();
     if (uint32_t(millis() - _queuedAt) >= 10000U) start(request);
     pump();

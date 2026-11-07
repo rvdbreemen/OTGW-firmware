@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.118
+**  Version  : v2.0.0-beta.119
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -116,6 +116,14 @@ void webFileGateRejected() {
 }
 void webFileGateRelease() { if (webFileInFlight) webFileInFlight--; }
 uint8_t webFileInFlightNow() { return webFileInFlight; }  // TASK-1673 dip snapshot
+// TASK-1679: runs on async_tcp inside the file response ack wrapper.
+void webAckLowObserve(uint32_t windowMin, uint32_t freeBefore) {
+  state.heapdiag.iAckLowHits++;
+  if (windowMin >= state.heapdiag.iAckLowMin) return;
+  state.heapdiag.iAckLowMin        = windowMin;
+  state.heapdiag.iAckLowFreeBefore = freeBefore;
+  state.heapdiag.iAckLowFiles      = webFileInFlight;
+}
 uint8_t restInFlightNow()    { return restInFlight; }
 void restSlotRelease()    { if (restInFlight) restInFlight--; }
 
@@ -3483,6 +3491,10 @@ void sendDeviceInfoV2()
     je.field(F("hd_dip_files"),            (uint32_t)snap->st.heapdiag.iDipFiles);
     je.field(F("hd_dip_rest"),             (uint32_t)snap->st.heapdiag.iDipRest);
     je.field(F("hd_dip_ws"),               (uint32_t)snap->st.heapdiag.iDipWs);
+    je.field(F("hd_ack_low_min"),          snap->st.heapdiag.iAckLowMin == 0xFFFFFFFF ? 0u : snap->st.heapdiag.iAckLowMin);
+    je.field(F("hd_ack_low_free_before"),  snap->st.heapdiag.iAckLowFreeBefore);
+    je.field(F("hd_ack_low_hits"),         snap->st.heapdiag.iAckLowHits);
+    je.field(F("hd_ack_low_files"),        (uint32_t)snap->st.heapdiag.iAckLowFiles);
     je.field(F("hd_rest_503"),             snap->st.heapdiag.iRest503Count);
     je.field(F("hd_webfile_503"),          snap->st.heapdiag.iWebfile503Count);
     je.field(F("hd_webconn_503"),          snap->st.heapdiag.iWebConn503Count);

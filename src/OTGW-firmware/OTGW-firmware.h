@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.118
+**  Version  : v2.0.0-beta.119
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -547,6 +547,12 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint8_t  iDipFiles               = 0;  // file streams admitted by the file gate
   uint8_t  iDipRest                = 0;  // REST requests in flight
   uint8_t  iDipWs                  = 0;  // WebSocket clients
+  // TASK-1679: lowest heap-window minimum that fell inside a file response's library ack,
+  // the free heap just before that ack, and how many acks lowered the minimum.
+  uint32_t iAckLowMin              = 0xFFFFFFFF;
+  uint32_t iAckLowFreeBefore       = 0;
+  uint32_t iAckLowHits             = 0;
+  uint8_t  iAckLowFiles            = 0;  // file streams admitted at that moment
   uint16_t iTcpActivePcbs          = 0; // lwIP active TCP PCB count, sampled 1 Hz from the loop task (platformTcpActivePcbCount)
 };
 

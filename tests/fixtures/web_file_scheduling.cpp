@@ -67,6 +67,9 @@ static void setSenders(unsigned count) {
   }
 }
 static unsigned sendCapCalls = 0;
+static uint32_t winGen = 0, winMin = 0;
+volatile uint32_t& platformHeapWinGen() { return winGen; }
+uint32_t platformHeapWindowMin() { return winMin; }
 void platformTcpCapSendBuffer(tcp_pcb* pcb, uint16_t cap) { ++sendCapCalls; if (pcb && !pcb->unsent && !pcb->unacked && pcb->snd_buf > cap) pcb->snd_buf = cap; }
 uint32_t millis() { return clockMs; }
 uint32_t platformMaxFreeBlock() { return maxBlock; }

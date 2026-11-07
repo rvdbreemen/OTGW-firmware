@@ -316,6 +316,9 @@ inline uint8_t platformHeapFragmentation() {
 inline uint32_t& platformHeapWinBootMin() { static uint32_t v = 0xFFFFFFFFu; return v; }
 inline volatile bool& platformHeapWinActiveRef() { static volatile bool a = false; return a; }
 inline bool platformHeapWindowActive() { return platformHeapWinActiveRef(); }
+// TASK-1679: bumped on every window (re)start, so a reader can tell a real drop of the
+// window minimum from a restart by another task between two reads.
+inline volatile uint32_t& platformHeapWinGen() { static volatile uint32_t g = 0; return g; }
 
 // Minimum free internal heap since the window started (0 when no window is open).
 inline uint32_t platformHeapWindowMin() {
@@ -345,6 +348,7 @@ inline bool platformHeapWindowStart() {
   // Mark active before the start, clear it after the stop: a reader on another
   // task then always sees min(bootMin, native), which is never too high.
   platformHeapWinActiveRef() = true;
+  platformHeapWinGen() = platformHeapWinGen() + 1;
   if (wasActive) heap_caps_monitor_local_minimum_free_size_stop();
   if (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) < 256 ||
       heap_caps_monitor_local_minimum_free_size_start() != ESP_OK) {
