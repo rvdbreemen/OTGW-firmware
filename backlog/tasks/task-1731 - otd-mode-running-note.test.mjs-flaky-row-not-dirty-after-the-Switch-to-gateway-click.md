@@ -3,11 +3,11 @@ id: TASK-1731
 title: >-
   otd-mode-running-note.test.mjs flaky: row not dirty after the
   Switch-to-gateway click
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-08T14:42:00Z'
-updated_date: '2026-11-08T22:10:00Z'
+updated_date: '2026-11-08T22:55:00Z'
 labels:
   - tests
   - webui
@@ -40,3 +40,9 @@ Runs: 20 sequential before the timing change: 19 PASS, 1 watchdog stall; after i
 
 2026-11-08 otgw-firmware-80 red/green on int-157 (HEAD e4d0280f4) vs origin/dev 07b38ee49 + the new test file: otd-mode-running-note.test.mjs 20 consecutive serial runs on int-157: 20/20 green; plus PASS (7.0 s) inside run_tests.py -j 4 --webui (51 webui files).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 ticked earlier (root cause instrumented). AC2: otd-mode-running-note.test.mjs 20/20 consecutive serial runs on int-157, plus PASS inside run_tests.py -j 4 --webui (51 files). Pushed in 8b67ad039.
+<!-- SECTION:FINAL_SUMMARY:END -->

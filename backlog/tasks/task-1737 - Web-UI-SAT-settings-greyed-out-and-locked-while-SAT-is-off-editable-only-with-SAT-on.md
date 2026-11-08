@@ -3,10 +3,10 @@ id: TASK-1737
 title: >-
   Web UI: SAT settings greyed out and locked while SAT is off; editable only
   with SAT on
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-08T16:49:00Z'
-updated_date: '2026-11-08T22:10:00Z'
+updated_date: '2026-11-08T22:55:00Z'
 labels:
   - webui
   - sat
@@ -26,7 +26,7 @@ Robert, #dev-sat-mqtt 2026-11-08 17:48 (msg 1569030889692987405): 'No setting sh
 <!-- AC:BEGIN -->
 - [x] #1 SAT off: every SAT setting except Enable SAT is greyed out and cannot be changed or saved from the web UI (webui test red on old code, green on fix)
 - [x] #2 SAT on: SAT settings are editable as before (test)
-- [ ] #3 Bench .61 with SAT off and on, screenshots
+- [x] #3 Bench .61 with SAT off and on, screenshots
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -39,4 +39,12 @@ Robert, #dev-sat-mqtt 2026-11-08 17:48 (msg 1569030889692987405): 'No setting sh
 2026-11-08 review (OTGW agent 3) and Robert's takeover rule (via the coordinator): during a SAT fallback takeover (fallback_active, Enable switch off) the home DIAL stays on and sets the SAT target (SAT really controls: sat.owns = enabled || fallback_active), while the SAT SETTINGS stay locked (they follow settings.sat.bEnabled and the live switch). Fixes from the review: (1) lock source is live: satEnabledLive is set from every sat/status answer (home fetchSatStatus and SAT-page fetchSatPage, same endpoint, enabled = settings.sat.bEnabled), else the stored satenabled; (2) markDirty() ignores a locked SAT key, and saveSettings() no longer drops silently: an edit made while SAT was on and locked since is dropped with a red toast naming it; (3) the dial asks sat/status once while sat.owns is unknown (dialAsk pending guard; presses add up), so rapid presses stay within the 2-in-flight rule. New tests: takeover (settings locked + dial sets the SAT target), unlock after the switch without a reload, dropped-edit toast, one sat/status ask for four presses.
 
 2026-11-08 otgw-firmware-80 red/green on int-157 (HEAD e4d0280f4) vs origin/dev 07b38ee49 + the new test file: sat-settings-locked-when-off fix 6/6, old 2/6. Red on old: locked with SAT off, unlock on switch-on, takeover keeps locked, edit made while on not saved after off. Green on both (AC2, unchanged behaviour): 'with SAT on, SAT settings are editable' and 'SAT off and not set up starts the wizard'. settings-help needed the satLockedKey stub (e4d0280f4). AC3 (bench .61) pending.
+
+2026-11-08 23:46 otgw-firmware-80 bench .61 on beta.157+8b67ad0 (OTA app+fs): SAT page Control view in headless Chrome against the real device. SAT on: 41 SAT rows, 41 editable, 0 locked (61-1737-sat-on-control.png). POST satenabled:false: 41/41 locked, note 'SAT is off: the SAT settings are locked', switch shows Disabled and stays usable (61-1737-sat-off-control.png). SAT restored on. Evidence: C:\Users\rvdbr\AppData\Local\OTGW-capture\evidence\int157-beta157
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: sat-settings-locked-when-off 6/6 on the fix, 4 of 6 red on origin/dev 07b38ee49. AC2: 'with SAT on, SAT settings are editable' green on both trees (behaviour unchanged). AC3: .61 beta.157 screenshots, SAT on 41/41 editable, SAT off 41/41 locked. settings-help needed the satLockedKey stub (e4d0280f4). Pushed in 8b67ad039, posted as beta.157.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -3,11 +3,11 @@ id: TASK-1689
 title: >-
   Web UI languages: detect the browser language, English by default, prepare NL
   and DE
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T11:06:00Z'
-updated_date: '2026-11-08T22:10:00Z'
+updated_date: '2026-11-08T22:55:00Z'
 labels:
   - webui
   - i18n
@@ -65,3 +65,9 @@ Robert 2026-11-08 ~14:00: phase 1 goes next for otgw-firmware-54, directly after
 
 2026-11-08 otgw-firmware-80 red/green on int-157 (HEAD e4d0280f4) vs origin/dev 07b38ee49 + the new test file: tests/webui/i18n-lang.test.mjs fix 5/5 pass, old 0/5 (all 5 fail). Full webui -j 4 on int-157: 51 files, 50 PASS + settings-help fixed in e4d0280f4 (29/29).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 and AC3 were ticked earlier (ADR-219/220/221 Accepted, translation plan). AC2: tests/webui/i18n-lang.test.mjs 5/5 on int-157, 0/5 on origin/dev 07b38ee49 (browser language, English fallback, gzipped pack load). Full webui -j 4 on int-157: 51 files green after e4d0280f4. Pushed in 8b67ad039 (beta.150), posted as beta.157. Phase 2 (third language) is TASK-1724.
+<!-- SECTION:FINAL_SUMMARY:END -->

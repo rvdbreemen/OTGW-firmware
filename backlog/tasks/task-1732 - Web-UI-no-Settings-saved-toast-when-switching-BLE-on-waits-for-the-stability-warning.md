@@ -3,11 +3,11 @@ id: TASK-1732
 title: >-
   Web UI: no 'Settings saved' toast when switching BLE on waits for the
   stability warning
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-08T15:11:00Z'
-updated_date: '2026-11-08T22:10:00Z'
+updated_date: '2026-11-08T22:55:00Z'
 labels:
   - webui
 milestone: 2.0.0
@@ -40,3 +40,9 @@ Found on the TASK-1693 bench (.61, beta.148): when satbleenable is the only dirt
 
 2026-11-08 otgw-firmware-80 red/green on int-157 (HEAD e4d0280f4) vs origin/dev 07b38ee49 + the new test file: settings-error-toast fix 5/5, old 4/5 (fails: save that only switches SAT on posts nothing, no Settings saved); ble-nopsram-warning fix 5/5, old 3/5 (fails: switching BLE on shows the warning then stores enable+ack; failed Enable-anyway save says so).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: settings-error-toast 5/5 on the fix, 1 red on origin/dev 07b38ee49 (the save posts nothing, no 'Settings saved'); ble-nopsram-warning 5/5 on the fix, 2 red on old. Bench .61 (no PSRAM) ran beta.157 for a 15-min soak without issue. Pushed in 8b67ad039, posted as beta.157.
+<!-- SECTION:FINAL_SUMMARY:END -->
