@@ -3,10 +3,11 @@ id: TASK-1741
 title: >-
   Two open Web UI tabs get ~16 REST 503s per minute: the v2 pollers exceed the
   2-in-flight REST cap (ADR-165) and the 4-sender TX cap (ADR-188)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-08T18:26:00Z'
-updated_date: '2026-11-08T22:55:00Z'
+updated_date: '2026-11-08T23:36:00Z'
 labels:
   - bug
   - webui
@@ -33,7 +34,7 @@ ADR-165 (Accepted, N*=2) assumed the v2 client already stays within 2 in flight.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Explain per source (REST cap, TX cap, heap clamp) how many 503s two tabs cause, with the run A numbers as baseline
+- [x] #1 Explain per source (REST cap, TX cap, heap clamp) how many 503s two tabs cause, with the run A numbers as baseline
 - [ ] #2 A fix (client-side request scheduling in v2.js and/or a reviewed cap change) brings two-tab 503s close to 0 without heap regression; red/green evidence on .61
 - [ ] #3 If a cap or ADR changes, Robert decides with measured numbers (ADR-165/188 are Accepted)
 <!-- AC:END -->
@@ -85,4 +86,134 @@ Tests: tests/webui/rest-503-keeps-state.test.mjs, three cases. Red on dev data (
 2026-11-08 otgw-firmware-80 red/green on int-157 (HEAD e4d0280f4) vs origin/dev 07b38ee49 + the new test file: client side: rest-503-keeps-state fix 3/3, old 0/3 (SAT page keeps last data on 503; wizard health Unknown not a false warning; SIMULATION badge stays). AC2 also needs red/green on .61; AC1/AC3 are measurements.
 
 2026-11-08 bench .61 beta.157 soak (4 REST polls / 30 s plus a headless UI): 1 x 503 on /api/v2/settings in 81 calls, at the moment the UI loaded. Related finding: v2.js:6431 fetchSettings() at startup has no retry, so one busy 503 leaves the SAT page's 'SAT settings' empty until the Settings page is opened (seen on .61). AC1-3 measurements not done in this session.
+
+2026-11-09 otgw-firmware-80, AC1 analysis (read-only subagent, code + run A numbers; reviewed in session). Measured run A split per 503 source with code explanation below; derived poll inventory fits the measured load within ~5 %.
+
+Run A measured about 16 browser 503s per minute with two tabs. The code explains the cause. Each tab runs its own 2-slot API queue (a JS closure at v2.js:23-30), while the firmware's counters are global (restInFlight at restAPI.ino:46, a pcb walk in platform_esp32.h:465-481). So two tabs can offer 4 concurrent requests against a REST cap of 2 and a TX cap of 4.
+
+Run A split, measured:
+- REST cap 2 on a healthy heap: 9.8/min.
+- ADR-188 TX cap: 6.0/min.
+- Heap clamp to cap 1: 0.16/min.
+- Unattributed: 0.18/min.
+
+That split comes from whichever gate fires first, not from independent causes. webConnCapExceeded() runs before the in-flight check (restAPI.ino:2822 vs 2827), so a request that breaks both caps is logged as WEB CONN CAP. Raising the TX cap alone would turn many of those 269 into REST BUSY 503s rather than remove them.
+
+The poller inventory fits the measured load. The pollers I derived for Monitor > Values on an OT-Direct board add up to about 108-120 requests/min for two tabs; run A measured 114/min.
+
+The 503s fall mostly on the slow pollers (about 23-58 % of their calls) and hardly on otmonitor (2 %). That fits a phase effect. Every setInterval is registered in the same init() tick (v2.js:6419-6502), so every 30 s each tab fires otmonitor, device/time, health, sat/status and devClock at once, plus weather every 60 s, plus the 3-request health chain. Each tab then fills its own 2 slots, and the other tab's requests hit a full server.
+
+Two more effects add to this:
+- **Release skew.** The client frees a slot when the body arrives (v2.js:62-63), but the server frees it only on disconnect (webServerCompat.h:127-131). So even a perfect cross-tab budget of 2 will not reach exactly 0.
+- **Holders the queue doesn't count.** Every TX-cap 503 needs at least one connection outside the two queues: the logs show 5-7 HTTP holders (7-9 minus 2 ws), while the queues can have at most 4 requests open. That leaves at least 1-3 extra holders, and the queues admit at most 2 REST slots.
+
+**Basis checked:** the run A firmware (beta.149, 3dc9dfa20) and the code read (int-157 plus the uncommitted TASK-1743 diff) have the same poller periods and cap constants. Between the two, git diff shows only the one-time i18n pack load, the fetchSim 503 handling and the TASK-1743 startup settings retry.
+
+**Cheapest AC2 candidates:**
+- Random start offset per tab on the init timers, plus staggering inside one tab. A few lines. It breaks the phase alignment.
+- MAX_IN_FLIGHT 1 per tab. A one-line change, and it matches ADR-165's original premise (client N=1, ADR-165:49-53). The cost is a slower page start, and 3 tabs still overload.
+- A document.hidden guard on the pollers that lack one. It does nothing for run A's two visible windows, but it does help a real background tab.
+- A BroadcastChannel leader for otmonitor, which is about 49 % of all requests. This is the real N-tab fix but costs the most code. It only works within one origin.
+- Pausing the queue on a 503 (Retry-After: 1) without retrying. This is near Robert's 2026-11-08 decision "R1 only, no retry in the API queue", so it needs his OK.
+
+**AC3:** changing a cap, or adding a cross-tab contract, needs Robert's decision with measured numbers. ADR-165's data covers esp32-classic only. ADR-188 claimed hd_webconn_503 = 0 at nominal load, which run A contradicts. ADR-184 excludes the v2 bundle until a capture shows the burst there, and run A is that capture.
+
+NUMBERS: MEASURED (run A, from the task notes, 45 min, 2 tabs):
+- Total load: 5140 requests = 114.2/min. 503s: 725 = 16.1/min (14.1 %). otmonitor: 2506 = 55.7/min.
+- By telnet line:
+  - REST BUSY at cap 2 (maxblk 17396-31732): 441 = 9.8/min.
+  - WEB CONN CAP: 269 = 6.0/min.
+  - Cap-1 heap clamp: 7 = 0.16/min.
+  - 725 - 717 = 8 browser 503s with no telnet line: 0.18/min.
+  - The task-1736 notes say 448 REST BUSY lines; 441 + 7 = 448, which agrees.
+
+DERIVED FROM CODE (estimate): offered load per tab on Monitor > Values, OT-Direct board.
+
+| Endpoint | Per tab /min | Basis |
+|---|---|---|
+| otmonitor | 30 | 2 s |
+| health | 4 | 15 s |
+| simulate | 4 | 15 s |
+| otdirect/overrides | 4 | 15 s |
+| otdirect/status | 4 | 15 s |
+| sat/ble/discovery | 2.4 | 25 s, + retry on failure |
+| sensors | 2.4 | 25 s, + retry on failure |
+| sat/status | 2 | 30 s |
+| sat/weather | 1 | 60 s |
+| device/time | 6 or ~0.1 | 10 s when the WS carries no frames for 15 s; ~0.1 when frames flow |
+
+- Total per tab: ≈ 59.8/min (silent-WS branch) or ≈ 54/min (frames branch). Two tabs: 120 or 108/min, against 114 measured. The inventory fits within about ±5 %.
+- device/time: 70 503s cannot come from the frames branch, which makes about 9 calls in 45 min for 2 tabs. So on .61 the silent-WS branch (psCheckTick) was active at least part of the time. This is an inference, not verified.
+
+ESTIMATE: 503 fraction per endpoint = measured 503s ÷ derived calls (2 tabs, 45 min).
+
+| Endpoint | 503s ÷ calls | Fraction | Note |
+|---|---|---|---|
+| sat/weather | 52/90 | 58 % | |
+| sat/status | 91/180 | 51 % | |
+| ble/discovery | 80/216 | ≤37 % | retries enlarge the denominator, so an upper bound |
+| otdirect/overrides | 117/360 | 33 % | lower bound: a failed health request skips the chain |
+| simulate | 85/360 | 24 % | lower bound, same reason |
+| otdirect/status | 83/360 | 23 % | lower bound, same reason |
+| sensors | 50/216 | ≤23 % | upper bound, same as discovery |
+| device/time | 70/540 | 13 % | |
+| health | 34/360 | 9 % | |
+| otmonitor | 51/2506 | 2 % | measured denominator |
+
+- The slow pollers fire together at the 30 s / 60 s boundaries of each tab's init() phase. Each tab then offers 4-5 requests at once, filling its own 2 slots, and the other tab's requests hit a full server. This pattern is consistent with phase alignment and inconsistent with random overlap.
+
+ESTIMATE: 503s per minute per source.
+- **One tab:**
+  - REST cap: ≈ 0. The queue holds it to ≤2; only the release-skew race remains. Supporting data: ADR-184's classic capture had 0 503s with the queue, and the beta.157 soak had 1 × 503 in 81 calls at UI load.
+  - TX cap: ≈ 0. Two queued requests plus a few closing pcbs stay ≤ 4.
+  - Heap clamp: only during maxblk < 16000 dips.
+- **Two tabs:**
+  - REST cap: the measured 9.8/min is the baseline. Up to 2 of the 4 offered requests have no slot whenever both tabs burst together.
+  - TX cap: 6.0/min measured. Mechanism (derived): the queues alone reach at most 4, which is not > 4. So every TX-cap 503 needs at least one connection outside the queues, such as closing pcbs, 503 replies still draining, or WS handshakes in progress. The logs show 5-7 HTTP holders, so 1-3 such extras. Which kind dominates is not derivable from code.
+  - Heap clamp: 0.16/min. Small because the dips below 16000 are short; the run A per-window minimum was 11764-26612.
+  - 8192 B gates: expected 0 in run A, because the measured minimum maxblk was 11764 > 8192.
+- **ADR-172 429s (estimate):** two tabs offer about 60 otmonitor/min against a global 40/min budget. So up to about 1/3 of otmonitor answers would be 429. These are not 503s, but each one holds a REST slot while it is answered.
+
+FACTS:
+- The v2 API queue wraps window.fetch with MAX_IN_FLIGHT = 2. The inFlight/waiting state lives in a closure in each page, so nothing is shared across tabs. [D:/Users/Robert/Documents/GitHub/RvdB/wt-1689/src/OTGW-firmware/data/v2.js:23-30, 46-50, 72-78]
+- The client queue frees a slot when the response body has arrived. A 20 s valve frees a stalled slot without aborting the request. [v2.js:52-63 (release via response.clone().arrayBuffer().then(release, release) at v2.js:63; STALL_RELEASE_MS at v2.js:28)]
+- The server frees the REST slot only in the request's onDisconnect callback. The server sends Connection: close after every response. [src/OTGW-firmware/webServerCompat.h:127-131 (webArmDisconnect -> restSlotRelease), restAPI.ino:2813-2820 comment, restAPI.ino:2836-2837 (g_restSlotHeld, webArmSlotRelease)]
+- The REST cap is REST_MAX_INFLIGHT 2, held in a global static counter restInFlight. A request that arrives while restInFlight >= the effective cap gets a 503 'REST BUSY' with Retry-After: 1. [restAPI.ino:43-46, 2826-2833, 179-185]
+- The heap clamp lowers the cap to 1 when maxfreeblock < 16000, and to min(cap,2) when < 24000. With the shipped cap of 2, only the <16000 step changes anything. [restAPI.ino:55-64]
+- The ADR-188 TX cap returns a 503 when the port-80 connections holding TX, minus the WebSocket clients, exceed WEB_MAX_TX_CONNECTIONS = 4. It is checked BEFORE the REST in-flight cap, so a request that breaks both caps is logged as WEB CONN CAP. [restAPI.ino:80-95 (webConnCapExceeded), restAPI.ino:2822-2833 (order of the gates)]
+- A port-80 pcb counts toward the TX cap when it has unsent or unacked segments, or is ESTABLISHED and is not a queued idle file waiter. The request being admitted counts too. [src/libraries/Platform/src/platform_esp32.h:465-481; docs/adr/ADR-188-*.md:103-108]
+- Other 503 paths: an 8192 B maxfreeblock gate on sat/status, graph/history, debug dump, device/info and diag download, plus 'history busy'. None of them writes a REST BUSY or WEB CONN CAP telnet line. [SATcontrol.ino:4236, graphHistoryStuff.ino:92 and 95, restAPI.ino:2221, 3155/3210, 3800]
+- The ADR-172 rate check runs after restInFlight++, so a 429 answer also holds a REST slot. The otmonitor budget is global: 1 per 1500 ms, burst 2. [restAPI.ino:2834-2837, 2899-2905, 2661-2665, 2682-2684]
+- Pollers registered in init() in the same tick: tick 1 s (no fetch), fetchConn 15 s, fetchSeed 20 s only when the WS is closed, otmonTick 2 s, psCheckTick 5 s, devClockTick 30 s, fetchSatStatus 30 s, fetchWeather 60 s. startDiscoveryPolling runs BLE discovery at 10 s + 25 s*k and sensors at 14 s + 25 s*k. [v2.js:6419, 6436, 6438, 6494, 6497-6502, 5830-5838]
+- fetchConn requests /v2/health. On success it fires fetchSim (/v2/simulate) and fetchOverrides (/v2/otdirect/overrides on OT-Direct) together, then otdirect/status chained after the overrides. A failed health request (503) skips all three follow-ups. [v2.js:1846-1848, 1915-1919, 541-549, 2142-2151, 1959-1965]
+- otmonTick fetches otmonitor only when the tab is visible and Monitor > Values is open (or PS=1), with at most one request in flight per tab. A 429 pauses that tab for retry_after. [v2.js:3473, 3480-3494, 3518-3523]
+- psCheckTick asks for device/time every 10 s, but only after 15 s of WS frame silence (or while PS=1). devClockTick asks once per 600 s (re-arms on failure). Both skip hidden tabs. [v2.js:3532-3552, 341, 360-368, 675]
+- These pollers have NO document.hidden guard: fetchConn (4 requests/15 s), discovery, sensors, fetchSatStatus and fetchWeather. Only otmonTick, psCheckTick and devClockTick check document.hidden. [v2.js:1846, 5779, 5808, 3744, 3766 vs 3519, 3535, 361]
+- The SAT page polls sat/status every 5 s through fetchWithRetry (up to 3 tries). Settings > Sensors polls the BLE roster every 4 s. [v2.js:5001, 5018-5019, 98-111, 3206-3212]
+- Run A measured on bench .61 (OTGW32, no PSRAM, beta.149), 45 min, two visible headless windows on Monitor > Values: 5140 REST requests, 725 browser 503s, 2506 otmonitor GETs. Per endpoint: overrides 117, sat/status 91, simulate 85, otdirect/status 83, ble/discovery 80, device/time 70, weather 52, otmonitor 51, sensors 50, health 34, other 12. Telnet: 441 REST BUSY cap 2, 269 WEB CONN CAP with 7-9 holders (2 ws), 7 cap 1. maxblk minimum 11764. [backlog/tasks/task-1741*.md Description; backlog/tasks/task-1736*.md:74-79]
+- Between beta.149 (3dc9dfa20) and HEAD, the v2.js diff changes no poller period, MAX_IN_FLIGHT or document.hidden guard: only the one-time i18n pack retry and the fetchSim 503 handling. restAPI.ino and webServerCompat.h show no change to the cap constants. The uncommitted TASK-1743 diff only adds a retry to the one-time startup settings fetch. [git diff 3dc9dfa20 HEAD -- src/OTGW-firmware/data/v2.js restAPI.ino webServerCompat.h (grep on poller and cap lines); git diff -- v2.js at v2.js:2629-2633]
+- ADR-165 premise: the client kept N=1 single flight; a client MAX_INFLIGHT knob was left unbuilt. Its data covers esp32-classic only, and generalizing to esp32-otgw32 is unverified. [docs/adr/ADR-165-optimal-request-parallelism-esp32s3-webui-rest.md:49-57]
+- ADR-184 excludes the v2 bundle until a capture shows the same burst there. Yet the v2.js header cites 'ADR-184 for the v2 bundle (TASK-1210)', and the ADR has no amendment for v2. [docs/adr/ADR-184-*.md:105, 135, 44-65; v2.js:15]
+- ADR-188 recorded hd_webconn_503 = 0 at nominal load (three clients polling device/info and settings). Run A's two-tab v2 load produced 269 TX-cap 503s. [docs/adr/ADR-188-*.md:141-144; task-1741 Description]
+- MDN marks the Web Locks API as available only in secure contexts (HTTPS), so it is unusable on http://<ip>. MDN describes BroadcastChannel as same-origin and shows no secure-context banner for it. [https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API ; https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel (fetched 2026-11-09)]
+
+NEXT:
+- AC2, cheapest option and a first A/B arm: give each tab a random start offset (0 to the period) on the init setIntervals, and stagger the tab's own 30/60 s cluster so it never offers more than 2 at once (v2.js:6436-6502). It costs a few lines, adds no requests and stays inside ADR-184's 'no prioritise/batch' rule. It removes the phase-locked bursts that drive the 23-58 % rejection rate of the slow pollers. Expected effect: fewer REST-cap and TX-cap 503s. It cannot reach 0, because random overlap and the release skew remain.
+- AC2 arm B: MAX_IN_FLIGHT 1 per tab (v2.js:27), a one-line change. Two tabs then offer at most 2 = the REST cap, which also keeps the TX count low. This matches ADR-165's original client premise of N=1 (ADR-165:49-53); it does not contradict it, which corrects the earlier note in TASK-1741. Costs: single-tab startup and panel bursts take twice as many rounds, and 3 tabs overload again. Measure it against arm A with the same ab_bench harness on .61.
+- AC2 add-on that the run A harness cannot show: add a document.hidden early return to fetchConn, startDiscoveryPolling's pollers, fetchSatStatus and fetchWeather, and refresh once on visibilitychange. A real background tab then drops from about 24/min to 0. Both run A windows were visible, so the red/green harness would show no gain. A separate scenario (one visible, one hidden tab) is needed to evidence it.
+- AC2, larger option: a BroadcastChannel leader tab that polls otmonitor, and later the fetchConn chain, and broadcasts the result. otmonitor is about 49 % of all requests (2506 of 5140 in run A) and is fetched twice for identical data. Limits: same-origin only, so an IP tab, a hostname tab and an HA ingress tab do not coordinate. It needs leader failover. It changes the client contract and likely needs its own ADR. Web Locks is ruled out on plain http (MDN: secure contexts only).
+- Pausing queue dispatch on a 503 for Retry-After (1 s) plus jitter, with no retry, would slow the cascade in which a rejected tab immediately fires its next queued request, adding TX holders. It sits next to Robert's 2026-11-08 decision 'R1 only, no retry in the API queue', so ask Robert before building it, framed as rate reduction rather than retry.
+- Before AC2 red/green, check the run A CSV/summary.json (logging-session scratchpad t1736, outside this worktree) for: the 429 count, whether the 5140 total includes 429s, the time offset between the two windows' page loads (phase lock), and the heap.csv sampling interval.
+- Add a single-tab control run to the same harness (same page, 45 min) to measure the single-tab baseline that the release skew leaves. That sets a realistic AC2 target instead of exactly 0.
+- AC3: any change to REST_MAX_INFLIGHT, WEB_MAX_TX_CONNECTIONS or the 16000 clamp goes to Robert as one question with measured run numbers. Note the first-gate-wins attribution: raising the TX cap moves 503s to REST BUSY rather than removing them. ADR-165's ceiling was measured on esp32-classic only, and ADR-188's nominal-load claim (0 webconn 503s) does not hold for two v2 tabs. Also put the ADR-184 scope gap to Robert: v2 is excluded until a capture shows the burst, and run A is that capture.
+
+NOT VERIFIED:
+- The 429 count in run A and whether the 5140 total includes 429s: the task notes report neither. The raw CSV is in another session's scratchpad, which I did not access.
+- Whether ab_bench opened both windows at about the same moment, which would phase-lock the two tabs' timers. If it did, run A is close to a worst case.
+- Whether .61's WebSocket carried OT frames during run A. The device/time branch is inferred from the 70 device/time 503s, not observed.
+- Which connections make up the 1-3 extra TX holders behind the WEB CONN CAP 503s: closing pcbs with an unacked FIN or data, 503 replies still draining, WS upgrade handshakes in progress, or browser preconnects. Whether lwIP keeps the FIN segment in unsent/unacked until it is ACKed (so a closing pcb counts) is an lwIP detail I did not open.
+- How large the client/server release skew is, and how often one tab collides with itself. There is no single-tab run A control; the only hints are ADR-184's classic capture and the beta.157 soak (1 × 503 in 81 calls).
+- The cause of the 8 browser 503s with no telnet line (725 - 717). Candidates are telnet line loss or a short dip below 8192 between heap samples (sampling interval unknown). Unassigned.
+- Whether BroadcastChannel needs a secure context: MDN shows no banner, but I did not check the spec or the browser-compat data. Also from memory only, not checked: browser background-timer throttling (Chrome intensive throttling of hidden tabs).
+- All per-minute model numbers are estimates from code periods. No device, browser or test ran in this session (read-only constraints).
 <!-- SECTION:NOTES:END -->
