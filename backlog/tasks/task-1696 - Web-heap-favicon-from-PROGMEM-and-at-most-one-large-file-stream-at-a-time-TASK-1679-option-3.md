@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-07T16:52:00Z'
-updated_date: '2026-11-08T07:01:00Z'
+updated_date: '2026-11-08T08:31:00Z'
 labels:
   - webserver
   - heap
@@ -49,4 +49,6 @@ Baseline for this task (2026-11-08, beta.133, after TASK-1699): two-tab A/B min 
 Robert 2026-11-08 (session): part B only (favicon from PROGMEM); part A (one large stream at a time) dropped: beta.133 already meets the AC1 dip target (17.0 KB vs 8.1), serializing would not fix the 2 timeouts and could add queue-deadline timeouts. No ADR-165 amendment. Follow-up: check whether the 2 timeouts of run 1 were device-side (timeout/503 counters).
 
 2026-11-08 part B implemented (main tree, local commit, build after TASK-1455): scripts/gen_favicon_header.py writes src/OTGW-firmware/faviconData.h (FAVICON_ICO, 3627 bytes; the file is a PNG, served as image/x-icon as the LittleFS route did, FSexplorer.ino:697); route GET /favicon.ico (FSexplorer.ino) -> webSendFlashBody() (webServerCompat.h, new; webSendGzipPage now calls it with gzip=true): explicit length, ETag "<githash>-/favicon.ico", no-cache, 304; no LittleFS open, no REST gate, no web file-gate slot (webBeginRequest only caps the TCP send buffer). Within ADR-194 (static asset users never upload, from flash); binary instead of text, no new ADR. data/favicon.ico stays on LittleFS (FSexplorer protected list, recovery). AC3 evidence: tests/test_favicon_flash.py 3 OK (bytes equal the file, route on flash not webSendFile, explicit length + 304); old code 2 FAIL + 1 ERROR. evaluate --quick 86/0. AC2 (large-stream host fixture) dropped with part A (Robert). AC1 bench (two-tab A/B + curl sha256) pending the build slot.
+
+2026-11-08 bench .61 beta.136+908207f (OTA, settings 164 keys changed none, bootcount 137->139 = flash+2): GET /favicon.ico 200 image/x-icon Content-Length 3627, ETag "908207f-/favicon.ico", Cache-Control no-cache; sha256 equals data/favicon.ico (0711249770f063c9...); If-None-Match -> 304; 6 rounds of 2x / + 1x /favicon.ico concurrent = 18/18 200. AC2 belonged to part A (dropped by Robert). AC1 two-tab A/B: 'Geheugengebruik beperken' runs it on .61 after 54's TASK-1455 AC7 slot.
 <!-- SECTION:NOTES:END -->
