@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-08T07:11:00Z'
-updated_date: '2026-11-08T10:32:00Z'
+updated_date: '2026-11-08T11:42:00Z'
 labels:
   - otdirect
 milestone: 2.0.0
@@ -35,4 +35,6 @@ Robert 2026-11-08: only gateway and monitor stay user-facing, as on the PIC. Mas
 Robert 2026-11-08 (after 54's check): PIC model. 'No thermostat' becomes a runtime state of gateway mode: detect the thermostat continuously, send own (standalone) frames while it is absent, relay again as soon as it appears (as gateway.asm:1740-1772); apply the TASK-1684 CH rule to the standalone frames. Then the UI shows only gateway + monitor. Needs an ADR (adr-kit) and a bench test with a thermostat plugged in late.
 
 2026-11-08 auto-detect check (read-only, origin/dev 2f705e5e9 OTDirect.ino), the basis for Robert's PIC-model choice: SAT without a thermostat is covered (no frame in the 5 s window after step-up :945 + handshake -> master for this boot :1066-1091, SAT owns MsgID 1, TASK-1684 CH rule). Risk A: OT spec v4.2 sets no upper bound for a room unit's first frame after power-up (3.4.2.2; :575 gives the boiler 20 s for OT/+); a thermostat slower than handshake + 5 s is classed absent and in master mode answered from the cache (handleMasterModeSlaveFrame :2114), never relayed until the next boot. Risk B: bAutoDetect=false + stored gateway + no thermostat runs gateway standalone, whose own MsgID 0 keeps the board default CH enable (0x01) without a setpoint when SAT is off (buildStatusRequest clears bit 0 only in master mode). PIC: no master mode; missing thermostat detected continuously from the line voltage (gateway.asm:1740-1772), standalone frames while absent, re-attach when back. Not measured: real first-frame times of thermostats.
+
+Robert 2026-11-08 (later, simplification): do the small variant now: hide only bypass and loopback in the settings UI (service/REST only), keep gateway, monitor and master visible; no runtime thermostat detection now. The PIC model (runtime detect) is parked as TASK-1728 until a field report needs it.
 <!-- SECTION:NOTES:END -->

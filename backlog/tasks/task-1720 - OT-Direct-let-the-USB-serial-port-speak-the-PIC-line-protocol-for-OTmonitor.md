@@ -1,10 +1,10 @@
 ---
 id: TASK-1720
 title: 'OT-Direct: let the USB serial port speak the PIC line protocol for OTmonitor'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-08T08:27:00Z'
-updated_date: '2026-11-08T09:48:00Z'
+updated_date: '2026-11-08T10:48:00Z'
 labels:
   - otdirect
 milestone: 2.0.0
@@ -35,4 +35,12 @@ Robert 2026-11-08 chose option B of the TASK-1721 research (docs/research/2026-1
 Robert 2026-11-08: every test of this feature includes a flash over USB (setting on and off).
 
 Robert 2026-11-08: even with USB in protocol mode (same output as port 25238), the regular USB flash must still work. Design consequence: stay on the hardware USB-Serial-JTAG peripheral, whose DTR/RTS reset-into-download is handled in silicon, independent of the firmware; never switch USB to TinyUSB/OTG, never reconfigure the USB-Serial-JTAG peripheral or its reset behaviour. Test: start flash_otgw --update over USB while the protocol stream is running (and once with OTmonitor just disconnected); esptool must enter download mode, flash, and the unit must boot.
+
+2026-11-08 bench gate (system32-78, .61 = COM4, beta.143+0f8ffd4): one OTmonitor-style open/close of COM4 via tclsh 8.6.18 with otmonitor.tcl:1522-1538 calls (open RDWR, fconfigure 9600,n,8,1, no -ttycontrol) rebooted the unit: uptime 1113 -> 28 s, reboots 150 -> 151, lastreset 'USB reset (host)', settings diff none. Gate failed after cycle 1; stopped as planned, no USB flash. Robert chose: stop option B, fall back to A (OTmonitor via TCP 25238, documented).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Not feasible: the hardware USB-Serial-JTAG port resets the gateway when Windows opens/closes the COM port the way OTmonitor does (the same line-state reset that makes USB auto-flash work), so a USB OTmonitor connection would reboot the gateway mid-heating. Evidence: gate log in session system32-78 (scratchpad t1720/gate-run1.log). Robert 2026-11-08: fall back to option A, OTmonitor over TCP port 25238; manual note and tester reply follow.
+<!-- SECTION:FINAL_SUMMARY:END -->

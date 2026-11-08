@@ -1,9 +1,10 @@
 ---
 id: TASK-1726
 title: pre-push hook refuses a push to dev while another session holds the build lock
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-08T10:06:00Z'
+updated_date: '2026-11-08T10:53:00Z'
 labels:
   - tooling
 milestone: 2.0.0
@@ -23,3 +24,9 @@ ordinal: 834000
 - [ ] #1 pre-push refuses a push to origin/dev while a live foreign build lock exists, and allows it when the lock is absent or stale (dead PID)
 - [ ] #2 Red/green shown with a fake lock file: refused, then allowed after removal; no effect on other remotes/branches
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Dropped by Robert 2026-11-08: the coordinator rule (no push while another session holds the build lock) suffices; a hook is more code than the problem is worth.
+<!-- SECTION:FINAL_SUMMARY:END -->
