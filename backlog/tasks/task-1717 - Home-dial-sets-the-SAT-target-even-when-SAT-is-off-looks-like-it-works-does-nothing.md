@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-11-08T07:54:00Z'
-updated_date: '2026-11-08T12:39:00Z'
+updated_date: '2026-11-08T15:31:00Z'
 labels:
   - webui
   - field-report
@@ -36,4 +36,6 @@ tjfs 2026-11-08 07:57 (msg 1568897217505402944): 'definitely not obvious! I thin
 Robert 2026-11-08: with SAT off the dial sends a TT= temporary room-setpoint override and says so (e.g. 'thermostat override 20.5 C until its next program change'); with SAT on it keeps setting the SAT target. Depends on TASK-1718 (beta.142) for OT-Direct; PIC boards already handle TT=.
 
 2026-11-08 implementation (per Robert's decision above). v2.js: sat.owns = sat/status enabled || fallback_active (the satOwnsControlSetpoint() rule); stepTarget() POSTs /api/v2/sat/target when SAT owns, else stepRoomOverride(): TT=<x> over POST /api/v2/otgw/commands, base = the last TT= this page sent, else the thermostat's room setpoint (MsgID 16), else 20; message 'thermostat override X° until its next program change'. A press before sat/status answered fetches it first (not covered by a test: timing-dependent). Test tests/webui/home-dial-tt-when-sat-off.test.mjs, 3 tests (SAT off -> TT=20.5 + message; SAT on -> sat/target 20.5; SAT off twice -> TT=20.5, TT=21.0): fix 3/3 pass; origin/dev v2.js: both SAT-off tests fail, the SAT-on guard passes. Occasional CDP Page.enable stalls under machine load are infrastructure. evaluate --quick 0 failed. Real device .61 (beta.143 firmware + this v2.js via ota_flash --webui): SAT off, design b +: POST {"command":"TT=20.5"}, UI 'thermostat override 20.5° until its next program change', firmware overrides write 16 = 5248 (20.5 C) and 100 = 2, sat_owns false; restored TT=0 and SAT on, settings diff none. Not tested on hardware: a thermostat following the TT= (none on .61); the SAT-on press (host-tested; skipped to keep the stored SAT target).
+
+Robert 2026-11-08 ~16:30 reversed this: the UI may only control temperatures with SAT on; with SAT off it only shows the thermostat's values. The TT= dial path from beta.146 is removed by the follow-up task (see TASK-1735).
 <!-- SECTION:NOTES:END -->

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T16:56:00Z'
-updated_date: '2026-11-07T22:36:00Z'
+updated_date: '2026-11-08T00:27:00Z'
 labels:
   - mqtt
   - ha
@@ -54,6 +54,8 @@ Regression sweep 2026-11-07 (full run_tests.py was killed twice by low memory; s
 2026-11-07 beta.131 f0c99f6bb pushed, zip #alpha msg 1568754894930710650. Bench .61 OTA app+fs (settings 164 changed none), reboot, mosquitto_sub homeassistant/# from before the reboot filtered on otgw-1020BA21B4F8, 9 min: 193 configs (193 distinct) + 43 empty clears, first +20 s, last +226 s, span 206 s, max configs in one second 1; hd_mqtt_queue_hwm 17, hd_min_free_heap 26632, hd_min_max_block 31732, bootcount 116. Baseline beta.128 same procedure: 193 configs + 43 clears in 32 s, peak 39/s, hwm 49 (48 on another boot), min free 24884, max block 23540. Log scratchpad b103/drip-new131.log and drip-old128.log. AC1 open: entity count equal (193 = 193), but hwm 17 is above the example bound 3 in the AC; what fills the outbox to 17 (status bursts, connect-time telemetry) is not measured. Waiting for Robert: accept 17, or investigate.
 
 Robert 2026-11-07 (session, AskUserQuestion): hwm 17 accepted for AC1, task Done; the remaining outbox peak belongs to TASK-1697 (bound the outbox).
+
+2026-11-08 full run_tests.py after the memory cleanup (commit 77%): files 183, passed 175, failed 6, timeout 2 (1316 s, -j 4). Every failure traced: test_board_detect_persist_gate, test_sat_requested_vs_transmitted and LL-010 of test_sat_lowload_contract = Defender WinError 225 on a fresh test exe (requested_vs_transmitted alone: 10 OK); test_web_file_scheduling = no host g++ (also on HEAD); test_diag_decode = missing fixture recording-v1.bin (also on HEAD); test_boiler_unsupported_origin and test_local_frame_consumers = stale harness expectations since TASK-1391, fixed in TASK-1713/1714 (abdfbeefc, other session); timeouts test_dhw_water_meter (alone: RESULT PASS) and test_sat_lowload_contract (alone 643 s: 34 of 35, the 1 = LL-010 Defender). None from TASK-1695/1699/1709. Log scratchpad alltests-0008.log, ll010.log.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

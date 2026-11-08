@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-02T16:51:00Z'
-updated_date: '2026-11-06T19:52:00Z'
+updated_date: '2026-11-07T11:32:00Z'
 labels:
   - sat
 dependencies: []
@@ -56,4 +56,6 @@ Field reference 2026-11-06 (maarten_41762, #alpha-testing msg 156833670560023376
 Compressor starts in 24.7 h: 5 (4 CH + 1 DHW). CH: each demand = 2:00 min CH mode without compressor, then 49:11-49:13 min compressor on, identical in all 4 runs (00:16, 03:16, 10:35, 13:36). Start-to-start within a pair 3h00m35s. No run in the allowed slot around 21:13 on 5 Nov. DHW: one run 04:32-05:11 (39.4 min), started 2 s after an MQTT HW=1 (HW=0 had been sent at 21:22). Shortest compressor off time 26.4 min (CH2 end 04:05:48 to DHW start 04:32:12). Modulation (MsgID17) only 0 or 100.
 
 CH run profile: supply 27 to 30.5-31.5 C within about 20 min, return 25-26.4 C at the end, dT 5.2-5.5 K steady; supply never reaches CS 35, so each run ends on time, not on temperature. DHW run: supply 27 to 62 C, tank (MsgID26) 46.1 to 55.7 C. Outdoor 2.0-12.9 C; run length did not change with outdoor temperature. Rooms (his CSVs, 5 min): north 20.7-21.1 C all day; south 20.0 C at 07:10 to 21.7 C at 12:30 (sun), still 21.6 C during the 13:34 run. Check against the heat-pump sim: about 2-4 starts per day predicted for this house type; observed 4 CH starts (3 per day on 1-2 Nov per his summary). The raw capture stays local.
+
+2026-11-07 maarten_41762 (#alpha-testing msg 1568587787454783589) corrects the heat-pump field reference: (a) the OpenTherm control setpoint 35 C is the return-water temperature at which this heat pump pauses, not a supply setpoint; supply is an end result of the refrigerant circuit; runs still end on the Honeywell relay release (return stayed 25-26 C). (b) DHW is switched by Homey through the gateway (HW=0/HW=1) following the lowest energy prices. (c) The equal run lengths at different outdoor temperatures on 6 Nov are coincidence; he has seen longer runs when colder. Use multi-day captures before deriving run length vs weather.
 <!-- SECTION:NOTES:END -->
