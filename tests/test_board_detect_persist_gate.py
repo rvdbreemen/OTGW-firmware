@@ -35,6 +35,7 @@ import test_sat_pwm_override as base  # noqa: E402  (compile_cpp: g++, clang++ o
 
 REPO = Path(__file__).resolve().parent.parent
 INO = Path(os.environ.get("OTGW_INO", REPO / "src" / "OTGW-firmware" / "OTGW-firmware.ino"))
+FWH = Path(os.environ.get("OTGW_FIRMWARE_H", REPO / "src" / "OTGW-firmware" / "OTGW-firmware.h"))
 CORE_INO = Path(os.environ.get("OTGW_CORE_INO", REPO / "src" / "OTGW-firmware" / "OTGW-Core.ino"))
 
 START_MARK = "  if (settings.iBoardMode == 2) {"
@@ -101,7 +102,13 @@ def cut_setup(src: str) -> str:
     block = src[a:b]
     # The cut starts after `#if HAS_RUNTIME_HW_DETECT`; check that anchor really precedes it.
     assert "#if HAS_RUNTIME_HW_DETECT" in src[max(0, a - 120):a], "HAS_RUNTIME_HW_DETECT anchor moved"
-    return "static void resolveBoard() {\n" + block + "}\n"
+    helper = ""
+    if "isOtgw32HardwarePossible()" in block:   # TASK-1730 gate on the auto no-PIC branch: the real helper
+        m = re.search(r"inline bool isOtgw32HardwarePossible\(\) \{\n.*?\n\}\n", load(FWH), re.S)
+        assert m, "isOtgw32HardwarePossible() not found in OTGW-firmware.h"
+        # no PSRAM: the OTGW32 module, so the no-PIC branch keeps its OT-Direct behaviour here
+        helper = "static bool platformHasPsram() { return false; }\n" + m.group(0)
+    return helper + "static void resolveBoard() {\n" + block + "}\n"
 
 
 def cut_core(src: str) -> str:

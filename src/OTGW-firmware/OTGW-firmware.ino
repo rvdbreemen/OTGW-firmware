@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.146
+**  Version  : v2.0.0-beta.147
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -452,8 +452,15 @@ void setup() {
         // then persists the positive Classic verdict. A genuine OTGW32 just pays a
         // benign PIC-NACK probe each boot.
         OTGWSerial.end();
-        initOTDirect();            // sets HW_MODE_OT_DIRECT for this boot only
-        SetupDebugln(F("Board mode: auto -> no PIC -> OTGW32/OT-Direct (this boot; NOT persisted, re-probes next boot -- TASK-1031)"));
+        if (isOtgw32HardwarePossible()) {
+          initOTDirect();            // sets HW_MODE_OT_DIRECT for this boot only
+          SetupDebugln(F("Board mode: auto -> no PIC -> OTGW32/OT-Direct (this boot; NOT persisted, re-probes next boot -- TASK-1031)"));
+        } else {
+          // TASK-1730: PSRAM or an S3 Mini Pro IMU means a LOLIN module in a Classic
+          // socket, so this is a Classic whose PIC did not answer: leave the OTGW32
+          // OT-Direct GPIOs alone (eMode stays HW_MODE_DEGRADED from detectPIC()).
+          SetupDebugln(F("Board mode: auto -> no PIC on a LOLIN module (Classic) -> OT-Direct not started (TASK-1730)"));
+        }
       }
       // Persist ONLY a positive (Classic 1/3) verdict; a no-PIC result stays
       // iBoardMode=0 so auto-detection self-heals a transient miss on the next boot.
@@ -519,11 +526,12 @@ void setup() {
   // Ethernet and disable WiFi. Placed after startMDNS()/startWebSocket()/startMQTT()
   // because switchToEthernet() rebinds those services to the wired interface —
   // running it earlier would double-init them. OLED was already brought up above.
-  // ADR-127: skip W5500 in combo PIC mode — the SPI probe clocks GPIO12, which
-  // on a Classic PCB is the PIC reset hole, and a Classic PCB has no Ethernet.
-  // isPICEnabled() is compile-time false on the fixed OTGW32, so this is a
-  // no-op there.
-  if (!isPICEnabled()) initEthernet();
+  // ADR-127 / TASK-1730: probe the W5500 only on a confirmed OTGW32. The SPI probe
+  // clocks GPIO12, which on a Classic PCB is the PIC reset hole, and a Classic PCB
+  // has no Ethernet. "No PIC enabled" alone is not enough: a Classic whose PIC is
+  // dead (board mode 1/3, HW_MODE_DEGRADED) probed it and restart-looped
+  // (crashevans, beta.77, task watchdog in w5500_tsk).
+  if (isConfirmedOtgw32()) initEthernet();
 #endif
 
   { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.146
+**  Version  : v2.0.0-beta.147
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -841,6 +841,28 @@ inline bool isOTDirectUiExposed() {
 #else
   return true;
 #endif
+}
+
+// TASK-1730 (Robert 2026-11-08): the W5500 and the OT-Direct GPIOs may only be touched
+// on a board that can be an OTGW32, never in PIC mode. On the combo that means: board
+// mode not 1/3 (no Classic persisted or forced), no PIC enabled, no S3 Mini Pro IMU
+// found, and no PSRAM. The PSRAM term tells the modules apart even when the PIC never
+// answered: the LOLIN S3 Mini / Mini Pro in a Classic socket are ESP32-S3FH4R2 with
+// in-package PSRAM, the OTGW32 module is an ESP32-S3FN4 without (TASK-1221 bench).
+// Fixed boards: the compile-time class.
+inline bool isOtgw32HardwarePossible() {
+#if HAS_RUNTIME_HW_DETECT
+  if (settings.iBoardMode == 1 || settings.iBoardMode == 3) return false;
+  return !isPICEnabled() && !state.hw.bClassicPro && !platformHasPsram();
+#else
+  return HAS_DIRECT_OT && !isPICEnabled();
+#endif
+}
+
+// The same, after OT-Direct actually started (eMode resolved to HW_MODE_OT_DIRECT):
+// the only state in which the W5500 probe runs (it clocks GPIO12 = PIC reset on a Classic).
+inline bool isConfirmedOtgw32() {
+  return isOtgw32HardwarePossible() && state.hw.eMode == HW_MODE_OT_DIRECT;
 }
 
 // ---- Combo runtime pin resolution (ADR-127; ADR-158 adds the S3 Mini Pro) --
