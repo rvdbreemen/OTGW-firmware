@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-07T11:06:00Z'
-updated_date: '2026-11-07T23:29:00Z'
+updated_date: '2026-11-08T09:09:00Z'
 labels:
   - webui
   - i18n
@@ -27,7 +27,7 @@ Robert 2026-11-07: detect which language the user uses; the default is always En
 <!-- AC:BEGIN -->
 - [ ] #1 ADR for the web UI language mechanism Accepted by Robert
 - [ ] #2 Browser language detected; English is used when the language is not supported, proven by a test
-- [ ] #3 NL and DE translation plan agreed (scope, who translates, how strings are kept in sync)
+- [x] #3 NL and DE translation plan agreed (scope, who translates, how strings are kept in sync)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -44,4 +44,6 @@ Robert 2026-11-07: detect which language the user uses; the default is always En
 2026-11-07 Robert's decision (AskUserQuestion): trust store = a mini CA bundle of about 15 roots built with ESP-IDF gen_crt_bundle.py (ISRG X1/X2, USERTrust RSA/ECC, DigiCert G2/G3, Google Trust R1-R4, Amazon Root CA 1-4 or similar), estimated 8-12 KB (to be measured), kept in the repo with a test that the target hosts validate through it. Rejected: 2 pinned roots (breaks on a CA change, GitHub moved to Let's Encrypt this year) and the full IDF bundle (+69 KB, 4.2 KB left in app0).
 
 2026-11-08: ADR-218 written as Proposed and parked (outbound TLS client only on PSRAM boards, mini CA bundle, fallback or disable per feature; inbound stays HTTP per ADR-003). Robert asked why outbound TLS is needed: nothing in src/ needs it today (PIC check/download and webhook use plain HTTP; language packs are fetched by the browser from jsDelivr). Stays Proposed until a concrete feature (likely HTTPS webhooks) asks for it. Mini bundle evidence from peer: commit 1dd2007 (lane-1689tls), 14 roots 5,427 B, tests/test_tls_mini_bundle.py 7/7.
+
+2026-11-08 Robert's four decisions (AskUserQuestion): (1) packs: NL and DE gzipped on LittleFS (offline), other languages later fetched by the browser from jsDelivr pinned to the firmware tag with SRI; (2) choice: browser language (navigator.languages), English when unsupported, per-browser override in the UI stored in localStorage (no device setting); (3) scope: all visible web UI texts including the settings help; NOT translated: MQTT topics, HA entity names, REST fields, telnet and logs, update/safeboot pages; (4) translation: English source in the repo, AI draft for NL/DE on every change, human review (Robert NL, a German-speaking tester DE), a test fails when a key is missing in a pack and the UI falls back to English per key; Hosted Weblate only when more languages come.
 <!-- SECTION:NOTES:END -->
