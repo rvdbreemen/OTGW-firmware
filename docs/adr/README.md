@@ -689,7 +689,7 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-210: REST API streams the stored ESP32 core dump as an admin download](ADR-210-rest-api-streams-the-stored-esp32-core-dump-as-an-admin-download.md)** 🆕 *(Proposed)*  
   Guideline-level (ADR-080) with a test gate (`tests/test_device_coredump_api.py`). `GET /api/v2/device/coredump` behind `checkHttpAuth()` (ADR-056) streams the coredump image from flash in filler chunks as an attachment, 404 when no valid dump, flash access only through `platformCoreDump*()` shims (TASK-1560).
 
-- **[ADR-211: Skip the WiFi config portal on the boot after a WiFi supervisor restart](ADR-211-skip-the-wifi-config-portal-on-the-boot-after-a-wifi-supervisor-restart.md)** 🆕 *(Proposed)*  
+- **[ADR-211: Skip the WiFi config portal on the boot after a WiFi supervisor restart](ADR-211-skip-the-wifi-config-portal-on-the-boot-after-a-wifi-supervisor-restart.md)** 🆕 *(Accepted)*  
   Guideline-level (ADR-080) with a test gate (`tests/test_wifi_skip_portal.py`). The 2.x counterpart of 1.x ADR-099 (WiFi portal skip). A WiFi supervisor restart (dead link or `WIFI_FAILED`) writes a one-boot mark in RTC_NOINIT memory; that boot opens neither the config portal nor the prerelease AP fallback while the saved network is away, finishes `setup()` offline and lets `loopWifi()` retry. Power cycle, no credentials and triple reset still get the portal (TASK-1455).
 
 - **[ADR-212: Load the Web UI assets natively behind a bounded server-side file queue](ADR-212-load-web-ui-assets-natively-behind-a-bounded-server-side-file-queue.md)** 🆕 *(Proposed)*  
@@ -709,6 +709,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 - **[ADR-217: While SAT is enabled, the Classic port 25238 bridge filters inbound lines and drops CV control commands and binary data](ADR-217-while-sat-is-enabled-the-classic-port-25238-bridge-filters-inbound-lines-and-drops-cv-control-commands-and-binary-data.md)** 🆕 *(Accepted)*  
   Binding (ADR-080), gated by `tests/test_bridge25238_sat_filter.py` on the real `handlePICSerial()`. With SAT off port 25238 stays byte-transparent; with SAT on each inbound line is held to CR, CS/CH/MM/C2/H2/TT/TC and non-text lines are dropped and counted (`ext_bridge_dropped`), allowed lines pass byte-identical (TASK-1695).
+
+- **[ADR-218: Allow outbound TLS client requests on boards with PSRAM, inbound stays plain HTTP (amends ADR-003)](ADR-218-allow-outbound-tls-client-requests-on-boards-with-psram-inbound-stays-plain-http-amends-adr-003.md)** 🆕 *(Proposed, parked)*  
+  Robert's TLS rules (PSRAM boards only, mini CA bundle, fallback or disable per feature) with the 2026-11-07 proof of concept; parked until a firmware feature needs an HTTPS request (no current user, TASK-1689).
 
 - **[ADR-196: SAT behaviour ground truth: Sergeant D's recorded decisions, then pinned thermo-nova, then specs, then firmware](ADR-196-sat-behaviour-ground-truth-sergeant-d-s-recorded-decisions-then-pinned-thermo-nova-then-specs-then-firmware.md)** 🆕 *(Accepted)*  
   Source order for every SAT statement or change: `docs/sat/sergeant-d-corrections.md` entries, then thermo-nova at 7beaaf5 (`file:line`), then `thermo-nova-spec.md`, then the firmware and its docs, which are never the authority. Read the corrections file first, cite the entry or say none covers it, put conflicts to Sergeant D. Guideline-level, no CI gate.
