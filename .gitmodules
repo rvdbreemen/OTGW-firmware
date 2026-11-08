@@ -1,9 +1,3 @@
-[submodule "Arduino/libraries/aceTime"]
-	path = Arduino/libraries/aceTime
-	url = https://github.com/bxparks/AceTime
-[submodule "Arduino/libraries/Time"]
-	path = Arduino/libraries/Time
-	url = https://github.com/PaulStoffregen/Time.git
 [submodule "src/libraries/SimpleTelnet"]
 	path = src/libraries/SimpleTelnet
 	url = https://github.com/rvdbreemen/SimpleTelnet

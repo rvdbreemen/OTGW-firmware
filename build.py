@@ -3152,6 +3152,12 @@ def main():
     """Main build script entry point"""
     args = build_arg_parser().parse_args()
 
+    # TASK-1725: stop before any work when OpenTherm or SimpleTelnet is not checked out (an empty
+    # submodule directory in a new worktree), with the command that fixes it, instead of a compiler error.
+    sys.path.insert(0, str(Path(__file__).parent.resolve() / "scripts"))
+    import submodule_check
+    submodule_check.check(Path(__file__).parent.resolve(), submodule_check.BUILD)
+
     # TASK-1488: one build at a time on this machine, across all sessions and worktrees.
     import atexit
     _lock = acquire_build_lock(Path(__file__).parent.resolve())

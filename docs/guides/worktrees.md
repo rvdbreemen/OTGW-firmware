@@ -32,7 +32,15 @@ Two Claude (or Codex / Gemini) sessions doing git operations in the **same** wor
 
 **Prevention.** Give each concurrent session its OWN worktree (`git worktree add ../wt-<topic> <branch-or-HEAD>`), OR run parallel work as **background sub-agents inside ONE session** (they serialise git through the single main thread, and the convention here is that sub-agents implement + report but do NOT commit/bump/build — the main thread does that once after reviewing). Do not run two top-level sessions in the same tree expecting clean commits.
 
-**After `git worktree add`, init the submodules before tests or builds** (TASK-1723): a fresh worktree has an empty `src/libraries/OpenTherm` and `src/libraries/SimpleTelnet`, so the C++ host harnesses fail with a missing `OpenTherm.h`. Run `git submodule update --init` in the new worktree before `python scripts/run_tests.py` or `build.bat`. A fresh worktree also needs its own `.build-venv` before `build.bat` works.
+### A new worktree gets its submodules by itself (TASK-1725)
+
+`git worktree add` does not initialise git submodules, so a fresh worktree used to have empty `src/libraries/OpenTherm`, `src/libraries/SimpleTelnet` and `other-projects` directories: the C++ host harnesses then failed on a missing `OpenTherm.h`, and the SAT ground-truth and PIC reference reads found nothing. Since TASK-1725:
+
+- **`.githooks/post-checkout`** runs on a worktree's first checkout (git passes the null ref as the previous HEAD; a normal branch switch is left alone) and runs `git submodule update --init` for every submodule the commit records, at the recorded commit. It borrows the objects from the main worktree's copy when that copy is a full clone (`--reference ... --dissociate`, so `other-projects`' 77 MB come from disk and the new copy does not depend on the main tree afterwards); a shallow copy (the main tree's OpenTherm) cannot serve as a reference, so that one is fetched from its URL. A failure never blocks the checkout: the hook prints the command to run. Measured: a fresh worktree took 89 s with all three submodules populated. Bypass: `OTGW_SUBMODULE_HOOK_DISABLE=1 git worktree add ...`.
+- The hook only runs where `core.hooksPath` points at `.githooks` (set once per clone, see `.githooks/README.md`). In this repo `core.hooksPath` is the main tree's absolute `.githooks` path, so every worktree uses the hooks of the main tree's checkout: a hook change takes effect once the main tree is on a commit that has it.
+- **`build.py` and `scripts/run_tests.py`** stop before any work when OpenTherm or SimpleTelnet is missing, with one message naming the submodule and the command `git submodule update --init -- <path>` (`scripts/submodule_check.py`). A missing `other-projects` is only a note in `run_tests.py`: the tests that need it skip, and CI has no access to that repository (`.github/workflows/build.yml`).
+- An existing worktree made before TASK-1725 is fixed with `git submodule update --init` in that worktree.
+- Until the hook is live in the main tree, or with hooks off, run `git submodule update --init` in a new worktree before `python scripts/run_tests.py` or `build.bat` (TASK-1723). A fresh worktree also needs its own `.build-venv` before `build.bat` works (TASK-1723).
 
 ### Cross-worktree work — ask first, then plan once, then parallelise
 

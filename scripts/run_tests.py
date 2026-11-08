@@ -185,6 +185,13 @@ def main():
     ap.add_argument("pattern", nargs="*", help="optional substrings to restrict test file names")
     a = ap.parse_args()
 
+    # TASK-1725: an empty submodule directory (a worktree made without the post-checkout hook) breaks
+    # the host harnesses with a missing OpenTherm.h; say which submodule and how to fix it instead.
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import submodule_check
+    if not a.list:
+        submodule_check.check(ROOT, submodule_check.BUILD, {"other-projects": submodule_check.SUBMODULES["other-projects"]})
+
     py_tests = sorted(TESTS.glob("test_*.py"))
     if not a.no_host:
         if os.name == "nt":

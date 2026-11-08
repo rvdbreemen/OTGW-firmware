@@ -27,6 +27,14 @@ Two passes:
    `data/version.hash` alongside your code change.
    Bypass: `OTGW_BUMP_HOOK_DISABLE=1 git commit ...`
 
+### `post-checkout` (TASK-1725)
+
+On the first checkout of a new worktree (`git worktree add`; git passes the null ref as the previous
+HEAD) it runs `git submodule update --init` for every submodule the commit records, borrowing objects
+from the main worktree's full (not shallow) copy with `--reference ... --dissociate`. Normal branch
+switches are left alone, and a failure never blocks the checkout (it prints the command to run).
+Bypass: `OTGW_SUBMODULE_HOOK_DISABLE=1 git worktree add ...`
+
 ### `commit-msg` (TASK-659)
 
 Two passes:

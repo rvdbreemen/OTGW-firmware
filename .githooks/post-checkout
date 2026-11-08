@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# post-checkout hook (TASK-1725): a new worktree gets its git submodules.
+#
+# `git worktree add` (and `git clone` with this hooksPath) calls post-checkout with the null ref as
+# the previous HEAD. Only then this hook runs `git submodule update --init` for every submodule the
+# checked-out commit records. A normal branch switch is left alone.
+#
+# The objects come from the main worktree's copy of each submodule when it has a full (not shallow)
+# one (--reference with --dissociate: no network for other-projects' 77 MB, and the new copy does not
+# depend on the main tree afterwards); otherwise git fetches from the submodule's URL. A failure never fails the checkout: the hook prints the
+# command to run by hand, and build.py / scripts/run_tests.py name a missing submodule too.
+#
+# Bypass: OTGW_SUBMODULE_HOOK_DISABLE=1 git worktree add ...
+
+[ "$1" = "0000000000000000000000000000000000000000" ] || exit 0
+[ "${OTGW_SUBMODULE_HOOK_DISABLE:-0}" = "1" ] && exit 0
+
+top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+[ -f "$top/.gitmodules" ] || exit 0
+main=$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')
+
+git config --file "$top/.gitmodules" --get-regexp '^submodule\..*\.path$' | while read -r _key path; do
+  # Only submodules this commit actually records (a gitlink); .gitmodules may list more.
+  git -C "$top" ls-files --stage -- "$path" | grep -q '^160000' || continue
+  echo "post-checkout: initialising submodule $path"
+  # A shallow copy cannot serve as --reference (git refuses it), so it is skipped.
+  if [ -n "$main" ] && [ "$main" != "$top" ] && git -C "$main/$path" rev-parse --git-dir >/dev/null 2>&1 \
+     && [ "$(git -C "$main/$path" rev-parse --is-shallow-repository 2>/dev/null)" = "false" ]; then
+    git -C "$top" submodule update --init --reference "$main/$path" --dissociate -- "$path"
+  else
+    git -C "$top" submodule update --init -- "$path"
+  fi || echo "post-checkout: could not initialise $path; run: git submodule update --init -- $path" >&2
+done
+exit 0
