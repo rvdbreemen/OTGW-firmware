@@ -164,6 +164,24 @@ De OTA-updatepagina accepteert geen merged binaries (`*-merged*.bin`, `*-migrate
 
 ---
 
+### 6.7 OTmonitor verbinden
+
+OTmonitor (het monitorprogramma van Schelte Bron voor de OpenTherm Gateway) verbindt met een 2.x-gateway via het netwerk, op TCP-poort 25238. De gateway spreekt daar hetzelfde regelprotocol als een klassieke OTGW op zijn seriële kabel, ook op hardware zonder PIC.
+
+1. Open in de webinterface **Settings > OpenTherm Gateway** en zet **Legacy TCP port 25238** aan. Deze staat standaard uit. Sla op.
+2. Open in OTmonitor de verbindingsinstellingen en kies **TCP connection**.
+3. Vul bij **Remote host** het IP-adres van de gateway in (het adres dat u in de browser gebruikt) en bij **Remote port** **25238**.
+4. Maak verbinding. OTmonitor toont de OpenTherm-berichten zoals bij een klassieke OTGW.
+
+Goed om te weten:
+
+- **USB is geen OTmonitor-verbinding.** Op hardware zonder PIC is de USB-poort alleen voor flashen en diagnose. Als OTmonitor die USB-poort opent, herstart de gateway (door dezelfde USB-lijnsignalen waarmee een USB-flash start), dus midden in het stoken. Gebruik TCP-poort 25238.
+- **Flash de PIC nooit via WiFi met OTmonitor.** Een mislukte of onderbroken upload over het netwerk kan de PIC onbruikbaar maken. Gebruik voor een update van de PIC-firmware op een Classic **Advanced > PIC firmware** in de webinterface.
+- **SAT beperkt wat OTmonitor mag.** Zolang SAT aan staat, weigert de gateway commando's die de ketelregeling zouden veranderen (bijvoorbeeld `CS=`), zodat ze niet tegen SAT in kunnen werken. Op een Classic laat de poort dan alleen gewone tekstregels naar de PIC door en worden binaire gegevens weggegooid. Een PIC-upgrade via OTmonitor kan dus niet zolang SAT aan staat.
+- Poort 25238 heeft geen wachtwoord. Laat hem uit als u hem niet gebruikt, en zet hem niet open in uw router.
+
+---
+
 ### 6.8 Poortgebruik
 
 | Poort | Protocol | Functie | Opmerkingen |
