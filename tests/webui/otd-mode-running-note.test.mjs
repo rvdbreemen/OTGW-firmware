@@ -13,8 +13,9 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { stopChromeTree, guardChrome } from './lib/page-harness.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.OTGW_DATA_DIR || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
@@ -72,14 +73,10 @@ PORT = srv.address().port;
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'otgw-cdp-'));
 const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,1000', 'about:blank'], { stdio: 'ignore' });
-// TASK-1731: on Windows chrome.kill() ends only the browser process; its renderer and GPU
-// children stay behind (seen: 13 orphans from two stalled runs), so stop the whole tree.
-function stopChrome() {
-  if (process.platform === 'win32' && chrome.pid) {
-    try { spawnSync('taskkill', ['/PID', String(chrome.pid), '/T', '/F'], { stdio: 'ignore', timeout: 10000 }); } catch { /* ignore */ }
-  }
-  try { chrome.kill(); } catch { /* ignore */ }
-}
+// TASK-1731/1739: stop the whole Chrome tree (on Windows killing the parent leaves the children),
+// also when the run exits early; the shared launcher helpers do both.
+guardChrome(chrome);
+const stopChrome = () => stopChromeTree(chrome);
 // TASK-1731: a stalled run fails after 240 s with a reason instead of hanging the suite.
 setTimeout(() => {
   console.log('FAIL: watchdog: the run did not finish within 240 s (Chrome or the page stalled)');
