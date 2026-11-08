@@ -257,6 +257,7 @@ function load(fetchImpl) {
     'function markDirty() {}',
     'function ipPrefill() {}',
     'function ipv4Err() { return ""; }',
+    'function satLockedKey() { return false; }',   // TASK-1737: settingRow locks SAT rows while SAT is off
     ...names.map((n) => extractFunction(n, true)),
     'return {',
     '  SET_META: SET_META, setData: setData, settingRow: typeof settingRow === "function" ? settingRow : null,',
