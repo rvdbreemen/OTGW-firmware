@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-beta.135
+**  Version  : v2.0.0-beta.136
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -136,6 +136,7 @@ static void sendFSexplorerPage() {
 // streams straight from flash (webSendPStream, no heap copy). The path is a
 // compile-time constant of the caller, always a plain ASCII URL.
 #include "settingsHelp.h"
+#include "faviconData.h"   // TASK-1696: /favicon.ico from app flash
 static void serveProgmemAsset(const char* path, PGM_P mime, PGM_P body) {
   char etag[64];
   snprintf_P(etag, sizeof(etag), PSTR("\"%s-%s\""), _VERSION_GITHASH, path);
@@ -193,6 +194,9 @@ void startWebserver(){
   // TASK-1281: the settings help texts, fetched by v2.js the first time an info icon is used.
   // TASK-1294: served from the firmware image (settingsHelp.h), not from LittleFS.
   server.on("/settings-help.json", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveProgmemAsset("/settings-help.json", PSTR("application/json"), SETTINGS_HELP_JSON); });
+  // TASK-1696: the favicon comes from app flash, so a page load opens no LittleFS file for it and
+  // takes no web file-gate slot (WEB_FILE_MAX_INFLIGHT); same ETag/no-cache/304 rule as the pages.
+  server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); webSendFlashBody(PSTR("image/x-icon"), FAVICON_ICO, FAVICON_ICO_LEN, "/favicon.ico", false); });
 #if HAS_PIC
   //otgw pic functions
   server.on("/pic", HTTP_ANY, upgradepic);

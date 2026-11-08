@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-beta.135
+**  Version  : v2.0.0-beta.136
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -378,7 +378,9 @@ inline void webSendPStream(int code, PGM_P contentType, PGM_P body) {
 // without a heap copy and sent with Content-Encoding: gzip. With etagPath, the ETag is the
 // firmware hash plus that path (the page changes only with the firmware) and a matching
 // If-None-Match gets 304 with no body.
-inline void webSendGzipPage(PGM_P contentType, const uint8_t* gz, size_t len, const char* etagPath = nullptr) {
+// TASK-1696: the same for any binary body with an explicit length (no strlen, so zero bytes are
+// fine), optionally gzipped. Takes neither the REST gate nor a web file-gate slot.
+inline void webSendFlashBody(PGM_P contentType, const uint8_t* body, size_t len, const char* etagPath, bool gzip) {
   if (!currentRequest || g_responseSent) return;
   webPushHeader(F("Cache-Control"), F("no-cache"));
   if (etagPath) {
@@ -390,11 +392,14 @@ inline void webSendGzipPage(PGM_P contentType, const uint8_t* gz, size_t len, co
       return;
     }
   }
-  webPushHeader(F("Content-Encoding"), F("gzip"));
-  AsyncWebServerResponse* resp = currentRequest->beginResponse(200, String(FPSTR(contentType)), gz, len);
+  if (gzip) webPushHeader(F("Content-Encoding"), F("gzip"));
+  AsyncWebServerResponse* resp = currentRequest->beginResponse(200, String(FPSTR(contentType)), body, len);
   webApplyHeaders(resp);
   currentRequest->send(resp);
   g_responseSent = true;
+}
+inline void webSendGzipPage(PGM_P contentType, const uint8_t* gz, size_t len, const char* etagPath = nullptr) {
+  webSendFlashBody(contentType, gz, len, etagPath, true);
 }
 
 // Active-file admission is silent; only actual safety/queue/deadline refusals
