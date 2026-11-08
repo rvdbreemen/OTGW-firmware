@@ -8385,6 +8385,64 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-219",
+      "title": "Translate the web UI with a t() helper, English built in, NL and DE packs on LittleFS",
+      "path": "ADR-219-translate-the-web-ui-with-a-t-helper-english-built-in-nl-and-de-packs-on-littlefs.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-08",
+      "decision_summary": "User Decision (Robert, 2026-11-08): the web UI is translated in the browser by a small t(key, params) helper in v2.js...",
+      "topics": [
+        "i18n",
+        "language-pack",
+        "translation",
+        "web-ui-language"
+      ],
+      "aliases": [
+        "internationalisation",
+        "taalpakket",
+        "web UI translation"
+      ],
+      "components": [
+        "web UI translation mechanism"
+      ],
+      "symbols": [
+        "applyI18n",
+        "t()"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep English complete in the repo and use it per key when a pack lacks the key.",
+          "Gate every pack with a test for missing keys and placeholder mismatches.",
+          "Pin any remote pack URL to the firmware tag and check it with an SRI hash built into the firmware."
+        ],
+        "must_not": [
+          "Translate MQTT topics, Home Assistant entity names, REST fields, telnet output or logs.",
+          "Add an i18n library to the web UI bundle.",
+          "Let the device itself download packs (no TLS, ADR-003/ADR-218)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "A web UI test that runs the real v2.js helper: an unsupported browser language gives English, a supported one gives the pack, a missing key falls back per key (TASK-1689 AC2).",
+          "A pack-coverage test over i18n/.json against the English key set."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -14703,6 +14761,30 @@
     {
       "source": "ADR-218",
       "target": "ADR-137",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-219",
+      "target": "ADR-192",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-219",
+      "target": "ADR-194",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-219",
+      "target": "ADR-215",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-219",
+      "target": "ADR-218",
       "type": "related",
       "resolved": true
     }

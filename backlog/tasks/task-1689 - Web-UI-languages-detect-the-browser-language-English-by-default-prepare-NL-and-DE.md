@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-07T11:06:00Z'
-updated_date: '2026-11-08T09:09:00Z'
+updated_date: '2026-11-08T09:11:00Z'
 labels:
   - webui
   - i18n
@@ -25,7 +25,7 @@ Robert 2026-11-07: detect which language the user uses; the default is always En
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ADR for the web UI language mechanism Accepted by Robert
+- [x] #1 ADR for the web UI language mechanism Accepted by Robert
 - [ ] #2 Browser language detected; English is used when the language is not supported, proven by a test
 - [x] #3 NL and DE translation plan agreed (scope, who translates, how strings are kept in sync)
 <!-- AC:END -->
@@ -46,4 +46,6 @@ Robert 2026-11-07: detect which language the user uses; the default is always En
 2026-11-08: ADR-218 written as Proposed and parked (outbound TLS client only on PSRAM boards, mini CA bundle, fallback or disable per feature; inbound stays HTTP per ADR-003). Robert asked why outbound TLS is needed: nothing in src/ needs it today (PIC check/download and webhook use plain HTTP; language packs are fetched by the browser from jsDelivr). Stays Proposed until a concrete feature (likely HTTPS webhooks) asks for it. Mini bundle evidence from peer: commit 1dd2007 (lane-1689tls), 14 roots 5,427 B, tests/test_tls_mini_bundle.py 7/7.
 
 2026-11-08 Robert's four decisions (AskUserQuestion): (1) packs: NL and DE gzipped on LittleFS (offline), other languages later fetched by the browser from jsDelivr pinned to the firmware tag with SRI; (2) choice: browser language (navigator.languages), English when unsupported, per-browser override in the UI stored in localStorage (no device setting); (3) scope: all visible web UI texts including the settings help; NOT translated: MQTT topics, HA entity names, REST fields, telnet and logs, update/safeboot pages; (4) translation: English source in the repo, AI draft for NL/DE on every change, human review (Robert NL, a German-speaking tester DE), a test fails when a key is missing in a pack and the UI falls back to English per key; Hosted Weblate only when more languages come.
+
+2026-11-08 ADR-219 Accepted by Robert in session (acceptance packet shown); adr-lint --strict incl. clarity PASS. AC1 met.
 <!-- SECTION:NOTES:END -->
