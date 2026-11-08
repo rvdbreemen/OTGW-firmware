@@ -76,9 +76,14 @@ test('with SAT off, SAT settings are locked and cannot be saved; the switch and 
 test('with SAT on, SAT settings are editable', async () => {
   const h = await open(true);
   try {
-    for (const k of SAT_KEYS) assert.equal(await disabledOf(h, `#satSetL2 .srow[data-key="${k}"] input`), false, `${k} is editable`);
-    for (const id of PAGE_IDS) assert.equal(await disabledOf(h, `#${id}`), false, `#${id} is usable`);
-    assert.doesNotMatch(await h.evalJs(`(document.getElementById('satSetL2') || {}).textContent || ''`), /SAT is off/);
+    // Under load each CDP round trip can stall: wait for the end state once, then read it in one call.
+    const sels = [...SAT_KEYS.map((k) => `#satSetL2 .srow[data-key="${k}"] input`), ...PAGE_IDS.map((id) => `#${id}`)];
+    const read = `(function(){ var s = ${JSON.stringify(sels)}; return { dis: s.map(function (q) { var e = document.querySelector(q); return e ? e.disabled : null; }),
+      note: ((document.getElementById('satSetL2') || {}).textContent || '').indexOf('SAT is off') >= 0 }; })()`;
+    await h.until(`(function(){ var r = ${read}; return !r.note && r.dis.every(function (d) { return d === false; }); })()`, 30000);
+    const r = await h.evalJs(read);
+    sels.forEach((q, i) => assert.equal(r.dis[i], false, `${q} is editable`));
+    assert.equal(r.note, false, 'no "SAT is off" note');
     assert.deepEqual(h.exceptions, []);
   } finally { await h.close(); }
 });
