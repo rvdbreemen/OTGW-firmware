@@ -227,7 +227,9 @@ static unsigned long applyResponseModifiers(unsigned long response);
 
 MAIN = r"""
 // ---- boiler model --------------------------------------------------------------
+static bool g_no24 = false;   // T2 (TASK-1733): tjfs's boiler answers MsgID 24 Unknown-DataID
 static bool boilerSupports(uint8_t id) {
+  if (g_no24 && id == 24) return false;
   switch (id) { case 2: case 9: case 127: return false; default: return id <= 57 || (id >= 116 && id <= 123); }
 }
 static unsigned long frameOf(unsigned type, unsigned id, uint16_t data) {
@@ -366,6 +368,31 @@ int main() {
     printf("T1 t9=%d ack=%d%c", t9, ack, 10); }
   otRemoteOverride.mode = OT_OVERRIDE_NONE; otRemoteOverride.f88Value = 0;
 @T1CLEAR@
+  // T2 (TASK-1733, tjfs beta.146): TT=21.5 in gateway mode. tjfs's thermostat never reads MsgID 9 and
+  // his boiler answers MsgID 24 Unknown-DataID. The bridge log is decoded as v2.js does
+  // (case 24: room = data of a type 1/4/5 frame; case 16: roomSet = data of a type 1 frame).
+  resetAll(); g_no24 = true;
+  { const unsigned ids[][3] = { {0,0,0x0200}, {1,1,0x3200}, {0,0,0x0200}, {0,25,0}, {0,0,0x0200}, {0,17,0},
+                                {0,0,0x0200}, {1,16,0x1400}, {0,0,0x0200}, {1,24,0x1499}, {0,0,0x0200}, {0,27,0} };
+    g_stream.clear(); for (auto& e : ids) g_stream.push_back(frameOf(e[0], e[1], (uint16_t)e[2])); }
+  simulate(true, 60000);   // 24 becomes an alternative slot (three Unknown-DataID answers)
+  { const uint16_t tt = 0x1580;   // TT=21.5: what setRemoteOverride() does via enqueueWriteCommand()
+    otCmdEnqueue(OpenTherm::buildRequest(OpenThermMessageType::WRITE_DATA, (OpenThermMessageID)16, tt)); updateWriteCache(16, tt); setOverride(16, tt);
+    otCmdEnqueue(OpenTherm::buildRequest(OpenThermMessageType::WRITE_DATA, (OpenThermMessageID)100, 2)); updateWriteCache(100, 2); setOverride(100, 2);
+    otRemoteOverride.mode = OT_OVERRIDE_TEMPORARY; otRemoteOverride.f88Value = tt; }
+  size_t from = g_log.size();
+  simulate(true, 120000);
+  { uint16_t room = 0, roomSet = 0; int room215 = 0, set215 = 0;
+    for (size_t i = from; i < g_log.size(); i++) {
+      unsigned long f = g_log[i].frame; uint8_t t = typeOf(f), id = idOf(f); uint16_t d = (uint16_t)(f & 0xFFFF);
+      bool isAck = (t == 4 || t == 5), isWrite = (t == 1 || t == 5);
+      if (id == 24 && (isAck || isWrite)) { room = d; if (d == 0x1580) { room215++; if (room215 <= 3) printf("T2-room215 %c %08lX%c", g_log[i].prefix, f, 10); } }
+      if (id == 16 && t == 1) { roomSet = d; if (d == 0x1580) set215++; }
+    }
+    int boiler16 = 0;
+    for (unsigned long q : otMaster.sent) if (idOf(q) == 16 && typeOf(q) == 1 && (q & 0xFFFF) == 0x1580) boiler16++;
+    printf("T2 room=%u roomset=%u room215=%d set215=%d boiler16=%d%c", room, roomSet, room215, set215, boiler16, 10); }
+  g_no24 = false;
   return 0;
 }
 """
@@ -485,6 +512,16 @@ class GatewayAltSlots(unittest.TestCase):
         self.assertIsNotNone(r, "T1c not run: the TASK-1718 clear one-shot is missing")
         self.assertEqual(r["first"], 1, "the first MsgID 9 read after TT=0 must be READ_ACK 0")
         self.assertEqual(r["pending"], 0)
+
+    def test_T2_tt_lands_on_the_setpoint_not_on_the_room_temperature(self):
+        # TASK-1733 (tjfs, beta.146): TT=21.5 in gateway mode, thermostat without MsgID 9 reads and a
+        # boiler that answers MsgID 24 Unknown-DataID (so 24 is an alternative slot). Decoded as v2.js
+        # does: 21.5 must reach the boiler on MsgID 16 and show as the setpoint, never as MsgID 24.
+        r = self.rows["T2"]
+        self.assertEqual(r["room215"], 0, "21.5 appeared on MsgID 24 (the room temperature)")
+        self.assertEqual(r["room"], 0x1499, "the room temperature must stay the thermostat's own MsgID 24 value")
+        self.assertEqual(r["roomset"], 0x1580, "the setpoint (MsgID 16) seen by the web UI must be the override")
+        self.assertGreater(r["boiler16"], 0, "the boiler must get MsgID 16 = 21.5")
 
     def test_H1_relayed_status_keeps_adr208_rule(self):
         r = self.rows["H1"]
