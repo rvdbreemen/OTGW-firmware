@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-08T18:26:00Z'
-updated_date: '2026-11-08T18:51:00Z'
+updated_date: '2026-11-08T22:10:00Z'
 labels:
   - bug
   - webui
@@ -81,4 +81,6 @@ Implemented in lane-1741 (wt-1741), v2.js only:
 - Wizard loadHealth/healthRow: a failed /health or /sat/status request gives grey 'Unknown' rows (ok === null) instead of 'Offline'/'Not connected'/'Not detected', and no outside-temperature warning.
 - page-harness: { __status } support, byte-identical to lane-1732's change, so the merge is clean.
 Tests: tests/webui/rest-503-keeps-state.test.mjs, three cases. Red on dev data (OTGW_DATA_DIR = main checkout): 3/3 fail with the exact defect ('Couldn't load' banner over data; 'OpenTherm bus Offline'; badge hidden). Green on the fix: 3/3. python evaluate.py --quick: 85 passed, 0 failed. Not verified on a device (the 1741 checks on .61 come after the single build).
+
+2026-11-08 otgw-firmware-80 red/green on int-157 (HEAD e4d0280f4) vs origin/dev 07b38ee49 + the new test file: client side: rest-503-keeps-state fix 3/3, old 0/3 (SAT page keeps last data on 503; wizard health Unknown not a false warning; SIMULATION badge stays). AC2 also needs red/green on .61; AC1/AC3 are measurements.
 <!-- SECTION:NOTES:END -->

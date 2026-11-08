@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-08T15:11:00Z'
-updated_date: '2026-11-08T21:27:00Z'
+updated_date: '2026-11-08T22:10:00Z'
 labels:
   - webui
 milestone: 2.0.0
@@ -24,7 +24,7 @@ Found on the TASK-1693 bench (.61, beta.148): when satbleenable is the only dirt
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With only satbleenable dirty on a no-PSRAM board without ack, Save shows the warning and no 'Settings saved' toast; a browser test is red on beta.148 and green on the fix
+- [x] #1 With only satbleenable dirty on a no-PSRAM board without ack, Save shows the warning and no 'Settings saved' toast; a browser test is red on beta.148 and green on the fix
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -37,4 +37,6 @@ Found on the TASK-1693 bench (.61, beta.148): when satbleenable is the only dirt
 2026-11-08 19:0x coordinator renumbering: TASK-1731 takes beta.151 (with 150), so TASK-1732 = beta.152; re-bump at the final rebase (lane commit daf1fed26 currently carries beta.151). (carried over from the main dev tree copy by otgw-firmware-4c, 2026-11-08)
 
 2026-11-08 int-157 (combined build plan, Robert approved): rebased onto int-157 e8b96e689 (150+151), bumped to beta.152, commit b5c19dbc3; int-157 moved there and handed to agent 1. Gates on that tip: ble-nopsram-warning 5/5, settings-error-toast 5/5, evaluate --quick 92 checks 0 FAIL 0 WARN. Bench on the combined image (54 builds/flashes .61) pending. (carried over from the main dev tree copy by otgw-firmware-4c, 2026-11-08)
+
+2026-11-08 otgw-firmware-80 red/green on int-157 (HEAD e4d0280f4) vs origin/dev 07b38ee49 + the new test file: settings-error-toast fix 5/5, old 4/5 (fails: save that only switches SAT on posts nothing, no Settings saved); ble-nopsram-warning fix 5/5, old 3/5 (fails: switching BLE on shows the warning then stores enable+ack; failed Enable-anyway save says so).
 <!-- SECTION:NOTES:END -->
