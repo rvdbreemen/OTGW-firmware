@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-08T07:54:00Z'
+updated_date: '2026-11-08T08:14:00Z'
 labels:
   - webui
   - field-report
@@ -27,3 +28,9 @@ Reported by tjfs 2026-11-08 07:51 #alpha-testing (msg 1568895744029499403): in O
 - [ ] #1 With SAT off the dial does not pretend to set anything: it either sends a TT= room-setpoint override (and says so) or is shown as SAT-only (decision Robert)
 - [ ] #2 With SAT on the dial keeps setting the SAT target (test)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+tjfs 2026-11-08 07:57 (msg 1568897217505402944): 'definitely not obvious! I think if you're not in sat mode the temperature dial should alter the TT setting.' Depends on TASK-1718 (OT-Direct TT= does not reach the thermostat yet).
+<!-- SECTION:NOTES:END -->
