@@ -53,7 +53,7 @@ function stubToast() {
 }
 
 // Build saveSettings() + bleToast() with the given POST status per key.
-function load(statusFor) {
+function load(statusFor, opts = {}) {
   const src = fs.readFileSync(V2JS, 'utf8');
   const toast = stubToast();
   const posted = [];
@@ -75,10 +75,11 @@ function load(statusFor) {
     'var setDirty = {}, setData = {}, APIGW = "/api/", IP_KEY_RE = /^$/;\n' +
     'function ipv4Err() { return ""; } function ipGroupsErr() { return ""; }\n' +
     'function subFor() { return ""; } function labelFor() { return ""; } function curVal() { return ""; }\n' +
-    'function satOnbNeeded() { return false; } function renderSettings() {}\n' +
-    'function bleAction() {} function startSatOnboarding() {}\n' +
+    'function satOnbNeeded() { return ' + (opts.onboardingNeeded ? 'true' : 'false') + '; } function renderSettings() {}\n' +
+    'var wizardStarted = 0; function bleAction() {} function startSatOnboarding() { wizardStarted++; }\n' +
+    'function bleNeedsRiskAck() { return false; } function maybeShowBleConsent() {}\n' +
     extractFunction(src, 'bleToast') + '\n' + extractFunction(src, 'saveSettings') + '\n' +
-    'return { save: function (d) { setDirty = d; saveSettings(); }, bleToast: bleToast };';
+    'return { save: function (d) { setDirty = d; saveSettings(); }, bleToast: bleToast, wizard: function () { return wizardStarted; } };';
   const api = new Function('document', 'fetch', 'setTimeout', 'clearTimeout', body)(env.document, env.fetch, env.setTimeout, env.clearTimeout);
   const fireTimers = () => { const fns = [...timers.values()]; timers.clear(); fns.forEach((f) => f()); };
   return { api, toast, posted, timers, fireTimers };
@@ -103,6 +104,17 @@ test('a good save after a failed one shows the green toast (err cleared)', async
   await settle();
   assert.equal(toast.textContent, 'Settings saved');
   assert.ok(!toast.classList.contains('err'), 'success toast must not carry .err');
+});
+
+test('a save that only switches SAT on hands it to the wizard: nothing posted, no "Settings saved"', async () => {
+  // TASK-1732: the wizard owns the enable, so this save stored nothing yet.
+  const { api, toast, posted } = load(() => 200, { onboardingNeeded: true });
+  api.save({ satenabled: 'true' });
+  await settle();
+  assert.deepEqual(posted, [], 'nothing is posted');
+  assert.equal(api.wizard(), 1, 'the SAT wizard starts');
+  assert.ok(!(toast.classList.contains('show') && /Settings saved/.test(toast.textContent)),
+    'no "Settings saved" toast: ' + toast.textContent);
 });
 
 test('a new toast cancels the previous toast\'s pending hide timer', () => {

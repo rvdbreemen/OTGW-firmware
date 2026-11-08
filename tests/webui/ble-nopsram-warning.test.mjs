@@ -14,13 +14,14 @@ import { startPage, CHROME } from './lib/page-harness.mjs';
 
 const skip = !CHROME && 'no Chrome';
 
-function fakeDevice({ psram, bleEnable, riskAck }) {
+function fakeDevice({ psram, bleEnable, riskAck, failPost }) {
   const st = { satbleenable: bleEnable, satbleriskack: riskAck };
   const posts = [];
   const api = (method, p, search, body) => {
     if (p.endsWith('/v2/settings') && method === 'POST') {
       const j = JSON.parse(body || '{}');
       posts.push(j.name + '=' + j.value);
+      if (failPost === j.name) return { __status: 500 };
       if (j.name in st) st[j.name] = ('' + j.value) === 'true';
       return { ok: true };
     }
@@ -74,10 +75,30 @@ test('no PSRAM: switching BLE on and saving shows the warning; Enable anyway sto
       i.checked = true; i.dispatchEvent(new Event('change')); document.getElementById('btnSave').click(); })()`);
     assert.ok(await h.until(MODAL, 8000), 'the stability warning opened on save');
     assert.ok(!dev.posts.includes('satbleenable=true'), 'BLE is not stored before the user accepts: ' + dev.posts);
+    // TASK-1732: nothing was posted, so no "Settings saved" toast while the warning waits
+    const toast = await h.evalJs(`(function(){ var t = document.getElementById('toast'); return t && t.classList.contains('show') ? t.textContent : ''; })()`);
+    assert.doesNotMatch(toast, /Settings saved/, 'no "Settings saved" toast when nothing was saved: ' + toast);
     await h.evalJs(`Array.from(document.querySelectorAll('#bleRiskBackdrop button')).find(function (b) { return /anyway/i.test(b.textContent); }).click()`);
     assert.ok(await h.until(`!document.getElementById('bleRiskBackdrop')`, 5000), 'the warning closed');
     for (let i = 0; i < 40 && dev.posts.length < 2; i++) await h.sleep(100);
     assert.deepEqual(dev.posts, ['satbleenable=true', 'satbleriskack=true'], 'enable first, then the ack');
+    assert.deepEqual(h.exceptions, []);
+  } finally { await h.close(); }
+});
+
+test('no PSRAM: Enable anyway whose save fails says so (red "Save failed"), not silence', { skip }, async () => {
+  // TASK-1732 review (agent 3): before, a failed satbleenable/satbleriskack POST on the consent
+  // path was swallowed; with the "Settings saved" toast gone the user saw nothing at all.
+  const dev = fakeDevice({ psram: 0, bleEnable: false, riskAck: false, failPost: 'satbleriskack' });
+  const h = await startPage({ api: dev.api });
+  try {
+    await openSensors(h);
+    await h.evalJs(`(function(){ var i = document.querySelector('#setCols .srow[data-key="satbleenable"] input.sw');
+      i.checked = true; i.dispatchEvent(new Event('change')); document.getElementById('btnSave').click(); })()`);
+    assert.ok(await h.until(MODAL, 8000), 'the stability warning opened on save');
+    await h.evalJs(`Array.from(document.querySelectorAll('#bleRiskBackdrop button')).find(function (b) { return /anyway/i.test(b.textContent); }).click()`);
+    const TOAST = `(function(){ var t = document.getElementById('toast'); return t && t.classList.contains('show') ? (t.classList.contains('err') ? 'ERR:' : '') + t.textContent : ''; })()`;
+    assert.ok(await h.until(`/^ERR:Save failed/.test(${TOAST})`, 5000), 'red "Save failed" toast: ' + await h.evalJs(TOAST));
     assert.deepEqual(h.exceptions, []);
   } finally { await h.close(); }
 });

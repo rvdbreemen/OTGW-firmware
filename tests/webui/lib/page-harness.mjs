@@ -37,7 +37,8 @@ export async function startPage({ api, asset, beforeScript, width = 1400, height
       if (p.indexOf('/api/') === 0) {
         log.push(q.method + ' ' + p + u.search + ' ' + body);
         const r = api ? api(q.method, p, u.search, body) : undefined;
-        s.writeHead(200, { 'content-type': 'application/json' });
+        // A handler may answer { __status: 500 } to make the request fail with that HTTP status.
+        s.writeHead((r && r.__status) || 200, { 'content-type': 'application/json' });
         s.end(JSON.stringify(r === undefined ? {} : r));
         return;
       }

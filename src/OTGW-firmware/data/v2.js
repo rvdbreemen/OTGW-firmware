@@ -3056,7 +3056,9 @@
     });
     chain.then(function () {
       setDirty = {};
-      bleToast('Settings saved');
+      // TASK-1732: only when something was posted. A save that held only a key handed to the SAT
+      // wizard (satenabled) or the BLE warning (satbleenable) stored nothing yet.
+      if (keys.length) bleToast('Settings saved');
       renderSettings();
       if (bleName) bleAction('rescan');   // TASK-1231: re-apply the name filter (classic parity)
       if (satEnabling) startSatOnboarding('enable');   // TASK-1012: wizard owns the actual enable
@@ -3127,7 +3129,13 @@
     var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = 'Enable anyway (accept risk)';
     function post(name, value, then) {
       fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, value: value }) })
-        .then(function (r) { if (r.ok && then) then(); }).catch(function () { });
+        // TASK-1732 review: a failed store says so; the user must not be left without feedback.
+        // The failure handler covers the request only, so an error in then() is not shown as a failed save.
+        .then(function (r) {
+          if (!r.ok) { bleToast('Save failed (HTTP ' + r.status + ')', true, 2500); return false; }
+          return true;
+        }, function () { bleToast('Save failed', true, 2500); return false; })
+        .then(function (ok) { if (ok && then) then(); });
     }
     function close() { if (bd.parentNode) bd.parentNode.removeChild(bd); }
     var wasOn = setData.satbleenable && ('' + setData.satbleenable.value) === 'true';
