@@ -8495,6 +8495,56 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-221",
+      "title": "Language packs may be gzipped on LittleFS (amends ADR-194 for language packs only)",
+      "path": "ADR-221-language-packs-may-be-gzipped-on-littlefs-amends-adr-194-for-language-packs-only.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-08",
+      "decision_summary": "User Decision (Robert, 2026-11-08): the web UI language packs (i18n/ .json, ADR-219/ADR-220) are stored on LittleFS a...",
+      "topics": [
+        "gzip",
+        "i18n",
+        "language-pack",
+        "littlefs"
+      ],
+      "aliases": [
+        "gzipped language packs"
+      ],
+      "components": [
+        "language pack storage"
+      ],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Serve each gzipped pack with Content-Encoding: gzip and an ETag, like the ADR-215 pages.",
+          "Build the .gz packs in build.py from the i18n/ sources; never commit .gz files."
+        ],
+        "must_not": [
+          "Gzip any other LittleFS asset under this ADR.",
+          "Inflate a pack on the device."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "A build test that the LittleFS staging contains nl.json.gz and de.json.gz and no other new .gz file; a web UI test that the real t() loads a gzipped pack served with Content-Encoding: gzip."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -14843,6 +14893,30 @@
     {
       "source": "ADR-220",
       "target": "ADR-219",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-221",
+      "target": "ADR-194",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-221",
+      "target": "ADR-215",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-221",
+      "target": "ADR-219",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-221",
+      "target": "ADR-220",
       "type": "related",
       "resolved": true
     }

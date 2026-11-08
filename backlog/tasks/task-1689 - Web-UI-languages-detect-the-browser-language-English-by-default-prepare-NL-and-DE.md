@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-07T11:06:00Z'
-updated_date: '2026-11-08T09:28:00Z'
+updated_date: '2026-11-08T09:45:00Z'
 labels:
   - webui
   - i18n
@@ -50,4 +50,8 @@ Robert 2026-11-07: detect which language the user uses; the default is always En
 2026-11-08 ADR-219 Accepted by Robert in session (acceptance packet shown); adr-lint --strict incl. clarity PASS. AC1 met.
 
 2026-11-08 Robert: pack file format = i18next v4 JSON with our own t() (no library); Hosted Weblate opens once NL and DE run. Recorded as ADR-220 (amends ADR-219), Accepted by Robert in session.
+
+2026-11-08 ADR-194 conflict found by the language-research verifier (ADR-219 said gzipped packs on LittleFS; ADR-194 forbids gzip outside the ADR-215 pages). Robert chose a small ADR: ADR-221 (packs may be gzipped, nothing else), Accepted by Robert. LittleFS measured on .61 (beta.142, GET /api/listfiles): 786,432 B total, 387,072 used, 399,360 free; v2.html.gz 171,973 B.
+
+2026-11-08 language advice (workflow wf_604b1a26-22f, 4 angles each with a verifier), adopted by Robert: no third language now; PL, then FR and IT only when a named native reviewer commits; ES and EL not. Evidence: PL arturhome.pl >= 7 OTGW topics 2021-2025, 13/158 located issue authors; FR 38,669 HA installs but 1 OTGW forum topic, main brand Saunier Duval on eBUS; IT 12 OpenTherm Association members (4th, after NL 25, CN 16, UK 14), 0 located stargazers; ES 2/158 authors; EL 0.64% of European HA installs, oil 40.9% > gas 16.6%, Inter font has 0 Greek glyphs (~20 KB woff2 subset). Refuted by verifiers: 'Italy second in the OpenTherm Association', 'French has the most support', an uncited PL new-build figure, an uncited ES 40% gas figure. Unknown: our own users per country (Discord, NodoShop sales, otgw.tclcode.com traffic).
 <!-- SECTION:NOTES:END -->

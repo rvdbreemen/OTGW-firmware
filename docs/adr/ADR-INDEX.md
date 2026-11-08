@@ -226,3 +226,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-218 | Proposed | - | User Decision (Robert, 2026-11-07), parked 2026-11-08: when a firmware feature needs an HTTPS request, the gateway ma... |
 | ADR-219 | Accepted | - | User Decision (Robert, 2026-11-08): the web UI is translated in the browser by a small t(key, params) helper in v2.js... |
 | ADR-220 | Accepted | - | User Decision (Robert, 2026-11-08): the language pack files follow the i18next v4 JSON format, read by the project's... |
+| ADR-221 | Accepted | - | User Decision (Robert, 2026-11-08): the web UI language packs (i18n/ .json, ADR-219/ADR-220) are stored on LittleFS a... |
