@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.141
+**  Version  : v2.0.0-beta.142
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -434,6 +434,8 @@ static constexpr uint8_t OT_OVERRIDE_COUNT = sizeof(otOverrides) / sizeof(otOver
 // for the enum + struct). Single file-static instance: only one TT/TC override
 // is active at a time, second command replaces the first. Not persisted: PIC
 // resets these on power cycle / heartbeat reset, and so do we.
+// TASK-1718: set by clearRemoteOverride(); the next thermostat MsgID 9 read answers READ_ACK 0 once.
+static bool otRemoteOverrideClearPending = false;
 static OTRemoteOverrideState otRemoteOverride = {
   OT_OVERRIDE_NONE,  // mode
   0,                 // f88Value
@@ -443,6 +445,13 @@ static OTRemoteOverrideState otRemoteOverride = {
   false,             // bHaveLastThermostat — TASK-498 (1A-M2)
   0                  // honoredCount
 };
+
+// TASK-1718: MsgID 9 / 100 are answered by the gateway while an override is active
+// or its clear is pending (see otdIsAltSlot and otdRemoteOverrideReply).
+static bool otdRemoteOverrideHoldsSlot(uint8_t msgId) {
+  if (msgId != 9 && msgId != 100) return false;
+  return otRemoteOverride.mode != OT_OVERRIDE_NONE || (msgId == 9 && otRemoteOverrideClearPending);
+}
 
 // TASK-466: tunables for the auto-clear honour state machine. Kept as named
 // constants so future tuning is grep-able. Values mirror gateway.asm intent:
@@ -1373,6 +1382,38 @@ static unsigned long buildOverriddenReply(unsigned long thermostatReq, unsigned 
   return buildOTResponse(type, msgId, data);
 }
 
+// TASK-1718: the thermostat READs MsgID 9 (TrOverride, remote override room setpoint) and
+// MsgID 100 (remote override function flags) to learn about a TT=/TC= override (OT spec v4.2
+// 5.3.9/5.3.10: MsgID 9 value != 0 = override active, 0 = none). Parity with the PIC
+// (gateway.asm MessageID9 / MessageID100): an active override answers READ_ACK with the override
+// setpoint / the flags in the low byte; the first MsgID 9 read after a clear answers READ_ACK 0
+// once; a boiler Data-Invalid / Unknown-DataID on either id becomes READ_ACK 0; a boiler
+// READ_ACK passes through. Any other frame is returned unchanged.
+// --- otdRemoteOverrideReply begin
+static unsigned long otdRemoteOverrideReply(unsigned long boilerResp, bool overrideActive,
+                                            uint16_t f88Value, uint16_t flags, bool &clearPending) {
+  const uint8_t msgId = (uint8_t)((boilerResp >> 16) & 0xFF);
+  if (msgId != 9 && msgId != 100) return boilerResp;
+  const uint8_t type = (uint8_t)((boilerResp >> 28) & 0x07);
+  if (type != 4 && type != 6 && type != 7) return boilerResp;   // READ_ACK, DATA_INVALID, UNKNOWN_DATA_ID
+  uint16_t data = 0;
+  bool own = false;
+  if (overrideActive) {
+    data = (msgId == 9) ? f88Value : (uint16_t)(flags & 0x00FF);
+    own = true;
+  } else if (msgId == 9 && clearPending) {
+    clearPending = false;
+    own = true;
+  } else if (type != 4) {
+    own = true;
+  }
+  if (!own) return boilerResp;
+  unsigned long reply = (4UL << 28) | ((unsigned long)msgId << 16) | data;
+  setOTParityBit(reply);
+  return reply;
+}
+// --- otdRemoteOverrideReply end
+
 // ---------------------------------------------------------------------------
 // replyToThermostat: answer a forwarded thermostat frame once the boiler has
 // replied (OT spec v4.2 section 4.3.2: the gateway forwards the next slave's
@@ -1388,6 +1429,10 @@ static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentRe
     reply = buildOverriddenReply(otLastThermostatRequest, sentReq, boilerResp);
   } else if (otCurrentMode == OTD_MODE_GATEWAY) {
     reply = applyResponseModifiers(boilerResp);
+    reply = otdRemoteOverrideReply(reply, otRemoteOverride.mode != OT_OVERRIDE_NONE,
+                                   otRemoteOverride.f88Value,
+                                   otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY ? 0x0002 : 0x0001,
+                                   otRemoteOverrideClearPending);
   }
   if (!otSlave.sendResponse(reply)) {
     OTDDebugTf(PSTR("OTD: reply to thermostat refused, slave not ready, MsgID=%u\r\n"),
@@ -1710,7 +1755,12 @@ static bool otdResponseOverrideActive(uint8_t msgId) {
 // A thermostat Data-ID whose slot the gateway may use: one the UI= table marks
 // unknown, or one the boiler answered Unknown-DataID three times in a row and the
 // SR= table does not answer. MsgID 0 is never counted (handleMasterResponse).
+// While a TT=/TC= override is active, or its clear is still to be answered, MsgID 9
+// and 100 are no slot: the thermostat must get the override from replyToThermostat()
+// (otdRemoteOverrideReply, TASK-1718), not Unknown-DataID.
+static bool otdRemoteOverrideHoldsSlot(uint8_t msgId);
 static bool otdIsAltSlot(uint8_t msgId) {
+  if (otdRemoteOverrideHoldsSlot(msgId)) return false;
   if (isUnknownId(msgId)) return true;
   return getUnknownCount(msgId) >= 3 && !otdResponseOverrideActive(msgId);
 }
@@ -2320,6 +2370,7 @@ static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius) {
   otRemoteOverride.honoredCount       = 0;
   otRemoteOverride.lastThermostatVal  = 0;       // value undefined until bHaveLastThermostat flips
   otRemoteOverride.bHaveLastThermostat = false;  // TASK-498 (1A-M2): reset honour history
+  otRemoteOverrideClearPending        = false;
   state.otd.eOverrideMode             = mode;
   state.otd.iOverrideF88              = f88;
 }
@@ -2332,6 +2383,7 @@ static void clearRemoteOverride() {
   otRemoteOverride.bHaveLastThermostat = false;  // TASK-498 (1A-M2)
   state.otd.eOverrideMode              = OT_OVERRIDE_NONE;
   state.otd.iOverrideF88               = 0;
+  otRemoteOverrideClearPending         = true;   // TASK-1718
 
   clearWriteOverride(16);
   clearWriteOverride(100);
@@ -2454,6 +2506,7 @@ static void resetTransientState() {
   // TASK-466: clear TT/TC remote-override state machine. Mirrors PIC
   // behaviour where a hardware reset wipes setpoint1/2 + OverrideReq.
   otRemoteOverride.mode                = OT_OVERRIDE_NONE;
+  otRemoteOverrideClearPending         = false;
   otRemoteOverride.f88Value            = 0;
   otRemoteOverride.honoredCount        = 0;
   otRemoteOverride.lastThermostatVal   = 0;

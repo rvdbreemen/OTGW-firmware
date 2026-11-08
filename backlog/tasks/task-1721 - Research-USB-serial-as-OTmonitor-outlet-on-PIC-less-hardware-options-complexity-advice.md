@@ -1,0 +1,29 @@
+---
+id: TASK-1721
+title: >-
+  Research: USB serial as OTmonitor outlet on PIC-less hardware - options,
+  complexity, advice
+status: To Do
+assignee: []
+created_date: '2026-11-08T08:55:00Z'
+labels:
+  - research
+  - otdirect
+milestone: 2.0.0
+dependencies: []
+priority: low
+ordinal: 830000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Robert 2026-11-08: research tjfs's feature request TASK-1720 (Discord msg 1568902343880216738): use the native USB port as an outlet for the PIC line protocol traffic so OTmonitor can connect over USB as on a classic OTGW. Explain the options, evaluate the added complexity, advise. Research only, no firmware change.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 Report in docs/research/ lists the options: TCP 25238 only; USB CDC carries the PIC line protocol instead of the debug log; mode switch on one CDC; second CDC interface. Per option: ESP32-S3 USB-Serial-JTAG vs TinyUSB OTG, effect on USB flashing, safeboot, recovery and boot log, code and flash and RAM cost, risks
+- [ ] #2 Claims cite primary sources: our code file:line, ESP-IDF and arduino-esp32 docs, otmonitor source in other-projects; and say what was not verified
+- [ ] #3 Clear recommendation with consequences, put to Robert as one question
+<!-- AC:END -->

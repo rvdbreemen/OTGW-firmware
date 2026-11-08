@@ -356,8 +356,30 @@ int main() {
     int stale = 0;
     for (size_t i = 0; i < otMaster.sent.size(); i++) { unsigned long q = otMaster.sent[i]; if (idOf(q) == 1 && (q & 0xFFFF) == 0x0A00) stale++; }
     printf("W1stale n=%d%c", stale, 10); }
+  // T1 (TASK-1718, tjfs): TT=20 active. The boiler answers MsgID 9 Unknown-DataID (boilerSupports),
+  // so without the gateway's own answer the thermostat never reads the override setpoint.
+  resetAll(); buildStream(0x02);
+  otRemoteOverride.mode = OT_OVERRIDE_TEMPORARY; otRemoteOverride.f88Value = 0x1400;
+  { simulate(true, 360000);
+    int t9 = 0, ack = 0;
+    for (unsigned long a : otSlave.sent) if (idOf(a) == 9) { t9++; if (typeOf(a) == 4 && (a & 0xFFFF) == 0x1400 && !OpenTherm::parity(a)) ack++; }
+    printf("T1 t9=%d ack=%d%c", t9, ack, 10); }
+  otRemoteOverride.mode = OT_OVERRIDE_NONE; otRemoteOverride.f88Value = 0;
+@T1CLEAR@
   return 0;
 }
+"""
+
+# T1 clear part: only on code that has the TASK-1718 one-shot flag (old code lacks the symbol)
+T1CLEAR = r"""
+  // T1c: after TT=0 the first MsgID 9 read answers READ_ACK 0 once, then the boiler path returns
+  resetAll(); buildStream(0x02); otRemoteOverrideClearPending = true;
+  { simulate(true, 120000);
+    int t9 = 0, zero = 0, first = -1;
+    for (unsigned long a : otSlave.sent) if (idOf(a) == 9) {
+      if (first < 0) first = (typeOf(a) == 4 && (a & 0xFFFF) == 0) ? 1 : 0;
+      t9++; if (typeOf(a) == 4 && (a & 0xFFFF) == 0) zero++; }
+    printf("T1c t9=%d zero=%d first=%d pending=%d%c", t9, zero, first, otRemoteOverrideClearPending ? 1 : 0, 10); }
 """
 
 
@@ -367,7 +389,8 @@ def build_and_run(ino_path):
     pre = PRE.replace("@LIB_ENUMS@", enums).replace("@LIB_STATICS@", statics).replace("@TYPES@", types)
     with tempfile.TemporaryDirectory() as d:
         cpp = Path(d) / "t.cpp"
-        cpp.write_text(pre + slices(src) + MAIN, encoding="utf-8")
+        main = MAIN.replace("@T1CLEAR@", T1CLEAR if "otRemoteOverrideClearPending" in src else "")
+        cpp.write_text(pre + slices(src) + main, encoding="utf-8")
         exe = compile_cpp(cpp, Path(d) / ("t.exe" if os.name == "nt" else "t"))
         if exe is None:
             return None
@@ -449,6 +472,19 @@ class GatewayAltSlots(unittest.TestCase):
         m = re.search(r"^W1stale n=(\d+)$", self.out, re.M)
         self.assertIsNotNone(m, "W1 case missing")
         self.assertEqual(int(m.group(1)), 0, "the gateway wrote its own cached TSet next to the thermostat's")
+
+    def test_T1_tt_override_reaches_the_thermostat_on_msgid9(self):
+        # TASK-1718 (tjfs): every thermostat MsgID 9 read during TT=20 gets READ_ACK 20.0,
+        # also when the boiler does not support MsgID 9 (no alternative slot takes it).
+        r = self.rows["T1"]
+        self.assertGreater(r["t9"], 10)
+        self.assertEqual(r["ack"], r["t9"], "a MsgID 9 read during TT=20 was not answered READ_ACK 20.0")
+
+    def test_T1c_clear_answers_zero_once(self):
+        r = self.rows.get("T1c")
+        self.assertIsNotNone(r, "T1c not run: the TASK-1718 clear one-shot is missing")
+        self.assertEqual(r["first"], 1, "the first MsgID 9 read after TT=0 must be READ_ACK 0")
+        self.assertEqual(r["pending"], 0)
 
     def test_H1_relayed_status_keeps_adr208_rule(self):
         r = self.rows["H1"]

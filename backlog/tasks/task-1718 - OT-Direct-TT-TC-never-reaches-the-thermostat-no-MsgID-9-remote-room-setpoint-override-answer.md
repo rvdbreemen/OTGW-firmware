@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-08T08:13:00Z'
-updated_date: '2026-11-08T08:17:00Z'
+updated_date: '2026-11-08T08:44:00Z'
 labels:
   - bug
   - otdirect
@@ -26,8 +26,8 @@ Reported by tjfs 2026-11-08 08:02 #alpha-testing (msg 1568898605186551859): in O
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test (replay): with TT=20 active in gateway mode, the thermostat's MsgID 9 READ is answered with 20.0 (red on old code: forwarded/unanswered)
-- [ ] #2 TT=0 / thermostat program change clears it as on the PIC (MsgID 100 flags, gateway.asm:3269-3299)
+- [x] #1 Host test (replay): with TT=20 active in gateway mode, the thermostat's MsgID 9 READ is answered with 20.0 (red on old code: forwarded/unanswered)
+- [x] #2 TT=0 / thermostat program change clears it as on the PIC (MsgID 100 flags, gateway.asm:3269-3299)
 - [ ] #3 Field or bench: thermostat shows the override and raises CH demand (tjfs)
 <!-- AC:END -->
 
@@ -39,3 +39,9 @@ Fix (OTDirect.ino, thermostat-request path next to the SR table ~2093, mirrors g
 Check OpenTherm v4.2 MsgID 9 (TrOverride, R) and 100 (RemoteOverrideFunction, R) semantics before coding; Celcia MsgID 4 special case out of scope (note).
 Verification: host test red->green; regression: test_otd_ch_override, test_otd_gateway_own_status, OT-Direct suites; evaluate --quick; bench .61 has no thermostat (monitor/loopback can't prove it) -> AC3 field (tjfs).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-08 implementation (uncommitted, waiting for the build slot): OTDirect.ino otdRemoteOverrideReply() in replyToThermostat() gateway branch (MsgID 9 -> READ_ACK override f88, MsgID 100 -> READ_ACK flags TT 0x02/TC 0x01; one-shot READ_ACK 0 after clearRemoteOverride; no override + boiler Data-Invalid/Unknown -> READ_ACK 0, PIC parity gateway.asm:2932-2944/3270-3290). Review finding fixed: a boiler that answers MsgID 9 Unknown 3x turned 9 into a TASK-1707 alt slot, so otdAltSlotTaken() answered Unknown and the fix never ran; otdRemoteOverrideHoldsSlot() keeps 9/100 out of the slots while an override is active or its clear is pending (no change without an override, so the alt-slot gates stay as they were). Evidence: tests/test_otd_gateway_alt_slots.py new T1/T1c through the real gateway path (handleSlaveRequest -> boiler model -> replyToThermostat): old code T1 t9=18 ack=0 FAIL, T1c not run (FAIL); fix T1 t9=18 ack=18, T1c first=1 pending=0, Ran 11 OK (skipped=1). tests/test_otd_remote_override_msgid9.py (helper, 10 cases) old FAILED 10 / fix OK. OT-Direct suites OK; evaluate --quick Passed 86 Failed 0. Out of scope, unchanged: TT= still also writes MsgID 16/100 to the boiler (MsgID 100 is R-only per spec; harmless). Open question for Robert: answer MsgID 9 with READ_ACK 0 also when no override is active (full PIC parity, costs alt slots) - not done.
+<!-- SECTION:NOTES:END -->

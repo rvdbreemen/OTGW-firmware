@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : UItypes.h
-**  Version  : v2.0.0-beta.141
+**  Version  : v2.0.0-beta.142
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
