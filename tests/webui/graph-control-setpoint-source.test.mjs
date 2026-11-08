@@ -54,11 +54,8 @@ function load() {
     'var samples = [], SAMPLES_MAX = 1800, GSLOT = 5000, GHIST_MAX = 86400000 / GSLOT, gHist = [], gDallas = null, gLastRender = 0;\n' +
     'var sat = { roomLost: false }, GROOM_STALE_MS = 270000;\n' +
     'function scheduleRender() {}\nfunction isMonitorVisible() { return false; }\nfunction renderGraph() {}\n' +
-    // TASK-1723: applyFrame() and applyOtmonToModel() call trackPressSwitch() since TASK-1682.
-    ((SRC.match(/var PRESS_SWITCH_BAR[^\n]*;/) || [''])[0]) + '\n' +
     [extractFunction(SRC, 'f88'), extractFunction(SRC, 'applyFrame'), extractFunction(SRC, 'rawFromLine'),
-     extractFunction(SRC, 'pushSample'), extractFunction(SRC, 'graphRoomLost'), extractFunction(SRC, 'pushGraphSlot'), extractFunction(SRC, 'applyOtmonToModel'),
-     (SRC.indexOf('function trackPressSwitch(') >= 0 ? extractFunction(SRC, 'trackPressSwitch') : '')]
+     extractFunction(SRC, 'pushSample'), extractFunction(SRC, 'graphRoomLost'), extractFunction(SRC, 'pushGraphSlot'), extractFunction(SRC, 'applyOtmonToModel')]
       .join('\n').replace(/\bDate\.now\b/g, 'fakeDate.now') + '\n' +
     'return { model: model, gHist: function () { return gHist; }, setClock: function (t) { clock = t; },' +
     ' feed: function (line) { var raw = rawFromLine(line); if (raw) applyFrame(raw); return raw; },' +

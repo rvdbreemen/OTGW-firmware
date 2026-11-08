@@ -564,7 +564,7 @@
   var ws = null, wsTimer = null;
   var model = {
     flow: null, ret: null, dhw: null, outside: null, room: null,
-    roomSet: null, chSet: null, mod: null, pressure: null, pressFlatSince: null, tsetGatewayMs: 0, picTempSensor: '',
+    roomSet: null, chSet: null, mod: null, pressure: null, tsetGatewayMs: 0, picTempSensor: '',
     flame: false, ch: false, dhw_on: false, fault: false, fresh: false,
     wxValid: false   // TASK-954: weather API drives OUTSIDE when its last fetch is valid
   };
@@ -621,7 +621,7 @@
                break;
       case 16: if (type === 1) { model.roomSet = f88(u16); changed = true; } break;  // TrSet (thermostat setpoint); Write-Ack data is undefined too
       case 17: if (isAck) { model.mod = f88(u16); changed = true; } break;        // RelModLevel
-      case 18: if (isAck) { model.pressure = f88(u16); trackPressSwitch(model, Date.now()); changed = true; } break;   // CH water pressure
+      case 18: if (isAck) { model.pressure = f88(u16); changed = true; } break;   // CH water pressure
       case 24: if (isAck || isWrite) { model.room = f88(u16); model.roomAt = Date.now(); changed = true; } break; // Troom (TASK-1546: roomAt = when it was last reported)
       case 25: if (isAck) { model.flow = f88(u16); changed = true; } break;       // Tboiler (flow)
       case 26: if (isAck) { model.dhw = f88(u16); changed = true; } break;        // Tdhw
@@ -1244,7 +1244,7 @@
             : model.flame ? (lead + ' ' + (model.mod === null ? '--' : Math.round(model.mod)) + '%')
             : (model.ch ? lead + ' idle' : 'STANDBY');
     txt('aLcd', lcd);
-    setPress('aPress', Date.now());
+    txt('aPress', fmt(model.pressure, 2, ' bar'));
     txt('aDt', 'ΔT ' + (model.flow !== null && model.ret !== null ? fmt(model.flow - model.ret, 1, '°') : '—'));
     // radiator bars tint from the flow temperature (cool track → hot), but only
     // while CH is actually heating — residual boiler heat must not paint them red.
@@ -1277,7 +1277,7 @@
     // mobile chip strip (≤719px) — same six values as the schematic
     var strip = document.getElementById('aStrip');
     if (strip) {
-      var chips = [['Flow', fmt(model.flow, 1, '°'), 'var(--hot)'], ['Return', fmt(model.ret, 1, '°'), 'var(--cold)'], ['DHW', model.dhw === null ? '—' : Math.round(model.dhw) + '°', ''], ['Pressure', pressText(model, Date.now()), ''], ['Room', fmt(model.room, 1, '°'), ''], ['Outside', fmt(model.outside, 1, '°'), '']];
+      var chips = [['Flow', fmt(model.flow, 1, '°'), 'var(--hot)'], ['Return', fmt(model.ret, 1, '°'), 'var(--cold)'], ['DHW', model.dhw === null ? '—' : Math.round(model.dhw) + '°', ''], ['Pressure', fmt(model.pressure, 2, ' bar'), ''], ['Room', fmt(model.room, 1, '°'), ''], ['Outside', fmt(model.outside, 1, '°'), '']];
       strip.textContent = '';
       chips.forEach(function (c) {
         var ch = document.createElement('span'); ch.className = 'mchip';
@@ -1321,7 +1321,7 @@
     txt('bFlow', fmt(model.flow, 1, '°'));
     txt('bRet', fmt(model.ret, 1, '°'));
     txt('bDt', 'ΔT ' + (model.flow !== null && model.ret !== null ? fmt(model.flow - model.ret, 1, '°') : '—'));
-    setPress('bPress', Date.now());
+    txt('bPress', fmt(model.pressure, 2, ' bar'));
     txt('bMod', model.mod === null ? '—' : Math.round(model.mod) + '%');
     txt('bDhw', model.dhw === null ? '—' : Math.round(model.dhw) + '°');
     txt('bDhwState', model.dhw_on ? ((effectiveSource() === 2 || sat.tank) ? 'charging' : 'running') : 'standby');
@@ -1383,30 +1383,6 @@
     renderCGrid();
     renderTicker();
   }
-  // TASK-1682: a boiler with only a low-pressure switch (Ideal Logic, reported by
-  // tjfs) answers MsgID 18 with a fixed 0.1 bar. When the value has stayed at 0.1 bar
-  // for 10 minutes the UI marks it as probably a switch; the value itself is shown
-  // as reported and MQTT/Home Assistant are unchanged. f8.8 has no exact 0.1, so the
-  // match allows 0.005 bar (0x0019 = 0.098, 0x001A = 0.102).
-  var PRESS_SWITCH_BAR = 0.1, PRESS_SWITCH_TOL = 0.005, PRESS_SWITCH_MS = 10 * 60 * 1000;
-  var PRESS_SWITCH_TITLE = 'Probably a pressure switch, no sensor: the boiler has reported a fixed 0.1 bar for 10 minutes';
-  function trackPressSwitch(m, now) {
-    var flat = m.pressure !== null && m.pressure !== undefined && Math.abs(m.pressure - PRESS_SWITCH_BAR) <= PRESS_SWITCH_TOL;
-    if (!flat) m.pressFlatSince = null;
-    else if (m.pressFlatSince === null || m.pressFlatSince === undefined) m.pressFlatSince = now;
-  }
-  function pressIsSwitch(m, now) {
-    return m.pressFlatSince !== null && m.pressFlatSince !== undefined && m.pressure !== null && now - m.pressFlatSince >= PRESS_SWITCH_MS;
-  }
-  function pressText(m, now) {
-    return fmt(m.pressure, 2, ' bar') + (pressIsSwitch(m, now) ? ' · switch?' : '');
-  }
-  function setPress(id, now) {
-    var el = document.getElementById(id); if (!el) return;
-    el.textContent = pressText(model, now);
-    if (pressIsSwitch(model, now)) el.setAttribute('title', PRESS_SWITCH_TITLE);
-    else el.removeAttribute('title');
-  }
   // Pressure severity (5-band, HA-style): green around the 2.0 optimum.
   function pressClass(p) {
     if (p === null || p === undefined || isNaN(p)) return '';
@@ -1426,7 +1402,7 @@
       ['MODULATION', model.mod === null ? '—' : Math.round(model.mod) + '%', model.flame ? 'ok' : ''],
       ['CH SETPOINT', fmt(model.chSet, 1, '°'), ''],
       ['DHW', model.dhw === null ? '—' : fmt(model.dhw, 1, '°'), ''],
-      ['PRESSURE', pressText(model, Date.now()), pressIsSwitch(model, Date.now()) ? '' : pressClass(model.pressure)],
+      ['PRESSURE', fmt(model.pressure, 2, ' bar'), pressClass(model.pressure)],
       ['FLAME', model.flame ? 'ON' : 'OFF', model.flame ? 'ok' : ''],
       ['STATUS', model.fault ? 'FAULT' : 'OK', model.fault ? 'alert' : 'ok']
     ];
@@ -3496,7 +3472,6 @@
     var map = { flow: 'boilertemperature', ret: 'returnwatertemperature', dhw: 'dhwtemperature', outside: 'outsidetemperature', room: 'roomtemperature', roomSet: 'roomsetpoint', chSet: 'controlsetpoint', mod: 'relmodlvl', pressure: 'chwaterpressure' };
     var changed = false;
     Object.keys(map).forEach(function (f) { if (f === 'outside' && model.wxValid) return; var v = num(map[f]); if (v !== null) { model[f] = v; changed = true; } });
-    trackPressSwitch(model, Date.now());
     // TASK-1546: the otmonitor epoch of the room temperature is a rolling counter; a new value means the thermostat reported again
     var re = o.roomtemperature && o.roomtemperature.epoch;
     if (re && re !== model.roomEp) { model.roomEp = re; model.roomAt = Date.now(); }
