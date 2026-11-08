@@ -8443,6 +8443,58 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-220",
+      "title": "Language packs use the i18next v4 JSON file format; Weblate opens once NL and DE run (amends ADR-219)",
+      "path": "ADR-220-language-packs-use-the-i18next-v4-json-file-format-weblate-opens-once-nl-and-de-run-amends-adr-219.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-08",
+      "decision_summary": "User Decision (Robert, 2026-11-08): the language pack files follow the i18next v4 JSON format, read by the project's...",
+      "topics": [
+        "i18n",
+        "language-pack-format",
+        "weblate"
+      ],
+      "aliases": [
+        "i18next v4 JSON",
+        "translation file format"
+      ],
+      "components": [
+        "language pack file format"
+      ],
+      "symbols": [
+        "t()"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Write every pack and the English source in i18next v4 JSON ({{name}}, CLDR plural suffixes).",
+          "Keep the packs outside src/ (i18n/), so Weblate pull requests need no firmware bump."
+        ],
+        "must_not": [
+          "Ship the i18next library or any other i18n library in the web UI bundle.",
+          "Squash-merge Weblate pull requests."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "The pack-coverage test parses every i18n/.json as i18next v4 JSON and fails on a missing {{placeholder}} or a plural form that Intl.PluralRules needs for that language."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -14785,6 +14837,12 @@
     {
       "source": "ADR-219",
       "target": "ADR-218",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-220",
+      "target": "ADR-219",
       "type": "related",
       "resolved": true
     }
