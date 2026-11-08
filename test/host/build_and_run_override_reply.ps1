@@ -91,6 +91,8 @@ $otdAnchors = @(
      EndRegex = '^static unsigned long otSlaveFrame\b'; EndKind = 'construct' },
   @{ Name = 'otOverrides[]';                Kind = 'range';     Regex = '^struct OTFrameOverride\b';
      EndRegex = '^static constexpr uint8_t OT_OVERRIDE_COUNT\b'; EndKind = 'construct' },
+  @{ Name = 'TT/TC remote override state'; Kind = 'range'; Regex = '^static bool otRemoteOverrideClearPending\b';
+     EndRegex = '^static bool otdRemoteOverrideHoldsSlot\(uint8_t msgId\)\s*\{'; EndKind = 'construct'; Optional = $true },   # TASK-1718: replyToThermostat reads it
   @{ Name = 'floatToF88';                   Kind = 'construct'; Regex = '^static inline uint16_t floatToF88\(float celsius\)\s*\{' },
   @{ Name = 'setOverride, clearOverride';   Kind = 'range';     Regex = '^static void setOverride\(uint8_t msgId, uint16_t value\)\s*\{';
      EndRegex = '^static void clearOverride\(uint8_t msgId\)\s*\{'; EndKind = 'construct' },
@@ -113,7 +115,9 @@ $otdAnchors = @(
 )
 $typesAnchors = @(
   @{ Name = 'enum OTDirectRequestOrigin'; Kind = 'construct'; Regex = '^enum OTDirectRequestOrigin\b' },
-  @{ Name = 'enum OTDirectMode';          Kind = 'construct'; Regex = '^enum OTDirectMode\b' }
+  @{ Name = 'enum OTDirectMode';          Kind = 'construct'; Regex = '^enum OTDirectMode\b' },
+  @{ Name = 'enum OTRemoteOverrideMode';  Kind = 'construct'; Regex = '^enum OTRemoteOverrideMode\b' },
+  @{ Name = 'struct OTRemoteOverrideState'; Kind = 'construct'; Regex = '^struct OTRemoteOverrideState\b' }
 )
 $libEnumAnchors = @(
   @{ Name = 'enum OpenThermResponseStatus'; Kind = 'construct'; Regex = '^enum class OpenThermResponseStatus\b' },

@@ -798,8 +798,11 @@ int main(int argc, char** argv) {
     const unsigned long t = otFrame(kReadData, 100, 0), b = otFrame(kUnknownId, 100, 0);
     thermostatSends(t); loopOTDirect();
     otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
-    verdict("C8b", "READ(100) with the TT flag override active: forwarded unmodified, boiler reply relayed, nothing cached",
-            { t }, { b }, logOf({ { 'T', t }, { 'B', b } }), "-");
+    // TASK-1718 (PIC gateway.asm MessageID100): a boiler Unknown-DataID on MsgID 100 becomes the
+    // gateway's own READ-ACK 0 to the thermostat, logged as A; the boiler's frame stays uncached.
+    const unsigned long a = otFrame(kReadAck, 100, 0);
+    verdict("C8b", "READ(100), boiler Unknown-DataID: forwarded unmodified, the thermostat gets READ-ACK 0 (A), nothing cached",
+            { t }, { a }, logOf({ { 'T', t }, { 'B', b }, { 'A', a } }), "-");
   }
 
   // ---- C9-C11: no override; a gateway command ------------------------------------
