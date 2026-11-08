@@ -5,9 +5,9 @@ title: >-
   answers (rule 3)
 status: In Progress
 assignee:
-  - '@claude'
+  - '@system32-78'
 created_date: '2026-11-02T21:10:00Z'
-updated_date: '2026-11-02T22:15:00Z'
+updated_date: '2026-11-08T18:15:00Z'
 labels:
   - pic
   - command-queue
@@ -30,11 +30,13 @@ Robert 2026-11-02, queue design rule 3. The PIC has one priority-message slot (p
 - [x] #2 TP=11:12=80 and a user PM= do not cancel each other: the second waits for the boiler answer of the first (host test)
 - [x] #3 Other commands (CS=, MM=) keep draining while a PM=/TP= waits (host test)
 - [x] #4 pmChain behaviour kept: tests/test_pic_pm_chain.py green
-- [ ] #5 Bench .63 with SAT sim: three REST PM= each get their boiler answer in the log, none cancelled
+- [ ] #5 Bench .63 (PIC, no boiler): three REST PM= go out one after another; each waits for the 60 s priority-slot timeout before the next is sent; none is cancelled (telnet log)
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-02 handover to the lead (lane-q2 ../wt-q2, no bump, series 537fd5a63..HEAD, one commit per task). Host: tests/test_pic_pm_chain.py 28/28 at the top; each task's new tests red on the code before it (see commit/test names), green at its own commit; evaluate --quick 0 failed. Open: bench on .63 after the 08:00 release (lead tags, builds, benches each task), firmware compile check of the top running at handover.
+
+2026-11-08 AC5 reworded, approved by Robert (relayed by the coordinator): the old AC5 (three REST PM= each get their boiler answer on .63 with SAT sim) cannot pass on .63, which has no boiler (health: boilerconnected false, otgwconnected false) and whose simulation is a frame replay that does not answer PM=. The new AC5 checks the 60 s priority-slot timeout path on .63; the boiler-answer path stays covered by the host tests of AC1-AC2. Taken by system32-78; bench during 54's .63 time tonight.
 <!-- SECTION:NOTES:END -->

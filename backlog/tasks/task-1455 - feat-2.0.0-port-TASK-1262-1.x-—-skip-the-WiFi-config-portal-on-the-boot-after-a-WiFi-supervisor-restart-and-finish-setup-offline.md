@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:28:00Z'
-updated_date: '2026-11-08T08:41:00Z'
+updated_date: '2026-11-08T18:14:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -110,7 +110,7 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 - [x] #1 A boot that follows a 'WiFi: too many reconnect failures' restart, where the saved AP is still unreachable, does not open the WiFiManager config portal. setup() completes, and loop()/loopWifi() run within the direct-connect window (about 120 s) plus normal setup time. Verified on the bench (.63 Classic+S3 and .61 OTGW32) with the AP blocked on the MikroTik router; the telnet log shows the skip message and loopWifi retry attempts.
 - [x] #2 Red/green bench proof on the same reproduction (AP access-list deny long enough to trigger the supervisor restart, then allow), run against a release-configured build (no _VERSION_PRERELEASE) or with the prerelease path made equivalent: the old build opens the portal SSID (laptop WiFi scan) and rejoins only after the portal timeout; the fix build never shows the portal SSID and rejoins within 35 s after the allow. Times recorded in the task notes.
 - [ ] #3 A power cycle with the AP unreachable, a first install without saved credentials, and a triple reset still open the config portal. Bench-verified at least for the power cycle and the triple reset.
-- [ ] #4 The skip mark applies to exactly one boot: a software restart that was not a WiFi supervisor restart (for example nightly restart or a settings-triggered restart) with the AP unreachable behaves as before. Verified by log.
+- [x] #4 The skip mark applies to exactly one boot: a software restart that was not a WiFi supervisor restart (for example nightly restart or a settings-triggered restart) with the AP unreachable behaves as before. Verified by log.
 - [x] #5 The skip mark is held in RTC memory (RTC_NOINIT_ATTR), not in NVS; no NVS/flash write is added on the restart path (code review plus grep).
 - [x] #6 After the AP returns on a boot that ran setup() offline: telnet port 23, HTTP port 80, WebSocket, MQTT (online LWT and data published) and NTP time all work again without a further restart, and <hostname>.local resolves through mDNS. If mDNS did not resolve without a fix, the fix is added and shown red/green.
 - [x] #7 The prerelease AP-fallback interaction is decided and documented in the task notes (skip mark also bypasses the AP fallback, or not). The chosen behaviour is bench-verified on an alpha build.
@@ -151,4 +151,6 @@ AC5: g_rtcWifiSkipPortal is RTC_NOINIT_ATTR (networkStuff.ino:561); wifiMarkSkip
 2026-11-08 Robert: AC7 settled by host test (a prerelease marked boot only arises from the dead-link restart; a bench run needs 30-40 min with a router switch at the restart moment). Evidence: tests/test_wifi_skip_portal.py test_prerelease_marked_boot_skips_ap_fallback and test_prerelease_unmarked_boot_keeps_ap_fallback OK (30/30 in the file). The decision itself is recorded in ADR-211 (Robert's answer 2026-11-05).
 
 2026-11-08 ADR-211 Accepted by Robert in session after the acceptance packet (adr accept --confirm, changed_by Robert van den Breemen). Before acceptance the Proposed text got the bench evidence (Evidence section, AC6 result in Consequences) and acronym expansions for the clarity gate (NVS, SSID, MQTT, NTP, LLMNR); adr-lint --strict incl. clarity PASS. AC9 met. Remaining: AC3 hands-on bench (Robert, later).
+
+2026-11-08 AC4 accepted by Robert on the host tests (relayed by the coordinator, session system32-78): tests/test_wifi_skip_portal.py test_other_software_restart_opens_portal, test_next_boot_without_new_mark_opens_portal and test_mark_is_consumed_at_boot. The bench log run stays out: a REST /ReBoot inside a WiFi outage is deferred until the link returns, so it cannot place a non-supervisor software restart inside the outage. AC3 stays Robert's own hands-on bench.
 <!-- SECTION:NOTES:END -->
