@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.147
+**  Version  : v2.0.0-beta.148
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -542,17 +542,29 @@ static bool g_sawLegacyTopicsKey = false;
 static bool g_satCphOutOfSet = false;    // TASK-1375: set when the file carried a SATcyclesperhour other than 3 or 4; the deferred flush then rewrites the snapped value
 static bool g_sawSatFollowKey = false;   // TASK-1259: set when SATfollowthermostat is parsed; its absence means "default to the push-setpoint value"
 static bool g_sawOnboardedKey = false;   // TASK-997: set when ui_onboarded is parsed; its absence marks a pre-feature (existing) install
+static bool g_sawBleEnableKey = false;   // TASK-1693: set when SATbleenable is parsed; its absence means no stored BLE choice yet
+// [ble-nopsram-default:begin] TASK-1693
+// On a board without PSRAM, BLE starts off: no stored choice means off, and the web UI shows the
+// stability warning when the user switches it on (ADR-169 successor). PSRAM boards keep the struct
+// default (on), and a stored SATbleenable always wins.
+static void applyBleNoPsramDefault(bool psram)
+{
+  if (!psram) settings.sat.bBleEnable = false;
+}
+// [ble-nopsram-default:end]
 
 void readSettings(bool show)
 {
   DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
   g_sawLegacyTopicsKey = false;  // reset per parse; updateSetting() sets it when the key is seen
   g_sawOnboardedKey = false;     // TASK-997: same sentinel pattern for the first-time-setup flag
+  g_sawBleEnableKey = false;     // TASK-1693: same sentinel pattern for the BLE default
   g_satCphOutOfSet = false;      // TASK-1375: same sentinel pattern for SATcyclesperhour
   g_sawSatFollowKey = false;     // TASK-1259: same sentinel pattern for SATfollowthermostat
   if (!LittleFS.exists(SETTINGS_FILE))
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
+    applyBleNoPsramDefault(psramFound());   // TASK-1693: a fresh install without PSRAM starts with BLE off
     writeSettings(show);
     readSettings(false); //now it should work...
     return;
@@ -641,6 +653,13 @@ void readSettings(bool show)
   // (=false) and the re-read sees the key -> onboard. An EXISTING install that predates
   // this feature parsed a file WITHOUT the key -> migrate it to onboarded so the wizard
   // never appears for already-configured users ("only the first time ever").
+  // TASK-1693: no stored BLE choice (e.g. settings from 1.x): without PSRAM BLE starts off. The deferred
+  // flush persists the key, so from then on the stored value wins.
+  if (!g_sawBleEnableKey && !psramFound()) {
+    applyBleNoPsramDefault(false);
+    settingsDirty = true;
+    DebugTln(F("[Settings] no SATbleenable key on a board without PSRAM: BLE off by default"));
+  }
   if (!g_sawOnboardedKey) {
     settings.ui.bOnboarded = true;
     settingsDirty = true;              // persist the key so this migration runs once
@@ -1226,7 +1245,7 @@ void updateSetting(const char *field, const char *newValue)
   // --- BLE temperature sensor settings (Task #20) ---
   // ESP-abstraction Tier 2 (TASK-742): parsed unconditionally so a settings.json
   // written on either platform round-trips; harmless no-op fields on ESP8266.
-  else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  settings.sat.bBleEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  { settings.sat.bBleEnable = EVALBOOLEAN(newValue); g_sawBleEnableKey = true; }  // TASK-1693 sentinel
   else if (strcasecmp_P(field, PSTR("SATbleriskack")) == 0) settings.sat.bBleRiskAck = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblefailover")) == 0) settings.sat.bBleFailover = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblemac")) == 0)      strlcpy(settings.sat.sBleMAC, newValue, sizeof(settings.sat.sBleMAC));

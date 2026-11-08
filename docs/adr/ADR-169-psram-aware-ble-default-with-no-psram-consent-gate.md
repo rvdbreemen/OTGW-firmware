@@ -1,20 +1,20 @@
 ---
 id: "ADR-169"
 title: "PSRAM-Aware BLE Default with a No-PSRAM Instability-Consent Gate"
-status: "Accepted"
-date: "2026-07-09"
+status: "Superseded"
+date: "2026-11-08"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-222"
 ---
 # ADR-169 PSRAM-Aware BLE Default with a No-PSRAM Instability-Consent Gate
 
 ## Status
 
-Accepted. Date: 2026-07-09.
+Superseded by ADR-222, 2026-11-08.
 
 This ADR documents an architectural decision that already shipped as code in
 TASK-995 (commit 2f3bd23d3). Accepted by the maintainer on 2026-07-09. The
@@ -36,6 +36,11 @@ status_history:
     changed_by: User: Robert van den Breemen
     reason: Maintainer accepted the PSRAM-aware BLE default + no-PSRAM consent-gate policy. All four verification gates pass (Completeness/Evidence/Clarity/Consistency); the decision matches shipped code (SATble.ino:629-631). TASK-988's PSRAM real-utility validation stays open as a possible later amendment, not a blocker on the policy.
     changed_via: adr-kit
+  - date: 2026-11-08
+    status: Superseded
+    changed_by: "User: Robert van den Breemen"
+    reason: "Robert accepted ADR-222 (2026-11-08, TASK-1693): BLE off by default on no-PSRAM boards, warning only on enable; the bleActive() gate and memory rationale of ADR-169 stay"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

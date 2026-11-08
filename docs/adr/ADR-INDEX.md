@@ -174,7 +174,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-166 | Superseded | - | Firmware/app OTA is rejected outright on any board whose partition table has no spare app slot (single otaX == the ru... |
 | ADR-167 | Accepted | - | On the dev branch, retire the ADR-089 heap tier machine and the ADR-121 per-consumer gating in a separate Phase-3 imp... |
 | ADR-168 | Accepted | `src/libraries/OTGWSerial/OTGWSerial.cpp` | On the PIC path (esp32-classic and combo-with-PIC), the PIC serial link binds the ESP32-S3's native UART0 on GPIO43/4... |
-| ADR-169 | Accepted | `src/OTGW-firmware/SATble.ino` | BLE runs by default only on boards where psramFound() is true; on no-PSRAM boards it stays dormant behind a persisted... |
+| ADR-169 | Superseded | `src/OTGW-firmware/SATble.ino` | BLE runs by default only on boards where psramFound() is true; on no-PSRAM boards it stays dormant behind a persisted... |
 | ADR-170 | Accepted | - | Remove the automatic discovery-verify readback. |
 | ADR-171 | Accepted | - | Introduce one private helper, queueNonOTDiscoveryIds() in MQTTstuff.ino, as the single definition of "which non-bus-s... |
 | ADR-172 | Accepted | - | A per-endpoint, globally-shared poll budget checked in the v2 dispatcher immediately before the handler call (restAPI... |
@@ -227,3 +227,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-219 | Accepted | - | User Decision (Robert, 2026-11-08): the web UI is translated in the browser by a small t(key, params) helper in v2.js... |
 | ADR-220 | Accepted | - | User Decision (Robert, 2026-11-08): the language pack files follow the i18next v4 JSON format, read by the project's... |
 | ADR-221 | Accepted | - | User Decision (Robert, 2026-11-08): the web UI language packs (i18n/ .json, ADR-219/ADR-220) are stored on LittleFS a... |
+| ADR-222 | Accepted | - | User Decision: on a board without PSRAM, BLE is off by default and no dialog appears after boot or when a page opens;... |

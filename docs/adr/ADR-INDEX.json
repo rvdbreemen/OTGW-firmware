@@ -5339,8 +5339,8 @@
       "title": "PSRAM-Aware BLE Default with a No-PSRAM Instability-Consent Gate",
       "path": "ADR-169-psram-aware-ble-default-with-no-psram-consent-gate.md",
       "format": "canonical",
-      "status": "Accepted",
-      "date": "2026-07-09",
+      "status": "Superseded",
+      "date": "2026-11-08",
       "decision_summary": "BLE runs by default only on boards where psramFound() is true; on no-PSRAM boards it stays dormant behind a persisted...",
       "topics": [],
       "aliases": [],
@@ -5364,7 +5364,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-222"
       }
     },
     {
@@ -8543,6 +8543,75 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-222",
+      "title": "On boards without PSRAM BLE starts off and warns when the user enables it",
+      "path": "ADR-222-on-boards-without-psram-ble-starts-off-and-warns-when-the-user-enables-it.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-08",
+      "decision_summary": "User Decision: on a board without PSRAM, BLE is off by default and no dialog appears after boot or when a page opens;...",
+      "topics": [
+        "ble",
+        "psram",
+        "settings defaults",
+        "web ui consent"
+      ],
+      "aliases": [
+        "bBleRiskAck",
+        "BLE no-PSRAM default",
+        "BLE stability warning"
+      ],
+      "components": [
+        "applyBleNoPsramDefault",
+        "bleNeedsRiskAck",
+        "maybeShowBleConsent"
+      ],
+      "symbols": [
+        "applyBleNoPsramDefault",
+        "bBleEnable",
+        "bBleRiskAck",
+        "bleBlePaused",
+        "bleNeedsRiskAck",
+        "g_sawBleEnableKey",
+        "maybeShowBleConsent"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "On a board without PSRAM, apply the BLE-off default to a fresh install before the first writeSettings() and to a settings file without the SATbleenable key.",
+          "Keep a stored SATbleenable value as it is.",
+          "Show the stability warning only after a user action (switching BLE on, or the BLE card button).",
+          "On acceptance store satbleenable before satbleriskack, sequentially."
+        ],
+        "must_not": [
+          "Must not open the BLE warning from a poll, a page load or a boot.",
+          "Must not store satbleenable=true on a no-PSRAM board before the user accepted the warning.",
+          "Must not change the PSRAM-board default or show the warning there.",
+          "Must not change bleActive()'s gate."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "python tests/testblenopsramdefault.py: compiles the real applyBleNoPsramDefault() and checks the readSettings()/updateSetting() wiring; the pre-change settingStuff.ino fails 4/4.",
+          "node --test tests/webui/ble-nopsram-warning.test.mjs: drives the real v2 page; the pre-change page opens the modal on its own and stores BLE before consent (tests 1-3 fail), the change passes 4/4."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [
+          "ADR-169"
+        ],
         "superseded_by": null
       }
     }
@@ -13409,6 +13478,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-169",
+      "target": "ADR-222",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-170",
       "target": "ADR-062",
       "type": "related",
@@ -14918,6 +14993,30 @@
       "source": "ADR-221",
       "target": "ADR-220",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-222",
+      "target": "ADR-147",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-222",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-222",
+      "target": "ADR-169",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-222",
+      "target": "ADR-169",
+      "type": "supersedes",
       "resolved": true
     }
   ]

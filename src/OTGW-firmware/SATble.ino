@@ -620,7 +620,7 @@ static SATBLEScanCallbacks _bleScanCallbacks;
 // either it has PSRAM (which frees the internal room the web stack needs), or the
 // user has explicitly accepted the no-PSRAM instability risk in the Web UI. On a
 // no-PSRAM board with bBleEnable=true but no risk-ack, BLE stays dormant — the UI
-// surfaces a consent dialog. This replaces the bare bBleEnable check at every gate.
+// shows the stability warning when the user switches BLE on, and a hint in the BLE card (TASK-1693). This replaces the bare bBleEnable check at every gate.
 static inline bool bleActive() {
   return settings.sat.bBleEnable && (psramFound() || settings.sat.bBleRiskAck);
 }
