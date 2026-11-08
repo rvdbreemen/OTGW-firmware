@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:28:00Z'
-updated_date: '2026-11-08T08:33:00Z'
+updated_date: '2026-11-08T08:41:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -115,7 +115,7 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 - [x] #6 After the AP returns on a boot that ran setup() offline: telnet port 23, HTTP port 80, WebSocket, MQTT (online LWT and data published) and NTP time all work again without a further restart, and <hostname>.local resolves through mDNS. If mDNS did not resolve without a fix, the fix is added and shown red/green.
 - [x] #7 The prerelease AP-fallback interaction is decided and documented in the task notes (skip mark also bypasses the AP fallback, or not). The chosen behaviour is bench-verified on an alpha build.
 - [x] #8 Ethernet-active units (HAS_ETH_CAPABLE, NET_ETHERNET) do not set the skip mark and their boot is unchanged.
-- [ ] #9 A dev-numbered ADR mirroring 1.x ADR-099 is drafted via adr-kit as Proposed and accepted only by the maintainer.
+- [x] #9 A dev-numbered ADR mirroring 1.x ADR-099 is drafted via adr-kit as Proposed and accepted only by the maintainer.
 - [x] #10 build.py / build.bat green for esp32, esp32-classic and esp32-combo, and python evaluate.py --quick shows no new failures.
 <!-- AC:END -->
 
@@ -149,4 +149,6 @@ AC5: g_rtcWifiSkipPortal is RTC_NOINIT_ATTR (networkStuff.ino:561); wifiMarkSkip
 2026-11-08 Robert: AC3 hands-on bench (power cycle, triple reset with the AP blocked) later, when he has time. ADR-211 acceptance packet after the AC7 prerelease bench (6b's beta build on .61, slot agreed).
 
 2026-11-08 Robert: AC7 settled by host test (a prerelease marked boot only arises from the dead-link restart; a bench run needs 30-40 min with a router switch at the restart moment). Evidence: tests/test_wifi_skip_portal.py test_prerelease_marked_boot_skips_ap_fallback and test_prerelease_unmarked_boot_keeps_ap_fallback OK (30/30 in the file). The decision itself is recorded in ADR-211 (Robert's answer 2026-11-05).
+
+2026-11-08 ADR-211 Accepted by Robert in session after the acceptance packet (adr accept --confirm, changed_by Robert van den Breemen). Before acceptance the Proposed text got the bench evidence (Evidence section, AC6 result in Consequences) and acronym expansions for the clarity gate (NVS, SSID, MQTT, NTP, LLMNR); adr-lint --strict incl. clarity PASS. AC9 met. Remaining: AC3 hands-on bench (Robert, later).
 <!-- SECTION:NOTES:END -->

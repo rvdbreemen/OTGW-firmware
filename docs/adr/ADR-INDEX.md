@@ -216,7 +216,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-208 | Accepted | `src/OTGW-firmware/OTDirect.ino` | In OT-Direct gateway mode, bit 0 of the master status in a relayed thermostat READDATA MsgID 0 frame is set by the sa... |
 | ADR-209 | Accepted | - | Format. |
 | ADR-210 | Accepted | - | Route. |
-| ADR-211 | Proposed | - | A WiFi supervisor restart marks the next boot. |
+| ADR-211 | Accepted | - | A WiFi supervisor restart marks the next boot. |
 | ADR-212 | Accepted | - | Native loading. |
 | ADR-213 | Accepted | - | Opt-in, local, RAM (random-access memory) only. |
 | ADR-214 | Accepted | - | Ids are a hash, not a table. |

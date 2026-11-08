@@ -1,8 +1,8 @@
 ---
 id: "ADR-211"
 title: "Skip the WiFi config portal on the boot after a WiFi supervisor restart"
-status: "Proposed"
-date: "2026-11-04"
+status: "Accepted"
+date: "2026-11-08"
 binding: false
 gate: null
 documents_shipped: false
@@ -41,7 +41,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-04. Guideline-level (ADR-080) with a test gate:
+Accepted, 2026-11-08.
 `tests/test_wifi_skip_portal.py`. Only the maintainer accepts it.
 
 ## Status History
@@ -53,6 +53,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-08
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Bench A/B 2026-11-08 on .61 green (TASK-1455); accepted by Robert in session
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -87,7 +92,7 @@ are 1.x figures. Dev has not been measured yet; that is the bench test under
 Verification.
 
 Constraints on dev: the ESP32-S3 has no `ESP.rtcUserMemory`. The existing
-`platformRtcWrite()` is backed by NVS: it costs a flash write and survives a power
+`platformRtcWrite()` is backed by NVS (non-volatile storage, the ESP32 key-value store in flash): it costs a flash write and survives a power
 cycle, so a mark stored there would wrongly skip the portal after unplugging.
 TASK-1447 (reboot reason) and TASK-1450 (dead-link restart count) already keep
 one-restart records in `RTC_NOINIT_ATTR` memory, checked with a magic word and
@@ -168,7 +173,7 @@ marked boot, the prerelease branch in `startWiFi()` moves above the skip check;
   boot opens the portal and restarts, and the restart sites write no mark.
 - Bench (TASK-1455 AC1, AC2): MikroTik access-list deny until the supervisor
   restarts, then allow, on a release-configured build. The old build opens the
-  portal SSID and rejoins only after the portal timeout; the new build never
+  portal SSID (Service Set Identifier, the Wi-Fi network name) and rejoins only after the portal timeout; the new build never
   shows the portal SSID and rejoins within 35 s of the allow.
 
 ## Alternatives Considered
@@ -202,16 +207,39 @@ marked boot, the prerelease branch in `startWiFi()` moves above the skip check;
   10 retries, restart, 120 s direct-connect window. That is the same cycle as
   1.x and is the accepted trade-off.
 - `setup()` now runs without a network on this path. Telnet, HTTP, WebSocket,
-  MQTT, NTP, mDNS and LLMNR start without an IP; `WIFI_RECONNECTED` restarts
-  telnet, MQTT and WebSocket, but not mDNS or LLMNR. That every service comes back
-  after the access point returns, `<hostname>.local` included, is not verified
-  yet: it is a bench check (TASK-1455 AC6).
+  MQTT (Message Queuing Telemetry Transport), NTP (Network Time Protocol), mDNS and
+  LLMNR (Link-Local Multicast Name Resolution) start without an IP; `WIFI_RECONNECTED` restarts
+  telnet, MQTT and WebSocket, but not mDNS or LLMNR. Bench 2026-11-08 (TASK-1455
+  AC6, .61): after the access point returned, telnet 23, HTTP 80, `/ws`, MQTT,
+  NTP time and `marvin-otgw32.local` (mDNS) all worked without a further restart,
+  so no mDNS restart was added. LLMNR was not checked.
 
 ## Open Questions
 
 - [x] Robert: confirm that the skip mark also bypasses the prerelease boot-time
   AP fallback (recommended above), or keep the fallback on the marked boot.
   — **Answered 2026-11-05 by Robert van den Breemen:** Yes: the skip mark also bypasses the prerelease boot-time AP fallback (one behaviour on beta and release builds; the existing loopWifi rule still starts the AP fallback after 2 failed retries, about 60 s). Robert, session 2026-11-05.
+
+## Evidence
+
+Bench A/B, 2026-11-08, unit .61 (OT-Direct), both images release-configured
+(`_VERSION_PRERELEASE` commented out locally, not published). The access point
+was taken away by router rules scoped to the unit's MAC (wlan2 access-list deny
+and CAPsMAN access-list reject, auto-removal scheduler), Robert's go.
+
+- Before (0d6895f32~1, `2.0.0+b19322b`): after about 10.5 min the portal SSID
+  `marvin-otgw32-10:20:BA:21:B4:F8` was visible in a laptop Wi-Fi scan; after the
+  access point returned the unit came back only through a restart when the
+  portal timed out.
+- After (879aef359, `2.0.0+879aef3`): 15 min blocked, two supervisor restarts
+  (`reboot_log.txt` "WiFi: too many reconnect failures" 08:40:18 and 08:47:31),
+  portal SSID seen 0 times in 60 scans; the unit answered 7 s after the access
+  point returned, without a restart (uptime 3 min).
+- Host test `tests/test_wifi_skip_portal.py`: 30 OK, including one-boot scope,
+  power-on garbage in RTC memory, triple reset, Ethernet, and the prerelease
+  AP-fallback rule (Robert accepted the host test for that part).
+- Not bench-verified: a power cycle and a triple reset with the access point
+  away (TASK-1455 AC3, needs hands on the unit).
 
 ## Related Decisions
 
