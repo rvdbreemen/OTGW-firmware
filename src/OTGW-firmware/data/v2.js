@@ -535,10 +535,12 @@
     }
     el.title = tip;
   }
-  // SIMULATION badge — /api/v2/simulate is PIC-path only; any error (404/503 on
-  // OT-Direct, transport failure) is treated as "not simulating" and hides the badge.
+  // SIMULATION badge. An error (404, transport failure) reads as "not simulating" and
+  // hides the badge. TASK-1741: a 503 is the device's busy answer (REST in-flight cap),
+  // not a state, so it leaves the badge as it is; the next poll decides.
   function fetchSim() {
-    fetch(APIGW + 'v2/simulate').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+    fetch(APIGW + 'v2/simulate').then(function (r) { return r.status === 503 ? undefined : (r.ok ? r.json() : null); }).then(function (j) {
+      if (j === undefined) return;
       var active = !!(j && j.simulation && j.simulation.active);
       var el = document.getElementById('hdrSim'); if (el) el.classList.toggle('hidden', !active);
     }).catch(function () {
@@ -5017,6 +5019,10 @@
         var d = res.json;
         var nd = document.getElementById('satNoData'), body = document.getElementById('satBody');
         if (!d || typeof d !== 'object') {
+          // TASK-1741: a transient failure (load-shed 503) after good data keeps the page and
+          // its last data on screen; the next 5 s poll refreshes it. The banner is for the
+          // first paint and for a device without SAT (404).
+          if (res.status !== 404 && satLastData) return;
           // Distinguish "this device has no SAT endpoint" (404) from a transient
           // load-shed 503: the latter self-heals on the 5 s poll, so say so.
           if (nd) {
@@ -6094,13 +6100,18 @@
           otAge: (typeof h.boiler_age_s === 'number' && h.boiler_age_s >= 0) ? h.boiler_age_s : null,
           mqtt: !!h.mqttconnected,
           room: (s.room_temp == null) ? null : s.room_temp,
-          outside: (s.outside_temp == null) ? null : s.outside_temp
+          outside: (s.outside_temp == null) ? null : s.outside_temp,
+          // TASK-1741: a request that failed (a busy 503) says nothing about the source, so its
+          // rows show 'Unknown' in grey, not a false 'Offline' or 'Not connected' warning.
+          hUnk: !res[0], sUnk: !res[1]
         };
         if (back.querySelector('#satOnbHealth')) render();
       }).catch(function () { healthErr = true; if (back.querySelector('#satOnbHealth')) render(); });
     }
     function healthRow(label, ok, valHtml, last) {
-      var c = ok ? 'var(--zone-ok)' : 'var(--zone-warn)';   // theme-aware (--ok/--warn are not defined)
+      // ok === null: unknown (TASK-1741), grey; otherwise theme-aware (--ok/--warn are not defined)
+      var c = (ok === null) ? 'var(--muted)' : ok ? 'var(--zone-ok)' : 'var(--zone-warn)';
+      if (ok === null) valHtml = 'Unknown';
       return '<div style="display:flex;align-items:center;gap:12px;padding:13px 0;' + (last ? '' : 'border-bottom:1px solid var(--border)') + '">' +
         '<span style="width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:' + c + ';box-shadow:0 0 7px ' + c + '"></span>' +
         '<span style="font-weight:600;font-size:13px;color:var(--text)">' + label + '</span>' +
@@ -6185,12 +6196,13 @@
           rows = '<div style="padding:22px 0;text-align:center;color:var(--muted);font-size:12.5px">Checking sources…</div>';
         } else {
           var hh = health || {};
-          rows = healthRow('OpenTherm bus', !!hh.ot, hh.ot ? ('Online' + (hh.otAge != null ? ' · ' + hh.otAge + 's ago' : '')) : 'Offline') +
-            healthRow('Room temperature', hh.room != null, hh.room != null ? (hh.room.toFixed(1) + ' °C') : 'Not detected') +
-            healthRow('Outside temperature', hh.outside != null, hh.outside != null ? (hh.outside.toFixed(1) + ' °C') : 'Not detected') +
-            healthRow('MQTT', !!hh.mqtt, hh.mqtt ? 'Connected' : 'Not connected', true);
+          var hU = hh.hUnk ? null : undefined, sU = hh.sUnk ? null : undefined;   // TASK-1741: null = unknown
+          rows = healthRow('OpenTherm bus', hU !== undefined ? hU : !!hh.ot, hh.ot ? ('Online' + (hh.otAge != null ? ' · ' + hh.otAge + 's ago' : '')) : 'Offline') +
+            healthRow('Room temperature', sU !== undefined ? sU : hh.room != null, hh.room != null ? (hh.room.toFixed(1) + ' °C') : 'Not detected') +
+            healthRow('Outside temperature', sU !== undefined ? sU : hh.outside != null, hh.outside != null ? (hh.outside.toFixed(1) + ' °C') : 'Not detected') +
+            healthRow('MQTT', hU !== undefined ? hU : !!hh.mqtt, hh.mqtt ? 'Connected' : 'Not connected', true);
         }
-        var warnOutside = health && health.outside == null;
+        var warnOutside = health && !health.sUnk && health.outside == null;
         h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">Source health check</h1>' +
           '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">SAT reads these from your existing setup. This is a read-only check, configure inputs on their own pages. <span style="' + MONO + '">/api/v2/health</span></p>' +
           '<div id="satOnbHealth" style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:2px 16px">' + rows + '</div>' +
