@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-08T17:57:00Z'
+updated_date: '2026-11-08T19:55:00Z'
 labels:
   - tests
   - windows
@@ -26,3 +27,9 @@ otgw-firmware-54 2026-11-08 ~19:00: leftover headless Chrome trees (28 processes
 - [ ] #1 Shared launcher kills the full Chrome tree on win32 and POSIX; no leftover chrome.exe after a run of the affected tests (process count before/after)
 - [ ] #2 All webui tests use the shared launcher (grep shows no direct chrome.kill)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-08: the intermittent settings-reboot-badge failures are a separate test-side race (badge read before it is rendered), filed as TASK-1742 with the bisect numbers; not part of the Chrome process tree leak.
+<!-- SECTION:NOTES:END -->

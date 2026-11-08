@@ -5,9 +5,9 @@ title: >-
   KB): find the transient large allocation
 status: In Progress
 assignee:
-  - '@claude'
+  - '@system32-78'
 created_date: '2026-10-31T13:54:00Z'
-updated_date: '2026-11-05T21:35:00Z'
+updated_date: '2026-11-08T18:44:00Z'
 labels:
   - alpha
   - bug
@@ -74,4 +74,6 @@ Bench 2026-11-05 21:29-22:05 on .61 (2.0.0-beta.101+5781def, satsimulation on), 
 Not verified: the forced weather fetch. The telnet 'w' sent by the script (raw socket, char mode) produced no 'Weather: manual Open-Meteo fetch triggered' line in run 1 or run 2, so no fetch ran; cause of the lost keypress unknown (to test with 'h'). Run 3 (weather off, 180 s drop control) was cut at 22:00 after boot: the runner was killed by Claude Code's low-memory reaper before the drop; no drop rule was added. Cleanup checked: firewall/bridge/scheduler TASK-1528 count 0, router export t1528-runs-after, satweatherenable restored true, settings diff vs before = {}. AC1 still open: needs a working weather trigger and several boots to see whether the boot connect burst depth (16.8 KB vs 4.1 KB) is random.
 
 Robert 2026-11-05 ~22:30 (AskUserQuestion in session): option A chosen, outbox-depth gate on the discovery drip. Next: host test red/green on the gate decision, build, bench 5 boots old vs 5 boots fix on .61. Not started tonight: commit charge 83%, lead 6b asked for no long runs tonight.
+
+2026-11-08 taken by system32-78 (coordinator: '@claude' was the generic lead tag, nobody on it). Step (a), code reading on dev b75320028, no device: the 11-05 bench put both dips in the boot MQTT connect window with outbox=56 and 'discovery drip id=0 topics=39', i.e. the pre-TASK-1699 drip that sent a whole OT ID per tick. TASK-1699 (beta.131, 2026-11-07) sends one discovery config per second; its own bench showed the outbox high-water going 49 -> 17. onMqttConnect (MQTTstuff.ino:1567-1621) on the first connect after boot skips the republish (offlineMs 0) and queues birth, subscribe, sendMQTTversioninfo (:1918), publishAllPICsettings (OTGW-Core.ino:1467, 15 topics, PIC boards only, so none on .61), publishCommandDroppedState, publishBoilerUnsupportedMsgids. espMqttClient copies topic+payload into its outbox per publish, so the outbox depth times the packet size sets the transient. Hypothesis (not proven): most of the 11-05 dip was the 39-config drip burst on top of ~17 connect publishes, so TASK-1699 may already have lifted it. Plan agreed with the coordinator: (b) after tonight's single build (int-157), 5 boots on .61 with and without the internet forward-drop, reading the existing '[HEAP] boot win=... minWin=... outbox=... sburst=... connburst=... drip=...' line (MQTTstuff.ino:1140) per boot; (c) option A (outbox-depth gate on the drip, Robert 11-05) only if minWin stays below ~5 KB; otherwise the result goes to Robert for close or re-scope. TASK-1736 (agent 3) is a different metric (max free block stuck at 7668 B) but may share the many-small-allocations cause.
 <!-- SECTION:NOTES:END -->
