@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@system32-78'
 created_date: '2026-10-31T13:54:00Z'
-updated_date: '2026-11-08T18:44:00Z'
+updated_date: '2026-11-08T20:02:00Z'
 labels:
   - alpha
   - bug
@@ -76,4 +76,6 @@ Not verified: the forced weather fetch. The telnet 'w' sent by the script (raw s
 Robert 2026-11-05 ~22:30 (AskUserQuestion in session): option A chosen, outbox-depth gate on the discovery drip. Next: host test red/green on the gate decision, build, bench 5 boots old vs 5 boots fix on .61. Not started tonight: commit charge 83%, lead 6b asked for no long runs tonight.
 
 2026-11-08 taken by system32-78 (coordinator: '@claude' was the generic lead tag, nobody on it). Step (a), code reading on dev b75320028, no device: the 11-05 bench put both dips in the boot MQTT connect window with outbox=56 and 'discovery drip id=0 topics=39', i.e. the pre-TASK-1699 drip that sent a whole OT ID per tick. TASK-1699 (beta.131, 2026-11-07) sends one discovery config per second; its own bench showed the outbox high-water going 49 -> 17. onMqttConnect (MQTTstuff.ino:1567-1621) on the first connect after boot skips the republish (offlineMs 0) and queues birth, subscribe, sendMQTTversioninfo (:1918), publishAllPICsettings (OTGW-Core.ino:1467, 15 topics, PIC boards only, so none on .61), publishCommandDroppedState, publishBoilerUnsupportedMsgids. espMqttClient copies topic+payload into its outbox per publish, so the outbox depth times the packet size sets the transient. Hypothesis (not proven): most of the 11-05 dip was the 39-config drip burst on top of ~17 connect publishes, so TASK-1699 may already have lifted it. Plan agreed with the coordinator: (b) after tonight's single build (int-157), 5 boots on .61 with and without the internet forward-drop, reading the existing '[HEAP] boot win=... minWin=... outbox=... sburst=... connburst=... drip=...' line (MQTTstuff.ino:1140) per boot; (c) option A (outbox-depth gate on the drip, Robert 11-05) only if minWin stays below ~5 KB; otherwise the result goes to Robert for close or re-scope. TASK-1736 (agent 3) is a different metric (max free block stuck at 7668 B) but may share the many-small-allocations cause.
+
+Step (a) cont. (system32-78, 2026-11-08, code reading on dev eea57bd58): the drip's only deferral is isDripDeferred() (MQTTstuff.ino:189-197): status burst active or the post-burst cooldown (ADR-088). It does not look at the espMqttClient outbox depth (MQTTclient.queueSize(), exposed as mqttQueueNow() :217). dripDueWithinMs() (:181-188) only lets other publishers (queryNextPICsetting) avoid landing on a drip tick. So option A (defer a drip tick while queueSize() > N) would add a real gate that does not exist today; whether it is still needed depends on step (b) on the current drip (1 config/s since TASK-1699).
 <!-- SECTION:NOTES:END -->
