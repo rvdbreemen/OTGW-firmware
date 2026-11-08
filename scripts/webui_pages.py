@@ -13,6 +13,7 @@ Standard library only, so every build and developer script can import it.
 """
 import base64
 import gzip
+import json
 import re
 from pathlib import Path
 
@@ -91,6 +92,27 @@ def inline_page(base, page):
 def gzip_bytes(data):
     """Reproducible gzip: fixed mtime, maximum compression."""
     return gzip.compress(data, compresslevel=9, mtime=0)
+
+
+def stage_i18n_packs(i18n_dir, staging_dir):
+    """TASK-1689 (ADR-221): gzip each language pack i18n/<lang>.json into
+    staging_dir/i18n/<lang>.json.gz; the firmware serves it with
+    Content-Encoding: gzip. A pack that is not a JSON object fails the build.
+    Returns {staged name: size}; an absent i18n_dir stages nothing."""
+    i18n_dir, staged = Path(i18n_dir), {}
+    if not i18n_dir.is_dir():
+        return staged
+    for src in sorted(i18n_dir.glob("*.json")):
+        raw = src.read_bytes().replace(b"\r\n", b"\n")
+        if not isinstance(json.loads(raw.decode("utf-8")), dict):
+            raise ValueError(f"{src.name}: a language pack must be a JSON object")
+        name = f"i18n/{src.name}.gz"
+        out = Path(staging_dir) / name
+        out.parent.mkdir(parents=True, exist_ok=True)
+        data = gzip_bytes(raw)
+        out.write_bytes(data)
+        staged[name] = len(data)
+    return staged
 
 
 def build_pages(base):

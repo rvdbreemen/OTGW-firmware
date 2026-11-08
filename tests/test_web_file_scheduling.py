@@ -38,9 +38,10 @@ MUTANTS = {
     "no-plain-fallback": ("FSexplorer.ino",
                           "if (!plainPath || !LittleFS.exists(plainPath)) return false;", "return false;"),
     "double-encoding-file": ("FSexplorer.ino",
-                             'webSendFile(path, F("text/html; charset=UTF-8"), gzip);',
+                             # TASK-1689: serveGzipPage takes the mime as a parameter
+                             'webSendFile(path, type, gzip);',
                              'webPushHeader(F("Content-Encoding"), F("gzip"));\n  '
-                             'webSendFile(path, F("text/html; charset=UTF-8"), gzip);'),
+                             'webSendFile(path, type, gzip);'),
     "double-encoding-progmem": ("webServerCompat.h",
                                 # TASK-1723: anchor follows the TASK-1696B form (header only when gzip)
                                 '  if (gzip) webPushHeader(F("Content-Encoding"), F("gzip"));\n  AsyncWebServerResponse* resp',

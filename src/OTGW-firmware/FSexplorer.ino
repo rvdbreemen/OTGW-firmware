@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-beta.149
+**  Version  : v2.0.0-beta.150
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -86,7 +86,10 @@ const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCa
 // still has the plain page (plainPath, e.g. /v2.html). It is served as-is, without
 // Content-Encoding, when the .gz file is absent. Returns false, without sending
 // anything, when neither exists, so the caller can fall back to the recovery page.
-static bool serveGzipPage(const char* gzPath, const char* plainPath) {
+// mime: the Content-Type to send; nullptr means an HTML page (TASK-1689 adds the
+// language packs, served as application/json).
+static bool serveGzipPage(const char* gzPath, const char* plainPath,
+                          const __FlashStringHelper* mime = nullptr) {
   // Existence first, before any ETag is staged and before the 304 short-circuit:
   // the ETag is the filesystem hash, which only changes on a reflash, so a miss
   // must not be answered with it.
@@ -116,7 +119,8 @@ static bool serveGzipPage(const char* gzPath, const char* plainPath) {
     webPushHeader(F("ETag"), etag);
   }
   webPushHeader(F("Cache-Control"), F("no-cache"));
-  webSendFile(path, F("text/html; charset=UTF-8"), gzip);
+  const __FlashStringHelper* type = mime ? mime : F("text/html; charset=UTF-8");
+  webSendFile(path, type, gzip);
   return true;
 }
 
@@ -577,6 +581,20 @@ bool handleFile(String&& path)
       // true, not false: checkHttpAuth() already sent the 401/403, and the
       // onNotFound catch-all sends its own 404 when handleFile() returns false.
       return true;
+    }
+  }
+  // TASK-1689 (ADR-221): a web UI language pack, /i18n/<lang>.json with a 2-3 letter
+  // lowercase tag, exists only as <lang>.json.gz and is sent with Content-Encoding:
+  // gzip and the path ETag, like the pages. No plain fallback.
+  {
+    const char *p = path.c_str();
+    if (strncmp_P(p, PSTR("/i18n/"), 6) == 0) {
+      size_t n = 0;
+      while (p[6 + n] >= 'a' && p[6 + n] <= 'z') n++;
+      if (n < 2 || n > 3 || strcmp_P(p + 6 + n, PSTR(".json")) != 0) return false;
+      char gz[24];
+      snprintf_P(gz, sizeof(gz), PSTR("%s.gz"), p);
+      return serveGzipPage(gz, nullptr, F("application/json"));
     }
   }
   if (!LittleFS.exists(path)) return false;

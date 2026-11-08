@@ -110,6 +110,108 @@
     );
   }
 
+  // ---------- languages (TASK-1689, ADR-219/220/221) ----------
+  // English is built in (I18N_EN) and is the per-key fallback. NL and DE ship as
+  // gzipped packs on LittleFS, fetched as i18n/<lang>.json (relative, so it also
+  // works behind a reverse proxy). Packs and I18N_EN use the i18next v4 JSON format:
+  // nested keys addressed as 'nav.settings', {{name}} placeholders, CLDR plural
+  // suffixes (_one, _other, ...). The language is the localStorage override
+  // 'otgw.lang', else the first supported navigator.languages base tag, else English.
+  // HTML marks translatable text with data-i18n (text), data-i18n-title and
+  // data-i18n-placeholder; JS-built text calls t().
+  var I18N_EN = {
+    "nav": {
+      "home": "Home",
+      "sat": "SAT",
+      "monitor": "Monitor",
+      "settings": "Settings",
+      "advanced": "Advanced"
+    }
+  };
+  var I18N_LANGS = ['en', 'nl', 'de'];
+  var i18nLang = 'en';
+  var i18nPack = null;
+
+  function i18nPickLang(langs, supported, override) {
+    var list = [override].concat(langs || []);
+    for (var i = 0; i < list.length; i++) {
+      var base = String(list[i] || '').toLowerCase().split(/[-_]/)[0];
+      if (base && supported.indexOf(base) >= 0) return base;
+    }
+    return 'en';
+  }
+
+  function i18nLookup(dict, key) {
+    var node = dict;
+    var parts = key.split('.');
+    for (var i = 0; i < parts.length; i++) {
+      if (!node || typeof node !== 'object' || !Object.prototype.hasOwnProperty.call(node, parts[i])) return undefined;
+      node = node[parts[i]];
+    }
+    return (typeof node === 'string' && node !== '') ? node : undefined;
+  }
+
+  // The pack's string, else the English one; undefined when neither has the key.
+  function i18nString(key) {
+    var s = i18nPack ? i18nLookup(i18nPack, key) : undefined;
+    if (s === undefined) s = i18nLookup(I18N_EN, key);
+    return s;
+  }
+
+  function t(key, params) {
+    var p = params || {};
+    var k = key;
+    if (typeof p.count === 'number') {
+      var form = p.count === 1 ? 'one' : 'other';
+      try { form = new Intl.PluralRules(i18nLang).select(p.count); } catch (e) { }
+      k = (i18nString(key + '_' + form) !== undefined) ? key + '_' + form : key + '_other';
+    }
+    var s = i18nString(k);
+    if (s === undefined) return key;   // a visible hint of a missing key
+    return s.replace(/\{\{\s*(\w+)\s*\}\}/g, function (m, name) {
+      return Object.prototype.hasOwnProperty.call(p, name) ? String(p[name]) : m;
+    });
+  }
+
+  function applyI18n(root) {
+    var scope = root || document;
+    var attrs = [['data-i18n', null], ['data-i18n-title', 'title'], ['data-i18n-placeholder', 'placeholder']];
+    attrs.forEach(function (a) {
+      scope.querySelectorAll('[' + a[0] + ']').forEach(function (el) {
+        var text = t(el.getAttribute(a[0]));
+        if (a[1]) el.setAttribute(a[1], text);
+        else el.textContent = text;
+      });
+    });
+    if (scope === document && document.documentElement) document.documentElement.lang = i18nLang;
+  }
+
+  // English renders first; the pack swaps the text in when it arrives. A failed fetch
+  // (the device file queue answers 503 when busy) is tried once more, then English stays.
+  function loadI18nPack(lang, done, tries) {
+    if (lang === 'en') { i18nLang = 'en'; i18nPack = null; if (done) done(true); return; }
+    tries = (tries === undefined) ? 2 : tries;
+    fetch('i18n/' + lang + '.json', { cache: 'no-cache' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (pack) {
+        if (!pack || typeof pack !== 'object') throw new Error('not an object');
+        i18nPack = pack; i18nLang = lang;
+        if (done) done(true);
+      })
+      .catch(function () {
+        if (tries > 1) { setTimeout(function () { loadI18nPack(lang, done, tries - 1); }, 3000); return; }
+        if (done) done(false);
+      });
+  }
+
+  function initI18n() {
+    var override = null;
+    try { override = localStorage.getItem('otgw.lang'); } catch (e) { }
+    var lang = i18nPickLang(navigator.languages || [navigator.language], I18N_LANGS, override);
+    applyI18n(document);
+    loadI18nPack(lang, function (ok) { if (ok) applyI18n(document); });
+  }
+
   // ---------- theme (localStorage key otgw-theme) ----------
   function applyTheme(dark) {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
@@ -6151,6 +6253,7 @@
   // ---------- init ----------
   function init() {
     initTheme();
+    initI18n();   // TASK-1689
     document.querySelectorAll('.seg').forEach(function (s) {
       s.addEventListener('click', function () { showPage(s.dataset.page); });
     });

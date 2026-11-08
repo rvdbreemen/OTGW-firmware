@@ -60,6 +60,9 @@ PAGE_INPUTS = {
     "fonts/inter-400.woff2", "fonts/inter-700.woff2", "fonts/jetbrains-mono-400.woff2",
 }
 PAGES = {"v2.html.gz", "FSexplorer.html.gz"}
+# TASK-1689 (ADR-221): the language packs, built from i18n/*.json at the repo root.
+I18N_DIR = REPO_ROOT / "i18n"
+PACKS = {f"i18n/{p.name}.gz" for p in I18N_DIR.glob("*.json")}
 
 
 @unittest.skipUnless(HAVE_MINIFIERS, "rjsmin/rcssmin not installed (requirements-build.txt)")
@@ -71,7 +74,7 @@ class TestStagingOnRealData(unittest.TestCase):
         cls.tmp = tempfile.TemporaryDirectory()
         cls.staging = Path(cls.tmp.name) / "staging"
         cls.source_before = tree_hashes(DATA_DIR)
-        cls.report, cls.pages = build.stage_data_dir(DATA_DIR, cls.staging, minify=True)
+        cls.report, cls.pages = build.stage_data_dir(DATA_DIR, cls.staging, minify=True, i18n_dir=I18N_DIR)
         cls.source_after = tree_hashes(DATA_DIR)
         cls.staged = tree_hashes(cls.staging)
 
@@ -83,8 +86,8 @@ class TestStagingOnRealData(unittest.TestCase):
         self.assertEqual(self.source_before, self.source_after)
 
     def test_inputs_replaced_by_gzipped_pages(self):
-        self.assertEqual(set(self.staged), (set(self.source_before) - PAGE_INPUTS) | PAGES)
-        self.assertEqual(set(self.pages), PAGES)
+        self.assertEqual(set(self.staged), (set(self.source_before) - PAGE_INPUTS) | PAGES | PACKS)
+        self.assertEqual(set(self.pages), PAGES | PACKS)
         for name, size in self.pages.items():
             self.assertEqual(size, (self.staging / name).stat().st_size, name)
 
@@ -103,7 +106,7 @@ class TestStagingOnRealData(unittest.TestCase):
 
     def test_other_files_byte_identical(self):
         for rel, digest in self.staged.items():
-            if rel not in PAGES:
+            if rel not in PAGES | PACKS:
                 self.assertEqual(digest, self.source_before[rel], f"{rel} changed in staging")
 
     def test_browser_assets_minified_and_smaller(self):
@@ -113,6 +116,34 @@ class TestStagingOnRealData(unittest.TestCase):
         for rel, before, after in self.report:
             self.assertGreater(after, 0, rel)
             self.assertLess(after, before, f"{rel} did not shrink")
+
+
+    def test_language_packs_gzipped_and_nothing_else_new(self):
+        # ADR-221: nl and de packs as .json.gz; no other new gzip file in the image.
+        self.assertEqual(PACKS, {"i18n/nl.json.gz", "i18n/de.json.gz"})
+        for name in PACKS:
+            src = (I18N_DIR / Path(name).stem).read_bytes().replace(b"\r\n", b"\n")
+            self.assertEqual(gzip.decompress((self.staging / name).read_bytes()), src, name)
+        gz = {rel for rel in self.staged if rel.endswith(".gz")}
+        self.assertEqual(gz, PAGES | PACKS)
+        self.assertFalse(any(rel.startswith("i18n/") and not rel.endswith(".gz") for rel in self.staged))
+
+
+class TestLanguagePackStaging(unittest.TestCase):
+    def test_a_pack_that_is_not_a_json_object_fails_the_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            packs = Path(tmp) / "i18n"
+            packs.mkdir()
+            (packs / "nl.json").write_text("[1, 2]", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                build.webui_pages.stage_i18n_packs(packs, Path(tmp) / "staging")
+            (packs / "nl.json").write_text("{nav:", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                build.webui_pages.stage_i18n_packs(packs, Path(tmp) / "staging")
+
+    def test_no_i18n_dir_stages_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(build.webui_pages.stage_i18n_packs(Path(tmp) / "absent", Path(tmp) / "s"), {})
 
 
 class TestStagingWithoutMinify(unittest.TestCase):

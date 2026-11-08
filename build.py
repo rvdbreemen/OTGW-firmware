@@ -739,12 +739,13 @@ def _minify_asset(path, data):
     return rcssmin.cssmin(data)
 
 
-def stage_data_dir(source_dir, staging_dir, minify=True):
+def stage_data_dir(source_dir, staging_dir, minify=True, i18n_dir=None):
     """Copy source_dir to staging_dir, minify the browser assets in the copy and
-    replace the web pages by their gzipped single-file builds. Returns
+    replace the web pages by their gzipped single-file builds; with i18n_dir, also
+    stage the gzipped language packs (TASK-1689, ADR-221). Returns
     ([(relative path, bytes before, bytes after)] for each minified file,
-    {gzipped page: bytes}). Raises on a minify or page-build failure, so the
-    build fails instead of shipping a broken page."""
+    {gzipped page or pack: bytes}). Raises on a minify, page-build or pack failure,
+    so the build fails instead of shipping a broken page."""
     if staging_dir.exists():
         shutil.rmtree(staging_dir)
     shutil.copytree(source_dir, staging_dir)
@@ -760,7 +761,10 @@ def stage_data_dir(source_dir, staging_dir, minify=True):
                 raise RuntimeError(f"minifier returned an empty result for {rel}")
             path.write_bytes(after)
             report.append((rel, len(before), len(after)))
-    return report, webui_pages.write_pages(staging_dir)
+    pages = webui_pages.write_pages(staging_dir)
+    if i18n_dir is not None:
+        pages.update(webui_pages.stage_i18n_packs(i18n_dir, staging_dir))
+    return report, pages
 
 
 def find_mklittlefs(project_dir, target):
@@ -866,7 +870,8 @@ def prepare_filesystem_staging(project_dir, target, minify=True):
     """Build the staging copy for the LittleFS image and print the size report."""
     print_step("Staging web assets for the filesystem image")
     try:
-        report, pages = stage_data_dir(config.DATA_DIR, STAGING_DIR, minify=minify)
+        report, pages = stage_data_dir(config.DATA_DIR, STAGING_DIR, minify=minify,
+                                       i18n_dir=config.PROJECT_DIR / "i18n")
     except ImportError as exc:
         print_error(f"Minifier not installed ({exc}). Run build.bat / build.sh, which install "
                     "requirements-build.txt, or use --no-minify.")
@@ -883,7 +888,8 @@ def prepare_filesystem_staging(project_dir, target, minify=True):
     else:
         print_warning("--no-minify: the web pages hold unminified CSS and JavaScript")
     for name, size in pages.items():
-        print_info(f"  web page {name}: {size} bytes (gzipped, assets inlined)")
+        kind = "language pack" if name.startswith("i18n/") else "web page"
+        print_info(f"  {kind} {name}: {size} bytes (gzipped)")
     total = sum(p.stat().st_size for p in STAGING_DIR.rglob("*") if p.is_file())
     print_info(f"Staged content: {total} bytes in {STAGING_DIR}")
     tcfg = TARGETS[target]

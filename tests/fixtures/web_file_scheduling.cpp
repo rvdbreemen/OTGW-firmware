@@ -23,6 +23,7 @@ using PGM_P = const char*;
 #define PROGMEM
 #define RESTDebugTf(...) do {} while (0)
 #define strcmp_P strcmp
+#define strncmp_P strncmp  // handleFile's /i18n/ route (TASK-1689)
 #define snprintf_P snprintf  // webSendGzipPage's ETag (TASK-1640)
 #define strlen_P strlen
 static size_t hostStrlcpy(char* dest, const char* src, size_t cap) {
@@ -596,6 +597,25 @@ static void handle_file_keeps_serving_on_an_older_filesystem() {
   { bool handled = true; auto r = serve([&] { handled = handleFile(String("/nothing.ini")); });
     EXPECT(!handled); }
 }
+static void language_pack_served_gzipped() {
+  // TASK-1689 (ADR-221): /i18n/<lang>.json exists only as <lang>.json.gz.
+  files({"/FSexplorer.html.gz", "/i18n/nl.json.gz", "/i18n/nl.json"});
+  { bool handled = false; auto r = serve([&] { handled = handleFile(String("/i18n/nl.json")); });
+    EXPECT(handled); EXPECT(r->wire.status == 200); EXPECT(r->wire.path == "/i18n/nl.json.gz");
+    EXPECT(r->wire.type == "application/json");
+    EXPECT(r->wire.headers.count("Content-Encoding") == 1); EXPECT(r->wire.headers["Content-Encoding"] == "gzip");
+    EXPECT(contentEncodingCollisions == 0);
+    EXPECT(r->wire.headers["ETag"] == "\"abc1234-/i18n/nl.json.gz\""); }
+  { auto r = serve([&] { handleFile(String("/i18n/nl.json")); }, "\"abc1234-/i18n/nl.json.gz\"");
+    EXPECT(r->wire.status == 304); }
+  // A missing pack, a malformed name or a traversal is not served (the caller sends 404).
+  const char* refused[] = {"/i18n/de.json", "/i18n/x.json", "/i18n/abcd.json", "/i18n/NL.json",
+                           "/i18n/../settings.ini", "/i18n/nl.json.gz", "/i18n/nl.jsonx"};
+  for (const char* name : refused) {
+    bool handled = true; auto r = serve([&] { handled = handleFile(String(name)); });
+    EXPECT(!handled); EXPECT(r->wire.path.empty());
+  }
+}
 static void progmem_gzip_page_etag_and_encoding() {
   static const uint8_t gz[] = {0x1f, 0x8b, 0x08, 0x00};
   reset();
@@ -623,7 +643,8 @@ int main() {
   small_file_buffer_and_total_heap_cap();
 #ifdef GZIP_PAGES_TEST
   gzip_page_etag_and_304(); plain_page_fallback_from_an_older_filesystem(); recovery_page_then_upload_prompt();
-  handle_file_keeps_serving_on_an_older_filesystem(); progmem_gzip_page_etag_and_encoding(); reset();
+  handle_file_keeps_serving_on_an_older_filesystem(); language_pack_served_gzipped();
+  progmem_gzip_page_etag_and_encoding(); reset();
   std::printf("gzip pages: production serveGzipPage, handleFile and webSendGzipPage compiled\n");
 #endif
   std::printf("%s: production webSendFile scheduling (%d failures)\n", failures ? "FAIL" : "PASS", failures);

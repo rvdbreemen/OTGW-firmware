@@ -1,0 +1,9 @@
+{
+  "nav": {
+    "home": "Start",
+    "sat": "SAT",
+    "monitor": "Monitor",
+    "settings": "Einstellungen",
+    "advanced": "Erweitert"
+  }
+}
