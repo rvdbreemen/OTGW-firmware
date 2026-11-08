@@ -2637,9 +2637,12 @@
       });
       // Re-apply the unsaved edits; drop one only when the device now already holds that value
       // (it was saved meanwhile) or the key no longer exists. A save or Discard clears setDirty itself.
+      // TASK-1731: the otdmode "Switch to <stored mode>" mark equals the stored value on purpose
+      // (saving applies it live, TASK-1702), so it stays while the bus still runs another mode.
       Object.keys(keepDirty).forEach(function (k) {
         if (!setData[k]) return;
-        if (!isPwd(k) && ('' + setData[k].value) === keepDirty[k]) return;
+        if (!isPwd(k) && ('' + setData[k].value) === keepDirty[k] &&
+            !(k === 'otdmode' && otdRunningDiffers(keepDirty[k]))) return;
         setDirty[k] = keepDirty[k];
       });
       renderSettings();

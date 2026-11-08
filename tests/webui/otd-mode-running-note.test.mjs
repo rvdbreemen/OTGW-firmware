@@ -13,7 +13,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -44,9 +44,11 @@ const SETTINGS = {
   mqttbroker: S('broker.local', 30),
 };
 const log = [];
+const reqs = [];   // TASK-1731: every request with its arrival and finish time, printed by the watchdog
 const srv = http.createServer((q, s) => {
   const u = new URL(q.url, `http://127.0.0.1:${PORT}`);
   const p = decodeURIComponent(u.pathname);
+  const rq = { t: Date.now(), m: q.method, p, done: null }; reqs.push(rq); s.on('finish', () => { rq.done = Date.now(); });
   const api = p.indexOf('/api/') === 0;
   let body = '';
   q.on('data', (c) => { body += c; });
@@ -70,6 +72,23 @@ PORT = srv.address().port;
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'otgw-cdp-'));
 const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,1000', 'about:blank'], { stdio: 'ignore' });
+// TASK-1731: on Windows chrome.kill() ends only the browser process; its renderer and GPU
+// children stay behind (seen: 13 orphans from two stalled runs), so stop the whole tree.
+function stopChrome() {
+  if (process.platform === 'win32' && chrome.pid) {
+    try { spawnSync('taskkill', ['/PID', String(chrome.pid), '/T', '/F'], { stdio: 'ignore', timeout: 10000 }); } catch { /* ignore */ }
+  }
+  try { chrome.kill(); } catch { /* ignore */ }
+}
+// TASK-1731: a stalled run fails after 240 s with a reason instead of hanging the suite.
+setTimeout(() => {
+  console.log('FAIL: watchdog: the run did not finish within 240 s (Chrome or the page stalled)');
+  const t0 = reqs.length ? reqs[0].t : 0;
+  console.log('requests (ms from first, method path, ms to finish or OPEN):\n' + reqs.map((r) =>
+    `  ${r.t - t0} ${r.m} ${r.p} ${r.done ? r.done - r.t : 'OPEN'}`).join('\n'));
+  stopChrome();
+  process.exit(1);
+}, 240000).unref();
 let target = null;
 for (let i = 0; i < 100 && !target; i++) {
   try { const r = await fetch(`http://127.0.0.1:${cdpPort()}/json/new?about:blank`, { method: 'PUT' }); if (r.ok) target = await r.json(); } catch { /* not up yet */ }
@@ -84,31 +103,49 @@ ws.addEventListener('message', (ev) => {
   if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
   if (m.method === 'Runtime.exceptionThrown') exceptions.push(JSON.stringify(m.params.exceptionDetails).slice(0, 300));
 });
-const send = (method, params = {}) => new Promise((res) => { const id = ++msgId; pending.set(id, res); ws.send(JSON.stringify({ id, method, params })); });
+// TASK-1731: a CDP call that never answers (Chrome starved or gone under load) resolves empty
+// after 10 s instead of hanging the test; the watchdog below ends a run that still stalls.
+const send = (method, params = {}) => new Promise((res) => {
+  const id = ++msgId; pending.set(id, res);
+  setTimeout(() => { if (pending.delete(id)) res({}); }, 10000);
+  try { ws.send(JSON.stringify({ id, method, params })); } catch { pending.delete(id); res({}); }
+});
 const evalJs = async (expression) => {
   const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
   return r.result && r.result.result ? r.result.result.value : undefined;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(expr, ms = 5000) {
-  for (let t = 0; t < ms; t += 100) { const v = await evalJs(expr).catch(() => null); if (v) return v; await sleep(100); }
+  // TASK-1731: bounded by wall time; each evalJs may itself take up to 10 s when Chrome stalls.
+  const end = Date.now() + ms;
+  while (Date.now() < end) { const v = await evalJs(expr).catch(() => null); if (v) return v; await sleep(100); }
   return evalJs(expr).catch(() => null);
 }
 
 let ok = true; let n = 0;
+// TASK-1731: OTGW_TEST_TRACE=1 prints each phase with its time since start, to see where a stall sits.
+const T0 = Date.now();
+const trace = (what) => { if (process.env.OTGW_TEST_TRACE) console.log(`[${Date.now() - T0} ms] ${what}`); };
 function check(pass, msg) { n++; console.log((pass ? 'PASS' : 'FAIL') + ': ' + msg); if (!pass) ok = false; }
 
+trace('cdp connected');
 await send('Page.enable'); await send('Runtime.enable');
+trace('page+runtime enabled');
 await send('Page.navigate', { url: `http://127.0.0.1:${PORT}/v2.html` });
-await until(`document.readyState === 'complete' && !!document.querySelector('.seg[data-page="settings"]')`);
-for (let i = 0; i < 50 && !log.some((l) => l.startsWith('GET /api/v2/device/info')); i++) await sleep(100);
+// TASK-1731: under load Chrome was seen to spend 19 s between receiving v2.js (417 KB) and its
+// next request, so the first load gets 60 s; interactions afterwards keep their 5 s budget.
+await until(`document.readyState === 'complete' && !!document.querySelector('.seg[data-page="settings"]')`, 60000);
+trace('page loaded');
+// The running mode arrives with device/info (fetched 1.2 s after init); wait for its answer.
+for (let end = Date.now() + 60000; Date.now() < end && !reqs.some((r) => r.p.endsWith('/v2/device/info') && r.done); ) await sleep(100);
 await sleep(400);
 await evalJs(`document.querySelector('.seg[data-page="settings"]').click()`);
-await until(`(function(){ var r = document.querySelector('.rail-item[data-cat="otd"]'); if (!r) return false; r.click(); return true; })()`);
-await until(`!!document.querySelector('.srow[data-key="otdmode"] select')`);
+await until(`(function(){ var r = document.querySelector('.rail-item[data-cat="otd"]'); if (!r) return false; r.click(); return true; })()`, 30000);
+await until(`!!document.querySelector('.srow[data-key="otdmode"] select')`, 30000);
 const row = () => evalJs(`(function(){ var r = document.querySelector('.srow[data-key="otdmode"]'); if (!r) return null;
   var b = r.querySelector('.shint button'); return { text: r.querySelector('.slbl').textContent, btn: b ? b.textContent : '',
   sel: r.querySelector('select').value, dirty: r.classList.contains('dirty'), count: document.getElementById('dirtyCount').textContent }; })()`);
+trace('otdmode row present');
 const r0 = await row();
 if (RUNNING === 'master') {
   check(r0 && /Running now: Master/.test(r0.text), `the row says the bus runs Master while Gateway is stored (${JSON.stringify(r0)})`);
@@ -116,6 +153,19 @@ if (RUNNING === 'master') {
   await evalJs(`(function(){ var b = document.querySelector('.srow[data-key="otdmode"] .shint button'); if (b) b.click(); })()`);
   const r1 = await row();
   check(r1 && r1.dirty && r1.count === '1', `the button marks otdmode for saving (${JSON.stringify(r1)})`);
+  // TASK-1731: a settings refetch that lands after the click (re-opening Settings, or the
+  // page-start fetch arriving late under load) must keep the mark: it equals the stored value
+  // on purpose. Before the fix fetchSettings() dropped it, the row went clean and the count 0.
+  const nGet = log.filter((l) => l.startsWith('GET /api/v2/settings')).length;
+  await evalJs(`document.querySelector('.seg[data-page="home"]').click()`);
+  await evalJs(`document.querySelector('.seg[data-page="settings"]').click()`);
+  for (let i = 0; i < 50 && log.filter((l) => l.startsWith('GET /api/v2/settings')).length <= nGet; i++) await sleep(100);
+  await sleep(300);   // the fake answers after 15 ms; give the render a margin
+  await until(`(function(){ var r = document.querySelector('.rail-item[data-cat="otd"]'); if (!r) return false; r.click(); return true; })()`);
+  await until(`!!document.querySelector('.srow[data-key="otdmode"] select')`);
+  const r2 = await row();
+  check(log.filter((l) => l.startsWith('GET /api/v2/settings')).length > nGet && r2 && r2.dirty && r2.count === '1',
+        `the mark survives a settings refetch (${JSON.stringify(r2)})`);
   const nPost = log.length;
   await evalJs(`document.getElementById('btnSave').click()`);
   for (let i = 0; i < 50 && !log.slice(nPost).some((l) => l.startsWith('POST /api/v2/settings')); i++) await sleep(100);
@@ -127,10 +177,16 @@ if (RUNNING === 'master') {
   const r1 = await row();
   check(r1 && !r1.dirty && r1.count === '0', `re-choosing the stored mode stays clean (${JSON.stringify(r1)})`);
 }
+if (!ok && process.env.OTGW_TEST_TRACE) {
+  const t0 = reqs.length ? reqs[0].t : 0;
+  console.log('requests (ms from first, method path, ms to finish or OPEN):\n' + reqs.map((r) =>
+    `  ${r.t - t0} ${r.m} ${r.p} ${r.done ? r.done - r.t : 'OPEN'}`).join('\n'));
+  console.log('evalJs probe: ' + JSON.stringify(await evalJs('document.readyState + " " + location.href')));
+}
 
 check(exceptions.length === 0, `no uncaught page exceptions (${exceptions.join(' ; ')})`);
 try { ws.close(); } catch { /* ignore */ }
-chrome.kill(); srv.close();
+stopChrome(); srv.close();
 // TASK-1492: Chrome holds the profile until it has exited; wait for that, then retry the removal.
 await new Promise((r) => { if (chrome.exitCode !== null || chrome.signalCode !== null) return r(); chrome.once('exit', r); setTimeout(r, 5000); });
 try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (e) { console.log('profile cleanup failed: ' + e.message); }
