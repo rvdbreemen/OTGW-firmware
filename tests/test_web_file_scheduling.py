@@ -21,6 +21,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,8 +42,9 @@ MUTANTS = {
                              'webPushHeader(F("Content-Encoding"), F("gzip"));\n  '
                              'webSendFile(path, F("text/html; charset=UTF-8"), gzip);'),
     "double-encoding-progmem": ("webServerCompat.h",
-                                '  webPushHeader(F("Content-Encoding"), F("gzip"));\n  AsyncWebServerResponse* resp',
-                                '  webPushHeader(F("Content-Encoding"), F("gzip"));\n'
+                                # TASK-1723: anchor follows the TASK-1696B form (header only when gzip)
+                                '  if (gzip) webPushHeader(F("Content-Encoding"), F("gzip"));\n  AsyncWebServerResponse* resp',
+                                '  if (gzip) webPushHeader(F("Content-Encoding"), F("gzip"));\n'
                                 '  webPushHeader(F("Content-Encoding"), F("gzip"));\n  AsyncWebServerResponse* resp'),
     "etag-without-path": ("FSexplorer.ino", r'PSTR("\"%s-%s\""), fsHash, path);', r'PSTR("\"%s%s\""), fsHash, "");'),
     "handlefile-gz-only-gate": ("FSexplorer.ino", ' && !LittleFS.exists("/FSexplorer.html")) {', ') {'),
@@ -83,8 +85,14 @@ def main():
                         help="apply one defect to the production gzip-page code; pass only if the fixture fails")
     args = parser.parse_args()
     compiler = shutil.which("clang++") or shutil.which("g++")
+    vcvars = None
     if not compiler:
-        raise SystemExit("A host C++ compiler is required")
+        # TASK-1723: on Windows without g++/clang++, use MSVC through the shared vcvars lookup.
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from test_sat_pwm_override import _vcvars  # noqa: E402
+        vcvars = _vcvars()
+        if not vcvars:
+            raise SystemExit("A host C++ compiler is required (clang++, g++ or MSVC)")
     with tempfile.TemporaryDirectory(prefix="otgw-file-scheduling-") as tmp:
         directory = Path(tmp)
         gate = source("src/OTGW-firmware/restAPI.ino", args.old_rev)
@@ -118,10 +126,18 @@ def main():
         (directory / "reset_heap.inc").write_text(helpers[start:end])
         (directory / "Arduino.h").write_text("")
         (directory / "ESPAsyncWebServer.h").write_text("")
-        executable = directory / "file-scheduling"
-        subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
-                        "-I", str(directory), "-I", str(ROOT / "src/OTGW-firmware"),
-                        str(ROOT / "tests/fixtures/web_file_scheduling.cpp"), "-o", str(executable)], check=True)
+        executable = directory / ("file-scheduling.exe" if vcvars else "file-scheduling")
+        if vcvars:
+            cmd = (f'call "{vcvars}" >nul && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /D_CRT_SECURE_NO_WARNINGS '
+                   f'/I"{directory}" /I"{ROOT / "src/OTGW-firmware"}" /Fo:"{str(directory).replace(chr(92), "/")}/" /Fe:"{executable}" '
+                   f'"{ROOT / "tests/fixtures/web_file_scheduling.cpp"}"')
+            built = subprocess.run(cmd, shell=True, cwd=directory, capture_output=True, text=True, errors="replace")
+            if built.returncode:
+                raise SystemExit("MSVC compile failed:\n" + built.stdout[-3000:] + built.stderr[-1000:])
+        else:
+            subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
+                            "-I", str(directory), "-I", str(ROOT / "src/OTGW-firmware"),
+                            str(ROOT / "tests/fixtures/web_file_scheduling.cpp"), "-o", str(executable)], check=True)
         code = subprocess.run([str(executable)]).returncode
         if args.mutant:
             print(f"mutant {args.mutant}: " + ("KILLED (fixture failed as it must)" if code else "SURVIVED (the fixture missed it)"))

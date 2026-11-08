@@ -32,6 +32,25 @@ HOST = ROOT / "test" / "host"   # compiled with MSVC through vswhere: Windows on
 # Fill in with a reason when a file proves to collide in parallel (see the doc).
 SERIAL_ONLY = {
     # "test_example.py": "reason",
+    # TASK-1723: drives headless Chrome with fixed waits; under -j 4 the browser starves and a
+    # check times out (seen by system32-78). Alone it passes 5/5.
+    "otd-mode-running-note.test.mjs": "headless Chrome timing under a loaded pool",
+    # TASK-1723: its local HTTP servers time out under -j 4 (test_busy_page_is_retried,
+    # urlopen timed out, seen by otgw-firmware-6b); standalone 20/20.
+    "test_ota_flash.py": "local-server timeouts under a loaded pool",
+    # TASK-1723, full run -j 2 on 2026-11-08 (other builds on the machine): these failed or timed out
+    # in the pool and pass alone (refresh_storm 39 OK in 120 s vs 596 s and 14 failures pooled; the
+    # three headless-Chrome pages 1/1 alone vs 600 s timeouts pooled).
+    "test_refresh_storm.py": "timing assertions under a loaded pool",
+    "room-tile-sat-target.test.mjs": "headless Chrome timing under a loaded pool",
+    "settings-reboot-badge.test.mjs": "headless Chrome timing under a loaded pool",
+    "v2-settings-sat-followups.test.mjs": "headless Chrome timing under a loaded pool",
+}
+
+# Files that need longer than --timeout; their timeout is the larger of the two.
+# TASK-1723: test_sat_lowload_contract runs its full simulation matrix in about 644 s.
+MIN_TIMEOUT = {
+    "test_sat_lowload_contract.py": 1200,
 }
 
 # Words too generic to link a changed file to a test by name.
@@ -209,7 +228,7 @@ def main():
         kind, t = job
         cmd = ([sys.executable, str(t)] if kind == "py"
                else ["node", "--test", str(t)])
-        rc, out, secs = run_one(cmd, a.timeout)
+        rc, out, secs = run_one(cmd, max(a.timeout, MIN_TIMEOUT.get(t.name, 0)))
         status = classify_py(rc, out) if kind == "py" else classify_node(rc, out)
         return t, status, secs, out, (detail_py(out) if kind == "py" else "")
 

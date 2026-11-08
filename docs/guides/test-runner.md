@@ -46,3 +46,5 @@ suite. The selection is a heuristic for fast feedback: run the full suite before
 Tests that compile C++ use their own temporary directories, so they do not collide.
 Files that prove to collide are listed in `SERIAL_ONLY` in the script and run one by one
 after the pool. See the measurements recorded with the task that introduced the runner.
+A file that needs longer than `--timeout` gets its own floor in `MIN_TIMEOUT` (the larger of
+the two applies): `test_sat_lowload_contract.py` runs about 644 s and has 1200 s (TASK-1723).

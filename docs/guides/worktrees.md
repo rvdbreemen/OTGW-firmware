@@ -32,6 +32,8 @@ Two Claude (or Codex / Gemini) sessions doing git operations in the **same** wor
 
 **Prevention.** Give each concurrent session its OWN worktree (`git worktree add ../wt-<topic> <branch-or-HEAD>`), OR run parallel work as **background sub-agents inside ONE session** (they serialise git through the single main thread, and the convention here is that sub-agents implement + report but do NOT commit/bump/build — the main thread does that once after reviewing). Do not run two top-level sessions in the same tree expecting clean commits.
 
+**After `git worktree add`, init the submodules before tests or builds** (TASK-1723): a fresh worktree has an empty `src/libraries/OpenTherm` and `src/libraries/SimpleTelnet`, so the C++ host harnesses fail with a missing `OpenTherm.h`. Run `git submodule update --init` in the new worktree before `python scripts/run_tests.py` or `build.bat`. A fresh worktree also needs its own `.build-venv` before `build.bat` works.
+
 ### Cross-worktree work — ask first, then plan once, then parallelise
 
 Whenever you take on a bug fix, feature change, or architectural decision, **explicitly ask yourself**: *does this also need to land on the other line?* For `dev` (2.0.0) ↔ `otgw-1.x.x` (1.x) the answer is **yes** when the change touches:
