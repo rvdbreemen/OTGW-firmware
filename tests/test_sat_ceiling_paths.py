@@ -96,7 +96,8 @@ def build(workdir, sat_text):
                        for n in ("SAT_HARD_MAX_FLOOR", "SAT_HARD_MAX_RAD", "SAT_GLOBAL_MAX_SETPOINT", "SAT_MAX_SETPOINT_DEFAULT",
                                  "SAT_THERMAL_SAFE_FLOW"))
     block = mt.cut(src, "// --- User Max flow setpoint", "// Returns heating curve base offset")
-    funcs = fn(src, "satPwmFlameOffHold") + fn(src, "satPwmSuppressionSetpoint") + fn(src, "satCapRepeatCS")
+    quant = fn(src, "satQuantizeTenths") if "satQuantizeTenths(" in src else ""   # TASK-1738 helper used by satCapRepeatCS
+    funcs = fn(src, "satPwmFlameOffHold") + fn(src, "satPwmSuppressionSetpoint") + quant + fn(src, "satCapRepeatCS")
     stubs = mt.STUBS.replace("@CONSTS@", consts).replace("@TYPES@", "")
     stubs = stubs.replace("struct SatSettings {", "static float g_flameOff = 18, g_modSup = 1;\nstruct SatSettings {")
     stubs = stubs.replace("struct SatState { uint8_t iShVerdict = 0; };", "struct SatState { uint8_t iShVerdict = 0; float fLastSentCS = 0; };")

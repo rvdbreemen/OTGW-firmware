@@ -594,14 +594,23 @@ static bool _sat_mmSentValid = false;
 static bool _sat_chSentValid = false;
 static const uint32_t SAT_CMD_RESEND_MS  = 5000UL;   // thermo-nova climate.py:707-708
 
+// TASK-1738: one rounding for a CS=/TC= value. The wire text (%.1f) and the last-sent cache both come from this
+// quantised value, so they cannot disagree. Before, the text used %.1f of the raw float and the cache used
+// lroundf(x * 10.0f): for 45.5499992f (flow 46.55 - offset 1.0) the text said 45.5 and the cache 45.6, and the 5 s
+// repeat then sent 45.6. %.1f of a value that is already a multiple of 0.1 always prints that tenth.
+static inline float satQuantizeTenths(float v) {
+  return (float)(int16_t)lroundf(v * 10.0f) / 10.0f;
+}
+
 // TASK-1536: a repeated CS (5 s resend, PIC keepalive) is capped by the same ceiling as the control tick,
 // satEffectiveMaxSetpoint() (boiler MaxTSet, user or default cap of entries 148/152, hard ceiling), so a limit
-// lowered after the last tick holds from the next repeat on. The cache takes the capped value.
+// lowered after the last tick holds from the next repeat on. The cache takes the capped value, and the caller
+// sends that cached (quantised) value (TASK-1738).
 static float satCapRepeatCS(float cs) {
   const float maxSp = satEffectiveMaxSetpoint();
   if (cs > maxSp) {
-    cs = maxSp;
-    state.sat.fLastSentCS = (float)(int16_t)lroundf(cs * 10.0f) / 10.0f;
+    state.sat.fLastSentCS = satQuantizeTenths(maxSp);
+    return state.sat.fLastSentCS;
   }
   return cs;
 }
@@ -648,10 +657,11 @@ static bool satEnqueueIfChangedCS(float setpoint) {
   int16_t oldQ = (int16_t)lroundf(state.sat.fLastSentCS * 10.0f);
   bool stale = (now - state.sat.iLastSentCSMs) >= SAT_CMD_REFRESH_MS;
   if (state.sat.bLastSentValid && newQ == oldQ && !stale) return false;
+  const float sent = (float)newQ / 10.0f;   // TASK-1738: the text and the cache use this one value
   char buf[16];
-  snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), setpoint);
+  snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), sent);
   if (!satEnqueueOwnCS(buf)) return false;   // TASK-1574 (commit-on-success): a dropped CS= stays out of the cache
-  state.sat.fLastSentCS     = (float)newQ / 10.0f;
+  state.sat.fLastSentCS     = sent;
   state.sat.iLastSentCSMs   = now;
   state.sat.bLastSentValid  = true;
   return true;
@@ -662,10 +672,11 @@ static bool satEnqueueIfChangedCS(float setpoint) {
 static bool _sat_cmdResendArmed = false;   // set by a tick send; the DHW and boiler-fault tick paths clear it
 static void satSendCS(float setpoint) {
   _sat_cmdResendArmed = true;
+  const float sent = satQuantizeTenths(setpoint);   // TASK-1738: the text and the cache use this one value
   char buf[16];
-  snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), setpoint);
+  snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), sent);
   if (!satEnqueueOwnCS(buf)) return;   // TASK-1574 (commit-on-success): iLastSentCSMs stays old, so satCmdResend() retries in 5 s
-  state.sat.fLastSentCS     = (float)(int16_t)lroundf(setpoint * 10.0f) / 10.0f;
+  state.sat.fLastSentCS     = sent;
   state.sat.iLastSentCSMs   = millis();
   state.sat.bLastSentValid  = true;
 }
@@ -846,7 +857,7 @@ static bool satEnqueueIfChangedTC(float tc) {
   int16_t oldQ = (int16_t)lroundf(state.sat.fLastSentTC * 10.0f);
   if (state.sat.bTCAccountedValid && newQ == oldQ) return false;
   char buf[16];
-  snprintf_P(buf, sizeof(buf), PSTR("TC=%.1f"), tc);
+  snprintf_P(buf, sizeof(buf), PSTR("TC=%.1f"), (float)newQ / 10.0f);   // TASK-1738: the text uses the cached value
   addCommandToQueue(buf, strlen(buf), false, 0, true);
   _sat_tcPushed               = true;                      // TASK-1541: satDisable() clears it with TC=0
   state.sat.fLastSentTC       = (float)newQ / 10.0f;
