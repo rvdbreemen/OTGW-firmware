@@ -146,6 +146,16 @@ Firmware v1.x ran on the ESP8266 module that shipped on earlier NodoShop OTGW bo
 
 The Wemos D1 mini (ESP8266) runs the 1.x firmware. To move an existing OTGW to v2.0.0, replace the Wemos D1 mini with a LOLIN S3 Mini or S3 Mini Pro: it keeps the same OTGW board and PIC co-processor. Going back to 1.x means putting the Wemos D1 mini back: a 1.x zip does not run on an S3.
 
+**Pin settings are GPIO numbers, and the numbers change with the module.** The sensor, S0 and output pin settings hold a raw GPIO number, not a hole on the board. The S3 module fits the same holes, but a different GPIO sits behind each hole. A 1.x value therefore points at another hole on the S3: a Dallas sensor wired to the D7 hole was GPIO 13 on the Wemos D1 mini, and GPIO 13 on an S3 Mini is the D6 hole. After the swap, or after restoring 1.x settings, set each pin you use to the GPIO for its hole:
+
+| Hole on the OTGW Classic | Wemos D1 mini (1.x) | LOLIN S3 Mini | LOLIN S3 Mini Pro |
+|---|---|---|---|
+| D6 | GPIO 12 | GPIO 13 | GPIO 39 |
+| D7 | GPIO 13 | GPIO 11 | GPIO 38 |
+| D8 | GPIO 15 | GPIO 10 | GPIO 37 |
+
+These are the free holes. The other holes (D0 to D5, TX, RX) carry the Classic's own signals (LED, button, I2C, PIC reset and serial link); the firmware does not start the sensors, S0 counter or output on such a pin and logs a warning instead. On the S3 Mini Pro the D7 hole (GPIO 38) is also the data line of the built-in display, so prefer D6 or D8 there. Sources: the LOLIN pin maps (`lolin_s3_mini` and `lolin_s3_mini_pro` variants of the Arduino core) and `docs/hardware/combo-esp32-s3-pinout.md`.
+
 #### Other Boards
 
 Other ESP32-S3 boards may compile and run the firmware but are not tested or supported. GPIO pin assignments for Dallas sensors, OLED, and the S0 counter may need adjustment in the settings.
@@ -201,7 +211,7 @@ The display turns off automatically after a configurable idle timeout. Configure
 
 #### Dallas DS18B20 Temperature Sensors
 
-Up to 16 DS18B20 sensors can be connected on a single 1-Wire bus to a configurable GPIO pin (setting range 0 to 16, default GPIO 10). Each sensor is identified by its 64-bit address and can be given a custom label via the web interface. All sensors are published to MQTT and appear in Home Assistant auto-discovery.
+Up to 16 DS18B20 sensors can be connected on a single 1-Wire bus to a configurable GPIO pin (any ESP32-S3 GPIO: 0 to 21 and 26 to 48; default GPIO 10, the D8 hole on an S3 Mini). On an S3 Mini Pro GPIO 10 is not one of the board's holes: pick the D6 or D8 hole (GPIO 39 or 37). Coming from 1.x, see the hole-to-GPIO table under [Migrating from ESP8266 (1.x)](#migrating-from-esp8266-1x). Each sensor is identified by its 64-bit address and can be given a custom label via the web interface. All sensors are published to MQTT and appear in Home Assistant auto-discovery.
 
 > **Note for users upgrading from versions before v1.0.0**: The default Dallas GPIO pin changed from GPIO 13 (D7) to GPIO 10 (SD3) in v1.0.0. If your sensors stopped working after an upgrade, check the Dallas GPIO setting in Settings and change it back to 13 if needed.
 
