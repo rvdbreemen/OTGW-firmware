@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-11-08T15:30:00Z'
-updated_date: '2026-11-08T16:38:00Z'
+updated_date: '2026-11-08T21:27:00Z'
 labels:
   - webui
 milestone: 2.0.0
@@ -36,4 +36,6 @@ Robert 2026-11-08 ~16:30: 'SAT enabled: the UI is responsive, the set temperatur
 2026-11-08 17:3x, Robert in #dev-sat-mqtt 17:23-17:27 (relayed by the coordinator): the dial never sends TT=, only the SAT target; UI control only with SAT on; with SAT off only the thermostat's values and the room temperature; with SAT on PIC commands are blocked and SAT is controlled through its own MQTT/REST. Checked: every home view shows only model.room (MsgID 24) and model.roomSet (MsgID 16) with SAT off: design a aRoom/aRoomSet (v2.js:1119-1125, SAT's target only while sat.active), design b bRoom/bSet and the arc/tick (1199-1216), design c Room chip and T ROOM/ROOM SET (1176, 1319-1320); no derived value. Both sources are the thermostat's: WS frames MsgID 24/16 and /api/v2/otgw/otmonitor roomtemperature = Tr (OTGW-Core.ino:5047, MsgID 24) and roomsetpoint = TrSet (5036, MsgID 16), restAPI.ino:3068-3069. New test case: SAT off, otmonitor 19.8/20.0 -> bRoom '19.8°', bSet 'target 20.0°'; the test file now passes 3/3. SAT settings pages unchanged pending Robert's answer on whether they stay editable with SAT off.
 
 2026-11-08 review (OTGW agent 3) and Robert's takeover rule (via the coordinator): during a SAT fallback takeover (fallback_active, Enable switch off) the dial stays on and sets the SAT target, because SAT really controls (sat.owns = enabled || fallback_active); the SAT settings stay locked then (TASK-1737). Presses while sat.owns is still unknown share one sat/status ask (dialAsk guard, presses add up), so the 2-in-flight rule holds. Tests added to home-dial-sat-only.test.mjs: takeover (+/- shown, POST sat/target 20.5) and four presses with a 1.5 s late sat/status give one ask and no POST. The SAT-off test now waits until design b is visible and the status is applied; before, under load it could read a zero-width dial as hidden and an empty command line (flaky 1 in 4).
+
+2026-11-08 17:23-17:27 Robert in #dev-sat-mqtt (msgs 1569024462718894322..1569025571319586898): 'the dial should never just send a TT command. The dial is for controlling SAT desired room temperature.' / 'The whole UI that just shows a dial and all kinds of settings is related to SAT and can only by used when SAT is enabled by the user.' / 'When SAT is turned off it should not be controllable. It is allowed to show the current value of a real thermostat ... and the room temperature if that is available.' / SAT off: remote control via MQTT, REST, serial stays; SAT on: PIC commands blocked, SAT topic on MQTT/REST. Discord agent answered (msg in #dev-sat-mqtt) and asked whether SAT settings pages stay editable with SAT off (recommend: yes, lock only the dial); answer pending. (carried over from the main dev tree copy by otgw-firmware-4c, 2026-11-08)
 <!-- SECTION:NOTES:END -->

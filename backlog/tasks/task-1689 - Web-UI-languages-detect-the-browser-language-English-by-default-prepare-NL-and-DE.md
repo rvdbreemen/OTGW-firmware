@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-07T11:06:00Z'
-updated_date: '2026-11-08T13:37:00Z'
+updated_date: '2026-11-08T21:27:00Z'
 labels:
   - webui
   - i18n
@@ -60,4 +60,6 @@ Robert 2026-11-07: detect which language the user uses; the default is always En
 Implementation: data/v2.js I18N_EN (i18next v4 nested JSON), i18nPickLang, i18nLookup, i18nString, t (placeholders {{name}}, CLDR plurals via Intl.PluralRules), applyI18n (data-i18n, -title, -placeholder), loadI18nPack, initI18n from init(); data/v2.html nav labels carry data-i18n; i18n/nl.json and i18n/de.json (AI draft, Robert reviews NL, a German-speaking tester DE); scripts/webui_pages.py stage_i18n_packs + build.py stage_data_dir(i18n_dir=...) gzip the packs into staging i18n/<lang>.json.gz; FSexplorer.ino serveGzipPage gains a mime parameter and handleFile serves /i18n/<lang>.json from the .gz (application/json, Content-Encoding gzip, path ETag, 304), no plain fallback.
 
 Evidence (host): tests/webui/i18n-lang.test.mjs 5/5 on the fix (3 runs), 0/5 on origin/dev v2.js (I18N_EN not found); covers unsupported -> English, nl-BE -> nl, override wins, per-key English fallback, blank string -> English, placeholders, plurals 0/1/42, a gzip pack loaded from a local HTTP server with Content-Encoding gzip, 503 twice -> English with exactly one retry, pack coverage both directions. tests/test_web_file_scheduling.py: new language_pack_served_gzipped case PASS (0 failures), FAIL on origin/dev FSexplorer.ino (served the plain file, no gzip/ETag); all 5 mutants KILLED after the double-encoding-file anchor moved to 'webSendFile(path, type, gzip);'. tests/test_build_staging.py 18 OK incl. nl/de .json.gz staged, decompress to the source, no other new .gz, a non-object or broken pack fails the build. v2-navigation 34/34, theme-toggle-labels 4/4, sat-area-sensor-mapping 1/1, v2-settings-dirty-survives-refetch 1/1. Note: loopback HTTP from the Bash tool shell intermittently timed out (ETIMEDOUT on 127.0.0.1); the same test is stable from PowerShell. Not yet: bump/build/bench (OTA, curl the pack, browser screenshot with nl), via 6b's build slot. Gap noted: scripts/ota_flash.py --webui pushes only PAGES, so packs reach a board only with --fs.
+
+Robert 2026-11-08 ~14:00: phase 1 goes next for otgw-firmware-54, directly after TASK-1723 and before TASK-1725 and TASK-1716; keep phase 1 small (t() helper, English built in, browser detection with English fallback, pack loading per ADR-219/220/221). (carried over from the main dev tree copy by otgw-firmware-4c, 2026-11-08)
 <!-- SECTION:NOTES:END -->
