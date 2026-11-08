@@ -3173,7 +3173,7 @@
   // P9: heat-source control, REST seed, target steppers, conn detail,
   // support hover, graph window/export, settings enum options.
   // ============================================================
-  var sat = { source: 0, detected: 1, target: null, active: false, roomLost: false, tank: false };  // tank: boiler reports a DHW storage tank (MsgID 3 HB bit 3, TASK-1392); roomLost: SAT is on and has no valid room temperature (TASK-1546); source: 0=auto,1=gas,2=hp,3=hybrid
+  var sat = { source: 0, detected: 1, target: null, active: false, roomLost: false, tank: false, owns: null };  // owns: SAT enabled or its MQTT-loss fallback (satOwnsControlSetpoint), null until sat/status answered (TASK-1717)  // tank: boiler reports a DHW storage tank (MsgID 3 HB bit 3, TASK-1392); roomLost: SAT is on and has no valid room temperature (TASK-1546); source: 0=auto,1=gas,2=hp,3=hybrid
   function effectiveSource() { return sat.source === 0 ? sat.detected : sat.source; }
   var statsSort = { col: 'id', asc: true };
   function sortStatsCmp(a, b) {
@@ -3547,6 +3547,7 @@
       if (st.target_temp !== undefined) sat.target = parseFloat(st.target_temp);
       if (st.dhw_config_tank !== undefined) sat.tank = !!st.dhw_config_tank;   // TASK-1392
       sat.active = !!st.active;   // TASK-1342: room tile shows SAT's target while SAT controls
+      sat.owns = !!(st.enabled || st.fallback_active);   // TASK-1717: the rule of satOwnsControlSetpoint()
       sat.roomLost = !!(st.enabled && st.room_temp_lost);   // TASK-1546
       applyApplianceToggle();
       if (activeDesign() === 'a') renderA();
@@ -3581,7 +3582,17 @@
       .then(function (r) { if (r.ok) { sat.source = v; applyApplianceToggle(); setTimeout(fetchSatStatus, 400); } }).catch(function () { });
   }
 
+  // TASK-1717 (Robert): with SAT on the dial sets the SAT target; with SAT off the thermostat owns the
+  // room setpoint, so the dial sends a TT= override (temporary: the thermostat's next program change
+  // ends it). A dial press before sat/status has answered asks for it first.
   function stepTarget(delta) {
+    if (sat.owns === null) {
+      fetch(APIGW + 'v2/sat/status').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+        var st = j && (j.sat || j); sat.owns = !!(st && (st.enabled || st.fallback_active)); stepTarget(delta);
+      }).catch(function () { txt('bCmd', 'set failed: SAT status unknown'); });
+      return;
+    }
+    if (!sat.owns) { stepRoomOverride(delta); return; }
     var base = (sat.target !== null && !isNaN(sat.target)) ? sat.target : (model.roomSet !== null ? model.roomSet : 20);
     var t = Math.max(5, Math.min(30, Math.round((base + delta) * 2) / 2));
     txt('bCmd', 'set target ' + t.toFixed(1) + '°…');
@@ -3590,6 +3601,18 @@
         if (r.ok) { sat.target = t; txt('bSet', 'target ' + t.toFixed(1) + '°'); txt('bCmd', 'target set ' + t.toFixed(1) + '°'); }
         else txt('bCmd', 'set failed (HTTP ' + r.status + ')');
       }).catch(function () { txt('bCmd', 'set failed'); });
+  }
+  var roomOverride = null;   // the last TT= value this page sent, so repeated presses step from it
+  function stepRoomOverride(delta) {
+    var base = roomOverride !== null ? roomOverride : (model.roomSet !== null ? model.roomSet : 20);
+    var t = Math.max(5, Math.min(30, Math.round((base + delta) * 2) / 2));
+    var cmd = 'TT=' + t.toFixed(1);
+    txt('bCmd', 'thermostat override ' + t.toFixed(1) + '°…');
+    fetch(APIGW + 'v2/otgw/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: cmd }) })
+      .then(function (r) {
+        if (r.ok) { roomOverride = t; txt('bCmd', 'thermostat override ' + t.toFixed(1) + '° until its next program change'); }
+        else txt('bCmd', 'override failed (HTTP ' + r.status + ')');
+      }).catch(function () { txt('bCmd', 'override failed'); });
   }
 
   // Grouped chain map: Heating bus / Network / Integrations / This browser, each

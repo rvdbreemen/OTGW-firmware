@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Home dial: with SAT off the +/- buttons send a thermostat override instead of a SAT target that does nothing** (TASK-1717, reported by tjfs, Robert's decision). The dial on the home view (design b) always POSTed `/api/v2/sat/target` and said "target set", also with SAT off, when the SAT target does not reach the boiler. With SAT off it now sends `TT=` (a temporary room setpoint override) over `POST /api/v2/otgw/commands`, starting from the thermostat's room setpoint (or the last override it sent), and says "thermostat override X° until its next program change". With SAT on (or its MQTT-loss fallback) it keeps setting the SAT target, because the firmware refuses `TT=` from other channels then (TASK-1695). `TT=` reaches the thermostat on OT-Direct since TASK-1718 and on PIC boards already. Test `tests/webui/home-dial-tt-when-sat-off.test.mjs`.
+
 ## [2.0.0-beta.144] - 2026-11-08
 
 ### Added
