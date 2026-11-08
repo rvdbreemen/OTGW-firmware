@@ -51,7 +51,8 @@ const MIME = {
 };
 
 // The four area settings exactly as GET /api/v2/settings shapes them.
-const SETTINGS = {};
+// SAT is on: since TASK-1737 the SAT settings are locked while SAT is off (onboarded, so no wizard).
+const SETTINGS = { satenabled: { value: true, type: 'b' }, sat_onboarded: { value: true, type: 'b' } };
 for (let i = 0; i < 4; i++) SETTINGS['satsensorarea' + i] = { value: '', type: 's', maxlen: 17 };
 
 const posts = [];   // JSON bodies POSTed to /api/v2/settings

@@ -2787,11 +2787,42 @@
     card.appendChild(p); card.appendChild(b);
     return card;
   }
+  // TASK-1737 (Robert 2026-11-08): with SAT off every SAT setting is greyed out and locked; the
+  // Enable switch (#satEnable, which saves at once) and Re-run setup stay usable, and non-SAT
+  // settings stay editable. The lock follows SAT's enabled setting (settings.sat.bEnabled), not the
+  // fallback takeover: during a takeover the home dial controls (sat.owns) but these stay locked.
+  // Source: the latest sat/status answer from either poller (satEnabledLive), else the stored
+  // satenabled. Switching SAT on unlocks as soon as the switch has saved and sat/status answered.
+  var SAT_OFF_NOTE = 'SAT is off: the SAT settings are locked. Switch SAT on (top right) to change them.';
+  var satEnabledLive = null;
+  function satIsOn() {
+    if (satEnabledLive !== null) return satEnabledLive;
+    return !!(setData && setData.satenabled && ('' + setData.satenabled.value) === 'true');
+  }
+  function noteSatEnabled(en) {
+    if (en === undefined) return;
+    satEnabledLive = !!en;
+    applySatLock();
+  }
+  function satLockedKey(k) { return k !== 'satenabled' && catFor(k) === 'sat' && !satIsOn(); }
+  // The SAT page's own controls that change a SAT setting. satDhwSlider and satSim are enabled by
+  // their own render rule, so unlocking leaves them to it.
+  var SAT_LOCK_IDS = ['satUp', 'satDown', 'satDhwEnabled', 'satDhwEnable', 'satMaxSlider', 'satModSlider', 'satDetectLoc'];
+  var SAT_LOCK_RENDERED = ['satDhwSlider', 'satSim'];
+  var satLockShown = null;
+  function applySatLock() {
+    var off = !satIsOn();
+    SAT_LOCK_IDS.forEach(function (id) { var e = document.getElementById(id); if (e) e.disabled = off; });
+    if (off) SAT_LOCK_RENDERED.forEach(function (id) { var e = document.getElementById(id); if (e) e.disabled = true; });
+    document.querySelectorAll('#satPresets .sat-preset').forEach(function (b) { b.disabled = off; });
+    if (satLockShown !== off) { satLockShown = off; if (setData) renderSatSettings(); }
+  }
   function renderSatSettings() {
     var l2 = document.getElementById('satSetL2'), l3 = document.getElementById('satSetL3');
     if (!l2 || !l3) return;
     hideHelp();   // TASK-1281
     l2.textContent = ''; l3.textContent = '';
+    if (!satIsOn()) { var note = document.createElement('p'); note.className = 'cat-desc'; note.textContent = SAT_OFF_NOTE; l2.appendChild(note); }
     var placed = {};
     function fill(host, groups) {
       groups.forEach(function (g) {
@@ -2891,6 +2922,7 @@
         if (k === 'wifistaticip' && wasEmpty && input.value.trim()) { wasEmpty = false; ipPrefill(false); }
       });
     }
+    if (satLockedKey(k)) { input.disabled = true; row.style.opacity = '0.55'; row.title = SAT_OFF_NOTE; }   // TASK-1737
     row.appendChild(input);
     return row;
   }
@@ -2992,6 +3024,7 @@
     });
   }
   function markDirty(k, val, row) {
+    if (satLockedKey(k)) return;   // TASK-1737: a locked SAT setting never becomes dirty
     // TASK-1542 (entry 195, Q-1527b B): "On/off heat pump, 3 h cycle (experimental)" is no firmware source of its own.
     // It is stored as satsource 2 (heat pump) with sathpcycle 10800; leaving it resets the cycle to the 1800 s default.
     if (k === 'satsource' && setData.sathpcycle) {
@@ -3021,8 +3054,16 @@
     });
   }
   function saveSettings() {
+    // TASK-1737: a locked SAT setting is never saved while SAT is off. One edited while SAT was on
+    // (SAT switched off since) is dropped with a message naming it, never silently.
+    var dropped = [];
+    Object.keys(setDirty).forEach(function (k) { if (satLockedKey(k)) { dropped.push(labelFor(k)); delete setDirty[k]; } });
+    if (dropped.length) {
+      document.querySelectorAll('.srow.dirty').forEach(function (r) { if (r.dataset.key && satLockedKey(r.dataset.key)) r.classList.remove('dirty'); });
+      bleToast('SAT is off: not saved: ' + dropped.join(', '), true, 4000);
+    }
     var keys = Object.keys(setDirty);
-    if (!keys.length) return;
+    if (!keys.length) { updateSaveBar(); return; }
     // TASK-1230: refuse the whole save (post nothing) when an edited IP field has a bad
     // octet (any mode; stored values are not re-checked) or a static group is incomplete.
     var ipErr = '', ipCat = '', ipKey = '';
@@ -3705,6 +3746,7 @@
       sat.active = !!st.active;   // TASK-1342: room tile shows SAT's target while SAT controls
       sat.owns = !!(st.enabled || st.fallback_active);   // the rule of satOwnsControlSetpoint()
       applyDialMode();   // TASK-1735: dial controls only while SAT owns the temperature
+      noteSatEnabled(st.enabled);   // TASK-1737: the settings lock follows the latest answer
       sat.roomLost = !!(st.enabled && st.room_temp_lost);   // TASK-1546
       applyApplianceToggle();
       if (activeDesign() === 'a') renderA();
@@ -4988,6 +5030,7 @@
         }
         if (nd) nd.style.display = 'none'; if (body) body.style.display = '';
         satLastData = d;
+        if (d.enabled !== undefined) satEnabledLive = !!d.enabled;   // TASK-1737 (renderSatPage applies the lock)
         syncSatBetaNotice();   // TASK-1507: once per page load
         try { renderSatPage(d); } catch (e) { }
       })
@@ -5098,6 +5141,7 @@
       .then(function () { satMarkerBusy = false; });
   }
   function satCurveClick(ev) {
+    if (!satIsOn()) return;   // TASK-1737: the curve is a SAT setting
     var svg = ev.currentTarget, m = svg.getScreenCTM && svg.getScreenCTM();
     if (!m) return;
     var pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
@@ -5220,6 +5264,7 @@
       ['Outdoor sensor', d.external_outdoor_valid ? 'External' : 'OT bus / weather']
     ]);
     satRenderSim(d);
+    applySatLock();   // TASK-1737: after the sub-renders, so the lock wins over their enable rules
     var raw = document.getElementById('satRawJson');
     if (raw && raw.style.display !== 'none') raw.textContent = JSON.stringify(d, null, 2);
   }
