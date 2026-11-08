@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.144
+**  Version  : v2.0.0-beta.145
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4387,26 +4387,31 @@ void sendDeviceSettings()
   addInt(F("satbleinterval"), settings.sat.iBleInterval, "i", 10, 300);
 #endif
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-  // --- OT-Direct settings (OTGW32 only) ---
-  addInt(F("otdmode"), settings.otd.iMode, "i", 0, 4);
-  addBool(F("otdautodetect"), settings.otd.bAutoDetect, "b");
-  {
-    char tmpBuf[8];
-    dtostrf(settings.otd.fSetbackTemp, 1, 1, tmpBuf);
-    addNum(F("otdsetbacktemp"), tmpBuf, "f", 1, 30);
+  // --- OT-Direct settings (only outside PIC mode) ---
+  // The combo links OT-Direct in for every board mode. In PIC mode (board mode 1/3 or a
+  // live PIC) the keys are left out, so the web UI shows no OT-Direct category (TASK-1719).
+  // settings.ini keeps the values; POST still accepts the keys.
+  if (isOTDirectUiExposed()) {
+    addInt(F("otdmode"), settings.otd.iMode, "i", 0, 4);
+    addBool(F("otdautodetect"), settings.otd.bAutoDetect, "b");
+    {
+      char tmpBuf[8];
+      dtostrf(settings.otd.fSetbackTemp, 1, 1, tmpBuf);
+      addNum(F("otdsetbacktemp"), tmpBuf, "f", 1, 30);
+    }
+    addInt(F("otdsetbacktimeout"), settings.otd.iSetbackTimeout, "i", 5, 255);
+    addBool(F("otdenableslave"), settings.otd.bEnableSlave, "b");
+    addBool(F("otdsummermode"), settings.otd.bSummerMode, "b");
+    addBool(F("otdfailsafe"), settings.otd.bFailSafe, "b");
+    addInt(F("otdmsginterval"), settings.otd.iMsgInterval, "i", 100, 1275);
+    addBool(F("otdhasbypassrelay"), settings.otd.bHasBypassRelay, "b");
+    // --- OT-Direct ventilation override (TASK-584) ---
+    addBool(F("otdventenable"),       settings.otd.bVentEnable, "b");
+    addBool(F("otdopenbypass"),       settings.otd.bOpenBypass, "b");
+    addBool(F("otdautobypass"),       settings.otd.bAutoBypass, "b");
+    addBool(F("otdfreeventenable"),   settings.otd.bFreeVentEnable, "b");
+    addInt(F("otdventsetpoint"),      settings.otd.iVentSetpoint, "i", 0, 100);
   }
-  addInt(F("otdsetbacktimeout"), settings.otd.iSetbackTimeout, "i", 5, 255);
-  addBool(F("otdenableslave"), settings.otd.bEnableSlave, "b");
-  addBool(F("otdsummermode"), settings.otd.bSummerMode, "b");
-  addBool(F("otdfailsafe"), settings.otd.bFailSafe, "b");
-  addInt(F("otdmsginterval"), settings.otd.iMsgInterval, "i", 100, 1275);
-  addBool(F("otdhasbypassrelay"), settings.otd.bHasBypassRelay, "b");
-  // --- OT-Direct ventilation override (TASK-584) ---
-  addBool(F("otdventenable"),       settings.otd.bVentEnable, "b");
-  addBool(F("otdopenbypass"),       settings.otd.bOpenBypass, "b");
-  addBool(F("otdautobypass"),       settings.otd.bAutoBypass, "b");
-  addBool(F("otdfreeventenable"),   settings.otd.bFreeVentEnable, "b");
-  addInt(F("otdventsetpoint"),      settings.otd.iVentSetpoint, "i", 0, 100);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // --- Ethernet settings (only when a W5500 was actually detected) ---

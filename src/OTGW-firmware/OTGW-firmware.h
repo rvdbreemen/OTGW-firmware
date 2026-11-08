@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.144
+**  Version  : v2.0.0-beta.145
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -828,6 +828,20 @@ struct OTGWSettings {
 };
 
 OTGWSettings settings;
+
+// TASK-1719: true when the web UI may show OT-Direct settings and elements. In PIC
+// mode (board mode 1 = Classic S3 Mini, 3 = Classic S3 Mini Pro, or a live PIC) it is
+// false, also when the forced PIC turned out dead. Needs `settings`, so it lives here.
+inline bool isOTDirectUiExposed() {
+#if !HAS_DIRECT_OT
+  return false;
+#elif HAS_RUNTIME_HW_DETECT
+  if (settings.iBoardMode == 1 || settings.iBoardMode == 3) return false;
+  return !isPICEnabled();
+#else
+  return true;
+#endif
+}
 
 // ---- Combo runtime pin resolution (ADR-127; ADR-158 adds the S3 Mini Pro) --
 // The combo binary carries THREE pin maps: OTGW32 (PIN_*), Classic-on-S3-Mini

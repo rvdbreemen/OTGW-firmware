@@ -299,6 +299,8 @@ Returns all device configuration settings.
 
 Returns a JSON map with all setting fields. Each setting includes its value, type indicator, and constraints. Settings cover: hostname, MQTT configuration, NTP, UI preferences, GPIO sensors, S0 counter, GPIO outputs, OTGW commands, webhook configuration, and HTTP password.
 
+Some groups depend on the running hardware mode. The OT-Direct fields (`otd*`) are left out in PIC mode: board mode 1 or 3, or whenever a PIC is live, also when a forced PIC turns out dead (TASK-1719). The Ethernet fields (`eth*`) appear only when a W5500 was found (TASK-865.18). A POST still accepts these keys in every mode, and `settings.ini` keeps their values.
+
 **Password fields** use a protected round-trip format:
 - `password=0` means no password is currently stored
 - `password=XX` means a password is stored and `XX` is its length

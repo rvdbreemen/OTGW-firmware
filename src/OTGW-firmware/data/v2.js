@@ -3963,6 +3963,7 @@
     ];
     Object.keys(d).forEach(function (k) {
       if (CURATED.indexOf(k) !== -1) return;
+      if (/^otd/.test(k) && !d.otdirectavailable) return;   // TASK-1719: no OT-Direct group in PIC mode
       var v = d[k];
       if (v === undefined || v === null || typeof v === 'object') return;
       for (var i = 0; i < OTHER.length; i++) {
