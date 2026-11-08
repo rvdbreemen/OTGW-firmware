@@ -722,6 +722,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-221: Language packs may be gzipped on LittleFS (amends ADR-194 for language packs only)](ADR-221-language-packs-may-be-gzipped-on-littlefs-amends-adr-194-for-language-packs-only.md)** 🆕 *(Accepted)*  
   `nl.json.gz`/`de.json.gz` served with `Content-Encoding: gzip` and an ETag like the ADR-215 pages; ADR-194's no-gzip rule stands for every other asset (TASK-1689).
 
+- **[ADR-222: On boards without PSRAM BLE starts off and warns when the user enables it](ADR-222-on-boards-without-psram-ble-starts-off-and-warns-when-the-user-enables-it.md)** 🆕 *(Accepted)*  
+  No-PSRAM boards default BLE off with no dialog at boot; the stability warning appears once when the user switches BLE on, and only an accepted warning stores BLE on with the ack. Supersedes ADR-169 (TASK-1693).
+
 - **[ADR-196: SAT behaviour ground truth: Sergeant D's recorded decisions, then pinned thermo-nova, then specs, then firmware](ADR-196-sat-behaviour-ground-truth-sergeant-d-s-recorded-decisions-then-pinned-thermo-nova-then-specs-then-firmware.md)** 🆕 *(Accepted)*  
   Source order for every SAT statement or change: `docs/sat/sergeant-d-corrections.md` entries, then thermo-nova at 7beaaf5 (`file:line`), then `thermo-nova-spec.md`, then the firmware and its docs, which are never the authority. Read the corrections file first, cite the entry or say none covers it, put conflicts to Sergeant D. Guideline-level, no CI gate.
 
