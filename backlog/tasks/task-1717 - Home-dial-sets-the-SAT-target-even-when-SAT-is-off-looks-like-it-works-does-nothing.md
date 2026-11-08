@@ -6,11 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-08T07:54:00Z'
-updated_date: '2026-11-08T08:14:00Z'
+updated_date: '2026-11-08T10:24:00Z'
 labels:
   - webui
   - field-report
-  - needs-maintainer-ok
 milestone: 2.0.0
 dependencies: []
 priority: medium
@@ -25,7 +24,7 @@ Reported by tjfs 2026-11-08 07:51 #alpha-testing (msg 1568895744029499403): in O
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With SAT off the dial does not pretend to set anything: it either sends a TT= room-setpoint override (and says so) or is shown as SAT-only (decision Robert)
+- [x] #1 With SAT off the dial does not pretend to set anything: it either sends a TT= room-setpoint override (and says so) or is shown as SAT-only (decision Robert)
 - [ ] #2 With SAT on the dial keeps setting the SAT target (test)
 <!-- AC:END -->
 
@@ -33,4 +32,6 @@ Reported by tjfs 2026-11-08 07:51 #alpha-testing (msg 1568895744029499403): in O
 
 <!-- SECTION:NOTES:BEGIN -->
 tjfs 2026-11-08 07:57 (msg 1568897217505402944): 'definitely not obvious! I think if you're not in sat mode the temperature dial should alter the TT setting.' Depends on TASK-1718 (OT-Direct TT= does not reach the thermostat yet).
+
+Robert 2026-11-08: with SAT off the dial sends a TT= temporary room-setpoint override and says so (e.g. 'thermostat override 20.5 C until its next program change'); with SAT on it keeps setting the SAT target. Depends on TASK-1718 (beta.142) for OT-Direct; PIC boards already handle TT=.
 <!-- SECTION:NOTES:END -->

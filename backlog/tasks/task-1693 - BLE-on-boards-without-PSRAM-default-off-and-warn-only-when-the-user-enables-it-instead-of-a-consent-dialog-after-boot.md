@@ -6,8 +6,8 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-07T12:29:00Z'
+updated_date: '2026-11-08T10:24:00Z'
 labels:
-  - needs-maintainer-ok
   - ble
   - webui
 milestone: 2.0.0
@@ -24,5 +24,11 @@ tjfs in #alpha-testing 2026-11-07 12:18 UTC (msg 1568600646901305449): instead o
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Decision by Robert: keep ADR-169, default off on no-PSRAM with a warning on enable, or hide BLE on no-PSRAM boards
+- [x] #1 Decision by Robert: keep ADR-169, default off on no-PSRAM with a warning on enable, or hide BLE on no-PSRAM boards
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Robert 2026-11-08: on boards without PSRAM BLE is off by default with no dialog after boot; when the user switches BLE on, show the stability warning once and store the ack (bBleRiskAck). PSRAM boards unchanged; existing installs keep their stored value. Needs a new ADR superseding ADR-169 (adr-kit).
+<!-- SECTION:NOTES:END -->

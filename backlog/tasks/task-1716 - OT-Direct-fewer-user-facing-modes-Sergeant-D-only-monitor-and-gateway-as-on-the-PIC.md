@@ -6,9 +6,9 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-08T07:11:00Z'
+updated_date: '2026-11-08T10:24:00Z'
 labels:
   - otdirect
-  - needs-maintainer-ok
 milestone: 2.0.0
 dependencies: []
 priority: medium
@@ -23,6 +23,12 @@ Sergeant D 2026-11-08 05:55 #alpha-testing (msg 1568866608133308471), to Robert:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Robert decides which modes stay user-facing
+- [x] #1 Robert decides which modes stay user-facing
 - [ ] #2 Settings UI, REST and MQTT match that decision; existing stored modes migrate without a surprise for the user (test)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Robert 2026-11-08: only gateway and monitor stay user-facing, as on the PIC. Master is entered automatically when no thermostat is seen (TASK-1694 auto-detect); bypass and loopback become service/test commands (REST/command only). Stored mode values must migrate without surprise: a stored master/bypass/loopback keeps working and the UI shows it as an automatic/service state. Before coding: check auto-detect covers SAT without a thermostat reliably (TASK-1694), since the user can no longer pick master.
+<!-- SECTION:NOTES:END -->
