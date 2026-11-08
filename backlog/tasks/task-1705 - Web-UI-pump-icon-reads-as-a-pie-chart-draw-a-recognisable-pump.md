@@ -1,11 +1,11 @@
 ---
 id: TASK-1705
 title: Web UI pump icon reads as a pie chart; draw a recognisable pump
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T17:08:00Z'
-updated_date: '2026-11-07T23:02:00Z'
+updated_date: '2026-11-08T09:03:00Z'
 labels:
   - webui
   - field-report
@@ -39,3 +39,9 @@ Screenshots (headless Edge, local file render, synthetic page without device): C
 
 Robert 2026-11-08 after the before/after screenshots (light and dark): 'Ik vind het pomp icoon goed' - the symbol is recognisable, grey idle and the pulse are accepted. Lead integration on wt-1678 (origin/dev 224a1f7ae + TASK-1662 + TASK-1682): test_webui_pump_icon fix 5/5 OK, old v2.html/v2.css (HEAD copy) FAILED; evaluate --quick 0 failed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: pump symbol (triangle in the circle along the return flow), grey idle, accent + pulse while CH runs; Robert approved the screenshots 2026-11-08; tests/test_webui_pump_icon.py old 4 fail, new 5/5. AC2: before/after light+dark screenshots (scratchpad tjfs-1107) plus device screenshot on beta.141 (.61). Pushed 9efbfa941 (beta.139), #alpha-testing 1568913428758798336 (zip beta.141+963b68d covers 137-141).
+<!-- SECTION:FINAL_SUMMARY:END -->
