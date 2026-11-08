@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.134
+**  Version  : v2.0.0-beta.135
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -564,6 +564,7 @@ void setup() {
   // empty queue until an edge fires, so order vs settings load is immaterial.
   startWebhookTask();
  // initSensors();        // init DS18B20 (after MQ is up! )
+  applyLegacyPinDefaults();   // TASK-1698: 1.x S0/output defaults are board pins on a Classic S3
   initOutputs();
   
   WatchDogEnabled(1);   // turn on watchdog

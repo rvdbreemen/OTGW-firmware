@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : S0types.h
-**  Version  : v2.0.0-beta.134
+**  Version  : v2.0.0-beta.135
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -19,7 +19,7 @@
 
 struct S0Section {
   bool     bEnabled      = false;
-  uint8_t  iPin          = 12;     // GPIO 12 = D6, preferred
+  uint8_t  iPin          = 12;     // 1.x default; on a Classic S3 applyLegacyPinDefaults() moves it to the D6 hole (TASK-1698)
   uint16_t iDebounceTime = 80;     // Depending on S0 switch
   uint16_t iPulsekw      = 1000;   // Most S0 counters have 1000 pulses per kW
   uint16_t iInterval     = 60;     // Suggested measurement reporting interval

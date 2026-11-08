@@ -1,6 +1,6 @@
 /*********
 **  Program  : output_ext.ino
-**  Version  : v2.0.0-beta.134
+**  Version  : v2.0.0-beta.135
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -18,7 +18,7 @@ static bool outputsInitialized = false;
 static bool validateGPIOOutputsConfig() {
   // evalOutputs() runs this on every OT frame: report a refused pin once, not per frame.
   static int16_t lastRefusedPin = -1000;
-  if (settings.outputs.iPin < 0 || settings.outputs.iPin > 16) {
+  if (!settingGpioInRange(settings.outputs.iPin)) {   // TASK-1686 range (the old cap of 16 refused the Pro's holes)
     if (lastRefusedPin != settings.outputs.iPin) DebugTf(PSTR("GPIO Outputs: invalid pin %d\r\n"), settings.outputs.iPin);
     lastRefusedPin = settings.outputs.iPin;
     return false;

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Outputstypes.h
-**  Version  : v2.0.0-beta.134
+**  Version  : v2.0.0-beta.135
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -19,6 +19,6 @@
 
 struct OutputsSection {             // GPIO relay outputs
   bool   bEnabled    = false;
-  int8_t iPin        = 16;
+  int8_t iPin        = 16;   // 1.x default; on a Classic S3 applyLegacyPinDefaults() moves it to a free hole (TASK-1698)
   int8_t iTriggerBit = 0;
 };

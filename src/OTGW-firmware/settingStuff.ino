@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.134
+**  Version  : v2.0.0-beta.135
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -124,6 +124,27 @@ bool checkGPIOConflict(int pin, GPIOConflictCaller caller)
   }
   return conflict;
 }
+
+//=======================================================================
+// [apply-legacy-pin-defaults:begin] TASK-1698
+// Called in setup() once the board map is known, before initOutputs()/initS0Count(). Moves a stored
+// 1.x S0/output default to the board's free hole (legacyPinMigrated()) and saves it once, so the
+// settings page shows the pin that is used.
+void applyLegacyPinDefaults()
+{
+  const ComboPinMap map = comboActivePinMap();
+  const int s0  = legacyPinMigrated(settings.s0.iPin, LEGACY_S0_PIN, map, CLASSIC_S0_PIN,
+                                    CLASSIC_PRO_S0_PIN, settings.sensors.iPin, settings.outputs.iPin);
+  const int out = legacyPinMigrated(settings.outputs.iPin, LEGACY_OUTPUT_PIN, map, CLASSIC_OUTPUT_PIN,
+                                    CLASSIC_PRO_OUTPUT_PIN, settings.sensors.iPin, s0);
+  if (s0 == settings.s0.iPin && out == settings.outputs.iPin) return;
+  DebugTf(PSTR("Board pin defaults: S0 pin %d -> %d, output pin %d -> %d\r\n"),
+          settings.s0.iPin, s0, settings.outputs.iPin, out);
+  settings.s0.iPin = s0;
+  settings.outputs.iPin = out;
+  if (!writeSettings(false)) settingsMarkDirty();   // TASK-1495: a failed write is retried by the flush
+}
+// [apply-legacy-pin-defaults:end]
 
 //=======================================================================
 static bool parseJsonKVLine(const char* line, char* keyOut, size_t keyOutSize, char* valueOut, size_t valueOutSize)

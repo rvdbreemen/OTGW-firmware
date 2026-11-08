@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.134
+**  Version  : v2.0.0-beta.135
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -972,6 +972,35 @@ inline bool boardPinReserved(int pin, ComboPinMap map) {
 }
 // [board-pin-reserved:end]
 inline bool isBoardReservedPin(int pin) { return boardPinReserved(pin, comboActivePinMap()); }
+
+// [legacy-pin-defaults:begin] TASK-1698
+// The S0 and output defaults carried over from 1.x (12 and 16) are board pins on both Classic S3
+// modules (see the TASK-1552 block above), so S0 or the output did nothing until the user changed
+// the pin. On a Classic map a stored legacy default moves to a free D1-mini hole:
+//   S0:     D6 hole, the hole the 1.x default used (ESP8266 GPIO12): S3 Mini 13, S3 Mini Pro 39
+//   output: S3 Mini D7 hole (11); S3 Mini Pro D8 hole (37), because its D7 hole (38) is the TFT MOSI.
+//           The Mini's D8 hole (10) is the sensor default.
+// Sources: LOLIN variants lolin_s3_mini / lolin_s3_mini_pro pins_arduino.h (MISO/MOSI/SS =
+// 13/11/10 and 39/38/37; TFT on 33-36, 38, 40) and docs/hardware/combo-esp32-s3-pinout.md.
+// A pin the user chose stays, and so does a legacy default whose new hole another feature holds.
+// The OTGW32 map keeps 12/16: its free header pins are not documented yet.
+#define LEGACY_S0_PIN            12
+#define LEGACY_OUTPUT_PIN        16
+#define CLASSIC_S0_PIN           13   // S3 Mini, D6 hole
+#define CLASSIC_PRO_S0_PIN       39   // S3 Mini Pro, D6 hole
+#define CLASSIC_OUTPUT_PIN       11   // S3 Mini, D7 hole
+#define CLASSIC_PRO_OUTPUT_PIN   37   // S3 Mini Pro, D8 hole
+inline int legacyPinMigrated(int stored, int legacy, ComboPinMap map, int classicPin, int proPin,
+                             int busyA, int busyB) {
+  if (stored != legacy) return stored;
+  int target;
+  if (map == COMBO_MAP_CLASSIC) target = classicPin;
+  else if (map == COMBO_MAP_CLASSIC_PRO) target = proPin;
+  else return stored;
+  if (target == busyA || target == busyB) return stored;
+  return target;
+}
+// [legacy-pin-defaults:end]
 
 // [setting-gpio-range:begin] TASK-1686
 // The GPIO numbers the sensor, S0 and output pin settings accept: the ESP32-S3 has GPIO 0-21 and
