@@ -130,13 +130,15 @@ Firmware observations from the superseded cases (F1104, beta.68). They are repor
 
 - **CS changes between ticks.** Many CS changes are inserted between the 30 s ticks, in steps of 0.1-0.2 °C every
   1-6 s (for example 40.8, 40.9, 41.1, 41.3, 41.4, 41.6 within 24 s). The superseded cases inspected by hand were steps
-  of such a ramp that the next step overtook before the next MsgID 1 slot. The code path that makes these steps was not
-  traced here.
-- **Three reverts.** In 3 cases the 5 s repeat inserted a CS 0.1 °C above the value of the last tick (for
-  example 45.5 then 45.6, 34.5 then 34.6), and a CS with the tick's value followed about 1-1.4 s later (in the
-  two cases inspected), before the next MsgID 1 slot. So
-  the boiler never saw the 0.1 °C blip. The source is not traced. A rounding difference between the tick path and
-  the repeat path (`satCapRepeatCS`, SATcontrol.ino:582-590) is one candidate.
+  of such a ramp that the next step overtook before the next MsgID 1 slot. Traced later (TASK-1412.5 notes,
+  2026-11-08): expected. In a PWM ON phase after the hold, `satPwmSuppressionRefresh()` (beta.68 SATcontrol.ino:1621-1645,
+  3 s timer) sets CS = flow - offset and sends it on every 0.1 change, and `satCmdResend()` repeats the last CS 5 s
+  after any send.
+- **Reverts.** There are 5 such cases, not 3 (traced 2026-11-08). Three are the expected ±0.1 dither of the
+  suppression refresh when the flow crosses an x.x5 boundary. Two (08:59:50 and 16:09:56) are a rounding bug, filed
+  as TASK-1738: the CS text comes from `%.1f` of the float and the last-sent cache from `lroundf(x * 10.0f)`. They
+  disagree for a float just below x.x5 (45.5499992 gives text 45.5 and cache 45.6), and the 5 s repeat then sends
+  the cache. The boiler did not get the blip in the case checked.
 
 The bench (B63) measures only the queue pick: p50 3 ms, max 46 ms over 45 inserts. There is no echo and no wire,
 because the simulation keeps CS off the bus.
@@ -239,12 +241,13 @@ Reasoning:
    - On OT-Direct with a slow or gateway slave the code-derived MsgID 25 interval can approach 20 s or more
      (section 4.4). N = 60 s then holds only about 3 polls, and that must be confirmed on the bench (TASK-1412.21)
      before OT-Direct counts as feasible for low-load.
-6. **Not rejected, open: a PIC with a thermostat that does not read MsgID 25.**
+6. **Not rejected, decided later: a PIC with a thermostat that does not read MsgID 25.**
    - On PIC pass-through the flow supply is entirely the thermostat's choice of polls.
    - A thermostat that never reads MsgID 25, or reads it more slowly than N, leaves SAT without flow, so it always
      falls back.
-   - Whether the gateway should then ask for MsgID 25 itself (PR or PM) is a design question for Sergeant D. It is
-     not decided here.
+   - Decided on 2026-11-05 by the maintainer (entry 276, TASK-1653): when the thermostat does not read MsgID 25,
+     SAT asks the PIC for it with PM=25 (SATcontrol.ino `satPm25PollStep()`). This section was written before
+     that decision.
 
 ## 7. Not measured
 
