@@ -22,9 +22,9 @@ test('REBOOT badge: tooltip, aria-label, not clickable-looking', { skip: !CHROME
     await h.until(`!!document.querySelector('.set-cat-title .badge-reboot')`);
     // TASK-1742: renderSettings() rebuilds the rail and the panel when a settings fetch or poll
     // lands, so a read in a separate evalJs after until() could find both badges gone ([null,null])
-    // or read the cursor before the badge's styles applied ('auto'). Each read below is one
+    // or (seen once, cause not established) read a cursor of 'auto'. Each read below is one
     // synchronous evaluation (no render can interleave inside it); repeat it until both badges are
-    // there with their stylesheet cursor, for at most 5 s, then assert on the last read. A real
+    // there with a non-auto cursor, for at most 5 s of wall time, then assert on the last read. A real
     // regression (badge missing, pointer cursor) still fails: it never settles to the right state.
     const READ = `(function(){
       return ['.rail-item[data-cat="network"] .badge-reboot', '.set-cat-title .badge-reboot'].map(function (sel) {
@@ -34,11 +34,13 @@ test('REBOOT badge: tooltip, aria-label, not clickable-looking', { skip: !CHROME
                  tabindex: b.getAttribute('tabindex'), cursor: cs.cursor, select: cs.userSelect };
       });
     })()`;
+    const settled = (v) => Array.isArray(v) && v.every((b) => b && b.cursor !== 'auto');
     let info = await h.evalJs(READ);
-    for (let i = 0; i < 50 && !(info.every((b) => b && b.cursor !== 'auto')); i++) {
+    for (const t0 = Date.now(); !settled(info) && Date.now() - t0 < 5000;) {   // wall-time bound, like h.until
       await h.sleep(100);
       info = await h.evalJs(READ);
     }
+    assert.ok(Array.isArray(info), 'badge read returned ' + JSON.stringify(info));
     const shotDir = process.env.OTGW_SHOT_DIR;
     if (shotDir) await h.shot(path.join(shotDir, '1398.png'));
     for (const b of info) {
