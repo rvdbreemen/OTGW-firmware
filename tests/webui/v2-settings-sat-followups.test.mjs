@@ -20,6 +20,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { stopChromeTree, guardChrome } from './lib/page-harness.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.OTGW_DATA_DIR || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
@@ -112,6 +113,7 @@ PORT = srv.address().port;
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'otgw-cdp-'));
 const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,1000', 'about:blank'], { stdio: 'ignore' });
+guardChrome(chrome);   // TASK-1739
 let target = null;
 for (let i = 0; i < 100 && !target; i++) {
   try { const r = await fetch(`http://127.0.0.1:${cdpPort()}/json/new?about:blank`, { method: 'PUT' }); if (r.ok) target = await r.json(); } catch { /* not up yet */ }
@@ -415,7 +417,7 @@ console.log('peak /api/ requests in flight at the fake device: ' + peak);
 check(peak <= 2, 'never more than 2 API requests in flight');
 
 try { ws.close(); } catch { /* ignore */ }
-chrome.kill(); srv.close();
+stopChromeTree(chrome); srv.close();
 // TASK-1492: Chrome holds the profile until it has exited; wait for that, then retry the removal.
 await new Promise((r) => { if (chrome.exitCode !== null || chrome.signalCode !== null) return r(); chrome.once('exit', r); setTimeout(r, 5000); });
 try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (e) { console.log('profile cleanup failed: ' + e.message); }

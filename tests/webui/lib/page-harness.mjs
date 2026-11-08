@@ -8,7 +8,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -24,6 +24,21 @@ export const CHROME = [
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Deadline for one CDP call (TASK-1715); OTGW_CDP_TIMEOUT_MS overrides it.
 export const CDP_TIMEOUT_MS = Number(process.env.OTGW_CDP_TIMEOUT_MS) || 20000;
+
+// TASK-1739: on Windows child.kill() ends only Chrome's browser process; its renderer, GPU and
+// utility children stay behind (28 orphans seen on 2026-11-08), so stop the whole tree.
+// guardChrome() also does that when the test exits early (a throw or process.exit).
+export function stopChromeTree(child) {
+  if (!child || child.exitCode !== null) return;
+  if (process.platform === 'win32' && child.pid) {
+    try { spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', timeout: 10000 }); } catch { /* ignore */ }
+  }
+  try { child.kill(); } catch { /* ignore */ }
+}
+export function guardChrome(child) {
+  process.on('exit', () => stopChromeTree(child));
+  return child;
+}
 
 export async function startPage({ api, asset, beforeScript, width = 1400, height = 1000, page = '/v2.html' } = {}) {
   const log = [];
@@ -57,6 +72,7 @@ export async function startPage({ api, asset, beforeScript, width = 1400, height
   const cdpPort = () => fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0].trim();
   const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check', '--disable-gpu', `--window-size=${width},${height}`, 'about:blank'], { stdio: 'ignore' });
+  guardChrome(chrome);
   let target = null;
   for (let i = 0; i < 100 && !target; i++) {
     try { const r = await fetch(`http://127.0.0.1:${cdpPort()}/json/new?about:blank`, { method: 'PUT' }); if (r.ok) target = await r.json(); } catch { /* not up yet */ }
@@ -115,7 +131,7 @@ export async function startPage({ api, asset, beforeScript, width = 1400, height
   };
   const close = async () => {
     try { ws.close(); } catch { /* ignore */ }
-    chrome.kill();
+    stopChromeTree(chrome);
     srv.close();
     await sleep(300);
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* chrome may still hold files */ }

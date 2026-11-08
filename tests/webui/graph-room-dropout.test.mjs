@@ -14,6 +14,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { stopChromeTree, guardChrome } from './lib/page-harness.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.OTGW_DATA_DIR || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
@@ -67,6 +68,7 @@ PORT = srv.address().port;
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'otgw-cdp-'));
 const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,1000', 'about:blank'], { stdio: 'ignore' });
+guardChrome(chrome);   // TASK-1739
 let target = null;
 for (let i = 0; i < 100 && !target; i++) {
   try { const r = await fetch(`http://127.0.0.1:${cdpPort()}/json/new?about:blank`, { method: 'PUT' }); if (r.ok) target = await r.json(); } catch { /* not up yet */ }
@@ -174,5 +176,5 @@ check(!!f.g && f.g.xN === 0, `device history where the room never reported: no i
 check(exceptions.length === 0, `no uncaught page exceptions (${exceptions.join(' ; ')})`);
 console.log(ok ? '\n0 failures' : '\nsome failures');
 try { ws.close(); } catch { /* ignore */ }
-chrome.kill(); srv.close();
+stopChromeTree(chrome); srv.close();
 setTimeout(() => process.exit(ok ? 0 : 1), 200);

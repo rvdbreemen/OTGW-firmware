@@ -17,6 +17,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { stopChromeTree, guardChrome } from './lib/page-harness.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.OTGW_DATA_DIR || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
@@ -86,6 +87,7 @@ const chrome = spawn(CHROME, [
   '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu', 'about:blank',
 ], { stdio: 'ignore' });
+guardChrome(chrome);   // TASK-1739
 
 // Chrome writes the port it bound to the first line of <profile>/DevToolsActivePort.
 async function cdpTarget() {
@@ -255,7 +257,7 @@ check(settingPosts().length === postsBefore, 'still nothing POSTed before the wi
 await shot('after-wizard-welcome.png');
 
 try { ws.close(); } catch { /* ignore */ }
-chrome.kill();
+stopChromeTree(chrome);
 srv.close();
 // TASK-1492: Chrome holds the profile until it has exited; wait for that, then retry the removal.
 await new Promise((r) => { if (chrome.exitCode !== null || chrome.signalCode !== null) return r(); chrome.once('exit', r); setTimeout(r, 5000); });

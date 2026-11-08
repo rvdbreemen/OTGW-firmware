@@ -10,6 +10,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { stopChromeTree, guardChrome } from './lib/page-harness.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.OTGW_DATA_DIR || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
@@ -83,6 +84,7 @@ const chrome = spawn(CHROME, [
   '--window-size=1400,900',
   'about:blank',
 ], { stdio: 'ignore' });
+guardChrome(chrome);   // TASK-1739
 
 async function cdpTarget() {
   for (let i = 0; i < 100; i++) {
@@ -139,7 +141,7 @@ if (process.env.SHOT_PNG) {
 v = await hintVisible(false);
 check(v === 'hidden', `push_refused false: hint is hidden (got ${v})`);
 try { ws.close(); } catch { /* ignore */ }
-chrome.kill(); srv.close();
+stopChromeTree(chrome); srv.close();
 // TASK-1492: Chrome holds the profile until it has exited; wait for that, then retry the removal.
 await new Promise((r) => { if (chrome.exitCode !== null || chrome.signalCode !== null) return r(); chrome.once('exit', r); setTimeout(r, 5000); });
 try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (e) { console.log('profile cleanup failed: ' + e.message); }
