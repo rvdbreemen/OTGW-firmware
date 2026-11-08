@@ -1397,7 +1397,7 @@ Returns all active write overrides and response overrides in the OT-direct engin
 
 **Authentication**: Not required
 
-**Response** `200 OK`: JSON object with override lists (structure defined by `getOTDirectOverridesJSON()`).
+**Response** `200 OK`: JSON object with override lists (structure defined by `getOTDirectOverridesJSON()`). `overrides.sat_owns` (boolean, TASK-1681) is `true` while SAT owns the heating commands (`satOwnsControlSetpoint()`: SAT enabled, or its MQTT-loss fallback active). The firmware then refuses `CS=`, `CH=`, `MM=`, `C2=`, `H2=`, `TT=` and `TC=` from every other channel (TASK-1695), so the write overrides those commands set (MsgID 1, 8, 14, 16, 100) cannot be cleared by a command until SAT is off.
 
 #### `POST /api/v2/otdirect/overrides`
 

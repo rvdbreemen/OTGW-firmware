@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.142
+**  Version  : v2.0.0-beta.143
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1169,6 +1169,10 @@ void sendOTDirectOverridesJSON() {
       je.value((uint32_t)otUnknownIds[i]);
     }
     je.endArray();
+
+    // TASK-1681: while SAT is enabled the firmware refuses CS=, CH=, MM=, C2=, H2=, TT= and TC= from
+    // every other channel (TASK-1695), so the web UI shows why such a write override has no Clear.
+    je.field(F("sat_owns"), satOwnsControlSetpoint());
 
     je.endObject();                    // close "overrides"
 

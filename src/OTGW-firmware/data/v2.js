@@ -1894,17 +1894,54 @@
     if (valueTxt) { var v = document.createElement('span'); v.className = 'ble-mac'; v.textContent = valueTxt; nm.appendChild(v); }
     row.appendChild(nm);
     if (clearAction) {
+      // clearAction: an overrides action ('cr', 'cm', 'ki') or a function (TASK-1681 write rows).
       var ctr = document.createElement('div'); ctr.className = 'ble-ctrls';
       var btn = document.createElement('button'); btn.className = 'tbtn'; btn.textContent = 'Clear';
-      btn.addEventListener('click', function () { otdOvrPost(clearAction, msgid); });
+      btn.addEventListener('click', typeof clearAction === 'function' ? clearAction : function () { otdOvrPost(clearAction, msgid); });
       ctr.appendChild(btn); row.appendChild(ctr);
     }
+    return row;
+  }
+  // TASK-1681: a write override is a value the gateway itself writes to the boiler, set by a
+  // command. Each row names that command; Clear sends the firmware's own clear command for it.
+  // sat: the firmware refuses this command from other channels while SAT is enabled (TASK-1695),
+  // so a Clear would only be refused; the row says so instead (GET overrides: sat_owns).
+  // The table holds the ids of otOverrides[] in OTDirect.ino; no other id can be a write override.
+  var OTD_WRITE_CMD = {
+    1: { cmd: 'CS', what: 'control setpoint', clear: 'CS=0', sat: true },
+    7: { cmd: 'CC/CL', what: 'cooling control', clear: 'CL=0' },   // CL=0 clears 7; CC=0 would write 0
+    8: { cmd: 'C2', what: 'CH2 setpoint', clear: 'C2=0', sat: true },
+    14: { cmd: 'MM', what: 'max modulation', clear: 'MM=T', sat: true },   // a non-numeric MM= clears
+    // 16 is also set by BS= and the MQTT room_setpoint route; TT=0 clears it whatever set it.
+    16: { cmd: 'TT/TC, BS or MQTT', what: 'room setpoint', clear: 'TT=0', sat: true },
+    56: { cmd: 'SW', what: 'DHW setpoint', clear: 'SW=0' },
+    57: { cmd: 'SH', what: 'max CH setpoint', clear: 'SH=0' },
+    100: { cmd: 'TT/TC', what: 'override flags', clear: 'TT=0', sat: true }   // TT=0 clears 16 and 100
+  };
+  function otdOvrReason(row, text) {
+    var r = document.createElement('div'); r.style.color = 'var(--muted)'; r.textContent = text;
+    row.firstChild.appendChild(r);
+  }
+  // The command is only queued (202); the loop applies it later, so the list is read twice.
+  function otdOvrSendCmd(cmd) {
+    fetch(APIGW + 'v2/otgw/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: cmd }) }).then(function (r) {
+      if (!r.ok) bleToast(cmd + ' was refused (HTTP ' + r.status + ')', true);
+      setTimeout(fetchOtdOvr, 400); setTimeout(fetchOtdOvr, 2000);
+    }).catch(function () { bleToast(cmd + ' could not be sent', true); });
+  }
+  function otdWriteRow(e, satOwns) {
+    var c = OTD_WRITE_CMD[e.msgid];
+    var satBlocked = c && c.sat && satOwns;
+    var row = otdOvrRow(c ? c.cmd + ' · ' + c.what : 'Write', e.msgid, otdHex(e.value),
+      (c && c.clear && !satBlocked) ? function () { otdOvrSendCmd(c.clear); } : null);
+    if (satBlocked) otdOvrReason(row, 'SAT controls this while SAT is enabled; switch SAT off to clear it.');
     return row;
   }
   function renderOtdOvr(ov) {
     var el = document.getElementById('otdOvrList'); if (!el) return;
     el.textContent = ''; var any = false;
-    (ov.write || []).forEach(function (e) { any = true; el.appendChild(otdOvrRow('Write', e.msgid, otdHex(e.value), null)); });
+    (ov.write || []).forEach(function (e) { any = true; el.appendChild(otdWriteRow(e, ov.sat_owns === true)); });
     (ov.response || []).forEach(function (e) { any = true; el.appendChild(otdOvrRow('SR', e.msgid, otdHex(e.value), 'cr')); });
     (ov.modify || []).forEach(function (e) { any = true; el.appendChild(otdOvrRow('RM', e.msgid, otdHex(e.value), 'cm')); });
     (ov.unknown || []).forEach(function (id) { any = true; el.appendChild(otdOvrRow('UI', (id && id.msgid !== undefined) ? id.msgid : id, '', 'ki')); });
