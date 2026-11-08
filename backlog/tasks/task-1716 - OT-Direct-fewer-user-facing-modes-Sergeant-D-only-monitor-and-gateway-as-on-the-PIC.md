@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-08T07:11:00Z'
-updated_date: '2026-11-08T10:24:00Z'
+updated_date: '2026-11-08T10:31:00Z'
 labels:
   - otdirect
 milestone: 2.0.0
@@ -31,4 +31,6 @@ Sergeant D 2026-11-08 05:55 #alpha-testing (msg 1568866608133308471), to Robert:
 
 <!-- SECTION:NOTES:BEGIN -->
 Robert 2026-11-08: only gateway and monitor stay user-facing, as on the PIC. Master is entered automatically when no thermostat is seen (TASK-1694 auto-detect); bypass and loopback become service/test commands (REST/command only). Stored mode values must migrate without surprise: a stored master/bypass/loopback keeps working and the UI shows it as an automatic/service state. Before coding: check auto-detect covers SAT without a thermostat reliably (TASK-1694), since the user can no longer pick master.
+
+Robert 2026-11-08 (after 54's check): PIC model. 'No thermostat' becomes a runtime state of gateway mode: detect the thermostat continuously, send own (standalone) frames while it is absent, relay again as soon as it appears (as gateway.asm:1740-1772); apply the TASK-1684 CH rule to the standalone frames. Then the UI shows only gateway + monitor. Needs an ADR (adr-kit) and a bench test with a thermostat plugged in late.
 <!-- SECTION:NOTES:END -->
