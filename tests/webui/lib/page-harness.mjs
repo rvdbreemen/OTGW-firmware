@@ -3,7 +3,7 @@
 // OTGW_DATA_DIR points the fake device at an older copy of data/ to see a test red.
 //
 //   const h = await startPage({ api: (method, p, search, body) => jsonOrUndefined, width: 1280 });
-//   h.evalJs(expr) / h.until(expr) / h.shot(file) / h.log / h.exceptions / await h.close()
+//   h.evalJs(expr) / h.until(expr[, ms = 15000]) / h.shot(file) / h.log / h.exceptions / await h.close()
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,6 +22,8 @@ export const CHROME = [
   '/usr/bin/chromium',
 ].find((p) => fs.existsSync(p));
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Deadline for one CDP call (TASK-1715); OTGW_CDP_TIMEOUT_MS overrides it.
+export const CDP_TIMEOUT_MS = Number(process.env.OTGW_CDP_TIMEOUT_MS) || 20000;
 
 export async function startPage({ api, asset, beforeScript, width = 1400, height = 1000, page = '/v2.html' } = {}) {
   const log = [];
@@ -69,14 +71,33 @@ export async function startPage({ api, asset, beforeScript, width = 1400, height
     if (m.method && (m.method.startsWith('Network.') || m.method === 'Runtime.consoleAPICalled')) events.push(m);
     if (m.method === 'Runtime.exceptionThrown') exceptions.push(JSON.stringify(m.params.exceptionDetails).slice(0, 300));
   });
-  const send = (method, params = {}) => new Promise((res) => { const id = ++msgId; pending.set(id, res); ws.send(JSON.stringify({ id, method, params })); });
+  // TASK-1715: every CDP call has a deadline. A headless Chrome that stops answering under load
+  // otherwise hangs the test until the node test timeout with no hint of the cause.
+  const send = (method, params = {}, timeoutMs = CDP_TIMEOUT_MS) => new Promise((res, rej) => {
+    const id = ++msgId;
+    const timer = setTimeout(() => {
+      if (!pending.has(id)) return;
+      pending.delete(id);
+      rej(new Error(`CDP ${method} got no reply within ${timeoutMs} ms (Chrome stalled?)`));
+    }, timeoutMs);
+    pending.set(id, (m) => { clearTimeout(timer); res(m); });
+    ws.send(JSON.stringify({ id, method, params }));
+  });
   const evalJs = async (expression) => {
     const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
     return r.result && r.result.result ? r.result.result.value : undefined;
   };
-  const until = async (expr, ms = 5000) => {
-    for (let t = 0; t < ms; t += 100) { const v = await evalJs(expr).catch(() => null); if (v) return v; await sleep(100); }
-    return evalJs(expr).catch(() => null);
+  // Bounded by wall time (the old loop counted iterations, so slow evals stretched it without limit).
+  // One last check at the deadline, unless the previous call already timed out. The default is 15 s:
+  // callers that ignore the result relied on that stretching while a cold Chrome was slow.
+  const until = async (expr, ms = 15000) => {
+    const t0 = Date.now(); let stalled = false;
+    while (Date.now() - t0 < ms) {
+      const v = await evalJs(expr).then((x) => { stalled = false; return x; }, () => { stalled = true; return null; });
+      if (v) return v;
+      await sleep(100);
+    }
+    return stalled ? null : evalJs(expr).catch(() => null);
   };
   await send('Page.enable'); await send('Runtime.enable');
   await send('Network.enable');

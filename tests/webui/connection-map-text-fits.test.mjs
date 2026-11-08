@@ -46,9 +46,12 @@ const MEASURE = `(function(){
 async function measure(width, shot) {
   const h = await startPage({ width, height: 900, api: (m, p) => (p.endsWith('/v2/health') ? HEALTH : undefined) });
   try {
-    await h.until(`!!document.querySelector('.connsum')`);
+    // TASK-1715: until() is bounded by wall time now, so check what it returns instead of relying
+    // on the old loop stretching itself while a cold Chrome was slow.
+    assert.ok(await h.until(`!!document.querySelector('.connsum')`, 20000), 'v2.js started');
     await h.evalJs(`document.querySelector('.connsum').click()`);
-    await h.until(`(document.getElementById('cnThermSub') || {}).textContent && /seen/.test(document.getElementById('cnThermSub').textContent) && document.getElementById('connMap').getBoundingClientRect().width > 0`);
+    assert.ok(await h.until(`(document.getElementById('cnThermSub') || {}).textContent && /seen/.test(document.getElementById('cnThermSub').textContent) && document.getElementById('connMap').getBoundingClientRect().width > 0`, 20000),
+      'the connection map rendered');
     await h.sleep(500);
     const r = await h.evalJs(MEASURE);
     if (process.env.OTGW_SHOT_DIR && shot) await h.shot(path.join(process.env.OTGW_SHOT_DIR, shot + '.png'));
