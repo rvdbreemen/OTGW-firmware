@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-08T08:55:00Z'
+updated_date: '2026-11-08T09:15:00Z'
 labels:
   - research
   - otdirect
@@ -27,3 +28,9 @@ Robert 2026-11-08: research tjfs's feature request TASK-1720 (Discord msg 156890
 - [ ] #2 Claims cite primary sources: our code file:line, ESP-IDF and arduino-esp32 docs, otmonitor source in other-projects; and say what was not verified
 - [ ] #3 Clear recommendation with consequences, put to Robert as one question
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-08 research done (report docs/research/2026-11-08-usb-serial-otmonitor-outlet.md, uncommitted): bridge output already funnels through otDirectBridgeWriteLine and input through handleOTDirectBridgeStream, so USB reuse is cheap (est. 80-150 lines); real costs are losing the USB diagnostic console (ADR-168, core Serial rule wording), OTmonitor treating stray log lines as command answers (otmonitor.tcl:580-583/448-452), and an unverified USB-Serial-JTAG reset on port open/close (esptool reset.py:125-143). Recommendation: A (TCP 25238, documented) now; B (opt-in USB protocol in OT-Direct mode) only after a Windows OTmonitor connect/disconnect bench test shows no reset; reject C and D (TinyUSB). Open question for Robert: A, B-gated or D.
+<!-- SECTION:NOTES:END -->
