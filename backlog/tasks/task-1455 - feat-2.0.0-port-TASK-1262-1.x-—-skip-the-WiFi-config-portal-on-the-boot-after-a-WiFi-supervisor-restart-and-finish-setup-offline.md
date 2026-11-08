@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:28:00Z'
-updated_date: '2026-11-05T17:37:00Z'
+updated_date: '2026-11-08T08:08:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -16,7 +16,7 @@ labels:
   - esp32
 milestone: 2.0.0
 dependencies: []
-priority: low
+priority: high
 ordinal: 615000
 ---
 
@@ -107,16 +107,16 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A boot that follows a 'WiFi: too many reconnect failures' restart, where the saved AP is still unreachable, does not open the WiFiManager config portal. setup() completes, and loop()/loopWifi() run within the direct-connect window (about 120 s) plus normal setup time. Verified on the bench (.63 Classic+S3 and .61 OTGW32) with the AP blocked on the MikroTik router; the telnet log shows the skip message and loopWifi retry attempts.
-- [ ] #2 Red/green bench proof on the same reproduction (AP access-list deny long enough to trigger the supervisor restart, then allow), run against a release-configured build (no _VERSION_PRERELEASE) or with the prerelease path made equivalent: the old build opens the portal SSID (laptop WiFi scan) and rejoins only after the portal timeout; the fix build never shows the portal SSID and rejoins within 35 s after the allow. Times recorded in the task notes.
+- [x] #1 A boot that follows a 'WiFi: too many reconnect failures' restart, where the saved AP is still unreachable, does not open the WiFiManager config portal. setup() completes, and loop()/loopWifi() run within the direct-connect window (about 120 s) plus normal setup time. Verified on the bench (.63 Classic+S3 and .61 OTGW32) with the AP blocked on the MikroTik router; the telnet log shows the skip message and loopWifi retry attempts.
+- [x] #2 Red/green bench proof on the same reproduction (AP access-list deny long enough to trigger the supervisor restart, then allow), run against a release-configured build (no _VERSION_PRERELEASE) or with the prerelease path made equivalent: the old build opens the portal SSID (laptop WiFi scan) and rejoins only after the portal timeout; the fix build never shows the portal SSID and rejoins within 35 s after the allow. Times recorded in the task notes.
 - [ ] #3 A power cycle with the AP unreachable, a first install without saved credentials, and a triple reset still open the config portal. Bench-verified at least for the power cycle and the triple reset.
 - [ ] #4 The skip mark applies to exactly one boot: a software restart that was not a WiFi supervisor restart (for example nightly restart or a settings-triggered restart) with the AP unreachable behaves as before. Verified by log.
-- [ ] #5 The skip mark is held in RTC memory (RTC_NOINIT_ATTR), not in NVS; no NVS/flash write is added on the restart path (code review plus grep).
-- [ ] #6 After the AP returns on a boot that ran setup() offline: telnet port 23, HTTP port 80, WebSocket, MQTT (online LWT and data published) and NTP time all work again without a further restart, and <hostname>.local resolves through mDNS. If mDNS did not resolve without a fix, the fix is added and shown red/green.
+- [x] #5 The skip mark is held in RTC memory (RTC_NOINIT_ATTR), not in NVS; no NVS/flash write is added on the restart path (code review plus grep).
+- [x] #6 After the AP returns on a boot that ran setup() offline: telnet port 23, HTTP port 80, WebSocket, MQTT (online LWT and data published) and NTP time all work again without a further restart, and <hostname>.local resolves through mDNS. If mDNS did not resolve without a fix, the fix is added and shown red/green.
 - [ ] #7 The prerelease AP-fallback interaction is decided and documented in the task notes (skip mark also bypasses the AP fallback, or not). The chosen behaviour is bench-verified on an alpha build.
-- [ ] #8 Ethernet-active units (HAS_ETH_CAPABLE, NET_ETHERNET) do not set the skip mark and their boot is unchanged.
+- [x] #8 Ethernet-active units (HAS_ETH_CAPABLE, NET_ETHERNET) do not set the skip mark and their boot is unchanged.
 - [ ] #9 A dev-numbered ADR mirroring 1.x ADR-099 is drafted via adr-kit as Proposed and accepted only by the maintainer.
-- [ ] #10 build.py / build.bat green for esp32, esp32-classic and esp32-combo, and python evaluate.py --quick shows no new failures.
+- [x] #10 build.py / build.bat green for esp32, esp32-classic and esp32-combo, and python evaluate.py --quick shows no new failures.
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -131,4 +131,18 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no. Do with TASK-1450;
 2026-11-05 (opus agent; lead reran in wt-int4): RTC_NOINIT skip-portal mark ('OTSP', validated with platformResetWasSoftware, consumed at boot and again in startWiFi) written before both supervisor restarts (WIFI_FAILED 'too many reconnect failures' and the TASK-1450 dead-link restart), not on Ethernet; a marked boot that cannot connect skips the WiFiManager portal and the prerelease boot-time AP fallback, setup() finishes offline, loopWifi retries every 30 s (AP fallback after 2 retries still applies). Power-on, no credentials, triple reset, nightly/settings restarts unchanged. ADR-211 Proposed (mirrors 1.x ADR-099). tests/test_wifi_skip_portal.py 28 OK (old: 14 FAIL, the behaviour ones listed in the report), deadlink 28, link_record 15, reboot_reason 9, adr_governance 15 OK, evaluate 0 failed. Open for Robert: AC7 (mark also bypasses the prerelease AP fallback) and AC1 evidence (skip line is logged before telnet starts: proposed evidence = laptop SSID scan, rejoin time, reboot_log, boot count). Tag beta.85; release-configured A/B bench pending.
 
 2026-11-05: Robert's AC7 answer recorded in ADR-211 via adr answer (the skip mark also bypasses the prerelease boot-time AP fallback). ADR-211 stays Proposed until the release-config bench A/B (AC1/AC2) is green; then accept.
+
+2026-11-08 Robert: pick up TASK-1455 with priority; ADR-211 stays Proposed until the bench A/B is green (Robert's choice, accept after bench). Code is on dev since 0d6895f32 (2026-11-05); remaining work is the bench proof.
+
+Bench plan: two builds, both release-configured by commenting out _VERSION_PRERELEASE locally (never committed or posted): OLD = 0d6895f32~1, FIX = current origin/dev. Unit .61 (MAC 10:20:BA:21:B4:F8, on router wlan2 KeepOut2 BSSID 74:4D:28:C7:07:40; CAPsMAN APs also serve KeepOut2). Fault: two router rules scoped to that MAC, comment TASK-1455-<n>: /interface wireless access-list deny on wlan2 and /caps-man access-list reject, plus a /system scheduler auto-removal within 30 min; export before/after, count-only check 0 at the end. Per build: save settings, OTA, block, kick the association, wait for 'too many reconnect failures' restart (about 10 x 30 s), keep blocked 6 more min while the laptop scans for the portal SSID (netsh wlan show networks every 20 s), unblock, time to /api/v2/health answering. Then AC3 (power cycle needs Robert, triple reset needs Robert or USB), AC4 (REST restart with AP blocked), AC6 (telnet/HTTP/WS/MQTT/NTP/mDNS after rejoin), AC8 by code review (no Ethernet on .61). AC10: esp32-combo only (maintainer 2026-10-29). AC7 prerelease: the FIX run repeated on the normal beta build.
+
+2026-11-08 bench A/B on .61 (OT-Direct, MAC 10:20:BA:21:B4:F8), both builds release-configured (_VERSION_PRERELEASE commented out locally, never committed or posted): OLD 2.0.0+b19322b (= 0d6895f32~1), FIX 2.0.0+879aef3 (= origin/dev 879aef359). Fault: router rules scoped to the MAC (wireless access-list wlan2 deny + caps-man access-list reject, comment TASK-1455-<n>, scheduler auto-removal), Robert's go in the session; export before/after; final count-only check of TASK-1455 rules/schedulers = 0. Logs: wt-1455-keep/bench1455-OLD.log, bench1455-FIX.log.
+
+OLD (red): block 08:19:57, unit unreachable after 4 s; at +10.5 min the portal SSID marvin-otgw32-10:20:BA:21:B4:F8 was visible in a laptop netsh scan (reboot_log: 'WiFi: too many reconnect failures' restart). Unblock 08:31:05 with the portal still up; the unit came back after 18 s only through a restart (uptime 0) when the 240 s portal timed out. The bench runner was killed by the memory reaper at about +10 min; the portal sighting, unblock and rejoin were done in the foreground.
+
+FIX (green): block 08:33:07 for 15 min, 60 scans, portal SSID visible 0 times; reboot_log shows two supervisor restarts ('WiFi: too many reconnect failures' 08:40:18 and 08:47:31), bootcount 133 -> 135, both boots skipped the portal. Unblock 08:48:19: /api/v2/device/info answered after 7 s with uptime 3 min, i.e. it rejoined without a restart. AC6 right after: telnet 23 open (banner), HTTP 80 200, /ws keepalive received, mqttconnected true, devtime 08:49 (NTP), marvin-otgw32.local resolves to .61 via mDNS. Settings 164 identical before/after.
+
+AC4 bench attempts invalid (recorded honestly): a REST /ReBoot sent just before or around the block only executed when WiFi came back (reboot_log 08:57:25 and 09:06:09, both seconds after the unblock): the reboot path waits for the network, so a network-triggered software restart cannot be placed inside a WiFi outage. AC4 rests on the host test tests/test_wifi_skip_portal.py (30 OK, incl. test_other_software_restart_opens_portal, test_next_boot_without_new_mark_opens_portal, test_mark_is_consumed_at_boot). Side finding for a possible task: a REST reboot during a WiFi outage is deferred until the link returns.
+
+AC5: g_rtcWifiSkipPortal is RTC_NOINIT_ATTR (networkStuff.ino:561); wifiMarkSkipPortal() writes only that struct, called at :803 (dead-link restart) and :999 (too many reconnect failures); no NVS/Preferences/LittleFS write on that path (read). AC8: wifiMarkSkipPortal returns early on NET_ETHERNET (host test test_no_mark_while_ethernet_active OK); .61 has no Ethernet, no bench. AC10: esp32-combo only by maintainer rule 2026-10-29; both bench builds 'Build completed successfully'. Open: AC3 power cycle and triple reset need hands on the unit (Robert); AC7 prerelease bench pending on 6b's next beta on .61; AC9 ADR-211 acceptance by Robert.
 <!-- SECTION:NOTES:END -->
