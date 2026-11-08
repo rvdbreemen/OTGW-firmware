@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:28:00Z'
-updated_date: '2026-11-08T08:08:00Z'
+updated_date: '2026-11-08T08:33:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -113,7 +113,7 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 - [ ] #4 The skip mark applies to exactly one boot: a software restart that was not a WiFi supervisor restart (for example nightly restart or a settings-triggered restart) with the AP unreachable behaves as before. Verified by log.
 - [x] #5 The skip mark is held in RTC memory (RTC_NOINIT_ATTR), not in NVS; no NVS/flash write is added on the restart path (code review plus grep).
 - [x] #6 After the AP returns on a boot that ran setup() offline: telnet port 23, HTTP port 80, WebSocket, MQTT (online LWT and data published) and NTP time all work again without a further restart, and <hostname>.local resolves through mDNS. If mDNS did not resolve without a fix, the fix is added and shown red/green.
-- [ ] #7 The prerelease AP-fallback interaction is decided and documented in the task notes (skip mark also bypasses the AP fallback, or not). The chosen behaviour is bench-verified on an alpha build.
+- [x] #7 The prerelease AP-fallback interaction is decided and documented in the task notes (skip mark also bypasses the AP fallback, or not). The chosen behaviour is bench-verified on an alpha build.
 - [x] #8 Ethernet-active units (HAS_ETH_CAPABLE, NET_ETHERNET) do not set the skip mark and their boot is unchanged.
 - [ ] #9 A dev-numbered ADR mirroring 1.x ADR-099 is drafted via adr-kit as Proposed and accepted only by the maintainer.
 - [x] #10 build.py / build.bat green for esp32, esp32-classic and esp32-combo, and python evaluate.py --quick shows no new failures.
@@ -145,4 +145,8 @@ FIX (green): block 08:33:07 for 15 min, 60 scans, portal SSID visible 0 times; r
 AC4 bench attempts invalid (recorded honestly): a REST /ReBoot sent just before or around the block only executed when WiFi came back (reboot_log 08:57:25 and 09:06:09, both seconds after the unblock): the reboot path waits for the network, so a network-triggered software restart cannot be placed inside a WiFi outage. AC4 rests on the host test tests/test_wifi_skip_portal.py (30 OK, incl. test_other_software_restart_opens_portal, test_next_boot_without_new_mark_opens_portal, test_mark_is_consumed_at_boot). Side finding for a possible task: a REST reboot during a WiFi outage is deferred until the link returns.
 
 AC5: g_rtcWifiSkipPortal is RTC_NOINIT_ATTR (networkStuff.ino:561); wifiMarkSkipPortal() writes only that struct, called at :803 (dead-link restart) and :999 (too many reconnect failures); no NVS/Preferences/LittleFS write on that path (read). AC8: wifiMarkSkipPortal returns early on NET_ETHERNET (host test test_no_mark_while_ethernet_active OK); .61 has no Ethernet, no bench. AC10: esp32-combo only by maintainer rule 2026-10-29; both bench builds 'Build completed successfully'. Open: AC3 power cycle and triple reset need hands on the unit (Robert); AC7 prerelease bench pending on 6b's next beta on .61; AC9 ADR-211 acceptance by Robert.
+
+2026-11-08 Robert: AC3 hands-on bench (power cycle, triple reset with the AP blocked) later, when he has time. ADR-211 acceptance packet after the AC7 prerelease bench (6b's beta build on .61, slot agreed).
+
+2026-11-08 Robert: AC7 settled by host test (a prerelease marked boot only arises from the dead-link restart; a bench run needs 30-40 min with a router switch at the restart moment). Evidence: tests/test_wifi_skip_portal.py test_prerelease_marked_boot_skips_ap_fallback and test_prerelease_unmarked_boot_keeps_ap_fallback OK (30/30 in the file). The decision itself is recorded in ADR-211 (Robert's answer 2026-11-05).
 <!-- SECTION:NOTES:END -->
