@@ -2742,7 +2742,11 @@
       ENUM_OPTS[k].forEach(function (o) {
         // TASK-1557 (entry 228): 60 min is for a heat pump only; a hybrid keeps 1800 or 2400 s (entry 188)
         if (k === 'sathpcycle' && o[0] === 3600 && setData.satsource && curVal('satsource') === '3') return;
-        var opt = document.createElement('option'); opt.value = '' + o[0]; opt.textContent = o[1]; input.appendChild(opt);
+        // TASK-1716 (Robert): bypass and loopback are service modes (REST/command only); the
+        // selector offers them only when one is the stored mode, so that stays visible as is.
+        var svc = k === 'otdmode' && OTD_SERVICE_MODES[o[0]];
+        if (svc && ('' + o[0]) !== cv) return;
+        var opt = document.createElement('option'); opt.value = '' + o[0]; opt.textContent = svc ? o[1] + ' (service mode)' : o[1]; input.appendChild(opt);
       });
       // Preserve an out-of-list current value as its own option so a custom setting
       // (e.g. a timezone not in the list) is never silently dropped to the 0th entry.
@@ -3276,6 +3280,7 @@
     [4, 'Boiler: cooling active'], [5, 'Boiler: CH2 active'], [6, 'Boiler: diagnostic'], [7, 'Boiler: electricity production'],
     [8, 'Thermostat: CH enable'], [9, 'Thermostat: DHW enable'], [10, 'Thermostat: cooling enable'], [11, 'Thermostat: OTC active'],
     [12, 'Thermostat: CH2 enable'], [13, 'Thermostat: summer/winter'], [14, 'Thermostat: DHW blocking'], [15, 'Thermostat: bit 7 (reserved)']];
+  var OTD_SERVICE_MODES = { 0: 1, 4: 1 };   // TASK-1716: OT-Direct bypass and loopback, not offered in the selector
   var ENUM_OPTS = {
     satsource: [[0, 'Auto'], [1, 'Gas Boiler'], [2, 'Heat Pump'], [3, 'Hybrid'], [4, 'On/off heat pump, 3 h cycle (experimental)']],
     satsystem: [[0, 'Auto'], [1, 'Radiators'], [2, 'Underfloor']],
@@ -3291,7 +3296,7 @@
     satheatingmode: [[0, 'Comfort'], [1, 'Eco']],
     // OT-Direct gateway mode — labels from OTDirecttypes.h (NOT the mockup's
     // Off/On-Off/PID list, which was a different, wrong concept).
-    otdmode: [[0, 'Bypass'], [1, 'Gateway'], [2, 'Monitor'], [3, 'Master'], [4, 'Loopback']],
+    otdmode: [[0, 'Bypass'], [1, 'Gateway'], [2, 'Monitor'], [3, 'Master'], [4, 'Loopback']],   // TASK-1716: 0 and 4 hidden unless stored
     // SAT manufacturer presets — labels from the firmware satManufacturerTable[].
     satmanufacturer: [[0, 'Auto'], [1, 'Atag'], [2, 'Baxi'], [3, 'Brotje'], [4, 'De Dietrich'], [5, 'Ferroli'], [6, 'Geminox'], [7, 'Ideal'], [8, 'Immergas'], [9, 'Intergas'], [10, 'Itho'], [11, 'Nefit'], [12, 'Radiant'], [13, 'Remeha'], [14, 'Sime'], [15, 'Vaillant'], [16, 'Viessmann'], [17, 'Worcester'], [18, 'Other']],
     // Webhook POST content type — standard closed set (string-valued enum; the
