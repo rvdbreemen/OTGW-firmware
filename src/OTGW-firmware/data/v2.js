@@ -3703,7 +3703,8 @@
       if (st.target_temp !== undefined) sat.target = parseFloat(st.target_temp);
       if (st.dhw_config_tank !== undefined) sat.tank = !!st.dhw_config_tank;   // TASK-1392
       sat.active = !!st.active;   // TASK-1342: room tile shows SAT's target while SAT controls
-      sat.owns = !!(st.enabled || st.fallback_active);   // TASK-1717: the rule of satOwnsControlSetpoint()
+      sat.owns = !!(st.enabled || st.fallback_active);   // the rule of satOwnsControlSetpoint()
+      applyDialMode();   // TASK-1735: dial controls only while SAT owns the temperature
       sat.roomLost = !!(st.enabled && st.room_temp_lost);   // TASK-1546
       applyApplianceToggle();
       if (activeDesign() === 'a') renderA();
@@ -3738,17 +3739,31 @@
       .then(function (r) { if (r.ok) { sat.source = v; applyApplianceToggle(); setTimeout(fetchSatStatus, 400); } }).catch(function () { });
   }
 
-  // TASK-1717 (Robert): with SAT on the dial sets the SAT target; with SAT off the thermostat owns the
-  // room setpoint, so the dial sends a TT= override (temporary: the thermostat's next program change
-  // ends it). A dial press before sat/status has answered asks for it first.
+  // TASK-1735 (Robert 2026-11-08, reverses TASK-1717's TT= dial): the UI controls temperatures only
+  // while SAT owns them. SAT on: the dial sets the SAT target. SAT off: the thermostat controls the
+  // temperature and the dial only shows its values; +/- are hidden and a press sends nothing.
+  // A press before sat/status has answered asks for it first.
+  var DIAL_SAT_OFF = 'SAT is off: the thermostat controls the temperature';
+  function applyDialMode() {
+    var off = sat.owns === false;
+    ['bUp', 'bDown'].forEach(function (id) { var b = document.getElementById(id); if (b) b.style.display = off ? 'none' : ''; });
+    var c = document.getElementById('bCmd');
+    if (c && off) c.textContent = DIAL_SAT_OFF;
+    else if (c && c.textContent === DIAL_SAT_OFF) c.textContent = '';
+  }
+  // Presses while the one sat/status ask is out add up and are applied once it answers.
+  var dialAsk = null;
   function stepTarget(delta) {
     if (sat.owns === null) {
+      if (dialAsk) { dialAsk.delta += delta; return; }
+      dialAsk = { delta: delta };
       fetch(APIGW + 'v2/sat/status').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
-        var st = j && (j.sat || j); sat.owns = !!(st && (st.enabled || st.fallback_active)); stepTarget(delta);
-      }).catch(function () { txt('bCmd', 'set failed: SAT status unknown'); });
+        var st = j && (j.sat || j), d = dialAsk.delta; dialAsk = null;
+        sat.owns = !!(st && (st.enabled || st.fallback_active)); applyDialMode(); stepTarget(d);
+      }).catch(function () { dialAsk = null; txt('bCmd', 'set failed: SAT status unknown'); });
       return;
     }
-    if (!sat.owns) { stepRoomOverride(delta); return; }
+    if (!sat.owns) { applyDialMode(); return; }
     var base = (sat.target !== null && !isNaN(sat.target)) ? sat.target : (model.roomSet !== null ? model.roomSet : 20);
     var t = Math.max(5, Math.min(30, Math.round((base + delta) * 2) / 2));
     txt('bCmd', 'set target ' + t.toFixed(1) + '°…');
@@ -3757,18 +3772,6 @@
         if (r.ok) { sat.target = t; txt('bSet', 'target ' + t.toFixed(1) + '°'); txt('bCmd', 'target set ' + t.toFixed(1) + '°'); }
         else txt('bCmd', 'set failed (HTTP ' + r.status + ')');
       }).catch(function () { txt('bCmd', 'set failed'); });
-  }
-  var roomOverride = null;   // the last TT= value this page sent, so repeated presses step from it
-  function stepRoomOverride(delta) {
-    var base = roomOverride !== null ? roomOverride : (model.roomSet !== null ? model.roomSet : 20);
-    var t = Math.max(5, Math.min(30, Math.round((base + delta) * 2) / 2));
-    var cmd = 'TT=' + t.toFixed(1);
-    txt('bCmd', 'thermostat override ' + t.toFixed(1) + '°…');
-    fetch(APIGW + 'v2/otgw/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ command: cmd }) })
-      .then(function (r) {
-        if (r.ok) { roomOverride = t; txt('bCmd', 'thermostat override ' + t.toFixed(1) + '° until its next program change'); }
-        else txt('bCmd', 'override failed (HTTP ' + r.status + ')');
-      }).catch(function () { txt('bCmd', 'override failed'); });
   }
 
   // Grouped chain map: Heating bus / Network / Integrations / This browser, each
