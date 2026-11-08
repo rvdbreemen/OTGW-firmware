@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.154
+**  Version  : v2.0.0-beta.155
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -44,6 +44,8 @@ OTGWUpdateServer        httpUpdater(true);
 // serializes all handlers on the one async_tcp task.
 AsyncWebServerRequest*  currentRequest  = nullptr;
 AsyncResponseStream*    g_restStream    = nullptr;
+uint8_t                 g_restSizeClass = 0;     // TASK-1736: REST_SIZE_NONE
+uint16_t                g_restSizeCap   = 0;
 bool                    g_responseSent  = false;
 bool                    g_restSlotHeld  = false;
 WebPendingHeaders       g_pendingHeaders{};

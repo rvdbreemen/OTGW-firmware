@@ -651,7 +651,7 @@ void weatherSendStatusJSON()
   // real true/false, ints as bare integers. The forecast arrays stay bare
   // numbers. The original wrapper key was F("") => a flat ROOT object, so build
   // directly on the root object (no nested wrapper).
-  AsyncResponseStream* strm = restBeginStream("application/json");
+  AsyncResponseStream* strm = restBeginStreamSized("application/json", REST_SIZE_WEATHER);
   if (strm) {
     JsonEmit je(*strm);
     je.beginObject();                 // root {

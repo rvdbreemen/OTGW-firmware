@@ -1064,7 +1064,7 @@ void satBLERosterSendJSON()
     if (settings.sat.sBleMac[i][0] != '\0') cnt++;
   }
 
-  AsyncResponseStream* strm = restBeginStream("application/json");
+  AsyncResponseStream* strm = restBeginStreamSized("application/json", REST_SIZE_BLE_ROSTER);
   if (strm) {
     JsonEmit je(*strm);
     je.beginObject();                 // root {

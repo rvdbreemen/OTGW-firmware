@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-beta.154
+**  Version  : v2.0.0-beta.155
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -40,6 +40,7 @@
 
 #include <Arduino.h>
 #include <ESPAsyncWebServer.h>
+#include <platform.h>   // platformMaxFreeBlock() for restBeginStreamSized (TASK-1736)
 #include <new>
 #include <utility>
 #include "version.h"   // _VERSION_GITHASH for webSendGzipPage's ETag
@@ -58,6 +59,8 @@ extern AsyncWebServer server;
 // Static-file slots belong to their response, not the disconnect callback.
 extern AsyncWebServerRequest* currentRequest;
 extern AsyncResponseStream*   g_restStream;
+extern uint8_t                g_restSizeClass;   // TASK-1736: RestSizeClass of g_restStream
+extern uint16_t               g_restSizeCap;     // TASK-1736: initial buffer g_restStream asked for
 extern bool                   g_responseSent;
 extern bool                   g_restSlotHeld;
 
@@ -169,6 +172,8 @@ inline void webBeginRequest(AsyncWebServerRequest* req) {
   }
   currentRequest          = req;
   g_restStream            = nullptr;
+  g_restSizeClass         = 0;      // TASK-1736: REST_SIZE_NONE (enum is declared further down)
+  g_restSizeCap           = 0;
   g_responseSent          = false;
   g_restSlotHeld          = false;
   g_pendingHeaders.count  = 0;
@@ -671,9 +676,82 @@ inline AsyncResponseStream* restBeginStream(const char* contentType,
   }
   return g_restStream;
 }
+//=====[ TASK-1736: presized response streams for the polled endpoints ]========
+// AsyncResponseStream starts with a 1460 B cbuf and, on every write that does not
+// fit, calls cbuf::resizeAdd(exact shortfall) (ESPAsyncWebServer 3.11.2
+// WebResponses.cpp:926-941). cbuf::resize (core 3.3.5 cbuf.cpp:75-133) does not
+// realloc: it creates a new ring buffer (calloc header + malloc storage), mallocs a
+// temp copy of the content, then frees the temp and the old buffer. JsonEmit prints
+// 1-20 B at a time, so past 1460 B nearly every print is a full recreate: a staircase
+// of slightly larger blocks. On a board without PSRAM, otmonitor polled every 2 s
+// per tab leaves free heap split into holes just too small for the next step.
+// The large bodies (settings, sat/status, device/info, debug) already moved to
+// restSendChunked() for this reason (TASK-883); the polled stream endpoints did not.
+//
+// Fix without touching the library: the polled stream endpoints whose body exceeds
+// 1460 B ask for a fixed, endpoint-specific buffer upfront. Every poll then makes one
+// allocation of the same size, so the allocator can reuse the hole the previous
+// response left. A body longer than the presize still works: the library grows the
+// tail as before. If the heap is too tight for the presized block plus headroom, keep
+// today's 1460 B start: a failed upfront cbuf leaves _buf NULL with size 0
+// (cbuf.cpp:53-54), and the staircase would then start from 1-20 B instead.
+//
+// The sizes are ESTIMATES from the emit code (field counts, loop bounds), not
+// measurements. restFinalize logs the real body length once per endpoint per boot and
+// on every overflow, so the bench measures them; adjust kRestPresize from that log.
+//
+// The pure sizing rule and the table sit between sentinels so test/host can slice them.
+// ---- host-testable stream size hint: BEGIN ----
+static const size_t REST_PRESIZE_HEADROOM = 4096;   // maxblk must exceed the presize by this much
+
+enum RestSizeClass : uint8_t {
+  REST_SIZE_NONE = 0,     // unclassed: default 1460 B start
+  REST_SIZE_OTMONITOR,    // v2/otgw/otmonitor: 38 entries + Dallas sensors, ~3 KB; polled every 2 s per tab
+  REST_SIZE_BLE_ROSTER,   // v2/sat/ble: 0-8 sensors x 12 fields, ~0.3-2.4 KB; every 4 s while the card is open
+  REST_SIZE_WEATHER,      // v2/sat/weather: ~20 fields + 4 x 24 forecast values, ~1-1.3 KB; every 60 s
+  REST_SIZE_COUNT
+};
+static const uint16_t kRestPresize[REST_SIZE_COUNT] = { 0, 4096, 3072, 2048 };
+
+// Initial stream buffer: the endpoint's presize when it is larger than the default
+// and the heap has room for it plus headroom; otherwise the default.
+inline size_t restChooseStreamSize(size_t want, size_t maxBlk, size_t dflt) {
+  if (want <= dflt) return dflt;
+  if (maxBlk < want + REST_PRESIZE_HEADROOM) return dflt;
+  return want;
+}
+// ---- host-testable stream size hint: END ----
+
+// Defined in restAPI.ino: logs the body length once per class per boot and on overflow.
+void restStreamSizeReport(uint8_t cls, size_t cap, size_t len);
+
+// Presized variant of restBeginStream() for a polled endpoint.
+inline AsyncResponseStream* restBeginStreamSized(const char* contentType, RestSizeClass cls) {
+  if (!currentRequest || g_responseSent) return nullptr;
+  if (!g_restStream) {
+    const uint8_t idx = (cls < REST_SIZE_COUNT) ? (uint8_t)cls : (uint8_t)REST_SIZE_NONE;
+    const size_t  cap = restChooseStreamSize(kRestPresize[idx], platformMaxFreeBlock(),
+                                             RESPONSE_STREAM_BUFFER_SIZE);
+    g_restStream = currentRequest->beginResponseStream(contentType, cap);
+    if (g_restStream) {
+      g_restSizeClass = idx;
+      g_restSizeCap   = (uint16_t)cap;
+    }
+    webApplyHeaders(g_restStream);
+  }
+  return g_restStream;
+}
+
 inline void restFinalize() {
   if (!currentRequest || g_responseSent) return;
   if (g_restStream) {
+    const uint8_t cls = g_restSizeClass;
+    if (cls != REST_SIZE_NONE && cls < REST_SIZE_COUNT) {
+      // available() is the whole body here: nothing has been sent yet.
+      restStreamSizeReport(cls, g_restSizeCap, g_restStream->available());
+    }
+    g_restSizeClass = REST_SIZE_NONE;
+    g_restSizeCap   = 0;
     currentRequest->send(g_restStream);
     g_restStream  = nullptr;
     g_responseSent = true;

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.154
+**  Version  : v2.0.0-beta.155
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3001,6 +3001,28 @@ void sendOTLabel(const char *msglabel){
 // sendOTmonitorV2(); the base char* overloads in jsonStuff.ino are untouched.
 //=======================================================================
 
+//=======================================================================
+// TASK-1736: called from restFinalize() (webServerCompat.h) for every presized
+// endpoint response. Logs the measured body length once per class per boot, and
+// on every overflow of a presized buffer, so the bench can check kRestPresize.
+// cap=1460 in the line means the heap was too tight to presize (fallback).
+// An overflow of the default 1460 B start is not logged, so a stuck heap does
+// not add a debug line to every 2 s poll.
+//=======================================================================
+void restStreamSizeReport(uint8_t cls, size_t cap, size_t len)
+{
+  static const char* const kNames[REST_SIZE_COUNT] = { "none", "otmonitor", "ble", "weather" };
+  static uint8_t loggedMask = 0;    // bit per class: first body already logged this boot
+  if (cls >= REST_SIZE_COUNT) return;
+  const bool    overflow = cap > RESPONSE_STREAM_BUFFER_SIZE && len > cap;
+  const uint8_t bit      = (uint8_t)(1u << cls);
+  if (!overflow && (loggedMask & bit)) return;
+  loggedMask |= bit;
+  RESTDebugTf(PSTR("REST stream size: class=%s len=%u cap=%u presize=%u%s maxblock=%u\r\n"),
+              kNames[cls], (unsigned)len, (unsigned)cap, (unsigned)kRestPresize[cls],
+              overflow ? " OVERFLOW" : "", (unsigned)platformMaxFreeBlock());
+}
+
 void sendOTmonitorV2()
 {
   time_t now = time(nullptr); // needed for Dallas sensor display
@@ -3026,7 +3048,9 @@ void sendOTmonitorV2()
   // "epoch": E}. The generic lambda mirrors the old sendJsonOTmonMapEntry
   // overloads: V is serialised by its native type (CONOFF()/CBOOLEAN strings
   // stay strings, numerics stay numbers).
-  AsyncResponseStream* strm = restBeginStream("application/json");
+  // TASK-1736: presized (kRestPresize, 4096 B), polled every 2 s per tab. Worst case
+  // ~3.9 KB: every entry present, s0 on, 16 Dallas sensors, f8.8 floats at 11 chars.
+  AsyncResponseStream* strm = restBeginStreamSized("application/json", REST_SIZE_OTMONITOR);
   if (strm) {
     JsonEmit je(*strm);
     je.beginObject();                 // root {
