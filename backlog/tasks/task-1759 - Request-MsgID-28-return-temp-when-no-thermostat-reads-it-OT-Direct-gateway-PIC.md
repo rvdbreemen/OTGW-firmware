@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:08:00Z'
-updated_date: '2026-11-09T22:34:00Z'
+updated_date: '2026-11-09T22:35:00Z'
 labels:
   - sat
   - opentherm
@@ -88,6 +88,19 @@ TESTS (before any bench)
 - SAT: with a valid Tret the flame-off hold uses return + offset, not the flow fallback (existing LL-018 tests).
 
 BENCH / FIELD: OT-Direct gateway mode with a thermostat cannot be built on the bench today (TASK-1707 AC4), so the proof is a tjfs capture. The PIC part also needs a capture from a PIC user whose thermostat offers an unsupported slot.
+
+ADDITIONS (coordinator review, 2026-11-09):
+STEP 0, before any code: an ADR via /adr-kit:adr, status Proposed, for option A. It is a deliberate deviation from the PIC model: OT-Direct gateway mode answers a supported thermostat read from the boiler cache instead of relaying it 1:1. That touches ADR-223 and the TASK-1707 slot rule (one boiler frame per thermostat frame, own reads only in unsupported slots).
+Trade-off to write down:
+- Gain: a return temperature for SAT where none exists today. Today SAT runs the flow + offset fallback (entries 135/149/151).
+- Cost: about 1 in 10 reads of ID 25 gets a value ~3 s old (at most W1). The 1:1 relay becomes 1:1 per frame, but not per value.
+Alternatives in the ADR:
+- B, own extra frames (removed by TASK-1701/1707);
+- do nothing (keep the fallback);
+- only the unsupported slots (status quo; reads nothing on tjfs's setup).
+The ADR is decided by Robert; Sergeant D answers W1-W3.
+BUDGET ITEM (A5): otBoilerCacheMs[128] (uint32_t) = 512 B of static RAM (BSS, internal DRAM) on every board, including the no-PSRAM OTGW32 .61 (heap tiers TASK-1736/1757). It is accepted as small, but stated explicitly. The smaller alternative is one stamp for the replaced ID (8 B), at the cost of checking only that ID's age.
+Check: the BSS delta in the build output (RAM: line) before/after.
 <!-- SECTION:PLAN:END -->
 
 ## Comments
