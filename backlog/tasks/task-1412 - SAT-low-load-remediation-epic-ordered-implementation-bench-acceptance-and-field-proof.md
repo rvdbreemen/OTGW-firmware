@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-27T23:40:00Z'
-updated_date: '2026-11-09T20:33:00Z'
+updated_date: '2026-11-09T20:37:00Z'
 labels:
   - epic
   - sat
@@ -107,6 +107,14 @@ created: 2026-11-09T20:33:00Z
 ---
 
 Field report gruijter 2026-11-09 20:27 UTC (msg 1569448447248048138): house cooled to 15 °C while away, slow remote warm-up (thermal mass); disturbances: living-room door open all day, bathroom radiator valve stuck open; graph PNG + CSV posted, no full capture; not analysed (capture rule); --long-run capture requested by 97. Waiting for capture.
+
+---
+
+created: 2026-11-09T20:37:00Z
+
+---
+
+Follow-up to the gruijter note: Robert had the graph CSV analysed anyway (an exception to the capture rule for this one). Analysis by otgw-firmware-97, posted with a chart (msg 1569450300778221699); CSV, not a capture; 2-min samples 06:26-21:21. Room stays 0.2-0.3 °C below each target (17.2 for 17.5, 18.3 for 18.5, 19.2 for 19.5). 37 burns, mostly 10-24 min, off 2-16 min (median 10), CS 10 between burns (PWM off, thermo-nova heating_control.py:388-390). Modulation 5-12 % average per burn, flow 40-47, return 30-38; the first burn reaches 100 %. Outside 2.4/9.9/2.3. DHW 3x. Data local in RvdB\capture-gruijter-1109 (user data, not committed).
 
 ---
 <!-- COMMENTS:END -->
