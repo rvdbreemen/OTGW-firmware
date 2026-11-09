@@ -539,7 +539,7 @@
   // hides the badge. TASK-1741: a 503 is the device's busy answer (REST in-flight cap),
   // not a state, so it leaves the badge as it is; the next poll decides.
   function fetchSim() {
-    fetch(APIGW + 'v2/simulate').then(function (r) { return r.status === 503 ? undefined : (r.ok ? r.json() : null); }).then(function (j) {
+    return fetch(APIGW + 'v2/simulate').then(function (r) { return r.status === 503 ? undefined : (r.ok ? r.json() : null); }).then(function (j) {
       if (j === undefined) return;
       var active = !!(j && j.simulation && j.simulation.active);
       var el = document.getElementById('hdrSim'); if (el) el.classList.toggle('hidden', !active);
@@ -1889,11 +1889,13 @@
       CONN.api.s = 'st-ok';
       renderConnMap(); renderConnStrip(); renderConnDetail();
       renderHdrNet();   // TASK-983: refresh Wi-Fi bars + dBm tooltip from the live RSSI
-      fetchSim();       // TASK-983: piggyback the SIMULATION-badge poll on this cadence
-      // TASK-984: refresh the injected-override count/list (source by interface).
-      // TASK-1223.16: on OT-Direct, chain the status read behind it (one at a time).
-      var ovP = fetchOverrides(iface);
-      if (iface === 'OT-Direct') ovP.then(fetchOtdStatus);
+      // TASK-984: refresh the injected-override count/list (source by interface); TASK-1223.16:
+      // on OT-Direct the status read follows; TASK-983: the SIMULATION-badge poll rides this
+      // cadence last. TASK-1747: one request at a time, so one tab never fills the device's
+      // 2-request REST cap on its own.
+      var chain = fetchOverrides(iface);
+      if (iface === 'OT-Direct') chain = chain.then(fetchOtdStatus);
+      chain.then(fetchSim);
     }).catch(function () { });
   }
   // ---------- Monitor > Connection > OT-Direct status (TASK-1223.16) ----------
@@ -2117,13 +2119,14 @@
   }
   function fetchOverrides(iface) {
     // On OT-Direct the gateway overrides endpoint is meaningless (no PIC); read the
-    // OT-Direct store instead. Both normalize into ovrRows; errors -> empty, silently.
+    // OT-Direct store instead. Both normalize into ovrRows; errors -> empty, silently, but a busy
+    // 503 (the REST in-flight cap) keeps the rows shown (TASK-1747).
     // Returns the (never-rejecting) promise so callers can chain behind it.
     var otd = (iface === 'OT-Direct');
     var url = APIGW + (otd ? 'v2/otdirect/overrides' : 'v2/otgw/overrides');
     function apply() { updateCnOvr(); scheduleRender(); }   // map badge + Home A badge/marks
-    return fetch(url).then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { ovrRows = otd ? normOtdOvr(j) : normPicOvr(j); apply(); })
+    return fetch(url).then(function (r) { return r.status === 503 ? undefined : (r.ok ? r.json() : null); })
+      .then(function (j) { if (j === undefined) return; ovrRows = otd ? normOtdOvr(j) : normPicOvr(j); apply(); })
       .catch(function () { ovrRows = []; apply(); });
   }
   // On-bus badge in the connection-map SVG (#cnOvr sits on the y=180 shared bus segment).
