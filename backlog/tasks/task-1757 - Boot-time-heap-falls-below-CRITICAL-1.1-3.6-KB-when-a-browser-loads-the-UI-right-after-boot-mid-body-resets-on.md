@@ -3,9 +3,11 @@ id: TASK-1757
 title: >-
   Boot-time heap falls below CRITICAL (1.1-3.6 KB) when a browser loads the UI
   right after boot; mid-body resets on '/'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-09T17:05:00Z'
+updated_date: '2026-11-09T20:11:00Z'
 labels:
   - heap
   - bug
@@ -30,3 +32,9 @@ Fix idea for the plan only (not decided): hold back UI serving (e.g. 503 + Retry
 - [ ] #2 Name which allocations in the boot window combine with UI serving to reach below CRITICAL, with evidence
 - [ ] #3 Fix agreed with Robert in the plan; after the fix the one-tab and two-tab boot runs stay above CRITICAL with 0 mid-body resets, with old-vs-fix numbers
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+AC1 measurement (no code change), on .61 in a slot from the coordinator, on the dev build then on .61 (no flash if it already runs current dev; otherwise OTA first and restart counting after the flash). Runner: scratchpad t1757/boots1757.py, based on detectie's TASK-1528 step b runner (same /ReBoot loop, device/info every 5 s, telnet [HEAP] phase lines until '[HEAP] boot done'). New mode B: ONE real headless Chrome tab (fresh profile, --log-net-log) opens http://.61/ at the first HTTP answer after boot and stays 120 s, so the real v2 UI loads its files, polls REST and opens its WebSocket; failed requests come from the net-log (net_error at REQUEST_ALIVE end; self-test: ERR_CONNECTION_REFUSED -102 detected, 13 requests counted). After every boot the crashlog summary is saved (doubles as the TASK-1763 panic count). Sequence: 12 boots alternating C and B (C B C B ...), so per mode 6 boots. Before: check no other telnet logger holds port 23 (single slot) and stop only my own afterwards. Output per boot: windowed minimum per [HEAP] phase (setup-late, wait-mqtt, connect, drip), nativeMin, the boot +t of the minimum, failed browser requests with URL and error, crashlog line. Decision rule: if B stays above CRITICAL (3072 B) in all 6 boots, AC1 says the normal one-tab case is safe and the gate rests on the two-tab case; if B goes below, AC1 is reproduced with one tab. AC2 next: add allocation attribution only where the phase data points (e.g. which phase overlaps the browser's '/' 175 KB gzip send: AsyncTCP send buffers vs MQTT connect + discovery drip), measured, not assumed. AC3: fix options (e.g. 503+Retry-After or a tiny wait page until boot done, or deferring the HA discovery drip while a page load is in flight) go to Robert with old-vs-fix numbers from the same runner (one-tab B and two-tab T).
+<!-- SECTION:PLAN:END -->
