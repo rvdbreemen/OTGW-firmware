@@ -1,7 +1,7 @@
 ---
 id: "ADR-223"
 title: "OT-Direct gateway mode answers a TT= or TC= override to the thermostat only, like the PIC"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-09"
 binding: false
 gate: null
@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "otdirect"
   - "opentherm"
@@ -32,6 +31,7 @@ symbols:
   - "otdRemoteOverrideReply"
   - "otOverrides"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -40,7 +40,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-09.
+Accepted, 2026-11-09.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer), 2026-11-09, in session
 otgw-firmware-80 (TASK-1733: option F2 "parity with the PIC (the gateway's Microchip PIC microcontroller) now", and the four parity sub-points below).
@@ -57,6 +57,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-09
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

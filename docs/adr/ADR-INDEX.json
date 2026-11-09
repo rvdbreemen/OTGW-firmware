@@ -8620,7 +8620,7 @@
       "title": "OT-Direct gateway mode answers a TT= or TC= override to the thermostat only, like the PIC",
       "path": "ADR-223-ot-direct-gateway-mode-answers-a-tt-override-to-the-thermostat-only-like-the-pic.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-09",
       "decision_summary": "User Decision: in OT-Direct gateway mode, a TT= or TC= override is answer state only, as on the PIC: the gateway answ...",
       "topics": [
@@ -8653,11 +8653,11 @@
         "must": [
           "In gateway mode, a TT= or TC= value is delivered to the thermostat only through the MsgID 9 and MsgID 100 read answers (otdRemoteOverrideReply).",
           "After the thermostat's first answered MsgID 9 read, a thermostat MsgID 16 within 0.25 °C of the override counts as acceptance; before acceptance the 4th mismatch releases the override, after acceptance the first mismatch releases it.",
-          "TT=0 and a release clear only the remote override state; a BS= or MQTT room setpoint write override on MsgID 16 survives."
+          "TT=0 and a release clear only the remote override state; a BS= or MQTT (Message Queuing Telemetry Transport) room setpoint write override on MsgID 16 survives."
         ],
         "must_not": [
-          "No gateway-originated WRITE 16 or WRITE 100 to the boiler for a TT= or TC= in gateway mode.",
-          "No rewrite of the thermostat's WRITE 16 data for a TT= or TC=.",
+          "No gateway-originated write 16 or write 100 to the boiler for a TT= or TC= in gateway mode.",
+          "No rewrite of the thermostat's write 16 data for a TT= or TC=.",
           "No change to SAT control (CS/CH/MM) under this ADR; no SAT re-push of a refused TC= (entry 16)."
         ],
         "exceptions": [
