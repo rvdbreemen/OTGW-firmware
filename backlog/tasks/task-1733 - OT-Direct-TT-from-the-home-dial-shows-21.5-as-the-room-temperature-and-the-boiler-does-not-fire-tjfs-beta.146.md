@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-08T15:26:00Z'
-updated_date: '2026-11-09T06:54:00Z'
+updated_date: '2026-11-09T07:18:00Z'
 labels:
   - bug
   - otdirect
@@ -133,4 +133,6 @@ NOT VERIFIED:
 2026-11-09 ADR-223 drafted via adr-kit as Proposed (adr-lint --strict 0 FAIL; test_adr_governance OK): TT= in OT-Direct gateway mode is answer state only (MsgID 9/100 reads), no gateway WRITE 16/100, PIC release rule after a MsgID 9 read; TC= and master mode unchanged. Sergeant D asked about TC= via 97 (Q-1733a, #dev-sat-mqtt msg 1569226090260725952). Implementation starts after Robert accepts ADR-223.
 
 2026-11-09 Sergeant D answered Q-1733a with A (#dev-sat-mqtt msg 1569231775144607755, corrections entry 286, recorded by otgw-firmware-97): TC= on OT-Direct behaves like the PIC too. ADR-223 (still Proposed) updated to cover TT= and TC= alike; Open Question answered in the record; master mode keeps TrSet for both. Implementation waits for Robert's acceptance of the final ADR-223 text.
+
+2026-11-09 ADR-223 clarity fix for adr accept (strict clarity flagged PIC, SAT, MQTT, READ, WRITE): PIC, SAT, MQTT expanded at first use, OpenTherm read/write in lower case in prose; no change in meaning. Strict clarity gate PASS.
 <!-- SECTION:NOTES:END -->

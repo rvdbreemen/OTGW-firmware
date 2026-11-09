@@ -43,8 +43,8 @@ context_scope: "selective"
 Proposed, 2026-11-09.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer), 2026-11-09, in session
-otgw-firmware-80 (TASK-1733: option F2 "PIC parity now", and the four parity sub-points below).
-For `TC=` (SAT push-setpoint): Sergeant D, 2026-11-09 06:06 UTC, answer "TASK-1733: A" in
+otgw-firmware-80 (TASK-1733: option F2 "parity with the PIC (the gateway's Microchip PIC microcontroller) now", and the four parity sub-points below).
+For `TC=` (the push-setpoint of SAT (Smart Autotune Thermostat)): Sergeant D, 2026-11-09 06:06 UTC, answer "TASK-1733: A" in
 #dev-sat-mqtt (https://discord.com/channels/812969634638725140/1105556725714649128/1569231775144607755),
 recorded as corrections entry 286.
 
@@ -67,11 +67,11 @@ reference source `other-projects/otgw-6.6/gateway.asm`, version 6.6) implements 
 answer to the thermostat. On `TT=` it stores the value and function bits b'11'
 (`gateway.asm:4058-4063`) and then:
 
-- answers the thermostat's READ of MsgID 9 (remote override room setpoint) with the value and the
-  READ of MsgID 100 (remote override function) with the flags, rewriting the boiler's reply
+- answers the thermostat's read of MsgID 9 (remote override room setpoint) with the value and the
+  read of MsgID 100 (remote override function) with the flags, rewriting the boiler's reply
   (`gateway.asm:2932-2955`, `3269-3303`);
 - never sends MsgID 9, 16 or 100 to the boiler itself (the IDs appear only at their definitions,
-  `gateway.asm:242,244,256`), and passes the thermostat's WRITE of MsgID 16 (room setpoint) to the
+  `gateway.asm:242,244,256`), and passes the thermostat's write of MsgID 16 (room setpoint) to the
   boiler unchanged (`gateway.asm:2976-2985`);
 - compares the thermostat's MsgID 16 with the override only after the thermostat has read MsgID 9
   (`OverrideWait` is cleared only in the MsgID 9 reply path, `gateway.asm:2948`; the compare is
@@ -80,9 +80,9 @@ answer to the thermostat. On `TT=` it stores the value and function bits b'11'
   override; after acceptance the first mismatch cancels it (`roomsetptdiff`, `gateway.asm:3025-3036`).
 
 OT-Direct (the ESP32-S3 board that is the OpenTherm master/slave itself, without a PIC) does more
-today. `setRemoteOverride()` queues a gateway WRITE 16 with the override value and a WRITE 100 with
+today. `setRemoteOverride()` queues a gateway write 16 with the override value and a write 100 with
 the flags to the boiler (`src/OTGW-firmware/OTDirect.ino:2355`, `:2366`), registers MsgID 16 in
-`otOverrides` (`OTDirect.ino:425`) so every thermostat WRITE 16 is rewritten to the override value
+`otOverrides` (`OTDirect.ino:425`) so every thermostat write 16 is rewritten to the override value
 (`applyOverrides`, `OTDirect.ino:630-645`), and refreshes the write every 15 s through the write
 cache. `clearRemoteOverride()` also clears the shared MsgID 16 and 100 write overrides
 (`OTDirect.ino:2392-2393`), so `TT=0` also wipes a `BS=` fake setpoint. `onThermostatMsgID16()`
@@ -98,8 +98,8 @@ boiler does not fire" is expected, and that OT-Direct's extra boiler writes are 
 ## Decision
 
 **User Decision:** in OT-Direct **gateway mode**, a `TT=` or `TC=` override is answer state only, as
-on the PIC: the gateway answers the thermostat's MsgID 9 and MsgID 100 reads, sends no WRITE 16 or
-WRITE 100 of its own to the boiler for it, passes the thermostat's WRITE 16 unchanged, and releases
+on the PIC: the gateway answers the thermostat's MsgID 9 and MsgID 100 reads, sends no write 16 or
+write 100 of its own to the boiler for it, passes the thermostat's write 16 unchanged, and releases
 the override by the PIC rule once the thermostat has read MsgID 9. The PIC treats `TT=` and `TC=`
 the same in this rule (MessageID16 has no TT/TC branch, `gateway.asm:2976-3036`); only the MsgID 100
 function bits differ (b'11' for TT, b'01' for TC, `gateway.asm:4053-4063`).
@@ -126,13 +126,13 @@ The parity sub-points, decided by Robert on 2026-11-09:
 - After the thermostat's first answered MsgID 9 read, a thermostat MsgID 16 within 0.25 °C of the
   override counts as acceptance; before acceptance the 4th mismatch releases the override, after
   acceptance the first mismatch releases it.
-- `TT=0` and a release clear only the remote override state; a `BS=` or MQTT room setpoint write
+- `TT=0` and a release clear only the remote override state; a `BS=` or MQTT (Message Queuing Telemetry Transport) room setpoint write
   override on MsgID 16 survives.
 
 ### Must Not
 
-- No gateway-originated WRITE 16 or WRITE 100 to the boiler for a `TT=` or `TC=` in gateway mode.
-- No rewrite of the thermostat's WRITE 16 data for a `TT=` or `TC=`.
+- No gateway-originated write 16 or write 100 to the boiler for a `TT=` or `TC=` in gateway mode.
+- No rewrite of the thermostat's write 16 data for a `TT=` or `TC=`.
 - No change to SAT control (CS/CH/MM) under this ADR; no SAT re-push of a refused `TC=` (entry 16).
 
 ### Exceptions
@@ -143,8 +143,8 @@ The parity sub-points, decided by Robert on 2026-11-09:
 
 - New host test `tests/test_otd_tt_pic_parity.py` on the real `handleOTDirectCommand("TT=21.5")`,
   `setRemoteOverride`, `applyOverrides`, `onThermostatMsgID16` and `otdRemoteOverrideReply` in the
-  gateway loop of `tests/test_otd_gateway_alt_slots.py`: no gateway WRITE 16/100, unchanged
-  thermostat WRITE 16, MsgID 9 answered 0x1580, release after 4 mismatches once MsgID 9 was read;
+  gateway loop of `tests/test_otd_gateway_alt_slots.py`: no gateway write 16/100, unchanged
+  thermostat write 16, MsgID 9 answered 0x1580, release after 4 mismatches once MsgID 9 was read;
   the same cases for `TC=21.5` (MsgID 100 flags 0x01). Red on the code before this ADR, green after.
 
 ## Alternatives Considered
@@ -183,7 +183,7 @@ The parity sub-points, decided by Robert on 2026-11-09:
 - SAT's push-setpoint (`TC=`) on OT-Direct is now cancelled by a thermostat that keeps its own
   setpoint after reading MsgID 9, as on PIC boards, and SAT does not re-push it (entry 16).
   Mitigation: same behaviour as PIC boards, chosen by Sergeant D (entry 286).
-- ADR-068's rationale lists TT/TC as producers of WRITE 16/100 frames; that rationale is outdated
+- ADR-068's rationale lists TT/TC as producers of write 16/100 frames; that rationale is outdated
   for `TT=` in gateway mode (no hard conflict: ADR-068's decision, the 12-frame queue, stands).
 
 ## Open Questions
@@ -192,10 +192,10 @@ The parity sub-points, decided by Robert on 2026-11-09:
 
 ## Related Decisions
 
-- **ADR-068** (12-frame OT-Direct write queue): its rationale names TT/TC as WRITE 16/100 producers;
+- **ADR-068** (12-frame OT-Direct write queue): its rationale names TT/TC as write 16/100 producers;
   this ADR removes the TT producer in gateway mode. The queue decision stands.
 - **ADR-118** (override store): after this ADR a TT on OT-Direct is visible only as the answered
-  MsgID 9/100 frames, not as a substituted WRITE 16.
+  MsgID 9/100 frames, not as a substituted write 16.
 - **ADR-208** (CH= override on the relayed MsgID 0): same pattern of gateway answers in OT-Direct
   gateway mode; not changed.
 
