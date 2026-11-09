@@ -1,6 +1,6 @@
 ---
 id: "ADR-223"
-title: "OT-Direct gateway mode answers a TT= override to the thermostat only, like the PIC"
+title: "OT-Direct gateway mode answers a TT= or TC= override to the thermostat only, like the PIC"
 status: "Proposed"
 date: "2026-11-09"
 binding: false
@@ -36,7 +36,7 @@ context_scope: "selective"
 
 <!-- markdownlint-disable MD025 -->
 
-# ADR-223 OT-Direct gateway mode answers a TT= override to the thermostat only, like the PIC
+# ADR-223 OT-Direct gateway mode answers a TT= or TC= override to the thermostat only, like the PIC
 
 ## Status
 
@@ -44,6 +44,9 @@ Proposed, 2026-11-09.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer), 2026-11-09, in session
 otgw-firmware-80 (TASK-1733: option F2 "PIC parity now", and the four parity sub-points below).
+For `TC=` (SAT push-setpoint): Sergeant D, 2026-11-09 06:06 UTC, answer "TASK-1733: A" in
+#dev-sat-mqtt (https://discord.com/channels/812969634638725140/1105556725714649128/1569231775144607755),
+recorded as corrections entry 286.
 
 ## Status History
 
@@ -94,18 +97,21 @@ boiler does not fire" is expected, and that OT-Direct's extra boiler writes are 
 
 ## Decision
 
-**User Decision:** in OT-Direct **gateway mode**, a `TT=` override is answer state only, as on the
-PIC: the gateway answers the thermostat's MsgID 9 and MsgID 100 reads, sends no WRITE 16 or WRITE
-100 of its own to the boiler for it, passes the thermostat's WRITE 16 unchanged, and releases the
-override by the PIC rule once the thermostat has read MsgID 9.
+**User Decision:** in OT-Direct **gateway mode**, a `TT=` or `TC=` override is answer state only, as
+on the PIC: the gateway answers the thermostat's MsgID 9 and MsgID 100 reads, sends no WRITE 16 or
+WRITE 100 of its own to the boiler for it, passes the thermostat's WRITE 16 unchanged, and releases
+the override by the PIC rule once the thermostat has read MsgID 9. The PIC treats `TT=` and `TC=`
+the same in this rule (MessageID16 has no TT/TC branch, `gateway.asm:2976-3036`); only the MsgID 100
+function bits differ (b'11' for TT, b'01' for TC, `gateway.asm:4053-4063`).
 
 The parity sub-points, decided by Robert on 2026-11-09:
 
 1. **Counting starts after a MsgID 9 read** (strict PIC). A thermostat that never reads MsgID 9
    never releases the override; it stays active until `TT=0`, as on a PIC board.
-2. **TT only.** `TC=` (constant override) keeps today's OT-Direct behaviour until Sergeant D
-   decides, because SAT's push-setpoint sends `TC=` on OT-Direct (SAT ground truth: corrections
-   entries 14 and 16).
+2. **TT and TC alike.** `TC=` is SAT's push-setpoint on OT-Direct, so this changes SAT behaviour;
+   Sergeant D chose option A on 2026-11-09 (corrections entry 286): `TC=` behaves like the PIC.
+   Entry 16 stands: SAT does not re-push a refused setpoint. This updates entry 14's Open note
+   ("OT-Direct boards never cancel a TC= override").
 3. **Match tolerance stays 0.25 °C** (`OT_OVERRIDE_HONOR_DELTA_F88`), a documented deviation from
    the PIC's ~0.125 °C so that thermostats rounding to 0.5 °C steps are not cancelled.
 4. **Master mode is unchanged:** with no thermostat, `TT=` keeps writing TrSet (MsgID 16) to the
@@ -115,8 +121,8 @@ The parity sub-points, decided by Robert on 2026-11-09:
 
 ### Must
 
-- In gateway mode, a `TT=` value is delivered to the thermostat only through the MsgID 9 and
-  MsgID 100 read answers (`otdRemoteOverrideReply`).
+- In gateway mode, a `TT=` or `TC=` value is delivered to the thermostat only through the MsgID 9
+  and MsgID 100 read answers (`otdRemoteOverrideReply`).
 - After the thermostat's first answered MsgID 9 read, a thermostat MsgID 16 within 0.25 °C of the
   override counts as acceptance; before acceptance the 4th mismatch releases the override, after
   acceptance the first mismatch releases it.
@@ -125,23 +131,21 @@ The parity sub-points, decided by Robert on 2026-11-09:
 
 ### Must Not
 
-- No gateway-originated WRITE 16 or WRITE 100 to the boiler for a `TT=` in gateway mode.
-- No rewrite of the thermostat's WRITE 16 data for a `TT=`.
-- No change to `TC=` behaviour or to SAT control (CS/CH/MM) under this ADR.
+- No gateway-originated WRITE 16 or WRITE 100 to the boiler for a `TT=` or `TC=` in gateway mode.
+- No rewrite of the thermostat's WRITE 16 data for a `TT=` or `TC=`.
+- No change to SAT control (CS/CH/MM) under this ADR; no SAT re-push of a refused `TC=` (entry 16).
 
 ### Exceptions
 
-- OT-Direct master mode (no thermostat): `TT=` keeps writing TrSet to the boiler.
-- `TC=` keeps its current behaviour until Sergeant D's answer is recorded in
-  `docs/sat/sergeant-d-corrections.md`; a later ADR records that change.
+- OT-Direct master mode (no thermostat): `TT=` and `TC=` keep writing TrSet to the boiler.
 
 ### Verification
 
 - New host test `tests/test_otd_tt_pic_parity.py` on the real `handleOTDirectCommand("TT=21.5")`,
   `setRemoteOverride`, `applyOverrides`, `onThermostatMsgID16` and `otdRemoteOverrideReply` in the
   gateway loop of `tests/test_otd_gateway_alt_slots.py`: no gateway WRITE 16/100, unchanged
-  thermostat WRITE 16, MsgID 9 answered 0x1580, release after 4 mismatches once MsgID 9 was read.
-  Red on the code before this ADR, green after.
+  thermostat WRITE 16, MsgID 9 answered 0x1580, release after 4 mismatches once MsgID 9 was read;
+  the same cases for `TC=21.5` (MsgID 100 flags 0x01). Red on the code before this ADR, green after.
 
 ## Alternatives Considered
 
@@ -151,8 +155,10 @@ The parity sub-points, decided by Robert on 2026-11-09:
 - **Count mismatches from the moment `TT=` is set.** Rejected: deviates from the PIC
   (`gateway.asm:2980-2982`); for a thermostat that never reads MsgID 9 the override is harmless
   under this ADR, because nothing is written to the boiler.
-- **Full parity including `TC=` now.** Rejected for now: it changes SAT push-setpoint behaviour on
-  OT-Direct, which needs Sergeant D's recorded OK first (`.claude/rules/sat-ground-truth.md`).
+- **`TT=` only, `TC=` unchanged.** Rejected after Sergeant D chose option A (entry 286): one
+  behaviour on PIC and OT-Direct boards for SAT's push-setpoint.
+- **Push SAT's setpoint with `TT=` instead of `TC=`** (as thermo-nova's serial path does, pyotgw
+  `set_target_temp` defaults to temporary). Rejected by Sergeant D (option C of Q-1733a).
 - **PIC tolerance 0.125 °C.** Rejected: cancels thermostats that report in 0.5 °C steps.
 - **Do nothing.** Rejected: OT-Direct would keep writing a room setpoint to the boiler that a PIC
   never writes, and keep rewriting the thermostat's own MsgID 16.
@@ -174,15 +180,15 @@ The parity sub-points, decided by Robert on 2026-11-09:
 - With a thermostat that never reads MsgID 9, `TT=` has no effect at all and the override stays
   shown as active until `TT=0`, as on a PIC. Mitigation: documented here and in the release note;
   MQTT `otgw32/room_setpoint` remains the explicit way to write TrSet.
-- `TT=` and `TC=` now differ on OT-Direct until Sergeant D decides on `TC=`. Mitigation: tracked
-  in TASK-1733 and `docs/sat/open-questions.md`.
+- SAT's push-setpoint (`TC=`) on OT-Direct is now cancelled by a thermostat that keeps its own
+  setpoint after reading MsgID 9, as on PIC boards, and SAT does not re-push it (entry 16).
+  Mitigation: same behaviour as PIC boards, chosen by Sergeant D (entry 286).
 - ADR-068's rationale lists TT/TC as producers of WRITE 16/100 frames; that rationale is outdated
   for `TT=` in gateway mode (no hard conflict: ADR-068's decision, the 12-frame queue, stands).
 
 ## Open Questions
 
-- [ ] Sergeant D: should `TC=` (SAT push-setpoint) follow the same PIC rule on OT-Direct? (asked via
-  #dev-sat-mqtt, TASK-1733; a later ADR records the answer.)
+- [x] Sergeant D: should `TC=` (SAT push-setpoint) follow the same PIC rule on OT-Direct? — **Answered 2026-11-09 by Sergeant D:** "TASK-1733: A": yes, like the PIC (#dev-sat-mqtt msg 1569231775144607755, corrections entry 286).
 
 ## Related Decisions
 
@@ -200,4 +206,6 @@ The parity sub-points, decided by Robert on 2026-11-09:
 - `src/OTGW-firmware/OTDirect.ino`: 420-431 (`otOverrides`), 464-466 (tolerances), 630-645
   (`applyOverrides`), 1397-1450 (MsgID 9/100 answers), 2345-2381 (`setRemoteOverride`), 2382-2404
   (`clearRemoteOverride`), 2419-2457 (`onThermostatMsgID16`).
-- `docs/sat/sergeant-d-corrections.md` entries 14 and 16 (push-setpoint, `TC=`).
+- `docs/sat/sergeant-d-corrections.md` entries 14, 16 and 286 (push-setpoint, `TC=`).
+- thermo-nova at 7beaaf5: `climate.py:656-657`, `coordinator/mqtt/opentherm.py:206-209` (`TC=`),
+  `coordinator/serial/__init__.py:204-208` with pyotgw `pyotgw.py:71-83` (`TT=` by default).

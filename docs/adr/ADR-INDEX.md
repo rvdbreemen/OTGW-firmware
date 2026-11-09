@@ -228,4 +228,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-220 | Accepted | - | User Decision (Robert, 2026-11-08): the language pack files follow the i18next v4 JSON format, read by the project's... |
 | ADR-221 | Accepted | - | User Decision (Robert, 2026-11-08): the web UI language packs (i18n/ .json, ADR-219/ADR-220) are stored on LittleFS a... |
 | ADR-222 | Accepted | - | User Decision: on a board without PSRAM, BLE is off by default and no dialog appears after boot or when a page opens;... |
-| ADR-223 | Proposed | - | User Decision: in OT-Direct gateway mode, a TT= override is answer state only, as on the PIC: the gateway answers the... |
+| ADR-223 | Proposed | - | User Decision: in OT-Direct gateway mode, a TT= or TC= override is answer state only, as on the PIC: the gateway answ... |
