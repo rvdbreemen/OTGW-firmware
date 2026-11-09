@@ -6171,3 +6171,15 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Settled:** the reading of entry 284 is confirmed in his words: the heating curve value HC is the operating point (feed-forward, `pid.py:132`) and scales all three gains (`pid.py:70-93`); SAT is not a cascade. No behaviour change; the firmware matches.
 
 **Task:** none. **Open:** nothing.
+
+## 286. Q-1733a answered A: on boards without a PIC the pushed setpoint (TC=) behaves as on the PIC (Sergeant D, 2026-11-09; updates the Open note of entry 14)
+
+**Source:** sergeantd, 2026-11-09 06:06:50 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1569231775144607755 (https://discord.com/channels/812969634638725140/1105556725714649128/1569231775144607755), a reply to our question Q-1733a, msg 1569226090260725952 (https://discord.com/channels/812969634638725140/1105556725714649128/1569226090260725952).
+
+**Quoted:** "@BlueFlame Bot TASK-1733: A"
+
+**Settled:** option A of Q-1733a. On boards without a PIC (OT-Direct), SAT's pushed setpoint (TC=) is handled like the PIC: it is answered only to the thermostat's MsgID 9/100 reads, nothing is written to the boiler as MsgID 16, and the override is cancelled when the thermostat keeps sending its own room setpoint (MsgID 16) after it has read MsgID 9 (gateway.asm MessageID16 2976, roomsetptdiff ~3022-3036). thermo-nova itself only issues the push (climate.py:656-657; TC= over MQTT, coordinator/mqtt/opentherm.py:206-209; TT= over serial via pyotgw set_target_temp temporary=True, coordinator/serial/__init__.py:204-208, pyotgw.py:71-83) and was written against the PIC, so A keeps the same behaviour on both board types. The firmware today differs (OTDirect.ino:2355 enqueues MsgID 16 to the boiler for TC=; :2416-2418 never auto-clears TC=) and must change. Entry 16 stands: a refused push is not repeated.
+
+**Changes an earlier entry:** entry 14's Open note ("OT-Direct boards never cancel a TC= override by themselves") describes the firmware before this answer; after TASK-1733 they cancel it as the PIC does. Entry 14 itself is not rewritten.
+
+**Task:** TASK-1733 (owner otgw-firmware-80; ADR-223 Proposed covers TT=, TC= now follows the same rule). **Open:** nothing from him.

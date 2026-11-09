@@ -3811,6 +3811,19 @@
    "supersedes": [],
    "tasks": [],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 286,
+   "title": "Q-1733a answered A: on boards without a PIC the pushed setpoint (TC=) behaves as on the PIC (Sergeant D, 2026-11-09; updates the Open note of entry 14)",
+   "date": "2026-11-09",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569231775144607755",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1733"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
