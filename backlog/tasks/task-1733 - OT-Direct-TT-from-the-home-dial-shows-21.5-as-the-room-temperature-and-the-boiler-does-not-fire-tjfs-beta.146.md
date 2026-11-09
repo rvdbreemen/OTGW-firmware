@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-08T15:26:00Z'
-updated_date: '2026-11-09T09:21:00Z'
+updated_date: '2026-11-09T10:17:00Z'
 labels:
   - bug
   - otdirect
@@ -145,6 +145,8 @@ NOT VERIFIED:
 2026-11-09 correction to the previous note: the 1 FAILED test_web_file_scheduling is NOT an environment cause; detectie traced it to 44d6ef686 breaking the harness (fix under TASK-1723, in its push queue). Independent of F2 (F2 touches no file that test reads); I had taken the 'known environment' label over without checking.
 
 2026-11-09 beta.161+45dadcf pushed (origin/dev 26cd2301a..45dadcfb8) and posted (Discord 1569280595832340551). Bench .61 (OT-Direct, master mode, no thermostat): OTA app+fs, 164 settings kept; 15-min soak 84/84 REST 200, no restart (bootcount 181), heap 68.9-71.7 KB, maxblock 31,732 B flat, MQTT connected; master path kept: TT=21.5 -> write override msgid 16 = 5504 (0x1580), TT=0 -> cleared (SAT briefly off: SAT blocks TT= by design). AC2 ticked: in gateway mode TT= now only changes the setpoint path (MsgID 9/100 answers); test_otd_tt_pic_parity 40/40 shows no gateway WRITE 16/100, no R16 rewrite and the thermostat's own WRITE 16 passed unchanged; red on 99035d1ce (16/27). Caveat: no separate assert on MsgID 24; the code analysis found no path that writes MsgID 24. AC1 (why 21.5 showed on MsgID 24) stays open: not reproducible from the code, needs tjfs's capture. AC3 field: tjfs to confirm on beta.161. Status In Review per the field-validation rule.
+
+2026-11-09 tjfs capture on beta.161 (20261109-093934-upload.zip, SHA256 effc1f95...0032, 32 min, 3876 frames; analysed by otgw-firmware-80 with python -I on otframes.log + transcript): (1) his thermostat reads MsgID 9 or 100 zero times in the whole run, also after TT=21.5 -> under ADR-223 (PIC rule) TT= has no effect on this thermostat, as on a PIC. (2) No gateway WRITE 16/100 reaches the boiler and there is no R frame on 16: the boiler only gets the thermostat's own T WRITE 16 = 17.0 (acked B 17.0); 0x1580 (21.5) appears in no frame. (3) MsgID 24 carries the thermostat's own measured room temperature 20.27-20.52 C (T WRITE 24, boiler answers Unknown-DataID A type 7); 21.5 never appears on 24, so on beta.161 the room-temperature path is clean; the beta.146 symptom (21.5 shown as room temperature) cannot be reproduced from the bus and its cause stays unproven (most likely the old UI dial path removed by TASK-1735). (4) The boiler does not fire because there is no heat demand: thermostat program setpoint 17.0 C, room 20.3 C, master CH-enable bit 0 off (T id0 hi byte 0x00/0x02), control setpoint 0/50. (5) Port 25238: OTmonitor's TT=21.5 (10:09:47 UTC) and TT=0 (10:10:40) were received and answered 'TT: 21.50' / 'TT: 0.00'; his earlier telnet attempt around 10:00 never reached the firmware (no bridge line), most likely an LF-only line end (the bridge, like the PIC, executes a line on CR) - not proven. AC1/AC3 as written cannot be met with this thermostat: proposal to Robert: AC1 -> 'not reproducible on beta.161; MsgID 24 carries the thermostat's room temperature', AC3 -> 'TT= has no effect on a thermostat that never reads MsgID 9; boiler follows the thermostat's own demand (field-confirmed)'.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
