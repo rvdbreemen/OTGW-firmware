@@ -3,11 +3,11 @@ id: TASK-1749
 title: >-
   OT-Direct: show an active TT=/TC= remote override in the overrides panel again
   (gateway mode)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-09T09:26:00Z'
-updated_date: '2026-11-09T10:20:00Z'
+updated_date: '2026-11-09T20:48:00Z'
 labels:
   - otdirect
   - webui
@@ -41,4 +41,12 @@ Part 1 (now, no conflict): OTDirect.ino getOTDirectOverridesJSON (~1131) gains a
 2026-11-09 part 1 (otgw-firmware-80; implementation subagent, rerun in session): OTDirect.ino sendOTDirectOverridesJSON() adds overrides.remote (null, or {mode temporary|constant, value C, msgid9_answered, accepted, mismatches}) after sat_owns, existing fields unchanged; new otdActiveOverrideCount() counts write slots + 1 for an active remote override, feeding state.otd.iOverrideCount (overrides_active / otdoverrides / override_count: all 4 readers are informational totals). Docs: openapi.yaml, docs/api/README.md, MQTT.md overrides_active row. Test tests/test_otd_overrides_remote_json.py compiles the real sendOTDirectOverridesJSON + otdActiveOverrideCount + jsonEmit.h: fix Ran 4 OK; old code (2fedae505) FAILED 4. Honest note: the genuine red is the missing 'remote' key (key-order case: ['write','response','modify','unknown','sat_owns'] without 'remote'); the 3 count cases are red only because the old code has no otdActiveOverrideCount and the test substitutes a 255 stub. evaluate --quick 0 FAIL. Part 2 (v2.js panel, AC2) waits for 4c's TASK-1747 push (same fetchOverrides region).
 
 2026-11-09 part 2 (otgw-firmware-80; implementation subagent, rerun in session): v2.js otdRemoteRow() renders overrides.remote as 'Room setpoint override (TT=|TC=, temporary|constant) · MsgID 9  <value> °C' with status 'waiting for the thermostat to read it' / 'offered to the thermostat' / 'accepted by the thermostat'; Clear sends TT=0 via otdOvrSendCmd; with sat_owns the SAT note instead of Clear; normOtdOvr pushes id 9 so the aRoomSet badge and the 'N injected' count include it; fetchOverrides (TASK-1747 503 handling) untouched. tests/webui/otd-remote-override-panel.test.mjs: new UI 5/5, old v2.js 1/5 (4 red; the null/absent case is a regression guard, green on both). otd-override-clear 5/5, otd-hidden-in-pic-mode 2/2, health-chain-one-in-flight 2/2. Review fix (master mode, found in session): .61 runs master mode, where TT= still writes MsgID 16, so the remote entry would show twice with a misleading 'waiting for the thermostat' text; otdRemoteOverrideListed() lists and counts the remote entry only outside OTD_MODE_MASTER. test_otd_overrides_remote_json.py now 5/5 incl. a master case, which fails on a variant without that rule (1 failure).
+
+Bench .61 (OT-Direct, master mode, no thermostat), beta.164+d99e552 built 21:27 from d99e552d2 (= this commit before the final docs-only rebase): OTA app+fs via scripts/ota_flash.py, 164 settings kept (changed: none), v2.html.gz complete. 15-min soak 21:29-21:44: 80/80 GET /api/v2/device/info 200, bootcount 195 steady (193 before; +2 = OTA restarts), free heap 67.6-71.7 KB, max block 31,732 B flat. Panel check (master mode, SAT briefly off because SAT blocks TT= by design, then restored): TT=21.5 -> overrides write [{msgid 16, value 5504 = 0x1580}], remote null (master mode lists TT only as the write slot, not twice); TT=0 -> write [] ; SAT back on -> sat_owns true. Not verified on hardware: the gateway-mode remote row with a real thermostat (no thermostat on the bench); covered by the host and webui tests.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: tests/test_otd_overrides_remote_json.py 5/5 compiles the real sendOTDirectOverridesJSON/otdActiveOverrideCount (red on the old code; master-mode case red without otdRemoteOverrideListed). AC2: tests/webui/otd-remote-override-panel.test.mjs 5/5 (4 red on the old UI); Clear sends TT=0. Bench .61 beta.164: 15-min soak 80/80, no restart; master-mode panel check TT=21.5 -> write 16 = 0x1580, remote null, TT=0 clears. Not verified on hardware: gateway-mode remote row with a real thermostat.
+<!-- SECTION:FINAL_SUMMARY:END -->
