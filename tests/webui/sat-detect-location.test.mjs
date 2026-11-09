@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { i18nEn } from './lib/i18n-en.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const V2JS = process.env.OTGW_V2_JS || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data', 'v2.js');
@@ -45,7 +46,7 @@ function extractFunction(src, name) {
 }
 
 function extractVarLine(src, name) {
-  const m = src.match(new RegExp('^\\s*var ' + name + ' = .*;$', 'm'));
+  const m = src.match(new RegExp('^\\s*var ' + name + ' = .*;(?:[ \t]*//.*)?$', 'm'));
   if (!m) throw new Error('var ' + name + ' not found in ' + V2JS);
   return m[0];
 }
@@ -71,6 +72,7 @@ function el() {
 // geo: navigator.geolocation stub (or undefined).
 function load({ secure, geo }) {
   const src = fs.readFileSync(V2JS, 'utf8');
+  const { t, setT } = i18nEn(src);
   const body = [
     optional(extractVarLine, src, 'SAT_GEO_ERR'),
     optional(extractFunction, src, 'satGeoUsable'),
@@ -81,13 +83,13 @@ function load({ secure, geo }) {
   const dom = { satDetectLoc: el(), satLocHint: Object.assign(el(), { hidden: true }), satCoords: el() };
   const posts = [];
   const fetchStub = async (url, opts) => { posts.push(JSON.parse(opts.body)); return { ok: true, status: 200 }; };
-  const make = new Function('window', 'navigator', 'document', 'txt', 'fetch', 'APIGW', 'setTimeout', 'fetchSatPageWeather', body);
+  const make = new Function('window', 'navigator', 'document', 'txt', 'fetch', 'APIGW', 'setTimeout', 'fetchSatPageWeather', 't', 'setT', body);
   const fns = make(
     { isSecureContext: secure },
     { geolocation: geo },
     { getElementById: (id) => dom[id] || null },
     (id, t) => { if (dom[id]) dom[id].textContent = t; },
-    fetchStub, '/api/', () => 0, () => {});
+    fetchStub, '/api/', () => 0, () => {}, t, setT);
   return { fns, dom, posts };
 }
 

@@ -12,10 +12,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { i18nEn } from './lib/i18n-en.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const V2JS = process.env.OTGW_V2_JS || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data', 'v2.js');
 const SRC = fs.readFileSync(V2JS, 'utf8');
+// TASK-1768: v2.js translates with t()/setT(); the sandbox gets the built-in English of the page.
+const I18N = i18nEn(SRC);
 
 function extractFunction(src, name) {
   const start = src.indexOf('function ' + name + '(');
@@ -57,7 +60,7 @@ function load(el, opts = {}) {
     extractFunction(SRC, 'txt') + '\n' + extractFunction(SRC, 'satNum') + '\n' +
     extractFunction(SRC, 'satRenderDhw') + '\n' + extractFunction(SRC, 'fetchDhwBounds') + '\n' +
     'return { satRenderDhw: satRenderDhw, fetchDhwBounds: fetchDhwBounds };';
-  return new Function('el', 'fetch', body)(el, opts.fetch || (() => Promise.reject(new Error('no fetch'))));
+  return new Function('el', 'fetch', 't', 'setT', body)(el, opts.fetch || (() => Promise.reject(new Error('no fetch'))), I18N.t, I18N.setT);
 }
 
 test('standalone DHW off: toggle off, slider disabled; on: toggle on, slider enabled', () => {

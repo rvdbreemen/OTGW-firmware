@@ -27,6 +27,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { i18nEn } from './lib/i18n-en.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
@@ -35,6 +36,8 @@ const V2CSS = process.env.OTGW_V2_CSS || path.join(DATA, 'v2.css');
 const HELP_HEADER = process.env.OTGW_SETTINGS_HELP || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'settingsHelp.h');
 const HELP_DATA_FILE = path.join(DATA, 'settings-help.json');
 const SRC = fs.readFileSync(V2JS, 'utf8');
+// TASK-1768: v2.js translates with t()/setT(); the sandbox gets the built-in English like the page without a language pack.
+const { t: T_EN, setT: SETT_EN } = i18nEn(SRC);
 // TASK-1688: 24 KB. The 18 KB limit dated from when the JSON was a LittleFS file. Since TASK-1294
 // (ADR-194) it is a PROGMEM string in the app slot (2,293,760 B; beta.118 used 2,123,984 B), streamed
 // from flash without a RAM copy, so the limit only guards flash growth, not RAM or LittleFS.
@@ -241,12 +244,14 @@ function load(fetchImpl) {
   const fetchCalls = [];
   const fetchStub = (url, init) => { fetchCalls.push([url, init]); return fetchImpl(url, init); };
   // The real state declarations, never a stand-in: a renamed or missing variable must fail here.
-  const stateDecls = [/^[ \t]*var SETTINGS_HELP[^;]*;/m, /^[ \t]*var helpPop[^;]*;/m].map((re) => {
+  // HINT_UNIT_RE (TASK-1764) is optional: beta.165 v2.js has no such state.
+  const stateDecls = [/^[ \t]*var SETTINGS_HELP[^;]*;/m, /^[ \t]*var helpPop[^;]*;/m, /^[ \t]*var HINT_UNIT_RE[^;]*;/m].map((re) => {
     const m = SRC.match(re);
+    if (!m && re.source.includes('HINT_UNIT_RE')) return '';
     if (!m) throw new Error('state declaration ' + re + ' not found in ' + V2JS);
     return m[0];
   });
-  const names = ['humanizeKey', 'labelFor', 'hintFor', 'subFor', 'helpFor', 'loadSettingsHelp', 'helpPlace', 'hideHelp',
+  const names = ['gSlug', 'hintKey', 'humanizeKey', 'labelFor', 'hintFor', 'subFor', 'helpFor', 'loadSettingsHelp', 'helpPlace', 'hideHelp',
     'helpKbFocus', 'helpPopover', 'showHelp', 'addHelpIcon', 'settingRow'];
   const body = [
     SET_META_SRC,
@@ -267,7 +272,7 @@ function load(fetchImpl) {
     '  get SETTINGS_HELP() { return SETTINGS_HELP; }, set SETTINGS_HELP(v) { SETTINGS_HELP = v; },',
     '};',
   ].join('\n');
-  const api = new Function('document', 'window', 'fetch', 'confirm', body)(dom.document, dom.window, fetchStub, () => true);
+  const api = new Function('document', 'window', 'fetch', 'confirm', 't', 'setT', body)(dom.document, dom.window, fetchStub, () => true, T_EN, SETT_EN);
   return { api, dom, fetchCalls };
 }
 

@@ -2620,10 +2620,11 @@
   // A boiler that rejected the ID (Unknown-DataId) and never acked it is 'unsup'.
   function supState(id) {
     var s = stats[id], p = otSup[id];
-    var t = (s && s.dirT) || (p && (p.tsR || p.tsW)), b = (s && s.dirB) || (p && (p.blAR || p.blAW));
+    // th = seen from the thermostat side (not t: t() is the translation helper, TASK-1768)
+    var th = (s && s.dirT) || (p && (p.tsR || p.tsW)), b = (s && s.dirB) || (p && (p.blAR || p.blAW));
     if (p && (p.blUR || p.blUW) && !p.blAR && !p.blAW) return { cls: 'unsup', label: t('stats.sup_unsup'), sv: 'var(--zone-alert)' };
-    if (t && b) return { cls: 'both', label: t('stats.sup_both'), sv: 'var(--zone-ok)' };
-    if (t) return { cls: 'tonly', label: t('stats.sup_tonly'), sv: 'var(--accent)' };
+    if (th && b) return { cls: 'both', label: t('stats.sup_both'), sv: 'var(--zone-ok)' };
+    if (th) return { cls: 'tonly', label: t('stats.sup_tonly'), sv: 'var(--accent)' };
     if (b) return { cls: 'bonly', label: t('stats.sup_bonly'), sv: 'var(--zone-warn)' };
     return { cls: 'off', label: t('stats.sup_off'), sv: 'var(--tile-off)' };
   }
@@ -3221,17 +3222,18 @@
   // Series labels are translated at render time (the GSER labels are the English defaults).
   var GSER_LABEL_KEY = { flow: 'graph.series_flow', ret: 'graph.series_ret', chSet: 'graph.series_ch_set', roomSet: 'graph.series_room_set',
     room: 'graph.series_room', outside: 'graph.series_outside', mod: 'graph.series_mod', flame: 'graph.series_flame', dhw_on: 'graph.series_dhw_on', ch: 'graph.series_ch' };
-  // TASK-1297: values of the visible series at time t. arr is ascending by t. Returns null when no
-  // record covers t (before the first record, or more than GBREAK_MS past the record's data end).
-  function graphReadout(arr, keys, metas, off, t) {
+  // TASK-1297: values of the visible series at time tMs. arr is ascending by t. Returns null when no
+  // record covers tMs (before the first record, or more than GBREAK_MS past the record's data end).
+  // The time is not called t: t() is the translation helper used below (TASK-1768).
+  function graphReadout(arr, keys, metas, off, tMs) {
     var lo = 0, hi = arr.length - 1, at = -1;
     while (lo <= hi) {
       var mid = (lo + hi) >> 1;
-      if (arr[mid].t <= t) { at = mid; lo = mid + 1; } else hi = mid - 1;
+      if (arr[mid].t <= tMs) { at = mid; lo = mid + 1; } else hi = mid - 1;
     }
     if (at < 0) return null;
     var rec = arr[at];
-    if (t > rec.t + (rec.span || 0) + GBREAK_MS) return null;
+    if (tMs > rec.t + (rec.span || 0) + GBREAK_MS) return null;
     var rows = [];
     keys.forEach(function (k, i) {
       if (off[k]) return;
@@ -6649,6 +6651,9 @@
     waiting_flame: 'Waiting flame', overshoot_cooling: 'Overshoot cooling', post_cycle: 'Post-cycle',
     heating: 'Heating', cooling: 'Cooling', heating_hot_water: 'Heating hot water'
   };
+  // HTML-escape a text for innerHTML templates (translated strings may contain & < "). The SAT
+  // wizard and the BLE roster keep their own local esc(); everywhere else uses this one.
+  function esc(s) { return ('' + (s == null ? '' : s)).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
   // Display text of an enum value: key = tools.<prefix>_<english name, lower-case, non-alphanumerics as _>.
   function satLbl(prefix, name) {
     if (!name) return '—';

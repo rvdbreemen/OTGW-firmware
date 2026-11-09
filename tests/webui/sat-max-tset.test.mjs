@@ -13,10 +13,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { i18nEn } from './lib/i18n-en.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const V2JS = process.env.OTGW_V2_JS || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data', 'v2.js');
 const SRC = fs.readFileSync(V2JS, 'utf8');
+const { t, setT } = i18nEn(SRC); // built-in English, like the page without a language pack (TASK-1768)
 
 function extractFunction(src, name) {
   const start = src.indexOf('function ' + name + '(');
@@ -52,7 +54,7 @@ function load(el, opts = {}) {
     extractFunction(SRC, 'txt') + '\n' + extractFunction(SRC, 'satNum') + '\n' +
     extractFunction(SRC, 'satRenderMaxTSet') + '\n' + extractFunction(SRC, 'fetchMaxTSetBounds') + '\n' +
     'return { satRenderMaxTSet: satRenderMaxTSet, fetchMaxTSetBounds: fetchMaxTSetBounds };';
-  return new Function('el', 'fetch', body)(el, opts.fetch || (() => Promise.reject(new Error('no fetch'))));
+  return new Function('el', 'fetch', 't', 'setT', body)(el, opts.fetch || (() => Promise.reject(new Error('no fetch'))), t, setT);
 }
 
 test('a chosen value moves the thumb and shows the value', () => {

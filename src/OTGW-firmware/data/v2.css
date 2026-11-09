@@ -484,6 +484,9 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .srow input[type=text],.srow input[type=number],.srow input[type=password],.srow select{
     width:46%;max-width:220px;border:1px solid var(--border);background:var(--panel-2);
     color:var(--text);border-radius:8px;padding:8px 10px;font-size:.84rem;font-family:var(--font-sans)}
+  /* A select grows to its longest option: translated options (nl/de/el) are longer than English (TASK-1768).
+     The label keeps at least 38% of the row; the phone layout below gives every field the full width. */
+  .srow select{width:auto;min-width:46%;max-width:62%}
   .srow.dirty .slbl::before{content:'●';color:var(--zone-warn);margin-right:6px;font-size:.7rem}
   /* TASK-1281: info icon after a setting label + the shared help popover (#shelp, built by v2.js) */
   .sinfo{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin:0 0 0 2px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--muted);cursor:pointer;vertical-align:middle}

@@ -11,10 +11,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { i18nEn } from './lib/i18n-en.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const V2JS = process.env.OTGW_V2_JS || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data', 'v2.js');
 const SRC = fs.readFileSync(V2JS, 'utf8');
+// TASK-1764: labels are t('key') calls; read them as the built-in English the page shows without a pack.
+const { i18nString } = i18nEn(SRC);
+const EN_SRC = SRC.replace(/\bt\('([\w.]+)'\)/g, (m, k) => (i18nString(k) === undefined ? m : "'" + i18nString(k) + "'"));
 
 function extractFunction(src, name) {
   const start = src.indexOf('function ' + name + '(');
@@ -43,8 +47,8 @@ test('every pressure readout shows the decoded value', () => {
   const plain = "fmt(model.pressure, 2, ' bar')";
   assert.ok(SRC.includes("txt('aPress', " + plain + ')'), '#aPress');
   assert.ok(SRC.includes("txt('bPress', " + plain + ')'), '#bPress');
-  assert.ok(SRC.includes("['Pressure', " + plain + ", '']"), 'mobile chip');
-  assert.ok(SRC.includes("['PRESSURE', " + plain + ', pressClass(model.pressure)]'), 'grid cell keeps the normal colour band');
+  assert.ok(EN_SRC.includes("['Pressure', " + plain + ", '']"), 'mobile chip');
+  assert.ok(EN_SRC.includes("['PRESSURE', " + plain + ', pressClass(model.pressure)]'), 'grid cell keeps the normal colour band');
   assert.ok(/case 18: if \(isAck\) \{ model\.pressure = f88\(u16\); changed = true; \} break;/.test(SRC), 'MsgID 18 stores the decoded value only');
 });
 

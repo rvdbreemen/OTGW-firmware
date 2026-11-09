@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { i18nEn } from './lib/i18n-en.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 // OTGW_V2_JS points at another copy (e.g. `git show HEAD:src/OTGW-firmware/data/v2.js`) for old-vs-fix runs.
@@ -25,7 +26,11 @@ function enumOpts(key) {
     assert.ok(t, 'TRIGGER_BITS list');
     lit = t[1];
   }
-  return JSON.parse(lit.replace(/'/g, '"'));
+  // TASK-1764: labels are lazy enumLabel(key) objects. Evaluate the literal with the REAL enumLabel()
+  // from v2.js and the built-in English t(), then coerce each label as a renderer does.
+  const fn = v2.match(/^\s*function enumLabel\(.*$/m);
+  const opts = new Function('t', (fn ? fn[0] : '') + '\nreturn ' + lit + ';')(i18nEn(v2).t);
+  return opts.map(([n, label]) => [n, '' + label]);
 }
 
 const EXPECTED = [[0, 'Boiler: fault'], [1, 'Boiler: CH active'], [2, 'Boiler: DHW active'], [3, 'Boiler: flame on'],

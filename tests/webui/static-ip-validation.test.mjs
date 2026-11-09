@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { i18nEn } from './lib/i18n-en.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const V2JS = process.env.OTGW_V2_JS || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data', 'v2.js');
@@ -41,9 +42,13 @@ function extractFunction(src, name) {
 
 function load() {
   const src = fs.readFileSync(V2JS, 'utf8');
-  const body = extractFunction(src, 'ipv4Err') + '\n' + extractFunction(src, 'ipGroupsErr') +
+  // gSlug/groupT exist only since TASK-1764; the older copy has no translation helpers.
+  const helpers = ['gSlug', 'groupT'].filter((n) => src.includes('function ' + n + '(')).map((n) => extractFunction(src, n) + '\n').join('');
+  const body = helpers + extractFunction(src, 'ipv4Err') + '\n' + extractFunction(src, 'ipGroupsErr') +
     '\nreturn { ipv4Err: ipv4Err, ipGroupsErr: ipGroupsErr };';
-  return new Function(body)();
+  // TASK-1768: since TASK-1764 the functions call t()/setT(); give the sandbox the built-in English.
+  const { t, setT } = i18nEn(src);
+  return new Function('t', 'setT', body)(t, setT);
 }
 
 test('ipv4Err accepts valid dotted quads', () => {

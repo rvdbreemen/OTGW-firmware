@@ -32,8 +32,13 @@ function extractFunction(src, name) {
 
 const mb = SRC.match(/\bGBREAK_MS\s*=\s*(\d+)/);
 const GBREAK_MS = mb ? Number(mb[1]) : undefined;
-const readout = new Function('GBREAK_MS',
-  extractFunction(SRC, 'gVal') + '\n' + extractFunction(SRC, 'graphReadout') + '\nreturn graphReadout;')(GBREAK_MS);
+// TASK-1764 translated the on/off labels: graphReadout() calls t(key). The sandbox gets a t() that
+// returns the built-in English text from I18N_EN, as the page does without a language pack.
+const EN_M = /var I18N_EN = (\{[\s\S]*?\r?\n  \});/.exec(SRC);
+const EN = EN_M ? JSON.parse(EN_M[1]) : {};
+const tEn = (k) => k.split('.').reduce((o, x) => (o && o[x] !== undefined ? o[x] : undefined), EN) ?? k;
+const readout = new Function('GBREAK_MS', 't',
+  extractFunction(SRC, 'gVal') + '\n' + extractFunction(SRC, 'graphReadout') + '\nreturn graphReadout;')(GBREAK_MS, tEn);
 
 const DEG = '°C';
 const DASH = '–';

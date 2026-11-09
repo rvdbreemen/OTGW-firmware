@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { i18nEn } from './lib/i18n-en.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.join(HERE, '..', '..', 'src', 'OTGW-firmware');
@@ -91,8 +92,9 @@ function load(statuses) {
     'function fetchPicSettings(full) { log("fetchPicSettings full=" + (full === true)); }\n' +
     (outcome || '') + '\n' + (after || '') + '\n' + poll + '\n' +
     'return { poll: pollPicFlash, outcome: ' + (outcome ? 'picFlashOutcome' : 'null') + ', busy: function () { return picBusy; } };';
-  const api = new Function('document', 'fetch', 'setTimeout', 'clearTimeout', 'log', body)(
-    env.document, env.fetch, env.setTimeout, env.clearTimeout, env.log);
+  const { t, setT } = i18nEn(src);
+  const api = new Function('document', 'fetch', 'setTimeout', 'clearTimeout', 'log', 't', 'setT', body)(
+    env.document, env.fetch, env.setTimeout, env.clearTimeout, env.log, t, setT);
   // Drive the poll loop: settle the promise chain, fire due timers, repeat.
   async function run(rounds = 120) {
     api.poll();
@@ -228,7 +230,8 @@ test('picAfterFlash() runs the real refresh functions one request at a time', as
     'function fetchPicSettings(full) { log.push("fetchPicSettings full=" + (full === true)); }\n' +
     parts.join('\n') + '\nreturn picAfterFlash;';
   const doc = { getElementById: () => null };
-  const after = new Function('document', 'fetch', 'log', 'setTimeout', body)(doc, fetchStub, log, setTimeout);
+  const { t, setT } = i18nEn(src);
+  const after = new Function('document', 'fetch', 'log', 'setTimeout', 't', 'setT', body)(doc, fetchStub, log, setTimeout, t, setT);
   after();
   await waitFor(() => log.includes('fetchPicSettings full=true'));   // last step of the chain
   assert.deepEqual(log, [
@@ -257,8 +260,9 @@ function runPoll(failures) {
   const body = 'var APIGW = "/api/";\n' +
     'function renderPicBanner(u) { log.push("render " + (u.status || "")); if (u.status === "ready") banner.textContent = "up to date " + u.current; }\n' +
     poll + '\nreturn picUpdatePoll;';
-  const fn = new Function('document', 'fetch', 'setTimeout', 'log', 'banner', body)(
-    { getElementById: (id) => (id === 'picBanner' ? banner : null) }, fetchStub, (f) => setTimeout(f, 1), log, banner);
+  const { t, setT } = i18nEn(src);
+  const fn = new Function('document', 'fetch', 'setTimeout', 'log', 'banner', 't', 'setT', body)(
+    { getElementById: (id) => (id === 'picBanner' ? banner : null) }, fetchStub, (f) => setTimeout(f, 1), log, banner, t, setT);
   let done = 0;
   fn(() => { done++; }, true);
   // Wait for the done callback, then a short settle so a second (wrong) call is still seen.
@@ -292,8 +296,9 @@ test('readPicSettings(d, true) keeps re-reading a complete cache; the tab-open r
       'function isAdvVisible() { return true; } function renderPicSettings() { return 0; }\n' +
       fn + '\nreturn readPicSettings;';
     const fetchStub = () => { gets++; return Promise.resolve({ ok: true, json: () => Promise.resolve({ pic_settings: {} }) }); };
-    const read = new Function('document', 'fetch', 'setTimeout', body)(
-      { hidden: false, getElementById: () => null }, fetchStub, (f) => { timers.push(f); return timers.length; });
+    const { t, setT } = i18nEn(src);
+    const read = new Function('document', 'fetch', 'setTimeout', 't', 'setT', body)(
+      { hidden: false, getElementById: () => null }, fetchStub, (f) => { timers.push(f); return timers.length; }, t, setT);
     read({}, full);
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setImmediate(r)); await new Promise((r) => setImmediate(r));

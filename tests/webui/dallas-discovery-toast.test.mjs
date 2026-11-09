@@ -63,9 +63,16 @@ async function runPoll(body, seenAddrs) {
   const fetchStub = async () => ({ ok: true, status: 200, json: async () => JSON.parse(JSON.stringify(body)) });
   // pushGraphSlot / gDallas: the same poll also feeds the Monitor graph (TASK-1226).
   // document: a visible tab (TASK-1741 skips the poll in a hidden one).
-  const make = new Function('fetch', 'APIGW', 'discoverSeenSet', 'showDiscoverCard', 'setTimeout', 'pushGraphSlot', 'document',
+  // t: TASK-1764 translated the card texts; the page without a language pack shows the built-in
+  // English of I18N_EN, which this t() returns.
+  const v2 = fs.readFileSync(V2JS, 'utf8');
+  const enM = /var I18N_EN = (\{[\s\S]*?\r?\n  \});/.exec(v2);
+  const EN = enM ? JSON.parse(enM[1]) : {};
+  const tEn = (k, p) => String(k.split('.').reduce((o, x) => (o && o[x] !== undefined ? o[x] : undefined), EN) ?? k)
+    .replace(/\{\{(\w+)\}\}/g, (m, n) => (p && p[n] !== undefined ? p[n] : m));
+  const make = new Function('fetch', 'APIGW', 'discoverSeenSet', 'showDiscoverCard', 'setTimeout', 'pushGraphSlot', 'document', 't',
     'var gDallas = null;\n' + src + '\nreturn pollDallasDiscovery;');
-  const poll = make(fetchStub, '/api/', () => seen, (o) => cards.push(o), () => 0, () => {}, { hidden: false });
+  const poll = make(fetchStub, '/api/', () => seen, (o) => cards.push(o), () => 0, () => {}, { hidden: false }, tEn);
   poll(0);
   for (let k = 0; k < 10; k++) await new Promise((r) => setImmediate(r));   // drain the promise chain
   return cards;

@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-09T20:40:00Z'
-updated_date: '2026-11-09T22:36:00Z'
+updated_date: '2026-11-09T23:16:00Z'
 labels:
   - webui
   - i18n
@@ -46,6 +46,8 @@ LittleFS fit (hard check): v2.html.gz 175,482 -> 195,990 B; i18n packs gz nl 22,
 2026-11-09 23:3x beta.166 shipped: pushed origin/dev c701f6b95, zip posted (Discord 1569479114736406538), alpha note by 97 (1569479277399773246; Sergeant D asked to review el). Bench .61 OTA 23:12:26: 164 settings kept, device serves i18n/nl|de|el.json identical to the repo (1492 keys), page has the language menu (4 entries, flags inline); 15-min soak 28/28 200, bootcount 199 steady, heap 66.3-71.1 KB. .63 flashed by the coordinator 23:14:33 on Robert's order. Both soak overnight until ~04:15.
 
 Screenshots (synthetic data: real settings structure with every text value replaced; one Chrome per language, chrome count 0 before/after each): C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/4f6ad420-bf33-4a3a-88bc-4eb9890a2231/scratchpad/shots-lang/{en,nl,de,el}-{home,monitor,settings,menu}.png. A first settings set showed the real SSID (read-only type 'r' not sanitized): deleted and retaken. Findings: Board mode select clips the de/el option text (TASK-1768, cosmetic); no English remnants apart from the known exceptions.
+
+2026-11-10 LESSON (coordinator + own finding): beta.166 shipped three regressions (esc out of scope, t shadowed in graphReadout and supState) because only i18n/lang-menu/panel tests ran before the push. A big UI change needs the WHOLE tests/webui folder before the push, one file at a time if Chrome is constrained, plus a scope scan. Fixed in beta.167 under TASK-1768; regression test v2-nested-helper-scope.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

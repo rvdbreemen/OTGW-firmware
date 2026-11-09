@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { i18nEn } from './lib/i18n-en.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
@@ -80,7 +81,8 @@ function load(statusFor, opts = {}) {
     'function bleNeedsRiskAck() { return false; } function maybeShowBleConsent() {} function satLockedKey() { return false; } var setFetchSeq = 0;\n' +
     extractFunction(src, 'bleToast') + '\n' + extractFunction(src, 'saveSettings') + '\n' +
     'return { save: function (d) { setDirty = d; saveSettings(); }, bleToast: bleToast, wizard: function () { return wizardStarted; } };';
-  const api = new Function('document', 'fetch', 'setTimeout', 'clearTimeout', body)(env.document, env.fetch, env.setTimeout, env.clearTimeout);
+  const { t, setT } = i18nEn(src);
+  const api = new Function('document', 'fetch', 'setTimeout', 'clearTimeout', 't', 'setT', body)(env.document, env.fetch, env.setTimeout, env.clearTimeout, t, setT);
   const fireTimers = () => { const fns = [...timers.values()]; timers.clear(); fns.forEach((f) => f()); };
   return { api, toast, posted, timers, fireTimers };
 }

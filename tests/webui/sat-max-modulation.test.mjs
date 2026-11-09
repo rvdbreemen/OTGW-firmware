@@ -11,12 +11,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { i18nEn } from './lib/i18n-en.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
 const V2JS = process.env.OTGW_V2_JS || path.join(DATA, 'v2.js');
 const SRC = fs.readFileSync(V2JS, 'utf8');
-const HTML = fs.readFileSync(path.join(DATA, 'v2.html'), 'utf8');
+const HTML = fs.readFileSync(process.env.OTGW_V2_HTML || path.join(DATA, 'v2.html'), 'utf8');
 
 function extractFunction(src, name) {
   const start = src.indexOf('function ' + name + '(');
@@ -49,11 +50,14 @@ const card = () => ({ satModSlider: { value: '100' }, satModR: { textContent: ''
 test('the card is titled "Central Heating Settings" and holds both sliders', () => {
   const m = HTML.match(/<details[^>]*id="satMaxGrp"[\s\S]*?<\/details>/);
   assert.ok(m, 'satMaxGrp card present');
-  assert.match(m[0], /<summary>Central Heating Settings<\/summary>/);
+  // TASK-1764: the summary may carry data-i18n; its key must give the same English title.
+  const sum = m[0].match(/<summary(?: data-i18n="([\w.]+)")?>Central Heating Settings<\/summary>/);
+  assert.ok(sum, 'summary titled Central Heating Settings');
+  if (sum[1]) assert.equal(i18nEn(SRC).i18nString(sum[1]), 'Central Heating Settings');
   assert.match(m[0], /id="satMaxSlider"/);
   assert.match(m[0], /<input type="range" min="0" max="100" value="100" id="satModSlider" class="sat-slider"/);
   assert.match(m[0], /id="satModR"/);
-  assert.doesNotMatch(HTML, /<summary>Max flow setpoint<\/summary>/);
+  assert.doesNotMatch(HTML, /<summary[^>]*>Max flow setpoint<\/summary>/);
 });
 
 test('a status value moves the thumb and shows it in percent', () => {
