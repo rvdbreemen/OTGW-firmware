@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-08T15:26:00Z'
-updated_date: '2026-11-08T23:36:00Z'
+updated_date: '2026-11-09T05:10:00Z'
 labels:
   - bug
   - otdirect
@@ -125,4 +125,6 @@ NOT VERIFIED:
 - Whether the Ideal Logic boiler does anything with TrSet (MsgID 16) or with WRITE 100: unknown. The spec calls MsgID 16 'current room setpoint' and marks 100 read-only.
 - The processOT T/R pairing outcome for TrSet (canonical = R = 21.5) comes from reading the code, not from a run.
 - The exact handleCommandSubmit line numbers in restAPI.ino (around 345-367) come from grep context, not a full read.
+
+2026-11-09 Robert (in session otgw-firmware-80, AskUserQuestion): chose 'PIC parity now (F2)' over capture-first: change OT-Direct TT=/TC= to PIC semantics (no gateway WRITE 16/100 to the boiler, stop rewriting the thermostat's WRITE 16, keep the MsgID 9/100 answers, release the override after N mismatching thermostat MsgID 16 frames as the PIC's roomsetptdiff does). Before coding: /adr-kit:context for OT-Direct gateway behaviour, and the PIC firmware reference for TT/TC semantics (other-projects).
 <!-- SECTION:NOTES:END -->

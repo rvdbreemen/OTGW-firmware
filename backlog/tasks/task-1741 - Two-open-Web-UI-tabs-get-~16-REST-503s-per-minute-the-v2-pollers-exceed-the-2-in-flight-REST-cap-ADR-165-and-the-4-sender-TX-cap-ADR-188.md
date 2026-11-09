@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-08T18:26:00Z'
-updated_date: '2026-11-08T23:36:00Z'
+updated_date: '2026-11-09T05:10:00Z'
 labels:
   - bug
   - webui
@@ -216,4 +216,6 @@ NOT VERIFIED:
 - The cause of the 8 browser 503s with no telnet line (725 - 717). Candidates are telnet line loss or a short dip below 8192 between heap samples (sampling interval unknown). Unassigned.
 - Whether BroadcastChannel needs a secure context: MDN shows no banner, but I did not check the spec or the browser-compat data. Also from memory only, not checked: browser background-timer throttling (Chrome intensive throttling of hidden tabs).
 - All per-minute model numbers are estimates from code periods. No device, browser or test ran in this session (read-only constraints).
+
+2026-11-09 Robert (in session otgw-firmware-80, AskUserQuestion): AC2 approach chosen: 'Spread + pause hidden': random start offset per tab for the init setIntervals and a staggered 30/60 s cluster (never more than 2 offered at once by one tab), plus a document.hidden early return in the pollers with one refresh on visibilitychange. No cap or ADR change. Measure with the run-A harness on .61 (two visible tabs, and one visible plus one hidden).
 <!-- SECTION:NOTES:END -->
