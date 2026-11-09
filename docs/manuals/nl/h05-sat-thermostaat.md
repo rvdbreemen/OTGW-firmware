@@ -635,12 +635,12 @@ Voor een woning waar een kachel of airco de kamer met de kamersensor verwarmt. M
 
 #### TT= en TC= remote-override semantiek (TASK-466)
 
-Wanneer `satpushsetpoint` aan staat, duwt SAT zijn doel naar het thermostaatdisplay met PIC-pariteits-remote-override semantiek op OpenTherm MsgID 16 + MsgID 100 (`RemoteOverrideFunction`). De twee commando's hebben verschillende prioriteiten:
+Wanneer `satpushsetpoint` aan staat, duwt SAT zijn doel met `TC=` naar het thermostaatdisplay, zoals de PIC-gateway: de waarde is alleen antwoordstatus. Op OT-Direct in gateway-modus leest de thermostaat hem uit OpenTherm MsgID 9 (remote override-kamersetpoint) en MsgID 100 (`RemoteOverrideFunction`); er wordt niets voor naar de ketel geschreven en het eigen kamersetpoint van de thermostaat (MsgID 16) gaat ongewijzigd door. De twee commando's hebben verschillende prioriteiten in MsgID 100:
 
-- `TT=<v>` -  program-prioriteit override; auto-clear als de thermostaat drie opeenvolgende MsgID 16-frames binnen 0,25 C van de override stuurt en het daaropvolgende frame meer dan 0,5 C afwijkt (typisch een geprogrammeerde programmawisseling).
-- `TC=<v>` -  manual-prioriteit override; blijft onbeperkt actief tot `TC=0` of vervanging.
+- `TT=<v>` -  program-prioriteit override (MsgID 100 low byte `0x02`).
+- `TC=<v>` -  manual-prioriteit override (MsgID 100 low byte `0x01`).
 
-Inkomende thermostaat-MsgID 16-frames worden door de OTDirect-toestandsmachine waargenomen; de auto-clear honoredCount wordt vanuit die stroom gevoed. De huidige override-modus wordt gespiegeld in de `PR=O`-rapportage als `O=T<v>` (TT), `O=C<v>` (TC) of `O=N` (geen). Multi-kanaals set-commando's (MQTT, REST, web-UI, serieel) worden binnen de OTDirect-commandowachtrij gecoalesceerd per MsgID (TASK-494): herhaalde WRITE_DATA voor dezelfde MsgID binnen een OT-cyclus collapsen tot een enkel "laatste waarde wint"-frame op de bus.
+Beide eindigen bij `TT=0` / `TC=0`, bij vervanging door een nieuw `TT=` / `TC=`, of door de loslaatregel van de PIC, die voor TT en TC hetzelfde geldt: het tellen begint nadat de thermostaat MsgID 9 een keer heeft gelezen. Een thermostaat-MsgID 16 binnen 0,25 C van de override geldt als acceptatie. Voor acceptatie laat het 4e afwijkende MsgID 16-frame de override los; na acceptatie doet het eerste afwijkende frame dat. Een thermostaat die MsgID 9 nooit leest, laat de override nooit los. In OT-Direct master-modus (geen thermostaat) schrijven `TT=` / `TC=` MsgID 16 en MsgID 100 naar de ketel. De huidige override-modus wordt gespiegeld in de `PR=O`-rapportage als `O=T<v>` (TT), `O=C<v>` (TC) of `O=N` (geen). Multi-kanaals set-commando's (MQTT, REST, web-UI, serieel) worden binnen de OTDirect-commandowachtrij gecoalesceerd per MsgID (TASK-494): herhaalde WRITE_DATA voor dezelfde MsgID binnen een OT-cyclus collapsen tot een enkel "laatste waarde wint"-frame op de bus.
 
 #### SAT-instellingen als HA-entiteiten (Task-81 / Task-284)
 

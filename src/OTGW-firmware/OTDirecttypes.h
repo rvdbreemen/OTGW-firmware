@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirecttypes.h
-**  Version  : v2.0.0-beta.160
+**  Version  : v2.0.0-beta.161
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -75,7 +75,9 @@ struct OTRemoteOverrideState {
   uint32_t lastThermostatMs;    // millis() of last MsgID 16 frame from thermostat
   uint16_t lastThermostatVal;   // last thermostat-reported MsgID 16 value (f8.8); valid only when bHaveLastThermostat=true
   bool     bHaveLastThermostat; // TASK-498 (1A-M2): true after first observed thermostat MsgID 16; replaces the 0xFFFF magic-value sentinel that collided with a valid -0.0039 °C
-  uint8_t  honoredCount;        // number of cycles thermostat echoed our override
+  uint8_t  mismatchCount;       // ADR-223: mismatching thermostat MsgID 16 frames before acceptance
+  bool     bAccepted;           // ADR-223: a thermostat MsgID 16 matched the override
+  bool     bMsgId9Answered;     // ADR-223: MsgID 9 read answered with the override since it was set; counting starts then
 };
 
 //====================================================================

@@ -23,7 +23,12 @@ loopOTDirect). Every case first warms up 70 s with a boiler that answers MsgID 2
 an alternative slot; test_00 checks that, and that a probe WRITE 14 pushed through the same ring reaches the boiler.
 Without that a 'no gateway WRITE 16' check would also be green on code that does send them.
 
-Old-vs-fix: OTGW_OTD_INO points at another copy of OTDirect.ino.
+Old-vs-fix: OTGW_OTD_INO points at another copy of OTDirect.ino and OTGW_OTD_TYPES at the OTDirecttypes.h of the same
+revision (struct OTRemoteOverrideState differs between the two). Recipe for the red run on the code before ADR-223:
+  git show <old-rev>:src/OTGW-firmware/OTDirect.ino      > $TMP/OTDirect.ino
+  git show <old-rev>:src/OTGW-firmware/OTDirecttypes.h   > $TMP/OTDirecttypes.h
+  OTGW_OTD_INO=$TMP/OTDirect.ino OTGW_OTD_TYPES=$TMP/OTDirecttypes.h python tests/test_otd_tt_pic_parity.py
+The two variables go together: the .ino of one revision with the types header of another does not compile.
 Run: python tests/test_otd_tt_pic_parity.py
 """
 import os
@@ -40,6 +45,8 @@ import test_otd_gateway_alt_slots as alt  # noqa: E402
 from test_sat_pwm_override import compile_cpp  # noqa: E402
 
 OTD_INO = alt.OTD_INO
+if os.environ.get("OTGW_OTD_TYPES"):
+    alt.TYPES_H = Path(os.environ["OTGW_OTD_TYPES"])   # alt.lib_and_types() reads the types header from here
 
 # ADR-223 numbers. EXPECT_TT_FLAGS is a named constant so the TT flags value can change on its own
 # (gateway.asm:4061 uses b'11' for TT; the firmware answers 0x0002 today).
@@ -144,12 +151,13 @@ static void step(uint32_t ms) {
   if (g_pend >= 0) { g_fr[g_pend].active = otRemoteOverride.mode != OT_OVERRIDE_NONE; g_pend = -1; }
 }
 
-static int countAltSlots() {
+static int countAltSlotsOf(int id) {
   int n = 0;
   for (size_t i = 0; i + 1 < g_log.size(); i++)
-    if (g_log[i].prefix == 'T' && idOf(g_log[i].frame) == 24 && g_log[i + 1].prefix == 'A' && typeOf(g_log[i + 1].frame) == 7) n++;
+    if (g_log[i].prefix == 'T' && idOf(g_log[i].frame) == id && g_log[i + 1].prefix == 'A' && typeOf(g_log[i + 1].frame) == 7) n++;
   return n;
 }
+static int countAltSlots() { return countAltSlotsOf(24); }
 
 static size_t g_fromLog, g_fromSent, g_fromSlave;
 static void mark() { g_fromLog = g_log.size(); g_fromSent = otMaster.sent.size(); g_fromSlave = otSlave.sent.size(); }
@@ -177,11 +185,14 @@ static void report(const char* tag, size_t fromLog, size_t fromSent, size_t from
   for (size_t i = 0; i < g_thermoW16.size(); i++) printf("TW16 %04X\n", g_thermoW16[i]);
   for (auto& fr : g_fr) printf("FR %d %04X %d %d\n", fr.j, fr.data, fr.ans9 ? 1 : 0, fr.active ? 1 : 0);
   printf("READS %d %d\n", g_reads9, g_reads100);
+  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++)
+    if (otSchedule[i].isWrite && otSchedule[i].msgId == 16) printf("VS16 %d\n", otSchedule[i].valueSet ? 1 : 0);
+  printf("ALT16 %d\n", countAltSlotsOf(16));
   printf("END %s\n", mname(otRemoteOverride.mode));
 }
 
-static void setupCase(int reads, int w16) {
-  resetAll(); g_no24 = true;
+static void setupCase(int reads, int w16, bool no16 = false) {
+  resetAll(); g_no24 = true; g_no16 = no16;
   g_readsMode = reads; g_w16Mode = w16;
   step(98000);      // 98 frames = 7 cycles: 24 becomes an alternative slot, the next frame is idx 0
   printf("PRE altslots=%d frameidx=%d\n", countAltSlots(), (int)(g_pos % 14));
@@ -193,6 +204,11 @@ static bool command(const char* cmd) {
          mname(otRemoteOverride.mode), (unsigned)otRemoteOverride.f88Value,
          mname(state.otd.eOverrideMode), (unsigned)state.otd.iOverrideF88);
   return ret;
+}
+
+static void dumpQueue(const char* tag) {
+  for (uint8_t i = otCmdTail; i != otCmdHead; i = (i + 1) % OT_CMD_QUEUE_SIZE)
+    printf("Q %s %u %04X\n", tag, (unsigned)typeOf(otCmdQueue[i]) * 1000 + idOf(otCmdQueue[i]), (unsigned)(otCmdQueue[i] & 0xFFFF));
 }
 
 static void startOverride(const char* cmd) {
@@ -224,7 +240,33 @@ int main(int argc, char** argv) {
     command("TT=0");
     step(60000);
     report("F", g_fromLog, g_fromSent, g_fromSlave);
-  } else { printf("unknown case %s\n", c.c_str()); return 2; }
+  }
+  else if (c.rfind("H_", 0) == 0) {          // MsgID 16 is an alternative slot: the boiler answers WRITE 16 Unknown-DataID
+    setupCase(1, 0, true); startOverride(cmd); step(120000); report("H", g_fromLog, g_fromSent, g_fromSlave);
+  }
+  else if (c == "N") {                        // no override: the boiler rejects MsgID 9, the thermostat keeps reading it
+    setupCase(1, 0); mark(); step(120000); report("N", g_fromLog, g_fromSent, g_fromSlave);
+  }
+  else if (c == "BS" || c == "MQ") {          // BS=0 clears a BS= rewrite and an MQTT room_setpoint write on MsgID 16
+    setupCase(0, 0);
+    if (c == "BS") command("BS=19.0");
+    else enqueueWriteCommand(16, 0x1300, "MQTT-room_setpoint");
+    step(30000);
+    command("BS=0");
+    step(3000);
+    mark();                                   // the window after BS=0
+    step(60000);
+    report(c.c_str(), g_fromLog, g_fromSent, g_fromSlave);
+  }
+  else if (c == "M") {                        // master mode: nobody reads MsgID 9, TT= writes TrSet and the flags
+    resetAll(); otCurrentMode = OTD_MODE_MASTER;
+    command("TT=21.5"); dumpQueue("TT");
+    otCmdTail = otCmdHead;
+    command("TT=0"); dumpQueue("TT0");
+    otCmdTail = otCmdHead;
+    command("TC=21.5"); dumpQueue("TC");
+  }
+  else { printf("unknown case %s\n", c.c_str()); return 2; }
   return 0;
 }
 """
@@ -264,12 +306,15 @@ def build_source(ino_path):
         handler,
     ])
     main_prefix = alt.MAIN[:alt.MAIN.index("struct Run {")]   # boiler model, frameOf, boilerTick, resetAll
+    main_prefix = _rep(main_prefix, "static bool g_no24 = false;", "static bool g_no24 = false;\nstatic bool g_no16 = false;   // the boiler answers WRITE 16 Unknown-DataID")
+    main_prefix = _rep(main_prefix, "if (g_no24 && id == 24) return false;", "if (g_no24 && id == 24) return false;\n  if (g_no16 && id == 16) return false;")
     return pre + STUBS + alt.slices(src) + "\n" + extra + "\n" + main_prefix + MAIN2
 
 
 CASES_TT = ["A_TT", "B_TT", "E_TT", "D_TT", "G_TT"]
 CASES_TC = ["A_TC", "B_TC", "E_TC", "D_TC", "G_TC"]
-ALL_CASES = ["P"] + CASES_TT + CASES_TC + ["F"]
+CASES_H = ["H_TT", "H_TC"]
+ALL_CASES = ["P"] + CASES_TT + CASES_TC + CASES_H + ["F", "N", "BS", "MQ", "M"]
 RES = {}
 ERR = None
 TMP = None
@@ -290,6 +335,9 @@ def setUpModule():
         print(f"--- {name} ---\n" + "".join(l + "\n" for l in p.stdout.splitlines()
                                             if not l.startswith(("FR ", "TW16", "RP16", "RP9", "RP100", "BW16"))), end="")
         r = RES[name]
+        if name == "M":
+            print("    queue=" + str(r["q"]))
+            continue
         print(f"    bw16={len(r['bw16'])} thermo_w16={len(r['tw16'])} bw100={len(r['bw100'])} r16={r['r16']} "
               f"rp9={len(r['rp9'])} rp100={len(r['rp100'])} reads={r['reads']} end={r['end']}")
 
@@ -301,7 +349,7 @@ def tearDownModule():
 
 def parse(out):
     r = {"bw16": [], "bw100": [], "bw14": [], "r16": 0, "rp16": [], "rp9": [], "rp100": [], "tw16": [], "fr": [],
-         "reads": (0, 0), "end": None, "pre": None, "cmd": {}}
+         "reads": (0, 0), "end": None, "pre": None, "cmd": {}, "vs16": [], "alt16": 0, "q": {}}
     for line in out.splitlines():
         t = line.split()
         if not t:
@@ -316,6 +364,9 @@ def parse(out):
         elif k == "FR": r["fr"].append({"j": int(t[1]), "data": int(t[2], 16), "ans9": bool(int(t[3])), "active": bool(int(t[4]))})
         elif k == "READS": r["reads"] = (int(t[1]), int(t[2]))
         elif k == "END": r["end"] = t[1]
+        elif k == "VS16": r["vs16"].append(int(t[1]))
+        elif k == "ALT16": r["alt16"] = int(t[1])
+        elif k == "Q": r["q"].setdefault(t[1], []).append((int(t[2]), int(t[3], 16)))
         elif k == "PRE": r["pre"] = {a.split("=")[0]: int(a.split("=")[1]) for a in t[1:]}
         elif k == "CMD":
             r["cmd"][t[1]] = {a.split("=")[0]: a.split("=")[1] for a in t[2:]}
@@ -334,7 +385,7 @@ class Base(unittest.TestCase):
 
 class Precondition(Base):
     def test_00_alternative_slots_exist_and_the_ring_drains(self):
-        for name in ALL_CASES:
+        for name in [n for n in ALL_CASES if n != "M"]:
             self.assertGreaterEqual(RES[name]["pre"]["altslots"], 3,
                                     f"{name}: MsgID 24 did not become an alternative slot; the ring would never drain")
         p = RES["P"]
@@ -454,6 +505,83 @@ class ClearCases(Base):
         self.assertEqual(r["cmd"]["TT=0"]["mode"], "NONE")
         self.assertGreaterEqual(len(r["bw16"]), 3)
         self.assertEqual(set(r["bw16"]), {0x1300}, f"after TT=0 the BS=19.0 override (0x1300) must still rewrite the thermostat's WRITE 16; boiler got {hexl(r['bw16'])}")
+
+
+class AltSlotCases:
+    """MsgID 16 is an alternative slot (the boiler answers WRITE 16 Unknown-DataID): the thermostat's frame never goes
+    through applyOverrides(), yet the release rule still counts it (gateway.asm TreatMessage runs before the swap)."""
+    KIND = None
+
+    def test_H1_msgid16_is_an_alternative_slot(self):
+        r = RES[f"H_{self.KIND}"]
+        self.assertGreaterEqual(r["alt16"], 3, "precondition: the thermostat's WRITE 16 must be answered Unknown-DataID in a slot")
+        self.assertEqual(r["bw16"], [], f"precondition: no WRITE 16 reaches the boiler as a slot request: {hexl(r['bw16'])}")
+
+    def test_H2_release_after_4_mismatches_once_msgid9_was_answered(self):
+        fr = RES[f"H_{self.KIND}"]["fr"]
+        f0 = next((i for i, f in enumerate(fr) if f["ans9"]), None)
+        self.assertIsNotNone(f0, "no MsgID 9 read was answered")
+        self.assertTrue(all(f["active"] for f in fr[:f0 + RELEASE_N - 1]),
+                        f"released before the {RELEASE_N}th mismatch: {[(f['j'], f['active']) for f in fr[:f0 + 4]]}")
+        self.assertFalse(fr[f0 + RELEASE_N - 1]["active"],
+                         f"MsgID 16 was an alternative slot and the override stayed active after {RELEASE_N} mismatching frames")
+        self.assertEqual(RES[f"H_{self.KIND}"]["end"], "NONE")
+
+    def test_H3_each_frame_counted_once(self):
+        # a second count per frame would release at the 2nd mismatch instead of the 4th
+        fr = RES[f"H_{self.KIND}"]["fr"]
+        f0 = next(i for i, f in enumerate(fr) if f["ans9"])
+        self.assertTrue(fr[f0 + 1]["active"] and fr[f0 + 2]["active"])
+
+
+class AltSlotTT(AltSlotCases, Base):
+    KIND = "TT"
+
+
+class AltSlotTC(AltSlotCases, Base):
+    KIND = "TC"
+
+
+class Msgid9Cases(Base):
+    def test_N1_rejected_msgid9_without_override_is_read_ack_zero(self):
+        r = RES["N"]
+        self.assertGreater(len(r["rp9"]), 5, "harness: the thermostat reads MsgID 9")
+        for k, row in enumerate(r["rp9"]):
+            self.assertEqual(row, (4, 0, 0), f"MsgID 9 reply #{k} without an override is type {row[0]} data {row[1]:04X}, not READ_ACK 0 (gateway.asm MessageID9)")
+
+    def test_N2_msgid9_is_no_alternative_slot(self):
+        # the alternative slots of the warm-up (MsgID 24) exist, MsgID 9 is not among them
+        r = RES["N"]
+        self.assertGreaterEqual(r["pre"]["altslots"], 3)
+        self.assertEqual(r["bw14"], [])
+
+
+class BsClearCases(Base):
+    def test_B1_bs0_clears_a_bs_rewrite(self):
+        r = RES["BS"]
+        self.assertGreaterEqual(len(r["bw16"]), 3)
+        self.assertEqual(set(r["bw16"]), {0x1400}, f"after BS=0 the thermostat's own WRITE 16 must reach the boiler: {hexl(r['bw16'])}")
+        self.assertEqual(r["r16"], 0)
+
+    def test_B2_bs0_clears_an_mqtt_room_setpoint_write(self):
+        r = RES["MQ"]
+        self.assertGreaterEqual(len(r["bw16"]), 3)
+        self.assertEqual(set(r["bw16"]), {0x1400}, f"after BS=0 an MQTT room_setpoint write must be gone: {hexl(r['bw16'])}")
+        self.assertEqual(r["r16"], 0)
+        self.assertTrue(r["vs16"] and not any(r["vs16"]), "the MsgID 16 schedule write value must be cleared, not refreshed")
+
+
+class MasterModeCases(Base):
+    def test_M1_master_mode_tt_writes_trset_and_flags(self):
+        q = RES["M"]["q"]
+        self.assertEqual(sorted(q["TT"]), sorted([(1016, OVR_F88), (1100, EXPECT_TT_FLAGS)]), f"TT=21.5 in master mode queued {q['TT']}")
+
+    def test_M2_master_mode_tt0_writes_flags_zero(self):
+        self.assertEqual(RES["M"]["q"]["TT0"], [(1100, 0)])
+
+    def test_M3_master_mode_tc_writes_trset_and_flags(self):
+        q = RES["M"]["q"]
+        self.assertEqual(sorted(q["TC"]), sorted([(1016, OVR_F88), (1100, EXPECT_TC_FLAGS)]), f"TC=21.5 in master mode queued {q['TC']}")
 
 
 if __name__ == "__main__":

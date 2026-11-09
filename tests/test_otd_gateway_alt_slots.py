@@ -230,7 +230,7 @@ MAIN = r"""
 static bool g_no24 = false;   // T2 (TASK-1733): tjfs's boiler answers MsgID 24 Unknown-DataID
 static bool boilerSupports(uint8_t id) {
   if (g_no24 && id == 24) return false;
-  switch (id) { case 2: case 9: case 127: return false; default: return id <= 57 || (id >= 116 && id <= 123); }
+  switch (id) { case 2: case 4: case 9: case 127: return false; default: return id <= 57 || (id >= 116 && id <= 123); }
 }
 static unsigned long frameOf(unsigned type, unsigned id, uint16_t data) {
   unsigned long f = ((unsigned long)type << 28) | ((unsigned long)id << 16) | data;
@@ -257,7 +257,7 @@ static void buildStream(uint8_t statusHB) {
   const unsigned ids[][3] = {   // {type, id, data}
     {0, 0, 0}, {1, 1, 0x2800}, {0, 0, 0}, {0, 25, 0}, {0, 0, 0}, {0, 17, 0}, {0, 0, 0}, {1, 16, 0x1400},
     {0, 0, 0}, {1, 24, 0x1499}, {0, 0, 0}, {1, 2, 0x0112}, {0, 0, 0}, {0, 3, 0}, {0, 0, 0}, {0, 28, 0},
-    {0, 0, 0}, {0, 127, 0}, {0, 0, 0}, {0, 9, 0} };
+    {0, 0, 0}, {0, 127, 0}, {0, 0, 0}, {0, 9, 0}, {0, 0, 0}, {0, 4, 0} };
   g_stream.clear();
   for (auto& e : ids) g_stream.push_back(frameOf(e[0], e[1], e[1] == 0 ? (uint16_t)(statusHB << 8) : (uint16_t)e[2]));
 }
@@ -473,7 +473,7 @@ class GatewayAltSlots(unittest.TestCase):
 
     def test_A1_unsupported_ids_become_slots_answered_unknown(self):
         r = self.rows["A1"]
-        self.assertGreater(r["altslots"], 30, "the slots of Data-IDs 2, 9 and 127 must carry the gateway's reads")
+        self.assertGreater(r["altslots"], 30, "the slots of Data-IDs 2, 4 and 127 must carry the gateway's reads")
         self.assertEqual(r["badslotreply"], 0, "a slot must be answered Unknown-DataID with the thermostat's Data-ID and data")
         ids = self.ids["A1"]
         self.assertGreater(ids.get(116, 0) + ids.get(120, 0) + ids.get(26, 0), 0, "gateway reads must go out in the slots")

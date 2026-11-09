@@ -87,13 +87,13 @@ test('while SAT owns the heating commands, a CS row says so and offers no Clear'
   } finally { await h.close(); }
 });
 
-test('a room setpoint row names every source that sets MsgID 16', async () => {
+test('a room setpoint row names the sources that set MsgID 16 in gateway mode', async () => {
   const { h, rows } = await openPanel([{ msgid: 16, value: 0x1400 }]);
   try {
     const rs = row(rows, 16);
     assert.ok(rs, `a row for MsgID 16 (${JSON.stringify(rows)})`);
-    assert.match(rs.text, /TT\/TC/, 'TT= and TC= set it');
-    assert.match(rs.text, /BS/, 'BS= sets it too (OTDirect.ino BS branch)');
+    assert.doesNotMatch(rs.text, /TT=|TT\/TC/, 'TT= and TC= no longer write MsgID 16 in gateway mode (ADR-223)');
+    assert.match(rs.text, /BS/, 'BS= sets it (OTDirect.ino BS branch)');
     assert.match(rs.text, /MQTT/, 'and the MQTT room_setpoint route');
     assert.deepEqual(h.exceptions, []);
   } finally { await h.close(); }
@@ -101,8 +101,9 @@ test('a room setpoint row names every source that sets MsgID 16', async () => {
 
 // The clear command per write override, from the OT-Direct command handler (OTDirect.ino):
 // CS=0 / C2=0 / SW=0 / SH=0 clear their MsgID, CL=0 clears 7 (CC= has no clear of its own),
-// a non-numeric MM= clears 14, TT=0 clears 16 and 100.
-const CLEARS = { 7: 'CL=0', 8: 'C2=0', 14: 'MM=T', 16: 'TT=0', 56: 'SW=0', 57: 'SH=0', 100: 'TT=0' };
+// a non-numeric MM= clears 14, BS=0 clears 16 (a BS= rewrite and an MQTT room_setpoint write alike).
+// MsgID 100 is no write override any more (ADR-223).
+const CLEARS = { 7: 'CL=0', 8: 'C2=0', 14: 'MM=T', 16: 'BS=0', 56: 'SW=0', 57: 'SH=0' };
 const ALL = Object.keys(CLEARS).map((id) => ({ msgid: +id, value: 0x1400 }));
 
 test('every clearable write override sends its own clear command', async () => {
@@ -118,16 +119,16 @@ test('every clearable write override sends its own clear command', async () => {
   } finally { await h.close(); }
 });
 
-test('while SAT owns the heating commands, CL, SW and SH stay clearable and the others do not', async () => {
+test('while SAT owns the heating commands, BS, CL, SW and SH stay clearable and C2 and MM do not', async () => {
   const { h, rows } = await openPanel(ALL, true);
   try {
-    for (const id of [8, 14, 16, 100]) {
+    for (const id of [8, 14]) {
       const r = row(rows, id);
       assert.ok(r && r.clear === '' && /SAT controls this/.test(r.text), `MsgID ${id}: SAT reason, no Clear (${JSON.stringify(r)})`);
     }
-    for (const id of [7, 56, 57]) {
+    for (const id of [7, 16, 56, 57]) {
       const r = row(rows, id);
-      assert.ok(r && r.clear === 'Clear', `MsgID ${id}: TASK-1695 leaves CL=/SW=/SH= free, so Clear stays (${JSON.stringify(r)})`);
+      assert.ok(r && r.clear === 'Clear', `MsgID ${id}: TASK-1695 leaves CL=/BS=/SW=/SH= free, so Clear stays (${JSON.stringify(r)})`);
     }
     assert.deepEqual(h.exceptions, []);
   } finally { await h.close(); }

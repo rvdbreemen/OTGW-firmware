@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-08T15:26:00Z'
-updated_date: '2026-11-09T07:19:00Z'
+updated_date: '2026-11-09T08:38:00Z'
 labels:
   - bug
   - otdirect
@@ -139,4 +139,8 @@ NOT VERIFIED:
 2026-11-09 08:3x coordinator: ADR-223 Accepted via adr-kit (adr accept --confirm) after Robert answered Accept in the coordinator session; F2 implementation unblocked (80, lane-1733).
 
 2026-11-09 RED half of the F2 proof (otgw-firmware-80; test written by an implementation subagent, run and checked in session): new tests/test_otd_tt_pic_parity.py (kept local on lane-1733 until the fix lands, so dev's suite stays green) drives the real handleOTDirectCommand (CS/TC/TT/BS branches), enqueueWriteCommand, clearWriteOverride, setRemoteOverride, clearRemoteOverride and onThermostatMsgID16 sliced from OTDirect.ino in the test_otd_gateway_alt_slots gateway loop. Current code (origin/dev 99035d1ce): Ran 27 tests, FAILED (failures=16): A1 boiler WRITE 16 = gateway 0x1580 not the thermostat's 0x1400, A2 WRITE 100 reaches the boiler, A3 R frame on MsgID 16, C1/C2 no release after 4 mismatches once MsgID 9 was read, D1 no release on the first mismatch after acceptance, E extra boiler WRITE 16 when the thermostat echoes (each for TT and TC), F1 TT=0 sends WRITE 100 = 0, F2 TT=0 wipes the BS= override. Precondition test_00 passes (alternative slots exist; a probe WRITE 14 reaches the boiler), so the red run is not vacuous. 11 pass (state, A4 own-data ack, A5 no release without MsgID 9 reads, B1/B2 MsgID 9/100 answers). Not covered: master mode, TT flags 0x03 (constant EXPECT_TT_FLAGS).
+
+2026-11-09 otgw-firmware-80: F2 implemented (ADR-223 accepted by Robert) in lane-1733 plus review fixes (2 reviewers): M1 the release observer runs once per thermostat frame before the alt-slot/UI/SR branches (PIC TreatMessage order); M2 MsgID 9/100 are never alternative slots, so without an override the thermostat gets READ_ACK 0 (PIC SendAltResponse + MessageID9); bMsgId9Answered only after a successful send; web UI row 16 Clear sends BS=0 (TT=0 no longer clears BS=/MQTT in gateway mode) and BS=0 also clears the MQTT room_setpoint write; row 100 removed; master-mode case; orphaned tests/test_otdirect_override.cpp retired; fixture md, manuals EN/NL, c4 doc, BREAKING_CHANGES updated. Tests (rerun in session): test_otd_tt_pic_parity 40/40 OK (red before: 16 of 27 on 99035d1ce; H2 release-with-alt-slot, N1 READ_ACK 0, B2 BS=0 clears MQTT write each red on the variant with only that fix reverted), alt_slots 12 OK (1 skip), msgid9 10, status_relay 9, sat_command_delivery 22, webui otd-override-clear 5/5. Full run_tests.py -j 4 --webui: 244 PASS, 1 FAILED = test_web_file_scheduling (known MSVC/vswhere environment cause, TASK-1723). Follow-ups to file: overrides panel no longer shows an active TT/TC; TT flags 0x02 vs PIC 0x03 and OH=; master TT=0 wipes MQTT room_setpoint; queued frames survive a mode switch.
+
+2026-11-09 correction to the previous note: the 1 FAILED test_web_file_scheduling is NOT an environment cause; detectie traced it to 44d6ef686 breaking the harness (fix under TASK-1723, in its push queue). Independent of F2 (F2 touches no file that test reads); I had taken the 'known environment' label over without checking.
 <!-- SECTION:NOTES:END -->

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.160
+**  Version  : v2.0.0-beta.161
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -422,11 +422,9 @@ static OTFrameOverride otOverrides[] = {
   {  7, false, 0 },   // CoolingControl — CC= override
   {  8, false, 0 },   // TsetCH2 — C2= override
   { 14, false, 0 },   // MaxRelModLevelSetting — MM= override
-  { 16, false, 0 },   // TrSet — TT=/TC= override
+  { 16, false, 0 },   // TrSet — BS= / MQTT room_setpoint override
   { 56, false, 0 },   // TdhwSet — SW= override
   { 57, false, 0 },   // MaxTSet — SH= override
-  // TASK-466: MsgID 100 RemoteOverrideFunction — flag synthesis for TT (0x02) / TC (0x01)
-  { 100, false, 0 },  // RemoteOverrideFunction — TT/TC flag synthesis
 };
 static constexpr uint8_t OT_OVERRIDE_COUNT = sizeof(otOverrides) / sizeof(otOverrides[0]);
 
@@ -443,27 +441,23 @@ static OTRemoteOverrideState otRemoteOverride = {
   0,                 // lastThermostatMs
   0,                 // lastThermostatVal (only valid when bHaveLastThermostat=true)
   false,             // bHaveLastThermostat — TASK-498 (1A-M2)
-  0                  // honoredCount
+  0,                 // mismatchCount
+  false,             // bAccepted
+  false              // bMsgId9Answered
 };
 
-// TASK-1718: MsgID 9 / 100 are answered by the gateway while an override is active
-// or its clear is pending (see otdIsAltSlot and otdRemoteOverrideReply).
+// MsgID 9 / 100 are never an alternative slot in gateway mode: the thermostat always gets READ_ACK
+// (0 or the override) from replyToThermostat() via otdRemoteOverrideReply, as on the PIC
+// (gateway.asm SendAltResponse :2463-2472, MessageID9/MessageID100 :2932-2938, :3271-3283).
 static bool otdRemoteOverrideHoldsSlot(uint8_t msgId) {
-  if (msgId != 9 && msgId != 100) return false;
-  return otRemoteOverride.mode != OT_OVERRIDE_NONE || (msgId == 9 && otRemoteOverrideClearPending);
+  return msgId == 9 || msgId == 100;
 }
 
-// TASK-466: tunables for the auto-clear honour state machine. Kept as named
-// constants so future tuning is grep-able. Values mirror gateway.asm intent:
-// "thermostat is echoing us within ~quarter-degree" -> honoured;
-// "thermostat moved more than half a degree after honouring us" -> released.
-// NB: the (uint16_t) cast TRUNCATES the float; only fractions of 1/256 land
-// exactly on an integer (0.25, 0.50, 0.125, ...). A future tuner picking 0.3
-// would silently get 76 instead of 76.8 — keep the fraction grid-aligned or
-// switch to integer literals (e.g. 0x0040, 0x0080) with the °C in a comment.
+// ADR-223: tunables for the TT=/TC= release rule (gateway.asm roomsetptdiff). A thermostat
+// MsgID 16 within 0.25 C of the override is a match. The value is a multiple of 1/256, so the
+// (uint16_t) cast of the float is exact.
 static constexpr uint16_t OT_OVERRIDE_HONOR_DELTA_F88   = (uint16_t)(0.25f * 256.0f); // 0x0040
-static constexpr uint16_t OT_OVERRIDE_RELEASE_DELTA_F88 = (uint16_t)(0.50f * 256.0f); // 0x0080
-static constexpr uint8_t  OT_OVERRIDE_HONOR_THRESHOLD   = 3;   // cycles before auto-clear is armed
+static constexpr uint8_t  OT_OVERRIDE_RELEASE_MISMATCHES = 4;  // mismatching frames that release a not yet accepted override
 
 // TASK-497 (4A-M1): single canonical float-to-f8.8 cast with the same
 // `-40..127` clamp that TASK-495 added to setRemoteOverride(). f8.8 is a
@@ -610,14 +604,6 @@ static unsigned long applyOverrides(unsigned long frame, bool &modified) {
   uint8_t msgId   = (frame >> 16) & 0xFF;
   uint16_t origData = frame & 0xFFFF;
 
-  // TASK-466: observe thermostat-originated MsgID 16 frames for the TT=/TC=
-  // auto-clear state machine. Done BEFORE override replacement so the
-  // honour/release detector sees the thermostat's intended value, not ours.
-  // Bounded work: a couple of compares + one 8-bit increment, no I/O.
-  if (msgId == 16) {
-    onThermostatMsgID16(msgType, origData);
-  }
-
   if (msgType == 0 /* READ_DATA */ && msgId == 0 && otCurrentMode == OTD_MODE_GATEWAY) {
     unsigned long rewritten = otdRelayedStatusFrame(frame);
     if (rewritten != frame) {
@@ -664,11 +650,16 @@ static OTDirectRequestOrigin otLastRequestOrigin = OT_DIRECT_ORIGIN_GATEWAY;
 // applyOverrides(). otSlaveFrame can take the next thermostat frame before the
 // boiler answers, so the reply to an overridden frame is built from this copy.
 static unsigned long otLastThermostatRequest = 0;
+// ADR-223: the gateway loop hands each received thermostat frame to the TT=/TC= release rule once,
+// before the alternative-slot, UI= and SR= branches (gateway.asm TreatMessage runs before them),
+// although it may take several loop passes before the frame is forwarded.
+static bool otSlaveFrameNoted = false;
 
 static void handleSlaveRequest(unsigned long request, OpenThermResponseStatus status) {
   if (status == OpenThermResponseStatus::SUCCESS) {
     otSlaveFrame = request;
     otSlaveFramePending = true;
+    otSlaveFrameNoted = false;
   }
 }
 
@@ -1429,6 +1420,7 @@ static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentRe
                               unsigned long boilerResp) {
   if (origin == OT_DIRECT_ORIGIN_GATEWAY) return;
   unsigned long reply = boilerResp;
+  bool answersOverrideRead = false;
   if (origin == OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN) {
     reply = buildOverriddenReply(otLastThermostatRequest, sentReq, boilerResp);
   } else if (otCurrentMode == OTD_MODE_GATEWAY) {
@@ -1437,6 +1429,11 @@ static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentRe
                                    otRemoteOverride.f88Value,
                                    otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY ? 0x0002 : 0x0001,
                                    otRemoteOverrideClearPending);
+    // ADR-223: the release rule counts thermostat MsgID 16 frames only after this answer.
+    if (otRemoteOverride.mode != OT_OVERRIDE_NONE && ((reply >> 16) & 0xFF) == 9
+        && ((reply >> 28) & 0x07) == 4) {
+      otRemoteOverride.bMsgId9Answered = true;
+    }
   }
   if (!otSlave.sendResponse(reply)) {
     OTDDebugTf(PSTR("OTD: reply to thermostat refused, slave not ready, MsgID=%u\r\n"),
@@ -1759,9 +1756,8 @@ static bool otdResponseOverrideActive(uint8_t msgId) {
 // A thermostat Data-ID whose slot the gateway may use: one the UI= table marks
 // unknown, or one the boiler answered Unknown-DataID three times in a row and the
 // SR= table does not answer. MsgID 0 is never counted (handleMasterResponse).
-// While a TT=/TC= override is active, or its clear is still to be answered, MsgID 9
-// and 100 are no slot: the thermostat must get the override from replyToThermostat()
-// (otdRemoteOverrideReply, TASK-1718), not Unknown-DataID.
+// MsgID 9 and 100 are no slot (otdRemoteOverrideHoldsSlot): the thermostat gets READ_ACK
+// from replyToThermostat() (otdRemoteOverrideReply, TASK-1718), not Unknown-DataID.
 static bool otdRemoteOverrideHoldsSlot(uint8_t msgId);
 static bool otdIsAltSlot(uint8_t msgId) {
   if (otdRemoteOverrideHoldsSlot(msgId)) return false;
@@ -2131,13 +2127,17 @@ void loopOTDirect() {
     else {
       // Gateway mode: full override processing
       uint8_t slaveMsgId = (otSlaveFrame >> 16) & 0xFF;
+      if (!otSlaveFrameNoted) {
+        otSlaveFrameNoted = true;
+        if (slaveMsgId == 16) onThermostatMsgID16((uint8_t)((otSlaveFrame >> 28) & 0x07), (uint16_t)(otSlaveFrame & 0xFFFF));
+      }
 
       // TASK-1707: the slot of a Data-ID the boiler does not support carries the gateway's own request
       if (otdAltSlotTaken(otSlaveFrame)) {
         otSlaveFramePending = false;
       }
       // UI table: respond UNKNOWN_DATAID directly, don't forward to boiler
-      else if (isUnknownId(slaveMsgId)) {
+      else if (isUnknownId(slaveMsgId) && !otdRemoteOverrideHoldsSlot(slaveMsgId)) {
         unsigned long unknownResp = (otSlaveFrame & 0x00FF0000UL) | (7UL << 28);  // type=UNKNOWN_DATAID
         setOTParityBit(unknownResp);
         bridgeFrameToParser('T', otSlaveFrame);
@@ -2327,18 +2327,16 @@ static void clearWriteOverride(uint8_t msgId) {
 }
 
 // ---------------------------------------------------------------------------
-// TASK-466: TT=/TC= remote-override state machine
+// TT=/TC= remote-override state machine (TASK-466, ADR-223)
 // ---------------------------------------------------------------------------
-// PIC distinguishes TT (temporary) from TC (constant) via MsgID 100
-// (RemoteOverrideFunction) low-byte flag bits (gateway.asm SetSetPoint):
-//   bit0 = ManualChangePriority  -> TC sets, TT clears
-//   bit1 = ProgramChangePriority -> TT sets, TC clears
-// MsgID 16 (TrSet) carries the actual setpoint value in both cases. The
-// thermostat reads MsgID 100 from us (the gateway-as-slave) to decide whether
-// to honour the override or its own program. The boiler ignores MsgID 100 and
-// only sees MsgID 16, so MsgID 100 is purely a UX hint to the thermostat.
+// Gateway mode: TT=/TC= is answer state only, like the PIC (gateway.asm SetSetPoint).
+// The thermostat's READ of MsgID 9 is answered with the setpoint and its READ of
+// MsgID 100 with the flags (otdRemoteOverrideReply). Nothing is written to the
+// boiler: the thermostat's own WRITE 16 passes unchanged.
+// Master mode (no thermostat): TT=/TC= writes TrSet (MsgID 16) and the flags
+// (MsgID 100) to the boiler through the write queue.
 //
-// Note: setRemoteOverride / clearRemoteOverride deliberately do NOT touch the
+// setRemoteOverride / clearRemoteOverride deliberately do NOT touch the
 // TASK-442 CS/C2 expiry timestamps (otCSLastCommandMs / otC2LastCommandMs).
 // TT/TC and CS/C2 are independent state machines.
 // ---------------------------------------------------------------------------
@@ -2347,33 +2345,30 @@ static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius) {
   // includes the -40..127 clamp formerly inlined here (TASK-495).
   uint16_t f88 = floatToF88(celsius);
 
-  // TASK-500 (1A-M1): "queue is the channel, no side-channels". Enqueue the
-  // primary frame (MsgID 16, TrSet) FIRST. If the queue is full, leave
-  // otRemoteOverride.* and state.otd.* untouched — the ghost-override bug
-  // happens when state claims an active override with no frame in flight.
-  // MsgID 16: replace thermostat's TrSet on outbound to boiler.
-  if (!enqueueWriteCommand(16, f88, mode == OT_OVERRIDE_TEMPORARY ? "TT" : "TC")) {
-    OTDDebugTln(F("OTD: OVR-set MsgID 16 dropped (queue full); state unchanged"));
-    return;
+  if (otCurrentMode == OTD_MODE_MASTER) {
+    // TASK-500 (1A-M1): "queue is the channel, no side-channels". Enqueue the
+    // primary frame (MsgID 16, TrSet) FIRST. If the queue is full, leave
+    // otRemoteOverride.* and state.otd.* untouched.
+    if (!enqueueWriteCommand(16, f88, mode == OT_OVERRIDE_TEMPORARY ? "TT" : "TC")) {
+      OTDDebugTln(F("OTD: OVR-set MsgID 16 dropped (queue full); state unchanged"));
+      return;
+    }
+    // MsgID 100: low byte = priority bits. If MsgID 16 made it through but
+    // MsgID 100 did not, the state is still committed.
+    uint16_t flags = (mode == OT_OVERRIDE_TEMPORARY) ? 0x0002 : 0x0001;
+    if (!enqueueWriteCommand(100, flags, "OVR-flags")) {
+      OTDDebugTln(F("OTD: OVR-flags MsgID 100 dropped (queue full); MsgID 16 in flight"));
+    }
   }
 
-  // MsgID 100: low byte = priority bits (high byte unused per OT v4.2). This
-  // is a UX hint to the thermostat — boiler ignores it. If MsgID 16 made it
-  // through but MsgID 100 didn't, we accept the partial state: boiler-side
-  // is correct, only the thermostat UI may briefly show "manual" until the
-  // periodic refresh re-emits it.
-  uint16_t flags = (mode == OT_OVERRIDE_TEMPORARY) ? 0x0002 : 0x0001;
-  if (!enqueueWriteCommand(100, flags, "OVR-flags")) {
-    OTDDebugTln(F("OTD: OVR-flags MsgID 100 dropped (queue full); MsgID 16 in flight"));
-  }
-
-  // Both queued (or 16-only with logged 100-drop) — now safe to commit state.
   otRemoteOverride.mode               = mode;
   otRemoteOverride.f88Value           = f88;
   otRemoteOverride.setAtMs            = millis();
-  otRemoteOverride.honoredCount       = 0;
   otRemoteOverride.lastThermostatVal  = 0;       // value undefined until bHaveLastThermostat flips
-  otRemoteOverride.bHaveLastThermostat = false;  // TASK-498 (1A-M2): reset honour history
+  otRemoteOverride.bHaveLastThermostat = false;  // TASK-498 (1A-M2): reset history
+  otRemoteOverride.mismatchCount      = 0;
+  otRemoteOverride.bAccepted          = false;
+  otRemoteOverride.bMsgId9Answered    = false;
   otRemoteOverrideClearPending        = false;
   state.otd.eOverrideMode             = mode;
   state.otd.iOverrideF88              = f88;
@@ -2382,12 +2377,17 @@ static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius) {
 static void clearRemoteOverride() {
   otRemoteOverride.mode                = OT_OVERRIDE_NONE;
   otRemoteOverride.f88Value            = 0;
-  otRemoteOverride.honoredCount        = 0;
   otRemoteOverride.lastThermostatVal   = 0;
   otRemoteOverride.bHaveLastThermostat = false;  // TASK-498 (1A-M2)
+  otRemoteOverride.mismatchCount       = 0;
+  otRemoteOverride.bAccepted           = false;
+  otRemoteOverride.bMsgId9Answered     = false;
   state.otd.eOverrideMode              = OT_OVERRIDE_NONE;
   state.otd.iOverrideF88               = 0;
   otRemoteOverrideClearPending         = true;   // TASK-1718
+
+  // Gateway mode: answer state only. A BS= or MQTT room_setpoint override on MsgID 16 stays.
+  if (otCurrentMode != OTD_MODE_MASTER) return;
 
   clearWriteOverride(16);
   clearWriteOverride(100);
@@ -2404,56 +2404,39 @@ static void clearRemoteOverride() {
 }
 
 // Hook into the thermostat-side MsgID 16 inbound path (called from
-// applyOverrides). Implements the PIC TT= auto-clear trigger:
-//
-//   1. Honour-detection: while a TT/TC is active, count cycles where the
-//      thermostat reports a MsgID 16 value within ~0.25 C of our override.
-//   2. Release-detection (TT only): once we have been honoured for at least
-//      OT_OVERRIDE_HONOR_THRESHOLD cycles, the next thermostat MsgID 16
-//      whose value diverges by > 0.5 C means the thermostat program has
-//      taken over; release the override.
-//
-// TC overrides intentionally never auto-clear here — only TT does. TC is
-// "vacation mode": it stays until the user explicitly sends TC=0 (or a
-// replacement TT=). This matches gateway.asm SetContSetPoint semantics.
+// applyOverrides). Release rule of the PIC (gateway.asm roomsetptdiff),
+// the same for TT and TC:
+//   - frames count only after the gateway answered a MsgID 9 read with the override;
+//   - a frame within OT_OVERRIDE_HONOR_DELTA_F88 of the override is a match and
+//     marks the override accepted;
+//   - before acceptance the OT_OVERRIDE_RELEASE_MISMATCHES-th mismatch releases it,
+//     after acceptance the first mismatch does.
+// A thermostat that never reads MsgID 9 never releases the override.
 static void onThermostatMsgID16(uint8_t msgType, uint16_t f88) {
   // OT v4.2: thermostat-originated MsgID 16 frames are WRITE_DATA (type 1)
-  // carrying TrSet. Other types (READ_DATA queries) carry no setpoint and
-  // would skew honour detection. Filter strictly.
+  // carrying TrSet. Other types (READ_DATA queries) carry no setpoint. Filter strictly.
   if (msgType != 1 /* WRITE_DATA */) return;
 
   uint32_t now = millis();
   otRemoteOverride.lastThermostatMs = now;
+  otRemoteOverride.lastThermostatVal   = f88;
+  otRemoteOverride.bHaveLastThermostat = true;
 
-  if (otRemoteOverride.mode == OT_OVERRIDE_NONE) {
-    otRemoteOverride.lastThermostatVal   = f88;
-    otRemoteOverride.bHaveLastThermostat = true;
-    return;
-  }
+  if (otRemoteOverride.mode == OT_OVERRIDE_NONE) return;
+  if (!otRemoteOverride.bMsgId9Answered) return;
 
-  // Compute |delta| in f8.8 units. f8.8 is two's-complement signed, so we
-  // sign-extend through int16_t before widening to int32_t. Without the
-  // (int16_t) hop a uint16_t -> int32_t cast keeps the high bit unset
-  // (e.g. -5 °C raw 0xFB00 would read as +64256 instead of -1280) and the
-  // honour/release deltas would mis-fire for negative TrSet values.
-  int16_t curSigned = (int16_t)f88;
-  int16_t ovrSigned = (int16_t)otRemoteOverride.f88Value;
-  int32_t signedDelta = (int32_t)curSigned - (int32_t)ovrSigned;
+  // f8.8 is two's-complement signed: sign-extend through int16_t before widening.
+  int32_t signedDelta = (int32_t)(int16_t)f88 - (int32_t)(int16_t)otRemoteOverride.f88Value;
   uint32_t delta = (signedDelta < 0) ? (uint32_t)(-signedDelta) : (uint32_t)signedDelta;
 
   if (delta < OT_OVERRIDE_HONOR_DELTA_F88) {
-    // Thermostat is echoing our value — count it as an honoured cycle.
-    if (otRemoteOverride.honoredCount < 0xFF) otRemoteOverride.honoredCount++;
-  } else if (otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY
-             && otRemoteOverride.honoredCount >= OT_OVERRIDE_HONOR_THRESHOLD
-             && delta > OT_OVERRIDE_RELEASE_DELTA_F88) {
-    // TT only: thermostat program has resumed after honouring us. Release.
-    OTDDebugTln(F("OTD: TT auto-clear (thermostat program resumed)"));
+    otRemoteOverride.bAccepted = true;
+    return;
+  }
+  if (otRemoteOverride.bAccepted || ++otRemoteOverride.mismatchCount >= OT_OVERRIDE_RELEASE_MISMATCHES) {
+    OTDDebugTln(F("OTD: TT/TC released (thermostat setpoint differs)"));
     clearRemoteOverride();
   }
-
-  otRemoteOverride.lastThermostatVal   = f88;
-  otRemoteOverride.bHaveLastThermostat = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -2512,7 +2495,9 @@ static void resetTransientState() {
   otRemoteOverride.mode                = OT_OVERRIDE_NONE;
   otRemoteOverrideClearPending         = false;
   otRemoteOverride.f88Value            = 0;
-  otRemoteOverride.honoredCount        = 0;
+  otRemoteOverride.mismatchCount       = 0;
+  otRemoteOverride.bAccepted           = false;
+  otRemoteOverride.bMsgId9Answered     = false;
   otRemoteOverride.lastThermostatVal   = 0;
   otRemoteOverride.bHaveLastThermostat = false;  // TASK-498 (1A-M2)
   state.otd.eOverrideMode              = OT_OVERRIDE_NONE;
@@ -2813,10 +2798,10 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     }
   }
   // TC=xx.x — Constant ("vacation") room temperature override.
-  // TASK-466: PIC parity. Sets MsgID 16 (TrSet) to the requested value AND
-  // MsgID 100 (RemoteOverrideFunction) low byte = 0x01 (Manual override
-  // priority). Persists until TC=0 or TT= replaces it; the TT auto-clear
-  // state machine does NOT release a TC override.
+  // ADR-223: gateway mode answers the thermostat's MsgID 9 / 100 reads with the
+  // value and flags 0x01 (Manual override priority) and writes nothing to the
+  // boiler; master mode writes MsgID 16 / 100. Ends at TC=0, a replacement TT=/TC=,
+  // or the release rule of onThermostatMsgID16.
   //
   // TASK-500 (1A-M3): "clear" trigger is exact-zero (gateway.asm SetSetPoint
   // parity). Negative values are NOT treated as clear; they set a TEMPORARY/
@@ -2834,10 +2819,10 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     synthesizeResponse(buf, rspBuf);
   }
   // TT=xx.x — Temporary room setpoint override.
-  // TASK-466: PIC parity. Sets MsgID 16 (TrSet) AND MsgID 100 low byte = 0x02
-  // (Program override priority). Auto-clears after the thermostat has echoed
-  // our value for OT_OVERRIDE_HONOR_THRESHOLD cycles and then moved on its
-  // own (program took over).
+  // ADR-223: gateway mode answers the thermostat's MsgID 9 / 100 reads with the
+  // value and flags 0x02 (Program override priority) and writes nothing to the
+  // boiler; master mode writes MsgID 16 / 100. Ends at TT=0, a replacement TT=/TC=,
+  // or the release rule of onThermostatMsgID16.
   else if (cmd0 == 'T' && cmd1 == 'T') {
     float temp = atof(value);
     if (temp == 0.0f) {
@@ -2858,7 +2843,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     float temp = atof(value);
     if (temp == 0.0f) {
       otFakeRoomSetpoint = 0.0f;
-      clearOverride(16);
+      clearWriteOverride(16);   // also an MQTT room_setpoint write
     } else {
       otFakeRoomSetpoint = temp;
       uint16_t f88 = floatToF88(temp);

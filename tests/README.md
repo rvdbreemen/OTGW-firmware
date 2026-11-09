@@ -12,7 +12,6 @@ cover isolated, deterministic functions only.
 | File | What it covers |
 | --- | --- |
 | `test_dallas_address.cpp` | `getDallasAddress()` hex-string conversion for Dallas DS18B20 ROM codes |
-| `test_otdirect_override.cpp` | TT/TC remote-override f8.8 round-trip, sign-extend, clamp, honour-cycle, auto-clear, plus otCmdEnqueue coalesce-by-MsgID semantics across MsgIDs 1, 14, 16, 100 |
 | `test_ble_parsers.cpp` | ATC/pvvx + BTHome v2 byte-layout parsers (TASK-487 / TASK-498), encrypted-flag rejection (3A-M4), packet-id prefix skip (2A-M3), and MAC-filter strict-vs-empty paths (3A-M2) |
 | `test_graph_history.cpp` | Monitor graph history (TASK-1296): compiles the real `graphHistoryStuff.h` and `jsonEmit.h` against the stubs in `tests/stubs`. Both ring sizes (126 slots of 30 s, 726 slots of 120 s): wrap, commit with gap fill (k late gives k-1 empty slots, capped), flag accumulation and reset, encoders (rounding, sentinels, NaN), the 720-slot emit cap, exact JSON for a small ring, the empty ring, and chunk-window reassembly with commits between windows (margin pinned: MARGIN identical, MARGIN+1 differs) |
 | `webui/graph-history-merge.test.mjs` | `mergeGraphHistory()` from `v2.js` (node:test, real function extracted): older history kept, overlap dropped, sorted with unique `t`, scale and nulls, trim to `GHIST_MAX`, malformed payloads leave the history unchanged. Run `node --test tests/webui/graph-history-merge.test.mjs`; set `OTGW_V2_JS` to an older copy to see it red |

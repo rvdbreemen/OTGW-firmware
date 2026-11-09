@@ -2230,9 +2230,10 @@ static bool satPushRefusedDecide(bool pushOn, bool pushed, uint32_t sincePushMs,
 // --- satPushRefusedDecide end
 
 // Called from processOT() for every MsgID 16 Write-Data frame the thermostat sent (T frame), also when
-// the gateway replaced it on the way to the boiler. OTcurrentSystemState.TrSet is not used: with a TC=
-// override active it holds the R frame, i.e. SAT's own pushed value, so a thermostat change would
-// never show up there. The PS=1 summary carries no T frame and is not a source.
+// the gateway replaced it on the way to the boiler. OTcurrentSystemState.TrSet is not used: when the
+// gateway replaces the frame (a BS= fake setpoint or an MQTT room_setpoint write) it holds the R frame,
+// so a thermostat change would not show up there. A TT=/TC= override no longer replaces MsgID 16 on
+// either board (ADR-223). The PS=1 summary carries no T frame and is not a source.
 void satOnThermostatSetpoint(float tr)
 {
   const bool active = satIsEnabled() && settings.sat.bFollowThermostat;

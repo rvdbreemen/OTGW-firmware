@@ -1993,11 +1993,10 @@
     7: { cmd: 'CC/CL', what: 'cooling control', clear: 'CL=0' },   // CL=0 clears 7; CC=0 would write 0
     8: { cmd: 'C2', what: 'CH2 setpoint', clear: 'C2=0', sat: true },
     14: { cmd: 'MM', what: 'max modulation', clear: 'MM=T', sat: true },   // a non-numeric MM= clears
-    // 16 is also set by BS= and the MQTT room_setpoint route; TT=0 clears it whatever set it.
-    16: { cmd: 'TT/TC, BS or MQTT', what: 'room setpoint', clear: 'TT=0', sat: true },
+    // 16 is set by BS= and the MQTT room_setpoint route (TT=/TC= only in master mode); BS=0 clears it whatever set it.
+    16: { cmd: 'BS or MQTT', what: 'room setpoint', clear: 'BS=0' },
     56: { cmd: 'SW', what: 'DHW setpoint', clear: 'SW=0' },
-    57: { cmd: 'SH', what: 'max CH setpoint', clear: 'SH=0' },
-    100: { cmd: 'TT/TC', what: 'override flags', clear: 'TT=0', sat: true }   // TT=0 clears 16 and 100
+    57: { cmd: 'SH', what: 'max CH setpoint', clear: 'SH=0' }
   };
   function otdOvrReason(row, text) {
     var r = document.createElement('div'); r.style.color = 'var(--muted)'; r.textContent = text;
