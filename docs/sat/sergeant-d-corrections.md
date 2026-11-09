@@ -6183,3 +6183,19 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Changes an earlier entry:** entry 14's Open note ("OT-Direct boards never cancel a TC= override by themselves") describes the firmware before this answer; after TASK-1733 they cancel it as the PIC does. Entry 14 itself is not rewritten.
 
 **Task:** TASK-1733 (owner otgw-firmware-80; ADR-223 Proposed covers TT=, TC= now follows the same rule). **Open:** nothing from him.
+
+## 287. SAT must ask for the return temperature (MsgID 28) when nobody reads it (Sergeant D, 2026-11-09)
+
+**Source:** sergeantd, 2026-11-09 16:09:03 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1569383329470488710 (https://discord.com/channels/812969634638725140/1105556725714649128/1569383329470488710), a reply to our finding msg 1569383164005056646 and to his own remark msg 1569383042605125823 ("Weird, normally ideal boilers report return temperature").
+
+**Quoted:** "@BlueFlame Bot We need to ask for return temperature"
+
+**Context:** tjfs's capture of 2026-11-09 12:45:30-12:48:11 UTC (beta.161, OT-Direct gateway mode, Ideal Halo Lite thermostat, Ideal Logic boiler, SAT on) holds no MsgID 28 frame at all. The thermostat reads only IDs 0, 1, 16, 17, 24, 25; the boiler supports all of them (0 Unknown-DataID), so the gateway, which since TASK-1707 (beta.132) sends its own reads only in the slot of a thermostat request the boiler does not support, never gets a slot to read ID 28. SAT's tick shows ret=0.0 throughout.
+
+**Settled:** SAT needs the return temperature and the gateway must request MsgID 28 itself when it is not otherwise read. thermo-nova uses it: the PWM flame-off hold sets the control setpoint to return temperature + flame-off offset and skips the override with a warning when the return temperature is missing (`heating_control.py:392-399`); the cycle tracker uses flow minus return (`cycles/tracker.py:262-265`) and the return temperature itself (`cycles/tracker.py:285-286`). thermo-nova reads it from the OTGW MQTT value `Tret` (`coordinator/mqtt/opentherm.py:21`, `:113-118`), so it relies on the gateway having read it. The firmware today does not read ID 28 on such an installation (capture above).
+
+**Interpretation (ours):** "ask for" read as: the gateway requests MsgID 28 itself. Not decided by him: how (on OT-Direct gateway mode a slot is needed; whether to take a thermostat slot or poll in another way; on PIC boards the equivalent of entry 276's own request), how often, and whether only while SAT is enabled or always.
+
+**Changes an earlier entry:** none; it is the MsgID 28 counterpart of entry 276 (maintainer decision for MsgID 25 on PIC boards).
+
+**Task:** TASK-1759 (OT-Direct gateway mode and PIC: request MsgID 28 when no thermostat reads it), related TASK-1707. **Open:** the method and interval (question for Robert/Sergeant D before code).

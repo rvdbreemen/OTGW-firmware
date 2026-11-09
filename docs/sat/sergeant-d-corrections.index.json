@@ -3824,6 +3824,20 @@
     "TASK-1733"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 287,
+   "title": "SAT must ask for the return temperature (MsgID 28) when nobody reads it (Sergeant D, 2026-11-09)",
+   "date": "2026-11-09",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569383329470488710",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1707",
+    "TASK-1759"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

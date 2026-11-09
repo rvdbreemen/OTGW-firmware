@@ -3,11 +3,11 @@ id: TASK-1528
 title: >-
   Heap low-water mark sinks to ~1.7 KB under a long-run capture (free stays ~71
   KB): find the transient large allocation
-status: In Progress
+status: Done
 assignee:
   - '@system32-78'
 created_date: '2026-10-31T13:54:00Z'
-updated_date: '2026-11-09T11:41:00Z'
+updated_date: '2026-11-09T17:10:00Z'
 labels:
   - alpha
   - bug
@@ -81,3 +81,9 @@ Step (a) cont. (system32-78, 2026-11-08, code reading on dev eea57bd58): the dri
 
 Step b, 2026-11-09 11:09-12:40, .61 on 2.0.0-beta.162+5786928 (system32-78, slot from the coordinator). 10 boots via /ReBoot, alternating C (clean) and T (two-tab trace for TASK-1675 R1 from the first HTTP answer to +120 s). Reboots only: no flash, no settings change, no router change. Unit left on beta.162 (bootcount 193). Native hd_min_free_heap per boot (device/info every 5 s): C 23756 / 18064 / 22620 / 21320 / 12664; T 2544 / 1368 / 3592 / 1104 / 1564. Boot-window low point for C, i.e. the first sample about 5 s after boot covering setup + MQTT connect: 32792 / 24760 / 22620 / 22520 / 29660. In boot 5, the one C boot with a full [HEAP] log: connect minWin 22620 = nativeMin, outside=0, drip minimum 24492. So on clean boots the boot connect window stays at ~22-33 KB. The 11-05 dips of 16.8 KB and 4.1 KB (pre-TASK-1699 drip) were NOT reproduced. Per the plan, minWin stays above ~5 KB, so option A is not needed for the clean boot; this goes to Robert for close or re-scope. Two new observations, not explained: (1) later steps in C boots outside the boot window: boot 3 18064 at +4:55, boot 9 12664 at +10:02 (18928 at +4:53), boot 1 23756 at +4:54; the ~+5 min steps recur. Candidate (not proven): the weather worker or another periodic job (cf. the 11-05 night-run notes). (2) Web load during boot drives the heap almost to exhaustion: in all T boots the minimum falls within ~5-15 s of boot to 1104-3592 B, 4 of 5 below the CRITICAL tier of 3072 B. In boot 8 (full log): connect minWin 1164 (outbox 2), nativeMin 1104, setup-late 47268 vs ~70600 clean. hd_mqtt_drops 1 in boot 8, otherwise 0; max loop gap 328-478 ms. Caveat: the trace (two loops each fetching '/' 175 KB plus favicon) is heavier than two normal tabs. Caveat on the data: two telnet_heaplog.py processes from another session (PID 43232, 31148) kept taking the single telnet slot for the whole run, so full [HEAP] boot lines exist for boots 2, 5 and 8 only. The C numbers rest on the native minimum from device/info. Not run: the internet forward-drop variant from the plan. It is a router change outside this slot's brief; it stays open as a decision for Robert. Data (local, not in the repo): scratchpad t1528step-b/run-20261109 (events.log, bootN{C,T}-samples.log, -telnet.txt, -trace.log), scripts boots.py and summary.py.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Robert, 2026-11-09: Done. Step b on beta.162+5786928 (bench .61, 10 reboots): clean boots stay at 22-33 KB in the boot window, so the old 4.1/16.8 KB boot dips are not reproduced and option A is not needed. ACs #1/#2 were not met as written (no single transient allocation named); the open findings move to new tasks: TASK-1756 (heap steps at about +5/+10 min after boot, down to 12664 B, cause unknown, medium) and TASK-1757 (boot-time heap below CRITICAL when a browser loads the UI right after boot, high, 2.0.0 stable gate).
+<!-- SECTION:FINAL_SUMMARY:END -->
