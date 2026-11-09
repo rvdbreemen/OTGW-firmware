@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-08T08:13:00Z'
-updated_date: '2026-11-08T09:30:00Z'
+updated_date: '2026-11-09T06:14:00Z'
 labels:
   - bug
   - otdirect
@@ -46,6 +46,8 @@ Verification: host test red->green; regression: test_otd_ch_override, test_otd_g
 2026-11-08 implementation (uncommitted, waiting for the build slot): OTDirect.ino otdRemoteOverrideReply() in replyToThermostat() gateway branch (MsgID 9 -> READ_ACK override f88, MsgID 100 -> READ_ACK flags TT 0x02/TC 0x01; one-shot READ_ACK 0 after clearRemoteOverride; no override + boiler Data-Invalid/Unknown -> READ_ACK 0, PIC parity gateway.asm:2932-2944/3270-3290). Review finding fixed: a boiler that answers MsgID 9 Unknown 3x turned 9 into a TASK-1707 alt slot, so otdAltSlotTaken() answered Unknown and the fix never ran; otdRemoteOverrideHoldsSlot() keeps 9/100 out of the slots while an override is active or its clear is pending (no change without an override, so the alt-slot gates stay as they were). Evidence: tests/test_otd_gateway_alt_slots.py new T1/T1c through the real gateway path (handleSlaveRequest -> boiler model -> replyToThermostat): old code T1 t9=18 ack=0 FAIL, T1c not run (FAIL); fix T1 t9=18 ack=18, T1c first=1 pending=0, Ran 11 OK (skipped=1). tests/test_otd_remote_override_msgid9.py (helper, 10 cases) old FAILED 10 / fix OK. OT-Direct suites OK; evaluate --quick Passed 86 Failed 0. Out of scope, unchanged: TT= still also writes MsgID 16/100 to the boiler (MsgID 100 is R-only per spec; harmless). Open question for Robert: answer MsgID 9 with READ_ACK 0 also when no override is active (full PIC parity, costs alt slots) - not done.
 
 2026-11-08 pushed 4f7fd7742 as beta.142, zip posted #alpha-testing 1568920313243377674, tjfs asked for the field check (1568920439214973040). Bench .61 (OT-Direct mode 3, no thermostat): OTA app+fs, settings 164 changed none, bootcount 146->148, no crashlog; POST /api/v2/otgw/commands TT=20 -> 202 queued; TT=0 -> 202; /api/v2/otdirect/overrides afterwards lists only MsgID 1 and 14 write overrides (no 16/100), so TT is set and cleared. Full suite: test/host/test_override_reply suite 1178 broke on the new replyToThermostat dependency (harness slice lacked otRemoteOverride) and C8b encoded the old pass-through of a boiler Unknown on MsgID 100; harness slice extended and C8b now expects the gateway's READ-ACK 0 (PIC MessageID100 parity): 4/4 OK. Test-only follow-up commit.
+
+2026-11-09 Robert's decision (relayed by the coordinator to system32-78): AC3 (field/bench: thermostat shows the override and raises CH demand) is WAIVED on the host evidence (AC1/AC2 replay tests) and is listed as a known issue in the 2.0.0 stable release notes. The AC stays unticked because it is waived, not met; it closes for real once tjfs confirms in the field.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
