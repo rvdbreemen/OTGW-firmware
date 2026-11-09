@@ -3,11 +3,11 @@ id: TASK-1736
 title: >-
   Bench .61 (beta.146-148, no PSRAM): max free block stuck at 7668 B, every REST
   call 503 'low heap', MQTT packets not queued
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-08T15:48:00Z'
-updated_date: '2026-11-09T08:43:00Z'
+updated_date: '2026-11-09T08:50:00Z'
 labels:
   - bug
   - heap
@@ -25,8 +25,8 @@ ordinal: 843000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduce or explain: which allocation pattern leaves the largest block < 8192 B with ~31 KB free (heap trace or telnet heap log over time on a no-PSRAM unit)
-- [ ] #2 Fix or gate change so a fragmented heap does not lock out REST and MQTT for minutes; red/green evidence
+- [x] #1 Reproduce or explain: which allocation pattern leaves the largest block < 8192 B with ~31 KB free (heap trace or telnet heap log over time on a no-PSRAM unit)
+- [x] #2 Fix or gate change so a fragmented heap does not lock out REST and MQTT for minutes; red/green evidence
 - [x] #3 Bench: no-PSRAM unit runs 1 h with REST/MQTT available, maxblk logged
 <!-- AC:END -->
 
@@ -81,4 +81,14 @@ Dry run A-dry on current .61 firmware (beta.149), 18:32:21-18:34:51 (2.5 min): 1
 - No 'REST stream size' lines, as expected on beta.149.
 
 2026-11-09 AC3 evidence (session 4c, TASK-1741 bench): bench .61 (OT-Direct, no PSRAM) on 2.0.0-beta.160+485649c from the OTA at 08:33 until 09:39 (1 h 06 min). REST answered throughout under three ab_bench runs (two visible tabs, one visible + one hidden, one tab; 20 min each), mqttconnected true, maxblk logged over telnet (92 samples, min 13300, max and last 31732), bootcount 179 = flash + 2, no crashlog, no HEAP-CRITICAL, no 'MQTT packet not queued'. Evidence: %LOCALAPPDATA%/OTGW-capture/bench-1741 (heap.csv, telnet.log, runs/). Caveat: beta.160 contains the presize from beta.155 plus TASK-1741, so this is not an isolated TASK-1736 soak. The 7668 B lock-out of beta.146-148 did not come back in these runs, also not on beta.159 (red run 08:11-08:31, maxblk min 12276).
+
+2026-11-09 AC1, explained from the code (session 4c). Every polled REST stream (otmonitor, BLE roster, weather) started as a 1460 B AsyncResponseStream and grew on each JsonEmit print that did not fit: ESPAsyncWebServer 3.11.2 WebResponses.cpp:926-943, write() calls _content->resizeAdd(len - room) for the exact shortfall. In the Arduino-ESP32 core, cbuf.cpp:71-72 turns that into resize(size() + add), and resize (cbuf.cpp:75-126) first creates a NEW ring buffer of the full new size (xRingbufferCreate, :91) while the old one is still alive, then mallocs a temporary copy of all buffered bytes (:100), copies, frees the copy (:123) and only then deletes the old ring (:124-126). JsonEmit prints 1-20 B at a time, so past 1460 B nearly every print repeats this. Measured with the real cbuf and the real write() in the new host test: one 3061 B otmonitor-like body makes 398 ring buffers of 398 different sizes (1460..3061 B, each a few bytes larger than the last), 397 temporary copies, and a transient peak of 9181 B live (old ring + new ring + copy, 3 x the body). Two tabs poll otmonitor every 2 s each, so this runs several hundred times per minute, interleaved with lwIP pbufs, WebSocket frames and MQTT buffers allocated by other tasks. Each cycle frees a block of size N right after allocating one of N+k, which leaves holes of 1.5-3 KB between longer-lived allocations: free memory stays near 31 KB while the largest free block shrinks. Below 8192 B the low-heap gates (the 8192 B maxfreeblock gate on sat/status, graph/history, device/info, restAPI.ino; the cap-1 clamp under 16000) answer 503, which is the 'every REST call 503 low heap' lock-out of beta.146-148 at maxblk 7668. The hole mechanism is inference: the TLSF allocator on the device was not modelled or traced. The presize (44d6ef686, beta.155: otmonitor 4096, BLE roster 3072, weather 2048, kept at 1460 when maxblk < presize + 4 KB) makes each poll one allocation of the same size. The 7668 B lock-out did not come back on bench .61 in 2026-11-09 runs: beta.159 two-tab red run 08:11-08:31 maxblk min 12276; beta.160 08:33-09:39 min 13300.
+
+2026-11-09 AC2: the fix is the presize of 44d6ef686 (beta.155). New host test against the real code: test/host/test_stream_real_cbuf.py runs build_and_run_stream_real_cbuf.ps1, which compiles the Arduino-ESP32 core cbuf.cpp byte for byte, AsyncResponseStream::write sliced verbatim from ESPAsyncWebServer 3.11.2 WebResponses.cpp, and restChooseStreamSize/kRestPresize sliced from webServerCompat.h; only the ESP-IDF ring buffer and cbuf's malloc/free are faked to count allocations (test/host/fake_rtos). GREEN (presize as shipped): 50 polls, 50 ring creates, 0 temporary copies, 1 ring size, peak 4096 B. RED (OTGW_NO_PRESIZE=1, the old 1460 B start): 19900 ring creates, 19850 temporary copies, 734 ring sizes, peak 9187 B, 4 checks fail. The wrapper asserts both, so run_tests.py keeps checking that the test still bites. The older test_stream_size_hint.cpp only modelled the growth rule. Not verified: the lock-out itself on a device, because it did not reproduce on beta.159 either (maxblk min 12276), so the bench cannot show it gone; the test shows the allocation pattern that caused it is gone.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Heap fragmentation on boards without PSRAM (bench .61, beta.146-148: maxblk stuck at 7668 B, every REST call 503 'low heap'). AC1: explained from the code with citations (notes 2026-11-09): every polled REST stream started at 1460 B and grew by the exact shortfall on each small JsonEmit print (WebResponses.cpp:926-943 -> cbuf.cpp:71-126), and every growth step creates a new full-size ring buffer while the old one lives, plus a temporary copy; measured with the real code: 398 ring buffers of 398 sizes and a 9181 B transient peak for one 3061 B body. That leaves 1.5-3 KB holes among other tasks' allocations; the hole step is inference (TLSF not traced). AC2: the presize of 44d6ef686 (beta.155) is the fix; new host test test/host/test_stream_real_cbuf.py on the real cbuf.cpp and the real AsyncResponseStream::write: presize 50 polls = 50 ring creates, 0 copies, 1 size, peak 4096 B (green); presize disabled = 19900 creates, 19850 copies, 734 sizes, peak 9187 B, 4 failures (red); the wrapper asserts both. AC3: bench .61 on beta.160 from 08:33 to 09:39 (1 h 06 min) with REST answering under three two-tab/hidden/single-tab runs, MQTT connected, maxblk logged over telnet (92 samples, min 13300, last 31732), bootcount flash + 2, no crashlog. Caveat: beta.160 contains the presize from beta.155 plus TASK-1741, so this is not an isolated TASK-1736 soak. Not verified: the 7668 B lock-out itself did not reproduce on beta.159 (two-tab red run, maxblk min 12276), so the device cannot show it gone; the allocator holes are inferred, not traced. Evidence: %LOCALAPPDATA%/OTGW-capture/bench-1741.
+<!-- SECTION:FINAL_SUMMARY:END -->
