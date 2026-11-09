@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-08T15:26:00Z'
-updated_date: '2026-11-09T05:40:00Z'
+updated_date: '2026-11-09T05:45:00Z'
 labels:
   - bug
   - otdirect
@@ -129,4 +129,6 @@ NOT VERIFIED:
 2026-11-09 Robert (in session otgw-firmware-80, AskUserQuestion): chose 'PIC parity now (F2)' over capture-first: change OT-Direct TT=/TC= to PIC semantics (no gateway WRITE 16/100 to the boiler, stop rewriting the thermostat's WRITE 16, keep the MsgID 9/100 answers, release the override after N mismatching thermostat MsgID 16 frames as the PIC's roomsetptdiff does). Before coding: /adr-kit:context for OT-Direct gateway behaviour, and the PIC firmware reference for TT/TC semantics (other-projects).
 
 2026-11-09 Robert (session otgw-firmware-80, AskUserQuestion) settled the F2 parity sub-points after the read-only design research (PIC source other-projects/otgw-6.6/gateway.asm v6.6): (a) mismatch counting starts only after the thermostat read MsgID 9 (strict PIC, gateway.asm:2980-2982 + 2948); for a thermostat that never reads MsgID 9 the override stays active until TT=0, as on a PIC. (b) TT only: TC= keeps today's no-auto-clear; releasing TC changes SAT push-setpoint behaviour on OT-Direct and goes to Sergeant D as a question first (corrections entry 14 Open note). (c) Keep the 0.25 C match tolerance (documented deviation from the PIC's ~0.125 C, gateway.asm:3002). (d) Master mode keeps writing TrSet (MsgID 16) for TT=; F2 applies to gateway mode only. Design inputs (PIC semantics, OT-Direct trace, real-code test design) saved locally; F2 also needs an ADR via adr-kit (ADR-068 rationale lists TT/TC as WRITE 16/100 producers).
+
+2026-11-09 ADR-223 drafted via adr-kit as Proposed (adr-lint --strict 0 FAIL; test_adr_governance OK): TT= in OT-Direct gateway mode is answer state only (MsgID 9/100 reads), no gateway WRITE 16/100, PIC release rule after a MsgID 9 read; TC= and master mode unchanged. Sergeant D asked about TC= via 97 (Q-1733a, #dev-sat-mqtt msg 1569226090260725952). Implementation starts after Robert accepts ADR-223.
 <!-- SECTION:NOTES:END -->
