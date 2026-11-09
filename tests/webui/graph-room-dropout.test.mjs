@@ -14,7 +14,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { stopChromeTree, guardChrome } from './lib/page-harness.mjs';
+import { stopChromeTree, guardChrome, launchChrome } from './lib/page-harness.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.OTGW_DATA_DIR || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
@@ -66,7 +66,7 @@ await new Promise((r) => srv.listen(0, '127.0.0.1', r));
 PORT = srv.address().port;
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'otgw-cdp-'));
-const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+const chrome = await launchChrome(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,1000', 'about:blank'], { stdio: 'ignore' });
 guardChrome(chrome);   // TASK-1739
 let target = null;

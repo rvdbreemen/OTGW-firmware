@@ -20,7 +20,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { stopChromeTree, guardChrome } from './lib/page-harness.mjs';
+import { stopChromeTree, guardChrome, launchChrome } from './lib/page-harness.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.OTGW_DATA_DIR || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
@@ -82,7 +82,7 @@ PORT = srv.address().port;
 
 // --- headless Chrome over CDP, no dependencies -----------------------------
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'otgw-cdp-'));
-const chrome = spawn(CHROME, [
+const chrome = await launchChrome(CHROME, [
   '--headless=new',
   '--remote-debugging-port=0',
   `--user-data-dir=${profile}`,

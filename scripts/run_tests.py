@@ -227,6 +227,9 @@ def main():
         print("node not found on PATH; cannot run --webui tests", file=sys.stderr)
         return 1
 
+    # TASK-1765: the web UI harness caps concurrent test Chromes machine-wide (default 1); let it
+    # run as many as this pool runs files, unless the caller set the cap. run_one copies os.environ.
+    os.environ.setdefault("OTGW_WEBUI_MAX_CHROME", str(max(1, a.jobs)))
     pool_jobs = [j for j in jobs if j[1].name not in SERIAL_ONLY]
     serial_jobs = [j for j in jobs if j[1].name in SERIAL_ONLY]
     results = []

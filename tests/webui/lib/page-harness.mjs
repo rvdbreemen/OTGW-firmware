@@ -35,9 +35,76 @@ export function stopChromeTree(child) {
   }
   try { child.kill(); } catch { /* ignore */ }
 }
-export function guardChrome(child) {
-  process.on('exit', () => stopChromeTree(child));
+// TASK-1765: guardChrome() stops the tree on exit and on SIGINT/SIGTERM/SIGHUP, and frees the
+// Chrome slot (below) when Chrome ends. Idempotent per child.
+const guarded = new WeakSet();
+export function guardChrome(child, slotFile) {
+  if (!child || guarded.has(child)) return child;
+  guarded.add(child);
+  const release = () => { if (slotFile) { try { fs.rmSync(slotFile, { force: true }); } catch { /* ignore */ } } };
+  process.on('exit', () => { stopChromeTree(child); release(); });
+  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+    process.once(sig, () => { stopChromeTree(child); release(); process.exit(130); });
+  }
+  child.once('exit', release);
   return child;
+}
+
+// TASK-1765: machine-wide cap on concurrent test Chromes. `node --test tests/webui/*.test.mjs`
+// runs every file at once, each with its own Chrome tree (638 chrome.exe, 23 GB, 2026-11-09);
+// with the cap the browser files run one at a time. Default 1; OTGW_WEBUI_MAX_CHROME=N raises it
+// (scripts/run_tests.py sets it to its -j). A slot is a file <tmp>/otgw-cdp-slots/<testPid>-<n>.slot;
+// a slot whose test process is gone is stale and removed. The wait (default 300 s) stays below
+// run_tests.py's 600 s per-file timeout, so a starved file reports this error, not a TIMEOUT.
+const SLOT_DIR = path.join(os.tmpdir(), 'otgw-cdp-slots');
+export const MAX_CHROME = Math.max(1, Number(process.env.OTGW_WEBUI_MAX_CHROME) || 1);
+const SLOT_WAIT_MS = Number(process.env.OTGW_WEBUI_SLOT_WAIT_MS) || 300000;
+const pidAlive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+let slotSeq = 0;
+// Counts the OTHER live test processes holding a slot: one test file may run several Chromes in
+// turn (or overlap two) without blocking itself.
+function liveSlots() {
+  const pids = new Set();
+  for (const f of fs.readdirSync(SLOT_DIR)) {
+    if (!f.endsWith('.slot')) continue;
+    const pid = Number(f.split('-')[0]);
+    if (pid && pidAlive(pid)) { if (pid !== process.pid) pids.add(pid); }
+    else { try { fs.rmSync(path.join(SLOT_DIR, f), { force: true }); } catch { /* ignore */ } }
+  }
+  return pids.size;
+}
+export async function acquireChromeSlot() {
+  fs.mkdirSync(SLOT_DIR, { recursive: true });
+  const t0 = Date.now(); let said = false;
+  const lock = path.join(SLOT_DIR, '.lock');
+  for (;;) {
+    let fd = null;
+    try { fd = fs.openSync(lock, 'wx'); } catch { /* another test is counting */ }
+    if (fd !== null) {
+      try {
+        if (liveSlots() < MAX_CHROME) {
+          const f = path.join(SLOT_DIR, `${process.pid}-${++slotSeq}.slot`);
+          fs.writeFileSync(f, String(process.pid));
+          return f;
+        }
+      } finally { fs.closeSync(fd); fs.rmSync(lock, { force: true }); }
+    } else {
+      try { if (Date.now() - fs.statSync(lock).mtimeMs > 10000) fs.rmSync(lock, { force: true }); } catch { /* gone */ }
+    }
+    if (!said) { said = true; console.error(`[webui] waiting for a Chrome slot (max ${MAX_CHROME}; set OTGW_WEBUI_MAX_CHROME to raise)`); }
+    if (Date.now() - t0 > SLOT_WAIT_MS) {
+      throw new Error(`no Chrome slot within ${SLOT_WAIT_MS} ms (max ${MAX_CHROME} concurrent test Chromes, OTGW_WEBUI_MAX_CHROME)`);
+    }
+    await sleep(250);
+  }
+}
+
+// Start a guarded test Chrome inside a slot: use this instead of spawn(CHROME, ...).
+export async function launchChrome(bin, args, opts = { stdio: 'ignore' }) {
+  const slot = await acquireChromeSlot();
+  let child;
+  try { child = spawn(bin, args, { windowsHide: true, ...opts }); } catch (e) { fs.rmSync(slot, { force: true }); throw e; }
+  return guardChrome(child, slot);
 }
 
 export async function startPage({ api, asset, beforeScript, width = 1400, height = 1000, page = '/v2.html' } = {}) {
@@ -70,9 +137,8 @@ export async function startPage({ api, asset, beforeScript, width = 1400, height
 
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'otgw-cdp-'));
   const cdpPort = () => fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0].trim();
-  const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+  const chrome = await launchChrome(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check', '--disable-gpu', `--window-size=${width},${height}`, 'about:blank'], { stdio: 'ignore' });
-  guardChrome(chrome);
   let target = null;
   for (let i = 0; i < 100 && !target; i++) {
     try { const r = await fetch(`http://127.0.0.1:${cdpPort()}/json/new?about:blank`, { method: 'PUT' }); if (r.ok) target = await r.json(); } catch { /* not up yet */ }
