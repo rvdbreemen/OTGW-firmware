@@ -3838,6 +3838,34 @@
     "TASK-1759"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 288,
+   "title": "Fail-safe: in continuous mode, flow - CS >= 3.5 falls back to PWM (Sergeant D, 2026-11-09)",
+   "date": "2026-11-09",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569416482025119805",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412",
+    "TASK-1762"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 289,
+   "title": "Q-288a answered A, with a 30 s hold: the flow - CS >= 3.5 fail-safe is an extra rule beside the 60 s rule (Sergeant D, 2026-11-09; settles the open points of entry 288)",
+   "date": "2026-11-09",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569426039703216169",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412",
+    "TASK-1762"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

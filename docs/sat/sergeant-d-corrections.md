@@ -6199,3 +6199,37 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Changes an earlier entry:** none; it is the MsgID 28 counterpart of entry 276 (maintainer decision for MsgID 25 on PIC boards).
 
 **Task:** TASK-1759 (OT-Direct gateway mode and PIC: request MsgID 28 when no thermostat reads it), related TASK-1707. **Open:** the method and interval (question for Robert/Sergeant D before code).
+
+## 288. Fail-safe: in continuous mode, flow - CS >= 3.5 falls back to PWM (Sergeant D, 2026-11-09)
+
+**Source:** sergeantd, 2026-11-09 18:20:47 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1569416482025119805 (https://discord.com/channels/812969634638725140/1105556725714649128/1569416482025119805), after our reading of tjfs's capture (msg 1569415672893546508: continuous mode, PID CS 41 while the flow ran at 44-46, PWM only after the 60 s sustained-overshoot rule at 12:47:01).
+
+**Quoted:** "@BlueFlame Bot Oh ok, we were in continuous mode. Then we were in a critical condition for flame off. So as a fail safe condition when boiler temperature -  cs >= 3.5 in continuous mode fall back to PWM"
+
+**Context:** tjfs's capture 2026-11-09 12:45:30-12:48:11 UTC (beta.161, OT-Direct gateway mode, Ideal Logic, SAT on). SATTICK 12:46:01: mode=1 (continuous), curve 29.80 + P 12.62 + I 0.00 + D -1.42 = PID 40.99, CS 41, flow 45.0. The switch to PWM came at 12:47:01 through the sustained-overshoot rule ("flow 46.0 stayed above setpoint 39.3 + 2.0 for 60 s").
+
+**Compared with thermo-nova:** thermo-nova enables PWM only on sustained overshoot: flow >= requested setpoint + OVERSHOOT_MARGIN_CELSIUS (3.0, `cycles/const.py:10`) for OVERSHOOT_SUSTAIN_SECONDS (60, `const.py:21`), `heating_control.py:262-305`. It has no immediate fail-safe on flow - CS. The firmware ports that rule in `SATcycles.ino` `satCycleCheckOvershootSwitch()` with the margin from settings.sat.fOvershootMargin (default 2.0) and the 60 s timer, compared against the requested (PID) setpoint.
+
+**Settled:** a new fail-safe on top of thermo-nova: while SAT is in continuous mode and flow - CS >= 3.5, SAT falls back to PWM. Reason in his words: "a critical condition for flame off".
+
+**Interpretation (ours, to be confirmed):** an addition to the existing 60 s sustained-overshoot rule, not a replacement, and acting without the 60 s wait. Not decided: whether "cs" is the requested (PID) setpoint or the final control setpoint sent to the boiler (the firmware's continuous clamp keeps the final one close to the flow, `SATcycles.ino` comment above `satCycleCheckOvershootSwitch()`); whether any timer or the hot-water guard and the MsgID 3 PWM permission (entry 213) apply; equality included (">=" as written).
+
+**Changes an earlier entry:** none replaced; it adds to the sustained-overshoot switch (Q43/Q46/Q47, entries 88, 109).
+
+**Task:** TASK-1762 (SAT continuous -> PWM fail-safe at flow - CS >= 3.5), related TASK-1412. **Open:** the points under Interpretation; asked as one question in #dev-sat-mqtt.
+
+## 289. Q-288a answered A, with a 30 s hold: the flow - CS >= 3.5 fail-safe is an extra rule beside the 60 s rule (Sergeant D, 2026-11-09; settles the open points of entry 288)
+
+**Source:** sergeantd, 2026-11-09 18:58:46 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1569426039703216169 (https://discord.com/channels/812969634638725140/1105556725714649128/1569426039703216169), answer to our question Q-288a, msg 1569419638117244961.
+
+**Quoted:** "@BlueFlame Bot the answer is A but we need to stay 30 seconds at flow - CS >= 3.5 just not to trigger unnecessary PWM cycles. This will be an extra fail safe mechanism for flame out"
+
+**Question as asked (Q-288a):** how the 3.5 rule relates to the existing switch (thermo-nova `heating_control.py:262-305`: flow >= requested setpoint + margin for 60 s, margin 3.0 in thermo-nova `cycles/const.py:10`, 2.0 in the firmware). A) extra rule, immediate, the 60 s rule stays (recommended); B) replaces the 60 s rule; C) 60 s timer with margin 3.5. Stated with the question: "CS" is the setpoint SAT computes (the requested/PID setpoint, the same value the 60 s rule uses), and the MsgID 3 "PWM not allowed" bit (entry 213) still blocks it.
+
+**Settled:** option A, changed in one point: not immediate. In continuous mode, when flow - CS >= 3.5 holds for 30 s, SAT switches to PWM. This rule is extra, beside the existing 60 s sustained-overshoot rule, which stays unchanged. Purpose in his words: an extra fail-safe for flame out, with the 30 s to avoid unnecessary PWM cycles. CS = the requested (PID) setpoint, as stated in the question and not contradicted. Entry 213 (MsgID 3 bit 4 blocks every PWM entry path) applies.
+
+**Interpretation (ours):** the 30 s timer runs like the 60 s one (`SATcycles.ino` `satCycleCheckOvershootSwitch()`): it starts on the first qualifying tick, a tick with flow - CS < 3.5, a missing flow, a tick outside continuous mode or within the hot-water guard resets it, and the switch comes on the first tick at least 30 s after the start (entry 109: ticks never catch up). Equality counts (">=" as written). Whether the hot-water guard applies to this rule was not asked; we apply it as for the 60 s rule because both enter PWM from the same place. A reviewer or Sergeant D may correct this.
+
+**Changes an earlier entry:** settles the open points of entry 288 (immediate vs timer, extra vs replacement, which CS).
+
+**Task:** TASK-1762 (the implementation task for entry 288), related TASK-1412. **Open:** nothing for Sergeant D; the hot-water-guard reading above is ours.
