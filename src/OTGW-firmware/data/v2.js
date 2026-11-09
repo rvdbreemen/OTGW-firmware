@@ -2602,9 +2602,16 @@
   var setDirty = {};  // key -> new value (string)
   var setSearch = '';
   var setActiveCat = '';  // id of the currently-shown category (empty => first non-empty)
+  // TASK-1743: bumped by every fetchSettings() and by every save; a response applies only while
+  // it is the newest, so a late startup retry never overwrites newer data or a just-saved value.
+  var setFetchSeq = 0;
   function fetchSettings() {
-    fetch(APIGW + 'v2/settings').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
-      if (!j) return;
+    // TASK-1743: the startup call is the only one until Settings is opened or a wizard finishes,
+    // so one busy 503 left setData empty and the SAT page's SAT settings blank. Retry 503s and
+    // network errors (400/800/1600/3200 ms, sequential, so the 2-in-flight cap holds).
+    var my = ++setFetchSeq;
+    fetchWithRetry(APIGW + 'v2/settings', undefined, 5).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (!j || my !== setFetchSeq) return;
       // settings come as { key: {value, type, ...}, ... } possibly nested under a root
       var src = j.settings || j;
       var keepDirty = setDirty;   // TASK-1318: unsaved edits survive a refetch (BLE Assign / roster links)
@@ -3032,6 +3039,7 @@
     });
   }
   function saveSettings() {
+    setFetchSeq++;   // TASK-1743: a settings GET still pending from before this save must not undo it
     // TASK-1737: a locked SAT setting is never saved while SAT is off. One edited while SAT was on
     // (SAT switched off since) is dropped with a message naming it, never silently.
     var dropped = [];

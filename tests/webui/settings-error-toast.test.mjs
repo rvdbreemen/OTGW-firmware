@@ -77,7 +77,7 @@ function load(statusFor, opts = {}) {
     'function subFor() { return ""; } function labelFor() { return ""; } function curVal() { return ""; }\n' +
     'function satOnbNeeded() { return ' + (opts.onboardingNeeded ? 'true' : 'false') + '; } function renderSettings() {}\n' +
     'var wizardStarted = 0; function bleAction() {} function startSatOnboarding() { wizardStarted++; }\n' +
-    'function bleNeedsRiskAck() { return false; } function maybeShowBleConsent() {} function satLockedKey() { return false; }\n' +
+    'function bleNeedsRiskAck() { return false; } function maybeShowBleConsent() {} function satLockedKey() { return false; } var setFetchSeq = 0;\n' +
     extractFunction(src, 'bleToast') + '\n' + extractFunction(src, 'saveSettings') + '\n' +
     'return { save: function (d) { setDirty = d; saveSettings(); }, bleToast: bleToast, wizard: function () { return wizardStarted; } };';
   const api = new Function('document', 'fetch', 'setTimeout', 'clearTimeout', body)(env.document, env.fetch, env.setTimeout, env.clearTimeout);
