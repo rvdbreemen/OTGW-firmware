@@ -3,10 +3,11 @@ id: TASK-1736
 title: >-
   Bench .61 (beta.146-148, no PSRAM): max free block stuck at 7668 B, every REST
   call 503 'low heap', MQTT packets not queued
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-08T15:48:00Z'
-updated_date: '2026-11-08T18:23:00Z'
+updated_date: '2026-11-09T08:43:00Z'
 labels:
   - bug
   - heap
@@ -26,7 +27,7 @@ ordinal: 843000
 <!-- AC:BEGIN -->
 - [ ] #1 Reproduce or explain: which allocation pattern leaves the largest block < 8192 B with ~31 KB free (heap trace or telnet heap log over time on a no-PSRAM unit)
 - [ ] #2 Fix or gate change so a fragmented heap does not lock out REST and MQTT for minutes; red/green evidence
-- [ ] #3 Bench: no-PSRAM unit runs 1 h with REST/MQTT available, maxblk logged
+- [x] #3 Bench: no-PSRAM unit runs 1 h with REST/MQTT available, maxblk logged
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -78,4 +79,6 @@ Dry run A-dry on current .61 firmware (beta.149), 18:32:21-18:34:51 (2.5 min): 1
 - MQTT: 2x 'MQTT packet not queued (connected, maxblk=11764)' at 19:20:35. This is the first reproduction of the MQTT symptom; transient, below the 16 KB EMC gate.
 - No lasting drift in 45 min: no step-down baseline, and the 7668 B lock-in was NOT reproduced. The deepest dip coming at the end (11764) is a single data point, not a trend.
 - No 'REST stream size' lines, as expected on beta.149.
+
+2026-11-09 AC3 evidence (session 4c, TASK-1741 bench): bench .61 (OT-Direct, no PSRAM) on 2.0.0-beta.160+485649c from the OTA at 08:33 until 09:39 (1 h 06 min). REST answered throughout under three ab_bench runs (two visible tabs, one visible + one hidden, one tab; 20 min each), mqttconnected true, maxblk logged over telnet (92 samples, min 13300, max and last 31732), bootcount 179 = flash + 2, no crashlog, no HEAP-CRITICAL, no 'MQTT packet not queued'. Evidence: %LOCALAPPDATA%/OTGW-capture/bench-1741 (heap.csv, telnet.log, runs/). Caveat: beta.160 contains the presize from beta.155 plus TASK-1741, so this is not an isolated TASK-1736 soak. The 7668 B lock-out of beta.146-148 did not come back in these runs, also not on beta.159 (red run 08:11-08:31, maxblk min 12276).
 <!-- SECTION:NOTES:END -->
