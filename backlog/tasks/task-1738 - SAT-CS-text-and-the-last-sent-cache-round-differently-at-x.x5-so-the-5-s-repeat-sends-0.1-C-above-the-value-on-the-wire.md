@@ -3,11 +3,11 @@ id: TASK-1738
 title: >-
   SAT: CS= text and the last-sent cache round differently at x.x5, so the 5 s
   repeat sends 0.1 C above the value on the wire
-status: In Progress
+status: Done
 assignee:
   - '@system32-78'
 created_date: '2026-11-08T17:24:00Z'
-updated_date: '2026-11-08T23:21:00Z'
+updated_date: '2026-11-09T05:32:00Z'
 labels:
   - sat
   - bug
@@ -26,7 +26,7 @@ Found in TASK-1412.5 triage on capture F1104 (gruijter, beta.68, PIC, Intergas, 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 A host test on the real senders shows text != cache for 45.5499992 (and 34.5499992) on the current code and text == cache after the fix
-- [ ] #2 All CS= senders format the wire text from the cached quantised value; no 0.1 C repeat blip in a replay of F1104 around 08:59:50 and 16:09:56
+- [x] #2 All CS= senders format the wire text from the cached quantised value; no 0.1 C repeat blip in a replay of F1104 around 08:59:50 and 16:09:56
 - [x] #3 evaluate.py --quick no new FAIL
 <!-- AC:END -->
 
@@ -40,4 +40,6 @@ Fix 2026-11-08 (system32-78, wt-1738 lane-1738 on origin/dev f60f0fa0d; coordina
 2026-11-08 otgw-firmware-80 red/green on int-157 (HEAD e4d0280f4) vs origin/dev 07b38ee49 + the new test file: tests/test_sat_cs_wire_matches_cache.py fix Ran 5 OK; old 4 FAIL (455!=456 for 45.5499992 on capped keepalive, 5 s repeat, suppression refresh; TC 202!=203 for 20.25). evaluate.py --quick on int-157: 86 passed, 0 WARN, 0 FAIL. AC2 left open: the test drives the F1104 values (45.5499992 / 34.5499992) through every real CS= sender, but it is not a replay of the F1104 capture around 08:59:50 and 16:09:56.
 
 2026-11-09 00:15-00:19 (system32-78) read-only CS stream check on .61 (marvin-otgw32, OT-Direct, 2.0.0-beta.157+8b67ad0, which contains the fix as beta.156 321c9ce2c), passive mosquitto_sub on the LAN broker 192.168.88.32 for 240 s, no telnet (1-client slot), no POST/setting/reboot. event_report: 35x 'CS: 10.00', 3x 'MM: 100', 3x 'CH: 0' between 00:17:22 and 00:18:37; sat/setpoint 10.0, requested_setpoint 24.2/23.0/22.9; at 00:18:19 boiler_connected, thermostat_connected and otgw_connected went OFF and the CS reports stopped. Result: inconclusive for this bug. CS sat at the 10.0 floor the whole window (night, no heat demand), an exact tenth, so no x.x5 float reached a sender; the stream shows no 0.1 C blip, but it could not have shown one. AC2 stays open: a replay of F1104 at 08:59:50 and 16:09:56 needs the F1104 capture again (removed from the session scratchpad in the 11-08 cleanup; re-downloading needs Robert's OK). Alternative: accept AC2 on the host test, which drives the same two float values (45.5499992, 34.5499992) through every real CS= sender incl. the 5 s repeat; that is Robert's/the coordinator's call. Lane-1738 (df2c73a0f) dropped: patch-id equal to 321c9ce2c on origin/dev, worktree clean, not pushed.
+
+2026-11-09 AC2 replay of F1104 (system32-78). Capture: gruijter #alpha-testing msg 1567635661518016717, 20261104-083659-upload.zip SHA256 752e73a7...5648, downloaded by otgw-firmware-97 on Robert's OK, kept local (user data, not committed). Replay (f1104_replay.py, see 'Evidence location' below): takes every CmdQueue CS= insert at 08:59:10-09:00:05 and 16:09:08-16:10:05, classifies it as tick (SATTICK within 50 ms), resend (4.95-5.15 s after the previous CS=) or refresh, and drives the REAL senders cut from SATcontrol.ino (same cut/stubs as tests/test_sat_cs_wire_matches_cache.py) with input = last 'Tboiler = xx.xx' minus 1.0f in float32: tick satSendCS(v), resend satSendCS(satCapRepeatCS(fLastSentCS)), refresh satEnqueueIfChangedCS(v). Model fit: beta.68 SATcontrol.ino and the pre-fix 321c9ce2c^ reproduce the captured wire text on 28/28 events AFTER excluding the first two events per window. Event 1 does not fit the Tboiler-1.0 input model (08:59:10.891 Tboiler 46.43: replay 45.4, capture 45.3; 16:09:10.524 Tboiler 34.79: replay 33.8, capture 33.5, 0.3 off; its sender/input is something else, not traced); event 2 then follows from event 1's cached value. Honest caveat: the windows (first run started at 08:59:40/16:09:38) and the resend tolerance (first run +-50 ms, which mislabelled the 5.08-5.09 s resends at 09:00:01.989 and 16:09:46.604 as refreshes) were widened after seeing the first run; the two exclusions were chosen by hand. Check 'a resend puts the same value on the wire as the CS= before it': old code 2 repeat blips, exactly the F1104 cases (08:59:55.511 CS=45.5->45.6, 16:10:01.533 CS=34.5->34.6); fix (origin/dev 94406bafc) 0 blips. The fix differs from the capture on 2 of the 28 events, both the intended consistent rounding of the x.x5 float: tick 08:59:50.510 Tboiler 46.55 -> 'CS=45.6' (was 45.5 with cache 45.6), refresh 16:09:56.532 Tboiler 35.55 -> 'CS=34.6' (was 34.5 with cache 34.6); the following resend repeats that same value. Not verified on hardware: .61 (beta.157) showed only CS=10.00 at night (note above). Evidence location: replay script committed as tests/f1104_replay.py (no data; capture and SATcontrol.ino paths as arguments; run: python -I tests/f1104_replay.py <transcript.txt> <old.ino> src/OTGW-firmware/SATcontrol.ino). The per-event output is a timeline of gruijter's home capture and stays local (coordinator: public repo); the numbers above are the record. Original zip kept in RvdB/capture-f1104 until Robert decides.
 <!-- SECTION:NOTES:END -->
