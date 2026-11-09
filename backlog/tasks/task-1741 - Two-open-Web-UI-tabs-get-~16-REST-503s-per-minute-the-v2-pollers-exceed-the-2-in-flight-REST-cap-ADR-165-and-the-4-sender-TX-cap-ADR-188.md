@@ -3,11 +3,11 @@ id: TASK-1741
 title: >-
   Two open Web UI tabs get ~16 REST 503s per minute: the v2 pollers exceed the
   2-in-flight REST cap (ADR-165) and the 4-sender TX cap (ADR-188)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-08T18:26:00Z'
-updated_date: '2026-11-09T06:56:00Z'
+updated_date: '2026-11-09T08:36:00Z'
 labels:
   - bug
   - webui
@@ -35,8 +35,8 @@ ADR-165 (Accepted, N*=2) assumed the v2 client already stays within 2 in flight.
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Explain per source (REST cap, TX cap, heap clamp) how many 503s two tabs cause, with the run A numbers as baseline
-- [ ] #2 A fix (client-side request scheduling in v2.js and/or a reviewed cap change) brings two-tab 503s close to 0 without heap regression; red/green evidence on .61
-- [ ] #3 If a cap or ADR changes, Robert decides with measured numbers (ADR-165/188 are Accepted)
+- [x] #2 A fix (client-side request scheduling in v2.js and/or a reviewed cap change) brings two-tab 503s close to 0 without heap regression; red/green evidence on .61
+- [x] #3 If a cap or ADR changes, Robert decides with measured numbers (ADR-165/188 are Accepted)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -230,3 +230,9 @@ Red/green: tests/webui/poll-spread-hidden.test.mjs drives the real v2.html/v2.js
 
 2026-11-09 gates on the final diff (before the rebase onto beta.159): full webui suite 291 tests, 280 pass, 0 fail, 11 skipped; python scripts/run_tests.py -j 4: 191 of 192 files pass. The one failure, tests/test_web_file_scheduling.py ('platform.h' not found in the MSVC harness), is on dev since 44d6ef686 (TASK-1736 added #include <platform.h> to webServerCompat.h:43). This diff does not touch its inputs (webServerCompat.h, Platform unchanged against HEAD). Reported to the coordinator for assignment.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped as 2.0.0-beta.160+485649c (origin/dev 8ea2cdcad..485649c46), on top of R1 (0e9d7b39c, beta.157). Robert's decision: spread + pause hidden, no cap or ADR change; the coordinator widened 'pause hidden' to the SAT page and BLE roster polls. AC1 (otgw-firmware-80): run A split REST cap 9.8/min, TX cap 6.0/min, heap clamp 0.16/min. AC2: v2.js gives each tab a random poll phase with fixed non-colliding offsets (health, device/time, sat/status, weather, BLE and Dallas discovery, otmonitor and PS=1 ticks), and a hidden tab skips every periodic poller, drops its Dallas and weather values, and refreshes once when shown after at least 15 s. Host test tests/webui/poll-spread-hidden.test.mjs (real v2.html/v2.js, timers and Date.now scaled): old code 0/5, fix 5/5, mutants red; full webui suite 280 pass 0 fail; run_tests 191/192 (the one failure, test_web_file_scheduling, is on dev since 44d6ef686 and was handed to detectie); evaluate 0 FAIL. Bench .61 (OT-Direct, no PSRAM), ab_bench harness, 20 min per run, evidence in %LOCALAPPDATA%/OTGW-capture/bench-1741/runs: RED beta.159 two visible tabs 15.6 503/min (311/2294, 13.6%; telnet REST cap2 210, WEB CONN CAP 101, cap1 3; maxblk min 12276); GREEN beta.160 two visible tabs 1.9/min (38/2340, 1.6%; cap2 19, WEB CONN CAP 0, cap1 0; maxblk min 13300, end 31732); one visible + one hidden 0.1/min (visible tab 0 of 1177; hidden tab 14 start-up requests, 3 x 503: 2 on the startup settings fetch, 1 debug; maxblk min 26612); single tab 0/1174, maxblk 31732 flat. OTA settings 164 keys, changed none; device-served page carries the new code; 1 h 02 min after the flash bootcount 179 = flash + 2, no crashlog, no heap-critical, no MQTT packet not queued. Two-tab 503s are not 0: the remaining 1.9/min fall mostly on otdirect/overrides (26 of 38), because one tab's health chain fires simulate and overrides together; that is a follow-up task. AC3: no cap or ADR changed (Robert's decision recorded in the notes), so nothing to decide. Not verified: a hidden tab in a real browser (emulated with document.hidden; real Chrome also throttles hidden timers); an OTGW Classic with an S3 Mini; the stale-value drop on hide (code read only). Zip posted #alpha-testing 1569269199656849428.
+<!-- SECTION:FINAL_SUMMARY:END -->
