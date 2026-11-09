@@ -127,6 +127,10 @@ def main():
         (directory / "reset_heap.inc").write_text(helpers[start:end])
         (directory / "Arduino.h").write_text("")
         (directory / "ESPAsyncWebServer.h").write_text("")
+        # webServerCompat.h includes <platform.h> for platformMaxFreeBlock() since TASK-1736
+        # (44d6ef686, restBeginStreamSized). The fixture defines platformMaxFreeBlock() itself
+        # (web_file_scheduling.cpp), so the header only needs the include to resolve (TASK-1723).
+        (directory / "platform.h").write_text("#pragma once\n")
         executable = directory / ("file-scheduling.exe" if vcvars else "file-scheduling")
         if vcvars:
             cmd = (f'call "{vcvars}" >nul && cl /nologo /std:c++17 /EHsc /W3 /utf-8 /D_CRT_SECURE_NO_WARNINGS '

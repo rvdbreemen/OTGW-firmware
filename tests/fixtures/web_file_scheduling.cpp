@@ -165,6 +165,7 @@ public:
 class AsyncResponseStream : public BoundaryResponse {
 public:
   AsyncResponseStream() : BoundaryResponse(200, "application/json") {}
+  size_t available() const { return 0; }  // restFinalize() reports the body length (TASK-1736)
 };
 #define RESPONSE_STREAM_BUFFER_SIZE 1460
 namespace AsyncWebRequestMethod { enum Method { HTTP_GET, HTTP_POST, HTTP_PUT, HTTP_DELETE, HTTP_PATCH, HTTP_HEAD, HTTP_OPTIONS }; }
@@ -256,6 +257,8 @@ void BoundaryResponse::_respond(AsyncWebServerRequest* req) {
 AsyncWebServer server;
 AsyncWebServerRequest* currentRequest = nullptr;
 AsyncResponseStream* g_restStream = nullptr;
+uint8_t  g_restSizeClass = 0;  // TASK-1736 globals (restAPI.ino in the firmware)
+uint16_t g_restSizeCap   = 0;
 bool g_responseSent = false, g_restSlotHeld = false;
 WebPendingHeaders g_pendingHeaders{};
 WebRequestBody g_requestBody{};
