@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-27T23:40:00Z'
-updated_date: '2026-11-04T19:46:00Z'
+updated_date: '2026-11-09T20:33:00Z'
 labels:
   - epic
   - sat
@@ -99,6 +99,14 @@ created: 2026-10-28T20:08:00Z
 ---
 
 Robert requested this builder handoff from Codex. Read docs/sat/sat-low-load-execution-backlog-2026-10-28.md (current schedule) and docs/sat/sat-low-load-agent-handoff-2026-10-28.md before the next task. Keep current 1368 and 1409 work; this update changes only metadata/docs. Main PID chain: 1368 -> 1270 -> 1416 -> 1417 -> 1418 -> 1414 -> 1423 -> 1415. 1381 branches after 1270 and still waits on Q53; 1415 waits on Robert for write cadence. Q55 is answered by entry 111. 1409 is independent, followed by telemetry verification with 1425. Include 1422/1424 and 1413 in their integration gates. Do not resolve the ID6/MaxTSet contract or any open question by assumption. Per-fix bench old-vs-new proof is required before tester alphas; formal 1412.18 -> .26 validation remains required. Do not stage or overwrite another worker's source/task changes; coordinate shared SATpid.ino edits one at a time.
+
+---
+
+created: 2026-11-09T20:33:00Z
+
+---
+
+Field report gruijter 2026-11-09 20:27 UTC (msg 1569448447248048138): house cooled to 15 °C while away, slow remote warm-up (thermal mass); disturbances: living-room door open all day, bathroom radiator valve stuck open; graph PNG + CSV posted, no full capture; not analysed (capture rule); --long-run capture requested by 97. Waiting for capture.
 
 ---
 <!-- COMMENTS:END -->
