@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-11-08T16:49:00Z'
-updated_date: '2026-11-08T22:55:00Z'
+updated_date: '2026-11-09T07:20:00Z'
 labels:
   - webui
   - sat
@@ -41,6 +41,8 @@ Robert, #dev-sat-mqtt 2026-11-08 17:48 (msg 1569030889692987405): 'No setting sh
 2026-11-08 otgw-firmware-80 red/green on int-157 (HEAD e4d0280f4) vs origin/dev 07b38ee49 + the new test file: sat-settings-locked-when-off fix 6/6, old 2/6. Red on old: locked with SAT off, unlock on switch-on, takeover keeps locked, edit made while on not saved after off. Green on both (AC2, unchanged behaviour): 'with SAT on, SAT settings are editable' and 'SAT off and not set up starts the wizard'. settings-help needed the satLockedKey stub (e4d0280f4). AC3 (bench .61) pending.
 
 2026-11-08 23:46 otgw-firmware-80 bench .61 on beta.157+8b67ad0 (OTA app+fs): SAT page Control view in headless Chrome against the real device. SAT on: 41 SAT rows, 41 editable, 0 locked (61-1737-sat-on-control.png). POST satenabled:false: 41/41 locked, note 'SAT is off: the SAT settings are locked', switch shows Disabled and stays usable (61-1737-sat-off-control.png). SAT restored on. Evidence: C:\Users\rvdbr\AppData\Local\OTGW-capture\evidence\int157-beta157
+
+2026-11-08 (agent 3 via the coordinator): the case 'with SAT on, SAT settings are editable' sometimes hung at the timeout on a CDP stall (base 1/4, with TASK-1741 2/6; the other 5 cases pass). Same family as TASK-1739/1742 (headless Chrome under load), not a product defect. Hardened: one h.until on the end state (all 8 controls enabled, no note), then a single evalJs reads all states, instead of 9 sequential CDP round trips. 3/3 green alone afterwards; a stall in startPage itself is still possible until TASK-1739. (Uncommitted in worktree OTGW-firmware-wt1735, carried over by system32-78 2026-11-09 before that worktree was removed.)
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
