@@ -97,6 +97,7 @@ static constexpr uint8_t OT_CMD_QUEUE_SIZE = 12;
 static uint32_t otCmdQueue[OT_CMD_QUEUE_SIZE];
 static uint8_t otCmdHead = 0, otCmdTail = 0;
 static bool otCmdQueueEmpty() { return otCmdHead == otCmdTail; }
+static void otCmdApplyPendingFlush() {}   // the ring flush itself is covered by test_otd_mode_switch_queue_reset.py
 static bool otIsVentSlave() { return false; }
 static bool otdCsOverrideActive() { return false; }
 static bool satOwnsControlSetpoint() { return false; }

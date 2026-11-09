@@ -429,6 +429,7 @@ enum OTDirectMode { OTD_MODE_GATEWAY = 1 }; static OTDirectMode otCurrentMode = 
 static unsigned long buildStatusRequest() { return 0xFFFF0000UL; }
 static bool otIsVentSlave() { return false; }
 static bool otCmdQueueEmpty() { return true; }
+static void otCmdApplyPendingFlush() {}
 static bool otCmdEnqueue(unsigned long f) { printf("%lu ENQ %lu\n", (unsigned long)g_ms, f & 0xFFFF); return true; }
 static void otDirectBridgeProcessStatus(const char* s) { printf("%lu STATUS %s\n", (unsigned long)g_ms, s); }
 static void synthesizeResponse(char*, const char*) {}

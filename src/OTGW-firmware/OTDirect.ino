@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.163
+**  Version  : v2.0.0-beta.164
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -340,12 +340,27 @@ static uint32_t otCmdQueue[OT_CMD_QUEUE_SIZE];
 static uint8_t  otCmdHead = 0;   // next write position
 static uint8_t  otCmdTail = 0;   // next read position
 static uint8_t  otCmdQueueHighWater = 0;  // TASK-494: peak depth observed
+// Flush request from resetTransientState(), which can run on the async_tcp task. The consumer on the
+// loop task applies it (otCmdApplyPendingFlush), so otCmdTail keeps a single writer.
+static uint8_t  otCmdFlushHead = 0;      // otCmdHead when the flush was requested
+static bool     otCmdFlushPending = false;
 
 static bool otCmdQueueEmpty() { return otCmdHead == otCmdTail; }
 static bool otCmdQueueFull()  { return ((otCmdHead + 1) % OT_CMD_QUEUE_SIZE) == otCmdTail; }
 
 static uint8_t otCmdQueueDepth() {
   return (otCmdHead + OT_CMD_QUEUE_SIZE - otCmdTail) % OT_CMD_QUEUE_SIZE;
+}
+
+// The ring is flushed by its consumer, so otCmdTail keeps a single writer; frames queued before a
+// mode switch or GW=R never go out under the new mode (ADR-223). The tail moves forward to the
+// head snapshot taken at the reset, never past the current head and never backwards: frames
+// enqueued after the reset stay, and a consumer that already drained past the snapshot is left alone.
+static void otCmdApplyPendingFlush() {
+  if (!__atomic_exchange_n(&otCmdFlushPending, false, __ATOMIC_ACQ_REL)) return;
+  const uint8_t snap = __atomic_load_n(&otCmdFlushHead, __ATOMIC_RELAXED);
+  const uint8_t dSnap = (uint8_t)((snap + OT_CMD_QUEUE_SIZE - otCmdTail) % OT_CMD_QUEUE_SIZE);
+  if (dSnap <= otCmdQueueDepth()) otCmdTail = snap;
 }
 
 // TASK-494: enqueue with coalesce-by-MsgID.
@@ -1703,10 +1718,12 @@ static void scheduleMasterRequest() {
 
   // Pending commands from the ring buffer take priority.
   // Peek first — only dequeue after successful async send (Codex P1 fix).
+  otCmdApplyPendingFlush();
   if (!otCmdQueueEmpty()) {
     uint32_t cmdFrame = otCmdQueue[otCmdTail];
     if (sendMasterRequestAsync(cmdFrame, OT_DIRECT_ORIGIN_GATEWAY)) {
       otCmdTail = (otCmdTail + 1) % OT_CMD_QUEUE_SIZE;  // consume on success
+      otCmdApplyPendingFlush();  // a reset during the send flushes now; a stale snapshot is rejected
     }
     return;
   }
@@ -1838,6 +1855,7 @@ static bool otdAltSlotTaken(unsigned long thermostatFrame) {
   otdNoteThermostatFrame(thermostatFrame, now);
   uint8_t idx = OT_SCHEDULE_SIZE;   // OT_SCHEDULE_SIZE: the queued command
   unsigned long request;
+  otCmdApplyPendingFlush();
   if (!otCmdQueueEmpty()) {
     request = otCmdQueue[otCmdTail];
   } else {
@@ -1857,7 +1875,10 @@ static bool otdAltSlotTaken(unsigned long thermostatFrame) {
   otSlave.sendResponse(unknownResp);
   if (sendMasterRequestAsync(request, OT_DIRECT_ORIGIN_GATEWAY)) {
     if (idx < OT_SCHEDULE_SIZE) otSchedule[idx].lastSentMs = now;
-    else otCmdTail = (otCmdTail + 1) % OT_CMD_QUEUE_SIZE;
+    else {
+      otCmdTail = (otCmdTail + 1) % OT_CMD_QUEUE_SIZE;
+      otCmdApplyPendingFlush();  // a reset during the send flushes now; a stale snapshot is rejected
+    }
   }
   return true;
 }
@@ -2111,6 +2132,9 @@ void otdMqttSetRoomSetpoint(float tempC) {
 // Non-blocking: uses async requests, never blocks for OT response.
 // ---------------------------------------------------------------------------
 void loopOTDirect() {
+  // Apply a pending command-ring flush every pass, also in modes where no consumer runs.
+  otCmdApplyPendingFlush();
+
   // TASK-1702: a saved OTDmode takes effect at once. Compared with the running mode, not
   // the stored one, so choosing Gateway after the boot auto-detect picked Master switches
   // back. Waits while a master request is in flight.
@@ -2475,6 +2499,12 @@ static void onThermostatMsgID16(uint8_t msgType, uint16_t f88) {
 // Mirrors PIC hardware reset clearing all RAM, except persisted settings.
 // ---------------------------------------------------------------------------
 static void resetTransientState() {
+  // Flush the command ring: a frame queued under the previous mode (a WRITE 16/100 from TT= in
+  // master mode) must not reach the boiler after the switch (ADR-223). The consumer applies the
+  // flush; frames queued after this point are kept. otCmdQueueHighWater stays: it is a diagnostic
+  // peak, not queue content.
+  __atomic_store_n(&otCmdFlushHead, otCmdHead, __ATOMIC_RELAXED);
+  __atomic_store_n(&otCmdFlushPending, true, __ATOMIC_RELEASE);
   // Operating mode overrides
   otOperModeDHW = 0;
   otOperModeCH1 = 0;

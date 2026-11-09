@@ -198,6 +198,8 @@ static struct { struct { bool bEnableSlave; int iMode; } otd; } settings;
 #ifdef _MSC_VER
 #define __ATOMIC_RELEASE 0
 #define __ATOMIC_ACQ_REL 0
+#define __ATOMIC_RELAXED 0
+#define __atomic_load_n(p, o) (*(p))
 #define __atomic_store_n(p, v, o) (*(p) = (v))
 template <typename T> static T __atomic_exchange_n(T* p, T v, int) { T o = *p; *p = v; return o; }
 #endif

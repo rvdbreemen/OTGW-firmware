@@ -45,6 +45,8 @@ PRELUDE = r"""
 #ifdef _MSC_VER   // the firmware uses the GCC __atomic builtins; MSVC gets plain single-thread stand-ins
 #define __ATOMIC_RELEASE 0
 #define __ATOMIC_ACQ_REL 0
+#define __ATOMIC_RELAXED 0
+#define __atomic_load_n(p, o) (*(p))
 #define __atomic_store_n(p, v, o) (*(p) = (v))
 template <typename T> static T __atomic_exchange_n(T* p, T v, int) { T o = *p; *p = v; return o; }
 #endif
@@ -66,6 +68,7 @@ static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
 static bool otMasterRequestActive = false;
 static int nApply = 0;
 static void applyOTDirectMode(OTDirectMode m) { nApply++; otCurrentMode = m; }
+static void otCmdApplyPendingFlush() {}   // the ring flush itself is covered by test_otd_mode_switch_queue_reset.py
 struct OtStub { void process() {} } otMaster, otSlave;
 static void updateSetting(const char* field, const char* newValue);
 """

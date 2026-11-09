@@ -354,6 +354,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Clears response overrides and write caches
   - Clears repeater overrides
   - Clears response modifiers
+  - Flushes the command ring (consumer-side: frames queued before the reset are dropped, frames queued after it are kept)
   - Resets setback engagement
   - Clears fake room setpoint (BS=)
 

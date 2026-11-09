@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : S0types.h
-**  Version  : v2.0.0-beta.163
+**  Version  : v2.0.0-beta.164
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

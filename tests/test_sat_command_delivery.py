@@ -40,6 +40,14 @@ OTD_INO = Path(os.environ.get("OTGW_OTD_INO", REPO / "src" / "OTGW-firmware" / "
 # TASK-1593: the OT-Direct side is the REAL code too: the command ring (otCmdEnqueue), enqueueWriteCommand() and the prologue, the CS= and the
 # MM= branches and the epilogue of handleOTDirectCommand() are cut out of OTDirect.ino. Every other command goes to a recording stub branch.
 OTD_STUBS = r"""
+#ifdef _MSC_VER   // the ring flush uses the GCC __atomic builtins; MSVC gets single-thread stand-ins
+#define __ATOMIC_RELEASE 0
+#define __ATOMIC_ACQ_REL 0
+#define __ATOMIC_RELAXED 0
+#define __atomic_load_n(p, o) (*(p))
+#define __atomic_store_n(p, v, o) (*(p) = (v))
+template <typename T> static T __atomic_exchange_n(T* p, T v, int) { T o = *p; *p = v; return o; }
+#endif
 #define OTDDebugTf(...) ((void)0)
 #define OTDDebugTln(...) ((void)0)
 #define DebugTf(...) ((void)0)
