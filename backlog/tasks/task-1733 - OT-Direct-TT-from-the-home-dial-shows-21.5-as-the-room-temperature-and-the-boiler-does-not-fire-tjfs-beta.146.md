@@ -3,11 +3,11 @@ id: TASK-1733
 title: >-
   OT-Direct: TT= from the home dial shows 21.5 as the room temperature and the
   boiler does not fire (tjfs, beta.146+)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-08T15:26:00Z'
-updated_date: '2026-11-09T10:17:00Z'
+updated_date: '2026-11-09T12:04:00Z'
 labels:
   - bug
   - otdirect
@@ -26,9 +26,9 @@ tjfs 2026-11-08 15:12 #alpha-testing (msgs 1569006644661190766, 1569006818347458
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Capture or host replay shows why 21.5 lands on MsgID 24 / the room temperature display (file:line)
+- [x] #1 Not reproducible on beta.161: a field capture shows MsgID 24 carries the thermostat's own room temperature and 21.5 appears on no frame (maintainer-accepted rewording 2026-11-09)
 - [x] #2 Fix: TT= in OT-Direct gateway mode changes the setpoint path only; room temperature display unchanged; red/green test
-- [ ] #3 Field: tjfs confirms the thermostat takes the override and the boiler fires
+- [x] #3 Field-confirmed: TT= has no effect on a thermostat that never reads MsgID 9 (PIC rule, ADR-223); the boiler follows the thermostat's own demand (maintainer-accepted rewording 2026-11-09)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -152,5 +152,11 @@ NOT VERIFIED:
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-AC2 done: ADR-223 F2 in beta.161 (45dadcfb8): TT=/TC= in OT-Direct gateway mode are answer state only (MsgID 9/100), no gateway WRITE 16/100, PIC release rule after a MsgID 9 read, master mode keeps TrSet; review fixes M1 (observer before alt-slot), M2 (9/100 never alt slots, READ_ACK 0), web UI row-16 Clear -> BS=0. Evidence: tests/test_otd_tt_pic_parity.py 40/40 (red 16/27 on 99035d1ce; each review fix red with only that fix reverted), full suite 244 PASS (1 unrelated harness break fixed under TASK-1723), .61 soak + master-mode bench. Open: AC1 needs tjfs's capture (no code path found that writes MsgID 24); AC3 field confirmation by tjfs. Not verified on hardware: the gateway path with a real thermostat.
+AC1 (reworded, Robert accepted 2026-11-09 via coordinator): tjfs capture on beta.161 (20261109-093934-upload.zip, 32 min, 3876 frames): MsgID 24 carries only the thermostat's own room temperature 20.27-20.52 C; 0x1580 (21.5) appears in no frame. The beta.146 symptom is not reproducible on the bus; cause unproven (most likely the old home-dial UI path removed by TASK-1735).
+
+AC2: ADR-223 F2 in beta.161 (45dadcfb8): TT=/TC= in OT-Direct gateway mode are answer state only (MsgID 9/100), no gateway WRITE 16/100, PIC release rule. tests/test_otd_tt_pic_parity.py 40/40, red 16/27 on 99035d1ce; full suite 244 PASS; .61 soak and master-mode bench (TT=21.5 -> write override 16 = 0x1580, TT=0 clears).
+
+AC3 (reworded, accepted): same capture: thermostat reads MsgID 9/100 zero times, also after TT=21.5 (OTmonitor TT=21.5/TT=0 answered 'TT: 21.50'/'TT: 0.00' on port 25238), so TT= has no effect, as on a PIC; the boiler follows the thermostat's own demand (program setpoint 17.0 C, room 20.3 C, CH-enable off -> no burn).
+
+Not verified: the gateway path with a thermostat that does read MsgID 9 (no such thermostat on the bench). TASK-1749 restores the remote override row in the overrides panel.
 <!-- SECTION:FINAL_SUMMARY:END -->
