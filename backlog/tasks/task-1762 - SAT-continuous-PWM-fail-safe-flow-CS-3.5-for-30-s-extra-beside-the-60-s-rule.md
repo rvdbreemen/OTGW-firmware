@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@system32-030509'
 created_date: '2026-11-09T19:17:00Z'
-updated_date: '2026-11-09T21:46:00Z'
+updated_date: '2026-11-09T21:54:00Z'
 labels:
   - sat
   - pwm
@@ -68,6 +68,14 @@ created: 2026-11-09T21:46:00Z
 ---
 
 Bench .61, 2026-11-09 (slot from the coordinator): build.bat exit 0, build/OTGW-firmware-esp32-combo-2.0.0-beta.165+cbf48f1.ino.bin + .littlefs.bin (22:33). OTA via scripts/ota_flash.py: app + fs OK, running 2.0.0-beta.165+cbf48f1, 'settings: 164 keys, changed: none'; settings diff after the bench against the pre-OTA dump: none; SATsimulation was already true and stayed true. Sim check (SAT simulation, solar_gain 0.2 C/min from 22:40:41): the PID stepped 34.25 -> 30.41 at 22:42:43 with sim flow 33.8, flow - pid = 3.39 K for 50 s, then the PID fell to 10.6 (cold cutoff, 22:43:43). Fail-safe correctly not triggered at 3.39 K < 3.5; positive switch on hardware not shown, only in host tests. (The 60 s rule, margin 3.0 on .61, had reached 50 s.) Health at 22:46: bootcount 197, lastreset Software reset, freeheap 64660, hd_min_free_heap 18044, maxfreeblock 31732, max loop gap 305 ms, mqtt drops 0; no panic/exception in telnet. Pushed on the coordinator's go (option a: push with this caveat).
+
+---
+
+created: 2026-11-09T21:54:00Z
+
+---
+
+Soak .61 beta.165+cbf48f1, read-only device/info at 22:53:27 (16 min uptime, after the push): bootcount 197 (unchanged since the OTA boots), lastreset Software reset, freeheap 68040, hd_min_free_heap 18044, maxfreeblock 31732, max loop gap 305 ms, mqtt drops 0, connected. Clean. .61 handed to otgw-firmware-80.
 
 ---
 <!-- COMMENTS:END -->
