@@ -1175,7 +1175,7 @@ External temperature values expire automatically (5 minutes for indoor, 10 minut
 - Not all thermostats report room temperature on OT MsgID 24. If yours does not, use an external sensor pushed via MQTT.
 - Outdoor temperature (MsgID 27) is rarely exchanged on the bus. An external push or weather API call is typically needed.
 - BLE temperature sensor scanning requires an ESP32 build.
-- SAT controls the flow temperature setpoint, but the wall thermostat still controls whether heating is enabled or disabled.
+- While SAT is enabled it sets both the flow temperature setpoint and the CH enable bit the boiler sees: SAT's `CH=0` (cold cutoff, PWM OFF phase, all valves closed, summer simmer) overrides the thermostat's heat demand. On a PIC board the PIC applies the `CH=` override to the thermostat's status message; in OT-Direct gateway mode the gateway rewrites the CH enable bit of the thermostat's relayed status message (MsgID 0). When SAT is off or has tripped a safety, the thermostat controls CH enable again. On OT-Direct a capture with a live thermostat that shows the boiler following SAT's `CH=0` is still open. Sources: ADR-208, ADR-199, ADR-179.
 
 ---
 
