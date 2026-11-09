@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@system32-030509'
 created_date: '2026-11-09T19:17:00Z'
-updated_date: '2026-11-09T20:37:00Z'
+updated_date: '2026-11-09T21:46:00Z'
 labels:
   - sat
   - pwm
@@ -59,3 +59,15 @@ Adjusted harness inputs (review point of the coordinator):
 
 Evidence (host, Windows, 2026-11-09): test_sat_overshoot_sustain 77 OK (FlameOutFailsafe 13 cases; red on old: 12 of 14 new cases + the old-input case); test_sat_pwm_override 83 OK; test_sat_slave_lowload 20 OK; the other tests that cut SATcycles.ino, run per file with python: fs_update_keep 37, ch_signals 4, classifier_parity 12, cycle_classifier 43, hp_pwm 35, last_cycle_expiry 10, lowload_contract 35 (1 skip, 2 expected failures as before), mqtt_contract_1485 15, narrate_fits 1, pwm_anchors 64, pwm_start_limit 26, requested_vs_transmitted 10, tail_percentile 9 (1 skip), telemetry_wire 18: all OK. Not yet: full run_tests, bump, ESP32 build, bench .61 (satsimulation).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-09T21:46:00Z
+
+---
+
+Bench .61, 2026-11-09 (slot from the coordinator): build.bat exit 0, build/OTGW-firmware-esp32-combo-2.0.0-beta.165+cbf48f1.ino.bin + .littlefs.bin (22:33). OTA via scripts/ota_flash.py: app + fs OK, running 2.0.0-beta.165+cbf48f1, 'settings: 164 keys, changed: none'; settings diff after the bench against the pre-OTA dump: none; SATsimulation was already true and stayed true. Sim check (SAT simulation, solar_gain 0.2 C/min from 22:40:41): the PID stepped 34.25 -> 30.41 at 22:42:43 with sim flow 33.8, flow - pid = 3.39 K for 50 s, then the PID fell to 10.6 (cold cutoff, 22:43:43). Fail-safe correctly not triggered at 3.39 K < 3.5; positive switch on hardware not shown, only in host tests. (The 60 s rule, margin 3.0 on .61, had reached 50 s.) Health at 22:46: bootcount 197, lastreset Software reset, freeheap 64660, hd_min_free_heap 18044, maxfreeblock 31732, max loop gap 305 ms, mqtt drops 0; no panic/exception in telnet. Pushed on the coordinator's go (option a: push with this caveat).
+
+---
+<!-- COMMENTS:END -->
