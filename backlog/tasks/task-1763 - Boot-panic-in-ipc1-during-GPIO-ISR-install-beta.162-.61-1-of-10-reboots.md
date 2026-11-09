@@ -4,6 +4,7 @@ title: Boot panic in ipc1 during GPIO ISR install (beta.162, .61, 1 of 10 reboot
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:21:00Z'
+updated_date: '2026-11-09T22:18:00Z'
 labels:
   - bug
   - crash
@@ -31,3 +32,33 @@ Candidates (not proven): attachInterrupt / attachInterruptArg in src/libraries/O
 - [ ] #2 Reproduce or bound it on the bench: repeated /ReBoot cycles (including after a long uptime and a low-heap boot) with serial capture; count panics per N reboots
 - [ ] #3 Fix, or a decision with Robert, with before/after panic counts
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-09T22:18:00Z
+
+---
+
+Code analysis, read-only (030509, 2026-11-09; firmware origin/dev 3c1353581; Arduino core + IDF 5.5.1 sources under D:\DevData\platformio\packages; sdkconfig framework-arduinoespressif32-libs/esp32s3/sdkconfig). F = fact from code/logs, G = guess.
+(A) Which call can produce this backtrace.
+F: esp32-hal-gpio.c:211-240: __attachInterruptFunctionalArg() calls gpio_install_isr_service() only once per boot (static interrupt_initialized, :212/:219-221); later attach/detach only use gpio_isr_handler_add/_remove (:240, :258), which do no esp_intr_alloc and no IPC.
+F: IDF esp_driver_gpio/src/gpio.c:528-553 gpio_install_isr_service -> gpio_isr_register :614-641 -> isr_core_id = current core (:624-626) -> esp_ipc_call_blocking(isr_core_id, gpio_isr_register_on_core_static) (:633) -> esp_intr_alloc (:608). So 'heap_caps_malloc <- esp_intr_alloc <- gpio_isr_register_on_core_static <- ipc_task' is the FIRST attachInterrupt of a boot, on core 1 (CONFIG_ARDUINO_RUNNING_CORE=1, sdkconfig:612; ipc1 = the IPC task of core 1).
+F: esp_intr_alloc mallocs small internal blocks (intr_alloc.c:172 vector_desc_t, :574 intr_handle_data_t, :611/:634); a NULL return is handled (ESP_ERR_NO_MEM), so a panic INSIDE heap_caps_malloc is not 'out of memory'.
+F: sdkconfig: CONFIG_HEAP_POISONING_LIGHT=y (header/tail canaries checked by the allocator), CONFIG_ESP_IPC_TASK_STACK_SIZE=1024, CONFIG_ESP_IPC_USES_CALLERS_PRIORITY=y, CONFIG_FREERTOS_CHECK_STACKOVERFLOW_CANARY=y, CONFIG_COMPILER_STACK_CHECK_MODE_NORM=y.
+G (most likely): a heap-integrity assert in multi_heap (corrupted block met by the malloc), i.e. the corruption happened earlier in that boot, not in the GPIO code. Less likely: ipc1's 1024 B stack (that usually reports 'Stack canary watchpoint triggered (ipc1)' instead). 4c's panic message text (e.g. 'CORRUPT HEAP' / 'assert failed: multi_heap...' / 'Stack protection fault') decides between the two; please add it.
+(1) Order at boot, and which boot.
+F: setup() order (OTGW-firmware.ino): LittleFS + readSettings, startWiFi (:108 within setup), initOTDirect (:150/:198/:230 by board path) -> OTDirect.ino:962 otMaster.begin(masterISR) -> OpenTherm.cpp:40-79 gptimer, :91-96 pinMode + attachInterrupt(CHANGE) = the first GPIO attach of the boot; then otSlave.begin :973 (OpenTherm.cpp:95/100); later startNTP/startTelnet/startWebserver/startMQTT, then updateRebootCount (OTGW-firmware.ino:540), startWebhookTask, initS0Count -> s0PulseCount.ino:50 (only if S0 is used, and never the first attach: OTDirect comes first). No other attachInterrupt/gpio ISR install in src/ or the bundled libraries (grep).
+F: the restart path does no detach/attach: doRestart (helperStuff.ino) -> flushSettings, prepareForReboot (mqtt disconnect, ws close, OTGWstream.stop; debugTelnet.stop() is commented out), delay(2000), platformRestart(). That is why telnet still showed the OLD banner at 12:02:22 (inside the 2 s delay).
+G (inference from the timeline, not proven): the panic happened in the NEW boot's setup, at initOTDirect's first attach, before updateRebootCount: the restart at ~12:02:22.5; a first boot 'A' that never answered telnet (timeouts 12:02:28/34); a second boot 'B' (connection refused at 39/43 = WiFi up, telnet not yet started; up 12:02:45.8 with lastreset Exception/panic). bootcount went only 189 -> 190, which fits a boot A that died before :540 and so never counted itself. The extra ~10 s over a normal reboot (25.5 vs 15.2-16.0 s) also fits one aborted boot.
+(2) Can an ISR fire before its state is ready?
+F: otMaster/otSlave are globals (state set by the constructor, OpenTherm.cpp:12 rxStatus NOT_INITIALIZED); attach happens before rxStatus = IDLE (:109). handleInterrupt (:324-366) with NOT_INITIALIZED takes the default branch and only writes responseTimestamp: benign. masterISR/slaveISR are IRAM (OTDirect.ino:39-40). S0: count zeroed before attach (s0PulseCount.ino:49-50). G: an early edge does not explain a panic inside heap_caps_malloc in ipc1.
+(3) Can the restart path call detach/attach while an IPC call runs?
+F: no: neither doRestart nor prepareForReboot touches GPIO interrupts, OTDirect or S0 (code above). Runtime re-attaches (OTDirect.ino:2600/2610/2621 mode switch, :3250-3254 GW=R) never reach the IPC path (install-once, (A)).
+Suggested next steps (no code before a decision):
+- 4c: the panic reason text and the PC/epc in multi_heap.
+- A heap integrity check (heap_caps_check_integrity_all) logged right before initOTDirect on a debug build, to see whether the heap is already corrupt at that point.
+- Repeat /ReBoot cycles with a serial console (TASK-1763 AC2).
+
+---
+<!-- COMMENTS:END -->
