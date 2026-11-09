@@ -1401,6 +1401,8 @@ Returns all active write overrides and response overrides in the OT-direct engin
 
 **Response** `200 OK`: JSON object with override lists (structure defined by `getOTDirectOverridesJSON()`). `overrides.sat_owns` (boolean, TASK-1681) is `true` while SAT owns the heating commands (`satOwnsControlSetpoint()`: SAT enabled, or its MQTT-loss fallback active). The firmware then refuses `CS=`, `CH=`, `MM=`, `C2=`, `H2=`, `TT=` and `TC=` from every other channel (TASK-1695), so the write overrides those commands set (MsgID 1, 8, 14, 16, 100) cannot be cleared by a command until SAT is off.
 
+`overrides.remote` (TASK-1749) is `null` when no `TT=`/`TC=` remote override is active, else an object: `mode` (`"temporary"` for `TT=`, `"constant"` for `TC=`), `value` (setpoint in degrees Celsius), `msgid9_answered` (boolean, the thermostat has read MsgID 9 since it was set), `accepted` (boolean, a thermostat MsgID 16 frame matched the value) and `mismatches` (integer, thermostat frames that did not match). In gateway mode `TT=`/`TC=` are answer state (ADR-223), not entries of `overrides.write`; `TT=0` clears the remote override.
+
 #### `POST /api/v2/otdirect/overrides`
 
 Add, clear, or manage override entries. All actions require `action` and `msgid`. Actions `sr` and `rm` additionally require `value`.
@@ -1450,7 +1452,7 @@ All fields are **read-only** runtime state except where noted.
 | `schedule_total` | `otdschedtotal` | `iScheduleTotal` | integer | read-only | Total number of OT message IDs in the polling schedule |
 | `schedule_active` | `otdschedactive` | `iScheduleActive` | integer | read-only | Number of schedule entries currently active (not disabled by boiler) |
 | `schedule_disabled` | `otdscheddisabled` | `iScheduleDisabled` | integer | read-only | Number of entries disabled (boiler returned UNKNOWN_DATA_ID three times) |
-| `overrides_active` | `otdoverrides` | `iOverrideCount` | integer | read-only | Number of active write-override slots (CS=, TT=, SH=, SW= etc.) |
+| `overrides_active` | `otdoverrides` | `iOverrideCount` | integer | read-only | Number of active write-override slots (CS=, SH=, SW= etc.), plus 1 while a `TT=`/`TC=` remote override is active (TASK-1749) |
 | `ot_online` | _(not in device/info)_ | _(otBus.bOnline)_ | boolean | read-only | True when the OT bus is alive (frames recently received) |
 | `thermostat` | _(not in device/info)_ | _(otBus.bThermostatState)_ | boolean | read-only | True when the thermostat OT bus side is active |
 | `boiler` | _(not in device/info)_ | _(otBus.bBoilerState)_ | boolean | read-only | True when the boiler OT bus side is active |

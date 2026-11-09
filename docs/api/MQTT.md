@@ -135,7 +135,7 @@ Note: the OT-bus presence values (`boiler_connected`, `thermostat_connected`) an
 | `otgw-otdirect/setback_active` | `"ON"` / `"OFF"` | Whether setback override is active (thermostat disconnected) |
 | `otgw-otdirect/schedule_active` | `"11"` | Number of OT polling schedule entries currently active |
 | `otgw-otdirect/schedule_disabled` | `"1"` | Number of schedule entries disabled because boiler returned UNKNOWN_DATA_ID |
-| `otgw-otdirect/overrides_active` | `"2"` | Number of active write-override slots |
+| `otgw-otdirect/overrides_active` | `"2"` | Number of active write-override slots, plus 1 while a `TT=`/`TC=` remote override is active |
 
 These topics are only published when `isOTDirectEnabled()` returns true. Topics prefixed `otgw-otdirect/` are skipped during MQTT discovery replay when OT-direct is not enabled.
 

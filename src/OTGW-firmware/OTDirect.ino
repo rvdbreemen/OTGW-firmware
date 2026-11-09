@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.162
+**  Version  : v2.0.0-beta.163
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1081,6 +1081,25 @@ void initOTDirect() {
 }
 
 // ---------------------------------------------------------------------------
+// otdActiveOverrideCount — write-override slots in use, plus 1 while a TT=/TC=
+// remote override is active (TASK-1749: in gateway mode ADR-223 keeps TT=/TC= out
+// of the otOverrides write table, so the count adds it for overrides_active and
+// the web UI badge). In master mode TT=/TC= still write MsgID 16, so the write slot
+// already shows it and the remote entry is not listed or counted twice.
+// ---------------------------------------------------------------------------
+static bool otdRemoteOverrideListed() {
+  return otRemoteOverride.mode != OT_OVERRIDE_NONE && otCurrentMode != OTD_MODE_MASTER;
+}
+static uint8_t otdActiveOverrideCount() {
+  uint8_t overrides = 0;
+  for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
+    if (otOverrides[i].active) overrides++;
+  }
+  if (otdRemoteOverrideListed()) overrides++;
+  return overrides;
+}
+
+// ---------------------------------------------------------------------------
 // updateOTDirectStatus — refresh state.otd with current schedule/override stats.
 // Called from loopOTDirect() once per second so REST/MQTT always have fresh data.
 // ---------------------------------------------------------------------------
@@ -1090,10 +1109,7 @@ void updateOTDirectStatus() {
   for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
     if (otSchedule[i].disabled) disabled++;
   }
-  uint8_t overrides = 0;
-  for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
-    if (otOverrides[i].active) overrides++;
-  }
+  uint8_t overrides = otdActiveOverrideCount();
   state.otd.iScheduleTotal    = total;
   state.otd.iScheduleActive   = total - disabled;
   state.otd.iScheduleDisabled = disabled;
@@ -1164,6 +1180,21 @@ void sendOTDirectOverridesJSON() {
     // TASK-1681: while SAT is enabled the firmware refuses CS=, CH=, MM=, C2=, H2=, TT= and TC= from
     // every other channel (TASK-1695), so the web UI shows why such a write override has no Clear.
     je.field(F("sat_owns"), satOwnsControlSetpoint());
+
+    // TASK-1749: the TT=/TC= remote override (ADR-223 answer state, not a write override) as its
+    // own entry; null when none is active. msgid9_answered: the thermostat read MsgID 9 since it
+    // was set. accepted: a thermostat MsgID 16 frame matched it. mismatches: frames that did not.
+    if (otdRemoteOverrideListed()) {
+      je.beginObject(F("remote"));
+      je.field(F("mode"), otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY ? F("temporary") : F("constant"));
+      je.field(F("value"), (float)((int16_t)otRemoteOverride.f88Value / 256.0f), (uint8_t)2);
+      je.field(F("msgid9_answered"), otRemoteOverride.bMsgId9Answered);
+      je.field(F("accepted"), otRemoteOverride.bAccepted);
+      je.field(F("mismatches"), (uint32_t)otRemoteOverride.mismatchCount);
+      je.endObject();
+    } else {
+      je.fieldRaw(F("remote"), "null");
+    }
 
     je.endObject();                    // close "overrides"
 

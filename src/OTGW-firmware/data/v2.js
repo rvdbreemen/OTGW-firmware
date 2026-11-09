@@ -2020,9 +2020,22 @@
     if (satBlocked) otdOvrReason(row, 'SAT controls this while SAT is enabled; switch SAT off to clear it.');
     return row;
   }
+  // TASK-1749: in gateway mode TT=/TC= are answer state (ADR-223), not a write slot; the firmware
+  // reports them as overrides.remote. Clear sends TT=0; the firmware refuses TT/TC while SAT is enabled.
+  function otdRemoteRow(r, satOwns) {
+    var tc = r.mode === 'constant';
+    var row = otdOvrRow('Room setpoint override (' + (tc ? 'TC=' : 'TT=') + ', ' + r.mode + ')', 9,
+      (typeof r.value === 'number') ? r.value + ' °C' : '',
+      satOwns ? null : function () { otdOvrSendCmd('TT=0'); });
+    otdOvrReason(row, satOwns ? 'SAT controls this while SAT is enabled; switch SAT off to clear it.'
+      : (!r.msgid9_answered ? 'waiting for the thermostat to read it'
+        : (r.accepted ? 'accepted by the thermostat' : 'offered to the thermostat')));
+    return row;
+  }
   function renderOtdOvr(ov) {
     var el = document.getElementById('otdOvrList'); if (!el) return;
     el.textContent = ''; var any = false;
+    if (ov.remote) { any = true; el.appendChild(otdRemoteRow(ov.remote, ov.sat_owns === true)); }
     (ov.write || []).forEach(function (e) { any = true; el.appendChild(otdWriteRow(e, ov.sat_owns === true)); });
     (ov.response || []).forEach(function (e) { any = true; el.appendChild(otdOvrRow('SR', e.msgid, otdHex(e.value), 'cr')); });
     (ov.modify || []).forEach(function (e) { any = true; el.appendChild(otdOvrRow('RM', e.msgid, otdHex(e.value), 'cm')); });
@@ -2113,6 +2126,8 @@
         out.push({ id: idn, name: label, meta: 'MsgID ' + mid + (v ? ' · ' + v : '') });
       });
     }
+    if (ov.remote) out.push({ id: 9, name: 'Room setpoint override (' + (ov.remote.mode === 'constant' ? 'TC=' : 'TT=') + ')',
+      meta: 'MsgID 9 · ' + ov.remote.value + ' °C' });
     push(ov.write, 'Write'); push(ov.response, 'Stored response');
     push(ov.modify, 'Response modifier'); push(ov.unknown, 'Unknown ID');
     return out;

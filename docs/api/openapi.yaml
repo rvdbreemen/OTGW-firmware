@@ -848,7 +848,7 @@ paths:
                         description: Number of schedule entries disabled because boiler returned UNKNOWN_DATA_ID
                       otdoverrides:
                         type: integer
-                        description: Number of active write-override slots
+                        description: Number of active write-override slots, plus 1 while a TT=/TC= remote override is active
               examples:
                 example:
                   value:
@@ -2422,7 +2422,34 @@ paths:
                 type: object
                 description: |
                   JSON object containing override lists. Structure defined by
-                  `getOTDirectOverridesJSON()` in `OTDirect.ino`.
+                  `sendOTDirectOverridesJSON()` in `OTDirect.ino`.
+                properties:
+                  overrides:
+                    type: object
+                    properties:
+                      remote:
+                        nullable: true
+                        description: |
+                          Active `TT=`/`TC=` remote override (ADR-223 answer state in gateway mode,
+                          not an entry of `write`); `null` when none is active. `TT=0` clears it.
+                        type: object
+                        properties:
+                          mode:
+                            type: string
+                            enum: [temporary, constant]
+                            description: "`temporary` for TT=, `constant` for TC="
+                          value:
+                            type: number
+                            description: Remote room setpoint in degrees Celsius
+                          msgid9_answered:
+                            type: boolean
+                            description: The thermostat has read MsgID 9 since the override was set
+                          accepted:
+                            type: boolean
+                            description: A thermostat MsgID 16 frame matched the override value
+                          mismatches:
+                            type: integer
+                            description: Thermostat MsgID 16 frames that did not match
         '503':
           description: OT Direct hardware not available (standard PIC build)
           content:
