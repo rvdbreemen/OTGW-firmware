@@ -4,7 +4,7 @@ title: Boot panic in ipc1 during GPIO ISR install (beta.162, .61, 1 of 10 reboot
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:21:00Z'
-updated_date: '2026-11-09T22:18:00Z'
+updated_date: '2026-11-09T22:22:00Z'
 labels:
   - bug
   - crash
@@ -59,6 +59,24 @@ Suggested next steps (no code before a decision):
 - 4c: the panic reason text and the PC/epc in multi_heap.
 - A heap integrity check (heap_caps_check_integrity_all) logged right before initOTDirect on a debug build, to see whether the heap is already corrupt at that point.
 - Repeat /ReBoot cycles with a serial console (TASK-1763 AC2).
+
+---
+
+created: 2026-11-09T22:22:00Z
+
+---
+
+Update with 4c's decode (relayed by the coordinator, 2026-11-09) and a check of it (030509):
+4c: the full backtrace has no abort path (no panic_abort / __assert_func / multi_heap_assert / stack-overflow hook); it ends in _xt_lowint1 (a level-1 interrupt frame on ipc1's stack) -> _frxt_setup_switch. Hypothesis: the end-of-stack watchpoint (CONFIG_FREERTOS_WATCHPOINT_END_OF_STACK=y, a debug exception) fires when an interrupt frame lands on ipc1's 1024 B stack during heap_caps_malloc in esp_intr_alloc. This replaces my heap-assert guess above (no assert in the trace), so the stack hypothesis is now the leading one.
+Checked (F):
+- sdkconfig (framework-arduinoespressif32-libs/esp32s3/sdkconfig): CONFIG_ESP_IPC_TASK_STACK_SIZE=1024 and :2548 CONFIG_FREERTOS_WATCHPOINT_END_OF_STACK=y. The IDF Kconfig default on S3 is 1280 (esp_system/Kconfig:662-668: 'default 1280 if !APPTRACE_ENABLE && IDF_TARGET_ESP32S3').
+- Which libs are linked: the package is framework-arduinoespressif32-libs 5.5.0+sha.9bb7aa84fe (package.json), Arduino core 3.3.5. The device's own boot line in the run logs reads 'core=v5.5.1-931-g9bb7aa84fe sdk=v5.5.1-931-g9bb7aa84fe' (boot7C-telnet.txt:113): same sha 9bb7aa84fe. So the linked libs are this package (4c's open point), as far as the sha identifies them.
+- Correction to the fix direction 'attachInterrupt from a task on core 1, so gpio_isr_register runs locally without IPC': in IDF 5.5.1 that does not avoid ipc1. gpio.c:629-634 calls esp_ipc_call_blocking() on every multicore build (only CONFIG_FREERTOS_UNICORE runs it inline), and esp_ipc.c:121-164 runs the function inline only when the CALLER IS the ipc task (:134-139). A call from loopTask on core 1 to core 1 still hands it to ipc1 and runs on ipc1's stack. Setup already runs on core 1 (CONFIG_ARDUINO_RUNNING_CORE=1).
+Fix directions (opinion, to weigh; no code before a decision):
+(a) a larger IPC stack (1280 or more) through a custom sdkconfig, which needs a framework libs rebuild (pioarduino custom_sdkconfig); this changes the build;
+(b) install the GPIO ISR service once early in setup, before startWiFi (e.g. a first attach or gpio_install_isr_service at setup-early), when fewer interrupts are active, so an interrupt frame during esp_intr_alloc is less likely. This lowers the probability, it does not remove the cause;
+(c) both.
+Proof: coredump GET (ADR-210) after the release + esp-coredump with the beta.162 ELF (4c), and repeated /ReBoot cycles to measure the rate before/after.
 
 ---
 <!-- COMMENTS:END -->
