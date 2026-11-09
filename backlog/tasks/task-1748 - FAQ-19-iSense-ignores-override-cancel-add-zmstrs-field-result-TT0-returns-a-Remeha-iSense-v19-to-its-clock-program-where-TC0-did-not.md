@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T08:47:00Z'
+updated_date: '2026-11-09T10:16:00Z'
 labels:
   - docs
   - faq
@@ -24,3 +25,9 @@ zmstr, #nederlandse-ondersteuning 2026-11-09 08:37 UTC (msg 1569269775258099766,
 <!-- AC:BEGIN -->
 - [ ] #1 FAQ 19 (NL and EN) mentions TT=0 as a tip from a user's field report, with the 'give it a few minutes' note, or Robert decides not to
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-09 10:12 UTC, Schelte Bron (.otgw, PIC firmware author), #nederlandse-ondersteuning msg 1569293561294360577 (https://discord.com/channels/812969634638725140/815561033036333076/1569293561294360577), to zmstr: 'Ik zou toch graag een log zien. Ik heb nog niet eerder klachten gehoord dat TC=0 niet zou werken. Dat commando doet vrijwel hetzelfde als TT=0. Als het minieme verschil inderdaad uitmaakt dan is dat iets dat in de PIC firmware moet worden opgelost. De informatie als tip in een FAQ verstoppen vind ik een slecht idee.' Reading: the PIC author advises against the FAQ tip; a log from zmstr is needed first; if TC=0 vs TT=0 really matters it is a PIC firmware fix. Robert decides. (Relayed by 97.)
+<!-- SECTION:NOTES:END -->
