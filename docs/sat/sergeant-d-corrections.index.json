@@ -3866,6 +3866,22 @@
     "TASK-1762"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 290,
+   "title": "Q-1759a: MsgID 28 per hardware setup, A on OT-Direct and C on PIC boards (maintainer decision, 2026-11-09; Sergeant D may revise)",
+   "date": "2026-11-09",
+   "source": "sergeant-d",
+   "kind": "decision",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569469705461440577",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1701",
+    "TASK-1707",
+    "TASK-1759",
+    "TASK-1767"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

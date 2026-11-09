@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:08:00Z'
+updated_date: '2026-11-09T22:04:00Z'
 labels:
   - sat
   - opentherm
@@ -31,3 +32,15 @@ Open questions before code, to Sergeant D per the SAT rules (sat-ground-truth, o
 - [ ] #3 PIC boards: the same, as decided; shown in a test and in a capture
 - [ ] #4 SAT sees a valid return temperature on such an installation (tick ret != 0.0) and the flame-off hold uses it
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-09T22:04:00Z
+
+---
+
+Q-1759a (msg 1569468785407299627) answered by the maintainer: Robert 2026-11-09 21:52:17 UTC, "I think A+C would be best, for each hardware setup the optimal solution." -> docs/sat/sergeant-d-corrections.md entry 290: A on OT-Direct (replace one frequent supported read by a MsgID 28 read, answer the thermostat from cache), C on PIC boards (AA=28 while SAT is on, DA=28 when off; slot-limited, TASK-1767). Still open (Q-1759a stays asked): interval (30 s proposed), SAT only or always, which read is replaced / cache age, Sergeant D's agreement (entry 287 is his). No code before.
+
+---
+<!-- COMMENTS:END -->

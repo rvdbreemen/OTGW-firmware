@@ -6233,3 +6233,26 @@ With entries 244, 245, 248, 249 and this one, every difference in the TASK-1412.
 **Changes an earlier entry:** settles the open points of entry 288 (immediate vs timer, extra vs replacement, which CS).
 
 **Task:** TASK-1762 (the implementation task for entry 288), related TASK-1412. **Open:** nothing for Sergeant D; the hot-water-guard reading above is ours.
+
+## 290. Q-1759a: MsgID 28 per hardware setup, A on OT-Direct and C on PIC boards (maintainer decision, 2026-11-09; Sergeant D may revise)
+
+**Source:** Maintainer decision (Robert as number3nl, not Sergeant D), #dev-sat-mqtt (channel 1105556725714649128), 2026-11-09 21:52:17 UTC, msg 1569469705461440577 (https://discord.com/channels/812969634638725140/1105556725714649128/1569469705461440577), in reply to our question Q-1759a (msg 1569468785407299627). Sergeant D may revise in a later entry; entry 287, which this answers, is his.
+
+**Question as asked (Q-1759a):** how the gateway reads the return temperature (MsgID 28) when the thermostat never asks for it (entry 287). A) OT-Direct gateway mode replaces now and then one supported thermostat read (never MsgID 0 or a write) by an own MsgID 28 read and answers the thermostat from the cache; B) own frames between the thermostat frames (what TASK-1701/TASK-1707 removed); C) PIC boards: `AA=28` while SAT is on, `DA=28` when it goes off. With it: the interval (advice 30 s, only while no valid MsgID 28 for 30 s) and SAT only or always (advice SAT only).
+
+**Quoted:** "I think A+C would be best, for each hardware setup the optimal solution."
+
+**Settled:** A on OT-Direct and C on PIC boards, not B.
+- **OT-Direct gateway mode:** now and then the gateway replaces one frequent supported thermostat read with a MsgID 28 read to the boiler, and answers the thermostat from the cache. Never MsgID 0, never a write. The boiler still gets one frame per thermostat frame (TASK-1707).
+- **PIC boards:** `AA=28` while SAT is on and `DA=28` when it goes off. This is limited by the PIC: an alternative (and a `PM=` priority read) only goes out in the slot of a thermostat request the boiler does not support. See gateway.asm:2387-2414, :3390, :3436 and :4984-4995 (TASK-1767). A PIC board whose thermostat asks only supported IDs therefore still gets no MsgID 28.
+
+**Not decided:**
+- the interval (30 s proposed);
+- SAT only or always;
+- which thermostat read is replaced, and how old a cached answer may be;
+- Sergeant D's agreement.
+Q-1759a stays asked for these points.
+
+**Changes an earlier entry:** none; it answers the "how" of entry 287 for the maintainer.
+
+**Task:** TASK-1759 (implementation; no code before the open points are answered), related TASK-1707, TASK-1767. **Open:** interval, SAT only or always, Sergeant D's agreement.
