@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-07T17:50:00Z'
-updated_date: '2026-11-07T22:51:00Z'
+updated_date: '2026-11-09T06:16:00Z'
 labels:
   - otdirect
 dependencies: []
@@ -57,4 +57,9 @@ Robert 2026-11-07: PIC model, fix the review bug first. Lead fix of the verifier
 tjfs's real log (scratchpad tjfs-1107/log.txt): 369 thermostat frames in 6 min, Data-IDs 0,1,15,16,17,24,25; only MsgID 24 (WRITE Tr) answered Unknown-DataID (12x), so about one slot per 30 s with his thermostat. AC1 measured on the stream composition, not replayed frame by frame. Related tests after rebase: test_otd_gateway_own_status, test_otd_mode_live_apply, test_sat_no_return_startup, test_otd_ch_override, test_sat_command_delivery, test_otd_autodetect_no_persist all OK; test/host/test_override_reply.py 4 suites OK (stub renamed to otdNoteThermostatFrame); evaluate --quick 0 failed.
 
 Pushed origin/dev 8cbdebc3f (TASK-1707 = 2ca74eae5, beta.132). Build of the same content (d6407b1, pre-rebase onto docs-only commits): Build completed successfully. Bench .61 (OT-Direct, master, no thermostat): OTA app+fs OK, bootcount 116->118, no crashlog, 164 settings unchanged, schedule_active 104 (master path unchanged). Gateway mode with a thermostat cannot be built on the bench: AC4 waits for field confirmation (tjfs). Zip covered by the next post (beta.134, memory).
+
+2026-11-09 AC1 frame-by-frame replay of tjfs's recorded stream (system32-78, coordinator task; capture: tjfs #alpha-testing msg 1568644300252651704, message.txt SHA256 a884f8fa...3055, downloaded by otgw-firmware-97 on Robert's OK, kept local, not committed). New tests/otd_gateway_replay_tjfs.py feeds the capture's 369 'Thermostat T........' frames at their recorded times (368.9 s) to handleSlaveRequest() of the real OTDirect.ino slices, through the same harness/fake boiler as tests/test_otd_gateway_alt_slots.py; the fake boiler answers Unknown-DataID for the IDs the capture's boiler did (only 24). Thermostat Data-IDs in the capture: 0:137 1:23 15:1 16:12 17:68 24:12 25:116.
+Old (OTDirect.ino at 2ca74eae5^): bframes 1159 for 369 thermostat frames, maxper 21 (up to 21 own frames between two thermostat frames), own reads of ~80 IDs, altslots 0. RED.
+Fix (origin/dev ba8747234): bframes 369 = tframes, minper = maxper = 1, replies 369, altslots 9, badslotreply 0. Boiler per ID: the thermostat's IDs relayed 1:1 (0:137 1:23 15:1 16:12 17:68 25:116); MsgID 24 reaches the boiler 3 times (3 Unknown-DataID strikes), the other 9 MsgID 24 requests become slots carrying the gateway's own reads (18,19,26,28,29,30,31,32,35) and the thermostat gets Unknown-DataID: the PIC model (gateway.asm UnknownMask/SendAltRequest). GREEN.
+Caveat: the capture's own firmware predates TASK-1701 (its 634 own frames include 299 own MsgID 0), so the old-code replay (which has 1701) is not a 1:1 reproduction of the field log (790 own frames in the replay vs 335 non-MsgID-0 own frames in the field; the fake boiler answers at once). The check is the fix's frame ratio on the real recorded thermostat timing, not a re-creation of the field bus. AC4 (bench with a thermostat) unchanged.
 <!-- SECTION:NOTES:END -->
