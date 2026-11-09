@@ -5,6 +5,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.162] - 2026-11-09
+
+### Changed
+- **OT-Direct gateway mode: `TT=` and `TC=` are answer state only, like the PIC** (TASK-1733, ADR-223, reported by tjfs). No gateway WRITE 16/100 to the boiler, the thermostat's own MsgID 16 passes unchanged, and the override is released by the PIC rule once the thermostat has read MsgID 9 (0.25 C match, the 4th mismatch before acceptance, the first after). `TC=` follows the same rule (Sergeant D, entry 286). MsgID 9 and 100 are never alternative slots. Row 16 Clear in the web UI sends `BS=0`, which also clears the MQTT `room_setpoint` write; row 100 is removed. Master mode keeps writing TrSet. Test `tests/test_otd_tt_pic_parity.py` on the real sliced code (40/40; 16 of 27 red on the old code).
+
+### Fixed
+- **Web UI: the pollers are spread per tab and pause in a hidden tab** (TASK-1741). Each tab gets a random 0-15 s phase with fixed offsets per poller; a hidden tab skips its polls and refreshes once, staggered, when shown again after 15 s or more. Bench .61, two tabs: 15.6 to 1.9 REST 503s per minute. Test `tests/webui/poll-spread-hidden.test.mjs` (old 0/5, fix 5/5).
+- **Web UI: one health follow-up request at a time; a busy 503 keeps the override list** (TASK-1747). fetchConn chains overrides, otdirect/status (OT-Direct) and simulate instead of firing them together. Bench .61, two tabs: 1.9 to 0.5 REST 503s per minute. Test `tests/webui/health-chain-one-in-flight.test.mjs` (old 0/2, fix 2/2).
+- **Web UI: the startup settings fetch retries after a busy 503** (TASK-1743). Up to 5 tries, 400-3200 ms apart, one at a time; only the newest answer applies, so a late retry never undoes a save. Test `tests/webui/settings-fetch-retry.test.mjs`.
+
+### Documentation
+- **SAT chapter: while SAT is enabled, SAT's `CH=` decides CH enable** (TASK-1755, ADR-208, ADR-199, ADR-179). The Known limitations said the wall thermostat still decides it.
+
 ## [2.0.0-beta.158] - 2026-11-09
 
 ### Changed
@@ -813,7 +826,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.158...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.162...HEAD
+[2.0.0-beta.162]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.158...v2.0.0-beta.162
 [2.0.0-beta.158]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.144...v2.0.0-beta.158
 [2.0.0-beta.144]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.130...v2.0.0-beta.144
 [2.0.0-beta.130]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.118...v2.0.0-beta.130
