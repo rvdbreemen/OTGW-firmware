@@ -47,19 +47,19 @@ function extractVar(src, name) {
 function load(base) {
   const body =
     extractVar(SRC, 'I18N_EN') + '\n' +
-    "var i18nLang = 'en', i18nPack = null;\n" +
+    "var i18nLang = 'en', i18nPack = null, i18nWanted = 'en';\n" +
     'function fetch(u, o) { return globalThis.fetch(new URL(u, BASE), o); }\n' +
     ['i18nPickLang', 'i18nLookup', 'i18nString', 't', 'loadI18nPack'].map(n => extractFunction(SRC, n)).join('\n') + '\n' +
     'return { I18N_EN: I18N_EN, pick: i18nPickLang, t: t,' +
     ' setPack: function (lang, p) { i18nLang = lang; i18nPack = p; },' +
     ' lang: function () { return i18nLang; },' +
-    ' load: function (lang, tries) { return new Promise(function (res) { loadI18nPack(lang, res, tries); }); } };';
+    ' load: function (lang, tries) { i18nWanted = lang; return new Promise(function (res) { loadI18nPack(lang, res, tries); }); } };';
   return new Function('BASE', 'setTimeout', body)(base || 'http://127.0.0.1:1/', (f) => f());
 }
 
 test('language choice: override, then navigator.languages base tag, else English', () => {
   const h = load();
-  const S = ['en', 'nl', 'de'];
+  const S = ['en', 'nl', 'de', 'el'];
   assert.equal(h.pick(['fr-FR', 'it'], S, null), 'en');          // unsupported -> English
   assert.equal(h.pick([], S, null), 'en');
   assert.equal(h.pick(undefined, S, null), 'en');
@@ -68,6 +68,7 @@ test('language choice: override, then navigator.languages base tag, else English
   assert.equal(h.pick(['de-DE'], S, 'nl'), 'nl');                  // override wins
   assert.equal(h.pick(['de-DE'], S, 'xx'), 'de');                  // unsupported override ignored
   assert.equal(h.pick(['NL_nl'], S, ''), 'nl');                    // case and underscore
+  assert.equal(h.pick(['el-GR', 'en'], S, null), 'el');            // Greek (TASK-1764)
 });
 
 test('t(): pack string, per-key English fallback, missing key shows the key', () => {
@@ -147,7 +148,7 @@ test('i18n packs cover the English keys with the same placeholders', () => {
   const en = flatten(load().I18N_EN, '', {});
   const dir = path.join(ROOT, 'i18n');
   const packs = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
-  assert.deepEqual(packs.sort(), ['de.json', 'nl.json']);
+  assert.deepEqual(packs.sort(), ['de.json', 'el.json', 'nl.json']);
   for (const file of packs) {
     const pack = flatten(JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8')), '', {});
     for (const key of Object.keys(en)) {
@@ -155,5 +156,19 @@ test('i18n packs cover the English keys with the same placeholders', () => {
       assert.equal(holders(pack[key]), holders(en[key]), file + ' placeholders of ' + key);
     }
     for (const key of Object.keys(pack)) assert.ok(key in en, file + ' has ' + key + ', English does not');
+  }
+});
+
+// A plural key needs both forms in English and in every pack: a lone _one would show the key
+// (or the wrong form) for any other count.
+test('plural keys come as _one/_other pairs in English and in every pack', () => {
+  const sets = { en: flatten(load().I18N_EN, '', {}) };
+  for (const f of fs.readdirSync(path.join(ROOT, 'i18n')).filter(n => n.endsWith('.json')))
+    sets[f] = flatten(JSON.parse(fs.readFileSync(path.join(ROOT, 'i18n', f), 'utf8')), '', {});
+  for (const [name, keys] of Object.entries(sets)) {
+    for (const k of Object.keys(keys)) {
+      const m = /^(.*)_one$/.exec(k);
+      if (m) assert.ok((m[1] + '_other') in keys, name + ' has ' + k + ' without ' + m[1] + '_other');
+    }
   }
 });

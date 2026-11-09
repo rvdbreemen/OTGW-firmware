@@ -111,7 +111,7 @@
   }
 
   // ---------- languages (TASK-1689, ADR-219/220/221) ----------
-  // English is built in (I18N_EN) and is the per-key fallback. NL and DE ship as
+  // English is built in (I18N_EN) and is the per-key fallback. NL, DE and EL ship as
   // gzipped packs on LittleFS, fetched as i18n/<lang>.json (relative, so it also
   // works behind a reverse proxy). Packs and I18N_EN use the i18next v4 JSON format:
   // nested keys addressed as 'nav.settings', {{name}} placeholders, CLDR plural
@@ -120,17 +120,1571 @@
   // HTML marks translatable text with data-i18n (text), data-i18n-title and
   // data-i18n-placeholder; JS-built text calls t().
   var I18N_EN = {
+    "adv": {
+      "pic_none": "No PIC detected: PIC firmware flashing is unavailable in OT-Direct mode.",
+      "pic_checking_caps": "Checking device capabilities…",
+      "pic_no_files": "No firmware files on device. Use Check for updates, or upload a .hex via the File System tab.",
+      "pic_col_name": "Firmware name",
+      "pic_col_version": "Version",
+      "pic_col_size": "Size",
+      "pic_refresh_title": "Re-download latest {{name}}",
+      "pic_flash_title": "Flash {{name}} onto the PIC",
+      "pic_flash_confirm_title": "Tap again to confirm flashing {{name}} — a bad flash can brick the PIC",
+      "pic_delete_title": "Delete {{name}}",
+      "pic_delete_confirm": "Delete firmware file {{name}}?",
+      "pic_banner_checking": "Checking for updates…",
+      "pic_update_available": "PIC firmware update available: {{current}} → {{latest}}",
+      "pic_up_to_date": "✓ PIC firmware up to date ({{current}})",
+      "pic_update_failed": "Update check failed",
+      "pic_mode_gateway": "Gateway",
+      "pic_mode_monitor": "Monitor",
+      "pic_mode_detecting": "Detecting…",
+      "pic_gpio_0": "Input",
+      "pic_gpio_1": "Ground",
+      "pic_gpio_2": "Vcc",
+      "pic_gpio_3": "LED E",
+      "pic_gpio_4": "LED F",
+      "pic_gpio_5": "Home",
+      "pic_gpio_6": "Away",
+      "pic_gpio_7": "DS18x20 sensor",
+      "pic_gpio_8": "DHW block",
+      "pic_led_r": "Receive",
+      "pic_led_x": "Transmit",
+      "pic_led_t": "Master traffic",
+      "pic_led_b": "Slave traffic",
+      "pic_led_o": "Remote override active",
+      "pic_led_f": "Flame",
+      "pic_led_h": "Central heating",
+      "pic_led_w": "Hot water",
+      "pic_led_c": "Comfort mode",
+      "pic_led_e": "Transmission error",
+      "pic_led_m": "Maintenance required",
+      "pic_led_p": "Raised power mode",
+      "pic_dhw_0": "Off",
+      "pic_dhw_1": "On",
+      "pic_dhw_a": "Auto",
+      "pic_dhw_p": "Push once",
+      "pic_tsens_o": "Outside temperature",
+      "pic_tsens_r": "Return water temperature",
+      "pic_spower_l": "Low power",
+      "pic_spower_m": "Medium power",
+      "pic_spower_h": "High power",
+      "pic_spower_n": "Normal power",
+      "pic_tdet_c": "Forced: Remeha Celcia 20",
+      "pic_tdet_i": "Forced: Remeha iSense",
+      "pic_tdet_s": "Forced: Standard thermostat",
+      "pic_tdet_d": "Auto-detect (default)",
+      "pic_tdet_a": "Auto-detect",
+      "pic_reset_b": "Brownout",
+      "pic_reset_c": "By command (GW=R)",
+      "pic_reset_e": "External reset",
+      "pic_reset_l": "Stuck in loop",
+      "pic_reset_o": "Stack overflow",
+      "pic_reset_p": "Power-on",
+      "pic_reset_s": "Serial BREAK",
+      "pic_reset_u": "Stack underflow",
+      "pic_reset_w": "Watchdog timer",
+      "pic_high": "High",
+      "pic_low": "Low",
+      "pic_on": "On",
+      "pic_off": "Off",
+      "pic_tweak_ignore": "Ignore transitions: {{state}}",
+      "pic_tweak_highbyte": "Override in high byte: {{state}}",
+      "pic_ovr_none": "No override",
+      "pic_ovr_temp": "Temporary override to {{temp}} °C",
+      "pic_ovr_const": "Constant override to {{temp}} °C",
+      "pic_vref_level": "Level {{level}}",
+      "pic_vref_detail": "Level {{level}} (F88: {{f88}} V / F1847: {{f1847}} V)",
+      "pic_grp_firmware": "Firmware",
+      "pic_row_fwver": "PIC firmware version",
+      "pic_row_mode": "Gateway/Monitor mode",
+      "pic_grp_active": "Active state",
+      "pic_row_setpoint": "Setpoint override",
+      "pic_row_setback": "Setback temperature",
+      "pic_row_dhw": "DHW override",
+      "pic_grp_hw": "Hardware config",
+      "pic_row_gpio": "GPIO functions",
+      "pic_row_gpiost": "GPIO states",
+      "pic_row_led": "LED functions",
+      "pic_row_tweaks": "Tweaks",
+      "pic_row_tsens": "Temp sensor",
+      "pic_row_spower": "Smart power",
+      "pic_row_tdet": "Thermostat detect",
+      "pic_grp_diag": "Diagnostics",
+      "pic_row_build": "Build date",
+      "pic_row_clock": "Clock speed",
+      "pic_row_reset": "Reset cause",
+      "pic_row_interval": "Standalone interval",
+      "pic_row_vref": "Voltage reference",
+      "pic_missing_one": "{{count}} setting not read yet or not supported by this PIC firmware (a full PR= readout takes about 45 s).",
+      "pic_missing_other": "{{count}} settings not read yet or not supported by this PIC firmware (a full PR= readout takes about 45 s).",
+      "pic_none_available": "No PIC settings available",
+      "pic_reading": "Reading PR= values…",
+      "pic_read_failed": "Failed to read PIC settings",
+      "pic_flash_starting": "Starting flash of {{name}}…",
+      "pic_flash_start_failed": "Flash failed to start",
+      "pic_flash_nostatus_poll": "No status from the device yet, still polling…",
+      "pic_flash_nostatus": "No flash status from the device; check the PIC version once it settles",
+      "pic_flash_progress": "Flashing {{name}} — {{percent}}%",
+      "pic_flash_waiting": "Waiting for the flash to start…",
+      "pic_flash_complete": "Flash complete",
+      "pic_flash_complete_file": "Flash complete: {{name}}",
+      "pic_flash_error": "Error: {{reason}}",
+      "pic_flash_not_started": "the flash did not start",
+      "pic_flash_failed": "the flash failed",
+      "pic_flash_lost": "Lost contact during flash (device may be rebooting)",
+      "pic_downloading": "Downloading {{name}}…",
+      "fs_read_failed": "Failed to read the file system.",
+      "fs_retry": "Retry",
+      "fs_crumb": "Current directory: {{path}}",
+      "fs_crumb_truncated": "Current directory: {{path}}  · list truncated",
+      "fs_download": "Download",
+      "fs_delete": "Delete",
+      "fs_usage": "used {{used}} of {{total}} — {{free}} free",
+      "fs_upload_hint": "{{free}} free · files land in the current directory.",
+      "fs_delete_confirm": "Delete {{name}} from the file system? This cannot be undone.",
+      "fs_deleted": "Deleted {{name}}",
+      "fs_not_authorized": "Not authorized — open classic /FSexplorer to sign in first",
+      "fs_delete_failed_status": "Delete failed: {{status}}",
+      "fs_delete_failed": "Delete failed",
+      "fs_choose_file": "Choose a file to upload first",
+      "fs_uploaded": "Uploaded {{name}}",
+      "fs_upload_failed_status": "Upload failed: {{status}}",
+      "fs_upload_failed": "Upload failed",
+      "sys_reboot_confirm": "Reboot the OTGW device now? The Web UI will be unavailable for a few seconds.",
+      "sys_rebooting": "Device is rebooting…",
+      "sys_reboot_failed": "Reboot failed: {{status}}",
+      "sys_wifi_confirm": "Reset Wireless settings?\n\nThis CLEARS the stored Wi-Fi network and reboots the device into AP-mode setup. You will have to reconnect it to your network afterwards.",
+      "sys_wifi_cleared": "Wi-Fi cleared — rebooting into AP-mode setup…",
+      "sys_reset_failed": "Reset failed: {{status}}"
+    },
+    "conn": {
+      "st_ok": "Connected",
+      "st_warn": "Degraded",
+      "st_down": "Disconnected",
+      "st_off": "Off",
+      "st_unknown": "Unknown",
+      "st_mode": "Mode",
+      "ws_name": "Live link",
+      "ws_exp": "This page has a live link to the gateway — the log updates in real time.",
+      "ws_fix": "Live link dropped — the page is reconnecting; data may be paused.",
+      "mode_name": "Gateway mode",
+      "mode_exp": "Gateway actively rewrites OT messages (lets the UI set temperatures); Monitor passively observes only.",
+      "mqtt_name": "MQTT broker",
+      "mqtt_exp": "Connected to the broker; the online (birth) message is published.",
+      "mqtt_fix": "Cannot reach the broker — check address, port and credentials.",
+      "wifi_name": "Wi-Fi",
+      "wifi_exp": "The gateway is on your network.",
+      "wifi_fix": "Weak or no signal — move the device or add a repeater.",
+      "boiler_name": "Boiler",
+      "boiler_exp": "The boiler (OT slave) is answering.",
+      "boiler_fix": "Boiler not answering — check the OT wiring / boiler power.",
+      "therm_name": "Thermostat",
+      "therm_exp": "The room thermostat (OT master) is talking to the gateway.",
+      "therm_fix": "No frames from the thermostat — check the OT wiring.",
+      "ot_name": "OpenTherm interface",
+      "ot_exp": "The active OpenTherm command interface (PIC gateway or OT-Direct).",
+      "ot_fix": "No OT interface available — check the hardware / board mode.",
+      "ntp_name": "Time (NTP)",
+      "ntp_exp": "The clock is synced; timestamps and time-to-thermostat are correct.",
+      "ntp_fix": "No time sync — check the NTP server and internet access.",
+      "api_name": "REST API",
+      "api_detail": "polling",
+      "api_exp": "Values on this page are fetched from the device API.",
+      "issues_one": "{{count}} connection issue",
+      "issues_other": "{{count}} connection issues",
+      "degraded": "{{count}} degraded",
+      "all_ok": "All systems connected",
+      "health_title": "Connectivity health — open the Connection map",
+      "go": "· Connection ›",
+      "mode_gateway": "Gateway",
+      "mode_monitor": "Monitor",
+      "mode_detecting": "Detecting…",
+      "mode_na": "N/A",
+      "mode_unknown": "Unknown",
+      "status_title": "{{state}} · {{mode}} mode",
+      "hostname_fallback": "device",
+      "ip_static": "static",
+      "tip_eth": "IP {{ip}} ({{mode}}) · Wired",
+      "tip_ap": "IP {{ip}} · AP mode",
+      "tip_wifi": "IP {{ip}} ({{mode}}) · Wi-Fi {{ssid}}"
+    },
+    "core": {
+      "theme_to_light": "Switch to light theme",
+      "theme_to_dark": "Switch to dark theme",
+      "theme_light": "☀ Light",
+      "theme_dark": "🌙 Dark",
+      "view_system": "System view",
+      "view_glance": "At a glance",
+      "view_mission": "Mission control",
+      "clock_device": "Device time {{date}} (device timezone)",
+      "clock_browser": "Browser time (device time not read yet)",
+      "fs_mismatch": "Firmware/filesystem mismatch (firmware {{fw}}, filesystem {{fs}}).",
+      "fs_unknown": "unknown",
+      "fs_flash_link": "Flash the matching LittleFS image"
+    },
+    "graph": {
+      "series_flow": "boiler",
+      "series_ret": "return",
+      "series_ch_set": "control setpoint",
+      "series_room_set": "thermostat setpoint",
+      "series_room": "room",
+      "series_outside": "outside",
+      "series_mod": "modulation",
+      "series_flame": "flame",
+      "series_dhw_on": "DHW mode",
+      "series_ch": "boiler CH mode",
+      "on": "on",
+      "off": "off",
+      "no_data": "no data",
+      "room_no_reading": "Room temperature: no reading",
+      "legend_toggle": "Show / hide",
+      "conn_pic_link": "PIC link",
+      "conn_ot_interface": "OpenTherm interface",
+      "conn_connected": "connected",
+      "conn_checking": "checking…",
+      "conn_not_connected": "not connected",
+      "conn_disabled_in_settings": "disabled in settings",
+      "conn_disabled": "disabled",
+      "conn_time_syncing": "time syncing",
+      "conn_ws_streaming": "WebSocket · streaming",
+      "conn_ws_reconnecting": "WebSocket · reconnecting…",
+      "conn_no_link": "no link",
+      "conn_seen_ago": "seen {{s}}s ago",
+      "conn_role_recency": "{{role}} · {{recency}}",
+      "conn_role_master": "master",
+      "conn_role_slave": "slave",
+      "conn_mode_gateway": "GATEWAY MODE",
+      "conn_mode_monitor": "MONITOR MODE",
+      "conn_mode_no_pic": "NO PIC",
+      "conn_mode_other": "MODE: {{mode}}",
+      "otd_running_now": "Running now: {{mode}}.",
+      "otd_running_master": "Running now: {{mode}} (no thermostat seen at boot).",
+      "otd_switch_to": "Switch to {{mode}}",
+      "otd_row_mode": "Mode",
+      "otd_row_ot_bus": "OT bus",
+      "otd_row_thermostat": "Thermostat",
+      "otd_row_boiler": "Boiler",
+      "otd_row_setback": "Setback",
+      "otd_row_stepup": "Step-up",
+      "otd_row_schedule": "Schedule (active / total)",
+      "otd_row_overrides": "Active overrides",
+      "otd_online": "Online",
+      "otd_offline": "Offline",
+      "otd_connected": "Connected",
+      "otd_none": "None",
+      "otd_active": "Active",
+      "otd_idle": "Idle",
+      "otd_off": "Off",
+      "otd_on": "On",
+      "otd_schedule_disabled": "({{n}} disabled)",
+      "otd_clear": "Clear",
+      "otd_write": "Write",
+      "otd_what_cs": "control setpoint",
+      "otd_what_cooling": "cooling control",
+      "otd_what_ch2": "CH2 setpoint",
+      "otd_what_mm": "max modulation",
+      "otd_what_room_setpoint": "room setpoint",
+      "otd_what_dhw": "DHW setpoint",
+      "otd_what_max_ch": "max CH setpoint",
+      "otd_cmd_bs_or_mqtt": "BS or MQTT",
+      "otd_cmd_refused": "{{cmd}} was refused (HTTP {{status}})",
+      "otd_cmd_failed": "{{cmd}} could not be sent",
+      "otd_sat_controls": "SAT controls this while SAT is enabled; switch SAT off to clear it.",
+      "otd_remote_row": "Room setpoint override ({{cmd}}, {{mode}})",
+      "otd_mode_temporary": "temporary",
+      "otd_mode_constant": "constant",
+      "otd_remote_waiting": "waiting for the thermostat to read it",
+      "otd_remote_accepted": "accepted by the thermostat",
+      "otd_remote_offered": "offered to the thermostat",
+      "otd_no_overrides": "No active overrides"
+    },
+    "h_home": {
+      "hdr_host_title": "Hostname · firmware version",
+      "hdr_net_title": "Network connection",
+      "hdr_status_title": "Connectivity status",
+      "conn_strip_title": "Connectivity — tap for details",
+      "sim_title": "Simulation active — values may be replayed, not live from the boiler",
+      "sim_badge": "SIMULATION",
+      "lang_title": "Language",
+      "nav_home_sub": "opening page",
+      "nav_sat_sub": "thermostat · control · technical",
+      "nav_monitor_sub": "log · stats · support · graph · connection",
+      "nav_settings_sub": "grouped & scannable",
+      "nav_advanced_sub": "pic · debug · files · system",
+      "nav_diagnose": "Diagnose",
+      "nav_diagnose_sub": "PIC test menu",
+      "viewpick_title": "Choose home view",
+      "viewpick_lead": "View:",
+      "view_a_name": "System view",
+      "view_a_sub": "the heating system, live",
+      "view_b_name": "At a glance",
+      "view_b_sub": "phone-first, one dial",
+      "view_c_name": "Mission control",
+      "view_c_sub": "live strip chart + raw bus",
+      "appl_boiler": "Boiler",
+      "appl_hp": "Heat pump",
+      "ovr_badge_title": "The gateway is injecting values onto the OT bus — click for detail",
+      "ovr_badge_suffix": "injected",
+      "schem_aria": "Live diagram of the heating system",
+      "svg_dhw": "DHW",
+      "svg_outside": "OUTSIDE",
+      "svg_modulation": "MODULATION",
+      "svg_flow": "FLOW →",
+      "svg_return": "← RETURN",
+      "svg_room": "ROOM",
+      "svg_space_heating": "SPACE HEATING",
+      "tile_flame": "Flame",
+      "tile_heating": "Heating",
+      "tile_dhw": "Hot water",
+      "tile_fault": "Fault",
+      "dial_aria": "Room temperature dial",
+      "target_down": "Lower target",
+      "target_up": "Raise target",
+      "stat_boiler": "Boiler",
+      "stat_pressure": "Pressure",
+      "stat_modulation": "Modulation",
+      "stat_dhw": "Hot water",
+      "leg_flow": "flow",
+      "leg_return": "return",
+      "leg_setpoint": "setpoint",
+      "leg_modulation": "modulation",
+      "strip_aria": "Live flow/return/setpoint/modulation strip chart",
+      "ticker_aria": "Live OpenTherm frames"
+    },
+    "h_mon": {
+      "cmd_aria": "OTGW command",
+      "cmd_ph": "Command, e.g. PS=1, TT=20.5, GW=1",
+      "cmd_send": "Send",
+      "conn_boiler": "Boiler",
+      "conn_broker": "Broker → HA",
+      "conn_browser": "This browser",
+      "conn_lg_down_d": "link down",
+      "conn_lg_down_t": "Disconnected",
+      "conn_lg_mode_d": "a setting, not health",
+      "conn_lg_mode_t": "Mode",
+      "conn_lg_off_d": "disabled in settings",
+      "conn_lg_off_t": "Off",
+      "conn_lg_ok_d": "link up, data recent",
+      "conn_lg_ok_t": "Connected",
+      "conn_lg_unknown_d": "not determined yet",
+      "conn_lg_unknown_t": "Unknown",
+      "conn_lg_warn_d": "up but impaired / stale",
+      "conn_lg_warn_t": "Degraded",
+      "conn_live": "live",
+      "conn_map_aria": "Connectivity map",
+      "conn_otbus": "OT bus",
+      "conn_ovr_aria": "Active gateway overrides — click for detail",
+      "conn_router": "Router",
+      "conn_thermostat": "Thermostat",
+      "graph_aria": "Temperatures, modulation and flame/DHW/CH graph",
+      "graph_autocsv": "Auto-CSV",
+      "graph_autocsv_title": "Auto-save a CSV every 5 minutes",
+      "graph_autopng": "Auto-PNG",
+      "graph_autopng_title": "Auto-save a PNG every 5 minutes",
+      "graph_flame": "flame",
+      "log_aria": "Live OpenTherm log",
+      "log_autodl": "Auto-download",
+      "log_autodl_title": "Download the log automatically every 15 minutes",
+      "log_autoscroll": "Auto-scroll",
+      "log_capture": "Capture",
+      "log_capture_title": "Capture: keep up to 200,000 lines (about a day) for Download instead of the last 2,000",
+      "log_clear": "Clear",
+      "log_download": "Download",
+      "log_filter_ph": "Filter frames… (e.g. 19, Boiler, DHW)",
+      "log_lines": "Lines:",
+      "log_rate": "Rate:",
+      "log_sat_only": "SAT only",
+      "log_sat_only_title": "Show only SAT narration lines",
+      "log_stream": "Stream to file",
+      "log_timestamps": "Timestamps",
+      "otd_action_aria": "Override action",
+      "otd_apply": "Apply",
+      "otd_cm": "CM · Clear modifier",
+      "otd_cr": "CR · Clear stored response",
+      "otd_ki": "KI · Mark known ID",
+      "otd_msgid_aria": "OpenTherm message ID",
+      "otd_overrides": "OT-Direct overrides",
+      "otd_ovr_hint": "Set or clear stored responses / response modifiers on the direct OpenTherm bus.",
+      "otd_rm": "RM · Set response modifier",
+      "otd_sr": "SR · Set stored response",
+      "otd_status": "OT-Direct status",
+      "otd_ui": "UI · Mark unknown ID",
+      "otd_value_aria": "Override value (hex)",
+      "sat_bench_sim": "Bench simulation",
+      "sat_beta_dismiss": "Dismiss for this session",
+      "sat_ch_title": "Central Heating Settings",
+      "sat_ctrl_status": "Control status",
+      "sat_curve_title": "Heating curve",
+      "sat_cycle_title": "Burner cycle mode",
+      "sat_detect_loc": "Detect location",
+      "sat_dhw_enable": "DHW enable (HW=)",
+      "sat_dhw_enable_aria": "DHW enable",
+      "sat_dhw_hint": "SAT sends this setpoint to the boiler only while standalone DHW control is on.",
+      "sat_dhw_setpoint": "DHW setpoint",
+      "sat_dhw_standalone": "Standalone DHW control",
+      "sat_dial_aria": "Room thermostat",
+      "sat_discard": "Discard",
+      "sat_ext": "External sensors",
+      "sat_health": "Health",
+      "sat_hist_hint": "SAT target and PID output since this page was opened. Full boiler history:",
+      "sat_hist_link": "Monitor › Graph",
+      "sat_hw_title": "Hot water",
+      "sat_loop_live": "live",
+      "sat_loop_title": "SAT control loop",
+      "sat_lower": "lower target",
+      "sat_markers": "Calibration markers",
+      "sat_markers_hint": "click the curve to add",
+      "sat_max_flow": "Max flow setpoint",
+      "sat_max_hint": "SAT never sends a flow setpoint above this. Until you move the slider SAT uses 62 °C (50 °C underfloor) and sends nothing to the boiler; a chosen value is also sent to the boiler (SH=). Max relative modulation caps the modulation SAT sends (MM=); 100 % is no cap. Some boilers ignore it.",
+      "sat_max_mod": "Max relative modulation",
+      "sat_nodata": "SAT status is unavailable on this device.",
+      "sat_ot_lost": "OpenTherm lost: boiler handed back",
+      "sat_outside_missing": "No outside temperature for 1 hour: boiler handed back",
+      "sat_pid": "PID controller",
+      "sat_presets": "Presets",
+      "sat_presets_hint": "Pick a preset or set the temperature — SAT works out the boiler.",
+      "sat_push_refused": "The thermostat refuses the pushed setpoint (it keeps its own value).",
+      "sat_pwm": "PWM & cycle tracking",
+      "sat_raise": "raise target",
+      "sat_rerun_setup": "Re-run setup",
+      "sat_room_lost": "Room temperature lost: heating on the curve only",
+      "sat_save": "Save settings",
+      "sat_settings_head": "SAT settings",
+      "sat_sim": "Simulation & diagnostics",
+      "sat_smart": "Smart features",
+      "sat_tile_outside": "Outside",
+      "sat_tile_room": "Room",
+      "sat_tile_setpoint": "Boiler setpoint",
+      "sat_tile_setpoint_tag": "SAT → boiler",
+      "sat_tile_target": "Target",
+      "sat_tuning_head": "SAT tuning",
+      "sat_unsaved": "unsaved change(s)",
+      "sat_weather": "Weather",
+      "stats_filter_ph": "Filter by name or msg id…",
+      "stats_overrides": "Active gateway overrides",
+      "stats_th_count": "Count",
+      "stats_th_desc": "Description",
+      "stats_th_dir": "Direction",
+      "stats_th_interval": "Interval",
+      "stats_th_value": "Value",
+      "stats_unique": "Unique msgIDs:",
+      "stats_unsupported": "Boiler unsupported messages",
+      "sup_boiler": "Boiler only",
+      "sup_both": "Thermostat + boiler",
+      "sup_hint": "Click (or tap) a cell to pin its decoded message details.",
+      "sup_map_aria": "OpenTherm message ID support map",
+      "sup_never": "Never seen",
+      "sup_observed": "Observed:",
+      "sup_observed_of": "/ 128 msgIDs",
+      "sup_therm": "Thermostat only",
+      "sup_unsup": "Boiler: not supported",
+      "sv_control": "Control",
+      "sv_control_sub": "operational",
+      "sv_tech": "Technical",
+      "sv_tech_sub": "the control loop",
+      "sv_thermo": "Thermostat",
+      "sv_thermo_sub": "simple",
+      "tab_conn": "Connection",
+      "tab_graph": "Graph",
+      "tab_log": "Log",
+      "tab_stats": "Statistics",
+      "tab_support": "OT Support",
+      "tab_values": "Values",
+      "val_count": "Values:",
+      "val_filter_ph": "Filter values… (e.g. temperature, S0, 28FF)",
+      "val_hint": "Grey rows have no data yet or have not changed for 2 minutes. Use ✎ next to a 1-Wire sensor to give it a label (max 16 characters, empty clears it).",
+      "val_ps": "PS=1 summary mode",
+      "val_ps_title": "The PIC sends a summary (PS=1) instead of frames; values are polled",
+      "val_th_change": "Last change",
+      "val_th_name": "Name",
+      "val_th_unit": "Unit",
+      "val_th_value": "Value"
+    },
+    "h_set": {
+      "discard": "Discard",
+      "save": "Save settings",
+      "search_ph": "Search settings… (e.g. broker, ntp, pin)",
+      "unsaved_suffix": "unsaved change(s)",
+      "tab_pic": "PIC firmware",
+      "tab_debug": "Debug Information",
+      "tab_files": "File System",
+      "tab_system": "System",
+      "pic_none": "No PIC detected: PIC firmware flashing is unavailable in OT-Direct mode.",
+      "pic_device": "PIC Device",
+      "pic_type": "PIC Type",
+      "pic_fwver": "PIC Firmware Version",
+      "pic_check": "Check for updates",
+      "pic_ready": "Ready to flash",
+      "gw_title": "Gateway settings",
+      "gw_sub": "· cached PR= values",
+      "rec_title": "Diagnostic recording",
+      "rec_sub": "· stays on this gateway until you download it",
+      "sys_actions": "System Actions",
+      "sys_actions_sub": "· device-wide",
+      "no_crash": "✓ No crash logs recorded since last boot.",
+      "loading": "Loading…",
+      "rec_start": "Start",
+      "rec_stop": "Stop",
+      "rec_download": "Download (.bin)",
+      "rec_note": "Records OpenTherm frames, commands, MQTT values and setting changes in RAM; passwords are never recorded. Decode on a PC with scripts/diag_decode.py.",
+      "raw_dump": "Raw debug dump (/api/v2/debug)",
+      "fs_title": "File system (LittleFS)",
+      "fs_upload_legend": "Upload file",
+      "fs_upload": "Upload",
+      "fs_hint": "Files land in the current directory.",
+      "fs_classic": "Open classic /FSexplorer ›",
+      "dev_status": "Device status",
+      "conn_title": "Live WebSocket link to the gateway",
+      "mode_title": "Current OpenTherm rewrite mode",
+      "sim_title": "Simulation active: OT replay / sensor simulation",
+      "simulation": "SIMULATION",
+      "dev_note": "Live gateway link, current OT-rewrite mode, and simulation state.",
+      "act_update": "Update Firmware",
+      "act_reboot": "ReBoot",
+      "act_wizard": "Run setup wizard",
+      "act_sat": "Run SAT setup",
+      "act_resetwifi": "Reset Wireless",
+      "act_home": "Home",
+      "act_update_desc": "OTA sketch / filesystem upload",
+      "act_reboot_desc": "restart the device",
+      "act_resetwifi_desc": "clear Wi-Fi & reboot into AP-mode setup",
+      "act_home_desc": "back to the dashboard",
+      "diag_title": "PIC diagnose",
+      "diag_sub": "interactive test menu on the PIC serial line",
+      "diag_desc": "The PIC is running diagnostic firmware, so it offers a test menu instead of speaking OpenTherm. Type a test number and press Enter. The menu reads a whole line, so send one number at a time.",
+      "diag_ph": "Test number, then Enter (empty Enter leaves a running test)",
+      "diag_input_aria": "Diagnose test number",
+      "diag_send": "Send",
+      "diag_out_aria": "PIC diagnose output",
+      "diag_notes": "What happens next differs per test. Tests 1, 2 and 3 keep running until you press Enter with the box empty, and test 1 produces no output at all while it runs, so a quiet screen is normal there. Test 5 ends by asking you for a reference voltage setting. Test 4 needs a loop between the two interfaces, and is the one test that interrupts communication between thermostat and boiler. Which connections each test needs, and how to read its results, is described on",
+      "diag_link": "Schelte Bron's diagnostic firmware page",
+      "foot": "OTGW firmware · v2 Web UI · live from the OpenTherm bus",
+      "toast_saved": "Settings saved"
+    },
+    "home": {
+      "injected_value_tip": "This value is being injected onto the OT bus by the gateway",
+      "status_fault": "Fault reported — check the appliance display.",
+      "status_dhw_charging": "Hot water demand · charging the tank",
+      "status_dhw_running": "Hot water running · tap open",
+      "status_heating_flame": "Heating · flame on",
+      "status_heating_flame_mod": "Heating · flame on · {{pct}}% modulation",
+      "status_heating_compressor": "Heating · compressor on",
+      "status_heating_compressor_mod": "Heating · compressor on · {{pct}}% modulation",
+      "status_idle_flame": "Heating idle · pump running, flame off",
+      "status_idle_compressor": "Heating idle · pump running, compressor off",
+      "status_standby": "Standby · everything quiet",
+      "setpoint_set": "set {{temp}}",
+      "setpoint_set_thermostat": "set {{target}} (thermostat {{thermostat}})",
+      "tag_compressor": "COMPRESSOR",
+      "tag_modulation": "MODULATION",
+      "lcd_fault": "FAULT",
+      "lcd_idle": "{{lead}} idle",
+      "lcd_standby": "STANDBY",
+      "tile_compressor": "Compressor",
+      "tile_flame": "Flame",
+      "on": "ON",
+      "off": "OFF",
+      "fault": "FAULT",
+      "ok": "OK",
+      "chip_flow": "Flow",
+      "chip_return": "Return",
+      "chip_pressure": "Pressure",
+      "chip_room": "Room",
+      "chip_outside": "Outside",
+      "target": "target {{temp}}",
+      "dhw_charging": "charging",
+      "dhw_running": "running",
+      "dhw_standby": "standby",
+      "outside_firmware": "Outside {{temp}} · OTGW firmware",
+      "chart_flow": "flow {{temp}}",
+      "chart_ret": "ret {{temp}}",
+      "cell_flow": "FLOW",
+      "cell_return": "RETURN",
+      "cell_room": "T ROOM",
+      "cell_room_set": "ROOM SET",
+      "cell_outside": "T OUTSIDE",
+      "cell_modulation": "MODULATION",
+      "cell_ch_setpoint": "CH SETPOINT",
+      "cell_pressure": "PRESSURE",
+      "cell_flame": "FLAME",
+      "cell_status": "STATUS"
+    },
+    "lang": {
+      "label": "Language"
+    },
     "nav": {
       "home": "Home",
       "sat": "SAT",
       "monitor": "Monitor",
       "settings": "Settings",
       "advanced": "Advanced"
+    },
+    "sat": {
+      "back": "Back",
+      "continue": "Continue",
+      "cancel": "Cancel",
+      "not_now": "Not now",
+      "retry": "Retry",
+      "get_started": "Get started",
+      "heat_pump": "Heat pump",
+      "auto": "Auto",
+      "step_of": "Step {{n}} of {{total}}",
+      "discover_assign": "Assign",
+      "discover_ignore": "Ignore",
+      "discover_dismiss": "Dismiss",
+      "discover_view": "View",
+      "discover_ble_new_one": "New BLE sensor discovered",
+      "discover_ble_new_other": "{{count}} new BLE sensors discovered",
+      "discover_ble_view_hint": "View them in Settings › Sensors.",
+      "discover_onewire_title": "New 1-Wire sensor detected",
+      "setup_header": "First-time setup",
+      "setup_appliance": "Appliance",
+      "setup_welcome_title": "Your gateway is online",
+      "setup_welcome_body": "Two quick things and you're done — everything else is read straight from the OpenTherm bus.",
+      "setup_appliance_title": "What are you heating with?",
+      "setup_appliance_desc": "Sets how OpenTherm data is read and labelled. Change it anytime in Settings.",
+      "setup_gas_title": "Gas boiler",
+      "setup_gas_desc": "Modulating OpenTherm boiler — flow & return temperature, modulation %, flame & DHW.",
+      "setup_hp_desc": "Air/water heat pump or electric heater — compressor, COP, water temperatures & defrost.",
+      "setup_mqtt_title": "Connect to Home Assistant",
+      "setup_mqtt_desc": "The gateway publishes every value over MQTT; Home Assistant auto-discovers them. Optional — leave off to run standalone.",
+      "setup_broker": "MQTT broker",
+      "setup_port": "Port",
+      "setup_username": "Username",
+      "setup_password": "Password",
+      "setup_unchanged": "unchanged",
+      "setup_top_topic": "Top topic",
+      "setup_testing": "Testing…",
+      "setup_test_again": "Test again",
+      "setup_test_conn": "Test connection",
+      "setup_testing_conn": "Testing connection…",
+      "setup_connected": "Connected",
+      "setup_no_response": "No response — check broker & port",
+      "setup_finish": "Finish",
+      "setup_skip_finish": "Skip & finish",
+      "setup_toggle": "toggle",
+      "setup_done_title": "You're all set",
+      "setup_done_body": "The gateway is live and reading the bus.",
+      "setup_integration": "Integration",
+      "setup_integration_ha": "Home Assistant · {{broker}}",
+      "setup_standalone": "Standalone (no MQTT)",
+      "setup_go_dashboard": "Go to dashboard",
+      "onb_header": "SAT SETUP",
+      "onb_step_system": "Heating system",
+      "onb_step_mfr": "Manufacturer",
+      "onb_step_tuning": "Tuning",
+      "onb_step_sources": "Sources health",
+      "onb_beta_title": "Before you enable SAT",
+      "onb_beta_ack": "I understand that SAT is experimental and controls my boiler.",
+      "onb_welcome_title": "Let's tune SAT for your system",
+      "onb_welcome_body": "The {{name}} takes over control of your boiler, driving flow temperature from the room. Four short questions set it up.",
+      "onb_welcome_note": "SAT stays <b>disabled</b> until you finish, nothing changes on your boiler yet.",
+      "onb_system_title": "What kind of heating do you have?",
+      "onb_system_desc": "Sets the heating curve and control interval SAT starts from.",
+      "onb_sys_radiators": "Radiators",
+      "onb_sys_radiators_desc": "High-temperature emitters. Steeper curve, faster response.",
+      "onb_sys_underfloor": "Underfloor heating",
+      "onb_sys_underfloor_desc": "Low-temperature, high inertia. Gentle curve, long cycles.",
+      "onb_sys_hp_desc": "Air/water heat pump. Also sets the appliance source to heat pump.",
+      "onb_hp_note": "Writes {{src}} alongside {{sys}}.",
+      "onb_mfr_title": "Which boiler do you have?",
+      "onb_mfr_desc": "Applies known modulation limits for your make.",
+      "onb_auto_title": "Auto-detect",
+      "onb_recommended": "RECOMMENDED",
+      "onb_auto_desc": "Reads the OpenTherm member-id from the bus. Detected: {{det}}",
+      "onb_auto_fallback": "read from the OT bus",
+      "onb_mfr_manual": "Or set it manually",
+      "onb_tuning_title": "How should SAT tune itself?",
+      "onb_tuning_desc": "SAT computes its PID gains from the heating curve. Keep the current curve slope, or set it yourself.",
+      "onb_tune_auto": "Automatic",
+      "onb_tune_auto_desc": "SAT computes the PID gains from the heating curve. The stored curve slope is kept.",
+      "onb_tune_manual": "Manual",
+      "onb_tune_manual_desc": "Set the heating-curve slope yourself. SAT still computes the PID gains from that curve. For experienced users.",
+      "onb_slope_title": "Heating curve slope",
+      "onb_slope_desc": "Flow temp rise per °C of outdoor drop",
+      "onb_slope_gentle": "Gentle · underfloor",
+      "onb_slope_steep": "Steep · radiators",
+      "onb_checking": "Checking sources…",
+      "onb_row_ot": "OpenTherm bus",
+      "onb_row_room": "Room temperature",
+      "onb_row_outside": "Outside temperature",
+      "onb_row_boiler": "Boiler",
+      "onb_online": "Online",
+      "onb_online_age": "Online · {{age}}s ago",
+      "onb_offline": "Offline",
+      "onb_not_detected": "Not detected",
+      "onb_connected": "Connected",
+      "onb_not_connected": "Not connected",
+      "onb_unknown": "Unknown",
+      "onb_sources_title": "Source health check",
+      "onb_sources_desc": "SAT reads these from your existing setup. This is a read-only check, configure inputs on their own pages.",
+      "onb_warn_outside": "No outside temperature. SAT will run without weather compensation until you set a location under <b>SAT ▸ Weather</b>. Not required to continue.",
+      "onb_finish_err": "Could not save the settings, SAT was not enabled. Check the device is reachable and try again.",
+      "onb_enabling": "Enabling…",
+      "onb_enable": "Enable SAT",
+      "onb_tune_auto_label": "Automatic (stored slope)",
+      "onb_tune_manual_label": "Manual · slope {{slope}}",
+      "onb_done_title": "SAT is now controlling your boiler",
+      "onb_done_body": "Room-driven control is live. It may take a heating cycle or two to settle.",
+      "onb_written": "Written to settings: {{keys}} plus every answer above.",
+      "onb_run_again": "Run setup again",
+      "onb_open_dashboard": "Open SAT dashboard",
+      "sim_title": "No boiler detected",
+      "sim_body": "This gateway sees no boiler or thermostat on the OpenTherm bus — looks like a bench setup. Run in simulation mode to preview live-like data?",
+      "sim_enable": "Enable simulation",
+      "sim_enabled": "Simulation enabled",
+      "log_resume": "Resume",
+      "log_pause": "Pause",
+      "stream_title": "Save every frame: downloads the new frames as a file every 5 minutes and when you switch it off"
+    },
+    "sensors": {
+      "label_aria": "Label for sensor {{addr}}",
+      "label_not_saved": "Label not saved ({{error}})",
+      "error_generic": "error",
+      "dial_sat_off": "SAT is off: the thermostat controls the temperature",
+      "dial_set_failed_unknown": "set failed: SAT status unknown",
+      "dial_setting_target": "set target {{value}}°…",
+      "dial_target": "target {{value}}°",
+      "dial_target_set": "target set {{value}}°",
+      "dial_set_failed_http": "set failed (HTTP {{status}})",
+      "dial_set_failed": "set failed",
+      "conn_group_bus": "Heating bus (OpenTherm)",
+      "conn_group_net": "Network",
+      "conn_group_int": "Integrations",
+      "conn_group_ses": "This browser session",
+      "tip_seen": "seen",
+      "tip_not_seen": "not seen",
+      "save_picker_text_log": "Text log",
+      "overrides_none": "No active gateway overrides",
+      "unknown": "Unknown",
+      "override_answer": "answer",
+      "override_substituted": "substituted",
+      "msgid_title": "MsgID {{id}} · {{name}}",
+      "override_meta": "{{kind}} = {{value}} · {{age}}s",
+      "boiler_unsupported_none": "None — boiler supports all observed messages (or no boiler seen).",
+      "mode_read": "read",
+      "mode_write": "write",
+      "yes": "Yes",
+      "no": "No",
+      "crash_no_detail": "Crash recorded (no detail).",
+      "debug_none": "No debug data",
+      "debug_load_failed": "Failed to load debug info",
+      "rec_status_unavailable": "Status unavailable",
+      "rec_recording": "Recording · ring {{size}} ({{blocks}} blocks)",
+      "rec_recording_psram": "Recording · ring {{size}} ({{blocks}} blocks) in PSRAM",
+      "rec_dropped_one": "{{count}} record dropped",
+      "rec_dropped_other": "{{count}} records dropped",
+      "rec_no_psram_warning": "no PSRAM: Stop clears the recording, download it first",
+      "rec_refused": "Refused: {{reason}}",
+      "rec_refused_default": "not enough memory",
+      "rec_stopped_data": "Stopped · a recording is in memory, ready to download",
+      "rec_stopped_empty": "Stopped · no recording in memory",
+      "rec_not_done": "not done",
+      "rec_request_failed": "request failed",
+      "psram_size_free": "{{size}} ({{free}} free)",
+      "none": "None",
+      "dbg_grp_firmware": "Firmware",
+      "dbg_firmware_version": "Firmware Version",
+      "dbg_compiled_on": "Compiled On",
+      "dbg_pic_fw_version": "PIC Firmware Version",
+      "dbg_pic_fw_type": "PIC Firmware Type",
+      "dbg_pic_device_id": "PIC Device ID",
+      "dbg_board_type": "Board Type",
+      "dbg_grp_credits": "Credits",
+      "dbg_sat_concept_by": "SAT concept by",
+      "dbg_sat_python_version": "Original SAT Python version",
+      "dbg_cpp_version": "C/C++ version",
+      "dbg_grp_network": "Network",
+      "dbg_hostname": "Hostname (.local)",
+      "dbg_ip_address": "IP Address",
+      "dbg_mac_address": "MAC Address",
+      "dbg_wifi_ssid": "Wi-Fi Network (SSID)",
+      "dbg_wifi_rssi": "Wi-Fi Signal Strength (dBm)",
+      "dbg_wifi_quality": "Wi-Fi Quality",
+      "dbg_grp_hardware": "Hardware",
+      "dbg_chip_model": "Chip Model (est.)",
+      "dbg_chip_id": "Unique Chip ID",
+      "dbg_core_version": "Arduino Core Version",
+      "dbg_sdk_version": "Espressif SDK Version",
+      "dbg_cpu_speed": "CPU Speed (MHz)",
+      "dbg_flash_size": "Flash Size",
+      "dbg_psram": "PSRAM",
+      "dbg_littlefs_size": "LittleFS Size (MB)",
+      "dbg_flash_mode": "Flash Mode",
+      "dbg_grp_memory": "Memory & uptime",
+      "dbg_free_heap": "Free Heap Memory (bytes)",
+      "dbg_max_free_block": "Max. Free Block (bytes)",
+      "dbg_heap_fragmentation": "Heap Fragmentation (%)",
+      "dbg_uptime": "Uptime Since Boot",
+      "dbg_reboots": "Number of Reboots",
+      "dbg_last_reset": "Last Reset Reason",
+      "dbg_grp_integrations": "Integrations",
+      "dbg_mqtt_connected": "MQTT Connected",
+      "dbg_mqtt_enabled": "MQTT Enabled",
+      "dbg_ntp_enabled": "NTP Enabled",
+      "dbg_ntp_timezone": "NTP Timezone",
+      "dbg_grp_otd": "OT-Direct (otd*)",
+      "dbg_grp_hd": "Heap diagnostics (hd_*)",
+      "dbg_grp_perf": "REST performance (perf_*)",
+      "dbg_grp_disc": "MQTT discovery (disc_*)",
+      "dbg_grp_eth": "Ethernet (eth_current_*)",
+      "dbg_grp_other": "All other fields"
+    },
+    "settings": {
+      "cat": {
+        "behavior": {
+          "desc": "LED, theme and restart behaviour.",
+          "title": "Behavior"
+        },
+        "mqtt": {
+          "desc": "Broker connection and Home Assistant publishing.",
+          "title": "MQTT"
+        },
+        "network": {
+          "desc": "Wi-Fi / Ethernet addressing. Changes apply after a reboot.",
+          "title": "Network"
+        },
+        "ntp": {
+          "desc": "Clock synchronisation.",
+          "title": "Time / NTP"
+        },
+        "otd": {
+          "desc": "Direct OpenTherm control (hardware without a PIC).",
+          "title": "OT-Direct"
+        },
+        "otgw": {
+          "desc": "Commands sent to the PIC at boot.",
+          "title": "OpenTherm Gateway"
+        },
+        "outputs": {
+          "desc": "Drive a GPIO from OT state.",
+          "title": "GPIO Outputs"
+        },
+        "s0": {
+          "desc": "Energy pulse counting.",
+          "title": "S0 Pulse Counter"
+        },
+        "sat": {
+          "desc": "Standalone Adaptive Thermostat.",
+          "title": "SAT — Smart Thermostat"
+        },
+        "sensors": {
+          "desc": "1-Wire / GPIO temperature sensors and the BLE roster.",
+          "title": "Sensors"
+        },
+        "system": {
+          "desc": "Device identity and access.",
+          "title": "System"
+        },
+        "webhook": {
+          "desc": "HTTP callbacks on OT state.",
+          "title": "Webhook"
+        }
+      },
+      "confirm_boardmode": "Board mode takes effect after a reboot. Forcing the wrong mode leaves the gateway non-functional until you set it back (or to Auto-detect). Continue?",
+      "confirm_no_buffer": "Not recommended without a buffer tank: the room may overheat.",
+      "enum_current": "{{value}} (current)",
+      "enum_service_mode": "{{label}} (service mode)",
+      "group": {
+        "areas": "Areas",
+        "ble_sensors": "BLE sensors",
+        "boiler": "Boiler",
+        "connection": "Connection",
+        "curve": "Curve",
+        "ethernet": "Ethernet",
+        "ha_publishing": "HA & publishing",
+        "hot_water": "Hot water",
+        "indoor_temperature": "Indoor temperature",
+        "multi_area": "Multi-area",
+        "offsets": "Offsets",
+        "other": "Other",
+        "presets": "Presets",
+        "pv_boost": "PV boost",
+        "pwm": "PWM",
+        "season": "Season",
+        "sensors": "Sensors",
+        "simulation": "Simulation",
+        "solar_gain": "Solar gain",
+        "summer_simmer": "Summer simmer",
+        "system": "System",
+        "thermal": "Thermal",
+        "weather": "Weather",
+        "wi_fi": "Wi-Fi"
+      },
+      "help_aria": "Help: {{label}}",
+      "help_loading": "Loading…",
+      "help_none": "No help text for this setting.",
+      "help_unavailable": "Help not available.",
+      "hint": {
+        "c_below_30_off_30_60": "°C (below 30 = off, 30-60)",
+        "connected_ssid_read_only": "Connected SSID (read-only)",
+        "ds18b20_or_ble": "DS18B20 or BLE",
+        "e_g_atc_empty_all": "e.g. ATC_ (empty = all)",
+        "fraction_0_5_1_0": "fraction 0.5–1.0",
+        "hardware_interface_override": "Hardware interface override",
+        "hours": "Hours",
+        "kw_0_boiler_capacity": "kW (0 = boiler capacity)",
+        "leave_empty_for_dhcp": "Leave empty for DHCP",
+        "m_h_0_off": "m³/h (0 = off)",
+        "mdns_name_on_your_network": "mDNS name on your network",
+        "milliseconds": "Milliseconds",
+        "minutes": "Minutes",
+        "optional": "Optional",
+        "otgwcommands": "Semicolon separated, e.g. PS=0;GW=1",
+        "protects_settings_advanced": "Protects Settings / Advanced",
+        "satboilerratedkw": "kW gas input. Enables the gas estimate and caps it (0 = off)",
+        "satmanufacturer": "Auto detects from the boiler; choose Immergas explicitly to enable its TP=11:12 modulation command",
+        "satmaxsetpoint": "°C (0 = not chosen, default 62 / 50 underfloor)",
+        "satsource": "On/off heat pump, 3 h cycle (experimental): Experimental. Only for on/off heat pumps with a large thermal mass (underfloor heating or a buffer tank). Long runs of up to 3 hours.",
+        "seconds": "Seconds",
+        "tcp_port_23_no_login": "TCP port 23, no login",
+        "wifinoportal": "Keeps retrying; triple reset opens the portal"
+      },
+      "ip_err_format": "needs four numbers separated by dots",
+      "ip_err_octet": "octet {{n}} (\"{{value}}\") is not a number from 0 to 255",
+      "ip_err_required": "is required for a static IP",
+      "ip_field_dns": "DNS",
+      "ip_field_gateway": "gateway",
+      "ip_field_ip_address": "IP address",
+      "ip_field_subnet_mask": "subnet mask",
+      "ip_group_err": "{{group}} {{field}}: {{reason}}",
+      "label": {
+        "boardmode": "Board mode",
+        "ethdns": "DNS",
+        "ethgateway": "Gateway",
+        "ethipaddress": "IP address",
+        "ethstaticip": "Use static IP",
+        "ethsubnet": "Subnet mask",
+        "gpiooutputsenabled": "Enable output",
+        "gpiooutputspin": "GPIO pin",
+        "gpiooutputstriggerbit": "Trigger on",
+        "gpiosensorsenabled": "Enable sensors",
+        "gpiosensorsinterval": "Poll interval",
+        "gpiosensorslegacyformat": "Legacy topic format",
+        "gpiosensorspin": "GPIO pin",
+        "hostname": "Hostname",
+        "httppasswd": "Admin password",
+        "ledblink": "Blink LED on OT traffic",
+        "legacyport25238enabled": "Legacy TCP port 25238",
+        "mqttbroker": "Broker",
+        "mqttbrokerport": "Port",
+        "mqttenable": "Enable MQTT",
+        "mqtthaprefix": "HA discovery prefix",
+        "mqttinterval": "Publish interval",
+        "mqttonchangepublishing": "Publish on change",
+        "mqttotmessage": "Publish raw OT messages",
+        "mqttpasswd": "Password",
+        "mqttseparatesources": "Separate thermostat/boiler topics",
+        "mqtttoptopic": "Top topic",
+        "mqttuniqueid": "Unique id",
+        "mqttuselegacyottopics": "Legacy OT topic layout",
+        "mqttuser": "Username",
+        "nightlyrestart": "Nightly restart",
+        "nightlyrestarthour": "Restart hour",
+        "ntpenable": "Enable NTP",
+        "ntphostname": "NTP server",
+        "ntpsendtime": "Send time to thermostat",
+        "ntptimezone": "Timezone",
+        "otdautobypass": "Auto bypass",
+        "otdautodetect": "Auto-detect OT-Direct mode",
+        "otdenableslave": "Enable slave (thermostat) passthrough",
+        "otdfailsafe": "Fail-safe on OT bus loss",
+        "otdfreeventenable": "Free ventilation",
+        "otdhasbypassrelay": "Bypass relay fitted",
+        "otdmode": "OT-Direct mode",
+        "otdmsginterval": "Message interval",
+        "otdopenbypass": "Open bypass now",
+        "otdsetbacktemp": "Setback temperature",
+        "otdsetbacktimeout": "Setback timeout",
+        "otdsummermode": "Summer mode (CH off)",
+        "otdventenable": "Ventilation enabled",
+        "otdventsetpoint": "Ventilation setpoint",
+        "otgwcommandenable": "Run commands at boot",
+        "otgwcommands": "Boot commands",
+        "s0counterdebouncetime": "Debounce time",
+        "s0counterenabled": "Enable S0 counter",
+        "s0counterinterval": "Report interval",
+        "s0counterpin": "GPIO pin",
+        "s0counterpulsekw": "Pulses per kWh",
+        "satareaweight0": "Area 0 weight",
+        "satareaweight1": "Area 1 weight",
+        "satareaweight2": "Area 2 weight",
+        "satareaweight3": "Area 3 weight",
+        "satbleenable": "Enable BLE sensors",
+        "satblefailover": "BLE failover to OT",
+        "satbleinterval": "BLE poll interval",
+        "satblemac": "BLE sensor MAC",
+        "satblenamefilteringest": "Only ingest sensors whose name matches",
+        "satblenameprefix": "Name prefix filter",
+        "satbleriskack": "BLE without PSRAM: risk accepted",
+        "satboilercapacity": "Boiler capacity",
+        "satboilerefficiency": "Boiler efficiency",
+        "satboilerratedkw": "Boiler rated input",
+        "satcoefficient": "Heating curve slope",
+        "satcurveselftune": "Heating curve self-tune",
+        "satcyclesperhour": "PWM cycle length",
+        "satdhwcapacity": "DHW capacity",
+        "satdhwenable": "DHW enable (HW= master)",
+        "satdhwenabled": "DHW enabled (standalone)",
+        "satdhwsetpoint": "DHW setpoint",
+        "satenabled": "SAT enabled",
+        "saterrormon": "Error monitoring",
+        "satexternaltemp": "Use MQTT/REST as indoor temp source",
+        "satfireplace": "Fireplace mode",
+        "satflameoffset": "Flame-off offset",
+        "satflowoffset": "Flow offset",
+        "satflushtreshold": "Flush threshold",
+        "satfollowthermostat": "Follow thermostat setpoint",
+        "satheatingmode": "Heating mode",
+        "sathpcycle": "PWM cycle length",
+        "sathumiditytimeout": "Humidity sensor timeout",
+        "satinterval": "Update interval",
+        "satmanufacturer": "Manufacturer",
+        "satmaxconsumption": "Gas use at max modulation",
+        "satmaxmodulation": "Max modulation",
+        "satmaxpressdrop": "Max pressure drop",
+        "satmaxpressure": "Max pressure",
+        "satmaxsetpoint": "Max flow setpoint",
+        "satminconsumption": "Gas use at min modulation",
+        "satminpressure": "Min pressure",
+        "satmodsupdelay": "Modulation suppression delay",
+        "satmodsupoffset": "Modulation suppression offset",
+        "satmqttfallback": "Take over when MQTT is lost",
+        "satmultiarea": "Enable multi-area",
+        "satmultiareacount": "Area count",
+        "satovershootmargin": "Overshoot margin",
+        "satovershootprotection": "PWM overshoot protection",
+        "satpresetactivity": "Activity preset",
+        "satpresetaway": "Away preset",
+        "satpresetcomfort": "Comfort preset",
+        "satpreseteco": "Eco preset",
+        "satpresethome": "Home preset",
+        "satpresetsleep": "Sleep preset",
+        "satpresetsync": "Sync presets via MQTT",
+        "satpresetsynctopic": "Preset sync topic",
+        "satpushsetpoint": "Push setpoint to thermostat",
+        "satpvboostdeltac": "Setpoint boost",
+        "satpvboostenabled": "Enable PV boost",
+        "satpvboostholds": "Hold time",
+        "satpvboostmaxdurationmin": "Max duration",
+        "satpvboostmaxindoorc": "Max indoor temp",
+        "satpvboostthresholdw": "Surplus threshold",
+        "satsensorarea0": "Area 0 sensor",
+        "satsensorarea1": "Area 1 sensor",
+        "satsensorarea2": "Area 2 sensor",
+        "satsensorarea3": "Area 3 sensor",
+        "satsensormaxage": "Sensor max age",
+        "satsimcoolrate": "Cool rate",
+        "satsimheatrate": "Heat rate",
+        "satsimulation": "Enable simulation",
+        "satsolarfreezeint": "Solar freeze integral",
+        "satsolargain": "Enable solar gain",
+        "satsolarminelev": "Solar min elevation",
+        "satsolarminrise": "Min rise rate",
+        "satsolaroffset": "Setpoint offset",
+        "satsource": "Appliance type",
+        "satsummerminhours": "Min summer hours",
+        "satsummersimmer": "Enable summer simmer",
+        "satsummerthreshold": "Summer threshold",
+        "satsystem": "Heating system",
+        "sattargettemp": "Target temperature",
+        "sattempstep": "Setpoint step",
+        "satthermalcoeff": "Thermal-drop coefficient",
+        "satthermalcomfort": "Thermal comfort model",
+        "satvalveoffset": "Valve offset",
+        "satweatherenable": "Enable weather compensation",
+        "satweatherinterval": "Update interval",
+        "satweatherlat": "Latitude",
+        "satweatherlon": "Longitude",
+        "satwindowdetect": "Window detection",
+        "satwindowminsec": "Window min open time",
+        "satzonecount": "Zone count",
+        "satzoneheadroom": "Zone headroom",
+        "satzonetimeout": "Zone sensor timeout",
+        "ssid": "Wi-Fi network",
+        "telnetenabled": "Telnet debug console",
+        "webhookcontenttype": "Content type",
+        "webhookenable": "Enable webhook",
+        "webhookpayload": "Payload template",
+        "webhooktriggerbit": "Trigger on",
+        "webhookurloff": "URL when OFF",
+        "webhookurlon": "URL when ON",
+        "wifidns1": "DNS 1",
+        "wifidns2": "DNS 2",
+        "wifigateway": "Gateway",
+        "wifinoportal": "No setup portal when Wi-Fi is down",
+        "wifistaticip": "Static IP",
+        "wifisubnet": "Subnet mask"
+      },
+      "ovr_injected": "{{n}} injected",
+      "ovr_kind_answer": "answer",
+      "ovr_kind_substituted": "substituted",
+      "ovr_meta": "{{kind}} = {{value}} · {{age}}s",
+      "ovr_none": "No active overrides",
+      "ovr_response_modifier": "Response modifier",
+      "ovr_stored_response": "Stored response",
+      "ovr_sub": "Values the gateway is injecting onto the OT bus — the boiler/thermostat see these, not the original.",
+      "ovr_title": "Active gateway overrides",
+      "ovr_unknown_id": "Unknown ID",
+      "ovr_remote": "Room setpoint override ({{cmd}})",
+      "ovr_write": "Write",
+      "pwm_help_gas": "Length of one PWM cycle in minutes. The field follows the Appliance type. Gas boiler (also Auto): 20 minutes (3 cycles per hour, default) or 15 minutes (4 cycles per hour).",
+      "pwm_help_hp": "Length of one PWM cycle in minutes. The field follows the Appliance type. Heat pump: 30 minutes (default), 40 or 60 minutes. The experimental on/off heat pump type uses a fixed 3 hour cycle and has no choice here.",
+      "pwm_help_hybrid": "Length of one PWM cycle in minutes. The field follows the Appliance type. Hybrid: 30 minutes (default) or 40 minutes.",
+      "reboot_aria": "Changes in this category take effect after a reboot",
+      "reboot_badge": "REBOOT",
+      "reboot_title": "Changes in this category take effect after a reboot.",
+      "sat_moved": "The SAT settings now live on the SAT page: the choices under Control, the tuning under Technical.",
+      "sat_off_not_saved": "SAT is off: not saved: {{names}}",
+      "sat_off_note": "SAT is off: the SAT settings are locked. Switch SAT on (top right) to change them.",
+      "sat_open_btn": "Open SAT settings",
+      "save_failed": "Save failed",
+      "saved": "Settings saved",
+      "wh_auth": "Auth required — sign in first (HTTP {{status}})",
+      "wh_disabled": "Webhook disabled — enable it above first",
+      "wh_error": "Error: {{message}}",
+      "wh_error_http": "Error: HTTP {{status}}",
+      "wh_network": "network",
+      "wh_not_fired": "Not fired yet",
+      "wh_send_test": "Send {{state}} test",
+      "wh_send_title": "Fires the saved {{state}} webhook (POST /api/v2/webhook/test)",
+      "wh_sending": "Sending {{state}}…",
+      "wh_sent": "✓ {{state}} {{ack}} · {{time}}"
+    },
+    "stats": {
+      "concl": {
+        "0": "Master/slave status flags: CH and DHW demand plus the boiler's flame, fault and mode bits.",
+        "1": "Thermostat's commanded boiler flow (CH water) setpoint.",
+        "2": "Thermostat announces its configuration flags and OpenTherm member ID.",
+        "3": "Boiler announces its configuration flags and OpenTherm member ID.",
+        "4": "Thermostat sends a remote command to the boiler (e.g. boiler reset).",
+        "5": "Boiler's application-specific fault flags plus an OEM fault code.",
+        "6": "Boiler advertises which remote boiler parameters are transfer-enabled and read/write.",
+        "7": "Thermostat's cooling demand signal to the boiler.",
+        "8": "Thermostat's flow setpoint for the second CH circuit.",
+        "9": "Remote-supplied room-setpoint override; a value of 0 means no override is active.",
+        "10": "Number of transparent slave parameters the boiler exposes.",
+        "11": "Reads or writes one transparent slave parameter by index.",
+        "12": "Size of the boiler's fault-history buffer.",
+        "13": "Reads one fault-history buffer entry by index.",
+        "14": "Thermostat caps the boiler's maximum relative modulation.",
+        "15": "Boiler reports its maximum capacity (kW) and minimum modulation level (%).",
+        "16": "Thermostat's current room setpoint.",
+        "17": "Boiler's actual relative modulation level (burner output, %).",
+        "18": "Boiler's central-heating water pressure.",
+        "19": "Domestic-hot-water flow rate through the boiler.",
+        "20": "Day-of-week and time-of-day clock exchanged between thermostat and boiler.",
+        "21": "Calendar month and day.",
+        "22": "Calendar year.",
+        "23": "Thermostat's room setpoint for the second CH circuit.",
+        "24": "Thermostat's measured room temperature.",
+        "25": "Boiler's actual flow (CH water) temperature.",
+        "26": "Domestic-hot-water temperature.",
+        "27": "Outside air temperature used for weather-compensated control.",
+        "28": "Central-heating return water temperature.",
+        "29": "Solar storage tank temperature.",
+        "30": "Solar collector temperature.",
+        "31": "Flow water temperature of the second CH circuit.",
+        "32": "Second domestic-hot-water circuit temperature.",
+        "33": "Boiler exhaust-gas temperature.",
+        "34": "Boiler heat-exchanger temperature.",
+        "35": "Boiler fan speed and its setpoint.",
+        "36": "Flame-ionisation current measured at the burner.",
+        "37": "Room temperature reported for the second CH circuit.",
+        "38": "Relative humidity measurement.",
+        "39": "Remote room-setpoint override for a second zone; 0 means no override is active.",
+        "48": "Allowed upper/lower bounds for the DHW setpoint.",
+        "49": "Allowed upper/lower bounds for the maximum CH setpoint.",
+        "50": "Allowed upper/lower bounds for the OTC heat-curve ratio.",
+        "51": "Upper/lower bounds for remote parameter 4.",
+        "52": "Upper/lower bounds for remote parameter 5.",
+        "53": "Upper/lower bounds for remote parameter 6.",
+        "54": "Upper/lower bounds for remote parameter 7.",
+        "55": "Upper/lower bounds for remote parameter 8.",
+        "56": "Domestic-hot-water setpoint.",
+        "57": "Maximum central-heating water setpoint.",
+        "58": "Outside-temperature-compensation (weather) heat-curve ratio.",
+        "59": "Value of remote parameter 4.",
+        "60": "Value of remote parameter 5.",
+        "61": "Value of remote parameter 6.",
+        "62": "Value of remote parameter 7.",
+        "63": "Value of remote parameter 8.",
+        "70": "Master/slave status flags for the ventilation/heat-recovery unit.",
+        "71": "Commanded ventilation/heat-recovery setpoint.",
+        "72": "Ventilation/heat-recovery fault flags and OEM fault code.",
+        "73": "Ventilation/heat-recovery diagnostic code.",
+        "74": "Ventilation/heat-recovery configuration flags and member ID.",
+        "75": "OpenTherm protocol version of the ventilation/heat-recovery unit.",
+        "76": "Product version and type of the ventilation/heat-recovery unit.",
+        "77": "Actual relative ventilation level.",
+        "78": "Relative humidity of the exhaust air.",
+        "79": "CO2 concentration of the exhaust air.",
+        "80": "Ventilation supply-air inlet temperature.",
+        "81": "Ventilation supply-air outlet temperature.",
+        "82": "Ventilation exhaust-air inlet temperature.",
+        "83": "Ventilation exhaust-air outlet temperature.",
+        "84": "Measured exhaust fan speed.",
+        "85": "Measured supply fan speed.",
+        "86": "Transfer-enable & read/write flags for the V/H remote parameters.",
+        "87": "Nominal ventilation level setting.",
+        "88": "Number of transparent slave parameters for the V/H unit.",
+        "89": "Reads or writes one V/H transparent slave parameter.",
+        "90": "Size of the V/H fault-history buffer.",
+        "91": "Reads one V/H fault-history buffer entry.",
+        "93": "Boiler brand name, transferred one character at a time by index.",
+        "94": "Boiler brand/version string, transferred one character at a time.",
+        "95": "Boiler serial number, transferred one character at a time.",
+        "96": "Cumulative hours spent in cooling mode.",
+        "97": "Number of boiler power cycles.",
+        "98": "RF sensor signal strength and battery level.",
+        "99": "Remote override of the heating/DHW operating mode; 0 means no override is active.",
+        "100": "Defines whether manual and program room-setpoint changes may overrule an active remote override.",
+        "101": "Master/slave status flags for the solar-storage unit.",
+        "102": "Solar-storage application-specific fault flags and OEM fault code.",
+        "103": "Solar-storage configuration flags and member ID.",
+        "104": "Solar-storage product version and type.",
+        "105": "Number of solar-storage transparent slave parameters.",
+        "106": "Reads or writes one solar-storage transparent slave parameter by index.",
+        "107": "Size of the solar-storage fault-history buffer.",
+        "108": "Reads one solar-storage fault-history buffer entry by index.",
+        "109": "Number of micro-CHP electricity-producer starts.",
+        "110": "Operating hours of the electricity producer.",
+        "111": "Instantaneous electricity production.",
+        "112": "Cumulative electricity produced.",
+        "113": "Count of failed burner ignition attempts.",
+        "114": "Count of low-flame-signal events.",
+        "115": "Manufacturer-specific diagnostic/service code.",
+        "116": "Total number of burner ignitions.",
+        "117": "Total number of CH pump starts.",
+        "118": "Total number of DHW pump/valve starts.",
+        "119": "Number of burner starts while in DHW mode.",
+        "120": "Total hours the burner has run (flame on).",
+        "121": "Total hours the CH pump has run.",
+        "122": "Total hours the DHW pump has run or the DHW valve has been open.",
+        "123": "Total burner hours while in DHW mode.",
+        "124": "OpenTherm protocol version implemented by the thermostat (master).",
+        "125": "OpenTherm protocol version implemented by the boiler (slave).",
+        "126": "Thermostat (master) product version number and type.",
+        "127": "Boiler (slave) product version number and type."
+      },
+      "id_n": "ID {{id}}",
+      "dir_read_bt": "Read · boiler → thermostat",
+      "dir_write_tb": "Write · thermostat → boiler",
+      "dir_read_write": "Read / Write",
+      "dir_undefined": "Undefined",
+      "sup_unsup": "Boiler: not supported",
+      "sup_both": "Both sides",
+      "sup_tonly": "Thermostat only",
+      "sup_bonly": "Boiler only",
+      "sup_off": "Not seen",
+      "sup_concl_unsup": "The thermostat asks for this, and the boiler answers that it does not support it.",
+      "sup_concl_both": "Both the thermostat and the boiler use this message.",
+      "sup_concl_tonly": "The thermostat asks for this, but the boiler never answers — your boiler may not implement it.",
+      "sup_concl_bonly": "The boiler reports this, but the thermostat never asks for it.",
+      "sup_concl_reserved": "Reserved / undefined in the OpenTherm spec — not used.",
+      "sup_concl_unseen_with": "{{concl}} (Not seen on your bus yet.)",
+      "sup_concl_unseen": "Not seen on your bus yet.",
+      "sd_data_type": "Data type",
+      "sd_direction": "Direction",
+      "sd_unit": "Unit",
+      "sd_value": "Value",
+      "sd_seen": "Seen",
+      "sd_thermostat": "Thermostat",
+      "sd_boiler": "Boiler",
+      "sd_read": "Read",
+      "sd_write": "Write",
+      "sd_read_ack": "Read ack",
+      "sd_write_ack": "Write ack",
+      "sd_no_read": "no read support",
+      "sd_rejects_write": "rejects write",
+      "sd_hint": "From the OpenTherm spec table, your bus traffic this session and the support history the gateway keeps across reboots."
+    },
+    "tools": {
+      "active": "Active",
+      "cmd_enter": "Enter a command",
+      "cmd_sent": "Sent: {{cmd}}",
+      "diag_not_available": "The PIC is not running diagnostic firmware, so there is no test menu to show.",
+      "disabled": "Disabled",
+      "enabled": "Enabled",
+      "error_status": "Error {{status}}",
+      "health_cycle": "Cycle",
+      "health_device": "Device",
+      "health_flame": "Flame",
+      "health_modulation": "Modulation",
+      "health_pressure": "Pressure",
+      "health_setpoint": "Setpoint",
+      "heating": "Heating",
+      "idle": "Idle",
+      "inactive": "Inactive",
+      "kv_active_preset": "Active preset",
+      "kv_boiler_status": "Boiler status",
+      "kv_coefficient": "Coefficient",
+      "kv_control_mode": "Control mode",
+      "kv_cycle_count": "Cycle count",
+      "kv_cycle_max_flow": "Cycle max flow",
+      "kv_cycle_overshoot": "Cycle overshoot",
+      "kv_cycles_this_hour": "Cycles this hour",
+      "kv_d_term": "D term",
+      "kv_duty_cycle": "Duty cycle",
+      "kv_error": "Error",
+      "kv_external": "External",
+      "kv_fallback_active": "Fallback active",
+      "kv_fallback_reason": "Fallback reason",
+      "kv_fetch_errors": "Fetch errors",
+      "kv_humidity": "Humidity",
+      "kv_i_term": "I term",
+      "kv_indoor_sensor": "Indoor sensor",
+      "kv_last_blocked_cmd": "Last blocked cmd",
+      "kv_last_cycle": "Last cycle",
+      "kv_last_update": "Last update",
+      "kv_manufacturer": "Manufacturer",
+      "kv_max_modulation": "Max modulation",
+      "kv_modulation": "Modulation",
+      "kv_ot_bus": "OT bus",
+      "kv_ot_bus_weather": "OT bus / weather",
+      "kv_outdoor_sensor": "Outdoor sensor",
+      "kv_outdoor_temp": "Outdoor temp",
+      "kv_p_term": "P term",
+      "kv_pid_output": "PID output",
+      "kv_pv_boost": "PV boost",
+      "kv_pwm_flame": "PWM flame",
+      "kv_raw_derivative": "Raw derivative",
+      "kv_requesting": "Requesting",
+      "kv_sim_flame": "Sim flame",
+      "kv_sim_flow": "Sim flow",
+      "kv_sim_modulation": "Sim modulation",
+      "kv_sim_on_bench": "On (bench)",
+      "kv_sim_return": "Sim return",
+      "kv_sim_room": "Sim room",
+      "kv_simulation": "Simulation",
+      "kv_solar_gain": "Solar gain",
+      "kv_summer_mode": "Summer mode",
+      "kv_thermal_learning": "Thermal learning",
+      "kv_weather": "Weather",
+      "kv_wind": "Wind",
+      "kv_window_detection": "Window detection",
+      "legend_flow": "Flow",
+      "legend_outside": "Outside",
+      "legend_pid": "PID",
+      "legend_room": "Room",
+      "legend_setpoint": "Setpoint",
+      "log_pause": "⏸ Pause",
+      "no": "No",
+      "off": "Off",
+      "on": "On",
+      "sat_beta_body": "We need field data to validate it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #alpha-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).",
+      "sat_beta_head": "SAT is experimental in this beta and it controls your boiler.",
+      "sat_big_at_target": "At target · idle",
+      "sat_big_heating_to": "Heating to {{temp}}",
+      "sat_big_off": "SAT is off",
+      "sat_big_safety": "Safety tripped!",
+      "sat_big_summer": "Summer mode",
+      "sat_big_window": "Window open",
+      "sat_blocked_cmd_ago": "{{cmd}} ({{seconds}}s ago)",
+      "sat_boiler_anti_cycling": "Anti-cycling",
+      "sat_boiler_at_setpoint": "At setpoint",
+      "sat_boiler_cooling": "Cooling",
+      "sat_boiler_heating": "Heating",
+      "sat_boiler_heating_hot_water": "Heating hot water",
+      "sat_boiler_idle": "Idle",
+      "sat_boiler_ignition_surge": "Ignition surge",
+      "sat_boiler_modulating_down": "Modulating down",
+      "sat_boiler_modulating_up": "Modulating up",
+      "sat_boiler_off": "Off",
+      "sat_boiler_overshoot_cooling": "Overshoot cooling",
+      "sat_boiler_post_cycle": "Post-cycle",
+      "sat_boiler_preheating": "Preheating",
+      "sat_boiler_pump_starting": "Pump starting",
+      "sat_boiler_stalled_ignition": "Stalled ignition",
+      "sat_boiler_waiting_flame": "Waiting flame",
+      "sat_curve_label": "{{system}} · coeff {{coeff}} · target {{target}}",
+      "sat_cycle_good": "Good",
+      "sat_cycle_insufficient": "Insufficient",
+      "sat_cycle_none": "None",
+      "sat_cycle_overshoot": "Overshoot",
+      "sat_cycle_short": "Short",
+      "sat_cycle_sub_continuous": "PID drives the burner continuously. SAT chooses the mode itself.",
+      "sat_cycle_sub_off": "SAT is not actively controlling. SAT chooses the mode itself.",
+      "sat_cycle_sub_pwm": "PID modulates the burner in PWM bursts. SAT chooses the mode itself.",
+      "sat_cycle_uncertain": "Uncertain",
+      "sat_cycle_underheat": "Underheat",
+      "sat_cycle_underheat_pwm": "Underheat (PWM)",
+      "sat_default": "default",
+      "sat_default_value": "default ({{value}}°C)",
+      "sat_dhw_off": "off",
+      "sat_dhw_range_boiler": "Boiler DHW range {{lb}}–{{ub}} °C (MsgID 48), usable {{lo}}–{{hi}} °C",
+      "sat_dhw_range_default": "Default range {{min}}–{{max}} °C (no MsgID 48 from the boiler)",
+      "sat_dial_caption": "target · room {{room}}",
+      "sat_geo_denied": "Location denied: the browser blocked access",
+      "sat_geo_detecting": "Detecting…",
+      "sat_geo_error": "Location error",
+      "sat_geo_hint": "Location detection needs HTTPS. Enter Latitude and Longitude under SAT settings > Weather.",
+      "sat_geo_needs_https": "Location detection needs HTTPS",
+      "sat_geo_save_failed": "Save failed",
+      "sat_geo_timeout": "Location timed out",
+      "sat_geo_unavailable": "Location unavailable",
+      "sat_just_now": "Just now",
+      "sat_learning": "Learning…",
+      "sat_legend_active_curve": "active curve (c={{coeff}})",
+      "sat_legend_current": "current point",
+      "sat_legend_markers": "calibration markers",
+      "sat_marker_added": "Marker added: {{out}}° out, {{flow}}° flow",
+      "sat_marker_delete": "Delete this marker",
+      "sat_marker_deleted": "Marker deleted",
+      "sat_marker_error": "Marker: {{message}}",
+      "sat_marker_flow": "{{value}}° flow",
+      "sat_marker_max": "20 markers is the maximum; delete one first",
+      "sat_marker_none": "No calibration markers yet.",
+      "sat_marker_out": "{{value}}° out",
+      "sat_max_chosen": "{{shown}}°C (chosen {{chosen}}°C)",
+      "sat_max_range_boiler": "Boiler range {{lb}}–{{ub}} °C (MsgID 49)",
+      "sat_max_range_default": "Default range {{min}}–{{max}} °C (no MsgID 49 from the boiler)",
+      "sat_min_ago": "{{minutes}} min ago",
+      "sat_mode_continuous": "Continuous",
+      "sat_mode_off": "Off",
+      "sat_mode_pwm": "PWM",
+      "sat_never": "Never",
+      "sat_no_location": "No location set",
+      "sat_preset_activity": "Activity",
+      "sat_preset_away": "Away",
+      "sat_preset_comfort": "Comfort",
+      "sat_preset_eco": "Eco",
+      "sat_preset_home": "Home",
+      "sat_preset_none": "None",
+      "sat_preset_sleep": "Sleep",
+      "sat_pv_boost_active": "Active {{value}}",
+      "sat_raw_data": "Raw data (JSON)",
+      "sat_sim_change_failed": "Could not change simulation (a real boiler may be connected).",
+      "sat_sim_unavailable": "A real boiler is connected — bench simulation is unavailable.",
+      "sat_status_retrying": "Couldn’t load SAT status — retrying…",
+      "sat_status_unavailable": "SAT status is unavailable on this device.",
+      "sat_summer_active_hours": "Active ({{hours}} h)",
+      "sat_system_radiator": "radiator",
+      "sat_system_underfloor": "underfloor",
+      "sat_takeover": "Takeover (MQTT lost)",
+      "send_failed": "Send failed",
+      "yes": "Yes"
+    },
+    "values": {
+      "save_failed_http": "Save failed (HTTP {{status}})",
+      "save_failed": "Save failed",
+      "ble_risk_title": "BLE without PSRAM — instability risk",
+      "ble_risk_text": "This board has no PSRAM. Enabling BLE takes ~64 KB of internal memory that the web server needs, so the Web UI can become unstable or unreachable under load (you may need to reboot). Enable BLE anyway?",
+      "ble_keep_off": "Keep BLE off",
+      "ble_enable_anyway": "Enable anyway (accept risk)",
+      "ble_kept_off": "BLE kept off",
+      "ble_enabled_accepted": "BLE enabled — risk accepted",
+      "ble_clearing": "Clearing roster…",
+      "ble_title": "BLE sensors",
+      "ble_slots": "{{used}} / {{max}} slots used",
+      "ble_slots_prefix": "{{used}} / {{max}} slots used · prefix \"{{prefix}}\"",
+      "ble_paused": "BLE is paused: this board has no PSRAM, and BLE scanning starts only after you accept the stability warning.",
+      "ble_read_warning": "Read the warning",
+      "ble_rescan": "Rescan",
+      "ble_scanning": "Scanning…",
+      "ble_scanning_toast": "Scanning for BLE sensors…",
+      "ble_clear": "Clear roster",
+      "ble_clear_confirm": "Click again to clear all",
+      "ble_none": "No BLE sensors discovered yet. Press Rescan and put a sensor in range.",
+      "ble_unnamed": "(unnamed)",
+      "ble_selected": "selected",
+      "ble_key": "key",
+      "ble_select": "Select",
+      "ble_forget": "Forget",
+      "ble_name_placeholder": "Name (e.g. Living room)",
+      "ble_save_name": "Save name",
+      "ble_name_saved": "Name saved",
+      "ble_name_cleared": "Name cleared",
+      "ble_bindkey_placeholder": "32-hex bindkey",
+      "ble_set_key": "Set",
+      "ble_add_title": "Add encrypted sensor",
+      "ble_add": "Add",
+      "none_option": "-- none --",
+      "trigger_boiler_fault": "Boiler: fault",
+      "trigger_boiler_ch": "Boiler: CH active",
+      "trigger_boiler_dhw": "Boiler: DHW active",
+      "trigger_boiler_flame": "Boiler: flame on",
+      "trigger_boiler_cooling": "Boiler: cooling active",
+      "trigger_boiler_ch2": "Boiler: CH2 active",
+      "trigger_boiler_diag": "Boiler: diagnostic",
+      "trigger_boiler_elec": "Boiler: electricity production",
+      "trigger_tstat_ch": "Thermostat: CH enable",
+      "trigger_tstat_dhw": "Thermostat: DHW enable",
+      "trigger_tstat_cooling": "Thermostat: cooling enable",
+      "trigger_tstat_otc": "Thermostat: OTC active",
+      "trigger_tstat_ch2": "Thermostat: CH2 enable",
+      "trigger_tstat_summer": "Thermostat: summer/winter",
+      "trigger_tstat_dhwblock": "Thermostat: DHW blocking",
+      "trigger_tstat_bit7": "Thermostat: bit 7 (reserved)",
+      "enum_auto": "Auto",
+      "enum_gas_boiler": "Gas Boiler",
+      "enum_heat_pump": "Heat Pump",
+      "enum_hybrid": "Hybrid",
+      "enum_onoff_hp": "On/off heat pump, 3 h cycle (experimental)",
+      "enum_radiators": "Radiators",
+      "enum_underfloor": "Underfloor",
+      "enum_min_default": "{{minutes}} min (default)",
+      "enum_min": "{{minutes}} min",
+      "enum_min_hp_only": "{{minutes}} min (heat pump only)",
+      "enum_autodetect": "Auto-detect",
+      "enum_board_pic": "PIC (Classic)",
+      "enum_board_otdirect": "OT-Direct (no PIC)",
+      "enum_comfort": "Comfort",
+      "enum_eco": "Eco",
+      "enum_other": "Other",
+      "otmon": {
+        "flamestatus": "Flame Status",
+        "chenable": "Central Heating Enabled",
+        "chmodus": "Central Heating Status",
+        "ch2enable": "Central Heating 2 Enabled",
+        "ch2modus": "Central Heating 2 Status",
+        "dhwenable": "Domestic Hot Water Enabled",
+        "dhwmode": "Domestic Hot Water Status",
+        "diagnosticindicator": "Diagnostic Indicator",
+        "faultindicator": "Fault Indicator",
+        "outsidetemperature": "Outside Temperature",
+        "roomtemperature": "Room Temperature",
+        "roomsetpoint": "Room Temperature Setpoint",
+        "remoteroomsetpoint": "Remote Room Temperature Setpoint",
+        "relmodlvl": "Relative Modulation Level",
+        "maxrelmodlvl": "Max. Rel. Modulation Level",
+        "chwaterpressure": "Central Heating Water Pressure",
+        "boilertemperature": "Boiler Temperature",
+        "returnwatertemperature": "Return Water Temperature",
+        "controlsetpoint": "Control Setpoint",
+        "maxchwatersetpoint": "Max. CH Water Setpoint",
+        "dhwtemperature": "Domestic Hot Water Temperature",
+        "dhwsetpoint": "Domestic Hot Water Setpoint",
+        "oemfaultcode": "OEM Fault Code",
+        "oemdiagnosticcode": "OEM Diagnostic Code",
+        "coolingmodus": "Cooling Enabled",
+        "coolingactive": "Cooling Status",
+        "otcactive": "Outside Temp Compensation",
+        "servicerequest": "Service Request",
+        "lockoutreset": "Lockout Reset",
+        "lowwaterpressure": "Low Water Pressure",
+        "gasflamefault": "Gas/Flame Fault",
+        "airtemp": "Air Temperature",
+        "waterovertemperature": "Water Over-Temperature",
+        "numberofsensors": "Number of Temperature Sensors",
+        "s0powerkw": "S0 Actual Power",
+        "s0intervalcount": "S0 Interval Pulses",
+        "s0totalcount": "S0 Total Pulses"
+      },
+      "edit_label_title": "Edit label for {{id}}",
+      "edit_label_aria": "Edit label for sensor {{id}}",
+      "loading": "Loading…",
+      "no_data": "no data",
+      "age_ago": "{{age}} ago",
+      "age_ago_atleast": "≥ {{age}} ago",
+      "updated_ago": "Updated {{age}} ago"
     }
   };
-  var I18N_LANGS = ['en', 'nl', 'de'];
+  var I18N_LANGS = ['en', 'nl', 'de', 'el'];
   var i18nLang = 'en';
   var i18nPack = null;
+  var i18nWanted = 'en';   // the latest requested language; a late reply for another one is dropped
 
   function i18nPickLang(langs, supported, override) {
     var list = [override].concat(langs || []);
@@ -175,7 +1729,7 @@
 
   function applyI18n(root) {
     var scope = root || document;
-    var attrs = [['data-i18n', null], ['data-i18n-title', 'title'], ['data-i18n-placeholder', 'placeholder']];
+    var attrs = [['data-i18n', null], ['data-i18n-title', 'title'], ['data-i18n-placeholder', 'placeholder'], ['data-i18n-aria-label', 'aria-label']];
     attrs.forEach(function (a) {
       scope.querySelectorAll('[' + a[0] + ']').forEach(function (el) {
         var text = t(el.getAttribute(a[0]));
@@ -195,10 +1749,12 @@
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function (pack) {
         if (!pack || typeof pack !== 'object') throw new Error('not an object');
+        if (lang !== i18nWanted) return;
         i18nPack = pack; i18nLang = lang;
         if (done) done(true);
       })
       .catch(function () {
+        if (lang !== i18nWanted) return;
         if (tries > 1) { setTimeout(function () { loadI18nPack(lang, done, tries - 1); }, 3000); return; }
         if (done) done(false);
       });
@@ -209,7 +1765,72 @@
     try { override = localStorage.getItem('otgw.lang'); } catch (e) { }
     var lang = i18nPickLang(navigator.languages || [navigator.language], I18N_LANGS, override);
     applyI18n(document);
-    loadI18nPack(lang, function (ok) { if (ok) applyI18n(document); });
+    syncLangMenu(lang);
+    i18nWanted = lang;
+    loadI18nPack(lang, function (ok) { if (ok && lang !== 'en') { applyI18n(document); i18nRerender(); } syncLangMenu(i18nLang); });
+    initLangMenu();
+  }
+
+  // Header language dropdown (TASK-1764): the summary shows the active flag and code, the entries
+  // switch the language live. The choice is the localStorage override read by initI18n().
+  function syncLangMenu(lang) {
+    var menu = document.getElementById('langMenu');
+    if (!menu) return;
+    var sum = menu.querySelector('summary');
+    menu.querySelectorAll('li a').forEach(function (a) {
+      var on = a.getAttribute('data-lang') === lang;
+      a.classList.toggle('active', on);
+      if (on) {
+        a.setAttribute('aria-current', 'true');
+        sum.setAttribute('aria-label', t('lang.label') + ': ' + a.querySelector('.nm').textContent);
+        sum.setAttribute('title', t('lang.label'));
+        sum.querySelector('.flag').className = a.querySelector('.flag').className;
+        sum.querySelector('.code').textContent = a.querySelector('.code').textContent;
+      } else a.removeAttribute('aria-current');
+    });
+  }
+
+  // Text that JS builds once (theme button, view label, connection strip and map, tables, settings,
+  // SAT and override panels) is rebuilt in the new language; each renderer keeps its own state.
+  function i18nRerender() {
+    [function () { applyTheme(document.documentElement.getAttribute('data-theme') === 'dark'); },
+     function () { var d = null; try { d = localStorage.getItem('otgw-v2-design'); } catch (e) { } showDesign(d || 'a'); },
+     renderConnStrip, renderHdrNet, renderConnMap, renderStats, renderSupport, renderValues,
+     renderSettings, renderSatSettings, renderOvrPanel, scheduleRender
+    ].forEach(function (f) { try { f(); } catch (e) { } });
+  }
+
+  function setLang(lang) {
+    i18nWanted = lang;
+    loadI18nPack(lang, function (ok) {
+      if (ok) {
+        try { localStorage.setItem('otgw.lang', lang); } catch (e) { }   // only a language that loaded is kept
+        applyI18n(document);
+        i18nRerender();
+      }
+      syncLangMenu(i18nLang);
+    });
+  }
+
+  function initLangMenu() {
+    var menu = document.getElementById('langMenu');
+    if (!menu || menu.getAttribute('data-bound')) return;
+    menu.setAttribute('data-bound', '1');
+    menu.querySelectorAll('li a').forEach(function (a) {
+      a.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        setLang(a.getAttribute('data-lang'));
+        menu.removeAttribute('open');
+      });
+    });
+    document.addEventListener('pointerdown', function (ev) {
+      if (menu.hasAttribute('open') && !menu.contains(ev.target)) menu.removeAttribute('open');
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Escape' || !menu.hasAttribute('open')) return;
+      menu.removeAttribute('open');
+      menu.querySelector('summary').focus();
+    });
   }
 
   // ---------- theme (localStorage key otgw-theme) ----------
@@ -219,8 +1840,8 @@
     // TASK-1692: the label shows what a click gives, so no aria-pressed (the WAI-ARIA toggle-button
     // pattern keeps the label fixed); aria-label and title name that action.
     if (b) {
-      var action = dark ? 'Switch to light theme' : 'Switch to dark theme';
-      b.textContent = dark ? '☀ Light' : '🌙 Dark';
+      var action = dark ? t('core.theme_to_light') : t('core.theme_to_dark');
+      b.textContent = dark ? t('core.theme_light') : t('core.theme_dark');
       b.setAttribute('aria-label', action);
       b.setAttribute('title', action);
     }
@@ -272,7 +1893,7 @@
   }
 
   // ---------- Home concept chips (A/B/C) ----------
-  var VIEW_LABELS = { a: 'System view', b: 'At a glance', c: 'Mission control' };
+  var VIEW_LABEL_KEYS = { a: 'core.view_system', b: 'core.view_glance', c: 'core.view_mission' };
   function showDesign(d) {
     document.querySelectorAll('.vp-item').forEach(function (s) {
       s.classList.toggle('active', s.dataset.design === d);
@@ -282,7 +1903,7 @@
       if (el) el.classList.toggle('active', k === d);
     });
     var lbl = document.getElementById('viewPickLabel');
-    if (lbl) lbl.textContent = VIEW_LABELS[d] || VIEW_LABELS.a;
+    if (lbl) lbl.textContent = t(VIEW_LABEL_KEYS[d] || VIEW_LABEL_KEYS.a);
     try { localStorage.setItem('otgw-v2-design', d); } catch (e) { }
     if (typeof renderActive === 'function') renderActive();
   }
@@ -353,7 +1974,7 @@
     function p(n) { return (n < 10 ? '0' : '') + n; }
     el.textContent = (dev ? '' : '~') + (dev ? p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds())
       : p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()));
-    el.title = dev ? 'Device time ' + d.toISOString().substring(0, 10) + ' (device timezone)' : 'Browser time (device time not read yet)';
+    el.title = dev ? t('core.clock_device', { date: d.toISOString().substring(0, 10) }) : t('core.clock_browser');
   }
   // Shares devTimeInflight/devTimeLastMs with psCheckTick, so the two never overlap and
   // together stay inside the device/time budget.
@@ -374,8 +1995,8 @@
       .then(function (j) {
         var fc = j && j.filesystem_check, b = document.getElementById('fsMismatch');
         if (!fc || !b || fc.match !== false) return;
-        b.textContent = '⚠ Firmware/filesystem mismatch (firmware ' + fc.fw_hash + ', filesystem ' + (fc.fs_hash || 'unknown') + '). ';
-        var a = document.createElement('a'); a.href = BASE + 'update'; a.textContent = 'Flash the matching LittleFS image';
+        b.textContent = '⚠ ' + t('core.fs_mismatch', { fw: fc.fw_hash, fs: fc.fs_hash || t('core.fs_unknown') }) + ' ';
+        var a = document.createElement('a'); a.href = BASE + 'update'; a.textContent = t('core.fs_flash_link');
         b.appendChild(a); b.hidden = false;
       }).catch(function () { });
   }
@@ -384,38 +2005,56 @@
   // One five-state vocabulary used everywhere (colour + icon + text), ported from
   // the mockup. MODE (gateway/monitor) is a separate kind, never a green/red light.
   var STICON = { 'st-ok': '✓', 'st-warn': '!', 'st-down': '✕', 'st-off': '○', 'st-unknown': '?', 'st-mode': '⇄' };
-  var STLABEL = { 'st-ok': 'Connected', 'st-warn': 'Degraded', 'st-down': 'Disconnected', 'st-off': 'Off', 'st-unknown': 'Unknown', 'st-mode': 'Mode' };
+  // Getters, so the label follows the active language at render time.
+  var STLABEL = {
+    get 'st-ok'() { return t('conn.st_ok'); }, get 'st-warn'() { return t('conn.st_warn'); },
+    get 'st-down'() { return t('conn.st_down'); }, get 'st-off'() { return t('conn.st_off'); },
+    get 'st-unknown'() { return t('conn.st_unknown'); }, get 'st-mode'() { return t('conn.st_mode'); }
+  };
   var STV = { 'st-ok': 'var(--zone-ok)', 'st-warn': 'var(--zone-warn)', 'st-down': 'var(--zone-alert)', 'st-off': 'var(--tile-off)', 'st-unknown': 'var(--muted)', 'st-mode': 'var(--accent)' };
   // CONN: static metadata (group / icon / name / explanation / fix hint) + live
   // state (s / value / detail), bound to the real /api/v2/health + settings. The OT
   // bus is two independent links (thermostat vs boiler) so "boiler not answering"
   // is distinguishable from "thermostat not asking".
+  // name / exp / fix / api detail are getters: read at render time they follow the active language.
   var CONN = {
-    ws:    { grp: 'ses', s: 'st-unknown', icon: '📱', name: 'Live link', detail: '',
-             exp: 'This page has a live link to the gateway — the log updates in real time.',
-             fix: 'Live link dropped — the page is reconnecting; data may be paused.' },
-    mode:  { grp: 'bus', s: 'st-mode', icon: '⇄', name: 'Gateway mode', value: '',
-             exp: 'Gateway actively rewrites OT messages (lets the UI set temperatures); Monitor passively observes only.' },
-    mqtt:  { grp: 'int', s: 'st-unknown', icon: '📡', name: 'MQTT broker', detail: '',
-             exp: 'Connected to the broker; the online (birth) message is published.',
-             fix: 'Cannot reach the broker — check address, port and credentials.' },
-    wifi:  { grp: 'net', s: 'st-unknown', icon: '📶', name: 'Wi-Fi', detail: '',
-             exp: 'The gateway is on your network.',
-             fix: 'Weak or no signal — move the device or add a repeater.' },
-    boiler:{ grp: 'bus', s: 'st-unknown', icon: '🔥', name: 'Boiler', detail: '',
-             exp: 'The boiler (OT slave) is answering.',
-             fix: 'Boiler not answering — check the OT wiring / boiler power.' },
-    therm: { grp: 'bus', s: 'st-unknown', icon: '🌡️', name: 'Thermostat', detail: '',
-             exp: 'The room thermostat (OT master) is talking to the gateway.',
-             fix: 'No frames from the thermostat — check the OT wiring.' },
-    ot:    { grp: 'bus', s: 'st-unknown', icon: '🔌', name: 'OpenTherm interface', detail: '',
-             exp: 'The active OpenTherm command interface (PIC gateway or OT-Direct).',
-             fix: 'No OT interface available — check the hardware / board mode.' },
-    ntp:   { grp: 'int', s: 'st-unknown', icon: '🕐', name: 'Time (NTP)', detail: '',
-             exp: 'The clock is synced; timestamps and time-to-thermostat are correct.',
-             fix: 'No time sync — check the NTP server and internet access.' },
-    api:   { grp: 'ses', s: 'st-ok', icon: '🔁', name: 'REST API', detail: 'polling',
-             exp: 'Values on this page are fetched from the device API.' }
+    ws:    { grp: 'ses', s: 'st-unknown', icon: '📱', detail: '',
+             get name() { return t('conn.ws_name'); },
+             get exp() { return t('conn.ws_exp'); },
+             get fix() { return t('conn.ws_fix'); } },
+    mode:  { grp: 'bus', s: 'st-mode', icon: '⇄', value: '',
+             get name() { return t('conn.mode_name'); },
+             get exp() { return t('conn.mode_exp'); } },
+    mqtt:  { grp: 'int', s: 'st-unknown', icon: '📡', detail: '',
+             get name() { return t('conn.mqtt_name'); },
+             get exp() { return t('conn.mqtt_exp'); },
+             get fix() { return t('conn.mqtt_fix'); } },
+    wifi:  { grp: 'net', s: 'st-unknown', icon: '📶', detail: '',
+             get name() { return t('conn.wifi_name'); },
+             get exp() { return t('conn.wifi_exp'); },
+             get fix() { return t('conn.wifi_fix'); } },
+    boiler:{ grp: 'bus', s: 'st-unknown', icon: '🔥', detail: '',
+             get name() { return t('conn.boiler_name'); },
+             get exp() { return t('conn.boiler_exp'); },
+             get fix() { return t('conn.boiler_fix'); } },
+    therm: { grp: 'bus', s: 'st-unknown', icon: '🌡️', detail: '',
+             get name() { return t('conn.therm_name'); },
+             get exp() { return t('conn.therm_exp'); },
+             get fix() { return t('conn.therm_fix'); } },
+    // name has a setter: the health refresh assigns the PIC / OT-Direct label; unset it falls back to the generic one.
+    ot:    { grp: 'bus', s: 'st-unknown', icon: '🔌', detail: '', _name: null,
+             get name() { return this._name !== null ? this._name : t('conn.ot_name'); },
+             set name(v) { this._name = v; },
+             get exp() { return t('conn.ot_exp'); },
+             get fix() { return t('conn.ot_fix'); } },
+    ntp:   { grp: 'int', s: 'st-unknown', icon: '🕐', detail: '',
+             get name() { return t('conn.ntp_name'); },
+             get exp() { return t('conn.ntp_exp'); },
+             get fix() { return t('conn.ntp_fix'); } },
+    api:   { grp: 'ses', s: 'st-ok', icon: '🔁',
+             get name() { return t('conn.api_name'); },
+             get detail() { return t('conn.api_detail'); },
+             get exp() { return t('conn.api_exp'); } }
   };
   var connRssi = null;
   var simActive = false;   // TASK-982: device/info otgwsimulation, cached via withDeviceInfo
@@ -434,16 +2073,16 @@
       else if (c.s === 'st-warn') { if (worst !== 'down') worst = 'warn'; issues++; }
     });
     var cls = worst === 'down' ? 'down' : (worst === 'warn' ? 'warn' : '');
-    var label = worst === 'down' ? (issues + ' connection issue' + (issues > 1 ? 's' : '')) :
-                (worst === 'warn' ? (issues + ' degraded') : 'All systems connected');
+    var label = worst === 'down' ? t('conn.issues', { count: issues }) :
+                (worst === 'warn' ? t('conn.degraded', { count: issues }) : t('conn.all_ok'));
     strip.textContent = '';   // rebuild with DOM nodes (textContent — no HTML injection)
     var btn = document.createElement('button');
     btn.className = 'connsum' + (cls ? ' ' + cls : '');
-    btn.title = 'Connectivity health — open the Connection map';
+    btn.title = t('conn.health_title');
     btn.addEventListener('click', function () { showPage('monitor', { tab: 'mconn' }); });
     var dot = document.createElement('span'); dot.className = 'd';
     var lbl = document.createElement('span'); lbl.textContent = label;
-    var go = document.createElement('span'); go.className = 'go'; go.textContent = '· Connection ›';
+    var go = document.createElement('span'); go.className = 'go'; go.textContent = t('conn.go');
     btn.appendChild(dot); btn.appendChild(lbl); btn.appendChild(go);
     strip.appendChild(btn);
 
@@ -458,18 +2097,18 @@
       hs.classList.toggle('down', wd);
       var mv = CONN.mode.value;
       var mode;
-      if (mv === 'gateway') mode = 'Gateway';
-      else if (mv === 'monitor') mode = 'Monitor';
-      else if (mv === 'detecting') mode = 'Detecting…';
-      else if (mv === 'n/a') mode = (CONN.ot.detail === 'OT-Direct') ? 'OT-Direct' : 'N/A';
-      else mode = mv ? (mv.charAt(0).toUpperCase() + mv.slice(1)) : 'Unknown';
-      hs.title = (wd ? 'Disconnected' : 'Connected') + ' · ' + mode + ' mode';
+      if (mv === 'gateway') mode = t('conn.mode_gateway');
+      else if (mv === 'monitor') mode = t('conn.mode_monitor');
+      else if (mv === 'detecting') mode = t('conn.mode_detecting');
+      else if (mv === 'n/a') mode = (CONN.ot.detail === 'OT-Direct') ? 'OT-Direct' : t('conn.mode_na');
+      else mode = mv ? (mv.charAt(0).toUpperCase() + mv.slice(1)) : t('conn.mode_unknown');
+      hs.title = t('conn.status_title', { state: wd ? t('conn.st_down') : t('conn.st_ok'), mode: mode });
       var md = document.getElementById('hdrStatMode');
-      if (md) md.textContent = (wd ? 'Disconnected' : mode);
+      if (md) md.textContent = (wd ? t('conn.st_down') : mode);
       // TASK-982: keep the Advanced › System 'Device status' badges in sync from the
       // SAME wd/mode mapping (no drift). sysSim reflects the cached device/info flag.
       var sc = document.getElementById('sysConn');
-      if (sc) { sc.classList.toggle('down', wd); sc.textContent = '● ' + (wd ? 'Disconnected' : 'Connected'); }
+      if (sc) { sc.classList.toggle('down', wd); sc.textContent = '● ' + (wd ? t('conn.st_down') : t('conn.st_ok')); }
       var sm = document.getElementById('sysMode');
       if (sm) sm.textContent = '⇄ ' + mode;
       var ssim = document.getElementById('sysSim');
@@ -493,7 +2132,7 @@
       var hn = ('' + (d.hostname || '')).trim();
       var ver = ('' + (d.fwversion || '')).split('+')[0];   // drop +buildmetadata for a compact chip
       host.textContent = '';
-      host.appendChild(document.createTextNode(hn || 'device'));
+      host.appendChild(document.createTextNode(hn || t('conn.hostname_fallback')));
       var sm = document.createElement('small'); sm.textContent = '.local';
       host.appendChild(sm);
       host.appendChild(document.createTextNode(' · ' + (ver ? 'v' + ver : '—')));
@@ -524,12 +2163,12 @@
     // Tooltip — honest per network type. DHCP-vs-static read lazily from the settings
     // cache (empty wifistaticip == DHCP); it fills in once fetchSettings() lands.
     var staticip = (setData.wifistaticip && setData.wifistaticip.value != null) ? ('' + setData.wifistaticip.value).trim() : '';
-    var mode = staticip === '' ? 'DHCP' : 'static';
+    var mode = staticip === '' ? 'DHCP' : t('conn.ip_static');
     var tip;
-    if (hdrNet.kind === 'eth') tip = 'IP ' + (hdrNet.ip || '—') + ' (' + mode + ') · Wired';
-    else if (hdrNet.kind === 'ap') tip = 'IP ' + (hdrNet.ip || '—') + ' · AP mode';
+    if (hdrNet.kind === 'eth') tip = t('conn.tip_eth', { ip: hdrNet.ip || '—', mode: mode });
+    else if (hdrNet.kind === 'ap') tip = t('conn.tip_ap', { ip: hdrNet.ip || '—' });
     else {
-      tip = 'IP ' + (hdrNet.ip || '—') + ' (' + mode + ') · Wi-Fi ' + (hdrNet.ssid || '—');
+      tip = t('conn.tip_wifi', { ip: hdrNet.ip || '—', mode: mode, ssid: hdrNet.ssid || '—' });
       if (connRssi !== null) tip += ' · ' + connRssi + ' dBm';
       if (q > 0) tip += ' · ' + q + '%';
     }
@@ -774,7 +2413,7 @@
       function td(txt, cls) { var e = document.createElement('td'); if (cls) e.className = cls; e.textContent = txt; return e; }
       var idTd = document.createElement('td'); var b = document.createElement('span'); b.className = 'idbadge'; b.textContent = id; idTd.appendChild(b);
       tr.appendChild(idTd);
-      tr.appendChild(td(s.label || ('ID ' + id)));
+      tr.appendChild(td(s.label || t('stats.id_n', { id: id })));
       var dTd = document.createElement('td'); var badge = document.createElement('span'); badge.className = 'dirbadge ' + db[1]; badge.textContent = db[0]; dTd.appendChild(badge); tr.appendChild(dTd);
       tr.appendChild(td(s.interval ? (s.interval / 1000).toFixed(1) + 's' : '—'));
       tr.appendChild(td('' + s.count));
@@ -982,21 +2621,29 @@
   function supState(id) {
     var s = stats[id], p = otSup[id];
     var t = (s && s.dirT) || (p && (p.tsR || p.tsW)), b = (s && s.dirB) || (p && (p.blAR || p.blAW));
-    if (p && (p.blUR || p.blUW) && !p.blAR && !p.blAW) return { cls: 'unsup', label: 'Boiler: not supported', sv: 'var(--zone-alert)' };
-    if (t && b) return { cls: 'both', label: 'Both sides', sv: 'var(--zone-ok)' };
-    if (t) return { cls: 'tonly', label: 'Thermostat only', sv: 'var(--accent)' };
-    if (b) return { cls: 'bonly', label: 'Boiler only', sv: 'var(--zone-warn)' };
-    return { cls: 'off', label: 'Not seen', sv: 'var(--tile-off)' };
+    if (p && (p.blUR || p.blUW) && !p.blAR && !p.blAW) return { cls: 'unsup', label: t('stats.sup_unsup'), sv: 'var(--zone-alert)' };
+    if (t && b) return { cls: 'both', label: t('stats.sup_both'), sv: 'var(--zone-ok)' };
+    if (t) return { cls: 'tonly', label: t('stats.sup_tonly'), sv: 'var(--accent)' };
+    if (b) return { cls: 'bonly', label: t('stats.sup_bonly'), sv: 'var(--zone-warn)' };
+    return { cls: 'off', label: t('stats.sup_off'), sv: 'var(--tile-off)' };
   }
   var SUP_BADGE = { both: '✓', tonly: '↑', bonly: '↓', unsup: '⚠', off: '○' };
+  // Direction texts and conclusions of the OTMSG table are looked up by key; the table text is the fallback.
+  var SUP_DIR_KEY = { 'Read · boiler → thermostat': 'stats.dir_read_bt', 'Write · thermostat → boiler': 'stats.dir_write_tb', 'Read / Write': 'stats.dir_read_write', 'Undefined': 'stats.dir_undefined' };
+  function supDirText(d) { var k = SUP_DIR_KEY[d]; return k ? t(k) : d; }
+  function supMsgConcl(id, m) {
+    if (!m || !m.concl) return '';
+    var k = 'stats.concl.' + id, s = t(k);
+    return s === k ? m.concl : s;
+  }
   function supConcl(id, st) {
     var m = (typeof OTMSG !== 'undefined' && OTMSG[id]) ? OTMSG[id] : null;
-    if (st.cls === 'unsup') return 'The thermostat asks for this, and the boiler answers that it does not support it.';
-    if (st.cls === 'both') return 'Both the thermostat and the boiler use this message.';
-    if (st.cls === 'tonly') return 'The thermostat asks for this, but the boiler never answers — your boiler may not implement it.';
-    if (st.cls === 'bonly') return 'The boiler reports this, but the thermostat never asks for it.';
-    if (m && m.spec === '') return 'Reserved / undefined in the OpenTherm spec — not used.';
-    return (m && m.concl) ? (m.concl + ' (Not seen on your bus yet.)') : 'Not seen on your bus yet.';
+    if (st.cls === 'unsup') return t('stats.sup_concl_unsup');
+    if (st.cls === 'both') return t('stats.sup_concl_both');
+    if (st.cls === 'tonly') return t('stats.sup_concl_tonly');
+    if (st.cls === 'bonly') return t('stats.sup_concl_bonly');
+    if (m && m.spec === '') return t('stats.sup_concl_reserved');
+    return (m && m.concl) ? t('stats.sup_concl_unseen_with', { concl: supMsgConcl(id, m) }) : t('stats.sup_concl_unseen');
   }
   function showSupportDetail(id) {
     var el = document.getElementById('supDetail'); if (!el) return;
@@ -1013,32 +2660,32 @@
     if (m.spec) { var sp = document.createElement('span'); sp.className = 'sd-spec'; sp.textContent = m.spec; top.appendChild(sp); }
     el.appendChild(top);
     // human name
-    var h5 = document.createElement('h5'); h5.textContent = m.name || ('ID ' + id); el.appendChild(h5);
+    var h5 = document.createElement('h5'); h5.textContent = m.name || t('stats.id_n', { id: id }); el.appendChild(h5);
     // coloured support badge — after the name, matching the mockup detail order
     var badge = document.createElement('div'); badge.className = 'sd-badge'; badge.textContent = (SUP_BADGE[st.cls] || '') + ' ' + st.label; el.appendChild(badge);
     // spec + observed fields
     var dl = document.createElement('dl');
-    var rows = [['Data type', m.type || '—'], ['Direction', m.dir || '—']];
-    if (m.unit) rows.push(['Unit', m.unit]);
+    var rows = [[t('stats.sd_data_type'), m.type || '—'], [t('stats.sd_direction'), m.dir ? supDirText(m.dir) : '—']];
+    if (m.unit) rows.push([t('stats.sd_unit'), m.unit]);
     if (s) {
-      rows.push(['Value', s.value || '—']);
-      rows.push(['Seen', s.count + '×' + (s.interval ? ' · ~' + (s.interval / 1000).toFixed(1) + 's' : '')]);
+      rows.push([t('stats.sd_value'), s.value || '—']);
+      rows.push([t('stats.sd_seen'), s.count + '×' + (s.interval ? ' · ~' + (s.interval / 1000).toFixed(1) + 's' : '')]);
     }
     var p = otSup[id];   // TASK-1228: the classic two-column view (index.js:9008-9017 at 3aa1ef927)
     if (p) {
       var tp = [], bp = [];
-      if (p.tsR) tp.push('Read'); if (p.tsW) tp.push('Write');
-      if (p.blAR) bp.push('Read ack'); if (p.blAW) bp.push('Write ack');
-      if (p.blUR) bp.push('no read support'); if (p.blUW) bp.push('rejects write');
-      rows.push(['Thermostat', tp.join(', ') || '—']);
-      rows.push(['Boiler', bp.join(', ') || '—']);
+      if (p.tsR) tp.push(t('stats.sd_read')); if (p.tsW) tp.push(t('stats.sd_write'));
+      if (p.blAR) bp.push(t('stats.sd_read_ack')); if (p.blAW) bp.push(t('stats.sd_write_ack'));
+      if (p.blUR) bp.push(t('stats.sd_no_read')); if (p.blUW) bp.push(t('stats.sd_rejects_write'));
+      rows.push([t('stats.sd_thermostat'), tp.join(', ') || '—']);
+      rows.push([t('stats.sd_boiler'), bp.join(', ') || '—']);
     }
     rows.forEach(function (kv) { var dt = document.createElement('dt'); dt.textContent = kv[0]; var dd = document.createElement('dd'); dd.textContent = kv[1]; dl.appendChild(dt); dl.appendChild(dd); });
     el.appendChild(dl);
     // plain-language conclusion
     var concl = document.createElement('div'); concl.className = 'sd-concl'; concl.textContent = supConcl(id, st); el.appendChild(concl);
     // provenance footnote — mockup closes every detail render with this
-    var hint = document.createElement('div'); hint.className = 'sd-hint'; hint.textContent = 'From the OpenTherm spec table, your bus traffic this session and the support history the gateway keeps across reboots.'; el.appendChild(hint);
+    var hint = document.createElement('div'); hint.className = 'sd-hint'; hint.textContent = t('stats.sd_hint'); el.appendChild(hint);
   }
 
   // ---------- Monitor > Log ----------
@@ -1173,7 +2820,7 @@
   function setMark(id, base, on) {
     var el = document.getElementById(id); if (!el) return;
     el.textContent = on ? base + ' ⛓' : base;
-    if (on) el.title = 'This value is being injected onto the OT bus by the gateway';
+    if (on) el.title = t('home.injected_value_tip');
     else el.removeAttribute('title');
   }
   function fmt(v, dp, suffix) {
@@ -1189,14 +2836,15 @@
 
   // Plain-language status line (mockup hero headline): load + action, appliance-aware.
   function statusSentence(isHP) {
-    var burn = isHP ? 'compressor' : 'flame';
-    if (model.fault) return 'Fault reported — check the appliance display.';
+    if (model.fault) return t('home.status_fault');
     // TASK-1392: a heat pump (or any appliance with a DHW storage tank) sends the flow to the tank
     // through a 3-way valve; "tap open" would be wrong there.
-    if (model.dhw_on) return (isHP || sat.tank) ? 'Hot water demand · charging the tank' : 'Hot water running · tap open';
-    if (model.flame) return 'Heating · ' + burn + ' on' + (model.mod !== null ? ' · ' + Math.round(model.mod) + '% modulation' : '');
-    if (model.ch) return 'Heating idle · pump running, ' + burn + ' off';
-    return 'Standby · everything quiet';
+    if (model.dhw_on) return (isHP || sat.tank) ? t('home.status_dhw_charging') : t('home.status_dhw_running');
+    if (model.flame) return model.mod !== null
+      ? t(isHP ? 'home.status_heating_compressor_mod' : 'home.status_heating_flame_mod', { pct: Math.round(model.mod) })
+      : t(isHP ? 'home.status_heating_compressor' : 'home.status_heating_flame');
+    if (model.ch) return t(isHP ? 'home.status_idle_compressor' : 'home.status_idle_flame');
+    return t('home.status_standby');
   }
   function renderA() {
     var isHP = effectiveSource() === 2;  // 2 = Heat Pump (electric → bolt + HP labels)
@@ -1224,8 +2872,8 @@
     // TASK-1342: while SAT controls the boiler its target is the setpoint that counts; the
     // thermostat's own setpoint (MsgID 16) is shown second, as the thermostat may refuse a push.
     var satSet = sat.active && sat.target !== null && !isNaN(sat.target);
-    var setBase = satSet ? 'set ' + fmt(sat.target, 1, '°') + (model.roomSet === null ? '' : ' (thermostat ' + fmt(model.roomSet, 1, '°') + ')')
-                         : (model.roomSet === null ? '' : 'set ' + fmt(model.roomSet, 1, '°'));
+    var setBase = satSet ? (model.roomSet === null ? t('home.setpoint_set', { temp: fmt(sat.target, 1, '°') }) : t('home.setpoint_set_thermostat', { target: fmt(sat.target, 1, '°'), thermostat: fmt(model.roomSet, 1, '°') }))
+                         : (model.roomSet === null ? '' : t('home.setpoint_set', { temp: fmt(model.roomSet, 1, '°') }));
     setMark('aRoomSet', setBase, !!setBase && ovrSet);
     // injected-override badge — count from the same polled overrides model.
     var aob = document.getElementById('aOvrBadge');
@@ -1236,13 +2884,13 @@
       if (!aob._wired) { aob._wired = true; aob.addEventListener('click', function (e) { e.stopPropagation(); toggleOvrPanel(); }); }
     }
     txt('aModBig', model.mod === null ? '—' : Math.round(model.flame ? model.mod : 0) + '%');
-    txt('aModTag', isHP ? 'COMPRESSOR' : 'MODULATION');
+    txt('aModTag', isHP ? t('home.tag_compressor') : t('home.tag_modulation'));
     // LCD context line: FAULT / DHW xx° / HP|CH xx% / HP|CH idle
     var lead = isHP ? 'HP' : 'CH';
-    var lcd = model.fault ? 'FAULT'
+    var lcd = model.fault ? t('home.lcd_fault')
             : model.dhw_on ? ('DHW ' + (model.dhw === null ? '--' : Math.round(model.dhw)) + '°')
             : model.flame ? (lead + ' ' + (model.mod === null ? '--' : Math.round(model.mod)) + '%')
-            : (model.ch ? lead + ' idle' : 'STANDBY');
+            : (model.ch ? t('home.lcd_idle', { lead: lead }) : t('home.lcd_standby'));
     txt('aLcd', lcd);
     txt('aPress', fmt(model.pressure, 2, ' bar'));
     txt('aDt', 'ΔT ' + (model.flow !== null && model.ret !== null ? fmt(model.flow - model.ret, 1, '°') : '—'));
@@ -1269,15 +2917,15 @@
     var aStatus = document.getElementById('aStatus');
     if (aStatus) aStatus.classList.toggle('heating', model.flame);
     // first tile relabels to Compressor in heat-pump mode; tile values uppercase.
-    var t0lbl = document.querySelector('#aTFlame .lbl'); if (t0lbl) t0lbl.textContent = isHP ? 'Compressor' : 'Flame';
-    setTile('aTFlame', model.flame, false, model.flame ? 'ON' : 'OFF');
-    setTile('aTCH', model.ch, false, model.ch ? 'ON' : 'OFF');
-    setTile('aTDHW', model.dhw_on, false, model.dhw_on ? 'ON' : 'OFF');
-    setTile('aTFault', false, model.fault, model.fault ? 'FAULT' : 'OK');
+    var t0lbl = document.querySelector('#aTFlame .lbl'); if (t0lbl) t0lbl.textContent = isHP ? t('home.tile_compressor') : t('home.tile_flame');
+    setTile('aTFlame', model.flame, false, model.flame ? t('home.on') : t('home.off'));
+    setTile('aTCH', model.ch, false, model.ch ? t('home.on') : t('home.off'));
+    setTile('aTDHW', model.dhw_on, false, model.dhw_on ? t('home.on') : t('home.off'));
+    setTile('aTFault', false, model.fault, model.fault ? t('home.fault') : t('home.ok'));
     // mobile chip strip (≤719px) — same six values as the schematic
     var strip = document.getElementById('aStrip');
     if (strip) {
-      var chips = [['Flow', fmt(model.flow, 1, '°'), 'var(--hot)'], ['Return', fmt(model.ret, 1, '°'), 'var(--cold)'], ['DHW', model.dhw === null ? '—' : Math.round(model.dhw) + '°', ''], ['Pressure', fmt(model.pressure, 2, ' bar'), ''], ['Room', fmt(model.room, 1, '°'), ''], ['Outside', fmt(model.outside, 1, '°'), '']];
+      var chips = [[t('home.chip_flow'), fmt(model.flow, 1, '°'), 'var(--hot)'], [t('home.chip_return'), fmt(model.ret, 1, '°'), 'var(--cold)'], ['DHW', model.dhw === null ? '—' : Math.round(model.dhw) + '°', ''], [t('home.chip_pressure'), fmt(model.pressure, 2, ' bar'), ''], [t('home.chip_room'), fmt(model.room, 1, '°'), ''], [t('home.chip_outside'), fmt(model.outside, 1, '°'), '']];
       strip.textContent = '';
       chips.forEach(function (c) {
         var ch = document.createElement('span'); ch.className = 'mchip';
@@ -1317,15 +2965,15 @@
       }
     }
     txt('bRoom', fmt(model.room, 1, '°'));
-    txt('bSet', 'target ' + (model.roomSet === null ? '—' : fmt(model.roomSet, 1, '°')));
+    txt('bSet', t('home.target', { temp: model.roomSet === null ? '—' : fmt(model.roomSet, 1, '°') }));
     txt('bFlow', fmt(model.flow, 1, '°'));
     txt('bRet', fmt(model.ret, 1, '°'));
     txt('bDt', 'ΔT ' + (model.flow !== null && model.ret !== null ? fmt(model.flow - model.ret, 1, '°') : '—'));
     txt('bPress', fmt(model.pressure, 2, ' bar'));
     txt('bMod', model.mod === null ? '—' : Math.round(model.mod) + '%');
     txt('bDhw', model.dhw === null ? '—' : Math.round(model.dhw) + '°');
-    txt('bDhwState', model.dhw_on ? ((effectiveSource() === 2 || sat.tank) ? 'charging' : 'running') : 'standby');
-    txt('bOut', 'Outside ' + fmt(model.outside, 1, '°') + ' · OTGW firmware');
+    txt('bDhwState', model.dhw_on ? ((effectiveSource() === 2 || sat.tank) ? t('home.dhw_charging') : t('home.dhw_running')) : t('home.dhw_standby'));
+    txt('bOut', t('home.outside_firmware', { temp: fmt(model.outside, 1, '°') }));
     var fill = document.getElementById('bModFill');
     if (fill) fill.style.height = (model.mod === null ? 0 : Math.max(0, Math.min(100, model.mod))) + '%';
     var dot = document.getElementById('bPressDot');
@@ -1378,8 +3026,8 @@
         mod.setAttribute('points', p.join(' '));
       }
     }
-    txt('cFlowLbl', model.flow === null ? '' : 'flow ' + fmt(model.flow, 1, '°'));
-    txt('cRetLbl', model.ret === null ? '' : 'ret ' + fmt(model.ret, 1, '°'));
+    txt('cFlowLbl', model.flow === null ? '' : t('home.chart_flow', { temp: fmt(model.flow, 1, '°') }));
+    txt('cRetLbl', model.ret === null ? '' : t('home.chart_ret', { temp: fmt(model.ret, 1, '°') }));
     renderCGrid();
     renderTicker();
   }
@@ -1393,18 +3041,18 @@
   function renderCGrid() {
     var grid = document.getElementById('cGrid'); if (!grid) return;
     var cells = [
-      ['FLOW', fmt(model.flow, 1, '°'), 'hot'],
-      ['RETURN', fmt(model.ret, 1, '°'), 'cold'],
+      [t('home.cell_flow'), fmt(model.flow, 1, '°'), 'hot'],
+      [t('home.cell_return'), fmt(model.ret, 1, '°'), 'cold'],
       ['ΔT', (model.flow !== null && model.ret !== null) ? fmt(model.flow - model.ret, 1, '°') : '—', ''],
-      ['T ROOM', fmt(model.room, 1, '°'), ''],
-      ['ROOM SET', fmt(model.roomSet, 1, '°'), ''],
-      ['T OUTSIDE', fmt(model.outside, 1, '°'), ''],
-      ['MODULATION', model.mod === null ? '—' : Math.round(model.mod) + '%', model.flame ? 'ok' : ''],
-      ['CH SETPOINT', fmt(model.chSet, 1, '°'), ''],
+      [t('home.cell_room'), fmt(model.room, 1, '°'), ''],
+      [t('home.cell_room_set'), fmt(model.roomSet, 1, '°'), ''],
+      [t('home.cell_outside'), fmt(model.outside, 1, '°'), ''],
+      [t('home.cell_modulation'), model.mod === null ? '—' : Math.round(model.mod) + '%', model.flame ? 'ok' : ''],
+      [t('home.cell_ch_setpoint'), fmt(model.chSet, 1, '°'), ''],
       ['DHW', model.dhw === null ? '—' : fmt(model.dhw, 1, '°'), ''],
-      ['PRESSURE', fmt(model.pressure, 2, ' bar'), pressClass(model.pressure)],
-      ['FLAME', model.flame ? 'ON' : 'OFF', model.flame ? 'ok' : ''],
-      ['STATUS', model.fault ? 'FAULT' : 'OK', model.fault ? 'alert' : 'ok']
+      [t('home.cell_pressure'), fmt(model.pressure, 2, ' bar'), pressClass(model.pressure)],
+      [t('home.cell_flame'), model.flame ? t('home.on') : t('home.off'), model.flame ? 'ok' : ''],
+      [t('home.cell_status'), model.fault ? t('home.fault') : t('home.ok'), model.fault ? 'alert' : 'ok']
     ];
     // Build with textContent to avoid HTML injection from values.
     grid.innerHTML = '';
@@ -1566,10 +3214,13 @@
   }
   function gVal(r, k) { return k.charAt(1) === ':' ? (r.d ? r.d[k.substring(2)] : null) : r[k]; }
   function gMeta(k, i) {
-    for (var j = 0; j < GSER.length; j++) if (GSER[j][0] === k) return GSER[j];
+    for (var j = 0; j < GSER.length; j++) if (GSER[j][0] === k) return [GSER[j][0], t(GSER_LABEL_KEY[k]), GSER[j][2], GSER[j][3]];
     var a = k.substring(2);
     return [k, dallasLabelFor(a) || a, GDCOL[i % GDCOL.length], 't'];
   }
+  // Series labels are translated at render time (the GSER labels are the English defaults).
+  var GSER_LABEL_KEY = { flow: 'graph.series_flow', ret: 'graph.series_ret', chSet: 'graph.series_ch_set', roomSet: 'graph.series_room_set',
+    room: 'graph.series_room', outside: 'graph.series_outside', mod: 'graph.series_mod', flame: 'graph.series_flame', dhw_on: 'graph.series_dhw_on', ch: 'graph.series_ch' };
   // TASK-1297: values of the visible series at time t. arr is ascending by t. Returns null when no
   // record covers t (before the first record, or more than GBREAK_MS past the record's data end).
   function graphReadout(arr, keys, metas, off, t) {
@@ -1587,7 +3238,7 @@
       var m = metas[i], v = gVal(rec, k), kind = m[3], txt;
       if (v === null || v === undefined || isNaN(v)) txt = '–';
       else if (kind === 'm') txt = Math.round(v) + ' %';
-      else if (kind === 'l') txt = v ? 'on' : 'off';
+      else if (kind === 'l') txt = v ? t('graph.on') : t('graph.off');
       else txt = Number(v).toFixed(1) + ' °C';
       rows.push([m[1], txt, m[2]]);
     });
@@ -1667,7 +3318,7 @@
       ex = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       ex.setAttribute('data-k', 'roomX'); ex.setAttribute('stroke', GROOM_X); ex.setAttribute('stroke-width', '2.6'); ex.setAttribute('fill', 'none');
       ex.setAttribute('stroke-dasharray', '2 3');
-      var title = document.createElementNS('http://www.w3.org/2000/svg', 'title'); title.textContent = 'Room temperature: no reading';
+      var title = document.createElementNS('http://www.w3.org/2000/svg', 'title'); title.textContent = t('graph.room_no_reading');
       ex.appendChild(title);
       g.appendChild(ex);
     }
@@ -1719,7 +3370,7 @@
     if (!gTip) { gTip = document.createElement('div'); gTip.className = 'gtip'; card.appendChild(gTip); }
     gTip.textContent = '';
     var hd = document.createElement('div'); hd.className = 'gtip-t';
-    hd.textContent = gp2(d.getHours()) + ':' + gp2(d.getMinutes()) + ':' + gp2(d.getSeconds()) + (res ? '' : '  no data');
+    hd.textContent = gp2(d.getHours()) + ':' + gp2(d.getMinutes()) + ':' + gp2(d.getSeconds()) + (res ? '' : '  ' + t('graph.no_data'));
     gTip.appendChild(hd);
     if (res) res.rows.forEach(function (r) {
       var ln = document.createElement('div'), sw = document.createElement('i'), v = document.createElement('b');
@@ -1750,7 +3401,7 @@
     keys.forEach(function (k, i) {
       var m = metas[i], sp = document.createElement('span'), sw = document.createElement('i');
       sw.style.background = m[2]; sp.appendChild(sw); sp.appendChild(document.createTextNode(m[1]));
-      sp.style.cursor = 'pointer'; sp.style.opacity = gOff[k] ? '.4' : '1'; sp.title = 'Show / hide';
+      sp.style.cursor = 'pointer'; sp.style.opacity = gOff[k] ? '.4' : '1'; sp.title = t('graph.legend_toggle');
       sp.addEventListener('click', function () {
         if (gOff[k]) delete gOff[k]; else gOff[k] = 1;
         try { localStorage.setItem('otgw-v2-goff', JSON.stringify(gOff)); } catch (e) { }
@@ -1844,7 +3495,7 @@
       CONN.boiler.s = isPic ? otLinkState(boilerOk, boilerAge) : st5ok(boilerOk);
       CONN.therm.seen = thermAge; CONN.boiler.seen = boilerAge;
       // OpenTherm command interface row (PIC link vs OT-Direct)
-      CONN.ot.name = isPic ? 'PIC link' : (iface === 'OT-Direct' ? 'OT-Direct' : 'OpenTherm interface');
+      CONN.ot.name = isPic ? t('graph.conn_pic_link') : (iface === 'OT-Direct' ? 'OT-Direct' : t('graph.conn_ot_interface'));
       CONN.ot.detail = iface || 'none';
       CONN.ot.s = (iface && iface !== 'None') ? 'st-ok' : 'st-down';
       // TASK-981: command-bar prompt reflects the live interface — 'OT ›' on OT-Direct,
@@ -1877,15 +3528,15 @@
       var mqttKnown = Object.prototype.hasOwnProperty.call(setData, 'mqttenable');
       var mqttEnabled = !mqttKnown || ('' + setData.mqttenable.value) === 'true';
       CONN.mqtt.s = h.mqttconnected ? 'st-ok' : (!mqttKnown ? 'st-unknown' : (mqttEnabled ? 'st-down' : 'st-off'));
-      CONN.mqtt.detail = h.mqttconnected ? 'connected' : (!mqttKnown ? 'checking…' : (mqttEnabled ? 'not connected' : 'disabled in settings'));
+      CONN.mqtt.detail = h.mqttconnected ? t('graph.conn_connected') : (!mqttKnown ? t('graph.conn_checking') : (mqttEnabled ? t('graph.conn_not_connected') : t('graph.conn_disabled_in_settings')));
       // NTP from ntpenable
       var ntpEnabled = (h.ntpenable === undefined) ? true : !!h.ntpenable;
       CONN.ntp.s = !ntpEnabled ? 'st-off' : 'st-ok';
-      CONN.ntp.detail = ntpEnabled ? 'time syncing' : 'disabled';
+      CONN.ntp.detail = ntpEnabled ? t('graph.conn_time_syncing') : t('graph.conn_disabled');
       // Live link (WS) + REST API — this browser session
       var wsUp = ws && ws.readyState === 1;
       CONN.ws.s = wsUp ? 'st-ok' : 'st-down';
-      CONN.ws.detail = wsUp ? 'WebSocket · streaming' : 'WebSocket · reconnecting…';
+      CONN.ws.detail = wsUp ? t('graph.conn_ws_streaming') : t('graph.conn_ws_reconnecting');
       CONN.api.s = 'st-ok';
       renderConnMap(); renderConnStrip(); renderConnDetail();
       renderHdrNet();   // TASK-983: refresh Wi-Fi bars + dBm tooltip from the live RSSI
@@ -1927,10 +3578,10 @@
     var cv = '' + curVal('otdmode');
     if (!otdRunningDiffers(cv)) return;
     var hs = document.createElement('span'); hs.className = 'shint';
-    hs.textContent = 'Running now: ' + otdMode.charAt(0).toUpperCase() + otdMode.slice(1) +
-      (otdMode === 'master' ? ' (no thermostat seen at boot). ' : '. ');
+    hs.textContent = t(otdMode === 'master' ? 'graph.otd_running_master' : 'graph.otd_running_now',
+      { mode: otdMode.charAt(0).toUpperCase() + otdMode.slice(1) }) + ' ';
     var b = document.createElement('button'); b.type = 'button'; b.className = 'tbtn';
-    b.textContent = 'Switch to ' + otdModeName(cv);
+    b.textContent = t('graph.otd_switch_to', { mode: otdModeName(cv) });
     b.addEventListener('click', function () { markDirty('otdmode', cv, row); });
     hs.appendChild(b);
     lbl.appendChild(hs);
@@ -1946,14 +3597,14 @@
     var host = document.getElementById('otdStatusRows'); if (!host) return;
     function onoff(b, yes, no) { return (b ? '● ' : '○ ') + (b ? yes : no); }
     var rows = [
-      ['Mode', (s.mode || '—').toUpperCase(), null],
-      ['OT bus', onoff(s.ot_online, 'Online', 'Offline'), s.ot_online],
-      ['Thermostat', onoff(s.thermostat_connected, 'Connected', 'None'), s.thermostat_connected],
-      ['Boiler', onoff(s.boiler, 'Active', 'Idle'), s.boiler],
-      ['Setback', onoff(s.setback_active, 'Active', 'Off'), s.setback_active],
-      ['Step-up', onoff(s.stepup, 'On', 'Off'), s.stepup],
-      ['Schedule (active / total)', (s.schedule_active || 0) + ' / ' + (s.schedule_total || 0) + (s.schedule_disabled ? ' (' + s.schedule_disabled + ' disabled)' : ''), null],
-      ['Active overrides', '' + (s.overrides_active || 0), null]
+      [t('graph.otd_row_mode'), (s.mode || '—').toUpperCase(), null],
+      [t('graph.otd_row_ot_bus'), onoff(s.ot_online, t('graph.otd_online'), t('graph.otd_offline')), s.ot_online],
+      [t('graph.otd_row_thermostat'), onoff(s.thermostat_connected, t('graph.otd_connected'), t('graph.otd_none')), s.thermostat_connected],
+      [t('graph.otd_row_boiler'), onoff(s.boiler, t('graph.otd_active'), t('graph.otd_idle')), s.boiler],
+      [t('graph.otd_row_setback'), onoff(s.setback_active, t('graph.otd_active'), t('graph.otd_off')), s.setback_active],
+      [t('graph.otd_row_stepup'), onoff(s.stepup, t('graph.otd_on'), t('graph.otd_off')), s.stepup],
+      [t('graph.otd_row_schedule'), (s.schedule_active || 0) + ' / ' + (s.schedule_total || 0) + (s.schedule_disabled ? ' ' + t('graph.otd_schedule_disabled', { n: s.schedule_disabled }) : ''), null],
+      [t('graph.otd_row_overrides'), '' + (s.overrides_active || 0), null]
     ];
     host.textContent = '';
     rows.forEach(function (r) {
@@ -1979,7 +3630,7 @@
     if (clearAction) {
       // clearAction: an overrides action ('cr', 'cm', 'ki') or a function (TASK-1681 write rows).
       var ctr = document.createElement('div'); ctr.className = 'ble-ctrls';
-      var btn = document.createElement('button'); btn.className = 'tbtn'; btn.textContent = 'Clear';
+      var btn = document.createElement('button'); btn.className = 'tbtn'; btn.textContent = t('graph.otd_clear');
       btn.addEventListener('click', typeof clearAction === 'function' ? clearAction : function () { otdOvrPost(clearAction, msgid); });
       ctr.appendChild(btn); row.appendChild(ctr);
     }
@@ -1991,14 +3642,14 @@
   // so a Clear would only be refused; the row says so instead (GET overrides: sat_owns).
   // The table holds the ids of otOverrides[] in OTDirect.ino; no other id can be a write override.
   var OTD_WRITE_CMD = {
-    1: { cmd: 'CS', what: 'control setpoint', clear: 'CS=0', sat: true },
-    7: { cmd: 'CC/CL', what: 'cooling control', clear: 'CL=0' },   // CL=0 clears 7; CC=0 would write 0
-    8: { cmd: 'C2', what: 'CH2 setpoint', clear: 'C2=0', sat: true },
-    14: { cmd: 'MM', what: 'max modulation', clear: 'MM=T', sat: true },   // a non-numeric MM= clears
+    1: { cmd: 'CS', what: 'graph.otd_what_cs', clear: 'CS=0', sat: true },
+    7: { cmd: 'CC/CL', what: 'graph.otd_what_cooling', clear: 'CL=0' },   // CL=0 clears 7; CC=0 would write 0
+    8: { cmd: 'C2', what: 'graph.otd_what_ch2', clear: 'C2=0', sat: true },
+    14: { cmd: 'MM', what: 'graph.otd_what_mm', clear: 'MM=T', sat: true },   // a non-numeric MM= clears
     // 16 is set by BS= and the MQTT room_setpoint route (TT=/TC= only in master mode); BS=0 clears it whatever set it.
-    16: { cmd: 'BS or MQTT', what: 'room setpoint', clear: 'BS=0' },
-    56: { cmd: 'SW', what: 'DHW setpoint', clear: 'SW=0' },
-    57: { cmd: 'SH', what: 'max CH setpoint', clear: 'SH=0' }
+    16: { cmd: 'BS or MQTT', cmdKey: 'graph.otd_cmd_bs_or_mqtt', what: 'graph.otd_what_room_setpoint', clear: 'BS=0' },
+    56: { cmd: 'SW', what: 'graph.otd_what_dhw', clear: 'SW=0' },
+    57: { cmd: 'SH', what: 'graph.otd_what_max_ch', clear: 'SH=0' }
   };
   function otdOvrReason(row, text) {
     var r = document.createElement('div'); r.style.color = 'var(--muted)'; r.textContent = text;
@@ -2008,28 +3659,28 @@
   function otdOvrSendCmd(cmd) {
     fetch(APIGW + 'v2/otgw/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ command: cmd }) }).then(function (r) {
-      if (!r.ok) bleToast(cmd + ' was refused (HTTP ' + r.status + ')', true);
+      if (!r.ok) bleToast(t('graph.otd_cmd_refused', { cmd: cmd, status: r.status }), true);
       setTimeout(fetchOtdOvr, 400); setTimeout(fetchOtdOvr, 2000);
-    }).catch(function () { bleToast(cmd + ' could not be sent', true); });
+    }).catch(function () { bleToast(t('graph.otd_cmd_failed', { cmd: cmd }), true); });
   }
   function otdWriteRow(e, satOwns) {
     var c = OTD_WRITE_CMD[e.msgid];
     var satBlocked = c && c.sat && satOwns;
-    var row = otdOvrRow(c ? c.cmd + ' · ' + c.what : 'Write', e.msgid, otdHex(e.value),
+    var row = otdOvrRow(c ? (c.cmdKey ? t(c.cmdKey) : c.cmd) + ' · ' + t(c.what) : t('graph.otd_write'), e.msgid, otdHex(e.value),
       (c && c.clear && !satBlocked) ? function () { otdOvrSendCmd(c.clear); } : null);
-    if (satBlocked) otdOvrReason(row, 'SAT controls this while SAT is enabled; switch SAT off to clear it.');
+    if (satBlocked) otdOvrReason(row, t('graph.otd_sat_controls'));
     return row;
   }
   // TASK-1749: in gateway mode TT=/TC= are answer state (ADR-223), not a write slot; the firmware
   // reports them as overrides.remote. Clear sends TT=0; the firmware refuses TT/TC while SAT is enabled.
   function otdRemoteRow(r, satOwns) {
     var tc = r.mode === 'constant';
-    var row = otdOvrRow('Room setpoint override (' + (tc ? 'TC=' : 'TT=') + ', ' + r.mode + ')', 9,
+    var row = otdOvrRow(t('graph.otd_remote_row', { cmd: tc ? 'TC=' : 'TT=', mode: t(tc ? 'graph.otd_mode_constant' : 'graph.otd_mode_temporary') }), 9,
       (typeof r.value === 'number') ? r.value + ' °C' : '',
       satOwns ? null : function () { otdOvrSendCmd('TT=0'); });
-    otdOvrReason(row, satOwns ? 'SAT controls this while SAT is enabled; switch SAT off to clear it.'
-      : (!r.msgid9_answered ? 'waiting for the thermostat to read it'
-        : (r.accepted ? 'accepted by the thermostat' : 'offered to the thermostat')));
+    otdOvrReason(row, satOwns ? t('graph.otd_sat_controls')
+      : (!r.msgid9_answered ? t('graph.otd_remote_waiting')
+        : (r.accepted ? t('graph.otd_remote_accepted') : t('graph.otd_remote_offered'))));
     return row;
   }
   function renderOtdOvr(ov) {
@@ -2040,7 +3691,7 @@
     (ov.response || []).forEach(function (e) { any = true; el.appendChild(otdOvrRow('SR', e.msgid, otdHex(e.value), 'cr')); });
     (ov.modify || []).forEach(function (e) { any = true; el.appendChild(otdOvrRow('RM', e.msgid, otdHex(e.value), 'cm')); });
     (ov.unknown || []).forEach(function (id) { any = true; el.appendChild(otdOvrRow('UI', (id && id.msgid !== undefined) ? id.msgid : id, '', 'ki')); });
-    if (!any) { var e = document.createElement('div'); e.className = 'ble-row'; e.style.color = 'var(--muted)'; e.textContent = 'No active overrides'; el.appendChild(e); }
+    if (!any) { var e = document.createElement('div'); e.className = 'ble-row'; e.style.color = 'var(--muted)'; e.textContent = t('graph.otd_no_overrides'); el.appendChild(e); }
   }
   function otdOvrPost(action, msgid, value) {
     var url = APIGW + 'v2/otdirect/overrides?action=' + action + '&msgid=' + encodeURIComponent(msgid);
@@ -2062,9 +3713,9 @@
     });
   }
   function connRecency(c) {
-    if (c.s === 'st-off') return 'disabled';
-    if (c.s === 'st-down') return 'no link';
-    if (c.seen != null) return 'seen ' + c.seen + 's ago';
+    if (c.s === 'st-off') return t('graph.conn_disabled');
+    if (c.s === 'st-down') return t('graph.conn_no_link');
+    if (c.seen != null) return t('graph.conn_seen_ago', { s: c.seen });
     return '';
   }
   function setLink(id, flowId, state) {
@@ -2083,13 +3734,13 @@
     setLink('lk-mqtt', 'fl-mqtt', CONN.mqtt.s); setDot('dot-mqtt', CONN.mqtt.s);
     setLink('lk-ws', 'fl-ws', CONN.ws.s); setDot('dot-ws', CONN.ws.s);
     setDot('dot-pic', CONN.ot.s);
-    function roleSub(role, c) { var r = connRecency(c); return r ? (role + ' · ' + r) : role; }
-    var ts2 = document.getElementById('cnThermSub'); if (ts2) ts2.textContent = roleSub('master', CONN.therm);
-    var bs = document.getElementById('cnBoilerSub'); if (bs) bs.textContent = roleSub('slave', CONN.boiler);
+    function roleSub(role, c) { var r = connRecency(c); return r ? t('graph.conn_role_recency', { role: role, recency: r }) : role; }
+    var ts2 = document.getElementById('cnThermSub'); if (ts2) ts2.textContent = roleSub(t('graph.conn_role_master'), CONN.therm);
+    var bs = document.getElementById('cnBoilerSub'); if (bs) bs.textContent = roleSub(t('graph.conn_role_slave'), CONN.boiler);
     var ps = document.getElementById('cnPicSub'); if (ps) ps.textContent = CONN.ot.name;
     var wf = document.getElementById('cnWifiSub'); if (wf) wf.textContent = connRssi !== null ? connRssi + ' dBm' : (CONN.wifi.detail || '—');
     var md = document.getElementById('cnModeTxt');
-    if (md) md.textContent = CONN.mode.value === 'gateway' ? 'GATEWAY MODE' : CONN.mode.value === 'monitor' ? 'MONITOR MODE' : CONN.mode.value === 'n/a' ? 'NO PIC' : ('MODE: ' + (CONN.mode.value || '?').toUpperCase());
+    if (md) md.textContent = CONN.mode.value === 'gateway' ? t('graph.conn_mode_gateway') : CONN.mode.value === 'monitor' ? t('graph.conn_mode_monitor') : CONN.mode.value === 'n/a' ? t('graph.conn_mode_no_pic') : t('graph.conn_mode_other', { mode: (CONN.mode.value || '?').toUpperCase() });
     // TASK-1223.16: any known mode (incl. the OT-Direct bypass/master/loopback) gets the accent.
     var mv2 = CONN.mode.value;
     var dm = document.getElementById('dot-mode'); if (dm) dm.setAttribute('fill', (mv2 && mv2 !== 'n/a' && mv2 !== 'detecting') ? STV['st-mode'] : STV['st-unknown']);
@@ -2110,9 +3761,11 @@
     var rows = (j && Array.isArray(j.overrides)) ? j.overrides : [];
     return rows.map(function (r) {
       var name = (r.friendly && r.friendly.length) ? r.friendly : (r.label || ('MsgID ' + r.id));
-      var kind = (r.kind === 'answer') ? 'answer' : 'substituted';
+      var isAnswer = (r.kind === 'answer');
       var val = (typeof r.value === 'number') ? r.value.toFixed(2) : r.value;
-      return { id: r.id, name: name, meta: kind + ' = ' + val + ' · ' + r.age_s + 's' };
+      return { id: r.id, name: name, meta: function () {
+        return t('settings.ovr_meta', { kind: t(isAnswer ? 'settings.ovr_kind_answer' : 'settings.ovr_kind_substituted'), value: val, age: r.age_s });
+      } };
     });
   }
   function normOtdOvr(j) {
@@ -2126,10 +3779,13 @@
         out.push({ id: idn, name: label, meta: 'MsgID ' + mid + (v ? ' · ' + v : '') });
       });
     }
-    if (ov.remote) out.push({ id: 9, name: 'Room setpoint override (' + (ov.remote.mode === 'constant' ? 'TC=' : 'TT=') + ')',
-      meta: 'MsgID 9 · ' + ov.remote.value + ' °C' });
-    push(ov.write, 'Write'); push(ov.response, 'Stored response');
-    push(ov.modify, 'Response modifier'); push(ov.unknown, 'Unknown ID');
+    if (ov.remote) {
+      var rcmd = (ov.remote.mode === 'constant') ? 'TC=' : 'TT=';
+      out.push({ id: 9, name: function () { return t('settings.ovr_remote', { cmd: rcmd }); },
+        meta: 'MsgID 9 · ' + ov.remote.value + ' °C' });
+    }
+    push(ov.write, function () { return t('settings.ovr_write'); }); push(ov.response, function () { return t('settings.ovr_stored_response'); });
+    push(ov.modify, function () { return t('settings.ovr_response_modifier'); }); push(ov.unknown, function () { return t('settings.ovr_unknown_id'); });
     return out;
   }
   function fetchOverrides(iface) {
@@ -2149,7 +3805,7 @@
     var g = document.getElementById('cnOvr'); if (!g) return;
     var n = ovrRows.length;
     g.style.display = n ? '' : 'none';
-    var tx = document.getElementById('cnOvrTxt'); if (tx) tx.textContent = '⛓ ' + n + ' injected';
+    var tx = document.getElementById('cnOvrTxt'); if (tx) tx.textContent = '⛓ ' + t('settings.ovr_injected', { n: n });
     g.onclick = function (e) { e.stopPropagation(); toggleOvrPanel(); };
   }
   // Floating read-only detail panel. The ADR-118 store carries {id,kind,value,age} only,
@@ -2157,20 +3813,20 @@
   function renderOvrPanel() {
     var p = document.getElementById('ovrPanel'); if (!p) return;
     p.textContent = '';
-    var h = document.createElement('h4'); h.textContent = '⛓ Active gateway overrides'; p.appendChild(h);
+    var h = document.createElement('h4'); h.textContent = '⛓ ' + t('settings.ovr_title'); p.appendChild(h);
     var sub = document.createElement('p'); sub.className = 'sub';
-    sub.textContent = 'Values the gateway is injecting onto the OT bus — the boiler/thermostat see these, not the original.';
+    sub.textContent = t('settings.ovr_sub');
     p.appendChild(sub);
     if (!ovrRows.length) {
       var m = document.createElement('div'); m.className = 'ovr-item'; m.style.color = 'var(--muted)';
-      m.textContent = 'No active overrides'; p.appendChild(m); return;
+      m.textContent = t('settings.ovr_none'); p.appendChild(m); return;
     }
     ovrRows.forEach(function (o) {
       var it = document.createElement('div'); it.className = 'ovr-item';
       var r1 = document.createElement('div'); r1.className = 'r1';
-      var nm = document.createElement('span'); nm.textContent = o.name; r1.appendChild(nm);
+      var nm = document.createElement('span'); nm.textContent = (typeof o.name === 'function') ? o.name() : o.name; r1.appendChild(nm);
       it.appendChild(r1);
-      var r2 = document.createElement('div'); r2.className = 'r2'; r2.textContent = o.meta;
+      var r2 = document.createElement('div'); r2.className = 'r2'; r2.textContent = (typeof o.meta === 'function') ? o.meta() : o.meta;
       it.appendChild(r2);
       p.appendChild(it);
     });
@@ -2188,6 +3844,16 @@
   // human-readable labels + hints grouped into categories. Any exposed key NOT in
   // the catalog is still shown (categorised by prefix, label humanised) so nothing
   // the firmware exposes ever disappears from the page.
+  // Display helpers: the catalog below keeps its English text as the fallback; the keys
+  // settings.cat.*, settings.group.*, settings.label.* and settings.hint.* carry the translations.
+  function setT(key, fb) { return i18nString(key) !== undefined ? t(key) : fb; }
+  function gSlug(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); }
+  function groupT(s) { return s ? setT('settings.group.' + gSlug(s), s) : s; }
+  function catTitle(c) { return setT('settings.cat.' + c.id + '.title', c.title); }
+  function catDesc(c) { return setT('settings.cat.' + c.id + '.desc', c.desc); }
+  // Pure unit hints stay as they are; a longer hint is keyed by its text, or by the setting when long.
+  var HINT_UNIT_RE = /^(°C|°|%|W|kW|bar|ms|m³\/h|°C\/min|bar\/hr|0–23)$/;
+  function hintKey(k, h) { return 'settings.hint.' + (h.length <= 30 ? gSlug(h) : k); }
   var SET_CATS = [
     { id: 'system',   title: 'System',                 icon: '🖥', reboot: false, desc: 'Device identity and access.' },
     { id: 'network',  title: 'Network',                icon: '📶', reboot: true,  desc: 'Wi-Fi / Ethernet addressing. Changes apply after a reboot.' },
@@ -2434,11 +4100,9 @@
   // TASK-1550: the tooltip of the one 'PWM cycle length' field names the range of the chosen appliance type.
   function satPwmHelp() {
     var src = setData.satsource ? curVal('satsource') : '0';
-    var t = 'Length of one PWM cycle in minutes. The field follows the Appliance type. ';
-    if (src === '2') t += 'Heat pump: 30 minutes (default), 40 or 60 minutes. The experimental on/off heat pump type uses a fixed 3 hour cycle and has no choice here.';
-    else if (src === '3') t += 'Hybrid: 30 minutes (default) or 40 minutes.';
-    else t += 'Gas boiler (also Auto): 20 minutes (3 cycles per hour, default) or 15 minutes (4 cycles per hour).';
-    return t;
+    if (src === '2') return t('settings.pwm_help_hp');
+    if (src === '3') return t('settings.pwm_help_hybrid');
+    return t('settings.pwm_help_gas');
   }
   // TASK-1542: the experimental on/off heat-pump type = heat pump (satsource 2) with the 10800 s cycle.
   function satHpLongCycle() {
@@ -2472,8 +4136,11 @@
     if (/^sat/.test(k)) return 'sat';
     return 'system';
   }
-  function labelFor(k) { return (SET_META[k] && SET_META[k].label) || humanizeKey(k); }
-  function hintFor(k) { return SET_META[k] && SET_META[k].hint; }
+  function labelFor(k) { return (SET_META[k] && SET_META[k].label) ? setT('settings.label.' + k, SET_META[k].label) : humanizeKey(k); }
+  function hintFor(k) {
+    var h = SET_META[k] && SET_META[k].hint;
+    return (h && !HINT_UNIT_RE.test(h)) ? setT(hintKey(k, h), h) : h;
+  }
   function subFor(k) { return (SET_META[k] && SET_META[k].sub) || ''; }
   // TASK-1281: help text of a setting. SET_META[k].help wins; otherwise settings-help.json
   // ({key: text}, loaded on the first interaction with an info icon). '' = not known (yet).
@@ -2567,18 +4234,18 @@
     if (pin) helpPinned = true;
     btn.setAttribute('aria-expanded', helpPinned ? 'true' : 'false');   // expanded means pinned open, not hovered
     btn.setAttribute('aria-describedby', 'shelp');
-    var t = helpFor(k);
-    pop.textContent = t || (SETTINGS_HELP ? 'No help text for this setting.' : 'Loading…');
+    var ht = helpFor(k);
+    pop.textContent = ht || (SETTINGS_HELP ? t('settings.help_none') : t('settings.help_loading'));
     pop.classList.add('show');
     helpPlace();
-    if (t || SETTINGS_HELP) return;
+    if (ht || SETTINGS_HELP) return;
     loadSettingsHelp().then(function () {
       if (helpBtn !== btn) return;
-      pop.textContent = helpFor(k) || 'No help text for this setting.';
+      pop.textContent = helpFor(k) || t('settings.help_none');
       helpPlace();
     }, function () {
       if (helpBtn !== btn) return;
-      pop.textContent = 'Help not available.';
+      pop.textContent = t('settings.help_unavailable');
       helpPlace();
     });
   }
@@ -2588,7 +4255,7 @@
     if (!SET_META[k]) return;
     var b = document.createElement('button');
     b.type = 'button'; b.className = 'sinfo';
-    b.setAttribute('aria-label', 'Help: ' + labelFor(k));
+    b.setAttribute('aria-label', t('settings.help_aria', { label: labelFor(k) }));
     b.setAttribute('aria-expanded', 'false');
     b.setAttribute('aria-controls', 'shelp');
     b.addEventListener('mouseenter', function () { if (!(helpPinned && helpBtn !== b)) showHelp(b, k); });
@@ -2610,9 +4277,9 @@
   function catById(id) { for (var i = 0; i < SET_CATS.length; i++) if (SET_CATS[i].id === id) return SET_CATS[i]; return null; }
   // TASK-1398: the REBOOT badge is a label, not a control. The title and aria-label say what it means.
   function rebootBadge() {
-    var b = document.createElement('span'); b.className = 'badge-reboot'; b.textContent = 'REBOOT';
-    b.title = 'Changes in this category take effect after a reboot.';
-    b.setAttribute('aria-label', 'Changes in this category take effect after a reboot');
+    var b = document.createElement('span'); b.className = 'badge-reboot'; b.textContent = t('settings.reboot_badge');
+    b.title = t('settings.reboot_title');
+    b.setAttribute('aria-label', t('settings.reboot_aria'));
     return b;
   }
 
@@ -2726,7 +4393,7 @@
       if (!n) return;
       if (!firstNonEmpty) firstNonEmpty = c.id;
       var ri = document.createElement('div'); ri.className = 'rail-item';
-      ri.appendChild(document.createTextNode(c.icon + ' ' + c.title + ' '));
+      ri.appendChild(document.createTextNode(c.icon + ' ' + catTitle(c) + ' '));
       if (c.reboot) ri.appendChild(rebootBadge());
       var cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = n; ri.appendChild(cnt);
       ri.addEventListener('click', function () { setActiveCat = c.id; renderSettings(); });
@@ -2749,10 +4416,10 @@
       // category header (title + REBOOT + description)
       var head = document.createElement('div');
       var title = document.createElement('div'); title.className = 'set-cat-title';
-      title.appendChild(document.createTextNode(c.icon + ' ' + c.title + ' '));
+      title.appendChild(document.createTextNode(c.icon + ' ' + catTitle(c) + ' '));
       if (c.reboot) title.appendChild(rebootBadge());
       head.appendChild(title);
-      if (c.desc) { var d = document.createElement('div'); d.className = 'cat-desc'; d.textContent = c.desc; head.appendChild(d); }
+      if (c.desc) { var d = document.createElement('div'); d.className = 'cat-desc'; d.textContent = catDesc(c); head.appendChild(d); }
       cols.appendChild(head);
       // masonry container; cards grouped by sub-group
       var wrap = document.createElement('div'); wrap.className = 'set-cards';
@@ -2761,7 +4428,7 @@
       keys.forEach(function (k) { var s = subFor(k); if (!(s in bySub)) { bySub[s] = []; subOrder.push(s); } bySub[s].push(k); });
       subOrder.forEach(function (s) {
         var card = document.createElement('section'); card.className = 'set-group';
-        if (s) { var h = document.createElement('h3'); h.textContent = s; card.appendChild(h); }
+        if (s) { var h = document.createElement('h3'); h.textContent = groupT(s); card.appendChild(h); }
         bySub[s].forEach(function (k) { card.appendChild(settingRow(k)); });
         wrap.appendChild(card);
       });
@@ -2784,8 +4451,8 @@
   function satMovedCard() {
     var card = document.createElement('section'); card.className = 'set-group';
     var p = document.createElement('p'); p.className = 'cat-desc';
-    p.textContent = 'The SAT settings now live on the SAT page: the choices under Control, the tuning under Technical.';
-    var b = document.createElement('button'); b.type = 'button'; b.className = 'tbtn'; b.textContent = 'Open SAT settings';
+    p.textContent = t('settings.sat_moved');
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'tbtn'; b.textContent = t('settings.sat_open_btn');
     b.addEventListener('click', function () { showPage('sat'); });
     card.appendChild(p); card.appendChild(b);
     return card;
@@ -2796,7 +4463,7 @@
   // fallback takeover: during a takeover the home dial controls (sat.owns) but these stay locked.
   // Source: the latest sat/status answer from either poller (satEnabledLive), else the stored
   // satenabled. Switching SAT on unlocks as soon as the switch has saved and sat/status answered.
-  var SAT_OFF_NOTE = 'SAT is off: the SAT settings are locked. Switch SAT on (top right) to change them.';
+  function satOffNote() { return t('settings.sat_off_note'); }
   var satEnabledLive = null;
   function satIsOn() {
     if (satEnabledLive !== null) return satEnabledLive;
@@ -2825,7 +4492,7 @@
     if (!l2 || !l3) return;
     hideHelp();   // TASK-1281
     l2.textContent = ''; l3.textContent = '';
-    if (!satIsOn()) { var note = document.createElement('p'); note.className = 'cat-desc'; note.textContent = SAT_OFF_NOTE; l2.appendChild(note); }
+    if (!satIsOn()) { var note = document.createElement('p'); note.className = 'cat-desc'; note.textContent = satOffNote(); l2.appendChild(note); }
     var placed = {};
     function fill(host, groups) {
       groups.forEach(function (g) {
@@ -2835,7 +4502,7 @@
         });
         if (!keys.length) return;
         var card = document.createElement('section'); card.className = 'set-group';
-        var h = document.createElement('h3'); h.textContent = g[0]; card.appendChild(h);
+        var h = document.createElement('h3'); h.textContent = groupT(g[0]); card.appendChild(h);
         keys.forEach(function (k) { placed[k] = 1; card.appendChild(settingRow(k)); });
         host.appendChild(card);
       });
@@ -2885,24 +4552,24 @@
         // selector offers them only when one is the stored mode, so that stays visible as is.
         var svc = k === 'otdmode' && OTD_SERVICE_MODES[o[0]];
         if (svc && ('' + o[0]) !== cv) return;
-        var opt = document.createElement('option'); opt.value = '' + o[0]; opt.textContent = svc ? o[1] + ' (service mode)' : o[1]; input.appendChild(opt);
+        var opt = document.createElement('option'); opt.value = '' + o[0]; opt.textContent = svc ? t('settings.enum_service_mode', { label: o[1] }) : o[1]; input.appendChild(opt);
       });
       // Preserve an out-of-list current value as its own option so a custom setting
       // (e.g. a timezone not in the list) is never silently dropped to the 0th entry.
       if (!hasRaw && !hasInt && cv !== '') {
-        var cur = document.createElement('option'); cur.value = cv; cur.textContent = cv + ' (current)'; input.appendChild(cur);
+        var cur = document.createElement('option'); cur.value = cv; cur.textContent = t('settings.enum_current', { value: cv }); input.appendChild(cur);
       }
       input.value = hasRaw ? cv : hasInt ? cvInt : cv;
       var prevSel = input.value;
       input.addEventListener('change', function () {
         // TASK-1230: board mode is the one select whose wrong value bricks the gateway.
         if (k === 'boardmode' && input.value !== '' + setData[k].value &&
-            !confirm('Board mode takes effect after a reboot. Forcing the wrong mode leaves the gateway non-functional until you set it back (or to Auto-detect). Continue?')) {
+            !confirm(t('settings.confirm_boardmode'))) {
           input.value = prevSel; return;
         }
         // TASK-1542, entry 204 (Robert): the experimental on/off heat-pump type on radiators needs a confirmed second warning.
         if (k === 'satsource' && input.value === '4' && setData.satsystem && curVal('satsystem') === '1' &&
-            !confirm('Not recommended without a buffer tank: the room may overheat.')) {
+            !confirm(t('settings.confirm_no_buffer'))) {
           input.value = prevSel; return;
         }
         prevSel = input.value;
@@ -2925,7 +4592,7 @@
         if (k === 'wifistaticip' && wasEmpty && input.value.trim()) { wasEmpty = false; ipPrefill(false); }
       });
     }
-    if (satLockedKey(k)) { input.disabled = true; row.style.opacity = '0.55'; row.title = SAT_OFF_NOTE; }   // TASK-1737
+    if (satLockedKey(k)) { input.disabled = true; row.style.opacity = '0.55'; row.title = satOffNote(); }   // TASK-1737
     row.appendChild(input);
     return row;
   }
@@ -2937,11 +4604,11 @@
   function webhookTestRow() {
     var wrap = document.createElement('div'); wrap.className = 'wh-actions';
     var status = document.createElement('span'); status.className = 'wh-status';
-    status.textContent = 'Not fired yet';
+    status.textContent = t('settings.wh_not_fired');
     var btns = ['on', 'off'].map(function (st) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'tbtn';
-      b.textContent = 'Send ' + st.toUpperCase() + ' test';
-      b.title = 'Fires the saved ' + st.toUpperCase() + ' webhook (POST /api/v2/webhook/test)';
+      b.textContent = t('settings.wh_send_test', { state: st.toUpperCase() });
+      b.title = t('settings.wh_send_title', { state: st.toUpperCase() });
       b.addEventListener('click', function () { fire(st); });
       wrap.appendChild(b);
       return b;
@@ -2955,22 +4622,22 @@
       // UX gate only (the firmware fires regardless of bEnabled): block when the enable
       // checkbox is present and unchecked; an absent one (search filter) proceeds.
       var en = document.querySelector('#setCols .srow[data-key="webhookenable"] input.sw');
-      if (en && !en.checked) { done('', 'Webhook disabled — enable it above first'); return; }
+      if (en && !en.checked) { done('', t('settings.wh_disabled')); return; }
       btns.forEach(function (b) { b.disabled = true; });   // one test call in flight at a time
-      status.className = 'wh-status'; status.textContent = 'Sending ' + st.toUpperCase() + '…';
+      status.className = 'wh-status'; status.textContent = t('settings.wh_sending', { state: st.toUpperCase() });
       // credentials:'same-origin' so HTTP Basic-Auth + CSRF same-origin (ADR-056) hold.
       fetch(APIGW + 'v2/webhook/test?state=' + st, { method: 'POST', credentials: 'same-origin' })
         .then(function (r) {
-          if (r.status === 401 || r.status === 403) { done('', 'Auth required — sign in first (HTTP ' + r.status + ')'); return; }
-          if (!r.ok) { done('', 'Error: HTTP ' + r.status); return; }
+          if (r.status === 401 || r.status === 403) { done('', t('settings.wh_auth', { status: r.status })); return; }
+          if (!r.ok) { done('', t('settings.wh_error_http', { status: r.status })); return; }
           return r.text().then(function (body) {
             var ack = 'ok';
             try { var j = JSON.parse(body); if (j && j.status) ack = j.status; }
             catch (e) { /* non-JSON ack still counts as sent */ }
-            done(' ok', '✓ ' + st.toUpperCase() + ' ' + ack + ' · ' + new Date().toTimeString().slice(0, 8));
+            done(' ok', t('settings.wh_sent', { state: st.toUpperCase(), ack: ack, time: new Date().toTimeString().slice(0, 8) }));
           });
         })
-        .catch(function (e) { done('', 'Error: ' + ((e && e.message) ? e.message : 'network')); });
+        .catch(function (e) { done('', t('settings.wh_error', { message: (e && e.message) ? e.message : t('settings.wh_network') })); });
     }
     return wrap;
   }
@@ -2980,9 +4647,9 @@
   // '' when s is a dotted quad of four 0-255 numbers, else the reason.
   function ipv4Err(s) {
     var p = ('' + s).trim().split('.');
-    if (p.length !== 4) return 'needs four numbers separated by dots';
+    if (p.length !== 4) return t('settings.ip_err_format');
     for (var i = 0; i < 4; i++) {
-      if (!/^\d{1,3}$/.test(p[i]) || +p[i] > 255) return 'octet ' + (i + 1) + ' ("' + p[i] + '") is not a number from 0 to 255';
+      if (!/^\d{1,3}$/.test(p[i]) || +p[i] > 255) return t('settings.ip_err_octet', { n: i + 1, value: p[i] });
     }
     return '';
   }
@@ -3001,8 +4668,8 @@
         if (v === undefined) continue;
         v = ('' + v).trim();
         if (v === '' && !req) continue;
-        var e = v === '' ? 'is required for a static IP' : ipv4Err(v);
-        if (e) return G[i][0] + ' ' + (req || 'DNS') + ': ' + e;
+        var e = v === '' ? t('settings.ip_err_required') : ipv4Err(v);
+        if (e) return t('settings.ip_group_err', { group: groupT(G[i][0]), field: setT('settings.ip_field_' + gSlug(req || 'DNS'), req || 'DNS'), reason: e });
       }
     }
     return '';
@@ -3064,14 +4731,14 @@
     Object.keys(setDirty).forEach(function (k) { if (satLockedKey(k)) { dropped.push(labelFor(k)); delete setDirty[k]; } });
     if (dropped.length) {
       document.querySelectorAll('.srow.dirty').forEach(function (r) { if (r.dataset.key && satLockedKey(r.dataset.key)) r.classList.remove('dirty'); });
-      bleToast('SAT is off: not saved: ' + dropped.join(', '), true, 4000);
+      bleToast(t('settings.sat_off_not_saved', { names: dropped.join(', ') }), true, 4000);
     }
     var keys = Object.keys(setDirty);
     if (!keys.length) { updateSaveBar(); return; }
     // TASK-1230: refuse the whole save (post nothing) when an edited IP field has a bad
     // octet (any mode; stored values are not re-checked) or a static group is incomplete.
     var ipErr = '', ipCat = '', ipKey = '';
-    keys.forEach(function (k) { var v = ('' + setDirty[k]).trim(); if (!ipErr && IP_KEY_RE.test(k) && v && ipv4Err(v)) { ipErr = subFor(k) + ' ' + labelFor(k) + ': ' + ipv4Err(v); ipCat = catFor(k); ipKey = k; } });
+    keys.forEach(function (k) { var v = ('' + setDirty[k]).trim(); if (!ipErr && IP_KEY_RE.test(k) && v && ipv4Err(v)) { ipErr = t('settings.ip_group_err', { group: groupT(subFor(k)), field: labelFor(k), reason: ipv4Err(v) }); ipCat = catFor(k); ipKey = k; } });
     if (!ipErr) { ipErr = ipGroupsErr(function (k) { return setData[k] ? curVal(k) : undefined; }); ipCat = 'network'; }
     if (ipErr) { bleToast(ipErr, true); revealSettingsGroup(ipCat, ipKey); return; }
     // TASK-1012: intercept satenabled false->on for a not-yet-onboarded SAT. Do NOT
@@ -3103,13 +4770,13 @@
       setDirty = {};
       // TASK-1732: only when something was posted. A save that held only a key handed to the SAT
       // wizard (satenabled) or the BLE warning (satbleenable) stored nothing yet.
-      if (keys.length) bleToast('Settings saved');
+      if (keys.length) bleToast(t('settings.saved'));
       renderSettings();
       if (bleName) bleAction('rescan');   // TASK-1231: re-apply the name filter (classic parity)
       if (satEnabling) startSatOnboarding('enable');   // TASK-1012: wizard owns the actual enable
       if (bleEnabling) maybeShowBleConsent();           // TASK-1693: the warning owns the actual enable
     }).catch(function () {
-      bleToast('Save failed', true, 2500);   // TASK-1254: red error variant
+      bleToast(t('settings.save_failed'), true, 2500);   // TASK-1254: red error variant
     });
   }
   function discardSettings() { setDirty = {}; renderSettings(); }
@@ -3166,20 +4833,20 @@
     if (document.getElementById('bleRiskBackdrop')) return;   // already open
     var bd = document.createElement('div'); bd.id = 'bleRiskBackdrop'; bd.className = 'sim-backdrop';
     var m = document.createElement('div'); m.className = 'sim-modal';
-    var h = document.createElement('h3'); h.textContent = '⚠ BLE without PSRAM — instability risk';
+    var h = document.createElement('h3'); h.textContent = '⚠ ' + t('values.ble_risk_title');
     var p = document.createElement('p');
-    p.textContent = 'This board has no PSRAM. Enabling BLE takes ~64 KB of internal memory that the web server needs, so the Web UI can become unstable or unreachable under load (you may need to reboot). Enable BLE anyway?';
+    p.textContent = t('values.ble_risk_text');
     var acts = document.createElement('div'); acts.className = 'acts';
-    var no = document.createElement('button'); no.textContent = 'Keep BLE off';
-    var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = 'Enable anyway (accept risk)';
+    var no = document.createElement('button'); no.textContent = t('values.ble_keep_off');
+    var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = t('values.ble_enable_anyway');
     function post(name, value, then) {
       fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, value: value }) })
         // TASK-1732 review: a failed store says so; the user must not be left without feedback.
         // The failure handler covers the request only, so an error in then() is not shown as a failed save.
         .then(function (r) {
-          if (!r.ok) { bleToast('Save failed (HTTP ' + r.status + ')', true, 2500); return false; }
+          if (!r.ok) { bleToast(t('values.save_failed_http', { status: r.status }), true, 2500); return false; }
           return true;
-        }, function () { bleToast('Save failed', true, 2500); return false; })
+        }, function () { bleToast(t('values.save_failed'), true, 2500); return false; })
         .then(function (ok) { if (ok && then) then(); });
     }
     function close() { if (bd.parentNode) bd.parentNode.removeChild(bd); }
@@ -3187,12 +4854,12 @@
     function stored(name, value) { if (setData[name]) setData[name].value = value; }
     no.addEventListener('click', function () {
       close();
-      if (!wasOn) { bleToast('BLE kept off'); return; }
-      post('satbleenable', false, function () { stored('satbleenable', false); bleToast('BLE kept off'); renderSettings(); setTimeout(fetchBle, 500); });
+      if (!wasOn) { bleToast(t('values.ble_kept_off')); return; }
+      post('satbleenable', false, function () { stored('satbleenable', false); bleToast(t('values.ble_kept_off')); renderSettings(); setTimeout(fetchBle, 500); });
     });
     yes.addEventListener('click', function () {
       close();
-      var ack = function () { post('satbleriskack', true, function () { stored('satbleriskack', true); bleToast('BLE enabled — risk accepted'); renderSettings(); setTimeout(fetchBle, 800); }); };
+      var ack = function () { post('satbleriskack', true, function () { stored('satbleriskack', true); bleToast(t('values.ble_enabled_accepted')); renderSettings(); setTimeout(fetchBle, 800); }); };
       if (wasOn) ack(); else post('satbleenable', true, function () { stored('satbleenable', true); ack(); });
     });
     acts.appendChild(no); acts.appendChild(yes);
@@ -3221,7 +4888,7 @@
   // HA discovery). Fire SEQUENTIALLY — concurrent POSTs trip the REST in-flight cap
   // (REST_MAX_INFLIGHT=4) and some forgets 503, leaving slots behind. Re-fetch once.
   function clearBleRoster(macs) {
-    if (typeof bleToast === 'function') bleToast('Clearing roster…');
+    if (typeof bleToast === 'function') bleToast(t('values.ble_clearing'));
     var list = (macs || []).filter(Boolean);
     (function next(i) {
       if (i >= list.length) { setTimeout(fetchBle, 500); return; }
@@ -3237,57 +4904,58 @@
     var host = document.getElementById('setCols');
     if (!host || setActiveCat !== 'sensors') { stopBlePoll(); return; }
     var card = document.createElement('div'); card.className = 'set-group'; card.id = 'setcard-ble';
-    var h = document.createElement('h3'); h.textContent = 'BLE sensors'; card.appendChild(h);
+    var h = document.createElement('h3'); h.textContent = t('values.ble_title'); card.appendChild(h);
     var desc = document.createElement('div'); desc.className = 'ble-desc';
-    desc.textContent = (bleData.populated_slots || 0) + ' / ' + (bleData.max_slots || 0) + ' slots used' +
-      (bleData.name_prefix ? ' · prefix "' + bleData.name_prefix + '"' : '');
+    desc.textContent = bleData.name_prefix
+      ? t('values.ble_slots_prefix', { used: bleData.populated_slots || 0, max: bleData.max_slots || 0, prefix: bleData.name_prefix })
+      : t('values.ble_slots', { used: bleData.populated_slots || 0, max: bleData.max_slots || 0 });
     card.appendChild(desc);
     // TASK-1693: BLE is switched on but waits for the stability warning (board without PSRAM,
     // install from before TASK-1693). A hint with a button, never a dialog on its own.
     if (bleBlePaused(bleData)) {
       var hint = document.createElement('div'); hint.className = 'ble-desc';
-      hint.textContent = 'BLE is paused: this board has no PSRAM, and BLE scanning starts only after you accept the stability warning. ';
-      var accept = document.createElement('button'); accept.className = 'tbtn'; accept.textContent = 'Read the warning';
+      hint.textContent = t('values.ble_paused') + ' ';
+      var accept = document.createElement('button'); accept.className = 'tbtn'; accept.textContent = t('values.ble_read_warning');
       accept.addEventListener('click', maybeShowBleConsent);
       hint.appendChild(accept);
       card.appendChild(hint);
     }
-    var rescan = document.createElement('button'); rescan.className = 'tbtn'; rescan.textContent = '🔄 Rescan';
+    var rescan = document.createElement('button'); rescan.className = 'tbtn'; rescan.textContent = '🔄 ' + t('values.ble_rescan');
     rescan.addEventListener('click', function () {
       // TASK-963: the POST already fires (200) but gave NO visible feedback, so the
       // button read as dead. Show a scanning state + toast; the continuous poll
       // surfaces any newly-found sensors. Re-enable after a short window.
-      rescan.disabled = true; rescan.textContent = '⏳ Scanning…';
-      bleToast('Scanning for BLE sensors…');
+      rescan.disabled = true; rescan.textContent = '⏳ ' + t('values.ble_scanning');
+      bleToast(t('values.ble_scanning_toast'));
       bleAction('rescan');
-      setTimeout(function () { if (rescan.isConnected) { rescan.disabled = false; rescan.textContent = '🔄 Rescan'; } }, 3000);
+      setTimeout(function () { if (rescan.isConnected) { rescan.disabled = false; rescan.textContent = '🔄 ' + t('values.ble_rescan'); } }, 3000);
     });
     card.appendChild(rescan);
     // TASK-975: clear the whole roster (forget every slot; forget also cleans up HA
     // discovery). Two-click confirm avoids a blocking modal dialog.
     var sensorsNow = (bleData.sensors || []).filter(function (s) { return s.mac; });
     if (sensorsNow.length) {
-      var clr = document.createElement('button'); clr.className = 'tbtn'; clr.textContent = '🗑 Clear roster';
+      var clr = document.createElement('button'); clr.className = 'tbtn'; clr.textContent = '🗑 ' + t('values.ble_clear');
       clr.style.marginLeft = '6px';
       clr.addEventListener('click', function () {
         if (clr._armed) { clr._armed = false; clearBleRoster(sensorsNow.map(function (s) { return s.mac; })); return; }
-        clr._armed = true; clr.textContent = '⚠ Click again to clear all';
-        clr._t = setTimeout(function () { if (clr.isConnected) { clr._armed = false; clr.textContent = '🗑 Clear roster'; } }, 3000);
+        clr._armed = true; clr.textContent = '⚠ ' + t('values.ble_clear_confirm');
+        clr._t = setTimeout(function () { if (clr.isConnected) { clr._armed = false; clr.textContent = '🗑 ' + t('values.ble_clear'); } }, 3000);
       });
       card.appendChild(clr);
     }
     var sensors = bleData.sensors || [];
     if (!sensors.length) {
       var empty = document.createElement('div'); empty.className = 'ble-row'; empty.style.color = 'var(--muted)';
-      empty.textContent = 'No BLE sensors discovered yet. Press Rescan and put a sensor in range.';
+      empty.textContent = t('values.ble_none');
       card.appendChild(empty);
     } else {
       sensors.forEach(function (s) {
         var row = document.createElement('div'); row.className = 'ble-row';
         var nm = document.createElement('div'); nm.className = 'ble-nm';
-        nm.textContent = s.name || s.label || '(unnamed)';
+        nm.textContent = s.name || s.label || t('values.ble_unnamed');
         var mac = document.createElement('span'); mac.className = 'ble-mac'; mac.textContent = s.mac || ''; nm.appendChild(mac);
-        if (s.mac && s.mac === bleData.selected_mac) { var tag = document.createElement('span'); tag.className = 'ble-tag temp'; tag.textContent = 'selected'; nm.appendChild(tag); }
+        if (s.mac && s.mac === bleData.selected_mac) { var tag = document.createElement('span'); tag.className = 'ble-tag temp'; tag.textContent = t('values.ble_selected'); nm.appendChild(tag); }
         row.appendChild(nm);
         // Firmware emits per-sensor "temp"/"hum" (SATble roster); accept the
         // longer aliases too for forward-compat. (audit fix: was reading
@@ -3301,11 +4969,11 @@
         }
         // TASK-931: bindkey state — encrypted Xiaomi MiBeacon sensors show a lock
         // when a key is set. The key itself is write-only (never sent back).
-        if (s.has_key) { var kt = document.createElement('span'); kt.className = 'ble-tag'; kt.textContent = '🔒 key'; nm.appendChild(kt); }
+        if (s.has_key) { var kt = document.createElement('span'); kt.className = 'ble-tag'; kt.textContent = '🔒 ' + t('values.ble_key'); nm.appendChild(kt); }
         var ctr = document.createElement('div'); ctr.className = 'ble-ctrls';
-        var sel = document.createElement('button'); sel.className = 'tbtn'; sel.textContent = 'Select';
+        var sel = document.createElement('button'); sel.className = 'tbtn'; sel.textContent = t('values.ble_select');
         sel.addEventListener('click', function () { bleAction('select', { mac: s.mac }); });
-        var forget = document.createElement('button'); forget.className = 'tbtn'; forget.textContent = 'Forget';
+        var forget = document.createElement('button'); forget.className = 'tbtn'; forget.textContent = t('values.ble_forget');
         forget.addEventListener('click', function () { bleAction('forget', { mac: s.mac }); });
         ctr.appendChild(sel); ctr.appendChild(forget); row.appendChild(ctr);
         // TASK-996: per-row friendly-name input. The firmware persists a label per
@@ -3314,15 +4982,15 @@
         // current label; Enter or Save applies; clearing + Save clears the label.
         var nameRow = document.createElement('div'); nameRow.className = 'ble-ctrls';
         var nameIn = document.createElement('input'); nameIn.type = 'text';
-        nameIn.placeholder = 'Name (e.g. Living room)'; nameIn.maxLength = 23;
+        nameIn.placeholder = t('values.ble_name_placeholder'); nameIn.maxLength = 23;
         nameIn.value = s.label || ''; nameIn.autocomplete = 'off';
         nameIn.style.flex = '1'; nameIn.style.minWidth = '12ch';
-        var nameBtn = document.createElement('button'); nameBtn.className = 'tbtn'; nameBtn.textContent = '💾 Save name';
+        var nameBtn = document.createElement('button'); nameBtn.className = 'tbtn'; nameBtn.textContent = '💾 ' + t('values.ble_save_name');
         (function (mac, input) {
           function saveName() {
             var v = (input.value || '').trim();
             bleAction('label', { mac: mac, label: v });
-            if (typeof bleToast === 'function') bleToast(v ? 'Name saved' : 'Name cleared');
+            if (typeof bleToast === 'function') bleToast(v ? t('values.ble_name_saved') : t('values.ble_name_cleared'));
           }
           nameBtn.addEventListener('click', saveName);
           input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); saveName(); } });
@@ -3331,9 +4999,9 @@
         // TASK-931: per-row bindkey input (encrypted MiBeacon). Paste the 32-hex
         // beaconkey from the pvvx/Xiaomi-cloud tooling; empty clears it.
         var keyRow = document.createElement('div'); keyRow.className = 'ble-ctrls';
-        var keyIn = document.createElement('input'); keyIn.type = 'password'; keyIn.placeholder = '32-hex bindkey';
+        var keyIn = document.createElement('input'); keyIn.type = 'password'; keyIn.placeholder = t('values.ble_bindkey_placeholder');
         keyIn.maxLength = 32; keyIn.autocomplete = 'off'; keyIn.style.flex = '1'; keyIn.style.minWidth = '12ch';
-        var keyBtn = document.createElement('button'); keyBtn.className = 'tbtn'; keyBtn.textContent = '🔑 Set';
+        var keyBtn = document.createElement('button'); keyBtn.className = 'tbtn'; keyBtn.textContent = '🔑 ' + t('values.ble_set_key');
         keyBtn.addEventListener('click', function () {
           var k = (keyIn.value || '').trim().toLowerCase();
           if (k && !/^[0-9a-f]{32}$/.test(k)) { keyIn.style.borderColor = 'var(--hot,#c33)'; return; }
@@ -3347,14 +5015,14 @@
     // encrypted Mijia cannot self-announce until it has a key, so paste its MAC +
     // 32-hex bindkey together (both from the pvvx/Xiaomi-cloud tooling).
     var add = document.createElement('div'); add.className = 'ble-row';
-    var addLbl = document.createElement('div'); addLbl.className = 'ble-nm'; addLbl.textContent = 'Add encrypted sensor';
+    var addLbl = document.createElement('div'); addLbl.className = 'ble-nm'; addLbl.textContent = t('values.ble_add_title');
     add.appendChild(addLbl);
     var addCtr = document.createElement('div'); addCtr.className = 'ble-ctrls';
     var macIn = document.createElement('input'); macIn.type = 'text'; macIn.placeholder = 'AA:BB:CC:DD:EE:FF';
     macIn.autocomplete = 'off'; macIn.style.minWidth = '15ch';
-    var bkIn = document.createElement('input'); bkIn.type = 'password'; bkIn.placeholder = '32-hex bindkey';
+    var bkIn = document.createElement('input'); bkIn.type = 'password'; bkIn.placeholder = t('values.ble_bindkey_placeholder');
     bkIn.maxLength = 32; bkIn.autocomplete = 'off'; bkIn.style.minWidth = '12ch';
-    var addBtn = document.createElement('button'); addBtn.className = 'tbtn'; addBtn.textContent = '➕ Add';
+    var addBtn = document.createElement('button'); addBtn.className = 'tbtn'; addBtn.textContent = '➕ ' + t('values.ble_add');
     addBtn.addEventListener('click', function () {
       var m = (macIn.value || '').trim().toUpperCase();
       var k = (bkIn.value || '').trim().toLowerCase();
@@ -3397,7 +5065,7 @@
   // sequential chain and shown as the option text; the option value stays the raw
   // address, because that is what the setting stores.
   function populateAreaSensorChoices() {
-    var opts = [['', '-- none --']];
+    var opts = [['', t('values.none_option')]];
     loadDallasLabels()
       .then(function () { return fetch(APIGW + 'v2/sensors'); })
       .then(function (r) { return r.ok ? r.json() : null; })
@@ -3434,29 +5102,32 @@
       .catch(function () { /* leave the text inputs in place */ });
   }
 
-  var TRIGGER_BITS = [[0, 'Boiler: fault'], [1, 'Boiler: CH active'], [2, 'Boiler: DHW active'], [3, 'Boiler: flame on'],
-    [4, 'Boiler: cooling active'], [5, 'Boiler: CH2 active'], [6, 'Boiler: diagnostic'], [7, 'Boiler: electricity production'],
-    [8, 'Thermostat: CH enable'], [9, 'Thermostat: DHW enable'], [10, 'Thermostat: cooling enable'], [11, 'Thermostat: OTC active'],
-    [12, 'Thermostat: CH2 enable'], [13, 'Thermostat: summer/winter'], [14, 'Thermostat: DHW blocking'], [15, 'Thermostat: bit 7 (reserved)']];
+  // Option labels are lazy: a label object turns into text (the current language) when a renderer
+  // coerces it, so ENUM_OPTS can stay a load-time constant.
+  function enumLabel(key, params) { return { toString: function () { return t(key, params); } }; }
+  var TRIGGER_BITS = [[0, enumLabel('values.trigger_boiler_fault')], [1, enumLabel('values.trigger_boiler_ch')], [2, enumLabel('values.trigger_boiler_dhw')], [3, enumLabel('values.trigger_boiler_flame')],
+    [4, enumLabel('values.trigger_boiler_cooling')], [5, enumLabel('values.trigger_boiler_ch2')], [6, enumLabel('values.trigger_boiler_diag')], [7, enumLabel('values.trigger_boiler_elec')],
+    [8, enumLabel('values.trigger_tstat_ch')], [9, enumLabel('values.trigger_tstat_dhw')], [10, enumLabel('values.trigger_tstat_cooling')], [11, enumLabel('values.trigger_tstat_otc')],
+    [12, enumLabel('values.trigger_tstat_ch2')], [13, enumLabel('values.trigger_tstat_summer')], [14, enumLabel('values.trigger_tstat_dhwblock')], [15, enumLabel('values.trigger_tstat_bit7')]];
   var OTD_SERVICE_MODES = { 0: 1, 4: 1 };   // TASK-1716: OT-Direct bypass and loopback, not offered in the selector
   var ENUM_OPTS = {
-    satsource: [[0, 'Auto'], [1, 'Gas Boiler'], [2, 'Heat Pump'], [3, 'Hybrid'], [4, 'On/off heat pump, 3 h cycle (experimental)']],
-    satsystem: [[0, 'Auto'], [1, 'Radiators'], [2, 'Underfloor']],
-    sathpcycle: [[1800, '30 min (default)'], [2400, '40 min'], [3600, '60 min (heat pump only)']],   // TASK-1550: minutes, stored in seconds
-    satcyclesperhour: [[3, '20 min (default)'], [4, '15 min']],   // TASK-1550: minutes, stored as cycles per hour (3 or 4)
+    satsource: [[0, enumLabel('values.enum_auto')], [1, enumLabel('values.enum_gas_boiler')], [2, enumLabel('values.enum_heat_pump')], [3, enumLabel('values.enum_hybrid')], [4, enumLabel('values.enum_onoff_hp')]],
+    satsystem: [[0, enumLabel('values.enum_auto')], [1, enumLabel('values.enum_radiators')], [2, enumLabel('values.enum_underfloor')]],
+    sathpcycle: [[1800, enumLabel('values.enum_min_default', { minutes: 30 })], [2400, enumLabel('values.enum_min', { minutes: 40 })], [3600, enumLabel('values.enum_min_hp_only', { minutes: 60 })]],   // TASK-1550: minutes, stored in seconds
+    satcyclesperhour: [[3, enumLabel('values.enum_min_default', { minutes: 20 })], [4, enumLabel('values.enum_min', { minutes: 15 })]],   // TASK-1550: minutes, stored as cycles per hour (3 or 4)
     // boardmode is the real 3-value hardware override (ADR-127); the mockup's
     // 4-option ESP8266/OTGW32/LOLIN list was semantically wrong.
-    boardmode: [[0, 'Auto-detect'], [1, 'PIC (Classic)'], [2, 'OT-Direct (no PIC)']],
+    boardmode: [[0, enumLabel('values.enum_autodetect')], [1, enumLabel('values.enum_board_pic')], [2, enumLabel('values.enum_board_otdirect')]],
     // TASK-1358 (ADR-200): the firmware tests Statusflags & (1 << n), Statusflags = (master << 8) | slave
     // (OT MsgID 0), so bits 0-7 are the boiler status and bits 8-15 the thermostat status (OT v4.2).
     gpiooutputstriggerbit: TRIGGER_BITS,
     webhooktriggerbit: TRIGGER_BITS,
-    satheatingmode: [[0, 'Comfort'], [1, 'Eco']],
+    satheatingmode: [[0, enumLabel('values.enum_comfort')], [1, enumLabel('values.enum_eco')]],
     // OT-Direct gateway mode — labels from OTDirecttypes.h (NOT the mockup's
     // Off/On-Off/PID list, which was a different, wrong concept).
     otdmode: [[0, 'Bypass'], [1, 'Gateway'], [2, 'Monitor'], [3, 'Master'], [4, 'Loopback']],   // TASK-1716: 0 and 4 hidden unless stored
     // SAT manufacturer presets — labels from the firmware satManufacturerTable[].
-    satmanufacturer: [[0, 'Auto'], [1, 'Atag'], [2, 'Baxi'], [3, 'Brotje'], [4, 'De Dietrich'], [5, 'Ferroli'], [6, 'Geminox'], [7, 'Ideal'], [8, 'Immergas'], [9, 'Intergas'], [10, 'Itho'], [11, 'Nefit'], [12, 'Radiant'], [13, 'Remeha'], [14, 'Sime'], [15, 'Vaillant'], [16, 'Viessmann'], [17, 'Worcester'], [18, 'Other']],
+    satmanufacturer: [[0, enumLabel('values.enum_auto')], [1, 'Atag'], [2, 'Baxi'], [3, 'Brotje'], [4, 'De Dietrich'], [5, 'Ferroli'], [6, 'Geminox'], [7, 'Ideal'], [8, 'Immergas'], [9, 'Intergas'], [10, 'Itho'], [11, 'Nefit'], [12, 'Radiant'], [13, 'Remeha'], [14, 'Sime'], [15, 'Vaillant'], [16, 'Viessmann'], [17, 'Worcester'], [18, enumLabel('values.enum_other')]],
     // Webhook POST content type — standard closed set (string-valued enum; the
     // string-safe select path preserves any custom value not in this list).
     webhookcontenttype: [['application/json', 'application/json'], ['application/x-www-form-urlencoded', 'form-urlencoded'], ['text/plain', 'text/plain']]
@@ -3591,7 +5262,9 @@
   }
   function valDisplayName(k, e) {
     if (isDallasEntry(k, e)) return dallasLabelFor(k) || k;
-    return OTMON_LABELS[k] || k;
+    if (!OTMON_LABELS[k]) return k;
+    var s = t('values.otmon.' + k);
+    return s === 'values.otmon.' + k ? OTMON_LABELS[k] : s;   // a pack without the key: the English label
   }
   function buildValRow(k, e) {
     var tr = document.createElement('tr'); tr.dataset.key = k;
@@ -3612,7 +5285,7 @@
       var lbl = dallasLabelFor(k);
       if (lbl) { var ad = document.createElement('span'); ad.className = 'ble-mac'; ad.style.marginLeft = '6px'; ad.textContent = k; td.appendChild(ad); }
       var b = document.createElement('button'); b.type = 'button'; b.className = 'vlbl-edit'; b.textContent = '✎';
-      b.title = 'Edit label for ' + k; b.setAttribute('aria-label', 'Edit label for sensor ' + k);
+      b.title = t('values.edit_label_title', { id: k }); b.setAttribute('aria-label', t('values.edit_label_aria', { id: k }));
       b.addEventListener('click', function () { openValLabelEditor(k, row); });
       td.appendChild(b);
     }
@@ -3620,7 +5293,7 @@
   function renderValues() {
     var tb = document.querySelector('#valTable tbody'); if (!tb) return;
     var st = document.getElementById('valStatus');
-    if (!otmonData) { if (st) st.textContent = 'Loading…'; return; }
+    if (!otmonData) { if (st) st.textContent = t('values.loading'); return; }
     var now = Date.now(), q = valSearch.trim().toLowerCase(), shown = 0;
     Object.keys(otmonData).forEach(function (k) {
       var e = otmonData[k];
@@ -3641,10 +5314,10 @@
       } else row.valTd.textContent = fmtOtmonValue(e.value);
       row.unitTd.textContent = e.unit || '';
       var age, stale;
-      if (!ep) { row.ageTd.textContent = 'no data'; stale = true; }
+      if (!ep) { row.ageTd.textContent = t('values.no_data'); stale = true; }
       else {
         age = row.changeMs ? (now - row.changeMs) : (now - row.firstMs);
-        row.ageTd.textContent = (row.changeMs ? '' : '≥ ') + fmtAge(age) + ' ago';
+        row.ageTd.textContent = t(row.changeMs ? 'values.age_ago' : 'values.age_ago_atleast', { age: fmtAge(age) });
         stale = age > VAL_STALE_MS;
       }
       row.tr.classList.toggle('vstale', !!stale);
@@ -3658,7 +5331,7 @@
       if (!Object.prototype.hasOwnProperty.call(otmonData, k) && !valRows[k].editing) { valRows[k].tr.remove(); delete valRows[k]; }
     });
     var cnt = document.getElementById('valCount'); if (cnt) cnt.textContent = shown;
-    if (st) st.textContent = 'Updated ' + fmtAge(now - otmonLastOkMs) + ' ago';
+    if (st) st.textContent = t('values.updated_ago', { age: fmtAge(now - otmonLastOkMs) });
   }
 
   // ---------- 1-Wire (Dallas) sensor labels (TASK-1223.15) ----------
@@ -3705,7 +5378,7 @@
     var td = row.nameTd, original = dallasLabelFor(addr);
     td.textContent = '';
     var inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 16; inp.className = 'vlbl-input';
-    inp.value = original; inp.placeholder = addr; inp.setAttribute('aria-label', 'Label for sensor ' + addr);
+    inp.value = original; inp.placeholder = addr; inp.setAttribute('aria-label', t('sensors.label_aria', { addr: addr }));
     td.appendChild(inp);
     var done = false;
     function close() { row.editing = false; fillValName(addr, otmonData ? otmonData[addr] : null, row); }
@@ -3717,7 +5390,7 @@
       saveDallasLabel(addr, nv).then(function () { close(); if (Object.keys(setData).length) populateAreaSensorChoices(); })
         .catch(function (err) {
           done = false; inp.disabled = false; inp.focus();
-          var st = document.getElementById('valStatus'); if (st) st.textContent = 'Label not saved (' + ((err && err.message) || 'error') + ')';
+          var st = document.getElementById('valStatus'); if (st) st.textContent = t('sensors.label_not_saved', { error: (err && err.message) || t('sensors.error_generic') });
         });
     }
     inp.addEventListener('keydown', function (ev) {
@@ -3790,13 +5463,13 @@
   // while SAT owns them. SAT on: the dial sets the SAT target. SAT off: the thermostat controls the
   // temperature and the dial only shows its values; +/- are hidden and a press sends nothing.
   // A press before sat/status has answered asks for it first.
-  var DIAL_SAT_OFF = 'SAT is off: the thermostat controls the temperature';
+  var dialOffShown = '';
   function applyDialMode() {
     var off = sat.owns === false;
     ['bUp', 'bDown'].forEach(function (id) { var b = document.getElementById(id); if (b) b.style.display = off ? 'none' : ''; });
     var c = document.getElementById('bCmd');
-    if (c && off) c.textContent = DIAL_SAT_OFF;
-    else if (c && c.textContent === DIAL_SAT_OFF) c.textContent = '';
+    if (c && off) { dialOffShown = t('sensors.dial_sat_off'); c.textContent = dialOffShown; }
+    else if (c && dialOffShown && c.textContent === dialOffShown) c.textContent = '';
   }
   // Presses while the one sat/status ask is out add up and are applied once it answers.
   var dialAsk = null;
@@ -3807,28 +5480,28 @@
       fetch(APIGW + 'v2/sat/status').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
         var st = j && (j.sat || j), d = dialAsk.delta; dialAsk = null;
         sat.owns = !!(st && (st.enabled || st.fallback_active)); applyDialMode(); stepTarget(d);
-      }).catch(function () { dialAsk = null; txt('bCmd', 'set failed: SAT status unknown'); });
+      }).catch(function () { dialAsk = null; txt('bCmd', t('sensors.dial_set_failed_unknown')); });
       return;
     }
     if (!sat.owns) { applyDialMode(); return; }
     var base = (sat.target !== null && !isNaN(sat.target)) ? sat.target : (model.roomSet !== null ? model.roomSet : 20);
-    var t = Math.max(5, Math.min(30, Math.round((base + delta) * 2) / 2));
-    txt('bCmd', 'set target ' + t.toFixed(1) + '°…');
-    fetch(APIGW + 'v2/sat/target', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: '' + t }) })
+    var tv = Math.max(5, Math.min(30, Math.round((base + delta) * 2) / 2));   // not t: that is the translate function
+    txt('bCmd', t('sensors.dial_setting_target', { value: tv.toFixed(1) }));
+    fetch(APIGW + 'v2/sat/target', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: '' + tv }) })
       .then(function (r) {
-        if (r.ok) { sat.target = t; txt('bSet', 'target ' + t.toFixed(1) + '°'); txt('bCmd', 'target set ' + t.toFixed(1) + '°'); }
-        else txt('bCmd', 'set failed (HTTP ' + r.status + ')');
-      }).catch(function () { txt('bCmd', 'set failed'); });
+        if (r.ok) { sat.target = tv; txt('bSet', t('sensors.dial_target', { value: tv.toFixed(1) })); txt('bCmd', t('sensors.dial_target_set', { value: tv.toFixed(1) })); }
+        else txt('bCmd', t('sensors.dial_set_failed_http', { status: r.status }));
+      }).catch(function () { txt('bCmd', t('sensors.dial_set_failed')); });
   }
 
   // Grouped chain map: Heating bus / Network / Integrations / This browser, each
   // row with state badge (icon + word), explanation, per-link fix hint when down,
   // and recency — the mockup's "locate the break and tell the user how to fix it".
   var CONN_GROUPS = [
-    { id: 'bus', title: 'Heating bus (OpenTherm)' },
-    { id: 'net', title: 'Network' },
-    { id: 'int', title: 'Integrations' },
-    { id: 'ses', title: 'This browser session' }
+    { id: 'bus', key: 'sensors.conn_group_bus' },
+    { id: 'net', key: 'sensors.conn_group_net' },
+    { id: 'int', key: 'sensors.conn_group_int' },
+    { id: 'ses', key: 'sensors.conn_group_ses' }
   ];
   function connDetailRow(key) {
     var c = CONN[key];
@@ -3854,7 +5527,7 @@
       var keys = Object.keys(CONN).filter(function (k) { return CONN[k].grp === g.id; });
       if (!keys.length) return;
       var grp = document.createElement('div'); grp.className = 'conngroup';
-      var h4 = document.createElement('h4'); h4.textContent = g.title; grp.appendChild(h4);
+      var h4 = document.createElement('h4'); h4.textContent = t(g.key); grp.appendChild(h4);
       keys.forEach(function (k) { grp.appendChild(connDetailRow(k)); });
       box.appendChild(grp);
     });
@@ -3867,7 +5540,7 @@
     var b = document.createElement('b'); b.textContent = id; tip.appendChild(b);
     // Spec name from the firmware OTmap for ALL cells (even never-seen ones).
     var m = (typeof OTMSG !== 'undefined' && OTMSG[id]) ? OTMSG[id] : null;
-    var nm = (m && m.name) ? m.name : (sx ? (sx.label || 'seen') : 'not seen');
+    var nm = (m && m.name) ? m.name : (sx ? (sx.label || t('sensors.tip_seen')) : t('sensors.tip_not_seen'));
     tip.appendChild(document.createTextNode(' ' + nm));
     tip.style.left = e.clientX + 'px'; tip.style.top = e.clientY + 'px'; tip.style.opacity = '1';
   }
@@ -3990,7 +5663,7 @@
     if (!window.showSaveFilePicker) {   // plain HTTP (or Firefox/Safari): part files every 5 min
       logStreamChunk = []; logStreamTimer = setInterval(flushStreamChunk, 300000); chip.classList.add('on'); return;
     }
-    window.showSaveFilePicker({ suggestedName: 'otgw-log-' + ts() + '.txt', types: [{ description: 'Text log', accept: { 'text/plain': ['.txt'] } }] })
+    window.showSaveFilePicker({ suggestedName: 'otgw-log-' + ts() + '.txt', types: [{ description: t('sensors.save_picker_text_log'), accept: { 'text/plain': ['.txt'] } }] })
       .then(function (h) { return h.createWritable(); })
       .then(function (w) { logStreamWriter = w; chip.classList.add('on'); })
       .catch(function () { });
@@ -4008,21 +5681,21 @@
     fetch(APIGW + 'v2/otgw/overrides').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       var el = document.getElementById('ovStatList'); if (!el) return; el.textContent = '';
       var rows = (j && Array.isArray(j.overrides)) ? j.overrides : [];
-      if (!rows.length) { el.appendChild(statMuted('No active gateway overrides')); return; }
+      if (!rows.length) { el.appendChild(statMuted(t('sensors.overrides_none'))); return; }
       rows.forEach(function (r) {
-        var name = (r.friendly && r.friendly.length) ? r.friendly : (r.label || 'Unknown');
-        var kind = (r.kind === 'answer') ? 'answer' : 'substituted';
+        var name = (r.friendly && r.friendly.length) ? r.friendly : (r.label || t('sensors.unknown'));
+        var kind = (r.kind === 'answer') ? t('sensors.override_answer') : t('sensors.override_substituted');
         var val = (typeof r.value === 'number') ? r.value.toFixed(2) : r.value;
-        el.appendChild(statRow('MsgID ' + r.id + ' · ' + name, kind + ' = ' + val + ' · ' + r.age_s + 's'));
+        el.appendChild(statRow(t('sensors.msgid_title', { id: r.id, name: name }), t('sensors.override_meta', { kind: kind, value: val, age: r.age_s })));
       });
     }).catch(function () { });
     fetch(APIGW + 'v2/otgw/boiler-support').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       var el = document.getElementById('boilerUnsupList'); if (!el) return; el.textContent = '';
       var rd = (j && Array.isArray(j.unsupported_read)) ? j.unsupported_read : [];
       var wr = (j && Array.isArray(j.unsupported_write)) ? j.unsupported_write : [];
-      if (!rd.length && !wr.length) { el.appendChild(statMuted('None — boiler supports all observed messages (or no boiler seen).')); return; }
-      function add(arr, mode) { arr.forEach(function (e) { var name = (e.friendly && e.friendly.length) ? e.friendly : (e.label || 'Unknown'); el.appendChild(statRow('MsgID ' + e.id + ' · ' + name, mode)); }); }
-      add(rd, 'read'); add(wr, 'write');
+      if (!rd.length && !wr.length) { el.appendChild(statMuted(t('sensors.boiler_unsupported_none'))); return; }
+      function add(arr, mode) { arr.forEach(function (e) { var name = (e.friendly && e.friendly.length) ? e.friendly : (e.label || t('sensors.unknown')); el.appendChild(statRow(t('sensors.msgid_title', { id: e.id, name: name }), mode)); }); }
+      add(rd, t('sensors.mode_read')); add(wr, t('sensors.mode_write'));
     }).catch(function () { });
   }
 
@@ -4052,7 +5725,7 @@
       cbs.forEach(function (fn) { try { fn(devInfoCache); } catch (e) { } });
     });
   }
-  function yesno(b) { return (b === undefined || b === null) ? undefined : (b === false || b === 'false' || b === 0) ? 'No' : 'Yes'; }
+  function yesno(b) { return (b === undefined || b === null) ? undefined : (b === false || b === 'false' || b === 0) ? t('sensors.no') : t('sensors.yes'); }
 
   // ---------- Advanced > Debug Information (TASK-967/982) ----------
   function fetchDebug() {
@@ -4063,7 +5736,7 @@
       var c = (j && j.crashlog) || {};
       var ok = document.getElementById('dbgCrashOk'), pre = document.getElementById('dbgCrash');
       if (!c.available) { if (ok) ok.style.display = ''; if (pre) pre.style.display = 'none'; }
-      else { if (ok) ok.style.display = 'none'; if (pre) { pre.style.display = ''; pre.textContent = ((c.summary || '') + '\n\n' + (c.details || '')).trim() || 'Crash recorded (no detail).'; } }
+      else { if (ok) ok.style.display = 'none'; if (pre) { pre.style.display = ''; pre.textContent = ((c.summary || '') + '\n\n' + (c.details || '')).trim() || t('sensors.crash_no_detail'); } }
     }).catch(function () {
       var ok = document.getElementById('dbgCrashOk'), pre = document.getElementById('dbgCrash');
       if (ok) ok.style.display = 'none'; if (pre) { pre.style.display = ''; pre.textContent = '—'; }
@@ -4073,8 +5746,8 @@
       var el = document.getElementById('dbgInfo'); if (!el) return;
       var d = (j && j.debug) || j || {};
       var keys = Object.keys(d);
-      el.textContent = keys.length ? keys.map(function (k) { return k + '  =  ' + d[k]; }).join('\n') : 'No debug data';
-    }).catch(function () { var el = document.getElementById('dbgInfo'); if (el) el.textContent = 'Failed to load debug info'; })
+      el.textContent = keys.length ? keys.map(function (k) { return k + '  =  ' + d[k]; }).join('\n') : t('sensors.debug_none');
+    }).catch(function () { var el = document.getElementById('dbgInfo'); if (el) el.textContent = t('sensors.debug_load_failed'); })
       // The recording status goes after the two reads above, so this panel keeps ADR-165's two calls in flight.
       .then(function () { diagRecCall('GET', '/status'); });
   }
@@ -4092,14 +5765,15 @@
     var stop = document.getElementById('diagRecStop'), dl = document.getElementById('diagRecDownload');
     if (!st) return;
     var text;
-    if (!r) text = 'Status unavailable';
+    if (!r) text = t('sensors.rec_status_unavailable');
     else if (r.state === 'recording') {
-      text = 'Recording · ring ' + diagRecSize(r.ring_bytes || 0) + ' (' + (r.ring_blocks || 0) + ' blocks)' +
-        (r.psram ? ' in PSRAM' : '') + (r.dropped ? ' · ' + r.dropped + ' records dropped' : '') +
-        // ADR-213: without PSRAM the ring is a heap block that Stop frees, so the data goes with it
-        (r.psram ? '' : ' · no PSRAM: Stop clears the recording, download it first');
-    } else if (r.state === 'refused') text = 'Refused: ' + (r.reason || 'not enough memory');
-    else text = 'Stopped · ' + (r.has_data ? 'a recording is in memory, ready to download' : 'no recording in memory');
+      var recParts = [t(r.psram ? 'sensors.rec_recording_psram' : 'sensors.rec_recording', { size: diagRecSize(r.ring_bytes || 0), blocks: r.ring_blocks || 0 })];
+      if (r.dropped) recParts.push(t('sensors.rec_dropped', { count: r.dropped }));
+      // ADR-213: without PSRAM the ring is a heap block that Stop frees, so the data goes with it
+      if (!r.psram) recParts.push(t('sensors.rec_no_psram_warning'));
+      text = recParts.join(' · ');
+    } else if (r.state === 'refused') text = t('sensors.rec_refused', { reason: r.reason || t('sensors.rec_refused_default') });
+    else text = t(r.has_data ? 'sensors.rec_stopped_data' : 'sensors.rec_stopped_empty');
     st.textContent = note ? text + ' — ' + note : text;
     var active = !!(r && r.active);
     if (start) start.disabled = diagRecBusy || active;
@@ -4120,9 +5794,9 @@
     var opts = method === 'POST' ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' } : undefined;
     fetch(APIGW + 'v2/diag/recording' + path, opts).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       diagRecBusy = false;
-      var note = (j && j.ok === false && j.result === 'refused') ? '' : (j && j.ok === false ? (j.result || 'not done') : '');
+      var note = (j && j.ok === false && j.result === 'refused') ? '' : (j && j.ok === false ? (j.result || t('sensors.rec_not_done')) : '');
       renderDiagRec((j && j.recording) || null, note);
-    }).catch(function () { diagRecBusy = false; renderDiagRec(null, 'request failed'); });
+    }).catch(function () { diagRecBusy = false; renderDiagRec(null, t('sensors.rec_request_failed')); });
   }
   function wireDiagRec() {
     if (diagRecWired) return;
@@ -4136,40 +5810,40 @@
     var host = document.getElementById('dbgGroups'); if (!host) return;
     host.textContent = '';
     var mqttEn;
-    if (Object.prototype.hasOwnProperty.call(setData, 'mqttenable')) mqttEn = (('' + setData.mqttenable.value) === 'true') ? 'Yes' : 'No';
+    if (Object.prototype.hasOwnProperty.call(setData, 'mqttenable')) mqttEn = (('' + setData.mqttenable.value) === 'true') ? t('sensors.yes') : t('sensors.no');
     var wifiQ;
     if (d.wifiquality_text !== undefined) wifiQ = d.wifiquality_text + (d.wifiquality !== undefined ? ' (' + d.wifiquality + '%)' : '');
     // TASK-995: format a byte count as MB (whole when exact) for the Hardware group.
     function fmtMB(b) { if (b === undefined || b === null) return undefined; var m = b / 1048576; return (m % 1 ? m.toFixed(1) : m) + ' MB'; }
-    var psramStr = d.psram_found ? (fmtMB(d.psram_size) + ' (' + fmtMB(d.psram_free) + ' free)') : 'None';
+    var psramStr = d.psram_found ? t('sensors.psram_size_free', { size: fmtMB(d.psram_size), free: fmtMB(d.psram_free) }) : t('sensors.none');
     var groups = [
-      ['Firmware', [
-        ['Firmware Version', d.fwversion], ['Compiled On', d.compiled],
-        ['PIC Firmware Version', d.picfwversion], ['PIC Firmware Type', d.picfwtype],
-        ['PIC Device ID', d.picdeviceid], ['Board Type', d.board]
+      [t('sensors.dbg_grp_firmware'), [
+        [t('sensors.dbg_firmware_version'), d.fwversion], [t('sensors.dbg_compiled_on'), d.compiled],
+        [t('sensors.dbg_pic_fw_version'), d.picfwversion], [t('sensors.dbg_pic_fw_type'), d.picfwtype],
+        [t('sensors.dbg_pic_device_id'), d.picdeviceid], [t('sensors.dbg_board_type'), d.board]
       ]],
       // TASK-1379: static credits, not device data. SAT's concept is George Ntellas's.
-      ['Credits', [
-        ['SAT concept by', 'George Ntellas'],
-        ['Original SAT Python version', 'Alex Wijnholds - George Ntellas'],
-        ['C/C++ version', 'Robert van den Breemen + Claude + George Ntellas']
+      [t('sensors.dbg_grp_credits'), [
+        [t('sensors.dbg_sat_concept_by'), 'George Ntellas'],
+        [t('sensors.dbg_sat_python_version'), 'Alex Wijnholds - George Ntellas'],
+        [t('sensors.dbg_cpp_version'), 'Robert van den Breemen + Claude + George Ntellas']
       ]],
-      ['Network', [
-        ['Hostname (.local)', d.hostname], ['IP Address', d.ipaddress], ['MAC Address', d.macaddress],
-        ['Wi-Fi Network (SSID)', d.ssid], ['Wi-Fi Signal Strength (dBm)', d.wifirssi], ['Wi-Fi Quality', wifiQ]
+      [t('sensors.dbg_grp_network'), [
+        [t('sensors.dbg_hostname'), d.hostname], [t('sensors.dbg_ip_address'), d.ipaddress], [t('sensors.dbg_mac_address'), d.macaddress],
+        [t('sensors.dbg_wifi_ssid'), d.ssid], [t('sensors.dbg_wifi_rssi'), d.wifirssi], [t('sensors.dbg_wifi_quality'), wifiQ]
       ]],
-      ['Hardware', [
-        ['Chip Model (est.)', d.chip_model_est], ['Unique Chip ID', d.chipid],
-        ['Arduino Core Version', d.coreversion], ['Espressif SDK Version', d.sdkversion],
-        ['CPU Speed (MHz)', d.cpufreq], ['Flash Size', d.flash_size ? fmtMB(d.flash_size) : (d.flashchipsize ? d.flashchipsize + ' MB' : undefined)],
-        ['PSRAM', psramStr], ['LittleFS Size (MB)', d.LittleFSsize], ['Flash Mode', d.flashchipmode]
+      [t('sensors.dbg_grp_hardware'), [
+        [t('sensors.dbg_chip_model'), d.chip_model_est], [t('sensors.dbg_chip_id'), d.chipid],
+        [t('sensors.dbg_core_version'), d.coreversion], [t('sensors.dbg_sdk_version'), d.sdkversion],
+        [t('sensors.dbg_cpu_speed'), d.cpufreq], [t('sensors.dbg_flash_size'), d.flash_size ? fmtMB(d.flash_size) : (d.flashchipsize ? d.flashchipsize + ' MB' : undefined)],
+        [t('sensors.dbg_psram'), psramStr], [t('sensors.dbg_littlefs_size'), d.LittleFSsize], [t('sensors.dbg_flash_mode'), d.flashchipmode]
       ]],
-      ['Memory & uptime', [
-        ['Free Heap Memory (bytes)', d.freeheap], ['Max. Free Block (bytes)', d.maxfreeblock], ['Heap Fragmentation (%)', d.hd_fragmentation_pct],
-        ['Uptime Since Boot', d.uptime], ['Number of Reboots', d.bootcount], ['Last Reset Reason', d.lastreset]
+      [t('sensors.dbg_grp_memory'), [
+        [t('sensors.dbg_free_heap'), d.freeheap], [t('sensors.dbg_max_free_block'), d.maxfreeblock], [t('sensors.dbg_heap_fragmentation'), d.hd_fragmentation_pct],
+        [t('sensors.dbg_uptime'), d.uptime], [t('sensors.dbg_reboots'), d.bootcount], [t('sensors.dbg_last_reset'), d.lastreset]
       ]],
-      ['Integrations', [
-        ['MQTT Connected', yesno(d.mqttconnected)], ['MQTT Enabled', mqttEn], ['NTP Enabled', yesno(d.ntpenable)], ['NTP Timezone', d.ntptimezone]
+      [t('sensors.dbg_grp_integrations'), [
+        [t('sensors.dbg_mqtt_connected'), yesno(d.mqttconnected)], [t('sensors.dbg_mqtt_enabled'), mqttEn], [t('sensors.dbg_ntp_enabled'), yesno(d.ntpenable)], [t('sensors.dbg_ntp_timezone'), d.ntptimezone]
       ]]
     ];
     // TASK-1223.18 (gap audit row 36): every device/info field the curated groups above
@@ -4183,12 +5857,12 @@
       'freeheap', 'maxfreeblock', 'hd_fragmentation_pct', 'uptime', 'bootcount', 'lastreset',
       'mqttconnected', 'ntpenable', 'ntptimezone', 'otgwsimulation'];
     var OTHER = [
-      ['OT-Direct (otd*)', /^otd/, []],
-      ['Heap diagnostics (hd_*)', /^hd_/, []],
-      ['REST performance (perf_*)', /^perf_/, []],
-      ['MQTT discovery (disc_*)', /^disc_/, []],
-      ['Ethernet (eth_current_*)', /^eth_current_/, []],
-      ['All other fields', /^/, []]
+      [t('sensors.dbg_grp_otd'), /^otd/, []],
+      [t('sensors.dbg_grp_hd'), /^hd_/, []],
+      [t('sensors.dbg_grp_perf'), /^perf_/, []],
+      [t('sensors.dbg_grp_disc'), /^disc_/, []],
+      [t('sensors.dbg_grp_eth'), /^eth_current_/, []],
+      [t('sensors.dbg_grp_other'), /^/, []]
     ];
     Object.keys(d).forEach(function (k) {
       if (CURATED.indexOf(k) !== -1) return;
@@ -4219,7 +5893,6 @@
   // ---------- Advanced > PIC firmware flash (TASK-972/982) ----------
   var PICBASE = location.protocol + '//' + location.host + BASE;   // /pic is a top-level route, not under /api/v2
   var picPollTimer = null, picBusy = false, picDevVer = '';
-  var PIC_NONE_MSG = 'No PIC detected: PIC firmware flashing is unavailable in OT-Direct mode.';
   var picGateRetries = 0;
   // done (optional) runs once the header and file list are refreshed, so a caller
   // can chain the next request instead of firing it alongside (TASK-1255).
@@ -4232,7 +5905,7 @@
         // conclude "No PIC" from a missing answer. Show a neutral checking state
         // and re-poll a few times; only a successful snapshot decides the card.
         if (wrap) wrap.style.display = 'none';
-        if (none) { none.style.display = ''; none.textContent = 'Checking device capabilities…'; }
+        if (none) { none.style.display = ''; none.textContent = t('adv.pic_checking_caps'); }
         if (picGateRetries < 5) { picGateRetries++; setTimeout(function () { fetchPic(done); }, 2000); }
         else fin();
         return;
@@ -4240,7 +5913,7 @@
       picGateRetries = 0;
       var isPic = (d.otcommandinterface || '') === 'PIC';
       if (wrap) wrap.style.display = isPic ? '' : 'none';      // hidden on OTGW32 / OT-Direct
-      if (none) { none.style.display = isPic ? 'none' : ''; if (!isPic) none.textContent = PIC_NONE_MSG; }
+      if (none) { none.style.display = isPic ? 'none' : ''; if (!isPic) none.textContent = t('adv.pic_none'); }
       var ssim = document.getElementById('sysSim'); if (ssim) ssim.classList.toggle('hidden', !simActive);
       if (!isPic) { fin(); return; }
       picDevVer = ('' + (d.picfwversion || '')).trim();        // for the .newer highlight
@@ -4270,11 +5943,11 @@
     var el = document.getElementById('picFiles'); if (!el) return; el.textContent = '';
     if (!files.length) {
       var em = document.createElement('div'); em.className = 'picempty';
-      em.textContent = 'No firmware files on device. Use Check for updates, or upload a .hex via the File System tab.';
+      em.textContent = t('adv.pic_no_files');
       el.appendChild(em); return;
     }
     var head = document.createElement('div'); head.className = 'picrow head';
-    ['Firmware name', 'Version', 'Size', '', '', ''].forEach(function (t) { var s = document.createElement('span'); s.textContent = t; head.appendChild(s); });
+    ['adv.pic_col_name', 'adv.pic_col_version', 'adv.pic_col_size', '', '', ''].forEach(function (k) { var s = document.createElement('span'); s.textContent = k ? t(k) : ''; head.appendChild(s); });
     el.appendChild(head);
     files.forEach(function (f) {
       var row = document.createElement('div'); row.className = 'picrow' + (newerThanDevice(f.version) ? ' newer' : '');
@@ -4282,17 +5955,17 @@
       var ver = document.createElement('span'); ver.className = 'fver'; ver.textContent = 'v' + (f.version || '?');
       var sz = document.createElement('span'); sz.className = 'fsize'; sz.textContent = ((f.size || 0) >= 1024 ? (f.size / 1024).toFixed(1) + ' KB' : (f.size || 0) + ' B');
       row.appendChild(nm); row.appendChild(ver); row.appendChild(sz);
-      var refr = picIcon('⟳', 'Re-download latest ' + (f.name || ''), '');
+      var refr = picIcon('⟳', t('adv.pic_refresh_title', { name: f.name || '' }), '');
       refr.addEventListener('click', function () { if (!picBusy) picRefresh(f.name, f.version); });
-      var flash = picIcon('⇩', 'Flash ' + (f.name || '') + ' onto the PIC', '');
+      var flash = picIcon('⇩', t('adv.pic_flash_title', { name: f.name || '' }), '');
       flash.addEventListener('click', function () {
         if (picBusy) return;
-        if (flash._armed) { flash._armed = false; flash.classList.remove('armed'); flash.textContent = '⇩'; flash.title = 'Flash ' + (f.name || '') + ' onto the PIC'; startPicFlash(f.name); return; }
-        flash._armed = true; flash.classList.add('armed'); flash.textContent = '⚠'; flash.title = 'Tap again to confirm flashing ' + (f.name || '') + ' — a bad flash can brick the PIC';
-        setTimeout(function () { if (flash.isConnected && flash._armed) { flash._armed = false; flash.classList.remove('armed'); flash.textContent = '⇩'; flash.title = 'Flash ' + (f.name || '') + ' onto the PIC'; } }, 3000);
+        if (flash._armed) { flash._armed = false; flash.classList.remove('armed'); flash.textContent = '⇩'; flash.title = t('adv.pic_flash_title', { name: f.name || '' }); startPicFlash(f.name); return; }
+        flash._armed = true; flash.classList.add('armed'); flash.textContent = '⚠'; flash.title = t('adv.pic_flash_confirm_title', { name: f.name || '' });
+        setTimeout(function () { if (flash.isConnected && flash._armed) { flash._armed = false; flash.classList.remove('armed'); flash.textContent = '⇩'; flash.title = t('adv.pic_flash_title', { name: f.name || '' }); } }, 3000);
       });
-      var del = picIcon('🗑', 'Delete ' + (f.name || ''), 'del');
-      del.addEventListener('click', function () { if (!picBusy && window.confirm('Delete firmware file ' + (f.name || '') + '?')) picDelete(f.name); });
+      var del = picIcon('🗑', t('adv.pic_delete_title', { name: f.name || '' }), 'del');
+      del.addEventListener('click', function () { if (!picBusy && window.confirm(t('adv.pic_delete_confirm', { name: f.name || '' }))) picDelete(f.name); });
       row.appendChild(refr); row.appendChild(flash); row.appendChild(del);
       el.appendChild(row);
     });
@@ -4302,9 +5975,9 @@
   function renderPicBanner(u) {
     var b = document.getElementById('picBanner'); if (!b) return;
     b.className = 'pic-banner';
-    if (u.status === 'checking') { b.style.display = ''; b.textContent = 'Checking for updates…'; return; }
-    if (u.update_available) { b.style.display = ''; b.classList.add('warn'); b.textContent = 'PIC firmware update available: ' + (u.current || '?') + ' → ' + (u.latest || '?'); }
-    else if (u.status === 'ready' || u.current) { b.style.display = ''; b.classList.add('ok'); b.textContent = '✓ PIC firmware up to date (' + (u.current || '?') + ')'; }
+    if (u.status === 'checking') { b.style.display = ''; b.textContent = t('adv.pic_banner_checking'); return; }
+    if (u.update_available) { b.style.display = ''; b.classList.add('warn'); b.textContent = t('adv.pic_update_available', { current: u.current || '?', latest: u.latest || '?' }); }
+    else if (u.status === 'ready' || u.current) { b.style.display = ''; b.classList.add('ok'); b.textContent = t('adv.pic_up_to_date', { current: u.current || '?' }); }
     else { b.style.display = 'none'; b.textContent = ''; }
   }
   // recheck: drop the cached latest version first (after a flash the PIC type can differ).
@@ -4320,17 +5993,17 @@
       fin();
     }).catch(function () {
       if (tries < 3) { setTimeout(function () { picUpdatePoll(done, recheck, tries + 1); }, 2500); return; }
-      var b = document.getElementById('picBanner'); if (b) { b.className = 'pic-banner'; b.textContent = 'Update check failed'; }
+      var b = document.getElementById('picBanner'); if (b) { b.className = 'pic-banner'; b.textContent = t('adv.pic_update_failed'); }
       fin();
     });
   }
   function checkPicUpdate() {
-    var b = document.getElementById('picBanner'); if (b) { b.className = 'pic-banner'; b.style.display = ''; b.textContent = 'Checking for updates…'; }
+    var b = document.getElementById('picBanner'); if (b) { b.className = 'pic-banner'; b.style.display = ''; b.textContent = t('adv.pic_banner_checking'); }
     fetch(APIGW + 'v2/pic/update-check?recheck=1').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       var u = (j && j.pic_update) || {};
       if (u.status === 'checking') { setTimeout(picUpdatePoll, 2500); return; }
       renderPicBanner(u);
-    }).catch(function () { if (b) { b.className = 'pic-banner'; b.textContent = 'Update check failed'; } });
+    }).catch(function () { if (b) { b.className = 'pic-banner'; b.textContent = t('adv.pic_update_failed'); } });
   }
   // Gateway settings · PR= values (TASK-1223.17, gap audit row 35). Renders every field
   // of /api/v2/pic/settings (restAPI.ino sendPICsettings) with the former classic
@@ -4343,54 +6016,55 @@
   function picModeText(m) {
     if (m === undefined || m === null || m === '') return '';
     var s = ('' + m).toLowerCase();
-    return s === 'on' ? 'Gateway' : s === 'off' ? 'Monitor' : s === 'detecting' ? 'Detecting…' : ('' + m);
+    return s === 'on' ? t('adv.pic_mode_gateway') : s === 'off' ? t('adv.pic_mode_monitor') : s === 'detecting' ? t('adv.pic_mode_detecting') : ('' + m);
   }
-  function picCode(v, table) { return Object.prototype.hasOwnProperty.call(table, v) ? table[v] : v; }
+  // table values are i18n keys; an unknown code is shown as received.
+  function picCode(v, table) { return Object.prototype.hasOwnProperty.call(table, v) ? t(table[v]) : v; }
   function picLetters(v, labels, fn) {
     var out = [];
     for (var i = 0; i < v.length && i < labels.length; i++) out.push(labels[i] + ': ' + fn(v.charAt(i)));
     return out.length ? out.join('\n') : v;
   }
-  var PIC_GPIO = { '0': 'Input', '1': 'Ground', '2': 'Vcc', '3': 'LED E', '4': 'LED F', '5': 'Home', '6': 'Away', '7': 'DS18x20 sensor', '8': 'DHW block' };
-  var PIC_LED = { R: 'Receive', X: 'Transmit', T: 'Master traffic', B: 'Slave traffic', O: 'Remote override active', F: 'Flame', H: 'Central heating', W: 'Hot water', C: 'Comfort mode', E: 'Transmission error', M: 'Maintenance required', P: 'Raised power mode' };
+  var PIC_GPIO = { '0': 'adv.pic_gpio_0', '1': 'adv.pic_gpio_1', '2': 'adv.pic_gpio_2', '3': 'adv.pic_gpio_3', '4': 'adv.pic_gpio_4', '5': 'adv.pic_gpio_5', '6': 'adv.pic_gpio_6', '7': 'adv.pic_gpio_7', '8': 'adv.pic_gpio_8' };
+  var PIC_LED = { R: 'adv.pic_led_r', X: 'adv.pic_led_x', T: 'adv.pic_led_t', B: 'adv.pic_led_b', O: 'adv.pic_led_o', F: 'adv.pic_led_f', H: 'adv.pic_led_h', W: 'adv.pic_led_w', C: 'adv.pic_led_c', E: 'adv.pic_led_e', M: 'adv.pic_led_m', P: 'adv.pic_led_p' };
   var PIC_VREF_F88 = [0.625, 0.833, 1.042, 1.250, 1.458, 1.667, 1.875, 2.083, 2.292, 2.500];
   var PIC_VREF_F1847 = [0.832, 0.960, 1.088, 1.216, 1.344, 1.472, 1.600, 1.728, 1.856, 1.984];
   function fmtPicSetting(key, v) {
-    var t, lv;
+    var tw, lv;
     switch (key) {
       case 'setpoint_override':
-        if (v === 'N' || v === '0') return 'No override';
-        if (v.length > 1 && v.charAt(0) === 'T') return 'Temporary override to ' + v.slice(1) + ' °C';
-        if (v.length > 1 && v.charAt(0) === 'C') return 'Constant override to ' + v.slice(1) + ' °C';
+        if (v === 'N' || v === '0') return t('adv.pic_ovr_none');
+        if (v.length > 1 && v.charAt(0) === 'T') return t('adv.pic_ovr_temp', { temp: v.slice(1) });
+        if (v.length > 1 && v.charAt(0) === 'C') return t('adv.pic_ovr_const', { temp: v.slice(1) });
         return v;
-      case 'dhw_override': return picCode(v, { '0': 'Off', '1': 'On', A: 'Auto', P: 'Push once' });
+      case 'dhw_override': return picCode(v, { '0': 'adv.pic_dhw_0', '1': 'adv.pic_dhw_1', A: 'adv.pic_dhw_a', P: 'adv.pic_dhw_p' });
       case 'gpio': return picLetters(v, ['A', 'B'], function (c) { return picCode(c, PIC_GPIO); });
-      case 'gpio_states': return picLetters(v, ['A', 'B'], function (c) { return c === '1' ? 'High' : 'Low'; });
+      case 'gpio_states': return picLetters(v, ['A', 'B'], function (c) { return c === '1' ? t('adv.pic_high') : t('adv.pic_low'); });
       case 'led': return picLetters(v, ['A', 'B', 'C', 'D', 'E', 'F'], function (c) { return picCode(c, PIC_LED); });
       case 'tweaks':
-        t = [];
-        if (v.length >= 1) t.push('Ignore transitions: ' + (v.charAt(0) === '1' ? 'On' : 'Off'));
-        if (v.length >= 2) t.push('Override in high byte: ' + (v.charAt(1) === '1' ? 'On' : 'Off'));
-        return t.length ? t.join('\n') : v;
-      case 'temp_sensor': return picCode(v, { O: 'Outside temperature', R: 'Return water temperature' });
-      case 'smart_power': return picCode(v, { L: 'Low power', M: 'Medium power', H: 'High power', N: 'Normal power' });
-      case 'thermostat_detect': return picCode(v, { C: 'Forced: Remeha Celcia 20', I: 'Forced: Remeha iSense', S: 'Forced: Standard thermostat', D: 'Auto-detect (default)', A: 'Auto-detect' });
-      case 'reset_cause': return picCode(v, { B: 'Brownout', C: 'By command (GW=R)', E: 'External reset', L: 'Stuck in loop', O: 'Stack overflow', P: 'Power-on', S: 'Serial BREAK', U: 'Stack underflow', W: 'Watchdog timer' });
+        tw = [];
+        if (v.length >= 1) tw.push(t('adv.pic_tweak_ignore', { state: t(v.charAt(0) === '1' ? 'adv.pic_on' : 'adv.pic_off') }));
+        if (v.length >= 2) tw.push(t('adv.pic_tweak_highbyte', { state: t(v.charAt(1) === '1' ? 'adv.pic_on' : 'adv.pic_off') }));
+        return tw.length ? tw.join('\n') : v;
+      case 'temp_sensor': return picCode(v, { O: 'adv.pic_tsens_o', R: 'adv.pic_tsens_r' });
+      case 'smart_power': return picCode(v, { L: 'adv.pic_spower_l', M: 'adv.pic_spower_m', H: 'adv.pic_spower_h', N: 'adv.pic_spower_n' });
+      case 'thermostat_detect': return picCode(v, { C: 'adv.pic_tdet_c', I: 'adv.pic_tdet_i', S: 'adv.pic_tdet_s', D: 'adv.pic_tdet_d', A: 'adv.pic_tdet_a' });
+      case 'reset_cause': return picCode(v, { B: 'adv.pic_reset_b', C: 'adv.pic_reset_c', E: 'adv.pic_reset_e', L: 'adv.pic_reset_l', O: 'adv.pic_reset_o', P: 'adv.pic_reset_p', S: 'adv.pic_reset_s', U: 'adv.pic_reset_u', W: 'adv.pic_reset_w' });
       case 'voltage_ref':
         lv = parseInt(v, 10);
-        if (isNaN(lv) || lv < 0 || lv > 9) return 'Level ' + v;
-        return 'Level ' + lv + ' (F88: ' + PIC_VREF_F88[lv].toFixed(3) + ' V / F1847: ' + PIC_VREF_F1847[lv].toFixed(3) + ' V)';
+        if (isNaN(lv) || lv < 0 || lv > 9) return t('adv.pic_vref_level', { level: v });
+        return t('adv.pic_vref_detail', { level: lv, f88: PIC_VREF_F88[lv].toFixed(3), f1847: PIC_VREF_F1847[lv].toFixed(3) });
       default: return v;
     }
   }
   // [title, [[label, key, unit]]]; a 'dev:<field>' key reads the device/info snapshot.
   var PIC_SET_GROUPS = [
-    ['Firmware', [['PIC firmware version', 'dev:picfwversion', ''], ['Gateway/Monitor mode', 'dev:otgwmode', '']]],
-    ['Active state', [['Setpoint override', 'setpoint_override', ''], ['Setback temperature', 'setback', '°C'], ['DHW override', 'dhw_override', '']]],
-    ['Hardware config', [['GPIO functions', 'gpio', ''], ['GPIO states', 'gpio_states', ''], ['LED functions', 'led', ''], ['Tweaks', 'tweaks', ''],
-      ['Temp sensor', 'temp_sensor', ''], ['Smart power', 'smart_power', ''], ['Thermostat detect', 'thermostat_detect', '']]],
-    ['Diagnostics', [['Build date', 'builddate', ''], ['Clock speed', 'clock_mhz', ''], ['Reset cause', 'reset_cause', ''],
-      ['Standalone interval', 'standalone_interval', 's'], ['Voltage reference', 'voltage_ref', '']]]
+    ['adv.pic_grp_firmware', [['adv.pic_row_fwver', 'dev:picfwversion', ''], ['adv.pic_row_mode', 'dev:otgwmode', '']]],
+    ['adv.pic_grp_active', [['adv.pic_row_setpoint', 'setpoint_override', ''], ['adv.pic_row_setback', 'setback', '°C'], ['adv.pic_row_dhw', 'dhw_override', '']]],
+    ['adv.pic_grp_hw', [['adv.pic_row_gpio', 'gpio', ''], ['adv.pic_row_gpiost', 'gpio_states', ''], ['adv.pic_row_led', 'led', ''], ['adv.pic_row_tweaks', 'tweaks', ''],
+      ['adv.pic_row_tsens', 'temp_sensor', ''], ['adv.pic_row_spower', 'smart_power', ''], ['adv.pic_row_tdet', 'thermostat_detect', '']]],
+    ['adv.pic_grp_diag', [['adv.pic_row_build', 'builddate', ''], ['adv.pic_row_clock', 'clock_mhz', ''], ['adv.pic_row_reset', 'reset_cause', ''],
+      ['adv.pic_row_interval', 'standalone_interval', 's'], ['adv.pic_row_vref', 'voltage_ref', '']]]
   ];
   function picSetPresent(v) { return typeof v === 'string' && v.trim() !== '' && v.trim() !== '--'; }
   // Renders and returns how many PR= fields are still missing.
@@ -4411,10 +6085,10 @@
           val = fmtPicSetting(key, ('' + raw).trim());
         }
         if (val === '') return;
-        rows.push([r[0], val + (r[2] ? ' ' + r[2] : '')]);
+        rows.push([t(r[0]), val + (r[2] ? ' ' + r[2] : '')]);
       });
       if (!rows.length) return;
-      var h = document.createElement('span'); h.className = 'prg'; h.textContent = g[0]; el.appendChild(h);
+      var h = document.createElement('span'); h.className = 'prg'; h.textContent = t(g[0]); el.appendChild(h);
       rows.forEach(function (r) {
         var k = document.createElement('span'); k.className = 'prk'; k.textContent = r[0];
         var v = document.createElement('span'); v.className = 'prv'; v.textContent = r[1];
@@ -4423,10 +6097,10 @@
     });
     if (missing) {
       var note = document.createElement('span'); note.className = 'prk'; note.style.gridColumn = '1/-1';
-      note.textContent = missing + ' setting(s) not read yet or not supported by this PIC firmware (a full PR= readout takes about 45 s).';
+      note.textContent = t('adv.pic_missing', { count: missing });
       el.appendChild(note);
     } else if (!shown) {
-      var e = document.createElement('span'); e.className = 'prk'; e.textContent = 'No PIC settings available'; el.appendChild(e);
+      var e = document.createElement('span'); e.className = 'prk'; e.textContent = t('adv.pic_none_available'); el.appendChild(e);
     }
     return missing;
   }
@@ -4446,7 +6120,7 @@
     picSetIter = 0;
     var el = document.getElementById('picPrTable'); if (!el) return;
     el.textContent = '';
-    var ld = document.createElement('span'); ld.className = 'prk'; ld.textContent = 'Reading PR= values…'; el.appendChild(ld);
+    var ld = document.createElement('span'); ld.className = 'prk'; ld.textContent = t('adv.pic_reading'); el.appendChild(ld);
     // device/info once per tab open (cached 8 s); the re-reads below reuse this snapshot.
     withDeviceInfo(function (d) { readPicSettings(d || {}, full); });
   }
@@ -4462,7 +6136,7 @@
       }
     }).catch(function () {
       var el = document.getElementById('picPrTable'); if (!el) return;
-      el.textContent = ''; var e = document.createElement('span'); e.className = 'prk'; e.textContent = 'Failed to read PIC settings'; el.appendChild(e);
+      el.textContent = ''; var e = document.createElement('span'); e.className = 'prk'; e.textContent = t('adv.pic_read_failed'); el.appendChild(e);
     });
   }
   // Outcome of one /api/v2/pic/flash-status answer (TASK-1255): 'running', 'success',
@@ -4501,11 +6175,11 @@
     var prog = document.getElementById('picProg'), txt = document.getElementById('picProgTxt'), bar = document.getElementById('picProgBar');
     if (prog) prog.style.display = '';
     if (bar) { bar.style.width = '0%'; bar.style.background = 'var(--accent)'; }
-    if (txt) txt.textContent = 'Starting flash of ' + name + '…';
+    if (txt) txt.textContent = t('adv.pic_flash_starting', { name: name });
     fetch(PICBASE + 'pic?action=upgrade&name=' + encodeURIComponent(name)).then(function (r) {
       if (!r.ok) throw 0;
       pollPicFlash();
-    }).catch(function () { if (txt) txt.textContent = 'Flash failed to start'; picBusy = false; });
+    }).catch(function () { if (txt) txt.textContent = t('adv.pic_flash_start_failed'); picBusy = false; });
   }
   function pollPicFlash() {
     if (picPollTimer) clearTimeout(picPollTimer);
@@ -4514,12 +6188,12 @@
       if (!j || !j.flashstatus) {
         if (picNoStatusPolls < PIC_NOSTATUS_MAX) {
           picNoStatusPolls++;
-          if (txt) txt.textContent = 'No status from the device yet, still polling…';
+          if (txt) txt.textContent = t('adv.pic_flash_nostatus_poll');
           picPollTimer = setTimeout(pollPicFlash, 1000);
           return;
         }
         picNoStatusPolls = 0; picSawRunning = false; picBusy = false;
-        if (txt) txt.textContent = 'No flash status from the device; check the PIC version once it settles';
+        if (txt) txt.textContent = t('adv.pic_flash_nostatus');
         setTimeout(fetchPic, 2500);
         return;
       }
@@ -4530,13 +6204,13 @@
       if (o === 'running') {
         picPendingPolls = 0; picSawRunning = true;
         if (bar) bar.style.width = Math.max(0, Math.min(100, p)) + '%';
-        if (txt) txt.textContent = 'Flashing ' + (s.filename || '') + ' — ' + p + '%';
+        if (txt) txt.textContent = t('adv.pic_flash_progress', { name: s.filename || '', percent: p });
         picPollTimer = setTimeout(pollPicFlash, 1000);
         return;
       }
       if (o === 'pending' && picPendingPolls < PIC_PENDING_MAX) {
         picPendingPolls++;
-        if (txt) txt.textContent = 'Waiting for the flash to start…';
+        if (txt) txt.textContent = t('adv.pic_flash_waiting');
         picPollTimer = setTimeout(pollPicFlash, 1000);
         return;
       }
@@ -4544,20 +6218,20 @@
       picBusy = false;
       if (o === 'success') {
         if (bar) { bar.style.width = '100%'; bar.style.background = 'var(--accent)'; }
-        if (txt) txt.textContent = 'Flash complete' + (s.filename ? ': ' + s.filename : '');
+        if (txt) txt.textContent = s.filename ? t('adv.pic_flash_complete_file', { name: s.filename }) : t('adv.pic_flash_complete');
         // The PIC restarts after the flash; give its banner time to report the new version.
         setTimeout(picAfterFlash, 2500);
       } else {
         var err = (s.error === undefined || s.error === null) ? '' : ('' + s.error).trim();
         if (err === PIC_FLASH_LEGACY_OK) err = '';   // a previous flash's result, never this one's error
         if (bar) { bar.style.width = '100%'; bar.style.background = 'var(--hot,#c33)'; }   // progress is -1 on failure
-        if (txt) txt.textContent = 'Error: ' + (err || (o === 'pending' ? 'the flash did not start' : 'the flash failed'));
+        if (txt) txt.textContent = t('adv.pic_flash_error', { reason: err || t(o === 'pending' ? 'adv.pic_flash_not_started' : 'adv.pic_flash_failed') });
         setTimeout(fetchPic, 2500);
       }
-    }).catch(function () { picBusy = false; var txt = document.getElementById('picProgTxt'); if (txt) txt.textContent = 'Lost contact during flash (device may be rebooting)'; });
+    }).catch(function () { picBusy = false; var txt = document.getElementById('picProgTxt'); if (txt) txt.textContent = t('adv.pic_flash_lost'); });
   }
   function picRefresh(name, version) {
-    var b = document.getElementById('picBanner'); if (b) b.textContent = 'Downloading ' + name + '…';
+    var b = document.getElementById('picBanner'); if (b) b.textContent = t('adv.pic_downloading', { name: name });
     fetch(PICBASE + 'pic?action=refresh&name=' + encodeURIComponent(name) + '&version=' + encodeURIComponent(version || '')).then(function () { setTimeout(fetchPicFiles, 2000); }).catch(function () { });
   }
   function picDelete(name) {
@@ -4588,7 +6262,7 @@
     fetchWithRetry(APIGW + 'v2/filesystem/files?path=' + encodeURIComponent(fsCurrentPath))
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (json) {
-        if (!Array.isArray(json)) { renderFsError('Failed to read the file system.'); return; }
+        if (!Array.isArray(json)) { renderFsError(t('adv.fs_read_failed')); return; }
         var summary = json.length ? json[json.length - 1] : null;
         var files = json.slice(0, -1);
         // LittleFS drops empty directories; if this one vanished, fall back to root.
@@ -4600,14 +6274,14 @@
         });
         renderFsList(files, summary);
       })
-      .catch(function () { renderFsError('Failed to read the file system.'); });
+      .catch(function () { renderFsError(t('adv.fs_read_failed')); });
   }
   function renderFsError(msg) {
     var body = document.getElementById('fsTableBody'); if (!body) return;
     body.textContent = '';
     var tr = document.createElement('tr'); var td = document.createElement('td');
     td.colSpan = 4; td.style.color = 'var(--muted)'; td.style.padding = '12px'; td.textContent = msg + ' ';
-    var retry = document.createElement('button'); retry.className = 'tbtn'; retry.textContent = 'Retry';
+    var retry = document.createElement('button'); retry.className = 'tbtn'; retry.textContent = t('adv.fs_retry');
     retry.addEventListener('click', function () { fetchFsList(); });
     td.appendChild(retry);
     tr.appendChild(td); body.appendChild(tr);
@@ -4616,7 +6290,7 @@
     var body = document.getElementById('fsTableBody'); if (!body) return;
     body.textContent = '';
     var crumb = document.getElementById('fsCrumb');
-    if (crumb) crumb.textContent = 'Current directory: ' + fsCurrentPath + (summary && summary.truncated ? '  · list truncated' : '');
+    if (crumb) crumb.textContent = t(summary && summary.truncated ? 'adv.fs_crumb_truncated' : 'adv.fs_crumb', { path: fsCurrentPath });
 
     // Parent row (navigates up one level) whenever we are below root.
     if (fsCurrentPath !== '/') {
@@ -4642,12 +6316,12 @@
         var nn = document.createElement('td'); nn.className = 'fn'; nn.textContent = name; tr.appendChild(nn);
         var sz = document.createElement('td'); sz.className = 'fsz'; sz.textContent = fsFmtBytes(f.size); tr.appendChild(sz);
         var dl = document.createElement('td');
-        var a = document.createElement('a'); a.className = 'fsact'; a.textContent = 'Download';
+        var a = document.createElement('a'); a.className = 'fsact'; a.textContent = t('adv.fs_download');
         a.href = fsFullPath(name); a.setAttribute('download', name); a.target = '_blank'; a.rel = 'noopener';
         dl.appendChild(a); tr.appendChild(dl);
         var dc = document.createElement('td');
         if (FS_PROTECTED.indexOf(name) === -1) {
-          var del = document.createElement('a'); del.className = 'fsact del'; del.href = '#'; del.textContent = 'Delete';
+          var del = document.createElement('a'); del.className = 'fsact del'; del.href = '#'; del.textContent = t('adv.fs_delete');
           del.addEventListener('click', function (e) { e.preventDefault(); fsDelete(fsFullPath(name), name); });
           dc.appendChild(del);
         }
@@ -4662,8 +6336,7 @@
         usage.textContent = '';
         var b = document.createElement('b'); b.textContent = 'LittleFS'; usage.appendChild(b);
         usage.appendChild(document.createTextNode(
-          ' used ' + fsFmtBytes(summary.usedBytes) + ' of ' + fsFmtBytes(summary.totalBytes) +
-          ' — ' + fsFmtBytes(summary.freeBytes) + ' free'));
+          ' ' + t('adv.fs_usage', { used: fsFmtBytes(summary.usedBytes), total: fsFmtBytes(summary.totalBytes), free: fsFmtBytes(summary.freeBytes) })));
       }
       var bar = document.getElementById('fsBar');
       if (bar) {
@@ -4671,7 +6344,7 @@
         bar.style.width = Math.max(0, Math.min(100, pct)).toFixed(0) + '%';
       }
       var hint = document.getElementById('fsUploadHint');
-      if (hint) hint.textContent = fsFmtBytes(summary.freeBytes) + ' free · files land in the current directory.';
+      if (hint) hint.textContent = t('adv.fs_upload_hint', { free: fsFmtBytes(summary.freeBytes) });
     }
   }
   function fsNavigate(name) {
@@ -4685,18 +6358,18 @@
     fetchFsList();
   }
   function fsDelete(fullPath, name) {
-    if (!window.confirm('Delete ' + name + ' from the file system? This cannot be undone.')) return;
+    if (!window.confirm(t('adv.fs_delete_confirm', { name: name }))) return;
     fetch(APIGW + 'v2/filesystem/files?delete=' + encodeURIComponent(fullPath), { credentials: 'same-origin' })
       .then(function (r) {
-        if (r.ok) { bleToast('Deleted ' + name); fetchFsList(); return; }
-        if (r.status === 401 || r.status === 403) bleToast('Not authorized — open classic /FSexplorer to sign in first', true);
-        else bleToast('Delete failed: ' + r.status, true);
+        if (r.ok) { bleToast(t('adv.fs_deleted', { name: name })); fetchFsList(); return; }
+        if (r.status === 401 || r.status === 403) bleToast(t('adv.fs_not_authorized'), true);
+        else bleToast(t('adv.fs_delete_failed_status', { status: r.status }), true);
       })
-      .catch(function () { bleToast('Delete failed', true); });
+      .catch(function () { bleToast(t('adv.fs_delete_failed'), true); });
   }
   function fsDoUpload() {
     var inp = document.getElementById('fsFile'), btn = document.getElementById('fsUpload');
-    if (!inp || !inp.files || !inp.files.length) { bleToast('Choose a file to upload first', true); return; }
+    if (!inp || !inp.files || !inp.files.length) { bleToast(t('adv.fs_choose_file'), true); return; }
     var fd = new FormData(); fd.append('file', inp.files[0], inp.files[0].name);
     if (btn) btn.disabled = true;
     // /upload replies 303 -> FSexplorer.html; redirect:'manual' keeps us here and we
@@ -4705,13 +6378,13 @@
       method: 'POST', body: fd, credentials: 'same-origin', redirect: 'manual'
     }).then(function (r) {
       // An opaqueredirect (type 'opaqueredirect', status 0) is the success path here.
-      if (r.type === 'opaqueredirect' || r.ok || r.status === 0) { bleToast('Uploaded ' + inp.files[0].name); }
-      else if (r.status === 401 || r.status === 403) { bleToast('Not authorized — open classic /FSexplorer to sign in first', true); }
-      else { bleToast('Upload failed: ' + r.status, true); }
+      if (r.type === 'opaqueredirect' || r.ok || r.status === 0) { bleToast(t('adv.fs_uploaded', { name: inp.files[0].name })); }
+      else if (r.status === 401 || r.status === 403) { bleToast(t('adv.fs_not_authorized'), true); }
+      else { bleToast(t('adv.fs_upload_failed_status', { status: r.status }), true); }
       inp.value = ''; if (btn) btn.disabled = true;
       setTimeout(fetchFsList, 400);
     }).catch(function () {
-      bleToast('Upload failed', true); if (btn) btn.disabled = false;
+      bleToast(t('adv.fs_upload_failed'), true); if (btn) btn.disabled = false;
     });
   }
 
@@ -4729,18 +6402,18 @@
     if (act === 'sat-onboarding') { _satOnbShown = false; startSatOnboarding('rerun'); return; }   // TASK-1012: re-run the SAT setup wizard on demand
     if (act === 'update') { window.location.href = BASE + 'update'; return; }   // OTA sketch / filesystem upload page
     if (act === 'reboot') {
-      if (!window.confirm('Reboot the OTGW device now? The Web UI will be unavailable for a few seconds.')) return;
-      bleToast('Device is rebooting…');
+      if (!window.confirm(t('adv.sys_reboot_confirm'))) return;
+      bleToast(t('adv.sys_rebooting'));
       fetch(BASE + 'ReBoot', { credentials: 'same-origin' })
-        .then(function (r) { if (!r.ok) bleToast('Reboot failed: ' + r.status, true); })
+        .then(function (r) { if (!r.ok) bleToast(t('adv.sys_reboot_failed', { status: r.status }), true); })
         .catch(function () { });   // socket drops as the device restarts — expected
       return;
     }
     if (act === 'resetwifi') {
-      if (!window.confirm('Reset Wireless settings?\n\nThis CLEARS the stored Wi-Fi network and reboots the device into AP-mode setup. You will have to reconnect it to your network afterwards.')) return;
-      bleToast('Wi-Fi cleared — rebooting into AP-mode setup…');
+      if (!window.confirm(t('adv.sys_wifi_confirm'))) return;
+      bleToast(t('adv.sys_wifi_cleared'));
       fetch(BASE + 'ResetWireless', { credentials: 'same-origin' })
-        .then(function (r) { if (!r.ok) bleToast('Reset failed: ' + r.status, true); })
+        .then(function (r) { if (!r.ok) bleToast(t('adv.sys_reset_failed', { status: r.status }), true); })
         .catch(function () { });   // socket drops as the device restarts — expected
     }
   }
@@ -4754,7 +6427,7 @@
   function sendOtgwCmd() {
     var inp = document.getElementById('otCmdInput');
     var cmd = ((inp && inp.value) || '').trim();
-    if (!cmd) { showCmdStatus('Enter a command', false); return; }
+    if (!cmd) { showCmdStatus(t('tools.cmd_enter'), false); return; }
     // OTGW convention: the two-letter command code is upper-case (tt=20.5 -> TT=20.5).
     // Only the leading code is forced; the value is sent verbatim.
     cmd = cmd.replace(/^([a-zA-Z]{2})/, function (m) { return m.toUpperCase(); });
@@ -4763,21 +6436,21 @@
     // response. Restore the Pause button label exactly like its own click handler.
     if (logPaused) {
       logPaused = false;
-      var lp = document.getElementById('logPause'); if (lp) lp.textContent = '⏸ Pause';
+      var lp = document.getElementById('logPause'); if (lp) lp.textContent = t('tools.log_pause');
       if (isMonitorLogVisible()) renderLog();
     }
     fetch(APIGW + 'v2/otgw/commands', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ command: cmd })
     }).then(function (r) {
-      if (r.status === 202 || r.ok) { showCmdStatus('Sent: ' + cmd, true); if (inp) inp.value = ''; return; }
+      if (r.status === 202 || r.ok) { showCmdStatus(t('tools.cmd_sent', { cmd: cmd }), true); if (inp) inp.value = ''; return; }
       // TASK-981: surface the firmware's error text ({"error":{"message":...}}) rather
       // than a bare status code (e.g. 413 "Command too long", 503 "No OT interface").
       r.json().then(function (j) {
-        var msg = (j && j.error && j.error.message) ? j.error.message : ('Error ' + r.status);
+        var msg = (j && j.error && j.error.message) ? j.error.message : t('tools.error_status', { status: r.status });
         showCmdStatus(msg, false);
-      }).catch(function () { showCmdStatus('Error ' + r.status, false); });
-    }).catch(function () { showCmdStatus('Send failed', false); });
+      }).catch(function () { showCmdStatus(t('tools.error_status', { status: r.status }), false); });
+    }).catch(function () { showCmdStatus(t('tools.send_failed'), false); });
   }
 
   // ======================= Diagnose page (TASK-1128) =======================
@@ -4832,10 +6505,10 @@
     }).then(function (r) {
       if (r.status === 202 || r.ok) return true;
       return r.json().then(function (j) {
-        showDiagStatus((j && j.error && j.error.message) ? j.error.message : ('Error ' + r.status), false);
+        showDiagStatus((j && j.error && j.error.message) ? j.error.message : t('tools.error_status', { status: r.status }), false);
         return false;
-      }).catch(function () { showDiagStatus('Error ' + r.status, false); return false; });
-    }).catch(function () { showDiagStatus('Send failed', false); return false; });
+      }).catch(function () { showDiagStatus(t('tools.error_status', { status: r.status }), false); return false; });
+    }).catch(function () { showDiagStatus(t('tools.send_failed'), false); return false; });
   }
 
   function sendDiagnoseLine() {
@@ -4887,7 +6560,7 @@
       // Reachable through a stale localStorage page restore, or by staying put
       // while the PIC is reflashed back to gateway.
       banner.style.display = diagAvailable ? 'none' : '';
-      if (!diagAvailable) banner.textContent = 'The PIC is not running diagnostic firmware, so there is no test menu to show.';
+      if (!diagAvailable) banner.textContent = t('tools.diag_not_available');
     }
     if (!diagAvailable) return;
     requestDiagnoseMenu();
@@ -4951,7 +6624,7 @@
     withDeviceInfo(function (d) {   // existing device/info snapshot (cached), no extra request path
       if (!d) { _satBetaSynced = false; return; }   // unknown: try again on the next poll
       if (!isPrereleaseFw(d.fwversion)) return;
-      tx.textContent = SAT_BETA_HEAD + ' ' + SAT_BETA_BODY;
+      tx.textContent = t('tools.sat_beta_head') + ' ' + t('tools.sat_beta_body');
       box.style.display = '';
     });
   }
@@ -4965,10 +6638,10 @@
   var SAT_MAXTSET_MIN = 20, SAT_MAXTSET_MAX = 80;             // = SAT_MAXTSET_MIN/MAX in SATtypes.h (TASK-1373)
   var satMaxDirty = false;              // user dragging the Max flow slider — defer status echo
   var satModDirty = false;              // user dragging the Max relative modulation slider (TASK-1514)
-  var SAT_MODE_LABELS = ['Off', 'Continuous', 'PWM'];      // control_mode enum
+  var SAT_MODE_LABELS = ['Off', 'Continuous', 'PWM'];      // control_mode enum (the English names are lookup keys, shown through satLbl)
   var SAT_CYCLE_LABELS = ['None', 'Good', 'Overshoot', 'Underheat', 'Short', 'Uncertain', 'Underheat (PWM)', 'Insufficient'];  // last_cycle_class (6/7 added TASK-891.4)
   var SAT_PRESET_NAMES = ['None', 'Away', 'Eco', 'Comfort', 'Sleep', 'Activity', 'Home'];   // active_preset enum
-  var SAT_PRESETS = [['home', '🏠 Home'], ['away', '🚪 Away'], ['eco', '🌱 Eco'], ['comfort', '🛋 Comfort'], ['sleep', '🌙 Sleep'], ['activity', '🏃 Activity']];
+  var SAT_PRESETS = [['home', '🏠'], ['away', '🚪'], ['eco', '🌱'], ['comfort', '🛋'], ['sleep', '🌙'], ['activity', '🏃']];   // [id, emoji]; the text is satLbl('sat_preset', id)
   var SAT_BOILER_LABELS = {
     off: 'Off', idle: 'Idle', preheating: 'Preheating', at_setpoint: 'At setpoint',
     modulating_up: 'Modulating up', modulating_down: 'Modulating down', ignition_surge: 'Ignition surge',
@@ -4976,6 +6649,11 @@
     waiting_flame: 'Waiting flame', overshoot_cooling: 'Overshoot cooling', post_cycle: 'Post-cycle',
     heating: 'Heating', cooling: 'Cooling', heating_hot_water: 'Heating hot water'
   };
+  // Display text of an enum value: key = tools.<prefix>_<english name, lower-case, non-alphanumerics as _>.
+  function satLbl(prefix, name) {
+    if (!name) return '—';
+    return t('tools.' + prefix + '_' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''));
+  }
   // Boiler states in which the burner produces no heat. Everything else counts as firing.
   var SAT_BOILER_IDLE = { off: 1, idle: 1, anti_cycling: 1, post_cycle: 1, overshoot_cooling: 1 };
   // Is the burner actually running? Falls back to the control-loop flag only when the
@@ -5030,8 +6708,8 @@
           // load-shed 503: the latter self-heals on the 5 s poll, so say so.
           if (nd) {
             nd.textContent = (res.status === 404)
-              ? 'SAT status is unavailable on this device.'
-              : 'Couldn’t load SAT status — retrying…';
+              ? t('tools.sat_status_unavailable')
+              : t('tools.sat_status_retrying');
             nd.style.display = '';
           }
           if (body) body.style.display = 'none';
@@ -5077,8 +6755,8 @@
         var hi = ok ? Math.min(ub, SAT_DHW_SETPOINT_MAX) : SAT_DHW_SETPOINT_MAX;
         if (lo > hi) { lo = SAT_DHW_SETPOINT_MIN; hi = SAT_DHW_SETPOINT_MAX; }
         s.min = lo; s.max = hi;
-        s.title = ok ? 'Boiler DHW range ' + lb + '–' + ub + ' °C (MsgID 48), usable ' + lo + '–' + hi + ' °C'
-                     : 'Default range ' + SAT_DHW_SETPOINT_MIN + '–' + SAT_DHW_SETPOINT_MAX + ' °C (no MsgID 48 from the boiler)';
+        s.title = ok ? t('tools.sat_dhw_range_boiler', { lb: lb, ub: ub, lo: lo, hi: hi })
+                     : t('tools.sat_dhw_range_default', { min: SAT_DHW_SETPOINT_MIN, max: SAT_DHW_SETPOINT_MAX });
         if (satLastData) satRenderDhw(satLastData);
       })
       .catch(function () { });
@@ -5095,8 +6773,8 @@
         var ok = raw > 0 && ub > lb && ub <= 100;
         var lo = ok ? lb : SAT_MAXTSET_MIN, hi = ok ? ub : SAT_MAXTSET_MAX;
         s.min = lo; s.max = hi;
-        s.title = ok ? 'Boiler range ' + lb + '–' + ub + ' °C (MsgID 49)'
-                     : 'Default range ' + SAT_MAXTSET_MIN + '–' + SAT_MAXTSET_MAX + ' °C (no MsgID 49 from the boiler)';
+        s.title = ok ? t('tools.sat_max_range_boiler', { lb: lb, ub: ub })
+                     : t('tools.sat_max_range_default', { min: SAT_MAXTSET_MIN, max: SAT_MAXTSET_MAX });
         if (satLastData) satRenderMaxTSet(satLastData);
       })
       .catch(function () { });
@@ -5111,13 +6789,13 @@
     if (user === null) { txt('satMaxR', '—'); return; }
     if (user <= 0) {
       if (eff !== null) slider.value = Math.round(eff);
-      txt('satMaxR', eff !== null ? 'default (' + Math.round(eff) + '°C)' : 'default');
+      txt('satMaxR', eff !== null ? t('tools.sat_default_value', { value: Math.round(eff) }) : t('tools.sat_default'));
     } else {
       // Chosen: show the ceiling SAT really works with (the boiler bounds and the heating system
       // can cut the chosen value); name the chosen value when it differs.
       var shown = eff !== null ? Math.round(eff) : Math.round(user);
       slider.value = shown;
-      txt('satMaxR', shown + '°C' + (shown !== Math.round(user) ? ' (chosen ' + Math.round(user) + '°C)' : ''));
+      txt('satMaxR', shown !== Math.round(user) ? t('tools.sat_max_chosen', { shown: shown, chosen: Math.round(user) }) : shown + '°C');
     }
   }
 
@@ -5141,12 +6819,12 @@
     satMarkerBusy = true;
     fetch(url, opts)
       .then(function (r) {
-        if (r.status === 409) throw new Error('20 markers is the maximum; delete one first');
+        if (r.status === 409) throw new Error(t('tools.sat_marker_max'));
         if (!r.ok) throw new Error('HTTP ' + r.status);
         bleToast(okMsg);
         return fetchSatMarkers();
       })
-      .catch(function (e) { bleToast('Marker: ' + e.message, true); })
+      .catch(function (e) { bleToast(t('tools.sat_marker_error', { message: e.message }), true); })
       .then(function () { satMarkerBusy = false; });
   }
   function satCurveClick(ev) {
@@ -5161,7 +6839,7 @@
     satMarkerReq(APIGW + 'v2/sat/markers', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ outside_temp: o, flow_temp: f, label: 'Marker ' + new Date().toTimeString().slice(0, 5) })
-    }, 'Marker added: ' + o + '° out, ' + f + '° flow');
+    }, t('tools.sat_marker_added', { out: o, flow: f }));
   }
 
   function fetchSatMarkers() {
@@ -5196,22 +6874,22 @@
 
     var pill = document.getElementById('satPill');
     if (pill) {
-      pill.textContent = !enabled ? 'Off' : (takeover ? 'Takeover (MQTT lost)' : (heating ? 'Heating' : 'Idle'));
+      pill.textContent = !enabled ? t('tools.off') : (takeover ? t('tools.sat_takeover') : (heating ? t('tools.heating') : t('tools.idle')));
       pill.className = 'sat-pill' + (!enabled ? ' off' : (heating ? '' : ' idle'));
     }
-    txt('satEnableLbl', userEnabled ? 'Enabled' : 'Disabled');
+    txt('satEnableLbl', userEnabled ? t('tools.enabled') : t('tools.disabled'));
     var enCb = document.getElementById('satEnable'); if (enCb && !satEnPending) enCb.checked = userEnabled;
 
     // L1 — dial + status + presets
     satDialDraw(d);
     var big;
-    if (!enabled) big = 'SAT is off';
-    else if (d.safety_tripped) big = 'Safety tripped!';
-    else if (takeover) big = 'Takeover (MQTT lost)';
-    else if (d.window_open) big = 'Window open';
-    else if (d.summer_active) big = 'Summer mode';
-    else if (heating) big = 'Heating to ' + satFmt(d.target_temp, 1, '°');
-    else big = 'At target · idle';
+    if (!enabled) big = t('tools.sat_big_off');
+    else if (d.safety_tripped) big = t('tools.sat_big_safety');
+    else if (takeover) big = t('tools.sat_takeover');
+    else if (d.window_open) big = t('tools.sat_big_window');
+    else if (d.summer_active) big = t('tools.sat_big_summer');
+    else if (heating) big = t('tools.sat_big_heating_to', { temp: satFmt(d.target_temp, 1, '°') });
+    else big = t('tools.sat_big_at_target');
     txt('satStatusBig', big);
     var pr = document.getElementById('satPushRefused'); if (pr) pr.hidden = !(enabled && d.push_refused);
     var rl = document.getElementById('satRoomLost'); if (rl) rl.hidden = !(enabled && d.room_temp_lost);
@@ -5232,45 +6910,45 @@
     satRenderCycle(d);
     satDrawCurve(d);
     satKv('satControlStatus', [
-      ['Control mode', SAT_MODE_LABELS[d.control_mode | 0] || '—'],
-      ['Boiler status', SAT_BOILER_LABELS[d.boiler_status] || '—'],
-      ['Active preset', SAT_PRESET_NAMES[d.active_preset | 0] || '—'],
-      ['Manufacturer', d.manufacturer || '—'],
-      ['Coefficient', satFmt(d.coefficient, 2)],
-      ['PID output', satFmt(d.pid_output, 1, ' °C')],
-      ['Error', satFmt(d.error, 2, ' °C')],
-      ['Modulation', d.current_modulation != null ? d.current_modulation + ' %' : '—'],
-      ['Max modulation', d.max_rel_modulation != null ? d.max_rel_modulation + ' %' : '—']
+      [t('tools.kv_control_mode'), satLbl('sat_mode', SAT_MODE_LABELS[d.control_mode | 0])],
+      [t('tools.kv_boiler_status'), (SAT_BOILER_LABELS[d.boiler_status] ? satLbl('sat_boiler', d.boiler_status) : '—')],
+      [t('tools.kv_active_preset'), satLbl('sat_preset', SAT_PRESET_NAMES[d.active_preset | 0])],
+      [t('tools.kv_manufacturer'), d.manufacturer || '—'],
+      [t('tools.kv_coefficient'), satFmt(d.coefficient, 2)],
+      [t('tools.kv_pid_output'), satFmt(d.pid_output, 1, ' °C')],
+      [t('tools.kv_error'), satFmt(d.error, 2, ' °C')],
+      [t('tools.kv_modulation'), d.current_modulation != null ? d.current_modulation + ' %' : '—'],
+      [t('tools.kv_max_modulation'), d.max_rel_modulation != null ? d.max_rel_modulation + ' %' : '—']
     ]);
 
     // L3 — health + PID + PWM/cycle + smart + external + simulation + raw JSON
     satRenderHealth(d);
     satKv('satPidKv', [
-      ['P term', satFmt(d.pid_p, 2)], ['I term', satFmt(d.pid_i, 2)], ['D term', satFmt(d.pid_d, 2)],
+      [t('tools.kv_p_term'), satFmt(d.pid_p, 2)], [t('tools.kv_i_term'), satFmt(d.pid_i, 2)], [t('tools.kv_d_term'), satFmt(d.pid_d, 2)],
       ['Kp', satFmt(d.kp, 4)], ['Ki', satFmt(d.ki, 4)], ['Kd', satFmt(d.kd, 4)],
-      ['Raw derivative', satFmt(d.raw_derivative, 4)]
+      [t('tools.kv_raw_derivative'), satFmt(d.raw_derivative, 4)]
     ]);
     satKv('satPwmKv', [
-      ['Duty cycle', d.pwm_duty != null ? Math.round(d.pwm_duty * 100) + ' %' : '—'],
-      ['PWM flame', d.pwm_flame_req ? 'Requesting' : 'Off'],
-      ['Cycle count', d.cycle_count != null ? String(d.cycle_count) : '—'],
-      ['Cycles this hour', d.cycles_this_hour != null ? String(d.cycles_this_hour) : '—'],
-      ['Last cycle', SAT_CYCLE_LABELS[d.last_cycle_class | 0] || '—'],
-      ['Cycle max flow', satFmt(d.cycle_max_flow, 1, ' °C')],
-      ['Cycle overshoot', d.cycle_overshoot_sec != null ? Math.round(d.cycle_overshoot_sec) + ' s' : '—']
+      [t('tools.kv_duty_cycle'), d.pwm_duty != null ? Math.round(d.pwm_duty * 100) + ' %' : '—'],
+      [t('tools.kv_pwm_flame'), d.pwm_flame_req ? t('tools.kv_requesting') : t('tools.off')],
+      [t('tools.kv_cycle_count'), d.cycle_count != null ? String(d.cycle_count) : '—'],
+      [t('tools.kv_cycles_this_hour'), d.cycles_this_hour != null ? String(d.cycles_this_hour) : '—'],
+      [t('tools.kv_last_cycle'), satLbl('sat_cycle', SAT_CYCLE_LABELS[d.last_cycle_class | 0])],
+      [t('tools.kv_cycle_max_flow'), satFmt(d.cycle_max_flow, 1, ' °C')],
+      [t('tools.kv_cycle_overshoot'), d.cycle_overshoot_sec != null ? Math.round(d.cycle_overshoot_sec) + ' s' : '—']
     ]);
-    var summer = d.summer_active ? ('Active' + (d.summer_hours_above != null ? ' (' + Math.round(d.summer_hours_above) + ' h)' : '')) : 'Inactive';
-    var thermal = (d.thermal_model_valid && d.thermal_coeff != null) ? satFmt(d.thermal_coeff, 3) : 'Learning…';
+    var summer = d.summer_active ? (d.summer_hours_above != null ? t('tools.sat_summer_active_hours', { hours: Math.round(d.summer_hours_above) }) : t('tools.active')) : t('tools.inactive');
+    var thermal = (d.thermal_model_valid && d.thermal_coeff != null) ? satFmt(d.thermal_coeff, 3) : t('tools.sat_learning');
     satKv('satSmartKv', [
-      ['Solar gain', d.solar_gain_active ? 'Active' : 'Inactive'],
-      ['Summer mode', summer],
-      ['Thermal learning', thermal],
-      ['PV boost', d.pv_boost_active ? ('Active ' + satFmt(d.pv_boost_applied_c, 1, ' °C')) : 'Off'],
-      ['Window detection', d.window_detection ? 'On' : 'Off']
+      [t('tools.kv_solar_gain'), d.solar_gain_active ? t('tools.active') : t('tools.inactive')],
+      [t('tools.kv_summer_mode'), summer],
+      [t('tools.kv_thermal_learning'), thermal],
+      [t('tools.kv_pv_boost'), d.pv_boost_active ? t('tools.sat_pv_boost_active', { value: satFmt(d.pv_boost_applied_c, 1, ' °C') }) : t('tools.off')],
+      [t('tools.kv_window_detection'), d.window_detection ? t('tools.on') : t('tools.off')]
     ]);
     satKv('satExtKv', [
-      ['Indoor sensor', d.external_temp_valid ? 'External' : 'OT bus'],
-      ['Outdoor sensor', d.external_outdoor_valid ? 'External' : 'OT bus / weather']
+      [t('tools.kv_indoor_sensor'), d.external_temp_valid ? t('tools.kv_external') : t('tools.kv_ot_bus')],
+      [t('tools.kv_outdoor_sensor'), d.external_outdoor_valid ? t('tools.kv_external') : t('tools.kv_ot_bus_weather')]
     ]);
     satRenderSim(d);
     applySatLock();   // TASK-1737: after the sub-renders, so the lock wins over their enable rules
@@ -5292,7 +6970,7 @@
       g += '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) + '" stroke="' + ok + '" stroke-width="4" stroke-linecap="round"/>';
     }
     g += '<text x="120" y="116" text-anchor="middle" font-size="44" font-weight="700" fill="' + txtc + '" font-family="var(--font-sans)">' + (tgt !== null ? tgt.toFixed(1) + '°' : '—') + '</text>';
-    g += '<text x="120" y="140" text-anchor="middle" font-size="13" fill="' + muted + '" font-family="var(--font-sans)">target · room ' + (room !== null ? room.toFixed(1) + '°' : '—') + '</text>';
+    g += '<text x="120" y="140" text-anchor="middle" font-size="13" fill="' + muted + '" font-family="var(--font-sans)">' + esc(t('tools.sat_dial_caption', { room: room !== null ? room.toFixed(1) + '°' : '—' })) + '</text>';
     svg.innerHTML = g;
   }
 
@@ -5304,7 +6982,7 @@
     SAT_PRESETS.forEach(function (p) {
       var b = document.createElement('button');
       b.className = 'sat-preset' + (p[0] === activeName ? ' active' : '');
-      b.textContent = p[1];
+      b.textContent = p[1] + ' ' + satLbl('sat_preset', p[0]);
       b.dataset.preset = p[0];
       b.addEventListener('click', function () {
         satPost('preset', p[0]).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
@@ -5346,9 +7024,9 @@
     svg.innerHTML = g;
     var lg = document.getElementById('satHistLegend');
     if (lg) lg.innerHTML =
-      '<span><i style="background:' + accent + '"></i>Setpoint</span><span><i style="background:' + hot + '"></i>Flow</span>' +
-      '<span><i style="background:' + ok + '"></i>Room</span><span><i style="background:' + cold + '"></i>Outside</span>' +
-      '<span><i style="background:' + muted + '"></i>PID</span>';
+      '<span><i style="background:' + accent + '"></i>' + esc(t('tools.legend_setpoint')) + '</span><span><i style="background:' + hot + '"></i>' + esc(t('tools.legend_flow')) + '</span>' +
+      '<span><i style="background:' + ok + '"></i>' + esc(t('tools.legend_room')) + '</span><span><i style="background:' + cold + '"></i>' + esc(t('tools.legend_outside')) + '</span>' +
+      '<span><i style="background:' + muted + '"></i>' + esc(t('tools.legend_pid')) + '</span>';
   }
 
   function satRenderDhw(d) {
@@ -5362,7 +7040,7 @@
     if (slider) slider.disabled = known && !dhwOn;
     if (slider && !satDhwDirty) {
       if (sp === null) txt('satDhwR', '—');
-      else if (sp < SAT_DHW_SETPOINT_MIN) { slider.value = slider.min; txt('satDhwR', 'off'); }
+      else if (sp < SAT_DHW_SETPOINT_MIN) { slider.value = slider.min; txt('satDhwR', t('tools.sat_dhw_off')); }
       else { slider.value = Math.round(sp); txt('satDhwR', Math.round(sp) + '°C'); }
     }
     var row = document.getElementById('satDhwEnableRow');
@@ -5373,20 +7051,20 @@
 
   function satRenderCycle(d) {
     var cm = d.control_mode | 0;
-    txt('satCycleMode', cm === 2 ? 'PWM' : (cm === 1 ? 'Continuous' : 'Off'));
-    txt('satCycleSub', (cm === 2 ? 'PID modulates the burner in PWM bursts. ' : (cm === 1 ? 'PID drives the burner continuously. ' : 'SAT is not actively controlling. ')) + 'SAT chooses the mode itself.');
+    txt('satCycleMode', t(cm === 2 ? 'tools.sat_mode_pwm' : (cm === 1 ? 'tools.sat_mode_continuous' : 'tools.sat_mode_off')));
+    txt('satCycleSub', t(cm === 2 ? 'tools.sat_cycle_sub_pwm' : (cm === 1 ? 'tools.sat_cycle_sub_continuous' : 'tools.sat_cycle_sub_off')));
   }
 
   function satRenderHealth(d) {
     var box = document.getElementById('satHealth'); if (!box) return;
     var lc = d.last_cycle_class | 0, badCycle = (lc === 2 || lc === 3 || lc === 4 || lc === 6); // 6 = UNDERHEAT_PWM (TASK-891.4)
     var items = [
-      ['Device', (d.boiler_status && d.boiler_status !== 'off') ? 'ok' : 'idle'],
-      ['Cycle', badCycle ? 'warn' : 'ok'],
-      ['Flame', d.safety_tripped ? 'alert' : 'ok'],
-      ['Pressure', d.pressure_alarm ? 'alert' : 'ok'],
-      ['Setpoint', d.setpoint_mismatch ? 'warn' : 'ok'],
-      ['Modulation', d.modulation_reliable ? 'ok' : 'warn']
+      [t('tools.health_device'), (d.boiler_status && d.boiler_status !== 'off') ? 'ok' : 'idle'],
+      [t('tools.health_cycle'), badCycle ? 'warn' : 'ok'],
+      [t('tools.health_flame'), d.safety_tripped ? 'alert' : 'ok'],
+      [t('tools.health_pressure'), d.pressure_alarm ? 'alert' : 'ok'],
+      [t('tools.health_setpoint'), d.setpoint_mismatch ? 'warn' : 'ok'],
+      [t('tools.health_modulation'), d.modulation_reliable ? 'ok' : 'warn']
     ];
     box.textContent = '';
     items.forEach(function (it) {
@@ -5402,33 +7080,33 @@
     var cb = document.getElementById('satSim');
     if (cb && !satSimPending) cb.checked = on;
     if (cb) cb.disabled = (!avail && !on);
-    txt('satSimHint', avail ? '' : 'A real boiler is connected — bench simulation is unavailable.');
+    txt('satSimHint', avail ? '' : t('tools.sat_sim_unavailable'));
     satKv('satSimKv', [
-      ['Simulation', on ? 'On (bench)' : 'Off'],
-      ['Sim room', on ? satFmt(d.sim_room_temp, 1, ' °C') : '—'],
-      ['Sim flow', on ? satFmt(d.sim_flow_temp, 1, ' °C') : '—'],
-      ['Sim return', on ? satFmt(d.sim_return_temp, 1, ' °C') : '—'],
-      ['Sim flame', on ? (d.sim_flame_on ? 'On' : 'Off') : '—'],
-      ['Sim modulation', on && d.sim_modulation != null ? d.sim_modulation + ' %' : '—'],
-      ['Last blocked cmd', (on && d.last_blocked_cmd) ? (d.last_blocked_cmd + (d.last_blocked_cmd_age_ms != null ? ' (' + Math.round(d.last_blocked_cmd_age_ms / 1000) + 's ago)' : '')) : '—'],
-      ['Fallback active', d.fallback_active ? 'Yes' : 'No'],
-      ['Fallback reason', d.fallback_reason != null ? String(d.fallback_reason) : '—']
+      [t('tools.kv_simulation'), on ? t('tools.kv_sim_on_bench') : t('tools.off')],
+      [t('tools.kv_sim_room'), on ? satFmt(d.sim_room_temp, 1, ' °C') : '—'],
+      [t('tools.kv_sim_flow'), on ? satFmt(d.sim_flow_temp, 1, ' °C') : '—'],
+      [t('tools.kv_sim_return'), on ? satFmt(d.sim_return_temp, 1, ' °C') : '—'],
+      [t('tools.kv_sim_flame'), on ? (d.sim_flame_on ? t('tools.on') : t('tools.off')) : '—'],
+      [t('tools.kv_sim_modulation'), on && d.sim_modulation != null ? d.sim_modulation + ' %' : '—'],
+      [t('tools.kv_last_blocked_cmd'), (on && d.last_blocked_cmd) ? (d.last_blocked_cmd_age_ms != null ? t('tools.sat_blocked_cmd_ago', { cmd: d.last_blocked_cmd, seconds: Math.round(d.last_blocked_cmd_age_ms / 1000) }) : d.last_blocked_cmd) : '—'],
+      [t('tools.kv_fallback_active'), d.fallback_active ? t('tools.yes') : t('tools.no')],
+      [t('tools.kv_fallback_reason'), d.fallback_reason != null ? String(d.fallback_reason) : '—']
     ]);
   }
 
   function renderSatWeather(w) {
-    if (!w || !w.enabled) { satKv('satWeatherKv', [['Weather', 'Disabled']]); txt('satCoords', ''); return; }
+    if (!w || !w.enabled) { satKv('satWeatherKv', [[t('tools.kv_weather'), t('tools.disabled')]]); txt('satCoords', ''); return; }
     var valid = !!w.valid;
     var mins = (valid && w.age_seconds >= 0) ? Math.floor(w.age_seconds / 60) : null;
     satKv('satWeatherKv', [
-      ['Outdoor temp', valid ? satFmt(w.temperature, 1, ' °C') : '—'],
-      ['Humidity', valid && w.humidity != null ? Math.round(w.humidity) + ' %' : '—'],
-      ['Wind', valid && w.wind_speed != null ? satFmt(w.wind_speed, 1, ' km/h') : '—'],
-      ['Last update', mins === null ? 'Never' : (mins < 1 ? 'Just now' : mins + ' min ago')],
-      ['Fetch errors', String(w.fetch_errors || 0)]
+      [t('tools.kv_outdoor_temp'), valid ? satFmt(w.temperature, 1, ' °C') : '—'],
+      [t('tools.kv_humidity'), valid && w.humidity != null ? Math.round(w.humidity) + ' %' : '—'],
+      [t('tools.kv_wind'), valid && w.wind_speed != null ? satFmt(w.wind_speed, 1, ' km/h') : '—'],
+      [t('tools.kv_last_update'), mins === null ? t('tools.sat_never') : (mins < 1 ? t('tools.sat_just_now') : t('tools.sat_min_ago', { minutes: mins }))],
+      [t('tools.kv_fetch_errors'), String(w.fetch_errors || 0)]
     ]);
     var lat = parseFloat(w.latitude), lon = parseFloat(w.longitude);
-    txt('satCoords', (!isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0)) ? lat.toFixed(3) + ', ' + lon.toFixed(3) : 'No location set');
+    txt('satCoords', (!isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0)) ? lat.toFixed(3) + ', ' + lon.toFixed(3) : t('tools.sat_no_location'));
   }
 
   // JS port of satCalcHeatingCurve() (SATcontrol.ino): base offset + (coeff/4)·curve.
@@ -5469,31 +7147,31 @@
     });
     if (outside !== null && setp !== null) g += '<circle cx="' + X(outside).toFixed(1) + '" cy="' + Y(setp).toFixed(1) + '" r="6.5" fill="' + hot + '" stroke="' + panel + '" stroke-width="2"/>';
     svg.innerHTML = g;
-    txt('satCurveLbl', (system === 2 ? 'underfloor' : 'radiator') + ' · coeff ' + coeff.toFixed(1) + ' · target ' + target.toFixed(1) + '°');
+    txt('satCurveLbl', t('tools.sat_curve_label', { system: t(system === 2 ? 'tools.sat_system_underfloor' : 'tools.sat_system_radiator'), coeff: coeff.toFixed(1), target: target.toFixed(1) + '°' }));
     var lg = document.getElementById('satCurveLegend');
     if (lg) lg.innerHTML =
-      '<span><i style="background:' + accent + '"></i>active curve (c=' + coeff.toFixed(1) + ')</span>' +
-      '<span><i style="background:' + ok + '"></i>calibration markers</span>' +
-      '<span><i style="background:' + hot + '"></i>current point</span>';
+      '<span><i style="background:' + accent + '"></i>' + esc(t('tools.sat_legend_active_curve', { coeff: coeff.toFixed(1) })) + '</span>' +
+      '<span><i style="background:' + ok + '"></i>' + esc(t('tools.sat_legend_markers')) + '</span>' +
+      '<span><i style="background:' + hot + '"></i>' + esc(t('tools.sat_legend_current')) + '</span>';
   }
 
   function satRenderMarkerList() {
     var list = document.getElementById('satMarkerList'); if (!list) return;
     list.textContent = '';
     if (!satMarkers.length) {
-      var li0 = document.createElement('li'); li0.textContent = 'No calibration markers yet.'; li0.style.color = 'var(--muted)';
+      var li0 = document.createElement('li'); li0.textContent = t('tools.sat_marker_none'); li0.style.color = 'var(--muted)';
       list.appendChild(li0); return;
     }
     satMarkers.forEach(function (m) {
       var li = document.createElement('li');
-      var s = document.createElement('span'); s.textContent = satFmt(m.outside_temp, 0, '° out');
-      var b = document.createElement('b'); b.textContent = satFmt(m.flow_temp, 0, '° flow');
+      var s = document.createElement('span'); s.textContent = satNum(m.outside_temp) === null ? '—' : t('tools.sat_marker_out', { value: satFmt(m.outside_temp, 0) });
+      var b = document.createElement('b'); b.textContent = satNum(m.flow_temp) === null ? '—' : t('tools.sat_marker_flow', { value: satFmt(m.flow_temp, 0) });
       li.appendChild(s); li.appendChild(b);
       if (m.label) li.title = m.label;
       if ((m.id | 0) > 0) {
         var x = document.createElement('button'); x.type = 'button'; x.className = 'tbtn'; x.textContent = '✕';
-        x.title = 'Delete this marker'; x.style.padding = '0 6px';
-        x.addEventListener('click', function () { satMarkerReq(APIGW + 'v2/sat/markers/' + (m.id | 0), { method: 'DELETE' }, 'Marker deleted'); });
+        x.title = t('tools.sat_marker_delete'); x.style.padding = '0 6px';
+        x.addEventListener('click', function () { satMarkerReq(APIGW + 'v2/sat/markers/' + (m.id | 0), { method: 'DELETE' }, t('tools.sat_marker_deleted')); });
         li.appendChild(x);
       }
       list.appendChild(li);
@@ -5528,10 +7206,10 @@
   function satGeoUsable() {
     return window.isSecureContext !== false && !!navigator.geolocation;
   }
-  var SAT_GEO_ERR = { 1: 'Location denied: the browser blocked access', 2: 'Location unavailable', 3: 'Location timed out' };
+  var SAT_GEO_ERR = { 1: 'tools.sat_geo_denied', 2: 'tools.sat_geo_unavailable', 3: 'tools.sat_geo_timeout' };   // geolocation error code -> key
   function satDetectLocation() {
-    if (!satGeoUsable()) { txt('satCoords', 'Location detection needs HTTPS'); return; }
-    txt('satCoords', 'Detecting…');
+    if (!satGeoUsable()) { txt('satCoords', t('tools.sat_geo_needs_https')); return; }
+    txt('satCoords', t('tools.sat_geo_detecting'));
     navigator.geolocation.getCurrentPosition(function (pos) {
       var lat = pos.coords.latitude.toFixed(4), lon = pos.coords.longitude.toFixed(4);
       // Land the two coords one at a time (never both at once) so the REST
@@ -5541,9 +7219,9 @@
           return fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: kv[0], value: kv[1] }) })
             .then(function (r) { if (!r.ok) throw new Error(r.status); return r; });
         });
-      }, Promise.resolve()).then(function () { txt('satCoords', lat + ', ' + lon); setTimeout(fetchSatPageWeather, 1500); }).catch(function () { txt('satCoords', 'Save failed'); });
+      }, Promise.resolve()).then(function () { txt('satCoords', lat + ', ' + lon); setTimeout(fetchSatPageWeather, 1500); }).catch(function () { txt('satCoords', t('tools.sat_geo_save_failed')); });
     }, function (err) {
-      txt('satCoords', (err && SAT_GEO_ERR[err.code]) || 'Location error');
+      txt('satCoords', t((err && SAT_GEO_ERR[err.code]) || 'tools.sat_geo_error'));
     }, { timeout: 10000 });
   }
 
@@ -5644,7 +7322,7 @@
       satSimPending = true;
       satPost('settings/simulation', sim.checked ? '1' : '0')
         .then(function () { satSimPending = false; setTimeout(fetchSatPage, 300); })
-        .catch(function () { satSimPending = false; if (satLastData) sim.checked = !!satLastData.simulation; txt('satSimHint', 'Could not change simulation (a real boiler may be connected).'); });
+        .catch(function () { satSimPending = false; if (satLastData) sim.checked = !!satLastData.simulation; txt('satSimHint', t('tools.sat_sim_change_failed')); });
     });
 
     var rt = document.getElementById('satRawToggle');
@@ -5652,7 +7330,7 @@
       var pre = document.getElementById('satRawJson'); if (!pre) return;
       var open = pre.style.display === 'none';
       pre.style.display = open ? 'block' : 'none';
-      rt.textContent = (open ? '▾' : '▸') + ' Raw data (JSON)';
+      rt.textContent = (open ? '▾ ' : '▸ ') + t('tools.sat_raw_data');
       rt.setAttribute('aria-expanded', open ? 'true' : 'false');
       if (open && satLastData) pre.textContent = JSON.stringify(satLastData, null, 2);
     });
@@ -5669,7 +7347,7 @@
     dl.hidden = true;
     var lh = document.getElementById('satLocHint');
     if (lh) {
-      lh.textContent = 'Location detection needs HTTPS. Enter Latitude and Longitude under SAT settings > Weather.';
+      lh.textContent = t('tools.sat_geo_hint');
       lh.hidden = false;
     }
   }
@@ -5680,6 +7358,15 @@
   // or Ignore, then dismiss/auto-expire. Runs GLOBALLY off the same
   // GET /api/v2/sat/ble/discovery poll the roster uses, so a background discovery is
   // never silent. Each MAC surfaces once (persisted in localStorage otgw-ble-seen).
+  // t() text for HTML built by string concatenation: values in params are escaped, raw holds
+  // trusted HTML fragments (code spans, bold) for {{placeholders}}; the key text itself may
+  // carry <b>..</b> and plain "&".
+  function satH(key, params, raw) {
+    var p = {};
+    Object.keys(params || {}).forEach(function (k) { p[k] = ('' + params[k]).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); });
+    Object.keys(raw || {}).forEach(function (k) { p[k] = raw[k]; });
+    return t(key, p);
+  }
   var discoverSeen = null;
   function discoverSeenSet() {
     if (discoverSeen) return discoverSeen;
@@ -5712,19 +7399,19 @@
     card.setAttribute('data-mac', id);
     var ic = document.createElement('span'); ic.className = 'discover-ic';
     var bd = document.createElement('div'); bd.className = 'discover-bd';
-    var t = document.createElement('div'); t.className = 't'; t.textContent = o.title;
+    var tt = document.createElement('div'); tt.className = 't'; tt.textContent = o.title;
     var ss = document.createElement('div'); ss.className = 's'; ss.textContent = o.sub;
     var act = document.createElement('div'); act.className = 'discover-act';
-    var assign = document.createElement('button'); assign.className = 'primary'; assign.textContent = 'Assign';
+    var assign = document.createElement('button'); assign.className = 'primary'; assign.textContent = t('sat.discover_assign');
     assign.addEventListener('click', function () {
       dropDiscoverCard(card, id);
       openSettingsGroup('sensors');
     });
-    var ign = document.createElement('button'); ign.textContent = 'Ignore';
+    var ign = document.createElement('button'); ign.textContent = t('sat.discover_ignore');
     ign.addEventListener('click', function () { dropDiscoverCard(card, id); });
     act.appendChild(assign); act.appendChild(ign);
-    bd.appendChild(t); bd.appendChild(ss); bd.appendChild(act);
-    var x = document.createElement('button'); x.className = 'discover-x'; x.setAttribute('aria-label', 'Dismiss'); x.textContent = '×';
+    bd.appendChild(tt); bd.appendChild(ss); bd.appendChild(act);
+    var x = document.createElement('button'); x.className = 'discover-x'; x.setAttribute('aria-label', t('sat.discover_dismiss')); x.textContent = '×';
     x.addEventListener('click', function () { dropDiscoverCard(card, id); });
     card.appendChild(ic); card.appendChild(bd); card.appendChild(x);
     stack.appendChild(card);
@@ -5757,21 +7444,21 @@
       card.setAttribute('data-ble-group', '1');
       var ic = document.createElement('span'); ic.className = 'discover-ic';
       var bd = document.createElement('div'); bd.className = 'discover-bd';
-      var t = document.createElement('div'); t.className = 't';
+      var tt = document.createElement('div'); tt.className = 't';
       var ss = document.createElement('div'); ss.className = 's';
       var act = document.createElement('div'); act.className = 'discover-act';
-      var view = document.createElement('button'); view.className = 'primary'; view.textContent = 'View';
+      var view = document.createElement('button'); view.className = 'primary'; view.textContent = t('sat.discover_view');
       view.addEventListener('click', function () { bleDiscoverDismiss(); goToSensorRoster(); });
       act.appendChild(view);
-      bd.appendChild(t); bd.appendChild(ss); bd.appendChild(act);
-      var x = document.createElement('button'); x.className = 'discover-x'; x.setAttribute('aria-label', 'Dismiss'); x.textContent = '×';
+      bd.appendChild(tt); bd.appendChild(ss); bd.appendChild(act);
+      var x = document.createElement('button'); x.className = 'discover-x'; x.setAttribute('aria-label', t('sat.discover_dismiss')); x.textContent = '×';
       x.addEventListener('click', bleDiscoverDismiss);
       card.appendChild(ic); card.appendChild(bd); card.appendChild(x);
       stack.appendChild(card);
     }
     var tEl = card.querySelector('.t'), sEl = card.querySelector('.s');
-    if (tEl) tEl.textContent = (macs.length === 1) ? 'New BLE sensor discovered' : macs.length + ' new BLE sensors discovered';
-    if (sEl) sEl.textContent = (macs.length === 1) ? bleDiscoverPending[macs[0]] : 'View them in Settings › Sensors.';
+    if (tEl) tEl.textContent = t('sat.discover_ble_new', { count: macs.length });
+    if (sEl) sEl.textContent = (macs.length === 1) ? bleDiscoverPending[macs[0]] : t('sat.discover_ble_view_hint');
     if (bleDiscoverTimer) clearTimeout(bleDiscoverTimer);
     bleDiscoverTimer = setTimeout(bleDiscoverDismiss, 15000);
   }
@@ -5820,7 +7507,7 @@
           var s = d[addr] || {}; if (!addr || seen[addr]) return;
           var sub = 'DS18B20 · ' + addr;
           if (typeof s.temp === 'number') sub += ' · ' + s.temp.toFixed(1) + '°C';
-          showDiscoverCard({ id: addr, bus: 'dallas', title: 'New 1-Wire sensor detected', sub: sub });
+          showDiscoverCard({ id: addr, bus: 'dallas', title: t('sat.discover_onewire_title'), sub: sub });
         });
       })
       .catch(function () { if ((retriesLeft | 0) > 0) setTimeout(function () { pollDallasDiscovery(retriesLeft - 1); }, 4000); });
@@ -5933,64 +7620,64 @@
         '<p style="font:400 11.5px/1.5 inherit;color:var(--muted);margin:9px 0 0">' + desc + '</p></button>';
     }
     function toggle(on, act) {
-      return '<button data-act="' + act + '" aria-label="toggle" style="width:44px;height:24px;border-radius:12px;position:relative;flex:0 0 auto;cursor:pointer;border:0;padding:0;background:' + (on ? 'var(--accent)' : 'var(--border)') + '">' +
+      return '<button data-act="' + act + '" aria-label="' + satH('sat.setup_toggle') + '" style="width:44px;height:24px;border-radius:12px;position:relative;flex:0 0 auto;cursor:pointer;border:0;padding:0;background:' + (on ? 'var(--accent)' : 'var(--border)') + '">' +
         '<span style="position:absolute;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;left:' + (on ? '22px' : '2px') + '"></span></button>';
     }
     function render() {
       var h = '';
       h += '<div style="display:flex;align-items:center;gap:11px;padding:12px 18px;background:var(--panel);border-bottom:1px solid var(--border)">' +
         '<span style="font-weight:700;font-size:15px;color:var(--text)">OTGW firmware</span>' +
-        '<span style="font-weight:600;font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase">First-time setup</span></div>';
+        '<span style="font-weight:600;font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase">' + satH('sat.setup_header') + '</span></div>';
       h += '<div style="flex:1;display:flex;align-items:flex-start;justify-content:center;padding:44px 18px 60px"><div style="width:100%;max-width:560px">';
       if (st.screen === 'appliance' || st.screen === 'mqtt') {
         var isM = st.screen === 'mqtt';
         h += '<div style="margin:0 0 20px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">' +
-          '<span style="font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Step ' + (isM ? 2 : 1) + ' of 2</span>' +
-          '<span style="font-weight:600;font-size:12px;color:var(--text)">' + (isM ? 'Home Assistant' : 'Appliance') + '</span></div>' +
+          '<span style="font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">' + satH('sat.step_of', { n: isM ? 2 : 1, total: 2 }) + '</span>' +
+          '<span style="font-weight:600;font-size:12px;color:var(--text)">' + (isM ? 'Home Assistant' : satH('sat.setup_appliance')) + '</span></div>' +
           '<div style="height:5px;border-radius:3px;background:var(--border);overflow:hidden"><span style="display:block;height:100%;border-radius:3px;background:var(--accent);width:' + (isM ? 100 : 50) + '%"></span></div></div>';
       }
       if (st.screen === 'welcome') {
         h += '<div style="' + CARD + ';text-align:center">' +
           '<div style="width:54px;height:54px;border-radius:50%;background:color-mix(in srgb,var(--ok,#27c469) 18%,transparent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px"><span style="width:16px;height:16px;border-radius:50%;background:var(--ok,#27c469);box-shadow:0 0 10px var(--ok,#27c469)"></span></div>' +
-          '<h1 style="font-weight:700;font-size:25px;color:var(--text);margin:0 0 8px">Your gateway is online</h1>' +
-          '<p style="font:400 13px/1.65 inherit;color:var(--muted);margin:0 auto 24px;max-width:400px">Two quick things and you\'re done — everything else is read straight from the OpenTherm bus.</p>' +
-          '<button data-act="begin" style="' + PRIM + ';font-size:15px;padding:13px 30px">Get started</button></div>';
+          '<h1 style="font-weight:700;font-size:25px;color:var(--text);margin:0 0 8px">' + satH('sat.setup_welcome_title') + '</h1>' +
+          '<p style="font:400 13px/1.65 inherit;color:var(--muted);margin:0 auto 24px;max-width:400px">' + satH('sat.setup_welcome_body') + '</p>' +
+          '<button data-act="begin" style="' + PRIM + ';font-size:15px;padding:13px 30px">' + satH('sat.get_started') + '</button></div>';
       } else if (st.screen === 'appliance') {
-        h += '<div style="' + CARD + '"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">What are you heating with?</h1>' +
-          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">Sets how OpenTherm data is read and labelled. Change it anytime in Settings.</p>' +
-          '<div style="display:flex;gap:12px;flex-wrap:wrap">' + choiceCard('gas', 'Gas boiler', 'Modulating OpenTherm boiler — flow &amp; return temperature, modulation %, flame &amp; DHW.') + choiceCard('hp', 'Heat pump', 'Air/water heat pump or electric heater — compressor, COP, water temperatures &amp; defrost.') + '</div>' +
-          '<div style="display:flex;align-items:center;gap:12px;margin-top:24px"><button data-act="back-welcome" style="' + GHOST + '">Back</button>' +
-          '<button data-act="to-mqtt" style="margin-left:auto;' + PRIM + '">Continue</button></div></div>';
+        h += '<div style="' + CARD + '"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">' + satH('sat.setup_appliance_title') + '</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">' + satH('sat.setup_appliance_desc') + '</p>' +
+          '<div style="display:flex;gap:12px;flex-wrap:wrap">' + choiceCard('gas', satH('sat.setup_gas_title'), satH('sat.setup_gas_desc')) + choiceCard('hp', satH('sat.heat_pump'), satH('sat.setup_hp_desc')) + '</div>' +
+          '<div style="display:flex;align-items:center;gap:12px;margin-top:24px"><button data-act="back-welcome" style="' + GHOST + '">' + satH('sat.back') + '</button>' +
+          '<button data-act="to-mqtt" style="margin-left:auto;' + PRIM + '">' + satH('sat.continue') + '</button></div></div>';
       } else if (st.screen === 'mqtt') {
         h += '<div style="' + CARD + '"><div style="display:flex;align-items:flex-start;gap:12px"><div style="flex:1">' +
-          '<h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">Connect to Home Assistant</h1>' +
-          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0">The gateway publishes every value over MQTT; Home Assistant auto-discovers them. Optional — leave off to run standalone.</p></div>' +
+          '<h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">' + satH('sat.setup_mqtt_title') + '</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0">' + satH('sat.setup_mqtt_desc') + '</p></div>' +
           toggle(st.mqtt, 'toggle-mqtt') + '</div>';
         if (st.mqtt) {
           h += '<div style="margin-top:18px;display:flex;flex-direction:column;gap:12px">' +
-            '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + LBL + '">MQTT broker</label><input id="onbBroker" value="' + esc(st.broker) + '" style="' + IN + '"></div>' +
-            '<div style="width:116px"><label style="' + LBL + '">Port</label><input id="onbPort" value="' + esc(st.port) + '" style="' + IN + '"></div></div>' +
-            '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + LBL + '">Username</label><input id="onbUser" value="' + esc(st.user) + '" style="' + IN + '"></div>' +
-            '<div style="flex:1"><label style="' + LBL + '">Password</label><input id="onbPass" type="password" placeholder="unchanged" style="' + IN + '"></div></div>' +
-            '<div style="flex:1"><label style="' + LBL + '">Top topic</label><input id="onbTopic" value="' + esc(st.topic) + '" style="' + IN + '"></div>' +
+            '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + LBL + '">' + satH('sat.setup_broker') + '</label><input id="onbBroker" value="' + esc(st.broker) + '" style="' + IN + '"></div>' +
+            '<div style="width:116px"><label style="' + LBL + '">' + satH('sat.setup_port') + '</label><input id="onbPort" value="' + esc(st.port) + '" style="' + IN + '"></div></div>' +
+            '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + LBL + '">' + satH('sat.setup_username') + '</label><input id="onbUser" value="' + esc(st.user) + '" style="' + IN + '"></div>' +
+            '<div style="flex:1"><label style="' + LBL + '">' + satH('sat.setup_password') + '</label><input id="onbPass" type="password" placeholder="' + satH('sat.setup_unchanged') + '" style="' + IN + '"></div></div>' +
+            '<div style="flex:1"><label style="' + LBL + '">' + satH('sat.setup_top_topic') + '</label><input id="onbTopic" value="' + esc(st.topic) + '" style="' + IN + '"></div>' +
             '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-height:40px">' +
-            '<button data-act="test" style="background:none;color:var(--accent);font-weight:600;font-size:12.5px;border-radius:9px;padding:9px 15px;min-height:40px;border:1px solid var(--accent);cursor:pointer">' + (st.test === 'testing' ? 'Testing…' : (st.test === 'ok' || st.test === 'fail') ? 'Test again' : 'Test connection') + '</button>' +
-            (st.test === 'testing' ? '<span style="font:500 12px inherit;color:var(--muted)">Testing connection…</span>' : '') +
-            (st.test === 'ok' ? '<span style="font-weight:600;font-size:12px;color:var(--ok,#27c469)">✓ Connected</span>' : '') +
-            (st.test === 'fail' ? '<span style="font-weight:600;font-size:12px;color:var(--warn,#e0a300)">No response — check broker &amp; port</span>' : '') +
+            '<button data-act="test" style="background:none;color:var(--accent);font-weight:600;font-size:12.5px;border-radius:9px;padding:9px 15px;min-height:40px;border:1px solid var(--accent);cursor:pointer">' + (st.test === 'testing' ? satH('sat.setup_testing') : (st.test === 'ok' || st.test === 'fail') ? satH('sat.setup_test_again') : satH('sat.setup_test_conn')) + '</button>' +
+            (st.test === 'testing' ? '<span style="font:500 12px inherit;color:var(--muted)">' + satH('sat.setup_testing_conn') + '</span>' : '') +
+            (st.test === 'ok' ? '<span style="font-weight:600;font-size:12px;color:var(--ok,#27c469)">✓ ' + satH('sat.setup_connected') + '</span>' : '') +
+            (st.test === 'fail' ? '<span style="font-weight:600;font-size:12px;color:var(--warn,#e0a300)">' + satH('sat.setup_no_response') + '</span>' : '') +
             '</div></div>';
         }
-        h += '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-act="back-appliance" style="' + GHOST + '">Back</button>' +
-          '<button data-act="finish" style="margin-left:auto;' + PRIM + '">' + (st.mqtt ? 'Finish' : 'Skip &amp; finish') + '</button></div></div>';
+        h += '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-act="back-appliance" style="' + GHOST + '">' + satH('sat.back') + '</button>' +
+          '<button data-act="finish" style="margin-left:auto;' + PRIM + '">' + (st.mqtt ? satH('sat.setup_finish') : satH('sat.setup_skip_finish')) + '</button></div></div>';
       } else if (st.screen === 'done') {
         h += '<div style="' + CARD + ';text-align:center">' +
           '<div style="width:54px;height:54px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-weight:700;font-size:24px;color:#04222c">✓</div>' +
-          '<h1 style="font-weight:700;font-size:24px;color:var(--text);margin:0 0 6px">You\'re all set</h1>' +
-          '<p style="font:400 13px/1.6 inherit;color:var(--muted);margin:0 auto 20px;max-width:400px">The gateway is live and reading the bus.</p>' +
+          '<h1 style="font-weight:700;font-size:24px;color:var(--text);margin:0 0 6px">' + satH('sat.setup_done_title') + '</h1>' +
+          '<p style="font:400 13px/1.6 inherit;color:var(--muted);margin:0 auto 20px;max-width:400px">' + satH('sat.setup_done_body') + '</p>' +
           '<div style="text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:6px 16px;margin:0 0 20px">' +
-          '<div style="display:flex;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)"><span style="font:500 12.5px inherit;color:var(--muted)">Appliance</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + (st.appliance === 'hp' ? 'Heat pump' : 'Gas boiler') + '</span></div>' +
-          '<div style="display:flex;align-items:center;padding:11px 0"><span style="font:500 12.5px inherit;color:var(--muted)">Integration</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + (st.mqtt ? 'Home Assistant · ' + esc(st.broker) : 'Standalone (no MQTT)') + '</span></div></div>' +
-          '<button data-act="go" style="' + PRIM + ';font-size:15px;padding:13px 30px">Go to dashboard</button></div>';
+          '<div style="display:flex;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)"><span style="font:500 12.5px inherit;color:var(--muted)">' + satH('sat.setup_appliance') + '</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + (st.appliance === 'hp' ? satH('sat.heat_pump') : satH('sat.setup_gas_title')) + '</span></div>' +
+          '<div style="display:flex;align-items:center;padding:11px 0"><span style="font:500 12.5px inherit;color:var(--muted)">' + satH('sat.setup_integration') + '</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + (st.mqtt ? satH('sat.setup_integration_ha', { broker: st.broker }) : satH('sat.setup_standalone')) + '</span></div></div>' +
+          '<button data-act="go" style="' + PRIM + ';font-size:15px;padding:13px 30px">' + satH('sat.setup_go_dashboard') + '</button></div>';
       }
       h += '</div></div>';
       back.innerHTML = h;
@@ -6076,7 +7763,7 @@
         (sel ? 'background:color-mix(in srgb,var(--accent) 12%,var(--panel));border:2px solid var(--accent)' : 'background:var(--bg);border:1.5px solid var(--border)');
     }
     function dot(sel) { return 'width:18px;height:18px;border-radius:50%;box-sizing:border-box;flex:0 0 auto;' + (sel ? 'border:5px solid var(--accent)' : 'border:1.5px solid var(--muted)'); }
-    function recBadge() { return '<span style="font-weight:600;font-size:9.5px;letter-spacing:.05em;color:var(--accent);border:1px solid var(--accent);border-radius:20px;padding:2px 8px">RECOMMENDED</span>'; }
+    function recBadge() { return '<span style="font-weight:600;font-size:9.5px;letter-spacing:.05em;color:var(--accent);border:1px solid var(--accent);border-radius:20px;padding:2px 8px">' + satH('sat.onb_recommended') + '</span>'; }
 
     // Written at Finish: satsystem + satmanufacturer + satcoefficient (Manual only) +
     // satenabled + sat_onboarded. Heat pump also writes satsource=2.
@@ -6127,7 +7814,7 @@
     function healthRow(label, ok, valHtml, last) {
       // ok === null: unknown (TASK-1741), grey; otherwise theme-aware (--ok/--warn are not defined)
       var c = (ok === null) ? 'var(--muted)' : ok ? 'var(--zone-ok)' : 'var(--zone-warn)';
-      if (ok === null) valHtml = 'Unknown';
+      if (ok === null) valHtml = satH('sat.onb_unknown');
       return '<div style="display:flex;align-items:center;gap:12px;padding:13px 0;' + (last ? '' : 'border-bottom:1px solid var(--border)') + '">' +
         '<span style="width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:' + c + ';box-shadow:0 0 7px ' + c + '"></span>' +
         '<span style="font-weight:600;font-size:13px;color:var(--text)">' + label + '</span>' +
@@ -6141,104 +7828,104 @@
       h += '<div style="background:var(--nav);display:flex;align-items:center;gap:11px;padding:12px 18px">' +
         '<span style="width:16px;height:16px;border-radius:4px;background:var(--accent);box-shadow:0 0 8px var(--accent);flex:0 0 auto"></span>' +
         '<span style="font-weight:700;font-size:15px;color:#fff">OTGW firmware</span>' +
-        '<span style="font-weight:600;font-size:10px;color:rgba(255,255,255,.6);letter-spacing:.05em;' + MONO + '">SAT SETUP</span></div>';
+        '<span style="font-weight:600;font-size:10px;color:rgba(255,255,255,.6);letter-spacing:.05em;' + MONO + '">' + satH('sat.onb_header') + '</span></div>';
       h += '<div style="flex:1;display:flex;align-items:flex-start;justify-content:center;padding:44px 18px 60px"><div style="width:100%;max-width:580px">';
       if (idx >= 0) {
         h += '<div style="margin:0 0 20px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">' +
-          '<span style="font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Step ' + (idx + 1) + ' of ' + total + '</span>' +
-          '<span style="font-weight:600;font-size:12px;color:var(--text)">' + ['Heating system', 'Manufacturer', 'Tuning', 'Sources health'][idx] + '</span></div>' +
+          '<span style="font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">' + satH('sat.step_of', { n: idx + 1, total: total }) + '</span>' +
+          '<span style="font-weight:600;font-size:12px;color:var(--text)">' + satH(['sat.onb_step_system', 'sat.onb_step_mfr', 'sat.onb_step_tuning', 'sat.onb_step_sources'][idx]) + '</span></div>' +
           '<div style="height:5px;border-radius:3px;background:var(--bg);overflow:hidden"><span style="display:block;height:100%;border-radius:3px;background:var(--accent);transition:width .25s;width:' + Math.round(((idx + 1) / total) * 100) + '%"></span></div></div>';
       }
       if (st.screen === 'beta') {
-        h += '<div style="' + CARD + ';padding:30px 28px"><h1 style="font-weight:700;font-size:23px;color:var(--text);margin:0 0 10px">Before you enable SAT</h1>' +
-          '<p style="font:400 13.5px/1.65 inherit;color:var(--text);margin:0 0 8px"><b>' + esc(SAT_BETA_HEAD) + '</b></p>' +
-          '<p style="font:400 13px/1.65 inherit;color:var(--muted);margin:0 0 16px">' + esc(SAT_BETA_BODY) + '</p>' +
+        h += '<div style="' + CARD + ';padding:30px 28px"><h1 style="font-weight:700;font-size:23px;color:var(--text);margin:0 0 10px">' + satH('sat.onb_beta_title') + '</h1>' +
+          '<p style="font:400 13.5px/1.65 inherit;color:var(--text);margin:0 0 8px"><b>' + esc(t('tools.sat_beta_head')) + '</b></p>' +
+          '<p style="font:400 13px/1.65 inherit;color:var(--muted);margin:0 0 16px">' + esc(t('tools.sat_beta_body')) + '</p>' +
           '<label style="display:flex;align-items:flex-start;gap:10px;margin:0 0 22px;cursor:pointer;font-weight:600;font-size:13px;color:var(--text)">' +
-          '<input type="checkbox" id="satOnbBetaOk" style="margin-top:3px;width:18px;height:18px;flex:0 0 auto"> <span>I understand that SAT is experimental and controls my boiler.</span></label>' +
-          '<div style="display:flex;gap:10px;align-items:center"><button data-sa="notnow" style="' + GHOST + '">Cancel</button>' +
-          '<button data-sa="beta-ok" id="satOnbBetaGo" disabled style="' + PRIM + ';opacity:.5">Continue</button></div></div>';
+          '<input type="checkbox" id="satOnbBetaOk" style="margin-top:3px;width:18px;height:18px;flex:0 0 auto"> <span>' + satH('sat.onb_beta_ack') + '</span></label>' +
+          '<div style="display:flex;gap:10px;align-items:center"><button data-sa="notnow" style="' + GHOST + '">' + satH('sat.cancel') + '</button>' +
+          '<button data-sa="beta-ok" id="satOnbBetaGo" disabled style="' + PRIM + ';opacity:.5">' + satH('sat.continue') + '</button></div></div>';
       } else if (st.screen === 'welcome') {
         h += '<div style="' + CARD + ';padding:34px 30px;text-align:center">' +
           '<div style="width:54px;height:54px;border-radius:14px;background:color-mix(in srgb,var(--accent) 18%,transparent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px"><span style="width:16px;height:16px;border-radius:4px;background:var(--accent);box-shadow:0 0 12px var(--accent)"></span></div>' +
-          '<h1 style="font-weight:700;font-size:25px;color:var(--text);margin:0 0 8px">Let\'s tune SAT for your system</h1>' +
-          '<p style="font:400 13.5px/1.65 inherit;color:var(--muted);margin:0 auto 8px;max-width:440px">The <b style="color:var(--text)">Smart Autotune Thermostat</b> takes over control of your boiler, driving flow temperature from the room. Four short questions set it up.</p>' +
-          '<div style="display:inline-flex;align-items:center;gap:8px;margin:6px auto 22px;padding:8px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px"><span style="width:9px;height:9px;border-radius:50%;background:var(--zone-warn);box-shadow:0 0 7px var(--zone-warn);flex:0 0 auto"></span><span style="font-weight:500;font-size:12px;color:var(--text)">SAT stays <b>disabled</b> until you finish, nothing changes on your boiler yet.</span></div>' +
-          '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button data-sa="notnow" style="' + GHOST + '">Not now</button>' +
-          '<button data-sa="begin" style="background:var(--accent);border:0;color:#04222c;font-weight:700;font-size:15px;border-radius:11px;padding:13px 30px;cursor:pointer;min-height:48px">Get started</button></div></div>';
+          '<h1 style="font-weight:700;font-size:25px;color:var(--text);margin:0 0 8px">' + satH('sat.onb_welcome_title') + '</h1>' +
+          '<p style="font:400 13.5px/1.65 inherit;color:var(--muted);margin:0 auto 8px;max-width:440px">' + satH('sat.onb_welcome_body', null, { name: '<b style="color:var(--text)">Smart Autotune Thermostat</b>' }) + '</p>' +
+          '<div style="display:inline-flex;align-items:center;gap:8px;margin:6px auto 22px;padding:8px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px"><span style="width:9px;height:9px;border-radius:50%;background:var(--zone-warn);box-shadow:0 0 7px var(--zone-warn);flex:0 0 auto"></span><span style="font-weight:500;font-size:12px;color:var(--text)">' + satH('sat.onb_welcome_note') + '</span></div>' +
+          '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button data-sa="notnow" style="' + GHOST + '">' + satH('sat.not_now') + '</button>' +
+          '<button data-sa="begin" style="background:var(--accent);border:0;color:#04222c;font-weight:700;font-size:15px;border-radius:11px;padding:13px 30px;cursor:pointer;min-height:48px">' + satH('sat.get_started') + '</button></div></div>';
       } else if (st.screen === 'system') {
         function sysCard(k, title, desc) {
           return '<button data-sa="sys-' + k + '" style="' + optCard(st.system === k) + '"><span style="' + dot(st.system === k) + '"></span>' +
             '<div style="text-align:left"><span style="font-weight:700;font-size:14.5px;color:var(--text)">' + title + '</span><p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:3px 0 0">' + desc + '</p></div></button>';
         }
-        h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">What kind of heating do you have?</h1>' +
-          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">Sets the heating curve and control interval SAT starts from. <span style="' + MONO + '">satsystem</span></p>' +
+        h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">' + satH('sat.onb_system_title') + '</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">' + satH('sat.onb_system_desc') + ' <span style="' + MONO + '">satsystem</span></p>' +
           '<div style="display:flex;flex-direction:column;gap:10px">' +
-          sysCard('radiators', 'Radiators', 'High-temperature emitters. Steeper curve, faster response.') +
-          sysCard('underfloor', 'Underfloor heating', 'Low-temperature, high inertia. Gentle curve, long cycles.') +
-          sysCard('hp', 'Heat pump', 'Air/water heat pump. Also sets the appliance source to heat pump.') + '</div>' +
-          (st.system === 'hp' ? '<div style="display:flex;align-items:flex-start;gap:9px;margin-top:14px;padding:10px 13px;background:var(--bg);border:1px solid var(--border);border-radius:10px"><span style="width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);margin-top:3px;flex:0 0 auto"></span><span style="font-weight:500;font-size:11.5px;line-height:1.5;color:var(--muted)">Writes <span style="' + MONO + ';color:var(--text)">satsource = heat pump</span> alongside <span style="' + MONO + ';color:var(--text)">satsystem</span>.</span></div>' : '') +
-          '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-welcome" style="' + GHOST + '">Back</button><button data-sa="to-mfr" style="' + PRIM + '">Continue</button></div></div>';
+          sysCard('radiators', satH('sat.onb_sys_radiators'), satH('sat.onb_sys_radiators_desc')) +
+          sysCard('underfloor', satH('sat.onb_sys_underfloor'), satH('sat.onb_sys_underfloor_desc')) +
+          sysCard('hp', satH('sat.heat_pump'), satH('sat.onb_sys_hp_desc')) + '</div>' +
+          (st.system === 'hp' ? '<div style="display:flex;align-items:flex-start;gap:9px;margin-top:14px;padding:10px 13px;background:var(--bg);border:1px solid var(--border);border-radius:10px"><span style="width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);margin-top:3px;flex:0 0 auto"></span><span style="font-weight:500;font-size:11.5px;line-height:1.5;color:var(--muted)">' + satH('sat.onb_hp_note', null, { src: '<span style="' + MONO + ';color:var(--text)">satsource = heat pump</span>', sys: '<span style="' + MONO + ';color:var(--text)">satsystem</span>' }) + '</span></div>' : '') +
+          '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-welcome" style="' + GHOST + '">' + satH('sat.back') + '</button><button data-sa="to-mfr" style="' + PRIM + '">' + satH('sat.continue') + '</button></div></div>';
       } else if (st.screen === 'mfr') {
-        var mopts = (typeof ENUM_OPTS !== 'undefined' && ENUM_OPTS.satmanufacturer ? ENUM_OPTS.satmanufacturer : [[0, 'Auto']]).map(function (o) {
+        var mopts = (typeof ENUM_OPTS !== 'undefined' && ENUM_OPTS.satmanufacturer ? ENUM_OPTS.satmanufacturer : [[0, t('sat.auto')]]).map(function (o) {
           return '<option value="' + o[0] + '"' + (('' + st.mfr) === ('' + o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
         }).join('');
-        var det = (satLastData && satLastData.manufacturer) ? esc(satLastData.manufacturer) : 'read from the OT bus';
-        h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">Which boiler do you have?</h1>' +
-          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">Applies known modulation limits for your make. <span style="' + MONO + '">satmanufacturer</span></p>' +
+        var det = (satLastData && satLastData.manufacturer) ? esc(satLastData.manufacturer) : satH('sat.onb_auto_fallback');
+        h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">' + satH('sat.onb_mfr_title') + '</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">' + satH('sat.onb_mfr_desc') + ' <span style="' + MONO + '">satmanufacturer</span></p>' +
           '<button data-sa="pick-auto" style="' + optCard(st.mfr === '0') + '"><span style="' + dot(st.mfr === '0') + '"></span>' +
-          '<div style="text-align:left;flex:1"><div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;font-size:14.5px;color:var(--text)">Auto-detect</span>' + recBadge() + '</div>' +
-          '<p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:4px 0 0">Reads the OpenTherm member-id from the bus. Detected: <span style="' + MONO + ';color:var(--text)">' + det + '</span></p></div></button>' +
-          '<div style="margin-top:14px"><label style="font-weight:600;font-size:11.5px;color:var(--muted);display:block;margin-bottom:6px">Or set it manually</label>' +
+          '<div style="text-align:left;flex:1"><div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;font-size:14.5px;color:var(--text)">' + satH('sat.onb_auto_title') + '</span>' + recBadge() + '</div>' +
+          '<p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:4px 0 0">' + satH('sat.onb_auto_desc', null, { det: '<span style="' + MONO + ';color:var(--text)">' + det + '</span>' }) + '</p></div></button>' +
+          '<div style="margin-top:14px"><label style="font-weight:600;font-size:11.5px;color:var(--muted);display:block;margin-bottom:6px">' + satH('sat.onb_mfr_manual') + '</label>' +
           '<select id="satOnbMfr" style="width:100%;min-height:44px;-webkit-appearance:none;appearance:none;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;padding:11px 34px 11px 12px;font-weight:500;font-size:13.5px;cursor:pointer">' + mopts + '</select></div>' +
-          '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-system" style="' + GHOST + '">Back</button><button data-sa="to-tuning" style="' + PRIM + '">Continue</button></div></div>';
+          '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-system" style="' + GHOST + '">' + satH('sat.back') + '</button><button data-sa="to-tuning" style="' + PRIM + '">' + satH('sat.continue') + '</button></div></div>';
       } else if (st.screen === 'tuning') {
-        h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">How should SAT tune itself?</h1>' +
-          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">SAT computes its PID gains from the heating curve. Keep the current curve slope, or set it yourself.</p>' +
+        h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">' + satH('sat.onb_tuning_title') + '</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">' + satH('sat.onb_tuning_desc') + '</p>' +
           '<div style="display:flex;flex-direction:column;gap:10px">' +
-          '<button data-sa="tune-auto" style="' + optCard(st.tuning === 'auto') + '"><span style="' + dot(st.tuning === 'auto') + '"></span><div style="text-align:left;flex:1"><div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;font-size:14.5px;color:var(--text)">Automatic</span>' + recBadge() + '</div><p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:4px 0 0">SAT computes the PID gains from the heating curve. The stored curve slope is kept. <span style="' + MONO + '">satcoefficient</span></p></div></button>' +
-          '<button data-sa="tune-manual" style="' + optCard(st.tuning === 'manual') + '"><span style="' + dot(st.tuning === 'manual') + '"></span><div style="text-align:left;flex:1"><span style="font-weight:700;font-size:14.5px;color:var(--text)">Manual</span><p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:4px 0 0">Set the heating-curve slope yourself. SAT still computes the PID gains from that curve. For experienced users.</p></div></button></div>';
+          '<button data-sa="tune-auto" style="' + optCard(st.tuning === 'auto') + '"><span style="' + dot(st.tuning === 'auto') + '"></span><div style="text-align:left;flex:1"><div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;font-size:14.5px;color:var(--text)">' + satH('sat.onb_tune_auto') + '</span>' + recBadge() + '</div><p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:4px 0 0">' + satH('sat.onb_tune_auto_desc') + ' <span style="' + MONO + '">satcoefficient</span></p></div></button>' +
+          '<button data-sa="tune-manual" style="' + optCard(st.tuning === 'manual') + '"><span style="' + dot(st.tuning === 'manual') + '"></span><div style="text-align:left;flex:1"><span style="font-weight:700;font-size:14.5px;color:var(--text)">' + satH('sat.onb_tune_manual') + '</span><p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:4px 0 0">' + satH('sat.onb_tune_manual_desc') + '</p></div></button></div>';
         if (st.tuning === 'manual') {
           var pct = slopePct(st.slope);
           h += '<div style="margin-top:16px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px">' +
-            '<div style="display:flex;align-items:baseline;margin-bottom:12px"><div><span style="font-weight:600;font-size:13px;color:var(--text)">Heating curve slope</span><p style="font:400 11px inherit;color:var(--muted);margin:2px 0 0">Flow temp rise per °C of outdoor drop · <span style="' + MONO + '">satcoefficient</span></p></div>' +
+            '<div style="display:flex;align-items:baseline;margin-bottom:12px"><div><span style="font-weight:600;font-size:13px;color:var(--text)">' + satH('sat.onb_slope_title') + '</span><p style="font:400 11px inherit;color:var(--muted);margin:2px 0 0">' + satH('sat.onb_slope_desc') + ' · <span style="' + MONO + '">satcoefficient</span></p></div>' +
             '<span id="satOnbSlopeVal" style="margin-left:auto;font-weight:600;font-size:17px;' + MONO + ';color:var(--accent)">' + st.slope.toFixed(1) + '</span></div>' +
             '<input id="satOnbSlope" type="range" class="satonb-slope" min="0.1" max="5.0" step="0.1" value="' + st.slope + '" style="width:100%;background-image:linear-gradient(90deg,var(--accent) ' + pct + '%,var(--tile-off,#54565a) ' + pct + '%)">' +
-            '<div style="display:flex;justify-content:space-between;margin-top:7px;font-weight:500;font-size:10px;color:var(--muted)"><span>Gentle · underfloor</span><span>Steep · radiators</span></div></div>';
+            '<div style="display:flex;justify-content:space-between;margin-top:7px;font-weight:500;font-size:10px;color:var(--muted)"><span>' + satH('sat.onb_slope_gentle') + '</span><span>' + satH('sat.onb_slope_steep') + '</span></div></div>';
         }
-        h += '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-mfr" style="' + GHOST + '">Back</button><button data-sa="to-sources" style="' + PRIM + '">Continue</button></div></div>';
+        h += '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-mfr" style="' + GHOST + '">' + satH('sat.back') + '</button><button data-sa="to-sources" style="' + PRIM + '">' + satH('sat.continue') + '</button></div></div>';
       } else if (st.screen === 'sources') {
         var rows;
         if (health == null && !healthErr) {
-          rows = '<div style="padding:22px 0;text-align:center;color:var(--muted);font-size:12.5px">Checking sources…</div>';
+          rows = '<div style="padding:22px 0;text-align:center;color:var(--muted);font-size:12.5px">' + satH('sat.onb_checking') + '</div>';
         } else {
           var hh = health || {};
           var hU = hh.hUnk ? null : undefined, sU = hh.sUnk ? null : undefined;   // TASK-1741: null = unknown
-          rows = healthRow('OpenTherm bus', hU !== undefined ? hU : !!hh.ot, hh.ot ? ('Online' + (hh.otAge != null ? ' · ' + hh.otAge + 's ago' : '')) : 'Offline') +
-            healthRow('Room temperature', sU !== undefined ? sU : hh.room != null, hh.room != null ? (hh.room.toFixed(1) + ' °C') : 'Not detected') +
-            healthRow('Outside temperature', sU !== undefined ? sU : hh.outside != null, hh.outside != null ? (hh.outside.toFixed(1) + ' °C') : 'Not detected') +
-            healthRow('MQTT', hU !== undefined ? hU : !!hh.mqtt, hh.mqtt ? 'Connected' : 'Not connected', true);
+          rows = healthRow(satH('sat.onb_row_ot'), hU !== undefined ? hU : !!hh.ot, hh.ot ? (hh.otAge != null ? satH('sat.onb_online_age', { age: hh.otAge }) : satH('sat.onb_online')) : satH('sat.onb_offline')) +
+            healthRow(satH('sat.onb_row_room'), sU !== undefined ? sU : hh.room != null, hh.room != null ? (hh.room.toFixed(1) + ' °C') : satH('sat.onb_not_detected')) +
+            healthRow(satH('sat.onb_row_outside'), sU !== undefined ? sU : hh.outside != null, hh.outside != null ? (hh.outside.toFixed(1) + ' °C') : satH('sat.onb_not_detected')) +
+            healthRow('MQTT', hU !== undefined ? hU : !!hh.mqtt, hh.mqtt ? satH('sat.onb_connected') : satH('sat.onb_not_connected'), true);
         }
         var warnOutside = health && !health.sUnk && health.outside == null;
-        h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">Source health check</h1>' +
-          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">SAT reads these from your existing setup. This is a read-only check, configure inputs on their own pages. <span style="' + MONO + '">/api/v2/health</span></p>' +
+        h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">' + satH('sat.onb_sources_title') + '</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">' + satH('sat.onb_sources_desc') + ' <span style="' + MONO + '">/api/v2/health</span></p>' +
           '<div id="satOnbHealth" style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:2px 16px">' + rows + '</div>' +
-          (warnOutside ? '<div style="display:flex;align-items:flex-start;gap:9px;margin-top:14px;padding:11px 13px;background:color-mix(in srgb,var(--zone-warn) 12%,var(--bg));border:1px solid color-mix(in srgb,var(--zone-warn) 40%,var(--border));border-radius:10px"><span style="width:8px;height:8px;border-radius:50%;background:var(--zone-warn);box-shadow:0 0 7px var(--zone-warn);margin-top:3px;flex:0 0 auto"></span><span style="font-weight:500;font-size:12px;line-height:1.5;color:var(--text)">No outside temperature. SAT will run without weather compensation until you set a location under <b>SAT ▸ Weather</b>. Not required to continue.</span></div>' : '') +
-          (st.finishErr ? '<div style="margin-top:14px;padding:11px 13px;background:color-mix(in srgb,var(--zone-alert) 12%,var(--bg));border:1px solid color-mix(in srgb,var(--zone-alert) 45%,var(--border));border-radius:10px;font-weight:500;font-size:12px;line-height:1.5;color:var(--text)">Could not save the settings, SAT was not enabled. Check the device is reachable and try again.</div>' : '') +
-          '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-tuning" style="' + GHOST + '">Back</button><button data-sa="finish" style="' + PRIM + '"' + (st.finishing ? ' disabled' : '') + '>' + (st.finishing ? 'Enabling…' : (st.finishErr ? 'Retry' : 'Enable SAT')) + '</button></div></div>';
+          (warnOutside ? '<div style="display:flex;align-items:flex-start;gap:9px;margin-top:14px;padding:11px 13px;background:color-mix(in srgb,var(--zone-warn) 12%,var(--bg));border:1px solid color-mix(in srgb,var(--zone-warn) 40%,var(--border));border-radius:10px"><span style="width:8px;height:8px;border-radius:50%;background:var(--zone-warn);box-shadow:0 0 7px var(--zone-warn);margin-top:3px;flex:0 0 auto"></span><span style="font-weight:500;font-size:12px;line-height:1.5;color:var(--text)">' + satH('sat.onb_warn_outside') + '</span></div>' : '') +
+          (st.finishErr ? '<div style="margin-top:14px;padding:11px 13px;background:color-mix(in srgb,var(--zone-alert) 12%,var(--bg));border:1px solid color-mix(in srgb,var(--zone-alert) 45%,var(--border));border-radius:10px;font-weight:500;font-size:12px;line-height:1.5;color:var(--text)">' + satH('sat.onb_finish_err') + '</div>' : '') +
+          '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-tuning" style="' + GHOST + '">' + satH('sat.back') + '</button><button data-sa="finish" style="' + PRIM + '"' + (st.finishing ? ' disabled' : '') + '>' + (st.finishing ? satH('sat.onb_enabling') : (st.finishErr ? satH('sat.retry') : satH('sat.onb_enable'))) + '</button></div></div>';
       } else if (st.screen === 'done') {
-        var sysL = { radiators: 'Radiators', underfloor: 'Underfloor heating', hp: 'Heat pump' }[st.system];
-        var mfrL = (typeof ENUM_OPTS !== 'undefined' && ENUM_OPTS.satmanufacturer ? (ENUM_OPTS.satmanufacturer.filter(function (o) { return ('' + o[0]) === ('' + st.mfr); })[0] || [0, 'Auto'])[1] : 'Auto');
-        var tuneL = st.tuning === 'auto' ? 'Automatic (stored slope)' : ('Manual · slope ' + st.slope.toFixed(1));
+        var sysL = { radiators: satH('sat.onb_sys_radiators'), underfloor: satH('sat.onb_sys_underfloor'), hp: satH('sat.heat_pump') }[st.system];
+        var mfrL = (typeof ENUM_OPTS !== 'undefined' && ENUM_OPTS.satmanufacturer ? (ENUM_OPTS.satmanufacturer.filter(function (o) { return ('' + o[0]) === ('' + st.mfr); })[0] || [0, t('sat.auto')])[1] : t('sat.auto'));
+        var tuneL = st.tuning === 'auto' ? satH('sat.onb_tune_auto_label') : satH('sat.onb_tune_manual_label', { slope: st.slope.toFixed(1) });
         h += '<div style="' + CARD + ';padding:30px 28px;text-align:center"><div style="width:54px;height:54px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-weight:700;font-size:24px;color:#04222c">✓</div>' +
-          '<h1 style="font-weight:700;font-size:24px;color:var(--text);margin:0 0 6px">SAT is now controlling your boiler</h1>' +
-          '<p style="font:400 13px/1.6 inherit;color:var(--muted);margin:0 auto 20px;max-width:420px">Room-driven control is live. It may take a heating cycle or two to settle.</p>' +
+          '<h1 style="font-weight:700;font-size:24px;color:var(--text);margin:0 0 6px">' + satH('sat.onb_done_title') + '</h1>' +
+          '<p style="font:400 13px/1.6 inherit;color:var(--muted);margin:0 auto 20px;max-width:420px">' + satH('sat.onb_done_body') + '</p>' +
           '<div style="text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:6px 16px;margin:0 0 20px">' +
-          '<div style="display:flex;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)"><span style="font-weight:500;font-size:12.5px;color:var(--muted)">Heating system</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + sysL + '</span></div>' +
-          '<div style="display:flex;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)"><span style="font-weight:500;font-size:12.5px;color:var(--muted)">Boiler</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + esc(mfrL) + '</span></div>' +
-          '<div style="display:flex;align-items:center;padding:11px 0"><span style="font-weight:500;font-size:12.5px;color:var(--muted)">Tuning</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + tuneL + '</span></div></div>' +
-          '<p style="font:400 11px/1.6 inherit;color:var(--muted);margin:0 0 20px;text-align:left">Written to settings: <span style="' + MONO + '">satenabled=on · sat_onboarded=on</span> plus every answer above.</p>' +
-          '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button data-sa="restart" style="' + GHOST + '">Run setup again</button>' +
-          '<button data-sa="go" style="background:var(--accent);border:0;color:#04222c;font-weight:700;font-size:15px;border-radius:11px;padding:13px 28px;cursor:pointer;min-height:48px">Open SAT dashboard</button></div></div>';
+          '<div style="display:flex;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)"><span style="font-weight:500;font-size:12.5px;color:var(--muted)">' + satH('sat.onb_step_system') + '</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + sysL + '</span></div>' +
+          '<div style="display:flex;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)"><span style="font-weight:500;font-size:12.5px;color:var(--muted)">' + satH('sat.onb_row_boiler') + '</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + esc(mfrL) + '</span></div>' +
+          '<div style="display:flex;align-items:center;padding:11px 0"><span style="font-weight:500;font-size:12.5px;color:var(--muted)">' + satH('sat.onb_step_tuning') + '</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + tuneL + '</span></div></div>' +
+          '<p style="font:400 11px/1.6 inherit;color:var(--muted);margin:0 0 20px;text-align:left">' + satH('sat.onb_written', null, { keys: '<span style="' + MONO + '">satenabled=on · sat_onboarded=on</span>' }) + '</p>' +
+          '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button data-sa="restart" style="' + GHOST + '">' + satH('sat.onb_run_again') + '</button>' +
+          '<button data-sa="go" style="background:var(--accent);border:0;color:#04222c;font-weight:700;font-size:15px;border-radius:11px;padding:13px 28px;cursor:pointer;min-height:48px">' + satH('sat.onb_open_dashboard') + '</button></div></div>';
       }
       h += '</div></div>';
       back.innerHTML = h;
@@ -6291,16 +7978,16 @@
     if (document.getElementById('simBackdrop')) return;
     var bd = document.createElement('div'); bd.id = 'simBackdrop'; bd.className = 'sim-backdrop';
     var m = document.createElement('div'); m.className = 'sim-modal';
-    var h = document.createElement('h3'); h.textContent = '⚙ No boiler detected';
-    var p = document.createElement('p'); p.textContent = 'This gateway sees no boiler or thermostat on the OpenTherm bus — looks like a bench setup. Run in simulation mode to preview live-like data?';
+    var h = document.createElement('h3'); h.textContent = '⚙ ' + t('sat.sim_title');
+    var p = document.createElement('p'); p.textContent = t('sat.sim_body');
     var acts = document.createElement('div'); acts.className = 'acts';
-    var no = document.createElement('button'); no.textContent = 'Not now';
-    var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = 'Enable simulation';
+    var no = document.createElement('button'); no.textContent = t('sat.not_now');
+    var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = t('sat.sim_enable');
     function closeSim() { try { localStorage.setItem('otgw-sim-prompted', '1'); } catch (e) { } if (bd.parentNode) bd.parentNode.removeChild(bd); }
     no.addEventListener('click', closeSim);
     yes.addEventListener('click', function () {
       fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'simulation', value: true }) })
-        .then(function (r) { if (r.ok && typeof bleToast === 'function') bleToast('Simulation enabled'); })
+        .then(function (r) { if (r.ok && typeof bleToast === 'function') bleToast(t('sat.sim_enabled')); })
         .catch(function () { });
       closeSim();
     });
@@ -6381,7 +8068,7 @@
 
     // Monitor > Log controls
     var lp = document.getElementById('logPause');
-    if (lp) lp.addEventListener('click', function () { logPaused = !logPaused; lp.textContent = logPaused ? '▶ Resume' : '⏸ Pause'; });
+    if (lp) lp.addEventListener('click', function () { logPaused = !logPaused; lp.textContent = logPaused ? '▶ ' + t('sat.log_resume') : '⏸ ' + t('sat.log_pause'); });
     var ls = document.getElementById('logSearch');
     if (ls) ls.addEventListener('input', function () { logSearch = ls.value; if (isMonitorLogVisible()) renderLog(); });
     // TASK-965: send raw OTGW command (button + Enter key)
@@ -6400,7 +8087,7 @@
     var cad = document.getElementById('chipAutoDl');
     if (cad) cad.addEventListener('click', function () { toggleAutoDl(cad); });
     var cst = document.getElementById('chipStream');
-    if (cst) { if (!window.showSaveFilePicker) cst.title = 'Save every frame: downloads the new frames as a file every 5 minutes and when you switch it off'; cst.addEventListener('click', function () { toggleStream(cst); }); }
+    if (cst) { if (!window.showSaveFilePicker) cst.title = t('sat.stream_title'); cst.setAttribute('data-i18n-title', 'sat.stream_title'); cst.addEventListener('click', function () { toggleStream(cst); }); }
     var cs = document.getElementById('chipScroll');
     if (cs) cs.addEventListener('click', function () { setLogAutoScroll(!logAutoScroll); });
     var ct = document.getElementById('chipTs');

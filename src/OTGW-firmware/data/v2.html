@@ -30,42 +30,52 @@
        Filled once from /api/v2/device/info at startup; the Wi-Fi bars + dBm refresh
        live from the /api/v2/health poll (fetchConn). -->
   <span class="hdr-net">
-    <span class="hdr-id" id="hdrHost" title="Hostname · firmware version">…</span>
-    <span class="hdr-id" id="hdrNet" title="Network connection">…</span>
+    <span class="hdr-id" id="hdrHost" title="Hostname · firmware version" data-i18n-title="h_home.hdr_host_title">…</span>
+    <span class="hdr-id" id="hdrNet" title="Network connection" data-i18n-title="h_home.hdr_net_title">…</span>
   </span>
   <span class="hdr-spacer"></span>
-  <span class="hdr-status" id="hdrStatus" title="Connectivity status">
+  <span class="hdr-status" id="hdrStatus" title="Connectivity status" data-i18n-title="h_home.hdr_status_title">
     <span class="hdr-dot"></span><span id="hdrStatMode">…</span>
   </span>
   <!-- TASK-999: connectivity pill moved up onto the header line (was a strip below the nav). -->
-  <div class="connstrip" id="connStrip" title="Connectivity — tap for details"></div>
+  <div class="connstrip" id="connStrip" title="Connectivity — tap for details" data-i18n-title="h_home.conn_strip_title"></div>
   <!-- TASK-983: shown only while OT-replay simulation is active (polled via /api/v2/simulate). -->
-  <span class="hdr-sim hidden" id="hdrSim" title="Simulation active — values may be replayed, not live from the boiler">SIMULATION</span>
+  <span class="hdr-sim hidden" id="hdrSim" title="Simulation active — values may be replayed, not live from the boiler" data-i18n-title="h_home.sim_title" data-i18n="h_home.sim_badge">SIMULATION</span>
   <span class="sub" id="clock">--:--:--</span>
+  <!-- TASK-1764: language dropdown (flag + code); entries switch the language live, see initLangMenu() in v2.js. -->
+  <details class="lang-menu" id="langMenu">
+    <summary title="Language" data-i18n-title="h_home.lang_title" aria-label="Language: English"><span class="flag flag-gb" aria-hidden="true"></span><span class="code">EN</span><span class="caret" aria-hidden="true">▾</span></summary>
+    <ul>
+      <li><a href="#" lang="en" data-lang="en" class="active" aria-current="true"><span class="flag flag-gb" aria-hidden="true"></span><span class="nm">English</span><span class="code">EN</span></a></li>
+      <li><a href="#" lang="nl" data-lang="nl"><span class="flag flag-nl" aria-hidden="true"></span><span class="nm">Nederlands</span><span class="code">NL</span></a></li>
+      <li><a href="#" lang="de" data-lang="de"><span class="flag flag-de" aria-hidden="true"></span><span class="nm">Deutsch</span><span class="code">DE</span></a></li>
+      <li><a href="#" lang="el" data-lang="el"><span class="flag flag-gr" aria-hidden="true"></span><span class="nm">Ελληνικά</span><span class="code">EL</span></a></li>
+    </ul>
+  </details>
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch to dark theme" title="Switch to dark theme">🌙 Dark</button>
 </div>
 <div class="fs-banner" id="fsMismatch" role="alert" hidden></div>
 <div class="switcher">
-  <button class="seg active" data-page="home"><b data-i18n="nav.home">Home</b><small>opening page</small></button>
-  <button class="seg" data-page="sat"><b data-i18n="nav.sat">SAT</b><small>thermostat · control · technical</small></button>
-  <button class="seg" data-page="monitor"><b data-i18n="nav.monitor">Monitor</b><small>log · stats · support · graph · connection</small></button>
-  <button class="seg" data-page="settings"><b data-i18n="nav.settings">Settings</b><small>grouped &amp; scannable</small></button>
-  <button class="seg" data-page="advanced"><b data-i18n="nav.advanced">Advanced</b><small>pic · debug · files · system</small></button>
-  <button class="seg hidden" data-page="diagnose"><b>Diagnose</b><small>PIC test menu</small></button>
+  <button class="seg active" data-page="home"><b data-i18n="nav.home">Home</b><small data-i18n="h_home.nav_home_sub">opening page</small></button>
+  <button class="seg" data-page="sat"><b data-i18n="nav.sat">SAT</b><small data-i18n="h_home.nav_sat_sub">thermostat · control · technical</small></button>
+  <button class="seg" data-page="monitor"><b data-i18n="nav.monitor">Monitor</b><small data-i18n="h_home.nav_monitor_sub">log · stats · support · graph · connection</small></button>
+  <button class="seg" data-page="settings"><b data-i18n="nav.settings">Settings</b><small data-i18n="h_home.nav_settings_sub">grouped &amp; scannable</small></button>
+  <button class="seg" data-page="advanced"><b data-i18n="nav.advanced">Advanced</b><small data-i18n="h_home.nav_advanced_sub">pic · debug · files · system</small></button>
+  <button class="seg hidden" data-page="diagnose"><b data-i18n="h_home.nav_diagnose">Diagnose</b><small data-i18n="h_home.nav_diagnose_sub">PIC test menu</small></button>
 </div>
 <div class="wrap">
 
 <!-- ════════════════ PAGE: HOME ════════════════ -->
 <div id="page-home" class="page active">
 <div class="viewpick" id="viewPick">
-  <button type="button" class="viewpick-btn" id="viewPickBtn" aria-haspopup="true" aria-expanded="false" title="Choose home view">
+  <button type="button" class="viewpick-btn" id="viewPickBtn" aria-haspopup="true" aria-expanded="false" title="Choose home view" data-i18n-title="h_home.viewpick_title">
     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="1" y="1" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1"/></svg>
-    <span class="vp-lead">View:</span><span id="viewPickLabel">System view</span><span class="vp-car">▾</span>
+    <span class="vp-lead" data-i18n="h_home.viewpick_lead">View:</span><span id="viewPickLabel">System view</span><span class="vp-car">▾</span>
   </button>
   <div class="viewpick-menu" id="viewPickMenu" role="menu">
-    <button type="button" class="vp-item active" data-design="a" role="menuitem"><span class="vp-chk">✓</span><span>System view<small>the heating system, live</small></span></button>
-    <button type="button" class="vp-item" data-design="b" role="menuitem"><span class="vp-chk">✓</span><span>At a glance<small>phone-first, one dial</small></span></button>
-    <button type="button" class="vp-item" data-design="c" role="menuitem"><span class="vp-chk">✓</span><span>Mission control<small>live strip chart + raw bus</small></span></button>
+    <button type="button" class="vp-item active" data-design="a" role="menuitem"><span class="vp-chk">✓</span><span><span data-i18n="h_home.view_a_name">System view</span><small data-i18n="h_home.view_a_sub">the heating system, live</small></span></button>
+    <button type="button" class="vp-item" data-design="b" role="menuitem"><span class="vp-chk">✓</span><span><span data-i18n="h_home.view_b_name">At a glance</span><small data-i18n="h_home.view_b_sub">phone-first, one dial</small></span></button>
+    <button type="button" class="vp-item" data-design="c" role="menuitem"><span class="vp-chk">✓</span><span><span data-i18n="h_home.view_c_name">Mission control</span><small data-i18n="h_home.view_c_sub">live strip chart + raw bus</small></span></button>
   </div>
 </div>
 
@@ -74,15 +84,15 @@
   <div class="schemcard">
     <div class="statusline" id="aStatus"><span class="dot"></span><span id="aStatusTxt">—</span>
       <span class="appl-toggle" id="applToggle">
-        <button class="seg2btn active" data-appl="gas">🔥 Boiler</button>
-        <button class="seg2btn" data-appl="hp">⚡ Heat pump</button>
+        <button class="seg2btn active" data-appl="gas">🔥 <span data-i18n="h_home.appl_boiler">Boiler</span></button>
+        <button class="seg2btn" data-appl="hp">⚡ <span data-i18n="h_home.appl_hp">Heat pump</span></button>
       </span>
       <!-- TASK-984: injected-value badge. Hidden when zero; opens the override panel. -->
-      <button class="ovr-badge hidden" id="aOvrBadge" style="margin-left:auto" title="The gateway is injecting values onto the OT bus — click for detail">⛓ <span id="aOvrCount">0</span> injected</button>
+      <button class="ovr-badge hidden" id="aOvrBadge" style="margin-left:auto" title="The gateway is injecting values onto the OT bus — click for detail" data-i18n-title="h_home.ovr_badge_title">⛓ <span id="aOvrCount">0</span> <span data-i18n="h_home.ovr_badge_suffix">injected</span></button>
     </div>
 
     <svg class="schematic" id="schem" viewBox="0 0 800 470" role="img"
-         aria-label="Live diagram of the heating system">
+         aria-label="Live diagram of the heating system" data-i18n-aria-label="h_home.schem_aria">
       <defs>
         <linearGradient id="gHot" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0" stop-color="#ff8a3c"/><stop offset="1" stop-color="#ff4d2e"/>
@@ -114,14 +124,14 @@
       <g transform="translate(232,38)">
         <rect x="-46" y="-17" width="92" height="34" rx="11" class="chip-dhw"/>
         <text class="chip-txt" y="3" font-size="17" id="aDhw">—</text>
-        <text class="chip-sub" y="14.5">DHW</text>
+        <text class="chip-sub" y="14.5" data-i18n="h_home.svg_dhw">DHW</text>
       </g>
 
       <!-- Outside chip -->
       <g transform="translate(660,34)">
         <path class="cloud" d="M14,22 a10,10 0 0 1 2,-19.8 a13,13 0 0 1 25,2 a8.5,8.5 0 0 1 -1,17.8 z"/>
         <text class="label-big" x="52" y="18" id="aOut">—</text>
-        <text class="label-tag" x="52" y="32">OUTSIDE</text>
+        <text class="label-tag" x="52" y="32" data-i18n="h_home.svg_outside">OUTSIDE</text>
       </g>
 
       <!-- Boiler / heat pump body -->
@@ -153,7 +163,7 @@
 
       <!-- prominent modulation readout -->
       <text class="mod-big" x="150" y="286" id="aModBig">—</text>
-      <text class="mod-tag" x="150" y="300" id="aModTag">MODULATION</text>
+      <text class="mod-tag" x="150" y="300" id="aModTag" data-i18n="h_home.svg_modulation">MODULATION</text>
 
       <!-- pressure mini-gauge on boiler face (lower) -->
       <g transform="translate(0,10)">
@@ -175,7 +185,7 @@
       <g transform="translate(310,128)">
         <rect x="-52" y="-22" width="104" height="44" rx="12" class="chip-hot"/>
         <text class="chip-txt" y="0" id="aFlow">—</text>
-        <text class="chip-sub" y="15">FLOW →</text>
+        <text class="chip-sub" y="15" data-i18n="h_home.svg_flow">FLOW →</text>
       </g>
 
       <!-- RETURN pipe (blue, back into the boiler) -->
@@ -185,7 +195,7 @@
       <g transform="translate(310,392)">
         <rect x="-52" y="-22" width="104" height="44" rx="12" class="chip-cold"/>
         <text class="chip-txt" y="0" id="aRet">—</text>
-        <text class="chip-sub" y="15">← RETURN</text>
+        <text class="chip-sub" y="15" data-i18n="h_home.svg_return">← RETURN</text>
       </g>
 
       <!-- ΔT chip -->
@@ -217,21 +227,21 @@
         <path class="house" d="M0,10 L13,-3 L26,10 V28 H0 Z"/>
         <text class="label-big" x="36" y="13" id="aRoom">—</text>
         <text class="label-sub" x="36" y="28" id="aRoomSet"></text>
-        <text class="label-tag" x="120" y="13">ROOM</text>
+        <text class="label-tag" x="120" y="13" data-i18n="h_home.svg_room">ROOM</text>
       </g>
 
       <!-- emitter label (TASK-1392: neutral, the emitters may be radiators or floor heating) -->
-      <text class="label-tag" x="560" y="334">SPACE HEATING</text>
+      <text class="label-tag" x="560" y="334" data-i18n="h_home.svg_space_heating">SPACE HEATING</text>
     </svg>
 
     <div class="mobile-strip" id="aStrip"></div>
   </div>
 
   <div class="tiles">
-    <div class="tile" id="aTFlame"><span class="led"></span><div><div class="lbl">Flame</div><div class="val">—</div></div></div>
-    <div class="tile" id="aTCH"><span class="led"></span><div><div class="lbl">Heating</div><div class="val">—</div></div></div>
-    <div class="tile" id="aTDHW"><span class="led"></span><div><div class="lbl">Hot water</div><div class="val">—</div></div></div>
-    <div class="tile" id="aTFault"><span class="led"></span><div><div class="lbl">Fault</div><div class="val">—</div></div></div>
+    <div class="tile" id="aTFlame"><span class="led"></span><div><div class="lbl" data-i18n="h_home.tile_flame">Flame</div><div class="val">—</div></div></div>
+    <div class="tile" id="aTCH"><span class="led"></span><div><div class="lbl" data-i18n="h_home.tile_heating">Heating</div><div class="val">—</div></div></div>
+    <div class="tile" id="aTDHW"><span class="led"></span><div><div class="lbl" data-i18n="h_home.tile_dhw">Hot water</div><div class="val">—</div></div></div>
+    <div class="tile" id="aTFault"><span class="led"></span><div><div class="lbl" data-i18n="h_home.tile_fault">Fault</div><div class="val">—</div></div></div>
   </div>
 </section>
 
@@ -242,7 +252,7 @@
     <div class="g-status" id="bStatus"><span class="dot"></span><span id="bStatusTxt">—</span></div>
 
     <div class="hero">
-      <svg viewBox="0 0 240 240" aria-label="Room temperature dial">
+      <svg viewBox="0 0 240 240" aria-label="Room temperature dial" data-i18n-aria-label="h_home.dial_aria">
         <path class="hero-track" id="bTrack" d=""/>
         <path class="hero-arc" id="bArc" d=""/>
         <line class="hero-tick" id="bTick" x1="0" y1="0" x2="0" y2="0"/>
@@ -250,34 +260,34 @@
         <text class="hero-sub" x="120" y="152" id="bSet">target —</text>
       </svg>
       <div>
-        <button class="stepbtn" id="bDown" aria-label="Lower target">−</button>
-        <button class="stepbtn" id="bUp" aria-label="Raise target">+</button>
+        <button class="stepbtn" id="bDown" aria-label="Lower target" data-i18n-aria-label="h_home.target_down">−</button>
+        <button class="stepbtn" id="bUp" aria-label="Raise target" data-i18n-aria-label="h_home.target_up">+</button>
       </div>
       <div class="cmdline" id="bCmd"></div>
     </div>
 
     <div class="statgrid">
       <div class="stat">
-        <div class="lbl">Boiler</div>
+        <div class="lbl" data-i18n="h_home.stat_boiler">Boiler</div>
         <div class="big"><span class="hotArrow">↑ <span id="bFlow">—</span></span>
           <span class="flamebadge" id="bFlame">🔥</span></div>
         <div class="big" style="font-size:1.05rem"><span class="coldArrow">↓ <span id="bRet">—</span></span>
           <span style="color:var(--muted);font-size:.8rem" id="bDt">ΔT —</span></div>
       </div>
       <div class="stat">
-        <div class="lbl">Pressure</div>
+        <div class="lbl" data-i18n="h_home.stat_pressure">Pressure</div>
         <div class="big" id="bPress">—</div>
         <div class="zonebar"><div class="zonedot" id="bPressDot" style="left:44%"></div></div>
       </div>
       <div class="stat">
-        <div class="lbl">Modulation</div>
+        <div class="lbl" data-i18n="h_home.stat_modulation">Modulation</div>
         <div class="modwrap">
           <div class="modbar"><div class="modfill" id="bModFill" style="height:45%"></div></div>
           <div class="big" id="bMod">—</div>
         </div>
       </div>
       <div class="stat">
-        <div class="lbl">Hot water</div>
+        <div class="lbl" data-i18n="h_home.stat_dhw">Hot water</div>
         <div class="big" id="bDhw">—</div>
         <div style="font-size:.8rem;color:var(--muted)" id="bDhwState">standby</div>
       </div>
@@ -294,12 +304,12 @@
 
     <div class="stripcard">
       <div class="legend">
-        <span><i style="background:var(--hot)"></i>flow</span>
-        <span><i style="background:var(--cold)"></i>return</span>
-        <span><i style="background:#8b949e"></i>setpoint</span>
-        <span><i style="background:rgba(0,191,254,.5)"></i>modulation</span>
+        <span><i style="background:var(--hot)"></i><span data-i18n="h_home.leg_flow">flow</span></span>
+        <span><i style="background:var(--cold)"></i><span data-i18n="h_home.leg_return">return</span></span>
+        <span><i style="background:#8b949e"></i><span data-i18n="h_home.leg_setpoint">setpoint</span></span>
+        <span><i style="background:rgba(0,191,254,.5)"></i><span data-i18n="h_home.leg_modulation">modulation</span></span>
       </div>
-      <svg viewBox="0 0 780 210" id="strip" role="img" aria-label="Live flow/return/setpoint/modulation strip chart">
+      <svg viewBox="0 0 780 210" id="strip" role="img" aria-label="Live flow/return/setpoint/modulation strip chart" data-i18n-aria-label="h_home.strip_aria">
         <line x1="34" y1="10" x2="34" y2="170" stroke="var(--border)"/>
         <line x1="34" y1="170" x2="772" y2="170" stroke="var(--border)"/>
         <text class="axis-txt" x="8" y="16">90°</text>
@@ -316,7 +326,7 @@
 
     <div class="mc-grid" id="cGrid"></div>
 
-    <div class="ticker" id="cTicker" role="log" aria-live="polite" aria-label="Live OpenTherm frames"></div>
+    <div class="ticker" id="cTicker" role="log" aria-live="polite" aria-label="Live OpenTherm frames" data-i18n-aria-label="h_home.ticker_aria"></div>
   </div>
 </section>
 </div><!-- /page-home -->
@@ -331,23 +341,23 @@
 <div id="page-sat" class="page">
   <div class="sat-head">
     <div class="sat-title">SAT · Smart Autotune Thermostat <span class="sat-pill off" id="satPill">…</span></div>
-    <button id="satRerunSetup" class="fs-btn" style="margin-left:auto">Re-run setup</button>
+    <button id="satRerunSetup" class="fs-btn" style="margin-left:auto" data-i18n="h_mon.sat_rerun_setup">Re-run setup</button>
     <label class="sat-switch" style="margin-left:12px"><span id="satEnableLbl">Enabled</span><input type="checkbox" class="sw" id="satEnable"></label>
   </div>
 
   <div class="sat-views">
-    <button class="satview-btn active" data-sv="simple"><b>🏠 Thermostat</b><small>simple</small></button>
-    <button class="satview-btn" data-sv="control"><b>🎛 Control</b><small>operational</small></button>
-    <button class="satview-btn" data-sv="technical"><b>🔬 Technical</b><small>the control loop</small></button>
+    <button class="satview-btn active" data-sv="simple"><b>🏠 <span data-i18n="h_mon.sv_thermo">Thermostat</span></b><small data-i18n="h_mon.sv_thermo_sub">simple</small></button>
+    <button class="satview-btn" data-sv="control"><b>🎛 <span data-i18n="h_mon.sv_control">Control</span></b><small data-i18n="h_mon.sv_control_sub">operational</small></button>
+    <button class="satview-btn" data-sv="technical"><b>🔬 <span data-i18n="h_mon.sv_tech">Technical</span></b><small data-i18n="h_mon.sv_tech_sub">the control loop</small></button>
   </div>
 
   <!-- no-data banner: shown when /api/v2/sat/status is unreachable (older firmware / build without SAT) -->
-  <div class="card" id="satNoData" style="display:none;text-align:center;color:var(--muted)">SAT status is unavailable on this device.</div>
+  <div class="card" id="satNoData" style="display:none;text-align:center;color:var(--muted)" data-i18n="h_mon.sat_nodata">SAT status is unavailable on this device.</div>
 
   <!-- TASK-1507: beta notice, filled and shown by v2.js only on a prerelease firmware; dismissed per browser session -->
   <div id="satBetaNotice" class="pic-banner warn" role="note" style="display:none">
     <div id="satBetaNoticeText"></div>
-    <button id="satBetaNoticeClose" class="fs-btn" type="button" style="margin-top:8px">Dismiss for this session</button>
+    <button id="satBetaNoticeClose" class="fs-btn" type="button" style="margin-top:8px" data-i18n="h_mon.sat_beta_dismiss">Dismiss for this session</button>
   </div>
 
   <div id="satBody" class="sv-simple">
@@ -356,44 +366,44 @@
     <div class="sat-l1">
       <div class="sat-thermo-wrap">
         <div class="sat-dial-card">
-          <svg viewBox="0 0 240 240" id="satDial" aria-label="Room thermostat"></svg>
-          <div class="sat-steps"><button class="stepbtn" id="satDown" aria-label="lower target">−</button><button class="stepbtn" id="satUp" aria-label="raise target">+</button></div>
+          <svg viewBox="0 0 240 240" id="satDial" aria-label="Room thermostat" data-i18n-aria-label="h_mon.sat_dial_aria"></svg>
+          <div class="sat-steps"><button class="stepbtn" id="satDown" aria-label="lower target" data-i18n-aria-label="h_mon.sat_lower">−</button><button class="stepbtn" id="satUp" aria-label="raise target" data-i18n-aria-label="h_mon.sat_raise">+</button></div>
         </div>
         <div class="sat-side">
           <div class="sat-status-big" id="satStatusBig">—</div>
-          <div class="sat-hint" id="satRoomLost" hidden>Room temperature lost: heating on the curve only</div>
-          <div class="sat-hint" id="satOtLost" hidden>OpenTherm lost: boiler handed back</div>
-          <div class="sat-hint" id="satOutsideMissing" hidden>No outside temperature for 1 hour: boiler handed back</div>
-          <div class="sat-hint" id="satPushRefused" hidden>The thermostat refuses the pushed setpoint (it keeps its own value).</div>
-          <div class="sat-side-lbl">Presets</div>
+          <div class="sat-hint" id="satRoomLost" hidden data-i18n="h_mon.sat_room_lost">Room temperature lost: heating on the curve only</div>
+          <div class="sat-hint" id="satOtLost" hidden data-i18n="h_mon.sat_ot_lost">OpenTherm lost: boiler handed back</div>
+          <div class="sat-hint" id="satOutsideMissing" hidden data-i18n="h_mon.sat_outside_missing">No outside temperature for 1 hour: boiler handed back</div>
+          <div class="sat-hint" id="satPushRefused" hidden data-i18n="h_mon.sat_push_refused">The thermostat refuses the pushed setpoint (it keeps its own value).</div>
+          <div class="sat-side-lbl" data-i18n="h_mon.sat_presets">Presets</div>
           <div class="sat-presets" id="satPresets"></div>
-          <div class="sat-hint">Pick a preset or set the temperature — SAT works out the boiler.</div>
+          <div class="sat-hint" data-i18n="h_mon.sat_presets_hint">Pick a preset or set the temperature — SAT works out the boiler.</div>
         </div>
       </div>
-      <div class="card"><h4>SAT control loop <span class="sub">live</span></h4>
+      <div class="card"><h4><span data-i18n="h_mon.sat_loop_title">SAT control loop</span> <span class="sub" data-i18n="h_mon.sat_loop_live">live</span></h4>
         <svg viewBox="0 0 600 200" id="satHistChart" preserveAspectRatio="none" style="height:200px"></svg>
         <div class="legend" id="satHistLegend"></div>
-        <div class="sat-hint">SAT target and PID output since this page was opened. Full boiler history: <button type="button" class="sat-link" id="satHistMonitorLink">Monitor &rsaquo; Graph</button></div></div>
+        <div class="sat-hint"><span data-i18n="h_mon.sat_hist_hint">SAT target and PID output since this page was opened. Full boiler history:</span> <button type="button" class="sat-link" id="satHistMonitorLink" data-i18n="h_mon.sat_hist_link">Monitor &rsaquo; Graph</button></div></div>
       <!-- Closed by default; the open state is stored only on a click on the summary (wireSat, concept rule 4) -->
       <details class="grp" data-grp="sat-dhw" id="satDhwGrp">
-        <summary>Hot water</summary>
+        <summary data-i18n="h_mon.sat_hw_title">Hot water</summary>
         <div class="grp-body">
           <div class="kv">
-            <div class="kv-row"><span class="kv-k">Standalone DHW control</span><span class="kv-v"><input type="checkbox" class="sw" id="satDhwEnabled" aria-label="Standalone DHW control"></span></div>
-            <div class="kv-row"><span class="kv-k">DHW setpoint</span><span class="kv-v"><input type="range" min="30" max="60" value="50" id="satDhwSlider" class="sat-slider" aria-label="DHW setpoint" disabled> <b id="satDhwR">—</b></span></div>
-            <div class="kv-row" id="satDhwEnableRow" style="display:none"><span class="kv-k">DHW enable (HW=)</span><span class="kv-v"><input type="checkbox" class="sw" id="satDhwEnable" aria-label="DHW enable"></span></div>
+            <div class="kv-row"><span class="kv-k" data-i18n="h_mon.sat_dhw_standalone">Standalone DHW control</span><span class="kv-v"><input type="checkbox" class="sw" id="satDhwEnabled" aria-label="Standalone DHW control" data-i18n-aria-label="h_mon.sat_dhw_standalone"></span></div>
+            <div class="kv-row"><span class="kv-k" data-i18n="h_mon.sat_dhw_setpoint">DHW setpoint</span><span class="kv-v"><input type="range" min="30" max="60" value="50" id="satDhwSlider" class="sat-slider" aria-label="DHW setpoint" data-i18n-aria-label="h_mon.sat_dhw_setpoint" disabled> <b id="satDhwR">—</b></span></div>
+            <div class="kv-row" id="satDhwEnableRow" style="display:none"><span class="kv-k" data-i18n="h_mon.sat_dhw_enable">DHW enable (HW=)</span><span class="kv-v"><input type="checkbox" class="sw" id="satDhwEnable" aria-label="DHW enable" data-i18n-aria-label="h_mon.sat_dhw_enable_aria"></span></div>
           </div>
-          <div class="sat-hint" id="satDhwHint">SAT sends this setpoint to the boiler only while standalone DHW control is on.</div>
+          <div class="sat-hint" id="satDhwHint" data-i18n="h_mon.sat_dhw_hint">SAT sends this setpoint to the boiler only while standalone DHW control is on.</div>
         </div>
       </details>
       <details class="grp" data-grp="sat-maxflow" id="satMaxGrp">
-        <summary>Central Heating Settings</summary>
+        <summary data-i18n="h_mon.sat_ch_title">Central Heating Settings</summary>
         <div class="grp-body">
           <div class="kv">
-            <div class="kv-row"><span class="kv-k">Max flow setpoint</span><span class="kv-v"><input type="range" min="20" max="80" value="62" id="satMaxSlider" class="sat-slider" aria-label="Max flow setpoint"> <b id="satMaxR">—</b></span></div>
-            <div class="kv-row"><span class="kv-k">Max relative modulation</span><span class="kv-v"><input type="range" min="0" max="100" value="100" id="satModSlider" class="sat-slider" aria-label="Max relative modulation"> <b id="satModR">—</b></span></div>
+            <div class="kv-row"><span class="kv-k" data-i18n="h_mon.sat_max_flow">Max flow setpoint</span><span class="kv-v"><input type="range" min="20" max="80" value="62" id="satMaxSlider" class="sat-slider" aria-label="Max flow setpoint" data-i18n-aria-label="h_mon.sat_max_flow"> <b id="satMaxR">—</b></span></div>
+            <div class="kv-row"><span class="kv-k" data-i18n="h_mon.sat_max_mod">Max relative modulation</span><span class="kv-v"><input type="range" min="0" max="100" value="100" id="satModSlider" class="sat-slider" aria-label="Max relative modulation" data-i18n-aria-label="h_mon.sat_max_mod"> <b id="satModR">—</b></span></div>
           </div>
-          <div class="sat-hint" id="satMaxHint">SAT never sends a flow setpoint above this. Until you move the slider SAT uses 62 °C (50 °C underfloor) and sends nothing to the boiler; a chosen value is also sent to the boiler (SH=). Max relative modulation caps the modulation SAT sends (MM=); 100 % is no cap. Some boilers ignore it.</div>
+          <div class="sat-hint" id="satMaxHint" data-i18n="h_mon.sat_max_hint">SAT never sends a flow setpoint above this. Until you move the slider SAT uses 62 °C (50 °C underfloor) and sends nothing to the boiler; a chosen value is also sent to the boiler (SH=). Max relative modulation caps the modulation SAT sends (MM=); 100 % is no cap. Some boilers ignore it.</div>
         </div>
       </details>
     </div>
@@ -401,62 +411,62 @@
     <!-- L2 Control: burner cycle mode, live tiles, heating curve, control status, weather -->
     <div class="sat-l2">
       <div class="sat-row2 sat-row-1up">
-        <div class="card sat-mini"><h4>Burner cycle mode</h4><div class="sat-status-big" id="satCycleMode">—</div><div class="sub" id="satCycleSub">—</div></div>
+        <div class="card sat-mini"><h4 data-i18n="h_mon.sat_cycle_title">Burner cycle mode</h4><div class="sat-status-big" id="satCycleMode">—</div><div class="sub" id="satCycleSub">—</div></div>
       </div>
       <div class="sat-tiles4">
-        <div class="sat-tile"><div class="l">Outside</div><div class="v" id="satOut">—</div></div>
-        <div class="sat-tile"><div class="l">Boiler setpoint <span class="tag">SAT → boiler</span></div><div class="v hot" id="satFlowSet">—</div></div>
-        <div class="sat-tile"><div class="l">Room</div><div class="v" id="satRoom">—</div></div>
-        <div class="sat-tile is-target"><div class="l">Target</div><div class="v" id="satTargetT">—</div></div>
+        <div class="sat-tile"><div class="l" data-i18n="h_mon.sat_tile_outside">Outside</div><div class="v" id="satOut">—</div></div>
+        <div class="sat-tile"><div class="l"><span data-i18n="h_mon.sat_tile_setpoint">Boiler setpoint</span> <span class="tag" data-i18n="h_mon.sat_tile_setpoint_tag">SAT → boiler</span></div><div class="v hot" id="satFlowSet">—</div></div>
+        <div class="sat-tile"><div class="l" data-i18n="h_mon.sat_tile_room">Room</div><div class="v" id="satRoom">—</div></div>
+        <div class="sat-tile is-target"><div class="l" data-i18n="h_mon.sat_tile_target">Target</div><div class="v" id="satTargetT">—</div></div>
       </div>
-      <div class="card sat-curve-hero"><h4>Heating curve <span class="sub" id="satCurveLbl"></span></h4>
+      <div class="card sat-curve-hero"><h4><span data-i18n="h_mon.sat_curve_title">Heating curve</span> <span class="sub" id="satCurveLbl"></span></h4>
         <div class="curve-wrap">
           <svg viewBox="0 0 600 300" id="satCurveBig"></svg>
           <div class="curve-side">
             <div class="curve-legend" id="satCurveLegend"></div>
-            <div class="marker-head">Calibration markers <span class="sub">click the curve to add</span></div>
+            <div class="marker-head"><span data-i18n="h_mon.sat_markers">Calibration markers</span> <span class="sub" data-i18n="h_mon.sat_markers_hint">click the curve to add</span></div>
             <ul class="marker-list" id="satMarkerList"></ul>
           </div>
         </div>
       </div>
       <div class="sat-row2 sat-row-2up">
-        <div class="card"><h4>Control status</h4><div class="kv" id="satControlStatus"></div></div>
-        <div class="card"><h4>Weather <span class="sub">Open-Meteo</span></h4><div class="kv" id="satWeatherKv"></div>
-          <button class="tbtn" id="satDetectLoc" style="margin-top:8px">Detect location</button>
+        <div class="card"><h4 data-i18n="h_mon.sat_ctrl_status">Control status</h4><div class="kv" id="satControlStatus"></div></div>
+        <div class="card"><h4><span data-i18n="h_mon.sat_weather">Weather</span> <span class="sub">Open-Meteo</span></h4><div class="kv" id="satWeatherKv"></div>
+          <button class="tbtn" id="satDetectLoc" style="margin-top:8px" data-i18n="h_mon.sat_detect_loc">Detect location</button>
           <span class="sub" id="satCoords" style="margin-left:8px"></span>
           <div class="sub" id="satLocHint" style="margin-top:8px" hidden></div></div>
       </div>
       <!-- TASK-1211: the SAT settings a user chooses (system, presets, indoor source, areas, weather, hot water, season) -->
-      <h4 class="sat-set-head">SAT settings</h4>
+      <h4 class="sat-set-head" data-i18n="h_mon.sat_settings_head">SAT settings</h4>
       <div class="set-cards" id="satSetL2"></div>
     </div>
 
     <!-- L3 Technical — health, PID, PWM/cycle, smart features, external sensors, simulation, raw JSON -->
     <div class="sat-l3">
-      <div class="card"><h4>Health</h4><div class="health-strip" id="satHealth"></div></div>
+      <div class="card"><h4 data-i18n="h_mon.sat_health">Health</h4><div class="health-strip" id="satHealth"></div></div>
       <div class="sat-row2 sat-row-2up">
-        <div class="card"><h4>PID controller</h4><div class="kv" id="satPidKv"></div></div>
-        <div class="card"><h4>PWM &amp; cycle tracking</h4><div class="kv" id="satPwmKv"></div></div>
+        <div class="card"><h4 data-i18n="h_mon.sat_pid">PID controller</h4><div class="kv" id="satPidKv"></div></div>
+        <div class="card"><h4 data-i18n="h_mon.sat_pwm">PWM &amp; cycle tracking</h4><div class="kv" id="satPwmKv"></div></div>
       </div>
       <div class="sat-row2 sat-row-2up">
-        <div class="card"><h4>Smart features</h4><div class="kv" id="satSmartKv"></div></div>
-        <div class="card"><h4>External sensors</h4><div class="kv" id="satExtKv"></div></div>
+        <div class="card"><h4 data-i18n="h_mon.sat_smart">Smart features</h4><div class="kv" id="satSmartKv"></div></div>
+        <div class="card"><h4 data-i18n="h_mon.sat_ext">External sensors</h4><div class="kv" id="satExtKv"></div></div>
       </div>
       <div class="sat-row2 sat-row-2up">
-        <div class="card"><h4>Simulation &amp; diagnostics</h4><div class="kv" id="satSimKv"></div>
-          <label class="sat-switch" style="margin-top:10px"><span>Bench simulation</span><input type="checkbox" class="sw" id="satSim"></label>
+        <div class="card"><h4 data-i18n="h_mon.sat_sim">Simulation &amp; diagnostics</h4><div class="kv" id="satSimKv"></div>
+          <label class="sat-switch" style="margin-top:10px"><span data-i18n="h_mon.sat_bench_sim">Bench simulation</span><input type="checkbox" class="sw" id="satSim"></label>
           <div class="sub" id="satSimHint" style="margin-top:6px"></div></div>
-        <div class="card"><h4><button class="raw-toggle" id="satRawToggle" aria-expanded="false">▸ Raw data (JSON)</button></h4>
+        <div class="card"><h4><button class="raw-toggle" id="satRawToggle" aria-expanded="false">▸ <span data-i18n="tools.sat_raw_data">Raw data (JSON)</span></button></h4>
           <pre class="raw-json" id="satRawJson" style="display:none"></pre></div>
       </div>
       <!-- TASK-1211: the SAT tuning settings (curve, PID/PWM, offsets, boiler, thermal, sensors, PV boost) -->
-      <h4 class="sat-set-head">SAT tuning</h4>
+      <h4 class="sat-set-head" data-i18n="h_mon.sat_tuning_head">SAT tuning</h4>
       <div class="set-cards" id="satSetL3"></div>
     </div>
     <div class="savebar" id="satSaveBar">
-      <span class="msg"><b id="satDirtyCount">0</b> unsaved change(s)</span>
-      <button class="discard" id="satBtnDiscard">Discard</button>
-      <button class="save" id="satBtnSave">Save settings</button>
+      <span class="msg"><b id="satDirtyCount">0</b> <span data-i18n="h_mon.sat_unsaved">unsaved change(s)</span></span>
+      <button class="discard" id="satBtnDiscard" data-i18n="h_mon.sat_discard">Discard</button>
+      <button class="save" id="satBtnSave" data-i18n="h_mon.sat_save">Save settings</button>
     </div>
   </div>
 </div><!-- /page-sat -->
@@ -465,42 +475,42 @@
 <div id="page-monitor" class="page">
 
   <div class="subtabs">
-    <button class="subtab active" data-tab="mlog">Log</button>
-    <button class="subtab" data-tab="mvalues">Values</button>
-    <button class="subtab" data-tab="mstats">Statistics</button>
-    <button class="subtab" data-tab="msupport">OT Support</button>
-    <button class="subtab" data-tab="mgraph">Graph</button>
-    <button class="subtab" data-tab="mconn">Connection</button>
+    <button class="subtab active" data-tab="mlog" data-i18n="h_mon.tab_log">Log</button>
+    <button class="subtab" data-tab="mvalues" data-i18n="h_mon.tab_values">Values</button>
+    <button class="subtab" data-tab="mstats" data-i18n="h_mon.tab_stats">Statistics</button>
+    <button class="subtab" data-tab="msupport" data-i18n="h_mon.tab_support">OT Support</button>
+    <button class="subtab" data-tab="mgraph" data-i18n="h_mon.tab_graph">Graph</button>
+    <button class="subtab" data-tab="mconn" data-i18n="h_mon.tab_conn">Connection</button>
   </div>
 
   <div id="mlog" class="mpanel active">
     <div class="toolbar">
-      <button class="tbtn" id="logPause">⏸ Pause</button>
-      <button class="tbtn" id="logClear">Clear</button>
-      <button class="tbtn" id="logDownload">⬇ Download</button>
-      <input class="tsearch" id="logSearch" placeholder="Filter frames… (e.g. 19, Boiler, DHW)">
-      <span class="tchip on" id="chipScroll">Auto-scroll</span>
-      <span class="tchip on" id="chipTs">Timestamps</span>
+      <button class="tbtn" id="logPause" data-i18n="tools.log_pause">⏸ Pause</button>
+      <button class="tbtn" id="logClear" data-i18n="h_mon.log_clear">Clear</button>
+      <button class="tbtn" id="logDownload">⬇ <span data-i18n="h_mon.log_download">Download</span></button>
+      <input class="tsearch" id="logSearch" placeholder="Filter frames… (e.g. 19, Boiler, DHW)" data-i18n-placeholder="h_mon.log_filter_ph">
+      <span class="tchip on" id="chipScroll" data-i18n="h_mon.log_autoscroll">Auto-scroll</span>
+      <span class="tchip on" id="chipTs" data-i18n="h_mon.log_timestamps">Timestamps</span>
       <!-- TASK-970: Log power-features (SAT-only filter, auto-download, stream-to-file). -->
-      <span class="tchip" id="chipSatOnly" title="Show only SAT narration lines">SAT only</span>
-      <span class="tchip" id="chipCapture" title="Capture: keep up to 200,000 lines (about a day) for Download instead of the last 2,000">Capture</span>
-      <span class="tchip" id="chipAutoDl" title="Download the log automatically every 15 minutes">Auto-download</span>
-      <span class="tchip" id="chipStream" title="Stream every frame straight to a local file you pick">Stream to file</span>
+      <span class="tchip" id="chipSatOnly" title="Show only SAT narration lines" data-i18n-title="h_mon.log_sat_only_title" data-i18n="h_mon.log_sat_only">SAT only</span>
+      <span class="tchip" id="chipCapture" title="Capture: keep up to 200,000 lines (about a day) for Download instead of the last 2,000" data-i18n-title="h_mon.log_capture_title" data-i18n="h_mon.log_capture">Capture</span>
+      <span class="tchip" id="chipAutoDl" title="Download the log automatically every 15 minutes" data-i18n-title="h_mon.log_autodl_title" data-i18n="h_mon.log_autodl">Auto-download</span>
+      <span class="tchip" id="chipStream" title="Stream every frame straight to a local file you pick" data-i18n="h_mon.log_stream">Stream to file</span>
     </div>
     <!-- TASK-965/981: send a raw OTGW command (PS=1, TT=20.5, GW=1, ...). Works on PIC
          and OT-Direct (OTGW32 translates PIC commands to OT frames natively). The prompt
          label is bound to the live command interface (PIC › vs OT ›) in fetchConn. -->
     <div class="cmdbar" id="otCmdBar">
       <span class="cmdbar-prompt" id="otCmdPrompt">PIC &rsaquo;</span>
-      <input class="cmdbar-in" id="otCmdInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Command, e.g. PS=1, TT=20.5, GW=1" aria-label="OTGW command">
-      <button class="cmdbar-send" id="otCmdSend">Send</button>
+      <input class="cmdbar-in" id="otCmdInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Command, e.g. PS=1, TT=20.5, GW=1" aria-label="OTGW command" data-i18n-placeholder="h_mon.cmd_ph" data-i18n-aria-label="h_mon.cmd_aria">
+      <button class="cmdbar-send" id="otCmdSend" data-i18n="h_mon.cmd_send">Send</button>
     </div>
     <span class="tchip" id="otCmdStatus" style="display:none;margin:0 0 8px" aria-live="polite"></span>
-    <div class="console" id="monLog" role="log" aria-live="polite" aria-label="Live OpenTherm log"></div>
+    <div class="console" id="monLog" role="log" aria-live="polite" aria-label="Live OpenTherm log" data-i18n-aria-label="h_mon.log_aria"></div>
     <div class="statfoot">
-      <span>Lines: <b id="logCount">0</b></span>
-      <span>Rate: <b id="logRate">2.0</b>/s</span>
-      <span>WS ● live</span>
+      <span><span data-i18n="h_mon.log_lines">Lines:</span> <b id="logCount">0</b></span>
+      <span><span data-i18n="h_mon.log_rate">Rate:</span> <b id="logRate">2.0</b>/s</span>
+      <span>WS ● <span data-i18n="h_mon.conn_live">live</span></span>
     </div>
   </div>
 
@@ -509,56 +519,56 @@
        Rows are built by renderValues() in v2.js. -->
   <div id="mvalues" class="mpanel">
     <div class="toolbar">
-      <input class="tsearch" id="valSearch" placeholder="Filter values… (e.g. temperature, S0, 28FF)">
-      <span class="tchip" style="cursor:default">Values: <b id="valCount" style="margin-left:4px">0</b></span>
-      <span class="tchip" id="valPsChip" style="cursor:default;display:none" title="The PIC sends a summary (PS=1) instead of frames; values are polled">PS=1 summary mode</span>
+      <input class="tsearch" id="valSearch" placeholder="Filter values… (e.g. temperature, S0, 28FF)" data-i18n-placeholder="h_mon.val_filter_ph">
+      <span class="tchip" style="cursor:default"><span data-i18n="h_mon.val_count">Values:</span> <b id="valCount" style="margin-left:4px">0</b></span>
+      <span class="tchip" id="valPsChip" style="cursor:default;display:none" title="The PIC sends a summary (PS=1) instead of frames; values are polled" data-i18n-title="h_mon.val_ps_title" data-i18n="h_mon.val_ps">PS=1 summary mode</span>
       <span class="tchip" id="valStatus" style="cursor:default" aria-live="polite">Loading…</span>
     </div>
     <div style="overflow-x:auto;border-radius:12px">
     <table class="stats" id="valTable">
-      <thead><tr><th>Name</th><th style="text-align:right">Value</th><th>Unit</th><th>Last change</th></tr></thead>
+      <thead><tr><th data-i18n="h_mon.val_th_name">Name</th><th style="text-align:right" data-i18n="h_mon.val_th_value">Value</th><th data-i18n="h_mon.val_th_unit">Unit</th><th data-i18n="h_mon.val_th_change">Last change</th></tr></thead>
       <tbody></tbody>
     </table>
     </div>
-    <p class="ot-support-hint" style="margin-top:10px">Grey rows have no data yet or have not changed for 2 minutes. Use ✎ next to a 1-Wire sensor to give it a label (max 16 characters, empty clears it).</p>
+    <p class="ot-support-hint" style="margin-top:10px" data-i18n="h_mon.val_hint">Grey rows have no data yet or have not changed for 2 minutes. Use ✎ next to a 1-Wire sensor to give it a label (max 16 characters, empty clears it).</p>
   </div>
 
   <div id="mstats" class="mpanel">
     <div class="toolbar">
-      <input class="tsearch" id="statsSearch" placeholder="Filter by name or msg id…">
-      <span class="tchip" style="cursor:default">Unique msgIDs: <b id="statsCount" style="margin-left:4px">0</b></span>
+      <input class="tsearch" id="statsSearch" placeholder="Filter by name or msg id…" data-i18n-placeholder="h_mon.stats_filter_ph">
+      <span class="tchip" style="cursor:default"><span data-i18n="h_mon.stats_unique">Unique msgIDs:</span> <b id="statsCount" style="margin-left:4px">0</b></span>
     </div>
     <div style="overflow-x:auto;border-radius:12px">
     <table class="stats" id="statsTable">
-      <thead><tr><th>MsgID</th><th>Description</th><th>Direction</th><th>Interval</th><th>Count</th><th style="text-align:right">Value</th></tr></thead>
+      <thead><tr><th>MsgID</th><th data-i18n="h_mon.stats_th_desc">Description</th><th data-i18n="h_mon.stats_th_dir">Direction</th><th data-i18n="h_mon.stats_th_interval">Interval</th><th data-i18n="h_mon.stats_th_count">Count</th><th style="text-align:right" data-i18n="h_mon.stats_th_value">Value</th></tr></thead>
       <tbody></tbody>
     </table>
     </div>
     <!-- TASK-969: gateway overrides + boiler-unsupported panels (parity w/ Classic Statistics) -->
     <div class="set-group" style="margin-top:14px">
-      <h3>Active gateway overrides</h3>
+      <h3 data-i18n="h_mon.stats_overrides">Active gateway overrides</h3>
       <div id="ovStatList"></div>
     </div>
     <div class="set-group" style="margin-top:14px">
-      <h3>Boiler unsupported messages</h3>
+      <h3 data-i18n="h_mon.stats_unsupported">Boiler unsupported messages</h3>
       <div id="boilerUnsupList"></div>
     </div>
   </div>
 
   <div id="msupport" class="mpanel">
     <div class="mlegend">
-      <span class="lb"><i></i>Thermostat + boiler</span>
-      <span class="lt"><i></i>Thermostat only</span>
-      <span class="lo"><i></i>Boiler only</span>
-      <span class="lu"><i></i>Boiler: not supported</span>
-      <span><i></i>Never seen</span>
-      <span style="margin-left:auto">Observed: <b id="supCount">0</b> / 128 msgIDs</span>
+      <span class="lb"><i></i><span data-i18n="h_mon.sup_both">Thermostat + boiler</span></span>
+      <span class="lt"><i></i><span data-i18n="h_mon.sup_therm">Thermostat only</span></span>
+      <span class="lo"><i></i><span data-i18n="h_mon.sup_boiler">Boiler only</span></span>
+      <span class="lu"><i></i><span data-i18n="h_mon.sup_unsup">Boiler: not supported</span></span>
+      <span><i></i><span data-i18n="h_mon.sup_never">Never seen</span></span>
+      <span style="margin-left:auto"><span data-i18n="h_mon.sup_observed">Observed:</span> <b id="supCount">0</b> <span data-i18n="h_mon.sup_observed_of">/ 128 msgIDs</span></span>
     </div>
     <div class="supwrap">
-      <div class="matrix" id="supMatrix" aria-label="OpenTherm message ID support map"></div>
+      <div class="matrix" id="supMatrix" aria-label="OpenTherm message ID support map" data-i18n-aria-label="h_mon.sup_map_aria"></div>
       <aside class="supdetail" id="supDetail"></aside>
     </div>
-    <p class="ot-support-hint" style="margin-top:10px">Click (or tap) a cell to pin its decoded message details.</p>
+    <p class="ot-support-hint" style="margin-top:10px" data-i18n="h_mon.sup_hint">Click (or tap) a cell to pin its decoded message details.</p>
   </div>
   <div class="suptip" id="supTip"></div>
 
@@ -569,18 +579,18 @@
       <span style="flex:1"></span>
       <button class="tbtn">📷 PNG</button><button class="tbtn">⬇ CSV</button>
       <!-- TASK-971: auto-save the graph as PNG/CSV on an interval. -->
-      <span class="tchip" id="chipAutoPng" title="Auto-save a PNG every 5 minutes">Auto-PNG</span>
-      <span class="tchip" id="chipAutoCsv" title="Auto-save a CSV every 5 minutes">Auto-CSV</span>
+      <span class="tchip" id="chipAutoPng" title="Auto-save a PNG every 5 minutes" data-i18n-title="h_mon.graph_autopng_title" data-i18n="h_mon.graph_autopng">Auto-PNG</span>
+      <span class="tchip" id="chipAutoCsv" title="Auto-save a CSV every 5 minutes" data-i18n-title="h_mon.graph_autocsv_title" data-i18n="h_mon.graph_autocsv">Auto-CSV</span>
     </div>
     <div class="graphcard">
       <div class="legend" id="gLegend"></div>
-      <svg viewBox="0 0 780 262" id="gstrip" role="img" aria-label="Temperatures, modulation and flame/DHW/CH graph">
+      <svg viewBox="0 0 780 262" id="gstrip" role="img" aria-label="Temperatures, modulation and flame/DHW/CH graph" data-i18n-aria-label="h_mon.graph_aria">
         <line x1="34" y1="10" x2="34" y2="170" stroke="#8b949e"/>
         <line x1="34" y1="170" x2="772" y2="170" stroke="#8b949e"/>
         <text class="axis-txt" x="2" y="16" id="gAxHi">90°</text>
         <text class="axis-txt" x="2" y="94" id="gAxMid">50°</text>
         <text class="axis-txt" x="2" y="172" id="gAxLo">10°</text>
-        <text class="axis-txt" x="2" y="194">flame</text>
+        <text class="axis-txt" x="2" y="194" data-i18n="h_mon.graph_flame">flame</text>
         <text class="axis-txt" x="2" y="216">DHW</text>
         <text class="axis-txt" x="2" y="238">CH</text>
         <g id="gTime"></g>
@@ -591,17 +601,17 @@
 
   <div id="mconn" class="mpanel">
     <div class="connlegend">
-      <span class="lg st-ok"><span class="ic">✓</span> <b>Connected</b> link up, data recent</span>
-      <span class="lg st-warn"><span class="ic">!</span> <b>Degraded</b> up but impaired / stale</span>
-      <span class="lg st-down"><span class="ic">✕</span> <b>Disconnected</b> link down</span>
-      <span class="lg st-off"><span class="ic">○</span> <b>Off</b> disabled in settings</span>
-      <span class="lg st-unknown"><span class="ic">?</span> <b>Unknown</b> not determined yet</span>
-      <span class="lg st-mode"><span class="ic">⇄</span> <b>Mode</b> a setting, not health</span>
+      <span class="lg st-ok"><span class="ic">✓</span> <b data-i18n="h_mon.conn_lg_ok_t">Connected</b> <span data-i18n="h_mon.conn_lg_ok_d">link up, data recent</span></span>
+      <span class="lg st-warn"><span class="ic">!</span> <b data-i18n="h_mon.conn_lg_warn_t">Degraded</b> <span data-i18n="h_mon.conn_lg_warn_d">up but impaired / stale</span></span>
+      <span class="lg st-down"><span class="ic">✕</span> <b data-i18n="h_mon.conn_lg_down_t">Disconnected</b> <span data-i18n="h_mon.conn_lg_down_d">link down</span></span>
+      <span class="lg st-off"><span class="ic">○</span> <b data-i18n="h_mon.conn_lg_off_t">Off</b> <span data-i18n="h_mon.conn_lg_off_d">disabled in settings</span></span>
+      <span class="lg st-unknown"><span class="ic">?</span> <b data-i18n="h_mon.conn_lg_unknown_t">Unknown</b> <span data-i18n="h_mon.conn_lg_unknown_d">not determined yet</span></span>
+      <span class="lg st-mode"><span class="ic">⇄</span> <b data-i18n="h_mon.conn_lg_mode_t">Mode</b> <span data-i18n="h_mon.conn_lg_mode_d">a setting, not health</span></span>
     </div>
 
     <!-- signal-flow chain: see WHERE a break is, not just that something is down -->
     <div class="connmap">
-      <svg viewBox="0 0 820 360" id="connMap" role="img" aria-label="Connectivity map">
+      <svg viewBox="0 0 820 360" id="connMap" role="img" aria-label="Connectivity map" data-i18n-aria-label="h_mon.conn_map_aria">
         <!-- links (drawn first, under the nodes) -->
         <g id="cnLinks">
           <path id="lk-therm"  class="cn-link" d="M210,86 H264 V180 H300"/>
@@ -614,24 +624,24 @@
           <path id="fl-mqtt"   class="cn-flow" d="M700,150 V104 H760"/>
           <path id="lk-ws"     class="cn-link" d="M700,210 V300 H760"/>
           <path id="fl-ws"     class="cn-flow" d="M700,210 V300 H760"/>
-          <text class="cn-linklbl" x="240" y="74">OT bus</text>
-          <text class="cn-linklbl" x="240" y="262">OT bus</text>
+          <text class="cn-linklbl" x="240" y="74" data-i18n="h_mon.conn_otbus">OT bus</text>
+          <text class="cn-linklbl" x="240" y="262" data-i18n="h_mon.conn_otbus">OT bus</text>
           <text class="cn-linklbl" x="515" y="170">Wi-Fi</text>
           <text class="cn-linklbl" x="676" y="120">MQTT</text>
-          <text class="cn-linklbl" x="676" y="250">live</text>
+          <text class="cn-linklbl" x="676" y="250" data-i18n="h_mon.conn_live">live</text>
         </g>
         <!-- nodes -->
         <g id="n-therm">
           <rect class="cn-box" x="20" y="56" width="190" height="60" rx="12"/>
           <text class="cn-ic" x="36" y="96">🌡️</text>
-          <text class="cn-title" x="64" y="84">Thermostat</text>
+          <text class="cn-title" x="64" y="84" data-i18n="h_mon.conn_thermostat">Thermostat</text>
           <text class="cn-sub" x="64" y="102" id="cnThermSub">master</text>
           <circle class="cn-statedot" id="dot-therm" cx="202" cy="64" r="7"/>
         </g>
         <g id="n-boiler">
           <rect class="cn-box" x="20" y="244" width="190" height="60" rx="12"/>
           <text class="cn-ic" x="36" y="284">🔥</text>
-          <text class="cn-title" x="64" y="272">Boiler</text>
+          <text class="cn-title" x="64" y="272" data-i18n="h_mon.conn_boiler">Boiler</text>
           <text class="cn-sub" x="64" y="290" id="cnBoilerSub">slave</text>
           <circle class="cn-statedot" id="dot-boiler" cx="202" cy="252" r="7"/>
         </g>
@@ -649,7 +659,7 @@
         <g id="n-router">
           <rect class="cn-box" x="560" y="150" width="140" height="60" rx="12"/>
           <text class="cn-ic" x="578" y="190">📶</text>
-          <text class="cn-title" x="610" y="178">Router</text>
+          <text class="cn-title" x="610" y="178" data-i18n="h_mon.conn_router">Router</text>
           <text class="cn-sub" x="610" y="196" id="cnWifiSub">—</text>
           <circle class="cn-statedot" id="dot-wifi" cx="692" cy="158" r="7"/>
         </g>
@@ -658,15 +668,15 @@
           <text class="cn-ic" x="772" y="110">🗄️</text>
           <circle class="cn-statedot" id="dot-mqtt" cx="808" cy="82" r="7"/>
         </g>
-        <text class="cn-sub" x="812" y="148" text-anchor="end">Broker → HA</text>
+        <text class="cn-sub" x="812" y="148" text-anchor="end" data-i18n="h_mon.conn_broker">Broker → HA</text>
         <g id="n-browser">
           <rect class="cn-box" x="760" y="270" width="56" height="60" rx="12"/>
           <text class="cn-ic" x="772" y="306">📱</text>
           <circle class="cn-statedot" id="dot-ws" cx="808" cy="278" r="7"/>
         </g>
-        <text class="cn-sub" x="812" y="344" text-anchor="end">This browser</text>
+        <text class="cn-sub" x="812" y="344" text-anchor="end" data-i18n="h_mon.conn_browser">This browser</text>
         <!-- TASK-984: override signal on the OT bus (elbows converge at y=180). Hidden when zero. -->
-        <g id="cnOvr" style="cursor:pointer;display:none" role="button" aria-label="Active gateway overrides — click for detail">
+        <g id="cnOvr" style="cursor:pointer;display:none" role="button" aria-label="Active gateway overrides — click for detail" data-i18n-aria-label="h_mon.conn_ovr_aria">
           <rect x="200" y="167" width="96" height="26" rx="13" fill="color-mix(in srgb,var(--zone-warn) 16%,var(--panel))" stroke="var(--zone-warn)" stroke-width="1.5"/>
           <text id="cnOvrTxt" x="248" y="184" text-anchor="middle" font-size="12" font-weight="700" fill="var(--zone-warn)" font-family="var(--font-sans)">⛓ 0 injected</text>
         </g>
@@ -678,7 +688,7 @@
     <!-- TASK-1223.16: OT-Direct runtime status (/api/v2/otdirect/status). Shown only
          when /health reports the OT-Direct interface; hidden on PIC boards. -->
     <div id="otdStatus" class="set-group" style="display:none;margin-top:14px">
-      <h3>OT-Direct status</h3>
+      <h3 data-i18n="h_mon.otd_status">OT-Direct status</h3>
       <div class="devinfo-rows" id="otdStatusRows"></div>
     </div>
 
@@ -686,21 +696,21 @@
          (fetchConn toggles it when the OpenTherm interface is OT-Direct). Mirrors
          the classic Home override panel: set/clear stored responses + modifiers. -->
     <div id="otdOvr" class="set-group" style="display:none;margin-top:14px">
-      <h3>OT-Direct overrides</h3>
-      <p class="ot-support-hint">Set or clear stored responses / response modifiers on the direct OpenTherm bus.</p>
+      <h3 data-i18n="h_mon.otd_overrides">OT-Direct overrides</h3>
+      <p class="ot-support-hint" data-i18n="h_mon.otd_ovr_hint">Set or clear stored responses / response modifiers on the direct OpenTherm bus.</p>
       <div id="otdOvrList"></div>
       <div class="ble-ctrls" style="margin-top:8px">
-        <select id="otdOvrAction" class="tbtn" aria-label="Override action" style="flex:0 0 auto">
-          <option value="sr">SR · Set stored response</option>
-          <option value="cr">CR · Clear stored response</option>
-          <option value="rm">RM · Set response modifier</option>
-          <option value="cm">CM · Clear modifier</option>
-          <option value="ui">UI · Mark unknown ID</option>
-          <option value="ki">KI · Mark known ID</option>
+        <select id="otdOvrAction" class="tbtn" aria-label="Override action" data-i18n-aria-label="h_mon.otd_action_aria" style="flex:0 0 auto">
+          <option value="sr" data-i18n="h_mon.otd_sr">SR · Set stored response</option>
+          <option value="cr" data-i18n="h_mon.otd_cr">CR · Clear stored response</option>
+          <option value="rm" data-i18n="h_mon.otd_rm">RM · Set response modifier</option>
+          <option value="cm" data-i18n="h_mon.otd_cm">CM · Clear modifier</option>
+          <option value="ui" data-i18n="h_mon.otd_ui">UI · Mark unknown ID</option>
+          <option value="ki" data-i18n="h_mon.otd_ki">KI · Mark known ID</option>
         </select>
-        <input id="otdOvrMsgid" type="number" min="0" max="127" placeholder="MsgID" aria-label="OpenTherm message ID" style="width:82px">
-        <input id="otdOvrValue" type="text" maxlength="4" placeholder="Hex" aria-label="Override value (hex)" style="width:82px">
-        <button id="otdOvrApply" class="tbtn">Apply</button>
+        <input id="otdOvrMsgid" type="number" min="0" max="127" placeholder="MsgID" aria-label="OpenTherm message ID" data-i18n-aria-label="h_mon.otd_msgid_aria" style="width:82px">
+        <input id="otdOvrValue" type="text" maxlength="4" placeholder="Hex" aria-label="Override value (hex)" data-i18n-aria-label="h_mon.otd_value_aria" style="width:82px">
+        <button id="otdOvrApply" class="tbtn" data-i18n="h_mon.otd_apply">Apply</button>
       </div>
     </div>
   </div>
@@ -710,16 +720,16 @@
 <!-- ════════════════ PAGE: SETTINGS ════════════════ -->
 <div id="page-settings" class="page">
 
-  <input class="set-search" id="setSearch" placeholder="Search settings… (e.g. broker, ntp, pin)">
+  <input class="set-search" id="setSearch" placeholder="Search settings… (e.g. broker, ntp, pin)" data-i18n-placeholder="h_set.search_ph">
 
   <div class="set-layout">
     <nav class="set-rail" id="setRail"></nav>
     <div>
       <div class="set-cols" id="setCols"></div>
       <div class="savebar" id="saveBar">
-        <span class="msg"><b id="dirtyCount">0</b> unsaved change(s)</span>
-        <button class="discard" id="btnDiscard">Discard</button>
-        <button class="save" id="btnSave">Save settings</button>
+        <span class="msg"><b id="dirtyCount">0</b> <span data-i18n="h_set.unsaved_suffix">unsaved change(s)</span></span>
+        <button class="discard" id="btnDiscard" data-i18n="h_set.discard">Discard</button>
+        <button class="save" id="btnSave" data-i18n="h_set.save">Save settings</button>
       </div>
     </div>
   </div>
@@ -731,34 +741,34 @@
 <div id="page-advanced" class="page">
 
   <div class="subtabs" id="advTabs">
-    <button class="subtab active" data-adv="pic">PIC firmware</button>
-    <button class="subtab" data-adv="debug">Debug Information</button>
-    <button class="subtab" data-adv="files">File System</button>
-    <button class="subtab" data-adv="system">System</button>
+    <button class="subtab active" data-adv="pic" data-i18n="h_set.tab_pic">PIC firmware</button>
+    <button class="subtab" data-adv="debug" data-i18n="h_set.tab_debug">Debug Information</button>
+    <button class="subtab" data-adv="files" data-i18n="h_set.tab_files">File System</button>
+    <button class="subtab" data-adv="system" data-i18n="h_set.tab_system">System</button>
   </div>
 
   <!-- ---- PIC firmware (relocated + restyled from Monitor > Debug, TASK-972) ---- -->
   <div id="adv-pic" class="mpanel active">
-    <div id="picNone" class="crashlog-ok" style="display:none;background:none;border-color:var(--border);color:var(--muted)">
+    <div id="picNone" class="crashlog-ok" style="display:none;background:none;border-color:var(--border);color:var(--muted)" data-i18n="h_set.pic_none">
       No PIC detected: PIC firmware flashing is unavailable in OT-Direct mode.</div>
     <div id="picFlash">
       <div class="pic-head">
-        <div><span class="k">PIC Device</span><b id="picHeadDev">…</b></div>
-        <div><span class="k">PIC Type</span><b id="picHeadType">…</b></div>
-        <div><span class="k">PIC Firmware Version</span><b id="picHeadVer">…</b></div>
+        <div><span class="k" data-i18n="h_set.pic_device">PIC Device</span><b id="picHeadDev">…</b></div>
+        <div><span class="k" data-i18n="h_set.pic_type">PIC Type</span><b id="picHeadType">…</b></div>
+        <div><span class="k" data-i18n="h_set.pic_fwver">PIC Firmware Version</span><b id="picHeadVer">…</b></div>
       </div>
       <div id="picBanner" class="pic-banner" style="display:none"></div>
       <div class="ble-ctrls" style="margin-bottom:12px">
-        <button id="picCheckUpd" class="tbtn">🔄 Check for updates</button>
+        <button id="picCheckUpd" class="tbtn">🔄 <span data-i18n="h_set.pic_check">Check for updates</span></button>
       </div>
       <!-- filled by renderPicFiles(): header row + one .picrow per firmware file -->
       <div class="pictable" id="picFiles"></div>
       <div id="picProg" class="pic-progress" style="display:none">
         <div class="track"><div class="fill" id="picProgBar"></div></div>
-        <div class="lbl" id="picProgTxt">Ready to flash</div>
+        <div class="lbl" id="picProgTxt" data-i18n="h_set.pic_ready">Ready to flash</div>
       </div>
       <div class="adv-card" style="margin-top:14px">
-        <h4>Gateway settings <span style="font-weight:400;color:var(--muted);font-size:.8rem">· cached PR= values</span></h4>
+        <h4><span data-i18n="h_set.gw_title">Gateway settings</span> <span style="font-weight:400;color:var(--muted);font-size:.8rem" data-i18n="h_set.gw_sub">· cached PR= values</span></h4>
         <div class="prtable" id="picPrTable"></div>
       </div>
     </div>
@@ -766,67 +776,67 @@
 
   <!-- ---- Debug Information (relocated from Monitor > Debug, TASK-967) ---- -->
   <div id="adv-debug" class="mpanel">
-    <div id="dbgCrashOk" class="crashlog-ok" style="display:none">✓ No crash logs recorded since last boot.</div>
+    <div id="dbgCrashOk" class="crashlog-ok" style="display:none" data-i18n="h_set.no_crash">✓ No crash logs recorded since last boot.</div>
     <pre id="dbgCrash" class="console" style="display:none;max-height:320px;white-space:pre-wrap">—</pre>
     <!-- Diagnostic recording (TASK-1700, ADR-213): local only, off by default -->
     <div class="adv-card" id="diagRec" style="margin:12px 0">
-      <h4>Diagnostic recording <span style="font-weight:400;color:var(--muted);font-size:.8rem">· stays on this gateway until you download it</span></h4>
-      <div id="diagRecStatus" role="status" aria-live="polite" style="font-size:.85rem">Loading…</div>
+      <h4><span data-i18n="h_set.rec_title">Diagnostic recording</span> <span style="font-weight:400;color:var(--muted);font-size:.8rem" data-i18n="h_set.rec_sub">· stays on this gateway until you download it</span></h4>
+      <div id="diagRecStatus" role="status" aria-live="polite" style="font-size:.85rem" data-i18n="h_set.loading">Loading…</div>
       <div class="fs-btnrow" style="margin-top:10px">
-        <button type="button" class="fs-btn primary" id="diagRecStart">Start</button>
-        <button type="button" class="fs-btn" id="diagRecStop" disabled>Stop</button>
-        <a class="fs-btn" id="diagRecDownload" href="#" download="otgw-recording.bin" aria-disabled="true">Download (.bin)</a>
+        <button type="button" class="fs-btn primary" id="diagRecStart" data-i18n="h_set.rec_start">Start</button>
+        <button type="button" class="fs-btn" id="diagRecStop" disabled data-i18n="h_set.rec_stop">Stop</button>
+        <a class="fs-btn" id="diagRecDownload" href="#" download="otgw-recording.bin" aria-disabled="true" data-i18n="h_set.rec_download">Download (.bin)</a>
       </div>
-      <p style="font-size:.78rem;color:var(--muted);margin:8px 0 0">Records OpenTherm frames, commands, MQTT values and setting changes in RAM; passwords are never recorded. Decode on a PC with <code>scripts/diag_decode.py</code>.</p>
+      <p style="font-size:.78rem;color:var(--muted);margin:8px 0 0" data-i18n="h_set.rec_note">Records OpenTherm frames, commands, MQTT values and setting changes in RAM; passwords are never recorded. Decode on a PC with scripts/diag_decode.py.</p>
     </div>
     <div id="dbgGroups"></div>
     <details class="grp">
-      <summary>Raw debug dump (/api/v2/debug)</summary>
-      <div class="grp-body"><pre id="dbgInfo" class="console" style="max-height:340px;white-space:pre-wrap">Loading…</pre></div>
+      <summary data-i18n="h_set.raw_dump">Raw debug dump (/api/v2/debug)</summary>
+      <div class="grp-body"><pre id="dbgInfo" class="console" style="max-height:340px;white-space:pre-wrap" data-i18n="h_set.loading">Loading…</pre></div>
     </details>
   </div>
 
   <!-- ---- File System — in-page FSexplorer (TASK-982) ---- -->
   <div id="adv-files" class="mpanel">
-    <h3 class="fs-title">File system (LittleFS)</h3>
+    <h3 class="fs-title" data-i18n="h_set.fs_title">File system (LittleFS)</h3>
     <div class="fs-crumb" id="fsCrumb">Current directory: /</div>
     <table class="fstable"><tbody id="fsTableBody"></tbody></table>
     <div class="fs-usage" id="fsUsage"></div>
     <div class="fs-bar"><i id="fsBar" style="width:0%"></i></div>
     <fieldset class="fs-upload">
-      <legend>Upload file</legend>
+      <legend data-i18n="h_set.fs_upload_legend">Upload file</legend>
       <div class="row">
         <input type="file" id="fsFile">
-        <button class="fs-btn" id="fsUpload" disabled style="min-height:38px;padding:8px 16px">Upload</button>
-        <span id="fsUploadHint" style="font-size:.76rem;color:var(--muted)">Files land in the current directory.</span>
+        <button class="fs-btn" id="fsUpload" disabled style="min-height:38px;padding:8px 16px" data-i18n="h_set.fs_upload">Upload</button>
+        <span id="fsUploadHint" style="font-size:.76rem;color:var(--muted)" data-i18n="h_set.fs_hint">Files land in the current directory.</span>
       </div>
     </fieldset>
     <p style="font-size:.78rem;color:var(--muted);margin:0">
-      <a class="fsact" href="FSexplorer" style="color:var(--accent);font-weight:600">Open classic /FSexplorer ›</a></p>
+      <a class="fsact" href="FSexplorer" style="color:var(--accent);font-weight:600" data-i18n="h_set.fs_classic">Open classic /FSexplorer ›</a></p>
   </div>
 
   <!-- ---- System (relocated Tools + new device status + actions, TASK-968/982) ---- -->
   <div id="adv-system" class="mpanel">
     <div class="adv-card" style="margin-bottom:14px">
-      <h4>Device status</h4>
+      <h4 data-i18n="h_set.dev_status">Device status</h4>
       <div class="fs-btnrow" style="gap:8px">
-        <span class="fw-badge fw-conn" id="sysConn" title="Live WebSocket link to the gateway">● …</span>
-        <span class="fw-badge fw-mode" id="sysMode" title="Current OpenTherm rewrite mode">⇄ …</span>
-        <span class="fw-badge fw-sim hidden" id="sysSim" title="Simulation active: OT replay / sensor simulation">SIMULATION</span>
+        <span class="fw-badge fw-conn" id="sysConn" title="Live WebSocket link to the gateway" data-i18n-title="h_set.conn_title">● …</span>
+        <span class="fw-badge fw-mode" id="sysMode" title="Current OpenTherm rewrite mode" data-i18n-title="h_set.mode_title">⇄ …</span>
+        <span class="fw-badge fw-sim hidden" id="sysSim" title="Simulation active: OT replay / sensor simulation" data-i18n-title="h_set.sim_title" data-i18n="h_set.simulation">SIMULATION</span>
       </div>
-      <p style="font-size:.75rem;color:var(--muted);margin:10px 2px 0">Live gateway link, current OT-rewrite mode, and simulation state.</p>
+      <p style="font-size:.75rem;color:var(--muted);margin:10px 2px 0" data-i18n="h_set.dev_note">Live gateway link, current OT-rewrite mode, and simulation state.</p>
     </div>
     <div class="fs-actions" style="border-top:0;padding-top:0">
-      <h4>System Actions <span style="font-weight:400;color:var(--muted);font-size:.8rem">· device-wide</span></h4>
+      <h4><span data-i18n="h_set.sys_actions">System Actions</span> <span style="font-weight:400;color:var(--muted);font-size:.8rem" data-i18n="h_set.sys_actions_sub">· device-wide</span></h4>
       <div class="fs-btnrow">
-        <button class="fs-btn primary" data-act="update">Update Firmware</button>
-        <button class="fs-btn" data-act="reboot">ReBoot</button>
-        <button class="fs-btn" data-act="onboarding">Run setup wizard</button>
-        <button class="fs-btn" data-act="sat-onboarding">Run SAT setup</button>
-        <button class="fs-btn danger" data-act="resetwifi">Reset Wireless</button>
-        <button class="fs-btn" data-act="home">Home</button>
+        <button class="fs-btn primary" data-act="update" data-i18n="h_set.act_update">Update Firmware</button>
+        <button class="fs-btn" data-act="reboot" data-i18n="h_set.act_reboot">ReBoot</button>
+        <button class="fs-btn" data-act="onboarding" data-i18n="h_set.act_wizard">Run setup wizard</button>
+        <button class="fs-btn" data-act="sat-onboarding" data-i18n="h_set.act_sat">Run SAT setup</button>
+        <button class="fs-btn danger" data-act="resetwifi" data-i18n="h_set.act_resetwifi">Reset Wireless</button>
+        <button class="fs-btn" data-act="home" data-i18n="h_set.act_home">Home</button>
       </div>
-      <p style="font-size:.75rem;color:var(--muted);margin:10px 2px 0"><b>Update Firmware</b> → OTA sketch / filesystem upload · <b>ReBoot</b> → restart the device · <b>Reset Wireless</b> → clear Wi-Fi &amp; reboot into AP-mode setup · <b>Home</b> → back to the dashboard.</p>
+      <p style="font-size:.75rem;color:var(--muted);margin:10px 2px 0"><b data-i18n="h_set.act_update">Update Firmware</b> → <span data-i18n="h_set.act_update_desc">OTA sketch / filesystem upload</span> · <b data-i18n="h_set.act_reboot">ReBoot</b> → <span data-i18n="h_set.act_reboot_desc">restart the device</span> · <b data-i18n="h_set.act_resetwifi">Reset Wireless</b> → <span data-i18n="h_set.act_resetwifi_desc">clear Wi-Fi &amp; reboot into AP-mode setup</span> · <b data-i18n="h_set.act_home">Home</b> → <span data-i18n="h_set.act_home_desc">back to the dashboard</span>.</p>
     </div>
   </div>
 </div><!-- /page-advanced -->
@@ -837,11 +847,11 @@
      so this is a firmware-type test, not a hardware mode. -->
 <div id="page-diagnose" class="page">
   <div class="card">
-    <h4>PIC diagnose <span class="sub">interactive test menu on the PIC serial line</span></h4>
+    <h4><span data-i18n="h_set.diag_title">PIC diagnose</span> <span class="sub" data-i18n="h_set.diag_sub">interactive test menu on the PIC serial line</span></h4>
 
     <div id="diagBanner" class="pic-banner warn" style="display:none"></div>
 
-    <p class="cat-desc">
+    <p class="cat-desc" data-i18n="h_set.diag_desc">
       The PIC is running diagnostic firmware, so it offers a test menu instead of
       speaking OpenTherm. Type a test number and press Enter. The menu reads a
       whole line, so send one number at a time.
@@ -850,29 +860,29 @@
     <div class="cmdbar" id="diagBar">
       <span class="cmdbar-prompt" id="diagPrompt">DIAG &rsaquo;</span>
       <input class="cmdbar-in" id="diagInput" maxlength="32" autocomplete="off" spellcheck="false"
-             placeholder="Test number, then Enter (empty Enter leaves a running test)"
-             aria-label="Diagnose test number">
-      <button class="cmdbar-send" id="diagSend">Send</button>
+             placeholder="Test number, then Enter (empty Enter leaves a running test)" data-i18n-placeholder="h_set.diag_ph"
+             aria-label="Diagnose test number" data-i18n-aria-label="h_set.diag_input_aria">
+      <button class="cmdbar-send" id="diagSend" data-i18n="h_set.diag_send">Send</button>
     </div>
     <span class="tchip" id="diagStatus" style="display:none;margin:0 0 8px" aria-live="polite"></span>
 
-    <div class="console" id="diagOut" role="log" aria-live="polite" aria-label="PIC diagnose output"></div>
+    <div class="console" id="diagOut" role="log" aria-live="polite" aria-label="PIC diagnose output" data-i18n-aria-label="h_set.diag_out_aria"></div>
 
     <p style="font-size:.75rem;color:var(--muted);margin:10px 2px 0">
-      What happens next differs per test. Tests 1, 2 and 3 keep running until you press
+      <span data-i18n="h_set.diag_notes">What happens next differs per test. Tests 1, 2 and 3 keep running until you press
       Enter with the box empty, and test 1 produces no output at all while it runs, so a
       quiet screen is normal there. Test 5 ends by asking you for a reference voltage
       setting. Test 4 needs a loop between the two interfaces, and is the one test that
       interrupts communication between thermostat and boiler. Which connections each test
-      needs, and how to read its results, is described on
-      <a href="https://otgw.tclcode.com/diagnose.html" target="_blank" rel="noopener">Schelte Bron's diagnostic firmware page</a>.
+      needs, and how to read its results, is described on</span>
+      <a href="https://otgw.tclcode.com/diagnose.html" target="_blank" rel="noopener" data-i18n="h_set.diag_link">Schelte Bron's diagnostic firmware page</a>.
     </p>
   </div>
 </div><!-- /page-diagnose -->
 
-<div class="foot">OTGW firmware · v2 Web UI · live from the OpenTherm bus</div>
+<div class="foot" data-i18n="h_set.foot">OTGW firmware · v2 Web UI · live from the OpenTherm bus</div>
 </div>
-<div class="toast" id="toast" role="status" aria-live="polite">Settings saved</div>
+<div class="toast" id="toast" role="status" aria-live="polite" data-i18n="h_set.toast_saved">Settings saved</div>
 <!-- TASK-984: floating override-detail panel (fixed position). Opened by #aOvrBadge (Home) and #cnOvr (Monitor map). -->
 <div class="ovr-panel" id="ovrPanel"></div>
 <script src="v2.js"></script>
