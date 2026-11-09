@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-08T09:01:00Z'
-updated_date: '2026-11-09T09:09:00Z'
+updated_date: '2026-11-09T20:06:00Z'
 labels:
   - tests
 milestone: 2.0.0
@@ -47,3 +47,15 @@ Load-only failures (pass alone): test_static_integrity OK; test_refresh_storm 39
 
 2026-11-09 full run on the rebased lane (origin/dev 26cd2301a + 13 backlog/test/docs commits, wt-ac-updates, -j 4, 80's beta.161 build running in parallel): files 192, passed 189, failed 1, timeout 1, skipped 1, 1363.6 s. test_web_file_scheduling PASS (13.3 s). (1) TIMEOUT test/host/test_dhw_water_meter.py at 601 s under the parallel build; rerun alone: RESULT: PASS, exit 0, so load, not a defect. (2) FAILED test_sat_lowload_contract (LL-021 error, LL-023 fail) and SKIP test_sat_classifier_parity: other-projects/SAT-releases-thermo-nova is not checked out in this worktree (parity: 'thermo-nova upstream not runnable'; ground truth: 'no UPSTREAM_COMMIT marker in the local copy'). Worktree environment, not code; none of the 13 commits touches these tests. Side finding: delegated_results() in test_sat_lowload_contract.py:296 crashes with AttributeError '_ErrorHolder' object has no attribute '_testMethodName' when the delegated class skips in setUpClass, so LL-021 shows as error instead of a clean skip. Not fixed here.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-09T20:06:00Z
+
+---
+
+030509, 2026-11-09: pytest collection crash ('ValueError: I/O operation on closed file' in _pytest/capture.py snap, 'no tests ran') comes from tests/test_fs_update_keep.py:41-42: at import it replaces sys.stdout with io.TextIOWrapper(sys.stdout.buffer, ...), which wraps pytest's capture file; when the wrapper is dropped the capture file is closed. Shown: 'python -m pytest -q tests/test_fs_update_keep.py' -> no tests ran; with tests/test_sat_narrate_fits.py added -> no tests ran; test_sat_narrate_fits.py alone -> 1 passed. scripts/run_tests.py (python per file) is not affected: the file runs 37 OK. Fix idea, not done: sys.stdout.reconfigure(encoding='utf-8', errors='replace') or only rewrap under __main__.
+
+---
+<!-- COMMENTS:END -->
