@@ -206,7 +206,9 @@ int main(int argc, char** argv) {
 #ifdef HAS_SWITCH_TICK
     state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false;
     satPwmReset(); _pwm_effectiveBoilerTemp = 47.2f; g_flameOffStart = g_ms - 600000UL; _pwm_lastUpdateMs = g_ms - 600000UL;
-    g_flow = 45.0f; setPrev(40.0f);        // 45 >= 35 + 2: a sustained overshoot
+    // 38 >= 35 + 2: a sustained overshoot below the 3.5 K fail-safe of TASK-1762, so the 60 s rule fires. argv[5] (optional): another
+    // flow, e.g. 45 (the pre-TASK-1762 input, 10 K over): the fail-safe fires after 30 s.
+    g_flow = (argc > 5) ? (float)atof(argv[5]) : 38.0f; setPrev(40.0f);
     float cs = 0; int ticks = 0; int contBefore = 0;
     for (; ticks < 400; ticks++) {
       g_ms += (argc > 4) ? (uint32_t)strtoul(argv[4], 0, 10) : 1000UL; _sat_tickMs = g_ms;   // argv[4]: tick interval in ms (TASK-1412.8)
@@ -914,6 +916,17 @@ class SatPwmOverride(unittest.TestCase):
                     self.assertEqual(r["prev"], prev, r)
                     self.assertEqual(r["cont_marker"], "1", r)
                     self.assertEqual(r["ch"], "1", r)
+
+    # TASK-1762: the old input of the case above (flow 45 against request 35, 10 K over) now switches through the flame-out
+    # fail-safe 30 s after the first qualifying tick, and the switch tick still sends the PWM setpoint (Q47 A, entry 88).
+    def test_failsafe_switch_tick_sends_the_pwm_setpoint_after_30s(self):
+        r = self.run_sc("swtick", 1, "x", 1000, 45)
+        self.assertEqual(r["mode"], "2", r)
+        self.assertEqual(r["ticks"], "31", r)                       # first qualifying tick starts the timer, 30 s later it fires
+        self.assertEqual(r["continuous_ticks"], "30", r)
+        self.assertEqual(r["cont_marker"], "0", "the fail-safe switch tick sent the continuous setpoint: %r" % r)
+        self.assertEqual(r["cs"], "48.0", r)
+        self.assertEqual(r["ch"], "1", r)
 
     def test_same_tick_overshoot_switch_at_10s_30s_60s_and_120s_ticks(self):
         for step_s in (10, 30, 60, 120):

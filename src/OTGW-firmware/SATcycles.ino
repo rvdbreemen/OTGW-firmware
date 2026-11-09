@@ -31,6 +31,11 @@ static const uint32_t SAT_CYCLE_MIN_SAMPLES        = 3;       // a cycle with fe
 // Overshoot margin now read from settings.sat.fOvershootMargin (default 2.0C; Python OVERSHOOT_MARGIN_CELSIUS is 3.0)
 static const float    SAT_OVERSHOOT_SUSTAIN_SEC     = 60.0f;   // Sustained overshoot (cycle classifier streak)
 static const uint32_t SAT_OVERSHOOT_SUSTAIN_MS      = 60000UL;  // Sustained overshoot before PWM switch (satCycleCheckOvershootSwitch)
+// TASK-1762, Sergeant D entries 288/289: flame-out fail-safe beside the 60 s rule. In continuous mode, flow - requested (PID)
+// setpoint >= 3.5 C for 30 s also switches to PWM. A fixed value from Sergeant D, not the overshoot margin setting; it has no
+// thermo-nova counterpart (deliberate addition on top of the pin, heating_control.py:262-305 has only the 60 s rule).
+static const float    SAT_OVERSHOOT_FAILSAFE_DELTA_C = 3.5f;
+static const uint32_t SAT_OVERSHOOT_FAILSAFE_SUSTAIN_MS = 30000UL;
 static const float    SAT_UNDERSHOOT_MARGIN_C       = 3.0f;    // Below-setpoint margin for underheat (Python UNDERSHOOT_MARGIN_CELSIUS=-3.0)
 static const uint32_t SAT_UNDERHEAT_SUSTAIN_MS      = 180000UL; // Sustained underheat before continuous switch
 static const uint32_t SAT_SATURATION_SUSTAIN_MS     = 300000UL; // Sustained saturation before continuous switch
@@ -159,6 +164,8 @@ static const uint32_t SAT_OFF_GAP_UNKNOWN = 0xFFFFFFFFUL;   // offDurationMs of 
 // sustained_runtime() does (helpers.py:51-56; entry 41): the first sample only starts the timer.
 static bool     _sustain_overshootRunning = false;
 static uint32_t _sustain_overshootStartMs = 0;
+static bool     _sustain_overshootFailsafeRunning = false;   // TASK-1762: flow - CS >= 3.5 for 30 s (entries 288/289)
+static uint32_t _sustain_overshootFailsafeStartMs = 0;
 static bool     _sustain_underheatRunning = false;
 static uint32_t _sustain_underheatStartMs = 0;
 static bool     _sustain_saturationRunning = false;
@@ -204,6 +211,7 @@ static const float EMA_ALPHA      = 0.15f; // decay factor per cycle
 void satCycleResetSustainGuards()
 {
   _sustain_overshootRunning = false;
+  _sustain_overshootFailsafeRunning = false;   // TASK-1762
   _sustain_underheatRunning = false;
   _sustain_saturationRunning = false;
 }
@@ -1353,35 +1361,67 @@ bool satCycleCheckLowLoadVeto()
 // The 60 s are tickMs - start (Q46 B), so the switch comes on the first tick at least 60 s after
 // the first qualifying tick (ticks are never closer than one interval; entry 109). A tick outside CONTINUOUS (:264-266), or within the hot-water guard (:268-274),
 // clears the start.
+// TASK-1762 (Sergeant D entries 288/289): a second rule beside it, a fail-safe for flame out. flow - requested >= 3.5 C
+// (SAT_OVERSHOOT_FAILSAFE_DELTA_C, equality included) held for 30 s also switches to PWM. It has its own timer, counted the same
+// way (first qualifying tick starts it, no catch-up, entry 109), and the same gates: outside CONTINUOUS, the hot-water guard and
+// a missing flow clear both starts. Each rule is evaluated on its own: the margin setting may be 0.5-5.0 C, so the 3.5 C rule
+// does not depend on the margin check, and a tick below 3.5 C clears only the fail-safe start. Both use entry path 1 for the
+// MsgID 3 permission (entry 213); a refusal clears both starts.
 bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
 {
   if (state.sat.eControlMode != SAT_MODE_CONTINUOUS || satDhwGuardActive(tickMs)) {
     _sustain_overshootRunning = false;
+    _sustain_overshootFailsafeRunning = false;
     return false;
   }
   const float flowTemp = satGetFlowTemp();
   // satGetFlowTemp() is 0.0 for a flow temperature that is missing: never received, Data-Invalid, Unknown-DataID or older than
   // 60 s (SATboilerFeed.h classes; entries 218, 241). Missing clears the start, as thermo-nova (heating_control.py:284-286).
-  if (flowTemp <= 0.0f || !(flowTemp >= requestedSetpoint + settings.sat.fOvershootMargin)) {
+  if (flowTemp <= 0.0f) {
     _sustain_overshootRunning = false;
+    _sustain_overshootFailsafeRunning = false;
     return false;
   }
-  if (!satSustainedFor(_sustain_overshootRunning, _sustain_overshootStartMs, tickMs, SAT_OVERSHOOT_SUSTAIN_MS)) return false;
 
-  // The boiler's MsgID 3 permission comes first (entry 213): without it the switch stays in continuous and the start
-  // is cleared, so a permission that returns later starts a fresh 60 s.
+  bool fire60 = false;
+  if (flowTemp >= requestedSetpoint + settings.sat.fOvershootMargin) {
+    fire60 = satSustainedFor(_sustain_overshootRunning, _sustain_overshootStartMs, tickMs, SAT_OVERSHOOT_SUSTAIN_MS);
+  } else {
+    _sustain_overshootRunning = false;
+  }
+  bool fireFailsafe = false;
+  if (flowTemp >= requestedSetpoint + SAT_OVERSHOOT_FAILSAFE_DELTA_C) {
+    fireFailsafe = satSustainedFor(_sustain_overshootFailsafeRunning, _sustain_overshootFailsafeStartMs, tickMs,
+                                   SAT_OVERSHOOT_FAILSAFE_SUSTAIN_MS);
+  } else {
+    _sustain_overshootFailsafeRunning = false;
+  }
+  if (!fire60 && !fireFailsafe) return false;
+
+  // The boiler's MsgID 3 permission comes first (entry 213): without it the switch stays in continuous and the starts
+  // are cleared, so a permission that returns later starts a fresh 60 s (and 30 s).
   if (!satPwmEntryAllowed(1)) {
     _sustain_overshootRunning = false;
+    _sustain_overshootFailsafeRunning = false;
     return false;
   }
 
-  SATDebugTf(PSTR("SAT: sustained overshoot for %lus (flow=%.1f >= sp=%.1f + %.1f), switching to PWM mode\r\n"),
-             (unsigned long)((uint32_t)(tickMs - _sustain_overshootStartMs) / 1000UL), flowTemp, requestedSetpoint,
-             settings.sat.fOvershootMargin);
+  if (fire60) {
+    SATDebugTf(PSTR("SAT: sustained overshoot for %lus (flow=%.1f >= sp=%.1f + %.1f), switching to PWM mode\r\n"),
+               (unsigned long)((uint32_t)(tickMs - _sustain_overshootStartMs) / 1000UL), flowTemp, requestedSetpoint,
+               settings.sat.fOvershootMargin);
+    satNarratef_P(PSTR("Control mode: PWM (flow %.1f stayed above setpoint %.1f + %.1f for %lu s)"), flowTemp,
+                  requestedSetpoint, settings.sat.fOvershootMargin,
+                  (unsigned long)(SAT_OVERSHOOT_SUSTAIN_MS / 1000UL));   // TASK-1521
+  } else {
+    SATDebugTf(PSTR("SAT: flame-out fail-safe for %lus (flow=%.1f - sp=%.1f >= %.1f), switching to PWM mode\r\n"),
+               (unsigned long)((uint32_t)(tickMs - _sustain_overshootFailsafeStartMs) / 1000UL), flowTemp, requestedSetpoint,
+               SAT_OVERSHOOT_FAILSAFE_DELTA_C);
+    satNarratef_P(PSTR("Control mode: PWM (fail-safe: flow %.1f - setpoint %.1f >= %.1f for %lu s)"), flowTemp,
+                  requestedSetpoint, SAT_OVERSHOOT_FAILSAFE_DELTA_C,
+                  (unsigned long)(SAT_OVERSHOOT_FAILSAFE_SUSTAIN_MS / 1000UL));   // TASK-1762
+  }
   satSetControlMode(SAT_MODE_PWM);
-  satNarratef_P(PSTR("Control mode: PWM (flow %.1f stayed above setpoint %.1f + %.1f for %lu s)"), flowTemp,
-                requestedSetpoint, settings.sat.fOvershootMargin,
-                (unsigned long)(SAT_OVERSHOOT_SUSTAIN_MS / 1000UL));   // TASK-1521
   satCycleResetSustainGuards();   // _reset_pwm_disable_guards() after pwm.enable() (heating_control.py:304-305)
   return true;
 }

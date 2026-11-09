@@ -143,6 +143,7 @@ These have no thermo-nova counterpart. They are listed so they can be confirmed,
 - No SAT commands while the boiler reports a fault (SATcontrol.ino:4716-4719). (Area 1, row 34; area 8, row 34.)
 - MQTT-loss fallback, and a fixed 45 °C safe setpoint after 2 h without room data in that fallback (SATcontrol.ino:4540-4563, SATcontrol.ino:4730-4746). (Area 8, row 36.)
 - A 45 s low-pass filter on the room temperature before the PID (SATcontrol.ino:4694-4713). (Area 1, row 32; area 2, row 25.)
+- Flame-out fail-safe (TASK-1762, Sergeant D entries 288 and 289): in continuous mode flow - requested setpoint >= 3.5 °C for 30 s switches to PWM, beside the 60 s sustained-overshoot rule, which stays as thermo-nova (heating_control.py:262-305). thermo-nova has only the 60 s rule. Deliberate addition decided by Sergeant D.
 - Summer mode that turns heating off after warm hours outside, off by default (SATcontrol.ino:4764-4776, SATtypes.h:499). It shares the "summer simmer" name with thermo-nova's comfort index, which is only an index (summer_simmer.py:26-35). (Area 7, row T10.)
 
 ### Firmware defects found that do not change heating today

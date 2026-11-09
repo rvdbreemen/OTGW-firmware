@@ -3,9 +3,11 @@ id: TASK-1762
 title: >-
   SAT continuous -> PWM fail-safe: flow - CS >= 3.5 for 30 s (extra beside the
   60 s rule)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@system32-030509'
 created_date: '2026-11-09T19:17:00Z'
+updated_date: '2026-11-09T20:37:00Z'
 labels:
   - sat
   - pwm
@@ -29,3 +31,31 @@ Rule: in continuous mode, when flow - CS >= 3.5 holds for 30 s, SAT switches to 
 - [ ] #3 Recorded as a deliberate deviation from thermo-nova in the SAT ground-truth docs, citing entries 288/289
 - [ ] #4 Shown on a capture or simulation replay of tjfs's 2026-11-09 case: the switch comes 30 s after flow - CS reaches 3.5 instead of via the 60 s rule
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Ground truth: Sergeant D entries 288 (fail-safe) and 289 (Q-288a answered A with a 30 s hold); entry 213 (MsgID 3 bit 4 blocks every PWM entry path) still applies; entries 88/109 (switch before apply, ticks never catch up). thermo-nova at the pin (7beaaf5) has only the 60 s rule, heating_control.py:262-305 (_maybe_enable_pwm_on_sustained_overshoot: reset on PWM enabled :264-266, hot water :268-270, DHW guard :272-274, heater off :276-278, request <= COLD_SETPOINT :280-282, flow None :284-286, flow < requested + OVERSHOOT_MARGIN_CELSIUS :288-291, sustained_runtime :293-297, pwm.enable() + _reset_pwm_disable_guards() :304-305), OVERSHOOT_SUSTAIN_SECONDS 60 (const.py:21), OVERSHOOT_MARGIN_CELSIUS 3.0 (cycles/const.py:10). The fail-safe is a deliberate addition on top of thermo-nova.
+1. SATcycles.ino: own timer pair _sustain_overshootFailsafeRunning/StartMs and constants SAT_OVERSHOOT_FAILSAFE_DELTA_C = 3.5 (fixed, not the margin setting) and SAT_OVERSHOOT_FAILSAFE_SUSTAIN_MS = 30000, in satCycleCheckOvershootSwitch(): shared gates first (not continuous, DHW guard, missing flow reset both timers), then each rule evaluated independently (the margin setting can be 0.5-5.0, so the 3.5 rule must not sit inside the margin check); a tick with flow - CS < 3.5 resets only the fail-safe timer. CS = requested (PID) setpoint, >= counts, satSustainedFor() (no catch-up). Either rule firing asks satPwmEntryAllowed(1) (same entry path as the overshoot switch); refused -> both timers reset. satCycleResetSustainGuards() clears the new timer too. Own narration line naming the 3.5/30 s rule.
+2. Host test tests/test_sat_overshoot_sustain.py against the real code: token 'o' moves to flow 53 (inside [req+2, req+3.5)) so the 60 s cases keep testing the 60 s rule; g-cases with flow >= req+3.5 reviewed one by one; new cases: 3.5 boundary, 29 999 vs 30 000 ms, a dip that resets only the fail-safe, missing flow, PWM tick, DHW guard, margin 5.0, MsgID 3 refusal. Red on the old SATcycles.ino (OTGW_SATCYCLES_INO), green on the new. Run the other SAT tests that cut SATcycles.ino.
+3. Docs: firmware-sat-spec.md, the deviation record (as entry 279 KD 0.063), comments.
+4. Version bump, build via build.bat in a slot from the coordinator; bench .61 (OTA + SAT simulation, settings saved and restored) for the transition.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementation (lane-1762, wt-1762, on top of origin/dev 00b2f2b6c; not bumped yet: beta.165 after 80's beta.164). SATcycles.ino satCycleCheckOvershootSwitch(): own timer _sustain_overshootFailsafeRunning/StartMs, SAT_OVERSHOOT_FAILSAFE_DELTA_C 3.5 (fixed), SAT_OVERSHOOT_FAILSAFE_SUSTAIN_MS 30000; shared gates (continuous, hot-water guard, missing flow clear both starts); each rule evaluated on its own (margin setting 0.5-5.0 may exceed 3.5); a tick below req + 3.5 clears only the fail-safe start; satPwmEntryAllowed(1) for both, a refusal clears both; satCycleResetSustainGuards() clears it; own narration line. thermo-nova at the pin re-opened: heating_control.py:262-305 (60 s rule only), const.py:21 (60), cycles/const.py:10 (3.0).
+
+Adjusted harness inputs (review point of the coordinator):
+(a) What each test proved and why the new input still proves it. The fail-safe fires on flow >= req + 3.5 for 30 s, so any test that wanted the 60 s rule with a flow >= req + 3.5 now saw the fail-safe first. Their inputs moved into [req + margin, req + 3.5), where only the 60 s rule qualifies, so they prove the same thing as before:
+- test_sat_overshoot_sustain.py token o (55 -> 53 at req 50) and the LowLoadEntryCells g-cases (58/54 -> 53; start-up ramp 58/64/66 -> 53/53.2/53.4; post-draw 62 -> 44 at req 41): 60 s fire time, dips, PWM/bypass/missing-flow resets, DHW guard windows, late ticks, setpoint fall, valve step. Same expected times.
+- test_sat_pwm_override.py swtick (45 -> 38 at pid 35): loop level, the real overshoot gate and apply step in one tick; the switch tick sends the PWM setpoint (Q47 A, entry 88), not the continuous one, after 60 s at 1/10/30/60/120 s ticks. Same assertions.
+- test_sat_slave_lowload.py overshootTicks (55 -> 53 at req 50): the MsgID 3 permission (entry 213) blocks the automatic 60 s switch, traces reason/path, and after bit 4 clears the switch needs a fresh 60 s (3rd 30 s tick). Same assertions.
+(b) The old inputs are kept as explicit cases of the new behaviour (red on the old SATcycles.ino, green on the new):
+- test_sat_overshoot_sustain.py test_old_60s_case_inputs_now_switch_at_30s: (50,55), (50,54), (50,58), (35,45) switch 30 s after the first qualifying tick, also at a 10 s tick; test_heat_left_far_above_the_request_after_a_draw_..._failsafe_takes_30s: the old post-draw input 62/41 switches 330 s after the draw. Old code: fails.
+- test_sat_pwm_override.py test_failsafe_switch_tick_sends_the_pwm_setpoint_after_30s: swtick with the old flow 45: switch on tick 31, PWM CS 48.0 on that tick, CH 1. Old code: '61' != '31'.
+- test_sat_slave_lowload.py test_failsafe_needs_a_valid_reply_with_bit4_clear: the old flow 55 switches on the 2nd 30 s tick when permitted; bit 4 = 1 and no valid reply keep continuous; reason 2, path 1. Old code: ('2','3') != ('2','2').
+
+Evidence (host, Windows, 2026-11-09): test_sat_overshoot_sustain 77 OK (FlameOutFailsafe 13 cases; red on old: 12 of 14 new cases + the old-input case); test_sat_pwm_override 83 OK; test_sat_slave_lowload 20 OK; the other tests that cut SATcycles.ino, run per file with python: fs_update_keep 37, ch_signals 4, classifier_parity 12, cycle_classifier 43, hp_pwm 35, last_cycle_expiry 10, lowload_contract 35 (1 skip, 2 expected failures as before), mqtt_contract_1485 15, narrate_fits 1, pwm_anchors 64, pwm_start_limit 26, requested_vs_transmitted 10, tail_percentile 9 (1 skip), telemetry_wire 18: all OK. Not yet: full run_tests, bump, ESP32 build, bench .61 (satsimulation).
+<!-- SECTION:NOTES:END -->

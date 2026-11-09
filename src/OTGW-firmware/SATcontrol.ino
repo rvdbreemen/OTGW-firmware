@@ -7284,7 +7284,8 @@ static void satControlLoopRun()
   // Before the mode is applied, as thermo-nova (heating_control.py:206-215, Sergeant D entry 88, Q47 A): on the
   // switch tick satApplyPWM() below sends the first PWM CS. Delegated to satCycleCheckOvershootSwitch() in
   // SATcycles.ino: flow >= requested + settings.sat.fOvershootMargin (default 2.0C), 60 s from the first
-  // qualifying tick on the tick time (entries 41, 86, 109), 300 s DHW guard. Heat pumps enter PWM through
+  // qualifying tick on the tick time (entries 41, 86, 109), 300 s DHW guard; beside it the flame-out fail-safe,
+  // flow - requested >= 3.5 C for 30 s (TASK-1762, entries 288/289, no thermo-nova counterpart). Heat pumps enter PWM through
   // this switch like every other source: thermo-nova's _maybe_enable_pwm_on_sustained_overshoot
   // (heating_control.py:262-305) has no heat-pump case (entry 87, Q45 A).
   if (pidOutput > satColdThreshold()) {

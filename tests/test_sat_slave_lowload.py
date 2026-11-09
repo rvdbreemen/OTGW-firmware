@@ -46,7 +46,8 @@ SAT_STATE_NEW = ("struct SatState { SATControlMode eControlMode = SAT_MODE_OFF; 
 PERMIT_STUBS = ("// TASK-1412.4: the slave low-load permission is not under test here (tests/test_sat_slave_lowload.py): PWM is permitted\n"
                 "static bool satPwmPermitted() { return true; }\n"
                 "static void satPwmNoteRefused(uint8_t) {}\n"
-                "static bool satPwmEntryAllowed(uint8_t) { return true; }\n"
+                "static bool g_allow = true;            // TASK-1762 tokens R / P: the MsgID 3 permission refuses / permits the entry\n"
+                "static bool satPwmEntryAllowed(uint8_t) { return g_allow; }\n"
                 "static bool satCycleCheckLowLoadVeto() { return false; }\n")   # the shared harness stubs; this test uses the real functions
 STUB_SETCONTROL = "static void satSetControlMode(SATControlMode m) { if (m != state.sat.eControlMode) g_switches++; state.sat.eControlMode = m; }"
 
@@ -87,8 +88,10 @@ static void pushHb(uint8_t hb) {
   setperm(1, (hb & 0x10) != 0);          // the old code has no decoder hook: the fields are set directly and stay unread
 #endif
 }
-static int overshootTicks(uint32_t maxTicks) {   // 30 s ticks, flow far above the request: returns the tick count at the switch or -1
-  state.sat.eControlMode = SAT_MODE_CONTINUOUS; g_flow = 55.0f;
+static float g_osFlow = 53.0f;   // 53 against 50: above request + margin, below the 3.5 K fail-safe (TASK-1762), so the 60 s rule fires;
+                                 // scenario failsafe uses 55 (the pre-TASK-1762 input): the 30 s fail-safe fires
+static int overshootTicks(uint32_t maxTicks) {   // 30 s ticks, flow above request + margin: returns the tick count at the switch or -1
+  state.sat.eControlMode = SAT_MODE_CONTINUOUS; g_flow = g_osFlow;
   for (uint32_t i = 1; i <= maxTicks; i++) {
     g_ms += 30000UL;
     satCycleCheckOvershootSwitch(50.0f, g_ms);
@@ -129,7 +132,11 @@ int main(int argc, char** argv) {
   }
   const int valid = argc > 2 ? atoi(argv[2]) : 1, denied = argc > 3 ? atoi(argv[3]) : 0;
   setperm(valid, denied);
-  if (!strcmp(sc, "overshoot")) {          // the automatic 60 s switch
+  if (!strcmp(sc, "failsafe")) {           // TASK-1762: the 30 s flame-out fail-safe through the same permission
+    g_osFlow = 55.0f;
+    const int n = overshootTicks(20);
+    printf("ticks=%d ", n); report("failsafe");
+  } else if (!strcmp(sc, "overshoot")) {   // the automatic 60 s switch
     const int n = overshootTicks(20);
     printf("ticks=%d ", n); report("overshoot");
   } else if (!strcmp(sc, "restore")) {     // PWM saved before the restart
@@ -239,6 +246,16 @@ class SlaveLowLoad(unittest.TestCase):
         self.assertEqual((denied["mode"], denied["ticks"]), ("1", "-1"), "bit 4 = 1 must keep SAT continuous")
         unknown = self.run_sc("overshoot", 0, 0)
         self.assertEqual((unknown["mode"], unknown["ticks"]), ("1", "-1"), "no valid reply must keep SAT continuous")
+
+    # TASK-1762: the old input of the case above (flow 55 against 50, 5 K over) now switches through the flame-out fail-safe after
+    # 30 s (2nd 30 s tick), and the MsgID 3 permission (entry 213, real satPwmEntryAllowed) blocks it as it blocks the 60 s rule.
+    def test_failsafe_needs_a_valid_reply_with_bit4_clear(self):
+        allowed = self.run_sc("failsafe", 1, 0)
+        self.assertEqual((allowed["mode"], allowed["ticks"]), ("2", "2"), "allowed: the fail-safe switches after 30 s (2nd 30 s tick)")
+        denied = self.run_sc("failsafe", 1, 1)
+        self.assertEqual((denied["mode"], denied["ticks"], denied["reason"], denied["path"]), ("1", "-1", "2", "1"))
+        unknown = self.run_sc("failsafe", 0, 0)
+        self.assertEqual((unknown["mode"], unknown["ticks"]), ("1", "-1"))
 
     def test_overshoot_refusal_is_traced_with_reason_and_path(self):
         denied = self.run_sc("overshoot", 1, 1)
