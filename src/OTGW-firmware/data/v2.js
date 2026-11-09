@@ -1820,6 +1820,7 @@
     return 'st-ok';
   }
   function fetchConn() {
+    if (document.hidden) return;   // TASK-1741: a hidden tab does not poll
     fetch(APIGW + 'v2/health').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j || !j.health) return;
       var h = j.health;
@@ -3189,7 +3190,7 @@
     blePollTimer = setInterval(function () {
       var pg = document.getElementById('page-settings');
       if (setActiveCat !== 'sensors' || !document.getElementById('setcard-ble') || !pg || !pg.classList.contains('active')) { stopBlePoll(); return; }
-      fetchBle();
+      if (!document.hidden) fetchBle();   // TASK-1741
     }, 4000);
   }
   function stopBlePoll() { if (blePollTimer) { clearInterval(blePollTimer); blePollTimer = null; } }
@@ -3722,6 +3723,7 @@
   }
 
   function fetchSatStatus() {
+    if (document.hidden) return;   // TASK-1741
     fetch(APIGW + 'v2/sat/status').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       var st = j && (j.sat || j); if (!st) return;
       if (st.heating_source !== undefined) sat.source = st.heating_source | 0;
@@ -3744,6 +3746,7 @@
   // Toutside (MsgID 27) / otmonitor value (the OT case 27 + fetchSeed both yield
   // to model.wxValid). Polled slowly — weather changes on the minute scale.
   function fetchWeather() {
+    if (document.hidden) return;   // TASK-1741
     fetch(APIGW + 'v2/sat/weather').then(function (r) { return r.ok ? r.json() : null; }).then(function (w) {
       if (!w) return;
       if (w.enabled && w.valid) {
@@ -4978,7 +4981,7 @@
     satMarkersLoaded = true;
     mk.then(fetchDhwBounds).then(fetchMaxTSetBounds);   // one after the other: at most 2 API calls in flight
     if (satPollTimer) clearInterval(satPollTimer);
-    satPollTimer = setInterval(fetchSatPage, 5000);
+    satPollTimer = setInterval(function () { if (!document.hidden) fetchSatPage(); }, 5000);   // TASK-1741
     // TASK-1012: existing SAT users see the wizard once on first SAT-page visit.
     if (setData && setData.satenabled && ('' + setData.satenabled.value) === 'true') maybeShowSatOnboarding('migrate');
     // Wire the "Re-run setup" button (guarded so re-entry doesn't double-bind).
@@ -5757,6 +5760,7 @@
   }
   // BLE discovery: /api/v2/sat/ble/discovery (mac + temp/hum).
   function pollDiscovery(retriesLeft) {
+    if (document.hidden) return;   // TASK-1741
     fetch(APIGW + 'v2/sat/ble/discovery', { cache: 'no-store' })
       .then(function (r) { if (!r.ok) throw 0; return r.json(); })
       .then(function (j) {
@@ -5786,6 +5790,7 @@
   // keyed by address: {"<addr>":{"temp":..,"epoch":..}} (restAPI.ino sendSensorStatus).
   // Each detected address surfaces once (seen-tracked, shared with BLE).
   function pollDallasDiscovery(retriesLeft) {
+    if (document.hidden) return;   // TASK-1741
     fetch(APIGW + 'v2/sensors', { cache: 'no-store' })
       .then(function (r) { if (!r.ok) throw 0; return r.json(); })
       .then(function (j) {
@@ -5803,19 +5808,30 @@
       })
       .catch(function () { if ((retriesLeft | 0) > 0) setTimeout(function () { pollDallasDiscovery(retriesLeft - 1); }, 4000); });
   }
-  // Gentle scheduler: skip the boot asset-burst (10s), then poll on a 25s cycle
-  // OFFSET from the 15s health poll so the two rarely fire together — that
-  // collision is what starved the discovery fetch. Dallas polls a beat later so
-  // the two discovery fetches don't collide with each other. Each tick retries once.
+  // TASK-1741: spread the periodic pollers. The device admits 2 REST requests in flight
+  // (ADR-165) and 4 connections holding TX (ADR-188) for ALL tabs together, while each tab
+  // queues its own 2. So each tab gets a random phase, and inside it the pollers sit at fixed
+  // offsets that never coincide (all periods are multiples of 5 s): health +0, device/time
+  // +1.25 s, sat/status +7.5 s, weather +22.5 s, BLE discovery +3.75 s, Dallas +1.25 s on the
+  // 25 s cycle (device/time asks the device only once per 600 s). The fast otmonitor (2 s)
+  // and PS=1 check (5 s) ticks take the phase modulo their period. every() makes the first
+  // periodic call one full period plus the offset after start.
+  var TAB_PHASE_MS = Math.floor(Math.random() * 15000);
+  function every(fn, periodMs, offsetMs) {
+    setTimeout(function () { fn(); setInterval(fn, periodMs); }, periodMs + offsetMs);
+  }
+
+  // Discovery scheduler: skip the boot asset-burst, then poll on a 25 s cycle in the free slots
+  // of the spread above: BLE at +13.75 s, Dallas 12.5 s later. Each tick retries once.
   function startDiscoveryPolling() {
     setTimeout(function () {
       pollDiscovery(1);
       setInterval(function () { pollDiscovery(1); }, 25000);
-    }, 10000);
+    }, 13750 + TAB_PHASE_MS);
     setTimeout(function () {
       pollDallasDiscovery(1);
       setInterval(function () { pollDallasDiscovery(1); }, 25000);
-    }, 14000);
+    }, 26250 + TAB_PHASE_MS);
   }
 
   // ---------- TASK-991: bench-mode -> simulation prompt ----------
@@ -6413,7 +6429,7 @@
     // the seed/SAT/weather cluster trickle in behind (see below).
     fetchSettings();
     setTimeout(fetchConn, 400);
-    setInterval(fetchConn, 15000);
+    every(fetchConn, 15000, TAB_PHASE_MS);   // TASK-1741: spread, see every()
     // TASK-990: surface newly discovered BLE + 1-Wire sensors as discovery toasts
     // (any page), via a gentle retrying scheduler that stays out of the boot burst.
     startDiscoveryPolling();
@@ -6474,12 +6490,28 @@
     setInterval(function () { if (!ws || ws.readyState !== 1) fetchSeed(); }, 20000);
     // TASK-1223.14: Monitor > Values / PS=1 otmonitor poll (no request unless needed),
     // and the PS=1 check (asks device/time only after 15 s of socket silence).
-    setInterval(otmonTick, OTMON_POLL_MS);
-    setInterval(psCheckTick, 5000);
-    setTimeout(devClockTick, 4400); setInterval(devClockTick, 30000);   // TASK-1229
+    // TASK-1741: these two get the tab's phase as well, so two tabs on Monitor > Values do not
+    // ask otmonitor (about half of all requests) in the same moment every 2 s.
+    every(otmonTick, OTMON_POLL_MS, TAB_PHASE_MS % OTMON_POLL_MS);
+    every(psCheckTick, 5000, TAB_PHASE_MS % 5000);
+    setTimeout(devClockTick, 4400); every(devClockTick, 30000, TAB_PHASE_MS + 1250);   // TASK-1229, TASK-1741
     setTimeout(checkFsMismatch, 5200);
-    setInterval(fetchSatStatus, 30000);
-    setInterval(fetchWeather, 60000);   // TASK-954: refresh weather-API OUTSIDE
+    every(fetchSatStatus, 30000, TAB_PHASE_MS + 7500);   // TASK-1741: spread, see every()
+    every(fetchWeather, 60000, TAB_PHASE_MS + 22500);   // TASK-954: refresh weather-API OUTSIDE
+    // TASK-1741: the pollers skip a hidden tab. While hidden, the Dallas and weather values are
+    // not refreshed, so they are dropped (the graph shows a gap, OUTSIDE falls back to the OT
+    // bus) instead of being recorded as live. When the tab is shown after at least 15 s, the
+    // pollers are refreshed once, staggered like the startup burst.
+    var hiddenSince = 0;
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { hiddenSince = Date.now(); gDallas = null; model.wxValid = false; return; }
+      if (Date.now() - hiddenSince < 15000) return;
+      fetchConn();
+      if (satPollTimer) setTimeout(fetchSatPage, 700);   // the SAT page asks sat/status and weather itself
+      else { setTimeout(fetchSatStatus, 700); setTimeout(fetchWeather, 1400); }
+      setTimeout(function () { pollDallasDiscovery(0); }, 2100);
+      if (blePollTimer) setTimeout(fetchBle, 2800);   // Settings > Sensors is open
+    });
 
     // Hooks for later phases to attach live-data renderers.
     window.OTGWv2 = {

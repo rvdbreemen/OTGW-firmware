@@ -62,9 +62,10 @@ async function runPoll(body, seenAddrs) {
   seenAddrs.forEach((a) => { seen[a] = 1; });
   const fetchStub = async () => ({ ok: true, status: 200, json: async () => JSON.parse(JSON.stringify(body)) });
   // pushGraphSlot / gDallas: the same poll also feeds the Monitor graph (TASK-1226).
-  const make = new Function('fetch', 'APIGW', 'discoverSeenSet', 'showDiscoverCard', 'setTimeout', 'pushGraphSlot',
+  // document: a visible tab (TASK-1741 skips the poll in a hidden one).
+  const make = new Function('fetch', 'APIGW', 'discoverSeenSet', 'showDiscoverCard', 'setTimeout', 'pushGraphSlot', 'document',
     'var gDallas = null;\n' + src + '\nreturn pollDallasDiscovery;');
-  const poll = make(fetchStub, '/api/', () => seen, (o) => cards.push(o), () => 0, () => {});
+  const poll = make(fetchStub, '/api/', () => seen, (o) => cards.push(o), () => 0, () => {}, { hidden: false });
   poll(0);
   for (let k = 0; k < 10; k++) await new Promise((r) => setImmediate(r));   // drain the promise chain
   return cards;
