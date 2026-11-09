@@ -5,7 +5,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-06T19:39:00Z'
-updated_date: '2026-11-09T06:19:00Z'
+updated_date: '2026-11-09T06:23:00Z'
 labels:
   - bug
 milestone: 2.0.0
@@ -42,4 +42,6 @@ R3 optional pcap: pktmon needs admin, so only if Robert runs it himself during R
 Decision rule: a hang in R1 or R2 reopens the task with its phase (AC1), then the beta.109 comparison (AC2) on the same script. 0 hangs in R1+R2 (~800 more requests in the two risk conditions) supports the waiver below.
 Side finding to keep (not this symptom): the vendored ESP32Async AsyncTCP accept path logs 'couldn't allocate client', calls tcp_abort(pcb) and then returns ERR_OK (.pio/libdeps/esp32-combo/AsyncTCP/src/AsyncTCP.cpp ~1579-1584, earlier noted as 1580-1585). lwIP expects ERR_ABRT after an abort in the accept callback, so on an AsyncClient OOM this is a use-after-free risk (a crash, not a hang). A library change needs Robert.
 Draft waiver text for Robert (stable notes, Known issues): 'Rarely (about 1 in 100 requests on early 2.0.0 betas, not seen since beta.116) the web UI can wait about 12 s for a small file such as the page icon when two browser tabs load at the same time on a busy gateway. Reload the page if a tab stays blank. We could not reproduce it on the current build; if it happens to you, a capture log helps us find it.'
+
+2026-11-09: the AsyncTCP accept side finding is filed as TASK-1746 (unconfirmed crash risk, needs-maintainer-ok).
 <!-- SECTION:NOTES:END -->
