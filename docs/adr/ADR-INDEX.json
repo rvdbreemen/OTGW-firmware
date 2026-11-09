@@ -8678,6 +8678,75 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-224",
+      "title": "OT-Direct gateway mode reads the return temperature in a supported thermostat slot and answers that read from the boiler cache",
+      "path": "ADR-224-ot-direct-gateway-mode-reads-the-return-temperature-in-a-supported-thermostat-slot-and-answers-that-read-from-the-boiler-cache.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-09",
+      "decision_summary": "In OT-Direct gateway mode the gateway reads MsgID 28 in the slot of a supported thermostat read, and answers that rea...",
+      "topics": [
+        "gateway-mode",
+        "opentherm",
+        "otdirect",
+        "pic-parity",
+        "return-temperature",
+        "sat"
+      ],
+      "aliases": [
+        "cache-answered slot",
+        "entry 290",
+        "MsgID 28 on OT-Direct",
+        "TASK-1759 option A",
+        "Tret read without thermostat"
+      ],
+      "components": [
+        "OT-Direct gateway-mode return-temperature slot (cache-answered thermostat read)"
+      ],
+      "symbols": [
+        "feedTret",
+        "otBoilerCache",
+        "otBoilerCacheStore",
+        "otdAltSlotTaken",
+        "replyToThermostat"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep exactly one boiler frame per thermostat frame in gateway mode with a thermostat.",
+          "Replace at most one thermostat frame per interval. Replace only a READDATA of an eligible ID (see Decision) whose cached boiler answer is younger than the interval.",
+          "Answer the replaced read with READACK and the cached boiler value of the asked ID. Log both frames ('T' and 'A') as today.",
+          "Do nothing while MsgID 28 is fresh, or while the boiler answers MsgID 28 with Unknown-DataID (isBoilerMsgIdUnsupportedRead(28)).",
+          "Let an unsupported-ID slot (TASK-1707) take priority."
+        ],
+        "must_not": [
+          "Send extra frames between thermostat frames. That is option B, which TASK-1701 and TASK-1707 removed.",
+          "Replace MsgID 0, 9 or 100, a WRITEDATA, an SR= or UI= ID, or MsgID 28.",
+          "Answer from a cache entry older than the interval."
+        ],
+        "exceptions": [
+          "None in gateway mode. Master mode (no thermostat) is not affected: there the gateway's own schedule already reads MsgID 28 every 10 s (RENTRY(28, OTTEMPINTERVALMS), OTDirect.ino:154, :59)."
+        ],
+        "verification": [
+          "MsgID 28 reaches the boiler once per interval;",
+          "the number of boiler frames equals the number of thermostat frames;",
+          "only frames of the candidate READ ID are replaced, and the thermostat gets READACK with the cached value;",
+          "nothing is replaced while MsgID 28 is fresh or Unknown, while the cache is stale, or outside gateway mode. The test must fail on the code before the change and pass after it. Field proof: a capture from tjfs. There is no bench with a the..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -15098,6 +15167,12 @@
     {
       "source": "ADR-223",
       "target": "ADR-208",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-224",
+      "target": "ADR-223",
       "type": "related",
       "resolved": true
     }
