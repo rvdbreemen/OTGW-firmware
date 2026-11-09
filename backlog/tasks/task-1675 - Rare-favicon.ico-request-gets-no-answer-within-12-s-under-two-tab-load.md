@@ -5,7 +5,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-06T19:39:00Z'
-updated_date: '2026-11-09T06:23:00Z'
+updated_date: '2026-11-09T11:42:00Z'
 labels:
   - bug
 milestone: 2.0.0
@@ -44,4 +44,6 @@ Side finding to keep (not this symptom): the vendored ESP32Async AsyncTCP accept
 Draft waiver text for Robert (stable notes, Known issues): 'Rarely (about 1 in 100 requests on early 2.0.0 betas, not seen since beta.116) the web UI can wait about 12 s for a small file such as the page icon when two browser tabs load at the same time on a busy gateway. Reload the page if a tab stays blank. We could not reproduce it on the current build; if it happens to you, a capture log helps us find it.'
 
 2026-11-09: the AsyncTCP accept side finding is filed as TASK-1746 (unconfirmed crash risk, needs-maintainer-ok).
+
+R1, 2026-11-09 11:09-12:40, .61 beta.162 (with TASK-1528 step b, boots 2/4/6/8/10): the two-tab trace from the first HTTP answer after boot to +120 s, 1496 requests in total. Results: boot 2: 274 ok / 2 fail; boot 4: 303/1; boot 6: 308/0; boot 8: 296/0; boot 10: 312/0. All 3 failures are '/' (175047 B) with status 200 and a connection RESET mid-body (phase d, send path): 83288 B at 11:21:21.9 (boot +8 s), 22976 B at 11:21:32.6 (boot +19 s), 74672 B at 11:36:22.5 (boot +20 s). t_conn 13-31 ms, t_first 74-98 ms. 0 hangs, 0 connect timeouts, 0 favicon failures; worst t_first 0.63 s. Context: in these boots the native heap minimum was 2544 resp. 1368 B (TASK-1528 notes), so the resets coincide with near heap exhaustion in the boot window. Reading per the decision rule: no hang in R1 (the rule reopens on a hang); the mid-body resets are a different symptom (body abort under low heap) and are not covered by the waiver text. Robert/coordinator decide whether this reopens the task or goes into the TASK-1528 heap thread. R2 (end of the RC 24 h soak) still to do. Data local: scratchpad t1528step-b/run-20261109/boot*T-trace.log.
 <!-- SECTION:NOTES:END -->
