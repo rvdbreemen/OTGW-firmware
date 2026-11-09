@@ -3,11 +3,11 @@ id: TASK-1733
 title: >-
   OT-Direct: TT= from the home dial shows 21.5 as the room temperature and the
   boiler does not fire (tjfs, beta.146+)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-08T15:26:00Z'
-updated_date: '2026-11-09T08:38:00Z'
+updated_date: '2026-11-09T09:21:00Z'
 labels:
   - bug
   - otdirect
@@ -27,7 +27,7 @@ tjfs 2026-11-08 15:12 #alpha-testing (msgs 1569006644661190766, 1569006818347458
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Capture or host replay shows why 21.5 lands on MsgID 24 / the room temperature display (file:line)
-- [ ] #2 Fix: TT= in OT-Direct gateway mode changes the setpoint path only; room temperature display unchanged; red/green test
+- [x] #2 Fix: TT= in OT-Direct gateway mode changes the setpoint path only; room temperature display unchanged; red/green test
 - [ ] #3 Field: tjfs confirms the thermostat takes the override and the boiler fires
 <!-- AC:END -->
 
@@ -143,4 +143,12 @@ NOT VERIFIED:
 2026-11-09 otgw-firmware-80: F2 implemented (ADR-223 accepted by Robert) in lane-1733 plus review fixes (2 reviewers): M1 the release observer runs once per thermostat frame before the alt-slot/UI/SR branches (PIC TreatMessage order); M2 MsgID 9/100 are never alternative slots, so without an override the thermostat gets READ_ACK 0 (PIC SendAltResponse + MessageID9); bMsgId9Answered only after a successful send; web UI row 16 Clear sends BS=0 (TT=0 no longer clears BS=/MQTT in gateway mode) and BS=0 also clears the MQTT room_setpoint write; row 100 removed; master-mode case; orphaned tests/test_otdirect_override.cpp retired; fixture md, manuals EN/NL, c4 doc, BREAKING_CHANGES updated. Tests (rerun in session): test_otd_tt_pic_parity 40/40 OK (red before: 16 of 27 on 99035d1ce; H2 release-with-alt-slot, N1 READ_ACK 0, B2 BS=0 clears MQTT write each red on the variant with only that fix reverted), alt_slots 12 OK (1 skip), msgid9 10, status_relay 9, sat_command_delivery 22, webui otd-override-clear 5/5. Full run_tests.py -j 4 --webui: 244 PASS, 1 FAILED = test_web_file_scheduling (known MSVC/vswhere environment cause, TASK-1723). Follow-ups to file: overrides panel no longer shows an active TT/TC; TT flags 0x02 vs PIC 0x03 and OH=; master TT=0 wipes MQTT room_setpoint; queued frames survive a mode switch.
 
 2026-11-09 correction to the previous note: the 1 FAILED test_web_file_scheduling is NOT an environment cause; detectie traced it to 44d6ef686 breaking the harness (fix under TASK-1723, in its push queue). Independent of F2 (F2 touches no file that test reads); I had taken the 'known environment' label over without checking.
+
+2026-11-09 beta.161+45dadcf pushed (origin/dev 26cd2301a..45dadcfb8) and posted (Discord 1569280595832340551). Bench .61 (OT-Direct, master mode, no thermostat): OTA app+fs, 164 settings kept; 15-min soak 84/84 REST 200, no restart (bootcount 181), heap 68.9-71.7 KB, maxblock 31,732 B flat, MQTT connected; master path kept: TT=21.5 -> write override msgid 16 = 5504 (0x1580), TT=0 -> cleared (SAT briefly off: SAT blocks TT= by design). AC2 ticked: in gateway mode TT= now only changes the setpoint path (MsgID 9/100 answers); test_otd_tt_pic_parity 40/40 shows no gateway WRITE 16/100, no R16 rewrite and the thermostat's own WRITE 16 passed unchanged; red on 99035d1ce (16/27). Caveat: no separate assert on MsgID 24; the code analysis found no path that writes MsgID 24. AC1 (why 21.5 showed on MsgID 24) stays open: not reproducible from the code, needs tjfs's capture. AC3 field: tjfs to confirm on beta.161. Status In Review per the field-validation rule.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC2 done: ADR-223 F2 in beta.161 (45dadcfb8): TT=/TC= in OT-Direct gateway mode are answer state only (MsgID 9/100), no gateway WRITE 16/100, PIC release rule after a MsgID 9 read, master mode keeps TrSet; review fixes M1 (observer before alt-slot), M2 (9/100 never alt slots, READ_ACK 0), web UI row-16 Clear -> BS=0. Evidence: tests/test_otd_tt_pic_parity.py 40/40 (red 16/27 on 99035d1ce; each review fix red with only that fix reverted), full suite 244 PASS (1 unrelated harness break fixed under TASK-1723), .61 soak + master-mode bench. Open: AC1 needs tjfs's capture (no code path found that writes MsgID 24); AC3 field confirmation by tjfs. Not verified on hardware: the gateway path with a real thermostat.
+<!-- SECTION:FINAL_SUMMARY:END -->
