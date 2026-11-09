@@ -3,11 +3,11 @@ id: TASK-1734
 title: >-
   Water pressure: show the decoded MsgID 18 value as is, remove the TASK-1682
   10-minute pressure-switch flag (Robert)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-08T15:28:00Z'
-updated_date: '2026-11-08T22:51:00Z'
+updated_date: '2026-11-09T05:12:00Z'
 labels:
   - webui
   - maintainer-ok
@@ -53,3 +53,9 @@ tjfs request (22:01/22:03): a user toggle to hide the pressure on the main scree
 
 2026-11-08 23:50 evidence (otgw-firmware-4c): AC2 red/green: tests/webui/pressure-switch-flag.test.mjs guard, 1/3 pass on origin/dev 07b38ee49 (2 fail: switch code present, readouts not plain) and 3/3 on lane-1734 0ff5bcbb6; graph-control-setpoint-source 11/11, no-sample-values 2/2, test_sat_pressure_health 8 passed 1 skipped, evaluate --quick 0 FAIL 0 WARN. AC3: Robert's answer 'Alleen gedecodeerde waarde' via AskUserQuestion in session 4c (~23:55, recorded above). Open DoD: esp32-combo build, OTA bench on .61 (readouts show '<n> bar'), push; waits for int-157 to land (rebase + re-bump to beta.158).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Web UI shows the MsgID 18 CH water pressure exactly as decoded, like MQTT/REST/HA; the TASK-1682 0.1 bar 'switch?' mark ( · switch? suffix plus tooltip after a 10-min window) is removed. Shipped as 2.0.0-beta.158+8a4b25d (origin/dev 73f9654da..8a4b25d60, fix dc64d4aba). AC1/AC3: Robert's decision 'Alleen gedecodeerde waarde' (AskUserQuestion, 2026-11-08 ~23:55), superseding the 23:10 'direct markeren'. AC2: tests/webui/pressure-switch-flag.test.mjs 1/3 on old dev (switch code present, readouts not plain), 3/3 on the fix; graph-control-setpoint-source 11/11; evaluate --quick 0 FAIL. Build esp32-combo beta.158+8a4b25d (zip 5992501 B). Bench .61 OTA 2026-11-09 00:18: runs beta.158+8a4b25d, fs hash 8a4b25d, 164 settings keys unchanged, device-served UI has 0 switch-code matches and the plain fmt readouts; soak 00:21-00:37 16 samples, no reboot, HTTP 200, freeheap 70636-72292, maxfreeblock 31732. Zip posted #alpha-testing msg 1569217694610358313. NOT verified on a device: the rendering of 0.10 bar, because the bench has no boiler and so no MsgID 18 (port 25238 cannot inject boiler answers); that rests on the host test running the real fmt()/pressClass().
+<!-- SECTION:FINAL_SUMMARY:END -->
