@@ -5,9 +5,9 @@ title: >-
   2-in-flight REST cap (ADR-165) and the 4-sender TX cap (ADR-188)
 status: In Progress
 assignee:
-  - '@claude'
+  - '@otgw-firmware-4c'
 created_date: '2026-11-08T18:26:00Z'
-updated_date: '2026-11-09T05:10:00Z'
+updated_date: '2026-11-09T05:15:00Z'
 labels:
   - bug
   - webui
@@ -218,4 +218,6 @@ NOT VERIFIED:
 - All per-minute model numbers are estimates from code periods. No device, browser or test ran in this session (read-only constraints).
 
 2026-11-09 Robert (in session otgw-firmware-80, AskUserQuestion): AC2 approach chosen: 'Spread + pause hidden': random start offset per tab for the init setIntervals and a staggered 30/60 s cluster (never more than 2 offered at once by one tab), plus a document.hidden early return in the pollers with one refresh on visibilitychange. No cap or ADR change. Measure with the run-A harness on .61 (two visible tabs, and one visible plus one hidden).
+
+2026-11-09 coordinator: implementation of AC2 (Robert's 'Spread + pause hidden') handed to otgw-firmware-4c; otgw-firmware-80 delivered the AC1 analysis (copy: C:\Users\rvdbr\AppData\Local\OTGW-capture\evidence\task-1741\AC1-analysis-2026-11-09.md).
 <!-- SECTION:NOTES:END -->
