@@ -42,9 +42,9 @@ format: "canonical"
 
 Proposed, 2026-11-09.
 
-**Decision Maker:** to be decided by User: Robert van den Breemen (maintainer). The choice of option A+C itself was his, made on 2026-11-09 at 21:52:17 UTC in #dev-sat-mqtt: "I think A+C would be best, for each hardware setup the optimal solution." (msg 1569469705461440577; corrections entry 290).
+**Decision Maker:** to be decided by User: Robert van den Breemen (maintainer). The choice of option A+C itself was his, made on 2026-11-09 at 21:52:17 UTC (Coordinated Universal Time) in #dev-sat-mqtt: "I think A+C would be best, for each hardware setup the optimal solution." (msg 1569469705461440577; corrections entry 290).
 
-This ADR records option A's deviation from the PIC model and its parameters. It was written by agent otgw-firmware-030509. On 2026-11-10 06:40 Robert answered "Direction OK, 8 B cache" (AskUserQuestion in the coordinator's session, relayed to 030509): the deviation from ADR-223 is accepted for this one read per interval, and the 8 B variant is chosen. The ADR stays Proposed until Sergeant D answers the interval, the scope and his agreement (W1-W3, Q-1759a).
+This ADR (architecture decision record) records option A's deviation from the PIC model (PIC: the gateway's Microchip PIC microcontroller on the classic boards) and its parameters. It was written by agent otgw-firmware-030509. On 2026-11-10 06:40 Robert answered "Direction OK, 8 B cache" (AskUserQuestion in the coordinator's session, relayed to 030509): the deviation from ADR-223 is accepted for this one read per interval, and the 8 B variant is chosen. Sergeant D answered the interval, the scope and his agreement on 2026-11-10 (W1-W3, Q-1759a; corrections entry 291). On 2026-11-10 ~14:40 Robert answered "Accept, scope OT-Direct" (AskUserQuestion in the coordinator's session): option A only; option C (`AA=28` on PIC boards) is out of scope and follows in its own ADR and task after Sergeant D answers Q-1759b. The status change to Accepted is recorded by the coordinator with `adr accept`.
 
 ## Status History
 
@@ -59,9 +59,9 @@ status_history:
 
 ## Context
 
-SAT (Smart Autotune Thermostat, the firmware port of thermo-nova) needs the boiler return temperature, OpenTherm MsgID 28. Sergeant D said so in entry 287: "We need to ask for return temperature".
+SAT (Smart Autotune Thermostat, the firmware port of thermo-nova) needs the boiler return temperature, OpenTherm MsgID 28 (message identifier 28, the return water temperature). Sergeant D said so in entry 287: "We need to ask for return temperature".
 
-- **PWM flame-off hold:** thermo-nova sets it to return temperature + flame-off offset. When the return temperature is missing it makes no override at all (`heating_control.py:392-399` at pin 7beaaf5).
+- **PWM (pulse-width modulation) flame-off hold:** thermo-nova sets it to return temperature + flame-off offset. When the return temperature is missing it makes no override at all (`heating_control.py:392-399` at pin 7beaaf5).
 - **Cycle tracker:** thermo-nova uses flow minus return (`cycles/tracker.py:262-265`).
 - **Firmware today:** without MsgID 28 it falls back to flow + offset after 5 minutes (`satNoReturnTemp()` / `satPwmFlameOffHold()` in `SATcontrol.ino`; entries 135, 149, 151, 263).
 
@@ -70,7 +70,7 @@ On OT-Direct in gateway mode, TASK-1707 (beta.132) copied the PIC model. OT-Dire
 - The boiler gets exactly one frame per thermostat frame.
 - The gateway sends its own read only in the slot of a thermostat request that the boiler answers with Unknown-DataID. See `otdAltSlotTaken()` (`OTDirect.ino:1850-1882`) and, on the PIC, `gateway.asm:2387-2414`.
 
-A thermostat that asks only for supported IDs therefore never lets the gateway read MsgID 28. tjfs's setup is such a case: an Ideal Halo Lite thermostat with an Ideal Logic boiler. The thermostat asks only IDs 0, 1, 16, 17, 24 and 25 (capture 2026-11-09, `ret=0.0`).
+A thermostat that asks only for supported IDs (OpenTherm data identifiers) therefore never lets the gateway read MsgID 28. tjfs's setup is such a case: an Ideal Halo Lite thermostat with an Ideal Logic boiler. The thermostat asks only IDs 0, 1, 16, 17, 24 and 25 (capture 2026-11-09, `ret=0.0`).
 
 The PIC has the same limit, and `AA=` / `PM=` do not get around it (TASK-1767). That is why Robert chose A on OT-Direct plus C (`AA=28`) on the PIC.
 
@@ -89,13 +89,13 @@ The boiler still receives exactly one frame per thermostat frame; only the conte
 Which thermostat frames may be used:
 
 - A READ_DATA only, never a WRITE_DATA. A write must reach the boiler; that is the lesson of TASK-1701.
-- Never MsgID 0 (status and CH enable).
+- Never MsgID 0 (status and CH (central heating) enable).
 - Never MsgID 9 or 100 (remote override, ADR-223).
-- Never an ID with an active SR= or UI= entry, and never MsgID 28 itself.
+- Never an ID with an active SR= (fixed response) or UI= (treat as unknown ID) entry, and never MsgID 28 itself.
 - Only an ID whose cached answer is younger than the interval.
 - An unsupported-ID slot (TASK-1707) keeps priority, because the schedule already reads MsgID 28 there.
 
-**Cache age: one stamp of about 8 B static RAM (KISS), chosen by Robert on 2026-11-10 ("Direction OK, 8 B cache").**
+**Cache age: one stamp of about 8 B of static RAM (random-access memory), the simplest variant (KISS: keep it simple), chosen by Robert on 2026-11-10 ("Direction OK, 8 B cache").**
 
 - The gateway keeps one candidate ID: the first eligible READ_DATA ID that the thermostat repeats. In tjfs's log that is 25 or 17.
 - With it, the gateway stores the time of the last boiler reply for that ID.
@@ -104,7 +104,9 @@ Which thermostat frames may be used:
 
 This covers the need as long as the thermostat repeats at least one eligible read; every thermostat observed so far does. The per-slot variant (512 B) is the fallback if review wants any ID to be replaceable.
 
-Sergeant D decides the interval (W1, proposal 30 s) and whether this runs only with SAT on or always (W2, proposal: SAT only), under Q-1759a. The decision does not depend on their values.
+Sergeant D set the interval to 30 s, acting only while no valid MsgID 28 arrived for 30 s (W1), and limited it to while SAT is on (W2), corrections entry 291.
+
+**Scope: OT-Direct gateway mode only.** Option C of Q-1759a and entry 290 (`AA=28` on PIC boards while SAT is on) is not part of this decision. It follows in its own ADR and task once Sergeant D answers Q-1759b. PIC boards keep today's behaviour.
 
 ## Decision Contract
 
@@ -144,7 +146,7 @@ Field proof: a capture from tjfs. There is no bench with a thermostat in gateway
 - **B, own frames between the thermostat's frames.** Rejected. TASK-1701 and TASK-1707 removed exactly this after tjfs's field log, which showed 634 own frames against 369 thermostat frames in 6 minutes. The PIC never does it, and it risks delaying the thermostat's next frame.
 - **Only the unsupported-ID slots (status quo, TASK-1707).** Rejected for the setups that matter: with a thermostat that asks only supported IDs, as tjfs's does, it reads nothing. It stays the preferred path whenever such a slot exists.
 - **Do nothing and keep the flow + offset fallback.** Rejected by entry 287 (Sergeant D) and entry 290 (Robert). The fallback is a recorded deviation from thermo-nova, and the return temperature also feeds the cycle tracker.
-- **A cache age per slot, `otBoilerCacheMs[128]`.** This costs 512 B of static RAM in internal DRAM (BSS), also on the OTGW32 without PSRAM. It would let any eligible ID be replaced, with an exact age per ID. It is not proposed first, because the single-stamp variant covers the observed thermostats with about 1/64 of the RAM and less code. It remains the fallback.
+- **A cache age per slot, `otBoilerCacheMs[128]`.** This costs 512 B of static RAM in internal DRAM (data RAM; zero-initialised static data, BSS), also on the OTGW32 board without PSRAM (external pseudo-static RAM). It would let any eligible ID be replaced, with an exact age per ID. It is not proposed first, because the single-stamp variant covers the observed thermostats with about 1/64 of the RAM and less code. It remains the fallback.
 - **Answer the thermostat Unknown-DataID for the replaced read, as the TASK-1707 slot does.** Rejected. The ID is supported, and three Unknown-DataID answers could make a thermostat stop asking for a value it uses.
 
 ## Consequences
@@ -152,7 +154,7 @@ Field proof: a capture from tjfs. There is no bench with a thermostat in gateway
 **Positive:**
 
 - SAT gets a real return temperature on OT-Direct gateway installations whose thermostat asks only supported IDs. The flame-off hold becomes return + offset, as in thermo-nova, instead of the flow + offset fallback.
-- `Tret` reaches MQTT and Home Assistant on those installations.
+- `Tret` reaches MQTT (the message protocol the firmware publishes to) and Home Assistant on those installations.
 - The load on the boiler bus does not change: one frame per thermostat frame.
 
 **Negative:**
