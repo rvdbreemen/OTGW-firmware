@@ -8810,6 +8810,50 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-226",
+      "title": "Use acorn and eslint-scope as test-only dependencies for a parser-based undefined-name gate on the web UI",
+      "path": "ADR-226-use-acorn-and-eslint-scope-as-test-only-dependencies-for-a-parser-based-undefined-name-gate-on-the-web-ui.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-10",
+      "decision_summary": "Add acorn (a JavaScript parser) and eslint-scope (scope analysis on its syntax tree) as pinned, test-only npm depende...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Pin exact versions (acorn 8.19.0, eslint-scope 9.1.2) in tests/webui/package.json and commit tests/webui/package-lock.json (excepted from the root package-lock.json ignore rule).",
+          "Keep tests/webui/nodemodules/ out of git (.gitignore).",
+          "Fail with an install instruction (npm ci --prefix tests/webui) when the packages are missing, never skip silently.",
+          "Add a name to the allowlist only when the browser or the language really provides it."
+        ],
+        "must_not": [
+          "Load acorn, eslint-scope or any npm package from firmware sources, from src/OTGW-firmware/data/ or from the LittleFS image.",
+          "Use a version range (^, ~) for these packages."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "node --test tests/webui/v2-undefined-names.test.mjs: 2/2 green on the current v2.js; with OTGWV2JS pointing at the beta.166 v2.js it fails with esc (line 6973).",
+          "npm audit --prefix tests/webui: 0 vulnerabilities on 2026-11-10."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": "tests/webui/v2-undefined-names.test.mjs",
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -15242,6 +15286,18 @@
     {
       "source": "ADR-225",
       "target": "ADR-185",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-226",
+      "target": "ADR-146",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-226",
+      "target": "ADR-192",
       "type": "related",
       "resolved": true
     }
