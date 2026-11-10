@@ -4,7 +4,7 @@ title: Boot panic in ipc1 during GPIO ISR install (beta.162, .61, 1 of 10 reboot
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:21:00Z'
-updated_date: '2026-11-09T22:22:00Z'
+updated_date: '2026-11-10T03:25:00Z'
 labels:
   - bug
   - crash
@@ -32,6 +32,14 @@ Candidates (not proven): attachInterrupt / attachInterruptArg in src/libraries/O
 - [ ] #2 Reproduce or bound it on the bench: repeated /ReBoot cycles (including after a long uptime and a low-heap boot) with serial capture; count panics per N reboots
 - [ ] #3 Fix, or a decision with Robert, with before/after panic counts
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-10 ~04:25, coredump decode (session 4c6667da, slot from the coordinator): one read-only GET /api/v2/device/coredump on .61 (no reboot): 10,596 B, header X-Coredump-App-Sha256 886504532 = prefix of sha256 of the beta.162+5786928 ELF (886504532221f56a44fd289c6bc07eeb1f162c34382e7d09f60e545ab7e86cd1), so the ELF matches. esp-coredump 1.18.1 (PIO penv) with tool-xtensa-esp-elf-gdb: exccause 0x41 DebugException, EPC6 0x40383bfa, crashed task ipc1 (TCB 0x3fcbc338), not in interrupt context. Backtrace: _frxt_int_enter portasm.S:127 <- _xt_lowint1 xtensa_vectors.S:1225 <- vPortExitCriticalSafe (portmacro.h:596) / multi_heap_internal_unlock multi_heap.c:176 <- multi_heap_malloc(size=8) multi_heap_poisoning.c:265 <- heap_caps_malloc(8, caps 0x804) heap_caps.c:84 <- esp_intr_alloc_intrstatus_bind(source=16, handler gpio_intr_service) intr_alloc.c:574 <- esp_intr_alloc intr_alloc.c:728 <- gpio_isr_register_on_core_static gpio.c:608 <- ipc_task esp_ipc.c:84 <- vPortTaskWrapper. gdb on the saved core: ipc1 pxStack 0x3fcbbef4, pxEndOfStack 0x3fcbc2f0 (1,020 B), current SP 0x3fcbbec0 = 52 B below pxStack. Words at pxStack: 0xa5a5a5a5 fill except 0x00060c23 at pxStack+8 (a saved PS-like value, cf. EPS6 0x60c30): the level-1 interrupt frame was written past the bottom of ipc1's stack and the end-of-stack watchpoint (CONFIG_FREERTOS_WATCHPOINT_END_OF_STACK=y) fired. VERDICT: ipc1 stack overflow (CONFIG_ESP_IPC_TASK_STACK_SIZE=1024 in the precompiled arduino-libs 5.5.0+sha.9bb7aa84fe; IDF default on S3 is 1280); not heap corruption, not OOM. Files (local, not in git; coredump.bin may hold RAM content): D:\Users\Robert\Documents\GitHub\RvdB\OTGW-build-archive\coredumps\task-1763-beta162-61\ (decode.txt, cmds.gdb, coredump.bin, core.elf).
+
+DECISION FOR ROBERT (not implemented): (a) raise the IPC task stack to 1280 B or more by rebuilding the Arduino libs with custom_sdkconfig (a build tooling change, so an ADR first): fixes the cause, costs a libs rebuild in the build chain and RAM for two IPC stacks (+256 B each at 1280). (b) install the GPIO ISR service early, before startWiFi, so the ISR allocation runs while few interrupts are pending: smaller chance, the cause stays (any later cross-core ISR install can still overflow). Recommendation from the evidence: (a), because only (a) removes the overflow; (b) at most as a stopgap. The project sdkconfig.h wrapper of ADR-185 does not help: the stack size is compiled into the precompiled esp_ipc.c.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
