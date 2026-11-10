@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:08:00Z'
-updated_date: '2026-11-10T15:50:00Z'
+updated_date: '2026-11-10T16:55:00Z'
 labels:
   - sat
   - opentherm
@@ -143,6 +143,14 @@ created: 2026-11-10T15:50:00Z
 ---
 
 C part changed by Sergeant D (corrections entry 296; 2026-11-10 16:38:27 UTC, 'option 3 is my choice', msg 1569738014878605403): on PIC boards SAT sends PM=28 every 30 s, not AA=28/DA=28. The plan items C1-C3 (AA/DA, EEPROM, duplicates) drop; C4 (slot limit, TASK-1767) stays: PM= also goes out only in an unsupported slot. Our reading (not asked for PIC): same conditions as A (only while no valid MsgID 28 for 30 s, SAT on, not while MsgID 28 is Unknown), modelled on the PM=25 logic (SATcontrol.ino satPm25Decide, TASK-1412.5). Robert may confirm the change to entry 290. The C part is a separate change from A (ADR-224, OT-Direct only).
+
+---
+
+created: 2026-11-10T16:55:00Z
+
+---
+
+Robert decided (2026-11-10 ~17:0x, via AskUserQuestion in the coordinator's session, relayed to 030509): 'Yes, PM=28 every 30 s'. He agrees with Sergeant D's choice (corrections entry 296), which replaces the C part of his entry 290 (AA=28/DA=28). So the PIC part of this task is PM=28 every 30 s. This is a maintainer decision recorded here, not a new corrections entry. Still our interpretation (entry 296): the same conditions as A (only while no valid MsgID 28 for 30 s, SAT on, not while MsgID 28 is Unknown), modelled on the PM=25 logic.
 
 ---
 <!-- COMMENTS:END -->
