@@ -165,9 +165,9 @@ Field proof: a capture from tjfs. There is no bench with a thermostat in gateway
 
 ## Open Questions
 
-- [ ] W1: the interval (proposal 30 s), Sergeant D (Q-1759a).
-- [ ] W2: only while SAT is enabled, or always (proposal: SAT only), Sergeant D (Q-1759a).
-- [ ] W3: Sergeant D's agreement with A+C (entry 287 is his).
+- [x] W1: the interval (proposal 30 s), Sergeant D (Q-1759a). — **Answered 2026-11-10 by User: Sergeant D (relayed by otgw-firmware-97):** 30 s, and only while no valid MsgID 28 arrived for 30 s; Sergeant D 2026-11-10, 'the answer is A' (08:29:17 UTC, msg 1569614915222773762) and 'yes' (09:24:44 UTC, msg 1569628868648767570) to our explicit check; corrections entry 291
+- [x] W2: only while SAT is enabled, or always (proposal: SAT only), Sergeant D (Q-1759a). — **Answered 2026-11-10 by User: Sergeant D (relayed by otgw-firmware-97):** only while SAT is on; Sergeant D 2026-11-10 'yes' (msg 1569628868648767570) to our check; entry 291
+- [x] W3: Sergeant D's agreement with A+C (entry 287 is his). — **Answered 2026-11-10 by User: Sergeant D (relayed by otgw-firmware-97):** agreed for A on OT-Direct; Sergeant D 2026-11-10 'the answer is A' + 'yes' (entry 291). C on PIC not answered by him (Q-1759b queued); C stays Robert's entry 290
 - [x] Cache-age variant: one stamp (8 B, candidate ID) or per slot (512 B), Robert / review. — **Answered 2026-11-10 by User: Robert van den Breemen (relayed by Coordinator OTGW):** single stamp, 8 B (candidate ID, KISS). Robert, 2026-11-10 06:40, 'Direction OK, 8 B cache', via AskUserQuestion in the coordinator's session (relayed to 030509)
 - [x] Acceptance of the deviation from ADR-223's PIC parity for this one read, Robert. — **Answered 2026-11-10 by User: Robert van den Breemen (relayed by Coordinator OTGW):** accepted for this one read per interval. Robert, 2026-11-10 06:40, 'Direction OK', via AskUserQuestion in the coordinator's session (relayed to 030509); the ADR stays Proposed until Sergeant D answers W1-W3
 

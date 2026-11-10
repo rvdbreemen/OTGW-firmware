@@ -3881,6 +3881,21 @@
     "TASK-1759",
     "TASK-1767"
    ],
+   "confirmed_by_entry": 291
+  },
+  {
+   "id": 291,
+   "title": "Q-1759a answered by Sergeant D: A on OT-Direct, every 30 s, only while SAT is on (Sergeant D, 2026-11-10; confirms entry 290 for direct mode, C on PIC still open)",
+   "date": "2026-11-10",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569614915222773762",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1707",
+    "TASK-1759",
+    "TASK-1767"
+   ],
    "confirmed_by_entry": null
   }
  ]

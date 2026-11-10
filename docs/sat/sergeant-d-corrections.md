@@ -6256,3 +6256,26 @@ Q-1759a stays asked for these points.
 **Changes an earlier entry:** none; it answers the "how" of entry 287 for the maintainer.
 
 **Task:** TASK-1759 (implementation; no code before the open points are answered), related TASK-1707, TASK-1767. **Open:** interval, SAT only or always, Sergeant D's agreement.
+
+## 291. Q-1759a answered by Sergeant D: A on OT-Direct, every 30 s, only while SAT is on (Sergeant D, 2026-11-10; confirms entry 290 for direct mode, C on PIC still open)
+
+**Source:** sergeantd, #dev-sat-mqtt (channel 1105556725714649128), two messages:
+- 2026-11-10 08:29:17 UTC, msg 1569614915222773762 (https://discord.com/channels/812969634638725140/1105556725714649128/1569614915222773762). This answers our follow-up msg 1569604976282443839, asked by otgw-firmware-97 at 07:4x UTC: "interval 30 s, only while no valid MsgID 28 for 30 s? / SAT only or always?" (advice: 30 s, SAT only), with a reference to Robert's A+C (entry 290).
+- 2026-11-10 09:24:44 UTC, msg 1569628868648767570 (https://discord.com/channels/812969634638725140/1105556725714649128/1569628868648767570). This answers our yes/no check msg 1569616265348120678. That check read: "A = swap one frequent thermostat read for a MsgID 28 read (yesterday's option A). ... may I write down our recommendation, every 30 s and only while SAT is on? A "yes" is enough".
+
+**Quoted:**
+- "@BlueFlame Bot the answer is A"
+- "@BlueFlame Bot yes"
+
+**Settled (by Sergeant D, read through his "yes" to our explicit check):**
+- Option A of Q-1759a on OT-Direct gateway mode: replace one frequent supported thermostat read with an own MsgID 28 read, and answer the thermostat from the cache (ADR-224).
+- The interval is 30 s, and it only acts while no valid MsgID 28 has arrived for 30 s (as worded in the follow-up).
+- It acts only while SAT is on.
+
+This confirms Robert's maintainer decision of entry 290 for direct mode. It also answers W1 (interval), W2 (SAT only) and W3 (agreement, for A) of ADR-224.
+
+**Interpretation (ours):** his first message ("the answer is A") came after a follow-up that had no A/B options, only the interval and SAT only or always. We read "A" as option A of Q-1759a. His "yes" to our explicit restatement confirms that reading, the 30 s and SAT only. He did not mention C, so this entry does not record a rejection of C.
+
+**Changes an earlier entry:** settles the open points of entry 290 for direct mode (interval, SAT only, Sergeant D's agreement). Entry 290's C (PIC: `AA=28` while SAT is on, slot-limited, TASK-1767) stays a maintainer decision without his answer.
+
+**Task:** TASK-1759 (implementation of A per ADR-224; C per entry 290), related TASK-1707, TASK-1767. **Open:** C on PIC boards (asked separately as Q-1759b, queued).
