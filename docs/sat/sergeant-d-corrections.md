@@ -6477,3 +6477,29 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1784 (done with this answer); TASK-1787 (coefficient).
 
 **Open:** nothing for KD. The coefficient question stays open under entry 298.
+
+## 301. Sergeant D asks gruijter to raise the heating curve coefficient to 1.8; gruijter says he never set 1.12 himself (Sergeant D and gruijter, 2026-11-10; follows entry 298)
+
+**Source:** #alpha-testing (channel 1514720723980259460), read first-hand by the comms session (otgw-firmware-97) through the bot REST API. Times are from the message ids.
+- 20:00:22 UTC, gruijter, msg 1569803928478941383 (https://discord.com/channels/812969634638725140/1514720723980259460/1569803928478941383): his answer to our log request (msg 1569790714794221639).
+- 20:16:02 UTC, gruijter, msg 1569807874551578657: today's data on beta.167, 3 attachments (not yet downloaded or analysed).
+- 20:34:15 UTC, sergeantd, msg 1569812455402504274 (https://discord.com/channels/812969634638725140/1514720723980259460/1569812455402504274): his instruction to gruijter.
+
+**Quoted:** (gruijter) "Ok will let it run tonight. 1.12 was not entered by me in any way, so auto-tune must have come up with that. Will post todays capture in a moment too." (Sergeant D) "@gruijter can you raise the heating curve coefficient to 1.8?"
+
+**Settled:**
+- Sergeant D asks one tester to set his coefficient to 1.8 by hand. This is an instruction to a tester for his own installation, not a firmware decision. Nothing changes in code.
+- gruijter states he did not set 1.12. That contradicts the working guess of entry 298 ("most likely did not come from the self-tune"). Not verified: we have no log that shows where 1.12 came from.
+
+**Interpretation (ours, not asked):**
+- He changes the setting so the night run starts from a value inside the 1.6-2.4 band of entry 166, in line with his remark in entry 300 that a low coefficient probably causes the slow warm-up.
+- A hand change of the coefficient restarts the tuner window: hours are excluded with `coeff_changed` and `/sat_tune.json` days belonging to another coefficient are not restored (`docs/sat/sat-log-format.md:27,29`). Tonight's SATTUNE lines will therefore not show how the tuner reached 1.12. The SATTUNER line at the next boot and older logs, if gruijter has them, are the only sources for that.
+
+**Checked against the recorded entries:**
+- Entry 298 (wait for gruijter's night log, the self-tune stays as it is): agrees; no tuner change is decided.
+- Entry 166 (most homes 1.6-2.4): 1.8 is inside it.
+- Entry 300 (low coefficient as the probable cause of slow warm-up): consistent.
+
+**Task:** TASK-1787 (coefficient). If gruijter's data shows that the self-tune drove the coefficient below its ADR-205 limit of one 0.1 step per 3 counted days, that becomes a separate bug task.
+
+**Open:** where 1.12 came from; Sergeant D's decision after the night log (entry 298).
