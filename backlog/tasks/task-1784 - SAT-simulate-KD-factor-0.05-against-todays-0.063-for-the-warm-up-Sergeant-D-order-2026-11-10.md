@@ -3,11 +3,11 @@ id: TASK-1784
 title: >-
   SAT: simulate KD factor 0.05 against today's 0.063 for the warm-up (Sergeant D
   order 2026-11-10)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-10T18:37:00Z'
-updated_date: '2026-11-10T19:13:00Z'
+updated_date: '2026-11-10T19:20:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -27,7 +27,7 @@ Sergeant D, #dev-sat-mqtt 2026-11-10 19:33 UTC, msg 1569781945460727873 (relayed
 - [x] #1 Pre-registration committed before the first run: same thresholds and rule as TASK-1655, baseline 0.063, variant 0.05
 - [x] #2 Fairness check: the 0.063 baseline reproduces the committed TASK-1655 x0.9 rows exactly (host test)
 - [x] #3 Post text handed to 97 for #dev-sat-mqtt; Sergeant D's answer recorded as a numbered entry
-- [ ] #4 Result per plant class 0.05 vs 0.063 (t03, t01, overshoot, starts, guards) plus a chart; report docs/sat/sim-1784/
+- [x] #4 Result per plant class 0.05 vs 0.063 (t03, t01, overshoot, starts, guards) plus a chart; report docs/sat/sim-1784/
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -38,4 +38,12 @@ Sergeant D, #dev-sat-mqtt 2026-11-10 19:33 UTC, msg 1569781945460727873 (relayed
 2026-11-10 030509: grid run 19:44:46-19:52 local (1152 runs, commit charge 71-74 %); merge: 576 baseline runs equal the committed 1655 x0.9 runs (0 mismatches); validity check passed; 0.05 passes 0 of 8 classes (B 0.6-3.4 %), no guard fails because of 0.05; recommendation by the rule: keep 0.063. Results f32f54a61. Post text with options A/B/C handed to 97 (HOLD until push). Time note: the order is 18:33 UTC by its message id (the description says 19:33, local time).
 
 2026-11-10 030509: pushed. Pre-registration alone first: ab340a9f4 (7f8a3b9b1..ab340a9f4; rebased from e9883eb93, content identical, runs.json meta thresholds_commit keeps e9883eb93), then results dfd7befd2, entry 298 9f56e7316, entry 299 a7c67888a. Posted by 97 as a reply to his order with the chart: msg 1569792005486411786 (19:12:59 UTC from the id). AC4 waits for his A/B/C answer as a numbered entry.
+
+2026-11-10 030509: Sergeant D answered 19:14:57 UTC (msg 1569792502163054612): 'Keep A. Probably the low heating curve coefficient is the issue there'. Recorded as entry 300: KD stays 0.063, field data first; his remark points to the coefficient question (entry 298, TASK-1787).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+KD factor 0.05 vs 0.063 warm-up simulation (1152 runs, TASK-1655 model; pre-registration ab340a9f4 pushed before the results dfd7befd2). The 0.063 baseline reproduces all 576 committed 1655 x0.9 runs (0 mismatches); validity check passed. 0.05 is 0.6-3.4 % faster (1.6-4.6 min median), passes 0 of 8 classes against the 10 % rule, no guard fails because of it. Posted via 97 (msg 1569792005486411786); Sergeant D chose A, keep 0.063 (entry 300). Not verified: real boilers and houses; the firmware outside the modelled logic.
+<!-- SECTION:FINAL_SUMMARY:END -->

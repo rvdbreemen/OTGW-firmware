@@ -4005,6 +4005,20 @@
     "TASK-1786"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 300,
+   "title": "KD factor: keep 0.063 and collect field data first (option A); he links the slow warm-up to a low heating curve coefficient (Sergeant D, 2026-11-10; answers the TASK-1784 result, follows entry 297)",
+   "date": "2026-11-10",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569792502163054612",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1784",
+    "TASK-1787"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

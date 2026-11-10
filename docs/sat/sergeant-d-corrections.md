@@ -6455,3 +6455,25 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Checked:** every time-and-id pair in entries 287-296 was recomputed from its id. 287-290 match; the 12 pairs above were one hour late.
 
 **Task:** none (record correction). TASK-1776 and TASK-1786 carry the same error and are corrected by their owners.
+
+## 300. KD factor: keep 0.063 and collect field data first (option A); he links the slow warm-up to a low heating curve coefficient (Sergeant D, 2026-11-10; answers the TASK-1784 result, follows entry 297)
+
+**Source:** sergeantd, 2026-11-10 19:14:57 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1569792502163054612 (https://discord.com/channels/812969634638725140/1105556725714649128/1569792502163054612). It answers our post of the TASK-1784 result, msg 1569792005486411786 (19:12:59 UTC), posted by otgw-firmware-97. Relayed by 97, not seen first-hand (the Discord tools were down in this session).
+
+**Quoted:** "@BlueFlame Bot Keep A. Probably the low heating curve coefficient is the issue there"
+
+**Settled:**
+- Of our options (A keep 0.063 and collect field data first; B change to 0.05; C simulate something else), he chose A.
+- The KD factor stays 0.063 (`SATpid.ino:28`, entries 279 and 280). Nothing changes in code.
+- The simulation he ordered in entry 297 is done; its result is `docs/sat/sim-1784/report.md`.
+
+**Interpretation (ours, not asked):** "the issue there" refers to the slow warm-up he set out to fix with a lower KD. He now names a low heating curve coefficient as the probable cause. That ties to his coefficient concern about gruijter's 1.12 (entry 298), which waits for gruijter's night log.
+
+**Checked against the recorded entries:**
+- Entry 280 (keep 0.063, real data instead of simulation): agrees.
+- Entry 297 (the order for this simulation): answered.
+- Entry 298 (wait for gruijter's night log): this answer points to the same topic.
+
+**Task:** TASK-1784 (done with this answer); TASK-1787 (coefficient).
+
+**Open:** nothing for KD. The coefficient question stays open under entry 298.
