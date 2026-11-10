@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.167] - 2026-11-10
+
+### Changed
+- SAT: switch from continuous to PWM when the flow stays 3.5 °C above the requested setpoint for 30 s, beside the unchanged 60 s rule (flame-out protection; Sergeant D's decisions 288/289; TASK-1762).
+- Web UI in English, Dutch, German and Greek with a flag language menu; English default, browser language on first visit; firmware, MQTT, API and telnet stay English (TASK-1764). beta.167 fixes the beta.166 translation regressions on the SAT page, the Monitor > Graph readout and the Monitor > OT support table, and the cut-off "Board mode" choice (TASK-1768).
+
+### Fixed
+- OT-Direct gateway mode: an active `TT=`/`TC=` shows in the override list and `GET /api/v2/otdirect/overrides` again (`overrides.remote`), and counts in `overrides_active` (TASK-1749).
+- OT-Direct: a queued boiler write no longer goes out after a mode switch or `GW=R` (TASK-1752).
+
 ## [2.0.0-beta.162] - 2026-11-09
 
 ### Changed
@@ -826,7 +836,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.162...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.167...HEAD
+[2.0.0-beta.167]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.162...v2.0.0-beta.167
 [2.0.0-beta.162]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.158...v2.0.0-beta.162
 [2.0.0-beta.158]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.144...v2.0.0-beta.158
 [2.0.0-beta.144]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.130...v2.0.0-beta.144
