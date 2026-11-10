@@ -58,9 +58,9 @@ Op een werkende Classic staat er twee keer `"PIC"`. `Degraded` betekent: de firm
 
 #### Snelle controles (begin hier)
 
-1. **Controleer hoe de S3 Mini in de voet zit.** De S3 Mini heeft aan elke kant twee pinrijen. Alleen de **buitenste** rijen passen op de voetafdruk van de Wemos D1 mini; de binnenste rijen zijn extra S3-pinnen en blijven buiten de voet. Zit de module een rij verschoven, of is een pin verbogen of niet helemaal ingedrukt, dan is de seriële verbinding met de PIC weg. Kijk van opzij: elke buitenste pin moet helemaal in de voet zitten.
+1. **Controleer hoe de S3 Mini in de voet zit.** De S3 Mini heeft aan elke kant twee pinrijen. Alleen de **buitenste** rijen passen op de voetafdruk van de Wemos D1 mini; de binnenste rijen zijn extra S3-pinnen. Zorg dat de buitenste rijen in de voet zitten. Zit de module een rij verschoven, of is een pin verbogen of niet helemaal ingedrukt, dan is de seriële verbinding met de PIC weg. Kijk van opzij: elke buitenste pin moet helemaal in de voet zitten.
 2. **Haal de stroom van de hele print.** Stroom eraf, tien seconden wachten, stroom erop. Een herstart vanuit de Web UI herstart alleen de ESP.
-3. **Zet Board mode op Auto-detect.** Ga in de Web UI naar Settings, System, **Board mode**. Kies **Auto-detect**, sla op en herstart. Kies op een Classic niet **OT-Direct (no PIC)**: die stand is voor een print zonder PIC.
+3. **Controleer Board mode.** Ga in de Web UI naar Settings, System, **Board mode**. **Auto-detect** (de standaard) en **PIC (Classic)** werken allebei op een Classic. Kies tijdens het zoeken naar de oorzaak liever **PIC (Classic)**: dan blijft de seriële verbinding met de PIC open en vraagt de firmware elke minuut opnieuw (zie hieronder). Sla op en herstart. Kies op een Classic niet **OT-Direct (no PIC)**: die stand is voor een print zonder PIC.
 4. **Vergelijk met de oude module.** Heeft u de D1 mini met 1.x-firmware nog? Zet die terug. Ziet 1.x de PIC wel, dan zijn PIC en print in orde en zit het probleem tussen de S3 Mini en de voet.
 
 Nog steeds `Degraded`? Verzamel het bewijs hieronder en vraag om hulp (paragraaf 7.14).
@@ -77,7 +77,7 @@ De instelling **Board mode** bepaalt hoe vaak de firmware het probeert en wat ze
 | PIC (Classic) (1) | Eén poging per start. Geen antwoord geeft `Degraded`. |
 | OT-Direct (no PIC) (2) | Kijkt één keer of er een PIC is. Antwoordt er een, dan gaat ze terug naar Classic en slaat dat op. Antwoordt er geen, dan start ze OT-Direct, en dat is fout op een Classic. |
 
-Zolang er geen PIC bekend is, stuurt de firmware ook elke minuut `PR=A` naar de PIC en logt `PIC is unknown, probe pic using PR=A`. Antwoordt de PIC daarop, dan wordt de modus `PIC` zonder herstart.
+Zolang er geen PIC bekend is, logt de firmware elke minuut `PIC is unknown, probe pic using PR=A` en stuurt ze `PR=A` naar de PIC. In Board mode **PIC (Classic)** blijft de seriële verbinding open: antwoordt de PIC, dan wordt de modus `PIC` zonder herstart. In **Auto-detect** sluit de firmware de seriële verbinding na een gemiste detectie bij het opstarten; de logregel verschijnt nog wel, maar pas de volgende herstart probeert het echt opnieuw.
 
 #### Het opstartverslag: `/bootdetect.log`
 
@@ -112,7 +112,7 @@ Staat er op elke regel `pic=0` terwijl `RST`, `RX` en `TX` 12, 44 en 43 tonen? D
 
 1. `/bootdetect.log` (downloaden via de FSexplorer).
 2. De uitvoer van `/api/v2/device/info`.
-3. Een capture met het capture-script uit de flash-zip (`capture-mqtt-debug.bat` op Windows, `capture-mqtt-debug.sh` op Linux, `capture-mqtt-debug-macos.sh` op macOS). Start het, herstart de gateway vanuit de Web UI terwijl het loopt, laat het een paar minuten lopen, stop met `Q` en post de upload-zip. Daarin staan de `PR=A`-pogingen per minuut en het herstartlog; de detectie bij het opstarten zelf komt uit `/bootdetect.log`.
+3. Een capture met het capture-script uit de flash-zip (`capture-mqtt-debug.bat` op Windows, `capture-mqtt-debug.sh` op Linux, `capture-mqtt-debug-macos.sh` op macOS). Start het, herstart de gateway vanuit de Web UI terwijl het loopt, laat het een paar minuten lopen, stop met `Q` en post de upload-zip. Daarin staan de `PR=A`-regels per minuut en het herstartlog; de detectie bij het opstarten zelf komt uit `/bootdetect.log`.
 4. Foto's van opzij van beide pinrijen van de S3 Mini in de voet.
 5. De firmwareversie en de printversie die op de print staat.
 

@@ -33,9 +33,9 @@ On a working Classic they read `"PIC"` and `"PIC"`. `Degraded` means the firmwar
 
 #### Quick checks (start here)
 
-1. **Check how the S3 Mini sits in the socket.** The S3 Mini has two pin rows on each side. Only the **outer** rows match the Wemos D1 mini footprint; the inner rows carry extra S3 pins and stay outside the socket. A module shifted by one row, or a pin that is bent or not pushed in all the way, cuts the serial link to the PIC. Look at the board from the side: every outer pin should go fully into the socket.
+1. **Check how the S3 Mini sits in the socket.** The S3 Mini has two pin rows on each side. Only the **outer** rows match the Wemos D1 mini footprint; the inner rows carry extra S3 pins. Make sure the outer rows are the ones in the socket. A module shifted by one row, or a pin that is bent or not pushed in all the way, cuts the serial link to the PIC. Look at the board from the side: every outer pin should go fully into the socket.
 2. **Power-cycle the whole board.** Remove the power, wait ten seconds, power it again. A reboot from the web UI restarts the ESP only.
-3. **Set Board mode to Auto-detect.** In the web UI go to Settings, System, **Board mode**. Choose **Auto-detect**, save and reboot. Do not choose **OT-Direct (no PIC)** on a Classic: that mode is for a board without a PIC.
+3. **Check Board mode.** In the web UI go to Settings, System, **Board mode**. **Auto-detect** (the default) and **PIC (Classic)** both work on a Classic. While you are troubleshooting, **PIC (Classic)** is the better choice: it keeps the serial link to the PIC open and keeps asking the PIC once a minute (see below). Save and reboot. Do not choose **OT-Direct (no PIC)** on a Classic: that mode is for a board without a PIC.
 4. **Cross-check with the old module.** If you still have the D1 mini with 1.x firmware, put it back. If 1.x sees the PIC, the PIC and the board are fine and the problem sits between the S3 Mini and the socket.
 
 Still `Degraded`? Collect the evidence below and ask for help (section 7.14).
@@ -52,7 +52,7 @@ The **Board mode** setting decides how often it tries and what it remembers (ADR
 | PIC (Classic) (1) | One try per boot. No answer gives `Degraded`. |
 | OT-Direct (no PIC) (2) | Checks once for a PIC. If one answers, it switches back to Classic and saves that. If none answers, it starts OT-Direct, which is wrong for a Classic. |
 
-While no PIC is known, the firmware also sends `PR=A` to the PIC once a minute and logs `PIC is unknown, probe pic using PR=A`. If the PIC answers that, the mode changes to `PIC` without a reboot.
+While no PIC is known, the firmware logs `PIC is unknown, probe pic using PR=A` once a minute and sends `PR=A` to the PIC. In Board mode **PIC (Classic)** the serial link stays open, so if the PIC answers, the mode changes to `PIC` without a reboot. In **Auto-detect** the firmware closes the serial link after a missed boot detection; the log line still appears, but only the next reboot really tries again.
 
 #### The boot record: `/bootdetect.log`
 
@@ -87,7 +87,7 @@ If `pic=0` on every line while `RST`, `RX` and `TX` show 12, 44 and 43, the firm
 
 1. `/bootdetect.log` (download from the FSexplorer).
 2. The output of `/api/v2/device/info`.
-3. A capture with the capture tool from the flash zip (`capture-mqtt-debug.bat` on Windows, `capture-mqtt-debug.sh` on Linux, `capture-mqtt-debug-macos.sh` on macOS). Start it, reboot the gateway from the web UI while it runs, let it run a few minutes, stop with `Q`, and post the upload zip. It shows the per-minute `PR=A` retries and the reboot log; the boot detection itself comes from `/bootdetect.log`.
+3. A capture with the capture tool from the flash zip (`capture-mqtt-debug.bat` on Windows, `capture-mqtt-debug.sh` on Linux, `capture-mqtt-debug-macos.sh` on macOS). Start it, reboot the gateway from the web UI while it runs, let it run a few minutes, stop with `Q`, and post the upload zip. It shows the per-minute `PR=A` lines and the reboot log; the boot detection itself comes from `/bootdetect.log`.
 4. Side photos of both pin rows of the S3 Mini in the socket.
 5. The firmware version and the board revision printed on the PCB.
 

@@ -4,9 +4,9 @@ You put a LOLIN S3 Mini on your OTGW Classic, flashed 2.0.0, and there is no Ope
 
 ## Try this first
 
-1. **Seating.** The S3 Mini has two pin rows per side. Only the **outer** rows go into the Wemos socket; the inner rows stay outside. Check from the side that every outer pin is fully in and none is bent or shifted by a row.
+1. **Seating.** The S3 Mini has two pin rows per side. Only the **outer** rows match the Wemos D1 mini footprint, so they are the ones that belong in the socket. Check from the side that every outer pin is fully in and none is bent or shifted by a row.
 2. **Full power cycle.** Power off for ten seconds, then on. A web UI reboot restarts only the ESP.
-3. **Board mode = Auto-detect.** Settings, System, Board mode, Auto-detect, save, reboot. Never pick *OT-Direct (no PIC)* on a Classic.
+3. **Board mode.** Settings, System, Board mode. While troubleshooting pick *PIC (Classic)*: it keeps the serial link open and asks the PIC again every minute. *Auto-detect* closes the link after a miss and only retries on the next reboot. Never pick *OT-Direct (no PIC)* on a Classic.
 4. **Old module.** If the D1 mini with 1.x still sees the PIC, PIC and board are fine; look at the S3 Mini and the socket.
 
 ## Read the boot record
