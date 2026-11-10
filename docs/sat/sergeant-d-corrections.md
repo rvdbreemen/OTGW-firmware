@@ -6379,3 +6379,22 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Changes an earlier entry:** entry 290's C part (Robert, maintainer decision: `AA=28` while SAT is on, `DA=28` when it goes off) is replaced by `PM=28` every 30 s. Robert may confirm. Entry 291 (A on OT-Direct) is unchanged.
 
 **Task:** TASK-1759 (C part, PIC; A on OT-Direct is separate, ADR-224); related TASK-1767, TASK-1412.5 (the PM=25 logic). **Maintainer confirmation (relayed, not seen first-hand):** Robert, 2026-11-10 ~17:0x local, via AskUserQuestion in the coordinator's session. The coordinator relayed his answer as "Yes, PM=28 every 30 s" (the coordinator's quote; 030509 and 97 did not see Robert's own text): the C part of entry 290 (AA=28/DA=28) is replaced by PM=28 every 30 s with maintainer agreement (recorded in TASK-1759). **Open:** the interpretation above.
+
+## 297. Sergeant D orders a new KD simulation: derivative coefficient 0.5 instead of 0.63 (Sergeant D, 2026-11-10; reverses the "no simulation" part of entry 280)
+
+**Source:** sergeantd, 2026-11-10 19:33 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1569781945460727873 (https://discord.com/channels/812969634638725140/1105556725714649128/1569781945460727873). Relayed by the coordinating session, not seen first-hand (the Discord tools were down in this session); the quote is the coordinator's copy.
+
+**Quoted:** "run a simulation with derivative coefficient 0.5 instead of 0.63"
+
+**Settled:** a new simulation of the derivative gain is wanted. That reverses the part of entry 280 that said no further KD simulation now. The KD factor itself stays 0.063 until he decides otherwise (entries 279 and 280; `SATpid.ino:28` `SAT_PID_KD_FACTOR = 0.063f`).
+
+**Interpretation (ours, not asked):** "derivative coefficient" is that KD factor, and 0.5 / 0.63 is written for 0.05 / 0.063. The ratio is the same either way (0.794), so the simulation is the same under both readings. No other derivative coefficient near 0.63 exists in `SATpid.ino`; the derivative filter alpha is adaptive (`SATpid.ino:324`). He may correct this.
+
+**Checked against the recorded entries:**
+- Entry 277: the integral stays as thermo-nova and KD is the lever. Agrees.
+- Entry 279: the factor is 0.063, the baseline of the new run. Agrees.
+- Entry 280: "no simulation at this point". Reversed by this order, on his authority.
+
+**Task:** TASK-1784, the same plant classes, grid and thresholds as TASK-1655 with 0.063 as the baseline (`docs/sat/sim-1784/thresholds.md`).
+
+**Open:** the result, and his decision on the factor after it.

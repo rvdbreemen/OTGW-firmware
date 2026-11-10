@@ -3964,6 +3964,20 @@
     "TASK-1767"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 297,
+   "title": "Sergeant D orders a new KD simulation: derivative coefficient 0.5 instead of 0.63 (Sergeant D, 2026-11-10; reverses the \"no simulation\" part of entry 280)",
+   "date": "2026-11-10",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569781945460727873",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1655",
+    "TASK-1784"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
