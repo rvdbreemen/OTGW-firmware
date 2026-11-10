@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:05:00Z'
-updated_date: '2026-11-09T22:05:00Z'
+updated_date: '2026-11-10T04:16:00Z'
 labels:
   - heap
   - bug
@@ -28,7 +28,7 @@ Fix idea for the plan only (not decided): hold back UI serving (e.g. 503 + Retry
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduce with ONE normal browser tab loading the UI right after boot first (not the two-tab trace): windowed heap minimum per boot phase and any reset, on the current dev build
+- [x] #1 Reproduce with ONE normal browser tab loading the UI right after boot first (not the two-tab trace): windowed heap minimum per boot phase and any reset, on the current dev build
 - [ ] #2 Name which allocations in the boot window combine with UI serving to reach below CRITICAL, with evidence
 - [ ] #3 Fix agreed with Robert in the plan; after the fix the one-tab and two-tab boot runs stay above CRITICAL with 0 mid-body resets, with old-vs-fix numbers
 <!-- AC:END -->
@@ -43,4 +43,6 @@ AC1 measurement (no code change), on .61 in a slot from the coordinator, on the 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-09 ~23:00: the AC1 .61 slot tonight is cancelled (Robert: long soak of beta.166 on .61 and .63 until the ~05:00 public beta). The AC1 run (runner scratchpad t1757/boots1757.py, 12 boots C/B) moves to after that release, on the then current dev build.
+
+AC1 result, 2026-11-10 04:28-05:15, .61 on 2.0.0-beta.167+e79e495 (OT-Direct bench unit, no PSRAM), runner scratchpad t1757/boots1757.py + summary1757.py, data run-20261110b. 12 reboots via /ReBoot, C (clean) and B (ONE real headless Chrome tab on http://.61/ from the first HTTP answer for 120 s: the real v2 UI loads, polls REST, opens /ws) alternating. All 12 boots clean: each up 15.3-16.0 s after /ReBoot, bootcount +1 each (203..214), '[HEAP] boot done reason=drip-done' in every boot (~3.5 min). Lowest windowed heap per boot (allWinMin; nativeMin equal except boot 9): C 21932 / 24156 / 18608 / 21380 / 19160 (native 18720, outside=1) / 10396; B 14648 / 10692 / 11800 / 13260 / 26108 / 9768. Lowest phase is 'connect' (WiFi/MQTT connect window) in 11 of 12 boots (drip in boot 9). Medians: C ~20.3 KB, B ~12.5 KB; minimum C 10.4 KB, B 9.8 KB. CRITICAL (3072 B) never reached; one normal tab does NOT reproduce the 1.1-3.6 KB of the two-tab trace in TASK-1528 step b. Browser (net-log): 96-100 requests per B boot; failures: ws://.61/ws net error -173 once in every B boot (not yet tied to the Chrome stop at +120 s; to check), and once /api/v2/otdirect/overrides -118 (connection timed out) in boot 10. No mid-body reset of '/' and no failed static file in any B boot. Crashlog: no new panic in 12 boots (TASK-1763 not reproduced in this run); the old 2026-11-09 12:02 entry rotated out of /reboot_log.txt after boot 6 (the coredump itself is archived, see TASK-1763). Side finding: device/info answers bootcount 0 for about the first second after boot (startWebserver() runs before updateRebootCount() in setup(), OTGW-firmware.ino:516 vs later), seen in boots 3, 4, 6. Next: AC2 (which allocations combine in the connect window, with the two-tab case as the reproducer, since one tab stays above CRITICAL) and a decision for Robert whether the one-tab result changes the 2.0.0 stable gate.
 <!-- SECTION:NOTES:END -->
