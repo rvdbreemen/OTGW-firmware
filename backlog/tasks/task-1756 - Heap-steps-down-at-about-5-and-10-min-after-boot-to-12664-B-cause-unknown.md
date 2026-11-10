@@ -1,11 +1,11 @@
 ---
 id: TASK-1756
 title: Heap steps down at about +5 and +10 min after boot (to 12664 B), cause unknown
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:03:00Z'
-updated_date: '2026-11-10T14:52:00Z'
+updated_date: '2026-11-10T18:10:00Z'
 labels:
   - heap
   - bug
@@ -25,7 +25,7 @@ Found in TASK-1528 step b (bench .61, beta.162+5786928, 2026-11-09, 10 reboots, 
 <!-- AC:BEGIN -->
 - [ ] #1 Reproduce on the bench with clean boots: the windowed heap minimum around +5 and +10 min after boot, with timestamps, on the current dev build
 - [ ] #2 Name the job or allocation that causes each step, with evidence (telnet [HEAP] lines or an instrumented build), and rule out the device/info poll of the test itself
-- [ ] #3 Decide with Robert: bound or fix it, or accept it with the numbers recorded
+- [x] #3 Decide with Robert: bound or fix it, or accept it with the numbers recorded
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -51,6 +51,8 @@ Settings saved before and restored after each run (A1/A3 change settings).
 Limits, honest: (1) the telnet capture FAILED in every run: after the reboot the script stayed on the dead pre-reboot socket (the device sends no FIN; recv only timed out, no reconnect), so there are no 'Weather: fetching' / [HEAP] lines to time the steps (030509's boots.py has the same pattern); (2) 2 boots per run is too few: late steps appear in some runs and not in others, so no variable is shown to cause or remove the step yet. Verdict so far: on beta.167 the +5/+10 min step did not reproduce in the baseline (2/2 boots), the cause is NOT named. Next: fix the telnet reconnect (reconnect when bootcount changes or after 20 s without data) with the heap + weather + MQTT debug flags on, 4 boots per run for A0 and A1 first, then A3; needs another .61 slot.
 
 2026-11-10 telnet A/B on .61 (beta.170, UI-only change vs 167), 4 boots each of 720 s, device/info every 5 s, settings restore 0 differences both runs. Outputs: session scratchpad t1756/runT1-telnet-170 (14:12-15:01) and runT0-notelnet-170 (15:01-15:50), analyze.py. Result: no step at ~300 s or ~600 s after boot in any of the 8 boots (with the 2 A0 boots of this morning: 0 of 10 on beta.167/170, against 4/4 on beta.162 in detectie's runs). The minimum is set within ~5 s after 'up' (boot burst), 22.7-39.4 KB, both arms. One later step: telnet arm boot 4 at +617 s, hd_min_free_heap 35156 -> 27328 (-7.8 KB); it sits exactly on 15:00:00 wall clock, where the hourly block (OTGW-firmware.ino:960-962, hourFlag) runs sendMQTTheapdiag(): a burst of about 30 otgw-firmware/stats/* publishes, each also printed to the live telnet client. No other boot crossed a full hour (telnet boots 1-3 ran 14:12-14:49, all no-telnet boots 15:01-15:50), so this does NOT show that telnet matters: the no-telnet arm never met the hourly burst. Hypothesis 'live telnet causes the ~5/10 min step' is not supported (no such step seen at all). New lead: the hourly heapdiag burst costs ~8 KB of free-heap minimum with a telnet reader attached. Next measurement: span a full hour, with and without telnet (and with debug MQTT logging off), 2-3 hours each.
+
+2026-11-10 ~17:30 Robert's decision (via the coordinator's AskUserQuestion): close as not reproducible. The hourly sendMQTTheapdiag() step stays an observation; no new task (min free heap after it 27.3 KB, far above the 3072/5120/8192 ladder of ADR-167; it only showed with a telnet reader attached in 1 boot).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -76,3 +78,9 @@ Conclusion (opinion, to be verified): the 5-min step is the first weather fetch 
 
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as not reproducible (Robert, 2026-11-10). AC1 attempted, not met: 10 clean boots on .61 (2 A0 boots on beta.167 in the morning, 8 on beta.170: 4 with a live telnet reader, 4 without, 720 s each, device/info every 5 s, settings restored with 0 differences) showed no step at ~+5 or ~+10 min; detectie saw it 4/4 on beta.162 and the code between 162 and 167 differs only in banners. The windowed minimum always falls in the boot burst (first ~5 s after up), 22.7-39.4 KB. AC2 not met, consequently: no step to attribute. One observation: a -7.8 KB drop of hd_min_free_heap (35156 -> 27328) at exactly 15:00:00 wall clock, the hourly sendMQTTheapdiag() burst (OTGW-firmware.ino:960-962, ~30 stats publishes, each also printed to telnet); only that boot crossed a full hour, so telnet vs no telnet is not settled. AC3: Robert decided to close (accept), no follow-up task. Evidence: session scratchpad t1756/runT1-telnet-170, runT0-notelnet-170, analyze.py.
+<!-- SECTION:FINAL_SUMMARY:END -->
