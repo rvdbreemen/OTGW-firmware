@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-10T18:37:00Z'
-updated_date: '2026-11-10T19:08:00Z'
+updated_date: '2026-11-10T19:13:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -36,4 +36,6 @@ Sergeant D, #dev-sat-mqtt 2026-11-10 19:33 UTC, msg 1569781945460727873 (relayed
 2026-11-10 030509: pre-registration docs/sat/sim-1784/thresholds.md (TASK-1655 rules, baseline 0.063, variant 0.05). Wrapper tools/research/sat/sat_kd_005_sim.py imports and patches the 1655 module (file unchanged). tests/test_sat_kd_005_sim.py 3/3 OK in 1.0 s; red check with baseline K forced to 0.07: 2 failures (kd 14112.0 != 12700.8; warm-up t03 142.0 != 139.7), so the fairness test detects a wrong baseline. Entry 297 recorded (relayed, not seen first-hand). Grid run waits for 4c's beta.172 build and the coordinator's go.
 
 2026-11-10 030509: grid run 19:44:46-19:52 local (1152 runs, commit charge 71-74 %); merge: 576 baseline runs equal the committed 1655 x0.9 runs (0 mismatches); validity check passed; 0.05 passes 0 of 8 classes (B 0.6-3.4 %), no guard fails because of 0.05; recommendation by the rule: keep 0.063. Results f32f54a61. Post text with options A/B/C handed to 97 (HOLD until push). Time note: the order is 18:33 UTC by its message id (the description says 19:33, local time).
+
+2026-11-10 030509: pushed. Pre-registration alone first: ab340a9f4 (7f8a3b9b1..ab340a9f4; rebased from e9883eb93, content identical, runs.json meta thresholds_commit keeps e9883eb93), then results dfd7befd2, entry 298 9f56e7316, entry 299 a7c67888a. Posted by 97 as a reply to his order with the chart: msg 1569792005486411786 (19:12:59 UTC from the id). AC4 waits for his A/B/C answer as a numbered entry.
 <!-- SECTION:NOTES:END -->
