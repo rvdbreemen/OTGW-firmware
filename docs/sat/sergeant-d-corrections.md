@@ -6477,3 +6477,23 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1784 (done with this answer); TASK-1787 (coefficient).
 
 **Open:** nothing for KD. The coefficient question stays open under entry 298.
+
+## 301. Sergeant D asks gruijter to raise his heating curve coefficient from 1.12 to 1.8 (Sergeant D, 2026-11-10; before the night log of entry 298)
+
+**Source:** sergeantd, 2026-11-10 20:34:15 UTC (time from the message id), #alpha-testing (channel 1514720723980259460), msg 1569812455402504274 (https://discord.com/channels/812969634638725140/1514720723980259460/1569812455402504274). Addressed to gruijter. It follows gruijter's post of his beta.167 capture (msg 1569807874551578657, 20:16:02 UTC) and gruijter's answer that he did not set 1.12 himself (msg 1569803928478941383, 20:00:22 UTC: "1.12 was not entered by me in any way, so auto-tune must have come up with that"). Read via the Discord REST API by otgw-firmware-a4; recorded on the coordinator's request.
+
+**Quoted:** "@gruijter can you raise the heating curve coefficient to 1.8?"
+
+**Settled:**
+- For gruijter's unit only: Sergeant D wants the coefficient at 1.8 instead of 1.12. It is a request to the tester, not a firmware change. The default stays 2.0 (`SATtypes.h:500`, entry 24).
+
+**Interpretation (ours, not asked):** this acts on his view in entry 300 that a low coefficient is the probable cause of the slow warm-up, without waiting for the night log of entry 298. A manual coefficient change empties the self-tune window (ADR-205 decision 7; `settingStuff.ino:1109` calls `satCurveTuneNoteManualChange()`), so the night log after the change shows the tuner from an empty window at 1.8, not how the unit reached 1.12.
+
+**Checked against the recorded entries:**
+- Entry 298 (wait for gruijter's night log, the self-tune stays as it is): the self-tune code stays; the wait for the log is overtaken for this unit by the hand change.
+- Entry 300 (low coefficient as the probable cause): agrees.
+- Entry 24 (default 2.0): unchanged.
+
+**Task:** TASK-1787.
+
+**Open:** where 1.12 came from. The ADR-205 tuner steps 0.1 at most once per 3 counted days, rounded to 0.01 (`SATcontrol.ino:6080-6084`), so from 2.0 it only reaches values ending in 0. Whether gruijter's unit ran the old hourly auto-tune removed by TASK-1413 (multiplicative 2 % steps, off by default) is asked.
