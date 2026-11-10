@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:08:00Z'
-updated_date: '2026-11-10T16:55:00Z'
+updated_date: '2026-11-10T16:56:00Z'
 labels:
   - sat
   - opentherm
@@ -151,6 +151,14 @@ created: 2026-11-10T16:55:00Z
 ---
 
 Robert decided (2026-11-10 ~17:0x, via AskUserQuestion in the coordinator's session, relayed to 030509): 'Yes, PM=28 every 30 s'. He agrees with Sergeant D's choice (corrections entry 296), which replaces the C part of his entry 290 (AA=28/DA=28). So the PIC part of this task is PM=28 every 30 s. This is a maintainer decision recorded here, not a new corrections entry. Still our interpretation (entry 296): the same conditions as A (only while no valid MsgID 28 for 30 s, SAT on, not while MsgID 28 is Unknown), modelled on the PM=25 logic.
+
+---
+
+created: 2026-11-10T16:56:00Z
+
+---
+
+Correction to the note above: 'Yes, PM=28 every 30 s' is the coordinator's relay of Robert's AskUserQuestion answer; 030509 did not see Robert's own text. Recorded in entry 296 as a relayed, not first-hand, maintainer confirmation.
 
 ---
 <!-- COMMENTS:END -->
