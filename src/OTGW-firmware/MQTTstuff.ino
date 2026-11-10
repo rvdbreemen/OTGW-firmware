@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.170
+**  Version  : v2.0.0-beta.171
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1107,7 +1107,104 @@ static uint16_t sHeapBurstLines      = 0;
 enum : uint8_t { BOOTHEAP_IDLE = 0, BOOTHEAP_RUN = 1, BOOTHEAP_DONE = 2 };
 static uint8_t     sBootHeapState   = BOOTHEAP_IDLE;
 static uint32_t    sBootHeapMin     = 0xFFFFFFFFu;   // running boot-phase minimum (boot windows below)
+
+// ---------------------------------------------------------------------
+// TASK-1757 AC2 diagnostics: connect-window trace. The boot 'connect' phase
+// (MQTT CONNACK until the first discovery drip tick) holds the deepest boot dip.
+// While it runs, every sample reads the shared window minimum (one cheap read, no
+// restart). When it falls below the lowest value seen so far in this phase, one
+// entry records who was active: outbox, web files, REST, WS, TCP TX bytes, and the
+// same gauges of the previous sample, which bracket the drop. The window is
+// restarted by the burst/drip code; every restart first calls heapBurstFold(),
+// which samples here, and platformHeapWinGen() marks the new baseline. The last
+// 16 drops are kept (the phase minimum is the last drop) and printed when the
+// phase closes, with a check that the trace minimum equals the phase minimum.
+// Heap values are stored in 4-byte units to keep the table at 16 x 22 B.
+// Diagnostic only, loop task only.
+// ---------------------------------------------------------------------
+struct ConnTraceRec {
+  uint16_t tMs, dtMs;              // since the phase opened / since the previous sample
+  uint16_t min4, free4, maxblk4;   // window minimum, free heap, largest block (4 B units)
+  uint16_t txBytes, mqttTxBytes;   // unacked TCP bytes on port 80 / to the broker (capped)
+  uint8_t  outbox, files, rest, ws;
+  uint8_t  pOutbox, pFiles, pRest; // previous sample
+  uint8_t  gen;                    // low byte of platformHeapWinGen(): a restart between samples shows here
+};
+static ConnTraceRec sConnTrace[16];
+static uint8_t  sConnTraceN = 0, sConnTraceHead = 0;
+static bool     sConnTraceOn = false;
+static uint32_t sConnTraceT0 = 0, sConnTraceLastMs = 0, sConnTraceMin = 0xFFFFFFFFu, sConnTraceGen = 0;
+static uint8_t  sConnTracePOutbox = 0, sConnTracePFiles = 0, sConnTracePRest = 0;
+static uint16_t sConnTraceSamples = 0, sConnTraceRestarts = 0;
+
+static inline uint16_t connTraceCap16(uint32_t v) { return v > 0xFFFFu ? 0xFFFFu : (uint16_t)v; }
+static inline uint8_t  connTraceCap8(uint32_t v)  { return v > 0xFFu ? 0xFFu : (uint8_t)v; }
+
+static void connTraceBegin() {
+  sConnTraceOn = true;
+  sConnTraceN = sConnTraceHead = 0;
+  sConnTraceT0 = sConnTraceLastMs = millis();
+  sConnTraceMin = 0xFFFFFFFFu;
+  sConnTraceGen = platformHeapWinGen();
+  sConnTraceSamples = sConnTraceRestarts = 0;
+  sConnTracePOutbox = connTraceCap8(mqttQueueNow());
+  sConnTracePFiles  = webFileInFlightNow();
+  sConnTracePRest   = restInFlightNow();
+}
+
+// Called every loop pass (via the public tick), at points inside onMqttConnect,
+// and from heapBurstFold() before every window restart.
+static void connTraceSample() {
+  if (!sConnTraceOn) return;
+  const uint32_t now = millis();
+  const uint32_t gen = platformHeapWinGen();
+  const uint32_t w = platformHeapWindowMin();
+  if (gen != sConnTraceGen) { sConnTraceGen = gen; sConnTraceRestarts++; }
+  sConnTraceSamples++;
+  const uint8_t outbox = connTraceCap8(mqttQueueNow());
+  const uint8_t files  = webFileInFlightNow();
+  const uint8_t rest   = restInFlightNow();
+  if (w != 0 && w < sConnTraceMin) {
+    sConnTraceMin = w;
+    const PlatformTcpHoldSnapshot t = platformTcpHoldSnapshot(80);  // core-lock walk: only on a new low
+    ConnTraceRec &r = sConnTrace[sConnTraceHead];
+    r.tMs = connTraceCap16(now - sConnTraceT0);   r.dtMs = connTraceCap16(now - sConnTraceLastMs);
+    r.min4 = connTraceCap16(w / 4);               r.free4 = connTraceCap16(platformFreeHeap() / 4);
+    r.maxblk4 = connTraceCap16(platformMaxFreeBlock() / 4);
+    r.txBytes = connTraceCap16(t.txBytes);
+    r.mqttTxBytes = connTraceCap16(platformTcpTxBytesToRemotePort(settings.mqtt.iBrokerPort));
+    r.outbox = outbox; r.files = files; r.rest = rest; r.ws = connTraceCap8(webSocketClientCount());
+    r.pOutbox = sConnTracePOutbox; r.pFiles = sConnTracePFiles; r.pRest = sConnTracePRest;
+    r.gen = (uint8_t)gen;
+    sConnTraceHead = (uint8_t)((sConnTraceHead + 1) % 16);
+    if (sConnTraceN < 16) sConnTraceN++;
+  }
+  sConnTracePOutbox = outbox; sConnTracePFiles = files; sConnTracePRest = rest;
+  sConnTraceLastMs = now;
+}
+
+// Print the kept drops, oldest first, and whether the trace caught the phase minimum.
+static void connTraceEnd(uint32_t phaseMin) {
+  if (!sConnTraceOn) return;
+  sConnTraceOn = false;
+  const uint8_t first = (uint8_t)((sConnTraceHead + 16 - sConnTraceN) % 16);
+  for (uint8_t i = 0; i < sConnTraceN; i++) {
+    const ConnTraceRec &r = sConnTrace[(first + i) % 16];
+    DebugTf(PSTR("[HEAP] connect-trace t=%u dt=%u min=%lu free=%lu maxblk=%lu outbox=%u files=%u rest=%u ws=%u tx=%u mqttTx=%u prev(outbox=%u files=%u rest=%u) gen=%u\r\n"),
+            r.tMs, r.dtMs, (unsigned long)r.min4 * 4, (unsigned long)r.free4 * 4, (unsigned long)r.maxblk4 * 4,
+            r.outbox, r.files, r.rest, r.ws, r.txBytes, r.mqttTxBytes, r.pOutbox, r.pFiles, r.pRest, r.gen);
+  }
+  const uint32_t tmin = (sConnTraceMin == 0xFFFFFFFFu) ? 0 : sConnTraceMin;
+  DebugTf(PSTR("[HEAP] connect-trace end entries=%u samples=%u restarts=%u traceMin=%lu phaseMin=%lu match=%u\r\n"),
+          (unsigned)sConnTraceN, (unsigned)sConnTraceSamples, (unsigned)sConnTraceRestarts,
+          (unsigned long)tmin, (unsigned long)phaseMin, (tmin == phaseMin) ? 1u : 0u);
+}
+
+// Public tick for the loop (OTGW-firmware.ino), next to sampleHeapDip().
+void bootHeapConnectTraceTick() { connTraceSample(); }
+
 static void heapBurstFold() {
+  connTraceSample();  // TASK-1757: sample before the window is restarted or read
   uint32_t w = platformHeapWindowMin();
   if (w != 0 && w < sHeapBurstMin) sHeapBurstMin = w;
   if (sBootHeapState == BOOTHEAP_RUN && w != 0 && w < sBootHeapMin) sBootHeapMin = w;  // TASK-1339: boot phase shares the window
@@ -1160,6 +1257,7 @@ static void bootHeapCloseLine() {
                     (int16_t)sBootHeapDripId };
   if (sBootHeapShow) bootHeapPrint(r);
   else if (sBootHeapRecN < (sizeof(sBootHeapRec) / sizeof(sBootHeapRec[0]))) sBootHeapRec[sBootHeapRecN++] = r;
+  connTraceEnd(m);  // TASK-1757: no-op unless this was the connect phase
   sBootHeapDripId = -1;
 }
 
@@ -1566,7 +1664,10 @@ void PrintMQTTError(){
 // unused (we always setCleanSession(true)).
 static void onMqttConnect(bool sessionPresent) {
   (void)sessionPresent;
-  if (sBootHeapState == BOOTHEAP_RUN) bootHeapPhase(PSTR("connect"));  // TASK-1339: closes wait-mqtt
+  if (sBootHeapState == BOOTHEAP_RUN) {
+    bootHeapPhase(PSTR("connect"));  // TASK-1339: closes wait-mqtt
+    connTraceBegin();                // TASK-1757: trace the connect phase from here
+  }
   heapBurstOpen();  // TASK-1339 diagnostics: windowed heap minimum over the connect burst
   reconnectAttempts = 0;
   state.mqtt.bConnected = true;
@@ -1621,12 +1722,14 @@ static void onMqttConnect(bool sessionPresent) {
   // clean brokers.
   mqttV2MigrationOnConnect();
   DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
+  connTraceSample();  // TASK-1757
   sendMQTTversioninfo();
   publishAllPICsettings();
   publishCommandDroppedState();      // TASK-1439: replaces a retained ON left from before a reboot
   publishBoilerUnsupportedMsgids();  // TASK-692 port: republish the retained CSV so HA/dashboards see it after every reconnect.
   clearBoilerUnsupportedDirty();
   DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
+  connTraceSample();  // TASK-1757
 }
 
 // Disconnect / connect-refused. Records the reason for PrintMQTTError() and
