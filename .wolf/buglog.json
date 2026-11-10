@@ -3768,5 +3768,128 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-10-30T23:20:00Z"
+  },
+  {
+    "id": "bug-8664",
+    "timestamp": "2026-11-06T16:30:00Z",
+    "error_message": "Commit security review: diagRedactSetting copied non-secret free-text values verbatim, so a WebhookPayload template with \"token\":\"...\" reached the recorder ring",
+    "file": "src/OTGW-firmware/diagRecorderStuff.h",
+    "root_cause": "Redaction keyed only on the setting name; a free-text value can itself be a body with secret keys",
+    "fix": "Run diagRedactBody() over the copied value; host test F10 red on old code, green on fix; bench .61 beta.109 token absent from download",
+    "tags": [
+      "security",
+      "redaction",
+      "diag-recorder",
+      "TASK-1665"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-06T16:30:00Z"
+  },
+  {
+    "id": "bug-8665",
+    "timestamp": "2026-11-06T20:30:00Z",
+    "error_message": "webServerCompat.h:505: call of overloaded 'beginResponse(fs::File&, char [128], char [48])' is ambiguous",
+    "file": "src/OTGW-firmware/webServerCompat.h",
+    "root_cause": "fs::File has an implicit operator bool, so beginResponse(int, const char*, const char*) competes when the path needs a user conversion to String; host mock had explicit bool so the test compiled",
+    "fix": "Pass String(_path) and (const char*)_mime; make the fixture File mock implicit-bool with the int overload so the host test reproduces it",
+    "tags": [
+      "build",
+      "overload",
+      "ESPAsyncWebServer",
+      "mock-fidelity",
+      "TASK-1673"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-06T20:30:00Z"
+  },
+  {
+    "id": "bug-8666",
+    "timestamp": "2026-11-07T10:00:00+01:00",
+    "error_message": "Dead-code removal script cut live sendJsonMapEntry overloads together with sendStartJsonMap",
+    "file": "TASK-1685 removal tooling (job tmp remove.py)",
+    "root_cause": "Brace matching counted '{' and '}' inside string literals such as restSendContent(\"{\"), so the body end of sendStartJsonMap was found 100 lines too late.",
+    "fix": "String-, char- and comment-aware brace counter; print every removed span with its last line and review the diff hunk by hunk before building.",
+    "tags": [
+      "tooling",
+      "dead-code",
+      "brace-matching",
+      "review-diff"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-07"
+  },
+  {
+    "id": "bug-217",
+    "timestamp": "2026-11-07T19:37:13",
+    "error_message": "rebase commit e1b54c113 contained conflict markers in 55 files",
+    "file": "(git rebase workflow)",
+    "root_cause": "python under Git Bash on Windows could not open /tmp/u.txt written by bash (different /tmp), the resolver crashed, but the chained git add + rebase --continue still ran",
+    "fix": "never chain git add/rebase --continue after a resolver without '&&' and a marker check; use a repo-relative file, grep for markers before git add; recommitted via reset --soft origin/dev",
+    "tags": [
+      "git",
+      "rebase",
+      "windows",
+      "tmp-path"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-07"
+  },
+  {
+    "id": "bug-218",
+    "timestamp": "2026-11-08T01:59:11",
+    "error_message": "evaluate --quick: [Design System] Class drift: 1 referenced CSS class(es) have no selector",
+    "file": "src/OTGW-firmware/data/v2.js",
+    "root_cause": "TASK-1681 note row used a new class name (otd-write-note) without a CSS selector; ADR-091 drift gate is binding",
+    "fix": "use only existing classes (ble-row); tests select by text, not by a marker class",
+    "tags": [
+      "webui",
+      "adr-091",
+      "design-system",
+      "evaluate"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-08"
+  },
+  {
+    "id": "bug-8667",
+    "timestamp": "2026-11-10T00:10:00Z",
+    "error_message": "beta.166 SAT page: ReferenceError esc is not defined in satDrawHistory; renderSatPage stops, sliders stay '—', TASK-1737 SAT lock not applied",
+    "file": "src/OTGW-firmware/data/v2.js",
+    "root_cause": "TASK-1764 region extractors wrapped legend/label strings in esc(t(...)) outside the two functions that define a local esc(); the error is swallowed in a fetch promise chain, and the full webui suite was not run (Chrome-leak rule), only i18n/lang-menu/panel tests",
+    "fix": "top-level function esc(s) next to satLbl (TASK-1768 lane); eslint-scope scan shows no other new undefined names; sat-settings-locked-when-off 6/6, v2-settings-sat-followups 1/1",
+    "tags": [
+      "webui",
+      "i18n",
+      "regression",
+      "scope",
+      "TASK-1764",
+      "TASK-1768"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-10T00:10:00Z"
+  },
+  {
+    "id": "bug-ota63-fs-reset-20261110",
+    "timestamp": "2026-11-10T06:47:00",
+    "error_message": "ota_flash .63 166->167: filesystem OTA ConnectionResetError, v2.html.gz not valid gzip, unit rolled back to safeboot, all settings reset to defaults, bootcount 178->3",
+    "file": "scripts/ota_flash.py",
+    "root_cause": "unknown (interrupted filesystem OTA; under investigation in a new task)",
+    "fix": "recovered: app via curl -F to safeboot /update, then --no-app --fs; 16 settings restored via POST /api/v2/settings from the pre-flash backup",
+    "tags": [
+      "ota",
+      "safeboot",
+      "littlefs",
+      "settings-reset",
+      ".63"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-10T06:47:00"
   }
 ]
