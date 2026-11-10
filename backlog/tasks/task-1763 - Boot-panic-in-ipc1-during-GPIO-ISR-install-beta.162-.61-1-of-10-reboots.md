@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@system32-030509'
 created_date: '2026-11-09T19:21:00Z'
-updated_date: '2026-11-10T06:39:00Z'
+updated_date: '2026-11-10T07:54:00Z'
 labels:
   - bug
   - crash
@@ -143,6 +143,26 @@ Tests (host, Windows, 2026-11-10):
   - also red on origin/dev without this change: tests/test_adr_governance.py (test_live_index_complete), tests/test_build_staging.py (3 failures), tests/test_sat_dhw_range.py ('off' not found);
   - green when run alone (failed only under -j 4 load): tests/test_discord_post_payload.py, tests/test_flash_migrate_settings_compare.py, test/host/test_override_reply.py.
 Build: build.bat started 07:37 (commit charge 79.3%). Bench .61 pending the coordinator's slot: 12 boots on 168 and 12 boots with a temporary old-order build (same log line, labelled OLD ORDER, not committed), each with the crashlog and the ipc line. Caveat: the high-water mark of a non-crashing boot shows the margin, not proof that (b) prevents the rare nesting; the coredump (-52 B) is the only direct crash measurement.
+
+---
+
+created: 2026-11-10T07:54:00Z
+
+---
+
+Bench .61, 2026-11-10 07:5x-08:53 (slot from the coordinator; OLD order first, beta.168 last). Settings saved before and checked after each OTA: ota_flash.py 'settings: 164 keys, changed: none' twice; final settings diff against the pre-slot dump: none. Start beta.167+e79e495 bootcount 232; end beta.168+283698a bootcount 272, Software reset, MQTT connected.
+Builds: beta.168+283698a = commit f40e1bf73 + backlog-only 283698a14 (07:56). OLD-ORDER measurement build = the same tree with the early-install call removed and the log label '(OLD ORDER)', uncommitted, built 08:08; the string 'OLD ORDER' is in that ino.bin only (grep). Not pushed, not posted; the tree was restored (git restore) right after the build.
+Results (boot line 'boot: ipc stack free min ... ipc0=.. ipc1=.. B', uxTaskGetStackHighWaterMark at the end of setup()):
+- OLD order, script v2, 12 boots (bootcount 247-258): 12x Software reset, 0 panics; ipc1 free minimum 88 B in all 12; ipc0 208-224 B.
+- beta.168 (early install), 12 boots (261-272): 12x Software reset, 0 panics; ipc1 free minimum 88 B in all 12; ipc0 144-224 B.
+- OLD order, script v1, 12 boots (235-246): no panics in device/info; no ipc lines (v1 telnet bug: it stayed on the old instance's dead socket); 3 boots read bootcount 0 / empty lastreset from an early device/info answer, so for those 3 the reset reason is unknown.
+Reading:
+- ipc1's deepest point is the same, 88 B free of 1024 B, in both orders. The IPC call chain of the GPIO ISR install (esp_intr_alloc -> heap_caps_malloc) uses ~936 B every time, deterministically.
+- A level-1 interrupt frame taken at that depth needs more than 88 B. That is the coredump case: SP 52 B below the bottom.
+- So (b) does not change the margin. It can only lower the chance that an interrupt lands at that moment, and that chance is not visible in a high-water mark of a boot without a crash.
+- 0 panics in 24 boots (OLD 12 + 168 12) proves nothing about (b): the rate on beta.162 was 1 in 10, and beta.167 already had 0 in 12.
+- The measured 88 B margin supports (a) (ADR-225): +256 B (1280) would give ~344 B free at that point.
+Evidence files (local, not committed): scratchpad t1763/bench/ (old-*, old2-*, new168-* events/summary/telnet, settings-0/1/2 json).
 
 ---
 <!-- COMMENTS:END -->
