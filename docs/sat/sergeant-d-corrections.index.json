@@ -3978,6 +3978,19 @@
     "TASK-1784"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 298,
+   "title": "Coefficient concern: wait for gruijter's night log, then decide; the self-tune stays as it is (Sergeant D, 2026-11-10; answers our question on his concern)",
+   "date": "2026-11-10",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569785822394323056",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1787"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

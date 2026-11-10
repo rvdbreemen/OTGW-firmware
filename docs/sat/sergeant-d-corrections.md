@@ -6382,7 +6382,7 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 
 ## 297. Sergeant D orders a new KD simulation: derivative coefficient 0.5 instead of 0.63 (Sergeant D, 2026-11-10; reverses the "no simulation" part of entry 280)
 
-**Source:** sergeantd, 2026-11-10 19:33 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1569781945460727873 (https://discord.com/channels/812969634638725140/1105556725714649128/1569781945460727873). Relayed by the coordinating session, not seen first-hand (the Discord tools were down in this session); the quote is the coordinator's copy.
+**Source:** sergeantd, 2026-11-10 18:33 UTC (time from the message id; the relay said 19:33, which is local time), #dev-sat-mqtt (channel 1105556725714649128), msg 1569781945460727873 (https://discord.com/channels/812969634638725140/1105556725714649128/1569781945460727873). Relayed by the coordinating session, not seen first-hand (the Discord tools were down in this session); the quote is the coordinator's copy.
 
 **Quoted:** "run a simulation with derivative coefficient 0.5 instead of 0.63"
 
@@ -6398,3 +6398,29 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1784, the same plant classes, grid and thresholds as TASK-1655 with 0.063 as the baseline (`docs/sat/sim-1784/thresholds.md`).
 
 **Open:** the result, and his decision on the factor after it.
+
+## 298. Coefficient concern: wait for gruijter's night log, then decide; the self-tune stays as it is (Sergeant D, 2026-11-10; answers our question on his concern)
+
+**Source:** sergeantd, 2026-11-10, #dev-sat-mqtt (channel 1105556725714649128). Times are from the message ids. Relayed by the coordinating session, not seen first-hand (the Discord tools were down in this session).
+- 18:48 UTC, msg 1569785822394323056 (https://discord.com/channels/812969634638725140/1105556725714649128/1569785822394323056): his concern, about gruijter's screenshot of 2026-11-07 (#alpha-testing msg 1568595554416595025, coefficient 1.12).
+- 18:59 UTC, msg 1569788551833329848: our question, posted by otgw-firmware-97.
+- 19:06 UTC, msg 1569790312220590140 (https://discord.com/channels/812969634638725140/1105556725714649128/1569790312220590140): his answer.
+- After it, otgw-firmware-97 posted an acknowledgement (msg 1569790712331903141) and asked gruijter for the log (#alpha-testing msg 1569790714794221639).
+- The relays gave his answer as 20:06 local and as 20:06:15 UTC; the message id gives 19:06:15 UTC, used here.
+
+**Quoted:** (concern) "Regarding this heating curve coefficient I have a strong feeling that the autotune of the coefficient is moving very fast. 1.12 is very low. Since the heating curve value works as the base calculation of the algorithm it gives the same effect as an overdamped integral" (answer) "@BlueFlame Bot let’s wait guitars night log and decide later"
+
+**Settled:** no change now. The heating curve self-tune stays as ADR-205 describes it (`SATcurveTune.h:8-13`, `SATcontrol.ino:6054-6090`: at most one 0.1 step per 3 counted days). The decision comes after gruijter's night log is in. Of our options (A: ask gruijter for his SAT log to see where 1.12 came from; B: slow the tuner now; C: keep the tuner inside 1.6-2.4, entry 166), this is A.
+
+**Interpretation (ours, not asked):** "guitars" is an autocorrect of "gruijter's". "Night log" is a SAT log of a night that holds the tuner lines (`SATTUNEH`, `SATTUNED`, `SATTUNER`, `SATTUNE`, `docs/sat/sat-log-format.md:27-30`).
+
+**Facts behind the question:**
+- thermo-nova at 7beaaf5 never changes the coefficient itself; it only reads the user's setting (`custom_components/sat/entry_data.py:213`, `heating_curve.py:15/25/39`, `pid.py:71`; checked by a second reader).
+- Our tuner landed on dev on 2026-10-31 (0fd940bf7). By 2026-11-07 it could have made at most 2 decisions (-0.2).
+- 1.12 is not on its 0.1 grid from the default 2.0, so the tuner alone most likely did not produce 1.12. Not yet verified against his log.
+
+**Checked against the recorded entries:** entries 164-176 (the tuner design) are unchanged; entry 166 (most homes 1.6-2.4) is the basis of option C, not chosen now.
+
+**Task:** TASK-1787.
+
+**Open:** gruijter's night log, and Sergeant D's decision after it.

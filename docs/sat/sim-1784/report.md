@@ -4,7 +4,7 @@
 (1.6-4.6 minutes on 1.5-7 hours). By the pre-registered rule the recommendation is **keep 0.063**: no class reaches
 the 10 % warm-up gain. The change also does no measurable harm: no guard fails because of 0.05.
 
-- **Order:** Sergeant D, #dev-sat-mqtt 2026-11-10 19:33 UTC, msg 1569781945460727873, entry 297 (relayed, not seen
+- **Order:** Sergeant D, #dev-sat-mqtt 2026-11-10 18:33 UTC, msg 1569781945460727873, entry 297 (relayed, not seen
   first-hand): "run a simulation with derivative coefficient 0.5 instead of 0.63".
 - **Our reading:** 0.5 vs 0.63 means 0.05 vs 0.063, the `SAT_PID_KD_FACTOR` of `SATpid.ino:28`. The ratio is the
   same under either reading (0.794), so the result is the same.

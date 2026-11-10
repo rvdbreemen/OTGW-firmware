@@ -45,4 +45,4 @@ Simulation only: no result is physical boiler proof.
 
 ## Changes after the first run
 
-(none)
+- 2026-11-10, after the run: the order time above (19:33 UTC) is local time; the message id gives 18:33 UTC. Source detail only; no metric, threshold, grid or rule changed. The script docstring keeps 19:33 because its sha256 is pinned in `runs.json`.
