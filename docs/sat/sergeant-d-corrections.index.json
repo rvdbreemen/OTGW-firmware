@@ -3949,6 +3949,21 @@
     "TASK-1777"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 296,
+   "title": "Q-1759b answered: on PIC boards SAT sends PM=28 every 30 s, not AA=28/DA=28 (Sergeant D, 2026-11-10; changes the C part of entry 290)",
+   "date": "2026-11-10",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569734786203914394",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.5",
+    "TASK-1759",
+    "TASK-1767"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

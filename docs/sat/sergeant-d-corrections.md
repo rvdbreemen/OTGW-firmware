@@ -6345,3 +6345,37 @@ This confirms Robert's maintainer decision of entry 290 for direct mode. It also
 **Interpretation (ours):** "Α" is the Greek letter for our option A. The scope is the list named in Q3. Not in that list and unchanged: `adv.pic_led_w` (PIC LED function "Ζεστό νερό"), and the mixed-case "Χώρος" keys (`home.chip_room`, `h_mon.sat_tile_room`, `tools.legend_room`, `graph.series_room`) and `home.cell_room_set` "ΣΤΟΧΟΣ ΧΩΡΟΥ".
 
 **Changes an earlier entry:** settles open point (3) of entry 292. **Task:** TASK-1777. **Open:** the two-card layout question (entry 294, for Robert); whether the unchanged "Χώρος" keys should follow (not asked).
+
+## 296. Q-1759b answered: on PIC boards SAT sends PM=28 every 30 s, not AA=28/DA=28 (Sergeant D, 2026-11-10; changes the C part of entry 290)
+
+**Source:** sergeantd, #dev-sat-mqtt (channel 1105556725714649128). Two messages to the bot and Robert:
+- 2026-11-10 16:25:37 UTC, msg 1569734786203914394 (https://discord.com/channels/812969634638725140/1105556725714649128/1569734786203914394), lists three options. This came in answer to Q-1759b (msg 1569729601259708417), asked by otgw-firmware-97.
+- 2026-11-10 16:38:27 UTC, msg 1569738014878605403 (https://discord.com/channels/812969634638725140/1105556725714649128/1569738014878605403), gives the choice.
+
+Between the two, 97 posted the PIC facts (msg 1569737537218543709, gateway.asm 6.6):
+- `AA=` has no duplicate check (SetAltLoop :4627-4634).
+- `DA=` deletes only the first match (DeleteAlt :4650-4659).
+- `PM=` writes no EEPROM and is cleared once answered (:2434).
+- `PM=` goes out only in the slot of a thermostat request the boiler does not support (SendAltRequest :2396-2414, TASK-1767).
+
+97 recommended option 3.
+
+**Quoted:**
+- "AA command is a bit tricky. We need to send it ONLY ONCE, if we keep sending the AA=28 command after every restart we will use all the allocated command slots with the AA=28. So I have 3 options:
+  1. Send ONLY ONCE the AA command, not on every restart.
+  2. If we choose to send the AA=28 command then first we need to send the DA=28 and after the AA=28 in order to ensure that the previous AA=28 command is deleted during restarts.
+  3. Send periodically the PM=28 command ( every 30 seconds )."
+- "@BlueFlame Bot  option 3 is my choice"
+
+**Settled:** on PIC boards in gateway mode, SAT sends `PM=28` every 30 s to get the return temperature. `AA=28` / `DA=28` is not used. Every PIC command goes through `addCommandToQueue()`. The known limit was stated to him before he chose: the priority read goes out only in an unsupported thermostat slot. On a PIC board whose thermostat asks only supported IDs, MsgID 28 therefore still does not come, and SAT keeps the flow + offset fallback (entries 135, 149, 151).
+
+**Interpretation (ours, not asked for the PIC):** the same conditions as option A on OT-Direct (entry 291):
+- only while no valid MsgID 28 arrived for 30 s;
+- only while SAT is on;
+- not while the boiler answers MsgID 28 Unknown-DataID.
+
+This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276). A reviewer, Sergeant D or Robert may correct it.
+
+**Changes an earlier entry:** entry 290's C part (Robert, maintainer decision: `AA=28` while SAT is on, `DA=28` when it goes off) is replaced by `PM=28` every 30 s. Robert may confirm. Entry 291 (A on OT-Direct) is unchanged.
+
+**Task:** TASK-1759 (C part, PIC; A on OT-Direct is separate, ADR-224); related TASK-1767, TASK-1412.5 (the PM=25 logic). **Open:** Robert's confirmation of the change to entry 290; the interpretation above.

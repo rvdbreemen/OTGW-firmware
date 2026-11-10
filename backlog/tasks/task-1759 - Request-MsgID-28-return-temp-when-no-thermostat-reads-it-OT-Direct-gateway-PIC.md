@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:08:00Z'
-updated_date: '2026-11-10T08:36:00Z'
+updated_date: '2026-11-10T15:50:00Z'
 labels:
   - sat
   - opentherm
@@ -135,6 +135,14 @@ created: 2026-11-10T08:36:00Z
 ---
 
 Sergeant D answered Q-1759a (corrections entry 291): 'the answer is A' (2026-11-10 08:29:17 UTC, msg 1569614915222773762) and 'yes' (09:24:44 UTC, msg 1569628868648767570) to our explicit check. So A on OT-Direct gateway mode, every 30 s, only while no valid MsgID 28 arrived for 30 s, and only while SAT is on. ADR-224's open questions are now all answered (W1-W3 via adr answer); acceptance of ADR-224 needs Robert's explicit yes in a session (adr accept --confirm), not done. C on PIC: not answered by Sergeant D; queued as Q-1759b; C stays Robert's maintainer decision (entry 290). Code for A may start after ADR-224 is accepted.
+
+---
+
+created: 2026-11-10T15:50:00Z
+
+---
+
+C part changed by Sergeant D (corrections entry 296; 2026-11-10 16:38:27 UTC, 'option 3 is my choice', msg 1569738014878605403): on PIC boards SAT sends PM=28 every 30 s, not AA=28/DA=28. The plan items C1-C3 (AA/DA, EEPROM, duplicates) drop; C4 (slot limit, TASK-1767) stays: PM= also goes out only in an unsupported slot. Our reading (not asked for PIC): same conditions as A (only while no valid MsgID 28 for 30 s, SAT on, not while MsgID 28 is Unknown), modelled on the PM=25 logic (SATcontrol.ino satPm25Decide, TASK-1412.5). Robert may confirm the change to entry 290. The C part is a separate change from A (ADR-224, OT-Direct only).
 
 ---
 <!-- COMMENTS:END -->
