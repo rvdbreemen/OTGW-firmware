@@ -43,6 +43,81 @@ Controleer in de Telnet-log op meldingen met `SERIAL OVERRUN` of bekijk het WebS
 
 ---
 
+### 7.1a PIC niet gevonden op een OTGW Classic met een S3 Mini
+
+#### Symptomen
+
+U heeft uw OTGW Classic (de NodoShop-print met de PIC-chip) omgebouwd van een Wemos D1 mini naar een LOLIN S3 Mini en 2.0.0 geflasht. De Web UI werkt, maar er komt geen OpenTherm-verkeer binnen. Open `http://<ip-van-uw-otgw>/api/v2/device/info` in een browser en zoek deze twee velden:
+
+```json
+"hardwaremode": "Degraded",
+"otcommandinterface": "None",
+```
+
+Op een werkende Classic staat er twee keer `"PIC"`. `Degraded` betekent: de firmware zocht bij het opstarten de PIC en kreeg geen antwoord. `None` betekent: er is geen weg om OpenTherm te praten.
+
+#### Snelle controles (begin hier)
+
+1. **Controleer hoe de S3 Mini in de voet zit.** De S3 Mini heeft aan elke kant twee pinrijen. Alleen de **buitenste** rijen passen op de voetafdruk van de Wemos D1 mini; de binnenste rijen zijn extra S3-pinnen en blijven buiten de voet. Zit de module een rij verschoven, of is een pin verbogen of niet helemaal ingedrukt, dan is de seriële verbinding met de PIC weg. Kijk van opzij: elke buitenste pin moet helemaal in de voet zitten.
+2. **Haal de stroom van de hele print.** Stroom eraf, tien seconden wachten, stroom erop. Een herstart vanuit de Web UI herstart alleen de ESP.
+3. **Zet Board mode op Auto-detect.** Ga in de Web UI naar Settings, System, **Board mode**. Kies **Auto-detect**, sla op en herstart. Kies op een Classic niet **OT-Direct (no PIC)**: die stand is voor een print zonder PIC.
+4. **Vergelijk met de oude module.** Heeft u de D1 mini met 1.x-firmware nog? Zet die terug. Ziet 1.x de PIC wel, dan zijn PIC en print in orde en zit het probleem tussen de S3 Mini en de voet.
+
+Nog steeds `Degraded`? Verzamel het bewijs hieronder en vraag om hulp (paragraaf 7.14).
+
+#### Wat de firmware bij het opstarten doet
+
+Bij elke start, zodra WiFi werkt, zoekt de firmware de PIC. Ze reset de PIC en wacht op het end-of-text-byte (ETX, 0x03) dat de bootloader van de PIC na een reset stuurt. Komt de ETX, dan is er een PIC en wordt de modus `PIC`. Komt er niets, dan wordt het `Degraded`.
+
+De instelling **Board mode** bepaalt hoe vaak de firmware het probeert en wat ze onthoudt (ADR-201):
+
+| Board mode | Wat er bij het opstarten gebeurt |
+|---|---|
+| Auto-detect (0, standaard) | Maximaal 3 pogingen, 60 ms uit elkaar. Een gevonden PIC wordt opgeslagen als "Classic"; daarna neemt elke start het vaste PIC-pad, dat de PIC nog steeds controleert. Een misser wordt **niet** opgeslagen, dus de volgende start probeert het opnieuw. Op een S3 Mini zonder antwoord van de PIC blijft de firmware `Degraded` en schakelt ze niet over op OT-Direct. |
+| PIC (Classic) (1) | Eén poging per start. Geen antwoord geeft `Degraded`. |
+| OT-Direct (no PIC) (2) | Kijkt één keer of er een PIC is. Antwoordt er een, dan gaat ze terug naar Classic en slaat dat op. Antwoordt er geen, dan start ze OT-Direct, en dat is fout op een Classic. |
+
+Zolang er geen PIC bekend is, stuurt de firmware ook elke minuut `PR=A` naar de PIC en logt `PIC is unknown, probe pic using PR=A`. Antwoordt de PIC daarop, dan wordt de modus `PIC` zonder herstart.
+
+#### Het opstartverslag: `/bootdetect.log`
+
+De detectie bij het opstarten loopt **voordat** de Telnet-server start. Een Telnet-capture laat haar dus nooit zien, ook niet over een herstart heen. De firmware schrijft het resultaat daarom naar een klein bestand op het apparaat. Open de FSexplorer (`http://<ip>/FSexplorer.html`) en download `/bootdetect.log`. De nieuwste start staat bovenaan; het bestand bewaart de laatste 30 starts.
+
+Een Classic met S3 Mini die de PIC vond:
+
+```text
+boot#12 t=6843ms eMode=1 pic=1 mode=1 pro=0 RST=12 RX=44 TX=43 I2C=35/36
+```
+
+Een Classic waarvan de PIC niet antwoordde:
+
+```text
+boot#13 t=6851ms eMode=3 pic=0 mode=0 pro=0 RST=12 RX=44 TX=43 I2C=35/36
+```
+
+(De `t=`-waarden zijn voorbeelden; bij u staan er andere getallen.)
+
+| Veld | Betekenis |
+|---|---|
+| `eMode` | Uitkomst: `0` nog niet bepaald, `1` PIC, `2` OT-Direct, `3` Degraded |
+| `pic` | `1` als de PIC antwoordde |
+| `mode` | De instelling Board mode na de detectie: `0` auto, `1` PIC op S3 Mini, `2` OT-Direct, `3` PIC op S3 Mini Pro |
+| `pro` | `1` als een S3 Mini Pro herkend is (aan de bewegingssensor op de module) |
+| `RST` `RX` `TX` | GPIO's voor de PIC-reset en de seriële verbinding. S3 Mini: 12, 44, 43 |
+| `I2C` | SDA/SCL-pinnen. S3 Mini: 35/36 |
+
+Staat er op elke regel `pic=0` terwijl `RST`, `RX` en `TX` 12, 44 en 43 tonen? Dan gebruikte de firmware de juiste pinnen en antwoordde de PIC niet. Dat wijst naar de plaatsing in de voet, de module of de PIC zelf, niet naar een instelling.
+
+#### Wat u meestuurt als u om hulp vraagt
+
+1. `/bootdetect.log` (downloaden via de FSexplorer).
+2. De uitvoer van `/api/v2/device/info`.
+3. Een capture met het capture-script uit de flash-zip (`capture-mqtt-debug.bat` op Windows, `capture-mqtt-debug.sh` op Linux, `capture-mqtt-debug-macos.sh` op macOS). Start het, herstart de gateway vanuit de Web UI terwijl het loopt, laat het een paar minuten lopen, stop met `Q` en post de upload-zip. Daarin staan de `PR=A`-pogingen per minuut en het herstartlog; de detectie bij het opstarten zelf komt uit `/bootdetect.log`.
+4. Foto's van opzij van beide pinrijen van de S3 Mini in de voet.
+5. De firmwareversie en de printversie die op de print staat.
+
+---
+
 ### 7.2 MQTT maakt geen verbinding
 
 #### Symptomen

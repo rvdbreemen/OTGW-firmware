@@ -20,6 +20,79 @@ This chapter covers the most common problems, their root causes, and step-by-ste
 
 ---
 
+### 7.1a PIC Not Detected on an OTGW Classic with an S3 Mini
+
+**Symptom:** you moved your OTGW Classic (the NodoShop board with the PIC chip) from a Wemos D1 mini to a LOLIN S3 Mini and flashed 2.0.0. The web UI comes up, but there is no OpenTherm traffic. Open `http://<ip-of-your-otgw>/api/v2/device/info` in a browser and look for these two fields:
+
+```json
+"hardwaremode": "Degraded",
+"otcommandinterface": "None",
+```
+
+On a working Classic they read `"PIC"` and `"PIC"`. `Degraded` means the firmware looked for the PIC at boot and got no answer. `None` means it has no way to talk OpenTherm.
+
+#### Quick checks (start here)
+
+1. **Check how the S3 Mini sits in the socket.** The S3 Mini has two pin rows on each side. Only the **outer** rows match the Wemos D1 mini footprint; the inner rows carry extra S3 pins and stay outside the socket. A module shifted by one row, or a pin that is bent or not pushed in all the way, cuts the serial link to the PIC. Look at the board from the side: every outer pin should go fully into the socket.
+2. **Power-cycle the whole board.** Remove the power, wait ten seconds, power it again. A reboot from the web UI restarts the ESP only.
+3. **Set Board mode to Auto-detect.** In the web UI go to Settings, System, **Board mode**. Choose **Auto-detect**, save and reboot. Do not choose **OT-Direct (no PIC)** on a Classic: that mode is for a board without a PIC.
+4. **Cross-check with the old module.** If you still have the D1 mini with 1.x firmware, put it back. If 1.x sees the PIC, the PIC and the board are fine and the problem sits between the S3 Mini and the socket.
+
+Still `Degraded`? Collect the evidence below and ask for help (section 7.14).
+
+#### What the firmware does at boot
+
+Each boot, after WiFi is up, the firmware looks for the PIC. It resets the PIC and waits for the end-of-text byte (ETX, 0x03) that the PIC's bootloader sends after a reset. An ETX means a PIC is there and the mode becomes `PIC`. No ETX means `Degraded`.
+
+The **Board mode** setting decides how often it tries and what it remembers (ADR-201):
+
+| Board mode | What happens at boot |
+|---|---|
+| Auto-detect (0, default) | Up to 3 tries, 60 ms apart. A found PIC is saved as "Classic", and from then on every boot takes the forced-PIC path, which still checks the PIC. A miss is **not** saved, so the next boot tries again. On an S3 Mini without a PIC answer the firmware stays `Degraded` and does not switch to OT-Direct. |
+| PIC (Classic) (1) | One try per boot. No answer gives `Degraded`. |
+| OT-Direct (no PIC) (2) | Checks once for a PIC. If one answers, it switches back to Classic and saves that. If none answers, it starts OT-Direct, which is wrong for a Classic. |
+
+While no PIC is known, the firmware also sends `PR=A` to the PIC once a minute and logs `PIC is unknown, probe pic using PR=A`. If the PIC answers that, the mode changes to `PIC` without a reboot.
+
+#### The boot record: `/bootdetect.log`
+
+The boot detection runs **before** the Telnet server starts, so a Telnet capture never shows it, not even across a restart. The firmware writes the result to a small file on the device instead. Open the FSexplorer (`http://<ip>/FSexplorer.html`) and download `/bootdetect.log`. The newest boot is on top; the file keeps the last 30 boots.
+
+A Classic with an S3 Mini that found its PIC:
+
+```text
+boot#12 t=6843ms eMode=1 pic=1 mode=1 pro=0 RST=12 RX=44 TX=43 I2C=35/36
+```
+
+A Classic whose PIC did not answer:
+
+```text
+boot#13 t=6851ms eMode=3 pic=0 mode=0 pro=0 RST=12 RX=44 TX=43 I2C=35/36
+```
+
+(The `t=` values above are examples; yours will differ.)
+
+| Field | Meaning |
+|---|---|
+| `eMode` | Result: `0` not yet detected, `1` PIC, `2` OT-Direct, `3` Degraded |
+| `pic` | `1` when the PIC answered |
+| `mode` | The Board mode setting after detection: `0` auto, `1` PIC on S3 Mini, `2` OT-Direct, `3` PIC on S3 Mini Pro |
+| `pro` | `1` when an S3 Mini Pro was recognised (by its on-board motion sensor) |
+| `RST` `RX` `TX` | GPIOs used for PIC reset and the serial link. S3 Mini: 12, 44, 43 |
+| `I2C` | SDA/SCL pins. S3 Mini: 35/36 |
+
+If `pic=0` on every line while `RST`, `RX` and `TX` show 12, 44 and 43, the firmware used the right pins and the PIC did not answer. That points at the socket seating, the module or the PIC itself, not at a setting.
+
+#### What to send when you ask for help
+
+1. `/bootdetect.log` (download from the FSexplorer).
+2. The output of `/api/v2/device/info`.
+3. A capture with the capture tool from the flash zip (`capture-mqtt-debug.bat` on Windows, `capture-mqtt-debug.sh` on Linux, `capture-mqtt-debug-macos.sh` on macOS). Start it, reboot the gateway from the web UI while it runs, let it run a few minutes, stop with `Q`, and post the upload zip. It shows the per-minute `PR=A` retries and the reboot log; the boot detection itself comes from `/bootdetect.log`.
+4. Side photos of both pin rows of the S3 Mini in the socket.
+5. The firmware version and the board revision printed on the PCB.
+
+---
+
 ### 7.2 MQTT Not Connecting
 
 **Symptom:** MQTT status shows disconnected.
