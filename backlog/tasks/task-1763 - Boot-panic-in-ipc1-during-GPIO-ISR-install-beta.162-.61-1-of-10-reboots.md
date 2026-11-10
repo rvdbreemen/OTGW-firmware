@@ -4,7 +4,7 @@ title: Boot panic in ipc1 during GPIO ISR install (beta.162, .61, 1 of 10 reboot
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:21:00Z'
-updated_date: '2026-11-10T03:25:00Z'
+updated_date: '2026-11-10T03:27:00Z'
 labels:
   - bug
   - crash
@@ -104,6 +104,14 @@ Fix options now rest on proof (decision for Robert, no code yet):
 (b) install the GPIO ISR service earlier in setup, before startWiFi; this lowers the chance, but does not remove the cause;
 (c) both.
 Note: attaching from core 1 does not avoid ipc1 (esp_ipc.c:134-139).
+
+---
+
+created: 2026-11-10T03:27:00Z
+
+---
+
+Location fix for the comment above: the coredump files (coredump.bin, decode.txt, core.elf, cmds.gdb) are kept in D:\Users\Robert\Documents\GitHub\RvdB\OTGW-build-archive\coredumps\task-1763-beta162-61\ (local, not in git; checked present 2026-11-10). 4c's session scratchpad cd1763\ was only temporary.
 
 ---
 <!-- COMMENTS:END -->
