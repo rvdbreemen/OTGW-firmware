@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "otdirect"
   - "opentherm"
@@ -32,6 +31,7 @@ symbols:
   - "replyToThermostat"
   - "feedTret"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -44,7 +44,7 @@ Proposed, 2026-11-09.
 
 **Decision Maker:** to be decided by User: Robert van den Breemen (maintainer). The choice of option A+C itself was his, made on 2026-11-09 at 21:52:17 UTC in #dev-sat-mqtt: "I think A+C would be best, for each hardware setup the optimal solution." (msg 1569469705461440577; corrections entry 290).
 
-This ADR records option A's deviation from the PIC model and its parameters. It was written by agent otgw-firmware-030509 and is not accepted until Robert says so. The interval and scope (W1, W2) wait for Sergeant D (Q-1759a).
+This ADR records option A's deviation from the PIC model and its parameters. It was written by agent otgw-firmware-030509. On 2026-11-10 06:40 Robert answered "Direction OK, 8 B cache" (AskUserQuestion in the coordinator's session, relayed to 030509): the deviation from ADR-223 is accepted for this one read per interval, and the 8 B variant is chosen. The ADR stays Proposed until Sergeant D answers the interval, the scope and his agreement (W1-W3, Q-1759a).
 
 ## Status History
 
@@ -95,7 +95,7 @@ Which thermostat frames may be used:
 - Only an ID whose cached answer is younger than the interval.
 - An unsupported-ID slot (TASK-1707) keeps priority, because the schedule already reads MsgID 28 there.
 
-**Cache age, proposed variant (KISS): one stamp of about 8 B static RAM.**
+**Cache age: one stamp of about 8 B static RAM (KISS), chosen by Robert on 2026-11-10 ("Direction OK, 8 B cache").**
 
 - The gateway keeps one candidate ID: the first eligible READ_DATA ID that the thermostat repeats. In tjfs's log that is 25 or 17.
 - With it, the gateway stores the time of the last boiler reply for that ID.
@@ -168,8 +168,8 @@ Field proof: a capture from tjfs. There is no bench with a thermostat in gateway
 - [ ] W1: the interval (proposal 30 s), Sergeant D (Q-1759a).
 - [ ] W2: only while SAT is enabled, or always (proposal: SAT only), Sergeant D (Q-1759a).
 - [ ] W3: Sergeant D's agreement with A+C (entry 287 is his).
-- [ ] Cache-age variant: one stamp (8 B, candidate ID) or per slot (512 B), Robert / review.
-- [ ] Acceptance of the deviation from ADR-223's PIC parity for this one read, Robert.
+- [x] Cache-age variant: one stamp (8 B, candidate ID) or per slot (512 B), Robert / review. — **Answered 2026-11-10 by User: Robert van den Breemen (relayed by Coordinator OTGW):** single stamp, 8 B (candidate ID, KISS). Robert, 2026-11-10 06:40, 'Direction OK, 8 B cache', via AskUserQuestion in the coordinator's session (relayed to 030509)
+- [x] Acceptance of the deviation from ADR-223's PIC parity for this one read, Robert. — **Answered 2026-11-10 by User: Robert van den Breemen (relayed by Coordinator OTGW):** accepted for this one read per interval. Robert, 2026-11-10 06:40, 'Direction OK', via AskUserQuestion in the coordinator's session (relayed to 030509); the ADR stays Proposed until Sergeant D answers W1-W3
 
 ## Related Decisions
 

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T17:08:00Z'
-updated_date: '2026-11-09T22:39:00Z'
+updated_date: '2026-11-10T05:51:00Z'
 labels:
   - sat
   - opentherm
@@ -119,6 +119,14 @@ created: 2026-11-09T22:39:00Z
 ---
 
 STEP 0 done as a draft: docs/adr/ADR-224 (Proposed, not accepted), 'OT-Direct gateway mode reads the return temperature in a supported thermostat slot and answers that read from the boiler cache'. Proposed cache variant: one stamp (~8 B, candidate ID, KISS); per-slot otBoilerCacheMs[128] (512 B) as fallback. Open questions in the ADR: W1-W3 (Sergeant D), cache variant and the ADR-223 deviation (Robert). adr-lint --strict: pass (1 advisory).
+
+---
+
+created: 2026-11-10T05:51:00Z
+
+---
+
+Robert, 2026-11-10 06:40 (his words via AskUserQuestion in the coordinator's session, relayed to 030509): ADR-224 'Direction OK, 8 B cache'. So the deviation from ADR-223 is accepted for this one cache-answered read per interval, and the cache-age variant is the single stamp (~8 B, candidate ID); the 512 B per-slot otBoilerCacheMs[128] is dropped from the plan (A5) unless review reopens it. Recorded in ADR-224 (open questions answered via adr answer). ADR-224 stays Proposed and there is no code until Sergeant D answers W1 (interval), W2 (SAT only or always) and W3 (agreement A+C) under Q-1759a.
 
 ---
 <!-- COMMENTS:END -->
