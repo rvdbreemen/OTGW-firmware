@@ -200,9 +200,9 @@ One AC each, sequential.
 **3D-2 Release notes** (one subagent), `docs/releases/RELEASE_NOTES_<version>.md`:
 
 > Start from the newest `docs/releases/RELEASE_NOTES_2.*.md` that was actually
-> published (`gh release view v<prev>` shows it). Do NOT start from
-> `RELEASE_NOTES_2.0.0.md` or `RELEASE_GITHUB_2.0.0.md` if they predate the first beta:
-> they are April 2026 drafts that still describe a unified ESP8266/ESP32 build.
+> published (`gh release view v<prev>` shows it). The April 2026 drafts
+> `RELEASE_NOTES_2.0.0.md` and `RELEASE_GITHUB_2.0.0.md` were removed (TASK-1753); the stable
+> 2.0.0 notes start from `docs/releases/RELEASE_NOTES_2.0.0-draft.md` (TASK-1740).
 > Keep the structure of the last beta notes: what this release is, SAT status, changes
 > since the previous tag, before you flash (USB first flash with `flash_otgw.bat` /
 > `./flash_otgw.sh` for a new S3 Mini, `/update` with the zip on a 2.x unit,

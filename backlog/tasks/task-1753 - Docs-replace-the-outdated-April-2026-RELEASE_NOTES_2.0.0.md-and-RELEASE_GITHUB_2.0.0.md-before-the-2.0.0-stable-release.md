@@ -3,9 +3,11 @@ id: TASK-1753
 title: >-
   Docs: replace the outdated April 2026 RELEASE_NOTES_2.0.0.md and
   RELEASE_GITHUB_2.0.0.md before the 2.0.0 stable release
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-11-09T10:17:00Z'
+updated_date: '2026-11-10T18:13:00Z'
 labels:
   - docs
   - release
@@ -23,7 +25,21 @@ docs/releases/RELEASE_NOTES_2.0.0.md (507 lines, 'Last updated 2026-04-25') and 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 RELEASE_NOTES_2.0.0.md and RELEASE_GITHUB_2.0.0.md no longer hold the April text: replaced by the reviewed stable notes (TASK-1740) or removed, with Robert's choice recorded
-- [ ] #2 grep -ri otgw32 docs/releases/RELEASE_NOTES_2.0.0.md docs/releases/RELEASE_GITHUB_2.0.0.md finds nothing
-- [ ] #3 No link in the repo points at a removed file (grep for the two file names)
+- [x] #1 RELEASE_NOTES_2.0.0.md and RELEASE_GITHUB_2.0.0.md no longer hold the April text: replaced by the reviewed stable notes (TASK-1740) or removed, with Robert's choice recorded
+- [x] #2 grep -ri otgw32 docs/releases/RELEASE_NOTES_2.0.0.md docs/releases/RELEASE_GITHUB_2.0.0.md finds nothing
+- [x] #3 No link in the repo points at a removed file (grep for the two file names)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Robert's choice (2026-11-10, relayed by the coordinator session, his words: "taak 1753 verwijder de bordnaam, voer taak 1753 uit"): remove. Interpretation of 'verwijder de bordnaam' (remove the board name) as removing both April 2026 files by the coordinator; removing them takes the board name out of the public repo on dev.
+
+Done on dev: git rm docs/releases/RELEASE_NOTES_2.0.0.md and docs/releases/RELEASE_GITHUB_2.0.0.md. Mentions updated: .claude/skills/update-docs-2x/SKILL.md (now says removed by TASK-1753, start from RELEASE_NOTES_2.0.0-draft.md) and the HTML comment in docs/releases/RELEASE_NOTES_2.0.0-draft.md. Left as is: archived tasks and TASK-1740 notes (history), ADR-084:108 (Accepted ADR, immutable, plain mention, not a link). main is NOT touched: the RELEASE_GITHUB file and its link on main stay until the release flow.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: both April 2026 files removed (git rm) with Robert's choice recorded in the notes (relayed by the coordinator; 'remove' is the coordinator's reading of 'verwijder de bordnaam'). AC2: grep -ri otgw32 on both paths exits 2 (No such file or directory), so it finds nothing. AC3: git grep for a Markdown link '](...RELEASE_NOTES_2.0.0.md|RELEASE_GITHUB_2.0.0.md)' outside backlog exits 1 (no match); the only live mentions (update-docs-2x SKILL.md, draft notes comment) were updated; ADR-084:108 is an immutable plain mention. evaluate.py --quick: 92 checks, 0 failed, 0 warnings. main untouched: its RELEASE_GITHUB_2.0.0.md link stays until the release flow.
+<!-- SECTION:FINAL_SUMMARY:END -->
