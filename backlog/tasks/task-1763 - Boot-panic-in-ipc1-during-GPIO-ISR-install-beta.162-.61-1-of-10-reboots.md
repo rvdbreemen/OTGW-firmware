@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@system32-030509'
 created_date: '2026-11-09T19:21:00Z'
-updated_date: '2026-11-10T15:25:00Z'
+updated_date: '2026-11-10T22:37:00Z'
 labels:
   - bug
   - crash
@@ -55,6 +55,8 @@ Limit: (b) lowers the chance (fewer interrupts before WiFi); the install still r
 DECISION FOR ROBERT (not implemented): (a) raise the IPC task stack to 1280 B or more by rebuilding the Arduino libs with custom_sdkconfig (a build tooling change, so an ADR first): fixes the cause, costs a libs rebuild in the build chain and RAM for two IPC stacks (+256 B each at 1280). (b) install the GPIO ISR service early, before startWiFi, so the ISR allocation runs while few interrupts are pending: smaller chance, the cause stays (any later cross-core ISR install can still overflow). Recommendation from the evidence: (a), because only (a) removes the overflow; (b) at most as a stopgap. The project sdkconfig.h wrapper of ADR-185 does not help: the stack size is compiled into the precompiled esp_ipc.c.
 
 2026-11-10 16:23, second case DECODED (session 4c6667da): .63 (OTGW Classic, S3 Mini Pro with PSRAM) crashlog '2026-11-10 06:43:01 - reboot cause: Exception/panic (4)', 'Core dump: ipc0 pc=0x4037caec elf=a4485854 bt=...!' (corrupted). elf a4485854 = 2.0.0-beta.167+ddf8498 (the published public beta; ELF from OTGW-build-archive, sha256 a44858545960759d..., coredump header X-Coredump-App-Sha256 a44858545: match). One read-only GET /api/v2/device/coredump (30,756 B). esp-coredump 1.18.1: exccause 0x41 DebugException, EPC6 0x4037caef, crashed task ipc0 (TCB 0x3fcbbd80), not in interrupt context. Backtrace: _xt_lowint1 xtensa_vectors.S:1207 <- (frame lost, 0x40060030) <- heap_caps_malloc_base(8, caps 0x804) heap_caps_base.c:202 <- heap_caps_malloc heap_caps.c:84 <- esp_intr_alloc_intrstatus_bind(source=8, flags=1032, handler r_rwbtdm_isr_wrapper_hack) <- esp_intr_alloc <- btdm_intr_alloc (BLE controller init) <- ipc_task esp_ipc.c:84. gdb: ipc0 pxStack 0x3fcbb93c, pxEndOfStack 0x3fcbbd30 (1,012 B), SP 0x3fcbb950 = only 20 B above the stack bottom; bottom words 0xa5a5a5a5, 0x80376df8 (a heap_caps_malloc_base return address), 0x3fcbba30, 0x3fcbaf9c, 0x00000008 written into the end-of-stack watchpoint area. VERDICT: the same class as the ipc1 case (IPC task stack too small for esp_intr_alloc's malloc path plus a level-1 interrupt frame), here on ipc0 during the BLE controller's interrupt allocation (btdm_intr_alloc), not the GPIO ISR install. Consequence: mitigation (b) (early GPIO ISR install, beta.168) does NOT cover this path; only (a) (larger IPC stacks, ADR-225) covers both. Timing: 06:43:01 is the moment of the TASK-1774 rollback during the coordinator's flash of .63, so this panic is the likely cause of that rollback (inference from the timing, see TASK-1774). Files (local, not in git): D:\Users\Robert\Documents\GitHub\RvdB\OTGW-build-archive\coredumps\task-1763-beta167-63-ipc0\.
+
+Not this class (2026-11-10, a4): the coredump in gruijter's upload 20261110-100556 is a Task watchdog (loopTask + async_tcp on CPU 1) in setup() -> updateRebootLog() -> LittleFS lfs_alloc_scan, from 2.0.0-alpha.532+689cb05 (dump app SHA 661d01720 = that ELF; a stale dump kept across OTA). ipc0/ipc1 idle in ipc_task with 348/340 B free. Filed as TASK-1789. It does not bear on ADR-225.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
