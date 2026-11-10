@@ -4,6 +4,7 @@ title: 'Classic + S3 Mini: PIC no longer detected after flashing with --migrate'
 status: To Do
 assignee: []
 created_date: '2026-11-10T18:52:00Z'
+updated_date: '2026-11-10T19:10:00Z'
 labels:
   - needs-maintainer-ok
   - bug
@@ -29,4 +30,6 @@ Report from thaghostnl, #nederlandse-ondersteuning 2026-11-10 19:44:03 UTC, msg 
 
 <!-- SECTION:NOTES:BEGIN -->
 Waiting for capture.
+
+Time correction (2026-11-10): the report time above is local CET. From the message snowflake the correct time is 2026-11-10 18:44:03 UTC (msg 1569784722903662795).
 <!-- SECTION:NOTES:END -->

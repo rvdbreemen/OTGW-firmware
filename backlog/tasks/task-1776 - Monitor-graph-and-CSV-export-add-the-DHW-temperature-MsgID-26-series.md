@@ -4,6 +4,7 @@ title: 'Monitor graph and CSV export: add the DHW temperature (MsgID 26) series'
 status: To Do
 assignee: []
 created_date: '2026-11-10T09:41:00Z'
+updated_date: '2026-11-10T19:10:00Z'
 labels:
   - needs-maintainer-ok
   - web-ui
@@ -24,3 +25,9 @@ Tester request (fegyosz_47807, #alpha-testing 2026-11-10 08:45:41 UTC, https://d
 - [ ] #1 Robert decided whether the DHW temperature is added (and whether an amending ADR to ADR-193 is needed)
 - [ ] #2 If added: the graph shows a DHW temperature series and the CSV export has a DHW temperature column, shown as a dash when the boiler does not report MsgID 26
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Time correction (2026-11-10): the report time above is local CET. From the message snowflake the correct time is 2026-11-10 07:45:41 UTC (msg 1569619039276245013).
+<!-- SECTION:NOTES:END -->
