@@ -20,8 +20,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { stopChromeTree, guardChrome, launchChrome } from './lib/page-harness.mjs';
+import { stopChromeTree, guardChrome, launchChrome, CDP_TIMEOUT_MS } from './lib/page-harness.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.OTGW_DATA_DIR || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
@@ -78,59 +79,126 @@ const srv = http.createServer((q, s) => {
     } else { s.writeHead(404); s.end('nf'); }
   });
 });
+// TASK-1766: the fake device accepts the page's WebSocket and keeps it open (it sends no frames),
+// as a real device does. Refused, every connect closed at once: ws.onclose then fetched otgw/otmonitor
+// (v2.js connectWs: onclose -> fetchSeed()) and retried 5 s later, and the 20 s closed-socket
+// fallback fetched it too, so otmonitor GETs landed at random moments inside the checks below.
+const wsSocks = new Set();
+srv.on('upgrade', (q, sock) => {
+  const key = q.headers['sec-websocket-key'];
+  if (!key) { sock.destroy(); return; }
+  const accept = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
+  sock.write(['HTTP/1.1 101 Switching Protocols', 'Upgrade: websocket', 'Connection: Upgrade', 'Sec-WebSocket-Accept: ' + accept, '', ''].join(String.fromCharCode(13, 10)));
+  wsSocks.add(sock);
+  sock.on('data', (b) => { if ((b[0] & 0x0f) === 8) sock.end(Buffer.from([0x88, 0x00])); });   // the page left: answer its close frame, then end
+  sock.on('error', () => {});
+  sock.on('close', () => wsSocks.delete(sock));
+});
 await new Promise((r) => srv.listen(0, '127.0.0.1', r));
 PORT = srv.address().port;
 
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'otgw-cdp-'));
-const chrome = await launchChrome(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-  '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,1000', 'about:blank'], { stdio: 'ignore' });
-guardChrome(chrome);   // TASK-1739
-let target = null;
-for (let i = 0; i < 100 && !target; i++) {
-  try { const r = await fetch(`http://127.0.0.1:${cdpPort()}/json/new?about:blank`, { method: 'PUT' }); if (r.ok) target = await r.json(); } catch { /* not up yet */ }
-  if (!target) await new Promise((r) => setTimeout(r, 200));
-}
-if (!target) throw new Error('Chrome DevTools endpoint never came up');
-const ws = new WebSocket(target.webSocketDebuggerUrl);
-await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
-let msgId = 0; const pending = new Map(); const exceptions = [];
-ws.addEventListener('message', (ev) => {
-  const m = JSON.parse(ev.data);
-  if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
-  if (m.method === 'Runtime.exceptionThrown') exceptions.push(JSON.stringify(m.params.exceptionDetails).slice(0, 300));
+// TASK-1766: start-up (Chrome, its CDP socket, the first Settings render) gets its own deadlines and one
+// retry with a fresh Chrome. In 5 of 17 runs on 2026-11-10 a busy machine's headless Chrome failed here,
+// before any check: no reply to Page.enable or Runtime.evaluate, the CDP socket closed or refused, a
+// first page load of 14 s. Without deadlines the file then hung with no output until an outer timeout.
+let profile = null; let chrome = null; let ws = null;
+let msgId = 0; const pending = new Map(); let exceptions = [];
+// Every CDP call has a deadline (as in lib/page-harness.mjs, TASK-1715).
+const send = (method, params = {}) => new Promise((res, rej) => {
+  const id = ++msgId;
+  const timer = setTimeout(() => { if (pending.delete(id)) rej(new Error(`CDP ${method} got no reply within ${CDP_TIMEOUT_MS} ms (Chrome stalled?)`)); }, CDP_TIMEOUT_MS);
+  pending.set(id, (m) => { clearTimeout(timer); if (m.closed) rej(new Error(`CDP socket closed during ${method}`)); else res(m); });
+  try { ws.send(JSON.stringify({ id, method, params })); } catch (e) { pending.delete(id); clearTimeout(timer); rej(e); }
 });
-const send = (method, params = {}) => new Promise((res) => { const id = ++msgId; pending.set(id, res); ws.send(JSON.stringify({ id, method, params })); });
+async function startChrome() {
+  profile = fs.mkdtempSync(path.join(os.tmpdir(), 'otgw-cdp-'));
+  chrome = await launchChrome(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+    '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1400,1000', 'about:blank'], { stdio: 'ignore' });
+  guardChrome(chrome);   // TASK-1739
+  let target = null;
+  for (const t0 = Date.now(); !target && Date.now() - t0 < 20000;) {   // 20 s wall time, also when each try waits its 3 s
+    try { const r = await fetch(`http://127.0.0.1:${cdpPort()}/json/new?about:blank`, { method: 'PUT', signal: AbortSignal.timeout(3000) }); if (r.ok) target = await r.json(); } catch { /* not up yet */ }
+    if (!target) await new Promise((r) => setTimeout(r, 200));
+  }
+  if (!target) throw new Error('Chrome DevTools endpoint never came up');
+  ws = new WebSocket(target.webSocketDebuggerUrl);
+  await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('CDP WebSocket refused')); setTimeout(() => rej(new Error('CDP WebSocket did not open within 10 s (Chrome stalled?)')), 10000); });
+  exceptions = [];
+  ws.addEventListener('message', (ev) => {
+    const m = JSON.parse(ev.data);
+    if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
+    if (m.method === 'Runtime.exceptionThrown') exceptions.push(JSON.stringify(m.params.exceptionDetails).slice(0, 300));
+  });
+  const sock = ws;   // a late close of a failed attempt's socket must not fail the next attempt's calls
+  ws.addEventListener('close', () => { if (sock !== ws) return; for (const [id, fn] of pending) { pending.delete(id); fn({ closed: true }); } });
+  await send('Page.enable'); await send('Runtime.enable');
+  // v2.js gives each tab a random poll phase, TAB_PHASE_MS = Math.floor(Math.random() * 15000) (TASK-1741,
+  // its only Math.random), and the first BLE discovery poll comes 13.75 s + that phase after load. A phase
+  // above about 11 s put the card past the 25 s waits below. Phase 0 makes the timing the same in every run.
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: 'Math.random = function () { return 0; };' });
+}
+async function stopChrome() {
+  try { ws.close(); } catch { /* ignore */ }
+  for (const sk of wsSocks) sk.destroy();
+  if (!chrome) return;
+  stopChromeTree(chrome);
+  // TASK-1492: Chrome holds the profile until it has exited; wait for that, then retry the removal.
+  await new Promise((r) => { if (chrome.exitCode !== null || chrome.signalCode !== null) return r(); chrome.once('exit', r); setTimeout(r, 5000); });
+  try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (e) { console.log('profile cleanup failed: ' + e.message); }
+}
 const evalJs = async (expression) => {
   const r = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
   return r.result && r.result.result ? r.result.result.value : undefined;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Bounded by wall time: counted in loop turns, a stalled Chrome (each evalJs waiting CDP_TIMEOUT_MS) stretched
+// a 20 s wait to over an hour.
 async function until(expr, ms = 5000) {
-  for (let t = 0; t < ms; t += 100) { const v = await evalJs(expr).catch(() => null); if (v) return v; await sleep(100); }
+  for (const t0 = Date.now(); Date.now() - t0 < ms;) { const v = await evalJs(expr).catch(() => null); if (v) return v; await sleep(100); }
   return evalJs(expr).catch(() => null);
 }
 
 let ok = true; let n = 0;
 function check(pass, msg) { n++; console.log((pass ? 'PASS' : 'FAIL') + ': ' + msg); if (!pass) ok = false; }
 
-await send('Page.enable'); await send('Runtime.enable');
 const PAGE_URL = `http://127.0.0.1:${PORT}/v2.html`;
+// window.__otgwOld marks the document a load() leaves, so READY can only hold on the new one.
+const READY = `!window.__otgwOld && document.readyState === 'complete' && !!document.querySelector('.seg[data-page="settings"]')`;
+let loadMark = 0;   // reqLog index at the last load()
 async function load(page) {
+  loadMark = reqLog.length;
+  await evalJs('window.__otgwOld = 1').catch(() => {});
   await send('Page.navigate', { url: PAGE_URL });
-  await until(`document.readyState === 'complete' && !!document.querySelector('.seg[data-page="settings"]')`);
-  if (page) await evalJs(`document.querySelector('.seg[data-page="${page}"]').click()`);
+  // 20 s: on a busy machine Chrome sometimes holds a page's requests for several seconds before they reach
+  // the fake device; a page that is not up after 20 s fails here by name instead of in the next check.
+  if (!(await until(READY, 20000))) check(false, `load(${page || ''}): the page did not finish loading within 20 s`);
+  if (page) await click(`.seg[data-page="${page}"]`);
 }
 const railItems = () => evalJs(`Array.prototype.map.call(document.querySelectorAll('#setRail .rail-item'), function (r) { return r.dataset.cat + (r.classList.contains('active') ? '*' : ''); }).join(',')`);
 const rowKeys = () => evalJs(`Array.prototype.map.call(document.querySelectorAll('#setCols .srow'), function (r) { return r.dataset.key; }).sort().join(',')`);
 const stored = (k) => evalJs(`localStorage.getItem('${k}')`);
 const setSearch = (v) => evalJs(`(function(){ var i = document.getElementById('setSearch'); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event('input')); })()`);
-const click = (sel) => evalJs(`document.querySelector(${JSON.stringify(sel)}).click()`);
+// A click whose target is missing is a failure of its own, not a silent no-op.
+const click = async (sel) => { if (!(await evalJs(`(function(){ var e = document.querySelector(${JSON.stringify(sel)}); if (!e) return false; e.click(); return true; })()`))) check(false, `click: ${sel} not found`); };
 const settle = async () => { await until(`document.querySelectorAll('#setRail .rail-item').length >= 5`); await sleep(400); };
 
-await load();
-await evalJs(`localStorage.clear()`);
-await load('settings');
-await settle();
+for (let attempt = 1; ; attempt++) {
+  try {
+    await startChrome();
+    const nav = async () => { await send('Page.navigate', { url: PAGE_URL }); if (!(await until(READY, 15000))) throw new Error('the first page load did not finish within 15 s'); };
+    await nav();
+    await evalJs(`localStorage.clear()`);
+    await nav();
+    if (!(await evalJs(`(function(){ var e = document.querySelector('.seg[data-page="settings"]'); if (!e) return false; e.click(); return true; })()`))) throw new Error('no Settings button');
+    if (!(await until(`document.querySelectorAll('#setRail .rail-item').length >= 5`, 15000))) throw new Error('the first Settings render did not come within 15 s');
+    await sleep(400);
+    break;
+  } catch (e) {
+    if (attempt >= 2) throw e;
+    console.log(`NOTE: Chrome start-up attempt ${attempt} failed (${e.message}); starting a fresh Chrome once more`);
+    await stopChrome();
+  }
+}
 
 // ---- a: the rail, one item per non-empty category in SET_CATS order, first category shown ----
 const ORDER = ['system', 'network', 'mqtt', 'ntp', 'otgw', 'otd', 'sensors', 'outputs', 's0', 'webhook', 'behavior', 'sat'];
@@ -238,7 +306,11 @@ await evalJs(`localStorage.setItem('otgw-v2-montab', 'mvalues')`);
 await load('home');
 const chip = await until(`!!document.querySelector('.connsum')`, 20000);
 check(!!chip, 'the connection-health chip is there');
-await sleep(500);
+// With the socket open, the only otmonitor fetch on Home is the start-up seed 2 s after load
+// (v2.js init: setTimeout(fetchSeed, 2000)). Wait for it, so the window below cannot catch it.
+for (let i = 0; i < 100 && !reqLog.slice(loadMark).some((l) => /otgw\/otmonitor/.test(l)); i++) await sleep(50);
+if (!reqLog.slice(loadMark).some((l) => /otgw\/otmonitor/.test(l))) console.log('NOTE: the start-up otmonitor seed has not come yet; a late one would land in the window below');
+await sleep(200);
 let mark = reqLog.length;
 await click('.connsum');
 await until(`(document.querySelector('#page-monitor .subtab.active') || {}).dataset && document.querySelector('#page-monitor .subtab.active').dataset.tab === 'mconn'`);
@@ -264,10 +336,6 @@ check(await evalJs(`!!document.querySelector('#adv-debug details.grp > summary')
 
 check(exceptions.length === 0, `no uncaught page exceptions (${exceptions.join(' ; ')})`);
 
-try { ws.close(); } catch { /* ignore */ }
-stopChromeTree(chrome); srv.close();
-// TASK-1492: Chrome holds the profile until it has exited; wait for that, then retry the removal.
-await new Promise((r) => { if (chrome.exitCode !== null || chrome.signalCode !== null) return r(); chrome.once('exit', r); setTimeout(r, 5000); });
-try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (e) { console.log('profile cleanup failed: ' + e.message); }
+await stopChrome(); srv.close();
 console.log('\n' + (ok ? 0 : 'some') + ' failures of ' + n + ' checks');
 process.exit(ok ? 0 : 1);
