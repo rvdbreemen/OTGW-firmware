@@ -1,0 +1,10 @@
+{
+  "name": "otgw-webui-tests",
+  "private": true,
+  "description": "Test-only dependencies for tests/webui (TASK-1769). Not part of the firmware or the LittleFS image.",
+  "license": "MIT",
+  "devDependencies": {
+    "acorn": "8.19.0",
+    "eslint-scope": "9.1.2"
+  }
+}

@@ -134,3 +134,7 @@ docs/adr/.adr-kit-state.json.lock
 
 # flash_otgw --migrate saves settings.ini (with MQTT/HTTP passwords) here: never commit
 /backup/
+
+# TASK-1769: test-only npm dependencies
+tests/webui/node_modules/
+!tests/webui/package-lock.json
