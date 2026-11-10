@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T21:48:00Z'
-updated_date: '2026-11-10T08:07:00Z'
+updated_date: '2026-11-10T12:19:00Z'
 labels:
   - tests
   - webui
@@ -36,4 +36,6 @@ Seen 2026-11-09 during TASK-1765. v2-navigation.test.mjs alone on the harness fr
 2026-11-10 (otgw-firmware-80 + an opus agent; details and run outputs in the session scratchpad final*.txt, instr-*.txt). Baseline: old test 5/10 single-file runs. Races named: (1) the fake device had no WebSocket: every failed connect -> ws.onclose -> fetchSeed() (otgw/otmonitor GET) + retry every 5 s (v2.js connectWs ~2776-2788, 20 s fallback ~8199): seeds landed in the 800 ms chip window ('chip shows Connection without the stored Values tab's fetch'). Fix: the fake device completes the WebSocket handshake and keeps it open (one WS per navigation, no reconnects, no seeds). (2) BLE discovery card: TASK-1741's TAB_PHASE_MS = Math.random()*15000 (v2.js:7528) puts the first BLE poll at 13.75 s + phase, up to 28.75 s, past the test's 25 s wait; red with the phase pinned at 0.999 (2/2), green at 0. Fix: the test pins Math.random to 0 via Page.addScriptToEvaluateOnNewDocument. Not a UI bug. (3) Chrome itself stalls on this loaded machine (requests held as 'sent' with 0 open server connections; Page.enable unanswered; also on the unchanged test): CDP calls now have deadlines, until() is wall-time bound, load/click failures are named, start-up gets one retry. (4) 'Advanced tab stored' never reproduced in ~27 instrumented runs; a stale-document marker was added (unproven).
 
 Result: final test 7/10 single-file runs (batch 6); all 3 failures are named Chrome stalls (first page load not finished in 15 s twice, chip not up in 20 s), none traced to the test logic or v2.js. My own extra run: 1/1 pass, chrome count 0. AC2 (10/10) NOT met: blocked by the Chrome stall on this machine (cause not established; next capture: log every server request on arrival with CDP Network events, see final-instr.mjs). v2.js untouched.
+
+2026-11-10 coordinator: stays In Progress; the remaining 3/10 failures are the Chrome request stalls on this machine, the same harness problem as TASK-1765 (CDP Chrome leak/stall). Resolve AC2 together with TASK-1765.
 <!-- SECTION:NOTES:END -->
