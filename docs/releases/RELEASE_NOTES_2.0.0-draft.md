@@ -109,7 +109,7 @@ The items below follow the CHANGELOG; quoted parts are in quotation marks. Check
 - **While SAT is enabled it owns the control setpoint.** "a `CS=` from MQTT, REST or the serial bridge is refused."
 - **`TP=` commands are no longer replaced in the command queue.** Each `TP=` now waits its turn.
 - **`sat/weather/snowfall` is in cm** (TASK-1464). It was announced in mm while Open-Meteo sends cm; the value itself did not change. Home Assistant may report a unit change for the long-term statistics of this sensor.
-- **Heating curve self-tune is on by default** (TASK-1525). On a unit with SAT enabled, the heating curve coefficient can now change by 0.1 at most once a day. Do: switch "Heating curve self-tune" off if you want to keep your coefficient fixed.
+- **Heating curve self-tune is on by default** (TASK-1525). On a unit with SAT enabled, the heating curve coefficient (the **Heating curve slope** setting) can now change by 0.1 per step. The tuner decides once a day over the last 3 counted days, and a change empties that window, so there are at least 3 counted days between two steps. Do: switch "Heating curve self-tune" off if you want to keep your coefficient fixed.
 
 #### Settings and SAT features removed
 
@@ -158,6 +158,9 @@ The items below follow the CHANGELOG; quoted parts are in quotation marks. Check
 - **One crash seen in the field** (alpha.566, TASK-1538): a panic inside a memory allocation, with a backtrace too short to name the caller. Not reproduced; crash reports now keep up to 16 return addresses. If your unit reboots unexpectedly, send the crash log (`GET /api/v2/device/crashlog`) and `reboot_log.txt`.
 
 **SAT (experimental):**
+
+- **Used SAT in an alpha before 30 October 2026? Check the heating curve slope** (TASK-1787). The hourly heating curve auto-tune of the early 2.0.0 test builds (the `SAT Auto Tune` switch, removed by TASK-1413 on 30 October 2026) could lower the heating curve coefficient. 2.0.0 keeps a stored coefficient as it is, so a unit that ran that auto-tune can still carry a value far below the default of 2.0; one tester's unit was at 1.12. The daily self-tune moves the coefficient only by 0.1 per step, with at least 3 counted days between steps, so it does not correct such a value quickly. **Do:** after the upgrade, open Settings > SAT and check **Heating curve slope** (default 2.0).
+<!-- Review (TASK-1787): written from a4's TASK-1787 notes (lane-1759a, 37bf983e1). The old auto-tune is their leading explanation for the 1.12, not a proven one (no log of the old tuner exists in the tester's uploads). The text gives no value to set: Sergeant D asked that tester for 1.8 (entry 301, on lane-1759a, a57293143, not yet on dev when this was written), which is advice for one house, not a default. A firmware warning or migration (options B/C in the task notes) is still Robert's decision; if one ships, change this item. -->
 
 - **SAT is still being validated.** A list of open SAT questions is with Sergeant D, the SAT designer; his answers can change SAT behaviour in later builds. The ignition logic for a boiler without a return temperature (TASK-1371) was bench-tested; it has not run on such a boiler in the field.
 - **SAT's flame-out protection (TASK-1762) has not run on a real boiler.** SAT switches from continuous to pulse mode (PWM) when the boiler water stays 3.5 °C above the requested temperature for 30 s. If SAT switches to pulse mode more often than you expect, look for the SAT log line "Control mode: PWM (fail-safe: ...)", and please send a capture.
