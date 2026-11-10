@@ -6,6 +6,9 @@ import argparse, json, os, statistics
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sat_kd_warmup_sim_1655 import _key
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
 VAR = "0.794"
@@ -35,14 +38,19 @@ def main():
                      "guards_failing": [g for g, ok in s["G"].items() if not ok], "pass": s["class_pass"]})
     with open(os.path.join(a.dir, "table.json"), "w", encoding="utf-8") as f: json.dump(rows, f, indent=1)
 
+    # Left: per-run paired difference in t03 (0.063 minus 0.05, minutes; > 0 = 0.05 is faster). The unpaired class
+    # medians in table.json can jump between the clusters of a bimodal grid; the paired runs are what the rule scores.
+    key = lambda r: (r["plant_class"],) + _key(r)
+    base = {key(r): r for r in d["runs"] if r["kd_factor"] == 1.0 and r["kind"] == "warmup"}
+    diffs = [[base[key(r)]["min_to_0_3_scored"] - r["min_to_0_3_scored"] for r in d["runs"]
+              if r["plant_class"] == pc and r["kd_factor"] == 0.794 and r["kind"] == "warmup"] for pc in pcs]
     fig, ax = plt.subplots(1, 2, figsize=(13, 5))
-    x = range(len(rows)); w = 0.27
-    ax[0].bar([i - w for i in x], [r["t03_007"] for r in rows], w, label="0.07 (thermo-nova, TASK-1655 data)", color="#bbbbbb")
-    ax[0].bar(list(x), [r["t03_0063"] for r in rows], w, label="0.063 (firmware today)", color="#3b6fb6")
-    ax[0].bar([i + w for i in x], [r["t03_005"] for r in rows], w, label="0.05 (variant)", color="#e08a2c")
+    x = range(len(rows))
+    ax[0].boxplot(diffs, positions=list(x), widths=0.5)
+    ax[0].axhline(0, color="k", lw=0.8)
     ax[0].set_xticks(list(x)); ax[0].set_xticklabels([r["class"] for r in rows], rotation=35, ha="right")
-    ax[0].set_ylabel("median minutes to within 0.3 K of target"); ax[0].set_title("Warm-up time per plant class")
-    ax[0].legend(fontsize=8)
+    ax[0].set_ylabel("minutes faster to within 0.3 K (0.05 vs 0.063, per run)")
+    ax[0].set_title("Paired warm-up gain per run (48 runs per class)")
     ax[1].bar(list(x), [100 * r["B"] for r in rows], 0.5, color="#e08a2c")
     ax[1].axhline(10, color="k", ls="--", lw=1, label="pre-registered benefit threshold 10 %")
     ax[1].set_xticks(list(x)); ax[1].set_xticklabels([r["class"] for r in rows], rotation=35, ha="right")

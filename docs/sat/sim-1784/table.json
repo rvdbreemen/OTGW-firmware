@@ -1,0 +1,116 @@
+[
+ {
+  "class": "1983-92 heavy rad",
+  "t03_007": 236.35,
+  "t03_0063": 224.35,
+  "t03_005": 249.45,
+  "B": 0.0123,
+  "saved": 3.8,
+  "t01_delta": -3.1,
+  "over_max": 0.174,
+  "starts_max": 70.0,
+  "guards_failing": [],
+  "pass": false
+ },
+ {
+  "class": "1983-92 heavy ufh",
+  "t03_007": 159.3,
+  "t03_0063": 157.4,
+  "t03_005": 153.2,
+  "B": 0.0338,
+  "saved": 4.6,
+  "t01_delta": -6.0,
+  "over_max": 0.146,
+  "starts_max": 67.0,
+  "guards_failing": [],
+  "pass": false
+ },
+ {
+  "class": "1983-92 light rad",
+  "t03_007": 106.25,
+  "t03_0063": 107.25,
+  "t03_005": 101.35,
+  "B": 0.0175,
+  "saved": 2.2,
+  "t01_delta": -1.3,
+  "over_max": 0.204,
+  "starts_max": 84.0,
+  "guards_failing": [
+   "G2"
+  ],
+  "pass": false
+ },
+ {
+  "class": "1983-92 light ufh",
+  "t03_007": 95.5,
+  "t03_0063": 93.75,
+  "t03_005": 90.6,
+  "B": 0.0328,
+  "saved": 3.0,
+  "t01_delta": -4.0,
+  "over_max": 0.282,
+  "starts_max": 68.0,
+  "guards_failing": [],
+  "pass": false
+ },
+ {
+  "class": "2015 heavy rad",
+  "t03_007": 410.5,
+  "t03_0063": 413.5,
+  "t03_005": 409.0,
+  "B": 0.0062,
+  "saved": 2.7,
+  "t01_delta": -3.6,
+  "over_max": 0.174,
+  "starts_max": 69.0,
+  "guards_failing": [],
+  "pass": false
+ },
+ {
+  "class": "2015 heavy ufh",
+  "t03_007": 317.85,
+  "t03_0063": 316.25,
+  "t03_005": 314.1,
+  "B": 0.0089,
+  "saved": 2.5,
+  "t01_delta": -3.2,
+  "over_max": 0.716,
+  "starts_max": 67.0,
+  "guards_failing": [
+   "G1",
+   "G6"
+  ],
+  "pass": false
+ },
+ {
+  "class": "2015 light rad",
+  "t03_007": 175.1,
+  "t03_0063": 175.55,
+  "t03_005": 174.45,
+  "B": 0.0235,
+  "saved": 3.4,
+  "t01_delta": -4.6,
+  "over_max": 0.198,
+  "starts_max": 70.0,
+  "guards_failing": [
+   "G6"
+  ],
+  "pass": false
+ },
+ {
+  "class": "2015 light ufh",
+  "t03_007": 186.75,
+  "t03_0063": 185.7,
+  "t03_005": 184.1,
+  "B": 0.0103,
+  "saved": 1.6,
+  "t01_delta": -2.0,
+  "over_max": 1.124,
+  "starts_max": 66.0,
+  "guards_failing": [
+   "G1",
+   "G6"
+  ],
+  "pass": false
+ }
+]
