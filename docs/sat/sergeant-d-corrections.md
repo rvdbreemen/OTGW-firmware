@@ -6330,3 +6330,18 @@ This confirms Robert's maintainer decision of entry 290 for direct mode. It also
 **Also raised (not a translation, not settled here):** 14:25:10 UTC, msg 1569704474744717437: "Do we really need both these cards? My recommendation is to keep only the first one. Actually they are repeating the same things". That is a UI layout change; it goes to Robert as a needs-maintainer-ok task via the coordinator.
 
 **Task:** TASK-1777. **Open:** Q3 (other "Ζεστό νερό" / "Χώρος" / "Θερμοκρασία ΖΝΧ" keys); the two-card question (Robert).
+
+## 295. Greek web UI: the same names everywhere: "Ζεστό Νερό Χρήσης", "ΕΣΩΤΕΡΙΚΗ", "Θερμοκρασία στόχος ΖΝΧ" (Sergeant D, 2026-11-10; follows entries 292-294)
+
+**Source:** sergeantd, #dev-sat-mqtt (channel 1105556725714649128), 2026-11-10 15:53:30 UTC, msg 1569726704107388981 (https://discord.com/channels/812969634638725140/1105556725714649128/1569726704107388981). Answers our Q3, asked by otgw-firmware-97 in msg 1569707236987637771: A = change all the other places that show these words, B = only where he pointed. Our recommendation A; our fit check (local render at 1036 and 390 px) showed the longer texts fit.
+
+**Quoted:** "@BlueFlame Bot Α" (Greek capital Alpha, read as option A).
+
+**Settled (translation only, no SAT behaviour):** in `i18n/el.json`:
+- `h_home.tile_dhw`, `h_home.stat_dhw`, `settings.group.hot_water`: "Ζεστό νερό" -> "Ζεστό Νερό Χρήσης".
+- `h_home.svg_room` (label beside the house in the Home drawing): "ΧΩΡΟΣ" -> "ΕΣΩΤΕΡΙΚΗ".
+- `settings.label.satdhwsetpoint` (number field on the second hot-water card): "Θερμοκρασία ΖΝΧ" -> "Θερμοκρασία στόχος ΖΝΧ".
+
+**Interpretation (ours):** "Α" is the Greek letter for our option A. The scope is the list named in Q3. Not in that list and unchanged: `adv.pic_led_w` (PIC LED function "Ζεστό νερό"), and the mixed-case "Χώρος" keys (`home.chip_room`, `h_mon.sat_tile_room`, `tools.legend_room`, `graph.series_room`) and `home.cell_room_set` "ΣΤΟΧΟΣ ΧΩΡΟΥ".
+
+**Changes an earlier entry:** settles open point (3) of entry 292. **Task:** TASK-1777. **Open:** the two-card layout question (entry 294, for Robert); whether the unchanged "Χώρος" keys should follow (not asked).

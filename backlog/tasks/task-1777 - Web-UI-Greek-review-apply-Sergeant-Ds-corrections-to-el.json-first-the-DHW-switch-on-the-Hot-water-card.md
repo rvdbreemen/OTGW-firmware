@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-10T12:18:00Z'
-updated_date: '2026-11-10T13:35:00Z'
+updated_date: '2026-11-10T15:05:00Z'
 labels:
   - webui
   - i18n
@@ -38,4 +38,8 @@ Sergeant D (Greek native speaker) reviews the Greek web UI pack. First correctio
 2026-11-10 14:15 beta.170 posted (msg 1569700928221749350, 2dda513da; bench .61 on the identical tree 749ba83: live el title 'Ζεστό Νερό Χρήσης', switch + aria 'Ενεργοποίηση ΖΝΧ'; 'ΕΣΩΤΕΡΙΚΗ' in the served /i18n/el.json, #cGrid hidden on .61 so the cell is not seen live). Q1 answered B (entry 293): h_mon.sat_dhw_hint now names the switch; committed without its own build, ships with the next build together with the Q2/Q3 answers.
 
 2026-11-10 14:40 entry 294: Q2 answer A (tank switch label stays); slider label h_mon.sat_dhw_setpoint -> 'Θερμοκρασία στόχος ΖΝΧ' (verbatim, slider only; settings.label.satdhwsetpoint waits for Q3). His 'keep only one hot-water card' is a layout change for Robert (coordinator files it). Committed, no build yet.
+
+2026-11-10 14:55 found while checking Q3: the Home chips (v2.js:2937) and the Home cell grid (renderCGrid, v2.js:3061) showed a hard-coded English 'DHW'. Now t('home.chip_dhw') / t('home.cell_dhw'), nl/de 'WW', el 'ΖΝΧ' (glossary). i18n-followups test 4: red on the previous v2.js, green on the fix. Fit check for Q3 (local render, 1036 and 390 px): 'Ζεστό Νερό Χρήσης' fits the Home tile on one line (173 px tile), 'ΕΣΩΤΕΡΙΚΗ' fits the Home drawing label (ends x=745 of 800).
+
+2026-11-10 16:00 entry 295: Q3 answered A ('Α'): el.json h_home.tile_dhw, h_home.stat_dhw, settings.group.hot_water -> 'Ζεστό Νερό Χρήσης'; h_home.svg_room -> 'ΕΣΩΤΕΡΙΚΗ'; settings.label.satdhwsetpoint -> 'Θερμοκρασία στόχος ΖΝΧ'. Scope = the Q3 list; adv.pic_led_w and the mixed-case 'Χώρος' keys unchanged. All Greek review answers (Q1-Q3) are in; build after the 16:21 public-beta freeze and the 4c/detectie benches, re-bumped to the free number.
 <!-- SECTION:NOTES:END -->
