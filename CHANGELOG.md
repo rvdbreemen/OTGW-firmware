@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.170] - 2026-11-10
+
+### Changed
+- Boot: install the GPIO interrupt service before WiFi starts, to lower the chance of the ipc1 stack overflow at boot (TASK-1763 (b), mitigation; the larger IPC stack follows).
+
+### Fixed
+- Web UI: translate the webhook on/off word, the Home LCD abbreviations and the plural change/override counts (TASK-1775).
+- Web UI: Greek wording reviewed by Sergeant D (hot water title, switch, room cell, slider label and hint) (TASK-1777).
+
 ## [2.0.0-beta.167] - 2026-11-10
 
 ### Changed
@@ -836,7 +845,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.167...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.170...HEAD
+[2.0.0-beta.170]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.167...v2.0.0-beta.170
 [2.0.0-beta.167]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.162...v2.0.0-beta.167
 [2.0.0-beta.162]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.158...v2.0.0-beta.162
 [2.0.0-beta.158]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.144...v2.0.0-beta.158
