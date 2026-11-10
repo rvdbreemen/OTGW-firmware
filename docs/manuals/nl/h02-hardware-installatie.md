@@ -17,7 +17,7 @@ Kenmerken:
 - De RGB-led op de LOLIN-module toont de WiFi-status
 - Geen Ethernet en geen OT-Direct-hardware
 
-De Wemos D1 mini (ESP8266) draait de 1.x-firmware. Terug naar 1.x betekent de Wemos D1 mini terugplaatsen: een 1.x-zip draait niet op een S3.
+De 1.x-lijn (onderhoudsbranch `otgw-1.x.x`) draait op de Wemos D1 mini (ESP8266). Terug naar 1.x betekent de Wemos D1 mini terug in de voet zetten en een 1.x-release flashen; een 1.x-zip draait niet op een S3.
 
 #### Andere boards
 
@@ -273,11 +273,11 @@ Als alternatief kunt u een firmwarebinary handmatig uploaden:
 2. Ga in de webinterface naar **Update > Handmatig uploaden**.
 3. Selecteer het gedownloade bestand en klik op **Uploaden**.
 
-**Let op:** Upload altijd de `esp32-combo`-binary. Een 1.x-binary (ESP8266) draait niet op de S3. Het uploaden van een verkeerde binary kan het apparaat in een bootloop brengen; in dat geval is serieel herflashen via USB nodig.
+**Let op:** Upload altijd de `esp32-combo`-binary. Een 1.x-binary draait niet op de S3. Het uploaden van een verkeerde binary kan het apparaat in een bootloop brengen; in dat geval is serieel herflashen via USB nodig.
 
 #### Opmerkingen bij upgraden van v1.x
 
-- Overstappen van 1.x naar 2.x betekent de Wemos D1 mini (ESP8266) vervangen door een LOLIN S3 Mini of S3 Mini Pro en die via USB flashen (zie Firmware flashen). Terug naar 1.x betekent de Wemos D1 mini terugplaatsen; een 1.x-zip draait niet op een S3.
+- Overstappen van 1.x naar 2.x betekent de Wemos D1 mini vervangen door een LOLIN S3 Mini of S3 Mini Pro en die via USB flashen (zie Firmware flashen). Terug naar 1.x betekent de Wemos D1 mini terugplaatsen en een 1.x-release flashen; een 1.x-zip draait niet op een S3.
 - Geen settings-migratie nodig. Instellingenbestanden van v1.3.x laden zonder wijziging in v2.0.0.
 - MQTT-topics en de REST API zijn ongewijzigd ten opzichte van v1.x.
 - Als u upgradet van een versie voor v1.2.0: REST API v0 en v1 endpoints zijn verwijderd in v1.2.0. Alleen `/api/v2/` endpoints zijn beschikbaar. Zie [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md).

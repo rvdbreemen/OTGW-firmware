@@ -17,7 +17,7 @@ Characteristics:
 - The on-board RGB pixel of the LOLIN module shows the WiFi status
 - No Ethernet and no OT-Direct hardware
 
-The Wemos D1 mini (ESP8266) runs the 1.x firmware. Going back to 1.x means putting the Wemos D1 mini back: a 1.x zip does not run on an S3.
+The 1.x line (maintenance branch `otgw-1.x.x`) runs on the Wemos D1 mini (ESP8266). Going back to 1.x means putting the Wemos D1 mini back in its socket and flashing a 1.x release; a 1.x zip does not run on an S3.
 
 #### Other Boards
 
@@ -252,7 +252,7 @@ If you have a firmware binary file and want to upload it directly:
 
 #### Notes When Upgrading from v1.x
 
-- Moving from 1.x to 2.x means replacing the Wemos D1 mini (ESP8266) with a LOLIN S3 Mini or S3 Mini Pro and flashing it over USB (see Flashing the Firmware). Going back to 1.x means putting the Wemos D1 mini back; a 1.x zip does not run on an S3.
+- Moving from 1.x to 2.x means replacing the Wemos D1 mini with a LOLIN S3 Mini or S3 Mini Pro and flashing it over USB (see Flashing the Firmware). Going back to 1.x means putting the Wemos D1 mini back and flashing a 1.x release; a 1.x zip does not run on an S3.
 - No settings migration is required. Settings files from v1.3.x load without modification in v2.0.0.
 - MQTT topics and the REST API are unchanged from v1.x.
 - If you are upgrading from before v1.2.0, be aware that REST API v0 and v1 endpoints were removed in v1.2.0. Only `/api/v2/` endpoints are available. See [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md).

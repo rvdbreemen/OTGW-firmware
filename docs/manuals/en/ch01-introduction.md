@@ -54,7 +54,7 @@ The firmware also has an OT-Direct mode, used only on hardware without a PIC. On
 
 ### What Is New in v2.0.0
 
-Version 2.0.0 is a major platform release. It is the ESP32-S3-only async + FreeRTOS line; ESP8266 has moved to the 1.x maintenance / LTS line. Settings files from v1.3.x load without modification.
+Version 2.0.0 is a major platform release. It is the ESP32-S3-only async + FreeRTOS line. Settings files from v1.3.x load without modification.
 
 Version 2.0.0 is still in alpha at the time of writing. It is feature complete on the established functionality but receives ongoing refinement on SAT, OTDirect, and the new MQTT topic shape (see below). Track the GitHub Releases page for the current alpha tag.
 

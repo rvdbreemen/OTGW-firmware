@@ -123,7 +123,7 @@ All MQTT topics, REST API endpoints, and settings format remain identical to `v1
 - Three new REST endpoints (`GET /api/v2/discovery`, `POST /api/v2/discovery/verify`, `POST /api/v2/discovery/republish`) do not replace or alter any existing endpoint.
 - `MQTTdiscoveryAutoVerify` is a new setting (default `true`). On shared brokers or brokers with tight wildcard ACLs, set it to `false`.
 
-See [RELEASE_NOTES_1.4.1.md](../RELEASE_NOTES_1.4.1.md) for the complete changelog covering all changes since `v1.3.5`.
+See [RELEASE_NOTES_1.4.1.md](releases/archive/RELEASE_NOTES_1.4.1.md) for the complete changelog covering all changes since `v1.3.5`.
 
 ---
 

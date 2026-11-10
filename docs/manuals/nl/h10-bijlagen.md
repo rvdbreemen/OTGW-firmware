@@ -85,8 +85,8 @@ Volledige specificatie: `docs/opentherm specification/OpenTherm-Protocol-Specifi
 | **C4** | C4-model: architectuurvisualisatiemethode in vier niveaus: Context, Container, Component, Code. Zie `docs/c4/`. |
 | **CH** | Central Heating: ruimteverwarming (de CV). |
 | **DHW** | Domestic Hot Water: warmwatervoorziening (sanitair warm water). |
-| **ESP8266** | Espressif microcontroller met ingebouwde WiFi op de Wemos D1 mini, gebruikt door de 1.x-firmware (~40 KB bruikbaar DRAM). Terug naar 1.x betekent de Wemos D1 mini terugplaatsen in de OTGW Classic. |
-| **ESP32** | Espressif ESP32-S3 op de LOLIN S3 Mini of S3 Mini Pro, met WiFi, Bluetooth en meer RAM; gebruikt door de 2.x-firmware in de OTGW Classic. |
+| **1.x-lijn** | De onderhoudsbranch `otgw-1.x.x`, firmware voor de Wemos D1 mini. Terug naar 1.x betekent de Wemos D1 mini terugplaatsen in de OTGW Classic. |
+| **ESP32** | Espressif ESP32-S3 op de LOLIN S3 Mini of S3 Mini Pro, draait op 240 MHz en ondersteunt BLE; gebruikt door de 2.x-firmware in de OTGW Classic. |
 | **Frame Bridge** | Abstractielaag (ADR-087) die een uniforme OpenTherm frame-interface biedt, ongeacht of het onderliggende transport de PIC UART (PIC-gatewaymodus) of OTDirect (OT-Direct-modus) is. |
 | **F8.8** | OpenTherm-getal met vaste komma: 16 bits, waarvan 8 bit geheel en 8 bit breuk (resolutie 1/256 ≈ 0,004). |
 | **HA** | Home Assistant: open source domotica-platform, primaire integratiedoelstelling. |
@@ -105,7 +105,7 @@ Volledige specificatie: `docs/opentherm specification/OpenTherm-Protocol-Specifi
 | **PIC** | Microchip PIC16F-microcontroller op het Nodoshop OTGW Classic-bord; verzorgt de OT-buscommunicatie in PIC-gatewaymodus. |
 | **PID** | Proportioneel-Integrerend-Differentiërend: regelalgoritme gebruikt door SAT voor ruimtetemperatuurregeling. |
 | **platform.h** | Platform abstraction header (ADR-061), in `src/libraries/Platform/src/`. Biedt `platformXxx()`-shims en typedefs die platformspecifieke code achter een enkele interface houden; de `HAS_*`-capability flags komen uit `boards.h`. |
-| **PROGMEM** | Flash-geheugenopslag voor constante tekenreeksen; via `F()` en `PSTR()` in code. De regel komt uit de 1.x-lijn (ESP8266, ~40 KB RAM) en geldt ook op 2.x. |
+| **PROGMEM** | Flash-geheugenopslag voor constante tekenreeksen; via `F()` en `PSTR()` in code. De regel komt uit de 1.x-lijn en geldt ook op 2.x. |
 | **REST** | Representational State Transfer: architectuurstijl voor HTTP-API's. |
 | **S0** | Pulsteller-interface (DIN 43864) voor energiemeters; geeft pulsen per kWh. |
 | **SAT** | Smart Autotune Thermostat: ingebedde PID-ruimtetemperatuurregelaar in de firmware. |
@@ -298,7 +298,7 @@ Dit is een grote versiesprong met uitgebreide nieuwe functionaliteit:
 #### v1.3.5 (6 april 2026)
 
 - Firmware publiceert uptime en versie naar MQTT bij verbinding
-- WiFi-herverbindingsregressie opgelost: time-out vergroot van 5 s naar 30 s voor stabielere ESP8266-verbinding
+- WiFi-herverbindingsregressie opgelost: time-out vergroot van 5 s naar 30 s voor stabielere WiFi-verbinding op de 1.x-lijn
 
 #### v1.3.4 (1 april 2026)
 

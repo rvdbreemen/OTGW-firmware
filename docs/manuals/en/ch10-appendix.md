@@ -75,8 +75,8 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **DallasTemperature** | Arduino library for DS18B20 1-Wire temperature sensors. Used by `sensorStuff.ino`. |
 | **DHW** | Domestic Hot Water. The circuit supplying hot tap water, as distinct from the central heating circuit. |
 | **DUE()** | A timer macro from `safeTimers.h`. Returns true when the declared timer's interval has elapsed, and false otherwise. Handles `millis()` rollover safely. |
-| **ESP8266** | The Espressif Wi-Fi microcontroller on the Wemos D1 mini, used by the 1.x firmware. Runs at 80 or 160 MHz, approximately 40 KB usable heap. Going back to 1.x means putting the Wemos D1 mini back in the OTGW Classic. |
-| **ESP32** | The Espressif ESP32-S3 on the LOLIN S3 Mini or S3 Mini Pro, used by the 2.x firmware in the OTGW Classic. Runs at 240 MHz, with significantly more RAM and flash than the 1.x hardware, and supports BLE. |
+| **1.x line** | The maintenance branch `otgw-1.x.x`, firmware for the Wemos D1 mini. Going back to 1.x means putting the Wemos D1 mini back in the OTGW Classic. |
+| **ESP32** | The Espressif ESP32-S3 on the LOLIN S3 Mini or S3 Mini Pro, used by the 2.x firmware in the OTGW Classic. Runs at 240 MHz and supports BLE. |
 | **f8.8** | OpenTherm fixed-point data format: an 8-bit signed integer plus an 8-bit fractional part (1/256 per LSB). Used for all temperature values in the protocol. |
 | **Frame Bridge** | The abstraction layer (ADR-087) that provides a uniform OpenTherm frame interface regardless of whether the underlying transport is the PIC UART (PIC gateway mode) or OTDirect (OT-Direct mode). |
 | **HA** | Home Assistant. The primary target home automation platform for this firmware. |
@@ -95,7 +95,7 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **OTDirect** | The firmware's direct OpenTherm bus interface, used in OT-Direct mode on hardware without a PIC. Implemented in `OTDirect.ino` and guarded by `#if HAS_DIRECT_OT`. Supports gateway, monitor, bypass, master, and loopback operating modes (ADR-064). |
 | **OPV** | Overshoot Protection Value. SAT calibration parameter (ADR-076) that limits flow temperature overshoot during burner ignition by capping the initial setpoint boost. |
 | **PIC** | The PIC16F88 or PIC16F1847 microcontroller co-processor on the NodoShop OTGW Classic board. Handles the OpenTherm electrical bus and communicates with the ESP over UART at 9600 baud. |
-| **PROGMEM** | Program Memory. String literals declared with `PROGMEM` (or wrapped in `F()` / `PSTR()`) are stored in flash memory instead of RAM. The rule is carried over from the 1.x line, where the ESP8266 had a scarce ~40 KB RAM budget, and still applies on 2.x. |
+| **PROGMEM** | Program Memory. String literals declared with `PROGMEM` (or wrapped in `F()` / `PSTR()`) are stored in flash memory instead of RAM. The rule is carried over from the 1.x line and still applies on 2.x. |
 | **PubSubClient** | The Arduino MQTT client library used by the firmware. Pinned to version 2.8.0 in `platformio.ini`. |
 | **platform.h** | The platform abstraction header (ADR-061), in `src/libraries/Platform/src/`. Provides `platformXxx()` shims and typedefs that keep platform-specific code behind a single interface; the `HAS_*` capability flags come from `boards.h`. |
 | **PlatformIO** | Cross-platform embedded development toolchain and IDE plugin. Used for building the `esp32-combo` firmware, driven by `build.bat` / `./build.sh`. Config: `platformio.ini`. |
@@ -269,7 +269,7 @@ Version 2.0.0 is a major release. The headline changes are:
 
 #### v1.3.5
 
-WiFi reconnection regression fix: the 5-second state machine timeout was too short for ESP8266 association (5-10 seconds on some routers). Timeout increased to 30 seconds, restoring reliable reconnection behavior.
+WiFi reconnection regression fix: the 5-second state machine timeout was too short for WiFi association on the 1.x line (5-10 seconds on some routers). Timeout increased to 30 seconds, restoring reliable reconnection behavior.
 
 #### v1.3.4
 

@@ -10,7 +10,7 @@ This manual covers the full OTGW-firmware v2.0.0 product for both end users (Cha
 
 OTGW-firmware turns the NodoShop OpenTherm Gateway into a fully networked smart heating controller. It runs on the ESP32-S3 Wi-Fi microcontroller (a LOLIN S3 Mini or S3 Mini Pro) plugged into the OTGW Classic, monitors the OpenTherm communication bus between your room thermostat and your boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API.
 
-The 2.0.0 line is ESP32-S3 only: it runs on the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket. The PIC stays in place, and one firmware image (`esp32-combo`) detects it at boot. The 1.x maintenance / LTS line is the firmware for the Wemos D1 mini (ESP8266); if you are coming from 1.x, see the migration note in [Supported Hardware](#supported-hardware).
+The 2.0.0 line is ESP32-S3 only: it runs on the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket. The PIC stays in place, and one firmware image (`esp32-combo`) detects it at boot. The 1.x line (maintenance branch `otgw-1.x.x`) is the firmware for the Wemos D1 mini; if you are coming from 1.x, see the migration note in [Supported Hardware](#supported-hardware).
 
 ### The OpenTherm Gateway Hardware
 
@@ -51,7 +51,7 @@ The firmware also has an OT-Direct mode, used only on hardware without a PIC. On
 
 ### What Is New in v2.0.0
 
-Version 2.0.0 is a major platform release. It is the ESP32-S3-only line; ESP8266 has moved to the 1.x maintenance / LTS line. There are no breaking changes to MQTT topics or the REST API from v1.x. Settings files from v1.3.x load without modification.
+Version 2.0.0 is a major platform release. It is the ESP32-S3-only line. There are no breaking changes to MQTT topics or the REST API from v1.x. Settings files from v1.3.x load without modification.
 
 #### Highlights
 
@@ -135,16 +135,16 @@ Characteristics:
 - Bluetooth LE radio for BLE temperature sensors
 - No Ethernet and no OT-Direct hardware
 
-##### Migrating from ESP8266 (1.x)
+##### Migrating from 1.x
 
-Firmware v1.x ran on the ESP8266 module that shipped on earlier NodoShop OTGW boards:
+Firmware v1.x ran on the module that shipped on earlier NodoShop OTGW boards:
 
-| NodoShop OTGW version | ESP8266 module (v1.x) |
+| NodoShop OTGW version | Module (v1.x) |
 |---|---|
-| 1.x through 2.0 | NodeMCU ESP8266 |
-| 2.3 and later | Wemos D1 mini ESP8266 |
+| 1.x through 2.0 | NodeMCU |
+| 2.3 and later | Wemos D1 mini |
 
-The Wemos D1 mini (ESP8266) runs the 1.x firmware. To move an existing OTGW to v2.0.0, replace the Wemos D1 mini with a LOLIN S3 Mini or S3 Mini Pro: it keeps the same OTGW board and PIC co-processor. Going back to 1.x means putting the Wemos D1 mini back: a 1.x zip does not run on an S3.
+The 1.x line (maintenance branch `otgw-1.x.x`) runs on the Wemos D1 mini. To move an existing OTGW to v2.0.0, replace the Wemos D1 mini with a LOLIN S3 Mini or S3 Mini Pro: it keeps the same OTGW board and PIC co-processor. Going back to 1.x means putting the Wemos D1 mini back in its socket and flashing a 1.x release; a 1.x zip does not run on an S3.
 
 **Pin settings are GPIO numbers, and the numbers change with the module.** The sensor, S0 and output pin settings hold a raw GPIO number, not a hole on the board. The S3 module fits the same holes, but a different GPIO sits behind each hole. A 1.x value therefore points at another hole on the S3: a Dallas sensor wired to the D7 hole was GPIO 13 on the Wemos D1 mini, and GPIO 13 on an S3 Mini is the D6 hole. After the swap, or after restoring 1.x settings, set each pin you use to the GPIO for its hole:
 
@@ -211,7 +211,7 @@ The display turns off automatically after a configurable idle timeout. Configure
 
 #### Dallas DS18B20 Temperature Sensors
 
-Up to 16 DS18B20 sensors can be connected on a single 1-Wire bus to a configurable GPIO pin (any ESP32-S3 GPIO: 0 to 21 and 26 to 48; default GPIO 10, the D8 hole on an S3 Mini). On an S3 Mini Pro GPIO 10 is not one of the board's holes: pick the D6 or D8 hole (GPIO 39 or 37). Coming from 1.x, see the hole-to-GPIO table under [Migrating from ESP8266 (1.x)](#migrating-from-esp8266-1x). Each sensor is identified by its 64-bit address and can be given a custom label via the web interface. All sensors are published to MQTT and appear in Home Assistant auto-discovery.
+Up to 16 DS18B20 sensors can be connected on a single 1-Wire bus to a configurable GPIO pin (any ESP32-S3 GPIO: 0 to 21 and 26 to 48; default GPIO 10, the D8 hole on an S3 Mini). On an S3 Mini Pro GPIO 10 is not one of the board's holes: pick the D6 or D8 hole (GPIO 39 or 37). Coming from 1.x, see the hole-to-GPIO table under [Migrating from 1.x](#migrating-from-1x). Each sensor is identified by its 64-bit address and can be given a custom label via the web interface. All sensors are published to MQTT and appear in Home Assistant auto-discovery.
 
 > **Note for users upgrading from versions before v1.0.0**: The default Dallas GPIO pin changed from GPIO 13 (D7) to GPIO 10 (SD3) in v1.0.0. If your sensors stopped working after an upgrade, check the Dallas GPIO setting in Settings and change it back to 13 if needed.
 
@@ -371,7 +371,7 @@ If you have a firmware binary file and want to upload it directly:
 
 #### Notes When Upgrading from v1.x
 
-- Moving from 1.x to 2.x means replacing the Wemos D1 mini (ESP8266) with a LOLIN S3 Mini or S3 Mini Pro and flashing it over USB (see Flashing the Firmware). Going back to 1.x means putting the Wemos D1 mini back; a 1.x zip does not run on an S3.
+- Moving from 1.x to 2.x means replacing the Wemos D1 mini with a LOLIN S3 Mini or S3 Mini Pro and flashing it over USB (see Flashing the Firmware). Going back to 1.x means putting the Wemos D1 mini back and flashing a 1.x release; a 1.x zip does not run on an S3.
 - No settings migration is required. Settings files from v1.3.x load without modification in v2.0.0.
 - MQTT topics and the REST API are unchanged from v1.x.
 - If you are upgrading from before v1.2.0, be aware that REST API v0 and v1 endpoints were removed in v1.2.0. Only `/api/v2/` endpoints are available. See [docs/BREAKING_CHANGES.md](../docs/BREAKING_CHANGES.md).
@@ -1412,7 +1412,7 @@ Common MQTT return codes:
 
 ### 7.7 Serial Overrun and OTGW Online-Offline Flapping
 
-**Root cause in versions before 2.0.0:** The `publishToSourceTopic()` function allocated approximately 1,600 bytes of local buffers on the cooperative stack. On the 1.x firmware for the Wemos D1 mini (ESP8266) that CONT stack is only 4 KB. The fix in v2.0.0 converts those buffers to static or pre-allocated scratch memory.
+**Root cause in versions before 2.0.0:** The `publishToSourceTopic()` function allocated approximately 1,600 bytes of local buffers on the stack, which overflowed it on the 1.x line. The fix in v2.0.0 converts those buffers to static or pre-allocated scratch memory.
 
 If you see this on v2.0.0: update to the latest build. If the problem persists, connect to the Telnet debug console and look for `Exception` or `Stack smashing` messages.
 
@@ -1651,7 +1651,7 @@ The OTGW-firmware sits between the OpenTherm heating bus and the home automation
 
 #### Level 2: Container (`c4-container.md`)
 
-The 2.x firmware runs on an ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the NodoShop OTGW Classic. The PIC16F co-processor handles the OpenTherm electrical bus; the ESP32-S3 communicates with it over UART at 9600 baud. The 1.x firmware for the Wemos D1 mini (ESP8266) uses the same PIC link.
+The 2.x firmware runs on an ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the NodoShop OTGW Classic. The PIC16F co-processor handles the OpenTherm electrical bus; the ESP32-S3 communicates with it over UART at 9600 baud.
 
 #### Level 3: Component (`c4-component.md`)
 
@@ -1681,7 +1681,7 @@ The application code runs cooperatively in the Arduino `loop()` task. The firmwa
 
 `feedWatchDog()` services the hardware watchdog. It does not call `yield()` (that line is intentionally commented out to prevent re-entrancy of `doBackgroundTasks()`). The background task re-entrancy that does exist comes from MQTT autoconfig's file-reading loop calling `handleOTGW()` mid-iteration.
 
-#### Static Buffers (ADR-004 / ADR-053)
+#### Static Buffers (ADR-053 / ADR-180)
 
 Dynamic allocation fragments the heap and leads to crashes after days of operation. This rule comes from the 1.x line and still holds on 2.x (ADR-180 for the `String` class). All buffers are statically allocated:
 
@@ -2167,7 +2167,6 @@ Not required for: pure bug fixes, minor features within existing patterns.
 
 | ADR | Topic | Impact |
 |-----|-------|--------|
-| ADR-004 | Static buffer allocation | No `String` in hot paths; all buffers `char[]` |
 | ADR-009 | PROGMEM string literals | All literals in flash via `F()` / `PSTR()` |
 | ADR-014 | Dual build system | `build.py` for Arduino CLI, PlatformIO for ESP32 |
 | ADR-016 | OpenTherm command queue | Always use `addCommandToQueue()` |
@@ -2179,6 +2178,7 @@ Not required for: pure bug fixes, minor features within existing patterns.
 | ADR-051 | Dual encapsulating structs | `OTGWSettings` / `OTGWState` architecture |
 | ADR-053 | Large feature buffer allocation | Static allocation for large per-feature buffers |
 | ADR-061 | Platform abstraction | Use `platform.h` abstractions, not direct SDK calls |
+| ADR-180 | Keep the `String` class out of hot-path source files | Guideline-level; `evaluate.py` reports WARN with the call site |
 
 #### Creating a New ADR
 
@@ -3408,8 +3408,8 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **DallasTemperature** | Arduino library for DS18B20 1-Wire temperature sensors. Used by `sensorStuff.ino`. |
 | **DHW** | Domestic Hot Water. The circuit supplying hot tap water, as distinct from the central heating circuit. |
 | **DUE()** | A timer macro from `safeTimers.h`. Returns true when the declared timer's interval has elapsed, and false otherwise. Handles `millis()` rollover safely. |
-| **ESP8266** | The Espressif Wi-Fi microcontroller on the Wemos D1 mini, used by the 1.x firmware. Runs at 80 or 160 MHz, approximately 40 KB usable heap. Going back to 1.x means putting the Wemos D1 mini back in the OTGW Classic. |
-| **ESP32** | The Espressif ESP32-S3 on the LOLIN S3 Mini or S3 Mini Pro, used by the 2.x firmware in the OTGW Classic. Runs at 240 MHz, with significantly more RAM and flash than the 1.x hardware, and supports BLE. |
+| **1.x line** | The maintenance branch `otgw-1.x.x`, firmware for the Wemos D1 mini. Going back to 1.x means putting the Wemos D1 mini back in the OTGW Classic. |
+| **ESP32** | The Espressif ESP32-S3 on the LOLIN S3 Mini or S3 Mini Pro, used by the 2.x firmware in the OTGW Classic. Runs at 240 MHz and supports BLE. |
 | **f8.8** | OpenTherm fixed-point data format: an 8-bit signed integer plus an 8-bit fractional part (1/256 per LSB). Used for all temperature values in the protocol. |
 | **HA** | Home Assistant. The primary target home automation platform for this firmware. |
 | **HEAP_CRITICAL** | Heap level below ~3 KB. Emergency mode: MQTT and WebSocket sends are blocked. |
@@ -3426,7 +3426,7 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **OTGW** | OpenTherm Gateway. The NodoShop hardware device that sits in-line on the OpenTherm bus and allows monitoring and override of messages. Refers to both the hardware and to this firmware project. |
 | **OTDirect** | The firmware's direct OpenTherm bus interface, used in OT-Direct mode on hardware without a PIC. Implemented in `OTDirect.ino` and guarded by `#if HAS_DIRECT_OT`. |
 | **PIC** | The PIC16F88 or PIC16F1847 microcontroller co-processor on the NodoShop OTGW board. Handles the OpenTherm electrical bus and communicates with the ESP over UART at 9600 baud. |
-| **PROGMEM** | Program Memory. String literals declared with `PROGMEM` (or wrapped in `F()` / `PSTR()`) are stored in flash memory instead of RAM. The rule is carried over from the 1.x line, where the ESP8266 had a scarce ~40 KB RAM budget, and still applies on 2.x. |
+| **PROGMEM** | Program Memory. String literals declared with `PROGMEM` (or wrapped in `F()` / `PSTR()`) are stored in flash memory instead of RAM. The rule is carried over from the 1.x line and still applies on 2.x. |
 | **PubSubClient** | The Arduino MQTT client library used by the firmware. Pinned to version 2.8.0 in `platformio.ini`. |
 | **PlatformIO** | Cross-platform embedded development toolchain and IDE plugin. Used for building the `esp32-combo` firmware, driven by `build.bat` / `./build.sh`. Config: `platformio.ini`. |
 | **SAT** | Smart Autotune Thermostat. The embedded heating controller in the firmware that replaces the room thermostat's role. Combines a weather-compensated heating curve with a PID v3 control loop and automatic gain tuning. |
@@ -3568,7 +3568,7 @@ The full changelog is in `CHANGELOG.md` at the repository root.
 
 Version 2.0.0 is a major release. The headline changes are:
 
-**ESP32-S3 line.** Version 2.0.0 runs on the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket; the PIC stays in place. One `esp32-combo` image detects the PIC at boot. A platform abstraction layer (`platform.h`, `boards.h`) isolates hardware differences. The 1.x firmware for the Wemos D1 mini (ESP8266) continues on its own maintenance line.
+**ESP32-S3 line.** Version 2.0.0 runs on the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket; the PIC stays in place. One `esp32-combo` image detects the PIC at boot. A platform abstraction layer (`platform.h`, `boards.h`) isolates hardware differences. The 1.x firmware for the Wemos D1 mini continues on its own maintenance line.
 
 **SAT (Smart Autotune Thermostat).** The embedded PID thermostat is now a major feature. Version 2.0.0 adds PID v3 with deadband and anti-cycling, a heating curve advisor (INCREASE/DECREASE/HOLD), multi-zone room temperature averaging, Summer Simmer Index, solar gain compensation, DHW setpoint control, boiler gas consumption estimation, and BLE room temperature sensor support.
 
@@ -3582,7 +3582,7 @@ Version 2.0.0 is a major release. The headline changes are:
 
 #### v1.3.5
 
-WiFi reconnection regression fix: the 5-second state machine timeout was too short for ESP8266 association (5-10 seconds on some routers). Timeout increased to 30 seconds, restoring reliable reconnection behavior.
+WiFi reconnection regression fix: the 5-second state machine timeout was too short for WiFi association on the 1.x line (5-10 seconds on some routers). Timeout increased to 30 seconds, restoring reliable reconnection behavior.
 
 #### v1.3.4
 

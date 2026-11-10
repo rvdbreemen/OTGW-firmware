@@ -122,7 +122,7 @@ To enable: go to Settings in the Web UI and enable "Nightly Restart", then choos
 
 ### 7.8 Serial Overrun and OTGW Online-Offline Flapping
 
-**Root cause in versions before 2.0.0:** The `publishToSourceTopic()` function allocated approximately 1,600 bytes of local buffers on the cooperative stack. On the 1.x firmware for the Wemos D1 mini (ESP8266) that CONT stack is only 4 KB. The fix in v2.0.0 converts those buffers to static or pre-allocated scratch memory.
+**Root cause in versions before 2.0.0:** The `publishToSourceTopic()` function allocated approximately 1,600 bytes of local buffers on the stack, which overflowed it on the 1.x line. The fix in v2.0.0 converts those buffers to static or pre-allocated scratch memory.
 
 If you see this on v2.0.0: update to the latest build. If the problem persists, connect to the Telnet debug console and look for `Exception` or `Stack smashing` messages.
 
@@ -249,7 +249,7 @@ If you are coming from an older firmware or reading older forum threads, the pro
 | Flood of MQTT messages and broker hammering right after a reconnect | Full MQTT discovery burst re-sent in one go on every reconnect, exhausting heap and overwhelming the broker. | Fixed. Discovery is now async and drip-published (see 7.3). On reconnect the bitmap is preserved; use `F` in the Telnet console to force a full re-publish if needed. |
 | Clock jumps to `2106-02-07` shortly after boot | SDK sometimes hands back a bogus `time_t` before the first successful NTP exchange. | Fixed. NTP code now ignores the pre-epoch/post-2106 values until a real sync succeeds. Enable key `n` in the Telnet console to watch the handshake. |
 | Device unreachable after the router reboots, until the OTGW is power-cycled | DHCP lease renewal raced with the WiFi reconnect logic, leaving the interface without an IP. | Fixed. DHCP renewal and WiFi recovery are coordinated (ADR-047 two-layer recovery logic). |
-| OTGW online/offline flapping, serial overruns during MQTT bursts | `publishToSourceTopic()` allocated ~1.6 KB of local buffers on the 4 KB CONT stack. | Fixed. Large buffers converted to static or pre-allocated scratch memory. See section 7.8. |
+| OTGW online/offline flapping, serial overruns during MQTT bursts | `publishToSourceTopic()` allocated ~1.6 KB of local buffers on the stack (1.x line). | Fixed. Large buffers converted to static or pre-allocated scratch memory. See section 7.8. |
 
 ---
 

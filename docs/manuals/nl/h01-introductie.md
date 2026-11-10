@@ -63,7 +63,7 @@ Sinds v2.0.0 bevat de firmware een `boards.h`-header die pin-mappings, feature f
 
 ### Nieuwe functies in v2.0.0
 
-v2.0.0 is een grote platformrelease. Het is de ESP32-S3-only async + FreeRTOS-lijn; ESP8266 is verplaatst naar de 1.x maintenance / LTS-lijn. Instellingenbestanden van v1.3.x worden automatisch geladen zonder conversie.
+v2.0.0 is een grote platformrelease. Het is de ESP32-S3-only async + FreeRTOS-lijn. Instellingenbestanden van v1.3.x worden automatisch geladen zonder conversie.
 
 v2.0.0 verkeert op het moment van schrijven nog in alpha. De bestaande functionaliteit is feature-compleet, maar SAT, OTDirect en de nieuwe MQTT-topicnamen (zie hieronder) worden nog verder verfijnd. Volg de GitHub Releases-pagina voor de actuele alpha-tag.
 
@@ -194,7 +194,7 @@ Meld fouten en verbeterverzoeken via de GitHub Issues-pagina. Voeg bij een bugre
 De community is actief op de OTGW Discord-server. Hier kunt u terecht voor hulp bij installatie, configuratie en Home Assistant-integratie. Beginners zijn welkom; de community is internationaal en communiceert in het Engels.
 
 **Releases**
-Nieuwe releases worden gepubliceerd als GitHub Releases en bevatten voorgebouwde binaries: voor de 2.x-lijn de `esp32-combo`-zip, voor de 1.x-lijn de binaries voor de Wemos D1 mini (ESP8266). De webinterface biedt een ingebouwde update-functie waarmee u direct kunt updaten vanuit de lijst met beschikbare releases.
+Nieuwe releases worden gepubliceerd als GitHub Releases en bevatten voorgebouwde binaries: voor de 2.x-lijn de `esp32-combo`-zip, voor de 1.x-lijn de binaries van die lijn. De webinterface biedt een ingebouwde update-functie waarmee u direct kunt updaten vanuit de lijst met beschikbare releases.
 
 **Documentatie**
 De volledige technische documentatie, inclusief C4-architectuurdiagrammen, API-referentie en ADR's, staat in de `docs/`-map van de repository.

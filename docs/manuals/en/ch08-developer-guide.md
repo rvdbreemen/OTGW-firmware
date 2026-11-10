@@ -195,7 +195,7 @@ Use these flags in conditional compilation:
 
 ### Build Targets and Boards (2.0.0)
 
-The `dev` line (firmware 2.0.0) is ESP32-S3-only, built on an async + FreeRTOS stack. The 1.x firmware for the Wemos D1 mini (ESP8266) continues only on the `otgw-1.x.x` maintenance line. On 2.0.0 the build is PlatformIO-only and every target is an ESP32-S3.
+The `dev` line (firmware 2.0.0) is ESP32-S3-only, built on an async + FreeRTOS stack. The 1.x line continues only on the `otgw-1.x.x` maintenance branch. On 2.0.0 the build is PlatformIO-only and every target is an ESP32-S3.
 
 #### Fixed Build Targets (ADR-126)
 
@@ -270,7 +270,7 @@ The OTGW-firmware sits between the OpenTherm heating bus and the home automation
 
 #### Level 2: Container (`c4-container.md`)
 
-The 2.x firmware runs on an ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the NodoShop OTGW Classic. The PIC16F co-processor handles the OpenTherm electrical bus; the ESP32-S3 communicates with it over UART at 9600 baud. The 1.x firmware for the Wemos D1 mini (ESP8266) uses the same PIC link.
+The 2.x firmware runs on an ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the NodoShop OTGW Classic. The PIC16F co-processor handles the OpenTherm electrical bus; the ESP32-S3 communicates with it over UART at 9600 baud.
 
 #### Level 3: Component (`c4-component.md`)
 
@@ -300,7 +300,7 @@ The application code runs cooperatively in the Arduino `loop()` task. The firmwa
 
 `feedWatchDog()` services the hardware watchdog. It does not call `yield()` (that line is intentionally commented out to prevent re-entrancy of `doBackgroundTasks()`). The background task re-entrancy that does exist comes from MQTT autoconfig's file-reading loop calling `handleOTGW()` mid-iteration.
 
-#### Static Buffers (ADR-004 / ADR-053)
+#### Static Buffers (ADR-053 / ADR-180)
 
 Dynamic allocation fragments the heap and leads to crashes after days of operation. This rule comes from the 1.x line and still holds on 2.x (ADR-180 for the `String` class). All buffers are statically allocated:
 
@@ -798,7 +798,6 @@ Not required for: pure bug fixes, minor features within existing patterns.
 | ADR | Topic | Impact |
 |-----|-------|--------|
 | ADR-003 | HTTP/WS only, no HTTPS/WSS | Plain HTTP and WebSocket only; trusted LAN security model |
-| ADR-004 | Static buffer allocation | No `String` in hot paths; all buffers `char[]` |
 | ADR-009 | PROGMEM string literals | All literals in flash via `F()` / `PSTR()` |
 | ADR-014 | Dual build system | `build.py` wraps PlatformIO; on 2.x run it through `build.bat` / `./build.sh` |
 | ADR-016 | OpenTherm command queue | Always use `addCommandToQueue()` |
@@ -820,6 +819,7 @@ Not required for: pure bug fixes, minor features within existing patterns.
 | ADR-100 | JIT HA discovery + smart reconnect | OT configs only published once the MsgID is seen; broker-restart heuristic gates republish |
 | ADR-101 | Flat per-value MQTT topics | One topic per value; no aggregated JSON payloads |
 | ADR-106 | Self-describing MQTT topic names | New default topic naming; legacy shape behind `bUseLegacyOtTopics` |
+| ADR-180 | Keep the `String` class out of hot-path source files | Guideline-level; `evaluate.py` reports WARN with the call site |
 
 #### Creating a New ADR
 

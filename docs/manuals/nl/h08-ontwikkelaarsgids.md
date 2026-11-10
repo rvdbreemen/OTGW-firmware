@@ -194,7 +194,7 @@ Gebruik deze vlaggen in conditionele compilatie:
 
 ### Build targets en boards (2.0.0)
 
-De `dev`-lijn (firmware 2.0.0) is uitsluitend ESP32-S3, gebouwd op een async + FreeRTOS-stack. De 1.x-firmware voor de Wemos D1 mini (ESP8266) blijft alleen bestaan op de `otgw-1.x.x` maintenance-lijn. Op 2.0.0 verloopt de build uitsluitend via PlatformIO en is elk target een ESP32-S3.
+De `dev`-lijn (firmware 2.0.0) is uitsluitend ESP32-S3, gebouwd op een async + FreeRTOS-stack. De 1.x-lijn blijft alleen bestaan op de `otgw-1.x.x` maintenance-branch. Op 2.0.0 verloopt de build uitsluitend via PlatformIO en is elk target een ESP32-S3.
 
 #### Vaste build targets (ADR-126)
 
@@ -269,7 +269,7 @@ De OTGW-firmware bevindt zich tussen de OpenTherm-verwarmingsbus en het domotica
 
 #### Niveau 2: Container (`c4-container.md`)
 
-De 2.x-firmware draait op een ESP32-S3 (LOLIN S3 Mini of S3 Mini Pro) in de NodoShop OTGW Classic. De PIC16F-co-processor handelt de OpenTherm-bus af; de ESP32-S3 praat ermee via UART op 9600 baud. De 1.x-firmware voor de Wemos D1 mini (ESP8266) gebruikt dezelfde PIC-verbinding.
+De 2.x-firmware draait op een ESP32-S3 (LOLIN S3 Mini of S3 Mini Pro) in de NodoShop OTGW Classic. De PIC16F-co-processor handelt de OpenTherm-bus af; de ESP32-S3 praat ermee via UART op 9600 baud.
 
 #### Niveau 3: Component (`c4-component.md`)
 
@@ -304,9 +304,9 @@ Kritische implicaties:
 
 #### Statische buffers
 
-Dynamische allocatie fragmenteert de heap. Deze regel komt van de 1.x-lijn en geldt nog steeds op 2.x (ADR-180 voor de `String`-klasse). Richtlijnen:
+Dynamische allocatie fragmenteert de heap. Deze regel komt van de 1.x-lijn en geldt nog steeds op 2.x (ADR-053 voor statische buffers, ADR-180 voor de `String`-klasse). Richtlijnen:
 - Gebruik `char[]`-buffers met `strlcpy()`, `snprintf_P()`, `strncat()`.
-- Gebruik nooit de `String`-klasse in kritieke paden (heap-fragmentatie, ADR-004).
+- Gebruik nooit de `String`-klasse in kritieke paden (heap-fragmentatie, ADR-180).
 - Grote buffers op de stack kunnen een stack overflow veroorzaken. Maak ze `static`.
 
 #### PROGMEM
@@ -805,7 +805,6 @@ Voor puur refactoren, bugfixes en kleine functies binnen bestaande patronen is g
 | ADR | Onderwerp | Impact |
 |-----|-----------|--------|
 | ADR-003 | Alleen HTTP/WS, geen HTTPS/WSS | Plain HTTP en WebSocket; beveiligingsmodel is vertrouwd LAN |
-| ADR-004 | Static buffer allocation | Geen `String` in hot paths; alle buffers `char[]` |
 | ADR-009 | PROGMEM string literals | Alle literals in flash via `F()` / `PSTR()` |
 | ADR-014 | Dual build system | `build.py` wrapt PlatformIO; op 2.x start je het via `build.bat` / `./build.sh` |
 | ADR-016 | OpenTherm command queue | Altijd `addCommandToQueue()` |
@@ -827,6 +826,7 @@ Voor puur refactoren, bugfixes en kleine functies binnen bestaande patronen is g
 | ADR-100 | JIT HA-discovery + smart reconnect | OT-configs pas gepubliceerd als de MsgID is gezien; broker-restart-heuristiek bewaakt republish |
 | ADR-101 | Flat per-value MQTT-topics | Eén topic per waarde; geen geaggregeerde JSON-payloads |
 | ADR-106 | Zelfbeschrijvende MQTT-topicnamen | Nieuwe standaard topicnaamgeving; legacy vorm via `bUseLegacyOtTopics` |
+| ADR-180 | `String`-klasse buiten hot-path-bronbestanden houden | Richtlijnniveau; `evaluate.py` meldt WARN met de aanroepplek |
 
 #### Levenscyclus
 

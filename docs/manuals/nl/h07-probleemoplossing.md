@@ -270,7 +270,7 @@ Seriële overruns duiden vaak op een achterliggend probleem:
 
 #### OTGW online-offline-flikkeringen opgelost in v2.0.0
 
-In versies voor 2.0.0 konden herhaalde disconnectie-events op de MQTT-verbinding zorgen voor een cascade van publicaties, waardoor de OTGW-beschikbaarheidsberichten snel achter elkaar `online` en `offline` publiceerden. De stackoverloopproblemen in `publishToSourceTopic` (te grote lokale buffers op de 4KB CONT-stack van de ESP8266 in de Wemos D1 mini, onder de 1.x-firmware) zijn opgelost door alle grote buffers statisch te maken. Dit elimineert de crashes die de flikkeringen veroorzaakten.
+In versies voor 2.0.0 konden herhaalde disconnectie-events op de MQTT-verbinding zorgen voor een cascade van publicaties, waardoor de OTGW-beschikbaarheidsberichten snel achter elkaar `online` en `offline` publiceerden. De stackoverloopproblemen in `publishToSourceTopic` (te grote lokale buffers op de stack, onder de 1.x-firmware) zijn opgelost door alle grote buffers statisch te maken. Dit elimineert de crashes die de flikkeringen veroorzaakten.
 
 Als u flikkeringen ziet na een upgrade naar v2.0.0, controleer dan:
 - Of u daadwerkelijk v2.0.0 draait (zie Web UI voettekst).
@@ -422,7 +422,7 @@ Komt u van een oudere firmware of leest u oudere forumdraadjes, dan komen onders
 | Vloedgolf van MQTT-berichten en hameren op de broker direct na een reconnect | Volledige MQTT-discovery-burst werd in één keer opnieuw verstuurd bij iedere reconnect, waardoor de heap uitgeput raakte en de broker overbelast werd. | Opgelost. Discovery is nu async en drip-published (zie 7.3). Bij een reconnect blijft de bitmap bewaard; gebruik `F` in de Telnet-console om zo nodig een volledige herpublicatie af te dwingen. |
 | Klok springt vlak na opstart naar `2106-02-07` | De SDK geeft soms een onzinnige `time_t` terug vóór de eerste geslaagde NTP-uitwisseling. | Opgelost. De NTP-code negeert nu pre-epoch/post-2106-waarden tot een echte sync slaagt. Schakel toets `n` in de Telnet-console in om de handshake te volgen. |
 | Apparaat onbereikbaar na een routerherstart totdat de OTGW wordt uit- en weer ingeschakeld | DHCP-lease-vernieuwing liep in een race met de WiFi-reconnectlogica, waardoor de interface zonder IP achterbleef. | Opgelost. DHCP-vernieuwing en WiFi-herstel zijn gecoördineerd (ADR-047 tweelaagse herstellogica). |
-| OTGW online/offline-flikkeringen, seriele overruns tijdens MQTT-bursts | `publishToSourceTopic()` reserveerde ~1,6 KB aan lokale buffers op de 4 KB CONT-stack. | Opgelost. Grote buffers omgezet naar statisch of pre-allocated scratch-geheugen. Zie paragraaf 7.8. |
+| OTGW online/offline-flikkeringen, seriele overruns tijdens MQTT-bursts | `publishToSourceTopic()` reserveerde ~1,6 KB aan lokale buffers op de stack (1.x-lijn). | Opgelost. Grote buffers omgezet naar statisch of pre-allocated scratch-geheugen. Zie paragraaf 7.8. |
 
 ---
 
