@@ -1,0 +1,28 @@
+---
+id: TASK-1773
+title: >-
+  device/info reports bootcount 0 for about 1 s after boot (web server starts
+  before updateRebootCount())
+status: To Do
+assignee: []
+created_date: '2026-11-10T04:17:00Z'
+labels:
+  - bug
+  - rest
+milestone: 2.0.0
+dependencies: []
+priority: low
+ordinal: 870000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Seen 2026-11-10 in the TASK-1757 reboot run on .61 (beta.167+e79e495): the first GET /api/v2/device/info after a reboot answered bootcount=0 in boots 3, 4 and 6 (e.g. 04:36:20 bootcount=0, 04:36:25 bootcount=205). Cause in setup(): startWebserver() at src/OTGW-firmware/OTGW-firmware.ino:516 opens the REST API before state.uptime.iRebootCount = updateRebootCount() at :540; restAPI.ino:3396 emits the 0. Same for runtime.reboots (restAPI.ino:2260) and the diag recorder header (restAPI.ino:3806). Impact: a script or Home Assistant that reads bootcount right after a reboot sees a reset to 0. Low.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 Reproduce: device/info polled from the first HTTP answer after a reboot shows bootcount 0 on the old code
+- [ ] #2 Fix: bootcount is correct from the first REST answer (e.g. read the count before startWebserver(), or report null until it is known); same reproduction shows no 0
+<!-- AC:END -->
