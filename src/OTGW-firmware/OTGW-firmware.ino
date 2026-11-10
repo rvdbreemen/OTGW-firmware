@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.167
+**  Version  : v2.0.0-beta.168
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -261,6 +261,14 @@ void setup() {
   captureWifiDeadRestarts();  // TASK-1450: same rule, the dead-link restart count
   captureWifiSkipPortal();    // TASK-1455: one-boot skip-portal mark of a WiFi supervisor restart
   bootHeapPhase(PSTR("setup-early"));  // TASK-1339 diagnostics: windowed heap minimum over the boot path
+  // TASK-1763 (b): GPIO ISR service now, before startWiFi() and before the first attachInterrupt()
+  // (initOTDirect -> OpenTherm::begin): the install runs on the ipc1 stack (platform_esp32.h).
+  {
+    const esp_err_t gpioIsrErr = platformGpioIsrServiceInstallEarly();
+    if (gpioIsrErr != ESP_OK && gpioIsrErr != ESP_ERR_INVALID_STATE) {
+      SetupDebugf(PSTR("GPIO ISR service early install failed (%d); attachInterrupt() retries it\r\n"), (int)gpioIsrErr);
+    }
+  }
 
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
@@ -544,6 +552,9 @@ void setup() {
   // One-line boot signature for field diagnostics (TASK-394 Phase 2).
   // Captured AFTER full init so heap/fragmentation reflect steady-state setup.
   logBootSignature("boot:");
+  // TASK-1763: the IPC stacks' low point after the GPIO ISR install (bench evidence; the prebuilt libs give 1024 B each).
+  SetupDebugf(PSTR("boot: ipc stack free min ipc0=%ld ipc1=%ld B\r\n"),
+              (long)platformIpcStackHighWater("ipc0"), (long)platformIpcStackHighWater("ipc1"));
 
   // TASK-396: warn once if flash hardware doesn't match the 4M2M DIO build.
   // Silent on matching boards; emits one or more [flash] WARN lines otherwise.

@@ -26,6 +26,7 @@
 #include <esp_system.h>
 #include <esp_timer.h>          // esp_timer_get_time (platformUptimeSeconds, TASK-1449)
 #include <esp_heap_caps.h>      // heap_caps_malloc (platformPsramAllocOnce)
+#include <driver/gpio.h>        // gpio_install_isr_service (platformGpioIsrServiceInstallEarly, TASK-1763)
 #include <esp_mac.h>
 #include <esp_netif.h>
 #include <esp_wifi.h>            // esp_wifi_get_config/set_config (platformWifiPreferStrongestAp, TASK-1397)
@@ -1145,5 +1146,28 @@ inline void platformTaskExit() {
 *
 ****************************************************************************
 */
+
+// TASK-1763 (b): install the GPIO ISR service early in setup(), before startWiFi().
+// Arduino installs it on the first attachInterrupt() (esp32-hal-gpio.c:219-221, once per boot);
+// IDF then registers the GPIO interrupt through esp_ipc_call_blocking() on the calling core
+// (esp_driver_gpio gpio.c:624-633), so esp_intr_alloc() runs on the IPC task's stack (ipc1,
+// CONFIG_ESP_IPC_TASK_STACK_SIZE=1024 in the Arduino libs). A level-1 interrupt taken there
+// overflowed that stack on .61 (coredump, TASK-1763: SP 52 B below ipc1's 1020 B stack).
+// Before WiFi starts far fewer interrupts are live, so the chance of that nesting is lower.
+// This lowers the chance; it does not remove the cause (a larger IPC stack does, TASK-1763 (a)).
+// Same flags as Arduino (ARDUINO_ISR_FLAG), so the later attachInterrupt() gets
+// ESP_ERR_INVALID_STATE, which Arduino treats as "installed" (esp32-hal-gpio.c:221).
+// Returns the IDF result: ESP_OK, ESP_ERR_INVALID_STATE (already installed) or an error.
+inline esp_err_t platformGpioIsrServiceInstallEarly() {
+  return gpio_install_isr_service((int)ARDUINO_ISR_FLAG);
+}
+
+// TASK-1763: free stack of an IPC task ("ipc0"/"ipc1") at its low point since boot, in bytes
+// (ESP-IDF's uxTaskGetStackHighWaterMark() returns bytes), or -1 when the task is not found.
+inline int32_t platformIpcStackHighWater(const char* taskName) {
+  TaskHandle_t h = xTaskGetHandle(taskName);
+  if (h == nullptr) return -1;
+  return (int32_t)uxTaskGetStackHighWaterMark(h);
+}
 
 #endif // PLATFORM_ESP32_H

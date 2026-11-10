@@ -1,10 +1,11 @@
 ---
 id: TASK-1763
 title: Boot panic in ipc1 during GPIO ISR install (beta.162, .61, 1 of 10 reboots)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@system32-030509'
 created_date: '2026-11-09T19:21:00Z'
-updated_date: '2026-11-10T03:27:00Z'
+updated_date: '2026-11-10T06:00:00Z'
 labels:
   - bug
   - crash
@@ -32,6 +33,19 @@ Candidates (not proven): attachInterrupt / attachInterruptArg in src/libraries/O
 - [ ] #2 Reproduce or bound it on the bench: repeated /ReBoot cycles (including after a long uptime and a low-heap boot) with serial capture; count panics per N reboots
 - [ ] #3 Fix, or a decision with Robert, with before/after panic counts
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Robert 2026-11-10 06:40 (AskUserQuestion in the coordinator's session, relayed): '(c) Both': (b) now as a quick mitigation in the next beta, (a) afterwards via an ADR.
+(b) Early GPIO ISR install (this lane, lane-1763b on origin/dev 956f7748a):
+1. platform_esp32.h: inline platformGpioIsrServiceInstallEarly() = gpio_install_isr_service((int)ARDUINO_ISR_FLAG), the same flags as Arduino's own install (esp32-hal-gpio.c:220), so the later attachInterrupt() gets ESP_ERR_INVALID_STATE, which Arduino treats as installed (:221).
+2. OTGW-firmware.ino setup(): call it right after bootHeapPhase('setup-early'), before startWiFi() and before the first attachInterrupt() (initOTDirect -> OpenTherm::begin -> OpenTherm.cpp:95; initS0Count -> s0PulseCount.ino:50). An error other than INVALID_STATE is logged, and Arduino retries the install at the first attach.
+3. Host test tests/test_gpio_isr_early_install.py: source order in setup(), the helper's flags, and a host build of the REAL Arduino __attachInterruptFunctionalArg with the REAL helper (IDF calls stubbed): with the early call the one install runs in the early call; in the old order it runs inside the first attach. Red on the old code, green on the new.
+4. Prerelease bump (number from the coordinator), build only after the coordinator's go, bench check (one boot, no regressions: OT-Direct frames, S0 if configured), then /ReBoot cycles (AC2) to compare the panic rate with beta.162 (1/10).
+Limit: (b) lowers the chance (fewer interrupts before WiFi); the install still runs on ipc1's 1024 B stack. (a) removes the cause.
+(a) IPC stack >= 1280 B (IDF S3 default) via custom_sdkconfig / framework libs rebuild: an ADR (Proposed) via /adr-kit:adr first, then a separate change.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
