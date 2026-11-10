@@ -36,6 +36,8 @@ context_scope: "selective"
 
 # ADR-225 Raise the ESP32-S3 IPC task stack to at least 1280 B by rebuilding the Arduino framework libs with a custom sdkconfig
 
+Terms used below: IPC (inter-processor call), GPIO (general-purpose input/output), ISR (interrupt service routine), IDF (ESP-IDF, the Espressif IoT Development Framework), RAM (random-access memory), DRAM (data RAM, the internal RAM for data), PSRAM (pseudo-static RAM, external).
+
 ## Status
 
 Proposed, 2026-11-10.
