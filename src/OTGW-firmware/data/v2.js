@@ -695,6 +695,7 @@
       "ok": "OK",
       "chip_flow": "Flow",
       "chip_return": "Return",
+      "chip_dhw": "DHW",
       "chip_pressure": "Pressure",
       "chip_room": "Room",
       "chip_outside": "Outside",
@@ -707,6 +708,7 @@
       "chart_ret": "ret {{temp}}",
       "cell_flow": "FLOW",
       "cell_return": "RETURN",
+      "cell_dhw": "DHW",
       "cell_room": "T ROOM",
       "cell_room_set": "ROOM SET",
       "cell_outside": "T OUTSIDE",
@@ -2933,7 +2935,7 @@
     // mobile chip strip (≤719px) — same six values as the schematic
     var strip = document.getElementById('aStrip');
     if (strip) {
-      var chips = [[t('home.chip_flow'), fmt(model.flow, 1, '°'), 'var(--hot)'], [t('home.chip_return'), fmt(model.ret, 1, '°'), 'var(--cold)'], ['DHW', model.dhw === null ? '—' : Math.round(model.dhw) + '°', ''], [t('home.chip_pressure'), fmt(model.pressure, 2, ' bar'), ''], [t('home.chip_room'), fmt(model.room, 1, '°'), ''], [t('home.chip_outside'), fmt(model.outside, 1, '°'), '']];
+      var chips = [[t('home.chip_flow'), fmt(model.flow, 1, '°'), 'var(--hot)'], [t('home.chip_return'), fmt(model.ret, 1, '°'), 'var(--cold)'], [t('home.chip_dhw'), model.dhw === null ? '—' : Math.round(model.dhw) + '°', ''], [t('home.chip_pressure'), fmt(model.pressure, 2, ' bar'), ''], [t('home.chip_room'), fmt(model.room, 1, '°'), ''], [t('home.chip_outside'), fmt(model.outside, 1, '°'), '']];
       strip.textContent = '';
       chips.forEach(function (c) {
         var ch = document.createElement('span'); ch.className = 'mchip';
@@ -3057,7 +3059,7 @@
       [t('home.cell_outside'), fmt(model.outside, 1, '°'), ''],
       [t('home.cell_modulation'), model.mod === null ? '—' : Math.round(model.mod) + '%', model.flame ? 'ok' : ''],
       [t('home.cell_ch_setpoint'), fmt(model.chSet, 1, '°'), ''],
-      ['DHW', model.dhw === null ? '—' : fmt(model.dhw, 1, '°'), ''],
+      [t('home.cell_dhw'), model.dhw === null ? '—' : fmt(model.dhw, 1, '°'), ''],
       [t('home.cell_pressure'), fmt(model.pressure, 2, ' bar'), pressClass(model.pressure)],
       [t('home.cell_flame'), model.flame ? t('home.on') : t('home.off'), model.flame ? 'ok' : ''],
       [t('home.cell_status'), model.fault ? t('home.fault') : t('home.ok'), model.fault ? 'alert' : 'ok']

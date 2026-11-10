@@ -53,3 +53,12 @@ test('change and override counts use _one/_other plural keys in every language',
   assert.match(JS, /txt\(ids\[1\] \+ 'Sfx', t\(/, 'updateSaveBar does not set the plural suffix');
   assert.match(JS, /txt\('aOvrCountSfx', t\('h_home\.ovr_badge_suffix', \{ count: no \}\)\)/);
 });
+
+test('the Home chips and cells label hot water through a key, not a hard-coded DHW', () => {
+  assert.doesNotMatch(JS, /\['DHW', model\.dhw/, 'Home chip or cell DHW is hard-coded English');
+  const en = i18nEn(JS);
+  for (const k of ['home.chip_dhw', 'home.cell_dhw']) {
+    assert.equal(en.i18nString(k), 'DHW');
+    for (const [l, p] of Object.entries(PACKS)) assert.ok(get(p, k), `${l} ${k} missing`);
+  }
+});

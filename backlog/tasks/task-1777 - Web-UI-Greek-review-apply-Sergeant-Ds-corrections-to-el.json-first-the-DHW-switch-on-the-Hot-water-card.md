@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-10T12:18:00Z'
-updated_date: '2026-11-10T15:05:00Z'
+updated_date: '2026-11-10T19:39:00Z'
 labels:
   - webui
   - i18n
@@ -42,4 +42,6 @@ Sergeant D (Greek native speaker) reviews the Greek web UI pack. First correctio
 2026-11-10 14:55 found while checking Q3: the Home chips (v2.js:2937) and the Home cell grid (renderCGrid, v2.js:3061) showed a hard-coded English 'DHW'. Now t('home.chip_dhw') / t('home.cell_dhw'), nl/de 'WW', el 'ΖΝΧ' (glossary). i18n-followups test 4: red on the previous v2.js, green on the fix. Fit check for Q3 (local render, 1036 and 390 px): 'Ζεστό Νερό Χρήσης' fits the Home tile on one line (173 px tile), 'ΕΣΩΤΕΡΙΚΗ' fits the Home drawing label (ends x=745 of 800).
 
 2026-11-10 16:00 entry 295: Q3 answered A ('Α'): el.json h_home.tile_dhw, h_home.stat_dhw, settings.group.hot_water -> 'Ζεστό Νερό Χρήσης'; h_home.svg_room -> 'ΕΣΩΤΕΡΙΚΗ'; settings.label.satdhwsetpoint -> 'Θερμοκρασία στόχος ΖΝΧ'. Scope = the Q3 list; adv.pic_led_w and the mixed-case 'Χώρος' keys unchanged. All Greek review answers (Q1-Q3) are in; build after the 16:21 public-beta freeze and the 4c/detectie benches, re-bumped to the free number.
+
+2026-11-10 evening: rebased onto 008bec20e. Contains the Home chips/cell grid DHW labels (t('home.chip_dhw'), t('home.cell_dhw'); nl/de WW, el ΖΝΧ). i18n-followups 4/4 (red on the previous v2.js for the chip/cell check), i18n-lang 6/6, i18n-no-hardcoded 3/3, v2-undefined-names 2/2 (after npm ci --prefix tests/webui), v2-nested-helper-scope 2/2. Greek entries 292-295 are already on origin (e93a8c07e, 0b835ccc0, 75ed5ac29).
 <!-- SECTION:NOTES:END -->
