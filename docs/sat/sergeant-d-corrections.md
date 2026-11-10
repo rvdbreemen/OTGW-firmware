@@ -6424,3 +6424,34 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1787.
 
 **Open:** gruijter's night log, and Sergeant D's decision after it.
+
+## 299. Time correction for entries 291-296: the times given as UTC are local time (CET), one hour late (record correction, 2026-11-10)
+
+**Source:** our own record, not a statement by Sergeant D. Since the Discord tools dropped on 2026-11-10 (about 04:00 UTC), otgw-firmware-97 read the channel with PowerShell `Invoke-RestMethod`. That converts message timestamps to local time (CET, UTC+1), and the times were then labelled UTC. Found 2026-11-10 by comparing with the time in the Discord message id (snowflake: milliseconds = (id >> 22) + 1420070400000).
+
+**Corrected times.** Entries 291-296 are not rewritten. The message ids in them are right; only the times are one hour late. The correct UTC times from the ids:
+
+| Entry | Message id | Given | Correct (UTC) |
+|---|---|---|---|
+| 291 | 1569614915222773762 ("the answer is A") | 08:29:17 | 07:29:17 |
+| 291 | 1569628868648767570 ("yes") | 09:24:44 | 08:24:44 |
+| 292 | 1569631735581253643 | 09:36:08 | 08:36:08 |
+| 292 | 1569692344758829138 | 13:36:58 | 12:36:58 |
+| 292 | 1569693277198880791 | 13:40:40 | 12:40:40 |
+| 293 | 1569696654997590049 | 13:54:06 | 12:54:06 |
+| 294 | 1569704071856787457 | 14:23:34 | 13:23:34 |
+| 294 | 1569704474744717437 | 14:25:10 | 13:25:10 |
+| 294 | 1569706197748293734 | 14:32:01 | 13:32:01 |
+| 295 | 1569726704107388981 | 15:53:30 | 14:53:30 |
+| 296 | 1569734786203914394 | 16:25:37 | 15:25:37 |
+| 296 | 1569738014878605403 | 16:38:27 | 15:38:27 |
+
+**Settled:**
+- Nothing in the content of entries 291-296 changes: quotes, decisions and message ids stand. Only the clock times are wrong.
+- Entries 297 and 298 already give the time from the message id.
+- `docs/sat/open-questions.md` rows Q-1759a and Q-1759b repeat the old times; the times above apply there as well.
+- From now on a time in an entry is taken from the message id.
+
+**Checked:** every time-and-id pair in entries 287-296 was recomputed from its id. 287-290 match; the 12 pairs above were one hour late.
+
+**Task:** none (record correction). TASK-1776 and TASK-1786 carry the same error and are corrected by their owners.

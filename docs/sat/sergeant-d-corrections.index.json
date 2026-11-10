@@ -3991,6 +3991,20 @@
     "TASK-1787"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 299,
+   "title": "Time correction for entries 291-296: the times given as UTC are local time (CET), one hour late (record correction, 2026-11-10)",
+   "date": "2026-11-10",
+   "source": "unknown",
+   "kind": "correction",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1776",
+    "TASK-1786"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
