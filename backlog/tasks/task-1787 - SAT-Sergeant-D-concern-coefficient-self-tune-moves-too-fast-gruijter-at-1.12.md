@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-10T18:57:00Z'
-updated_date: '2026-11-10T22:37:00Z'
+updated_date: '2026-11-10T22:54:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -44,4 +44,6 @@ Capture 20261110-100556 (gruijter, beta.167+e79e495, 10:05-21:15 local): setting
 Leading explanation (2026-11-10, a4, with input from 92 and the coordinator): the old hourly auto-tune (satautotune), removed by TASK-1413 on 2026-10-30, lowered gruijter's coefficient. gruijter answered (relayed by 92): '1: probably, look in the discord history. 2: no. Not running HA', so no HA or MQTT writer. Discord history (relayed): on 25 Oct our bot analysis gave his coefficient as 1.28, which is 2.0 x 0.98^22 = 1.2823 (22 steps of the old -2 % rule); on 26 Oct Sergeant D asked him to raise it to 2.2. Arithmetic check of the old factors (0.98, 0.96, 1.02, 1.01, value rounded to 0.01): 1.28 reaches 1.12 in 5 hourly steps (e.g. 1x 0.98, 3x 0.96, 1x 1.01); 2.2 reaches it in 17 (1x 0.98, 16x 0.96). Both fit before the removal on 30 Oct with satautotune on. Caveats: 1.28 comes from our own analysis message, not from his settings file; whether he set 2.2 is asked by 92 and not answered yet; no log of the old tuner exists in his uploads. The current ADR-205 tuner is ruled out (see the code check above).
 
 Proposal for Robert (not built, a decision is needed): units that ran the old auto-tune can carry a coefficient far below the usual range, and after TASK-1413 it loads unchanged. Options: (A) do nothing, the ADR-205 tuner raises it by 0.1 per 3 counted days (slow: 1.12 to 1.6 takes at least 15 counted days); (B) a one-time warning in the SAT page and the boot log when the stored coefficient is outside 1.6-2.4 and satautotune was set in settings.ini, suggesting a check; (C) a one-time migration that resets such a coefficient to 2.0 (changes behaviour without asking the user, so it needs Sergeant D's OK as a SAT behaviour change). Recommendation: B, it informs without changing control behaviour; C only with Sergeant D's agreement.
+
+Update 2026-11-10 (relayed by the coordinator from 92): asked whether he set 2.2 after Sergeant D's request of 26 Oct, gruijter answered 'probably not. dont remember'. So the leading path stays 1.28 (bot analysis of 25 Oct) to 1.12 by the old hourly auto-tune: a ratio of 0.875, about 6.6 steps of -2 % or, with the old mixed factors, 5 hourly steps (see above). Circumstantial: no log of the old tuner and no settings file from before 30 Oct.
 <!-- SECTION:NOTES:END -->
