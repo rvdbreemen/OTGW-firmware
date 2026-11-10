@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@system32-030509'
 created_date: '2026-11-09T19:21:00Z'
-updated_date: '2026-11-10T06:00:00Z'
+updated_date: '2026-11-10T06:39:00Z'
 labels:
   - bug
   - crash
@@ -126,6 +126,23 @@ created: 2026-11-10T03:27:00Z
 ---
 
 Location fix for the comment above: the coredump files (coredump.bin, decode.txt, core.elf, cmds.gdb) are kept in D:\Users\Robert\Documents\GitHub\RvdB\OTGW-build-archive\coredumps\task-1763-beta162-61\ (local, not in git; checked present 2026-11-10). 4c's session scratchpad cd1763\ was only temporary.
+
+---
+
+created: 2026-11-10T06:39:00Z
+
+---
+
+Implementation (b), commit f40e1bf73 on lane-1763b (local, beta.168; push only after the bench):
+- platformGpioIsrServiceInstallEarly() (platform_esp32.h) called in setup() right after bootHeapPhase('setup-early'), before startWiFi()/initOTDirect()/initS0Count().
+- Evidence line at boot: 'boot: ipc stack free min ipc0=.. ipc1=.. B' (platformIpcStackHighWater, uxTaskGetStackHighWaterMark via xTaskGetHandle).
+Tests (host, Windows, 2026-11-10):
+- tests/test_gpio_isr_early_install.py: 5/5 on the new code; on the old code (OTGW_SETUP_INO/OTGW_PLATFORM_H = HEAD copies) 4 of 5 fail (the 1 that passes is the old-order control case).
+- evaluate.py --quick: 92 checks, 0 failed.
+- Full scripts/run_tests.py -j 4 (host, no webui): 197 files, 190 passed, 6 failed, 1 skipped. NOT green as a whole. Per file:
+  - also red on origin/dev without this change: tests/test_adr_governance.py (test_live_index_complete), tests/test_build_staging.py (3 failures), tests/test_sat_dhw_range.py ('off' not found);
+  - green when run alone (failed only under -j 4 load): tests/test_discord_post_payload.py, tests/test_flash_migrate_settings_compare.py, test/host/test_override_reply.py.
+Build: build.bat started 07:37 (commit charge 79.3%). Bench .61 pending the coordinator's slot: 12 boots on 168 and 12 boots with a temporary old-order build (same log line, labelled OLD ORDER, not committed), each with the crashlog and the ipc line. Caveat: the high-water mark of a non-crashing boot shows the margin, not proof that (b) prevents the rare nesting; the coredump (-52 B) is the only direct crash measurement.
 
 ---
 <!-- COMMENTS:END -->
