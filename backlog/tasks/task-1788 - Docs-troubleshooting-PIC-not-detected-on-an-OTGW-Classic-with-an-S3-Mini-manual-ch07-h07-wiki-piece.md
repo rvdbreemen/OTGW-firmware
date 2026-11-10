@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-10T22:23:00Z'
-updated_date: '2026-11-10T22:34:00Z'
+updated_date: '2026-11-10T22:35:00Z'
 labels:
   - docs
   - support
@@ -24,10 +24,10 @@ Users get stuck when the combo firmware on a Classic with a LOLIN S3 Mini does n
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 EN section in ch07 covers symptom (device/info hardwaremode Degraded, otcommandinterface None), seating check, Board Mode auto/pic/otdirect, /bootdetect.log via FSexplorer, capture across a restart, what to send
-- [ ] #2 NL section in h07 with the same content
-- [ ] #3 Short wiki-ready piece in docs/ (EN)
-- [ ] #4 Every behaviour claim has a file:line citation in the task notes; no OTGW32 naming in the user-facing text
+- [x] #1 EN section in ch07 covers symptom (device/info hardwaremode Degraded, otcommandinterface None), seating check, Board Mode auto/pic/otdirect, /bootdetect.log via FSexplorer, capture across a restart, what to send
+- [x] #2 NL section in h07 with the same content
+- [x] #3 Short wiki-ready piece in docs/ (EN)
+- [x] #4 Every behaviour claim has a file:line citation in the task notes; no OTGW32 naming in the user-facing text
 - [ ] #5 Committed locally on dev; pushed only after the coordinator's go
 <!-- AC:END -->
 
