@@ -3897,6 +3897,19 @@
     "TASK-1767"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 292,
+   "title": "Greek web UI: Hot water card title \"Ζεστό Νερό Χρήσης\", standalone DHW switch \"Ενεργοποίηση ΖΝΧ\", Home room cell \"ΕΣΩΤΕΡΙΚΗ\" (Sergeant D, 2026-11-10)",
+   "date": "2026-11-10",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569631735581253643",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1777"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

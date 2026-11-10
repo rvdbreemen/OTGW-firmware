@@ -6279,3 +6279,24 @@ This confirms Robert's maintainer decision of entry 290 for direct mode. It also
 **Changes an earlier entry:** settles the open points of entry 290 for direct mode (interval, SAT only, Sergeant D's agreement). Entry 290's C (PIC: `AA=28` while SAT is on, slot-limited, TASK-1767) stays a maintainer decision without his answer.
 
 **Task:** TASK-1759 (implementation of A per ADR-224; C per entry 290), related TASK-1707, TASK-1767. **Open:** C on PIC boards (asked separately as Q-1759b, queued).
+
+## 292. Greek web UI: Hot water card title "Ζεστό Νερό Χρήσης", standalone DHW switch "Ενεργοποίηση ΖΝΧ", Home room cell "ΕΣΩΤΕΡΙΚΗ" (Sergeant D, 2026-11-10)
+
+**Source:** sergeantd, #dev-sat-mqtt (channel 1105556725714649128), three messages, each with a screenshot of his web UI in Greek (relayed by otgw-firmware-97, screenshots in its session scratchpad `greekshots/shot1.png`, `shot2.png`):
+- 2026-11-10 09:36:08 UTC, msg 1569631735581253643 (https://discord.com/channels/812969634638725140/1105556725714649128/1569631735581253643). We asked which of two switches he meant (A standalone, B tank-only) in msg 1569635443606159451.
+- 2026-11-10 13:36:58 UTC, msg 1569692344758829138 (https://discord.com/channels/812969634638725140/1105556725714649128/1569692344758829138), screenshot of the SAT page Hot water card.
+- 2026-11-10 13:40:40 UTC, msg 1569693277198880791 (https://discord.com/channels/812969634638725140/1105556725714649128/1569693277198880791), screenshot of a Home grid cell "ΧΩΡΟΣ 20.4°".
+
+**Quoted:**
+- "The domestic hot water enable switch in the Hot water card should be remained to “Ενεργοποίηση ΖΝΧ”"
+- "Rename title to “Ζεστό Νερό Χρήσης”\n\nRename “Αυτόνομος έλεγχος ΖΝΧ” to\n“Ενεργοποίηση ΖΝΧ”"
+- "Rename “ΧΩΡΟΣ” to “ΕΣΩΤΕΡΙΚΗ”"
+
+**Settled (translation only, no SAT behaviour):** in `i18n/el.json`:
+- `h_mon.sat_hw_title` (SAT page Hot water card title): "Ζεστό νερό" -> "Ζεστό Νερό Χρήσης".
+- `h_mon.sat_dhw_standalone` (the always-visible switch, our option A) and its aria label: "Αυτόνομος έλεγχος ΖΝΧ" -> "Ενεργοποίηση ΖΝΧ". His second message answers our A/B question: A.
+- `home.cell_room` (Home grid cell, label above the value as in his screenshot): "ΧΩΡΟΣ" -> "ΕΣΩΤΕΡΙΚΗ".
+
+**Interpretation (ours):** "remained" in the first message reads as "renamed". The room rename applies to the grid cell he showed (`home.cell_room`), not to the label beside the house in the Home drawing (`h_home.svg_room`, also "ΧΩΡΟΣ") or the other keys that read "Ζεστό νερό" / "Χώρος" (`h_home.tile_dhw`, `h_home.stat_dhw`, `settings.group.hot_water`, `adv.pic_led_w`, `home.chip_room`, `h_mon.sat_tile_room`, `tools.legend_room`, `graph.series_room`, `home.cell_room_set` "ΣΤΟΧΟΣ ΧΩΡΟΥ"). Those stay as they are until he says otherwise.
+
+**Changes an earlier entry:** none. **Task:** TASK-1777. **Open:** (1) the hint under the slider, `h_mon.sat_dhw_hint`, still says "ο αυτόνομος έλεγχος ΖΝΧ"; a rewording goes to him first. (2) With a DHW tank the card also shows the switch "Ενεργοποίηση ΖΝΧ (HW=)" (`h_mon.sat_dhw_enable`), now nearly the same label as the renamed one. (3) Whether the other "Ζεστό νερό" / "Χώρος" keys should follow.

@@ -3,9 +3,11 @@ id: TASK-1777
 title: >-
   Web UI Greek review: apply Sergeant D's corrections to el.json (first: the DHW
   switch on the Hot water card)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-10T12:18:00Z'
+updated_date: '2026-11-10T12:51:00Z'
 labels:
   - webui
   - i18n
@@ -23,7 +25,13 @@ Sergeant D (Greek native speaker) reviews the Greek web UI pack. First correctio
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Each correction recorded verbatim with msg link in docs/sat/sergeant-d-corrections.md before it is applied
+- [x] #1 Each correction recorded verbatim with msg link in docs/sat/sergeant-d-corrections.md before it is applied
 - [ ] #2 el.json changed only for keys he named; i18n-lang and i18n-followups tests green
 - [ ] #3 Shipped in an alpha build and checked on a bench unit in Greek
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-10 13:50 Sergeant D answered (entry 292): A (the always-visible switch) -> 'Ενεργοποίηση ΖΝΧ', SAT Hot water title -> 'Ζεστό Νερό Χρήσης', Home grid cell home.cell_room 'ΧΩΡΟΣ' -> 'ΕΣΩΤΕΡΙΚΗ'. Recorded in docs/sat/sergeant-d-corrections.md entry 292 (index refreshed) before applying. el.json: h_mon.sat_hw_title, h_mon.sat_dhw_standalone (also its aria label, same key), home.cell_room. Tests: i18n-lang 6/6, i18n-followups 3/3, i18n-no-hardcoded 3/3. Open questions via 97: the slider hint wording, the near-identical tank switch label 'Ενεργοποίηση ΖΝΧ (HW=)', and whether other 'Ζεστό νερό'/'Χώρος' keys follow.
+<!-- SECTION:NOTES:END -->
