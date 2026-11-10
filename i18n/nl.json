@@ -363,6 +363,8 @@
     "graph_autopng": "Auto-PNG",
     "graph_autopng_title": "Elke 5 minuten automatisch een PNG opslaan",
     "graph_flame": "vlam",
+    "graph_dhw": "WW",
+    "graph_ch": "CV",
     "log_aria": "Live OpenTherm-log",
     "log_autodl": "Auto-download",
     "log_autodl_title": "De log elke 15 minuten automatisch downloaden",

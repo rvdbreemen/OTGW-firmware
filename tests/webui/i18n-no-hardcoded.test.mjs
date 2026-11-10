@@ -32,6 +32,9 @@ function looksEnglish(text) {
   let s = String(text);
   s = s.replace(/<[^>]*>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ');
   s = s.replace(/\{\{[^}]*\}\}|\$\{[^}]*\}/g, ' ');
+  // TASK-1791: DHW, CH and HP are abbreviations the packs translate (WW/CV, ZNX/THERM ...), so a text that contains one of
+  // them counts as text even in capitals and even though KEEP drops DHW and CH from prose; other all-caps codes (LED, PIC, MQTT) stay codes.
+  if (/(^|[^A-Za-z])(DHW|CH|HP)([^A-Za-z]|$)/.test(s.trim())) return true;
   s = s.replace(UNIT, ' ').replace(KEEP, ' ');
   // a CSS selector, path, url, identifier or format token is not prose
   if (/^[\w.#:\[\]=>~*, -]*$/.test(s.trim()) && /[#.\[\]=>:_]|^[a-z0-9-]+$/.test(s.trim()) && !/\s[A-Za-z]{3,}\s/.test(' ' + s.trim() + ' ')) return false;

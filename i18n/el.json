@@ -363,6 +363,8 @@
     "graph_autopng": "Αυτόματο PNG",
     "graph_autopng_title": "Αυτόματη αποθήκευση PNG κάθε 5 λεπτά",
     "graph_flame": "φλόγα",
+    "graph_dhw": "ΖΝΧ",
+    "graph_ch": "ΘΕΡΜ",
     "log_aria": "Ζωντανή καταγραφή OpenTherm",
     "log_autodl": "Αυτόματη λήψη",
     "log_autodl_title": "Αυτόματη λήψη της καταγραφής κάθε 15 λεπτά",

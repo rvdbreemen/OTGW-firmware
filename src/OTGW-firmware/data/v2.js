@@ -484,6 +484,8 @@
       "graph_autopng": "Auto-PNG",
       "graph_autopng_title": "Auto-save a PNG every 5 minutes",
       "graph_flame": "flame",
+      "graph_dhw": "DHW",
+      "graph_ch": "CH",
       "log_aria": "Live OpenTherm log",
       "log_autodl": "Auto-download",
       "log_autodl_title": "Download the log automatically every 15 minutes",
