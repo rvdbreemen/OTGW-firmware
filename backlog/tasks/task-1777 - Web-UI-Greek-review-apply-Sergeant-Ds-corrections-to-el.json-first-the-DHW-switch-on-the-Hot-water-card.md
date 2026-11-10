@@ -3,11 +3,11 @@ id: TASK-1777
 title: >-
   Web UI Greek review: apply Sergeant D's corrections to el.json (first: the DHW
   switch on the Hot water card)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-10T12:18:00Z'
-updated_date: '2026-11-10T19:39:00Z'
+updated_date: '2026-11-10T22:46:00Z'
 labels:
   - webui
   - i18n
@@ -26,8 +26,8 @@ Sergeant D (Greek native speaker) reviews the Greek web UI pack. First correctio
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Each correction recorded verbatim with msg link in docs/sat/sergeant-d-corrections.md before it is applied
-- [ ] #2 el.json changed only for keys he named; i18n-lang and i18n-followups tests green
-- [ ] #3 Shipped in an alpha build and checked on a bench unit in Greek
+- [x] #2 el.json changed only for keys he named; i18n-lang and i18n-followups tests green
+- [x] #3 Shipped in an alpha build and checked on a bench unit in Greek
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -44,4 +44,12 @@ Sergeant D (Greek native speaker) reviews the Greek web UI pack. First correctio
 2026-11-10 16:00 entry 295: Q3 answered A ('Α'): el.json h_home.tile_dhw, h_home.stat_dhw, settings.group.hot_water -> 'Ζεστό Νερό Χρήσης'; h_home.svg_room -> 'ΕΣΩΤΕΡΙΚΗ'; settings.label.satdhwsetpoint -> 'Θερμοκρασία στόχος ΖΝΧ'. Scope = the Q3 list; adv.pic_led_w and the mixed-case 'Χώρος' keys unchanged. All Greek review answers (Q1-Q3) are in; build after the 16:21 public-beta freeze and the 4c/detectie benches, re-bumped to the free number.
 
 2026-11-10 evening: rebased onto 008bec20e. Contains the Home chips/cell grid DHW labels (t('home.chip_dhw'), t('home.cell_dhw'); nl/de WW, el ΖΝΧ). i18n-followups 4/4 (red on the previous v2.js for the chip/cell check), i18n-lang 6/6, i18n-no-hardcoded 3/3, v2-undefined-names 2/2 (after npm ci --prefix tests/webui), v2-nested-helper-scope 2/2. Greek entries 292-295 are already on origin (e93a8c07e, 0b835ccc0, 75ed5ac29).
+
+2026-11-10 23:50 shipped in beta.172 (a905bc2a5, pushed 4595fa65a..0d02754a5 with beta.173; zip msg 1569845393427009538). Bench .63 (Classic+PIC, OTA app+fs, settings 150 keys 0 differences, PIC gateway 6.8 found): headless Chrome DOM dumps en/nl/de/el-GR show the Home chips 'DHW'/'WW'/'WW'/'ΖΝΧ' and all of entries 292-295 live in el: title 'Ζεστό Νερό Χρήσης', switch 'Ενεργοποίηση ΖΝΧ', slider 'Θερμοκρασία στόχος ΖΝΧ', hint (answer B), h_home tile/stat 'Ζεστό Νερό Χρήσης', drawing label 'ΕΣΩΤΕΡΙΚΗ'. AC2 note: besides the keys Sergeant D named (entries 292-295), el.json gained home.chip_dhw/cell_dhw 'ΖΝΧ' (glossary term he uses himself), not a rename of his. Tests: i18n-lang 6/6, i18n-followups 4/4. Chrome note: --lang=el gives an empty dump (also for a data: URL), --lang=el-GR works: a Chrome quirk, not the UI.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: every Sergeant D correction recorded first (entries 292-295, his messages verbatim with links). AC2: el.json changed for the keys he named plus the chip/cell 'ΖΝΧ' labels from the glossary; i18n-lang 6/6, i18n-followups 4/4. AC3: shipped in beta.172 (a905bc2a5; zip msg 1569845393427009538 covers 172+173), bench .63 DOM dumps in Greek show every renamed label live. Not seen live: the SAT settings form (Playwright unavailable this session).
+<!-- SECTION:FINAL_SUMMARY:END -->
