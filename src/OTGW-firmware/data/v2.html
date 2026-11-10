@@ -88,7 +88,7 @@
         <button class="seg2btn" data-appl="hp">⚡ <span data-i18n="h_home.appl_hp">Heat pump</span></button>
       </span>
       <!-- TASK-984: injected-value badge. Hidden when zero; opens the override panel. -->
-      <button class="ovr-badge hidden" id="aOvrBadge" style="margin-left:auto" title="The gateway is injecting values onto the OT bus — click for detail" data-i18n-title="h_home.ovr_badge_title">⛓ <span id="aOvrCount">0</span> <span data-i18n="h_home.ovr_badge_suffix">injected</span></button>
+      <button class="ovr-badge hidden" id="aOvrBadge" style="margin-left:auto" title="The gateway is injecting values onto the OT bus — click for detail" data-i18n-title="h_home.ovr_badge_title">⛓ <span id="aOvrCount">0</span> <span id="aOvrCountSfx" data-i18n-skip>injected</span></button>
     </div>
 
     <svg class="schematic" id="schem" viewBox="0 0 800 470" role="img"
@@ -464,7 +464,7 @@
       <div class="set-cards" id="satSetL3"></div>
     </div>
     <div class="savebar" id="satSaveBar">
-      <span class="msg"><b id="satDirtyCount">0</b> <span data-i18n="h_mon.sat_unsaved">unsaved change(s)</span></span>
+      <span class="msg"><b id="satDirtyCount">0</b> <span id="satDirtyCountSfx" data-i18n-skip>unsaved changes</span></span>
       <button class="discard" id="satBtnDiscard" data-i18n="h_mon.sat_discard">Discard</button>
       <button class="save" id="satBtnSave" data-i18n="h_mon.sat_save">Save settings</button>
     </div>
@@ -727,7 +727,7 @@
     <div>
       <div class="set-cols" id="setCols"></div>
       <div class="savebar" id="saveBar">
-        <span class="msg"><b id="dirtyCount">0</b> <span data-i18n="h_set.unsaved_suffix">unsaved change(s)</span></span>
+        <span class="msg"><b id="dirtyCount">0</b> <span id="dirtyCountSfx" data-i18n-skip>unsaved changes</span></span>
         <button class="discard" id="btnDiscard" data-i18n="h_set.discard">Discard</button>
         <button class="save" id="btnSave" data-i18n="h_set.save">Save settings</button>
       </div>

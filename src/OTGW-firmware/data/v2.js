@@ -425,7 +425,8 @@
       "appl_boiler": "Boiler",
       "appl_hp": "Heat pump",
       "ovr_badge_title": "The gateway is injecting values onto the OT bus — click for detail",
-      "ovr_badge_suffix": "injected",
+      "ovr_badge_suffix_one": "injected",
+      "ovr_badge_suffix_other": "injected",
       "schem_aria": "Live diagram of the heating system",
       "svg_dhw": "DHW",
       "svg_outside": "OUTSIDE",
@@ -559,7 +560,8 @@
       "sat_tile_setpoint_tag": "SAT → boiler",
       "sat_tile_target": "Target",
       "sat_tuning_head": "SAT tuning",
-      "sat_unsaved": "unsaved change(s)",
+      "sat_unsaved_one": "unsaved change",
+      "sat_unsaved_other": "unsaved changes",
       "sat_weather": "Weather",
       "stats_filter_ph": "Filter by name or msg id…",
       "stats_overrides": "Active gateway overrides",
@@ -605,7 +607,8 @@
       "discard": "Discard",
       "save": "Save settings",
       "search_ph": "Search settings… (e.g. broker, ntp, pin)",
-      "unsaved_suffix": "unsaved change(s)",
+      "unsaved_suffix_one": "unsaved change",
+      "unsaved_suffix_other": "unsaved changes",
       "tab_pic": "PIC firmware",
       "tab_debug": "Debug Information",
       "tab_files": "File System",
@@ -680,6 +683,9 @@
       "tag_modulation": "MODULATION",
       "lcd_fault": "FAULT",
       "lcd_idle": "{{lead}} idle",
+      "lcd_lead_ch": "CH",
+      "lcd_lead_hp": "HP",
+      "lcd_dhw": "DHW {{temp}}°",
       "lcd_standby": "STANDBY",
       "tile_compressor": "Compressor",
       "tile_flame": "Flame",
@@ -1796,7 +1802,7 @@
     [function () { applyTheme(document.documentElement.getAttribute('data-theme') === 'dark'); },
      function () { var d = null; try { d = localStorage.getItem('otgw-v2-design'); } catch (e) { } showDesign(d || 'a'); },
      renderConnStrip, renderHdrNet, renderConnMap, renderStats, renderSupport, renderValues,
-     renderSettings, renderSatSettings, renderOvrPanel, scheduleRender
+     renderSettings, renderSatSettings, renderOvrPanel, scheduleRender, updateSaveBar
     ].forEach(function (f) { try { f(); } catch (e) { } });
   }
 
@@ -2882,14 +2888,15 @@
       var no = ovrRows.length;
       aob.classList.toggle('hidden', !no);
       txt('aOvrCount', no);
+      txt('aOvrCountSfx', t('h_home.ovr_badge_suffix', { count: no }));
       if (!aob._wired) { aob._wired = true; aob.addEventListener('click', function (e) { e.stopPropagation(); toggleOvrPanel(); }); }
     }
     txt('aModBig', model.mod === null ? '—' : Math.round(model.flame ? model.mod : 0) + '%');
     txt('aModTag', isHP ? t('home.tag_compressor') : t('home.tag_modulation'));
     // LCD context line: FAULT / DHW xx° / HP|CH xx% / HP|CH idle
-    var lead = isHP ? 'HP' : 'CH';
+    var lead = t(isHP ? 'home.lcd_lead_hp' : 'home.lcd_lead_ch');
     var lcd = model.fault ? t('home.lcd_fault')
-            : model.dhw_on ? ('DHW ' + (model.dhw === null ? '--' : Math.round(model.dhw)) + '°')
+            : model.dhw_on ? t('home.lcd_dhw', { temp: model.dhw === null ? '--' : Math.round(model.dhw) })
             : model.flame ? (lead + ' ' + (model.mod === null ? '--' : Math.round(model.mod)) + '%')
             : (model.ch ? t('home.lcd_idle', { lead: lead }) : t('home.lcd_standby'));
     txt('aLcd', lcd);
@@ -4609,8 +4616,8 @@
     status.textContent = t('settings.wh_not_fired');
     var btns = ['on', 'off'].map(function (st) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'tbtn';
-      b.textContent = t('settings.wh_send_test', { state: st.toUpperCase() });
-      b.title = t('settings.wh_send_title', { state: st.toUpperCase() });
+      b.textContent = t('settings.wh_send_test', { state: t(st === 'on' ? 'home.on' : 'home.off') });
+      b.title = t('settings.wh_send_title', { state: t(st === 'on' ? 'home.on' : 'home.off') });
       b.addEventListener('click', function () { fire(st); });
       wrap.appendChild(b);
       return b;
@@ -4626,7 +4633,7 @@
       var en = document.querySelector('#setCols .srow[data-key="webhookenable"] input.sw');
       if (en && !en.checked) { done('', t('settings.wh_disabled')); return; }
       btns.forEach(function (b) { b.disabled = true; });   // one test call in flight at a time
-      status.className = 'wh-status'; status.textContent = t('settings.wh_sending', { state: st.toUpperCase() });
+      status.className = 'wh-status'; status.textContent = t('settings.wh_sending', { state: t(st === 'on' ? 'home.on' : 'home.off') });
       // credentials:'same-origin' so HTTP Basic-Auth + CSRF same-origin (ADR-056) hold.
       fetch(APIGW + 'v2/webhook/test?state=' + st, { method: 'POST', credentials: 'same-origin' })
         .then(function (r) {
@@ -4636,7 +4643,7 @@
             var ack = 'ok';
             try { var j = JSON.parse(body); if (j && j.status) ack = j.status; }
             catch (e) { /* non-JSON ack still counts as sent */ }
-            done(' ok', t('settings.wh_sent', { state: st.toUpperCase(), ack: ack, time: new Date().toTimeString().slice(0, 8) }));
+            done(' ok', t('settings.wh_sent', { state: t(st === 'on' ? 'home.on' : 'home.off'), ack: ack, time: new Date().toTimeString().slice(0, 8) }));
           });
         })
         .catch(function (e) { done('', t('settings.wh_error', { message: (e && e.message) ? e.message : t('settings.wh_network') })); });
@@ -4722,6 +4729,7 @@
     [['saveBar', 'dirtyCount'], ['satSaveBar', 'satDirtyCount']].forEach(function (ids) {
       var bar = document.getElementById(ids[0]), cnt = document.getElementById(ids[1]);
       if (cnt) cnt.textContent = n;
+      txt(ids[1] + 'Sfx', t(ids[1] === 'dirtyCount' ? 'h_set.unsaved_suffix' : 'h_mon.sat_unsaved', { count: n }));
       if (bar) bar.classList.toggle('show', n > 0);
     });
   }
