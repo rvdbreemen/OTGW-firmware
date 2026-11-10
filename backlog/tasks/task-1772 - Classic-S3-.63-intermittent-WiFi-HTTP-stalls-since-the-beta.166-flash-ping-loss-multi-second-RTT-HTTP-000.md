@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-10T03:29:00Z'
+updated_date: '2026-11-10T03:32:00Z'
 labels:
   - bench
   - network
@@ -27,3 +28,9 @@ Coordinator's overnight checks (2026-11-10): .63 (Classic + PIC, beta.166+c701f6
 - [ ] #1 Capture: 30-60 min ping + device/info timing + telnet [HEAP]/loop-stall log on .63 and .61 side by side, plus the router's WiFi client stats for both MACs
 - [ ] #2 Baseline: same measurement on .63 with the previous firmware (beta.165 or older) or a note why it cannot be done; verdict radio vs firmware with evidence
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Correction 2026-11-10 (otgw-firmware-80): the .61 comparison above (1 timeout, max 7.7 s) is NOT usable: it ran around 04:25-04:26 and probably overlapped 4c's first TASK-1757 reboot of .61 at 04:26:44. Only the .63 numbers stand; .61 needs a clean re-measurement outside a reboot run.
+<!-- SECTION:NOTES:END -->

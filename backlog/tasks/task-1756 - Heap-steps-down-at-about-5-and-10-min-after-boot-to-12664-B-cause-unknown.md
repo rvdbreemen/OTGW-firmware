@@ -1,10 +1,11 @@
 ---
 id: TASK-1756
 title: Heap steps down at about +5 and +10 min after boot (to 12664 B), cause unknown
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-09T17:03:00Z'
-updated_date: '2026-11-09T22:08:00Z'
+updated_date: '2026-11-10T03:33:00Z'
 labels:
   - heap
   - bug
@@ -26,6 +27,21 @@ Found in TASK-1528 step b (bench .61, beta.162+5786928, 2026-11-09, 10 reboots, 
 - [ ] #2 Name the job or allocation that causes each step, with evidence (telnet [HEAP] lines or an instrumented build), and rule out the device/info poll of the test itself
 - [ ] #3 Decide with Robert: bound or fix it, or accept it with the numbers recorded
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Measurement plan (otgw-firmware-80, 2026-11-10; builds on 030509's analysis in comment #1). Goal: name the cause of the ~305 s and ~610 s steps with A/B evidence, not timing alone. Bench .61 only after 4c's TASK-1757 run (~06:20), current dev build, clean boots (reboot via REST, no browser open).
+Logging per run (all read-only): (a) telnet, debug flags for heap + SAT weather + MQTT, capture '[HEAP]' lines, 'Weather: fetching', 'Heap: ... bytes free' (logHeapStats every 60 s) with PC timestamps; (b) device/info hd_min_free_heap / hd_min_max_block / freeheap / maxfreeblock. To rule out the poll itself (AC2): runs B use device/info every 60 s instead of 5 s, and one run polls nothing except telnet.
+Runs (2 clean boots each, 12 min per boot):
+A0 baseline: weather on, MQTT on, poll 5 s (reproduces 030509's data).
+A1 weather off (satweatherenable false): if the ~305 s step disappears -> weather fetch confirmed (candidate 1).
+A2 weather on, poll 60 s / no poll: steps unchanged -> the test's own poll is ruled out.
+A3 MQTT off (broker unreachable or mqttenable false): the ~310/610 s birth re-assert and the timer5min burst go away; isolates candidates 2/3 and the SAT-sim publish burst (candidate 5; also SAT sim off in A3b).
+A4 window artifact (candidate 4): read hd_min_free_heap just before and just after the '[HEAP] boot done' / 600 s timeout line with no other activity; a drop with no allocation = merge artifact, not a leak.
+Old-vs-fix: once a cause is named, the fix (e.g. weather fetch with a bounded RX / earlier stream drain, or reporting the window-merged minimum separately) is measured with the same A0 run before and after. Decision on bound/fix/accept goes to Robert (AC3) with the numbers.
+Settings saved before and restored after each run (A1/A3 change settings).
+<!-- SECTION:PLAN:END -->
 
 ## Comments
 
