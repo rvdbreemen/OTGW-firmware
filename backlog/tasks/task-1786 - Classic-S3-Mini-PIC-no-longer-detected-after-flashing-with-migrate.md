@@ -4,7 +4,7 @@ title: 'Classic + S3 Mini: PIC no longer detected after flashing with --migrate'
 status: To Do
 assignee: []
 created_date: '2026-11-10T18:52:00Z'
-updated_date: '2026-11-10T19:38:00Z'
+updated_date: '2026-11-10T22:18:00Z'
 labels:
   - needs-maintainer-ok
   - bug
@@ -34,4 +34,6 @@ Waiting for capture.
 Time correction (2026-11-10): the report time above is local CET. From the message snowflake the correct time is 2026-11-10 18:44:03 UTC (msg 1569784722903662795).
 
 Captures received 2026-11-10 18:10 UTC (msgs 1569791410595565642, 1569791462365724854), analysed in the comms session (local copy RvdB/capture-thaghost-1110). 1.7.7 (Wemos, IP .42, host otgw): PIC 'gateway v6.8 id pic16f1847', MQTT connected to 192.168.10.2, uptime 15 min. 2.0.0-beta.170+d260e69 (S3, MAC AC:27:6E:CB:E5:90, IP .66, host OTGW2): /api/v2/device/info board 'Nodoshop OTGW Combo (ESP32-S3)', hardwaremode Degraded, otcommandinterface None, otdirectavailable false; telnet banner PIC 'no pic found', OTbus offline; 'PIC is unknown, probe pic using PR=A' at 18:59:05 UTC with no PIC answer in the 11 s left; 0 OT frames. Board Mode 0 (auto). reboot_log: 18:54:05 power on, 18:58:03 software reset 'Reboot after upgrade'; the capture started 18:58:35, 32 s after that reboot, so the boot-time detection lines are not in it. Settings on 2.0.0 look like defaults (MQTT disabled, broker homeassistant.local), unlike 1.7.7 (broker 192.168.10.2): settings were not carried over (relates to TASK-1774?), not verified how he flashed. Next: a capture that is running BEFORE a restart (restart from the web UI during the capture), plus confirm it is the same gateway board and how the S3 was seated.
+
+2026-11-10 (comms) second 2.0 capture (20:58 local, zip 20261110-205823-upload-2.0.0-beta-pic-niet-gedetecteerd.zip in ../capture-thaghost-1110b, Discord msg 1569805728946851881): spans a web-UI reboot ('Reboot after upgrade' 20:58:16 local) but telnet reconnected 11 s later (gap 20:58:27-20:58:38), so the boot detection window is again missing. Board Mode is now 1 (pic) (first capture 19:58: 0 auto); forced PIC mode still logs 'PIC is unknown, probe pic using PR=A' with no reply, otframes 0 frames, hardware.mode Degraded. Photo: PCB silkscreen 'Opentherm Gateway V2.12 (c) 2024 nodo-shop.nl' (user wrote V2.13), PIC16F1847 seated, 24V/5V/3V3 LEDs lit, purple LOLIN S3 Mini in the Wemos socket; pin seating not judgeable from a top view. Robert 2026-11-10: the board is the same as other Nodo boards and should work. Asked thaghostnl (msg 1569838519357022209) for /bootdetect.log and side photos of both header rows. No cause claimed.
 <!-- SECTION:NOTES:END -->
