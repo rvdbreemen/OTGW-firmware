@@ -134,7 +134,7 @@ class WebUiMatchesConstants(unittest.TestCase):
         body = _function_body(JS, r"function satRenderDhw\(d\)\s*\{")
         self.assertIn("d.dhw_enabled", body)
         self.assertIn("slider.disabled", body)
-        self.assertIn("'off'", body)
+        self.assertIn("t('tools.sat_dhw_off')", body)  # TASK-1764: the off text is translated
 
     def test_toggle_posts_dhw_enabled_with_in_flight_guard(self):
         m = re.search(r"var dsOn = document\.getElementById\('satDhwEnabled'\);(.*?)var de = ", JS, re.S)

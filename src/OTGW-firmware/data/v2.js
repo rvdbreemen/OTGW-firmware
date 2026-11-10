@@ -4079,7 +4079,6 @@
     ['Areas', ['satsensorarea0', 'satsensorarea1', 'satsensorarea2', 'satsensorarea3', 'satmultiarea',
                'satmultiareacount', 'satareaweight0', 'satareaweight1', 'satareaweight2', 'satareaweight3', 'satzonecount']],
     ['Weather', ['satweatherenable', 'satweatherlat', 'satweatherlon', 'satweatherinterval']],
-    ['Hot water', ['satdhwenabled', 'satdhwenable', 'satdhwsetpoint']],
     ['Season', ['satsummersimmer', 'satsummerthreshold', 'satsummerminhours', 'satwindowdetect', 'satwindowminsec']]
   ];
   var SAT_L3 = [
@@ -4098,7 +4097,9 @@
     ['Simulation', ['satsimulation', 'satsimheatrate', 'satsimcoolrate']]
   ];
   // TASK-1530: satmaxmodulation is set only by the Max relative modulation slider (Central Heating Settings).
-  var SAT_NOT_IN_FORMS = { satenabled: 1, satmaxmodulation: 1 };
+  // TASK-1779 (Robert 2026-11-10, Sergeant D's suggestion): the hot-water settings live only on the
+  // SAT Hot water card (satDhwEnabled, satDhwSlider, satDhwEnable), so no form repeats them.
+  var SAT_NOT_IN_FORMS = { satenabled: 1, satmaxmodulation: 1, satdhwenabled: 1, satdhwenable: 1, satdhwsetpoint: 1 };
   // TASK-1529: the PWM card shows only the cycle setting the firmware uses for the chosen appliance type:
   // heat pump (satsource 2) and hybrid (3, entry 188) -> sathpcycle, otherwise (Auto = gas, gas) -> satcyclesperhour
   // (satGetPwmPeriodSec / satGetEffectiveHeatingSource in SATcontrol.ino).
