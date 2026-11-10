@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "build"
   - "sdkconfig"
@@ -30,6 +29,7 @@ symbols:
   - "esp_ipc_call_blocking"
   - "gpio_install_isr_service"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -145,7 +145,7 @@ Before acceptance the rebuild must show:
 
 - [ ] Does pioarduino 55.03.35 `custom_sdkconfig` rebuild the libs reproducibly with build.bat and CI, and how long does it take? (measurement)
 - [ ] 1280 (the IDF default) or more (e.g. 1536)? Decide after reading the high-water mark on the bench.
-- [ ] Acceptance of the build cost by Robert.
+- [x] Acceptance of the build cost by Robert. — **Answered 2026-11-10 by User: Robert van den Breemen (relayed by the `Coordinator OTGW` session):** Robert accepts the build cost, 2026-11-10 ~17:00, via AskUserQuestion in the coordinator's session: 'Accept, build it now'
 
 ## Related Decisions
 
