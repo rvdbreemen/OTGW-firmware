@@ -1,7 +1,7 @@
 ---
 id: "ADR-226"
 title: "Use acorn and eslint-scope as test-only dependencies for a parser-based undefined-name gate on the web UI"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-10"
 binding: false
 gate: "tests/webui/v2-undefined-names.test.mjs"
@@ -9,12 +9,25 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
-topics: ["web UI tests", "undefined names", "ReferenceError", "test dependencies", "npm"]
-aliases: ["parser gate", "undefined-name gate", "acorn", "eslint-scope"]
-components: ["tests/webui/package.json", "tests/webui/v2-undefined-names.test.mjs"]
-symbols: ["ALLOW", "unresolvedNames"]
+topics:
+  - "web UI tests"
+  - "undefined names"
+  - "ReferenceError"
+  - "test dependencies"
+  - "npm"
+aliases:
+  - "parser gate"
+  - "undefined-name gate"
+  - "acorn"
+  - "eslint-scope"
+components:
+  - "tests/webui/package.json"
+  - "tests/webui/v2-undefined-names.test.mjs"
+symbols:
+  - "ALLOW"
+  - "unresolvedNames"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -23,7 +36,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-10. Robert approved adding the dependency on 2026-11-10 (relayed by the
+Accepted, 2026-11-10.
 coordinating session); acceptance of this record waits for his explicit yes on the record itself.
 
 ## Status History
@@ -35,21 +48,26 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-10
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-The v2 web UI is one large script, `src/OTGW-firmware/data/v2.js` (about 8,000 lines, no build
+The v2 web UI (user interface) is one large script, `src/OTGW-firmware/data/v2.js` (about 8,000 lines, no build
 step, no bundler, no type checker). Release 2.0.0-beta.166 shipped calls to the helper `esc()` from
 functions outside the scope that defines it. The browser threw a `ReferenceError` (a runtime error
-for a name that resolves to no declaration), the SAT page stopped rendering and a lock on it was not
-applied. All web UI tests at the time were regex or DOM tests; none of them could see scope.
+for a name that resolves to no declaration), the SAT (Smart Autotune Thermostat) page stopped rendering and a lock on it was not
+applied. All web UI tests at the time were regex or DOM (Document Object Model) tests; none of them could see scope.
 TASK-1768 added `tests/webui/v2-nested-helper-scope.test.mjs`, which catches the specific pattern
 of beta.166, but not a misplaced name in general.
 
 Constraints: the firmware build and the LittleFS image must not change; the project rule is to reuse
 an open-source solution before building one, with as few dependencies as possible; until now the
-web UI tests ran on plain `node --test` with no npm packages at all, and no CI job runs them (they
+web UI tests ran on plain `node --test` with no npm packages at all, and no CI (continuous integration) job runs them (they
 run locally through `python scripts/run_tests.py --webui`).
 
 ## Decision
@@ -113,7 +131,7 @@ the allowlist cannot silently grow.
 
 - Any undeclared name in `v2.js` fails a local test before a build, instead of a page failing in a
   tester's browser.
-- Small footprint: 6 packages, 944 KB installed, all MIT or BSD-2-Clause; nothing reaches a device.
+- Small footprint: 6 packages, 944 KB (kilobytes) installed, all under the MIT licence or the BSD-2-Clause (Berkeley Software Distribution) licence; nothing reaches a device.
 
 **Negative:**
 
@@ -126,7 +144,7 @@ the allowlist cannot silently grow.
 
 ## Open Questions
 
-- [ ] Robert's explicit yes on this record (the dependency itself was approved on 2026-11-10).
+- [x] Robert's explicit yes on this record (the dependency itself was approved on 2026-11-10). — **Answered 2026-11-10 by User: Robert van den Breemen:** Yes: Robert accepted the record in session otgw-firmware-80 (AskUserQuestion, 2026-11-10).
 
 ## Related Decisions
 

@@ -8816,13 +8816,30 @@
       "title": "Use acorn and eslint-scope as test-only dependencies for a parser-based undefined-name gate on the web UI",
       "path": "ADR-226-use-acorn-and-eslint-scope-as-test-only-dependencies-for-a-parser-based-undefined-name-gate-on-the-web-ui.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-10",
       "decision_summary": "Add acorn (a JavaScript parser) and eslint-scope (scope analysis on its syntax tree) as pinned, test-only npm depende...",
-      "topics": [],
-      "aliases": [],
-      "components": [],
-      "symbols": [],
+      "topics": [
+        "npm",
+        "ReferenceError",
+        "test dependencies",
+        "undefined names",
+        "web UI tests"
+      ],
+      "aliases": [
+        "acorn",
+        "eslint-scope",
+        "parser gate",
+        "undefined-name gate"
+      ],
+      "components": [
+        "tests/webui/package.json",
+        "tests/webui/v2-undefined-names.test.mjs"
+      ],
+      "symbols": [
+        "ALLOW",
+        "unresolvedNames"
+      ],
       "context_scope": "selective",
       "decision_contract": {
         "must": [
