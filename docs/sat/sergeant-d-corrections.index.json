@@ -3910,6 +3910,19 @@
     "TASK-1777"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 293,
+   "title": "Greek web UI: the DHW slider hint names the renamed switch (Sergeant D, 2026-11-10; follows entry 292)",
+   "date": "2026-11-10",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569696654997590049",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1777"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

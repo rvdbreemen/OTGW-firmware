@@ -6300,3 +6300,13 @@ This confirms Robert's maintainer decision of entry 290 for direct mode. It also
 **Interpretation (ours):** "remained" in the first message reads as "renamed". The room rename applies to the grid cell he showed (`home.cell_room`), not to the label beside the house in the Home drawing (`h_home.svg_room`, also "ΧΩΡΟΣ") or the other keys that read "Ζεστό νερό" / "Χώρος" (`h_home.tile_dhw`, `h_home.stat_dhw`, `settings.group.hot_water`, `adv.pic_led_w`, `home.chip_room`, `h_mon.sat_tile_room`, `tools.legend_room`, `graph.series_room`, `home.cell_room_set` "ΣΤΟΧΟΣ ΧΩΡΟΥ"). Those stay as they are until he says otherwise.
 
 **Changes an earlier entry:** none. **Task:** TASK-1777. **Open:** (1) the hint under the slider, `h_mon.sat_dhw_hint`, still says "ο αυτόνομος έλεγχος ΖΝΧ"; a rewording goes to him first. (2) With a DHW tank the card also shows the switch "Ενεργοποίηση ΖΝΧ (HW=)" (`h_mon.sat_dhw_enable`), now nearly the same label as the renamed one. (3) Whether the other "Ζεστό νερό" / "Χώρος" keys should follow.
+
+## 293. Greek web UI: the DHW slider hint names the renamed switch (Sergeant D, 2026-11-10; follows entry 292)
+
+**Source:** sergeantd, #dev-sat-mqtt (channel 1105556725714649128), 2026-11-10 13:54:06 UTC, msg 1569696654997590049 (https://discord.com/channels/812969634638725140/1105556725714649128/1569696654997590049). Answers our Q1, asked by otgw-firmware-97 in msg 1569696288117620757 with options A (" ... μόνο όσο είναι ενεργή η Ενεργοποίηση ΖΝΧ."), B (" ... μόνο όταν ο διακόπτης Ενεργοποίηση ΖΝΧ είναι ανοιχτός.") and C (keep), our recommendation B.
+
+**Quoted:** "@BlueFlame Bot my answer is B"
+
+**Settled (translation only, no SAT behaviour):** `i18n/el.json` `h_mon.sat_dhw_hint` becomes "Το SAT στέλνει αυτή τη θερμοκρασία στον λέβητα μόνο όταν ο διακόπτης Ενεργοποίηση ΖΝΧ είναι ανοιχτός." (was "... μόνο όσο είναι ενεργός ο αυτόνομος έλεγχος ΖΝΧ.").
+
+**Changes an earlier entry:** settles open point (1) of entry 292. **Task:** TASK-1777. **Open:** points (2) the tank switch label and (3) the other "Ζεστό νερό" / "Χώρος" keys of entry 292.
