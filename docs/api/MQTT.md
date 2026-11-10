@@ -1063,7 +1063,7 @@ Payloads: `"true"` / `"false"`. Each of these corresponds to one of the auto-dis
 | `sat/push_setpoint` | `SATpushsetpoint` | Enable pushing setpoint changes to boiler |
 | `sat/external_temp` | `SATexternaltemp` | Prefer the MQTT/REST indoor temperature (`sat/indoor_temp`) over the thermostat room temperature. State: `sat/external_temp_enable` |
 | `sat/follow_thermostat` | `SATfollowthermostat` | A room setpoint change on the thermostat (MsgID 16) becomes the SAT target and clears an active preset. Defaults to the push-setpoint value on units with no stored value |
-| `sat/curve_self_tune` | `SATcurveselftune` | Heating curve self-tune on/off (default on): SAT changes the curve slope by 0.1 at most once a day, from the last 3 days of clean heating hours (ADR-205). State: `sat/curve_self_tune_enable` |
+| `sat/curve_self_tune` | `SATcurveselftune` | Heating curve self-tune on/off (default on): SAT decides once a day from the last 3 counted days of clean heating hours and changes the curve slope by 0.1; a change empties that window, so two steps are at least 3 counted days apart (ADR-205). State: `sat/curve_self_tune_enable` |
 | `sat/fireplace_mode` | `SATfireplace` | Fireplace mode (default off): SAT sends only the heating curve value to the control loop, P/I/D 0, exactly as with a missing room temperature. For a room with a stove or air conditioner. The room temperature stays shown |
 | `sat/preset_sync` | `SATpresetsync` | Enable HA preset-sync subscription |
 | `sat/dhw_enabled` | `SATdhwenabled` | Enable DHW heating |

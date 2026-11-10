@@ -4446,7 +4446,7 @@ components:
           description: "A room setpoint change on the thermostat (MsgID 16 Write-Data) becomes the SAT target and clears an active preset. A value within 0.25 C of the last TC= SAT pushed is the SAT echo and is ignored while push_setpoint is on; with push on a change is adopted only when the previous thermostat value was within 0.25 C of it. Units with no stored value get the push_setpoint value. Settable through POST /api/v2/sat/follow_thermostat."
         curve_self_tune:
           type: boolean
-          description: "Heating curve self-tune (ADR-205, default on). SAT changes the curve coefficient by 0.1 at most once a day from the last 3 days of clean heating hours. Off keeps the current coefficient. Settable through POST /api/v2/sat/curve_self_tune."
+          description: "Heating curve self-tune (ADR-205, default on). SAT decides once a day from the last 3 counted days of clean heating hours and changes the curve coefficient by 0.1; a change empties that window, so two steps are at least 3 counted days apart. Off keeps the current coefficient. Settable through POST /api/v2/sat/curve_self_tune."
         fireplace_mode:
           type: boolean
           description: "Fireplace mode (default false): SAT heats on the heating curve only with P, I and D at 0, as with a missing room temperature. Settable through POST /api/v2/sat/settings/fireplace_mode."
