@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.171
+**  Version  : v2.0.0-beta.172
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1384,6 +1384,10 @@ static void heapDripTickEnd(int msgId, bool ok, uint32_t topicsBefore) {
           (unsigned long)MQTTclient.queueSize(), (unsigned long)tickMin);
 }
 
+static void mqttConnectStageStart();  // TASK-1757 option C, defined after onMqttConnect
+static void mqttConnectStageTick();
+static void discoveryOutboxWaitReset();  // TASK-1757 option B, defined with discoveryCanPublishNow()
+
 void handleMQTT()
 {
   bootHeapTick();
@@ -1548,6 +1552,7 @@ void handleMQTT()
         // "unavailable" in HA while the link stays up. publishBirthOnline() bypasses
         // the heap/throttle gate so a low-heap moment cannot drop it again.
         if (DUE(timerMQTTbirthreassert)) publishBirthOnline();
+        mqttConnectStageTick();  // TASK-1757 option C: the staged connect follow-up
       }
       else
       { //onMqttDisconnect cleared the live flag — wait for next reconnect (42s).
@@ -1658,10 +1663,12 @@ void PrintMQTTError(){
 // espMqttClient async event handlers (TASK-865.7 / ADR-123 Phase 2)
 // =====================================================================
 
-// Birth + subscribe + republish + versioninfo. PubSubClient ran this inline in
-// MQTT_STATE_TRY_TO_CONNECT once connect() returned true; with the async client
-// it runs here, when the broker's CONNACK actually lands. sessionPresent is
-// unused (we always setCleanSession(true)).
+// Birth + republish decision + the two command subscriptions, when the broker's
+// CONNACK lands (PubSubClient ran this inline in MQTT_STATE_TRY_TO_CONNECT). The rest
+// of the connect follow-up (V2 migration subscribes, version info, PIC settings,
+// command-dropped state, unsupported msgIDs) is staged by mqttConnectStageTick() in
+// later handleMQTT() passes (TASK-1757). sessionPresent is unused (we always
+// setCleanSession(true)).
 static void onMqttConnect(bool sessionPresent) {
   (void)sessionPresent;
   if (sBootHeapState == BOOTHEAP_RUN) {
@@ -1716,20 +1723,64 @@ static void onMqttConnect(bool sessionPresent) {
     PrintMQTTError();
   }
   MQTTclient.subscribe("homeassistant/status", 0);
-  // TASK-410 / ADR-084: briefly subscribe to the six deprecated OT-bus topics so
-  // the broker delivers any lingering retained payloads from pre-2.0.0 firmware.
-  // The callback clears them; mqttV2MigrationTick() closes the window. No-op on
-  // clean brokers.
-  mqttV2MigrationOnConnect();
   DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
   connTraceSample();  // TASK-1757
-  sendMQTTversioninfo();
-  publishAllPICsettings();
-  publishCommandDroppedState();      // TASK-1439: replaces a retained ON left from before a reboot
-  publishBoilerUnsupportedMsgids();  // TASK-692 port: republish the retained CSV so HA/dashboards see it after every reconnect.
-  clearBoilerUnsupportedDirty();
-  DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
+  // TASK-1757 (Robert: option C): everything below the birth and the two command
+  // subscriptions leaves in later loop passes, in small portions (mqttConnectStageTick).
+  // Sending the whole connect burst at once (17+ packets) cost 30-50 KB of free heap in
+  // the 50-150 ms it was on the wire (bench .61, beta.171 connect trace).
+  mqttConnectStageStart();
+}
+
+// ---------------------------------------------------------------------------
+// TASK-1757 option C: staged connect follow-up. Each step queues a small group of
+// packets; the next step waits until the outbox is back to MQTT_CONNECT_STAGE_MAX_DEPTH
+// packets or fewer (the two command SUBSCRIBEs stay queued until their SUBACK), or at
+// most MQTT_CONNECT_STAGE_MAX_WAIT_MS, so a slow broker cannot hold the steps back.
+// One step per handleMQTT() pass, loop task only. Restarts on every connect; a
+// disconnect stops it (the next connect starts again at step 1).
+// ---------------------------------------------------------------------------
+static const uint32_t MQTT_CONNECT_STAGE_MAX_DEPTH   = 2;
+static const uint32_t MQTT_CONNECT_STAGE_MAX_WAIT_MS = 3000;
+static uint8_t  sConnStageStep   = 0;   // 0 = idle; 1..4 = next step to run
+static uint32_t sConnStageLastMs = 0;   // when the previous step (or the connect) ran
+
+static void mqttConnectStageStart() {
+  sConnStageStep   = 1;
+  sConnStageLastMs = millis();
+  discoveryOutboxWaitReset();  // option B: a wait from before the reconnect must not carry over
+}
+
+static void mqttConnectStageTick() {
+  if (sConnStageStep == 0) return;
+  if (!MQTTclient.connected()) { sConnStageStep = 0; return; }
+  const uint32_t now = millis();
+  if (mqttOutboxDepth() > MQTT_CONNECT_STAGE_MAX_DEPTH &&
+      (uint32_t)(now - sConnStageLastMs) < MQTT_CONNECT_STAGE_MAX_WAIT_MS) return;
+  switch (sConnStageStep) {
+    case 1:
+      // TASK-410 / ADR-084: briefly subscribe to the six deprecated OT-bus topics so the
+      // broker delivers any lingering retained payloads from pre-2.0.0 firmware. The
+      // callback clears them; mqttV2MigrationTick() closes the window 5 s after this
+      // subscribe (the window starts here, not at connect). No-op on clean brokers.
+      mqttV2MigrationOnConnect();
+      break;
+    case 2:
+      sendMQTTversioninfo();
+      break;
+    case 3:
+      publishAllPICsettings();
+      break;
+    case 4:
+      publishCommandDroppedState();      // TASK-1439: replaces a retained ON left from before a reboot
+      publishBoilerUnsupportedMsgids();  // TASK-692 port: republish the retained CSV so HA/dashboards see it after every reconnect.
+      clearBoilerUnsupportedDirty();
+      DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
+      break;
+  }
   connTraceSample();  // TASK-1757
+  sConnStageLastMs = now;
+  sConnStageStep = (sConnStageStep >= 4) ? 0 : (uint8_t)(sConnStageStep + 1);
 }
 
 // Disconnect / connect-refused. Records the reason for PrintMQTTError() and
@@ -1743,6 +1794,7 @@ static void onMqttConnect(bool sessionPresent) {
 static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason) {
   lastMqttDisconnectReason = reason;
   state.mqtt.bConnected = false;
+  discoveryOutboxWaitReset();  // TASK-1757 option B: the outbox is emptied on disconnect
   PrintMQTTError();
 }
 
@@ -2716,8 +2768,29 @@ static bool buildDiscoveryDeviceBlock(char *dest, size_t destSize, HaDiscoveryCo
 // composers' floor) ends the call and stays the next slot (g->failed), so a heap dip mid-id is retried instead of
 // marking the rest of the id done. A slot that fails while publishing is possible (an entity that does not apply)
 // is passed, as before.
+// TASK-1757 (Robert: option B): the discovery drip waits while the outbox holds more than
+// DISCOVERY_OUTBOX_MAX packets (the gate's false makes the drip retry the same slot next
+// tick, nothing is dropped). Bounded: after DISCOVERY_OUTBOX_MAX_WAIT_MS of continuous
+// waiting one publish is let through and the wait starts again, so a busy broker link slows
+// discovery to one config per 10 s instead of stalling it. The wait is reset on every
+// connect and disconnect (discoveryOutboxWaitReset), so a wait from before a drop cannot
+// open the gate at once after the reconnect.
+static const uint32_t DISCOVERY_OUTBOX_MAX         = 8;
+static const uint32_t DISCOVERY_OUTBOX_MAX_WAIT_MS = 10000;
+static bool     sDiscOutboxWaiting     = false;
+static uint32_t sDiscOutboxWaitSinceMs = 0;
+static void discoveryOutboxWaitReset() { sDiscOutboxWaiting = false; }
+static bool discoveryOutboxAllows() {
+  if (mqttOutboxDepth() <= DISCOVERY_OUTBOX_MAX) { sDiscOutboxWaiting = false; return true; }
+  const uint32_t now = millis();
+  if (!sDiscOutboxWaiting) { sDiscOutboxWaiting = true; sDiscOutboxWaitSinceMs = now; return false; }
+  if ((uint32_t)(now - sDiscOutboxWaitSinceMs) < DISCOVERY_OUTBOX_MAX_WAIT_MS) return false;
+  sDiscOutboxWaitSinceMs = now;   // one release, then wait again
+  return true;
+}
 static bool discoveryCanPublishNow() {
-  return MQTTclient.connected() && canPublishMQTT() && platformFreeHeap() >= HA_DISCOVERY_STREAM_HEAP_MIN;
+  return MQTTclient.connected() && canPublishMQTT() && platformFreeHeap() >= HA_DISCOVERY_STREAM_HEAP_MIN &&
+         discoveryOutboxAllows();
 }
 static bool discSlot(DiscoveryEmitGate *g) {
   if (g == nullptr) return true;

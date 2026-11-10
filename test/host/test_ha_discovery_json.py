@@ -193,6 +193,14 @@ def export(rev, out_dir):
         construct(mino, r"^bool satBLEPublishHaDiscovery\(const char\* macCompact, const char\* macWithColons,\s*$"),
         construct(mino, r"^void satBLEUnpublishDiscovery\(const char\* macCompact\)\s*$"),
         construct(mino, r"^static bool buildDiscoveryDeviceBlock\(char \*dest, size_t destSize, HaDiscoveryContext &ctx\)\s*$"),
+        # TASK-1757 option B: the drip outbox gate that discoveryCanPublishNow() consults (if present)
+        *([line(mino, r"^static const uint32_t DISCOVERY_OUTBOX_MAX\s"),
+           line(mino, r"^static const uint32_t DISCOVERY_OUTBOX_MAX_WAIT_MS\b"),
+           line(mino, r"^static bool\s+sDiscOutboxWaiting\b"),
+           line(mino, r"^static uint32_t sDiscOutboxWaitSinceMs\b"),
+           line(mino, r"^static void discoveryOutboxWaitReset\(\) \{"),
+           construct(mino, r"^static bool discoveryOutboxAllows\(\) \{")]
+          if any(l.startswith("static bool discoveryOutboxAllows()") for l in mino) else []),
         *([construct(mino, r"^static bool discoveryCanPublishNow\(\) \{"),
            construct(mino, r"^static bool discSlot\(DiscoveryEmitGate \*g\) \{"),
            construct(mino, r"^static bool discNote\(DiscoveryEmitGate \*g, bool ok, bool isConfig = true\) \{")]

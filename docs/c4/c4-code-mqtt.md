@@ -72,7 +72,8 @@
 
 - `static void onMqttConnect(bool sessionPresent)`
   - Sets `bConnected` and `MQTT_STATE_IS_CONNECTED`, publishes the retained birth (`publishBirthOnline()`), and when the outage exceeded `MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS` (300000 ms) runs `requestMQTTRepublishAll()`, `clearMQTTConfigDone()`, `clearMQTTConfigPending()`, `publishNonOTDiscoveryConfigs()`
-  - Subscribes to `<MQTTSubNamespace>/#` and `homeassistant/status` (QoS 0), opens the ADR-084 retained-cleanup window (`mqttV2MigrationOnConnect()`), publishes `sendMQTTversioninfo()`, `publishAllPICsettings()` and `publishBoilerUnsupportedMsgids()`
+  - Subscribes to `<MQTTSubNamespace>/#` and `homeassistant/status` (QoS 0), then calls `mqttConnectStageStart()`. Nothing else is queued in the callback (TASK-1757: sending the whole connect burst at once cost 30-50 KB of free heap on the bench)
+- `static void mqttConnectStageStart()` / `static void mqttConnectStageTick()` (TASK-1757, option C): the staged connect follow-up, one step per `handleMQTT()` pass in `MQTT_STATE_IS_CONNECTED`: (1) opens the ADR-084 retained-cleanup window (`mqttV2MigrationOnConnect()`), (2) `sendMQTTversioninfo()`, (3) `publishAllPICsettings()`, (4) `publishCommandDroppedState()` + `publishBoilerUnsupportedMsgids()`. A step runs when the outbox holds at most `MQTT_CONNECT_STAGE_MAX_DEPTH` (2) packets or after `MQTT_CONNECT_STAGE_MAX_WAIT_MS` (3 s); a disconnect stops the sequence and the next connect starts it again
 - `static void onMqttDisconnect(DisconnectReason)`: records `lastMqttDisconnectReason`, clears `bConnected`, calls `PrintMQTTError()`. It does not drive the state machine; the next `handleMQTT()` tick observes the loss.
 - `void doMqttDisconnect()`: clean disconnect for the reboot path (`prepareForReboot()`).
 
@@ -189,9 +190,13 @@ Two bitmaps of 8 x uint32_t (256 bits, one per OT message ID): `MQTTautoConfigMa
 - `canPublishMQTT()` (helperStuff.ino): ADR-167 reduced it to blocking on `HEAP_CRITICAL` only (counts `iMqttDropsTotal`)
 - `MQTTDebugTln/Tf/...` macros are gated on `state.debug.bMQTT` (telnet key `3`); dropped set commands log unconditionally
 
+### Discovery Drip Outbox Gate (TASK-1757, option B)
+
+- `discoveryCanPublishNow()` also requires `discoveryOutboxAllows()`: false while the outbox holds more than `DISCOVERY_OUTBOX_MAX` (8) packets, so the drip retries the same slot on the next tick (nothing is dropped). After `DISCOVERY_OUTBOX_MAX_WAIT_MS` (10 s) of continuous waiting one publish is let through and the wait starts again, so a busy broker link slows discovery to one config per 10 s instead of stalling it. `discoveryOutboxWaitReset()` clears the wait on every connect and disconnect.
+
 ### Retained Cleanup of Deprecated Topics (ADR-084, TASK-410)
 
-- `mqttV2MigrationOnConnect()`, `mqttV2MigrationHandleIfDeprecated(topic)`, `mqttV2MigrationTick()`: after each (re)connect the firmware subscribes briefly to six pre-2.0.0 topics (`otgw-pic/boiler_connected`, `thermostat_connected`, `otgw_connected`, `otgw-otdirect/boiler_connected`, `thermostat_connected`, `ot_online`), clears any retained payload it receives and closes the window. Temporary code; removal is tracked in TASK-409.
+- `mqttV2MigrationOnConnect()`, `mqttV2MigrationHandleIfDeprecated(topic)`, `mqttV2MigrationTick()`: after each (re)connect, as step 1 of the staged connect follow-up (TASK-1757), the firmware subscribes briefly to six pre-2.0.0 topics (`otgw-pic/boiler_connected`, `thermostat_connected`, `otgw_connected`, `otgw-otdirect/boiler_connected`, `thermostat_connected`, `ot_online`), clears any retained payload it receives and closes the window. Temporary code; removal is tracked in TASK-409.
 
 ### Topic & Namespace Building
 

@@ -4105,7 +4105,7 @@
       "path": "ADR-131-mqtt-engine-espmqttclient-async.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-06-14",
+      "date": "2026-11-10",
       "decision_summary": "Replace PubSubClient with espMqttClient as the 2.0.0 MQTT engine, on the terms below.",
       "topics": [],
       "aliases": [],
@@ -8871,6 +8871,67 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-227",
+      "title": "Stage the MQTT connect follow-up and gate the discovery drip on outbox depth (amends ADR-131 decision 3)",
+      "path": "ADR-227-stage-the-mqtt-connect-follow-up-and-gate-the-discovery-drip-on-outbox-depth-amends-adr-131-decision-3.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-10",
+      "decision_summary": "The MQTT connect follow-up is sent in small portions over later loop passes, and the HA (Home Assistant) discovery dr...",
+      "topics": [
+        "discovery-drip",
+        "heap-dip",
+        "mqtt-connect-burst"
+      ],
+      "aliases": [
+        "connect burst staging",
+        "drip outbox gate",
+        "staged connect follow-up"
+      ],
+      "components": [
+        "MQTTstuff"
+      ],
+      "symbols": [
+        "discoveryOutboxAllows",
+        "discoveryOutboxWaitReset",
+        "mqttConnectStageStart",
+        "mqttConnectStageTick"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "onMqttConnect() queues at most the birth, the two command SUBSCRIBEs and the republish decision's work; every other connect follow-up runs from mqttConnectStageTick().",
+          "Each staged step waits until the outbox depth is at most 2 packets, bounded by 3 s.",
+          "The discovery drip gate refuses while the outbox depth is above 8, retries the same slot, and releases at most one publish per 10 s while the depth stays above 8.",
+          "The drip wait is reset on connect and disconnect."
+        ],
+        "must_not": [
+          "Drop a staged publish or a discovery config because of the outbox depth.",
+          "Move the birth or the command SUBSCRIBEs out of onMqttConnect()."
+        ],
+        "exceptions": [
+          "The republish after more than 5 minutes offline (requestMQTTRepublishAll(), publishNonOTDiscoveryConfigs()) keeps its ADR-131 place in onMqttConnect(); it is not on the boot path."
+        ],
+        "verification": [
+          "tests/testmqttconnectstaged.py: source order of onMqttConnect() and handleMQTT(), and the real mqttConnectStageStart/Tick and discoveryOutboxAllows/discoveryOutboxWaitReset host-compiled with stubs (order, depth gate, 3 s bound, disconne...",
+          "Bench (pending): the TASK-1757 runner on .61, boots with two real browser tabs, old (2.0.0-beta.171) versus this change; the [HEAP] connect-trace lines must show the connect-window minimum clearly above CRITICAL."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/MQTTstuff.ino"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -12277,6 +12338,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-131",
+      "target": "ADR-227",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-132",
       "target": "ADR-035",
       "type": "related",
@@ -15315,6 +15382,36 @@
     {
       "source": "ADR-226",
       "target": "ADR-192",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-227",
+      "target": "ADR-084",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-227",
+      "target": "ADR-088",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-227",
+      "target": "ADR-131",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-227",
+      "target": "ADR-174",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-227",
+      "target": "ADR-182",
       "type": "related",
       "resolved": true
     }

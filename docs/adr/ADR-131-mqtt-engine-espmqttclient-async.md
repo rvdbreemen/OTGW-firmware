@@ -10,6 +10,8 @@ verified_in: []
 supersedes:
   - "ADR-108"
 superseded_by: null
+related:
+  - "ADR-227"
 ---
 # ADR-131 MQTT Engine on espMqttClient: Async Connect, Single Publish Chokepoint (ADR-123 Phase 2)
 
@@ -38,6 +40,11 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer accepted espMqttClient with UseInternalTask::NO as the Phase-2 MQTT engine (async connect, single-threaded loop-pumped); discussed and confirmed the deferral of a dedicated MQTT task to Phase 3+
     changed_via: manual
+  - date: 2026-11-10
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-227
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

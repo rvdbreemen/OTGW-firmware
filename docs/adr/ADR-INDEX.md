@@ -232,3 +232,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-224 | Accepted | - | In OT-Direct gateway mode the gateway reads MsgID 28 in the slot of a supported thermostat read, and answers that rea... |
 | ADR-225 | Proposed | - | Rebuild the ESP32-S3 framework libraries with CONFIGESPIPCTASKSTACKSIZE of at least 1280 (the IDF S3 default), using... |
 | ADR-226 | Accepted | - | Add acorn (a JavaScript parser) and eslint-scope (scope analysis on its syntax tree) as pinned, test-only npm depende... |
+| ADR-227 | Proposed | `src/OTGW-firmware/MQTTstuff.ino` | The MQTT connect follow-up is sent in small portions over later loop passes, and the HA (Home Assistant) discovery dr... |

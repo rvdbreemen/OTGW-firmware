@@ -64,6 +64,8 @@ void incPublishedTopicCount() {}
 void PrintMQTTError()         {}
 bool mqttIsConnected()        { return true; }
 static struct { bool connected() const { return true; } } MQTTclient;   // espMqttClient, connected
+uint32_t mqttOutboxDepth()    { return 0; }   // TASK-1757 drip outbox gate: an empty outbox never holds the drip
+static uint32_t millis()      { return 0; }
 // IPAddress and the two transports: buildDiscoveryContext() (TASK-1377.1) formats the active
 // transport's address into configuration_url with ip[0]..ip[3]. Documentation addresses
 // (RFC 5737), one per transport, so a payload shows which one was read.
