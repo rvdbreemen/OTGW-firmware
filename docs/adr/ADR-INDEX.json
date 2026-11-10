@@ -8747,6 +8747,69 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-225",
+      "title": "Raise the ESP32-S3 IPC task stack to at least 1280 B by rebuilding the Arduino framework libs with a custom sdkconfig",
+      "path": "ADR-225-raise-the-esp32-s3-ipc-task-stack-to-at-least-1280-b-by-rebuilding-the-arduino-framework-libs-with-a-custom-sdkconfig.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-10",
+      "decision_summary": "Rebuild the ESP32-S3 framework libraries with CONFIGESPIPCTASKSTACKSIZE of at least 1280 (the IDF S3 default), using...",
+      "topics": [
+        "boot-stability",
+        "build",
+        "esp-idf",
+        "freertos",
+        "ipc",
+        "sdkconfig"
+      ],
+      "aliases": [
+        "CONFIG_ESP_IPC_TASK_STACK_SIZE",
+        "custom_sdkconfig",
+        "ipc1 stack overflow",
+        "TASK-1763 (a)"
+      ],
+      "components": [
+        "Build configuration of the ESP32-S3 framework libraries (IPC task stack size)"
+      ],
+      "symbols": [
+        "CONFIG_ESP_IPC_TASK_STACK_SIZE",
+        "esp_ipc_call_blocking",
+        "gpio_install_isr_service",
+        "ipc_task"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Set CONFIGESPIPCTASKSTACKSIZE ≥ 1280 in the framework libraries linked into every S3 environment.",
+          "Prove the larger stack on the device: log ipc1's stack size or high-water mark at boot, for example uxTaskGetStackHighWaterMark(xTaskGetHandle(\"ipc1\")).",
+          "Keep mitigation (b): the early GPIO ISR install in setup(), guarded by tests/testgpioisrearlyinstall.py.",
+          "Include the full sdkconfig diff, rebuild against prebuilt, in the change that adopts it."
+        ],
+        "must_not": [
+          "Rely on include/sdkconfig.h for this value; it does not reach the precompiled IPC task.",
+          "Let the rebuild change other sdkconfig values without saying so."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "Bench: at least 12 /ReBoot cycles on .61, with a crashlog check per boot. The old rate was 1 panic in 10 on beta.162. Read the ipc1 high-water mark before and after.",
+          "Build: the RAM line of the build output before and after, plus the sdkconfig diff."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -15173,6 +15236,12 @@
     {
       "source": "ADR-224",
       "target": "ADR-223",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-225",
+      "target": "ADR-185",
       "type": "related",
       "resolved": true
     }
