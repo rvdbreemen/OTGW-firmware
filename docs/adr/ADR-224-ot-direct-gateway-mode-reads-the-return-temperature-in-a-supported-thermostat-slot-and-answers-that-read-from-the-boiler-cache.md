@@ -1,8 +1,8 @@
 ---
 id: "ADR-224"
 title: "OT-Direct gateway mode reads the return temperature in a supported thermostat slot and answers that read from the boiler cache"
-status: "Proposed"
-date: "2026-11-09"
+status: "Accepted"
+date: "2026-11-10"
 binding: false
 gate: null
 documents_shipped: false
@@ -40,7 +40,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-09.
+Accepted, 2026-11-10.
 
 **Decision Maker:** to be decided by User: Robert van den Breemen (maintainer). The choice of option A+C itself was his, made on 2026-11-09 at 21:52:17 UTC (Coordinated Universal Time) in #dev-sat-mqtt: "I think A+C would be best, for each hardware setup the optimal solution." (msg 1569469705461440577; corrections entry 290).
 
@@ -55,6 +55,11 @@ status_history:
     changed_by: "Agent: otgw-firmware-030509"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-10
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Accepted by Robert on 2026-11-10 in the coordinator session, scoped to the direct gateway mode only, as the Decision states.
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

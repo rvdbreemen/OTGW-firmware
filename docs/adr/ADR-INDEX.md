@@ -229,5 +229,5 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-221 | Accepted | - | User Decision (Robert, 2026-11-08): the web UI language packs (i18n/ .json, ADR-219/ADR-220) are stored on LittleFS a... |
 | ADR-222 | Accepted | - | User Decision: on a board without PSRAM, BLE is off by default and no dialog appears after boot or when a page opens;... |
 | ADR-223 | Accepted | - | User Decision: in OT-Direct gateway mode, a TT= or TC= override is answer state only, as on the PIC: the gateway answ... |
-| ADR-224 | Proposed | - | In OT-Direct gateway mode the gateway reads MsgID 28 in the slot of a supported thermostat read, and answers that rea... |
+| ADR-224 | Accepted | - | In OT-Direct gateway mode the gateway reads MsgID 28 in the slot of a supported thermostat read, and answers that rea... |
 | ADR-225 | Proposed | - | Rebuild the ESP32-S3 framework libraries with CONFIGESPIPCTASKSTACKSIZE of at least 1280 (the IDF S3 default), using... |
