@@ -44,7 +44,7 @@ Proposed, 2026-11-09.
 
 **Decision Maker:** to be decided by User: Robert van den Breemen (maintainer). The choice of option A+C itself was his, made on 2026-11-09 at 21:52:17 UTC (Coordinated Universal Time) in #dev-sat-mqtt: "I think A+C would be best, for each hardware setup the optimal solution." (msg 1569469705461440577; corrections entry 290).
 
-This ADR (architecture decision record) records option A's deviation from the PIC model (PIC: the gateway's Microchip PIC microcontroller on the classic boards) and its parameters. It was written by agent otgw-firmware-030509. On 2026-11-10 06:40 Robert answered "Direction OK, 8 B cache" (AskUserQuestion in the coordinator's session, relayed to 030509): the deviation from ADR-223 is accepted for this one read per interval, and the 8 B variant is chosen. Sergeant D answered the interval, the scope and his agreement on 2026-11-10 (W1-W3, Q-1759a; corrections entry 291). On 2026-11-10 ~14:40 Robert answered "Accept, scope OT-Direct" (AskUserQuestion in the coordinator's session): option A only; option C (`AA=28` on PIC boards) is out of scope and follows in its own ADR and task after Sergeant D answers Q-1759b. The status change to Accepted is recorded by the coordinator with `adr accept`.
+This ADR (architecture decision record) records option A's deviation from the PIC (the Microchip PIC microcontroller of the classic gateway boards) model and its parameters. It was written by agent otgw-firmware-030509. On 2026-11-10 06:40 Robert answered "Direction OK, 8 B cache" (AskUserQuestion in the coordinator's session, relayed to 030509): the deviation from ADR-223 is accepted for this one read per interval, and the 8 B variant is chosen. Sergeant D answered the interval, the scope and his agreement on 2026-11-10 (W1-W3, Q-1759a; corrections entry 291). On 2026-11-10 ~14:40 Robert answered "Accept, scope OT-Direct" (AskUserQuestion in the coordinator's session): option A only; option C (`AA=28` on PIC boards) is out of scope and follows in its own ADR and task after Sergeant D answers Q-1759b. The status change to Accepted is recorded by the coordinator with `adr accept`.
 
 ## Status History
 
@@ -134,7 +134,7 @@ Host test on the real `OTDirect.ino` slices: `tests/test_otd_gateway_alt_slots.p
 
 - MsgID 28 reaches the boiler once per interval;
 - the number of boiler frames equals the number of thermostat frames;
-- only frames of the candidate READ ID are replaced, and the thermostat gets READ_ACK with the cached value;
+- only frames of the candidate `READ_DATA` ID are replaced, and the thermostat gets READ_ACK with the cached value;
 - nothing is replaced while MsgID 28 is fresh or Unknown, while the cache is stale, or outside gateway mode.
 
 The test must fail on the code before the change and pass after it.
@@ -146,7 +146,7 @@ Field proof: a capture from tjfs. There is no bench with a thermostat in gateway
 - **B, own frames between the thermostat's frames.** Rejected. TASK-1701 and TASK-1707 removed exactly this after tjfs's field log, which showed 634 own frames against 369 thermostat frames in 6 minutes. The PIC never does it, and it risks delaying the thermostat's next frame.
 - **Only the unsupported-ID slots (status quo, TASK-1707).** Rejected for the setups that matter: with a thermostat that asks only supported IDs, as tjfs's does, it reads nothing. It stays the preferred path whenever such a slot exists.
 - **Do nothing and keep the flow + offset fallback.** Rejected by entry 287 (Sergeant D) and entry 290 (Robert). The fallback is a recorded deviation from thermo-nova, and the return temperature also feeds the cycle tracker.
-- **A cache age per slot, `otBoilerCacheMs[128]`.** This costs 512 B of static RAM in internal DRAM (data RAM; zero-initialised static data, BSS), also on the OTGW32 board without PSRAM (external pseudo-static RAM). It would let any eligible ID be replaced, with an exact age per ID. It is not proposed first, because the single-stamp variant covers the observed thermostats with about 1/64 of the RAM and less code. It remains the fallback.
+- **A cache age per slot, `otBoilerCacheMs[128]`.** This costs 512 B of static RAM in internal DRAM (data RAM) as BSS (zero-initialised static data), also on the `OTGW32` board without PSRAM (external pseudo-static RAM). It would let any eligible ID be replaced, with an exact age per ID. It is not proposed first, because the single-stamp variant covers the observed thermostats with about 1/64 of the RAM and less code. It remains the fallback.
 - **Answer the thermostat Unknown-DataID for the replaced read, as the TASK-1707 slot does.** Rejected. The ID is supported, and three Unknown-DataID answers could make a thermostat stop asking for a value it uses.
 
 ## Consequences
@@ -170,8 +170,8 @@ Field proof: a capture from tjfs. There is no bench with a thermostat in gateway
 - [x] W1: the interval (proposal 30 s), Sergeant D (Q-1759a). — **Answered 2026-11-10 by User: Sergeant D (relayed by otgw-firmware-97):** 30 s, and only while no valid MsgID 28 arrived for 30 s; Sergeant D 2026-11-10, 'the answer is A' (08:29:17 UTC, msg 1569614915222773762) and 'yes' (09:24:44 UTC, msg 1569628868648767570) to our explicit check; corrections entry 291
 - [x] W2: only while SAT is enabled, or always (proposal: SAT only), Sergeant D (Q-1759a). — **Answered 2026-11-10 by User: Sergeant D (relayed by otgw-firmware-97):** only while SAT is on; Sergeant D 2026-11-10 'yes' (msg 1569628868648767570) to our check; entry 291
 - [x] W3: Sergeant D's agreement with A+C (entry 287 is his). — **Answered 2026-11-10 by User: Sergeant D (relayed by otgw-firmware-97):** agreed for A on OT-Direct; Sergeant D 2026-11-10 'the answer is A' + 'yes' (entry 291). C on PIC not answered by him (Q-1759b queued); C stays Robert's entry 290
-- [x] Cache-age variant: one stamp (8 B, candidate ID) or per slot (512 B), Robert / review. — **Answered 2026-11-10 by User: Robert van den Breemen (relayed by Coordinator OTGW):** single stamp, 8 B (candidate ID, KISS). Robert, 2026-11-10 06:40, 'Direction OK, 8 B cache', via AskUserQuestion in the coordinator's session (relayed to 030509)
-- [x] Acceptance of the deviation from ADR-223's PIC parity for this one read, Robert. — **Answered 2026-11-10 by User: Robert van den Breemen (relayed by Coordinator OTGW):** accepted for this one read per interval. Robert, 2026-11-10 06:40, 'Direction OK', via AskUserQuestion in the coordinator's session (relayed to 030509); the ADR stays Proposed until Sergeant D answers W1-W3
+- [x] Cache-age variant: one stamp (8 B, candidate ID) or per slot (512 B), Robert / review. — **Answered 2026-11-10 by User: Robert van den Breemen (relayed by the `Coordinator OTGW` session):** single stamp, 8 B (candidate ID, KISS). Robert, 2026-11-10 06:40, 'Direction OK, 8 B cache', via AskUserQuestion in the coordinator's session (relayed to 030509)
+- [x] Acceptance of the deviation from ADR-223's PIC parity for this one read, Robert. — **Answered 2026-11-10 by User: Robert van den Breemen (relayed by the `Coordinator OTGW` session):** accepted for this one read per interval. Robert, 2026-11-10 06:40, 'Direction OK', via AskUserQuestion in the coordinator's session (relayed to 030509); the ADR stays Proposed until Sergeant D answers W1-W3
 
 ## Related Decisions
 

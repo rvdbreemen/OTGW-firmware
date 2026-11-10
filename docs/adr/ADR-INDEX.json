@@ -8732,7 +8732,7 @@
         "verification": [
           "MsgID 28 reaches the boiler once per interval;",
           "the number of boiler frames equals the number of thermostat frames;",
-          "only frames of the candidate READ ID are replaced, and the thermostat gets READACK with the cached value;",
+          "only frames of the candidate READDATA ID are replaced, and the thermostat gets READACK with the cached value;",
           "nothing is replaced while MsgID 28 is fresh or Unknown, while the cache is stale, or outside gateway mode. The test must fail on the code before the change and pass after it. Field proof: a capture from tjfs. There is no bench with a the..."
         ]
       },
