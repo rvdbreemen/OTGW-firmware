@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:03:00Z'
-updated_date: '2026-11-10T03:33:00Z'
+updated_date: '2026-11-10T06:21:00Z'
 labels:
   - heap
   - bug
@@ -42,6 +42,14 @@ A4 window artifact (candidate 4): read hd_min_free_heap just before and just aft
 Old-vs-fix: once a cause is named, the fix (e.g. weather fetch with a bounded RX / earlier stream drain, or reporting the window-merged minimum separately) is measured with the same A0 run before and after. Decision on bound/fix/accept goes to Robert (AC3) with the numbers.
 Settings saved before and restored after each run (A1/A3 change settings).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-10 05:17-07:20 runs on .61 (beta.167+e79e495, otgw-firmware-80; scripts and raw data in the session scratchpad t1756/): A0 baseline, A1 satweatherenable=false, A2 no poll, A3 mqttenable=false, A3b satsimulation=false; 2 clean boots x 12 min each; every run's settings restored and verified (0 differences). Results from device/info every 5 s (hd_min_free_heap / hd_min_max_block, seconds after the first answer, about millis +15 s): A0: NO step at ~300 s or ~600 s in either boot (minimum flat after the first seconds: 31,720 B and 39,244 B). A1: early step -11,764 B at +11 s in boot2 (min 15,844 B), nothing late. A3 (MQTT off): late steps +294 s -1,688 B, +604 s -5,468 B (boot1), +247 s -8,200 B (boot2). A3b (SAT sim off): +264 s -3,268 B (boot1). A2: no time series (no poll and no telnet, see below), end values only.
+
+Limits, honest: (1) the telnet capture FAILED in every run: after the reboot the script stayed on the dead pre-reboot socket (the device sends no FIN; recv only timed out, no reconnect), so there are no 'Weather: fetching' / [HEAP] lines to time the steps (030509's boots.py has the same pattern); (2) 2 boots per run is too few: late steps appear in some runs and not in others, so no variable is shown to cause or remove the step yet. Verdict so far: on beta.167 the +5/+10 min step did not reproduce in the baseline (2/2 boots), the cause is NOT named. Next: fix the telnet reconnect (reconnect when bootcount changes or after 20 s without data) with the heap + weather + MQTT debug flags on, 4 boots per run for A0 and A1 first, then A3; needs another .61 slot.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
