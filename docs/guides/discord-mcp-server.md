@@ -10,8 +10,10 @@ TASK-1625.
 | Part | What it is |
 |---|---|
 | Discord MCP server | Native Java process `saseq/discord-mcp` (Temurin JDK 17) on Robert's workstation, `http://localhost:8085/mcp`. No Docker since 2026-07-04. |
-| Launcher | `D:\Users\Robert\Documents\GitHub\RvdB\discord-mcp-saseq\run-discord-mcp.ps1`. Reads `DISCORD_TOKEN` and `DISCORD_GUILD_ID` from the Windows user environment and sets `SPRING_PROFILES_ACTIVE=http`. |
-| Autostart | Startup-folder shortcut `discord-mcp-saseq.lnk`, at logon. |
+| Supervisor | `D:\Users\Robert\Documents\GitHub\RvdB\discord-mcp-saseq\supervise-discord-mcp.ps1` (since 2026-11-10). One instance (named mutex), waits until `discord.com:443` is reachable, adopts a server that already runs, starts `java -jar discord-mcp-1.0.0.jar` with `DISCORD_TOKEN` and `DISCORD_GUILD_ID` from the Windows user environment and `SPRING_PROFILES_ACTIVE=http`, checks port 8085 every 30 s and restarts the server when it exits or fails 4 checks (back-off 15 to 120 s). Logs in `discord-mcp-saseq\logs\` (`supervisor.log`, `server-<stamp>.log`). |
+| Autostart | Scheduled task **OTGW Discord MCP** (user, no admin): at logon after 20 s and every minute; a running supervisor makes the extra starts no-ops. Launched windowless through `start-supervisor-hidden.vbs`. The old Startup-folder shortcut is parked as `discord-mcp-saseq.lnk.bak`: do not restore it. |
+| Claude Code hook | `ensure-discord-mcp.ps1`, a SessionStart hook in the user `settings.json`: when port 8085 is closed it starts the task and waits up to 40 s. |
+| Why | The server logs in to Discord (JDA) before it opens port 8085. Started straight at logon without network, the login failed, the JVM exited and nothing restarted it; the old launcher logged nothing. |
 | Tool namespace | `mcp__discord-mcp__*`. No login tool: JDA connects to Discord when the process starts. |
 | Bot identity | The bot posts as **BlueFlame Bot**. |
 | Build zips | Not through the MCP server: `scripts/discord-post-build.sh` posts the esp32-combo zip to #alpha-testing through a webhook whose URL lives in `%LOCALAPPDATA%\OTGW-capture\discord-alpha-webhook.url` (a secret, never printed or committed). |
@@ -66,9 +68,14 @@ ground truth blocks of CLAUDE.md. In short:
 Symptom: Discord calls fail with "Expected token to be set" or HTTP 401. The Java process has
 dropped its gateway session.
 
-1. Run `run-discord-mcp.ps1` again, or kill the stale `java -jar discord-mcp-1.0.0.jar` process
-   and then run the launcher.
-2. Reconnect the MCP server in Claude Code with `/mcp`.
+1. Kill the `java -jar discord-mcp-1.0.0.jar` process. The supervisor starts a fresh one
+   (about 15 s back-off plus about 18 s start-up); `logs\supervisor.log` shows it. Do not run
+   `run-discord-mcp.ps1` by hand next to the supervisor: two processes on one token fight
+   over the gateway.
+2. A Claude session that was already connected keeps working (tested 2026-11-10). A session
+   that started while the server was down needs `/mcp` once.
+3. To stop the server on purpose: `Disable-ScheduledTask 'OTGW Discord MCP'`, then stop the
+   supervisor `powershell` process and the `java` process; `Enable-ScheduledTask` to resume.
 
 ## Bot-side settings
 
