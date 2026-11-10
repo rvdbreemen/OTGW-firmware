@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-10T12:18:00Z'
-updated_date: '2026-11-10T13:11:00Z'
+updated_date: '2026-11-10T13:35:00Z'
 labels:
   - webui
   - i18n
@@ -36,4 +36,6 @@ Sergeant D (Greek native speaker) reviews the Greek web UI pack. First correctio
 2026-11-10 13:50 Sergeant D answered (entry 292): A (the always-visible switch) -> 'Ενεργοποίηση ΖΝΧ', SAT Hot water title -> 'Ζεστό Νερό Χρήσης', Home grid cell home.cell_room 'ΧΩΡΟΣ' -> 'ΕΣΩΤΕΡΙΚΗ'. Recorded in docs/sat/sergeant-d-corrections.md entry 292 (index refreshed) before applying. el.json: h_mon.sat_hw_title, h_mon.sat_dhw_standalone (also its aria label, same key), home.cell_room. Tests: i18n-lang 6/6, i18n-followups 3/3, i18n-no-hardcoded 3/3. Open questions via 97: the slider hint wording, the near-identical tank switch label 'Ενεργοποίηση ΖΝΧ (HW=)', and whether other 'Ζεστό νερό'/'Χώρος' keys follow.
 
 2026-11-10 14:15 beta.170 posted (msg 1569700928221749350, 2dda513da; bench .61 on the identical tree 749ba83: live el title 'Ζεστό Νερό Χρήσης', switch + aria 'Ενεργοποίηση ΖΝΧ'; 'ΕΣΩΤΕΡΙΚΗ' in the served /i18n/el.json, #cGrid hidden on .61 so the cell is not seen live). Q1 answered B (entry 293): h_mon.sat_dhw_hint now names the switch; committed without its own build, ships with the next build together with the Q2/Q3 answers.
+
+2026-11-10 14:40 entry 294: Q2 answer A (tank switch label stays); slider label h_mon.sat_dhw_setpoint -> 'Θερμοκρασία στόχος ΖΝΧ' (verbatim, slider only; settings.label.satdhwsetpoint waits for Q3). His 'keep only one hot-water card' is a layout change for Robert (coordinator files it). Committed, no build yet.
 <!-- SECTION:NOTES:END -->

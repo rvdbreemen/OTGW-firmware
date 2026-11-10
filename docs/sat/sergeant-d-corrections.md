@@ -6310,3 +6310,23 @@ This confirms Robert's maintainer decision of entry 290 for direct mode. It also
 **Settled (translation only, no SAT behaviour):** `i18n/el.json` `h_mon.sat_dhw_hint` becomes "Το SAT στέλνει αυτή τη θερμοκρασία στον λέβητα μόνο όταν ο διακόπτης Ενεργοποίηση ΖΝΧ είναι ανοιχτός." (was "... μόνο όσο είναι ενεργός ο αυτόνομος έλεγχος ΖΝΧ.").
 
 **Changes an earlier entry:** settles open point (1) of entry 292. **Task:** TASK-1777. **Open:** points (2) the tank switch label and (3) the other "Ζεστό νερό" / "Χώρος" keys of entry 292.
+
+## 294. Greek web UI: keep the tank switch label; the DHW slider label becomes "Θερμοκρασία στόχος ΖΝΧ" (Sergeant D, 2026-11-10; follows entries 292 and 293)
+
+**Source:** sergeantd, #dev-sat-mqtt (channel 1105556725714649128), relayed by otgw-firmware-97 (screenshots shot11-13 in its session scratchpad `greekshots/`):
+- 2026-11-10 14:23:34 UTC, msg 1569704071856787457 (https://discord.com/channels/812969634638725140/1105556725714649128/1569704071856787457), answer to our Q2 (msg 1569699350102413395: A keep "Ενεργοποίηση ΖΝΧ (HW=)", B a new label).
+- 2026-11-10 14:32:01 UTC, msg 1569706197748293734 (https://discord.com/channels/812969634638725140/1105556725714649128/1569706197748293734), screenshot of the slider row in the SAT page Hot water card (42°C).
+
+**Quoted:**
+- "@BlueFlame Bot my answer is A"
+- "Rename “Θερμοκρασία ΖΝΧ” to “Θερμοκρασία στόχος ΖΝΧ”"
+
+**Settled (translation only, no SAT behaviour):**
+- `h_mon.sat_dhw_enable` stays "Ενεργοποίηση ΖΝΧ (HW=)" (Q2 answer A). Settles open point (2) of entry 292.
+- `h_mon.sat_dhw_setpoint` (the slider label he showed, also the slider's aria label) becomes "Θερμοκρασία στόχος ΖΝΧ", applied verbatim.
+
+**Interpretation (ours):** the second "Θερμοκρασία ΖΝΧ" (`settings.label.satdhwsetpoint`, the number field on the second hot-water card) is not changed: he pointed at the slider only. It is part of our consistency question Q3 (entry 292 point 3).
+
+**Also raised (not a translation, not settled here):** 14:25:10 UTC, msg 1569704474744717437: "Do we really need both these cards? My recommendation is to keep only the first one. Actually they are repeating the same things". That is a UI layout change; it goes to Robert as a needs-maintainer-ok task via the coordinator.
+
+**Task:** TASK-1777. **Open:** Q3 (other "Ζεστό νερό" / "Χώρος" / "Θερμοκρασία ΖΝΧ" keys); the two-card question (Robert).
