@@ -51,7 +51,11 @@ The firmware also has an OT-Direct mode, used only on hardware without a PIC. On
 
 ### What Is New in v2.0.0
 
-Version 2.0.0 is a major platform release. It is the ESP32-S3-only line. There are no breaking changes to MQTT topics or the REST API from v1.x. Settings files from v1.3.x load without modification.
+Version 2.0.0 is a major platform release. It is the ESP32-S3-only line. Settings files from v1.3.x load without modification.
+
+**Breaking change in this release.** v2.0.0 changes the default MQTT topic names to a new self-describing scheme (ADR-106). Thirty-seven OT-spec-derived binary sensor topics are renamed to clearer, Home Assistant friendly labels (for example, the legacy `master_ch_enable` becomes `central_heating_enabled`). Users with existing automations pinned to the legacy labels can flip `settings.mqtt.bUseLegacyOtTopics` to `true` and keep the v1.x behaviour. The two modes are mutually exclusive: either the new names or the legacy names publish, never both. The REST API is unchanged from v1.x.
+
+Version 2.0.0 is in public beta: releases are published as GitHub prereleases. The established functionality is feature complete, but SAT, OTDirect, and the new MQTT topic shape (see below) still receive refinement. SAT stays experimental and opt-in. Track the GitHub Releases page for the current beta.
 
 #### Highlights
 
@@ -114,6 +118,25 @@ Before you begin, you need:
 - For full Home Assistant auto-discovery: Home Assistant with the MQTT integration enabled.
 
 The firmware does not require an internet connection for normal operation. An internet connection is used optionally for: NTP time synchronization and the Open-Meteo weather API used by SAT.
+
+---
+
+### Community and Support
+
+**GitHub**
+The source code, releases, bug tracker, and pull requests are at:
+`https://github.com/rvdbreemen/OTGW-firmware`
+
+Report bugs and feature requests on the GitHub Issues page. With a bug report, always include: firmware version, firmware line (1.x or 2.x), a description of the problem, and, if available, the output of the Telnet debug log (port 23).
+
+**Discord**
+The community is active on the OTGW Discord server (`https://discord.gg/zjW3ju7vGQ`). You can ask there for help with installation, configuration, and Home Assistant integration. Beginners are welcome; the community is international and communicates in English.
+
+**Releases**
+New releases are published as GitHub Releases and contain prebuilt binaries: the `esp32-combo` zip for the 2.x line, the binaries of that line for the 1.x line. The 2.x firmware does not download updates itself: download the release zip and give it to the Update page of the web interface.
+
+**Documentation**
+The full technical documentation, including the C4 architecture diagrams, the API reference, and the ADRs, is in the `docs/` folder of the repository.
 
 ---
 
@@ -1412,9 +1435,26 @@ Common MQTT return codes:
 
 ### 7.7 Serial Overrun and OTGW Online-Offline Flapping
 
-**Root cause in versions before 2.0.0:** The `publishToSourceTopic()` function allocated approximately 1,600 bytes of local buffers on the stack, which overflowed it on the 1.x line. The fix in v2.0.0 converts those buffers to static or pre-allocated scratch memory.
+#### What is a serial overrun?
 
-If you see this on v2.0.0: update to the latest build. If the problem persists, connect to the Telnet debug console and look for `Exception` or `Stack smashing` messages.
+A serial overrun happens when the PIC sends more data to the ESP than the firmware reads before the UART buffer is full. Individual bytes are lost. The firmware detects this through the UART hardware overrun flag.
+
+#### Symptoms
+
+- A `Serial Overrun` line in the Telnet debug console.
+- A `Serial Overrun` event in the Web UI event log and on the MQTT `event_report` topic. The event is suppressed during the first 15 seconds after the PIC starts.
+- Incomplete OpenTherm lines in the debug log.
+- OTGW availability that switches quickly between `online` and `offline`.
+
+#### What to do
+
+1. **Check the MQTT connection.** A busy or unstable MQTT connection slows processing and can cause indirect overruns (see section 7.2).
+2. **Check the free heap.** Low memory slows the firmware down.
+3. **Check for OTmonitor on port 25238.** OTmonitor that is active and sending commands adds load.
+4. **Rule out other causes of flapping:** WiFi instability (section 7.4) or an MQTT broker restart.
+5. **Capture evidence.** Connect to the Telnet debug console and note any `Exception` or `Stack smashing` messages, then attach the Telnet log to a GitHub issue.
+
+On the 1.x line this was caused by large stack buffers in `publishToSourceTopic()`; on 2.x that function uses a static buffer.
 
 ---
 
@@ -1491,7 +1531,7 @@ Connect on port 23 and type `resetwifi` to clear WiFi credentials only.
 1. **GitHub Issues:** `https://github.com/rvdbreemen/OTGW-firmware/issues`
    Include: firmware version, board type, Telnet debug log, and settings (redact passwords).
 
-2. **Discord:** Check the GitHub repository for the invite link.
+2. **Discord:** Join the OTGW Discord server: `https://discord.gg/zjW3ju7vGQ`.
 
 3. **Tweakers.net forum:** The Dutch home automation community has a long-running OTGW discussion thread.
 ## Chapter 8: Developer Guide
@@ -2167,18 +2207,29 @@ Not required for: pure bug fixes, minor features within existing patterns.
 
 | ADR | Topic | Impact |
 |-----|-------|--------|
+| ADR-003 | HTTP/WS only, no HTTPS/WSS | Plain HTTP and WebSocket only; trusted LAN security model |
 | ADR-009 | PROGMEM string literals | All literals in flash via `F()` / `PSTR()` |
-| ADR-014 | Dual build system | `build.py` for Arduino CLI, PlatformIO for ESP32 |
 | ADR-016 | OpenTherm command queue | Always use `addCommandToQueue()` |
 | ADR-019 | REST API versioning | `/api/v2/` is current; v0/v1 return 410 Gone |
 | ADR-028 | File streaming | Files >2 KB must use `streamFile()`, never load |
 | ADR-040 | MQTT source-specific topics | Source separation topic structure |
-| ADR-042 | Streaming JSON | No ArduinoJson; manual `snprintf_P` construction |
+| ADR-049 | String prohibition on protocol paths | No `String` class on MQTT/REST/WebSocket hot paths |
 | ADR-050 | Centralized API dispatch | Single `kV2Routes[]` table; no per-route router changes |
 | ADR-051 | Dual encapsulating structs | `OTGWSettings` / `OTGWState` architecture |
 | ADR-053 | Large feature buffer allocation | Static allocation for large per-feature buffers |
 | ADR-061 | Platform abstraction | Use `platform.h` abstractions, not direct SDK calls |
+| ADR-064 | OTDirect operating-mode architecture | Gateway / Monitor / Thermostat / Off modes in OT-Direct mode |
+| ADR-079 | Per-component type headers | Each subsystem owns its state + settings structs in `<Component>types.h` |
+| ADR-081 | Types merge into `<Component>stuff.h` | Amendment to ADR-079: fold into the existing stuff sibling when one exists |
+| ADR-083 | PlatformIO as build system | `platformio.ini` is the build configuration; on 2.x build through `build.bat` / `./build.sh` |
+| ADR-090 | Re-entrancy guard pattern for shared scratch buffers | `MQTTAutoConfigSessionLock` and the `inUse` flag on `publishToSourceTopic` |
+| ADR-092 | NimBLE-Arduino for BLE scanner | SAT BLE scanner uses NimBLE-Arduino 2.x instead of Bluedroid |
+| ADR-101 | Flat per-value MQTT topics | One topic per value; no aggregated JSON payloads |
+| ADR-106 | Self-describing MQTT topic names | New default topic naming; legacy shape behind `bUseLegacyOtTopics` |
+| ADR-146 | Streaming JsonEmit writer | No ArduinoJson; REST JSON goes through the `JsonEmit` streaming writer (`jsonEmit.h`) |
+| ADR-174 | Republish on-change MQTT state when Home Assistant comes back online | `offline` to `online` on `homeassistant/status` calls `requestMQTTRepublishAll()`; JIT discovery stays as in ADR-100 |
 | ADR-180 | Keep the `String` class out of hot-path source files | Guideline-level; `evaluate.py` reports WARN with the call site |
+| ADR-197 | SAT PID v3 controller | Current PID control law for Smart Autotune Thermostat, following thermo-nova `pid.py` |
 
 #### Creating a New ADR
 
@@ -3399,7 +3450,7 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 |------|-----------|
 | **ADR** | Architecture Decision Record. A short document capturing a significant design choice, its rationale, and its consequences. All ADRs live in `docs/adr/`. Once Accepted, an ADR is immutable. |
 | **AceTime** | Arduino timezone library used by the firmware for NTP time management and zone-aware timestamps. |
-| **ArduinoJson** | A popular Arduino JSON parsing library. Explicitly excluded from this project (ADR-042) due to RAM and flash cost. JSON is handled via manual `snprintf_P` construction and `parseJsonKVLine()` parsing. |
+| **ArduinoJson** | A popular Arduino JSON library. Removed from this project (ADR-146). REST JSON output goes through the `JsonEmit` streaming writer (`jsonEmit.h`); settings lines are read with `parseJsonKVLine()`. |
 | **BLE** | Bluetooth Low Energy. On the ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro), the firmware can receive room temperature and humidity from a BTHome-compatible BLE sensor (e.g., a Xiaomi sensor). |
 | **BTHome** | An open BLE advertisement protocol for home sensor devices. Used by the SAT BLE integration for passive scanning of room temperature sensors. |
 | **C4 model** | A four-level architecture documentation model: Context, Container, Component, Code. The firmware's architecture is documented using C4 in `docs/c4/`. |
@@ -3545,7 +3596,7 @@ All inbound services are unencrypted (HTTP, not HTTPS; WS, not WSS). The device 
 #### Community
 
 - Tweakers forum thread (Dutch, primary community): search for "OTGW-firmware" on [https://tweakers.net/](https://tweakers.net/)
-- Discord server: community link available in the GitHub repository README
+- Discord server: `https://discord.gg/zjW3ju7vGQ`
 
 #### Libraries Used
 

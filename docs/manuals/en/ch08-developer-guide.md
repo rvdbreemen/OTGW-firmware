@@ -197,9 +197,9 @@ Use these flags in conditional compilation:
 
 The `dev` line (firmware 2.0.0) is ESP32-S3-only, built on an async + FreeRTOS stack. The 1.x line continues only on the `otgw-1.x.x` maintenance branch. On 2.0.0 the build is PlatformIO-only and every target is an ESP32-S3.
 
-#### Fixed Build Targets (ADR-126)
+#### Build Targets (ADR-127)
 
-There is no runtime hardware detection on the two fixed single-engine targets; each links exactly one OpenTherm engine. Three environments are defined in `platformio.ini`:
+The two fixed single-engine targets do no runtime hardware detection; each links exactly one OpenTherm engine. The `esp32-combo` target links both and detects the hardware at boot (ADR-127). Three environments are defined in `platformio.ini`:
 
 | Target (`--target`) | Hardware | OpenTherm engine |
 |---|---|---|
@@ -215,7 +215,7 @@ There is no runtime hardware detection on the two fixed single-engine targets; e
 
 `esp32` is the default PlatformIO environment. `esp32-classic` and `esp32-combo` extend it (`extends = env:esp32`), inheriting the platform, board, partition table, `lib_deps` and `build_unflags`, and override only `build_flags` and `lib_ignore`.
 
-#### Combo Boot Detection (ADR-127 / ADR-158 / ADR-160)
+#### Combo Boot Detection (ADR-127 / ADR-158 / ADR-201)
 
 The `esp32-combo` binary links both OT engines and selects one at boot. The `iBoardMode` setting picks the mode:
 
@@ -223,10 +223,10 @@ The `esp32-combo` binary links both OT engines and selects one at boot. The `iBo
 |---|---|---|
 | `0` | AUTO | re-probe PIC vs OTDirect (and S3 Mini vs S3 Mini Pro) at boot |
 | `1` | Force PIC | LOLIN S3 Mini in the Classic socket |
-| `2` | OT-Direct mode | only on hardware without a PIC |
+| `2` | OT-Direct mode | only on hardware without a PIC; probes once per boot, and a PIC that answers corrects the mode to `1` or `3` |
 | `3` | Force PIC | LOLIN S3 Mini Pro in the Classic socket |
 
-The S3 Mini Pro is distinguished from the plain S3 Mini by its on-board QMI8658C IMU. The Pro reroutes its Classic I2C headers and needs a different Classic pin map; `state.hw.bClassicPro` records the result. AUTO re-probes the PIC on every boot: the detection is persist-once, but a wrong verdict is re-evaluated at the next boot rather than being frozen in place.
+The S3 Mini Pro is distinguished from the plain S3 Mini by its on-board QMI8658C IMU. The Pro reroutes its Classic I2C headers and needs a different Classic pin map; `state.hw.bClassicPro` records the result. AUTO probes for the PIC up to 3 times per boot. A found PIC is persisted as `1` (S3 Mini) or `3` (S3 Mini Pro). A miss runs OT-Direct for that boot only and is never written to `iBoardMode`, so the next boot probes again (ADR-201). Nothing in the firmware writes `2` on its own.
 
 #### PSRAM
 
@@ -251,9 +251,9 @@ The ESP32-S3 partition table `partitions_otgw_esp32.csv` is used by every 4 MB t
 
 | ADR | Topic |
 |-----|-------|
-| ADR-126 | Fixed build targets (no runtime hardware detection) |
+| ADR-127 | Single `esp32-combo` binary with runtime PIC/OT-Direct boot detection; the fixed `esp32` and `esp32-classic` targets remain |
 | ADR-158 | LOLIN S3 Mini Pro Classic variant (IMU-detected) |
-| ADR-160 | Combo AUTO re-probe (persist-once, re-evaluate on boot) |
+| ADR-201 | Combo detection persists only a positive PIC verdict and re-probes every boot |
 | ADR-130 | PIC-UART FreeRTOS task |
 | ADR-146 | Streaming JsonEmit writer (ArduinoJson removed) |
 | ADR-147 / ADR-149 | Async static-serve config and LWIP TCP-pcb limits |
@@ -799,27 +799,27 @@ Not required for: pure bug fixes, minor features within existing patterns.
 |-----|-------|--------|
 | ADR-003 | HTTP/WS only, no HTTPS/WSS | Plain HTTP and WebSocket only; trusted LAN security model |
 | ADR-009 | PROGMEM string literals | All literals in flash via `F()` / `PSTR()` |
-| ADR-014 | Dual build system | `build.py` wraps PlatformIO; on 2.x run it through `build.bat` / `./build.sh` |
 | ADR-016 | OpenTherm command queue | Always use `addCommandToQueue()` |
 | ADR-019 | REST API versioning | `/api/v2/` is current; v0/v1 return 410 Gone |
 | ADR-028 | File streaming | Files >2 KB must use `streamFile()`, never load |
 | ADR-040 | MQTT source-specific topics | Source separation topic structure |
-| ADR-042 | Streaming JSON | No ArduinoJson; manual `snprintf_P` construction |
 | ADR-049 | String prohibition on protocol paths | No `String` class on MQTT/REST/WebSocket hot paths |
 | ADR-050 | Centralized API dispatch | Single `kV2Routes[]` table; no per-route router changes |
 | ADR-051 | Dual encapsulating structs | `OTGWSettings` / `OTGWState` architecture |
 | ADR-053 | Large feature buffer allocation | Static allocation for large per-feature buffers |
 | ADR-061 | Platform abstraction | Use `platform.h` abstractions, not direct SDK calls |
 | ADR-064 | OTDirect operating-mode architecture | Gateway / Monitor / Thermostat / Off modes in OT-Direct mode |
-| ADR-069 | SAT PID v3 implementation | Current PID control law for Smart Autotune Thermostat |
 | ADR-079 | Per-component type headers | Each subsystem owns its state + settings structs in `<Component>types.h` |
 | ADR-081 | Types merge into `<Component>stuff.h` | Amendment to ADR-079: fold into the existing stuff sibling when one exists |
+| ADR-083 | PlatformIO as build system | `platformio.ini` is the build configuration; on 2.x build through `build.bat` / `./build.sh` |
 | ADR-090 | Re-entrancy guard pattern for shared scratch buffers | `MQTTAutoConfigSessionLock` and the `inUse` flag on `publishToSourceTopic` |
 | ADR-092 | NimBLE-Arduino for BLE scanner | SAT BLE scanner uses NimBLE-Arduino 2.x instead of Bluedroid |
-| ADR-100 | JIT HA discovery + smart reconnect | OT configs only published once the MsgID is seen; broker-restart heuristic gates republish |
 | ADR-101 | Flat per-value MQTT topics | One topic per value; no aggregated JSON payloads |
 | ADR-106 | Self-describing MQTT topic names | New default topic naming; legacy shape behind `bUseLegacyOtTopics` |
+| ADR-146 | Streaming JsonEmit writer | No ArduinoJson; REST JSON goes through the `JsonEmit` streaming writer (`jsonEmit.h`) |
+| ADR-174 | Republish on-change MQTT state when Home Assistant comes back online | `offline` to `online` on `homeassistant/status` calls `requestMQTTRepublishAll()`; JIT discovery stays as in ADR-100 |
 | ADR-180 | Keep the `String` class out of hot-path source files | Guideline-level; `evaluate.py` reports WARN with the call site |
+| ADR-197 | SAT PID v3 controller | Current PID control law for Smart Autotune Thermostat, following thermo-nova `pid.py` |
 
 #### Creating a New ADR
 

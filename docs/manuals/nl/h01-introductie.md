@@ -65,7 +65,7 @@ Sinds v2.0.0 bevat de firmware een `boards.h`-header die pin-mappings, feature f
 
 v2.0.0 is een grote platformrelease. Het is de ESP32-S3-only async + FreeRTOS-lijn. Instellingenbestanden van v1.3.x worden automatisch geladen zonder conversie.
 
-v2.0.0 verkeert op het moment van schrijven nog in alpha. De bestaande functionaliteit is feature-compleet, maar SAT, OTDirect en de nieuwe MQTT-topicnamen (zie hieronder) worden nog verder verfijnd. Volg de GitHub Releases-pagina voor de actuele alpha-tag.
+v2.0.0 is in publieke beta: releases verschijnen als GitHub prereleases. De bestaande functionaliteit is feature-compleet, maar SAT, OTDirect en de nieuwe MQTT-topicnamen (zie hieronder) worden nog verder verfijnd. SAT blijft experimenteel en opt-in. Volg de GitHub Releases-pagina voor de actuele beta.
 
 **Breaking change in deze release.** v2.0.0 gebruikt standaard een nieuwe, zelfbeschrijvende set MQTT-topicnamen (ADR-106). Zevenendertig OT-spec-georiënteerde binary_sensor-topics krijgen een duidelijker, Home Assistant-vriendelijk label (bijvoorbeeld: `master_ch_enable` wordt `central_heating_enabled`). Gebruikers met bestaande automations op de oude labels kunnen `settings.mqtt.bUseLegacyOtTopics` op `true` zetten om het v1.x-gedrag te behouden. De twee modi sluiten elkaar uit: of de nieuwe namen, of de oude namen worden gepubliceerd, nooit beide tegelijk. De REST API is ongewijzigd ten opzichte van v1.x.
 
@@ -191,10 +191,10 @@ De broncode, releases, bug tracker en pull requests staan op:
 Meld fouten en verbeterverzoeken via de GitHub Issues-pagina. Voeg bij een bugreport altijd toe: firmwareversie, firmwarelijn (1.x of 2.x), een beschrijving van het probleem en indien beschikbaar de uitvoer van de telnet-debuglog (poort 23).
 
 **Discord**
-De community is actief op de OTGW Discord-server. Hier kunt u terecht voor hulp bij installatie, configuratie en Home Assistant-integratie. Beginners zijn welkom; de community is internationaal en communiceert in het Engels.
+De community is actief op de OTGW Discord-server (`https://discord.gg/zjW3ju7vGQ`). Hier kunt u terecht voor hulp bij installatie, configuratie en Home Assistant-integratie. Beginners zijn welkom; de community is internationaal en communiceert in het Engels.
 
 **Releases**
-Nieuwe releases worden gepubliceerd als GitHub Releases en bevatten voorgebouwde binaries: voor de 2.x-lijn de `esp32-combo`-zip, voor de 1.x-lijn de binaries van die lijn. De webinterface biedt een ingebouwde update-functie waarmee u direct kunt updaten vanuit de lijst met beschikbare releases.
+Nieuwe releases worden gepubliceerd als GitHub Releases en bevatten voorgebouwde binaries: voor de 2.x-lijn de `esp32-combo`-zip, voor de 1.x-lijn de binaries van die lijn. De 2.x-firmware downloadt zelf geen updates: download de release-zip en geef die aan de Update-pagina van de webinterface.
 
 **Documentatie**
 De volledige technische documentatie, inclusief C4-architectuurdiagrammen, API-referentie en ADR's, staat in de `docs/`-map van de repository.

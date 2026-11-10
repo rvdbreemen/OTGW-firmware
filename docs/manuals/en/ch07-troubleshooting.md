@@ -122,9 +122,26 @@ To enable: go to Settings in the Web UI and enable "Nightly Restart", then choos
 
 ### 7.8 Serial Overrun and OTGW Online-Offline Flapping
 
-**Root cause in versions before 2.0.0:** The `publishToSourceTopic()` function allocated approximately 1,600 bytes of local buffers on the stack, which overflowed it on the 1.x line. The fix in v2.0.0 converts those buffers to static or pre-allocated scratch memory.
+#### What is a serial overrun?
 
-If you see this on v2.0.0: update to the latest build. If the problem persists, connect to the Telnet debug console and look for `Exception` or `Stack smashing` messages.
+A serial overrun happens when the PIC sends more data to the ESP than the firmware reads before the UART buffer is full. Individual bytes are lost. The firmware detects this through the UART hardware overrun flag.
+
+#### Symptoms
+
+- A `Serial Overrun` line in the Telnet debug console.
+- A `Serial Overrun` event in the Web UI event log and on the MQTT `event_report` topic. The event is suppressed during the first 15 seconds after the PIC starts.
+- Incomplete OpenTherm lines in the debug log.
+- OTGW availability that switches quickly between `online` and `offline`.
+
+#### What to do
+
+1. **Check the MQTT connection.** A busy or unstable MQTT connection slows processing and can cause indirect overruns (see section 7.2).
+2. **Check the free heap.** Low memory slows the firmware down (see section 7.7).
+3. **Check for OTmonitor on port 25238.** OTmonitor that is active and sending commands adds load.
+4. **Rule out other causes of flapping:** WiFi instability (section 7.4) or an MQTT broker restart.
+5. **Capture evidence.** Connect to the Telnet debug console and note any `Exception` or `Stack smashing` messages, then attach the crash log (section 7.11) and the Telnet log to a GitHub issue.
+
+On the 1.x line this was caused by large stack buffers in `publishToSourceTopic()`; on 2.x that function uses a static buffer.
 
 ---
 
@@ -249,7 +266,7 @@ If you are coming from an older firmware or reading older forum threads, the pro
 | Flood of MQTT messages and broker hammering right after a reconnect | Full MQTT discovery burst re-sent in one go on every reconnect, exhausting heap and overwhelming the broker. | Fixed. Discovery is now async and drip-published (see 7.3). On reconnect the bitmap is preserved; use `F` in the Telnet console to force a full re-publish if needed. |
 | Clock jumps to `2106-02-07` shortly after boot | SDK sometimes hands back a bogus `time_t` before the first successful NTP exchange. | Fixed. NTP code now ignores the pre-epoch/post-2106 values until a real sync succeeds. Enable key `n` in the Telnet console to watch the handshake. |
 | Device unreachable after the router reboots, until the OTGW is power-cycled | DHCP lease renewal raced with the WiFi reconnect logic, leaving the interface without an IP. | Fixed. DHCP renewal and WiFi recovery are coordinated (ADR-047 two-layer recovery logic). |
-| OTGW online/offline flapping, serial overruns during MQTT bursts | `publishToSourceTopic()` allocated ~1.6 KB of local buffers on the stack (1.x line). | Fixed. Large buffers converted to static or pre-allocated scratch memory. See section 7.8. |
+| OTGW online/offline flapping, serial overruns during MQTT bursts (1.x line) | `publishToSourceTopic()` allocated ~1.6 KB of local buffers on the stack (1.x line). | Fixed. The buffer is static. See section 7.8. |
 
 ---
 
@@ -295,6 +312,6 @@ Connect on port 23 and type `resetwifi` to clear WiFi credentials only.
 1. **GitHub Issues:** `https://github.com/rvdbreemen/OTGW-firmware/issues`
    Include: firmware version, board (for example OTGW Classic with LOLIN S3 Mini), Telnet debug log, crash log (if available), and settings (redact passwords).
 
-2. **Discord:** Check the GitHub repository for the invite link.
+2. **Discord:** Join the OTGW Discord server: `https://discord.gg/zjW3ju7vGQ`.
 
 3. **Tweakers.net forum:** The Dutch home automation community has a long-running OTGW discussion thread.

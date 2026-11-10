@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-10T18:40:00Z'
-updated_date: '2026-11-10T18:52:00Z'
+updated_date: '2026-11-10T19:08:00Z'
 labels:
   - docs
 milestone: 2.0.0
@@ -30,6 +30,9 @@ Robert's decision 2026-11-10 ('clean up everything now', relayed by the coordina
 - [x] #5 ch10/h10 ESP8266 passages reworked
 - [x] #6 docs/MANUAL.md matches the reworked chapters
 - [x] #7 docs/BREAKING_CHANGES.md link to the 1.4.1 notes fixed
+- [x] #8 ch01/h01: release status no longer 'alpha' (matches the published betas); EN has the report-issues section NL h01 has (parity)
+- [x] #9 ch07/h07 7.8: 1.x-only root cause removed or reduced to one 1.x-line reference
+- [x] #10 MANUAL.md: ADR-014 row correct for 2.x (build.py via build.bat/build.sh); 'Key ADRs' table aligned with ch08 / docs/adr/ADR-INDEX.md; mirrors the ch01/ch07 changes
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -50,6 +53,14 @@ ch08/h08: ESP8266 2->0 and ADR-004 2->0 each. 'Wemos D1 mini socket' (physical s
 ch10/h10: ESP8266 EN 8->5, NL 9->6. ESP8266 glossary entry -> '1.x line' entry; ESP32 entry: 240 MHz (platformio.ini:116 f_cpu) and BLE, unsourced RAM claim removed; PROGMEM rule 'carried over from the 1.x line'; v1.3.5 changelog line now says 'on the 1.x line'. Remaining hits are the allowed 1.x-line form (v2.0.0 changelog, NL 333 release assets) and verbatim titles of immutable ADRs (ADR-001 'ESP8266 Platform Selection', ADR-061 'Unified ESP8266/ESP32 Platform Abstraction') in the ADR index and supersession list.
 
 MANUAL.md: mirrors the chapter changes (15 ESP8266 lines -> 0, ADR-004 for current rules -> ADR-053/ADR-180, 'Migrating from ESP8266 (1.x)' -> 'Migrating from 1.x' with anchor #migrating-from-1x updated, glossary 1.x line/ESP32/PROGMEM, ch07 7.8, ch08 ADR table). The v1.0.0 changelog line keeps 'ADR-004' as history (main session reverted the subagent's rewrite, matching ch10:288). Findings, not fixed: MANUAL ADR-014 row still says 'build.py for Arduino CLI' (1.x-era; ch08 is current); MANUAL's 'Key ADRs' table is older/shorter than ch08's.
+
+2026-11-10 coordinator, under Robert's 'clean up everything now': also fix the remaining findings (alpha status, EN/NL parity of the report-issues section, ch07 7.8, MANUAL ADR-014 row and ADR table). ch04 heading stays as is.
+
+ch01/h01: status sentence now 'in public beta: releases are published as GitHub prereleases ... SAT stays experimental and opt-in' (tag v2.0.0-beta.170; gh release list shows 170/167/162/158 as Pre-release; TASK-1740 line 21). EN gained the 'Community and Support' section NL had (GitHub, Discord https://discord.gg/zjW3ju7vGQ from README.md:3/:334, Releases, Documentation). A false NL claim (built-in update from the releases list) was not ported and is corrected in NL: 2.x does not download updates itself (ch03:357), give the release zip to the Update page. Unverified, ported: Discord 'international, English'. Other EN/NL structure gaps in ch01 (Key Features subheadings, NL hardware subsections, 'How to use this manual' scope, Prerequisites grouping) are recorded as findings, not fixed. EN ch07:303 still says 'check the repository for the Discord invite link'.
+
+ch07/h07 7.8: 1.x root cause and NL 'opgelost in v2.0.0' subsection removed; 7.8 now has the same structure in EN and NL (what it is, symptoms, what to do) with one closing 1.x-line sentence. Kept 2.x claims checked: OTGW-Core.ino:741 (platformSerialHasOverrun), :865 DebugT 'Serial Overrun', :866 reportOTGWEvent_P -> MQTT event_report (:187) + WebSocket (:190), 15 s startup quiet (:106, :151-159); MQTTstuff.ino:2301 static sourceTopic. Removed a wrong NL claim of a 'serial_overrun' WebSocket event type (no such string in src/, re-checked). 7.10a table row kept as 1.x-line history; cross-references to 7.8, 7.2, 7.4, 7.7, 7.11 resolve.
+
+MANUAL.md + ADR tables (coordinator follow-up): MANUAL mirrors ch01 status/Community section and ch07 7.8; MANUAL 'no breaking changes' sentence replaced by ch01's ADR-106 paragraph (ADR-106 Accepted). Key ADRs table (ch08/h08/MANUAL) now lists current ADRs: 014->083, 042->146 (via 141), 069->197, 100->174 (successor text from each ADR's Decision). ch08/h08 build-target section: ADR-126->127, ADR-160->201, persist-once prose replaced by ADR-201 Decision items 1-4 (checked against the ADR text). ArduinoJson glossary (MANUAL, ch10) -> ADR-146/JsonEmit (jsonEmit.h, settingStuff.ino:150). Discord link (README.md:3/:334) in ch07/h07, ch10/h10, MANUAL. ch10/h10 ADR catalog aligned with ADR frontmatter: 005->133, 011 Amended, 014->083, 022->200, 026->139, 042->141->146, 048->136, 069->197, 071->198; supersession list extended; main-session re-check: 0 catalog mismatches in EN and NL (remaining script hits are other tables). Note: ADR-083 itself names 'pio run' while CLAUDE.md requires build.bat/build.sh; the manual follows the project rule.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

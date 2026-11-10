@@ -231,7 +231,7 @@ De firmware opent de volgende netwerk-poorten. Alle diensten zijn beschikbaar op
 | Home Assistant OTGW-integratie (HACS) | `https://github.com/mvdw73/otgw-mqtt` |
 | Home Assistant PubSubClient MQTT | Ingebouwd in HA, geen extra installatie |
 | OTGW Community Forum (Tweakers) | `https://gathering.tweakers.net/forum/list_messages/1754099` |
-| Discord-server (ontwikkelaars) | Zie `README.md` voor uitnodigingslink |
+| Discord-server | `https://discord.gg/zjW3ju7vGQ` |
 
 #### Specificaties en referentie-implementaties
 
@@ -373,9 +373,9 @@ Deze ADR's zijn toegevoegd tijdens de v2.0.0-ontwikkelcyclus (de ESP32-S3-port, 
 | 066 | Thermostat Auto-Detection Master Mode | Accepted |
 | 067 | SSD1306Ascii OLED Library | Accepted |
 | 068 | OTDirect Schedule Tuning Constants | Accepted |
-| 069 | SAT PID v3 Implementation | Accepted |
+| 069 | SAT PID v3 Implementation | Superseded by ADR-197 |
 | 070 | SAT Memory Allocation Strategy | Accepted |
-| 071 | SAT Heating Curve Algorithm | Accepted |
+| 071 | SAT Heating Curve Algorithm | Superseded by ADR-198 |
 | 072 | SAT Platform Compatibility Layer | Accepted |
 | 073 | SAT MQTT Topic Structure | Accepted |
 | 074 | ADR Audit SAT Integration Phase | Accepted |
@@ -397,16 +397,16 @@ Deze ADR's zijn toegevoegd tijdens de v2.0.0-ontwikkelcyclus (de ESP32-S3-port, 
 | 002 | Modular .ino File Architecture | Accepted |
 | 003 | HTTP-Only Network Architecture (No HTTPS) | Accepted |
 | 004 | Static Buffer Allocation Strategy | Superseded by ADR-053 |
-| 005 | WebSocket for Real-Time Streaming | Accepted |
+| 005 | WebSocket for Real-Time Streaming | Superseded by ADR-133 |
 | 006 | MQTT Integration Pattern | Accepted |
 | 007 | Timer-Based Task Scheduling | Accepted |
 | 008 | LittleFS for Configuration Persistence | Accepted |
 | 009 | PROGMEM Usage for String Literals | Accepted |
 | 010 | Multiple Concurrent Network Services | Accepted |
-| 011 | External Hardware Watchdog for Reliability | Accepted |
+| 011 | External Hardware Watchdog for Reliability | Amended |
 | 012 | PIC Firmware Upgrade via Web UI | Accepted |
 | 013 | Arduino Framework Over ESP-IDF | Accepted |
-| 014 | Dual Build System (Makefile + Python Script) | Accepted |
+| 014 | Dual Build System (Makefile + Python Script) | Superseded by ADR-083 |
 | 015 | NTP and AceTime for Time Management | Accepted |
 | 016 | OpenTherm Command Queue with Deduplication | Accepted |
 | 017 | WiFiManager for Initial Configuration | Accepted |
@@ -414,11 +414,11 @@ Deze ADR's zijn toegevoegd tijdens de v2.0.0-ontwikkelcyclus (de ESP32-S3-port, 
 | 019 | REST API Versioning Strategy | Accepted |
 | 020 | Dallas DS18B20 Temperature Sensor Integration | Accepted |
 | 021 | S0 Pulse Counter Hardware Interrupt Architecture | Accepted |
-| 022 | GPIO Output Control (Bit-Flag Triggered Relays) | Accepted |
+| 022 | GPIO Output Control (Bit-Flag Triggered Relays) | Superseded by ADR-200 |
 | 023 | File System Explorer HTTP Architecture | Accepted |
 | 024 | Debug Telnet Command Console | Accepted |
 | 025 | Safari WebSocket Connection Management | Accepted |
-| 026 | Conditional JavaScript Cache-Busting | Accepted |
+| 026 | Conditional JavaScript Cache-Busting | Superseded by ADR-139 |
 | 027 | Version Mismatch Warning System in Web UI | Accepted |
 | 028 | File Streaming Over Loading for Memory Safety | Accepted |
 | 029 | Simple XHR-Based OTA Flash (KISS Principle) | Accepted |
@@ -434,13 +434,13 @@ Deze ADR's zijn toegevoegd tijdens de v2.0.0-ontwikkelcyclus (de ESP32-S3-port, 
 | 039 | Real-Time OTGraph Charting Architecture | Accepted |
 | 040 | MQTT Source-Specific Topics for OpenTherm Values | Accepted |
 | 041 | JIT Home Assistant Discovery | Accepted |
-| 042 | Streaming JSON I/O (No ArduinoJson) | Accepted |
+| 042 | Streaming JSON I/O (No ArduinoJson) | Superseded by ADR-141, then ADR-146 |
 | 043 | Reset-Pattern WiFi Recovery Trigger | Accepted |
 | 044 | Global State Header Definition Pattern | Accepted |
 | 045 | PS=1 Print Summary Parsing | Superseded by ADR-046 |
 | 046 | PS=1 Summary Translation with Shared Publish Helpers | Accepted |
 | 047 | Non-Blocking WiFi Reconnect State Machine | Superseded by ADR-075 |
-| 048 | Non-Blocking Webhook State Machine with Retry | Accepted |
+| 048 | Non-Blocking Webhook State Machine with Retry | Superseded by ADR-136 |
 | 049 | String Class Prohibition in Protocol Paths | Accepted |
 | 050 | Centralized API Route Dispatch Table | Accepted |
 | 051 | Dual Encapsulating Structs (Settings + State) | Accepted |
@@ -460,9 +460,9 @@ Deze ADR's zijn toegevoegd tijdens de v2.0.0-ontwikkelcyclus (de ESP32-S3-port, 
 | 066 | Thermostat Auto-Detection Master Mode | Accepted |
 | 067 | SSD1306Ascii OLED Library | Accepted |
 | 068 | OTDirect Schedule Tuning Constants | Accepted |
-| 069 | SAT PID v3 Implementation | Accepted |
+| 069 | SAT PID v3 Implementation | Superseded by ADR-197 |
 | 070 | SAT Memory Allocation Strategy | Accepted |
-| 071 | SAT Heating Curve Algorithm | Accepted |
+| 071 | SAT Heating Curve Algorithm | Superseded by ADR-198 |
 | 072 | SAT Platform Compatibility Layer | Accepted |
 | 073 | SAT MQTT Topic Structure | Accepted |
 | 074 | ADR Audit SAT Integration Phase | Accepted |
@@ -473,8 +473,15 @@ Deze ADR's zijn toegevoegd tijdens de v2.0.0-ontwikkelcyclus (de ESP32-S3-port, 
 
 - ADR-001 (ESP8266 Platform) -> ADR-061 (Unified Platform Abstraction)
 - ADR-004 (Static Buffers) -> ADR-053 (Large Feature Buffer Static Allocation)
-- ADR-018 (ArduinoJson) -> ADR-042 (Streaming JSON, No ArduinoJson)
+- ADR-018 (ArduinoJson) -> ADR-042 (Streaming JSON, No ArduinoJson) -> ADR-141 (ArduinoJson v7) -> ADR-146 (JsonEmit, no ArduinoJson)
 - ADR-045 (PS=1 Parsing) -> ADR-046 (PS=1 Summary Translation)
 - ADR-047 (WiFi Reconnect) -> ADR-075 (WiFi Reconnect Timeout Tuning)
 - ADR-054 (HTTP Basic Auth) -> ADR-056 (Protected Admin Security Contract)
 - ADR-055 (Webhook HTTP) -> ADR-057 (Webhook Delivery + Test Endpoint Policy)
+- ADR-005 (WebSocket Real-Time Streaming) -> ADR-133
+- ADR-014 (Dual Build System) -> ADR-083
+- ADR-022 (GPIO Output Control) -> ADR-200
+- ADR-026 (Conditional JS Cache-Busting) -> ADR-139
+- ADR-048 (Webhook State Machine) -> ADR-136
+- ADR-069 (SAT PID v3) -> ADR-197
+- ADR-071 (SAT Heating Curve) -> ADR-198

@@ -56,7 +56,7 @@ The firmware also has an OT-Direct mode, used only on hardware without a PIC. On
 
 Version 2.0.0 is a major platform release. It is the ESP32-S3-only async + FreeRTOS line. Settings files from v1.3.x load without modification.
 
-Version 2.0.0 is still in alpha at the time of writing. It is feature complete on the established functionality but receives ongoing refinement on SAT, OTDirect, and the new MQTT topic shape (see below). Track the GitHub Releases page for the current alpha tag.
+Version 2.0.0 is in public beta: releases are published as GitHub prereleases. The established functionality is feature complete, but SAT, OTDirect, and the new MQTT topic shape (see below) still receive refinement. SAT stays experimental and opt-in. Track the GitHub Releases page for the current beta.
 
 **Breaking change in this release.** v2.0.0 changes the default MQTT topic names to a new self-describing scheme (ADR-106). Thirty-seven OT-spec-derived binary sensor topics are renamed to clearer, Home Assistant friendly labels (for example, the legacy `master_ch_enable` becomes `central_heating_enabled`). Users with existing automations pinned to the legacy labels can flip `settings.mqtt.bUseLegacyOtTopics` to `true` and keep the v1.x behaviour. The two modes are mutually exclusive: either the new names or the legacy names publish, never both. The REST API is unchanged from v1.x.
 
@@ -132,5 +132,24 @@ Before you begin, you need:
 - For full Home Assistant auto-discovery: Home Assistant with the MQTT integration enabled.
 
 The firmware does not require an internet connection for normal operation. An internet connection is used optionally for: NTP time synchronization and the Open-Meteo weather API used by SAT for outdoor temperature and solar data.
+
+---
+
+### Community and Support
+
+**GitHub**
+The source code, releases, bug tracker, and pull requests are at:
+`https://github.com/rvdbreemen/OTGW-firmware`
+
+Report bugs and feature requests on the GitHub Issues page. With a bug report, always include: firmware version, firmware line (1.x or 2.x), a description of the problem, and, if available, the output of the Telnet debug log (port 23).
+
+**Discord**
+The community is active on the OTGW Discord server (`https://discord.gg/zjW3ju7vGQ`). You can ask there for help with installation, configuration, and Home Assistant integration. Beginners are welcome; the community is international and communicates in English.
+
+**Releases**
+New releases are published as GitHub Releases and contain prebuilt binaries: the `esp32-combo` zip for the 2.x line, the binaries of that line for the 1.x line. The 2.x firmware does not download updates itself: download the release zip and give it to the Update page of the web interface.
+
+**Documentation**
+The full technical documentation, including the C4 architecture diagrams, the API reference, and the ADRs, is in the `docs/` folder of the repository.
 
 ---

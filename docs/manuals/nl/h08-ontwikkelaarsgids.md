@@ -196,9 +196,9 @@ Gebruik deze vlaggen in conditionele compilatie:
 
 De `dev`-lijn (firmware 2.0.0) is uitsluitend ESP32-S3, gebouwd op een async + FreeRTOS-stack. De 1.x-lijn blijft alleen bestaan op de `otgw-1.x.x` maintenance-branch. Op 2.0.0 verloopt de build uitsluitend via PlatformIO en is elk target een ESP32-S3.
 
-#### Vaste build targets (ADR-126)
+#### Build targets (ADR-127)
 
-Er is geen runtime hardwaredetectie op de twee vaste single-engine targets; elk linkt precies één OpenTherm-engine. Drie omgevingen zijn gedefinieerd in `platformio.ini`:
+De twee vaste single-engine targets doen geen runtime hardwaredetectie; elk linkt precies één OpenTherm-engine. Het `esp32-combo`-target linkt beide en detecteert de hardware bij het opstarten (ADR-127). Drie omgevingen zijn gedefinieerd in `platformio.ini`:
 
 | Target (`--target`) | Hardware | OpenTherm-engine |
 |---|---|---|
@@ -214,7 +214,7 @@ Er is geen runtime hardwaredetectie op de twee vaste single-engine targets; elk 
 
 `esp32` is de standaard PlatformIO-omgeving. `esp32-classic` en `esp32-combo` breiden die uit (`extends = env:esp32`) en erven het platform, board, de partitietabel, `lib_deps` en `build_unflags`; ze overschrijven alleen `build_flags` en `lib_ignore`.
 
-#### Combo boot-detectie (ADR-127 / ADR-158 / ADR-160)
+#### Combo boot-detectie (ADR-127 / ADR-158 / ADR-201)
 
 De `esp32-combo`-binary linkt beide OT-engines en kiest er één bij het opstarten. De `iBoardMode`-instelling bepaalt de modus:
 
@@ -222,10 +222,10 @@ De `esp32-combo`-binary linkt beide OT-engines en kiest er één bij het opstart
 |---|---|---|
 | `0` | AUTO | herprobeer PIC vs OTDirect (en S3 Mini vs S3 Mini Pro) bij boot |
 | `1` | Force PIC | LOLIN S3 Mini in de Classic-socket |
-| `2` | OT-Direct-modus | alleen op hardware zonder PIC |
+| `2` | OT-Direct-modus | alleen op hardware zonder PIC; probeert eenmaal per boot, en een PIC die antwoordt corrigeert de modus naar `1` of `3` |
 | `3` | Force PIC | LOLIN S3 Mini Pro in de Classic-socket |
 
-De S3 Mini Pro onderscheidt zich van de gewone S3 Mini door zijn onboard QMI8658C IMU. De Pro herbedraadt zijn Classic I2C-headers en heeft een andere Classic pin map nodig; `state.hw.bClassicPro` legt het resultaat vast. AUTO herprobeer de PIC bij elke boot: de detectie is persist-once, maar een verkeerd oordeel wordt bij de volgende boot opnieuw geëvalueerd in plaats van vastgezet.
+De S3 Mini Pro onderscheidt zich van de gewone S3 Mini door zijn onboard QMI8658C IMU. De Pro herbedraadt zijn Classic I2C-headers en heeft een andere Classic pin map nodig; `state.hw.bClassicPro` legt het resultaat vast. AUTO probeert tot 3 keer per boot de PIC te vinden. Een gevonden PIC wordt vastgelegd als `1` (S3 Mini) of `3` (S3 Mini Pro). Een misser draait alleen die boot OT-Direct en wordt nooit naar `iBoardMode` geschreven, zodat de volgende boot opnieuw probeert (ADR-201). Niets in de firmware schrijft uit zichzelf `2`.
 
 #### PSRAM
 
@@ -250,9 +250,9 @@ De ESP32-S3-partitietabel `partitions_otgw_esp32.csv` geldt voor elk 4 MB-target
 
 | ADR | Onderwerp |
 |-----|-----------|
-| ADR-126 | Vaste build targets (geen runtime hardwaredetectie) |
+| ADR-127 | Eén `esp32-combo`-binary met runtime PIC/OT-Direct-bootdetectie; de vaste targets `esp32` en `esp32-classic` blijven bestaan |
 | ADR-158 | LOLIN S3 Mini Pro Classic-variant (IMU-gedetecteerd) |
-| ADR-160 | Combo AUTO herprobeer (persist-once, opnieuw evalueren bij boot) |
+| ADR-201 | Combo-detectie legt alleen een positief PIC-oordeel vast en probeert elke boot opnieuw |
 | ADR-130 | PIC-UART FreeRTOS-task |
 | ADR-146 | Streaming JsonEmit-writer (ArduinoJson verwijderd) |
 | ADR-147 / ADR-149 | Async static-serve config en LWIP TCP-pcb-limieten |
@@ -806,27 +806,27 @@ Voor puur refactoren, bugfixes en kleine functies binnen bestaande patronen is g
 |-----|-----------|--------|
 | ADR-003 | Alleen HTTP/WS, geen HTTPS/WSS | Plain HTTP en WebSocket; beveiligingsmodel is vertrouwd LAN |
 | ADR-009 | PROGMEM string literals | Alle literals in flash via `F()` / `PSTR()` |
-| ADR-014 | Dual build system | `build.py` wrapt PlatformIO; op 2.x start je het via `build.bat` / `./build.sh` |
 | ADR-016 | OpenTherm command queue | Altijd `addCommandToQueue()` |
 | ADR-019 | REST API versioning | `/api/v2/` is huidig; v0/v1 retourneren 410 Gone |
 | ADR-028 | File streaming | Bestanden >2 KB moeten `streamFile()` gebruiken, nooit laden |
 | ADR-040 | MQTT source-specific topics | Bronscheiding topicstructuur |
-| ADR-042 | Streaming JSON | Geen ArduinoJson; handmatige `snprintf_P`-constructie |
 | ADR-049 | String-verbod op protocolpaden | Geen `String`-klasse op MQTT/REST/WebSocket hot paths |
 | ADR-050 | Centralized API dispatch | Enkele `kV2Routes[]`-tabel; geen per-route routerwijzigingen |
 | ADR-051 | Dual encapsulating structs | `OTGWSettings` / `OTGWState`-architectuur |
 | ADR-053 | Large feature buffer allocation | Statische allocatie voor grote per-feature buffers |
 | ADR-061 | Platformabstractie | Gebruik `platform.h`-abstracties, geen directe SDK-aanroepen |
 | ADR-064 | OTDirect operating-mode architectuur | Gateway / Monitor / Thermostat / Off modi in OT-Direct-modus |
-| ADR-069 | SAT PID v3 implementatie | Huidige PID-regelwet voor Smart Autotune Thermostat |
 | ADR-079 | Per-component type-headers | Elk subsysteem bezit zijn state + settings structs in `<Component>types.h` |
 | ADR-081 | Types vouwen in `<Component>stuff.h` | Amendement op ADR-079: fold in de bestaande stuff-sibling waar die al bestaat |
+| ADR-083 | PlatformIO als buildsysteem | `platformio.ini` is de buildconfiguratie; op 2.x bouw je via `build.bat` / `./build.sh` |
 | ADR-090 | Re-entrancy guard pattern voor gedeelde scratch buffers | `MQTTAutoConfigSessionLock` en de `inUse`-vlag op `publishToSourceTopic` |
 | ADR-092 | NimBLE-Arduino voor BLE-scanner | De SAT BLE-scanner gebruikt NimBLE-Arduino 2.x in plaats van Bluedroid |
-| ADR-100 | JIT HA-discovery + smart reconnect | OT-configs pas gepubliceerd als de MsgID is gezien; broker-restart-heuristiek bewaakt republish |
 | ADR-101 | Flat per-value MQTT-topics | Eén topic per waarde; geen geaggregeerde JSON-payloads |
 | ADR-106 | Zelfbeschrijvende MQTT-topicnamen | Nieuwe standaard topicnaamgeving; legacy vorm via `bUseLegacyOtTopics` |
+| ADR-146 | Streaming JsonEmit-writer | Geen ArduinoJson; REST-JSON gaat via de streaming `JsonEmit`-writer (`jsonEmit.h`) |
+| ADR-174 | On-change MQTT-state opnieuw publiceren als Home Assistant terugkomt | `offline` naar `online` op `homeassistant/status` roept `requestMQTTRepublishAll()` aan; JIT-discovery blijft zoals in ADR-100 |
 | ADR-180 | `String`-klasse buiten hot-path-bronbestanden houden | Richtlijnniveau; `evaluate.py` meldt WARN met de aanroepplek |
+| ADR-197 | SAT PID v3-regelaar | Huidige PID-regelwet voor Smart Autotune Thermostat, volgens thermo-nova `pid.py` |
 
 #### Levenscyclus
 

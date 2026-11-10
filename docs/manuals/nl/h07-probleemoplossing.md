@@ -250,31 +250,26 @@ Inschakelen: ga naar Settings in de Web UI, schakel "Nightly Restart" in en kies
 
 ### 7.8 Seriële overrun en OTGW online-offline-flikkeringen
 
-#### Wat zijn seriële overruns?
+#### Wat is een seriële overrun?
 
-Een seriële overrun treedt op wanneer de PIC meer data naar de ESP stuurt dan de firmware kan verwerken voordat de UART-buffer vol is. Individuele bytes gaan verloren. De firmware detecteert dit via de hardware foutvlag van de UART.
+Een seriële overrun treedt op wanneer de PIC meer data naar de ESP stuurt dan de firmware leest voordat de UART-buffer vol is. Individuele bytes gaan verloren. De firmware detecteert dit via de hardware overrun-vlag van de UART.
 
 #### Symptomen
 
+- Een `Serial Overrun`-regel in de Telnet-debugconsole.
+- Een `Serial Overrun`-event in het eventlog van de Web UI en op het MQTT-topic `event_report`. Het event wordt onderdrukt in de eerste 15 seconden nadat de PIC is gestart.
 - Onvolledige OpenTherm-regels in de debuglog.
-- Sporadische MQTT-berichten voor berichttypen die normaal gesproken consistent zijn.
-- WebSocket-event van type `serial_overrun` zichtbaar in de Web UI.
+- OTGW-beschikbaarheid die snel wisselt tussen `online` en `offline`.
 
-#### Hoe ermee omgaan
+#### Wat te doen
 
-Seriële overruns duiden vaak op een achterliggend probleem:
+1. **Controleer de MQTT-verbinding.** Een drukke of instabiele MQTT-verbinding vertraagt de verwerking en kan indirecte overruns veroorzaken (zie paragraaf 7.2).
+2. **Controleer de vrije heap.** Bij laag geheugen vertraagt de firmware (zie paragraaf 7.7).
+3. **Controleer of OTmonitor actief is op poort 25238.** OTmonitor die actief is en commands stuurt, geeft extra belasting.
+4. **Sluit andere oorzaken van flikkeringen uit:** WiFi-onstabiliteit (paragraaf 7.4) of een herstart van de MQTT-broker.
+5. **Verzamel bewijs.** Verbind met de Telnet-debugconsole en noteer `Exception`- of `Stack smashing`-meldingen. Voeg het crashlog (paragraaf 7.11) en de Telnet-log toe aan een GitHub-issue.
 
-1. **MQTT-verbindingsproblemen**: Een drukke MQTT-verbinding kan de verwerking vertragen en indirecte overruns veroorzaken.
-2. **Heapdruk**: Bij laag geheugen vertraagt de firmware. Controleer de vrije heap (zie paragraaf 7.7).
-3. **OTmonitor actief op poort 25238**: Wanneer OTmonitor actief is en commands stuurt, kan dit extra belasting geven.
-
-#### OTGW online-offline-flikkeringen opgelost in v2.0.0
-
-In versies voor 2.0.0 konden herhaalde disconnectie-events op de MQTT-verbinding zorgen voor een cascade van publicaties, waardoor de OTGW-beschikbaarheidsberichten snel achter elkaar `online` en `offline` publiceerden. De stackoverloopproblemen in `publishToSourceTopic` (te grote lokale buffers op de stack, onder de 1.x-firmware) zijn opgelost door alle grote buffers statisch te maken. Dit elimineert de crashes die de flikkeringen veroorzaakten.
-
-Als u flikkeringen ziet na een upgrade naar v2.0.0, controleer dan:
-- Of u daadwerkelijk v2.0.0 draait (zie Web UI voettekst).
-- Of er geen andere oorzaak is (WiFi-onstabiliteit, MQTT-broker herstart).
+Op de 1.x-lijn werd dit veroorzaakt door grote stackbuffers in `publishToSourceTopic()`; op 2.x gebruikt die functie een statische buffer.
 
 ---
 
@@ -422,7 +417,7 @@ Komt u van een oudere firmware of leest u oudere forumdraadjes, dan komen onders
 | Vloedgolf van MQTT-berichten en hameren op de broker direct na een reconnect | Volledige MQTT-discovery-burst werd in één keer opnieuw verstuurd bij iedere reconnect, waardoor de heap uitgeput raakte en de broker overbelast werd. | Opgelost. Discovery is nu async en drip-published (zie 7.3). Bij een reconnect blijft de bitmap bewaard; gebruik `F` in de Telnet-console om zo nodig een volledige herpublicatie af te dwingen. |
 | Klok springt vlak na opstart naar `2106-02-07` | De SDK geeft soms een onzinnige `time_t` terug vóór de eerste geslaagde NTP-uitwisseling. | Opgelost. De NTP-code negeert nu pre-epoch/post-2106-waarden tot een echte sync slaagt. Schakel toets `n` in de Telnet-console in om de handshake te volgen. |
 | Apparaat onbereikbaar na een routerherstart totdat de OTGW wordt uit- en weer ingeschakeld | DHCP-lease-vernieuwing liep in een race met de WiFi-reconnectlogica, waardoor de interface zonder IP achterbleef. | Opgelost. DHCP-vernieuwing en WiFi-herstel zijn gecoördineerd (ADR-047 tweelaagse herstellogica). |
-| OTGW online/offline-flikkeringen, seriele overruns tijdens MQTT-bursts | `publishToSourceTopic()` reserveerde ~1,6 KB aan lokale buffers op de stack (1.x-lijn). | Opgelost. Grote buffers omgezet naar statisch of pre-allocated scratch-geheugen. Zie paragraaf 7.8. |
+| OTGW online/offline-flikkeringen, seriele overruns tijdens MQTT-bursts (1.x-lijn) | `publishToSourceTopic()` reserveerde ~1,6 KB aan lokale buffers op de stack (1.x-lijn). | Opgelost. De buffer is statisch. Zie paragraaf 7.8. |
 
 ---
 
@@ -503,7 +498,7 @@ Voeg bij een bugrapport altijd het volgende mee:
 
 #### Discord
 
-Het project heeft een Discord-server voor real-time discussies, vragen en aankondigingen. De link staat op de GitHub-projectpagina. De kanalen zijn in het Engels; houd dat in acht bij het stellen van vragen.
+Het project heeft een Discord-server voor real-time discussies, vragen en aankondigingen. De uitnodigingslink is `https://discord.gg/zjW3ju7vGQ`. De kanalen zijn in het Engels; houd dat in acht bij het stellen van vragen.
 
 #### Tweakers
 
