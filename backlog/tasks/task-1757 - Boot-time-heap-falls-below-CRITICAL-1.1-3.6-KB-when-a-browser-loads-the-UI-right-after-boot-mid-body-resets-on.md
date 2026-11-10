@@ -7,12 +7,11 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:05:00Z'
-updated_date: '2026-11-10T06:54:00Z'
+updated_date: '2026-11-10T11:53:00Z'
 labels:
   - heap
   - bug
   - webui
-  - 2.0.0-stable-gate
 dependencies: []
 priority: high
 ordinal: 859000
@@ -51,4 +50,6 @@ AC2 prep (offline, 2026-11-10 ~05:20). (1) First read of the AC1 data: the hd_di
 DECISION Robert (2026-11-10 06:40, relayed by the coordinator): 'Gate after AC2'. AC2 runs with TWO real browser tabs (mode W) on beta.167 in the .61 slot after 80's TASK-1756 (~07:30). If two real tabs do NOT reach CRITICAL (3072 B) in the boot window, TASK-1757 is no longer a 2.0.0 stable gate; if they do, the gate stays and a fix comes first. The socket trace T (TASK-1528 step b) is heavier than two normal tabs and is run as context only, not as the deciding case. Adjusted AC2 sequence: W W T W W T W W (6 deciding W boots, 2 T), ~35 min.
 
 AC2 run, 2026-11-10 07:21-07:53, .61 on 2.0.0-beta.167+e79e495, runner t1757/boots1757ac2.py, data run-20261110-ac2, sequence W W T W W T W W. 8/8 boots clean (up 15.1-15.8 s after /ReBoot, bootcount +1 each 225..232, boot done in all, no crashlog). W (two real Chrome tabs from the first HTTP answer, 120 s): lowest boot-window heap (allWinMin = nativeMin at boot done) 4,684 / 4,244 / 13,444 / 30,316 / 15,012 / 13,672 B; lowest over the whole sampled boot 3,600 B (boot 2, after boot done while both tabs polled). T (TASK-1528 socket trace, context): 4,592 / 16,160 B (on beta.162 the same trace gave 1.1-3.6 KB; not explained, possibly the beta.159-162 poll changes, unproven). Low point in the 'connect' window in all 8. RESULT FOR THE GATE: CRITICAL (3,072 B) was never reached with two real tabs; per Robert's 06:40 rule TASK-1757 is no longer a 2.0.0 stable gate (the coordinator confirms with Robert). Caveats: thin margin (528 B overall in boot 2; 1.2-1.6 KB in the boot window of boots 1-2), wide spread (4.2-30.3 KB), 6 deciding boots. Browser: 83-100 requests per tab; /ws -173 in every tab at Chrome stop; boot 5 both tabs '/' timed out (-118) at boot (later requests succeeded; heap stayed at 30 KB since nothing loaded in the connect window); boot 2 /api/v2/simulate -118; boot 7 /api/v2/otdirect/overrides -118; no mid-body reset; webconn_503 3-25 per W boot (the ADR-188 send-connection cap refusing), webfile_503 0. AC2 evidence so far (dip snapshot at the end of each boot; not taken at the exact low point, so co-occurrence, not bytes): the three lowest boots (W1 4,684, W2 4,244, T3 4,592) all show dip_mqtt_queue 17 (the MQTT outbox full at connect), 1-2 web files in flight (dip_files 1-2, dip_tx_bytes 2,872-5,744), 2-3 TX pcbs, largest block 5.1-7.7 KB; the highest boots have mqtt_queue 0/1 (W5 30,316, W7 15,012) or no file in flight at the dip. Candidate for AC2 (not yet proven): the MQTT connect burst (17 queued messages) coinciding with the browser's first file sends in the connect window. AC2 stays open: the next step is a targeted [HEAP] line at the connect-window minimum (outbox bytes, file sends in flight, TX bytes), proposed first; AC3 (fix with old-vs-fix numbers) depends on whether Robert still wants a margin fix now that the gate drops.
+
+DECISION Robert (2026-11-10 ~08:0x, relayed by the coordinator): 'Drop the gate, keep task'. TASK-1757 is no longer a 2.0.0 stable gate (two real tabs never reached CRITICAL on beta.167: lowest boot-window heap 4,244 B, overall 3,600 B, margin 528 B in boot 2; one tab min 9.8 KB). The task stays open as a normal task: AC2 naming the allocations in the connect window (offline from the dip snapshots for now, no .61 slot) and AC3 building margin. Robert also asked for options on the MQTT connect burst (outbox cap of ~8, delayed or slower discovery drip); an analysis is running and the options go to him for decision.
 <!-- SECTION:NOTES:END -->
