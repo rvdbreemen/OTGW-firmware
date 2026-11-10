@@ -8783,7 +8783,7 @@
       "decision_contract": {
         "must": [
           "Set CONFIGESPIPCTASKSTACKSIZE ≥ 1280 in the framework libraries linked into every S3 environment.",
-          "Prove the larger stack on the device: log ipc1's stack size or high-water mark at boot, for example uxTaskGetStackHighWaterMark(xTaskGetHandle(\"ipc1\")).",
+          "Prove the larger stack on the device for both ipc0 and ipc1: their high-water marks at boot (the beta.168 boot line \"boot: ipc stack free min ipc0=.. ipc1=.. B\").",
           "Keep mitigation (b): the early GPIO ISR install in setup(), guarded by tests/testgpioisrearlyinstall.py.",
           "Include the full sdkconfig diff, rebuild against prebuilt, in the change that adopts it."
         ],

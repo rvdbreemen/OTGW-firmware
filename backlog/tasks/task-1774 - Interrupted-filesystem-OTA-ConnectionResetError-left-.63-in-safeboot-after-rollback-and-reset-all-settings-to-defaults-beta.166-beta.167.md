@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-10T05:53:00Z'
+updated_date: '2026-11-10T15:10:00Z'
 labels:
   - bug
   - ota
@@ -43,3 +44,18 @@ Files (local, not in git): OTGW-build-archive\flash-logs\63-beta167-fs-ota-reset
 - [ ] #3 Fix so that an interrupted fs OTA keeps settings.ini and the boot counter, and the main app still starts (or safeboot can restore without data loss); old-vs-fix proof on the reproduction
 - [ ] #4 scripts/ota_flash.py detects a unit in safeboot (no JSON from the main firmware) and says so, or can drive the safeboot recovery, instead of failing with JSONDecodeError
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-10T15:10:00Z
+
+---
+
+New fact (otgw-firmware-4c, relayed by the coordinator, 2026-11-10): on .63 there is a panic on ipc0 at 06:43:01 (pc 0x4037caec = _xt_lowint1, xtensa_vectors.S:1206, beta.167+ddf8498 ELF, backtrace corrupted). That is the moment of the safeboot rollback during the coordinator's flash (06:42-06:47).
+Hypothesis (not confirmed): the beta.167 app panicked at boot with the same kind of IPC-stack overflow as TASK-1763, but on ipc0. The app was then not confirmed, so safeboot rolled it back, and the settings/bootcount reset followed. If so, this task is not (only) an interrupted-filesystem-OTA problem.
+Next: 4c reads the coredump after the release; this task is updated then.
+Related: TASK-1763 (ipc1 overflow, proven), ADR-225 (covers both IPC stacks).
+
+---
+<!-- COMMENTS:END -->

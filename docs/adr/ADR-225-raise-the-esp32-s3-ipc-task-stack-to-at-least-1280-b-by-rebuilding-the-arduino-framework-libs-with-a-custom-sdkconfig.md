@@ -76,11 +76,13 @@ status_history:
 
 **Why the existing override does not help.** The project already overrides sdkconfig values through `include/sdkconfig.h` (ADR-185, `-Iinclude` in platformio.ini). That wrapper only changes what our own translation units see. The IPC task is created by precompiled IDF code inside the framework libraries, so the wrapper cannot change its stack size. This follows from how the libraries are built; it has not been tested with a build.
 
+**Both IPC stacks.** `ipc0` (core 0) and `ipc1` (core 1) are created with the same `CONFIG_ESP_IPC_TASK_STACK_SIZE` (`esp_ipc.c:26-30`, one task per core). The bench on .61 (TASK-1763, beta.168, 24 boots) measured the low point at 88 B free on `ipc1` and 144-224 B free on `ipc0`. On .63 otgw-firmware-4c found a panic on `ipc0` at 06:43:01 on 2026-11-10 (pc 0x4037caec = `_xt_lowint1`, xtensa_vectors.S:1206, beta.167+ddf8498 ELF (the firmware image with symbols), backtrace corrupted), at the moment of the safeboot rollback of TASK-1774. Whether that is the same overflow on `ipc0` is not confirmed (coredump to be read after the release). This decision therefore covers both stacks.
+
 **What (b) does and does not do.** Mitigation (b) (TASK-1763, beta.168) moves the one install to before `startWiFi()`, which lowers the chance of an interrupt during it. The install still runs on the 1024 B stack.
 
 ## Decision
 
-Rebuild the ESP32-S3 framework libraries with `CONFIG_ESP_IPC_TASK_STACK_SIZE` of at least 1280 (the IDF S3 default), using pioarduino's `custom_sdkconfig` option in platformio.ini. Then `ipc1` and `ipc0` both get the larger stack. Mitigation (b) stays in place. The cost is a longer, heavier build, accepted for this one boot-stability setting.
+Rebuild the ESP32-S3 framework libraries with `CONFIG_ESP_IPC_TASK_STACK_SIZE` of at least 1280 (the IDF S3 default), using pioarduino's `custom_sdkconfig` option in platformio.ini. Then `ipc1` and `ipc0` both get the larger stack (one setting serves both cores). Mitigation (b) stays in place. The cost is a longer, heavier build, accepted for this one boot-stability setting.
 
 `custom_sdkconfig` is pioarduino's "hybrid compile": it rebuilds the framework libraries from ESP-IDF with the given sdkconfig lines. The project uses pioarduino platform 55.03.35 (platformio.ini:111).
 
@@ -97,7 +99,7 @@ Before acceptance the rebuild must show:
 ### Must
 
 - Set `CONFIG_ESP_IPC_TASK_STACK_SIZE` ≥ 1280 in the framework libraries linked into every S3 environment.
-- Prove the larger stack on the device: log `ipc1`'s stack size or high-water mark at boot, for example `uxTaskGetStackHighWaterMark(xTaskGetHandle("ipc1"))`.
+- Prove the larger stack on the device for both `ipc0` and `ipc1`: their high-water marks at boot (the beta.168 boot line "boot: ipc stack free min ipc0=.. ipc1=.. B").
 - Keep mitigation (b): the early GPIO ISR install in `setup()`, guarded by `tests/test_gpio_isr_early_install.py`.
 - Include the full sdkconfig diff, rebuild against prebuilt, in the change that adopts it.
 
