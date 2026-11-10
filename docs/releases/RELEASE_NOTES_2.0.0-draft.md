@@ -2,6 +2,8 @@
 
 <!-- DRAFT for Robert's review (TASK-1740 AC4/AC6 preparation, 2026-11-09). Not released. Every section is copied from the v2.0.0-beta.158 notes, docs/BREAKING_CHANGES.md or the named task notes. Review notes like this one are HTML comments: they do not render, and the release-2x lint should find none left before publishing. When the release happens, this file becomes docs/releases/RELEASE_NOTES_2.0.0.md (the outdated April 2026 file of that name was removed in TASK-1753). -->
 
+<!-- Refreshed 2026-11-10 against dev at beta.171 (TASK-1740.1): the changes of beta.159 to beta.170 come from the beta.162, beta.167 and beta.170 notes; Known issues were checked against the status of each named task on that date. beta.171 adds only a diagnostic heap trace (TASK-1757) and no user-visible change. What was dropped and why is in the review comments under Known issues. -->
+
 **Status:** draft, not released. **Branch:** dev. **Compared with:** the 1.x line (latest stable v1.7.9).
 
 ## What 2.0.0 is
@@ -19,6 +21,7 @@ The web UI is the v2 web UI, the only web UI in 2.0.0. Read "Before you flash", 
 ## Highlights
 
 - **v2 web UI.** The only web UI in 2.0.0. Live value table, help text for every setting (the **i** button), settings rail with card panels, SAT page. Since beta.111 each page is one gzipped file with an ETag.
+- **Web UI in English, Dutch, German and Greek** (TASK-1764). A flag menu at the top right switches the language at once, without a reload, and remembers your choice. On your first visit the web UI follows your browser language if it is one of the four; otherwise it is English. Only the web UI is translated: firmware texts, MQTT, Home Assistant names, the API and telnet stay English.
 - **Firmware updates over WiFi.** A small safeboot updater next to the firmware. If an upload fails or a new firmware crashes in its first 30 seconds, the unit returns to safeboot and stays reachable. One-action update page for the release zip.
 - **Monitor graph with history.** The graph opens with the last hour the gateway kept (24 hours on boards with PSRAM). The control setpoint line shows what the boiler got, also when the thermostat briefly asks something else that the gateway replaces (TASK-1522).
 - **Works behind a reverse proxy**, including a Home Assistant sidebar panel (ingress). Guide: [Reverse proxy and HA ingress](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md).
@@ -27,8 +30,6 @@ The web UI is the v2 web UI, the only web UI in 2.0.0. Read "Before you flash", 
 - **Crash log endpoint.** `GET /api/v2/device/crashlog` for diagnostics. After an ESP32 panic or watchdog reset it holds a `Core dump:` line with the task, the program counter and a short backtrace (TASK-1479). `reboot_log.txt` names every ESP-IDF reset reason, including 0xb (USB reset by the host) (TASK-1438).
 - **Capture tool** with raw OpenTherm frame logging (next section), and an opt-in diagnostic recorder on the device (TASK-1665), with Start, Stop and Download in the web UI (TASK-1700).
 - **Relicensed to GNU GPLv3** (was MIT).
-
----
 
 ---
 
@@ -42,8 +43,6 @@ SAT (Smart Autotune Thermostat) is an embedded heating controller. It is **off b
 - If you enable SAT, please share a capture log (see "Capture tool"). SAT is only as good as the field data we get.
 
 Without SAT, the gateway behaves as a transparent OpenTherm gateway, as in 1.x.
-
----
 
 ---
 
@@ -69,8 +68,6 @@ curl http://<ip>/api/v2/settings -o settings-backup.json
 
 ---
 
----
-
 ## BREAKING changes
 
 The full log, with the reason and what to do for each item, is [BREAKING_CHANGES.md](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/BREAKING_CHANGES.md). The 2.0.0 entries there:
@@ -81,7 +78,10 @@ The full log, with the reason and what to do for each item, is [BREAKING_CHANGES
 - Behaviour change: a WiFi link without traffic triggers a reconnect, then a restart (TASK-1450)
 - Behaviour change: MQTT on-change publishing is the default (ADR-116)
 
-Changes between the 2.0.0 betas are in the release notes of each beta, the latest being the [beta.158 notes](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/releases/RELEASE_NOTES_2.0.0-beta.158.md).
+Changes between the 2.0.0 betas are in the release notes of each beta, the latest being the [beta.170 notes](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/releases/RELEASE_NOTES_2.0.0-beta.170.md).
+<!-- Review: point this link at the last public beta before the release. -->
+
+A note for beta users: from beta.162 to beta.170 no MQTT topic, setting or API field was renamed or removed (beta.170 notes, BREAKING changes).
 
 ### Compared with the 1.x line
 
@@ -134,21 +134,47 @@ The items below follow the CHANGELOG; quoted parts are in quotation marks. Check
 
 ---
 
----
-
 ## Known issues
 
 - **OT-Direct gateway mode: a `TT=` or `TC=` override has not been seen working with a real thermostat** (TASK-1718). The gateway answers the thermostat's read of the remote room setpoint (MsgID 9) and of the override flags (MsgID 100) as the PIC does; this is proven by replay tests on the host. Whether a real thermostat shows the override and raises its heat demand is not confirmed in the field yet. Robert waived that check for this release (2026-11-09).
-- **OT-Direct gateway mode: the override list no longer shows an active `TT=`/`TC=`** (TASK-1749). Since `TT=` and `TC=` stopped writing MsgID 16 and 100 to the boiler in gateway mode (ADR-223, TASK-1733), Monitor > Connection and `GET /api/v2/otdirect/overrides` do not list an active remote override.
+- **The thermostat in OT-Direct gateway mode has not been tested on a bench** (TASK-1707, TASK-1733). The bench unit has no thermostat. These changes are covered by host tests on the real gateway path. How the slots behave with a real thermostat and boiler over time is not confirmed yet. If your boiler or thermostat misbehaves in gateway mode, please send a capture.
 - **OT-Direct: the override flags (MsgID 100) differ from the PIC** (TASK-1750). The PIC answers with the function bits of the active override and applies `OH=`; OT-Direct answers `TT=` with a fixed value and ignores `OH=`.
 - **OT-Direct master mode: `TT=0` also clears a room setpoint written over MQTT or with `BS=`** (TASK-1751).
-- **OT-Direct: one queued boiler write can still go out after a mode switch** (TASK-1752). Low impact: one frame.
-<!-- Review: TASK-1749 to TASK-1752 are To Do on 2026-11-09. Drop each item that is Done at release time. -->
+<!-- Review (2026-11-10): TASK-1749 (override list) and TASK-1752 (queued write after a mode switch) are Done, fixed in beta.163 and beta.164, so their items were removed. TASK-1750 and TASK-1751 are still To Do. Drop each item that is Done at release time. -->
+- **A reboot can occasionally take about 25 s** (TASK-1763). One panic in the interrupt setup at boot was seen in 10 reboots of the bench unit with beta.162; the gateway restarted by itself and then ran normally. The cause is known: a small internal task runs out of stack during that setup. Since beta.168 the setup runs earlier in the boot, which lowers the chance (0 panics in 24 bench reboots), but the stack is still as small. The fix, a larger stack, comes in a later build.
+<!-- Review: copied from the beta.170 notes without its last sentence (the damaged beta.167 report on the Classic bench unit). TASK-1763 is In Progress; ADR-225 (the larger IPC stack) has its build cost accepted. If that fix ships before the release, drop this item. -->
 - **With several browser tabs open the gateway sometimes answers "busy" (HTTP 503)** (TASK-1741, TASK-1747). On a board without PSRAM, two visible tabs on Monitor > Values got about 0.5 busy answers per minute on the bench (0.4 % of requests), down from 15.6 per minute before. The pages keep showing their last values, so a busy answer only makes a value one poll older. A tab you do not look at stops polling.
 - **The first periodic refresh of a page can come up to 15 s later than in the betas before beta.160** (TASK-1741). Each tab now spreads its polls; a tab shown again after at least 15 s refreshes at once.
 - **Rarely, a small file such as the page icon takes about 12 s** (TASK-1675). Proposed text, not yet decided: "Rarely (about 1 in 100 requests on early 2.0.0 betas, not seen since beta.116) the web UI can wait about 12 s for a small file such as the page icon when two browser tabs load at the same time on a busy gateway. Reload the page if a tab stays blank. We could not reproduce it on the current build; if it happens to you, a capture log helps us find it."
 <!-- Review: TASK-1675 is In Review. Its notes give this as a DRAFT waiver text for Robert, to be decided after the R1 (boot dip) and R2 (24 h soak) two-tab traces. Keep, change or drop it after that decision. -->
-<!-- Review: the beta.158 notes list more known issues (SAT validation status, the Immergas TP=11:12 proof, heat-pump cycle, diagnostic recorder on PSRAM, the OLED fix, update through the HA panel, filesystem update during a capture, and others). Decide per item which still hold for stable before release. -->
+- **The update page's automatic return to the web UI has not been seen in a real browser** (TASK-1703). It is covered by a test that runs the page script with a stub; the safeboot page still reloads after a fixed 20 seconds. If the page stays on "Opening the web UI", open the link.
+- **Page loads are about 0.3 s slower than they would be without the send cap** (TASK-1673, ADR-216). The cap on each web connection's send queue halves the data in flight. In the bench two-tab test the median tab load is 1.4 to 1.5 s against 1.1 to 1.3 s without the cap. It is the price for the higher free-heap margin.
+- **The port 25238 line filter (TASK-1695) has been tested on the host only.** If OTmonitor or the Home Assistant `opentherm_gw` integration misbehaves while SAT is on, `ext_bridge_dropped` in `/api/v2/sat/status` and the telnet log show what the bridge dropped.
+- **The diagnostic recorder has not run on a board with PSRAM** (TASK-1665, TASK-1666). It was tested on a board without PSRAM, with its 4 KB ring. The 1.5 MB ring of an S3 Mini with PSRAM, the time to download it and the web UI response during that download are not measured yet.
+- **The new WiFi features have not run in the field** (TASK-1450, TASK-1455, TASK-1446, TASK-1444). The dead-link recovery was seen once on the bench (forced reconnect, then the restart); its guards, the restart cap, the skip-portal boot and the outage record under a real WiFi drop are covered by host tests only. If your WiFi drops, the `Drop :` line in the telnet banner and the `wifi_drop_*` keys in `device/info` are what we would like to see.
+- **Filesystem update while a capture runs** (TASK-1524): on our bench a filesystem update failed once while a long capture was connected, and the unit served the file explorer upload page until a second update. Settings were kept. Stop the capture before you update.
+- **Updating through the Home Assistant panel** completed in 2 of 3 bench runs (one 502 during the upload). Update by IP when you can.
+- **Decoding a core dump:** the thread listing of `esp-coredump` may fail inside the tool. The decode still shows the panic reason. Send the downloaded file anyway.
+- **One crash seen in the field** (alpha.566, TASK-1538): a panic inside a memory allocation, with a backtrace too short to name the caller. Not reproduced; crash reports now keep up to 16 return addresses. If your unit reboots unexpectedly, send the crash log (`GET /api/v2/device/crashlog`) and `reboot_log.txt`.
+
+**SAT (experimental):**
+
+- **SAT is still being validated.** A list of open SAT questions is with Sergeant D, the SAT designer; his answers can change SAT behaviour in later builds. The ignition logic for a boiler without a return temperature (TASK-1371) was bench-tested; it has not run on such a boiler in the field.
+- **SAT's flame-out protection (TASK-1762) has not run on a real boiler.** SAT switches from continuous to pulse mode (PWM) when the boiler water stays 3.5 °C above the requested temperature for 30 s. If SAT switches to pulse mode more often than you expect, look for the SAT log line "Control mode: PWM (fail-safe: ...)", and please send a capture.
+- **Heating curve self-tune** (on by default) passed a 4-day run in the bench simulation (TASK-1525). It has not yet run for days on a real house. Switch it off if you want a fixed coefficient.
+- **The SAT request for the boiler flow temperature (TASK-1653) has not run on a PIC board with a thermostat that skips MsgID 25.** It is covered by host tests. If your thermostat never reads MsgID 25 on a PIC board, `sat/pm25_no_slot` tells whether the PIC had a free slot for the request.
+- **No Immergas boiler has run this firmware.** The Immergas `TP=11:12` behaviour is proven by host tests and by the commands seen on the bench only. If you own an Immergas, your capture is valuable.
+- **The 3-hour on/off heat-pump cycle** (TASK-1542) has run on the bench with a simulated heat pump, not on a real heat pump or house. Treat it as experimental.
+- **Cycle verdicts follow thermo-nova more closely than in the early betas** (TASK-1584, 1585, 1586, 1588). The change is covered by host tests against the thermo-nova reference, not by a long field run.
+- **Pressure alarm:** a pump-head step of about 0.3 bar after the pump stops can still raise it. It is display only and sends no command.
+
+<!-- Review (2026-11-10, TASK-1740.1): the items above are copied from the beta.170 Known issues (some shortened: beta-to-beta history and bench build numbers removed), because their tasks are still open or the limitation still holds. Dropped from the beta.170 list, with the reason:
+  - TASK-1528 heap low-water under long captures: Done (Robert, 2026-11-09); the open findings moved to TASK-1756 (Done) and TASK-1757 (high, In Progress, a stable gate: boot-time heap below CRITICAL when a browser loads the UI right after boot). Decide on a 1757 item at release time.
+  - TASK-1679 two tabs loading at once / lower heap in a field capture: Done; the beta.170 text says "being measured", which no longer fits. Add a short residual item if you want one.
+  - TASK-1678 OLED fix not seen on a display: Done, tjfs confirmed it on beta.117.
+  - TASK-1455 skip-portal boot does not stop the beta AP fallback: the AP fallback exists only in prerelease builds (networkStuff.ino:496-529, guarded by _VERSION_PRERELEASE), so it does not apply to a stable build.
+  - TASK-1698 moved S0 and output pins, TASK-1701 and TASK-1600 gateway-mode fixes during a heat demand, the unexplained 3-minute drop on beta.127, the undecodable IRAM crash (TASK-1498) and the telnet-off boot (TASK-1644): bench or field notes from older betas; keep any you still want stable users to read.
+  Not yet in the list, decide at release time: TASK-1790 (Auto board mode on a Classic closes the PIC UART after a missed boot probe, high, To Do) and TASK-1786 (a Classic with an S3 Mini whose PIC is not found after the USB migration, support case, cause open). Troubleshooting for that case is in the manual, chapter 7, section 7.1a. -->
 
 ---
 
@@ -180,8 +206,6 @@ Without `--device` the tool looks for gateways on your network (mDNS, TASK-1690)
 **What to post:** at the end the tool prints `Upload this one file: ...-upload.zip`. That single file holds everything (for a short run: the transcript, `otframes.log`, `otgw_simulation.log` and the CSV files). Post it in Discord or attach it to a GitHub issue (see "How to report"). Check the files before you share them: they contain your device address, your broker address and your MQTT topics. To leave MQTT out of the capture, give `--broker ""`.
 
 The Windows launcher is tested on our bench, also without Python installed. A tester ran the macOS launcher on a Mac (macOS 27.3) for a 2-minute and a 5-minute capture, one with MQTT, without tool errors. On a Mac without Edge or Chrome, the browser part now uses Safari (TASK-1708, pull request #699 by Crash-Evans). Switch on Safari > Settings > Advanced > "Show features for web developers", then Develop > Developer Settings > "Allow remote automation", and run `safaridriver --enable` once. Safari opens a separate window for the capture: leave it alone. This was tested on the contributor's Mac only.
-
----
 
 ---
 
