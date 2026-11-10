@@ -87,4 +87,23 @@ Fix directions (opinion, to weigh; no code before a decision):
 Proof: coredump GET (ADR-210) after the release + esp-coredump with the beta.162 ELF (4c), and repeated /ReBoot cycles to measure the rate before/after.
 
 ---
+
+created: 2026-11-10T03:25:00Z
+
+---
+
+PROVEN by coredump (decode by otgw-firmware-4c, 2026-11-10; relayed to 030509): ipc1 stack overflow, not heap corruption, not OOM.
+- Coredump from .61, header app sha 886504532 = sha256 of the beta.162+5786928 ELF. exccause 0x41 DebugException, EPC6 0x40383bfa, task ipc1 (not an ISR).
+- Backtrace: _frxt_int_enter portasm.S:127 <- _xt_lowint1 xtensa_vectors.S:1225 <- vPortExitCriticalSafe / multi_heap_internal_unlock multi_heap.c:176 <- multi_heap_malloc(size 8) poisoning.c:265 <- heap_caps_malloc(8, 0x804) <- esp_intr_alloc_intrstatus_bind(source 16, gpio_intr_service) intr_alloc.c:574 <- esp_intr_alloc intr_alloc.c:728 <- gpio_isr_register_on_core_static gpio.c:608 <- ipc_task esp_ipc.c:84.
+- gdb on the saved core: ipc1 pxStack 0x3fcbbef4, pxEndOfStack 0x3fcbc2f0 (1,020 B), SP 0x3fcbbec0 = 52 B below the stack bottom (checked: 0x3fcbbef4 - 0x3fcbbec0 = 52; 0x3fcbc2f0 - 0x3fcbbef4 = 1020). The bottom words are a5a5a5a5 except 0x00060c23 at pxStack+8 (an interrupt-frame write).
+- So the level-1 interrupt frame, taken while malloc unlocks inside esp_intr_alloc during the first GPIO ISR install (the IPC path of my analysis above), landed past ipc1's end. The FreeRTOS end-of-stack watchpoint (CONFIG_FREERTOS_WATCHPOINT_END_OF_STACK=y) fired.
+- This confirms 4c's stack hypothesis; my heap-assert guess is withdrawn.
+Files, local only, not committed (device data): 4c's scratchpad cd1763\ (coredump.bin, decode.txt, core.elf, cmds.gdb).
+Fix options now rest on proof (decision for Robert, no code yet):
+(a) a larger IPC stack (>= the IDF S3 default 1280 B) through custom_sdkconfig / a framework libs rebuild; this removes the cause;
+(b) install the GPIO ISR service earlier in setup, before startWiFi; this lowers the chance, but does not remove the cause;
+(c) both.
+Note: attaching from core 1 does not avoid ipc1 (esp_ipc.c:134-139).
+
+---
 <!-- COMMENTS:END -->
