@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-10T18:57:00Z'
-updated_date: '2026-11-10T22:12:00Z'
+updated_date: '2026-11-10T19:08:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -34,6 +34,4 @@ Sergeant D, #dev-sat-mqtt 2026-11-10 19:48 UTC, msg 1569785822394323056 (relayed
 2026-11-10 030509: question posted by 97 in #dev-sat-mqtt as a reply to his msg, msg 1569788551833329848; options A (ask gruijter for his SATTUNE/SATTUNED/SATTUNER log lines, recommended), B (slow the tuner), C (keep the tuner inside 1.6-2.4, entry 166). Correction by 97's second reader: the tuner landed on dev on 2026-10-31 (0fd940bf7, TASK-1525; ADR-205 ce5e9e6bb), so alpha testers had it from 31 Oct, not from beta.1 on 1 Nov; 31 Oct to 7 Nov still allows at most 2 decisions (0.2), so the conclusion stands. AC2 is half done: the answer is still to be recorded as an entry; AC2 stays open until the entry exists.
 
 2026-11-10 030509: Sergeant D answered 19:06:15 UTC (msg 1569790312220590140, time from the message id): '@BlueFlame Bot let’s wait guitars night log and decide later' ('guitars' = gruijter's, our interpretation). Recorded as entry 298: option A, no tuner change until gruijter's night log is in. 97 acked (1569790712331903141) and asked gruijter for the log (#alpha-testing 1569790714794221639). Time note: the description says 19:48 UTC for his concern; the message id gives 18:48 UTC. Next: read gruijter's SATTUNEH/SATTUNED/SATTUNER/SATTUNE lines when they arrive (AC1), then bring the result back to him.
-
-2026-11-10 (comms): gruijter 20:00:22 UTC (msg 1569803928478941383): '1.12 was not entered by me in any way, so auto-tune must have come up with that.' Sergeant D 20:34:15 UTC (msg 1569812455402504274) asked him to raise the coefficient to 1.8 by hand. Recorded as entry 301. A hand change restarts the tuner window (coeff_changed), so tonight's SATTUNE lines will not show how 1.12 was reached; ask gruijter for older logs / the SATTUNER boot line. gruijter's 20:16 data (3 attachments) not yet downloaded, waits for Robert's OK.
 <!-- SECTION:NOTES:END -->

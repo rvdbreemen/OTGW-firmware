@@ -4019,19 +4019,6 @@
     "TASK-1787"
    ],
    "confirmed_by_entry": null
-  },
-  {
-   "id": 301,
-   "title": "Sergeant D asks gruijter to raise the heating curve coefficient to 1.8; gruijter says he never set 1.12 himself (Sergeant D and gruijter, 2026-11-10; follows entry 298)",
-   "date": "2026-11-10",
-   "source": "sergeant-d",
-   "kind": "unclassified",
-   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1569803928478941383",
-   "supersedes": [],
-   "tasks": [
-    "TASK-1787"
-   ],
-   "confirmed_by_entry": null
   }
  ]
 }
