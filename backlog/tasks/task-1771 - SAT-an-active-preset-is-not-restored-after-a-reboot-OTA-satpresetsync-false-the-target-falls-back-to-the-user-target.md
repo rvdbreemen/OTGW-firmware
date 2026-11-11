@@ -3,11 +3,11 @@ id: TASK-1771
 title: >-
   SAT: an active preset is not restored after a reboot/OTA (satpresetsync
   false): the target falls back to the user target
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-10T03:24:00Z'
-updated_date: '2026-11-11T21:33:00Z'
+updated_date: '2026-11-11T22:14:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -25,7 +25,7 @@ Seen on .63 (Classic + PIC, SAT enabled) around the beta.166 OTA of 2026-11-09 2
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Reproduced on the bench: set a preset, reboot (and OTA), read active_preset and target before/after; capture the SAT state file write
-- [ ] #2 Decision recorded (Sergeant D / Robert): an active preset survives a reboot or not; implement and test accordingly
+- [x] #2 Decision recorded (Sergeant D / Robert): an active preset survives a reboot or not; implement and test accordingly
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -53,3 +53,9 @@ Fix 2: the update server snapshots satStateLoaded() at the fs upload start, befo
 
 Bench fix 2 on .61, 2026-11-11 ~23:00, beta.184+d7b32cb, same reproduction (seed preset sleep p4, energy 12.345 kWh, a v2 /sat_tune.json; reboot; fs OTA via scripts/ota_flash.py --fs --no-app the moment HTTP answers): run 1 HTTP up 12.4 s, run 2 12.2 s; both: preset, energy and tune file byte-identical after the update. Old beta.182 on the same reproduction: all three lost; first fix beta.184+84003bd: preset and energy lost, tune kept. .61 restored: settings 164/164 equal to the backup, preset p0, energy 0.000, no tune file. Logs: bench scratch bench1771_{old,fix,fix2_run1,fix2_run2}.log, trace60.log.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: reproduced on .61 (beta.180): a plain reboot keeps the preset; an fs OTA right after boot wiped /sat/sat_preset.json; root cause setup() starts the web server (OTGW-firmware.ino:524) before initSAT() (:600). AC2: decision Sergeant D entry 308 (Q-1771a A) + Robert 'Release, build it'; implemented in beta.183 (763d087f9): SAT state files in KEEP_LIST, satPersistAllToFs() waits for initSAT(), and (fix 2, found by the bench) the update server lets RAM win at the restore only when SAT was loaded before the fs write started. Evidence: tests/test_fs_update_keep.py 38 OK (new test red on the first fix), evaluate --quick 86/0, full tests folder green apart from the known -j 4 cbuf flake; bench .61 same reproduction: beta.182 lost preset, energy and tune window, first fix lost preset and energy, fix 2 (d7b32cb) kept all three byte-identical in two runs; posted build 893c5b7 has identical src (git diff --stat d7b32cbbb 893c5b79b -- src/ empty), flashed and checked by the bench tester; pushed 19d70dd58..893c5b79b, zip posted msg 1570199829844590718. Release-note line for 92: before this fix every filesystem update restarted the self-tune's 3-day window.
+<!-- SECTION:FINAL_SUMMARY:END -->

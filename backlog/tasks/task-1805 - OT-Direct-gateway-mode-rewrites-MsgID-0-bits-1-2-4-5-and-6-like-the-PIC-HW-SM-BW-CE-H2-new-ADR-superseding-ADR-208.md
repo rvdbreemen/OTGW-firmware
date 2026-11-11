@@ -3,11 +3,11 @@ id: TASK-1805
 title: >-
   OT-Direct gateway mode rewrites MsgID 0 bits 1, 2, 4, 5 and 6 like the PIC
   (HW=, SM=, BW=, CE=, H2=); new ADR superseding ADR-208
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:42:00Z'
-updated_date: '2026-11-11T21:33:00Z'
+updated_date: '2026-11-11T22:14:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -29,7 +29,7 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 - [x] #1 A new ADR made with /adr-kit:adr supersedes ADR-208: Proposed, with Robert's choice 'Like the PIC: new ADR' as the User Decision; never self-accepted
 - [x] #2 The relayed thermostat MsgID 0 carries the HW=/SM=/BW=/CE=/H2= bits (1, 2, 4, 5, 6) by the PIC readstatus rule (gateway.asm:2712-2740), bit 0 stays as ADR-208
 - [x] #3 Host tests against the real relay code (otdRelayedStatusFrame and its callers): red on the old code, green on the fix, one case per bit
-- [ ] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
+- [x] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -45,3 +45,9 @@ ADR-229 Accepted 2026-11-11 by Robert van den Breemen via the coordinator sessio
 
 Bench on .61 (OT-Direct, beta.184+d7b32cb), what is measurable without a thermostat: the build boots on OT-Direct (combo image, otcommandinterface OT-Direct); HW=0, SM=1, BW=1, CE=1, H2=1 are accepted (HTTP 202 queued) and undone (HW=A, SM=0, BW=0, CE=0, H2=0), health stays UP (heap 69 KB). NOT benched: the rewrite of a relayed thermostat MsgID 0 in gateway mode, because there is no thermostat on any bench unit in OT-Direct gateway mode; that path is proven by tests/test_otd_status_bits.py (8 OK on the fix, 7 failures on the old code) and test_otd_status_relay.py (9 OK). Field check to be asked from tjfs in the release note (via 92). A first combo build failed: OtdStatusCmd defined in OTDirect.ino is named by the Arduino-generated prototypes; moved to OTDirecttypes.h (bug-8668 in .wolf/buglog.json).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: ADR-229 via adr-kit, Accepted 2026-11-11 by Robert (coordinator session, 'Accept both'), supersedes ADR-208. AC2: otdRelayedStatusFrame()/otdRelayedStatusHB() apply the PIC readstatus rule (gateway.asm:2712-2742) to bits 1, 2, 4, 5, 6; bit 0 as ADR-208. AC3: tests/test_otd_status_bits.py 8 OK on the fix, 7 failures on the old code; test_otd_status_relay.py 9 OK; override_reply 4 OK; the OTD helper suites green after OtdStatusCmd moved to OTDirecttypes.h. AC4: esp32-combo built (beta.184, posted 893c5b7, msg 1570199829844590718), evaluate --quick 86/0; bench .61: boots on OT-Direct, HW=0/SM=1/BW=1/CE=1/H2=1 accepted and undone, health UP. NOT benched: the rewrite of a relayed thermostat MsgID 0 in gateway mode (no thermostat in OT-Direct gateway mode on any bench unit); field check to be asked from tjfs via 92.
+<!-- SECTION:FINAL_SUMMARY:END -->
