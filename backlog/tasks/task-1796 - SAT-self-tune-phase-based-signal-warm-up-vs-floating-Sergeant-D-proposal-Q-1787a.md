@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:21:00Z'
-updated_date: '2026-11-11T13:12:00Z'
+updated_date: '2026-11-11T14:03:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -52,6 +52,8 @@ Sergeant D 2026-11-11 06:18:39 UTC, #dev-sat-mqtt msg 1569959525715542148 (entry
 2026-11-11 bench .61 (OT-Direct, master mode; .63 left to TASK-1306): settings saved first (/api/v2/settings), OTA app+fs via scripts/ota_flash.py: running 2.0.0-beta.176+a736f2b, 164 settings kept. Scenario TASK-1525 run 3: satenabled true, satboilercapacity 10, satsimcoolrate 0.2, satcoefficient 1.0, satinterval 10, satsimulation true, sim event tune_hour 60. Telnet 13:46-: 24 SATTUNEH hours with the per-phase fields, e.g. 'SATTUNEH hour=1 mean=2.33 ticks=6 counted=0 reason=sun wmean=9.27 wticks=1 fmean=0.94 fticks=5'; 14:10:40 'SATTUNED day=0 clean=0 counted=0 days_in_window=0 mean3=na decision=hold reason=day_not_counted wmean3=na wticks3=0 wsay=hold fmean3=na fticks3=0 fsay=hold'. No reboot. All hours so far excluded by the real sun elevation (reason=sun), so no phase decision (raise/hold on phases) seen on the device yet; the decision logic is proven by the host test only. Log: scratchpad bench176_telnet.log.
 
 2026-11-11 pushed a736f2b44 to origin/dev (fast-forward from 2154cce46); zip posted by scripts/discord-post-build.sh, message 1570063472945922071. ADR-228 stays Proposed until Robert accepts it (coordinator puts it to him).
+
+2026-11-11 follow-up (found by the full run of scripts/run_tests.py, which I had not run before the beta.176 push): tests/test_sat_narrate_fits.py failed on the new narration line, worst case 134 > 127 with o/n bounded by their char[12] buffers. In practice the line never overflowed in beta.176: satTuneCoeffStr writes at most "5.00" for the 0.1..5.0 range, so the real worst case is 120. Fix: o and n become char[8] (bound 7, worst case 126), the test's width entry follows; test_sat_narrate_fits OK, test_sat_curve_selftune 74 OK. Ships in the next tag after beta.179.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

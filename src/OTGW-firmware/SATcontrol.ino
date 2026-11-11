@@ -6403,7 +6403,7 @@ static void satTuneRollHour()
   if (d.decision == 0) { satTuneSaveWindow(); return; }
   satTuneApplyCoeff(d.newCoeff);   // the one settings.ini write: only here, only on a change
   satTuneSaveWindow();
-  char o[12], n[12];
+  char o[8], n[8];   // the coefficient is 0.1..5.0 (SAT_CT_COEFF_MIN/MAX): "5.00" at most; 7 keeps the narration line in its buffer
   satTuneCoeffStr(o, sizeof(o), oldCoeff);
   satTuneCoeffStr(n, sizeof(n), settings.sat.fHeatingCurveCoeff);
   SATDebugTf(PSTR("SATTUNE old=%s new=%s mean3=%.2f wmean3=%.2f fmean3=%.2f\r\n"), o, n, (double)d.mean3,

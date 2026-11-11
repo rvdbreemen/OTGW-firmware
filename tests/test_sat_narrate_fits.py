@@ -20,8 +20,9 @@ CONV = re.compile(r"%(?:(%)|[-+ #0]*(\d+)?(?:\.(\d+))?(hh|h|ll|l|z)?([diuxXfcs])
 # Every %s needs a known bound: a unique piece of the format text -> the widths of its %s arguments, in order, with the
 # source of each bound. A new %s without an entry fails the test, so its length is decided on purpose.
 KNOWN_S_WIDTHS = {
-    # SATcontrol.ino satTuneRunHourly(): o and n are char[12] (11 characters), the last %s is "above" or "below"
-    "Heating curve self-tune: coefficient %s -> %s": [11, 11, 5],
+    # SATcontrol.ino satTuneRunHourly(): o and n are char[8] (7 characters; satTuneCoeffStr writes "5.00" at most for
+    # the 0.1..5.0 range), the last %s is "above" or "below"
+    "Heating curve self-tune: coefficient %s -> %s": [7, 7, 5],
     # SATcontrol.ino satSetControlMode(): "PWM", "Continuous" or "Off"
     "Control mode: %s": [10],
     # SATcycles.ino flame-off narration: the longest _satCycleWord entry, "underheat_pwm"
