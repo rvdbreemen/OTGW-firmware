@@ -3,11 +3,11 @@ id: TASK-1797
 title: >-
   OT-Direct: PR=A banner and PR=T format break pyotgw (HA opentherm_gw) on port
   25238; the banner names the board
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:35:00Z'
-updated_date: '2026-11-11T13:34:00Z'
+updated_date: '2026-11-11T13:56:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -52,3 +52,9 @@ Bench before (.61 on beta.175, port 25238 enabled for the test and restored): PR
 
 Build: esp32-combo from d5b57f3a0 (covers beta.177 and beta.178), build.bat exit 0, fresh artifacts 14:21-14:31 incl. OTGW-firmware-esp32-combo-2.0.0-beta.178+d5b57f3-flash.zip (6,295,027 B) and .ino.bin 2,128,816 B; the console SUCCESS line was not captured (cmd redirect gave an empty log). OTA to .61: app 2.0.0-beta.178+d5b57f3, fs version.hash a736f2b -> d5b57f3, settings 164 keys changed: none. Bench after (.61, port 25238 enabled for the test and restored to off): PR=A -> 'PR: A=OpenTherm Gateway 6.6', PR=T -> 'PR: T=10'. Not benched: a live HA opentherm_gw / pyotgw connection and a live OTmonitor (host test runs the real pyotgw parsing).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 'PR: A=OpenTherm Gateway 6.6', digit at index 18, no board name: host test A1/A2 and bench .61 beta.178. AC2 'PR: T=10': host T1 (4 combinations) and bench. AC3 the real pyotgw 2.2.3 get_reports() runs on the OT-Direct replies (host P1, asks PR=D). AC4 tests/test_otd_pr_reports_pyotgw.py: old code 2 failures + 2 errors incl. the HA ValueError, fix 4/4. AC5 esp32-combo d5b57f3a0 (beta.177+178) built, evaluate.py --quick 0 FAIL, OTA .61 settings unchanged, bench before/after over port 25238. Pushed 5f31ef3bf (beta.177), zip msg 1570074550555639918. Not verified: a live HA opentherm_gw / OTmonitor session; OTmonitor upgrade refusal read from code only.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -3,11 +3,11 @@ id: TASK-1800
 title: >-
   OT-Direct: the PS=1 summary line is unusable (separators, not on port 25238,
   repeats, wrong MsgID 71/77 fields)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:38:00Z'
-updated_date: '2026-11-11T13:34:00Z'
+updated_date: '2026-11-11T13:56:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -53,3 +53,9 @@ Bench before (.61 on beta.175): PS=1 -> 'PS: 1' and no summary line on port 2523
 
 Bench after (.61 on beta.178): PS=1 -> 'PS: 1' then exactly one line on port 25238 (33 commas, all zero: no boiler, no thermostat), none in the next 5 s; telnet: 'enterPSMode: PS mode auto-detected as ON (comma-separated summary)' and 'processPSSummary: PS=1 summary parsed: 34 fields (v5+ firmware)'; PS=2 -> 'PS: BV'; PS=0 -> 'PS: 0'. Note: the firmware leaves its PS mode on the first raw frame after PS=0 (OTGW-Core.ino:5753-5757), as on a PIC board; on .61 no frames flow, so telnet still shows 'PS: ON'. Not benched: values from a real boiler and the hiding of T/B frames (no bus traffic on .61).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1/AC5 one PIC-format line per PS=1 on port 25238 and to the parser: golden test (oracle of the PIC print routines + literal pins) 9/9, old code 8/9 FAIL; bench .61: 'PS: 1' then one 33-comma line, none in the next 5 s. AC2 T/B/R/A hidden on 25238 until PS=0 (host A3); a GW= mode switch keeps it, GW=R clears it. AC3 real cut code + real gateway loop (1 line instead of 31 per minute). AC6 MsgID 71/77 from the raw store; processPSSummary parsed it on the bench ('PS=1 summary parsed: 34 fields (v5+ firmware)'). AC4 build d5b57f3a0, evaluate 0 FAIL, refute-only review (no format/store bug; 2 points fixed), full run_tests 7 red all explained (harnesses fixed in 64a5f3b88). Pushed d5b57f3a0 (beta.178). Not verified: real boiler values and the T/B hiding on a live bus (.61 has no bus traffic); the bare error format of other commands stays TASK-1804 BC7.
+<!-- SECTION:FINAL_SUMMARY:END -->
