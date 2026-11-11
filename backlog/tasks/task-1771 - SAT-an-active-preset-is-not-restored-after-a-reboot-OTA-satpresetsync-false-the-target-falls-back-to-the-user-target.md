@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-10T03:24:00Z'
-updated_date: '2026-11-11T14:42:00Z'
+updated_date: '2026-11-11T21:13:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -46,4 +46,8 @@ Behaviour (Sergeant D entry 308, Q-1771a A): after a restart the active preset a
 2026-11-11 implemented on lane-1771 (not built yet, build slot after 09's beta.181): OTGW-ModUpdateServer-esp32.h KEEP_LIST + cap + create-dirs restore; SATcontrol.ino _sat_stateLoaded guard set after the last load in initSAT(). tests/test_fs_update_keep.py updated (list, cap, guard and flag order): 37 OK; on the old source 3 of its checks fail (source checks; the behaviour proof is the bench). Also found: satSaveEnergyState() writes state.sat.fEnergyTotal without a loaded check, so before the fix an early fs OTA would reset the energy total too; and /sat_tune.json (self-tune window, TASK-1525/1796) was in neither list, so every filesystem OTA restarted the 3-day window.
 
 For the release note (coordinator, 2026-11-11): before this fix every filesystem update restarted the self-tune's 3-day window (/sat_tune.json was wiped), so a tester who flashed every alpha within 3 days never got a self-tune decision. Bench plan for the build slot (after 09's beta.181, this commit re-bumped to 182): red already on beta.180; green on 182 with the same fs OTA right after boot, with a non-zero energy total and a /sat_tune.json present before the OTA, both checked after.
+
+Bench 2026-11-11 22:00 on .61 found the first fix incomplete. Same reproduction (fs OTA the moment HTTP answers after a boot, ~13 s): old beta.182 lost preset, energy and /sat_tune.json; first-fix beta.184+84003bd kept /sat_tune.json but still lost preset (p4->p0) and energy (12.345->0); the same OTA 60 s after boot kept all. Cause: the fs upload start calls LittleFS.end() (OTGW-ModUpdateServer-esp32.h fs branch of the upload start); setup() continues to initSAT() (OTGW-firmware.ino:600) during the write, reads nothing, keeps defaults and sets _sat_stateLoaded; the restore's satPersistAllToFs() then wrote those defaults over the heap copies.
+
+Fix 2: the update server snapshots satStateLoaded() at the fs upload start, before LittleFS.end(); _restoreRuntimeFiles() lets RAM win (satPersistAllToFs) only when SAT was loaded before the write, else the heap copies stand. Choice vs the coordinator's alternative (refuse fs uploads with 503 until setup() is done): chosen the restore condition, because it closes the only RAM model that _restoreRuntimeFiles() writes back and that loads after the web server (settings and OT profiles load at OTGW-firmware.ino:333/336, before startWebserver() at :524), and it needs no client change: scripts/ota_flash.py flash_fs() does not retry a 503, nor does the /update page. Other setup readers after :524 (sensors) read empty in that window but are not written back, and the fs OTA ends in a reboot. tests/test_fs_update_keep.py: 38 OK on the fix; on the first-fix tree the new test_sat_ram_only_when_loaded_before_the_write and the order test fail.
 <!-- SECTION:NOTES:END -->
