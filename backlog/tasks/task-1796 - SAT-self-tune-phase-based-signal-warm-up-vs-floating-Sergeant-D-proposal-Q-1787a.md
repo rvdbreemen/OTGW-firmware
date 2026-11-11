@@ -3,11 +3,11 @@ id: TASK-1796
 title: >-
   SAT self-tune: phase-based signal (warm-up vs floating), Sergeant D proposal
   (Q-1787a)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:21:00Z'
-updated_date: '2026-11-11T08:08:00Z'
+updated_date: '2026-11-11T13:12:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,9 +24,9 @@ Sergeant D 2026-11-11 06:18:39 UTC, #dev-sat-mqtt msg 1569959525715542148 (entry
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Sergeant D's answer to Q-1787a recorded as a numbered entry, and any follow-up question (thresholds, step) asked and recorded one at a time
-- [ ] #2 Design written with thermo-nova and firmware citations, and a Proposed ADR that supersedes ADR-205 for the changed signal
-- [ ] #3 Implementation with host tests that are red on the old tuner and green on the new one, and a simulation run per house type
+- [x] #1 Sergeant D's answer to Q-1787a recorded as a numbered entry, and any follow-up question (thresholds, step) asked and recorded one at a time
+- [x] #2 Design written with thermo-nova and firmware citations, and a Proposed ADR that supersedes ADR-205 for the changed signal
+- [x] #3 Implementation with host tests that are red on the old tuner and green on the new one, and a simulation run per house type
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -46,4 +46,16 @@ Sergeant D 2026-11-11 06:18:39 UTC, #dev-sat-mqtt msg 1569959525715542148 (entry
 2026-11-11 round 12 done (research model, tools/research/sat/sat_curve_selftune_study12.py, data docs/sat/sim-1519/data/round12_runs.json, 1200 runs). Out-band min/day 2025-26 / 2010-11: none 146/210, A (ADR-205) 100/124, P (built, phase without data holds) 114/168, Q (phase without data does not veto) 100/125; changes per winter A 2.2/4.0, P 1.3/1.9, Q 2.1/3.0. Low starts 1.0/1.2 never corrected: A 20/60 18/60, P 38/60 37/60, Q 20/60 18/60. Example 4_1992-2012 heavy gas 2010-11: A and Q 1.0->1.8 (39 min/d), P stays 1.0 (129 min/d, no_floating 368x). Sent to comms 92 for the Q-1787e follow-up; recommendation B (= Q).
 
 2026-11-11 Sergeant D answers recorded by comms 92 as entries 305 (Q-1787e B: phase with data decides alone), 306 (Q-1787f A: overshoot is warm-up), 307 (Q-1787b A: ADR-205 tuner stays on until this ships), wt-comms 119d9f206. Built B: SAT_CT_MISSING_PHASE_VETO 0, reason no_phases when no phase data. Tests 74 OK; previous lane commit (A for e) fails the two new PhaseSplit tests (holds no_floating where B raises 2.0->2.1); origin/dev tuner failures=9 errors=14. ADR-228 cites entries 303-307; adr-lint 0 FAIL; test_adr_governance 17 passed.
+
+2026-11-11 d3: rebased twice onto moved origin/dev (119d9f206, then 2154cce46; docs-only, no bump conflict), commit a736f2b44 (2.0.0-beta.176). Host test tests/test_sat_curve_selftune.py on a736f2b44: 74 OK. evaluate.py --quick: 86 passed, 0 failed. Build esp32-combo via build.bat: SUCCESS, 2.0.0-beta.176+a736f2b (zip 13:44).
+
+2026-11-11 bench .61 (OT-Direct, master mode; .63 left to TASK-1306): settings saved first (/api/v2/settings), OTA app+fs via scripts/ota_flash.py: running 2.0.0-beta.176+a736f2b, 164 settings kept. Scenario TASK-1525 run 3: satenabled true, satboilercapacity 10, satsimcoolrate 0.2, satcoefficient 1.0, satinterval 10, satsimulation true, sim event tune_hour 60. Telnet 13:46-: 24 SATTUNEH hours with the per-phase fields, e.g. 'SATTUNEH hour=1 mean=2.33 ticks=6 counted=0 reason=sun wmean=9.27 wticks=1 fmean=0.94 fticks=5'; 14:10:40 'SATTUNED day=0 clean=0 counted=0 days_in_window=0 mean3=na decision=hold reason=day_not_counted wmean3=na wticks3=0 wsay=hold fmean3=na fticks3=0 fsay=hold'. No reboot. All hours so far excluded by the real sun elevation (reason=sun), so no phase decision (raise/hold on phases) seen on the device yet; the decision logic is proven by the host test only. Log: scratchpad bench176_telnet.log.
+
+2026-11-11 pushed a736f2b44 to origin/dev (fast-forward from 2154cce46); zip posted by scripts/discord-post-build.sh, message 1570063472945922071. ADR-228 stays Proposed until Robert accepts it (coordinator puts it to him).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: Sergeant D's answers recorded as entries 302-307 (303 keep the 3-day rule, change only when both phases agree; 304 mirrored lowering, phase split by our reading; 305 Q-1787e B the phase with data decides alone; 306 Q-1787f A overshoot is warm-up; 307 Q-1787b A ADR-205 tuner stays until this ships), on origin/dev. AC2: ADR-228 Proposed (docs/adr/ADR-228-...md) cites thermo-nova const.py:16 DEADBAND=0.1, pid.py:187/205, and the firmware (SATtypes.h SAT_PID_DEADBAND, SATpid.ino fError); partly supersedes ADR-205 decisions 1 and 3. Robert's acceptance pending. AC3: tests/test_sat_curve_selftune.py 74 OK on a736f2b44; on the old origin/dev tuner FAILED (failures=9, errors=14), core case warm-up +2.4/floating 0.0: old raises 2.0->2.1, new holds phases_disagree. Round 12 simulation per house type (5 houses x gas/hp30/hp60, 2 winters, tools/research/sat/sat_curve_selftune_study12.py, docs/sat/sim-1519/data/round12_runs.json). evaluate --quick 86/0. Build 2.0.0-beta.176+a736f2b SUCCESS; bench .61 OTA: SATTUNEH and SATTUNED lines with per-phase fields on the device, no reboot; a phase decision was not seen on the device (hours excluded by sun), only in the host test. Pushed a736f2b44, zip posted (msg 1570063472945922071).
+<!-- SECTION:FINAL_SUMMARY:END -->
