@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.180
+**  Version  : v2.0.0-beta.181
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -670,7 +670,52 @@ static unsigned long otLastThermostatRequest = 0;
 // although it may take several loop passes before the frame is forwarded.
 static bool otSlaveFrameNoted = false;
 
+// TASK-1798: an answer to the thermostat goes out once the slave side is ready. The library refuses a
+// slave send for RESPONSE_TIME (50 ms) after a received frame (OpenTherm.cpp:443, sendResponse() returns
+// false while isReady() is false), and the gateway makes some answers itself in the same loop pass
+// (master mode, UI=, SR=, the alternative and MsgID 28 slots). A refused answer is kept here and sent
+// from loopOTDirect() as soon as the gate opens; it is dropped, and logged, when the next thermostat
+// frame arrives or after OTD_REPLY_DEADLINE_MS (the slave must answer within 800 ms, OT spec).
+static constexpr uint32_t OTD_REPLY_DEADLINE_MS = 750;
+static unsigned long otdReplyFrame = 0;
+static uint32_t otdReplySinceMs = 0;
+static bool otdReplyPending = false;
+static OTDirectMode otdReplyMode = OTD_MODE_GATEWAY;   // a mode switch drops a held answer
+static bool otdReplyLogA = false;   // log the held answer as A once it leaves (relayed path only)
+static void bridgeFrameToParser(char, unsigned long);   // defined below; host tests cut the definition by its signature
+
+static void otdReplyDrop(const char* why) {
+  if (!otdReplyPending) return;
+  otdReplyPending = false;
+  OTDDebugTf(PSTR("OTD: reply to thermostat dropped (%s), MsgID=%u\r\n"), why,
+             (unsigned)((otdReplyFrame >> 16) & 0xFF));
+}
+
+// Send now, or keep it for otdReplyService(). Returns true when it went out now.
+static bool otdSendReply(unsigned long reply) {
+  otdReplyDrop("replaced");
+  if (otSlave.sendResponse(reply)) return true;
+  otdReplyFrame = reply;
+  otdReplySinceMs = millis();
+  otdReplyMode = otCurrentMode;
+  otdReplyLogA = false;
+  otdReplyPending = true;
+  return false;
+}
+
+static void otdReplyService() {
+  if (!otdReplyPending) return;
+  if (otCurrentMode != otdReplyMode) { otdReplyDrop("mode switch"); return; }
+  // the deadline first: after a stalled loop the thermostat no longer waits for this answer
+  if ((uint32_t)(millis() - otdReplySinceMs) >= OTD_REPLY_DEADLINE_MS) { otdReplyDrop("too late"); return; }
+  if (otSlave.sendResponse(otdReplyFrame)) {
+    otdReplyPending = false;
+    if (otdReplyLogA) bridgeFrameToParser('A', otdReplyFrame);
+  }
+}
+
 static void handleSlaveRequest(unsigned long request, OpenThermResponseStatus status) {
+  otdReplyDrop("next thermostat frame");   // any received frame, also an invalid one, ends the old request
   if (status == OpenThermResponseStatus::SUCCESS) {
     otSlaveFrame = request;
     otSlaveFramePending = true;
@@ -1484,18 +1529,20 @@ static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentRe
       otRemoteOverride.bMsgId9Answered = true;
     }
   }
-  if (!otSlave.sendResponse(reply)) {
-    OTDDebugTf(PSTR("OTD: reply to thermostat refused, slave not ready, MsgID=%u\r\n"),
+  const bool sentNow = otdSendReply(reply);
+  if (!sentNow) {
+    OTDDebugTf(PSTR("OTD: reply to thermostat held, slave not ready yet, MsgID=%u\r\n"),
                (unsigned)((reply >> 16) & 0xFF));
-    return;
   }
   // A reply that differs from the boiler's frame is the gateway's own answer,
   // logged as A so the parser keeps the boiler's B as the canonical value (ADR-096/103).
+  // A held reply is logged when it leaves (otdReplyService); a dropped one never is.
   if (reply != boilerResp) {
     OTDDebugTf(PSTR("OTD: reply MsgID=%u boiler=0x%04X thermostat=0x%04X\r\n"),
                (unsigned)((reply >> 16) & 0xFF), (unsigned)(boilerResp & 0xFFFF),
                (unsigned)(reply & 0xFFFF));
-    bridgeFrameToParser('A', reply);
+    if (sentNow) bridgeFrameToParser('A', reply);
+    else otdReplyLogA = true;
   }
 }
 
@@ -1873,7 +1920,7 @@ static bool otdAltSlotTaken(unsigned long thermostatFrame) {
                                               (uint16_t)(thermostatFrame & 0xFFFF));
   bridgeFrameToParser('T', thermostatFrame);
   bridgeFrameToParser('A', unknownResp);
-  otSlave.sendResponse(unknownResp);
+  otdSendReply(unknownResp);
   if (sendMasterRequestAsync(request, OT_DIRECT_ORIGIN_GATEWAY)) {
     if (idx < OT_SCHEDULE_SIZE) otSchedule[idx].lastSentMs = now;
     else {
@@ -1974,7 +2021,7 @@ static bool otdRetSlotTaken(unsigned long thermostatFrame) {
   const unsigned long reply = applyResponseModifiers(buildOTResponse(4 /* READ_ACK */, id, otBoilerCache[id]));
   bridgeFrameToParser('T', thermostatFrame);
   bridgeFrameToParser('A', reply);
-  otSlave.sendResponse(reply);
+  otdSendReply(reply);
   otdRetLastSlotMs = now ? now : 1;
   const unsigned long request = OpenTherm::buildRequest(OpenThermMessageType::READ_DATA,
                                                         static_cast<OpenThermMessageID>(28), 0);
@@ -2216,6 +2263,7 @@ void loopOTDirect() {
   // Process OpenTherm library state machines (drives ISR-based TX/RX)
   otMaster.process();
   otSlave.process();
+  otdReplyService();   // TASK-1798: a held answer leaves once the slave gate opens
 
   // Check if an async master request has completed
   if (otMasterRequestActive && otMaster.isReady()) {
@@ -2271,7 +2319,7 @@ void loopOTDirect() {
         setOTParityBit(unknownResp);
         bridgeFrameToParser('T', otSlaveFrame);
         bridgeFrameToParser('A', unknownResp);
-        otSlave.sendResponse(unknownResp);
+        otdSendReply(unknownResp);
         otSlaveFramePending = false;
       }
       // SR table: respond with stored value directly, don't forward to boiler
@@ -2284,7 +2332,7 @@ void loopOTDirect() {
             setOTParityBit(srResp);
             bridgeFrameToParser('T', otSlaveFrame);
             bridgeFrameToParser('A', srResp);
-            otSlave.sendResponse(srResp);
+            otdSendReply(srResp);
             otSlaveFramePending = false;
             srHandled = true;
             break;
@@ -2820,7 +2868,7 @@ static void handleMasterModeSlaveFrame(unsigned long frame) {
   // Bridge the thermostat frame + our response for logging
   bridgeFrameToParser('T', frame);
   bridgeFrameToParser('A', response);
-  otSlave.sendResponse(response);
+  otdSendReply(response);
 }
 
 // ---------------------------------------------------------------------------
