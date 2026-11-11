@@ -269,6 +269,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .stripcard{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-2xl);padding:8px}
   .stripcard svg{width:100%;height:auto;display:block}
   .axis-txt{fill:var(--muted);font-size:10px;font-family:var(--font-mono)}
+  .axis-txt.gtitle{fill:var(--text);font-weight:600}
   .ser-flow{fill:none;stroke:var(--hot);stroke-width:2}
   .ser-ret{fill:none;stroke:var(--cold);stroke-width:2}
   .ser-sp{stroke:#8b949e;stroke-width:1.5;stroke-dasharray:5 5}

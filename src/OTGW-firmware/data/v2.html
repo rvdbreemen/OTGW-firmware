@@ -582,19 +582,42 @@
       <!-- TASK-971: auto-save the graph as PNG/CSV on an interval. -->
       <span class="tchip" id="chipAutoPng" title="Auto-save a PNG every 5 minutes" data-i18n-title="h_mon.graph_autopng_title" data-i18n="h_mon.graph_autopng">Auto-PNG</span>
       <span class="tchip" id="chipAutoCsv" title="Auto-save a CSV every 5 minutes" data-i18n-title="h_mon.graph_autocsv_title" data-i18n="h_mon.graph_autocsv">Auto-CSV</span>
+      <!-- TASK-1821: dashed red/green lines where the live connection dropped and came back; on by default -->
+      <span class="tchip on" id="chipMarks" title="Show where the live connection dropped (red) and came back (green)" data-i18n-title="h_mon.graph_marks_title" data-i18n="h_mon.graph_marks">Disconnects</span>
     </div>
     <div class="graphcard">
       <div class="legend" id="gLegend"></div>
-      <svg viewBox="0 0 780 262" id="gstrip" role="img" aria-label="Temperatures, modulation and flame/DHW/CH graph" data-i18n-aria-label="h_mon.graph_aria">
-        <line x1="34" y1="10" x2="34" y2="170" stroke="#8b949e"/>
-        <line x1="34" y1="170" x2="772" y2="170" stroke="#8b949e"/>
-        <text class="axis-txt" x="2" y="16" id="gAxHi">90°</text>
-        <text class="axis-txt" x="2" y="94" id="gAxMid">50°</text>
-        <text class="axis-txt" x="2" y="172" id="gAxLo">10°</text>
-        <text class="axis-txt" x="2" y="194" data-i18n="h_mon.graph_flame">flame</text>
-        <text class="axis-txt" x="2" y="216" data-i18n="h_mon.graph_dhw">DHW</text>
-        <text class="axis-txt" x="2" y="238" data-i18n="h_mon.graph_ch">CH</text>
+      <!-- TASK-1821: five stacked panels on one time axis, as the 1.x OTGraph. The panel bands are GPANEL in v2.js. -->
+      <svg viewBox="0 0 780 398" id="gstrip" role="img" aria-label="Temperatures, modulation and flame/DHW/CH graph" data-i18n-aria-label="h_mon.graph_aria">
+        <line x1="34" y1="22" x2="34" y2="376" stroke="#8b949e"/>
+        <line x1="34" y1="40" x2="772" y2="40" stroke="#8b949e"/>
+        <line x1="34" y1="72" x2="772" y2="72" stroke="#8b949e"/>
+        <line x1="34" y1="104" x2="772" y2="104" stroke="#8b949e"/>
+        <line x1="34" y1="176" x2="772" y2="176" stroke="#8b949e"/>
+        <line x1="34" y1="148" x2="772" y2="148" stroke="#8b949e" stroke-opacity=".2"/>
+        <line x1="34" y1="120" x2="772" y2="120" stroke="#8b949e" stroke-opacity=".2"/>
+        <line x1="34" y1="376" x2="772" y2="376" stroke="#8b949e"/>
+        <line x1="34" y1="284" x2="772" y2="284" stroke="#8b949e" stroke-opacity=".2"/>
+        <line x1="34" y1="192" x2="772" y2="192" stroke="#8b949e" stroke-opacity=".2"/>
+        <text class="axis-txt gtitle" x="38" y="19" data-i18n="h_mon.graph_flame">flame</text>
+        <text class="axis-txt" x="2" y="29" data-i18n="graph.on">on</text>
+        <text class="axis-txt" x="2" y="42" data-i18n="graph.off">off</text>
+        <text class="axis-txt gtitle" x="38" y="51" data-i18n="h_mon.graph_dhw">DHW</text>
+        <text class="axis-txt" x="2" y="61" data-i18n="graph.on">on</text>
+        <text class="axis-txt" x="2" y="74" data-i18n="graph.off">off</text>
+        <text class="axis-txt gtitle" x="38" y="83" data-i18n="h_mon.graph_ch">CH</text>
+        <text class="axis-txt" x="2" y="93" data-i18n="graph.on">on</text>
+        <text class="axis-txt" x="2" y="106" data-i18n="graph.off">off</text>
+        <text class="axis-txt gtitle" x="38" y="117" data-i18n="graph.series_mod">modulation</text>
+        <text class="axis-txt" x="2" y="126">100%</text>
+        <text class="axis-txt" x="2" y="151">50%</text>
+        <text class="axis-txt" x="2" y="178">0%</text>
+        <text class="axis-txt gtitle" x="38" y="189" data-i18n="h_mon.graph_temps">temperatures</text>
+        <text class="axis-txt" x="2" y="198" id="gAxHi">90°</text>
+        <text class="axis-txt" x="2" y="287" id="gAxMid">50°</text>
+        <text class="axis-txt" x="2" y="378" id="gAxLo">10°</text>
         <g id="gTime"></g>
+        <g id="gMarks"></g>
         <g id="gSer"></g>
       </svg>
     </div>

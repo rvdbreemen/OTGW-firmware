@@ -176,6 +176,7 @@ test('renderGraphTime rebuilds #gTime only when the tick set changes, otherwise 
   const body = PLOT + '\n' +
     'var document = { getElementById: function (id) { return id === "gTime" ? g : null; },' +
     ' createElementNS: function (ns, tag) { return mk(tag); } };\n' +
+    SRC.match(/var GPANEL = \{[\s\S]*?\};/)[0] + '\n' + SRC.match(/var GPLOT_TOP = [^\n]*/)[0] + '\n' +   // TASK-1821: panel bands
     SRC.match(/var gTimeSig = '';/)[0] + '\n' +
     extractFunction(SRC, 'graphTimeTicks') + '\n' + extractFunction(SRC, 'renderGraphTime') + '\n' +
     'return renderGraphTime;';
@@ -192,16 +193,17 @@ test('renderGraphTime rebuilds #gTime only when the tick set changes, otherwise 
   for (const l of g.children.filter((c) => c.tag === 'line')) assert.equal(l.attrs.x1, l.attrs.x2);
   const labels = g.children.filter((c) => c.tag === 'text').map((c) => c.textContent);
   assert.ok(labels.every((t) => /^\d\d:\d\d$/.test(t)), labels.join());
-  // Layout: labels centred on their gridline, inside the 262-high viewBox below the CH lane
-  // (y 226..240), gridlines spanning the plot and lanes; no label within half a label of the edge.
+  // Layout (TASK-1821 stacked panels): labels centred on their gridline, inside the viewBox below the
+  // temperature panel (bottom y 376), gridlines spanning all panels (flame top y 22 to 376); no label
+  // within half a label of the edge.
   const vbH = +HTML.match(/id="gstrip"[^>]*viewBox="0 0 780 (\d+)"|viewBox="0 0 780 (\d+)"[^>]*id="gstrip"/).slice(1).find(Boolean);
   for (const tx of g.children.filter((c) => c.tag === 'text')) {
     assert.equal(tx.attrs['text-anchor'], 'middle');
-    assert.ok(+tx.attrs.y > 240 && +tx.attrs.y <= vbH, 'label y ' + tx.attrs.y + ' (viewBox height ' + vbH + ')');
+    assert.ok(+tx.attrs.y > 376 && +tx.attrs.y <= vbH, 'label y ' + tx.attrs.y + ' (viewBox height ' + vbH + ')');
     assert.ok(+tx.attrs.x >= C_X0 + 16 && +tx.attrs.x <= C_X1 - 7, 'label x ' + tx.attrs.x + ' too close to the edge');
   }
   for (const l of g.children.filter((c) => c.tag === 'line')) {
-    assert.ok(+l.attrs.y1 <= 10 && +l.attrs.y2 >= 240 && +l.attrs.y2 < vbH, 'gridline ' + l.attrs.y1 + '..' + l.attrs.y2);
+    assert.ok(+l.attrs.y1 <= 22 && +l.attrs.y2 >= 376 && +l.attrs.y2 < vbH, 'gridline ' + l.attrs.y1 + '..' + l.attrs.y2);
   }
   render(now + 11 * MIN - win, win);                     // 11 min later: a tick left, one entered
   assert.ok(created > first, 'rebuilt when the tick set changed');
@@ -345,7 +347,7 @@ test('layoutLegend wraps onto a second row instead of clipping, and is empty wit
 });
 
 test('v2.html: #gstrip has room for the time axis and a #gTime group drawn before the series', () => {
-  assert.match(HTML, /<svg viewBox="0 0 780 262" id="gstrip"/);
+  assert.match(HTML, /<svg viewBox="0 0 780 398" id="gstrip"/);   // TASK-1821: five stacked panels
   const iTime = HTML.indexOf('id="gTime"'), iSer = HTML.indexOf('id="gSer"');
   assert.ok(iTime > 0 && iTime < iSer, 'gTime must exist and sit behind the series');
   assert.match(SRC, /renderGraphTime\(t0, win\)/, 'renderGraph must draw the axis');

@@ -486,6 +486,9 @@
       "graph_flame": "flame",
       "graph_dhw": "DHW",
       "graph_ch": "CH",
+      "graph_temps": "temperatures",
+      "graph_marks": "Disconnects",
+      "graph_marks_title": "Show where the live connection dropped (red) and came back (green)",
       "log_aria": "Live OpenTherm log",
       "log_autodl": "Auto-download",
       "log_autodl_title": "Download the log automatically every 15 minutes",
@@ -1808,7 +1811,8 @@
     [function () { applyTheme(document.documentElement.getAttribute('data-theme') === 'dark'); },
      function () { var d = null; try { d = localStorage.getItem('otgw-v2-design'); } catch (e) { } showDesign(d || 'a'); },
      renderConnStrip, renderHdrNet, renderConnMap, renderStats, renderSupport, renderValues,
-     renderSettings, renderSatSettings, renderOvrPanel, scheduleRender, updateSaveBar
+     renderSettings, renderSatSettings, renderOvrPanel, scheduleRender, updateSaveBar,
+     function () { if (isMonitorVisible('mgraph')) renderGraph(); }   // TASK-1821: legend labels, without waiting for data
     ].forEach(function (f) { try { f(); } catch (e) { } });
   }
 
@@ -2794,8 +2798,8 @@
     try {
       ws = new WebSocket(url);
       ws.onmessage = onWsMessage;
-      ws.onopen = function () { wsOpenMs = Date.now(); };
-      ws.onclose = function () { ws = null; scheduleReconnect(); fetchSeed(); };
+      ws.onopen = function () { wsOpenMs = Date.now(); noteWsMark(true); };
+      ws.onclose = function () { ws = null; noteWsMark(false); scheduleReconnect(); fetchSeed(); };
       ws.onerror = function () { try { if (ws) ws.close(); } catch (e) { } };
     } catch (e) { scheduleReconnect(); }
   }
@@ -3118,7 +3122,53 @@
     ['mod', 'modulation', '#00bffe', 'm'], ['flame', 'flame', '#ff7b00', 'l'], ['dhw_on', 'DHW mode', '#2f81f7', 'l'], ['ch', 'boiler CH mode', '#e5534b', 'l']];
   // 'ch' is the boiler's own CH-mode status bit (MsgID 0 slave bit 1; pump overrun keeps it on), not SAT's CH enable (Sergeant D entry 219)
   var GDCOL = ['#56d4dd', '#db61a2', '#7ee787', '#f0883e', '#79c0ff', '#bc8cff'];
-  var GLANE_Y = { flame: 196, dhw_on: 218, ch: 240 };
+  // TASK-1821: five stacked panels on one time axis, as the 1.x OTGraph: {top, h} in viewBox units, top to
+  // bottom. The static axes, gridlines and titles in v2.html (#gstrip) are drawn for these bands.
+  var GPANEL = { flame: { top: 22, h: 18 }, dhw_on: { top: 54, h: 18 }, ch: { top: 86, h: 18 },
+    mod: { top: 120, h: 56 }, temp: { top: 192, h: 184 } };
+  var GPLOT_TOP = GPANEL.flame.top, GPLOT_BOT = GPANEL.temp.top + GPANEL.temp.h;
+  var GLANE_Y = { flame: GPANEL.flame.top + GPANEL.flame.h, dhw_on: GPANEL.dhw_on.top + GPANEL.dhw_on.h, ch: GPANEL.ch.top + GPANEL.ch.h };   // lane baselines
+  // TASK-1821: dashed markers where the live connection (WebSocket) dropped (up 0, red) and came back (up 1,
+  // green), since this page was opened. A drop counts only after an open socket; failed reconnects in one
+  // outage add nothing. The chip #chipMarks hides them (remembered per browser, default on).
+  var gMarks = [], gWsUp = false, gWsDown = false, gMarksOn = graphMarksPref();
+  function noteWsMark(up) {
+    var now = Date.now();
+    var n = gMarks.length;
+    if (up) { if (gWsDown) gMarks.push({ t: now, up: 1 }); gWsDown = false; gWsUp = true; }
+    else { if (gWsUp && !gWsDown) { gMarks.push({ t: now, up: 0 }); gWsDown = true; } gWsUp = false; }
+    if (gMarks.length > 512) gMarks = gMarks.slice(-256);
+    if (gMarks.length !== n && isMonitorVisible('mgraph')) renderGraph();   // the graph otherwise redraws only when data arrives
+  }
+  function graphMarksPref() {
+    try { return localStorage.getItem('otgw-v2-gmarks') !== '0'; } catch (e) { return true; }
+  }
+  function setGraphMarksOn(on) {
+    gMarksOn = !!on;
+    try { localStorage.setItem('otgw-v2-gmarks', gMarksOn ? '1' : '0'); } catch (e) { }
+    var chip = document.getElementById('chipMarks'); if (chip) chip.classList.toggle('on', gMarksOn);
+    renderGraph();
+  }
+  // [{x, up}] for the marks inside the window [t0, t0 + win]
+  function graphMarkLines(marks, t0, win) {
+    var out = [];
+    marks.forEach(function (m) {
+      if (m.t < t0 || m.t > t0 + win) return;
+      out.push({ x: C_X0 + (m.t - t0) / win * (C_X1 - C_X0), up: m.up });
+    });
+    return out;
+  }
+  function renderGraphMarks(t0, win) {
+    var g = document.getElementById('gMarks'); if (!g) return;
+    g.textContent = '';
+    if (!gMarksOn) return;
+    graphMarkLines(gMarks, t0, win).forEach(function (m) {
+      var ln = document.createElementNS('http://www.w3.org/2000/svg', 'line'), x = m.x.toFixed(1);
+      ln.setAttribute('x1', x); ln.setAttribute('x2', x); ln.setAttribute('y1', GPLOT_TOP); ln.setAttribute('y2', GPLOT_BOT);
+      ln.setAttribute('stroke', m.up ? '#3fb950' : '#f85149'); ln.setAttribute('stroke-width', '1.5'); ln.setAttribute('stroke-dasharray', '5 4');
+      g.appendChild(ln);
+    });
+  }
   var gOff = {};
   try { gOff = JSON.parse(localStorage.getItem('otgw-v2-goff') || '{}') || {}; } catch (e) { gOff = {}; }
   // TASK-1546: no valid room temperature. With SAT on, SAT's own verdict (sat/status room_temp_lost);
@@ -3268,23 +3318,26 @@
   // The line breaks (a new subpath starts) where the next point starts more than GBREAK_MS after
   // the previous point's data ends (t + span), so a
   // hole in the data is drawn as a hole: no line across it, and a lane (kind 'l', base `laneY`)
-  // does not hold its value over it. kind 't' = temperature line, 'm' = modulation area
-  // (closed at the 170 baseline), 'l' = on/off lane. `y` maps a temperature to a y coordinate.
+  // does not hold its value over it. kind 't' = temperature line, 'm' = modulation area, 'l' = on/off
+  // area 14 high; 'm' and 'l' close each subpath on the baseline `laneY`. `y` maps a value (temperature,
+  // or modulation 0-100 %) to a y coordinate.
   function graphPath(c, kind, y, laneY) {
     var d = '', seg = [], i;
     function flush() {
       if (!seg.length) return;
       var pts = [], py = null, q;
       if (kind === 'm') {
-        pts.push(seg[0][0] + ',170');
-        for (q = 0; q < seg.length; q++) pts.push(seg[q][0] + ',' + (170 - Math.max(0, Math.min(100, seg[q][1])) * 0.4).toFixed(1));
-        pts.push(seg[seg.length - 1][0] + ',170');
+        pts.push(seg[0][0] + ',' + laneY);
+        for (q = 0; q < seg.length; q++) pts.push(seg[q][0] + ',' + y(Math.max(0, Math.min(100, seg[q][1]))).toFixed(1));
+        pts.push(seg[seg.length - 1][0] + ',' + laneY);
       } else if (kind === 'l') {
+        pts.push(seg[0][0] + ',' + laneY);   // TASK-1821: a closed on/off area, as the 1.x step areas
         for (q = 0; q < seg.length; q++) { var yy = laneY - (seg[q][1] ? 14 : 0); if (py !== null) pts.push(seg[q][0] + ',' + py); pts.push(seg[q][0] + ',' + yy); py = yy; }
+        pts.push(seg[seg.length - 1][0] + ',' + laneY);
       } else {
         for (q = 0; q < seg.length; q++) pts.push(seg[q][0] + ',' + y(seg[q][1]).toFixed(1));
       }
-      d += (d ? ' ' : '') + 'M' + pts.join(' L') + (kind === 'm' ? ' Z' : '');
+      d += (d ? ' ' : '') + 'M' + pts.join(' L') + (kind === 'm' || kind === 'l' ? ' Z' : '');
       seg = [];
     }
     for (i = 0; i < c.length; i++) {
@@ -3314,7 +3367,9 @@
     });
     if (lo > hi) { lo = 10; hi = 90; }
     lo = Math.floor(lo / 10) * 10; hi = Math.max(Math.ceil(hi / 10) * 10, lo + 20);
-    function y(v) { return 170 - (v - lo) / (hi - lo) * 160; }
+    var TP = GPANEL.temp, MP = GPANEL.mod;   // TASK-1821: temperatures and modulation each have their own panel
+    function y(v) { return TP.top + TP.h - (v - lo) / (hi - lo) * TP.h; }
+    function ym(v) { return MP.top + MP.h - v / 100 * MP.h; }
     [['gAxHi', hi], ['gAxMid', (lo + hi) / 2], ['gAxLo', lo]].forEach(function (a) {
       var e = document.getElementById(a[0]); if (e) e.textContent = Math.round(a[1]) + '°';
     });
@@ -3324,11 +3379,12 @@
       if (!el) {
         el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         el.setAttribute('data-k', k); el.setAttribute('stroke', m[2]); el.setAttribute('stroke-width', kind === 't' ? '1.8' : '1.2');
-        el.setAttribute('fill', kind === 'm' ? 'rgba(0,191,254,.18)' : 'none');
+        el.setAttribute('fill', kind === 'm' ? 'rgba(0,191,254,.18)' : (kind === 'l' ? m[2] : 'none'));
+        if (kind === 'l') el.setAttribute('fill-opacity', '.3');
         if (k === 'chSet' || k === 'roomSet') el.setAttribute('stroke-dasharray', '5 4');
         g.appendChild(el);
       }
-      if (!gOff[k] && c.length) d = graphPath(c, kind, y, GLANE_Y[k]);
+      if (!gOff[k] && c.length) d = kind === 'm' ? graphPath(c, kind, ym, MP.top + MP.h) : graphPath(c, kind, y, GLANE_Y[k]);
       el.setAttribute('d', d);
     });
     // TASK-1546: the room dropout is its own line in a different colour along the bottom of the plot; it follows the room legend toggle
@@ -3341,9 +3397,10 @@
       g.appendChild(ex);
     }
     ex.firstChild.textContent = t('graph.room_no_reading');   // TASK-1820: follows a language switch
-    var xd = (!gOff.room && xcol.length) ? graphPath(xcol, 't', function () { return 167; }) : '';
+    var xd = (!gOff.room && xcol.length) ? graphPath(xcol, 't', function () { return GPLOT_BOT - 3; }) : '';
     ex.setAttribute('d', xd.replace(/M([\d.]+),([\d.]+)(?![\d.]| L)/g, function (m, a, c) { return 'M' + a + ',' + c + ' L' + (+a + 3) + ',' + c; }));
     renderGraphTime(t0, win);
+    renderGraphMarks(t0, win);
     renderGraphLegend(keys, metas);
     gRArr = arr; gRKeys = keys; gRMetas = metas;   // the readout reads what was drawn
     bindGraphReadout();
@@ -3382,7 +3439,7 @@
     var res = graphReadout(gRArr, gRKeys, gRMetas, gOff, t), d = new Date(res ? res.t : t);
     if (!gCursor) {
       gCursor = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      gCursor.setAttribute('class', 'gcursor'); gCursor.setAttribute('y1', '10'); gCursor.setAttribute('y2', '244');
+      gCursor.setAttribute('class', 'gcursor'); gCursor.setAttribute('y1', GPLOT_TOP); gCursor.setAttribute('y2', GPLOT_BOT);
       svg.appendChild(gCursor);
     }
     gCursor.setAttribute('x1', x.toFixed(1)); gCursor.setAttribute('x2', x.toFixed(1)); gCursor.setAttribute('visibility', 'visible');
@@ -3466,8 +3523,8 @@
       gTimeSig = sig; g.textContent = '';
       ticks.forEach(function (k) {
         var ln = document.createElementNS(NS, 'line'), tx = document.createElementNS(NS, 'text');
-        ln.setAttribute('y1', '10'); ln.setAttribute('y2', '244'); ln.setAttribute('stroke', '#8b949e'); ln.setAttribute('stroke-opacity', '.15');
-        tx.setAttribute('class', 'axis-txt'); tx.setAttribute('y', '257'); tx.setAttribute('text-anchor', 'middle'); tx.textContent = k.label;
+        ln.setAttribute('y1', GPLOT_TOP); ln.setAttribute('y2', GPLOT_BOT); ln.setAttribute('stroke', '#8b949e'); ln.setAttribute('stroke-opacity', '.15');
+        tx.setAttribute('class', 'axis-txt'); tx.setAttribute('y', GPLOT_BOT + 14); tx.setAttribute('text-anchor', 'middle'); tx.textContent = k.label;
         g.appendChild(ln); g.appendChild(tx);
       });
     }
@@ -5594,6 +5651,7 @@
       b[i].setAttribute('fill', paintOr(fill !== 'none' ? fill : '', '#8b949e'));
       b[i].setAttribute('font-size', cs.fontSize || '10px');
       b[i].setAttribute('font-family', cs.fontFamily || 'monospace');
+      if (cs.fontWeight && cs.fontWeight !== '400' && cs.fontWeight !== 'normal') b[i].setAttribute('font-weight', cs.fontWeight);   // TASK-1821: panel titles
     }
   }
   // Visible legend entries ([{color, label}]); a series hidden with a click (opacity .4) is left out.
@@ -8244,6 +8302,8 @@
     if (apng) apng.addEventListener('click', function () { toggleAutoPng(apng); });
     var acsv = document.getElementById('chipAutoCsv');
     if (acsv) acsv.addEventListener('click', function () { toggleAutoCsv(acsv); });
+    var cmk = document.getElementById('chipMarks');   // TASK-1821
+    if (cmk) { cmk.classList.toggle('on', gMarksOn); cmk.addEventListener('click', function () { setGraphMarksOn(!gMarksOn); }); }
     // TASK-989: staggered (see the startup-burst note above) — seed/SAT/weather
     // trail the first-paint fetches one at a time instead of bursting together.
     setTimeout(fetchSeed, 2000); setTimeout(fetchSatStatus, 2800); setTimeout(fetchWeather, 3600);

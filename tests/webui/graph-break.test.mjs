@@ -66,7 +66,8 @@ test('the break is between the right points', () => {
 });
 
 test('modulation area: each segment is closed on its own baseline', () => {
-  const d = graphPath(pts(0, 5000, 400000, 405000).map(p => [p[0], 50, p[2]]), 'm', y);
+  // TASK-1821: the modulation panel passes its own % -> y mapping and baseline (here 0.4 px per %, base 170)
+  const d = graphPath(pts(0, 5000, 400000, 405000).map(p => [p[0], 50, p[2]]), 'm', v => 170 - v * 0.4, 170);
   assert.equal(segs(d), 2);
   assert.equal((d.match(/Z/g) || []).length, 2);
   assert.match(d, /^M0,170 L0,150\.0 L10,150\.0 L10,170 Z M20,170 /);
@@ -76,7 +77,8 @@ test('lane does not hold its value across a gap', () => {
   const c = [[0, 1, T0], [10, 0, T0 + 5000], [20, 1, T0 + 400000], [30, 1, T0 + 405000]];
   const d = graphPath(c, 'l', y, 218);
   assert.equal(segs(d), 2);
-  assert.equal(d, 'M0,204 L10,204 L10,218 M20,204 L30,204 L30,204');   // the stair step repeats a point, as before
+  // TASK-1821: each segment is a closed area on the lane baseline (the stair step repeats a point, as before)
+  assert.equal(d, 'M0,218 L0,204 L10,204 L10,218 L10,218 Z M20,218 L20,204 L30,204 L30,204 L30,218 Z');
   // no horizontal run from x=10 (before the gap) to x=20 (after it)
   assert.ok(!/10,218 L20/.test(d));
 });
