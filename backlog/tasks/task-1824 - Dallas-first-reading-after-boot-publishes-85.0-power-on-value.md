@@ -4,6 +4,7 @@ title: 'Dallas: first reading after boot publishes 85.0 power-on value'
 status: To Do
 assignee: []
 created_date: '2026-11-11T21:39:00Z'
+updated_date: '2026-11-11T21:50:00Z'
 labels:
   - sensors
   - bug
@@ -25,3 +26,9 @@ Found while answering thaghostnl in #nederlandse-ondersteuning (msg https://disc
 - [ ] #2 The fix publishes no value before a completed conversion (for example skip the first read after requestTemperatures, or read in the next tick); the same test is green
 - [ ] #3 No valid measurement is lost after that: a real 85.0 after a valid previous value is still published, unless it jumps
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-11 21:42 UTC thaghostnl (msg 1570191896427499614): waterproof probe, cable about 1 m; he sees 85 in the stats and in MQTT; photo of the wiring to follow. Not yet clear whether it stays at 85 (wiring/parasite) or is only the first value (this bug).
+<!-- SECTION:NOTES:END -->
