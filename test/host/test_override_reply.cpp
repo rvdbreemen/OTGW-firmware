@@ -247,6 +247,10 @@ struct OTScheduleEntry { uint8_t msgId; bool disabled; };
 static OTScheduleEntry otSchedule[] = { { 0, false } };
 static constexpr uint8_t OT_SCHEDULE_SIZE = 1;
 
+// ADR-229 (TASK-1805): command state the relayed MsgID 0 rewrite reads. Not sliced: the anchors
+// must match every old revision this harness compares against. Unused by older slices.
+static bool otSummerMode = false, otDHWBlocking = false, otCoolingEnable = false;
+
 // ---- code under test, sliced by anchor from OTDirect.ino ------------------------
 #include "otd_slice.inc"
 
