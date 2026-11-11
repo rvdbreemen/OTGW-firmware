@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T06:27:00Z'
-updated_date: '2026-11-05T15:24:00Z'
+updated_date: '2026-11-11T07:49:00Z'
 labels:
   - webui
   - graph
@@ -48,4 +48,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: measurement only, need
 2026-11-05 lead: (a) 1 s image (GRAPH_HIST_LARGE_INTERVAL_S=1, beta.79 e8fb50b) app-only on .63 (Classic, PSRAM 2 MB) 14:24; ring full at count 720 after 30 min. 14:55: 5x GET /api/v2/graph/history: 28237 B in 0.249-0.358 s, HTTP 200 each; bootcount 146 before/after, uptime continuous, lastreset Software reset (the OTA), hd_max_loop_gap_ms 476 before/after (baseline 435-459), crashlog empty. This is PSRAM-board evidence; AC1 asks the no-PSRAM bench (.61, psram_found 0): to run there after the TASK-1450 bench frees .61. (b) AC2: .63 back on beta.95+1fbd5cf at ~14:58 (interval_s 120 reported); psram_free 2057884 of 2097152 after boot; the 24 h window needs the unit untouched until ~2026-11-06 15:00.
 
 2026-11-05 AC1 on the no-PSRAM bench .61 (psram_found 0): temporary uncommitted build (graphHistoryStuff.ino: static ring forced to GRAPH_HIST_LARGE_SLOTS 726, interval 1 s; beta.98+df9ea31-dirty, RAM 39.8%), app-only OTA 16:09; ring full 16:22 (count 720). 5x GET /api/v2/graph/history: 28753-28756 B in 0.245-0.324 s, HTTP 200 each; hd_max_loop_gap_ms 416 before and after; bootcount 66 before/after, uptime continuous, no TWDT, crashlog empty. .61 restored to beta.95+1fbd5cf (app+fs). The temp image is not kept in the repo. AC2 (PSRAM .63, 24 h window) runs until ~2026-11-06 15:00.
+
+2026-11-11 08:49 otgw-firmware-09, AC2 read-only on .63 (beta.174+e6b4037, uptime 2:16, bootcount 11, so it restarted ~06:33 with the public beta.174): psram_found 1, psram_size 2097152, psram_free 2057544; GET /api/v2/graph/history HTTP 200, 2776 B in 0.059 s, interval_s 120, count 67, newest_age_ms 115005. 67 slots x 120 s = 134 min matches the uptime: the ring fills at one slot per 2 min. The full 24 h window (720 slots) needs uptime >= 24 h without a reboot: earliest check 2026-11-12 ~06:40. Series flow/ret/mod are null because .63 has no boiler on the bus (outside has values).
 <!-- SECTION:NOTES:END -->
