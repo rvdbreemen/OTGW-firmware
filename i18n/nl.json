@@ -373,6 +373,8 @@
     "log_capture_title": "Opname: bewaar tot 200.000 regels (ongeveer een dag) om te downloaden, in plaats van de laatste 2.000",
     "log_clear": "Wissen",
     "log_download": "Downloaden",
+    "log_download_otmon": "OTmonitor-log",
+    "log_download_otmon_title": "Download de OT-frames van deze log in het eigen logformaat van OTmonitor, zodat OTmonitor 6.6 het bestand kan openen",
     "log_filter_ph": "Berichten filteren… (bijv. 19, Boiler, DHW)",
     "log_lines": "Regels:",
     "log_rate": "Tempo:",

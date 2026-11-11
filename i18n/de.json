@@ -373,6 +373,8 @@
     "log_capture_title": "Aufzeichnen: bis zu 200.000 Zeilen (etwa ein Tag) für den Download behalten statt nur der letzten 2.000",
     "log_clear": "Leeren",
     "log_download": "Herunterladen",
+    "log_download_otmon": "OTmonitor-Log",
+    "log_download_otmon_title": "Die OT-Frames dieses Logs im eigenen Logformat von OTmonitor herunterladen, damit OTmonitor 6.6 die Datei öffnen kann",
     "log_filter_ph": "Nachrichten filtern… (z. B. 19, Boiler, DHW)",
     "log_lines": "Zeilen:",
     "log_rate": "Rate:",

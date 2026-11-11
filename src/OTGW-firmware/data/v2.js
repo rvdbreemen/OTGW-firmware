@@ -494,6 +494,8 @@
       "log_capture_title": "Capture: keep up to 200,000 lines (about a day) for Download instead of the last 2,000",
       "log_clear": "Clear",
       "log_download": "Download",
+      "log_download_otmon": "OTmonitor log",
+      "log_download_otmon_title": "Download the OT frames of this log in OTmonitor's own log format, so OTmonitor 6.6 can open the file",
       "log_filter_ph": "Filter frames… (e.g. 19, Boiler, DHW)",
       "log_lines": "Lines:",
       "log_rate": "Rate:",
@@ -2704,7 +2706,9 @@
   // day at 2 frames/s, a few tens of MB) for Download. The console only ever renders the
   // newest LOG_SHOW matching lines, so a deep buffer does not slow the page.
   var LOG_DEF = 2000, LOG_CAPTURE = 200000, LOG_SHOW = 2000;
-  var LOG_MAX = LOG_DEF, logBuf = [], logRecvTimes = [];
+  // TASK-1813: logBufDev[i] is the device wall clock (devClockBase convention: device time in UTC
+  // fields) when logBuf[i] arrived; the OTmonitor log export takes each line's date from it.
+  var LOG_MAX = LOG_DEF, logBuf = [], logBufDev = [], logRecvTimes = [];
   var logPaused = false, logSearch = '', logShowTs = true, logAutoScroll = true;
   // TASK-970: SAT-only filter, auto-download timer, stream-to-file writer
   var logSatOnly = false, logAutoDlTimer = null, logStreamWriter = null;
@@ -2725,8 +2729,10 @@
     else if (logStreamChunk) { logStreamChunk.push(line); if (logStreamChunk.length >= LOG_CAPTURE) flushStreamChunk(); }
     if (logPaused) return;
     logBuf.push(line);
+    // Device clock when known (TASK-1229), else the browser's own local time.
+    logBufDev.push(devClockBase > 0 ? devClockBase + (now - devClockAt) : now - new Date(now).getTimezoneOffset() * 60000);
     // Trim in batches: shift() on a 200k array per frame is O(n).
-    if (logBuf.length > LOG_MAX + (LOG_MAX >> 4)) logBuf = logBuf.slice(-LOG_MAX);
+    if (logBuf.length > LOG_MAX + (LOG_MAX >> 4)) { logBuf = logBuf.slice(-LOG_MAX); logBufDev = logBufDev.slice(-LOG_MAX); }
     if (isMonitorLogVisible() && !logRenderPending) {   // one render per animation frame
       logRenderPending = true;
       // TASK-1533: with auto-scroll off the shown lines stay put (new lines wait in logBuf);
@@ -5657,6 +5663,31 @@
   function downloadLog() {
     downloadBlob(new Blob([logBuf.join('\n')], { type: 'text/plain' }), 'otgw-log-' + ts() + '.txt');
   }
+  // TASK-1813: the log as OTmonitor 6.6 reads it (otmonitor.tcl fileanal/filedata, layout 23):
+  // "YYYYMMDD-HHMMSS.uuuuuu <frame>", one OT frame ([ABRT] + 8 upper-case hex, right after the
+  // 18-character source label) or "Error NN" line per line, CRLF. Events, commands, responses, PS1
+  // summaries, SAT narration and DIAG lines are left out. The time is the device's own stamp on the
+  // line; the date comes from devMs[i], the device clock when the line arrived. When stamp and
+  // arrival lie more than 12 h apart they straddle midnight, and the date moves one day.
+  function otmonLogText(lines, devMs) {
+    var DAY = 86400000, out = [];
+    function p2(n) { return (n < 10 ? '0' : '') + n; }
+    for (var i = 0; i < lines.length; i++) {
+      var m = /^(\d\d):(\d\d):(\d\d)\.(\d{6}) (.*)$/.exec(lines[i]);
+      if (!m || !(devMs[i] > 0)) continue;
+      var f = /^[A-Za-z ]{18} ([ABRT][0-9A-F]{8})(?:\s|$)/.exec(m[5]) || /^! (Error 0[1-4])\b/.exec(m[5]);
+      if (!f) continue;
+      var tod = ((+m[1] * 60 + +m[2]) * 60 + +m[3]) * 1000;
+      var day = Math.floor(devMs[i] / DAY) * DAY, arr = devMs[i] - day;
+      if (tod - arr > DAY / 2) day -= DAY; else if (arr - tod > DAY / 2) day += DAY;
+      var d = new Date(day);
+      out.push(d.getUTCFullYear() + p2(d.getUTCMonth() + 1) + p2(d.getUTCDate()) + '-' + m[1] + m[2] + m[3] + '.' + m[4] + ' ' + f[1]);
+    }
+    return out.length ? out.join('\r\n') + '\r\n' : '';
+  }
+  function downloadOtmonLog() {
+    downloadBlob(new Blob([otmonLogText(logBuf, logBufDev)], { type: 'text/plain' }), 'otlog-' + ts() + '.txt');
+  }
   function toggleCapture(chip) {   // TASK-1227
     // Leaving Capture trims to 2000 lines on the next frame: save the capture first.
     if (LOG_MAX === LOG_CAPTURE && logBuf.length > LOG_DEF) downloadLog();
@@ -8095,9 +8126,11 @@
     if (oci) oci.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); sendOtgwCmd(); } });
     // TASK-970: Clear + Download (were rendered but unwired) + SAT-only / auto-download / stream chips
     var lcl = document.getElementById('logClear');
-    if (lcl) lcl.addEventListener('click', function () { logBuf = []; logRecvTimes = []; renderLog(); });
+    if (lcl) lcl.addEventListener('click', function () { logBuf = []; logBufDev = []; logRecvTimes = []; renderLog(); });
     var ldl = document.getElementById('logDownload');
     if (ldl) ldl.addEventListener('click', downloadLog);
+    var lom = document.getElementById('logDownloadOtmon');   // TASK-1813
+    if (lom) lom.addEventListener('click', downloadOtmonLog);
     var cso = document.getElementById('chipSatOnly');
     if (cso) cso.addEventListener('click', function () { logSatOnly = !logSatOnly; cso.classList.toggle('on', logSatOnly); if (isMonitorLogVisible()) renderLog(); });
     var ccp = document.getElementById('chipCapture');

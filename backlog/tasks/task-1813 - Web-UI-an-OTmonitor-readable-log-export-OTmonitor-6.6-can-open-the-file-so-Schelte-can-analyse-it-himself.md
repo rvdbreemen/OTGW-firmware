@@ -3,10 +3,11 @@ id: TASK-1813
 title: >-
   Web UI: an OTmonitor-readable log export (OTmonitor 6.6 can open the file, so
   Schelte can analyse it himself)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-11T12:59:00Z'
-updated_date: '2026-11-11T13:00:00Z'
+updated_date: '2026-11-11T13:50:00Z'
 labels:
   - webui
   - otmonitor
@@ -67,10 +68,10 @@ Related: TASK-1727 (manual: OTmonitor over TCP port 25238), TASK-1720 (USB seria
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The web UI has an 'OTmonitor log' download (next to the existing log download) that writes the logBuf frames in the target format from the description: one line per OT frame, `YYYYMMDD-HHMMSS.uuuuuu <frame>`, with the right date also across midnight, plus Error lines; no event, PS1, SAT or DIAG lines
-- [ ] #2 An automated test parses the exported file with OTmonitor's own reader logic: preferably the real fileanal and filedata procs from other-projects/otmonitor-6.6/otmonitor.vfs/otmonitor.tcl under tclsh (as in the harness named in the description), otherwise a faithful port that names its source lines. The test is red on the current downloadLog() output (no format found, 0 frames) and green on the new export (layout found, every frame read with its date)
+- [x] #1 The web UI has an 'OTmonitor log' download (next to the existing log download) that writes the logBuf frames in the target format from the description: one line per OT frame, `YYYYMMDD-HHMMSS.uuuuuu <frame>`, with the right date also across midnight, plus Error lines; no event, PS1, SAT or DIAG lines
+- [x] #2 An automated test parses the exported file with OTmonitor's own reader logic: preferably the real fileanal and filedata procs from other-projects/otmonitor-6.6/otmonitor.vfs/otmonitor.tcl under tclsh (as in the harness named in the description), otherwise a faithful port that names its source lines. The test is red on the current downloadLog() output (no format found, 0 frames) and green on the new export (layout found, every frame read with its date)
 - [ ] #3 Manual check in OTmonitor 6.6: open the exported file (`otmonitor <file>` or the file connection); the graph and the message views show the data at the right times; screenshot as evidence
-- [ ] #4 The user manual (EN and NL) describes the OTmonitor log download: what it holds (logBuf depth, Pause), how to open it in OTmonitor, and what to send along for an analysis
+- [x] #4 The user manual (EN and NL) describes the OTmonitor log download: what it holds (logBuf depth, Pause), how to open it in OTmonitor, and what to send along for an analysis
 - [ ] #5 The web UI test files touched (one file per run) and python evaluate.py --quick show no new FAIL; the download is checked on a bench unit
 <!-- AC:END -->
 
@@ -105,4 +106,14 @@ foreach f [lrange $argv 1 end] {
   close $dev
 }
 ```
+
+2026-11-11 d3: design option (a) as decided by the coordinator: the web UI keeps the device wall clock per logBuf line (logBufDev, devClockBase convention from TASK-1229; browser local time until the first device/time answer) and the pure otmonLogText(lines, devMs) writes layout 23. Date rule: the line's own HH:MM:SS.uuuuuu plus the date of the device clock at arrival; when stamp and arrival lie more than 12 h apart they straddle midnight and the date moves one day (no rolling state, works for any line order). Frame = [ABRT]+8 upper-case hex right after the 18-character source label (OTGW-Core.ino:6034-6050), so a response or command echo with a frame-like token is never taken; Error 01-04 from the '!' event lines (OTGW-Core.ino:6176-6206). CRLF, empty file when nothing exportable. Option (b) not taken: a WS line format change touches every consumer. No library needed (a few lines, project-specific).
+
+2026-11-11 tests: tests/webui/otmonitor-log-export.test.mjs (5 tests) cuts the real otmonLogText out of v2.js; the OTmonitor part feeds the files to the REAL fileanal/filedata procs of other-projects/otmonitor-6.6/otmonitor.vfs/otmonitor.tcl under tclsh (Git for Windows ucrt64 tclsh 8.6) via tests/webui/lib/otmon_reader.tcl; skipped with the reason when tclsh or the private submodule is missing. On the new code 5/5 pass: plain download -> fileanal {} and 0 messages (the bug); export -> layout {a15xa6xa* %Y%m%d-%H%M%S}, all 4 frames and the Error 01 line with their dates across midnight. On origin/dev v2.js (OTGW_V2_JS): 1 pass, 4 fail (otmonLogText not found). Full web UI suite one file per run: 63 files, 0 fail (after npm ci --prefix tests/webui for acorn). log-autoscroll-off-freezes.test.mjs stub scope extended with logBufDev/devClockBase/devClockAt. evaluate.py --quick: 86 passed, 0 failed.
+
+2026-11-11 strings: EN in I18N_EN, NL, DE and EL packs (i18n-lang requires every pack to carry every key). The EL text is mine, not reviewed by a native speaker. Manual: docs/manuals/en/ch03-web-interface.md and docs/manuals/nl/h03-webinterface.md (what it holds, Capture/Pause/Clear, how to open, what to send). Opening: only the command line, otmonitor <file> (otmonitor.tcl:2207-2211); no file connection found in the GUI code, so the manual does not claim one. AC3 not done: OTmonitor's GUI needs its starkit runtime (sqlite3, tdom, Thread); wish from Git fails 'Error in startup script'. Needs otmonitor.exe 6.6 on a machine that has it (Robert). AC5 bench download check waits for the build freeze (09 beta.177/178).
+
+2026-11-11: the two Greek strings are put to Sergeant D as Q-1813a by comms 92 (#dev-sat-mqtt msg 1570071042880176200; A fine / B corrections, recommendation A). Apply his answer before Done.
+
+2026-11-11 13:46 UTC: Sergeant D answered Q-1813a with A (msg 1570072123983011951): both Greek strings stay as they are. Recorded by comms 92 as an entry.
 <!-- SECTION:NOTES:END -->

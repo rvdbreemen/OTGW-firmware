@@ -60,7 +60,8 @@ function page() {
   const body = ['pushLog', 'renderLog', 'renderLogCounts', 'setLogAutoScroll']
     .map((n) => (SRC.indexOf('function ' + n + '(') < 0 && OLD[n]) ? OLD[n] : extractFunction(SRC, n)).join('\n');
   const make = new Function('document', 'requestAnimationFrame',
-    'var LOG_MAX = 2000, LOG_SHOW = 2000, LOG_CAPTURE = 200000, logBuf = [], logRecvTimes = [];\n' +
+    'var LOG_MAX = 2000, LOG_SHOW = 2000, LOG_CAPTURE = 200000, logBuf = [], logBufDev = [], logRecvTimes = [];\n' +
+    'var devClockBase = 0, devClockAt = 0;\n' +
     'var logPaused = false, logSearch = "", logShowTs = true, logAutoScroll = true, logSatOnly = false;\n' +
     'var logStreamWriter = null, logStreamChunk = null, logRenderPending = false;\n' +
     'var SAT_LINE_RE = /^x/;\n' +

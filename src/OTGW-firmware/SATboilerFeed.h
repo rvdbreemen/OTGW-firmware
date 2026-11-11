@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATboilerFeed.h
-**  Version  : v2.0.0-beta.178
+**  Version  : v2.0.0-beta.179
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
