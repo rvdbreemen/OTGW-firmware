@@ -20,3 +20,12 @@ If Discord calls start failing with "Expected token to be set" or 401, the nativ
 2. When the build slot or memory does not allow a separate build, the next posted zip covers the tag; its post and `-m` line name every covered tag.
 3. The pushing session messages the coordinating 2.0.0 session with tag, commit, tasks and evidence. The coordinator posts the plain-language report in #alpha-testing (several tags may share one message) and keeps the ledger `.claude/alpha-build-ledger.local.md` in the main dev tree (gitignored).
 4. Before every post the coordinator compares the ledger with `git log -G"_VERSION_PRERELEASE" origin/dev -- src/OTGW-firmware/version.h`; any tag that is neither posted nor named as covered is published with the next zip.
+
+## Boiler and thermostat support questions
+
+Maintainer directive, 2026-11-11: every question about whether a boiler or thermostat works with the gateway, or which OpenTherm messages it supports, is checked against the OpenTherm Gateway equipment matrix first: https://otgw.tclcode.com/matrix.cgi (boilers under `#boilers`, thermostats under `#thermostats`). This applies on Discord, GitHub, Tweakers, in task notes and in capture analyses.
+
+- The matrix is maintained by Schelte Bron (PIC firmware author) from OTmonitor logs that gateway owners upload. Its rows are OpenTherm Data-IDs, its columns are boiler or thermostat models, and its symbols show which IDs that unit answered in the uploaded logs. Many crosses means weak OpenTherm support; a few crosses can also mean the logged thermostat simply never asked for those IDs.
+- It is best effort, not a guarantee. Cite it as "the equipment matrix shows ..." with the model name as listed, and say when the model is missing or only partly covered.
+- When the model is missing or has gaps, ask the user for a capture (and point them to the matrix page's own request to upload OTmonitor logs). Never claim support from the brand name alone.
+- A capture from the user's own system outranks the matrix for that system; report a conflict between the two instead of picking one.
