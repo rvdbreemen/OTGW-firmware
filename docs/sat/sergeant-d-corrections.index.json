@@ -4139,6 +4139,33 @@
     "TASK-1777"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 310,
+   "title": "Greek web UI: the two TASK-1813 strings are fine as they are (Q-1813a A) (Sergeant D, 2026-11-11; follows entry 309)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570072123983011951",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1813"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 311,
+   "title": "Sergeant D proposes removing the SAT target temperature field from the SAT tab Settings card (proposal, Robert decides) (Sergeant D, 2026-11-11)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570071794612707380",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1779",
+    "TASK-1814"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

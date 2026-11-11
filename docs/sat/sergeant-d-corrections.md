@@ -6623,3 +6623,33 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1777 (follow-up translation change).
 
 **Open:** nothing.
+
+## 310. Greek web UI: the two TASK-1813 strings are fine as they are (Q-1813a A) (Sergeant D, 2026-11-11; follows entry 309)
+
+**Source:** sergeantd, 2026-11-11 13:46:04 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1570072123983011951 (https://discord.com/channels/812969634638725140/1105556725714649128/1570072123983011951), a Discord reply to our question msg 1570071042880176200. Read first-hand by the comms session through the bot REST API.
+
+**Quoted:** "@BlueFlame Bot Q-1813a: A"
+
+**Settled (translation only, no SAT behaviour):** in i18n/el.json, h_mon.log_download_otmon "Καταγραφή OTmonitor" and h_mon.log_download_otmon_title "Λήψη των μηνυμάτων OT αυτής της καταγραφής στη μορφή καταγραφής του ίδιου του OTmonitor, ώστε το OTmonitor 6.6 να μπορεί να ανοίξει το αρχείο" stay as written by otgw-firmware-d3.
+
+**Checked against the recorded entries:** entries 292-295 and 309 (Greek terms): consistent (καταγραφή = log, μηνύματα = frames).
+
+**Task:** TASK-1813.
+
+**Open:** nothing.
+
+## 311. Sergeant D proposes removing the SAT target temperature field from the SAT tab Settings card (proposal, Robert decides) (Sergeant D, 2026-11-11)
+
+**Source:** sergeantd, 2026-11-11 13:44:46 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1570071794612707380 (https://discord.com/channels/812969634638725140/1105556725714649128/1570071794612707380), with a screenshot of the "Target temperature" field (21 C). Read first-hand by the comms session.
+
+**Quoted:** "In the sat tab -> Settings card we have the target temperature input field. It is not necessary to be there because the SAT climate entity already handles the room setpoint"
+
+**Settled:** nothing yet. The field is the setting sattargettemp (src/OTGW-firmware/data/v2.js:3950, label v2.js:1201). Web UI layout is Robert's decision, as with the Hot water card (TASK-1779).
+
+**Interpretation (ours, not asked):** "the SAT climate entity" is the Home Assistant climate entity that SAT publishes; users without Home Assistant set the target through the web UI home dial or REST, which is a point to check before removing the field.
+
+**Checked against the recorded entries:** no earlier entry covers where the target temperature is edited.
+
+**Task:** TASK-1814 (needs-maintainer-ok).
+
+**Open:** Robert's decision.
