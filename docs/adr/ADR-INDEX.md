@@ -234,3 +234,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-226 | Accepted | - | Add acorn (a JavaScript parser) and eslint-scope (scope analysis on its syntax tree) as pinned, test-only npm depende... |
 | ADR-228 | Accepted | `src/OTGW-firmware/SATcurveTune.h` | Each signal tick of the self-tune is assigned to the warm-up phase (\|PID error\| > 0.1 C) or the floating phase (\|PID... |
 | ADR-229 | Accepted | - | In OT-Direct gateway mode the relayed thermostat READDATA MsgID 0 gets bits 0, 1, 2, 4, 5 and 6 of its master status... |
+| ADR-230 | Proposed | - | Floating vote minimum (entries 313, 315). |

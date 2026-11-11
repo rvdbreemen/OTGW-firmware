@@ -11,6 +11,7 @@ supersedes: []
 superseded_by: null
 related:
   - "ADR-205"
+  - "ADR-230"
 topics:
   - "heating curve self-tune"
   - "phase split"
@@ -67,6 +68,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: "ADR-228 replaces ADR-205 decision 1 (signal) and decision 3 (decision rule) only, and its Must 'curve integral as the only signal'; the other ADR-205 decisions stay in force. Accepted by Robert van den Breemen, 2026-11-11, via the coordinator session ('Accept both')"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-12
+    status: Accepted
+    changed_by: "Agent: Claude"
+    reason: ADR-230 amends ADR-228 (Sergeant D entries 313, 315, 316)
     changed_via: adr-kit lifecycle
 ```
 
