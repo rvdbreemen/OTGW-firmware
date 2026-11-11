@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T12:59:00Z'
-updated_date: '2026-11-11T13:50:00Z'
+updated_date: '2026-11-11T14:25:00Z'
 labels:
   - webui
   - otmonitor
@@ -72,7 +72,7 @@ Related: TASK-1727 (manual: OTmonitor over TCP port 25238), TASK-1720 (USB seria
 - [x] #2 An automated test parses the exported file with OTmonitor's own reader logic: preferably the real fileanal and filedata procs from other-projects/otmonitor-6.6/otmonitor.vfs/otmonitor.tcl under tclsh (as in the harness named in the description), otherwise a faithful port that names its source lines. The test is red on the current downloadLog() output (no format found, 0 frames) and green on the new export (layout found, every frame read with its date)
 - [ ] #3 Manual check in OTmonitor 6.6: open the exported file (`otmonitor <file>` or the file connection); the graph and the message views show the data at the right times; screenshot as evidence
 - [x] #4 The user manual (EN and NL) describes the OTmonitor log download: what it holds (logBuf depth, Pause), how to open it in OTmonitor, and what to send along for an analysis
-- [ ] #5 The web UI test files touched (one file per run) and python evaluate.py --quick show no new FAIL; the download is checked on a bench unit
+- [x] #5 The web UI test files touched (one file per run) and python evaluate.py --quick show no new FAIL; the download is checked on a bench unit
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -116,4 +116,8 @@ foreach f [lrange $argv 1 end] {
 2026-11-11: the two Greek strings are put to Sergeant D as Q-1813a by comms 92 (#dev-sat-mqtt msg 1570071042880176200; A fine / B corrections, recommendation A). Apply his answer before Done.
 
 2026-11-11 13:46 UTC: Sergeant D answered Q-1813a with A (msg 1570072123983011951): both Greek strings stay as they are. Recorded by comms 92 as an entry.
+
+2026-11-11 rebuilt on origin/dev 64a5f3b88 after 09's beta.177/178 (bump files taken from origin, re-bumped): caf868c7c (beta.179). Build esp32-combo 2.0.0-beta.180+2b5c29a SUCCESS (covers 179 + 180); evaluate --quick 86/0. Bench .61 (OT-Direct): settings saved, OTA app+fs, 164 settings kept. Headless Chrome (CDP, scratchpad otmon_bench.mjs) opened http://192.168.88.61/, Monitor > Log, clicked the real 'OTmonitor log' and 'Download' buttons; the anchor click was intercepted so the blob was read instead of written to Downloads. No OT bus on .61, so the built-in frame replay ran (POST /api/v2/simulate/start, source builtin, 750 ms; no /otgw_simulation.log on the unit). After 120 s: 162 lines. otlog-20261111-152406.txt (162 lines, CRLF, e.g. '20261111-152204.044432 B40192519') through the real fileanal/filedata (tests/webui/lib/otmon_reader.tcl): LAYOUT {a15xa6xa* %Y%m%d-%H%M%S}, 162 of 162 frames read, 15:22:04 to 15:24:05 on 2026-11-11. The plain download of the same buffer: LAYOUT {}, 0 frames. With SAT on and no replay, only '< CS: 30.10' response lines arrived and the export was correctly empty. Screenshot of the toolbar with the button: scratchpad bench180/monitor-log-toolbar.png. Replay stopped, SAT back off, settings diff vs backup: 0.
+
+2026-11-11 pushed caf868c7c (beta.179) + 2b5c29a2c (beta.180) to origin/dev; zip 2.0.0-beta.180+2b5c29a posted (msg 1570081892999630898). Still open: AC3, the check in the real OTmonitor 6.6 GUI (needs otmonitor.exe; not runnable here), put to Robert via the coordinator.
 <!-- SECTION:NOTES:END -->
