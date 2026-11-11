@@ -810,7 +810,8 @@ class SourceChecks(unittest.TestCase):
     def test_signal_is_the_clamped_praw_minus_the_curve(self):
         self.assertRegex(self.src, r"float sigPid = pidRaw;")
         self.assertRegex(self.src, r"if \(sigPid < SAT_MIN_SETPOINT\) sigPid = SAT_MIN_SETPOINT;")
-        self.assertRegex(self.src, r"if \(sigPid > sysMax\) sigPid = sysMax;")
+        # entry 317 (TASK-1815): the effective ceiling; tests/test_sat_tune_signal_ceiling.py checks what fills it
+        self.assertRegex(self.src, r"if \(sigPid > maxSetpoint\) sigPid = maxSetpoint;")
         self.assertRegex(self.src, r"ti\.signal = sigPid - curveValue;")
 
     def test_tick_passes_every_exclusion_input(self):

@@ -5946,7 +5946,9 @@ static void satUpdateSimulation()
 // a phase without data in the window does not veto, the other decides alone (entry 305).
 // The tuner changes only settings.sat.fHeatingCurveCoeff; it never touches the PID terms (ADR-204).
 //
-// Signal variable (ADR-205 decision 1): signal = clamp(pidRaw, SAT_MIN_SETPOINT, satGetMaxSetpoint()) - curveValue,
+// Signal variable (ADR-205 decision 1): signal = clamp(pidRaw, SAT_MIN_SETPOINT, satEffectiveMaxSetpoint()) - curveValue,
+// the same ceiling SAT applies to the setpoint it sends (boiler MaxTSet MsgID 57 / SH=, user max, hard ceiling;
+// Sergeant D entry 317, TASK-1815): above the boiler's own maximum the curve can add no heat, so the tuner does not count it.
 // where pidRaw is curve + P + I + D straight from satPidOutput() (the SATTICK "praw" field). The SATTICK "pid" field
 // is NOT used: it is the requested setpoint after zones, the solar offset and the MaxTSet clamp, so it carries more
 // than what the PID adds on top of the curve. pidRaw is before the PWM override as well, because PWM acts on the
@@ -7364,7 +7366,6 @@ static void satControlLoopRun()
   // --- Clamp to valid range ---
   // Ceiling: MaxTSet, system/source cap, hard safety ceiling, global cap (satEffectiveMaxSetpoint).
   float maxSetpoint = satEffectiveMaxSetpoint();
-  float sysMax = satGetMaxSetpoint();
 
   // TASK-1521: narrate the edge into and out of the maximum clamp (the reason a CS stops rising)
   const bool atMax = (pidOutput > maxSetpoint);
@@ -7548,7 +7549,7 @@ static void satControlLoopRun()
                                          : (float)(OTcurrentSystemState.MaxCapacityMinModLevel & 0xFF);   // MsgID 15 low byte; 0 = never seen
     float sigPid = pidRaw;
     if (sigPid < SAT_MIN_SETPOINT) sigPid = SAT_MIN_SETPOINT;
-    if (sigPid > sysMax) sigPid = sysMax;
+    if (sigPid > maxSetpoint) sigPid = maxSetpoint;   // entry 317: the effective ceiling, not the SAT max alone
     ti.signal = sigPid - curveValue;
     satCurveTuneNoteTick(ti);
   }

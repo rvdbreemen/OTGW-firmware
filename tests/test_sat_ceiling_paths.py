@@ -178,7 +178,8 @@ class CeilingPaths(unittest.TestCase):
 
     def test_main_tick_clamps_every_mode_to_the_effective_ceiling_before_it_sends(self):
         s = self.src
-        a = s.index("float maxSetpoint = satEffectiveMaxSetpoint();\n  float sysMax = satGetMaxSetpoint();".replace("\n", "\r\n" if "\r\n" in s else "\n"))
+        # TASK-1815 dropped the sysMax line after this one (the tuner signal now uses maxSetpoint too)
+        a = s.index("// Ceiling: MaxTSet, system/source cap, hard safety ceiling, global cap (satEffectiveMaxSetpoint).\n  float maxSetpoint = satEffectiveMaxSetpoint();".replace("\n", "\r\n" if "\r\n" in s else "\n"))
         i_pid = s.index("if (pidOutput > maxSetpoint) pidOutput = maxSetpoint;", a)
         i_apply_pwm = s.index("finalSetpoint = satApplyPWM(pidOutput, true);", i_pid)       # ignition hold, PWM ON/OFF
         i_apply_cont = s.index("finalSetpoint = satApplyContinuous(pidOutput, _sat_lastControlCS);", i_pid)   # continuous and recovery after an exit

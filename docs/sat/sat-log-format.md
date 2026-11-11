@@ -31,7 +31,7 @@ Every line starts with the device time `HH:MM:SS.uuuuuu` and the usual debug pre
 
 Self-tune window file (`/sat_tune.json`, Sergeant D log entry 183): the counted days of the window (clean hours and signal sum per day) and the coefficient they belong to, written once a day at the daily decision (removed when the window is empty). It is restored once per boot only when its coefficient equals the current one; a manual coefficient change, switching the tuner off, or leaving simulation removes it. Simulation never reads or writes it. The partial counters of the current day are not kept. In simulation with short hours (`tune_hour`), set the control interval to 10 s so an hour still reaches 75 % of its expected ticks.
 
-Self-tune signal (TASK-1525): per control tick `clamp(praw, 10, system maximum) - curve`, where `praw` is the SATTICK field (curve + P + I + D before zones, solar offset and the MaxTSet clamp). The SATTICK `pid` field is not used. A hot-water tick is not a SATTICK line but is noted by the tuner as `dhw`.
+Self-tune signal (TASK-1525): per control tick `clamp(praw, 10, system maximum) - curve`, where the system maximum is the effective ceiling SAT applies to the setpoint it sends (`satEffectiveMaxSetpoint()`: the boiler MaxTSet MsgID 57 / SH=, the user max, the hard ceiling; Sergeant D entry 317, TASK-1815), and `praw` is the SATTICK field (curve + P + I + D before zones, solar offset and the MaxTSet clamp). The SATTICK `pid` field is not used. A hot-water tick is not a SATTICK line but is noted by the tuner as `dhw`.
 
 An adopted thermostat setpoint keeps its existing line `SAT: follow thermostat: target ...`.
 
