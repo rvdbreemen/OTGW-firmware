@@ -4061,6 +4061,19 @@
     "TASK-1796"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 304,
+   "title": "Self-tune lowering is mirrored (A); our reading: the phase split of Q-1787d is A as well (Sergeant D, 2026-11-11; answers Q-1787c, follows entry 303)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569963753720651867",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1796"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

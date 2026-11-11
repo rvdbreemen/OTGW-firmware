@@ -6537,3 +6537,19 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1796. Robert gave this work priority on 2026-11-11, aiming for a new build.
 
 **Open:** Q-1787c (lowering), Q-1787d (phase split and per-phase threshold), then a Proposed ADR superseding ADR-205 for the changed rule.
+
+## 304. Self-tune lowering is mirrored (A); our reading: the phase split of Q-1787d is A as well (Sergeant D, 2026-11-11; answers Q-1787c, follows entry 303)
+
+**Source:** sergeantd, 2026-11-11 06:35:27 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1569963753720651867 (https://discord.com/channels/812969634638725140/1105556725714649128/1569963753720651867), a Discord reply to our Q-1787c (msg 1569963485633323010). Our Q-1787d (msg 1569963676771942532) was posted 18 s before it. Read first-hand by the comms session. Our confirmation of the reading: msg 1569964436796739676.
+
+**Quoted:** "@BlueFlame Bot Yes mirrored. So the answer is A"
+
+**Settled:** Q-1787c, answer A. The coefficient is lowered only when both the warm-up phase and the floating phase say lower: the mirror of the raise rule of entry 303.
+
+**Interpretation (ours, posted for him to correct):** "So the answer is A" is a reply to Q-1787c, so it certainly answers that one. We also read it as A for Q-1787d, because it came right after Q-1787d and its option A matches the rule he described. Under that reading: per control tick the phase is floating when the room is within the 0.1 C deadband of thermo-nova (const.py:16 DEADBAND = 0.1, used in pid.py:187 and pid.py:205) and warm-up when it is outside. Each phase keeps its own mean of setpoint minus curve over the 3 counted days, with the ADR-205 rule per phase (above +1.0 C says higher, below -1.0 C says lower, step 0.1). The coefficient changes only when both phases agree, up or down. We said we start building this and asked him to say so if he meant otherwise (msg 1569964436796739676).
+
+**Checked against the recorded entries:** entry 303 (raise when both agree): completed by the mirror. ADR-205 decisions 1-3 and entries 163/164/171-175: the signal per phase and the +-1.0 C / 0.1 values stay; the split into phases and the agreement rule are new and need a Proposed ADR that supersedes ADR-205 for those parts. Entry 166 (1.6-2.4 band): untouched; Q-1787b still open.
+
+**Task:** TASK-1796 (implementation by otgw-firmware-d3, Robert's priority of 2026-11-11).
+
+**Open:** Q-1787d confirmed only by our reading until he reacts to msg 1569964436796739676; Q-1787b, Q-1771a, Q-1777g.
