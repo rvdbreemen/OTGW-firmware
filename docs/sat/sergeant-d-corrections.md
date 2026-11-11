@@ -6519,3 +6519,21 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1787 (origin, closed on this explanation, not log-proven); TASK-1796 (phase-based signal, waits for Q-1787a).
 
 **Open:** Q-1787a (how the two phases decide: A split clean hours into warm-up and floating and decide on the difference, our recommendation; B warm-up only; C other), then the thresholds.
+
+## 303. Self-tune: keep the 3-counted-day rule; raise the coefficient only when the warm-up phase and the floating phase both say higher (Sergeant D, 2026-11-11; answers Q-1787a, follows entry 302)
+
+**Source:** sergeantd, 2026-11-11 06:28:28 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1569961995187261481 (https://discord.com/channels/812969634638725140/1105556725714649128/1569961995187261481). Read first-hand by the comms session through the bot REST API. It follows our Q-1787a (msg 1569959952854945914, 06:20:21 UTC); our combined overview (msg 1569961879022084211, 06:28:19 UTC) was posted 9 s before it, so it answers Q-1787a, not the overview.
+
+**Quoted:** "@BlueFlame Bot it will also keep the 3 days monitoring rule, to make sure that the overdamping is real. So if the warm up phase monitoring decides that the coefficient should be higher and the floating phase needs higher coefficient we change to a higher value"
+
+**Settled:**
+- The phase-based self-tune of entry 302 keeps the window of 3 counted days (ADR-205 decision 3), so the overdamping must be real before a change.
+- Raise the coefficient when both the warm-up phase and the floating phase say it should be higher.
+
+**Interpretation (ours, confirmed only for raising):** an AND rule. Each phase is judged on its own; the coefficient changes only when both agree, otherwise it holds. Of our options this is closest to A (split the clean hours into warm-up and floating), but the decision is agreement of both phases, not their difference. He did not say how lowering works: asked as Q-1787c (msg 1569963485633323010, advice: mirrored, lower only when both say lower). How the phases are split and when a phase "says higher" is asked as Q-1787d (msg 1569963676771942532, advice: floating = room within the 0.1 C deadband of thermo-nova const.py:16 / pid.py:187, :205, warm-up outside it; per phase the ADR-205 mean of setpoint minus curve with +-1.0 C and a 0.1 step).
+
+**Checked against the recorded entries:** entry 302 (the proposal): this answers its open point Q-1787a. ADR-205 decision 3 and entries 164/172/173/175 (3-day window, decision rule): the window stays; the decision rule changes to per-phase agreement, which needs a new ADR superseding ADR-205 for the signal and decision. Entries 163/171 (signal): the per-phase signal is still setpoint minus curve if Q-1787d is answered A.
+
+**Task:** TASK-1796. Robert gave this work priority on 2026-11-11, aiming for a new build.
+
+**Open:** Q-1787c (lowering), Q-1787d (phase split and per-phase threshold), then a Proposed ADR superseding ADR-205 for the changed rule.

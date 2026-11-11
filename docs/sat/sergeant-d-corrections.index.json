@@ -4048,6 +4048,19 @@
     "TASK-1796"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 303,
+   "title": "Self-tune: keep the 3-counted-day rule; raise the coefficient only when the warm-up phase and the floating phase both say higher (Sergeant D, 2026-11-11; answers Q-1787a, follows entry 302)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569961995187261481",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1796"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
