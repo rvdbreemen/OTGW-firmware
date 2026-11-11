@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:21:00Z'
-updated_date: '2026-11-11T14:03:00Z'
+updated_date: '2026-11-11T19:41:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -54,6 +54,8 @@ Sergeant D 2026-11-11 06:18:39 UTC, #dev-sat-mqtt msg 1569959525715542148 (entry
 2026-11-11 pushed a736f2b44 to origin/dev (fast-forward from 2154cce46); zip posted by scripts/discord-post-build.sh, message 1570063472945922071. ADR-228 stays Proposed until Robert accepts it (coordinator puts it to him).
 
 2026-11-11 follow-up (found by the full run of scripts/run_tests.py, which I had not run before the beta.176 push): tests/test_sat_narrate_fits.py failed on the new narration line, worst case 134 > 127 with o/n bounded by their char[12] buffers. In practice the line never overflowed in beta.176: satTuneCoeffStr writes at most "5.00" for the 0.1..5.0 range, so the real worst case is 120. Fix: o and n become char[8] (bound 7, worst case 126), the test's width entry follows; test_sat_narrate_fits OK, test_sat_curve_selftune 74 OK. Ships in the next tag after beta.179.
+
+2026-11-11 field capture (gruijter, #alpha-testing msg 1570113823061577850 + csv 1570114673003729047; beta.171, coefficient 1.80, gas boiler, 10 Nov 21:18 to 11 Nov 17:26, 20.1 h, no reboot). Self-tune: 20 SATTUNEH hours, counted 0. First reasons: min_mod 11 (22:00-07:17 no heat demand, room above the 17.5 target; 07-08 and 09-10 min output), sun 5 (11:17-16:17), pwm 3, dhw 1, not_sat 1. No SATTUNED line (no day closed). Hour means: night -17.9 rising to -0.9 (praw below the curve), day +0.3 to +8.7 (praw 31-43 vs curve 29-32 at outside 3-6 C). Exclusion order in dev satTuneTickReason (SATcontrol.ino:5972) is the same as beta.171, so beta.176+ likely holds too in this house: the entry 174 low-load blind spot seen in the field. Boiler: MsgID 15 and 28 Unknown-DataID (minMod falls back to 5 %, no return temp); relmod with flame on 4654 samples, 721 at <=5 %, most 6-8 %; daytime PWM in 40-73 % of ticks, CH 37 runs 05:49-17:26, 29 of 2 min or more, daytime about 10 min on (ends on time) and 10 min off. Comfort: target 19.0 from 07:46, room 18.93 at 10:00; target 19.5 from 12:02, room 0.1-0.35 C below until about 17:00. Coredump in the upload is an old TWDT (loopTask + async_tcp CPU 1, app sha 661d01720), not from this window; no matching ELF here. Raw data local only: D:\Users\Robert\Documents\GitHub\RvdB\capture-gruijter-1111 (not committed).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
