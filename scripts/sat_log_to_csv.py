@@ -5,8 +5,9 @@ The firmware logs (telnet debug key '5', on by default):
   SATTICK room=.. target=.. out=.. curve=.. p=.. i=.. d=.. pid=.. cs=.. mm=.. ch=.. mode=.. pwm=.. duty=.. pon=.. poff=.. starts=.. flame=.. flow=.. ret=.. fc=.. fage=.. rc=.. rage=.. rsrc=..
   SATBOOT phase=decide|takeover ms=.. ...; SATMODE from= to=; SATTC push= | refused=; SATFOLLOW recorded=;
   SATDHW start|end (event column)
-  SATTUNEH hour= mean= ticks= counted= reason=; SATTUNED day= clean= counted= days_in_window= mean3= decision= reason=;
-  SATTUNER restored= coeff=; SATTUNE old= new= mean3=  (heating curve self-tune, TASK-1525)
+  SATTUNEH hour= mean= ticks= counted= reason= wmean= wticks= fmean= fticks=; SATTUNED day= clean= counted= days_in_window=
+  mean3= decision= reason= wmean3= wticks3= wsay= fmean3= fticks3= fsay=; SATTUNER restored= coeff=;
+  SATTUNE old= new= mean3= wmean3= fmean3=  (heating curve self-tune, TASK-1525; per-phase fields ADR-228, TASK-1796)
 Each line starts with the device time "HH:MM:SS.uuuuuu". Output: one CSV per record type, columns = "time" plus the
 keys in the order of their first appearance. A capture transcript (capture-otgw / capture-mqtt-debug) works as input.
 

@@ -17,6 +17,11 @@ no tuner, so setUpClass fails there (red).
 Not reachable from here: the two call sites in satControlLoopRun() (they need the whole control loop). Source-level checks at
 the end pin what they pass (signal = clamp(pidRaw) - curve, the hot-water hook); the bench run covers the rest.
 
+TASK-1796 (ADR-228): phase split and agreement rule. Ticks without an explicit err= alternate between a warm-up error
+(0.5 C) and a floating error (0.0 C), so every older scenario feeds both phases the same signal and keeps its old outcome;
+the PhaseSplit tests set err= themselves. The err= token exists only when the header defines SAT_CT_PHASE_SPLIT, so the
+pre-ADR-228 tuner (OTGW_SAT_INO + OTGW_SAT_HDR from HEAD) still compiles and fails on assertions, not on a build error.
+
 Run: python tests/test_sat_curve_selftune.py
 """
 import os
@@ -30,6 +35,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / "src" / "OTGW-firmware"
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", SRC / "SATcontrol.ino"))
+SAT_HDR = Path(os.environ.get("OTGW_SAT_HDR", SAT_INO.with_name("SATcurveTune.h")))   # old-vs-fix: both files from one commit
 
 STUBS = r"""
 #include <cstdint>
@@ -94,8 +100,12 @@ static SatTuneTickIn g_def() {
   t.relMod = 40.0f; t.minMod = 20.0f; t.signal = 1.5f;
   return t;
 }
+static int g_alt = 0;
 static void tick(const char* spec) {
   SatTuneTickIn t = g_def();
+#ifdef SAT_CT_PHASE_SPLIT
+  t.error = (g_alt++ & 1) ? 0.0f : 0.5f;   // default: alternate warm-up / floating (ADR-228), see the module docstring
+#endif
   char buf[256]; strncpy(buf, spec, sizeof(buf) - 1); buf[sizeof(buf) - 1] = 0;
   for (char* p = strtok(buf, ","); p; p = strtok(nullptr, ",")) {
     char* eq = strchr(p, '='); if (!eq) continue; *eq = 0; float v = (float)atof(eq + 1);
@@ -105,6 +115,9 @@ static void tick(const char* spec) {
     else if (!strcmp(p, "flame")) t.flameOn = v != 0; else if (!strcmp(p, "rm")) t.relMod = v;
     else if (!strcmp(p, "mm")) t.minMod = v; else if (!strcmp(p, "sig")) t.signal = v;
     else if (!strcmp(p, "room")) t.roomLost = v != 0;
+#ifdef SAT_CT_PHASE_SPLIT
+    else if (!strcmp(p, "err")) t.error = (float)atof(eq + 1);   // "nan" gives NaN
+#endif
   }
   satCurveTuneNoteTick(t);
 }
@@ -143,7 +156,7 @@ BLOCKS = (
 def extract(src: str) -> str:
     # constants and types live in SATcurveTune.h (Arduino prototype hoisting); a pre-header copy of SATcontrol.ino
     # (OTGW_SAT_INO, old-vs-fix runs) still carries them inline, so the header is only added when the source lacks them
-    hdr = SAT_INO.with_name("SATcurveTune.h")
+    hdr = SAT_HDR
     if "struct SatTune {" not in src and hdr.exists():
         src_hdr = hdr.read_text(encoding="utf-8").replace("#pragma once", "")
     elif "struct SatTune {" not in src:
@@ -291,7 +304,7 @@ class SatCurveSelfTune(unittest.TestCase):
         self.assertEqual([d["decision"] for d in o.days], ["hold", "hold", "raise"])
         self.assertEqual(o.days[2]["mean3"], "1.50")
         self.assertEqual(o.days[2]["days_in_window"], "3")
-        self.assertEqual(o.days[2]["reason"], "outside_band")
+        self.assertEqual(o.days[2]["reason"], "phases_agree")
 
     def test_too_high_curve_lowers_by_exactly_one_tenth(self):
         o = self.run_tokens(day(-1.5) * 3)
@@ -455,14 +468,17 @@ class SatCurveSelfTune(unittest.TestCase):
     # --- AC6: records -----------------------------------------------------------------------------------------------
     def test_record_formats(self):
         o = self.run_tokens(day(1.5) * 3)
-        self.assertRegex(o.log[0], r"^SATTUNEH hour=0 mean=1\.50 ticks=4 counted=1 reason=none$")
+        self.assertRegex(o.log[0], r"^SATTUNEH hour=0 mean=1\.50 ticks=4 counted=1 reason=none "
+                                   r"wmean=1\.50 wticks=2 fmean=1\.50 fticks=2$")
         daily = [l for l in o.log if l.startswith("SATTUNED ")]
-        self.assertRegex(daily[0], r"^SATTUNED day=0 clean=24 counted=1 days_in_window=1 mean3=na decision=hold reason=few_days$")
-        self.assertRegex(daily[2], r"^SATTUNED day=2 clean=24 counted=1 days_in_window=3 mean3=1\.50 decision=raise reason=outside_band$")
-        self.assertEqual(o.changes, ["SATTUNE old=2.0 new=2.1 mean3=1.50"])
-        self.assertEqual(o.narr, ["NARR Heating curve self-tune: coefficient 2.0 -> 2.1 (3-day mean +1.50 C above the curve)"])
+        self.assertRegex(daily[0], r"^SATTUNED day=0 clean=24 counted=1 days_in_window=1 mean3=na decision=hold reason=few_days "
+                                   r"wmean3=na wticks3=0 wsay=hold fmean3=na fticks3=0 fsay=hold$")
+        self.assertRegex(daily[2], r"^SATTUNED day=2 clean=24 counted=1 days_in_window=3 mean3=1\.50 decision=raise reason=phases_agree "
+                                   r"wmean3=1\.50 wticks3=144 wsay=higher fmean3=1\.50 fticks3=144 fsay=higher$")
+        self.assertEqual(o.changes, ["SATTUNE old=2.0 new=2.1 mean3=1.50 wmean3=1.50 fmean3=1.50"])
+        self.assertEqual(o.narr, ["NARR Heating curve self-tune: coefficient 2.0 -> 2.1 (3-day warm-up +1.50 C and floating +1.50 C, both above the curve)"])
         o = self.run_tokens(day(-1.5) * 3)
-        self.assertEqual(o.narr, ["NARR Heating curve self-tune: coefficient 2.0 -> 1.9 (3-day mean -1.50 C below the curve)"])
+        self.assertEqual(o.narr, ["NARR Heating curve self-tune: coefficient 2.0 -> 1.9 (3-day warm-up -1.50 C and floating -1.50 C, both below the curve)"])
 
     def test_hour_record_of_an_excluded_hour_keeps_its_mean(self):
         o = self.run_tokens([tk(sig=2.0), tk(sig=4.0, pwm=1), f"A:{HOUR}"])
@@ -503,7 +519,7 @@ class SatCurveSelfTune(unittest.TestCase):
         f = Path(self.tmp.name) / "daily.json"
         o = self.run_tokens(day(1.5) + [tk(sig=1.5), f"A:{HOUR}"] * 10, file=f)
         self.assertEqual(o.fw, 1, "ten ordinary hours after the day write nothing")
-        self.assertRegex(f.read_text(), r'^\{"coeff":2\.00,"n":1,"c0":24,"s0":36\.000\}$')
+        self.assertRegex(f.read_text(), r'^\{"v":2,"coeff":2\.00,"n":1,"c0":24,"s0":36\.000,"w0":48,"x0":72\.000,"f0":48,"y0":72\.000\}$')
 
     def test_window_is_restored_after_a_reboot(self):
         f = Path(self.tmp.name) / "x.json"
@@ -571,7 +587,8 @@ class SatCurveSelfTune(unittest.TestCase):
     def test_gas_and_hybrid_records_unchanged(self):
         for src in ("src:1", "src:3"):
             o = self.run_tokens([src, tk(sig=2.0), tk(sig=4.0, pwm=1), f"A:{HOUR}"])
-            self.assertRegex(o.log[0], r"^SATTUNEH hour=0 mean=3\.00 ticks=2 counted=0 reason=pwm$", src)
+            self.assertRegex(o.log[0], r"^SATTUNEH hour=0 mean=3\.00 ticks=2 counted=0 reason=pwm "
+                                       r"wmean=2\.00 wticks=1 fmean=4\.00 fticks=1$", src)   # no pwm= field (ADR-228 adds the phases)
 
     def test_heat_pump_logging_does_not_change_the_decision(self):
         toks = day(1.5) * 3 + [tk(sig=2.0, pwm=1), f"A:{HOUR}"] + day(1.5) * 3
@@ -613,6 +630,135 @@ class SatCurveSelfTune(unittest.TestCase):
         self.assertEqual(len(o.days), 4)
         self.assertEqual(len(o.changes), 1)
         self.assertEqual(o.coeff, 2.1)
+
+
+def phase_day(warm_sig, float_sig, warm_n=2, float_n=2, clean=24):
+    """A day of `clean` clean hours, each with warm_n warm-up ticks (err 0.5) and float_n floating ticks (err 0.0)."""
+    toks = []
+    for h in range(24):
+        if h < clean:
+            toks += [tk(sig=warm_sig, err=0.5)] * warm_n + [tk(sig=float_sig, err=0.0)] * float_n + [f"A:{HOUR}"]
+        else:
+            toks += [tk(sig=warm_sig, err=0.5, dhw=1), f"A:{HOUR}"]
+    return toks
+
+
+class PhaseSplit(unittest.TestCase):
+    """TASK-1796 / ADR-228: per-tick phase, per-phase window mean, change only when both phases agree (entries 303, 304)."""
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.exe = build(Path(cls.tmp.name))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    setUp = SatCurveSelfTune.setUp
+    run_tokens = SatCurveSelfTune.run_tokens
+
+    def test_warmup_high_floating_inside_holds(self):
+        # The defining case: 3 warm-up ticks at +2.4 and 1 floating tick at 0.0 per hour. The ADR-205 tuner sees +1.8 and
+        # raises; under ADR-228 the warm-up phase says higher, the floating phase inside the band: hold.
+        o = self.run_tokens(phase_day(2.4, 0.0, warm_n=3, float_n=1) * 3)
+        self.assertEqual((o.coeff, o.writes, o.changes), (2.0, 0, []))
+        d = o.days[2]
+        self.assertEqual((d["decision"], d["reason"], d["wsay"], d["fsay"]), ("hold", "phases_disagree", "higher", "hold"))
+        self.assertEqual((d["mean3"], d["wmean3"], d["fmean3"]), ("1.80", "2.40", "0.00"))
+
+    def test_both_phases_higher_raise(self):
+        o = self.run_tokens(phase_day(2.5, 1.2) * 3)
+        self.assertEqual((o.coeff, o.writes), (2.1, 1))
+        self.assertEqual((o.days[2]["wsay"], o.days[2]["fsay"], o.days[2]["reason"]), ("higher", "higher", "phases_agree"))
+
+    def test_both_phases_lower_lower(self):
+        o = self.run_tokens(phase_day(-1.2, -2.5) * 3)
+        self.assertEqual((o.coeff, o.writes), (1.9, 1))
+        self.assertEqual(o.days[2]["decision"], "lower")
+
+    def test_opposite_phases_hold(self):
+        o = self.run_tokens(phase_day(2.0, -2.0) * 3)
+        self.assertEqual((o.coeff, o.writes), (2.0, 0))
+        self.assertEqual((o.days[2]["reason"], o.days[2]["wsay"], o.days[2]["fsay"]), ("phases_disagree", "higher", "lower"))
+
+    def test_both_inside_hold(self):
+        o = self.run_tokens(phase_day(0.9, -0.9) * 3)
+        self.assertEqual((o.coeff, o.days[2]["reason"]), (2.0, "inside_band"))
+
+    def test_a_phase_without_ticks_lets_the_other_decide(self):
+        # Q-1787e B (Sergeant D): a too-low curve never reaches the deadband; the warm-up phase decides alone
+        o = self.run_tokens(phase_day(3.0, 0.0, warm_n=4, float_n=0) * 3)
+        self.assertEqual((o.coeff, o.days[2]["decision"], o.days[2]["reason"], o.days[2]["fticks3"], o.days[2]["fmean3"]),
+                         (2.1, "raise", "phases_agree", "0", "na"))
+        o = self.run_tokens(phase_day(0.0, -3.0, warm_n=0, float_n=4) * 3)
+        self.assertEqual((o.coeff, o.days[2]["decision"], o.days[2]["wticks3"]), (1.9, "lower", "0"))
+        o = self.run_tokens(phase_day(0.5, 0.0, warm_n=4, float_n=0) * 3)
+        self.assertEqual((o.coeff, o.days[2]["reason"]), (2.0, "inside_band"), "the lone phase inside the band holds")
+
+    def test_no_phase_data_at_all_holds(self):
+        toks = []
+        for _ in range(3):
+            for h in range(24): toks += [tk(sig=3.0, err="nan")] * 2 + [f"A:{HOUR}"]
+        o = self.run_tokens(toks)
+        self.assertEqual((o.coeff, o.days[2]["reason"]), (2.0, "no_phases"))
+
+    def test_window_mean_is_tick_weighted(self):
+        # warm-up: day 1 has 1 tick/hour at +4.0, days 2-3 have 3 ticks/hour at 0.0: tick-weighted (24*4)/(24*7) = 0.57 (hold);
+        # an hour-weighted mean of the hour means would be (24*4)/(72) = 1.33 (higher).
+        o = self.run_tokens(phase_day(4.0, 2.0, warm_n=1) + phase_day(0.0, 2.0, warm_n=3) * 2)
+        self.assertEqual((o.days[2]["wmean3"], o.days[2]["wsay"], o.coeff), ("0.57", "hold", 2.0))
+
+    def test_deadband_boundary(self):
+        # |error| <= 0.1 is floating (pid.py:205), above it warm-up (pid.py:187); both signs; NaN has no phase
+        for err, phase in (("0.1", "f"), ("-0.1", "f"), ("0.1001", "w"), ("-0.1001", "w"), ("2.0", "w"), ("-3.0", "w")):
+            with self.subTest(err=err):
+                o = self.run_tokens([tk(sig=1.0, err=err), f"A:{HOUR}"])
+                self.assertEqual((o.hours[0]["wticks"], o.hours[0]["fticks"]), ("1", "0") if phase == "w" else ("0", "1"))
+        o = self.run_tokens([tk(sig=1.0, err="nan"), f"A:{HOUR}"])
+        self.assertEqual((o.hours[0]["ticks"], o.hours[0]["wticks"], o.hours[0]["fticks"], o.hours[0]["mean"]), ("1", "0", "0", "1.00"))
+
+    def test_excluded_hours_never_reach_a_phase(self):
+        bad = []
+        for h in range(24):
+            bad += [tk(sig=0.0, err=0.5), tk(sig=0.0, err=0.0), tk(sig=9.0, err=0.0, pwm=1), f"A:{HOUR}"]
+        o = self.run_tokens(phase_day(2.0, 2.0, clean=6) + bad + phase_day(2.0, 2.0, clean=6) + phase_day(2.0, 2.0, clean=6))
+        self.assertEqual((o.days[3]["wmean3"], o.days[3]["fmean3"]), ("2.00", "2.00"))
+
+    def test_hot_water_tick_has_no_phase(self):
+        o = self.run_tokens([tk(sig=5.0, err=0.0, dhw=1), tk(sig=1.0, err=0.0), f"A:{HOUR}"])
+        self.assertEqual((o.hours[0]["fticks"], o.hours[0]["fmean"]), ("1", "1.00"))
+
+    def test_manual_change_clears_the_phase_day_counters(self):
+        # 12 clean hours with a high warm-up, then a manual change, then 12 hours with both phases at +2: the day's phase
+        # sums hold only the 12 hours after the change (wmean 2.00, not the 6.00 mix)
+        first = phase_day(10.0, 2.0)[: 12 * 5]
+        rest = phase_day(2.0, 2.0)[: 12 * 5]
+        o = self.run_tokens(first + ["M:2.5", "S"] + rest + phase_day(2.0, 2.0) * 2)
+        self.assertEqual(o.days[0]["clean"], "11", "the hour of the change does not count")
+        self.assertEqual((o.days[2]["wmean3"], o.days[2]["decision"]), ("2.00", "raise"))
+
+    def test_version_1_window_file_is_dropped(self):
+        f = Path(self.tmp.name) / "v1.json"
+        f.write_text('{"coeff":2.00,"n":2,"c0":24,"s0":36.000,"c1":24,"s1":36.000}')
+        o = self.run_tokens(phase_day(2.0, 2.0), file=f)
+        self.assertTrue(any(l.startswith("SATTUNER restored=0") for l in o.log))
+        self.assertEqual((o.days[0]["days_in_window"], o.coeff), ("1", 2.0))
+
+    def test_window_file_round_trip_at_the_limits(self):
+        # 2 counted days of 3600 ticks an hour (a 1 s control interval) with large signals: the file must stay complete
+        f = Path(self.tmp.name) / "big.json"
+        toks = []
+        for d in range(2):
+            for h in range(24):
+                toks += [tk(sig=-49.5, err=3.0)] * 1800 + [tk(sig=49.5, err=0.0)] * 1800 + [f"A:{HOUR}"]
+        self.run_tokens(toks, file=f)
+        text = f.read_text()
+        self.assertTrue(text.endswith("}"), text)
+        self.assertRegex(text, r'"n":2,.*"w1":43200,"x1":-2138400\.000,"f1":43200,"y1":2138400\.000\}$')
+        o = self.run_tokens(phase_day(-49.5, 49.5), file=f)   # a reboot, then one more counted day
+        self.assertTrue(any(l.startswith("SATTUNER restored=2") for l in o.log))
+        self.assertEqual(o.days[0]["days_in_window"], "3")
+        self.assertEqual((o.days[0]["wsay"], o.days[0]["fsay"], o.days[0]["reason"]), ("lower", "higher", "phases_disagree"))
 
 
 class ExclusionMutation(unittest.TestCase):
@@ -679,6 +825,13 @@ class SourceChecks(unittest.TestCase):
         self.assertIsNotNone(m)
         self.assertIn("ti.dhw = true;", m.group(1))
         self.assertIn("satCurveTuneNoteTick(ti);", m.group(1))
+
+    def test_phase_error_is_the_held_pid_error(self):
+        # ADR-228: the phase uses the error the PID deadband acts on (state.sat.fError = target - room, set by satPidStep),
+        # NaN without a room temperature; the hot-water tick carries no phase
+        self.assertRegex(self.src, r"ti\.error = roomValid \? state\.sat\.fError : NAN;")
+        self.assertRegex(self.src, r"ti\.satActive = true; ti\.dhw = true; ti\.error = NAN;")
+        self.assertRegex(self.src, r"#define SAT_CT_PHASE_BAND_C\s+0\.1f")
 
     def test_service_runs_before_every_early_return(self):
         m = re.search(r"static void satControlLoopRun\(\)\s*\{\s*\n\s*satApplyControlStateReset\(\);[^\n]*\n\s*satCurveTuneService\(millis\(\)\);", self.src)

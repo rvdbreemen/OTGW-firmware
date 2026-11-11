@@ -3,10 +3,11 @@ id: TASK-1796
 title: >-
   SAT self-tune: phase-based signal (warm-up vs floating), Sergeant D proposal
   (Q-1787a)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-11T06:21:00Z'
-updated_date: '2026-11-11T08:05:00Z'
+updated_date: '2026-11-11T08:08:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -40,4 +41,9 @@ Sergeant D 2026-11-11 06:18:39 UTC, #dev-sat-mqtt msg 1569959525715542148 (entry
 2026-11-11 07:04-07:19 UTC: Q-1787e (one phase without data; advice B) and Q-1787f (overshoot counts as warm-up; advice A) asked; round 12 simulation posted (msg 1569974584600690750). Sergeant D asked for one question per message for tracking; all open questions re-posted separately (msgs 1569974667819618396 to 1569974694289870849).
 
 2026-11-11: entries 305 (Q-1787e B, the phase with data decides alone), 306 (Q-1787f A, both sides of the deadband), 307 (Q-1787b A, the current tuner stays on). Entry numbers claimed by comms after checking that every tree ended at 304 (coordinator informed).
+2026-11-11 d3 (wt-selftune, lane-selftune): implemented ADR-228 (Proposed, number reserved by the coordinator). Per-tick phase on state.sat.fError (|err|>0.1 warm-up, <=0.1 floating; thermo-nova const.py:16, pid.py:187/205 opened this session), per-phase tick-weighted 3-day means, change only when both phases say the same; hold reasons inside_band / phases_disagree / no_warmup / no_floating; window file v2 (v1 dropped); SATTUNEH/SATTUNED per-phase fields; docs/sat/sat-log-format.md updated. Host test tests/test_sat_curve_selftune.py: 73 OK on the lane; on origin/dev f64aba399 code (OTGW_SAT_INO + OTGW_SAT_HDR) FAILED failures=8 errors=14, core case warm-up +2.4 / floating 0.0: old raises 2.0->2.1 (mean3=1.80), new holds phases_disagree. evaluate.py --quick: 85 passed, 0 failed. test_adr_governance 17 passed. Finding: research-model smoke (round 12) house 4_1992-2012 heavy gas start 1.2: ADR-205 rule raises 4x to 1.6, rule P holds 63 days no_floating (a too-low curve never reaches the deadband). Asked Sergeant D as Q-1787e (B: the phase with data decides alone) and Q-1787f (overshoot counts as warm-up) by comms 92, msg 1569970979948601356. Full round 12 running.
+
+2026-11-11 round 12 done (research model, tools/research/sat/sat_curve_selftune_study12.py, data docs/sat/sim-1519/data/round12_runs.json, 1200 runs). Out-band min/day 2025-26 / 2010-11: none 146/210, A (ADR-205) 100/124, P (built, phase without data holds) 114/168, Q (phase without data does not veto) 100/125; changes per winter A 2.2/4.0, P 1.3/1.9, Q 2.1/3.0. Low starts 1.0/1.2 never corrected: A 20/60 18/60, P 38/60 37/60, Q 20/60 18/60. Example 4_1992-2012 heavy gas 2010-11: A and Q 1.0->1.8 (39 min/d), P stays 1.0 (129 min/d, no_floating 368x). Sent to comms 92 for the Q-1787e follow-up; recommendation B (= Q).
+
+2026-11-11 Sergeant D answers recorded by comms 92 as entries 305 (Q-1787e B: phase with data decides alone), 306 (Q-1787f A: overshoot is warm-up), 307 (Q-1787b A: ADR-205 tuner stays on until this ships), wt-comms 119d9f206. Built B: SAT_CT_MISSING_PHASE_VETO 0, reason no_phases when no phase data. Tests 74 OK; previous lane commit (A for e) fails the two new PhaseSplit tests (holds no_floating where B raises 2.0->2.1); origin/dev tuner failures=9 errors=14. ADR-228 cites entries 303-307; adr-lint 0 FAIL; test_adr_governance 17 passed.
 <!-- SECTION:NOTES:END -->

@@ -8871,6 +8871,76 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-228",
+      "title": "SAT heating curve self-tune splits the signal into warm-up and floating phases and changes the coefficient only when both agree",
+      "path": "ADR-228-sat-heating-curve-self-tune-splits-the-signal-into-warm-up-and-floating-phases-and-changes-the-coefficient-only-when-both-agree.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-11",
+      "decision_summary": "Each signal tick of the self-tune is assigned to the warm-up phase (|PID error| > 0.1 C) or the floating phase (|PID...",
+      "topics": [
+        "deadband",
+        "floating phase",
+        "heating curve self-tune",
+        "phase agreement",
+        "phase split",
+        "warm-up phase"
+      ],
+      "aliases": [
+        "autotune",
+        "curve tuner",
+        "phase-based self-tune",
+        "self-tune"
+      ],
+      "components": [
+        "SAT heating curve self-tune decision rule"
+      ],
+      "symbols": [
+        "fHeatingCurveCoeff",
+        "SAT_CT_PHASE_BAND_C",
+        "satTuneCloseDay",
+        "satTunePhaseSay",
+        "satTuneTickPhase"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Classify each signal tick of a clean hour as warm-up (|error| > SATCTPHASEBANDC) or floating (|error| <= it), on the held PID error; a tick without a room temperature or with hot water has no phase.",
+          "Decide on per-phase tick-weighted means over the last 3 counted days, each with the symmetric +-1.0 C threshold.",
+          "Change the coefficient only when both phases say the same direction, by 0.1, clamped to 0.1-5.0, at most once a day; a phase without data in the window does not veto (the phase with data decides alone).",
+          "Keep every other ADR-205 decision (clean hour, PID untouched, persistence, setting, logging).",
+          "Log the per-phase means, tick counts and verdicts in the hourly and daily records.",
+          "Drop a window file without \"v\":2."
+        ],
+        "must_not": [
+          "Change the coefficient on one phase alone while the other phase has data and does not say the same direction.",
+          "Use the overall mean (mean3) for the decision.",
+          "Mix ticks of excluded hours, hot-water ticks or room-lost ticks into a phase."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "python tests/testsatcurveselftune.py: compiles the real satCurveTune blocks of SATcontrol.ino with SATcurveTune.h. Class PhaseSplit: raise on +/+, lower on -/-, hold on +/- and on +/0 (warm-up +2.4, floating 0.0: the ADR-205 tuner raises...",
+          "python tools/research/sat/satcurveselftunestudy12.py: study evidence from the research model (not a firmware test), rule P (this ADR) against ADR-205 and no tuner per house type and heat source.",
+          "A bench run with SAT simulation that shows the per-phase hourly and daily records."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/SATcurveTune.h"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": "tests/test_sat_curve_selftune.py",
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -15315,6 +15385,36 @@
     {
       "source": "ADR-226",
       "target": "ADR-192",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-228",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-228",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-228",
+      "target": "ADR-198",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-228",
+      "target": "ADR-204",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-228",
+      "target": "ADR-205",
       "type": "related",
       "resolved": true
     }

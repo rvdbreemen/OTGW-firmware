@@ -5932,6 +5932,10 @@ static void satUpdateSimulation()
 //=== Heating curve self-tune (TASK-1525, ADR-205) ===
 //=====================================================================
 // Hourly evaluation, daily decision on the curve integral. Design: ADR-205, Sergeant D entries 160-180.
+// Phase split and agreement rule (TASK-1796): ADR-228, entries 302-306. Each signal tick of a clean hour goes to the warm-up
+// phase (|error| > SAT_CT_PHASE_BAND_C) or the floating phase (|error| <= it); each phase has its own tick-weighted mean
+// over the 3 counted days with the ADR-205 +-1.0 C rule, and the coefficient moves only when both phases say the same way;
+// a phase without data in the window does not veto, the other decides alone (entry 305).
 // The tuner changes only settings.sat.fHeatingCurveCoeff; it never touches the PID terms (ADR-204).
 //
 // Signal variable (ADR-205 decision 1): signal = clamp(pidRaw, SAT_MIN_SETPOINT, satGetMaxSetpoint()) - curveValue,
@@ -5979,16 +5983,39 @@ static uint8_t satTuneTickReason(const SatTuneTickIn& in)
   return SATT_NONE;
 }
 
+// ADR-228 phase of one tick: floating inside the deadband (thermo-nova pid.py:205 `<= DEADBAND`), warm-up outside it
+// (pid.py:187 `> DEADBAND`). Returns SATP_COUNT when the tick has no phase (no room temperature: error NaN).
+static uint8_t satTuneTickPhase(float error)
+{
+  if (!isfinite(error)) return SATP_COUNT;
+  return (fabsf(error) <= SAT_CT_PHASE_BAND_C) ? SATP_FLOATING : SATP_WARMUP;
+}
+
+static void satTuneClearDay(SatTune& t)
+{
+  t.hoursInDay = 0; t.cleanInDay = 0; t.cleanSumInDay = 0.0f;
+  for (uint8_t p = 0; p < SATP_COUNT; p++) { t.phTicksInDay[p] = 0; t.phSumInDay[p] = 0.0f; }
+}
+
+static void satTuneClearHour(SatTune& t)
+{
+  t.ticks = 0; t.sigTicks = 0; t.sigSum = 0.0f; t.reason = SATT_NONE; t.coeffChanged = false; t.pwmTicks = 0;
+  for (uint8_t p = 0; p < SATP_COUNT; p++) { t.phTicks[p] = 0; t.phSum[p] = 0.0f; }
+}
+
 static void satTuneEmptyWindow(SatTune& t)
 {
   t.winDays = 0;
-  for (uint8_t i = 0; i < SAT_CT_WINDOW_DAYS; i++) { t.winClean[i] = 0; t.winSum[i] = 0.0f; }
+  for (uint8_t i = 0; i < SAT_CT_WINDOW_DAYS; i++) {
+    t.winClean[i] = 0; t.winSum[i] = 0.0f;
+    for (uint8_t p = 0; p < SATP_COUNT; p++) { t.winPhTicks[i][p] = 0; t.winPhSum[i][p] = 0.0f; }
+  }
 }
 
 static void satTuneReset(SatTune& t)
 {
-  t.ticks = 0; t.sigTicks = 0; t.sigSum = 0.0f; t.reason = SATT_NONE; t.coeffChanged = false; t.pwmTicks = 0;
-  t.hoursInDay = 0; t.cleanInDay = 0; t.cleanSumInDay = 0.0f;
+  satTuneClearHour(t);
+  satTuneClearDay(t);
   satTuneEmptyWindow(t);
   t.hourNo = 0; t.dayNo = 0;
 }
@@ -6007,7 +6034,11 @@ static void satTuneAddTick(SatTune& t, const SatTuneTickIn& in)
   if (in.pwm) t.pwmTicks++;   // TASK-1551: logged for heat pumps, the tuner still excludes the hour (reason pwm)
   const uint8_t r = satTuneTickReason(in);
   if (r != SATT_NONE) satTuneMarkReason(t, r);
-  if (in.satActive && !in.dhw && isfinite(in.signal)) { t.sigSum += in.signal; t.sigTicks++; }
+  if (in.satActive && !in.dhw && isfinite(in.signal)) {
+    t.sigSum += in.signal; t.sigTicks++;
+    const uint8_t ph = satTuneTickPhase(in.error);   // inside the signal block: a hot-water tick never reaches a phase
+    if (ph < SATP_COUNT) { t.phSum[ph] += in.signal; t.phTicks[ph]++; }
+  }
 }
 
 // A coefficient change: the current hour does not count. A manual change also empties the window and the clean-hour counters of
@@ -6016,7 +6047,10 @@ static void satTuneAddTick(SatTune& t, const SatTuneTickIn& in)
 static void satTuneNoteCoeffChange(SatTune& t, bool manual)
 {
   t.coeffChanged = true;
-  if (manual) { satTuneEmptyWindow(t); t.cleanInDay = 0; t.cleanSumInDay = 0.0f; }   // the day so far was on the old coefficient too
+  if (manual) {   // the day so far was on the old coefficient too
+    satTuneEmptyWindow(t); t.cleanInDay = 0; t.cleanSumInDay = 0.0f;
+    for (uint8_t p = 0; p < SATP_COUNT; p++) { t.phTicksInDay[p] = 0; t.phSumInDay[p] = 0.0f; }
+  }
 }
 
 // Close the current hour and start the next. An hour counts with at least one tick that carried a signal and no exclusion.
@@ -6034,11 +6068,19 @@ static void satTuneCloseHour(SatTune& t, SatTuneHourOut& out, uint32_t minTicks)
   out.reason   = t.reason;
   if (t.reason == SATT_NONE && !out.haveMean) out.reason = SATT_NO_TICKS;
   out.counted  = (out.reason == SATT_NONE);
-  if (out.counted) { t.cleanInDay++; t.cleanSumInDay += out.mean; }
+  for (uint8_t p = 0; p < SATP_COUNT; p++) {
+    out.phTicks[p]    = t.phTicks[p];
+    out.phHaveMean[p] = (t.phTicks[p] > 0);
+    out.phMean[p]     = out.phHaveMean[p] ? t.phSum[p] / (float)t.phTicks[p] : 0.0f;
+  }
+  if (out.counted) {
+    t.cleanInDay++; t.cleanSumInDay += out.mean;
+    for (uint8_t p = 0; p < SATP_COUNT; p++) { t.phTicksInDay[p] += t.phTicks[p]; t.phSumInDay[p] += t.phSum[p]; }
+  }
   t.hoursInDay++;
   t.hourNo++;
   out.dayComplete = (t.hoursInDay >= SAT_CT_HOURS_PER_DAY);
-  t.ticks = 0; t.sigTicks = 0; t.sigSum = 0.0f; t.reason = SATT_NONE; t.coeffChanged = false; t.pwmTicks = 0;
+  satTuneClearHour(t);
 }
 
 static float satTuneClampCoeff(float c)
@@ -6048,9 +6090,19 @@ static float satTuneClampCoeff(float c)
   return c;
 }
 
-// Close the day and decide. The mean is hour-weighted: the sum of all clean-hour means of the counted days in the window
-// divided by their number of clean hours. The decision runs once a day, on a counted day, when the window holds
-// SAT_CT_WINDOW_DAYS counted days. A change empties the window (3 new counted days are needed).
+// ADR-228 verdict of one phase on its window mean: +1 says higher (above +SAT_CT_BAND_C), -1 says lower, 0 inside the band.
+static int8_t satTunePhaseSay(bool haveMean, float mean)
+{
+  if (!haveMean) return 0;
+  if (mean > SAT_CT_BAND_C)  return 1;
+  if (mean < -SAT_CT_BAND_C) return -1;
+  return 0;
+}
+
+// Close the day and decide. The decision runs once a day, on a counted day, when the window holds SAT_CT_WINDOW_DAYS counted
+// days. ADR-228: each phase has a tick-weighted mean (its signal sum over the counted days divided by its signal ticks) and a
+// verdict; the coefficient moves 0.1 only when both phases say the same direction, otherwise it holds. mean3 is the ADR-205
+// hour-weighted mean of all clean hours, still logged for comparison. A change empties the window (3 new counted days).
 static void satTuneCloseDay(SatTune& t, float coeff, SatTuneDayOut& out)
 {
   out.day = t.dayNo;
@@ -6060,14 +6112,19 @@ static void satTuneCloseDay(SatTune& t, float coeff, SatTuneDayOut& out)
   out.newCoeff = coeff;
   out.haveMean3 = false;
   out.mean3 = 0.0f;
+  for (uint8_t p = 0; p < SATP_COUNT; p++) { out.phTicks3[p] = 0; out.phHaveMean3[p] = false; out.phMean3[p] = 0.0f; out.phSay[p] = 0; }
   out.reason = PSTR("day_not_counted");
   if (out.counted) {
     if (t.winDays >= SAT_CT_WINDOW_DAYS) {   // drop the oldest
-      for (uint8_t i = 1; i < SAT_CT_WINDOW_DAYS; i++) { t.winClean[i - 1] = t.winClean[i]; t.winSum[i - 1] = t.winSum[i]; }
+      for (uint8_t i = 1; i < SAT_CT_WINDOW_DAYS; i++) {
+        t.winClean[i - 1] = t.winClean[i]; t.winSum[i - 1] = t.winSum[i];
+        for (uint8_t p = 0; p < SATP_COUNT; p++) { t.winPhTicks[i - 1][p] = t.winPhTicks[i][p]; t.winPhSum[i - 1][p] = t.winPhSum[i][p]; }
+      }
       t.winDays = SAT_CT_WINDOW_DAYS - 1;
     }
     t.winClean[t.winDays] = t.cleanInDay;
     t.winSum[t.winDays]   = t.cleanSumInDay;
+    for (uint8_t p = 0; p < SATP_COUNT; p++) { t.winPhTicks[t.winDays][p] = t.phTicksInDay[p]; t.winPhSum[t.winDays][p] = t.phSumInDay[p]; }
     t.winDays++;
     out.reason = PSTR("few_days");
     if (t.winDays >= SAT_CT_WINDOW_DAYS) {
@@ -6075,14 +6132,30 @@ static void satTuneCloseDay(SatTune& t, float coeff, SatTuneDayOut& out)
       for (uint8_t i = 0; i < SAT_CT_WINDOW_DAYS; i++) { sum += t.winSum[i]; n += t.winClean[i]; }
       out.haveMean3 = (n > 0);
       out.mean3 = (n > 0) ? sum / (float)n : 0.0f;
-      out.reason = PSTR("inside_band");
+      for (uint8_t p = 0; p < SATP_COUNT; p++) {
+        float ps = 0.0f; uint32_t pn = 0;
+        for (uint8_t i = 0; i < SAT_CT_WINDOW_DAYS; i++) { ps += t.winPhSum[i][p]; pn += t.winPhTicks[i][p]; }
+        out.phTicks3[p]    = pn;
+        out.phHaveMean3[p] = (pn > 0);
+        out.phMean3[p]     = (pn > 0) ? ps / (float)pn : 0.0f;
+        out.phSay[p]       = satTunePhaseSay(out.phHaveMean3[p], out.phMean3[p]);
+      }
+      const bool haveW = out.phHaveMean3[SATP_WARMUP], haveF = out.phHaveMean3[SATP_FLOATING];
+      // Q-1787e B: a phase without data takes the verdict of the phase with data (SAT_CT_MISSING_PHASE_VETO 0)
+      const int8_t w = haveW ? out.phSay[SATP_WARMUP]   : out.phSay[SATP_FLOATING];
+      const int8_t f = haveF ? out.phSay[SATP_FLOATING] : out.phSay[SATP_WARMUP];
       float target = coeff;
-      if (out.mean3 > SAT_CT_BAND_C)       { target = coeff + SAT_CT_STEP; out.decision = 1; }
-      else if (out.mean3 < -SAT_CT_BAND_C) { target = coeff - SAT_CT_STEP; out.decision = -1; }
+      if (!haveW && !haveF)                                 out.reason = PSTR("no_phases");     // no tick with a room temperature
+      else if (SAT_CT_MISSING_PHASE_VETO && !haveW)         out.reason = PSTR("no_warmup");
+      else if (SAT_CT_MISSING_PHASE_VETO && !haveF)         out.reason = PSTR("no_floating");
+      else if (w == 0 && f == 0)                            out.reason = PSTR("inside_band");
+      else if (w != f)                          out.reason = PSTR("phases_disagree");
+      else if (w > 0)                           { target = coeff + SAT_CT_STEP; out.decision = 1; }
+      else                                      { target = coeff - SAT_CT_STEP; out.decision = -1; }
       if (out.decision != 0) {
         target = satTuneClampCoeff(floorf(target * 100.0f + 0.5f) / 100.0f);
         if (target == coeff) { out.decision = 0; out.reason = PSTR("at_limit"); }   // clamped: nothing to change, the window stays
-        else { out.newCoeff = target; out.reason = PSTR("outside_band"); out.daysInWindow = t.winDays; satTuneEmptyWindow(t); }
+        else { out.newCoeff = target; out.reason = PSTR("phases_agree"); out.daysInWindow = t.winDays; satTuneEmptyWindow(t); }
       }
     }
     if (out.decision == 0 || out.newCoeff == coeff) out.daysInWindow = t.winDays;
@@ -6090,18 +6163,24 @@ static void satTuneCloseDay(SatTune& t, float coeff, SatTuneDayOut& out)
     out.daysInWindow = t.winDays;
   }
   t.dayNo++;
-  t.hoursInDay = 0; t.cleanInDay = 0; t.cleanSumInDay = 0.0f;
+  satTuneClearDay(t);
 }
 
 // Window file /sat_tune.json (item 4 of the TASK-1525 review, Sergeant D log entry 183): the counted days of the window and the
-// coefficient they belong to, written once a day at the daily decision. Hand-written JSON:
-//   {"coeff":2.10,"n":2,"c0":24,"s0":36.000,"c1":23,"s1":30.500}
+// coefficient they belong to, written once a day at the daily decision. Hand-written JSON, version 2 (ADR-228):
+//   {"v":2,"coeff":2.10,"n":1,"c0":24,"s0":36.000,"w0":48,"x0":72.000,"f0":48,"y0":72.000}
+// per day i: c = clean hours, s = sum of their hour means, w/x = warm-up ticks/signal sum, f/y = floating ticks/signal sum.
+// A version-1 file (no "v", sums of both phases mixed) cannot be split and is dropped on restore.
 // The partial counters of the current day are not kept: at the daily decision they are zero.
+#define SAT_CT_FILE_BUF 384   // 3 days at the widest values fit with room to spare (host test: round trip at the limits)
 static void satTuneFormat(const SatTune& t, float coeff, char* out, size_t n)
 {
-  int pos = snprintf_P(out, n, PSTR("{\"coeff\":%.2f,\"n\":%u"), (double)coeff, (unsigned)t.winDays);
+  int pos = snprintf_P(out, n, PSTR("{\"v\":%u,\"coeff\":%.2f,\"n\":%u"), (unsigned)SAT_CT_FILE_VERSION, (double)coeff, (unsigned)t.winDays);
   for (uint8_t i = 0; i < t.winDays && pos > 0 && (size_t)pos < n; i++)
-    pos += snprintf_P(out + pos, n - (size_t)pos, PSTR(",\"c%u\":%u,\"s%u\":%.3f"), (unsigned)i, (unsigned)t.winClean[i], (unsigned)i, (double)t.winSum[i]);
+    pos += snprintf_P(out + pos, n - (size_t)pos, PSTR(",\"c%u\":%u,\"s%u\":%.3f,\"w%u\":%lu,\"x%u\":%.3f,\"f%u\":%lu,\"y%u\":%.3f"),
+                      (unsigned)i, (unsigned)t.winClean[i], (unsigned)i, (double)t.winSum[i],
+                      (unsigned)i, (unsigned long)t.winPhTicks[i][SATP_WARMUP], (unsigned)i, (double)t.winPhSum[i][SATP_WARMUP],
+                      (unsigned)i, (unsigned long)t.winPhTicks[i][SATP_FLOATING], (unsigned)i, (double)t.winPhSum[i][SATP_FLOATING]);
   if (pos > 0 && (size_t)pos < n) snprintf_P(out + pos, n - (size_t)pos, PSTR("}"));
 }
 
@@ -6120,21 +6199,30 @@ static bool satTuneJsonNum(const char* json, const char* key, double& v)
 static uint8_t satTuneParse(const char* json, SatTune& t, float coeff)
 {
   satTuneEmptyWindow(t);
-  double c = 0, n = 0;
+  double c = 0, n = 0, v = 0;
+  if (!satTuneJsonNum(json, "v", v) || (int)v != SAT_CT_FILE_VERSION) return 0;   // version 1: mixed-phase sums, dropped
   if (!satTuneJsonNum(json, "coeff", c) || !satTuneJsonNum(json, "n", n)) return 0;
   if (fabs(c - (double)coeff) > 0.005) return 0;
   if (n < 1 || n > SAT_CT_WINDOW_DAYS) return 0;
   for (uint8_t i = 0; i < (uint8_t)n; i++) {
-    char kc[4], ks[4];
+    char kc[4], ks[4], kw[4], kx[4], kf[4], ky[4];
     snprintf_P(kc, sizeof(kc), PSTR("c%u"), (unsigned)i);
     snprintf_P(ks, sizeof(ks), PSTR("s%u"), (unsigned)i);
-    double cv = 0, sv = 0;
-    if (!satTuneJsonNum(json, kc, cv) || !satTuneJsonNum(json, ks, sv) || cv < SAT_CT_MIN_CLEAN_HOURS || cv > SAT_CT_HOURS_PER_DAY) {
+    snprintf_P(kw, sizeof(kw), PSTR("w%u"), (unsigned)i);
+    snprintf_P(kx, sizeof(kx), PSTR("x%u"), (unsigned)i);
+    snprintf_P(kf, sizeof(kf), PSTR("f%u"), (unsigned)i);
+    snprintf_P(ky, sizeof(ky), PSTR("y%u"), (unsigned)i);
+    double cv = 0, sv = 0, wv = 0, xv = 0, fv = 0, yv = 0;
+    if (!satTuneJsonNum(json, kc, cv) || !satTuneJsonNum(json, ks, sv) || cv < SAT_CT_MIN_CLEAN_HOURS || cv > SAT_CT_HOURS_PER_DAY ||
+        !satTuneJsonNum(json, kw, wv) || !satTuneJsonNum(json, kx, xv) || !satTuneJsonNum(json, kf, fv) || !satTuneJsonNum(json, ky, yv) ||
+        wv < 0 || fv < 0 || wv > 4294967295.0 || fv > 4294967295.0) {
       satTuneEmptyWindow(t);
       return 0;
     }
     t.winClean[i] = (uint8_t)cv;
     t.winSum[i] = (float)sv;
+    t.winPhTicks[i][SATP_WARMUP]   = (uint32_t)wv; t.winPhSum[i][SATP_WARMUP]   = (float)xv;
+    t.winPhTicks[i][SATP_FLOATING] = (uint32_t)fv; t.winPhSum[i][SATP_FLOATING] = (float)yv;
   }
   t.winDays = (uint8_t)n;
   return t.winDays;
@@ -6207,7 +6295,7 @@ static void satTuneSaveWindow()
 {
   if (settings.sat.bSimulation) return;
   if (_sat_tune.winDays == 0) { satTuneFileRemove(); return; }
-  char buf[128];
+  char buf[SAT_CT_FILE_BUF];
   satTuneFormat(_sat_tune, settings.sat.fHeatingCurveCoeff, buf, sizeof(buf));
   satTuneFileWrite(buf);
 }
@@ -6216,7 +6304,7 @@ static void satTuneSaveWindow()
 // current coefficient; otherwise the file is stale and goes.
 static void satTuneRestoreWindow()
 {
-  char buf[160];
+  char buf[SAT_CT_FILE_BUF];
   if (!satTuneFileRead(buf, sizeof(buf))) return;
   const uint8_t days = satTuneParse(buf, _sat_tune, settings.sat.fHeatingCurveCoeff);
   SATDebugTf(PSTR("SATTUNER restored=%u coeff=%.2f\r\n"), (unsigned)days, (double)settings.sat.fHeatingCurveCoeff);
@@ -6256,28 +6344,46 @@ static void satTuneApplyCoeff(float newCoeff)
   _sat_tuneApplying = false;
 }
 
+static void satTuneMeanStr(char* out, size_t n, bool have, float v)
+{
+  if (have) snprintf_P(out, n, PSTR("%.2f"), (double)v); else strlcpy(out, "na", n);
+}
+
+static const char* satTuneSayName(int8_t s)
+{
+  return s > 0 ? PSTR("higher") : (s < 0 ? PSTR("lower") : PSTR("hold"));
+}
+
 static void satTuneLogHour(const SatTuneHourOut& h)
 {
-  char m[12];
-  if (h.haveMean) snprintf_P(m, sizeof(m), PSTR("%.2f"), (double)h.mean); else strlcpy(m, "na", sizeof(m));
+  char m[12], wm[12], fm[12];
+  satTuneMeanStr(m, sizeof(m), h.haveMean, h.mean);
+  satTuneMeanStr(wm, sizeof(wm), h.phHaveMean[SATP_WARMUP], h.phMean[SATP_WARMUP]);
+  satTuneMeanStr(fm, sizeof(fm), h.phHaveMean[SATP_FLOATING], h.phMean[SATP_FLOATING]);
   // TASK-1551 (Sergeant D entry 205, Q-1527e C): for a heat pump the record also carries the ticks spent in SAT PWM, so a
   // field test shows the curve signal of PWM hours; the tuner ignores those hours as before. Gas and hybrid unchanged.
   if (settings.sat.iHeatingSource == SAT_SRC_HEAT_PUMP)
-    SATDebugTf(PSTR("SATTUNEH hour=%lu mean=%s ticks=%lu counted=%d reason=%s pwm=%lu\r\n"),
+    SATDebugTf(PSTR("SATTUNEH hour=%lu mean=%s ticks=%lu counted=%d reason=%s wmean=%s wticks=%lu fmean=%s fticks=%lu pwm=%lu\r\n"),
                (unsigned long)h.hour, m, (unsigned long)h.ticks, (int)h.counted, satTuneReasonName(h.reason),
-               (unsigned long)h.pwmTicks);
+               wm, (unsigned long)h.phTicks[SATP_WARMUP], fm, (unsigned long)h.phTicks[SATP_FLOATING], (unsigned long)h.pwmTicks);
   else
-    SATDebugTf(PSTR("SATTUNEH hour=%lu mean=%s ticks=%lu counted=%d reason=%s\r\n"),
-               (unsigned long)h.hour, m, (unsigned long)h.ticks, (int)h.counted, satTuneReasonName(h.reason));
+    SATDebugTf(PSTR("SATTUNEH hour=%lu mean=%s ticks=%lu counted=%d reason=%s wmean=%s wticks=%lu fmean=%s fticks=%lu\r\n"),
+               (unsigned long)h.hour, m, (unsigned long)h.ticks, (int)h.counted, satTuneReasonName(h.reason),
+               wm, (unsigned long)h.phTicks[SATP_WARMUP], fm, (unsigned long)h.phTicks[SATP_FLOATING]);
 }
 
 static void satTuneLogDay(const SatTuneDayOut& d)
 {
-  char m[12];
-  if (d.haveMean3) snprintf_P(m, sizeof(m), PSTR("%.2f"), (double)d.mean3); else strlcpy(m, "na", sizeof(m));
-  SATDebugTf(PSTR("SATTUNED day=%lu clean=%u counted=%d days_in_window=%u mean3=%s decision=%s reason=%s\r\n"),
+  char m[12], wm[12], fm[12];
+  satTuneMeanStr(m, sizeof(m), d.haveMean3, d.mean3);
+  satTuneMeanStr(wm, sizeof(wm), d.phHaveMean3[SATP_WARMUP], d.phMean3[SATP_WARMUP]);
+  satTuneMeanStr(fm, sizeof(fm), d.phHaveMean3[SATP_FLOATING], d.phMean3[SATP_FLOATING]);
+  SATDebugTf(PSTR("SATTUNED day=%lu clean=%u counted=%d days_in_window=%u mean3=%s decision=%s reason=%s"
+                  " wmean3=%s wticks3=%lu wsay=%s fmean3=%s fticks3=%lu fsay=%s\r\n"),
              (unsigned long)d.day, (unsigned)d.clean, (int)d.counted, (unsigned)d.daysInWindow, m,
-             d.decision > 0 ? PSTR("raise") : (d.decision < 0 ? PSTR("lower") : PSTR("hold")), d.reason);
+             d.decision > 0 ? PSTR("raise") : (d.decision < 0 ? PSTR("lower") : PSTR("hold")), d.reason,
+             wm, (unsigned long)d.phTicks3[SATP_WARMUP], satTuneSayName(d.phSay[SATP_WARMUP]),
+             fm, (unsigned long)d.phTicks3[SATP_FLOATING], satTuneSayName(d.phSay[SATP_FLOATING]));
 }
 
 // Close one tuner hour: hourly record, and at the end of the day the daily record and, on a decision, the change.
@@ -6300,9 +6406,10 @@ static void satTuneRollHour()
   char o[12], n[12];
   satTuneCoeffStr(o, sizeof(o), oldCoeff);
   satTuneCoeffStr(n, sizeof(n), settings.sat.fHeatingCurveCoeff);
-  SATDebugTf(PSTR("SATTUNE old=%s new=%s mean3=%.2f\r\n"), o, n, (double)d.mean3);
-  satNarratef_P(PSTR("Heating curve self-tune: coefficient %s -> %s (3-day mean %+.2f C %s the curve)"),
-                o, n, (double)d.mean3, d.decision > 0 ? PSTR("above") : PSTR("below"));
+  SATDebugTf(PSTR("SATTUNE old=%s new=%s mean3=%.2f wmean3=%.2f fmean3=%.2f\r\n"), o, n, (double)d.mean3,
+             (double)d.phMean3[SATP_WARMUP], (double)d.phMean3[SATP_FLOATING]);
+  satNarratef_P(PSTR("Heating curve self-tune: coefficient %s -> %s (3-day warm-up %+.2f C and floating %+.2f C, both %s the curve)"),
+                o, n, (double)d.phMean3[SATP_WARMUP], (double)d.phMean3[SATP_FLOATING], d.decision > 0 ? PSTR("above") : PSTR("below"));
 }
 
 // Called every pass of satControlLoopRun(), before any early return. Starts, stops and rolls the tuner clock.
@@ -7020,7 +7127,7 @@ static void satControlLoopRun()
     satPwmNoteDhwFlame(satIsFlameOn());            // a flame burning with the DHW bit set is a hot-water flame (entries 105, 106)
     {   // TASK-1525: a hot-water tick returns early below, so the tuner is told here that this hour had hot water
       SatTuneTickIn ti = {};
-      ti.satActive = true; ti.dhw = true;
+      ti.satActive = true; ti.dhw = true; ti.error = NAN;   // no phase: a hot-water tick carries no signal
       satCurveTuneNoteTick(ti);
     }
     _sat_prevDhwActive = true;
@@ -7426,6 +7533,7 @@ static void satControlLoopRun()
     ti.sunValid = state.sat.bSunElevationValid; ti.sunElevation = state.sat.fSunElevation;
     ti.pwm = pwmMode;
     ti.roomLost = !roomValid;
+    ti.error = roomValid ? state.sat.fError : NAN;   // ADR-228 phase: the held PID error (target - room) the deadband acts on
     ti.chOn = (state.sat.iLastSentCH != 0); ti.flameOn = satIsFlameOn();
     ti.relMod = (float)satGetActualModulation();   // same source as satIsFlameOn(): the simulated value in SAT simulation
     ti.minMod = settings.sat.bSimulation ? (float)satSimMinMod()   // TASK-1532: the simulated boiler's minimum, not a replayed MsgID 15

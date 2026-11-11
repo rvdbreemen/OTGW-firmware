@@ -40,6 +40,9 @@ HP_CTRL = "sat"        # round 16, heat pumps only: "sat" = SAT PWM as today; "o
 HP_DM_START = 120.0    # degree minutes: start when DM <= -HP_DM_START, stop when DM >= 0
 HP_MIN_ON, HP_MIN_OFF = 20, 10   # compressor protection for "dm" (minutes, assumption)
 HP_PERIOD_S = 1800     # heat-pump PWM period; round 14 tests 2400 and 7200 (Sergeant D 2026-10-31 14:46)
+PHASE_BAND = 0.1       # round 12 (TASK-1796, ADR-228): per heating minute, |err| > band = warm-up, else floating (thermo-nova DEADBAND,
+                       # const.py:16). The per-phase sums of the hour go to the tuner as st.ph_hour = (wsum, wn, fsum, fn) before
+                       # st.hour(); tuners without phases ignore it, so earlier rounds are unchanged.
 STEP_KEEPS_PID = False # True (round 10): a coefficient step leaves the PID integral and derivative alone, as ADR-204 requires
 COLD_K = 0.3          # EXCLUDE_ATMIN = "cold" (round 5e): a PWM / minimum-output hour counts only when the hour-mean room is more than COLD_K below target       # CI+guard: an hour whose room temperature moved more than this is not clean
 UPPER, LOWER = 1200.0, 180.0
@@ -98,6 +101,7 @@ def run(args):
     pwm = False; pwm_phase_on = False; pwm_left = 0; pwm_new = False; t_on = 40.0; Pcur = 0.0
     ov_s = uh_s = sat_s = 0; last_draw_m = -10**6; last_off_s = 1
     dm_acc = 0.0
+    ph = [0.0, 0, 0.0, 0]
     corr_acc = 0.0; corr_n = 0; clean = True; stepped = False; hour_ta0 = TARGET; rdt = 0.0; hour_lowload = False; hour_ta_sum = 0.0; day_err_sum = 0.0; day_err_n = 0; day_tmax = -99.0; day_tmin = 99.0; day_capped = 0
     sq = n = out_band = over = 0.0; fuel = 0.0; heat = 0.0; starts = 0; short_burns = 0; pwm_min = 0; flame_min = 0
     writes = flips = 0; last_dir = 0; clean_h = 0
@@ -178,6 +182,8 @@ def run(args):
             elif SIGNAL == "CI+D": sig = (sp - cv) + kd * rdt
             else: sig = sp - cv
             corr_acc += sig; corr_n += 1
+            if abs(err) > PHASE_BAND: ph[0] += sig; ph[1] += 1
+            else: ph[2] += sig; ph[3] += 1
             if day >= 14:
                 sq += err * err; n += 1; heat += qrad * DT
                 if abs(Ta - TARGET) > 0.3: out_band += 1
@@ -198,6 +204,7 @@ def run(args):
             if hour_lowload and hour_ta_sum / 60.0 - TARGET > -COLD_K: clean = False
             mc = corr_acc / corr_n if corr_n else 0.0
             if clean and not stepped and corr_n > 0 and day >= 14: clean_h += 1
+            st.ph_hour = tuple(ph); ph = [0.0, 0, 0.0, 0]
             new_c = st.hour(c, day, mc, clean and not stepped and corr_n > 0)
             corr_acc = 0.0; corr_n = 0; clean = True; stepped = False; hour_lowload = False; hour_ta_sum = 0.0
             if new_c != c:

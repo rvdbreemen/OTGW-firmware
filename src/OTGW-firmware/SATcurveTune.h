@@ -1,4 +1,6 @@
 // SATcurveTune.h - TASK-1525 (ADR-205) heating curve self-tune: constants and types.
+// TASK-1796 (ADR-228, Sergeant D entries 303, 304): the signal is split per control tick into a warm-up and a floating
+// phase, and the coefficient changes only when both phases say the same direction.
 // Kept in a header, included from SATtypes.h, because the Arduino builder hoists function prototypes above
 // any type defined later in a .ino (the functions live in SATcontrol.ino, satCurveTune blocks).
 // tests/test_sat_curve_selftune.py compiles this header together with those blocks.
@@ -15,6 +17,16 @@
 #define SAT_CT_COEFF_MAX        5.0f
 #define SAT_CT_DEFAULT_MIN_MOD  5.0f   // minimum modulation when MsgID 15 was never seen (entry 174)
 #define SAT_CT_MIN_TICK_FRACTION  0.75f  // an hour counts only with this share of its expected control ticks (hour length / control interval)
+// Phase split (ADR-228, entry 304, Q-1787d A by our reading): a tick is floating when |error| <= this band, warm-up when
+// |error| > it. The value is thermo-nova DEADBAND (const.py:16, used at pid.py:187 `> DEADBAND` and pid.py:205 `<= DEADBAND`,
+// pin 7beaaf5), the same 0.1 C as SAT_PID_DEADBAND in SATtypes.h (not included here: this header comes first).
+// "Outside" is both sides of the target, so an overshoot tick counts as warm-up (entry 306, Q-1787f A).
+#define SAT_CT_PHASE_BAND_C     0.1f
+// A phase without a tick in the window does not veto: the phase with data decides alone; with data in both phases both must
+// agree (Sergeant D entry 305, Q-1787e B). 1 = the as-first-built hold (a phase without data holds).
+#define SAT_CT_MISSING_PHASE_VETO 0
+#define SAT_CT_PHASE_SPLIT      1      // marks the phase-split tuner (the host test sets SatTuneTickIn.error only with it)
+#define SAT_CT_FILE_VERSION     2      // window file format: 2 = per-phase sums (ADR-228); files without "v":2 are dropped
 // An hour with a lost room temperature (signal 0, curve only) is not counted: reason no_room (Sergeant D entry 225,
 // Q-1525a A, TASK-1559).
 
@@ -36,7 +48,11 @@ struct SatTuneTickIn {
   float relMod;        // MsgID 17 relative modulation, %
   float minMod;        // MsgID 15 low byte, %; 0 = never seen
   float signal;        // curve integral sample, C (ignored for dhw / not-active ticks)
+  float error;         // PID error target - room, C (state.sat.fError, held by the 60 s PID step); NaN = no room temperature
 };
+
+// The two phases of ADR-228. Index into the per-phase arrays.
+enum SatTunePhase : uint8_t { SATP_WARMUP = 0, SATP_FLOATING = 1, SATP_COUNT = 2 };
 
 struct SatTune {
   // current hour
@@ -44,16 +60,22 @@ struct SatTune {
   uint32_t sigTicks;     // ticks that carried a signal
   float    sigSum;       // sum of the signals
   uint32_t pwmTicks;     // ticks in SAT PWM this hour (logged for heat pumps, not used by the tuner; entry 205, TASK-1551)
+  uint32_t phTicks[SATP_COUNT];   // signal ticks per phase this hour (ADR-228)
+  float    phSum[SATP_COUNT];     // sum of their signals
   uint8_t  reason;       // first exclusion seen this hour (SATT_NONE while every tick was clean)
   bool     coeffChanged; // the coefficient changed during this hour
   // current day
   uint8_t  hoursInDay;
   uint8_t  cleanInDay;
   float    cleanSumInDay;   // sum of the signal means of the clean hours
+  uint32_t phTicksInDay[SATP_COUNT];   // per-phase signal ticks of the clean hours of the day (ADR-228)
+  float    phSumInDay[SATP_COUNT];
   // window of counted days
   uint8_t  winDays;
   uint8_t  winClean[SAT_CT_WINDOW_DAYS];
   float    winSum[SAT_CT_WINDOW_DAYS];
+  uint32_t winPhTicks[SAT_CT_WINDOW_DAYS][SATP_COUNT];   // per counted day: per-phase ticks and sums (ADR-228)
+  float    winPhSum[SAT_CT_WINDOW_DAYS][SATP_COUNT];
   // counters for the log
   uint32_t hourNo;
   uint32_t dayNo;
@@ -64,6 +86,9 @@ struct SatTuneHourOut {
   uint32_t ticks;
   bool     haveMean;
   float    mean;        // mean signal of the hour (all ticks that carried one)
+  uint32_t phTicks[SATP_COUNT];   // per-phase signal ticks of the hour (ADR-228)
+  bool     phHaveMean[SATP_COUNT];
+  float    phMean[SATP_COUNT];
   uint32_t pwmTicks;    // ticks in SAT PWM (TASK-1551)
   bool     counted;
   uint8_t  reason;
@@ -76,7 +101,11 @@ struct SatTuneDayOut {
   bool        counted;
   uint8_t     daysInWindow; // counted days the decision used (before a change empties the window)
   bool        haveMean3;
-  float       mean3;
+  float       mean3;        // all clean-hour signals, hour-weighted (ADR-205 value, logged for comparison, no longer decides)
+  uint32_t    phTicks3[SATP_COUNT];    // per-phase signal ticks over the window (ADR-228)
+  bool        phHaveMean3[SATP_COUNT];
+  float       phMean3[SATP_COUNT];     // per-phase tick-weighted mean over the window
+  int8_t      phSay[SATP_COUNT];       // per-phase verdict: +1 higher, -1 lower, 0 inside the band (or no ticks)
   int8_t      decision;     // +1 raise, -1 lower, 0 hold
   const char* reason;       // PSTR: why hold, or what drove the change
   float       newCoeff;     // equals the old coefficient unless decision != 0
