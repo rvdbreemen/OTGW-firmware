@@ -1,10 +1,10 @@
 ---
 id: TASK-1786
 title: 'Classic + S3 Mini: PIC no longer detected after flashing with --migrate'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-10T18:52:00Z'
-updated_date: '2026-11-10T22:54:00Z'
+updated_date: '2026-11-11T20:24:00Z'
 labels:
   - needs-maintainer-ok
   - bug
@@ -22,8 +22,8 @@ Report from thaghostnl, #nederlandse-ondersteuning 2026-11-10 19:44:03 UTC, msg 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A capture from the reporter shows the boot and the PIC detection (or the reporter is asked again)
-- [ ] #2 Cause found from the capture and a fix or answer agreed with Robert
+- [x] #1 A capture from the reporter shows the boot and the PIC detection (or the reporter is asked again)
+- [x] #2 Cause found from the capture and a fix or answer agreed with Robert
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -46,4 +46,12 @@ Captures received 2026-11-10 18:10 UTC (msgs 1569791410595565642, 15697914623657
 bootdetect.log from thaghostnl (721 B, 10 boots, Robert-approved download, read as text by otgw-firmware-a4 2026-11-10; local copy RvdB/capture-thaghost-1110c, not in git): every boot eMode=3 (HW_MODE_DEGRADED) pic=0 pro=0 RST=12 RX=44 TX=43 I2C=35/36 (the S3 Mini pin map). Boots #1-4 mode=0 (Auto), t=7553-7649 ms; boots #5-10 mode=1 (forced PIC), t=5189-5847 ms. t is millis() when the line is written (OTGW-firmware.ino:180-181), after detection, so it is the boot time up to that point, not the detection time alone.
 
 Sanity check of the timing against the code: one detectPIC() (OTGW-Core.ino:1053-1078) is resetPic() with a 100 ms reset pulse (src/libraries/OTGWSerial/OTGWSerial.cpp resetPic) plus OTGWSerial.find(ETX) with the Stream default timeout of 1000 ms (framework Stream.h:62; OTGWSerial sets no other timeout). Auto runs 3 attempts with 60 ms between them (OTGW-firmware.ino:437-441), forced mode 1 attempt (:426-428). Predicted extra time in Auto: 2 x (100 + 1000) + 2 x 60 = 2320 ms. Measured: mean Auto 7614.5 ms minus mean forced 5428.5 ms = 2186 ms (forced boots spread 658 ms). The numbers agree: every attempt waited the full timeout, so no ETX arrived within 1 s after any reset, in either mode. No cause is claimed here: the log shows only that the PIC did not answer a reset; the reporter will try the old Wemos in the same socket. TASK-1790 (closed UART after a miss in Auto) does not explain the forced-mode boots #5-10.
+
+2026-11-11 (comms): solved. thaghostnl, 20:14:40 UTC, #nederlandse-ondersteuning msg 1570169914961035297 (https://discord.com/channels/812969634638725140/815561033036333076/1570169914961035297): on closer inspection he found a few doubtful solder joints on the board, reflowed it in an oven, and now it works. Cause: hardware (cold solder joints), not firmware. Earlier evidence: /bootdetect.log (10 boots, pic=0, correct S3 Mini pins RST=12 RX=44 TX=43, both Board Mode auto and pic), so the firmware probed correctly and the PIC did not answer. Thanked him (msg 1570171743790960651) and asked for /bootdetect.log if it returns.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Classic + S3 Mini, PIC not detected after flashing 2.0.0 (thaghostnl). AC1: the reporter was asked for a capture and then /bootdetect.log (boot detection runs before telnet starts, so no capture can show it); bootdetect.log showed 10 boots with pic=0 on the correct S3 Mini pins in both Board Mode auto and pic. AC2: cause found by the reporter: cold solder joints on his board; after an oven reflow the PIC is detected (msg 1570169914961035297). No firmware change. The answer was given in Discord; closing was agreed by the coordinator under Robert's decide-yourself rule, not by a separate Robert decision. Not verified by us on the device after the reflow (reporter's statement).
+<!-- SECTION:FINAL_SUMMARY:END -->
