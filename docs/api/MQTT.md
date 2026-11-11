@@ -947,7 +947,7 @@ Sending `PR=X` returns the current value of register `X`. On OTGW32 these are sy
 
 | Topic suffix | Payload | Returns | Description |
 |--------------|---------|---------|-------------|
-| `command` | `"PR=A"` | `PR: A=OpenTherm Gateway OTGW32` | Device banner (tools pattern-match on this) |
+| `command` | `"PR=A"` | `PR: A=OpenTherm Gateway 6.6` | Banner in the PIC format; the version is the PIC command set OT-Direct implements (pyotgw and OTmonitor read it) |
 | `command` | `"PR=M"` | `PR: M=G` / `M=M` / `M=P` / `M=S` / `M=L` | Current gateway mode: G=gateway, M=monitor, P=passthru (bypass), S=standalone, L=loopback |
 | `command` | `"PR=O"` | `PR: O=T20.50` / `O=C20.50` / `O=N` | Setpoint override: T=temporary (TT=), C=constant (TC=), N=none |
 | `command` | `"PR=S"` | `PR: S=15.00` | Setback temperature (SB= value) |

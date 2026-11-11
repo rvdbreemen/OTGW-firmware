@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.176
+**  Version  : v2.0.0-beta.177
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -531,6 +531,7 @@ static void clearOverride(uint8_t msgId) {
 // processes auto-prototypes before variable definitions, unlike ESP8266.
 // ---------------------------------------------------------------------------
 static float   otSetbackTemp     = 16.0f;   // SB= setback temperature
+#define OTD_PIC_COMPAT_VERSION "6.6"   // PIC firmware whose command set OT-Direct implements (PR=A)
 static uint8_t otIgnoreTransitions = 1;      // IT= (1=ignore, PIC default)
 static uint8_t otOverrideHB      = 0;        // OH= override high byte flag
 static char    otGpioFunctions[3] = "00";    // GA=/GB= function codes
@@ -3362,8 +3363,11 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     char prBuf[48];
     switch (reg) {
       case 'A':
-        // Banner — tools pattern-match on "OpenTherm Gateway" to detect device
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: A=OpenTherm Gateway OTGW32"));
+        // Banner in the PIC format "OpenTherm Gateway <version>" (gateway.asm:5434-5435). The version is
+        // the PIC command set this code implements (audited against 6.6, TASK-1795): pyotgw reads it with
+        // int(ver[18]) and skips PR=D below 5, OTmonitor gates features on it (gui.tcl:1080 needs 6.2).
+        // No board name: the banner reaches HA and other public output (TASK-1797).
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: A=OpenTherm Gateway " OTD_PIC_COMPAT_VERSION));
         otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'M':
@@ -3432,7 +3436,8 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
         otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'T':
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: T=%d/%d"), otIgnoreTransitions, otOverrideHB);
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: T=%c%c"),   // two booleans, no separator (PrintTweaks, gateway.asm:2278-2285)
+                   otIgnoreTransitions ? '1' : '0', otOverrideHB ? '1' : '0');
         otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'D':
