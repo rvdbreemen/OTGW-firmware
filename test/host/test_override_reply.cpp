@@ -322,7 +322,6 @@ static void resetAll() {
   otLastRequestOrigin   = OT_DIRECT_ORIGIN_GATEWAY;
   otCurrentMode         = OTD_MODE_GATEWAY;
   otDHWPushState        = PUSH_IDLE;
-  otSummaryMode         = false;
   otSummaryPending      = false;
   state.otBus.bOnline   = true;
   otMaster.reset();

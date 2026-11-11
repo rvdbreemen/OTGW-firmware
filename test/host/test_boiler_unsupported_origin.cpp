@@ -204,6 +204,8 @@ static void processPSSummary(const char*, int) {}
 
 // ---- code under test: OTGW-Core.ino and OTDirect.ino, sliced ---------------------
 #include "core.inc"
+// TASK-1800: bridgeFrameToParser() feeds the PS=1 store; that store is not under test here.
+static void otdPsNoteFrame(char, unsigned long) {}
 #include "otd.inc"
 
 // ---- harness ------------------------------------------------------------------------

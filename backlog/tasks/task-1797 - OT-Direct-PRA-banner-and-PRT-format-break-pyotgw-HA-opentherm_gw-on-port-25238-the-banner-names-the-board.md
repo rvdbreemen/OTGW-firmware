@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:35:00Z'
-updated_date: '2026-11-11T12:39:00Z'
+updated_date: '2026-11-11T13:34:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -30,7 +30,7 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 - [x] #2 PR=T answers two digits without a separator, as the PIC
 - [x] #3 pyotgw get_reports() runs without an exception against the new replies (test on the real pyotgw parsing code)
 - [x] #4 Host test against the real code (not a re-implementation): red on the old code, green on the fix
-- [ ] #5 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
+- [x] #5 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -47,4 +47,8 @@ Evidence (wt-cyc09, 2026-11-11): new tests/test_otd_pr_reports_pyotgw.py cuts th
 Coordinator checks (2026-11-11). (1) Own firmware does not turn the OT-Direct PR=A reply into a PIC version. The reply 'PR: A=...' has ':' at index 2, so processOT() routes it to handlePRresponse() (OTGW-Core.ino:6160-6165), which ignores register A (:1325-1329). It never reaches the banner branch (:6209, also gated by !isOTDirectEnabled()). state.pic.sFwversion is written only from OTGWSerial.firmwareVersion(), the parse of bytes from the PIC UART (OTGW-Core.ino:847, :6233, handleDebug.ino:375); OT-Direct writes none (grep sFwversion OTDirect.ino: 0 hits). So device/info picfwversion (restAPI.ino:3288), MQTT otgw-pic/version (MQTTstuff.ino:2036, skipped while isPICEnabled() is false) and the PIC menu are unchanged by this fix.
 
 (2) OTmonitor PIC upgrade over port 25238. It starts only from the menu 'Firmware upgrade ...' (gui.tcl:382-383; enabled for every non-file device, whatever the version). It never starts on the version. What changes with '6.6': upgrade::resetcommand now sends GW=R, because fwvariant=gateway and vsatisfies 4.0a6- holds (upgrade.tcl:326-353). With the old banner fwversion stayed 0 and no GW=R was sent. OT-Direct answers GW=R as a gateway reset of its own state; a PIC resets too. OTmonitor then sends only the bootloader version query cocmd 0 3 (upgrade.tcl:407), a binary line starting with STX that handleOTDirectCommand() rejects. No bootloader answers it, so OTmonitor shows 'Please manually reset', waits up to 60 s and ends 'Could not switch gateway to self-programming mode' (upgrade.tcl:408-416). All of this happens before any write packet, which needs selfprogmode=1 (:421). An OT-Direct board therefore refuses the upgrade by design: there is nothing to flash and nothing is written. No code change needed. Not run against a live OTmonitor (no OTmonitor rig): read from the code only.
+
+Bench before (.61 on beta.175, port 25238 enabled for the test and restored): PR=A -> 'PR: A=OpenTherm Gateway OTGW32', PR=T -> 'PR: T=1/0'.
+
+Build: esp32-combo from d5b57f3a0 (covers beta.177 and beta.178), build.bat exit 0, fresh artifacts 14:21-14:31 incl. OTGW-firmware-esp32-combo-2.0.0-beta.178+d5b57f3-flash.zip (6,295,027 B) and .ino.bin 2,128,816 B; the console SUCCESS line was not captured (cmd redirect gave an empty log). OTA to .61: app 2.0.0-beta.178+d5b57f3, fs version.hash a736f2b -> d5b57f3, settings 164 keys changed: none. Bench after (.61, port 25238 enabled for the test and restored to off): PR=A -> 'PR: A=OpenTherm Gateway 6.6', PR=T -> 'PR: T=10'. Not benched: a live HA opentherm_gw / pyotgw connection and a live OTmonitor (host test runs the real pyotgw parsing).
 <!-- SECTION:NOTES:END -->

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:38:00Z'
-updated_date: '2026-11-11T13:17:00Z'
+updated_date: '2026-11-11T13:34:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -29,7 +29,7 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 - [x] #1 PS=1 sends one summary line in the PIC format (33 commas, the right fields, no '+') to port 25238 and to the parser, and processPSSummary accepts it
 - [x] #2 While PS=1 is on, T/B frames are hidden as on the PIC; PS=0 restores them
 - [x] #3 Host test against the real code (not a re-implementation): red on the old code, green on the fix
-- [ ] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
+- [x] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 - [x] #5 PS=1 output is byte-for-byte equal to the PIC (gateway.asm PS routine): field order, separators ('/' for byte pairs, ','), number formats, and the same moments of output as the PIC; also delivered on port 25238; golden test against the PIC format, red on the old code (Robert 2026-11-11: 'OT-Direct can also be asked for a report with PS=1. That must always be identical to the PIC's answers.')
 - [x] #6 The MsgID 71 and MsgID 77 fields read their own sources (BC2), and the firmware's own processPSSummary accepts the OT-Direct line
 <!-- AC:END -->
@@ -48,4 +48,8 @@ Evidence (wt-cyc09, 2026-11-11, uncommitted until beta.176 lands): tests/test_ot
 GW=R now clears the PS=1 store (memset after resetTransientState), as the PIC's restart clears its RAM.
 
 Review (refute-only, opus): no format or store bug found. Fixed from it: a GW= mode switch cleared HideReports in resetTransientState(); the PIC changes HideReports only in PrintSummary (gateway.asm:2354, :2357), so it is now cleared only by PS=0 and GW=R (with the store and the pending line). Test gap closed: case A7 (no thermostat: own R WRITE stored; 0x8000 -> -128.00 / -32768, 0xFFFF -> 0.00 wrap); a mutant without the R rule now fails A7. Fix 9/9, old code 8/9 FAIL. Accepted as PIC parity, not changed: processPSSummary now consumes the OT-Direct line (enterPSMode, publish of all 34 fields incl. zeros for Data-IDs never seen), the same as on a PIC board; before, the 36-comma line was dropped. Not covered by a test: the mode-switch rule (resetTransientState not in this harness), read from the code only.
+
+Bench before (.61 on beta.175): PS=1 -> 'PS: 1' and no summary line on port 25238 within 8 s; PS=2 -> 'PS: 2'. The bus on .61 is offline (no boiler, no thermostat), so no T/B frames flowed: the hiding of reports is not observable on this bench.
+
+Bench after (.61 on beta.178): PS=1 -> 'PS: 1' then exactly one line on port 25238 (33 commas, all zero: no boiler, no thermostat), none in the next 5 s; telnet: 'enterPSMode: PS mode auto-detected as ON (comma-separated summary)' and 'processPSSummary: PS=1 summary parsed: 34 fields (v5+ firmware)'; PS=2 -> 'PS: BV'; PS=0 -> 'PS: 0'. Note: the firmware leaves its PS mode on the first raw frame after PS=0 (OTGW-Core.ino:5753-5757), as on a PIC board; on .61 no frames flow, so telnet still shows 'PS: ON'. Not benched: values from a real boiler and the hiding of T/B frames (no bus traffic on .61).
 <!-- SECTION:NOTES:END -->
