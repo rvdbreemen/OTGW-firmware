@@ -82,12 +82,19 @@ SATCYC = code(*FWDIR, "SATcycles.ino")
 OTCORE = code(*FWDIR, "OTGW-Core.ino")
 
 EXPECTED_KEEP = {
+    # TASK-1771: the SAT state files, carried over a new image until initSAT() has loaded them
+    "/sat/sat_preset.json": 96,
+    "/sat_pid_state.json": 256,
+    "/sat_energy.json": 64,
+    "/sat_energy_estimate.json": 48,
+    "/sat/sat_hcr.json": 1280,
+    "/sat_tune.json": 384,
     "/dallas_labels.ini": 2048,
     "/sat_markers.json": 2560,
     "/reboot_count.txt": 16,
     "/reboot_log.txt": 3072,
 }
-TOTAL_MAX = 8192
+TOTAL_MAX = 10240
 
 
 def function_body(src, signature_regex):
@@ -201,12 +208,29 @@ class TestOrdering(unittest.TestCase):
     def test_writeback_steps_in_order(self):
         restore = function_body(UPD, RESTORE)
         order = ["bool saved = writeSettings(false);", "settingsMarkClean();", "if (!saved) settingsMarkDirty();",
-                 "_restoreKeptFiles();", "saveOtSupportFilesForced();", "satPersistAllToFs();"]
+                 "_restoreKeptFiles();", "saveOtSupportFilesForced();", "if (_satLoadedAtFsStart) satPersistAllToFs();"]
         pos = [restore.find(s) for s in order]
         self.assertTrue(all(p >= 0 for p in pos), dict(zip(order, pos)))
         self.assertEqual(pos, sorted(pos), "write-back steps out of order: " + str(dict(zip(order, pos))))
         for stmt in order:
             self.assertTrue(is_plain_statement(restore, stmt), stmt + " is guarded or not a statement of its own")
+
+    def test_sat_ram_only_when_loaded_before_the_write(self):
+        """TASK-1771 (bench .61, beta.184 first build): an fs upload that starts in setup() before initSAT()
+        unmounts LittleFS; initSAT() then loads nothing and the restore wrote the defaults over the heap
+        copies (preset and energy lost, the window file kept). RAM may win only when SAT was loaded at the start."""
+        start = function_body(UPD, START)
+        snap = "_satLoadedAtFsStart = satStateLoaded();"
+        self.assertTrue(is_plain_statement(start, snap), snap + " missing or guarded in the upload start")
+        self.assertLess(start.index(snap), start.index("LittleFS.end()"), "snapshot must precede the unmount")
+        restore = function_body(UPD, RESTORE)
+        self.assertEqual(len(re.findall(r"satPersistAllToFs\(\);", restore)), 1)
+        self.assertRegex(restore, r"if \(_satLoadedAtFsStart\) satPersistAllToFs\(\);")
+        self.assertRegex(UPD, r"bool _satLoadedAtFsStart = true;")   # other targets: RAM is current
+        self.assertRegex(UPD, r"extern bool satStateLoaded\(\);")
+        self.assertRegex(SATCTL, r"bool satStateLoaded\(\) \{ return _sat_stateLoaded; \}")
+        init = function_body(SATCTL, r"\nvoid initSAT\(\)")
+        self.assertLess(init.index("satHCRLoadState();"), init.index("_sat_stateLoaded = true;"))
 
     def test_writeback_after_remount(self):
         end = function_body(UPD, END)
@@ -359,7 +383,11 @@ class TestSatWriteBack(unittest.TestCase):
             if fn == "satSavePidState":
                 continue   # gated on a room reading, see test_pid_save_gated_on_room_seen
             self.assertTrue(is_plain_statement(body, fn + "();"), fn + " is not called unconditionally")
-        self.assertIn("if (!LittleFSmounted) return;", body)
+        # TASK-1771: nothing is written before initSAT() loaded the files (RAM would be the defaults)
+        self.assertIn("if (!LittleFSmounted || !_sat_stateLoaded) return;", body)
+        init = function_body(SATCTL, r"\nvoid initSAT\(\)")
+        self.assertLess(init.index("satHCRLoadState();"), init.index("_sat_stateLoaded = true;"),
+                        "the flag must go up after the last SAT state load")
 
     def test_pid_save_gated_on_room_seen(self):
         """Sergeant D entry 115 (TASK-1365): a PID state restored at boot, with no room reading

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-beta.182
+**  Version  : v2.0.0-beta.183
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -57,6 +57,7 @@ extern bool writeSettings(bool show);
 extern void settingsMarkClean();
 extern void settingsMarkDirty();
 extern void satPersistAllToFs();           // TASK-1286: SAT learned state, RAM -> LittleFS
+extern bool satStateLoaded();              // TASK-1771: initSAT() has loaded the SAT files into RAM
 extern void saveOtSupportFilesForced();    // TASK-1286: OT profile files, RAM -> LittleFS
 extern void blinkLEDnow(uint8_t);
 extern bool checkHttpAuth();
@@ -361,6 +362,10 @@ private:
       if (_serial_output) {
         DebugTf(PSTR("[OTA] Target: filesystem (%u bytes)\r\n"), static_cast<unsigned>(fsSize));
       }
+      // TASK-1771: RAM may replace the heap copies at the restore only when SAT had loaded its files before
+      // this write. An upload that starts in setup() before initSAT() unmounts LittleFS below, so an
+      // initSAT() during the write reads nothing and holds defaults (bench .61: preset and energy lost).
+      _satLoadedAtFsStart = satStateLoaded();
       _keepFiles();   // TASK-1266/1286: the image lacks these files; copy them to the heap, restore after the remount
       LittleFS.end();
       if (uploadTotal > 0 && uploadTotal > fsSize) {
@@ -514,7 +519,7 @@ private:
     if (!saved) settingsMarkDirty();  // TASK-1495: the next flush (at the latest the restart) tries again
     _restoreKeptFiles();           // TASK-1266/1286: files without a RAM copy, from the heap
     saveOtSupportFilesForced();    // TASK-1286: the OT profiles live in RAM, so no heap copy is needed
-    satPersistAllToFs();           // TASK-1286: SAT learned state from RAM, even when it was saved less than an hour ago
+    if (_satLoadedAtFsStart) satPersistAllToFs();   // TASK-1286: SAT state from RAM; TASK-1771: only a RAM loaded before the write
   }
 
   // TASK-1495: the filesystem was formatted after an incomplete image, so the web UI
@@ -593,14 +598,26 @@ private:
   // is made and restored on the AsyncTCP task (the upload callbacks), which
   // serializes the uploads, so the per-instance buffers need no further guard.
   struct KeepEntry { const char *path; uint16_t maxLen; };
+  // TASK-1771: the SAT state files come first. Their RAM model is loaded only in initSAT(), after
+  // the web server started (OTGW-firmware.ino startWebserver() before initSAT()); an upload in that
+  // window found the RAM still empty and satPersistAllToFs() wrote it over the files (preset lost).
+  // satPersistAllToFs() now waits for initSAT(); until then these heap copies carry the files over.
+  // Once SAT is loaded, satPersistAllToFs() runs after this restore and RAM, the fresher copy, wins.
+  // /sat_tune.json has no RAM writer at all, so only this copy keeps the self-tune window.
   static constexpr KeepEntry KEEP_LIST[] = {
+    {"/sat/sat_preset.json",       96},    // _sat_presetSaved[96]
+    {"/sat_pid_state.json",       256},    // satSavePidState() buf[256]
+    {"/sat_energy.json",           64},    // satSaveEnergyState() buf[64]
+    {"/sat_energy_estimate.json",  48},    // satSaveEstimatedEnergy() buf[48]
+    {"/sat/sat_hcr.json",        1280},    // HCR_DAYS (<= 30) medians + at most 96 samples, about 7 B each
+    {"/sat_tune.json",            384},    // SAT_CT_FILE_BUF
     {"/dallas_labels.ini", 2048},   // the user's Dallas sensor names
     {"/sat_markers.json",  2560},   // at most 20 heating-curve markers of at most 110 B
     {"/reboot_count.txt",    16},   // one decimal number
     {"/reboot_log.txt",    3072},   // 20 lines of at most 140 B
   };
   static constexpr size_t   KEEP_COUNT        = sizeof(KEEP_LIST) / sizeof(KEEP_LIST[0]);
-  static constexpr size_t   KEEP_TOTAL_MAX    = 8192;   // all copies together
+  static constexpr size_t   KEEP_TOTAL_MAX    = 10240;  // all copies together (the maxima add up to 9824)
   static constexpr uint32_t KEEP_HEAP_RESERVE = 8192;   // largest free block must stay this far above a copy
 
   void _keepFiles() {
@@ -659,7 +676,7 @@ private:
   void _restoreKeptFiles() {
     for (size_t i = 0; i < KEEP_COUNT; i++) {
       if (_keepBuf[i] == nullptr) continue;
-      File f = LittleFS.open(KEEP_LIST[i].path, "w");
+      File f = LittleFS.open(KEEP_LIST[i].path, "w", true);   // create /sat, which the new image lacks
       const bool ok = f && f.write(_keepBuf[i], _keepLen[i]) == _keepLen[i];
       if (f) f.close();
       if (_serial_output) {
@@ -690,6 +707,7 @@ private:
   bool _updateFinalized;    // set in END; suppresses onDisconnect abort on clean close
   char _updaterError[128];
   UploadTarget _uploadTarget;
+  bool _satLoadedAtFsStart = true;   // TASK-1771: SAT had loaded its files when this filesystem write started
   size_t _uploadExpectedBytes;
   size_t _uploadWrittenBytes;
   uint32_t _uploadBlockIndex;

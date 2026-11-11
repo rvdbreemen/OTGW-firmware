@@ -3778,9 +3778,16 @@ static void satLoadEstimatedEnergy()
 // were: energy is only saved hourly.
 // What it does not cover: /sat_markers.json has no RAM copy (the update server
 // keeps it on the heap) and /sat/sat_cycles.json is never written by the firmware.
+// TASK-1771: true once initSAT() has loaded the SAT state files into RAM. setup() starts the web
+// server before initSAT(), so a filesystem upload or a reboot request can arrive while RAM still holds
+// the defaults; writing those would overwrite the files (an active preset came back as none after an
+// OTA). Until then the update server's heap copies (KEEP_LIST) carry the files over a new image.
+static bool _sat_stateLoaded = false;
+bool satStateLoaded() { return _sat_stateLoaded; }   // read by the update server when a filesystem write starts
+
 void satPersistAllToFs()
 {
-  if (!LittleFSmounted) return;
+  if (!LittleFSmounted || !_sat_stateLoaded) return;
   if (satPidRoomSeen()) satSavePidState();   // entry 115: a restored state with no room reading yet stays on flash
   satSaveEnergyState();
   satSaveEstimatedEnergy();
@@ -5619,6 +5626,7 @@ void initSAT()
   satLoadEstimatedEnergy();  // Restore estimated gas energy from LittleFS (Task #232)
   satLoadPresetState();      // Restore preset + window target after readSettings() (TASK-1487)
   satHCRLoadState();         // Restore daily-median recommendation ring from LittleFS (Task #228)
+  _sat_stateLoaded = true;   // TASK-1771: from here satPersistAllToFs() writes RAM, which now holds the files
   satCycleInit();
   satPwmReset();
   state.sat.bActive = false;

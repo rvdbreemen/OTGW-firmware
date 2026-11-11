@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.182
+**  Version  : v2.0.0-beta.183
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -489,6 +489,7 @@ void satFlushCycleWindow();
 void satFlushShortLivedData();
 void satResetControlState();               // TASK-1414: PID integral + raw derivative (primary and zones), SATcontrol.ino
 void satPersistAllToFs();                  // TASK-1286: write the SAT learned state from RAM (filesystem update write-back)
+bool satStateLoaded();   // TASK-1771: SAT files loaded into RAM (initSAT() done)
 float satUserTargetTemp();                 // TASK-1487: the user's own target (settings.ini), never a preset temperature
 void satPresetClearForUserTarget();        // TASK-1487: a changed SATtargettemp clears an active preset / window switch
 void satSavePresetState();                 // TASK-1487: /sat/sat_preset.json
