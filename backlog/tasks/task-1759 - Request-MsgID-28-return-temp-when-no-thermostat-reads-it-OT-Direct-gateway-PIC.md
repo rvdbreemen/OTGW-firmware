@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:08:00Z'
-updated_date: '2026-11-11T06:57:00Z'
+updated_date: '2026-11-11T07:48:00Z'
 labels:
   - sat
   - opentherm
@@ -28,7 +28,7 @@ Open questions before code, to Sergeant D per the SAT rules (sat-ground-truth, o
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Open questions (method, interval, SAT-only or always) asked to Sergeant D and his answers recorded as entries in docs/sat/sergeant-d-corrections.md before any code
+- [x] #1 Open questions (method, interval, SAT-only or always) asked to Sergeant D and his answers recorded as entries in docs/sat/sergeant-d-corrections.md before any code
 - [ ] #2 OT-Direct gateway mode: the gateway reads MsgID 28 when no thermostat reads it, as decided; shown in a test and in a bench or tester capture
 - [ ] #3 PIC boards: the same, as decided; shown in a test and in a capture
 - [ ] #4 SAT sees a valid return temperature on such an installation (tick ret != 0.0) and the flame-off hold uses it
@@ -110,6 +110,8 @@ Check: the BSS delta in the build output (RAM: line) before/after.
 2026-11-11 07:xx taken over by otgw-firmware-09 (coordinator, a4's lane orphaned): lane-1759a reset to origin/dev 99e85b61c+ and only the feature commit 0d6e9f8de cherry-picked (853e9efb4 dropped: its cherry-pick 058a6f50d is on dev); banner-only hunks and version files taken from upstream; old HEAD kept as branch lane-1759a-pre-takeover (and NAS refs/backup/2026-11-11/lane-1759a). Tests on the rebased tree: test_otd_return_temp_slot 9/9, test_otd_return_temp_slot_source 2/2, test_otd_gateway_alt_slots 12 OK (1 skip), test_override_reply OK; evaluate --quick 86/0. Bumped to beta.175.
 
 2026-11-11 audit 1795 area E notes for TASK-1759 checked against the code: (1) the age stamp is set only in otdRetNoteReply from handleMasterResponse for a thermostat READ_DATA answered READ_ACK; the loopback path never calls it (comment corrected) -> no stamp from a WRITE_ACK echo or a loopback reply: OK. (2) the cached reply goes through applyResponseModifiers (OTDirect.ino otdRetSlotTaken): OK. (3) GAP FOUND AND FIXED: otBoilerCacheStore keeps a Data-Invalid (or WRITE_ACK) value and only Unknown-DataID clears validity, while the candidate stamp from an earlier READ_ACK stayed fresh, so the slot could answer the thermostat READ_ACK with an invalid value. Fix: any non-READ_ACK reply for the candidate ID, from any origin, clears the stamp. New host case R9 in tests/test_otd_return_temp_slot.py (harness knob g_invalidFrom in test_otd_gateway_alt_slots.py: boiler answers 17/25 Data-Invalid 0xDEAD from 100 s): before the fix cachedbad=1 (FAILED), after 0 (cached=3 in the first 100 s); file 10/10, _source 2/2, alt_slots 12 OK (1 skip); evaluate --quick 86/0.
+
+2026-11-11 08:50 otgw-firmware-09: part A shipped as 2.0.0-beta.175+b5459f8 (origin/dev e3b4229df..b5459f863), zip posted to #alpha-testing msg 1569981951643750426. AC1 ticked: Sergeant D entries 287/291 and Robert entry 290 in docs/sat/sergeant-d-corrections.md predate the code (ADR-224 Accepted). Host evidence AC2: tests/test_otd_return_temp_slot.py 10/10 (R1 r28=10 cached=10 in 6 min, R9 Data-Invalid red before the audit fix, green after), _source 2/2, test_otd_gateway_alt_slots 12 OK (1 skip), evaluate --quick 86/0, full sweep 199/200 (the 1 is the run_tests false negative TASK-1810). Bench .61 (beta.175+cd9d50e, same code, ino.bin 2128992 B identical to b5459f8): OTA app+fs OK, settings 164 keys unchanged, 11 min soak no reboot, heap ~71 KB, MQTT up, sched 104/104. NOT verified on bench: .61 has no boiler and no thermostat and runs master mode, so the slot behaviour is host-test-proven only. Open: AC2 field/tester capture in OT-Direct gateway mode with a thermostat (tjfs), AC3 PIC part C (Q-1759b), AC4 SAT tick ret != 0.0 in the field.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
