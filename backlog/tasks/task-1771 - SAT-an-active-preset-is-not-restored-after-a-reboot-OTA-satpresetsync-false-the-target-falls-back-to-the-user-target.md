@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-10T03:24:00Z'
+updated_date: '2026-11-11T08:05:00Z'
 labels:
   - sat
   - needs-maintainer-ok
@@ -26,3 +27,9 @@ Seen on .63 (Classic + PIC, SAT enabled) around the beta.166 OTA of 2026-11-09 2
 - [ ] #1 Reproduced on the bench: set a preset, reboot (and OTA), read active_preset and target before/after; capture the SAT state file write
 - [ ] #2 Decision recorded (Sergeant D / Robert): an active preset survives a reboot or not; implement and test accordingly
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-11: Sergeant D answered Q-1771a with A (07:26:05 UTC, msg 1569976495491915849, entry 308): restore the active preset and its target after a reboot or update, like thermo-nova climate.py:175-181 (target) and :187-188 (preset). The behaviour is settled; the task keeps needs-maintainer-ok until Robert releases it.
+<!-- SECTION:NOTES:END -->

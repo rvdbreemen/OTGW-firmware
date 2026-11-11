@@ -4074,6 +4074,71 @@
     "TASK-1796"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 305,
+   "title": "Self-tune: when one phase has no data in the 3 counted days, the phase with data decides alone (Q-1787e B) (Sergeant D, 2026-11-11; follows entries 303-304)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569975937657999373",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1796"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 306,
+   "title": "Self-tune: warm-up covers both sides of the deadband, overshoot above target included (Q-1787f A) (Sergeant D, 2026-11-11; follows entry 304)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569976134198628413",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1796"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 307,
+   "title": "The current ADR-205 self-tune stays on, unchanged, until the phase-based tuner ships (Q-1787b A) (Sergeant D, 2026-11-11; settles the open point of entry 298)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569976299315920906",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1796"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 308,
+   "title": "An active preset and its target are restored after a reboot or update, like thermo-nova (Q-1771a A) (Sergeant D, 2026-11-11)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569976495491915849",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1771"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 309,
+   "title": "Greek web UI: the last mixed-case labels follow, “Εσωτερική” and “Ζεστό Νερό Χρήσης” (Q-1777g A) (Sergeant D, 2026-11-11; follows entry 295)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569976714157891605",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1777"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

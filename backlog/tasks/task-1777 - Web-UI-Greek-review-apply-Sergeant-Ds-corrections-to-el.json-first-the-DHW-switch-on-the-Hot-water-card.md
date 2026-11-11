@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-10T12:18:00Z'
-updated_date: '2026-11-10T22:46:00Z'
+updated_date: '2026-11-11T08:05:00Z'
 labels:
   - webui
   - i18n
@@ -46,6 +46,8 @@ Sergeant D (Greek native speaker) reviews the Greek web UI pack. First correctio
 2026-11-10 evening: rebased onto 008bec20e. Contains the Home chips/cell grid DHW labels (t('home.chip_dhw'), t('home.cell_dhw'); nl/de WW, el ΖΝΧ). i18n-followups 4/4 (red on the previous v2.js for the chip/cell check), i18n-lang 6/6, i18n-no-hardcoded 3/3, v2-undefined-names 2/2 (after npm ci --prefix tests/webui), v2-nested-helper-scope 2/2. Greek entries 292-295 are already on origin (e93a8c07e, 0b835ccc0, 75ed5ac29).
 
 2026-11-10 23:50 shipped in beta.172 (a905bc2a5, pushed 4595fa65a..0d02754a5 with beta.173; zip msg 1569845393427009538). Bench .63 (Classic+PIC, OTA app+fs, settings 150 keys 0 differences, PIC gateway 6.8 found): headless Chrome DOM dumps en/nl/de/el-GR show the Home chips 'DHW'/'WW'/'WW'/'ΖΝΧ' and all of entries 292-295 live in el: title 'Ζεστό Νερό Χρήσης', switch 'Ενεργοποίηση ΖΝΧ', slider 'Θερμοκρασία στόχος ΖΝΧ', hint (answer B), h_home tile/stat 'Ζεστό Νερό Χρήσης', drawing label 'ΕΣΩΤΕΡΙΚΗ'. AC2 note: besides the keys Sergeant D named (entries 292-295), el.json gained home.chip_dhw/cell_dhw 'ΖΝΧ' (glossary term he uses himself), not a rename of his. Tests: i18n-lang 6/6, i18n-followups 4/4. Chrome note: --lang=el gives an empty dump (also for a data: URL), --lang=el-GR works: a Chrome quirk, not the UI.
+
+2026-11-11: Sergeant D answered Q-1777g with A (07:26:57 UTC, msg 1569976714157891605, entry 309). Follow-up translation in i18n/el.json: chip_room, sat_tile_room, legend_room 'Χώρος' -> 'Εσωτερική'; pic_led_w 'Ζεστό νερό' -> 'Ζεστό Νερό Χρήσης'.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

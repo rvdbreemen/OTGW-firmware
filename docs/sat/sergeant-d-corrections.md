@@ -6553,3 +6553,73 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1796 (implementation by otgw-firmware-d3, Robert's priority of 2026-11-11).
 
 **Open:** Q-1787d confirmed only by our reading until he reacts to msg 1569964436796739676; Q-1787b, Q-1771a, Q-1777g.
+
+## 305. Self-tune: when one phase has no data in the 3 counted days, the phase with data decides alone (Q-1787e B) (Sergeant D, 2026-11-11; follows entries 303-304)
+
+**Source:** sergeantd, 2026-11-11 07:23:52 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1569975937657999373 (https://discord.com/channels/812969634638725140/1105556725714649128/1569975937657999373), a Discord reply to our question msg 1569974667819618396. Read first-hand by the comms session through the bot REST API. Acknowledged in msg 1569978658007810111.
+
+**Quoted:** "@BlueFlame Bot Q-1787e: B"
+
+**Settled:** If the warm-up or the floating phase has no samples in the window of 3 counted days, the other phase decides alone; when both have data, both must agree (entries 303-304). This keeps a too-low curve correctable: with the hold rule (A) the room never reaches the 0.1 C deadband, so the floating phase never has data and the coefficient is never raised. Research model round 12 by otgw-firmware-d3 (msg 1569974584600690750): minutes/day outside +-0.3 C, ADR-205 100/124, hold-rule 114/168, B 100/125 (2025-26 / 2010-11); too-low starts never corrected, hold-rule 38/37 of 60, B 20/18 of 60. Simulation only, not boiler proof.
+
+**Checked against the recorded entries:** Entries 303 and 304 (agreement rule, mirrored): completed for the missing-data case. ADR-205 decision 3 (3 counted days): unchanged.
+
+**Task:** TASK-1796 (otgw-firmware-d3: constant SAT_CT_MISSING_PHASE_VETO 0; no data in both phases holds with reason no_phases).
+
+**Open:** nothing for this point.
+
+## 306. Self-tune: warm-up covers both sides of the deadband, overshoot above target included (Q-1787f A) (Sergeant D, 2026-11-11; follows entry 304)
+
+**Source:** sergeantd, 2026-11-11 07:24:39 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1569976134198628413 (https://discord.com/channels/812969634638725140/1105556725714649128/1569976134198628413), a Discord reply to our question msg 1569974674648203276. Read first-hand by the comms session through the bot REST API. Acknowledged in msg 1569978658007810111.
+
+**Quoted:** "@BlueFlame Bot Q-1787f: A"
+
+**Settled:** A control tick counts as warm-up whenever the room is outside the 0.1 C deadband, below or above the target (thermo-nova const.py:16 DEADBAND = 0.1, pid.py:187 and pid.py:205). Time above the target is not ignored.
+
+**Checked against the recorded entries:** Entry 304 (phase split at the deadband): this fixes the open side question. Entries 163/171 (signal): unchanged.
+
+**Task:** TASK-1796 (as built, one named constant).
+
+**Open:** nothing.
+
+## 307. The current ADR-205 self-tune stays on, unchanged, until the phase-based tuner ships (Q-1787b A) (Sergeant D, 2026-11-11; settles the open point of entry 298)
+
+**Source:** sergeantd, 2026-11-11 07:25:18 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1569976299315920906 (https://discord.com/channels/812969634638725140/1105556725714649128/1569976299315920906), a Discord reply to our question msg 1569974680981340202. Read first-hand by the comms session through the bot REST API. Acknowledged in msg 1569978658007810111.
+
+**Quoted:** "@BlueFlame Bot Q-1787b: A"
+
+**Settled:** No interim change: no 1.6-2.4 clamp and no default-off. The ADR-205 tuner (at most 0.1 per 3 counted days, logged hourly and daily) runs as it is until TASK-1796 replaces its decision rule.
+
+**Checked against the recorded entries:** Entry 298 (wait for the night log, the tuner stays as it is): closed with this decision. Entry 166 (most homes 1.6-2.4): not turned into a clamp. Entry 302 (cause of 1.12 = the old satautotune): consistent.
+
+**Task:** TASK-1796 (no extra work).
+
+**Open:** nothing.
+
+## 308. An active preset and its target are restored after a reboot or update, like thermo-nova (Q-1771a A) (Sergeant D, 2026-11-11)
+
+**Source:** sergeantd, 2026-11-11 07:26:05 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1569976495491915849 (https://discord.com/channels/812969634638725140/1105556725714649128/1569976495491915849), a Discord reply to our question msg 1569974687726043167. Read first-hand by the comms session through the bot REST API. Acknowledged in msg 1569978658007810111.
+
+**Quoted:** "@BlueFlame Bot Q-1771a: A"
+
+**Settled:** After a restart the firmware restores the active preset and the target that goes with it. thermo-nova at 7beaaf5 does this through Home Assistant's RestoreEntity: custom_components/sat/climate.py:175-181 restores the target (ATTR_TEMPERATURE) and climate.py:187-188 the preset (ATTR_PRESET_MODE); opened in this session. The firmware today starts without a preset and falls back to the user target (TASK-1771).
+
+**Checked against the recorded entries:** No earlier entry covers preset persistence.
+
+**Task:** TASK-1771 (it carries needs-maintainer-ok: this settles the behaviour; Robert releases the work).
+
+**Open:** Robert's release of TASK-1771.
+
+## 309. Greek web UI: the last mixed-case labels follow, “Εσωτερική” and “Ζεστό Νερό Χρήσης” (Q-1777g A) (Sergeant D, 2026-11-11; follows entry 295)
+
+**Source:** sergeantd, 2026-11-11 07:26:57 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1569976714157891605 (https://discord.com/channels/812969634638725140/1105556725714649128/1569976714157891605), a Discord reply to our question msg 1569974694289870849. Read first-hand by the comms session through the bot REST API. Acknowledged in msg 1569978658007810111.
+
+**Quoted:** "@BlueFlame Bot Q-1777g: A"
+
+**Settled:** Translation only, no SAT behaviour. In i18n/el.json: chip_room, sat_tile_room and legend_room “Χώρος” -> “Εσωτερική”; pic_led_w “Ζεστό νερό” -> “Ζεστό Νερό Χρήσης”.
+
+**Checked against the recorded entries:** Entry 295 (same names everywhere, scope of Q3): extends it to the keys it left out. Entries 292-294: unchanged.
+
+**Task:** TASK-1777 (follow-up translation change).
+
+**Open:** nothing.

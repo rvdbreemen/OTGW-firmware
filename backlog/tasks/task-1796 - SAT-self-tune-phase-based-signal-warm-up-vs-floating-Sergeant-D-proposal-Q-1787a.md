@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-11T06:21:00Z'
-updated_date: '2026-11-11T07:19:00Z'
+updated_date: '2026-11-11T08:05:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -38,4 +38,6 @@ Sergeant D 2026-11-11 06:18:39 UTC, #dev-sat-mqtt msg 1569959525715542148 (entry
 2026-11-11 06:35:27 UTC: Sergeant D 'Yes mirrored. So the answer is A' (reply to Q-1787c; entry 304). Q-1787c = A (lower only when both phases say lower). Q-1787d = A by our reading (deadband split 0.1 C per tick, per phase ADR-205 rule +-1.0 C / step 0.1, change only when both agree), confirmed to him in msg 1569964436796739676; he may still correct it. Implementer: otgw-firmware-d3 (wt-selftune).
 
 2026-11-11 07:04-07:19 UTC: Q-1787e (one phase without data; advice B) and Q-1787f (overshoot counts as warm-up; advice A) asked; round 12 simulation posted (msg 1569974584600690750). Sergeant D asked for one question per message for tracking; all open questions re-posted separately (msgs 1569974667819618396 to 1569974694289870849).
+
+2026-11-11: entries 305 (Q-1787e B, the phase with data decides alone), 306 (Q-1787f A, both sides of the deadband), 307 (Q-1787b A, the current tuner stays on). Entry numbers claimed by comms after checking that every tree ended at 304 (coordinator informed).
 <!-- SECTION:NOTES:END -->
