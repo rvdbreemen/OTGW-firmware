@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:42:00Z'
-updated_date: '2026-11-11T19:21:00Z'
+updated_date: '2026-11-11T21:33:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -42,4 +42,6 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 2026-11-11 full scripts/run_tests.py: 201 of 203 passed. test/host/test_override_reply.py failed to compile the fix slice (otSummerMode, otDHWBlocking, otCoolingEnable undeclared: the harness slices OTDirect.ino by anchor and these globals are outside its slices). Slicing them breaks its old-revision suites (anchors must match old revisions), so test_override_reply.cpp declares them before the slice; suites 1177/1178/1184/1684 OK. test/host/test_stream_real_cbuf.py fails only under -j 4 and passes alone (exit 0), unrelated (seen on the TASK-1813 run too).
 
 ADR-229 Accepted 2026-11-11 by Robert van den Breemen via the coordinator session ('Accept both (Recommended)', AskUserQuestion answer in session 9604259c at 19:10Z, verified in that transcript). Steps: adr answer (open question), adr accept --confirm, adr supersede ADR-208 --by ADR-229. Clarity gate first failed (PIC/DHW/MQTT without expansion); fixed inline. Full-dir strict lint: ADR-208 and ADR-229 PASS strictly; tests/test_adr_governance.py 17 OK.
+
+Bench on .61 (OT-Direct, beta.184+d7b32cb), what is measurable without a thermostat: the build boots on OT-Direct (combo image, otcommandinterface OT-Direct); HW=0, SM=1, BW=1, CE=1, H2=1 are accepted (HTTP 202 queued) and undone (HW=A, SM=0, BW=0, CE=0, H2=0), health stays UP (heap 69 KB). NOT benched: the rewrite of a relayed thermostat MsgID 0 in gateway mode, because there is no thermostat on any bench unit in OT-Direct gateway mode; that path is proven by tests/test_otd_status_bits.py (8 OK on the fix, 7 failures on the old code) and test_otd_status_relay.py (9 OK). Field check to be asked from tjfs in the release note (via 92). A first combo build failed: OtdStatusCmd defined in OTDirect.ino is named by the Arduino-generated prototypes; moved to OTDirecttypes.h (bug-8668 in .wolf/buglog.json).
 <!-- SECTION:NOTES:END -->

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-10T03:24:00Z'
-updated_date: '2026-11-11T21:13:00Z'
+updated_date: '2026-11-11T21:33:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -50,4 +50,6 @@ For the release note (coordinator, 2026-11-11): before this fix every filesystem
 Bench 2026-11-11 22:00 on .61 found the first fix incomplete. Same reproduction (fs OTA the moment HTTP answers after a boot, ~13 s): old beta.182 lost preset, energy and /sat_tune.json; first-fix beta.184+84003bd kept /sat_tune.json but still lost preset (p4->p0) and energy (12.345->0); the same OTA 60 s after boot kept all. Cause: the fs upload start calls LittleFS.end() (OTGW-ModUpdateServer-esp32.h fs branch of the upload start); setup() continues to initSAT() (OTGW-firmware.ino:600) during the write, reads nothing, keeps defaults and sets _sat_stateLoaded; the restore's satPersistAllToFs() then wrote those defaults over the heap copies.
 
 Fix 2: the update server snapshots satStateLoaded() at the fs upload start, before LittleFS.end(); _restoreRuntimeFiles() lets RAM win (satPersistAllToFs) only when SAT was loaded before the write, else the heap copies stand. Choice vs the coordinator's alternative (refuse fs uploads with 503 until setup() is done): chosen the restore condition, because it closes the only RAM model that _restoreRuntimeFiles() writes back and that loads after the web server (settings and OT profiles load at OTGW-firmware.ino:333/336, before startWebserver() at :524), and it needs no client change: scripts/ota_flash.py flash_fs() does not retry a 503, nor does the /update page. Other setup readers after :524 (sensors) read empty in that window but are not written back, and the fs OTA ends in a reboot. tests/test_fs_update_keep.py: 38 OK on the fix; on the first-fix tree the new test_sat_ram_only_when_loaded_before_the_write and the order test fail.
+
+Bench fix 2 on .61, 2026-11-11 ~23:00, beta.184+d7b32cb, same reproduction (seed preset sleep p4, energy 12.345 kWh, a v2 /sat_tune.json; reboot; fs OTA via scripts/ota_flash.py --fs --no-app the moment HTTP answers): run 1 HTTP up 12.4 s, run 2 12.2 s; both: preset, energy and tune file byte-identical after the update. Old beta.182 on the same reproduction: all three lost; first fix beta.184+84003bd: preset and energy lost, tune kept. .61 restored: settings 164/164 equal to the backup, preset p0, energy 0.000, no tune file. Logs: bench scratch bench1771_{old,fix,fix2_run1,fix2_run2}.log, trace60.log.
 <!-- SECTION:NOTES:END -->

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T12:59:00Z'
-updated_date: '2026-11-11T14:25:00Z'
+updated_date: '2026-11-11T21:19:00Z'
 labels:
   - webui
   - otmonitor
@@ -120,4 +120,12 @@ foreach f [lrange $argv 1 end] {
 2026-11-11 rebuilt on origin/dev 64a5f3b88 after 09's beta.177/178 (bump files taken from origin, re-bumped): caf868c7c (beta.179). Build esp32-combo 2.0.0-beta.180+2b5c29a SUCCESS (covers 179 + 180); evaluate --quick 86/0. Bench .61 (OT-Direct): settings saved, OTA app+fs, 164 settings kept. Headless Chrome (CDP, scratchpad otmon_bench.mjs) opened http://192.168.88.61/, Monitor > Log, clicked the real 'OTmonitor log' and 'Download' buttons; the anchor click was intercepted so the blob was read instead of written to Downloads. No OT bus on .61, so the built-in frame replay ran (POST /api/v2/simulate/start, source builtin, 750 ms; no /otgw_simulation.log on the unit). After 120 s: 162 lines. otlog-20261111-152406.txt (162 lines, CRLF, e.g. '20261111-152204.044432 B40192519') through the real fileanal/filedata (tests/webui/lib/otmon_reader.tcl): LAYOUT {a15xa6xa* %Y%m%d-%H%M%S}, 162 of 162 frames read, 15:22:04 to 15:24:05 on 2026-11-11. The plain download of the same buffer: LAYOUT {}, 0 frames. With SAT on and no replay, only '< CS: 30.10' response lines arrived and the export was correctly empty. Screenshot of the toolbar with the button: scratchpad bench180/monitor-log-toolbar.png. Replay stopped, SAT back off, settings diff vs backup: 0.
 
 2026-11-11 pushed caf868c7c (beta.179) + 2b5c29a2c (beta.180) to origin/dev; zip 2.0.0-beta.180+2b5c29a posted (msg 1570081892999630898). Still open: AC3, the check in the real OTmonitor 6.6 GUI (needs otmonitor.exe; not runnable here), put to Robert via the coordinator.
+
+Static comparison with Schelte's OTmonitor master 715d3c0 (2026-11-11 21:19, 'Support reading the log file format created by the ESP8266 OTGW-Firmware'), clone OTGW-other-projects/otmonitor, read only, nothing executed. fileanal (otmonitor.vfs/otmonitor.tcl:1803-1866) picks the layout from the column where the first [ABRT]+8 hex frame occurs most often. New case 35 (:1857-1862): format a8xa6x20a*@18a*, timestamp %T, i.e. HH:MM:SS (a8), skip '.', microseconds (a6), skip 20 columns (the label), frame from column 35; @18 a* is the fallback text. filedata (:1771-1776) then takes the first 9 characters when they scan as %1[ABRT]%7x%x.
+
+(b) Our 2.x OT log line matches case 35: a real device download from .61 (beta.180, the plain Download button, otgw-log-20261111-152406.txt in the bench scratch) has all 162 frames at column 35, e.g. '15:22:04.044432 Boiler             B40192519  25 Read-Ack'. So with 715d3c0 the plain download is readable too; with OTmonitor 6.6 it was not (layout {}, 0 frames, bench 2026-11-11). (a) Our 'OTmonitor log' export (layout 23, YYYYMMDD-HHMMSS.uuuuuu <frame>) is OTmonitor's own existing case 23 (:1846-1849) and is untouched by 715d3c0. Difference that matters: case 35 has no date (%T, base = end time minus 6 hours, midnight crossing by the 00:00 rule at :1779-1783), our export carries the date per line.
+
+Not verified: a 1.x ESP8266 log line sample (the commit names the ESP8266 firmware; I did not open a 1.x download), and OTmonitor actually reading either file with 715d3c0 (running it is Robert's call). Not a regression risk for AC3: the export uses case 23, which both 6.6 and 715d3c0 read.
+
+2026-11-11 ~22:40 Robert decided against the separate button: keep the plain log format, OTmonitor 715d3c0 reads it (see the static comparison above). The feature is reverted under a follow-up task; AC3 is moot. Do not close as Done for the feature.
 <!-- SECTION:NOTES:END -->
