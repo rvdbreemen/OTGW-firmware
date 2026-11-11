@@ -25,6 +25,10 @@
 // A phase without a tick in the window does not veto: the phase with data decides alone; with data in both phases both must
 // agree (Sergeant D entry 305, Q-1787e B). 1 = the as-first-built hold (a phase without data holds).
 #define SAT_CT_MISSING_PHASE_VETO 0
+// The floating phase votes only with at least this much data (its signal ticks times the control interval) over the
+// counted days of the window; with less, the warm-up phase decides alone, as for a phase without data (Sergeant D
+// entries 313 and 315, Q-1796a B and Q-1796a2 B: 1 hour). The warm-up phase has no such minimum (entry 313 names floating).
+#define SAT_CT_FLOAT_MIN_MS     3600000UL
 #define SAT_CT_PHASE_SPLIT      1      // marks the phase-split tuner (the host test sets SatTuneTickIn.error only with it)
 #define SAT_CT_FILE_VERSION     2      // window file format: 2 = per-phase sums (ADR-228); files without "v":2 are dropped
 // An hour with a lost room temperature (signal 0, curve only) is not counted: reason no_room (Sergeant D entry 225,
@@ -106,6 +110,7 @@ struct SatTuneDayOut {
   bool        phHaveMean3[SATP_COUNT];
   float       phMean3[SATP_COUNT];     // per-phase tick-weighted mean over the window
   int8_t      phSay[SATP_COUNT];       // per-phase verdict: +1 higher, -1 lower, 0 inside the band (or no ticks)
+  bool        floatVotes;              // the floating phase had SAT_CT_FLOAT_MIN_MS of data and took part (entry 315)
   int8_t      decision;     // +1 raise, -1 lower, 0 hold
   const char* reason;       // PSTR: why hold, or what drove the change
   float       newCoeff;     // equals the old coefficient unless decision != 0

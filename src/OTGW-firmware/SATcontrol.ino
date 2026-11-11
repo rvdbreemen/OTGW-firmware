@@ -6113,7 +6113,7 @@ static int8_t satTunePhaseSay(bool haveMean, float mean)
 // days. ADR-228: each phase has a tick-weighted mean (its signal sum over the counted days divided by its signal ticks) and a
 // verdict; the coefficient moves 0.1 only when both phases say the same direction, otherwise it holds. mean3 is the ADR-205
 // hour-weighted mean of all clean hours, still logged for comparison. A change empties the window (3 new counted days).
-static void satTuneCloseDay(SatTune& t, float coeff, SatTuneDayOut& out)
+static void satTuneCloseDay(SatTune& t, float coeff, uint32_t tickMs, SatTuneDayOut& out)
 {
   out.day = t.dayNo;
   out.clean = t.cleanInDay;
@@ -6123,6 +6123,7 @@ static void satTuneCloseDay(SatTune& t, float coeff, SatTuneDayOut& out)
   out.haveMean3 = false;
   out.mean3 = 0.0f;
   for (uint8_t p = 0; p < SATP_COUNT; p++) { out.phTicks3[p] = 0; out.phHaveMean3[p] = false; out.phMean3[p] = 0.0f; out.phSay[p] = 0; }
+  out.floatVotes = false;
   out.reason = PSTR("day_not_counted");
   if (out.counted) {
     if (t.winDays >= SAT_CT_WINDOW_DAYS) {   // drop the oldest
@@ -6150,7 +6151,11 @@ static void satTuneCloseDay(SatTune& t, float coeff, SatTuneDayOut& out)
         out.phMean3[p]     = (pn > 0) ? ps / (float)pn : 0.0f;
         out.phSay[p]       = satTunePhaseSay(out.phHaveMean3[p], out.phMean3[p]);
       }
-      const bool haveW = out.phHaveMean3[SATP_WARMUP], haveF = out.phHaveMean3[SATP_FLOATING];
+      // Entries 313/315: the floating phase votes only with at least SAT_CT_FLOAT_MIN_MS of data in the window; below that it
+      // counts as a phase without data, so the warm-up phase decides alone (entry 305). tickMs = one control tick.
+      out.floatVotes = out.phHaveMean3[SATP_FLOATING] &&
+                       (uint64_t)out.phTicks3[SATP_FLOATING] * (uint64_t)tickMs >= (uint64_t)SAT_CT_FLOAT_MIN_MS;
+      const bool haveW = out.phHaveMean3[SATP_WARMUP], haveF = out.floatVotes;
       // Q-1787e B: a phase without data takes the verdict of the phase with data (SAT_CT_MISSING_PHASE_VETO 0)
       const int8_t w = haveW ? out.phSay[SATP_WARMUP]   : out.phSay[SATP_FLOATING];
       const int8_t f = haveF ? out.phSay[SATP_FLOATING] : out.phSay[SATP_WARMUP];
@@ -6389,11 +6394,11 @@ static void satTuneLogDay(const SatTuneDayOut& d)
   satTuneMeanStr(wm, sizeof(wm), d.phHaveMean3[SATP_WARMUP], d.phMean3[SATP_WARMUP]);
   satTuneMeanStr(fm, sizeof(fm), d.phHaveMean3[SATP_FLOATING], d.phMean3[SATP_FLOATING]);
   SATDebugTf(PSTR("SATTUNED day=%lu clean=%u counted=%d days_in_window=%u mean3=%s decision=%s reason=%s"
-                  " wmean3=%s wticks3=%lu wsay=%s fmean3=%s fticks3=%lu fsay=%s\r\n"),
+                  " wmean3=%s wticks3=%lu wsay=%s fmean3=%s fticks3=%lu fsay=%s fvote=%d\r\n"),
              (unsigned long)d.day, (unsigned)d.clean, (int)d.counted, (unsigned)d.daysInWindow, m,
              d.decision > 0 ? PSTR("raise") : (d.decision < 0 ? PSTR("lower") : PSTR("hold")), d.reason,
              wm, (unsigned long)d.phTicks3[SATP_WARMUP], satTuneSayName(d.phSay[SATP_WARMUP]),
-             fm, (unsigned long)d.phTicks3[SATP_FLOATING], satTuneSayName(d.phSay[SATP_FLOATING]));
+             fm, (unsigned long)d.phTicks3[SATP_FLOATING], satTuneSayName(d.phSay[SATP_FLOATING]), (int)d.floatVotes);
 }
 
 // Close one tuner hour: hourly record, and at the end of the day the daily record and, on a decision, the change.
@@ -6408,7 +6413,7 @@ static void satTuneRollHour()
   if (!h.dayComplete) return;
   const float oldCoeff = settings.sat.fHeatingCurveCoeff;
   SatTuneDayOut d;
-  satTuneCloseDay(_sat_tune, oldCoeff, d);
+  satTuneCloseDay(_sat_tune, oldCoeff, intervalMs, d);
   satTuneLogDay(d);
   if (d.decision == 0) { satTuneSaveWindow(); return; }
   satTuneApplyCoeff(d.newCoeff);   // the one settings.ini write: only here, only on a change

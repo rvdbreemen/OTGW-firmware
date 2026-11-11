@@ -472,9 +472,9 @@ class SatCurveSelfTune(unittest.TestCase):
                                    r"wmean=1\.50 wticks=2 fmean=1\.50 fticks=2$")
         daily = [l for l in o.log if l.startswith("SATTUNED ")]
         self.assertRegex(daily[0], r"^SATTUNED day=0 clean=24 counted=1 days_in_window=1 mean3=na decision=hold reason=few_days "
-                                   r"wmean3=na wticks3=0 wsay=hold fmean3=na fticks3=0 fsay=hold$")
+                                   r"wmean3=na wticks3=0 wsay=hold fmean3=na fticks3=0 fsay=hold fvote=0$")
         self.assertRegex(daily[2], r"^SATTUNED day=2 clean=24 counted=1 days_in_window=3 mean3=1\.50 decision=raise reason=phases_agree "
-                                   r"wmean3=1\.50 wticks3=144 wsay=higher fmean3=1\.50 fticks3=144 fsay=higher$")
+                                   r"wmean3=1\.50 wticks3=144 wsay=higher fmean3=1\.50 fticks3=144 fsay=higher fvote=1$")
         self.assertEqual(o.changes, ["SATTUNE old=2.0 new=2.1 mean3=1.50 wmean3=1.50 fmean3=1.50"])
         self.assertEqual(o.narr, ["NARR Heating curve self-tune: coefficient 2.0 -> 2.1 (3-day warm-up +1.50 C and floating +1.50 C, both above the curve)"])
         o = self.run_tokens(day(-1.5) * 3)
@@ -694,6 +694,37 @@ class PhaseSplit(unittest.TestCase):
         self.assertEqual((o.coeff, o.days[2]["decision"], o.days[2]["wticks3"]), (1.9, "lower", "0"))
         o = self.run_tokens(phase_day(0.5, 0.0, warm_n=4, float_n=0) * 3)
         self.assertEqual((o.coeff, o.days[2]["reason"]), (2.0, "inside_band"), "the lone phase inside the band holds")
+
+    @staticmethod
+    def short_float_window(float_total, warm_sig=3.0, float_sig=-2.0):
+        """3 days at a 60 s control interval: every hour 60 warm-up ticks, and float_total floating ticks over the whole
+        window (one per hour from the start), i.e. float_total minutes of floating data."""
+        toks, left = ["int:60"], float_total
+        for _ in range(3):
+            for _h in range(24):
+                f = 1 if left > 0 else 0
+                left -= f
+                toks += [tk(sig=warm_sig, err=0.5)] * 60 + [tk(sig=float_sig, err=0.0)] * f + [f"A:{HOUR}"]
+        return toks
+
+    def test_short_floating_sample_does_not_veto(self):
+        # TASK-1816, entries 313/315 (Q-1796a B, Q-1796a2 B): 12 floating minutes against 72 warm-up hours (the 10 Nov
+        # gruijter case) no longer block a raise; the warm-up phase decides alone, as for a phase without data (entry 305).
+        o = self.run_tokens(self.short_float_window(12))
+        d = o.days[2]
+        self.assertEqual((d["fticks3"], d["fsay"]), ("12", "lower"))
+        self.assertEqual((o.coeff, d["decision"], d["reason"]), (2.1, "raise", "phases_agree"))
+        self.assertEqual(d.get("fvote"), "0")
+
+    def test_one_hour_of_floating_data_votes(self):
+        # exactly SAT_CT_FLOAT_MIN_MS (60 ticks of 60 s): the floating phase votes, so the two phases disagree and hold
+        o = self.run_tokens(self.short_float_window(60))
+        d = o.days[2]
+        self.assertEqual((o.coeff, d["fticks3"], d["decision"], d["reason"]), (2.0, "60", "hold", "phases_disagree"))
+        self.assertEqual(d.get("fvote"), "1")
+        o = self.run_tokens(self.short_float_window(59))
+        self.assertEqual((o.coeff, o.days[2]["reason"]), (2.1, "phases_agree"))
+        self.assertEqual(o.days[2].get("fvote"), "0")
 
     def test_no_phase_data_at_all_holds(self):
         toks = []
