@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATpm25Poll.h
-**  Version  : v2.0.0-beta.181
+**  Version  : v2.0.0-beta.182
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

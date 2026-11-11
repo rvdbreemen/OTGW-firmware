@@ -4080,7 +4080,7 @@
   // satenabled is the SAT header toggle, so no form shows it. A SAT key that is not
   // listed here lands in L3 "Other", so a new firmware setting is never hidden.
   var SAT_L2 = [
-    ['System', ['satsystem', 'satsource', 'satheatingmode', 'sattargettemp', 'satpushsetpoint', 'satfollowthermostat', 'satfireplace', 'satmqttfallback']],
+    ['System', ['satsystem', 'satsource', 'satheatingmode', 'satpushsetpoint', 'satfollowthermostat', 'satfireplace', 'satmqttfallback']],
     ['Presets', ['satpresetcomfort', 'satpreseteco', 'satpresetaway', 'satpresetsleep', 'satpresetactivity',
                  'satpresethome', 'satpresetsync', 'satpresetsynctopic']],
     ['Indoor temperature', ['satexternaltemp', 'satsensormaxage']],
@@ -4107,7 +4107,10 @@
   // TASK-1530: satmaxmodulation is set only by the Max relative modulation slider (Central Heating Settings).
   // TASK-1779 (Robert 2026-11-10, Sergeant D's suggestion): the hot-water settings live only on the
   // SAT Hot water card (satDhwEnabled, satDhwSlider, satDhwEnable), so no form repeats them.
-  var SAT_NOT_IN_FORMS = { satenabled: 1, satmaxmodulation: 1, satdhwenabled: 1, satdhwenable: 1, satdhwsetpoint: 1 };
+  // TASK-1814 (Robert 2026-11-11, Sergeant D's proposal, entry 311): the room target is set by the Home page dial
+  // (POST /api/v2/sat/target) and the SAT climate entity, so the SAT Settings card no longer repeats it.
+  var SAT_NOT_IN_FORMS = { satenabled: 1, satmaxmodulation: 1, satdhwenabled: 1, satdhwenable: 1, satdhwsetpoint: 1,
+                           sattargettemp: 1 };
   // TASK-1529: the PWM card shows only the cycle setting the firmware uses for the chosen appliance type:
   // heat pump (satsource 2) and hybrid (3, entry 188) -> sathpcycle, otherwise (Auto = gas, gas) -> satcyclesperhour
   // (satGetPwmPeriodSec / satGetEffectiveHeatingSource in SATcontrol.ino).
