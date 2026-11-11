@@ -731,8 +731,8 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-224: OT-Direct gateway mode reads the return temperature in a supported thermostat slot and answers that read from the boiler cache](ADR-224-ot-direct-gateway-mode-reads-the-return-temperature-in-a-supported-thermostat-slot-and-answers-that-read-from-the-boiler-cache.md)** 🆕 *(Accepted)*  
   In OT-Direct gateway mode the gateway swaps one frequent supported thermostat read for its own MsgID 28 read every 30 s while SAT is on and no valid MsgID 28 arrived for 30 s, and answers the thermostat from the cache (TASK-1759, Sergeant D entries 290-291).
 
-- **[ADR-229: OT-Direct gateway mode rewrites MsgID 0 bits 1, 2, 4, 5 and 6 of the relayed thermostat status like the PIC](ADR-229-ot-direct-gateway-mode-rewrites-msgid-0-bits-1-2-4-5-and-6-of-the-relayed-thermostat-status-like-the-pic.md)** 🆕 *(Proposed)*  
-  In gateway mode the relayed thermostat MsgID 0 gets bits 0, 1, 2, 4, 5 and 6 by the PIC readstatus rule (gateway.asm:2712-2742): HW=0/1 (or a DHW push) sets bit 1, CE= sets bit 2 while a CL= level is held, H2= sets bit 4 while a C2= setpoint is held, SM=1 and BW=1 force bits 5 and 6; bit 0 stays as ADR-208. User Decision (Robert): 'Like the PIC: new ADR'. Would supersede ADR-208. Gate: host test on the real relay block (TASK-1805).
+- **[ADR-229: OT-Direct gateway mode rewrites MsgID 0 bits 1, 2, 4, 5 and 6 of the relayed thermostat status like the PIC](ADR-229-ot-direct-gateway-mode-rewrites-msgid-0-bits-1-2-4-5-and-6-of-the-relayed-thermostat-status-like-the-pic.md)** 🆕 *(Accepted)*  
+  In gateway mode the relayed thermostat MsgID 0 gets bits 0, 1, 2, 4, 5 and 6 by the PIC readstatus rule (gateway.asm:2712-2742): HW=0/1 (or a DHW push) sets bit 1, CE= sets bit 2 while a CL= level is held, H2= sets bit 4 while a C2= setpoint is held, SM=1 and BW=1 force bits 5 and 6; bit 0 stays as ADR-208. User Decision (Robert): 'Like the PIC: new ADR'. Supersedes ADR-208. Gate: host test on the real relay block (TASK-1805).
 
 - **[ADR-225: Raise the ESP32-S3 IPC task stack to at least 1280 B by rebuilding the Arduino framework libs with a custom sdkconfig](ADR-225-raise-the-esp32-s3-ipc-task-stack-to-at-least-1280-b-by-rebuilding-the-arduino-framework-libs-with-a-custom-sdkconfig.md)** 🆕 *(Proposed)*  
   Rebuild the Arduino framework libraries with a custom sdkconfig so the ipc0/ipc1 task stacks are at least 1280 B, the fix for the rare boot panic (TASK-1763).
@@ -740,8 +740,8 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-226: Use acorn and eslint-scope as test-only dependencies for a parser-based undefined-name gate on the web UI](ADR-226-use-acorn-and-eslint-scope-as-test-only-dependencies-for-a-parser-based-undefined-name-gate-on-the-web-ui.md)** 🆕 *(Accepted)*  
   acorn 8.19.0 (MIT) and eslint-scope 9.1.2 (BSD-2-Clause), pinned in tests/webui/package.json, back tests/webui/v2-undefined-names.test.mjs: every unresolved name in v2.js must be a listed browser global. Test-only, never in the firmware or LittleFS (TASK-1769).
 
-- **[ADR-228: SAT heating curve self-tune splits the signal into warm-up and floating phases and changes the coefficient only when both agree](ADR-228-sat-heating-curve-self-tune-splits-the-signal-into-warm-up-and-floating-phases-and-changes-the-coefficient-only-when-both-agree.md)** 🆕 *(Proposed)*  
-  Each signal tick goes to the warm-up phase (|PID error| > 0.1 C, thermo-nova DEADBAND) or the floating phase; each phase has its own tick-weighted 3-day mean with the +-1.0 C rule, and the coefficient moves 0.1 only when both phases say the same way (Sergeant D entries 302-304). Would supersede ADR-205 decisions 1 and 3; open: a phase without data (Q-1787e), overshoot as warm-up (Q-1787f). Gate: tests/test_sat_curve_selftune.py (TASK-1796).
+- **[ADR-228: SAT heating curve self-tune splits the signal into warm-up and floating phases and changes the coefficient only when both agree](ADR-228-sat-heating-curve-self-tune-splits-the-signal-into-warm-up-and-floating-phases-and-changes-the-coefficient-only-when-both-agree.md)** 🆕 *(Accepted)*  
+  Each signal tick goes to the warm-up phase (|PID error| > 0.1 C, thermo-nova DEADBAND) or the floating phase; each phase has its own tick-weighted 3-day mean with the +-1.0 C rule, and the coefficient moves 0.1 only when both phases say the same way (Sergeant D entries 302-304). Partly supersedes ADR-205 (decisions 1 and 3); a phase without data decides alone (Q-1787e, entry 305), overshoot ticks count as warm-up (Q-1787f, entry 306). Gate: tests/test_sat_curve_selftune.py (TASK-1796).
 
 - **[ADR-196: SAT behaviour ground truth: Sergeant D's recorded decisions, then pinned thermo-nova, then specs, then firmware](ADR-196-sat-behaviour-ground-truth-sergeant-d-s-recorded-decisions-then-pinned-thermo-nova-then-specs-then-firmware.md)** 🆕 *(Accepted)*  
   Source order for every SAT statement or change: `docs/sat/sergeant-d-corrections.md` entries, then thermo-nova at 7beaaf5 (`file:line`), then `thermo-nova-spec.md`, then the firmware and its docs, which are never the authority. Read the corrections file first, cite the entry or say none covers it, put conflicts to Sergeant D. Guideline-level, no CI gate.
@@ -1028,11 +1028,11 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | Metric | Count |
 | --- | ---: |
 | Total ADRs | 228 |
-| Accepted | 185 |
+| Accepted | 186 |
 | Amended | 1 |
-| Proposed | 4 |
+| Proposed | 2 |
 | Rejected | 2 |
-| Superseded | 35 |
+| Superseded | 36 |
 | Superseded by adr-124 | 1 |
 | Duplicate IDs | 0 |
 
@@ -1244,10 +1244,10 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | ADR-202 | Replace the two capture scripts with one Python capture tool behind thin launchers | Accepted | 2026-11-02 | - | ADR-202-replace-the-two-capture-scripts-with-one-python-capture-tool-behind-thin-launchers.md |
 | ADR-203 | SAT sends CS MM and CH on every control update (supersedes ADR-199 decision 4) | Accepted | 2026-11-07 | - | ADR-203-sat-sends-cs-mm-and-ch-on-every-control-update-supersedes-adr-199-decision-4.md |
 | ADR-204 | SAT PID reset triggers (supersedes ADR-197 decision 8) | Accepted | 2026-10-31 | - | ADR-204-sat-pid-reset-triggers-supersedes-adr-197-decision-8.md |
-| ADR-205 | SAT heating curve self-tune: hourly evaluation, daily decision on the curve integral | Accepted | 2026-10-31 | - | ADR-205-sat-heating-curve-self-tune-hourly-evaluation-daily-decision-on-the-curve-integral.md |
+| ADR-205 | SAT heating curve self-tune: hourly evaluation, daily decision on the curve integral | Accepted | 2026-11-11 | - | ADR-205-sat-heating-curve-self-tune-hourly-evaluation-daily-decision-on-the-curve-integral.md |
 | ADR-206 | REST API sets the telnet debug log flags by name from one shared table | Accepted | 2026-11-02 | - | ADR-206-rest-api-sets-the-telnet-debug-log-flags-by-name-from-one-shared-table.md |
 | ADR-207 | SAT sends MM, the Immergas TP and CH on change, CS keeps the 5 s resend (partly supersedes ADR-203) | Accepted | 2026-11-02 | - | ADR-207-sat-sends-mm-the-immergas-tp-and-ch-on-change-cs-keeps-the-5-s-resend-partly-supersedes-adr-203.md |
-| ADR-208 | OT-Direct gateway mode applies the CH= override to the relayed thermostat MsgID 0 | Accepted | 2026-11-04 | - | ADR-208-ot-direct-gateway-mode-applies-the-ch-override-to-the-relayed-thermostat-msgid-0.md |
+| ADR-208 | OT-Direct gateway mode applies the CH= override to the relayed thermostat MsgID 0 | Superseded | 2026-11-11 | Superseded by ADR-229 | ADR-208-ot-direct-gateway-mode-applies-the-ch-override-to-the-relayed-thermostat-msgid-0.md |
 | ADR-209 | Replay file lines may carry the otframes.log device time and the replay waits the recorded gap | Accepted | 2026-11-05 | - | ADR-209-replay-file-lines-may-carry-the-otframes-log-device-time-and-the-replay-waits-the-recorded-gap.md |
 | ADR-210 | REST API streams the stored ESP32 core dump as an admin download | Accepted | 2026-11-05 | - | ADR-210-rest-api-streams-the-stored-esp32-core-dump-as-an-admin-download.md |
 | ADR-211 | Skip the WiFi config portal on the boot after a WiFi supervisor restart | Accepted | 2026-11-08 | - | ADR-211-skip-the-wifi-config-portal-on-the-boot-after-a-wifi-supervisor-restart.md |
@@ -1266,6 +1266,6 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | ADR-224 | OT-Direct gateway mode reads the return temperature in a supported thermostat slot and answers that read from the boiler cache | Accepted | 2026-11-10 | - | ADR-224-ot-direct-gateway-mode-reads-the-return-temperature-in-a-supported-thermostat-slot-and-answers-that-read-from-the-boiler-cache.md |
 | ADR-225 | Raise the ESP32-S3 IPC task stack to at least 1280 B by rebuilding the Arduino framework libs with a custom sdkconfig | Proposed | 2026-11-10 | - | ADR-225-raise-the-esp32-s3-ipc-task-stack-to-at-least-1280-b-by-rebuilding-the-arduino-framework-libs-with-a-custom-sdkconfig.md |
 | ADR-226 | Use acorn and eslint-scope as test-only dependencies for a parser-based undefined-name gate on the web UI | Accepted | 2026-11-10 | - | ADR-226-use-acorn-and-eslint-scope-as-test-only-dependencies-for-a-parser-based-undefined-name-gate-on-the-web-ui.md |
-| ADR-228 | SAT heating curve self-tune splits the signal into warm-up and floating phases and changes the coefficient only when both agree | Proposed | 2026-11-11 | - | ADR-228-sat-heating-curve-self-tune-splits-the-signal-into-warm-up-and-floating-phases-and-changes-the-coefficient-only-when-both-agree.md |
-| ADR-229 | OT-Direct gateway mode rewrites MsgID 0 bits 1, 2, 4, 5 and 6 of the relayed thermostat status like the PIC | Proposed | 2026-11-11 | - | ADR-229-ot-direct-gateway-mode-rewrites-msgid-0-bits-1-2-4-5-and-6-of-the-relayed-thermostat-status-like-the-pic.md |
+| ADR-228 | SAT heating curve self-tune splits the signal into warm-up and floating phases and changes the coefficient only when both agree | Accepted | 2026-11-11 | - | ADR-228-sat-heating-curve-self-tune-splits-the-signal-into-warm-up-and-floating-phases-and-changes-the-coefficient-only-when-both-agree.md |
+| ADR-229 | OT-Direct gateway mode rewrites MsgID 0 bits 1, 2, 4, 5 and 6 of the relayed thermostat status like the PIC | Accepted | 2026-11-11 | Supersedes ADR-208 | ADR-229-ot-direct-gateway-mode-rewrites-msgid-0-bits-1-2-4-5-and-6-of-the-relayed-thermostat-status-like-the-pic.md |
 <!-- adr-kit-index:end -->

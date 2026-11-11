@@ -1,7 +1,7 @@
 ---
 id: "ADR-228"
 title: "SAT heating curve self-tune splits the signal into warm-up and floating phases and changes the coefficient only when both agree"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-11"
 binding: false
 gate: "tests/test_sat_curve_selftune.py"
@@ -9,7 +9,8 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
+related:
+  - "ADR-205"
 topics:
   - "heating curve self-tune"
   - "phase split"
@@ -31,6 +32,7 @@ symbols:
   - "satTuneCloseDay"
   - "fHeatingCurveCoeff"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -39,9 +41,9 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-11. Supersedes ADR-205 decision 1 (signal) and decision 3 (decision rule), and its Must "Use the curve
-integral (setpoint before the PWM override, minus the curve) as the only signal", once accepted. All other ADR-205 decisions
-(clean hour, bounds, PID, persistence, setting, logging) stay in force. Guideline-level until accepted; the gate named in
+Accepted, 2026-11-11. This ADR replaces ADR-205 decision 1 (signal) and decision 3 (decision rule) only, and its Must "Use the curve
+integral (setpoint before the PWM (pulse-width modulation) override, minus the curve) as the only signal". All other ADR-205 decisions
+(clean hour, bounds, PID (proportional-integral-derivative controller), persistence, setting, logging) stay in force. The gate named in
 the frontmatter is the host test that compiles the real tuner (ADR-080).
 
 **Decision Maker:** Sergeant D (SAT design owner) for the rule, entries 303-307 of `docs/sat/sergeant-d-corrections.md`;
@@ -56,6 +58,16 @@ status_history:
     changed_by: Agent (otgw-firmware-d3)
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-11
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Accepted by Robert van den Breemen, 2026-11-11, via the coordinator session ('Accept both'); TASK-1796, Sergeant D entries 303-307
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-11
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: "ADR-228 replaces ADR-205 decision 1 (signal) and decision 3 (decision rule) only, and its Must 'curve integral as the only signal'; the other ADR-205 decisions stay in force. Accepted by Robert van den Breemen, 2026-11-11, via the coordinator session ('Accept both')"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

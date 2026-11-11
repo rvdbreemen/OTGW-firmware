@@ -12,6 +12,7 @@ superseded_by: null
 related:
   - "ADR-198"
   - "ADR-204"
+  - "ADR-228"
 topics:
   - "heating curve self-tune"
   - "curve coefficient auto-tune"
@@ -66,6 +67,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: "Accepted by Robert in session 2026-10-31 (interactive question) and in #dev-sat-mqtt msg 1566083570903027713; design from Sergeant D entries 160-178"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-11
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: "ADR-228 replaces ADR-205 decision 1 (signal) and decision 3 (decision rule) only, and its Must 'curve integral as the only signal'; the other ADR-205 decisions stay in force. Accepted by Robert van den Breemen, 2026-11-11, via the coordinator session ('Accept both')"
     changed_via: adr-kit lifecycle
 ```
 

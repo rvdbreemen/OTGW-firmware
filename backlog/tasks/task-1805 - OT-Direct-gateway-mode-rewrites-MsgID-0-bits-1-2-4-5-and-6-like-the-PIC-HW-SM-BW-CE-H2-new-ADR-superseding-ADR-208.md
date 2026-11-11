@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:42:00Z'
-updated_date: '2026-11-11T15:10:00Z'
+updated_date: '2026-11-11T19:21:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -40,4 +40,6 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 2026-11-11 tests: new tests/test_otd_status_bits.py compiles the real setOTParityBit, otdEffectiveMasterFlags and otdRelayedStatus block and drives otdRelayedStatusFrame() (the applyOverrides entry point): pass-through of all 256 high bytes, one case per bit with mask on and off (HW 0/1/A/push, CE with/without CL, H2 with/without C2, SM, BW), bit 0 = ADR-208, bits 3/7 untouched, all together; parity checked. On origin/dev OTDirect.ino (OTGW_OTD_INO): FAILED (failures=7), only the pass-through case passes; on the fix: 8 OK. tests/test_otd_status_relay.py (ADR-208 cases) stub preamble extended with the new globals: OK; test_otd_gateway_alt_slots 12 OK (1 skipped), test_otd_ch_override OK, test_sat_requested_vs_transmitted OK. evaluate.py --quick 86/0.
 
 2026-11-11 full scripts/run_tests.py: 201 of 203 passed. test/host/test_override_reply.py failed to compile the fix slice (otSummerMode, otDHWBlocking, otCoolingEnable undeclared: the harness slices OTDirect.ino by anchor and these globals are outside its slices). Slicing them breaks its old-revision suites (anchors must match old revisions), so test_override_reply.cpp declares them before the slice; suites 1177/1178/1184/1684 OK. test/host/test_stream_real_cbuf.py fails only under -j 4 and passes alone (exit 0), unrelated (seen on the TASK-1813 run too).
+
+ADR-229 Accepted 2026-11-11 by Robert van den Breemen via the coordinator session ('Accept both (Recommended)', AskUserQuestion answer in session 9604259c at 19:10Z, verified in that transcript). Steps: adr answer (open question), adr accept --confirm, adr supersede ADR-208 --by ADR-229. Clarity gate first failed (PIC/DHW/MQTT without expansion); fixed inline. Full-dir strict lint: ADR-208 and ADR-229 PASS strictly; tests/test_adr_governance.py 17 OK.
 <!-- SECTION:NOTES:END -->

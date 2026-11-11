@@ -1,14 +1,14 @@
 ---
 id: "ADR-208"
 title: "OT-Direct gateway mode applies the CH= override to the relayed thermostat MsgID 0"
-status: "Accepted"
-date: "2026-11-04"
+status: "Superseded"
+date: "2026-11-11"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-229"
 topics:
   - "otdirect"
   - "opentherm"
@@ -40,7 +40,7 @@ format: "canonical"
 
 ## Status
 
-Accepted, 2026-11-04.
+Superseded by ADR-229, 2026-11-11.
 
 Guideline-level per ADR-080 (Binding ADR rules must have a CI (continuous integration) gate): no gate exists yet, because the behaviour is not implemented. The implementation task adds the host test named under Verification; with that test in place the maintainer may reclassify this ADR as pattern-level at acceptance.
 
@@ -59,6 +59,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: "Maintainer decision 2026-11-04 (interactive): any CS override, accept now; entry 264"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-11
+    status: Superseded
+    changed_by: Robert van den Breemen
+    reason: ADR-229 supersedes ADR-208 (bit 0 rule carried over unchanged; bits 1, 2, 4, 5, 6 added); Accepted by Robert van den Breemen, 2026-11-11, via the coordinator session ('Accept both')
     changed_via: adr-kit lifecycle
 ```
 

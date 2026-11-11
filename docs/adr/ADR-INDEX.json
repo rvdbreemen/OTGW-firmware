@@ -7503,7 +7503,7 @@
       "path": "ADR-205-sat-heating-curve-self-tune-hourly-evaluation-daily-decision-on-the-curve-integral.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-31",
+      "date": "2026-11-11",
       "decision_summary": "SAT gets an on/off self-tune, on by default, that evaluates every clean hour, logs it, and changes the heating curve...",
       "topics": [
         "clean hour",
@@ -7702,8 +7702,8 @@
       "title": "OT-Direct gateway mode applies the CH= override to the relayed thermostat MsgID 0",
       "path": "ADR-208-ot-direct-gateway-mode-applies-the-ch-override-to-the-relayed-thermostat-msgid-0.md",
       "format": "canonical",
-      "status": "Accepted",
-      "date": "2026-11-04",
+      "status": "Superseded",
+      "date": "2026-11-11",
       "decision_summary": "In OT-Direct gateway mode, bit 0 of the master status in a relayed thermostat READDATA MsgID 0 frame is set by the sa...",
       "topics": [
         "ch-enable",
@@ -7732,23 +7732,10 @@
       ],
       "context_scope": "selective",
       "decision_contract": {
-        "must": [
-          "In gateway mode, a relayed thermostat READDATA MsgID 0 frame gets bit 0 of its high byte from otdEffectiveMasterFlags(), with the same otChModeOff and otdCsOverrideActive() inputs that buildStatusRequest() uses, and its parity recomputed.",
-          "The reply to the thermostat for a rewritten MsgID 0 carries the boiler's low byte and the thermostat's original high byte.",
-          "The gateway's own MsgID 0 schedule and the MsgID-0-based offline detection stay in place."
-        ],
-        "must_not": [
-          "Must not rewrite any MsgID 0 bit other than bit 0 (CH enable).",
-          "Must not rewrite the frame without an active CS override, or in monitor mode.",
-          "Must not suppress the gateway's own MsgID 0 while a thermostat is connected (option A)."
-        ],
-        "exceptions": [
-          "None."
-        ],
-        "verification": [
-          "To be added by the implementation task: a host test that compiles the real rewrite and reply code cut from src/OTGW-firmware/OTDirect.ino (the cut-between-markers pattern of tests/testotdchoverride.py, which already covers otdEffectiveMa...",
-          "Field validation, open: a capture from an OT-Direct user with a live thermostat in gateway mode, showing which MsgID 0 frames reach the boiler and that the boiler follows SAT's CH=0 (TASK-1238 AC1, waived for this decision)."
-        ]
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
       },
       "scope": {
         "path_globs": [
@@ -7761,7 +7748,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-229"
       }
     },
     {
@@ -8877,7 +8864,7 @@
       "title": "SAT heating curve self-tune splits the signal into warm-up and floating phases and changes the coefficient only when both agree",
       "path": "ADR-228-sat-heating-curve-self-tune-splits-the-signal-into-warm-up-and-floating-phases-and-changes-the-coefficient-only-when-both-agree.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-11",
       "decision_summary": "Each signal tick of the self-tune is assigned to the warm-up phase (|PID error| > 0.1 C) or the floating phase (|PID...",
       "topics": [
@@ -8947,39 +8934,59 @@
       "title": "OT-Direct gateway mode rewrites MsgID 0 bits 1, 2, 4, 5 and 6 of the relayed thermostat status like the PIC",
       "path": "ADR-229-ot-direct-gateway-mode-rewrites-msgid-0-bits-1-2-4-5-and-6-of-the-relayed-thermostat-status-like-the-pic.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-11",
-      "decision_summary": "State one concrete chosen approach and its rationale.",
-      "topics": [],
-      "aliases": [],
-      "components": [],
-      "symbols": [],
+      "decision_summary": "In OT-Direct gateway mode the relayed thermostat READDATA MsgID 0 gets bits 0, 1, 2, 4, 5 and 6 of its master status...",
+      "topics": [
+        "gateway-mode",
+        "master-status",
+        "opentherm",
+        "otdirect",
+        "pic-parity"
+      ],
+      "aliases": [
+        "HW SM BW CE H2 in gateway mode",
+        "MsgID 0 relay rewrite",
+        "readstatus parity"
+      ],
+      "components": [
+        "OT-Direct relayed MsgID 0 master-status rewrite"
+      ],
+      "symbols": [
+        "applyOverrides",
+        "otdEffectiveMasterFlags",
+        "otdRelayedStatusFrame"
+      ],
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "State required implementation constraints."
+          "In gateway mode, a relayed thermostat READDATA MsgID 0 has its high byte computed by one pure function from the frame's high byte and the command state in the table above; otdRelayedStatusFrame() applies it and recomputes the parity when...",
+          "The reply to the thermostat for a rewritten MsgID 0 keeps the boiler's low byte and the thermostat's original high byte (otdStatusReplyData(), unchanged from ADR-208).",
+          "With no command state active (HW=A, no CL=, no C2=, SM=0, BW=0, no CS override) the frame passes byte for byte."
         ],
         "must_not": [
-          "State prohibited implementation choices."
+          "Must not touch bits 3 and 7 of the master status or the low byte.",
+          "Must not rewrite in monitor or bypass mode, or any MsgID 0 that is not a READDATA.",
+          "Must not replace bit 2 or bit 4 without the held CL= or C2= value (CE= or H2= alone changes nothing, as on the PIC)."
         ],
         "exceptions": [
-          "State explicit exceptions, or None."
+          "Bit 0 trigger: the ADR-208 predicate (any active CS override), see Decision."
         ],
         "verification": [
-          "Name the test, command, or source anchor that verifies this decision."
+          "A host test compiles the real rewrite block cut from src/OTGW-firmware/OTDirect.ino (the cut-between-markers pattern of tests/testotdstatusrelay.py) with one case per bit (mask on and off), the pass-through case and the reply. It fails o..."
         ]
       },
       "scope": {
-        "path_globs": [
-          "src/**/*.py"
-        ]
+        "path_globs": []
       },
       "metadata": {
         "binding": false,
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-208"
+        ],
         "superseded_by": null
       }
     }
@@ -14884,6 +14891,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-205",
+      "target": "ADR-228",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-206",
       "target": "ADR-051",
       "type": "related",
@@ -14983,6 +14996,12 @@
       "source": "ADR-208",
       "target": "ADR-207",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-208",
+      "target": "ADR-229",
+      "type": "superseded-by",
       "resolved": true
     },
     {
@@ -15456,6 +15475,30 @@
     {
       "source": "ADR-228",
       "target": "ADR-205",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-229",
+      "target": "ADR-208",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-229",
+      "target": "ADR-208",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-229",
+      "target": "ADR-223",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-229",
+      "target": "ADR-224",
       "type": "related",
       "resolved": true
     }

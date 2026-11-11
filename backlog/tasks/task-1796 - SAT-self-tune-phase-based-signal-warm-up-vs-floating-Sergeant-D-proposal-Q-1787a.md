@@ -64,6 +64,8 @@ Sergeant D 2026-11-11 06:18:39 UTC, #dev-sat-mqtt msg 1569959525715542148 (entry
 2026-11-11: Sergeant D Q-1796b B (entry 316, PWM hours count for warm-up on gas boilers; Robert still decides because of entry 174) and Q-1796d B (entry 317, effective ceiling; TASK-1815).
 
 2026-11-11: maintainer decision on Q-1796b: Robert answered B by Discord DM (msg 1570171160111620147, relayed by the coordinator), Sergeant D B too (entry 316). PWM hours count for the warm-up phase on gas boilers; the both-phases-agree rule stays. Revises entry 174. Needs a follow-up task and an ADR-228 update.
+
+ADR-228 Accepted 2026-11-11 by Robert van den Breemen via the coordinator session ('Accept both (Recommended)', session 9604259c 19:10Z). Partial supersession of ADR-205 recorded the way ADR-207/ADR-203 did it: adr relate ADR-228 --to ADR-205 with a reason; ADR-205 stays Accepted for its other decisions. Clarity gate fix: PWM/PID expanded inline. Status text repaired after adr accept cut the multi-line paragraph. README entry updated (Q-1787e/f answered, no longer open). Full-dir strict lint: ADR-205 and ADR-228 PASS strictly.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

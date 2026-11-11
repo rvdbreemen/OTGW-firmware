@@ -1,15 +1,15 @@
 ---
 id: "ADR-229"
 title: "OT-Direct gateway mode rewrites MsgID 0 bits 1, 2, 4, 5 and 6 of the relayed thermostat status like the PIC"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-11"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-208"
 superseded_by: null
-format: "canonical"
 topics:
   - "otdirect"
   - "opentherm"
@@ -27,6 +27,7 @@ symbols:
   - "otdEffectiveMasterFlags"
   - "applyOverrides"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -35,7 +36,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-11. Supersedes ADR-208 when accepted (ADR-208's bit 0 rule is carried over unchanged, below). The supersession is recorded on both ADRs with `adr supersede` at acceptance; ADR-208 stays as it is until then.
+Accepted, 2026-11-11. Supersedes ADR-208 (ADR-208's bit 0 rule is carried over unchanged, below).
 
 ## Status History
 
@@ -46,13 +47,23 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal (TASK-1805; User Decision 'Like the PIC: new ADR', relayed by the coordinator session)
     changed_via: adr-kit
+  - date: 2026-11-11
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: "Accepted by Robert van den Breemen, 2026-11-11, via the coordinator session ('Accept both'); TASK-1805, decision 'Like the PIC: new ADR'"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-11
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: ADR-229 supersedes ADR-208 (bit 0 rule carried over unchanged; bits 1, 2, 4, 5, 6 added); Accepted by Robert van den Breemen, 2026-11-11, via the coordinator session ('Accept both')
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-In gateway mode the gateway sits between a thermostat and the boiler. MsgID 0 (Status) is a READ_DATA whose high byte is the master status: bit 0 CH enable, bit 1 DHW enable, bit 2 cooling enable, bit 4 CH2 enable, bit 5 summer mode, bit 6 DHW blocking (OpenTherm 2.2). The serial commands HW=, CE=, H2=, SM= and BW= exist to change those bits.
+In gateway mode the gateway sits between a thermostat and the boiler. MsgID 0 (Status) is a READ_DATA whose high byte is the master status: bit 0 CH enable, bit 1 DHW (domestic hot water) enable, bit 2 cooling enable, bit 4 CH2 enable, bit 5 summer mode, bit 6 DHW blocking (OpenTherm 2.2). The serial commands HW=, CE=, H2=, SM= and BW= exist to change those bits.
 
-- **What the PIC does.** For the thermostat's own MsgID 0 the PIC replaces bits of the master status before the frame goes to the boiler (`readstatus`, `other-projects/otgw-6.6/gateway.asm:2712-2742`). Per bit, a mask says whether the gateway replaces the bit and a value says with what:
+- **What the PIC (the PIC microcontroller firmware on the Classic gateway) does.** For the thermostat's own MsgID 0 the PIC replaces bits of the master status before the frame goes to the boiler (`readstatus`, `other-projects/otgw-6.6/gateway.asm:2712-2742`). Per bit, a mask says whether the gateway replaces the bit and a value says with what:
   - bit 0: mask when a control setpoint is held (CS=, `SysCtrlSetpoint` = bit 7 of `controlsetpt1` clear, `:342`) or there is heat demand (`HeatDemand`, `:452`), value `!CHModeOff` (CH=). This is the rule ADR-208 brought to OT-Direct.
   - bit 1: mask when `HotWaterSwitch` (HW=0 or HW=1) or a DHW push is running (`dhwpushspoof`), value `HotWaterEnable` (HW=1) or the push (`SetHotWater` `:4348-4367`, flags `:488`, `:517-518`).
   - bit 2: mask when a cooling level is held (CL=, `SysCoolLevel` = bit 7 of `coolinglevel1` clear, `:348`, `SetCoolLevel` `:4411-4421`), value `!CoolModeOff` (CE=, `SetCoolEnable` `:4403-4409`).
@@ -114,7 +125,7 @@ Bit 0 keeps OT-Direct's ADR-208 trigger (any active CS override) rather than the
 
 **Positive:**
 
-- HW=, CE= (with CL=), H2= (with C2=), SM= and BW= work in OT-Direct gateway mode with a thermostat, as on a PIC board; Home Assistant and MQTT controls of these bits stop being no-ops.
+- HW=, CE= (with CL=), H2= (with C2=), SM= and BW= work in OT-Direct gateway mode with a thermostat, as on a PIC board; Home Assistant and MQTT (Message Queuing Telemetry Transport) controls of these bits stop being no-ops.
 - Without commands nothing changes: the thermostat's status reaches the boiler as it is.
 
 **Negative:**
@@ -125,7 +136,7 @@ Bit 0 keeps OT-Direct's ADR-208 trigger (any active CS override) rather than the
 
 ## Open Questions
 
-- [ ] Acceptance by Robert (maintainer); this ADR is never self-accepted.
+- [x] Acceptance by Robert (maintainer); this ADR is never self-accepted. — **Answered 2026-11-11 by User: Robert van den Breemen:** Accepted by Robert van den Breemen, 2026-11-11, via the coordinator session ('Accept both')
 
 ## Related Decisions
 
