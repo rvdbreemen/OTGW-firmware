@@ -121,7 +121,7 @@ flowchart TB
   EU --> TW & GH & DS
   AT --> ALP
   SD --> ALP & DEV
-  RB == sessie, AskUserQuestion ==> HS
+  RB == opdrachten in de sessie, vragen via Discord DM ==> HS
   TW & GH & DS --> HS
   ALP <--> HS
   DEV <--> HS
@@ -148,7 +148,7 @@ Er zijn vier rollen met een strikt verschil in zeggenschap (zie de matrix in 5.1
 | Discord support (NL, EN, #beta-testing, #devs-esp-firmware) | Gebruikersmeldingen | `discord-mcp`, alleen lezen via `/check_otgw_issues` | in |
 | GitHub issues | Gebruikersmeldingen | `gh issue list/view` | in |
 | Tweakers-topic | Nederlandstalige gebruikersmeldingen | RSS via `curl` | in |
-| Claude Code-sessie | Opdrachten en beslissingen van Robert | direct, AskUserQuestion | beide |
+| Claude Code-sessie | Opdrachten van Robert | direct in de sessie; vragen aan Robert alleen via Discord DM (zonder DM-kanaal asynchroon in de sessie), nooit een interactieve CLI-vraag (TASK-1829) | beide |
 
 De Discord-MCP is een native Java-proces (`saseq/discord-mcp`) op `localhost:8085` op Roberts werkplek. Het start bij inloggen en mag maar één keer de bottoken vasthouden. De zip-post loopt via een webhook-URL in `%LOCALAPPDATA%\OTGW-capture\` en wordt nooit gelogd.
 

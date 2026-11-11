@@ -58,7 +58,9 @@ Each push to `release/2.x` happens only inside this flow after checkpoint 1.
 2. Gates on the candidate: the open release blockers in the tracking task, the 24 h
    soak on a Classic + S3 Mini, capture runs on Windows, Linux and macOS
    (TASK-1544 for the first stable). Report each as met or not met with evidence.
-3. **CHECKPOINT 1** (AskUserQuestion, one question per decision, with a recommendation):
+3. **CHECKPOINT 1** (by Discord DM via the coordinator, never as an interactive CLI question; one question per
+   decision, with a recommendation. A release is a hard stop: only Robert's explicit yes as a reply to a DM that names
+   the version and the action counts, TASK-1829):
    - the go for version `<v>` on `CAND`;
    - each unmet gate: waive or wait;
    - **GitHub "Latest"**: mark this 2.x stable as Latest (recommended once 2.x is

@@ -56,8 +56,8 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
    No soak waiver: a slot whose candidate has not finished its 1 h soak waits until it has. Every flash
    of the bench unit restarts the soak, so the last flash before a slot is at least 1 h before it. Skip also when nothing user-visible changed or the candidate failed its soak or a bench
    check. Hotfix exception: a public beta that breaks or crashes units may get its fix out at
-   once. No per-release question within this rule; still ask (AskUserQuestion, one question
-   each) for anything new to weigh: a new waiver, a failed gate, a breaking change. The
+   once. No per-release question within this rule; still ask (by Discord DM via the coordinator, one question
+   each; never an interactive CLI question, TASK-1829) for anything new to weigh: a new waiver, a failed gate, a breaking change. The
    soak/macOS waiver (TASK-1544) carries over and is stated in every notes file.
    The release is a docs-only commit on top of the candidate (notes bundling every beta.N
    since the previous public beta, CHANGELOG rollover, README link), tagged and built from

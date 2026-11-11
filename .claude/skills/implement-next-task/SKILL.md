@@ -83,8 +83,9 @@ picked up through step 1.
    - **Bug report or PR**: priority `high`. These go first among new tasks in step 1
      (after the resumable `In Progress` tasks of step 1.1).
    - **Feature request, proposal, discussion or question**: file it with the label
-     `needs-maintainer-ok` (same rule as tester feedback) and ask Robert once in the
-     session, interactively, whether to release it, with a recommendation. Answer a plain
+     `needs-maintainer-ok` (same rule as tester feedback) and ask Robert once, by Discord DM
+     via the coordinator (never an interactive CLI question, TASK-1829), whether to release it,
+     with a recommendation. Answer a plain
      question on the issue directly.
 5. **Working a GitHub task**:
    - Bug: follow "Bug fixing: reproduce, then prove". When the issue has no captures, ask
