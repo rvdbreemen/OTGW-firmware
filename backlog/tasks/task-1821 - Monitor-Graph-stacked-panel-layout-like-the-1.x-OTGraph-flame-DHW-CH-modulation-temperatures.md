@@ -3,11 +3,11 @@ id: TASK-1821
 title: >-
   Monitor > Graph: stacked panel layout like the 1.x OTGraph (flame, DHW, CH,
   modulation, temperatures)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T21:08:00Z'
-updated_date: '2026-11-11T22:31:00Z'
+updated_date: '2026-11-11T23:21:00Z'
 labels:
   - webui
   - graph
@@ -52,4 +52,14 @@ Browser evidence (headless Chrome, real v2 page, fake device with 24 h synthetic
 Full tests/webui run, one file at a time: 66 files, 0 failing. evaluate.py --quick: 93 checks, 0 FAIL. AC3 screenshots done on the fake device (1 h and 24 h, light and dark, before/after); device bench by 09 after the coordinator's go.
 
 Coordinator correction: OTGW_BUMP_HOOK_DISABLE=1 on fe90a0750 was wrong (the hook is the gate that every firmware commit carries its own bump; never bypass hooks). At the rebase this commit gets its own bump via bin/bump-prerelease.sh and passes the hook normally. Tags: TASK-1820 beta.186, TASK-1821 beta.187; one 187 build covers both; 09 benches both behaviours.
+
+Rebased onto fa5790118 and re-bumped through the hook: TASK-1820 6fb23b77f beta.186, TASK-1821 579e0d172 beta.187. tests/webui 66 files 0 failing, evaluate --quick 93 checks 0 FAIL. build.bat esp32-combo from 579e0d172: 'Build completed successfully', build/OTGW-firmware-esp32-combo-2.0.0-beta.187+579e0d1-flash.zip (6155.7 KB), archived to OTGW-build-archive/2.0.0-beta.187+579e0d1.zip. Bench requested from 09 via the coordinator; push waits for its OK.
+
+Bench (09, 2026-11-12, .61, beta.187+579e0d1): 5 stacked panels PASS (on/off labels, 0/50/100 %, temperature axis + gridlines, legend 10 entries); windows 10 min/1 h/24 h PASS (24 h from synthetic history injected via CDP interception of /api/v2/graph/history, .61 has no boiler: real device history not checked); light/dark PASS; disconnects PASS (POST /ReBoot, gap ~16 s, red #f85149 and green #3fb950 dashed lines, chip toggles localStorage otgw-v2-gmarks 0/1 and survives reload, PNG export follows the chip, 1560x880); NL PASS (vlam/WW/CV/modulatie/temperaturen, 'Onderbrekingen', Dutch legend and aan/uit). Findings (cosmetic, both existed before this task, filed as TASK-1828): axis shows ° without C; window and export chips untranslated. Screenshots in C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/4f6ad420-bf33-4a3a-88bc-4eb9890a2231/scratchpad/b187: C2-graph-{10min,1h,24h}-{light,dark}.png, D-marks-{on,off}-light-10min.png, D-export-chip-{on,off}.png, E-nl-graph.png. Pushed (579e0d172), zip posted.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 5 panels: graph-panels.test.mjs 6 red/6 green, headless Chrome screenshots, 09's bench PASS. AC2 kept features: full tests/webui 66 files 0 failing (history merge, readout, room dropout, PNG/CSV), 09 PASS. AC3 screenshots before/after, 1 h/24 h, light/dark: scratchpad bench old-*/new-* plus 09's C2-graph-*. AC4 disconnect markers switchable and remembered, PNG follows: unit test + real WebSocket drop in headless Chrome + 09's /ReBoot bench. Commit 579e0d172 (beta.187), pushed, zip posted. Follow-up TASK-1828 for the ° without C and untranslated chips.
+<!-- SECTION:FINAL_SUMMARY:END -->
