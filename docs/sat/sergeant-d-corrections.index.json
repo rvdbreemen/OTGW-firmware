@@ -4166,6 +4166,32 @@
     "TASK-1814"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 312,
+   "title": "Self-tune holding in gruijter's house: wait one more day before judging, the house was cold for 5 days (Sergeant D, 2026-11-11)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1570165900789686466",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1796"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 313,
+   "title": "Q-1796a B: a short floating sample does not veto a warm-up raise; the floating phase votes only above a minimum amount of data (Sergeant D, 2026-11-11; follows entry 305)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1570167074670780447",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1796"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

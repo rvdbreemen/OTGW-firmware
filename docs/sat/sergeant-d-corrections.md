@@ -6653,3 +6653,33 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1814 (needs-maintainer-ok).
 
 **Open:** Robert's decision.
+
+## 312. Self-tune holding in gruijter's house: wait one more day before judging, the house was cold for 5 days (Sergeant D, 2026-11-11)
+
+**Source:** sergeantd, 2026-11-11 19:58:43 UTC (time from the message id), #alpha-testing (channel 1514720723980259460), msg 1570165900789686466 (https://discord.com/channels/812969634638725140/1514720723980259460/1570165900789686466). It answers the question at the end of our analysis of gruijter's overnight capture (msg 1570161973948063865: "is holding acceptable here, or should this house teach us something?"). Read first-hand by the comms session.
+
+**Quoted:** "@BlueFlame Bot let’s wait one more day because the home was cold for 5 days in a row. Tomorrow we will have some better results."
+
+**Settled:** no judgement yet on the tuner holding in this house (0 of 20 hours counted on beta.171, coefficient 1.80). Sergeant D wants one more day of data, because the house had been cold for 5 days before the capture.
+
+**Interpretation (ours, not asked):** "tomorrow" means a capture of 12 November, preferably on beta.176 or later (two-phase self-tune).
+
+**Checked against the recorded entries:** entry 174 (low-load blind spot, maintainer): not changed. Entries 302-307 (two-phase tuner): not changed.
+
+**Task:** TASK-1796.
+
+**Open:** the next-day capture from gruijter, and Q-1796b (PWM hours on gas boilers), which is also with Robert because of entry 174.
+
+## 313. Q-1796a B: a short floating sample does not veto a warm-up raise; the floating phase votes only above a minimum amount of data (Sergeant D, 2026-11-11; follows entry 305)
+
+**Source:** sergeantd, 2026-11-11 20:03:22 UTC (time from the message id), #alpha-testing, msg 1570167074670780447 (https://discord.com/channels/812969634638725140/1514720723980259460/1570167074670780447), answering Q-1796a (msg 1570166265912361081). Read first-hand by the comms session.
+
+**Quoted:** "@BlueFlame Bot Q-1796a: B"
+
+**Settled:** the floating phase only votes when it has at least a minimum amount of data in the 3 counted days; below that the warm-up phase decides alone, the same way as entry 305 (a phase without data). On 10 Nov 12 floating minutes against 650 warm-up minutes would then no longer block a raise.
+
+**Open:** the minimum itself. He did not give it; asked as the Q-1796a follow-up (msg 1570167442775220225: A 2 h, B 1 h, C other; advice A). The implementation waits for it.
+
+**Checked against the recorded entries:** entry 305 (phase without data decides alone): extended to a phase with too little data. Entries 303-304 (agreement rule): unchanged when both phases have enough data.
+
+**Task:** TASK-1796.
