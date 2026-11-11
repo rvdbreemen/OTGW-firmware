@@ -1,6 +1,6 @@
 ---
 name: otgw-device-verify
-description: Runs the OTGW on-device verify loop (build LittleFS/firmware -> flash the bench ESP32-S3 over USB -> verify the v2 Web UI on the device) and returns ONLY a compact PASS/FAIL summary. Use after any change to src/OTGW-firmware/data/* (v2.html/js/css) or firmware that needs on-device confirmation, so the verbose build log, esptool progress dump, and Playwright output stay in THIS agent's context instead of bloating the main session. Give it: what changed + the exact checks to run (elements/endpoints/values to assert).
+description: For the bench-tester agent (otgw-bench-tester) only; other agents never flash (maintainer directive 2026-11-11) and request a bench run through the coordinator. Runs the OTGW on-device verify loop (build LittleFS/firmware -> flash the bench ESP32-S3 over USB -> verify the v2 Web UI on the device) and returns ONLY a compact PASS/FAIL summary. Use after any change to src/OTGW-firmware/data/* (v2.html/js/css) or firmware that needs on-device confirmation, so the verbose build log, esptool progress dump, and Playwright output stay in THIS agent's context instead of bloating the main session. Give it: what changed + the exact checks to run (elements/endpoints/values to assert).
 tools: Bash, Read, Write, Glob, Grep
 model: sonnet
 ---

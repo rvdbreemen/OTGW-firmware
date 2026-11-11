@@ -194,7 +194,8 @@ behaviour choice (logging, UI, graphs, docs) do not wait.
    - `python evaluate.py --quick` (no new FAIL) and the relevant tests in `tests/`.
 4. Prove the behaviour: the same reproduction red on the old code and green on the
    fix. Use the boiler emulator, frame replay or host tests as simulation; use the
-   bench when it is available (OTGW32 test unit, WiFi OTA through safeboot for the app and `/update?cmd=100` for the filesystem; USB only when OTA cannot work, and then `flash_otgw --migrate --host`; save
+   bench through the bench-tester agent (`otgw-bench-tester`, maintainer directive 2026-11-11): never flash a
+   unit yourself; request the run through the coordinator, and the bench-tester flashes and tests (OTGW32 test unit, WiFi OTA through safeboot for the app and `/update?cmd=100` for the filesystem; USB only when OTA cannot work, and then `flash_otgw --migrate --host`; save
    `/api/v2/settings` first; never flash or reset a PIC without an explicit order).
    For UI changes take screenshots before and after.
 5. Append evidence to the task notes as you go and tick each AC only with evidence
@@ -252,9 +253,10 @@ Every alpha tag that reaches `dev` is published, also one another session built:
 the zip, report to the coordinating session, ledger check before each post).
 
 Per-task cadence (maintainer directive, 2026-10-30, `docs/guides/agent-build-and-bench.md`
-"Per-task cadence"): after the commit of step 7, build esp32-combo, OTA-flash a bench unit
-and bench-test this task's behaviour. Only after a passing bench test: push, post the zip and the
-step 8 report. A failed bench test publishes nothing: fix it, then build and bench-test again.
+"Per-task cadence"): after the commit of step 7, build esp32-combo and request a bench run from
+`otgw-bench-tester` through the coordinator (githash, absolute artifact path, behaviour to check). The
+bench-tester flashes, tests and ticks the bench ACs. Only after its passing report: push, post the zip and
+the step 8 report. A failed bench test publishes nothing: fix it, build again and request a new run.
 Tasks that are ready at the same moment may share one build, but each task's behaviour is
 bench-tested before the zip is posted. At most 3 hours between two builds while work lands.
 

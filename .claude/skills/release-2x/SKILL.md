@@ -148,7 +148,8 @@ Each push to `release/2.x` happens only inside this flow after checkpoint 1.
    must, put the worktree first on `sys.path`:
    `python.exe -c "import sys,runpy; sys.path.insert(0, r'<wt>'); sys.argv=['build.py']; runpy.run_path(r'<wt>\build.py', run_name='__main__')"`.
    A fresh worktree also needs `mkdir build` first.
-2. Bench, at least the Classic + S3 Mini, preferably two units:
+2. Bench, by the bench-tester agent (`otgw-bench-tester`, maintainer directive 2026-11-11; request it
+   through the coordinator), at least the Classic + S3 Mini, preferably two units:
    - save settings, OTA with `scripts/ota_flash.py` (exit 0, `changed: none`);
    - the user route: `/update` with the release zip;
    - `device/info` shows `<v>+<hash>` with no prerelease part, PIC detected;

@@ -133,8 +133,9 @@ from the file at create time.
    ls -la build | grep "beta.N+<githash>"                               # fresh mtimes
    ```
    Exit 0 alone proves nothing (build.py masks failures).
-2. Save settings, then OTA-flash a **Classic + S3 Mini** bench unit (the supported
-   public hardware):
+2. The bench-tester agent (`otgw-bench-tester`, maintainer directive 2026-11-11) does steps 2 to 4;
+   request it through the coordinator with the githash and the absolute artifact paths. It saves
+   settings, then OTA-flashes a **Classic + S3 Mini** bench unit (the supported public hardware):
    ```bash
    curl -s http://<ip>/api/v2/settings -o "$SCRATCH/settings-<ip>-before.json"
    ./.build-python/python.exe scripts/ota_flash.py --host <ip> \

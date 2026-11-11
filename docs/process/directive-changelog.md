@@ -20,9 +20,10 @@ lives here.
 | 2026-10-24 | Flash over WiFi OTA first, USB only with `--migrate --host` | `docs/guides/agent-build-and-bench.md`, CLAUDE.md summary |
 | 2026-10-25 | Pace SAT questions to Sergeant D's presence | `.claude/rules/sat-ground-truth.md` |
 | 2026-10-29 | One build at a time machine-wide, max 4 jobs, esp32-combo only on `dev` | `docs/guides/agent-build-and-bench.md`, CLAUDE.md summary |
+| 2026-11-11 | Only the bench-tester agent flashes and bench-tests; the developer builds and pushes after its OK; the bench-tester ticks the bench ACs (TASK-1826) | AGENT-CORE block, CLAUDE.md "Build, flash and bench", `docs/guides/agent-build-and-bench.md`, the implement-next-task, beta-release-2x and release-2x skills |
 | 2026-10-29 | Every alpha tag on `dev` is published, also when another session built it | `.claude/rules/discord.md` |
 | 2026-10-29 | Open questions go to Robert interactively with a weighed recommendation | CLAUDE.md "Design Principles" |
-| 2026-10-30 | Per-task cadence: bench-test every firmware task before its zip is published | `docs/guides/agent-build-and-bench.md`, CLAUDE.md summary |
+| 2026-10-30 | Per-task cadence: bench-test every firmware task before its zip is published (since 2026-11-11 the bench-tester agent runs that bench test) | `docs/guides/agent-build-and-bench.md`, CLAUDE.md summary |
 | 2026-11-01 | `release/2.x` is the stable 2.x line (TASK-1545) | CLAUDE.md "Git push policy" |
 
 ## Replaced directives

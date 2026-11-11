@@ -2,7 +2,8 @@
 
 `scripts/bench_check.py` (Python stdlib only) runs a list of checks from a JSON file against a
 bench unit and writes a timestamped transcript as evidence. Use one checks file per task, run it
-after the OTA flash, attach the transcript to the task's Final Summary.
+after the OTA flash, attach the transcript to the task's Final Summary. The bench-tester agent
+(`otgw-bench-tester`) does the flash and runs this tool; other agents request a run through the coordinator.
 
 ```
 python scripts/bench_check.py --host 192.168.88.61 --checks docs/guides/bench-check-example.json --out <dir>
