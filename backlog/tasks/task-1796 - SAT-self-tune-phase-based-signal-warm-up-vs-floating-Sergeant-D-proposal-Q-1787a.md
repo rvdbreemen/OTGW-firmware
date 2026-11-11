@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:21:00Z'
-updated_date: '2026-11-11T20:05:00Z'
+updated_date: '2026-11-11T20:08:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -58,6 +58,8 @@ Sergeant D 2026-11-11 06:18:39 UTC, #dev-sat-mqtt msg 1569959525715542148 (entry
 2026-11-11 field capture (gruijter, #alpha-testing msg 1570113823061577850 + csv 1570114673003729047; beta.171, coefficient 1.80, gas boiler, 10 Nov 21:18 to 11 Nov 17:26, 20.1 h, no reboot). Self-tune: 20 SATTUNEH hours, counted 0. First reasons: min_mod 11 (22:00-07:17 no heat demand, room above the 17.5 target; 07-08 and 09-10 min output), sun 5 (11:17-16:17), pwm 3, dhw 1, not_sat 1. No SATTUNED line (no day closed). Hour means: night -17.9 rising to -0.9 (praw below the curve), day +0.3 to +8.7 (praw 31-43 vs curve 29-32 at outside 3-6 C). Exclusion order in dev satTuneTickReason (SATcontrol.ino:5972) is the same as beta.171, so beta.176+ likely holds too in this house: the entry 174 low-load blind spot seen in the field. Boiler: MsgID 15 and 28 Unknown-DataID (minMod falls back to 5 %, no return temp); relmod with flame on 4654 samples, 721 at <=5 %, most 6-8 %; daytime PWM in 40-73 % of ticks, CH 37 runs 05:49-17:26, 29 of 2 min or more, daytime about 10 min on (ends on time) and 10 min off. Comfort: target 19.0 from 07:46, room 18.93 at 10:00; target 19.5 from 12:02, room 0.1-0.35 C below until about 17:00. Coredump in the upload is an old TWDT (loopTask + async_tcp CPU 1, app sha 661d01720), not from this window; no matching ELF here. Raw data local only: D:\Users\Robert\Documents\GitHub\RvdB\capture-gruijter-1111 (not committed).
 
 2026-11-11 20:03 UTC: Sergeant D Q-1796a B (entry 313): the floating phase votes only above a minimum amount of data; minimum asked as Q-1796a2 (advice 2 h). Entry 312: wait one more day before judging the tuner holding in gruijter's house. Q-1796b (PWM hours on gas boilers) is with Robert via the coordinator (entry 174); Q-1796c open.
+
+2026-11-11 20:05-20:07 UTC: Sergeant D Q-1796c A (entry 314: PWM ON time from flame ignition, thermo-nova pwm.py:186-198) and Q-1796a2 B (entry 315: minimum 1 hour of floating data in the 3 counted days). Q-1796d (tuner ceiling, TASK-1815) asked in #dev-sat-mqtt msg 1570168069114826913.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

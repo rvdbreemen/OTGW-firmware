@@ -6683,3 +6683,33 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Checked against the recorded entries:** entry 305 (phase without data decides alone): extended to a phase with too little data. Entries 303-304 (agreement rule): unchanged when both phases have enough data.
 
 **Task:** TASK-1796.
+
+## 314. Q-1796c A: a PWM ON phase counts its ON time from flame ignition, like thermo-nova (Sergeant D, 2026-11-11)
+
+**Source:** sergeantd, 2026-11-11 20:05:34 UTC (time from the message id), #alpha-testing, msg 1570167628020842557 (https://discord.com/channels/812969634638725140/1514720723980259460/1570167628020842557), answering Q-1796c (msg 1570166282320486514). Read first-hand by the comms session.
+
+**Quoted:** "@BlueFlame Bot Q-1796c: A"
+
+**Settled:** when a PWM ON phase starts and the flame does not light (for example right after a hot-water draw), the ON time is counted from flame ignition, as in thermo-nova at 7beaaf5: the ON timer waits for ignition and resyncs to it (custom_components/sat/pwm.py:186-191), and starts anyway after HEATER_STARTUP_TIMEFRAME without flame (pwm.py:192-198, const.py:18 HEATER_STARTUP_TIMEFRAME = 180). Opened in this session.
+
+**Checked against the recorded entries:** no earlier entry covers the ON timer after a missed ignition.
+
+**Firmware:** already does this, by code reading of otgw-firmware-d3 at e550795cd (not benched): SATcontrol.ino:1468-1477 syncs the ON phase to the first ignition (_pwm_waitingForFlame), and :1549-1554 starts the timer anyway after PWM_IGNITION_TIMEOUT_MS = 180 s (entry 80). This entry confirms existing behaviour. The question came from the 10 Nov analysis (PWM ON phases 18:13:57-18:17:57 and 19:18:57-19:25:27 with CS 48 and no flame after a hot-water run). How PWM hours count in the self-tune is Q-1796b, not this entry.
+
+**Task:** none (no change needed).
+
+**Open:** nothing.
+
+## 315. Q-1796a2 B: the floating phase needs at least 1 hour of data in the 3 counted days before it may vote (Sergeant D, 2026-11-11; completes entry 313)
+
+**Source:** sergeantd, 2026-11-11 20:06:59 UTC (time from the message id), #alpha-testing, msg 1570167982762491906 (https://discord.com/channels/812969634638725140/1514720723980259460/1570167982762491906), a reply to Q-1796a2 (msg 1570167442775220225). Read first-hand by the comms session.
+
+**Quoted:** "@BlueFlame Bot Q-1796a follow up question : B"
+
+**Settled:** the minimum of entry 313 is 1 hour of floating data over the 3 counted days. Below that the warm-up phase decides alone (entry 305). Our advice was 2 hours; he chose 1 hour.
+
+**Checked against the recorded entries:** entry 313: completed. Entries 303-305: unchanged otherwise.
+
+**Task:** TASK-1796 (otgw-firmware-d3: a named constant).
+
+**Open:** nothing for this point.

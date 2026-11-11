@@ -4192,6 +4192,30 @@
     "TASK-1796"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 314,
+   "title": "Q-1796c A: a PWM ON phase counts its ON time from flame ignition, like thermo-nova (Sergeant D, 2026-11-11)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1570167628020842557",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 315,
+   "title": "Q-1796a2 B: the floating phase needs at least 1 hour of data in the 3 counted days before it may vote (Sergeant D, 2026-11-11; completes entry 313)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1570167982762491906",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1796"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
