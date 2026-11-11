@@ -36,10 +36,12 @@ Robert 2026-11-06 ~00:00 (AskUserQuestion, lead session), after Andre's gzip+ETa
 2026-11-11 GitHub #692 closed as completed with Robert's OK: comment https://github.com/rvdbreemen/OTGW-firmware/issues/692#issuecomment-6787920267 (PR #698 shipped in beta.111, ADR-215).
 
 Robert's OK, 2026-11-11 ~06:3x local, session otgw-firmware-09, AskUserQuestion 'May I close GitHub issues #694, #692 and #154 (...)?' answered verbatim: "Yes, close all three (Recommended)" (option text: 'Post the two comments, then close #694, #692 and #154 as completed. #10 stays open.').
+
+2026-11-11 (docs session 95, coordinator request): GitHub #692 closed by Robert 2026-11-11T05:28:53Z (COMPLETED) with the comment 'Landed after all: your PR #698 shipped in 2.0.0-beta.111 (ADR-215 ...)'. Verified in git: 14d304af9 'feat(webui): TASK-1640 TASK-1674 serve each web page as one gzipped file with an ETag (ADR-215, PR #698)' carries _VERSION_PRERELEASE beta.111; the first public tag that contains it is v2.0.0-beta.118, whose release notes list it. ADR-215 Accepted. The task has no ACs; nothing to tick.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Implemented by PR #698 (André Brait), landed as 14d304af9 (beta.111) with the TASK-1674 review fixes; ADR-215 Accepted 2026-11-06 by Robert. Bench evidence in TASK-1674. GitHub issue #692 still open (closing it was not in the approval).
+Implemented by PR #698 (André Brait), landed as 14d304af9 (in-tree beta.111, first public tag v2.0.0-beta.118) with the TASK-1674 review fixes; ADR-215 Accepted 2026-11-06 by Robert. Bench evidence in TASK-1674. GitHub issue #692 closed by Robert on 2026-11-11 (COMPLETED).
 <!-- SECTION:FINAL_SUMMARY:END -->

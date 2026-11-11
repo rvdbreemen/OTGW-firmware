@@ -32,10 +32,12 @@ https://github.com/rvdbreemen/OTGW-firmware/issues/694 by andrebrait. Measured b
 2026-11-11 GitHub #694 closed as completed (Robert's OK in session otgw-firmware-09; his closing comment of 2026-11-05 already on the issue).
 
 Robert's OK, 2026-11-11 ~06:3x local, session otgw-firmware-09, AskUserQuestion 'May I close GitHub issues #694, #692 and #154 (...)?' answered verbatim: "Yes, close all three (Recommended)" (option text: 'Post the two comments, then close #694, #692 and #154 as completed. #10 stays open.').
+
+2026-11-11 (docs session 95, coordinator request): GitHub #694 closed by Robert 2026-11-11T05:28:51Z (COMPLETED); his reply of 2026-11-05T16:33Z covers the siscanf change, so the 'GitHub #694 reply' to-do above is done. Verified in git: 9c9f77904 'perf(size): TASK-1639 use newlib's integer-only siscanf' carries _VERSION_PRERELEASE beta.90; the first public tag that contains it is v2.0.0-beta.95 (git tag --contains). Bench closure in faef12707 (beta.94). Note: the GitHub reply says 'Shipped in 2.0.0-beta.98 (alpha build)'; the git history gives beta.90 in-tree and beta.95 as first public tag. Not corrected on GitHub (Robert's own comment). The task has no ACs; nothing to tick.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-siscanf instead of sscanf (19 call sites, integer formats only): app 2,158,720 -> 2,149,424 B at beta.89 (-9.3 KB incl. 1645), nm: no sscanf/__ssvfscanf_r. Evidence: tests/test_no_float_sscanf.py 4 OK (red on base), 19 host harnesses compile, bench .63 PIC 6.8: frame decode, PIC version and boot counter unchanged. Other #694 candidates not done by Robert's choice. Not verified: other MsgIDs on a real boiler, OT-Direct command parsing on hardware.
+siscanf instead of sscanf (19 call sites, integer formats only), commit 9c9f77904 (in-tree beta.90, first public tag v2.0.0-beta.95): app 2,158,720 -> 2,149,424 B (-9.3 KB incl. 1645), nm: no sscanf/__ssvfscanf_r. Evidence: tests/test_no_float_sscanf.py 4 OK (red on base), 19 host harnesses compile, bench .63 PIC 6.8: frame decode, PIC version and boot counter unchanged (faef12707). Other #694 candidates not done by Robert's choice. GitHub #694 answered (2026-11-05) and closed by Robert on 2026-11-11. Not verified: other MsgIDs on a real boiler, OT-Direct command parsing on hardware.
 <!-- SECTION:FINAL_SUMMARY:END -->
