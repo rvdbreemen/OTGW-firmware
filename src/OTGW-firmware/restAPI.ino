@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.184
+**  Version  : v2.0.0-beta.185
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3493,12 +3493,14 @@ void sendDeviceInfoV2()
     je.field(F("flashchipspeed"),   sBootFlash.flashChipSpeedMHz);
     je.field(F("flashchipmode"),    flashMode[sBootFlash.flashChipModeIdx < 4 ? sBootFlash.flashChipModeIdx : 4]);
     je.field(F("LittleFSsize"),     sBootFlash.littleFSSizeMB);
-    // TASK-959: lets the Flash Utility UI hide/disable the firmware-upload option
-    // before the user tries it on a single-app-slot board (app OTA would brick
-    // the running partition — see hasSpareAppOtaSlot() / _handleUploadStart).
-    je.field(F("app_ota_available"), hasSpareAppOtaSlot());
-    // ADR-191: on the 4MB safeboot layout the firmware update goes through the
-    // safeboot updater (POST /safeboot); the /update page offers that path.
+    // Firmware update path (TASK-1819): "direct" | "safeboot" | "usb", see
+    // firmwareOtaPath(). The two flags below are its inputs and stay for the
+    // /update page and scripts: app_ota_available = the running firmware takes
+    // a firmware image itself (a spare OTA slot; false on every 4MB table, also
+    // when firmware OTA works through safeboot), safeboot_available = the
+    // ADR-191 safeboot updater is installed (firmware OTA via POST /safeboot).
+    je.field(F("firmware_ota"),       firmwareOtaPath());
+    je.field(F("app_ota_available"),  hasSpareAppOtaSlot());
     je.field(F("safeboot_available"), hasSafeboot());
 
     // --- Reliability drops (heap-pressure side effects) ---

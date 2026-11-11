@@ -374,7 +374,7 @@ The firmware exposes a versioned HTTP REST API on port 80. All responses are JSO
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/v2/health` | System health: uptime, heap, network mode, RSSI, connectivity flags |
-| `GET` | `/api/v2/device/info` | Device metadata: hostname, version, chip, MAC, IP, OTA flags (`app_ota_available`, `safeboot_available`) |
+| `GET` | `/api/v2/device/info` | Device metadata: hostname, version, chip, MAC, IP, firmware update path `firmware_ota` and OTA flags (`app_ota_available`, `safeboot_available`) |
 | `GET` | `/api/v2/device/time` | Device time and NTP status (rate limited) |
 | `GET` | `/api/v2/device/crashlog` | Reboot / crash log |
 | `GET` | `/api/v2/flash/status` | Flash and filesystem metrics |

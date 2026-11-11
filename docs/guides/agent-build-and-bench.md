@@ -68,7 +68,26 @@ heap-frag soak, TASK-934):
   `POST /update?cmd=100&size=<n>` on the main firmware. The filesystem OTA keeps
   `settings.ini` and the other kept files by itself, and it is the route users take.
   Flash app and filesystem together when the web assets changed, so the hashes match.
-- **USB only when OTA cannot work** (unit does not boot, no network, no safeboot), and
+- **Firmware OTA facts (TASK-1819, checked 2026-11-11 on .61 and .63):**
+  - Every 4MB unit we ship has ONE OTA app slot. The old table has `app0` only. The ADR-191
+    table has `safeboot` (factory, 0x10000) plus `app0` (ota_0, 0x100000). The running firmware
+    therefore never writes a firmware image itself. IDF `esp_ota_get_next_update_partition()`
+    returns the running slot when it is the only one (`esp_ota_ops.c`, `default_ota`).
+    The TASK-959 guard in `_handleUploadStart` refuses the image before `Update.begin()`.
+    That guard is the safety boundary: keep it.
+  - `GET /api/v2/device/info` field `firmware_ota` names the path:
+    - `safeboot`: firmware OTA works over WiFi through the updater. Both bench units report this.
+    - `usb`: old table; migrate once with `flash_otgw.bat --migrate --host <ip>`.
+    - `direct`: a spare OTA slot; no 4MB table has one.
+  - `app_ota_available=false` does NOT mean "no firmware OTA". It only means the running
+    firmware takes no image itself. Read `firmware_ota`, or `safeboot_available`.
+  - Agent route for app + filesystem in one run:
+    `python scripts/ota_flash.py --host <ip> --app <...ino.bin> --fs <...littlefs.bin>`.
+    It saves the settings, does `POST /safeboot`, uploads the app to the updater and the
+    filesystem to the main firmware, reports the new running version and exits 2 when the settings changed.
+  - User route: the `/update` page, release zip, one action (same endpoints).
+  - Never upload a merged image over WiFi.
+- **USB only when OTA cannot work** (unit does not boot, no network, `firmware_ota` is `usb`), and
   then always `flash_otgw.bat --board esp32 --migrate --host <ip>`, which saves and
   restores `settings.ini` (auto-detects the S3 over USB VID/PID 303A:1001; `--port COMx`
   to force; esptool-only, works on any Python). Never `--update --fs` over USB.

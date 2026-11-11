@@ -950,10 +950,11 @@ var OTGWUpd = (function () {
       });
       box.appendChild(title); box.appendChild(text); box.appendChild(btn); box.appendChild(msg);
     } else {
-      box.innerHTML = '<b>Firmware (app) update is USB-only on this board</b><br>' +
-        'This board has a single app slot (no spare OTA partition), so writing a firmware image over WiFi ' +
-        'would overwrite the running app and could brick the device. Use <code>flash_otgw.bat</code> over USB instead. ' +
-        'Filesystem (LittleFS) updates below are unaffected.';
+      box.innerHTML = '<b>This unit needs a one-time USB update first</b><br>' +
+        'It still has the old partition table without the firmware updater, so a firmware image cannot be written over WiFi ' +
+        '(it would overwrite the running firmware). Run <code>flash_otgw.bat --migrate --host &lt;ip&gt;</code> over USB once; ' +
+        'it keeps your settings and installs the updater, and after that firmware updates run over WiFi from this page. ' +
+        'Filesystem (LittleFS) updates below work over WiFi now.';
     }
     fwForm.parentNode.replaceChild(box, fwForm);
   }

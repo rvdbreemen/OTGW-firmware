@@ -89,7 +89,7 @@ Over budget gives `429` with `application/problem+json` (RFC 9457; `retry_after`
 
 #### `handleDevice`
 - `GET /api/v2/device/info` (`sendDeviceInfoV2()`), `/device/time` (`sendDeviceTimeV2()`, rate limited), `/device/crashlog` (`sendDeviceCrashLog()`).
-- `device/info` carries chip fields for the Debug screen (`psram_found`, `psram_size`, `psram_free`, `flash_size`, `internal_free`, `internal_maxblk`, `chip_model_est`), `status_pixel_gpio` (TASK-1221), `ssid` = `Wired` on Ethernet, and the OTA capability flags `app_ota_available` (`hasSpareAppOtaSlot()`) and `safeboot_available` (`hasSafeboot()`, ADR-191) that the `/update` page uses to choose between direct upload and `POST /safeboot`.
+- `device/info` carries chip fields for the Debug screen (`psram_found`, `psram_size`, `psram_free`, `flash_size`, `internal_free`, `internal_maxblk`, `chip_model_est`), `status_pixel_gpio` (TASK-1221), `ssid` = `Wired` on Ethernet, the firmware update path `firmware_ota` = `direct` | `safeboot` | `usb` (`firmwareOtaPath()`, TASK-1819), and its two inputs `app_ota_available` (`hasSpareAppOtaSlot()`: the running firmware takes a firmware image itself; false on every 4MB table) and `safeboot_available` (`hasSafeboot()`, ADR-191) that the `/update` page uses to choose between direct upload and `POST /safeboot`.
 
 #### `handleFlash`, `handlePic`, `handleFirmware`, `handleFilesystem`
 - `GET /api/v2/flash/status` (`sendFlashStatus()`).

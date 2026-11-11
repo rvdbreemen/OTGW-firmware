@@ -713,6 +713,16 @@ paths:
                         type: number
                       LittleFSsize:
                         type: number
+                      firmware_ota:
+                        type: string
+                        enum: [direct, safeboot, usb]
+                        description: "How a firmware image reaches the unit over WiFi (TASK-1819). safeboot = POST /safeboot, then upload the .ino.bin to the updater; usb = old partition table, migrate once over USB (flash_otgw --migrate); direct = a spare OTA slot, upload to /update here (no 4MB table has one)."
+                      app_ota_available:
+                        type: boolean
+                        description: "The running firmware writes a firmware image itself (a spare OTA app slot). False on every 4MB table, also when firmware OTA works through safeboot."
+                      safeboot_available:
+                        type: boolean
+                        description: "The ADR-191 safeboot updater is installed; firmware OTA goes through POST /safeboot."
                       flashchipspeed:
                         type: number
                       flashchipmode:

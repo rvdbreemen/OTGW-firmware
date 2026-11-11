@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-beta.184
+**  Version  : v2.0.0-beta.185
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -69,11 +69,15 @@ extern void requestDeferredReboot(const char *reason);
   #define Debugf(...)     ({ OTGWSerial.printf_P(__VA_ARGS__); })
 #endif
 
-// TASK-959: shared with restAPI.ino's device/info emit so the v2/Classic Flash
-// Utility UI can hide the firmware-upload option before the user ever tries it,
-// rather than only rejecting the upload after the fact (see _handleUploadStart
-// below, which independently re-checks this — the UI hint is a courtesy, not
-// the safety boundary). Dynamic: an 8MB dual-slot table flips this to true.
+// TASK-959 guard: true only when a second OTA app slot exists that is not the
+// running one, so the running firmware can write a firmware image itself.
+// Every 4MB table we ship has one OTA app slot (app0 = ota_0): the old table
+// (app0 only) and the ADR-191 safeboot table (safeboot = factory + app0). With
+// one OTA slot, IDF esp_ota_get_next_update_partition(NULL) returns that slot
+// even though it is running (esp_ota_ops.c: default_ota = the first OTA slot),
+// so Update.begin() would pick it and the writes after it would erase the
+// running firmware (Updater.cpp: begin() picks the slot, writing erases it). _handleUploadStart checks
+// this before any write; it is the safety boundary, the /update page hint is not.
 inline bool hasSpareAppOtaSlot() {
   const esp_partition_t *running  = esp_ota_get_running_partition();
   const esp_partition_t *nextSlot = esp_ota_get_next_update_partition(nullptr);
@@ -101,6 +105,19 @@ inline bool hasSafeboot() {
   esp_app_desc_t desc;
   return esp_ota_get_partition_description(sb, &desc) == ESP_OK;
 }
+
+// TASK-1819: how a firmware (app) image reaches this unit over WiFi, for
+// device/info "firmware_ota":
+//   "direct"   a spare OTA app slot: upload the .ino.bin to /update here (no 4MB table has one).
+//   "safeboot" ADR-191 layout: POST /safeboot, then upload the .ino.bin to the
+//              safeboot updater's /update at the same address.
+//   "usb"      old table without a safeboot app: migrate once over USB
+//              (flash_otgw --migrate --host <ip>); after that the path is "safeboot".
+// The filesystem image goes over WiFi in every case (POST /update?cmd=100 here).
+inline const char *firmwareOtaPathFor(bool spareAppSlot, bool safeboot) {
+  return spareAppSlot ? "direct" : (safeboot ? "safeboot" : "usb");
+}
+inline const char *firmwareOtaPath() { return firmwareOtaPathFor(hasSpareAppOtaSlot(), hasSafeboot()); }
 
 // Mirror the hostname and the admin password into NVS for safeboot, which
 // cannot read settings.ini (LittleFS). Writes only on change, so calling it on
@@ -377,27 +394,25 @@ private:
       }
     } else {
       _uploadTarget = UploadTarget::Firmware;
-      // App/firmware OTA needs a SECOND app partition to receive the image:
-      // esp_ota writes to the inactive OTA slot, then otadata flips the boot
-      // pointer. On a single-app-slot table (the 4MB combo — app0/ota_0 only;
-      // the web-asset LittleFS leaves no room for a second ~1.9MB slot, and the
-      // only 4MB dual-slot scheme ships a 190KB FS too small for the web UI),
-      // esp_ota_get_next_update_partition() returns the RUNNING partition, so
-      // the write would overwrite the executing app and brick the device
-      // (empirically confirmed — TASK-959). Reject before any Update.begin();
-      // app flashing is USB-only here (flash_otgw.bat / merged-full over USB).
-      // The check is dynamic: an 8MB dual-slot (ota_0+ota_1) table would make
-      // nextSlot != running and re-enable OTA app updates automatically.
-      // The 4MB merged image is deliberately NOT accepted over OTA (USB-only);
-      // a plain firmware.bin app image is the only firmware upload we handle.
+      // The running firmware can only write a firmware image into a second OTA
+      // app slot. Our 4MB tables have one (app0 = ota_0, the running slot), so
+      // writing here would erase the running firmware (see hasSpareAppOtaSlot,
+      // TASK-959). Reject before any Update.begin() and name the path that works
+      // (firmwareOtaPath): "safeboot" on the ADR-191 layout (POST /safeboot, then
+      // the updater's /update; the /update page does this in one action), "usb"
+      // on an old table (migrate once with flash_otgw --migrate, then safeboot).
+      // A table with a spare OTA slot ("direct") passes this check unchanged.
+      // A merged image (bootloader + table + apps) is never accepted over WiFi;
+      // the only firmware upload is the plain .ino.bin app image.
       if (!hasSpareAppOtaSlot()) {
+        const bool sb = hasSafeboot();
         strlcpy(_updaterError,
-                hasSafeboot()
-                  ? "app update runs in the safeboot updater on this board; use 'Restart into the firmware updater' on /update"
-                  : "app update is USB-only on this board (single app slot); use flash_otgw.bat over USB",
+                sb ? "firmware goes through the safeboot updater here: POST /safeboot, then upload the .ino.bin there"
+                   : "old partition table without safeboot: migrate once over USB (flash_otgw --migrate), then firmware OTA works",
                 sizeof(_updaterError));
         if (_serial_output) {
-          DebugTln(F("[OTA] Firmware OTA rejected: single app slot (no ota_1) — app flash is USB-only"));
+          if (sb) DebugTln(F("[OTA] Firmware image refused here: it goes through the safeboot updater (POST /safeboot)"));
+          else    DebugTln(F("[OTA] Firmware image refused: old partition table without safeboot, migrate once over USB"));
         }
         return;
       }

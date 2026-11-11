@@ -98,7 +98,7 @@ Both sub-systems avoid whole-document allocations on a heap-constrained device: 
   - `GET /api/v2/health` - system health metrics (heap, uptime, network mode, RSSI, connectivity flags)
   - `GET|POST|PUT /api/v2/settings` - read all settings with type metadata / update one setting (`{"name","value"}`); auth required
   - `GET /api/v2/sensors[/status]`, `GET|POST|PUT /api/v2/sensors/labels` - Dallas and S0 readings, Dallas labels
-  - `GET /api/v2/device/info|time|crashlog` - device metadata (includes the OTA flags `app_ota_available` and `safeboot_available`); `device/time` is rate limited
+  - `GET /api/v2/device/info|time|crashlog` - device metadata (includes the firmware update path `firmware_ota` and the OTA flags `app_ota_available` and `safeboot_available`); `device/time` is rate limited
   - `GET /api/v2/flash/status` - flash metrics
   - `GET /api/v2/pic/flash-status|update-check|settings` - PIC firmware status
   - `GET /api/v2/otgw/otmonitor|telegraf|messages/{id}|id/{id}|label/{label}|boiler-support|ot-support|overrides` - OT state (`otmonitor` and `telegraf` share a rate-limit budget)
