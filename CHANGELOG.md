@@ -5,6 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.174] - 2026-11-11
+
+### Added
+- Diagnostics: connect-window heap trace at boot, printed as `[HEAP] connect-trace` telnet lines when the MQTT connect phase ends (TASK-1757).
+
+### Fixed
+- Web UI: one Hot water card; the SAT settings no longer repeat the hot-water controls (TASK-1779).
+- Web UI: translate the hard-coded DHW in the Home chips and cell grid (TASK-1777) and the Monitor graph axis labels DHW and CH (TASK-1791).
+
 ## [2.0.0-beta.170] - 2026-11-10
 
 ### Changed
@@ -845,7 +854,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.170...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.174...HEAD
+[2.0.0-beta.174]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.170...v2.0.0-beta.174
 [2.0.0-beta.170]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.167...v2.0.0-beta.170
 [2.0.0-beta.167]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.162...v2.0.0-beta.167
 [2.0.0-beta.162]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.158...v2.0.0-beta.162
