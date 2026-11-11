@@ -3,11 +3,11 @@ id: TASK-1798
 title: >-
   OT-Direct: answers the gateway makes itself are refused by the library's 50 ms
   slave gate, and the refusal is ignored
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:36:00Z'
-updated_date: '2026-11-11T14:16:00Z'
+updated_date: '2026-11-11T19:29:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -28,7 +28,7 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 <!-- AC:BEGIN -->
 - [x] #1 Every answer the gateway makes itself (master mode, UI=, SR=, alternative slot) is sent once the slave is ready; no refused send is dropped silently (retried while the thermostat's window lasts, else logged)
 - [x] #2 Host test against the real code (not a re-implementation): red on the old code, green on the fix
-- [ ] #3 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
+- [x] #3 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -43,4 +43,12 @@ One holder for an answer to the thermostat in OTDirect (otdSendReply/otdReplySer
 Evidence (wt-cyc09): tests/test_otd_slave_reply_gate.py runs the gateway loop of the alt-slots harness, a real handleMasterModeSlaveFrame() and the library's real isReady()/sendResponse() bodies, RESPONSE_TIME and DATA_READY delay statement (cut from OpenTherm.cpp) on a fake micros(). Old code (HEAD d9eda734d copy): G1 alternative slot 0/60 answered, G2 UI= 0/30, G3 SR= 0/30, G4 master mode 0/30; G0 relayed reply 30/30 (90 ms boiler round trip, contrast). Fix: all answered within 800 ms. test_override_reply C28 (refused reply: no A for it) kept: the relayed path logs A only once the held reply leaves. Regression: all tests/test_otd_*.py OK, test_override_reply / test_local_frame_consumers / test_boiler_unsupported_origin PASS, evaluate.py --quick 0 FAIL. Residual by design: a GW=R in the same mode can still send a held reply on the restarted slave within 750 ms (resetTransientState() may run on the async_tcp task, so it does not touch the holder).
 
 Refute-only review (opus): no stale or duplicate send in the normal flow. Fixed from it: (1) the service checked the 750 ms deadline only after a refused send, so after a loop stall over ~800 ms a held answer could still go out late: deadline now first; (2) only a valid frame dropped a held answer: any received frame now does. Test now also asserts late == 0 and no second answer per thermostat frame, and G5 (held, then a 900 ms stall: nothing sent). A mutant with the old service order fails G5 (late_sent=1). Accepted: A frames of the alternative-slot / UI= / SR= / master paths are still logged at decision time (tagged OTFRAME_SRC_OTDIRECT_LOCAL, not counted in the boiler-support bitmaps); only the relayed path logs on send (C28 contract).
+
+2026-11-11 beta.181 bec10121a, built with beta.182 c9f37bd (esp32-combo, exit 0, artifacts 20:25). evaluate.py --quick 86 pass 0 fail. Bench .61 (OT-Direct, no thermostat, no boiler, otdmode=master): boots, OTA OK, PR=A 'PR: A=OpenTherm Gateway 6.6', PR=T 'PR: T=10', PS=1 one summary line, PS=2 'PS: BV', PS=0 'PS: 0' - identical to beta.178, no regression in the OTD command path. NOT benched: the gate behaviour itself (held answer sent after 50 ms) needs a thermostat on the slave side; .61 has none. Covered only by the host test with the real library gate (tests/test_otd_slave_reply_gate.py, G1-G5).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: otdSendReply/otdReplyService hold an own answer until the library's 50 ms slave gate opens, drop it on the next frame, a mode switch or after 750 ms (deadline first); all six answer sites use it, relayed A logged only when sent. AC2: tests/test_otd_slave_reply_gate.py compiles the real OpenTherm gate and OTDirect code: old code G1-G4 answered 0/150; fix all answered, late=0, dup=0; G5 stall no late send; deadline-after-send mutant fails G5. AC3: esp32-combo build beta.182+c9f37bd (includes beta.181), evaluate 0 FAIL, OTA .61 and PR/PS bench unchanged vs beta.178. Not verified on hardware: the gate path with a real thermostat (no thermostat on any bench unit); evidence is the host test only. Commit bec10121a.
+<!-- SECTION:FINAL_SUMMARY:END -->
