@@ -6497,3 +6497,25 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1787.
 
 **Open:** where 1.12 came from. The ADR-205 tuner steps 0.1 at most once per 3 counted days, rounded to 0.01 (`SATcontrol.ino:6080-6084`), so from 2.0 it only reaches values ending in 0. Whether gruijter's unit ran the old hourly auto-tune removed by TASK-1413 (multiplicative 2 % steps, off by default) is asked.
+
+## 302. Sergeant D reads the old auto-tuner as the cause of gruijter's 1.12 and proposes a phase-based self-tune signal (warm-up vs floating) (Sergeant D, 2026-11-11; follows entries 298 and 301)
+
+**Source:** sergeantd, 2026-11-11 06:18:39 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1569959525715542148 (https://discord.com/channels/812969634638725140/1105556725714649128/1569959525715542148). Read first-hand by the comms session through the bot REST API. Our reply with question Q-1787a: msg 1569959952854945914 (06:20:21 UTC).
+
+**Quoted:** "@BlueFlame Bot regarding the gruijter’s issue now. It looks that the previous Autotuner was the issue. Since we identified the integral overdamping during warming up ( the heat curve value acts like the integral outside deadband ), can we use this type of data for the Autotuner? My idea is to have a comparison between warm up phase and the floating phase ( inside deadband ) and then decide how we change the heating curve coefficient"
+
+**Settled:**
+- Origin of 1.12 (entry 298, TASK-1787): Sergeant D reads it as the old hourly auto-tune, removed on 2026-10-30 (02029bf75, TASK-1413: switch "SAT Auto Tune", setting `satautotune`, default off, `satautotunerate` 0.02 per tuning cycle). This agrees with the facts gathered on 2026-11-10: the coefficient was 1.28 on 2026-10-25 (bot analysis msg 1563858326687588506), which is 2.0 x 0.98^22; gruijter never set 1.12 himself and runs no Home Assistant (msgs 1569803928478941383, 1569842194175762484); he probably did not set 2.2 on 2026-10-26 (msg 1569843197444886589). Not log-proven: no settings file or log shows the switch state.
+- Nothing changes in code from this entry. The ADR-205 self-tune stays as it is.
+
+**Proposal (not decided):** use the warm-up overdamping data for the self-tune. Compare the warm-up phase with the floating phase inside the deadband, and decide the coefficient change from that comparison.
+
+**Conflict with the recorded design:** ADR-205 Must: "Use the curve integral (setpoint before the PWM override, minus the curve) as the only signal", from entries 163 and 171. The current tuner averages setpoint minus curve over every clean hour and does not split warm-up from floating hours (ADR-205 decisions 1-3). Adopting the proposal changes the signal, so it needs a new ADR that supersedes ADR-205 for that part. thermo-nova at 7beaaf5 has no coefficient tuner (citations in entry 298), so this is our own design.
+
+**Interpretation (ours, not asked):** "the heat curve value acts like the integral outside deadband" refers to his entry 298 remark that a low coefficient "gives the same effect as an overdamped integral", and to entry 300 (low coefficient as the probable cause of the slow warm-up).
+
+**Checked against the recorded entries:** entries 163 and 171 (signal) and 164-176 (tuner design): in conflict if adopted, see above. Entry 298 (wait for the night log, the tuner stays as it is): agrees, no tuner change is decided. Entry 301 (1.8 for gruijter): unchanged.
+
+**Task:** TASK-1787 (origin, closed on this explanation, not log-proven); TASK-1796 (phase-based signal, waits for Q-1787a).
+
+**Open:** Q-1787a (how the two phases decide: A split clean hours into warm-up and floating and decide on the difference, our recommendation; B warm-up only; C other), then the thresholds.

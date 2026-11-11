@@ -4033,6 +4033,21 @@
     "TASK-1787"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 302,
+   "title": "Sergeant D reads the old auto-tuner as the cause of gruijter's 1.12 and proposes a phase-based self-tune signal (warm-up vs floating) (Sergeant D, 2026-11-11; follows entries 298 and 301)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1569959525715542148",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1413",
+    "TASK-1787",
+    "TASK-1796"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

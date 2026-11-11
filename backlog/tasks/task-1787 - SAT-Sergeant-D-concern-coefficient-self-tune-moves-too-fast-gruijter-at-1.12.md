@@ -3,11 +3,11 @@ id: TASK-1787
 title: >-
   SAT: Sergeant D concern, coefficient self-tune moves too fast (gruijter at
   1.12)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-10T18:57:00Z'
-updated_date: '2026-11-10T22:54:00Z'
+updated_date: '2026-11-11T06:23:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,8 +24,8 @@ Sergeant D, #dev-sat-mqtt 2026-11-10 19:48 UTC, msg 1569785822394323056 (relayed
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Origin of gruijter's 1.12 established from his SATTUNE/SATTUNED/SATTUNER log lines or settings history
-- [x] #2 Question to Sergeant D posted via 97 with options and a recommendation; his answer recorded as a numbered entry
+- [x] #1 Question to Sergeant D posted via 97 with options and a recommendation; his answer recorded as a numbered entry
+- [x] #2 Origin of gruijter's 1.12 explained and accepted (old satautotune: Sergeant D's reading entry 302, coefficient history 1.28 on 2026-10-25 = 2.0 x 0.98^22, gruijter's answers); recorded as not log-proven
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -46,4 +46,12 @@ Leading explanation (2026-11-10, a4, with input from 92 and the coordinator): th
 Proposal for Robert (not built, a decision is needed): units that ran the old auto-tune can carry a coefficient far below the usual range, and after TASK-1413 it loads unchanged. Options: (A) do nothing, the ADR-205 tuner raises it by 0.1 per 3 counted days (slow: 1.12 to 1.6 takes at least 15 counted days); (B) a one-time warning in the SAT page and the boot log when the stored coefficient is outside 1.6-2.4 and satautotune was set in settings.ini, suggesting a check; (C) a one-time migration that resets such a coefficient to 2.0 (changes behaviour without asking the user, so it needs Sergeant D's OK as a SAT behaviour change). Recommendation: B, it informs without changing control behaviour; C only with Sergeant D's agreement.
 
 Update 2026-11-10 (relayed by the coordinator from 92): asked whether he set 2.2 after Sergeant D's request of 26 Oct, gruijter answered 'probably not. dont remember'. So the leading path stays 1.28 (bot analysis of 25 Oct) to 1.12 by the old hourly auto-tune: a ratio of 0.875, about 6.6 steps of -2 % or, with the old mixed factors, 5 hourly steps (see above). Circumstantial: no log of the old tuner and no settings file from before 30 Oct.
+
+2026-11-11 (comms): AC1 'established from his SATTUNE/SATTUNED/SATTUNER log lines or settings history' was replaced by the current AC2, because no such log or settings history exists. The coordinator decided to close on the explanation under Robert's rule of 2026-11-11 (decide yourself). Evidence: Sergeant D 2026-11-11 06:18:39 UTC msg 1569959525715542148 'It looks that the previous Autotuner was the issue' (entry 302); 1.28 on 2026-10-25 (msg 1563858326687588506) = 2.0 x 0.98^22 = 1.282; 1.28 -> 1.12 is 6.6 more 2 % steps; gruijter did not set 1.12 and runs no HA (msgs 1569803928478941383, 1569842194175762484), probably did not set 2.2 (msg 1569843197444886589); old tuner removed 2026-10-30 in 02029bf75 (TASK-1413), stored coefficient kept. Follow-up design: TASK-1796 (Q-1787a).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Origin of gruijter's coefficient 1.12 explained as the old hourly satautotune (removed 2026-10-30, 02029bf75): Sergeant D's reading (entry 302) plus the coefficient history (1.28 on 2026-10-25 = 22 old 2 % steps from 2.0; about 7 more to 1.12) and gruijter's answers (never set it, no HA, probably not 2.2). NOT log-proven: no settings file or SATTUNE log shows the switch state; the original AC1 that required that evidence was replaced by AC2 with this basis stated. AC1 (question to Sergeant D, entry recorded): entries 298 and 302. Sergeant D's proposal for a phase-based self-tune signal moved to TASK-1796, waiting for Q-1787a. No code change.
+<!-- SECTION:FINAL_SUMMARY:END -->
