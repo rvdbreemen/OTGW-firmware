@@ -6713,3 +6713,33 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1796 (otgw-firmware-d3: a named constant).
 
 **Open:** nothing for this point.
+
+## 316. Q-1796b B: PWM hours count for the self-tune's warm-up phase on gas boilers (Sergeant D and Robert, 2026-11-11; revises entry 174)
+
+**Source:** sergeantd, 2026-11-11 20:04:33 UTC (time from the message id), #alpha-testing, msg 1570167372474617888 (https://discord.com/channels/812969634638725140/1514720723980259460/1570167372474617888), answering Q-1796b (msg 1570166274107904259). Read first-hand by the comms session.
+
+**Quoted:** "@BlueFlame Bot Q-1796b: B"
+
+**Settled (Sergeant D's side):** on gas boilers, PWM hours count for the warm-up phase of the self-tune. The signal is the same (setpoint minus curve, before the PWM override). Field basis: gruijter 10 Nov (PWM 88 %, no clean hour) and 11 Nov overnight (0 of 20 hours counted).
+
+**Maintainer decision:** this changes the low-load blind spot the maintainer accepted in entry 174 and the ADR-205 Must Not on PWM hours (now ADR-228), so Robert was asked too, by the coordinator by Discord DM (question msg 1570166620066684959). Robert answered "B" (DM channel 1570160296146899116, msg 1570171160111620147, 2026-11-11), relayed by the coordinator, not seen first-hand by comms. The agreement rule of entries 303-305/313/315 stays.
+
+**Checked against the recorded entries:** entry 174 (maintainer): revised by Robert's own answer above. Entry 205 (heat pumps: PWM hours logged, not used): not about gas boilers, unchanged. Entries 303-305, 313, 315: unchanged.
+
+**Task:** TASK-1796 (follow-up task to file).
+
+**Open:** a follow-up task to count PWM hours for the warm-up phase on gas boilers, and the ADR-228 update.
+
+## 317. Q-1796d B: the self-tune measures against the effective ceiling, the lower of the SAT max and the boiler max (Sergeant D, 2026-11-11)
+
+**Source:** sergeantd, 2026-11-11 20:11:32 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1570169126947655914 (https://discord.com/channels/812969634638725140/1105556725714649128/1570169126947655914), answering Q-1796d (msg 1570168069114826913). Read first-hand by the comms session.
+
+**Quoted:** "@BlueFlame Bot Q-1796d: B"
+
+**Settled:** the tuner clamps its signal at the effective ceiling SAT already applies to the setpoint it sends (satEffectiveMaxSetpoint(), SATcontrol.ino:419-431 at e550795cd: boiler MaxTSet MsgID 57 / SH=, user max, hard ceiling), instead of the SAT max setpoint alone (satGetMaxSetpoint(), :382-385; the signal clamp is at :7548-7551). Example: gruijter, boiler max 48 C against SAT max 65 C.
+
+**Checked against the recorded entries:** ADR-205 decision 1 / ADR-228 ("the system maximum"): this names which maximum. No conflicting entry. Our tuner; thermo-nova has no coefficient tuner (entry 298).
+
+**Task:** TASK-1815 (otgw-firmware-d3).
+
+**Open:** nothing.

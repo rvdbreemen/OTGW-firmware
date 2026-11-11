@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:21:00Z'
-updated_date: '2026-11-11T20:08:00Z'
+updated_date: '2026-11-11T20:21:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -60,6 +60,10 @@ Sergeant D 2026-11-11 06:18:39 UTC, #dev-sat-mqtt msg 1569959525715542148 (entry
 2026-11-11 20:03 UTC: Sergeant D Q-1796a B (entry 313): the floating phase votes only above a minimum amount of data; minimum asked as Q-1796a2 (advice 2 h). Entry 312: wait one more day before judging the tuner holding in gruijter's house. Q-1796b (PWM hours on gas boilers) is with Robert via the coordinator (entry 174); Q-1796c open.
 
 2026-11-11 20:05-20:07 UTC: Sergeant D Q-1796c A (entry 314: PWM ON time from flame ignition, thermo-nova pwm.py:186-198) and Q-1796a2 B (entry 315: minimum 1 hour of floating data in the 3 counted days). Q-1796d (tuner ceiling, TASK-1815) asked in #dev-sat-mqtt msg 1570168069114826913.
+
+2026-11-11: Sergeant D Q-1796b B (entry 316, PWM hours count for warm-up on gas boilers; Robert still decides because of entry 174) and Q-1796d B (entry 317, effective ceiling; TASK-1815).
+
+2026-11-11: maintainer decision on Q-1796b: Robert answered B by Discord DM (msg 1570171160111620147, relayed by the coordinator), Sergeant D B too (entry 316). PWM hours count for the warm-up phase on gas boilers; the both-phases-agree rule stays. Revises entry 174. Needs a follow-up task and an ADR-228 update.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

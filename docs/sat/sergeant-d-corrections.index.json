@@ -4216,6 +4216,32 @@
     "TASK-1796"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 316,
+   "title": "Q-1796b B: PWM hours count for the self-tune's warm-up phase on gas boilers (Sergeant D and Robert, 2026-11-11; revises entry 174)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1570167372474617888",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1796"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 317,
+   "title": "Q-1796d B: the self-tune measures against the effective ceiling, the lower of the SAT max and the boiler max (Sergeant D, 2026-11-11)",
+   "date": "2026-11-11",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570169126947655914",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1815"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
