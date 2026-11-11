@@ -3337,10 +3337,10 @@
       ex = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       ex.setAttribute('data-k', 'roomX'); ex.setAttribute('stroke', GROOM_X); ex.setAttribute('stroke-width', '2.6'); ex.setAttribute('fill', 'none');
       ex.setAttribute('stroke-dasharray', '2 3');
-      var title = document.createElementNS('http://www.w3.org/2000/svg', 'title'); title.textContent = t('graph.room_no_reading');
-      ex.appendChild(title);
+      ex.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'title'));
       g.appendChild(ex);
     }
+    ex.firstChild.textContent = t('graph.room_no_reading');   // TASK-1820: follows a language switch
     var xd = (!gOff.room && xcol.length) ? graphPath(xcol, 't', function () { return 167; }) : '';
     ex.setAttribute('d', xd.replace(/M([\d.]+),([\d.]+)(?![\d.]| L)/g, function (m, a, c) { return 'M' + a + ',' + c + ' L' + (+a + 3) + ',' + c; }));
     renderGraphTime(t0, win);
@@ -5303,6 +5303,7 @@
   }
   function fillValName(k, e, row) {
     if (row.editing) return;
+    row.nameLang = i18nLang;   // TASK-1820: renderValues rebuilds the name when the language changed
     var td = row.nameTd; td.textContent = '';
     var nm = document.createElement('span'); nm.textContent = valDisplayName(k, e); td.appendChild(nm);
     if (row.dallas) {
@@ -5324,7 +5325,8 @@
       if (!e || typeof e !== 'object' || k === 'sensorsimulation') return;   // classic hides the debug flag
       var row = valRows[k];
       if (!row) { row = valRows[k] = buildValRow(k, e); tb.appendChild(row.tr); }
-      var ep = (typeof e.epoch === 'number') ? e.epoch : parseInt(e.epoch, 10) || 0;
+      else if (row.nameLang !== i18nLang) fillValName(k, e, row);
+      var ep =(typeof e.epoch === 'number') ? e.epoch : parseInt(e.epoch, 10) || 0;
       if (row.epoch !== null && ep !== row.epoch) row.changeMs = now;
       row.epoch = ep;
       // value: On/Off as a coloured word; fault/alarm/safety flags colour "On" as an alert
