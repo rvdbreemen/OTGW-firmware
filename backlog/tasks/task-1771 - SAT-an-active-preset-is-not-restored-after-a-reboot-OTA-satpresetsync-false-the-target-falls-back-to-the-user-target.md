@@ -6,10 +6,9 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-10T03:24:00Z'
-updated_date: '2026-11-11T08:05:00Z'
+updated_date: '2026-11-11T12:30:00Z'
 labels:
   - sat
-  - needs-maintainer-ok
 milestone: 2.0.0
 dependencies: []
 priority: low
@@ -32,4 +31,6 @@ Seen on .63 (Classic + PIC, SAT enabled) around the beta.166 OTA of 2026-11-09 2
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-11: Sergeant D answered Q-1771a with A (07:26:05 UTC, msg 1569976495491915849, entry 308): restore the active preset and its target after a reboot or update, like thermo-nova climate.py:175-181 (target) and :187-188 (preset). The behaviour is settled; the task keeps needs-maintainer-ok until Robert releases it.
+
+2026-11-11: released by Robert (AskUserQuestion in the coordinator session: 'Release, build it'). Behaviour per Sergeant D entry 308 (Q-1771a A: restore the active preset and its target after a restart, like thermo-nova climate.py:175-188). Queue: after the OT-Direct audit fixes; worker to be assigned by the coordinator.
 <!-- SECTION:NOTES:END -->
