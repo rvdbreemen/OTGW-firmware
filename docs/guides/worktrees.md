@@ -12,6 +12,18 @@ The everyday state is a **single working tree on `dev`**; a second worktree is o
 
 **One line, no stray sub-branches (maintainer directive, 2026-06-19, still in force).** Single-lane work commits and pushes DIRECTLY on `dev`, NO sub-branch. Create a sub-branch/worktree ONLY for a genuine parallel lane, and DELETE it immediately after merging back: `git branch -d <sub>`, `git push origin --delete <sub>`, `git worktree remove <dir>`. Codified in `.claude/skills/implement-next-task/SKILL.md`.
 
+### Finish a lane (maintainer directive, 2026-11-11, TASK-1827)
+
+Robert: "Zorg je er wel voor dat alles netjes commit, push, en weer bijgewerkt wordt van remote terug. Verder moet je echt lokaal je worktrees ook opruimen en remote je lane branches, als je ze hebt laten samenvoegen." Work is finished only when it is on origin and nothing of the lane is left behind. In this order:
+
+1. **Commit and push** what belongs to the task, once its gates pass and no announced build or push freeze holds it (the coordinator announces them). Task files and notes are part of the work: commit them too.
+2. **Update from remote:** `git fetch --prune origin`, then fast-forward your own tree (`git pull --ff-only` or `git rebase origin/dev` on a lane). Never pull into a tree that holds another session's local commit; report it to the coordinator instead.
+3. **Prove it landed** before you delete anything: `git cherry origin/dev <branch>` shows no `+` lines. A rebase that re-bumped the version gives the same content a new patch id, so `+` lines can remain: then compare the content (`git diff <branch-commit> <landed-commit> -- <paths>`) and name the landed commit when you delete with `git branch -D`. Otherwise use `git branch -d`.
+4. **Delete the lane branch** locally (`git branch -d <lane>`) and on the remote if you pushed it (`git push origin --delete <lane>`).
+5. **Remove your worktree:** `git worktree remove <dir>`, then `git worktree prune`. A worktree with submodules refuses this ("working trees containing submodules cannot be moved or removed"): use `--force` only after `git -C <dir> status --porcelain` is empty and `git -C <dir> submodule foreach 'git status --porcelain'` shows no change, with every submodule on its recorded commit. For the Windows symlink case see the gotcha below.
+6. **Only your own.** A branch, worktree or directory of another session (dirty, recent, or owner unknown) stays; ask the coordinator, who checks whether its owner is still live.
+7. **Leftover directories** (a `wt-*` folder git no longer knows) move to `RvdB/OTGW-worktree-leftovers/`; they are not deleted without Robert's word, because a `*-keep` folder can hold work found nowhere else.
+
 **Rule: don't cross lines inside one tree.** Work targeting `otgw-1.x.x` belongs in its own worktree. Never `git checkout otgw-1.x.x` inside the `dev` tree to do 1.x work: it defeats the split and risks losing in-flight changes.
 
 **Windows gotcha:** `git worktree remove` can fail with "Function not implemented" (ENOSYS) when a worktree holds internal symlinks (venv `lib64`, toolchain). Remove junction-safe with `cmd //c rmdir /s /q "<path>"` then `git worktree prune`, never a blind recursive delete that may follow a junction's target.
