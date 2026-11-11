@@ -59,6 +59,8 @@ PAGE_INPUTS = {
     "v2.html", "v2.js", "v2.css", "ds-tokens.css", "FSexplorer.html", "fsexplorer.css",
     "fonts/inter-400.woff2", "fonts/inter-700.woff2", "fonts/jetbrains-mono-400.woff2",
 }
+# TASK-1764: the language-menu flags are inlined into v2.html as data: URIs, so they are page inputs too.
+PAGE_INPUTS |= {p.relative_to(DATA_DIR).as_posix() for p in (DATA_DIR / "flags").glob("*.svg")}
 PAGES = {"v2.html.gz", "FSexplorer.html.gz"}
 # TASK-1689 (ADR-221): the language packs, built from i18n/*.json at the repo root.
 I18N_DIR = REPO_ROOT / "i18n"
@@ -120,7 +122,7 @@ class TestStagingOnRealData(unittest.TestCase):
 
     def test_language_packs_gzipped_and_nothing_else_new(self):
         # ADR-221: nl and de packs as .json.gz; no other new gzip file in the image.
-        self.assertEqual(PACKS, {"i18n/nl.json.gz", "i18n/de.json.gz"})
+        self.assertEqual(PACKS, {"i18n/nl.json.gz", "i18n/de.json.gz", "i18n/el.json.gz"})  # TASK-1764 added el
         for name in PACKS:
             src = (I18N_DIR / Path(name).stem).read_bytes().replace(b"\r\n", b"\n")
             self.assertEqual(gzip.decompress((self.staging / name).read_bytes()), src, name)
@@ -157,8 +159,8 @@ class TestStagingWithoutMinify(unittest.TestCase):
             for name in PAGE_INPUTS:
                 source.pop(name)
             staged = tree_hashes(staging)
-            for name in PAGES:
-                staged.pop(name)
+            for name in PAGES | PACKS:  # the packs (if staged) come from i18n/, not from data/
+                staged.pop(name, None)
             self.assertEqual(source, staged)
 
 
