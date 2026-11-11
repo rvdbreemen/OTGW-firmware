@@ -65,9 +65,10 @@ Two findings needed a choice that only Robert can make. The coordinator put them
 1. **MsgID 0 bits in gateway mode** (report A, A2). He chose "Like the PIC: new ADR". The work is TASK-1805, and its ADR supersedes ADR-208.
 2. **The 16 °C setback on a thermostat disconnect** (report A, A8; report CD, D9). He chose "Like the PIC": the gateway stops its own control and the boiler follows its own OpenTherm timeout. The work is TASK-1806.
 
-Two findings from report E wait for Robert's decision before a task is filed:
-- **E-cand 4.** In master mode a TSet written by the thermostat never expires, and a later TSet 0 is ignored. The ignored 0 is documented in BREAKING_CHANGES.md; the missing expiry and the stale MsgID 16/24 writes are not.
-- **U1.** In master mode the thermostat's WRITEs of MsgID 56, 57, 14 and some other IDs are acknowledged and then dropped.
+Two findings from report E were put to him later the same day, also by the coordinator:
+
+3. **E-cand 4.** In master mode a TSet written by the thermostat never expires, and a later TSet 0 is ignored. He chose "Expiry + TSet=0 respected": the thermostat's TSet gets the same 60 s expiry as `CS=`, and TSet 0 switches the override off. docs/BREAKING_CHANGES.md:25 changes with it. The work is TASK-1811. The stale MsgID 16/24 writes after the thermostat goes silent were not part of the decision; TASK-1811 notes them.
+4. **U1.** In master mode the thermostat's WRITEs of MsgID 56, 57, 14 and some other IDs are acknowledged and then dropped. He chose "Forward to the boiler": the write goes to the boiler and the boiler's answer goes back to the thermostat, like the PIC. The work is TASK-1812.
 
 ## Not verified
 
