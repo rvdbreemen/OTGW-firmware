@@ -3,11 +3,11 @@ id: TASK-1788
 title: >-
   Docs: troubleshooting 'PIC not detected' on an OTGW Classic with an S3 Mini
   (manual ch07/h07 + wiki piece)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-10T22:23:00Z'
-updated_date: '2026-11-10T22:35:00Z'
+updated_date: '2026-11-11T05:06:00Z'
 labels:
   - docs
   - support
@@ -28,7 +28,7 @@ Users get stuck when the combo firmware on a Classic with a LOLIN S3 Mini does n
 - [x] #2 NL section in h07 with the same content
 - [x] #3 Short wiki-ready piece in docs/ (EN)
 - [x] #4 Every behaviour claim has a file:line citation in the task notes; no OTGW32 naming in the user-facing text
-- [ ] #5 Committed locally on dev; pushed only after the coordinator's go
+- [x] #5 Committed locally on dev; pushed only after the coordinator's go
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -40,3 +40,9 @@ Written: docs/manuals/en/ch07-troubleshooting.md 7.1a, docs/manuals/nl/h07-probl
 
 Review fixes: (1) Auto mode closes the PIC UART after a missed boot probe (OTGWSerial.end() OTGW-firmware.ino:462; begin only at :405/:421), so the per-minute PR=A cannot reach the PIC in Auto; in forced PIC (1) the UART stays open and a banner reply sets bAvailable + HW_MODE_PIC (OTGW-Core.ino:841-843). Docs now scope the no-reboot recovery to PIC (Classic) and recommend that mode while troubleshooting. (2) Telnet 'never' verified: AsyncSimpleTelnet::write returns 0 with no connected client (src/libraries/SimpleTelnet/src/AsyncSimpleTelnet.h:481), no pre-connect buffer; detection runs before startTelnet (:516). (3) Inner-row wording made a check instead of a claim about the PCB.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: docs/manuals/en/ch07-troubleshooting.md section 7.1a (symptom via device/info hardwaremode Degraded + otcommandinterface None, seating, Board mode per mode, /bootdetect.log fields, capture across a restart, what to send); claims cited in the notes. AC2: docs/manuals/nl/h07-probleemoplossing.md 7.1a, same content. AC3: docs/wiki-drafts/PIC-not-detected-on-Classic-with-S3-Mini.md. AC4: file:line citations in the notes (OTGW-Core.ino:1053-1078, OTGW-firmware.ino:149-213/394-491/890-899, AsyncSimpleTelnet.h:481, restAPI.ino:3320/3402-3404, Hardwaretypes.h:25-30, boards.h:264-268, v2.js:5130); grep of the added text: 0 OTGW32, 0 em dash; tests/test_manual_sat_commands.py 6 passed. Review fix 0e39dc77a scoped the PR=A recovery to Board mode PIC (the Auto UART gap became TASK-1790). AC5: on origin/dev as c5951fc0a, 0e39dc77a and a20e127dd, pushed by the coordinator in 3da316376.
+<!-- SECTION:FINAL_SUMMARY:END -->
