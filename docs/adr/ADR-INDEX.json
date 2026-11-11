@@ -8941,6 +8941,47 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-229",
+      "title": "OT-Direct gateway mode rewrites MsgID 0 bits 1, 2, 4, 5 and 6 of the relayed thermostat status like the PIC",
+      "path": "ADR-229-ot-direct-gateway-mode-rewrites-msgid-0-bits-1-2-4-5-and-6-of-the-relayed-thermostat-status-like-the-pic.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-11",
+      "decision_summary": "State one concrete chosen approach and its rationale.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "State required implementation constraints."
+        ],
+        "must_not": [
+          "State prohibited implementation choices."
+        ],
+        "exceptions": [
+          "State explicit exceptions, or None."
+        ],
+        "verification": [
+          "Name the test, command, or source anchor that verifies this decision."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/**/*.py"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [

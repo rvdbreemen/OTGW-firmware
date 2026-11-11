@@ -117,7 +117,9 @@ $typesAnchors = @(
   @{ Name = 'enum OTDirectRequestOrigin'; Kind = 'construct'; Regex = '^enum OTDirectRequestOrigin\b' },
   @{ Name = 'enum OTDirectMode';          Kind = 'construct'; Regex = '^enum OTDirectMode\b' },
   @{ Name = 'enum OTRemoteOverrideMode';  Kind = 'construct'; Regex = '^enum OTRemoteOverrideMode\b' },
-  @{ Name = 'struct OTRemoteOverrideState'; Kind = 'construct'; Regex = '^struct OTRemoteOverrideState\b' }
+  @{ Name = 'struct OTRemoteOverrideState'; Kind = 'construct'; Regex = '^struct OTRemoteOverrideState\b' },
+  # ADR-229 (TASK-1805): the status commands the relay reads; in OTDirecttypes.h since beta.184, absent before
+  @{ Name = 'struct OtdStatusCmd';        Kind = 'construct'; Regex = '^struct OtdStatusCmd\b'; Optional = $true }
 )
 $libEnumAnchors = @(
   @{ Name = 'enum OpenThermResponseStatus'; Kind = 'construct'; Regex = '^enum class OpenThermResponseStatus\b' },

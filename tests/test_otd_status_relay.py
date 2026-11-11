@@ -23,6 +23,17 @@ from test_sat_pwm_override import compile_cpp  # noqa: E402
 
 OTD_INO = Path(os.environ.get("OTGW_OTD_INO", REPO / "src" / "OTGW-firmware" / "OTDirect.ino"))
 SRC = OTD_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+OTD_TYPES = Path(os.environ.get("OTGW_OTD_TYPES", REPO / "src" / "OTGW-firmware" / "OTDirecttypes.h"))
+TYPES = OTD_TYPES.read_text(encoding="utf-8").replace("\r\n", "\n") if OTD_TYPES.exists() else ""
+
+
+def status_cmd_struct(relay_block):
+    """ADR-229: OtdStatusCmd lives in OTDirecttypes.h (the Arduino-generated prototypes name it); an older
+    OTDirect.ino has it inline in the relay block, and then nothing is added."""
+    if not relay_block or "struct OtdStatusCmd" in relay_block:
+        return ""
+    m = re.search(r"// --- OtdStatusCmd begin\n(.*?)// --- OtdStatusCmd end", TYPES, re.S)
+    return m.group(1) if m else ""
 
 
 def func(header):
@@ -46,6 +57,12 @@ PRE = r"""
 enum OTDirectMode { OTD_MODE_MONITOR = 0, OTD_MODE_GATEWAY = 1, OTD_MODE_BYPASS = 2 };
 static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
 static bool otChModeOff = false;
+// ADR-229 (TASK-1805): the other status commands the relay reads, all at their "not in force" defaults
+enum DHWPushState { PUSH_IDLE, PUSH_PENDING, PUSH_ACTIVE };
+static DHWPushState otDHWPushState = PUSH_IDLE;
+static uint8_t otDHWOverride = 0xFF;
+static uint8_t otMasterStatusFlags = 0x01;
+static bool otSummerMode = false, otDHWBlocking = false, otCoolingEnable = false;
 struct Ov { uint8_t msgId; bool active; uint16_t overrideValue; };
 #define OT_OVERRIDE_COUNT 2
 static Ov otOverrides[OT_OVERRIDE_COUNT] = { {1, false, 0}, {9, false, 0} };
@@ -101,7 +118,7 @@ class Compiled(unittest.TestCase):
             return
         cls.tmp = tempfile.TemporaryDirectory()
         cpp = Path(cls.tmp.name) / "t.cpp"
-        cpp.write_text(PRE + "\n".join(parts) + MAIN, encoding="utf-8")
+        cpp.write_text(PRE + status_cmd_struct(block("otdRelayedStatus")) + "\n".join(parts) + MAIN, encoding="utf-8")
         cls.exe = compile_cpp(cpp, Path(cls.tmp.name) / ("t.exe" if os.name == "nt" else "t"))
         if cls.exe is None:
             cls.err = "SKIP no host compiler"

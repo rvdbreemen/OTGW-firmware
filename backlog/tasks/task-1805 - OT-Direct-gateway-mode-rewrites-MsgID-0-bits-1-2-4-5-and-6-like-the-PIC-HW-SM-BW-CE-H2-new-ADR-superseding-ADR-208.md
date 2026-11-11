@@ -3,10 +3,11 @@ id: TASK-1805
 title: >-
   OT-Direct gateway mode rewrites MsgID 0 bits 1, 2, 4, 5 and 6 like the PIC
   (HW=, SM=, BW=, CE=, H2=); new ADR superseding ADR-208
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-11T06:42:00Z'
-updated_date: '2026-11-11T06:45:00Z'
+updated_date: '2026-11-11T14:53:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -25,8 +26,16 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A new ADR made with /adr-kit:adr supersedes ADR-208: Proposed, with Robert's choice 'Like the PIC: new ADR' as the User Decision; never self-accepted
-- [ ] #2 The relayed thermostat MsgID 0 carries the HW=/SM=/BW=/CE=/H2= bits (1, 2, 4, 5, 6) by the PIC readstatus rule (gateway.asm:2712-2740), bit 0 stays as ADR-208
-- [ ] #3 Host tests against the real relay code (otdRelayedStatusFrame and its callers): red on the old code, green on the fix, one case per bit
+- [x] #1 A new ADR made with /adr-kit:adr supersedes ADR-208: Proposed, with Robert's choice 'Like the PIC: new ADR' as the User Decision; never self-accepted
+- [x] #2 The relayed thermostat MsgID 0 carries the HW=/SM=/BW=/CE=/H2= bits (1, 2, 4, 5, 6) by the PIC readstatus rule (gateway.asm:2712-2740), bit 0 stays as ADR-208
+- [x] #3 Host tests against the real relay code (otdRelayedStatusFrame and its callers): red on the old code, green on the fix, one case per bit
 - [ ] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-11 d3: ADR-229 created with adr-kit (python bin/adr new; number reserved by the coordinator), Proposed, User Decision 'Like the PIC: new ADR'; supersedes ADR-208 on acceptance (adr supersede then; ADR-208 untouched now, so the bidirectional-supersession lint stays clean). adr-lint: no FAIL for ADR-229; tests/test_adr_governance.py 17 passed (README entry added, index regenerated). PIC rule decoded from gateway.asm:2712-2742 (readstatus): bit 1 mask HotWaterSwitch||dhwpushspoof value HotWaterEnable||push; bit 2 mask CL= level held (SysCoolLevel = coolinglevel1 bit 7 clear) value !CoolModeOff (CE=); bit 4 mask C2= setpoint held (SysCH2Setpoint) value !CH2ModeOff (H2=); bit 5 SM=1 forces 1; bit 6 BW=1 forces 1; bits 3, 7 pass. Implementation: OTDirect.ino otdRelayedStatus block: OtdStatusCmd + pure otdRelayedStatusHB() + otdWriteOverrideActive(); otdRelayedStatusFrame() fills it from otDHWOverride/otDHWPushState, the MsgID 7/8 write overrides, otCoolingEnable, otMasterStatusFlags bit 4, otSummerMode, otDHWBlocking (otDHWBlocking/otCoolingEnable declarations moved up). Bit 0 unchanged (ADR-208 rule).
+
+2026-11-11 tests: new tests/test_otd_status_bits.py compiles the real setOTParityBit, otdEffectiveMasterFlags and otdRelayedStatus block and drives otdRelayedStatusFrame() (the applyOverrides entry point): pass-through of all 256 high bytes, one case per bit with mask on and off (HW 0/1/A/push, CE with/without CL, H2 with/without C2, SM, BW), bit 0 = ADR-208, bits 3/7 untouched, all together; parity checked. On origin/dev OTDirect.ino (OTGW_OTD_INO): FAILED (failures=7), only the pass-through case passes; on the fix: 8 OK. tests/test_otd_status_relay.py (ADR-208 cases) stub preamble extended with the new globals: OK; test_otd_gateway_alt_slots 12 OK (1 skipped), test_otd_ch_override OK, test_sat_requested_vs_transmitted OK. evaluate.py --quick 86/0.
+<!-- SECTION:NOTES:END -->

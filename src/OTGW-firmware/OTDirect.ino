@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.183
+**  Version  : v2.0.0-beta.184
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -539,6 +539,8 @@ static uint8_t otVoltageRef      = 5;        // VR= voltage reference digit
 static char    otTempSensor      = 'O';      // TS= temp sensor function
 static char    otForceThermostat = 'A';      // FT= thermostat detection
 static uint8_t otDHWOverride     = 0xFF;     // HW state: 0='0', 1='1', 0xFF='A' (auto)
+static bool    otDHWBlocking     = false;    // BW= DHW blocking (bit6, not persisted); read by otdRelayedStatusFrame (ADR-229)
+static bool    otCoolingEnable   = false;    // CE= cooling enable (bit2, not persisted); read by otdRelayedStatusFrame (ADR-229)
 
 // BS= fake room setpoint: intercepts thermostat MsgID 16 WRITE_DATA frames
 // and replaces the data bytes with the fake setpoint before forwarding to boiler.
@@ -610,8 +612,9 @@ static void clearUnknownCount(uint8_t msgId) {
 // from the thermostat's own (the PIC's setbyte3/setbyte4 rule, gateway.asm:2680-2697).
 // A READ-DATA passes unchanged, so the thermostat gets the boiler's own answer
 // to its read. The one exception is the thermostat's MsgID 0 in gateway mode
-// (ADR-208): bit 0 (CH enable) of its master status follows the CS-override
-// rule, as the PIC does (gateway.asm:2700-2743). Returns the frame to send;
+// (ADR-229, superseding ADR-208): bits 0, 1, 2, 4, 5 and 6 of its master status
+// follow CH=, HW=, CE=, H2=, SM= and BW= by the PIC readstatus rule
+// (gateway.asm:2712-2742, otdRelayedStatusFrame). Returns the frame to send;
 // modified is true when the data was replaced.
 static unsigned long applyOverrides(unsigned long frame, bool &modified) {
   modified = false;
@@ -623,7 +626,7 @@ static unsigned long applyOverrides(unsigned long frame, bool &modified) {
     unsigned long rewritten = otdRelayedStatusFrame(frame);
     if (rewritten != frame) {
       modified = true;
-      OTDDebugTf(PSTR("OTD: CH override MsgID=0 orig=0x%04X new=0x%04X\r\n"),
+      OTDDebugTf(PSTR("OTD: status rewrite MsgID=0 orig=0x%04X new=0x%04X\r\n"),
                  origData, (unsigned)(rewritten & 0xFFFF));
     }
     return rewritten;
@@ -878,13 +881,45 @@ static uint8_t otdEffectiveMasterFlags(uint8_t boardFlags, bool chModeOff, bool 
 }
 // --- otdEffectiveMasterFlags end
 
-// ADR-208: the thermostat's relayed MsgID 0 READ_DATA gets the same bit 0 rule as the
-// gateway's own frame (high byte = master status). Other bits and the low byte pass
-// unchanged; parity is recomputed only when bit 0 changed. No CS override: unchanged.
+// ADR-229 (supersedes ADR-208): the thermostat's relayed MsgID 0 READ_DATA gets bits 0, 1, 2, 4,
+// 5 and 6 of its master status (high byte) by the PIC readstatus rule (gateway.asm:2712-2742):
+// per bit a mask (the command is in force) and a value. Bit 0 keeps the ADR-208 rule (CH= while a
+// CS override is active, otdEffectiveMasterFlags). Bits 3 and 7 and the low byte pass unchanged;
+// parity is recomputed only when the frame changed. No command in force: unchanged.
 // --- otdRelayedStatus begin
+static uint8_t otdRelayedStatusHB(uint8_t hb, const OtdStatusCmd& c) {
+  uint8_t mask = 0, val = 0;
+  if (c.dhwSwitch)   { mask |= 0x02; if (c.dhwEnable)  val |= 0x02; }
+  if (c.coolHeld)    { mask |= 0x04; if (c.coolEnable) val |= 0x04; }
+  if (c.ch2Held)     { mask |= 0x10; if (c.ch2Enable)  val |= 0x10; }
+  if (c.summer)      { mask |= 0x20; val |= 0x20; }
+  if (c.dhwBlocking) { mask |= 0x40; val |= 0x40; }
+  hb = (uint8_t)((hb & (uint8_t)~mask) | val);
+  return otdEffectiveMasterFlags(hb, c.chModeOff, c.csOverride);
+}
+
+static bool otdWriteOverrideActive(uint8_t msgId) {
+  for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
+    if (otOverrides[i].msgId == msgId) return otOverrides[i].active;
+  }
+  return false;
+}
+
 static unsigned long otdRelayedStatusFrame(unsigned long frame) {
   const uint8_t hb = (uint8_t)((frame >> 8) & 0xFF);
-  const uint8_t eff = otdEffectiveMasterFlags(hb, otChModeOff, otdCsOverrideActive());
+  const bool push = (otDHWPushState != PUSH_IDLE);
+  OtdStatusCmd c;
+  c.csOverride  = otdCsOverrideActive();
+  c.chModeOff   = otChModeOff;
+  c.dhwSwitch   = (otDHWOverride != 0xFF) || push;
+  c.dhwEnable   = (otDHWOverride == 1) || push;
+  c.coolHeld    = otdWriteOverrideActive(7);    // CL= (and CC=) write MsgID 7
+  c.coolEnable  = otCoolingEnable;
+  c.ch2Held     = otdWriteOverrideActive(8);    // C2= writes MsgID 8
+  c.ch2Enable   = (otMasterStatusFlags & 0x10) != 0;
+  c.summer      = otSummerMode;
+  c.dhwBlocking = otDHWBlocking;
+  const uint8_t eff = otdRelayedStatusHB(hb, c);
   if (eff == hb) return frame;
   frame = (frame & 0xFFFF00FFUL) | ((unsigned long)eff << 8);
   setOTParityBit(frame);
@@ -2483,8 +2518,6 @@ static inline bool checkBoolean(const char* value) {
 
 // PIC-compat + Phase 1-10 state variables and tables: moved to top of file.
 // Remaining state variables that are only used after this point:
-static bool otDHWBlocking      = false;     // BW= DHW blocking (bit6, not persisted)
-static bool otCoolingEnable    = false;     // CE= cooling enable (bit2, not persisted)
 static uint8_t otOperModeDHW   = 0;         // MW= lower nibble of byte3
 static uint8_t otOperModeCH1   = 0;         // MH= lower nibble of byte4
 static uint8_t otOperModeCH2   = 0;         // M2= upper nibble of byte4

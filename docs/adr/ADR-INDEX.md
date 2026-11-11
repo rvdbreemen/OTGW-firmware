@@ -233,3 +233,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-225 | Proposed | - | Rebuild the ESP32-S3 framework libraries with CONFIGESPIPCTASKSTACKSIZE of at least 1280 (the IDF S3 default), using... |
 | ADR-226 | Accepted | - | Add acorn (a JavaScript parser) and eslint-scope (scope analysis on its syntax tree) as pinned, test-only npm depende... |
 | ADR-228 | Proposed | `src/OTGW-firmware/SATcurveTune.h` | Each signal tick of the self-tune is assigned to the warm-up phase (\|PID error\| > 0.1 C) or the floating phase (\|PID... |
+| ADR-229 | Proposed | `src/**/*.py` | State one concrete chosen approach and its rationale. |

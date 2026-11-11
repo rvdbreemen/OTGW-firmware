@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirecttypes.h
-**  Version  : v2.0.0-beta.183
+**  Version  : v2.0.0-beta.184
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -123,5 +123,18 @@ struct OTDirectSettingsSection {
   bool     bFreeVentEnable    = false; // Free ventilation mode (OT MsgID 70 HB bit4)
   uint8_t  iVentSetpoint      = 0;     // Ventilation setpoint 0-100% (OT MsgID 71 HB)
 };
+
+// ADR-229 (TASK-1805): the status commands otdRelayedStatusHB() reads. Here, not in OTDirect.ino,
+// because the Arduino-generated prototypes in front of the sketch name it.
+// --- OtdStatusCmd begin
+struct OtdStatusCmd {
+  bool csOverride, chModeOff;   // bit 0: CS= held, CH=
+  bool dhwSwitch, dhwEnable;    // bit 1: HW=0/1 or a DHW push (PIC HotWaterSwitch/HotWaterEnable, dhwpushspoof)
+  bool coolHeld, coolEnable;    // bit 2: a CL= cooling level held (PIC SysCoolLevel), CE=
+  bool ch2Held, ch2Enable;      // bit 4: a C2= CH2 setpoint held (PIC SysCH2Setpoint), H2=
+  bool summer;                  // bit 5: SM=1
+  bool dhwBlocking;             // bit 6: BW=1
+};
+// --- OtdStatusCmd end
 
 #endif // HAS_DIRECT_OT

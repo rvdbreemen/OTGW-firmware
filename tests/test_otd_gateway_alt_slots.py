@@ -118,6 +118,9 @@ def lib_and_types():
                construct(c, r"^bool OpenTherm::isValidRequest\(unsigned long request\)")]
     types = [construct(t, r"^enum OTDirectRequestOrigin\b"), construct(t, r"^enum OTDirectMode\b"),
              construct(t, r"^enum OTRemoteOverrideMode\b"), construct(t, r"^struct OTRemoteOverrideState\b")]
+    # ADR-229 (TASK-1805): the status commands the relay reads; in OTDirecttypes.h since beta.184, absent before
+    if re.search(r"^struct OtdStatusCmd\b", t, re.M):
+        types.append(construct(t, r"^struct OtdStatusCmd\b"))
     return "\n".join(out), "\n".join(statics), "\n".join(types)
 
 
