@@ -3,10 +3,11 @@ id: TASK-1759
 title: >-
   Request MsgID 28 (return temp) when no thermostat reads it (OT-Direct gateway
   + PIC)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-09T17:08:00Z'
-updated_date: '2026-11-10T16:56:00Z'
+updated_date: '2026-11-11T06:57:00Z'
 labels:
   - sat
   - opentherm
@@ -103,6 +104,14 @@ BUDGET ITEM (A5): otBoilerCacheMs[128] (uint32_t) = 512 B of static RAM (BSS, in
 Check: the BSS delta in the build output (RAM: line) before/after.
 <!-- SECTION:PLAN:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-11 07:xx taken over by otgw-firmware-09 (coordinator, a4's lane orphaned): lane-1759a reset to origin/dev 99e85b61c+ and only the feature commit 0d6e9f8de cherry-picked (853e9efb4 dropped: its cherry-pick 058a6f50d is on dev); banner-only hunks and version files taken from upstream; old HEAD kept as branch lane-1759a-pre-takeover (and NAS refs/backup/2026-11-11/lane-1759a). Tests on the rebased tree: test_otd_return_temp_slot 9/9, test_otd_return_temp_slot_source 2/2, test_otd_gateway_alt_slots 12 OK (1 skip), test_override_reply OK; evaluate --quick 86/0. Bumped to beta.175.
+
+2026-11-11 audit 1795 area E notes for TASK-1759 checked against the code: (1) the age stamp is set only in otdRetNoteReply from handleMasterResponse for a thermostat READ_DATA answered READ_ACK; the loopback path never calls it (comment corrected) -> no stamp from a WRITE_ACK echo or a loopback reply: OK. (2) the cached reply goes through applyResponseModifiers (OTDirect.ino otdRetSlotTaken): OK. (3) GAP FOUND AND FIXED: otBoilerCacheStore keeps a Data-Invalid (or WRITE_ACK) value and only Unknown-DataID clears validity, while the candidate stamp from an earlier READ_ACK stayed fresh, so the slot could answer the thermostat READ_ACK with an invalid value. Fix: any non-READ_ACK reply for the candidate ID, from any origin, clears the stamp. New host case R9 in tests/test_otd_return_temp_slot.py (harness knob g_invalidFrom in test_otd_gateway_alt_slots.py: boiler answers 17/25 Data-Invalid 0xDEAD from 100 s): before the fix cachedbad=1 (FAILED), after 0 (cached=3 in the first 100 s); file 10/10, _source 2/2, alt_slots 12 OK (1 skip); evaluate --quick 86/0.
+<!-- SECTION:NOTES:END -->
+
 ## Comments
 
 <!-- COMMENTS:BEGIN -->
@@ -159,6 +168,34 @@ created: 2026-11-10T16:56:00Z
 ---
 
 Correction to the note above: 'Yes, PM=28 every 30 s' is the coordinator's relay of Robert's AskUserQuestion answer; 030509 did not see Robert's own text. Recorded in entry 296 as a relayed, not first-hand, maintainer confirmation.
+
+---
+
+created: 2026-11-10T14:51:00Z
+
+---
+
+Implementation A (ADR-224 Accepted, scope OT-Direct), lane-1759a on origin/dev fc5809372:
+- OTDirect.ino otdRetSlot block, inside the TASK-1707 region:
+  - otdRetEligibleId: never 0, 28, >=128, 9/100, UI=/SR=, or an unsupported slot.
+  - otdRetNoteReply, called from handleMasterResponse: an unmodified thermostat READ answered READ_ACK stamps the candidate. A candidate quiet for more than 30 s is replaced.
+  - otdRetWanted: gateway mode + thermostat; satIsEnabled() && sat.bActive && !sat.bSimulation (as the PM=25 gate); not isBoilerMsgIdUnsupportedRead(28); not satFeedFresh(feedTret, 30 s); 30 s since the last slot.
+  - otdRetSlotTaken in the relay path, right after otdAltSlotTaken: the thermostat gets READ_ACK with applyResponseModifiers(cache), logged T/A; READ_DATA 28 goes to the boiler (origin GATEWAY); the schedule entry 28 restarts. An overridden read is relayed as usual (applyOverrides check).
+- OTGW-firmware.h: satIsEnabled() declared.
+- State: 1 B candidate ID + 2 x 4 B stamps (9 B + padding), static. Real size to be read from the ELF.
+- Fact checked: OTGW-Core.ino:6104-6111 stamps feedTret from every boiler 'B' frame for MsgID 28, also the reply to a gateway 'R' request; an 'A' frame (bLocalAnswer) stamps nothing.
+Tests (host, Windows):
+- tests/test_otd_return_temp_slot.py (real code via the TASK-1707 harness; the boiler model stamps feedTret on a 28 READ_ACK as processOT does): new 9/9; old OTDirect.ino 2 fail (R1 count, R1 cache answers; the 7 guard cases also pass on old).
+  - R1 tjfs stream 6 min: tframes = bframes = replies = 360; MsgID 28 10x (about every 36 s: the 30 s interval plus the wait for the next candidate read); 10 cache answers, 0 wrong.
+  - R2 SAT off / R3 28 fresh / R4 28 unsupported / R5 SAT simulation / R6 candidate slower than 30 s: 0 slots.
+  - R7 with an unsupported thermostat ID: 24 TASK-1707 slots still; the cache slot fills in 11x (the shared schedule read 28 only 3x in 6 min there).
+  - R8: the ID 25 boiler-read gap is at most 12 s (< SAT_FLOW_VALID_MS 60 s).
+- tests/test_otd_return_temp_slot_source.py: the two rules of ADR-224 (30 s; order right after otdAltSlotTaken), kept as a test instead of an Enforcement block, per the coordinator: an Accepted ADR is not edited. New OK; old 2 fail.
+- tests/test_otd_gateway_alt_slots.py: harness extended (SAT/feed stubs, inert defaults, feedTret stamp in the boiler model, sentAt times). 12 OK on old and new code.
+- Docs: docs/c4/c4-code-otdirect.md, gateway-mode section.
+Not done yet: bump (next free number after beta.170's tag), build (slot after the release), the RAM delta from the ELF.
+Bench .61: regression check only (OTA, settings diff, a few boots). Without a thermostat in gateway mode MsgID 28 does not come through this slot (TASK-1707 AC4).
+Field proof: awaiting a tjfs capture.
 
 ---
 <!-- COMMENTS:END -->

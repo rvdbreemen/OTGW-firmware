@@ -216,6 +216,10 @@ static void handleMasterModeSlaveFrame(unsigned long frame);
 // compiles the real helpers).
 static bool otdAltSlotTaken(unsigned long) { return false; }
 static void otdNoteThermostatFrame(unsigned long, uint32_t) {}
+// TASK-1759 (ADR-224): the MsgID 28 slot sits in the same region and is not sliced here either; it never
+// takes a frame in this harness (tests/test_otd_return_temp_slot.py compiles the real helpers).
+static bool otdRetSlotTaken(unsigned long) { return false; }
+static void otdRetNoteReply(OTDirectRequestOrigin, unsigned long, unsigned long, uint32_t) {}
 
 // Called by loopOTDirect() only from its timer blocks.
 static void scheduleMasterRequest() {}

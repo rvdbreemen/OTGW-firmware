@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.174
+**  Version  : v2.0.0-beta.175
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -467,6 +467,7 @@ void satNarratef_P(PGM_P fmt_P, ...);
 bool satSimulationBlocksBusTx(const char* cmd, const __FlashStringHelper* source);  // TASK-795 plan §4.1: bus-tx isolation gate
 void satNotifyPicRestart();       // TASK-1570: PIC banner seen -> SAT resends its on-change MM=/CH=
 void satNotifyBoilerFrameSeen();  // TASK-795 plan §4.2: slave-frame edge hook → deferred auto-disable
+bool satIsEnabled();              // SATcontrol.ino; used by OTDirect.ino (TASK-1759 MsgID 28 slot)
 bool otRealBoilerSeenRecently();  // TASK-1185: a real boiler B (not loopback, not replayed) within 30 s
 bool satBoilerHardwarePresent();  // TASK-795 plan §4.2: real boiler on bus (REST 409 / MQTT reject guard)
 void satSetDebugForceBoilerPresent(bool on);  // TASK-802 F7-A: test-only boiler-present override (trips §4.2 edge, transient)

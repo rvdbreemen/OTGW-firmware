@@ -41,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_sat_pwm_override import compile_cpp  # noqa: E402
 
 OTD_INO = Path(os.environ.get("OTGW_OTD_INO", REPO / "src" / "OTGW-firmware" / "OTDirect.ino"))
+FEED_H = REPO / "src" / "OTGW-firmware" / "SATboilerFeed.h"
 REF_INO = os.environ.get("OTGW_OTD_REF")
 TYPES_H = REPO / "src" / "OTGW-firmware" / "OTDirecttypes.h"
 LIB_H = REPO / "src" / "libraries" / "OpenTherm" / "src" / "OpenTherm.h"
@@ -171,6 +172,7 @@ public:
 class FakeOT {
 public:
   std::vector<unsigned long> sent;
+  std::vector<uint32_t> sentAt;   // TASK-1759: when each request went out (R8 flow-gap check)
   bool waiting = false, answered = false;
   uint32_t answerAt = 0;
   unsigned long response = 0;
@@ -179,7 +181,7 @@ public:
   bool isReady() { return !waiting || answered; }
   bool sendRequestAsync(unsigned long r) {
     if (!isReady()) return false;
-    sent.push_back(r); waiting = true; answered = false; answerAt = g_now + 40;
+    sent.push_back(r); sentAt.push_back(g_now); waiting = true; answered = false; answerAt = g_now + 40;
     status = OpenThermResponseStatus::NONE; response = 0;
     return true;
   }
@@ -189,8 +191,17 @@ public:
 };
 static FakeOT otMaster, otSlave;
 
-static struct { struct { bool bOnline; } otBus; struct { bool bThermostatConnected; } otd; } state;
-static struct { struct { bool bEnableSlave; int iMode; } otd; } settings;
+@FEED_H@
+// TASK-1759: the MsgID 28 slot reads SAT's on-state and the return feed. Defaults keep it inert (SAT off),
+// so the TASK-1707 cases above behave exactly as before; tests/test_otd_return_temp_slot.py turns it on.
+static struct { struct { bool bOnline; SatBoilerFeed feedTret; } otBus; struct { bool bThermostatConnected; } otd;
+                struct { bool bActive; } sat; } state;
+static struct { struct { bool bEnableSlave; int iMode; } otd; struct { bool bSimulation; } sat; } settings;
+static bool g_satEnabled = false, g_ret28Unsupported = false;
+// TASK-1759 R9: from g_invalidFrom on (0 = never), the boiler answers DATA_INVALID 0xDEAD for MsgID 17 and 25.
+static uint32_t g_invalidFrom = 0;
+static bool satIsEnabled() { return g_satEnabled; }
+static bool isBoilerMsgIdUnsupportedRead(uint8_t id) { return id == 28 && g_ret28Unsupported; }
 // TASK-1702: the sliced mode-apply head of loopOTDirect() needs these; its flag stays false here.
 #ifndef constrain
 #define constrain(v, lo, hi) ((v) < (lo) ? (lo) : ((v) > (hi) ? (hi) : (v)))
@@ -227,6 +238,9 @@ static uint16_t otdStatusReplyData(uint16_t thermostatData, uint16_t boilerData)
 static unsigned long applyResponseModifiers(unsigned long response);
 """
 
+# TASK-1759: the real SatBoilerFeed / satFeedFresh, filled in here so every user of PRE gets it
+PRE = PRE.replace("@FEED_H@", FEED_H.read_text(encoding="utf-8"))
+
 MAIN = r"""
 // ---- boiler model --------------------------------------------------------------
 static bool g_no24 = false;   // T2 (TASK-1733): tjfs's boiler answers MsgID 24 Unknown-DataID
@@ -247,7 +261,10 @@ static void boilerTick() {
   if (!boilerSupports(id)) r = frameOf(7, id, 0);
   else if (type == 1) r = frameOf(5, id, q & 0xFFFF);
   else if (id == 0) r = frameOf(4, 0, (q & 0xFF00) | 0x0A);
+  else if (g_invalidFrom && g_now >= g_invalidFrom && (id == 17 || id == 25)) r = frameOf(6, id, 0xDEAD);
   else r = frameOf(4, id, (uint16_t)(0x1000 + id));
+  // TASK-1759: a boiler READ_ACK for MsgID 28 is what processOT() stamps into feedTret (OTGW-Core.ino 'B' frame path)
+  if (id == 28 && ((r >> 28) & 7) == 4) state.otBus.feedTret.sampleMs = g_now ? g_now : 1;
   otMaster.response = r;
   otMaster.status = OpenThermResponseStatus::SUCCESS;
   otMaster.answered = true;

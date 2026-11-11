@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.174
+**  Version  : v2.0.0-beta.175
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1574,6 +1574,8 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
 // ---------------------------------------------------------------------------
 // handleMasterResponse — process a completed async master request
 // ---------------------------------------------------------------------------
+static void otdRetNoteReply(OTDirectRequestOrigin origin, unsigned long request, unsigned long response,
+                            uint32_t now);   // TASK-1759, otdRetSlot block below
 static void handleMasterResponse() {
   unsigned long response = otMaster.getLastResponse();
   OpenThermResponseStatus status = otMaster.getLastResponseStatus();
@@ -1599,6 +1601,7 @@ static void handleMasterResponse() {
 
     // Cache boiler response data for master mode slave responses
     otBoilerCacheStore(response);
+    otdRetNoteReply(otLastRequestOrigin, otLastSentRequest, response, millis());   // TASK-1759
 
     // TASK-795 §4.2: a real boiler answered on the OT-direct bus. If SAT
     // simulation is active, trip the edge hook (deferred auto-disable). Not in
@@ -1899,6 +1902,94 @@ static void otdNoteThermostatFrame(unsigned long frame, uint32_t now) {
 static void otdForgetThermostatWrites() {
   for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) otdThermostatWritesEntry[i] = false;
 }
+// ---------------------------------------------------------------------------
+// TASK-1759, ADR-224 (Sergeant D entries 287 and 291; Robert entry 290): the return temperature
+// (MsgID 28) for SAT when the thermostat never reads it and offers no unsupported slot (tjfs,
+// 2026-11-09: IDs 0, 1, 16, 17, 24, 25, all supported). Every 30 s, while SAT is on and no valid
+// MsgID 28 arrived for 30 s, the gateway takes the slot of one supported thermostat READ (the
+// "candidate"), sends READ_DATA MsgID 28 to the boiler there, and answers the thermostat READ_ACK
+// with the boiler's cached value for the ID it asked. The boiler still gets one frame per
+// thermostat frame (TASK-1707). A deliberate deviation from the PIC model (ADR-224, ADR-223).
+// The candidate is the first eligible thermostat READ answered READ_ACK by the boiler, unmodified;
+// its stamp is the cache age (one stamp, ADR-224's 8 B variant). A candidate not answered for
+// longer than the interval is replaced by the next eligible read.
+// --- otdRetSlot begin
+static constexpr uint32_t OTD_RET_SLOT_INTERVAL_MS = 30000UL;   // entry 291: every 30 s, while no valid MsgID 28 for 30 s
+static uint8_t  otdRetCandidateId = 0;   // 0 = none yet
+static uint32_t otdRetCandidateMs = 0;   // millis() of the candidate's last unmodified boiler READ_ACK
+static uint32_t otdRetLastSlotMs  = 0;   // millis() of the last replaced frame, 0 = never
+
+// A thermostat Data-ID whose read may be answered from the cache: never MsgID 0 (status, CH enable),
+// never 9/100 (remote override, ADR-223), never an ID the UI=/SR= tables answer, never an
+// unsupported (TASK-1707) slot, never MsgID 28 itself, and only the OT spec's 1-127.
+static bool otdRetEligibleId(uint8_t id) {
+  if (id == 0 || id == 28 || id >= 128) return false;
+  if (otdRemoteOverrideHoldsSlot(id)) return false;
+  if (isUnknownId(id) || otdResponseOverrideActive(id)) return false;
+  return !otdIsAltSlot(id);
+}
+
+// handleMasterResponse() only (never the loopback path): an unmodified thermostat READ answered READ_ACK
+// stamps the candidate. Any other reply for the candidate ID (Data-Invalid, a WRITE_ACK echo, Unknown-DataID),
+// from any origin, clears the stamp: otBoilerCacheStore() keeps that reply's value, so a stamp from an
+// earlier READ_ACK would otherwise let otdRetSlotTaken() answer the thermostat with it (audit 1795 area E).
+static void otdRetNoteReply(OTDirectRequestOrigin origin, unsigned long request, unsigned long response,
+                            uint32_t now) {
+  if (otdRetCandidateId != 0 && (uint8_t)((response >> 16) & 0xFF) == otdRetCandidateId &&
+      OpenTherm::getMessageType(response) != OpenThermMessageType::READ_ACK) {
+    otdRetCandidateMs = 0;
+    return;
+  }
+  if (origin != OT_DIRECT_ORIGIN_THERMOSTAT) return;
+  if (OpenTherm::getMessageType(request) != OpenThermMessageType::READ_DATA) return;
+  if (OpenTherm::getMessageType(response) != OpenThermMessageType::READ_ACK) return;
+  const uint8_t id = (uint8_t)((request >> 16) & 0xFF);
+  if ((uint8_t)((response >> 16) & 0xFF) != id || !otdRetEligibleId(id)) return;
+  if (otdRetCandidateId == 0 || (uint32_t)(now - otdRetCandidateMs) > OTD_RET_SLOT_INTERVAL_MS) otdRetCandidateId = id;
+  if (id == otdRetCandidateId) otdRetCandidateMs = now ? now : 1;
+}
+
+// Gateway mode with a thermostat, SAT on (the same "on" as the PM=25 gate, SATcontrol.ino),
+// MsgID 28 supported, not fresh, and at least one interval since the last replaced frame.
+static bool otdRetWanted(uint32_t now) {
+  if (otCurrentMode != OTD_MODE_GATEWAY || !state.otd.bThermostatConnected) return false;
+  if (!(satIsEnabled() && state.sat.bActive && !settings.sat.bSimulation)) return false;
+  if (isBoilerMsgIdUnsupportedRead(28)) return false;
+  if (satFeedFresh(state.otBus.feedTret, now, OTD_RET_SLOT_INTERVAL_MS)) return false;
+  return otdRetLastSlotMs == 0 || (uint32_t)(now - otdRetLastSlotMs) >= OTD_RET_SLOT_INTERVAL_MS;
+}
+
+// Takes the slot of a pending thermostat frame for MsgID 28 when all of the above hold, the frame is
+// a READ of the candidate with a cached answer younger than the interval, and no override applies
+// to it. Returns false, with nothing sent or answered, otherwise: the caller relays the frame.
+static bool otdRetSlotTaken(unsigned long thermostatFrame) {
+  const uint32_t now = millis();
+  const uint8_t id = (uint8_t)((thermostatFrame >> 16) & 0xFF);
+  if (((thermostatFrame >> 28) & 0x07) != 0) return false;            // READ_DATA only, never a write
+  if (id != otdRetCandidateId || !otdRetEligibleId(id)) return false;
+  if (!otdRetWanted(now)) return false;
+  if (!otBoilerCacheValid[id] || (uint32_t)(now - otdRetCandidateMs) >= OTD_RET_SLOT_INTERVAL_MS) return false;
+  bool modified = false;
+  (void)applyOverrides(thermostatFrame, modified);
+  if (modified) return false;                                          // an override applies: relay it as usual
+  if (!otMaster.isReady()) return false;
+  const unsigned long reply = applyResponseModifiers(buildOTResponse(4 /* READ_ACK */, id, otBoilerCache[id]));
+  bridgeFrameToParser('T', thermostatFrame);
+  bridgeFrameToParser('A', reply);
+  otSlave.sendResponse(reply);
+  otdRetLastSlotMs = now ? now : 1;
+  const unsigned long request = OpenTherm::buildRequest(OpenThermMessageType::READ_DATA,
+                                                        static_cast<OpenThermMessageID>(28), 0);
+  if (sendMasterRequestAsync(request, OT_DIRECT_ORIGIN_GATEWAY)) {
+    for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+      if (otSchedule[i].msgId == 28 && !otSchedule[i].isWrite) otSchedule[i].lastSentMs = now;
+    }
+  }
+  OTDDebugTf(PSTR("OTD: MsgID 28 read in the slot of thermostat MsgID %u (answered from cache 0x%04X)\r\n"),
+             (unsigned)id, (unsigned)otBoilerCache[id]);
+  return true;
+}
+// --- otdRetSlot end
 // --- otdAltSlot end
 
 // ---------------------------------------------------------------------------
@@ -2189,6 +2280,10 @@ void loopOTDirect() {
 
       // TASK-1707: the slot of a Data-ID the boiler does not support carries the gateway's own request
       if (otdAltSlotTaken(otSlaveFrame)) {
+        otSlaveFramePending = false;
+      }
+      // TASK-1759, ADR-224: MsgID 28 in the slot of a supported read, answered from the cache
+      else if (otdRetSlotTaken(otSlaveFrame)) {
         otSlaveFramePending = false;
       }
       // UI table: respond UNKNOWN_DATAID directly, don't forward to boiler

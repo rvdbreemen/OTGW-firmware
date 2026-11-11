@@ -620,6 +620,15 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 - **Master**: Forwards to boiler with optional overrides
 - **Overrides**: UI (unknown-ID), SR (response), repeater (value injection)
 - **Scheduler**: Runs periodic reads/writes to boiler
+- **Slots with a thermostat (TASK-1707)**: one boiler frame per thermostat frame; the gateway's own reads and queued
+  commands go out only in the slot of a thermostat request the boiler does not support (`otdAltSlotTaken()`), as on the PIC
+- **Return temperature slot (TASK-1759, ADR-224)**: when no valid MsgID 28 arrived for 30 s and SAT is on (not in SAT
+  simulation), the gateway takes the slot of one supported thermostat READ every 30 s (`otdRetSlotTaken()`, checked
+  right after the TASK-1707 slot): MsgID 28 goes to the boiler and the thermostat gets READ_ACK with the boiler's cached
+  value for the ID it asked. Only the candidate read is used: the first READ the boiler answers READ_ACK unmodified,
+  never MsgID 0, a write, MsgID 9/100, an SR=/UI= ID or MsgID 28; its cached answer must be younger than 30 s
+  (`otdRetNoteReply()` stamps it). A deliberate deviation from the PIC (ADR-224); PIC boards are unchanged
+  (Q-1759b). Host test: `tests/test_otd_return_temp_slot.py`
 - **Use case**: Normal operation with thermostat + boiler
 
 ### Mode: Monitor (GW=0 or GW=M)
