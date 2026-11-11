@@ -19,6 +19,7 @@ History at the end of this file.
 - **Q-1821a** (asked): TASK-1821
 - **Q-1817a** (asked): TASK-1817
 - **Q-1817b** (asked): TASK-1817
+- **Q-1828a** (asked): ba lane (window chips: TASK-1828)
 <!-- live-queue:end -->
 
 A new correction from Sergeant D (e.g. 2026-10-26 'CH=1 stays during PWM OFF') is handled before the queue.
@@ -240,6 +241,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q-1821a | — | asked 2026-11-11 22:31:46 UTC ([msg](https://discord.com/channels/812969634638725140/1105556725714649128/1570204419113484390)); Greek web UI, new keys from TASK-1821 (not SAT behaviour): h_mon.graph_temps "θερμοκρασίες" (EN "temperatures"), h_mon.graph_marks "Διακοπές σύνδεσης" (EN "disconnects"), h_mon.graph_marks_title "Εμφάνιση των σημείων όπου η ζωντανή σύνδεση χάθηκε (κόκκινο) και επανήλθε (πράσινο)". A) all fine; B) corrections. Answer goes to ba. | TASK-1821 |
 | Q-1817a | — | asked 2026-11-11 23:12:13 UTC ([msg](https://discord.com/channels/812969634638725140/1105556725714649128/1570214599238877266); from otgw-firmware-d3, posted while he was away on Robert's instruction): entry 316 says PWM hours count for the warm-up phase on gas boilers. Which phase gets a PWM tick? A) every PWM tick counts for warm-up, whatever the PID error (our advice, plain reading of entry 316); B) PWM hours are no longer excluded and each tick follows the normal split by PID error (warm-up outside the 0.1 C deadband, floating inside; consequence: a PWM hour near the target feeds the floating phase). Our own tuner, no thermo-nova citation (entry 298). | TASK-1817 |
 | Q-1817b | — | asked 2026-11-11 23:12:15 UTC ([msg](https://discord.com/channels/812969634638725140/1105556725714649128/1570214605882662923); from otgw-firmware-d3): a hybrid (satsource 3) in SAT PWM: the new gas-boiler rule (entry 316, PWM hours count) or the heat-pump rule (entry 205, PWM hours logged, not used)? Our advice: the gas-boiler rule, because PWM on a hybrid runs on the boiler side; entry 82 (hybrid in PWM uses gas timing) points the same way, entry 21 ("hybrid systems should be treated as heat pumps", for MM) points the other way. | TASK-1817 |
+| Q-1828a | — | asked 2026-11-11 23:57:04 UTC ([msg](https://discord.com/channels/812969634638725140/1105556725714649128/1570225884621709475)); Greek web UI from ba (not SAT behaviour): theme "Φωτεινό" / "Σκούρο" / "Θέμα"; graph window chips "10 λεπ." / "1 ώρα" / "4 ώρες" / "24 ώρες"; lane labels ON/OFF Latin or Greek; Values view "Πίνακας" (table) / "Πλέγμα" (grid). A) all fine (+ Latin/Greek for ON/OFF); B) corrections. Answer goes to ba. | ba lane (window chips: TASK-1828) |
 
 Questions Q5 onwards come from the SAT port audit of 2026-10-24
 ([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)); the numbers in brackets are its
