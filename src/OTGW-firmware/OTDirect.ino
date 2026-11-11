@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.177
+**  Version  : v2.0.0-beta.178
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -130,9 +130,8 @@ static uint32_t otDHWPushStartMs = 0;
 static constexpr uint32_t OT_DHW_PUSH_TIMEOUT_MS = 30000;  // 30s, matches PIC
 
 // Phase 10: PS= summary mode (moved here: used before original definition)
-static bool otSummaryMode     = false;      // PS=1 active
-static bool otHideReports     = false;      // suppress T/B/R/A frame output
-static bool otSummaryPending  = false;      // summary line ready to emit
+static bool otHideReports     = false;      // PS=1: T/B/R/A reports hidden until PS=0 (PIC HideReports)
+static bool otSummaryPending  = false;      // PS=1 asked for one summary line (PIC SummaryRequest)
 
 // Schedule table: supports both reads and periodic writes.
 // Write entries periodically re-send a cached value to keep the boiler in sync.
@@ -779,7 +778,9 @@ void handleOTDirectBridgeStream() {
 // ---------------------------------------------------------------------------
 // bridgeFrameToParser — format a 32-bit OT frame and feed to processOT()
 // ---------------------------------------------------------------------------
+static void otdPsNoteFrame(char prefix, unsigned long frame);   // TASK-1800, PS=1 store below
 static void bridgeFrameToParser(char prefix, unsigned long frame) {
+  otdPsNoteFrame(prefix, frame);
   // TASK-293: always feed the frame into processOT() so state, decoded
   // values, and connected-state flags stay fresh. In PS=1 mode, pass
   // suppressOutput=true so the per-frame raw "otmessage" publish and the
@@ -787,7 +788,8 @@ static void bridgeFrameToParser(char prefix, unsigned long frame) {
   // which froze the whole ESP32 OT-direct pipeline while PS=1 was active.
   char buf[10];
   snprintf_P(buf, sizeof(buf), PSTR("%c%08lX"), prefix, frame);
-  otDirectBridgeWriteLine(buf, 9);
+  // TASK-1800: while PS=1 is on the PIC prints no T/B/R/A reports (PrintMessage, gateway.asm:1921-1922)
+  if (!otHideReports) otDirectBridgeWriteLine(buf, 9);
   // TASK-865.5: OTDirect producer. Enqueue the 9-char frame instead of calling
   // processOT() inline; the consumer (drainOTFrameQueue) parses it in loop()
   // context. otDirectBridgeWriteLine above already does the OTDirect ser2net
@@ -1665,11 +1667,6 @@ static void handleMasterResponse() {
       }
     }
 
-    // PS=1 summary: trigger pending summary after MsgID 0 response
-    if (respMsgId == 0 && otSummaryMode) {
-      otSummaryPending = true;
-    }
-
     // Log per-frame: MsgID, data value, override applied
     {
       uint8_t logMsgId = (response >> 16) & 0xFF;
@@ -1994,104 +1991,85 @@ static bool otdRetSlotTaken(unsigned long thermostatFrame) {
 // --- otdAltSlot end
 
 // ---------------------------------------------------------------------------
-// emitSummaryLine — PS=1 summary: 34 comma-separated values matching PIC format
-// MsgIDs: 0,1,6,7,8,14,15,16,17,18,19,23,24,25,26,27,28,31,33,48,49,56,57,70,71,77,116-123
+// PS=1 summary (TASK-1800): the PIC's value store and print routines, so the line is byte for byte the
+// PIC's (Robert 2026-11-11: identical to the PIC's answers).
+// Store (StoreValue, gateway.asm:3574-3609, table :3530-3572): the raw data word of 34 Data-IDs, taken
+// from a thermostat WRITE_DATA request (HandleRequest :2384-2385, before any override), from the
+// gateway's own WRITE_DATA without a thermostat (StandAloneMsg :1806-1808) and from a boiler READ_ACK
+// (HandleResponse :2434-2436). Data-Invalid, Unknown-DataID and Data-IDs >= 128 are not stored.
+// Print (StoreProcTable :1978-2012): one field per Data-ID in this order, separated by ','.
 // ---------------------------------------------------------------------------
+enum : uint8_t { PS_STATUS, PS_FLOAT, PS_BYTES, PS_SIGNED, PS_SIGSHORT, PS_LOWBYTE, PS_SHORT };
+static const uint8_t PROGMEM otdPsIds[] = { 0, 1, 6, 7, 8, 14, 15, 16, 17, 18, 19, 23, 24, 25, 26, 27, 28,
+                                            31, 33, 48, 49, 56, 57, 70, 71, 77,
+                                            116, 117, 118, 119, 120, 121, 122, 123 };
+static const uint8_t PROGMEM otdPsKinds[] = {
+  PS_STATUS, PS_FLOAT, PS_STATUS, PS_FLOAT, PS_FLOAT, PS_FLOAT, PS_BYTES, PS_FLOAT, PS_FLOAT, PS_FLOAT,
+  PS_FLOAT, PS_FLOAT, PS_FLOAT, PS_FLOAT, PS_FLOAT, PS_SIGNED, PS_FLOAT, PS_FLOAT, PS_SIGSHORT, PS_BYTES,
+  PS_BYTES, PS_FLOAT, PS_FLOAT, PS_STATUS, PS_LOWBYTE, PS_LOWBYTE,
+  PS_SHORT, PS_SHORT, PS_SHORT, PS_SHORT, PS_SHORT, PS_SHORT, PS_SHORT, PS_SHORT };
+static constexpr uint8_t OTD_PS_FIELDS = sizeof(otdPsIds);   // SUMMARYFIELDS = 34 (:3572)
+static_assert(sizeof(otdPsKinds) == sizeof(otdPsIds), "one print kind per summary Data-ID");
+static uint16_t otdPsValues[OTD_PS_FIELDS];   // zero at boot, as the PIC's cleared RAM
+
+static void otdPsNoteFrame(char prefix, unsigned long frame) {
+  const uint8_t type = (uint8_t)((frame >> 28) & 0x07);
+  const bool keep = (prefix == 'T' && type == 1) || (prefix == 'B' && type == 4) ||
+                    (prefix == 'R' && type == 1 && !state.otd.bThermostatConnected);
+  if (!keep) return;
+  const uint8_t id = (uint8_t)((frame >> 16) & 0xFF);
+  for (uint8_t i = 0; i < OTD_PS_FIELDS; i++) {
+    if (pgm_read_byte(&otdPsIds[i]) == id) { otdPsValues[i] = (uint16_t)(frame & 0xFFFF); return; }
+  }
+}
+
+// Append one field in the PIC's format. Returns the new length.
+static int otdPsAppend(char* line, int pos, int size, uint8_t kind, uint16_t v) {
+  char* out = line + pos;
+  const int room = size - pos;
+  int n = 0;
+  switch (kind) {
+    case PS_STATUS:                                   // PrintStatus: 8 bits '/' 8 bits
+      for (int b = 15; b >= 0; b--) {
+        if (b == 7) out[n++] = '/';
+        out[n++] = ((v >> b) & 1) ? '1' : '0';
+      }
+      out[n] = '\0';
+      break;
+    case PS_BYTES:                                    // PrintBytes: HB '/' LB
+      n = snprintf_P(out, room, PSTR("%u/%u"), (unsigned)(v >> 8), (unsigned)(v & 0xFF));
+      break;
+    case PS_LOWBYTE:                                  // PrintLowByte
+      n = snprintf_P(out, room, PSTR("%u"), (unsigned)(v & 0xFF));
+      break;
+    case PS_SIGSHORT:                                 // PrintSigShort: '-' and the magnitude
+    case PS_SHORT:                                    // PrintShort: unsigned 16 bit
+      if (kind == PS_SIGSHORT && (v & 0x8000)) { out[n++] = '-'; v = (uint16_t)(0u - v); }
+      n += snprintf_P(out + n, room - n, PSTR("%u"), (unsigned)v);
+      break;
+    default: {                                        // PS_FLOAT, PS_SIGNED: PrintFloat (:2047-2059)
+      if (kind == PS_SIGNED && (v & 0x8000)) { out[n++] = '-'; v = (uint16_t)(0u - v); }   // PrintNegative
+      uint8_t hi = (uint8_t)(v >> 8), lo = (uint8_t)(v & 0xFF);
+      if (lo == 0xFF) { hi = (uint8_t)(hi + 1); lo = 0; }   // .996 rounds up to the next integer
+      const uint16_t prod = (uint16_t)lo * 100u;             // Multiply: the high byte is the fraction
+      uint8_t frac = (uint8_t)(prod >> 8);
+      if (prod & 0x80) frac++;                               // rounding
+      n += snprintf_P(out + n, room - n, PSTR("%u.%02u"), (unsigned)hi, (unsigned)frac);
+      break;
+    }
+  }
+  return pos + n;
+}
+
 static void emitSummaryLine() {
-  // Build summary into a buffer. Max ~34 fields × ~12 chars = ~408 bytes.
   static char line[420];
   int pos = 0;
-  OTdataStruct &s = OTcurrentSystemState;
-
-  // Helper: append binary status (BBBBBBBB/BBBBBBBB)
-  auto appendStatus = [&](uint16_t val) {
-    for (int b = 7; b >= 0; b--) pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%c"), (val >> (8 + b)) & 1 ? '1' : '0');
-    line[pos++] = '/';
-    for (int b = 7; b >= 0; b--) pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%c"), (val >> b) & 1 ? '1' : '0');
-  };
-  // Helper: append float (f8.8)
-  auto appendFloat = [&](float val) {
-    char tmp[12]; dtostrf(val, 1, 2, tmp);
-    pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%s"), tmp);
-  };
-  // Helper: append signed float
-  auto appendSigned = [&](float val) {
-    char tmp[12]; dtostrf(val, 1, 2, tmp);
-    if (val >= 0) { line[pos++] = '+'; }
-    pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%s"), tmp);
-  };
-
-  #define COMMA() do { line[pos++] = ','; } while(0)
-
-  // MsgID 0: Status (binary HB/LB)
-  appendStatus(s.Statusflags); COMMA();
-  // MsgID 1: TSet (f8.8)
-  appendFloat(s.TSet); COMMA();
-  // MsgID 6: RBPflags (status)
-  appendStatus(s.RBPflags); COMMA();
-  // MsgID 7: CoolingControl (f8.8)
-  appendFloat(s.CoolingControl); COMMA();
-  // MsgID 8: TsetCH2 (f8.8)
-  appendFloat(s.TsetCH2); COMMA();
-  // MsgID 14: MaxRelModLevelSetting (f8.8)
-  appendFloat(s.MaxRelModLevelSetting); COMMA();
-  // MsgID 15: MaxCapacityMinModLevel (bytes HB,LB)
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u,%u"),
-    (s.MaxCapacityMinModLevel >> 8) & 0xFF, s.MaxCapacityMinModLevel & 0xFF); COMMA();
-  // MsgID 16: TrSet (f8.8)
-  appendFloat(s.TrSet); COMMA();
-  // MsgID 17: RelModLevel (f8.8)
-  appendFloat(s.RelModLevel); COMMA();
-  // MsgID 18: CHPressure (f8.8)
-  appendFloat(s.CHPressure); COMMA();
-  // MsgID 19: DHWFlowRate (f8.8)
-  appendFloat(s.DHWFlowRate); COMMA();
-  // MsgID 23: TrSetCH2 (f8.8)
-  appendFloat(s.TrSetCH2); COMMA();
-  // MsgID 24: Tr (f8.8)
-  appendFloat(s.Tr); COMMA();
-  // MsgID 25: Tboiler (f8.8)
-  appendFloat(s.Tboiler); COMMA();
-  // MsgID 26: Tdhw (f8.8)
-  appendFloat(s.Tdhw); COMMA();
-  // MsgID 27: Toutside (signed f8.8)
-  appendSigned(s.Toutside); COMMA();
-  // MsgID 28: Tret (f8.8)
-  appendFloat(s.Tret); COMMA();
-  // MsgID 31: TflowCH2 (f8.8)
-  appendFloat(s.TflowCH2); COMMA();
-  // MsgID 33: Texhaust (signed short)
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%d"), s.Texhaust); COMMA();
-  // MsgID 48: TdhwSetUBTdhwSetLB (bytes)
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u,%u"),
-    (s.TdhwSetUBTdhwSetLB >> 8) & 0xFF, s.TdhwSetUBTdhwSetLB & 0xFF); COMMA();
-  // MsgID 49: MaxTSetUBMaxTSetLB (bytes)
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u,%u"),
-    (s.MaxTSetUBMaxTSetLB >> 8) & 0xFF, s.MaxTSetUBMaxTSetLB & 0xFF); COMMA();
-  // MsgID 56: TdhwSet (f8.8)
-  appendFloat(s.TdhwSet); COMMA();
-  // MsgID 57: MaxTSet (f8.8)
-  appendFloat(s.MaxTSet); COMMA();
-  // MsgID 70: StatusVH (status)
-  appendStatus(s.StatusVH); COMMA();
-  // MsgID 71: RelativeVentilation (low byte)
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.RelativeVentilation & 0xFF); COMMA();
-  // MsgID 77: OEMDiagnosticCode → use FanSpeed as proxy for ID77 (exhaust fan speed)
-  // PIC stores raw ID77 value; we use the closest available field
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.FanSpeed & 0xFF); COMMA();
-  // MsgID 116-123: counters (unsigned 16-bit)
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.BurnerStarts); COMMA();
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.CHPumpStarts); COMMA();
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.DHWPumpValveStarts); COMMA();
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.DHWBurnerStarts); COMMA();
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.BurnerOperationHours); COMMA();
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.CHPumpOperationHours); COMMA();
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.DHWPumpValveOperationHours); COMMA();
-  pos += snprintf_P(line + pos, sizeof(line) - pos, PSTR("%u"), s.DHWBurnerOperationHours);
-
-  #undef COMMA
-
+  for (uint8_t i = 0; i < OTD_PS_FIELDS; i++) {
+    if (i) line[pos++] = ',';
+    pos = otdPsAppend(line, pos, (int)sizeof(line), pgm_read_byte(&otdPsKinds[i]), otdPsValues[i]);
+  }
   line[pos] = '\0';
+  otDirectBridgeWriteLine(line, (size_t)pos);   // port 25238, as the PIC's serial line
   processOT(line, pos);
 }
 
@@ -2608,10 +2586,8 @@ static void resetTransientState() {
   // DHW push state machine
   otDHWPushState = PUSH_IDLE;
   otDHWPushStartMs = 0;
-  // PS=1 summary mode
-  otSummaryMode = false;
-  otHideReports = false;
-  otSummaryPending = false;
+  // PS=1 is not touched here: a GW= mode switch leaves HideReports alone on the PIC (gateway.asm:4690-4733);
+  // only PS=0 and GW=R clear it (TASK-1800).
   // Thermostat connectivity tracking — reset to boot state
   otThermostatSeen = false;
   otLastThermostatMs = 0;
@@ -3342,6 +3318,10 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       // Full reset: clear all transient state (mirrors PIC hardware reset)
       OTDDebugTln(F("OTD: full gateway reset"));
       resetTransientState();
+      // TASK-1800: a PIC reset clears its RAM: the PS=1 store, the pending summary and HideReports
+      memset(otdPsValues, 0, sizeof(otdPsValues));
+      otHideReports = false;
+      otSummaryPending = false;
       // Restart OT interfaces
       otMaster.end();
       otSlave.end();
@@ -3485,21 +3465,17 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   }
 
   // =====================================================================
-  // PS=0/1 — Print Summary mode
-  // PS=1: suppress T/B/R/A frames, emit comma-separated summary per cycle
-  // PS=0: resume normal frame output
+  // PS=0/1 — Print Summary, as the PIC (PrintSummary, gateway.asm:2341-2358)
+  // PS=1: one summary line (SummaryReport, :1644-1658), T/B/R/A reports hidden until PS=0
+  // PS=0: reports back. One character only (else "PS: SE"), 0 or 1 (else "PS: BV"): the PIC prints
+  // "PS: " before it checks the value (SerialCommand, gateway.asm:3697-3704).
   // =====================================================================
 
   else if (cmd0 == 'P' && cmd1 == 'S') {
-    if (value[0] == '1') {
-      otSummaryMode = true;
-      otHideReports = true;
-      otSummaryPending = true;  // trigger immediate first summary
-    } else {
-      otSummaryMode = false;
-      otHideReports = false;
-      otSummaryPending = false;
-    }
+    if (value[0] == '\0' || value[1] != '\0') { synthesizeResponse(buf, "SE"); return false; }
+    if (!checkBoolean(value)) { synthesizeResponse(buf, "BV"); return false; }
+    otHideReports = (value[0] == '1');
+    otSummaryPending = otHideReports;
     rspBuf[0] = value[0]; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }

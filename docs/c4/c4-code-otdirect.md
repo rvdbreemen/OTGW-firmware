@@ -93,7 +93,6 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
     - Updates flame ratio state from a MsgID 0 reply's slave status (bit 3 = flame active); a reply for MsgID 128 does not
     - Implements 3-strike auto-blacklist: increments 2-bit counter for UNKNOWN_DATA_ID; disables schedule entry on third strike
     - Monitors DHW push state machine (MsgID 0): transitions PENDING→STARTED→IDLE, detects timeout
-    - Triggers PS=1 summary emission if in summary mode
   - On a boiler DATA-INVALID reply (library status INVALID with even parity, message type DATA-INVALID and the Data-ID of the request): bridges it to the parser (prefix 'B'), does not cache it
   - On any other failure: Sets `state.otBus.bOnline = false` only for status request (MsgID 0)
   - After SUCCESS or DATA-INVALID: answers a forwarded thermostat frame through `replyToThermostat()`. A timeout or a corrupt reply gets no answer (OT spec v4.2 §4.5: the thermostat retries)
@@ -177,14 +176,12 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - `static void otDirectBridgeProcessPRResponse(const char* prLine)` - same for a synthesized `PR:` line
 - `void handleOTDirectBridgeStream()` - line-buffered input from the port 25238 client (128-byte lines, at most 4 lines per call), each line goes to `sendPICSerial()`, which routes to `handleOTDirectCommand()` when no PIC is active. Called from `doBackgroundTasks()` while OT-Direct is active. The setting is off by default
 
-#### `static void emitSummaryLine()`
-- **Purpose**: PS=1 mode: emit comma-separated summary matching PIC format (34 fields)
-- **Behavior**:
-  - Appends MsgID values in order: 0,1,6,7,8,14,15,16,17,18,19,23,24,25,26,27,28,31,33,48,49,56,57,70,71,77,116-123
-  - Formats binary status as "BBBBBBBB/BBBBBBBB" (HB/LB)
-  - Formats floats with 2 decimal places, signed floats with +/- prefix
-  - Reads from `OTcurrentSystemState` (populated by parser)
-  - Calls `processOT(line, pos)` to emit single-line output
+#### `static void emitSummaryLine()` and the PS=1 store (TASK-1800)
+- **Purpose**: answer PS=1 byte for byte as the PIC does (Robert 2026-11-11): one summary line of 34 fields per PS=1, on port 25238 and to the parser
+- **Store** (`otdPsNoteFrame()`, called from `bridgeFrameToParser()`; PIC StoreValue): keeps the raw data word of Data-IDs 0,1,6,7,8,14,15,16,17,18,19,23,24,25,26,27,28,31,33,48,49,56,57,70,71,77,116-123 from a thermostat WRITE_DATA (T, before overrides), a boiler READ_ACK (B) and, without a thermostat, the gateway's own WRITE_DATA (R). Data-Invalid, Unknown-DataID and answers the gateway makes itself (A) are not stored. Zero at boot
+- **Print** (PIC StoreProcTable and print routines): status as `BBBBBBBB/BBBBBBBB`, f8.8 as `<int>.<2 digits>` with the PIC's rounding (a low byte 0xFF rounds up), MsgID 27 with `-` only (no `+`), MsgID 33 as a signed 16-bit integer, MsgID 15/48/49 as `HB/LB`, MsgID 71/77 as their low byte, counters 116-123 as unsigned 16-bit
+- **When**: `PS=1` answers `PS: 1`, sets `otSummaryPending`, and the next `loopOTDirect()` pass emits the line once. T/B/R/A reports stay hidden on port 25238 until `PS=0` (`otHideReports`); the parser still gets every frame. `PS=` with another value answers `PS: BV`, with more than one character `PS: SE`
+- **Test**: `tests/test_otd_ps1_summary_pic.py` (golden line from the PIC routines in gateway.asm)
 
 ### Command Handler
 
@@ -233,7 +230,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - `GW=R` - Full reset (clears transient state, restarts OT interfaces)
 
 **Category 5: PR= Register Queries** (read-only responses)
-- `PR=A` → "OpenTherm Gateway OTGW32"
+- `PR=A` → "OpenTherm Gateway 6.6" (`OTD_PIC_COMPAT_VERSION`, PIC format, TASK-1797); `PR=T` → two digits without separator, e.g. "T=10"
 - `PR=M` → Mode char (G gateway, P bypass, M monitor, S master, L loopback)
 - `PR=O` → Override status (N/C value/T value)
 - `PR=S` → Setback temp
@@ -241,7 +238,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - `PR=G` / `PR=I` / `PR=L` / `PR=T` / `PR=D` / `PR=P` / `PR=R` / `PR=B` / `PR=C` / `PR=Q` / `PR=N` / `PR=V` → Various status
 
 **Category 6: PS= Summary Mode**
-- `PS=1` - Enable (suppress individual frames, emit summary per MsgID 0)
+- `PS=1` - one PIC-format summary line, T/B/R/A reports hidden on port 25238 until `PS=0` (TASK-1800)
 - `PS=0` - Disable (resume normal frame output)
 
 **Category 7: Schedule Management**
