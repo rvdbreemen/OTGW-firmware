@@ -4,7 +4,7 @@ title: 'GitHub #692: serve LittleFS web assets pre-compressed with gzip on 2.0.0
 status: Done
 assignee: []
 created_date: '2026-11-04T23:51:00Z'
-updated_date: '2026-11-06T19:41:00Z'
+updated_date: '2026-11-11T05:29:00Z'
 labels:
   - github
   - needs-maintainer-ok
@@ -32,6 +32,8 @@ Robert 2026-11-05 (session, AskUserQuestion): decided together with PR #697 (que
 Robert 2026-11-06 ~00:00 (AskUserQuestion, lead session), after Andre's gzip+ETag measurement: 'Beide: eerst queue, gzip later'. The PR #697 request queue (ADR-212) goes first; the single gzipped page is follow-up TASK-1668 with its own ADR (supersedes ADR-192), after measuring today's multi-file load time.
 
 2026-11-06 implemented by PR #698 (André Brait), landed via TASK-1674 with the review fixes; ADR-215 Accepted.
+
+2026-11-11 GitHub #692 closed as completed with Robert's OK: comment https://github.com/rvdbreemen/OTGW-firmware/issues/692#issuecomment-6787920267 (PR #698 shipped in beta.111, ADR-215).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
