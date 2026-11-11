@@ -8992,25 +8992,23 @@
     },
     {
       "id": "ADR-230",
-      "title": "SAT heating curve self-tune: the floating phase needs one hour of data to vote, and PWM hours count for the warm-up phase on gas boilers (amends ADR-228)",
-      "path": "ADR-230-sat-heating-curve-self-tune-the-floating-phase-needs-one-hour-of-data-to-vote-and-pwm-hours-count-for-the-warm-up-phase-on-gas-boilers-amends-adr-228.md",
+      "title": "SAT heating curve self-tune: the floating phase needs one hour of data to vote (amends ADR-228)",
+      "path": "ADR-230-sat-heating-curve-self-tune-the-floating-phase-needs-one-hour-of-data-to-vote-amends-adr-228.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-12",
-      "decision_summary": "Floating vote minimum (entries 313, 315).",
+      "decision_summary": "The floating phase votes only when its data in the window is at least 1 hour: its signal ticks over the counted days...",
       "topics": [
         "floating phase minimum",
         "heating curve self-tune",
-        "phase split",
-        "pwm hours"
+        "phase split"
       ],
       "aliases": [
         "floating phase needs one hour",
-        "self-tune pwm hours warm-up"
+        "short floating sample veto"
       ],
       "components": [
-        "self-tune floating vote minimum",
-        "self-tune pwm hour rule"
+        "self-tune floating vote minimum"
       ],
       "symbols": [
         "SAT_CT_FLOAT_MIN_MS",
@@ -9024,15 +9022,13 @@
           "Log fvote in every SATTUNED record."
         ],
         "must_not": [
-          "Must not apply a minimum to the warm-up phase.",
-          "Must not count PWM hours on a heat pump (entry 205)."
+          "Must not apply a minimum to the warm-up phase."
         ],
         "exceptions": [
           "None."
         ],
         "verification": [
-          "tests/testsatcurveselftune.py: testshortfloatingsampledoesnotveto (12 floating minutes against 72 warm-up hours at a 60 s interval raises; on the code before TASK-1816 it holds with phasesdisagree), testonehouroffloatingdatavotes (60 tic...",
-          "The PWM rule gets its own red/green test with TASK-1817."
+          "tests/testsatcurveselftune.py: testshortfloatingsampledoesnotveto (12 floating minutes against 72 warm-up hours at a 60 s interval raises; on the code before TASK-1816 it holds with phasesdisagree), testonehouroffloatingdatavotes (60 tic..."
         ]
       },
       "scope": {
@@ -14954,12 +14950,6 @@
       "resolved": true
     },
     {
-      "source": "ADR-205",
-      "target": "ADR-230",
-      "type": "related",
-      "resolved": true
-    },
-    {
       "source": "ADR-206",
       "target": "ADR-051",
       "type": "related",
@@ -15568,12 +15558,6 @@
     {
       "source": "ADR-229",
       "target": "ADR-224",
-      "type": "related",
-      "resolved": true
-    },
-    {
-      "source": "ADR-230",
-      "target": "ADR-205",
       "type": "related",
       "resolved": true
     },

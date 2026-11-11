@@ -74,6 +74,16 @@ status_history:
     changed_by: "Agent: Claude"
     reason: ADR-230 amends ADR-228 (Sergeant D entries 313, 315, 316)
     changed_via: adr-kit lifecycle
+  - date: 2026-11-12
+    status: Accepted
+    changed_by: "Agent: Claude"
+    reason: ADR-230 recreated with a narrower title (split on Robert's choice)
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-12
+    status: Accepted
+    changed_by: "Agent: Claude"
+    reason: ADR-230 amends ADR-228 decision 4 (Sergeant D entries 313, 315)
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

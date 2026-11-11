@@ -13,7 +13,6 @@ related:
   - "ADR-198"
   - "ADR-204"
   - "ADR-228"
-  - "ADR-230"
 topics:
   - "heating curve self-tune"
   - "curve coefficient auto-tune"
@@ -78,6 +77,11 @@ status_history:
     status: Accepted
     changed_by: "Agent: Claude"
     reason: ADR-230 amends ADR-205 (Sergeant D entries 313, 315, 316)
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-12
+    status: Accepted
+    changed_by: "Agent: Claude"
+    reason: "ADR-230 split on Robert's choice: only the floating minimum, which does not touch ADR-205"
     changed_via: adr-kit lifecycle
 ```
 

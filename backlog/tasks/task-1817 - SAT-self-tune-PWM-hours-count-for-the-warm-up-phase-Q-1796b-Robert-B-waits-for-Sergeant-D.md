@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-11T20:20:00Z'
-updated_date: '2026-11-11T23:06:00Z'
+updated_date: '2026-11-11T23:30:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -35,4 +35,6 @@ Robert decided Q-1796b = B (DM msg 1570171160111620147, relayed by the coordinat
 Sergeant D answered Q-1796b B as well, entry 316 (20:04:33 UTC, msg 1570167372474617888); with Robert's DM B this revises entry 174. Needs an ADR-228 update (ADR-228 is Accepted: supersede or amend via adr-kit). Unblocked once entry 316 is on origin/dev.
 
 ADR-230 (Proposed) carries this rule as decision 2. Built only after Sergeant D answers Q-1817a (A: every PWM tick counts for warm-up, advice; B: PWM hours stay in the normal phase split) and Q-1817b (hybrid: gas-boiler rule, advice, or heat-pump rule), asked via comms 92.
+
+2026-11-12 Robert chose to split (session d3): ADR-230 now holds only the floating minimum (Accepted); the PWM-hours rule gets its own new ADR once Sergeant D answers Q-1817a/b (posted by 92, msgs 1570214599238877266 and 1570214605882662923).
 <!-- SECTION:NOTES:END -->
