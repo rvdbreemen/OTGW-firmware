@@ -3,9 +3,11 @@ id: TASK-1797
 title: >-
   OT-Direct: PR=A banner and PR=T format break pyotgw (HA opentherm_gw) on port
   25238; the banner names the board
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-11T06:35:00Z'
+updated_date: '2026-11-11T12:28:00Z'
 labels:
   - otdirect
   - review-2026-11-11
