@@ -281,6 +281,11 @@ Als alternatief kunt u een firmwarebinary handmatig uploaden:
 - Geen settings-migratie nodig. Instellingenbestanden van v1.3.x laden zonder wijziging in v2.0.0.
 - MQTT-topics en de REST API zijn ongewijzigd ten opzichte van v1.x.
 - Als u upgradet van een versie voor v1.2.0: REST API v0 en v1 endpoints zijn verwijderd in v1.2.0. Alleen `/api/v2/` endpoints zijn beschikbaar. Zie [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md).
+- **Dezelfde Home Assistant-entiteiten houden: neem de MQTT unique id mee.** De standaard unique id is `otgw-` plus het MAC-adres van de module. De S3 heeft een ander MAC-adres dan de Wemos, dus zonder actie krijgt hij een nieuwe unique id. Home Assistant ziet dan een nieuw apparaat en maakt nieuwe entiteiten aan; omdat de oude namen nog bezet zijn, krijgen die een achtervoegsel zoals `_2`. Er zijn twee oplossingen:
+  1. **Oude entiteiten houden.** Zet vóór het wisselen de unique id van de Wemos over: zet uw 1.x-instellingenbestand terug op de S3 (de unique id gaat mee), of neem bij de MQTT-instellingen de waarde van **Unique id** van de Wemos over in de S3. Laat de twee gateways daarna nooit tegelijk draaien: met dezelfde unique id schrijven ze naar dezelfde entiteiten.
+  2. **Opnieuw beginnen.** Verwijder in Home Assistant het oude OTGW-apparaat en geef de nieuwe entiteiten zo nodig de oude namen terug, zodat uw automatiseringen en dashboards blijven werken.
+
+  Het wissen van de retained topics met MQTT Explorer lost de `_2`-namen niet op: de oude entiteiten staan dan nog in het entiteitenregister van Home Assistant. Verwijder ze daar.
 - Verwijder na de upgrade eventuele verweesde Home Assistant-entiteiten en laat MQTT auto-discovery ze opnieuw aanmaken om nieuwe of hernoemde entiteiten op te pikken.
 
 #### Belangrijke waarschuwingen

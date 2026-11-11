@@ -256,6 +256,11 @@ If you have a firmware binary file and want to upload it directly:
 - No settings migration is required. Settings files from v1.3.x load without modification in v2.0.0.
 - MQTT topics and the REST API are unchanged from v1.x.
 - If you are upgrading from before v1.2.0, be aware that REST API v0 and v1 endpoints were removed in v1.2.0. Only `/api/v2/` endpoints are available. See [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md).
+- **Keeping the same Home Assistant entities: carry the MQTT unique id over.** The default unique id is `otgw-` plus the MAC address of the module. The S3 has a different MAC address than the Wemos, so without action it gets a new unique id. Home Assistant then sees a new device and creates new entities; because the old names are still taken, the new ones get a suffix such as `_2`. There are two fixes:
+  1. **Keep the old entities.** Carry the Wemos unique id over before the swap: restore your 1.x settings file on the S3 (the unique id comes with it), or copy the **Unique id** value from the Wemos MQTT settings into the S3. Never run the two gateways at the same time afterwards: with the same unique id they write to the same entities.
+  2. **Start fresh.** Delete the old OTGW device in Home Assistant and, where needed, give the new entities their old names back, so your automations and dashboards keep working.
+
+  Deleting the retained topics with MQTT Explorer does not fix the `_2` names: the old entities are still in the Home Assistant entity registry. Delete them there.
 - After upgrade, delete any orphaned Home Assistant entities and allow MQTT auto-discovery to recreate them to pick up any new or renamed entities.
 
 #### Important Warnings
