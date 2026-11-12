@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:01:00Z'
-updated_date: '2026-11-12T12:17:00Z'
+updated_date: '2026-11-12T21:26:00Z'
 labels:
   - heap
   - investigation
@@ -29,9 +29,9 @@ Not yet a regression. hd_min_free_heap is a run-wide watermark since boot, so ea
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Like-for-like comparison on .61, beta.211 against beta.214: same scenario (SAT sim, no boiler), same WS clients, at least 30 min, the minimum heap reported separately for the first 60 s after boot and for steady state (not only hd_min_free_heap); ideally with TASK-1757's probe build so the dip is attributed
+- [ ] #1 Closing run on .61 with beta.218 (TASK-1757 fix) in the 214 scenario: SAT on, satsimulation, no boiler, the Firefox tab, one pyotgw session, 30 min after a /ReBoot; hd_min_free_heap at +60 s and at +30 min, plus device/info free and maxblk every 60 s; close as the TASK-1757 boot race when the +30 min watermark stays at or near the +60 s value, well above 3,072 B, with no reset
 - [x] #2 Static review of src/ changes 203..214 per prerelease tag for new allocations, buffers, task stacks and connection handling, recorded in the notes
-- [ ] #3 Only if AC1 shows a real steady-state difference: bisect over the tags (208, 211, 214) by the bench-tester and name the commit with the measurement; otherwise close as the TASK-1757 boot race with the numbers
+- [ ] #3 Only if AC1 shows the watermark falling during steady state well below the +60 s value: bisect over the tags (208, 211, 214) by the bench-tester and name the commit with the measurement; otherwise close as the TASK-1757 boot race with the numbers
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -56,4 +56,10 @@ Attribution build (ba): TASK-1757 instrumentation is prepared on lane/ba-1757 (c
 WS client baseline (ba, 2026-11-12; Robert's choice B on the desktop Firefox tab at .61): the tab stays open as a constant extra /ws client, so every run on beta.208/211/214/215 has one client more than its mode says (C = 1, one-tab = 2, two-tab = 3); unknown for the beta.167/171 baselines. The 211-vs-214 comparison stays like-for-like as long as both sides have the tab open (they had); do not compare against the 167/171 numbers without that caveat. Same note in TASK-1757.
 
 Correction (coordinator and 09, 2026-11-12): the three 214 values 4,100 / 3,948 / 3,896 B all come from ONE boot (bootcount 466). hd_min_free_heap is a since-boot low-water mark and can only fall within a boot, so a falling watermark is not a trend. The ~7 KB on 211 was a per-boot watermark over a boot window without pyotgw or a SAT run, so the 211-vs-214 comparison does not hold either. What stands: one boot under bench load with a lowest point of 3,896 B (about 0.8 KB above CRITICAL), no reset. AC1 must use current free heap and maxblk sampled per phase (boot window per '[HEAP] boot win=' phase, then steady state), not the watermark; 09's TASK-1757 probe bench on 215 (12 boots, the same per-boot window) gives comparable numbers.
+
+2026-11-12 re-read after TASK-1757 landed (ba, no build, numbers from 09's bench files as reported in TASK-1757): beta.215 (214 code base + probes), 12 boots on .61 with the Firefox tab: the boot-window probe minimum was 8,184-35,944 B, and in every boot the largest drop sat inside one MQTTclient.loop() after onMqttConnect (23,452-43,516 B, outbox 4), with the SAT core-state publish landing on an outbox of 18. beta.218 (TASK-1757 fix, same scenarios): probe minimum 31,816-52,528 B, largest loop() drop 7,024-19,976 B, maxblk minimum 19,444-31,732 B, hd_min_free_heap at +60 s 29,216-52,368 B. Reading: the 214 observation (one boot, bootcount 466, since-boot watermark 3,896 B under pyotgw + SAT sim + Firefox) fits the TASK-1757 boot race: the dip that race caused was 23-43 KB per boot on the 214 code base, enough to reach about 4 KB from a 30-50 KB start, and the 218 fix removes it. The static review (AC2) found no new allocation in 203..214. What is NOT shown: steady-state heap under the 214 load (pyotgw session + SAT sim + Firefox WS client), on any build; all 215/218 numbers are boot-window or +60 s. So the boot race explains the low point plausibly but not with a measurement of the same load.
+
+Proposed closing run instead of AC1's 211-vs-214 comparison (which the correction note already shows does not hold): beta.218 on .61, the 214 scenario (SAT on, satsimulation, no boiler, Firefox tab, one pyotgw session), 30 min after a /ReBoot. Record hd_min_free_heap at +60 s (boot window) and at +30 min, plus device/info free and maxblk every 60 s. Pass to close as the TASK-1757 boot race: the +30 min watermark stays at or near the +60 s value and well above 3,072 B (CRITICAL), with no reset. If the watermark falls during steady state well below the +60 s value, a steady-state cause remains and AC3's bisect applies. Needs a bench slot from 09, no new firmware. AC1 wording should change to this run; that is the coordinator's or Robert's call.
+
+2026-11-12 AC1 reworded by the coordinator's call (measurement detail): the 211-vs-214 comparison is replaced by the beta.218 closing run in the 214 scenario. AC2 stays ticked (95's static review). The coordinator books the run with 09 after the beta and 219's bench.
 <!-- SECTION:NOTES:END -->

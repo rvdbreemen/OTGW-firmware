@@ -102,7 +102,10 @@ def classify_py(rc, out):
         return "SKIP"
     if re.search(r"^(SKIP|SKIPPED)\b", out.strip(), re.M) and not m:
         return "SKIP"
-    if re.search(r"^FAILED", out, re.M):
+    # TASK-1872: only unittest's own summary counts ("FAILED (failures=1)", "FAILED (errors=2)"),
+    # not any line starting with FAILED: a C++ harness inside a passing test may print
+    # "FAILED (4 failure(s))" for a mutant that is meant to fail (test_stream_real_cbuf.py).
+    if re.search(r"^FAILED \((?:failures|errors|unexpected successes)=", out, re.M):
         return "FAILED"
     return "PASS"
 
