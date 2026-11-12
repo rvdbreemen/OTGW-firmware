@@ -65,6 +65,8 @@ def slices(src):
     if own:
         parts.append(own)
     parts.append(function(src, r"^static unsigned long buildStatusRequest\(\)\s*\{"))
+    if "static void otdNoteCmdSent(" in src:   # TASK-1855: the command-sent hook of the two consumers
+        parts.append(function(src, r"^static void otdNoteCmdSent\(uint32_t frame, uint32_t now\)\s*\{"))
     parts.append(function(src, r"^static void scheduleMasterRequest\(\)\s*\{"))
     return "\n".join(parts)
 

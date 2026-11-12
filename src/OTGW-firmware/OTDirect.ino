@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.209
+**  Version  : v2.0.0-beta.210
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -711,6 +711,20 @@ static void updateWriteCache(uint8_t msgId, uint16_t value) {
     if (otSchedule[i].isWrite && otSchedule[i].msgId == msgId) {
       otSchedule[i].cachedValue = value;
       otSchedule[i].valueSet = true;
+      return;
+    }
+  }
+}
+
+// TASK-1855: a one-shot WRITE from the command ring that carries the value of a write schedule entry counts as that
+// entry's send, so the schedule's refresh follows after its interval instead of repeating the same WRITE at once
+// (a new entry has lastSentMs 0 and is due immediately). The PIC sends one frame per command.
+static void otdNoteCmdSent(uint32_t frame, uint32_t now) {
+  if (((frame >> 28) & 0x07) != 1) return;   // WRITE_DATA only
+  const uint8_t id = (uint8_t)((frame >> 16) & 0xFF);
+  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+    if (otSchedule[i].isWrite && otSchedule[i].msgId == id && otSchedule[i].cachedValue == (uint16_t)(frame & 0xFFFF)) {
+      otSchedule[i].lastSentMs = now;
       return;
     }
   }
@@ -1860,6 +1874,7 @@ static void scheduleMasterRequest() {
   if (!otCmdQueueEmpty()) {
     uint32_t cmdFrame = otCmdQueue[otCmdTail];
     if (sendMasterRequestAsync(cmdFrame, OT_DIRECT_ORIGIN_GATEWAY)) {
+      otdNoteCmdSent(cmdFrame, now);   // TASK-1855: the schedule refresh waits its interval
       otCmdTail = (otCmdTail + 1) % OT_CMD_QUEUE_SIZE;  // consume on success
       otCmdApplyPendingFlush();  // a reset during the send flushes now; a stale snapshot is rejected
     }
@@ -2017,6 +2032,7 @@ static bool otdAltSlotTaken(unsigned long thermostatFrame) {
   if (sendMasterRequestAsync(request, OT_DIRECT_ORIGIN_GATEWAY)) {
     if (idx < OT_SCHEDULE_SIZE) otSchedule[idx].lastSentMs = now;
     else {
+      otdNoteCmdSent((uint32_t)request, now);   // TASK-1855: the schedule refresh waits its interval
       otCmdTail = (otCmdTail + 1) % OT_CMD_QUEUE_SIZE;
       otCmdApplyPendingFlush();  // a reset during the send flushes now; a stale snapshot is rejected
     }

@@ -246,6 +246,8 @@ def build_source():
         ring,
         clock,
         cut_braced(src, "static bool otCmdEnqueue(uint32_t frame)"),
+        (cut_braced(src, "static void otdNoteCmdSent(uint32_t frame, uint32_t now)")   # TASK-1855
+         if "static void otdNoteCmdSent(" in src else ""),
         cut_braced(src, "static void scheduleMasterRequest()"),
         cut_braced(src, "static bool otdAltSlotTaken(unsigned long thermostatFrame)"),
         cut_braced(src, "static void resetTransientState()"),

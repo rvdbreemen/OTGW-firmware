@@ -476,6 +476,9 @@ def build_otd_source():
     own = m.group(1) if m else ""   # the scheduler's own-frames gate (TASK-1701, TASK-1707), real code
     sm = o.index("static void scheduleMasterRequest() {")
     sched_fn = o[sm:o.index("\n}\n", sm) + 3]
+    if "static void otdNoteCmdSent(" in o:   # TASK-1855: the command-sent hook scheduleMasterRequest() calls
+        hk = o.index("static void otdNoteCmdSent(")
+        sched_fn = o[hk:o.index("\n}\n", hk) + 3] + sched_fn
     pm = o.index("else if (cmd0 == 'P' && cmd1 == 'M') {")
     pm_end = o.index("\n  }\n", pm) + len("\n  }\n")
     branch = o[pm:pm_end]
