@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:01:00Z'
-updated_date: '2026-11-12T11:06:00Z'
+updated_date: '2026-11-12T11:47:00Z'
 labels:
   - heap
   - investigation
@@ -52,4 +52,6 @@ AC1 recipe from ba (TASK-1757 owner, 2026-11-12), works on every 2.0.0 build sin
 Existing runners: 09's b211 run (telnet per boot + info60.json) and ba's t1757/boots1757ac2.py + trace_summary.py (ba's scratchpad). Like-for-like conditions (ba): the Firefox tab adds one WS client to every boot, so keep it identical on 211 and 214 (or closed; Robert's DM answer on the tab is pending), same mode (C / one tab / two tabs), at least 4 boots per build, because one-tab boots are bimodal (18-19 KB vs about 7 KB on 211).
 
 Attribution build (ba): TASK-1757 instrumentation is prepared on lane/ba-1757 (connProbe() at 17 call sites, including right before and after satPublishCoreState; ba's offline read of the 211 boot-3 log shows about 14 sat/* topics published in the first pass after onMqttConnect, then '[loop-stall] 288 ms'). It takes the beta.215 slot, on top of 214, so it attributes the dip on the 214 code base but does not compare 211 with 214.
+
+WS client baseline (ba, 2026-11-12; Robert's choice B on the desktop Firefox tab at .61): the tab stays open as a constant extra /ws client, so every run on beta.208/211/214/215 has one client more than its mode says (C = 1, one-tab = 2, two-tab = 3); unknown for the beta.167/171 baselines. The 211-vs-214 comparison stays like-for-like as long as both sides have the tab open (they had); do not compare against the 167/171 numbers without that caveat. Same note in TASK-1757.
 <!-- SECTION:NOTES:END -->
