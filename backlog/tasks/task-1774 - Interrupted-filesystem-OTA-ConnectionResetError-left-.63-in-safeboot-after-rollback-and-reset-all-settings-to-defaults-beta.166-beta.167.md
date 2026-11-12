@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-10T05:53:00Z'
-updated_date: '2026-11-12T18:11:00Z'
+updated_date: '2026-11-12T21:12:00Z'
 labels:
   - bug
   - ota
@@ -55,6 +55,8 @@ Files (local, not in git): OTGW-build-archive\flash-logs\63-beta167-fs-ota-reset
 Recurrence on beta.217+a7676dc (otgw-bench-tester 09, relayed by the coordinator, written by otgw-firmware-95, 2026-11-12): filesystem OTA (/update?cmd=100) on the Classic with PIC (.63) panicked at 19:01:29. crashlog: 'reboot cause: Exception/panic (4)', 'Core dump: ipc0 pc=0x4038394f elf=805ace66 bt=0x4038394f 0x40384e98 0x40383c98' (elf SHA matches the build ELF). 09's decode: xPortEnterCriticalTimeout (port.c:478) <- vTaskSwitchContext (tasks.c:3653) <- _frxt_dispatch, on ipc0. Afterwards the UI file was 4096 of 199243 B, the settings were reset to defaults, and after the FS re-upload the device rolled back to safeboot; recovered via the safeboot app upload, stable since. The same FS OTA on .61 (OTGW32) went fine twice. Evidence: C:\Users\rvdbr\AppData\Local\Temp\claude\d9c572fbc7f8e9ee\4f6ad420-bf33-4a3a-88bc-4eb9890a2231\scratchpad\b217-63 (63-ota.log, 63-ota-fs2.log, 63-repro-fs.log, 63-safeboot-app.log, crashlog.json, settings pre/post). 09 is trying to reproduce (FS 217->217, then 203->203).
 
 Reading (95), interpretation, not verified: a fault inside xPortEnterCriticalTimeout called from the scheduler's context switch on ipc0 fits a corrupted spinlock/TCB more than a plain stack overflow of the running task; it is compatible with ADR-225's hypothesis (ipc1 stack overflowing into ipc0's TCB), but the crashlog carries no exception cause (EXCCAUSE/EXCVADDR), so a spinlock-timeout abort is not excluded. The port.c line was checked only against the local framework-espidf copy, which may not be the IDF build inside the pinned Arduino libs. Consequence for ADR-225: the evidence is on ipc0, so the stack raise must cover both IPC tasks (CONFIG_ESP_IPC_TASK_STACK_SIZE sets both, to be confirmed in the plan), and the bench for it must include the FS OTA on .63, not only the boot loop on .61. Bench .61 vs .63 difference to keep in view: .63 has a PIC and the serial task running during the FS write.
+
+2026-11-12 rate on the Classic bench (.63), otgw-bench-tester 09's repro, relayed by the coordinator: 9 filesystem writes, 1 panic. 19:00 203->217 app+fs PANIC (ipc0, crashlog 19:01:29); 19:09 217 FS-only OK; 19:10 FS-only x3 OK; 19:11 217->217 app+fs OK; 19:12 217->203 OK; 19:13 203 FS-only OK; 19:13 203->217 OK. Per build: 217 1 of 7, 203 0 of 2. Evidence: 09's scratchpad b217-63\63-repro-fs.log, 63-repro-full.log, 63-repro-203.log (comms checked: every later read shows lastreset Software reset and only the 19:01:29 panic in the crashlog). Used in the beta.218 known issues as '1 of 9 filesystem writes on the Classic bench unit on 12 Nov'.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

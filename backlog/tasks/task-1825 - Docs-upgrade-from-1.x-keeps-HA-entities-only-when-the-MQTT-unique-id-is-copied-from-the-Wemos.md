@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T21:52:00Z'
-updated_date: '2026-11-11T22:20:00Z'
+updated_date: '2026-11-12T20:38:00Z'
 labels:
   - docs
 milestone: 2.0.0
@@ -34,6 +34,8 @@ Own finding from the same support question twice (indigo_light, #nederlandse-ond
 <!-- SECTION:NOTES:BEGIN -->
 Facts checked against dev 52fab1fb7: getUniqueId() returns otgw-<MAC> (src/OTGW-firmware/networkStuff.ino:1475-1479); readSettings fills settings.mqtt.sUniqueid only when it is empty or 'null' (settingStuff.ino:638-639); 2.x writes and reads the key MQTTuniqueid (settingStuff.ino:309, :920); 1.x writes the same key (origin/otgw-1.x.x settingStuff.ino:246, read at :565), so restoring a 1.x settings file carries the unique id over. Web UI label: MQTT settings, group Connection, 'Unique id' (data/v2.js:3916).
 Edits: docs/manuals/nl/h02-hardware-installatie.md and docs/manuals/en/ch02-hardware-setup.md, section on upgrading from v1.x: why the S3 gets a new unique id (MAC), the _2 suffix, fix 1 (restore the 1.x settings file or copy Unique id; never run both gateways at once), fix 2 (delete the old device, rename the new entities), and that wiping retained topics with MQTT Explorer leaves the entities in the HA registry. Checks: no em dashes, no OTGW32 in the added text. Docs-only, no build or evaluator gate needed (CLAUDE.md push policy).
+
+2026-11-12 indigo_light (Discord 301077214374658048, #nederlandse-ondersteuning https://discord.com/channels/812969634638725140/815561033036333076/1570535626447782012): after swapping the Wemos D1 mini for an S3 Mini, the HACS SAT integration in Home Assistant kept sending commands to OTGW/set/otgw-<old MAC>/command (node id is derived from the MAC), so the new gateway got nothing and the Honeywell kept controlling. HA looked normal because room and outside temperature are plain entities. His fix: remove the SAT integration, delete the old otgw-<old MAC> branches in MQTT Explorer, re-add SAT with the new device; then SH= and CS= arrived on the new node. He asks to add this to the migration guide next to the _2 duplicate entities.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

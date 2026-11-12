@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.218] - 2026-11-12
+
+### Added
+- `device/info` fields `hd_ipc0_stack_min` and `hd_ipc1_stack_min`: the lowest free stack of the two IPC system tasks since boot (TASK-1865).
+- OT-Direct: `RT=` sets the room temperature for the boiler, as on the PIC 6.8; the MQTT `room_temp` command also replaces a thermostat's MsgID 24 write (TASK-1842). `PR=X` and the `device/info` field `otdpiccompat` report the PIC command set OT-Direct follows (TASK-1860).
+- Diagnostics: connect-window heap probes between the loop steps (TASK-1757).
+
+### Changed
+- SAT heating curve self-tune: on a gas boiler, and with the heat source on AUTO, PWM ticks count for the warm-up phase; heat pumps and hybrids keep leaving PWM hours out (ADR-231; Sergeant D entries 316, 318, 319, 322, 323; TASK-1817).
+- MQTT: after a connect the remaining connect messages leave in four portions behind the outbox depth and the largest free block, the discovery drip waits while more than 8 messages are queued, and the SAT state messages wait until those portions are done, at most 60 s (TASK-1757).
+- Web UI: Home shows the appliance type as a label instead of a switch (TASK-1837); Home Mission control and the SAT control loop chart use the Monitor > Graph panel style (TASK-1841); Advanced hides the PIC firmware tab on a unit without a PIC (TASK-1843); the footer is the 1.x copyright line (TASK-1838).
+- OT-Direct: the thermostat gets the PIC's own answers for MsgID 6, 125 and an unsupported 56 or 57, and `PR=A` reports version 6.8 followed by the board name (TASK-1844).
+
+### Fixed
+- `/api/v2/health` no longer runs filesystem operations on the web task; the mount check and the write probe run on the main loop (TASK-1865).
+- OT-Direct: a write command puts one WRITE on the bus (TASK-1855); `PS=1` shows the `OT=` value in the MsgID 27 field and `OT=-` clears it (TASK-1846).
+
 ## [2.0.0-beta.203] - 2026-11-12
 
 ### Added
@@ -872,7 +889,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.203...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.218...HEAD
+[2.0.0-beta.218]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.203...v2.0.0-beta.218
 [2.0.0-beta.203]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.174...v2.0.0-beta.203
 [2.0.0-beta.174]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.170...v2.0.0-beta.174
 [2.0.0-beta.170]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.167...v2.0.0-beta.170
