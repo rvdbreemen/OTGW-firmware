@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T18:15:00Z'
-updated_date: '2026-11-12T23:03:00Z'
+updated_date: '2026-11-12T23:05:00Z'
 labels:
   - firmware
   - build
@@ -26,7 +26,7 @@ Robert chose A on ADR-225 (DM 1570489845019840593, 2026-11-12, relayed by the co
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 ADR-225 Accepted through the adr-kit gates (Completeness, Evidence, Clarity, Consistency), Robert's DM 1570489845019840593 recorded as the User Decision
-- [ ] #2 Plan posted in #alpha-testing before the build tooling change lands (message link in the notes)
+- [x] #2 Plan posted in #alpha-testing before the build tooling change lands (message link in the notes)
 - [x] #3 src/OTGW-firmware/esp_ipc_stack.c is IDF esp_ipc.c at 9bb7aa84fe with only the OTGW-PATCH block changed (stack 1280 B, #error guards on IDF 5.5.1 and the prebuilt 1024), gated by tests/test_esp_ipc_override_gate.py: red on the code without the file, green on the fix, mutants red
 - [x] #4 Build evidence: scripts/check_esp_ipc_override.py passes on the built ELF and map (stack argument 0x500, esp_ipc_init in __init_array, ipc_task code and literals in IRAM, IPC data in DRAM, no libesp_system.a(esp_ipc.c.obj)) and fails on the beta.217 ELF; RAM line before/after (about +512 B DRAM)
 - [x] #5 Bench by the bench-tester: hd_ipc0_stack_min / hd_ipc1_stack_min about 256 B higher than on beta.217 on .61 and .63 (ipc1 ~336 B), at least 12 /ReBoot cycles on .61 with a crashlog check per boot, and the filesystem OTA on .63 (Classic with PIC) repeated without an ipc0 panic
@@ -62,4 +62,6 @@ Bench .61 (OTGW32) on 2.0.0-beta.219+9e3b0f3 by otgw-firmware-09, 2026-11-12, re
 Published 2026-11-13: 2.0.0-beta.219+4274624 pushed to dev (789dc56b5..42746244d, firmware commit d4f9c627d), posted with discord-post-build.sh (http 200, Discord message 1570574546984108183). Final build ELF check PASS (creator _sub_I_65535_0$0 in __init_array, stack 0x500, ipc_task + 11 literals in IRAM); src identical to the .61-benched 9e3b0f38a (0 diff lines).
 
 AC3 ticked: gate red without the file (2 failures), green on the fix (10 OK), mutants red, all in this session (notes above). AC4 ticked with one deviation: the build keeps no firmware.map, so the map line was replaced by ELF evidence (one creator, no duplicate IPC functions, the LTO marker symbol esp_ipc_stack_c_ff1bed1d of our object, stack 0x500; beta.217 ELF fails with 1024). RAM: static .dram0.bss +16 B; the 2 x 256 B stack is heap, as expected. AC5 ticked from otgw-firmware-09's bench (evidence C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/4f6ad420-bf33-4a3a-88bc-4eb9890a2231/scratchpad/b219f/ and .../b219/): .61 ipc0/ipc1 436 (404-484)/332 B vs 152-232/80-88 on 217/218; 20/20 /ReBoot clean on 9e3b0f3 (src-identical) plus one on 4274624; .63 (Classic + PIC) ipc0 80-88 -> 340 B, ipc1 88 -> 332 B after boot and steady during every FS write (551 progress lines each), 1 full OTA + 10 FS-only OTAs with 0 panics, settings diff none, PIC 6.8. Honest limit (coordinator): 10 clean writes alone would still happen about 31 % of the time at the old 1-in-9 rate (8/9^10), so the measured ipc0 margin (+252 B) is the real proof, not the panic count. AC2 NOT done: the plan was never posted in #alpha-testing before the change landed; reported to the coordinator for a decision (post now as an after-the-fact note, or waive).
+
+AC2 ticked LATE: the plan was not posted in #alpha-testing before the build tooling change landed. The coordinator's beta.219 note in #alpha-testing (message 1570575185869017141, 2026-11-13) carries an explicit after-the-fact announcement of the build-tooling plan (our own copy of IDF esp_ipc.c with a 1280 B IPC stack, gates, fallback B); ticked on the coordinator's instruction with that message as the evidence.
 <!-- SECTION:NOTES:END -->
