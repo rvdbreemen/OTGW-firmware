@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.193
+**  Version  : v2.0.0-beta.194
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2518,9 +2518,14 @@ static inline bool checkBoolean(const char* value) {
 
 // PIC-compat + Phase 1-10 state variables and tables: moved to top of file.
 // Remaining state variables that are only used after this point:
-static uint8_t otOperModeDHW   = 0;         // MW= lower nibble of byte3
-static uint8_t otOperModeCH1   = 0;         // MH= lower nibble of byte4
-static uint8_t otOperModeCH2   = 0;         // M2= upper nibble of byte4
+static uint8_t otOperModeDHW   = 0;         // MW= MsgID 99 HB bits 0..3
+static uint8_t otOperModeCH1   = 0;         // MH= MsgID 99 LB bits 0..3
+static uint8_t otOperModeCH2   = 0;         // M2= MsgID 99 LB bits 4..7
+// TASK-1832: MsgID 99 data as the spec (v4.2 MsgID 99) and the PIC (OperModeData, gateway.asm 6.8:3247-3250) lay it out:
+// HB = DHW operating mode (bits 0..3) + manual DHW push (bit 4), LB = HC1 (bits 0..3) + HC2 (bits 4..7).
+static uint16_t otdOperModeData(bool push) {
+  return (uint16_t)(((otOperModeDHW & 0x0F) | (push ? 0x10 : 0)) << 8) | (uint16_t)((otOperModeCH1 & 0x0F) | ((otOperModeCH2 & 0x0F) << 4));
+}
 
 // ---------------------------------------------------------------------------
 // clearWriteOverride — helper to clear both write cache and repeater override
@@ -3204,9 +3209,8 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       if (otDHWPushState == PUSH_IDLE) {
         otDHWPushState = PUSH_PENDING;
         otDHWPushStartMs = millis();
-        // Send MsgID 99 with DHW push bit (bit4 of byte3)
-        uint16_t data99 = ((uint16_t)(otOperModeDHW | 0x10)) |
-                          ((uint16_t)(otOperModeCH1 | (otOperModeCH2 << 4)) << 8);
+        // Send MsgID 99 with the DHW push bit (HB bit 4, TASK-1832)
+        uint16_t data99 = otdOperModeData(true);
         unsigned long frame99 = OpenTherm::buildRequest(
           OpenThermMessageType::WRITE_DATA,
           static_cast<OpenThermMessageID>(99), data99);
@@ -3310,13 +3314,13 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // Operating mode commands (MH, MW, M2) — MsgID 99
   // =====================================================================
 
-  // MH=x — Remote override operating mode CH1 (lower nibble of byte4)
+  // MH=x — Remote override operating mode CH1 (LB bits 0..3)
   else if (cmd0 == 'M' && cmd1 == 'H') {
     uint8_t val = atoi(value);
     if (val > 15) { otDirectBridgeProcessStatus("BV"); return false; }
     otOperModeCH1 = val;
     // Send MsgID 99 WRITE_DATA
-    uint16_t data99 = ((uint16_t)otOperModeDHW) | ((uint16_t)(otOperModeCH1 | (otOperModeCH2 << 4)) << 8);
+    uint16_t data99 = otdOperModeData(false);
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
@@ -3324,12 +3328,12 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
-  // MW=x — Remote override operating mode DHW (lower nibble of byte3)
+  // MW=x — Remote override operating mode DHW (HB bits 0..3)
   else if (cmd0 == 'M' && cmd1 == 'W') {
     uint8_t val = atoi(value);
     if (val > 15) { otDirectBridgeProcessStatus("BV"); return false; }
     otOperModeDHW = val;
-    uint16_t data99 = ((uint16_t)otOperModeDHW) | ((uint16_t)(otOperModeCH1 | (otOperModeCH2 << 4)) << 8);
+    uint16_t data99 = otdOperModeData(false);
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
@@ -3337,12 +3341,12 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
-  // M2=x — Remote override operating mode CH2 (upper nibble of byte4)
+  // M2=x — Remote override operating mode CH2 (LB bits 4..7)
   else if (cmd0 == 'M' && cmd1 == '2') {
     uint8_t val = atoi(value);
     if (val > 15) { otDirectBridgeProcessStatus("BV"); return false; }
     otOperModeCH2 = val;
-    uint16_t data99 = ((uint16_t)otOperModeDHW) | ((uint16_t)(otOperModeCH1 | (otOperModeCH2 << 4)) << 8);
+    uint16_t data99 = otdOperModeData(false);
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);

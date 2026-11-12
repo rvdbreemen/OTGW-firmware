@@ -1,10 +1,11 @@
 ---
 id: TASK-1832
 title: 'OT-Direct: MsgID 99 data bytes are swapped (MW=, MH=, M2=, HW=P)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-11T23:39:00Z'
-updated_date: '2026-11-12T00:09:00Z'
+updated_date: '2026-11-12T00:27:00Z'
 labels:
   - otdirect
   - parity
@@ -26,7 +27,7 @@ From the PIC 6.8 parity audit (N2), docs/reviews/2026-11-12_pic68-otdirect-parit
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 host test on real handlers: MW=4 -> 0x0400, MH=2 -> 0x0002, M2=3 -> 0x0030, HW=P -> bit 12; red on current code
+- [x] #1 host test on real handlers: MW=4 -> 0x0400, MH=2 -> 0x0002, M2=3 -> 0x0030, HW=P -> bit 12; red on current code
 - [ ] #2 decoded MQTT topics for MsgID 99 match the command sent
 - [ ] #3 bench capture of the R frames
 <!-- AC:END -->
@@ -37,4 +38,8 @@ From the PIC 6.8 parity audit (N2), docs/reviews/2026-11-12_pic68-otdirect-parit
 Not verified (from the audit): boiler reaction.
 
 Part of the PIC 6.8 parity audit, parent TASK-1851.
+
+Ground truth checked in this session (3 sources): spec v4.2 MsgID 99 LB = HC1 bits 0..3, HC2 bits 4..7; HB = DHW bits 0..3, bit 4 manual DHW push (docs/opentherm specification/...v4.2.md:2249-2289); PIC 6.8 OperModeData operatingmode1 -> byte 3 (HB), operatingmode2 -> byte 4 (LB) (gateway.asm:3247-3250), SetOperModeDHW low nibble of operatingmode1 (gateway.asm:4482-4494); PIC test dhw-5.stc HW=P -> R10631000. Fix: otdOperModeData(push) builds (DHW|push<<4)<<8 | HC1 | HC2<<4; the MH, MW, M2 and HW=P branches use it. Decoder OTGW-Core.ino print_remote_override_operating_mode reads LB = HC1/HC2, HB = DHW+push, so decode now matches the command (AC2: confirm topics on the bench).
+
+Test tests/test_otd_msgid99_bytes.py (real MH/MW/M2/HW branches cut from handleOTDirectCommand + the helper): old code 6 FAIL (e.g. MW=1, MH=4, HW=P -> 0x0411 instead of 0x1104), fix 6 OK. Neighbours: test_otd_tt_pic_parity 40 OK, test_otd_pr_reports_pyotgw OK, test_otd_ps1_summary_pic OK. evaluate.py --quick in wt-ba-otd: 92 checks, 0 FAIL.
 <!-- SECTION:NOTES:END -->
