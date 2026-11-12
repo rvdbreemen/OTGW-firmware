@@ -24,9 +24,9 @@ where the data is collected? Opt-in, switched on during onboarding or in the set
   **7 days fits in no encoding.** 7 days means the cloud (or a PSRAM ring, lost on a reboot).
 - The "changed values only" profile with the SAT events (about 230 KiB per day) is the only one
   that comes near a day on LittleFS, and it costs the timing of every repeated frame (below).
-- Cloudflare's free plan has room for this data. The upload itself is the hard part:
-  Cloudflare and comparable services want HTTPS, and the firmware does not do HTTPS
-  (ADR-003). The ways around that are below, with their consequences.
+- Cloudflare's free plan has room for this data, and a Worker on `workers.dev` accepts plain HTTP
+  (verified 2026-11-12), so no SSL is needed on the device. Google and the cloud MQTT brokers do need TLS.
+  Without TLS the data is readable in transit unless the payload is encrypted. Details and ranking below.
 
 ## How the numbers were measured
 
@@ -72,29 +72,94 @@ minute, so gaps stay visible. Estimate: under 50 KiB per day extra.
 
 ## How the data can get to a collection point
 
-The service side is not the problem. **Cloudflare free plan** (official pages, 2026-11-12):
-Workers 100,000 requests per day and 1,000 per minute, 10 ms CPU per request; R2 10 GB-month
-storage, 1 million write operations and 10 million reads per month, no egress fees. One upload
-per hour per gateway of the 230 KiB-per-day profile, kept 30 days, fits about 1,400 gateways
-(limited by the write operations; storage allows about 1,500). The every-frame profile fits
-about 390 gateways (storage). Not verified: whether R2 asks for a payment method on the free
-plan, and whether the EU jurisdiction is available on it (open since TASK-1473).
+Robert's brief, 2026-11-12 (via the coordinator): "Voor het feature om data op te slaan in van OT-logs,
+onderzoek wat hier een goede optie is, bv via REST of MQTT naar cloudflare of google, in elk geval naar een
+dienst die schaalbaar is, en gratis. bij voorkeur geen SSL nodig heeft, maar als het nodig is, dan wil ik dat
+weten. Het doel is om datacaptures op te slaan van gebruikers die in beta mode meedoen en opt-in hebben op het
+delen van data te verbetering van de firmware."
 
-The transport is the problem. Options:
+### Is SSL needed?
 
-| | A. Plain HTTP POST to a Worker | B. HTTPS from the device (ADR-218) | C. LAN relay (HA or a PC uploads) |
-|---|---|---|---|
-| Firmware rules | Allowed (no TLS). | Needs ADR-218 (Proposed, parked 2026-11-08) and an amendment of ADR-003. | Allowed; the device only serves a download on the LAN. |
-| Boards | All. | Only boards with PSRAM. The OT-Direct board cannot. | All. |
-| Works with Cloudflare | Only on a custom domain with "Always Use HTTPS" off. `http://workers.dev` answers 301 to HTTPS (checked 2026-11-12). Not verified that a Worker route then accepts plain HTTP. | Yes. | Yes (the relay speaks HTTPS). |
-| Privacy in transit | **Cleartext over the internet**, including the device's upload token. | Encrypted. | Encrypted from the relay on. |
-| Cost | Small firmware change; a domain on Cloudflare. | About 100 KB app flash in a nearly full slot (ADR-218), heap for the handshake. | No firmware TLS; the user must run a relay (an HA automation or a script). |
-| Fails quietly offline | Must be built (TASK-1471 rules). | Same. | The relay's problem. |
+**No, not for Cloudflare Workers; yes for Google and for the cloud MQTT brokers.**
 
-Already rejected in TASK-1473 (2026-10-30, not repeated here): Google Cloud Storage (free tier
-US only, billing account), MQTT cloud brokers (TLS mandatory, transport not storage), a
-Hetzner VPS (maintenance), WireGuard on the ESP32 (stale), payload encryption over plain HTTP.
-Considered there: Grafana Cloud Free EU (Loki), Hetzner Storage Box.
+- Cloudflare: three public Workers on `*.workers.dev` answered a plain `http://` request with
+  `HTTP/1.1 200 OK`, no redirect and no `Strict-Transport-Security` header (curl, 2026-11-12:
+  `demo.turnstile.workers.dev`, `demo-endpoints.pydantic.workers.dev`,
+  `remix-cloudflare-demo.jacob-ebey.workers.dev`). Only the bare `http://workers.dev` redirects (301 to
+  `workers.cloudflare.com`). Cloudflare's own Workers pages say nothing either way (workers.dev page, last
+  updated 2026-11-06; Custom Domains page, 2026-09-29); "Always Use HTTPS" is an opt-in zone setting that
+  redirects every host of a zone when turned on (page updated 2026-08-14). So a Worker can take plain HTTP
+  uploads today. Measured with GET; a POST takes the same path, but that was not tested.
+- Google: `http://script.google.com/...` answers 301 to HTTPS (curl, 2026-11-12). Cloud Run and Firebase
+  were not probed with a real service; they need a billing account anyway (below).
+- Cloud MQTT brokers: TLS (port 8883) was found mandatory in the TASK-1473 research (2026-10-30); not
+  re-verified today, the vendor pages fetched today do not state the ports.
+
+**What plain HTTP costs.** Without TLS the upload is readable on the way (OT data shows presence and
+heating habits) and a sniffed upload credential can be replayed. Two cheap measures restore most of it
+without a TLS session: an HMAC-SHA256 signature per upload with a per-device secret that is never sent
+(integrity and authenticity; SHA-256 has hardware support on the ESP32-S3), and optionally encrypting the
+payload to the collector's public key (X25519 + AES-GCM from the mbedTLS primitives that are already in the
+Arduino core; no 2 x 16.7 KB TLS record buffers). Payload encryption over plain HTTP was rejected in
+TASK-1473 on 2026-10-30 without a recorded reason; it is listed here again because it is the only way to
+encrypt on boards without PSRAM. Its flash and RAM cost were not measured.
+
+**What TLS costs on the device** (ADR-218 proof of concept on both bench units, 2026-11-07): two record
+buffers of about 16.7 KB each, each one contiguous block; the largest free internal block was 31,732 B, so
+every handshake without PSRAM failed (14/14), with the allocator redirected to PSRAM all succeeded; about
+96 KB of code plus 5.4 KB of root certificates in an app slot that is about 93 % full; 0.7 to 0.8 s per
+connect. Boards without PSRAM (the OT-Direct board among them) cannot do TLS.
+
+### Volume against the free limits
+
+Per gateway: about 230 KiB per day (changed values + SAT) or about 890 KiB per day (every frame + SAT),
+measured above. Retention 30 days.
+
+| Beta gateways | Stored, 230 KiB/day | Stored, 890 KiB/day | Uploads per day, hourly | Write ops per month, hourly |
+|---|---|---|---|---|
+| 50 | 0.33 GiB | 1.3 GiB | 1,200 | 36,000 |
+| 200 | 1.3 GiB | 5.1 GiB | 4,800 | 144,000 |
+| 1,000 | 6.6 GiB | 25.5 GiB | 24,000 | 720,000 |
+
+### Candidates
+
+| | Cloudflare Worker + R2 | Google (Apps Script + Drive, Cloud Run + Cloud Storage, Firebase) | Cloud MQTT broker (EMQX Serverless; HiveMQ) | Robert's NAS (self-hosted) |
+|---|---|---|---|---|
+| Free limits | Workers: 100,000 requests/day, 10 ms CPU per request, 100 MB request body on a free domain plan ([limits](https://developers.cloudflare.com/workers/platform/limits/)). R2: 10 GB-month, 1 million Class A and 10 million Class B ops per month, free egress; Standard storage only ([pricing](https://developers.cloudflare.com/r2/pricing/), updated 2026-10-30). | Cloud Run: 2 million requests/month; Cloud Storage free tier: 5 GB-months, 5,000 Class A ops/month, **US regions only**; **a billing account is required** for the Free Tier ([free features](https://docs.cloud.google.com/free/docs/free-cloud-features)). Firebase Spark: no Cloud Functions, no Cloud Storage; Firestore 1 GiB and 20,000 writes/day ([pricing](https://firebase.google.com/pricing)). Apps Script (consumer): 6 min per run, 90 min trigger time/day, 20,000 URL fetches/day ([quotas](https://developers.google.com/apps-script/guides/services/quotas)). | EMQX Serverless: 1 million session minutes, **1 GB traffic** and 1 million rule actions per month ([pricing](https://www.emqx.com/en/pricing)). HiveMQ Cloud: **the Serverless plan is retired on 2026-12-31** ([docs](https://docs.hivemq.com/hivemq-cloud/introduction.html)); the pricing page lists no free cloud plan, only Starter (paid) and a 30-day self-hosted Lab licence ([pricing](https://www.hivemq.com/pricing/)). | No vendor limits; the home uplink and the NAS are the limit. |
+| Fits 1,000 gateways | Yes for 230 KiB/day (6.6 GiB, 720,000 writes); every frame needs 25.5 GiB, above the 10 GB (paid: storage is billed per GB-month). | Cloud Storage 5 GB and 5,000 writes/month: no beyond about 7 gateways hourly. Firestore 20,000 writes/day: about 800 gateways hourly, 1 GiB storage: about 150. | 1 GB/month: about 150 gateways at 230 KiB/day. | Yes, if the uplink holds. |
+| Storage, not only transport | Yes (R2). | Yes. | **No**: a broker forwards; a subscriber that stores must run somewhere else. | Yes. |
+| TLS needed | No (verified above). | Yes. | Yes (TASK-1473 research). | No. |
+| EU data location | R2 jurisdiction `eu` exists ([data location](https://developers.cloudflare.com/r2/reference/data-location/)); the page names no plan restriction, not verified on a free account. | Free Cloud Storage only in US regions. | Region choice not checked. | Yes (in Robert's home). |
+| Billing / payment method | Not stated on the R2 pricing page; not verified. | Billing account required (Cloud); Firebase Spark has no Functions/Storage. | Not checked. | None. |
+| Upload auth | Worker code: per-device token or HMAC signature, rate limit and size cap per device in the Worker. | Apps Script web app: anyone-with-link; own checks in the script. | Broker username/password per device. | Own reverse proxy. |
+| Lock-in | Low: R2 speaks the S3 API, the Worker is about 100 lines. | Medium. | Low (MQTT), but needs a storing subscriber. | None, but Robert carries the operations. |
+| Other risk | Plain HTTP: content readable in transit unless encrypted (above). | US storage on the free tier conflicts with storing in the EU. | HiveMQ free option disappears. | Opens the home network to the internet; uptime depends on the house; Robert is the operator. |
+
+Terms of service and data-processing terms for storing third-party personal data were not checked for any
+candidate; that is part of the GDPR step below.
+
+### Abuse protection
+
+The firmware is public, so a shared upload key in the image leaks on the first download. Per device instead:
+at opt-in the gateway enrols with a beta invite code that the tester gets on request (revocable, for example
+handed out on Discord), and the Worker returns a device id plus a device secret. Each upload carries the
+device id and an HMAC over the body and a timestamp; the Worker checks the signature, refuses replays and
+old timestamps, caps the size and the rate per device, and writes only under that device's prefix. A device
+can never read or list data. Withdrawing consent deletes the prefix.
+
+### Ranking
+
+1. **Cloudflare Worker on `workers.dev` + R2 (EU jurisdiction), plain HTTP, HMAC-signed uploads.** Free for
+   up to about 1,000 beta gateways at the changed-values profile, works on every board without TLS, low
+   lock-in. Weak spot: the content is readable in transit; payload encryption closes that (cost not measured).
+2. **The same backend over HTTPS (ADR-218)** on PSRAM boards, if Robert wants transport encryption and accepts
+   that boards without PSRAM upload in plain HTTP or not at all.
+3. **The same backend through a LAN relay** (Home Assistant or a script): encrypted, no firmware TLS, but the
+   tester must run the relay.
+4. **Robert's NAS:** no vendor limits or TLS, but it exposes the home network and makes Robert the operator.
+5. **Google:** a billing account, free storage only in the US, HTTPS forced.
+6. **Cloud MQTT brokers:** TLS required, no storage, 1 GB per month on EMQX, HiveMQ's free plan retires on
+   2026-12-31.
 
 ### Daily or hourly
 
@@ -108,16 +173,16 @@ grouping the hours per day.
 ## Conflicts with earlier decisions
 
 1. **ADR-213 decision 1** (Accepted, Robert 2026-11-05): "The firmware never sends a recording
-   anywhere; it only answers a download request from the LAN." Options A and B change that and
-   need a new ADR that amends it. Option C does not.
+   anywhere; it only answers a download request from the LAN." Any upload by the device itself
+   (ranking 1, 2 and 4) changes that and needs a new ADR that amends it. A LAN relay (ranking 3) does not.
 2. **TASK-1473** (parked by Robert on 2026-10-30, 11-03, 11-04 and 11-05, milestone 2.1.0)
    covers continuous cloud recording to Cloudflare R2 EU over outbound TLS on PSRAM boards.
    This proposal overlaps with it. Robert decides whether it reopens 1473, replaces it, or
    stays separate.
-3. **"No HTTPS or WSS"** (core firmware rule, ADR-003): any upload to Cloudflare or a
-   comparable service needs HTTPS outbound, except option A on a custom domain. The only
-   sanctioned route is ADR-218 (outbound TLS on PSRAM boards, Proposed, parked 2026-11-08),
-   which boards without PSRAM cannot use.
+3. **"No HTTPS or WSS"** (core firmware rule, ADR-003): Google and the cloud MQTT brokers need HTTPS or TLS
+   outbound, and the only sanctioned route for that is ADR-218 (outbound TLS on PSRAM boards, Proposed,
+   parked 2026-11-08), which boards without PSRAM cannot use. A Cloudflare Worker over plain HTTP stays
+   within the rule.
 4. **Privacy.** OT logs show when people are home and how they heat (room temperature,
    setpoints, hot-water use). Uploading them makes the maintainer the controller of personal
    data under the GDPR: a consent text at onboarding that says what is uploaded, a random
@@ -134,8 +199,9 @@ grouping the hours per day.
    automatically before a filesystem update.
 2. **Phase 2, upload:** after Robert picks a transport (questions below) and a new ADR
    amends ADR-213 decision 1: an hourly upload task in the style of the webhook task
-   (ADR-136/137), a Worker plus an R2 bucket with a 30-day lifecycle, one random device id
-   and token per gateway, and a consent text.
+   (ADR-136/137) that posts over plain HTTP to a Worker on `workers.dev`, an R2 bucket in the
+   EU jurisdiction with a 30-day lifecycle, per-device enrolment with a beta invite code, HMAC-signed
+   uploads, and a consent text. Payload encryption if Robert wants the content unreadable in transit.
 
 Open questions for Robert, one decision each (sent through the coordinator): where the log
 lives and which frame profile; which transport; daily or hourly; and how this relates to
@@ -146,4 +212,6 @@ TASK-1473.
 - ADR-213 and `docs/diagnostics/recording-budget-1470.md` (record format, field-run sizes, RAM).
 - ADR-003, ADR-194 (LittleFS budget), ADR-218 (outbound TLS, Proposed), TASK-1473, TASK-1508, TASK-1524, TASK-1528.
 - `build.py:823` (`FS_RUNTIME_RESERVE_KIB = 96`).
+- Plain-HTTP probes (curl, 2026-11-12): three public `*.workers.dev` Workers 200 over HTTP; `http://workers.dev` 301; `http://script.google.com` 301 to HTTPS.
+- Google: [Free features](https://docs.cloud.google.com/free/docs/free-cloud-features), [Firebase pricing](https://firebase.google.com/pricing), [Apps Script quotas](https://developers.google.com/apps-script/guides/services/quotas). MQTT: [EMQX pricing](https://www.emqx.com/en/pricing), [HiveMQ Cloud docs](https://docs.hivemq.com/hivemq-cloud/introduction.html), [HiveMQ pricing](https://www.hivemq.com/pricing/). Cloudflare R2 [data location](https://developers.cloudflare.com/r2/reference/data-location/).
 - Cloudflare: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), [R2 pricing](https://developers.cloudflare.com/r2/pricing/), [Always Use HTTPS](https://developers.cloudflare.com/ssl/edge-certificates/additional-options/always-use-https/).
