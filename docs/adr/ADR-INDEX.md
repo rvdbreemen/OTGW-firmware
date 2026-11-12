@@ -235,3 +235,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-228 | Accepted | `src/OTGW-firmware/SATcurveTune.h` | Each signal tick of the self-tune is assigned to the warm-up phase (\|PID error\| > 0.1 C) or the floating phase (\|PID... |
 | ADR-229 | Accepted | - | In OT-Direct gateway mode the relayed thermostat READDATA MsgID 0 gets bits 0, 1, 2, 4, 5 and 6 of its master status... |
 | ADR-230 | Accepted | - | The floating phase votes only when its data in the window is at least 1 hour: its signal ticks over the counted days... |
+| ADR-231 | Proposed | - | On a gas boiler, a tick in SAT PWM is a warm-up tick of the self-tune, and the PWM-related exclusions do not drop its... |

@@ -9042,6 +9042,65 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-231",
+      "title": "SAT heating curve self-tune: PWM ticks on a gas boiler count for the warm-up phase; hybrid and heat pump PWM hours are logged, not used",
+      "path": "ADR-231-sat-heating-curve-self-tune-pwm-ticks-on-a-gas-boiler-count-for-the-warm-up-phase-hybrid-and-heat-pump-pwm-hours-are-logged-not-used.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-12",
+      "decision_summary": "On a gas boiler, a tick in SAT PWM is a warm-up tick of the self-tune, and the PWM-related exclusions do not drop its...",
+      "topics": [
+        "clean hour exclusions",
+        "heat source",
+        "heating curve self-tune",
+        "PWM hours"
+      ],
+      "aliases": [
+        "PWM hours count for warm-up",
+        "self-tune in PWM"
+      ],
+      "components": [
+        "self-tune PWM tick rule"
+      ],
+      "symbols": [
+        "satGetEffectiveHeatingSource",
+        "satTuneAddTick",
+        "satTuneTickPhase",
+        "satTuneTickReason"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Decide the PWM rule from satGetEffectiveHeatingSource(), not from a detected source.",
+          "Put every PWM tick on a gas boiler in the warm-up phase, whatever its PID error.",
+          "Keep reason=pwm for PWM ticks of a heat pump or a hybrid, and keep counting their pwmTicks.",
+          "Keep the signal of a PWM tick as the PID request before the PWM override."
+        ],
+        "must_not": [
+          "Let a PWM tick of a heat pump or a hybrid count for the tuner.",
+          "Skip the hot water, sun, room-lost, coefficient-change or tick-count exclusions for a PWM tick.",
+          "Change the phase rule for ticks outside PWM."
+        ],
+        "exceptions": [
+          "Decision 2's skipping of flameoff and minmod holds only after Sergeant D confirms Q-1817c A; with B, only the pwm exclusion goes for a gas boiler."
+        ],
+        "verification": [
+          "A host test on the real tuner (tests/testsatcurveselftune.py): a PWM hour on a gas boiler with flame-off and low-modulation ticks counts and adds its ticks to the warm-up phase on the fix, and is excluded with reason=pwm on the old code;..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -14950,6 +15009,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-205",
+      "target": "ADR-231",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-206",
       "target": "ADR-051",
       "type": "related",
@@ -15538,6 +15603,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-228",
+      "target": "ADR-231",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-229",
       "target": "ADR-208",
       "type": "related",
@@ -15564,6 +15635,24 @@
     {
       "source": "ADR-230",
       "target": "ADR-228",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-231",
+      "target": "ADR-205",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-231",
+      "target": "ADR-228",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-231",
+      "target": "ADR-230",
       "type": "related",
       "resolved": true
     }
