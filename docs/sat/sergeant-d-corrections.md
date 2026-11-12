@@ -6743,3 +6743,65 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1815 (otgw-firmware-d3).
 
 **Open:** nothing.
+
+## 318. Q-1817a A: every PWM tick counts for the self-tune's warm-up phase, whatever the PID error (Sergeant D, 2026-11-12)
+
+**Source:** sergeantd, 2026-11-12 06:42:10 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1570327834336165920 (https://discord.com/channels/812969634638725140/1105556725714649128/1570327834336165920), a reply to the re-asked Q-1817a (msg 1570318792033173535; first asked in msg 1570214599238877266). Read first-hand by the comms session.
+
+**Quoted:** "Q-1817a: A"
+
+**Settled:** on gas boilers (entry 316) a PWM tick always goes to the warm-up phase of the self-tune, whatever the PID error. Option B (PWM ticks split by the PID error, so a PWM hour near the target feeds the floating phase) is not chosen. This was our advice.
+
+**Checked against the recorded entries:** entry 316 (PWM hours count for warm-up on gas boilers): this says how. Entries 303-306, 313 and 315 (the phase split and the floating minimum): unchanged for non-PWM ticks. Our own tuner, no thermo-nova citation (entry 298).
+
+**Task:** TASK-1817 (otgw-firmware-d3), with a new ADR for the PWM-hours rule (ADR-230 is Accepted and covers only the floating-phase minimum).
+
+**Open:** nothing.
+
+## 319. Q-1817b B: a hybrid in SAT PWM follows the heat-pump rule, PWM hours are logged but not used by the self-tune (Sergeant D, 2026-11-12)
+
+**Source:** sergeantd, 2026-11-12 06:43:12 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1570328090490699818 (https://discord.com/channels/812969634638725140/1105556725714649128/1570328090490699818), a reply to the re-asked Q-1817b (msg 1570318796949037107; first asked in msg 1570214605882662923). Read first-hand by the comms session.
+
+**Quoted:** "A-1817b: B"
+
+**Interpretation (ours):** "A-1817b" is a typo for "Q-1817b"; the message is a reply to the Q-1817b post, so we read it as Q-1817b: B.
+
+**Settled:** for a hybrid (satsource 3) in SAT PWM the self-tune uses the heat-pump rule of entry 205: PWM hours are logged, marked as such, and not used by the tuner. The new gas-boiler rule (entries 316 and 318) does not apply to hybrids. This is NOT our advice (we advised A, the gas-boiler rule).
+
+**Checked against the recorded entries:** entry 205 (heat pumps: PWM hours logged, not used): applied to hybrids too. Entry 21 ("hybrid systems should be treated as heat pumps", given for MM): consistent with B. Entry 82 (a hybrid in PWM uses gas boiler timing): about PWM timing, not about the tuner, so it stays as it is. Both conflicting entries were named in the question.
+
+**Task:** TASK-1817 (otgw-firmware-d3), with a new ADR for the PWM-hours rule (ADR-230 is Accepted and covers only the floating-phase minimum).
+
+**Open:** nothing.
+
+## 320. Q-1821a A: the three Greek Monitor > Graph texts are fine (Sergeant D, 2026-11-12)
+
+**Source:** sergeantd, 2026-11-12 06:43:38 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1570328200167293014 (https://discord.com/channels/812969634638725140/1105556725714649128/1570328200167293014), a reply to the re-asked Q-1821a (msg 1570318802154029128; first asked in msg 1570204419113484390). Read first-hand by the comms session.
+
+**Quoted:** "Q-1828a: A"
+
+**Interpretation (ours):** the label says Q-1828a, but the message is a reply to the Q-1821a post, and he answered Q-1828a separately one minute later (entry 321). We read this as Q-1821a: A.
+
+**Settled:** web UI (not SAT behaviour). h_mon.graph_temps "θερμοκρασίες", h_mon.graph_marks "Διακοπές σύνδεσης" and h_mon.graph_marks_title "Εμφάνιση των σημείων όπου η ζωντανή σύνδεση χάθηκε (κόκκινο) και επανήλθε (πράσινο)" stay as they are.
+
+**Checked against the recorded entries:** entries 309 and 310 (earlier Greek texts): same kind of advice. No conflict.
+
+**Task:** TASK-1821 (otgw-firmware-ba).
+
+**Open:** nothing.
+
+## 321. Q-1828a A: the Greek theme, window chip, lane label and Values view texts are fine (Sergeant D, 2026-11-12)
+
+**Source:** sergeantd, 2026-11-12 06:44:41 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1570328464429416569 (https://discord.com/channels/812969634638725140/1105556725714649128/1570328464429416569), a reply to the re-asked Q-1828a (msg 1570318807468081213; first asked in msg 1570225884621709475). Read first-hand by the comms session.
+
+**Quoted:** "Q-1828a: A"
+
+**Settled:** web UI (not SAT behaviour). Theme "Φωτεινό" / "Σκούρο" / "Θέμα", window chips "10 λεπ." / "1 ώρα" / "4 ώρες" / "24 ώρες", and Values view "Πίνακας" / "Πλέγμα" stay as they are.
+
+**Interpretation (ours):** option A asked him to add "Latin or Greek" for the ON/OFF lane labels; he did not. We read a plain A as "keep what is built", which is ON/OFF in Latin letters (h_mon.graph_lane_on/off, commit 9a5d5cc90).
+
+**Checked against the recorded entries:** entries 309, 310 and 320: no conflict.
+
+**Task:** TASK-1828 (otgw-firmware-ba).
+
+**Open:** whether he prefers Greek words for ON/OFF; not asked again unless he raises it.

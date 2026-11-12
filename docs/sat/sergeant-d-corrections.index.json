@@ -4242,6 +4242,58 @@
     "TASK-1815"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 318,
+   "title": "Q-1817a A: every PWM tick counts for the self-tune's warm-up phase, whatever the PID error (Sergeant D, 2026-11-12)",
+   "date": "2026-11-12",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570327834336165920",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1817"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 319,
+   "title": "Q-1817b B: a hybrid in SAT PWM follows the heat-pump rule, PWM hours are logged but not used by the self-tune (Sergeant D, 2026-11-12)",
+   "date": "2026-11-12",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570328090490699818",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1817"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 320,
+   "title": "Q-1821a A: the three Greek Monitor > Graph texts are fine (Sergeant D, 2026-11-12)",
+   "date": "2026-11-12",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570328200167293014",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1821"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 321,
+   "title": "Q-1828a A: the Greek theme, window chip, lane label and Values view texts are fine (Sergeant D, 2026-11-12)",
+   "date": "2026-11-12",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570328464429416569",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1828"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
