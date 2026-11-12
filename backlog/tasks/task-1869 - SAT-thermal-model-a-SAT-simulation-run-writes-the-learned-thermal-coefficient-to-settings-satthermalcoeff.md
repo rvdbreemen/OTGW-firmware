@@ -3,9 +3,11 @@ id: TASK-1869
 title: >-
   SAT thermal model: a SAT simulation run writes the learned thermal coefficient
   to settings (satthermalcoeff)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-12T14:38:00Z'
+updated_date: '2026-11-12T14:41:00Z'
 labels:
   - sat
   - bug
