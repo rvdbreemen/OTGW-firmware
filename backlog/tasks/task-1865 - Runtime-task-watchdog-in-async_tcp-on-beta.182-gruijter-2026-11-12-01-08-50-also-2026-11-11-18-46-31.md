@@ -3,9 +3,11 @@ id: TASK-1865
 title: >-
   Runtime task watchdog in async_tcp on beta.182 (gruijter 2026-11-12 01:08:50,
   also 2026-11-11 18:46:31)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-12T11:51:00Z'
+updated_date: '2026-11-12T11:58:00Z'
 labels:
   - bug
   - crash
@@ -27,3 +29,9 @@ Found in gruijter's overnight capture (#alpha-testing msg https://discord.com/ch
 - [ ] #2 The backtrace is compared with the current dev code: the cause is named with file:line, or shown to be fixed already by a later commit
 - [ ] #3 Fix with a reproduction red on the old code and green on the fix, or close as fixed with the evidence of the commit that fixed it
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Claimed by otgw-firmware-95 (2026-11-12, coordinator assignment). Step 1, no build: decode the core dump from gruijter's upload against the beta.182+c9f37bd .elf, name the stuck task and code path, compare with current dev; report before any fix.
+<!-- SECTION:NOTES:END -->
