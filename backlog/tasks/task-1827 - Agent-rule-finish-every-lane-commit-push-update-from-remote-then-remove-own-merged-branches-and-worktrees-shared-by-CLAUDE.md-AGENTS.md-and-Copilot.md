@@ -3,11 +3,11 @@ id: TASK-1827
 title: >-
   Agent rule: finish every lane (commit, push, update from remote, then remove
   own merged branches and worktrees), shared by CLAUDE.md, AGENTS.md and Copilot
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T22:47:00Z'
-updated_date: '2026-11-11T22:51:00Z'
+updated_date: '2026-11-12T10:40:00Z'
 labels:
   - process
   - docs
@@ -37,3 +37,9 @@ Rule line 'Finish every lane' added to the AGENT-CORE block, identical in CLAUDE
 
 AC3: told the coordinator (with a request to relay to new sessions) and directly 09, 92, 95 and ba (2026-11-11 ~23:55), each with the 6-point short version; 95 and ba also got their own open items (lane-docs95 not yet on origin; ba's local main-tree commit labelled beta.183). Done after the push (waits for ba's post).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: 'Finish every lane' line in the AGENT-CORE block of CLAUDE.md, AGENTS.md and .github/copilot-instructions.md (each 1 match on origin/dev, checked 2026-11-12 by git show origin/dev:<file> | grep -c); commit 987ba435c is an ancestor of origin/dev. tests/test_agent_core_block.py OK, tests/test_adr_governance.py OK (run on detached origin/dev e8af7d61a+, 2026-11-12). AC2: docs/guides/worktrees.md:15 '### Finish a lane (maintainer directive, 2026-11-11, TASK-1827)' with the 7-step checklist. AC3: coordinator plus 09, 92, 95, ba told 2026-11-11 ~23:55 (notes).
+<!-- SECTION:FINAL_SUMMARY:END -->

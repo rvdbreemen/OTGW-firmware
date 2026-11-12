@@ -1,7 +1,7 @@
 ---
 id: "ADR-231"
 title: "SAT heating curve self-tune: PWM ticks on a gas boiler count for the warm-up phase; hybrid and heat pump PWM hours are logged, not used"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-12"
 binding: false
 gate: null
@@ -37,9 +37,12 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-12. Amends ADR-205 decision 2 (the clean-hour exclusions) and ADR-228 decision 1 (the phase per tick)
-for ticks in SAT PWM only; every other decision of both records stays in force. Both open questions are answered by
-Sergeant D (entries 322, 323); no code before Robert accepts this record.
+Accepted, 2026-11-12.
+
+Amends ADR-205 decision 2 (the clean-hour exclusions) and ADR-228 decision 1 (the phase per tick)
+for ticks in SAT (Smart Autotune Thermostat) PWM (pulse-width modulation) only; every other decision of both records stays in force. Both open questions are answered by
+Sergeant D (entries 322, 323). Robert accepted this record on 2026-11-12 (DM msg 1570402646186139730, "A", a reply to
+the accept question 1570337513208414273).
 
 **Decision Maker:** Sergeant D (SAT design owner) for the rule: entries 316, 318 and 319 of
 `docs/sat/sergeant-d-corrections.md`, and entries 322 (Q-1817c A) and 323 (Q-1817d A), 2026-11-12. Robert (maintainer) accepts or rejects this record;
@@ -64,6 +67,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-228
     changed_via: adr-kit lifecycle
+  - date: 2026-11-12
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: "Accepted by Robert: DM msg 1570402646186139730 (2026-11-12 11:39:27 UTC), \"A\", reply to accept question 1570337513208414273"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -80,7 +88,7 @@ Sergeant D decided:
 - Entry 316 (Q-1796b, 2026-11-11, msg 1570167372474617888): "Q-1796b: B": on gas boilers, PWM hours count for the warm-up
   phase; the signal is the same (setpoint minus curve, before the PWM override).
 - Entry 318 (Q-1817a, 2026-11-12, msg 1570327834336165920): "Q-1817a: A": on a gas boiler every PWM tick goes to the
-  warm-up phase, whatever the PID error.
+  warm-up phase, whatever the PID (proportional-integral-derivative controller) error.
 - Entry 319 (Q-1817b, 2026-11-12, msg 1570328090490699818): "A-1817b: B" (read as Q-1817b: B, a reply to that post): a
   hybrid (satsource 3) in SAT PWM follows the heat-pump rule of entry 205: PWM hours are logged, marked as such, and not
   used by the tuner. Entry 82 (a hybrid in PWM uses gas boiler PWM timing) is about the PWM timing and stays.
@@ -99,7 +107,7 @@ Unknown-DataID; scripts and output in the TASK-1817 notes):
 | B: skip `pwm` only | 0 | `min_mod` (61 and 56 of 120 PWM ticks at or below 5 %) |
 
 This choice is not covered by entries 316, 318 or 319. It was asked as Q-1817c (#dev-sat-mqtt msg 1570334185896411147,
-2026-11-12 07:07 UTC), with our advice A.
+2026-11-12 07:07 UTC, Coordinated Universal Time), with our advice A.
 
 ## Decision
 
@@ -107,7 +115,7 @@ On a gas boiler, a tick in SAT PWM is a warm-up tick of the self-tune, and the P
 hour; for a heat pump and a hybrid, a PWM tick keeps excluding the hour (`pwm`) and stays logged.
 
 1. **Heat source.** The rule follows `satGetEffectiveHeatingSource()` (`SATcontrol.ino:309-314`): `SAT_SRC_GAS_BOILER`
-   gets the PWM rule below; a heat pump and a hybrid keep `pwm` as an exclusion (entries 205 and 319). `AUTO` resolves
+   gets the PWM rule below; a heat pump and a hybrid keep `pwm` as an exclusion (entries 205 and 319). AUTO (heat source left on automatic) resolves
    to gas boiler here as it does for control (TASK-943), so an unconfigured heat pump or hybrid gets the gas rule
    (entry 323, Q-1817d A).
 2. **Exclusions for a PWM tick on a gas boiler** (amends ADR-205 decision 2). The tick is not excluded for being in PWM.
