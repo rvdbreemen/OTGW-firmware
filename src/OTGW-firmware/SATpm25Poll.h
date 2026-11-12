@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATpm25Poll.h
-**  Version  : v2.0.0-beta.199
+**  Version  : v2.0.0-beta.200
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -94,6 +94,23 @@ static inline SatPm25Verdict satPm25Decide(const SatPm25Bus &b, uint32_t nowMs, 
   const uint32_t sinceT25 = b.t25ReadMs ? (uint32_t)(nowMs - b.t25ReadMs) : nowMs;   // never: time since boot
   if (sinceT25 < SAT_PM25_THERMOSTAT_QUIET_MS) return SatPm25Verdict::Idle;
   if (flowAgeMs < SAT_PM25_FLOW_AGE_MS) return SatPm25Verdict::Idle;
+  if (b.slotMs == 0 || (uint32_t)(nowMs - b.slotMs) >= SAT_PM25_SLOT_WINDOW_MS) return SatPm25Verdict::NoSlot;
+  if (b.faultEdgeMs != 0 && (uint32_t)(nowMs - b.faultEdgeMs) < SAT_PM25_FAULT_HOLDOFF_MS) return SatPm25Verdict::Hold;
+  return SatPm25Verdict::Send;
+}
+
+// TASK-1759 part C (Sergeant D, corrections entry 296, maintainer agreement relayed): on a PIC board SAT asks for the return
+// temperature (MsgID 28) itself with PM=28 every 30 s, not with AA=28/DA=28. Our interpretation in entry 296 (open for
+// correction): only while no valid MsgID 28 sample came for 30 s, only while SAT is on, not while the boiler answers MsgID 28
+// Unknown-DataID. There is no thermostat-quiet rule for 28: a thermostat that reads MsgID 28 keeps the sample fresh, so SAT then
+// asks nothing. PM=28 uses the same alternative slot and fault hold-off as PM=25, so it inherits signature 2 above.
+static const uint32_t SAT_PM28_RETURN_AGE_MS = 30000UL;   // the last valid return sample is at least 30 s old
+
+// gatesOk as for satPm25Decide(), with MsgID 28 not marked unsupported. retAgeMs: satFeedAgeMs() of the return feed.
+static inline SatPm25Verdict satPm28Decide(const SatPm25Bus &b, uint32_t nowMs, uint32_t retAgeMs, bool gatesOk)
+{
+  if (!gatesOk) return SatPm25Verdict::Idle;
+  if (retAgeMs < SAT_PM28_RETURN_AGE_MS) return SatPm25Verdict::Idle;
   if (b.slotMs == 0 || (uint32_t)(nowMs - b.slotMs) >= SAT_PM25_SLOT_WINDOW_MS) return SatPm25Verdict::NoSlot;
   if (b.faultEdgeMs != 0 && (uint32_t)(nowMs - b.faultEdgeMs) < SAT_PM25_FAULT_HOLDOFF_MS) return SatPm25Verdict::Hold;
   return SatPm25Verdict::Send;

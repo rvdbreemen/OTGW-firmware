@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.199
+**  Version  : v2.0.0-beta.200
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -423,6 +423,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iPm25Sent              = 0;      // PM=25 SAT queued itself for a thermostat that does not read MsgID 25 (TASK-1653)
   uint32_t iPm25Answered          = 0;      // of those, answered by a boiler reply for MsgID 25 (TASK-1653)
   uint32_t iPm25Unanswered        = 0;      // of those, the PIC priority slot came free without a boiler reply for MsgID 25 (TASK-1653)
+  uint32_t iPm28Sent              = 0;      // PM=28 SAT queued itself for a missing return temperature (TASK-1759 part C, entry 296)
+  uint32_t iPm28Answered          = 0;      // of those, answered by a boiler reply for MsgID 28
+  uint32_t iPm28Unanswered        = 0;      // of those, the PIC priority slot came free without a boiler reply for MsgID 28
   bool     bTCAccountedValid      = false;  // fLastSentTC is the value the thermostat push has dealt with; false after boot, a cache reset or push off: the next tick sends TC= (TASK-1272)
   float    fThermostatTrSet       = 0.0f;   // last thermostat room setpoint seen for follow-thermostat (TASK-1259)
   float    fThermostatTrSetCand   = 0.0f;   // debounce: new thermostat setpoint seen once, waiting for its second frame

@@ -112,6 +112,7 @@ static void satPidService(uint32_t) {}
 static void satDhwSetpointSync() {}   // TASK-1376: SW= is covered by test_sat_dhw_sw_sync.py
 static void satMiStep() {}   // TASK-1371: MI=500 is tested in test_sat_no_return_ignition.py
 static void satPm25PollStep() {}   // TASK-1653: own PM=25 is tested in test_sat_pm25_poll.py
+static void satPm28PollStep() {}   // TASK-1759 part C: own PM=28 is tested in test_sat_pm28_poll.py
 static bool _sat_pm25Unanswered = false;   // TASK-1653: satDisable() resets it
 static void satNoReturnFloodOnFlameEdge(bool, bool) {}
 static void satNoReturnFloodStep() {}

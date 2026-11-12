@@ -1929,6 +1929,40 @@ static void satPm25PollStep()
   SATDebugTln(F("SAT: PM=25 (the thermostat does not read the flow temperature)"));
 }
 
+// TASK-1759 part C (entry 296): on a PIC board SAT asks for the return temperature (MsgID 28) with PM=28 when no valid sample
+// came for 30 s (satPm28Decide). It shares the PIC's one priority slot with PM=25 and the boot PM chain: it waits while that
+// slot is taken or a PM= is queued (picPrioSlotBusy(), pmChainBusy()), so at most one priority message is outstanding and none
+// replaces another. satPm25PollStep() runs first in the same pass; PM=25 sends at most one per 20 s and PM=28 at most one per
+// 30 s, so a free slot between two PM=25 requests goes to PM=28. Rate as built: at most one PM=28 per 30 s, one per ~60 s while
+// unanswered (the PRIO_SLOT_TIMEOUT_MS of handleCommandQueue()), none without a slot.
+static uint32_t _sat_pm28SentMs = 0;          // millis() of the outstanding PM=28; 0 = none
+static uint32_t _sat_pm28LastSentMs = 0;      // millis() of the last PM=28 SAT queued; 0 = none since boot
+static void satPm28PollStep()
+{
+  const uint32_t now = millis();
+  const SatBoilerFeed &feed = state.otBus.feedTret;
+  if (_sat_pm28SentMs != 0) {
+    if (feed.eventMs != 0 && (int32_t)(feed.eventMs - _sat_pm28SentMs) >= 0) {   // a boiler reply for MsgID 28 (Data-Invalid too)
+      state.sat.iPm28Answered++;
+      _sat_pm28SentMs = 0;
+    } else if (!picPrioSlotBusy()) {             // the slot came free without a reply: the 60 s timeout, or a newer PM=/TP=
+      state.sat.iPm28Unanswered++;
+      _sat_pm28SentMs = 0;
+    }
+  }
+  const bool gatesOk = isPICEnabled() && hasOTCommandInterface() && satIsEnabled() && state.sat.bActive && !settings.sat.bSimulation &&
+                       state.otBus.bGatewayModeKnown && state.otBus.bGatewayMode && !state.otBus.bPSmode &&
+                       !isBoilerMsgIdUnsupportedRead(28);
+  if (satPm28Decide(state.otBus.pm25, now, satFeedAgeMs(feed, now), gatesOk) != SatPm25Verdict::Send || _sat_pm28SentMs != 0) return;
+  if (_sat_pm28LastSentMs != 0 && (uint32_t)(now - _sat_pm28LastSentMs) < SAT_PM28_RETURN_AGE_MS) return;
+  if (picPrioSlotBusy() || pmChainBusy()) return;
+  if (addCommandToQueue("PM=28", 5, false, 0, true) == CmdQueueResult::Dropped) return;
+  _sat_pm28SentMs = satFeedStamp(now);
+  _sat_pm28LastSentMs = _sat_pm28SentMs;
+  state.sat.iPm28Sent++;
+  SATDebugTln(F("SAT: PM=28 (no valid return temperature for 30 s)"));
+}
+
 //=====================================================================
 //=== Preset Handling ===
 //=====================================================================
@@ -4354,6 +4388,9 @@ void satSendStatusJSON()
     je.field(F("pm25_sent"),            snap->st.sat.iPm25Sent);
     je.field(F("pm25_answered"),        snap->st.sat.iPm25Answered);
     je.field(F("pm25_unanswered"),      snap->st.sat.iPm25Unanswered);
+    je.field(F("pm28_sent"),            snap->st.sat.iPm28Sent);         // TASK-1759 part C
+    je.field(F("pm28_answered"),        snap->st.sat.iPm28Answered);
+    je.field(F("pm28_unanswered"),      snap->st.sat.iPm28Unanswered);
     je.field(F("room_temp_lost"),       snap->st.sat.bRoomTempLost);
     je.field(F("ot_link_lost"),         snap->st.sat.bOtLinkLost);
     je.field(F("outside_temp_missing"), snap->st.sat.bOutsideTempMissing);   // TASK-1390
@@ -7054,6 +7091,7 @@ static void satControlLoopRun()
   satMaxTSetSendStep();   // TASK-1373: SH= on a change of the user MaxTSet and once after a restart
   satMiStep();            // TASK-1371: MI=500 once, PIC boards only
   satPm25PollStep();      // TASK-1653: PM=25 when the thermostat does not read the flow temperature, PIC boards only
+  satPm28PollStep();      // TASK-1759 part C (entry 296): PM=28 when no valid return temperature came for 30 s, PIC boards only
   satRestoreDeferredStep();   // entries 121, 213, 215: PWM comes back on the first valid MsgID 3 reply with bit 4 clear
   satPwmSaveStep();       // TASK-1482, entry 121
 
