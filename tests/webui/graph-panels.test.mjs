@@ -57,13 +57,26 @@ test('five stacked panels top to bottom: flame, DHW, CH, modulation, temperature
 test('each panel has a translated title and its own y axis labels', () => {
   const titles = [...svg.matchAll(/class="axis-txt gtitle"[^>]*data-i18n="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(titles, ['h_mon.graph_flame', 'h_mon.graph_dhw', 'h_mon.graph_ch', 'graph.series_mod', 'h_mon.graph_temps']);
-  assert.equal((svg.match(/data-i18n="graph\.on"/g) || []).length, 3, 'on label per lane');
-  assert.equal((svg.match(/data-i18n="graph\.off"/g) || []).length, 3, 'off label per lane');
+  assert.equal((svg.match(/data-i18n="h_mon\.graph_lane_on"/g) || []).length, 3, 'on label per lane');
+  assert.equal((svg.match(/data-i18n="h_mon\.graph_lane_off"/g) || []).length, 3, 'off label per lane');
   for (const pct of ['100%', '50%', '0%']) assert.ok(svg.includes('>' + pct + '<'), 'modulation axis ' + pct);
   for (const id of ['gAxHi', 'gAxMid', 'gAxLo']) assert.ok(svg.includes('id="' + id + '"'), id);
   // the marker group sits between the time grid and the series
   const iT = svg.indexOf('id="gTime"'), iM = svg.indexOf('id="gMarks"'), iS = svg.indexOf('id="gSer"');
   assert.ok(iT > 0 && iT < iM && iM < iS, 'gTime < gMarks < gSer');
+});
+
+// TASK-1828: the axis labels sit in the 34-unit left margin (x 2..34) at 10 px monospace (about 6 units a
+// character), so they fit at 5 characters. The Greek 'ενεργό'/'ανενεργό' ran into the panels on beta.187.
+test('lane on/off labels fit the left margin in every language', () => {
+  const EN = JSON.parse(/var I18N_EN = (\{[\s\S]*?\r?\n  \});/.exec(SRC)[1]);
+  const packs = { en: EN };
+  for (const l of ['nl', 'de', 'el']) packs[l] = JSON.parse(fs.readFileSync(path.join(HERE, '..', '..', 'i18n', l + '.json'), 'utf8'));
+  for (const [l, p] of Object.entries(packs)) for (const k of ['graph_lane_on', 'graph_lane_off']) {
+    const s = p.h_mon && p.h_mon[k];
+    assert.ok(s, l + ' has h_mon.' + k);
+    assert.ok([...s].length <= 5, l + ' h_mon.' + k + ' "' + s + '" is longer than 5 characters');
+  }
 });
 
 test('disconnect markers: a toolbar chip, translated', () => {

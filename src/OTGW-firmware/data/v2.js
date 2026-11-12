@@ -487,6 +487,12 @@
       "graph_dhw": "DHW",
       "graph_ch": "CH",
       "graph_temps": "temperatures",
+      "graph_lane_on": "on",
+      "graph_lane_off": "off",
+      "graph_win_10m": "10 min",
+      "graph_win_1h": "1 hour",
+      "graph_win_4h": "4 h",
+      "graph_win_24h": "24 h",
       "graph_marks": "Disconnects",
       "graph_marks_title": "Show where the live connection dropped (red) and came back (green)",
       "log_aria": "Live OpenTherm log",
@@ -3344,6 +3350,10 @@
     flush();
     return d;
   }
+  // TASK-1828: temperature axis label, as the 1.x OTGraph ('{value}°C')
+  function graphAxisTemp(v) { return Math.round(v) + '°C'; }
+  // TASK-1828: a graph window chip's window in ms (data-win-ms); 1 h when the attribute is missing
+  function graphChipWindowMs(ch) { return parseInt(ch.getAttribute('data-win-ms'), 10) || 3600000; }
   function renderGraph() {
     var g = document.getElementById('gSer'); if (!g) return;
     gLastRender = Date.now();
@@ -3367,7 +3377,7 @@
     function y(v) { return TP.top + TP.h - (v - lo) / (hi - lo) * TP.h; }
     function ym(v) { return MP.top + MP.h - v / 100 * MP.h; }
     [['gAxHi', hi], ['gAxMid', (lo + hi) / 2], ['gAxLo', lo]].forEach(function (a) {
-      var e = document.getElementById(a[0]); if (e) e.textContent = Math.round(a[1]) + '°';
+      var e = document.getElementById(a[0]); if (e) e.textContent = graphAxisTemp(a[1]);
     });
     keys.forEach(function (k, i) {
       var m = metas[i], kind = m[3], c = cols[k] || [], d = '';
@@ -8304,11 +8314,7 @@
     });
     document.querySelectorAll('#mgraph .tchip:not([id])').forEach(function (ch) {
       ch.addEventListener('click', function () {
-        // Parse the leading number + unit. indexOf('4') used to match the '4' in
-        // '24 h' and silently apply a 4 h window to the 24 h chip.
-        var t = ch.textContent.toLowerCase();
-        var n = parseInt(t, 10) || 1;
-        graphWindowMs = /min/.test(t) ? n * 60000 : n * 3600000;
+        graphWindowMs = graphChipWindowMs(ch);   // TASK-1828: from data-win-ms, not the (translated) chip text
         document.querySelectorAll('#mgraph .tchip:not([id])').forEach(function (x) { x.classList.toggle('on', x === ch); });
         if (isMonitorVisible('mgraph')) renderGraph();
       });

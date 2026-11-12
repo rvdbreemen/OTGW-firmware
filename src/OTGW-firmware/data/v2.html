@@ -579,8 +579,9 @@
 
   <div id="mgraph" class="mpanel">
     <div class="toolbar">
-      <span class="tchip">10 min</span><span class="tchip on">1 hour</span>
-      <span class="tchip">4 h</span><span class="tchip">24 h</span>
+      <!-- TASK-1828: the window comes from data-win-ms (graphChipWindowMs), so the chip text can be translated -->
+      <span class="tchip" data-win-ms="600000" data-i18n="h_mon.graph_win_10m">10 min</span><span class="tchip on" data-win-ms="3600000" data-i18n="h_mon.graph_win_1h">1 hour</span>
+      <span class="tchip" data-win-ms="14400000" data-i18n="h_mon.graph_win_4h">4 h</span><span class="tchip" data-win-ms="86400000" data-i18n="h_mon.graph_win_24h">24 h</span>
       <span style="flex:1"></span>
       <button class="tbtn">📷 PNG</button><button class="tbtn">⬇ CSV</button>
       <!-- TASK-971: auto-save the graph as PNG/CSV on an interval. -->
@@ -604,14 +605,14 @@
         <line x1="34" y1="284" x2="772" y2="284" stroke="#8b949e" stroke-opacity=".2"/>
         <line x1="34" y1="192" x2="772" y2="192" stroke="#8b949e" stroke-opacity=".2"/>
         <text class="axis-txt gtitle" x="38" y="19" data-i18n="h_mon.graph_flame">flame</text>
-        <text class="axis-txt" x="2" y="29" data-i18n="graph.on">on</text>
-        <text class="axis-txt" x="2" y="42" data-i18n="graph.off">off</text>
+        <text class="axis-txt" x="2" y="29" data-i18n="h_mon.graph_lane_on">on</text>
+        <text class="axis-txt" x="2" y="42" data-i18n="h_mon.graph_lane_off">off</text>
         <text class="axis-txt gtitle" x="38" y="51" data-i18n="h_mon.graph_dhw">DHW</text>
-        <text class="axis-txt" x="2" y="61" data-i18n="graph.on">on</text>
-        <text class="axis-txt" x="2" y="74" data-i18n="graph.off">off</text>
+        <text class="axis-txt" x="2" y="61" data-i18n="h_mon.graph_lane_on">on</text>
+        <text class="axis-txt" x="2" y="74" data-i18n="h_mon.graph_lane_off">off</text>
         <text class="axis-txt gtitle" x="38" y="83" data-i18n="h_mon.graph_ch">CH</text>
-        <text class="axis-txt" x="2" y="93" data-i18n="graph.on">on</text>
-        <text class="axis-txt" x="2" y="106" data-i18n="graph.off">off</text>
+        <text class="axis-txt" x="2" y="93" data-i18n="h_mon.graph_lane_on">on</text>
+        <text class="axis-txt" x="2" y="106" data-i18n="h_mon.graph_lane_off">off</text>
         <text class="axis-txt gtitle" x="38" y="117" data-i18n="graph.series_mod">modulation</text>
         <text class="axis-txt" x="2" y="126">100%</text>
         <text class="axis-txt" x="2" y="151">50%</text>

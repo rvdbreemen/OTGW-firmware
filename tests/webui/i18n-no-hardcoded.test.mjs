@@ -80,7 +80,6 @@ const ALLOW_HTML = [
 // test is green today and still catches every NEW untranslated string; each one is a defect
 // to fix by giving it data-i18n (then delete the entry). Reported in TASK-1764.
 const KNOWN_GAPS_HTML = [
-  [/^1 hour$/, 'Monitor > Graph window chip: the graph code reads the chip text back by regex (/min/), so it stays English'],
   [/^· ws ● live$/, 'Mission control view heading "OTGW // MISSION CONTROL · ws ● live"'],
 ];
 const allowedJs = s => ALLOW_JS.some(([re]) => re.test(s.trim()));
