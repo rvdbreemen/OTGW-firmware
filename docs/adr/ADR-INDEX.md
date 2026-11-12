@@ -236,3 +236,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-229 | Accepted | - | In OT-Direct gateway mode the relayed thermostat READDATA MsgID 0 gets bits 0, 1, 2, 4, 5 and 6 of its master status... |
 | ADR-230 | Accepted | - | The floating phase votes only when its data in the window is at least 1 hour: its signal ticks over the counted days... |
 | ADR-231 | Accepted | - | On a gas boiler, a tick in SAT PWM is a warm-up tick of the self-tune, and the PWM-related exclusions do not drop its... |
+| ADR-232 | Proposed | - | Carry 7befe25 as a build-time patch on the registry copy of AsyncTCP 3.4.10, applied by scripts/patchpiolibs.py: |

@@ -8,6 +8,11 @@ Patch 3 — ESP32 mklittlefs PATH (pioarduino platform):
   mklittlefs as a bare command name, relying on PATH. If the versioned
   package dir is not on PATH, buildfs fails with "not recognized". We prepend
   the directory that actually contains mklittlefs.exe so buildfs finds it.
+
+Patch 4 — AsyncTCP 3.4.10 + upstream 7befe25 (ADR-232):
+  Applies the stored upstream fix to the libdeps AsyncTCP.cpp (tcp_accept returns
+  ERR_ABRT after tcp_abort) through scripts/asynctcp_patch.py, hash-checked; the
+  build stops when the file is neither 3.4.10 nor already patched.
 """
 
 Import("env")  # noqa: F821  (SCons variable injected by PlatformIO)
@@ -37,3 +42,20 @@ if env.get("PIOENV", "").startswith("esp32"):
                 break
     if not mklittlefs_found:
         print("patch_pio_libs: ESP32 mklittlefs PATH: mklittlefs.exe not found in any tool-mklittlefs* package")
+
+# --- Patch 4: AsyncTCP 3.4.10 + upstream 7befe25 (ADR-232, TASK-1746.1) -------
+# tcp_accept() in the pinned 3.4.10 returns ERR_OK after tcp_abort(), which sends
+# lwIP into a freed pcb. scripts/asynctcp_patch.py applies the stored upstream
+# commit to the libdeps copy and stops the build when the file is neither 3.4.10
+# nor already patched, so a moved pin can never build unpatched.
+if env.get("PIOENV", "").startswith("esp32"):
+    import sys
+    sys.path.insert(0, os.path.join(env["PROJECT_DIR"], "scripts"))
+    import asynctcp_patch
+    _cpp = asynctcp_patch.libdeps_cpp(env["PROJECT_DIR"], env["PIOENV"])
+    try:
+        _state = asynctcp_patch.ensure_patched(_cpp)
+        print(f"patch_pio_libs: AsyncTCP 7befe25 (ADR-232): {_state}")
+    except asynctcp_patch.PatchError as _err:
+        print(f"patch_pio_libs: AsyncTCP 7befe25 (ADR-232): FAILED: {_err}")
+        env.Exit(1)

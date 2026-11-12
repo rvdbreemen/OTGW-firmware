@@ -9108,6 +9108,73 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-232",
+      "title": "Patch AsyncTCP 3.4.10 with upstream fix 7befe25 at build time through the patch_pio_libs pre-hook",
+      "path": "ADR-232-patch-asynctcp-3-4-10-with-upstream-fix-7befe25-at-build-time-through-the-patch-pio-libs-pre-hook.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-13",
+      "decision_summary": "Carry 7befe25 as a build-time patch on the registry copy of AsyncTCP 3.4.10, applied by scripts/patchpiolibs.py:",
+      "topics": [
+        "asynctcp",
+        "boot-stability",
+        "build",
+        "library-patch",
+        "lwip"
+      ],
+      "aliases": [
+        "AsyncTCP 7befe25",
+        "TASK-1746.1",
+        "tcp_accept ERR_OK after tcp_abort"
+      ],
+      "components": [
+        "Build-time patch of the AsyncTCP library copy in .pio/libdeps (scripts/patch_pio_libs.py)"
+      ],
+      "symbols": [
+        "AsyncTCP_detail::tcp_accept",
+        "ERR_ABRT",
+        "tcp_abort"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Apply exactly upstream commit 7befe25 to AsyncTCP 3.4.10 in every esp32 environment, from the stored patch file.",
+          "Stop the build when the libdeps AsyncTCP.cpp matches neither the 3.4.10 hash nor the patched hash, and when the patched result does not hash to c786989e…e4e5.",
+          "Print one line per build that says whether the patch was applied or already present.",
+          "Keep a host test on the real tcpaccept that fails on unpatched 3.4.10 and passes on the patched file."
+        ],
+        "must_not": [
+          "Edit any other part of AsyncTCP, or any other library, under this record.",
+          "Vendor AsyncTCP into src/libraries while ESPAsyncWebServer depends on it from the registry.",
+          "Silently build an unpatched or unknown AsyncTCP version."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testasynctcpacceptpatch.py:",
+          "slices the real tcpaccept from the libdeps file and stubs lwIP, the server and the event queue;",
+          "makes the event allocation, the client allocation and the missing onConnect callback each fail in turn;",
+          "asserts the lwIP contract on every path that calls tcpabort: the return is ERRABRT, and tcpabort is called at most once;",
+          "is red with OTGWASYNCTCPCPP pointing at the unpatched v3.4.10 file, green on the patched file;",
+          "also checks the hash logic of the pre-hook against an unknown file.",
+          "Build: one esp32-combo build log shows the patch line, and only one AsyncTCP.cpp object is compiled.",
+          "Bench by the bench-tester: at least 20 /ReBoot cycles and a connection storm on .61, with no tiT panic and the redirect page still arriving. A storm rarely makes an allocation fail inside tcpaccept, so the host test proves the mechanism;..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": "tests/test_asynctcp_accept_patch.py",
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -15660,6 +15727,36 @@
     {
       "source": "ADR-231",
       "target": "ADR-230",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-232",
+      "target": "ADR-083",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-232",
+      "target": "ADR-139",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-232",
+      "target": "ADR-147",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-232",
+      "target": "ADR-186",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-232",
+      "target": "ADR-187",
       "type": "related",
       "resolved": true
     }

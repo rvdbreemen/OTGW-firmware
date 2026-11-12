@@ -1,0 +1,95 @@
+From 7befe25a549c71b0fc7794596ba9d21fa6fd9d1f Mon Sep 17 00:00:00 2001
+From: Will Miles <will@willmiles.net>
+Date: Thu, 10 Sep 2026 00:12:16 -0400
+Subject: [PATCH] fix: Report an aborted connection to LwIP as aborted
+
+ERR_OK after tcp_abort() sends LwIP into tcp_receive() on a freed pcb; any error but
+ERR_ABRT makes it abort a second time.  Allocating the event before the AsyncClient also
+keeps a client off the failure path, which we could not destroy from this thread anyway.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ src/AsyncTCP.cpp | 62 ++++++++++++++++++++++++------------------------
+ 1 file changed, 31 insertions(+), 31 deletions(-)
+
+diff --git a/src/AsyncTCP.cpp b/src/AsyncTCP.cpp
+index c90df59f..c38d82e3 100644
+--- a/src/AsyncTCP.cpp
++++ b/src/AsyncTCP.cpp
+@@ -1564,45 +1564,45 @@ void AsyncServer::end() {
+ 
+ // runs on LwIP thread
+ int8_t AsyncTCP_detail::tcp_accept(void *arg, tcp_pcb *pcb, int8_t err) {
++  // Note LwIP return value semantics:
++  //  - ERR_OK: delivery successful
++  //  - ERR_ABRT: the connection was aborted, discard your reference
++  //  - Anything else: abort the connection
++
+   if (!pcb) {
+     async_tcp_log_e("_accept failed: pcb is NULL");
+     return ERR_ABRT;
+   }
++
+   auto server = reinterpret_cast<AsyncServer *>(arg);
+-  if (server->_connect_cb) {
+-    AsyncClient *c = new (std::nothrow) AsyncClient(pcb);
+-    if (c && c->pcb()) {
+-      c->setNoDelay(server->_noDelay);
+-
+-      lwip_tcp_event_packet_t *e = new (std::nothrow) lwip_tcp_event_packet_t{LWIP_TCP_ACCEPT, c};
+-      if (e) {
+-        e->accept.server = server;
+-
+-        queue_mutex_guard guard;
+-        _prepend_async_event(e);
+-        return ERR_OK;  // success
+-      }
++  if (!server->_connect_cb) {
++    async_tcp_log_e("_accept failed: no onConnect callback");
++    tcp_abort(pcb);
++    return ERR_ABRT;
++  }
+ 
+-      // Couldn't allocate accept event
+-      // We can't let the client object call in to close, as we're on the LWIP thread; it could deadlock trying to RPC to itself
+-      c->_pcb = nullptr;
+-      tcp_abort(pcb);
+-      async_tcp_log_e("_accept failed: couldn't accept client");
+-      return ERR_ABRT;
+-    }
+-    if (c) {
+-      // Couldn't complete setup
+-      // pcb has already been aborted
+-      delete c;
+-      pcb = nullptr;
+-      async_tcp_log_e("_accept failed: couldn't complete setup");
+-      return ERR_ABRT;
+-    }
++  // Queue the accept event for processing by the async task.
++  lwip_tcp_event_packet_t *e = new (std::nothrow) lwip_tcp_event_packet_t{LWIP_TCP_ACCEPT, nullptr};
++  if (!e) {
++    async_tcp_log_e("_accept failed: couldn't allocate event");
++    tcp_abort(pcb);
++    return ERR_ABRT;
++  }
++
++  AsyncClient *c = new (std::nothrow) AsyncClient(pcb);
++  if (!c) {
++    _free_event(e);
+     async_tcp_log_e("_accept failed: couldn't allocate client");
+-  } else {
+-    async_tcp_log_e("_accept failed: no onConnect callback");
++    tcp_abort(pcb);
++    return ERR_ABRT;
+   }
+-  tcp_abort(pcb);
++
++  c->setNoDelay(server->_noDelay);
++  e->client = c;
++  e->accept.server = server;
++
++  queue_mutex_guard guard;
++  _prepend_async_event(e);
+   return ERR_OK;
+ }
+ 
