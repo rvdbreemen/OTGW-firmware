@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-10T05:53:00Z'
-updated_date: '2026-11-10T15:25:00Z'
+updated_date: '2026-11-12T00:31:00Z'
 labels:
   - bug
   - ota
@@ -39,7 +39,7 @@ Files (local, not in git): OTGW-build-archive\flash-logs\63-beta167-fs-ota-reset
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduce on a bench unit: interrupt a filesystem OTA (e.g. drop the connection mid-upload) and record what the device does (serial + telnet), with settings and bootcount before/after
+- [x] #1 Reproduce on a bench unit: interrupt a filesystem OTA (e.g. drop the connection mid-upload) and record what the device does (serial + telnet), with settings and bootcount before/after
 - [ ] #2 Find the cause of (1) the settings/bootcount loss and (2) the app rollback to safeboot, with evidence
 - [ ] #3 Fix so that an interrupted fs OTA keeps settings.ini and the boot counter, and the main app still starts (or safeboot can restore without data loss); old-vs-fix proof on the reproduction
 - [ ] #4 scripts/ota_flash.py detects a unit in safeboot (no JSON from the main firmware) and says so, or can drive the safeboot recovery, instead of failing with JSONDecodeError
@@ -49,6 +49,8 @@ Files (local, not in git): OTGW-build-archive\flash-logs\63-beta167-fs-ota-reset
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-10 16:23 cross-reference TASK-1763: the .63 crashlog holds 'reboot cause: Exception/panic (4)' at 2026-11-10 06:43:01 on 2.0.0-beta.167+ddf8498, the exact moment of this task's rollback. The coredump decodes (session 4c6667da) to an ipc0 stack overflow during the BLE controller's interrupt allocation (btdm_intr_alloc -> esp_intr_alloc -> heap_caps_malloc; SP 20 B above the stack bottom, end-of-stack watchpoint, DebugException). Likely chain (inference from the timing, not proven): the new 167 app panicked at boot -> the app was never confirmed -> safeboot rolled it back and settings went to defaults; not a corrupt filesystem. Details and files in TASK-1763 notes.
+
+2026-11-12 01:26 AC1 bench (otgw-bench-tester), .61 OTGW32 on 2.0.0-beta.187+579e0d1 (app already running and valid for minutes): filesystem OTA of the same 187 littlefs.bin (786432 B) via POST /update?cmd=100&size=786432, cut after 314572 B (40 %, 2.6 s) with a TCP RST (scratchpad t1774/cut_fs_ota.py), then 3 min of polling every 10 s; COM4 serial and telnet 23 logged. What the device did (telnet): '[OTA] Filesystem image incomplete: formatting LittleFS' -> 'LittleFS format OK (61 ms)' -> 'Abort: LittleFS remount OK' -> 'Restoring settings to filesystem' -> restored /sat/sat_preset.json, /sat_energy.json, /sat_energy_estimate.json, /sat/sat_hcr.json, /sat_markers.json, /reboot_count.txt, /reboot_log.txt -> 'Filesystem update incomplete (249652 of 786432 bytes): LittleFS was formatted and restored, the web UI files are missing'. No reboot (bootcount 383 before and during all 18 polls), no safeboot (main firmware kept answering /api/v2/device/info), crashlog available=false, settings 518/518 flattened keys equal (0 diff). The web UI then serves 'You first need to upload this file'; recovery: ota_flash.py --no-app --fs <187 fs> -> v2.html.gz complete, settings 164 unchanged, bootcount 384. So the .63 incident (settings lost, bootcount 178 -> 3, app rolled back to safeboot) is NOT reproduced by a cut fs upload on an app that is already valid. Hypothesis for AC2 (not verified): on .63 the fs OTA followed the app OTA within the app's 30 s verify window (verifyRollbackLater, marked valid after 30 s of loop() or in doRestart); a reset or crash during that window rolls the app back to safeboot, and a reset mid-format/before the restore would lose settings.ini and the boot counter. Next reproduction to try: app OTA then an fs cut within 30 s of the new app's boot.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

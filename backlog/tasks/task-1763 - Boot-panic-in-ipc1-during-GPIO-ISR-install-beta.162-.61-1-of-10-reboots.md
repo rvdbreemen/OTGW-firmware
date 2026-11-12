@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@system32-030509'
 created_date: '2026-11-09T19:21:00Z'
-updated_date: '2026-11-11T23:00:00Z'
+updated_date: '2026-11-12T00:31:00Z'
 labels:
   - bug
   - crash
@@ -59,6 +59,8 @@ DECISION FOR ROBERT (not implemented): (a) raise the IPC task stack to 1280 B or
 Not this class (2026-11-10, a4): the coredump in gruijter's upload 20261110-100556 is a Task watchdog (loopTask + async_tcp on CPU 1) in setup() -> updateRebootLog() -> LittleFS lfs_alloc_scan, from 2.0.0-alpha.532+689cb05 (dump app SHA 661d01720 = that ELF; a stale dump kept across OTA). ipc0/ipc1 idle in ipc_task with 348/340 B free. Filed as TASK-1789. It does not bear on ADR-225.
 
 2026-11-11 lane cleanup (finish-every-lane, TASK-1827; owner session a4 gone; done by otgw-docs on the coordinator's request): every commit of lane-1763a was already on origin/dev (git cherry: no '+'; lane HEAD a242518bf). The uncommitted ADR-225 experiment was saved before the worktree was removed: D:\Users\Robert\Documents\GitHub\RvdB\OTGW-worktree-leftovers\wt-1763a-2026-11-11\ (README.md; platformio-custom_sdkconfig-ADR-225.patch = custom_sdkconfig CONFIG_ESP_IPC_TASK_STACK_SIZE=2048; wt-1763a-uncommitted.patch; the hybrid-compile sdkconfig.defaults, sdkconfig.esp32-combo, dependencies.lock, CMakeLists.txt, .dummy/ and managed_components/ (583 MB, moved)). Not kept: .pio and .build-python (regenerable). Worktree wt-1763a and branch lane-1763a removed.
+
+2026-11-12 01:14-01:25 bench (otgw-bench-tester), .61 OTGW32, 2.0.0-beta.187+579e0d1: 30 x POST /ReBoot (scratchpad t1763/reboot_loop.py); after each: wait for /api/v2/health, read bootcount and /api/v2/device/crashlog, on a new crash save crashlog + /api/v2/device/coredump; COM4 serial captured with DTR/RTS off (serial.log, 795 lines). Result: 0 panics in 30 reboots. Bootcount 353 -> 383, +1 each (no extra panic reboot); crashlog available=false throughout; serial shows all 30 ROM reset lines 'rst:0xc (RTC_SW_CPU_RST)', 0 hits for Guru/panic/abort/Backtrace/ipc1, so the capture works. Bound: 0/30 gives a 95 % upper bound of about 10 % per reboot (rule of three); this does NOT exclude the 1-in-10 seen on beta.162 (and is 4 % likely if the rate were still 10 %). Not covered yet: the long-uptime case (start uptime 59 min; the beta.162 panic came after a boot with hd_min_free_heap 3592) and a deliberately low-heap boot. Evidence local: scratchpad t1763/results.txt, serial.log; 187 ELF kept in scratchpad/cand187/ for a decode. AC2 not ticked.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
