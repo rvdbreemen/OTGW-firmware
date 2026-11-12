@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.208
+**  Version  : v2.0.0-beta.209
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2163,6 +2163,15 @@ static void otdPsNoteFrame(char prefix, unsigned long frame) {
   }
 }
 
+// TASK-1846: OT= stores the outside temperature in the summary slot of MsgID 27, as the PIC's SetOutsideT ->
+// StoreOutTemp (gateway.asm 6.8 :4256-4287, outsideval1 = valuestorage+30 :568-569), with or without a thermostat.
+// OT=- only clears the PIC's OutsideTemp flag, so the slot keeps its last value; a boiler READ_ACK still overwrites it.
+static void otdPsStoreOutside(uint16_t f88) {
+  for (uint8_t i = 0; i < OTD_PS_FIELDS; i++) {
+    if (pgm_read_byte(&otdPsIds[i]) == 27) { otdPsValues[i] = f88; return; }
+  }
+}
+
 // Append one field in the PIC's format. Returns the new length.
 static int otdPsAppend(char* line, int pos, int size, uint8_t kind, uint16_t v) {
   char* out = line + pos;
@@ -3320,12 +3329,16 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   }
   // OT=xx.x — Outside temperature (MsgID 27 = Toutside). Non-numeric clears.
   else if (cmd0 == 'O' && cmd1 == 'T') {
-    if (!isdigit((unsigned char)value[0]) && value[0] != '-') {
+    // TASK-1846: a value is a digit, or a '-'/'+' sign followed by a digit (PIC GetFloatArg/GetFloat gateway.asm 6.8 :5118-5129); anything else,
+    // OT=- included, clears as the PIC's ClrOutsideT. Before, OT=- passed as a number and wrote 0.00.
+    const bool signedNum = (value[0] == '-' || value[0] == '+') && isdigit((unsigned char)value[1]);
+    if (!isdigit((unsigned char)value[0]) && !signedNum) {
       clearWriteOverride(27);
       synthesizeResponse(buf, value);
     } else {
       uint16_t f88 = floatToF88(atof(value));
       if (enqueueWriteCommand(27, f88, "OT")) {
+        otdPsStoreOutside(f88);   // TASK-1846: the PS=1 line shows the OT= value, as on the PIC
         OTcurrentSystemState.Toutside = (int16_t)f88 / 256.0f;
         dtostrf(OTcurrentSystemState.Toutside, 1, 2, rspBuf);
         synthesizeResponse(buf, rspBuf);
