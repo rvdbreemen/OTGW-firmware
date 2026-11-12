@@ -1,10 +1,11 @@
 ---
 id: TASK-1846
 title: 'OT-Direct: PS=1 does not show the OT= value in the MsgID 27 field'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-11T23:59:00Z'
-updated_date: '2026-11-12T00:11:00Z'
+updated_date: '2026-11-12T04:10:00Z'
 labels:
   - otdirect
   - parity
