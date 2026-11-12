@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:51:00Z'
-updated_date: '2026-11-12T17:11:00Z'
+updated_date: '2026-11-12T17:44:00Z'
 labels:
   - bug
   - crash
@@ -70,4 +70,6 @@ B (bench): /health 325 samples, littlefsMounted true in all, 0 non-200 outside r
 C (bench): 74 ipc readings, never -1. ipc1 min free stack 80 B in every reading (baseline, 32 quick boots, 6 x 10 min boots at +60 s and +600 s, end at bc 521); ipc0 152-232 B, lowest 152. ipc1 constant: looks like a fixed path, not load-dependent. Reading (95): no ipc1 overflow on any of 38 boots, so the ADR-225 overflow hypothesis is NOT supported by this data, and not ruled out either (the beta.182 failure was not reproduced). 80 of 1024 B is a thin margin (TASK-1763 measured a 52 B overflow on another load), so ADR-225 (A) goes to Robert as a margin argument, not as a proven cause. AC4 ticked.
 
 Regression (bench): v2 UI loads with 0 console errors (b217/ui61-home.png); MQTT connected with fresh sat/* and otgw32/* publishes; settings save LEDblink false/true POST 200, on disk within 3 s, GET confirms, diff 0 (518 keys). Not verified: the write probe itself; the real beta.182 pattern (lost ipc0 wakeup during a cross-core flash read) was not reproduced, so 38 clean boots do not prove it gone; no A/B against older builds (no ipc fields there); no real OT bus load (no boiler); no steady state beyond 10 min. AC3 stays open: the host test shows the flash traversal leaves async_tcp (red old / green fix), but the hang itself needs field confirmation (gruijter on 217+). Evidence: C:\Users\rvdbr\AppData\Local\Temp\claude\d9c572fbc7f8e9ee\4f6ad420-bf33-4a3a-88bc-4eb9890a2231\scratchpad\b217 (run/events.log, boots.jsonl, health.csv, telnet-raw.txt, 61-ota.log, ui61-home.png).
+
+Published (95, 2026-11-12): pushed 22d269e0e..a7676dcc8 to dev; posted 2.0.0-beta.217+a7676dc (esp32-combo flash zip, 6315083 B) in #alpha-testing, Discord message 1570494289371205743. Confirm bench by 09 on a7676dc (src identical to the benched 84c3514): fwversion exact, version.hash flipped, /health 20/20 mounted, ipc0 232->184 / ipc1 80 B, 5 min no reboot/TWDT, settings diff 0 (09 scratchpad b217b/). .elf archived as OTGW-build-archive/2.0.0-beta.217+a7676dc.zip. AC3 open until field confirmation on 217+ (gruijter). ADR-225 (A) chosen by Robert (DM 1570489845019840593) goes as a separate task.
 <!-- SECTION:NOTES:END -->
