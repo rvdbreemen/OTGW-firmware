@@ -60,14 +60,22 @@ static void satNarratef_P(PGM_P fmt, ...) { va_list ap; va_start(ap, fmt); g_app
 static size_t strlcpy(char* d, const char* s, size_t n) { size_t l = strlen(s); if (n) { size_t c = l >= n ? n - 1 : l; memcpy(d, s, c); d[c] = 0; } return l; }
 
 #ifndef SAT_SRC_HEAT_PUMP
+#define SAT_SRC_AUTO 0
+#define SAT_SRC_GAS_BOILER 1
 #define SAT_SRC_HEAT_PUMP 2
+#define SAT_SRC_HYBRID 3
 #endif
 struct SatSettings { bool bCurveSelfTune = true, bSimulation = false; float fHeatingCurveCoeff = 2.0f; uint32_t iControlInterval = 3600;
-                     uint8_t iHeatingSource = 1; };   // TASK-1551: 1 gas, 2 heat pump, 3 hybrid
+                     uint8_t iHeatingSource = 1; };   // TASK-1551: 0 AUTO, 1 gas, 2 heat pump, 3 hybrid
 struct Settings { SatSettings sat; };
+static Settings settings;
+// Mirrors satGetEffectiveHeatingSource() (SATcontrol.ino, TASK-943): AUTO resolves to the gas boiler. SourceChecks pins the real one.
+static uint8_t satGetEffectiveHeatingSource() {
+  return settings.sat.iHeatingSource == SAT_SRC_AUTO ? (uint8_t)SAT_SRC_GAS_BOILER : settings.sat.iHeatingSource;
+}
 struct SatState { bool bActive = true, bSafetyTripped = false; float fPidI = 7.5f, fPidD = -1.25f; };
 struct State { SatState sat; };
-static Settings settings; static State state;
+static State state;
 static bool g_satEnabled = true;
 static bool satIsEnabled() { return g_satEnabled; }
 static int g_writes = 0;
@@ -234,6 +242,9 @@ EXCL = {
     "min_mod":   dict(rm=4.0, mm=0),           # MsgID 15 never seen: 5 % default, 4 % is below it
 }
 ALL_EXCL = list(EXCL)
+# ADR-231: a PWM tick excludes the hour only on a heat pump or a hybrid; the generic exclusion tests run the pwm case on a
+# hybrid (src:3). The gas-boiler PWM rule has its own tests (PwmGasRule).
+EXCL_PRE = {"pwm": ["src:3"]}
 
 
 def day(sig, clean=24, excl=None, excl_sig_clean=None):
@@ -332,7 +343,7 @@ class SatCurveSelfTune(unittest.TestCase):
     def test_each_exclusion_makes_the_hour_not_count(self):
         for ex in ALL_EXCL:
             with self.subTest(exclusion=ex):
-                o = self.run_tokens(excluded_hour(0.5, ex) + clean_hour(0.5))
+                o = self.run_tokens(EXCL_PRE.get(ex, []) + excluded_hour(0.5, ex) + clean_hour(0.5))
                 self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("0", ex))
                 self.assertEqual((o.hours[1]["counted"], o.hours[1]["reason"]), ("1", "none"))
 
@@ -368,7 +379,7 @@ class SatCurveSelfTune(unittest.TestCase):
         # With any one exclusion removed the +9 hours count and the coefficient moves (see the mutation test).
         for ex in ALL_EXCL:
             with self.subTest(exclusion=ex):
-                o = self.run_tokens(day(0.5, clean=6, excl=ex) * 3)
+                o = self.run_tokens(EXCL_PRE.get(ex, []) + day(0.5, clean=6, excl=ex) * 3)
                 self.assertEqual((o.coeff, o.writes), (2.0, 0))
                 self.assertEqual(o.days[2]["clean"], "6")
                 self.assertEqual((o.days[2]["mean3"], o.days[2]["decision"], o.days[2]["reason"]),
@@ -481,7 +492,7 @@ class SatCurveSelfTune(unittest.TestCase):
         self.assertEqual(o.narr, ["NARR Heating curve self-tune: coefficient 2.0 -> 1.9 (3-day warm-up -1.50 C and floating -1.50 C, both below the curve)"])
 
     def test_hour_record_of_an_excluded_hour_keeps_its_mean(self):
-        o = self.run_tokens([tk(sig=2.0), tk(sig=4.0, pwm=1), f"A:{HOUR}"])
+        o = self.run_tokens(["src:3", tk(sig=2.0), tk(sig=4.0, pwm=1), f"A:{HOUR}"])
         self.assertEqual((o.hours[0]["mean"], o.hours[0]["ticks"], o.hours[0]["reason"]), ("3.00", "2", "pwm"))
 
     # --- review round: not controlling, few ticks, simulation switch, window file, manual day counters, no_room -----------
@@ -490,7 +501,7 @@ class SatCurveSelfTune(unittest.TestCase):
         self.assertEqual([(h["counted"], h["reason"]) for h in o.hours], [("0", "not_controlling"), ("1", "none")])
 
     def test_first_reason_is_first_in_time(self):
-        o = self.run_tokens([tk(pwm=1), "NC", f"A:{HOUR}", "NC", tk(pwm=1), f"A:{HOUR}"])
+        o = self.run_tokens(["src:3", tk(pwm=1), "NC", f"A:{HOUR}", "NC", tk(pwm=1), f"A:{HOUR}"])
         self.assertEqual([h["reason"] for h in o.hours], ["pwm", "not_controlling"])
 
     def test_hour_needs_75_percent_of_the_expected_ticks(self):
@@ -502,7 +513,7 @@ class SatCurveSelfTune(unittest.TestCase):
                          "120 expected at 30 s, 90 needed")
 
     def test_few_ticks_does_not_hide_an_earlier_reason(self):
-        o = self.run_tokens(["int:900", tk(pwm=1), f"A:{HOUR}"])
+        o = self.run_tokens(["int:900", "src:3", tk(pwm=1), f"A:{HOUR}"])
         self.assertEqual(o.hours[0]["reason"], "pwm")
 
     def test_simulation_switch_restarts_the_tuner_with_an_empty_window(self):
@@ -584,15 +595,15 @@ class SatCurveSelfTune(unittest.TestCase):
         o = self.run_tokens(["src:2", tk(dhw=1), tk(sig=2.0, pwm=1), f"A:{HOUR}"])
         self.assertEqual((o.hours[0]["reason"], o.hours[0].get("pwm")), ("dhw", "1"))
 
-    def test_gas_and_hybrid_records_unchanged(self):
-        for src in ("src:1", "src:3"):
-            o = self.run_tokens([src, tk(sig=2.0), tk(sig=4.0, pwm=1), f"A:{HOUR}"])
-            self.assertRegex(o.log[0], r"^SATTUNEH hour=0 mean=3\.00 ticks=2 counted=0 reason=pwm "
-                                       r"wmean=2\.00 wticks=1 fmean=4\.00 fticks=1$", src)   # no pwm= field (ADR-228 adds the phases)
+    def test_hybrid_record_unchanged(self):
+        # a gas boiler counts this hour since ADR-231 (PwmGasRule); a hybrid keeps the record of TASK-1551
+        o = self.run_tokens(["src:3", tk(sig=2.0), tk(sig=4.0, pwm=1), f"A:{HOUR}"])
+        self.assertRegex(o.log[0], r"^SATTUNEH hour=0 mean=3\.00 ticks=2 counted=0 reason=pwm "
+                                   r"wmean=2\.00 wticks=1 fmean=4\.00 fticks=1$")   # no pwm= field (ADR-228 adds the phases)
 
     def test_heat_pump_logging_does_not_change_the_decision(self):
         toks = day(1.5) * 3 + [tk(sig=2.0, pwm=1), f"A:{HOUR}"] + day(1.5) * 3
-        gas, hp = self.run_tokens(["src:1"] + toks), self.run_tokens(["src:2"] + toks)
+        gas, hp = self.run_tokens(["src:3"] + toks), self.run_tokens(["src:2"] + toks)   # hybrid: the heat-pump tuner rule (entry 319)
         self.assertEqual(gas.days, hp.days)
         self.assertEqual([l for l in gas.log if l.startswith("RESULT")], [l for l in hp.log if l.startswith("RESULT")])
 
@@ -752,7 +763,7 @@ class PhaseSplit(unittest.TestCase):
         bad = []
         for h in range(24):
             bad += [tk(sig=0.0, err=0.5), tk(sig=0.0, err=0.0), tk(sig=9.0, err=0.0, pwm=1), f"A:{HOUR}"]
-        o = self.run_tokens(phase_day(2.0, 2.0, clean=6) + bad + phase_day(2.0, 2.0, clean=6) + phase_day(2.0, 2.0, clean=6))
+        o = self.run_tokens(["src:3"] + phase_day(2.0, 2.0, clean=6) + bad + phase_day(2.0, 2.0, clean=6) + phase_day(2.0, 2.0, clean=6))
         self.assertEqual((o.days[3]["wmean3"], o.days[3]["fmean3"]), ("2.00", "2.00"))
 
     def test_hot_water_tick_has_no_phase(self):
@@ -792,6 +803,69 @@ class PhaseSplit(unittest.TestCase):
         self.assertEqual((o.days[0]["wsay"], o.days[0]["fsay"], o.days[0]["reason"]), ("lower", "higher", "phases_disagree"))
 
 
+def pwm_gas_hour(sig, err="0.0"):
+    """One SAT PWM hour as a gas boiler gives it at low load (gruijter 10-11 Nov): a pulse tick, a pause tick (CH on, flame
+    off) and a tick at or below the minimum modulation (MsgID 15 unknown, 5 % default), all near the target (floating error)."""
+    return [tk(sig=sig, err=err, pwm=1), tk(sig=sig, err=err, pwm=1, ch=1, flame=0), tk(sig=sig, err=err, pwm=1, rm=3.0, mm=0),
+            f"A:{HOUR}"]
+
+
+class PwmGasRule(unittest.TestCase):
+    """TASK-1817 / ADR-231 (Sergeant D entries 316, 318, 319, 322, 323): on a gas boiler (or AUTO) a PWM tick is a warm-up tick
+    and the pwm, flame_off and min_mod exclusions do not drop its hour; a heat pump or a hybrid keeps reason=pwm."""
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.exe = build(Path(cls.tmp.name))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    setUp = SatCurveSelfTune.setUp
+    run_tokens = SatCurveSelfTune.run_tokens
+
+    def test_gas_pwm_hour_counts_and_goes_to_warm_up(self):
+        for src in ("src:1", "src:0"):   # gas boiler, and AUTO (entry 323)
+            with self.subTest(src=src):
+                o = self.run_tokens([src] + pwm_gas_hour(2.0))
+                h = o.hours[0]
+                self.assertEqual((h["counted"], h["reason"], h["wticks"], h["fticks"], h["wmean"], h["fmean"]),
+                                 ("1", "none", "3", "0", "2.00", "na"))
+
+    def test_heat_pump_and_hybrid_pwm_hour_stays_excluded(self):
+        for src, pwm in (("src:2", "3"), ("src:3", None)):
+            with self.subTest(src=src):
+                o = self.run_tokens([src] + pwm_gas_hour(2.0))
+                h = o.hours[0]
+                self.assertEqual((h["counted"], h["reason"], h.get("pwm")), ("0", "pwm", pwm))
+
+    def test_other_exclusions_still_drop_a_gas_pwm_hour(self):
+        for extra, reason in ((dict(dhw=1), "dhw"), (dict(sunv=0), "no_sun"), (dict(sun=12.0), "sun"),
+                              (dict(room=1), "no_room"), (dict(act=0), "not_sat")):
+            with self.subTest(reason=reason):
+                o = self.run_tokens(["src:1", tk(sig=2.0, pwm=1, **extra), f"A:{HOUR}"])
+                self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("0", reason))
+        o = self.run_tokens(["src:1", "M:2.5"] + pwm_gas_hour(2.0))
+        self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("0", "coeff_changed"))
+        o = self.run_tokens(["int:900", "src:1", tk(sig=2.0, pwm=1), f"A:{HOUR}"])
+        self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("0", "few_ticks"))
+
+    def test_non_pwm_tick_keeps_the_deadband_rule(self):
+        o = self.run_tokens(["src:1", tk(sig=1.0, err=0.0), tk(sig=1.0, err=0.5), tk(sig=1.0, err=0.0, ch=1, flame=0),
+                             f"A:{HOUR}"])
+        h = o.hours[0]
+        self.assertEqual((h["wticks"], h["fticks"], h["counted"], h["reason"]), ("1", "2", "0", "flame_off"))
+
+    def test_three_gas_pwm_days_raise_the_curve(self):
+        # 3 days of PWM-only hours at +1.5: warm-up decides alone (floating has no data, entry 305), the curve goes up
+        o = self.run_tokens(["src:1"] + pwm_gas_hour(1.5) * 72)
+        self.assertEqual((o.coeff, o.days[2]["decision"], o.days[2]["wticks3"], o.days[2]["fticks3"], o.days[2]["fvote"]),
+                         (2.1, "raise", "216", "0", "0"))
+        o = self.run_tokens(["src:3"] + pwm_gas_hour(1.5) * 72)
+        self.assertEqual((o.coeff, o.days[0]["counted"], o.days[2]["reason"]), (2.0, "0", "day_not_counted"))
+
+
 class ExclusionMutation(unittest.TestCase):
     """Removing any one exclusion from the real source must make the per-exclusion decision test fail (red)."""
 
@@ -800,9 +874,9 @@ class ExclusionMutation(unittest.TestCase):
         "dhw":       r"  if \(in\.dhw\)\s+return SATT_DHW;",
         "no_sun":    r"  if \(!in\.sunValid\)\s+return SATT_NO_SUN;",
         "sun":       r"  if \(in\.sunElevation >= SAT_CT_SUN_MAX_DEG\)\s+return SATT_SUN;",
-        "pwm":       r"  if \(in\.pwm\)\s+return SATT_PWM;",
-        "flame_off": r"  if \(in\.chOn && !in\.flameOn\)\s+return SATT_FLAME_OFF;",
-        "min_mod":   r"  if \(!\(in\.relMod > minMod\)\)\s+return SATT_MIN_MOD;[^\n]*",
+        "pwm":       r"  if \(in\.pwm && !in\.pwmGas\)\s+return SATT_PWM;",
+        "flame_off": r"  if \(!pwmGas && in\.chOn && !in\.flameOn\)\s+return SATT_FLAME_OFF;",
+        "min_mod":   r"  if \(!pwmGas && !\(in\.relMod > minMod\)\)\s+return SATT_MIN_MOD;[^\n]*",
     }
 
     @classmethod
@@ -821,7 +895,7 @@ class ExclusionMutation(unittest.TestCase):
                 exe = build(Path(self.tmp.name), re.sub(rx, "", self.body), name=f"mut_{ex}")
                 if not exe:
                     self.skipTest("no host C++ compiler")
-                tokens = ["S"] + day(0.5, clean=6, excl=ex) * 3
+                tokens = EXCL_PRE.get(ex, []) + ["S"] + day(0.5, clean=6, excl=ex) * 3
                 out = Out(subprocess.run([str(exe)], input="\n".join(tokens), capture_output=True, text=True,
                                          check=True).stdout)
                 # a tick of dhw / not_sat carries no signal, so its removal shows in the clean-hour count, the others in the mean
@@ -857,6 +931,12 @@ class SourceChecks(unittest.TestCase):
         self.assertIsNotNone(m)
         self.assertIn("ti.dhw = true;", m.group(1))
         self.assertIn("satCurveTuneNoteTick(ti);", m.group(1))
+
+    def test_pwm_rule_follows_the_effective_heat_source(self):
+        # ADR-231 d1: the tuner takes the configured source through satGetEffectiveHeatingSource(), AUTO = gas (entry 323);
+        # the host stub mirrors that function, this pins the real one and the call
+        self.assertRegex(self.src, r"if \(settings\.sat\.iHeatingSource == SAT_SRC_AUTO\)\s*\n\s*return SAT_SRC_GAS_BOILER;")
+        self.assertRegex(self.src, r"t\.pwmGas = \(satGetEffectiveHeatingSource\(\) == SAT_SRC_GAS_BOILER\);")
 
     def test_phase_error_is_the_held_pid_error(self):
         # ADR-228: the phase uses the error the PID deadband acts on (state.sat.fError = target - room, set by satPidStep),

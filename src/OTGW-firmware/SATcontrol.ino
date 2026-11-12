@@ -6016,16 +6016,19 @@ static const char* satTuneReasonName(uint8_t r)
 }
 
 // First exclusion that applies to one tick, in the order of ADR-205 decision 2. SATT_NONE = the tick is clean.
+// ADR-231 (entries 316, 322): a PWM tick on a gas boiler is not excluded for PWM, flame off or the minimum modulation
+// (pulses and pauses are what PWM is); on a heat pump or a hybrid a PWM tick still excludes the hour (entries 205, 319).
 static uint8_t satTuneTickReason(const SatTuneTickIn& in)
 {
+  const bool pwmGas = in.pwm && in.pwmGas;
   if (!in.satActive)                            return SATT_NOT_SAT;
   if (in.dhw)                                   return SATT_DHW;
   if (!in.sunValid)                             return SATT_NO_SUN;
   if (in.sunElevation >= SAT_CT_SUN_MAX_DEG)  return SATT_SUN;
-  if (in.pwm)                                   return SATT_PWM;
-  if (in.chOn && !in.flameOn)                   return SATT_FLAME_OFF;
+  if (in.pwm && !in.pwmGas)                     return SATT_PWM;
+  if (!pwmGas && in.chOn && !in.flameOn)        return SATT_FLAME_OFF;
   const float minMod = (in.minMod > 0.0f) ? in.minMod : SAT_CT_DEFAULT_MIN_MOD;
-  if (!(in.relMod > minMod))                    return SATT_MIN_MOD;   // also true when relMod is NaN
+  if (!pwmGas && !(in.relMod > minMod))         return SATT_MIN_MOD;   // also true when relMod is NaN
   if (in.roomLost)                              return SATT_NO_ROOM;   // Sergeant D entry 225 (Q-1525a A), TASK-1559
   return SATT_NONE;
 }
@@ -6078,12 +6081,14 @@ static void satTuneMarkReason(SatTune& t, uint8_t reason)
 static void satTuneAddTick(SatTune& t, const SatTuneTickIn& in)
 {
   t.ticks++;
-  if (in.pwm) t.pwmTicks++;   // TASK-1551: logged for heat pumps, the tuner still excludes the hour (reason pwm)
+  if (in.pwm) t.pwmTicks++;   // TASK-1551: logged for heat pumps, the tuner still excludes their hour (reason pwm)
   const uint8_t r = satTuneTickReason(in);
   if (r != SATT_NONE) satTuneMarkReason(t, r);
   if (in.satActive && !in.dhw && isfinite(in.signal)) {
     t.sigSum += in.signal; t.sigTicks++;
-    const uint8_t ph = satTuneTickPhase(in.error);   // inside the signal block: a hot-water tick never reaches a phase
+    // inside the signal block: a hot-water tick never reaches a phase. ADR-231 (entry 318): a PWM tick on a gas boiler is
+    // a warm-up tick whatever its PID error.
+    const uint8_t ph = (in.pwm && in.pwmGas) ? (uint8_t)SATP_WARMUP : satTuneTickPhase(in.error);
     if (ph < SATP_COUNT) { t.phSum[ph] += in.signal; t.phTicks[ph]++; }
   }
 }
@@ -6503,7 +6508,10 @@ static void satCurveTuneService(uint32_t nowMs)
 // One control tick (normal or hot water) for the current hour.
 static void satCurveTuneNoteTick(const SatTuneTickIn& in)
 {
-  if (_sat_tuneRunning) satTuneAddTick(_sat_tune, in);
+  if (!_sat_tuneRunning) return;
+  SatTuneTickIn t = in;
+  t.pwmGas = (satGetEffectiveHeatingSource() == SAT_SRC_GAS_BOILER);   // ADR-231 d1: the configured source, AUTO = gas (entry 323)
+  satTuneAddTick(_sat_tune, t);
 }
 // --- satCurveTune glue end
 

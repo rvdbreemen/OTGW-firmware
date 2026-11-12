@@ -46,6 +46,7 @@ struct SatTuneTickIn {
   bool  sunValid;      // a sun elevation is known
   float sunElevation;  // degrees
   bool  pwm;           // SAT is in PWM mode
+  bool  pwmGas;        // ADR-231: PWM ticks follow the gas-boiler rule (heat source gas boiler or AUTO); set in satCurveTuneNoteTick()
   bool  chOn;          // CH enabled (CH=1 sent)
   bool  flameOn;
   bool  roomLost;      // no valid room temperature on this tick (heating on the curve only)
