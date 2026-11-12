@@ -596,8 +596,6 @@
     "dhw_running": "läuft",
     "dhw_standby": "Standby",
     "outside_firmware": "Außen {{temp}} · OTGW-Firmware",
-    "chart_flow": "Vorlauf {{temp}}",
-    "chart_ret": "Rückl. {{temp}}",
     "cell_flow": "VORLAUF",
     "cell_return": "RÜCKLAUF",
     "cell_dhw": "WW",

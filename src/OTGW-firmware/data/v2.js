@@ -717,8 +717,6 @@
       "dhw_running": "running",
       "dhw_standby": "standby",
       "outside_firmware": "Outside {{temp}} · OTGW firmware",
-      "chart_flow": "flow {{temp}}",
-      "chart_ret": "ret {{temp}}",
       "cell_flow": "FLOW",
       "cell_return": "RETURN",
       "cell_dhw": "DHW",
@@ -2376,7 +2374,7 @@
   var SAMPLES_MAX = 1800, samples = [];
   var TICKER_MAX = 60, ticker = [];
   function pushSample() {
-    samples.push({ t: Date.now(), flow: model.flow, ret: model.ret, sp: model.chSet, mod: model.mod });
+    samples.push({ t: Date.now(), flow: model.flow, ret: model.ret, sp: model.chSet, mod: model.mod, flame: model.flame ? 1 : 0 });   // flame: TASK-1841
     if (samples.length > SAMPLES_MAX) samples.shift();
     pushGraphSlot();   // TASK-1226: Monitor > Graph history
   }
@@ -3018,48 +3016,22 @@
   }
 
   // Concept C — mission control: live strip chart + metric cells + frame ticker.
-  // strip svg: viewBox 0 0 780 210, plot x 34..772, temp axis y = 170-(T-10)*2
-  // (T=10->170, 50->90, 90->10).
+  // TASK-1841: the strip uses the Monitor > Graph panel style (drawPanelChart). This view is about the
+  // boiler loop right now, so it shows flame (on/off), modulation and the flow, return and control setpoint
+  // temperatures of the live samples; room, outside and DHW stay on Monitor > Graph.
   var C_X0 = 34, C_X1 = 772;
-  function tempY(t) { return 170 - (t - 10) * 2; }
-  function seriesPoints(key) {
-    if (samples.length < 2) return '';
-    var n = samples.length, span = C_X1 - C_X0, pts = [];
-    for (var i = 0; i < n; i++) {
-      var v = samples[i][key];
-      if (v === null || v === undefined || isNaN(v)) continue;
-      var x = C_X0 + (n === 1 ? 0 : (i / (n - 1)) * span);
-      pts.push(x.toFixed(1) + ',' + tempY(v).toFixed(1));
-    }
-    return pts.join(' ');
-  }
-  function setPoints(id, key) { var el = document.getElementById(id); if (el) el.setAttribute('points', seriesPoints(key)); }
   function renderC() {
-    setPoints('cFlow', 'flow');
-    setPoints('cRet', 'ret');
-    // setpoint: horizontal line at the latest chSet
-    var sp = document.getElementById('cSpLine');
-    if (sp) {
-      if (model.chSet === null) { sp.setAttribute('y1', -10); sp.setAttribute('y2', -10); }
-      else { var y = tempY(model.chSet).toFixed(1); sp.setAttribute('y1', y); sp.setAttribute('y2', y); }
+    var svg = document.getElementById('strip');
+    if (svg) {
+      var col = function (k) { return samples.map(function (r) { return r[k]; }); };
+      drawPanelChart(svg, { n: samples.length, panels: [
+        { title: t('h_mon.graph_flame'), kind: 'l', series: [{ vals: col('flame'), color: '#ff7b00' }] },
+        { title: t('graph.series_mod'), kind: 'm', series: [{ vals: col('mod'), color: '#00bffe' }] },
+        { title: t('h_mon.graph_temps'), kind: 't', unit: '°C', series: [
+          { vals: col('flow'), color: satCssVar('--hot') }, { vals: col('ret'), color: satCssVar('--cold') },
+          { vals: col('sp'), color: '#8b949e', dash: '5 4' }] }
+      ] });
     }
-    // modulation: filled area along the bottom (0% at y=170, 100% at y=130)
-    var mod = document.getElementById('cMod');
-    if (mod) {
-      if (samples.length < 2) mod.setAttribute('points', '');
-      else {
-        var n = samples.length, span = C_X1 - C_X0, p = [C_X0 + ',170'];
-        for (var i = 0; i < n; i++) {
-          var m = samples[i].mod; if (m === null || m === undefined || isNaN(m)) m = 0;
-          var x = C_X0 + (i / (n - 1)) * span;
-          p.push(x.toFixed(1) + ',' + (170 - Math.max(0, Math.min(100, m)) * 0.4).toFixed(1));
-        }
-        p.push(C_X1 + ',170');
-        mod.setAttribute('points', p.join(' '));
-      }
-    }
-    txt('cFlowLbl', model.flow === null ? '' : t('home.chart_flow', { temp: fmt(model.flow, 1, '°') }));
-    txt('cRetLbl', model.ret === null ? '' : t('home.chart_ret', { temp: fmt(model.ret, 1, '°') }));
     renderCGrid();
     renderTicker();
   }
@@ -3360,6 +3332,58 @@
   }
   // TASK-1828: temperature axis label, as the 1.x OTGraph ('{value}°C')
   function graphAxisTemp(v) { return Math.round(v) + '°C'; }
+  // TASK-1841: the Monitor > Graph panel style for the smaller charts (Home > Mission control, SAT control
+  // loop). spec = { n, panels: [{ title, kind, unit, series: [{ vals, color, dash }] }] }; vals are n samples,
+  // oldest first, null for no reading (the line breaks there). kind 'l' = on/off area (18 high), 'm' =
+  // modulation 0-100 % (56 high), 't' = auto-scaled line panel (unit on the axis, 120 high or p.h). Plot x 34..772.
+  function drawPanelChart(svg, spec) {
+    var n = spec.n, H = { l: 18, m: 56, t: 120 }, y = 18, out = '', lines = '';
+    function X(i) { return n > 1 ? C_X0 + i * (C_X1 - C_X0) / (n - 1) : C_X1; }
+    function txtEl(x, yy, s, cls) { return '<text class="axis-txt' + (cls ? ' ' + cls : '') + '" x="' + x + '" y="' + yy + '">' + esc(s) + '</text>'; }
+    spec.panels.forEach(function (p) {
+      var top = y, h = p.h || H[p.kind] || H.t, bot = top + h, lo = 0, hi = 100;
+      out += txtEl(38, top - 3, p.title, 'gtitle');
+      out += '<line x1="' + C_X0 + '" y1="' + bot + '" x2="' + C_X1 + '" y2="' + bot + '" stroke="#8b949e"/>';
+      if (p.kind === 't') {
+        lo = Infinity; hi = -Infinity;
+        p.series.forEach(function (s) { s.vals.forEach(function (v) { if (v !== null && v !== undefined && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } }); });
+        if (lo > hi) { lo = 10; hi = 90; }
+        lo = Math.floor(lo / 10) * 10; hi = Math.max(Math.ceil(hi / 10) * 10, lo + 20);
+        out += txtEl(2, top + 6, Math.round(hi) + (p.unit || '')) + txtEl(2, (top + bot) / 2 + 3, Math.round((lo + hi) / 2) + (p.unit || '')) + txtEl(2, bot + 2, Math.round(lo) + (p.unit || ''));
+        out += '<line x1="' + C_X0 + '" y1="' + ((top + bot) / 2) + '" x2="' + C_X1 + '" y2="' + ((top + bot) / 2) + '" stroke="#8b949e" stroke-opacity=".2"/>';
+      } else if (p.kind === 'm') {
+        out += txtEl(2, top + 6, '100%') + txtEl(2, bot + 2, '0%');
+      } else {
+        out += txtEl(2, top + 7, t('h_mon.graph_lane_on')) + txtEl(2, bot + 2, t('h_mon.graph_lane_off'));
+      }
+      function Y(v) { return p.kind === 'l' ? bot - (v ? 14 : 0) : bot - (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * h; }
+      p.series.forEach(function (s) {
+        var d = '', seg = [];
+        function flush() {
+          if (!seg.length) return;
+          var pts = [], q;
+          if (p.kind === 'l') { pts.push(seg[0][0] + ',' + bot); for (q = 0; q < seg.length; q++) { if (q) pts.push(seg[q][0] + ',' + seg[q - 1][1]); pts.push(seg[q][0] + ',' + seg[q][1]); } pts.push(seg[seg.length - 1][0] + ',' + bot); }
+          else if (p.kind === 'm') { pts.push(seg[0][0] + ',' + bot); seg.forEach(function (c) { pts.push(c[0] + ',' + c[1]); }); pts.push(seg[seg.length - 1][0] + ',' + bot); }
+          else seg.forEach(function (c) { pts.push(c[0] + ',' + c[1]); });
+          d += (d ? ' ' : '') + 'M' + pts.join(' L') + (p.kind === 't' ? '' : ' Z');
+          seg = [];
+        }
+        for (var i = 0; i < n; i++) {
+          var v = s.vals[i];
+          if (v === null || v === undefined || !isFinite(v)) { flush(); continue; }
+          seg.push([X(i).toFixed(1), Y(v).toFixed(1)]);
+        }
+        flush();
+        if (!d) return;
+        if (p.kind === 't') lines += '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="1.8"' + (s.dash ? ' stroke-dasharray="' + s.dash + '"' : '') + '/>';
+        else lines += '<path d="' + d + '" fill="' + s.color + '" fill-opacity="' + (p.kind === 'l' ? '.3' : '.18') + '" stroke="' + s.color + '" stroke-width="1.2"/>';
+      });
+      y = bot + 16;
+    });
+    var total = y - 4;
+    svg.setAttribute('viewBox', '0 0 780 ' + total);
+    svg.innerHTML = '<line x1="' + C_X0 + '" y1="' + 18 + '" x2="' + C_X0 + '" y2="' + (total - 12) + '" stroke="#8b949e"/>' + out + lines;
+  }
   // TASK-1828: a graph window chip's window in ms (data-win-ms); 1 h when the attribute is missing
   function graphChipWindowMs(ch) { return parseInt(ch.getAttribute('data-win-ms'), 10) || 3600000; }
   function renderGraph() {
@@ -7152,25 +7176,17 @@
 
   function satDrawHistory() {
     var svg = document.getElementById('satHistChart'); if (!svg) return;
-    var n = satHist.flow.length;
     var accent = satCssVar('--accent'), hot = satCssVar('--hot'), ok = satCssVar('--zone-ok'),
-      cold = satCssVar('--cold'), muted = satCssVar('--muted'), border = satCssVar('--border');
-    function Y(t) { return 186 - (Math.max(-5, Math.min(80, t)) + 5) / 85 * 168; }
-    var x0 = 8, x1 = 592, dx = n > 1 ? (x1 - x0) / (n - 1) : 0;
-    function L(arr) {
-      var p = '';
-      for (var i = 0; i < n; i++) { var v = arr[i]; if (v === null || v === undefined || isNaN(v)) continue; p += (x0 + i * dx).toFixed(1) + ',' + Y(v).toFixed(1) + ' '; }
-      return p.trim();
-    }
-    function poly(pts, stroke, w, dash) { return pts ? '<polyline points="' + pts + '" fill="none" stroke="' + stroke + '" stroke-width="' + w + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>' : ''; }
-    var g = '';
-    [0, 20, 40, 60, 80].forEach(function (t) { var y = Y(t).toFixed(1); g += '<line x1="8" y1="' + y + '" x2="592" y2="' + y + '" stroke="' + border + '" stroke-width="1"/>'; });
-    g += poly(L(satHist.out), cold, 1.5, '6 4');
-    g += poly(L(satHist.pid), muted, 1.5, '1 4');
-    g += poly(L(satHist.flow), hot, 2);
-    g += poly(L(satHist.set), accent, 2);
-    g += poly(L(satHist.room), ok, 2);
-    svg.innerHTML = g;
+      cold = satCssVar('--cold'), muted = satCssVar('--muted');
+    // TASK-1841: the Monitor > Graph panel style. The SAT loop on its own scales: room and outside (what SAT
+    // controls on), the flow it asks (setpoint) and the heating curve, and the PID output (no unit shown).
+    drawPanelChart(svg, { n: satHist.flow.length, panels: [
+      { title: t('tools.legend_room') + ' · ' + t('tools.legend_outside'), kind: 't', unit: '°C', h: 90,
+        series: [{ vals: satHist.room, color: ok }, { vals: satHist.out, color: cold, dash: '6 4' }] },
+      { title: t('tools.legend_setpoint') + ' · ' + t('tools.legend_flow'), kind: 't', unit: '°C', h: 90,
+        series: [{ vals: satHist.set, color: accent }, { vals: satHist.flow, color: hot }] },
+      { title: t('tools.legend_pid'), kind: 't', h: 60, series: [{ vals: satHist.pid, color: muted }] }
+    ] });
     var lg = document.getElementById('satHistLegend');
     if (lg) lg.innerHTML =
       '<span><i style="background:' + accent + '"></i>' + esc(t('tools.legend_setpoint')) + '</span><span><i style="background:' + hot + '"></i>' + esc(t('tools.legend_flow')) + '</span>' +

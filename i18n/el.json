@@ -596,8 +596,6 @@
     "dhw_running": "σε χρήση",
     "dhw_standby": "αναμονή",
     "outside_firmware": "Εξωτερική {{temp}} · OTGW firmware",
-    "chart_flow": "προσαγωγή {{temp}}",
-    "chart_ret": "επιστρ. {{temp}}",
     "cell_flow": "ΠΡΟΣΑΓΩΓΗ",
     "cell_return": "ΕΠΙΣΤΡΟΦΗ",
     "cell_dhw": "ΖΝΧ",

@@ -275,10 +275,6 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .stripcard svg{width:100%;height:auto;display:block}
   .axis-txt{fill:var(--muted);font-size:10px;font-family:var(--font-mono)}
   .axis-txt.gtitle{fill:var(--text);font-weight:600}
-  .ser-flow{fill:none;stroke:var(--hot);stroke-width:2}
-  .ser-ret{fill:none;stroke:var(--cold);stroke-width:2}
-  .ser-sp{stroke:#8b949e;stroke-width:1.5;stroke-dasharray:5 5}
-  .ser-mod{fill:rgba(0,191,254,.18);stroke:rgba(0,191,254,.5);stroke-width:1}
   .legend{display:flex;gap:14px;font-family:var(--font-mono);font-size:.7rem;color:var(--muted);
     padding:6px 6px 2px;flex-wrap:wrap}
   .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}

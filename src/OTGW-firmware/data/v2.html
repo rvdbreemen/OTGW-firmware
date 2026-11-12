@@ -314,19 +314,8 @@
         <span><i style="background:#8b949e"></i><span data-i18n="h_home.leg_setpoint">setpoint</span></span>
         <span><i style="background:rgba(0,191,254,.5)"></i><span data-i18n="h_home.leg_modulation">modulation</span></span>
       </div>
-      <svg viewBox="0 0 780 210" id="strip" role="img" aria-label="Live flow/return/setpoint/modulation strip chart" data-i18n-aria-label="h_home.strip_aria">
-        <line x1="34" y1="10" x2="34" y2="170" stroke="var(--border)"/>
-        <line x1="34" y1="170" x2="772" y2="170" stroke="var(--border)"/>
-        <text class="axis-txt" x="8" y="16">90°</text>
-        <text class="axis-txt" x="8" y="92">50°</text>
-        <text class="axis-txt" x="8" y="172">10°</text>
-        <line class="ser-sp" id="cSpLine" x1="34" y1="0" x2="772" y2="0"/>
-        <polygon class="ser-mod" id="cMod" points=""/>
-        <polyline class="ser-flow" id="cFlow" points=""/>
-        <polyline class="ser-ret" id="cRet" points=""/>
-        <text class="axis-txt" id="cFlowLbl" x="745" y="20" fill="var(--hot)"></text>
-        <text class="axis-txt" id="cRetLbl" x="745" y="34" fill="var(--cold)"></text>
-      </svg>
+      <!-- TASK-1841: drawn by renderC() with drawPanelChart(), the Monitor > Graph panel style -->
+      <svg viewBox="0 0 780 262" id="strip" role="img" aria-label="Live flow/return/setpoint/modulation strip chart" data-i18n-aria-label="h_home.strip_aria"></svg>
     </div>
 
     <div class="mc-grid" id="cGrid"></div>
@@ -386,7 +375,7 @@
         </div>
       </div>
       <div class="card"><h4><span data-i18n="h_mon.sat_loop_title">SAT control loop</span> <span class="sub" data-i18n="h_mon.sat_loop_live">live</span></h4>
-        <svg viewBox="0 0 600 200" id="satHistChart" preserveAspectRatio="none" style="height:200px"></svg>
+        <svg viewBox="0 0 780 320" id="satHistChart" style="width:100%;height:auto;display:block"></svg><!-- TASK-1841: drawPanelChart -->
         <div class="legend" id="satHistLegend"></div>
         <div class="sat-hint"><span data-i18n="h_mon.sat_hist_hint">SAT target and PID output since this page was opened. Full boiler history:</span> <button type="button" class="sat-link" id="satHistMonitorLink" data-i18n="h_mon.sat_hist_link">Monitor &rsaquo; Graph</button></div></div>
       <!-- Closed by default; the open state is stored only on a click on the summary (wireSat, concept rule 4) -->

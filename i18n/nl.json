@@ -596,8 +596,6 @@
     "dhw_running": "loopt",
     "dhw_standby": "stand-by",
     "outside_firmware": "Buiten {{temp}} · OTGW firmware",
-    "chart_flow": "aanvoer {{temp}}",
-    "chart_ret": "retour {{temp}}",
     "cell_flow": "AANVOER",
     "cell_return": "RETOUR",
     "cell_dhw": "WW",
