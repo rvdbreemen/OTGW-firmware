@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:05:00Z'
-updated_date: '2026-11-12T09:09:00Z'
+updated_date: '2026-11-12T11:45:00Z'
 labels:
   - heap
   - bug
@@ -78,4 +78,6 @@ AC3 status: NOT ticked. Met: both one-tab and two-tab runs stay above CRITICAL w
 2026-11-12, offline read of the beta.211 boot-3 telnet log (the 6,992 B boot): right after onMqttConnect (post-subscribe 08.154) the same loop pass publishes the SAT always-on state set, satPublishCoreState() (SATcontrol.ino:4587): sat/enabled, active, safety_tripped, fallback_active, push_refused, sh_rejected, pm25_no_slot, room_temp_lost, ot_link_lost, outside_temp_missing, external_temp_enable, mode, control_mode, preset (08.181-08.383), interleaved with REST answers to the tab (health 114 ms, otdirect, simulate), then '[loop-stall] 288 ms gap'. On the first pass after bConnected the on-change shadows are empty, so all ~14 go at once; this burst is outside the connStage staging. Lead hypothesis, to be proven by the probe build: the first-write drop is this SAT burst (plus its telnet debug lines) coinciding with the page load.
 
 2026-11-12, instrumentation build prepared (coordinator go, slot after 95's 212-214): connProbe(tag) in MQTTstuff.ino with 15 call sites (loop() top/timers/discovery/SAT/app-end/bg-end/OT frames, doBackgroundTasks() pre/post MQTT, post PIC, post OTD, handleMQTT() pre/post MQTTclient.loop(), onMqttConnect() after birth and after the subscribes); a record is kept when the window minimum fell >= 1 KB since the previous probe or >= 20 ms passed, max 32, printed as '[HEAP] connect-probe t= dt= at= from= ...' after the connect trace; no-op outside the boot connect phase. Tags in MQTTstuff.h (CPROBE_*). Host test tests/test_mqtt_connect_probe.py cuts the real block: 5 pass; on origin/dev MQTTstuff.ino 5 errors (block absent). evaluate --quick 92 checks 0 FAIL.
+
+2026-11-12 Robert (relayed by the coordinator): the desktop Firefox tab with the .61 v2 UI stays (option B, a constant extra /ws client). So every 1757 run on beta.208, 211 and later counts one client more than its mode name: C = 1 client, one-tab = 2, two-tab = 3. Unknown for the beta.167/171 baselines, so old-vs-fix comparisons carry that caveat. 09 adds 4 one-tab boots to the beta.215 probe bench.
 <!-- SECTION:NOTES:END -->
