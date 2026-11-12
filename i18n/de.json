@@ -555,7 +555,6 @@
     "diag_out_aria": "Ausgabe der PIC-Diagnose",
     "diag_notes": "Was danach passiert, hängt vom Test ab. Die Tests 1, 2 und 3 laufen so lange, bis Enter bei leerem Feld gedrückt wird. Test 1 gibt dabei überhaupt nichts aus, ein stiller Bildschirm ist dort also normal. Test 5 fragt am Ende nach einer Einstellung für die Referenzspannung. Test 4 braucht eine Schleife zwischen den beiden Schnittstellen und ist der einzige Test, der die Kommunikation zwischen Thermostat und Kessel unterbricht. Welche Anschlüsse jeder Test braucht und wie die Ergebnisse zu lesen sind, steht auf",
     "diag_link": "der Seite zur Diagnose-Firmware von Schelte Bron",
-    "foot": "OTGW-Firmware · v2-Weboberfläche · live vom OpenTherm-Bus",
     "toast_saved": "Einstellungen gespeichert"
   },
   "home": {

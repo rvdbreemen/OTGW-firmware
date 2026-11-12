@@ -676,7 +676,6 @@
       "diag_out_aria": "PIC diagnose output",
       "diag_notes": "What happens next differs per test. Tests 1, 2 and 3 keep running until you press Enter with the box empty, and test 1 produces no output at all while it runs, so a quiet screen is normal there. Test 5 ends by asking you for a reference voltage setting. Test 4 needs a loop between the two interfaces, and is the one test that interrupts communication between thermostat and boiler. Which connections each test needs, and how to read its results, is described on",
       "diag_link": "Schelte Bron's diagnostic firmware page",
-      "foot": "OTGW firmware · v2 Web UI · live from the OpenTherm bus",
       "toast_saved": "Settings saved"
     },
     "home": {

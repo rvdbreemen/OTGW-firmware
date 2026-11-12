@@ -71,6 +71,7 @@ const ALLOW_HTML = [
   [/^Stream every frame straight to a local file you pick$/, 'chipStream: wiring sets data-i18n-title (sat.stream_title) and applyI18n re-runs'],
   // names that stay English
   [/^Open-Meteo$/, 'weather service name'],
+  [/^© 2021-2026 Robert van den Breemen$/, 'page footer: copyright line, a name and years (TASK-1838)'],
   [/^SAT · Smart Autotune Thermostat$/, 'product name with its expansion'],
   [/^Hex$/, 'placeholder naming the number base of the input; same word in NL, DE and EL'],
 ];

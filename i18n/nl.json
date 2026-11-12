@@ -555,7 +555,6 @@
     "diag_out_aria": "Uitvoer PIC-diagnose",
     "diag_notes": "Wat er daarna gebeurt, verschilt per test. Test 1, 2 en 3 lopen door tot je op Enter drukt met een leeg vak, en test 1 geeft tijdens het lopen helemaal geen uitvoer, dus een stil scherm is daar normaal. Test 5 vraagt aan het eind om een instelling voor de referentiespanning. Test 4 heeft een doorverbinding tussen de twee interfaces nodig en is de enige test die de communicatie tussen thermostaat en ketel onderbreekt. Welke aansluitingen elke test nodig heeft en hoe je de resultaten leest, staat op",
     "diag_link": "de pagina over de diagnosefirmware van Schelte Bron",
-    "foot": "OTGW firmware · v2-webinterface · live van de OpenTherm-bus",
     "toast_saved": "Instellingen opgeslagen"
   },
   "home": {
