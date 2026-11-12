@@ -3,9 +3,11 @@ id: TASK-1855
 title: >-
   OT-Direct: a write command (CS=, C2=, MM=, SW=, SH=, CC=/CL=, VS=) puts its
   WRITE on the bus twice
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-12T02:35:00Z'
+updated_date: '2026-11-12T04:24:00Z'
 labels:
   - otdirect
 dependencies: []
