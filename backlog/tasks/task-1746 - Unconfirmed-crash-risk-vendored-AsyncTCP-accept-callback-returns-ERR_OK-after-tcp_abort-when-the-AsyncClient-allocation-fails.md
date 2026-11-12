@@ -3,14 +3,14 @@ id: TASK-1746
 title: >-
   Unconfirmed crash risk: vendored AsyncTCP accept callback returns ERR_OK after
   tcp_abort() when the AsyncClient allocation fails
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-09T06:21:00Z'
-updated_date: '2026-11-12T12:28:00Z'
+updated_date: '2026-11-12T13:26:00Z'
 labels:
   - asynctcp
   - crash-risk
-  - needs-maintainer-ok
   - library
 milestone: 2.0.0
 dependencies: []
@@ -26,13 +26,19 @@ Found in the TASK-1675 review (system32-78, 2026-11-09, read-only; not observed 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Robert decides: patch the pinned library, take an upstream release that fixes it, or accept the risk
+- [x] #1 Robert decides: patch the pinned library, take an upstream release that fixes it, or accept the risk
 - [ ] #2 Upstream ESP32Async/AsyncTCP checked for this path (issue/commit link or 'not fixed upstream')
 - [ ] #3 If patched: a host or device test that forces the AsyncClient allocation to fail at accept shows no crash, red on the old code where reproducible
+- [ ] #4 Firmware closes the port-80 listener before the /ReBoot and the reset-wireless teardown (no new accept during teardown); host or source test on the real reboot paths, red on the old code
+- [ ] #5 Bench by the bench-tester on .61: a reboot loop with a poller hammering /api/v2/device/info during /ReBoot, at least 20 reboots on the old build and on the new one; the new build shows no tcp_accept panic
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 First observed instance (relayed by the coordinator, 2026-11-12): 09's bench on .61, beta.215+242633e, TASK-1757 probe run, boot 5 of 12 (W, two Chrome tabs plus Robert's Firefox tab open). PANIC in tiT during the /ReBoot teardown of the old session; backtrace AsyncTCP_detail::tcp_accept <- tcp_input <- ip4_input <- tcpip_thread; free heap 64,736 B. ba's code reading: the beta.215 probe runs only on the loop task, not on this path (a reading, not proof). First reading to check: an accept arriving while the server is being torn down; an allocation failure is unlikely at 64 KB free. Title and label unchanged; Robert decides.
+
+DECISION Robert (2026-11-12, DM via the coordinator, msg 1570428435195502645, verbatim 'B'): firmware-only, no AsyncTCP library change. Close the port-80 listener (AsyncWebServer end / stop accepting) before the /ReBoot (and reset-wireless) teardown, so no accept arrives during the teardown. Evidence that drives it: 09's beta.215 panic (tcp_accept during teardown, 1 in 12 reboots). AC1 ticked with this answer; AC2 (upstream check) and AC3 (library patch test) belong to the library options Robert did not choose and are superseded by the new AC4/AC5.
+
+Claimed by otgw-firmware-95 (2026-11-12). Starts after beta.217 (TASK-1865 B+C) is built and posted; number beta.219 (ba has 218). Consider TASK-1868 (reboot label) in the same change: it touches the same doRedirect path in FSexplorer.ino:795.
 <!-- SECTION:NOTES:END -->
