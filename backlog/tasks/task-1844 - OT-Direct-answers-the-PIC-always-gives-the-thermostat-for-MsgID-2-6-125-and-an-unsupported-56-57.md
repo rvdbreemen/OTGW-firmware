@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:56:00Z'
-updated_date: '2026-11-12T09:13:00Z'
+updated_date: '2026-11-12T10:31:00Z'
 labels:
   - otdirect
   - parity
@@ -52,4 +52,6 @@ Evidence AC1 (for 6, 125, 56/57; MsgID 2 moved to TASK-1861) and AC2: tests/test
 Open: AC3 bench with a slave simulator (needs a thermostat-side sim on the OT-Direct unit; .61 is in the release soak now). Note for the bench-tester: MsgID 125/6/56/57 answers are only observable with a thermostat (or sim) on the thermostat port.
 
 After the rebase onto 096056ce1 (d3's TASK-1855 otdNoteCmdSent): tests/test_otd_write_once.py also cut the alt-slot path at otdClockReply end and missed otdPicAnswer/otdUpperBoundF88; slice extended to otdUpperBoundF88 plus an empty boiler cache, as in test_otd_mode_switch_queue_reset.py. Green on the lane (2 tests OK) and on origin/dev 096056ce1 OTDirect.ino (2 OK). Bench note (coordinator): .61 has no thermostat or slave sim, so the MsgID 6/125/56/57 answers stay host-test evidence unless 09 can simulate (asked in the bench request).
+
+Pushed origin/dev e8af7d61a..5d03c17c3 (beta.212 TASK-1842, beta.213 TASK-1844, beta.214 TASK-1860, test-only 5d03c17c3); zip OTGW-firmware-esp32-combo-2.0.0-beta.214+5d03c17-flash.zip posted (Discord msg 1570385106462580746). Bench by otgw-bench-tester (09) on .61, beta.214+5d03c17 (zip sha256 e167f2af1e49b850...), OTA 211 -> 214, settings 164 keys unchanged; evidence in session 09 scratchpad b214\ (baseline-old.txt, post-PR.txt, pyotgw-read.txt, rt-set.txt, rt-clear.txt, regress-poll.log, regress-telnet.log). Old 211: PR=X no answer, PR=A 'OpenTherm Gateway 6.6', RT=21.50 'NG', no otdpiccompat. Regression 11 min: bootcount delta 0, no crashlog, MQTT and health 200 in 23/23 polls. TASK-1844 banner: PR=A answers 'OpenTherm Gateway 6.8' + board, as decided; pyotgw 2.2.3 connected over port 25238 and read status, otgw_about = that string: PASS (HA itself not tested). AC3 (bench with a slave simulator where possible): NOT possible on this bench: loopback mode only fakes the boiler side (simulateLoopbackResponse, OTDirect.ino:1575-1606) and otdPicAnswer runs only on thermostat frames, so the MsgID 6/125/56/57 answers stay host-test evidence (tests/test_otd_pic_fixed_answers.py red on old, green on new). Heap note (09, not analysed, no claim): hd_min_free_heap fell to 4,612 B at 11:18:10 and 4,100 B at 11:21:43 on 214 (CRITICAL 3,072 B) against about 7 KB in 09's 211 run; the first dip followed a pyotgw session, the second came with only the bench loggers and a Firefox WS client. The 212-214 diff adds no allocation (no malloc/new/String/large buffer, grep of the src diff). Could be bench activity; worth a look if it recurs.
 <!-- SECTION:NOTES:END -->

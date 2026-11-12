@@ -3,11 +3,11 @@ id: TASK-1842
 title: >-
   OT-Direct: the PIC 6.8 command RT= (room temperature for the boiler) is
   missing
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:53:00Z'
-updated_date: '2026-11-12T06:03:00Z'
+updated_date: '2026-11-12T10:31:00Z'
 labels:
   - otdirect
   - parity
@@ -51,4 +51,12 @@ Open: AC3 (OTD_PIC_COMPAT_VERSION -> 6.8) waits for the MsgID 125 part of TASK-1
 USER-VISIBLE BEHAVIOUR CHANGE (for the alpha note): on OT-Direct, the MQTT command room_temp (topic <top>/set/<node>/otgw32/room_temp, MQTTstuff.ino:925-934, only active on OT-Direct hardware) now works like RT=: from that command on, a thermostat's own WRITE of MsgID 24 (room temperature) reaches the boiler with the MQTT value instead of the thermostat's, and the thermostat gets WRITE_ACK with its own value. Before, the value was only sent as the gateway's own MsgID 24 writes and the thermostat's writes passed unchanged. This is what RT= does on the PIC: MessageID24 puts fakeroomtemp into every thermostat MsgID 24 request while NoFakeRoomTemp is clear (OTGW-other-projects/otgw-6.8/gateway.asm:3061-3068), set by SetRoomTemp (:4300-4309). RT=0 (or a clear via RT=) gives the thermostat's value back. Public wording must not name the board (the topic segment is internal).
 
 AC3: OTD_PIC_COMPAT_VERSION is 6.8 in the TASK-1844 commit (RT= here + the MsgID 125 clamp there); the PR=A banner is 'OpenTherm Gateway 6.8 OTGW32' (Robert's decision, TASK-1844 notes).
+
+Pushed origin/dev e8af7d61a..5d03c17c3 (beta.212 TASK-1842, beta.213 TASK-1844, beta.214 TASK-1860, test-only 5d03c17c3); zip OTGW-firmware-esp32-combo-2.0.0-beta.214+5d03c17-flash.zip posted (Discord msg 1570385106462580746). Bench by otgw-bench-tester (09) on .61, beta.214+5d03c17 (zip sha256 e167f2af1e49b850...), OTA 211 -> 214, settings 164 keys unchanged; evidence in session 09 scratchpad b214\ (baseline-old.txt, post-PR.txt, pyotgw-read.txt, rt-set.txt, rt-clear.txt, regress-poll.log, regress-telnet.log). Old 211: PR=X no answer, PR=A 'OpenTherm Gateway 6.6', RT=21.50 'NG', no otdpiccompat. Regression 11 min: bootcount delta 0, no crashlog, MQTT and health 200 in 23/23 polls. TASK-1842: RT=21.50 -> 'RT: 21.50', /api/v2/otdirect/overrides write [{msgid 24, value 5504}] (0x1580 = 21.50), otdoverrides 1; RT=0 -> 'RT: 0.00', write [] and otdoverrides 0: PASS. Host-test only: the MsgID 24 frame to the boiler (no thermostat or slave sim on .61).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+RT= (PIC 6.8 GetPercentArg parsing: two fraction digits, third rounds, '-' = SE, above 100.00 = OR) sets a MsgID 24 write override that a thermostat WRITE 24 carries to the boiler; RT=0 clears it. AC1/AC2: tests/test_otd_rt_room_temp.py 6/6, 5 FAIL on the old code; the frame equals heatpump-1.stc R10181969. AC3: OTD_PIC_COMPAT_VERSION 6.8 with TASK-1844. Bench 09 .61 beta.214: RT= accepted, override set and cleared (old 211: 'NG'). Not covered on hardware: the MsgID 24 frame on the bus (no thermostat or slave sim); host-test evidence only. Pushed as beta.212 (8f6924552), zip posted. Follow-up TASK-1859 (floatToF88 truncates where the PIC rounds).
+<!-- SECTION:FINAL_SUMMARY:END -->

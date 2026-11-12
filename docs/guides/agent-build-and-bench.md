@@ -40,7 +40,7 @@ wipe the affected `.pio/build/<env>` dir and rebuild solo to recover.
 End-to-end loop for firmware changes that need on-device validation (e.g. the
 heap-frag soak, TASK-934):
 
-- **Build (canonical):** `build.bat --target esp32` / `./build.sh --target esp32`
+- **Build (canonical):** `build.bat` / `./build.sh` (no `--target`: the default is `esp32-combo`, the one image built, benched and posted on `dev`; `--target esp32` builds a separate OTGW32-only image, see `BUILD.md`)
   (a bare wrapper builds esp32-combo only) — builds firmware + filesystem and
   bootstraps its own venv, so it is immune to the host Python version.
 - **Build (direct pio) gotcha:** `python -m platformio run -e esp32` fails if the
