@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T02:36:00Z'
-updated_date: '2026-11-12T03:05:00Z'
+updated_date: '2026-11-12T05:02:00Z'
 labels:
   - otdirect
   - sat
@@ -36,7 +36,7 @@ Related: TASK-1185 (simulation must not switch itself off on synthetic traffic),
 - [x] #2 Host test that feeds loopback frames (and the boot handshake) through the real code and shows settings.sat.bSimulation stays on; red on the old code, green on the fix
 - [x] #3 Loopback state never counts as boiler presence on any path that reaches satOnBoilerDetected()
 - [x] #4 Re-enabling simulation works without a reboot after a detection (the one-way latch is cleared when presence goes away, or the false trip cannot happen)
-- [ ] #5 Bench on .61 by the bench-tester: loopback with simulation on for at least 15 min and across a mode switch, simulation stays on
+- [x] #5 Bench on .61 by the bench-tester: loopback with simulation on for at least 15 min and across a mode switch, simulation stays on
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -51,4 +51,6 @@ Fix (wt-95fw, on top of 1840/1836): OTDirect.ino presence block (markers otdBoil
 Evidence AC2/AC3/AC4: tests/test_otd_loopback_not_boiler_for_sat.py (6 tests; real presence block or the old otDirectBoilerPresent(), real otBoilerCacheStore(), real satBoilerHardwarePresent() and the backstop line of SATcontrol.ino, the real SATsimulation enable gate of settingStuff.ino; source checks for both call sites). Fix 6/6 OK. Old code (origin/dev ba41264e6): 4 FAIL, reproducing the bench: 'master present=1 sim=0 teardown=1' after loopback -> master, and 'reenable sim=0' (09: POST satsimulation=true accepted, GET stays False). Harness kept compiling: test/host/test_local_frame_consumers.py/.cpp (the marker as an optional slice; its cache3 world sets the marker too, the harness models a real MsgID 3 answer there): RESULT PASS; test_override_reply 4 OK; alt_slots, gateway_own_status, mode_switch_queue_reset, ps1_summary, return_temp_slot, slave_reply_gate, tt_pic_parity, sat_no_return_startup all exit 0. evaluate --quick: 92 checks, 0 failed, 0 warnings.
 
 Open: AC5 bench by the bench-tester on .61: simulation on, loopback 15 min, then otdmode 4 -> 3 -> 1 -> 4, simulation stays True throughout (REST poll) and no 'SAT-SIM: boiler appeared on bus' line; then POST satsimulation=false/true works without a reboot. Side finding still open (not this fix): in loopback SAT detects a manufacturer from the synthetic MsgID 3 ('Detected manufacturer: Remeha (MemberID 11)').
+
+2026-11-12 AC5 bench (otgw-bench-tester), .61 OTGW32 on 2.0.0-beta.203+61b69e0, scratchpad t1856/cap15.py. satsimulation=true (start state (True,3)), otdmode=4 (loopback) from 05:44:51 to 06:00:21 (15 min 30 s), then otdmode 3 -> 1 -> 4 -> 3 at 30 s per step. A REST poll every 1 s logged only state changes: (True,4) at 05:44:51, (True,3) 06:00:21, (True,1) 06:00:52, (True,4) 06:01:23, (True,3) 06:01:54. satsimulation never left True; there were 4 poll timeouts during loopback, with no state change before or after them. Continuous telnet (27086 lines) holds all 5 'OTD: mode ->' lines (loopback / master / gateway / loopback / master) and 0 lines 'SAT-SIM: boiler appeared on bus'. Crashlog none afterwards. Old reference (197, t1856/run2): satsimulation flipped to False 0.5 s after leaving loopback, with that line. Earlier 203 run (b203, 125 s loopback, 3 -> 1 -> 4 at 15 s): satsimulation false/true worked without a reboot. Evidence: scratchpad t1856/run15/events.txt, telnet.log.
 <!-- SECTION:NOTES:END -->
