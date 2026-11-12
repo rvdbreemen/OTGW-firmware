@@ -450,6 +450,16 @@ class FlameOutFailsafe(unittest.TestCase):
     def test_failsafe_switches_30s_after_the_first_qualifying_tick(self):
         self.assertEqual(self.switch_at(self.g(*[(50, 54)] * 4)), 30000 + 30000)
 
+    def test_tjfs_2026_11_09_capture_replay_switches_30s_earlier(self):
+        # TASK-1762 AC4: the case behind entries 288/289, replayed through the real satCycleCheckOvershootSwitch().
+        # tjfs's capture 2026-11-09 (beta.161, OT-Direct gateway, Ideal Logic, SAT on), SATTICK lines at a 30 s control
+        # interval, (requested PID setpoint, flow): 12:46:01 (40.99, 45.0), 12:46:31 (39.99, 46.0), 12:47:01 (39.27, 46.0).
+        # On beta.161 the 60 s rule switched to PWM at 12:47:01 ("flow 46.0 stayed above setpoint 39.3 + 2.0 for 60 s").
+        # With the fail-safe the first tick already has flow - CS = 4.01 >= 3.5, so the switch comes 30 s later, at
+        # 12:46:31: one tick (30 s) earlier than the 60 s rule.
+        ticks = self.g((40.99, 45.0), (39.99, 46.0), (39.27, 46.0))
+        self.assertEqual(self.switch_at(ticks), 30000 + 30000, "fail-safe: 30 s after 12:46:01, i.e. at 12:46:31")
+
     def test_failsafe_at_a_ten_second_tick(self):
         self.assertEqual(self.switch_at(self.g(*[(50, 54)] * 6, dt=10000)), 10000 + 30000)
 

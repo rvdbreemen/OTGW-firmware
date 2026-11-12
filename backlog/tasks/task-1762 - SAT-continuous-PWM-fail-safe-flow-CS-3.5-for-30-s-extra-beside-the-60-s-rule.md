@@ -3,11 +3,11 @@ id: TASK-1762
 title: >-
   SAT continuous -> PWM fail-safe: flow - CS >= 3.5 for 30 s (extra beside the
   60 s rule)
-status: In Progress
+status: Done
 assignee:
-  - '@system32-030509'
+  - '@claude'
 created_date: '2026-11-09T19:17:00Z'
-updated_date: '2026-11-09T21:54:00Z'
+updated_date: '2026-11-12T00:41:00Z'
 labels:
   - sat
   - pwm
@@ -26,10 +26,10 @@ Rule: in continuous mode, when flow - CS >= 3.5 holds for 30 s, SAT switches to 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Firmware: in continuous mode, flow - CS >= 3.5 for 30 s switches to PWM, beside the unchanged 60 s rule; CS is the requested (PID) setpoint; entry 213's MsgID 3 block applies
-- [ ] #2 Timer behaviour as in entry 289 (start, reset conditions, no catch-up, >=) covered by native tests, including the boundary 3.5 and 29/30 s
-- [ ] #3 Recorded as a deliberate deviation from thermo-nova in the SAT ground-truth docs, citing entries 288/289
-- [ ] #4 Shown on a capture or simulation replay of tjfs's 2026-11-09 case: the switch comes 30 s after flow - CS reaches 3.5 instead of via the 60 s rule
+- [x] #1 Firmware: in continuous mode, flow - CS >= 3.5 for 30 s switches to PWM, beside the unchanged 60 s rule; CS is the requested (PID) setpoint; entry 213's MsgID 3 block applies
+- [x] #2 Timer behaviour as in entry 289 (start, reset conditions, no catch-up, >=) covered by native tests, including the boundary 3.5 and 29/30 s
+- [x] #3 Recorded as a deliberate deviation from thermo-nova in the SAT ground-truth docs, citing entries 288/289
+- [x] #4 Shown on a capture or simulation replay of tjfs's 2026-11-09 case: the switch comes 30 s after flow - CS reaches 3.5 instead of via the 60 s rule
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -58,6 +58,10 @@ Adjusted harness inputs (review point of the coordinator):
 - test_sat_slave_lowload.py test_failsafe_needs_a_valid_reply_with_bit4_clear: the old flow 55 switches on the 2nd 30 s tick when permitted; bit 4 = 1 and no valid reply keep continuous; reason 2, path 1. Old code: ('2','3') != ('2','2').
 
 Evidence (host, Windows, 2026-11-09): test_sat_overshoot_sustain 77 OK (FlameOutFailsafe 13 cases; red on old: 12 of 14 new cases + the old-input case); test_sat_pwm_override 83 OK; test_sat_slave_lowload 20 OK; the other tests that cut SATcycles.ino, run per file with python: fs_update_keep 37, ch_signals 4, classifier_parity 12, cycle_classifier 43, hp_pwm 35, last_cycle_expiry 10, lowload_contract 35 (1 skip, 2 expected failures as before), mqtt_contract_1485 15, narrate_fits 1, pwm_anchors 64, pwm_start_limit 26, requested_vs_transmitted 10, tail_percentile 9 (1 skip), telemetry_wire 18: all OK. Not yet: full run_tests, bump, ESP32 build, bench .61 (satsimulation).
+
+Verification 2026-11-12 (otgw-firmware-d3, Robert's 'HIGH tasks first'). On origin/dev ba41264e6: the fail-safe from cbf48f169 (beta.165) is in SATcycles.ino:37-38 (SAT_OVERSHOOT_FAILSAFE_DELTA_C 3.5, SAT_OVERSHOOT_FAILSAFE_SUSTAIN_MS 30000) and :1365-1393 (satCycleCheckOvershootSwitch, own timer, >=, shared gates incl. satPwmEntryAllowed for entry 213). tests/test_sat_overshoot_sustain.py 78 OK now; on SATcycles.ino from cbf48f169^ the FlameOutFailsafe class fails (16 failures over 14 tests).
+
+AC4: replay of tjfs's 2026-11-09 case (capture-tjfs-sat1, transcript of beta.161+45dadcf, SATTICK at a 30 s interval: 12:46:01 pid 40.99 flow 45.0, 12:46:31 pid 39.99 flow 46.0, 12:47:01 pid 39.27 flow 46.0; beta.161 narrated 'Control mode: PWM (flow 46.0 stayed above setpoint 39.3 + 2.0 for 60 s)' at 12:47:01) through the real satCycleCheckOvershootSwitch(): new test test_tjfs_2026_11_09_capture_replay_switches_30s_earlier. Fix: switch at 60000 ms = 12:46:31 (30 s after the first tick with flow - CS = 4.01 >= 3.5). Old code (cbf48f169^): 90000 != 60000, i.e. 12:47:01, exactly what the field unit did. AC3: deviation recorded in docs/sat/firmware-sat-spec.md:1558 and :1594 and docs/sat/sat-comparison.md:146 (entries 288/289, no thermo-nova counterpart).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -79,3 +83,9 @@ Soak .61 beta.165+cbf48f1, read-only device/info at 22:53:27 (16 min uptime, aft
 
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: SATcycles.ino satCycleCheckOvershootSwitch() switches continuous -> PWM when flow - requested setpoint >= 3.5 for 30 s, own timer beside the unchanged 60 s rule, satPwmEntryAllowed (entry 213) gates it (cbf48f169, beta.165). AC2: tests/test_sat_overshoot_sustain.py 78 OK incl. FlameOutFailsafe (boundary 3.5 and 29 999 / 30 000 ms, reset on dips, missing flow, PWM tick, DHW guard, margin independence, MsgID 3 refusal); red on cbf48f169^ (16 failures). AC3: firmware-sat-spec.md:1558/:1594 and sat-comparison.md:146 record the deliberate deviation (entries 288/289). AC4: tjfs's 2026-11-09 SATTICK series replayed through the real code: switch at 12:46:31 (60 000 ms) on the fix vs 12:47:01 (90 000 ms) on the old code, matching beta.161 in the field. Earlier bench .61 beta.165 (2026-11-09): OTA, health, sim check not triggered at 3.39 K, 16 min soak clean.
+<!-- SECTION:FINAL_SUMMARY:END -->
