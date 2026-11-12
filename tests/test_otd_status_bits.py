@@ -66,6 +66,7 @@ static bool otChModeOff = false;
 static bool otSummerMode = false;
 static bool otDHWBlocking = false;
 static bool otCoolingEnable = false;
+static bool otCH2Enable = false;   // TASK-1833: H2= value for the relayed status (older code reads bit 4 of otMasterStatusFlags)
 """
 
 MAIN = r"""
@@ -81,6 +82,7 @@ int main(int argc, char** argv) {
   otCoolingEnable = atoi(argv[7]) != 0;
   otOverrides[2].active = atoi(argv[8]) != 0;
   if (atoi(argv[9])) otMasterStatusFlags |= 0x10; else otMasterStatusFlags &= ~0x10;
+  otCH2Enable = atoi(argv[9]) != 0;
   otSummerMode = atoi(argv[10]) != 0;
   otDHWBlocking = atoi(argv[11]) != 0;
   unsigned long req = ((unsigned long)hb << 8) | 0x00;   // READ_DATA, MsgID 0, low byte 0

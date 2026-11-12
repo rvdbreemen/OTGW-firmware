@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.195
+**  Version  : v2.0.0-beta.196
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -542,7 +542,10 @@ static char    otTempSensor      = 'O';      // TS= temp sensor function
 static char    otForceThermostat = 'A';      // FT= thermostat detection
 static uint8_t otDHWOverride     = 0xFF;     // HW state: 0='0', 1='1', 0xFF='A' (auto)
 static bool    otDHWBlocking     = false;    // BW= DHW blocking (bit6, not persisted); read by otdRelayedStatusFrame (ADR-229)
-static bool    otCoolingEnable   = false;    // CE= cooling enable (bit2, not persisted); read by otdRelayedStatusFrame (ADR-229)
+// TASK-1833: CE= and H2= as the PIC's CoolModeOff/CH2ModeOff, clear at reset (gateway.asm 6.8:1178-1188): while a CL= or
+// C2= value is held, the relayed MsgID 0 has bit 2 / bit 4 set until CE=0 / H2=0 (readstatus, gateway.asm:2720-2747).
+static bool    otCoolingEnable   = true;     // CE= cooling enable (bit2, not persisted); read by otdRelayedStatusFrame (ADR-229)
+static bool    otCH2Enable       = true;     // H2= CH2 enable for the relayed status (bit4, not persisted)
 
 // BS= fake room setpoint: intercepts thermostat MsgID 16 WRITE_DATA frames
 // and replaces the data bytes with the fake setpoint before forwarding to boiler.
@@ -930,7 +933,7 @@ static unsigned long otdRelayedStatusFrame(unsigned long frame) {
   c.coolHeld    = otdWriteOverrideActive(7);    // CL= (and CC=) write MsgID 7
   c.coolEnable  = otCoolingEnable;
   c.ch2Held     = otdWriteOverrideActive(8);    // C2= writes MsgID 8
-  c.ch2Enable   = (otMasterStatusFlags & 0x10) != 0;
+  c.ch2Enable   = otCH2Enable;                 // TASK-1833: on until H2=0
   c.summer      = otSummerMode;
   c.dhwBlocking = otDHWBlocking;
   const uint8_t eff = otdRelayedStatusHB(hb, c);
@@ -2697,7 +2700,8 @@ static void resetTransientState() {
   }
   // Status bit overrides (non-persisted) — reset to CH enable only (boot default)
   otDHWBlocking = false;
-  otCoolingEnable = false;
+  otCoolingEnable = true;      // TASK-1833: PIC CoolModeOff/CH2ModeOff clear at reset
+  otCH2Enable = true;
   otMasterStatusFlags = 0x01;  // CH enable only; summer mode re-applied below if persisted
   otChModeOff = false;         // PIC boots with CHModeOff clear
   if (settings.otd.bSummerMode) otMasterStatusFlags |= 0x20;
@@ -3265,6 +3269,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     } else {
       otMasterStatusFlags &= ~0x10;
     }
+    otCH2Enable = (value[0] == '1');   // TASK-1833: the relayed status reads this one
     rspBuf[0] = value[0]; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }
@@ -3310,17 +3315,21 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   }
   // CL=xx.x — Cooling level (PIC-compatible alias for CC=, MsgID 7)
   else if (cmd0 == 'C' && cmd1 == 'L') {
-    float cl = atof(value);
+    // TASK-1833: as the PIC SetCoolLevel (gateway.asm 6.8:4454-4464): a number, 0 included, is held as the
+    // cooling level; only a value that is not a number clears it, with the ValueCleared reply "CL: -".
+    char* end = nullptr;
+    float cl = strtof(value, &end);
     bool enqueued = true;
-    if (cl == 0.0f) {
+    if (end == value) {
       clearWriteOverride(7);
+      synthesizeResponse(buf, "-");
     } else {
       uint16_t f88 = floatToF88(cl);
       enqueued = enqueueWriteCommand(7, f88, "CL");
-    }
-    if (enqueued) {
-      dtostrf(cl, 1, 2, rspBuf);
-      synthesizeResponse(buf, rspBuf);
+      if (enqueued) {
+        dtostrf(cl, 1, 2, rspBuf);
+        synthesizeResponse(buf, rspBuf);
+      }
     }
   }
 

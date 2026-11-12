@@ -76,7 +76,7 @@ static bool otRemoteOverrideClearPending = false;
 static uint8_t otOperModeDHW, otOperModeCH1, otOperModeCH2, otMasterStatusFlags, otDHWOverride, otUnknownIdCount;
 static uint8_t otUnknownCounters[32];
 static DHWPushState otDHWPushState; static uint32_t otDHWPushStartMs, otLastThermostatMs;
-static bool otSummaryMode, otHideReports, otSummaryPending, otThermostatSeen, otDHWBlocking, otCoolingEnable,
+static bool otSummaryMode, otHideReports, otSummaryPending, otThermostatSeen, otDHWBlocking, otCoolingEnable, otCH2Enable,
             otChModeOff, otSetbackEngaged;
 static float otFakeRoomSetpoint;
 static OTDirectMode otCurrentMode = OTD_MODE_MASTER;

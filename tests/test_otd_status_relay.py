@@ -62,7 +62,7 @@ enum DHWPushState { PUSH_IDLE, PUSH_PENDING, PUSH_ACTIVE };
 static DHWPushState otDHWPushState = PUSH_IDLE;
 static uint8_t otDHWOverride = 0xFF;
 static uint8_t otMasterStatusFlags = 0x01;
-static bool otSummerMode = false, otDHWBlocking = false, otCoolingEnable = false;
+static bool otSummerMode = false, otDHWBlocking = false, otCoolingEnable = false, otCH2Enable = false;   // otCH2Enable: TASK-1833
 struct Ov { uint8_t msgId; bool active; uint16_t overrideValue; };
 #define OT_OVERRIDE_COUNT 2
 static Ov otOverrides[OT_OVERRIDE_COUNT] = { {1, false, 0}, {9, false, 0} };

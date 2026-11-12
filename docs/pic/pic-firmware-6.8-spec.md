@@ -116,8 +116,8 @@ DataIDs 128-255 skip the table and go to `WordResponse` (gateway.asm:2537-2538).
 | 0 Status | Req | `MandatoryID` clears any blacklisting first. | Always. | gateway.asm:2720, 3411-3416 |
 | 0 | Req | HB bit 0 (CH enable) := NOT `CHModeOff` (CH=). | CS= active (`SysCtrlSetpoint` clear) or `HeatDemand` (short-circuited on/off thermostat). | gateway.asm:2721-2731, 4414-4420, 1766-1769 |
 | 0 | Req | HB bit 1 (DHW enable) := `HotWaterEnable` OR `dhwpushspoof`. | HW=0 or HW=1 (`HotWaterSwitch`), or a spoofed DHW push. | gateway.asm:2723-2726, 2732-2734, 4390-4409 |
-| 0 | Req | HB bit 2 (cooling enable) := NOT `CoolModeOff` (CE=). | CL= active (`SysCoolLevel` clear). | gateway.asm:2721-2722, 2735-2736, 4446-4452 |
-| 0 | Req | HB bit 4 (CH2 enable) := NOT `CH2ModeOff` (H2=). | C2= active (`SysCH2Setpoint` clear). | gateway.asm:2721-2722, 2737-2738, 5264-5270 |
+| 0 | Req | HB bit 2 (cooling enable) := NOT `CoolModeOff` (CE=). `CoolModeOff` is clear after reset (RAM clear), so the bit is 1 until CE=0. | CL= active (`SysCoolLevel` clear). | gateway.asm:2721-2722, 2735-2736, 4446-4452, 1178-1188 |
+| 0 | Req | HB bit 4 (CH2 enable) := NOT `CH2ModeOff` (H2=). `CH2ModeOff` is clear after reset (RAM clear), so the bit is 1 until H2=0. | C2= active (`SysCH2Setpoint` clear). | gateway.asm:2721-2722, 2737-2738, 5264-5270, 1178-1188 |
 | 0 | Req | HB bit 5 (summer mode) := 1. | SM=1. With SM=0 the thermostat bit is passed. | gateway.asm:2739-2740, 4561-4567 |
 | 0 | Req | HB bit 6 (DHW blocking) := 1. | BW=1, or the GPIO block function. With BW=0 the thermostat bit is passed. | gateway.asm:2741-2742, 4569-4575, 5444-5451 |
 | 0 | Req | Bits 3, 7 and the LB are never changed. The change is applied with `setbyte3` only, so `OverrideUsed` stays set. | - | gateway.asm:2743-2747 |
