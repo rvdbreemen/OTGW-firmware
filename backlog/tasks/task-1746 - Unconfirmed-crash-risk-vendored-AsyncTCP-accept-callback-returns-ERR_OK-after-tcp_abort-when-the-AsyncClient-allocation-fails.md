@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T06:21:00Z'
+updated_date: '2026-11-12T12:28:00Z'
 labels:
   - asynctcp
   - crash-risk
@@ -29,3 +30,9 @@ Found in the TASK-1675 review (system32-78, 2026-11-09, read-only; not observed 
 - [ ] #2 Upstream ESP32Async/AsyncTCP checked for this path (issue/commit link or 'not fixed upstream')
 - [ ] #3 If patched: a host or device test that forces the AsyncClient allocation to fail at accept shows no crash, red on the old code where reproducible
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+First observed instance (relayed by the coordinator, 2026-11-12): 09's bench on .61, beta.215+242633e, TASK-1757 probe run, boot 5 of 12 (W, two Chrome tabs plus Robert's Firefox tab open). PANIC in tiT during the /ReBoot teardown of the old session; backtrace AsyncTCP_detail::tcp_accept <- tcp_input <- ip4_input <- tcpip_thread; free heap 64,736 B. ba's code reading: the beta.215 probe runs only on the loop task, not on this path (a reading, not proof). First reading to check: an accept arriving while the server is being torn down; an allocation failure is unlikely at 64 KB free. Title and label unchanged; Robert decides.
+<!-- SECTION:NOTES:END -->
