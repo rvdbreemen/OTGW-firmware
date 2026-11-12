@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:05:00Z'
-updated_date: '2026-11-12T12:46:00Z'
+updated_date: '2026-11-12T17:47:00Z'
 labels:
   - heap
   - bug
@@ -86,4 +86,6 @@ AC3 status: NOT ticked. Met: both one-tab and two-tab runs stay above CRITICAL w
 Attribution from the probe lines, all 12 boots: the largest single drop is in every boot at at=13 from=12, i.e. inside ONE MQTTclient.loop() call: 23-43 KB (e.g. 57.7 -> 22.6 KB, 68.8 -> 36.1 KB), maxblk down to 5-8 KB, mqttTx 833. The step before (at=17 from=16, satPublishCoreState) only queues: outbox 4 -> 18, free -5 KB. So the cost is espMqttClient sending the whole queued outbox in one pass, and the SAT always-on set (~14 packets, first pass after a connect) is what fills it on top of the 3-4 connect packets. Remaining minima (8-21 KB) fall later (t 95-681 ms) in brackets around web serving (at=6/9/16 from=3/11/13), i.e. concurrent async_tcp work while the outbox is still 4-7 deep.
 
 Fix decided by the coordinator as a direct application of Robert's option C (publish pacing, not SAT control): the TASK-1339 SAT outbox gate (SATmqttPublish.cpp satOutboxFull()) also defers while MQTTstuff.ino's post-connect pace window holds (outbox > 2 or largest block < 20 KB), window opens at connect, closes when the connStage portions are done and the outbox is shallow, hard end 60 s, reopens on every connect. ADR-088's burst window was checked and does not fit: it only defers the discovery drip and does not throttle the publisher. Prepared as beta.218 (after d3 216, 95 217); host tests red on the old code, green on the fix (test_sat_mqtt_state pace test; test_mqtt_connect_staging pace/pacetimeout/pacereconnect).
+
+2026-11-12 beta.218: fix (option C stage + B outbox-depth pace on SAT core-state publish) rebased onto origin/dev 40d1801ea, bumped beta.217->beta.218. Targeted tests green after rebase: probe, staging, sat_mqtt_state, wifi_deadlink, otd_dhw_push_pic, otd_msgid99_bytes, health_no_fs_flash_ops (each files 1 passed 1). evaluate.py --quick: 93 checks, 86 PASS, 0 FAIL. Connect-window probes stay in 218 for the old-vs-fix bench comparison. Full suite: files 1-80 green before rebase; 81-222 to run.
 <!-- SECTION:NOTES:END -->

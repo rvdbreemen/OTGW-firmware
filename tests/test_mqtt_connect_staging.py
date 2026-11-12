@@ -132,6 +132,38 @@ int main(int argc, char** argv) {
     printf("whiledown=%d migr=%d ver=%d pic=%d total=%d\n", whileDown, published[1], published[2], published[3], queued);
     return 0;
   }
+  if (!strcmp(mode, "pace")) {               // TASK-1757 pace window for the SAT publish gate
+    onMqttConnect(false);                    // 3 packets queued, stage 1 pending
+    int hold = mqttConnectPaceHold();        // 3 > 2: hold
+    sent = queued; int shallow = mqttConnectPaceHold();   // shallow, stages pending: go, window stays open
+    queued += 5; int burst = mqttConnectPaceHold();       // deep again while the stages run: hold
+    for (int i = 0; i < 60; i++) { nowMs += 50; sent = queued; tick(); }
+    int done = mqttConnectPaceHold();        // stages done, outbox shallow: go, window closes
+    queued += 5; int closed = mqttConnectPaceHold();      // closed: never holds again
+    printf("hold=%d shallow=%d burst=%d done=%d closed=%d\n", hold, shallow, burst, done, closed);
+    return 0;
+  }
+  if (!strcmp(mode, "pacetimeout")) {        // largest block stuck below 20 KB: the window ends at 60 s anyway
+    maxBlock = 10000;
+    onMqttConnect(false); sent = queued;
+    nowMs += 1000;  int at1 = mqttConnectPaceHold();
+    nowMs += 58000; int at59 = mqttConnectPaceHold();
+    nowMs += 1000;  int at60 = mqttConnectPaceHold();
+    nowMs += 1000;  int after = mqttConnectPaceHold();
+    printf("at1=%d at59=%d at60=%d after=%d\n", at1, at59, at60, after);
+    return 0;
+  }
+  if (!strcmp(mode, "pacereconnect")) {      // a disconnect closes the window, the next connect opens it again
+    onMqttConnect(false); sent = queued;
+    for (int i = 0; i < 60; i++) { nowMs += 50; sent = queued; tick(); }
+    mqttConnectPaceHold();                   // closes after the stages
+    queued += 5; int closed = mqttConnectPaceHold();
+    connStageReset();                        // onMqttDisconnect()
+    sent = queued; int down = mqttConnectPaceHold();
+    onMqttConnect(false); int reopened = mqttConnectPaceHold();
+    printf("closed=%d down=%d reopened=%d\n", closed, down, reopened);
+    return 0;
+  }
   if (!strcmp(mode, "drip")) {               // outbox 20 deep: skip 5, publish on the 6th; shallow: never skip
     uint8_t w = 0; int seq = 0;
     for (int i = 0; i < 7; i++) seq = seq * 2 + (dripOutboxWait(20, w) ? 1 : 0);
@@ -168,6 +200,8 @@ def program(src: str) -> str:
     # the code from before TASK-1757 has no stages: an empty tick keeps it compilable for the red run
     stage = m.group(0) if m else "static void connStageTick() {}\nstatic void connStageReset() {}\n"
     stage = stage.replace("static void mqttV2MigrationOnConnect();\n", "")
+    if "bool mqttConnectPaceHold()" not in stage:   # code from before the pace window: never holds (red run)
+        stage += "\nbool mqttConnectPaceHold() { return false; }\n"
     drip = ""
     if "static bool dripOutboxWait(" in src:
         d = re.search(r"constexpr uint32_t DRIP_OUTBOX_MAX .*?\n(?=\n)", src, re.S)
@@ -194,6 +228,16 @@ class MqttConnectStaging(unittest.TestCase):
     def run_mode(self, mode):
         out = subprocess.run([str(self.exe), mode], capture_output=True, text=True, check=True).stdout.strip()
         return dict(kv.split("=", 1) for kv in out.split())
+
+    def test_pace_window_holds_sat_publishes_until_the_stages_are_done(self):
+        # TASK-1757 (beta.215 probes): the SAT always-on set must not join the connect packets in one send
+        self.assertEqual(self.run_mode("pace"), {"hold": "1", "shallow": "0", "burst": "1", "done": "0", "closed": "0"})
+
+    def test_pace_window_has_a_hard_60_s_end(self):
+        self.assertEqual(self.run_mode("pacetimeout"), {"at1": "1", "at59": "1", "at60": "0", "after": "0"})
+
+    def test_pace_window_reopens_on_reconnect(self):
+        self.assertEqual(self.run_mode("pacereconnect"), {"closed": "0", "down": "0", "reopened": "1"})
 
     def test_connect_queues_only_birth_and_command_subscriptions(self):
         self.assertEqual(int(self.run_mode("connect")["queued"]), 3)

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.217
+**  Version  : v2.0.0-beta.218
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1748,8 +1748,10 @@ constexpr uint32_t CONN_STAGE_MAX_WAIT_MS  = 5000;     // then send anyway
 static uint8_t  sConnStage   = 0;   // 0 = idle, 1..4 = next portion to send
 static uint32_t sConnStageMs = 0;   // millis() of connect or of the last portion
 
-static void connStageStart() { sConnStage = 1; sConnStageMs = millis(); }
-static void connStageReset() { sConnStage = 0; }
+static bool     sConnPaceOn = false;  // post-connect pace window for the SAT publish gate (below)
+static uint32_t sConnPaceMs = 0;      // millis() of the CONNACK that opened it
+static void connStageStart() { sConnStage = 1; sConnStageMs = millis(); sConnPaceOn = true; sConnPaceMs = sConnStageMs; }
+static void connStageReset() { sConnStage = 0; sConnPaceOn = false; }
 
 // True when the next portion may go now.
 static bool connStageReady(uint32_t nowMs, uint32_t outbox, uint32_t maxBlock) {
@@ -1785,6 +1787,26 @@ static void connStageTick() {
   connTraceSample();  // TASK-1757
   sConnStageMs = millis();
   sConnStage = (sConnStage >= 4) ? 0 : (uint8_t)(sConnStage + 1);
+}
+// Post-connect pace window (TASK-1757, beta.215 probes): right after CONNACK the SAT
+// always-on state set (~14 topics, first pass after a connect) was queued in one
+// pass and espMqttClient sent the whole outbox in one MQTTclient.loop(): free heap
+// fell 32-36 KB there, to 11-18 KB with a page load on top. The SAT publish gate
+// (TASK-1339, SATmqttPublish.cpp satOutboxFull()) asks this function: while the
+// window is open a SAT publish waits for the same conditions as a connStage
+// portion (outbox <= CONN_STAGE_MAX_OUTBOX, largest block >= CONN_STAGE_MIN_BLOCK),
+// so the set leaves a few packets per pass. Nothing is dropped: a held publish keeps
+// its shadow and is retried on the next pass. The window closes when the connStage
+// portions are done and the outbox is shallow, or CONN_PACE_MAX_MS after CONNACK at
+// the latest, and reopens on every connect. Loop task only.
+constexpr uint32_t CONN_PACE_MAX_MS = 60000;   // hard end, so a stuck low block cannot hold SAT publishes
+bool mqttConnectPaceHold() {
+  if (!sConnPaceOn) return false;
+  if (millis() - sConnPaceMs >= CONN_PACE_MAX_MS) { sConnPaceOn = false; return false; }
+  const bool hold = (uint32_t)MQTTclient.queueSize() > CONN_STAGE_MAX_OUTBOX ||
+                    platformMaxFreeBlock() < CONN_STAGE_MIN_BLOCK;
+  if (!hold && sConnStage == 0) sConnPaceOn = false;   // portions sent and the outbox is shallow: window done
+  return hold;
 }
 // --- end connStage -----------------------------------------------------------
 

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.cpp
-**  Version  : v2.0.0-beta.217
+**  Version  : v2.0.0-beta.218
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -48,7 +48,8 @@ bool satPublishDeferred()      { return s_satPublishDeferred; }
 void satPublishDeferredClear() { s_satPublishDeferred = false; }
 
 static inline bool satOutboxFull() {
-  if (mqttOutboxDepth() <= SAT_MQTT_OUTBOX_LIMIT) return false;
+  // TASK-1757: right after a connect, wait until the outbox is shallow (MQTTstuff.ino mqttConnectPaceHold())
+  if (!mqttConnectPaceHold() && mqttOutboxDepth() <= SAT_MQTT_OUTBOX_LIMIT) return false;
   s_satPublishDeferred = true;
   return true;
 }

@@ -222,6 +222,8 @@ static uint32_t g_outbox = 0;
 static int g_sent = 0;
 static char g_lastPayload[64];
 uint32_t mqttOutboxDepth() { return g_outbox; }
+static bool g_paceHold = false;   // TASK-1757: MQTTstuff.ino post-connect pace window (stub)
+bool mqttConnectPaceHold() { return g_paceHold; }
 bool sendMQTTData(const char* topic, const char* json, const bool retain) {
   (void)topic; (void)retain; ++g_sent; ++g_outbox; test_strlcpy(g_lastPayload, json, sizeof(g_lastPayload)); return true; }
 bool sendMQTTData(const __FlashStringHelper* topic, const char* json, const bool retain) {
@@ -295,6 +297,14 @@ int main() {
   r = publishIfChangedF(F("t/f"), 1.5f, ef, 0.05f, 1, false);
   bool r2 = publishIfChangedF(F("t/f"), 1.5f, ef, 0.05f, 1, false);
   printf("epoch_retry r=%d sent=%d again=%d\n", (int)r, g_sent, (int)r2);
+  // 10. TASK-1757: right after a connect the pace window holds a due publish even with an empty
+  //     outbox (shadow untouched, flag set); once it releases, the publish goes.
+  { SATShadowB pb{}; g_paceHold = true; g_outbox = 0; g_sent = 0; DEFERRED_CLEAR();
+    bool rh = publishIfChangedB(F("t/pace"), true, pb, true);
+    printf("pace_hold r=%d sent=%d deferred=%d\n", (int)rh, g_sent, DEFERRED());
+    g_paceHold = false; g_sent = 0;
+    bool rr = publishIfChangedB(F("t/pace"), true, pb, true);
+    printf("pace_release r=%d sent=%d\n", (int)rr, g_sent); }
   printf("sizes F=%d I=%d B=%d S=%d\n", (int)sizeof(SATShadowF), (int)sizeof(SATShadowI), (int)sizeof(SATShadowB), (int)sizeof(SATShadowS));
   return 0;
 }
@@ -336,6 +346,13 @@ class OutboxGate(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.tmp.cleanup()
+
+    def test_connect_pace_window_holds_then_releases(self):
+        # TASK-1757: the SAT always-on set queued 14 packets in one pass right after CONNACK and the
+        # client sent them in one loop() (beta.215 probes: free heap -32..36 KB). The gate now also
+        # waits while MQTTstuff.ino says the post-connect pace window holds.
+        self.assertEqual(self.r("pace_hold"), {"r": "0", "sent": "0", "deferred": "1"})
+        self.assertEqual(self.r("pace_release"), {"r": "1", "sent": "1"})
 
     def r(self, name):
         if not self.exe:

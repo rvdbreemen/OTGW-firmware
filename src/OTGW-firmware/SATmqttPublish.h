@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-beta.217
+**  Version  : v2.0.0-beta.218
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -89,6 +89,7 @@ static inline uint32_t satRandomBootScatterMs() {
 static constexpr uint32_t SAT_MQTT_OUTBOX_LIMIT = 24;   // TASK-1339: steady-state outbox on the bench is 0-35 packets
 
 uint32_t mqttOutboxDepth();         // MQTTstuff.ino: packets queued in the MQTT client outbox
+bool     mqttConnectPaceHold();     // MQTTstuff.ino: TASK-1757 post-connect pace window says wait
 bool     satPublishDeferred();      // true when a helper skipped a publish since the last clear
 void     satPublishDeferredClear(); // satPublishMQTT() clears it at the start of every pass
 
