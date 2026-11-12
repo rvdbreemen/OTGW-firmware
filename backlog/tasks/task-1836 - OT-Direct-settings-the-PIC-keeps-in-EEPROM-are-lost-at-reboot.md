@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:46:00Z'
-updated_date: '2026-11-12T01:31:00Z'
+updated_date: '2026-11-12T01:37:00Z'
 labels:
   - otdirect
   - parity
@@ -47,4 +47,6 @@ Decision AC3 (per item, taken under Robert's 'decide yourself' rule): IT and OH:
 Evidence AC1+AC2: tests/test_otd_persist_pic_eeprom.py (4 tests; real SM, SB, MI, FS, IT, OH, SW, SH, UI, KI and HW branches, the real otdPersist helpers and otdRestorePersistedCommands, the real OTDirectSettingsSection; settingsMarkDirty() a counter; a reboot keeps settings.otd, wipes RAM and calls the restore). Fix: 4/4 OK, stored 'sm=1 sb=12.5 mi=500 fs=0 it=0 oh=1 sw=55.0 sh=70.0 hw=0 ui=[70]', boot 'hw=0 dhwbit=0 it=0 oh=1 unknown=1 id0=70 sched70=1 enq=2 last=57:4600'. Old code (origin/dev ba41264e6 + its OTDirecttypes.h): 3 FAIL ('SM dirty=0', 'IT dirty=0', 'boot none'), 1 ok (the unchanged-value case is trivially true there). evaluate --quick 0 failed; the same targeted suites as TASK-1840 are green.
 
 Open: AC4 bench via the bench-tester: HW=0, reboot, PR=W answers W=0 (plus SW= and UI= across a reboot). Not run: esp32-combo build (build slot via the coordinator).
+
+Bench checklist for otgw-bench-tester: on .61 (any OT-Direct mode; loopback is fine): (1) HW=0, SW=55, SH=70, UI=70, IT=0, OH=1; (2) GET /settings.ini (check the downloaded size first) shows OTDdhwoverride 0, OTDdhwsetpoint 55.00, OTDmaxchsetpoint 70.00, OTDignoretransitions false, OTDoverridehb true, OTDunknownids "70" (the flush is deferred: wait a few seconds); (3) reboot; (4) PR=W answers W=0 (AC4), PR=T answers T=01 (IT=0, OH=1); (5) in loopback the boot re-sends SW and SH: R frames WRITE MsgID 56 data 0x3700 and MsgID 57 data 0x4600 appear after boot; (6) UI=70 still active: no R frame READ MsgID 70 in loopback (its schedule entry is disabled). Clean up afterwards: HW=A, SW=0, SH=0, KI=70, IT=1, OH=0, and check settings.ini again. Settings unchanged otherwise (save /api/v2/settings before, compare after).
 <!-- SECTION:NOTES:END -->

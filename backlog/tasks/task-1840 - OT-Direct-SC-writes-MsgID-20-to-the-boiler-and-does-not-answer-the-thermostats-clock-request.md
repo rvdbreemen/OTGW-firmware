@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:51:00Z'
-updated_date: '2026-11-12T01:31:00Z'
+updated_date: '2026-11-12T01:37:00Z'
 labels:
   - otdirect
   - parity
@@ -48,4 +48,6 @@ Evidence AC1+AC2: tests/test_otd_sc_clock.py (8 tests, real SC= branch with a re
 Harnesses that slice the touched code, kept green in the same lane: tests/test_otd_mode_switch_queue_reset.py (takes the SC state + otdClockReply when present; 8 OK) and test/host/build_and_run_override_reply.ps1 (optional anchor 'SC= clock answer'; test/host/test_override_reply.py 4 OK). Also run and green: test_otd_gateway_alt_slots (12), test_otd_return_temp_slot, test_otd_slave_reply_gate, test_otd_tt_pic_parity, test_otd_ps1_summary_pic, test_sat_command_delivery (22), test_sat_lowload_contract (exit 0, 523.8 s, missing LL ids: none). python evaluate.py --quick: exit 0, 92 checks, 0 failed, 0 warnings. A full scripts/run_tests.py sweep was stopped by the harness for low memory (not by a failure); per the coordinator a full run now goes through the coordinator one at a time.
 
 Open: AC3 bench capture, via the bench-tester (TASK-1826 rule): SC= on the OT-Direct unit with a thermostat or the slave simulator reading MsgID 20; expect no R..014.... WRITE to the boiler and A frames as above. Not run: esp32-combo build (build slot via the coordinator).
+
+Bench checklist for otgw-bench-tester (TASK-1826 rule; the bench-tester chooses and ticks). On .61 (OTGW32) in LOOPBACK mode (GW=L): loopback logs the gateway's own requests as R frames (OTDirect.ino bridgeFrameToParser 'R'), so the boiler side is observable: (1) send SC=21:50/3; OLD code shows an R frame WRITE MsgID 20 with data 0x7532 (R..147532) within seconds; FIX shows no R..014 frame, and the reply is 'SC: 21:50/3'. That is the only part .61 can show without a thermostat. NOT observable in loopback: the thermostat answer (otdClockReply runs only in gateway mode, on a thermostat frame). It needs a thermostat or an OT slave simulator on the thermostat port of a gateway-mode unit: thermostat READ 0x00140000 -> A frame C0147532 while SC is valid, A frame 60140000 (Data-Invalid) about 64 s after the last SC=, WRITE 0x9014892A -> 50147532 / 5014892A. Without such a setup AC3 stays open for that part; the answer path is covered by the host test only (do not tick it on air).
 <!-- SECTION:NOTES:END -->
