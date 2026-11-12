@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.211
+**  Version  : v2.0.0-beta.212
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -452,6 +452,7 @@ static OTFrameOverride otOverrides[] = {
   {  8, false, 0 },   // TsetCH2 — C2= override
   { 14, false, 0 },   // MaxRelModLevelSetting — MM= override
   { 16, false, 0 },   // TrSet — BS= / MQTT room_setpoint override
+  { 24, false, 0 },   // Tr — RT= / MQTT room_temp override (TASK-1842)
   { 56, false, 0 },   // TdhwSet — SW= override
   { 57, false, 0 },   // MaxTSet — SH= override
   { 71, false, 0 },   // Vset — VS= override (TASK-1831)
@@ -3092,6 +3093,36 @@ static unsigned long applyResponseModifiers(unsigned long response) {
   return response;
 }
 
+// TASK-1842: the PIC's GetPercentArg (gateway.asm GetPosFloat :5114-5117 + GetFloat :5118-5185, GetPercent
+// :5099-5112) as an f8.8 value. An integer part of 0-255 digits, an optional '.' and digits: the first two
+// fraction digits are kept, the third rounds (:5138-5159), further digits are checked but ignored; the hundredths
+// become 1/256 steps rounded UP when not exact (:5169-5178, "the honeywell thermostat always rounds down").
+// No sign other than '+'; above 100.00 is OR. Returns nullptr on success, else the PIC error code.
+// --- otdPicPercentF88 begin
+static const char* otdPicPercentF88(const char* s, uint16_t &out) {
+  if (*s == '+') s++;
+  if (*s < '0' || *s > '9') return "SE";
+  unsigned ip = 0;
+  while (*s >= '0' && *s <= '9') { ip = ip * 10 + (unsigned)(*s - '0'); if (ip > 255) return "OR"; s++; }
+  unsigned h = 0;
+  if (*s == '.') {
+    s++;
+    for (uint8_t n = 0; *s; n++, s++) {
+      if (*s < '0' || *s > '9') return "SE";
+      if (n < 2) h = h * 10 + (unsigned)(*s - '0');
+      else if (n == 2 && *s >= '5') h++;
+    }
+  } else if (*s) {
+    return "SE";
+  }
+  if (h >= 100) { ip++; h -= 100; }                  // Divide100 carry (:5170-5172)
+  if (ip > 100 || (ip == 100 && h > 0)) return "OR";  // GetPercent: above 100.00
+  const unsigned frac = (h * 256u + 99u) / 100u;     // round up when not exact
+  out = (uint16_t)((ip << 8) | frac);
+  return nullptr;
+}
+// --- otdPicPercentF88 end
+
 // ---------------------------------------------------------------------------
 // handleOTDirectCommand — translate PIC-style commands to OT frames
 // Called from sendPICSerial() when HAS_DIRECT_OT is enabled.
@@ -3268,6 +3299,26 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       setOverride(16, f88);
     }
     dtostrf(temp, 1, 2, rspBuf);
+    synthesizeResponse(buf, rspBuf);
+  }
+  // RT=xx.xx — Room temperature for the boiler (MsgID 24 = Tr), PIC 6.8 (gateway.asm SetRoomTemp
+  // :4300-4309, MessageID24 :3061-3068, tests/heatpump-1.stc RT=25.41 -> R10181969). Some heat pumps
+  // control on room setpoint and room temperature. Like BS= for MsgID 16, nothing is sent at once:
+  // the thermostat's own WRITE of MsgID 24 gets the RT value (applyOverrides; the thermostat gets
+  // WRITE_ACK with its own data, buildOverriddenReply), and without a thermostat the schedule's
+  // MsgID 24 write entry sends it. RT=0 stops it (NoFakeRoomTemp). Parsed as the PIC's
+  // GetPercentArg (otdPicPercentF88); the reply prints the stored value with two decimals.
+  else if (cmd0 == 'R' && cmd1 == 'T') {
+    uint16_t f88 = 0;
+    const char* err = otdPicPercentF88(value, f88);
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
+    if (f88 == 0) {
+      clearWriteOverride(24);
+    } else {
+      setOverride(24, f88);
+      updateWriteCache(24, f88);
+    }
+    dtostrf(f88 / 256.0f, 1, 2, rspBuf);
     synthesizeResponse(buf, rspBuf);
   }
   // C2=xx.x — Control setpoint CH2 (MsgID 8 = TsetCH2). Value 0 clears.

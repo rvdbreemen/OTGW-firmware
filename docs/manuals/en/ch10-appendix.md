@@ -468,6 +468,7 @@ These are the commands sent by the firmware to the PIC co-processor over UART (o
 | `PR=O` | Query current setpoint override |
 | `RS=HBS` | Reset burner start counter (replace HBS with counter code) |
 | `MM=xx` | Set maximum modulation level (%) |
+| `RT=xx.xx` | Room temperature for the boiler (MsgID 24), for heat pumps that control on room setpoint and room temperature. A thermostat's own MsgID 24 write is sent to the boiler with this value; without a thermostat the gateway sends it itself. 0 to 100.00, `RT=0` stops it. PIC firmware 6.8 and OT-Direct |
 | `OT=xx.xx` | Override outside temperature reported to boiler |
 
 ---
