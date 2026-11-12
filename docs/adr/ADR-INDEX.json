@@ -9073,7 +9073,7 @@
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "Decide the PWM rule from satGetEffectiveHeatingSource(), not from a detected source.",
+          "Decide the PWM rule from the configured heat source (satGetEffectiveHeatingSource() with A on Q-1817d), not from a detected source.",
           "Put every PWM tick on a gas boiler in the warm-up phase, whatever its PID error.",
           "Keep reason=pwm for PWM ticks of a heat pump or a hybrid, and keep counting their pwmTicks.",
           "Keep the signal of a PWM tick as the PID request before the PWM override."

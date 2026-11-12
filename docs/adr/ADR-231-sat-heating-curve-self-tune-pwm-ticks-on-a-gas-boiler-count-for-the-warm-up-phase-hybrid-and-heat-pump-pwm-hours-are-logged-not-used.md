@@ -38,11 +38,11 @@ format: "canonical"
 ## Status
 
 Proposed, 2026-11-12. Amends ADR-205 decision 2 (the clean-hour exclusions) and ADR-228 decision 1 (the phase per tick)
-for ticks in SAT PWM only; every other decision of both records stays in force. No code before the open question below
-is answered and Robert accepts this record.
+for ticks in SAT PWM only; every other decision of both records stays in force. Both open questions are answered by
+Sergeant D (entries 322, 323); no code before Robert accepts this record.
 
 **Decision Maker:** Sergeant D (SAT design owner) for the rule: entries 316, 318 and 319 of
-`docs/sat/sergeant-d-corrections.md`, plus the open question Q-1817c. Robert (maintainer) accepts or rejects this record;
+`docs/sat/sergeant-d-corrections.md`, and entries 322 (Q-1817c A) and 323 (Q-1817d A), 2026-11-12. Robert (maintainer) accepts or rejects this record;
 he chose Q-1796b B as well (DM msg 1570171160111620147, relayed by the coordinator, TASK-1817 description).
 
 ## Status History
@@ -107,12 +107,12 @@ On a gas boiler, a tick in SAT PWM is a warm-up tick of the self-tune, and the P
 hour; for a heat pump and a hybrid, a PWM tick keeps excluding the hour (`pwm`) and stays logged.
 
 1. **Heat source.** The rule follows `satGetEffectiveHeatingSource()` (`SATcontrol.ino:309-314`): `SAT_SRC_GAS_BOILER`
-   gets the PWM rule below; a heat pump and a hybrid keep `pwm` as an exclusion (entries 205 and 319). **Our design
-   choice, open (Q-1817d, option A):** `AUTO` resolves to gas boiler here as it does for control (TASK-943), so an
-   unconfigured heat pump or hybrid gets the gas rule.
+   gets the PWM rule below; a heat pump and a hybrid keep `pwm` as an exclusion (entries 205 and 319). `AUTO` resolves
+   to gas boiler here as it does for control (TASK-943), so an unconfigured heat pump or hybrid gets the gas rule
+   (entry 323, Q-1817d A).
 2. **Exclusions for a PWM tick on a gas boiler** (amends ADR-205 decision 2). The tick is not excluded for being in PWM.
-   **Our interpretation, open (Q-1817c, option A):** it is also not excluded for flame off while CH is on, nor for the
-   modulation at or below the minimum. SAT not active, hot water, the sun rule, lost room temperature, a coefficient
+   It is also not excluded for flame off while CH is on, nor for the modulation at or below the minimum (entry 322,
+   Q-1817c A). SAT not active, hot water, the sun rule, lost room temperature, a coefficient
    change and the minimum tick count keep excluding as before.
 3. **Phase** (amends ADR-228 decision 1). A PWM tick on a gas boiler goes to the warm-up phase whatever the PID error
    (entry 318). A tick outside PWM keeps the deadband rule.
@@ -125,8 +125,8 @@ hour; for a heat pump and a hybrid, a PWM tick keeps excluding the hour (`pwm`) 
 
 ### Must
 
-- Decide the PWM rule from the configured heat source (`satGetEffectiveHeatingSource()` with A on Q-1817d), not from a
-  detected source.
+- Decide the PWM rule from the configured heat source (`satGetEffectiveHeatingSource()`, AUTO = gas boiler, entry 323),
+  not from a detected source.
 - Put every PWM tick on a gas boiler in the warm-up phase, whatever its PID error.
 - Keep `reason=pwm` for PWM ticks of a heat pump or a hybrid, and keep counting their `pwmTicks`.
 - Keep the signal of a PWM tick as the PID request before the PWM override.
@@ -139,8 +139,7 @@ hour; for a heat pump and a hybrid, a PWM tick keeps excluding the hour (`pwm`) 
 
 ### Exceptions
 
-- Decision 2's skipping of `flame_off` and `min_mod` holds only after Sergeant D confirms Q-1817c A; with B, only the
-  `pwm` exclusion goes for a gas boiler.
+- None.
 
 ### Verification
 
@@ -151,8 +150,9 @@ hour; for a heat pump and a hybrid, a PWM tick keeps excluding the hour (`pwm`) 
 
 ## Alternatives Considered
 
-- **B: drop only the `pwm` exclusion.** Rejected as our advice: on the measured field data it gains 0 hours, so entry
-  316 would change nothing in practice. Still possible if Sergeant D answers Q-1817c B.
+- **B: drop only the `pwm` exclusion.** Rejected by Sergeant D (entry 322): on the measured field data it gains 0
+  hours, so entry 316 would change nothing in practice.
+- **AUTO as unknown, PWM hours excluded until a heat source is set** (Q-1817d B). Rejected by Sergeant D (entry 323).
 - **Split PWM ticks by the PID error** (Q-1817a option B). Rejected by Sergeant D (entry 318).
 - **Use the gas rule for hybrids** (Q-1817b option A, our advice then). Rejected by Sergeant D (entry 319).
 - **Do nothing.** Rejected: Robert and Sergeant D both chose B on Q-1796b; low-load gas houses never tune.
@@ -172,19 +172,21 @@ hour; for a heat pump and a hybrid, a PWM tick keeps excluding the hour (`pwm`) 
   (entry 316); the 3-day mean and the 0.1 step limit the effect of one such hour.
 - Hours with a mix of PWM and continuous ticks can still drop on `min_mod` from their continuous ticks (hours 8, 9 and 11
   of the measured night). That is the existing low-load rule, unchanged here.
-- With A on Q-1817d, an unconfigured heat pump or hybrid (`AUTO`) gets the gas rule and can learn from PWM hours it is
-  not designed for. Mitigation: the setup asks for the heat source; Q-1817d puts the choice to Sergeant D and Robert.
+- An unconfigured heat pump or hybrid (`AUTO`) gets the gas rule and can learn from PWM hours it is not designed for
+  (entry 323, accepted consequence). Mitigation: the setup asks for the heat source.
 
 ## Open Questions
 
-- [ ] Q-1817c (Sergeant D): for a PWM tick on a gas boiler, do `flame_off` and `min_mod` also not exclude the hour (A,
+- [x] Q-1817c (Sergeant D): for a PWM tick on a gas boiler, do `flame_off` and `min_mod` also not exclude the hour (A,
   our advice), or does only the `pwm` exclusion go (B)? Asked in #dev-sat-mqtt msg 1570334185896411147.
-- [ ] Q-1817d (Sergeant D, then Robert): with the heat source on `AUTO`, does the tuner follow the control default and
+  — **Answered 2026-11-12 by Sergeant D (relayed by otgw-firmware-d3):** A. Sergeant D, #dev-sat-mqtt msg 1570335940474310677 (2026-11-12 07:14:23 UTC): "The answer is A" (entry 322). On a gas boiler a PWM tick also skips flame_off and min_mod; sun, hot water, lost room temperature, coefficient change and tick count still exclude.
+- [x] Q-1817d (Sergeant D, then Robert): with the heat source on `AUTO`, does the tuner follow the control default and
   treat the system as a gas boiler (A, our advice: one rule everywhere; `satGetEffectiveHeatingSource()` already gives
   AUTO the gas control path, TASK-943, because OpenTherm carries no reliable source signal), or does it treat AUTO as
   unknown and keep excluding PWM hours until the user picks a source (B: never learns from PWM data of an unconfigured
   heat pump, but an unconfigured gas boiler, the common case, gains nothing until it is set)? Not from Sergeant D's
   entries; our design choice so far.
+  — **Answered 2026-11-12 by Sergeant D (relayed by otgw-firmware-d3):** A. Sergeant D, #dev-sat-mqtt msg 1570336083177242756 (2026-11-12 07:14:57 UTC): "The answer is A" (entry 323). AUTO counts as a gas boiler for the self-tune as for control; an unconfigured heat pump or hybrid learns from PWM hours (accepted consequence).
 
 ## Related Decisions
 
