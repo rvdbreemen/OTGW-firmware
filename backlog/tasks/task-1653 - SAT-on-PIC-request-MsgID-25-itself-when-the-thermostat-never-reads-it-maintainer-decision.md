@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-05T07:00:00Z'
-updated_date: '2026-11-09T06:10:00Z'
+updated_date: '2026-11-12T04:57:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -41,4 +41,6 @@ Robert 2026-11-05: on a PIC installation whose thermostat never reads MsgID 25, 
 2026-11-05: In Review (Robert's rule): all self-verifiable ACs evidenced (host test 16/16, old 11 FAIL; published in alpha beta.98); the open AC3 bench half needs a PIC with a thermostat that skips MsgID 25 (field / hardware we lack). Not yet in a public beta: the 2-week clock starts at the first public beta that contains beta.97.
 
 2026-11-09 AC1/AC2 re-checked and ticked (system32-78, coordinator request, on dev 358273f98). AC1: opened in other-projects/otgw-6.6/gateway.asm: SetPrioMessage 4984-4995 (sets prioritymsgid + PriorityMsg, no EEPROM write), serial dispatch 'P' -> SetPrioMessage 3920-3926, CreateRequest/SendAltRequest 2386-2413 (an alternative only for a thermostat request of an ID UnknownMask marks unsupported; the request is replaced, no frame added), cleared by the matching boiler response 2430-2434: all as cited in the 11-05 research note. otmonitor-6.6: grep over its 21 .tcl files finds no PM (nor AA=/UI=), so otmonitor does not use the command. Research note precedes the implementation note (both 2026-11-05). AC2: SATpm25Poll.h:29-35: N = 20 s flow age (SAT_PM25_FLOW_AGE_MS), only after 300 s without a thermostat read of 25 (so never alongside the thermostat's own reads), only with an alternative slot seen in the last 120 s, 10 s hold-off after a fault edge, at most one PM=25 outstanding and at least 20 s apart; documented in docs/api/MQTT.md:353 (sat/pm25_no_slot) and the header. Rerun now: python -I tests/test_sat_pm25_poll.py -> Ran 16 tests, OK (spacing 20 s, fault hold-off, Data-Invalid answers, never-served case). Old-code red (11 FAIL) is the 11-05 record, not rerun. AC3 unchanged: the bench half needs a PIC with a thermostat that skips MsgID 25 or the TASK-1654 simulator.
+
+2026-11-12 maintainer decision (Robert, Discord DM, first-hand: author number3nl, user 384411356616720384): slot signature question (bot msg 1570246426003247188, 01:18 UTC) answered 'A' at 04:52:41 and 04:53:41 UTC (msgs 1570300278127984641, 1570300530331357285; two answers 'A' to two open questions, both A, the bot's 04:57 summary maps A to the slot signature). Decision: keep both alternative-slot signatures as built (1: T(X) then R(Y); 2: T(X) answered Unknown-DataID by the boiler), for PM=25 and PM=28. SATpm25Poll.h comment updated (comment only, ships with the next build).
 <!-- SECTION:NOTES:END -->

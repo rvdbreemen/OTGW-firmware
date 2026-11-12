@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:08:00Z'
-updated_date: '2026-11-12T04:06:00Z'
+updated_date: '2026-11-12T04:57:00Z'
 labels:
   - sat
   - opentherm
@@ -116,6 +116,8 @@ Check: the BSS delta in the build output (RAM: line) before/after.
 2026-11-12 otgw-firmware-d3, part C implemented (lane-1762b, local, not pushed): SATpm25Poll.h satPm28Decide() (gates as PM=25 with MsgID 28 not unsupported; return feed age >= 30 s; the same alternative-slot window 120 s and fault hold-off; no thermostat-quiet rule, per entry 296 interpretation). SATcontrol.ino satPm28PollStep() runs right after satPm25PollStep(): waits on picPrioSlotBusy()/pmChainBusy() so PM=25, PM=28 and the boot chain never have two priority messages outstanding; at most one PM=28 per 30 s. Reply path checked: B(28) after R(28) lands in state.otBus.feedTret via the processOT feed hook (OTGW-Core.ino ~6105-6112). REST counters pm28_sent/answered/unanswered; docs/api/MQTT.md. Implementation note (not a SAT behaviour change, so no Sergeant D question): order 25 then 28 in one pass, the 20 s / 30 s spacing gives PM=28 the free slot between PM=25 requests. Inherited open item: slot signature 2 (B Unknown-DataID) still waits for Robert's OK per SATpm25Poll.h; no OK found in 1653/1767 notes. Evidence: new tests/test_sat_pm28_poll.py 7 OK (about every 30 s answered, max 1 outstanding with PM=25 due too, idle when the thermostat reads 28, no slot, Unknown-DataID 28, PS/monitor/SAT off); on the pre-change SATcontrol.ino + SATpm25Poll.h 3 failures (no PM=28 ever). test_sat_pm25_poll 16 OK, test_pic_pm_chain 40 OK, test_sat_ot_loss 24 OK and test_sat_restart_quiet 20 OK (both got a satPm28PollStep stub). NOT run yet: the other SAT suites and evaluate --quick (killed by the low-memory reaper; to run in the coordinator's test slot before the push). AC3 needs a PIC capture with boiler + thermostat: field check.
 
 2026-11-12 shipped: origin/dev 6be2fa59b..f1bb2a000, zip 2.0.0-beta.200+f1bb2a0 posted #alpha-testing msg 1570288402668982272. Before the build: full run_tests.py 212/213 (test_stream_real_cbuf under -j 4, exit 0 alone, TASK-1854), evaluate --quick 86/0. Bench by 09 on .61 (old beta.197+4cafc97 vs new): OTA app+fs, githash f1bb2a0, bootcount 420 -> 422, health 200, MQTT, crashlog none, settings 164 unchanged; restored (settings diff 0). Evidence: 09 scratchpad b200/ (OLD-results.txt, NEW-results.txt, check200.py). Part C (beta.200, PM=28 on PIC boards) is host-proven only: .63 was not available before the 08:00 slot. AC3 (PIC capture with boiler + thermostat) and AC4 (SAT tick ret != 0.0 in the field) stay field checks; slot signature 2 question is with Robert (DM msg 1570246426003247188).
+
+2026-11-12 maintainer decision (Robert, Discord DM, first-hand: author number3nl, user 384411356616720384): slot signature question (bot msg 1570246426003247188, 01:18 UTC) answered 'A' at 04:52:41 and 04:53:41 UTC (msgs 1570300278127984641, 1570300530331357285; two answers 'A' to two open questions, both A, the bot's 04:57 summary maps A to the slot signature). Decision: keep both alternative-slot signatures as built (1: T(X) then R(Y); 2: T(X) answered Unknown-DataID by the boiler), for PM=25 and PM=28. SATpm25Poll.h comment updated (comment only, ships with the next build).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

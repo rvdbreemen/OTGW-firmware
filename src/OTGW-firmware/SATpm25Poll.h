@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATpm25Poll.h
-**  Version  : v2.0.0-beta.210
+**  Version  : v2.0.0-beta.211
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -64,7 +64,8 @@ struct SatPm25Bus {
 //     SendDefaultMsg ~2401-2403) and prints no R (R/A only through SetParity ~2492-2496), so signature 1 never shows then.
 //     The AA list starts as 116-123 (AlternativeCmd ~5479), but the PIC deletes each entry the boiler rejects
 //     (MsgUnsupported ~2446 DeleteAlt), so on a boiler without those counters it ends up empty.
-//     Signature 2 is a widening of the rule in the TASK-1653 notes (which name only signature 1) and waits for Robert's OK.
+//     Signature 2 is a widening of the rule in the TASK-1653 notes (which name only signature 1); Robert chose to keep both
+//     signatures (DM 2026-11-12, answer A, msg 1570300530331357285).
 static inline void satPm25NoteFrame(SatPm25Bus &b, char src, uint8_t type, uint8_t id, uint8_t valueLB,
                                     bool havePrev, char prevSrc, uint8_t prevId, uint32_t gapMs, uint32_t nowMs)
 {
