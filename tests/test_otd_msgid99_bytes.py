@@ -53,6 +53,7 @@ struct OpenTherm {
 };
 static unsigned long g_frames[16]; static int g_nframes = 0;
 static bool otCmdEnqueue(unsigned long f) { g_frames[g_nframes++] = f; return true; }
+static void otdPersistHW(char) {}   // TASK-1836: the HW= branch stores HW 0/1/A (not under test here)
 static unsigned long millis() { return 1000; }
 static void otDirectBridgeProcessStatus(const char* s) { printf("STATUS %s\n", s); }
 static void synthesizeResponse(const char* c, const char* v) { printf("REPLY %.2s: %s\n", c, v); }
