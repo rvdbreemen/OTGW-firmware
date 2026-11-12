@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.201
+**  Version  : v2.0.0-beta.202
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1115,6 +1115,7 @@ static void otdBootHandshake() {
 // ---------------------------------------------------------------------------
 // initOTDirect — called from setup() on OTGW32 builds
 // ---------------------------------------------------------------------------
+static void otdRestorePersistedCommands();   // TASK-1836, defined with the command handlers
 void initOTDirect() {
   DebugTln(F("OT-direct: Initializing direct GPIO OpenTherm..."));
 
@@ -1149,6 +1150,7 @@ void initOTDirect() {
     OTDDebugTf(PSTR("OT-direct: restored vent setpoint %u%% from settings\r\n"),
                settings.otd.iVentSetpoint);
   }
+  otdRestorePersistedCommands();   // TASK-1836: HW, SW, SH, IT, OH and the UI= list
 
   {
     const char* modeNames[] = { "bypass", "gateway", "monitor", "master" };
@@ -3060,6 +3062,70 @@ static unsigned long applyResponseModifiers(unsigned long response) {
 // are handled here — either translated to OpenTherm frames, applied to
 // local state, or acknowledged with a valid response.
 // ---------------------------------------------------------------------------
+// TASK-1836: the commands whose state the PIC keeps in EEPROM (SaveConfig: HW gateway.asm:4408,
+// SW/SH :4187-4188 and :4214-4215, IT/OH :4959-4965, UI/KI :4900-4905, SM, SB, MI, FS) write it to
+// settings.otd and mark the settings dirty; the deferred flush writes settings.ini, and
+// otdRestorePersistedCommands() applies it again at boot (the PIC restores it at reset, :1205-1240,
+// :1298-1324). A value that did not change marks nothing.
+// --- otdPersist begin
+static void otdPersistBool(bool &field, bool v) {
+  if (field != v) { field = v; settingsMarkDirty(); }
+}
+static void otdPersistFloat(float &field, float v) {
+  if (field != v) { field = v; settingsMarkDirty(); }
+}
+static void otdPersistU16(uint16_t &field, uint16_t v) {
+  if (field != v) { field = v; settingsMarkDirty(); }
+}
+// HW=0, 1 or A (any other character). HW=P is a one-off push and leaves the stored state (gateway.asm:4410-4412).
+static void otdPersistHW(char v) {
+  const uint8_t s = (v == '0') ? 0 : (v == '1') ? 1 : 0xFF;
+  if (settings.otd.iDhwOverride != s) { settings.otd.iDhwOverride = s; settingsMarkDirty(); }
+}
+// The UI= list as "5 6 70"; 16 Data-IDs of at most 3 digits fit sUnknownIds[64].
+static void otdPersistUnknownIds() {
+  char list[sizeof(settings.otd.sUnknownIds)];
+  size_t n = 0;
+  list[0] = '\0';
+  for (uint8_t i = 0; i < otUnknownIdCount; i++) {
+    const int w = snprintf(list + n, sizeof(list) - n, n ? " %u" : "%u", (unsigned)otUnknownIds[i]);
+    if (w < 0 || (size_t)w >= sizeof(list) - n) break;
+    n += (size_t)w;
+  }
+  if (strcmp(list, settings.otd.sUnknownIds) != 0) {
+    strlcpy(settings.otd.sUnknownIds, list, sizeof(settings.otd.sUnknownIds));
+    settingsMarkDirty();
+  }
+}
+// --- otdPersist end
+
+// TASK-1836: apply the stored command state at boot, as the PIC does after a reset. SW/SH are
+// re-sent to the boiler (gateway.asm:1218-1229) through the same write path as the commands;
+// HW=A keeps the boot default; the UI= list marks its Data-IDs unknown again and disables their
+// schedule entries, as the UI= handler does.
+// --- otdRestorePersistedCommands begin
+static void otdRestorePersistedCommands() {
+  if (settings.otd.iDhwOverride == 1) { otMasterStatusFlags |= 0x02;  otDHWOverride = 1; }
+  else if (settings.otd.iDhwOverride == 0) { otMasterStatusFlags &= ~0x02; otDHWOverride = 0; }
+  if (settings.otd.fDhwSetpoint > 0.0f)   enqueueWriteCommand(56, floatToF88(settings.otd.fDhwSetpoint), "SW-boot");
+  if (settings.otd.fMaxChSetpoint > 0.0f) enqueueWriteCommand(57, floatToF88(settings.otd.fMaxChSetpoint), "SH-boot");
+  otIgnoreTransitions = settings.otd.bIgnoreTransitions ? 1 : 0;
+  otOverrideHB        = settings.otd.bOverrideHB ? 1 : 0;
+  const char* p = settings.otd.sUnknownIds;
+  while (*p && otUnknownIdCount < OT_UNKNOWN_ID_MAX) {
+    char* end = nullptr;
+    const long id = strtol(p, &end, 10);
+    if (end == p) { p++; continue; }
+    p = end;
+    if (id < 0 || id > 127 || isUnknownId((uint8_t)id)) continue;
+    otUnknownIds[otUnknownIdCount++] = (uint8_t)id;
+    for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+      if (otSchedule[i].msgId == (uint8_t)id) { otSchedule[i].disabled = true; break; }
+    }
+  }
+}
+// --- otdRestorePersistedCommands end
+
 bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   otdWriteRefused = false;
   if (diagRec.active) diagRec.recOtdCommand(buf, (size_t)len);   // TASK-1665 (ADR-213)
@@ -3205,6 +3271,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       enqueued = enqueueWriteCommand(56, f88, "SW");
     }
     if (enqueued) {
+      otdPersistFloat(settings.otd.fDhwSetpoint, temp);   // TASK-1836: SaveConfig, re-sent at boot
       dtostrf(temp, 1, 2, rspBuf);
       synthesizeResponse(buf, rspBuf);
     }
@@ -3220,6 +3287,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       enqueued = enqueueWriteCommand(57, f88, "SH");
     }
     if (enqueued) {
+      otdPersistFloat(settings.otd.fMaxChSetpoint, temp);   // TASK-1836: SaveConfig, re-sent at boot
       dtostrf(temp, 1, 2, rspBuf);
       synthesizeResponse(buf, rspBuf);
     }
@@ -3312,6 +3380,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       otDHWOverride = 0xFF;
       v = 'A';
     }
+    if (v != 'P') otdPersistHW(v);   // TASK-1836: SaveConfig; HW=P leaves the stored state
     rspBuf[0] = v; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }
@@ -3344,7 +3413,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       otMasterStatusFlags &= ~0x20;
       otSummerMode = false;
     }
-    settings.otd.bSummerMode = otSummerMode;
+    otdPersistBool(settings.otd.bSummerMode, otSummerMode);   // TASK-1836: SaveConfig
     rspBuf[0] = value[0]; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }
@@ -3803,6 +3872,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     if (!isUnknownId(msgId)) {
       if (otUnknownIdCount >= OT_UNKNOWN_ID_MAX) { otDirectBridgeProcessStatus("NS"); return false; }
       otUnknownIds[otUnknownIdCount++] = msgId;
+      otdPersistUnknownIds();   // TASK-1836
     }
     // Also disable from schedule so we stop polling it
     for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
@@ -3818,6 +3888,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     for (uint8_t i = 0; i < otUnknownIdCount; i++) {
       if (otUnknownIds[i] == msgId) {
         otUnknownIds[i] = otUnknownIds[--otUnknownIdCount];
+        otdPersistUnknownIds();   // TASK-1836
         break;
       }
     }
@@ -3856,7 +3927,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // SB=xx.x — Setback temperature (used when thermostat disconnects)
   else if (cmd0 == 'S' && cmd1 == 'B') {
     otSetbackTemp = constrain(atof(value), 1.0f, 30.0f);
-    settings.otd.fSetbackTemp = otSetbackTemp;  // persist to settings
+    otdPersistFloat(settings.otd.fSetbackTemp, otSetbackTemp);   // TASK-1836: persist (marks dirty)
     dtostrf(otSetbackTemp, 1, 2, rspBuf);
     synthesizeResponse(buf, rspBuf);
   }
@@ -3864,6 +3935,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   else if (cmd0 == 'I' && cmd1 == 'T') {
     if (!checkBoolean(value)) { otDirectBridgeProcessStatus("BV"); return false; }
     otIgnoreTransitions = (value[0] == '1') ? 1 : 0;
+    otdPersistBool(settings.otd.bIgnoreTransitions, otIgnoreTransitions != 0);   // TASK-1836
     rspBuf[0] = '0' + otIgnoreTransitions; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }
@@ -3871,6 +3943,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   else if (cmd0 == 'O' && cmd1 == 'H') {
     if (!checkBoolean(value)) { otDirectBridgeProcessStatus("BV"); return false; }
     otOverrideHB = (value[0] == '1') ? 1 : 0;
+    otdPersistBool(settings.otd.bOverrideHB, otOverrideHB != 0);   // TASK-1836
     rspBuf[0] = '0' + otOverrideHB; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }
@@ -3902,7 +3975,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     uint16_t val = atoi(value);
     if (val < 100 || val > 1275) { otDirectBridgeProcessStatus("OR"); return false; }
     otMinIntervalMs = val;
-    settings.otd.iMsgInterval = val;
+    otdPersistU16(settings.otd.iMsgInterval, val);   // TASK-1836: SaveConfig (gateway.asm:4610-4611)
     // TASK-440: PIC SetInterval/PrintInterval reports milliseconds, not
     // centiseconds. Internally PIC stores 5ms ticks but echoes ms.
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u"), val);
@@ -3912,7 +3985,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   else if (cmd0 == 'F' && cmd1 == 'S') {
     if (!checkBoolean(value)) { otDirectBridgeProcessStatus("BV"); return false; }
     otFailSafeEnabled = (value[0] == '1');
-    settings.otd.bFailSafe = otFailSafeEnabled;
+    otdPersistBool(settings.otd.bFailSafe, otFailSafeEnabled);   // TASK-1836: SaveConfig (gateway.asm:5300)
     rspBuf[0] = value[0]; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }

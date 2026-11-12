@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.201
+**  Version  : v2.0.0-beta.202
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -488,6 +488,13 @@ bool writeSettings(bool show)
   writeJsonBoolKV(file, F("OTDautobypass"), settings.otd.bAutoBypass);
   writeJsonBoolKV(file, F("OTDfreeventenable"), settings.otd.bFreeVentEnable);
   writeJsonIntKV(file, F("OTDventsetpoint"), settings.otd.iVentSetpoint);
+  // TASK-1836: command state the PIC keeps in EEPROM
+  writeJsonIntKV(file, F("OTDdhwoverride"), settings.otd.iDhwOverride);
+  writeJsonFloatKV(file, F("OTDdhwsetpoint"), settings.otd.fDhwSetpoint);
+  writeJsonFloatKV(file, F("OTDmaxchsetpoint"), settings.otd.fMaxChSetpoint);
+  writeJsonBoolKV(file, F("OTDignoretransitions"), settings.otd.bIgnoreTransitions);
+  writeJsonBoolKV(file, F("OTDoverridehb"), settings.otd.bOverrideHB);
+  writeJsonStringKV(file, F("OTDunknownids"), settings.otd.sUnknownIds);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)
@@ -1332,6 +1339,16 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("OTDautobypass")) == 0)      settings.otd.bAutoBypass = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDfreeventenable")) == 0)  settings.otd.bFreeVentEnable = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDventsetpoint")) == 0)    settings.otd.iVentSetpoint = (uint8_t)constrain(atoi(newValue), 0, 100);
+  // --- TASK-1836: command state the PIC keeps in EEPROM ---
+  else if (strcasecmp_P(field, PSTR("OTDdhwoverride")) == 0) {
+    const int v = atoi(newValue);
+    settings.otd.iDhwOverride = (v == 0 || v == 1) ? (uint8_t)v : 0xFF;
+  }
+  else if (strcasecmp_P(field, PSTR("OTDdhwsetpoint")) == 0)     settings.otd.fDhwSetpoint = clampSettingFloat(newValue, settings.otd.fDhwSetpoint, 0.0f, 127.0f);
+  else if (strcasecmp_P(field, PSTR("OTDmaxchsetpoint")) == 0)   settings.otd.fMaxChSetpoint = clampSettingFloat(newValue, settings.otd.fMaxChSetpoint, 0.0f, 127.0f);
+  else if (strcasecmp_P(field, PSTR("OTDignoretransitions")) == 0) settings.otd.bIgnoreTransitions = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTDoverridehb")) == 0)      settings.otd.bOverrideHB = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTDunknownids")) == 0)      strlcpy(settings.otd.sUnknownIds, newValue, sizeof(settings.otd.sUnknownIds));
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)

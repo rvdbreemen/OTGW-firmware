@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirecttypes.h
-**  Version  : v2.0.0-beta.201
+**  Version  : v2.0.0-beta.202
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -122,6 +122,14 @@ struct OTDirectSettingsSection {
   bool     bAutoBypass        = false; // Automatic bypass valve mode (OT MsgID 70 HB bit3)
   bool     bFreeVentEnable    = false; // Free ventilation mode (OT MsgID 70 HB bit4)
   uint8_t  iVentSetpoint      = 0;     // Ventilation setpoint 0-100% (OT MsgID 71 LB)
+  // --- TASK-1836: command state the PIC keeps in EEPROM (gateway.asm SaveConfig), restored at boot.
+  // Written by the commands only; not offered in GET/POST /api/v2/settings.
+  uint8_t  iDhwOverride       = 0xFF;  // HW= 0 or 1, 0xFF = A (thermostat decides); HW=P is not stored
+  float    fDhwSetpoint       = 0.0f;  // SW= DHW setpoint (MsgID 56), 0 = none
+  float    fMaxChSetpoint     = 0.0f;  // SH= max CH setpoint (MsgID 57), 0 = none
+  bool     bIgnoreTransitions = true;  // IT= (PIC default 1)
+  bool     bOverrideHB        = false; // OH= (OT-Direct default 0; the PIC default is TASK-1750)
+  char     sUnknownIds[64]    = "";    // UI= list, Data-IDs separated by a space (KI= removes)
 };
 
 // ADR-229 (TASK-1805): the status commands otdRelayedStatusHB() reads. Here, not in OTDirect.ino,
