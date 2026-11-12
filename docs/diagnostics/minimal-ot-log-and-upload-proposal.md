@@ -138,14 +138,41 @@ measured above. Retention 30 days.
 Terms of service and data-processing terms for storing third-party personal data were not checked for any
 candidate; that is part of the GDPR step below.
 
-### Abuse protection
+### Abuse protection and the per-device secret
 
-The firmware is public, so a shared upload key in the image leaks on the first download. Per device instead:
-at opt-in the gateway enrols with a beta invite code that the tester gets on request (revocable, for example
-handed out on Discord), and the Worker returns a device id plus a device secret. Each upload carries the
-device id and an HMAC over the body and a timestamp; the Worker checks the signature, refuses replays and
-old timestamps, caps the size and the rate per device, and writes only under that device's prefix. A device
-can never read or list data. Withdrawing consent deletes the prefix.
+The firmware is public, so a shared upload key in the image leaks on the first download. Every gateway
+needs its own secret, and where that secret comes from decides whether the HMAC means anything.
+
+- **Enrolment.** At opt-in the tester enters a beta invite code (handed out on request, for example on
+  Discord, revocable per code). The gateway generates an X25519 key pair itself and sends its public key
+  with the invite code to the Worker's `/enrol`. The Worker's public key is compiled into the firmware. Both
+  sides derive the same device secret by Diffie-Hellman, so **the secret never crosses the wire**. This
+  matters on plain HTTP: if the Worker sent a secret back, anyone on the path at enrolment would have it.
+  The Worker answers with a random device id (not the MAC) and stores id, public key, invite code and date.
+- **Storage on the gateway.** The private key and device id live in the settings as secrets: masked in
+  GET /api/v2/settings and in a settings backup (ADR-056), replaced before they enter a recording
+  (ADR-213 decision 6), and erased by a factory reset or when the tester switches the feature off.
+- **Each upload** carries the device id, a timestamp, a sequence number and an HMAC-SHA256 over all three
+  and the body. The Worker checks the signature, refuses an old timestamp or a sequence number it has
+  seen, caps size and rate per device, and writes only under that device's prefix. A device can never
+  read or list data.
+- **Revocation.** Three levels, all in the Worker's device table (Workers KV or D1): delete one device
+  (the tester withdraws consent: a signed "forget me" request from the gateway or a request to Robert;
+  the Worker also deletes the device's prefix in R2), revoke an invite code (every device enrolled with
+  it stops), or rotate the Worker key pair (every gateway must enrol again; a firmware update ships the new
+  public key).
+- **What a stolen gateway secret allows:** uploading junk under that one device id until it is revoked.
+  It never gives access to other testers' data, because nothing can be read through the Worker.
+
+### A forced-HTTPS day
+
+Cloudflare documents no guarantee that Workers on `workers.dev` keep answering plain HTTP; it only works
+today. The firmware must survive the day it stops: a 301 or 308 to `https://`, or any TLS-only answer,
+stops the upload (no retry loop, one log line per retry interval, TASK-1471 rules), the local log keeps
+running, and the web UI shows "upload unavailable". Fallbacks then, in order: move the Worker to a custom
+domain with "Always Use HTTPS" off (needs a domain on Cloudflare; the same zone setting could later be
+forced too), HTTPS through ADR-218 on PSRAM boards, or a LAN relay on any board. The upload URL is a
+setting with a firmware default, so a fallback needs no new firmware.
 
 ### Ranking
 
