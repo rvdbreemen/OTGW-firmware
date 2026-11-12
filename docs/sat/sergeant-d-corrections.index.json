@@ -4294,6 +4294,32 @@
     "TASK-1828"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 322,
+   "title": "Q-1817c A: on a gas boiler a PWM tick also skips the flame_off and min_mod exclusions of the self-tune (Sergeant D, 2026-11-12)",
+   "date": "2026-11-12",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570335940474310677",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1817"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 323,
+   "title": "Q-1817d A: for the self-tune, heat source AUTO counts as a gas boiler, as it does for control (Sergeant D, 2026-11-12)",
+   "date": "2026-11-12",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570336083177242756",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1817"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

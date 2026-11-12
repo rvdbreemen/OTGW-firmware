@@ -6805,3 +6805,31 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1828 (otgw-firmware-ba).
 
 **Open:** whether he prefers Greek words for ON/OFF; not asked again unless he raises it.
+
+## 322. Q-1817c A: on a gas boiler a PWM tick also skips the flame_off and min_mod exclusions of the self-tune (Sergeant D, 2026-11-12)
+
+**Source:** sergeantd, 2026-11-12 07:14:23 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1570335940474310677 (https://discord.com/channels/812969634638725140/1105556725714649128/1570335940474310677), a reply to Q-1817c (msg 1570334185896411147), asked for otgw-firmware-d3. Read first-hand by the comms session.
+
+**Quoted:** "@BlueFlame Bot The answer is A"
+
+**Settled:** on a gas boiler a PWM tick no longer drops its hour for the "flame_off" (heating on, flame off between pulses) or "min_mod" (modulation at or below the boiler minimum) exclusion, as well as "pwm" itself (exclusion names at SATcontrol.ino:6004-6009 on origin/dev). Sun, hot water, a lost room temperature and the tick count still exclude an hour. On gruijter's data of 10-11 Nov this lets 1 of the 2 full PWM hours count. This was our advice.
+
+**Checked against the recorded entries:** entries 316 and 318 (PWM hours count for warm-up on gas boilers): this makes them work in practice. Entry 319 (hybrids follow the heat-pump rule): unchanged, this applies to gas boilers only. Our own tuner, no thermo-nova citation (entry 298).
+
+**Task:** TASK-1817 (otgw-firmware-d3), with the new ADR for the PWM-hours rule (ADR-231).
+
+**Open:** nothing.
+
+## 323. Q-1817d A: for the self-tune, heat source AUTO counts as a gas boiler, as it does for control (Sergeant D, 2026-11-12)
+
+**Source:** sergeantd, 2026-11-12 07:14:57 UTC (time from the message id), #dev-sat-mqtt (channel 1105556725714649128), msg 1570336083177242756 (https://discord.com/channels/812969634638725140/1105556725714649128/1570336083177242756), a reply to Q-1817d (msg 1570335728708231269), asked for otgw-firmware-d3. Read first-hand by the comms session.
+
+**Quoted:** "@BlueFlame Bot The answer is A"
+
+**Settled:** with the heat source setting on AUTO, the self-tune treats the system as a gas boiler, so its PWM hours count for warm-up (entries 316, 318, 322). This matches control, where AUTO already resolves to a gas boiler (satGetEffectiveHeatingSource(), SATcontrol.ino:309-314 on origin/dev). Accepted consequence: an unconfigured heat pump or hybrid learns from PWM hours until the user picks a heat source. This was our advice.
+
+**Checked against the recorded entries:** entry 319 (a configured hybrid follows the heat-pump rule): unchanged, it applies once the user sets the heat source. Entry 205 (heat pumps: PWM hours logged, not used): applies to a configured heat pump. Our own tuner, no thermo-nova citation (entry 298).
+
+**Task:** TASK-1817 (otgw-firmware-d3), ADR-231.
+
+**Open:** nothing.
