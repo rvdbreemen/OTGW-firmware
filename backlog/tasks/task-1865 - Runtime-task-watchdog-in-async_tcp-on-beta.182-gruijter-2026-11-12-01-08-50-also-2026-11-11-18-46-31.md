@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:51:00Z'
-updated_date: '2026-11-12T12:53:00Z'
+updated_date: '2026-11-12T17:11:00Z'
 labels:
   - bug
   - crash
@@ -29,7 +29,7 @@ Found in gruijter's overnight capture (#alpha-testing msg https://discord.com/ch
 - [x] #1 The core dump coredump-20261111-213113.bin is decoded with the beta.182 .elf (app SHA ebfbbaf5) and the backtrace of the async_tcp watchdog is recorded
 - [x] #2 The backtrace is compared with the current dev code: the cause is named with file:line, or shown to be fixed already by a later commit
 - [ ] #3 Fix with a reproduction red on the old code and green on the fix, or close as fixed with the evidence of the commit that fixed it
-- [ ] #4 Bench by the bench-tester on .61: the TASK-1763 boot/interrupt load plus /api/v2/health polling, hd_ipc0_stack_min / hd_ipc1_stack_min reported per run (C), no task watchdog; result decides whether ADR-225 (A) goes to Robert
+- [x] #4 Bench by the bench-tester on .61: the TASK-1763 boot/interrupt load plus /api/v2/health polling, hd_ipc0_stack_min / hd_ipc1_stack_min reported per run (C), no task watchdog; result decides whether ADR-225 (A) goes to Robert
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -62,4 +62,12 @@ Decision (coordinator, 2026-11-12): B + C in one build now (beta.217); A (ADR-22
 Evidence B+C: tests/test_health_no_fs_flash_ops.py (4 tests: sendHealth body has no platformFSInfo/updateLittleFSStatus; doBackgroundTasks calls loopLittleFSStatus outside flashing; the real loopLittleFSStatus with the real safeTimers.h over 16 simulated minutes does 3 write probes and 13-16 mount checks, against 128 traversals from one tab's health polls before; device/info snapshot + emit of both ipc fields). Fix 4/4 OK; old code (origin/dev restAPI/helperStuff/OTGW-firmware.ino) 4/4 FAIL. Sweep: 51 tests slicing restAPI/helperStuff/OTGW-firmware.ino/sendHealth/device-info green (foreground, one at a time), test_dhw_water_meter 407 s and test_sat_lowload_contract 483 s green, evaluate --quick 92/0 failed/0 warnings.
 
 AC1 ticked: decoded against the beta.182 .elf (SHA match), backtraces of all 17 tasks in the 95 scratchpad t1865/decode.txt. AC2 ticked: compared with dev (restAPI.ino:3587 still had platformFSInfo in sendHealth; espMqttClient unchanged): the starvation path is named with file:line (restAPI.ino sendHealth -> platform_esp32.h:167 -> lfs_fs_size -> cache_utils.c:176, loopTask ready on the same core); the root of the lost ipc0 wakeup is a hypothesis (ADR-225 ipc1 overflow into ipc0's TCB tail) that C measures. AC3 stays open until the bench (new AC4): B removes the most frequent trigger from async_tcp, it is not proven to remove the hang.
+
+Bench (otgw-bench-tester 09, 2026-11-12, beta.217+84c3514 on .61, fwversion confirmed, settings changed: none): PASS on the pass criteria. 38 boots (32 quick with 30 s dwell, 6 with 10 min uptime; more than TASK-1763's 36), bootcount 483 -> 521, +1 per boot, all Software reset; 0 TWDT/panic/Guru/abort/Backtrace lines in telnet (136 loop stalls, max 689 ms), no new crashlog entry, lowest free heap 10912 B. Load alongside: Chrome with 2 v2-UI tabs across reboots, Firefox as constant WS client, telnet, device/info every 5 s, /health every 15 s.
+
+B (bench): /health 325 samples, littlefsMounted true in all, 0 non-200 outside reboot gaps. First 60 s after boot n=86 median 99 ms p95 314 max 1282; steady state n=227 median 98 p95 256 max 659 (p95 219 / max 443 without the 6 s before a reboot request). beta.182 median after a reboot was ~181 ms, so about half now. The 5-min write probe logs nothing on success and was not observed directly; at boot+300 s /health stayed 59-179 ms, no stall above 249 ms.
+
+C (bench): 74 ipc readings, never -1. ipc1 min free stack 80 B in every reading (baseline, 32 quick boots, 6 x 10 min boots at +60 s and +600 s, end at bc 521); ipc0 152-232 B, lowest 152. ipc1 constant: looks like a fixed path, not load-dependent. Reading (95): no ipc1 overflow on any of 38 boots, so the ADR-225 overflow hypothesis is NOT supported by this data, and not ruled out either (the beta.182 failure was not reproduced). 80 of 1024 B is a thin margin (TASK-1763 measured a 52 B overflow on another load), so ADR-225 (A) goes to Robert as a margin argument, not as a proven cause. AC4 ticked.
+
+Regression (bench): v2 UI loads with 0 console errors (b217/ui61-home.png); MQTT connected with fresh sat/* and otgw32/* publishes; settings save LEDblink false/true POST 200, on disk within 3 s, GET confirms, diff 0 (518 keys). Not verified: the write probe itself; the real beta.182 pattern (lost ipc0 wakeup during a cross-core flash read) was not reproduced, so 38 clean boots do not prove it gone; no A/B against older builds (no ipc fields there); no real OT bus load (no boiler); no steady state beyond 10 min. AC3 stays open: the host test shows the flash traversal leaves async_tcp (red old / green fix), but the hang itself needs field confirmation (gruijter on 217+). Evidence: C:\Users\rvdbr\AppData\Local\Temp\claude\d9c572fbc7f8e9ee\4f6ad420-bf33-4a3a-88bc-4eb9890a2231\scratchpad\b217 (run/events.log, boots.jsonl, health.csv, telnet-raw.txt, 61-ota.log, ui61-home.png).
 <!-- SECTION:NOTES:END -->
