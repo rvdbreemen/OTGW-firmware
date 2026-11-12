@@ -78,7 +78,11 @@ def build_source():
     clock = ""
     if "// --- otdClockReply end" in src:
         a = src.index("static uint32_t otSCLastCommandMs")
-        clock = src[a:src.index("// --- otdClockReply end")]
+        e = src.index("// --- otdClockReply end")
+        if "static uint16_t otdUpperBoundF88(" in src:   # TASK-1844: the slot answer also runs otdPicAnswer()
+            e = src.index("\n}\n", src.index("static uint16_t otdUpperBoundF88(")) + 3
+            clock = "static uint16_t otBoilerCache[128];\nstatic bool otBoilerCacheValid[128];\n"   # empty: default bounds
+        clock += src[a:e]
     parts = [ring, clock, msq.cut_braced(src, "static bool otCmdEnqueue(uint32_t frame)"),
              msq.cut_braced(src, "static void updateWriteCache(uint8_t msgId, uint16_t value)")]
     if "static void otdNoteCmdSent(" in src:

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:56:00Z'
-updated_date: '2026-11-12T06:03:00Z'
+updated_date: '2026-11-12T09:13:00Z'
 labels:
   - otdirect
   - parity
@@ -50,4 +50,6 @@ Banner decision (Robert, in session 2026-11-12), recorded above; final format 'P
 Evidence AC1 (for 6, 125, 56/57; MsgID 2 moved to TASK-1861) and AC2: tests/test_otd_pic_fixed_answers.py (5 tests; real otdPicAnswer with the real parity/buildOTResponse; PIC frames of otversion-1/2/4.stc: AC07D0300, AC07D0300, A407D0433; source checks of the three call sites incl. the slot and UI= paths). Fix 5/5 OK; old code (origin/dev 61b69e037, identity stub) 4 FAIL, 1 ok (the pass-through case). Harnesses kept compiling: test_otd_mode_switch_queue_reset.py (slice extended to otdUpperBoundF88 + an empty boiler cache) and test/host/build_and_run_override_reply.ps1 (optional 'PIC fixed answers' anchor): green on the lane and on origin. All 39 tests that slice the touched code rerun after the final change: green. evaluate --quick 92 checks 0 failed.
 
 Open: AC3 bench with a slave simulator (needs a thermostat-side sim on the OT-Direct unit; .61 is in the release soak now). Note for the bench-tester: MsgID 125/6/56/57 answers are only observable with a thermostat (or sim) on the thermostat port.
+
+After the rebase onto 096056ce1 (d3's TASK-1855 otdNoteCmdSent): tests/test_otd_write_once.py also cut the alt-slot path at otdClockReply end and missed otdPicAnswer/otdUpperBoundF88; slice extended to otdUpperBoundF88 plus an empty boiler cache, as in test_otd_mode_switch_queue_reset.py. Green on the lane (2 tests OK) and on origin/dev 096056ce1 OTDirect.ino (2 OK). Bench note (coordinator): .61 has no thermostat or slave sim, so the MsgID 6/125/56/57 answers stay host-test evidence unless 09 can simulate (asked in the bench request).
 <!-- SECTION:NOTES:END -->
