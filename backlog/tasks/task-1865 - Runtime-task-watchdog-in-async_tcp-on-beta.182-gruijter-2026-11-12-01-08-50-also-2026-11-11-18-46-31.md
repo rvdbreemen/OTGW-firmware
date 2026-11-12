@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:51:00Z'
-updated_date: '2026-11-12T20:59:00Z'
+updated_date: '2026-11-12T22:50:00Z'
 labels:
   - bug
   - crash
@@ -74,4 +74,6 @@ Regression (bench): v2 UI loads with 0 console errors (b217/ui61-home.png); MQTT
 Published (95, 2026-11-12): pushed 22d269e0e..a7676dcc8 to dev; posted 2.0.0-beta.217+a7676dc (esp32-combo flash zip, 6315083 B) in #alpha-testing, Discord message 1570494289371205743. Confirm bench by 09 on a7676dc (src identical to the benched 84c3514): fwversion exact, version.hash flipped, /health 20/20 mounted, ipc0 232->184 / ipc1 80 B, 5 min no reboot/TWDT, settings diff 0 (09 scratchpad b217b/). .elf archived as OTGW-build-archive/2.0.0-beta.217+a7676dc.zip. AC3 open until field confirmation on 217+ (gruijter). ADR-225 (A) chosen by Robert (DM 1570489845019840593) goes as a separate task.
 
 2026-11-12 gruijter capture on beta.214+5d03c17 (before the 217 fix): two Task-watchdog resets, 14:06:20 (Reboots 99, transcript banner line 73267) and 17:58:20 (Reboots 100, line 216013); no backtrace in the capture, core dump HTTP 503, crashlog/reboot_log not in the upload; heap just before was healthy (14:05:50 51972 free / 29684 maxblk; 17:58:00 51860 / 31732), WS/MQTT drops 0. The capture cannot show whether these took the health/LittleFS path. gruijter asked to update to 218 and send /api/v2/device/crashlog + reboot_log.txt on a new reset. Source https://discord.com/channels/812969634638725140/1514720723980259460/1570542193934860348
+
+2026-11-12 (comms): second field unit for confirming the fix: cmdr_langers (Ideal Logic 35, Wiser HubR, PIC 6.8) asked to run beta.218 with Nightly Restart off and send crashlog + reboot_log.txt on an unexpected restart (#english-support msg 1570571315977527407); see TASK-1544 note.
 <!-- SECTION:NOTES:END -->

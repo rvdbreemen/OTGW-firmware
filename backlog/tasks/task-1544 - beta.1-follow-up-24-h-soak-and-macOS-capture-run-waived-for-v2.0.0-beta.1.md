@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T15:47:00Z'
-updated_date: '2026-11-11T05:24:00Z'
+updated_date: '2026-11-12T22:50:00Z'
 labels:
   - beta
   - release
@@ -41,4 +41,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: verification only 
 2026-11-06 15:00 .63 (Classic + S3 Mini, beta.95+1fbd5cf): uptime 1(d)-00:03, bootcount 148 (unchanged since the soak start), mqttconnected true, crashlog available:false, reboot_log newest entries '2026-11-05 14:56:34 - reboot cause: Software reset (3)' and '2026-11-05 14:56:01 - ... [OTA] Rebooting...' (the beta.95 flash), nothing after: 24 h without a reboot.
 
 2026-11-11 (comms): capture-tool volunteer call (one volunteer per OS, beta.158 zip, 10-15 min run) posted in #alpha-testing on 2026-11-09 06:28 UTC, msg 1569237211789000751. No direct reply or volunteer to that post as of 2026-11-11 (checked the 68 later #alpha-testing messages via the bot REST API: no message references it, no reactions). Capture uploads that did arrive afterwards, not as replies to the call: tjfs 2026-11-09 (acknowledged in msg 1569333602137935873), thaghostnl 2026-11-10 two uploads on beta.170 (TASK-1786), gruijter 2026-11-10 20261110-100556-upload.zip on beta.167 (TASK-1787). The OS of those runs was not checked here, so this note does not close the per-OS check; macOS still has only the earlier run (#beta-testing 2026-11-08).
+
+2026-11-12 (comms): long-run volunteer cmdr_langers (Discord 695051073886355508), #english-support https://discord.com/channels/812969634638725140/931267109726593116/1570569541678010461: Nodoshop OTGW, PIC 6.8, S3, OLED; Ideal Logic 35 boiler; Wiser HubR 1st Gen thermostat; MQTT to HA via a separate broker; one week on 2.x without issues seen (Nightly Restart on). Asked (msg 1570571315977527407) to update to beta.218, switch Nightly Restart off, run capture --long-run for a day or more and post the zip, and send crashlog + reboot_log.txt on an unexpected restart.
 <!-- SECTION:NOTES:END -->
