@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-10T04:17:00Z'
+updated_date: '2026-11-12T04:08:00Z'
 labels:
   - bug
   - rest
@@ -26,3 +27,9 @@ Seen 2026-11-10 in the TASK-1757 reboot run on .61 (beta.167+e79e495): the first
 - [ ] #1 Reproduce: device/info polled from the first HTTP answer after a reboot shows bootcount 0 on the old code
 - [ ] #2 Fix: bootcount is correct from the first REST answer (e.g. read the count before startWebserver(), or report null until it is known); same reproduction shows no 0
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-12 bench confirmation (otgw-bench-tester), .61 OTGW32 on 2.0.0-beta.200+f1bb2a0: after POST /ReBoot, a 0.5 s poll of /api/v2/device/info gave (t after the request) 15.1 s -> bootcount 0, uptime 0; 15.8 s -> 433; 16.4 s -> 433. /reboot_count.txt held the real value. So the window is about 0.7 s from the first REST answer; the counter is not reset. The coordinator also saw bootcount 0 once during the 197/200 bench reboots.
+<!-- SECTION:NOTES:END -->
