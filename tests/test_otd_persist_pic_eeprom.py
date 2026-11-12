@@ -88,6 +88,8 @@ enum OpenThermMessageType { READ_DATA = 0, WRITE_DATA = 1 };
 typedef int OpenThermMessageID;
 #define OpenThermMessageType_WRITE_DATA 1
 enum { PUSH_IDLE = 0, PUSH_PENDING = 1 };
+static void otdPushStart() {}   // TASK-1845 push helpers the HW= branch calls (not under test here)
+static void otdPushEnd() {}
 static uint8_t otDHWPushState = PUSH_IDLE; static uint32_t otDHWPushStartMs = 0;
 static uint8_t otOperModeDHW = 0, otOperModeCH1 = 0, otOperModeCH2 = 0;
 static uint8_t otMasterStatusFlags = 0x01;
