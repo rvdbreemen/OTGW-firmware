@@ -230,7 +230,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-222 | Accepted | - | User Decision: on a board without PSRAM, BLE is off by default and no dialog appears after boot or when a page opens;... |
 | ADR-223 | Accepted | - | User Decision: in OT-Direct gateway mode, a TT= or TC= override is answer state only, as on the PIC: the gateway answ... |
 | ADR-224 | Accepted | - | In OT-Direct gateway mode the gateway reads MsgID 28 in the slot of a supported thermostat read, and answers that rea... |
-| ADR-225 | Proposed | - | Rebuild the ESP32-S3 framework libraries with CONFIGESPIPCTASKSTACKSIZE of at least 1280 (the IDF S3 default), using... |
+| ADR-225 | Accepted | - | Add src/OTGW-firmware/espipcstack.c, a copy of IDF components/espsystem/espipc.c at commit 9bb7aa84fe, the IDF inside... |
 | ADR-226 | Accepted | - | Add acorn (a JavaScript parser) and eslint-scope (scope analysis on its syntax tree) as pinned, test-only npm depende... |
 | ADR-228 | Accepted | `src/OTGW-firmware/SATcurveTune.h` | Each signal tick of the self-tune is assigned to the warm-up phase (\|PID error\| > 0.1 C) or the floating phase (\|PID... |
 | ADR-229 | Accepted | - | In OT-Direct gateway mode the relayed thermostat READDATA MsgID 0 gets bits 0, 1, 2, 4, 5 and 6 of its master status... |

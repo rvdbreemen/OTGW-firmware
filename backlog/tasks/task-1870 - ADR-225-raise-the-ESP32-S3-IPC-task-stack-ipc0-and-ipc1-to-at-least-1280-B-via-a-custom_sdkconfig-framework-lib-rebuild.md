@@ -1,13 +1,13 @@
 ---
 id: TASK-1870
 title: >-
-  ADR-225: raise the ESP32-S3 IPC task stack (ipc0 and ipc1) to at least 1280 B
-  via a custom_sdkconfig framework lib rebuild
+  ADR-225: raise the ESP32-S3 IPC task stack (ipc0 and ipc1) to 1280 B by
+  linking our own copy of IDF esp_ipc.c
 status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T18:15:00Z'
-updated_date: '2026-11-12T18:22:00Z'
+updated_date: '2026-11-12T19:47:00Z'
 labels:
   - firmware
   - build
@@ -25,11 +25,11 @@ Robert chose A on ADR-225 (DM 1570489845019840593, 2026-11-12, relayed by the co
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ADR-225 Accepted through the adr-kit gates (Completeness, Evidence, Clarity, Consistency), Robert's DM 1570489845019840593 recorded as the User Decision
+- [x] #1 ADR-225 Accepted through the adr-kit gates (Completeness, Evidence, Clarity, Consistency), Robert's DM 1570489845019840593 recorded as the User Decision
 - [ ] #2 Plan posted in #alpha-testing before the build tooling change lands (message link in the notes)
-- [ ] #3 platformio.ini sets CONFIG_ESP_IPC_TASK_STACK_SIZE >= 1280 through custom_sdkconfig for every S3 environment, with a gate that fails when it is removed (red on the old platformio.ini, green on the fix)
-- [ ] #4 Build evidence: IDF version and Arduino core sha unchanged (5.5.1, 9bb7aa84fe), full sdkconfig diff rebuild vs prebuilt showing only the intended change(s), RAM line before/after, build time and disk use measured, build.bat reproducible
-- [ ] #5 Bench by the bench-tester: hd_ipc0_stack_min / hd_ipc1_stack_min about 256 B higher than on beta.217 (ipc1 ~336 B), at least 12 /ReBoot cycles on .61 with a crashlog check per boot, and the filesystem OTA on .63 (Classic with PIC) repeated without an ipc0 panic
+- [ ] #3 src/OTGW-firmware/esp_ipc_stack.c is IDF esp_ipc.c at 9bb7aa84fe with only the OTGW-PATCH block changed (stack 1280 B, #error guards on IDF 5.5.1 and the prebuilt 1024), gated by tests/test_esp_ipc_override_gate.py: red on the code without the file, green on the fix, mutants red
+- [ ] #4 Build evidence: scripts/check_esp_ipc_override.py passes on the built ELF and map (stack argument 0x500, esp_ipc_init in __init_array, ipc_task code and literals in IRAM, IPC data in DRAM, no libesp_system.a(esp_ipc.c.obj)) and fails on the beta.217 ELF; RAM line before/after (about +512 B DRAM)
+- [ ] #5 Bench by the bench-tester: hd_ipc0_stack_min / hd_ipc1_stack_min about 256 B higher than on beta.217 on .61 and .63 (ipc1 ~336 B), at least 12 /ReBoot cycles on .61 with a crashlog check per boot, and the filesystem OTA on .63 (Classic with PIC) repeated without an ipc0 panic
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -42,4 +42,10 @@ Evidence from 09 on .63 (Classic with PIC, beta.217+a7676dc, evidence C:\Users\r
 Blocker found before any build (95, read-only, pioarduino 55.03.35 in D:\DevData\platformio\platforms/espressif32@src-17531e5e458e568c91320bf271c45c44/builder/frameworks): custom_sdkconfig (hybrid compile) writes into the SHARED package framework-arduinoespressif32-libs: espidf.py idf_lib_copy (~:2606-2651) copies the rebuilt .a, sdkconfig.h and memory.ld there and writes a root sdkconfig. After that, any build of an env without custom_sdkconfig (an unrebased lane, an older commit) takes arduino.py:645-648 check_reinstall_frwrk -> deletes both framework packages (:491-500) and downloads them again (platform.json:42, esp32-3.3.5-libs.tar.xz); the next custom build recompiles all IDF libs. Matching per project by sdkconfig.defaults line 1 '# TASMOTA__<md5(custom_sdkconfig+mcu)>' (arduino.py:616-642, espidf.py:695-711). Robert accepted the build cost, not this machine-wide effect, so the mechanism went to him (coordinator DM, options A custom_sdkconfig + lane rule, B separate PLATFORMIO_PACKAGES_DIR, C own esp_ipc.c copy linked ahead of the archive; recommendation C, fallback B).
 
 Checked in the local IDF 5.5.1 (framework-espidf 5.5.1.251215) and the prebuilt libs: esp_ipc.c:26-30 IPC_STACK_SIZE = CONFIG_ESP_IPC_TASK_STACK_SIZE, one task per core created in the loop at :114, so one value sets ipc0 and ipc1; Kconfig:662-668 S3 default 1280; prebuilt qio_qspi/include/sdkconfig.h:1099 = 1024. Feasibility of C: the archive member esp_ipc.c.obj (libesp_system.a, qio_qspi) exports only esp_ipc_call, esp_ipc_call_blocking, esp_ipc_call_nonblocking (nm T); init is esp_ipc_init, static with __attribute__((constructor)) (esp_ipc.c:104-106, .ctors + section startup.esp_ipc_init), so it registers only if the object is linked: if our object defines the three exported symbols, the archive member is never pulled and only our constructor runs. ipc_task is placed in IRAM by ESP_SYSTEM_IRAM_ATTR (= IRAM_ATTR because CONFIG_ESP_SYSTEM_IN_IRAM=1, sdkconfig.h:1069), not by an archive pattern in sections.ld (no esp_ipc entry), so the attribute carries over to our compile. To prove on a build: .map shows our esp_ipc object and no libesp_system.a(esp_ipc.c.obj); boot reports hd_ipc*_stack_min about +256 B. Open: whether the .ctors of our object runs at the same point as the IDF startup constructor (both are global constructors in do_global_ctors); IPC must be up before the first esp_ipc_call, which is the same requirement the original has.
+
+Mechanism C chosen by Robert (DM 1570519798071300168, relayed by the coordinator 2026-11-12), fallback B. Title and AC3-AC5 rewritten from custom_sdkconfig to the link override (old AC3/AC4 described the dropped mechanism). Source checks (95): esp_ipc.c at IDF 9bb7aa84fe fetched from GitHub is byte-identical to local framework-espidf 5.5.1.251215 (sha256 1429b684...414f); libs defines carry IDF_VER v5.5.1-931-g9bb7aa84fe while package.json says 5.5.0+sha.9bb7aa84fe, so the gate pins the commit and the hash, not the version number. Single-file cross-compile of esp_ipc_stack.c with the libs' own c_flags/defines/includes (-Os, no LTO): exit 0, same sections as the prebuilt member (.iram1.2 0xde, .iram1.2.literal, .text.startup.esp_ipc_init, .ctors, .dram1.0/.1), same 3 global symbols, esp_ipc_init loads movi a12, 0x500 (prebuilt 0x400). The project build adds -flto; whether ltrans keeps ipc_task and its literals in IRAM is checked on the built ELF by scripts/check_esp_ipc_override.py before any bench request (advisor: if it fails, take the file out of LTO, else fallback B).
+
+AC1 evidence: ADR-225 amended while Proposed (mechanism C, .63 ipc0 data 88 B and 1 in 9 FS writes, 1280-vs-more closed with numbers: worst overflow 52 B, lowest free 80/88 B, +256 B each), renamed to ADR-225-raise-the-esp32-s3-ipc-task-stack-to-1280-b-by-linking-our-own-copy-of-the-idf-esp-ipc-c.md; adr-quality 1.00 on Completeness, Evidence, Clarity, Consistency; adr accept --confirm signed 'User: Robert van den Breemen' with both DMs in the reason; adr-lint 0 FAIL; ADR-INDEX.md/.json and README regenerated with adr-index (230 ADRs, 0 duplicates).
+
+AC3 evidence so far (host): python tests/test_esp_ipc_override_gate.py -> Ran 10, OK (exit 0) on the fix; with OTGW_ESP_IPC_C pointing at a missing file (the code before ADR-225) -> FAILED (failures=2, skipped=5), exit 1. Mutants (stack 1024, upstream edit outside the block, missing IDF guard, stack from CONFIG_ESP_IPC_TASK_STACK_SIZE) each go red; CRLF checkout passes. ELF checker on the beta.217 ELF (OTGW-build-archive/2.0.0-beta.217+a7676dc.zip): 'FAIL IPC stack is 1024 B, want 1280 B (prebuilt esp_ipc.c.obj linked)', exit 1 (red reference for AC4). Telemetry for 09's per-phase question: boot line 'boot: ipc stack free min after hw detect ipc0= ipc1=' after the PIC probe, and ipc0min/ipc1min on every '[OTA] progress' line.
 <!-- SECTION:NOTES:END -->

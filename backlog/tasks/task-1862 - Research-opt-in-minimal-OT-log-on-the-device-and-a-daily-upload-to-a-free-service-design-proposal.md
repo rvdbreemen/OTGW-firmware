@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T06:32:00Z'
-updated_date: '2026-11-12T07:07:00Z'
+updated_date: '2026-11-12T19:48:00Z'
 labels:
   - diagnostics
   - research
@@ -51,4 +51,6 @@ Robert's research brief via the coordinator (2026-11-12, verbatim): 'Voor het fe
 Robert answered Q2 by DM (via coordinator, msgs 1570328825353609217 and 1570329291030270033, verbatim in the proposal): none of the batch-upload options; stream every log line to a cloud service, encrypted, HTTPS allowed. Streaming research in commit 14cb58c72: 2.46 frames/s per gateway makes a message per frame exhaust every free tier; lines keep their own timestamps and go in 10 s batches over one TLS connection. Compared (primary pricing pages, 2026-11-12): Cloudflare Worker+Durable Object+R2 (~230 gw), Grafana Cloud Loki (~300 gw, 14 d), InfluxDB Cloud (~135 gw, 30 d), AWS IoT Core (12 months free), Azure IoT Hub Free, Better Stack, EMQX Serverless, Google Pub/Sub (pricing page unreadable today). Streaming needs TLS: PSRAM boards only (ADR-218 PoC). Questions S1 (granularity, rec. 10 s batches), S2 (service, rec. Cloudflare DO+R2 EU, Loki fallback), S3 (non-PSRAM boards + ADR-218, rec. accept ADR-218, measure app-slot fit first) sent to the coordinator. Not verified: Grafana Free EU region choice and byte counting, DO duration under hibernation, app-slot fit of TLS + WebSocket client, DPAs.
 
 ADR numbering (coordinator, 2026-11-12): ADR-231 is reserved for d3 (TASK-1817). Any ADR this task needs (accepting ADR-218 for streaming, amending ADR-213 decision 1) asks the coordinator for the next number first (then ADR-232).
+
+Requirements from Robert in #dev-sat-mqtt (2026-11-12, relayed by the coordinator, recorded by otgw-firmware-95): (R1) EU hosting: 'I need to look at something that lands into a European server' (message 1570518857121271941). (R2) Explicit opt-in dialog: replying to Sergeant D's 'We need their permission first' (1570519191797112963), Robert: 'Yep it would be an opt in dialog' (1570520075755323554). Consequence for the ranking: only services that store the data in an EU region stay in; candidates without an EU data location drop out. Re-rank on that basis before the next proposal; the opt-in dialog becomes part of the onboarding/settings design, off by default.
 <!-- SECTION:NOTES:END -->

@@ -8737,12 +8737,12 @@
     },
     {
       "id": "ADR-225",
-      "title": "Raise the ESP32-S3 IPC task stack to at least 1280 B by rebuilding the Arduino framework libs with a custom sdkconfig",
-      "path": "ADR-225-raise-the-esp32-s3-ipc-task-stack-to-at-least-1280-b-by-rebuilding-the-arduino-framework-libs-with-a-custom-sdkconfig.md",
+      "title": "Raise the ESP32-S3 IPC task stack to 1280 B by linking our own copy of the IDF esp_ipc.c",
+      "path": "ADR-225-raise-the-esp32-s3-ipc-task-stack-to-1280-b-by-linking-our-own-copy-of-the-idf-esp-ipc-c.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-10",
-      "decision_summary": "Rebuild the ESP32-S3 framework libraries with CONFIGESPIPCTASKSTACKSIZE of at least 1280 (the IDF S3 default), using...",
+      "status": "Accepted",
+      "date": "2026-11-12",
+      "decision_summary": "Add src/OTGW-firmware/espipcstack.c, a copy of IDF components/espsystem/espipc.c at commit 9bb7aa84fe, the IDF inside...",
       "topics": [
         "boot-stability",
         "build",
@@ -8753,37 +8753,44 @@
       ],
       "aliases": [
         "CONFIG_ESP_IPC_TASK_STACK_SIZE",
-        "custom_sdkconfig",
+        "esp_ipc_stack.c",
+        "ipc0 panic during filesystem OTA",
         "ipc1 stack overflow",
         "TASK-1763 (a)"
       ],
       "components": [
-        "Build configuration of the ESP32-S3 framework libraries (IPC task stack size)"
+        "IPC task creation (src/OTGW-firmware/esp_ipc_stack.c, a copy of IDF esp_ipc.c)"
       ],
       "symbols": [
         "CONFIG_ESP_IPC_TASK_STACK_SIZE",
         "esp_ipc_call_blocking",
+        "esp_ipc_init",
         "gpio_install_isr_service",
-        "ipc_task"
+        "ipc_task",
+        "OTGW_IPC_TASK_STACK_SIZE"
       ],
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "Set CONFIGESPIPCTASKSTACKSIZE ≥ 1280 in the framework libraries linked into every S3 environment.",
-          "Prove the larger stack on the device for both ipc0 and ipc1: their high-water marks at boot (the beta.168 boot line \"boot: ipc stack free min ipc0=.. ipc1=.. B\").",
-          "Keep mitigation (b): the early GPIO ISR install in setup(), guarded by tests/testgpioisrearlyinstall.py.",
-          "Include the full sdkconfig diff, rebuild against prebuilt, in the change that adopts it."
+          "Link src/OTGW-firmware/espipcstack.c into every ESP32-S3 environment, with a stack of at least 1280 B for both IPC tasks.",
+          "Keep the file equal to IDF espipc.c at the pinned commit outside the OTGW-PATCH block, and keep its #error guards.",
+          "Copy the file again from the new IDF, and re-run the gates, whenever the pioarduino platform or the Arduino libraries move.",
+          "Prove each firmware build that adopts or changes it with scripts/checkespipcoverride.py on the ELF before it is flashed.",
+          "Keep mitigation (b): the early GPIO ISR install in setup(), guarded by tests/testgpioisrearlyinstall.py."
         ],
         "must_not": [
-          "Rely on include/sdkconfig.h for this value; it does not reach the precompiled IPC task.",
-          "Let the rebuild change other sdkconfig values without saying so."
+          "Rely on include/sdkconfig.h for this value; it does not reach the prebuilt IPC task.",
+          "Edit the copy outside the OTGW-PATCH block.",
+          "Rebuild the shared framework packages with customsdkconfig in the common PlatformIO directory."
         ],
         "exceptions": [
           "None."
         ],
         "verification": [
-          "Bench: at least 12 /ReBoot cycles on .61, with a crashlog check per boot. The old rate was 1 panic in 10 on beta.162. Read the ipc1 high-water mark before and after.",
-          "Build: the RAM line of the build output before and after, plus the sdkconfig diff."
+          "Host gate tests/testespipcoverridegate.py: fails when the file is missing (the code from before this ADR), when it differs from upstream outside the block, when the stack is below 1280, when a guard is missing, when the platform pin 55.0...",
+          "ELF check scripts/checkespipcoverride.py --elf [--map ]: the stack argument to xTaskCreatePinnedToCore in espipcinit is 0x500, espipcinit is in initarray, ipctask and all its literals are in IRAM, the IPC data is in internal DRAM, no IPC...",
+          "Bench by the bench-tester: hdipc0stackmin and hdipc1stackmin about 256 B higher than on beta.217 on .61 and .63; at least 12 /ReBoot cycles on .61 with a crashlog check per boot; the filesystem OTA on .63 repeated without an ipc0 panic....",
+          "Build: the RAM line of the build output before and after (512 B more internal DRAM expected)."
         ]
       },
       "scope": {
@@ -8791,7 +8798,7 @@
       },
       "metadata": {
         "binding": false,
-        "gate": null,
+        "gate": "tests/test_esp_ipc_override_gate.py",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
