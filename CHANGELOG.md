@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.203] - 2026-11-12
+
+### Added
+- SAT on a PIC board asks for the return temperature itself with `PM=28` when no valid MsgID 28 came for 30 s; it shares the PIC's priority slot with `PM=25` (Sergeant D entry 296; TASK-1759). REST SAT status: `pm28_sent`, `pm28_answered`, `pm28_unanswered`.
+- OT-Direct gateway mode reads MsgID 28 in a supported thermostat slot while SAT is on (ADR-224; TASK-1759).
+- `device/info` field `firmware_ota` (`direct`, `safeboot` or `usb`) (TASK-1819).
+- Web UI: Monitor > Graph in stacked panels like the 1.x graph, with switchable disconnect markers (TASK-1821); Monitor > Values grid view (TASK-1823); Light/Dark switch in the header (TASK-1830).
+
+### Changed
+- SAT heating curve self-tune: warm-up and floating phases, the coefficient changes only when both agree (ADR-228; Sergeant D entries 302-307; TASK-1796); the signal is clamped at the effective maximum, boiler MaxTSet included (entry 317; TASK-1815); the floating phase votes only with at least 1 hour of data over the counted days, `SATTUNED` gets `fvote=` (ADR-230; entries 313, 315; TASK-1816).
+- Web UI: the SAT Settings card no longer shows the target temperature; set it on the Home dial, MQTT or REST (entry 311; TASK-1814).
+- OT-Direct: `PR=A`, `PR=T` and `PS=1` answer in the PIC format (TASK-1797, TASK-1800); `HW=`, `CE=`, `H2=`, `SM=`, `BW=` set their bits in the relayed MsgID 0 (ADR-229; TASK-1805); `CE=`/`H2=` default on and `CL=0` holds 0 % (TASK-1833); `HW=P` as the PIC (TASK-1845); the PIC's EEPROM command state survives a reboot (TASK-1836).
+
+### Fixed
+- SAT: an early filesystem update no longer wipes the active preset, the energy total and the tune window (TASK-1771); the self-tune narration line fits its buffer (TASK-1796).
+- Web UI: Monitor > Values names follow a language switch (TASK-1820); Monitor > Graph axis in °C, translated window chips, Greek lane labels (TASK-1828).
+- OT-Direct: answers the gateway makes itself wait for the OpenTherm slave gate (TASK-1798); MsgID 99 byte order (TASK-1832); `VS=` in the low byte of MsgID 71 and kept as an override (TASK-1831); no own frames at boot outside master mode (TASK-1835); `GW=` for the running mode keeps the state (TASK-1839); `SC=` never writes MsgID 20 to the boiler (TASK-1840); loopback answers never count as a real boiler for SAT (TASK-1856).
+
 ## [2.0.0-beta.174] - 2026-11-11
 
 ### Added
@@ -854,7 +872,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.174...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.203...HEAD
+[2.0.0-beta.203]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.174...v2.0.0-beta.203
 [2.0.0-beta.174]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.170...v2.0.0-beta.174
 [2.0.0-beta.170]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.167...v2.0.0-beta.170
 [2.0.0-beta.167]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.162...v2.0.0-beta.167
