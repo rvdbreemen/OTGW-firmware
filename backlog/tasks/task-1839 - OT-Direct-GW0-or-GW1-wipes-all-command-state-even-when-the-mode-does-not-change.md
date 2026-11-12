@@ -1,0 +1,42 @@
+---
+id: TASK-1839
+title: >-
+  OT-Direct: GW=0 or GW=1 wipes all command state, even when the mode does not
+  change
+status: To Do
+assignee: []
+created_date: '2026-11-11T23:50:00Z'
+updated_date: '2026-11-12T00:10:00Z'
+labels:
+  - otdirect
+  - parity
+milestone: 2.0.0
+dependencies: []
+priority: high
+ordinal: 920000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+From the PIC 6.8 parity audit (N7), docs/reviews/2026-11-12_pic68-otdirect-parity-audit/REVIEW.md. G: = gateway.asm 6.8 (OTGW-other-projects/otgw-6.8, 770aa45); O: = src/OTGW-firmware/OTDirect.ino at fa5790118. Read from code and the PIC's own test scripts only; not reproduced on a bench.
+
+- PIC: SetGatewayMode only switches comparators and saves the mode; current mode = no-op (G:4729-4747, :4749-4774). CS, MM, HW, BW, SR=, UI=, TT/TC stay.
+- OT-Direct: every GW= -> setOTDirectMode -> applyOTDirectMode -> resetTransientState (O:3368-3416, :2735-2737, :2656-2728); no unchanged-mode check.
+- Consequence: a client sending GW=1 (settings help gives `PS=0;GW=1` as boot-command example) drops CS, HW=0, MM, SR=, UI=.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 GW=1 in gateway mode changes no state; host test red on current code
+- [ ] #2 decide and record (ADR or task note) what a real mode change keeps (PIC parity = everything except what ADR-223 flushes from the queue)
+- [ ] #3 host test for GW=0 then GW=1 with HW=0 and an SR= entry set
+<!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Not verified (from the audit): which resets master and loopback mode need for their own reasons.
+
+Part of the PIC 6.8 parity audit, parent TASK-1851.
+<!-- SECTION:NOTES:END -->

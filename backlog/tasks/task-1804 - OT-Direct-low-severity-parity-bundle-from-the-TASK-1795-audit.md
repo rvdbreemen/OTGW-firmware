@@ -4,7 +4,7 @@ title: 'OT-Direct: low-severity parity bundle from the TASK-1795 audit'
 status: To Do
 assignee: []
 created_date: '2026-11-11T06:41:00Z'
-updated_date: '2026-11-11T06:57:00Z'
+updated_date: '2026-11-12T00:07:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -32,4 +32,6 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-11 added from report E (area E, boiler cache and answer generation): (E-cand 5) SR= answers every matching thermostat frame with READ_ACK (OTDirect.ino:2203-2217 builds 4UL<<28), also a WRITE_DATA; the PIC's messageack returns the request's own type with the response bit, READ -> READ_ACK, WRITE -> WRITE_ACK (gateway.asm:2668-2677); spec v4.2 4.3.1: a WRITE-DATA is answered WRITE-ACK. (E-cand 6) A boiler Data-Invalid neither counts nor resets the Unknown-DataID strike counter (OTDirect.ino:1683-1686; reset only in the SUCCESS branch :1634-1637), while the PIC resets on every non-Unknown reply including Data-Invalid (MsgSupported gateway.asm:2455-2458); so Unknown, Unknown, Data-Invalid, Unknown blacklists on OT-Direct and not on the PIC, and the 'three consecutive' comment at :1788 is not strictly true. Fix the counter or the comment.
+
+PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-audit/REVIEW.md), section 3 'Corrections to existing tasks'. G: = gateway.asm 6.8 (OTGW-other-projects/otgw-6.8, 770aa45); O: = OTDirect.ino at fa5790118. Read from code only. Correction (MI item worded wrong): OT-Direct does not clamp MI; it rejects <100 with OR and echoes unrounded (O:3813-3822). PIC rounds to 5 ms first, so MI=99 answers `MI: 100` (G:4577-4615, tests/interval-1.stc).
 <!-- SECTION:NOTES:END -->

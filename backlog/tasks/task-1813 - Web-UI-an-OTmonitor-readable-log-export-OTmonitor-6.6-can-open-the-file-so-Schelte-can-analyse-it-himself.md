@@ -3,11 +3,11 @@ id: TASK-1813
 title: >-
   Web UI: an OTmonitor-readable log export (OTmonitor 6.6 can open the file, so
   Schelte can analyse it himself)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T12:59:00Z'
-updated_date: '2026-11-11T21:19:00Z'
+updated_date: '2026-11-12T00:14:00Z'
 labels:
   - webui
   - otmonitor
@@ -128,4 +128,12 @@ Static comparison with Schelte's OTmonitor master 715d3c0 (2026-11-11 21:19, 'Su
 Not verified: a 1.x ESP8266 log line sample (the commit names the ESP8266 firmware; I did not open a 1.x download), and OTmonitor actually reading either file with 715d3c0 (running it is Robert's call). Not a regression risk for AC3: the export uses case 23, which both 6.6 and 715d3c0 read.
 
 2026-11-11 ~22:40 Robert decided against the separate button: keep the plain log format, OTmonitor 715d3c0 reads it (see the static comparison above). The feature is reverted under a follow-up task; AC3 is moot. Do not close as Done for the feature.
+
+2026-11-12: closed as superseded by TASK-1822. Robert's decision (relayed by the coordinator, in session): no separate OTmonitor log download button; the plain web UI log format stays, and OTmonitor 715d3c0 reads it (see TASK-1822). The ACs of this task were not implemented and are left unticked on purpose.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Superseded by TASK-1822 (Robert's decision: no separate OTmonitor button; the plain log format is read by OTmonitor 715d3c0). Not implemented; ACs left unticked.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:38:00Z'
-updated_date: '2026-11-11T13:56:00Z'
+updated_date: '2026-11-12T00:08:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -52,6 +52,8 @@ Review (refute-only, opus): no format or store bug found. Fixed from it: a GW= m
 Bench before (.61 on beta.175): PS=1 -> 'PS: 1' and no summary line on port 25238 within 8 s; PS=2 -> 'PS: 2'. The bus on .61 is offline (no boiler, no thermostat), so no T/B frames flowed: the hiding of reports is not observable on this bench.
 
 Bench after (.61 on beta.178): PS=1 -> 'PS: 1' then exactly one line on port 25238 (33 commas, all zero: no boiler, no thermostat), none in the next 5 s; telnet: 'enterPSMode: PS mode auto-detected as ON (comma-separated summary)' and 'processPSSummary: PS=1 summary parsed: 34 fields (v5+ firmware)'; PS=2 -> 'PS: BV'; PS=0 -> 'PS: 0'. Note: the firmware leaves its PS mode on the first raw frame after PS=0 (OTGW-Core.ino:5753-5757), as on a PIC board; on .61 no frames flow, so telnet still shows 'PS: ON'. Not benched: values from a real boiler and the hiding of T/B frames (no bus traffic on .61).
+
+PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-audit/REVIEW.md), section 3 'Corrections to existing tasks'. G: = gateway.asm 6.8 (OTGW-other-projects/otgw-6.8, 770aa45); O: = OTDirect.ino at fa5790118. Read from code only. Correction (Done): each left a gap; filed as N3 and N12 instead of reopening. The gap is filed as TASK-1846 (N12: PS=1 MsgID 27 field shows the OT= value).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

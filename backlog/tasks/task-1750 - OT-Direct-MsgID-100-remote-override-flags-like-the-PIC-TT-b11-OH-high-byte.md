@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T09:28:00Z'
+updated_date: '2026-11-12T00:07:00Z'
 labels:
   - otdirect
   - needs-maintainer-ok
@@ -26,3 +27,9 @@ Follow-up of TASK-1733 / ADR-223 (found by the 2026-11-09 correctness review, ot
 - [ ] #1 Robert decides: keep 0x0002 or move to PIC parity (TT 0x03, OH= high byte)
 - [ ] #2 If parity: MsgID 100 answers match gateway.asm for TT=, TC= with OH on/off; host test red before, green after
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-audit/REVIEW.md), section 3 'Corrections to existing tasks'. G: = gateway.asm 6.8 (OTGW-other-projects/otgw-6.8, 770aa45); O: = OTDirect.ino at fa5790118. Read from code only. Correction (AC gap): description says OH defaults on, ACs do not. PIC default IgnoreErr1 and OverrideHigh set (G:5459) -> `PR: T=11` (tests/serial-2.stc). OT-Direct otOverrideHB=0 (O:535) -> T=10.
+<!-- SECTION:NOTES:END -->

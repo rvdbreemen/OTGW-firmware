@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-11T06:37:00Z'
+updated_date: '2026-11-12T00:07:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -29,3 +30,9 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 - [ ] #3 Host test against the real code (not a re-implementation): red on the old code, green on the fix
 - [ ] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-audit/REVIEW.md), section 3 'Corrections to existing tasks'. G: = gateway.asm 6.8 (OTGW-other-projects/otgw-6.8, 770aa45); O: = OTDirect.ino at fa5790118. Read from code only. Correction (incomplete): OT=+15.4 clears on OT-Direct (test `!isdigit && != '-'`, O:3141-3144). PIC accepts a leading + (GetFloat G:5118-5127) and documents that form (G:45).
+<!-- SECTION:NOTES:END -->
