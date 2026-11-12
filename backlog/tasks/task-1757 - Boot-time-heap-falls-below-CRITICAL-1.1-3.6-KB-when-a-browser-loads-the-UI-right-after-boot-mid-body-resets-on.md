@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:05:00Z'
-updated_date: '2026-11-12T03:25:00Z'
+updated_date: '2026-11-12T08:05:00Z'
 labels:
   - heap
   - bug
@@ -28,7 +28,7 @@ Fix idea for the plan only (not decided): hold back UI serving (e.g. 503 + Retry
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Reproduce with ONE normal browser tab loading the UI right after boot first (not the two-tab trace): windowed heap minimum per boot phase and any reset, on the current dev build
-- [ ] #2 Name which allocations in the boot window combine with UI serving to reach below CRITICAL, with evidence
+- [x] #2 Name which allocations in the boot window combine with UI serving to reach below CRITICAL, with evidence
 - [ ] #3 Fix agreed with Robert in the plan; after the fix the one-tab and two-tab boot runs stay above CRITICAL with 0 mid-body resets, with old-vs-fix numbers
 <!-- AC:END -->
 
@@ -62,4 +62,8 @@ AC2 MEASURED (2026-11-10 16:3x-16:50, .61 on 2.0.0-beta.171+a5da56b, OTA app+fs,
 2026-11-12 ~05:00, otgw-firmware-ba takes over (worktree wt-ba-heap, lane/ba-heap). Implements the decided C + B. C: onMqttConnect keeps only the birth, the set/# SUBSCRIBE and homeassistant/status; the rest goes through a stage tick in handleMQTT (MQTT_STATE_IS_CONNECTED, same task: espMqttClient UseInternalTask::NO, pumped from loop()): stage 1 the 6 V2 migration SUBSCRIBEs (v2MigrationSubscribed/Ms set only then), stage 2 version info, stage 3 PIC settings (up to 15 publishes on a Classic, own stage), stage 4 command_retry_exceeded + unsupported_msgids with clearBoilerUnsupportedDirty(). A stage runs only when the outbox is <= 2 deep AND the largest block is >= 20 KB (espMqttClient refuses below 16 KB, Config.h:31-32) AND >= 200 ms after the previous stage (AC2: dips last 50-150 ms); after 5 s waiting it runs anyway, so nothing is lost or stalls. Disconnect resets, the next connect starts at stage 1. connTraceSample() after each stage keeps the trace. The offline>threshold path (republish + non-OT discovery) stays unstaged: it never runs on a first boot. B: the discovery drip skips a tick while the outbox is > 8 deep, at most 5 ticks in a row, then publishes anyway (pure helper dripOutboxWait()). Evidence: host test compiling the real onMqttConnect + stage tick + helper (red on the old code: all packets queued inside onMqttConnect), then bench via the coordinator: >= 8 boots W/C alternating on the connect trace, against beta.171 (W min 2,916 B, C 21-24 KB).
 
 Implemented 2026-11-12 (lane/ba-heap, local, push freeze): connStage block in MQTTstuff.ino (connStageStart/Reset/Ready/Tick, called from MQTT_STATE_IS_CONNECTED, reset in onMqttDisconnect) and dripOutboxWait() in loopMQTTDiscovery after isDripDeferred(). Host test tests/test_mqtt_connect_staging.py compiles the real onMqttConnect + connStage block + dripOutboxWait: fix 6/6 OK (connect queues 3; portions 6/6/15/2 at t=200/400/600/800 ms in the healthy case; min gap 200 ms; stuck outbox + 10 KB block: first portion at 5 s, total 32, nothing lost; disconnect stops, reconnect restarts from migration; CSV before dirty clear; drip skips 5 then publishes, never on depth 8). Old code (origin/dev MQTTstuff.ino): 5 FAIL / 1 OK (connect queues 32 of 32; the reconnect test passes on both because everything goes at connect). Gates: evaluate --quick 92 checks 0 FAIL; run_tests --changed -j2: 21/21 files pass. Open: build + bench (AC3: >= 8 boots W/C on the connect trace vs beta.171) via the coordinator, after the UI batch.
+
+AC2 ticked 2026-11-12 from the beta.171 connect-trace above (match=1 in 4/4 boots): in the deciding W boot the dip is the HA/MQTT connect outbox (17 packets queued at CONNACK, then sent: free heap 42.9 KB -> 8.0 KB -> 2.9 KB, maxblk 5,620 B) on top of the browser's port-80 file sends (2 files in flight, 5,744 B TX) in the same 50-240 ms after CONNACK; C boots with the same outbox but no web sends stay at 21-24 KB.
+
+AC3 bench 2026-11-12 by otgw-bench-tester (09) on 2.0.0-beta.208+e449692 (fix C+B, beta.208), .61, 8 boots via /ReBoot, bootcount +1 each (449->457), reset reason Software each time, crashlog none. Min free heap in the connect phase: W (two real tabs) 22,328 / 28,136 / 21,108 / 17,024 B; C (no browser) 28,408 / 23,228 / 27,072 / 22,876 B. Old (beta.171, same trace): W 2,916 B, C 21-24 KB. MQTT after connect in all 8 boots: version, command_retry_exceeded (OFF), boiler/unsupported_msgids, 89-92 HA discovery configs (PIC settings n/a on .61). NOT yet run: the ONE-tab case named in AC3 (baseline beta.167 min 9,768 B); requested from 09 via the coordinator. AC3 stays open until that run.
 <!-- SECTION:NOTES:END -->
