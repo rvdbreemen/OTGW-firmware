@@ -1909,6 +1909,7 @@
     if (p === 'advanced') {
       var at = null; try { at = localStorage.getItem('otgw-v2-advtab'); } catch (e) { }
       showAdvTab(at || 'pic');
+      initPicTabGate();   // TASK-1843
     }
   }
 
@@ -1957,6 +1958,16 @@
   }
 
   // ---------- Advanced sub-tabs (TASK-982): PIC / Debug / File System / System ----------
+  // TASK-1843: without a PIC (OT-Direct) the PIC firmware tab has nothing to offer: hide it, and leave
+  // it for Debug Information when it was the open tab. Only a known answer decides (fetchPic/initPicTabGate).
+  function applyPicTabGate(isPic) {
+    var tab = document.querySelector('#advTabs .subtab[data-adv="pic"]'); if (!tab) return;
+    tab.hidden = !isPic;
+    if (!isPic && tab.classList.contains('active')) showAdvTab('debug');
+  }
+  function initPicTabGate() {
+    withDeviceInfo(function (d) { if (d && d.otcommandinterface !== undefined) applyPicTabGate((d.otcommandinterface || '') === 'PIC'); });
+  }
   function showAdvTab(k) {
     document.querySelectorAll('#advTabs .subtab').forEach(function (s) {
       s.classList.toggle('active', s.dataset.adv === k);
@@ -6046,6 +6057,7 @@
       }
       picGateRetries = 0;
       var isPic = (d.otcommandinterface || '') === 'PIC';
+      applyPicTabGate(isPic);
       if (wrap) wrap.style.display = isPic ? '' : 'none';      // hidden on OTGW32 / OT-Direct
       if (none) { none.style.display = isPic ? 'none' : ''; if (!isPic) none.textContent = t('adv.pic_none'); }
       var ssim = document.getElementById('sysSim'); if (ssim) ssim.classList.toggle('hidden', !simActive);
