@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T18:15:00Z'
-updated_date: '2026-11-12T20:25:00Z'
+updated_date: '2026-11-12T21:18:00Z'
 labels:
   - firmware
   - build
@@ -52,4 +52,8 @@ AC3 evidence so far (host): python tests/test_esp_ipc_override_gate.py -> Ran 10
 Firmware change committed locally on lane-95-1870 (not pushed, not built). Bump beta.218 is provisional: ba holds 218 and lane-95-1746 claims the next; re-bump at the final rebase to the number the coordinator assigns. Gates: python evaluate.py --quick -> 93 checks, 0 FAIL, 0 WARN, health 100%. python scripts/run_tests.py was stopped by Claude Code's memory-pressure reaper after 217 PASS (not restarted, per the reaper notice); its FAILED lines (test_dhw_water_meter, test_sat_pid_derivative, test_sat_lowload_contract, test_stream_real_cbuf, and 0.0 s kill artefacts test_ota_flash, test_webserver_listener_retry, test_refresh_storm) came from the killed run. Re-run one by one, all rc=0: test_ota_flash, test_webserver_listener_retry, test_refresh_storm, test_firmware_ota_path (7), test_fs_update_keep (38), test_gpio_isr_early_install (5), test_board_detect_persist_gate (7), test_esp_ipc_override_gate (10). Not re-run: dhw_water_meter, sat_pid_derivative, sat_lowload_contract, stream_real_cbuf (they do not read the changed files); a full suite run is still owed before the push.
 
 beta.219 lane (coordinator plan 2026-11-12): TASK-1746/1868 (lane-95-1746, 1e071a04b) and TASK-1870 (lane-95-1870, 364a52820) combined into ONE firmware commit on origin/dev 695ba6f4a+c97d93659 with one bump to beta.219 (branch lane-95-219b). Built by a per-file 3-way merge with the version banners normalized; check: the diff origin/dev..tree equals bc7c2400b..lane-95-219 (both lanes cherry-picked) line for line after filtering banners and stamps (767 lines each, identical). The 1870 ELF check gates the bench for both lanes.
+
+beta.219 build (95, 2026-11-12, lane-95-219b 9e3b0f38a on origin/dev c97d93659): build.bat in the foreground, cold .pio, 21:58:35-22:13:40 (15:05, moved to background after 600 s, exit 0), commit 79 % after ollama stop. Artifact D:/Users/Robert/Documents/GitHub/RvdB/wt-95w/build/OTGW-firmware-esp32-combo-2.0.0-beta.219+9e3b0f3-flash.zip (6,315,780 B), app .ino.bin 2,135,904 B (217: 2,135,328). ELF archived as OTGW-build-archive/2.0.0-beta.219+9e3b0f3.zip.
+
+AC4 ELF evidence: first checker run FAILED for the wrong reason: -flto renames statics with '$' (ipc_task$lto_priv$0, s_ipc_task_handle$lto_priv$0) and merges esp_ipc_init into the shared constructor _sub_I_65535_0$0, so the checker found no symbols. Checker fixed to split names on '.' and '$' and to find the creator as the function that loads ipc_task and calls xTaskCreatePinnedToCore. Result: beta.219 -> 'ipc_task creator: _sub_I_65535_0$0 at 0x42098640, stack argument 1280 (0x500)', found in __init_array (7 entries), ipc_task 0x4037579c with 11 literal loads, none outside IRAM, data in DRAM, no duplicate IPC functions, PASS exit 0; beta.217 -> creator esp_ipc_init 0x4209c0c4, stack 1024, FAIL exit 1. The LTO marker symbol esp_ipc_stack_c_ff1bed1d in the ELF shows our object is linked. Map check not run: the build leaves no firmware.map in .pio (only the ELF is kept). RAM: static .dram0.bss 94896 -> 94912 (+16 B), .dram0.data unchanged; the 2 x 256 B stack is heap (xTaskCreatePinnedToCore allocates it), so expect about 512 B less free heap after boot on the device.
 <!-- SECTION:NOTES:END -->
