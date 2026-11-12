@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.216
+**  Version  : v2.0.0-beta.217
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3174,6 +3174,8 @@ struct DeviceInfoSnap {
   uint32_t  freeHeap;
   uint32_t  maxFreeBlock;
   uint32_t  heapMinFree;         // TASK-1017: platformMinFreeHeap(), frozen (was a live read the closure would need)
+  int32_t   ipc0StackMin;        // TASK-1865: ipc0 / ipc1 stack free at its low point since boot, bytes (-1 = not found)
+  int32_t   ipc1StackMin;
   uint8_t   fragPct;
   uint16_t  pendingDiscoveryIds;
   int32_t   rssi;
@@ -3227,6 +3229,8 @@ void sendDeviceInfoV2()
   cmdQueueSnapshot(&snap->cq);
   snap->maxFreeBlock    = platformMaxFreeBlock();
   snap->heapMinFree     = platformMinFreeHeap();  // TASK-1017
+  snap->ipc0StackMin    = platformIpcStackHighWater("ipc0");  // TASK-1865: bytes free at the low point, -1 = not found
+  snap->ipc1StackMin    = platformIpcStackHighWater("ipc1");
   snap->fragPct         = getHeapFragmentation();
   snap->pendingDiscoveryIds = countPendingDiscoveryIds();
   snap->rssi            = WiFi.RSSI();
@@ -3478,6 +3482,8 @@ void sendDeviceInfoV2()
     je.field(F("hd_dip_mqtt_queue"),       (uint32_t)snap->st.heapdiag.iDipMqttQueue);
     je.field(F("hd_dip_mqtt_tx_bytes"),    (uint32_t)snap->st.heapdiag.iDipMqttTxBytes);
     je.field(F("hd_mqtt_queue_hwm"),       (uint32_t)snap->st.heapdiag.iMqttQueueHwm);
+    je.field(F("hd_ipc0_stack_min"),       snap->ipc0StackMin);   // TASK-1865 / ADR-225: IPC stack headroom
+    je.field(F("hd_ipc1_stack_min"),       snap->ipc1StackMin);
     je.field(F("hd_ack_low_min"),          snap->st.heapdiag.iAckLowMin == 0xFFFFFFFF ? 0u : snap->st.heapdiag.iAckLowMin);
     je.field(F("hd_ack_low_free_before"),  snap->st.heapdiag.iAckLowFreeBefore);
     je.field(F("hd_ack_low_hits"),         snap->st.heapdiag.iAckLowHits);
@@ -3576,16 +3582,8 @@ void sendDeviceInfoV2()
 // Returns: {"health": {"status": "UP", "uptime": "...", ...}}
 void sendHealth()
 {
-  // TASK-1205: the write probe (a flash write of /.health) runs at most once per
-  // 5 minutes, not on every health poll. In between, the read-only mount check
-  // still catches an unmounted filesystem, and a failed write probe keeps
-  // LittleFSmounted false until the next write probe.
-  DECLARE_TIMER_MIN(healthFsWriteProbe, 5, SKIP_MISSED_TICKS);
-  if (DUE(healthFsWriteProbe)) {
-    updateLittleFSStatus(F("/.health"));
-  } else if (LittleFSmounted) {
-    LittleFSmounted = platformFSInfo(LittleFSinfo);
-  }
+  // TASK-1865: no filesystem access here. The mount check and the write probe run on the loop task
+  // (loopLittleFSStatus(), helperStuff.ino); this handler runs on async_tcp and only reports the result.
 
   // ADR-141 / TASK-885: streaming JsonEmit replaces the JsonDocument path.
   // Booleans emit as real JSON booleans (the old hand-rolled map quoted them

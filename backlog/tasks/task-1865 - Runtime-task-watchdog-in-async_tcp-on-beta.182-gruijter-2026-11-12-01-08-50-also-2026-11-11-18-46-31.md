@@ -1,13 +1,14 @@
 ---
 id: TASK-1865
 title: >-
-  Runtime task watchdog in async_tcp on beta.182 (gruijter 2026-11-12 01:08:50,
-  also 2026-11-11 18:46:31)
+  loopTask starved into the task watchdog on beta.182: async_tcp stuck in a
+  cross-core flash read from /api/v2/health (gruijter 2026-11-12 ~01:08:21, also
+  2026-11-11 18:46:31)
 status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:51:00Z'
-updated_date: '2026-11-12T12:17:00Z'
+updated_date: '2026-11-12T12:53:00Z'
 labels:
   - bug
   - crash
@@ -25,9 +26,10 @@ Found in gruijter's overnight capture (#alpha-testing msg https://discord.com/ch
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The core dump coredump-20261111-213113.bin is decoded with the beta.182 .elf (app SHA ebfbbaf5) and the backtrace of the async_tcp watchdog is recorded
-- [ ] #2 The backtrace is compared with the current dev code: the cause is named with file:line, or shown to be fixed already by a later commit
+- [x] #1 The core dump coredump-20261111-213113.bin is decoded with the beta.182 .elf (app SHA ebfbbaf5) and the backtrace of the async_tcp watchdog is recorded
+- [x] #2 The backtrace is compared with the current dev code: the cause is named with file:line, or shown to be fixed already by a later commit
 - [ ] #3 Fix with a reproduction red on the old code and green on the fix, or close as fixed with the evidence of the commit that fixed it
+- [ ] #4 Bench by the bench-tester on .61: the TASK-1763 boot/interrupt load plus /api/v2/health polling, hd_ipc0_stack_min / hd_ipc1_stack_min reported per run (C), no task watchdog; result decides whether ADR-225 (A) goes to Robert
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -52,4 +54,12 @@ Second crash (2026-11-11 18:46:31): its dump was not found. The other local grui
 Separate observation, not the cause: every /api/v2/health call runs LittleFS.totalBytes() on async_tcp, a full lfs_fs_size traversal of the filesystem metadata with one cross-core flash read per block (a health call after the reboot took 181 ms). Each such read is a cross-core IPC flash operation, so health polling (every 15 s from the web UI) is the most frequent trigger of the path that hung. Current dev unchanged here: restAPI.ino:3587 still calls platformFSInfo in the health path; espMqttClient unchanged since c9f37bd (0 diff lines).
 
 Candidate directions (for the coordinator / Robert, nothing done): (A) ADR-225: rebuild the S3 framework libs with CONFIG_ESP_IPC_TASK_STACK_SIZE >= 1280 (root cause if the hypothesis holds; Proposed, build-heavy); (B) cache the LittleFS total/used bytes (refresh on write, or once a minute on the loop task) so /health does no flash traversal on async_tcp (removes the most frequent trigger, cheap, independent of A); (C) test the hypothesis: an ipc1 stack-watermark probe (uxTaskGetStackHighWaterMark on both ipc tasks in device/info) on the bench under the TASK-1763 reboot/interrupt load.
+
+Title changed (coordinator, 2026-11-12). Old title: 'Runtime task watchdog in async_tcp on beta.182 (gruijter 2026-11-12 01:08:50, also 2026-11-11 18:46:31)'. The decode showed the watchdog named loopTask, starved by async_tcp on the same core.
+
+Decision (coordinator, 2026-11-12): B + C in one build now (beta.217); A (ADR-225 lib rebuild) only after C confirms, its acceptance then goes to Robert. B: /api/v2/health does no LittleFS flash operation on async_tcp; the mount check (60 s, platformFSInfo) and the write probe (5 min, updateLittleFSStatus('/.health'), TASK-1205) moved to loopLittleFSStatus() (helperStuff.ino), called from doBackgroundTasks() when not flashing; sendHealth() only reports LittleFSmounted (LittleFSinfo's sizes are read nowhere, so the old 2 traversals per poll only refreshed that bool). Detection of an unmounted filesystem now takes up to 60 s instead of the next poll. C: device/info hd_ipc0_stack_min / hd_ipc1_stack_min from platformIpcStackHighWater() (TASK-1763 shim), frozen in the DeviceInfoSnap; the hd_* group is not in docs/api (existing undocumented diagnostics), so no API doc change.
+
+Evidence B+C: tests/test_health_no_fs_flash_ops.py (4 tests: sendHealth body has no platformFSInfo/updateLittleFSStatus; doBackgroundTasks calls loopLittleFSStatus outside flashing; the real loopLittleFSStatus with the real safeTimers.h over 16 simulated minutes does 3 write probes and 13-16 mount checks, against 128 traversals from one tab's health polls before; device/info snapshot + emit of both ipc fields). Fix 4/4 OK; old code (origin/dev restAPI/helperStuff/OTGW-firmware.ino) 4/4 FAIL. Sweep: 51 tests slicing restAPI/helperStuff/OTGW-firmware.ino/sendHealth/device-info green (foreground, one at a time), test_dhw_water_meter 407 s and test_sat_lowload_contract 483 s green, evaluate --quick 92/0 failed/0 warnings.
+
+AC1 ticked: decoded against the beta.182 .elf (SHA match), backtraces of all 17 tasks in the 95 scratchpad t1865/decode.txt. AC2 ticked: compared with dev (restAPI.ino:3587 still had platformFSInfo in sendHealth; espMqttClient unchanged): the starvation path is named with file:line (restAPI.ino sendHealth -> platform_esp32.h:167 -> lfs_fs_size -> cache_utils.c:176, loopTask ready on the same core); the root of the lost ipc0 wakeup is a hypothesis (ADR-225 ipc1 overflow into ipc0's TCB tail) that C measures. AC3 stays open until the bench (new AC4): B removes the most frequent trigger from async_tcp, it is not proven to remove the hang.
 <!-- SECTION:NOTES:END -->

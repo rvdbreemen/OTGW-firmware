@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.216
+**  Version  : v2.0.0-beta.217
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -207,6 +207,23 @@ bool updateLittleFSStatus(const char *probePath)
     LittleFSmounted = false;
   }
   return LittleFSmounted;
+}
+
+// TASK-1865: the LittleFS mount check and the write probe run here, on the loop task. They used to run in
+// sendHealth() on async_tcp, where every health poll did two full lfs_fs_size() traversals (one cross-core flash
+// read per block) only to refresh LittleFSmounted; a hang in such a flash read starved the loop task on the same core
+// into the task watchdog (core dump beta.182). Mount check every 60 s, the flash write probe every 5 minutes
+// (TASK-1205: a failed probe keeps LittleFSmounted false until the next probe). The caller skips it while flashing.
+void loopLittleFSStatus() {
+  DECLARE_TIMER_MIN(fsWriteProbe, 5, SKIP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(fsMountCheck, 60, SKIP_MISSED_TICKS);
+  if (DUE(fsWriteProbe)) {
+    updateLittleFSStatus(F("/.health"));
+    return;
+  }
+  if (DUE(fsMountCheck) && LittleFSmounted) {
+    LittleFSmounted = platformFSInfo(LittleFSinfo);
+  }
 }
 
 // PROGMEM overload for updateLittleFSStatus

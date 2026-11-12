@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.216
+**  Version  : v2.0.0-beta.217
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -214,6 +214,7 @@ bool dripDueWithinMs(uint32_t windowMs);  // true if drip fires within windowMs 
 void incrementStatusBurstPublishCount(); // called by status publishers on each real MQTT send
 bool updateLittleFSStatus(const char *probePath = nullptr);
 bool updateLittleFSStatus(const __FlashStringHelper *probePath);
+void loopLittleFSStatus();   // TASK-1865: mount check + write probe on the loop task, not in /api/v2/health
 // Longest reboot-log line incl. CRLF and NUL: a core-dump detail line with all 16 backtrace frames the ESP-IDF
 // summary holds is 236 chars ("Core dump: " + task (15) + pc + elf + "bt=" + 16 PCs + "!\r\n"; TASK-1538).
 #define REBOOT_LOG_LINE_MAX 240
