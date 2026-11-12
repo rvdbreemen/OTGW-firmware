@@ -1,11 +1,11 @@
 ---
 id: TASK-1868
 title: A plain /ReBoot is logged as 'Reboot after upgrade'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T12:46:00Z'
-updated_date: '2026-11-12T21:39:00Z'
+updated_date: '2026-11-12T23:04:00Z'
 labels:
   - bug
 milestone: 2.0.0
@@ -36,4 +36,12 @@ Implementation (95, 2026-11-12, same commit as TASK-1746): doRedirect(msg, wait,
 Evidence (host, real functions): tests/test_reboot_listener_and_reason.py: old code reports reason 'Reboot after upgrade' for /ReBoot and for reset wireless (2 FAIL); fix reports 'User reboot (/ReBoot)' and 'Reset wireless settings' (OK), the redirect page is still built. AC1 ticked. AC2 asks for 'a host test or bench check' on old and fix: the host test on the real doRedirect/reBootESP shows both, so AC2 ticked too; reboot_log.txt on the device after a /ReBoot is in 09's TASK-1746 bench as a confirmation.
 
 Bench .61 on 2.0.0-beta.219+9e3b0f3 by otgw-firmware-09 (2026-11-12): reboot_log shows 'User reboot (/ReBoot)' after 20/20 /ReBoot cycles. Evidence: C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/4f6ad420-bf33-4a3a-88bc-4eb9890a2231/scratchpad/b219/.
+
+Published in 2.0.0-beta.219+4274624 (dev 42746244d, Discord 1570574546984108183); bench .61: 'User reboot (/ReBoot)' 20/20 on 9e3b0f3 and again on 4274624 (otgw-firmware-09).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+doRedirect() takes the reboot reason from its caller (FSexplorer.ino): /ReBoot logs 'User reboot (/ReBoot)', reset wireless logs 'Reset wireless settings', OTA keeps its own reasons. AC1: code in 2.0.0-beta.219 (dev 42746244d, firmware commit d4f9c627d). AC2: tests/test_reboot_listener_and_reason.py on the real functions, old 3 FAIL / 2 OK, fix 5/5 OK; bench .61 by otgw-firmware-09: reboot_log 'User reboot (/ReBoot)' 20/20 on 9e3b0f3 (src-identical) and on 4274624. Published: Discord 1570574546984108183.
+<!-- SECTION:FINAL_SUMMARY:END -->

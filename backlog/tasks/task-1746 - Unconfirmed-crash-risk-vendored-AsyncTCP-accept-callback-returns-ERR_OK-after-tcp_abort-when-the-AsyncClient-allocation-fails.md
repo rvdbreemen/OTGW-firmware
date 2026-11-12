@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T06:21:00Z'
-updated_date: '2026-11-12T21:39:00Z'
+updated_date: '2026-11-12T23:03:00Z'
 labels:
   - asynctcp
   - crash-risk
@@ -27,7 +27,7 @@ Found in the TASK-1675 review (system32-78, 2026-11-09, read-only; not observed 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Robert decides: patch the pinned library, take an upstream release that fixes it, or accept the risk
-- [ ] #2 Upstream ESP32Async/AsyncTCP checked for this path (issue/commit link or 'not fixed upstream')
+- [x] #2 Upstream ESP32Async/AsyncTCP checked for this path (issue/commit link or 'not fixed upstream')
 - [ ] #3 If patched: a host or device test that forces the AsyncClient allocation to fail at accept shows no crash, red on the old code where reproducible
 - [x] #4 Firmware closes the port-80 listener before the /ReBoot and the reset-wireless teardown (no new accept during teardown); host or source test on the real reboot paths, red on the old code
 - [ ] #5 Bench by the bench-tester on .61: a reboot loop with a poller hammering /api/v2/device/info during /ReBoot, at least 20 reboots on the old build and on the new one; the new build shows no tcp_accept panic
@@ -49,4 +49,6 @@ Coordinator's caution checked (server.end() must not abort the in-flight /ReBoot
 Evidence (host, real functions): tests/test_reboot_listener_and_reason.py compiles the real prepareForReboot(), doRedirect(), reBootESP() and resetWirelessButton() with stubs. Old code (lane-95w 84c351493): 3 FAIL / 2 OK (teardown order 'mqtt,ws,otgwstream', no server.end; reasons 'Reboot after upgrade'). Fix: 5/5 OK (order 'server.end,mqtt,ws,otgwstream'; redirect page still built and restFinalize before requestDeferredReboot; AsyncServer::end touches only _pcb). tests/test_fsexplorer_relative_urls.py regex updated for the reason argument, OK. 12 tests slicing FSexplorer.ino/helperStuff.ino all exit 0; evaluate --quick 0 failed. AC4 ticked on this evidence. AC5 (bench: 20+ reboots old vs new with a device/info poller, plus the /ReBoot redirect page still arriving) open for 09.
 
 AC5 bench .61 on 2.0.0-beta.219+9e3b0f3 by otgw-firmware-09 (2026-11-12): 20/20 /ReBoot cycles clean, crashlog empty each boot, the redirect page (817 B) arrived every time. Evidence: C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/4f6ad420-bf33-4a3a-88bc-4eb9890a2231/scratchpad/b219/. Upstream (09): AsyncTCP 3.4.10 and v3.5.0 still do tcp_abort(pcb); return ERR_OK in tcp_accept; fixed on upstream main in 7befe25 (ERR_ABRT), 4192390 (client facade at delivery), d233104 (accept decided under the queue mutex, end() bumps _epoch). Plan (coordinator + 09, Robert's 'upstream if fixed, otherwise patch'): backport 7befe25 + d233104 (+4192390 if needed) as a patch on 3.4.10 with an ADR (ADR-187 precedent) in a later build; drop it when upstream tags a release.
+
+AC2 ticked: upstream checked by otgw-firmware-09 (2026-11-12): pinned 3.4.10 and release v3.5.0 still return ERR_OK after tcp_abort in tcp_accept (v3.5.0 AsyncTCP.cpp:1605-1610); fixed on main in 7befe25, 4192390, d233104, not released. Follow-up TASK-1746.1. Published in 2.0.0-beta.219+4274624 (Discord 1570574546984108183). AC5 left open: 09 ran 20/20 clean /ReBoot cycles with the redirect arriving on the new build (9e3b0f3, src-identical to 4274624), but this session has no record of the 20-reboot run on the OLD build that the AC asks for; 09 to confirm or run it. AC3 is conditional on the patch (TASK-1746.1).
 <!-- SECTION:NOTES:END -->
