@@ -3,11 +3,11 @@ id: TASK-1757
 title: >-
   Boot-time heap falls below CRITICAL (1.1-3.6 KB) when a browser loads the UI
   right after boot; mid-body resets on '/'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:05:00Z'
-updated_date: '2026-11-12T19:51:00Z'
+updated_date: '2026-11-12T20:20:00Z'
 labels:
   - heap
   - bug
@@ -93,3 +93,9 @@ Fix decided by the coordinator as a direct application of Robert's option C (pub
 
 2026-11-12 AC3 bench PASS (otgw-firmware-09, bench owner, on .61, beta.218+105ac46, OTA app+fs 19:10, settings 164 keys unchanged). Fix as agreed with Robert (TASK-1757 decision: C stage onMqttConnect + B drip waits on outbox depth). 12 boots W,C,W,C,W,C,W,C,B,B,B,B; Firefox a constant extra WS client, plus 1 Chrome on W/B boots (two clients), C boots one client. 0 resets other than /ReBoot, crashlog empty, bootcount 525->537 (+1 per boot). Old-vs-fix on the same probe lines: largest heap drop inside one MQTTclient.loop() (tag 12->13) 215: 23452-43516 B in all 12 boots (outbox 4 each time); 218: 7024-19976 B, none >= 23 KB. SAT core-state publish (tag 17): 215 first at 47-441 ms after connect with outbox 18 every boot; 218 within the probe window in 6/12 boots at 185-895 ms with outbox 3 (5x) or 7 (1x), held beyond the window in the other 6; outbox 18 never seen. Probe-min per boot 215 8184-35944 B vs 218 31816-52528 B; maxblk-min 215 5108-24564 vs 218 19444-31732; hd_min_free_heap at +60 s 29216-52368 B (CRITICAL is 3072 B). ipc0/ipc1 224/88. Not verified: the outbox value at the gate before the publish (probe reads it after) and the 60 s CONN_PACE_MAX_MS fallback (not hit). Evidence: C:\Users\rvdbr\AppData\Local\Temp\claude\d9c572fbc7f8e9ee\4f6ad420-bf33-4a3a-88bc-4eb9890a2231\scratchpad\b218\ (run/boot*-telnet-kept.txt, -raw.txt, boot*-info60.json, events.log, old-vs-fix.txt), comparison script scratchpad\tools\probe_cmp.py.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fix (Robert's decision C+B): mqttConnectPaceHold() holds the SAT core-state publish while the MQTT outbox holds more than 2 messages or the largest free block is under 20480 B, until the connect stages finish (hard end 60 s); satOutboxFull() consults it. Shipped in v2.0.0-beta.218 (fb374191f, pushed 2f5ecb430, posted #alpha-testing msg 1570533715321421906). AC1/AC2: earlier sessions (one-tab repro, the drop isolated inside one MQTTclient.loop() after onMqttConnect with probes, beta.215 bench). AC3: host tests red on old code, green on fix (test_mqtt_connect_staging, test_sat_mqtt_state); evaluate --quick 93/86 PASS/0 FAIL; full tests 223 files on 105ac46fd, 222 PASS + 1 runner false-FAIL explained (TASK-1872). Bench by otgw-firmware-09 on .61, 12 boots W/C/B (one- and two-client), 0 resets other than /ReBoot, crashlog empty: largest drop per loop() 215 23452-43516 B vs 218 7024-19976 B; probe-min 8184-35944 vs 31816-52528 B; maxblk-min 5108-24564 vs 19444-31732 B; SAT publish outbox 18 -> 3-7. Confirm bench 218+2f5ecb4: 5 min clean, /health 20/20. Not verified: outbox value at the gate before publish, the 60 s fallback. Probes remain in the build.
+<!-- SECTION:FINAL_SUMMARY:END -->
