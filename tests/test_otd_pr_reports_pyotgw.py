@@ -11,7 +11,8 @@ Consumers:
     ValueError, and HA's config flow and entry setup fail;
   - OTmonitor matches "PR: T=[01][01]" (otmonitor.tcl:628-634) and takes the third word after "OpenTherm Gateway "
     as the firmware version it gates features on (otmonitor.tcl:552-562, gui.tcl:1080 needs 6.2).
-The banner must not contain the board name.
+The banner is "OpenTherm Gateway <version> OTGW32" (Robert, 2026-11-12): the version right after
+"OpenTherm Gateway " for pyotgw and OTmonitor, then the board name, a deliberate difference from the PIC.
 
 The code under test is REAL: the whole `else if (cmd0 == 'P' && cmd1 == 'R') { ... }` branch of
 handleOTDirectCommand() is cut from src/OTGW-firmware/OTDirect.ino and compiled with doubles for the state it reads.
@@ -185,10 +186,9 @@ def run_pyotgw_get_reports(reply_map: dict):
 
 
 class OTDirectPRReports(unittest.TestCase):
-    def test_A1_banner_is_pic_format_without_board_name(self):
+    def test_A1_banner_is_pic_version_then_the_board(self):
         a = replies()["A"]
-        self.assertRegex(a, r"^PR: A=OpenTherm Gateway \d+(\.\d+)+$", a)
-        self.assertNotIn("OTGW32", a)
+        self.assertRegex(a, r"^PR: A=OpenTherm Gateway \d+(\.\d+)+ OTGW32$", a)
         about = a[len("PR: "):][2:]
         self.assertTrue(about[18].isdigit(), f"pyotgw int(ver[18]) on {about!r}")
 

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:53:00Z'
-updated_date: '2026-11-12T05:24:00Z'
+updated_date: '2026-11-12T06:03:00Z'
 labels:
   - otdirect
   - parity
@@ -30,7 +30,7 @@ From the PIC 6.8 parity audit (N9), docs/reviews/2026-11-12_pic68-otdirect-parit
 <!-- AC:BEGIN -->
 - [x] #1 RT=25.41 replies `RT: 25.41`; a thermostat WRITE 24 reaches the boiler with 0x1969; RT=0 stops it; host test red on current code
 - [x] #2 thermostat gets WRITE_ACK with its own data
-- [ ] #3 OTD_PIC_COMPAT_VERSION (O:533) goes to 6.8 once this and the MsgID 125 part of N10 have landed
+- [x] #3 OTD_PIC_COMPAT_VERSION (O:533) goes to 6.8 once this and the MsgID 125 part of N10 have landed
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -49,4 +49,6 @@ Evidence AC1/AC2: tests/test_otd_rt_room_temp.py (6 tests; real RT= branch, pars
 Open: AC3 (OTD_PIC_COMPAT_VERSION -> 6.8) waits for the MsgID 125 part of TASK-1844. Bench not run (.61 is in the public-beta soak); for the bench-tester: in loopback/master on .61, RT=25.41 -> loopback R frames WRITE 24 data 0x1969 (R10181969 after parity); RT=0 -> they stop.
 
 USER-VISIBLE BEHAVIOUR CHANGE (for the alpha note): on OT-Direct, the MQTT command room_temp (topic <top>/set/<node>/otgw32/room_temp, MQTTstuff.ino:925-934, only active on OT-Direct hardware) now works like RT=: from that command on, a thermostat's own WRITE of MsgID 24 (room temperature) reaches the boiler with the MQTT value instead of the thermostat's, and the thermostat gets WRITE_ACK with its own value. Before, the value was only sent as the gateway's own MsgID 24 writes and the thermostat's writes passed unchanged. This is what RT= does on the PIC: MessageID24 puts fakeroomtemp into every thermostat MsgID 24 request while NoFakeRoomTemp is clear (OTGW-other-projects/otgw-6.8/gateway.asm:3061-3068), set by SetRoomTemp (:4300-4309). RT=0 (or a clear via RT=) gives the thermostat's value back. Public wording must not name the board (the topic segment is internal).
+
+AC3: OTD_PIC_COMPAT_VERSION is 6.8 in the TASK-1844 commit (RT= here + the MsgID 125 clamp there); the PR=A banner is 'OpenTherm Gateway 6.8 OTGW32' (Robert's decision, TASK-1844 notes).
 <!-- SECTION:NOTES:END -->

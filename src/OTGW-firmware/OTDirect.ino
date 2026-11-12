@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.212
+**  Version  : v2.0.0-beta.213
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -546,6 +546,48 @@ static unsigned long otdClockReply(unsigned long thermostatReq, unsigned long re
 }
 // --- otdClockReply end
 
+// TASK-1844: answers the PIC always gives the thermostat for MsgID 6, 125 and an unsupported 56/57, whatever the
+// boiler answered (gateway.asm 6.8, MsgUnknown = byte1 bit 5 = Data-Invalid or Unknown-DataID, :298):
+// - MsgID 6 (remote-parameter flags): READ_ACK, the transfer-enable bits 0 and 1 of the HB set, "the gateway will
+//   simulate read access" (MessageID6 :2900-2918).
+// - MsgID 125 (OpenTherm version of the slave): READ_ACK 3.0 when the boiler gave none or one below 3.0, 4.51 when it
+//   gave 5.0 or higher, else the boiler's version (MessageID125 :3327-3344; tests/otversion-1/2/4.stc AC07D0300,
+//   A407D0433).
+// - MsgID 56/57 (DHW / max CH setpoint) answered Unknown-DataID: acknowledged with the upper bound (hotwaterreturn
+//   :3149-3161, maxchsetptret :3185-3197). A held SW=/SH= is answered by buildOverriddenReply() instead.
+// MsgID 2 (master configuration, Smart Power) is not rewritten here: see TASK-1844 notes.
+// --- otdPicAnswer begin
+static unsigned long otdPicAnswer(unsigned long thermostatReq, unsigned long reply,
+                                  uint16_t dhwUpperF88, uint16_t chUpperF88) {
+  const uint8_t id = (uint8_t)((thermostatReq >> 16) & 0xFF);
+  const uint8_t reqType = (uint8_t)((thermostatReq >> 28) & 0x07);
+  if (reqType != 0 && reqType != 1) return reply;          // READ_DATA, WRITE_DATA
+  const uint8_t replyType = (uint8_t)((reply >> 28) & 0x07);
+  const bool unknown = (replyType & 0x02) != 0;             // MsgUnknown: Data-Invalid or Unknown-DataID
+  const uint16_t data = (uint16_t)(reply & 0xFFFF);
+  if (id == 6 && reqType == 0) {
+    return buildOTResponse(4, 6, (uint16_t)(data | 0x0300));
+  }
+  if (id == 125 && reqType == 0) {
+    const uint8_t major = (uint8_t)(data >> 8);
+    uint16_t v = data;
+    if (unknown || major < 3) v = 0x0300;
+    else if (major >= 5) v = 0x0433;
+    return buildOTResponse(4, 125, v);
+  }
+  if ((id == 56 || id == 57) && replyType == 7) {
+    return buildOTResponse((uint8_t)(reqType | 0x04), id, id == 56 ? dhwUpperF88 : chUpperF88);
+  }
+  return reply;
+}
+// --- otdPicAnswer end
+// The upper bounds otdPicAnswer() uses: the boiler's MsgID 48/49 upper bound (HB) when it gave one, else the PIC
+// defaults 80 and 90 (MAX_DHWSETPOINT, MAX_CHSETPOINT, gateway.asm:262-265).
+static uint16_t otdUpperBoundF88(uint8_t boundId, uint8_t fallback) {
+  const uint8_t hb = otBoilerCacheValid[boundId] ? (uint8_t)(otBoilerCache[boundId] >> 8) : 0;
+  return (uint16_t)((hb ? hb : fallback) << 8);
+}
+
 // Set an override value for a MsgID (activates repeater modification for that ID)
 static void setOverride(uint8_t msgId, uint16_t value) {
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
@@ -572,7 +614,7 @@ static void clearOverride(uint8_t msgId) {
 // processes auto-prototypes before variable definitions, unlike ESP8266.
 // ---------------------------------------------------------------------------
 static float   otSetbackTemp     = 16.0f;   // SB= setback temperature
-#define OTD_PIC_COMPAT_VERSION "6.6"   // PIC firmware whose command set OT-Direct implements (PR=A)
+#define OTD_PIC_COMPAT_VERSION "6.8"   // PIC firmware whose command set OT-Direct implements (PR=A); 6.8 since RT= (TASK-1842) and the MsgID 125 clamp (TASK-1844)
 static uint8_t otIgnoreTransitions = 1;      // IT= (1=ignore, PIC default)
 static uint8_t otOverrideHB      = 0;        // OH= override high byte flag
 static char    otGpioFunctions[3] = "00";    // GA=/GB= function codes
@@ -1647,6 +1689,8 @@ static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentRe
                                    otRemoteOverrideClearPending);
     // TASK-1840: MsgID 20 is answered from the SC= time (sentReq is the thermostat's own frame here)
     reply = otdClockReply(sentReq, reply, otSCLastCommandMs != 0, otSCClockData);
+    // TASK-1844: MsgID 6, 125 and an unsupported 56/57 get the PIC's own answer
+    reply = otdPicAnswer(sentReq, reply, otdUpperBoundF88(48, 80), otdUpperBoundF88(49, 90));
     // ADR-223: the release rule counts thermostat MsgID 16 frames only after this answer.
     if (otRemoteOverride.mode != OT_OVERRIDE_NONE && ((reply >> 16) & 0xFF) == 9
         && ((reply >> 28) & 0x07) == 4) {
@@ -2027,6 +2071,7 @@ static bool otdAltSlotTaken(unsigned long thermostatFrame) {
   // TASK-1840: a blacklisted MsgID 20 still gets the PIC's clock answer (TreatMessage runs MessageID20
   // on the fake Unknown-DataID, gateway.asm:2467-2477, :3048-3056)
   unknownResp = otdClockReply(thermostatFrame, unknownResp, otSCLastCommandMs != 0, otSCClockData);
+  unknownResp = otdPicAnswer(thermostatFrame, unknownResp, otdUpperBoundF88(48, 80), otdUpperBoundF88(49, 90));   // TASK-1844
   bridgeFrameToParser('T', thermostatFrame);
   bridgeFrameToParser('A', unknownResp);
   otdSendReply(unknownResp);
@@ -2438,6 +2483,7 @@ void loopOTDirect() {
         setOTParityBit(unknownResp);
         // TASK-1840: UI=20 still gets the PIC's clock answer (MessageID20 on the fake Unknown-DataID)
         unknownResp = otdClockReply(otSlaveFrame, unknownResp, otSCLastCommandMs != 0, otSCClockData);
+        unknownResp = otdPicAnswer(otSlaveFrame, unknownResp, otdUpperBoundF88(48, 80), otdUpperBoundF88(49, 90));   // TASK-1844
         bridgeFrameToParser('T', otSlaveFrame);
         bridgeFrameToParser('A', unknownResp);
         otdSendReply(unknownResp);
@@ -3674,11 +3720,12 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     char prBuf[48];
     switch (reg) {
       case 'A':
-        // Banner in the PIC format "OpenTherm Gateway <version>" (gateway.asm:5434-5435). The version is
-        // the PIC command set this code implements (audited against 6.6, TASK-1795): pyotgw reads it with
-        // int(ver[18]) and skips PR=D below 5, OTmonitor gates features on it (gui.tcl:1080 needs 6.2).
-        // No board name: the banner reaches HA and other public output (TASK-1797).
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: A=OpenTherm Gateway " OTD_PIC_COMPAT_VERSION));
+        // Banner "OpenTherm Gateway <version> OTGW32" (Robert, 2026-11-12): the PIC format (gateway.asm:5434-5435)
+        // with the board after the version, a deliberate difference from the PIC. The version is the PIC command
+        // set OT-Direct implements (OTD_PIC_COMPAT_VERSION) and must stay right after "OpenTherm Gateway ":
+        // pyotgw reads int(ver[18]) (pyotgw.py:182) and OTmonitor takes the third word (otmonitor.tcl:552,
+        // gui.tcl:1080 needs 6.2). The board name alone broke pyotgw / HA opentherm_gw (TASK-1797).
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: A=OpenTherm Gateway " OTD_PIC_COMPAT_VERSION " OTGW32"));
         otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'M':
