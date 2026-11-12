@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.194
+**  Version  : v2.0.0-beta.195
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -165,6 +165,7 @@ static OTScheduleEntry otSchedule[] = {
   W_ENTRY(27, OT_WRITE_INTERVAL_MS),    // Outside temperature (Toutside) — OT=
   W_ENTRY(56, OT_WRITE_INTERVAL_MS),    // DHW setpoint (TdhwSet) — SW=
   W_ENTRY(57, OT_WRITE_INTERVAL_MS),    // Max CH water setpoint (MaxTSet) — SH=
+  W_ENTRY(71, OT_WRITE_INTERVAL_MS),    // Ventilation setpoint (Vset) — VS= (TASK-1831)
 
   // === Temperature & modulation reads — 10s interval ===
   R_ENTRY(25, OT_TEMP_INTERVAL_MS),     // Boiler flow temp (Tboiler)
@@ -439,6 +440,7 @@ static OTFrameOverride otOverrides[] = {
   { 16, false, 0 },   // TrSet — BS= / MQTT room_setpoint override
   { 56, false, 0 },   // TdhwSet — SW= override
   { 57, false, 0 },   // MaxTSet — SH= override
+  { 71, false, 0 },   // Vset — VS= override (TASK-1831)
 };
 static constexpr uint8_t OT_OVERRIDE_COUNT = sizeof(otOverrides) / sizeof(otOverrides[0]);
 
@@ -632,6 +634,18 @@ static unsigned long applyOverrides(unsigned long frame, bool &modified) {
     return rewritten;
   }
 
+  // TASK-1831: with VS= held, a thermostat READ of MsgID 71 goes to the boiler as a WRITE of the VS value, as
+  // the PIC does (MessageID71 sets MsgWriteOp, gateway.asm 6.8:3210-3217).
+  if (msgType == 0 /* READ_DATA */ && msgId == 71) {
+    for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
+      if (otOverrides[i].active && otOverrides[i].msgId == 71) {
+        frame = (1UL << 28) | (frame & 0x00FF0000UL) | otOverrides[i].overrideValue;   // WRITE_DATA, MsgID 71
+        setOTParityBit(frame);
+        modified = true;
+        return frame;
+      }
+    }
+  }
   if (msgType != 1 /* WRITE_DATA */) return frame;
 
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
@@ -1016,7 +1030,7 @@ void initOTDirect() {
   // TASK-584: restore persisted ventilation setpoint to write cache so the
   // scheduler will re-apply it to the boiler after boot without a new command.
   if (settings.otd.iVentSetpoint > 0) {
-    uint16_t ventData = ((uint16_t)settings.otd.iVentSetpoint) << 8;
+    uint16_t ventData = (uint16_t)settings.otd.iVentSetpoint;   // TASK-1831: MsgID 71 LB (spec v4.2 MsgID 71)
     updateWriteCache(71, ventData);
     setOverride(71, ventData);
     OTDDebugTf(PSTR("OT-direct: restored vent setpoint %u%% from settings\r\n"),
@@ -3162,7 +3176,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   else if (cmd0 == 'V' && cmd1 == 'S') {
     if (!isdigit((unsigned char)value[0])) {
       clearWriteOverride(71);
-      synthesizeResponse(buf, value);
+      synthesizeResponse(buf, "-");   // TASK-1831: the PIC's ValueCleared reply
       // Clear persisted ventilation setpoint on explicit clear command
       if (settings.otd.iVentSetpoint != 0) {
         settings.otd.iVentSetpoint = 0;
@@ -3170,7 +3184,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       }
     } else {
       int setpt = constrain(atoi(value), 0, 100);
-      uint16_t data = ((uint16_t)(setpt & 0xFF)) << 8;
+      uint16_t data = (uint16_t)(setpt & 0xFF);   // TASK-1831: LB, as the spec and the PIC (setbyte4)
       if (enqueueWriteCommand(71, data, "VS")) {
         snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), setpt);
         synthesizeResponse(buf, rspBuf);

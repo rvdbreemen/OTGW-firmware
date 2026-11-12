@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirecttypes.h
-**  Version  : v2.0.0-beta.194
+**  Version  : v2.0.0-beta.195
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -121,7 +121,7 @@ struct OTDirectSettingsSection {
   bool     bOpenBypass        = false; // Open bypass valve (OT MsgID 70 HB bit2)
   bool     bAutoBypass        = false; // Automatic bypass valve mode (OT MsgID 70 HB bit3)
   bool     bFreeVentEnable    = false; // Free ventilation mode (OT MsgID 70 HB bit4)
-  uint8_t  iVentSetpoint      = 0;     // Ventilation setpoint 0-100% (OT MsgID 71 HB)
+  uint8_t  iVentSetpoint      = 0;     // Ventilation setpoint 0-100% (OT MsgID 71 LB)
 };
 
 // ADR-229 (TASK-1805): the status commands otdRelayedStatusHB() reads. Here, not in OTDirect.ino,
