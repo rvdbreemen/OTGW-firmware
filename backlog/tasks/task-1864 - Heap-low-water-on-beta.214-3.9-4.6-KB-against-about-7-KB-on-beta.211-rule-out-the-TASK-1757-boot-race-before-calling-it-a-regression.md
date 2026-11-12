@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:01:00Z'
-updated_date: '2026-11-12T11:47:00Z'
+updated_date: '2026-11-12T12:17:00Z'
 labels:
   - heap
   - investigation
@@ -54,4 +54,6 @@ Existing runners: 09's b211 run (telnet per boot + info60.json) and ba's t1757/b
 Attribution build (ba): TASK-1757 instrumentation is prepared on lane/ba-1757 (connProbe() at 17 call sites, including right before and after satPublishCoreState; ba's offline read of the 211 boot-3 log shows about 14 sat/* topics published in the first pass after onMqttConnect, then '[loop-stall] 288 ms'). It takes the beta.215 slot, on top of 214, so it attributes the dip on the 214 code base but does not compare 211 with 214.
 
 WS client baseline (ba, 2026-11-12; Robert's choice B on the desktop Firefox tab at .61): the tab stays open as a constant extra /ws client, so every run on beta.208/211/214/215 has one client more than its mode says (C = 1, one-tab = 2, two-tab = 3); unknown for the beta.167/171 baselines. The 211-vs-214 comparison stays like-for-like as long as both sides have the tab open (they had); do not compare against the 167/171 numbers without that caveat. Same note in TASK-1757.
+
+Correction (coordinator and 09, 2026-11-12): the three 214 values 4,100 / 3,948 / 3,896 B all come from ONE boot (bootcount 466). hd_min_free_heap is a since-boot low-water mark and can only fall within a boot, so a falling watermark is not a trend. The ~7 KB on 211 was a per-boot watermark over a boot window without pyotgw or a SAT run, so the 211-vs-214 comparison does not hold either. What stands: one boot under bench load with a lowest point of 3,896 B (about 0.8 KB above CRITICAL), no reset. AC1 must use current free heap and maxblk sampled per phase (boot window per '[HEAP] boot win=' phase, then steady state), not the watermark; 09's TASK-1757 probe bench on 215 (12 boots, the same per-boot window) gives comparable numbers.
 <!-- SECTION:NOTES:END -->
