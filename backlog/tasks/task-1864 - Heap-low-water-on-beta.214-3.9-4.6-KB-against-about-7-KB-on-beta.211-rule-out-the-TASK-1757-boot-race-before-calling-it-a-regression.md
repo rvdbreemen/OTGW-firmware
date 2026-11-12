@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:01:00Z'
-updated_date: '2026-11-12T11:03:00Z'
+updated_date: '2026-11-12T11:06:00Z'
 labels:
   - heap
   - investigation
@@ -46,4 +46,10 @@ beta.208 -> beta.211 (b2e473f87): 9aa81609c TASK-1846 and 2216ea923 TASK-1855, O
 beta.211 -> beta.214 (47f9edd84): 8f6924552 TASK-1842, 60762c994 TASK-1844, 47f9edd84 TASK-1860: OTDirect.ino plus one emitted field in restAPI.ino (device/info otdpiccompat, a const char* from a flash string); no scan hits. New code is a few pure functions and one entry in the existing otOverrides table.
 
 Static conclusion: no change in 203..214 adds a heap allocation, buffer, task or stack. The only change near the boot heap window is beta.208's TASK-1757 connect-burst change (by design it lowers the burst). So the static review gives no cause for a 211 -> 214 drop; AC1 (like-for-like measurement) decides. Not checked: libraries (no src/libraries change in the range), runtime behaviour.
+
+AC1 recipe from ba (TASK-1757 owner, 2026-11-12), works on every 2.0.0 build since beta.171, no new firmware: hd_min_free_heap in device/info is a run-wide, non-resettable watermark, so it always contains the boot dip and cannot separate boot from steady state. Read telnet from right after /ReBoot instead: each '[HEAP] boot win=<phase> dur=.. minWin=..' line gives the windowed minimum per boot phase (setup-early, setup-net, setup-services, setup-late, wait-mqtt, connect, drip ...) until '[HEAP] boot done'; the connect phase also prints '[HEAP] connect-trace ...' lines and 'connect-trace end ... traceMin= phaseMin= match=1'. Boot-window minimum = the minimum over those minWin values. Steady-state minimum = sample device/info after 'boot done' and track free / maxblk (or the windowed dip fields), not hd_min_free_heap.
+
+Existing runners: 09's b211 run (telnet per boot + info60.json) and ba's t1757/boots1757ac2.py + trace_summary.py (ba's scratchpad). Like-for-like conditions (ba): the Firefox tab adds one WS client to every boot, so keep it identical on 211 and 214 (or closed; Robert's DM answer on the tab is pending), same mode (C / one tab / two tabs), at least 4 boots per build, because one-tab boots are bimodal (18-19 KB vs about 7 KB on 211).
+
+Attribution build (ba): TASK-1757 instrumentation is prepared on lane/ba-1757 (connProbe() at 17 call sites, including right before and after satPublishCoreState; ba's offline read of the 211 boot-3 log shows about 14 sat/* topics published in the first pass after onMqttConnect, then '[loop-stall] 288 ms'). It takes the beta.215 slot, on top of 214, so it attributes the dip on the 214 code base but does not compare 211 with 214.
 <!-- SECTION:NOTES:END -->
