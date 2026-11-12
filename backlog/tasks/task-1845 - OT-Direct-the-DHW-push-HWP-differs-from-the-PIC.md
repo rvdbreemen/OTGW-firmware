@@ -1,11 +1,11 @@
 ---
 id: TASK-1845
 title: 'OT-Direct: the DHW push (HW=P) differs from the PIC'
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:57:00Z'
-updated_date: '2026-11-12T01:58:00Z'
+updated_date: '2026-11-12T02:38:00Z'
 labels:
   - otdirect
   - parity
@@ -48,4 +48,8 @@ Tests: new tests/test_otd_dhw_push_pic.py (real HW branch, otdOperModeData, otdP
 Advisor review fix (folded into the commit, now 528a2a3c7): a READ_ACK of MsgID 99 while the push WRITE is pending (answer to an earlier READ 99: the gateway's slow poll or the thermostat's) no longer ends the push; PIC ID99ReadData turns such reads into writes while opermodewrite is set (gateway.asm:3253-3257). New test case red before the guard, green after; 7 OK. Enum check: vendored OpenTherm.h READ_ACK=0b100, WRITE_ACK=0b101 (UNKNOWN_DATA_ID 0b111), so (uint8_t)respType gives 4/5/7. Bench limit: on .61 in loopback the push hooks do not run (loopback answers never reach handleMasterResponse), so .61 can show HW=P -> R10631000 and PR=W unchanged, not the boiler-driven end or the spoof path; AC4 (capture of one push) needs a real boiler or the slave simulator.
 
 Full scripts/run_tests.py on the integrated HEAD (6841ab5d9, -j 4): 210 files, 208 passed, 2 failed. (1) test/host/test_override_reply.py: its PowerShell slicer anchored on 'enum DHWPushState' (gone with this task) and lacked otCH2Enable (TASK-1833) and the push hooks; fixed in a follow-up test commit (anchor matches the old enum or the new otPushManual flag, so older revisions still slice; otCH2Enable stub; no-op push hooks, the push is measured by tests/test_otd_dhw_push_pic.py). Rerun: 4 OK. I missed it before because I ran the tests/ suites, not test/host/. (2) test/host/test_stream_real_cbuf.py failed only under -j 4; alone it passes (exit 0, 'PASS: green with the presize, red without it'); not related to these changes, reported to the coordinator.
+
+Integrated and built: rebased on ac5967ad2, one bump per task (1823 beta.191, 1828 192, 1830 193, 1832 194, 1831 195, 1833 196, 1845 197) + test commit 4cafc97eb; full run_tests.py 208/210 (test_override_reply fixed in 4cafc97eb, test_stream_real_cbuf -j4-only, unrelated); evaluate --quick 93 checks 0 FAIL; build.bat esp32-combo 'Build completed successfully', build/OTGW-firmware-esp32-combo-2.0.0-beta.197+4cafc97-flash.zip (6158.3 KB). Bench requested from 09 via the coordinator.
+
+Bench (otgw-bench-tester 09, .61 loopback, commands via TCP 25238, telnet + MQTT captured; beta.197+4cafc97 vs 190+1a4c0a4): flash OK, githash 4cafc97, health 200. Pushed ac5967ad2..4cafc97eb, zip posted (Discord 1570265549747781763). TASK-1845 PASS for PR=W: HW=P reply 'HW: P', PR=W old 'W=1' -> new 'W=0'. Frame R10631432 because MW/MH/M2 were still held from the 1832 checks: checked against gateway.asm, PIC-like (OperModeData puts operatingmode1 = DHW mode + push bit in HB and operatingmode2 = HC1/HC2 in LB, 3247-3250; SetHotWaterPush does not clear the modes): HB 0x14 = MW 4 + push, LB 0x32 = M2 3/MH 2. The bare 10631000 from a clean state is shown by the host test (exactly dhw-5.stc), not on the bench. AC4 (capture of one boiler-driven push / spoof end) stays open: needs a real boiler or the slave simulator (loopback answers never reach handleMasterResponse).
 <!-- SECTION:NOTES:END -->

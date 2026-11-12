@@ -3,11 +3,11 @@ id: TASK-1833
 title: >-
   OT-Direct: CE= and H2= default to off where the PIC defaults to on; CL=0
   clears instead of holding 0 %
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:41:00Z'
-updated_date: '2026-11-12T01:08:00Z'
+updated_date: '2026-11-12T02:38:00Z'
 labels:
   - otdirect
   - parity
@@ -49,4 +49,14 @@ Tests: new tests/test_otd_cool_ch2_defaults.py (real C2/CL/CE/H2 branches, enque
 AC3 replaced by the coordinator's decision (2026-11-12, option A): no ADR, because ADR-229 already states the rule (bit = NOT CoolModeOff / NOT CH2ModeOff) and the reset value is PIC parity, not a new decision (CLAUDE.md: no ADR for a bug fix within an existing pattern). Evidence: the defaults are pinned by tests/test_otd_cool_ch2_defaults.py (C2=40 alone -> bit 4, CL=50 alone -> bit 2) and docs/pic/pic-firmware-6.8-spec.md rows MsgID 0 bit 2/bit 4 now name the reset state; verified in gateway.asm: statusflags is RAM (line 464, CoolModeOff = bit 2, CH2ModeOff = bit 4), cleared by ClearRam (1178-1188), and the only other writer (gpio_block, 5449-5451) touches DHWBlocking only.
 
 Full scripts/run_tests.py in wt-ba-otd was stopped by Claude Code for low system memory (not a test result). The targeted OT-Direct suites and evaluate --quick are green; the full run must be repeated and pass before the push.
+
+Integrated and built: rebased on ac5967ad2, one bump per task (1823 beta.191, 1828 192, 1830 193, 1832 194, 1831 195, 1833 196, 1845 197) + test commit 4cafc97eb; full run_tests.py 208/210 (test_override_reply fixed in 4cafc97eb, test_stream_real_cbuf -j4-only, unrelated); evaluate --quick 93 checks 0 FAIL; build.bat esp32-combo 'Build completed successfully', build/OTGW-firmware-esp32-combo-2.0.0-beta.197+4cafc97-flash.zip (6158.3 KB). Bench requested from 09 via the coordinator.
+
+Bench (otgw-bench-tester 09, .61 loopback, commands via TCP 25238, telnet + MQTT captured; beta.197+4cafc97 vs 190+1a4c0a4): flash OK, githash 4cafc97, health 200. Pushed ac5967ad2..4cafc97eb, zip posted (Discord 1570265549747781763). TASK-1833 PASS: CL=0 reply 'CL: 0.00' on both, old sent no MsgID 7, new sends R10070000; CL=x 'CL: 0.00' -> 'CL: -'. CE=/H2= relayed status bits need a thermostat: host-test only (09 did not tick).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 relayed status bits: host test on the real otdRelayedStatus path 4 FAIL old / 6 OK fix (bench needs a thermostat, host-test only). AC2 CL=0 holds 0 %, CL=x -> 'CL: -': host test + 09 bench (R10070000, 'CL: -'). AC3 defaults pinned in the test and named in docs/pic/pic-firmware-6.8-spec.md (coordinator's choice A, no ADR). Commit 60c0fbc50 (beta.196), pushed, posted.
+<!-- SECTION:FINAL_SUMMARY:END -->

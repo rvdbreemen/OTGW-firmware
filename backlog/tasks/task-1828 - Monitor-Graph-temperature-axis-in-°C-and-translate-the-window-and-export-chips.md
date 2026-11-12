@@ -3,11 +3,11 @@ id: TASK-1828
 title: >-
   Monitor > Graph: temperature axis in °C, and translate the window and export
   chips
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:19:00Z'
-updated_date: '2026-11-11T23:30:00Z'
+updated_date: '2026-11-12T02:37:00Z'
 labels:
   - webui
   - i18n
@@ -37,4 +37,14 @@ Implemented: window chips carry data-win-ms + data-i18n (h_mon.graph_win_10m/1h/
 Tests: new graph-window-chips-axis.test.mjs 3 red on the old code, 3 green; i18n-no-hardcoded red (1 fail) on the old code once the '1 hour' gap entry is gone, green with the fix. Headless Chrome (fake device, 24 h synthetic history, real WS drop): NL toolbar '10 min / 1 uur / 4 uur / 24 uur', 24 h window applied, axis 70°C/35°C/0°C, markers still red@623.4 green@772.0, 0 exceptions; screenshot C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/f1fafa03-7939-46ad-a89a-e59de20dd2bb/scratchpad/bench/t1828-24h-light-nl.png.
 
 Extra defect found while taking the EL screenshot (in shipped beta.187, TASK-1821; 09 benched NL only): the lane labels used graph.on/graph.off, in Greek 'ενεργό'/'ανενεργό', which run past the 34-unit left margin into the flame/DHW/CH panels (C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/f1fafa03-7939-46ad-a89a-e59de20dd2bb/scratchpad/bench/t1828-24h-light-el.png). Fix: own short keys h_mon.graph_lane_on/off (EN on/off, NL aan/uit, DE an/aus, EL ON/OFF; ON/OFF is common on Greek appliances, flagged for Sergeant D). New test in graph-panels.test.mjs: every pack's lane labels are at most 5 characters; red on the old code (2 fail), green with the fix. After: C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/f1fafa03-7939-46ad-a89a-e59de20dd2bb/scratchpad/bench/t1828b-24h-light-el.png (labels inside the margin), EL toolbar '10 λεπ. / 1 ώρα / 4 ώρες / 24 ώρες', axis °C, 0 exceptions.
+
+Integrated and built: rebased on ac5967ad2, one bump per task (1823 beta.191, 1828 192, 1830 193, 1832 194, 1831 195, 1833 196, 1845 197) + test commit 4cafc97eb; full run_tests.py 208/210 (test_override_reply fixed in 4cafc97eb, test_stream_real_cbuf -j4-only, unrelated); evaluate --quick 93 checks 0 FAIL; build.bat esp32-combo 'Build completed successfully', build/OTGW-firmware-esp32-combo-2.0.0-beta.197+4cafc97-flash.zip (6158.3 KB). Bench requested from 09 via the coordinator.
+
+Bench (otgw-bench-tester 09, .61, beta.197+4cafc97 vs 190+1a4c0a4): ota_flash app+fs, githash 4cafc97, bootcount 392->394, health 200, MQTT connected, crashlog none, settings 164 unchanged; restored afterwards (settings diff 0, bootcount 395). Pushed ac5967ad2..4cafc97eb, zip posted (Discord 1570265549747781763). TASK-1828 PASS: axis °C (50°C/40°C/30°C in loopback); window chips NL 1 uur/4 uur/24 uur, DE 1 Std./4 Std., EL 1 ώρα/4 ώρες, the 4h chip switches the window; EL lane labels end at x<=189.8 inside plot-left 199.1. 09 notes the EL lane labels stay ON/OFF (the chosen Greek value, flagged for Sergeant D).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 axis °C and AC2 translated chips via data-win-ms: graph-window-chips-axis 3 red/3 green, i18n-no-hardcoded red without the gap entry/green, 09 bench PASS. AC3 NL and EL screenshots (t1828-*, t1828b-*) + 09. Extra: Greek lane labels fit (width test 2 red/green, 09 measured). Commit 9a5d5cc90 (beta.192), pushed, posted. Greek ON/OFF awaits Sergeant D.
+<!-- SECTION:FINAL_SUMMARY:END -->
