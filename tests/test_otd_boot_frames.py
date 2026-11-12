@@ -84,6 +84,7 @@ static State state = {};
 static bool isPICEnabled() { return false; }
 static OTDirectMode otdModeFromSetting(int m) { return (OTDirectMode)m; }
 static void initFlameRatio() {}
+static void otdRestorePersistedCommands() {}   // TASK-1836: boot restore of the stored command state (not under test here)
 static void updateWriteCache(uint8_t, uint16_t) {}
 static void setOverride(uint8_t, uint16_t) {}
 static void bridgeFrameToParser(char, unsigned long) {}
