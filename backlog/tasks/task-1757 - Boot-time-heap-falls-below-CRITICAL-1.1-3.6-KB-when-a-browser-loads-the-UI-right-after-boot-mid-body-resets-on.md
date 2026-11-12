@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:05:00Z'
-updated_date: '2026-11-12T17:47:00Z'
+updated_date: '2026-11-12T19:03:00Z'
 labels:
   - heap
   - bug
@@ -88,4 +88,6 @@ Attribution from the probe lines, all 12 boots: the largest single drop is in ev
 Fix decided by the coordinator as a direct application of Robert's option C (publish pacing, not SAT control): the TASK-1339 SAT outbox gate (SATmqttPublish.cpp satOutboxFull()) also defers while MQTTstuff.ino's post-connect pace window holds (outbox > 2 or largest block < 20 KB), window opens at connect, closes when the connStage portions are done and the outbox is shallow, hard end 60 s, reopens on every connect. ADR-088's burst window was checked and does not fit: it only defers the discovery drip and does not throttle the publisher. Prepared as beta.218 (after d3 216, 95 217); host tests red on the old code, green on the fix (test_sat_mqtt_state pace test; test_mqtt_connect_staging pace/pacetimeout/pacereconnect).
 
 2026-11-12 beta.218: fix (option C stage + B outbox-depth pace on SAT core-state publish) rebased onto origin/dev 40d1801ea, bumped beta.217->beta.218. Targeted tests green after rebase: probe, staging, sat_mqtt_state, wifi_deadlink, otd_dhw_push_pic, otd_msgid99_bytes, health_no_fs_flash_ops (each files 1 passed 1). evaluate.py --quick: 93 checks, 86 PASS, 0 FAIL. Connect-window probes stay in 218 for the old-vs-fix bench comparison. Full suite: files 1-80 green before rebase; 81-222 to run.
+
+2026-11-12 beta.218 105ac46fd: build retry SUCCESS 19:02 (try 1 died 18:51 on 0xC0000142 under memory pressure, no zip); zip OTGW-firmware-esp32-combo-2.0.0-beta.218+105ac46-flash.zip, .elf kept. Full tests on 105ac46fd: 223/223 files (fresh run_tests --list after rebase), one per process, -j 1: 222 PASS, 1 FAILED = test/host/test_stream_real_cbuf.py, a runner false-FAIL (rc=0 and RESULT: PASS run directly; its mutant section prints a FAILED line that run_tests.py classify_py():105 matches). Filed TASK-1872. Coordinator counts the run green for 218. Bench on 09 pending.
 <!-- SECTION:NOTES:END -->
