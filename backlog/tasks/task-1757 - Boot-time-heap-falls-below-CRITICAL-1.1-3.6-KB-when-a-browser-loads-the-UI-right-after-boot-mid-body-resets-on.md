@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:05:00Z'
-updated_date: '2026-11-12T11:45:00Z'
+updated_date: '2026-11-12T12:46:00Z'
 labels:
   - heap
   - bug
@@ -80,4 +80,10 @@ AC3 status: NOT ticked. Met: both one-tab and two-tab runs stay above CRITICAL w
 2026-11-12, instrumentation build prepared (coordinator go, slot after 95's 212-214): connProbe(tag) in MQTTstuff.ino with 15 call sites (loop() top/timers/discovery/SAT/app-end/bg-end/OT frames, doBackgroundTasks() pre/post MQTT, post PIC, post OTD, handleMQTT() pre/post MQTTclient.loop(), onMqttConnect() after birth and after the subscribes); a record is kept when the window minimum fell >= 1 KB since the previous probe or >= 20 ms passed, max 32, printed as '[HEAP] connect-probe t= dt= at= from= ...' after the connect trace; no-op outside the boot connect phase. Tags in MQTTstuff.h (CPROBE_*). Host test tests/test_mqtt_connect_probe.py cuts the real block: 5 pass; on origin/dev MQTTstuff.ino 5 errors (block absent). evaluate --quick 92 checks 0 FAIL.
 
 2026-11-12 Robert (relayed by the coordinator): the desktop Firefox tab with the .61 v2 UI stays (option B, a constant extra /ws client). So every 1757 run on beta.208, 211 and later counts one client more than its mode name: C = 1 client, one-tab = 2, two-tab = 3. Unknown for the beta.167/171 baselines, so old-vs-fix comparisons carry that caveat. 09 adds 4 one-tab boots to the beta.215 probe bench.
+
+2026-11-12 probe bench by otgw-bench-tester (09) on .61, 2.0.0-beta.215+242633e (ELF sha checked), Firefox tab = constant extra WS client (Robert B), otdmode 3, satsimulation on. 12 boots: W 4, C 4, one-tab B 4; bootcount +1 each (467->479); 11 Software resets, 1 PANIC in tiT (AsyncTCP tcp_accept <- tcp_input, during the /ReBoot teardown of boot 5, before the browser connects; filed on TASK-1746). Probe-min per boot: W 16,856 / 11,348 / 21,052 / 18,604; C 35,944 / 16,456 / 21,396 / 26,564; B 22,212 / 8,184 / 13,164 / 16,708 B; none below CRITICAL. Chrome net-logs (W, B): no mid-body resets, no ERR_CONNECTION_RESET / EMPTY_RESPONSE / INCOMPLETE_CHUNKED_ENCODING; 503 admission refusals 3-4 per W boot, 0 in B; 1x ERR_FAILED on /api/v2/settings in each W boot; boot 12 (B) 3x ERR_CONNECTION_TIMED_OUT 20-45 s after HTTP up, cause unknown.
+
+Attribution from the probe lines, all 12 boots: the largest single drop is in every boot at at=13 from=12, i.e. inside ONE MQTTclient.loop() call: 23-43 KB (e.g. 57.7 -> 22.6 KB, 68.8 -> 36.1 KB), maxblk down to 5-8 KB, mqttTx 833. The step before (at=17 from=16, satPublishCoreState) only queues: outbox 4 -> 18, free -5 KB. So the cost is espMqttClient sending the whole queued outbox in one pass, and the SAT always-on set (~14 packets, first pass after a connect) is what fills it on top of the 3-4 connect packets. Remaining minima (8-21 KB) fall later (t 95-681 ms) in brackets around web serving (at=6/9/16 from=3/11/13), i.e. concurrent async_tcp work while the outbox is still 4-7 deep.
+
+Fix decided by the coordinator as a direct application of Robert's option C (publish pacing, not SAT control): the TASK-1339 SAT outbox gate (SATmqttPublish.cpp satOutboxFull()) also defers while MQTTstuff.ino's post-connect pace window holds (outbox > 2 or largest block < 20 KB), window opens at connect, closes when the connStage portions are done and the outbox is shallow, hard end 60 s, reopens on every connect. ADR-088's burst window was checked and does not fit: it only defers the discovery drip and does not throttle the publisher. Prepared as beta.218 (after d3 216, 95 217); host tests red on the old code, green on the fix (test_sat_mqtt_state pace test; test_mqtt_connect_staging pace/pacetimeout/pacereconnect).
 <!-- SECTION:NOTES:END -->
