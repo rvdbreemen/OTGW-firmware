@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-beta.218
+**  Version  : v2.0.0-beta.219
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -732,7 +732,7 @@ void reBootESP(AsyncWebServerRequest *request)
   webBeginRequest(request);
   if (!checkHttpAuth()) return;
   DebugTln(F("Redirect and ReBoot .."));
-  doRedirect("Reboot OTGW firmware ..", 120, "./", true);   // TASK-1445: page-relative, also behind a proxy prefix
+  doRedirect("Reboot OTGW firmware ..", 120, "./", "User reboot (/ReBoot)");   // TASK-1445: page-relative; TASK-1868: own reason
 } // reBootESP()
 
 void resetWirelessButton(AsyncWebServerRequest *request)
@@ -741,16 +741,17 @@ void resetWirelessButton(AsyncWebServerRequest *request)
   if (!checkHttpAuth()) return;
   DebugTln(F("Reset Wireless settings.."));
   resetWiFiSettings();
-  doRedirect("Reboot OTGW firmware with reset wireless settings..", 120, "./", true);   // TASK-1445
+  doRedirect("Reboot OTGW firmware with reset wireless settings..", 120, "./", "Reset wireless settings");   // TASK-1445, TASK-1868
 }
 //=====================================================================================
 // Emits the bounded redirect/countdown page into the per-request response stream
-// and queues the Refresh header. When reboot==true the restart is DEFERRED to the
+// and queues the Refresh header. When rebootReason is not null the restart is DEFERRED to the
 // next loop() tick (requestDeferredReboot): the async response is only queued —
 // not yet drained to the socket — when this returns, so tearing the services down
 // here (doRestart) would truncate the body. loop() fires the reboot once
-// !isFlashing(), giving lwIP time to flush (mirrors the OTA path).
-void doRedirect(String msg, int wait, const char* URL, bool reboot)
+// !isFlashing(), giving lwIP time to flush (mirrors the OTA path). TASK-1868: rebootReason is what
+// reboot_log.txt reports after the restart, so each caller passes its own.
+void doRedirect(String msg, int wait, const char* URL, const char* rebootReason)
 {
   // clamp wait to sane bounds
   int safeWait = max(0, min(wait, 3600)); // 1 hour max
@@ -792,6 +793,6 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   s->print(safeURL);
   s->print(F("');}},1000);</script></body></html>\r\n"));
   restFinalize();
-  if (reboot) requestDeferredReboot("Reboot after upgrade");
+  if (rebootReason) requestDeferredReboot(rebootReason);
 
 } // doRedirect()

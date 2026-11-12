@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T06:21:00Z'
-updated_date: '2026-11-12T13:26:00Z'
+updated_date: '2026-11-12T15:35:00Z'
 labels:
   - asynctcp
   - crash-risk
@@ -29,7 +29,7 @@ Found in the TASK-1675 review (system32-78, 2026-11-09, read-only; not observed 
 - [x] #1 Robert decides: patch the pinned library, take an upstream release that fixes it, or accept the risk
 - [ ] #2 Upstream ESP32Async/AsyncTCP checked for this path (issue/commit link or 'not fixed upstream')
 - [ ] #3 If patched: a host or device test that forces the AsyncClient allocation to fail at accept shows no crash, red on the old code where reproducible
-- [ ] #4 Firmware closes the port-80 listener before the /ReBoot and the reset-wireless teardown (no new accept during teardown); host or source test on the real reboot paths, red on the old code
+- [x] #4 Firmware closes the port-80 listener before the /ReBoot and the reset-wireless teardown (no new accept during teardown); host or source test on the real reboot paths, red on the old code
 - [ ] #5 Bench by the bench-tester on .61: a reboot loop with a poller hammering /api/v2/device/info during /ReBoot, at least 20 reboots on the old build and on the new one; the new build shows no tcp_accept panic
 <!-- AC:END -->
 
@@ -41,4 +41,10 @@ First observed instance (relayed by the coordinator, 2026-11-12): 09's bench on 
 DECISION Robert (2026-11-12, DM via the coordinator, msg 1570428435195502645, verbatim 'B'): firmware-only, no AsyncTCP library change. Close the port-80 listener (AsyncWebServer end / stop accepting) before the /ReBoot (and reset-wireless) teardown, so no accept arrives during the teardown. Evidence that drives it: 09's beta.215 panic (tcp_accept during teardown, 1 in 12 reboots). AC1 ticked with this answer; AC2 (upstream check) and AC3 (library patch test) belong to the library options Robert did not choose and are superseded by the new AC4/AC5.
 
 Claimed by otgw-firmware-95 (2026-11-12). Starts after beta.217 (TASK-1865 B+C) is built and posted; number beta.219 (ba has 218). Consider TASK-1868 (reboot label) in the same change: it touches the same doRedirect path in FSexplorer.ino:795.
+
+Implementation (95, 2026-11-12, local commit on lane-95-1746, together with TASK-1868; local bump beta.218, becomes beta.219 after ba's 218 is posted): prepareForReboot() (helperStuff.ino) now calls server.end() as its first step, before the MQTT disconnect, the WS close, the 25238 stop and doRestart()'s delay(2000). Placed in the shared teardown, so it covers every planned reboot path (/ReBoot, reset wireless, OTA, nightly, WiFi supervisor), not only /ReBoot.
+
+Coordinator's caution checked (server.end() must not abort the in-flight /ReBoot redirect): pinned AsyncTCP 3.4.10 (.pio/libdeps/esp32-combo/AsyncTCP/src/AsyncTCP.cpp:1532-1542): AsyncServer::end() does tcp_arg(_pcb,NULL), tcp_accept(_pcb,NULL), tcp_close(_pcb) (tcp_abort on failure) on the LISTEN pcb only, under tcp_core_guard; it keeps no client list and touches no client. AsyncWebServer::end() (ESPAsyncWebServer 3.11.2, WebServer.cpp:116) only calls _server.end(). An accept that lwIP queued before end() still dispatches to the (global, still alive) server's connect callback (AsyncTCP.cpp:310-312, 1588) and is served normally. So open connections and their queued responses stay; only new handshakes stop.
+
+Evidence (host, real functions): tests/test_reboot_listener_and_reason.py compiles the real prepareForReboot(), doRedirect(), reBootESP() and resetWirelessButton() with stubs. Old code (lane-95w 84c351493): 3 FAIL / 2 OK (teardown order 'mqtt,ws,otgwstream', no server.end; reasons 'Reboot after upgrade'). Fix: 5/5 OK (order 'server.end,mqtt,ws,otgwstream'; redirect page still built and restFinalize before requestDeferredReboot; AsyncServer::end touches only _pcb). tests/test_fsexplorer_relative_urls.py regex updated for the reason argument, OK. 12 tests slicing FSexplorer.ino/helperStuff.ino all exit 0; evaluate --quick 0 failed. AC4 ticked on this evidence. AC5 (bench: 20+ reboots old vs new with a device/info poller, plus the /ReBoot redirect page still arriving) open for 09.
 <!-- SECTION:NOTES:END -->

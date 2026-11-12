@@ -25,7 +25,7 @@ class RelativeUrls(unittest.TestCase):
         self.src = INO.read_text(encoding="utf-8")
 
     def test_reboot_redirects_are_page_relative(self):
-        calls = re.findall(r'doRedirect\("Reboot[^"]*", \d+, "([^"]*)", true\)', self.src)
+        calls = re.findall(r'doRedirect\("Reboot[^"]*", \d+, "([^"]*)", "[^"]+"\)', self.src)   # TASK-1868: reason arg
         self.assertEqual(len(calls), 2, calls)
         self.assertEqual(calls, ["./", "./"])
 

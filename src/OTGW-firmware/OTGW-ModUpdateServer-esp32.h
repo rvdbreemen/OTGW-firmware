@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-beta.218
+**  Version  : v2.0.0-beta.219
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -452,11 +452,13 @@ private:
     if (_serial_output && _uploadExpectedBytes > 0) {
       unsigned long pct = static_cast<unsigned long>((_uploadWrittenBytes * 100UL) / _uploadExpectedBytes);
       if (pct > 100UL) pct = 100UL;
-      DebugTf(PSTR("[OTA] progress: %s block=%lu %u/%u (%lu%%)\r\n"),
+      // TASK-1870: the IPC stack low points per chunk show whether the flash write path uses them (ADR-225).
+      DebugTf(PSTR("[OTA] progress: %s block=%lu %u/%u (%lu%%) ipc0min=%ld ipc1min=%ld\r\n"),
               _uploadTargetStr(),
               static_cast<unsigned long>(_uploadBlockIndex),
               static_cast<unsigned>(_uploadWrittenBytes),
-              static_cast<unsigned>(_uploadExpectedBytes), pct);
+              static_cast<unsigned>(_uploadExpectedBytes), pct,
+              (long)platformIpcStackHighWater("ipc0"), (long)platformIpcStackHighWater("ipc1"));
     }
   }
 

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : diagRecorderStuff.h
-**  Version  : v2.0.0-beta.218
+**  Version  : v2.0.0-beta.219
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

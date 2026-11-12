@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.218
+**  Version  : v2.0.0-beta.219
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -489,6 +489,10 @@ void setup() {
   // Durable copy of the detection result to LittleFS (/bootdetect.log),
   // readable via FSexplorer after a power cycle when no console is attached.
   appendBootDetectLog();
+  // TASK-1870: IPC stack low point after the PIC probe, next to the one after full init below,
+  // so a bench log shows which boot phase uses the ipc0/ipc1 stacks (ADR-225).
+  SetupDebugf(PSTR("boot: ipc stack free min after hw detect ipc0=%ld ipc1=%ld B\r\n"),
+              (long)platformIpcStackHighWater("ipc0"), (long)platformIpcStackHighWater("ipc1"));
 #else
   // UART0 was muted at the top of setup() (TASK-1131, TASK-1217).
   detectPIC();

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.218
+**  Version  : v2.0.0-beta.219
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -696,7 +696,15 @@ static void prepareForReboot() {
           (unsigned)platformFreeHeap(),
           (unsigned)platformMaxFreeBlock());
 
+  // TASK-1746: stop accepting on port 80 first, so no tcp_accept arrives during the teardown and the
+  // delay(2000) in doRestart() (09's beta.215 panic in tiT: AsyncTCP tcp_accept during the /ReBoot teardown).
+  // AsyncWebServer::end() -> AsyncServer::end() (AsyncTCP 3.4.10) clears the accept callback and closes only
+  // the listen pcb; open connections and their queued responses (the /ReBoot redirect page) are untouched.
   uint32_t t = millis();
+  server.end();
+  DebugTf(PSTR("[reboot]   web listener closed: %lums\r\n"), (unsigned long)(millis() - t));
+
+  t = millis();
   doMqttDisconnect();     // clean disconnect to broker (file-static wrapper, see MQTTstuff.ino)
   DebugTf(PSTR("[reboot]   mqtt disconnect: %lums\r\n"), (unsigned long)(millis() - t));
 

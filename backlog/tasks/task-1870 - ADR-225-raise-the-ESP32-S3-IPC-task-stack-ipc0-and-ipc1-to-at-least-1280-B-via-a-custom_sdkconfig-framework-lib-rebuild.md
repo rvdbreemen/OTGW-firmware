@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T18:15:00Z'
-updated_date: '2026-11-12T19:47:00Z'
+updated_date: '2026-11-12T20:25:00Z'
 labels:
   - firmware
   - build
@@ -48,4 +48,8 @@ Mechanism C chosen by Robert (DM 1570519798071300168, relayed by the coordinator
 AC1 evidence: ADR-225 amended while Proposed (mechanism C, .63 ipc0 data 88 B and 1 in 9 FS writes, 1280-vs-more closed with numbers: worst overflow 52 B, lowest free 80/88 B, +256 B each), renamed to ADR-225-raise-the-esp32-s3-ipc-task-stack-to-1280-b-by-linking-our-own-copy-of-the-idf-esp-ipc-c.md; adr-quality 1.00 on Completeness, Evidence, Clarity, Consistency; adr accept --confirm signed 'User: Robert van den Breemen' with both DMs in the reason; adr-lint 0 FAIL; ADR-INDEX.md/.json and README regenerated with adr-index (230 ADRs, 0 duplicates).
 
 AC3 evidence so far (host): python tests/test_esp_ipc_override_gate.py -> Ran 10, OK (exit 0) on the fix; with OTGW_ESP_IPC_C pointing at a missing file (the code before ADR-225) -> FAILED (failures=2, skipped=5), exit 1. Mutants (stack 1024, upstream edit outside the block, missing IDF guard, stack from CONFIG_ESP_IPC_TASK_STACK_SIZE) each go red; CRLF checkout passes. ELF checker on the beta.217 ELF (OTGW-build-archive/2.0.0-beta.217+a7676dc.zip): 'FAIL IPC stack is 1024 B, want 1280 B (prebuilt esp_ipc.c.obj linked)', exit 1 (red reference for AC4). Telemetry for 09's per-phase question: boot line 'boot: ipc stack free min after hw detect ipc0= ipc1=' after the PIC probe, and ipc0min/ipc1min on every '[OTA] progress' line.
+
+Firmware change committed locally on lane-95-1870 (not pushed, not built). Bump beta.218 is provisional: ba holds 218 and lane-95-1746 claims the next; re-bump at the final rebase to the number the coordinator assigns. Gates: python evaluate.py --quick -> 93 checks, 0 FAIL, 0 WARN, health 100%. python scripts/run_tests.py was stopped by Claude Code's memory-pressure reaper after 217 PASS (not restarted, per the reaper notice); its FAILED lines (test_dhw_water_meter, test_sat_pid_derivative, test_sat_lowload_contract, test_stream_real_cbuf, and 0.0 s kill artefacts test_ota_flash, test_webserver_listener_retry, test_refresh_storm) came from the killed run. Re-run one by one, all rc=0: test_ota_flash, test_webserver_listener_retry, test_refresh_storm, test_firmware_ota_path (7), test_fs_update_keep (38), test_gpio_isr_early_install (5), test_board_detect_persist_gate (7), test_esp_ipc_override_gate (10). Not re-run: dhw_water_meter, sat_pid_derivative, sat_lowload_contract, stream_real_cbuf (they do not read the changed files); a full suite run is still owed before the push.
+
+beta.219 lane (coordinator plan 2026-11-12): TASK-1746/1868 (lane-95-1746, 1e071a04b) and TASK-1870 (lane-95-1870, 364a52820) combined into ONE firmware commit on origin/dev 695ba6f4a+c97d93659 with one bump to beta.219 (branch lane-95-219b). Built by a per-file 3-way merge with the version banners normalized; check: the diff origin/dev..tree equals bc7c2400b..lane-95-219 (both lanes cherry-picked) line for line after filtering banners and stamps (767 lines each, identical). The 1870 ELF check gates the bench for both lanes.
 <!-- SECTION:NOTES:END -->
