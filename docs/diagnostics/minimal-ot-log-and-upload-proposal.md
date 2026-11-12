@@ -1,6 +1,7 @@
 # Minimal OT log on the device and a daily upload: research and design proposal
 
 Status: proposal for the maintainer (TASK-1862), 2026-11-12. Nothing is implemented. Docs only.
+Robert rejected the batch-upload transports of question 2 and asked for streaming per log line over HTTPS: see "Streaming per log line".
 
 ## The question
 
@@ -196,6 +197,77 @@ the day is lost when the next day overwrites it. An hourly upload of the last ho
 device buffer to a few hours (about 10 to 40 KiB per hour), loses at most an hour, and spreads
 the load. Recommended: hourly, with the "once a day" wish met by the collection side
 grouping the hours per day.
+
+## Streaming per log line (Robert's follow-up, 2026-11-12)
+
+Robert's answers to question 2, by DM via the coordinator (verbatim): "Okay, geen van de opties klinkt goed.
+Wat als we volledig zouden streamen naar een cloud dienst ?" (msg 1570328825353609217) and "Ik wil het dan
+versleuteld, maar wat mij betreft zijn dit geen opties. Onderzoek een optie die streaming is, dus per logregel
+wegschrijven naar een clouddienst. Welke clouddiensten zijn dan beschikbaar. En HTTPS is wat mij betreft dan
+een optie." (msg 1570329291030270033). So: a continuous stream, encrypted in transit, HTTPS allowed.
+
+### The rate that decides everything
+
+The 20 h capture has 8,872 OT frames per hour: **2.46 frames per second per gateway**, 213,000 per day,
+6.4 million per month, plus 95 SAT ticks per hour. As text that is about 5.5 MiB per day (about 165 MiB per
+month); in the binary record format about 0.9 MiB per day (about 26 MiB per month).
+
+Every free tier below counts messages or requests. **One cloud message per frame exhausts each of them with
+one to ten gateways.** What works is the way log services are built: the gateway writes every line with its
+own timestamp into a buffer and sends what has gathered every few seconds over one connection that stays
+open. Each line keeps its exact time; the delay to the cloud is the batch interval. With 10 s batches a
+gateway sends 8,640 messages per day instead of 213,000.
+
+### Candidates (all encrypted with TLS)
+
+| | Protocol | Free tier (primary source) | Gateways free, 10 s batches | Retention | EU region | Device auth | Verdict |
+|---|---|---|---|---|---|---|---|
+| **Grafana Cloud Logs (Loki)** | HTTPS `POST /loki/api/v1/push`, JSON (gzip allowed) or protobuf; every line its own timestamp ([API](https://grafana.com/docs/loki/latest/reference/loki-http-api/)) | 50 GB ingested per month, 14 days retention ([pricing](https://grafana.com/pricing/); [logs invoice](https://grafana.com/docs/grafana-cloud/cost-management-and-billing/understand-your-invoice/logs-invoice/)); how bytes are counted and any rate limit not stated | about 300 (text lines, by volume) | 14 days (free) | EU regions exist (Germany, Ireland, Sweden, Belgium, Netherlands) ([regions](https://grafana.com/docs/grafana-cloud/account-management/regional-availability/)); not stated whether Free can choose them | Access-policy token per tester (write-only scope) | Best fit for "per log line": least server code, query and graphs included. Data must be exported within 14 days for replays. |
+| **Cloudflare Worker + Durable Object + R2** | WebSocket over TLS (`wss://`) to a Durable Object that buffers and writes R2; or HTTPS POST to a Worker | DO on Free: 100,000 requests/day, incoming WebSocket messages billed 20:1, 13,000 GB-s duration/day, SQLite only ([DO pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/), updated 2026-10-18); R2 10 GB-month, 1M writes/month ([R2](https://developers.cloudflare.com/r2/pricing/)); Workers 100,000 requests/day ([limits](https://developers.cloudflare.com/workers/platform/limits/)); Queues 10,000 ops/day, 24 h retention ([Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)) | about 230 over WebSocket (8,640 msgs / 20 = 432 request-equivalents per gateway per day); about 11 with an HTTPS POST every 10 s, about 69 with one per minute | Own choice (R2 lifecycle); 10 GB holds about 380 gateways x 30 days of the binary format | R2 jurisdiction `eu` ([data location](https://developers.cloudflare.com/r2/reference/data-location/)) | Own: per-device enrolment (section above) | Full control, binary format (6x smaller than text), replay-ready raw data kept as long as wanted. More code: Worker + DO (estimate 200 lines) and a WebSocket client on the device. DO duration under hibernation not measured. |
+| **InfluxDB Cloud (free)** | HTTPS line protocol | 5 MB writes per 5 minutes, 30 days retention, 2 buckets ([pricing](https://www.influxdata.com/influxdb-cloud-pricing/)) | about 135 (write rate, per organisation) | 30 days | Not stated on the pricing page | One token per bucket or per tester | Time-series, not logs; frames fit as points. Write cap is per organisation. |
+| **AWS IoT Core** | MQTT over TLS with an X.509 certificate per device, or HTTPS | 500,000 messages and 2.25 million connection-minutes per month, **for 12 months only**; messages metered per 5 KB; then $1 per million messages in eu-west-1; Basic Ingest topics have no messaging cost ([pricing](https://aws.amazon.com/iot-core/pricing/)) | about 1 (10 s) or 11 (1 min batches) inside the free months; 1,000 gateways at 1 min batches cost about $43 per month in messages, plus storage | Rule into S3 (own choice) | Yes (eu-west-1, eu-central-1) | Best of all: a certificate per device | Strongest device identity, but not free after 12 months. |
+| Azure IoT Hub (Free) | MQTT/AMQP/HTTPS | 8,000 messages per day per hub, 0.5 KB blocks, 500 devices ([pricing](https://azure.microsoft.com/en-us/pricing/details/iot-hub/)) | about 0 to 2 | Not a store | Yes | Per device | Too small. |
+| Better Stack Logs (Free) | HTTPS | 3 GB per month, 3 days retention ([pricing](https://betterstack.com/pricing)) | about 18 | 3 days | Not stated for Free | Source token | Too small. |
+| EMQX Serverless (+ rule to storage) | MQTT over TLS | 1 GB traffic per month, 1M session minutes, 1M rule actions ([pricing](https://www.emqx.com/en/pricing)) | about 6 (text) to 38 (binary) | Needs a storage sink | Not checked | Username/password per device | Too small; HiveMQ's free Serverless plan retires on 2026-12-31 ([docs](https://docs.hivemq.com/hivemq-cloud/introduction.html)). |
+| Google Pub/Sub | HTTPS/gRPC | Pricing page could not be read today; the Google Cloud Free Tier needs a billing account ([free features](https://docs.cloud.google.com/free/docs/free-cloud-features)) | not established | Transport, not a store | Yes (paid regions) | Service account per device | Billing account; transport only. |
+
+"Gateways free" is the number of beta gateways one free account carries at 10 s batches, from the limit that
+binds first, rounded down; derived from the numbers above, not measured on the services.
+
+### What the gateway must carry
+
+- **TLS only on boards with PSRAM.** The ADR-218 proof of concept (2026-11-07, both bench units) needs two
+  record buffers of about 16.7 KB each; without PSRAM 14 of 14 handshakes failed, with the allocator
+  redirected to PSRAM all succeeded. A stream keeps that connection open all the time, so those 33 KB stay
+  allocated in PSRAM for as long as the stream runs. **The OT-Direct board and other boards without PSRAM
+  cannot stream**; they keep the local log (phase 1) only.
+- **Flash.** The TLS client adds about 96 KB plus 5.4 KB of root certificates to an app slot that is about
+  93 % full (ADR-218), and a WebSocket client (for the Cloudflare option) adds more. Whether both fit was not
+  measured; it is the first thing to measure, before any choice is final.
+- **Rules.** Outbound HTTPS or WSS needs ADR-218 to be accepted (it waits for "a concrete feature", and this
+  is one) and amends ADR-003, which forbids WSS. The upload runs in its own task with its own stack, never on
+  async_tcp (ADR-137, ADR-218).
+- **Offline.** The stream reads from the same buffer as the local log: on a PSRAM board the ADR-213 ring
+  (about 40 h). When the connection drops, the gateway keeps recording and resends from the last acknowledged
+  record when it is back, with the original timestamps. Loki can refuse entries that are too old; the limit
+  on Grafana Cloud Free was not checked.
+- **Encryption.** TLS encrypts the transport; the service then sees the data in the clear. The GDPR points
+  from the conflicts section stay: consent at opt-in, per-device id, retention, deletion, EU storage, and a
+  data-processing agreement with the chosen service (not checked for any of them).
+
+### Ranking for streaming
+
+1. **Cloudflare Worker + Durable Object (WebSocket over TLS) into R2, EU jurisdiction.** About 230 beta
+   gateways free at 10 s batches, raw binary data kept as long as Robert wants and ready for replays, own
+   per-device enrolment. Cost: most code of the four, a WebSocket client on the device, DO duration not yet
+   measured.
+2. **Grafana Cloud Logs (Loki), EU region.** About 300 gateways free, the simplest device side (HTTPS POST of
+   batched lines) and analysis tools included. Cost: 14 days retention on Free (export for replays), text
+   format, one token per tester to manage, free-plan EU choice and byte counting not verified.
+3. **InfluxDB Cloud free.** About 135 gateways, 30 days, time-series model.
+4. **AWS IoT Core.** Best device identity, not free after 12 months.
+
+Too small or not a store: Azure IoT Hub Free, Better Stack Free, EMQX Serverless, Google Pub/Sub.
 
 ## Conflicts with earlier decisions
 
