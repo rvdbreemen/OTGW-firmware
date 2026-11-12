@@ -6634,6 +6634,22 @@ static void satUpdateThermalLearning()
     _thermal_initialized = true;
   }
 
+  // TASK-1869: a SAT simulation run learns on the simulated house only. Its coefficient is never saved (below), and the
+  // real model is kept on entry and put back when the simulation ends, so a sim run leaves no trace in the real one.
+  static bool     s_thermalSim     = false;
+  static float    s_realCoeffEma   = 0.0f;
+  static uint32_t s_realLearnMs    = 0;
+  static bool     s_realModelValid = false;
+  if (settings.sat.bSimulation != s_thermalSim) {
+    if (settings.sat.bSimulation) {
+      s_realCoeffEma = _thermal_coeffEma; s_realLearnMs = _thermal_totalLearnMs; s_realModelValid = state.sat.bThermalModelValid;
+    } else {
+      _thermal_coeffEma = s_realCoeffEma; _thermal_totalLearnMs = s_realLearnMs; state.sat.bThermalModelValid = s_realModelValid;
+    }
+    s_thermalSim = settings.sat.bSimulation;
+    _thermal_learning = false;   // a decay period never spans the switch
+  }
+
   // Learning: only when flame is OFF, room temp valid, outdoor temp valid
   // AC#6: Learning only runs when SAT has valid room temp AND outside temp simultaneously
   if (!flame && roomValid && outdoorValid && !settings.sat.bFireplaceMode) {   // a stove heating the room would corrupt the learned coefficient (TASK-1374)
@@ -6675,8 +6691,8 @@ static void satUpdateThermalLearning()
             state.sat.bThermalModelValid = true;
           }
 
-          // AC#11: Save to settings periodically (every hour)
-          if ((now - _thermal_lastSaveMs) >= SAT_THERMAL_SAVE_MS) {
+          // AC#11: Save to settings periodically (every hour); never from a simulation run (TASK-1869)
+          if (!settings.sat.bSimulation && (now - _thermal_lastSaveMs) >= SAT_THERMAL_SAVE_MS) {
             settings.sat.fThermalCoeff = _thermal_coeffEma;
             char coeffBuf[12];
             dtostrf(_thermal_coeffEma, 1, 4, coeffBuf);
