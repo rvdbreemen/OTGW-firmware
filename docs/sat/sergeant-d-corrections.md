@@ -6833,3 +6833,19 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** TASK-1817 (otgw-firmware-d3), ADR-231.
 
 **Open:** nothing.
+
+## 324. Q-OS1 A: the room oscillation worries him most; he reads the 11:30 overshoot as sun and wants an evening period before conclusions (Sergeant D, 2026-11-12)
+
+**Source:** sergeantd, 2026-11-12 16:10:14 UTC (time from the message id), #alpha-testing (channel 1514720723980259460), msg 1570470790829441075 (https://discord.com/channels/812969634638725140/1514720723980259460/1570470790829441075), a reply to Q-OS1 (msg 1570465428029968478), followed at 16:11:58 UTC by msg 1570471225996738643 (https://discord.com/channels/812969634638725140/1514720723980259460/1570471225996738643). Read first-hand by the comms session.
+
+**Quoted:** "@BlueFlame Bot A" and "Probably the cause is the sun since the overshoot happened at 11:30. For safer results we need to wait for the evening graph when the sun is down"
+
+**Settled:** of the three oscillations in the overshoot deep-dive of gruijter's 12 Nov morning (msgs 1570465417053601803, 1570465422518657068), the room swing around the target is the one that matters to him, not the flow sawtooth (B) or the PWM/continuous switches (C). He gives the sun as the likely cause of the 11:27 overshoot (+0.16 C at target 19.0) and asks to judge on an evening period without sun. Our reading (interpretation): no control change follows from this morning's data; the next step is the same analysis on an evening period of gruijter's data. Option A carried the consequence "little to change in the control", which fits his wish to wait.
+
+**Facts reported back, not decided by him:** the self-tune itself skipped hours 9 and 10 with reason=sun (SATTUNEH lines in the deep-dive data). That reason only means sun elevation at or above 12 degrees (SAT_CT_SUN_MAX_DEG, SATcurveTune.h:13; SATcontrol.ino:6027 on origin/dev; entry 161), not sunshine; the comms session first called it support for his reading (msg 1570473557593694380) and corrected that (msg 1570477072747331646). The larger overshoot, +0.21 C at 07:17 (target 18.0), came before sunrise: the gateway logged sun elevation -6.0 degrees at 07:17:54 (msg 1570473962486501558). gruijter reported the morning was cloudy, with sun only after 13:00 (msg 1570476074918482120, with a screenshot not analysed).
+
+**Checked against the recorded entries:** entry 37 (overshoot margin 2.0, option B 3.0 rejected) stays untouched: the conditional margin follow-up in docs/sat/open-questions.md was only for answer C and is dropped. No conflict with entries 22, 37, 262, 318-323. No thermo-nova behaviour is decided here, so no citation is needed.
+
+**Task:** none yet; the evening analysis is a follow-up to Robert's deep-dive request (msg 1570456741630447867). The coefficient question (Robert's simulation request, msg 1570465414285234177) is separate and still running.
+
+**Open:** the evening analysis; the queued follow-ups (saturation exit, pump-overrun test, coefficient 1.8/2.0) wait for it.

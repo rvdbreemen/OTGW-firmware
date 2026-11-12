@@ -4320,6 +4320,17 @@
     "TASK-1817"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 324,
+   "title": "Q-OS1 A: the room oscillation worries him most; he reads the 11:30 overshoot as sun and wants an evening period before conclusions (Sergeant D, 2026-11-12)",
+   "date": "2026-11-12",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1570470790829441075",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
   }
  ]
 }
