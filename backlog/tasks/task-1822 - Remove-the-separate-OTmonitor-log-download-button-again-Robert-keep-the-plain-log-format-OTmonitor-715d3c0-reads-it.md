@@ -3,11 +3,11 @@ id: TASK-1822
 title: >-
   Remove the separate 'OTmonitor log' download button again (Robert: keep the
   plain log format; OTmonitor 715d3c0 reads it)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T21:17:00Z'
-updated_date: '2026-11-12T01:26:00Z'
+updated_date: '2026-11-12T01:45:00Z'
 labels:
   - webui
 milestone: 2.0.0
@@ -42,3 +42,9 @@ Reverted locally on lane-1815 (to be ordered first at integration, beta.188): re
 
 Bench by otgw-firmware-09 on .61, 2.0.0-beta.190+1a4c0a4 (2026-11-12): ota_flash.py app + fs, githash 1a4c0a4, bootcount 384 -> 386, health 200, MQTT connected, crashlog none, settings 164 keys unchanged, firmware_ota=safeboot; restored afterwards (settings diff 0 of 518 flattened keys, sim files deleted, reboot, bootcount 387). Pushed origin/dev ba41264e6..1a4c0a48b; zip posted #alpha-testing msg 1570248008279523399. Evidence: 09 scratchpad b190/ (telnet-A.log, phaseA-sattick.txt, sattuned.txt, log-toolbar.png). AC3: Monitor > Log toolbar holds Pause, Clear, Download, filter and the chips Auto-scroll, Timestamps, SAT only, Capture, Auto-download, Stream to file; no 'OTmonitor log' button and no logDownloadOtmon element in the DOM (b190/log-toolbar.png); the plain download has every frame at 0-based column 35, e.g. '01:54:59.827450 Boiler             BC0393000  57 Read-Ack        > MaxTSet = 48.00 °C'.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The OTmonitor-log download button (TASK-1813) is reverted on Robert's decision: OTmonitor 715d3c0 reads the plain log. AC1: revert of caf868c7c (10 files), downloadLog() byte-identical to caf868c7c^. AC2: web UI suite 63/63 (one file per run), evaluate --quick no FAIL (85/0 on origin 2622e44b5). AC3: bench by 09 on .61 with 2.0.0-beta.190+1a4c0a4: toolbar without the button and no logDownloadOtmon in the DOM (b190/log-toolbar.png), plain download frames at column 35. Shipped as beta.188 within origin/dev 1a4c0a48b, zip msg 1570248008279523399.
+<!-- SECTION:FINAL_SUMMARY:END -->

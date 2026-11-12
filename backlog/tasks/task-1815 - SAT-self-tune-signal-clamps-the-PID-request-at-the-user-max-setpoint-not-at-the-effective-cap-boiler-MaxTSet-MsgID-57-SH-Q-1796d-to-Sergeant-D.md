@@ -3,11 +3,11 @@ id: TASK-1815
 title: >-
   SAT self-tune signal clamps the PID request at the user max setpoint, not at
   the effective cap (boiler MaxTSet MsgID 57 / SH=): Q-1796d to Sergeant D
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T20:05:00Z'
-updated_date: '2026-11-12T01:25:00Z'
+updated_date: '2026-11-12T01:44:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -26,7 +26,7 @@ The self-tune signal is clamp(pidRaw, SAT_MIN_SETPOINT, sysMax) - curve with sys
 <!-- AC:BEGIN -->
 - [x] #1 Sergeant D's answer to Q-1796d is recorded in docs/sat/sergeant-d-corrections.md
 - [x] #2 The tuner signal uses the maximum he chose; a host test (tests/test_sat_curve_selftune.py or the SATcontrol harness) fails on the old clamp and passes on the fix when the answer is B
-- [ ] #3 Build, evaluate --quick and a bench run on .61 with a boiler MaxTSet below the user max show the clamped signal in SATTUNEH
+- [x] #3 Build, evaluate --quick and a bench run on .61 with a boiler MaxTSet below the user max show the clamped signal in SATTUNEH
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -44,3 +44,9 @@ Implemented locally (lane-1815 on origin/dev 52fab1fb7): SATcontrol.ino tuner bl
 
 Bench by otgw-firmware-09 on .61, 2.0.0-beta.190+1a4c0a4 (2026-11-12): ota_flash.py app + fs, githash 1a4c0a4, bootcount 384 -> 386, health 200, MQTT connected, crashlog none, settings 164 keys unchanged, firmware_ota=safeboot; restored afterwards (settings diff 0 of 518 flattened keys, sim files deleted, reboot, bootcount 387). Pushed origin/dev ba41264e6..1a4c0a48b; zip posted #alpha-testing msg 1570248008279523399. Evidence: 09 scratchpad b190/ (telnet-A.log, phaseA-sattick.txt, sattuned.txt, log-toolbar.png). AC3: MsgID 57 = 48.0 fed through the firmware frame replay (/otgw_simulation.log with BC0393000 and B40030004) with the SAT simulation, satmaxsetpoint 65. Before the first MsgID 57 frame: 'praw=94.40 pid=65.00 cs=65.0'; after it: '01:51:52 SATTICK ... curve=36.30 p=60.50 praw=96.80 pid=48.00 cs=48.0' (also 01:52:52, 01:54:13). Tuner signal clamped: 'SATTUNEH hour=0 mean=11.70 ... wmean=11.70' = 48 - 36.30 (unclamped >= 28.70). Not verified: MsgID 27 from the boiler (weather feed used, osrc=S).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The self-tune signal clamps the PID request at the effective maximum (satEffectiveMaxSetpoint(): user max, boiler MaxTSet MsgID 57, SH), entry 317. AC1: Sergeant D's Q-1796d answer recorded (entry 317). AC2: tests/test_sat_tune_signal_ceiling.py red on the old clamp, green on the fix; test_sat_curve_selftune pin and test_sat_ceiling_paths anchor updated. AC3: built 2.0.0-beta.190+1a4c0a4, evaluate --quick 85/0 on origin 2622e44b5 (same firmware), bench by 09 on .61: MsgID 57 = 48 via frame replay took pid 65.00 -> 48.00 (SATTICK 01:51:52) and SATTUNEH wmean 11.70 = 48 - 36.30. Shipped: origin/dev 1a4c0a48b, zip msg 1570248008279523399. Not verified: MsgID 57 from a real boiler.
+<!-- SECTION:FINAL_SUMMARY:END -->

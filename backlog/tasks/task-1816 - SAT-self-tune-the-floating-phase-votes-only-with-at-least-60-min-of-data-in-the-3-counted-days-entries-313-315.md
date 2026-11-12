@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T20:09:00Z'
-updated_date: '2026-11-12T01:26:00Z'
+updated_date: '2026-11-12T01:28:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -46,4 +46,6 @@ AC3 (ADR question): settled with the coordinator: one new ADR via adr-kit amends
 ADR-230 split on Robert's choice (floating minimum only) and Accepted 2026-11-12 by Robert in session d3 (AskUserQuestion 'Ja, accepteer'; also DM 'A' to the coordinator, msg 1570216668469133343). Clarity gate fixed (PID/PWM expanded), Status paragraph repaired after adr accept cut it; strict lint: ADR-228 and ADR-230 PASS strictly; governance OK.
 
 Bench by otgw-firmware-09 on .61, 2.0.0-beta.190+1a4c0a4 (2026-11-12): ota_flash.py app + fs, githash 1a4c0a4, bootcount 384 -> 386, health 200, MQTT connected, crashlog none, settings 164 keys unchanged, firmware_ota=safeboot; restored afterwards (settings diff 0 of 518 flattened keys, sim files deleted, reboot, bootcount 387). Pushed origin/dev ba41264e6..1a4c0a48b; zip posted #alpha-testing msg 1570248008279523399. Evidence: 09 scratchpad b190/ (telnet-A.log, phaseA-sattick.txt, sattuned.txt, log-toolbar.png). Shipped in beta.190. Bench shows the new field only: '02:19:51 SATTUNED day=0 clean=24 counted=1 days_in_window=1 mean3=na decision=hold reason=few_days ... fvote=0' (satsimcoolrate 0.2, coefficient 1.0, interval 10, sim tune_hour 60). AC4 NOT ticked: it asks for the TASK-1525 run-3 scenario, which needs at least 3 tuner days on the sim (~75 min); the decision itself is host-proven (AC2). AC4 wording 'new reason' is stale: the change adds fvote=, the reason strings are unchanged. Follow-up bench run requested via the coordinator.
+
+Correction (2026-11-12, otgw-firmware-d3): the zip post -m for beta.190 (msg 1570248008279523399) said 'at least 60 min of floating ticks per day'. Wrong: SATcontrol.ino:6148-6157 sums the floating ticks over the 3 counted days (phTicks3), so the floating phase votes with at least 1 hour over the counted days (SAT_CT_FLOAT_MIN_MS 3600000, SATcurveTune.h:31). 92 posts the public correction.
 <!-- SECTION:NOTES:END -->
