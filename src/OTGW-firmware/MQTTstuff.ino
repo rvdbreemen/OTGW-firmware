@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.207
+**  Version  : v2.0.0-beta.208
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1539,6 +1539,7 @@ void handleMQTT()
       if (MQTTclient.connected())
       { // engine already pumped by the unconditional loop() at top of handleMQTT()
         state.mqtt.iLastConnectedMs = millis();  // stamp each confirmed-live tick for offline-duration tracking
+        connStageTick();  // TASK-1757: rest of the connect burst, in portions
         // ADR-118: periodically refresh the retained gateway-override topics so HA / dashboards
         // reflect active overrides even when no new override frame arrived this minute.
         if (DUE(timerMQTToverridepublish)) publishActiveOverrides();
@@ -1662,6 +1663,66 @@ void PrintMQTTError(){
 // MQTT_STATE_TRY_TO_CONNECT once connect() returned true; with the async client
 // it runs here, when the broker's CONNACK actually lands. sessionPresent is
 // unused (we always setCleanSession(true)).
+// --- connStage (TASK-1757) ---------------------------------------------------
+// The connect burst used to queue ~17 packets inside onMqttConnect (up to ~30
+// with a PIC). Queueing them is cheap; transmitting them in one go is not: the
+// boot connect trace (beta.171) showed the heap fall 30-50 KB in the 50-150 ms
+// in which they were sent, and with a browser loading the UI at the same time
+// that reached 2.9 KB, below CRITICAL. onMqttConnect now sends only the birth
+// and the two command subscriptions; connStageTick() sends the rest in four
+// portions. A portion goes only when the previous one has left the outbox, the
+// largest block is clear of espMqttClient's 16 KB refusal floor, and the
+// previous portion is CONN_STAGE_GAP_MS old; after CONN_STAGE_MAX_WAIT_MS it
+// goes anyway, so nothing is skipped. Runs in the loop task (espMqttClient is
+// pumped from handleMQTT(), UseInternalTask::NO), like onMqttConnect itself.
+static void mqttV2MigrationOnConnect();
+constexpr uint32_t CONN_STAGE_MAX_OUTBOX   = 2;        // packets still queued from the previous portion
+constexpr uint32_t CONN_STAGE_MIN_BLOCK    = 20480U;   // bytes; espMqttClient refuses below 16 KB
+constexpr uint32_t CONN_STAGE_GAP_MS       = 200;      // a send dip lasted 50-150 ms in the trace
+constexpr uint32_t CONN_STAGE_MAX_WAIT_MS  = 5000;     // then send anyway
+static uint8_t  sConnStage   = 0;   // 0 = idle, 1..4 = next portion to send
+static uint32_t sConnStageMs = 0;   // millis() of connect or of the last portion
+
+static void connStageStart() { sConnStage = 1; sConnStageMs = millis(); }
+static void connStageReset() { sConnStage = 0; }
+
+// True when the next portion may go now.
+static bool connStageReady(uint32_t nowMs, uint32_t outbox, uint32_t maxBlock) {
+  uint32_t waited = nowMs - sConnStageMs;
+  if (waited >= CONN_STAGE_MAX_WAIT_MS) return true;
+  return waited >= CONN_STAGE_GAP_MS && outbox <= CONN_STAGE_MAX_OUTBOX && maxBlock >= CONN_STAGE_MIN_BLOCK;
+}
+
+static void connStageTick() {
+  if (sConnStage == 0) return;
+  if (!MQTTclient.connected()) { connStageReset(); return; }
+  if (!connStageReady(millis(), (uint32_t)MQTTclient.queueSize(), platformMaxFreeBlock())) return;
+  switch (sConnStage) {
+    case 1:
+      // TASK-410 / ADR-084: briefly subscribe to the six deprecated OT-bus topics so
+      // the broker delivers any lingering retained payloads from pre-2.0.0 firmware.
+      // The callback clears them; mqttV2MigrationTick() closes the window.
+      mqttV2MigrationOnConnect();
+      break;
+    case 2:
+      sendMQTTversioninfo();
+      break;
+    case 3:
+      publishAllPICsettings();
+      break;
+    default:
+      publishCommandDroppedState();      // TASK-1439: replaces a retained ON left from before a reboot
+      publishBoilerUnsupportedMsgids();  // TASK-692 port: republish the retained CSV after every reconnect
+      clearBoilerUnsupportedDirty();
+      break;
+  }
+  DebugTf(PSTR("[HEAP] connect stage %u: free=%u max_block=%u\r\n"), (unsigned)sConnStage, platformFreeHeap(), platformMaxFreeBlock());
+  connTraceSample();  // TASK-1757
+  sConnStageMs = millis();
+  sConnStage = (sConnStage >= 4) ? 0 : (uint8_t)(sConnStage + 1);
+}
+// --- end connStage -----------------------------------------------------------
+
 static void onMqttConnect(bool sessionPresent) {
   (void)sessionPresent;
   if (sBootHeapState == BOOTHEAP_RUN) {
@@ -1716,20 +1777,12 @@ static void onMqttConnect(bool sessionPresent) {
     PrintMQTTError();
   }
   MQTTclient.subscribe("homeassistant/status", 0);
-  // TASK-410 / ADR-084: briefly subscribe to the six deprecated OT-bus topics so
-  // the broker delivers any lingering retained payloads from pre-2.0.0 firmware.
-  // The callback clears them; mqttV2MigrationTick() closes the window. No-op on
-  // clean brokers.
-  mqttV2MigrationOnConnect();
   DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
   connTraceSample();  // TASK-1757
-  sendMQTTversioninfo();
-  publishAllPICsettings();
-  publishCommandDroppedState();      // TASK-1439: replaces a retained ON left from before a reboot
-  publishBoilerUnsupportedMsgids();  // TASK-692 port: republish the retained CSV so HA/dashboards see it after every reconnect.
-  clearBoilerUnsupportedDirty();
-  DebugTf(PSTR("[HEAP] post-versioninfo: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
-  connTraceSample();  // TASK-1757
+  // TASK-1757: the rest of the connect burst (V2 migration subscribes, version
+  // info, PIC settings, command_retry_exceeded, unsupported_msgids) leaves in
+  // portions from connStageTick(), so it is not transmitted in one go.
+  connStageStart();
 }
 
 // Disconnect / connect-refused. Records the reason for PrintMQTTError() and
@@ -1743,6 +1796,7 @@ static void onMqttConnect(bool sessionPresent) {
 static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason) {
   lastMqttDisconnectReason = reason;
   state.mqtt.bConnected = false;
+  connStageReset();  // TASK-1757: the next connect starts the portions again
   PrintMQTTError();
 }
 
@@ -2501,6 +2555,19 @@ static bool discoveryDripIsHeapHealthyForRestore() {
 // leave a stale literal behind in the auto-heal path.
 bool discoveryDripHeapHealthy() { return discoveryDripIsHeapHealthyForRestore(); }
 
+// TASK-1757 (B): the drip skips a tick while more than DRIP_OUTBOX_MAX packets
+// wait in the MQTT outbox (the connect burst or a status fan-out still leaving),
+// at most DRIP_OUTBOX_MAX_WAITS ticks in a row; then it publishes anyway, so a
+// busy outbox delays discovery but never starves it. Nothing is dropped: the
+// pending bit stays set. Returns true when this tick must be skipped.
+constexpr uint32_t DRIP_OUTBOX_MAX       = 8;
+constexpr uint8_t  DRIP_OUTBOX_MAX_WAITS = 5;
+static bool dripOutboxWait(uint32_t outbox, uint8_t& waits) {
+  if (outbox > DRIP_OUTBOX_MAX && waits < DRIP_OUTBOX_MAX_WAITS) { waits++; return true; }
+  waits = 0;
+  return false;
+}
+
 void loopMQTTDiscovery()
 {
   DECLARE_TIMER_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
@@ -2554,6 +2621,10 @@ void loopMQTTDiscovery()
   if (isDripDeferred()) {
     state.heapdiag.iDripCooldownSkipCount++;
     return;
+  }
+  {
+    static uint8_t outboxWaits = 0;  // TASK-1757: ticks skipped in a row on a deep outbox
+    if (dripOutboxWait(mqttOutboxDepth(), outboxWaits)) return;
   }
 
   // Scan pending bitmap for the next set bit
