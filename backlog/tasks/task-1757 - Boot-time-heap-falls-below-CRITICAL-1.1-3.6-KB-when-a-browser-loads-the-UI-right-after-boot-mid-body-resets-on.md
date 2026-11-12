@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:05:00Z'
-updated_date: '2026-11-12T19:03:00Z'
+updated_date: '2026-11-12T19:51:00Z'
 labels:
   - heap
   - bug
@@ -29,7 +29,7 @@ Fix idea for the plan only (not decided): hold back UI serving (e.g. 503 + Retry
 <!-- AC:BEGIN -->
 - [x] #1 Reproduce with ONE normal browser tab loading the UI right after boot first (not the two-tab trace): windowed heap minimum per boot phase and any reset, on the current dev build
 - [x] #2 Name which allocations in the boot window combine with UI serving to reach below CRITICAL, with evidence
-- [ ] #3 Fix agreed with Robert in the plan; after the fix the one-tab and two-tab boot runs stay above CRITICAL with 0 mid-body resets, with old-vs-fix numbers
+- [x] #3 Fix agreed with Robert in the plan; after the fix the one-tab and two-tab boot runs stay above CRITICAL with 0 mid-body resets, with old-vs-fix numbers
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -90,4 +90,6 @@ Fix decided by the coordinator as a direct application of Robert's option C (pub
 2026-11-12 beta.218: fix (option C stage + B outbox-depth pace on SAT core-state publish) rebased onto origin/dev 40d1801ea, bumped beta.217->beta.218. Targeted tests green after rebase: probe, staging, sat_mqtt_state, wifi_deadlink, otd_dhw_push_pic, otd_msgid99_bytes, health_no_fs_flash_ops (each files 1 passed 1). evaluate.py --quick: 93 checks, 86 PASS, 0 FAIL. Connect-window probes stay in 218 for the old-vs-fix bench comparison. Full suite: files 1-80 green before rebase; 81-222 to run.
 
 2026-11-12 beta.218 105ac46fd: build retry SUCCESS 19:02 (try 1 died 18:51 on 0xC0000142 under memory pressure, no zip); zip OTGW-firmware-esp32-combo-2.0.0-beta.218+105ac46-flash.zip, .elf kept. Full tests on 105ac46fd: 223/223 files (fresh run_tests --list after rebase), one per process, -j 1: 222 PASS, 1 FAILED = test/host/test_stream_real_cbuf.py, a runner false-FAIL (rc=0 and RESULT: PASS run directly; its mutant section prints a FAILED line that run_tests.py classify_py():105 matches). Filed TASK-1872. Coordinator counts the run green for 218. Bench on 09 pending.
+
+2026-11-12 AC3 bench PASS (otgw-firmware-09, bench owner, on .61, beta.218+105ac46, OTA app+fs 19:10, settings 164 keys unchanged). Fix as agreed with Robert (TASK-1757 decision: C stage onMqttConnect + B drip waits on outbox depth). 12 boots W,C,W,C,W,C,W,C,B,B,B,B; Firefox a constant extra WS client, plus 1 Chrome on W/B boots (two clients), C boots one client. 0 resets other than /ReBoot, crashlog empty, bootcount 525->537 (+1 per boot). Old-vs-fix on the same probe lines: largest heap drop inside one MQTTclient.loop() (tag 12->13) 215: 23452-43516 B in all 12 boots (outbox 4 each time); 218: 7024-19976 B, none >= 23 KB. SAT core-state publish (tag 17): 215 first at 47-441 ms after connect with outbox 18 every boot; 218 within the probe window in 6/12 boots at 185-895 ms with outbox 3 (5x) or 7 (1x), held beyond the window in the other 6; outbox 18 never seen. Probe-min per boot 215 8184-35944 B vs 218 31816-52528 B; maxblk-min 215 5108-24564 vs 218 19444-31732; hd_min_free_heap at +60 s 29216-52368 B (CRITICAL is 3072 B). ipc0/ipc1 224/88. Not verified: the outbox value at the gate before the publish (probe reads it after) and the 60 s CONN_PACE_MAX_MS fallback (not hit). Evidence: C:\Users\rvdbr\AppData\Local\Temp\claude\d9c572fbc7f8e9ee\4f6ad420-bf33-4a3a-88bc-4eb9890a2231\scratchpad\b218\ (run/boot*-telnet-kept.txt, -raw.txt, boot*-info60.json, events.log, old-vs-fix.txt), comparison script scratchpad\tools\probe_cmp.py.
 <!-- SECTION:NOTES:END -->
