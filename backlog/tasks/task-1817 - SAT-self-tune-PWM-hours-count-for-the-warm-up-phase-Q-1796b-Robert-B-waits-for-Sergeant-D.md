@@ -3,11 +3,11 @@ id: TASK-1817
 title: >-
   SAT self-tune: PWM hours count for the warm-up phase (Q-1796b, Robert B; waits
   for Sergeant D)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T20:20:00Z'
-updated_date: '2026-11-12T12:27:00Z'
+updated_date: '2026-11-12T14:40:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -27,7 +27,7 @@ Robert decided Q-1796b = B (DM msg 1570171160111620147, relayed by the coordinat
 - [x] #1 Sergeant D's answer (or recorded silence) on Q-1796b is in docs/sat/sergeant-d-corrections.md before the code commit
 - [x] #2 Host test: an hour with PWM ticks counts for the warm-up phase on the fix and is excluded on the old code; floating unchanged
 - [x] #3 ADR impact settled (ADR-205 d2 / ADR-228) via adr-kit, recorded in the notes
-- [ ] #4 Build, evaluate --quick, OTA bench on .61 with PWM active (satboilercapacity low) shows the PWM hour counted in SATTUNEH
+- [x] #4 Build, evaluate --quick, OTA bench on .61 with PWM active (satboilercapacity low) shows the PWM hour counted in SATTUNEH
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -52,4 +52,12 @@ Host evidence 2026-11-12: tests/test_sat_curve_selftune.py 82/82 OK on the fix (
 AC3: ADR-231 (adr-kit) amends ADR-205 d2 and ADR-228 d1, relate written both sides; Accepted 2026-11-12 on Robert's DM 'A' (msg 1570402646186139730, reply to 1570337513208414273).
 
 Full scripts/run_tests.py on lane-1817 (2026-11-12, -j 4, 1037 s): 221 files, 217 passed, 4 failed. Claude Code stopped the shell for low system memory, and the 4 failed files do not touch the tuner code. Rerun one at a time in the foreground, with the change in place: test_ota_flash rc=0 OK; test_refresh_storm rc=0 OK (skipped=2); test_stream_real_cbuf rc=0 'PASS: green with the presize, red without it'; test_dhw_water_meter rc=0 RESULT: PASS. So the 4 failures were artifacts of the memory reaper.
+
+Bench by otgw-firmware-09 on .61, beta.216+0a10492 (2026-11-12): OTA app + fs, settings 164 keys changed none, githash 0a10492, bootcount 479 -> 481 then stable. otdmode 3 + sim never reached PWM ('PWM refused (path 1): no valid MsgID 3 reply'), so the run used otdmode 4 (loopback, MsgID 3 Read-Ack), satsource 1, target 19.8, interval 10, coefficient 0.8, lat 70, tune_hour 60, plus a sim solar_gain 0.15. PWM 14:54:26-14:57:26. SATTUNEH hour=17 mean=-5.42 ticks=6 counted=1 reason=none wticks=6 fticks=0, and hour=18 mean=-6.85 counted=1 reason=none wticks=6 fticks=0; both hours 6 of 6 SATTICK mode=2. Mixed hours 16 and 19 drop on min_mod (ADR-231 Negative). Flame, modulation and minMod come from the sim model (SATcontrol.ino:2721, :2727, :7605). Not benched: flame=0 ticks inside a counted PWM hour (the sim stayed lit), and the satsource=2 control (PWM did not return after the switch); both are host-proven (PwmGasRule). Health: bootcount 481 stable over 12 polls, heap low 60068 B, no new crashlog. Settings restored, diff 0. Side finding: a sim run wrote satthermalcoeff 0.0966 -> 0.0998, filed as TASK-1869. Pushed origin/dev f0dd92d5e..0a1049215; zip posted to #alpha-testing, msg 1570447126356430879 (covers beta.215 and beta.216).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ADR-231 (Accepted by Robert, DM 1570402646186139730): on a gas boiler or AUTO a SAT PWM tick is a warm-up tick, and the pwm, flame_off and min_mod exclusions do not drop its hour; heat pumps and hybrids keep reason=pwm. Shipped in 2.0.0-beta.216 (0a1049215). AC1: entries 316, 318, 319, 322, 323 recorded. AC2: tests/test_sat_curve_selftune.py 82/82 OK on the fix; PwmGasRule 5 FAIL on the old code (a gas/AUTO PWM hour gives reason=pwm, 3 PWM days give no raise). The heat-pump and hybrid subtests pass on both, by design: they check the unchanged rule. Full run_tests 217/221; the 4 failures were artifacts of the memory reaper and passed when rerun alone. AC3: ADR-231 via adr-kit, amends ADR-205 d2 and ADR-228 d1. AC4: 09 bench .61: two full PWM hours (6 of 6 mode=2) counted=1 reason=none fticks=0; build exit 0, evaluate --quick 0 failed. Not benched: flame=0 inside a counted PWM hour and the heat-pump control (host-proven only). The PWM came from the sim model with loopback for MsgID 3, not from a real boiler.
+<!-- SECTION:FINAL_SUMMARY:END -->

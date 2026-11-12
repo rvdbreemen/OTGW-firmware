@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T20:09:00Z'
-updated_date: '2026-11-12T12:13:00Z'
+updated_date: '2026-11-12T13:52:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -52,6 +52,8 @@ Correction (2026-11-12, otgw-firmware-d3): the zip post -m for beta.190 (msg 157
 AC4 bench by otgw-firmware-09 on .61, beta.214, SAT sim, TASK-1525 run-3 scenario (2026-11-12 11:58-13:10): first daylight run void (every hour reason=sun); rerun with satweatherlat=70 temporarily (sun gate only; sim outside temp is state.sat.fSimOutdoorTemp, SATcontrol.ino:2549). SATTUNED day=2 clean=23 counted=1 days_in_window=3 mean3=24.94 decision=raise reason=phases_agree wmean3=24.94 wticks3=390 wsay=higher fmean3=na fticks3=0 fsay=hold fvote=0; SATTUNE old=1.0 new=1.1. Days 0-1 hold few_days fvote=0. 72 SATTUNEH: 65 none, 6 dhw, 1 not_sat. Bootcount 466 stable, health 200, MQTT connected, crashlog none; min free heap low point 3896 B (trend reported to 95, not this task). Settings restored, diff 0. reason=phases_agree with a floating phase without a vote is the ADR-228/entry 305 label (host test test_a_phase_without_ticks_lets_the_other_decide pins it). Not benched: a real floating phase near 60 min, the boundary (host only), the real sun gate. Evidence: 09 scratchpad b1816/ (telnet.log, poll.log).
 
 Correction from 09: the heap was not trending down. 3896 B is the since-boot low-water mark of boot 466 (it covers pyotgw and the SAT sim as well), not comparable with the per-boot values on 211. The AC4 PASS stands.
+
+Correction from 09 (2026-11-12): the sim outside temperature does come from the weather fetch. fSimOutdoorTemp is filled by satSimOutdoorTemp() (SATcontrol.ino:5729-5731: weather.bValid ? weather.fTemperature : triangle wave). After satweatherlat=70 the device fetched the weather for that place (12:06:13), and SATTICK out= fell from 7.8 to 3.8. So mean3=24.94 is not comparable with the 10.08 of the TASK-1525 run. AC4 is unaffected: it checks the decision path (warm-up decides alone with fticks3=0, fvote=0), not the size of mean3.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
