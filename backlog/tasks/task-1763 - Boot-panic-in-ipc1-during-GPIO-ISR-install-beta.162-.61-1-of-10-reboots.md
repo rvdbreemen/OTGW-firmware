@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@system32-030509'
 created_date: '2026-11-09T19:21:00Z'
-updated_date: '2026-11-12T00:31:00Z'
+updated_date: '2026-11-12T03:11:00Z'
 labels:
   - bug
   - crash
@@ -61,6 +61,8 @@ Not this class (2026-11-10, a4): the coredump in gruijter's upload 20261110-1005
 2026-11-11 lane cleanup (finish-every-lane, TASK-1827; owner session a4 gone; done by otgw-docs on the coordinator's request): every commit of lane-1763a was already on origin/dev (git cherry: no '+'; lane HEAD a242518bf). The uncommitted ADR-225 experiment was saved before the worktree was removed: D:\Users\Robert\Documents\GitHub\RvdB\OTGW-worktree-leftovers\wt-1763a-2026-11-11\ (README.md; platformio-custom_sdkconfig-ADR-225.patch = custom_sdkconfig CONFIG_ESP_IPC_TASK_STACK_SIZE=2048; wt-1763a-uncommitted.patch; the hybrid-compile sdkconfig.defaults, sdkconfig.esp32-combo, dependencies.lock, CMakeLists.txt, .dummy/ and managed_components/ (583 MB, moved)). Not kept: .pio and .build-python (regenerable). Worktree wt-1763a and branch lane-1763a removed.
 
 2026-11-12 01:14-01:25 bench (otgw-bench-tester), .61 OTGW32, 2.0.0-beta.187+579e0d1: 30 x POST /ReBoot (scratchpad t1763/reboot_loop.py); after each: wait for /api/v2/health, read bootcount and /api/v2/device/crashlog, on a new crash save crashlog + /api/v2/device/coredump; COM4 serial captured with DTR/RTS off (serial.log, 795 lines). Result: 0 panics in 30 reboots. Bootcount 353 -> 383, +1 each (no extra panic reboot); crashlog available=false throughout; serial shows all 30 ROM reset lines 'rst:0xc (RTC_SW_CPU_RST)', 0 hits for Guru/panic/abort/Backtrace/ipc1, so the capture works. Bound: 0/30 gives a 95 % upper bound of about 10 % per reboot (rule of three); this does NOT exclude the 1-in-10 seen on beta.162 (and is 4 % likely if the rate were still 10 %). Not covered yet: the long-uptime case (start uptime 59 min; the beta.162 panic came after a boot with hd_min_free_heap 3592) and a deliberately low-heap boot. Evidence local: scratchpad t1763/results.txt, serial.log; 187 ELF kept in scratchpad/cand187/ for a decode. AC2 not ticked.
+
+2026-11-12 02:24-03:15 and 03:54-04:05 load runs (otgw-bench-tester, .61 OTGW32), scratchpad t1763b/loadloop.py. Each cycle: about 10 min of uptime under two headless web UI tabs, a read-only telnet session and device/info polls every 5 s (like the beta.162 two-tab boot), then POST /ReBoot, then a crashlog check with coredump save; COM4 captured with DTR/RTS off. Results: beta.190+1a4c0a4, 5 cycles, 0 panics, minimum hd_min_free_heap per cycle 26876 / 26292 / 22632 / 21576 / 24524 B; beta.197+4cafc97, 1 cycle, 0 panics, hd_min 13732 B (the lowest seen; maxblk >= 26612). COM4: only 'rst:0xc (RTC_SW_CPU_RST)' lines, 0 hits for Guru/panic/abort/Backtrace. The second run was stopped by the host (laptop low on memory), not by the device. Total so far: 30 plain reboots on 187 plus 6 load cycles on 190/197 = 36 reboots, 0 panics. This still does NOT reproduce the beta.162 condition (hd_min 3592 B), so the 1-in-10 is neither confirmed nor excluded for a really low-heap boot. AC2 not ticked; resuming the load loop is the coordinator's call after the 08:00 slot.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
