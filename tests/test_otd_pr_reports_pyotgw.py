@@ -133,8 +133,8 @@ def tearDownModule():
         shutil.rmtree(_tmp, ignore_errors=True)
 
 
-def replies(it=1, oh=0) -> dict:
-    out = subprocess.run([str(_exe), LETTERS, str(it), str(oh)], capture_output=True, text=True, check=True).stdout
+def replies(it=1, oh=0, letters=LETTERS) -> dict:
+    out = subprocess.run([str(_exe), letters, str(it), str(oh)], capture_output=True, text=True, check=True).stdout
     res, cur = {}, None
     for line in out.splitlines():
         if line.startswith("Q "):
@@ -214,6 +214,35 @@ class OTDirectPRReports(unittest.TestCase):
         self.assertEqual(otgw["otgw_ovrd_high_byte"], 0)
         self.assertIn("PR=D", asked, "pyotgw skips PR=D when the banner version is below 5")
         self.assertEqual(otgw.get("otgw_temp_sensor"), "O")
+
+
+    def test_X1_pr_x_reports_the_compat_version_from_the_banner_macro(self):
+        # TASK-1860: an OT-Direct-only report (the PIC 6.8 answers BV for PR=X, gateway.asm:2163-2189).
+        rm = replies(1, 0, LETTERS + "X")
+        self.assertIn("X", rm, "PR=X gives no reply")
+        self.assertRegex(rm["X"], r"^PR: X=\d+\.\d+$", rm["X"])
+        banner_ver = rm["A"][len("PR: A=OpenTherm Gateway "):].split()[0]
+        self.assertEqual(rm["X"][len("PR: X="):], banner_ver, "PR=X and the PR=A banner must carry the same version")
+
+
+class DeviceInfoCompatField(unittest.TestCase):
+    """TASK-1860 AC2: /api/v2/device/info carries the same version as "otdpiccompat", only on OT-Direct.
+
+    Source-level check on the real emitter (sendDeviceInfoV2() is a chunked lambda over the whole device
+    state, not sliceable into a host binary): the field sits in the `if (snap->otDirectEnabled)` block, and
+    otdPicCompatVersion() returns the same macro PR=A and PR=X print. The rendered JSON is a bench AC.
+    """
+
+    def test_field_is_emitted_only_in_the_ot_direct_block(self):
+        rest = Path(os.environ.get("OTGW_REST_INO", REPO / "src" / "OTGW-firmware" / "restAPI.ino")).read_text(encoding="utf-8")
+        fn = rest[rest.index("void sendDeviceInfoV2()"):]
+        block = fn[fn.index("if (snap->otDirectEnabled) {"):fn.index("#endif", fn.index("if (snap->otDirectEnabled) {"))]
+        self.assertIn('je.field(F("otdpiccompat"), otdPicCompatVersion());', block)
+        self.assertEqual(fn.count('F("otdpiccompat")'), 1, "emitted once, in the OT-Direct block only")
+
+    def test_helper_returns_the_banner_macro(self):
+        src = OTD_INO.read_text(encoding="utf-8")
+        self.assertRegex(src, r'const char\* otdPicCompatVersion\(\) \{ return OTD_PIC_COMPAT_VERSION; \}')
 
 
 if __name__ == "__main__":

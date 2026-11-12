@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T05:42:00Z'
-updated_date: '2026-11-12T05:48:00Z'
+updated_date: '2026-11-12T08:05:00Z'
 labels:
   - otdirect
   - api
@@ -25,9 +25,9 @@ Free letters: the PIC 6.8 answers BV for PR=H, J, K, U, X, Y, Z (gateway.asm:216
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 PR=X on OT-Direct answers 'PR: X=<OTD_PIC_COMPAT_VERSION>' (e.g. 'PR: X=6.8'); host test on the real PR branch; pyotgw get_reports still runs on all replies
-- [ ] #2 GET /api/v2/device/info carries the version (e.g. a pic_compat field) on OT-Direct and says it does not apply on a PIC board; host or JSON test on the real emitter
-- [ ] #3 docs/api (device/info) and the manual's PR= list name the new report and field
+- [x] #1 PR=X on OT-Direct answers 'PR: X=<OTD_PIC_COMPAT_VERSION>' (e.g. 'PR: X=6.8'); host test on the real PR branch; pyotgw get_reports still runs on all replies
+- [x] #2 GET /api/v2/device/info carries the version (e.g. a pic_compat field) on OT-Direct and says it does not apply on a PIC board; host or JSON test on the real emitter
+- [x] #3 docs/api (device/info) and the manual's PR= list name the new report and field
 - [ ] #4 Bench by the bench-tester on the OT-Direct unit: PR=X and device/info show 6.8
 <!-- AC:END -->
 
@@ -35,4 +35,10 @@ Free letters: the PIC 6.8 answers BV for PR=H, J, K, U, X, Y, Z (gateway.asm:216
 
 <!-- SECTION:NOTES:BEGIN -->
 Constraint (coordinator, 2026-11-12): on a real PIC, PR=X answers BV (gateway.asm:2163-2189: X is one of the letters H/J/K/U/X/Y/Z that the PIC 6.8 refuses). Tools must not rely on PR=X across board types: it exists only on OT-Direct. A client that needs the version on every board reads the PR=A banner (PIC: 'OpenTherm Gateway 6.6'; OT-Direct: 'OpenTherm Gateway 6.8 OTGW32') or /api/v2/device/info. The REST contract change goes into docs/api in the same commit as the code.
+
+Implementation (wt-95rt): OTDirect.ino: otdPicCompatVersion() returns OTD_PIC_COMPAT_VERSION (next to the define); PR=X case in the PR switch prints 'PR: X=' OTD_PIC_COMPAT_VERSION (the PIC 6.8 answers BV for PR=X, gateway.asm:2163-2189). restAPI.ino sendDeviceInfoV2(): field 'otdpiccompat' inside the if (snap->otDirectEnabled) block only. Docs: docs/api/openapi.yaml + docs/api/README.md (example and field table), manual ch10 PR= list (PR=X row, with the BV-on-a-PIC warning).
+
+Evidence AC1/AC2: tests/test_otd_pr_reports_pyotgw.py 7 tests: X1 (PR=X reply from the real PR branch equals the PR=A banner version), DeviceInfoCompatField (field emitted once, only in the OT-Direct block; helper returns the macro; source-level, the chunked emitter is not sliceable), P1 real pyotgw get_reports still green. Fix 7/7 OK; old code (741af9428 OTDirect.ino + restAPI.ino via OTGW_OTD_INO / OTGW_REST_INO) 3 FAIL (X1, field, helper). Gap: the rendered device/info JSON is checked on the bench (AC4).
+
+Gates 2026-11-12: all 72 tests that slice OTDirect.ino / restAPI.ino rerun one at a time in the foreground (an earlier background run was reaped for low memory twice): green; test_dhw_water_meter (382 s) and test_sat_lowload_contract (535 s, 35 tests OK) only exceeded my 240-300 s per-test limit and pass alone. evaluate --quick: 92 checks, 0 failed, 0 warnings.
 <!-- SECTION:NOTES:END -->

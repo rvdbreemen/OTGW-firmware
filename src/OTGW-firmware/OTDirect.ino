@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.213
+**  Version  : v2.0.0-beta.214
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -615,6 +615,8 @@ static void clearOverride(uint8_t msgId) {
 // ---------------------------------------------------------------------------
 static float   otSetbackTemp     = 16.0f;   // SB= setback temperature
 #define OTD_PIC_COMPAT_VERSION "6.8"   // PIC firmware whose command set OT-Direct implements (PR=A); 6.8 since RT= (TASK-1842) and the MsgID 125 clamp (TASK-1844)
+// TASK-1860: the same version for the REST API (device/info "otdpiccompat") without depending on the .ino order.
+const char* otdPicCompatVersion() { return OTD_PIC_COMPAT_VERSION; }
 static uint8_t otIgnoreTransitions = 1;      // IT= (1=ignore, PIC default)
 static uint8_t otOverrideHB      = 0;        // OH= override high byte flag
 static char    otGpioFunctions[3] = "00";    // GA=/GB= function codes
@@ -3834,6 +3836,13 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
         break;
       case 'V':
         snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: V=%d"), otVoltageRef);
+        otDirectBridgeProcessPRResponse(prBuf);
+        break;
+      case 'X':
+        // TASK-1860 (Robert, 2026-11-12): an OT-Direct report the PIC does not have. The PIC 6.8 answers BV for
+        // PR=H/J/K/U/X/Y/Z (gateway.asm:2163-2189), so a tool must not rely on PR=X on a PIC board; the PR=A
+        // banner and /api/v2/device/info carry the same version on every board.
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: X=" OTD_PIC_COMPAT_VERSION));
         otDirectBridgeProcessPRResponse(prBuf);
         break;
       default:

@@ -859,6 +859,13 @@ paths:
                       otdoverrides:
                         type: integer
                         description: Number of active write-override slots, plus 1 while a TT=/TC= remote override is active
+                      otdpiccompat:
+                        type: string
+                        description: >-
+                          OT-Direct only. The PIC firmware version whose command set OT-Direct implements (also reported
+                          by PR=X and in the PR=A banner), e.g. "6.8". Absent on a PIC board, where picfwversion is the
+                          version of the real PIC.
+                        example: "6.8"
               examples:
                 example:
                   value:

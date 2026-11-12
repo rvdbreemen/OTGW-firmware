@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T06:32:00Z'
-updated_date: '2026-11-12T06:51:00Z'
+updated_date: '2026-11-12T07:07:00Z'
 labels:
   - diagnostics
   - research
@@ -49,4 +49,6 @@ Proposal committed locally (0632d889d, lane wt-95rt, not pushed: beta.203 releas
 Robert's research brief via the coordinator (2026-11-12, verbatim): 'Voor het feature om data op te slaan in van OT-logs, onderzoek wat hier een goede optie is, bv via REST of MQTT naar cloudflare of google, in elk geval naar een dienst die schaalbaar is, en gratis. bij voorkeur geen SSL nodig heeft, maar als het nodig is, dan wil ik dat weten. Het doel is om datacaptures op te slaan van gebruikers die in beta mode meedoen en opt-in hebben op het delen van data te verbetering van de firmware.' Done in commit 5cf1e4269: comparison Cloudflare / Google / cloud MQTT / NAS on primary pages; curl verified that Workers on *.workers.dev take plain HTTP (200, no HSTS: demo.turnstile, demo-endpoints.pydantic, remix-cloudflare-demo.jacob-ebey), bare workers.dev 301, script.google.com 301 to HTTPS; Google free tier needs a billing account and stores only in US regions; EMQX 1 GB/month, HiveMQ Serverless retires 2026-12-31. Correction: my first proposal said workers.dev forces HTTPS; wrong, only the apex redirects. Q2 was resent to the coordinator as a replacement (A plain HTTP + HMAC, B + payload encryption, C ADR-218 HTTPS, D LAN relay; rec. B). Not verified: R2 payment method and EU jurisdiction on a free account, POST over plain HTTP, ToS/DPA terms, EMQX ports, payload-encryption cost.
 
 Robert answered Q2 by DM (via coordinator, msgs 1570328825353609217 and 1570329291030270033, verbatim in the proposal): none of the batch-upload options; stream every log line to a cloud service, encrypted, HTTPS allowed. Streaming research in commit 14cb58c72: 2.46 frames/s per gateway makes a message per frame exhaust every free tier; lines keep their own timestamps and go in 10 s batches over one TLS connection. Compared (primary pricing pages, 2026-11-12): Cloudflare Worker+Durable Object+R2 (~230 gw), Grafana Cloud Loki (~300 gw, 14 d), InfluxDB Cloud (~135 gw, 30 d), AWS IoT Core (12 months free), Azure IoT Hub Free, Better Stack, EMQX Serverless, Google Pub/Sub (pricing page unreadable today). Streaming needs TLS: PSRAM boards only (ADR-218 PoC). Questions S1 (granularity, rec. 10 s batches), S2 (service, rec. Cloudflare DO+R2 EU, Loki fallback), S3 (non-PSRAM boards + ADR-218, rec. accept ADR-218, measure app-slot fit first) sent to the coordinator. Not verified: Grafana Free EU region choice and byte counting, DO duration under hibernation, app-slot fit of TLS + WebSocket client, DPAs.
+
+ADR numbering (coordinator, 2026-11-12): ADR-231 is reserved for d3 (TASK-1817). Any ADR this task needs (accepting ADR-218 for streaming, amending ADR-213 decision 1) asks the coordinator for the next number first (then ADR-232).
 <!-- SECTION:NOTES:END -->

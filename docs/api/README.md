@@ -190,7 +190,8 @@ Returns comprehensive device information as a flat JSON map. Boolean values are 
     "otdschedtotal": 12,
     "otdschedactive": 11,
     "otdscheddisabled": 1,
-    "otdoverrides": 0
+    "otdoverrides": 0,
+    "otdpiccompat": "6.8"
   }
 }
 ```
@@ -1453,6 +1454,7 @@ All fields are **read-only** runtime state except where noted.
 | `schedule_active` | `otdschedactive` | `iScheduleActive` | integer | read-only | Number of schedule entries currently active (not disabled by boiler) |
 | `schedule_disabled` | `otdscheddisabled` | `iScheduleDisabled` | integer | read-only | Number of entries disabled (boiler returned UNKNOWN_DATA_ID three times) |
 | `overrides_active` | `otdoverrides` | `iOverrideCount` | integer | read-only | Number of active write-override slots (CS=, SH=, SW= etc.), plus 1 while a `TT=`/`TC=` remote override is active (TASK-1749) |
+| `pic_compat` | `otdpiccompat` | _(OTD_PIC_COMPAT_VERSION)_ | string | read-only | PIC firmware version whose command set OT-Direct implements, e.g. `6.8`; also `PR=X` and the `PR=A` banner. Absent on a PIC board (use `picfwversion` there) (TASK-1860) |
 | `ot_online` | _(not in device/info)_ | _(otBus.bOnline)_ | boolean | read-only | True when the OT bus is alive (frames recently received) |
 | `thermostat` | _(not in device/info)_ | _(otBus.bThermostatState)_ | boolean | read-only | True when the thermostat OT bus side is active |
 | `boiler` | _(not in device/info)_ | _(otBus.bBoilerState)_ | boolean | read-only | True when the boiler OT bus side is active |
