@@ -293,6 +293,9 @@ static void resetAll(const World& w) {
   state.pic.bAvailable = w.picAvailable;
   otCurrentMode = w.mode;
   otBoilerCacheValid[3] = w.cache3;
+#ifdef OTD_HAS_MSGID3_MARKER
+  otdMsgId3FromBoiler = w.cache3;   // TASK-1856: cache3 stands for a real boiler's MsgID 3 answer
+#endif
   settings.sat.bSimulation = w.satSim;
 }
 

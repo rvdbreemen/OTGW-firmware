@@ -57,6 +57,7 @@ GATE_SLICES = [
     (CORE, r"^bool otRealBoilerSeenRecently\(\)", None, True),
     (FW_H, r"^inline bool isPICEnabled\(\) \{", None),
     (FW_H, r"^inline bool isOTDirectEnabled\(\) \{", None),
+    (OTD, r"^static bool otdMsgId3FromBoiler\b", r"^static bool otdMsgId3FromBoiler\b", True),   # TASK-1856 marker
     (OTD, r"^bool otDirectBoilerPresent\(\) \{", None),
     (SAT, r"^static bool satDebugForceBoilerPresent = false;", r"^static bool satDebugForceBoilerPresent = false;"),
     (SAT, r"^bool satBoilerHardwarePresent\(\)", None),
@@ -131,6 +132,8 @@ def export(rev, out_dir):
                 continue
             text, first, last = cut(sources[path], start_rx, end_rx)
             parts.append(f"// ---- {path}:{first}-{last} ----\n{text}")
+            if "otdMsgId3FromBoiler" in start_rx:   # TASK-1856: the harness's cache3 is a real boiler answer
+                parts.append("#define OTD_HAS_MSGID3_MARKER 1")
         (out_dir / name).write_text("\n".join(parts) + "\n", encoding="utf-8")
 
 

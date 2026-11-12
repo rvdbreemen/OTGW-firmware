@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.202
+**  Version  : v2.0.0-beta.203
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -324,10 +324,21 @@ static inline bool otIsVentSlave() {
 // state.otBus.bBoilerState (stamped in processOT, OTGW-Core.ino) deliberately
 // DOES count loopback B-frames, so a bench rig in loopback reports
 // boiler_connected. The asymmetry is by decision, not drift.
+// TASK-1856: the MsgID 3 entry of the cache is filled by real boiler answers and, in loopback,
+// by the synthetic ones, and the cache survives a mode switch. A presence that read the entry
+// alone took the loopback boiler for a real one right after loopback -> master/gateway, and the
+// SATcontrol.ino backstop then switched SAT simulation off for good (re-enable refused until a
+// reboot emptied the cache). The marker says who stored MsgID 3 last.
+// --- otdBoilerPresence begin
+static bool otdMsgId3FromBoiler = false;   // MsgID 3 in the cache came from a real boiler answer
+static void otdNoteMsgId3Source(unsigned long response, bool realBoiler) {
+  if (((response >> 16) & 0xFF) == 3) otdMsgId3FromBoiler = realBoiler;
+}
 bool otDirectBoilerPresent() {
   if (IS_LOOPBACK_MODE()) return false;   // synthetic responses are not a real boiler
-  return otBoilerCacheValid[3];
+  return otBoilerCacheValid[3] && otdMsgId3FromBoiler;
 }
+// --- otdBoilerPresence end
 
 // Command ring buffer — queues frames from handleOTDirectCommand() and
 // the various per-channel input paths (MQTT, REST, WebUI, telnet serial).
@@ -1687,6 +1698,7 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
 
     // Cache response for master mode slave handler (reuses same cache)
     otBoilerCacheStore(response);
+    otdNoteMsgId3Source(response, false);   // TASK-1856: synthetic, never boiler presence
 
     // A forwarded thermostat frame is answered by the same rule as a real boiler reply
     replyToThermostat(origin, request, response);
@@ -1749,6 +1761,7 @@ static void handleMasterResponse() {
 
     // Cache boiler response data for master mode slave responses
     otBoilerCacheStore(response);
+    otdNoteMsgId3Source(response, true);    // TASK-1856: a real boiler answered
     otdRetNoteReply(otLastRequestOrigin, otLastSentRequest, response, millis());   // TASK-1759
 
     // TASK-795 §4.2: a real boiler answered on the OT-direct bus. If SAT
