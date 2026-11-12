@@ -1,7 +1,8 @@
 // TASK-1692: honest theme toggle labels, and no no-op "Dark theme by default" setting.
-// D1: the toggle keeps its action label ('☀ Light' while dark, '🌙 Dark' while light) but carries no
-//     aria-pressed (WAI-ARIA APG Button pattern: a toggle button's label must not change with its
-//     state); aria-label and title name the action: "Switch to light theme" / "Switch to dark theme".
+// D1 (TASK-1830, Robert 2026-11-12, replaces the single action button of TASK-1692): a Light/Dark
+//     segmented switch as on the OTGW site: role=group with two buttons that keep their labels
+//     ('☀ Light', '☾ Dark'); aria-pressed marks the theme that is on (WAI-ARIA button group); the title
+//     names the action ("Switch to light theme" / "Switch to dark theme").
 // D2: "theme" in every user-facing string about it (no "dark mode").
 // D3: the darktheme setting is not shown on the settings page (the v2 UI never reads it: the theme
 //     comes from the toggle in localStorage, else the OS preference, v2.html pre-paint script); the
@@ -27,28 +28,33 @@ const SETTINGS = { settings: {
 const api = (m, p) => (p.endsWith('/v2/settings') ? SETTINGS : undefined);
 const skip = !CHROME && 'no Chrome';
 
-const BUTTON = `(function(){ var b = document.getElementById('themeToggle'); return {
-  text: b.textContent, pressed: b.hasAttribute('aria-pressed'), label: b.getAttribute('aria-label'),
-  title: b.getAttribute('title'), theme: document.documentElement.getAttribute('data-theme') }; })()`;
+const SWITCH = `(function(){ var g = document.getElementById('themeSwitch'); if (!g) return null;
+  var bs = g.querySelectorAll('button[data-theme-set]');
+  return { role: g.getAttribute('role'), label: g.getAttribute('aria-label'), theme: document.documentElement.getAttribute('data-theme'),
+    stored: localStorage.getItem('otgw-theme'),
+    buttons: Array.prototype.map.call(bs, function (b) { return [b.getAttribute('data-theme-set'), b.textContent, b.getAttribute('aria-pressed'), b.getAttribute('title')]; }) }; })()`;
 
-test('toggle: action label, no aria-pressed, aria-label and title name the action (D1)', { skip }, async () => {
-  const h = await startPage({ api, beforeScript: `try { localStorage.setItem('otgw-theme', 'light'); } catch (e) {}` });
+test('Light/Dark segmented switch: fixed labels, aria-pressed on the active theme, click stores it (D1)', { skip }, async () => {
+  const h = await startPage({ api, beforeScript: `try { if (!sessionStorage.getItem('seeded')) { localStorage.setItem('otgw-theme', 'light'); sessionStorage.setItem('seeded', '1'); } } catch (e) {}` });
   try {
-    // .connsum is built by v2.js at start-up: from then on the toggle's click handler is bound.
+    // .connsum is built by v2.js at start-up: from then on the click handlers are bound.
     assert.ok(await h.until(`!!document.querySelector('.connsum') && document.documentElement.getAttribute('data-theme') === 'light'`),
       'v2.js started with the light theme');
-    const light = await h.evalJs(BUTTON);
-    assert.equal(light.text, '🌙 Dark');
-    assert.equal(light.pressed, false, 'no aria-pressed while light');
-    assert.equal(light.label, 'Switch to dark theme');
-    assert.equal(light.title, 'Switch to dark theme');
-    await h.evalJs(`document.getElementById('themeToggle').click()`);
+    const light = await h.evalJs(SWITCH);
+    assert.ok(light, '#themeSwitch exists');
+    assert.equal(light.role, 'group'); assert.equal(light.label, 'Theme');
+    assert.deepEqual(light.buttons, [['light', '☀Light', 'true', 'Switch to light theme'], ['dark', '☾Dark', 'false', 'Switch to dark theme']]);
+    await h.evalJs(`document.querySelector('#themeSwitch [data-theme-set="dark"]').click()`);
     assert.ok(await h.until(`document.documentElement.getAttribute('data-theme') === 'dark'`), 'the click switched to dark');
-    const dark = await h.evalJs(BUTTON);
-    assert.equal(dark.text, '☀ Light');
-    assert.equal(dark.pressed, false, 'no aria-pressed while dark');
-    assert.equal(dark.label, 'Switch to light theme');
-    assert.equal(dark.title, 'Switch to light theme');
+    const dark = await h.evalJs(SWITCH);
+    assert.deepEqual(dark.buttons.map((b) => b[2]), ['false', 'true'], 'aria-pressed follows the theme');
+    assert.deepEqual(dark.buttons.map((b) => b[1]), ['☀Light', '☾Dark'], 'labels do not change with the state');
+    assert.equal(dark.stored, 'dark');
+    await h.evalJs(`document.querySelector('#themeSwitch [data-theme-set="dark"]').click()`);   // clicking the active one keeps it
+    assert.equal((await h.evalJs(SWITCH)).theme, 'dark');
+    await h.send('Page.reload');
+    assert.ok(await h.until(`!!document.querySelector('.connsum') && document.documentElement.getAttribute('data-theme') === 'dark'`), 'dark survives a reload');
+    assert.deepEqual((await h.evalJs(SWITCH)).buttons.map((b) => b[2]), ['false', 'true']);
     assert.deepEqual(h.exceptions, []);
   } finally { await h.close(); }
 });

@@ -35,10 +35,14 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   html[data-theme="dark"] .headerrow{color:#e8e8ea}
   .headerrow .big{font-size:1.05rem}
   .headerrow .sub{font-weight:400;opacity:.9;font-size:.8rem}
-  .theme-toggle{cursor:pointer;user-select:none;border:1px solid rgba(255,255,255,.4);
-    border-radius:8px;padding:8px 12px;font-size:.85rem;min-height:40px;
-    /* button reset so <button> matches the old <span> look + stays keyboard-operable */
-    background:transparent;color:inherit;font-family:inherit;line-height:1.2}
+  /* TASK-1830: Light/Dark segmented switch, as the OTGW site's .switch */
+  .theme-switch{display:inline-flex;align-items:stretch;border:1px solid rgba(255,255,255,.4);border-radius:9px;padding:2px;gap:2px;flex-shrink:0}
+  .theme-switch button{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:7px;border:0;background:transparent;
+    color:inherit;opacity:.8;font-family:inherit;font-size:.85rem;line-height:1.2;cursor:pointer;user-select:none;min-height:34px}
+  .theme-switch button:hover{opacity:1;background:rgba(255,255,255,.12)}
+  .theme-switch button[aria-pressed="true"],.theme-switch button[aria-pressed="true"]:hover{background:var(--accent);color:#fff;opacity:1}
+  .theme-switch .lbl{white-space:nowrap}
+  @media (max-width:1100px){.theme-switch .lbl{display:none}}
   /* TASK-1764: language dropdown in the header (same shape as the OTGW site's .lang-menu). The flags are
      CSS backgrounds so the build inlines them into the page (webui_pages.py), no extra request. */
   .lang-menu{position:relative;flex-shrink:0}
@@ -638,7 +642,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* ================= TASK-932 mobile review: tap targets + readability ≤719px ================= */
   @media(max-width:719px){
     /* lift sub-44px controls to the 44px comfortable touch target */
-    .connsum,.connpill,.seg2btn,.viewpick-btn,.vp-item,.tbtn,.theme-toggle,.ovr-badge{min-height:44px}
+    .connsum,.connpill,.seg2btn,.viewpick-btn,.vp-item,.tbtn,.theme-switch button,.ovr-badge{min-height:44px}
     /* bump the smallest labels for phone readability */
     .ble-tag{font-size:.66rem}
     .mc-cell .lbl{font-size:.68rem}

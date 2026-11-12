@@ -312,8 +312,9 @@
     "core": {
       "theme_to_light": "Switch to light theme",
       "theme_to_dark": "Switch to dark theme",
-      "theme_light": "☀ Light",
-      "theme_dark": "🌙 Dark",
+      "theme_light": "Light",
+      "theme_dark": "Dark",
+      "theme_group": "Theme",
       "view_system": "System view",
       "view_glance": "At a glance",
       "view_mission": "Mission control",
@@ -1858,23 +1859,20 @@
   // ---------- theme (localStorage key otgw-theme) ----------
   function applyTheme(dark) {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-    var b = document.getElementById('themeToggle');
-    // TASK-1692: the label shows what a click gives, so no aria-pressed (the WAI-ARIA toggle-button
-    // pattern keeps the label fixed); aria-label and title name that action.
-    if (b) {
-      var action = dark ? t('core.theme_to_light') : t('core.theme_to_dark');
-      b.textContent = dark ? t('core.theme_light') : t('core.theme_dark');
-      b.setAttribute('aria-label', action);
-      b.setAttribute('title', action);
-    }
+    // TASK-1830 (replaces TASK-1692 D1): a Light/Dark segmented switch as on the OTGW site. Each button
+    // keeps its label; aria-pressed tells which theme is on (WAI-ARIA button group pattern).
+    document.querySelectorAll('#themeSwitch [data-theme-set]').forEach(function (b) {
+      b.setAttribute('aria-pressed', (b.getAttribute('data-theme-set') === 'dark') === !!dark ? 'true' : 'false');
+    });
   }
   function initTheme() {
     applyTheme(document.documentElement.getAttribute('data-theme') === 'dark');
-    var b = document.getElementById('themeToggle');
-    if (b) b.addEventListener('click', function () {
-      var nowDark = document.documentElement.getAttribute('data-theme') !== 'dark';
-      applyTheme(nowDark);
-      try { localStorage.setItem('otgw-theme', nowDark ? 'dark' : 'light'); } catch (e) { }
+    document.querySelectorAll('#themeSwitch [data-theme-set]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var dark = b.getAttribute('data-theme-set') === 'dark';
+        applyTheme(dark);
+        try { localStorage.setItem('otgw-theme', dark ? 'dark' : 'light'); } catch (e) { }
+      });
     });
   }
 

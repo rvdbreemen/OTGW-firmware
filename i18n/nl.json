@@ -191,8 +191,9 @@
   "core": {
     "theme_to_light": "Overschakelen naar licht thema",
     "theme_to_dark": "Overschakelen naar donker thema",
-    "theme_light": "☀ Licht",
-    "theme_dark": "🌙 Donker",
+    "theme_light": "Licht",
+    "theme_dark": "Donker",
+    "theme_group": "Thema",
     "view_system": "Systeemweergave",
     "view_glance": "In één oogopslag",
     "view_mission": "Controlekamer",

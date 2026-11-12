@@ -191,8 +191,9 @@
   "core": {
     "theme_to_light": "Μετάβαση σε φωτεινό θέμα",
     "theme_to_dark": "Μετάβαση σε σκούρο θέμα",
-    "theme_light": "☀ Φωτεινό",
-    "theme_dark": "🌙 Σκούρο",
+    "theme_light": "Φωτεινό",
+    "theme_dark": "Σκούρο",
+    "theme_group": "Θέμα",
     "view_system": "Προβολή συστήματος",
     "view_glance": "Με μια ματιά",
     "view_mission": "Κέντρο ελέγχου",

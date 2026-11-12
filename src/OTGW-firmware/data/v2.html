@@ -52,7 +52,11 @@
       <li><a href="#" lang="el" data-lang="el"><span class="flag flag-gr" aria-hidden="true"></span><span class="nm">Ελληνικά</span><span class="code">EL</span></a></li>
     </ul>
   </details>
-  <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch to dark theme" title="Switch to dark theme">🌙 Dark</button>
+  <!-- TASK-1830: Light/Dark segmented switch, as on the OTGW site (role=group, aria-pressed per button); applyTheme() sets the state -->
+  <div class="theme-switch" id="themeSwitch" role="group" aria-label="Theme" data-i18n-aria-label="core.theme_group">
+    <button type="button" data-theme-set="light" aria-pressed="false" title="Switch to light theme" data-i18n-title="core.theme_to_light"><span aria-hidden="true">☀</span><span class="lbl" data-i18n="core.theme_light">Light</span></button>
+    <button type="button" data-theme-set="dark" aria-pressed="false" title="Switch to dark theme" data-i18n-title="core.theme_to_dark"><span aria-hidden="true">☾</span><span class="lbl" data-i18n="core.theme_dark">Dark</span></button>
+  </div>
 </div>
 <div class="fs-banner" id="fsMismatch" role="alert" hidden></div>
 <div class="switcher">

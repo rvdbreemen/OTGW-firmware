@@ -59,8 +59,6 @@ const ALLOW_HTML = [
   [/^(English|Nederlands|Deutsch|Ελληνικά)$/, 'language endonym in the language menu'],
   [/^Language: English$/, 'aria-label rewritten by syncLangMenu() with t(lang.label)'],
   // text that JS overwrites with t() at load or on every render; the HTML holds the English default
-  [/^Switch to dark theme$/, 'themeToggle: applyTheme() sets text, aria-label and title with t()'],
-  [/^🌙 Dark$/, 'themeToggle: applyTheme() sets text with t()'],
   [/^System view$/, 'viewPickLabel: showDesign() sets it with t()'],
   [/^target —$/, 'bSet: render sets it with t(home.target)'],
   [/^standby$/, 'bDhwState: render sets it with t(home.dhw_*)'],

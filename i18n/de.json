@@ -191,8 +191,9 @@
   "core": {
     "theme_to_light": "Zum hellen Design wechseln",
     "theme_to_dark": "Zum dunklen Design wechseln",
-    "theme_light": "☀ Hell",
-    "theme_dark": "🌙 Dunkel",
+    "theme_light": "Hell",
+    "theme_dark": "Dunkel",
+    "theme_group": "Design",
     "view_system": "Systemansicht",
     "view_glance": "Auf einen Blick",
     "view_mission": "Leitstand",
