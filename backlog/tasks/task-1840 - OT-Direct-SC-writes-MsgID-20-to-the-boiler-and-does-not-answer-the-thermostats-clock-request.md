@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:51:00Z'
-updated_date: '2026-11-12T01:37:00Z'
+updated_date: '2026-11-12T04:44:00Z'
 labels:
   - otdirect
   - parity
@@ -50,4 +50,6 @@ Harnesses that slice the touched code, kept green in the same lane: tests/test_o
 Open: AC3 bench capture, via the bench-tester (TASK-1826 rule): SC= on the OT-Direct unit with a thermostat or the slave simulator reading MsgID 20; expect no R..014.... WRITE to the boiler and A frames as above. Not run: esp32-combo build (build slot via the coordinator).
 
 Bench checklist for otgw-bench-tester (TASK-1826 rule; the bench-tester chooses and ticks). On .61 (OTGW32) in LOOPBACK mode (GW=L): loopback logs the gateway's own requests as R frames (OTDirect.ino bridgeFrameToParser 'R'), so the boiler side is observable: (1) send SC=21:50/3; OLD code shows an R frame WRITE MsgID 20 with data 0x7532 (R..147532) within seconds; FIX shows no R..014 frame, and the reply is 'SC: 21:50/3'. That is the only part .61 can show without a thermostat. NOT observable in loopback: the thermostat answer (otdClockReply runs only in gateway mode, on a thermostat frame). It needs a thermostat or an OT slave simulator on the thermostat port of a gateway-mode unit: thermostat READ 0x00140000 -> A frame C0147532 while SC is valid, A frame 60140000 (Data-Invalid) about 64 s after the last SC=, WRITE 0x9014892A -> 50147532 / 5014892A. Without such a setup AC3 stays open for that part; the answer path is covered by the host test only (do not tick it on air).
+
+2026-11-12 bench (otgw-bench-tester), .61, old vs fix in loopback over TCP 25238. OLD 2.0.0-beta.200+f1bb2a0: SC=21:50/3 replied 'SC: 21:50/3', then R90147532 (WRITE MsgID 20, 0x7532 = Wednesday 21:50), answered by B50147532; telnet 'enqueueWrite: OTD: SC-time -> MsgID 20 frame 0x90147532'. NEW 2.0.0-beta.203+61b69e0: reply 'SC: 21:50/3' and NO R/B frame for MsgID 20. This is bench evidence for the 'no frame on the bus' behaviour (AC1). AC3 NOT ticked: it asks for a thermostat that reads MsgID 20, or the slave simulator; neither was used. Evidence: scratchpad b203/old1840-out.txt, check203_12-out.txt.
 <!-- SECTION:NOTES:END -->

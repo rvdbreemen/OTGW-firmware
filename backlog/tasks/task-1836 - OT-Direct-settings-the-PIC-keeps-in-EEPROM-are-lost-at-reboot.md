@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:46:00Z'
-updated_date: '2026-11-12T01:37:00Z'
+updated_date: '2026-11-12T04:44:00Z'
 labels:
   - otdirect
   - parity
@@ -30,7 +30,7 @@ From the PIC 6.8 parity audit (N6), docs/reviews/2026-11-12_pic68-otdirect-parit
 - [x] #1 host test on real handlers: SM=, SB=, MI=, FS= mark settings dirty; red on current code
 - [x] #2 HW, SW, SH and the UI list restored after reboot and applied
 - [x] #3 decision per item for IT, OH, AA/DA recorded
-- [ ] #4 bench: HW=0, reboot, PR=W answers W=0
+- [x] #4 bench: HW=0, reboot, PR=W answers W=0
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -49,4 +49,6 @@ Evidence AC1+AC2: tests/test_otd_persist_pic_eeprom.py (4 tests; real SM, SB, MI
 Open: AC4 bench via the bench-tester: HW=0, reboot, PR=W answers W=0 (plus SW= and UI= across a reboot). Not run: esp32-combo build (build slot via the coordinator).
 
 Bench checklist for otgw-bench-tester: on .61 (any OT-Direct mode; loopback is fine): (1) HW=0, SW=55, SH=70, UI=70, IT=0, OH=1; (2) GET /settings.ini (check the downloaded size first) shows OTDdhwoverride 0, OTDdhwsetpoint 55.00, OTDmaxchsetpoint 70.00, OTDignoretransitions false, OTDoverridehb true, OTDunknownids "70" (the flush is deferred: wait a few seconds); (3) reboot; (4) PR=W answers W=0 (AC4), PR=T answers T=01 (IT=0, OH=1); (5) in loopback the boot re-sends SW and SH: R frames WRITE MsgID 56 data 0x3700 and MsgID 57 data 0x4600 appear after boot; (6) UI=70 still active: no R frame READ MsgID 70 in loopback (its schedule entry is disabled). Clean up afterwards: HW=A, SW=0, SH=0, KI=70, IT=1, OH=0, and check settings.ini again. Settings unchanged otherwise (save /api/v2/settings before, compare after).
+
+2026-11-12 05:31-05:40 bench (otgw-bench-tester), .61 OTGW32 on 2.0.0-beta.203+61b69e0 (flash: ota_flash.py app+fs, bootcount 440 -> 442, health 200, crashlog none, settings unchanged). In loopback over TCP 25238: HW=0, SW=55, SH=70, UI=70, IT=0, OH=1 replied 'HW: 0', 'SW: 55.00', 'SH: 70.00', 'UI: 70', 'IT: 0', 'OH: 1'. /settings.ini then held OTDdhwoverride 0, OTDdhwsetpoint 55.0, OTDmaxchsetpoint 70.0, OTDignoretransitions false, OTDoverridehb true, OTDunknownids "70". After a reboot: 'PR: W=0' (AC4) and 'PR: T=01'. A 40 s loopback boot capture showed R90383700 (WRITE MsgID 56 = 55.00) and R10394600 (WRITE MsgID 57 = 70.00) every 15 s, and no frame or READ for MsgID 70. Cleanup HW=A, SW=0, SH=0, KI=70, IT=1, OH=0 restored settings.ini (255 / 0.0 / 0.0 / true / false / ""). Settings diff against the pre-bench backup: 0. Evidence: scratchpad b203/check203_12-out.txt.
 <!-- SECTION:NOTES:END -->
