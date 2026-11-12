@@ -5559,7 +5559,7 @@
     if (document.hidden) return;   // TASK-1741
     fetch(APIGW + 'v2/sat/status').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       var st = j && (j.sat || j); if (!st) return;
-      if (st.heating_source !== undefined) sat.source = st.heating_source | 0;
+      if (st.heating_source !== undefined) { sat.source = st.heating_source | 0; sat.srcKnown = true; }   // TASK-1837
       if (st.heating_source_detected !== undefined) sat.detected = st.heating_source_detected | 0;
       if (st.target_temp !== undefined) sat.target = parseFloat(st.target_temp);
       if (st.dhw_config_tank !== undefined) sat.tank = !!st.dhw_config_tank;   // TASK-1392
@@ -5589,17 +5589,18 @@
       model.wxValid = false;
     }).catch(function () { });
   }
-  function applyApplianceToggle() {
-    var hp = effectiveSource() === 2;
-    var svg = document.getElementById('schem'); if (svg) svg.classList.toggle('heatpump', hp);
-    document.querySelectorAll('#applToggle .seg2btn').forEach(function (b) {
-      var isHp = (b.dataset.appl === 'hp');
-      b.classList.toggle('active', isHp === hp);
-    });
+  // TASK-1837: which appliance labels Home shows for the effective source (1 gas, 2 heat pump, 3 hybrid,
+  // 4 on/off heat pump); nothing while sat/status has not answered. hpDrawing: the schematic's heat pump.
+  function applianceTags(src, known) {
+    if (!known) return { gas: false, hp: false, hpDrawing: false };
+    return { gas: src === 1 || src === 3, hp: src === 2 || src === 3 || src === 4, hpDrawing: src === 2 || src === 4 };
   }
-  function setSource(v) {
-    fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'satsource', value: '' + v }) })
-      .then(function (r) { if (r.ok) { sat.source = v; applyApplianceToggle(); setTimeout(fetchSatStatus, 400); } }).catch(function () { });
+  function applyApplianceToggle() {
+    var a = applianceTags(effectiveSource(), sat.srcKnown);
+    var svg = document.getElementById('schem'); if (svg) svg.classList.toggle('heatpump', a.hpDrawing);
+    document.querySelectorAll('#applTags .appl-tag').forEach(function (s) {
+      s.hidden = !(s.dataset.appl === 'hp' ? a.hp : a.gas);
+    });
   }
 
   // TASK-1735 (Robert 2026-11-08, reverses TASK-1717's TT= dial): the UI controls temperatures only
@@ -8307,9 +8308,6 @@
     });
 
     // P9 wiring -----------------------------------------------------------
-    document.querySelectorAll('#applToggle .seg2btn').forEach(function (b) {
-      b.addEventListener('click', function () { setSource(b.dataset.appl === 'hp' ? 2 : 1); });
-    });
     var bU = document.getElementById('bUp'); if (bU) bU.addEventListener('click', function () { stepTarget(0.5); });
     var bD = document.getElementById('bDown'); if (bD) bD.addEventListener('click', function () { stepTarget(-0.5); });
     document.querySelectorAll('#statsTable thead th').forEach(function (th, idx) {

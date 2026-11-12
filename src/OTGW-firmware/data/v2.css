@@ -172,10 +172,11 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .glow-e{filter:drop-shadow(0 0 7px color-mix(in srgb,#2ad4ff 78%,transparent))}
   .mod-big{fill:var(--gauge-text);font-size:25px;font-weight:700;text-anchor:middle;font-family:var(--font-sans)}
   .mod-tag{fill:var(--muted);font-size:9px;letter-spacing:.14em;text-anchor:middle;font-weight:700}
-  .seg2btn{border:1px solid var(--border);background:var(--panel);color:var(--muted);
-    border-radius:8px;padding:6px 10px;font-size:.74rem;cursor:pointer;min-height:34px;font-family:var(--font-sans)}
-  .seg2btn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
-  .appl-toggle{display:inline-flex;gap:4px;margin-left:auto}
+  /* TASK-1837: appliance type as a label (not a switch) */
+  .appl-tags{display:inline-flex;gap:4px;margin-left:auto}
+  .appl-tag{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--accent);background:var(--accent);color:#fff;
+    border-radius:8px;padding:6px 10px;font-size:.74rem;font-weight:700;font-family:var(--font-sans)}
+  .appl-tag[hidden]{display:none}
   @keyframes flick{
     0%,100%{transform:scale(var(--fs,1)) }
     30%{transform:scale(calc(var(--fs,1)*1.07)) skewX(2deg)}
@@ -642,7 +643,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* ================= TASK-932 mobile review: tap targets + readability ≤719px ================= */
   @media(max-width:719px){
     /* lift sub-44px controls to the 44px comfortable touch target */
-    .connsum,.connpill,.seg2btn,.viewpick-btn,.vp-item,.tbtn,.theme-switch button,.ovr-badge{min-height:44px}
+    .connsum,.connpill,.viewpick-btn,.vp-item,.tbtn,.theme-switch button,.ovr-badge{min-height:44px}
     /* bump the smallest labels for phone readability */
     .ble-tag{font-size:.66rem}
     .mc-cell .lbl{font-size:.68rem}

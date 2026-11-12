@@ -87,9 +87,10 @@
 <section id="design-a" class="design active">
   <div class="schemcard">
     <div class="statusline" id="aStatus"><span class="dot"></span><span id="aStatusTxt">—</span>
-      <span class="appl-toggle" id="applToggle">
-        <button class="seg2btn active" data-appl="gas">🔥 <span data-i18n="h_home.appl_boiler">Boiler</span></button>
-        <button class="seg2btn" data-appl="hp">⚡ <span data-i18n="h_home.appl_hp">Heat pump</span></button>
+      <!-- TASK-1837: the appliance type as a label (Boiler, Heat pump, both for hybrid); set in Settings, not here -->
+      <span class="appl-tags" id="applTags">
+        <span class="appl-tag" data-appl="gas" hidden>🔥 <span data-i18n="h_home.appl_boiler">Boiler</span></span>
+        <span class="appl-tag" data-appl="hp" hidden>⚡ <span data-i18n="h_home.appl_hp">Heat pump</span></span>
       </span>
       <!-- TASK-984: injected-value badge. Hidden when zero; opens the override panel. -->
       <button class="ovr-badge hidden" id="aOvrBadge" style="margin-left:auto" title="The gateway is injecting values onto the OT bus — click for detail" data-i18n-title="h_home.ovr_badge_title">⛓ <span id="aOvrCount">0</span> <span id="aOvrCountSfx" data-i18n-skip>injected</span></button>
