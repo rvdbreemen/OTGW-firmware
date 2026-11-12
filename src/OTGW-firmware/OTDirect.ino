@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.198
+**  Version  : v2.0.0-beta.199
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2859,7 +2859,11 @@ static void applyOTDirectMode(OTDirectMode newMode) {
 // setOTDirectMode — a mode change chosen by the user (command, REST): apply it and persist it
 // via the public updateSetting() API, which handles the dirty flag and the debounce timer.
 static void setOTDirectMode(OTDirectMode newMode) {
-  applyOTDirectMode(newMode);
+  // TASK-1839 (PIC 6.8 parity audit N7): a GW= for the mode already running changes nothing, as on the PIC
+  // (SetGatewayMode only switches the comparators and saves the mode: gateway.asm 6.8 :4729-4747, :4749-4774).
+  // Before, every GW= reset the transient state, so a client sending PS=0;GW=1 lost CS, HW, MM, SR= and UI=.
+  // The setting is still written: after a boot auto-detect the running mode and the stored one can differ.
+  if (newMode != otCurrentMode) applyOTDirectMode(newMode);
   char modeBuf[4];
   snprintf_P(modeBuf, sizeof(modeBuf), PSTR("%d"), (int)newMode);
   updateSetting("OTDmode", modeBuf);
