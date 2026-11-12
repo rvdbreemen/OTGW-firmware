@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-12T03:07:00Z'
+updated_date: '2026-11-12T04:47:00Z'
 labels:
   - otdirect
   - sat
@@ -23,7 +24,13 @@ Side finding of TASK-1856 (bench-tester run 2 on .61, beta.197, telnet 03:49:49.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Decision recorded: loopback answers either leave manufacturer and heating-source detection alone, or deliberately stand in for a bench boiler (documented)
+- [x] #1 Decision recorded: loopback answers either leave manufacturer and heating-source detection alone, or deliberately stand in for a bench boiler (documented)
 - [ ] #2 If they leave it alone: a host test feeds a loopback MsgID 3 and a real one through the real decode path; red on the old code (loopback sets iDetectedManufacturer), green on the fix, and the real frame still sets it
 - [ ] #3 Bench on .61 by the bench-tester: loopback boot shows no 'Detected manufacturer' line from synthetic data (or the documented stand-in)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Decision (coordinator, 2026-11-12, on behalf of the 2.0.0 coordination): loopback frames must not drive detection, neither the manufacturer (satDetectManufacturer) nor state.sat.iDetectedHeatingSource. Same principle as TASK-1856: synthetic answers are not evidence about a real boiler. A bench that needs a fake brand sets it explicitly, not via loopback. So AC1 is settled as 'leave detection alone'; AC2 (red/green host test) and AC3 (bench) remain. Status stays To Do, priority low.
+<!-- SECTION:NOTES:END -->

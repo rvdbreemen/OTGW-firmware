@@ -3,10 +3,11 @@ id: TASK-1842
 title: >-
   OT-Direct: the PIC 6.8 command RT= (room temperature for the boiler) is
   missing
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-11T23:53:00Z'
-updated_date: '2026-11-12T00:11:00Z'
+updated_date: '2026-11-12T04:47:00Z'
 labels:
   - otdirect
   - parity
