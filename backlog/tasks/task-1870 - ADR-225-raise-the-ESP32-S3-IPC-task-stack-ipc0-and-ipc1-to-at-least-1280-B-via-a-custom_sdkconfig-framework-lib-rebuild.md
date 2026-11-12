@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T18:15:00Z'
-updated_date: '2026-11-12T21:18:00Z'
+updated_date: '2026-11-12T21:39:00Z'
 labels:
   - firmware
   - build
@@ -56,4 +56,6 @@ beta.219 lane (coordinator plan 2026-11-12): TASK-1746/1868 (lane-95-1746, 1e071
 beta.219 build (95, 2026-11-12, lane-95-219b 9e3b0f38a on origin/dev c97d93659): build.bat in the foreground, cold .pio, 21:58:35-22:13:40 (15:05, moved to background after 600 s, exit 0), commit 79 % after ollama stop. Artifact D:/Users/Robert/Documents/GitHub/RvdB/wt-95w/build/OTGW-firmware-esp32-combo-2.0.0-beta.219+9e3b0f3-flash.zip (6,315,780 B), app .ino.bin 2,135,904 B (217: 2,135,328). ELF archived as OTGW-build-archive/2.0.0-beta.219+9e3b0f3.zip.
 
 AC4 ELF evidence: first checker run FAILED for the wrong reason: -flto renames statics with '$' (ipc_task$lto_priv$0, s_ipc_task_handle$lto_priv$0) and merges esp_ipc_init into the shared constructor _sub_I_65535_0$0, so the checker found no symbols. Checker fixed to split names on '.' and '$' and to find the creator as the function that loads ipc_task and calls xTaskCreatePinnedToCore. Result: beta.219 -> 'ipc_task creator: _sub_I_65535_0$0 at 0x42098640, stack argument 1280 (0x500)', found in __init_array (7 entries), ipc_task 0x4037579c with 11 literal loads, none outside IRAM, data in DRAM, no duplicate IPC functions, PASS exit 0; beta.217 -> creator esp_ipc_init 0x4209c0c4, stack 1024, FAIL exit 1. The LTO marker symbol esp_ipc_stack_c_ff1bed1d in the ELF shows our object is linked. Map check not run: the build leaves no firmware.map in .pio (only the ELF is kept). RAM: static .dram0.bss 94896 -> 94912 (+16 B), .dram0.data unchanged; the 2 x 256 B stack is heap (xTaskCreatePinnedToCore allocates it), so expect about 512 B less free heap after boot on the device.
+
+Bench .61 (OTGW32) on 2.0.0-beta.219+9e3b0f3 by otgw-firmware-09, 2026-11-12, relayed to 95: PASS. hd_ipc0_stack_min 404-484 B and hd_ipc1_stack_min 332 B (beta.217/218: ipc0 152-232, ipc1 80-88), so about +252 B each, matching the +256 B of the 0x500 copy; [OTA] progress lines show ipc0min=484 ipc1min=332 over all 551 filesystem blocks (no drop during the flash write on .61). Evidence: C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/4f6ad420-bf33-4a3a-88bc-4eb9890a2231/scratchpad/b219/. Still open for AC5: the .63 part (filesystem OTA repeated, ipc0 on the Classic with PIC), after the 218 public beta soak and tag (09 holds .63 until then). Gap found by 09: the new boot line 'boot: ipc stack free min after hw detect' (OTGW-firmware.ino SetupDebugf in setup()) never reaches telnet because it prints before a client can connect; to move into device/info or the boot buffer in the next firmware build, not in 219 (changing src now would void this bench; 219 only gets a docs rebase onto the beta tag).
 <!-- SECTION:NOTES:END -->

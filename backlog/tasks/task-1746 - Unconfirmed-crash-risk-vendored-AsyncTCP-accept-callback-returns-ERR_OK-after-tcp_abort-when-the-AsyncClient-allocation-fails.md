@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T06:21:00Z'
-updated_date: '2026-11-12T15:35:00Z'
+updated_date: '2026-11-12T21:39:00Z'
 labels:
   - asynctcp
   - crash-risk
@@ -47,4 +47,6 @@ Implementation (95, 2026-11-12, local commit on lane-95-1746, together with TASK
 Coordinator's caution checked (server.end() must not abort the in-flight /ReBoot redirect): pinned AsyncTCP 3.4.10 (.pio/libdeps/esp32-combo/AsyncTCP/src/AsyncTCP.cpp:1532-1542): AsyncServer::end() does tcp_arg(_pcb,NULL), tcp_accept(_pcb,NULL), tcp_close(_pcb) (tcp_abort on failure) on the LISTEN pcb only, under tcp_core_guard; it keeps no client list and touches no client. AsyncWebServer::end() (ESPAsyncWebServer 3.11.2, WebServer.cpp:116) only calls _server.end(). An accept that lwIP queued before end() still dispatches to the (global, still alive) server's connect callback (AsyncTCP.cpp:310-312, 1588) and is served normally. So open connections and their queued responses stay; only new handshakes stop.
 
 Evidence (host, real functions): tests/test_reboot_listener_and_reason.py compiles the real prepareForReboot(), doRedirect(), reBootESP() and resetWirelessButton() with stubs. Old code (lane-95w 84c351493): 3 FAIL / 2 OK (teardown order 'mqtt,ws,otgwstream', no server.end; reasons 'Reboot after upgrade'). Fix: 5/5 OK (order 'server.end,mqtt,ws,otgwstream'; redirect page still built and restFinalize before requestDeferredReboot; AsyncServer::end touches only _pcb). tests/test_fsexplorer_relative_urls.py regex updated for the reason argument, OK. 12 tests slicing FSexplorer.ino/helperStuff.ino all exit 0; evaluate --quick 0 failed. AC4 ticked on this evidence. AC5 (bench: 20+ reboots old vs new with a device/info poller, plus the /ReBoot redirect page still arriving) open for 09.
+
+AC5 bench .61 on 2.0.0-beta.219+9e3b0f3 by otgw-firmware-09 (2026-11-12): 20/20 /ReBoot cycles clean, crashlog empty each boot, the redirect page (817 B) arrived every time. Evidence: C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/4f6ad420-bf33-4a3a-88bc-4eb9890a2231/scratchpad/b219/. Upstream (09): AsyncTCP 3.4.10 and v3.5.0 still do tcp_abort(pcb); return ERR_OK in tcp_accept; fixed on upstream main in 7befe25 (ERR_ABRT), 4192390 (client facade at delivery), d233104 (accept decided under the queue mutex, end() bumps _epoch). Plan (coordinator + 09, Robert's 'upstream if fixed, otherwise patch'): backport 7befe25 + d233104 (+4192390 if needed) as a patch on 3.4.10 with an ADR (ADR-187 precedent) in a later build; drop it when upstream tags a release.
 <!-- SECTION:NOTES:END -->

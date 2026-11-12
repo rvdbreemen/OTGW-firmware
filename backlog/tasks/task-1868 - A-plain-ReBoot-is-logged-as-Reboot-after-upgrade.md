@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T12:46:00Z'
-updated_date: '2026-11-12T15:35:00Z'
+updated_date: '2026-11-12T21:39:00Z'
 labels:
   - bug
 milestone: 2.0.0
@@ -34,4 +34,6 @@ Claimed by otgw-firmware-95 (2026-11-12, coordinator OK): done in one change wit
 Implementation (95, 2026-11-12, same commit as TASK-1746): doRedirect(msg, wait, URL, const char *rebootReason) replaces the bool; null = no reboot. /ReBoot passes 'User reboot (/ReBoot)', reset wireless 'Reset wireless settings' (both well under the 48-byte reboot-reason record, helperStuff.ino:248). Note on AC1's 'upgrade path keeps Reboot after upgrade': doRedirect() has only these two callers on dev; the OTA paths call requestDeferredReboot('[OTA] Rebooting...' / '[OTA] handover to safeboot') directly (OTGW-ModUpdateServer-esp32.h:248/268) and are unchanged, so the upgrade path keeps its own reason.
 
 Evidence (host, real functions): tests/test_reboot_listener_and_reason.py: old code reports reason 'Reboot after upgrade' for /ReBoot and for reset wireless (2 FAIL); fix reports 'User reboot (/ReBoot)' and 'Reset wireless settings' (OK), the redirect page is still built. AC1 ticked. AC2 asks for 'a host test or bench check' on old and fix: the host test on the real doRedirect/reBootESP shows both, so AC2 ticked too; reboot_log.txt on the device after a /ReBoot is in 09's TASK-1746 bench as a confirmation.
+
+Bench .61 on 2.0.0-beta.219+9e3b0f3 by otgw-firmware-09 (2026-11-12): reboot_log shows 'User reboot (/ReBoot)' after 20/20 /ReBoot cycles. Evidence: C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/4f6ad420-bf33-4a3a-88bc-4eb9890a2231/scratchpad/b219/.
 <!-- SECTION:NOTES:END -->
