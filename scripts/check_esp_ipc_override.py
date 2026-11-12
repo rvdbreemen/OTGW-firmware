@@ -7,7 +7,9 @@ the final ELF (and in the linker map when one is given), so the build is proven 
 
   1. esp_ipc_init creates the IPC tasks with 1280 B: the stack argument (a12) loaded right before
      the call to xTaskCreatePinnedToCore is 0x500, not the prebuilt 0x400.
-  2. esp_ipc_init is registered as a constructor: its address is in __init_array.
+  2. esp_ipc_init is registered as a constructor: its address is in __init_array. With -flto the
+     linker merges it into one _sub_I_65535_0 constructor, so the check finds the function that
+     loads ipc_task and calls xTaskCreatePinnedToCore, whatever its name.
   3. ipc_task and every literal it loads (l32r) are in IRAM: the IPC task runs while the flash
      cache is off during a flash write, so code or literals in flash would crash there.
   4. The IPC data (s_ipc_task_handle, s_ipc_mutex_buffer, s_ipc_ack_buffer) is in internal DRAM.
@@ -58,9 +60,38 @@ def symbols(b, elf):
         parts = line.split()
         if len(parts) == 3:
             addr, kind, name = parts
-            base = name.split(".")[0]   # LTO may rename a static to name.lto_priv.0
+            base = re.split(r"[.$]", name)[0]   # LTO renames a static to name$lto_priv$0 (or name.lto_priv.0)
             out.setdefault(base, []).append((int(addr, 16), kind, name))
     return out
+
+
+def find_creator(b, elf):
+    """Return (function name, start address, stack argument) of the code that creates ipc_task.
+
+    Without LTO that is esp_ipc_init; with -flto the linker merges the static constructors into one
+    _sub_I_65535_0 function, so the creator is found as the function that loads ipc_task's address
+    and then calls xTaskCreatePinnedToCore. The stack argument is the last a12 load before that call.
+    """
+    dis = run([tool(b, "objdump"), "-d", elf])
+    func, start, stack, seen_task, pending = None, None, None, False, False
+    for line in dis.splitlines():
+        m = re.match(r"^([0-9a-f]{8}) <(.+)>:$", line)
+        if m:
+            func, start = m.group(2), int(m.group(1), 16)
+            stack, seen_task, pending = None, False, False
+            continue
+        if func is None or re.split(r"[.$]", func)[0] == "ipc_task":
+            continue
+        mv = re.search(r"\bmovi(?:\.n)?\s+a12,\s*(-?0x[0-9a-f]+|-?\d+)", line)
+        if mv:
+            stack = int(mv.group(1), 0)
+        if "l32r" in line and re.search(r"<ipc_task(?:[.$][^>]*)?>", line):
+            seen_task = True
+        if seen_task and "l32r" in line and "<xTaskCreatePinnedToCore>" in line:
+            pending = True
+        elif pending and "callx8" in line:
+            return func, start, stack
+    return None
 
 
 def in_range(a, rng):
@@ -88,17 +119,14 @@ def main():
         if len(syms.get(fn, [])) > 1:
             fails.append(f"{fn}: defined {len(syms[fn])} times")
 
-    init = one("esp_ipc_init")
-    if init:
-        dis = run([tool(b, "objdump"), "-d", "--disassemble=" + init[2], a.elf])
-        stack = None
-        for line in dis.splitlines():
-            m = re.search(r"\bmovi(?:\.n)?\s+a12,\s*(-?0x[0-9a-f]+|-?\d+)", line)
-            if m:
-                stack = int(m.group(1), 0)
-            if "xTaskCreatePinnedToCore" in line and stack is not None:
-                break
-        notes.append(f"esp_ipc_init stack argument: {stack!r} ({hex(stack) if stack is not None else '-'})")
+    creator = find_creator(b, a.elf)
+    if creator is None:
+        fails.append("no function loads ipc_task and calls xTaskCreatePinnedToCore: the IPC tasks are never created")
+    else:
+        cname, caddr, stack = creator
+        init = (caddr, "t", cname)
+        notes.append(f"ipc_task creator: {cname} at {caddr:#x}, stack argument {stack!r}"
+                     f" ({hex(stack) if stack is not None else '-'})")
         if stack != WANT_STACK:
             fails.append(f"IPC stack is {stack} B, want {WANT_STACK} B"
                          + (" (prebuilt esp_ipc.c.obj linked)" if stack == PREBUILT_STACK else ""))
@@ -113,9 +141,9 @@ def main():
                     for w in m.group(1).split():
                         words.append(int.from_bytes(bytes.fromhex(w), "little"))
             if init[0] not in words:
-                fails.append("esp_ipc_init is not in __init_array: the IPC tasks would never start")
+                fails.append(f"{cname} is not in __init_array: the IPC tasks would never start")
             else:
-                notes.append(f"esp_ipc_init {init[0]:#x} found in __init_array ({len(words)} entries)")
+                notes.append(f"{cname} {init[0]:#x} found in __init_array ({len(words)} entries)")
         else:
             fails.append("__init_array_start/end not found")
 
