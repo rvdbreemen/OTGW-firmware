@@ -1,11 +1,11 @@
 ---
 id: TASK-1836
 title: 'OT-Direct: settings the PIC keeps in EEPROM are lost at reboot'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:46:00Z'
-updated_date: '2026-11-12T04:44:00Z'
+updated_date: '2026-11-12T10:37:00Z'
 labels:
   - otdirect
   - parity
@@ -52,3 +52,9 @@ Bench checklist for otgw-bench-tester: on .61 (any OT-Direct mode; loopback is f
 
 2026-11-12 05:31-05:40 bench (otgw-bench-tester), .61 OTGW32 on 2.0.0-beta.203+61b69e0 (flash: ota_flash.py app+fs, bootcount 440 -> 442, health 200, crashlog none, settings unchanged). In loopback over TCP 25238: HW=0, SW=55, SH=70, UI=70, IT=0, OH=1 replied 'HW: 0', 'SW: 55.00', 'SH: 70.00', 'UI: 70', 'IT: 0', 'OH: 1'. /settings.ini then held OTDdhwoverride 0, OTDdhwsetpoint 55.0, OTDmaxchsetpoint 70.0, OTDignoretransitions false, OTDoverridehb true, OTDunknownids "70". After a reboot: 'PR: W=0' (AC4) and 'PR: T=01'. A 40 s loopback boot capture showed R90383700 (WRITE MsgID 56 = 55.00) and R10394600 (WRITE MsgID 57 = 70.00) every 15 s, and no frame or READ for MsgID 70. Cleanup HW=A, SW=0, SH=0, KI=70, IT=1, OH=0 restored settings.ini (255 / 0.0 / 0.0 / true / false / ""). Settings diff against the pre-bench backup: 0. Evidence: scratchpad b203/check203_12-out.txt.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SM=, SB=, MI=, FS=, IT=, OH=, SW=, SH=, UI= and HW= are kept in settings.otd and restored at boot by otdRestorePersistedCommands(), like the PIC's EEPROM; AA/DA deliberately not persisted (decision in the notes, TASK-1707 model). AC1/AC2: tests/test_otd_persist_pic_eeprom.py 4 tests on the real branches, helpers and restore: 3 FAIL on the old code, 4/4 on the fix. AC3: per-item decision recorded (IT/OH persisted as the PIC, AA/DA not). AC4: bench 09 on .61 beta.203+61b69e0: HW=0, SW=55, SH=70, UI=70, IT=0, OH=1 stored in settings.ini, after a reboot 'PR: W=0' and 'PR: T=01', loopback capture shows the WRITE 56/57 values every 15 s and no MsgID 70; settings restored (diff 0). Pushed as beta.202 (20d61556e).
+<!-- SECTION:FINAL_SUMMARY:END -->
