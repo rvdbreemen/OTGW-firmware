@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:57:00Z'
-updated_date: '2026-11-12T01:25:00Z'
+updated_date: '2026-11-12T01:58:00Z'
 labels:
   - otdirect
   - parity
@@ -46,4 +46,6 @@ Fix: PIC-named flags otPushManual/Pending/Spoof/Started/Fails replace the old en
 Tests: new tests/test_otd_dhw_push_pic.py (real HW branch, otdOperModeData, otdPush block, otOverrides, otdEffectiveMasterFlags/otdRelayedStatus, OtdStatusCmd): old code 6 FAIL, fix 6 OK (HW=0 + HW=P -> SENT 10631000 = dhw-5.stc, W=0 during and after, bit 1 = 0; DHW enable not forced when the boiler takes the push; forced on WRITE_ACK without push bit, Unknown-DataID, or 99 known unsupported (no frame then); a started spoofed push survives 60 s and ends when DHW mode clears; 8 flame-off answers end it; HW=A aborts). Limitation: the old 30 s cut lived inside handleMasterResponse, not cut into this harness; on the old code that test is red because the old answer path is stubbed, so the 30 s red is shown by reading the old code (OT_DHW_PUSH_TIMEOUT_MS = 30000 checked in handleMasterResponse). Harness updates for the new flags: status_bits, status_relay, cool_ch2_defaults, mode_switch_queue_reset, msgid99_bytes, gateway_own_status, gateway_alt_slots (slices now include the push block; tt_pic_parity and ps1_summary use it). All OT-Direct suites OK; evaluate --quick 92 checks 0 FAIL.
 
 Advisor review fix (folded into the commit, now 528a2a3c7): a READ_ACK of MsgID 99 while the push WRITE is pending (answer to an earlier READ 99: the gateway's slow poll or the thermostat's) no longer ends the push; PIC ID99ReadData turns such reads into writes while opermodewrite is set (gateway.asm:3253-3257). New test case red before the guard, green after; 7 OK. Enum check: vendored OpenTherm.h READ_ACK=0b100, WRITE_ACK=0b101 (UNKNOWN_DATA_ID 0b111), so (uint8_t)respType gives 4/5/7. Bench limit: on .61 in loopback the push hooks do not run (loopback answers never reach handleMasterResponse), so .61 can show HW=P -> R10631000 and PR=W unchanged, not the boiler-driven end or the spoof path; AC4 (capture of one push) needs a real boiler or the slave simulator.
+
+Full scripts/run_tests.py on the integrated HEAD (6841ab5d9, -j 4): 210 files, 208 passed, 2 failed. (1) test/host/test_override_reply.py: its PowerShell slicer anchored on 'enum DHWPushState' (gone with this task) and lacked otCH2Enable (TASK-1833) and the push hooks; fixed in a follow-up test commit (anchor matches the old enum or the new otPushManual flag, so older revisions still slice; otCH2Enable stub; no-op push hooks, the push is measured by tests/test_otd_dhw_push_pic.py). Rerun: 4 OK. I missed it before because I ran the tests/ suites, not test/host/. (2) test/host/test_stream_real_cbuf.py failed only under -j 4; alone it passes (exit 0, 'PASS: green with the presize, red without it'); not related to these changes, reported to the coordinator.
 <!-- SECTION:NOTES:END -->

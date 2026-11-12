@@ -250,6 +250,11 @@ static constexpr uint8_t OT_SCHEDULE_SIZE = 1;
 // ADR-229 (TASK-1805): command state the relayed MsgID 0 rewrite reads. Not sliced: the anchors
 // must match every old revision this harness compares against. Unused by older slices.
 static bool otSummerMode = false, otDHWBlocking = false, otCoolingEnable = false;
+static bool otCH2Enable = false;   // TASK-1833: H2= value for the relayed status; unused by older slices
+// TASK-1845: handleMasterResponse() hands MsgID 99 and MsgID 0 answers to the DHW push. The push is not what this
+// harness measures (tests/test_otd_dhw_push_pic.py does), so its hooks are no-ops here; unused by older slices.
+static void otdPushOnBoiler99(uint8_t, uint16_t) {}
+static void otdPushOnBoilerStatus(uint8_t) {}
 
 // ---- code under test, sliced by anchor from OTDirect.ino ------------------------
 #include "otd_slice.inc"
@@ -325,7 +330,7 @@ static void resetAll() {
   otLastSentRequest     = 0;
   otLastRequestOrigin   = OT_DIRECT_ORIGIN_GATEWAY;
   otCurrentMode         = OTD_MODE_GATEWAY;
-  otDHWPushState        = PUSH_IDLE;
+  otPushManual = otPushPending = otPushSpoof = otPushStarted = false; otPushFails = 0;   // TASK-1845
   otSummaryPending      = false;
   state.otBus.bOnline   = true;
   otMaster.reset();
