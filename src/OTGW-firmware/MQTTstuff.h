@@ -628,4 +628,27 @@ bool clearThermostatDupDiscoveryForOTId(uint8_t otId,
                                         const char *nodeId,
                                         uint8_t *cleared);
 
+// TASK-1757 AC3 diagnostics: call sites of connProbe() (MQTTstuff.ino), printed as at=/from=.
+enum : uint8_t {
+  CPROBE_LOOP_TOP = 1,      // loop(): top
+  CPROBE_TIMERS,            // loop(): after the timer events (flush, sensors, 15/5 min, 60/3/1 s, command queue)
+  CPROBE_DISCOVERY,         // loop(): after loopMQTTDiscovery()
+  CPROBE_SAT,               // loop(): after satControlLoop()
+  CPROBE_APP_END,           // loop(): after BLE, weather, PIC upgrade, OLED
+  CPROBE_BG_END,            // loop(): after doBackgroundTasks()
+  CPROBE_OTFRAMES,          // loop(): after drainOTFrameQueue()
+  CPROBE_PRE_MQTT,          // doBackgroundTasks(): before handleMQTT()
+  CPROBE_POST_MQTT,         // doBackgroundTasks(): after handleMQTT()
+  CPROBE_POST_PIC,          // doBackgroundTasks(): after handlePICSerial()
+  CPROBE_POST_OTD,          // doBackgroundTasks(): after loopOTDirect()
+  CPROBE_MQTT_PRE_LOOP,     // handleMQTT(): before MQTTclient.loop()
+  CPROBE_MQTT_POST_LOOP,    // handleMQTT(): after MQTTclient.loop()
+  CPROBE_CONN_BIRTH,        // onMqttConnect(): after the birth
+  CPROBE_CONN_SUBS,         // onMqttConnect(): after the two subscribes
+  CPROBE_SAT_RUN,           // satControlLoop(): after satControlLoopRun()
+  CPROBE_SAT_CORE           // satControlLoop(): after satPublishCoreState()
+};
+void connProbe(uint8_t tag);
+#define OTGW_CONN_PROBE(tag) connProbe(tag)  // used where host test harnesses cut the code without this header
+
 // end of MQTTstuff.h

@@ -76,6 +76,8 @@ static void PrintMQTTError() {}
 static void bootHeapPhase(const char*) {}
 static void connTraceBegin() {}
 static void connTraceSample() {}
+enum { CPROBE_CONN_BIRTH = 14, CPROBE_CONN_SUBS = 15 };  // TASK-1757 AC3 probes (MQTTstuff.h)
+static void connProbe(uint8_t) {}
 static void heapBurstOpen() {}
 enum { BOOTHEAP_RUN = 1 };
 static int sBootHeapState = 0;

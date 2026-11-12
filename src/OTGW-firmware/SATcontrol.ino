@@ -6997,7 +6997,13 @@ void satControlLoop()
   satPresetPersistIfChanged();    // TASK-1487: preset state file, written on the loop task
   _sat_tuneGatesPassed = false;
   satControlLoopRun();
+#ifdef OTGW_CONN_PROBE
+  OTGW_CONN_PROBE(CPROBE_SAT_RUN);   // TASK-1757 AC3 diagnostics (MQTTstuff.h); absent in host test harnesses
+#endif
   satPublishCoreState();
+#ifdef OTGW_CONN_PROBE
+  OTGW_CONN_PROBE(CPROBE_SAT_CORE);  // TASK-1757 AC3: the first pass after a connect publishes the whole core set
+#endif
   if (!_sat_tuneGatesPassed) satCurveTuneNoteNotControlling();   // TASK-1525: a gate held SAT back this pass: the tuner hour does not count
 }
 

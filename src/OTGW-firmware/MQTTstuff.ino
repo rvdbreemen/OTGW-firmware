@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.214
+**  Version  : v2.0.0-beta.215
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1140,6 +1140,67 @@ static uint16_t sConnTraceSamples = 0, sConnTraceRestarts = 0;
 static inline uint16_t connTraceCap16(uint32_t v) { return v > 0xFFFFu ? 0xFFFFu : (uint16_t)v; }
 static inline uint8_t  connTraceCap8(uint32_t v)  { return v > 0xFFu ? 0xFFu : (uint8_t)v; }
 
+// TASK-1757 AC3 diagnostics: connect-window probes. The beta.208/211 traces show
+// 40-55 KB vanish in one 83-288 ms sample gap right after onMqttConnect, in which
+// the loop does not reach the trace tick. connProbe(tag) is called between the big
+// loop steps (OTGW-firmware.ino, handleMQTT) while the connect trace runs. A probe
+// is kept when the window minimum fell by 1 KB or more since the previous probe
+// (same window generation; after a restart: against the previous free heap), or
+// when 20 ms or more passed since the previous probe. Each kept probe names the
+// step that ended there and the step before it, so the drop is bracketed by two
+// call sites. The first 32 are printed with the connect trace. Loop task only.
+// The tags (CPROBE_*) are in MQTTstuff.h.
+struct ConnProbeRec {
+  uint16_t tMs, dtMs;              // since the phase opened / since the previous probe
+  uint16_t min4, free4, pFree4, maxblk4;  // 4 B units; pFree = free heap at the previous probe
+  uint16_t mqttTxBytes;
+  uint8_t  tag, pTag, outbox, ws, gen;
+};
+static ConnProbeRec sConnProbe[32];
+static uint8_t  sConnProbeN = 0, sConnProbePTag = 0;
+static uint32_t sConnProbePMs = 0, sConnProbePFree = 0, sConnProbePW = 0, sConnProbePGen = 0;
+static uint16_t sConnProbeCalls = 0;
+
+static void connProbeReset() {
+  sConnProbeN = 0; sConnProbePTag = 0; sConnProbeCalls = 0;
+  sConnProbePMs = millis(); sConnProbePFree = platformFreeHeap();
+  sConnProbePW = platformHeapWindowMin(); sConnProbePGen = platformHeapWinGen();
+}
+
+void connProbe(uint8_t tag) {
+  if (!sConnTraceOn) return;
+  const uint32_t now = millis();
+  const uint32_t freeNow = platformFreeHeap();
+  const uint32_t w = platformHeapWindowMin();
+  const uint32_t gen = platformHeapWinGen();
+  sConnProbeCalls++;
+  const uint32_t ref = (gen == sConnProbePGen) ? sConnProbePW : sConnProbePFree;
+  const bool fell = (w != 0) && (w + 1024U <= ref);
+  const bool slow = (now - sConnProbePMs) >= 20U;
+  if ((fell || slow) && sConnProbeN < 32) {
+    ConnProbeRec &r = sConnProbe[sConnProbeN++];
+    r.tMs = connTraceCap16(now - sConnTraceT0);  r.dtMs = connTraceCap16(now - sConnProbePMs);
+    r.min4 = connTraceCap16(w / 4);              r.free4 = connTraceCap16(freeNow / 4);
+    r.pFree4 = connTraceCap16(sConnProbePFree / 4);
+    r.maxblk4 = connTraceCap16(platformMaxFreeBlock() / 4);
+    r.mqttTxBytes = connTraceCap16(platformTcpTxBytesToRemotePort(settings.mqtt.iBrokerPort));
+    r.tag = tag; r.pTag = sConnProbePTag; r.outbox = connTraceCap8(mqttQueueNow());
+    r.ws = connTraceCap8(webSocketClientCount()); r.gen = (uint8_t)gen;
+  }
+  sConnProbePTag = tag; sConnProbePMs = now; sConnProbePFree = freeNow;
+  sConnProbePW = w; sConnProbePGen = gen;
+}
+
+static void connProbePrint() {
+  for (uint8_t i = 0; i < sConnProbeN; i++) {
+    const ConnProbeRec &r = sConnProbe[i];
+    DebugTf(PSTR("[HEAP] connect-probe t=%u dt=%u at=%u from=%u min=%lu free=%lu pfree=%lu maxblk=%lu outbox=%u ws=%u mqttTx=%u gen=%u\r\n"),
+            r.tMs, r.dtMs, r.tag, r.pTag, (unsigned long)r.min4 * 4, (unsigned long)r.free4 * 4,
+            (unsigned long)r.pFree4 * 4, (unsigned long)r.maxblk4 * 4, r.outbox, r.ws, r.mqttTxBytes, r.gen);
+  }
+  DebugTf(PSTR("[HEAP] connect-probe end kept=%u calls=%u\r\n"), (unsigned)sConnProbeN, (unsigned)sConnProbeCalls);
+}
+
 static void connTraceBegin() {
   sConnTraceOn = true;
   sConnTraceN = sConnTraceHead = 0;
@@ -1150,6 +1211,7 @@ static void connTraceBegin() {
   sConnTracePOutbox = connTraceCap8(mqttQueueNow());
   sConnTracePFiles  = webFileInFlightNow();
   sConnTracePRest   = restInFlightNow();
+  connProbeReset();  // TASK-1757 AC3
 }
 
 // Called every loop pass (via the public tick), at points inside onMqttConnect,
@@ -1198,6 +1260,7 @@ static void connTraceEnd(uint32_t phaseMin) {
   DebugTf(PSTR("[HEAP] connect-trace end entries=%u samples=%u restarts=%u traceMin=%lu phaseMin=%lu match=%u\r\n"),
           (unsigned)sConnTraceN, (unsigned)sConnTraceSamples, (unsigned)sConnTraceRestarts,
           (unsigned long)tmin, (unsigned long)phaseMin, (tmin == phaseMin) ? 1u : 0u);
+  connProbePrint();  // TASK-1757 AC3
 }
 
 // Public tick for the loop (OTGW-firmware.ino), next to sampleHeapDip().
@@ -1407,7 +1470,9 @@ void handleMQTT()
   // Gating it on connected() (as the synchronous PubSubClient path did) would
   // stall the handshake forever — connected() never becomes true because the
   // thing that makes it true is loop() itself. It is a safe no-op when idle.
+  connProbe(CPROBE_MQTT_PRE_LOOP);   // TASK-1757 AC3
   MQTTclient.loop();
+  connProbe(CPROBE_MQTT_POST_LOOP);  // TASK-1757 AC3
   heapBurstTick();  // TASK-1339 diagnostics: [HEAP] burst trace, no behaviour change
 
   // Poll the discovery-verify window closer (ADR-062). Handles timeout,
@@ -1743,6 +1808,7 @@ static void onMqttConnect(bool sessionPresent) {
   // MQTT_STATE_IS_CONNECTED backstops a transient outbox-full at this instant.
   publishBirthOnline();
   DebugTf(PSTR("[HEAP] post-birth: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
+  connProbe(CPROBE_CONN_BIRTH);  // TASK-1757 AC3
 
   // Republish OT retained topics and reset discovery only if offline long enough
   // that the broker may have lost its retained state (e.g. broker restart without
@@ -1778,6 +1844,7 @@ static void onMqttConnect(bool sessionPresent) {
   }
   MQTTclient.subscribe("homeassistant/status", 0);
   DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
+  connProbe(CPROBE_CONN_SUBS);   // TASK-1757 AC3
   connTraceSample();  // TASK-1757
   // TASK-1757: the rest of the connect burst (V2 migration subscribes, version
   // info, PIC settings, command_retry_exceeded, unsupported_msgids) leaves in

@@ -101,7 +101,8 @@ class DisabledStateIsPublished(unittest.TestCase):
                 calls += len(re.findall(r"^\s*satPublishCoreState\(\);", text, re.M))
         self.assertEqual(calls, 1)
         loop = body(self.sat, "void satControlLoop()")
-        self.assertRegex(loop, r"satControlLoopRun\(\);\s*satPublishCoreState\(\);")
+        # TASK-1757: an #ifdef OTGW_CONN_PROBE diagnostic block (heap probe, no logic) may sit between the two
+        self.assertRegex(loop, r"satControlLoopRun\(\);\s*(?:#ifdef OTGW_CONN_PROBE\s+OTGW_CONN_PROBE\(\w+\);[^\n]*\s+#endif\s*)?satPublishCoreState\(\);")
         # every path of the pass (enabled, disabled, tripped) goes through the wrapper
         self.assertNotIn("satPublishCoreState", body(self.sat, "static void satControlLoopRun()"))
         self.assertIn("satControlLoop();", read("OTGW-firmware.ino"))

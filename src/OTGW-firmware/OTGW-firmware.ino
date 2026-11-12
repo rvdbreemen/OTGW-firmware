@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.214
+**  Version  : v2.0.0-beta.215
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1084,15 +1084,19 @@ void doBackgroundTasks()
       //while connected handle everything that uses network stuff
       handleDebug();
       handleOTGWstream();          // OTGW serial bridge on TCP port 25238
+      connProbe(CPROBE_PRE_MQTT);   // TASK-1757 AC3
       handleMQTT();                 // MQTT transmissions
+      connProbe(CPROBE_POST_MQTT);  // TASK-1757 AC3
       handleOTReplay();             // TASK-1071: fixture replay, transport-independent
       handlePICSerial();            // OTGW/PIC handling
+      connProbe(CPROBE_POST_PIC);   // TASK-1757 AC3
 #if HAS_DIRECT_OT
       // Run the OT-direct engine only when the OT-direct hardware is active
       // (guards against a degraded init on the fixed OTGW32).
       if (isOTDirectEnabled()) {
         handleOTDirectBridgeStream(); // OTGW32/TCP 25238 command bridge
         loopOTDirect();               // OT-direct GPIO poll
+        connProbe(CPROBE_POST_OTD); // TASK-1757 AC3
       }
 #endif
       // TASK-865.10: WebSocket serving moved onto the AsyncTCP service task — there
@@ -1143,6 +1147,7 @@ void loop()
   }
 
 
+  connProbe(CPROBE_LOOP_TOP);       // TASK-1757 AC3 (no-op outside the boot connect phase)
   DECLARE_TIMER_SEC(timer1s,   1,   SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer3s,   3,   SKIP_MISSED_TICKS);
   DECLARE_TIMER_MS(timer500ms, 500, SKIP_MISSED_TICKS);
@@ -1170,6 +1175,7 @@ void loop()
     if (DUE(timer3s))                 doTaskEvery3s();
     if (DUE(timer1s))                 doTaskEvery1s();
     handleCommandQueue();             // TASK-1571: PIC command queue, paced by the PIC's echo (not by a timer)
+    connProbe(CPROBE_TIMERS);         // TASK-1757 AC3
     if (DUE(timer500ms)) {
       // LED2 fast blink (2x/s) when WiFi is up but no OT traffic for >10s
       bool noOT = (WiFi.status() == WL_CONNECTED) &&
@@ -1182,10 +1188,12 @@ void loop()
     }
     if (minuteChanged())              doTaskMinuteChanged(); //ADR-086: sole minuteChanged() caller; hour/day/year dispatch lives inside
     loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, one config per 1 s normal / 10 s slow)
+    connProbe(CPROBE_DISCOVERY);      // TASK-1757 AC3
     runTopicCleanupStep();            // ADR-106: drain stale-mode discovery topics after bUseLegacyOtTopics toggle
     evalOutputs();                    // when the bits change, the output gpio bit will follow
     evalWebhook();                    // when the trigger bit changes, fire the webhook
     satControlLoop();                 // SAT thermostat control loop (timer-guarded internally)
+    connProbe(CPROBE_SAT);            // TASK-1757 AC3
     satBLELoop();                     // BLE temperature sensor scan (timer-guarded, Task #20). TASK-742: no-op stub on ESP8266.
     weatherLoop();                    // Weather data fetch (timer-guarded, Task #50)
 #if HAS_PIC
@@ -1193,9 +1201,11 @@ void loop()
     handlePendingPicHttp();           // TASK-865.14: run deferred PIC update-check/refresh outbound HTTP off the AsyncTCP task
 #endif
     loopOLED();                       // OLED display refresh and button handling (no-op if no OLED detected)
+    connProbe(CPROBE_APP_END);        // TASK-1757 AC3
   }
 
   doBackgroundTasks();              // run background tasks
+  connProbe(CPROBE_BG_END);         // TASK-1757 AC3
   sampleHeapDip();                  // TASK-1673: who holds memory at the lowest free heap
   bootHeapConnectTraceTick();       // TASK-1757: connect-window heap trace (boot only, no-op otherwise)
 
@@ -1207,6 +1217,7 @@ void loop()
   handlePendingMQTTRepublish();     // TASK-1176: apply a REST-queued republish reset before these frames
   handlePendingDHWWaterMeterReset(); // TASK-1123: apply a REST- or MQTT-queued DHW water total reset before these frames
   drainOTFrameQueue();
+  connProbe(CPROBE_OTFRAMES);       // TASK-1757 AC3
 
   // TASK-396: heap watermark tick + deferred-reboot gate. The watermark runs
   // every loop so slow leaks are visible in the minHeap field of the boot
