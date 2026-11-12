@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.197
+**  Version  : v2.0.0-beta.198
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1007,6 +1007,87 @@ static bool probeOTBus() {
 }
 
 // ---------------------------------------------------------------------------
+// otdBootHandshake — boot status request and protocol handshake to the boiler (master mode only, TASK-1835)
+// Blocking calls are acceptable: it runs from initOTDirect() in setup(), before the cooperative loop.
+// ---------------------------------------------------------------------------
+static void otdBootHandshake() {
+  // 7. Send initial status request to boiler to check connectivity
+  // Blocking calls are acceptable during setup() — not yet in cooperative loop
+  unsigned long request = buildStatusRequest();
+  unsigned long response = otMaster.sendRequest(request);
+  if (otMaster.isValidResponse(response)) {
+    state.otBus.bOnline = true;
+    OTDDebugTln(F("OT-direct: Boiler responded — OT bus online"));
+    sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: connected\"}");
+    bridgeFrameToParser('R', request);
+    bridgeFrameToParser('B', response);
+  } else {
+    state.otBus.bOnline = false;
+    DebugTln(F("OT-direct: No valid boiler response — OT bus offline (will retry in loop)"));
+  }
+
+  // 8. OT protocol handshake — identify ourselves to the boiler.
+  //    MsgID 2: Master config flags (HB) + MemberID (LB). We set Smart Power bit if available.
+  //    MsgID 124: OpenTherm version we speak (f8.8, 2.2 = 0x0233).
+  //    MsgID 126: Master product type (HB) + version (LB).
+  //    These are one-time WRITE_DATA, not polled.
+  if (state.otBus.bOnline) {
+    unsigned long handshake;
+
+    // MsgID 2: Master config (HB=flags bit0=SmartPower, LB=MemberID 0)
+    handshake = OpenTherm::buildRequest(
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::MConfigMMemberIDcode,
+      0x0100  // HB=0x01 (Smart Power supported), LB=0x00 (MemberID)
+    );
+    response = otMaster.sendRequest(handshake);
+    bridgeFrameToParser('R', handshake);
+    if (otMaster.isValidResponse(response)) bridgeFrameToParser('B', response);
+
+    // MsgID 3: Read slave config to learn what the boiler supports
+    handshake = OpenTherm::buildRequest(
+      OpenThermMessageType::READ_DATA,
+      OpenThermMessageID::SConfigSMemberIDcode,
+      0
+    );
+    response = otMaster.sendRequest(handshake);
+    bridgeFrameToParser('R', handshake);
+    if (otMaster.isValidResponse(response)) {
+      bridgeFrameToParser('B', response);
+      uint8_t slaveConfig = (response >> 8) & 0xFF;
+      OTDDebugTf(PSTR("OT-direct: Slave config=0x%02X (DHW=%d ModCtrl=%d Cool=%d CH2=%d)\r\n"),
+        slaveConfig,
+        (slaveConfig & 0x01) ? 1 : 0,  // DHW present
+        (slaveConfig & 0x02) ? 0 : 1,  // 0=modulating, 1=on-off
+        (slaveConfig & 0x04) ? 1 : 0,  // Cooling supported
+        (slaveConfig & 0x10) ? 1 : 0); // CH2 present
+    }
+
+    // MsgID 124: OT protocol version (f8.8: 2.2 = 0x0233 ≈ 2.20)
+    handshake = OpenTherm::buildRequest(
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::OpenThermVersionMaster,
+      0x0233  // 2.2 in f8.8 (2 + 51/256 ≈ 2.20)
+    );
+    response = otMaster.sendRequest(handshake);
+    bridgeFrameToParser('R', handshake);
+    if (otMaster.isValidResponse(response)) bridgeFrameToParser('B', response);
+
+    // MsgID 126: Master product type=0 (gateway), version=1
+    handshake = OpenTherm::buildRequest(
+      OpenThermMessageType::WRITE_DATA,
+      OpenThermMessageID::MasterVersion,
+      0x0001  // HB=type 0, LB=version 1
+    );
+    response = otMaster.sendRequest(handshake);
+    bridgeFrameToParser('R', handshake);
+    if (otMaster.isValidResponse(response)) bridgeFrameToParser('B', response);
+
+    OTDDebugTln(F("OT-direct: Protocol handshake complete"));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // initOTDirect — called from setup() on OTGW32 builds
 // ---------------------------------------------------------------------------
 void initOTDirect() {
@@ -1094,81 +1175,6 @@ void initOTDirect() {
     DebugTln(F("OT-direct: WARNING — OT bus not idle, boiler may be disconnected"));
   }
 
-  // 7. Send initial status request to boiler to check connectivity
-  // Blocking calls are acceptable during setup() — not yet in cooperative loop
-  unsigned long request = buildStatusRequest();
-  unsigned long response = otMaster.sendRequest(request);
-  if (otMaster.isValidResponse(response)) {
-    state.otBus.bOnline = true;
-    OTDDebugTln(F("OT-direct: Boiler responded — OT bus online"));
-    sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: connected\"}");
-    bridgeFrameToParser('R', request);
-    bridgeFrameToParser('B', response);
-  } else {
-    state.otBus.bOnline = false;
-    DebugTln(F("OT-direct: No valid boiler response — OT bus offline (will retry in loop)"));
-  }
-
-  // 8. OT protocol handshake — identify ourselves to the boiler.
-  //    MsgID 2: Master config flags (HB) + MemberID (LB). We set Smart Power bit if available.
-  //    MsgID 124: OpenTherm version we speak (f8.8, 2.2 = 0x0233).
-  //    MsgID 126: Master product type (HB) + version (LB).
-  //    These are one-time WRITE_DATA, not polled.
-  if (state.otBus.bOnline) {
-    unsigned long handshake;
-
-    // MsgID 2: Master config (HB=flags bit0=SmartPower, LB=MemberID 0)
-    handshake = OpenTherm::buildRequest(
-      OpenThermMessageType::WRITE_DATA,
-      OpenThermMessageID::MConfigMMemberIDcode,
-      0x0100  // HB=0x01 (Smart Power supported), LB=0x00 (MemberID)
-    );
-    response = otMaster.sendRequest(handshake);
-    bridgeFrameToParser('R', handshake);
-    if (otMaster.isValidResponse(response)) bridgeFrameToParser('B', response);
-
-    // MsgID 3: Read slave config to learn what the boiler supports
-    handshake = OpenTherm::buildRequest(
-      OpenThermMessageType::READ_DATA,
-      OpenThermMessageID::SConfigSMemberIDcode,
-      0
-    );
-    response = otMaster.sendRequest(handshake);
-    bridgeFrameToParser('R', handshake);
-    if (otMaster.isValidResponse(response)) {
-      bridgeFrameToParser('B', response);
-      uint8_t slaveConfig = (response >> 8) & 0xFF;
-      OTDDebugTf(PSTR("OT-direct: Slave config=0x%02X (DHW=%d ModCtrl=%d Cool=%d CH2=%d)\r\n"),
-        slaveConfig,
-        (slaveConfig & 0x01) ? 1 : 0,  // DHW present
-        (slaveConfig & 0x02) ? 0 : 1,  // 0=modulating, 1=on-off
-        (slaveConfig & 0x04) ? 1 : 0,  // Cooling supported
-        (slaveConfig & 0x10) ? 1 : 0); // CH2 present
-    }
-
-    // MsgID 124: OT protocol version (f8.8: 2.2 = 0x0233 ≈ 2.20)
-    handshake = OpenTherm::buildRequest(
-      OpenThermMessageType::WRITE_DATA,
-      OpenThermMessageID::OpenThermVersionMaster,
-      0x0233  // 2.2 in f8.8 (2 + 51/256 ≈ 2.20)
-    );
-    response = otMaster.sendRequest(handshake);
-    bridgeFrameToParser('R', handshake);
-    if (otMaster.isValidResponse(response)) bridgeFrameToParser('B', response);
-
-    // MsgID 126: Master product type=0 (gateway), version=1
-    handshake = OpenTherm::buildRequest(
-      OpenThermMessageType::WRITE_DATA,
-      OpenThermMessageID::MasterVersion,
-      0x0001  // HB=type 0, LB=version 1
-    );
-    response = otMaster.sendRequest(handshake);
-    bridgeFrameToParser('R', handshake);
-    if (otMaster.isValidResponse(response)) bridgeFrameToParser('B', response);
-
-    OTDDebugTln(F("OT-direct: Protocol handshake complete"));
-  }
-
   // 9. Auto-detect thermostat presence (if enabled and mode is gateway)
   //    Wait a few seconds to see if any thermostat frames arrive on the slave bus.
   //    OpenTherm thermostats send MsgID 0 every ~1 second, so 5 seconds gives
@@ -1197,6 +1203,13 @@ void initOTDirect() {
       OTDDebugTln(F("OT-direct: Thermostat present — staying in gateway mode"));
     }
   }
+
+  // 10. TASK-1835 (PIC 6.8 parity audit N5): the boot status request and the protocol handshake go out only when the
+  //     gateway is the master, i.e. in master mode, also when the auto-detect above just chose it for this boot. In
+  //     gateway, monitor and bypass mode the gateway sends nothing of its own at boot, as the PIC (own frames only
+  //     without a thermostat: gateway.asm 6.8 StandAloneMsg :1797-1820, HandleRequest :2388-2407). Gateway mode
+  //     without a thermostat gets its own frames from the scheduler (otdOwnFramesAllowed, TASK-1701).
+  if (IS_MASTER_MODE()) otdBootHandshake();
 }
 
 // ---------------------------------------------------------------------------
