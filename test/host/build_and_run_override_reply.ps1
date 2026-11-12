@@ -94,6 +94,8 @@ $otdAnchors = @(
   @{ Name = 'TT/TC remote override state'; Kind = 'range'; Regex = '^static bool otRemoteOverrideClearPending\b';
      EndRegex = '^static bool otdRemoteOverrideHoldsSlot\(uint8_t msgId\)\s*\{'; EndKind = 'construct'; Optional = $true },   # TASK-1718: replyToThermostat reads it
   @{ Name = 'floatToF88';                   Kind = 'construct'; Regex = '^static inline uint16_t floatToF88\(float celsius\)\s*\{' },
+  @{ Name = 'SC= clock answer';             Kind = 'range';     Regex = '^static uint16_t otSCClockData\b';
+     EndRegex = '^// --- otdClockReply end'; EndKind = 'line'; Optional = $true },   # TASK-1840: replyToThermostat answers MsgID 20
   @{ Name = 'setOverride, clearOverride';   Kind = 'range';     Regex = '^static void setOverride\(uint8_t msgId, uint16_t value\)\s*\{';
      EndRegex = '^static void clearOverride\(uint8_t msgId\)\s*\{'; EndKind = 'construct' },
   @{ Name = 'otDHWOverride';                Kind = 'construct'; Regex = '^static uint8_t otDHWOverride\b' },

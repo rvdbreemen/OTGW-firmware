@@ -237,8 +237,14 @@ def build_source():
     src = OTD_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
     ring_at = src.index("static constexpr uint8_t OT_CMD_QUEUE_SIZE")
     ring = src[ring_at:src.index("// TASK-494: enqueue with coalesce-by-MsgID.", ring_at)]
+    # TASK-1840: otdAltSlotTaken() answers a MsgID 20 slot with otdClockReply(); its state and helper come along
+    clock = ""
+    if "// --- otdClockReply end" in src:
+        a = src.index("static uint32_t otSCLastCommandMs")
+        clock = src[a:src.index("// --- otdClockReply end")]
     parts = [
         ring,
+        clock,
         cut_braced(src, "static bool otCmdEnqueue(uint32_t frame)"),
         cut_braced(src, "static void scheduleMasterRequest()"),
         cut_braced(src, "static bool otdAltSlotTaken(unsigned long thermostatFrame)"),

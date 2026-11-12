@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.200
+**  Version  : v2.0.0-beta.201
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -504,10 +504,35 @@ static inline uint16_t floatToF88(float celsius) {
 static uint32_t otCSLastCommandMs = 0;
 static uint32_t otC2LastCommandMs = 0;
 static constexpr uint32_t OT_CSC2_EXPIRY_MS = 60000;  // ~1 minute, matches PIC heartbeat window
-// TASK-733: SC= clock command expiry — PIC CommandExpiry clears MsgID 20 override if SC
-// is not refreshed within ~61s (HeartbeatSC flag checked each minute by CommandExpiry).
+// TASK-733, TASK-1840: SC= stores the time for the thermostat's MsgID 20 only; nothing goes to
+// the boiler (PIC SetClock, gateway.asm:4331-4388). The value is valid until CommandExpiry sets
+// InvalidTime (gateway.asm:1623-1646): at least 121 Timer-1 overflows of 524.288 ms = 63.4 s
+// after the last SC= (gateway.asm:157-158; tests/thermostat-2.stc: SC= at 2 s still answered at 66 s).
+// otSCLastCommandMs == 0 means no valid time.
 static uint32_t otSCLastCommandMs = 0;
-static constexpr uint32_t OT_SC_EXPIRY_MS = 61000;
+static constexpr uint32_t OT_SC_EXPIRY_MS = 63500;
+static uint16_t otSCClockData = 0;   // MsgID 20 data: HB = day of week << 5 | hours, LB = minutes
+
+// TASK-1840: the gateway's answer to a thermostat MsgID 20 frame, as the PIC's MessageID20 and
+// missingclock (gateway.asm:3048-3056, :2694-2706). With a valid SC= time the request becomes the
+// matching acknowledgement (messageack, :2676-2679) with that time, whatever the boiler answered.
+// Without one, a boiler Data-Invalid or Unknown-DataID becomes Data-Invalid for a READ (messageinv
+// changes only the type, :2674-2675) and WRITE_ACK with the thermostat's own data for a WRITE
+// (datarestore, :2699-2701); any other boiler answer passes. Other frames are returned unchanged.
+// --- otdClockReply begin
+static unsigned long otdClockReply(unsigned long thermostatReq, unsigned long reply,
+                                   bool clockValid, uint16_t clockData) {
+  if (((thermostatReq >> 16) & 0xFF) != 20) return reply;
+  const uint8_t reqType = (uint8_t)((thermostatReq >> 28) & 0x07);
+  if (reqType != 0 && reqType != 1) return reply;           // READ_DATA, WRITE_DATA
+  const uint8_t ackType = (uint8_t)(reqType | 0x04);         // READ_ACK, WRITE_ACK
+  if (clockValid) return buildOTResponse(ackType, 20, clockData);
+  const uint8_t replyType = (uint8_t)((reply >> 28) & 0x07);
+  if (replyType != 6 && replyType != 7) return reply;        // the boiler's own answer
+  if (reqType == 0) return buildOTResponse(6, 20, (uint16_t)(reply & 0xFFFF));
+  return buildOTResponse(5, 20, (uint16_t)(thermostatReq & 0xFFFF));
+}
+// --- otdClockReply end
 
 // Set an override value for a MsgID (activates repeater modification for that ID)
 static void setOverride(uint8_t msgId, uint16_t value) {
@@ -1592,6 +1617,8 @@ static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentRe
                                    otRemoteOverride.f88Value,
                                    otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY ? 0x0002 : 0x0001,
                                    otRemoteOverrideClearPending);
+    // TASK-1840: MsgID 20 is answered from the SC= time (sentReq is the thermostat's own frame here)
+    reply = otdClockReply(sentReq, reply, otSCLastCommandMs != 0, otSCClockData);
     // ADR-223: the release rule counts thermostat MsgID 16 frames only after this answer.
     if (otRemoteOverride.mode != OT_OVERRIDE_NONE && ((reply >> 16) & 0xFF) == 9
         && ((reply >> 28) & 0x07) == 4) {
@@ -1966,6 +1993,9 @@ static bool otdAltSlotTaken(unsigned long thermostatFrame) {
   // Unknown-DataID with the thermostat's own Data-ID and data bytes, as CreateMessage builds it
   unsigned long unknownResp = buildOTResponse(7, (uint8_t)((thermostatFrame >> 16) & 0xFF),
                                               (uint16_t)(thermostatFrame & 0xFFFF));
+  // TASK-1840: a blacklisted MsgID 20 still gets the PIC's clock answer (TreatMessage runs MessageID20
+  // on the fake Unknown-DataID, gateway.asm:2467-2477, :3048-3056)
+  unknownResp = otdClockReply(thermostatFrame, unknownResp, otSCLastCommandMs != 0, otSCClockData);
   bridgeFrameToParser('T', thermostatFrame);
   bridgeFrameToParser('A', unknownResp);
   otdSendReply(unknownResp);
@@ -2365,6 +2395,8 @@ void loopOTDirect() {
       else if (isUnknownId(slaveMsgId) && !otdRemoteOverrideHoldsSlot(slaveMsgId)) {
         unsigned long unknownResp = (otSlaveFrame & 0x00FF0000UL) | (7UL << 28);  // type=UNKNOWN_DATAID
         setOTParityBit(unknownResp);
+        // TASK-1840: UI=20 still gets the PIC's clock answer (MessageID20 on the fake Unknown-DataID)
+        unknownResp = otdClockReply(otSlaveFrame, unknownResp, otSCLastCommandMs != 0, otSCClockData);
         bridgeFrameToParser('T', otSlaveFrame);
         bridgeFrameToParser('A', unknownResp);
         otdSendReply(unknownResp);
@@ -2442,10 +2474,9 @@ void loopOTDirect() {
       clearWriteOverride(8);
       otC2LastCommandMs = 0;
     }
-    // TASK-733: SC= clock sync expires after ~61s (PIC CommandExpiry / InvalidTime pattern)
+    // TASK-733, TASK-1840: the SC= time becomes invalid (PIC CommandExpiry sets InvalidTime)
     if (otSCLastCommandMs != 0 && (uint32_t)(nowExp - otSCLastCommandMs) > OT_SC_EXPIRY_MS) {
-      OTDDebugTln(F("OTD: SC heartbeat expired, clearing MsgID 20 override"));
-      clearWriteOverride(20);
+      OTDDebugTln(F("OTD: SC time expired, MsgID 20 answers follow the boiler again"));
       otSCLastCommandMs = 0;
     }
   }
@@ -3250,8 +3281,8 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   else if (cmd0 == 'S' && cmd1 == 'C') {
     int hh = 0, mm = 0, dow = 0;
     if (siscanf(value, "%d:%d/%d", &hh, &mm, &dow) >= 2) {
-      uint16_t data20 = (uint16_t)(((dow & 0x07) << 5 | (hh & 0x1F)) << 8) | (mm & 0x3F);
-      enqueueWriteCommand(20, data20, "SC-time");
+      // TASK-1840: stored for the thermostat's MsgID 20 only, never written to the boiler
+      otSCClockData = (uint16_t)(((dow & 0x07) << 5 | (hh & 0x1F)) << 8) | (mm & 0x3F);
       otSCLastCommandMs = millis();
       if (otSCLastCommandMs == 0) otSCLastCommandMs = 1;  // 0 sentinel reserved
       snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d:%02d/%d"), hh & 0x1F, mm & 0x3F, dow & 0x07);

@@ -462,7 +462,7 @@ These are the commands sent by the firmware to the PIC co-processor over UART (o
 |---------|-------------|
 | `PS=1` | Enable Print Summary mode (suppress frame-by-frame, emit CSV) |
 | `PS=0` | Disable Print Summary mode |
-| `SC=HH:MM/D` | Synchronize boiler clock. D=day of week 1-7 |
+| `SC=HH:MM/D` | Set the time the gateway gives the thermostat when it asks for MsgID 20 (time and day of week). Nothing is written to the boiler. D = day of week 1-7. Valid for about a minute: send it again at least every minute |
 | `PR=A` | Query PIC banner (returns firmware identifier) |
 | `PR=M` | Query current gateway mode |
 | `PR=O` | Query current setpoint override |
