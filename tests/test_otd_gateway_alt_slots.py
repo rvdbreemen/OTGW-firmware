@@ -98,6 +98,9 @@ def slices(src):
         parts.append(src[s:e])
     else:
         parts.append(span(src, r"^static const uint16_t PROGMEM otLoopbackData\[", r"^static void scheduleMasterRequest\(\)"))
+    if "// --- otdPush end" in src:   # TASK-1845: handleMasterResponse() feeds the boiler's answers to the push functions
+        s = _find(src, r"^static uint8_t otOperModeDHW\b").start()
+        parts.append(src[s:src.index("// --- otdPush end")])
     parts.append(construct(src, r"^void loopOTDirect\(\)\s*\{"))
     parts.append(construct(src, r"^static unsigned long buildOTResponse\([^)]*\)\s*\{"))
     parts.append(construct(src, r"^static unsigned long applyResponseModifiers\(unsigned long response\)\s*\{"))
@@ -239,6 +242,8 @@ static unsigned long buildOTResponse(uint8_t type, uint8_t msgId, uint16_t data)
 static unsigned long otdRelayedStatusFrame(unsigned long frame);
 static uint16_t otdStatusReplyData(uint16_t thermostatData, uint16_t boilerData);
 static unsigned long applyResponseModifiers(unsigned long response);
+static void otdPushOnBoiler99(uint8_t type, uint16_t data);   // TASK-1845
+static void otdPushOnBoilerStatus(uint8_t slaveLB);
 """
 
 # TASK-1759: the real SatBoilerFeed / satFeedFresh, filled in here so every user of PRE gets it

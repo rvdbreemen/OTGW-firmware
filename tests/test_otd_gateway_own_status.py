@@ -101,6 +101,7 @@ static void otCmdApplyPendingFlush() {}   // the ring flush itself is covered by
 static bool otIsVentSlave() { return false; }
 static bool otdCsOverrideActive() { return false; }
 static bool satOwnsControlSetpoint() { return false; }
+static bool otPushSpoof = false;   // TASK-1845: buildStatusRequest() enables DHW while a push is spoofed
 
 // Bus stand-in: every frame the gateway sends reaches the boiler model.
 static int g_bootCH = -1;           // boiler CH demand: bit 0 of the last MsgID 0 it received

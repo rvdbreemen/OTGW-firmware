@@ -66,6 +66,7 @@ static bool otChModeOff = false;
 static bool otSummerMode = false;
 static bool otDHWBlocking = false;
 static bool otCoolingEnable = false;
+static bool otPushSpoof = false;   // TASK-1845: the relayed status forces DHW enable only while the push is spoofed
 static bool otCH2Enable = false;   // TASK-1833: H2= value for the relayed status (older code reads bit 4 of otMasterStatusFlags)
 """
 
@@ -78,6 +79,7 @@ int main(int argc, char** argv) {
   otChModeOff = atoi(argv[3]) != 0;
   otDHWOverride = (uint8_t)atoi(argv[4]);
   otDHWPushState = atoi(argv[5]) ? PUSH_ACTIVE : PUSH_IDLE;
+  otPushSpoof = atoi(argv[5]) != 0;
   otOverrides[1].active = atoi(argv[6]) != 0;
   otCoolingEnable = atoi(argv[7]) != 0;
   otOverrides[2].active = atoi(argv[8]) != 0;

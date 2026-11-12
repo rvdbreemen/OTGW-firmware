@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.196
+**  Version  : v2.0.0-beta.197
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -123,11 +123,14 @@ static uint32_t otLastAnySendMs  = 0;       // timestamp of last frame sent
 // Phase 5: Fail safety — FS= controls setback on thermostat disconnect
 static bool otFailSafeEnabled    = true;    // default: enabled
 
-// Phase 9: DHW push state machine (moved here: used before original definition)
-enum DHWPushState : uint8_t { PUSH_IDLE = 0, PUSH_PENDING, PUSH_STARTED };
-static DHWPushState otDHWPushState = PUSH_IDLE;
-static uint32_t otDHWPushStartMs = 0;
-static constexpr uint32_t OT_DHW_PUSH_TIMEOUT_MS = 30000;  // 30s, matches PIC
+// TASK-1845: manual DHW push (HW=P) as the PIC 6.8 (gateway.asm: StartDHWPush/PushOperModes 3270-3288, MessageID99
+// 3218-3262, readstatus 2720-2747, statusreturn/dhwpushcheck 2753-2797). The flags carry the PIC names. Declared here
+// because otdRelayedStatusFrame() and buildStatusRequest() read otPushSpoof before the push functions.
+static bool    otPushManual  = false;   // manualdhwpush (operatingmode1 bit 4): a push is requested or running
+static bool    otPushPending = false;   // dhwpushpending: WRITE 99 with the push bit sent, no boiler answer yet
+static bool    otPushSpoof   = false;   // dhwpushspoof: the boiler refused or lacks the push, the gateway forces DHW enable
+static bool    otPushStarted = false;   // dhwpushstarted (spoof path): flame on with DHW mode seen
+static uint8_t otPushFails   = 0;       // dhwpushflags bits 0..2: boiler status answers with the flame off before the start
 
 // Phase 10: PS= summary mode (moved here: used before original definition)
 static bool otHideReports     = false;      // PS=1: T/B/R/A reports hidden until PS=0 (PIC HideReports)
@@ -924,7 +927,7 @@ static bool otdWriteOverrideActive(uint8_t msgId) {
 
 static unsigned long otdRelayedStatusFrame(unsigned long frame) {
   const uint8_t hb = (uint8_t)((frame >> 8) & 0xFF);
-  const bool push = (otDHWPushState != PUSH_IDLE);
+  const bool push = otPushSpoof;   // TASK-1845: DHW enable is forced only while the gateway spoofs the push
   OtdStatusCmd c;
   c.csOverride  = otdCsOverrideActive();
   c.chModeOff   = otChModeOff;
@@ -967,6 +970,7 @@ static unsigned long buildStatusRequest() {
   // Build a complete READ_DATA request so message type, data-id and parity are correct.
   // MsgID 0: Master status flags in data-value HB (bits 15-8), LB = 0 (slave fills it)
   uint8_t flags = otdEffectiveMasterFlags(otMasterStatusFlags, otChModeOff, otdCsOverrideActive());
+  if (otPushSpoof) flags |= 0x02;   // TASK-1845: a spoofed DHW push enables DHW in the gateway's own status
   // Master mode: CH enable (bit 0) stays on while SAT is enabled, also during its hand-back or before
   // its first CS. Without SAT and without a CS override (an external CS= or a thermostat write on the
   // slave interface) nothing sets a flow setpoint, so bit 0 is off. DHW and the other bits are unchanged.
@@ -1741,30 +1745,9 @@ static void handleMasterResponse() {
       clearUnknownCount(respMsgId);
     }
 
-    // DHW push state machine — monitor MsgID 0 boiler responses
-    if (respMsgId == 0 && otDHWPushState != PUSH_IDLE) {
-      // Timeout check (~30s, matching PIC firmware)
-      if ((millis() - otDHWPushStartMs) >= OT_DHW_PUSH_TIMEOUT_MS) {
-        otDHWPushState = PUSH_IDLE;
-        otMasterStatusFlags &= ~0x02;
-        otDHWOverride = 0xFF;
-        OTDDebugTln(F("OTD: DHW push timed out"));
-      } else {
-        uint8_t slaveByte4 = response & 0xFF;
-        if (otDHWPushState == PUSH_PENDING) {
-          if ((slaveByte4 & 0x08) && (slaveByte4 & 0x04)) {  // flame on + DHW mode
-            otDHWPushState = PUSH_STARTED;
-          }
-        } else if (otDHWPushState == PUSH_STARTED) {
-          if (!(slaveByte4 & 0x04)) {  // DHW mode off — push complete
-            otDHWPushState = PUSH_IDLE;
-            otMasterStatusFlags &= ~0x02;  // clear DHW enable
-            otDHWOverride = 0xFF;          // back to auto
-            OTDDebugTln(F("OTD: DHW push complete"));
-          }
-        }
-      }
-    }
+    // TASK-1845: the DHW push follows the boiler's answers, as the PIC (MessageID99, statusreturn).
+    if (respMsgId == 99) otdPushOnBoiler99((uint8_t)respType, (uint16_t)(response & 0xFFFF));
+    if (respMsgId == 0 && respType == OpenThermMessageType::READ_ACK) otdPushOnBoilerStatus((uint8_t)(response & 0xFF));
 
     // Log per-frame: MsgID, data value, override applied
     {
@@ -2544,6 +2527,53 @@ static uint16_t otdOperModeData(bool push) {
   return (uint16_t)(((otOperModeDHW & 0x0F) | (push ? 0x10 : 0)) << 8) | (uint16_t)((otOperModeCH1 & 0x0F) | ((otOperModeCH2 & 0x0F) << 4));
 }
 
+// TASK-1845: the manual DHW push, as the PIC 6.8 (see the flags at the top of the file).
+// --- otdPush begin
+static void otdPushEnd() {   // dhwpushdone / abort: clrf dhwpushflags, bcf manualdhwpush (gateway.asm:2795-2796, 4398-4399)
+  otPushManual = otPushPending = otPushSpoof = otPushStarted = false;
+  otPushFails = 0;
+}
+// HW=P: StartDHWPush (gateway.asm:3270-3288). A push in progress is left alone. The HW= state is not touched. When the
+// boiler is known not to support MsgID 99 the gateway spoofs the push at once, else it writes MsgID 99 with the push bit.
+static void otdPushStart() {
+  if (otPushManual) return;
+  otPushManual = true;
+  if (isUnknownId(99)) { otPushSpoof = true; return; }
+  otPushPending = true;
+  unsigned long frame99 = OpenTherm::buildRequest(OpenThermMessageType::WRITE_DATA,
+                                                  static_cast<OpenThermMessageID>(99), otdOperModeData(true));
+  if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
+}
+// The boiler's answer to MsgID 99 (MessageID99, gateway.asm:3218-3262): Unknown-DataID during a push, or a WRITE_ACK
+// without the push bit to the push request, makes the gateway spoof it. Otherwise the push bit follows the boiler, so
+// a push the boiler ran ends when it clears the bit.
+static void otdPushOnBoiler99(uint8_t type, uint16_t data) {
+  const bool boilerPush = (data & 0x1000) != 0;
+  if (type == 7 /* UNKNOWN_DATA_ID */) { if (otPushManual) otPushSpoof = true; return; }
+  if (type == 5 /* WRITE_ACK */ && otPushPending && !boilerPush) { otPushSpoof = true; otPushPending = false; return; }
+  if (type != 4 /* READ_ACK */ && type != 5 /* WRITE_ACK */) return;
+  // A READ_ACK while the push WRITE is still on its way answers an earlier READ 99 (the gateway's poll or the
+  // thermostat's); the PIC turns such reads into writes while opermodewrite is set (ID99ReadData, gateway.asm:3253-3257).
+  if (type == 4 && otPushPending) return;
+  otPushPending = false;
+  if (otPushSpoof) return;                       // the gateway runs this push (ID99ReadAck keeps it)
+  if (otPushManual && !boilerPush) otdPushEnd(); // the boiler finished its push
+  else if (boilerPush) otPushManual = true;
+}
+// A boiler MsgID 0 READ_ACK while the gateway spoofs the push (statusreturn -> dhwpushcheck, gateway.asm:2753-2797):
+// before the start, flame on with DHW mode starts it and 8 answers with the flame off end it; once started it ends when
+// the boiler leaves DHW mode. No wall-clock timeout.
+static void otdPushOnBoilerStatus(uint8_t slaveLB) {
+  if (!otPushSpoof) return;
+  if (!otPushStarted) {
+    if (slaveLB & 0x08) { if (slaveLB & 0x04) otPushStarted = true; return; }
+    if (++otPushFails >= 8) otdPushEnd();
+    return;
+  }
+  if (!(slaveLB & 0x04)) otdPushEnd();
+}
+// --- otdPush end
+
 // ---------------------------------------------------------------------------
 // clearWriteOverride — helper to clear both write cache and repeater override
 // for a MsgID (used by TT=0, CS=0, etc.)
@@ -2686,9 +2716,8 @@ static void resetTransientState() {
   otOperModeDHW = 0;
   otOperModeCH1 = 0;
   otOperModeCH2 = 0;
-  // DHW push state machine
-  otDHWPushState = PUSH_IDLE;
-  otDHWPushStartMs = 0;
+  // DHW push (TASK-1845)
+  otdPushEnd();
   // PS=1 is not touched here: a GW= mode switch leaves HideReports alone on the PIC (gateway.asm:4690-4733);
   // only PS=0 and GW=R clear it (TASK-1800).
   // Thermostat connectivity tracking — reset to boot state
@@ -3220,31 +3249,15 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // HW=0/1/A/P — DHW enable (bit1 of master status) + DHW push state machine
   else if (cmd0 == 'H' && cmd1 == 'W') {
     char v = value[0];
+    if (v != 'P') otdPushEnd();   // TASK-1845: any other HW= aborts a manual push (gateway.asm:4398-4399)
     if (v == 'P') {
-      // DHW push: enable DHW + start push state machine
-      otMasterStatusFlags |= 0x02;
-      otDHWOverride = 1;
-      if (otDHWPushState == PUSH_IDLE) {
-        otDHWPushState = PUSH_PENDING;
-        otDHWPushStartMs = millis();
-        // Send MsgID 99 with the DHW push bit (HB bit 4, TASK-1832)
-        uint16_t data99 = otdOperModeData(true);
-        unsigned long frame99 = OpenTherm::buildRequest(
-          OpenThermMessageType::WRITE_DATA,
-          static_cast<OpenThermMessageID>(99), data99);
-        if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
-      }
+      otdPushStart();   // TASK-1845: the push leaves the HW= state alone (PIC SetHotWaterPush)
     } else if (v == '1') {
       otMasterStatusFlags |= 0x02;
       otDHWOverride = 1;
     } else if (v == '0') {
       otMasterStatusFlags &= ~0x02;
       otDHWOverride = 0;
-      // Abort DHW push if in progress
-      if (otDHWPushState != PUSH_IDLE) {
-        otDHWPushState = PUSH_IDLE;
-        OTDDebugTln(F("OTD: DHW push aborted"));
-      }
     } else {
       // Any other char = auto (thermostat controls DHW)
       otMasterStatusFlags |= 0x02;  // default on for auto
@@ -3343,7 +3356,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     if (val > 15) { otDirectBridgeProcessStatus("BV"); return false; }
     otOperModeCH1 = val;
     // Send MsgID 99 WRITE_DATA
-    uint16_t data99 = otdOperModeData(false);
+    uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
@@ -3356,7 +3369,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     uint8_t val = atoi(value);
     if (val > 15) { otDirectBridgeProcessStatus("BV"); return false; }
     otOperModeDHW = val;
-    uint16_t data99 = otdOperModeData(false);
+    uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
@@ -3369,7 +3382,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     uint8_t val = atoi(value);
     if (val > 15) { otDirectBridgeProcessStatus("BV"); return false; }
     otOperModeCH2 = val;
-    uint16_t data99 = otdOperModeData(false);
+    uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);

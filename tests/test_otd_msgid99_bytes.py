@@ -62,6 +62,10 @@ static unsigned long otDHWPushStartMs = 0;
 static uint8_t otMasterStatusFlags = 0;
 static uint8_t otDHWOverride = 0xFF;
 static uint8_t otOperModeDHW = 0, otOperModeCH1 = 0, otOperModeCH2 = 0;
+// TASK-1845: the push flags and isUnknownId the HW=P path reads (the push functions are cut from the source)
+static bool otPushManual = false, otPushPending = false, otPushSpoof = false, otPushStarted = false;
+static uint8_t otPushFails = 0;
+static bool isUnknownId(uint8_t) { return false; }
 """
 
 MAIN = r"""
@@ -100,7 +104,9 @@ def helper(src: str) -> str:
     if not m:
         return ""
     end = src.index("\n}\n", m.start())
-    return src[m.start():end + 3]
+    out = src[m.start():end + 3]
+    pm = re.search(r"// --- otdPush begin\n(.*?)// --- otdPush end", src, re.S)   # TASK-1845: HW=P calls otdPushStart()
+    return out + (pm.group(1) if pm else "")
 
 
 def build_source() -> str:

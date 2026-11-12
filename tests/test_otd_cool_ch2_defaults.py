@@ -74,6 +74,7 @@ static uint8_t otMasterStatusFlags = 0x01;
 static bool otChModeOff = false;
 static bool otSummerMode = false;
 static bool otDHWBlocking = false;
+static bool otPushSpoof = false;   // TASK-1845: the relayed status forces DHW enable only while the push is spoofed
 static char g_reply[32];
 static void synthesizeResponse(const char* c, const char* v) { snprintf(g_reply, sizeof g_reply, "%.2s: %s", c, v); }
 static void otDirectBridgeProcessStatus(const char* s) { snprintf(g_reply, sizeof g_reply, "%s", s); }
