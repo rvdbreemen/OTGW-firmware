@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T21:22:00Z'
-updated_date: '2026-11-11T22:35:00Z'
+updated_date: '2026-11-12T00:26:00Z'
 labels:
   - webui
 dependencies: []
@@ -36,4 +36,6 @@ Implemented (parked): Table/Grid chips in the Values toolbar (localStorage otgw-
 Evidence: tests/webui/values-grid-view.test.mjs 4 red on the old code, 4 green; values-names-follow-language 2 green, i18n-lang 6, i18n-no-hardcoded 3, v2-undefined-names 2, v2-nested-helper-scope 2. Browser (headless Chrome, real v2 page, fake device answering with OTGWELGA's real /api/v2/otgw/otmonitor of 2026-11-11): 31 cells, table hidden, EN 'Flame Status' -> NL 'Vlamstatus' live, 390 px wide no horizontal scroll, 0 exceptions; screenshots C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/f1fafa03-7939-46ad-a89a-e59de20dd2bb/scratchpad/bench/grid-en-light.png, grid-nl-light.png, grid-nl-phone.png.
 
 Parked per coordinator (Robert: finish first): the work is a patch, .git/wip-task-1823.patch (copy C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/f1fafa03-7939-46ad-a89a-e59de20dd2bb/scratchpad/wip-task-1823.patch), removed from the tree so the 186/187 build stays clean; git apply --check confirms it re-applies on HEAD. Commit with its own normal bump after d3's beta.188, full tests/webui run first.
+
+Defect found before the batch build: evaluate.py --quick FAIL 'Design-System Class drift: table, grid' from setValView() 'classList.toggle("on", valView === "table")' (the ADR-091 scanner reads every literal in a classList call as a class). Fix at the rebase: compute the boolean first (var g = valView === 'grid'; toggle('on', !g) / toggle('on', g)). My earlier evaluator run for 1823 predated that code; the full run on all local commits caught it.
 <!-- SECTION:NOTES:END -->

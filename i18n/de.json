@@ -479,6 +479,8 @@
     "tab_values": "Werte",
     "val_count": "Werte:",
     "val_filter_ph": "Werte filtern… (z. B. Temperatur, S0, 28FF)",
+    "val_view_table": "Tabelle",
+    "val_view_grid": "Raster",
     "val_hint": "Graue Zeilen haben noch keine Daten oder haben sich seit 2 Minuten nicht geändert. Mit ✎ neben einem 1-Wire-Sensor lässt sich eine Bezeichnung vergeben (max. 16 Zeichen, leer löscht sie).",
     "val_ps": "PS=1-Zusammenfassungsmodus",
     "val_ps_title": "Der PIC sendet eine Zusammenfassung (PS=1) statt einzelner Nachrichten; die Werte werden abgefragt",

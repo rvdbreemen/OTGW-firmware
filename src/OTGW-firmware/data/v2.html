@@ -523,8 +523,13 @@
       <span class="tchip" style="cursor:default"><span data-i18n="h_mon.val_count">Values:</span> <b id="valCount" style="margin-left:4px">0</b></span>
       <span class="tchip" id="valPsChip" style="cursor:default;display:none" title="The PIC sends a summary (PS=1) instead of frames; values are polled" data-i18n-title="h_mon.val_ps_title" data-i18n="h_mon.val_ps">PS=1 summary mode</span>
       <span class="tchip" id="valStatus" style="cursor:default" aria-live="polite">Loading…</span>
+      <span style="flex:1"></span>
+      <!-- TASK-1823: table or the compact 1.x-style grid; remembered per browser (otgw-v2-valview) -->
+      <span class="tchip on" id="valViewTable" data-i18n="h_mon.val_view_table">Table</span>
+      <span class="tchip" id="valViewGrid" data-i18n="h_mon.val_view_grid">Grid</span>
     </div>
-    <div style="overflow-x:auto;border-radius:12px">
+    <div class="valgrid" id="valGrid" hidden></div>
+    <div id="valTableWrap" style="overflow-x:auto;border-radius:12px">
     <table class="stats" id="valTable">
       <thead><tr><th data-i18n="h_mon.val_th_name">Name</th><th style="text-align:right" data-i18n="h_mon.val_th_value">Value</th><th data-i18n="h_mon.val_th_unit">Unit</th><th data-i18n="h_mon.val_th_change">Last change</th></tr></thead>
       <tbody></tbody>

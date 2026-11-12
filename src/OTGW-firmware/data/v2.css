@@ -695,6 +695,16 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   table.stats tr.vstale td{opacity:.55}
   .vbool-on{color:var(--zone-ok)}
   .vbool-alarm{color:var(--zone-alert)}
+  /* TASK-1823: compact grid view of Monitor > Values, as the 1.x Home screen (columns, on/off boxes) */
+  .valgrid{column-width:300px;column-gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:6px}
+  .valgrid[hidden]{display:none}
+  .vg-cell{display:flex;align-items:center;gap:6px;break-inside:avoid;padding:5px 8px;border-bottom:1px solid var(--border);font-size:13px}
+  .vg-n{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vg-v{min-width:56px;text-align:right;font-family:var(--font-mono);font-weight:600}
+  .vg-u{width:34px;color:var(--muted)}
+  .vsq{display:inline-block;width:13px;height:13px;border:1.5px solid var(--muted);border-radius:3px;vertical-align:middle}
+  .vsq.on{background:var(--zone-ok);border-color:var(--zone-ok)}
+  .vsq.alarm{background:var(--zone-alert);border-color:var(--zone-alert)}
   .vlbl-edit{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 4px;font-size:.85rem}
   .vlbl-edit:hover{color:var(--accent)}
   .vlbl-input{font:inherit;width:12em;max-width:100%;border:1px solid var(--accent);border-radius:6px;background:var(--panel);color:var(--text);padding:2px 6px}

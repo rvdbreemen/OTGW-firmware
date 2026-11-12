@@ -600,6 +600,8 @@
       "tab_values": "Values",
       "val_count": "Values:",
       "val_filter_ph": "Filter values… (e.g. temperature, S0, 28FF)",
+      "val_view_table": "Table",
+      "val_view_grid": "Grid",
       "val_hint": "Grey rows have no data yet or have not changed for 2 minutes. Use ✎ next to a 1-Wire sensor to give it a label (max 16 characters, empty clears it).",
       "val_ps": "PS=1 summary mode",
       "val_ps_title": "The PIC sends a summary (PS=1) instead of frames; values are polled",
@@ -5326,6 +5328,7 @@
   // instead, per row, when this page last saw the epoch change.
   var valRows = {};          // key -> { tr, nameTd, valTd, unitTd, ageTd, epoch, firstMs, changeMs }
   var valSearch = '';
+  var valView = valViewPref();   // TASK-1823: 'table' or 'grid'
   function isDallasEntry(k, e) { return (e && e.type === 'dallas') || /^[0-9A-Fa-f]{16}$/.test(k); }
   function fmtOtmonValue(v) {
     if (typeof v === 'number') return (Math.round(v * 100) / 100).toString();
@@ -5409,6 +5412,51 @@
     });
     var cnt = document.getElementById('valCount'); if (cnt) cnt.textContent = shown;
     if (st) st.textContent = t('values.updated_ago', { age: fmtAge(now - otmonLastOkMs) });
+    renderValGrid();
+  }
+  // TASK-1823: the compact grid view, as the 1.x Home screen (v1.7.9): every field that has data, in firmware
+  // order, flowing in columns (CSS column-width); on/off as a box, numbers with their unit. Rebuilt on every
+  // render (about 35 cells), so names follow a language switch and the filter applies as in the table.
+  function renderValGrid() {
+    var grid = document.getElementById('valGrid'), wrap = document.getElementById('valTableWrap');
+    var isGrid = valView === 'grid';
+    if (wrap) wrap.hidden = isGrid;
+    if (!grid) return;
+    grid.hidden = !isGrid;
+    grid.textContent = '';
+    if (!isGrid || !otmonData) return;
+    var q = valSearch.trim().toLowerCase();
+    Object.keys(otmonData).forEach(function (k) {
+      var e = otmonData[k];
+      if (!e || typeof e !== 'object' || k === 'sensorsimulation') return;
+      var ep = (typeof e.epoch === 'number') ? e.epoch : parseInt(e.epoch, 10) || 0;
+      if (!ep) return;   // no data yet: left out, as in 1.x
+      var name = valDisplayName(k, e);
+      if (q && (k + ' ' + name).toLowerCase().indexOf(q) === -1) return;
+      var cell = document.createElement('div'), n = document.createElement('span'), v = document.createElement('span'), u = document.createElement('span');
+      cell.className = 'vg-cell'; n.className = 'vg-n'; v.className = 'vg-v'; u.className = 'vg-u';
+      n.textContent = name; n.title = name;
+      if (e.value === 'On' || e.value === 'Off') {
+        var b = document.createElement('span');
+        b.className = e.value === 'On' ? (/fault|alarm|safety|lowwater|overtemp|servicereq/.test(k) ? 'vsq alarm' : 'vsq on') : 'vsq';
+        b.setAttribute('aria-label', t(e.value === 'On' ? 'graph.on' : 'graph.off'));
+        v.appendChild(b);
+      } else { v.textContent = fmtOtmonValue(e.value); u.textContent = e.unit || ''; }
+      cell.appendChild(n); cell.appendChild(v); cell.appendChild(u);
+      grid.appendChild(cell);
+    });
+  }
+  function valViewPref() {
+    try { return localStorage.getItem('otgw-v2-valview') === 'grid' ? 'grid' : 'table'; } catch (e) { return 'table'; }
+  }
+  function setValView(v) {
+    valView = v === 'grid' ? 'grid' : 'table';
+    try { localStorage.setItem('otgw-v2-valview', valView); } catch (e) { }
+    var a = document.getElementById('valViewTable'), b = document.getElementById('valViewGrid');
+    var g = valView === 'grid';   // a plain boolean: the ADR-091 drift scan reads every literal in a classList call
+    if (a) a.classList.toggle('on', !g);
+    if (b) b.classList.toggle('on', g);
+    renderValGrid();
   }
 
   // ---------- 1-Wire (Dallas) sensor labels (TASK-1223.15) ----------
@@ -8175,6 +8223,10 @@
     if (ct) ct.addEventListener('click', function () { logShowTs = !logShowTs; ct.classList.toggle('on', logShowTs); if (isMonitorLogVisible()) renderLog(); });
     var vs = document.getElementById('valSearch');   // TASK-1223.14
     if (vs) vs.addEventListener('input', function () { valSearch = vs.value; if (isMonitorVisible('mvalues')) renderValues(); });
+    ['valViewTable', 'valViewGrid'].forEach(function (id) {   // TASK-1823
+      var c = document.getElementById(id); if (c) c.addEventListener('click', function () { setValView(id === 'valViewGrid' ? 'grid' : 'table'); });
+    });
+    setValView(valView);
     var ss = document.getElementById('statsSearch');
     if (ss) ss.addEventListener('input', function () { statsSearch = ss.value; if (isMonitorVisible('mstats')) renderStats(); });
 

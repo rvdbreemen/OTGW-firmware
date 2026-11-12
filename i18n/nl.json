@@ -479,6 +479,8 @@
     "tab_values": "Waarden",
     "val_count": "Waarden:",
     "val_filter_ph": "Waarden filteren… (bijv. temperatuur, S0, 28FF)",
+    "val_view_table": "Tabel",
+    "val_view_grid": "Raster",
     "val_hint": "Grijze regels hebben nog geen gegevens of zijn 2 minuten niet veranderd. Klik op ✎ naast een 1-Wire-sensor om hem een naam te geven (max. 16 tekens, leeg maken wist de naam).",
     "val_ps": "PS=1-samenvattingsmodus",
     "val_ps_title": "De PIC stuurt een samenvatting (PS=1) in plaats van losse berichten; de waarden worden periodiek opgevraagd",

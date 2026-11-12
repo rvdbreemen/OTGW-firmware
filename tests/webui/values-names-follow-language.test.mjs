@@ -69,10 +69,10 @@ function load() {
   const body =
     obj('I18N_EN') + '\n' + obj('OTMON_LABELS') + '\n' +
     "var i18nLang = 'en', i18nPack = null;\n" +
-    'var VAL_STALE_MS = 120000, valRows = {}, valSearch = "", otmonData = null, otmonLastOkMs = Date.now();\n' +
+    'var VAL_STALE_MS = 120000, valRows = {}, valSearch = "", otmonData = null, otmonLastOkMs = Date.now(), valView = "table";\n' +
     'function dallasLabelFor() { return ""; }\nfunction openValLabelEditor() {}\n' +
     ['i18nLookup', 'i18nString', 't', 'isDallasEntry', 'fmtOtmonValue', 'fmtAge', 'valDisplayName',
-      'buildValRow', 'fillValName', 'renderValues'].map(fn).join('\n') + '\n' +
+      'buildValRow', 'fillValName', 'renderValues', 'renderValGrid'].map(fn).join('\n') + '\n' +
     'return { render: renderValues, setPack: function (l, p) { i18nLang = l; i18nPack = p; },' +
     ' setData: function (d) { otmonData = d; } };';
   const api = new Function('document', body)(document);
