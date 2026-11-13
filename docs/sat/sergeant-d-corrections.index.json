@@ -4433,6 +4433,19 @@
    "supersedes": [],
    "tasks": [],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 333,
+   "title": "Q-329a B (maintainer answer): halve the integral once when the error leaves the deadband and keep that value (2026-11-13, refines entry 329)",
+   "date": "2026-11-13",
+   "source": "unknown",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570768420805419089",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1890"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

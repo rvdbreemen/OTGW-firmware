@@ -6977,3 +6977,25 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Interpretation (ours):** he speaks about the current code as simulated (the firmware model matched the device-logged I term in 94 % of 1079 ticks). This is an assessment, not a decision: it does not revoke entry 329 (halve the integral outside the deadband instead of zeroing it), which is still open in the coordinator's PID report. Whether 329 is still wanted after this assessment is a question for that report, not decided here.
 
 **Task:** none new. **Open:** the entry-329 halving rule (coordinator's PID report).
+
+## 333. Q-329a B (maintainer answer): halve the integral once when the error leaves the deadband and keep that value (2026-11-13, refines entry 329)
+
+**Not by Sergeant D.** Robert answered the question we had put to Sergeant D; Sergeant D was invited to say if he sees it differently and has not objected so far.
+
+**Source:** Q-329a, #dev-sat-mqtt 2026-11-13 11:53 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1570768420805419089. Robert's answer, 13:00:35 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1570785451613225121. Our reading, posted with an invitation to correct it, 13:05 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1570786623585521665
+
+**Quoted:**
+
+> "B"
+
+**Option B as posted:** "Halve once when the error leaves the deadband, then keep that value. Half of the learned correction stays in the setpoint while the room is outside the band. It starts adding up again from there when the room comes back in."
+
+**Interpretation (ours):** the bare "B" was posted without a reply-reference. We read it as the answer to Q-329a, the last open question in that channel with an option B; Q-PWM1 (also A/B/C) was the other candidate. We said so publicly and asked for a correction; none came in the next round. The coordinator agreed with this reading.
+
+**Settled (refines entry 329, open point 1):** when the error goes from inside the ±0.1 deadband to outside it, the integral is multiplied by 0.5 once. While the error stays outside, the integral is held (it neither grows nor decays). When the error is back inside, it accumulates from the held value as today. A target change still resets the integral fully (`SATcontrol.ino:2124` -> `satPidResetTerms()` `SATpid.ino:150-158`).
+
+**Checked against thermo-nova and the firmware:** both set the integral to 0 outside the deadband today: `pid.py:185-189` (DEADBAND 0.1, `const.py:16`) and `SATpid.ino:247-250`. Option B is a deliberate deviation from thermo-nova. thermo-nova's full reset on a target change: `climate.py:641-660` -> `reset_control_state()` `climate.py:461-464` -> `pid.reset()` `pid.py:134-137`.
+
+**Open:** (1) what happens at a deadband exit right after a reset (integral already 0: halving is a no-op); (2) whether the halving also applies to the zone PIDs (`SATcontrol.ino` zone integrals, entry 329 named only the main PID); (3) the faster self-tune part of entry 329 is unchanged and waits for the PID study; (4) Sergeant D may still object.
+
+**Task:** TASK-1890.

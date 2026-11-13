@@ -4,7 +4,7 @@ title: SAT PID integral halving outside deadband instead of reset (entry 329)
 status: To Do
 assignee: []
 created_date: '2026-11-13T08:09:00Z'
-updated_date: '2026-11-13T11:52:00Z'
+updated_date: '2026-11-13T13:23:00Z'
 labels:
   - sat
   - adr
@@ -31,4 +31,6 @@ Sergeant D 2026-11-13 (https://discord.com/channels/812969634638725140/110555672
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-13: after the I/D simulation (1570758325740507237) Sergeant D said 'The integral works pretty good. I am also happy about the derivative' (1570765446636900415), recorded as entry 332 (assessment, no change decided). It does not revoke entry 329; whether the halving is still wanted goes into the coordinator's PID report.
+
+2026-11-13: Q-329a answered B by Robert (13:00:35 UTC, 1570785451613225121), recorded as entry 333 (maintainer answer, reading posted 1570786623585521665, no correction): halve the integral once when the error leaves the deadband, then hold it while outside; accumulate from the held value when back inside; target change keeps the full reset. Open: zone PIDs, exit right after a reset, the faster self-tune part (PID study).
 <!-- SECTION:NOTES:END -->
