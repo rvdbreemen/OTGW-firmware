@@ -143,6 +143,59 @@ The thermo-nova hourly start cap compares the number of starts with `duty_cycle_
 (pwm.py:156, const.py:167), so it never binds. This was already recorded in entry 123 and Q36.
 VTherm's accounting of minimum on/off times with a penalty is the more robust pattern.
 
+## Web UI
+
+This section compares the UI of the VTherm companion card (jmcollin78/versatile-thermostat-ui-card,
+commit `cec030f`, paths under `src/`) with the SAT page of the v2 web UI.
+
+### What VTherm does
+
+- **Why the thermostat is in its state.** The backend builds a list of reason keys
+  (`specific_states.messages[]`, base_thermostat.py:2210-2275) under a fixed priority
+  (state_manager.py:122-202). The card localises the keys (`localize/languages/en.json:115-145`) and
+  shows them behind an info icon, which turns red on an error (`versatile-thermostat-ui.ts:3135-3148`).
+- **Diagnostics.** Sensor age is shown in plain minutes (`assets/safety-message.png`;
+  `versatile-thermostat-ui.ts:2603-2622`). A slope sensor carries a trend icon (sensor.py:645-656).
+  Learning progress is shown as a state, counters and the last outcome (sensor.py:362-405).
+  Heating failure is a PROBLEM binary sensor (binary_sensor.py:130-163).
+- **Regulation chart** (`regulation-chart.ts:235-306`):
+  - the setpoint, the regulated target, the room and outdoor temperatures;
+  - power % as a filled area on a right-hand axis;
+  - 2 h and 1 day buttons.
+
+### Our SAT page
+
+- **Unused data.** `/api/v2/sat/status` already sends several reason and diagnostic fields that
+  v2.js never reads: `pwm_veto_reason`, `mod_suppressed`, `curve_recommendation`, the 24 h cycle set
+  and `indoor_rise_rate`. A grep of v2.js finds each of them 0 times.
+- **Fallback reason.** `fallback_reason` is shown as a bare number (v2.js:7258).
+- **The chart's "Flow" line.** It plots `heating_curve`, not the actual flow temperature
+  (v2.js:7170). sat/status has no actual flow temperature or flame state outside simulation.
+
+### Proposals
+
+| # | Proposal | Task |
+|---|---|---|
+| U1 | Show the fallback reason as text | TASK-1884 |
+| U2 | A why-line from the existing reason fields | TASK-1884 |
+| U3 | A messages panel behind an info icon | TASK-1884 |
+| U4 | A room trend arrow from `indoor_rise_rate` | TASK-1884 |
+| U5 | Show the curve recommendation | TASK-1884 |
+| U6 | A 24 h cycles card | TASK-1884 |
+| U7 | Actual flow temperature and flame state in sat/status, and an honest chart | TASK-1885 |
+| U8 | Sensor ages in minutes | TASK-1885 |
+| U9 | Tune progress | TASK-1881 |
+| U10 | A PWM phase card | TASK-1880 |
+| U11 | A problem badge | TASK-1882 |
+
+### Not proposed
+
+- **Named aggressiveness presets.** SAT's gains follow from the heating curve (entries 284, 285),
+  so a preset would change behaviour rather than explain it.
+- **Timed presets.** This is a new feature, not an explanation of an existing one.
+- **Several card themes.** They conflict with the single design system (ADR-091).
+- **A 24 h history ring buffer on the device.** RAM is tight. Link to Monitor > Graph instead.
+
 ## Follow-up
 
 Produced under TASK-1879.

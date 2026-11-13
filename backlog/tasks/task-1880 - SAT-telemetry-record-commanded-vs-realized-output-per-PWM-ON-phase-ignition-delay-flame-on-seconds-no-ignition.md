@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-13T06:13:00Z'
+updated_date: '2026-11-13T06:23:00Z'
 labels:
   - sat
   - telemetry
@@ -27,4 +28,11 @@ Lesson 1 of docs/sat/vtherm-comparison-2026-11-13.md (TASK-1879). VTherm learns 
 - [ ] #1 Host test reproduces a PWM ON phase without ignition and shows ignited=false with the commanded ON time; red on the old code (field absent), green on the fix
 - [ ] #2 REST /api/v2 and MQTT expose the per-phase record and counters; no control behaviour changes (existing SAT host tests unchanged and green)
 - [ ] #3 Bench run by otgw-bench-tester on a PIC and an OT-Direct unit shows the record matching the flame bit in a capture
+- [ ] #4 Web UI (U10): a PWM phase card in the Technical view shows commanded ON time, ignition delay and ignited yes/no for the last phases; webui test on a fixture payload
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-13: UI follow-up U10 from the VTherm UI review added as an AC.
+<!-- SECTION:NOTES:END -->
