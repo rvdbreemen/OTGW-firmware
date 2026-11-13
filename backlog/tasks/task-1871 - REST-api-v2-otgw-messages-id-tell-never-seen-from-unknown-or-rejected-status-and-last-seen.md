@@ -3,11 +3,11 @@ id: TASK-1871
 title: >-
   REST /api/v2/otgw/messages/<id>: tell never seen from unknown or rejected
   (status and last-seen)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-12T18:20:00Z'
-updated_date: '2026-11-13T10:53:00Z'
+updated_date: '2026-11-13T11:27:00Z'
 labels:
   - feature
   - rest-api
@@ -24,10 +24,10 @@ Reporter thaghostnl (Discord 285886063266889728), #alpha-testing https://discord
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Only genuine boiler answers count, the same boilerEvidence rule as the boiler-support bitmaps (B frames; no bLocalAnswer, no replayed line), on both the PIC and the OT-Direct path
-- [ ] #2 Host test on the real recording and status functions sliced from the firmware: red on the old code, green on the fix; covers never seen, ack, unknown_dataid, data_invalid, a later ack overriding unknown, and a gateway-made answer not counting
+- [x] #1 Only genuine boiler answers count, the same boilerEvidence rule as the boiler-support bitmaps (B frames; no bLocalAnswer, no replayed line), on both the PIC and the OT-Direct path
+- [x] #2 Host test on the real recording and status functions sliced from the firmware: red on the old code, green on the fix; covers never seen, ack, unknown_dataid, data_invalid, a later ack overriding unknown, and a gateway-made answer not counting
 - [ ] #3 docs/api/openapi.yaml and the REST docs describe the two fields; evaluate --quick no new FAIL; esp32-combo build; bench on .61 (and .63 PIC if 09 chooses): an ID never requested shows never_seen/0, an acked ID shows ack with a rising last_seen, and an Unknown-DataID ID (e.g. after PM=) shows unknown_dataid
-- [ ] #4 GET /api/v2/otgw/messages/<id> (and /otgw/id/<id>, /otgw/label/<label>) adds status (never_seen / ack / unknown_dataid / data_invalid) and last_seen_age_s (seconds since that boiler answer, -1 when never_seen) after label/value/unit; existing fields unchanged
+- [x] #4 GET /api/v2/otgw/messages/<id> (and /otgw/id/<id>, /otgw/label/<label>) adds status (never_seen / ack / unknown_dataid / data_invalid) and last_seen_age_s (seconds since that boiler answer, -1 when never_seen) after label/value/unit; existing fields unchanged
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -46,4 +46,8 @@ Plan (ba, 2026-11-12). Today: sendOTValue (restAPI.ino:2933) returns label/value
 2026-11-12 implementation: OTGW-Core.ino recordBoilerAnswer / boilerAnswerAgeS / boilerAnswerStatus between 'begin/end boiler-answer record' markers, one call in processOT's B-frame branch under boilerEvidence; restAPI.ino sendOTValue and sendOTLabel emit status (FPSTR) and last_seen_age_s after unit; declarations in OTGW-firmware.h; docs/api/openapi.yaml and docs/api/README.md. Tests: new tests/test_boiler_answer_status.py (9 functional cases on the sliced real block, 2 wiring checks): on origin/dev 789dc56b5 setUpClass errors (markers not found) and both wiring checks fail; on the fix 11/11 OK. It caught a real bug in the first version: storing millis 0 as 1 made age at now=0 wrap to 4294967 s; fixed by using the answer type as the seen flag. tests/test_boiler_support_bitmap_b_only.py (slices the real processOT branch) got a recorder stub and a new case: only genuine B frames record (B26 ack, B10 unknown, B1 write-ack), not the PIC-built A57 nor the gateway-made B6 (local): 9/9 OK.
 
 2026-11-13 rebase onto f1b2731fd. Full tests folder (229 files, tests/ + test/host/, one file per run_tests call, commit < 82 %): 227 green first pass; test_boiler_unsupported_origin and test_local_frame_consumers failed to compile (processOT now calls recordBoilerAnswer, outside their slice). Fix: a no-op recordBoilerAnswer double in both harness .cpp files, next to their other consumer doubles; moving the block into the sliced range broke test_ot_support_migration, so reverted. Rerun via run_tests: both 1/1 green, test_ot_support_migration green, test_boiler_answer_status 11/11, test_boiler_support_bitmap_b_only green. evaluate.py --quick: 85 PASS 0 WARN 0 FAIL. Bump beta.221 -> beta.222.
+
+2026-11-13 bench beta.222+a5e61eb by otgw-bench-tester 09 (relayed by coordinator): PASS never_seen/-1 with label/value/unit unchanged; PASS .61 OT-Direct loopback: gateway-made answers do not count; PASS ID>127 (128 reserved, 400 unchanged); no extra reboots, crashlog empty, settings diff none on both units. NOT testable on the bench (no boiler): ack with rising age, unknown_dataid after PM=, data_invalid -> host test only (test_boiler_answer_status 11/11, red on f1b2731fd), field validation open. AC3 stays open for that field part. AC1: host test (gateway answer not counting) + .61 bench; PIC path by host test only. Pushed a5e61ebd7 to origin/dev (f1b2731fd..a5e61ebd7). Posted zip to #alpha-testing, Discord message 1570761730533883964.
+
+AC4: /messages/<id> checked on the bench; /otgw/id/<id> and /otgw/label/<label> share sendOTValue/sendOTLabel, both checked on the source by test_boiler_answer_status (wiring test), not separately on the bench. Status In Review: AC3 waits on field validation with a real boiler (ack age, unknown_dataid).
 <!-- SECTION:NOTES:END -->
