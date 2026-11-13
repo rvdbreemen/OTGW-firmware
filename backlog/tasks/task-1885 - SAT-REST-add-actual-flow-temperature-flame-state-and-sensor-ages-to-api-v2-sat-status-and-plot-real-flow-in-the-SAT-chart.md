@@ -3,11 +3,11 @@ id: TASK-1885
 title: >-
   SAT REST: add actual flow temperature, flame state and sensor ages to
   /api/v2/sat/status, and plot real flow in the SAT chart
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:23:00Z'
-updated_date: '2026-11-13T13:16:00Z'
+updated_date: '2026-11-13T13:29:00Z'
 labels:
   - webui
   - sat
@@ -26,8 +26,8 @@ UI proposals U7 and U8 from the VTherm UI review (docs/sat/vtherm-comparison-202
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test of the status JSON contains flow_temp, flame_on and the two age fields with correct values from a fixture state; absent on the old code
-- [ ] #2 Chart shows actual flow next to the setpoint and labels the heating curve as such (webui test on a fixture payload)
+- [x] #1 Host test of the status JSON contains flow_temp, flame_on and the two age fields with correct values from a fixture state; absent on the old code
+- [x] #2 Chart shows actual flow next to the setpoint and labels the heating curve as such (webui test on a fixture payload)
 - [ ] #3 esp32-combo build green; evaluate --quick no new FAIL; bench run by otgw-bench-tester shows flow_temp/flame_on matching the OT data on a PIC and an OT-Direct unit
 <!-- AC:END -->
 
@@ -49,4 +49,6 @@ Evidence so far (2026-11-13, uncommitted in wt-ba-1885): python tests/test_sat_s
 2026-11-13 first esp32-combo build failed: OTGW-firmware.ino:888:51 error: 'SatStatusLive' does not name a type (the Arduino builder hoists a prototype of satEmitStatusLive(JsonEmit&, const SatStatusLive&) above the struct). Fix: the emitter takes the five values as plain parameters; test_sat_status_live follows (11/11). The host test could not catch it: it compiles the block on its own, without the hoisted prototypes. Also found: in a fresh worktree build.bat ends silently at :find_python because C:\tools\Codex\python.cmd (a .cmd shim, first python on PATH) is called without 'call'; this build ran with C:\tools\Codex left out of PATH for that process only. Reported to the coordinator, not fixed here.
 
 2026-11-13 new gate tests/test_ino_prototype_hoisting.py (coordinator request a): merges the .ino files in Arduino builder order and flags a function whose parameters name a struct/class/enum an .ino declares after the first function definition, unless the sketch declares that function itself (the FlameRatioBuf pattern, OTDirect.ino:2303). Evidence: green on 33e3a0728; red on 4391eaf19 ('satEmitStatusLive(JsonEmit& je, const SatStatusLive& l) uses SatStatusLive'); red on a mutant without the flameRatioBufCommit prototype. The first version missed the old code because a '/*' inside a string literal opened a fake comment; the comment stripper is string-aware now. Build 4 of 33e3a0728: SUCCESS, beta.223+33e3a07 in the zip binaries.
+
+2026-11-13 bench beta.223+33e3a07 by otgw-bench-tester 09 (relayed by coordinator), PIC and OT-Direct unit: PASS on all 4 checks: the 5 new sat/status fields present and nothing removed; in simulation flow_temp/return_temp equal sim_flow_temp/sim_return_temp exactly; SAT page shows the five panels, the 'updated X ago' lines and the TASK-1884 trend arrow; boot count flash+2, crashlog empty, settings diff none. Flow and flame came from the simulation only (no boiler on the bench), so 'flow_temp/flame_on match the OT data' with a real boiler stays open: AC3 open, field validation. Non-blocking from 09: the Modulation and Flame panel titles are lowercase (shared Monitor keys graph.series_mod/h_mon.graph_flame); follow-up commit with SAT legend keys. Pushed 33e3a0728 (ed751972a..33e3a0728), posted zip to #alpha-testing message 1570792541962506340. Gate commit f31b5a97b follows.
 <!-- SECTION:NOTES:END -->
