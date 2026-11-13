@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:23:00Z'
-updated_date: '2026-11-13T13:35:00Z'
+updated_date: '2026-11-13T21:29:00Z'
 labels:
   - webui
   - sat
@@ -53,4 +53,6 @@ Evidence so far (2026-11-13, uncommitted in wt-ba-1885): python tests/test_sat_s
 2026-11-13 bench beta.223+33e3a07 by otgw-bench-tester 09 (relayed by coordinator), PIC and OT-Direct unit: PASS on all 4 checks: the 5 new sat/status fields present and nothing removed; in simulation flow_temp/return_temp equal sim_flow_temp/sim_return_temp exactly; SAT page shows the five panels, the 'updated X ago' lines and the TASK-1884 trend arrow; boot count flash+2, crashlog empty, settings diff none. Flow and flame came from the simulation only (no boiler on the bench), so 'flow_temp/flame_on match the OT data' with a real boiler stays open: AC3 open, field validation. Non-blocking from 09: the Modulation and Flame panel titles are lowercase (shared Monitor keys graph.series_mod/h_mon.graph_flame); follow-up commit with SAT legend keys. Pushed 33e3a0728 (ed751972a..33e3a0728), posted zip to #alpha-testing message 1570792541962506340. Gate commit f31b5a97b follows.
 
 2026-11-13 follow-up prepared in lane/ba-titles (uncommitted, no bump until its build slot, coordinator): the SAT chart's Modulation and Flame panel titles and legend used the shared Monitor keys graph.series_mod ('modulation') and h_mon.graph_flame ('flame'), lowercase on purpose in the Monitor graph (09's bench remark). New SAT keys tools.legend_mod / tools.legend_flame: en Modulation/Flame, nl Modulatie/Vlam, de Modulation/Flamme, el Διαμόρφωση/Φλόγα; Monitor unchanged. sat-chart-actual-flow expects the new keys: fail 1 on origin/dev 3b1221c46, pass 4 on the change; i18n-lang 6, i18n-no-hardcoded 3, i18n-followups 4, panel-chart-style 2, v2-nested-helper-scope 2, sat-explain-state 1, sat-page-order 1 all pass.
+
+2026-11-13 titles follow-up 2ec6d946d (beta.228) built with beta.229+eea80bd; bench by 09 on .63: Modulation and Flame panel titles correct in EN and NL on the real page (screenshot 09 scratchpad b229/after-229-en-chart.png). Pushed 746ccd426..eea80bd3d, posted message 1570913314350047273. Status stays In Review for real-boiler validation (AC3).
 <!-- SECTION:NOTES:END -->

@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T13:22:00Z'
-updated_date: '2026-11-13T13:33:00Z'
+updated_date: '2026-11-13T21:29:00Z'
 labels:
   - build
   - tooling
@@ -39,6 +39,8 @@ Prefix every interpreter probe in build.bat :find_python (py -3, python, python3
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-13 evidence in fresh worktree wt-ba-buildbat (no .build-venv/.build-python; 'where python' first = C:\tools\Codex\python): echo-on copies of build.bat with the build.py line replaced by an echo. OLD: trace (4817 B) ends at the line 'python -c "import sys; ..." 1>nul 2>nul' and never reaches build.py. FIX: trace (4941 B) shows 'call python -c ...' returning, .build-venv created on it, then 'TRACE: reached build.py with ...\wt-ba-buildbat\.build-venv\Scripts\python.exe'. Logs kept in RvdB/OTGW-worktree-leftovers/evidence-1898/. tests/test_build_bat_call_probes.py: FAILED on the old build.bat (4 probes without CALL: py -3, python, python3, %BASE_PYTHON% -m venv), OK on the fix; run_tests 1/1. evaluate.py --quick 85 PASS 0 FAIL.
+
+2026-11-13 full verification: the beta.229 build ran in the fresh worktree wt-ba-1824 (no .build-venv) with PATH unchanged (C:\tools\Codex\python.cmd first): build.bat created .build-venv and built esp32-combo in one go ('Build completed successfully!', 65 KB log via Start-Process redirect). This closes the 'not verified' point of the final summary.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
