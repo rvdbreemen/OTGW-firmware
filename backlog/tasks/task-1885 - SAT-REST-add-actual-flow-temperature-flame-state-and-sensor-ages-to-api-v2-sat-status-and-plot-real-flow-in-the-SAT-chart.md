@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:23:00Z'
-updated_date: '2026-11-13T13:05:00Z'
+updated_date: '2026-11-13T13:16:00Z'
 labels:
   - webui
   - sat
@@ -47,4 +47,6 @@ Evidence so far (2026-11-13, uncommitted in wt-ba-1885): python tests/test_sat_s
 2026-11-13 rebased onto ed751972a (via f1b2731fd, 359f2dec5). Conflict with TASK-1884 room trend in v2.html (satRoom tile) and v2.js (satRenderRoomTrend call) resolved by keeping both; the webui test's markup regex follows the new tile (satRoomTrend span, then the age line). Full tests folder 303 files (tests/, test/host/, tests/webui one file per run, commit <= 82 %): all green. After the final rebase: test_sat_status_live 11/11, sat-chart-actual-flow 4/4; evaluate.py --quick 85 PASS 0 WARN 0 FAIL. Bump beta.222 -> beta.223.
 
 2026-11-13 first esp32-combo build failed: OTGW-firmware.ino:888:51 error: 'SatStatusLive' does not name a type (the Arduino builder hoists a prototype of satEmitStatusLive(JsonEmit&, const SatStatusLive&) above the struct). Fix: the emitter takes the five values as plain parameters; test_sat_status_live follows (11/11). The host test could not catch it: it compiles the block on its own, without the hoisted prototypes. Also found: in a fresh worktree build.bat ends silently at :find_python because C:\tools\Codex\python.cmd (a .cmd shim, first python on PATH) is called without 'call'; this build ran with C:\tools\Codex left out of PATH for that process only. Reported to the coordinator, not fixed here.
+
+2026-11-13 new gate tests/test_ino_prototype_hoisting.py (coordinator request a): merges the .ino files in Arduino builder order and flags a function whose parameters name a struct/class/enum an .ino declares after the first function definition, unless the sketch declares that function itself (the FlameRatioBuf pattern, OTDirect.ino:2303). Evidence: green on 33e3a0728; red on 4391eaf19 ('satEmitStatusLive(JsonEmit& je, const SatStatusLive& l) uses SatStatusLive'); red on a mutant without the flameRatioBufCommit prototype. The first version missed the old code because a '/*' inside a string literal opened a fake comment; the comment stripper is string-aware now. Build 4 of 33e3a0728: SUCCESS, beta.223+33e3a07 in the zip binaries.
 <!-- SECTION:NOTES:END -->
