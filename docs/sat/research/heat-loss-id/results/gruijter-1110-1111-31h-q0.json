@@ -1,0 +1,93 @@
+{
+ "label": "EXPLORATORY",
+ "files": [
+  "otgw-graph-20261110-211512.csv",
+  "otgw-graph-20261111-172639.csv"
+ ],
+ "hours": 31.46,
+ "flame_cycles": 114,
+ "bins": 64,
+ "bin_min": 20.0,
+ "tout_range": [
+  2.6,
+  8.0
+ ],
+ "model": "g, B (q = 0)",
+ "g_per_h": 0.0103,
+ "B_per_h": 0.0159,
+ "q_K_per_h": 0.0,
+ "g_over_B": 0.648,
+ "tau_h": 97.3,
+ "r2": 0.196,
+ "cond": 2.6,
+ "holdout_rmse": 0.5026,
+ "holdout_rmse_zero": 0.5382,
+ "guards": {
+  "g_in_0_1": true,
+  "B_pos": true,
+  "cond_lt_1000": true,
+  "bins_ge_40": true,
+  "cycles_ge_40": true,
+  "holdout_beats_zero": true
+ },
+ "boot_n": 2000,
+ "boot_rejected_by_guards": 1,
+ "note": "ci95_guarded uses only the resamples inside the guards (conditional); ci95_unconditional every resample with B > 0",
+ "ci95": {
+  "g": [
+   0.005,
+   0.016
+  ],
+  "B": [
+   0.01,
+   0.025
+  ],
+  "q": [
+   0.0,
+   0.0
+  ]
+ },
+ "tstar": 19.0,
+ "coefficient": {
+  "Tout=5": {
+   "c_star": 0.4,
+   "tflow_req": 28.1,
+   "ci95_guarded": [
+    -1.38,
+    2.572
+   ],
+   "ci95_unconditional": [
+    -1.399,
+    2.572
+   ],
+   "n_unconditional": 2000
+  },
+  "Tout=0": {
+   "c_star": 1.029,
+   "tflow_req": 31.3,
+   "ci95_guarded": [
+    -0.292,
+    2.641
+   ],
+   "ci95_unconditional": [
+    -0.306,
+    2.641
+   ],
+   "n_unconditional": 2000
+  },
+  "Tout=-5": {
+   "c_star": 1.189,
+   "tflow_req": 34.6,
+   "ci95_guarded": [
+    0.11,
+    2.505
+   ],
+   "ci95_unconditional": [
+    0.099,
+    2.505
+   ],
+   "n_unconditional": 2000
+  }
+ },
+ "verdict": "all guards pass"
+}

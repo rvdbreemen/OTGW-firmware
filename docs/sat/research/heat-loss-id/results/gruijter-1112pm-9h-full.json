@@ -1,0 +1,92 @@
+{
+ "label": "EXPLORATORY",
+ "files": [
+  "otgw-graph-20261112-212749.csv"
+ ],
+ "hours": 9.25,
+ "flame_cycles": 23,
+ "bins": 23,
+ "bin_min": 20.0,
+ "tout_range": [
+  7.2,
+  9.5
+ ],
+ "model": "g, B, q",
+ "g_per_h": -0.2125,
+ "B_per_h": -0.001,
+ "q_K_per_h": -2.217,
+ "g_over_B": null,
+ "tau_h": null,
+ "r2": 0.067,
+ "cond": 387.2,
+ "holdout_rmse": 0.2291,
+ "holdout_rmse_zero": 0.2037,
+ "guards": {
+  "g_in_0_1": false,
+  "B_pos": false,
+  "cond_lt_1000": true,
+  "bins_ge_40": false,
+  "cycles_ge_40": false,
+  "holdout_beats_zero": false
+ },
+ "boot_n": 2000,
+ "boot_rejected_by_guards": 1466,
+ "note": "ci95_guarded uses only the resamples inside the guards (conditional); ci95_unconditional every resample with B > 0",
+ "ci95": {
+  "g": [
+   0.009,
+   0.786
+  ],
+  "B": [
+   0.001,
+   0.052
+  ],
+  "q": [
+   -0.001,
+   8.103
+  ]
+ },
+ "tstar": 19.0,
+ "coefficient": {
+  "Tout=5": {
+   "c_star": NaN,
+   "tflow_req": NaN,
+   "ci95_guarded": [
+    0.836,
+    547.316
+   ],
+   "ci95_unconditional": [
+    -669.778,
+    247.075
+   ],
+   "n_unconditional": 1247
+  },
+  "Tout=0": {
+   "c_star": NaN,
+   "tflow_req": NaN,
+   "ci95_guarded": [
+    1.518,
+    769.43
+   ],
+   "ci95_unconditional": [
+    -914.311,
+    344.04
+   ],
+   "n_unconditional": 1247
+  },
+  "Tout=-5": {
+   "c_star": NaN,
+   "tflow_req": NaN,
+   "ci95_guarded": [
+    1.358,
+    801.323
+   ],
+   "ci95_unconditional": [
+    -946.133,
+    354.286
+   ],
+   "n_unconditional": 1247
+  }
+ },
+ "verdict": "guards failed: g_in_0_1, B_pos, bins_ge_40, cycles_ge_40, holdout_beats_zero"
+}
