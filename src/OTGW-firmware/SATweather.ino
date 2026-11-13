@@ -609,12 +609,11 @@ void weatherLoop()
   // 5-minute startup gate: give the OT bus time to report Toutside before
   // making the first weather API call.
   if (millis() < (WEATHER_POLL_MIN_SEC * 1000UL)) return;
-  // If the OT bus already provides a valid outside temperature, avoid
-  // burning weather API calls (SAT only needs weather as a fallback).
-  // TASK-511: canonical struct is OTcurrentSystemState (see OTGW-Core.ino:3490
-  // where OT message ID 27 populates this field). PR #559 originally referenced
-  // a non-existent state.sat.Toutside and would not compile.
-  if (OTcurrentSystemState.Toutside != 0.0f) return;
+  // If the boiler already provides the outside temperature SAT uses, avoid burning weather API calls
+  // (SAT only needs weather as a fallback). TASK-1897: the same rule satResolveOutsideTemp() ranks by: MsgID 27 from a
+  // live Read-Ack younger than 1 h and not 0.0. A Toutside the PIC fills from a DS18B20, or a stale one, is not used by
+  // SAT, so it must not block the weather fallback either.
+  if (satOtOutsideFresh(millis()) && OTcurrentSystemState.Toutside != 0.0f) return;
 
   // TASK-1319: until the first fetch succeeds, try right after the start-up gate
   // instead of waiting for the first poll tick (the poll timer runs from boot, so

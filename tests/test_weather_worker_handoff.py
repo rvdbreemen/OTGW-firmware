@@ -172,6 +172,10 @@ struct SatSettings { bool bWeatherEnable = true; float fWeatherLat = 52.1f, fWea
 struct Settings { SatSettings sat; };
 static Settings settings;
 struct { float Toutside = 0.0f; } OTcurrentSystemState;
+// TASK-1897: stands in for SATcontrol.ino satOtOutsideFresh() (MsgID 27 stamped by a live Read-Ack < 1 h ago); the
+// real helper is compiled by tests/test_sat_outside_order.py. Unused by code from before the fix.
+static bool g_otFresh = false;
+static bool satOtOutsideFresh(uint32_t) { return g_otFresh; }
 
 enum HeapHealthLevel { HEAP_HEALTHY, HEAP_LOW, HEAP_WARNING, HEAP_CRITICAL };
 static HeapHealthLevel g_heap = HEAP_HEALTHY;
@@ -293,6 +297,22 @@ int main(int argc, char** argv) {
   P("c4_retry_ms_after_success", _wxFirstRetryMs);
   P("c4_timer_restarted", g_restartTimer);
 
+  // ---- C6 TASK-1897: only a fresh, non-zero MsgID 27 skips the weather fetch (the resolver's rule)
+  auto c6 = [&](bool fresh, float tout) {
+    state.sat.weather.bValid = false; _wxFirstRetryMs = 0;
+    g_otFresh = fresh; OTcurrentSystemState.Toutside = tout;
+    int before = g_createCalls;
+    weatherLoop();
+    int started = g_createCalls - before;
+    if (started) { runWorker(json, 200); weatherConsumeResult(); }
+    return started;
+  };
+  P("c6_stale_nonzero_fetches", c6(false, 5.0f));     // DS18B20 / gateway-filled Toutside, never stamped
+  P("c6_fresh_nonzero_skips", c6(true, 5.0f));        // the boiler answers MsgID 27: SAT uses it
+  P("c6_fresh_zero_fetches", c6(true, 0.0f));         // 0.0 ranks below weather in satResolveOutsideTemp()
+  P("c6_stale_zero_fetches", c6(false, 0.0f));
+  g_otFresh = false; OTcurrentSystemState.Toutside = 0.0f;
+
   // ---- manual fetch dumps once on consume
   g_dumps = 0;
   weatherFetchOpenMeteoNow();
@@ -412,6 +432,14 @@ class Compiled(unittest.TestCase):
         self.assertEqual(o["c4_valid_after_success"], 1)
         self.assertEqual(o["c4_retry_ms_after_success"], 0)
         self.assertEqual(o["c4_timer_restarted"], 1)
+
+    def test_c6_outside_gate_follows_resolver(self):
+        # TASK-1897: a Toutside SAT does not use (no live MsgID 27 Read-Ack) must not block the weather fallback.
+        o = self.out
+        self.assertEqual(o["c6_stale_nonzero_fetches"], 1, "stale/unstamped Toutside blocked the weather fetch")
+        self.assertEqual(o["c6_fresh_nonzero_skips"], 0)
+        self.assertEqual(o["c6_fresh_zero_fetches"], 1)
+        self.assertEqual(o["c6_stale_zero_fetches"], 1)
 
     def test_manual_fetch_dumps_once(self):
         self.assertEqual(self.out["manual_dumps"], 1)

@@ -2633,6 +2633,15 @@ static const uint32_t SAT_OUTSIDE_VALID_MS = 3600000UL;   // entry 57: old after
 // O OpenTherm MsgID 27, W weather service, R restored from flash, N none valid.
 static char _sat_outsideSrc = 'N';
 
+// MsgID 27 counts as an outside temperature only while a live Read-Ack stamped it less than 1 h ago. A value the PIC
+// fills from its own DS18B20, or the gateway answers itself, never stamps iToutsideBoilerMs. Shared by
+// satResolveOutsideTemp() and weatherLoop() (TASK-1897), so the weather fetch is skipped only when SAT really uses MsgID 27.
+static bool satOtOutsideFresh(uint32_t nowMs)
+{
+  return state.otBus.iToutsideBoilerMs != 0 &&
+         (uint32_t)(nowMs - state.otBus.iToutsideBoilerMs) < SAT_OUTSIDE_VALID_MS;
+}
+
 static bool satResolveOutsideTemp(float* out, uint32_t* sampleMs)
 {
   const uint32_t nowMs = millis();
@@ -2641,8 +2650,7 @@ static bool satResolveOutsideTemp(float* out, uint32_t* sampleMs)
   const bool extSet = state.sat.bExternalOutdoorValid;
   const uint32_t extAge = (uint32_t)(nowMs - state.sat.iExternalOutdoorLastMs);
   const float otVal = OTcurrentSystemState.Toutside;
-  const bool otFresh = state.otBus.iToutsideBoilerMs != 0 &&
-                       (uint32_t)(nowMs - state.otBus.iToutsideBoilerMs) < SAT_OUTSIDE_VALID_MS;
+  const bool otFresh = satOtOutsideFresh(nowMs);
   const bool wxFresh = state.sat.weather.bValid && state.sat.weather.iLastUpdateMs != 0 &&
                        (uint32_t)(nowMs - state.sat.weather.iLastUpdateMs) < SAT_OUTSIDE_VALID_MS;
   if (extSet && extAge < SAT_OUTSIDE_VALID_MS) { *out = state.sat.fExternalOutdoor; *sampleMs = state.sat.iExternalOutdoorLastMs; _sat_outsideSrc = 'E'; return true; }
