@@ -5,6 +5,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.224] - 2026-11-13
+
+### Added
+- REST `/api/v2/otgw/messages/<id>` and `/api/v2/otgw/label/<label>`: `status` (`never_seen`, `ack`, `unknown_dataid`, `data_invalid`, the boiler's latest answer since boot; gateway-made and replayed answers do not count) and `last_seen_age_s` (`-1` when never seen) (TASK-1871).
+- REST `/api/v2/sat/status`: `flow_temp`, `return_temp`, `flame_on`, `room_temp_age_s` and `outside_temp_age_s` (TASK-1885).
+- SAT telemetry per PWM ON phase (asked and final ON time, length, ignition delay, CH flame seconds, lit or not, ended off or cut): the last 8 phases and counters in `/api/v2/sat/status`, a `SATPWMPHASE` telnet line, MQTT `sat/pwm_last_cmd_on_s`, `sat/pwm_last_ignition_delay_s`, `sat/pwm_last_flame_on_s`, `sat/pwm_last_ignited`, `sat/pwm_phases_not_ignited` with Home Assistant diagnostic sensors, and a PWM ON phases card in SAT > Technical; no control path reads it (TASK-1880).
+- Web UI: the SAT page explains its state: a why-line, a messages button and panel, the fallback reason as text, a room trend arrow, the curve advice and a 24 h burner cycles card, from the existing status poll (TASK-1884).
+- Web UI: an About card and a Contributors card in Settings (TASK-1893).
+
+### Changed
+- IPC task stack (ipc0 and ipc1) 1280 B instead of the prebuilt 1024 B, through our own copy of ESP-IDF `esp_ipc.c`, gated by `tests/test_esp_ipc_override_gate.py` and `scripts/check_esp_ipc_override.py` (ADR-225; TASK-1870).
+- Web UI: the SAT control loop chart plots the measured boiler flow next to the setpoint, the heating curve as its own dashed line, and modulation and flame panels; the outside and room tiles show the age of the reading (TASK-1885).
+- Web UI: Monitor > Connection draws the OT bus as Thermostat, OTGW, Boiler in one column, with MQTT and live leaving the router at top and bottom; the Home schematic room readout and SPACE HEATING label are clear of the pipes; the footer copyright line moves to the Settings About card (TASK-1893).
+- Thermostat support file `/ot-thermo.json` format 3: a format 2 file is dropped once at boot and relearned; `/ot-boiler.json` unchanged (TASK-1895).
+
+### Fixed
+- The port-80 listener stops before a planned restart, so no new connection is accepted during the teardown (TASK-1746).
+- `/ReBoot` and the wireless reset log their own reboot reason instead of `Reboot after upgrade` (TASK-1868).
+- SAT: a simulation run no longer saves the learned thermal coefficient, and the real learned values return when simulation ends (TASK-1869).
+- A replayed OpenTherm log no longer marks thermostat messages in the support map (TASK-1895).
+
 ## [2.0.0-beta.218] - 2026-11-12
 
 ### Added
@@ -889,7 +910,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.218...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.224...HEAD
+[2.0.0-beta.224]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.218...v2.0.0-beta.224
 [2.0.0-beta.218]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.203...v2.0.0-beta.218
 [2.0.0-beta.203]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.174...v2.0.0-beta.203
 [2.0.0-beta.174]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.170...v2.0.0-beta.174
