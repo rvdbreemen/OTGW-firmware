@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.234
+**  Version  : v2.0.0-beta.235
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4629,14 +4629,10 @@ void postSettings()
 // GET /api/v1/sensors/label?address=28FF64D1841703F1
 // Get all Dallas sensor labels from file (bulk read)
 void getDallasLabels() {
-  if (!LittleFS.exists(F("/dallas_labels.ini"))) {
-    // No file exists - return empty JSON object
-    webSend(200, F("application/json"), F("{}"));
-    return;
-  }
-
-  // Stream the file content directly to response
-  webSendFile("/dallas_labels.ini", F("application/json"), /*gzip=*/false);
+  // TASK-1912: the RAM copy (sensors_ext.ino), so a read right after a POST returns that POST ("{}" without labels)
+  if (!dallasLabelsLock(100)) { sendApiError(503, F("Labels busy, retry")); return; }
+  webSend(200, F("application/json"), dallasLabelsJson());   // webSend copies the body before the unlock
+  dallasLabelsUnlock();
 }
 
 // Update all Dallas sensor labels in file (bulk operation)
@@ -4688,16 +4684,10 @@ void updateAllDallasLabels() {
     }
   }
 
-  // Write validated JSON to file
-  File labelsFile = LittleFS.open(F("/dallas_labels.ini"), "w");
-  if (!labelsFile) {
-    webSendP(500, PSTR("application/json"),
-      PSTR("{\"success\":false,\"error\":\"Failed to open file for writing\"}"));
-    return;
-  }
-
-  labelsFile.print(body);
-  labelsFile.close();
+  // TASK-1912: replace the RAM copy; the loop task writes /dallas_labels.ini (temp file + rename). No flash access here.
+  if (!dallasLabelsLock(100)) { sendApiError(503, F("Labels busy, retry")); return; }
+  dallasLabelsReplaceLocked(body, bodyLen);
+  dallasLabelsUnlock();
 
   webSend(200, F("application/json"), F("{\"success\":true}"));
 }

@@ -26,8 +26,6 @@ REST_INO = Path(os.environ.get("OTGW_RESTAPI_INO", REPO / "src" / "OTGW-firmware
 # function -> (LittleFS calls allowed, follow-up task that removes the entry)
 ALLOWED = {
     "handleSAT": (9, "TASK-1911"),               # heating-curve calibration markers file (TASK-586): read and write
-    "getDallasLabels": (1, "TASK-1912"),         # /dallas_labels.ini read
-    "updateAllDallasLabels": (1, "TASK-1912"),   # /dallas_labels.ini write
 }
 
 

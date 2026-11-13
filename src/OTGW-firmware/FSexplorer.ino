@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-beta.234
+**  Version  : v2.0.0-beta.235
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -470,6 +470,7 @@ void apilistfiles()
     if (!LittleFS.exists(deletePath)) {
       webSend(404, F("text/plain"), F("File not found"));
     } else if (LittleFS.remove(deletePath)) {
+      dallasLabelsFileChanged(deletePath);   // TASK-1912: the labels RAM copy follows the file
       webSend(200, F("text/plain"), F("File deleted"));
     } else {
       webSend(500, F("text/plain"), F("Delete failed"));
@@ -563,6 +564,7 @@ bool handleFile(String&& path)
     if (!checkHttpAuth()) return false;
     DebugTf(PSTR("Delete -> [%s]\n\r"), argCompat("delete"));
     LittleFS.remove(argCompat("delete"));    // Datei löschen
+    dallasLabelsFileChanged(argCompat("delete"));   // TASK-1912: the labels RAM copy follows the file
     sendFSexplorerRedirect();
     return true;
   }
@@ -700,6 +702,7 @@ void handleFileUpload(AsyncWebServerRequest *request, const String &filename,
   if (final)
   {
     if (request->_tempFile) {
+      dallasLabelsFileChanged(request->_tempFile.path());   // TASK-1912: the labels RAM copy follows the file
       request->_tempFile.close();
       DebugT(F("FileUpload Size: ")); Debugln((String)(index + len));
     }

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.234
+**  Version  : v2.0.0-beta.235
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -217,6 +217,14 @@ bool updateLittleFSStatus(const char *probePath = nullptr);
 bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 void refreshLittleFSFileFlags();   // TASK-1899: file-exists flags for REST, on the loop task
 bool fsCommitTempFile(const char *tmpPath, const char *path, size_t expected);   // TASK-1913: rename a complete temp file over path
+void loadDallasLabels();           // TASK-1912: RAM copy of /dallas_labels.ini (sensors_ext.ino)
+void flushDallasLabels();
+void loopDallasLabels();
+bool dallasLabelsLock(uint32_t waitMs);
+void dallasLabelsUnlock();
+const char* dallasLabelsJson();
+void dallasLabelsReplaceLocked(const char* json, size_t len);
+void dallasLabelsFileChanged(const char* path);   // FSexplorer uploaded or deleted path
 void loopLittleFSStatus();   // TASK-1865: mount check + write probe on the loop task, not in /api/v2/health
 // Longest reboot-log line incl. CRLF and NUL: a core-dump detail line with all 16 backtrace frames the ESP-IDF
 // summary holds is 236 chars ("Core dump: " + task (15) + pc + elf + "bt=" + 16 PCs + "!\r\n"; TASK-1538).

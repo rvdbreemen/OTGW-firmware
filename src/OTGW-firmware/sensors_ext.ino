@@ -1,6 +1,6 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v2.0.0-beta.234
+**  Version  : v2.0.0-beta.235
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -27,9 +27,154 @@ const uint8_t DallasSimDeviceAddresses[SIM_SENSOR_COUNT][8] = {
   {0x28, 0xD0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03}
 };
 
+// --- dallasLabels begin
+// TASK-1912: the RAM copy of /dallas_labels.ini. GET /api/v2/sensors/labels answers from it and POST/PUT replaces it, so
+// the web UI's read-merge-write (v2.js saveDallasLabel) always reads the last write: before, a POST wrote the file on
+// async_tcp and a second edit could merge onto a stale read. The loop task writes the file when the copy changed (temp
+// file + rename, so a power cut keeps the old file), never while flashing, and doRestart() flushes it like the
+// settings. ensureSensorDefaultLabels() (loop task) works on the file under the same lock and reloads the copy.
+// The mutex guards the copy; REST takes it with a short wait and answers 503 when busy (fetchWithRetry retries).
+// The flush holds it only to copy the labels into s_dlFlushBuf: the flash write (up to ~1 s) runs without it, so REST
+// never waits on flash. A generation counter tells the flush whether a POST arrived during the write; then the copy
+// stays dirty and the next pass writes it. Every flush runs on the loop task (loopDallasLabels, doRestart), so
+// s_dlFlushBuf has one writer.
+// FSexplorer can upload or delete the file directly (async_tcp). It calls dallasLabelsFileChanged(), which only
+// records a reload request and the generation at that moment; the loop task reads the file and takes it over unless
+// a POST came after the request (the last action wins). The reload runs before the flush in the same pass, so an
+// older pending edit never writes over the user's file.
+static const size_t   DALLAS_LABELS_MAX = 2048;              // = the POST body limit in updateAllDallasLabels()
+static const char     kDallasLabelsFile[] = "/dallas_labels.ini";
+static const char     kDallasLabelsTmp[]  = "/dallas_labels.tmp";
+static char           s_dlBuf[DALLAS_LABELS_MAX + 1] = "{}";
+static char           s_dlFlushBuf[DALLAS_LABELS_MAX + 1];   // snapshot the flush writes outside the lock
+static uint32_t       s_dlGen = 0;                           // counts replacements of the copy
+static bool           s_dlReloadReq = false;                 // FSexplorer changed the file: reload on the loop task
+static uint32_t       s_dlReloadGen = 0;                     // s_dlGen when that request was made
+static bool           s_dlDirty = false;                     // the copy differs from the file
+static uint32_t       s_dlRetryMs = 0;                       // a failed write waits before the next try
+static PlatformMutex  s_dlMutex = nullptr;
+
+bool dallasLabelsLock(uint32_t waitMs) { return platformMutexLock(s_dlMutex, waitMs); }
+void dallasLabelsUnlock() { platformMutexUnlock(s_dlMutex); }
+const char* dallasLabelsJson() { return s_dlBuf; }           // caller holds the lock
+
+// Caller holds the lock and has validated json as a flat object of at most DALLAS_LABELS_MAX bytes.
+void dallasLabelsReplaceLocked(const char* json, size_t len) {
+  if (len > DALLAS_LABELS_MAX) len = DALLAS_LABELS_MAX;
+  memcpy(s_dlBuf, json, len);
+  s_dlBuf[len] = '\0';
+  s_dlGen++;
+  s_dlDirty = true;
+  s_dlRetryMs = 0;
+}
+
+// Read /dallas_labels.ini into buf (DALLAS_LABELS_MAX + 1 bytes); "{}" when it is missing, empty, too large or not
+// an object.
+static void readDallasLabelsFile(char* buf) {
+  strlcpy(buf, "{}", DALLAS_LABELS_MAX + 1);
+  if (!LittleFSmounted) return;
+  File f = LittleFS.open(kDallasLabelsFile, "r");
+  if (!f) return;
+  const size_t size = f.size();
+  if (size == 0 || size > DALLAS_LABELS_MAX) {
+    DebugTf(PSTR("Dallas labels: %s has %u bytes, not loaded (max %u)\r\n"), kDallasLabelsFile, (unsigned)size,
+            (unsigned)DALLAS_LABELS_MAX);
+    f.close();
+    return;
+  }
+  const size_t n = f.read(reinterpret_cast<uint8_t*>(buf), DALLAS_LABELS_MAX);
+  f.close();
+  buf[n] = '\0';
+  if (n != size || buf[0] != '{' || buf[n - 1] != '}') strlcpy(buf, "{}", DALLAS_LABELS_MAX + 1);
+}
+
+static void loadDallasLabelsLocked() {
+  readDallasLabelsFile(s_dlBuf);
+  s_dlDirty = false;
+}
+
+// Setup, loop task: read the file once, before the web server starts.
+void loadDallasLabels() {
+  if (s_dlMutex == nullptr) s_dlMutex = platformMutexCreate();
+  platformMutexLock(s_dlMutex);
+  loadDallasLabelsLocked();
+  platformMutexUnlock(s_dlMutex);
+}
+
+// Write json to /dallas_labels.ini through the temp file; fsCommitTempFile() (TASK-1913) checks the size and renames,
+// and on a failure removes the temp file, so the old file stays.
+static bool writeDallasLabelsFile(const char* json, size_t len) {
+  if (!LittleFSmounted) return false;
+  File f = LittleFS.open(kDallasLabelsTmp, "w");
+  if (f) {
+    f.write(reinterpret_cast<const uint8_t*>(json), len);
+    f.close();
+  }
+  const bool ok = fsCommitTempFile(kDallasLabelsTmp, kDallasLabelsFile, len);
+  if (!ok) DebugTln(F("Dallas labels: write failed, the old file stays; retry in 30 s"));
+  return ok;
+}
+
+// Caller holds the lock (ensureSensorDefaultLabels only).
+static bool flushDallasLabelsLocked() {
+  if (!s_dlDirty) return true;
+  if (!writeDallasLabelsFile(s_dlBuf, strlen(s_dlBuf))) return false;
+  s_dlDirty = false;
+  return true;
+}
+
+// Loop task (and doRestart()): write the copy when it changed. The lock is held for the snapshot and the bookkeeping,
+// not across the flash write.
+void flushDallasLabels() {
+  platformMutexLock(s_dlMutex);
+  if (!s_dlDirty) { platformMutexUnlock(s_dlMutex); return; }
+  const size_t len = strlen(s_dlBuf);
+  memcpy(s_dlFlushBuf, s_dlBuf, len + 1);
+  const uint32_t gen = s_dlGen;
+  platformMutexUnlock(s_dlMutex);
+
+  const bool ok = writeDallasLabelsFile(s_dlFlushBuf, len);
+
+  platformMutexLock(s_dlMutex);
+  if (!ok) s_dlRetryMs = millis();
+  else if (s_dlGen == gen) s_dlDirty = false;   // a POST during the write keeps the copy dirty for the next pass
+  platformMutexUnlock(s_dlMutex);
+}
+
+// Any task (FSexplorer runs on async_tcp): path was uploaded or deleted. Only the labels file asks for a reload.
+void dallasLabelsFileChanged(const char* path) {
+  if (path == nullptr) return;
+  while (*path == '/') path++;
+  if (strcmp(path, kDallasLabelsFile + 1) != 0) return;
+  __atomic_store_n(&s_dlReloadGen, __atomic_load_n(&s_dlGen, __ATOMIC_ACQUIRE), __ATOMIC_RELAXED);
+  __atomic_store_n(&s_dlReloadReq, true, __ATOMIC_RELEASE);
+}
+
+// Loop task: take the file over, read outside the lock, unless a POST came after the request.
+static void reloadDallasLabels() {
+  const uint32_t gen = __atomic_load_n(&s_dlReloadGen, __ATOMIC_RELAXED);
+  readDallasLabelsFile(s_dlFlushBuf);
+  platformMutexLock(s_dlMutex);
+  if (s_dlGen == gen) {
+    memcpy(s_dlBuf, s_dlFlushBuf, strlen(s_dlFlushBuf) + 1);
+    s_dlDirty = false;
+    s_dlRetryMs = 0;
+  }
+  platformMutexUnlock(s_dlMutex);
+}
+
+// Loop task, from loopLittleFSStatus() (so never while flashing).
+void loopDallasLabels() {
+  if (__atomic_exchange_n(&s_dlReloadReq, false, __ATOMIC_ACQ_REL)) reloadDallasLabels();
+  if (!__atomic_load_n(&s_dlDirty, __ATOMIC_ACQUIRE)) return;   // a hint only; the flush checks again under the lock
+  if (s_dlRetryMs != 0 && (uint32_t)(millis() - s_dlRetryMs) < 30000UL) return;
+  flushDallasLabels();
+}
+// --- dallasLabels end
+
 // Ensure all discovered sensors have default labels in /dallas_labels.ini
-// Works for both real and simulated sensors
-void ensureSensorDefaultLabels()
+// Works for both real and simulated sensors. TASK-1912: runs on the file under the labels lock (below).
+static void ensureSensorDefaultLabelsFile()
 {
   if (DallasrealDeviceCount < 1) return;
 
@@ -100,6 +245,18 @@ void ensureSensorDefaultLabels()
   outFile.print('}');
   outFile.close();
   DebugTf(PSTR("Saved %d sensor label(s) to dallas_labels.ini\r\n"), DallasrealDeviceCount);
+}
+
+// TASK-1912: the default labels go into the file and the RAM copy together. A pending REST edit is written first, so
+// the file is current; when that write fails the defaults wait for the next call, and the edit is kept.
+void ensureSensorDefaultLabels()
+{
+  platformMutexLock(s_dlMutex);
+  if (flushDallasLabelsLocked()) {
+    ensureSensorDefaultLabelsFile();
+    loadDallasLabelsLocked();
+  }
+  platformMutexUnlock(s_dlMutex);
 }
 
 void initSimulatedDallasSensors()
