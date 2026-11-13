@@ -84,6 +84,8 @@ FLOW_CHECK = "!(flowLitresPerMin > 0.0f) || flowLitresPerMin > DHW_METER_MAX_FLO
 SUMMARY_19 = "      OTcurrentSystemState.DHWFlowRate = fval;\n      break;"
 SUMMARY_19_FED = ("      OTcurrentSystemState.DHWFlowRate = fval;\n"
                   "      if (!isOTDirectEnabled()) updateDHWWaterMeter(fval, millis());\n      break;")
+# M6 anchors on the live sensor count, so a new discovery row elsewhere does not break this test (TASK-1880 moved it 399 -> 404).
+HA_COUNT = int(re.search(r"const uint16_t MQTT_HA_SENSOR_COUNT = (\d+);", (REPO / DISC).read_text(encoding="utf-8")).group(1))
 RESET_GATE = "  if (!LittleFSmounted || isFlashing()) return;   // the file cannot be written: the reset waits"
 RESET_ZERO = "    dhwWaterTotalL = 0.0;\n    writeDHWWaterMeterFile(millis());\n"
 SKIP_ZERO = "  if (dhwWaterTotalL != 0.0 || dhwMeterSavedL != 0.0) {   // RAM or file not at 0 yet"
@@ -152,8 +154,8 @@ DISC_MUTANTS = [
      [(PUBLISH_GATES, "  if (!settings.mqtt.bEnable) return;\n")], "D6", ["D7"]),
     ("M27", "MQTT-enabled check removed from publishDHWWaterMeter()", "gen_disc_mqtt.inc",
      [(PUBLISH_GATES, "  if (!dhwWaterMeterHasData()) return;\n")], "D9", ["D7"]),
-    ("M6", "MQTT_HA_SENSOR_COUNT left at 389", "gen_disc_table.inc",
-     [("const uint16_t MQTT_HA_SENSOR_COUNT = 399;", "const uint16_t MQTT_HA_SENSOR_COUNT = 398;")], "D1", []),   # 399 since TASK-1462
+    ("M6", "MQTT_HA_SENSOR_COUNT one short of the table", "gen_disc_table.inc",
+     [(f"const uint16_t MQTT_HA_SENSOR_COUNT = {HA_COUNT};", f"const uint16_t MQTT_HA_SENSOR_COUNT = {HA_COUNT - 1};")], "D1", []),
     ("M11", "publisher formats with dtostrf into msg[24] (the pre-fixup code)", "gen_disc_mqtt.inc",
      [('snprintf_P(msg, sizeof(msg), PSTR("%.1f"), dhwWaterTotalL);', "dtostrf(dhwWaterTotalL, 0, 1, msg);")],
      "D11", ["D7", "D10"], True),

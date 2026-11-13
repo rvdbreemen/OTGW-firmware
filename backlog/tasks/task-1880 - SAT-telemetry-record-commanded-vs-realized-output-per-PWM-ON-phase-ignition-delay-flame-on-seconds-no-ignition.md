@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:13:00Z'
-updated_date: '2026-11-13T16:06:00Z'
+updated_date: '2026-11-13T20:16:00Z'
 labels:
   - sat
   - telemetry
@@ -61,4 +61,6 @@ AC4 (U10) on lane-1880, uncommitted: card 'PWM ON phases: asked vs done' in SAT 
 2026-11-13 shipped in 2.0.0-beta.224 (5ddcc6543, post 1570832038179905578). Bench by 09 on .61: SAT simulation only; 1 PWM ON phase recorded ignited, ended cut, consistent with the flame bit; REST, MQTT and HA entities present. NOT bench-tested: a phase that never lit, a phase that ends 'off', a PIC unit (.63) and a real boiler with a capture to compare. The never-lit and 'off' paths are covered only by the host test (tests/test_sat_pwm_phase_telemetry.py). AC3 stays open for that.
 
 09's question: cmd_on_s 3600 on a forced PWM entry. Intended. A PWM entry at a duty at or above the maximum is duty range 5 (continuous ON): satPwmBeginOn(flame, boilerTemp, maxMs, 0) with maxMs = 2 x period (SATcontrol.ino range 5, thermo-nova pwm.py:297 on_time_maximum_threshold = 2 x on_time_upper_threshold, pwm.py:55). With a 1800 s period (heat pump / hybrid default) that is 3600 s; with a gas boiler at 3 per hour it would be 2400 s. The record stores the ON time SAT asked at the start, so 3600 is the commanded value, not a bug.
+
+2026-11-13 follow-up (found by 95): test/host/test_dhw_water_meter.py exited 1 on origin/dev because its mutant M6 anchored on the literal 'MQTT_HA_SENSOR_COUNT = 399;' and this task moved the count to 404. Fixed test-only: M6 now reads the live count from MQTTHaDiscovery.cpp (HA_COUNT) and mutates it to count - 1. Red/green: the old test file exits 1 ('mutant anchor must match exactly once ... got 0'), the fixed one gives RESULT: PASS (exit 0). My earlier full-suite runs covered tests/ but not test/host/, which is how this slipped.
 <!-- SECTION:NOTES:END -->
