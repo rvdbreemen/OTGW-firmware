@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.226
+**  Version  : v2.0.0-beta.227
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -450,23 +450,27 @@ void setup() {
         SetupDebugf(PSTR("Board mode: auto -> Classic %s (persisting iBoardMode=%d)\r\n"),
                     state.hw.bClassicPro ? "S3 Mini Pro" : "S3 Mini", (int)settings.iBoardMode);
       } else {
-        // No live PIC after retries: tear down UART0 BEFORE OT-direct so a floating
-        // PIC-RX pin can't drive an RX interrupt storm (ADR-125). Run as OTGW32/
-        // OT-Direct for THIS boot, but do NOT persist the negative verdict
-        // (TASK-1031): the forced OT-Direct path (iBoardMode==2) skips detectPIC()
-        // entirely, so persisting a transient first-boot PIC-miss would stick a
-        // live-PIC board in OT-Direct until the user manually resets to Auto.
-        // Leaving iBoardMode=0 (auto) re-probes every boot until a PIC is seen,
-        // then persists the positive Classic verdict. A genuine OTGW32 just pays a
-        // benign PIC-NACK probe each boot.
-        OTGWSerial.end();
+        // No live PIC after retries. Run as OTGW32/OT-Direct for THIS boot, but do NOT
+        // persist the negative verdict (TASK-1031): the forced OT-Direct path
+        // (iBoardMode==2) skips detectPIC() entirely, so persisting a transient
+        // first-boot PIC-miss would stick a live-PIC board in OT-Direct until the user
+        // manually resets to Auto. Leaving iBoardMode=0 (auto) re-probes every boot
+        // until a PIC is seen, then persists the positive Classic verdict. A genuine
+        // OTGW32 just pays a benign PIC-NACK probe each boot.
         if (isOtgw32HardwarePossible()) {
+          // OTGW32: no PIC is wired, so tear down UART0 BEFORE OT-Direct so a floating
+          // PIC-RX pin can't drive an RX interrupt storm (ADR-125).
+          OTGWSerial.end();
           initOTDirect();            // sets HW_MODE_OT_DIRECT for this boot only
           SetupDebugln(F("Board mode: auto -> no PIC -> OTGW32/OT-Direct (this boot; NOT persisted, re-probes next boot -- TASK-1031)"));
         } else {
           // TASK-1730: PSRAM or an S3 Mini Pro IMU means a LOLIN module in a Classic
           // socket, so this is a Classic whose PIC did not answer: leave the OTGW32
           // OT-Direct GPIOs alone (eMode stays HW_MODE_DEGRADED from detectPIC()).
+          // TASK-1790: keep the PIC UART open. Its RX pin is wired to the PIC, not
+          // floating, and the per-minute PR=A probe (doTaskEvery60s) can only find a
+          // PIC that came up late through an open UART; its banner reply then
+          // re-enables the PIC (applyPICBannerInfo) without a reboot.
           SetupDebugln(F("Board mode: auto -> no PIC on a LOLIN module (Classic) -> OT-Direct not started (TASK-1730)"));
         }
       }
