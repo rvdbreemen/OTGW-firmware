@@ -1,6 +1,6 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v2.0.0-beta.228
+**  Version  : v2.0.0-beta.229
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -223,14 +223,35 @@ if (settings.mqtt.bEnable) {
   }
 } // configSensors()
 
+// begin dallas-read record (sliced by tests/test_dallas_first_reading.py)
+// TASK-1824: with setWaitForConversion(false), requestTemperatures() only starts a conversion and getTempC()
+// reads the scratchpad, which holds the result of the PREVIOUS conversion. Until a first conversion has
+// completed it holds the DS18B20 power-on value 85.0, and a sensor that browns out returns to it.
+static bool dallasConversionRequested = false;   // a conversion was started on an earlier poll
+
+#define DALLAS_POWER_ON_C       85.0f   // DS18B20 scratchpad value after power-on (0x0550)
+#define DALLAS_POWER_ON_JUMP_C  10.0f   // an exact 85.0 this far from the previous value is a reset, not a reading
+
+// true when tempC is a measurement to store and publish. havePrev: this sensor already has a valid value.
+static bool dallasReadingValid(float tempC, bool havePrev, float prevC)
+{
+  if (tempC == DEVICE_DISCONNECTED_C) return false;
+  if (tempC == DALLAS_POWER_ON_C && (!havePrev || fabsf(tempC - prevC) > DALLAS_POWER_ON_JUMP_C)) return false;
+  return true;
+}
+// end dallas-read record
+
  void pollSensors()
  {
   time_t now = time(nullptr);
   if (!bSensorsDetected) return;  // Guard on runtime detection state, not persisted setting
 
+  // TASK-1824: read only after a conversion was started on an earlier poll; the first poll after boot only starts one.
+  const bool conversionDone = dallasConversionRequested;
   if (!state.debug.bSensorSim)
   {
     sensors.requestTemperatures(); // Non-blocking: setWaitForConversion(false) in initSensors()
+    dallasConversionRequested = true;
   }
   bool simUpdateDue = true;
   if (state.debug.bSensorSim && simLastUpdateTime != 0 && (now - simLastUpdateTime) < (time_t)SIM_SENSOR_UPDATE_INTERVAL_SECONDS)
@@ -261,10 +282,11 @@ if (settings.mqtt.bEnable) {
     }
     else
     {
+      if (!conversionDone) continue;   // TASK-1824: no completed conversion yet, the scratchpad still says 85.0
       float tempC = sensors.getTempC(DallasrealDevice[i].addr);
-      if (tempC == DEVICE_DISCONNECTED_C) {
-        // Sensor disconnected or read error — skip, keep previous value (Finding #29)
-        if (state.debug.bSensors) DebugTf(PSTR("Sensor [%s] disconnected or read error, skipping\r\n"), strDeviceAddress);
+      if (!dallasReadingValid(tempC, DallasrealDevice[i].lasttime != 0, DallasrealDevice[i].tempC)) {
+        // Disconnected or read error (Finding #29), or the 85.0 power-on value (TASK-1824): keep the previous value
+        if (state.debug.bSensors) DebugTf(PSTR("Sensor [%s] no valid reading (%.1f), skipping\r\n"), strDeviceAddress, tempC);
         continue;
       }
       DallasrealDevice[i].tempC = tempC;
