@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-10T19:09:20.950Z
-> Files: 155 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-13T06:13:01.639Z
+> Files: 156 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -967,6 +967,7 @@
 ## docs/sat/
 
 - `open-questions.md` — Open questions for Sergeant D (~27186 tok)
+- `vtherm-comparison-2026-11-13.md` — Versatile Thermostat compared with SAT: what we can learn (2026-11-13) (~2320 tok)
 
 ## scripts/
 
