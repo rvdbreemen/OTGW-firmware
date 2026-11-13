@@ -4237,6 +4237,81 @@ void satNoteBridgeDropped(const char* reasonP)
 #endif
 }
 
+// begin sat-status-live record
+// TASK-1885: the boiler's actual flow, return and flame, and the age of the room and outside temperature, for
+// /api/v2/sat/status. Filled once in the snapshot, never inside the emit closure.
+struct SatStatusLive {
+  float   flowTemp;      // NAN when SAT has no flow temperature (the 0.0 "missing" of satGetFlowTemp())
+  float   returnTemp;    // NAN when SAT has no return temperature (satReturnFresh() false)
+  bool    flameOn;
+  int32_t roomAgeS;      // -1: no age known
+  int32_t outsideAgeS;   // -1: no valid outside temperature
+};
+
+// Age in whole seconds of a sample taken at sampleMs, -1 when there is none (the convention of last_seen_age_s in
+// GET /api/v2/otgw/messages/<id>, TASK-1871). Unsigned difference, so a millis() wrap gives the right age.
+static int32_t satSampleAgeS(bool have, uint32_t sampleMs, uint32_t nowMs)
+{
+  return have ? (int32_t)((uint32_t)(nowMs - sampleMs) / 1000UL) : -1;
+}
+
+// The same values as satGetFlowTemp()/satGetReturnTemp() without satSimNoiseOffset(): that call advances the
+// simulation's noise sequence, so a REST poll must not make it.
+static float satStatusFlowTemp()
+{
+  if (settings.sat.bSimulation) return state.sat.fSimFlowTemp;
+  return satFeedClassIsFresh(satFlowFeedClass()) ? OTcurrentSystemState.Tboiler : NAN;
+}
+
+static float satStatusReturnTemp()
+{
+  if (settings.sat.bSimulation) return state.sat.fSimReturnTemp;
+  return satReturnFresh() ? OTcurrentSystemState.Tret : NAN;
+}
+
+// When the room temperature that satGetRoomTemp() just returned was measured. The same sources in the same order as
+// satGetRoomTemp(); this reads only (satGetRoomTemp() already cleared a stale BLE, area or external flag). The age of
+// a multi-area average is that of its oldest area. false: no age known (no reading, the fallback estimate, or a Tr
+// that did not come from a thermostat frame, e.g. a TR= feed).
+static bool satRoomTempSampleMs(float roomTemp, uint32_t nowMs, uint32_t* sampleMs)
+{
+  if (isnan(roomTemp)) return false;
+  if (settings.sat.bSimulation) { *sampleMs = nowMs; return true; }
+  if (settings.sat.bBleEnable && state.sat.bBleTempValid) { *sampleMs = state.sat.iBleTempLastMs; return true; }
+  if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
+    uint8_t count = settings.sat.iMultiAreaCount;
+    if (count > SAT_MAX_AREAS) count = SAT_MAX_AREAS;
+    bool any = false;
+    uint32_t oldestAge = 0;
+    for (uint8_t i = 0; i < count; i++) {
+      if (!state.sat.bAreaValid[i] || settings.sat.fAreaWeight[i] <= 0.0f) continue;
+      const uint32_t age = (uint32_t)(nowMs - state.sat.iAreaLastMs[i]);
+      if (!any || age > oldestAge) oldestAge = age;
+      any = true;
+    }
+    if (any) { *sampleMs = nowMs - oldestAge; return true; }
+  }
+  if (settings.sat.bUseExternalTemp && state.sat.bExternalTempValid) { *sampleMs = state.sat.iExternalTempLastMs; return true; }
+  float otRoom = OTcurrentSystemState.Tr;
+  if (state.otBus.iTrThermostatMs != 0 && (uint32_t)(nowMs - state.otBus.iTrThermostatMs) > SAT_STALE_TEMP_MS) otRoom = NAN;
+  if (state.sat.bFallbackActive && (otRoom < -10.0f || otRoom > 50.0f)) return false;   // the thermal estimate
+  if (state.otBus.iTrThermostatMs == 0) return false;
+  *sampleMs = state.otBus.iTrThermostatMs;
+  return true;
+}
+
+// Plain parameters, not the struct: the Arduino builder hoists a prototype of every function above the struct.
+static void satEmitStatusLive(JsonEmit& je, float flowTemp, float returnTemp, bool flameOn, int32_t roomAgeS,
+                              int32_t outsideAgeS)
+{
+  je.field(F("flow_temp"),          flowTemp);
+  je.field(F("return_temp"),        returnTemp);
+  je.field(F("flame_on"),           flameOn);
+  je.field(F("room_temp_age_s"),    roomAgeS);
+  je.field(F("outside_temp_age_s"), outsideAgeS);
+}
+// end sat-status-live record
+
 // TASK-883: per-response snapshot for the chunked /v2/sat/status stream. Same
 // DETERMINISM CONTRACT as DeviceInfoSnap (jsonChunked.h): the closure re-runs per
 // TCP window, so every AUTONOMOUS input is frozen ONCE here — the full state copy
@@ -4258,6 +4333,7 @@ struct SatStatusSnap {
   uint32_t phaseDurationSec;
   uint32_t nowMs;                     // millis() frozen for all sim-trace age maths
   bool     bleFailoverActive;
+  SatStatusLive live;                 // TASK-1885
   char     boilerStatus[20];
   char     manufacturer[12];
   char     phaseName[24];
@@ -4284,7 +4360,19 @@ void satSendStatusJSON()
   snap->st            = state;                          // en-bloc freeze of all state.*
   satGetBoilerStatusName(snap->boilerStatus, sizeof(snap->boilerStatus));
   snap->roomTemp      = satGetRoomTemp();
-  snap->outsideTemp   = satGetOutsideTemp();
+  {
+    // TASK-1885: the sample times come from the same resolve, right after it (satResolveOutsideTemp() is what
+    // satGetOutsideTemp() calls).
+    const uint32_t liveNow = millis();
+    uint32_t roomMs = 0, outsideMs = 0;
+    const bool roomHave = satRoomTempSampleMs(snap->roomTemp, liveNow, &roomMs);
+    const bool outsideHave = satResolveOutsideTemp(&snap->outsideTemp, &outsideMs);
+    snap->live.roomAgeS    = satSampleAgeS(roomHave, roomMs, liveNow);
+    snap->live.outsideAgeS = satSampleAgeS(outsideHave, outsideMs, liveNow);
+    snap->live.flowTemp    = satStatusFlowTemp();
+    snap->live.returnTemp  = satStatusReturnTemp();
+    snap->live.flameOn     = satIsFlameOn();
+  }
   snap->cyclesThisHour   = satCycleGetCyclesThisHour();
   strlcpy(snap->phaseName, satCycleGetPhaseName(), sizeof(snap->phaseName));
   snap->phaseDurationSec = satCycleGetPhaseDurationSec();
@@ -4397,7 +4485,9 @@ void satSendStatusJSON()
     je.field(F("fallback_reason"),      (int32_t)snap->st.sat.eFallbackReason);
     je.field(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
     je.field(F("current_modulation"),   (int32_t)snap->st.sat.iCurrentModulation);
-    je.field(F("heating_system"),       (int32_t)settings.sat.iHeatingSystem);
+    satEmitStatusLive(je, snap->live.flowTemp, snap->live.returnTemp, snap->live.flameOn, snap->live.roomAgeS,
+                      snap->live.outsideAgeS);   // TASK-1885: flow_temp, return_temp, flame_on, room/outside_temp_age_s
+    je.field(F("heating_system"),      (int32_t)settings.sat.iHeatingSystem);
     je.field(F("heating_source"),          (int32_t)settings.sat.iHeatingSource);
     je.field(F("heating_source_detected"), (int32_t)snap->st.sat.iDetectedHeatingSource);
     je.field(F("manufacturer"),         snap->manufacturer);

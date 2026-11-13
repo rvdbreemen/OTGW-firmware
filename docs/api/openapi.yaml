@@ -4395,6 +4395,23 @@ components:
         current_modulation:
           type: integer
           description: "Current relative modulation (%)"
+        flow_temp:
+          type: number
+          nullable: true
+          description: "TASK-1885: actual boiler flow temperature (C, OT MsgID 25; the model value in simulation). null when SAT has no valid flow temperature (no answer, Data-Invalid, Unknown-DataID or older than 60 s)"
+        return_temp:
+          type: number
+          nullable: true
+          description: "TASK-1885: actual return temperature (C, OT MsgID 28 or the PIC board sensor; the model value in simulation). null when SAT has none"
+        flame_on:
+          type: boolean
+          description: "TASK-1885: boiler flame on (MsgID 0 slave status bit 3; the model flame in simulation)"
+        room_temp_age_s:
+          type: integer
+          description: "TASK-1885: age of the room_temp reading in seconds; -1 when no age is known (no reading, the thermal fallback estimate, or a room temperature not stamped by a thermostat frame such as a TR= feed). A multi-area average reports its oldest area"
+        outside_temp_age_s:
+          type: integer
+          description: "TASK-1885: age of the outside temperature SAT uses, in seconds; -1 when no source is valid"
         ovp_value:
           type: number
           description: "Overshoot-protection learned value (C)"
@@ -4681,6 +4698,11 @@ components:
         fallback_reason: 0
         max_rel_modulation: 100
         current_modulation: 100
+        flow_temp: 44.8
+        return_temp: 37.5
+        flame_on: true
+        room_temp_age_s: 95
+        outside_temp_age_s: 1210
         ovp_value: 0.0
         ovp_enabled: false
         ovp_calib_phase: 0

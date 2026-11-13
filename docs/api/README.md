@@ -1034,6 +1034,11 @@ Returns the full SAT runtime state including temperatures, PID terms, cycle data
   "room_temp": 20.5,
   "outside_temp": 8.0,
   "heating_curve": 42.3,
+  "flow_temp": 44.8,
+  "return_temp": 37.5,
+  "flame_on": true,
+  "room_temp_age_s": 95,
+  "outside_temp_age_s": 1210,
   "pid_output": 43.1,
   "final_setpoint": 43.1,
   "error": 0.50,
@@ -1067,6 +1072,11 @@ Returns the full SAT runtime state including temperatures, PID terms, cycle data
 | `room_temp` | float | Current room temperature (°C, from OT bus or external sensor) |
 | `outside_temp` | float | Current outside temperature (°C, from OT bus or external sensor) |
 | `heating_curve` | float | Calculated heating curve setpoint (°C) |
+| `flow_temp` | float or null | Actual boiler flow temperature (°C, OT MsgID 25; the model value in simulation). `null` when SAT has no valid flow temperature (no answer, Data-Invalid, Unknown-DataID or older than 60 s) |
+| `return_temp` | float or null | Actual return temperature (°C, OT MsgID 28 or the PIC board sensor; the model value in simulation). `null` when SAT has none |
+| `flame_on` | boolean | Boiler flame on (MsgID 0 slave status bit 3; the model flame in simulation) |
+| `room_temp_age_s` | integer | Age of the `room_temp` reading in seconds; `-1` when no age is known (no reading, the thermal fallback estimate, or a room temperature not stamped by a thermostat frame such as a `TR=` feed). A multi-area average reports its oldest area |
+| `outside_temp_age_s` | integer | Age of the outside temperature SAT uses, in seconds; `-1` when no source is valid |
 | `pid_output` | float | PID output = curve + P + I + D (°C) |
 | `final_setpoint` | float | Setpoint sent to boiler after mode/clamp (°C) |
 | `error` | float | PID error = target - room temp (°C) |

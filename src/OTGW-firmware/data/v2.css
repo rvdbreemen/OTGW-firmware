@@ -819,6 +819,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .sat-tile .l{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .sat-tile .v{font-size:1.7rem;font-weight:700;margin-top:4px}
   .sat-tile .v.hot{color:var(--hot)}
+  .sat-tile .sub{font-size:.7rem;color:var(--muted);margin-top:2px}
   .sat-tile .tag{font-size:.56rem;background:color-mix(in srgb,var(--hot) 16%,transparent);color:var(--hot);border-radius:6px;padding:1px 6px;letter-spacing:0}
   .sat-row2{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
   .sat-row2.sat-row-2up{grid-template-columns:1fr 1fr}

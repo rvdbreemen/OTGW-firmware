@@ -1514,6 +1514,9 @@
       "no": "No",
       "off": "Off",
       "on": "On",
+      "sat_age_min_one": "updated {{count}} min ago",
+      "sat_age_min_other": "updated {{count}} min ago",
+      "sat_age_now": "updated just now",
       "sat_beta_body": "We need field data to validate it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #alpha-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).",
       "sat_beta_head": "SAT is experimental in this beta and it controls your boiler.",
       "sat_big_at_target": "At target · idle",
@@ -6822,7 +6825,7 @@
   }
   var satMarkers = [];
   var satMarkersLoaded = false;
-  var satHist = { set: [], flow: [], room: [], out: [], pid: [] };
+  var satHist = { set: [], flow: [], curve: [], mod: [], flame: [], room: [], out: [], pid: [] };   // TASK-1885: flow = the boiler's actual flow
   var SAT_HIST_MAX = 720;               // ~1 h at the 5 s poll cadence
   var satDhwDirty = false;              // user dragging the DHW slider — defer status echo
   var satEnPending = false, satDhwEnPending = false, satDhwEnabledPending = false, satSimPending = false;  // in-flight POST guards
@@ -7179,6 +7182,8 @@
     txt('satFlowSet', satFmt(d.final_setpoint, 1, '°'));
     txt('satRoom', satFmt(d.room_temp, 1, '°'));
     satRenderRoomTrend(d);
+    satRenderAge('satOutAge', d.outside_temp_age_s);   // TASK-1885 (U8): how old the reading is, in plain minutes
+    satRenderAge('satRoomAge', d.room_temp_age_s);
     txt('satTargetT', satFmt(d.target_temp, 1, '°'));
     satRenderDhw(d);
     satRenderMaxTSet(d);
@@ -7270,13 +7275,26 @@
     });
   }
 
+  // TASK-1885: "updated N min ago" under a tile; hidden when the firmware knows no age (-1) or sends none (older firmware).
+  function satRenderAge(id, ageS) {
+    var el = document.getElementById(id); if (!el) return;
+    var a = satNum(ageS);
+    el.hidden = a === null || a < 0;
+    if (el.hidden) { el.textContent = ''; return; }
+    var m = Math.floor(a / 60);
+    el.textContent = m < 1 ? t('tools.sat_age_now') : t('tools.sat_age_min', { count: m });
+  }
+
   function satHistPush(d) {
     satHist.set.push(satNum(d.final_setpoint));
-    satHist.flow.push(satNum(d.heating_curve));
+    satHist.flow.push(satNum(d.flow_temp));
+    satHist.curve.push(satNum(d.heating_curve));
+    satHist.mod.push(satNum(d.current_modulation));
+    satHist.flame.push(d.flame_on == null ? null : (d.flame_on ? 1 : 0));
     satHist.room.push(satNum(d.room_temp));
     satHist.out.push(satNum(d.outside_temp));
     satHist.pid.push(satNum(d.pid_output));
-    ['set', 'flow', 'room', 'out', 'pid'].forEach(function (k) { if (satHist[k].length > SAT_HIST_MAX) satHist[k].shift(); });
+    ['set', 'flow', 'curve', 'mod', 'flame', 'room', 'out', 'pid'].forEach(function (k) { if (satHist[k].length > SAT_HIST_MAX) satHist[k].shift(); });
   }
 
   function satDrawHistory() {
@@ -7284,17 +7302,22 @@
     var accent = satCssVar('--accent'), hot = satCssVar('--hot'), ok = satCssVar('--zone-ok'),
       cold = satCssVar('--cold'), muted = satCssVar('--muted');
     // TASK-1841: the Monitor > Graph panel style. The SAT loop on its own scales: room and outside (what SAT
-    // controls on), the flow it asks (setpoint) and the heating curve, and the PID output (no unit shown).
-    drawPanelChart(svg, { n: satHist.flow.length, panels: [
+    // controls on), the flow it asks (setpoint) against the actual boiler flow with the heating curve dashed
+    // (TASK-1885), modulation and flame as in Mission control, and the PID output (no unit shown).
+    drawPanelChart(svg, { n: satHist.set.length, panels: [
       { title: t('tools.legend_room') + ' · ' + t('tools.legend_outside'), kind: 't', unit: '°C', h: 90,
         series: [{ vals: satHist.room, color: ok }, { vals: satHist.out, color: cold, dash: '6 4' }] },
-      { title: t('tools.legend_setpoint') + ' · ' + t('tools.legend_flow'), kind: 't', unit: '°C', h: 90,
-        series: [{ vals: satHist.set, color: accent }, { vals: satHist.flow, color: hot }] },
+      { title: t('tools.legend_setpoint') + ' · ' + t('tools.legend_flow') + ' · ' + t('h_mon.sat_curve_title'), kind: 't', unit: '°C', h: 90,
+        series: [{ vals: satHist.set, color: accent }, { vals: satHist.flow, color: hot }, { vals: satHist.curve, color: muted, dash: '5 4' }] },
+      { title: t('graph.series_mod'), kind: 'm', h: 50, series: [{ vals: satHist.mod, color: '#00bffe' }] },
+      { title: t('h_mon.graph_flame'), kind: 'l', series: [{ vals: satHist.flame, color: '#ff7b00' }] },
       { title: t('tools.legend_pid'), kind: 't', h: 60, series: [{ vals: satHist.pid, color: muted }] }
     ] });
     var lg = document.getElementById('satHistLegend');
     if (lg) lg.innerHTML =
       '<span><i style="background:' + accent + '"></i>' + esc(t('tools.legend_setpoint')) + '</span><span><i style="background:' + hot + '"></i>' + esc(t('tools.legend_flow')) + '</span>' +
+      '<span><i style="background:' + muted + '"></i>' + esc(t('h_mon.sat_curve_title')) + '</span>' +
+      '<span><i style="background:#00bffe"></i>' + esc(t('graph.series_mod')) + '</span><span><i style="background:#ff7b00"></i>' + esc(t('h_mon.graph_flame')) + '</span>' +
       '<span><i style="background:' + ok + '"></i>' + esc(t('tools.legend_room')) + '</span><span><i style="background:' + cold + '"></i>' + esc(t('tools.legend_outside')) + '</span>' +
       '<span><i style="background:' + muted + '"></i>' + esc(t('tools.legend_pid')) + '</span>';
   }
