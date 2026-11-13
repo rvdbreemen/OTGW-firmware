@@ -4,7 +4,7 @@ title: 'SAT diagnostics: heating-failure and no-ignition event (no control actio
 status: To Do
 assignee: []
 created_date: '2026-11-13T06:13:00Z'
-updated_date: '2026-11-13T06:24:00Z'
+updated_date: '2026-11-13T07:19:00Z'
 labels:
   - sat
   - diagnostics
@@ -33,4 +33,6 @@ Lesson 3 of docs/sat/vtherm-comparison-2026-11-13.md (TASK-1879). VTherm raises 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-13: UI follow-up U11 from the VTherm UI review added as an AC.
+
+2026-11-13 AC1 part 1, thresholds decided by Robert (Discord DM 1570699094622470167, his reply 'A' to the coordinator's thresholds question; relayed by the coordinator, the DM itself not read by comms): heating failure = SAT asks for high heat for 15 min and the room rises < 0.5 C; no ignition = PWM ON or CS above the cold cutoff without flame within 180 s. AC1 part 2 (whether such hours are excluded from the self-tune) still waits for Sergeant D: Q-1882a, queued in docs/sat/open-questions.md behind Q-PWM1.
 <!-- SECTION:NOTES:END -->
