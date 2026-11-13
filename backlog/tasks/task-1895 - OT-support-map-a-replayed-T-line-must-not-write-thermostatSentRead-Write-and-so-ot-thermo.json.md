@@ -3,11 +3,11 @@ id: TASK-1895
 title: >-
   OT support map: a replayed T line must not write thermostatSentRead/Write (and
   so /ot-thermo.json)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T09:44:00Z'
-updated_date: '2026-11-13T10:46:00Z'
+updated_date: '2026-11-13T16:06:00Z'
 labels:
   - otgw
   - simulation
@@ -28,7 +28,7 @@ Robert 2026-11-13: data from a simulation run must not stay in what the firmware
 - [x] #2 A real (not replayed) T line still sets the bits (regression check in the same test)
 - [x] #3 The boiler-side behaviour is unchanged (existing tests/test_boiler_support_bitmap_b_only.py green)
 - [x] #4 A v2 /ot-thermo.json is discarded once at boot, v3 is kept; /ot-boiler.json untouched (host test)
-- [ ] #5 Bench: one boot with an old v2 /ot-thermo.json on the unit; after boot the file is rewritten as v3 and /ot-boiler.json is unchanged
+- [x] #5 Bench: one boot with an old v2 /ot-thermo.json on the unit; after boot the file is rewritten as v3 and /ot-boiler.json is unchanged
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -38,3 +38,9 @@ Robert 2026-11-13: data from a simulation run must not stay in what the firmware
 
 Implemented in wt-connmap (uncommitted until the bump slot): OTGW-Core.ino fromThermostat = rsptype == OTGW_THERMOSTAT && !OTdata.bReplayed (comment updated); loadOtSupportFiles drops thermostat format 1 or 2 and loads only 3; writeOtThermoFile writes v3; header comment documents format 3. Evidence: tests/test_boiler_support_bitmap_b_only.py 10/10 (new: replayed T read/write leaves thermostatSentRead/Write and thermostatFileDirty unset; a real T after a replay still counts), old code fails the replay test; new tests/test_ot_thermo_file_v3.py 5/5 (real loadOtSupportFiles on an in-memory LittleFS: v2 dropped and marked for rewrite, v3 kept, v1 still dropped, /ot-boiler.json v3 read and not dirty; writer pinned to v3), old code fails 3/5. test_fs_update_keep OK. evaluate --quick 85 passed, 0 failed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in 2.0.0-beta.224 (5ddcc6543, post 1570832038179905578). AC1-3: OTGW-Core.ino fromThermostat also requires !OTdata.bReplayed; tests/test_boiler_support_bitmap_b_only.py 11/11 (replayed T read/write leaves thermostatSentRead/Write and thermostatFileDirty unset, a real T after a replay still counts, boiler side unchanged); the replay test fails on the old code. AC4: Robert's choice A (DM 1570749159060013087): thermostat file format 3; tests/test_ot_thermo_file_v3.py 5/5 on the real loadOtSupportFiles (v2 dropped and rewritten, v3 kept, v1 dropped, /ot-boiler.json untouched, writer v3), 3/5 fail on the old code. AC5: bench by 09 on .61 with a genuinely replay-polluted v2 /ot-thermo.json: after boot a clean v3 file, /ot-boiler.json byte-identical. Not seen: the 'starting fresh' telnet line itself (it prints before telnet connects). Follow-ups from the analysis (replayed MsgID 16 -> SATtargettemp, replayed banner -> iBoardMode, SAT sim saving PID/curve files, RAM-only slave config) are not part of this task.
+<!-- SECTION:FINAL_SUMMARY:END -->

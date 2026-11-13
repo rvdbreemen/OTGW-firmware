@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:13:00Z'
-updated_date: '2026-11-13T08:24:00Z'
+updated_date: '2026-11-13T16:06:00Z'
 labels:
   - sat
   - telemetry
@@ -26,10 +26,10 @@ Lesson 1 of docs/sat/vtherm-comparison-2026-11-13.md (TASK-1879). VTherm learns 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test reproduces a PWM ON phase without ignition and shows ignited=false with the commanded ON time; red on the old code (field absent), green on the fix
-- [ ] #2 REST /api/v2 and MQTT expose the per-phase record and counters; no control behaviour changes (existing SAT host tests unchanged and green)
+- [x] #1 Host test reproduces a PWM ON phase without ignition and shows ignited=false with the commanded ON time; red on the old code (field absent), green on the fix
+- [x] #2 REST /api/v2 and MQTT expose the per-phase record and counters; no control behaviour changes (existing SAT host tests unchanged and green)
 - [ ] #3 Bench run by otgw-bench-tester on a PIC and an OT-Direct unit shows the record matching the flame bit in a capture
-- [ ] #4 Web UI (U10): a PWM phase card in the Technical view shows commanded ON time, ignition delay and ignited yes/no for the last phases; webui test on a fixture payload
+- [x] #4 Web UI (U10): a PWM phase card in the Technical view shows commanded ON time, ignition delay and ignited yes/no for the last phases; webui test on a fixture payload
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -57,4 +57,8 @@ Order: code after the 220 post; build slot after 1885 (ba).
 Evidence: tests/test_sat_pwm_phase_telemetry.py 6/6 OK; old code red (block absent, ValueError at build_source); mutants caught: ignited-on-open (3 fail), flame-always (2 fail), no close sample (1 fail); CS-instead-of-flame-bit call-site mutant fails the pin. Full tests folder run sequentially in the foreground in chunks (a run_tests.py pass hit 590 s and a background run was reaped): every test OK incl. test_sat_lowload_contract (35 tests, 522 s), only change to existing tests is a no-op satPwmPhaseSample stub in test_sat_ot_loss.py and test_sat_restart_quiet.py (they cut the loop). evaluate --quick: 86 passed, 0 failed. Open: AC4 web UI card (separate commit), AC3 bench.
 
 AC4 (U10) on lane-1880, uncommitted: card 'PWM ON phases: asked vs done' in SAT > Technical (v2.html, satRenderPwmPhases in v2.js, design-system table.stats and kv-row only), strings in EN + nl/de/el packs (i18n-lang completeness gate green). tests/webui/sat-pwm-phases.test.mjs on a fixture payload: 5/5 pass, 0/5 on the old v2.js/v2.html. All 72 webui files run one by one: 3 fail on the base commit too (pic-flash-status picAfterFlash, graph-room-dropout, home-dial-sat-only; checked in a detached base worktree), not caused by this task; every other file passes when run alone.
+
+2026-11-13 shipped in 2.0.0-beta.224 (5ddcc6543, post 1570832038179905578). Bench by 09 on .61: SAT simulation only; 1 PWM ON phase recorded ignited, ended cut, consistent with the flame bit; REST, MQTT and HA entities present. NOT bench-tested: a phase that never lit, a phase that ends 'off', a PIC unit (.63) and a real boiler with a capture to compare. The never-lit and 'off' paths are covered only by the host test (tests/test_sat_pwm_phase_telemetry.py). AC3 stays open for that.
+
+09's question: cmd_on_s 3600 on a forced PWM entry. Intended. A PWM entry at a duty at or above the maximum is duty range 5 (continuous ON): satPwmBeginOn(flame, boilerTemp, maxMs, 0) with maxMs = 2 x period (SATcontrol.ino range 5, thermo-nova pwm.py:297 on_time_maximum_threshold = 2 x on_time_upper_threshold, pwm.py:55). With a 1800 s period (heat pump / hybrid default) that is 3600 s; with a gas boiler at 3 per hour it would be 2400 s. The record stores the ON time SAT asked at the start, so 3600 is the commanded value, not a bug.
 <!-- SECTION:NOTES:END -->
