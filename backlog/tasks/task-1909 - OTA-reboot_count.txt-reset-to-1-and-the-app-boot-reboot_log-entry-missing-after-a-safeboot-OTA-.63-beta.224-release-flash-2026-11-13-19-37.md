@@ -3,11 +3,11 @@ id: TASK-1909
 title: >-
   OTA: reboot_count.txt reset to 1 and the app-boot reboot_log entry missing
   after a safeboot OTA (.63, beta.224 release flash 2026-11-13 19:37)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T18:53:00Z'
-updated_date: '2026-11-13T23:22:00Z'
+updated_date: '2026-11-13T23:57:00Z'
 labels:
   - bug
   - ota
@@ -48,4 +48,18 @@ Correction to the previous note: on origin/dev all 5 tests of test_fs_upload_boo
 2026-11-13 window coverage (coordinator question): the loop-task FS refresh loopLittleFSStatus() runs only if !isFlashing() (OTGW-firmware.ino:1089); isFlashing() = bESPactive || bPICactive (OTGW-firmware.h:1071-1072), and bESPactive is set at the upload start (OTGW-ModUpdateServer-esp32.h:356, before LittleFS.end() at :387) and cleared only after the remount and restore (:507 end, :585 abort). So the loop task is out of the whole LittleFS.end()..remount window already. The gap was in callers outside the loop: setup() (the reboot writers, now before startWebserver()), checklittlefshash() on a telnet connect and getFilesystemHash() on async_tcp, now guarded by bFsImageWriting. After the rebase onto TASK-1899 (95: refreshLittleFSFileFlags() next to loopLittleFSStatus()), check that the new refresh sits behind the same isFlashing() gate or the flag. The gate test_fs_upload_boot_writes is static; the proof is the bench: 09 repro on the old build and on the fix, at least 3 tries each (race).
 
 2026-11-14: rebased (patch + reset + apply --3way, then ff) onto origin/dev 491aaeb7f, bumped beta.231. 95's TASK-1899 refreshLittleFSFileFlags() has one caller, loopLittleFSStatus() (helperStuff.ino:238), which is behind if (!isFlashing()) at OTGW-firmware.ino:1089: covered. setupFSexplorer()'s LittleFS.begin() runs in setup() before startWebserver(): no listener, no upload, no gap. Rerun on the rebased tree: test_fs_upload_boot_writes OK, fs_update_keep, rest_fs_flags_loop, rest_no_littlefs_on_async_tcp, health_no_fs_flash_ops, reboot tests, crashlog, uptime_boot_clock, sat_pid/preset_persist, hoisting, static_integrity, webserver_listener_retry all rc=0; evaluate.py --quick 85 PASS 0 FAIL.
+
+2026-11-14 00:36: build OK beta.231+b14cce8 (build.bat via Start-Process, 'Build completed successfully', zip githash = HEAD). FIX zip wt-ba-1909/build/OTGW-firmware-esp32-combo-2.0.0-beta.231+b14cce8-flash.zip sha256 056ee6c25cb1bb0a..., .elf alongside; OLD repro build OTGW-build-archive/2.0.0-beta.230+5a23184.zip. Bench brief sent to coordinator for 09 on .63: FS upload at first HTTP 200, telnet captured, >=3x old, >=3x fix.
+
+2026-11-14 bench (09 on .63, relayed by the coordinator; evidence in 09's scratchpad b1909/): OLD beta.230+5a23184 RED 3/3; telnet in old1 shows '[OTA] Flash start' at 00:40:10.145 and then setup()'s 'Reboot count = [0]' at 00:40:10.913, inside the FS write: the race from the root cause, captured. FIX beta.231+b14cce8 GREEN 3/3: count +2 and 2 new reboot_log lines every cycle (app OTA reboot + FS reboot), 0 'LittleFS Already Mounted', settings diff none. AC1 and AC3 ticked on 09's evidence (task file lives in this lane, so ticked here).
+
+Correction (coordinator, per CLAUDE.md: the bench-tester ticks bench ACs): AC1/AC3 unticked again and status In Review; 09 ticks AC1/AC3 on top of this commit on the evidence above, then Done.
+
+2026-11-14: pushed b14cce850 (beta.231) to origin/dev; posted in #alpha-testing, msg 1570950792754499636.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fix in beta.231 (b14cce850): an OTA filesystem upload that starts while setup() still runs no longer loses /reboot_count.txt or the app-boot line of /reboot_log.txt. AC1: 09 reproduced it on .63 with beta.230+5a23184, RED 3/3, telnet shows the FS write start (00:40:10.145) before setup() wrote the counter (00:40:10.913). AC2: root cause in notes: web server started before updateRebootCount/updateRebootLog (OTGW-firmware.ino), helpers mounted LittleFS mid-write (helperStuff.ino), _remountAfterFsWrite begin() a no-op on an existing mount (OTGW-ModUpdateServer-esp32.h). AC3: fix GREEN 3/3 on .63 (count +2, 2 log lines per cycle, no 'Already Mounted', settings unchanged); static gate tests/test_fs_upload_boot_writes.py red 5/5 on old, green 5/5 on fix; related tests rc=0; evaluate --quick 85 PASS 0 FAIL. Not verified: OT-Direct board (.61) and the release safeboot path end to end beyond this bench recipe.
+<!-- SECTION:FINAL_SUMMARY:END -->
