@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-13T08:27:00Z'
+updated_date: '2026-11-13T08:43:00Z'
 labels:
   - sat
   - simulation
 dependencies: []
-priority: low
+priority: medium
 ordinal: 959000
 ---
 
