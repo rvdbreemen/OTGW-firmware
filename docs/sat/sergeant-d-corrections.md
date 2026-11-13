@@ -6872,7 +6872,7 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 
 **Settled:** a tolerance band of +0.1 / -0.1 around the target for "the SAT climate entity".
 
-**Checked against the code:** the firmware has no setting or field named tolerance for SAT control; the only `tolerance` in the SAT sources is the MQTT publish-on-change tolerance (`SATmqttPublish.h:97`). thermo-nova has `DEADBAND = 0.1` (`const.py:16`), the PID deadband that the self-tune phases also use (ADR-228). "Hot tolerance" and "cold tolerance" are the names of the Home Assistant generic thermostat options; a Home Assistant MQTT climate entity has no such options. Not found in the code: where these two values should act.
+**Checked against the code:** the firmware has no setting or field named tolerance for SAT control; the only `tolerance` in the SAT sources is the MQTT publish-on-change tolerance (`SATmqttPublish.h:97`). thermo-nova has no `hot_tolerance` / `cold_tolerance` key or code at the pinned commit (recursive search of `custom_components/sat`, this session); it has `DEADBAND = 0.1` (`const.py:16`), the PID deadband that the self-tune phases also use (ADR-228). "Hot tolerance" and "cold tolerance" are the names of the Home Assistant generic thermostat options; a Home Assistant MQTT climate entity has no such options. Not found in the code: where these two values should act.
 
 **Interpretation (ours, not confirmed):** a hysteresis band for the heating demand of the SAT climate entity: heat when the room is 0.1 C or more below target, stop when it is 0.1 C or more above. This is put to him as a question before anything is built.
 
