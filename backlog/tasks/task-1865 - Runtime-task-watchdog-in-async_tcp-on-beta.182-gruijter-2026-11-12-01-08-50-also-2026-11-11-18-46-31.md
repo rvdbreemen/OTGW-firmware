@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:51:00Z'
-updated_date: '2026-11-13T15:47:00Z'
+updated_date: '2026-11-13T16:26:00Z'
 labels:
   - bug
   - crash
@@ -78,4 +78,6 @@ Published (95, 2026-11-12): pushed 22d269e0e..a7676dcc8 to dev; posted 2.0.0-bet
 2026-11-12 (comms): second field unit for confirming the fix: cmdr_langers (Ideal Logic 35, Wiser HubR, PIC 6.8) asked to run beta.218 with Nightly Restart off and send crashlog + reboot_log.txt on an unexpected restart (#english-support msg 1570571315977527407); see TASK-1544 note.
 
 2026-11-13 gruijter beta.218 capture (12 Nov 21:39 - 13 Nov 16:07, analysis #alpha-testing 1570826381443469447): three watchdog resets in 18.5 h. 04:00:54 task watchdog with core dump: async_tcp stuck in LittleFS.exists inside sendSimulationStatus (/api/v2/simulate, polled ~every 9 s) -> filed as TASK-1899 (also device/info restAPI.ino:3410). 08:38:18 and 11:59:07 "Other watchdog", no core dump (time not set), cause unknown. Free heap ~51 KB before each reset; hd_ipc0_stack_min 80 B (bench 152-232 B). The beta.217 health fix does not cover these endpoints.
+
+2026-11-13 double correlation (gruijter beta.218 capture, transcript, checked by comms; Sergeant D asked 1570834690892497138, answered 1570836136136417321): both "Other watchdog" resets without a core dump fell 14-17 s after a regular SAT PWM ON switch (08:38:04 duty 0.79 -> reset 08:38:18; 11:58:50 duty 0.22 -> reset 11:59:07; ticks mode=2 pwm=1) AND 1.5-13 s after a web UI /api/v2/simulate call (08:38:05.563, 11:59:05.572; polled every 15 s). No log lines between the switch and the reset. Not a proven cause either way; the bench should exercise both. See TASK-1899.
 <!-- SECTION:NOTES:END -->
