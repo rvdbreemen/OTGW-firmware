@@ -364,11 +364,17 @@
           <div class="sat-steps"><button class="stepbtn" id="satDown" aria-label="lower target" data-i18n-aria-label="h_mon.sat_lower">−</button><button class="stepbtn" id="satUp" aria-label="raise target" data-i18n-aria-label="h_mon.sat_raise">+</button></div>
         </div>
         <div class="sat-side">
-          <div class="sat-status-big" id="satStatusBig">—</div>
+          <div class="sat-status-row"><div class="sat-status-big" id="satStatusBig">—</div>
+            <button type="button" class="sat-msg-btn" id="satMsgBtn" hidden aria-expanded="false" aria-controls="satMsgs"><span class="sat-msg-ico" id="satMsgIco">i</span> <span id="satMsgCount">0</span></button></div>
+          <div class="sat-why" id="satWhy" hidden></div>
+          <!-- TASK-1884 U3: every active message in one panel; it opens by itself while a warning is active -->
+          <div class="sat-msgs" id="satMsgs" hidden>
           <div class="sat-hint" id="satRoomLost" hidden data-i18n="h_mon.sat_room_lost">Room temperature lost: heating on the curve only</div>
           <div class="sat-hint" id="satOtLost" hidden data-i18n="h_mon.sat_ot_lost">OpenTherm lost: boiler handed back</div>
           <div class="sat-hint" id="satOutsideMissing" hidden data-i18n="h_mon.sat_outside_missing">No outside temperature for 1 hour: boiler handed back</div>
           <div class="sat-hint" id="satPushRefused" hidden data-i18n="h_mon.sat_push_refused">The thermostat refuses the pushed setpoint (it keeps its own value).</div>
+          <div id="satMsgInfo"></div>
+          </div>
           <div class="sat-side-lbl" data-i18n="h_mon.sat_presets">Presets</div>
           <div class="sat-presets" id="satPresets"></div>
           <div class="sat-hint" data-i18n="h_mon.sat_presets_hint">Pick a preset or set the temperature — SAT works out the boiler.</div>
@@ -410,7 +416,7 @@
       <div class="sat-tiles4">
         <div class="sat-tile"><div class="l" data-i18n="h_mon.sat_tile_outside">Outside</div><div class="v" id="satOut">—</div></div>
         <div class="sat-tile"><div class="l"><span data-i18n="h_mon.sat_tile_setpoint">Boiler setpoint</span> <span class="tag" data-i18n="h_mon.sat_tile_setpoint_tag">SAT → boiler</span></div><div class="v hot" id="satFlowSet">—</div></div>
-        <div class="sat-tile"><div class="l" data-i18n="h_mon.sat_tile_room">Room</div><div class="v" id="satRoom">—</div></div>
+        <div class="sat-tile"><div class="l" data-i18n="h_mon.sat_tile_room">Room</div><div class="v"><span id="satRoom">—</span><span class="sat-trend" id="satRoomTrend"></span></div></div>
         <div class="sat-tile is-target"><div class="l" data-i18n="h_mon.sat_tile_target">Target</div><div class="v" id="satTargetT">—</div></div>
       </div>
       <div class="card sat-curve-hero"><h4><span data-i18n="h_mon.sat_curve_title">Heating curve</span> <span class="sub" id="satCurveLbl"></span></h4>
@@ -418,6 +424,7 @@
           <svg viewBox="0 0 600 300" id="satCurveBig"></svg>
           <div class="curve-side">
             <div class="curve-legend" id="satCurveLegend"></div>
+            <div class="sat-hint" id="satCurveRec"></div>
             <div class="marker-head"><span data-i18n="h_mon.sat_markers">Calibration markers</span> <span class="sub" data-i18n="h_mon.sat_markers_hint">click the curve to add</span></div>
             <ul class="marker-list" id="satMarkerList"></ul>
           </div>
@@ -442,6 +449,7 @@
         <div class="card"><h4 data-i18n="h_mon.sat_pid">PID controller</h4><div class="kv" id="satPidKv"></div></div>
         <div class="card"><h4 data-i18n="h_mon.sat_pwm">PWM &amp; cycle tracking</h4><div class="kv" id="satPwmKv"></div></div>
       </div>
+      <div class="card"><h4><span data-i18n="h_mon.sat_cycles24">Burner cycles</span> <span class="sub" data-i18n="h_mon.sat_cycles24_sub">last 24 h</span></h4><div class="kv" id="satCycles24Kv"></div></div>
       <div class="sat-row2 sat-row-2up">
         <div class="card"><h4 data-i18n="h_mon.sat_smart">Smart features</h4><div class="kv" id="satSmartKv"></div></div>
         <div class="card"><h4 data-i18n="h_mon.sat_ext">External sensors</h4><div class="kv" id="satExtKv"></div></div>

@@ -494,7 +494,9 @@
     "val_th_change": "Laatste wijziging",
     "val_th_name": "Naam",
     "val_th_unit": "Eenheid",
-    "val_th_value": "Waarde"
+    "val_th_value": "Waarde",
+    "sat_cycles24": "Branderstarts",
+    "sat_cycles24_sub": "laatste 24 uur"
   },
   "h_set": {
     "discard": "Verwerpen",
@@ -1462,7 +1464,27 @@
     "sat_system_underfloor": "vloerverwarming",
     "sat_takeover": "Overgenomen (MQTT weg)",
     "send_failed": "Versturen mislukt",
-    "yes": "Ja"
+    "yes": "Ja",
+    "sat_fb_reason_none": "Geen",
+    "sat_fb_reason_thermostat_lost": "Thermostaat weggevallen",
+    "sat_fb_reason_mqtt_lost": "MQTT langer dan 5 minuten weg",
+    "sat_why_takeover": "SAT heeft de ketel overgenomen: {{reason}}.",
+    "sat_why_pwm_no_reply": "Nog geen aan/uit-regeling (PWM): de ketel heeft de configuratievraag (MsgID 3) nog niet beantwoord.",
+    "sat_why_pwm_denied": "Geen aan/uit-regeling (PWM): de ketel meldt dat hij dit niet toestaat (MsgID 3 bit 4).",
+    "sat_why_mod_suppressed": "Aan/uit-regeling: de modulatie wordt in deze branderfase laag gehouden.",
+    "sat_why_dhw": "Er wordt warm tapwater gemaakt: de ruimteverwarming wacht.",
+    "sat_why_valves_closed": "Alle radiatorkranen zijn dicht: SAT start de verwarming niet.",
+    "sat_msgs_aria": "Meldingen: {{count}}",
+    "sat_trend_rate": "{{rate}} °C per uur",
+    "sat_curve_rec_insufficient": "Stooklijnadvies: nog te weinig gegevens (minstens 6 uur regelen).",
+    "sat_curve_rec_increase": "Stooklijnadvies: de kamer bleef gemiddeld onder de doeltemperatuur; een hogere stooklijn kan helpen.",
+    "sat_curve_rec_decrease": "Stooklijnadvies: de kamer bleef gemiddeld boven de doeltemperatuur; een lagere stooklijn kan helpen.",
+    "sat_curve_rec_hold": "Stooklijnadvies: de stooklijn past; zo laten.",
+    "kv_24h_cycles": "Cycli",
+    "kv_24h_duty": "Brander aan (inschakelduur)",
+    "kv_24h_overshoot": "Cycli met doorschieten",
+    "kv_24h_underheat": "Cycli met te weinig warmte",
+    "kv_24h_long": "Lange cycli"
   },
   "values": {
     "save_failed_http": "Opslaan mislukt (HTTP {{status}})",

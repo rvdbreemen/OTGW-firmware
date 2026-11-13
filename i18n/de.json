@@ -494,7 +494,9 @@
     "val_th_change": "Letzte Änderung",
     "val_th_name": "Name",
     "val_th_unit": "Einheit",
-    "val_th_value": "Wert"
+    "val_th_value": "Wert",
+    "sat_cycles24": "Brennertakte",
+    "sat_cycles24_sub": "letzte 24 h"
   },
   "h_set": {
     "discard": "Verwerfen",
@@ -1462,7 +1464,27 @@
     "sat_system_underfloor": "Fußbodenheizung",
     "sat_takeover": "Übernahme (MQTT ausgefallen)",
     "send_failed": "Senden fehlgeschlagen",
-    "yes": "Ja"
+    "yes": "Ja",
+    "sat_fb_reason_none": "Keiner",
+    "sat_fb_reason_thermostat_lost": "Thermostat verloren",
+    "sat_fb_reason_mqtt_lost": "MQTT länger als 5 Minuten ausgefallen",
+    "sat_why_takeover": "SAT hat den Kessel übernommen: {{reason}}.",
+    "sat_why_pwm_no_reply": "Noch kein Ein/Aus-Takten (PWM): Der Kessel hat die Konfigurationsabfrage (MsgID 3) noch nicht beantwortet.",
+    "sat_why_pwm_denied": "Kein Ein/Aus-Takten (PWM): Der Kessel meldet, dass er es nicht erlaubt (MsgID 3 Bit 4).",
+    "sat_why_mod_suppressed": "Ein/Aus-Takten: Die Modulation wird in dieser Brennerphase niedrig gehalten.",
+    "sat_why_dhw": "Warmwasser wird bereitet: Die Raumheizung wartet.",
+    "sat_why_valves_closed": "Alle Heizkörperventile sind zu: SAT startet die Heizung nicht.",
+    "sat_msgs_aria": "Meldungen: {{count}}",
+    "sat_trend_rate": "{{rate}} °C pro Stunde",
+    "sat_curve_rec_insufficient": "Heizkurven-Empfehlung: noch zu wenig Daten (mindestens 6 Stunden Regelung).",
+    "sat_curve_rec_increase": "Heizkurven-Empfehlung: Der Raum lag im Mittel unter dem Sollwert; eine höhere Heizkurve kann helfen.",
+    "sat_curve_rec_decrease": "Heizkurven-Empfehlung: Der Raum lag im Mittel über dem Sollwert; eine niedrigere Heizkurve kann helfen.",
+    "sat_curve_rec_hold": "Heizkurven-Empfehlung: Die Heizkurve passt; beibehalten.",
+    "kv_24h_cycles": "Takte",
+    "kv_24h_duty": "Brenner an (Einschaltdauer)",
+    "kv_24h_overshoot": "Takte mit Überschwingen",
+    "kv_24h_underheat": "Takte mit zu wenig Wärme",
+    "kv_24h_long": "Lange Takte"
   },
   "values": {
     "save_failed_http": "Speichern fehlgeschlagen (HTTP {{status}})",

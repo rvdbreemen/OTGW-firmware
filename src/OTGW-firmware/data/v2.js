@@ -558,6 +558,8 @@
       "sat_presets": "Presets",
       "sat_presets_hint": "Pick a preset or set the temperature — SAT works out the boiler.",
       "sat_push_refused": "The thermostat refuses the pushed setpoint (it keeps its own value).",
+      "sat_cycles24": "Burner cycles",
+      "sat_cycles24_sub": "last 24 h",
       "sat_pwm": "PWM & cycle tracking",
       "sat_raise": "raise target",
       "sat_rerun_setup": "Re-run setup",
@@ -1450,6 +1452,26 @@
       "kv_external": "External",
       "kv_fallback_active": "Fallback active",
       "kv_fallback_reason": "Fallback reason",
+      "sat_fb_reason_none": "None",
+      "sat_fb_reason_thermostat_lost": "Thermostat lost",
+      "sat_fb_reason_mqtt_lost": "MQTT lost for more than 5 minutes",
+      "sat_why_takeover": "SAT took over the boiler: {{reason}}.",
+      "sat_why_pwm_no_reply": "No on/off cycling (PWM) yet: the boiler has not answered the configuration request (MsgID 3).",
+      "sat_why_pwm_denied": "No on/off cycling (PWM): the boiler reports that it does not allow it (MsgID 3 bit 4).",
+      "sat_why_mod_suppressed": "On/off cycling: modulation is held low during this burner phase.",
+      "sat_why_dhw": "Hot water is running: room heating waits.",
+      "sat_why_valves_closed": "All radiator valves are closed: SAT does not start heating.",
+      "sat_msgs_aria": "Messages: {{count}}",
+      "sat_trend_rate": "{{rate}} °C per hour",
+      "sat_curve_rec_insufficient": "Curve advice: not enough data yet (at least 6 hours of control).",
+      "sat_curve_rec_increase": "Curve advice: the room stayed below target on average; a higher curve may help.",
+      "sat_curve_rec_decrease": "Curve advice: the room stayed above target on average; a lower curve may help.",
+      "sat_curve_rec_hold": "Curve advice: the curve fits; keep it.",
+      "kv_24h_cycles": "Cycles",
+      "kv_24h_duty": "Burner on (duty)",
+      "kv_24h_overshoot": "Overshoot cycles",
+      "kv_24h_underheat": "Underheat cycles",
+      "kv_24h_long": "Long cycles",
       "kv_fetch_errors": "Fetch errors",
       "kv_humidity": "Humidity",
       "kv_i_term": "I term",
@@ -7039,6 +7061,85 @@
     });
   }
 
+  // TASK-1884 U1: fallback_reason enum (SATtypes.h SATFallbackReason) as text.
+  var SAT_FB_REASONS = ['none', 'thermostat_lost', 'mqtt_lost'];
+  function satFbReasonText(r) {
+    var k = SAT_FB_REASONS[r | 0];
+    return k ? t('tools.sat_fb_reason_' + k) : String(r);
+  }
+  // TASK-1884 U2: the reasons the page can explain from sat/status, highest priority first.
+  // Each says what the gateway does now. pwm_veto_reason is the last refusal and stays set, so the
+  // live MsgID 3 flags decide whether PWM is refused now.
+  function satWhyReasons(d) {
+    var out = [];
+    if (d.fallback_active) out.push({ text: t('tools.sat_why_takeover', { reason: satFbReasonText(d.fallback_reason) }), warn: true });
+    var veto = d.pwm_veto_reason | 0;
+    if (veto === 1 && d.slave_cfg_valid === false) out.push({ text: t('tools.sat_why_pwm_no_reply') });
+    else if (veto === 2 && d.slave_low_off_denied) out.push({ text: t('tools.sat_why_pwm_denied') });
+    if (d.mod_suppressed) out.push({ text: t('tools.sat_why_mod_suppressed') });
+    if (d.dhw_active) out.push({ text: t('tools.sat_why_dhw') });
+    if (d.valves_open === false) out.push({ text: t('tools.sat_why_valves_closed') });
+    return out;
+  }
+  var satMsgUserOpen = false;   // the user's choice on the messages button; a warning opens the panel anyway
+  // TASK-1884 U2+U3: the why-line shows the first reason; the panel lists every active message
+  // (the four hint lines plus the reasons). It opens by itself while a warning is active.
+  function satRenderMessages(d, enabled) {
+    var reasons = enabled ? satWhyReasons(d) : [];
+    var why = document.getElementById('satWhy');
+    if (why) { why.textContent = reasons.length ? reasons[0].text : ''; why.hidden = !reasons.length; }
+    var info = document.getElementById('satMsgInfo');
+    if (info) {
+      info.textContent = '';
+      reasons.forEach(function (r) {
+        var e = document.createElement('div'); e.className = 'sat-hint' + (r.warn ? ' warn' : ''); e.textContent = r.text;
+        info.appendChild(e);
+      });
+    }
+    var warns = 0, count = reasons.length;
+    ['satRoomLost', 'satOtLost', 'satOutsideMissing', 'satPushRefused'].forEach(function (id) {
+      var e = document.getElementById(id); if (e && !e.hidden) { warns++; count++; }
+    });
+    reasons.forEach(function (r) { if (r.warn) warns++; });
+    var open = count > 0 && (warns > 0 || satMsgUserOpen);
+    var panel = document.getElementById('satMsgs'); if (panel) panel.hidden = !open;
+    var btn = document.getElementById('satMsgBtn');
+    if (btn) {
+      btn.hidden = !count;
+      btn.className = 'sat-msg-btn' + (warns ? ' warn' : '');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      btn.setAttribute('aria-label', t('tools.sat_msgs_aria', { count: count }));
+      txt('satMsgIco', warns ? '!' : 'i');
+      txt('satMsgCount', String(count));
+    }
+  }
+  // TASK-1884 U4: room trend from indoor_rise_rate (°C/h, EMA). The firmware computes it only while
+  // solar-gain detection is on and sends 0 otherwise, so a small value shows no arrow.
+  function satRenderRoomTrend(d) {
+    var e = document.getElementById('satRoomTrend'); if (!e) return;
+    var r = satNum(d.indoor_rise_rate), room = satNum(d.room_temp);
+    var arrow = (r === null || room === null) ? '' : (r >= 0.2 ? '↑' : (r <= -0.2 ? '↓' : ''));
+    e.textContent = arrow;
+    e.title = arrow ? t('tools.sat_trend_rate', { rate: (r > 0 ? '+' : '') + r.toFixed(1) }) : '';
+  }
+  // TASK-1884 U5: curve_recommendation (hourly mean room error against twice the PID deadband).
+  var SAT_CURVE_RECS = { insufficient: 1, increase: 1, decrease: 1, hold: 1 };
+  function satRenderCurveRec(d) {
+    var r = d.curve_recommendation;
+    txt('satCurveRec', SAT_CURVE_RECS[r] ? t('tools.sat_curve_rec_' + r) : '');
+  }
+  // TASK-1884 U6: the 24 h cycle statistics.
+  function satPct(v) { var n = satNum(v); return n === null ? '—' : Math.round(n * 100) + ' %'; }
+  function satRenderCycles24(d) {
+    satKv('satCycles24Kv', [
+      [t('tools.kv_24h_cycles'), d['24h_cycles'] != null ? String(d['24h_cycles']) : '—'],
+      [t('tools.kv_24h_duty'), satPct(d['24h_duty_ratio'])],
+      [t('tools.kv_24h_overshoot'), satPct(d['24h_overshoot_fraction'])],
+      [t('tools.kv_24h_underheat'), satPct(d['24h_underheat_fraction'])],
+      [t('tools.kv_24h_long'), satPct(d['24h_long_cycle_fraction'])]
+    ]);
+  }
+
   function renderSatPage(d) {
     // `active` means the SAT control loop is engaged; it does NOT mean the burner is
     // running. Deriving "heating" from it made the pill read Heating with a cold boiler.
@@ -7069,6 +7170,7 @@
     sat.roomLost = !!(userEnabled && d.room_temp_lost);   // TASK-1546: the graph reads it
     var ol = document.getElementById('satOtLost'); if (ol) ol.hidden = !(enabled && d.ot_link_lost);
     var om = document.getElementById('satOutsideMissing'); if (om) om.hidden = !(enabled && d.outside_temp_missing);
+    satRenderMessages(d, enabled);
     satRenderPresets(d);
 
     // L2 — history + tiles + dhw + burner cycle + curve + control status
@@ -7076,12 +7178,14 @@
     txt('satOut', satFmt(d.outside_temp, 1, '°'));
     txt('satFlowSet', satFmt(d.final_setpoint, 1, '°'));
     txt('satRoom', satFmt(d.room_temp, 1, '°'));
+    satRenderRoomTrend(d);
     txt('satTargetT', satFmt(d.target_temp, 1, '°'));
     satRenderDhw(d);
     satRenderMaxTSet(d);
     satRenderMaxMod(d);
     satRenderCycle(d);
     satDrawCurve(d);
+    satRenderCurveRec(d);
     satKv('satControlStatus', [
       [t('tools.kv_control_mode'), satLbl('sat_mode', SAT_MODE_LABELS[d.control_mode | 0])],
       [t('tools.kv_boiler_status'), (SAT_BOILER_LABELS[d.boiler_status] ? satLbl('sat_boiler', d.boiler_status) : '—')],
@@ -7096,6 +7200,7 @@
 
     // L3 — health + PID + PWM/cycle + smart + external + simulation + raw JSON
     satRenderHealth(d);
+    satRenderCycles24(d);
     satKv('satPidKv', [
       [t('tools.kv_p_term'), satFmt(d.pid_p, 2)], [t('tools.kv_i_term'), satFmt(d.pid_i, 2)], [t('tools.kv_d_term'), satFmt(d.pid_d, 2)],
       ['Kp', satFmt(d.kp, 4)], ['Ki', satFmt(d.ki, 4)], ['Kd', satFmt(d.kd, 4)],
@@ -7255,7 +7360,7 @@
       [t('tools.kv_sim_modulation'), on && d.sim_modulation != null ? d.sim_modulation + ' %' : '—'],
       [t('tools.kv_last_blocked_cmd'), (on && d.last_blocked_cmd) ? (d.last_blocked_cmd_age_ms != null ? t('tools.sat_blocked_cmd_ago', { cmd: d.last_blocked_cmd, seconds: Math.round(d.last_blocked_cmd_age_ms / 1000) }) : d.last_blocked_cmd) : '—'],
       [t('tools.kv_fallback_active'), d.fallback_active ? t('tools.yes') : t('tools.no')],
-      [t('tools.kv_fallback_reason'), d.fallback_reason != null ? String(d.fallback_reason) : '—']
+      [t('tools.kv_fallback_reason'), d.fallback_reason != null ? satFbReasonText(d.fallback_reason) : '—']
     ]);
   }
 
@@ -7392,6 +7497,11 @@
 
   // Wire the SAT page controls once (elements exist at load; the page is just hidden).
   function wireSat() {
+    var msgBtn = document.getElementById('satMsgBtn');
+    if (msgBtn) msgBtn.addEventListener('click', function () {
+      satMsgUserOpen = !satMsgUserOpen;
+      if (satLastData) renderSatPage(satLastData);
+    });
     document.querySelectorAll('.satview-btn').forEach(function (b) {
       b.addEventListener('click', function () { satShowView(b.dataset.sv); });
     });
