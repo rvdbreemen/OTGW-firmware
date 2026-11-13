@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:51:00Z'
-updated_date: '2026-11-12T22:50:00Z'
+updated_date: '2026-11-13T15:47:00Z'
 labels:
   - bug
   - crash
@@ -76,4 +76,6 @@ Published (95, 2026-11-12): pushed 22d269e0e..a7676dcc8 to dev; posted 2.0.0-bet
 2026-11-12 gruijter capture on beta.214+5d03c17 (before the 217 fix): two Task-watchdog resets, 14:06:20 (Reboots 99, transcript banner line 73267) and 17:58:20 (Reboots 100, line 216013); no backtrace in the capture, core dump HTTP 503, crashlog/reboot_log not in the upload; heap just before was healthy (14:05:50 51972 free / 29684 maxblk; 17:58:00 51860 / 31732), WS/MQTT drops 0. The capture cannot show whether these took the health/LittleFS path. gruijter asked to update to 218 and send /api/v2/device/crashlog + reboot_log.txt on a new reset. Source https://discord.com/channels/812969634638725140/1514720723980259460/1570542193934860348
 
 2026-11-12 (comms): second field unit for confirming the fix: cmdr_langers (Ideal Logic 35, Wiser HubR, PIC 6.8) asked to run beta.218 with Nightly Restart off and send crashlog + reboot_log.txt on an unexpected restart (#english-support msg 1570571315977527407); see TASK-1544 note.
+
+2026-11-13 gruijter beta.218 capture (12 Nov 21:39 - 13 Nov 16:07, analysis #alpha-testing 1570826381443469447): three watchdog resets in 18.5 h. 04:00:54 task watchdog with core dump: async_tcp stuck in LittleFS.exists inside sendSimulationStatus (/api/v2/simulate, polled ~every 9 s) -> filed as TASK-1899 (also device/info restAPI.ino:3410). 08:38:18 and 11:59:07 "Other watchdog", no core dump (time not set), cause unknown. Free heap ~51 KB before each reset; hd_ipc0_stack_min 80 B (bench 152-232 B). The beta.217 health fix does not cover these endpoints.
 <!-- SECTION:NOTES:END -->
