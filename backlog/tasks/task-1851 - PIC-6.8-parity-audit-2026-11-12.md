@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T00:08:00Z'
-updated_date: '2026-11-13T18:39:00Z'
+updated_date: '2026-11-13T18:52:00Z'
 labels:
   - otdirect
   - parity
@@ -49,4 +49,6 @@ Successor of the 6.6 audit (TASK-1795, docs/reviews/2026-11-11_otdirect-pic-pari
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-13 delta parity check (TASK-1851, comms, read-only, OT-Direct at origin/dev 479e49391 vs PIC 6.8 gateway.asm; G=gateway.asm, O=OTDirect.ino): Commits since the audited fa5790118: matches PIC: c76efbe01 (1832), 1d4b8fdac (1831), 60c0fbc50 (1833), a9df4868f (1840), 9aa81609c (1846), 2216ea923 (1855), 8f6924552 (1842), 60762c994 (1844); partial: e7fbf7bf5 (1845, misses Data-Invalid, new task pending), c4067636a (1835), af1fdb740 (1839, real GW= change still wipes all state O:2920-2921), 20d61556e (1836, wiped on the auto-detect master path, see 1760); intentional deviation: 47f9edd84 (1860, PR=X answers X=6.8, PIC answers BV G:2187). Open children: 1834 still valid (CS/C2 expire at 60 s O:518 vs SC 63.5 s O:525; one PIC timer G:1623-1646); 1839 AC2/AC3 still valid; 1847 still valid (PM= refuses IDs >127, no TSP/string entries O:3916-3935; uint8_t atoi makes PM=300 -> 44); 1848 still valid (P,R,B,C,L O:3795-3820, :623); 1849 partly fixed; 1850 still valid (disconnect only logs, O:3003-3010). Also still valid: 1750 (OH default 0, O:621), 1859 (floatToF88 truncates/clamps, O:503-507), 1861. Untracked from REVIEW: N11 thermostat's own MsgID 99 (G:3253-3271) has no task. Two new gaps verified by comms in both sources: C1 boiler Data-Invalid to MsgID 99 does not start the spoofed DHW push (PIC: Data-Invalid nop falls into ID99Unknown G:3227-3230; O: otdPushOnBoiler99 only called in the success branch O:1865, Data-Invalid branch O:1875-1877, type 6 dropped O:2687) and C2 SC= accepts times/days the PIC refuses (PIC G:4331-4370: hours>23 OR, minutes>59 OR, missing :/ SE, day 0 or >7 BV, trailing chars SE; O:3492 siscanf>=2, masks O:3494). Filing C1/C2 waits until TASK-1905 (main tree) is on origin, to avoid a task-id collision.
+
+2026-11-13 filed from the delta check: TASK-1906 (N11 orphan, thermostat's own MsgID 99), TASK-1907 (C1, boiler Data-Invalid to MsgID 99 does not start the spoofed DHW push), TASK-1908 (C2, SC= accepts times/days the PIC refuses).
 <!-- SECTION:NOTES:END -->
