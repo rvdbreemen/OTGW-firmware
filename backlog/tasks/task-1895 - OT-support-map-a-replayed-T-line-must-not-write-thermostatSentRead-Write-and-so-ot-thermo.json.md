@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T09:44:00Z'
-updated_date: '2026-11-13T16:06:00Z'
+updated_date: '2026-11-13T20:50:00Z'
 labels:
   - otgw
   - simulation
@@ -37,6 +37,8 @@ Robert 2026-11-13: data from a simulation run must not stay in what the firmware
 2026-11-13 Robert chose A (DM 1570749159060013087, reply to the v3 question relayed by the coordinator): bump the thermostat file format to v3, so a v2 /ot-thermo.json is dropped once at the first boot on the new firmware and relearned from live frames; /ot-boiler.json stays. Ships in d3's combined build with TASK-1880 and TASK-1893.
 
 Implemented in wt-connmap (uncommitted until the bump slot): OTGW-Core.ino fromThermostat = rsptype == OTGW_THERMOSTAT && !OTdata.bReplayed (comment updated); loadOtSupportFiles drops thermostat format 1 or 2 and loads only 3; writeOtThermoFile writes v3; header comment documents format 3. Evidence: tests/test_boiler_support_bitmap_b_only.py 10/10 (new: replayed T read/write leaves thermostatSentRead/Write and thermostatFileDirty unset; a real T after a replay still counts), old code fails the replay test; new tests/test_ot_thermo_file_v3.py 5/5 (real loadOtSupportFiles on an in-memory LittleFS: v2 dropped and marked for rewrite, v3 kept, v1 still dropped, /ot-boiler.json v3 read and not dirty; writer pinned to v3), old code fails 3/5. test_fs_update_keep OK. evaluate --quick 85 passed, 0 failed.
+
+2026-11-13 follow-up (found by 95): test/host/test_ot_support_migration.py still expected thermostat format 2 (M5 rewrite to v2, M6 'v2 loads', mutants on the v2 check). Updated test-only: M5 v1 -> rewritten as v3; M6 v2 -> not loaded, rewritten as v3 (TASK-1895); new M7 v3 loads; MX3/MX4 (boiler) anchored with the next line because the thermostat loader checks "v":3 too; MX5 on the v3 check, MX6 writer writes 2 (fails C2/M5/M6), new MX7 v2 loads again (fails M6). Evidence: working tree PASS; --old-rev 8442aaa1c^ RESULT: PASS (OLD exits 1, defect and control cases as listed, all 7 mutants fail exactly their cases); the old test file on current dev exits 1 (M5, M6 FAIL); the new test against the pre-1895 core (5ddcc6543^) fails M5, M6, M7. Also test/host/test_dhw_water_meter.py: passes when given > 300 s (RESULT: PASS, exit 0); the full-run timeout was the runner, not the test.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

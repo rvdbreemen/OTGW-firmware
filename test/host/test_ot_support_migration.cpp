@@ -119,6 +119,8 @@ static const char* kThermoV1 = "{\"v\":1,\"device\":\"thermostat\",\"sr\":[0,25]
 // The same verdicts in format 2 (boiler: TASK-1185 up to TASK-1391; thermostat: TASK-1612 on).
 static const char* kBoilerV2 = "{\"v\":2,\"device\":\"boiler\",\"ar\":[3,26],\"aw\":[1],\"ur\":[27],\"uw\":[71]}\n";
 static const char* kThermoV2 = "{\"v\":2,\"device\":\"thermostat\",\"sr\":[0,25],\"sw\":[1]}\n";
+// Thermostat format 3 (TASK-1895): format 2 also counted replayed T lines, so it is dropped once at boot.
+static const char* kThermoV3 = "{\"v\":3,\"device\":\"thermostat\",\"sr\":[0,25],\"sw\":[1]}\n";
 
 static void resetRam() {
   memset(boilerLastMasterWasWrite, 0, sizeof(boilerLastMasterWasWrite));
@@ -230,21 +232,38 @@ int main(int argc, char** argv) {
     const bool dirty = thermostatFileDirty;
     saveOtSupportFilesIfDirty();
     const std::string f = LittleFS.files.count(kThermo) ? LittleFS.files[kThermo] : "";
-    const bool v2 = f.rfind("{\"v\":2,\"device\":\"thermostat\"", 0) == 0;
+    const bool v3 = f.rfind("{\"v\":3,\"device\":\"thermostat\"", 0) == 0;
     const bool empty = f.find("\"sr\":[]") != std::string::npos && f.find("\"sw\":[]") != std::string::npos;
     snprintf(got, sizeof got, "thermostat bits loaded=%d, thermostatFileDirty=%d, file after the save: %s", loaded,
              (int)dirty, oneLine(f).c_str());
-    finish("M5", "a format-1 thermostat file is not loaded and is rewritten as format 2 with empty arrays",
-           loaded == 0 && dirty && v2 && empty, got);
+    finish("M5", "a format-1 thermostat file is not loaded and is rewritten as format 3 with empty arrays",
+           loaded == 0 && dirty && v3 && empty, got);
+  }
+
+  // TASK-1895: format 2 also counted replayed T lines (OTGW simulation) as thermostat requests.
+  resetAll();
+  LittleFS.files[kThermo] = kThermoV2;
+  loadOtSupportFiles();
+  {
+    const int loaded = bits(thermostatSentRead) + bits(thermostatSentWrite);
+    const bool dirty = thermostatFileDirty;
+    saveOtSupportFilesIfDirty();
+    const std::string f = LittleFS.files.count(kThermo) ? LittleFS.files[kThermo] : "";
+    const bool v3 = f.rfind("{\"v\":3,\"device\":\"thermostat\"", 0) == 0;
+    const bool empty = f.find("\"sr\":[]") != std::string::npos && f.find("\"sw\":[]") != std::string::npos;
+    snprintf(got, sizeof got, "thermostat bits loaded=%d, thermostatFileDirty=%d, file after the save: %s", loaded,
+             (int)dirty, oneLine(f).c_str());
+    finish("M6", "a format-2 thermostat file is not loaded and is rewritten as format 3 with empty arrays",
+           loaded == 0 && dirty && v3 && empty, got);
   }
 
   resetAll();
-  LittleFS.files[kThermo] = kThermoV2;
+  LittleFS.files[kThermo] = kThermoV3;
   loadOtSupportFiles();
   snprintf(got, sizeof got, "thermostat sent read 0/25=%d/%d, write 1=%d, thermostatFileDirty=%d",
            (int)isThermostatMsgIdSentRead(0), (int)isThermostatMsgIdSentRead(25), (int)isThermostatMsgIdSentWrite(1),
            (int)thermostatFileDirty);
-  finish("M6", "a format-2 thermostat file loads: sent read 0 and 25, sent write 1",
+  finish("M7", "a format-3 thermostat file loads: sent read 0 and 25, sent write 1",
          isThermostatMsgIdSentRead(0) && isThermostatMsgIdSentRead(25) && isThermostatMsgIdSentWrite(1) &&
          !thermostatFileDirty, got);
 

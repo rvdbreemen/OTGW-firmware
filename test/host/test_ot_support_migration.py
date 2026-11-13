@@ -2,7 +2,8 @@
 """TASK-1185 / TASK-1660 host harness: do older /ot-boiler.json (formats 1 and 2) and
 /ot-thermo.json (format 1) files, written by builds that counted gateway-made frames as
 boiler or thermostat evidence, stay out of RAM and get replaced by the current formats
-(boiler 3 since TASK-1391, thermostat 2 since TASK-1612)?
+(boiler 3 since TASK-1391, thermostat 3 since TASK-1895; thermostat format 2 also
+counted replayed T lines and is dropped too)?
 
     python test/host/test_ot_support_migration.py                        # working tree only
     python test/host/test_ot_support_migration.py --old-rev 8442aaa1c^   # OLD vs FIX, with mutants
@@ -30,30 +31,36 @@ SLICES = [
     (CORE, r"^static bool fileFindToken\(File &f, const char \*target\)", r"^void saveOtSupportFilesIfDirty\(\)"),
 ]
 # OLD is the build before TASK-1391 (boiler format 2, thermostat format 1); FIX is the
-# working tree (boiler format 3, thermostat format 2). See the .cpp for each case.
-DEFECT = {"M2": "F", "M3": "R", "M4": "RF", "M5": "R", "M6": "R"}
+# working tree (boiler format 3, thermostat format 3). See the .cpp for each case.
+DEFECT = {"M2": "F", "M3": "R", "M4": "RF", "M5": "R", "M6": "", "M7": "R"}   # M6: the v2 thermostat file differs, not a dumped part
 CONTROL = {"M1": "", "C1": "F", "C2": "", "C3": "", "C4": ""}   # C1: FIX writes format 3, OLD format 2
 PARTS = ["R", "D", "F"]
+BOILER_NEXT = '\n      readBitmapArrayFromJson(f, F("\\"ar\\":["), boilerAckedRead);'
 
 MUTANTS = [
     ("MX1", "the load does not mark a migrated boiler file for rewrite",
      [("boilerFileDirty     = boilerMigrated;", "boilerFileDirty     = false;")], ["M1", "M2", "M4"]),
     ("MX2", "the boiler writer still writes format 2",
      [(r'{\"v\":3,\"device\":\"boiler\"', r'{\"v\":2,\"device\":\"boiler\"')], ["C1", "M2", "M4"]),
+    # The thermostat loader checks "v":3 too since TASK-1895: the next line tells the boiler check apart.
     ("MX3", "a format-1 boiler file loads again",
-     [(r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr) {',
-       r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr || strstr_P(header, PSTR("\"v\":1")) != nullptr) {')],
+     [(r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr) {' + BOILER_NEXT,
+       r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr || strstr_P(header, PSTR("\"v\":1")) != nullptr) {' + BOILER_NEXT)],
      ["M1", "M2"]),
     ("MX4", "a format-2 boiler file loads again",
-     [(r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr) {',
-       r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr || strstr_P(header, PSTR("\"v\":2")) != nullptr) {')],
+     [(r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr) {' + BOILER_NEXT,
+       r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr || strstr_P(header, PSTR("\"v\":2")) != nullptr) {' + BOILER_NEXT)],
      ["M4"]),
     ("MX5", "a format-1 thermostat file loads again",
-     [(r'if (strstr_P(header, PSTR("\"v\":2")) != nullptr) {',
-       r'if (strstr_P(header, PSTR("\"v\":2")) != nullptr || strstr_P(header, PSTR("\"v\":1")) != nullptr) {')],
+     [(r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr) {' + '\n      // TASK-696',
+       r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr || strstr_P(header, PSTR("\"v\":1")) != nullptr) {' + '\n      // TASK-696')],
      ["M5"]),
-    ("MX6", "the thermostat writer still writes format 1",
-     [(r'{\"v\":2,\"device\":\"thermostat\"', r'{\"v\":1,\"device\":\"thermostat\"')], ["C2", "M5"]),
+    ("MX6", "the thermostat writer still writes format 2",
+     [(r'{\"v\":3,\"device\":\"thermostat\"', r'{\"v\":2,\"device\":\"thermostat\"')], ["C2", "M5", "M6"]),
+    ("MX7", "a format-2 thermostat file loads again (TASK-1895)",
+     [(r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr) {' + '\n      // TASK-696',
+       r'if (strstr_P(header, PSTR("\"v\":3")) != nullptr || strstr_P(header, PSTR("\"v\":2")) != nullptr) {' + '\n      // TASK-696')],
+     ["M6"]),
 ]
 
 
