@@ -3,9 +3,11 @@ id: TASK-1883
 title: >-
   Research: offline heat-loss / heating-curve identification from captures and a
   tuner convergence closed-loop test
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-13T06:13:00Z'
+updated_date: '2026-11-13T06:33:00Z'
 labels:
   - sat
   - research
@@ -28,3 +30,9 @@ Lessons 4 and 5 of docs/sat/vtherm-comparison-2026-11-13.md (TASK-1879). (4) VTh
 - [ ] #2 Prototype estimates the coefficient with a confidence interval on at least one existing long-run capture, labelled exploratory
 - [ ] #3 Tuner convergence test: fails on a mutant tuner that oscillates or diverges, passes on the real tuner
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-13 picked up by the comms session on Robert's request via the coordinator (no rush). Research runs in a background agent in wt-comms; output docs/sat/research/ + a test under tests/.
+<!-- SECTION:NOTES:END -->
