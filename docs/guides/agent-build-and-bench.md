@@ -114,3 +114,17 @@ heap-frag soak, TASK-934):
   if reset mid-pressure, the tier-entry counters (`enter_*`) only resume counting
   after the heap recovers to HEALTHY and re-enters the tier (they share
   `getHeapHealth()`'s internal state, which the reset deliberately does not touch).
+
+## SAT simulation: thermal-learning test (TASK-1891)
+
+The SAT simulation defaults (`satsimcoolrate` 0.1, `satsimheatrate` 0.5) make the house about 6x faster than a real
+one, which keeps bench runs short (Robert, TASK-1891: keep them). At that speed thermal learning never runs: every
+sample is 6 x `satsimcoolrate` (0.6 > `SAT_THERMAL_COEFF_MAX` 0.3), and the log shows once per run
+`SAT: Sim: thermal learning skips samples (measured X > 0.30); test with ...`. For a run that must exercise thermal learning:
+
+1. Save `/api/v2/settings`.
+2. Set `satsimcoolrate` 0.016 and `satsimheatrate` 0.08 (sample = 0.096, a real house is about 0.1).
+3. Run the simulation with the flame off long enough for 5-min samples (the learner needs 0.05 C of drop per sample).
+4. Restore both settings. A simulation run never saves `satthermalcoeff` (TASK-1869).
+
+Host check: `python tests/test_sat_sim_thermal_learning.py`.

@@ -254,7 +254,12 @@ all run under simulation:
 - **Modulation and flow/return temperatures**: modulation tracks demand; flow climbs
   while firing and the return follows with a load-dependent ΔT.
 - **Room temperature**: responds to the synthetic flame using configurable heating and
-  cooling rates (`fSimHeatRate`, `fSimCoolRate`).
+  cooling rates (`fSimHeatRate`, `fSimCoolRate`). The defaults (0.5 and 0.1 °C/min) make the
+  simulated house about 6 times faster than a real one, so a test run stays short. Thermal
+  learning cannot run at that speed: every sample comes out at 6 × the cooling rate (0.6), above
+  the 0.3 limit, and the log says once per run "Sim: thermal learning skips samples". To
+  test thermal learning, set `satsimcoolrate` to 0.016 and `satsimheatrate` to 0.08 (a realistic
+  house, coefficient about 0.1), and put both back afterwards.
 - **Diurnal outdoor temperature**: a day/night curve drives the weather-dependent
   heating curve (or the real weather feed when valid).
 - **Scenario injection**: short test scenarios (e.g. sensor noise, a DHW draw) can be

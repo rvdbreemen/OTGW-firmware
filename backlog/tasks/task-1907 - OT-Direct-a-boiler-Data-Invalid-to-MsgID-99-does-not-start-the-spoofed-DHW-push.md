@@ -3,9 +3,11 @@ id: TASK-1907
 title: >-
   OT-Direct: a boiler Data-Invalid to MsgID 99 does not start the spoofed DHW
   push
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-13T18:50:00Z'
+updated_date: '2026-11-13T21:47:00Z'
 labels:
   - otdirect
   - parity
@@ -23,6 +25,18 @@ From the TASK-1851 delta parity check (2026-11-13, read-only, verified in both s
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test on the real handleMasterResponse and otdPushOnBoiler99 code: HW=P, then a boiler Data-Invalid to the WRITE 99 gives otPushSpoof = true and bit 1 set in the relayed MsgID 0; red on the current code, green on the fix
+- [x] #1 Host test on the real handleMasterResponse and otdPushOnBoiler99 code: HW=P, then a boiler Data-Invalid to the WRITE 99 gives otPushSpoof = true and bit 1 set in the relayed MsgID 0; red on the current code, green on the fix
 - [ ] #2 Bench or replay: HW=P against a Data-Invalid MsgID 99 answer enables DHW once, as the PIC does
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Scope OTDirect.ino only. (1) otdPushOnBoiler99: handle type 6 (DATA_INVALID) like type 7: if a manual push is set, spoof it (PIC MessageID99: the Data-Invalid jump entry is a nop that falls into ID99Unknown, gateway.asm:3227-3230; dhwpushpending is not cleared there, so otPushPending is left as is too). (2) handleMasterResponse: the boilerDataInvalid branch hands a MsgID 99 reply to otdPushOnBoiler99(6, data). Proof: tests/test_otd_dhw_push_pic.py (real push block): HW=P then b99:6 -> relayed MsgID 0 HB 02 (DHW enable forced by the spoof), no push asked -> 00; plus a source pin on the Data-Invalid branch of the real handleMasterResponse. Red on the old code, green on the fix.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-13 d3, lane-1907 (wt-1907, uncommitted until a bump slot after 95's 230). Fix applied as planned. Evidence: tests/test_otd_dhw_push_pic.py on the old code 2 FAIL (test_dhw_enable_forced_when_the_boiler_refuses_or_lacks_the_push: b99:6 gave HB 00; test_handle_master_response_feeds_a_data_invalid_99_to_the_push: no call in the branch), on the fix OK. Related OTD tests OK (gateway_alt_slots, loopback_not_boiler_for_sat, msgid99_bytes, tt_pic_parity, write_once). evaluate --quick 85/0. AC1 note: the handleMasterResponse part is a source pin on the real branch (the push harness does not cut handleMasterResponse); the behaviour part runs the real otdPushOnBoiler99 + relayed-status code.
+<!-- SECTION:NOTES:END -->

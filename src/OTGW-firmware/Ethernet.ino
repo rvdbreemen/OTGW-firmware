@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Ethernet.ino
-**  Version  : v2.0.0-beta.231
+**  Version  : v2.0.0-beta.232
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

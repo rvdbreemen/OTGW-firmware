@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.231
+**  Version  : v2.0.0-beta.232
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1875,6 +1875,9 @@ static void handleMasterResponse() {
   } else if (boilerDataInvalid) {
     // Logged like any boiler reply. Not cached: its data is not a boiler value.
     bridgeFrameToParser('B', response);
+    // TASK-1907: the PIC handles a Data-Invalid answer to MsgID 99 as Unknown-DataID (MessageID99: the Data-Invalid
+    // entry is a nop that falls into ID99Unknown, gateway.asm:3227-3230), so a pending HW=P push is spoofed.
+    if (((response >> 16) & 0xFF) == 99) otdPushOnBoiler99(6 /* DATA_INVALID */, (uint16_t)(response & 0xFFFF));
   } else {
     // Only mark offline on status request (MsgID 0) failures
     uint8_t msgId = (otLastSentRequest >> 16) & 0xFF;
@@ -2677,12 +2680,13 @@ static void otdPushStart() {
                                                   static_cast<OpenThermMessageID>(99), otdOperModeData(true));
   if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
 }
-// The boiler's answer to MsgID 99 (MessageID99, gateway.asm:3218-3262): Unknown-DataID during a push, or a WRITE_ACK
+// The boiler's answer to MsgID 99 (MessageID99, gateway.asm:3218-3262): Unknown-DataID or Data-Invalid (TASK-1907: the
+// Data-Invalid entry falls through into ID99Unknown, :3227-3230) during a push, or a WRITE_ACK
 // without the push bit to the push request, makes the gateway spoof it. Otherwise the push bit follows the boiler, so
 // a push the boiler ran ends when it clears the bit.
 static void otdPushOnBoiler99(uint8_t type, uint16_t data) {
   const bool boilerPush = (data & 0x1000) != 0;
-  if (type == 7 /* UNKNOWN_DATA_ID */) { if (otPushManual) otPushSpoof = true; return; }
+  if (type == 7 /* UNKNOWN_DATA_ID */ || type == 6 /* DATA_INVALID */) { if (otPushManual) otPushSpoof = true; return; }
   if (type == 5 /* WRITE_ACK */ && otPushPending && !boilerPush) { otPushSpoof = true; otPushPending = false; return; }
   if (type != 4 /* READ_ACK */ && type != 5 /* WRITE_ACK */) return;
   // A READ_ACK while the push WRITE is still on its way answers an earlier READ 99 (the gateway's poll or the

@@ -38,7 +38,9 @@ STUBS = r"""
 #include <cstring>
 #define PSTR(x) x
 #define SATDebugTf(...) do {} while (0)
-struct SatSettings { bool bSimulation = false, bFireplaceMode = false; float fThermalCoeff = 0.0966f; };
+#define PGM_P const char*
+static void satNarratef_P(PGM_P, ...) {}   // TASK-1891 note when the sim cool rate is out of range
+struct SatSettings { bool bSimulation = false, bFireplaceMode = false; float fThermalCoeff = 0.0966f; float fSimCoolRate = 0.1f; };
 struct Settings { SatSettings sat; };
 struct SatState { float fLastKnownRoom = 0.0f; uint32_t iLastKnownRoomMs = 0; float fThermalDropRate = 0.0f;
                   bool bThermalModelValid = false; };

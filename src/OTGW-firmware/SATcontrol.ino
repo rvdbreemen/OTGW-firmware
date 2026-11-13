@@ -6929,7 +6929,9 @@ static void satUpdateThermalLearning()
   static float    s_realCoeffEma   = 0.0f;
   static uint32_t s_realLearnMs    = 0;
   static bool     s_realModelValid = false;
+  static bool     s_simRangeLogged = false;   // TASK-1891: the out-of-range note, once per simulation run
   if (settings.sat.bSimulation != s_thermalSim) {
+    s_simRangeLogged = false;
     if (settings.sat.bSimulation) {
       s_realCoeffEma = _thermal_coeffEma; s_realLearnMs = _thermal_totalLearnMs; s_realModelValid = state.sat.bThermalModelValid;
     } else {
@@ -6989,6 +6991,14 @@ static void satUpdateThermalLearning()
             _thermal_lastSaveMs = now;
             SATDebugTf(PSTR("SAT thermal: coeff updated %.4f\r\n"), _thermal_coeffEma);
           }
+        } else if (settings.sat.bSimulation && sample > SAT_THERMAL_COEFF_MAX && !s_simRangeLogged) {
+          // TASK-1891 (Robert's choice B): the fast sim house cools at 6 x satsimcoolrate per K per hour, so with the
+          // default 0.1 every sample is 0.6, above the 0.3 limit, and thermal learning never runs. Say so once per run.
+          // The value is the measured sample. The line must fit SAT_NARRATE_BUF (tests/test_sat_narrate_fits.py).
+          s_simRangeLogged = true;
+          satNarratef_P(PSTR("Sim: thermal learning skips samples (measured %.2f > %.2f); "
+                             "test with satsimcoolrate 0.016 + satsimheatrate 0.08"),
+                        (double)sample, (double)SAT_THERMAL_COEFF_MAX);
         }
       }
 

@@ -282,7 +282,13 @@ allemaal onder simulatie draaien:
   aanvoertemperatuur stijgt tijdens branden en de retour volgt met een
   belastingsafhankelijke ΔT.
 - **Ruimtetemperatuur**: reageert op de gesimuleerde vlam met instelbare verwarmings- en
-  afkoelsnelheden (`fSimHeatRate`, `fSimCoolRate`).
+  afkoelsnelheden (`fSimHeatRate`, `fSimCoolRate`). De standaardwaarden (0,5 en 0,1 °C/min)
+  maken het gesimuleerde huis ongeveer 6 keer sneller dan een echt huis, zodat een testrun kort
+  blijft. Thermisch leren werkt op die snelheid niet: elke meting komt uit op 6 × de
+  afkoelsnelheid (0,6), boven de grens van 0,3, en het log meldt één keer per run "Sim: thermal
+  learning skips samples". Wil je thermisch leren testen, zet dan `satsimcoolrate` op
+  0,016 en `satsimheatrate` op 0,08 (een realistisch huis, coëfficiënt rond 0,1) en zet ze
+  daarna terug.
 - **Dag/nacht-buitentemperatuur**: een etmaalcurve voedt de weersafhankelijke
   verwarmingscurve (of de echte weerfeed wanneer geldig).
 - **Scenario-injectie**: korte testscenario's (bijv. sensorruis, een warmwatertapping)

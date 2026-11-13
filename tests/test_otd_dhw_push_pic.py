@@ -209,9 +209,23 @@ class DhwPush(unittest.TestCase):
         # AC3: WRITE_ACK without the push bit, or Unknown-DataID, or MsgID 99 known unsupported -> spoof
         self.assertEqual(hbs(run("c:P", "b99:5:0000", "s:00")), ["02"])
         self.assertEqual(hbs(run("c:P", "b99:7:1000", "s:00")), ["02"])
+        # TASK-1907: a boiler Data-Invalid (type 6) is the PIC's Unknown-DataID path too: MessageID99's jump table has a
+        # nop for Data-Invalid that falls through into ID99Unknown (gateway.asm:3227-3230), which spoofs during a push
+        self.assertEqual(hbs(run("c:P", "b99:6:1000", "s:00")), ["02"])
+        self.assertEqual(hbs(run("b99:6:0000", "s:00")), ["00"])   # no push asked: nothing spoofed (manualdhwpush clear)
         out = run("u", "c:P", "s:00")
         self.assertNotIn("SENT", " ".join(out))              # nothing written when 99 is known unsupported
         self.assertEqual(hbs(out), ["02"])
+
+    def test_handle_master_response_feeds_a_data_invalid_99_to_the_push(self):
+        # TASK-1907: the boiler's Data-Invalid comes in through the boilerDataInvalid branch of handleMasterResponse(),
+        # not the SUCCESS branch; that branch must hand MsgID 99 to otdPushOnBoiler99() with type 6
+        src = OTD_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+        a = src.index("static void handleMasterResponse() {")
+        branch = src[src.index("  } else if (boilerDataInvalid) {", a):]
+        branch = branch[:branch.index("  } else {")]
+        self.assertRegex(branch, r"otdPushOnBoiler99\(6 /\* DATA_INVALID \*/, \(uint16_t\)\(response & 0xFFFF\)\)")
+        self.assertRegex(branch, r"if \(\(\(response >> 16\) & 0xFF\) == 99\)")
 
     def test_a_read_ack_while_the_push_write_is_pending_does_not_end_it(self):
         # a READ 99 (the gateway's own slow poll, or the thermostat's) answered before the WRITE 99: the PIC turns such
