@@ -22,6 +22,9 @@ History at the end of this file.
 - **Q-PWM1** (asked): gruijter 12 Nov PM capture, d3 PWM analysis
 - **Q-PWM2** (queued): follow-up of Q-PWM1
 - **Q-1882a** (queued): TASK-1882 (lesson 3 of docs/sat/vtherm-comparison-2026-11-13.md)
+- **Q-327a** (queued): entry 327, TASK-1888
+- **Q-328a** (queued): entry 328, TASK-1887
+- **Q-327b** (queued): entry 327, TASK-1888
 <!-- live-queue:end -->
 
 A new correction from Sergeant D (e.g. 2026-10-26 'CH=1 stays during PWM OFF') is handled before the queue.
@@ -254,6 +257,9 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q-PWM2 | — | queued (ask after Q-PWM1 is answered): should the firmware also evaluate PWM every 5 s like thermo-nova, instead of on every 30 s control tick (iControlInterval 30, SATtypes.h:504; SATcontrol.ino:901)? Coordinator 2026-11-13. | follow-up of Q-PWM1 |
 | Q-1882a | — | queued 2026-11-13 (TASK-1882; ask after Q-PWM1 is answered, one question at a time): should hours with a heating-failure or no-ignition event be excluded from the heating curve self-tune? Context: TASK-1882 adds a diagnostic event (no control action) for (a) a high requested setpoint for N minutes while the room temperature does not rise and (b) a PWM ON phase or requested CS above the cold cutoff with no flame within X; thresholds are with Robert. Coordinator 2026-11-13. | TASK-1882 (lesson 3 of docs/sat/vtherm-comparison-2026-11-13.md) |
 | Q-326a | ✓ 328 | answered A by Sergeant D 2026-11-13 07:27:22 UTC (entry 328, [msg](https://discord.com/channels/812969634638725140/1105556725714649128/1570701593073025099), link to the HA generic thermostat docs); asked 2026-11-13 07:22 UTC ([msg](https://discord.com/channels/812969634638725140/1105556725714649128/1570700362187542539)), a reply to his decision 1570698600952893454 (entry 326): what do hot tolerance 0.1 / cold tolerance -0.1 act on? A) heating demand on/off hysteresis band; B) the PID / self-tune deadband (thermo-nova DEADBAND 0.1, const.py:16); C) only the Home Assistant climate entity display. Recommendation A. | entry 326 |
+| Q-327a | — | queued (FIRST after Q-PWM1 is answered; coordinator order 2026-11-13): with the new continuous->PWM rule of entry 327 (flow - requested >= 1.5 C for 30 s), does the entry-289 flame-out fail-safe (flow - CS >= 3.5 C for 30 s, SATcycles.ino:1416-1419) stay as a separate rule or go? It can no longer fire first. Unblocks TASK-1888 most. | entry 327, TASK-1888 |
+| Q-328a | — | queued (SECOND): how does the hot/cold tolerance band of entry 328 combine with the PID and the cold cutoff (ADR-199, satColdCutoff SATchEnable.h:26-29, cutoff SATcontrol.ino:5209-5214)? Options to give: band only on the CH-enable decision, PID keeps running, cold cutoff unchanged (our recommendation) / band also freezes the PID / band replaces the cold cutoff. | entry 328, TASK-1887 |
+| Q-327b | — | queued (THIRD, may be proposed by us): keep the fOvershootMargin settings key with the new default 1.5 so existing settings keep working (and what happens to units that still store 2.0)? | entry 327, TASK-1888 |
 
 Questions Q5 onwards come from the SAT port audit of 2026-10-24
 ([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)); the numbers in brackets are its
