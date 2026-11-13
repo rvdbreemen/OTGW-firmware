@@ -66,12 +66,14 @@ static bool platformFSInfo(FSInfo &i) { g_reads++; i.totalBytes = 786432; return
 struct __FlashStringHelper;
 #define F(s) (reinterpret_cast<const __FlashStringHelper*>(s))
 static bool updateLittleFSStatus(const __FlashStringHelper*) { g_probes++; return true; }
+static int g_fileFlags = 0;
+static void refreshLittleFSFileFlags() { g_fileFlags++; }   // TASK-1899: file-exists flags for REST
 @SAFE@
 @FN@
 int main() {
   // 16 minutes at 1 s steps (the timers start at the first call)
   for (int s = 0; s < 16 * 60; s++) { g_now += 1000; loopLittleFSStatus(); }
-  printf("run reads=%d probes=%d\n", g_reads, g_probes);
+  printf("run reads=%d probes=%d fileflags=%d\n", g_reads, g_probes, g_fileFlags);
   return 0;
 }
 """
@@ -128,6 +130,10 @@ class LoopCheckTiming(unittest.TestCase):
         reads, probes = int(m.group(1)), int(m.group(2))
         self.assertEqual(probes, 3, self.out)                # at 5, 10 and 15 min
         self.assertIn(reads, (13, 14, 15, 16), self.out)      # every 60 s, minus the passes a probe takes
+        # TASK-1899: the REST file flags refresh on the first pass, then every 10 s (96 ticks in 16 min, plus the
+        # first pass; a pass the write probe takes skips it, the tick stays due for the next one)
+        flags = int(re.search(r"fileflags=(\d+)", self.out).group(1))
+        self.assertIn(flags, range(94, 99), self.out)
         # the old poll ran 2 traversals per 15 s health call: 128 in 16 min with one browser tab
 
 

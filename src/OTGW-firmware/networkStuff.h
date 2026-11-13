@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program : networkStuff.h
-**  Version  : v2.0.0-beta.229
+**  Version  : v2.0.0-beta.230
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -83,6 +83,8 @@ extern time_t            NtpLastSync;
 extern OTGWUpdateServer  httpUpdater;
 extern FSInfo            LittleFSinfo;
 extern bool              LittleFSmounted;
+extern bool              LittleFSsimFilePresent;     // TASK-1899: read by /api/v2/simulate (async_tcp)
+extern bool              LittleFSupdateIncomplete;   // TASK-1899: read by /api/v2/device/info (async_tcp)
 #define WM_DEBUG_PORT debugTelnet
 
 //=====[ Forward declarations ]================================================

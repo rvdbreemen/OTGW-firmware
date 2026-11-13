@@ -328,8 +328,11 @@ class TestAbortRestore(unittest.TestCase):
         self.assertIn("LittleFS.open(FS_UPDATE_INCOMPLETE_FILE", mark)
         hdr = code(*FWDIR, "OTGW-firmware.h")
         self.assertRegex(hdr, r'#define FS_UPDATE_INCOMPLETE_FILE\s+"/\.fs_update_incomplete"')
+        # TASK-1899: device/info runs on async_tcp, so it reports the flag the loop task keeps from the marker file
         rest = code(*FWDIR, "restAPI.ino")
-        self.assertRegex(rest, r'je\.field\(F\("fsupdateincomplete"\), LittleFSmounted && LittleFS\.exists\(F\(FS_UPDATE_INCOMPLETE_FILE\)\)\);')
+        self.assertRegex(rest, r'je\.field\(F\("fsupdateincomplete"\), LittleFSupdateIncomplete\);')
+        helper = code(*FWDIR, "helperStuff.ino")
+        self.assertRegex(helper, r'LittleFSupdateIncomplete\s*=\s*LittleFSmounted && LittleFS\.exists\(F\(FS_UPDATE_INCOMPLETE_FILE\)\);')
 
 
 class TestSettingsPersistence(unittest.TestCase):

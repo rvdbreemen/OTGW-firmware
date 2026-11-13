@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.229
+**  Version  : v2.0.0-beta.230
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -53,6 +53,8 @@ WebRequestBody          g_requestBody{};
 
 FSInfo LittleFSinfo;
 bool   LittleFSmounted = false;
+bool   LittleFSsimFilePresent = false;     // TASK-1899: /otgw_simulation.log exists (refreshed on the loop task)
+bool   LittleFSupdateIncomplete = false;   // TASK-1899: FS_UPDATE_INCOMPLETE_FILE exists (refreshed on the loop task)
 
 //=====[ WiFi ]================================================================
 

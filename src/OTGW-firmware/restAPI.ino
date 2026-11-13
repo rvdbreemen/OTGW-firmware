@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.229
+**  Version  : v2.0.0-beta.230
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -372,8 +372,9 @@ static void sendSimulationStatus() {
   // TASK-1294: replay is always available. Since TASK-1071 it runs loop-side on every
   // board and transport, and without a /otgw_simulation.log on LittleFS it replays the
   // fixture built into the firmware. "source" says which one the next replay reads:
-  // "file" when the LittleFS file exists, else "builtin".
-  const bool haveFile = LittleFSmounted && LittleFS.exists(F("/otgw_simulation.log"));
+  // "file" when the LittleFS file exists, else "builtin". TASK-1899: this runs on async_tcp, so it reads the flag the
+  // loop task keeps (refreshLittleFSFileFlags(), helperStuff.ino) instead of a cross-core LittleFS.exists().
+  const bool haveFile = LittleFSsimFilePresent;
   char jsonBuf[240];
   snprintf_P(jsonBuf, sizeof(jsonBuf),
              PSTR("{\"simulation\":{\"active\":%s,\"available\":true,\"source\":\"%s\",\"file\":\"%S\",\"interval_ms\":%lu,\"timing\":\"%s\"}}"),
@@ -3407,7 +3408,7 @@ void sendDeviceInfoV2()
     je.field(F("uptime"), snap->uptimeStr);
     je.field(F("lastreset"), lastReset);
     je.field(F("bootcount"), snap->st.uptime.iRebootCount);
-    je.field(F("fsupdateincomplete"), LittleFSmounted && LittleFS.exists(F(FS_UPDATE_INCOMPLETE_FILE)));  // TASK-1495: last filesystem update interrupted: formatted and restored, web UI files missing until uploaded again
+    je.field(F("fsupdateincomplete"), LittleFSupdateIncomplete);  // TASK-1899: flag from the loop task, no LittleFS on async_tcp  // TASK-1495: last filesystem update interrupted: formatted and restored, web UI files missing until uploaded again
 
     // --- Connection status (MQTT, OTGW, thermostat, boiler) ---
     je.field(F("mqttconnected"), snap->st.mqtt.bConnected);

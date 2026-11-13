@@ -4,10 +4,11 @@ title: >-
   REST handlers /api/v2/simulate and /device/info call LittleFS.exists on the
   async_tcp task: cross-core flash read, TWDT (gruijter 13-11 04:00:54,
   coredump)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-13T15:45:00Z'
-updated_date: '2026-11-13T16:52:00Z'
+updated_date: '2026-11-13T19:42:00Z'
 labels:
   - bug
   - stability
@@ -25,12 +26,18 @@ Found in gruijter's beta.218+2f5ecb4 capture (Discord #alpha-testing https://dis
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No LittleFS call runs on the async_tcp task for /api/v2/simulate and /api/v2/device/info: existence is cached on the loop task (host test or source test on the real handlers, red on the old code)
-- [ ] #2 A gate (evaluate.py check or test) fails on a LittleFS.* call inside a REST handler that runs on async_tcp, red on the old code, green on the fix
+- [x] #1 No LittleFS call runs on the async_tcp task for /api/v2/simulate and /api/v2/device/info: existence is cached on the loop task (host test or source test on the real handlers, red on the old code)
+- [x] #2 A gate (evaluate.py check or test) fails on a LittleFS.* call inside a REST handler that runs on async_tcp, red on the old code, green on the fix
 - [ ] #3 Bench: polling /api/v2/simulate and /device/info every 1-2 s for at least 2 h during filesystem activity gives no watchdog reset
 - [ ] #4 Field: no TWDT with async_tcp in LittleFS in a long-run capture from a tester
 - [ ] #5 Bench (sim): poll /api/v2/simulate every 9 s while SAT runs through PWM ON/OFF switches (simulation mode), at least 2 h, no watchdog reset
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Narrow scope (coordinator 2026-11-13). The two polled calls move off async_tcp: refreshLittleFSFileFlags() in helperStuff.ino (next to the TASK-1865 loopLittleFSStatus()) sets LittleFSsimFilePresent and LittleFSupdateIncomplete (globals next to LittleFSmounted, networkStuff.ino/.h) on the loop task, first pass then every 10 s, never while flashing; sendSimulationStatus and sendDeviceInfoV2 read the flags. Gate tests/test_rest_no_littlefs_on_async_tcp.py maps every LittleFS call in restAPI.ino to its function and fails on an unlisted one; the user-triggered handlers that also write are allow-listed with exact counts and moved by TASK-1911 (handleSAT, 9) and TASK-1912 (Dallas labels, 1+1).
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
@@ -38,4 +45,6 @@ Found in gruijter's beta.218+2f5ecb4 capture (Discord #alpha-testing https://dis
 2026-11-13 double correlation (gruijter beta.218 capture, transcript, checked by comms; Sergeant D asked 1570834690892497138, answered 1570836136136417321): both "Other watchdog" resets without a core dump fell 14-17 s after a regular SAT PWM ON switch (08:38:04 duty 0.79 -> reset 08:38:18; 11:58:50 duty 0.22 -> reset 11:59:07; ticks mode=2 pwm=1) AND 1.5-13 s after a web UI /api/v2/simulate call (08:38:05.563, 11:59:05.572; polled every 15 s). No log lines between the switch and the reset. Not a proven cause either way; the bench should exercise both.
 
 2026-11-13 CORRECTION of the earlier "double correlation" note (comms misread the log): the line "SAT PWM: pwm_on=... ON" (SATcontrol.ino:1539 at 2f5ecb4) is printed on every 30 s control tick during a phase; it is NOT the ON switch. The real ON edges are the "PWM ON:" lines (SATcontrol.ino:1231, satPwmBeginOn): 08:36:04 (on=489 s) and 11:58:20 (on=275 s). The two "Other watchdog" resets came ~134 s and ~47 s INTO those ON phases, not 14-17 s after a switch. 19 ON edges that day, 17 without a reset. At an ON edge only CS, MM=0, CH=1 are queued plus a log line; no flash work (SATcontrol.ino:1231-1240, :1666-1690). Reset reason: platform_esp32.h:216 maps ESP_RST_WDT (raw 7) to "Other watchdog" = RTC/super/CPU-level watchdog, not the task watchdog (6) or interrupt watchdog (5); no new core dump (the 04:00:54 dump was still the stored one). Device logged live OT frames until 1.6 s / 2.7 s before reboot (reboot time from uptime). Ranked hypotheses (trace agent, read-only): H1 hardware-level watchdog, trigger unknown; H2 IPC stack overflow (this unit ipc0/ipc1 low points 80/88 B of 1024; beta.219 raised the stack) escalating to H1; H3 external 0x26 watchdog unlikely (loop task fed it every <=100 ms until 1-3 s before reboot; an EN-pin reset would read "Power on", wiring not verified); H4 SAT/PWM, LittleFS or /simulate: no evidence. The /simulate correlation (1.5-13 s before) remains a coincidence candidate only. Bench next: capture the ROM rst:0x.. line on the S3 USB console during such a reset; beta.218 vs beta.219 on a Classic+PIC with two web UIs polling and SAT in PWM. Corrected publicly: 1570843356219703308 (earlier message 1570836136136417321 marked as corrected).
+
+AC1 and AC2 evidence (2026-11-13, wt-95w lane-95-1899 on origin/dev 6f302ffb4). Gate tests/test_rest_no_littlefs_on_async_tcp.py: on the old restAPI.ino (OTGW_RESTAPI_INO=git show HEAD:...) exit 1, 'sendDeviceInfoV2: 1 LittleFS call(s), 0 allowed (3410 LittleFS.exists)' and 'sendSimulationStatus: 1 LittleFS call(s), 0 allowed (376 LittleFS.exists)'; on the fix 4 OK, including a self-test that injects an unlisted LittleFS call into sendSimulationStatus and sees it reported, and a staleness check on the allow-list. AC1 tests/test_rest_fs_flags_loop.py: the source class on the old copies 3 FAIL (both handlers call LittleFS, no refresh in loopLittleFSStatus), on the fix 7 OK including the host compile of the real fsFileFlags block (flags follow the files; unmounted reports false and reads nothing). Tests that had to follow: test_health_no_fs_flash_ops (stub for the new function, flags refresh count 94-98 in 16 min, mount check and write probe rhythm unchanged: the refresh takes no own pass) and test_fs_update_keep (fsupdateincomplete now reads the flag; the flag comes from FS_UPDATE_INCOMPLETE_FILE). Also OK: sim_fixture_builtin, replay_timing, web_file_scheduling, heap_tier_watermark, reboot_listener_and_reason, reboot_reason, reboot_log_time_not_set, wifi_link_record, crashlog_coredump, capture_otframes, ota_flash, otd_pr_reports_pyotgw, local_frame_consumers. Pre-existing, not from this change: test/host/test_dhw_water_meter.py mutant M28 anchor 'MQTT_HA_SENSOR_COUNT = 399' no longer matches since 5ddcc6543 (TASK-1880/1893/1895), reported to the coordinator. TASK-1910 (extra '}' in device/info under a storm): the device/info change here only replaces the value of one je.field(), so it cannot add a brace; cause not in this code.
 <!-- SECTION:NOTES:END -->

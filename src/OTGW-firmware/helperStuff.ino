@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.229
+**  Version  : v2.0.0-beta.230
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -214,12 +214,28 @@ bool updateLittleFSStatus(const char *probePath)
 // read per block) only to refresh LittleFSmounted; a hang in such a flash read starved the loop task on the same core
 // into the task watchdog (core dump beta.182). Mount check every 60 s, the flash write probe every 5 minutes
 // (TASK-1205: a failed probe keeps LittleFSmounted false until the next probe). The caller skips it while flashing.
+// --- fsFileFlags begin
+// TASK-1899: /api/v2/simulate and /api/v2/device/info report whether two files exist. Their handlers run on async_tcp,
+// where LittleFS.exists() is a cross-core flash read; one of them hung there and starved the loop task into the task
+// watchdog (gruijter, 13 Nov 04:00:54, core dump). The loop task now checks both files and the handlers read the flags.
+void refreshLittleFSFileFlags() {
+  LittleFSsimFilePresent   = LittleFSmounted && LittleFS.exists(F("/otgw_simulation.log"));
+  LittleFSupdateIncomplete = LittleFSmounted && LittleFS.exists(F(FS_UPDATE_INCOMPLETE_FILE));
+}
+// --- fsFileFlags end
+
 void loopLittleFSStatus() {
   DECLARE_TIMER_MIN(fsWriteProbe, 5, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(fsMountCheck, 60, SKIP_MISSED_TICKS);
+  DECLARE_TIMER_SEC(fsFileFlags, 10, SKIP_MISSED_TICKS);   // TASK-1899: a new or removed file shows within 10 s
+  static bool fsFileFlagsRead = false;                      // the first loop pass reads them at once
   if (DUE(fsWriteProbe)) {
     updateLittleFSStatus(F("/.health"));
     return;
+  }
+  if (!fsFileFlagsRead || DUE(fsFileFlags)) {   // two cheap lookups: no own pass, the mount check keeps its rhythm
+    fsFileFlagsRead = true;
+    refreshLittleFSFileFlags();
   }
   if (DUE(fsMountCheck) && LittleFSmounted) {
     LittleFSmounted = platformFSInfo(LittleFSinfo);
