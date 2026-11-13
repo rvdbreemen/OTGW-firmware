@@ -4320,6 +4320,36 @@ components:
         cycles_this_hour:
           type: integer
           description: "PWM ON phases started in the trailing hour, the count the cycles-per-hour limit is checked against (hot-water ignitions and relights are not counted)"
+        pwm_phases_total:
+          type: integer
+          description: "TASK-1880: PWM ON phases closed since boot"
+        pwm_phases_ignited:
+          type: integer
+          description: "TASK-1880: closed PWM ON phases in which the boiler lit a CH flame"
+        pwm_phases_not_ignited:
+          type: integer
+          description: "TASK-1880: closed PWM ON phases in which the burner never lit"
+        pwm_ignition_delay_max_s:
+          type: integer
+          description: "TASK-1880: longest ON-start-to-CH-flame delay since boot, in s"
+        pwm_ignition_delay_avg_s:
+          type: number
+          nullable: true
+          description: "TASK-1880: mean ON-start-to-CH-flame delay of the lit phases, in s; null before the first lit phase"
+        pwm_phases:
+          type: array
+          description: "TASK-1880: the last 8 closed PWM ON phases, newest first. Telemetry only, no control path reads it."
+          items:
+            type: object
+            properties:
+              age_s: {type: integer, description: "Seconds since the phase started"}
+              cmd_on_s: {type: integer, description: "ON time asked at the ON start"}
+              final_on_s: {type: integer, description: "ON time in force when the phase closed (the duty is re-evaluated every tick)"}
+              len_s: {type: integer, description: "ON start to close"}
+              ignited: {type: boolean, description: "The boiler lit a CH flame (flame bit with the DHW bit clear)"}
+              ignition_delay_s: {type: integer, nullable: true, description: "ON start to the first CH flame; 0 = already burning; null = never lit"}
+              flame_on_s: {type: integer, description: "CH flame seconds inside the phase"}
+              end: {type: string, enum: ["off", "cut"], description: "off = the ON time ran out; cut = ended by a mode change, heating off, SAT off or a reset"}
         last_cycle_class:
           type: integer
           description: "Last cycle classification code (0=none,1=good,2=overshoot,3=underheat,4=short,5=uncertain)"

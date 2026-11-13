@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.223
+**  Version  : v2.0.0-beta.224
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5950,7 +5950,8 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
       // TASK-1086: a frame the gateway made itself (OTdata.bLocalAnswer: every
       // OTDirect A, and every B of OTDirect loopback mode) says nothing about
       // the boiler, so it neither sets nor retracts an unsupported verdict;
-      // nor does a replayed line (OTdata.bReplayed, TASK-1185).
+      // nor does a replayed line (OTdata.bReplayed, TASK-1185; the thermostat
+      // bitmaps too since TASK-1895).
       {
         const uint8_t idx  = OTdata.id >> 3;
         const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
@@ -5958,8 +5959,10 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
           // Master frame. boilerLastMasterWasWrite follows every request the
           // boiler gets (T, or the gateway's R); the thermostat bitmaps take
           // only a T: an R is the gateway's own request or its replacement of
-          // a T, not something the thermostat sent (TASK-1612).
-          const bool fromThermostat = (OTdata.rsptype == OTGW_THERMOSTAT);
+          // a T, not something the thermostat sent (TASK-1612). A replayed T
+          // (OTGW simulation, OTdata.bReplayed) is no thermostat evidence either:
+          // it would end up in /ot-thermo.json (TASK-1895).
+          const bool fromThermostat = (OTdata.rsptype == OTGW_THERMOSTAT) && !OTdata.bReplayed;
           if (OTdata.type == OT_WRITE_DATA) {
             boilerLastMasterWasWrite[idx] |= mask;
             if (fromThermostat && (thermostatSentWrite[idx] & mask) == 0) {
@@ -7345,7 +7348,12 @@ void upgradepic(AsyncWebServerRequest *request) {
 // TASK-693 port (dev TASK-688): persist the OT-bus support map across reboots.
 //
 // Files (LittleFS):
-//   /ot-thermo.json — {"v":2,"device":"thermostat","sent_read":[...],"sent_write":[...]}
+//   /ot-thermo.json — {"v":3,"device":"thermostat","sent_read":[...],"sent_write":[...]}
+//
+// Thermostat format 3 (TASK-1895, Robert's choice A, DM 1570749159060013087): format 2 was written by builds that
+// also counted replayed T lines (OTGW simulation) as thermostat requests; a format-2 file is dropped once at boot,
+// the real thermostat relearns its bits from live frames, and the next save writes format 3. /ot-boiler.json is
+// not affected.
 //
 // Thermostat format 2 (TASK-1612): format 1 was written by builds that counted
 // the gateway's own R requests (a PIC write such as R56, or the R that replaced
@@ -7460,16 +7468,16 @@ void loadOtSupportFiles() {
     char header[16] = {0};
     int n = f.read((uint8_t*)header, sizeof(header) - 1);
     header[n > 0 ? n : 0] = '\0';
-    if (strstr_P(header, PSTR("\"v\":2")) != nullptr) {
+    if (strstr_P(header, PSTR("\"v\":3")) != nullptr) {
       // TASK-696: short keys (sr/sw/ar/aw/ur/uw) to trim flash on ESP32.
       // The file is firmware-internal; the WebUI / REST surfaces use the long
       // names.
       readBitmapArrayFromJson(f, F("\"sr\":["), thermostatSentRead);
       readBitmapArrayFromJson(f, F("\"sw\":["), thermostatSentWrite);
       DebugTln(F("ot-support: thermostat profile loaded from /ot-thermo.json"));
-    } else if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
-      thermostatMigrated = true;          // format 1: see the header comment above
-      DebugTln(F("ot-support: /ot-thermo.json is format 1 (it counted gateway requests as thermostat requests), starting fresh"));
+    } else if (strstr_P(header, PSTR("\"v\":1")) != nullptr || strstr_P(header, PSTR("\"v\":2")) != nullptr) {
+      thermostatMigrated = true;          // format 1 or 2: see the header comment above
+      DebugTln(F("ot-support: /ot-thermo.json is format 1/2 (it counted gateway or replayed requests as thermostat requests), starting fresh"));
     } else {
       DebugTln(F("ot-support: /ot-thermo.json header missing/invalid — starting fresh"));
     }
@@ -7509,7 +7517,7 @@ static bool writeOtThermoFile(const char* canonicalPath, const char* tmpPath) {
   File f = LittleFS.open(tmpPath, "w");
   if (!f) return false;
   // TASK-696: short keys (sr/sw) match the reader and save ~30 B per write.
-  f.print(F("{\"v\":2,\"device\":\"thermostat\",\"sr\":["));
+  f.print(F("{\"v\":3,\"device\":\"thermostat\",\"sr\":["));   // format 3 since TASK-1895
   writeBitmapArrayToJson(f, thermostatSentRead);
   f.print(F("],\"sw\":["));
   writeBitmapArrayToJson(f, thermostatSentWrite);

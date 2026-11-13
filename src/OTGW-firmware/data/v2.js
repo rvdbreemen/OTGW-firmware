@@ -561,6 +561,7 @@
       "sat_cycles24": "Burner cycles",
       "sat_cycles24_sub": "last 24 h",
       "sat_pwm": "PWM & cycle tracking",
+      "sat_pwm_phases": "PWM ON phases: asked vs done",
       "sat_raise": "raise target",
       "sat_rerun_setup": "Re-run setup",
       "sat_room_lost": "Room temperature lost: heating on the curve only",
@@ -622,6 +623,21 @@
     "h_set": {
       "discard": "Discard",
       "save": "Save settings",
+      "about_title": "About",
+      "about_by": "This is an independent open-source project by",
+      "about_credits": "Credits",
+      "about_schelte": "designed the",
+      "about_schelte2": "and its PIC firmware.",
+      "about_george": "designed the SAT algorithm.",
+      "about_alex": "developed the original",
+      "about_alex_link": "SAT component for Home Assistant",
+      "about_alex2": ", which the SAT controller in 2.0 is ported from.",
+      "about_kit": "The kit is sold by",
+      "contrib_title": "Contributors",
+      "contrib_sub": "Thank you to everyone who built, tested and supported this firmware over the years. Most contributions first.",
+      "contrib_code": "Code (GitHub)",
+      "contrib_community": "Community (Discord)",
+      "contrib_more": "And everyone in the community who reports issues, tests betas and helps others.",
       "search_ph": "Search settings… (e.g. broker, ntp, pin)",
       "unsaved_suffix_one": "unsaved change",
       "unsaved_suffix_other": "unsaved changes",
@@ -1446,6 +1462,19 @@
       "kv_cycle_max_flow": "Cycle max flow",
       "kv_cycle_overshoot": "Cycle overshoot",
       "kv_cycles_this_hour": "Cycles this hour",
+      "kv_pwm_phases": "PWM ON phases since boot",
+      "kv_pwm_not_ignited": "Never lit",
+      "kv_pwm_ign_delay": "Ignition delay (avg / max)",
+      "pwm_ph_col_started": "Started",
+      "pwm_ph_col_asked": "Asked ON",
+      "pwm_ph_col_lit": "Lit after",
+      "pwm_ph_col_flame": "Flame on",
+      "pwm_ph_col_end": "End",
+      "pwm_ph_ago": "{{min}} min ago",
+      "pwm_ph_not_lit": "not lit",
+      "pwm_ph_end_off": "ON time done",
+      "pwm_ph_end_cut": "cut short",
+      "pwm_ph_none": "No PWM ON phase since boot",
       "kv_d_term": "D term",
       "kv_duty_cycle": "Duty cycle",
       "kv_error": "Error",
@@ -7143,6 +7172,43 @@
     ]);
   }
 
+  // TASK-1880 (U10): the last PWM ON phases from /api/v2/sat/status pwm_phases[] (newest first): asked ON time, how long
+  // until the burner lit (or "not lit"), CH flame seconds and how the phase ended. Telemetry only.
+  function satRenderPwmPhases(d) {
+    var avg = d.pwm_ignition_delay_avg_s, max = d.pwm_ignition_delay_max_s;
+    satKv('satPwmPhaseKv', [
+      [t('tools.kv_pwm_phases'), d.pwm_phases_total != null ? String(d.pwm_phases_total) : '—'],
+      [t('tools.kv_pwm_not_ignited'), d.pwm_phases_not_ignited != null ? String(d.pwm_phases_not_ignited) : '—'],
+      [t('tools.kv_pwm_ign_delay'), (avg != null ? Math.round(avg) + ' s' : '—') + ' / ' + (max != null && d.pwm_phases_ignited ? max + ' s' : '—')]
+    ]);
+    var box = document.getElementById('satPwmPhaseList'); if (!box) return;
+    box.textContent = '';
+    var list = Array.isArray(d.pwm_phases) ? d.pwm_phases : [];
+    if (!list.length) {
+      var none = document.createElement('div'); none.className = 'kv-row'; none.textContent = t('tools.pwm_ph_none');
+      box.appendChild(none);
+      return;
+    }
+    var tbl = document.createElement('table'); tbl.className = 'stats';   // the design-system table (v2.css table.stats)
+    var head = document.createElement('tr');
+    ['pwm_ph_col_started', 'pwm_ph_col_asked', 'pwm_ph_col_lit', 'pwm_ph_col_flame', 'pwm_ph_col_end'].forEach(function (k) {
+      var th = document.createElement('th'); th.textContent = t('tools.' + k); head.appendChild(th);
+    });
+    tbl.appendChild(head);
+    list.forEach(function (p) {
+      var tr = document.createElement('tr');
+      [t('tools.pwm_ph_ago', { min: Math.round((p.age_s || 0) / 60) }),
+       p.cmd_on_s + ' s',
+       p.ignited ? p.ignition_delay_s + ' s' : t('tools.pwm_ph_not_lit'),
+       p.flame_on_s + ' s',
+       p.end === 'off' ? t('tools.pwm_ph_end_off') : t('tools.pwm_ph_end_cut')].forEach(function (v) {
+        var td = document.createElement('td'); td.textContent = v; tr.appendChild(td);
+      });
+      tbl.appendChild(tr);
+    });
+    box.appendChild(tbl);
+  }
+
   function renderSatPage(d) {
     // `active` means the SAT control loop is engaged; it does NOT mean the burner is
     // running. Deriving "heating" from it made the pill read Heating with a cold boiler.
@@ -7220,6 +7286,7 @@
       [t('tools.kv_cycle_max_flow'), satFmt(d.cycle_max_flow, 1, ' °C')],
       [t('tools.kv_cycle_overshoot'), d.cycle_overshoot_sec != null ? Math.round(d.cycle_overshoot_sec) + ' s' : '—']
     ]);
+    satRenderPwmPhases(d);
     var summer = d.summer_active ? (d.summer_hours_above != null ? t('tools.sat_summer_active_hours', { hours: Math.round(d.summer_hours_above) }) : t('tools.active')) : t('tools.inactive');
     var thermal = (d.thermal_model_valid && d.thermal_coeff != null) ? satFmt(d.thermal_coeff, 3) : t('tools.sat_learning');
     satKv('satSmartKv', [

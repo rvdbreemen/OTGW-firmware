@@ -228,15 +228,18 @@
         <rect class="rad-bar" x="692" y="206" width="16" height="100" rx="8"/>
         <rect class="rad-bar" x="716" y="206" width="16" height="100" rx="8"/>
       </g>
-      <g transform="translate(560,150)">
+      <!-- TASK-1893: room readout clear of the flow pipe corner (x=560, y=170), laid out like OUTSIDE:
+           value with the setpoint beside it, the ROOM tag under the value -->
+      <g transform="translate(580,122)">
         <path class="house" d="M0,10 L13,-3 L26,10 V28 H0 Z"/>
         <text class="label-big" x="36" y="13" id="aRoom">—</text>
-        <text class="label-sub" x="36" y="28" id="aRoomSet"></text>
-        <text class="label-tag" x="120" y="13" data-i18n="h_home.svg_room">ROOM</text>
+        <text class="label-sub" x="100" y="13" id="aRoomSet"></text>
+        <text class="label-tag" x="36" y="28" data-i18n="h_home.svg_room">ROOM</text>
       </g>
 
-      <!-- emitter label (TASK-1392: neutral, the emitters may be radiators or floor heating) -->
-      <text class="label-tag" x="560" y="334" data-i18n="h_home.svg_space_heating">SPACE HEATING</text>
+      <!-- emitter label (TASK-1392: neutral, the emitters may be radiators or floor heating); TASK-1893: centred under the
+           emitter, clear of the return pipe at x=560 -->
+      <text class="label-tag" x="638" y="332" text-anchor="middle" data-i18n="h_home.svg_space_heating">SPACE HEATING</text>
     </svg>
 
     <div class="mobile-strip" id="aStrip"></div>
@@ -450,6 +453,8 @@
         <div class="card"><h4 data-i18n="h_mon.sat_pwm">PWM &amp; cycle tracking</h4><div class="kv" id="satPwmKv"></div></div>
       </div>
       <div class="card"><h4><span data-i18n="h_mon.sat_cycles24">Burner cycles</span> <span class="sub" data-i18n="h_mon.sat_cycles24_sub">last 24 h</span></h4><div class="kv" id="satCycles24Kv"></div></div>
+      <!-- TASK-1880 (U10): per PWM ON phase, what SAT asked and what the boiler did -->
+      <div class="card"><h4 data-i18n="h_mon.sat_pwm_phases">PWM ON phases: asked vs done</h4><div class="kv" id="satPwmPhaseKv"></div><div id="satPwmPhaseList"></div></div>
       <div class="sat-row2 sat-row-2up">
         <div class="card"><h4 data-i18n="h_mon.sat_smart">Smart features</h4><div class="kv" id="satSmartKv"></div></div>
         <div class="card"><h4 data-i18n="h_mon.sat_ext">External sensors</h4><div class="kv" id="satExtKv"></div></div>
@@ -642,74 +647,76 @@
 
     <!-- signal-flow chain: see WHERE a break is, not just that something is down -->
     <div class="connmap">
-      <svg viewBox="0 0 820 360" id="connMap" role="img" aria-label="Connectivity map" data-i18n-aria-label="h_mon.conn_map_aria">
+      <svg viewBox="0 0 610 372" id="connMap" role="img" aria-label="Connectivity map" data-i18n-aria-label="h_mon.conn_map_aria">
         <!-- links (drawn first, under the nodes) -->
         <g id="cnLinks">
-          <path id="lk-therm"  class="cn-link" d="M210,86 H264 V180 H300"/>
-          <path id="fl-therm"  class="cn-flow" d="M210,86 H264 V180 H300"/>
-          <path id="lk-boiler" class="cn-link" d="M210,274 H264 V180 H300"/>
-          <path id="fl-boiler" class="cn-flow" d="M210,274 H264 V180 H300"/>
-          <path id="lk-wifi"   class="cn-link" d="M470,180 H560"/>
-          <path id="fl-wifi"   class="cn-flow" d="M470,180 H560"/>
-          <path id="lk-mqtt"   class="cn-link" d="M700,150 V104 H760"/>
-          <path id="fl-mqtt"   class="cn-flow" d="M700,150 V104 H760"/>
-          <path id="lk-ws"     class="cn-link" d="M700,210 V300 H760"/>
-          <path id="fl-ws"     class="cn-flow" d="M700,210 V300 H760"/>
-          <text class="cn-linklbl" x="240" y="74" data-i18n="h_mon.conn_otbus">OT bus</text>
-          <text class="cn-linklbl" x="240" y="262" data-i18n="h_mon.conn_otbus">OT bus</text>
-          <text class="cn-linklbl" x="515" y="170">Wi-Fi</text>
-          <text class="cn-linklbl" x="676" y="120">MQTT</text>
-          <text class="cn-linklbl" x="676" y="250" data-i18n="h_mon.conn_live">live</text>
+          <!-- TASK-1893: the gateway interrupts the OT bus: Thermostat -> OTGW and OTGW -> Boiler, one column;
+               MQTT and live leave the Router from the centre of its top and bottom edge -->
+          <path id="lk-therm"  class="cn-link" d="M115,80 V130"/>
+          <path id="fl-therm"  class="cn-flow" d="M115,80 V130"/>
+          <path id="lk-boiler" class="cn-link" d="M115,250 V300"/>
+          <path id="fl-boiler" class="cn-flow" d="M115,250 V300"/>
+          <path id="lk-wifi"   class="cn-link" d="M210,190 H340"/>
+          <path id="fl-wifi"   class="cn-flow" d="M210,190 H340"/>
+          <path id="lk-mqtt"   class="cn-link" d="M410,160 V104 H540"/>
+          <path id="fl-mqtt"   class="cn-flow" d="M410,160 V104 H540"/>
+          <path id="lk-ws"     class="cn-link" d="M410,220 V300 H540"/>
+          <path id="fl-ws"     class="cn-flow" d="M410,220 V300 H540"/>
+          <text class="cn-linklbl" x="150" y="109" data-i18n="h_mon.conn_otbus">OT bus</text>
+          <text class="cn-linklbl" x="150" y="279" data-i18n="h_mon.conn_otbus">OT bus</text>
+          <text class="cn-linklbl" x="275" y="180">Wi-Fi</text>
+          <text class="cn-linklbl" x="386" y="132">MQTT</text>
+          <text class="cn-linklbl" x="392" y="264" data-i18n="h_mon.conn_live">live</text>
         </g>
         <!-- nodes -->
         <g id="n-therm">
-          <rect class="cn-box" x="20" y="56" width="190" height="60" rx="12"/>
-          <text class="cn-ic" x="36" y="96">🌡️</text>
-          <text class="cn-title" x="64" y="84" data-i18n="h_mon.conn_thermostat">Thermostat</text>
-          <text class="cn-sub" x="64" y="102" id="cnThermSub">master</text>
-          <circle class="cn-statedot" id="dot-therm" cx="202" cy="64" r="7"/>
+          <rect class="cn-box" x="20" y="20" width="190" height="60" rx="12"/>
+          <text class="cn-ic" x="36" y="60">🌡️</text>
+          <text class="cn-title" x="64" y="48" data-i18n="h_mon.conn_thermostat">Thermostat</text>
+          <text class="cn-sub" x="64" y="66" id="cnThermSub">master</text>
+          <circle class="cn-statedot" id="dot-therm" cx="202" cy="28" r="7"/>
         </g>
         <g id="n-boiler">
-          <rect class="cn-box" x="20" y="244" width="190" height="60" rx="12"/>
-          <text class="cn-ic" x="36" y="284">🔥</text>
-          <text class="cn-title" x="64" y="272" data-i18n="h_mon.conn_boiler">Boiler</text>
-          <text class="cn-sub" x="64" y="290" id="cnBoilerSub">slave</text>
-          <circle class="cn-statedot" id="dot-boiler" cx="202" cy="252" r="7"/>
+          <rect class="cn-box" x="20" y="300" width="190" height="60" rx="12"/>
+          <text class="cn-ic" x="36" y="340">🔥</text>
+          <text class="cn-title" x="64" y="328" data-i18n="h_mon.conn_boiler">Boiler</text>
+          <text class="cn-sub" x="64" y="346" id="cnBoilerSub">slave</text>
+          <circle class="cn-statedot" id="dot-boiler" cx="202" cy="308" r="7"/>
         </g>
         <!-- gateway: PIC + ESP, carries the mode chip -->
         <g id="n-gw">
-          <rect class="cn-box" x="300" y="120" width="170" height="120" rx="14"/>
-          <text class="cn-ic" x="320" y="158">📟</text>
-          <text class="cn-title" x="352" y="150">OTGW</text>
-          <text class="cn-sub" x="352" y="167" id="cnPicSub">gateway</text>
-          <rect x="318" y="186" width="134" height="34" rx="9" fill="var(--panel)" stroke="var(--border)"/>
-          <circle id="dot-mode" cx="334" cy="203" r="5" fill="var(--accent)"/>
-          <text class="cn-modechip" id="cnModeTxt" x="392" y="207" fill="var(--accent)">GATEWAY MODE</text>
-          <circle class="cn-statedot" id="dot-pic" cx="462" cy="128" r="7"/>
+          <rect class="cn-box" x="20" y="130" width="190" height="120" rx="14"/>
+          <text class="cn-ic" x="40" y="168">📟</text>
+          <text class="cn-title" x="72" y="160">OTGW</text>
+          <text class="cn-sub" x="72" y="177" id="cnPicSub">gateway</text>
+          <rect x="38" y="196" width="154" height="34" rx="9" fill="var(--panel)" stroke="var(--border)"/>
+          <circle id="dot-mode" cx="54" cy="213" r="5" fill="var(--accent)"/>
+          <text class="cn-modechip" id="cnModeTxt" x="122" y="217" fill="var(--accent)">GATEWAY MODE</text>
+          <circle class="cn-statedot" id="dot-pic" cx="202" cy="138" r="7"/>
         </g>
         <g id="n-router">
-          <rect class="cn-box" x="560" y="150" width="140" height="60" rx="12"/>
-          <text class="cn-ic" x="578" y="190">📶</text>
-          <text class="cn-title" x="610" y="178" data-i18n="h_mon.conn_router">Router</text>
-          <text class="cn-sub" x="610" y="196" id="cnWifiSub">—</text>
-          <circle class="cn-statedot" id="dot-wifi" cx="692" cy="158" r="7"/>
+          <rect class="cn-box" x="340" y="160" width="140" height="60" rx="12"/>
+          <text class="cn-ic" x="358" y="200">📶</text>
+          <text class="cn-title" x="390" y="188" data-i18n="h_mon.conn_router">Router</text>
+          <text class="cn-sub" x="390" y="206" id="cnWifiSub">—</text>
+          <circle class="cn-statedot" id="dot-wifi" cx="472" cy="168" r="7"/>
         </g>
         <g id="n-broker">
-          <rect class="cn-box" x="760" y="74" width="56" height="60" rx="12"/>
-          <text class="cn-ic" x="772" y="110">🗄️</text>
-          <circle class="cn-statedot" id="dot-mqtt" cx="808" cy="82" r="7"/>
+          <rect class="cn-box" x="540" y="74" width="56" height="60" rx="12"/>
+          <text class="cn-ic" x="552" y="110">🗄️</text>
+          <circle class="cn-statedot" id="dot-mqtt" cx="588" cy="82" r="7"/>
         </g>
-        <text class="cn-sub" x="812" y="148" text-anchor="end" data-i18n="h_mon.conn_broker">Broker → HA</text>
+        <text class="cn-sub" x="600" y="148" text-anchor="end" data-i18n="h_mon.conn_broker">Broker → HA</text>
         <g id="n-browser">
-          <rect class="cn-box" x="760" y="270" width="56" height="60" rx="12"/>
-          <text class="cn-ic" x="772" y="306">📱</text>
-          <circle class="cn-statedot" id="dot-ws" cx="808" cy="278" r="7"/>
+          <rect class="cn-box" x="540" y="270" width="56" height="60" rx="12"/>
+          <text class="cn-ic" x="552" y="306">📱</text>
+          <circle class="cn-statedot" id="dot-ws" cx="588" cy="278" r="7"/>
         </g>
-        <text class="cn-sub" x="812" y="344" text-anchor="end" data-i18n="h_mon.conn_browser">This browser</text>
-        <!-- TASK-984: override signal on the OT bus (elbows converge at y=180). Hidden when zero. -->
+        <text class="cn-sub" x="600" y="344" text-anchor="end" data-i18n="h_mon.conn_browser">This browser</text>
+        <!-- TASK-984: override signal on the OT bus, beside the Thermostat -> OTGW segment (TASK-1893). Hidden when zero. -->
         <g id="cnOvr" style="cursor:pointer;display:none" role="button" aria-label="Active gateway overrides — click for detail" data-i18n-aria-label="h_mon.conn_ovr_aria">
-          <rect x="200" y="167" width="96" height="26" rx="13" fill="color-mix(in srgb,var(--zone-warn) 16%,var(--panel))" stroke="var(--zone-warn)" stroke-width="1.5"/>
-          <text id="cnOvrTxt" x="248" y="184" text-anchor="middle" font-size="12" font-weight="700" fill="var(--zone-warn)" font-family="var(--font-sans)">⛓ 0 injected</text>
+          <rect x="12" y="92" width="96" height="26" rx="13" fill="color-mix(in srgb,var(--zone-warn) 16%,var(--panel))" stroke="var(--zone-warn)" stroke-width="1.5"/>
+          <text id="cnOvrTxt" x="60" y="109" text-anchor="middle" font-size="12" font-weight="700" fill="var(--zone-warn)" font-family="var(--font-sans)">⛓ 0 injected</text>
         </g>
       </svg>
     </div>
@@ -763,6 +770,30 @@
         <button class="save" id="btnSave" data-i18n="h_set.save">Save settings</button>
       </div>
     </div>
+  </div>
+  <!-- TASK-1893 (Robert 2026-11-13): the copyright line left the page footer. Two cards at the end of Settings:
+       About (as on the project site) and Contributors (most contributions first). Names are not translated. -->
+  <div class="adv-card" id="setAbout" style="margin-top:14px">
+    <h4 data-i18n="h_set.about_title">About</h4>
+    <p><span data-i18n="h_set.about_by">This is an independent open-source project by</span> <span data-i18n-skip>Robert van den Breemen</span>.</p>
+    <p><b data-i18n="h_set.about_credits">Credits</b></p>
+    <p><b data-i18n-skip>Schelte Bron</b>: <span data-i18n="h_set.about_schelte">designed the</span> <a href="https://otgw.tclcode.com/" target="_blank" rel="noopener" data-i18n-skip>OpenTherm Gateway</a> <span data-i18n="h_set.about_schelte2">and its PIC firmware.</span></p>
+    <p><b data-i18n-skip>George Ntellas</b>: <span data-i18n="h_set.about_george">designed the SAT algorithm.</span></p>
+    <p><b data-i18n-skip>Alex (Alexwijn)</b>: <span data-i18n="h_set.about_alex">developed the original</span> <a href="https://github.com/Alexwijn/SAT" target="_blank" rel="noopener" data-i18n="h_set.about_alex_link">SAT component for Home Assistant</a><span data-i18n="h_set.about_alex2">, which the SAT controller in 2.0 is ported from.</span></p>
+    <p><span data-i18n="h_set.about_kit">The kit is sold by</span> <a href="https://www.nodo-shop.nl/" target="_blank" rel="noopener" data-i18n-skip>Nodo Shop</a>.</p>
+    <p data-i18n-skip>© 2021-2026 Robert van den Breemen · GPL-3.0</p>
+  </div>
+  <!-- Contributors, most contributions first. Code: commits on dev, main and otgw-1.x.x (git shortlog, bots and AI agents
+       left out, aliases merged). Community: Discord messages in the OTGW server since 2021 (all channels the bot can read,
+       bots and deleted accounts left out). Counted 2026-11-13; Robert van den Breemen leads both lists and is named above. -->
+  <div class="adv-card" id="setContrib">
+    <h4 data-i18n="h_set.contrib_title">Contributors</h4>
+    <p data-i18n="h_set.contrib_sub">Thank you to everyone who built, tested and supported this firmware over the years. Most contributions first.</p>
+    <p><b data-i18n="h_set.contrib_code">Code (GitHub)</b></p>
+    <p data-i18n-skip>Dave Davenport, sjorsjuhmaniac, Robbert Lagerweij (rlagerweij), tjfsteele, Rob Roos, Nicole Koopmans, Andre Brait, Ben Hählen, GeorgeZ83, Crash-Evans, STemplar, Dirk Zwager, Halim (hgokduman), Martinvdm, Tommy van der Vorst, mcc05, proditaki</p>
+    <p><b data-i18n="h_set.contrib_community">Community (Discord)</b></p>
+    <p data-i18n-skip>Qball, Richard_HA, fuzzyduck, sergeantd, sjorsjuhmaniac, Schelte Bron (.otgw), proditaki, Bas, RobR, TechJunky, Daballiemo, tjfs, Alexw, Dayton, kapryk85, (DSRT) John H., pzzy8127, GeorgeZ83, Simon Templar, gruijter, WitteTonnie, crashevans, NLJ, DeKemp, Tomas Salfischberger</p>
+    <p data-i18n="h_set.contrib_more">And everyone in the community who reports issues, tests betas and helps others.</p>
   </div>
 </div><!-- /page-settings -->
 
@@ -911,7 +942,6 @@
   </div>
 </div><!-- /page-diagnose -->
 
-<div class="foot">© 2021-2026 Robert van den Breemen</div><!-- TASK-1838: the 1.x footer line, not translated -->
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" data-i18n="h_set.toast_saved">Settings saved</div>
 <!-- TASK-984: floating override-detail panel (fixed position). Opened by #aOvrBadge (Home) and #cnOvr (Monitor map). -->

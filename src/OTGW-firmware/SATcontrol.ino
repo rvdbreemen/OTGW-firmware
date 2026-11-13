@@ -1223,6 +1223,93 @@ static bool satPwmHoldElapsed()
 // flame already burning the start-up window counts from now and BT is reseeded from the live flow (TASK-1273);
 // with the flame off it waits for ignition (up to 180 s, pwm.py:186-199).
 // Sergeant D, entry 93: each PWM edge goes to the SAT log with the ON and OFF times of the current step in seconds.
+// --- TASK-1880: what each PWM ON phase asked for and what the boiler did (VTherm lesson 1, evidence for Q-P2) ---
+// Telemetry only: REST, MQTT and the telnet log read it, no control path does. One record per ON phase: opened by
+// satPwmBeginOn(), closed by satPwmEndOn() (the ON time ran out) or satPwmReset() (the phase was cut: mode change, heating
+// off, SAT off, missing flow). "Lit" means a CH flame: the flame bit with the boiler's DHW-active bit clear, sampled on every
+// loop pass (satPwmPhaseSample()), so a phase whose CS stayed high while the burner never lit reads ignited=0.
+static const uint8_t  SAT_PWM_PHASE_HIST  = 8;
+static const uint16_t SAT_PWM_NO_IGNITION = 0xFFFF;
+static const uint8_t  SAT_PWM_PHASE_END_OFF = 0;   // the ON time ran out (ON->OFF)
+static const uint8_t  SAT_PWM_PHASE_END_CUT = 1;   // the phase ended another way
+struct SatPwmPhaseRec {
+  uint32_t startMs;          // millis() at the ON start
+  uint16_t cmdOnS;           // ON time asked at the ON start
+  uint16_t finalOnS;         // ON time in force when the phase closed (the duty is re-evaluated every tick, entry 196)
+  uint16_t lenS;             // ON start to close
+  uint16_t ignitionDelayS;   // ON start to the first CH flame; 0 = already burning; SAT_PWM_NO_IGNITION = never lit
+  uint16_t flameOnS;         // CH flame seconds inside the phase
+  uint8_t  ignited;
+  uint8_t  endReason;        // SAT_PWM_PHASE_END_*
+};
+struct SatPwmPhaseCounters { uint32_t phases, ignited, notIgnited, ignitionDelaySumS; uint16_t ignitionDelayMaxS; };
+static SatPwmPhaseRec      _pwmPhHist[SAT_PWM_PHASE_HIST];
+static uint8_t             _pwmPhHead = 0, _pwmPhCount = 0;   // next write slot, records held
+static SatPwmPhaseCounters _pwmPhCnt = {};
+static SatPwmPhaseRec      _pwmPhCur = {};
+static bool                _pwmPhOpen = false;
+static bool                _pwmPhLastLit = false;             // CH flame state at the last sample
+static uint32_t            _pwmPhLastMs = 0, _pwmPhFlameMs = 0;
+static uint32_t            _pwmPhSeq = 0;                     // bumped on every close (MQTT publishes on a change)
+
+static uint16_t satPwmPhaseSec(uint32_t ms) { const uint32_t s = (ms + 500UL) / 1000UL; return (uint16_t)(s > 65534UL ? 65534UL : s); }
+
+// Every loop pass: lit = CH flame now (flame bit and no DHW bit). Adds the lit time since the last sample, marks the ignition.
+static void satPwmPhaseSample(bool lit, uint32_t nowMs)
+{
+  if (_pwmPhOpen) {
+    if (_pwmPhLastLit) _pwmPhFlameMs += nowMs - _pwmPhLastMs;
+    if (lit && !_pwmPhCur.ignited) {
+      _pwmPhCur.ignited = 1;
+      _pwmPhCur.ignitionDelayS = satPwmPhaseSec(nowMs - _pwmPhCur.startMs);
+    }
+  }
+  _pwmPhLastLit = lit;
+  _pwmPhLastMs  = nowMs;
+}
+
+static void satPwmPhaseClose(uint8_t reason, uint32_t onTimeMs, uint32_t nowMs)
+{
+  if (!_pwmPhOpen) return;
+  satPwmPhaseSample(_pwmPhLastLit, nowMs);   // the lit time up to this moment
+  _pwmPhOpen = false;
+  _pwmPhCur.finalOnS  = satPwmPhaseSec(onTimeMs);
+  _pwmPhCur.lenS      = satPwmPhaseSec(nowMs - _pwmPhCur.startMs);
+  _pwmPhCur.flameOnS  = satPwmPhaseSec(_pwmPhFlameMs);
+  _pwmPhCur.endReason = reason;
+  _pwmPhHist[_pwmPhHead] = _pwmPhCur;
+  _pwmPhHead = (uint8_t)((_pwmPhHead + 1) % SAT_PWM_PHASE_HIST);
+  if (_pwmPhCount < SAT_PWM_PHASE_HIST) _pwmPhCount++;
+  _pwmPhCnt.phases++;
+  if (_pwmPhCur.ignited) {
+    _pwmPhCnt.ignited++;
+    _pwmPhCnt.ignitionDelaySumS += _pwmPhCur.ignitionDelayS;
+    if (_pwmPhCur.ignitionDelayS > _pwmPhCnt.ignitionDelayMaxS) _pwmPhCnt.ignitionDelayMaxS = _pwmPhCur.ignitionDelayS;
+  } else {
+    _pwmPhCnt.notIgnited++;
+  }
+  _pwmPhSeq++;
+  SATDebugTf(PSTR("SATPWMPHASE cmd_on=%u final_on=%u len=%u ignited=%u ign_delay=%d flame_on=%u end=%s\r\n"),
+             (unsigned)_pwmPhCur.cmdOnS, (unsigned)_pwmPhCur.finalOnS, (unsigned)_pwmPhCur.lenS, (unsigned)_pwmPhCur.ignited,
+             _pwmPhCur.ignited ? (int)_pwmPhCur.ignitionDelayS : -1, (unsigned)_pwmPhCur.flameOnS,
+             reason == SAT_PWM_PHASE_END_OFF ? "off" : "cut");
+}
+
+static void satPwmPhaseOpen(uint32_t onTimeMs, bool lit, uint32_t nowMs)
+{
+  satPwmPhaseClose(SAT_PWM_PHASE_END_CUT, onTimeMs, nowMs);   // a phase still open ends here (no ON->OFF edge seen)
+  _pwmPhCur = {};
+  _pwmPhCur.startMs        = nowMs;
+  _pwmPhCur.cmdOnS         = satPwmPhaseSec(onTimeMs);
+  _pwmPhCur.ignitionDelayS = SAT_PWM_NO_IGNITION;
+  _pwmPhFlameMs = 0;
+  _pwmPhOpen    = true;
+  _pwmPhLastLit = lit;
+  _pwmPhLastMs  = nowMs;
+  if (lit) { _pwmPhCur.ignited = 1; _pwmPhCur.ignitionDelayS = 0; }   // the burner was already lit at the ON start
+}
+// --- TASK-1880 end
+
 static void satPwmNarrateEdge(bool on, uint32_t onTimeMs, uint32_t offTimeMs)
 {
   const unsigned long onSec = (unsigned long)((onTimeMs + 500UL) / 1000UL);
@@ -1238,6 +1325,7 @@ static void satPwmBeginOn(bool flame, float boilerTemp, uint32_t onTimeMs, uint3
   _pwm_dhwFlameLit = false;   // a new ON phase: a flame burning now is its CH flame
   state.sat.bPwmFlameRequested = true;
   _pwm_lastUpdateMs = millis();
+  satPwmPhaseOpen(onTimeMs, flame && !state.sat.bDhwActive, _pwm_lastUpdateMs);   // TASK-1880 telemetry
   _pwm_dhwResumed = false;
   _pwm_dhwAnchorLate = false;
   _pwm_dhwHoldLapsed = false;
@@ -1270,6 +1358,7 @@ static bool satPwmColdCutWaitsForMinBurn()
 static void satPwmEndOn(uint32_t onTimeMs, uint32_t offTimeMs)
 {
   satPwmNarrateEdge(false, onTimeMs, offTimeMs);
+  satPwmPhaseClose(SAT_PWM_PHASE_END_OFF, onTimeMs, millis());   // TASK-1880 telemetry
   state.sat.bPwmFlameRequested = false;
   _pwm_flameOffHoldSetpoint = 0.0f;
   _pwm_flameOnMs = 0;
@@ -1693,6 +1782,7 @@ static void satPwmSuppressionRefresh()
 // satSetControlMode(), not here. The per-hour PWM start counter is kept (SATcycles.ino, TASK-1401).
 void satPwmReset()
 {
+  satPwmPhaseClose(SAT_PWM_PHASE_END_CUT, _pwm_lastOnTimeMs, millis());   // TASK-1880 telemetry: an open ON phase was cut
   state.sat.bPwmFlameRequested = false;
   _pwm_entryPending           = false;
   _pwm_lastUpdateMs           = millis();   // pwm.reset(): _last_update = timestamp() (pwm.py:91)
@@ -4337,6 +4427,9 @@ struct SatStatusSnap {
   char     boilerStatus[20];
   char     manufacturer[12];
   char     phaseName[24];
+  SatPwmPhaseRec      pwmPh[SAT_PWM_PHASE_HIST];   // TASK-1880: oldest first, pwmPhCount valid
+  uint8_t             pwmPhCount;
+  SatPwmPhaseCounters pwmPhCnt;
 };
 
 void satSendStatusJSON()
@@ -4383,6 +4476,11 @@ void satSendStatusJSON()
   snap->otSlaveConfigMemberIDcode = OTcurrentSystemState.SlaveConfigMemberIDcode;
   snap->nowMs         = millis();
   snap->bleFailoverActive = satBLEFailoverActive();
+  snap->pwmPhCount    = _pwmPhCount;               // TASK-1880: copy the ring oldest first
+  for (uint8_t k = 0; k < _pwmPhCount; k++) {
+    snap->pwmPh[k] = _pwmPhHist[(uint8_t)((_pwmPhHead + SAT_PWM_PHASE_HIST - _pwmPhCount + k) % SAT_PWM_PHASE_HIST)];
+  }
+  snap->pwmPhCnt      = _pwmPhCnt;
 
   // DETERMINISM GATE (TASK-883): this closure reads ONLY snap->*, settings.sat.*,
   // and F()/PSTR literals. No live state.*, OTcurrentSystemState.*, millis(), or
@@ -4431,6 +4529,29 @@ void satSendStatusJSON()
     je.field(F("overshoot_margin"),     settings.sat.fOvershootMargin);
     je.field(F("cycle_count"),          snap->st.sat.iCycleCount);
     je.field(F("cycles_this_hour"),     (int32_t)snap->cyclesThisHour);
+    // TASK-1880: commanded vs realised per PWM ON phase, newest first; ignition_delay_s null = never lit
+    je.field(F("pwm_phases_total"),       snap->pwmPhCnt.phases);
+    je.field(F("pwm_phases_ignited"),     snap->pwmPhCnt.ignited);
+    je.field(F("pwm_phases_not_ignited"), snap->pwmPhCnt.notIgnited);
+    je.field(F("pwm_ignition_delay_max_s"), (int32_t)snap->pwmPhCnt.ignitionDelayMaxS);
+    if (snap->pwmPhCnt.ignited) je.field(F("pwm_ignition_delay_avg_s"), (float)snap->pwmPhCnt.ignitionDelaySumS / (float)snap->pwmPhCnt.ignited, 1);
+    else                        je.field(F("pwm_ignition_delay_avg_s"), NAN);
+    je.beginArray(F("pwm_phases"));
+    for (int k = (int)snap->pwmPhCount - 1; k >= 0; k--) {
+      const SatPwmPhaseRec& ph = snap->pwmPh[k];
+      je.beginObject();
+      je.field(F("age_s"),            (uint32_t)((snap->nowMs - ph.startMs) / 1000UL));
+      je.field(F("cmd_on_s"),         (int32_t)ph.cmdOnS);
+      je.field(F("final_on_s"),       (int32_t)ph.finalOnS);
+      je.field(F("len_s"),            (int32_t)ph.lenS);
+      je.field(F("ignited"),          ph.ignited != 0);
+      if (ph.ignited) je.field(F("ignition_delay_s"), (int32_t)ph.ignitionDelayS);
+      else            je.field(F("ignition_delay_s"), NAN);
+      je.field(F("flame_on_s"),       (int32_t)ph.flameOnS);
+      je.field(F("end"),              ph.endReason == SAT_PWM_PHASE_END_OFF ? F("off") : F("cut"));
+      je.endObject();
+    }
+    je.endArray();
     je.field(F("last_cycle_class"),     (int32_t)satReportedLastCycleClass(snap->st.sat, millis()));
     je.field(F("cycle_max_flow"),       snap->st.sat.fCycleMaxFlow);
     je.field(F("cycle_overshoot_sec"),  snap->st.sat.fCycleOvershootSec);
@@ -4777,6 +4898,7 @@ void satPublishMQTT()
   static SATShadowF s_preset_comfort, s_preset_eco, s_preset_away;
   static SATShadowF s_preset_sleep, s_preset_activity, s_preset_home;
   static SATShadowI s_cycles_this_hour, s_4h_cycles, s_current_modulation;
+  static SATShadowI s_pwm_ph_not_ignited, s_pwm_ph_last_cmd_on, s_pwm_ph_last_ign_delay, s_pwm_ph_last_flame_on, s_pwm_ph_last_ignited;   // TASK-1880
   static SATShadowI s_pv_boost_threshold_w, s_pv_boost_hold_s, s_pv_boost_max_duration_min;
   static SATShadowI s_sensor_max_age, s_cycles_per_hour, s_humidity_timeout_s;
   static SATShadowI s_control_interval, s_max_modulation;
@@ -4884,6 +5006,14 @@ void satPublishMQTT()
 
   publishIfChangedS(F("sat/cycle_phase"),       satCycleGetPhaseName(),                            s_cycle_phase,       false);
   publishIfChangedI(F("sat/cycles_this_hour"),  (int32_t)satCycleGetCyclesThisHour(),              s_cycles_this_hour,  false);
+  if (_pwmPhCount) {   // TASK-1880: the last closed PWM ON phase; ignition delay -1 = the burner never lit
+    const SatPwmPhaseRec& ph = _pwmPhHist[(uint8_t)((_pwmPhHead + SAT_PWM_PHASE_HIST - 1) % SAT_PWM_PHASE_HIST)];
+    publishIfChangedI(F("sat/pwm_phases_not_ignited"),    (int32_t)_pwmPhCnt.notIgnited,                 s_pwm_ph_not_ignited,    false);
+    publishIfChangedI(F("sat/pwm_last_cmd_on_s"),         (int32_t)ph.cmdOnS,                            s_pwm_ph_last_cmd_on,    false);
+    publishIfChangedI(F("sat/pwm_last_ignition_delay_s"), ph.ignited ? (int32_t)ph.ignitionDelayS : -1, s_pwm_ph_last_ign_delay, false);
+    publishIfChangedI(F("sat/pwm_last_flame_on_s"),       (int32_t)ph.flameOnS,                          s_pwm_ph_last_flame_on,  false);
+    publishIfChangedI(F("sat/pwm_last_ignited"),          (int32_t)ph.ignited,                           s_pwm_ph_last_ignited,   false);
+  }
 
   publishIfChangedI(F("sat/4h_cycles"),               (int32_t)state.sat.i4hCycles,             s_4h_cycles,     false);
   publishIfChangedF(F("sat/4h_avg_on_sec"),           state.sat.f4hAvgOnSec,                    s_4h_avg_on,     SAT_EPS_DURATION, 1, false);
@@ -7229,6 +7359,7 @@ static void satControlLoopRun()
     satNoReturnFloodOnFlameEdge(currentFlame, dhwBitNow);   // TASK-1371: CH ignition of a boiler without a return temperature
     _sat_prevFlameState = currentFlame;
   }
+  satPwmPhaseSample(currentFlame && !dhwBitNow, millis());   // TASK-1880 telemetry: CH flame time of the open PWM ON phase
 
   // Sample cycle data frequently (every loop call)
   satCycleSample();

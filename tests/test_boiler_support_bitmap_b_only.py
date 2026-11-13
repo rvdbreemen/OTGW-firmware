@@ -47,9 +47,10 @@ static bool bit(const uint8_t* b, int id) { return (b[id >> 3] >> (id & 7)) & 1;
 static uint32_t millis() { return 1000; }
 static int answerType[256];
 static void recordBoilerAnswer(uint8_t id, uint8_t type, uint32_t) { answerType[id] = 100 + type; }
-static void feed(char k, int type, int id, bool override_ = false, bool local = false) {
+static void feed(char k, int type, int id, bool override_ = false, bool local = false, bool replayed = false) {
   OTdata = OTd();
   OTdata.id = id; OTdata.type = type; OTdata.bAnswerOverride = override_; OTdata.bLocalAnswer = local;
+  OTdata.bReplayed = replayed;   // TASK-1895
   OTdata.rsptype = k == 'T' ? OTGW_THERMOSTAT : k == 'R' ? OTGW_REQUEST_BOILER : k == 'B' ? OTGW_BOILER : OTGW_ANSWER_THERMOSTAT;
   OTdata.masterslave = (k == 'T' || k == 'R') ? 0 : 1;
 """
@@ -57,12 +58,12 @@ static void feed(char k, int type, int id, bool override_ = false, bool local = 
 MAIN = r"""
 }
 int main(int argc, char** argv) {
-  // argv[1]: frames "K:type:id[:o][:l]" separated by spaces in one argument
+  // argv[1]: frames "K:type:id[:o][:l][:r]" separated by spaces in one argument (r = replayed, TASK-1895)
   char buf[4096]; strncpy(buf, argv[1], sizeof(buf) - 1); buf[sizeof(buf) - 1] = 0;
   for (char* tok = strtok(buf, " "); tok; tok = strtok(nullptr, " ")) {
-    char k = tok[0]; int type = 0, id = 0; char f1 = 0, f2 = 0;
-    sscanf(tok + 2, "%d:%d:%c:%c", &type, &id, &f1, &f2);
-    feed(k, type, id, f1 == 'o' || f2 == 'o', f1 == 'l' || f2 == 'l');
+    char k = tok[0]; int type = 0, id = 0; char f1 = 0, f2 = 0, f3 = 0;
+    sscanf(tok + 2, "%d:%d:%c:%c:%c", &type, &id, &f1, &f2, &f3);
+    feed(k, type, id, f1 == 'o' || f2 == 'o' || f3 == 'o', f1 == 'l' || f2 == 'l' || f3 == 'l', f1 == 'r' || f2 == 'r' || f3 == 'r');
   }
   for (int id = 0; id < 256; id++) {
     int ar = bit(boilerAckedRead, id), aw = bit(boilerAckedWrite, id), ur = bit(boilerUnsupportedRead, id), uw = bit(boilerUnsupportedWrite, id);
@@ -74,6 +75,7 @@ int main(int argc, char** argv) {
   }
   for (int id = 0; id < 256; id++) if (answerType[id]) printf("r %d %d\n", id, answerType[id] - 100);
   printf("u28 %d\n", boilerUnknown28ThisBoot ? 1 : 0);
+  printf("tdirty %d\n", thermostatFileDirty ? 1 : 0);
   return 0;
 }
 """
@@ -126,6 +128,8 @@ class BoilerSupportBitmapBOnly(unittest.TestCase):
                 u28 = p[1] == "1"
             elif p[0] == "r":
                 self.answers[int(p[1])] = int(p[2])
+            elif p[0] == "tdirty":
+                self.tdirty = p[1] == "1"
             elif p[0] == "t":
                 self.tbits[int(p[1])] = dict(zip(("sr", "sw", "lastw"), (x == "1" for x in p[2:])))
             else:
@@ -146,6 +150,19 @@ class BoilerSupportBitmapBOnly(unittest.TestCase):
         self.run_frames([f"T:{RD}:57", f"R:{RD}:26", f"B:{RACK}:26", f"A:{RACK}:57"])
         self.assertTrue(self.tbits[57]["sr"])
         self.assertFalse(self.tbits.get(26, {}).get("sr"), "the PIC's R26 marked thermostatSentRead[26]")
+
+    # ---- TASK-1895: a replayed T line (OTGW simulation, /simulate/start or debug otgwsim) is no thermostat evidence; before
+    # the fix it set thermostatSentRead/Write and thermostatFileDirty, and the 15-minute flush saved it to /ot-thermo.json.
+
+    def test_replayed_thermostat_lines_leave_the_thermostat_bitmaps_alone(self):
+        self.run_frames([f"T:{RD}:17:r", f"B:{RACK}:17:r", f"T:{WR}:14:r", f"B:{WACK}:14:r"])
+        self.assertFalse(self.tbits.get(17, {}).get("sr"), "a replayed T17 read marked thermostatSentRead[17]")
+        self.assertFalse(self.tbits.get(14, {}).get("sw"), "a replayed T14 write marked thermostatSentWrite[14]")
+        self.assertFalse(self.tdirty, "a replay made /ot-thermo.json dirty")
+
+    def test_real_thermostat_line_after_a_replay_still_counts(self):
+        self.run_frames([f"T:{RD}:17:r", f"T:{RD}:17", f"B:{RACK}:17"])
+        self.assertTrue(self.tbits[17]["sr"] and self.tdirty)
 
     def test_thermostat_frames_still_count(self):
         self.run_frames([f"T:{WR}:1", f"B:{WACK}:1", f"T:{RD}:25", f"B:{RACK}:25"])

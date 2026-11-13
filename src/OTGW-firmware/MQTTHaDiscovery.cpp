@@ -323,6 +323,12 @@ DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_overshoot_fraction, "sat/4h_overshoot_fract
 DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_underheat_fraction, "sat/4h_underheat_fraction",        "SAT_4H_Underheat_Fraction")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_flow_ret_delta_p50, "sat/4h_flow_ret_delta_p50",        "SAT_4H_Flow_Ret_Delta_P50")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_flow_ret_delta_p90, "sat/4h_flow_ret_delta_p90",        "SAT_4H_Flow_Ret_Delta_P90")
+// TASK-1880: the last PWM ON phase, commanded vs realised (ignition delay -1 = the burner never lit)
+DECLARE_SAT_DISCOVERY_STRINGS(sat_pwm_phases_not_ignited,    "sat/pwm_phases_not_ignited",    "SAT_PWM_Phases_Not_Ignited")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_pwm_last_cmd_on_s,         "sat/pwm_last_cmd_on_s",         "SAT_PWM_Last_Commanded_On")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_pwm_last_ignition_delay_s, "sat/pwm_last_ignition_delay_s", "SAT_PWM_Last_Ignition_Delay")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_pwm_last_flame_on_s,       "sat/pwm_last_flame_on_s",       "SAT_PWM_Last_Flame_On")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_pwm_last_ignited,          "sat/pwm_last_ignited",          "SAT_PWM_Last_Ignited")
 // TASK-1276: boiler power (kW) and the energy totals for the Home Assistant Energy dashboard.
 // sat/energy_estimated_kwh is the estimated gas input (power / efficiency, TASK-1258).
 DECLARE_SAT_DISCOVERY_STRINGS(sat_power,                 "sat/power",                        "SAT_Power")
@@ -854,7 +860,7 @@ const char ha_name_alias_ventilation_system_type[]                           PRO
 const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
 const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
 // ========== Sensor array (400 entries) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 399;  // +4 SAT requested_setpoint/curve recommendation/manufacturer/pressure_drop_rate (id 254, TASK-1490), +2 SAT CH/DHW gas consumption (id 252, TASK-1506), +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276), +1 command_dropped (faux id 240, TASK-1439)
+const uint16_t MQTT_HA_SENSOR_COUNT = 404;  // +5 SAT PWM ON-phase telemetry (id 252, TASK-1880), +4 SAT requested_setpoint/curve recommendation/manufacturer/pressure_drop_rate (id 254, TASK-1490), +2 SAT CH/DHW gas consumption (id 252, TASK-1506), +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276), +1 command_dropped (faux id 240, TASK-1439)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1371,6 +1377,12 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {252, 0x00, ha_lbl_sat_4h_underheat_fraction,  ha_name_sat_4h_underheat_fraction,  HaDeviceClass::none,        HaUnit::percent, HaStateClass::measurement,      HaIcon::percent_outline, HaEntityCat::none, true, ha_tpl_sat_ratio_percent, nullptr},
     {252, 0x00, ha_lbl_sat_4h_flow_ret_delta_p50,  ha_name_sat_4h_flow_ret_delta_p50,  HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
     {252, 0x00, ha_lbl_sat_4h_flow_ret_delta_p90,  ha_name_sat_4h_flow_ret_delta_p90,  HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    // TASK-1880: telemetry of the last PWM ON phase (diagnostic)
+    {252, 0x00, ha_lbl_sat_pwm_phases_not_ignited,    ha_name_sat_pwm_phases_not_ignited,    HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::counter,       HaEntityCat::diagnostic, true, nullptr, nullptr},
+    {252, 0x00, ha_lbl_sat_pwm_last_cmd_on_s,         ha_name_sat_pwm_last_cmd_on_s,         HaDeviceClass::none, HaUnit::s,    HaStateClass::measurement,      HaIcon::timer_outline, HaEntityCat::diagnostic, true, nullptr, nullptr},
+    {252, 0x00, ha_lbl_sat_pwm_last_ignition_delay_s, ha_name_sat_pwm_last_ignition_delay_s, HaDeviceClass::none, HaUnit::s,    HaStateClass::measurement,      HaIcon::timer_outline, HaEntityCat::diagnostic, true, nullptr, nullptr},
+    {252, 0x00, ha_lbl_sat_pwm_last_flame_on_s,       ha_name_sat_pwm_last_flame_on_s,       HaDeviceClass::none, HaUnit::s,    HaStateClass::measurement,      HaIcon::fire,          HaEntityCat::diagnostic, true, nullptr, nullptr},
+    {252, 0x00, ha_lbl_sat_pwm_last_ignited,          ha_name_sat_pwm_last_ignited,          HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::fire,          HaEntityCat::diagnostic, true, nullptr, nullptr},
     // TASK-1276: power in kW, energy totals in kWh (total_increasing, so the HA Energy dashboard accepts them).
     {252, 0x00, ha_lbl_sat_power,                  ha_name_sat_power,                  HaDeviceClass::power,       HaUnit::kW,      HaStateClass::measurement,      HaIcon::flash,           HaEntityCat::none, true, nullptr,                 nullptr},
     {252, 0x00, ha_lbl_sat_energy_total,           ha_name_sat_energy_total,           HaDeviceClass::energy,      HaUnit::kWh,     HaStateClass::total_increasing, HaIcon::lightning_bolt,  HaEntityCat::none, true, nullptr,                 nullptr},
@@ -1817,9 +1829,9 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 237
     0xFFFF, // id 238
     0xFFFF, // id 239
-    398, // id 240, 1 entry (TASK-1439: OTGWcmddropid command_dropped)
-    397, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
-    395, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
+    403, // id 240, 1 entry (TASK-1439: OTGWcmddropid command_dropped)
+    402, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
+    400, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
     332, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
     0xFFFF, // id 244
     284, // id 245, 4 entries
@@ -1829,9 +1841,9 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     313, // id 249, 4 entries (TASK-541 PIC info; ADR-113 stage 2 removed picavailable)
     317, // id 250, 15 entries (TASK-541 PIC settings)
     334, // id 251, 4 entries (TASK-541 SAT diagnostics; flame metrics moved to 243 per ADR-124)
-    338, // id 252, 37 entries (TASK-543 SAT control/PID/cycle/stats; TASK-1276 power/energy; TASK-1506 CH/DHW gas consumption)
-    375, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
-    390, // id 254, 5 entries (TASK-543 SAT flame status; TASK-1490 requested_setpoint, curve recommendation, manufacturer, pressure_drop_rate)
+    338, // id 252, 42 entries (TASK-543 SAT control/PID/cycle/stats; TASK-1276 power/energy; TASK-1506 CH/DHW gas consumption; TASK-1880 PWM phase telemetry)
+    380, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
+    395, // id 254, 5 entries (TASK-543 SAT flame status; TASK-1490 requested_setpoint, curve recommendation, manufacturer, pressure_drop_rate)
     0xFFFF // id 255
 };
 

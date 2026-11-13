@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:13:00Z'
-updated_date: '2026-11-13T06:33:00Z'
+updated_date: '2026-11-13T08:24:00Z'
 labels:
   - sat
   - telemetry
@@ -51,4 +51,10 @@ Order: code after the 220 post; build slot after 1885 (ba).
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-13: UI follow-up U10 from the VTherm UI review added as an AC.
+
+2026-11-13 d3, firmware part on lane-1880 (uncommitted, bump waits for 220/1884/1871/1885 on origin): ring of 8 SatPwmPhaseRec + counters in SATcontrol.ino (TASK-1880 block before satPwmNarrateEdge), opened in satPwmBeginOn, closed in satPwmEndOn (off) / satPwmReset (cut), lit time sampled every loop pass on flame bit && !DHW bit; SATPWMPHASE telnet line; REST /api/v2/sat/status pwm_phases[] + counters (openapi); MQTT sat/pwm_last_cmd_on_s, pwm_last_ignition_delay_s (-1 never lit), pwm_last_flame_on_s, pwm_last_ignited, pwm_phases_not_ignited with HA discovery (diagnostic; MQTT_HA_SENSOR_COUNT 399->404, LUT regenerated); MQTT.md. Deviation from plan: REST fields in the base status, not only detail=full.
+
+Evidence: tests/test_sat_pwm_phase_telemetry.py 6/6 OK; old code red (block absent, ValueError at build_source); mutants caught: ignited-on-open (3 fail), flame-always (2 fail), no close sample (1 fail); CS-instead-of-flame-bit call-site mutant fails the pin. Full tests folder run sequentially in the foreground in chunks (a run_tests.py pass hit 590 s and a background run was reaped): every test OK incl. test_sat_lowload_contract (35 tests, 522 s), only change to existing tests is a no-op satPwmPhaseSample stub in test_sat_ot_loss.py and test_sat_restart_quiet.py (they cut the loop). evaluate --quick: 86 passed, 0 failed. Open: AC4 web UI card (separate commit), AC3 bench.
+
+AC4 (U10) on lane-1880, uncommitted: card 'PWM ON phases: asked vs done' in SAT > Technical (v2.html, satRenderPwmPhases in v2.js, design-system table.stats and kv-row only), strings in EN + nl/de/el packs (i18n-lang completeness gate green). tests/webui/sat-pwm-phases.test.mjs on a fixture payload: 5/5 pass, 0/5 on the old v2.js/v2.html. All 72 webui files run one by one: 3 fail on the base commit too (pic-flash-status picAfterFlash, graph-room-dropout, home-dial-sat-only; checked in a detached base worktree), not caused by this task; every other file passes when run alone.
 <!-- SECTION:NOTES:END -->

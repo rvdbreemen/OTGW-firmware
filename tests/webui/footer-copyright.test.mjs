@@ -13,11 +13,25 @@ const DATA = process.env.OTGW_DATA_DIR || path.join(ROOT, 'src', 'OTGW-firmware'
 const HTML = fs.readFileSync(path.join(DATA, 'v2.html'), 'utf8');
 const SRC = fs.readFileSync(path.join(DATA, 'v2.js'), 'utf8');
 
-test('the page footer is the 1.x copyright line', () => {
-  const m = /<div class="foot"(?! id=)[^>]*>([^<]*)<\/div>/.exec(HTML);
-  assert.ok(m, 'page footer present');
-  assert.equal(m[1], '© 2021-2026 Robert van den Breemen');
-  assert.doesNotMatch(m[0], /data-i18n/, 'a name and a year: not translated');
+// TASK-1893 (Robert 2026-11-13): the copyright line left the page footer; it lives in an About card at the end of
+// Settings (as on the project site), followed by a Contributors card (most contributions first).
+test('no page footer; the copyright line sits in the Settings About card', () => {
+  assert.doesNotMatch(HTML, /<div class="foot"(?! id=)[^>]*>[^<]*Robert van den Breemen/, 'page footer gone');
+  const set = HTML.slice(HTML.indexOf('<div id="page-settings"'), HTML.indexOf('</div><!-- /page-settings -->'));
+  const about = /<div class="adv-card" id="setAbout"[\s\S]*?id="setContrib"/.exec(set);
+  assert.ok(about, 'About card in Settings');
+  assert.match(about[0], /independent open-source project by<\/span> <span data-i18n-skip>Robert van den Breemen<\/span>/);
+  assert.match(about[0], /© 2021-2026 Robert van den Breemen/);
+  const order = ['Robert van den Breemen', 'Schelte Bron', 'George Ntellas', 'Alex (Alexwijn)', 'Nodo Shop']
+    .map((n) => about[0].indexOf(n));
+  assert.ok(order.every((i) => i >= 0), 'every credit present');
+  assert.deepEqual([...order].sort((x, y) => x - y), order, 'Robert first, then the credits in the site order');
+  assert.match(about[0], /href="https:\/\/otgw\.tclcode\.com\/"/);
+  assert.match(about[0], /href="https:\/\/github\.com\/Alexwijn\/SAT"/);
+  assert.match(about[0], /href="https:\/\/www\.nodo-shop\.nl\/"/);
+  const contrib = set.indexOf('id="setContrib"');
+  assert.ok(contrib > set.indexOf('id="setAbout"'), 'Contributors card after the About card');
+  assert.match(set.slice(contrib), /Code \(GitHub\)[\s\S]*Dave Davenport[\s\S]*Community \(Discord\)[\s\S]*Qball/);
 });
 
 test('the old footer text and its translation key are gone', () => {
