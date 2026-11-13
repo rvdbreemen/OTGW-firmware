@@ -4,7 +4,7 @@ title: 'OT-Direct: success and clear replies that differ from the PIC'
 status: To Do
 assignee: []
 created_date: '2026-11-12T00:04:00Z'
-updated_date: '2026-11-12T00:12:00Z'
+updated_date: '2026-11-13T18:39:00Z'
 labels:
   - otdirect
   - parity
@@ -38,4 +38,6 @@ From the PIC 6.8 parity audit (N15), docs/reviews/2026-11-12_pic68-otdirect-pari
 Not verified (from the audit): client impact; none found.
 
 Part of the PIC 6.8 parity audit, parent TASK-1851.
+
+2026-11-13 delta parity check (TASK-1851, comms, read-only, OT-Direct at origin/dev 479e49391 vs PIC 6.8 gateway.asm; G=gateway.asm, O=OTDirect.ino): partly fixed: VS clear (1d4b8fdac) and CL clear (60c0fbc50) replies match now. Still open: SR= echo (O:3999), FT= echo of any character (O:4211-4214), SC hours printed with %d (O:3497).
 <!-- SECTION:NOTES:END -->

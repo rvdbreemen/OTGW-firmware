@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-11T06:37:00Z'
-updated_date: '2026-11-12T00:07:00Z'
+updated_date: '2026-11-13T18:38:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -35,4 +35,6 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 
 <!-- SECTION:NOTES:BEGIN -->
 PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-audit/REVIEW.md), section 3 'Corrections to existing tasks'. G: = gateway.asm 6.8 (OTGW-other-projects/otgw-6.8, 770aa45); O: = OTDirect.ino at fa5790118. Read from code only. Correction (incomplete): OT=+15.4 clears on OT-Direct (test `!isdigit && != '-'`, O:3141-3144). PIC accepts a leading + (GetFloat G:5118-5127) and documents that form (G:45).
+
+2026-11-13 delta parity check (TASK-1851, comms, read-only, OT-Direct at origin/dev 479e49391 vs PIC 6.8 gateway.asm; G=gateway.asm, O=OTDirect.ino): partial: OT=- and OT=+x fixed by 9aa81609c (TASK-1846). Still open: MM=- goes into the numeric branch and writes 0 (O:3433-3436; PIC clears, G:4806-4807); OT>=64 still written (PIC clears, G:4259-4263); clear replies echo the input instead of '-' (G:4264).
 <!-- SECTION:NOTES:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-11T06:39:00Z'
-updated_date: '2026-11-12T00:07:00Z'
+updated_date: '2026-11-13T18:38:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -35,4 +35,6 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 
 <!-- SECTION:NOTES:BEGIN -->
 PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-audit/REVIEW.md), section 3 'Corrections to existing tasks'. G: = gateway.asm 6.8 (OTGW-other-projects/otgw-6.8, 770aa45); O: = OTDirect.ino at fa5790118. Read from code only. Correction (incomplete): covers only the 3-strike path. On the PIC, MandatoryID also undoes a manual UI= for IDs 0,1,3,14,17,25 on every request (G:3409-3416, "even (accidental) manual action cannot blacklist"; call sites G:2720, :2806, :2967, :3651). On OT-Direct UI=1, and also UI=0, goes into otUnknownIds (O:3712-3725) and otdIsAltSlot then takes the thermostat's frame for good (O:1893-1897, :2352-2359). After UI=0 the thermostat status never reaches the boiler. Add an AC for the UI= path including ID 0.
+
+2026-11-13 delta parity check (TASK-1851, comms, read-only, OT-Direct at origin/dev 479e49391 vs PIC 6.8 gateway.asm; G=gateway.asm, O=OTDirect.ino): still valid and worse: TASK-1836 now persists and restores the UI= list, and the restore accepts 0-127 (O:3224-3242, UI handler O:4021-4025), so an accidental UI=0/UI=1 survives a reboot; the PIC undoes it for the mandatory IDs on every request (G:3409-3416 per REVIEW).
 <!-- SECTION:NOTES:END -->
