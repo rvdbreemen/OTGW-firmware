@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-13T09:55:00Z'
-updated_date: '2026-11-13T10:06:00Z'
+updated_date: '2026-11-13T10:08:00Z'
 labels:
   - bug
   - sat
@@ -39,4 +39,6 @@ Report: indigo_light (Discord 301077214374658048), #nederlandse-ondersteuning ht
 2026-11-13 weather trace (comms, read-only, origin/dev 01e465054). Provider: Open-Meteo over plain HTTP, http://api.open-meteo.com/v1/forecast?latitude=..&longitude=.. (SATweather.ino:95/101), fetched on the webhook worker task (weatherRequestFetch :475-500), connect 2 s / read 5 s (:381-382). Preconditions in weatherLoop() (:605-640): settings.sat.bWeatherEnable (:608), 5 min after boot (WEATHER_POLL_MIN_SEC 300, :28, :611), coordinates not both 0 (:477-480, :630), heap not CRITICAL (:483-489); SAT on is NOT required. Interval: settings.sat.iWeatherInterval (default 900 s), first-fetch retry 60 s doubling to the interval (:557-565). LIKELY CAUSE of the follow-up: SATweather.ino:617  (TASK-511, f12a753eb) skips every weather fetch while the OT state holds a non-zero outside temperature. The PIC's own DS18B20 value fills OTcurrentSystemState.Toutside (the 5.6 C on his SAT page) but is rejected by satResolveOutsideTemp() (only a live boiler Read-Ack stamps it, OTGW-Core.ino:6098-6102). So the weather fallback never starts and SAT has no valid source at all: the two guards use different definitions of 'the boiler provides an outside temperature'. Failure reporting: telnet lines 'Weather: skipping fetch, no coordinates configured', 'Weather: no connection to the weather server', 'Weather: HTTP <code>', 'Weather: heap critical, fetch not started'; REST GET /api/v2/sat/weather fields enabled, valid, latitude, longitude, fetch_errors (:659-682). With the :617 skip there is NO log line and fetch_errors stays 0, valid false. No existing task for this skip (TASK-511 added it, archived). Fix direction (not decided): make :617 use the same validity as satResolveOutsideTemp (iToutsideBoilerMs fresh), not the raw state value.
 
 Correction to the note above (a shell quoting error dropped the code): the skip at SATweather.ino:617 is: if (OTcurrentSystemState.Toutside != 0.0f) return;
+
+2026-11-13 split (coordinator): the weather-fetch skip is TASK-1897 (fix without a Sergeant D decision). This task keeps only the question whether a gateway-measured outside value (DS18B20 on the PIC) counts as a SAT source: Sergeant D, after the capture.
 <!-- SECTION:NOTES:END -->
