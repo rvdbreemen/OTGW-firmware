@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:13:00Z'
-updated_date: '2026-11-13T08:26:00Z'
+updated_date: '2026-11-13T19:13:00Z'
 labels:
   - sat
   - telemetry
@@ -24,7 +24,7 @@ Lesson 2 of docs/sat/vtherm-comparison-2026-11-13.md (TASK-1879). The tuner alre
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Host test: excluded hours increment the counter of their reason; the decision path is unchanged (tests/test_sat_curve_selftune.py green)
-- [ ] #2 Counters visible in REST and as flat MQTT topics (ADR-101)
+- [x] #2 Counters visible in REST and as flat MQTT topics (ADR-101)
 - [x] #3 Web UI (U9): the curve card shows tune progress (counted days x/3, last decision, per-reason excluded hours) from the new fields; webui test on a fixture payload
 <!-- AC:END -->
 
@@ -55,4 +55,6 @@ Evidence so far: python tests/test_sat_curve_selftune.py -> Ran 95 tests OK (ski
 Gates 2026-11-13: affected host tests (run_tests.py --changed selection, 94 files, run one by one after the full parallel run was reaped for low memory): 94/94 pass. Fix on the way: tests/test_sat_cycle_classifier.py extract_types() now prepends SATcurveTune.h when SATRuntimeSection uses SatTuneProgress (it also feeds test_sat_pwm_start_limit). Web UI: 72 files one by one, 71 pass; tests/webui/pic-flash-status.test.mjs fails 1/14 (ReferenceError applyPicTabGate) on the d34723882 v2.js too, so not from this change (reported to the coordinator). AC2 stays open: REST/MQTT on a device needs the bench (09).
 
 Follow-up: the 32 nl/de/el strings were translated by hand against i18n/glossary.md (terms 5, 15, 20, 28, 45), not through the translate_webui skill with its two reviews; a sync review of the sat_tune_* keys is still open (e.g. Greek 'ώ' as the hour unit). pic-flash-status finding sent to the coordinator 2026-11-13.
+
+AC2 bench (otgw-bench-tester, 2026-11-13, .61 on 2.0.0-beta.226+e86aed9, src byte-identical to the pushed 6f302ffb4; SAT on + simulation + curve_self_tune on). REST /api/v2/sat/status curve_tune = {running true, days 0, days_needed 3, clean_hours_today, clean_hours_needed 6, hours_today, last_decision 'none', last_reason 'none', excluded_hours with 12 keys}. Sim event tune_hour=60: hours_today and clean_hours_today 0->1->2->3 in 3 minutes (19:03-19:06). Broker, 12-minute capture: all 17 flat topics (sat/curve_tune/running, /days, /clean_hours_today, /last_decision, /last_reason and 12x /excluded_hours/<reason>), 26 messages, all not retained (r=0); topics that do not change only arrive with the 7-11 minute heartbeat (SATmqttPublish.h:57-58). With curve_self_tune off: 12-minute capture, 0 sat/curve_tune/* messages while the control topic sat/pwm_duty did arrive. Screenshot of the curve card self-tune box ('0/3 counted days, today 1/6 clean hours'). Evidence (bench-tester scratchpad): b226\61-mqtt-curvetune-on12.txt, b226\61-mqtt-curvetune-off12.txt, b226\after-226-control-curvecard.png.
 <!-- SECTION:NOTES:END -->
