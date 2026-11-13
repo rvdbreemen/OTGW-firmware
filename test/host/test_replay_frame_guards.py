@@ -47,7 +47,15 @@ def main():
     lines = read_source(args.rev).splitlines()
     GEN.mkdir(exist_ok=True)
     hdr = f"// GENERATED from {SOURCE} ({origin}) by test_replay_frame_guards.py. Do not edit.\n"
-    (GEN / "replay_guard_outside27.inc").write_text(hdr + slice_block(lines, r"^\s*if \(OTdata\.id == 27 &&") + "\n", encoding="utf-8")
+    # TASK-1896 moved the frame rule into otFrameIsFreshOutsideTemp(); an older revision has it inline.
+    if any(re.search(r"^static bool otFrameIsFreshOutsideTemp\(", l) for l in lines):
+        pred = slice_block(lines, r"^static bool otFrameIsFreshOutsideTemp\(")
+        stamp = slice_block(lines, r"^\s*if \(otFrameIsFreshOutsideTemp\(OTdata\)\)")
+    else:
+        pred = "// (no otFrameIsFreshOutsideTemp() in this revision)"
+        stamp = slice_block(lines, r"^\s*if \(OTdata\.id == 27 &&")
+    (GEN / "replay_guard_outside27_pred.inc").write_text(hdr + pred + "\n", encoding="utf-8")
+    (GEN / "replay_guard_outside27.inc").write_text(hdr + stamp + "\n", encoding="utf-8")
     (GEN / "replay_guard_banner.inc").write_text(hdr + slice_banner(lines) + "\n", encoding="utf-8")
     print(f"== sliced the processOT() MsgID 27 stamp and banner statements ({origin})")
     exe = GEN / "test_replay_frame_guards.exe"

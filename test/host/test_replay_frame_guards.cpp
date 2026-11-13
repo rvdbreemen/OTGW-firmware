@@ -8,9 +8,10 @@
 #include <cstdio>
 #include <cstdint>
 
-enum { OTGW_BOILER = 1, OTGW_THERMOSTAT = 2 };
-enum { OT_READ_ACK = 1, OT_WRITE_DATA = 2 };
-struct { int id; int rsptype; int type; bool skipthis; bool bGatewaySubstituted; bool bReplayed; } OTdata;
+enum { OTGW_BOILER = 1, OTGW_THERMOSTAT = 2, OTGW_ANSWER_THERMOSTAT = 3, OTGW_REQUEST_BOILER = 4 };
+enum { OT_READ_ACK = 1, OT_WRITE_DATA = 2, OT_INVALID_DATA = 3 };
+struct OpenthermData_t { int id; int rsptype; int type; bool skipthis; bool bGatewaySubstituted; bool bReplayed; };
+OpenthermData_t OTdata;
 struct { struct { uint32_t iToutsideBoilerMs; } otBus; } state;
 static uint32_t g_ms = 5000;
 static uint32_t millis() { return g_ms; }
@@ -19,6 +20,7 @@ static bool isOTDirectEnabled() { return g_otDirect; }
 static int g_restarts = 0;
 static void satNotifyPicRestart() { g_restarts++; }
 
+#include "generated/replay_guard_outside27_pred.inc"
 static void outsideStamp() {
 #include "generated/replay_guard_outside27.inc"
 }
@@ -45,6 +47,11 @@ int main() {
   outside("live boiler Read-Ack stamps", OTGW_BOILER, OT_READ_ACK, false, 5000);
   outside("replayed boiler Read-Ack leaves the stamp", OTGW_BOILER, OT_READ_ACK, true, 111);
   outside("thermostat frame leaves the stamp", OTGW_THERMOSTAT, OT_WRITE_DATA, false, 111);
+  std::printf("TASK-1896 gateway Write-Data 27 (PIC DS18B20 / OT=)\n");
+  outside("gateway Write-Data to the boiler stamps", OTGW_REQUEST_BOILER, OT_WRITE_DATA, false, 5000);
+  outside("replayed gateway Write-Data leaves the stamp", OTGW_REQUEST_BOILER, OT_WRITE_DATA, true, 111);
+  outside("gateway Invalid-Data (failed sensor) leaves the stamp", OTGW_REQUEST_BOILER, OT_INVALID_DATA, false, 111);
+  outside("gateway answer to the thermostat leaves the stamp", OTGW_ANSWER_THERMOSTAT, OT_READ_ACK, false, 111);
 
   std::printf("TASK-1650 banner and satNotifyPicRestart\n");
   g_otDirect = false; g_restarts = 0; bannerSeen();

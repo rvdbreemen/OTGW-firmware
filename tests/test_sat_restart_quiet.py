@@ -470,11 +470,16 @@ class SourceGuards(unittest.TestCase):
         cls.core = (SRC / "OTGW-Core.ino").read_text(encoding="utf-8").replace("\r\n", "\n")
 
     def test_msgid27_stamp_only_on_a_live_boiler_read_ack(self):
+        # TASK-1896: the frame rule moved into otFrameIsFreshOutsideTemp(); its behaviour (boiler Read-Ack and
+        # the gateway's own Write-Data 27, never replay/parity/A frame) is tested by test_outside_stamp_gateway_frames.py.
         i = self.core.index("state.otBus.iToutsideBoilerMs = millis();")
         head = self.core[i - 260:i]
-        for cond in ("OTdata.id == 27", "OTdata.rsptype == OTGW_BOILER", "OTdata.type == OT_READ_ACK",
-                     "!OTdata.skipthis", "!OTdata.bGatewaySubstituted"):
-            self.assertIn(cond, head, cond)
+        self.assertIn("if (otFrameIsFreshOutsideTemp(OTdata))", head)
+        p = self.core.index("static bool otFrameIsFreshOutsideTemp(")
+        pred = self.core[p:self.core.index("\n}\n", p)]
+        for cond in ("f.id != 27", "f.skipthis", "f.bReplayed", "f.rsptype == OTGW_BOILER", "f.type == OT_READ_ACK",
+                     "!f.bGatewaySubstituted"):
+            self.assertIn(cond, pred, cond)
         a = self.core.index("static void updatePSSummaryFloatState(")
         self.assertNotIn("iToutsideBoilerMs", self.core[a:self.core.index("\n}\n", a)], "the PS=1 summary must not stamp")
 

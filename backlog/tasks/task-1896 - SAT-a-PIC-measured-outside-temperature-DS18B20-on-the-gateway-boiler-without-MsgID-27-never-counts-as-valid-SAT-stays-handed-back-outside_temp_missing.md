@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T09:55:00Z'
-updated_date: '2026-11-13T11:50:00Z'
+updated_date: '2026-11-13T11:57:00Z'
 labels:
   - bug
   - sat
@@ -57,4 +57,6 @@ Bench AC note: the bench check runs on the Classic + PIC with a DS18B20 or OT=; 
 2026-11-13 11:07 UTC: Sergeant D agrees with entry 330 ("hahahaha sorry. My answer is A", 1570756945470824540, after the ambiguous "of course yes" 1570753538420903997), recorded as entry 331. The coordinator replied to indigo_light in #nederlandse-ondersteuning; the comms follow-up on running HA SAT as a fallback (turn the firmware SAT off): 1570756471120076903.
 
 AC2 evidence: Robert decided (entry 330), Sergeant D agrees (entry 331, 1570756945470824540). AC3 host-test part done in 1f4d62091: test/host/test_replay_frame_guards.py --rev origin/dev FAIL 'gateway Write-Data to the boiler stamps' (got 111 want 5000), PASS 9/9 on the fix; tests/test_outside_stamp_gateway_frames.py red 1F/8P on the behaviour-neutral extraction, green 9/9; full suite 229 files 228 passed 0 failed 1 skipped; evaluate --quick 0 FAIL. AC3 'outside_temp_missing clears with only the PIC sensor present' is NOT ticked: needs the build on a unit (AC5 bench). AC1 (frame sequence from a capture) open: the reading is from the PIC 6.8 source only. The commit goes into lane 95's combined build (cherry-pick); lane-comms stays local until 95 pushes.
+
+Firmware fix commit rebased onto ed751972a (docs pushed separately); the code-only commit on lane-comms goes into lane 95's combined build.
 <!-- SECTION:NOTES:END -->

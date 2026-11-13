@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.224
+**  Version  : v2.0.0-beta.225
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5026,6 +5026,24 @@ static void stampThermostatRoomTemp()
   if (state.otBus.iTrThermostatMs == 0) state.otBus.iTrThermostatMs = 1;
 }
 
+// --- otOutsideStamp begin
+// A frame that carries a new MsgID 27 outside temperature, for SAT's 1 h validity (entries 57, 126, 330):
+// - the boiler's own live Read-Ack (TASK-1390);
+// - the gateway's own Write-Data towards the boiler (TASK-1896, entry 330): a PIC with a DS18B20 (TS=O) or
+//   an OT= value turns the thermostat's Read-Data 27 into a Write-Data 27 with that value (gateway.asm 6.8
+//   MessageID27), and on OT-Direct OT= writes it. This R frame is the one that writes the canonical
+//   Toutside. A failed PIC sensor sends Invalid-Data instead, so a dead sensor ages out.
+// Never a replayed line (TASK-1649) or a parity error, never an A frame (an OT-Direct cache answer can
+// repeat an old value), and never the PS=1 summary, which has no age (ADR-181).
+static bool otFrameIsFreshOutsideTemp(const OpenthermData_t &f)
+{
+  if (f.id != 27 || f.skipthis || f.bReplayed) return false;
+  if (f.rsptype == OTGW_BOILER) return f.type == OT_READ_ACK && !f.bGatewaySubstituted;
+  if (f.rsptype == OTGW_REQUEST_BOILER) return f.type == OT_WRITE_DATA;
+  return false;
+}
+// --- otOutsideStamp end
+
 static void updatePSSummaryFloatState(uint8_t msgid, float fval)
 {
   switch (msgid) {
@@ -6134,10 +6152,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
       if (OTdata.id == 24 && OTdata.rsptype == OTGW_THERMOSTAT && OTdata.type == OT_WRITE_DATA) {
         stampThermostatRoomTemp();
       }
-      // TASK-1390: the boiler's own outside temperature, from a live Read-Ack only (entries 57, 126).
-      // TASK-1649: a replayed line (OTdata.bReplayed) is no live Read-Ack and does not stamp it.
-      if (OTdata.id == 27 && OTdata.rsptype == OTGW_BOILER && OTdata.type == OT_READ_ACK &&
-          !OTdata.skipthis && !OTdata.bGatewaySubstituted && !OTdata.bReplayed) {
+      if (otFrameIsFreshOutsideTemp(OTdata)) {
         state.otBus.iToutsideBoilerMs = millis();
         if (state.otBus.iToutsideBoilerMs == 0) state.otBus.iToutsideBoilerMs = 1;
       }
