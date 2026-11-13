@@ -530,6 +530,22 @@ The example values are illustrative, not the defaults.
 | `sat/thermal_drop_rate` | `"0.03"` | no | Current thermal drop rate sample |
 | `sat/thermal_model_valid` | `"true"` | yes | Whether thermal model has sufficient data |
 
+#### Heating Curve Self-Tune Progress
+
+Telemetry of the self-tune (TASK-1881), published only while `curve_self_tune` is on. Values change once an hour at most.
+The counters cover the current window: they start at 0 when the window empties (a manual or a self-tune coefficient
+change, the self-tune switched on, a reboot) and are not stored in `/sat_tune.json`, so after a reboot they restart at 0
+while a restored window keeps its counted days.
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/curve_tune/running` | `"true"` / `"false"` | no | The self-tune clock runs (self-tune on and SAT enabled) |
+| `sat/curve_tune/days` | `"2"` | no | Counted days in the window (3 are needed for a decision) |
+| `sat/curve_tune/clean_hours_today` | `"4"` | no | Clean hours of the current day (6 are needed for the day to count) |
+| `sat/curve_tune/last_decision` | `"hold"` | no | Last daily decision: `raise`, `lower`, `hold`, or `none` before the first day closes |
+| `sat/curve_tune/last_reason` | `"few_days"` | no | Reason of the last daily record: `few_days`, `day_not_counted`, `no_phases`, `inside_band`, `phases_disagree`, `phases_agree`, `at_limit` (`none` before the first day) |
+| `sat/curve_tune/excluded_hours/<reason>` | `"3"` | no | Hours that did not count, per reason (the first reason of each hour), one topic per reason: `not_sat`, `dhw`, `no_sun`, `sun`, `pwm`, `flame_off`, `min_mod`, `coeff_changed`, `no_ticks`, `not_controlling`, `few_ticks`, `no_room` |
+
 #### Solar Gain
 
 | Topic | Value | Retained | Description |
@@ -1375,7 +1391,7 @@ Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-aud
 
 **BLE per-MAC entities:** see "Home Assistant auto-discovery" under BLE Temperature Sensor.
 
-The topics `sat/estimated_room`, `sat/humidity`, `sat/current_modulation`, `sat/pressure`, `sat/error_mean`, `sat/error_stddev`, `sat/thermal_*`, `sat/indoor_rise_rate`, `sat/curve_recommendation`, `sat/summer_*`, `sat/pressure_alarm`, `sat/modulation_reliable`, `sat/setpoint_mismatch`, `sat/solar_gain` and `sat/humidity_valid` are published but have no discovery entity. There is no SAT DHW-setpoint number entity.
+The topics `sat/estimated_room`, `sat/humidity`, `sat/current_modulation`, `sat/pressure`, `sat/error_mean`, `sat/error_stddev`, `sat/thermal_*`, `sat/indoor_rise_rate`, `sat/curve_recommendation`, `sat/summer_*`, `sat/pressure_alarm`, `sat/modulation_reliable`, `sat/setpoint_mismatch`, `sat/solar_gain`, `sat/humidity_valid` and `sat/curve_tune/*` are published but have no discovery entity. There is no SAT DHW-setpoint number entity.
 
 **Switch entities (TASK-284):**
 

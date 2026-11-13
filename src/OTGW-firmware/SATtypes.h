@@ -380,6 +380,8 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // Solar gain (Task #23)
   bool     bSolarGainActive       = false;
   float    fIndoorRiseRate        = 0.0f;  // Current indoor temp rise rate (C/hr)
+  // TASK-1881: heating curve self-tune progress (counted days, last decision, excluded hours per reason), copied on the loop task
+  SatTuneProgress tuneProgress   = {};
   // Sun elevation (Task #68)
   float    fSunElevation          = 0.0f;  // Current sun elevation (degrees): external MQTT value, else computed (TASK-1410)
   bool     bSunElevationValid     = false; // Whether we have valid sun elevation data

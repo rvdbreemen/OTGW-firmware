@@ -251,6 +251,9 @@ def extract_types(src: str, real_settings: bool) -> str:
     a = src.index("enum SATHeatingSystem")
     b = _grab(r"^struct SATRuntimeSection\b.*?^\};", src, "struct SATRuntimeSection").end()
     out = src[a:b] + "\n"
+    if "SatTuneProgress" in out:   # TASK-1881: state.sat holds the self-tune progress, its type lives in SATcurveTune.h
+        hdr = SATTYPES_H.with_name("SATcurveTune.h").read_text(encoding="utf-8").replace("#pragma once", "")
+        out = hdr + "\n" + out
     if real_settings:
         out += _grab(r"^struct SATSection\b.*?^\};", src, "struct SATSection").group(0) + "\n"
     return out

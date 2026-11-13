@@ -4432,6 +4432,8 @@ struct SatStatusSnap {
   SatPwmPhaseCounters pwmPhCnt;
 };
 
+static const char* satTuneReasonName(uint8_t r);   // TASK-1881: defined in the satCurveTune block below
+
 void satSendStatusJSON()
 {
   const uint32_t startMs = millis();
@@ -4634,6 +4636,22 @@ void satSendStatusJSON()
     je.field(F("overshoot_protection"),  settings.sat.bOvershootProtection);
     je.field(F("follow_thermostat"),    settings.sat.bFollowThermostat);
     je.field(F("curve_self_tune"),      settings.sat.bCurveSelfTune);   // TASK-1525
+    { // TASK-1881: self-tune progress and the hours each reason kept out of the window (telemetry, satCurveTuneGetProgress)
+      const SatTuneProgress& tp = snap->st.sat.tuneProgress;
+      je.beginObject(F("curve_tune"));
+      je.field(F("running"),           tp.running);
+      je.field(F("days"),              (uint32_t)tp.days);
+      je.field(F("days_needed"),       (uint32_t)SAT_CT_WINDOW_DAYS);
+      je.field(F("clean_hours_today"), (uint32_t)tp.cleanToday);
+      je.field(F("clean_hours_needed"), (uint32_t)SAT_CT_MIN_CLEAN_HOURS);
+      je.field(F("hours_today"),       (uint32_t)tp.hoursToday);
+      je.field(F("last_decision"),     !tp.haveLast ? "none" : (tp.lastDecision > 0 ? "raise" : (tp.lastDecision < 0 ? "lower" : "hold")));
+      je.field(F("last_reason"),       (const char*)tp.lastReason);
+      je.beginObject(F("excluded_hours"));
+      for (uint8_t r = SATT_NONE + 1; r < SATT_COUNT; r++) je.field(satTuneReasonName(r), tp.exclHours[r]);
+      je.endObject();
+      je.endObject();
+    }
     je.field(F("fireplace_mode"),       settings.sat.bFireplaceMode);
     je.field(F("flow_offset"),          settings.sat.fFlowOffset);
     je.field(F("pressure"),             snap->st.sat.fSmoothedPressure);
@@ -5131,6 +5149,28 @@ void satPublishMQTT()
   }
 
   publishIfChangedS(F("sat/heating_curve_recommendation"), state.sat.sHeatCurveRec, s_heating_curve_rec, true);
+
+  // TASK-1881: heating curve self-tune progress, flat topics (ADR-101), on change + heartbeat, not retained. Only while the
+  // self-tune is on; the values change once an hour at most. No discovery entity (MQTT.md, SAT diagnostics without one).
+  if (settings.sat.bCurveSelfTune) {
+    static SATShadowB s_ct_running;
+    static SATShadowI s_ct_days, s_ct_clean_today;
+    static SATShadowS s_ct_last_decision, s_ct_last_reason;
+    static SATShadowI s_ct_excl[SATT_COUNT];
+    const SatTuneProgress& tp = state.sat.tuneProgress;
+    publishIfChangedB(F("sat/curve_tune/running"),           tp.running,                s_ct_running,      false);
+    publishIfChangedI(F("sat/curve_tune/days"),              (int32_t)tp.days,          s_ct_days,         false);
+    publishIfChangedI(F("sat/curve_tune/clean_hours_today"), (int32_t)tp.cleanToday,    s_ct_clean_today,  false);
+    publishIfChangedS(F("sat/curve_tune/last_decision"),
+                      !tp.haveLast ? "none" : (tp.lastDecision > 0 ? "raise" : (tp.lastDecision < 0 ? "lower" : "hold")),
+                      s_ct_last_decision, false);
+    publishIfChangedS(F("sat/curve_tune/last_reason"),       tp.lastReason,             s_ct_last_reason,  false);
+    char topic[56];
+    for (uint8_t r = SATT_NONE + 1; r < SATT_COUNT; r++) {
+      snprintf_P(topic, sizeof(topic), PSTR("sat/curve_tune/excluded_hours/%s"), satTuneReasonName(r));
+      publishIfChangedI(topic, (int32_t)tp.exclHours[r], s_ct_excl[r], false);
+    }
+  }
 
   publishIfChangedF(F("sat/error_mean"),   state.sat.fMeanError,   s_error_mean,   SAT_EPS_ERROR,    2, false);
   publishIfChangedF(F("sat/error_stddev"), state.sat.fErrorStdDev, s_error_stddev, SAT_EPS_FRACTION, 3, false);
@@ -6276,6 +6316,7 @@ static void satTuneClearHour(SatTune& t)
 static void satTuneEmptyWindow(SatTune& t)
 {
   t.winDays = 0;
+  for (uint8_t r = 0; r < SATT_COUNT; r++) t.exclHours[r] = 0;   // TASK-1881: the counters cover the current window
   for (uint8_t i = 0; i < SAT_CT_WINDOW_DAYS; i++) {
     t.winClean[i] = 0; t.winSum[i] = 0.0f;
     for (uint8_t p = 0; p < SATP_COUNT; p++) { t.winPhTicks[i][p] = 0; t.winPhSum[i][p] = 0.0f; }
@@ -6288,6 +6329,7 @@ static void satTuneReset(SatTune& t)
   satTuneClearDay(t);
   satTuneEmptyWindow(t);
   t.hourNo = 0; t.dayNo = 0;
+  t.haveLast = false; t.lastDay = 0; t.lastDecision = 0; t.lastReason = PSTR("none");   // TASK-1881
 }
 
 // Note one exclusion for the current hour. "First reason" means first in time: the earliest exclusion noted in the hour
@@ -6340,6 +6382,8 @@ static void satTuneCloseHour(SatTune& t, SatTuneHourOut& out, uint32_t minTicks)
   out.reason   = t.reason;
   if (t.reason == SATT_NONE && !out.haveMean) out.reason = SATT_NO_TICKS;
   out.counted  = (out.reason == SATT_NONE);
+  // TASK-1881 telemetry: the hour that does not count adds one to its reason (the decision never reads these)
+  if (!out.counted && out.reason < SATT_COUNT && t.exclHours[out.reason] < 0xFFFF) t.exclHours[out.reason]++;
   for (uint8_t p = 0; p < SATP_COUNT; p++) {
     out.phTicks[p]    = t.phTicks[p];
     out.phHaveMean[p] = (t.phTicks[p] > 0);
@@ -6677,6 +6721,7 @@ static void satTuneRollHour()
   SatTuneDayOut d;
   satTuneCloseDay(_sat_tune, oldCoeff, intervalMs, d);
   satTuneLogDay(d);
+  _sat_tune.haveLast = true; _sat_tune.lastDay = d.day; _sat_tune.lastDecision = d.decision; _sat_tune.lastReason = d.reason;   // TASK-1881
   if (d.decision == 0) { satTuneSaveWindow(); return; }
   satTuneApplyCoeff(d.newCoeff);   // the one settings.ini write: only here, only on a change
   satTuneSaveWindow();
@@ -6732,6 +6777,20 @@ static void satCurveTuneNoteTick(const SatTuneTickIn& in)
   SatTuneTickIn t = in;
   t.pwmGas = (satGetEffectiveHeatingSource() == SAT_SRC_GAS_BOILER);   // ADR-231 d1: the configured source, AUTO = gas (entry 323)
   satTuneAddTick(_sat_tune, t);
+}
+
+// TASK-1881: the tuner state REST and MQTT show. Loop task only (it reads _sat_tune); satControlLoop() copies it into state.sat.
+static void satCurveTuneGetProgress(SatTuneProgress& p)
+{
+  p.running      = _sat_tuneRunning;
+  p.days         = _sat_tuneRunning ? _sat_tune.winDays : 0;
+  p.cleanToday   = _sat_tuneRunning ? _sat_tune.cleanInDay : 0;
+  p.hoursToday   = _sat_tuneRunning ? _sat_tune.hoursInDay : 0;
+  p.haveLast     = _sat_tuneRunning && _sat_tune.haveLast;
+  p.lastDay      = p.haveLast ? _sat_tune.lastDay : 0;
+  p.lastDecision = p.haveLast ? _sat_tune.lastDecision : 0;
+  strlcpy_P(p.lastReason, p.haveLast && _sat_tune.lastReason ? _sat_tune.lastReason : PSTR("none"), sizeof(p.lastReason));
+  for (uint8_t r = 0; r < SATT_COUNT; r++) p.exclHours[r] = _sat_tuneRunning ? _sat_tune.exclHours[r] : 0;
 }
 // --- satCurveTune glue end
 
@@ -7249,6 +7308,7 @@ void satControlLoop()
   OTGW_CONN_PROBE(CPROBE_SAT_CORE);  // TASK-1757 AC3: the first pass after a connect publishes the whole core set
 #endif
   if (!_sat_tuneGatesPassed) satCurveTuneNoteNotControlling();   // TASK-1525: a gate held SAT back this pass: the tuner hour does not count
+  satCurveTuneGetProgress(state.sat.tuneProgress);   // TASK-1881: REST (state snapshot) and MQTT read this copy
 }
 
 // Hot-water tick: MM= to the maximum for the whole draw (Sergeant D entry 220, Q-1539a B; entry 21; thermo-nova

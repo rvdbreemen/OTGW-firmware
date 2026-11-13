@@ -36,8 +36,12 @@
 
 enum SatTuneReason : uint8_t {
   SATT_NONE = 0, SATT_NOT_SAT, SATT_DHW, SATT_NO_SUN, SATT_SUN, SATT_PWM, SATT_FLAME_OFF, SATT_MIN_MOD,
-  SATT_COEFF_CHANGED, SATT_NO_TICKS, SATT_NOT_CONTROLLING, SATT_FEW_TICKS, SATT_NO_ROOM
+  SATT_COEFF_CHANGED, SATT_NO_TICKS, SATT_NOT_CONTROLLING, SATT_FEW_TICKS, SATT_NO_ROOM,
+  SATT_COUNT   // number of reasons, SATT_NONE included (size of the per-reason counters)
 };
+// TASK-1881: per-reason counters of excluded hours (telemetry only, the decision does not read them). The host test sets its
+// counter checks only with this marker, so the tuner from before TASK-1881 still compiles in the old-vs-fix run.
+#define SAT_CT_EXCL_COUNTERS 1
 
 // What one control tick tells the tuner. Hot-water ticks and ticks while SAT is not the active controller carry no signal.
 struct SatTuneTickIn {
@@ -84,6 +88,26 @@ struct SatTune {
   // counters for the log
   uint32_t hourNo;
   uint32_t dayNo;
+  // TASK-1881 telemetry: excluded hours per reason since the window last emptied (index SatTuneReason, SATT_NONE unused,
+  // saturating), and the last daily record. Not in /sat_tune.json: after a reboot the counters start at 0.
+  uint16_t exclHours[SATT_COUNT];
+  bool        haveLast;
+  uint32_t    lastDay;
+  int8_t      lastDecision;   // +1 raise, -1 lower, 0 hold
+  const char* lastReason;     // PSTR of the last SatTuneDayOut.reason
+};
+
+// TASK-1881: what REST and MQTT show of the tuner, copied by satCurveTuneGetProgress() on the loop task into state.sat.
+struct SatTuneProgress {
+  bool     running;           // the tuner clock runs (self-tune on and SAT enabled)
+  uint8_t  days;              // counted days in the window
+  uint8_t  cleanToday;        // clean hours of the current day
+  uint8_t  hoursToday;        // closed hours of the current day
+  bool     haveLast;          // a day has closed since the tuner started
+  uint32_t lastDay;
+  int8_t   lastDecision;      // +1 raise, -1 lower, 0 hold
+  char     lastReason[16];    // longest reason: "day_not_counted", "phases_disagree" (15)
+  uint16_t exclHours[SATT_COUNT];
 };
 
 struct SatTuneHourOut {

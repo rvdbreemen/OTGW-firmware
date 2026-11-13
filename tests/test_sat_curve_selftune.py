@@ -58,6 +58,7 @@ static void g_logf(const char* fmt, ...) { va_list ap; va_start(ap, fmt); g_appe
 static void satNarratef_P(PGM_P fmt, ...) { va_list ap; va_start(ap, fmt); g_append("NARR ", fmt, ap); va_end(ap); }
 #define SATDebugTf(...) g_logf(__VA_ARGS__)
 static size_t strlcpy(char* d, const char* s, size_t n) { size_t l = strlen(s); if (n) { size_t c = l >= n ? n - 1 : l; memcpy(d, s, c); d[c] = 0; } return l; }
+#define strlcpy_P strlcpy
 
 #ifndef SAT_SRC_HEAT_PUMP
 #define SAT_SRC_AUTO 0
@@ -129,6 +130,17 @@ static void tick(const char* spec) {
   }
   satCurveTuneNoteTick(t);
 }
+#ifdef SAT_CT_EXCL_COUNTERS
+// TASK-1881: what REST/MQTT would show, from the real satCurveTuneGetProgress()
+static void g_progress() {
+  SatTuneProgress p; memset(&p, 0x5a, sizeof(p));   // poison: every field must be written
+  satCurveTuneGetProgress(p);
+  g_logf("PROGRESS running=%d days=%u clean_today=%u hours_today=%u have_last=%d last_day=%lu last_decision=%d last_reason=%s",
+         (int)p.running, (unsigned)p.days, (unsigned)p.cleanToday, (unsigned)p.hoursToday, (int)p.haveLast,
+         (unsigned long)p.lastDay, (int)p.lastDecision, p.lastReason);
+  for (uint8_t r = SATT_NONE + 1; r < SATT_COUNT; r++) g_logf("EXCL %s=%u", satTuneReasonName(r), (unsigned)p.exclHours[r]);
+}
+#endif
 // tokens on stdin: T:k=v,.. tick | A:ms advance + service | S service | M:x manual coefficient (updateSetting) | C:x set
 // coefficient silently | tune:0/1 | sim:0/1 | hourS:n | act:0/1 (state.sat.bActive) | sat:0/1 (SAT enabled)
 int main() {
@@ -147,7 +159,13 @@ int main() {
     else if (!strncmp(tok, "sat:", 4)) g_satEnabled = atoi(tok + 4) != 0;
     else if (!strncmp(tok, "int:", 4)) settings.sat.iControlInterval = (uint32_t)atol(tok + 4);
     else if (!strcmp(tok, "NC")) satCurveTuneNoteNotControlling();
+#ifdef SAT_CT_EXCL_COUNTERS
+    else if (!strcmp(tok, "P")) g_progress();   // TASK-1881: progress record into the log at this point
+#endif
   }
+#ifdef SAT_CT_EXCL_COUNTERS
+  g_progress();
+#endif
   printf("RESULT coeff=%.2f writes=%d pidI=%.2f pidD=%.2f fw=%d fr=%d\n", settings.sat.fHeatingCurveCoeff, g_writes,
          state.sat.fPidI, state.sat.fPidD, g_fileWrites, g_fileRemoves);
   fputs(g_log, stdout);
@@ -274,6 +292,12 @@ class Out:
         self.days = [kv(l) for l in self.log if l.startswith("SATTUNED ")]
         self.changes = [l for l in self.log if l.startswith("SATTUNE ")]
         self.narr = [l for l in self.log if l.startswith("NARR ")]
+        # TASK-1881: progress records ("P" token and one at the end); excl = per-reason counters of the last record
+        self.progress = [kv(l) for l in self.log if l.startswith("PROGRESS ")]
+        excl_lines = [l for l in self.log if l.startswith("EXCL ")]
+        n = 12
+        self.excl_all = [{k: v for l in excl_lines[i:i + n] for k, v in kv(l).items()} for i in range(0, len(excl_lines), n)]
+        self.excl = {k: int(v) for k, v in self.excl_all[-1].items()} if self.excl_all else {}
 
 
 class SatCurveSelfTune(unittest.TestCase):
@@ -901,6 +925,165 @@ class ExclusionMutation(unittest.TestCase):
                 # a tick of dhw / not_sat carries no signal, so its removal shows in the clean-hour count, the others in the mean
                 caught = out.coeff != 2.0 or out.days[2]["clean"] != "6"
                 self.assertTrue(caught, f"removing the {ex} exclusion went unnoticed")
+
+
+REASONS = ["not_sat", "dhw", "no_sun", "sun", "pwm", "flame_off", "min_mod", "coeff_changed", "no_ticks", "not_controlling",
+           "few_ticks", "no_room"]
+
+
+class ExclusionCounters(unittest.TestCase):
+    """TASK-1881: excluded hours per reason, the last daily record, and what satCurveTuneGetProgress() hands to REST/MQTT.
+    Telemetry only. Red on the tuner from before TASK-1881 (OTGW_SAT_INO/OTGW_SAT_HDR from d34723882): no PROGRESS record."""
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.exe = build(Path(cls.tmp.name))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    setUp = SatCurveSelfTune.setUp
+    run_tokens = SatCurveSelfTune.run_tokens
+
+    def zero_but(self, o, **want):
+        self.assertEqual(sorted(o.excl), sorted(REASONS), "one counter per reason, SATT_NONE excluded")
+        self.assertEqual(o.excl, {r: want.get(r, 0) for r in REASONS})
+
+    def test_each_tick_exclusion_counts_its_hours(self):
+        for ex in ALL_EXCL:
+            with self.subTest(excl=ex):
+                o = self.run_tokens(EXCL_PRE.get(ex, []) + day(0.5, clean=18, excl=ex))
+                self.zero_but(o, **{ex: 6})
+                p = o.progress[-1]
+                self.assertEqual((p["running"], p["days"], p["clean_today"], p["hours_today"]), ("1", "1", "0", "0"))
+                self.assertEqual((p["have_last"], p["last_day"], p["last_decision"], p["last_reason"]),
+                                 ("1", "0", "0", "few_days"))
+
+    def test_hour_close_reasons_count(self):
+        # int:900 -> 4 ticks expected per hour, 3 needed: an hour with 2 ticks is few_ticks, an empty hour no_ticks
+        toks = ["int:900"] + clean_hour(0.5) + [tk(sig=0.5)] * 2 + [f"A:{HOUR}", f"A:{HOUR}"]
+        toks += [tk(sig=0.5)] * 4 + ["NC", f"A:{HOUR}"] + [tk(sig=0.5)] * 3 + [tk(sig=0.5, room=1), f"A:{HOUR}"]
+        o = self.run_tokens(toks)
+        self.zero_but(o, few_ticks=1, no_ticks=1, not_controlling=1, no_room=1)
+        p = o.progress[-1]
+        self.assertEqual((p["clean_today"], p["hours_today"], p["have_last"], p["last_decision"], p["last_reason"]),
+                         ("1", "5", "0", "0", "none"))
+
+    def test_first_reason_only_one_count_per_hour(self):
+        o = self.run_tokens([tk(sig=0.5, dhw=1), tk(sig=0.5, sun=20), tk(sig=0.5, rm=1, mm=0), f"A:{HOUR}"])
+        self.zero_but(o, dhw=1)
+
+    def test_manual_change_empties_the_counters(self):
+        toks = excluded_hour(0.5, "dhw") * 3 + ["P", tk(sig=0.5), "M:2.5", "S", f"A:{HOUR}"]
+        o = self.run_tokens(toks)
+        self.assertEqual(int(o.excl_all[0]["dhw"]), 3)
+        self.zero_but(o, coeff_changed=1)
+
+    def test_tuner_change_empties_the_counters(self):
+        d = day(1.5, clean=20, excl="dhw")
+        o = self.run_tokens(d * 2 + ["P"] + d)
+        self.assertEqual(o.coeff, 2.1)
+        self.assertEqual(int(o.excl_all[0]["dhw"]), 8)
+        self.assertEqual(o.progress[0]["days"], "2")
+        self.zero_but(o)
+        p = o.progress[-1]
+        self.assertEqual((p["days"], p["last_day"], p["last_decision"], p["last_reason"]), ("0", "2", "1", "phases_agree"))
+
+    def test_counters_survive_a_hold_and_an_uncounted_day(self):
+        o = self.run_tokens(day(0.5, clean=20, excl="sun") + day(0.5, clean=4, excl="flame_off"))
+        self.zero_but(o, sun=4, flame_off=20)
+        self.assertEqual((o.progress[-1]["days"], o.progress[-1]["last_reason"]), ("1", "day_not_counted"))
+
+    def test_off_shows_nothing(self):
+        o = self.run_tokens(excluded_hour(0.5, "dhw") * 2 + ["tune:0", "S"])
+        self.zero_but(o)
+        p = o.progress[-1]
+        self.assertEqual((p["running"], p["days"], p["hours_today"], p["have_last"], p["last_reason"]),
+                         ("0", "0", "0", "0", "none"))
+
+    def test_counters_do_not_reach_the_decision(self):
+        # the daily decision reads none of the new fields
+        block = extract(SAT_INO.read_text(encoding="utf-8"))
+        m = re.search(r"static void satTuneCloseDay\(.*?\n\}", block, re.S)
+        self.assertIsNotNone(m)
+        for word in ("exclHours", "lastDecision", "lastReason", "haveLast"):
+            self.assertNotIn(word, m.group(0))
+
+
+class DecisionUnchanged(unittest.TestCase):
+    """TASK-1881 AC1: the same multi-day scenario gives byte-identical tuner records (SATTUNEH/SATTUNED/SATTUNE/NARR) and the
+    same coefficient, writes and file traffic on the tuner of OTGW_TUNE_BASE_REV (e.g. d34723882, before TASK-1881) and on
+    this one. Opt-in: without the variable it is skipped, because an intended later change of the tuner differs on purpose."""
+    def test_same_records_as_the_base_tuner(self):
+        rev = os.environ.get("OTGW_TUNE_BASE_REV")
+        if not rev:
+            self.skipTest("set OTGW_TUNE_BASE_REV=<rev before TASK-1881> for the old-vs-new record comparison")
+
+        def show(f):
+            return subprocess.run(["git", "show", f"{rev}:src/OTGW-firmware/{f}"], cwd=REPO, capture_output=True,
+                                  check=True).stdout.decode("utf-8")
+        hdr = show("SATcurveTune.h").replace("#pragma once", "")
+        ino = show("SATcontrol.ino")
+        base_body = hdr + "\n" + "\n".join(re.search(rx, ino, re.S).group(1) for rx, _ in BLOCKS)
+        toks = (["int:900", "S"] + day(1.5, clean=20, excl="dhw") + day(2.0, clean=5, excl="sun") + day(1.5)
+                + day(1.5, clean=10, excl="flame_off") + ["M:2.3"] + day(-1.5) * 3
+                + phase_day(2.4, 0.0, warm_n=3, float_n=1) * 3
+                + excluded_hour(0.5, "no_sun") * 5 + [tk(sig=0.5)] * 2 + [f"A:{HOUR}"])
+        with tempfile.TemporaryDirectory() as d:
+            outs = []
+            for name, body in (("base", base_body), ("new", None)):
+                exe = build(Path(d), body, name=name)
+                if not exe:
+                    self.skipTest("no host C++ compiler")
+                env = dict(os.environ, SATTUNE_FILE=str(Path(d) / f"{name}.json"))
+                r = subprocess.run([str(exe)], input="\n".join(toks), capture_output=True, text=True, check=True, env=env)
+                lines = r.stdout.splitlines()
+                outs.append((lines[0], [l for l in lines[1:] if not l.startswith(("PROGRESS ", "EXCL "))]))
+        (rb, lb), (rn, ln) = outs
+        self.assertEqual(rb, rn)
+        self.assertEqual(len([l for l in lb if l.startswith("SATTUNED ")]), 10, "the scenario closes 10 days")
+        self.assertGreaterEqual(len([l for l in lb if l.startswith("SATTUNE ")]), 1, "and changes the coefficient")
+        self.assertEqual(lb, ln)
+
+
+class ProgressWiring(unittest.TestCase):
+    """TASK-1881 AC2, what the host build cannot reach: the copy into state.sat and the REST/MQTT emit of every reason."""
+    @classmethod
+    def setUpClass(cls):
+        cls.src = SAT_INO.read_text(encoding="utf-8")
+        cls.types = (SRC / "SATtypes.h").read_text(encoding="utf-8")
+
+    def test_loop_copies_the_progress_into_state(self):
+        self.assertRegex(self.types, r"SatTuneProgress tuneProgress\s*=\s*\{\};")
+        self.assertRegex(self.src, r"if \(!_sat_tuneGatesPassed\) satCurveTuneNoteNotControlling\(\);[^\n]*\n"
+                                   r"  satCurveTuneGetProgress\(state\.sat\.tuneProgress\);")
+
+    def test_rest_reads_the_snapshot_and_every_reason(self):
+        m = re.search(r'je\.beginObject\(F\("curve_tune"\)\);(.*?)\n      je\.endObject\(\);\n    \}', self.src, re.S)
+        self.assertIsNotNone(m, "curve_tune object in satSendStatusJSON()")
+        body = m.group(1)
+        self.assertIn("snap->st.sat.tuneProgress", self.src[m.start() - 400:m.start()])
+        self.assertNotIn("state.", body)
+        self.assertNotIn("_sat_tune", body)
+        for k in ("running", "days", "days_needed", "clean_hours_today", "clean_hours_needed", "hours_today",
+                  "last_decision", "last_reason", "excluded_hours"):
+            self.assertIn(f'F("{k}")', body)
+        self.assertIn("for (uint8_t r = SATT_NONE + 1; r < SATT_COUNT; r++) je.field(satTuneReasonName(r), tp.exclHours[r]);",
+                      body)
+
+    def test_mqtt_flat_topics(self):
+        for t in ("running", "days", "clean_hours_today", "last_decision", "last_reason"):
+            self.assertIn(f'F("sat/curve_tune/{t}")', self.src)
+        self.assertIn('PSTR("sat/curve_tune/excluded_hours/%s"), satTuneReasonName(r)', self.src)
+        self.assertIn("static SATShadowI s_ct_excl[SATT_COUNT];", self.src)
+
+    def test_reason_names_cover_every_reason(self):
+        names = re.findall(r'case SATT_\w+:\s+return PSTR\("(\w+)"\);', self.src)
+        names += re.findall(r'default:\s+return PSTR\("(\w+)"\);\s*\}\s*\}\s*// First exclusion', self.src)
+        self.assertEqual(sorted(names), sorted(["none"] + REASONS), "SATT_NO_TICKS is the default branch")
+        hdr = SAT_HDR.read_text(encoding="utf-8")
+        self.assertRegex(hdr, r"SATT_FEW_TICKS, SATT_NO_ROOM,\s*\n\s*SATT_COUNT")
 
 
 class SourceChecks(unittest.TestCase):

@@ -4523,6 +4523,53 @@ components:
         curve_self_tune:
           type: boolean
           description: "Heating curve self-tune (ADR-205, default on). SAT decides once a day from the last 3 counted days of clean heating hours and changes the curve coefficient by 0.1; a change empties that window, so two steps are at least 3 counted days apart. Off keeps the current coefficient. Settable through POST /api/v2/sat/curve_self_tune."
+        curve_tune:
+          type: object
+          description: "Heating curve self-tune progress (TASK-1881, telemetry). The counters cover the current window: they start at 0 when it empties (a coefficient change, self-tune switched on, a reboot) and are not stored, so after a reboot they restart at 0 while a restored window keeps its days. Zero and running false while the self-tune is off."
+          properties:
+            running:
+              type: boolean
+              description: "The self-tune clock runs (self-tune on and SAT enabled)"
+            days:
+              type: integer
+              description: "Counted days in the window"
+            days_needed:
+              type: integer
+              description: "Counted days a decision needs (3)"
+            clean_hours_today:
+              type: integer
+              description: "Clean hours of the current day"
+            clean_hours_needed:
+              type: integer
+              description: "Clean hours a day needs to count (6)"
+            hours_today:
+              type: integer
+              description: "Closed hours of the current day (0-23)"
+            last_decision:
+              type: string
+              enum: [raise, lower, hold, none]
+              description: "Last daily decision; none before the first day closes"
+            last_reason:
+              type: string
+              description: "Reason of the last daily record (few_days, day_not_counted, no_phases, inside_band, phases_disagree, phases_agree, at_limit; none before the first day)"
+            excluded_hours:
+              type: object
+              description: "Hours that did not count, per reason (the first reason of each hour)"
+              additionalProperties:
+                type: integer
+              properties:
+                not_sat: { type: integer }
+                dhw: { type: integer }
+                no_sun: { type: integer }
+                sun: { type: integer }
+                pwm: { type: integer }
+                flame_off: { type: integer }
+                min_mod: { type: integer }
+                coeff_changed: { type: integer }
+                no_ticks: { type: integer }
+                not_controlling: { type: integer }
+                few_ticks: { type: integer }
+                no_room: { type: integer }
         fireplace_mode:
           type: boolean
           description: "Fireplace mode (default false): SAT heats on the heating curve only with P, I and D at 0, as with a missing room temperature. Settable through POST /api/v2/sat/settings/fireplace_mode."
@@ -4760,6 +4807,16 @@ components:
         push_setpoint: false
         follow_thermostat: false
         curve_self_tune: true
+        curve_tune:
+          running: true
+          days: 2
+          days_needed: 3
+          clean_hours_today: 4
+          clean_hours_needed: 6
+          hours_today: 9
+          last_decision: hold
+          last_reason: few_days
+          excluded_hours: { not_sat: 0, dhw: 3, no_sun: 0, sun: 11, pwm: 0, flame_off: 0, min_mod: 0, coeff_changed: 0, no_ticks: 0, not_controlling: 0, few_ticks: 0, no_room: 1 }
         fireplace_mode: false
         flame_off_offset: 0.0
         overshoot_protection: true

@@ -841,6 +841,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   #satCurveBig{width:100%;height:auto;display:block}
   .curve-legend{display:flex;flex-direction:column;gap:6px;font-size:.76rem;color:var(--muted);margin-bottom:10px}
   .curve-legend i{display:inline-block;width:16px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+  .sat-tune-progress{font-size:.76rem;color:var(--muted);margin-bottom:10px;display:flex;flex-direction:column;gap:3px}
   .marker-head{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700;margin-bottom:6px}
   .marker-list{list-style:none;margin:0;padding:0;font-size:.8rem}
   .marker-list li{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)}

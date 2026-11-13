@@ -1636,6 +1636,38 @@
       "sat_system_radiator": "radiator",
       "sat_system_underfloor": "underfloor",
       "sat_takeover": "Takeover (MQTT lost)",
+      "sat_tune_days": "{{days}}/{{need}} counted days, today {{clean}}/{{cleanNeed}} clean hours",
+      "sat_tune_dec_hold": "held",
+      "sat_tune_dec_lower": "lowered",
+      "sat_tune_dec_raise": "raised",
+      "sat_tune_excl_item": "{{reason}} {{hours}} h",
+      "sat_tune_excluded": "Hours not counted: {{list}}",
+      "sat_tune_excluded_none": "No hours left out",
+      "sat_tune_last": "Last day: {{decision}} ({{reason}})",
+      "sat_tune_last_none": "No day closed yet",
+      "sat_tune_off": "Self-tune is off",
+      "sat_tune_r_at_limit": "coefficient at its limit",
+      "sat_tune_r_coeff_changed": "coefficient changed",
+      "sat_tune_r_day_not_counted": "too few clean hours",
+      "sat_tune_r_dhw": "hot water",
+      "sat_tune_r_few_days": "window not full yet",
+      "sat_tune_r_few_ticks": "too few samples",
+      "sat_tune_r_flame_off": "flame off",
+      "sat_tune_r_inside_band": "curve fits",
+      "sat_tune_r_min_mod": "at minimum modulation",
+      "sat_tune_r_no_floating": "no data at target",
+      "sat_tune_r_no_phases": "no room temperature data",
+      "sat_tune_r_no_room": "room temperature lost",
+      "sat_tune_r_no_sun": "no sun position",
+      "sat_tune_r_no_ticks": "no data",
+      "sat_tune_r_no_warmup": "no warm-up data",
+      "sat_tune_r_not_controlling": "SAT held back",
+      "sat_tune_r_not_sat": "SAT not active",
+      "sat_tune_r_phases_agree": "warm-up and at-target agree",
+      "sat_tune_r_phases_disagree": "warm-up and at-target disagree",
+      "sat_tune_r_pwm": "PWM",
+      "sat_tune_r_sun": "sun too high",
+      "sat_tune_title": "Self-tune",
       "send_failed": "Send failed",
       "yes": "Yes"
     },
@@ -6989,6 +7021,41 @@
       .catch(function () { });
   }
 
+  // TASK-1881 (U9): heating curve self-tune progress from the status object curve_tune: counted days, clean hours today,
+  // the last daily record and the hours each reason kept out of the window. Hidden on a firmware without curve_tune.
+  function satTuneReasonText(code) {
+    var k = 'tools.sat_tune_r_' + code, s = t(k);
+    return s === k ? String(code) : s;   // a reason this page does not know yet shows its code
+  }
+  function satRenderTune(d) {
+    var box = document.getElementById('satTuneProgress'); if (!box) return;
+    var ct = d && d.curve_tune;
+    if (!ct || typeof ct !== 'object') { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+    var h = '<div class="marker-head">' + esc(t('tools.sat_tune_title')) + '</div>';
+    if (!d.curve_self_tune || !ct.running) {
+      box.innerHTML = h + '<div>' + esc(t('tools.sat_tune_off')) + '</div>'; return;
+    }
+    h += '<div>' + esc(t('tools.sat_tune_days', { days: ct.days | 0, need: ct.days_needed | 0,
+      clean: ct.clean_hours_today | 0, cleanNeed: ct.clean_hours_needed | 0 })) + '</div>';
+    var dec = ct.last_decision;
+    h += '<div>' + esc(dec === 'raise' || dec === 'lower' || dec === 'hold'
+      ? t('tools.sat_tune_last', { decision: t('tools.sat_tune_dec_' + dec), reason: satTuneReasonText(ct.last_reason) })
+      : t('tools.sat_tune_last_none')) + '</div>';
+    var ex = ct.excluded_hours || {}, items = [];
+    Object.keys(ex).forEach(function (r) {
+      var n = ex[r] | 0;
+      if (n > 0) items.push({ r: r, n: n });
+    });
+    items.sort(function (a, b) { return b.n - a.n; });
+    h += '<div>' + esc(items.length
+      ? t('tools.sat_tune_excluded', { list: items.map(function (it) {
+          return t('tools.sat_tune_excl_item', { reason: satTuneReasonText(it.r), hours: it.n });
+        }).join(', ') })
+      : t('tools.sat_tune_excluded_none')) + '</div>';
+    box.innerHTML = h;
+  }
+
   // TASK-1373: Max flow slider bounds from boiler MsgID 49 (value = UB<<8 | LB, 0 = never reported).
   // Same validity rule as the firmware (satMaxTSetBounds): raw != 0, UB > LB, UB <= 100; otherwise 20-80.
   function fetchMaxTSetBounds() {
@@ -7254,6 +7321,7 @@
     satRenderDhw(d);
     satRenderMaxTSet(d);
     satRenderMaxMod(d);
+    satRenderTune(d);   // TASK-1881
     satRenderCycle(d);
     satDrawCurve(d);
     satRenderCurveRec(d);
