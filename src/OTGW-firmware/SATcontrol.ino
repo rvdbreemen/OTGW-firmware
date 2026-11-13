@@ -2620,9 +2620,10 @@ static float satGetRoomTemp()
 // is younger than 1 hour, whatever its source; with none SAT hands back (satRestartOutsideStep()). The external
 // value (MQTT/REST) wins for its whole valid hour. Order, first match wins:
 //   1. external (MQTT/REST) younger than 1 h;
-//   2. boiler MsgID 27 from a live Read-Ack younger than 1 h (state.otBus.iToutsideBoilerMs), when not 0.0;
+//   2. MsgID 27 stamped less than 1 h ago (state.otBus.iToutsideBoilerMs), when not 0.0: a live boiler Read-Ack or the
+//      gateway's own R Write-Data 27 (TASK-1896, otFrameIsFreshOutsideTemp() in OTGW-Core.ino);
 //   3. weather fetched less than 1 h ago;
-//   4. boiler MsgID 27 0.0 from a live Read-Ack younger than 1 h (a real 0 C reading);
+//   4. MsgID 27 0.0 stamped less than 1 h ago (a real 0 C reading);
 //   5. the value restored from the PID state file at boot, measured less than 1 h ago (entry 126).
 // Simulation comes before all of them.
 // A PS=1 summary repeats stored values with no age (ADR-181), so it never stamps MsgID 27.
@@ -2633,8 +2634,9 @@ static const uint32_t SAT_OUTSIDE_VALID_MS = 3600000UL;   // entry 57: old after
 // O OpenTherm MsgID 27, W weather service, R restored from flash, N none valid.
 static char _sat_outsideSrc = 'N';
 
-// MsgID 27 counts as an outside temperature only while a live Read-Ack stamped it less than 1 h ago. A value the PIC
-// fills from its own DS18B20, or the gateway answers itself, never stamps iToutsideBoilerMs. Shared by
+// MsgID 27 counts as an outside temperature only while it was stamped less than 1 h ago. otFrameIsFreshOutsideTemp()
+// (OTGW-Core.ino, TASK-1896) stamps iToutsideBoilerMs on a boiler Read-Ack 27 and on the gateway's own R Write-Data 27
+// (a PIC DS18B20 or OT= value), never on an A frame, a replay, a parity error or a PS=1 summary. Shared by
 // satResolveOutsideTemp() and weatherLoop() (TASK-1897), so the weather fetch is skipped only when SAT really uses MsgID 27.
 static bool satOtOutsideFresh(uint32_t nowMs)
 {
