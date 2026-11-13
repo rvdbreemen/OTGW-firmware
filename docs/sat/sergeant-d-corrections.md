@@ -6895,3 +6895,17 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Open:** whether the entry-289 fail-safe stays, and whether the `fOvershootMargin` user setting keeps its key with the new default 1.5.
 
 **Task:** none yet; the coordinator files it.
+
+## 328. Q-326a answered A: the hot/cold tolerance of entry 326 is a Home Assistant generic-thermostat style hysteresis on the heating demand (Sergeant D, 2026-11-13; settles the meaning of entry 326)
+
+**Source:** sergeantd, 2026-11-13 07:27:22 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1570701593073025099 (https://discord.com/channels/812969634638725140/1105556725714649128/1570701593073025099), after our Q-326a (msg 1570700362187542539). Read first-hand by the comms session.
+
+**Quoted:** "@BlueFlame Bot  about hot and cold tolerance of the sat climate entity read here <https://www.home-assistant.io/integrations/generic_thermostat/>"
+
+**Settled:** entry 326 means the generic thermostat's tolerances, which is option A of Q-326a. The Home Assistant documentation (fetched in this session) describes `cold_tolerance` as the difference between sensor and target "that must change before being switched on" and `hot_tolerance` as the difference "that must change before being switched off", default 0.3 each; its example (target 25, tolerance 0.5): "the heater will start when the sensor goes below 24.5" and "the heater will stop when the sensor equals or goes above 25.5". With entry 326's values: heating demand starts when the room is below target - 0.1 and stops when the room is at or above target + 0.1. Interpretation (ours): he gave the cold tolerance as "-0.1" to mean 0.1 below the target, not a negative tolerance.
+
+**Checked against the code:** thermo-nova has no hot/cold tolerance (entry 326, recursive search of `custom_components/sat`); its demand comes from the PID and the cold setpoint cutoff (`heating_control.py:72`, ADR-199). The firmware has no such band today. This is therefore a firmware addition on top of the thermo-nova port.
+
+**Open (not in his message):** how the band combines with SAT's PID and the cold cutoff (ADR-199): whether "switched off" means CH off / CS to the minimum as on the cold cutoff, and whether the PID keeps running inside the band. To be put to him one question at a time, after Q-PWM1.
+
+**Task:** TASK-1887 (no longer blocked on the meaning; the open point above is for its plan).

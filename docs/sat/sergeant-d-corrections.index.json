@@ -4368,6 +4368,19 @@
    ],
    "tasks": [],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 328,
+   "title": "Q-326a answered A: the hot/cold tolerance of entry 326 is a Home Assistant generic-thermostat style hysteresis on the heating demand (Sergeant D, 2026-11-13; settles the meaning of entry 326)",
+   "date": "2026-11-13",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570701593073025099",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
