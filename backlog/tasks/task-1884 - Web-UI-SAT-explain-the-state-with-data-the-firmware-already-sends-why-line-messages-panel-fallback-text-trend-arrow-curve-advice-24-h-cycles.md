@@ -3,11 +3,11 @@ id: TASK-1884
 title: >-
   Web UI SAT: explain the state with data the firmware already sends (why-line,
   messages panel, fallback text, trend arrow, curve advice, 24 h cycles)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:23:00Z'
-updated_date: '2026-11-13T06:55:00Z'
+updated_date: '2026-11-13T09:33:00Z'
 labels:
   - webui
   - sat
@@ -25,11 +25,11 @@ UI proposals U1-U6 from the VTherm UI review (docs/sat/vtherm-comparison-2026-11
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 tests/webui test(s) cover U1-U6 rendering from a fixture sat/status payload; red before the change, green after
-- [ ] #2 python evaluate.py --quick shows no new FAIL (ADR-091 drift gate included); i18n-no-hardcoded and the other webui tests green
-- [ ] #3 No new fetch: the SAT page still issues only sat/status + sat/weather per poll (network capture or test)
-- [ ] #4 nl/de/el packs carry the new keys (translate skill sync mode)
-- [ ] #5 Bench screenshot of the SAT page on a unit (otgw-bench-tester) showing the why-line and the messages panel
+- [x] #1 tests/webui test(s) cover U1-U6 rendering from a fixture sat/status payload; red before the change, green after
+- [x] #2 python evaluate.py --quick shows no new FAIL (ADR-091 drift gate included); i18n-no-hardcoded and the other webui tests green
+- [x] #3 No new fetch: the SAT page still issues only sat/status + sat/weather per poll (network capture or test)
+- [x] #4 nl/de/el packs carry the new keys (translate skill sync mode)
+- [x] #5 Bench screenshot of the SAT page on a unit (otgw-bench-tester) showing the why-line and the messages panel
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -48,4 +48,14 @@ Text provenance (UI describes what the port does): takeover = MQTT lost >5 min, 
 Evidence AC1/AC3: tests/webui/sat-explain-state.test.mjs (real page, headless Chrome, fixture payloads, 17 checks). Old data dir (git archive HEAD before edits): 13 failures of 17 (the 4 passes are absence checks + the AC3 baseline). New: 0 failures of 17. AC3: API_ALLOWED = path set measured on the old page (device/info, device/time, filesystem/hash-check, health, otgw/messages/48+49, otgw/otmonitor, sat/ble/discovery, sat/markers, sat/status, sat/weather, sensors, sensors/labels, settings); new page: extra none. Logs in scratchpad t1884/red-old2.txt, green-new.txt; screenshot after-sat-msgs.png (synthetic). AC2: evaluate --quick 92 checks, 0 FAIL 0 WARN; i18n-no-hardcoded 3/3, i18n-followups 4/4, no-sample-values 2/2, i18n-lang 6/6, lang-menu 7/7, sat-push-refused-hint 0/2 fail, sat-status-pill 0/14 fail, sat-page-order no exception; run one file at a time, Chrome count 0 after.
 
 AC4: nl/de/el keys written inline by the main session from i18n/glossary.md terms (stooklijn/Heizkurve/καμπύλη θέρμανσης, inschakelduur/Einschaltdauer/ποσοστό λειτουργίας, cyclus/Takt/κύκλος, warm tapwater/Warmwasser/ζεστό νερό χρήσης) and the existing pack wording; not through the multi-agent translate workflow (no opt-in for a workflow run, Robert asked for the fastest result). A native-review refresh can follow. Build/bump: waits for the 220 post (coordinator), then rebase, bump to 221, commit, FS build slot.
+
+Build and post: build log lines not captured (output redirect gave 0 bytes in 3 attempts, cause unknown; TASK-1893); proof = exit 0 + fresh artifacts + the posted binary itself OTA'd and checked on .61 (build #3, .ino.bin sha256 44A4FED2..FDEC9, fw 2.0.0-beta.221+e511226, bootcount 575->577, crashlog empty, settings changed none, served page contains satRenderMessages/satRenderCycles24/satMsgBtn). Builds #1 and #3 differ only in the build stamp (_VERSION_BUILD 7879->7882). Pushed e5112267e to origin/dev (d79210e23..e5112267e) after the coordinator's GO; zip posted to #alpha-testing, message 1570731979945803806.
+
+Correction: the build-output task is TASK-1894, not TASK-1893 as written in the note above.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Commit e5112267e (2.0.0-beta.221+e511226), UI only (v2.html/js/css, i18n nl/de/el, new test). AC1: tests/webui/sat-explain-state.test.mjs on the real page with fixture payloads, old data dir 13 failures of 17, new 0 of 17. AC2: evaluate --quick on HEAD 93 checks 0 FAIL 0 WARN (ADR-091 drift gate included); i18n-no-hardcoded 3/3, i18n-lang 6/6, lang-menu 7/7, i18n-followups 4/4, no-sample-values 2/2, sat-push-refused-hint 2/2, sat-status-pill 14/14, sat-page-order clean, one file at a time. AC3: the test logs every /api path; new page requests no path outside the set the old page requested. AC4: 22 keys per pack, written inline from i18n/glossary.md (not the multi-agent translate workflow; no opt-in, fastest result asked); native review can follow as a refresh. AC5: bench .61, build.bat exit 0, OTA rc 0, fw 2.0.0-beta.221+e511226, bootcount +2, no crash, settings unchanged; with SAT sim + sim DHW draw, 220 shows no why-line, 221 shows 'Hot water is running: room heating waits.' and the messages button; screenshots scratchpad b221 (clipped to the thermostat card, synthetic sim data). Not verified on hardware: the PWM-refusal and takeover texts (host test only; .61 has no boiler). Note: with one message, the opened panel repeats the why-line text.
+<!-- SECTION:FINAL_SUMMARY:END -->
