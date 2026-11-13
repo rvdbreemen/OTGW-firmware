@@ -3,11 +3,11 @@ id: TASK-1897
 title: >-
   SAT weather fetch skips while OT Toutside != 0 even when SAT rejects that
   value (SATweather.ino:617)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T10:07:00Z'
-updated_date: '2026-11-13T18:27:00Z'
+updated_date: '2026-11-13T19:11:00Z'
 labels:
   - bug
   - sat
@@ -43,3 +43,9 @@ AC1 evidence (2026-11-13, wt-95w): tests/test_weather_worker_handoff.py new case
 
 Bench limit (2026-11-13, 09 via the coordinator, build 2.0.0-beta.226+e86aed9): AC3 cannot be shown on the bench unit .61. OT-Direct loopback never asks MsgID 27, so Toutside is never set and a non-zero value without a fresh stamp cannot be produced there. AC3 stays open as evidence by host test (tests/test_weather_worker_handoff.py C6, red on the old gate, green on the fix) plus field confirmation (indigo_light, AC2). Not shown on a device.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in 2.0.0-beta.226+6f302ff (origin/dev 6f302ffb4, posted 1570878491497332817). weatherLoop() skipped every weather fetch while OTcurrentSystemState.Toutside != 0, also when SAT rejected that value. A shared helper satOtOutsideFresh() (SATcontrol.ino) now holds the resolver's freshness rule, and the fetch is skipped only for a stamped MsgID 27 younger than 1 h and not 0.0. AC1 done: tests/test_weather_worker_handoff.py C6 on the real weatherLoop(), red on the old gate (c6_stale_nonzero_fetches=0), green on the fix (11 OK); the helper compiles with the resolver in tests/test_sat_outside_order.py (6 OK). AC2 (field, indigo_light) open. AC3 (bench) not demonstrable on .61: OT-Direct loopback never asks MsgID 27 (09, 2026-11-13); evidence stays the host test plus the field. In Review until indigo_light confirms. Ships together with TASK-1896 (the gateway's own Write-Data 27 now stamps, a loopback B no longer does).
+<!-- SECTION:FINAL_SUMMARY:END -->
