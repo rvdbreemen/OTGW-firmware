@@ -4,6 +4,7 @@ title: 'SAT diagnostics: heating-failure and no-ignition event (no control actio
 status: To Do
 assignee: []
 created_date: '2026-11-13T06:13:00Z'
+updated_date: '2026-11-13T06:24:00Z'
 labels:
   - sat
   - diagnostics
@@ -25,4 +26,11 @@ Lesson 3 of docs/sat/vtherm-comparison-2026-11-13.md (TASK-1879). VTherm raises 
 - [ ] #1 Thresholds and the tuner-marking part decided (Robert; Sergeant D for the tuner part) and recorded
 - [ ] #2 Host test reproduces both failure patterns: event absent on the old code, raised on the fix; no change in CS/MM/CH output
 - [ ] #3 Event visible in REST, MQTT (flat topic) and the telnet log
+- [ ] #4 Web UI (U11): an active heating-failure or no-ignition event shows as a problem badge and an entry in the SAT messages panel (TASK-1884); webui test on a fixture payload
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-13: UI follow-up U11 from the VTherm UI review added as an AC.
+<!-- SECTION:NOTES:END -->
