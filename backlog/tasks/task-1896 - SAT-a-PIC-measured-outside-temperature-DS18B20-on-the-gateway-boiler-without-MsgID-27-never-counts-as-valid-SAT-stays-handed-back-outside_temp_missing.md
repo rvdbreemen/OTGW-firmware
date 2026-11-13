@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-13T09:55:00Z'
+updated_date: '2026-11-13T10:04:00Z'
 labels:
   - bug
   - sat
@@ -29,3 +30,9 @@ Report: indigo_light (Discord 301077214374658048), #nederlandse-ondersteuning ht
 - [ ] #3 If yes: host test red on the old stamp rule, green on the fix; outside_temp_missing clears with only the PIC sensor present
 - [ ] #4 Bench or field confirmation
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-13 09:56 UTC follow-up from indigo_light (https://discord.com/channels/812969634638725140/815561033036333076/1570739066360561805): 'de weersafhankelijke regeling krijgt ook geen data door als ik mijn coordinaten ingeef en slaat dus niet aan' - the weather workaround also gets no data after entering coordinates. Not analysed: needs the capture (weather fetch log lines, sat/status weather fields). Possibly a separate weather-fetch problem.
+<!-- SECTION:NOTES:END -->
