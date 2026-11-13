@@ -62,10 +62,13 @@ rem runtime (pyvenv.cfg says one version, python.exe is another), which then
 rem breaks pip/pio late. Wipe the invalid venv first so it is cleanly rebuilt
 rem on the correct 3.10-3.13 base.
 if exist "%BUILD_VENV_DIR%" rd /s /q "%BUILD_VENV_DIR%" >nul 2>nul
-%BASE_PYTHON% -m venv "%BUILD_VENV_DIR%" >nul 2>nul
+call %BASE_PYTHON% -m venv "%BUILD_VENV_DIR%" >nul 2>nul
 call :use_python_if_valid "%BUILD_VENV_PY%"
 exit /b 0
 
+rem TASK-1898: every interpreter probe runs through CALL. A "python" on PATH can be a .cmd/.bat
+rem shim (C:\tools\Codex\python.cmd); a batch file that runs another batch file without CALL never
+rem returns, so build.bat ended here with exit 1 and no output in a fresh worktree.
 :find_python
 rem Only a 3.10-3.13 interpreter is acceptable as the venv base (see
 rem :use_python_if_valid). If the host only has e.g. 3.14, this returns 1 so the
@@ -76,19 +79,19 @@ rem ...). On Windows the launcher, when the requested minor is NOT registered,
 rem can hang a non-interactive/hidden process on the "Python not found" Microsoft
 rem Store redirect prompt (observed: build.bat stuck for 100s+). `py -3` (bare)
 rem never redirects because at least one 3.x is present, so it is safe.
-py -3 -c "import sys; v=sys.version_info; raise SystemExit(0 if (v[0]==3 and 10<=v[1]<=13) else 1)" >nul 2>nul
+call py -3 -c "import sys; v=sys.version_info; raise SystemExit(0 if (v[0]==3 and 10<=v[1]<=13) else 1)" >nul 2>nul
 if not errorlevel 1 (
     set "BASE_PYTHON=py -3"
     exit /b 0
 )
 
-python -c "import sys; v=sys.version_info; raise SystemExit(0 if (v[0]==3 and 10<=v[1]<=13) else 1)" >nul 2>nul
+call python -c "import sys; v=sys.version_info; raise SystemExit(0 if (v[0]==3 and 10<=v[1]<=13) else 1)" >nul 2>nul
 if not errorlevel 1 (
     set "BASE_PYTHON=python"
     exit /b 0
 )
 
-python3 -c "import sys; v=sys.version_info; raise SystemExit(0 if (v[0]==3 and 10<=v[1]<=13) else 1)" >nul 2>nul
+call python3 -c "import sys; v=sys.version_info; raise SystemExit(0 if (v[0]==3 and 10<=v[1]<=13) else 1)" >nul 2>nul
 if not errorlevel 1 (
     set "BASE_PYTHON=python3"
     exit /b 0

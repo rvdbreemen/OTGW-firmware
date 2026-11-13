@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-13T09:30:00Z'
+updated_date: '2026-11-13T13:24:00Z'
 labels:
   - build
   - tooling
@@ -25,3 +26,9 @@ ordinal: 964000
 - [ ] #1 A documented command gives a build log that contains 'Successfully created ESP32S3 image' (x2) and 'Build completed successfully' when run from Claude's Bash and PowerShell tools
 - [ ] #2 docs/guides/agent-build-and-bench.md names that command
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-13: one cause found and split off as TASK-1898: in a fresh worktree build.bat :find_python runs C:\tools\Codex\python.cmd without 'call' and ends silently with exit 1 (echo-on trace). Not every 0-byte log is explained by it: the TASK-1871 build (worktree with .build-venv) built fine but PowerShell 'cmd /c build.bat *> file' still gave 0 bytes, while Start-Process -RedirectStandardOutput/-RedirectStandardError captured the full log of the TASK-1885 build.
+<!-- SECTION:NOTES:END -->
