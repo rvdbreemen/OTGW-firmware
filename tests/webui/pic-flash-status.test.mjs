@@ -228,6 +228,7 @@ test('picAfterFlash() runs the real refresh functions one request at a time', as
     'function withDeviceInfo(cb) { log.push("device/info devInfoTs=" + devInfoTs); cb({ otcommandinterface: "PIC", picfwversion: "6.8" }); }\n' +
     'function txt() {} function renderPicFiles() { log.push("renderPicFiles"); } function renderPicBanner(u) { log.push("banner " + u.current); }\n' +
     'function fetchPicSettings(full) { log.push("fetchPicSettings full=" + (full === true)); }\n' +
+    'function applyPicTabGate() {}\n' +   // TASK-1843 added this call to fetchPic(); TASK-1892
     parts.join('\n') + '\nreturn picAfterFlash;';
   const doc = { getElementById: () => null };
   const { t, setT } = i18nEn(src);
