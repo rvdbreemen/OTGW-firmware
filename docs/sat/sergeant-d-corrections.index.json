@@ -4331,6 +4331,43 @@
    "supersedes": [],
    "tasks": [],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 325,
+   "title": "Bring back the old hourly heating curve auto-tune (Sergeant D, 2026-11-13; reverses the removal in entry 72)",
+   "date": "2026-11-13",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570697693968212011",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1413"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 326,
+   "title": "SAT climate entity: hot tolerance 0.1 and cold tolerance -0.1 (Sergeant D, 2026-11-13; meaning to be confirmed)",
+   "date": "2026-11-13",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570698600952893454",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 327,
+   "title": "Continuous to PWM: flow - requested setpoint >= 1.5 for 30 s (Sergeant D, 2026-11-13; supersedes the 2.0 C / 60 s rule of entry 22)",
+   "date": "2026-11-13",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570699609200787459",
+   "supersedes": [
+    22
+   ],
+   "tasks": [],
+   "confirmed_by_entry": null
   }
  ]
 }

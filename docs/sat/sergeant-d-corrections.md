@@ -6849,3 +6849,49 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Task:** none yet; the evening analysis is a follow-up to Robert's deep-dive request (msg 1570456741630447867). The coefficient question (Robert's simulation request, msg 1570465414285234177) is separate and still running.
 
 **Open:** the evening analysis; the queued follow-ups (saturation exit, pump-overrun test, coefficient 1.8/2.0) wait for it.
+
+## 325. Bring back the old hourly heating curve auto-tune (Sergeant D, 2026-11-13; reverses the removal in entry 72)
+
+**Source:** sergeantd, 2026-11-13 07:11:52 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1570697693968212011 (https://discord.com/channels/812969634638725140/1105556725714649128/1570697693968212011), addressed to the bot. Read first-hand by the comms session.
+
+**Quoted:** "@BlueFlame Bot My decision is the bring back the old heating curve coefficient Autotuner. Probably the new Autotuner I proposed is very slow and can't quite much the load"
+
+**Settled:** the hourly coefficient auto-tune that entry 72 removed ("Q22: Remove", 2026-10-27; removed by TASK-1413, commit 02029bf75, the `SAT Auto Tune` switch) comes back. His reason: the new self-tune (ADR-205, ADR-228, ADR-230, ADR-231; entries 302-307, 313, 315, 316, 318, 322, 323) is too slow and cannot follow the load.
+
+**Checked against the recorded entries and the code:** this reverses the removal part of entry 72; the coefficient bound of 5.0 in entry 72 is not touched. The old tuner (`satAutoTuneUpdate()` at 02029bf75^:src/OTGW-firmware/SATcontrol.ino:5578-5688, opened in this session) counts completed cycles by their class (`SAT_CYCLE_OVERSHOOT`, `SAT_CYCLE_UNDERHEAT`, `SAT_CYCLE_UNDERHEAT_PWM`) and does not use the room temperature. thermo-nova has no coefficient auto-tune (entry 72, Q22: "the firmware auto-tunes the coefficient hourly, thermo-nova does not"). Fact reported to him on 2026-11-12 (round-2 simulation, msg 1570557328090988711): on gruijter's 10 Nov data at coefficient 1.12 the old rule would have held while the room stayed 0.73 C below target; this is a modelled replay, not a field run. Entry 316 was decided by Sergeant D and Robert together; that part is reported to Robert, not decided here.
+
+**Open (not in his message):** (1) whether the new self-tune is removed, switched off by default, or kept beside the old one; (2) whether the old tuner comes back unchanged (gain constants and statics as at 02029bf75^) or with changes; (3) the default of the switch (the old `SATautotune` setting). Our reading until he answers: the old tuner returns as it was, and the two tuners never run at the same time.
+
+**Task:** none yet; the coordinator files it after Robert has seen this entry.
+
+## 326. SAT climate entity: hot tolerance 0.1 and cold tolerance -0.1 (Sergeant D, 2026-11-13; meaning to be confirmed)
+
+**Source:** sergeantd, 2026-11-13 07:15:28 UTC, #dev-sat-mqtt, msg 1570698600952893454 (https://discord.com/channels/812969634638725140/1105556725714649128/1570698600952893454), addressed to the bot. Read first-hand by the comms session.
+
+**Quoted:** "@BlueFlame Bot Also in The SAT climate entity add a hot tolerance 0.1 and cold tolerance-0.1"
+
+**Settled:** a tolerance band of +0.1 / -0.1 around the target for "the SAT climate entity".
+
+**Checked against the code:** the firmware has no setting or field named tolerance for SAT control; the only `tolerance` in the SAT sources is the MQTT publish-on-change tolerance (`SATmqttPublish.h:97`). thermo-nova has `DEADBAND = 0.1` (`const.py:16`), the PID deadband that the self-tune phases also use (ADR-228). "Hot tolerance" and "cold tolerance" are the names of the Home Assistant generic thermostat options; a Home Assistant MQTT climate entity has no such options. Not found in the code: where these two values should act.
+
+**Interpretation (ours, not confirmed):** a hysteresis band for the heating demand of the SAT climate entity: heat when the room is 0.1 C or more below target, stop when it is 0.1 C or more above. This is put to him as a question before anything is built.
+
+**Open:** what the two values act on. Question asked to him (see docs/sat/open-questions.md, Q-326a).
+
+**Task:** none until the meaning is confirmed.
+
+## 327. Continuous to PWM: flow - requested setpoint >= 1.5 for 30 s (Sergeant D, 2026-11-13; supersedes the 2.0 C / 60 s rule of entry 22)
+
+**Source:** sergeantd, 2026-11-13 07:19:29 UTC, #dev-sat-mqtt, msg 1570699609200787459 (https://discord.com/channels/812969634638725140/1105556725714649128/1570699609200787459), addressed to the bot. Read first-hand by the comms session.
+
+**Quoted:** "@BlueFlame Bot my third desicio is to have a tighter control in the threshold from continuous operation to PWM. The new detection for PWM is boiler temperature - requested temperature >= 1.5 for 30 seconds go to PWM"
+
+**Settled:** SAT switches from continuous to PWM when the boiler (flow) temperature minus the requested setpoint is at least 1.5 C for 30 s. This replaces entry 22 (margin 2.0 C, 60 s), which itself replaced thermo-nova's 3.0 C. "Boiler temperature" is read as the flow temperature, as in entry 22 ("BT").
+
+**Checked against the code:** thermo-nova `_maybe_enable_pwm_on_sustained_overshoot()` (`heating_control.py:262-300`): threshold `requested_setpoint + OVERSHOOT_MARGIN_CELSIUS` with `OVERSHOOT_MARGIN_CELSIUS = 3.0` (`cycles/const.py:10`), sustained for `OVERSHOOT_SUSTAIN_SECONDS = 60.0` (`const.py:21`); no check below `COLD_SETPOINT` (`:280-282`). Firmware: the 60 s rule uses `settings.sat.fOvershootMargin` (2.0 per entry 22) and `SAT_OVERSHOOT_SUSTAIN_MS` (`SATcycles.ino:1409-1415`); beside it runs the flame-out fail-safe of entry 289 (flow - CS >= 3.5 C for 30 s, `SAT_OVERSHOOT_FAILSAFE_DELTA_C`, `SATcycles.ino:1416-1419`).
+
+**Interpretation (ours):** only the margin and the hold time of the sustained-overshoot rule change (2.0 -> 1.5 C, 60 -> 30 s); the gates around it stay (cold setpoint check, MsgID 3 permission of entry 213, the `<` / `>=` comparison). With 1.5 C / 30 s the entry-289 fail-safe (3.5 C / 30 s) can no longer fire first; whether it stays as a separate rule is not in his message. Entry 37 (the cycle classifier's overshoot margin 2.0) is a different rule and is not changed.
+
+**Open:** whether the entry-289 fail-safe stays, and whether the `fOvershootMargin` user setting keeps its key with the new default 1.5.
+
+**Task:** none yet; the coordinator files it.
