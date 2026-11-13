@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T10:07:00Z'
-updated_date: '2026-11-13T10:53:00Z'
+updated_date: '2026-11-13T18:27:00Z'
 labels:
   - bug
   - sat
@@ -40,4 +40,6 @@ Shared helper satOtOutsideFresh(nowMs) in the SATcontrol.ino satOutside block (i
 
 <!-- SECTION:NOTES:BEGIN -->
 AC1 evidence (2026-11-13, wt-95w): tests/test_weather_worker_handoff.py new case C6 runs the real weatherLoop() cut from SATweather.ino with a satOtOutsideFresh() stub. Old code (OTGW_SATWEATHER_INO=git show HEAD:src/OTGW-firmware/SATweather.ino): FAILED (failures=1), c6_stale_nonzero_fetches=0 'stale/unstamped Toutside blocked the weather fetch'. Fix: 11 tests OK, c6_stale_nonzero_fetches=1, c6_fresh_nonzero_skips=0 (fresh boiler MsgID 27 still skips), c6_fresh_zero_fetches=1, c6_stale_zero_fetches=1. The real helper is compiled with satResolveOutsideTemp() by tests/test_sat_outside_order.py: 6 OK. Also OK: test_weather_snowfall_unit, test_weather_stream_tail, test_no_hostbyname. evaluate.py --quick: 0 FAIL, 100 %.
+
+Bench limit (2026-11-13, 09 via the coordinator, build 2.0.0-beta.226+e86aed9): AC3 cannot be shown on the bench unit .61. OT-Direct loopback never asks MsgID 27, so Toutside is never set and a non-zero value without a fresh stamp cannot be produced there. AC3 stays open as evidence by host test (tests/test_weather_worker_handoff.py C6, red on the old gate, green on the fix) plus field confirmation (indigo_light, AC2). Not shown on a device.
 <!-- SECTION:NOTES:END -->

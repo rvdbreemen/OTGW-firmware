@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T09:55:00Z'
-updated_date: '2026-11-13T16:34:00Z'
+updated_date: '2026-11-13T18:27:00Z'
 labels:
   - bug
   - sat
@@ -61,4 +61,6 @@ AC2 evidence: Robert decided (entry 330), Sergeant D agrees (entry 331, 15707569
 Firmware fix commit rebased onto ed751972a (docs pushed separately); the code-only commit on lane-comms goes into lane 95's combined build.
 
 Follow-up 1903 item 2 (2026-11-13, wt-95w lane-95-219b, coordinator decision after 92's check): otFrameIsFreshOutsideTemp() also returns false for bLocalAnswer, so an OT-Direct loopback B Read-Ack 27 (OTDirect.ino:973 marks B as local only in loopback; R frames are never local, so OT= on OT-Direct still stamps) no longer stamps iToutsideBoilerMs. SAT sim is unaffected (satResolveOutsideTemp returns the sim outdoor first, osrc S). Pre-existing gap, the old inline block had the same conditions. Tests: tests/test_outside_stamp_gateway_frames.py test_local_answer_boiler_read_ack_does_not_stamp and test/host/test_replay_frame_guards.cpp 'B Read-Ack 27 with bLocalAnswer=1 does not stamp'. Red on the predicate without the condition: py FAILED (failures=1), cpp 'got 5000 want 111'; green with it: py 10 OK, cpp PASS. --rev origin/dev fails on both the bLocalAnswer and the Write-Data case. Also green: sat_restart_quiet 20, boiler_unsupported_origin, ino_prototype_hoisting 2, boiler_support_bitmap_b_only 11, weather_worker_handoff 11.
+
+Bench limit (2026-11-13, 09 via the coordinator, build 2.0.0-beta.226+e86aed9): not demonstrable on the bench unit .61. OT-Direct loopback never asks MsgID 27, and the bench has neither a thermostat nor a boiler that would make the PIC send a Write-Data 27. Evidence stays host tests (tests/test_outside_stamp_gateway_frames.py, test/host/test_replay_frame_guards.py with the --rev origin/dev red run, including the bLocalAnswer follow-up) plus field confirmation by indigo_light. Not shown on a device.
 <!-- SECTION:NOTES:END -->
