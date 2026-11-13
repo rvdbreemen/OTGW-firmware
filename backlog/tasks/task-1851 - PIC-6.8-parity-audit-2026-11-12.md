@@ -1,9 +1,11 @@
 ---
 id: TASK-1851
 title: PIC 6.8 parity audit (2026-11-12)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-12T00:08:00Z'
+updated_date: '2026-11-13T18:17:00Z'
 labels:
   - otdirect
   - parity
