@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:13:00Z'
-updated_date: '2026-11-13T08:24:00Z'
+updated_date: '2026-11-13T08:26:00Z'
 labels:
   - sat
   - telemetry
@@ -53,4 +53,6 @@ Plan (2026-11-13, otgw-firmware-95). Telemetry only: no tuner decision, threshol
 Evidence so far: python tests/test_sat_curve_selftune.py -> Ran 95 tests OK (skipped=1: DecisionUnchanged is opt-in). Red: OTGW_SAT_INO/OTGW_SAT_HDR = d34723882 copies -> ExclusionCounters 8 tests FAIL/ERROR (no PROGRESS record). Decision path: OTGW_TUNE_BASE_REV=d34723882 python -m unittest test_sat_curve_selftune.DecisionUnchanged -> OK: a 10-day scenario (dhw/sun/flame_off/no_sun exclusions, an uncounted day, a manual change, a tuner change, phase-split days, few_ticks hour) gives identical RESULT line and identical SATTUNEH/SATTUNED/SATTUNE/NARR records on the base tuner and the new one. Web UI: node --test tests/webui/sat-tune-progress.test.mjs -> 8/8 pass; red on d34723882 v2.js/v2.html -> 0/8. i18n-lang + i18n-no-hardcoded 9/9 pass. evaluate.py --quick: 93 checks, 0 FAIL, 0 WARN, 100%.
 
 Gates 2026-11-13: affected host tests (run_tests.py --changed selection, 94 files, run one by one after the full parallel run was reaped for low memory): 94/94 pass. Fix on the way: tests/test_sat_cycle_classifier.py extract_types() now prepends SATcurveTune.h when SATRuntimeSection uses SatTuneProgress (it also feeds test_sat_pwm_start_limit). Web UI: 72 files one by one, 71 pass; tests/webui/pic-flash-status.test.mjs fails 1/14 (ReferenceError applyPicTabGate) on the d34723882 v2.js too, so not from this change (reported to the coordinator). AC2 stays open: REST/MQTT on a device needs the bench (09).
+
+Follow-up: the 32 nl/de/el strings were translated by hand against i18n/glossary.md (terms 5, 15, 20, 28, 45), not through the translate_webui skill with its two reviews; a sync review of the sat_tune_* keys is still open (e.g. Greek 'ώ' as the hour unit). pic-flash-status finding sent to the coordinator 2026-11-13.
 <!-- SECTION:NOTES:END -->
