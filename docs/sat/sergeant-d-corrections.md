@@ -6909,3 +6909,22 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Open (not in his message):** how the band combines with SAT's PID and the cold cutoff (ADR-199): whether "switched off" means CH off / CS to the minimum as on the cold cutoff, and whether the PID keeps running inside the band. To be put to him one question at a time, after Q-PWM1.
 
 **Task:** TASK-1887 (no longer blocked on the meaning; the open point above is for its plan).
+
+## 329. Follow Robert's approach instead: a faster self-tune (hours, not days), keep the current control, halve the integral instead of zeroing it outside the deadband (Sergeant D, 2026-11-13; replaces entry 325)
+
+**Source:** sergeantd, 2026-11-13 08:02:24 UTC, #dev-sat-mqtt (channel 1105556725714649128), msg 1570710410427109397 (https://discord.com/channels/812969634638725140/1105556725714649128/1570710410427109397), a reply to Robert's msg 1570705537383800905. Read first-hand by the comms session. This is a conversation between Robert and Sergeant D; the bot did not take part.
+
+**Quoted:**
+> Robert (07:43:02 UTC, msg 1570705537383800905): "@sergeantd Okay, wait wait... reverting agains the simulation? Are you sure, because the old tuner never had a good temperature control either. I mean why not create a faster autotuner, like we had before, but keep the way we control And instead of resetting the integral from 0.1 to 0, why not half the approach?"
+> Robert (07:52:03 UTC, msg 1570707806607245357): "What way you would dampen the effect by half, and maybe speed up the speed of control not days but hours to control. What do you think @sergeantd ?"
+> Sergeant D (08:02:24 UTC): "We can follow this approach"
+
+**Settled:** entry 325 (bring back the old hourly auto-tune) is replaced. Instead: (1) keep the current control and self-tune structure, but make the coefficient tune react in hours instead of days; (2) outside the deadband, halve the integral instead of resetting it to 0. Decided by Sergeant D on Robert's proposal; Robert is the maintainer, so this also carries his intent.
+
+**Checked against thermo-nova and the firmware:** integral reset: thermo-nova `_update_integral()` sets `self._integral = 0.0` when `abs(state.error) > DEADBAND` (`pid.py:185-189`, `DEADBAND = 0.1` at `const.py:16`); the firmware does the same (`_pidUpdateIntegral()`, `SATpid.ino:247-250`). Halving is therefore a deliberate difference from thermo-nova. Self-tune speed: today the coefficient moves at most 0.1 per step with at least 3 counted days between steps (ADR-205, ADR-228, ADR-230; entry 325 and its sources); thermo-nova has no coefficient auto-tune (entry 72). The old hourly tuner of entry 325 (02029bf75^:SATcontrol.ino:5578-5688) is not brought back.
+
+**Interpretation (ours, from Robert's two messages):** "halve" means the integral is multiplied by 0.5 at each update while the error is outside the deadband (so it decays), not halved once at the crossing; "hours" means the tune evaluates and may step within hours, keeping the two-phase signal of ADR-228. Both readings are to be confirmed before a plan is written.
+
+**Open:** (1) the exact halving rule (every update outside the band, or once per crossing); (2) the new tune timing: evaluation window, step size, minimum time between steps, which exclusions (ADR-205, ADR-231) stay; (3) Q-VT1 (queued, the integral outside the deadband) is overtaken by this entry and should be dropped or rewritten; (4) Q-1882a and the open tuner observation of TASK-1883 apply to the new faster tune. Robert decides scope; Sergeant D decides behaviour.
+
+**Task:** TASK-1886 (entry 325) is superseded by this entry and must be rewritten or closed; the coordinator decides.

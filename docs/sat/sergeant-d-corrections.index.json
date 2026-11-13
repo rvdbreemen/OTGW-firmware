@@ -4381,6 +4381,20 @@
     "TASK-1887"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 329,
+   "title": "Follow Robert's approach instead: a faster self-tune (hours, not days), keep the current control, halve the integral instead of zeroing it outside the deadband (Sergeant D, 2026-11-13; replaces entry 325)",
+   "date": "2026-11-13",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570710410427109397",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1883",
+    "TASK-1886"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
