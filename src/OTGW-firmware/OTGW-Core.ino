@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.225
+**  Version  : v2.0.0-beta.226
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5034,10 +5034,11 @@ static void stampThermostatRoomTemp()
 //   MessageID27), and on OT-Direct OT= writes it. This R frame is the one that writes the canonical
 //   Toutside. A failed PIC sensor sends Invalid-Data instead, so a dead sensor ages out.
 // Never a replayed line (TASK-1649) or a parity error, never an A frame (an OT-Direct cache answer can
-// repeat an old value), and never the PS=1 summary, which has no age (ADR-181).
+// repeat an old value), never a B the gateway made itself (bLocalAnswer: the OT-Direct loopback boiler, TASK-1896 follow-up 1903 item 2;
+// an R frame is never local, so OT= on OT-Direct still stamps), and never the PS=1 summary, which has no age (ADR-181).
 static bool otFrameIsFreshOutsideTemp(const OpenthermData_t &f)
 {
-  if (f.id != 27 || f.skipthis || f.bReplayed) return false;
+  if (f.id != 27 || f.skipthis || f.bReplayed || f.bLocalAnswer) return false;
   if (f.rsptype == OTGW_BOILER) return f.type == OT_READ_ACK && !f.bGatewaySubstituted;
   if (f.rsptype == OTGW_REQUEST_BOILER) return f.type == OT_WRITE_DATA;
   return false;

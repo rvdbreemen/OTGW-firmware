@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T09:55:00Z'
-updated_date: '2026-11-13T11:57:00Z'
+updated_date: '2026-11-13T16:34:00Z'
 labels:
   - bug
   - sat
@@ -59,4 +59,6 @@ Bench AC note: the bench check runs on the Classic + PIC with a DS18B20 or OT=; 
 AC2 evidence: Robert decided (entry 330), Sergeant D agrees (entry 331, 1570756945470824540). AC3 host-test part done in 1f4d62091: test/host/test_replay_frame_guards.py --rev origin/dev FAIL 'gateway Write-Data to the boiler stamps' (got 111 want 5000), PASS 9/9 on the fix; tests/test_outside_stamp_gateway_frames.py red 1F/8P on the behaviour-neutral extraction, green 9/9; full suite 229 files 228 passed 0 failed 1 skipped; evaluate --quick 0 FAIL. AC3 'outside_temp_missing clears with only the PIC sensor present' is NOT ticked: needs the build on a unit (AC5 bench). AC1 (frame sequence from a capture) open: the reading is from the PIC 6.8 source only. The commit goes into lane 95's combined build (cherry-pick); lane-comms stays local until 95 pushes.
 
 Firmware fix commit rebased onto ed751972a (docs pushed separately); the code-only commit on lane-comms goes into lane 95's combined build.
+
+Follow-up 1903 item 2 (2026-11-13, wt-95w lane-95-219b, coordinator decision after 92's check): otFrameIsFreshOutsideTemp() also returns false for bLocalAnswer, so an OT-Direct loopback B Read-Ack 27 (OTDirect.ino:973 marks B as local only in loopback; R frames are never local, so OT= on OT-Direct still stamps) no longer stamps iToutsideBoilerMs. SAT sim is unaffected (satResolveOutsideTemp returns the sim outdoor first, osrc S). Pre-existing gap, the old inline block had the same conditions. Tests: tests/test_outside_stamp_gateway_frames.py test_local_answer_boiler_read_ack_does_not_stamp and test/host/test_replay_frame_guards.cpp 'B Read-Ack 27 with bLocalAnswer=1 does not stamp'. Red on the predicate without the condition: py FAILED (failures=1), cpp 'got 5000 want 111'; green with it: py 10 OK, cpp PASS. --rev origin/dev fails on both the bLocalAnswer and the Write-Data case. Also green: sat_restart_quiet 20, boiler_unsupported_origin, ino_prototype_hoisting 2, boiler_support_bitmap_b_only 11, weather_worker_handoff 11.
 <!-- SECTION:NOTES:END -->

@@ -10,7 +10,8 @@
 
 enum { OTGW_BOILER = 1, OTGW_THERMOSTAT = 2, OTGW_ANSWER_THERMOSTAT = 3, OTGW_REQUEST_BOILER = 4 };
 enum { OT_READ_ACK = 1, OT_WRITE_DATA = 2, OT_INVALID_DATA = 3 };
-struct OpenthermData_t { int id; int rsptype; int type; bool skipthis; bool bGatewaySubstituted; bool bReplayed; };
+struct OpenthermData_t { int id; int rsptype; int type; bool skipthis; bool bGatewaySubstituted; bool bReplayed;
+                         bool bLocalAnswer; };
 OpenthermData_t OTdata;
 struct { struct { uint32_t iToutsideBoilerMs; } otBus; } state;
 static uint32_t g_ms = 5000;
@@ -35,8 +36,8 @@ static void check(const char* name, long got, long want) {
   if (!ok) g_failures++;
 }
 
-static void outside(const char* name, int rsp, int type, bool replayed, uint32_t want) {
-  OTdata = {27, rsp, type, false, false, replayed};
+static void outside(const char* name, int rsp, int type, bool replayed, uint32_t want, bool local = false) {
+  OTdata = {27, rsp, type, false, false, replayed, local};
   state.otBus.iToutsideBoilerMs = 111;
   outsideStamp();
   check(name, state.otBus.iToutsideBoilerMs, want);
@@ -47,6 +48,8 @@ int main() {
   outside("live boiler Read-Ack stamps", OTGW_BOILER, OT_READ_ACK, false, 5000);
   outside("replayed boiler Read-Ack leaves the stamp", OTGW_BOILER, OT_READ_ACK, true, 111);
   outside("thermostat frame leaves the stamp", OTGW_THERMOSTAT, OT_WRITE_DATA, false, 111);
+  std::printf("TASK-1896 follow-up 1903.2: gateway-made B frame (OT-Direct loopback)\n");
+  outside("B Read-Ack 27 with bLocalAnswer=1 does not stamp", OTGW_BOILER, OT_READ_ACK, false, 111, true);
   std::printf("TASK-1896 gateway Write-Data 27 (PIC DS18B20 / OT=)\n");
   outside("gateway Write-Data to the boiler stamps", OTGW_REQUEST_BOILER, OT_WRITE_DATA, false, 5000);
   outside("replayed gateway Write-Data leaves the stamp", OTGW_REQUEST_BOILER, OT_WRITE_DATA, true, 111);
