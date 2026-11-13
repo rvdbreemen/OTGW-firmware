@@ -1,7 +1,7 @@
 ---
 id: "ADR-232"
 title: "Patch AsyncTCP 3.4.10 with upstream fix 7befe25 at build time through the patch_pio_libs pre-hook"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-13"
 binding: false
 gate: "tests/test_asynctcp_accept_patch.py"
@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "build"
   - "asynctcp"
@@ -27,6 +26,7 @@ symbols:
   - "tcp_abort"
   - "ERR_ABRT"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -37,9 +37,12 @@ Terms used below: TCP (Transmission Control Protocol), IP (Internet Protocol), l
 
 ## Status
 
-Proposed, 2026-11-13.
+Accepted, 2026-11-13.
 
-**Decision Maker:** to be decided by User: Robert van den Breemen (maintainer), by DM through the coordinator. Robert's instruction to the bench-tester for TASK-1746, "check upstream ESP32Async/AsyncTCP; if fixed there, use that, otherwise patch" (relayed by the coordinator, 2026-11-12), is the approval for a library change in principle. This record asks him to accept how the patch is carried.
+**Decision Maker:** User: Robert van den Breemen (maintainer), in two steps:
+
+- 2026-11-12, instruction to the bench-tester for TASK-1746 (relayed by the coordinator): "check upstream ESP32Async/AsyncTCP; if fixed there, use that, otherwise patch". The approval for a library change in principle.
+- 2026-11-13, Discord DM 1570699237501571073 (relayed by the coordinator), answer to the question "A = accept this hash-checked build-time patch, B = vendor AsyncTCP into src/libraries, C = wait for an upstream release": "A".
 
 ## Status History
 
@@ -50,6 +53,11 @@ status_history:
     changed_by: "Agent: otgw-firmware-95"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-13
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: "Accepted by Robert (DM 1570699237501571073: A, hash-checked build-time patch of AsyncTCP 3.4.10 with upstream 7befe25), relayed by the coordinator"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -137,7 +145,7 @@ d233104 and 4192390 are not taken: they need the upstream refactor around them, 
 
 ## Open Questions
 
-- [ ] Does Robert accept carrying 7befe25 as a hash-checked build-time patch on the registry copy (this decision), or does he prefer one of the alternatives?
+- [x] Does Robert accept carrying 7befe25 as a hash-checked build-time patch on the registry copy (this decision), or does he prefer one of the alternatives? Answered 2026-11-13, DM 1570699237501571073: "A", this decision.
 
 ## Related Decisions
 

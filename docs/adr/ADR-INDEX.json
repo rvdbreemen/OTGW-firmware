@@ -9114,7 +9114,7 @@
       "title": "Patch AsyncTCP 3.4.10 with upstream fix 7befe25 at build time through the patch_pio_libs pre-hook",
       "path": "ADR-232-patch-asynctcp-3-4-10-with-upstream-fix-7befe25-at-build-time-through-the-patch-pio-libs-pre-hook.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-13",
       "decision_summary": "Carry 7befe25 as a build-time patch on the registry copy of AsyncTCP 3.4.10, applied by scripts/patchpiolibs.py:",
       "topics": [
