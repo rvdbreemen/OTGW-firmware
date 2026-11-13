@@ -4,11 +4,11 @@ title: >-
   REST handlers /api/v2/simulate and /device/info call LittleFS.exists on the
   async_tcp task: cross-core flash read, TWDT (gruijter 13-11 04:00:54,
   coredump)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T15:45:00Z'
-updated_date: '2026-11-13T19:42:00Z'
+updated_date: '2026-11-13T23:11:00Z'
 labels:
   - bug
   - stability
@@ -28,9 +28,9 @@ Found in gruijter's beta.218+2f5ecb4 capture (Discord #alpha-testing https://dis
 <!-- AC:BEGIN -->
 - [x] #1 No LittleFS call runs on the async_tcp task for /api/v2/simulate and /api/v2/device/info: existence is cached on the loop task (host test or source test on the real handlers, red on the old code)
 - [x] #2 A gate (evaluate.py check or test) fails on a LittleFS.* call inside a REST handler that runs on async_tcp, red on the old code, green on the fix
-- [ ] #3 Bench: polling /api/v2/simulate and /device/info every 1-2 s for at least 2 h during filesystem activity gives no watchdog reset
+- [x] #3 Bench: polling /api/v2/simulate and /device/info every 1-2 s for at least 2 h during filesystem activity gives no watchdog reset
 - [ ] #4 Field: no TWDT with async_tcp in LittleFS in a long-run capture from a tester
-- [ ] #5 Bench (sim): poll /api/v2/simulate every 9 s while SAT runs through PWM ON/OFF switches (simulation mode), at least 2 h, no watchdog reset
+- [x] #5 Bench (sim): poll /api/v2/simulate every 9 s while SAT runs through PWM ON/OFF switches (simulation mode), at least 2 h, no watchdog reset
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -47,4 +47,8 @@ Narrow scope (coordinator 2026-11-13). The two polled calls move off async_tcp: 
 2026-11-13 CORRECTION of the earlier "double correlation" note (comms misread the log): the line "SAT PWM: pwm_on=... ON" (SATcontrol.ino:1539 at 2f5ecb4) is printed on every 30 s control tick during a phase; it is NOT the ON switch. The real ON edges are the "PWM ON:" lines (SATcontrol.ino:1231, satPwmBeginOn): 08:36:04 (on=489 s) and 11:58:20 (on=275 s). The two "Other watchdog" resets came ~134 s and ~47 s INTO those ON phases, not 14-17 s after a switch. 19 ON edges that day, 17 without a reset. At an ON edge only CS, MM=0, CH=1 are queued plus a log line; no flash work (SATcontrol.ino:1231-1240, :1666-1690). Reset reason: platform_esp32.h:216 maps ESP_RST_WDT (raw 7) to "Other watchdog" = RTC/super/CPU-level watchdog, not the task watchdog (6) or interrupt watchdog (5); no new core dump (the 04:00:54 dump was still the stored one). Device logged live OT frames until 1.6 s / 2.7 s before reboot (reboot time from uptime). Ranked hypotheses (trace agent, read-only): H1 hardware-level watchdog, trigger unknown; H2 IPC stack overflow (this unit ipc0/ipc1 low points 80/88 B of 1024; beta.219 raised the stack) escalating to H1; H3 external 0x26 watchdog unlikely (loop task fed it every <=100 ms until 1-3 s before reboot; an EN-pin reset would read "Power on", wiring not verified); H4 SAT/PWM, LittleFS or /simulate: no evidence. The /simulate correlation (1.5-13 s before) remains a coincidence candidate only. Bench next: capture the ROM rst:0x.. line on the S3 USB console during such a reset; beta.218 vs beta.219 on a Classic+PIC with two web UIs polling and SAT in PWM. Corrected publicly: 1570843356219703308 (earlier message 1570836136136417321 marked as corrected).
 
 AC1 and AC2 evidence (2026-11-13, wt-95w lane-95-1899 on origin/dev 6f302ffb4). Gate tests/test_rest_no_littlefs_on_async_tcp.py: on the old restAPI.ino (OTGW_RESTAPI_INO=git show HEAD:...) exit 1, 'sendDeviceInfoV2: 1 LittleFS call(s), 0 allowed (3410 LittleFS.exists)' and 'sendSimulationStatus: 1 LittleFS call(s), 0 allowed (376 LittleFS.exists)'; on the fix 4 OK, including a self-test that injects an unlisted LittleFS call into sendSimulationStatus and sees it reported, and a staleness check on the allow-list. AC1 tests/test_rest_fs_flags_loop.py: the source class on the old copies 3 FAIL (both handlers call LittleFS, no refresh in loopLittleFSStatus), on the fix 7 OK including the host compile of the real fsFileFlags block (flags follow the files; unmounted reports false and reads nothing). Tests that had to follow: test_health_no_fs_flash_ops (stub for the new function, flags refresh count 94-98 in 16 min, mount check and write probe rhythm unchanged: the refresh takes no own pass) and test_fs_update_keep (fsupdateincomplete now reads the flag; the flag comes from FS_UPDATE_INCOMPLETE_FILE). Also OK: sim_fixture_builtin, replay_timing, web_file_scheduling, heap_tier_watermark, reboot_listener_and_reason, reboot_reason, reboot_log_time_not_set, wifi_link_record, crashlog_coredump, capture_otframes, ota_flash, otd_pr_reports_pyotgw, local_frame_consumers. Pre-existing, not from this change: test/host/test_dhw_water_meter.py mutant M28 anchor 'MQTT_HA_SENSOR_COUNT = 399' no longer matches since 5ddcc6543 (TASK-1880/1893/1895), reported to the coordinator. TASK-1910 (extra '}' in device/info under a storm): the device/info change here only replaces the value of one je.field(), so it cannot add a brace; cause not in this code.
+
+Bench (09, .61, build 2.0.0-beta.228+c071dbb): AC3 PASS, 125 min, 3,736 poll pairs of /simulate + device/info every 2 s, FS activity every 60 s (124 cycles), bootcount 612 throughout, crashlog empty. Functional: source=file after 4.9-7 s, builtin after 7.8-10 s, fsupdateincomplete=false. AC5 PASS with a limit: 32 forced PWM entries but only 4 real ON phases (sim room ran above target), so the 2 h of /simulate polling ran beside 4 full ON/OFF phases, not continuous PWM cycling. Evidence: 09 scratchpad b228.
+
+Rebased onto origin/dev 479334c64 (ba: TASK-1885, TASK-1824, TASK-1895). Diff 746ccd426..479334c64 on restAPI.ino, helperStuff.ino, networkStuff.ino/.h, OTGW-firmware.h/.ino is banner lines only; sensors_ext.ino got only the TASK-1824 Dallas read path (no REST, no LittleFS). So the soak on c071dbb holds for the rebased code. Re-bumped to beta.230 (00a760326). Gates: evaluate --quick RESULT PASS; test_rest_no_littlefs_on_async_tcp, test_rest_fs_flags_loop, test_health_no_fs_flash_ops, test_fs_update_keep, test_dallas_first_reading OK; test/host/test_ot_support_migration PASS. Build 2.0.0-beta.230+5a23184 exit 0, RAM 126116 B, Flash 2140423 B, zip sha256 858a455697501634e6417b86e99401bfc445dfc9bb721d0c1e9ff40a2c7a6a64. Pushed 479334c64..5a23184b8, posted Discord message 1570939034551853158. AC4 (field, gruijter: no TWDT on async_tcp) stays open.
 <!-- SECTION:NOTES:END -->

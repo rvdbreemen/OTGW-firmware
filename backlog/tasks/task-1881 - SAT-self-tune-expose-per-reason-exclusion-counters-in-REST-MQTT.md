@@ -1,11 +1,11 @@
 ---
 id: TASK-1881
 title: 'SAT self-tune: expose per-reason exclusion counters in REST/MQTT'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:13:00Z'
-updated_date: '2026-11-13T19:13:00Z'
+updated_date: '2026-11-13T23:17:00Z'
 labels:
   - sat
   - telemetry
@@ -58,3 +58,9 @@ Follow-up: the 32 nl/de/el strings were translated by hand against i18n/glossary
 
 AC2 bench (otgw-bench-tester, 2026-11-13, .61 on 2.0.0-beta.226+e86aed9, src byte-identical to the pushed 6f302ffb4; SAT on + simulation + curve_self_tune on). REST /api/v2/sat/status curve_tune = {running true, days 0, days_needed 3, clean_hours_today, clean_hours_needed 6, hours_today, last_decision 'none', last_reason 'none', excluded_hours with 12 keys}. Sim event tune_hour=60: hours_today and clean_hours_today 0->1->2->3 in 3 minutes (19:03-19:06). Broker, 12-minute capture: all 17 flat topics (sat/curve_tune/running, /days, /clean_hours_today, /last_decision, /last_reason and 12x /excluded_hours/<reason>), 26 messages, all not retained (r=0); topics that do not change only arrive with the 7-11 minute heartbeat (SATmqttPublish.h:57-58). With curve_self_tune off: 12-minute capture, 0 sat/curve_tune/* messages while the control topic sat/pwm_duty did arrive. Screenshot of the curve card self-tune box ('0/3 counted days, today 1/6 clean hours'). Evidence (bench-tester scratchpad): b226\61-mqtt-curvetune-on12.txt, b226\61-mqtt-curvetune-off12.txt, b226\after-226-control-curvecard.png.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: tests/test_sat_curve_selftune.py green; excluded hours count per reason, decision path unchanged. AC2: counters in REST and as flat MQTT topics (ADR-101); bench by 09 on .61 with beta.226+e86aed9 OK, including off -> 0 topics (f00ab8103). AC3: curve card shows counted days x/3, last decision and per-reason excluded hours; webui test on a fixture payload. Shipped in beta.226+6f302ff.
+<!-- SECTION:FINAL_SUMMARY:END -->
