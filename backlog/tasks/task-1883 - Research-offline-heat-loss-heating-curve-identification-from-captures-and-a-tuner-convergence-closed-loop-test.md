@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:13:00Z'
-updated_date: '2026-11-13T06:57:00Z'
+updated_date: '2026-11-13T06:58:00Z'
 labels:
   - sat
   - research
@@ -39,6 +39,8 @@ Lessons 4 and 5 of docs/sat/vtherm-comparison-2026-11-13.md (TASK-1879). (4) VTh
 AC1 comparison (PyPI/CRAN/GitHub, 2026-11-13): numpy 2.5.4 (BSD-3, no deps); scipy 1.18.1 (BSD); statsmodels 0.15.0 (BSD-3; pandas, patsy, formulaic); arch 9.0.0 (NCSA, MovingBlockBootstrap, needs statsmodels); ctsmTMB 1.1.1 (R, GPL-3, CRAN 2026-07-14, continuous-time grey-box); locie/pySIP v1.0.0 2023-08-17 (no licence file found, pins numpy 1.x, pymc/numba; excluded); BuildingsPy 5.2.2 (simulation helper, not identification). PyPI 'pysip' is an unrelated SIP package. Choice: base on numpy (3-parameter lstsq + block bootstrap, ~30 lines; five transitive packages not worth it). Upgrade path: statsmodels + arch for HAC errors or non-linear emitters; ctsmTMB offline for a rigorous RC study. Metadata only for statsmodels/arch/ctsmTMB/pySIP, not run.
 
 Evidence run by comms 2026-11-13 in wt-comms: python tests/test_sat_tuner_convergence.py -> Ran 5 tests, OK (exit 0); OTGW_TUNER_MUTANT=sign -> FAILED (failures=4, skipped=1), exit 1; OTGW_TUNER_MUTANT=step10 -> FAILED (failures=4, skipped=1), exit 1. Real scenarios: raise 1.0->1.8 final 1.70 (7 steps, 0 direction changes), lower 2.6->1.4 final 1.50 (11 steps, 0 direction changes), already-right 1.80 (0 steps). Fixture observation for routing, not a conclusion: with an evening gain pulse only, the real tuner stops at 1.50 vs c_true 1.8 with phases_disagree (warm-up +0.87, floating +1.35), consistent with ADR-228/230. Side finding: tests/test_sat_curve_selftune.py:898-899 runs the exe without SATTUNE_FILE/cwd and leaves sat_tune_test.json in the repo root (one is untracked in the main dev tree).
+
+Open observation for later (not a conclusion): in the one-sided disturbance fixture (evening gain only) the real tuner settles at 1.50 against c_true 1.8 with reason phases_disagree (warm-up mean +0.87 holds, floating mean +1.35 says higher). Consistent with ADR-228/230 as recorded (entries 303-305, 313, 315). Possible single question for Sergeant D, to be considered only after Q-PWM1 and Q-1882a are answered (one question at a time).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

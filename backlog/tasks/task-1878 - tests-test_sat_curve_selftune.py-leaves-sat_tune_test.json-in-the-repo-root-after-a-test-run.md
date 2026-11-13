@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-12T22:07:00Z'
+updated_date: '2026-11-13T06:58:00Z'
 labels:
   - tests
   - tooling
@@ -25,3 +26,9 @@ Found during the TASK-1872 full run (2026-11-12): an untracked sat_tune_test.jso
 - [ ] #1 After python scripts/run_tests.py -j 1 test_sat_curve_selftune.py in a clean tree, git status shows no sat_tune_test.json, and the same check on the old code shows the file appearing
 - [ ] #2 test_sat_curve_selftune.py stays green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-13 (comms, TASK-1883 run): confirmed again. Running python scripts/run_tests.py --no-host tuner_convergence curve_selftune in wt-comms left sat_tune_test.json in the repo root (removed by hand); same cause tests/test_sat_curve_selftune.py:898-899 (test_removing_one_exclusion_is_caught runs the exe without SATTUNE_FILE and without cwd). The untracked sat_tune_test.json in the main dev tree fits this.
+<!-- SECTION:NOTES:END -->
