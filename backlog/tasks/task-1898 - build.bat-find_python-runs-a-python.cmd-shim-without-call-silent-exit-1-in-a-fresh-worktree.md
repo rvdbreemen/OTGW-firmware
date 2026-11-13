@@ -3,11 +3,11 @@ id: TASK-1898
 title: >-
   build.bat :find_python runs a python.cmd shim without call: silent exit 1 in a
   fresh worktree
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T13:22:00Z'
-updated_date: '2026-11-13T13:28:00Z'
+updated_date: '2026-11-13T13:33:00Z'
 labels:
   - build
   - tooling
@@ -40,3 +40,9 @@ Prefix every interpreter probe in build.bat :find_python (py -3, python, python3
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-13 evidence in fresh worktree wt-ba-buildbat (no .build-venv/.build-python; 'where python' first = C:\tools\Codex\python): echo-on copies of build.bat with the build.py line replaced by an echo. OLD: trace (4817 B) ends at the line 'python -c "import sys; ..." 1>nul 2>nul' and never reaches build.py. FIX: trace (4941 B) shows 'call python -c ...' returning, .build-venv created on it, then 'TRACE: reached build.py with ...\wt-ba-buildbat\.build-venv\Scripts\python.exe'. Logs kept in RvdB/OTGW-worktree-leftovers/evidence-1898/. tests/test_build_bat_call_probes.py: FAILED on the old build.bat (4 probes without CALL: py -3, python, python3, %BASE_PYTHON% -m venv), OK on the fix; run_tests 1/1. evaluate.py --quick 85 PASS 0 FAIL.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: build.bat :find_python runs py -3, python and python3 through CALL, and :bootstrap_build_venv runs %BASE_PYTHON% -m venv through CALL (commit f7c5c7a37, rebased). AC2: echo-on traces in the fresh worktree wt-ba-buildbat with C:\tools\Codex\python first on PATH: old build.bat stops after the 'python -c' probe and never reaches build.py; fixed build.bat creates .build-venv and reaches build.py (logs in RvdB/OTGW-worktree-leftovers/evidence-1898/). AC3: tests/test_build_bat_call_probes.py FAILED on the old build.bat (4 probes without CALL), OK on the fix, run_tests 1/1 after the rebase onto 827fb519f; evaluate.py --quick 85 PASS 0 FAIL. Not verified: a full build through the fixed build.bat in a fresh worktree (the traces stop before build.py by design); the next fresh-worktree build exercises it. TASK-1894 keeps the other 0-byte-log case (PowerShell '*>' on a working build).
+<!-- SECTION:FINAL_SUMMARY:END -->
