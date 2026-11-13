@@ -6928,3 +6928,52 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Open:** (1) the exact halving rule (every update outside the band, or once per crossing); (2) the new tune timing: evaluation window, step size, minimum time between steps, which exclusions (ADR-205, ADR-231) stay; (3) Q-VT1 (queued, the integral outside the deadband) is overtaken by this entry and should be dropped or rewritten; (4) Q-1882a and the open tuner observation of TASK-1883 apply to the new faster tune. Robert decides scope; Sergeant D decides behaviour.
 
 **Task:** TASK-1886 (entry 325) is superseded by this entry and must be rewritten or closed; the coordinator decides.
+
+## 330. Maintainer decision: an outside temperature the gateway measures itself counts as a SAT source (2026-11-13, deviates from entries 57 and 139)
+
+**Not by Sergeant D.** This is a maintainer decision by Robert, recorded here as a cross-reference because it changes which outside values SAT accepts. Sergeant D was notified and asked whether he objects: https://discord.com/channels/812969634638725140/1105556725714649128/1570753075830857779
+
+**Source:** Robert, in the Claude Code session of the communication agent, 2026-11-13 (about 10:50 UTC), after the trace of indigo_light's report (#nederlandse-ondersteuning 1570736532719935529 and 1570739066360561805).
+
+**Quoted:**
+
+> "Ehhh, waarom telt de waarde die de Pic maakt zelf niet, dat kan toch ook met een sensor gelezen worden? Dan kan het toch heel goed zijn dat de buitentemperatuur niet van de OTbug komt, maar van de gateway zelf. Je kan wel OTcurrentSystemState.Toutside zien. Los dit op."
+
+**Settled:** an outside temperature that the gateway itself puts on the bus as MsgID 27 counts as a valid SAT outside source, the same as the boiler's own MsgID 27 Read-Ack: a DS18B20 on the PIC (GPIO function 7, `TS=O`) or a value set with `OT=`. The 1-hour validity of entry 57 and the source order of entry 139 stay (external, then MsgID 27 including this value, then weather, then the restored value).
+
+**Checked against the PIC, thermo-nova and the firmware:**
+- PIC 6.8 (`OTGW-other-projects/otgw-6.8/gateway.asm`): `StoreTempValue` (:4269-4279) stores a valid DS18B20 reading in the same `outside1/2` storage as `OT=`; `MessageID27` turns the thermostat's Read-Data 27 into a Write-Data 27 with that value towards the boiler and answers the thermostat with a Read-Ack carrying it; a failed reading (`SensorInvalid`) is sent as Data-Invalid / Invalid-Data, so a dead sensor does not freeze the value. Identical in 6.6 (`other-projects/otgw-6.6/gateway.asm:3050-3071`).
+- Firmware before this decision: `state.otBus.iToutsideBoilerMs` is stamped only for a boiler (B) Read-Ack 27 that is not substituted and not replayed (`OTGW-Core.ino:6098-6102`). With a PIC value the boiler answers the Write-Data with Write-Ack or Unknown-DataId, never Read-Ack, so the stamp never fires and `satResolveOutsideTemp()` (`SATcontrol.ino:2546-2569`) has no MsgID 27 source.
+- thermo-nova reads the outside temperature from Home Assistant sensor entities and the weather entity (entry 139: `climate.py:317-343`); it has no notion of the gateway's MsgID 27 frame types, so this is a firmware-side choice.
+
+**Task:** TASK-1896 (stamp the gateway's own MsgID 27 frames); TASK-1897 (the weather fetch uses the same freshness). **Open:** Sergeant D's answer to the notice; if he objects, Robert decides.
+
+## 331. Sergeant D agrees with entry 330: the gateway's own outside temperature counts as a SAT source (2026-11-13, confirms entry 330)
+
+**Source:** #dev-sat-mqtt, 2026-11-13. Our notice of the maintainer decision (entry 330) ended with "Do you object to this?" (10:51 UTC): https://discord.com/channels/812969634638725140/1105556725714649128/1570753075830857779. His first reply (10:53:46 UTC) was ambiguous: https://discord.com/channels/812969634638725140/1105556725714649128/1570753538420903997. We asked A (agree) or B (object): https://discord.com/channels/812969634638725140/1105556725714649128/1570756784065482753. His answer (11:07:19 UTC): https://discord.com/channels/812969634638725140/1105556725714649128/1570756945470824540
+
+**Quoted:**
+
+> "of course yes"
+>
+> "hahahaha sorry. My answer is A"
+
+**Settled:** Sergeant D agrees with entry 330: an outside temperature that the gateway puts on the bus itself as MsgID 27 (a DS18B20 on the PIC with `TS=O`, or an `OT=` value) counts as a valid SAT outside source, with the 1-hour validity of entry 57 and the source order of entry 139. Option A as posted: "You agree: the gateway's own outside temperature (the DS18B20 on the PIC, or OT=) counts as a SAT source."
+
+**Compared with thermo-nova and the firmware:** see entry 330 (thermo-nova reads outside sensors and weather from Home Assistant entities, `climate.py:317-343`; the firmware stamped only a boiler Read-Ack, `OTGW-Core.ino:6098-6102` before TASK-1896).
+
+**Task:** TASK-1896. **Open:** nothing from Sergeant D; the frame sequence on a real PIC unit is still to be confirmed with a capture (TASK-1896 notes).
+
+## 332. Sergeant D is satisfied with the integral and derivative terms in the I/D simulation (2026-11-13, assessment, no change decided)
+
+**Source:** #dev-sat-mqtt, 2026-11-13 11:41:05 UTC, his reaction to the I and D term graphs he asked for (request 1570749660342128701; graphs 1570758325740507237: OTGW SAT model at dev f1b2731fd vs thermo-nova 7beaaf5 on gruijter's 12 Nov room data, coefficient 1.8): https://discord.com/channels/812969634638725140/1105556725714649128/1570765446636900415
+
+**Quoted:**
+
+> "The integral works pretty good.  I am also happy about the derivative"
+
+**Settled:** nothing is changed. He judges the integral and derivative behaviour shown in the graphs as good. Both implementations compute I and D with the same formulas on a 60 s step (`SATpid.ino:48`, `:248-264`, `:283-332`; `pid.py:20`, `:185-192`, `:205-230`); the shown differences are the Kd factor 0.063 vs 0.07 (entry 279, `pid.py:93`) and the firmware's 45 s room EMA (`SATcontrol.ino:6938-6958`).
+
+**Interpretation (ours):** he speaks about the current code as simulated (the firmware model matched the device-logged I term in 94 % of 1079 ticks). This is an assessment, not a decision: it does not revoke entry 329 (halve the integral outside the deadband instead of zeroing it), which is still open in the coordinator's PID report. Whether 329 is still wanted after this assessment is a question for that report, not decided here.
+
+**Task:** none new. **Open:** the entry-329 halving rule (coordinator's PID report).

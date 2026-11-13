@@ -4395,6 +4395,44 @@
     "TASK-1886"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 330,
+   "title": "Maintainer decision: an outside temperature the gateway measures itself counts as a SAT source (2026-11-13, deviates from entries 57 and 139)",
+   "date": "2026-11-13",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570753075830857779",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1896",
+    "TASK-1897"
+   ],
+   "confirmed_by_entry": 331
+  },
+  {
+   "id": 331,
+   "title": "Sergeant D agrees with entry 330: the gateway's own outside temperature counts as a SAT source (2026-11-13, confirms entry 330)",
+   "date": "2026-11-13",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570753075830857779",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1896"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 332,
+   "title": "Sergeant D is satisfied with the integral and derivative terms in the I/D simulation (2026-11-13, assessment, no change decided)",
+   "date": "2026-11-13",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1570765446636900415",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
   }
  ]
 }

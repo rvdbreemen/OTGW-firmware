@@ -4,6 +4,7 @@ title: SAT PID integral halving outside deadband instead of reset (entry 329)
 status: To Do
 assignee: []
 created_date: '2026-11-13T08:09:00Z'
+updated_date: '2026-11-13T11:52:00Z'
 labels:
   - sat
   - adr
@@ -25,3 +26,9 @@ Sergeant D 2026-11-13 (https://discord.com/channels/812969634638725140/110555672
 - [ ] #3 Host test on the real PID: red on reset-to-0, green on halving
 - [ ] #4 Bench test by the bench-tester
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-13: after the I/D simulation (1570758325740507237) Sergeant D said 'The integral works pretty good. I am also happy about the derivative' (1570765446636900415), recorded as entry 332 (assessment, no change decided). It does not revoke entry 329; whether the halving is still wanted goes into the coordinator's PID report.
+<!-- SECTION:NOTES:END -->

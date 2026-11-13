@@ -24,6 +24,7 @@ History at the end of this file.
 - **Q-327a** (queued): entry 327, TASK-1888
 - **Q-328a** (queued): entry 328, TASK-1887
 - **Q-327b** (queued): entry 327, TASK-1888
+- **Q-329a** (asked): entry 329, entry 332, TASK-1890
 <!-- live-queue:end -->
 
 A new correction from Sergeant D (e.g. 2026-10-26 'CH=1 stays during PWM OFF') is handled before the queue.
@@ -259,6 +260,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q-327a | — | queued (FIRST after Q-PWM1 is answered; coordinator order 2026-11-13): with the new continuous->PWM rule of entry 327 (flow - requested >= 1.5 C for 30 s), does the entry-289 flame-out fail-safe (flow - CS >= 3.5 C for 30 s, SATcycles.ino:1416-1419) stay as a separate rule or go? It can no longer fire first. Unblocks TASK-1888 most. | entry 327, TASK-1888 |
 | Q-328a | — | queued (SECOND): how does the hot/cold tolerance band of entry 328 combine with the PID and the cold cutoff (ADR-199, satColdCutoff SATchEnable.h:26-29, cutoff SATcontrol.ino:5209-5214)? Options to give: band only on the CH-enable decision, PID keeps running, cold cutoff unchanged (our recommendation) / band also freezes the PID / band replaces the cold cutoff. | entry 328, TASK-1887 |
 | Q-327b | — | queued (THIRD, may be proposed by us): keep the fOvershootMargin settings key with the new default 1.5 so existing settings keep working (and what happens to units that still store 2.0)? | entry 327, TASK-1888 |
+| Q-329a | — | asked 2026-11-13 11:53 UTC ([msg](https://discord.com/channels/812969634638725140/1105556725714649128/1570768420805419089)), on the coordinator's order while Q-PWM1 is still open (he was active and had just answered on the I/D graphs, entry 332): which "halve" of entry 329? A) halve at every 60 s PID step outside the deadband (decays to ~3 % in 5 min, close to today's reset); B) halve once when the error leaves the deadband and keep that value; C) keep today's reset to 0 (pid.py:185-189, SATpid.ino:247-250). Recommendation B. A setpoint change keeps its full reset (SATcontrol.ino:2124 -> satPidResetTerms() SATpid.ino:150-158; climate.py:641-660 -> pid.py:134-137). | entry 329, entry 332, TASK-1890 |
 
 Questions Q5 onwards come from the SAT port audit of 2026-10-24
 ([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)); the numbers in brackets are its

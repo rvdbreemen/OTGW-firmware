@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-13T10:07:00Z'
+updated_date: '2026-11-13T10:53:00Z'
 labels:
   - bug
   - sat
@@ -24,6 +25,6 @@ Split from TASK-1896 (reporter indigo_light, https://discord.com/channels/812969
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Host test on the real weatherLoop gate: red on the old code (fetch skipped with a gateway-made Toutside and no fresh boiler stamp), green on the fix (fetch requested); still skipped with a fresh boiler MsgID 27
-- [ ] #2 Telnet/REST evidence on a bench unit: with only a gateway outside value, /api/v2/sat/weather valid=true after the first fetch and SAT outside_temp_missing clears via the weather source
-- [ ] #3 Field confirmation by the reporter after the fix build
+- [ ] #2 Field confirmation by the reporter after the fix build
+- [ ] #3 Bench: with Toutside non-zero but no MsgID 27 stamp younger than 1 h (sensor gone, or before the first stamp), /api/v2/sat/weather valid=true after the first fetch and the SAT outside source is the weather (osrc=W)
 <!-- AC:END -->
