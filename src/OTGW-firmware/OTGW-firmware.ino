@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.230
+**  Version  : v2.0.0-beta.231
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -528,6 +528,14 @@ void setup() {
 #endif
   startMDNS(CSTR(settings.sHostname));
   startLLMNR(CSTR(settings.sHostname));
+  // TASK-1909: the reboot counter and log are written before the web server starts. An OTA filesystem
+  // upload that arrives right after startWebserver() copies these files to the heap and unmounts
+  // LittleFS; written after that, the new count and boot line were lost (and the write mounted the
+  // partition being overwritten).
+  platformResetReason(lastReset, sizeof(lastReset));
+  SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
+  state.uptime.iRebootCount = updateRebootCount();
+  updateRebootLog(lastReset);
   setupFSexplorer();
   startWebserver();
   startWebSocket();          // start the WebSocket server for OT log streaming
@@ -551,10 +559,6 @@ void setup() {
 #endif
 
   { char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason)); }  // setup the WatchDog
-  platformResetReason(lastReset, sizeof(lastReset));
-  SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
-  state.uptime.iRebootCount = updateRebootCount();
-  updateRebootLog(lastReset);
   diagRecorderBootResume();   // TASK-1665: a recording that was on at the last reboot resumes with the Reboot record first
 
   // One-line boot signature for field diagnostics (TASK-394 Phase 2).

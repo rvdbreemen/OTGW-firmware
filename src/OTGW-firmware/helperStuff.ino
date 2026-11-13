@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.230
+**  Version  : v2.0.0-beta.231
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -140,7 +140,7 @@ uint32_t updateRebootCount()
   //return: number of reboots (if it goes as planned)
   uint32_t _reboot = 0;
   #define REBOOTCNT_FILE "/reboot_count.txt"
-  if (LittleFS.begin()) {
+  if (!state.flash.bFsImageWriting && LittleFS.begin()) {   // TASK-1909: never mount over an image being written
     //start with opening the file
     File fh = LittleFS.open(REBOOTCNT_FILE, "r");
     if (fh) {
@@ -471,7 +471,7 @@ bool updateRebootLog(String text)
     snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("time not set - reboot cause: %s (%x) %s\r\n"), CSTR(text), errorCode, log_line_excpt);
   }
 
-  if (LittleFS.begin()) {
+  if (!state.flash.bFsImageWriting && LittleFS.begin()) {   // TASK-1909: never mount over an image being written
     //start with opening the file
     File outfh = LittleFS.open(TEMPLOG_FILE, "w");
 
@@ -901,7 +901,7 @@ bool hourChanged(){
 */
 bool checklittlefshash(){
   char _githash[16] = {0};  // git short hash is 7 chars; 16 is ample (ADR-004)
-  if (LittleFS.begin()) {
+  if (!state.flash.bFsImageWriting && LittleFS.begin()) {   // TASK-1909: a telnet connect during an image write must not mount it
     //start with opening the file
     File fh = LittleFS.open(GITHASH_FILE, "r");
     if (fh) {
@@ -955,7 +955,7 @@ const char* getFilesystemHash(){
   // Return cached value if available
   if (_githash[0] != '\0') return _githash;
 
-  if (LittleFS.begin()) {
+  if (!state.flash.bFsImageWriting && LittleFS.begin()) {   // TASK-1909: never mount over an image being written
     if (LittleFS.exists(GITHASH_FILE)) {
       File fh = LittleFS.open(GITHASH_FILE, "r");
       if (fh) {

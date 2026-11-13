@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-beta.230
+**  Version  : v2.0.0-beta.231
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -226,6 +226,7 @@ public:
         if (Update.hasError() || _updaterError[0] != '\0') {
           ::state.flash.bESPactive = false;
           _dropKeptFiles();   // clearing bESPactive disables the abort cleanup, so free the copies here
+          ::state.flash.bFsImageWriting = false;   // TASK-1909: the write ended without a remount
           if (!LittleFSmounted && _uploadTarget == UploadTarget::Filesystem) {
             LittleFSmounted = LittleFS.begin();
           }
@@ -385,6 +386,7 @@ private:
       _satLoadedAtFsStart = satStateLoaded();
       _keepFiles();   // TASK-1266/1286: the image lacks these files; copy them to the heap, restore after the remount
       LittleFS.end();
+      ::state.flash.bFsImageWriting = true;   // TASK-1909: no LittleFS.begin() elsewhere until the remount below
       if (uploadTotal > 0 && uploadTotal > fsSize) {
         strlcpy(_updaterError, "filesystem image too large", sizeof(_updaterError));
         _dropKeptFiles();   // the old filesystem is untouched; the copies are not needed
@@ -515,6 +517,12 @@ private:
   // write (0 of 1512 bytes)"), so it is formatted first; the web UI files are gone
   // and the restore puts settings and the other runtime files back.
   bool _remountAfterFsWrite(bool partial) {
+    // TASK-1909: LittleFS.begin() returns true without mounting when the partition is already mounted
+    // (framework LittleFS.cpp:58-61). A begin() that ran during the write left a mount of the half-written
+    // partition behind; the restore would then write the new image through that stale state. Drop any
+    // such mount so the image just written is the one mounted.
+    LittleFS.end();
+    ::state.flash.bFsImageWriting = false;
     if (partial) {
       if (_serial_output) DebugTln(F("[OTA] Filesystem image incomplete: formatting LittleFS"));
       unsigned long t0 = millis();
