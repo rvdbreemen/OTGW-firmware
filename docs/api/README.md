@@ -425,10 +425,12 @@ Retrieve the current value for a single OpenTherm message by its numeric ID.
 
 **Response** `200 OK`:
 ```json
-{"label": "boilertemperature", "value": 45.5, "unit": "\u00b0C"}
+{"label": "boilertemperature", "value": 45.5, "unit": "\u00b0C", "status": "ack", "last_seen_age_s": 3}
 ```
 
 The `value` field type depends on the message type: `float` for `f88` (fixed-point) types, `integer` for all others.
+
+`status` is the boiler's latest answer for this ID since boot: `never_seen` (no answer yet; `value` is then a default, not a boiler value), `ack` (Read-Ack or Write-Ack), `unknown_dataid` (the boiler does not know the ID) or `data_invalid`. Only genuine boiler answers count, not answers the gateway made itself. `last_seen_age_s` is the number of seconds since that answer, or `-1` when `status` is `never_seen` (TASK-1871). `/api/v2/otgw/label/{label}` returns the same two fields.
 
 **Error responses**:
 - `400` - Invalid or missing message ID

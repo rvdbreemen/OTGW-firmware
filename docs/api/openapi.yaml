@@ -1589,10 +1589,22 @@ paths:
                   value: {}
                   unit:
                     type: string
+                  status:
+                    type: string
+                    enum: [never_seen, ack, unknown_dataid, data_invalid]
+                    description: |
+                      The boiler's latest answer for this ID since boot (TASK-1871). Only genuine
+                      boiler answers count, not answers the gateway made itself. `never_seen` means
+                      no answer this boot; `value` then holds the default, not a boiler value.
+                  last_seen_age_s:
+                    type: integer
+                    description: Seconds since that answer; -1 when status is never_seen (same convention as boiler_age_s in /v2/health).
               example:
                 label: "boilertemperature"
                 value: 45.5
                 unit: "\u00b0C"
+                status: "ack"
+                last_seen_age_s: 3
         '400':
           $ref: '#/components/responses/BadRequestJson'
         '405':

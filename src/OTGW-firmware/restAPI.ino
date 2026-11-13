@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.221
+**  Version  : v2.0.0-beta.222
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2955,6 +2955,9 @@ void sendOTValue(int msgid){
       je.field(F("value"), (int32_t)atoi(getOTGWValue(msgid)));
     }
     je.field(F("unit"), OTlookupitem.unit);
+    // TASK-1871: what the boiler answered last for this ID this boot, and how long ago.
+    je.field(F("status"), FPSTR(boilerAnswerStatus((uint8_t)msgid)));
+    je.field(F("last_seen_age_s"), boilerAnswerAgeS((uint8_t)msgid, millis()));
     je.endObject();                   // close root
   }
   restFinalize();
@@ -2989,6 +2992,9 @@ void sendOTLabel(const char *msglabel){
       je.field(F("value"), (int32_t)atoi(getOTGWValue(msgid)));
     }
     je.field(F("unit"), OTlookupitem.unit);
+    // TASK-1871: what the boiler answered last for this ID this boot, and how long ago.
+    je.field(F("status"), FPSTR(boilerAnswerStatus((uint8_t)msgid)));
+    je.field(F("last_seen_age_s"), boilerAnswerAgeS((uint8_t)msgid, millis()));
     je.endObject();                   // close root
   }
   restFinalize();

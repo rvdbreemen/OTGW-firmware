@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.221
+**  Version  : v2.0.0-beta.222
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -285,6 +285,10 @@ bool isThermostatMsgIdSentRead(uint8_t id);
 bool isThermostatMsgIdSentWrite(uint8_t id);
 bool getBoilerUnsupportedDirty();
 void clearBoilerUnsupportedDirty();
+// TASK-1871: last boiler answer per ID this boot (RAM only), for GET /api/v2/otgw/messages/<id>.
+void recordBoilerAnswer(uint8_t id, uint8_t type, uint32_t nowMs);
+int32_t boilerAnswerAgeS(uint8_t id, uint32_t nowMs);   // -1 = not seen this boot
+const char* boilerAnswerStatus(uint8_t id);              // PSTR: never_seen / ack / unknown_dataid / data_invalid
 void publishBoilerUnsupportedMsgids();    // MQTT retained CSV ("14W,16W,24R,...")
 void loadOtSupportFiles();                 // read /ot-thermo.json and /ot-boiler.json at boot
 void saveOtSupportFilesIfDirty();          // 15-min debounced atomic write

@@ -119,6 +119,8 @@ static void platformRecursiveMutexUnlock(PlatformMutex) {}
 // Consumers of the frame that sit outside the chain under test (SAT follow-thermostat, the PM chain).
 static void satOnThermostatSetpoint(float) {}
 static void pmChainOnBoilerResponse(uint8_t) {}
+// The per-ID answer record for GET /api/v2/otgw/messages/<id> (TASK-1871); tests/test_boiler_answer_status.py covers it.
+static void recordBoilerAnswer(uint8_t, uint8_t, uint32_t) {}
 
 // ---- OTGW-Core.h and Hardwaretypes.h, sliced ----------------------------------------
 #include "types.inc"

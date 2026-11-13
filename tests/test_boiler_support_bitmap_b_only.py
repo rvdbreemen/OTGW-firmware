@@ -43,6 +43,10 @@ static uint8_t boilerUnsupportedRead[32], boilerUnsupportedWrite[32], boilerAcke
 static uint8_t boilerLastMasterWasWrite[32], thermostatSentRead[32], thermostatSentWrite[32];
 static bool boilerUnsupportedDirty, boilerFileDirty, thermostatFileDirty, boilerUnknown28ThisBoot;
 static bool bit(const uint8_t* b, int id) { return (b[id >> 3] >> (id & 7)) & 1; }
+// TASK-1871: the real branch also records the last boiler answer per ID; the stub keeps it.
+static uint32_t millis() { return 1000; }
+static int answerType[256];
+static void recordBoilerAnswer(uint8_t id, uint8_t type, uint32_t) { answerType[id] = 100 + type; }
 static void feed(char k, int type, int id, bool override_ = false, bool local = false) {
   OTdata = OTd();
   OTdata.id = id; OTdata.type = type; OTdata.bAnswerOverride = override_; OTdata.bLocalAnswer = local;
@@ -68,6 +72,7 @@ int main(int argc, char** argv) {
     int tr = bit(thermostatSentRead, id), tw = bit(thermostatSentWrite, id), lw = bit(boilerLastMasterWasWrite, id);
     if (tr || tw || lw) printf("t %d %d %d %d\n", id, tr, tw, lw);
   }
+  for (int id = 0; id < 256; id++) if (answerType[id]) printf("r %d %d\n", id, answerType[id] - 100);
   printf("u28 %d\n", boilerUnknown28ThisBoot ? 1 : 0);
   return 0;
 }
@@ -114,10 +119,13 @@ class BoilerSupportBitmapBOnly(unittest.TestCase):
         out = subprocess.run([str(self.exe), " ".join(frames)], capture_output=True, text=True, check=True).stdout
         bits, u28 = {}, None
         self.tbits = {}
+        self.answers = {}
         for line in out.splitlines():
             p = line.split()
             if p[0] == "u28":
                 u28 = p[1] == "1"
+            elif p[0] == "r":
+                self.answers[int(p[1])] = int(p[2])
             elif p[0] == "t":
                 self.tbits[int(p[1])] = dict(zip(("sr", "sw", "lastw"), (x == "1" for x in p[2:])))
             else:
@@ -183,6 +191,15 @@ class BoilerSupportBitmapBOnly(unittest.TestCase):
                                    f"T:{RD}:6", f"B:{RACK}:6:l"])                          # gateway-made B (OTDirect loopback)
         self.assertTrue(bits[5]["ur"] and not bits[5]["ar"])
         self.assertNotIn(6, bits)
+
+    # ---- TASK-1871: the per-ID last boiler answer (REST status / last_seen_age_s) follows the same evidence rule.
+
+    def test_last_answer_is_recorded_only_from_genuine_boiler_frames(self):
+        self.run_frames([f"T:{RD}:57", f"R:{RD}:26", f"B:{RACK}:26", f"A:{RACK}:57",   # PIC-built A57: not the boiler
+                         f"T:{RD}:10", f"B:{UNK}:10",                                    # boiler says Unknown-DataID
+                         f"T:{RD}:6", f"B:{RACK}:6:l",                                   # gateway-made B: not the boiler
+                         f"T:{WR}:1", f"B:{WACK}:1"])
+        self.assertEqual(self.answers, {26: RACK, 10: UNK, 1: WACK})
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.221
+**  Version  : v2.0.0-beta.222
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5630,6 +5630,43 @@ bool isThermostatMsgIdSentWrite(uint8_t id) {
 bool getBoilerUnsupportedDirty()   { return boilerUnsupportedDirty; }
 void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
 
+// TASK-1871: per-ID last boiler answer of this boot, for GET /api/v2/otgw/messages/<id>.
+// The bitmaps above are persisted across boots and have no time; these are RAM only and
+// say what the boiler answered last and when. Written by the loop task (processOT), read
+// by the REST handler on async_tcp: aligned 32-bit and 8-bit stores are atomic on the S3,
+// a pair read across one update is at worst one answer stale. 134 x 5 = 670 B.
+// begin boiler-answer record (sliced by tests/test_boiler_answer_status.py)
+static uint32_t boilerLastSeenMs[OT_MSGID_MAX + 1]  = {0};  // millis() of that answer
+static uint8_t  boilerLastRespType[OT_MSGID_MAX + 1] = {0};  // its OT message type; 0 = no boiler answer this boot
+
+void recordBoilerAnswer(uint8_t id, uint8_t type, uint32_t nowMs) {
+  if (id > OT_MSGID_MAX) return;
+  if (type != OT_READ_ACK && type != OT_WRITE_ACK && type != OT_DATA_INVALID && type != OT_UNKNOWN_DATA_ID) return;
+  boilerLastSeenMs[id]   = nowMs;
+  boilerLastRespType[id] = type;   // every recorded type is non-zero, so 0 keeps meaning never
+}
+
+// Seconds since the last boiler answer for this ID; -1 = not seen this boot (same
+// convention as thermostat_age_s / boiler_age_s in /api/v2/health).
+int32_t boilerAnswerAgeS(uint8_t id, uint32_t nowMs) {
+  if (id > OT_MSGID_MAX) return -1;
+  if (boilerLastRespType[id] == 0) return -1;
+  return (int32_t)((uint32_t)(nowMs - boilerLastSeenMs[id]) / 1000UL);   // unsigned difference survives the millis wrap
+}
+
+// never_seen / ack / unknown_dataid / data_invalid, from the latest boiler answer.
+const char* boilerAnswerStatus(uint8_t id) {
+  if (id > OT_MSGID_MAX || boilerLastRespType[id] == 0) return PSTR("never_seen");
+  switch (boilerLastRespType[id]) {
+    case OT_READ_ACK:
+    case OT_WRITE_ACK:        return PSTR("ack");
+    case OT_UNKNOWN_DATA_ID:  return PSTR("unknown_dataid");
+    case OT_DATA_INVALID:     return PSTR("data_invalid");
+    default:                  return PSTR("never_seen");
+  }
+}
+// end boiler-answer record
+
 //===========================================================================================
 // evaluateOTBusLiveness() — derive boiler/thermostat/bus presence from the
 // per-link last-seen stamps and publish the transitions.
@@ -5953,6 +5990,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
           // (bReplayed) counts for none of these bitmaps: it is no evidence of
           // what the boiler on this bus implements (TASK-1185).
           const bool boilerEvidence = !OTdata.bLocalAnswer && !OTdata.bReplayed;
+          if (boilerEvidence) recordBoilerAnswer(OTdata.id, OTdata.type, millis());   // TASK-1871
           if (OTdata.type == OT_READ_ACK) {
             if (boilerEvidence && (boilerAckedRead[idx] & mask) == 0) {
               boilerAckedRead[idx] |= mask;
