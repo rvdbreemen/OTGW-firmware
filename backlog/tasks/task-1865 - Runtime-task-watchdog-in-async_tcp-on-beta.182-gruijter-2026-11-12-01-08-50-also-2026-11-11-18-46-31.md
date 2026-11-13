@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:51:00Z'
-updated_date: '2026-11-13T16:26:00Z'
+updated_date: '2026-11-13T16:52:00Z'
 labels:
   - bug
   - crash
@@ -80,4 +80,6 @@ Published (95, 2026-11-12): pushed 22d269e0e..a7676dcc8 to dev; posted 2.0.0-bet
 2026-11-13 gruijter beta.218 capture (12 Nov 21:39 - 13 Nov 16:07, analysis #alpha-testing 1570826381443469447): three watchdog resets in 18.5 h. 04:00:54 task watchdog with core dump: async_tcp stuck in LittleFS.exists inside sendSimulationStatus (/api/v2/simulate, polled ~every 9 s) -> filed as TASK-1899 (also device/info restAPI.ino:3410). 08:38:18 and 11:59:07 "Other watchdog", no core dump (time not set), cause unknown. Free heap ~51 KB before each reset; hd_ipc0_stack_min 80 B (bench 152-232 B). The beta.217 health fix does not cover these endpoints.
 
 2026-11-13 double correlation (gruijter beta.218 capture, transcript, checked by comms; Sergeant D asked 1570834690892497138, answered 1570836136136417321): both "Other watchdog" resets without a core dump fell 14-17 s after a regular SAT PWM ON switch (08:38:04 duty 0.79 -> reset 08:38:18; 11:58:50 duty 0.22 -> reset 11:59:07; ticks mode=2 pwm=1) AND 1.5-13 s after a web UI /api/v2/simulate call (08:38:05.563, 11:59:05.572; polled every 15 s). No log lines between the switch and the reset. Not a proven cause either way; the bench should exercise both. See TASK-1899.
+
+2026-11-13 CORRECTION of the earlier "double correlation" note (comms misread the log): the line "SAT PWM: pwm_on=... ON" (SATcontrol.ino:1539 at 2f5ecb4) is printed on every 30 s control tick during a phase; it is NOT the ON switch. The real ON edges are the "PWM ON:" lines (SATcontrol.ino:1231, satPwmBeginOn): 08:36:04 (on=489 s) and 11:58:20 (on=275 s). The two "Other watchdog" resets came ~134 s and ~47 s INTO those ON phases, not 14-17 s after a switch. 19 ON edges that day, 17 without a reset. At an ON edge only CS, MM=0, CH=1 are queued plus a log line; no flash work (SATcontrol.ino:1231-1240, :1666-1690). Reset reason: platform_esp32.h:216 maps ESP_RST_WDT (raw 7) to "Other watchdog" = RTC/super/CPU-level watchdog, not the task watchdog (6) or interrupt watchdog (5); no new core dump (the 04:00:54 dump was still the stored one). Device logged live OT frames until 1.6 s / 2.7 s before reboot (reboot time from uptime). Ranked hypotheses (trace agent, read-only): H1 hardware-level watchdog, trigger unknown; H2 IPC stack overflow (this unit ipc0/ipc1 low points 80/88 B of 1024; beta.219 raised the stack) escalating to H1; H3 external 0x26 watchdog unlikely (loop task fed it every <=100 ms until 1-3 s before reboot; an EN-pin reset would read "Power on", wiring not verified); H4 SAT/PWM, LittleFS or /simulate: no evidence. The /simulate correlation (1.5-13 s before) remains a coincidence candidate only. Bench next: capture the ROM rst:0x.. line on the S3 USB console during such a reset; beta.218 vs beta.219 on a Classic+PIC with two web UIs polling and SAT in PWM. Corrected publicly: 1570843356219703308 (earlier message 1570836136136417321 marked as corrected).
 <!-- SECTION:NOTES:END -->
