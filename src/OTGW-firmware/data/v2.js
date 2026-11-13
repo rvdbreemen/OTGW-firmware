@@ -1534,7 +1534,9 @@
       "kv_weather": "Weather",
       "kv_wind": "Wind",
       "kv_window_detection": "Window detection",
+      "legend_flame": "Flame",
       "legend_flow": "Flow",
+      "legend_mod": "Modulation",
       "legend_outside": "Outside",
       "legend_pid": "PID",
       "legend_room": "Room",
@@ -7444,15 +7446,15 @@
         series: [{ vals: satHist.room, color: ok }, { vals: satHist.out, color: cold, dash: '6 4' }] },
       { title: t('tools.legend_setpoint') + ' · ' + t('tools.legend_flow') + ' · ' + t('h_mon.sat_curve_title'), kind: 't', unit: '°C', h: 90,
         series: [{ vals: satHist.set, color: accent }, { vals: satHist.flow, color: hot }, { vals: satHist.curve, color: muted, dash: '5 4' }] },
-      { title: t('graph.series_mod'), kind: 'm', h: 50, series: [{ vals: satHist.mod, color: '#00bffe' }] },
-      { title: t('h_mon.graph_flame'), kind: 'l', series: [{ vals: satHist.flame, color: '#ff7b00' }] },
+      { title: t('tools.legend_mod'), kind: 'm', h: 50, series: [{ vals: satHist.mod, color: '#00bffe' }] },
+      { title: t('tools.legend_flame'), kind: 'l', series: [{ vals: satHist.flame, color: '#ff7b00' }] },
       { title: t('tools.legend_pid'), kind: 't', h: 60, series: [{ vals: satHist.pid, color: muted }] }
     ] });
     var lg = document.getElementById('satHistLegend');
     if (lg) lg.innerHTML =
       '<span><i style="background:' + accent + '"></i>' + esc(t('tools.legend_setpoint')) + '</span><span><i style="background:' + hot + '"></i>' + esc(t('tools.legend_flow')) + '</span>' +
       '<span><i style="background:' + muted + '"></i>' + esc(t('h_mon.sat_curve_title')) + '</span>' +
-      '<span><i style="background:#00bffe"></i>' + esc(t('graph.series_mod')) + '</span><span><i style="background:#ff7b00"></i>' + esc(t('h_mon.graph_flame')) + '</span>' +
+      '<span><i style="background:#00bffe"></i>' + esc(t('tools.legend_mod')) + '</span><span><i style="background:#ff7b00"></i>' + esc(t('tools.legend_flame')) + '</span>' +
       '<span><i style="background:' + ok + '"></i>' + esc(t('tools.legend_room')) + '</span><span><i style="background:' + cold + '"></i>' + esc(t('tools.legend_outside')) + '</span>' +
       '<span><i style="background:' + muted + '"></i>' + esc(t('tools.legend_pid')) + '</span>';
   }

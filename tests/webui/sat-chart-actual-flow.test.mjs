@@ -60,7 +60,7 @@ test('the chart plots actual flow next to the setpoint and labels the heating cu
   assert.deepEqual(titles, [
     'tools.legend_room · tools.legend_outside',
     'tools.legend_setpoint · tools.legend_flow · h_mon.sat_curve_title',
-    'graph.series_mod', 'h_mon.graph_flame', 'tools.legend_pid',
+    'tools.legend_mod', 'tools.legend_flame', 'tools.legend_pid',
   ]);
   // the hot line is the actual flow (flow_temp 40..43); the fixture has no heating curve, so on the old code
   // (Flow = heating_curve) there is no hot line at all
