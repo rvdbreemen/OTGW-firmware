@@ -7284,3 +7284,21 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** (1) whether the return-less case of entry 45 (no return temperature: flood and flow-based start) applies in continuous mode too; we read it as yes, the same start sequence. (2) Q-346a (the clamp offset) is still open.
 
 **Task:** a new follow-up of TASK-1924 for d3 (filed by the coordinator).
+
+## 349. Q-346a A: the continuous clamp keeps flow_setpoint_offset 2.0; only the start-up following uses 1.0 (Sergeant D, 2026-11-14; answers Q-346a, settles the open point of entry 347)
+
+**Source:** #alpha-testing 2026-11-14. Q-346a: https://discord.com/channels/812969634638725140/1514720723980259460/1571194589082292296 (16:06 UTC), re-asked short in https://discord.com/channels/812969634638725140/1514720723980259460/1571213343509708943 . His answer, 17:23:25 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571213985490018415
+
+**Quoted:**
+
+> "Q-346a: A"
+
+**Option A as posted:** "Start-up following uses flow - 1.0 (the suppression offset). The continuous clamp stays at flow - 2.0, as in thermo-nova."
+
+**Settled (settles entry 347's open point):** the entry-112 continuous clamp keeps `flow_setpoint_offset_celsius` 2.0 (thermo-nova `const.py:154`, used at `heating_control.py:455` and `:485-489`; firmware `fFlowOffset` 2.0, `SATtypes.h:533`). The start-up following of entries 338/344/347 (and the start sequence of entry 348) uses the suppression offset 1.0 (`const.py:153`, `heating_control.py:440-441`; firmware `fModSupOffset`, `SATtypes.h:519`). His remark in entry 347 that the clamp is `min(flow - 1.0, previous CS)` is thereby not a change of the clamp. This was our recommendation.
+
+**Checked against the firmware:** beta.250 (TASK-1924 Part 2) already builds exactly this: `satContinuousSetpoint()` uses `fModSupOffset` in the 60 s window, `satApplyContinuous()` keeps `fFlowOffset` (`SATcontrol.ino` on origin/dev 029c3c420). No code change follows from this entry.
+
+**Open:** none for the offsets.
+
+**Task:** TASK-1924.

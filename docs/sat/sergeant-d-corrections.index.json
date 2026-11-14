@@ -4641,6 +4641,19 @@
     "TASK-1924"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 349,
+   "title": "Q-346a A: the continuous clamp keeps flow_setpoint_offset 2.0; only the start-up following uses 1.0 (Sergeant D, 2026-11-14; answers Q-346a, settles the open point of entry 347)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571194589082292296",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1924"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
