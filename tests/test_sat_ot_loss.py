@@ -96,6 +96,7 @@ static void satGetWindow24hStats() {}
 static void satPwmSuppressionRefresh() {}
 static void satContinuousClampRefresh() {}   // TASK-1924 Part 2: tested in test_sat_continuous_startup.py
 static uint32_t _sat_chFlameOnMs = 0;
+static bool _sat_flameOffSeen = false;   // TASK-1942
 static void satMaxTSetSendStep() {}   // TASK-1373: the user MaxTSet SH= step is tested in test_sat_max_tset.py
 static void satDhwSetpointSync() {}   // TASK-1376: the SW= sync is tested in test_sat_dhw_sw_sync.py
 static void satMiStep() {}   // TASK-1371: MI=500 is tested in test_sat_no_return_ignition.py

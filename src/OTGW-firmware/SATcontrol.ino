@@ -949,6 +949,11 @@ static bool     _sat_prevFlameState = false;
 // 0 while the flame is off. Starts the 60 s window in which the continuous CS follows the rising flow.
 static uint32_t _sat_chFlameOnMs = 0;
 static const uint32_t SAT_CONT_STARTUP_MS = 60000UL;   // entry 344: the cycle tracker's 60 s warm-up (cycles/tracker.py:114)
+// TASK-1942: the flame was seen off since SAT became active. A loop pass while SAT is off does not track the flame, so a boiler
+// already burning when SAT is switched on gives a flame "edge" that is no ignition; the continuous start rule and its flood ignore it.
+static bool _sat_flameOffSeen = false;
+static float _sat_contFlameOffHold = 0.0f;   // TASK-1942: the flame-off CS of the continuous start (satContinuousSetpoint), 0 = none
+static float satContinuousSetpoint(float pidOutput, float previousCS);   // TASK-1942: used by the no-return flood above its definition
 
 // --- Timer for control loop (initial value, updated from settings in initSAT) ---
 DECLARE_TIMER_SEC(timerSATControl, settings.sat.iControlInterval, CATCH_UP_MISSED_TICKS);
@@ -1947,7 +1952,9 @@ static int16_t  _flood_lastStep = -1;
 static bool satNoReturnFloodAllowed()
 {
   if (!satIsEnabled() || !state.sat.bActive || state.sat.bSafetyTripped || _sat_thermalSafeActive) return false;
-  if (state.sat.eControlMode != SAT_MODE_PWM || !state.sat.bPwmFlameRequested) return false;
+  // TASK-1942 (entry 348, open point 1 read as yes): a CH start in continuous mode floods too
+  if (!((state.sat.eControlMode == SAT_MODE_PWM && state.sat.bPwmFlameRequested) ||
+        state.sat.eControlMode == SAT_MODE_CONTINUOUS)) return false;
   if (!settings.sat.bOvershootProtection || (OTcurrentSystemState.SlaveStatus & 0x05)) return false;
   if (!state.sat.bValvesOpen || (state.sat.bSummerActive && settings.sat.bSummerSimmer)) return false;
   if (_sat_requestedSetpoint <= satColdThreshold() || state.sat.fFinalSetpoint <= SAT_MIN_SETPOINT) return false;
@@ -1960,6 +1967,7 @@ static void satNoReturnFloodOnFlameEdge(bool flame, bool dhwFlame)
 {
   _flood_active = false;
   if (!flame || dhwFlame || !satNoReturnTemp() || !satNoReturnFloodAllowed()) return;
+  if (state.sat.eControlMode == SAT_MODE_CONTINUOUS && !_sat_flameOffSeen) return;   // TASK-1942: no ignition, SAT came on mid-burn
   _flood_active   = true;
   _flood_startMs  = millis();
   _flood_lastStep = -1;
@@ -1978,7 +1986,10 @@ static void satNoReturnFloodStep()
     // Hand over to the suppression at once: one CS = flow - fModSupOffset through satSendCS(), so the cache the 30 s repeat repeats
     // holds the suppression value and never the last flood value (the flood re-armed the resend after a hot-water tick had
     // disarmed it, and the 3 s refresh stays out as long as the live DHW bit is set).
-    float cs = satPwmSuppressionSetpoint(satGetMaxSetpoint());
+    // TASK-1942: in continuous mode the start sequence goes on with the follow of satContinuousSetpoint() (entries 344, 347, 348)
+    float cs = (state.sat.eControlMode == SAT_MODE_CONTINUOUS)
+               ? satContinuousSetpoint(_sat_requestedSetpoint, _sat_lastControlCS)
+               : satPwmSuppressionSetpoint(satGetMaxSetpoint());
     const float maxSetpoint = satEffectiveMaxSetpoint();
     if (cs > maxSetpoint) cs = maxSetpoint;
     _pwm_flameOffHoldSetpoint = 0.0f;
@@ -1994,6 +2005,7 @@ static void satNoReturnFloodStep()
   if ((step & 1) == 0) {
     const float cs = satPwmFlameOffHold(satEffectiveMaxSetpoint());
     _pwm_flameOffHoldSetpoint = cs;
+    if (state.sat.eControlMode == SAT_MODE_CONTINUOUS) _sat_contFlameOffHold = cs;   // TASK-1942: the tick in the hold keeps it
     _sat_lastControlCS        = cs;            // the "previous CS" the next tick keeps
     state.sat.fFinalSetpoint  = cs;
     satSendCS(cs, true);                       // TASK-1924: every 2 s, also unchanged (entries 45, 142)
@@ -2557,9 +2569,28 @@ static float satApplyContinuous(float pidOutput, float previousCS)
 // start-up (entry 336). Outside that window the entry-112 clamp of satApplyContinuous() with fFlowOffset (unchanged here;
 // its value is the open question Q-346a), whose hold never follows a rising flow at a constant request.
 // The clamp's other bypass cases (flame off, flow invalid) apply in the window too.
+// TASK-1942 (Sergeant D entry 348, "as a fail safe guard"): a heating start in continuous mode runs the PWM start sequence
+// first, with the PWM ON gates (thermo-nova heating_control.py:384-389: hot water, request at or below the cold setpoint,
+// overshoot protection off -> no override): flame off -> the flame-off hold satPwmFlameOffHold() (return + fFlameOffOffset; the
+// flow for a boiler without a return temperature, entry 45), kept for fModSupDelay after the CH flame-on (:392-433); a flame
+// that lit without a recorded hold keeps the previous CS (pending, :430-433); then the follow above. Thermo-nova has this in
+// PWM only (:224-225); in continuous mode with the flame off it sends the request (:476-482): a deliberate deviation.
 static float satContinuousSetpoint(float pidOutput, float previousCS)
 {
-  if (_sat_chFlameOnMs != 0 && (uint32_t)(millis() - _sat_chFlameOnMs) < SAT_CONT_STARTUP_MS && satIsFlameOn()) {
+  const bool startRule = settings.sat.bOvershootProtection && !state.sat.bDhwActive && pidOutput > satColdThreshold();
+  if (startRule && !satIsFlameOn()) {
+    // No return temperature yet at boot and not (yet) a no-return boiler: no hold, as the PWM start (it keeps the previous CS)
+    if (satGetReturnTemp() <= 0.0f && !satNoReturnTemp()) { _sat_contFlameOffHold = 0.0f; return satApplyContinuous(pidOutput, previousCS); }
+    _sat_contFlameOffHold = satPwmFlameOffHold(satGetMaxSetpoint());
+    return _sat_contFlameOffHold;
+  }
+  const uint32_t sinceOn = (uint32_t)(millis() - _sat_chFlameOnMs);
+  if (startRule && _sat_chFlameOnMs != 0 && sinceOn < (uint32_t)(settings.sat.fModSupDelay * 1000.0f)) {
+    if (_sat_contFlameOffHold > 0.0f) return satNoReturnTemp() ? satPwmFlameOffHold(satGetMaxSetpoint()) : _sat_contFlameOffHold;
+    return (previousCS > SAT_MIN_SETPOINT) ? previousCS : pidOutput;   // pending: the flame lit without a recorded hold
+  }
+  _sat_contFlameOffHold = 0.0f;
+  if (_sat_chFlameOnMs != 0 && sinceOn < SAT_CONT_STARTUP_MS && satIsFlameOn()) {
     const float boilerTemp = satGetFlowTemp();
     if (boilerTemp > 0.0f && boilerTemp <= 100.0f) {
       const float follow = boilerTemp - settings.sat.fModSupOffset;   // entry 347
@@ -2580,6 +2611,7 @@ static void satContinuousClampRefresh()
   if (!satIsEnabled() || !state.sat.bActive || state.sat.bSafetyTripped) return;
   if (_sat_thermalSafeActive) return;                             // the thermal safe fallback owns CS
   if (state.sat.eControlMode != SAT_MODE_CONTINUOUS) return;
+  if (_flood_active) return;                                      // TASK-1942: the no-return start-up flood owns CS for its 20 s
   if (settings.sat.bSimulation && state.sat.bDhwActive) return;
   if (OTcurrentSystemState.SlaveStatus & 0x05) return;          // fault flag / DHW active: the control tick skips these too
   if (!state.sat.bValvesOpen || (state.sat.bSummerActive && settings.sat.bSummerSimmer)) return;
@@ -7491,6 +7523,7 @@ static void satControlLoopRun()
     _sat_swSentValid = false;              // TASK-1376: SAT sends the DHW setpoint again when it is back
     if (!satIsEnabled()) state.sat.bOtLinkLost = false;
     if (!satIsEnabled()) state.sat.bOutsideTempMissing = false;   // TASK-1390: a switch-off ends the outside-missing state
+    _sat_flameOffSeen = false;             // TASK-1942: a flame already burning when SAT comes back is no CH start
     return;
   }
 
@@ -7533,13 +7566,14 @@ static void satControlLoopRun()
 
   // Flame edge detection — always process, independent of timer
   bool currentFlame = satIsFlameOn();
+  if (!currentFlame) _sat_flameOffSeen = true;   // TASK-1942
   if (currentFlame != _sat_prevFlameState) {
     if (!currentFlame) state.sat.bModSuppressed = false;   // the suppression is a flame-on phase; the next tick sets it again (entry 267)
     satCycleOnFlameChange(currentFlame);
     satPwmNoteDhwFlameEdge(currentFlame, dhwBitNow);
     satNoReturnFloodOnFlameEdge(currentFlame, dhwBitNow);   // TASK-1371: CH ignition of a boiler without a return temperature
     _sat_prevFlameState = currentFlame;
-    if (currentFlame && !dhwBitNow) { const uint32_t n = millis(); _sat_chFlameOnMs = n ? n : 1; }   // TASK-1924 Part 2
+    if (currentFlame && !dhwBitNow && _sat_flameOffSeen) { const uint32_t n = millis(); _sat_chFlameOnMs = n ? n : 1; }   // TASK-1924 Part 2, 1942
     else if (!currentFlame)         _sat_chFlameOnMs = 0;
   }
   satPwmPhaseSample(currentFlame && !dhwBitNow, millis());   // TASK-1880 telemetry: CH flame time of the open PWM ON phase

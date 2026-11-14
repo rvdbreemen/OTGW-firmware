@@ -202,7 +202,7 @@ class CeilingPaths(unittest.TestCase):
         a = s.index("float cs = satPwmSuppressionSetpoint(satGetMaxSetpoint());")
         seg = s[a:s.index("satEnqueueIfChangedCS(cs);", a)]
         self.assertRegex(seg, r"maxSetpoint = satEffectiveMaxSetpoint\(\);\s*\n\s*if \(cs > maxSetpoint\) cs = maxSetpoint;")
-        b = s.index("float cs = satPwmSuppressionSetpoint(satGetMaxSetpoint());", a + 10)
+        b = s.index("float cs = (state.sat.eControlMode == SAT_MODE_CONTINUOUS)", a + 10)   # TASK-1942: the flood hand-over, PWM or continuous
         seg = s[b:s.index("satSendCS(cs, true);", b)]
         self.assertRegex(seg, r"maxSetpoint = satEffectiveMaxSetpoint\(\);\s*\n\s*if \(cs > maxSetpoint\) cs = maxSetpoint;")
         self.assertIn("satPwmFlameOffHold(satEffectiveMaxSetpoint())", s)

@@ -78,6 +78,8 @@ static float satGetFlowTemp() { return g_flow; }
 static float satGetReturnTemp() { return g_ret; }
 static float satApplyContinuous(float p, float) { return 1000.0f + p; }
 static float satContinuousSetpoint(float p, float c) { return satApplyContinuous(p, c); }   // TASK-1924 Part 2: outside the 60 s start-up window
+static float _sat_contFlameOffHold = 0.0f;   // TASK-1942: the continuous start hold the flood also sets
+static bool _sat_flameOffSeen = true;   // TASK-1942: flame seen off since enable (the flood edge in continuous mode)
 static float satGetBaseOffset() { return 27.2f; }
 static float satGetColdSetpoint() { return g_cold; }
 // TASK-1547: latched cold cutoff (SATcontrol.ino satColdThreshold/_sat_coldCut, outside the cut block); never cut here.

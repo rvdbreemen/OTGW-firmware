@@ -31,25 +31,44 @@ STUBS = r"""
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-struct SatSettings { float fFlowOffset = 2.0f; float fModSupOffset = 1.0f; };
+#define SAT_MIN_SETPOINT 10.0f
+struct SatSettings { float fFlowOffset = 2.0f; float fModSupOffset = 1.0f; float fFlameOffOffset = 18.0f; float fModSupDelay = 20.0f;
+                     bool bOvershootProtection = true; };
 struct Settings { SatSettings sat; };
 static Settings settings;
-static bool g_flame = true; static float g_flow = 30.0f; static uint32_t g_ms = 0;
+struct SatState { bool bDhwActive = false; }; struct State { SatState sat; }; static State state;
+static bool g_flame = true; static float g_flow = 30.0f, g_ret = 0.0f; static bool g_noret = false; static uint32_t g_ms = 0;
 static bool satIsFlameOn() { return g_flame; }
 static float satGetFlowTemp() { return g_flow; }
+static float satGetReturnTemp() { return g_ret; }
+static bool satNoReturnTemp() { return g_noret; }
+static float satGetColdSetpoint() { return 28.2f; }
+static float satColdThreshold() { return 28.2f; }
+static float satGetMaxSetpoint() { return 75.0f; }
 static uint32_t millis() { return g_ms; }
 static uint32_t _sat_chFlameOnMs = 0;
+static float _sat_contFlameOffHold = 0.0f;
 @CONST@
+@HOLD@
 @SPAN@
 int main(int argc, char** argv) {
   const uint32_t start = (uint32_t)strtoul(argv[1], 0, 10);   // millis() at the CH flame-on edge
   const int mode = atoi(argv[2]);
   const float req = 50.0f;
   float prev = 0.0f;                                           // the first computation after an ignition
-  _sat_chFlameOnMs = (mode == 1) ? 0 : (start ? start : 1);    // mode 1: no edge seen (window never opens)
+  // modes 0-2: flame on from t = 0. Modes 3-6 (TASK-1942): flame off until t = 30 s, CH flame-on edge at t = 30 s;
+  // 3 return 30 known, 4 a boiler without a return temperature, 5 overshoot protection off, 6 hot water active.
+  const bool late = mode >= 3;
+  if (mode == 4) g_noret = true;
+  if (mode == 3 || mode == 5 || mode == 6) g_ret = 30.0f;
+  if (mode == 5) settings.sat.bOvershootProtection = false;
+  if (mode == 6) state.sat.bDhwActive = true;
+  _sat_chFlameOnMs = (mode == 1 || late) ? 0 : (start ? start : 1);   // mode 1: no edge seen (window never opens)
   for (uint32_t t = 0; t <= 120; t += 5) {                     // the 5 s recompute
     g_ms = start + t * 1000UL;
-    g_flow = 30.0f + 0.5f * (float)t; if (g_flow > 62.0f) g_flow = 62.0f;   // a boiler warming up, then steady
+    const uint32_t on = late ? (t >= 30 ? t - 30 : 0) : t;
+    g_flow = 30.0f + 0.5f * (float)on; if (g_flow > 62.0f) g_flow = 62.0f;   // a boiler warming up, then steady
+    if (late) { g_flame = t >= 30; if (t == 30) _sat_chFlameOnMs = g_ms ? g_ms : 1; }
     if (mode == 2 && t >= 40) g_flame = false;                 // the flame goes off inside the window
     prev = @CALL@;
     printf("%lu:%.1f ", (unsigned long)t, prev);
@@ -72,8 +91,10 @@ def build_cpp(src: str) -> str:
     new = "static float satContinuousSetpoint(" in span
     m = re.search(r"static const uint32_t SAT_CONT_STARTUP_MS\s*=\s*[^;]+;", src)
     const = m.group(0) if m else ""
+    h = src.index("static float satPwmFlameOffHold(float maxSetpoint)")   # TASK-1942: the real PWM flame-off hold
+    hold = src[h:src.index("\n}\n", h) + 3]
     call = "satContinuousSetpoint(req, prev)" if new else "satApplyContinuous(req, prev)"
-    return STUBS.replace("@CONST@", const).replace("@SPAN@", span).replace("@CALL@", call)
+    return STUBS.replace("@CONST@", const).replace("@HOLD@", hold).replace("@SPAN@", span).replace("@CALL@", call)
 
 
 class ContinuousStartup(unittest.TestCase):
@@ -128,11 +149,52 @@ class ContinuousStartup(unittest.TestCase):
         self.assertAlmostEqual(cs[55], 56.5, places=1)
         self.assertEqual(cs[120], cs[65])
 
+    # --- TASK-1942 (entry 348): the PWM start sequence in continuous mode ---
+    def test_start_runs_return_plus_18_then_the_hold_then_the_follow_then_the_clamp(self):
+        # flame off to t=30 s (return 30): 30 + 18 = 48; old code (beta.250): the request (50). Flame-on edge at 30 s: the 48 is
+        # held for fModSupDelay (20 s: t=30..45); then max(request 50, flow - 1.0): t=80 flow 55 -> 54, t=85 -> 56.5; from 60 s
+        # after the flame-on (t=90) the entry-112 clamp holds it.
+        cs = self.run_mode(3)
+        self.assertEqual(cs[0], 48.0)
+        self.assertEqual(cs[25], 48.0)
+        self.assertEqual(cs[30], 48.0)
+        self.assertEqual(cs[45], 48.0)
+        self.assertEqual(cs[50], 50.0)
+        self.assertAlmostEqual(cs[85], 56.5, places=1)
+        self.assertAlmostEqual(cs[90], 56.5, places=1)
+        self.assertEqual(cs[120], cs[90])
+
+    def test_no_return_boiler_uses_the_flow_and_the_hold_follows_it(self):
+        # entry 45 / satPwmFlameOffHold: flow + 18; in the hold the live flow + 18 (t=40: flow 35 -> 53)
+        cs = self.run_mode(4)
+        self.assertEqual(cs[0], 48.0)
+        self.assertEqual(cs[40], 53.0)
+
+    def test_overshoot_protection_off_and_hot_water_keep_the_request(self):
+        for mode in (5, 6):
+            cs = self.run_mode(mode)
+            self.assertEqual(cs[0], 50.0, mode)
+
+    def test_the_flood_runs_in_continuous_mode_and_hands_over_to_the_follow(self):
+        s = self.src
+        allowed = s[s.index("static bool satNoReturnFloodAllowed()"):]
+        allowed = allowed[:allowed.index("\n}\n")]
+        self.assertIn("state.sat.eControlMode == SAT_MODE_CONTINUOUS", allowed)
+        step = s[s.index("static void satNoReturnFloodStep()"):]
+        step = step[:step.index("\n}\n")]
+        self.assertIn("satContinuousSetpoint(_sat_requestedSetpoint, _sat_lastControlCS)", step)
+        refresh = s[s.index("static void satContinuousClampRefresh()"):]
+        self.assertIn("if (_flood_active) return;", refresh[:refresh.index("\n}\n")])
+
     # --- source: where the window starts and where the CS goes out (the control loop cannot be compiled on the host) ---
     def test_window_starts_on_a_ch_flame_edge_only_and_closes_when_the_flame_goes_off(self):
         s = self.src
         self.assertIn("static const uint32_t SAT_CONT_STARTUP_MS = 60000UL;", s)   # entry 344
-        self.assertIn("if (currentFlame && !dhwBitNow) { const uint32_t n = millis(); _sat_chFlameOnMs = n ? n : 1; }", s)
+        self.assertIn("if (currentFlame && !dhwBitNow && _sat_flameOffSeen) { const uint32_t n = millis(); _sat_chFlameOnMs = n ? n : 1; }", s)
+        # TASK-1942: a flame already burning when SAT is switched on is no CH start (no window, no continuous flood)
+        self.assertIn("if (!currentFlame) _sat_flameOffSeen = true;", s)
+        self.assertIn("_sat_flameOffSeen = false;             // TASK-1942", s)
+        self.assertIn("if (state.sat.eControlMode == SAT_MODE_CONTINUOUS && !_sat_flameOffSeen) return;", s)
         self.assertIn("else if (!currentFlame)         _sat_chFlameOnMs = 0;", s)
 
     def test_tick_and_5s_refresh_both_use_the_continuous_setpoint(self):

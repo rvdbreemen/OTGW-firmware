@@ -106,10 +106,15 @@ tick repeats it once it is 29 s old, and a loop repeat timed on raw `millis()` s
   30 s keepalive. It shares the last-sent stamp with the repeat, so the two send one repeat per 31 s together, not two.
 - In continuous mode the CS is also recomputed every 5 s while the flame is on (`satContinuousClampRefresh()`, `:2577`,
   timer `:963`; Sergeant D entry 337, thermo-nova's 5 s heating loop `climate.py:706-710`) and goes out through
-  `satSendCS()`, so on change only. The value comes from `satContinuousSetpoint()` (`:2560`), shared with the tick: for
-  60 s after a CH flame-on (`SAT_CONT_STARTUP_MS`, `:951`) max(request, flow - `fModSupOffset`), then the entry-112 clamp
-  (Robert entry 338, Sergeant D entries 344 and 347). That control rule is Sergeant D's (recorded in
-  `docs/sat/sergeant-d-corrections.md`); this ADR records only that its output uses the on-change sender.
+  `satSendCS()`, so on change only. The value comes from `satContinuousSetpoint()`, shared with the tick. A heating start in
+  continuous mode runs the PWM start sequence (TASK-1942, entry 348): while the flame is off the flame-off hold
+  `satPwmFlameOffHold()` (return + `fFlameOffOffset` 18, the flow for a boiler without a return temperature), held for
+  `fModSupDelay` (20 s) after the CH flame-on; then for 60 s after the flame-on (`SAT_CONT_STARTUP_MS`) max(request, flow -
+  `fModSupOffset` 1.0); then the entry-112 clamp with `fFlowOffset` 2.0 (entry 349). A boiler without a return temperature
+  gets the start-up flood in continuous mode too. A flame already burning when SAT is switched on is no start
+  (`_sat_flameOffSeen`). The rule is Sergeant D's (Robert entry 338, Sergeant D entries 344, 347, 348, 349, recorded in
+  `docs/sat/sergeant-d-corrections.md`; thermo-nova has the start sequence in PWM only, `heating_control.py:224-225`,
+  `:380-448`); this ADR records only that its output uses the on-change sender.
 - The no-return start-up flood (TASK-1371, Sergeant D entries 45, 142, 149, 151) keeps its own cadence of one CS= every
   2 s, also when the value is unchanged (`satSendCS(cs, true)`, `:1987`, `:1999`). Entry 334 is read as being about the
   control tick. Whether the flood should also go on-change is queued as a low-priority question for Sergeant D (through the
@@ -193,7 +198,7 @@ tick repeats it once it is 29 s old, and a loop repeat timed on raw `millis()` s
 
 ## References
 
-- TASK-1924; Sergeant D corrections entries 334, 335, 337, 338, 344, 347 (`docs/sat/sergeant-d-corrections.md`), 44, 237, 239.
+- TASK-1924, TASK-1942; Sergeant D corrections entries 334, 335, 337, 338, 344, 347, 348, 349 (`docs/sat/sergeant-d-corrections.md`), 44, 237, 239.
 - `src/OTGW-firmware/SATcontrol.ino:600`, `:687`, `:719`, `:721`, `:793`, `:951`, `:963`, `:1987`, `:1999`, `:2560`, `:2577`
   (lane-1924 at beta.250, baf84d9).
 - thermo-nova 7beaaf5: `custom_components/sat/climate.py:706-710`, `custom_components/sat/heating_control.py:236-238`.

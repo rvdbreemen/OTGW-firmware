@@ -101,8 +101,9 @@ static void loopPass() {   // order of satControlLoopRun(); the frames arrive wh
   if (g_flowPer && now >= g_nextFlow) { flowFrame(); g_nextFlow += g_flowPer; }
   if (g_retPer && now >= g_nextRet) { frame(28, OT_READ_ACK, g_retVal); g_nextRet += g_retPer; }
   if (g_pmDue && now >= g_pmAt) { flowFrame(); g_pmDue = 0; }
-  if (!g_enabled) return;                       // satControlLoopRun() returns before the senders while SAT is off
+  if (!g_enabled) { _sat_flameOffSeen = false; return; }   // satControlLoopRun() returns before the senders while SAT is off
   const bool f = satIsFlameOn();
+  if (!f) _sat_flameOffSeen = true;             // TASK-1942: as satControlLoopRun()
   if (f != g_prevFlame) {
     const bool dhw = (OTcurrentSystemState.SlaveStatus & 0x04) != 0;
     satNoReturnFloodOnFlameEdge(f, dhw);
