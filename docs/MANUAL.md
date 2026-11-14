@@ -468,7 +468,7 @@ Below the log viewer, an ECharts temperature graph shows a rolling 24-hour view 
 - Boiler flow temperature (CH water temperature)
 - Return temperature
 - Room temperature (from the thermostat or SAT)
-- Outside temperature (if available)
+- Outside temperature (if available). When it comes only from the weather service and the browser tab is hidden, or the weather answer is invalid, the graph shows a gap instead of repeating the last value; a boiler-reported outside temperature (MsgID 27) still fills it (beta.247, TASK-1875).
 - Modulation level (percentage)
 - Flame status
 - DHW (hot water) temperature
@@ -1257,7 +1257,7 @@ In AP fallback mode the device keeps attempting to reconnect to the configured W
 | Method | How |
 |---|---|
 | Web UI | Settings page, click "Reset WiFi" button |
-| Triple-reset detection | Power-cycle the device 3 times within 10 seconds |
+| Triple-reset detection | Reset the gateway 3 times in a row, each reset within 10 seconds of the board coming back up: press the reset button or pull the plug (both count, and they may be mixed). Software, USB and watchdog resets do not count. See `docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md` |
 | Telnet debug console | Send the `resetwifi` command on port 23 |
 
 ---
@@ -1518,8 +1518,8 @@ Or use PuTTY: connection type "Other", protocol "Telnet", host `otgw2.local`, po
 2. Delete the file `/settings.json`.
 3. Reboot the device.
 
-**Method 2: Triple-reset (WiFi credentials only)**
-Power-cycle the device 3 times within 10 seconds.
+**Method 2: Triple-reset (forces the WiFi config portal)**
+Reset the gateway 3 times in a row, each reset within 10 seconds of the board coming back up (wait for it to boot between resets). A reset is a press of the reset button or pulling the plug (or the USB cable that powers it) and putting it back; both count and may be mixed, because the ESP32-S3 reports them with the same reset reason (ADR-238). On the 3rd reset the device clears the stored WiFi credentials and boots into the WiFiManager config portal. Software restarts, crashes, watchdog resets and a reset over USB never count. Be aware: a power supply that drops out three times in quick succession does the same. See section 6.1.4 and `docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md`.
 
 **Method 3: Telnet debug console**
 Connect on port 23 and type `resetwifi` to clear WiFi credentials only.

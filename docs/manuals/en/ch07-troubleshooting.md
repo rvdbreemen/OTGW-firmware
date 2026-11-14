@@ -373,7 +373,7 @@ The S3 Mini supports BLE (Bluetooth Low Energy) temperature sensor scanning. If 
 3. Reboot the device.
 
 **Method 2: Triple-reset (forces the WiFi config portal)**
-Press and release the hardware reset button 3 times in a row, each press within 10 seconds of the previous one (wait for the board to boot between presses). On the 3rd press the device boots into the WiFiManager config portal so you can enter new credentials. Use the reset button, not a power-cycle, and do not hold it. See section 6.1.4 and `docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md`.
+Reset the gateway 3 times in a row, each reset within 10 seconds of the board coming back up (wait for it to boot between resets). A reset is a press of the reset button or pulling the plug (or the USB cable that powers it) and putting it back; both count and may be mixed, because the ESP32-S3 reports them with the same reset reason (ADR-238). On the 3rd reset the device clears the stored WiFi credentials and boots into the WiFiManager config portal. Software restarts, crashes, watchdog resets and a reset over USB never count. Be aware: a power supply that drops out three times in quick succession does the same. See section 6.1.4 and `docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md`.
 
 **Method 3: Telnet debug console**
 Connect on port 23 and type `resetwifi` to clear WiFi credentials only.

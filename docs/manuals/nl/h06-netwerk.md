@@ -56,7 +56,7 @@ In AP-fallbackmodus probeert de firmware elke 5 minuten opnieuw verbinding te ma
 | Methode | Hoe |
 |---|---|
 | Web UI | Settings-pagina, klik op de knop "Reset WiFi" |
-| Driedubbele reset | Druk de hardware-resetknop 3 keer achter elkaar in, elke druk binnen 10 seconden na de vorige (forceert het configuratieportaal; geen power-cycle, niet ingedrukt houden) |
+| Driedubbele reset | Reset de gateway 3 keer achter elkaar, elke reset binnen 10 seconden nadat het bord weer is opgestart: druk op de resetknop of trek de stekker eruit (beide tellen, ook door elkaar). Een software-, USB- of watchdogreset telt niet. Zie `docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md` |
 | Telnet-debugconsole | Stuur het commando `resetwifi` op poort 23 |
 
 ---

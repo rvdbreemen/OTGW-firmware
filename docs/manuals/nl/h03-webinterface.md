@@ -161,7 +161,7 @@ Het paneel pollt `/api/v2/otdirect/status` elke 5 seconden zolang het Home-tabbl
 
 ### Startpagina: realtime temperatuurgrafieken
 
-Onder de OpenTherm-log toont de startpagina een temperatuurgrafiek op basis van Apache ECharts. De grafiek heeft tot vijf Y-assen en toont een rollend venster van 24 uur.
+Onder de OpenTherm-log toont de startpagina een temperatuurgrafiek op basis van Apache ECharts. De grafiek heeft tot vijf Y-assen en toont een rollend venster van 24 uur. Komt de buitentemperatuur alleen van de weerdienst en is het browsertabblad verborgen, of is het weerantwoord ongeldig, dan toont de grafiek een gat in plaats van de laatste waarde te herhalen; een buitentemperatuur van de ketel (MsgID 27) vult het gat wel (beta.247, TASK-1875).
 
 **Standaard weergegeven temperatuurreeksen:**
 
@@ -423,6 +423,8 @@ Onder de bestandenlijst staat een **System Actions**-paneel met snelkoppelingen 
 **Let op:** Verwijder geen actieve assets zoals `index.html`, `index.js`, `sat.js`, `graph.js`, `components.css`, `ds-tokens.css` of `/settings.ini`. Dit kan de werking van de webinterface verstoren. Herstel is mogelijk door het LittleFS-bestandssysteem opnieuw te flashen via USB.
 
 Wanneer `index.html` ontbreekt (bijvoorbeeld omdat het LittleFS-image nog niet is geflasht), serveren de FSexplorer-routes `FSexplorer.html` direct als fallback-pagina, zodat u alsnog een filesystem-image kunt uploaden.
+
+Ontbreekt ook de bestandsbeheerpagina zelf (geen `FSexplorer.html.gz` op het filesystem), dan worden bestaande bestanden gewoon geserveerd, bijvoorbeeld het herstartlog; alleen een verzoek om een bestand dat niet bestaat krijgt de uploadpagina (beta.244, TASK-1926).
 
 De firmware streamt alle bestanden in plaats van ze in RAM te bufferen, dus er is geen harde uploadlimiet anders dan de beschikbare ruimte in de LittleFS-partitie. Het `index.html`-bestand is op 2.0.0 enkele tientallen kilobytes groot en wordt altijd via `streamFile()` geserveerd om het RAM te ontzien (TASK-668).
 

@@ -140,7 +140,7 @@ Below the log viewer, an ECharts temperature graph shows a rolling 24-hour view 
 - Boiler flow temperature (CH water temperature)
 - Return temperature
 - Room temperature (from the thermostat or SAT)
-- Outside temperature (if available)
+- Outside temperature (if available). When it comes only from the weather service and the browser tab is hidden, or the weather answer is invalid, the graph shows a gap instead of repeating the last value; a boiler-reported outside temperature (MsgID 27) still fills it (beta.247, TASK-1875).
 - Modulation level (percentage)
 - Flame status
 - DHW (hot water) temperature
@@ -391,6 +391,8 @@ A **System Actions** panel below the file list provides quick buttons for **Upda
 This is useful for manually backing up or restoring `settings.ini`, `dallas_labels.ini`, the SAT PID state file, or custom web assets. The firmware always streams files rather than buffering them into RAM, so there is no hard upload size limit beyond the available LittleFS partition space. The main `index.html` (now several tens of kilobytes on 2.0.0) and all other assets are served via `streamFile()` to avoid loading them into RAM (TASK-668).
 
 When the FSexplorer routes detect that `index.html` is missing (filesystem not mounted or image not yet flashed), the routes serve `FSexplorer.html` directly so the user can still upload a filesystem image from the file manager.
+
+If the file manager page itself is missing as well (no `FSexplorer.html.gz` on the filesystem), existing files are still served as normal, for example the reboot log; only a request for a file that does not exist gets the upload page (beta.244, TASK-1926).
 
 #### Asset caching and the ETag flow
 
