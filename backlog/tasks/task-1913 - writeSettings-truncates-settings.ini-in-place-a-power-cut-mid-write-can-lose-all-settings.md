@@ -3,11 +3,11 @@ id: TASK-1913
 title: >-
   writeSettings truncates settings.ini in place: a power cut mid-write can lose
   all settings
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T23:14:00Z'
-updated_date: '2026-11-14T01:43:00Z'
+updated_date: '2026-11-14T02:13:00Z'
 labels: []
 dependencies: []
 priority: medium
@@ -45,4 +45,10 @@ Follow-up filed: TASK-1916 (remove-before-rename in writeOtThermoFile/writeOtBoi
 Caveat closed for the library (bench evidence, not reading): 09 bench 2026-11-14 ~02:30, 95's TASK-1912 step 4, .61 on beta.233: temp file + LittleFS.rename over the existing /dallas_labels.ini, then reboot: new names persisted, only dallas_labels.ini (103 B) left, no .tmp. That proves rename-over-existing works on our precompiled esp_littlefs, so dropping remove() before rename() in TASK-1913 relies on verified behaviour. Still to bench on the 1913 build itself: save settings twice and read /settings.ini back (second content present), no /settings.tmp after boot.
 
 Rebased onto origin/dev fe6d35b59 (d3's beta.232), re-bumped to beta.233 (coordinator order: 1913 before 95's 1912; flushDallasLabelsLocked() stays with 95, who switches it to fsCommitTempFile() after this push). After rebase: harness --old-rev fe6d35b59 OLD fails R1,S1,S2,S3,S4,W1,W3,W4, FIX PASS, MA1-MA4 each fail exactly their cases, RESULT PASS. run_tests.py on 19 patterns: 22 files, 22 passed, 0 failed. evaluate --quick: 92 checks, 85 PASS, 0 FAIL, 7 info. TASK-1916 number checked free on origin/dev.
+
+Bench by 09 on .63, 2.0.0-beta.233+6afbade (evidence in 09's scratchpad b233ba\), PASS: settings round-trip diff shows only the changed field; save A then B coalesced, /settings.ini shows B; no /settings.tmp and no /reboot_count.tmp after the saves and after reboot; reboot_count +1 on each of 3 reboots, one reboot_log line each, older lines kept; 0 times '[Settings] Error: short write or rename failed' over 7 flushes. AC3 is for 09 to tick.
+
+Not verified on the device: (1) brief step 6, the FSexplorer auth guard on /settings.tmp, was skipped because .63 has no HTTP password. The guard is covered only statically: host harness case S3 checks the handleFile() guard names SETTINGS_TMP_FILE, and mutant MA4 (guard drops the temp file) fails S3. No runtime 401 seen. (2) The 'reset during a save' half of AC3 cannot be run on the bench; host harness W1/W3/R1 carry old-vs-fix (OLD fe6d35b59 red, FIX green).
+
+Pushed 6afbade55 (beta.233) to origin/dev on fe6d35b59. Zip OTGW-firmware-esp32-combo-2.0.0-beta.233+6afbade-flash.zip, sha256 d83553017152dac6848578066eee2d43d81d4a85664d29f62822d847ceb40341, posted to #alpha-testing msg 1570984895382163647.
 <!-- SECTION:NOTES:END -->
