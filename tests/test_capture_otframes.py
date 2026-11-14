@@ -26,6 +26,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -167,6 +168,34 @@ class CaptureThreadTest(unittest.TestCase):
         for line in sim:
             self.assertRegex(line, r"^[A-Z][0-9A-F]{8}$")
         self.assertIn("5 frame(s)", (tmp / "summary.txt").read_text())
+
+    def test_frames_in_the_upgrade_read_are_kept(self):
+        # TASK-1922: a loaded host reads the 101 response, the ping and the first frame in ONE recv().
+        # Made deterministic: the capture's socket waits 0.3 s before its first recv(), so everything the
+        # fake device sent is already buffered. The upgrade must keep the bytes after the header.
+        real = socket.create_connection
+
+        class LateFirstRecv:
+            def __init__(self, sock):
+                self._s, self._first = sock, True
+
+            def recv(self, n, *a):
+                if self._first:
+                    self._first = False
+                    time.sleep(0.3)
+                return self._s.recv(n, *a)
+
+            def __getattr__(self, name):
+                return getattr(self._s, name)
+
+        ws = FakeWs(list(LINES.values()))
+        def five_frames(d):
+            f = d / oc.FRAMES_LOG
+            return f.exists() and sum(1 for l in f.read_text().splitlines() if l and not l.startswith("#")) >= 5
+        with mock.patch.object(oc.socket, "create_connection", lambda *a, **k: LateFirstRecv(real(*a, **k))):
+            cap, tmp = self.run_capture(ws.port, 0.5, five_frames)
+        rows = [l.split("	") for l in (tmp / oc.FRAMES_LOG).read_text().splitlines() if not l.startswith("#")]
+        self.assertEqual([r[2] + r[3] for r in rows], ["T10010A00", "B40000800", "R90190000", "A401920B0", "E00000000"])
 
     def test_degrades_when_unreachable(self):
         s = socket.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()  # closed port

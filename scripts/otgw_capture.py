@@ -1532,6 +1532,9 @@ class WebSocket:
             response += chunk
         if b" 101 " not in response.split(b"\r\n", 1)[0]:
             raise RuntimeError("websocket upgrade failed")
+        # TASK-1922: frames the server sent right after the 101 can arrive in the same recv() as the
+        # header (a loaded host, or a device that logs at once). Keep them for the frame reader.
+        self._pending = response.split(b"\r\n\r\n", 1)[1]
 
     def send_json(self, payload):
         data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
@@ -1581,7 +1584,8 @@ class WebSocket:
                 return b"".join(chunks).decode("utf-8", "replace")
 
     def _read_exact(self, count):
-        data = b""
+        data = self._pending[:count]
+        self._pending = self._pending[count:]
         started = time.monotonic()
         while len(data) < count:
             try:
