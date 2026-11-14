@@ -258,6 +258,10 @@ answer; host case T9 reproduces the round-1 result on the first implementation a
   decision; the SAT state files, Dallas labels and heating-curve markers (heap copies only, as
   today); `settings.ini` when it alone is larger than the snapshot (logged, then not protected at all); the
   counter or the log when they no longer fit after `settings.ini`.
+- Accepted trade-off (coordinator, 2026-11-14): a settings save made after a failed image write, while the
+  partition still holds the half-written image, does not drop the snapshot; the boot formats that image and
+  restores the settings from before the OTA, so that later save is lost. Such a save rarely lands at all, because
+  the half-written image is usually full.
 - The budget margin is thin: 7.2 KB of about 7.4 KB on the bench units. An install with BLE bind keys and more
   SAT settings can push `settings.ini` past 6 KB, and then the counter and log drop out first, and later the
   settings themselves. *Mitigation*: the size is logged at every filesystem OTA; compression is the named
