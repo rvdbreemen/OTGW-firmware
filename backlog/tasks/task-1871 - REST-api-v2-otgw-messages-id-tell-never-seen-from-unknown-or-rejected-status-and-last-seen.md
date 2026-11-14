@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-12T18:20:00Z'
-updated_date: '2026-11-14T21:25:00Z'
+updated_date: '2026-11-14T21:36:00Z'
 labels:
   - feature
   - rest-api
@@ -52,4 +52,6 @@ Plan (ba, 2026-11-12). Today: sendOTValue (restAPI.ino:2933) returns label/value
 AC4: /messages/<id> checked on the bench; /otgw/id/<id> and /otgw/label/<label> share sendOTValue/sendOTLabel, both checked on the source by test_boiler_answer_status (wiring test), not separately on the bench. Status In Review: AC3 waits on field validation with a real boiler (ack age, unknown_dataid).
 
 2026-11-14 22:25 (09, bench part of AC3, partial): .61 (OTGW32, beta.252+941a224, no boiler): GET /api/v2/otgw/messages/0, /25, /99 -> status never_seen, last_seen_age_s -1, existing label/value/unit unchanged (never_seen case PASS). Loopback (GW=L, 30 s, IDs 0-127 scanned): still 113x never_seen, 0 ack, 0 unknown_dataid, 0 data_invalid; correct per AC1 (loopback answers are gateway-local and must not count). The ack/rising last_seen and unknown_dataid cases need a real boiler: none of the bench units (.61, .63) has an OT bus, so these stay unverified on the bench; options: a field capture from a tester, or a boiler simulator on the OT bus. .61 restored to GW=S. Evidence: 09 scratchpad b1871/scan1.txt.
+
+AC 3: field AC (Robert C, 2026-11-14, DM 1571276554430976183 via the coordinator, no OT bus on the bench): the ack/rising last_seen and unknown_dataid cases (the never_seen case is bench-verified on .61) is verified from a tester capture, not on the bench. Status stays In Review until a tester capture covers it.
 <!-- SECTION:NOTES:END -->

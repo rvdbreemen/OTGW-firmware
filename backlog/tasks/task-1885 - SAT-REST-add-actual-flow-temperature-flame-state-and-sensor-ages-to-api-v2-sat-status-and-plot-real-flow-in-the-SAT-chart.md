@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:23:00Z'
-updated_date: '2026-11-13T21:29:00Z'
+updated_date: '2026-11-14T21:36:00Z'
 labels:
   - webui
   - sat
@@ -55,4 +55,6 @@ Evidence so far (2026-11-13, uncommitted in wt-ba-1885): python tests/test_sat_s
 2026-11-13 follow-up prepared in lane/ba-titles (uncommitted, no bump until its build slot, coordinator): the SAT chart's Modulation and Flame panel titles and legend used the shared Monitor keys graph.series_mod ('modulation') and h_mon.graph_flame ('flame'), lowercase on purpose in the Monitor graph (09's bench remark). New SAT keys tools.legend_mod / tools.legend_flame: en Modulation/Flame, nl Modulatie/Vlam, de Modulation/Flamme, el Διαμόρφωση/Φλόγα; Monitor unchanged. sat-chart-actual-flow expects the new keys: fail 1 on origin/dev 3b1221c46, pass 4 on the change; i18n-lang 6, i18n-no-hardcoded 3, i18n-followups 4, panel-chart-style 2, v2-nested-helper-scope 2, sat-explain-state 1, sat-page-order 1 all pass.
 
 2026-11-13 titles follow-up 2ec6d946d (beta.228) built with beta.229+eea80bd; bench by 09 on .63: Modulation and Flame panel titles correct in EN and NL on the real page (screenshot 09 scratchpad b229/after-229-en-chart.png). Pushed 746ccd426..eea80bd3d, posted message 1570913314350047273. Status stays In Review for real-boiler validation (AC3).
+
+AC 3: field AC (Robert C, 2026-11-14, DM 1571276554430976183 via the coordinator, no OT bus on the bench): the bench comparison of flow_temp/flame_on with the OT data is verified from a tester capture, not on the bench. Status stays In Review until a tester capture covers it.
 <!-- SECTION:NOTES:END -->
