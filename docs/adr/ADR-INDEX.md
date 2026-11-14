@@ -243,3 +243,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-237 | Proposed | `build.py` | The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2488), so .pio/build keeps on... |
 | ADR-238 | Accepted | - | On the ESP32-S3 a boot counts towards the triple-reset WiFi recovery when it is a reset-button press or a power-on (E... |
 | ADR-239 | Accepted | - | The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware holds... |
+| ADR-241 | Proposed | - | In master mode a thermostat WRITEDATA of any ID except 1, 16 and 24 is sent to the boiler as a relay in the next free... |
