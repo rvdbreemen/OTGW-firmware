@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:50:00Z'
-updated_date: '2026-11-14T17:22:00Z'
+updated_date: '2026-11-14T19:06:00Z'
 labels:
   - otdirect
   - parity
@@ -30,8 +30,8 @@ From the PIC 6.8 parity audit (N7), docs/reviews/2026-11-12_pic68-otdirect-parit
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 GW=1 in gateway mode changes no state; host test red on current code
-- [ ] #2 decide and record (ADR or task note) what a real mode change keeps (PIC parity = everything except what ADR-223 flushes from the queue)
-- [ ] #3 host test for GW=0 then GW=1 with HW=0 and an SR= entry set
+- [x] #2 decide and record (ADR or task note) what a real mode change keeps (PIC parity = everything except what ADR-223 flushes from the queue)
+- [x] #3 host test for GW=0 then GW=1 with HW=0 and an SR= entry set
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -48,4 +48,6 @@ AC1 implemented (lane-1762b, local): setOTDirectMode() applies the mode only whe
 Robert's answer found in the bot DM channel (stale audit 2026-11-14, coordinator request): DM 1570230662743592961, 2026-11-12 01:16:03 UTC, verbatim 'Vraag taak 1834: A / Vraag taak 1839: A', answering the bot's question 1570229987825418384. Option A: like the PIC, a real mode change (monitor <-> gateway) keeps all command state; only the queue is flushed as ADR-223 already does; a CS= stays valid after the switch back to gateway until it expires. This settles the decision AC2/AC3 waited for.
 
 AC2/AC3 implemented (d3, 2026-11-14, local, not yet built). Scope of Robert's answer A, read from the question itself (bot DM 1570229987825418384: 'wat een ECHTE moduswissel (monitor <-> gateway) moet bewaren'): a switch between gateway and monitor keeps all command state and only flushes the queue (new helper otdFlushCmdQueue(), ADR-223); a switch into or out of master, loopback or bypass keeps the full resetTransientState() (the PIC has none of those modes, outside the question; ask Robert separately if wanted). GW=R unchanged (full reset + flush). Checked: monitor mode applies none of the kept state (raw relay OTDirect.ino:2476, no own frames :2545, reply modifiers gateway-only :1699); the CS expiry clock runs every second in every mode (:2557-2581), so a CS= kept across monitor expires on time. New tests/test_otd_mode_change_keeps_state.py on the real otdFlushCmdQueue/resetTransientState/applyOTDirectMode/setOTDirectMode: GW=0 then GW=1 with HW=0, SR=60, CS=40: HEAD hw 255, SR/CS cleared (2 FAIL); fix all kept, flush set (6/6 OK); into master and GW=R still clear on both. test_otd_gw_same_mode updated (gateway->monitor resets 0, ->master 1), test_otd_mode_switch_queue_reset cuts the new helper. OTD suite 36/36 after the fix. Docs: c4-code-otdirect.md. Finding (not in scope, to file): at boot initOTDirect() restores the persisted HW/UI (otdRestorePersistedCommands) BEFORE the auto-detect switch into master (:1311), whose full reset then wipes HW=0 and the UI= list again.
+
+Bench 09 on .61 (OTGW32, OT-Direct), bench build 2.0.0-beta.252+941a224 (d3 lane; sha256 match, OTA OK, bootcount 647 -> 649, crashlog identical, MQTT up). PASS core case: in gateway HW=0, CS=40, SR=60:1,2 (write override [1:10240], response [60:258], PR W=0, O=C40.00); GW=0 -> M=M with W=0, O=C40.00, overrides unchanged; GW=1 -> M=G, all unchanged. PASS: GW=S (master) and GW=R from gateway with state clear everything (W=A, O=N, overrides empty); a first GW=0 from S (boot auto-detect master) clears, as a switch out of master should. NOT testable on .61: monitor-mode relay with a kept SR=/HW=0 (no thermostat or boiler, no relayed frames; covered by the source checks in test_otd_mode_change_keeps_state) and the queue flush (queue empty before every switch; covered by the host test). Evidence: 09 scratchpad b1839/. CORRECTION of d3's bench brief: it said 'GW=3 (master)'; master is GW=2 / GW=S in the handler (OTDirect.ino ~3725); 3 is only the enum value OTD_MODE_MASTER. 09's finding from that: GW=3 gets an echo 'GW: 3' with no mode change, where the PIC answers BV (BadValue) to any GW= value other than 0, 1 or R (gateway.asm 6.8 CheckBoolean :4072-4082, ResetGateway :4776-4780); also after GW=3 the REST write-override list lost [1:10240] while PR=O still said C40.00 (cause not traced). Filed as a separate low parity task.
 <!-- SECTION:NOTES:END -->
