@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-beta.244
+**  Version  : v2.0.0-beta.245
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -555,9 +555,40 @@ static void sendFSexplorerRedirect() {
   webSendStatus(303);
 }
 
+// TASK-1934: the request path in canonical form: repeated '/' collapsed, "." dropped,
+// ".." resolved. handleFile() uses this one path for its access check and for the file
+// it opens, so both always name the same file. Returns false for ".." above the root or
+// a result that does not fit.
+static bool fsCanonicalPath(const char *in, char *out, size_t cap) {
+  if (cap < 2) return false;
+  size_t len = 0;
+  out[len++] = '/';
+  const char *p = in;
+  while (*p) {
+    while (*p == '/') p++;
+    if (!*p) break;
+    const char *seg = p;
+    while (*p && *p != '/') p++;
+    const size_t n = (size_t)(p - seg);
+    if (n == 1 && seg[0] == '.') continue;
+    if (n == 2 && seg[0] == '.' && seg[1] == '.') {
+      if (len == 1) return false;                        // above the root
+      while (len > 1 && out[len - 1] != '/') len--;      // drop the last segment
+      if (len > 1) len--;                                // and the '/' before it
+      continue;
+    }
+    if (len > 1) { if (len + 1 >= cap) return false; out[len++] = '/'; }
+    if (len + n >= cap) return false;
+    memcpy(out + len, seg, n);
+    len += n;
+  }
+  out[len] = '\0';
+  return true;
+}
+
 //=====================================================================================
 // Called from the onNotFound catch-all; currentRequest is already bound there.
-bool handleFile(String&& path)
+bool handleFile(String&& rawPath)
 {
   if (hasArgCompat("delete"))
   {
@@ -568,14 +599,17 @@ bool handleFile(String&& path)
     sendFSexplorerRedirect();
     return true;
   }
+  // TASK-1934: every check below and the file read itself use the canonical path.
+  char canon[96];
+  if (!fsCanonicalPath(rawPath.c_str(), canon, sizeof(canon))) return false;   // 404
+  String path(canon);
   // ADR-056 §1: settings.ini stores httppasswd and MQTTpasswd in cleartext, so this
   // read path sits INSIDE the protected admin boundary — it is not one of the "read
   // paths that do not expose secret values" the open carve-out covers. Every sibling
   // operation on this handler already gates; only the read did not, so setting an
   // admin password created the secret that an unauthenticated GET then handed out.
   {
-    const char *sp = path.c_str();
-    while (sp[0] == '/' && sp[1] == '/') sp++;   // collapse a "//settings.ini" alias
+    const char *sp = canon;
     // TASK-1913: the temp file writeSettings() renames over settings.ini holds the same secrets.
     if ((strcasecmp_P(sp, PSTR(SETTINGS_FILE)) == 0 || strcasecmp_P(sp, PSTR(SETTINGS_TMP_FILE)) == 0)
         && !checkHttpAuth()) {

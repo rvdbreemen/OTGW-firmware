@@ -15,7 +15,7 @@ plain-page fallback on a filesystem from before ADR-215 and the handleFile uploa
 (TASK-1926: existing files are served without a recovery page; the prompt only for a missing path).
 --mutant <name> applies one defect to that production text and passes only when the fixture
 FAILS on it (proof the checks bite): no-plain-fallback, double-encoding-file,
-double-encoding-progmem, etag-without-path, handlefile-gz-only-gate.
+double-encoding-progmem, etag-without-path, handlefile-gz-only-gate, raw-path-guard.
 """
 import argparse
 from pathlib import Path
@@ -50,6 +50,10 @@ MUTANTS = {
                                 '  webPushHeader(F("Content-Encoding"), F("gzip"));\n  AsyncWebServerResponse* resp'),
     "etag-without-path": ("FSexplorer.ino", r'PSTR("\"%s-%s\""), fsHash, path);', r'PSTR("\"%s%s\""), fsHash, "");'),
     "handlefile-gz-only-gate": ("FSexplorer.ino", ' && !LittleFS.exists("/FSexplorer.html")) {', ') {'),
+    # TASK-1934: the access check and the read on the path as received again (no canonical form).
+    "raw-path-guard": ("FSexplorer.ino",
+                       "if (!fsCanonicalPath(rawPath.c_str(), canon, sizeof(canon))) return false;   // 404",
+                       "strlcpy(canon, rawPath.c_str(), sizeof(canon));"),
 }
 
 

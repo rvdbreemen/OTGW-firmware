@@ -124,13 +124,29 @@ struct FakeFile {
   bool setBufferSize(size_t size) { buffer = size; return true; }
 };
 using File = FakeFile;
+// TASK-1934: like LittleFS (lfs_dir_find), the lookup skips "." and empty segments and lets ".." go up a level, so
+// "/./settings.ini" and "/x/../settings.ini" name the same file as "/settings.ini". The served path stays the request's.
+// Simplified: littlefs v2.5 also counts a "." as a level for a following ".." ("/sat/./../x" is /sat/x there); the
+// aliases in the tests avoid that combination.
+static std::string fsResolve(const std::string& path) {
+  std::vector<std::string> parts; size_t i = 0;
+  while (i <= path.size()) {
+    size_t j = path.find('/', i); if (j == std::string::npos) j = path.size();
+    std::string seg = path.substr(i, j - i); i = j + 1;
+    if (seg.empty() || seg == ".") continue;
+    if (seg == "..") { if (!parts.empty()) parts.pop_back(); continue; }
+    parts.push_back(seg);
+  }
+  std::string out; for (auto& p : parts) out += "/" + p;
+  return out.empty() ? "/" : out;
+}
 struct FakeFS {
   std::map<std::string, FileEntry> files;
   unsigned opens = 0, openNow = 0, openHwm = 0;
   size_t lastBuffer = 0;  // TASK-1673: stdio buffer size the served File carried
-  FakeFile open(const String& path, const char*) { FakeFile f; if (files.count(path)) { f.ok = true; f.path = path.c_str(); } return f; }
+  FakeFile open(const String& path, const char*) { FakeFile f; if (files.count(fsResolve(path))) { f.ok = true; f.path = path.c_str(); } return f; }
   mutable unsigned existsChecks = 0;
-  bool exists(const String& path) const { ++existsChecks; return files.count(path) != 0; }
+  bool exists(const String& path) const { ++existsChecks; return files.count(fsResolve(path)) != 0; }
   void remove(const String& path) { files.erase(path); }
 } LittleFS;
 struct AsyncClient {
@@ -218,9 +234,9 @@ public:
     if (nullFileResponses) { --nullFileResponses; return nullptr; }
     if (!fs.exists(path)) return nullptr;
     ++fs.opens; ++fs.openNow; fs.openHwm = std::max(fs.openNow, fs.openHwm);
-    auto* result = new BoundaryResponse(200, type, fs.files.at(path).valid, true, path);
+    auto* result = new BoundaryResponse(200, type, fs.files.at(fsResolve(path)).valid, true, path);
     result->addHeader("Content-Disposition", "inline");
-    if (fs.files.at(path).compressed) result->addHeader("Content-Encoding", "gzip");
+    if (fs.files.at(fsResolve(path)).compressed) result->addHeader("Content-Encoding", "gzip");
     return result;
   }
   AsyncWebServerResponse* beginResponse(FakeFile content, const String& path, const char* type) {
@@ -614,6 +630,31 @@ static void handle_file_keeps_serving_on_an_older_filesystem() {
   { bool handled = true; auto r = serve([&] { handled = handleFile(String("/nothing.ini")); });
     EXPECT(!handled); }
 }
+static void settings_guard_sees_the_canonical_path() {
+  // TASK-1934: with an admin password set, every spelling of the settings.ini path (dot segments, doubled slashes;
+  // the server has already decoded %XX) reaches the ADR-056 access check before webSendFile().
+  files({"/FSexplorer.html.gz", "/settings.ini", "/settings.tmp", "/reboot_log.txt"});
+  LittleFS.files["/sat/x.json"] = {};
+  const char* aliases[] = {"/./settings.ini", "/x/../settings.ini", "/.//settings.ini", "/sat/../settings.ini",
+                           "//settings.ini", "/./settings.tmp", "/sat/../settings.tmp", "/settings.ini"};
+  httpAuthOk = false;
+  for (const char* name : aliases) {
+    bool handled = false; auto r = serve([&] { handled = handleFile(String(name)); });
+    EXPECT(handled); EXPECT(r->wire.path.empty());
+    if (!r->wire.path.empty()) std::printf("  not checked: %s\n", name);
+  }
+  // Above the root: no file access at all (the caller sends 404).
+  { bool handled = true; auto r = serve([&] { handled = handleFile(String("/../settings.ini")); });
+    EXPECT(!handled); EXPECT(r->wire.path.empty()); }
+  // With the password: the alias serves the canonical file; other files are served under their canonical path.
+  httpAuthOk = true;
+  { bool handled = false; auto r = serve([&] { handled = handleFile(String("/x/../settings.ini")); });
+    EXPECT(handled); EXPECT(r->wire.path == "/settings.ini"); }
+  { bool handled = false; auto r = serve([&] { handled = handleFile(String("/sat/../reboot_log.txt")); });
+    EXPECT(handled); EXPECT(r->wire.path == "/reboot_log.txt"); }
+  { bool handled = false; auto r = serve([&] { handled = handleFile(String("/sat//x.json")); });
+    EXPECT(handled); EXPECT(r->wire.path == "/sat/x.json"); }
+}
 static void language_pack_served_gzipped() {
   // TASK-1689 (ADR-221): /i18n/<lang>.json exists only as <lang>.json.gz.
   files({"/FSexplorer.html.gz", "/i18n/nl.json.gz", "/i18n/nl.json"});
@@ -652,6 +693,7 @@ static void progmem_gzip_page_etag_and_encoding() {
 }
 #endif
 int main() {
+  std::setvbuf(stdout, nullptr, _IONBF, 0);   // a crash must not swallow the FAIL lines already printed
   waits_then_streams_and_preserves_headers(); fifo_queue_cap_and_cancellation();
   low_memory_deadline_wrap_and_safety(); errors_bounds_and_response_ownership(); deferred_metadata_and_file_changes(); reset();
   unwritable_pending_and_null_responses(); reset();
@@ -660,7 +702,7 @@ int main() {
   small_file_buffer_and_total_heap_cap();
 #ifdef GZIP_PAGES_TEST
   gzip_page_etag_and_304(); plain_page_fallback_from_an_older_filesystem(); recovery_page_then_upload_prompt();
-  handle_file_keeps_serving_on_an_older_filesystem(); language_pack_served_gzipped();
+  handle_file_keeps_serving_on_an_older_filesystem(); settings_guard_sees_the_canonical_path(); language_pack_served_gzipped();
   progmem_gzip_page_etag_and_encoding(); reset();
   std::printf("gzip pages: production serveGzipPage, handleFile and webSendGzipPage compiled\n");
 #endif
