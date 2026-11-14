@@ -163,9 +163,10 @@ class CeilingPaths(unittest.TestCase):
         # A new CS= sender must be audited against the ceiling and added here on purpose.
         want = sorted([
             ("satEnqueueIfChangedCS", "cs"),                              # 3 s suppression refresh: cs <= satEffectiveMaxSetpoint() just above
-            ("satSendCS", "cs"),                                          # flood hand-over: cs <= satEffectiveMaxSetpoint() just above
-            ("satSendCS", "cs"),                                          # flood step: satPwmFlameOffHold(satEffectiveMaxSetpoint())
-            ("satSendCS", "satCapRepeatCS(state.sat.fLastSentCS)"),       # 5 s resend
+            ("satSendCS", "cs, true"),                                    # flood hand-over: cs <= satEffectiveMaxSetpoint() just above (forced, TASK-1924)
+            ("satSendCS", "cs, true"),                                    # flood step: satPwmFlameOffHold(satEffectiveMaxSetpoint()) (forced, TASK-1924)
+            ("satSendCS", "satCapRepeatCS(state.sat.fLastSentCS)"),       # 30 s repeat (TASK-1924)
+            ("satSendCS", "cs"),                                          # retry of a dropped CS: capped by satEffectiveMaxSetpoint() just above (TASK-1924)
             ("satSendCS", "(float)(int)state.sat.fFinalSetpoint"),        # thermal safe fallback: satThermalSafeSetpoint()
             ("satSendCS", "10.0f"),                                       # summer simmer: SAT_MIN_SETPOINT, below any ceiling
             ("satSendCS", "10.0f"),                                       # valves closed
@@ -173,7 +174,10 @@ class CeilingPaths(unittest.TestCase):
         ])
         self.assertEqual(sorted(self.senders()), want)
         # the PIC keepalive and the CS=0 release are the two other senders, outside satSendCS
-        self.assertIn('PSTR("CS=%.1f"), satCapRepeatCS(state.sat.fLastSentCS)', self.src)
+        keep = self.src[self.src.index("static void satPicCSKeepalive()"):]
+        keep = keep[:keep.index("\n}\n")]
+        self.assertIn("if (cs > maxSp) cs = satQuantizeTenths(maxSp);", keep)   # TASK-1924: capped like satCapRepeatCS()
+        self.assertIn('PSTR("CS=%.1f"), cs);', keep)
         self.assertIn('satEnqueueOwnCS("CS=0")', self.src)
 
     def test_main_tick_clamps_every_mode_to_the_effective_ceiling_before_it_sends(self):
@@ -198,7 +202,7 @@ class CeilingPaths(unittest.TestCase):
         seg = s[a:s.index("satEnqueueIfChangedCS(cs);", a)]
         self.assertRegex(seg, r"maxSetpoint = satEffectiveMaxSetpoint\(\);\s*\n\s*if \(cs > maxSetpoint\) cs = maxSetpoint;")
         b = s.index("float cs = satPwmSuppressionSetpoint(satGetMaxSetpoint());", a + 10)
-        seg = s[b:s.index("satSendCS(cs);", b)]
+        seg = s[b:s.index("satSendCS(cs, true);", b)]
         self.assertRegex(seg, r"maxSetpoint = satEffectiveMaxSetpoint\(\);\s*\n\s*if \(cs > maxSetpoint\) cs = maxSetpoint;")
         self.assertIn("satPwmFlameOffHold(satEffectiveMaxSetpoint())", s)
 

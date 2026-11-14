@@ -9243,6 +9243,72 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-235",
+      "title": "SAT sends CS= on change with a 30 s repeat (supersedes the CS part of ADR-207 and ADR-203)",
+      "path": "ADR-235-sat-sends-cs-on-change-with-a-30-s-repeat-supersedes-the-cs-part-of-adr-207-and-adr-203.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-14",
+      "decision_summary": "SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= every 30 s, timed on raw...",
+      "topics": [
+        "command-cadence",
+        "control-setpoint",
+        "opentherm",
+        "sat"
+      ],
+      "aliases": [
+        "30 s CS repeat",
+        "5 s resend",
+        "CS on change",
+        "PIC CS expiry",
+        "Q-337b",
+        "SAT_CS_REPEAT_MS"
+      ],
+      "components": [
+        "SAT CS= send cadence"
+      ],
+      "symbols": [
+        "SAT_CS_REPEAT_MS",
+        "SAT_CS_RETRY_MS",
+        "satCmdResend",
+        "satPicCSKeepalive",
+        "satSendCS"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Send CS= at once when the 0.1-rounded value changes.",
+          "Repeat an unchanged CS= no later than 31 s after the last accepted CS= while SAT is active and not paused.",
+          "Time the repeat on millis() in the loop, not on the control tick (a tick-timed check slips to 60 s, the TASK-1602 lesson).",
+          "Retry a dropped CS= with its own value within 5 s."
+        ],
+        "must_not": [
+          "Repeat an unchanged CS= more often than every 29 s, except in the start-up flood.",
+          "Let the PIC keepalive and the repeat send two repeats in the same 30 s window."
+        ],
+        "exceptions": [
+          "The no-return start-up flood (TASK-1371) sends every 2 s by design.",
+          "satEnqueueIfChangedCS() (the 3 s PWM suppression refresh, entry 23) stays change-checked with its own 5 min staleness window; the 30 s repeat covers it in between."
+        ],
+        "verification": [
+          "tests/testsatcmdcache.py::CmdCacheReset::teststeadystatesendstwocsperminuteandachangeatonce: 60 s of steady state sends 2 CS= on this decision and 13 on the code before it (origin/dev SATcontrol.ino before TASK-1924).",
+          "testresendrepeatstheunchangedcsafter30snotbefore, testdroppedsatsendcsisretriedwithitsownvalueafter5s, testpickeepaliveandtherepeatshareone30swindow in the same file; tests/testsatceilingpaths.py (the CS sender inventory, including the f...",
+          "Bench (TASK-1924 AC6): CS= count per minute in steady state and during a warm-up, and no PIC CS expiry over 30 min."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -15837,6 +15903,18 @@
     {
       "source": "ADR-233",
       "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-235",
+      "target": "ADR-203",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-235",
+      "target": "ADR-207",
       "type": "related",
       "resolved": true
     }

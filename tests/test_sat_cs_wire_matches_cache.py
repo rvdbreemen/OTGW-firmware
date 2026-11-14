@@ -71,9 +71,9 @@ int main(int argc, char** argv) {
   const char* c = argv[1]; float v = (float)atof(argv[2]);
   if (!strcmp(c, "send")) {                 // control tick: wire text vs cache
     satSendCS(v); printf("%s %d %d\n", g_last, tenths(wire()), tenths(state.sat.fLastSentCS));
-  } else if (!strcmp(c, "repeat")) {        // tick, then the 5 s repeat path: must not change the wire value
+  } else if (!strcmp(c, "repeat")) {        // tick, then the repeat path: must not change the wire value
     satSendCS(v); int first = tenths(wire());
-    g_now += 5000; satSendCS(satCapRepeatCS(state.sat.fLastSentCS));
+    g_now += 30000; satSendCS(satCapRepeatCS(state.sat.fLastSentCS));   // TASK-1924: the repeat is due after 30 s
     printf("%s %d %d\n", g_last, first, tenths(wire()));
   } else if (!strcmp(c, "refresh")) {       // suppression refresh after a cached 0.1 lower value
     state.sat.fLastSentCS = (float)(tenths(v) - 1) / 10.0f; state.sat.bLastSentValid = true; state.sat.iLastSentCSMs = g_now;
@@ -104,11 +104,12 @@ def cut_tc(src: str) -> str:
 
 
 START_FIX = "// TASK-1738: one rounding for a CS=/TC= value."   # the fix puts satQuantizeTenths() before START
+START_1924 = "// TASK-1924, entries 334 (Robert, 30 s)"            # the CS repeat and retry constants, right above START_FIX
 
 
 def build(workdir: Path, src: str):
     cpp = workdir / "cs_wire.cpp"
-    start = START_FIX if START_FIX in src else START
+    start = START_1924 if START_1924 in src else START_FIX if START_FIX in src else START
     cpp.write_text(STUBS + cut(src, start, END) + cut_tc(src) + MAIN, encoding="utf-8")
     return base.compile_cpp(cpp, workdir / ("cs_wire" + (".exe" if os.name == "nt" else "")))
 
@@ -139,7 +140,7 @@ class CsWireMatchesCache(unittest.TestCase):
             text, wire, cache = run(self.exe, "send", v)
             self.assertEqual(wire, cache, (v, text))
 
-    def test_five_second_repeat_resends_the_same_value(self):
+    def test_repeat_resends_the_same_value(self):
         for v in CS_VALUES:
             text, first, again = run(self.exe, "repeat", v)
             self.assertEqual(first, again, (v, text))

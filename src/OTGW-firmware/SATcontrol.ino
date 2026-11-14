@@ -572,11 +572,11 @@ static bool    _sat_prevOTOnline      = false;  // Track OT-bus online edge for 
 static int     _sat_lastSentSW        = 0;      // DHW setpoint last sent with SW= (TASK-1376)
 static bool    _sat_swSentValid       = false;  // false: SW= still has to go out (restart, SAT switched on, DHW control switched on)
 
-// --- SAT command cadence (TASK-1370, Sergeant D entry 44, ADR-203) ---
-// As thermo-nova's heating loop (climate.py:707-708 every 5 s; heating_control.py:236-238 sends CS, MM and CH at the
-// end of every update, unchanged values included): every control tick sends CS=, MM= and CH= through satSendCS/MM/CH(),
-// and satCmdResend() repeats the last sent values every SAT_CMD_RESEND_MS between ticks. A rebooted PIC or a boiler
-// whose state drifted resyncs within 5 s. TC= is not in this list: it is event-driven (TASK-1272, see satEnqueueIfChangedTC).
+// --- SAT command cadence (TASK-1370, ADR-203; CS part changed by TASK-1924, entries 334, 335) ---
+// Every control tick hands CS=, MM= and CH= to satSendCS/MM/CH(). CS= goes out when its value changes and is repeated
+// every 30 s while unchanged (satCmdResend, SAT_CS_REPEAT_MS below); MM=/CH= go out on change plus a 60 s repair
+// (entries 237, 239). thermo-nova sends all three on every 5 s update (climate.py:707-708, heating_control.py:236-238);
+// entry 334 deviates from that on purpose. TC= is not in this list: it is event-driven (TASK-1272, see satEnqueueIfChangedTC).
 // SAT_CMD_REFRESH_MS is the staleness window of the one change-checked sender left, satEnqueueIfChangedCS(), which the
 // 3 s PWM suppression refresh uses (entry 23).
 static const uint32_t SAT_CMD_REFRESH_MS = 300000UL; // 5 min
@@ -592,7 +592,17 @@ static const uint32_t SAT_MMCH_REPAIR_MS = 60000UL;
 static const uint32_t SAT_MMCH_REPAIR_SLACK_MS = 1000UL;
 static bool _sat_mmSentValid = false;
 static bool _sat_chSentValid = false;
-static const uint32_t SAT_CMD_RESEND_MS  = 5000UL;   // thermo-nova climate.py:707-708
+// TASK-1924, entries 334 (Robert, 30 s) and 335 (Sergeant D, "a fresh CS value every minute" at most): CS= goes out when
+// its value (0.1) changes, and an unchanged CS= is repeated every SAT_CS_REPEAT_MS, well inside the PIC expiry window
+// (~63 s, gateway.asm CommandExpiry; TASK-1834). The repeat runs on raw millis() in the loop (satCmdResend), not on the
+// control tick, so it cannot slip to the next tick (the TASK-1602 lesson); a tick send counts as due from
+// SAT_CS_REPEAT_MS - SAT_CS_REPEAT_SLACK_MS. A CS= that the queue dropped is tried again every SAT_CS_RETRY_MS (TASK-1574).
+static const uint32_t SAT_CS_REPEAT_MS       = 30000UL;
+static const uint32_t SAT_CS_REPEAT_SLACK_MS = 1000UL;
+static const uint32_t SAT_CS_RETRY_MS        = 5000UL;
+static bool     _sat_csRetryPending = false;   // the queue dropped the last tick CS=; _sat_csPendingCS is its value
+static float    _sat_csPendingCS    = 0.0f;
+static uint32_t _sat_csRetryMs      = 0;
 
 // TASK-1738: one rounding for a CS=/TC= value. The wire text (%.1f) and the last-sent cache both come from this
 // quantised value, so they cannot disagree. Before, the text used %.1f of the raw float and the cache used
@@ -602,7 +612,7 @@ static inline float satQuantizeTenths(float v) {
   return (float)(int16_t)lroundf(v * 10.0f) / 10.0f;
 }
 
-// TASK-1536: a repeated CS (5 s resend, PIC keepalive) is capped by the same ceiling as the control tick,
+// TASK-1536: a repeated CS (30 s repeat, PIC keepalive) is capped by the same ceiling as the control tick,
 // satEffectiveMaxSetpoint() (boiler MaxTSet, user or default cap of entries 148/152, hard ceiling), so a limit
 // lowered after the last tick holds from the next repeat on. The cache takes the capped value, and the caller
 // sends that cached (quantised) value (TASK-1738).
@@ -632,6 +642,7 @@ static inline void satResetCmdCache() {
   state.sat.bTCAccountedValid = false;   // TC= is event-driven (TASK-1272): force the resend explicitly
   _sat_mmSentValid = false;              // TASK-1570: MM= and CH= are on-change; force the next one
   _sat_chSentValid = false;
+  _sat_csRetryPending = false;           // TASK-1924: the stale stamp makes the next CS= go out anyway
 }
 
 
@@ -664,38 +675,61 @@ static bool satEnqueueIfChangedCS(float setpoint) {
   state.sat.fLastSentCS     = sent;
   state.sat.iLastSentCSMs   = now;
   state.sat.bLastSentValid  = true;
+  _sat_csRetryPending       = false;         // TASK-1924: a newer CS= went out, an older dropped one is not retried
   return true;
 }
 
-// Control tick senders (TASK-1370): send every time, unchanged values included. Each one updates the last-sent
-// cache that satEnqueueIfChangedCS(), satPicCSKeepalive() and satCmdResend() read.
+// Control tick senders: satSendMM()/satSendCH() send on change plus a 60 s repair (entries 237, 239); satSendCS() sends on
+// change plus the 30 s repeat (TASK-1924, entries 334, 335). Each one updates the last-sent cache that
+// satEnqueueIfChangedCS(), satPicCSKeepalive() and satCmdResend() read.
+// TASK-1924: force sends an unchanged value anyway; only the start-up flood uses it (one CS= every 2 s, entries 45, 142, 149, 151).
 static bool _sat_cmdResendArmed = false;   // set by a tick send; the DHW and boiler-fault tick paths clear it
-static void satSendCS(float setpoint) {
+static void satSendCS(float setpoint, bool force = false) {
   _sat_cmdResendArmed = true;
   const float sent = satQuantizeTenths(setpoint);   // TASK-1738: the text and the cache use this one value
+  const uint32_t now = millis();
+  // TASK-1924: an unchanged CS= is not sent again until it is SAT_CS_REPEAT_MS old (a cache reset stamps it stale).
+  if (!force && state.sat.bLastSentValid && lroundf(sent * 10.0f) == lroundf(state.sat.fLastSentCS * 10.0f) &&
+      (uint32_t)(now - state.sat.iLastSentCSMs) < SAT_CS_REPEAT_MS - SAT_CS_REPEAT_SLACK_MS) {
+    _sat_csRetryPending = false;
+    return;
+  }
   char buf[16];
   snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), sent);
-  if (!satEnqueueOwnCS(buf)) return;   // TASK-1574 (commit-on-success): iLastSentCSMs stays old, so satCmdResend() retries in 5 s
+  if (!satEnqueueOwnCS(buf)) {   // TASK-1574 (commit-on-success): not cached; satCmdResend() retries this value in 5 s
+    _sat_csRetryPending = true;
+    _sat_csPendingCS    = sent;
+    _sat_csRetryMs      = now;
+    return;
+  }
   state.sat.fLastSentCS     = sent;
-  state.sat.iLastSentCSMs   = millis();
+  state.sat.iLastSentCSMs   = now;
   state.sat.bLastSentValid  = true;
+  _sat_csRetryPending       = false;
 }
 
 // TASK-1236: the PIC drops a CS= of 8 C or more when no new CS= arrived within its
-// expiry period (gateway.asm CommandExpiry, ~63 to ~126 s after the last CS=). SAT's
-// own cadence is far slower (SAT_CMD_REFRESH_MS, and a control interval of up to 300 s),
-// so on PIC boards the last CS is re-sent every SAT_PIC_CS_KEEPALIVE_MS. OT-Direct does
-// not need this: it skips its own CS expiry while SAT owns MsgID 1 (OTDirect.ino).
+// expiry period (gateway.asm CommandExpiry, ~63 to ~126 s after the last CS=). On PIC boards the last CS is re-sent
+// every SAT_PIC_CS_KEEPALIVE_MS, also while satCmdResend() pauses (hot water, boiler fault, a DHW or fault tick):
+// entry 232. It shares iLastSentCSMs with the 30 s repeat of satCmdResend() (TASK-1924), so together they send at most
+// one repeat per 30 s. OT-Direct does not need this: it skips its own CS expiry while SAT owns MsgID 1 (OTDirect.ino).
+// TASK-1924: while a dropped CS= waits for its retry, the keepalive carries that value, not the older cached one.
 static const uint32_t SAT_PIC_CS_KEEPALIVE_MS = 30000UL;
 
 static void satPicCSKeepalive() {
   if (!isPICEnabled() || !state.sat.bLastSentValid) return;
-  if (state.sat.fLastSentCS < 8.0f) return;  // the PIC never expires a CS below 8 C
+  float cs = _sat_csRetryPending ? _sat_csPendingCS : state.sat.fLastSentCS;
+  if (cs < 8.0f) return;  // the PIC never expires a CS below 8 C
   uint32_t now = millis();
   if ((now - state.sat.iLastSentCSMs) < SAT_PIC_CS_KEEPALIVE_MS) return;
+  const float maxSp = satEffectiveMaxSetpoint();   // TASK-1536: the repeat is capped like the tick
+  if (cs > maxSp) cs = satQuantizeTenths(maxSp);
   char buf[16];
-  snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), satCapRepeatCS(state.sat.fLastSentCS));
-  if (satEnqueueOwnCS(buf)) state.sat.iLastSentCSMs = now;   // TASK-1574 (commit-on-success): a dropped keepalive is tried again on the next pass
+  snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), cs);
+  if (!satEnqueueOwnCS(buf)) return;   // TASK-1574 (commit-on-success): a dropped keepalive is tried again on the next pass
+  state.sat.fLastSentCS   = cs;
+  state.sat.iLastSentCSMs = now;
+  _sat_csRetryPending     = false;
 }
 
 // Immergas (SAT_QUIRK_IMMERGAS_TP): TP=11:12=<min(mm, 80)> goes right before every MM=, as thermo-nova does
@@ -743,9 +777,10 @@ static void satSendCH(uint8_t ch) {
   _sat_chSentValid          = true;
 }
 
-// Between control ticks, every SAT_CMD_RESEND_MS after the last CS= (a tick or the suppression refresh),
-// repeat the LAST SENT CS (not recomputed). MM= and CH= are on-change since TASK-1570 (entry 237), so the resend no
-// longer repeats them. Gates: the callers' (SAT enabled, not tripped, OpenTherm
+// TASK-1924 (entries 334, 335): between control ticks, SAT_CS_REPEAT_MS (30 s) after the last accepted CS= (a tick, the
+// suppression refresh or the PIC keepalive), repeat the LAST SENT CS (not recomputed); a CS= the queue dropped is retried
+// with its own value every SAT_CS_RETRY_MS. MM= and CH= are on-change since TASK-1570 (entry 237), so the resend does not
+// repeat them. Gates: the callers' (SAT enabled, not tripped, OpenTherm
 // link alive, restart and outside-temperature gates passed) plus bLastSentValid, which satResetCmdCache()
 // clears on every hand-back, so nothing is repeated after SAT released the boiler. A tick that ends on hot
 // water or on the boiler fault flag sends nothing and disarms the resend until a later tick sends again, and
@@ -756,7 +791,16 @@ static void satSendCH(uint8_t ch) {
 static void satCmdResend() {
   if (!_sat_cmdResendArmed || !state.sat.bLastSentValid || !state.sat.bActive || !hasOTCommandInterface()) return;
   if (OTcurrentSystemState.SlaveStatus & 0x05) return;
-  if ((uint32_t)(millis() - state.sat.iLastSentCSMs) < SAT_CMD_RESEND_MS) return;
+  const uint32_t now = millis();
+  if (_sat_csRetryPending) {
+    if ((uint32_t)(now - _sat_csRetryMs) < SAT_CS_RETRY_MS) return;
+    float cs = _sat_csPendingCS;
+    const float maxSp = satEffectiveMaxSetpoint();   // TASK-1536
+    if (cs > maxSp) cs = maxSp;
+    satSendCS(cs);   // differs from the cache, so it goes out; a new drop restarts the 5 s
+    return;
+  }
+  if ((uint32_t)(now - state.sat.iLastSentCSMs) < SAT_CS_REPEAT_MS) return;
   satSendCS(satCapRepeatCS(state.sat.fLastSentCS));
 }
 
@@ -1751,7 +1795,7 @@ static float satApplyPWM(float pidOutput, bool scheduleDone = false)
 
 // 3 s refresh of the suppression CS during the PWM ON phase after the hold (OpenTherm application
 // text 2.1.1.2.5: CS = actual boiler temperature, or 1 K lower, updated every 2-3 s). Same formula and
-// same change-checked CS helper, so it cannot fight the control tick or the 5 s resend (both read fLastSentCS).
+// same change-checked CS helper, so it cannot fight the control tick or the 30 s repeat (both read fLastSentCS).
 static void satPwmSuppressionRefresh()
 {
   if (!DUE(timerSATSuppress)) return;
@@ -1880,7 +1924,7 @@ bool satPwmIsIdle() { return _pwm_idle; }
 // off->on in a PWM ON phase (the relight after a hot-water draw included), for fModSupDelay (20 s), one command per second:
 // CS = the flame-off hold (flow + fFlameOffOffset, clamped to [cold setpoint, effective max]) at t = 0, 2, 4 ... and PM=25 (flow
 // temperature, MsgID 25) at t = 1, 3, 5 ... After that the suppression CS = flow - fModSupOffset (satPwmSuppressionSetpoint()) takes over.
-// The CS goes through satSendCS(), so the cache the 5 s satCmdResend() repeats always holds the last flood CS (never a stale tick value)
+// The CS goes through satSendCS(), so the cache the 30 s satCmdResend() repeats always holds the last flood CS (never a stale tick value)
 // and the 3 s suppression refresh only starts after the same delay. PM=25 is skipped while another PM= is pending (the boot chain, a
 // user PM=): a PIC keeps one priority message and a second PM= would replace it.
 static bool     _flood_active   = false;
@@ -1920,7 +1964,7 @@ static void satNoReturnFloodStep()
     return;
   }
   if (sinceMs >= (uint32_t)(settings.sat.fModSupDelay * 1000.0f)) {
-    // Hand over to the suppression at once: one CS = flow - fModSupOffset through satSendCS(), so the cache the 5 s resend repeats
+    // Hand over to the suppression at once: one CS = flow - fModSupOffset through satSendCS(), so the cache the 30 s repeat repeats
     // holds the suppression value and never the last flood value (the flood re-armed the resend after a hot-water tick had
     // disarmed it, and the 3 s refresh stays out as long as the live DHW bit is set).
     float cs = satPwmSuppressionSetpoint(satGetMaxSetpoint());
@@ -1929,7 +1973,7 @@ static void satNoReturnFloodStep()
     _pwm_flameOffHoldSetpoint = 0.0f;
     _sat_lastControlCS        = cs;
     state.sat.fFinalSetpoint  = cs;
-    satSendCS(cs);
+    satSendCS(cs, true);   // TASK-1924: the flood keeps its own cadence
     _flood_active = false;
     return;
   }
@@ -1941,7 +1985,7 @@ static void satNoReturnFloodStep()
     _pwm_flameOffHoldSetpoint = cs;
     _sat_lastControlCS        = cs;            // the "previous CS" the next tick keeps
     state.sat.fFinalSetpoint  = cs;
-    satSendCS(cs);
+    satSendCS(cs, true);                       // TASK-1924: every 2 s, also unchanged (entries 45, 142)
   } else if (!pmChainBusy()) {
     addCommandToQueue("PM=25", 5, false, 0, true);
   }
@@ -7335,7 +7379,7 @@ void satControlLoop()
 // relative_modulation_state is HOT_WATER, so _compute_relative_modulation_value() takes the maximum, heating_control.py:
 // 136-137, :517-524). It is the value of a tick that does not regulate: satComputeMM() with pwmMode false, so the heat pump
 // and Geminox rules of entry 21 apply as outside PWM. It goes through satSendMM(): on change, repaired every 60 s, Immergas TP
-// included. Nothing else is sent in the draw: no CS/CH tick values and no 5 s resend (entry 221), while the 30 s PIC CS keepalive
+// included. Nothing else is sent in the draw: no CS/CH tick values and no 30 s repeat (entry 221), while the 30 s PIC CS keepalive
 // keeps running (entry 232). After the draw the next tick sends its own MM= (0 in PWM), which differs from the maximum.
 static void satSendMMDuringDhw() {
   const uint8_t src = satGetEffectiveHeatingSource();
@@ -7459,7 +7503,7 @@ static void satControlLoopRun()
   // Refresh the PWM suppression CS between control ticks (TASK-1268)
   satPwmSuppressionRefresh();
 
-  // Repeat the last CS, MM and CH every 5 s between control ticks (TASK-1370, entry 44)
+  // Repeat an unchanged CS every 30 s and retry a dropped one (TASK-1924, entries 334, 335)
   satCmdResend();
 
   // The PID steps on its own 60 s timer plus a start-up step (TASK-1368, entries 42, 111; thermo-nova

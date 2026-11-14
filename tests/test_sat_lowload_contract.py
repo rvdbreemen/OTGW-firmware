@@ -176,11 +176,11 @@ DELEGATED = {
                ("test_sat_pressure_health", "SatPressureHealth", ["test_ch_enable_transition_suspends_and_clears", "test_sat_on_off_alone_does_not_suspend",
                 "test_pwm_off_phase_does_not_suspend"])],
     "LL-013b": [("test_sat_command_delivery", "OtDirectRefusal", None)],
-    "LL-013": [("test_sat_cmd_cache", "CmdCacheReset", ["test_dropped_enqueue_is_not_cached_and_sent_again", "test_dropped_satsendcs_is_retried_by_the_5s_resend",
-                "test_dropped_keepalive_is_tried_again_on_the_next_pass", "test_resend_repeats_last_values_after_5s_not_before",
+    "LL-013": [("test_sat_cmd_cache", "CmdCacheReset", ["test_dropped_enqueue_is_not_cached_and_sent_again", "test_dropped_satsendcs_is_retried_with_its_own_value_after_5s",
+                "test_dropped_keepalive_is_tried_again_on_the_next_pass", "test_resend_repeats_the_unchanged_cs_after_30s_not_before",
                 "test_mm_and_ch_only_on_change_and_again_after_pic_restart", "test_unchanged_mm_and_ch_repaired_after_60_s",
                 "test_reset_across_uint32_wrap", "test_resend_repeats_the_cs_the_suppression_refresh_sent",
-                "test_pic_keepalive_stays_silent_while_the_resend_runs"]),
+                "test_pic_keepalive_and_the_repeat_share_one_30s_window"]),
                # TASK-1412.11 AC1/AC2/AC3: intent, enqueue result, transmission and echo/boiler answer as separate events on the REAL
                # SAT senders and the REAL PIC queue (and the OT-Direct enqueue path); full queue, interrupted exchange, PIC reset,
                # superseded commands, recovery; measured queue latency at echo pacing

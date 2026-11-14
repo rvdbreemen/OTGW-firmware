@@ -82,25 +82,25 @@ int main(int argc, char** argv) {
     printf("[%s]\n", g_sent);
   } else if (mode == 1) {                                  // 5 s resend repeats the last values, not before
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
-    g_sent[0] = 0; g_ms = start + 4999; satCmdResend(); printf("[%s]\n", g_sent);
-    g_ms = start + 5000; satCmdResend(); printf("[%s]\n", g_sent);
-    g_sent[0] = 0; g_ms = start + 9999; satCmdResend(); printf("[%s]\n", g_sent);   // 4999 ms after the resend
-    g_ms = start + 10000; satCmdResend(); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 29999; satCmdResend(); printf("[%s]\n", g_sent);   // TASK-1924: 30 s repeat, not before
+    g_ms = start + 30000; satCmdResend(); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 59999; satCmdResend(); printf("[%s]\n", g_sent);   // 29999 ms after the repeat
+    g_ms = start + 60000; satCmdResend(); printf("[%s]\n", g_sent);
   } else if (mode == 2) {                                  // nothing sent yet: no resend
     g_ms = start; satResetCmdCache(); g_ms = start + 60000; satCmdResend(); printf("[%s]\n[]\n[]\n[]\n", g_sent);
   } else if (mode == 3) {                                  // the suppression refresh moved CS: the resend repeats that CS
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
     g_ms = start + 3000; satEnqueueIfChangedCS(37.0f);
-    g_sent[0] = 0; g_ms = start + 8000; satCmdResend(); printf("[%s]\n[]\n[]\n[]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 33000; satCmdResend(); printf("[%s]\n[]\n[]\n[]\n", g_sent);   // TASK-1924: 30 s after it
   } else if (mode == 4) {                                  // a DHW-ending tick disarms; a later tick that sends re-arms
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
     @DISARM@                                               // what the DHW branch of the tick does
     g_sent[0] = 0; g_ms = start + 8000; satCmdResend(); printf("[%s]\n", g_sent);
     g_ms = start + 30000; tick(41.0f, 80, 1); g_sent[0] = 0;
-    g_ms = start + 35000; satCmdResend(); printf("[%s]\n[]\n[]\n", g_sent);
+    g_ms = start + 60000; satCmdResend(); printf("[%s]\n[]\n[]\n", g_sent);   // TASK-1924: 30 s after the re-arming tick
   } else if (mode == 5) {                                  // live fault / DHW bits pause the resend
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
-    g_sent[0] = 0; OTcurrentSystemState.SlaveStatus = 0x04; g_ms = start + 8000; satCmdResend(); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; OTcurrentSystemState.SlaveStatus = 0x04; g_ms = start + 30000; satCmdResend(); printf("[%s]\n", g_sent);
     OTcurrentSystemState.SlaveStatus = 0x01; satCmdResend(); printf("[%s]\n", g_sent);
     OTcurrentSystemState.SlaveStatus = 0x00; satCmdResend(); printf("[%s]\n[]\n", g_sent);
   } else if (mode == 6) {                                  // ADR-203: the 30 s PIC keepalive stays silent while the 5 s resend runs
@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
     g_imm = true; g_ms = start; satResetCmdCache(); tick(40.0f, 100, 1); printf("[%s]\n", g_sent);
     g_sent[0] = 0; g_ms = start + 1000; tick(40.0f, 100, 1); printf("[%s]\n", g_sent);
     g_sent[0] = 0; g_ms = start + 2000; tick(40.0f, 60, 1); printf("[%s]\n", g_sent);
-    g_sent[0] = 0; g_ms = start + 7000; satCmdResend(); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 32000; satCmdResend(); printf("[%s]\n", g_sent);   // TASK-1924: 30 s after the last CS
   } else if (mode == 9) {                                  // TASK-1570 entry 239: repair resend of an unchanged MM/CH after 60 s
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
     g_sent[0] = 0; g_ms = start + 58999; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);   // TASK-1602: due from 60 s minus the 1 s slack
@@ -139,9 +139,11 @@ int main(int argc, char** argv) {
     g_sent[0] = 0; g_ms = start + 2000; tick(40.0f, 100, 1); printf("[%s]\n", g_sent);
   } else if (mode == 12) {                                 // a dropped satSendCS is repeated by the 5 s resend
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
-    g_ms = start + 1000; g_drop = 1; satSendCS(42.0f); g_drop = 0;   // iLastSentCSMs stays at start
-    g_sent[0] = 0; g_ms = start + 4999; satCmdResend(); printf("[%s]\n", g_sent);
-    g_ms = start + 5000; satCmdResend(); printf("[%s]\n", g_sent);   // 5 s after the last ACCEPTED CS
+    g_ms = start + 1000; g_drop = 1; satSendCS(42.0f); g_drop = 0;   // TASK-1924: not cached, retried with its own value
+    g_sent[0] = 0; g_ms = start + 5999; satCmdResend(); printf("[%s]\n", g_sent);
+    g_ms = start + 6000; satCmdResend(); printf("[%s]\n", g_sent);   // 5 s after the drop
+    g_sent[0] = 0; g_ms = start + 11000; satCmdResend(); printf("[%s]\n", g_sent);   // accepted: no further retry
+    g_ms = start + 36000; satCmdResend(); printf("[%s]\n", g_sent);                   // the 30 s repeat of 42.0
   } else if (mode == 14) {                                 // TASK-1539: MM to the maximum for a draw; keepalive on, no 5 s resend
     g_ms = start; satResetCmdCache(); tick(40.0f, 0, 1);   // PWM tick: MM=0
     printf("[%s]\n", g_sent); g_sent[0] = 0;
@@ -186,6 +188,18 @@ int main(int argc, char** argv) {
     }
     printf("[%s]\n", line);
     g_ms += 29997; g_sent[0] = 0; tick(40.0f, 70, 1); printf("[%s]\n", g_sent);   // a changed MM still goes out at once
+  } else if (mode == 19) {                                 // TASK-1924 AC5: 60 s steady state, satControlLoopRun() order
+    char line[256]; line[0] = 0; int n = 0;                // every second: keepalive, resend; a control tick every 30 s
+    for (uint32_t s = 0; s < 60; s++) {
+      g_ms = start + s * 1000UL; g_sent[0] = 0;
+      if (s == 0) satResetCmdCache();
+      satPicCSKeepalive(); satCmdResend();
+      if (s % 30 == 0) tick(40.0f, 80, 1);
+      for (const char* p = g_sent; (p = strstr(p, "CS=")); p += 3) n++;
+    }
+    snprintf(line, sizeof line, "cs=%d", n);
+    printf("[%s]\n", line);
+    g_ms = start + 61000; g_sent[0] = 0; tick(40.5f, 80, 1); printf("[%s]\n[]\n[]\n", g_sent);   // a change goes out at once
   } else if (mode == 13) {                                 // a dropped PIC keepalive is tried again on the next pass
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
     g_sent[0] = 0; g_ms = start + 30000; g_drop = 1; satPicCSKeepalive(); g_drop = 0; printf("[%s]\n", g_sent);
@@ -251,8 +265,9 @@ class CmdCacheReset(unittest.TestCase):
         self.assertEqual(sent, "CS=40.0;MM=80;CH=1;")
         # TASK-1370, Sergeant D entry 44: rewritten on purpose. The old assertion was write-on-change ("[]");
         # a control tick now sends CS, MM and CH every time, unchanged values included (thermo-nova heating_control.py:236-238).
-        # TASK-1570, Sergeant D entry 237: MM and CH only on change; CS still on every tick.
-        self.assertEqual(again, "[CS=40.0;]")
+        # TASK-1570, Sergeant D entry 237: MM and CH only on change.
+        # TASK-1924, entries 334/335: rewritten on purpose; CS is on change too now (30 s repeat): an unchanged tick sends nothing.
+        self.assertEqual(again, "[]")
 
     def test_reset_at_millis_zero(self):
         self.assertEqual(self.run_at(0)[0], "CS=40.0;MM=80;CH=1;")
@@ -264,11 +279,12 @@ class CmdCacheReset(unittest.TestCase):
         self.assertEqual(self.run_at(4294967295 - 500)[0], "CS=40.0;MM=80;CH=1;")
 
 
-    def test_resend_repeats_last_values_after_5s_not_before(self):
+    def test_resend_repeats_the_unchanged_cs_after_30s_not_before(self):
+        # TASK-1924, entries 334/335: was the 5 s resend (entry 44); the unchanged CS is now repeated every 30 s
         a, b, c, d = self.run_at(10000, 1)
-        self.assertEqual(a, "[]")                             # 4999 ms after the tick
-        self.assertEqual(b, "[CS=40.0;]")                     # 5000 ms; MM/CH on change only (entry 237)
-        self.assertEqual(c, "[]")                             # 4999 ms after the resend
+        self.assertEqual(a, "[]")                             # 29999 ms after the tick
+        self.assertEqual(b, "[CS=40.0;]")                     # 30000 ms; MM/CH on change only (entry 237)
+        self.assertEqual(c, "[]")                             # 29999 ms after the repeat
         self.assertEqual(d, "[CS=40.0;]")
 
     def test_no_resend_before_first_send(self):
@@ -283,10 +299,10 @@ class CmdCacheReset(unittest.TestCase):
         self.assertEqual(a, "[]")
         self.assertEqual(b, "[CS=41.0;]")
 
-    def test_pic_keepalive_stays_silent_while_the_resend_runs(self):
-        # ADR-203 Verification: every resend CS= restarts the keepalive window (iLastSentCSMs), so over 120 s the 30 s
-        # keepalive never fires and the 5 s resend fires 24 times.
-        self.assertEqual(self.run_at(10000, 6)[0], "[keepalive=0 resend=24]")
+    def test_pic_keepalive_and_the_repeat_share_one_30s_window(self):
+        # TASK-1924: both read iLastSentCSMs and both wait 30 s, so over 120 s there are 4 repeats in all, not 4 + 4. On a PIC
+        # board the keepalive runs first in satControlLoopRun(), so it sends them (was: keepalive 0, 5 s resend 24, ADR-203).
+        self.assertEqual(self.run_at(10000, 6)[0], "[keepalive=4 resend=0]")
 
     def test_live_fault_and_dhw_bits_pause_the_resend(self):
         a, b, c, _ = self.run_at(10000, 5)
@@ -296,23 +312,23 @@ class CmdCacheReset(unittest.TestCase):
     def test_mm_and_ch_only_on_change_and_again_after_pic_restart(self):
         # TASK-1570, Sergeant D entry 237 (msgs 1566917384483381390, 1566917834351575095)
         a, b, c, d = self.run_at(10000, 7)
-        self.assertEqual(a, "[CS=40.0;MM=60;]")
-        self.assertEqual(b, "[CS=40.0;CH=0;]")
-        self.assertEqual(c, "[CS=40.0;MM=60;CH=0;]")     # a PIC restart forgets MM/CH: sent again
-        self.assertEqual(d, "[CS=40.0;]")
+        self.assertEqual(a, "[MM=60;]")                   # TASK-1924: the unchanged CS is not repeated within 30 s
+        self.assertEqual(b, "[CH=0;]")
+        self.assertEqual(c, "[CS=40.0;MM=60;CH=0;]")     # a PIC restart forgets MM/CH: sent again (and the cache reset sends CS)
+        self.assertEqual(d, "[]")
 
     def test_immergas_tp_follows_mm_on_change(self):
         a, b, c, d = self.run_at(10000, 8)
         self.assertEqual(a, "[CS=40.0;TP=11:12=80;MM=100;CH=1;]")
-        self.assertEqual(b, "[CS=40.0;]")
-        self.assertEqual(c, "[CS=40.0;TP=11:12=60;MM=60;]")
-        self.assertEqual(d, "[CS=40.0;]")               # the 5 s resend repeats CS only
+        self.assertEqual(b, "[]")                       # TASK-1924: CS on change
+        self.assertEqual(c, "[TP=11:12=60;MM=60;]")
+        self.assertEqual(d, "[CS=40.0;]")               # the 30 s repeat repeats CS only
 
     def test_mm_t_at_the_maximum_duty_on_change_repeat_and_back(self):
         # TASK-1581, entries 242 (MM=T at range 5), 243 (own MM= below it), 237 (on change), 239 (60 s repeat)
         a, b, c, d = self.run_at(10000, 16)
-        self.assertEqual(a, "[CS=40.0;MM=T;]")
-        self.assertEqual(b, "[CS=40.0;]")
+        self.assertEqual(a, "[CS=40.0;MM=T;]")        # TASK-1924: the CS is 30 s old here, so its repeat goes with the tick
+        self.assertEqual(b, "[]")
         self.assertEqual(c, "[CS=40.0;MM=T;CH=1;]")   # CH=1 is its own 60 s repair
         self.assertEqual(d, "[CS=40.0;MM=0;]")
 
@@ -321,14 +337,14 @@ class CmdCacheReset(unittest.TestCase):
         a, b, c, d = self.run_at(10000, 17)
         self.assertEqual(a, "[CS=40.0;MM=T;]")
         self.assertEqual(b, "[CS=40.0;TP=11:12=80;MM=T;CH=1;]")
-        self.assertEqual(c, "[CS=40.0;TP=11:12=0;MM=0;]")
-        self.assertEqual(d, "[CS=40.0;TP=11:12=80;MM=T;]")
+        self.assertEqual(c, "[TP=11:12=0;MM=0;]")     # TASK-1924: CS unchanged and 1 s old
+        self.assertEqual(d, "[TP=11:12=80;MM=T;]")
 
     def test_unchanged_mm_and_ch_repaired_after_60_s(self):
         # TASK-1570, entry 239: a dropped enqueue or an external MM=/CH= is corrected by one resend once the value is 60 s old
         a, b, c, _ = self.run_at(10000, 9)
-        self.assertEqual(a, "[CS=40.0;]")
-        self.assertEqual(b, "[CS=40.0;MM=80;CH=1;]")
+        self.assertEqual(a, "[CS=40.0;]")                # TASK-1924: the CS is 59 s old, its 30 s repeat is due
+        self.assertEqual(b, "[MM=80;CH=1;]")
         self.assertEqual(c, "[CS=40.0;]")
 
     def test_repair_is_due_at_the_first_tick_at_or_after_60_s_despite_the_stamp_lag(self):
@@ -342,17 +358,21 @@ class CmdCacheReset(unittest.TestCase):
         a, b, c, _ = self.run_at(10000, 10)
         self.assertEqual(a, "[]")
         self.assertEqual(b, "[CS=40.0;MM=80;CH=1;]")
-        self.assertEqual(c, "[CS=40.0;]")  # accepted now: CS every tick, MM/CH on change only
+        self.assertEqual(c, "[]")  # accepted now: CS, MM and CH on change only (TASK-1924 for CS)
 
     def test_immergas_dropped_tp_sends_tp_and_mm_again(self):
         a, b, _, _ = self.run_at(10000, 11)
-        self.assertEqual(a, "[CS=40.0;TP=11:12=80;MM=100;]")   # TP is min(mm, 80); CH was accepted on the first tick
-        self.assertEqual(b, "[CS=40.0;]")
+        self.assertEqual(a, "[TP=11:12=80;MM=100;]")   # TP is min(mm, 80); CS and CH were accepted on the first tick (TASK-1924)
+        self.assertEqual(b, "[]")
 
-    def test_dropped_satsendcs_is_retried_by_the_5s_resend(self):
-        a, b, _, _ = self.run_at(10000, 12)
+    def test_dropped_satsendcs_is_retried_with_its_own_value_after_5s(self):
+        # TASK-1924 (TASK-1574 commit-on-success): the 5 s retry stays for a dropped CS, and now sends the value that was
+        # dropped (42.0), not the older cached one (40.0, what the 5 s resend repeated before); after that the 30 s repeat.
+        a, b, c, d = self.run_at(10000, 12)
         self.assertEqual(a, "[]")
-        self.assertEqual(b, "[CS=40.0;]")
+        self.assertEqual(b, "[CS=42.0;]")
+        self.assertEqual(c, "[]")
+        self.assertEqual(d, "[CS=42.0;]")
 
     def test_dhw_draw_sends_mm_max_keeps_the_keepalive_and_drops_the_resend(self):
         # TASK-1539, Sergeant D entries 220 (MM to max during the draw), 221 (no 5 s resend in hot water), 232 (the 30 s PIC CS
@@ -372,6 +392,13 @@ class CmdCacheReset(unittest.TestCase):
         self.assertEqual(b, "[MM=100;]")
         self.assertEqual(c, "[MM=10;]")
         self.assertEqual(d, "[TP=11:12=80;MM=100;]")
+
+    def test_steady_state_sends_two_cs_per_minute_and_a_change_at_once(self):
+        # TASK-1924 AC5, entries 334/335: unchanged CS over 60 s = the first send and one 30 s repeat (old code: 13, every
+        # tick plus the 5 s resend); a changed value goes out on the next tick without waiting for the repeat.
+        a, b, _, _ = self.run_at(10000, 19)
+        self.assertEqual(a, "[cs=2]")
+        self.assertTrue(b.startswith("[CS=40.5;"), b)   # at 61 s MM/CH also get their 60 s repair (entry 239)
 
     def test_dropped_keepalive_is_tried_again_on_the_next_pass(self):
         a, b, _, _ = self.run_at(10000, 13)
@@ -394,9 +421,9 @@ class TickPaths(unittest.TestCase):
     def test_tick_paths_use_always_send_helpers(self):
         for name in ("satSendCS", "satSendMM", "satSendCH"):
             # one definition (+ the resend helper's own call) + four control-tick paths
-            # TASK-1570: the resend calls satSendCS only (MM/CH are on change, entry 237)
+            # TASK-1570: the resend calls satSendCS only (MM/CH are on change, entry 237); TASK-1924: twice (retry, 30 s repeat)
             # TASK-1539: satSendMM also has the call in satSendMMDuringDhw()
-            self.assertEqual(len(re.findall(r"\b%s\(" % name, self.code)), 1 + 4 + (3 if name == "satSendCS" else 0) + (1 if name == "satSendMM" else 0), name)   # + the start-up flood CS and its hand-over to the suppression (TASK-1371)
+            self.assertEqual(len(re.findall(r"\b%s\(" % name, self.code)), 1 + 4 + (4 if name == "satSendCS" else 0) + (1 if name == "satSendMM" else 0), name)   # + the start-up flood CS and its hand-over to the suppression (TASK-1371)
         for old in ("satEnqueueIfChangedMM", "satEnqueueIfChangedCH"):
             self.assertNotIn(old, self.code)
         # the only change-checked CS callers left: its definition and the suppression refresh

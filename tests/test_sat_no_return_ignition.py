@@ -329,8 +329,9 @@ class NoReturnIgnition(unittest.TestCase):
         first = [c for _, c in cmds if c.startswith("CS=")][0]
         self.assertEqual(first, "CS=48.0")                             # return 30 + 18, as thermo-nova
         hold = self.css(cmds, 4100, 24100)
-        self.assertEqual({c for _, c in hold}, {"CS=48.0"})            # only the 5 s resend of the hold, no flood values, no 2 s cadence
-        self.assertLessEqual(len(hold), 4)
+        # no flood values, no 2 s cadence; TASK-1924: the unchanged hold is not repeated within 30 s (was the 5 s resend, up to 4)
+        self.assertLessEqual({c for _, c in hold}, {"CS=48.0"})
+        self.assertLessEqual(len(hold), 1)
 
     def test_pm25_is_skipped_while_another_pm_is_pending(self):
         cmds, _ = self.run_sc("pm_busy", 1)

@@ -241,9 +241,11 @@ class OtLoss(unittest.TestCase):
         cmds, _ = self.run_sc("invalid", 720)
         self.assertIn((1, "CS=45.0"), cmds, "premise: the first control tick sends CS/MM/CH")
         self.assertTrue(any(c == "CS=45.0" and t > 300 for t, c in cmds), "premise: the PIC keepalive runs")
-        # TASK-1370 premise: between control ticks (60 s) the 5 s resend repeats CS, so test_b's silence is a real check.
+        # TASK-1370 premise: between control ticks (60 s) the resend repeats CS, so test_b's silence is a real check.
         # TASK-1570 (Sergeant D entry 237): MM and CH are on change only, the resend repeats CS alone.
-        self.assertEqual([c for t, c in cmds if t == 6], ["CS=45.0"], "premise: the 5 s resend runs after the tick at 1 s")
+        # TASK-1924 (entries 334, 335): the unchanged CS is repeated 30 s after the tick at 1 s (was 5 s).
+        self.assertEqual([c for t, c in cmds if t == 31], ["CS=45.0"], "premise: the 30 s repeat runs after the tick at 1 s")
+        self.assertFalse([c for t, c in cmds if 2 <= t <= 30], "TASK-1924: no repeat of the unchanged CS within 30 s")
 
     def test_b_loss_hands_back_once_then_silence(self):
         # Last boiler reply at t=119 s. Expected: CS=0, CH=1, MM=T at t=149 s (30 s silence), then nothing up to 720 s.

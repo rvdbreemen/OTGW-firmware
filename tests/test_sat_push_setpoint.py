@@ -110,9 +110,9 @@ int main(int argc, char** argv) {
     at(130);
   } else if (sc[0] == 'f') {               // cache reset (offline->online) forces one resend
     at(100); at(130); satResetCmdCache(); at(160); at(190);
-  } else if (sc[0] == 'r') {               // TASK-1370: the 5 s CS/MM/CH resend never carries TC=; TC= stays event-driven
+  } else if (sc[0] == 'r') {               // TASK-1370: the CS resend never carries TC=; TC= stays event-driven (TASK-1924: 30 s repeat)
     at(100); satSendCS(45.0f); satSendMM(100); satSendCH(1);
-    for (uint32_t s = 101; s <= 115; s++) { g_ms = s * 1000UL; g_sent[0] = 0; satCmdResend(); tick(); if (g_sent[0]) printf("%u:%s ", s, g_sent); }
+    for (uint32_t s = 101; s <= 131; s++) { g_ms = s * 1000UL; g_sent[0] = 0; satCmdResend(); tick(); if (g_sent[0]) printf("%u:%s ", s, g_sent); }
   } else if (sc[0] == 'g') {               // no re-push of any kind, whatever MsgID 9 does: 10 min
     for (uint32_t s = 100; s <= 700; s += 10) at(s);
   }
@@ -179,7 +179,8 @@ class PushSetpoint(unittest.TestCase):
     def test_r_cmd_resend_is_not_a_tc_repush(self):
         # only on the lane: HEAD has no resend
         # TASK-1570 (entry 237): the resend repeats CS only; MM and CH are on change
-        self.assertEqual(self.run_sc("r"), "100:TC=20.0; 105:CS=45.0; 110:CS=45.0; 115:CS=45.0;")
+        # TASK-1924 (entries 334, 335): one repeat of the unchanged CS 30 s after it, not every 5 s
+        self.assertEqual(self.run_sc("r"), "100:TC=20.0; 130:CS=45.0;")
 
     def test_f_cache_reset_forces_resend(self):
         self.assertEqual(self.run_sc("f"), "100:TC=20.0; 160:TC=20.0;")
